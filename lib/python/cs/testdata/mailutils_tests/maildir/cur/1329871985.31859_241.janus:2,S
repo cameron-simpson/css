@@ -1,0 +1,35 @@
+Date: Thu, 4 Nov 2010 08:03:37 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: jk <sanjo_ie@yahoo.com>
+Cc: python-list@python.org
+Subject: Re: Python documentation too difficult for beginners
+Message-ID: <20101103210336.GA9858@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <a5dc65e1-3a72-4160-90e3-956a456be3eb@26g2000yqv.googlegroups.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 788
+
+On 02Nov2010 04:23, jk <sanjo_ie@yahoo.com> wrote:
+| This (http://epydoc.sourceforge.net/stdlib/) is what I'm talking
+| about.
+| 
+| Why aren't the official docs like this, and why has it taken me 2 days
+| of searching? All this needs is a search engine behind it and it'd be
+| perfect.
+
+It looks a lot like javadoc. But its weakness is stuff like this:
+
+  http://epydoc.sourceforge.net/stdlib/Canvas.Polygon-class.html
+
+Automatic docness, no useful information.
+
+And of course the ugliness; I find the python docs much nicer to look
+at. But I do wish the cross referencing was a bit better, often.
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+In an insane society, the sane man must appear insane.
+        - Keith A. Schauer <keith@balrog.dseg.ti.com>

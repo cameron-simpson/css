@@ -1,0 +1,79 @@
+Date: Thu, 19 Feb 2009 08:33:50 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: python-list@python.org
+Subject: Re: Musings: Using decorators to reduce duplicate exception
+	handling
+Message-ID: <20090218213350.GA23549@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <878wo4verq.fsf@agentultra.com>
+User-Agent: Mutt/1.5.18 (2008-05-17)
+Content-Length: 2643
+
+On 17Feb2009 15:12, J Kenneth King <james@agentultra.com> wrote:
+| I recently started a project called TracShell
+| (http://code.google.com/p/tracshell) where I make heavy use of the
+| xmlrpclib core module.
+| 
+| When the number of RPC calls was small, wrapping each call in try/except
+| was acceptable. [...]
+| To combat the duplication, my clever idea was to use a function
+| decorator to wrap any function that used xmlrpclib calls:
+| def catch_errors(fn):
+[...]
+| Maybe I could rename the decorator to something meaningful, but besides
+| that it works pretty well. Now any function I write in my class that
+| uses RPC calls can be wrapped by this decorator and have the exception
+| handling done in a uniform way for these particular exceptions.
+
+My Python fu is still weak, but I had a similar issue last year and
+wrote a context manager, used thus:
+
+  with NoExceptions(handler):
+      ... do stuff that may break ...
+
+The constructor takes a handleException argument (which may be None, but it
+has to be explicit) to tune which exceptions are caught; default is
+everything. This was for a daemon thread that did RPC calls, so it was
+actually fairly important to never die; normally you'd want to catch only
+specific exceptions.
+
+Code:
+
+  class NoExceptions(object):
+      ''' A context manager to catch _all_ exceptions and log them.
+          Arguably this should be a bare try...except but that's syntacticly
+          noisy and separates the catch from the top.
+      '''
+
+      def __init__(self, handleException):
+          ''' Initialise the NoExceptions context manager.
+              The handleException is a callable which
+              expects (exc_type, exc_value, traceback)
+              and returns True or False for the __exit__
+              method of the manager.
+              If handleException is None, the __exit__ method
+              always returns True, suppressing any exception.
+          '''
+          self.__handler = handleException
+
+      def __enter__(self):
+          pass
+
+      def __exit__(self, exc_type, exc_value, traceback):
+          if self.__handler is not None:
+              return self.__handler(exc_type, exc_value, traceback)
+          if exc_type is not None:
+              print >>sys.stderr, "ignore %s" % (exc_type,)
+          return True
+
+It doesn't actually solve your duplication issue and is a bit of a niche
+application, but it's a lot shorter than an inline try/except and to my eye
+reads a little better, and it keeps the exception handling up front at the
+calling end where it is visible.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/

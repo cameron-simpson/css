@@ -1,0 +1,52 @@
+Date: Wed, 19 May 2010 14:33:34 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: frank zhu <frank.zhu.mingyu@gmail.com>
+Cc: python-list@python.org
+Subject: Re: question on logging module
+Message-ID: <20100519043334.GA17039@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <AANLkTinbhU5PnYg-wJ7BtHqyvJSHUaf5lRWDenCxKyw1@mail.gmail.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 1278
+
+On 18May2010 23:42, frank zhu <frank.zhu.mingyu@gmail.com> wrote:
+| Hi,
+| >From the python 2.6.4 tutorial, refer to
+| http://docs.python.org/release/2.6.4/tutorial/stdlib2.html#logging
+| 
+| The above example doesn't work for me.
+| Here is script log
+| 
+| #############################################
+| 
+| oem@oem-desktop ~ $ python -V
+| Python 2.6.4
+| oem@oem-desktop ~ $ python
+| Python 2.6.4 (r264:75706, Dec  7 2009, 18:45:15)
+| [GCC 4.4.1] on linux2
+| Type "help", "copyright", "credits" or "license" for more information.
+| >>> import logging
+| >>> logging.debug('debug information')
+| Traceback (most recent call last):
+|   File "<stdin>", line 1, in <module>
+| AttributeError: 'module' object has no attribute 'debug'
+| 
+| ################################################
+| 
+| I am current using python2.6.4.
+| 
+| Can anyone point out what's problem?
+
+I don't suppose you have a file called "logging.py" in your working
+directory? Python will find it before the system libraries; it is a bad
+idea to name .py files the same as library module for this reason.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+The First Law of Internet Communications:
+Be liberal in what you accept, and conservative in what you send. - Jon Postel

@@ -1,0 +1,114 @@
+Return-Path: <python-dev-bounces+cs=zip.com.au@python.org>
+Delivered-To: unknown
+Received: from mail.zip.com.au (125.255.95.3) by janus.home with POP3-SSL; 07
+  Dec 2011 01:25:02 -0000
+Delivered-To: cs@zipworld.com.au
+Received: from mailin3-syd3.pacific.net.au (mailin3-syd3.pacific.net.au [125.255.92.144])
+	by mailstore1.syd.pacific.net.au (Postfix) with ESMTP id 4800993E21
+	for <cs@zipworld.com.au>; Wed,  7 Dec 2011 12:25:00 +1100 (EST)
+Received: from mail.python.org (unknown [82.94.164.166])
+	by mailin3-syd3.pacific.net.au (Postfix) with ESMTP id 52892400094
+	for <cs@zip.com.au>; Wed,  7 Dec 2011 12:25:53 +1100 (EST)
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3SyhvX0kFVzN32
+	for <cs@zip.com.au>; Wed,  7 Dec 2011 02:24:56 +0100 (CET)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=python.org; s=200901;
+	t=1323221096; bh=L4DTaWvqmo0MuwVNLcd/kIjtpRbGlH4QYbl4b8YT8N8=;
+	h=Date:From:To:Message-ID:MIME-Version:In-Reply-To:References:Cc:
+	 Subject:List-Id:List-Unsubscribe:List-Archive:List-Post:List-Help:
+	 List-Subscribe:Content-Type:Content-Transfer-Encoding:Sender;
+	b=UFqmGB19USeyYaGcvflJoUI1v2tzWHLhq3OtWO9S4mdhkXOjp8imn8LO8IFQ05EUH
+	 kbRS5L26w3hPysoP20cU3cn3lFRVLKp576Lb+BjkMxPK43Vb8YxANJM6Zq02FG7KRB
+	 l+b50DxoiLyYd39cn2trkmNAHFh6E+ksV0W0j0kY=
+X-Original-To: python-dev@python.org
+Delivered-To: python-dev@mail.python.org
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3Syhsk0YNCzP7j
+	for <python-dev@python.org>; Wed,  7 Dec 2011 02:23:22 +0100 (CET)
+X-Spam-Status: OK 0.007
+X-Spam-Evidence: '*H*': 0.99; '*S*': 0.00; 'hettinger': 0.07;
+	'received:edu.au': 0.07; 'flushed': 0.16; 'from:addr:cs': 0.16;
+	'from:addr:zip.com.au': 0.16; 'from:name:cameron simpson': 0.16;
+	'message-id:@cskk.homeip.net': 0.16; 'received:202.125.174': 0.16;
+	'received:202.125.174.133': 0.16;
+	'received:boardofstudies.nsw.edu.au': 0.16;
+	'received:cskk.homeip.net': 0.16;
+	'received:harvey.boardofstudies.nsw.edu.au': 0.16;
+	'received:homeip.net': 0.16; 'received:nsw.edu.au': 0.16; 'text:':
+	0.16; 'wrote:': 0.18; 'raymond': 0.21; 'header:In-Reply-To:1':
+	0.22; 'cc:2**0': 0.24; 'correctly.': 0.24; 'not.': 0.28; 'coding':
+	0.28; 'cc:addr:python.org': 0.29; 'corruption': 0.30; 'publicly':
+	0.30; 'silence': 0.30; 'does': 0.32; 'header:User-Agent:1': 0.33;
+	'there': 0.33; "we're": 0.34; 'url:python': 0.36; 'received:au':
+	0.36; 'charset:us-ascii': 0.37; 'but': 0.37; 'passed': 0.37;
+	'url:docs': 0.39; 'url:org': 0.39; 'tool': 0.39; 'files': 0.39;
+	'link': 0.63; 'received:202': 0.66; 'show': 0.67; 'cameron': 0.73;
+	'url:style': 0.91
+Received: from localhost (HELO mail.python.org) (127.0.0.1)
+	by albatross.python.org with SMTP; 07 Dec 2011 02:23:22 +0100
+Received: from harvey.boardofstudies.nsw.edu.au
+	(mail2.rack1.boardofstudies.nsw.edu.au [202.125.174.133])
+	by mail.python.org (Postfix) with ESMTP
+	for <python-dev@python.org>; Wed,  7 Dec 2011 02:23:21 +0100 (CET)
+Received: from cskk.homeip.net (localhost.localdomain [127.0.0.1])
+	by harvey.boardofstudies.nsw.edu.au (Postfix) with ESMTP id 9238D4D3B5C;
+	Wed,  7 Dec 2011 12:23:12 +1100 (EST)
+Received: by janus.cskk.homeip.net (Postfix, from userid 1000)
+	id 7A2BC100419B7; Wed,  7 Dec 2011 12:23:12 +1100 (EST)
+Date: Wed, 7 Dec 2011 12:23:12 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Raymond Hettinger <raymond.hettinger@gmail.com>
+Message-ID: <20111207012312.GA7566@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <17CC15CD-539C-4214-ADD5-E85322259C64@gmail.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+References: <17CC15CD-539C-4214-ADD5-E85322259C64@gmail.com>
+Cc: python-dev dev <python-dev@python.org>
+Subject: Re: Warnings
+X-BeenThere: python-dev@python.org
+X-Mailman-Version: 2.1.12
+Precedence: list
+List-Id: Python core developers <python-dev.python.org>
+List-Unsubscribe: <http://mail.python.org/mailman/options/python-dev>,
+	<mailto:python-dev-request@python.org?subject=unsubscribe>
+List-Archive: <http://mail.python.org/pipermail/python-dev>
+List-Post: <mailto:python-dev@python.org>
+List-Help: <mailto:python-dev-request@python.org?subject=help>
+List-Subscribe: <http://mail.python.org/mailman/listinfo/python-dev>,
+	<mailto:python-dev-request@python.org?subject=subscribe>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Sender: python-dev-bounces+cs=zip.com.au@python.org
+Errors-To: python-dev-bounces+cs=zip.com.au@python.org
+X-Cats2Procmailrc-Rule: cats/home: python  python-dev      sender:python-dev-bounces+cs=zip.com.au@python.org
+X-Label: python-dev
+Content-Length: 1076
+
+On 30Nov2011 22:10, Raymond Hettinger <raymond.hettinger@gmail.com> wrote:
+| When updating the documentation, please don't go overboard with warnings.
+| The docs need to be worded affirmatively -- say what a tool does and show how to use it correctly.
+| See http://docs.python.org/documenting/style.html#affirmative-tone
+
+I come to this late, but if we're going after the docs...
+
+At the above link one finds this text:
+
+  This assures that files are flushed [...]
+
+It does not. It _ensures_ that files are flushed. The doco style "affirmative
+tone" _assures_. The coding practice _ensures_!
+
+Pedanticly,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+There is one evil which...should never be passed over in silence but be
+continually publicly attacked, and that is corruption of the language...
+        - W.H. Auden
+_______________________________________________
+Python-Dev mailing list
+Python-Dev@python.org
+http://mail.python.org/mailman/listinfo/python-dev
+Unsubscribe: http://mail.python.org/mailman/options/python-dev/cs%40zip.com.au

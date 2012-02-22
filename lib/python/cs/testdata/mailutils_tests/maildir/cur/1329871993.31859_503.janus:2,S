@@ -1,0 +1,52 @@
+Date: Mon, 13 Apr 2009 07:55:28 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Thomas Bellman <bellman@lysator.liu.se>
+Cc: python-list@python.org
+Subject: Re: named pipe and Linux
+Message-ID: <20090412215528.GA1569@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <griifi$blo$1@news.lysator.liu.se>
+User-Agent: Mutt/1.5.18 (2008-05-17)
+Content-Length: 1562
+
+On 08Apr2009 16:13, Thomas Bellman <bellman@lysator.liu.se> wrote:
+| Cameron Simpson <cs@zip.com.au> wrote:
+| > On 07Apr2009 10:08, akineko <akineko@gmail.com> wrote:
+| >| I'm trying to use named pipes to fuse a Python program and a C
+| >| program.
+| >| One side creates pipes using os.mkfifo() and both sides use the same
+| >| named pipes (one side reads, another side writes). The read side uses
+| >| select.select() to wait for incoming messages and read the message
+| >| when select.select() says it is ready.
+| >| The length of the message is unknown to the read side.
+| 
+| > That's a serious flaw in the message protocol.
+[...]
+| > No!
+| > You should use os.read() with the maximum size of a message.
+| > It _should_ return with the number of bytes in the message, provided the
+| > C program writes messages with a single OS-level write() call.
+| 
+| No!
+| 
+| That's still broken.  You can't know if the writer has managed to
+| write one or several messages onto the pipe.
+
+I did think of that. It's an insurmountable problem, which is why he
+needs a message length in the protocol, or other way to recognise
+message boundaries. akineko has said elsewhere that's he's chasing that
+side of things.
+
+The os.read() thing simply avoids the tedium of polling; you can block
+on the read without the annoyance of file.read() blocking waiting for
+"too much" data.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+The Government that robs Peter to pay Paul, can always count on Paul for
+support.        - George Bernard Shaw

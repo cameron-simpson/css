@@ -1,0 +1,35 @@
+Date: Sat, 27 Mar 2010 09:28:28 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Sebastien Binet <seb.binet@gmail.com>
+Cc: python-list@python.org
+Subject: Re: Revisiting Generators and Subgenerators
+Message-ID: <20100326222828.GA15135@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: inline
+Content-Transfer-Encoding: 8bit
+In-Reply-To: <32b967ce-bb76-45ad-8660-c1d96a35fc72@g11g2000yqe.googlegroups.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 795
+
+On 26Mar2010 07:29, Sebastien Binet <seb.binet@gmail.com> wrote:
+| On Mar 25, 10:39 pm, Winston <winst...@stratolab.com> wrote:
+| > A Baton object for generators to allow subfunction to yield, and to
+| > make them symetric.
+| 
+| isn't a Baton what CSP calls a channel ?
+
+I was thinking about this (roughly) in the shower this morning before
+seeing this message.
+
+One difference is that a Channel or zero-storage Queue lets the putter
+continue execution after the put (or at least the other side's get). A
+co-routine won't proceed until later, no? So a co-routine setup will do
+lazier computation than a similar threaded setup.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Principles have no real force except when one is well fed.      - Mark Twain

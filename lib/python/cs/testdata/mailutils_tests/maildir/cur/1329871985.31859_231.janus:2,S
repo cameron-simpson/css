@@ -1,0 +1,35 @@
+Date: Tue, 23 Nov 2010 14:00:59 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Neal Becker <ndbecker2@gmail.com>
+Cc: python-list@python.org
+Subject: Re: bug? mmap doesn't like 0-length files
+Message-ID: <20101123030059.GA27628@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20101123025929.GA27420@cskk.homeip.net>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 716
+
+On 23Nov2010 13:59, I wrote:
+| On 22Nov2010 20:33, Neal Becker <ndbecker2@gmail.com> wrote:
+| |  mmap.mmap (f.fileno(), 0, prot=mmap.PROT_READ)
+| | error: [Errno 22] Invalid argument
+[...]
+| | I don't see anything in linux man-page about the underlying C mmap function 
+| | not accepting 0-length files.
+
+It's worth noting that any time you get an errno error/exception then it
+is almost certainly the underlying OS interface that has rejected your
+request, not the python library.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Don't have awk? Use this simple sh emulation:
+    #!/bin/sh
+    echo 'Awk bailing out!' >&2
+    exit 2
+- Tom Horsley <tahorsley@csd.harris.com>

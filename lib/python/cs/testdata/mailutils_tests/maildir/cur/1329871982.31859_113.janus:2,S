@@ -1,0 +1,131 @@
+Return-Path: <python-dev-bounces+cs=zip.com.au@python.org>
+Delivered-To: unknown
+Received: from mail.zip.com.au (125.255.95.3) by janus.home with POP3-SSL; 05
+  Oct 2011 23:57:02 -0000
+Delivered-To: cs@zipworld.com.au
+Received: from mailin4-syd3.pacific.net.au (mailin4-syd3.pacific.net.au [125.255.92.145])
+	by mailstore1.syd.pacific.net.au (Postfix) with ESMTP id 3A26169D2C
+	for <cs@zipworld.com.au>; Thu,  6 Oct 2011 10:56:55 +1100 (EST)
+Received: from mail.python.org (unknown [82.94.164.166])
+	by mailin4-syd3.pacific.net.au (Postfix) with ESMTP id 8F9E74D8089
+	for <cs@zip.com.au>; Thu,  6 Oct 2011 10:56:54 +1100 (EST)
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3SDYtY039nzPRG
+	for <cs@zip.com.au>; Thu,  6 Oct 2011 01:56:53 +0200 (CEST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=python.org; s=200901;
+	t=1317859013; bh=8NiCtBvXrXJb2ri5r/NUCIUvujPYuA/OusICs510bdk=;
+	h=Date:From:To:Message-ID:MIME-Version:In-Reply-To:References:Cc:
+	 Subject:List-Id:List-Unsubscribe:List-Archive:List-Post:List-Help:
+	 List-Subscribe:Content-Type:Content-Transfer-Encoding:Sender;
+	b=fmIZ/r1Cm/QLXzrOm0qDcJ9dmOwZa/Q7Sr6tT4CVhllejPppOAgaR0iL7U+88QqgP
+	 IRHZbCsc5CPLoRKe6AVhyn7owz0DyQ0s1vLjKJ4qh2KNJkCTIP1mZVyx7PwILndpId
+	 C4Vn7+rbrstg92w4rwyhXgXTkOAIS6lgxo1hrEnw=
+X-Original-To: python-dev@python.org
+Delivered-To: python-dev@mail.python.org
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3SDYrj1kphzPQs
+	for <python-dev@python.org>; Thu,  6 Oct 2011 01:55:17 +0200 (CEST)
+X-Spam-Status: OK 0.000
+X-Spam-Evidence: '*H*': 1.00; '*S*': 0.00; 'permissions': 0.04;
+	'skip': 0.04; 'think,': 0.05; 'behave': 0.07; 'exec': 0.07;
+	'received:edu.au': 0.07; 'subject:when': 0.07; 'fetch': 0.09;
+	'stuff!': 0.09; 'files.': 0.09; 'subject:Issue': 0.15; '(all?)':
+	0.16; '(note': 0.16; 'around,': 0.16; 'blindly': 0.16;
+	'from:addr:cs': 0.16; 'from:addr:zip.com.au': 0.16;
+	'from:name:cameron simpson': 0.16; 'message-id:@cskk.homeip.net':
+	0.16; 'received:202.125.174': 0.16; 'received:202.125.174.133':
+	0.16; 'received:boardofstudies.nsw.edu.au': 0.16;
+	'received:cskk.homeip.net': 0.16;
+	'received:harvey.boardofstudies.nsw.edu.au': 0.16;
+	'received:homeip.net': 0.16; 'received:nsw.edu.au': 0.16; 'side.':
+	0.16; 'subject:): ': 0.16; 'wrote:': 0.16; 'linux': 0.17;
+	'cheers,': 0.18; 'thanks,': 0.18; 'cc:no real name:2**0': 0.20;
+	'stuff': 0.22; 'header:In-Reply-To:1': 0.22; 'tone': 0.23;
+	'noticed': 0.24; 'changed': 0.24; 'permission': 0.24; 'expect':
+	0.25; 'code': 0.25; 'tests': 0.25; 'guess': 0.26; "i'm": 0.27;
+	'random': 0.28; 'effect': 0.28; 'bit': 0.28; "he's": 0.29;
+	'cc:addr:python.org': 0.30; 'compiling': 0.30; 'os,': 0.30;
+	'semantics': 0.30; "didn't": 0.31; 'subject: \n\t': 0.32; 'does':
+	0.32; "i've": 0.34; 'regardless': 0.34; 'header:User-Agent:1':
+	0.34; 'fail': 0.34; 'idea': 0.34; 'test': 0.34; 'another.': 0.34;
+	'root': 0.34; 'apply': 0.35; 'running': 0.35; 'post': 0.36;
+	'received:au': 0.36; 'issue': 0.36; 'cc:2**1': 0.36; 'example,':
+	0.37; 'run': 0.37; 'but': 0.37; 'some': 0.38; 'subject:: ': 0.39;
+	'systems,': 0.39; 'data': 0.39; 'why': 0.39; 'subject: (': 0.39;
+	"i'd": 0.40; "it's": 0.40; 'bring': 0.61; 'received:202': 0.66;
+	'cameron': 0.67; 'safe': 0.69; '"oh,': 0.84; 'marks,': 0.84;
+	'quotation': 0.91
+Received: from localhost (HELO mail.python.org) (127.0.0.1)
+	by albatross.python.org with SMTP; 06 Oct 2011 01:55:17 +0200
+Received: from harvey.boardofstudies.nsw.edu.au
+	(mail2.rack1.boardofstudies.nsw.edu.au [202.125.174.133])
+	by mail.python.org (Postfix) with ESMTP
+	for <python-dev@python.org>; Thu,  6 Oct 2011 01:55:16 +0200 (CEST)
+Received: from cskk.homeip.net (localhost.localdomain [127.0.0.1])
+	by harvey.boardofstudies.nsw.edu.au (Postfix) with ESMTP id 7E1CC4D3B5C;
+	Thu,  6 Oct 2011 10:55:07 +1100 (EST)
+Received: by janus.cskk.homeip.net (Postfix, from userid 1000)
+	id 5B55D100419B7; Thu,  6 Oct 2011 10:55:07 +1100 (EST)
+Date: Thu, 6 Oct 2011 10:55:07 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: =?utf-8?Q?Charles-Fran=E7ois_Natali_=3Ccf=2Enatali=40gmail=2Ecom=3E?=@cskk.homeip.net
+Message-ID: <20111005235507.GA32295@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <CAH_1eM3=PWkf7Pix7emzB+tGFycWwnQmJBaY7DzT=kTbz+SQLQ@mail.gmail.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+References: <CAH_1eM3=PWkf7Pix7emzB+tGFycWwnQmJBaY7DzT=kTbz+SQLQ@mail.gmail.com>
+Cc: Ned Deily <nad@acm.org>, python-dev@python.org
+Subject: Re: cpython (3.2): Issue #11956:
+	Skip	test_import.test_unwritable_directory on FreeBSD when run as
+X-BeenThere: python-dev@python.org
+X-Mailman-Version: 2.1.12
+Precedence: list
+List-Id: Python core developers <python-dev.python.org>
+List-Unsubscribe: <http://mail.python.org/mailman/options/python-dev>,
+	<mailto:python-dev-request@python.org?subject=unsubscribe>
+List-Archive: <http://mail.python.org/pipermail/python-dev>
+List-Post: <mailto:python-dev@python.org>
+List-Help: <mailto:python-dev-request@python.org?subject=help>
+List-Subscribe: <http://mail.python.org/mailman/listinfo/python-dev>,
+	<mailto:python-dev-request@python.org?subject=subscribe>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
+Sender: python-dev-bounces+cs=zip.com.au@python.org
+Errors-To: python-dev-bounces+cs=zip.com.au@python.org
+X-Cats2Procmailrc-Rule: cats/home: python  python-dev      sender:python-dev-bounces+cs=zip.com.au@python.org
+X-Label: python-dev
+Content-Length: 2456
+
+T24gMDRPY3QyMDExIDIwOjQ0LCBDaGFybGVzLUZyYW7vv71vaXMgTmF0YWxpIDxjZi5uYXRhbGlA
+Z21haWwuY29tPiB3cm90ZToKfCA+PiBzdW1tYXJ5Ogp8ID4+ICAgSXNzdWUgIzExOTU2OiBTa2lw
+IHRlc3RfaW1wb3J0LnRlc3RfdW53cml0YWJsZV9kaXJlY3Rvcnkgb24gRnJlZUJTRCB3aGVuCnwg
+Pj4KfCA+PiAgIHJ1biBhcwp8ID4+IHJvb3QgKGRpcmVjdG9yeSBwZXJtaXNzaW9ucyBhcmUgaWdu
+b3JlZCkuCnwgPgp8ID4gVGhlIHNhbWUgZGlyZWN0b3J5IHBlcm1pc3Npb24gc2VtYW50aWNzIGFw
+cGx5IHRvIG90aGVyIChhbGw/KQp8ID4gQlNELWRlcml2ZWQgc3lzdGVtcywgbm90IGp1c3QgRnJl
+ZUJTRC4gIEZvciBleGFtcGxlLCB0aGUgdGVzdCBzdGlsbAp8ID4gZmFpbHMgaW4gdGhlIHNhbWUg
+d2F5IG9uIE9TIFggd2hlbiBydW4gdmlhIHN1ZG8uCnwgPgp8IAp8IFRoYW5rcywgSSBkaWRuJ3Qg
+a25vdzogSSBvbmx5IG5vdGljZWQgdGhpcyBvbiB0aGUgRnJlZUJTRCBidWlsZGJvdHMgKEkKfCBn
+dWVzcyBPUy1YIGJ1aWxkYm90cyBkb24ndCBydW4gYXMgcm9vdCkuIE5vdGUgdGhhdCBpdCBkb2Vz
+IGJlaGF2ZSBhcwp8ICJleHBlY3RlZCIgb24gTGludXggKG5vdGUgdGhlIHVzZSBvZiBxdW90YXRp
+b24gbWFya3MsIEknbSBub3Qgc3VyZQp8IHdoZXRoZXIgdGhpcyBiZWhhdmlvciBpcyBhdXRob3Jp
+emVkIGJ5IFBPU0lYKS4KfCBJIGNoYW5nZWQgdGhlIHRlc3QgdG8gc2tpcCB3aGVuIHRoZSBlZmZl
+Y3RpdmUgVUlEIGlzIDAsIHJlZ2FyZGxlc3Mgb2YKfCB0aGUgT1MsIHRvIHN0YXkgb24gdGhlIHNh
+ZmUgc2lkZS4KCkknZCBoYXZlIGV4cGVjdCB0aGlzIHRlc3QgdG8gZmFpbCBvbiBfYW55XyBVTklY
+IHN5c3RlbSBpZiBydW4gYXMgcm9vdC4KUm9vdCdzIGFsbG93ZWQgdG8gd3JpdGUgdG8gc3R1ZmYh
+IEFueSBzdHVmZiEgQWJvdXQgdGhlIG9ubHkgcGVybWlzc2lvbgp3aXRoIGFueSBlZmZlY3Qgb24g
+cm9vdCBpcyB0aGUgZVhlY3V0ZSBiaXQgZm9yIHRoZSBleGVjIGNhbGwsIHRvIHByZXZlbnQKYmxp
+bmRseSBydW5uaW5nIHJhbmRvbSBkYXRhIGZpbGVzLgoKRXF1YWxseSwgd2h5IG9uIGVhcnRoIGFy
+ZSB5b3UgcnVubmluZyB0ZXN0cyBhcyByb290IT8hPyE/IT8hIE1hZG5lc3MuCkl0J3MgYXMgYmFk
+IGFzIGNvbXBpbGluZyBzdHVmZiBhcyByb290IGV0YyBldGMuIEEgYmFkIGlkZWEgYWxsIGFyb3Vu
+ZCwKc2VjdXJpdHl3aXNlLgoKRXNwZWNpYWxseSwgSSB3b3VsZCB0aGluaywgYSBidWlsdGJvdC4g
+Ik9oLCBsZXQncyBmZXRjaCBzb21lIHNoaW55IG5ldwpjb2RlIGFuZCBydW4gaXQgYXMgdGhlIHN5
+c3RlbSBzdXBlcnVzZXIuIgoKSSBrbm93IHRoaXMgcG9zdCBzb3VuZHMgc2hvdXR5LCBidXQgSSd2
+ZSBqdXN0IHJlcmVhZCBpdCBhIGZldyB0aW1lcyBhbmQKc3RpbGwgY2Fubm90IGJyaW5nIG15c2Vs
+ZiB0byB0b25lIGl0IGRvd24uCgpDaGVlcnMsCi0tIApDYW1lcm9uIFNpbXBzb24gPGNzQHppcC5j
+b20uYXU+IERvRCM3NDMKaHR0cDovL3d3dy5jc2trLmV6b3Nob3N0aW5nLmNvbS9jcy8KCklmIGhl
+J3Mgbm90IG9uZSB0aGluZywgaGUncyBhbm90aGVyLiAgICAtIEJ1Y2thcm9vIEJhbnphaQpfX19f
+X19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fX19fXwpQeXRob24tRGV2IG1h
+aWxpbmcgbGlzdApQeXRob24tRGV2QHB5dGhvbi5vcmcKaHR0cDovL21haWwucHl0aG9uLm9yZy9t
+YWlsbWFuL2xpc3RpbmZvL3B5dGhvbi1kZXYKVW5zdWJzY3JpYmU6IGh0dHA6Ly9tYWlsLnB5dGhv
+bi5vcmcvbWFpbG1hbi9vcHRpb25zL3B5dGhvbi1kZXYvY3MlNDB6aXAuY29tLmF1Cg==

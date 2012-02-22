@@ -1,0 +1,43 @@
+Date: Tue, 20 Apr 2010 13:52:04 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Menghan Zheng <menghan412@gmail.com>
+Cc: python-list@python.org
+Subject: Re: dict.keys() and dict.values() are always the same order, is it?
+Message-ID: <20100420035204.GA11149@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <x2n2559ebe21004192003n92d12cdoe34e5f6c197be8a@mail.gmail.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 972
+
+On 20Apr2010 11:03, Menghan Zheng <menghan412@gmail.com> wrote:
+| Is it assured the following statement is always True?
+| If it is always True, in which version, python2.x or python3.x?
+| 
+| >>> a = dict()
+| ...
+| >>> assert(a.values == [a[k] for k in a.keys()])
+| --> ?
+
+It is always true. At this URL:
+
+  http://docs.python.org/library/stdtypes.html?highlight=values#dict.items
+
+it says:
+
+  If items(), keys(), values(), iteritems(), iterkeys(), and
+  itervalues() are called with no intervening modifications to the
+  dictionary, the lists will directly correspond. This allows the
+  creation of (value, key) pairs using zip(): pairs = zip(d.values(),
+  d.keys()).
+
+BTW, I got to that particular piece of text by starting at the doco for
+the .values() method of "dict", which links to the .items() method.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+I couldn't think of anything else to do with it, so I put it on the web.

@@ -1,0 +1,41 @@
+Date: Mon, 4 Jan 2010 11:36:39 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: cassiope <fpm@u.washington.edu>
+Cc: python-list@python.org
+Subject: Re: IOError - cannot create file (linux daemon-invoked script)
+Message-ID: <20100104003639.GA6459@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <ef68e3d2-8c11-4b94-8c65-3dee7b3dd4e5@s31g2000yqs.googlegroups.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 978
+
+On 03Jan2010 15:56, cassiope <fpm@u.washington.edu> wrote:
+| Strace confirms the uid and gid == "lesser user".  Changing the
+| directory
+| permissions to 775 changes nothing.  Clearly get EACCES error on the
+| attempted
+| file creation.
+| 
+| The only other thing is that as part of the python interpreter call, I
+| provide
+| a "reduced environment", just UID,GID,TMP,PWD,USER, and HOME.  Is
+| anything
+| else needed?
+
+Should be irrelevant.
+
+Ok: does the file to be created already exist? If so, what are its
+permissions? If the file exists and isn't writable you may get this
+error.
+
+Also, did you eyeball the actual open() call to ensure the file pathname
+is correct, and doesn't use a bogus (non-existent) directory name?
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+"GOD IS MY SOURCE"      - Bumper sticker, Chapel Hill, NC
+I'll have to remember that one for the next code review meeting.
+        - ajvander@ingr.com (Alain van der Heide)

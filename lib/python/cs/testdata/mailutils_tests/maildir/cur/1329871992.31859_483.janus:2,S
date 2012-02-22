@@ -1,0 +1,105 @@
+Date: Thu, 30 Apr 2009 09:28:52 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Barry Scott <barry@barrys-emacs.org>
+Cc: Martin =?utf-8?B?di4gTMO2d2lzIDxtYXJ0aW5Adi5sb2V3aXMuZGU+?=,
+	Python List <python-list@python.org>,
+	Python-Dev <python-dev@python.org>
+Subject: Re: PEP 383: Non-decodable Bytes in System Character Interfaces
+Message-ID: <20090429232852.GA26172@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: inline
+Content-Transfer-Encoding: 8bit
+In-Reply-To: <83846C63-72CE-4E6E-A30D-8CF1AD95D2CF@barrys-emacs.org>
+User-Agent: Mutt/1.5.18 (2008-05-17)
+Content-Length: 4352
+
+On 29Apr2009 23:41, Barry Scott <barry@barrys-emacs.org> wrote:
+> On 22 Apr 2009, at 07:50, Martin v. Löwis wrote:
+>> If the locale's encoding is UTF-8, the file system encoding is set to
+>> a new encoding "utf-8b". The UTF-8b codec decodes non-decodable bytes
+>> (which must be >= 0x80) into half surrogate codes U+DC80..U+DCFF.
+>
+> Forgive me if this has been covered. I've been reading this thread for a 
+> long time and still have a 100 odd replies to go...
+>
+> How do get a printable unicode version of these path strings if they  
+> contain none unicode data?
+
+Personally, I'd use repr(). One might ask, what would you expect to see
+if you were printing such a string?
+
+> I'm guessing that an app has to understand that filenames come in two  
+> forms unicode and bytes if its not utf-8 data. Why not simply return string if 
+> its valid utf-8 otherwise return bytes? Then in the app you check for the type for 
+> the object, string or byte and deal with reporting errors appropriately.
+
+Because it complicates the app enormously, for every app.
+
+It would be _nice_ to just call os.listdir() et al with strings, get
+strings, and not worry.
+
+With strings becoming unicode in Python3, on POSIX you have an issue of
+deciding how to get its filenames-are-bytes into a string and the
+reverse. One could naively map the byte values to the same Unicode code
+points, but that results in strings that do not contain the same
+characters as the user/app expects for byte values above 127.
+
+Since POSIX does not really have a filesystem level character encoding,
+just a user environment setting that says how the current user encodes
+characters into bytes (UTF-8 is increasingly common and useful, but
+it is not universal), it is more useful to decode filenames on the
+assumption that they represent characters in the user's (current) encoding
+convention; that way when things are displayed they are meaningful,
+and they interoperate well with strings made by the user/app. If all
+the filenames were actually encoded that way when made, that works. But
+different users may adopt different conventions, and indeed a user may
+have used ACII or and ISO8859-* coding in the past and be transitioning
+to something else now, so they will have a bunch of files in different
+encodings.
+
+The PEP uses the user's current encoding with a handler for byte
+sequences that don't decode to valid Unicode scaler values in
+a fashion that is reversible. That is, you get "strings" out of
+listdir() and those strings will go back in (eg to open()) perfectly
+robustly.
+
+Previous approaches would either silently hide non-decodable names in
+listdir() results or throw exceptions when the decode failed or mangle
+things no reversably. I believe Python3 went with the first option
+there.
+
+The PEP at least lets programs naively access all files that exist,
+and create a filename from any well-formed unicode string provided that
+the filesystem encoding permits the name to be encoded.
+
+The lengthy discussion mostly revolves around:
+
+  - Glenn points out that strings that came _not_ from listdir, and that are
+    _not_ well-formed unicode (== "have bare surrogates in them") but that
+    were intended for use as filenames will conflict with the PEP's scheme -
+    programs must know that these strings came from outside and must be
+    translated into the PEP's funny-encoding before use in the os.*
+    functions. Previous to the PEP they would get used directly and
+    encode differently after the PEP, thus producing different POSIX
+    filenames. Breakage.
+
+  - Glenn would like the encoding to use Unicode scalar values only,
+    using a rare-in-filenames character.
+    That would avoid the issue with "outside' strings that contain
+    surrogates. To my mind it just moves the punning from rare illegal
+    strings to merely uncommon but legal characters.
+
+  - Some parties think it would be better to not return strings from
+    os.listdir but a subclass of string (or at least a duck-type of
+    string) that knows where it came from and is also handily
+    recognisable as not-really-a-string for purposes of deciding
+    whether is it PEP-funny-encoded by direct inspection.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+The peever can look at the best day in his life and sneer at it.
+        - Jim Hill, JennyGfest '95

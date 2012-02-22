@@ -1,0 +1,56 @@
+Date: Wed, 8 Apr 2009 08:26:28 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: akineko <akineko@gmail.com>
+Cc: python-list@python.org
+Subject: Re: named pipe and Linux
+Message-ID: <20090407222628.GA29089@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <5b5157dd-ca70-4c6d-8adb-8a4d322fbd4a@x31g2000prc.googlegroups.com>
+User-Agent: Mutt/1.5.18 (2008-05-17)
+Content-Length: 1787
+
+On 07Apr2009 10:08, akineko <akineko@gmail.com> wrote:
+| I'm trying to use named pipes to fuse a Python program and a C
+| program.
+| One side creates pipes using os.mkfifo() and both sides use the same
+| named pipes (one side reads, another side writes). The read side uses
+| select.select() to wait for incoming messages and read the message
+| when select.select() says it is ready.
+| The length of the message is unknown to the read side.
+
+That's a serious flaw in the message protocol.
+
+| I cannot use file.read() because it will block waiting for an EOF.
+| I cannot use file.readline() because how many lines have arrived is
+| unknown.
+| So, I needed to use os.read() with the exact number of characters to
+| read.
+
+No!
+
+You should use os.read() with the maximum size of a message.
+It _should_ return with the number of bytes in the message, provided the
+C program writes messages with a single OS-level write() call.
+
+Forget all the fstat() stuff - it's racy.
+
+Personally, I'd use a thread to just do continuous blocking os.read()s of
+the pipe, and putting the resulting messages on a Queue for collection
+by your main program. If you're the only consumer of a Queue it's safe
+to poll it for emptiness or not, or to use a no-wait get().
+
+All the above is untested, but absent a size in the protocol or other
+ways of parsing message boundaries in data stream, you can only rely on
+the C program writing messages with a single write() and collect using a
+large os.read(), which should return with what is there.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Language... has created the word "loneliness" to express the pain of
+being alone. And it has created the word "solitude" to express the glory
+of being alone. - Paul Johannes Tillich

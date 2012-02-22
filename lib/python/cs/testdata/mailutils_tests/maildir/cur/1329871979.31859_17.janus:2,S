@@ -1,0 +1,156 @@
+Return-Path: <python-ideas-bounces+cs=zip.com.au@python.org>
+Delivered-To: unknown
+Received: from mail.zip.com.au (125.255.95.3:995) by janus.home with
+  POP3-SSL; 15 Feb 2012 23:09:20 -0000
+Delivered-To: cs@zipworld.com.au
+Received: from mailin4-syd3.pacific.net.au (mailin4-syd3.pacific.net.au [125.255.92.145])
+	by mailstore1.syd.pacific.net.au (Postfix) with ESMTP id 093D9951F5
+	for <cs@zipworld.com.au>; Thu, 16 Feb 2012 10:08:18 +1100 (EST)
+Received: from mail.python.org (unknown [82.94.164.166])
+	by mailin4-syd3.pacific.net.au (Postfix) with ESMTP id 5FE424D80AD
+	for <cs@zip.com.au>; Thu, 16 Feb 2012 10:08:17 +1100 (EST)
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3TpGW36lL5zQ4g
+	for <cs@zip.com.au>; Thu, 16 Feb 2012 00:08:15 +0100 (CET)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=python.org; s=200901;
+	t=1329347295; bh=RADcTYcJ09nIWLLktwc9kOcM813TLUQeRX2CiqyaBOQ=;
+	h=Date:From:To:Message-ID:MIME-Version:In-Reply-To:References:Cc:
+	 Subject:List-Id:List-Unsubscribe:List-Archive:List-Post:List-Help:
+	 List-Subscribe:Content-Type:Content-Transfer-Encoding:Sender;
+	b=n1rJrao/Mu5JlBSh4WxqyVccX+D70+7DA3VqREP87jsvcwr0QONqKlZ+2Ud+lSEWE
+	 5RwnKqOJAq/GsWX/9eS6mmnODscW6M0ofaeKXnDSTppoAl11TuYcn7aqIJB03fq4C3
+	 7OnWMWdvDYdhJOzEADTRoy0SPPWurnq/9N6vJwzY=
+X-Original-To: python-ideas@python.org
+Delivered-To: python-ideas@mail.python.org
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3TpGVL4cdXzQ2p
+	for <python-ideas@python.org>; Thu, 16 Feb 2012 00:07:38 +0100 (CET)
+X-Spam-Status: OK 0.002
+X-Spam-Evidence: '*H*': 1.00; '*S*': 0.00; 'preferably': 0.03;
+	'flags': 0.05; 'subject:Python': 0.05; 'bytes.': 0.07;
+	'received:edu.au': 0.07; 'am,': 0.12; 'operations,': 0.15;
+	'subject:was': 0.15; 'example).': 0.16; 'filenames,': 0.16;
+	'filesystem': 0.16; 'from:addr:cs': 0.16; 'from:addr:zip.com.au':
+	0.16; 'from:name:cameron simpson': 0.16; 'message-
+	id:@cskk.homeip.net': 0.16; 'received:202.125.174': 0.16;
+	'received:202.125.174.133': 0.16;
+	'received:boardofstudies.nsw.edu.au': 0.16;
+	'received:cskk.homeip.net': 0.16;
+	'received:harvey.boardofstudies.nsw.edu.au': 0.16;
+	'received:homeip.net': 0.16; 'received:nsw.edu.au': 0.16;
+	'simple:': 0.16; 'subject:Unicode': 0.16; 'surrogates.': 0.16;
+	'wrote:': 0.18; 'bytes': 0.18; 'subject:skip:s 10': 0.18;
+	'cheers,': 0.20; 'cc:no real name:2**0': 0.21; 'maybe': 0.21;
+	'header:In-Reply-To:1': 0.22; '(or': 0.22; 'feb': 0.22;
+	'otherwise,': 0.25; 'cc:2**0': 0.26; 'code': 0.26; "i'm": 0.28;
+	'pass': 0.29; 'explicitly': 0.29; 'cc:addr:python.org': 0.29;
+	'carl': 0.30; 'logic': 0.30; 'yes.': 0.30; 'usually': 0.31;
+	'rest': 0.32; 'languages': 0.32; 'there': 0.33; "won't": 0.33;
+	'header:User-Agent:1': 0.33; 'however,': 0.35; 'received:au':
+	0.36; 'encoding': 0.37; 'but': 0.37; 'charset:us-ascii': 0.37;
+	'either': 0.37; 'enough': 0.38; 'jim': 0.38; 'should': 0.38;
+	'clearly': 0.39; 'unless': 0.39; 'johnson': 0.39; 'ok,': 0.39;
+	'change': 0.40; 'one,': 0.40; 'easy': 0.60; 'back': 0.60;
+	'received:202': 0.66; 'beat': 0.67; 'refuse': 0.67; 'doing.':
+	0.73; 'cameron': 0.77; '10:04': 0.84; '2012,': 0.84; 'beats':
+	0.84; 'pursued': 0.84; 'subject:3000': 0.84; 'dutch': 0.91
+Received: from localhost (HELO mail.python.org) (127.0.0.1)
+	by albatross.python.org with SMTP; 16 Feb 2012 00:07:38 +0100
+Received: from harvey.boardofstudies.nsw.edu.au
+	(mail2.rack1.boardofstudies.nsw.edu.au [202.125.174.133])
+	by mail.python.org (Postfix) with ESMTP
+	for <python-ideas@python.org>; Thu, 16 Feb 2012 00:07:38 +0100 (CET)
+Received: from janus.cskk.homeip.net (localhost.localdomain [127.0.0.1])
+	by harvey.boardofstudies.nsw.edu.au (Postfix) with ESMTP id AED474D3B66;
+	Thu, 16 Feb 2012 10:07:29 +1100 (EST)
+Received: by janus.cskk.homeip.net (Postfix, from userid 1000)
+	id CC4012005A97B; Thu, 16 Feb 2012 10:07:49 +1100 (EST)
+Date: Thu, 16 Feb 2012 10:07:49 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: "Carl M. Johnson" <cmjohnson.mailinglist@gmail.com>
+Message-ID: <20120215230749.GA7352@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <04A64366-3F31-40AF-9E84-FFB3C3C1E690@gmail.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+References: <04A64366-3F31-40AF-9E84-FFB3C3C1E690@gmail.com>
+Cc: python-ideas@python.org
+Subject: Re: Unicode surrogateescape [was: Re: Python 3000
+	TIOBE -3%]
+X-BeenThere: python-ideas@python.org
+X-Mailman-Version: 2.1.12
+Precedence: list
+List-Id: Discussions of speculative Python language ideas
+	<python-ideas.python.org>
+List-Unsubscribe: <http://mail.python.org/mailman/options/python-ideas>,
+	<mailto:python-ideas-request@python.org?subject=unsubscribe>
+List-Archive: <http://mail.python.org/pipermail/python-ideas>
+List-Post: <mailto:python-ideas@python.org>
+List-Help: <mailto:python-ideas-request@python.org?subject=help>
+List-Subscribe: <http://mail.python.org/mailman/listinfo/python-ideas>,
+	<mailto:python-ideas-request@python.org?subject=subscribe>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Sender: python-ideas-bounces+cs=zip.com.au@python.org
+Errors-To: python-ideas-bounces+cs=zip.com.au@python.org
+X-Cats2Procmailrc-Rule: cats/home: python  python-ideas    sender:python-ideas-bounces+cs=zip.com.au@python.org
+X-Label: python-ideas
+Content-Length: 1867
+
+On 14Feb2012 10:17, Carl M. Johnson <cmjohnson.mailinglist@gmail.com> wrote:
+| On Feb 14, 2012, at 10:04 AM, Jim Jewett wrote:
+| > But is there a good reason not to change the default errorhandler to
+| > errors="surrogateescape"?
+| 
+| It's a conflict in the Zen:
+| 
+| > Errors should never pass silently.
+| > Unless explicitly silenced.
+| 
+| OK, so default to strict. But:
+
+Yes.
+
+| > Although practicality beats purity.
+| 
+| Hmm, so maybe do use surrogates. Then again:
+
+No. Adding errors="surrogateescape" when needed is easy enough not to be
+impractical.
+
+(Also, it clearly flags in the code that we won't always get what we
+expect/hope.)
+
+| > In the face of ambiguity, refuse the temptation to guess.
+| 
+| Grr, I'm not nearly Dutch enough to make sense of this logical conflict!
+
+I'm not Dutch either (I can never remember which way P and V go in
+semaphore operations, for example). However, the logic I would use is
+very simple:
+
+  I should know the encoding of these bytes.
+
+  If I don't, and I merely have to suck them in and spit them back out again
+  as bytes undamaged (such as when reading filesystem filenames, which can
+  often be treated as opaque tokens), use errors="surrogateescape".
+
+  Otherwise, arrange to know the encoding (or have enough fiat to declare
+  one, preferably utf-8).
+
+errors="surrogateescape" is for lossless but usually "blind"
+decode/encode. The rest of the time it would be better to know what
+you're doing.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+We don't just *borrow* words; on occasion, English has pursued other
+languages down alleyways to beat them unconscious and rifle their pockets for
+new vocabulary. - James D. Nicoli
+_______________________________________________
+Python-ideas mailing list
+Python-ideas@python.org
+http://mail.python.org/mailman/listinfo/python-ideas

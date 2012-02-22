@@ -1,0 +1,39 @@
+Date: Wed, 1 Feb 2012 13:02:59 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Paulo da Silva <p_s_d_a_s_i_l_v_a@netcabo.pt>
+Cc: python-list@python.org
+Subject: Re: Iterate from 2nd element of a huge list
+Message-ID: <20120201020259.GA15152@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <jga54q$vqg$1@speranza.aioe.org>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+Content-Length: 721
+
+On 01Feb2012 01:39, Paulo da Silva <p_s_d_a_s_i_l_v_a@netcabo.pt> wrote:
+| What is the best way to iterate thru a huge list having the 1st element
+| a different process? I.e.:
+| 
+| process1(mylist[0])
+| for el in mylist[1:]:
+| 	process2(el)
+| 
+| This way mylist is almost duplicated, isn't it?
+
+Yep.
+
+What about (untested):
+
+  process1(mylist[0])
+  for i in xrange(1,len(mylist)):
+  	process2(mylist[i])
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+The truth is, I will not give myself the trouble to write sense long, for I
+would as soon please fools as wise men; because fools are more numerous, and
+every prudent man will go with the majority.    - Hugh Henry Brackenridge

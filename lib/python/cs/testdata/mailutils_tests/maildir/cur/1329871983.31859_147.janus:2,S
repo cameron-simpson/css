@@ -1,0 +1,136 @@
+Return-Path: <python-list-bounces+cs=zip.com.au@python.org>
+Delivered-To: unknown
+Received: from mail.zip.com.au (125.255.95.3) by janus.home with POP3-SSL; 15
+  Aug 2011 23:49:02 -0000
+Delivered-To: cs@zipworld.com.au
+Received: from mailin1.pacific.net.au (mailin1.pacific.net.au [61.8.0.80])
+	by mailstore1.syd.pacific.net.au (Postfix) with ESMTP id 2F2E66EEDD
+	for <cs@zipworld.com.au>; Tue, 16 Aug 2011 09:47:27 +1000 (EST)
+Received: from mail.python.org (unknown [82.94.164.166])
+	by mailin1.pacific.net.au (Postfix) with ESMTP id 7BFD5184329
+	for <cs@zip.com.au>; Tue, 16 Aug 2011 09:47:26 +1000 (EST)
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3RdD564v1XzMfh
+	for <cs@zip.com.au>; Tue, 16 Aug 2011 01:47:22 +0200 (CEST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=python.org; s=200901;
+	t=1313452042; bh=1mao4lzcGO4PEZbtpGMP358UF+FiyhNERnDbJYJVNLw=;
+	h=Date:From:To:Subject:Message-ID:MIME-Version:In-Reply-To:
+	 References:Cc:List-Id:List-Unsubscribe:List-Archive:List-Post:
+	 List-Help:List-Subscribe:Content-Type:Content-Transfer-Encoding:
+	 Sender;
+	b=PsSHyaO84peamuM3+x9ckZXtRnrXWVvMNKqYfO84/oloX/QFxc9gFJkKEYviXbEyL
+	 GD7DEXTUhE0Z/j6wJGXkha0EJvCqbx+YFF9Uyblfsa3C8LCeYhgOfD/ziVu8VyXDtc
+	 EXndFaMQFImVig0JO6XtTxoxgc7RJIYTsu/88/4M=
+X-Original-To: python-list@python.org
+Delivered-To: python-list@mail.python.org
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3RdD1j71HRzMrS
+	for <python-list@python.org>; Tue, 16 Aug 2011 01:44:25 +0200 (CEST)
+X-Spam-Status: OK 0.001
+X-Spam-Evidence: '*H*': 1.00; '*S*': 0.00; 'bug': 0.02; 'context':
+	0.04; 'cleanup': 0.07; 'received:edu.au': 0.07; 'locks': 0.09;
+	'exception': 0.12; 'backwards.': 0.16; 'debugged': 0.16;
+	'from:addr:cs': 0.16; 'from:addr:zip.com.au': 0.16;
+	'from:name:cameron simpson': 0.16; 'function)': 0.16; 'message-
+	id:@cskk.homeip.net': 0.16; 'monitors': 0.16; 'occurs,': 0.16;
+	'received:202.125.174': 0.16; 'received:202.125.174.133': 0.16;
+	'received:boardofstudies.nsw.edu.au': 0.16;
+	'received:cskk.homeip.net': 0.16;
+	'received:harvey.boardofstudies.nsw.edu.au': 0.16;
+	'received:homeip.net': 0.16; 'received:nsw.edu.au': 0.16; 'cc:addr
+	:python-list': 0.16; 'wrote:': 0.16; 'cheers,': 0.18; 'have:':
+	0.18; 'cc:no real name:2**0': 0.20; 'seems': 0.20; 'cc:2**0':
+	0.22; 'header:In-Reply-To:1': 0.22; 'versions': 0.23; 'base.':
+	0.23; 'locking': 0.23; 'code': 0.25; 'creating': 0.25; 'code.':
+	0.26; "i'm": 0.27; 'fact': 0.27; 'cc:addr:python.org': 0.30;
+	'decorators': 0.30; 'lock': 0.30; 'reviewing': 0.30; 'use?': 0.30;
+	'equivalent': 0.31; 'too': 0.33; 'there': 0.33; '...': 0.34;
+	'header:User-Agent:1': 0.34; 'things': 0.34; '(for': 0.35;
+	'charset:us-ascii': 0.36; 'received:au': 0.36; 'doing': 0.36;
+	'thread': 0.37; 'easier': 0.38; 'subject:: ': 0.39; "it's": 0.40;
+	'more': 0.60; 'managers': 0.62; 'wide': 0.63; 'received:202':
+	0.66; 'making': 0.67; 'cameron': 0.67; 'safe': 0.69; 'money.':
+	0.72; 'wheel': 0.84; 'here!': 0.91; 'prone': 0.91; 'technique':
+	0.93
+Received: from localhost (HELO mail.python.org) (127.0.0.1)
+	by albatross.python.org with SMTP; 16 Aug 2011 01:44:25 +0200
+Received: from harvey.boardofstudies.nsw.edu.au
+	(mail2.rack1.boardofstudies.nsw.edu.au [202.125.174.133])
+	by mail.python.org (Postfix) with ESMTP
+	for <python-list@python.org>; Tue, 16 Aug 2011 01:44:25 +0200 (CEST)
+Received: from cskk.homeip.net (localhost.localdomain [127.0.0.1])
+	by harvey.boardofstudies.nsw.edu.au (Postfix) with ESMTP id 5C7B14D3B5A;
+	Tue, 16 Aug 2011 09:37:21 +1000 (EST)
+Received: by janus.cskk.homeip.net (Postfix, from userid 1000)
+	id 43D14100419B7; Tue, 16 Aug 2011 09:37:21 +1000 (EST)
+Date: Tue, 16 Aug 2011 09:37:21 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: python@bdurham.com
+Subject: Re: Reusable ways to wrapping thread locking techniques
+Message-ID: <20110815233720.GA30163@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <1313430966.16911.140258129884193@webmail.messagingengine.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+References: <1313430966.16911.140258129884193@webmail.messagingengine.com>
+Cc: python-list@python.org
+X-BeenThere: python-list@python.org
+X-Mailman-Version: 2.1.12
+Precedence: list
+List-Id: General discussion list for the Python programming language
+	<python-list.python.org>
+List-Unsubscribe: <http://mail.python.org/mailman/options/python-list>,
+	<mailto:python-list-request@python.org?subject=unsubscribe>
+List-Archive: <http://mail.python.org/pipermail/python-list>
+List-Post: <mailto:python-list@python.org>
+List-Help: <mailto:python-list-request@python.org?subject=help>
+List-Subscribe: <http://mail.python.org/mailman/listinfo/python-list>,
+	<mailto:python-list-request@python.org?subject=subscribe>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Sender: python-list-bounces+cs=zip.com.au@python.org
+Errors-To: python-list-bounces+cs=zip.com.au@python.org
+X-Cats2Procmailrc-Rule: cats/home: python  python-list     sender:python-list-bounces+cs=zip.com.au@python.org
+X-Label: python-list
+Content-Length: 1265
+
+On 15Aug2011 13:56, python@bdurham.com <python@bdurham.com> wrote:
+| I'm reviewing a lot of code that has thread acquire and release
+| locks scattered throughout the code base.
+| 
+| Would a better technique be to use contextmanagers (for safe
+| granular locking within a function) or decorators (function wide
+| locks) to manage locks or am I making things too complicated?
+
+No, you're on the money.
+
+| Am I reinventing the wheel by creating my own versions of above
+| or are there off-the-shelf, debugged versions of above that one
+| can use?
+
+I routinely have:
+
+  some_lock = allocate_lock()
+  ...
+  with some_lock:
+    code here!
+
+Doing the equivalent with decorators to make monitors seems perfectly
+reasonable to me too.
+
+Do it all with context managers if you can; they do reliable lock
+release even when an exception occurs, and don't clutter the code with
+distracting and hard to verify cleanup code.
+
+It's worth it just to make everything more readable. The fact that it
+makes the code smaller and easier to maintain and less bug prone is just
+sugar.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+My mind is like a blotter: Soaks it up, gets it backwards.
+-- 
+http://mail.python.org/mailman/listinfo/python-list

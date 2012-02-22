@@ -1,0 +1,73 @@
+Date: Fri, 24 Apr 2009 09:47:24 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: =?utf-8?B?Ik1hcnRpbiB2LiBM77+9d2lzIiA8bWFydGluQHYubG9ld2lzLmRlPg==?=
+Cc: glyph@divmod.com, python-dev@python.org
+Subject: Re: PEP 383: Non-decodable Bytes in System Character Interfaces
+Message-ID: <20090423234724.GA8077@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: inline
+Content-Transfer-Encoding: 8bit
+In-Reply-To: <49EF6D64.4030302@v.loewis.de>
+User-Agent: Mutt/1.5.18 (2008-05-17)
+Content-Length: 2610
+
+On 22Apr2009 21:17, Martin v. L�wis <martin@v.loewis.de> wrote:
+| > -1.  On UNIX, character data is not sufficient to represent paths.  We
+| > must, must, must continue to have a simple bytes interface to these
+| > APIs.
+| 
+| I'd like to respond to this concern in three ways:
+| 
+| 1. The PEP doesn't remove any of the existing interfaces. So if the
+|    interfaces for byte-oriented file names in 3.0 work fine for you,
+|    feel free to continue to use them.
+
+Ok. I think I had read things as supplanting byte-oriented interfaces
+with this exciting new strings-can-do-it-all approach.
+
+| 2. Even if they were taken away (which the PEP does not propose to do),
+|    it would be easy to emulate them for applications that want them.
+|    For example, listdir could be wrapped as
+| 
+|    def listdir_b(bytestring):
+|        fse = sys.getfilesystemencoding()
+
+Alas, no, because there is no sys.getfilesystemencoding() at the POSIX
+level. It's only the user's current locale stuff on a UNIX system, and
+has _nothing_ to do with the filesystem because UNIX filesystems don't
+have encodings.
+
+In particular, because the "best" (or to my mind "misleading") you
+can do for this is report what the current user thinks:
+  http://docs.python.org/library/sys.html#sys.getfilesystemencoding
+then there's no guarrentee that what is chosen has any releationship to
+what was in use when the files being consulted were made.
+
+Now, if I were writing listdir_b() I'd want to be able to do something
+along these lines:
+  - set LC_ALL=C (or some equivalent mechanism)
+  - have os.listdir() read bytes as numeric values and transcode their values
+    _directly_ into the corresponding Unicode code points.
+  - yield bytes( ord(c) for c in os_listdir_string )
+  - have os.open() et al transcode unicode code points back into bytes.
+i.e. a straight one-to-one mapping, using only codepoints in the range
+1..255.
+
+Then I'd have some confidence that I had got hold of the bytes as they
+had come from the underlying UNIX system call, and a way to get those
+bytes _back_ to a UNIX system call intact.
+
+|        string = bytestring.decode(fse, "python-escape")
+|        for fn in os.listdir(string):
+|            yield fn.encoded(fse, "python-escape")
+| 
+| 3. I still disagree that we must, must, must continue to provide these
+|    interfaces. I don't understand from the rest of your message what
+|    would *actually* break if people would use the proposed interfaces.
+
+My other longer message describes what would break, if I understand your
+proposal.
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/

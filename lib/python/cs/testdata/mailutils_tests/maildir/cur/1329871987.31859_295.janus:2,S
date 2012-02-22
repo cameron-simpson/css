@@ -1,0 +1,101 @@
+Date: Wed, 11 Aug 2010 13:08:59 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: "Steven W. Orr" <steveo@syslang.net>
+Cc: python-list@python.org
+Subject: Re: How to capture all the environment variables from shell?
+Message-ID: <20100811030859.GA2279@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <4C615D1B.7060204@syslang.net>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 4020
+
+On 10Aug2010 10:07, Steven W. Orr <steveo@syslang.net> wrote:
+| On 8/2/2010 4:33 AM, Thorsten Kampe wrote:
+| > * Tim Chase (Mon, 26 Jul 2010 21:42:24 -0500)
+| >> On 07/26/10 21:26, Steven W. Orr wrote:
+| >>> Please! Never export anything from your .bashrc unless you
+| >>> really know what you're doing. Almost all exports should be
+| >>> done in your .bash_profile
+| >>
+| >> Could you elaborate on your reasoning why (or why-not)?  I've 
+| >> found that my .bash_profile doesn't get evaluated when I crank up 
+| >> another terminal window, while my bashrc does.  Thus I tend to 
+| >> put my exports in my ~/.bashrc so they actually take effect in my 
+| >> shell...
+| > 
+| > ~/.bash_profile is only evaluated for login shells and ~/.bashrc only 
+| > for non-login shells. Thus it's recommended to keep ~/.bash_profile 
+| > empty (except a source statement for .bashrc) and put all your settings, 
+| > aliases, exports, etc. in .bashrc.
+| 
+| Sorry. Dead wrong. Please reread the above comment I wrote. If you set your
+| environment variables in the .bashrc then you completely lose the ability of
+| environment variables to be inherited by sub-shells. Again, envvars should be
+| set in the .bash_profile, most everything else should be set in the .bashrc, and
+| the .bashrc should be sourced into the .bash_profile to solve the problem that
+| you thought you were solving.
+| 
+| After that, and again, be aware that the .bashrc alone is executed for login
+| shells *which are not interactive*. for example:
+| 
+| ssh somemachine 'echo Hello'
+| 
+| This command will *not*  go through the .bash_profile but it will go through the
+| .bashrc.
+
+No, only interactive shells use the .bashrc.
+
+Still, you're quite right that envvars belong in the .bash_profile.
+.bashrc is for trivial setup stuff relevant only to interactive shells
+(for example history settings and interactive aliases).
+
+| This means that for cases like this, we want to check to see if the
+| bash process is interactive or not inside the .bashrc and then do the right thing.
+| 
+| ========<Inside your .bashrc>=======
+| [[ -z "$PS1" ]] && setPATHHere
+| ========<EOInside your .bashrc>=======
+
+This is Very Wrong. (RedHat do this test - it is bogus - if I set $PS1
+in my profile it breaks badly.) Instead, test $-:
+
+  case $- in *i*) echo INTERACTIVE ;; *) echo BATCH ;; esac
+
+| This is not needed for the above degenerate case, but it is needed if the
+| command in question is kept in a directory that you normally find in a place
+| that is part of your personal login PATH. E.G., If myprog lives in ~/bin then
+| 
+| ssh somemachine myprog
+| 
+| will fail unless you use the above construct.
+| 
+| Hopefully, I'll only have to re-explain this another google times...
+
+"googol", surely?
+
+The reason .bashrc gets overused for envars, aside from ignorance and
+propagated bad habits, is that in a GUI desktop the setup sequence is
+often a bit backwards. A conventional terminal/console login means you
+get a login shell that sources your .{bash_}profile. And from there one
+would start a GUI and all the .profile stuff has been run Once, as it
+should be. But when the login itself is a GUI the various terminals get
+started _before_ the .profile stuff gets sourced, because the terminal
+is started by the desktop manager. Once common "fix" for this is to
+make all new terminals run login shells. Ugh, but it does work. But it
+they're not login shells, people stuff everything into their .bashrc
+because the .profile doesn't get sourced. And so the common awful setup
+you're bemoaning.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+For us, Zettai Zetsumei Toshi is an allegory for relations between the sexes,
+and it works especially well at this because we don't speak Japanese. She
+will say things, and we have no idea what the hell is going on, and then
+we'll select from a list of responses, but we have no idea which one is the
+right one, and then they're all wrong. It works on a lot of levels.
+- Tycho @ _Penny_Arcade_

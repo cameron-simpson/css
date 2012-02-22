@@ -1,0 +1,78 @@
+Date: Fri, 18 Jun 2010 08:50:28 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Brett Cannon <brett@python.org>
+Cc: "M.-A. Lemburg" <mal@egenix.com>,
+	Alexander Belopolsky <alexander.belopolsky@gmail.com>,
+	python-ideas@python.org
+Subject: Re: Rename time module to "posixtime"
+Message-ID: <20100617225028.GA19332@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: inline
+Content-Transfer-Encoding: 8bit
+In-Reply-To: <AANLkTik99USbgzSSRcdgqNNQdqoZcvVu5BRridokB7cC@mail.gmail.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 2789
+
+On 16Jun2010 10:37, Brett Cannon <brett@python.org> wrote:
+| On Wed, Jun 16, 2010 at 00:56, M.-A. Lemburg <mal@egenix.com> wrote:
+| > Brett Cannon wrote:
+| >> On Tue, Jun 15, 2010 at 16:01, Cameron Simpson <cs@zip.com.au> wrote:
+| >>> On 15Jun2010 10:47, Alexander Belopolsky <alexander.belopolsky@gmail.com> wrote:
+| >>> | I've reread my post and have to admit that I did not explain this
+| >>> | point clearly.  There are currently three different ways to represent
+| >>> | a point in time: datetime object, unix timestamp, and a 9-element time
+| >>> | tuple.  While the datetime module has its share of criticism, its
+| >>> | interfaces are more user friendly and more "pythonic" than C inspired
+| >>> | time module interfaces.
+| >>>
+| >>> Personally, I would be happy to see unix-timestamp and datetime object,
+| >>> and see the time tuples go away.
+[...]
+| >> I agree with this sentiment. The UNIX timestamp stuff should stay in
+| >> time, the time tuple stuff should just go, and datetime should be
+| >> fleshed out to handle all the stuff that is not a direct wrapping
+| >> around libc.
+[...]
+| > -1.
+| > Please note that the time module provides access to low-level OS
+| > provided services which the datetime module does not expose.
+| > You cannot seriously expect that an application which happily uses
+| > the time module (only) for its limited date/time functionality
+| > to have to be rewritten just to stay compatible with Python.
+| 
+| No, but the work to move people off of time tuples and over to
+| datetime objects or timestamps can start so that the next stdlib reorg
+| can drop time tuples without causing major pains.
+
+"I agree with this sentiment." :-)
+
+I, also, was insufficiently clear. I don't want any code to break, and
+Alexander's proposal describes a non-breaking approach. I would like my
+earlier statement to be read as wanting it to be possible to work with
+unixtimes and datetimes and never need to use a time tuple, and for the
+documentation to direct users to datetimes and unixtimes as the obvious
+and sufficent way to do things.
+
+[...]
+| I don't care as much about the rename as I do about losing time tuples
+| in the long run.
+| 
+| > The only improvement I could see, would be to move
+| > calendar.timegm() to the time module, since that's where
+| > it belongs (keeping an alias in the calendar module, of
+| > course).
+| 
+| That should definitely happen at some point.
+
++1 to the above too. That the "Use the following functions to convert
+between time representations" table near the top of the "time" module
+documentation reaches for the calendar module grates.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+In any event, this is a straw herring for debate.
+        - solovay@netcom.com (Andrew Solovay)

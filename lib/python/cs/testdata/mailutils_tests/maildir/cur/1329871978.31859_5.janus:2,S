@@ -1,0 +1,63 @@
+Date: Mon, 13 Feb 2012 07:30:43 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: =?utf-8?B?Ik1hcnRpbiB2LiBMw7Z3aXMi?= <martin@v.loewis.de>
+Cc: Antoine Pitrou <solipsis@pitrou.net>, python-dev@python.org
+Subject: Re: PEP 394 request for pronouncement (python2 symlink in *nix
+ systems)
+Message-ID: <20120212203043.GA10257@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: inline
+Content-Transfer-Encoding: 8bit
+In-Reply-To: <4F37FD96.2010603@v.loewis.de>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+Content-Length: 1768
+
+On 12Feb2012 18:57, "Martin v. Löwis" <martin@v.loewis.de> wrote:
+| Am 12.02.2012 17:04, schrieb Antoine Pitrou:
+| > Le dimanche 12 février 2012 à 16:52 +0100, "Martin v. Löwis" a écrit :
+| >>> Why hard links? Symlinks are much more introspectable. When looking at
+| >>> a hard link I have no easy way to know it's the same as whatever other
+| >>> file in the same directory.
+| >>
+| >> There actually *is* an easy way, in regular ls: look at the link count.
+| >> It comes out of ls -l by default, and if it's >1, there will be an
+| >> identical file.
+
+Yeah! Somewhere... :-(
+
+| > This doesn't tell me which file it is
+| 
+| Well, you didn't ask for that, it does "to know it's the same as
+| whatever other file" nicely :-)
+
+Sure, at the OS level. Not much use for _inspection_.
+
+| As Charles-François explains, you can use ls -i for that, which isn't
+| that easy, but still straight-forward.
+
+If the hardlink is nearby. Of course in this example it (almost
+certainly?) is, but it needn't be. A symlink is a much better solution
+to this problem because:
+
+  - usability - "ls -l" shows it to the user by default
+
+  - practicality:
+
+      With a symlink, to find out what it attaches to you examine the
+      symlink.
+      
+      With a hardlink you first examine a fairly opaque numeric attribute of
+      "python2", and _then_ you examine every other filename on the system!
+      Admittedly starting with "python2.*" in the same directory, but in
+      principle in other places. Arbitrary other places.
+
+IMO a symlink is far and away the better choice in this situation.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+I need your clothes, your boots, and your motorcycle.
+        - Arnold Schwarzenegger, Terminator 2

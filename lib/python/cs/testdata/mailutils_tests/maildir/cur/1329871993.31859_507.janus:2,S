@@ -1,0 +1,47 @@
+Date: Sun, 5 Apr 2009 09:55:06 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Randy Syring <randy@rcs-comp.com>
+Cc: Web SIG <web-sig@python.org>
+Subject: Re: Reverse Proxy & HTTPS
+Message-ID: <20090404235506.GA23458@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <49D7BE3B.5040709@rcs-comp.com>
+User-Agent: Mutt/1.5.18 (2008-05-17)
+Content-Length: 1768
+
+On 04Apr2009 16:08, Randy Syring <randy@rcs-comp.com> wrote:
+> I have a Python application that I want to run with the CherryPy WSGI  
+> Server.  My intention is to let the CherryPy server run on a non  
+> standard port (say 9001) and then let IIS (yes, I know what you are  
+> thinking, but that is what I have to work with) reverse proxy the  
+> website requests to CherryPy.
+>
+> However, I am wondering how I should handle HTTPS.  Currently, there are  
+> only a few pages in my app that need HTTPS.  When running the app  
+> natively in IIS, if one of those pages is requested using HTTP, I will  
+> issue a HTTP header redirect to the HTTPS page.  How should I handle  
+> this in a reverse proxy situation?  What I mean is, how do I detect in  
+> my Python app if the original request to IIS is using SSL?  I don't want  
+> to have to run SSL on the connection from IIS to CherryPy.
+>
+> I am thinking I could modify the headers to the CherryPy server adding  
+> something like "X-is-ssl" and then use middleware on the python side to  
+> set wsgi.url_scheme appropriately.  I just don't know the HTTP standard  
+> well enough to know how this kind of thing should be handled.
+
+How tightly knit is the IIS i.e. do you have control over it?  Maybe this
+rewrite thing should be set up in IIS instead, it seems the more obvious
+place for such control except that the rewrite config would no longer
+be "part of the app". At least the IIS server should know if it's http
+or https. Or are you wanting to make your CherryPy app robust against
+http misuse?
+
+Disclaimer: I know close to nothing about IIS; this is just how I'd be
+approaching it with an Apache reverse proxy from end.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/

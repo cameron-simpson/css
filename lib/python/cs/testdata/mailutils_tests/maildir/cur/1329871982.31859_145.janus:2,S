@@ -1,0 +1,122 @@
+Return-Path: <python-dev-bounces+cs=zip.com.au@python.org>
+Delivered-To: unknown
+Received: from mail.zip.com.au (125.255.95.3) by janus.home with POP3-SSL; 20
+  Aug 2011 01:16:35 -0000
+Delivered-To: cs@zipworld.com.au
+Received: from mailin2.pacific.net.au (mailin2.pacific.net.au [61.8.0.81])
+	by mailstore2.syd.pacific.net.au (Postfix) with ESMTP id 974B23C56
+	for <cs@zipworld.com.au>; Sat, 20 Aug 2011 11:16:12 +1000 (EST)
+Received: from mail.python.org (unknown [82.94.164.166])
+	by mailin2.pacific.net.au (Postfix) with ESMTP id F085619C191
+	for <cs@zip.com.au>; Sat, 20 Aug 2011 11:16:11 +1000 (EST)
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3Rgjsh1kvJzN0y
+	for <cs@zip.com.au>; Sat, 20 Aug 2011 03:16:08 +0200 (CEST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=python.org; s=200901;
+	t=1313802968; bh=ihSAusqjeSNqO352TnOsECaOXTShZdmUZCHlOi3L/KM=;
+	h=Date:From:To:Message-ID:MIME-Version:In-Reply-To:References:Cc:
+	 Subject:List-Id:List-Unsubscribe:List-Archive:List-Post:List-Help:
+	 List-Subscribe:Content-Type:Content-Transfer-Encoding:Sender;
+	b=MV1WOihBxFrLCZ/0kAHVRxylnFdTHqHUHEiLjitLalc6Oygnukm3cr0Jc+UU8ypS9
+	 neV004jP8D7dEhh1QA4vcSRrHs6gdpH9DCcasdm1XYNuxX0Hoz2rfKK/0dBOZwrDP9
+	 jDvKBcWpstNW9Cbzm/Mx/iFbS5SdwAdm8FzMm/2Q=
+X-Original-To: python-dev@python.org
+Delivered-To: python-dev@mail.python.org
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3Rgjqq0SdqzN8q
+	for <python-dev@python.org>; Sat, 20 Aug 2011 03:14:31 +0200 (CEST)
+X-Spam-Status: OK 0.001
+X-Spam-Evidence: '*H*': 1.00; '*S*': 0.00; 'example:': 0.03; 'ascii':
+	0.07; 'received:edu.au': 0.07; 'commonly': 0.09; '"embedded':
+	0.16; "'\\0'": 0.16; 'antoine': 0.16; 'character");': 0.16;
+	'from:addr:cs': 0.16; 'from:addr:zip.com.au': 0.16;
+	'from:name:cameron simpson': 0.16; 'iirc,': 0.16; 'message-
+	id:@cskk.homeip.net': 0.16; 'nul': 0.16; 'pitrou': 0.16;
+	'received:202.125.174': 0.16; 'received:202.125.174.133': 0.16;
+	'received:boardofstudies.nsw.edu.au': 0.16;
+	'received:cskk.homeip.net': 0.16;
+	'received:harvey.boardofstudies.nsw.edu.au': 0.16;
+	'received:homeip.net': 0.16; 'received:nsw.edu.au': 0.16;
+	'subject:): ': 0.16; 'wrote:': 0.16; 'cc:no real name:2**0': 0.20;
+	'cc:2**0': 0.22; 'header:In-Reply-To:1': 0.22; 'sfxlen:0': 0.23;
+	'aug': 0.24; '"the': 0.26; 'skip:p 30': 0.28; '+0200': 0.28;
+	'thu,': 0.28; 'stefan': 0.29; 'cc:addr:python.org': 0.30;
+	'cases.': 0.30; 'header:User-Agent:1': 0.34; 'character': 0.34;
+	'null': 0.34; 'surprised': 0.34; 'uses': 0.35; 'charset:us-ascii':
+	0.36; 'received:au': 0.36; 'arthur': 0.37; 'but': 0.37; 'open':
+	0.37; 'think': 0.38; 'should': 0.38; 'subject:: ': 0.39;
+	'represent': 0.39; 'either': 0.39; 'case': 0.39; 'subject: (':
+	0.39; 'construction': 0.62; 'lower': 0.64; 'fall': 0.64;
+	'traditional': 0.64; 'received:202': 0.66; 'cameron': 0.67;
+	'(while': 0.84
+Received: from localhost (HELO mail.python.org) (127.0.0.1)
+	by albatross.python.org with SMTP; 20 Aug 2011 03:14:31 +0200
+Received: from harvey.boardofstudies.nsw.edu.au
+	(mail2.rack1.boardofstudies.nsw.edu.au [202.125.174.133])
+	by mail.python.org (Postfix) with ESMTP
+	for <python-dev@python.org>; Sat, 20 Aug 2011 03:14:30 +0200 (CEST)
+Received: from cskk.homeip.net (localhost.localdomain [127.0.0.1])
+	by harvey.boardofstudies.nsw.edu.au (Postfix) with ESMTP id 8B53B4D3B5A;
+	Sat, 20 Aug 2011 11:14:19 +1000 (EST)
+Received: by janus.cskk.homeip.net (Postfix, from userid 1000)
+	id 73933100419B7; Sat, 20 Aug 2011 11:14:19 +1000 (EST)
+Date: Sat, 20 Aug 2011 11:14:19 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Stefan Krah <stefan@bytereef.org>
+Message-ID: <20110820011419.GA8291@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <20110818185121.GA19783@sleipnir.bytereef.org>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+References: <20110818185121.GA19783@sleipnir.bytereef.org>
+Cc: python-dev@python.org
+Subject: Re: cpython (3.2): NUL -> NULL
+X-BeenThere: python-dev@python.org
+X-Mailman-Version: 2.1.12
+Precedence: list
+List-Id: Python core developers <python-dev.python.org>
+List-Unsubscribe: <http://mail.python.org/mailman/options/python-dev>,
+	<mailto:python-dev-request@python.org?subject=unsubscribe>
+List-Archive: <http://mail.python.org/pipermail/python-dev>
+List-Post: <mailto:python-dev@python.org>
+List-Help: <mailto:python-dev-request@python.org?subject=help>
+List-Subscribe: <http://mail.python.org/mailman/listinfo/python-dev>,
+	<mailto:python-dev-request@python.org?subject=subscribe>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Sender: python-dev-bounces+cs=zip.com.au@python.org
+Errors-To: python-dev-bounces+cs=zip.com.au@python.org
+X-Cats2Procmailrc-Rule: cats/home: python  python-dev      sender:python-dev-bounces+cs=zip.com.au@python.org
+X-Label: python-dev
+Content-Length: 1214
+
+On 18Aug2011 20:51, Stefan Krah <stefan@bytereef.org> wrote:
+| Antoine Pitrou <solipsis@pitrou.net> wrote:
+| > On Thu, 18 Aug 2011 17:49:28 +0200
+| > benjamin.peterson <python-checkins@python.org> wrote:
+| > > -        PyErr_SetString(PyExc_TypeError, "embedded NUL character");
+| > > +        PyErr_SetString(PyExc_TypeError, "embedded NULL character");
+| > 
+| > Are you sure? IIRC, NUL is the little name of ASCII character 0
+| > (while NULL would be the NULL pointer).
+| 
+| Yes, that's the traditional name. I was surprised that the C99 standard uses
+| "null character" in almost all cases. Example:
+| 
+| "The construction '\0' is commonly used to represent the null character."
+| 
+| So I think it should be either NUL or "null character" with the lower
+| case spelling.
+
++1 from me, too.
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+I like to keep an open mind, but not so open my brains fall out.
+        - New York Times Chairman Arthur Sulzberger
+_______________________________________________
+Python-Dev mailing list
+Python-Dev@python.org
+http://mail.python.org/mailman/listinfo/python-dev
+Unsubscribe: http://mail.python.org/mailman/options/python-dev/cs%40zip.com.au

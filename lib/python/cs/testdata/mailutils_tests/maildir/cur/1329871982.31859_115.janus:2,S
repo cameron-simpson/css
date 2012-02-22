@@ -1,0 +1,117 @@
+Return-Path: <email-sig-bounces+cs=zip.com.au@python.org>
+Delivered-To: unknown
+Received: from mail.zip.com.au (125.255.95.3) by janus.home with POP3-SSL; 02
+  Oct 2011 08:09:02 -0000
+Delivered-To: cs@zipworld.com.au
+Received: from mailin4-syd3.pacific.net.au (mailin4-syd3.pacific.net.au [125.255.92.145])
+	by mailstore1.syd.pacific.net.au (Postfix) with ESMTP id 52A5C6BF0B
+	for <cs@zipworld.com.au>; Sun,  2 Oct 2011 19:07:58 +1100 (EST)
+Received: from mail.python.org (unknown [82.94.164.166])
+	by mailin4-syd3.pacific.net.au (Postfix) with ESMTP id 9C8584D8083
+	for <cs@zip.com.au>; Sun,  2 Oct 2011 19:07:57 +1100 (EST)
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3SBJz0396pzP5H
+	for <cs@zip.com.au>; Sun,  2 Oct 2011 10:07:56 +0200 (CEST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=python.org; s=200901;
+	t=1317542876; bh=qB0RnZQgpfW5eZz20k9vec4rF6JWXglh5h1uAHsDoJM=;
+	h=Date:From:To:Message-ID:MIME-Version:In-Reply-To:References:Cc:
+	 Subject:List-Id:List-Unsubscribe:List-Archive:List-Post:List-Help:
+	 List-Subscribe:Content-Type:Content-Transfer-Encoding:Sender;
+	b=ai1KQrVOU+fhl0ieLaikrRpyHAxERSJGUQlkxHnHVZTd2V0oiWjq+WaE8QhKjXG6R
+	 3Yy+kBNCY7OIv3HtHlR2EvYj+3A81UiiAJjbpIpCR4TVeNUEgL/3HqSO/RLa1i1Ql/
+	 4DPzEdVZ1xsLLQJHWuZR8ByWnkrRnBraNdugOucw=
+X-Original-To: email-sig@python.org
+Delivered-To: email-sig@mail.python.org
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3SBJty2pzVzPQV
+	for <email-sig@python.org>; Sun,  2 Oct 2011 10:04:26 +0200 (CEST)
+X-Spam-Status: OK 0.004
+X-Spam-Evidence: '*H*': 0.99; '*S*': 0.00; 'received:edu.au': 0.07;
+	'silently': 0.09; 'subject:addresses': 0.09; 'tuple': 0.09;
+	'library': 0.15; 'comma,': 0.16; 'from:addr:cs': 0.16;
+	'from:addr:zip.com.au': 0.16; 'from:name:cameron simpson': 0.16;
+	'ignores': 0.16; 'message-id:@cskk.homeip.net': 0.16;
+	'received:202.125.174': 0.16; 'received:202.125.174.133': 0.16;
+	'received:boardofstudies.nsw.edu.au': 0.16;
+	'received:cskk.homeip.net': 0.16;
+	'received:harvey.boardofstudies.nsw.edu.au': 0.16;
+	'received:homeip.net': 0.16; 'received:nsw.edu.au': 0.16;
+	'tuples,': 0.16; 'wrote:': 0.16; 'subject:list': 0.18; 'cc:no real
+	name:2**0': 0.20; 'this?': 0.21; 'cc:2**0': 0.22; 'header:In-
+	Reply-To:1': 0.22; "one's": 0.23; 'ones.': 0.23; 'guess': 0.26;
+	'string': 0.26; 'windows': 0.26; 'function': 0.27; 'field,': 0.28;
+	'cc:addr:python.org': 0.30; 'information?': 0.30; 'separated':
+	0.30; 'url:library': 0.31; 'version': 0.32; 'list': 0.32; "can't":
+	0.33; 'header:User-Agent:1': 0.34; 'here,': 0.35; 'pretty': 0.35;
+	'rather': 0.35; 'charset:us-ascii': 0.36; 'url:python': 0.36;
+	'received:au': 0.36; 'put': 0.37; 'could': 0.38; 'addresses':
+	0.38; 'url:org': 0.38; 'subject:: ': 0.39; 'correctly': 0.39;
+	'returned': 0.39; 'url:docs': 0.39; 'might': 0.40; 'address':
+	0.61; 'received:202': 0.66; 'cameron': 0.67; 'want,': 0.71;
+	'url:email': 0.74; 'bennett,': 0.84; 'cole': 0.84; 'indicator':
+	0.93
+Received: from localhost (HELO mail.python.org) (127.0.0.1)
+	by albatross.python.org with SMTP; 02 Oct 2011 10:04:26 +0200
+Received: from harvey.boardofstudies.nsw.edu.au
+	(mail2.rack1.boardofstudies.nsw.edu.au [202.125.174.133])
+	by mail.python.org (Postfix) with ESMTP
+	for <email-sig@python.org>; Sun,  2 Oct 2011 10:04:25 +0200 (CEST)
+Received: from cskk.homeip.net (localhost.localdomain [127.0.0.1])
+	by harvey.boardofstudies.nsw.edu.au (Postfix) with ESMTP id E8D684D3B5C;
+	Sun,  2 Oct 2011 18:57:20 +1100 (EST)
+Received: by janus.cskk.homeip.net (Postfix, from userid 1000)
+	id CEFEB100419B7; Sun,  2 Oct 2011 18:57:20 +1100 (EST)
+Date: Sun, 2 Oct 2011 18:57:20 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Nicholas Cole <nicholas.cole@gmail.com>
+Message-ID: <20111002075720.GA24656@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <CAAu18hcfH1-oYNO0cqfG2M9YBWKHH7M89D0gAppHm8B9TiBvAw@mail.gmail.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+References: <CAAu18hcfH1-oYNO0cqfG2M9YBWKHH7M89D0gAppHm8B9TiBvAw@mail.gmail.com>
+Cc: email-sig@python.org
+Subject: Re: Splitting a list of addresses
+X-BeenThere: email-sig@python.org
+X-Mailman-Version: 2.1.12
+Precedence: list
+List-Id: "SIG for designing and implementing email 3.0" <email-sig.python.org>
+List-Unsubscribe: <http://mail.python.org/mailman/options/email-sig>,
+	<mailto:email-sig-request@python.org?subject=unsubscribe>
+List-Archive: <http://mail.python.org/pipermail/email-sig>
+List-Post: <mailto:email-sig@python.org>
+List-Help: <mailto:email-sig-request@python.org?subject=help>
+List-Subscribe: <http://mail.python.org/mailman/listinfo/email-sig>,
+	<mailto:email-sig-request@python.org?subject=subscribe>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Sender: email-sig-bounces+cs=zip.com.au@python.org
+Errors-To: email-sig-bounces+cs=zip.com.au@python.org
+X-Cats2Procmailrc-Rule: cats/home: python  email-sig       sender:email-sig-bounces+cs=zip.com.au@python.org
+X-Label: email-sig
+Content-Length: 1031
+
+On 02Oct2011 08:45, Nicholas Cole <nicholas.cole@gmail.com> wrote:
+| Given a string containing a list of addresses separated by a comma,
+| such as one might find in a 'CC' field,  email.utils.parseaddr
+| correctly parses the first address and then silently ignores all of
+| the following ones.  Could a version of that function be put into the
+| library that returned a tuple of tuples, rather than just dropping the
+| additional information?
+
+What, like this?
+
+  http://docs.python.org/library/email.util.html#email.utils.getaddresses
+
+That's exactly what you want, I think.
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+No one's jumped off  the top of the [Windows] building here, so I guess
+that's a pretty good indicator that it can't be all that bad.
+        - Rob Bennett, Microsoft group product manager on Windows 98
+_______________________________________________
+Email-SIG mailing list
+Email-SIG@python.org
+Your options: http://mail.python.org/mailman/options/email-sig/cs%40zip.com.au

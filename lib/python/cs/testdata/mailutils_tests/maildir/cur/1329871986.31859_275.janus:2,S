@@ -1,0 +1,63 @@
+Date: Fri, 20 Aug 2010 15:22:43 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Nik Gr <nikos.the.gr33k@gmail.com>
+Cc: Tim Chase <python.list@tim.thechases.com>, python-list@python.org
+Subject: Re: String substitution VS proper mysql escaping
+Message-ID: <20100820052243.GA23046@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: inline
+Content-Transfer-Encoding: 8bit
+In-Reply-To: <4C6D7D0D.7040703@gmail.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 1963
+
+On 19Aug2010 21:50, Nik Gr <nikos.the.gr33k@gmail.com> wrote:
+|  Στις 19/8/2010 6:58 μμ, ο/η Tim Chase έγραψε:
+| >It can be written as a non-3-quote string, you just have to escape
+| >the inner quotes (single & double) and the backslash to be seen:
+| >
+| >  name = 'My name is "Nikos" and I\'m from Thessaloniki\\Greece'
+| >  name = "My name is \"Nikos\" and I'm from Thessaloniki\\Greece"
+| 
+| So if i enclose the string in double quotes the inner double quotes
+| have to be escaped while
+| if i enclose the string in single quotes the inner single quotes
+| have to be escaped.
+| 
+| But in 3-single-quoting thing became easier since i don't have to
+| escape all kind of quotes right? just the backslashes.
+
+Well, unless you have the misfortune to want three single quotes in a
+row inside your 3-single-quoting string...
+
+[...snip...]
+| Why does the page variable which is actually a string needs to be a
+| tuple or a list and not just as a string which is what it actually
+| is?
+
+With regard to the "%" operator, it considers the string on the left to
+be a format string with multiple %blah things in it to replace. The
+thing on the right is a sequence of items to place into the format
+string.
+
+So the thing on the right is _supposed_ to 
+
+| I have a strong desire to use it like this:
+| cursor.execute( '''SELECT hits FROM counters WHERE page = %s''' , page )
+| opposed to tuple.
+
+Hmm. This isn't the python "%" format operator at all.
+This is the database API's .execute() method.
+If it expects its second argument to be a sequence of parameters
+(which is does) then you need to supply a sequence of parameters.
+It is that simple!
+
+In you usage above you're supplying "page" instead of "(page,)".
+The latter matches the .execute() method's requirements.
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+The fabs of the future will be pressrooms.
+- overhead by WIRED at the Intelligent Printing conference Oct2006

@@ -1,0 +1,63 @@
+Date: Sun, 14 Jun 2009 15:16:18 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Greg Ewing <greg.ewing@canterbury.ac.nz>
+Cc: python-dev@python.org
+Subject: Re: io.BufferedReader.peek() Behaviour in python3.1
+Message-ID: <20090614051618.GA19302@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <4A34455F.1030106@canterbury.ac.nz>
+User-Agent: Mutt/1.5.19 (2009-01-05)
+Content-Length: 1766
+
+On 14Jun2009 12:33, Greg Ewing <greg.ewing@canterbury.ac.nz> wrote:
+> Antoine Pitrou wrote:
+>> The original docstring for peek() says:
+>>
+>>         ...we
+>>         do at most one raw read to satisfy it.
+>>
+>> In that light, I'm not sure it's a bug
+>
+> It may be behaving according to the docs, but is that
+> behaviour useful?
+>
+> Seems to me that if you're asking for n bytes, then it's
+> because you're doing some kind of parsing that requires
+> lookahead, and nothing less than n bytes will do.
+>
+> I think it would be more useful if the "at most one
+> raw read" part were dropped. That would give it the
+> kind of deterministic behaviour generally expected
+> when dealing with buffered streams.
+
+Is it possible to access the buffer? I see nothing in the docs.
+
+People seem to want peek() to be "read() without moving the read
+offset", which it almost seems to be. Nick and Greg both want it to
+really be that, and thus do enough raw reads to get "n" bytes; Nick
+wants a peek1() like read1(), too.
+
+It has a pleasing feel to me, too. But ...
+
+For myself, I'd expect more often to want to see if there's stuff in the
+buffer _without_ doing any raw reads at all. A peek0(n), if you will:
+
+  Read and return up to n bytes without calling on the raw stream.
+
+It feels like peek is trying to span both extremes and doesn't satisfy
+either really well.
+
+If peek gets enhanced to act like read in terms of the amount of data
+returned, should there not be a facility to examine buffered data
+without raw reads?
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Being on a Beemer and not having a wave returned by a Sportster is like
+having a clipper ship's hailing not returned by an orphaned New Jersey
+solid waste barge.   - OTL

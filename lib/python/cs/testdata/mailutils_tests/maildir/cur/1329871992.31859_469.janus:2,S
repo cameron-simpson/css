@@ -1,0 +1,47 @@
+Date: Wed, 29 Apr 2009 21:36:53 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Glenn Linderman <v+python@g.nevcal.com>
+Cc: =?utf-8?B?Ik1hcnRpbiB2LiBMw7Z3aXMiIDxtYXJ0aW5Adi5sb2V3aXMuZGU+?=,
+	Python Dev <python-dev@python.org>
+Subject: Re: PEP 383: Non-decodable Bytes in System Character Interfaces
+Message-ID: <20090429113653.GA22908@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <49F82435.3060205@g.nevcal.com>
+User-Agent: Mutt/1.5.18 (2008-05-17)
+Content-Length: 1295
+
+On 29Apr2009 02:56, Glenn Linderman <v+python@g.nevcal.com> wrote:
+> os.listdir(b"")
+>
+> I find that on my Windows system, with all ASCII path file names, that I  
+> get quite different results when I pass os.listdir an empty str vs an  
+> empty bytes.
+>
+> Rather than keep you guessing, I get the root directory contents from  
+> the empty str, and the current directory contents from an empty bytes.  
+> That is rather unexpected.
+>
+> So I guess I'd better suggest that a specific, equivalent directory name  
+> be passed in either bytes or str form.
+
+I think you may have uncovered an implementation bug rather than an
+encoding issue (because I'd expect "" and b"" to be equivalent).
+
+In ancient times, "" was a valid UNIX name for the working directory.
+POSIX disallows that, and requires people to use ".".
+
+Maybe you're seeing an artifact; did python move from UNIX to Windows or the
+other way around in its porting history? I'd guess the former.
+
+Do you get differing results from listdir(".") and listdir(b".") ?
+How's python2 behave for ""? (Since there's no b"" in python2.)
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+'Supposing a tree fell down, Pooh, when we were underneath it?'
+'Supposing it didn't,' said Pooh after careful thought.

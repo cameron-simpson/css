@@ -1,0 +1,120 @@
+Return-Path: <python-list-bounces+cs=zip.com.au@python.org>
+Delivered-To: unknown
+Received: from mail.zip.com.au (125.255.95.3) by janus.home with POP3-SSL; 16
+  Jul 2011 23:39:01 -0000
+Delivered-To: cs@zipworld.com.au
+Received: from mailin2.pacific.net.au (mailin2.pacific.net.au [61.8.0.81])
+	by mailstore1.syd.pacific.net.au (Postfix) with ESMTP id D2BD2A391D
+	for <cs@zipworld.com.au>; Sun, 17 Jul 2011 09:37:49 +1000 (EST)
+Received: from mail.python.org (unknown [82.94.164.166])
+	by mailin2.pacific.net.au (Postfix) with ESMTP id 39F7719C157
+	for <cs@zip.com.au>; Sun, 17 Jul 2011 09:37:49 +1000 (EST)
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3RGnHv5DPHzMsD
+	for <cs@zip.com.au>; Sun, 17 Jul 2011 01:37:47 +0200 (CEST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=python.org; s=200901;
+	t=1310859467; bh=rZ0T9VEMfVyswtcxFhbOSLsKAxni9j2Xcss3OkO2a0M=;
+	h=Date:From:To:Subject:Message-ID:MIME-Version:In-Reply-To:
+	 References:Cc:List-Id:List-Unsubscribe:List-Archive:List-Post:
+	 List-Help:List-Subscribe:Content-Type:Content-Transfer-Encoding:
+	 Sender;
+	b=rIG2JaFrBgtBwZTVnTGh4AbdF82WvvsandXcJD7HLfFRqp7CcJm//DkGhLlpB4ww8
+	 itRtZSHVdQZk34bKaiTQh+gWOpbryTEbj8Ogx/uhEh8HmRttww+IL/Q5CyIULaFQmL
+	 hAmANYKcBr/mxMVXhdcEmT8atB/DaTOKG5gW/KDM=
+X-Original-To: python-list@python.org
+Delivered-To: python-list@mail.python.org
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3RGn5Q2zLQzMtb
+	for <python-list@python.org>; Sun, 17 Jul 2011 01:28:42 +0200 (CEST)
+X-Spam-Status: OK 0.000
+X-Spam-Evidence: '*H*': 1.00; '*S*': 0.00; 'subject:bug': 0.04;
+	'test,': 0.04; 'exception,': 0.07; 'received:edu.au': 0.07;
+	'python': 0.08; 'caller': 0.09; 'seriously.': 0.09; 'exception':
+	0.12; 'wrote:': 0.15; 'billy': 0.16; 'entirely.': 0.16;
+	'from:addr:cs': 0.16; 'from:addr:zip.com.au': 0.16;
+	'from:name:cameron simpson': 0.16; 'iterator': 0.16; 'message-
+	id:@cskk.homeip.net': 0.16; 'okay,': 0.16; 'received:202.125.174':
+	0.16; 'received:202.125.174.133': 0.16;
+	'received:boardofstudies.nsw.edu.au': 0.16;
+	'received:cskk.homeip.net': 0.16;
+	'received:harvey.boardofstudies.nsw.edu.au': 0.16;
+	'received:homeip.net': 0.16; 'received:nsw.edu.au': 0.16;
+	'protocol': 0.16; 'cc:addr:python-list': 0.16; 'suggest': 0.17;
+	'issue.': 0.19; 'cc:2**0': 0.21; 'cc:no real name:2**0': 0.22;
+	'header:In-Reply-To:1': 0.22; 'raise': 0.28; 'problem': 0.29;
+	'cc:addr:python.org': 0.30; 'carrying': 0.30; 'header:User-
+	Agent:1': 0.34; 'there': 0.34; 'sometimes,': 0.35; 'charset:us-
+	ascii': 0.36; 'received:au': 0.36; 'convenient': 0.37; 'but':
+	0.37; 'could': 0.37; 'subject:: ': 0.38; 'signal': 0.38; 'steven':
+	0.38; 'data': 0.39; 'might': 0.39; "we've": 0.62; 'back': 0.63;
+	'received:202': 0.66; 'cameron': 0.67; 'introduce': 0.79;
+	'steering': 0.84; 'subject:Possible': 0.84
+Received: from localhost (HELO mail.python.org) (127.0.0.1)
+	by albatross.python.org with SMTP; 17 Jul 2011 01:28:42 +0200
+Received: from harvey.boardofstudies.nsw.edu.au
+	(mail2.rack1.boardofstudies.nsw.edu.au [202.125.174.133])
+	by mail.python.org (Postfix) with ESMTP
+	for <python-list@python.org>; Sun, 17 Jul 2011 01:28:42 +0200 (CEST)
+Received: from cskk.homeip.net (localhost.localdomain [127.0.0.1])
+	by harvey.boardofstudies.nsw.edu.au (Postfix) with ESMTP id E19194D3B56;
+	Sun, 17 Jul 2011 09:28:40 +1000 (EST)
+Received: by janus.cskk.homeip.net (Postfix, from userid 1000)
+	id C83D6100419B7; Sun, 17 Jul 2011 09:28:40 +1000 (EST)
+Date: Sun, 17 Jul 2011 09:28:40 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Steven D'Aprano <steve+comp.lang.python@pearwood.info>
+Subject: Re: Possible File iteration bug
+Message-ID: <20110716232840.GA7397@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <4e2108b0$0$29972$c3e8da3$5496439d@news.astraweb.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+References: <4e2108b0$0$29972$c3e8da3$5496439d@news.astraweb.com>
+Cc: python-list@python.org
+X-BeenThere: python-list@python.org
+X-Mailman-Version: 2.1.12
+Precedence: list
+List-Id: General discussion list for the Python programming language
+	<python-list.python.org>
+List-Unsubscribe: <http://mail.python.org/mailman/options/python-list>,
+	<mailto:python-list-request@python.org?subject=unsubscribe>
+List-Archive: <http://mail.python.org/pipermail/python-list>
+List-Post: <mailto:python-list@python.org>
+List-Help: <mailto:python-list-request@python.org?subject=help>
+List-Subscribe: <http://mail.python.org/mailman/listinfo/python-list>,
+	<mailto:python-list-request@python.org?subject=subscribe>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Sender: python-list-bounces+cs=zip.com.au@python.org
+Errors-To: python-list-bounces+cs=zip.com.au@python.org
+X-Cats2Procmailrc-Rule: cats/home: python  python-list     sender:python-list-bounces+cs=zip.com.au@python.org
+X-Label: python-list
+Content-Length: 1174
+
+On 16Jul2011 13:42, Steven D'Aprano <steve+comp.lang.python@pearwood.info> wrote:
+| Billy Mays wrote:
+| > I was thinking that a convenient solution to this problem would be to
+| > introduce a new Exception call PauseIteration, which would signal to the
+| > caller that there is no more data for now, but not to close down the
+| > generator entirely.
+| 
+| It never fails to amuse me how often people consider it "convenient" to add
+| new built-in functionality to Python to solve every little issue. As
+| pie-in-the-sky wishful-thinking, it can be fun, but people often mean it to
+| be taken seriously.
+| 
+| Okay, we've come up with the solution of a new exception, PauseIteration,
+| that the iterator protocol will recognise.
+
+One might suggest that Billy could wrp his generator in a Queue(1) and
+use the .empty() test, and/or raise his own PauseIteration from the
+wrapper.
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+No team manager will tell you this; but they all want to see you
+come walking back into the pits sometimes, carrying the steering wheel.
+        - Mario Andretti
+-- 
+http://mail.python.org/mailman/listinfo/python-list

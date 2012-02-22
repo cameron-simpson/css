@@ -1,0 +1,78 @@
+Date: Tue, 8 Nov 2011 07:05:29 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Nick Coghlan <ncoghlan@gmail.com>, Antoine Pitrou <solipsis@pitrou.net>,
+	Steven D'Aprano <steve@pearwood.info>
+Cc: python-ideas@python.org
+Subject: Re: raising an exception type doesn't instantiate it until it gets
+ caught
+Message-ID: <20111107200529.GA10386@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <4EB7AFC5.3040509@pearwood.info>
+ <20111107113544.6a413544@pitrou.net>
+ <CADiSq7eM8OOerLH4PN+hNEKk9i5dw94tdzugkC-qYgC2Lx3RCA@mail.gmail.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+Content-Length: 2145
+
+I wrote, naively:
+| > I presume StopIteration would get instantiated to a singleton, like
+| > NoneType to None? Just asking.
+
+On 07Nov2011 22:01, Nick Coghlan <ncoghlan@gmail.com> wrote:
+| Even without the traceback issue Antoine mentioned, it's already the
+| case that StopIteration isn't a singleton in 2.x. Various pieces of
+| code (e.g. contextlib.contextmanager) rely on being able to tell
+| whether they're getting a specific StopIteration instance back or a
+| new one.
+
+Interesting.
+
+Off topic digression:
+
+I've been slightly uncomfortable about exceptions as control flow for a
+while, basicly when writing code like this:
+
+  try:
+    x = G.next()
+  except StopIteration:
+    # G is empty!
+
+in that I don't entirely know that the StopIteration came from G of from
+some buggy code deeper inside G that let a StopIteration out, eg by
+mangling a try/except like the above. In most circumstances with other
+exceptions, while you might _expect_ the exception to come from the
+source you expect you don't care so much because it will indicate
+failure of the operation anyway. Report or die, you don't proceed as if
+the op was good. But with StopIteration one is reading "G is empty"
+directly into the situation and acting as though it is normal (exit the
+event loop or whatever it may imply).
+
+On 07Nov2011 11:35, Antoine Pitrou <solipsis@pitrou.net> wrote:
+| It is impossible to use singletons for exception instances now that the
+| traceback is stored on them.
+
+Ah. I had somehow thought the exception itself and the traceback were
+distinct items, presented in a tuple.
+
+On 07Nov2011 21:15, Steven D'Aprano <steve@pearwood.info> wrote:
+| Are you asking about what it should be, or what it is?
+
+The former.
+
+| Either way:
+| >>> a = StopIteration('spam')
+| >>> b = StopIteration('ham')
+| >>> a is b
+| False
+
+Since my question was about the proposed new behaviour when just a type
+was raised, the above test wouldn't educate me. Though it does address the
+behaviour of the type instantation in general.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Carpe Datum     - John Sloan <jsloan@ncar.ucar.edu>

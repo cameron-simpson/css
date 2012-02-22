@@ -1,0 +1,56 @@
+Date: Tue, 5 May 2009 21:42:00 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: python-list@python.org
+Subject: Re: exit a program gracefully
+Message-ID: <20090505114200.GA11906@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <gtp7sg$vbc$1@lust.ihug.co.nz>
+User-Agent: Mutt/1.5.18 (2008-05-17)
+Content-Length: 1157
+
+On 05May2009 23:28, Lawrence D'Oliveiro <ldo@geek-central.gen.new_zealand> wrote:
+| In message <mailman.5079.1241476454.11746.python-list@python.org>, Gabriel 
+| Genellina wrote:
+| 
+| > I prefer to put the code inside a function, and just `return` earlier.
+| 
+| It would be nice if Python offered a straightforward equivalent to
+| 
+|     ... initialization goes here ...
+|     do /*once*/
+|       {
+|         ... do stuff ...
+|         if (check1_failed)
+|             break;
+|         ... do more stuff ...
+|         if (check2_failed)
+|             break;
+|         ... do even more stuff ...
+|       }
+|     while (false);
+|     ... cleanup goes here ...
+
+  while True:
+    ... do stuff ...
+    if check1_failed:
+      break;
+    ... do more stuff ...
+    if check2_failed:
+      break;
+    ... do even more stuff ...
+    break
+  ... cleanup goes here ...
+
+Seems more straightforward to me!
+
+And there's always try/except and context managers.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+So why can't we celebrate November 5th the way Guy Fawkes would've wanted?
+        - Mike Holmes <fofp@tattoo.ed.ac.uk>

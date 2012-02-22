@@ -1,0 +1,100 @@
+Date: Tue, 28 Apr 2009 07:14:47 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Glenn Linderman <v+python@g.nevcal.com>
+Cc: =?utf-8?B?Ik1hcnRpbiB2LiBMw7Z3aXMiIDxtYXJ0aW5Adi5sb2V3aXMuZGU+?=,
+	Python-Dev <python-dev@python.org>
+Subject: Re: PEP 383: Non-decodable Bytes in System Character Interfaces
+Message-ID: <20090427211447.GA4291@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: inline
+Content-Transfer-Encoding: 8bit
+In-Reply-To: <49F559A4.8050400@g.nevcal.com>
+User-Agent: Mutt/1.5.18 (2008-05-17)
+Content-Length: 4231
+
+On 27Apr2009 00:07, Glenn Linderman <v+python@g.nevcal.com> wrote:
+> On approximately 4/25/2009 5:22 AM, came the following characters from  
+> the keyboard of Martin v. Löwis:
+>>> The problem with this, and other preceding schemes that have been
+>>> discussed here, is that there is no means of ascertaining whether a
+>>> particular file name str was obtained from a str API, or was funny-
+>>> decoded from a bytes API... and thus, there is no means of reliably
+>>> ascertaining whether a particular filename str should be passed to a
+>>> str API, or funny-encoded back to bytes.
+>>
+>> Why is it necessary that you are able to make this distinction?
+>
+>
+> It is necessary that programs (not me) can make the distinction, so that  
+> it knows whether or not to do the funny-encoding or not.
+
+I would say this isn't so. It's important that programs know if they're
+dealing with strings-for-filenames, but not that they be able to figure
+that out "a priori" if handed a bare string (especially since they
+can't:-)
+
+> If a name is  
+> funny-decoded when the name is accessed by a directory listing, it needs  
+> to be funny-encoded in order to open the file.
+
+Hmm. I had thought that legitimate unicode strings already get transcoded
+to bytes via the mapping specified by sys.getfilesystemencoding()
+(the user's locale). That already happens I believe, and Martin's
+scheme doesn't change this. He's just funny-encoding non-decodable byte
+sequences, not the decoded stuff that surrounds them.
+
+So it is already the case that strings get decoded to bytes by
+calls like open(). Martin isn't changing that.
+
+I suppose if your program carefully constructs a unicode string riddled
+with half-surrogates etc and imagines something specific should happen
+to them on the way to being POSIX bytes then you might have a problem...
+
+I think the advantage to Martin's choice of encoding-for-undecodable-bytes
+is that it _doesn't_ use normal characters for the special bits. This
+means that _all_ normal characters are left unmangled un both "bare"
+and "funny-encoded" strings.
+
+Because of that, I now think I'm -1 on your "use printable characters
+for the encoding". I think presentation of the special characters
+_should_ look bogus in an app (eg little rectangles or whatever in a
+GUI); it's a fine flashing red light to the user.
+
+Also, by avoiding reuse of legitimate characters in the encoding we can
+avoid your issue with losing track of where a string came from;
+legitimate characters are currently untouched by Martin's scheme, except
+for the normal "bytes<->string via the user's locale" translation that
+must already happen, and there you're aided by byets and strings being
+different types.
+
+> I'm certainly not experienced enough in Python development processes or  
+> internals to attempt such, as yet.  But somewhere in 25 years of  
+> programming, I picked up the knowledge that if you want to have a 1-to-1  
+> reversible mapping, you have to avoid data puns, mappings of two  
+> different data values into a single data value.  Your PEP, as first  
+> written, didn't seem to do that... since there are two interfaces from  
+> which to obtain data values, one performing a mapping from bytes to  
+> "funny invalid" Unicode, and the other performing no mapping, but  
+> accepting any sort of Unicode, possibly including "funny invalid"  
+> Unicode, the possibility of data puns seems to exist.  I may be  
+> misunderstanding something about the use cases that prevent these two  
+> sources of "funny invalid" Unicode from ever coexisting, but if so,  
+> perhaps you could point it out, or clarify the PEP.
+
+Please elucidate the "second source" of strings. I'm presuming you mean
+strings egenrated from scratch rather than obtained by something like
+listdir().
+
+Given such a string with "funny invalid" stuff in it, and _absent_
+Martin's scheme, what do you expect the source of the strings to _expect_
+to happen to them if passed to open()? They still have to be converted
+to bytes at the POSIX layer anyway.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Heaven could change from chocolate to vanilla without violating perfection.
+        - arromdee@jyusenkyou.cs.jhu.edu (Ken Arromdee)

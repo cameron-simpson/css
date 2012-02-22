@@ -1,0 +1,161 @@
+Date: Wed, 15 Jun 2011 13:01:36 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Eric Snow <ericsnowcurrently@gmail.com>
+Cc: Erik Max Francis <max@alcyone.com>, python-list@python.org
+Subject: Re: break in a module
+Message-ID: <20110615030136.GA4088@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: inline
+Content-Transfer-Encoding: 8bit
+In-Reply-To: <BANLkTikmNbNgSzirxO3Jbhs4898+OD2Efw@mail.gmail.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 5126
+
+On 14Jun2011 18:51, Eric Snow <ericsnowcurrently@gmail.com> wrote:
+| On Tue, Jun 14, 2011 at 5:51 PM, Erik Max Francis <max@alcyone.com> wrote:
+| > Ethan Furman wrote:
+| >>
+| >> To me, too -- too bad it doesn't work:
+| >>
+| >> c:\temp>\python32\python early_abort.py
+| >>  File "early_abort.py", line 7
+| >>    return
+| >>       ^
+| >> SyntaxError: 'return' outside function
+| >
+| > Nor should it.  There's nothing to return out of.
+| >
+| 
+| Perhaps we have a misunderstanding then.  The contents of a module
+| file are the body of the module definition.  Like the body of any
+| other complex statement, that body is going to get executed [1].
+
+One might argue that a module is not a statement.
+
+| Some of the complex statements have keywords that let you break out of
+| that execution, like break and continue in loops.  Some do not.
+| However, there is most certainly something out of which to return, the
+| execution of the module body.
+
+Ok...
+
+| That fact that the functionality is not there does not mean it has to
+| stay that way.  It may just be that no one has thought to add it.  I
+| don't agree that it's a bad idea.  I have a use case.  The alternative
+| is unappealing to me.  That's how new features are born.
+
+One litmus test may be whether such a statement buys you much.
+You say you have a use case, but so far it seems rather vague to me.
+
+Speaking for myself, my modules tend to be a heap of class or function
+definitions (cheap - a linear parse of the file) and a few
+as-simple-as-possible initialisations of any supporting global data
+structures. Actual examples of global data structures are hard to find,
+but of the few I make, here's one:
+
+  __seq = 0
+  __seqLock = allocate_lock()
+  def seq():
+    ''' Allocate a new sequential number.
+        Useful for creating unique tokens.
+    '''
+    global __seq
+    global __seqLock
+    __seqLock.acquire()
+    __seq += 1
+    n = __seq
+    __seqLock.release()
+    return n
+
+to support a free gimme-a-unique-number in other code:
+
+  from cs.misc import seq
+  ...
+  n = seq()
+
+| I apologize if my example was unclear.  I kept it pretty simple.
+
+Too simple, IMO. Please present a real module excerpt from your own code
+where significant "not a class or function definition" code is executed
+so we can see what ind of stuff you do that would benefit.
+
+| I
+| expect using __main__ was misleading.  However, this is by no means
+| the only use case.  In general it would be nice to do some checks up
+| front and decide whether or not to continue executing the module,
+| rather than waiting until the end to decide:
+| 
+|   if condition_1:
+|       ...
+|       return
+|   if condition_2:
+|       ...
+|       return
+| 
+|   # now do my expensive module stuff
+| 
+|   # finally handle being run as a script
+|   if __name__ == "__main__":
+|       ...
+
+I think many people don't think of a module as something "to execute".
+Of course, it _is_ executed but for most modules the stuff executed is
+unconditional and single pass class and function definitions, "constant"
+definitions (such as the symbolic logging level of the logging module
+etc).
+
+All such stuff is usually unconditional (or trivially conditional, eg
+"only define this on MacOSX" etc).
+
+In my own case, the only counter example I can recall is stuff like a
+main() function. In those cases my modules take the form:
+
+  import stuff ...
+
+  def main(argv):
+    xit = 0
+    ... main program top level logic here ...
+    return xit
+
+  ... classes, functions etc ...
+
+  if __name__ == __'main__':
+    sys.exit(main(sys.argv))
+
+This keeps the top level logic at the top where it is easy to find.
+
+That covers the case where running the module becomes a little utility
+(typically a basic tool to manipulate an instance of whatever facility
+the module provides). For the other common case in tension with this, to
+run unit tests, we just call the unittests at the bottom or if both
+modes make sense I tend to make main() accept a "selftest" argument
+to run the unittests.
+
+So my own code doesn't cry out for what you seem to be asking.
+
+Please make it more clear what you're doing that I'm not.
+
+| The only ways that I know of to accomplish this currently is either by
+| putting everything inside if-else blocks, or raise some kind of
+| ImportBreak exception and catch it in an import hook.  I would rather
+| not use either one.  The more levels of indentation in a module, the
+| harder it is to follow.  And exceptions really should not be involved
+| in execution flow control, but in the handling of abnormal situations
+| instead.
+| 
+| Considering that other complex statements have special flow control
+| statements, I don't see why modules shouldn't either.
+
+Basicly because, in my experience, an approach like havig a main()
+function often covers it. Counter/other examples needed!
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+The major difference between a thing that might go wrong and a thing that
+cannot possibly go wrong is that when a thing that cannot possibly go wrong
+goes wrong, it usually turns out to be impossible to get at or repair.
+- Douglas Adams

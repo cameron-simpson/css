@@ -1,0 +1,44 @@
+Date: Tue, 13 Jul 2010 16:59:41 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: joblack <johannes.black@gmail.com>
+Cc: python-list@python.org
+Subject: Re: Errno 9] Bad file descriptor
+Message-ID: <20100713065941.GA20959@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <cc7bd812-0ea8-4065-af09-667f04178ce1@y11g2000yqm.googlegroups.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 1150
+
+On 11Jul2010 17:48, joblack <johannes.black@gmail.com> wrote:
+| I get sometimes a
+| 
+| Errno 9 Bad file descriptor
+| 
+| the code is too long to show it here but what are the circumstances
+| this could happen? A web search showed nothing.
+| 
+| I have especially the feeling Python 2.6 has some problems with
+| Unicode ... and might not find the file. Is that possible?
+
+You get a UNIX "bad file descriptor" error when you try to use an
+invalid file descriptor number. The typical occasion is when you open a
+file, use it, close it, and then try to continue to use it.
+
+I would suspect you have performed that sequence in some way.
+
+But you should really try to produce a small sequence of code that shows
+the error. That way you can post it here, and for extra value you may
+reduce it to the point where you realise what you have done wrong, since
+the failing code is then small enough for you to examine easily.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+There is a chasm
+of carbon and silicon
+the software can't bridge
+- Haiku Error Messages http://www.salonmagazine.com/21st/chal/1998/02/10chal2.html

@@ -1,0 +1,48 @@
+Date: Tue, 22 Sep 2009 15:46:34 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Jason Tackaberry <tack@urandom.ca>
+Cc: python-list <python-list@python.org>
+Subject: Re: Non-deprecated equivalent of rfc822.AddressList
+Message-ID: <20090922054634.GA6107@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <1253544555.2721.4.camel@willow>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 1247
+
+On 21Sep2009 10:49, Jason Tackaberry <tack@urandom.ca> wrote:
+| On Wed, 2009-09-16 at 14:49 -0400, Jason Tackaberry wrote:
+| > Since the rfc822 module was removed in Python 3, and is deprecated in
+| > 2.3, I am obviously trying to avoid using it.
+| > 
+| > But I'm having a hard time finding an equivalent to rfc822.AddressList
+| > in the email module, which I want to use to parse a _list_ of addresses:
+| [...]
+| > Is there some non-deprecated method I can use to parse an RFC 2822
+| > address list?
+| 
+| No takers?  Should I file a bug?
+
+Hmm. My address gathering program starts with:
+
+  from email.utils import parseaddr, getaddresses, formataddr
+
+See the pydoc for email.utils; it's very easy to use.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Reason #173 to fear technology:
+
+    o       o       o       o       o       o      <o      <o>
+   ^|\     ^|^     v|^     v|v     |/v     |X|      \|      |
+    /\      >\     /<       >\     /<       >\     /<       >\
+
+    o>      o       o       o       o       o       o       o
+    \       x      </      <|>     </>     <\>     <)>      |\
+   /<       >\     /<       >\     /<       >\      >>      L
+
+             Mr. email does the Macarena.

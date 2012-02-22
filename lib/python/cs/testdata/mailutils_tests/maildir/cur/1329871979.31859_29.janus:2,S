@@ -1,0 +1,38 @@
+Date: Sun, 5 Feb 2012 10:34:46 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Python_Junkie <software.buy.design@gmail.com>
+Subject: Re: os.stat last accessed attribute
+Message-ID: <20120204233446.GA21935@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <c9b64470-cde5-42a4-8346-857e35d5e5d4@s7g2000vby.googlegroups.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+Content-Length: 1072
+
+OFF LIST: you're posting to python.announce! Don't do that!
+
+On 02Feb2012 18:13, Python_Junkie <software.buy.design@gmail.com> wrote:
+| I am using the os.stat module to determine a number of file
+| properties.   I am finding that a significant number of files are
+| having their last accessed date dynamically modified to the time that
+| the script determines its attributes.  I am not opening the files, and
+| the script is not applying this property for all of the files.
+| 
+| Any suggestions as to why this might be occurring.
+
+Show the code in your next post. Otherwise people can't help you.
+And cite the specific OS you're using - the st_atime behaviour has some
+variation amongst the UNIX varieties. And carefully read "man 2 stat" on
+whatever system you're running your code on.
+
+And post to comp.lang.python (or better still the python-list mailing
+list - they're gatewayed).
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+You do get used to it.  It still sucks.
+        - Universal Peeve Mantra, 242 lbs before cooking

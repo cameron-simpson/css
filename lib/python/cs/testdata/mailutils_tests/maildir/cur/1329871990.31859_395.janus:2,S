@@ -1,0 +1,32 @@
+Date: Fri, 26 Mar 2010 11:23:39 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Winston <winstonw@stratolab.com>
+Cc: python-list@python.org
+Subject: Re: Revisiting Generators and Subgenerators
+Message-ID: <20100326002339.GA18453@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <bc11ef60-2d6e-46d7-94b4-ed2096834b33@f12g2000prn.googlegroups.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 730
+
+On 25Mar2010 14:39, Winston <winstonw@stratolab.com> wrote:
+| Here's my proposal again, but hopefully with better formatting so you
+| can read it easier.
+
+Having quickly read the Abstract and Motivation, why is this any better
+than a pair of threads and a pair of Queue objects? (Aside from
+co-routines being more lightweight in terms of machine resources?)
+
+On the flipside, given that generators were recently augumented to
+support coroutines I can see your motivation within that framework.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+C makes it easy for you to shoot yourself in the foot.  C++ makes that
+harder, but when you do, it blows away your whole leg.
+- Bjarne Stroustrup

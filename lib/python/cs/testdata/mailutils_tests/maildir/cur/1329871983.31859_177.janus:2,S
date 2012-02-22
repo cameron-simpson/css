@@ -1,0 +1,34 @@
+Date: Fri, 15 Jul 2011 20:38:08 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Steven D'Aprano <steve+comp.lang.python@pearwood.info>
+Cc: python-list@python.org
+Subject: Re: None versus MISSING sentinel -- request for design feedback
+Message-ID: <20110715103808.GA19068@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <4e2013c6$0$29983$c3e8da3$5496439d@news.astraweb.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 990
+
+On 15Jul2011 20:17, Steven D'Aprano <steve+comp.lang.python@pearwood.info> wrote:
+| Cameron Simpson wrote:
+| > I suppose there's no scope for having the append-to-the-list step sanity
+| > check for the sentinel (be it None or otherwise)?
+| 
+| It is not my responsibility to validate data during construction, only to do
+| the right thing when given that data. The right thing being, raise an
+| exception if values are not numeric, unless an explicit "missing" value
+| (whatever that ends up being).
+
+Well there you go. You need to use MISSING, not None. As you say, None
+can easily be a mistake and you want to be sure. If what you describe as
+"right" is right, then I too would be using a special sentinal instead
+of None.
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+The English language has a word to describe a group of anarcho-collectivists
+without resorting to spiffy hyphenated coined phrases: a mob.
+        - Tim Mefford, <tim@physics.orst.edu>

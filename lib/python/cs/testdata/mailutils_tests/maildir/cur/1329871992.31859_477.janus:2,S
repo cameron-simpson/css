@@ -1,0 +1,47 @@
+Date: Tue, 28 Apr 2009 10:48:09 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Simon Cross <hodgestar+pythondev@gmail.com>
+Cc: Martin =?utf-8?B?di4gTMO2d2lzIDxtYXJ0aW5Adi5sb2V3aXMuZGU+?=,
+	python-dev@python.org
+Subject: Re: PEP 383: Non-decodable Bytes in System Character Interfaces
+Message-ID: <20090428004809.GA17780@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: inline
+Content-Transfer-Encoding: 8bit
+In-Reply-To: <fb73205e0904271427u20c082cdi93d30f6e3befd1f3@mail.gmail.com>
+User-Agent: Mutt/1.5.18 (2008-05-17)
+Content-Length: 1440
+
+On 27Apr2009 23:27, Simon Cross <hodgestar+pythondev@gmail.com> wrote:
+| On Mon, Apr 27, 2009 at 9:48 PM, "Martin v. Löwis" <martin@v.loewis.de> wrote:
+| > As Cameron says: it's out of the scope of the PEP. It really depends how
+| > the operating system deals with them. Most likely, the files are not
+| > accessible - not only not from Python, but also not accessible from
+| > any other Unix program. Details depend on the specific operating system
+| > software being used, and the specific parameters passed to it.
+| 
+| $ touch $'\xFF\xAA\xFF'
+| $ vi $'\xFF\xAA\xFF'
+| $ egrep foo $'\xFF\xAA\xFF'
+| 
+| All worked fine from my Bash shell with locale encoding set to UTF-8.
+| I can also open the created file from the GNOME editor file dialog (it
+| even tells me the filename is not valid in my locale's encoding). The
+| Nedit editor also worked. So far I haven't found anything that failed.
+
+Yes, they would. Are you doing that on a real UNIX filesystem
+(ext2/3/4, XFS etc)?
+
+I'm not sure whether you're arguing for or against the propsal here,
+btw.
+
+This would make a file with a presumably UTF-8-invalid name. Martin's
+proposal would cheerfully map that losslessly to a string. Is there a
+problem here?
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Stepwise Refinement n.  A sequence of kludges K, neither distinct or finite,
+applied to a program P aimed at transforming it into the target program Q.

@@ -1,0 +1,68 @@
+Date: Sun, 12 Feb 2012 15:34:11 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: "Stephen J. Turnbull" <stephen@xemacs.org>
+Cc: Jim Jewett <jimjjewett@gmail.com>, python-ideas@python.org,
+	Terry Reedy <tjreedy@udel.edu>
+Subject: Re: Py3 unicode impositions
+Message-ID: <20120212043411.GA442@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <87ty2yvwiq.fsf@uwakimon.sk.tsukuba.ac.jp>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+Content-Length: 2201
+
+On 11Feb2012 13:12, Stephen J. Turnbull <stephen@xemacs.org> wrote:
+| Jim Jewett writes:
+|  > Are you saying that some (many?  all?) platforms make a bad choice there?
+| 
+| No.  I'm saying that whatever choice is made (except for 'latin-1'
+| because it accepts all bytes regardless of the actual encoding of the
+| data, or PEP 383 "errors='surrogateescape'" for the same reason, both
+| of which are unacceptable defaults for production code *for the same
+| reason*), there is data that will cause that idiom to fail on Python 3
+| where it would not on Python 2.
+
+But...
+
+By your own argument here, the failing is on the part of Python 2
+becuase it is passing when it should fail, because it is effectively
+using the equivalent of 'latin-1'. And you say right there that that is
+unacceptable.
+
+At least with Python 3 you find out early that you're doing something
+dodgy.
+
+Disclaimer: I may be talking our my arse here; my personal code is all
+Python 2 at present because I haven't found an idle weekend (or, more
+likely, week) to spend getting it python 3 ready (meaning parsing ok but
+probably failing a bunch of tests to start with).
+
+I do know that in Python 2 I've tripped over a heap of unicode versus
+latin-1/maybe-ascii text issues and python unicode-vs-str issues
+just recently in Python 2 and a lot of the ambiguity I've been juggling
+would be absent in Python 3 (because at least all the strings will be
+unicode and I can concentrate on the encoding/decode stuff instead).
+
+[...snip...]
+| The fact is that with a little bit of knowledge, you can almost
+| certainly get more reliable (and in case of failure, more debuggable)
+| results from Python 3 than from Python 2.
+
+That's my hope.
+
+| But people are happy to
+| deal with the devil they know, even though it's more noxious than the
+| devil they don't.
+
+Not me :-) I speak as one who once moved to MH mail folders and
+vi-with-a-few-macros as a mail reader just to break my use of the mail
+reader I had been using:-(
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+No system, regardless of how sophisticated, can repeal the laws of physics or
+overcome careless driving actions.      - Mercedes Benz

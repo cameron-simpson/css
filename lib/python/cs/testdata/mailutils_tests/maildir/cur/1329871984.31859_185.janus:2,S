@@ -1,0 +1,119 @@
+Return-Path: <python-list-bounces+cs=zip.com.au@python.org>
+Delivered-To: unknown
+Received: from mail.zip.com.au (125.255.95.3) by janus.home with POP3-SSL; 18
+  Jun 2011 02:41:01 -0000
+Delivered-To: cs@zipworld.com.au
+Received: from mailin1.pacific.net.au (mailin1.pacific.net.au [61.8.0.80])
+	by mailstore1.syd.pacific.net.au (Postfix) with ESMTP id 567DE6E57B
+	for <cs@zipworld.com.au>; Sat, 18 Jun 2011 12:39:48 +1000 (EST)
+Received: from mail.python.org (unknown [82.94.164.166])
+	by mailin1.pacific.net.au (Postfix) with ESMTP id AA0FB1842FD
+	for <cs@zip.com.au>; Sat, 18 Jun 2011 12:39:47 +1000 (EST)
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3Qx2jG0tWwzM4L
+	for <cs@zip.com.au>; Sat, 18 Jun 2011 04:39:46 +0200 (CEST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=python.org; s=200901;
+	t=1308364786; bh=X7zfQpN5cf/Rwg6KRg0aFa65n1L9a/EA15PMZAvFrtk=;
+	h=Date:From:To:Subject:Message-ID:MIME-Version:In-Reply-To:
+	 References:Cc:List-Id:List-Unsubscribe:List-Archive:List-Post:
+	 List-Help:List-Subscribe:Content-Type:Content-Transfer-Encoding:
+	 Sender;
+	b=R7W577rZNKKNUXh5UxFo38ukeNkw3pXgf+nvBNuX9/K9J25hqfYjpo4l3M/vh9Jzw
+	 5BZha2Zk3cXV5tbGqkRtj8/hphvJVTw5/oUHL5mYm+FmbJXGpKXqgoORsCsggkhFkN
+	 MsFstI3O8Y6dgmSp8XdRfR/s6ZeGwnq/ZVOQZGS8=
+X-Original-To: python-list@python.org
+Delivered-To: python-list@mail.python.org
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3Qx2dv46hMzLqy
+	for <python-list@python.org>; Sat, 18 Jun 2011 04:36:51 +0200 (CEST)
+X-Spam-Status: OK 0.001
+X-Spam-Evidence: '*H*': 1.00; '*S*': 0.00; 'subject:module': 0.04;
+	'received:edu.au': 0.07; 'python': 0.08; 'mix': 0.09; 'throw':
+	0.09; 'wrote:': 0.14; '"exit': 0.16; '"finally"': 0.16; '"in"':
+	0.16; '"return"': 0.16; 'clash': 0.16; 'from:addr:cs': 0.16;
+	'from:addr:zip.com.au': 0.16; 'from:name:cameron simpson': 0.16;
+	'message-id:@cskk.homeip.net': 0.16; 'received:202.125.174': 0.16;
+	'received:202.125.174.133': 0.16;
+	'received:boardofstudies.nsw.edu.au': 0.16;
+	'received:cskk.homeip.net': 0.16;
+	'received:harvey.boardofstudies.nsw.edu.au': 0.16;
+	'received:homeip.net': 0.16; 'received:nsw.edu.au': 0.16;
+	'word),': 0.16; 'cc:addr:python-list': 0.17; 'keyword': 0.19;
+	'cheers,': 0.19; 'header:In-Reply-To:1': 0.21; 'cc:2**0': 0.22;
+	'cc:no real name:2**0': 0.23; 'statement,': 0.23; 'raise': 0.28;
+	'e.g.': 0.29; 'import': 0.29; 'cc:addr:python.org': 0.30;
+	'module': 0.30; 'exiting': 0.30; 'steven': 0.32; 'lines': 0.33;
+	'thinking': 0.34; 'header:User-Agent:1': 0.35; "d'aprano": 0.35;
+	'charset:us-ascii': 0.36; 'uses': 0.36; 'received:au': 0.37;
+	'another': 0.37; 'but': 0.38; 'word,': 0.38; 'subject:: ': 0.38;
+	"i'd": 0.39; 'feature': 0.40; 'lives': 0.63; 'our': 0.63;
+	'world.': 0.65; 'received:202': 0.66; 'here': 0.66; 'cameron':
+	0.73; 'age': 0.84; 'descriptive': 0.84; 'grey': 0.96
+Received: from localhost (HELO mail.python.org) (127.0.0.1)
+	by albatross.python.org with SMTP; 18 Jun 2011 04:36:51 +0200
+Received: from harvey.boardofstudies.nsw.edu.au
+	(mail2.rack1.boardofstudies.nsw.edu.au [202.125.174.133])
+	by mail.python.org (Postfix) with ESMTP
+	for <python-list@python.org>; Sat, 18 Jun 2011 04:36:51 +0200 (CEST)
+Received: from cskk.homeip.net (localhost.localdomain [127.0.0.1])
+	by harvey.boardofstudies.nsw.edu.au (Postfix) with ESMTP id 44B614D3B56;
+	Sat, 18 Jun 2011 12:36:42 +1000 (EST)
+Received: by janus.cskk.homeip.net (Postfix, from userid 1000)
+	id 2C075100419B7; Sat, 18 Jun 2011 12:36:42 +1000 (EST)
+Date: Sat, 18 Jun 2011 12:36:42 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Steven D'Aprano <steve+comp.lang.python@pearwood.info>
+Subject: Re: break in a module
+Message-ID: <20110618023641.GA16664@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <4dfaed89$0$30002$c3e8da3$5496439d@news.astraweb.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+References: <4dfaed89$0$30002$c3e8da3$5496439d@news.astraweb.com>
+Cc: python-list@python.org
+X-BeenThere: python-list@python.org
+X-Mailman-Version: 2.1.12
+Precedence: list
+List-Id: General discussion list for the Python programming language
+	<python-list.python.org>
+List-Unsubscribe: <http://mail.python.org/mailman/options/python-list>,
+	<mailto:python-list-request@python.org?subject=unsubscribe>
+List-Archive: <http://mail.python.org/pipermail/python-list>
+List-Post: <mailto:python-list@python.org>
+List-Help: <mailto:python-list-request@python.org?subject=help>
+List-Subscribe: <http://mail.python.org/mailman/listinfo/python-list>,
+	<mailto:python-list-request@python.org?subject=subscribe>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Sender: python-list-bounces+cs=zip.com.au@python.org
+Errors-To: python-list-bounces+cs=zip.com.au@python.org
+X-Cats2Procmailrc-Rule: cats/home: python  python-list     sender:python-list-bounces+cs=zip.com.au@python.org
+X-Label: python-list
+Content-Length: 1019
+
+On 17Jun2011 06:00, Steven D'Aprano <steve+comp.lang.python@pearwood.info> wrote:
+| If we were to have a "exit this module early, but without exiting Python 
+| altogether" statement, I'd consider "exit" to be the most descriptive 
+| name, although it would clash with existing uses of the word, e.g. 
+| sys.exit(). Overloading "break" strikes me as disagreeable, but not as 
+| disagreeable as overloading "return" or "in" :)
+
+Just to throw another approach into the mix (because I was thinking
+about the "finally" word), what about:
+
+  raise StopImport
+
+along the lines of generators' "raise StopIteration".
+
+Then the import machinery can catch it, no new keyword is needed and no
+existing keyword needs feature creeping.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+And it is not our part here to take thought only for a season, or for a few
+lives of Men, or for a passing age of the world.        - Gandalf the grey
+-- 
+http://mail.python.org/mailman/listinfo/python-list

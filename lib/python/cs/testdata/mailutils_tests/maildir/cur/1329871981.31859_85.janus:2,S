@@ -1,0 +1,124 @@
+Return-Path: <python-list-bounces+cs=zip.com.au@python.org>
+Delivered-To: unknown
+Received: from mail.zip.com.au (125.255.95.3) by janus.home with POP3-SSL; 08
+  Nov 2011 05:03:04 -0000
+Delivered-To: cs@zipworld.com.au
+Received: from mailin4-syd3.pacific.net.au (mailin4-syd3.pacific.net.au [125.255.92.145])
+	by mailstore2.syd.pacific.net.au (Postfix) with ESMTP id 0D6D03CCA
+	for <cs@zipworld.com.au>; Tue,  8 Nov 2011 16:01:59 +1100 (EST)
+Received: from mail.python.org (unknown [82.94.164.166])
+	by mailin4-syd3.pacific.net.au (Postfix) with ESMTP id 5E6AE4D8096
+	for <cs@zip.com.au>; Tue,  8 Nov 2011 16:01:58 +1100 (EST)
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3Scz5G4GRDzNSZ
+	for <cs@zip.com.au>; Tue,  8 Nov 2011 06:01:54 +0100 (CET)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=python.org; s=200901;
+	t=1320728514; bh=nOiCOEEh6v3whb9OblYco4JGb6ZpF5rDeBOxR6TjROo=;
+	h=Date:From:To:Subject:Message-ID:MIME-Version:In-Reply-To:
+	 References:Cc:List-Id:List-Unsubscribe:List-Archive:List-Post:
+	 List-Help:List-Subscribe:Content-Type:Content-Transfer-Encoding:
+	 Sender;
+	b=Goyg6AJFtvsVITpdFiFC8jBEYnfbM+Q1gltPgxfD/w8FqnNa6h4mYpIQXkkqnkv2U
+	 dJrwH8eksGOmAvCb4mJVH5udGrfGRd0Wvpbk0+pjc4FT2J7jZo19vzkJk81zP7fTdi
+	 zRr63PTaWmV1Gt+aKvO5ofERB3s9ohE5KFhUJ+dI=
+X-Original-To: python-list@python.org
+Delivered-To: python-list@mail.python.org
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3Scz275WbSzNS9
+	for <python-list@python.org>; Tue,  8 Nov 2011 05:59:11 +0100 (CET)
+X-Spam-Status: OK 0.017
+X-Spam-Evidence: '*H*': 0.97; '*S*': 0.00; 'suppose': 0.05;
+	'subject:Python': 0.06; 'received:edu.au': 0.07; 'tab': 0.07;
+	'fetch': 0.09; 'am,': 0.12; 'cc:addr:python-list': 0.15;
+	'footnotes': 0.16; 'from:addr:cs': 0.16; 'from:addr:zip.com.au':
+	0.16; 'from:name:cameron simpson': 0.16; 'gene': 0.16; 'message-
+	id:@cskk.homeip.net': 0.16; 'received:202.125.174': 0.16;
+	'received:202.125.174.133': 0.16;
+	'received:boardofstudies.nsw.edu.au': 0.16;
+	'received:cskk.homeip.net': 0.16;
+	'received:harvey.boardofstudies.nsw.edu.au': 0.16;
+	'received:homeip.net': 0.16; 'received:nsw.edu.au': 0.16;
+	'cheers,': 0.18; 'wrote:': 0.18; 'seems': 0.19; 'file,': 0.21;
+	'subject:please': 0.21; 'header:In-Reply-To:1': 0.23; 'elements':
+	0.28; 'toward': 0.28; 'cc:addr:python.org': 0.29; 'second': 0.29;
+	'turned': 0.30; 'header:User-Agent:1': 0.33; 'file.': 0.34;
+	'file': 0.36; 'received:au': 0.36; 'cc:2**1': 0.36; 'charset:us-
+	ascii': 0.36; 'but': 0.37; 'page': 0.37; 'using': 0.37; 'monday,':
+	0.38; 'perhaps': 0.38; 'extend': 0.39; 'subject:: ': 0.39; 'data':
+	0.40; 'did': 0.40; 'per': 0.61; 'leading': 0.61; 'your': 0.61;
+	'2011': 0.62; 'received:202': 0.65; 'high': 0.66; 'bottom': 0.68;
+	'cameron': 0.73; 'design.': 0.73; 'hate': 0.73; 'failure': 0.74;
+	'15k': 0.84; '30k': 0.84; "browser's": 0.84; 'on?': 0.84; 'swag,':
+	0.84; 'typographic': 0.84
+Received: from localhost (HELO mail.python.org) (127.0.0.1)
+	by albatross.python.org with SMTP; 08 Nov 2011 05:59:11 +0100
+Received: from harvey.boardofstudies.nsw.edu.au
+	(mail2.rack1.boardofstudies.nsw.edu.au [202.125.174.133])
+	by mail.python.org (Postfix) with ESMTP
+	for <python-list@python.org>; Tue,  8 Nov 2011 05:59:11 +0100 (CET)
+Received: from cskk.homeip.net (localhost.localdomain [127.0.0.1])
+	by harvey.boardofstudies.nsw.edu.au (Postfix) with ESMTP id 6E0ED4D3B56;
+	Tue,  8 Nov 2011 15:59:00 +1100 (EST)
+Received: by janus.cskk.homeip.net (Postfix, from userid 1000)
+	id 582E5100419B7; Tue,  8 Nov 2011 15:59:00 +1100 (EST)
+Date: Tue, 8 Nov 2011 15:59:00 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: gene heskett <gheskett@wdtv.com>
+Subject: Re: Python lesson please
+Message-ID: <20111108045900.GA12613@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <201111071500.49230.gheskett@wdtv.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+References: <201111071500.49230.gheskett@wdtv.com>
+Cc: python-list@python.org, d@davea.name
+X-BeenThere: python-list@python.org
+X-Mailman-Version: 2.1.12
+Precedence: list
+List-Id: General discussion list for the Python programming language
+	<python-list.python.org>
+List-Unsubscribe: <http://mail.python.org/mailman/options/python-list>,
+	<mailto:python-list-request@python.org?subject=unsubscribe>
+List-Archive: <http://mail.python.org/pipermail/python-list>
+List-Post: <mailto:python-list@python.org>
+List-Help: <mailto:python-list-request@python.org?subject=help>
+List-Subscribe: <http://mail.python.org/mailman/listinfo/python-list>,
+	<mailto:python-list-request@python.org?subject=subscribe>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Sender: python-list-bounces+cs=zip.com.au@python.org
+Errors-To: python-list-bounces+cs=zip.com.au@python.org
+X-Cats2Procmailrc-Rule: cats/home: python  python-list     sender:python-list-bounces+cs=zip.com.au@python.org
+X-Label: python-list
+Content-Length: 1150
+
+On 07Nov2011 15:00, gene heskett <gheskett@wdtv.com> wrote:
+| On Monday, November 07, 2011 02:43:11 PM Dave Angel did opine:
+| > On 11/07/2011 11:40 AM, gene heskett wrote:
+| > > Down toward the bottom of the file, the tab indentations were as high
+| > > as 33 leading tabs per line.  Each stanza of the data was tab
+| > > indented 2 additional tabs from the one above it in the original
+| > > file.  30k was perhaps a poor SWAG, but 10 to 15k seems an entirely
+| > > reasonable guess.
+| > 
+| > What program are you using to read the file and support that claim?
+| 
+| vim.  But remember, this first one started out as a copy/paste from the 
+| firefox-7.0.1 screen.
+
+I don't suppose you had autoident turned on?
+
+I hate using cu/paste to fetch data; _always_ use a "download" link, or
+use the browser's "save page as" facility.
+
+But still, if your MD5 checksums now match...
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Footnotes that extend to a second page are an abject failure of design.
+        - Bringhurst, _The Elements of Typographic Style_
+-- 
+http://mail.python.org/mailman/listinfo/python-list

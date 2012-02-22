@@ -1,0 +1,68 @@
+Date: Sat, 13 Jun 2009 15:12:22 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Nick Coghlan <ncoghlan@gmail.com>
+Cc: Frederick Reeve <cylix@solace.info>,
+	Antoine Pitrou <solipsis@pitrou.net>, python-dev@python.org
+Subject: Re: io.BufferedReader.peek() Behaviour in python3.1
+Message-ID: <20090613051222.GA23544@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <4A330DCD.4080608@gmail.com>
+User-Agent: Mutt/1.5.19 (2009-01-05)
+Content-Length: 2527
+
+On 13Jun2009 12:24, Nick Coghlan <ncoghlan@gmail.com> wrote:
+| Frederick Reeve wrote:
+| > The other point still stands though.  I would like to see peek
+| > changed.  I am willing to write and submit changes but don't want to
+| > unless others agree this is a good idea.  So I put forth the
+| > implementation at the bottom of this email.  If its bad or you don't
+| > see the point I may try to clarify but if nobody things its good,
+| > please just tell me I'm waisting your time, and I will go away.  I
+| > also apologize my last email was so long.
+| > 
+| > peek(n): If n is less than 0, None, or not set; return buffer
+| > contents with out advancing stream position. If the buffer is empty
+| > read a full chunk and return the buffer.  Otherwise return exactly n
+| > bytes up to _chunk size_(not contents) with out advancing the stream
+| > position.  If the buffer contents is less than n, buffer an
+| > additional chunk from the "raw" stream before hand.  If EOF is
+| > encountered during any raw read then return as much as we can up to
+| > n. (maybe I should write that in code form??)
+| 
+| I would phrase this suggestion as users having a reasonable expectation
+| that the following invariant should hold for a buffered stream:
+| 
+|   f.peek(n) == f.read(n)
+| 
+| Since the latter method will perform as many reads of the underlying
+| stream as necessary to reach the requested number of bytes (or EOF),
+| then so should the former.
+
+I disagree. If that were that case, why have peek() at all? I realise
+that it doesn't move the logical position, but it does mean that
+peek(huge_number) imposes a requirement to grow the stream buffer
+arbitrarily.
+
+A peek that does at most one raw read has the advantage that it can pick up
+data outside the buffer but lurking in the OS buffer, yet to be obtained.
+Those data are free, if they're present. (Of course, if they're absent
+peek() wil still block).
+
+Since (if the OS buffer is also empty) even a peek(1) can block, maybe
+we should canvas peek()'s common use cases. Naively (never having used
+peek()), my own desire would normally be for a peek(n, block=False) a
+bit like Queue.get(). Then I could be sure not to block if I wanted to
+avoid it, even on a blocking stream, yet still obtain unread buffered
+data if present.
+
+So: what do people use peek() for, mostly?
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+We're in the business of putting goo on a substrate.
+- overhead by WIRED at the Intelligent Printing conference Oct2006

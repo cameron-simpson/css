@@ -1,0 +1,49 @@
+Date: Mon, 21 Dec 2009 15:59:31 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Andreas =?utf-8?Q?R=F8sdal?= <andrearo@pvv.ntnu.no>
+Cc: python-list@python.org
+Subject: Re: Multithreaded python program freezes
+Message-ID: <20091221045931.GA15398@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: inline
+Content-Transfer-Encoding: 8bit
+In-Reply-To: <alpine.DEB.1.00.0912201729290.29519@decibel.pvv.ntnu.no>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 1232
+
+On 20Dec2009 17:36, Andreas R�sdal <andrearo@pvv.ntnu.no> wrote:
+| I have some problems with a http proxy which is implemented
+| in Python 2.6. A few times a day, the proxy begins using 100% CPU
+| and doesn't work any more.
+| 
+| I have created a thread dump when the problem occurs here:
+| http://www.pvv.ntnu.no/~andrearo/thread-dump.html
+| 
+| This is a thread dump during normal operation:
+| http://www.pvv.ntnu.no/~andrearo/thread-dump-normal.html
+
+These two URLs don't work for me.
+
+[...]
+| Any advice on why this Python program appears to freeze? Is there anything
+| more I can do to find out why this problem occurs?
+
+Sounds like a livelock:
+  http://en.wikipedia.org/wiki/Deadlock#Livelock
+or busy lock.
+
+Can you find out which bits of your program are busy?
+
+Are there places in your code that loop, polling for data, instead of
+using blocking I/O. With a network proxy, a typical place that might
+happen is a loop testing select() (or its poll-like friends) with a short or
+zero timeout on inactive file handles.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+No electrons were harmed in the production of this message.
+        - Dr. P. Gensheimer <paulg@fs1.mpifr-bonn.mpg.de>

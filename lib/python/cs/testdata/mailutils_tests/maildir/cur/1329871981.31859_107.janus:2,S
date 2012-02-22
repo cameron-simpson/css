@@ -1,0 +1,157 @@
+Return-Path: <python-dev-bounces+cs=zip.com.au@python.org>
+Delivered-To: unknown
+Received: from mail.zip.com.au (125.255.95.3) by janus.home with POP3-SSL; 07
+  Oct 2011 03:03:02 -0000
+Delivered-To: cs@zipworld.com.au
+Received: from mailin3-syd3.pacific.net.au (mailin3-syd3.pacific.net.au [125.255.92.144])
+	by mailstore2.syd.pacific.net.au (Postfix) with ESMTP id 901406A71
+	for <cs@zipworld.com.au>; Fri,  7 Oct 2011 14:02:57 +1100 (EST)
+Received: from mail.python.org (unknown [82.94.164.166])
+	by mailin3-syd3.pacific.net.au (Postfix) with ESMTP id AFF8E4000BD
+	for <cs@zip.com.au>; Fri,  7 Oct 2011 14:03:45 +1100 (EST)
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3SFFyd15w0zPJ5
+	for <cs@zip.com.au>; Fri,  7 Oct 2011 05:02:49 +0200 (CEST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=python.org; s=200901;
+	t=1317956569; bh=5Xi9UMfjfWjT37i2R/jgyWPmEhmKOTET2r1PekVguQ4=;
+	h=Date:From:To:Message-ID:MIME-Version:In-Reply-To:References:Cc:
+	 Subject:List-Id:List-Unsubscribe:List-Archive:List-Post:List-Help:
+	 List-Subscribe:Content-Type:Content-Transfer-Encoding:Sender;
+	b=NDqtb48xHtdlsKOTdpwuariJ0fJHpzfT4f68vUSInfk57+GIdhgeaRKMcGeXdyhDj
+	 ZOTaJbIER33OqUkT9zAu7EoWjzQpA2btd6xUgxx6lI8pSOrNhuFVIP8TI8JCVV4Up7
+	 dorWxPm3UJgVmIKIiTVUk3U2BshSrAR0K3C2g56E=
+X-Original-To: python-dev@python.org
+Delivered-To: python-dev@mail.python.org
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3SFFwp6Jz7zNy3
+	for <python-dev@python.org>; Fri,  7 Oct 2011 05:01:14 +0200 (CEST)
+X-Spam-Status: OK 0.001
+X-Spam-Evidence: '*H*': 1.00; '*S*': 0.00; 'oct': 0.02; 'disagree':
+	0.07; 'received:edu.au': 0.07; 'subject:when': 0.07; 'suite.':
+	0.07; 'tests,': 0.07; 'python': 0.08; 'api': 0.09;
+	'subject:Issue': 0.15; '*before*': 0.16; '>on': 0.16; 'badly.':
+	0.16; 'from:addr:cs': 0.16; 'from:addr:zip.com.au': 0.16;
+	'from:name:cameron simpson': 0.16; 'message-id:@cskk.homeip.net':
+	0.16; 'received:202.125.174': 0.16; 'received:202.125.174.133':
+	0.16; 'received:boardofstudies.nsw.edu.au': 0.16;
+	'received:cskk.homeip.net': 0.16;
+	'received:harvey.boardofstudies.nsw.edu.au': 0.16;
+	'received:homeip.net': 0.16; 'received:nsw.edu.au': 0.16; 'root,':
+	0.16; 'subject:): ': 0.16; 'to:addr:steve': 0.16; 'wrote:': 0.16;
+	'cheers,': 0.18; 'slightly': 0.19; 'cc:no real name:2**0': 0.20;
+	'seems': 0.20; "aren't": 0.21; 'stuff': 0.22; 'cc:2**0': 0.22;
+	'header:In-Reply-To:1': 0.22; '>the': 0.23; 'missed': 0.24; 'pm,':
+	0.24; 'tests': 0.25; "i'm": 0.27; 'code,': 0.28; 'putting': 0.28;
+	'described': 0.28; 'cc:addr:python.org': 0.30; '>and': 0.30;
+	'yes.': 0.30; 'andrew': 0.32; 'point,': 0.32; 'subject: \n\t':
+	0.32; 'probably': 0.33; 'there': 0.33; 'header:User-Agent:1':
+	0.34; 'test': 0.34; 'clearly': 0.34; "we're": 0.34; 'root': 0.34;
+	'symbol': 0.34; 'running': 0.35; 'supposed': 0.35; 'charset:us-
+	ascii': 0.36; 'received:au': 0.36; 'doing': 0.36; 'impression':
+	0.37; 'machine': 0.37; 'run': 0.37; 'but': 0.37; 'steven': 0.38;
+	'some': 0.38; 'should': 0.38; 'subject:: ': 0.39; 'under': 0.39;
+	'correctly': 0.39; 'subject: (': 0.39; 'more': 0.60; 'your': 0.61;
+	'order': 0.62; 'dedicated': 0.62; 'full': 0.63; 'reply': 0.64;
+	'received:202': 0.66; 'cameron': 0.67; 'special': 0.67;
+	'production': 0.70; 'news': 0.73; 'glyph': 0.84; 'territory.':
+	0.84; 'fear.': 0.91; 'scenario': 0.93; 'absolutely': 0.98
+Received: from localhost (HELO mail.python.org) (127.0.0.1)
+	by albatross.python.org with SMTP; 07 Oct 2011 05:01:14 +0200
+Received: from harvey.boardofstudies.nsw.edu.au
+	(mail2.rack1.boardofstudies.nsw.edu.au [202.125.174.133])
+	by mail.python.org (Postfix) with ESMTP
+	for <python-dev@python.org>; Fri,  7 Oct 2011 05:01:14 +0200 (CEST)
+Received: from cskk.homeip.net (localhost.localdomain [127.0.0.1])
+	by harvey.boardofstudies.nsw.edu.au (Postfix) with ESMTP id AAFA84D3B5C;
+	Fri,  7 Oct 2011 14:01:12 +1100 (EST)
+Received: by janus.cskk.homeip.net (Postfix, from userid 1000)
+	id 93B5E100419B7; Fri,  7 Oct 2011 14:01:12 +1100 (EST)
+Date: Fri, 7 Oct 2011 14:01:12 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Steven D'Aprano <steve@pearwood.info>
+Message-ID: <20111007030112.GA25985@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <4E8E6712.8050004@pearwood.info>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+References: <4E8E6712.8050004@pearwood.info>
+Cc: python-dev@python.org
+Subject: Re: cpython (3.2): Issue
+	#11956:	Skip	test_import.test_unwritable_directory on FreeBSD
+	when run as
+X-BeenThere: python-dev@python.org
+X-Mailman-Version: 2.1.12
+Precedence: list
+List-Id: Python core developers <python-dev.python.org>
+List-Unsubscribe: <http://mail.python.org/mailman/options/python-dev>,
+	<mailto:python-dev-request@python.org?subject=unsubscribe>
+List-Archive: <http://mail.python.org/pipermail/python-dev>
+List-Post: <mailto:python-dev@python.org>
+List-Help: <mailto:python-dev-request@python.org?subject=help>
+List-Subscribe: <http://mail.python.org/mailman/listinfo/python-dev>,
+	<mailto:python-dev-request@python.org?subject=subscribe>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Sender: python-dev-bounces+cs=zip.com.au@python.org
+Errors-To: python-dev-bounces+cs=zip.com.au@python.org
+X-Cats2Procmailrc-Rule: cats/home: python  python-dev      sender:python-dev-bounces+cs=zip.com.au@python.org
+X-Label: python-dev
+Content-Length: 2197
+
+On 07Oct2011 13:42, Steven D'Aprano <steve@pearwood.info> wrote:
+| Cameron Simpson wrote:
+| >On 06Oct2011 04:26, Glyph <glyph@twistedmatrix.com> wrote:
+| >| On Oct 5, 2011, at 10:46 PM, Cameron Simpson wrote:
+| >| > Surely VERY FEW tests need to be run as root, and they need careful
+| >| > consideration. The whole thing (build, full test suite) should
+| >| > not run as root.
+| >| | This is news to me - is most of Python not supported to run as
+| >root?
+| >| I was under the impression that Python was supposed to run correctly as
+| >| root, and therefore there should be some buildbots dedicated to running
+| >| it that way.  If only a few small parts of the API are supposed to work
+| >| perhaps this should be advertised more clearly in the documentation?
+| >
+| >Pretending the snark to be slightly serious: you've missed the point.
+| >The builtbots are building unreliable code, that being the point of the
+| >test suite. Doing unpredictable stuff as root is bad juju.
+| 
+| Sorry Cameron, it seems to me that you have missed the point, not
+| Glyph.
+
+We're probably both aiming badly.
+
+See my reply to Andrew Bennetts; I'm less concerned if his described
+scenario is typical.
+
+[...snip...]
+| Doing unpredictable stuff as root on a production machine is bad
+| juju. Doing unpredictable stuff as root in order to find out what it
+| will do *before* putting it into production is absolutely vital.
+
+Yes yes yes.
+
+| >Running the builtbots and their tests should not be run as root except
+| >for a very few special tests, and those few need careful consideration
+| >and sandboxing.
+| 
+| Are you suggested that they aren't currently sandboxed?
+
+No, but it was my instinctive fear.
+
+Please see my reply to Andrew Bennetts. I find nothing to disagree with
+in your reply.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+The word is not the thing.
+The map is not the territory.
+The symbol is not the thing symbolized.  - S.I. Hayakawa
+_______________________________________________
+Python-Dev mailing list
+Python-Dev@python.org
+http://mail.python.org/mailman/listinfo/python-dev
+Unsubscribe: http://mail.python.org/mailman/options/python-dev/cs%40zip.com.au

@@ -1,0 +1,28 @@
+Date: Tue, 19 Oct 2010 16:53:27 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: python-list@python.org
+Subject: Re: Deferring a function call
+Message-ID: <20101019055327.GA31483@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <4cbd25cf$0$29981$c3e8da3$5496439d@news.astraweb.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 555
+
+On 19Oct2010 04:59, Steven D'Aprano <steve-REMOVE-THIS@cybersource.com.au> wrote:
+| Chris Rebert has already mentioned the sched module. Otherwise, put the 
+| function call in a thread, and have the thread use time.sleep to wait 
+| until the right time to execute.
+
+There is also the Timer class from the threading module.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+A crash reduces
+your expensive computer
+to a simple stone.
+- Haiku Error Messages http://www.salonmagazine.com/21st/chal/1998/02/10chal2.html

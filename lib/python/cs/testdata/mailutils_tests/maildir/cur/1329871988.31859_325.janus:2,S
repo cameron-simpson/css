@@ -1,0 +1,47 @@
+Date: Sun, 11 Jul 2010 08:33:43 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: pavan kumar maddali <pavan_maddali@yahoo.com>
+Cc: python-list@python.org
+Subject: Re: About new urllib.request in python 3.1.2
+Message-ID: <20100710223343.GA1616@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <810244.99491.qm@web39701.mail.mud.yahoo.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 1023
+
+On 10Jul2010 09:11, pavan kumar maddali <pavan_maddali@yahoo.com> wrote:
+| Thank You Steve,
+| I am not using the urllib.
+
+Your example did:
+
+    from urllib.request import urlopen
+    response = urlopen('http://python.org/') html =
+    response.read()
+
+| I am using the xmlrpc and http modules from the 
+| python library.
+[...]
+
+That's not what he meant.
+
+Your file is called "http.py".
+Python searches the current directory first.
+That means that when any library module (internally) tried to use
+the "http" module it will find your file, not the library module.
+
+So you don't get to use the http library module.
+
+Rename your http.py file to "my-http-test.py" and retry.
+Then its name won't get in the way of the library name.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Success in software development depends on making a carefully planned
+series of small mistakes in order to avoid making unplanned large
+mistakes.       - Steve McConnell, _Software Project Survival Guide_

@@ -1,0 +1,52 @@
+Date: Mon, 28 Nov 2011 08:46:13 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Matt Joiner <anacrolix@gmail.com>
+Cc: rusi <rustompmody@gmail.com>, python-list@python.org
+Subject: Re: sick of distribute, setup, and all the rest...
+Message-ID: <20111127214613.GA11514@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <CAB4yi1Nv3u78i0xj0tsCFs7fiOES1v-qGkG4tsd2XcbSVOnfDA@mail.gmail.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+Content-Length: 1738
+
+On 27Nov2011 23:54, Matt Joiner <anacrolix@gmail.com> wrote:
+| Agreed. I recently gave Haskell a go, and it was remarkable how
+| similar the package management is to Python's.
+| 
+| How well does the new "packaging" (set for release in Python 3.3?)
+| module deal with the problems?
+| 
+| With a better package management system, the half of the standard
+| library that nobody uses can be unceremoniously dumped, and their more
+| recent upstream versions used correctly. Even distutils itself is
+| "obsolete", the first recommendation people give is to replace it with
+| distribute and/or pip.
+
+Ah the cheery optimism of the end user.
+Package systems have a lot of fun complications.
+
+Install for the user only? For the whole system?
+Architecture specific?
+What if people want access to different versions of a package?
+What about vendor supplied (eg RPM) versus user obtained? They'll fight,
+one way or another. What if policy has user supplied installing to its
+own tree (sensible to avoid conflicts) - the fetch/install kit need to
+know this.
+What about stability? Your "half of the standard library that nobody uses can
+be unceremoniously dumped, and their more recent upstream versions used
+correctly" leads to bugs in the apps that use the packages if they depend on
+particular versions/APIs. The stdlib is generally quite careful about
+breaking APIs but other packagers often are less so.
+
+I can make this list bigger or more detailed if you want.  All package
+systems have these issues. They're not as trivial as you might imagine.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+The problem with elections is that the government always wins.
+        - Chris Rudram <csr100@unix.york.ac.uk>

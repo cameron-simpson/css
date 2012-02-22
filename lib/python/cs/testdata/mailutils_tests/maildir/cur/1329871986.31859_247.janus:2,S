@@ -1,0 +1,42 @@
+Date: Sat, 18 Sep 2010 07:56:55 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Antoine Pitrou <solipsis@pitrou.net>
+Cc: python-ideas@python.org
+Subject: Re: New 3.x restriction on number of keyword arguments
+Message-ID: <20100917215655.GA7813@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20100917232133.6088424a@pitrou.net>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 1303
+
+On 17Sep2010 23:21, Antoine Pitrou <solipsis@pitrou.net> wrote:
+| On Sat, 18 Sep 2010 07:05:46 +1000
+| Cameron Simpson <cs@zip.com.au> wrote:
+| > As an example, I use a personal encoding for natural numbers scheme
+| > where values below 128 fit in one byte, 128 or more set the top bit on
+| > leading bytes to indicate followon bytes, so values up to 16383 fit in
+| > two bytes and so on arbitrarily. Compact and simple but unbounded.
+| 
+| Well, you are proposing that we (Python core maintainers) live with
+| additional complication in one of the most central and critical parts of
+| the interpreter, just so that we satisfy some theoretical impulse for
+| "consistency". That doesn't sound reasonable. [...]
+| For the record, have you been hit by this problem, or do you even think
+| you might be hit by it in the near future?
+
+Me, no. But arbitrary _syntactic_ constraints in an otherwise flexible
+language grate. I was only suggesting a compactness-supporting approach,
+not lobbying very hard for making the devs use it.
+
+I'm +10 on removing the syntactic constraint, not on hacking the opcode
+definitons.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Withdrawing in disgust is not the same as conceding.
+        - Jon Adams <jadams@sea06f.sea06.navy.mil>

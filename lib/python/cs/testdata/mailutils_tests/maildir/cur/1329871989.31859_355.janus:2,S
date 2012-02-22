@@ -1,0 +1,56 @@
+Date: Wed, 12 May 2010 14:54:20 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: VanL <van.lindberg@gmail.com>
+Cc: python-dev@python.org
+Subject: Re: Possible patch for functools partial - Interested?
+Message-ID: <20100512045420.GA27885@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <hs1r2s$aje$1@dough.gmane.org>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 1592
+
+On 07May2010 14:53, VanL <van.lindberg@gmail.com> wrote:
+| On 5/7/2010 12:41 PM, Steven D'Aprano wrote:
+| >> Now, if I write
+| >>
+| >>     def f1(x,y): return x+y
+| >>     def f2(x,y): return x+y
+| >>
+| >> I don't expect  f1==f2 to be True, even though f1 and f2 behave in
+| >> exactly the same way, and indeed it is not.
+| 
+| This is not what I am getting after; these (IMO) should compare unequal.
+| I took a fairly conservative line, testing for identity of functions and
+| equality of arguments when converted to a normal form:
+| 
+|     def __eq__(self, other):
+|         try:
+|             return ((self.func == other.func) and
+|                         (self.args == other.args) and
+|                         (self.keywords == other.keywords))
+[...]
+
+I think that if you're going to say "identity" above you should have:
+
+    self.func is other.func
+
+in your code.
+
+If you want "==" in your code (and I think you do, since you're implementing
+__eq__) you should say "equality" instead of "identity".
+
+I know for functions "==" and "is" currently are equivalent, but we should be
+really finicky here about intent, especially since a few messages in the
+thread is contemplate testing function for equivalence to one degree or
+other. At which point "==" and "is" aren't the same any more.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Careful and correct use of language is a powerful aid to straight thinking,
+for putting into words precisely what we mean necessitates getting our own
+minds quite clear on what we mean.      - W.I.B. Beveridge

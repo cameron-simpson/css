@@ -1,0 +1,152 @@
+Return-Path: <python-list-bounces+cs=zip.com.au@python.org>
+Delivered-To: unknown
+Received: from mail.zip.com.au (125.255.95.3) by janus.home with POP3-SSL; 15
+  Jan 2012 23:45:02 -0000
+Delivered-To: cs@zipworld.com.au
+Received: from mailin4-syd3.pacific.net.au (mailin4-syd3.pacific.net.au [125.255.92.145])
+	by mailstore2.syd.pacific.net.au (Postfix) with ESMTP id F2D793C3A
+	for <cs@zipworld.com.au>; Mon, 16 Jan 2012 10:43:17 +1100 (EST)
+Received: from mail.python.org (unknown [82.94.164.166])
+	by mailin4-syd3.pacific.net.au (Postfix) with ESMTP id 56CA44D8092
+	for <cs@zip.com.au>; Mon, 16 Jan 2012 10:43:12 +1100 (EST)
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3TRDlf5tppzN3D
+	for <cs@zip.com.au>; Mon, 16 Jan 2012 00:43:10 +0100 (CET)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=python.org; s=200901;
+	t=1326670990; bh=AgMCCRWeZZQ6dBVyHkWHzP7lTzmnbKd+Je34fu5z3io=;
+	h=Date:From:To:Subject:Message-ID:MIME-Version:In-Reply-To:
+	 References:Cc:List-Id:List-Unsubscribe:List-Archive:List-Post:
+	 List-Help:List-Subscribe:Content-Type:Content-Transfer-Encoding:
+	 Sender;
+	b=RNuBgUyIpwkVDXQ2DCoIm6S2SukAHhLYyK94BljzEThTtf7KFoqNYoQxsVV1b12Cr
+	 KnyVqNZbWYFKGwiopGXsNFjKJFKL5lQGLI44fqiMVckcOZiW6Nj+awzw0DkHFS7u9C
+	 wJLicEmu4EyuQBfgWXGlAzYpw0ZnL3ZwINA/pKPA=
+X-Original-To: python-list@python.org
+Delivered-To: python-list@mail.python.org
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3TRDhT5Jy7zN1J
+	for <python-list@python.org>; Mon, 16 Jan 2012 00:40:25 +0100 (CET)
+X-Spam-Status: OK 0.005
+X-Spam-Evidence: '*H*': 0.99; '*S*': 0.00; '"c"': 0.07;
+	'received:edu.au': 0.07; 'subject:while': 0.07; 'tab': 0.07;
+	'python': 0.08; 'subject:Problem': 0.09; "hasn't": 0.13;
+	'subject:file': 0.13; 'cc:addr:python-list': 0.15; 'this:': 0.15;
+	"'r').read()": 0.16; 'from:addr:cs': 0.16; 'from:addr:zip.com.au':
+	0.16; 'from:name:cameron simpson': 0.16; 'message-
+	id:@cskk.homeip.net': 0.16; 'officer.': 0.16;
+	'received:202.125.174': 0.16; 'received:202.125.174.133': 0.16;
+	'received:boardofstudies.nsw.edu.au': 0.16;
+	'received:cskk.homeip.net': 0.16;
+	'received:harvey.boardofstudies.nsw.edu.au': 0.16;
+	'received:homeip.net': 0.16; 'received:nsw.edu.au': 0.16;
+	'to:addr:pearwood.info': 0.16; 'to:addr:steve+comp.lang.python':
+	0.16; "to:name:steven d'aprano": 0.16; 'wrote:': 0.16; 'bytes':
+	0.18; 'jan': 0.19; 'cheers,': 0.20; 'cc:no real name:2**0': 0.21;
+	'header:In-Reply-To:1': 0.22; 'indentation': 0.23; 'cc:2**0':
+	0.25; 'guess': 0.25; 'mine': 0.28; 'explicit': 0.28; 'print':
+	0.29; 'cc:addr:python.org': 0.29; 'separated': 0.30; 'sun,': 0.30;
+	'does': 0.32; 'actual': 0.32; 'header:User-Agent:1': 0.33;
+	'character': 0.34; 'file.': 0.34; 'all.': 0.34; '2.4': 0.34;
+	'solaris': 0.34; 'thank': 0.35; 'file': 0.35; 'received:au': 0.36;
+	'post': 0.36; 'charset:us-ascii': 0.36; 'two': 0.37; 'but': 0.37;
+	'using': 0.37; 'configured': 0.38; 'steven': 0.38; 'some': 0.38;
+	'created': 0.38; 'subject:with': 0.38; 'think': 0.38; 'clearly':
+	0.39; 'called': 0.39; 'subject:: ': 0.39; 'one,': 0.40; 'type':
+	0.60; 'more': 0.61; 'your': 0.61; 'you.': 0.64; 'here.': 0.64;
+	'alternative': 0.65; 'received:202': 0.65; 'show': 0.67; 'ali':
+	0.67; 'special': 0.67; 'spaces': 0.73; 'cameron': 0.77; 'place?':
+	0.84; 'saqib': 0.84; 'size?': 0.84; 'finger': 0.91; 'letters,':
+	0.91
+Received: from localhost (HELO mail.python.org) (127.0.0.1)
+	by albatross.python.org with SMTP; 16 Jan 2012 00:40:25 +0100
+Received: from harvey.boardofstudies.nsw.edu.au
+	(mail2.rack1.boardofstudies.nsw.edu.au [202.125.174.133])
+	by mail.python.org (Postfix) with ESMTP
+	for <python-list@python.org>; Mon, 16 Jan 2012 00:40:25 +0100 (CET)
+Received: from cskk.homeip.net (localhost.localdomain [127.0.0.1])
+	by harvey.boardofstudies.nsw.edu.au (Postfix) with ESMTP id 1A0804D3B63;
+	Mon, 16 Jan 2012 10:40:09 +1100 (EST)
+Received: by janus.cskk.homeip.net (Postfix, from userid 1000)
+	id 04707100419B7; Mon, 16 Jan 2012 10:40:08 +1100 (EST)
+Date: Mon, 16 Jan 2012 10:40:08 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Steven D'Aprano <steve+comp.lang.python@pearwood.info>
+Subject: Re: Problem while doing a cat on a tabbed file with pexpect
+Message-ID: <20120115234008.GA28596@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <4f135b65$0$29987$c3e8da3$5496439d@news.astraweb.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+References: <4f135b65$0$29987$c3e8da3$5496439d@news.astraweb.com>
+Cc: python-list@python.org
+X-BeenThere: python-list@python.org
+X-Mailman-Version: 2.1.12
+Precedence: list
+List-Id: General discussion list for the Python programming language
+	<python-list.python.org>
+List-Unsubscribe: <http://mail.python.org/mailman/options/python-list>,
+	<mailto:python-list-request@python.org?subject=unsubscribe>
+List-Archive: <http://mail.python.org/pipermail/python-list>
+List-Post: <mailto:python-list@python.org>
+List-Help: <mailto:python-list-request@python.org?subject=help>
+List-Subscribe: <http://mail.python.org/mailman/listinfo/python-list>,
+	<mailto:python-list-request@python.org?subject=subscribe>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Sender: python-list-bounces+cs=zip.com.au@python.org
+Errors-To: python-list-bounces+cs=zip.com.au@python.org
+X-Cats2Procmailrc-Rule: cats/home: python  python-list     sender:python-list-bounces+cs=zip.com.au@python.org
+X-Label: python-list
+Content-Length: 1492
+
+On 15Jan2012 23:04, Steven D'Aprano <steve+comp.lang.python@pearwood.info> wrote:
+| On Sun, 15 Jan 2012 09:51:44 -0800, Saqib Ali wrote:
+| > I am using Solaris 10, python 2.6.2, pexpect 2.4
+| > 
+| > I create a file called me.txt which contains the letters "A", "B", "C"
+| > on the same line separated by tabs.
+| [...]
+| > Now, clearly the file contains tabs.
+| 
+| That is not clear at all. How do you know it contains tabs? How was the 
+| file created in the first place?
+| 
+| Try this:
+| 
+| text = open('me.txt', 'r').read()
+| print '\t' in text
+| 
+| My guess is that it will print False and that the file does not contain 
+| tabs. Check your editor used to create the file.
+
+I was going to post an alternative theory but on more thought I think
+Steven is right here.
+
+What does:
+
+  od -c me.txt
+
+show you? TABs or multiple spaces?
+
+What does:
+
+  ls -ld me.txt
+
+tell you about the file size? Is it 6 bytes long (three letters, two
+TABs, one newline)?
+
+Steven hasn't been explicit about it, but some editors will write spaces when
+you type a TAB. I have configured mine to do so - it makes indentation more
+reliable for others. If I really need a TAB character I have a special
+finger contortion to get one, but the actual need is rare.
+
+So first check that the file really does contain TABs.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Yes Officer, yes Officer, I will Officer. Thank you.
+-- 
+http://mail.python.org/mailman/listinfo/python-list

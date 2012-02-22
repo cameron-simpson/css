@@ -1,0 +1,28 @@
+From: cs@zip.com.au (Cameron Simpson)
+Date: Wed, 1 Jul 2009 07:46:16 +1000
+Subject: [Pythonmac-SIG] Fink vs MacPorts vs Framework
+In-Reply-To: <64504.66.43.195.184.1246374675.squirrel@rosspixelworks.com>
+Message-ID: <20090630214616.GA25491@cskk.homeip.net>
+Content-Length: 758
+Lines: 20
+
+On 30Jun2009 10:11, Dan Ross <dan at rosspixelworks.com> wrote:
+| I'm not sure I understand what you mean.
+| I can certainly add any packages I like to my Framework build so I don't
+| think availability of packages is a concern.
+| Unless I'm misinterpreting the term "packages"?
+
+Yeah. You mean "package" == "python module", yes?
+I believe he means "packge" == "app install", a MacPorts or Fink level
+"package"; you can install python 2.5 and/or python 2.6 with MacPorts and
+use each as needed.
+
+That said, I use python out of MacPorts, at least when I need 2.6.
+
+Cheers,
+-- 
+Cameron Simpson <cs at zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Trust the computer... the computer is your friend.
+        - Richard Dominelli <dominel at panix.com>

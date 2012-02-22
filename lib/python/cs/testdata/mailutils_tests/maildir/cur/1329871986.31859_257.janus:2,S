@@ -1,0 +1,44 @@
+Date: Fri, 15 Oct 2010 08:21:00 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Tim Chase <python.list@tim.thechases.com>
+Cc: python-list@python.org
+Subject: Re: Boolean value of generators
+Message-ID: <20101014212100.GA21062@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <4CB7565A.8050801@tim.thechases.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 1354
+
+On 14Oct2010 14:13, Tim Chase <python.list@tim.thechases.com> wrote:
+| On 10/14/10 12:53, Paul Rubin wrote:
+| >Carl Banks<pavlovevidence@gmail.com>  writes:
+| >>In general, the only way to test if a generator is empty is to try to
+| >>consume an item.  (It's possible to write an iterator that consumes an
+| >>item and caches it to be returned on the next next(), and whose
+| >>boolean status indicates if there's an item left. ...)
+| >
+| >I remember thinking that Python would be better off if all generators
+| >automatically cached an item, so you could test for emptiness, look
+| >ahead at the next item without consuming it, etc.  This might have been
+| >a good change to make in Python 3.0 (it would have broken compatibility
+| >with 2.x) but it's too late now.
+| 
+| Generators can do dangerous things...I'm not sure I'd *want* to have
+| Python implicitly cache generators without an explicit wrapper to
+| request it: [... damaging counter example ...]
+
++1 to this. Speaking for myself, I would _not_ want a generator to
+commence execution unless I overtly iterate over it.
+
+I suppose we can cue the "hasattr() runs getattr(), ouch!" discussion
+here:-)
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+I had no problem avoiding London before it was built.
+        - ir_johns@csd.brispoly.ac.uk (Ian Johnson)

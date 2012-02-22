@@ -1,0 +1,50 @@
+Date: Sun, 15 Aug 2010 07:25:52 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Stephen Hansen <me+list/python@ixokai.io>
+Cc: python-list@python.org
+Subject: Re: Simple Python Sandbox
+Message-ID: <20100814212552.GA30391@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <4C66F4FD.1010102@ixokai.io>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 1566
+
+On 14Aug2010 12:56, Stephen Hansen <me+list/python@ixokai.io> wrote:
+| On 8/13/10 8:04 PM, Steven D'Aprano wrote:
+| > On Fri, 13 Aug 2010 16:37:40 -0700, Stephen Hansen wrote:
+| >> So, I'm working on a project which embeds Python into a bigger system to
+| >> provide extensibility. In this project, there's basically two types of
+| >> people who will be entering python code.
+| >>
+| >> The trusted folks, who write code which are in files, and which can do
+| >> anything.
+| >>
+| >> The untrusted folks, who are writing very simple chunks of code which
+| >> can only do limited things.
+| > 
+| > I suggest that if the untrusted code is only supposed to be simple and 
+| > limited, you would be best off to write your own "mini-language" using 
+| > Python syntax. 
+| 
+| I considered it and rejected it. The return from the effort required
+| doesn't even vaguely come close to making it worth it.
+
+Ok, what about this: run the untrusted code in a separate process,
+if necessary running as a user with different privileges.
+Provide objects that need to be shared as some sort of proxy.
+Then your untrusted users can do whatever they like in python because
+they won't be presented with the inner parts of the privileged stuff.
+
+This is all rather vague because I don't know exactly what your
+untrusted users need to be able to do, nor how.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Computers in the future may weigh no more than 1.5 tons.
+      --Popular Mechanics, forecasting the relentless march of
+        science, 1949

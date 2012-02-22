@@ -1,0 +1,35 @@
+Date: Sat, 5 Jun 2010 08:05:20 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Magdoll <magdoll@gmail.com>
+Cc: python-list@python.org
+Subject: Re: bz2 module doesn't work properly with all bz2 files
+Message-ID: <20100604220520.GA8014@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <c26e7d3a-e0a2-4452-8a87-5de4d4065f3c@6g2000prg.googlegroups.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 1010
+
+On 04Jun2010 12:53, Magdoll <magdoll@gmail.com> wrote:
+| I'm not sure what's causing this, but depending on the compression
+| program used, the bz2 module sometimes exits earlier.
+| 
+| I used pbzip2 to compress my bz2 files and read through the file using
+| the bz2 module. The file descriptor always exits much earlier than
+| where the actual EOF is. If I use bzip2 instead of pbzip2 to compress
+| the files, then everything is fine.
+| 
+| My files are generally big (several GBs) so decompressing them is not
+| a wise choice, and it is a little unfortunate that I can't use pbzip2
+| because it's usually much faster than bz2.
+
+Have you tested the decompression or the problematic files with the
+bunzip2 command? Just to ensure the bug is with the python bz2 module
+and not with the pbzip2 utility?
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+A lot of people don't know the difference between a violin and a viola, so
+I'll tell you.  A viola burns longer.   - Victor Borge

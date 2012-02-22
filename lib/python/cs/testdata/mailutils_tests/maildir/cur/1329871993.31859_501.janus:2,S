@@ -1,0 +1,46 @@
+Date: Thu, 30 Apr 2009 16:08:16 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Ben Finney <ben+python@benfinney.id.au>
+Cc: python-ideas@python.org
+Subject: Re: having a "iterable" built-in
+Message-ID: <20090430060816.GA3430@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: inline
+Content-Transfer-Encoding: 8bit
+In-Reply-To: <878wljq7op.fsf@benfinney.id.au>
+User-Agent: Mutt/1.5.18 (2008-05-17)
+Content-Length: 1223
+
+On 30Apr2009 10:57, Ben Finney <ben+python@benfinney.id.au> wrote:
+| Cameron Simpson <cs@zip.com.au> writes:
+| > On 29Apr2009 20:47, Tarek Ziad? <ziade.tarek@gmail.com> wrote:
+| > | def iterable(ob):
+| > |     try:
+| > |         iter(ob)
+| > |     except TypeError:
+| > |         return False
+| > |     return True
+| > 
+| > This is actually a bad way of doing it. Suppose using the iterator has
+| > side effects?
+| 
+| If getting an iterator of an object has side effects, I'd say that
+| object's implementation is buggy.
+|
+| > For example, "ob" might be a store-of-recent-messages, which empties
+| > after they have been collected. Or a file() attached to a pipe.
+| 
+| Neither of which should lose any items merely by getting an iterable.
+| 
+| The only thing that should cause the iterable to “lose” items is
+| calling its ‘next’ method, which never happens with Tarek's code above.
+
+Oh. Sorry, my bad. You're absolutely right. I was confusing getting the
+iterator with using it. Thanks!
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+...if you don't get the finger several times a day [while commuting in
+Boston], you're not driving correctly.  - Mark Parrenteau, DJ, WBCN Boston

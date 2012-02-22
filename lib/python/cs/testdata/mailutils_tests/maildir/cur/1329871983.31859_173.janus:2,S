@@ -1,0 +1,120 @@
+Return-Path: <python-list-bounces+cs=zip.com.au@python.org>
+Delivered-To: unknown
+Received: from mail.zip.com.au (125.255.95.3) by janus.home with POP3-SSL; 13
+  Jul 2011 10:03:02 -0000
+Delivered-To: cs@zipworld.com.au
+Received: from mailin2.pacific.net.au (mailin2.pacific.net.au [61.8.0.81])
+	by mailstore1.syd.pacific.net.au (Postfix) with ESMTP id B59A76906A
+	for <cs@zipworld.com.au>; Wed, 13 Jul 2011 20:02:18 +1000 (EST)
+Received: from mail.python.org (unknown [82.94.164.166])
+	by mailin2.pacific.net.au (Postfix) with ESMTP id 19ABC19C173
+	for <cs@zip.com.au>; Wed, 13 Jul 2011 20:02:18 +1000 (EST)
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3RDbLG2Nt9zMdT
+	for <cs@zip.com.au>; Wed, 13 Jul 2011 12:02:14 +0200 (CEST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=python.org; s=200901;
+	t=1310551334; bh=UhAUD6nZflHUZ02TYc03/0hGb43EqHMiQMejXh2IoKg=;
+	h=Date:From:To:Subject:Message-ID:MIME-Version:In-Reply-To:
+	 References:Cc:List-Id:List-Unsubscribe:List-Archive:List-Post:
+	 List-Help:List-Subscribe:Content-Type:Content-Transfer-Encoding:
+	 Sender;
+	b=F7FmKbxZ976qSFcoOtQmkZnZ+yLxHJ5gQ7iXFWNSgQFAdPb5/LXXPoh2ogJfvFbU9
+	 zatYiOjlqvwg3o5ZJU++aJnznHqueH2anCKUUZ7LST/+VrwYzrpqVidbUcPwSoRibC
+	 Gp/4G7dcWVwDUCvU9c/BFE8Rbzl7hBO+XyzT1xSs=
+X-Original-To: python-list@python.org
+Delivered-To: python-list@mail.python.org
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3RDbH22Ss9zMP0
+	for <python-list@python.org>; Wed, 13 Jul 2011 11:59:26 +0200 (CEST)
+X-Spam-Status: OK 0.000
+X-Spam-Evidence: '*H*': 1.00; '*S*': 0.00; 'python,': 0.01; 'lesser':
+	0.07; 'received:edu.au': 0.07; 'hosts': 0.09; 'mercurial': 0.09;
+	'revision': 0.09; 'subject:hosting': 0.09; 'wrote:': 0.15;
+	'bitbucket': 0.16; 'from:addr:cs': 0.16; 'from:addr:zip.com.au':
+	0.16; 'from:name:cameron simpson': 0.16; 'message-
+	id:@cskk.homeip.net': 0.16; 'narrow': 0.16; 'now).': 0.16;
+	'received:202.125.174': 0.16; 'received:202.125.174.133': 0.16;
+	'received:boardofstudies.nsw.edu.au': 0.16;
+	'received:cskk.homeip.net': 0.16;
+	'received:harvey.boardofstudies.nsw.edu.au': 0.16;
+	'received:homeip.net': 0.16; 'received:nsw.edu.au': 0.16;
+	'sourceforge': 0.16; 'sticking': 0.16; 'two.': 0.16; 'useful,':
+	0.16; 'cc:addr:python-list': 0.16; 'cheers,': 0.19; 'cc:2**0':
+	0.21; 'header:In-Reply-To:1': 0.22; 'subject:Code': 0.23;
+	'topic.': 0.23; 'project,': 0.24; 'extent': 0.25; 'there.': 0.25;
+	'(and': 0.27; "i'm": 0.27; 'host': 0.28; 'problem': 0.29;
+	'cc:addr:python.org': 0.30; 'btw,': 0.30; 'liking': 0.30;
+	'conference': 0.30; 'andrew': 0.32; 'generally': 0.33; "i'll":
+	0.33; 'it.': 0.33; 'header:User-Agent:1': 0.34; 'there': 0.34;
+	"isn't": 0.35; 'guys': 0.36; 'charset:us-ascii': 0.36;
+	'received:au': 0.36; 'option': 0.37; 'are.': 0.37; 'some': 0.37;
+	'but': 0.37; 'using': 0.37; 'subject:: ': 0.38; 'somewhat': 0.38;
+	'back': 0.63; 'information,': 0.64; 'received:202': 0.66;
+	'intelligent': 0.66; 'cameron': 0.67; 'wired': 0.73; 'objective.':
+	0.84; 'sweat.': 0.91; 'subject:services': 0.93
+Received: from localhost (HELO mail.python.org) (127.0.0.1)
+	by albatross.python.org with SMTP; 13 Jul 2011 11:59:26 +0200
+Received: from harvey.boardofstudies.nsw.edu.au
+	(mail2.rack1.boardofstudies.nsw.edu.au [202.125.174.133])
+	by mail.python.org (Postfix) with ESMTP
+	for <python-list@python.org>; Wed, 13 Jul 2011 11:59:25 +0200 (CEST)
+Received: from cskk.homeip.net (localhost.localdomain [127.0.0.1])
+	by harvey.boardofstudies.nsw.edu.au (Postfix) with ESMTP id D00FE4D3B56;
+	Wed, 13 Jul 2011 19:59:17 +1000 (EST)
+Received: by janus.cskk.homeip.net (Postfix, from userid 1000)
+	id B3E97100419B7; Wed, 13 Jul 2011 19:59:17 +1000 (EST)
+Date: Wed, 13 Jul 2011 19:59:17 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Andrew Berg <bahamutzero8825@gmail.com>
+Subject: Re: Code hosting services
+Message-ID: <20110713095917.GA8232@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <4E1D413E.7080002@gmail.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+References: <4E1D413E.7080002@gmail.com>
+Cc: "comp.lang.python" <python-list@python.org>
+X-BeenThere: python-list@python.org
+X-Mailman-Version: 2.1.12
+Precedence: list
+List-Id: General discussion list for the Python programming language
+	<python-list.python.org>
+List-Unsubscribe: <http://mail.python.org/mailman/options/python-list>,
+	<mailto:python-list-request@python.org?subject=unsubscribe>
+List-Archive: <http://mail.python.org/pipermail/python-list>
+List-Post: <mailto:python-list@python.org>
+List-Help: <mailto:python-list-request@python.org?subject=help>
+List-Subscribe: <http://mail.python.org/mailman/listinfo/python-list>,
+	<mailto:python-list-request@python.org?subject=subscribe>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Sender: python-list-bounces+cs=zip.com.au@python.org
+Errors-To: python-list-bounces+cs=zip.com.au@python.org
+X-Cats2Procmailrc-Rule: cats/home: python  python-list     sender:python-list-bounces+cs=zip.com.au@python.org
+X-Label: python-list
+Content-Length: 1111
+
+On 13Jul2011 01:54, Andrew Berg <bahamutzero8825@gmail.com> wrote:
+| I know this isn't specific to Python, but it is somewhat on topic. Way
+| back when I had a simple project, SourceForge was by far the most
+| prominent place to host (and it still is, though to a lesser extent
+| now). SourceForge is still an option for me, but I know there are many
+| other hosts out there. The problem is I don't which one what the pros
+| and cons of each are. Wikipedia has some information, but it's generally
+| objective. This is useful, but it's not enough to narrow my choices down
+| to one or two. What can you guys recommend?
+| 
+| BTW, I'll likely be sticking with Mercurial for revision control.
+| TortoiseHg is a wonderful tool set and I managed to get MercurialEclipse
+| working well.
+
+I'm using bitbucket and liking it. Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+If not for the one-percent inspiration, that would have just been a lot
+of sweat.
+- overhead by WIRED at the Intelligent Printing conference Oct2006
+-- 
+http://mail.python.org/mailman/listinfo/python-list

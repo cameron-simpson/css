@@ -1,0 +1,42 @@
+Date: Tue, 28 Apr 2009 13:39:46 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Benjamin Peterson <benjamin@python.org>
+Cc: Glenn Linderman <v+python@g.nevcal.com>,
+	Python-Dev <python-dev@python.org>
+Subject: Re: PEP 383: Non-decodable Bytes in System Character Interfaces
+Message-ID: <20090428033946.GA14685@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: inline
+Content-Transfer-Encoding: 8bit
+In-Reply-To: <1afaf6160904271958r15f2c3c0ide616c9bbc8ca0ee@mail.gmail.com>
+User-Agent: Mutt/1.5.18 (2008-05-17)
+Content-Length: 1085
+
+On 27Apr2009 21:58, Benjamin Peterson <benjamin@python.org> wrote:
+| 2009/4/27 Cameron Simpson <cs@zip.com.au>:
+| > PROPOSAL: add to the PEP the following functions:
+[...]
+| > and for me, I would like to see:
+| >  os.setfilesystemencoding(coding)
+| >
+| > Currently os.getfilesystemencoding() returns you the encoding based on
+| > the current locale, and (I trust) the os.* stuff encodes on that basis.
+| > setfilesystemencoding() would override that, unless coding==None in what
+| > case it reverts to the former "use the user's current locale" behaviour.
+| > (We have locale "C" for what one might otherwise expect None to mean:-)
+| 
+| Time machine! http://docs.python.org/dev/py3k/library/sys.html#sys.setfilesystemencoding
+
+How embarrassing. I thought I'd looked.
+
+It doesn't have the None->return-to-default mode, and I'd like to see
+the word "overwritten" replaced by "overidden".
+
+And of course if Martin's PEP gets adopted then the "e.g." cleause needs
+replacing:-)
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Do not taunt Happy Fun Coder.

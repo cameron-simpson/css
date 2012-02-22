@@ -1,0 +1,85 @@
+Date: Thu, 12 Mar 2009 16:37:10 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Gideon <gideon.simpson@gmail.com>
+Cc: python-list@python.org
+Subject: Re: nohup and os.system
+Message-ID: <20090312053710.GA9615@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <c2812a42-0b83-4933-a87c-6d9573f8d20c@v39g2000yqm.googlegroups.com>
+User-Agent: Mutt/1.5.18 (2008-05-17)
+Content-Length: 2889
+
+On 11Mar2009 21:05, Gideon <gideon.simpson@gmail.com> wrote:
+| I've got a python script, batch.py that, amongst other things,
+| executes commands:
+| 
+| os.system('cmd1')
+| os.system('cmd2')
+| 
+| now, these programs output certain information at the command line,
+| and if i execute
+| 
+| ./batch.py
+| 
+| it shows up as I would expect.
+| 
+| However, if i run
+| 
+| nohup ./batch.py &
+| 
+| then while everything runs, but the intermediate output that generated
+| by each os.system call does not get appended to nohup.out until
+| *after* the command finishes executing.  Is there a way I can get this
+| data to be appended in real time?
+| 
+| What I'm doing in practice is sticking a lightweight python script
+| around an existing fortran binary, and I'd like to be able to monitor
+| the progress of the binary be checking the nohup.out log.
+
+You're being bitten by a standard bit of stdio-on-UNIX. With the stdio
+library, stdout behaves differently (by default) if attached to a
+terminal. If stdout is attached to a terminal it is line buffered,
+and output is flushed on newlines. Otherwise it is block buffered
+and flushed when the buffer fills (8192 bytes or some number like that,
+depending on the system).
+
+This is for efficiency: with block buffering, when you call the stdio
+fwrite() function is merely copies data into a buffer, and does not call an
+OS write() call unless the buffer is full. This results in fewer OS calls,
+fewer data copies, fewer context switches and thus higher throughput.
+
+Programs usually line buffer to a terminal because that produces more
+timely output for people such as yourself when watching it.
+
+This buffering is happening inside the cmd1 and cmd2 programs, not in
+your python script. (Python will buffer like this too, but that's not
+your problem here.)
+
+With nohup, the outputs of cmd1 and cmd2 are going to the nohup.out
+file, and thus are set to block buffering. Unless cmd1 and cmd2 have
+special command line switches to get them to line buffer (or no-buffer)
+your only recourse is to attach them to terminals, thus tricking them
+into doing line buffering again. Fortunately, this is made convenient by
+the script command. For example, try changing the string "cmd1" into the
+string:
+
+  script -a -q -f nohup.out cmd1
+
+(You will probably need GNU script for the -f option; see "man script"
+for details, or just try it.)
+
+The other thing to be aware of when doing this is that script logs the
+output post the terminal character driver; this will normally translate
+newlines in the program output into carriage-return and then newline
+because that is what a terminal requires to move the cursor as needed.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Network Planning Constraint Of The Month:
+        You can't send bits over a non-existant link.
+                - Valdis Kletnieks <valdis@vtvm1.cc.vt.edu>

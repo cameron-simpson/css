@@ -1,0 +1,141 @@
+Return-Path: <python-ideas-bounces+cs=zip.com.au@python.org>
+Delivered-To: unknown
+Received: from mail.zip.com.au (125.255.95.3) by janus.home with POP3-SSL; 11
+  Jan 2012 23:05:02 -0000
+Delivered-To: cs@zipworld.com.au
+Received: from mailin4-syd3.pacific.net.au (mailin4-syd3.pacific.net.au [125.255.92.145])
+	by mailstore1.syd.pacific.net.au (Postfix) with ESMTP id 6A79C6EA28
+	for <cs@zipworld.com.au>; Thu, 12 Jan 2012 10:03:46 +1100 (EST)
+Received: from mail.python.org (unknown [82.94.164.166])
+	by mailin4-syd3.pacific.net.au (Postfix) with ESMTP id 45CD24D808A
+	for <cs@zip.com.au>; Thu, 12 Jan 2012 10:03:34 +1100 (EST)
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3TNm3n00nbzNSS
+	for <cs@zip.com.au>; Thu, 12 Jan 2012 00:03:33 +0100 (CET)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=python.org; s=200901;
+	t=1326323013; bh=LveUDTC+7Pi7q72tNC65RfBVWBJhIbHmlBemKESbya8=;
+	h=Date:From:To:Message-ID:MIME-Version:In-Reply-To:References:
+	 Subject:List-Id:List-Unsubscribe:List-Archive:List-Post:List-Help:
+	 List-Subscribe:Content-Type:Content-Transfer-Encoding:Sender;
+	b=dMl2px946fBryW0M5oRO26C0T1k8TiKcMxjQNG7XL8lVnlCpsUx+FXjfUCpF9P9wb
+	 vqU5/Ny4uDEA9F9wcnOIWNP1CsdG9jm52K3C5HxwN+d8DIg36gR+8dQscosTU/g7KE
+	 hFsDOk+iMg07w0aqUHcTujQHOXoG0bkD59NYODDY=
+X-Original-To: python-ideas@python.org
+Delivered-To: python-ideas@mail.python.org
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3TNm335WHmzN75
+	for <python-ideas@python.org>; Thu, 12 Jan 2012 00:02:55 +0100 (CET)
+X-Spam-Status: OK 0.001
+X-Spam-Evidence: '*H*': 1.00; '*S*': 0.00; 'parameter': 0.05;
+	'(default': 0.07; 'received:edu.au': 0.07; 'suggesting': 0.07;
+	'default)': 0.09; 'flush': 0.09; 'none)': 0.09; 'subject:()':
+	0.09; 'underlying': 0.09; 'anyway': 0.09; '(meaning': 0.16;
+	'from:addr:cs': 0.16; 'from:addr:zip.com.au': 0.16;
+	'from:name:cameron simpson': 0.16; 'hmm.': 0.16; 'message-
+	id:@cskk.homeip.net': 0.16; 'objection': 0.16;
+	'received:202.125.174': 0.16; 'received:202.125.174.133': 0.16;
+	'received:boardofstudies.nsw.edu.au': 0.16;
+	'received:cskk.homeip.net': 0.16;
+	'received:harvey.boardofstudies.nsw.edu.au': 0.16;
+	'received:homeip.net': 0.16; 'received:nsw.edu.au': 0.16; 'sane':
+	0.16; 'subject:Pythonic': 0.16; 'subject:print': 0.16; 'writings':
+	0.16; 'wrote:': 0.18; 'have:': 0.18; '(e.g.,': 0.19; 'slightly':
+	0.19; 'cheers,': 0.20; 'later': 0.21; '(or': 0.22; 'assume': 0.22;
+	'header:In-Reply-To:1': 0.22; 'defined': 0.24; 'cc:2**0': 0.24;
+	'specify': 0.24; 'paul': 0.27; 'cc:addr:gmail.com': 0.28;
+	'explicit': 0.29; 'means,': 0.30; 'now)': 0.30; 'least': 0.30;
+	'values': 0.32; 'list': 0.32; "can't": 0.32; 'header:User-
+	Agent:1': 0.33; 'force': 0.34; 'leaves': 0.34; 'here,': 0.35;
+	'trouble': 0.35; 'received:au': 0.36; 'question': 0.36; 'none':
+	0.37; 'charset:us-ascii': 0.37; 'but': 0.37; 'think': 0.37;
+	'authors': 0.38; 'useful': 0.38; 'url:org': 0.39; 'should': 0.39;
+	'to:addr:python.org': 0.40; 'might': 0.40; 'personal': 0.60;
+	'back': 0.62; 'copyright': 0.64; 'url:11': 0.64; 'ever': 0.65;
+	'received:202': 0.66; '2012': 0.67; 'unlimited': 0.68; 'cameron':
+	0.73; 'moore': 0.73; 'stream': 0.77; 'to:addr:python-ideas': 0.78;
+	'exclusive': 0.79; 'flushing': 0.84; 'securing': 0.93
+Received: from localhost (HELO mail.python.org) (127.0.0.1)
+	by albatross.python.org with SMTP; 12 Jan 2012 00:02:55 +0100
+Received: from harvey.boardofstudies.nsw.edu.au
+	(mail2.rack1.boardofstudies.nsw.edu.au [202.125.174.133])
+	by mail.python.org (Postfix) with ESMTP
+	for <python-ideas@python.org>; Thu, 12 Jan 2012 00:02:54 +0100 (CET)
+Received: from cskk.homeip.net (localhost.localdomain [127.0.0.1])
+	by harvey.boardofstudies.nsw.edu.au (Postfix) with ESMTP id 125B94D3B54;
+	Thu, 12 Jan 2012 10:02:52 +1100 (EST)
+Received: by janus.cskk.homeip.net (Postfix, from userid 1000)
+	id EF418100419B7; Thu, 12 Jan 2012 10:02:51 +1100 (EST)
+Date: Thu, 12 Jan 2012 10:02:51 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: python-ideas@python.org
+Message-ID: <20120111230251.GA23059@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <CACac1F-7mkBhoSbEOgMEo7j25QxivOW26597f254Qgeb-wHe-Q@mail.gmail.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+References: <CACac1F-7mkBhoSbEOgMEo7j25QxivOW26597f254Qgeb-wHe-Q@mail.gmail.com>
+Subject: Re: Pythonic buffering in Py3 print()
+X-BeenThere: python-ideas@python.org
+X-Mailman-Version: 2.1.12
+Precedence: list
+List-Id: Discussions of speculative Python language ideas
+	<python-ideas.python.org>
+List-Unsubscribe: <http://mail.python.org/mailman/options/python-ideas>,
+	<mailto:python-ideas-request@python.org?subject=unsubscribe>
+List-Archive: <http://mail.python.org/pipermail/python-ideas>
+List-Post: <mailto:python-ideas@python.org>
+List-Help: <mailto:python-ideas-request@python.org?subject=help>
+List-Subscribe: <http://mail.python.org/mailman/listinfo/python-ideas>,
+	<mailto:python-ideas-request@python.org?subject=subscribe>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Sender: python-ideas-bounces+cs=zip.com.au@python.org
+Errors-To: python-ideas-bounces+cs=zip.com.au@python.org
+X-Cats2Procmailrc-Rule: cats/home: python  python-ideas    sender:python-ideas-bounces+cs=zip.com.au@python.org
+X-Label: python-ideas
+Content-Length: 1770
+
+[ Taken back on list - I can't see anyway personal here, and the
+  objection is a good one. - Cameron
+]
+
+On 11Jan2012 08:41, Paul Moore <p.f.moore@gmail.com> wrote:
+| On 11 January 2012 06:15, Cameron Simpson <cs@zip.com.au> wrote:
+| > | flush=None?
+| >
+| > +1 from me, if None means "honour the file's default flushing
+| > behaviour".
+| 
+| The trouble with this is that we then have:
+|  - no parameter (default None) => default behaviour
+|  - flush=True => Always flush
+| 
+| and that begs the question of what an explicit flush=False means, and
+| people will assume it means "never flush" even thought you can't force
+| that as the underlying stream might auto-flush (e.g., at a newline).
+| 
+| +1 for flush=True/False, with a default of False (meaning do the
+| stream's default behaviour).
+
+Hmm. Good point about False suggesting "never flush", but I think it should
+just be considered invalid. What about flush=3, or flush=tuple?
+
+Better if we only specify behaviour for True (flush now) and
+None/default/missing (flush default) and make it slightly clear that
+other values do not have defined behaviour. That leaves scope later
+for defining a sane (or at least clear) meaning for False if a _useful_
+one is ever agreed upon. Call it "reserved".
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Copyright and Patents: To prevent the Progress of Science and useful Arts, by
+securing for unlimited Times to Authors and Inventors and Trolls the
+exclusive Right to all Writings and Discoveries.
+- http://science.slashdot.org/story/11/04/26/211258/Copyright-Law-Is-Killing-Science
+_______________________________________________
+Python-ideas mailing list
+Python-ideas@python.org
+http://mail.python.org/mailman/listinfo/python-ideas

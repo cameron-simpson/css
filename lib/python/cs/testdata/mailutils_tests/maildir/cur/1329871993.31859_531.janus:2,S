@@ -1,0 +1,33 @@
+Date: Tue, 24 Feb 2009 13:30:11 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: John Ionides <john.ionides@gmail.com>
+Cc: python-list@python.org
+Subject: Re: ZSI / MTOM
+Message-ID: <20090224023011.GA31951@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <1fd305a1-d087-4902-83ba-780e97bd042f@m24g2000vbp.googlegroups.com>
+User-Agent: Mutt/1.5.18 (2008-05-17)
+Content-Length: 792
+
+On 23Feb2009 08:09, John Ionides <john.ionides@gmail.com> wrote:
+| I have project for which I would like to have a python web service
+| including MTOM. It seems that ZSI is the most complete python web
+| service library but that it doesn't currently support MTOM - and
+| having worked through the code it looks as though it isn't going to be
+| exactly simple. Is there anyone working on a patch (or interested in
+| collaborating if it comes down to writing one)?
+
+Maybe you should ask on the pywebsvcs mailing list, where ZSI discussion
+takes place?
+
+  http://pywebsvcs.sourceforge.net/
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Software engineering? That's like military intelligence, isn't it?
+        - Doug Mohney <sysmgr@king.eng.umd.edu>

@@ -1,0 +1,71 @@
+Date: Tue, 22 Nov 2011 17:06:16 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Roy Smith <roy@panix.com>
+Cc: python-list@python.org
+Subject: Re: sqlalchemy beginner
+Message-ID: <20111122060616.GA17562@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <roy-F87DE4.22180421112011@news.panix.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+Content-Length: 2383
+
+On 21Nov2011 22:18, Roy Smith <roy@panix.com> wrote:
+| In article 
+| <8832ab6d-8def-45d1-92df-baac40e1c498@t36g2000prt.googlegroups.com>,
+|  alex23 <wuwei23@gmail.com> wrote:
+| > On Nov 22, 10:25?am, Roy Smith <r...@panix.com> wrote:
+| > > Everytime I've worked with SQLAlchemy, I've run away screaming in the
+| > > other direction. ?Sure, portability is a good thing, but at what cost?
+| > 
+| > I've never found SQLAlchemy to be anything but sane and approachable.
+| > It's really worth understanding _how_ it works so you can see there's
+| > no magic happening there.
+| > 
+| > What cost do you see inherit in the use of SQLAlchemy?
+| 
+| The cost of understanding how it works :-)
+| 
+| Seriously.  I understand SQL.  Well, I'm not a SQL wizard, but I 
+| understand enough to do what I need to do.  Whenever I have to use 
+| SQLAlchemy, I always find myself knowing exactly what SQL I want to 
+| write and scratching my head to figure out how to translate that into 
+| SQLAlchemy calls.
+
+Are you trying to go the ORM route (make classes etc mapping to SQL
+entities etc)?
+
+I ask because I avoid ORM and mostly use the SQL syntax notation, eg:
+
+    for node_id, attr, value in select( [ attrs.c.NODE_ID,
+                                          attrs.c.ATTR,
+                                          attrs.c.VALUE,
+                                        ] ) \
+                                .order_by(asc(attrs.c.NODE_ID)) \
+                                .execute():
+
+or:
+
+    self.attrs.delete(self.attrs.c.NODE_ID == node_id).execute()
+
+which I find very easy to read (self.attrs is an SQLAchemy table).
+
+ORMs seem very cool and all, but I personally prefer to work with simple
+SQL level schemae and python-level objects and classes i.e. not ORM
+classes but ordinary classes that cll SQLAlchemy
+select/update/delete/etc methods to manipulate the db.
+
+For me the great strengths of SQLA are that it (1) talks to many
+different backend DBs and (2) removes the need to write tediously quotes
+SQL because I can write python expressions like the above that map
+directly to SQL statements, and SQLA does all the quoting, conversion
+etc. Reliably!
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+I sometimes wish that people would put a little more emphasis upon the
+observance of the law than they do upon its enforcement. - Calvin Coolidge

@@ -1,0 +1,49 @@
+Date: Mon, 24 May 2010 12:58:05 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: "Stephen J. Turnbull" <stephen@xemacs.org>
+Cc: Brian Quinlan <brian@sweetapp.com>,
+	Python Development List <python-dev@python.org>
+Subject: Re: PEP 3148 ready for pronouncement
+Message-ID: <20100524025805.GA29197@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <874ohym5op.fsf@uwakimon.sk.tsukuba.ac.jp>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 1607
+
+On 24May2010 10:47, Stephen J. Turnbull <stephen@xemacs.org> wrote:
+| Brian Quinlan writes:
+|  > If you are familiar with threads then writing a "good enough" solution  
+|  > without futures probably won't take you very long. Also, unless you  
+|  > are familiar with another futures implementation, you aren't likely to  
+|  > know where to look.
+| 
+| That looks like an argument *against* your module, to me.  Why would
+| people look for it in the stdlib if they're not looking for it at all,
+| and specifically because anybody who would know enough to look for
+| "something like" it is also able to devise a good-enough solution?
+| You're describing a solution in search of a user, not a user in search
+| of a solution, and it would appear to violate "not every three-line
+| function" as well as TOOWTDI.
+
+This might be a terminology problem. I think, above, Brian means "good
+enough" to mean "looks ok at first cut but doesn't handle the corner
+cases". Which usually means obscure breakage later.
+
+I almost am Brian's hypothetical user. I've got a "FuncMultiQueue" that
+accepts callables in synchronous and asynchronous modes for future
+possibly-concurrent execution, just as the futures module does. I've
+spent a _lot_ of time debugging it.
+
+There's a lot to be said for a robust implementation of a well defined
+problem. Brian's module, had it been present and presuming it robust and
+debugged, would have been quite welcome.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+I am a Bear of Very Little Brain and long words Bother Me.
+        - Winnie-the-Pooh

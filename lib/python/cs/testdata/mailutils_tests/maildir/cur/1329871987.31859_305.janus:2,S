@@ -1,0 +1,60 @@
+Date: Wed, 28 Jul 2010 08:10:48 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Guido van Rossum <guido@python.org>
+Cc: Mathias =?utf-8?Q?Panzenb=C3=B6ck?= <grosser.meister.morti@gmx.net>,
+	Python-Ideas <python-ideas@python.org>
+Subject: Re: Non-boolean return from __contains__
+Message-ID: <20100727221047.GA5223@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: inline
+Content-Transfer-Encoding: 8bit
+In-Reply-To: <AANLkTin4_7LAWfcPMY3vX_sJ6Jy_W_Us_B3qdngtJUav@mail.gmail.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 1740
+
+On 27Jul2010 16:59, Guido van Rossum <guido@python.org> wrote:
+| On Tue, Jul 27, 2010 at 3:29 PM, Mathias Panzenböck
+| <grosser.meister.morti@gmx.net> wrote:
+| > On 07/26/2010 04:20 AM, Alex Gaynor wrote:
+| >>
+| >> Fundamentally the argument in favor of it is the same as for the other
+| >> comparison operators: you want to do symbolic manipulation using the
+| >> "normal" syntax, as a DSL.  My example is that of a SQL expression
+| >> builder: SQLAlchemy uses User.id == 3 to create a clause where the ID
+| >> is 3, but for "id in [1, 2, 3]" it has: User.id.in_([1, 2, 3]), which
+| >> is rather unseamly IMO (at least as much as having User.id.eq(3) would
+| >> be).
+| >>
+| >
+| > This is a bad example for your wish because this code:
+| >>>> id in [1, 2, 3]
+| >
+| > translates into:
+| >>>> [1, 2, 3].__contains__(id)
+| >
+| > So it doesn't help that 'in' may return something else than a bool
+| > because the method is called on the wrong object for your purposes.
+| 
+| Well that pretty much kills the proposal. I can't believe nobody
+| (including myself) figured this out earlier in the thread. :-(
+
+That's a real shame.
+
+".__rcontains__", anyone?
+
+For the record (since I just said +0.5 to +1), I'm down to +0 on the
+proposal; I think the idea's good and removes an (to my mind) arbitrary
+constraint on __contains__, but now I haven't got a use case:-(
+
+Alex's "id in wrapper([1,2,3])" doesn't seem better than the existing
+"column.in_([1,2,3])" that already exists, alas.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+"Are we alpinists, or are we tourists" followed by "tourists! tourists!"
+        - Kobus Barnard <kobus@cs.sfu.ca> in rec.climbing,
+          on things he's heard firsthand

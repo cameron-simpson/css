@@ -1,0 +1,34 @@
+Date: Wed, 1 Apr 2009 17:20:28 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: python-list@python.org
+Subject: Re: urllib2, proxies, and pac files on OS X
+Message-ID: <20090401062028.GA22004@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <d2ae22970903300800n2b8324fct3dc9a3ea4f8481f8@mail.gmail.com>
+User-Agent: Mutt/1.5.18 (2008-05-17)
+Content-Length: 955
+
+On 30Mar2009 11:00, Mani Ghasemlou <mani@tungle.com> wrote:
+| urllib2 correctly detects proxies as configured in my preferences pane
+| on OS X 10.5:
+[...]
+| However, when configuring a proxy via PAC file, this does not seem to
+| be the case:
+[...]
+| Is there any way to obtain (and parse using something like pacparser)
+| the PAC file via urllib2 (or some other standard python library), or
+| is this something I need to tackle using Cocoa (in my case PyObjC)?
+
+You'll need a JavaScript interpreter. A PAC file contains a JavaScript
+function that is run _per_URL_ to decide what proxy, if any, to use for
+that particular fetch. Clearly you can't get a static proxy description
+in the general case.
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Look, Dave...  I can see you're really upset about this...  I honestly think
+you ought to sit down calmly, ... take a stress pill, and think things over.
+        - HAL, _2001_

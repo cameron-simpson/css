@@ -1,0 +1,52 @@
+Date: Wed, 4 Nov 2009 16:26:40 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Steven D'Aprano <steve@pearwood.info>
+Cc: python-dev@python.org
+Subject: Re: Retrieve an arbitrary element from a set withoutremoving it
+Message-ID: <20091104052640.GA15378@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <200911040946.15805.steve@pearwood.info>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 1635
+
+On 04Nov2009 09:46, Steven D'Aprano <steve@pearwood.info> wrote:
+| On Tue, 3 Nov 2009 09:19:38 am Greg Ewing wrote:
+| > Cameron Simpson wrote:
+| > > Personally, I'm for the iteration spec in a lot of ways.
+
+For the record, I've since, in mere hours or day, been convinced my
+preference was misguided.
+
+I _do_ still feel that a hypothetical .pick() (a name I think better than
+.get()) would be "nicer" if it didn't always return the same item. Not
+that I've imagined any use case not equally well served by the existing
+iterator facility :-(
+
+Greg Ewing:
+| > I completely fail to see a use case for this.
+
+Steven D'Aprano:
+| Nevertheless, people keep requesting it, so obviously they have a use 
+| for it. None of the standard solutions are obvious or easily 
+| discoverable, and in my experience the usual solution people come up 
+| with is to pop() an element, then add() it back in, but of course 
+| that's not just inelegant but it fails on frozensets.
+
+Question: has anyone asked for .pick()/.get() with a use case _not_ well
+served by the existing facilities?
+
+Personally, I have found it useful in doco I write to have a section on
+"Common Tasks", with recommended/suggested examples of how to do them and
+short rationale for the chosen method. It seems to me that if .pick()
+is frequently desired and "None of the standard solutions are obvious
+or easily discoverable" then they should be _made_ so with documentation.
+
+Comments?
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Politics, n. Strife of interests masquerading as a contest of principles.
+- Ambrose Bierce, _The_Devil's_Dictionary_

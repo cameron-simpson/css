@@ -1,0 +1,52 @@
+Date: Wed, 11 Aug 2010 19:42:30 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: RG <rNOSPAMon@flownet.com>
+Cc: python-list@python.org
+Subject: Re: Line-by-line processing when stdin is not a tty
+Message-ID: <20100811094230.GA21181@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <rNOSPAMon-8BF2C7.00114311082010@news.albasani.net>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 1508
+
+On 11Aug2010 00:11, RG <rNOSPAMon@flownet.com> wrote:
+| When stdin is not a tty, Python seems to buffer all the input through 
+| EOF before processing any of it:
+| 
+| [ron@mickey:~]$ cat | python
+| print 123
+| print 456 <hit ctrl-D here>
+| 123
+| 456
+| 
+| Is there a way to get Python to process input line-by-line the way it 
+| does when stdin is a TTY even when stdin is not a TTY?
+
+What you're seeing here is not python's behaviour but cat's behaviour.
+
+Almost all programs do line buffering (flush buffer at newline) when the
+file is a terminal (character device) and block buffering (flush when a
+fixed size buffer, typically 8192 bytes or some larger power of 2) when
+the file is not a terminal. This is default behaviour for the stdio
+package.
+
+So "cat" is simply not feeding any data to python until it has a lot of
+it; there is nothing python can do about that. We would need to know
+more about your specific task to suggest workarounds.
+
+Usually you either
+need an option on the upstream program to tell it to line buffer
+explicitly or you need to play silly games with pseudo terminals to
+convince the upstream program it is attached to a terminal. The latter
+is both ugly and generally inadvisable because many programs that change
+their buffering when attached to a terminal also change other behaviour,
+such as issuing interactiove prompts etc.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+The type syntax for C is essentially unparsable. - Rob Pike

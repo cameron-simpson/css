@@ -1,0 +1,37 @@
+Date: Tue, 5 Jan 2010 11:23:34 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: cassiope <fpm@u.washington.edu>
+Cc: python-list@python.org
+Subject: Re: IOError - cannot create file (linux daemon-invoked script)
+Message-ID: <20100105002334.GA10849@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <da164e53-accf-4158-94f5-68302321bafe@j4g2000yqe.googlegroups.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 875
+
+On 04Jan2010 09:16, cassiope <fpm@u.washington.edu> wrote:
+| To Cameron: the file doesn't (yet) exist; and it has the correct full
+| path.
+
+Can you show us the strace output of the failing open() call?
+
+| To "Nobody" : hey, this seems interesting.  First test, invoking
+| seteuid()
+| and setegid() didn't help - but strange thing was these calls didn't
+| show
+| up in the strace, so perhaps I wasn't testing what I thought I was.
+
+If you're using the "-e trace=file" option it won't. That constrains the
+output to file operations to make the log easier to read. Discard the -e
+option to get everything.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Rimmer: It will be happened; it shall be going to be happening; it will be
+    was an event that could will have been taken place in the future.
+        - Red Dwarf, _Future Echoes_

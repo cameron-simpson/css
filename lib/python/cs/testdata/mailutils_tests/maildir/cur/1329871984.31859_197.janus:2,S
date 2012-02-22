@@ -1,0 +1,48 @@
+Date: Sat, 7 May 2011 08:51:38 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Ethan Furman <ethan@stoneleaf.us>
+Cc: python-ideas@python.org
+Subject: Re: 1_000_000
+Message-ID: <20110506225138.GA2323@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <4DC478C6.3010801@stoneleaf.us>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 1249
+
+On 06May2011 15:40, Ethan Furman <ethan@stoneleaf.us> wrote:
+| Bruce Leban wrote:
+| >Is _ just ignored in numbers or are there more complex rules?
+| >
+| >    * 1_2345_6789  (can I use groups of other sizes instead?)
+| >    * 1_2_3_4_5  (ditto)
+| >    * 1_234_6789  (do all the groups need to be the same size?)
+| >    * 1_   (must the _ only be in between 2 digits?)
+| >    * 1__234   (what about multiple _s?)
+| >    * 9.876_543_210   (can it be used to the right of the decimal point?)
+| >    * 0xFEFF_0042   (can it be used in hex, octal or binary numbers?)
+| >    * int('123_456')   (do other functions accept this syntax too?)
+| 
+| I would say it's ignored.  Have the rule be something like
+| number_string.replace('_','').
+| 
+| The only wrinkle is that currently '_1' is usable name, and that
+| should probably be disallowed if the above change took place.
+| 
+| I'm +1 on the idea.
+
+Personally I'm be for ignoring the _ also, save that I would forbid it
+at the start or end, so no _1 or 1_.
+
+And I would permit it in hex code etc.
+
+I'm +0.5, myself.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+A strong conviction that something must be done is the parent of many
+bad measures.   - Daniel Webster

@@ -1,0 +1,62 @@
+Date: Fri, 13 Mar 2009 08:44:19 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: python-dev@python.org
+Subject: Re: Python-Dev] wait time [was: Ext4 data loss
+Message-ID: <20090312214419.GA29691@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <49B97A12.7080401@v.loewis.de>
+User-Agent: Mutt/1.5.18 (2008-05-17)
+X-Cats2Procmailrc-Rule: /home/cameron/mail/spool-out/.cats2procmailrc: +me     .       .
+Content-Length: 2167
+
+On 12Mar2009 22:09, Martin v. L?wis <martin@v.loewis.de> wrote:
+| > Let me try some examples.
+| > Suppose I'm running my applications on a laptop and I don't want the
+| > disk to be spinning continually while I work.  I'm willing to take the
+| > risk of data loss in order to extend my battery life.
+| 
+| So when you select "Save" in your application, would you like the data
+| to be saved, or would you accept that they get lost?
+
+Often, I will accept that they get lost. Why? Because that will only
+happen with and OS/hardware failure, and I expect those to be close to
+never.
+
+| If the latter,
+| what kind of interaction would you perform with your application to
+| indicate that you *do* want the data to appear on disk?
+
+I don't. I type "sync" to a convenient shell prompt. On a UNIX OS, that
+will not return until all outstanding data at the time of issuing the
+command have been commited to disc.
+
+As you can see, that places the timing in the hands of the user.  Where it
+belongs, not impacting the performance of the system except at my own
+command.
+
+I speak as one who keeps his bogofilter spam datbase on a RAM disc
+because bogofilter, too, is subject to atrocious sync overuse, since it
+uses a database library that overuses sync. Testing shows at least one
+and possibly more _orders_of_magnitude_ improvement in behaviour. Every
+so often I copy the bogofilter db back to real disc.
+
+The wholse point of a good OS on decent hardware is that one can commit
+data to the _OS_, and trust that it will reach the disc in due course.
+Fsync shows an app that doesn't trust the OS.
+
+I hope you don't believe that handing the data to the disc drive
+guarentees it has made it to the magnetic medium. It should do, but
+the drive will probably acknowledge the data before the medium has
+completed updating.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Isaac Asimov once remarked that friends had chided him for not patenting the
+electronic pocket calculator, since he wrote of similar devices back in the
+1940's.  His reply, "Have you ever noticed I only described what it looked
+like on the *outside*?" - ijl@mediaone.net

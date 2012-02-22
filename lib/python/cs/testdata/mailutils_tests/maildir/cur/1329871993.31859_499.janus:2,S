@@ -1,0 +1,50 @@
+Date: Sun, 3 May 2009 10:46:31 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Carl Johnson <cmjohnson.mailinglist@gmail.com>
+Cc: python-ideas@python.org
+Subject: Re: "yield from" -> "yield as"?
+Message-ID: <20090503004631.GA31730@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
+In-Reply-To: <3bdda690905021447v736915c4g4647b5e99b158336@mail.gmail.com>
+User-Agent: Mutt/1.5.18 (2008-05-17)
+Content-Length: 1640
+
+On 02May2009 11:47, Carl Johnson <cmjohnson.mailinglist@gmail.com> wrote:
+| John Graham wrote:
+| > There are some alternative designs for this problems that have been
+| > proposed. =C2=A0SJBrown has proposed a similar syntax, using the two
+| > keywords 'continue as' instead of simply 'continue'. =C2=A0This would
+| > further make clear to users unfamiliar with continuations that
+| > behavior is expected to be different here, and the English still flows
+| > elegantly. =C2=A0It does, however, reuse the 'as' keyword in an unfamil=
+iar
+| > way.
+|=20
+| I'm not sure what I think about redefining the continue keyword, but
+| has anyone already proposed doing "yield as" instead of "yield from"?
+| To me it make that wording makes a little more sense, "OK, you're not
+| yielding as f anymore, now you've silently replaced yourself with g
+| and it's 'as if' g is doing the yielding." "Yield from" makes it clear
+| that all of the values of g will be yielded, but "yield as" makes it
+| clear that things like .send(), etc. will be sent to g and not
+| intercepted by f in any real way.
+
+I'm a little uncomfortable with yield as.
+We've got:
+
+  import foo as bar
+  from foo import zot as bah
+  with fred() as bah: ...
+
+All of these place a new name "bah" into the namespace for further use.
+"yield as" doesn't, but reads to me like it should.
+--=20
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+=46rom the back of the research lab, the sound of a large metallic pile of
+loose objects collapsing, accompanied by a loud "Aaaaiiieeyyrrgghhh!!" from
+George. A few seconds of silence, then: "I'll have to call you back."

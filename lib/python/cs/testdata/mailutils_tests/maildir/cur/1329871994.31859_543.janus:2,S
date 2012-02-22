@@ -1,0 +1,70 @@
+Date: Tue, 30 Dec 2008 10:24:08 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: python-list@python.org
+Subject: Re: flushing of print statements ending with comma
+Message-ID: <20081229232408.GA24226@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <25783efa-fa57-49c8-b20a-7bdf6f7cb256@w1g2000prk.googlegroups.com>
+User-Agent: Mutt/1.5.18 (2008-05-17)
+Content-Length: 2097
+
+On 29Dec2008 11:11, Grebekel <grebekel@gmail.com> wrote:
+| I have recently noticed that print statements ending with a comma are
+| not immediately flushed.
+
+I will warn you that neither are the more common uncommaed print
+statements, except on a terminal.
+
+| [...] Example:
+| <code>
+| print 'Take a walk, because this will take a while...',
+| i = 0
+| while i < 10**10:
+|     i += 1
+| print "we're done!"
+| </code>
+| 
+| Here the first string is not printed until the second print statement.
+[...]
+| Using sys.std.flush after the print fixes this issue, but doing so
+| each time seems cumbersome and somewhat counterintuitive.
+| Is there some reasoning behind this behavior or is it a bug?
+
+It's correct behaviour. The python print etc is layered on the C library
+stdio. A stdio stream can be buffered in three standard ways: unbuffered,
+line buffered and block buffered.
+
+On UNIX, on a terminal, stdout is normally line buffered: output is
+flushed when a newline is encoutered in the data, and this is pleasing
+to humans. Conversely, is stdout is _not_ attached to a terminal it
+will be block buffered by default; output is only flushed when the
+buffer is filled. This is much more _efficient_ in terms of I/O and
+program activity.
+
+By contrast, again by default, stderr is normally unbuffered. Being
+reserved for error messages, immediate output (before your program
+explodes:-) is considered more important than system efficiency.
+
+So you should sys.stdout.flush() if you want data output right now.
+For many purposes it is better to let the default behaviour obtain.
+
+Also, I suugest that progress reporting such as your be written to
+stderr anyway. It will appear in a timely fashion, and will also thus
+not pollute the output stream. Consider:
+
+  your-program >datafile
+or
+  your-program | process the output data...
+
+Sending your progress reports to stdout puts junk in the data
+stream.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Gentle suggestions being those which are written on rocks of less than 5lbs.
+        - Tracy Nelson in comp.lang.c

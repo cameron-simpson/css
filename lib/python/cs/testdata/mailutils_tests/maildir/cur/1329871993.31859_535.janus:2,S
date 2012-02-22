@@ -1,0 +1,48 @@
+Date: Tue, 10 Feb 2009 12:38:06 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: eviljonny <how@about.no.com>
+Cc: python-list@python.org
+Subject: Re: wsdl2py/ZSI and complex types with arrays
+Message-ID: <20090210013806.GA29349@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: inline
+Content-Transfer-Encoding: 8bit
+In-Reply-To: <4989ba74$0$24592$da0feed9@news.zen.co.uk>
+User-Agent: Mutt/1.5.18 (2008-05-17)
+Content-Length: 1372
+
+On 04Feb2009 15:55, eviljonny <how@about.no.com> wrote:
+| I have been trying to write a web service using ZSI with wsdl2py. I have 
+| read 'The Zolera Soap Infrastructure User’s Guide Release 2.0.0' and some 
+| older guides (a guide by Nortel called Using ZSI with wsdl2py) and am 
+| unable to find any working examples of how to use arrays in complex 
+| types. I have a Request method which takes an array as an argument and 
+| responds with an array.
+[...]
+| Can anyone provide me an example (or a link to an example) of how to 
+| populate the arrays in complex types? Even pointing me in the right 
+| direction would be wonderful.
+
+I am by no means a ZSI expert. You may do better to join this list:
+  https://lists.sourceforge.net/lists/listinfo/pywebsvcs-talk
+and ask there.
+
+Glancing at some code using ZSI-2.1-a1 here I've got code like this:
+
+  # MR refers to a complex type with a <loginResultList> component,
+  # and that contains a list of <item> elements
+  LRL = MR._loginResultList = MR.new_loginResultList()
+  LRL._item = []
+  for LI in RQ.get_element_LoginList():
+    class item:
+      ... fill in some class attributes ...
+    LRL._item.append(item)
+
+thus populating the <loginResultList> with <item> elements.
+("item" is only a class for the convenience of having _foo attributes easy to
+assign to).
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743

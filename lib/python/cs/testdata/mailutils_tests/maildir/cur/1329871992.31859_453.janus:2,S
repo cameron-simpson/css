@@ -1,0 +1,26 @@
+Date: Wed, 29 Apr 2009 18:17:44 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: =?//TRANSLIT?B?Ik1hcnRpbiB2LiBM9ndpcyIgPG1hcnRpbkB2LmxvZXdpcy5kZT4=?=
+Cc: Antoine Pitrou <solipsis@pitrou.net>, python-dev@python.org
+Subject: Re: Python-Dev PEP 383: Non-decodable Bytes in System
+	Character?Interfaces
+Message-ID: <20090429081744.GA18296@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <49F7F346.2010003@v.loewis.de>
+User-Agent: Mutt/1.5.18 (2008-05-17)
+Content-Length: 335
+
+On 29Apr2009 08:27, Martin v. L?wis <martin@v.loewis.de> wrote:
+| > I would like utility functions to perform:
+| >   os-bytes->funny-encoded
+| >   funny-encoded->os-bytes
+| > or explicit example code snippets for same in the PEP text.
+| 
+| Done!
+
+Thanks!
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/

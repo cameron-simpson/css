@@ -1,0 +1,96 @@
+Date: Thu, 14 Oct 2010 23:48:54 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Tony <tony10@ximera.net>
+Cc: python-list@python.org
+Subject: Re: Boolean value of generators
+Message-ID: <20101014124854.GA3302@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <4cuio7-he8.ln1@hawthorn.home>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 1803
+
+On 14Oct2010 10:16, Tony <tony10@ximera.net> wrote:
+| I have been using generators for the first time and wanted to check for
+| an empty result.  Naively I assumed that generators would give
+| appopriate boolean values.  For example
+| 
+| def xx():
+|   l = []
+|   for x in l:
+|     yield x
+| 
+| y = xx()
+| bool(y)
+| 
+| 
+| I expected the last line to return False but it actually returns True.
+| Is there anyway I can enhance my generator or iterator to have the
+| desired effect?
+
+The generator is not the same as the values it yields.
+What you're doing is like this:
+
+  >>> def f():
+  ...   return False
+  ... 
+  >>> bool(f)
+  True
+  >>> bool(f())
+  False
+
+In your code, xx() returns a generator object. It is not None, nor any
+kind of "false"-ish value. So bool() returns True.
+
+The generator hasn't even _run_ at that point, so nobody has any idea if
+iterating over it will return an empty sequence.
+
+What you want is something like this:
+
+  values = list(xx())
+  bool(values)
+
+or more clearly:
+
+  gen = xx()
+  values = list(gen)
+  bool(values)
+
+You can see here that you actually have to iterate over the generator
+before you know if it is (will be) empty.
+
+Try this program:
+
+  def lines():
+    print "opening foo"
+    for line in open("foo"):
+      yield line
+    print "closing foo"
+
+  print "get generator"
+  L = lines()
+  print "iterate"
+  text = list(L)
+  print "done"
+
+For me it does this:
+
+  get generator
+  iterate
+  opening foo
+  closing foo
+  done
+
+You can see there that the generator _body_ doesn't even run until you
+start the iteration.
+
+Does this clarify things for you?
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Winter is gods' way of telling us to polish.
+        - Peter Harper <bo165@freenet.carleton.ca> <harperp@algonquinc.on.ca>

@@ -1,0 +1,77 @@
+Date: Fri, 23 Apr 2010 17:56:09 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: python-list@python.org
+Subject: Re: question about an exciting gotcha for unittests (and
+ elsewhere) ...
+Message-ID: <20100423075609.GA31112@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20100423061516.GA19320@cskk.homeip.net>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 2561
+
+On 23Apr2010 16:15, I wrote:
+| On 23Apr2010 15:37, I wrote:
+| |   class Backend(object):
+| |     def serialise(self, value):
+| |       ''' Convert a value for external string storage.
+| |       '''
+| |       if isinstance(value, Node): [...]
+| |         return ":%s:%s" % (value.type, value.name)
+| |       t = type(value)
+| |       assert t in (str,int), repr(t)+" "+repr(value)+" "+repr(Node)
+| |       [...]
+| [...]
+| |   AssertionError: <class '__main__.Node'> HOST:foo:{} <class 'cs.nodedb.node.Node'>
+| | 
+| | Experienced users will see at once what's happened: I've made a Node
+| | myself in the test using the local class, and the Node class is thus
+| | __main__.Node. However, my sql Backend class has independently imported
+| | the "Node" and "Backend" classes from "cs.nodedb.node". So when _it_
+| | calls serialise(), "Node" is "cs.nodedb.node.Node".
+| [...]
+| 
+| A walk around the block and I'm thinking the olny sane way to do this is
+| to use relative imports, to always get the sqla.py module from the same
+| place as the node.py where the test lives, and likewise in sqla.py
+| to relatively import node.py to get its matching file.
+| 
+| And then to explicitly import from "node" etc in the test to get the
+| right names.
+| 
+| However, that means the unit test knows its own filename/module-name.
+
+Further down this path I've done the following:
+
+  node.py's unittest now doesn't use the sqla module at all, and passes its
+    self tests with a no-op Backend
+
+  sqla.py's unittest subclasses node.py's unittest and replaces the setUp()
+    with one that uses a Backend_SQLAlchemy object
+
+  the imports at the top of sqla.py now read:
+    from . import NodeDB, Backend
+    from .node import TestAll as NodeTestAll
+  to remove special knowledge of the package name
+
+  I was invoking the self test like this:
+    DEBUG=1 dev python2.6 ./lib/cs/nodedb/sqla.py
+  which breaks relative imports. Now I do this:
+    DEBUG=1 dev python2.6 -m cs.nodedb.sqla
+  and it is all good. ("dev" is a wrapper to set PYTHONPATH
+  to use my work area, etc).
+
+Since I've convinced myself that my previous practices were inherently
+instantiating node.py twice with different names, I guess I can say my
+problem is solved, for some definition of the term:-)
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Every program has at least one bug and can be shortened by at least one
+instruction -- from which, by induction, it is evident that every
+program can be reduced to one instruction that does not work.
+        - Ken Arnold

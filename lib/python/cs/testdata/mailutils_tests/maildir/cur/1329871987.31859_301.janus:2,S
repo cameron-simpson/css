@@ -1,0 +1,67 @@
+Date: Sat, 31 Jul 2010 15:59:12 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Greg Ewing <greg.ewing@canterbury.ac.nz>
+Cc: python-ideas@python.org
+Subject: Re: Json object-level serializer
+Message-ID: <20100731055912.GA10882@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
+In-Reply-To: <4C52177A.7080906@canterbury.ac.nz>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 2166
+
+I'm uncomfortable with the __foo__ style proposed. Details and "what I
+would do" below.
+
+On 30Jul2010 12:06, Greg Ewing <greg.ewing@canterbury.ac.nz> wrote:
+| Mike Graham wrote:
+| >Since there isn't really any magic going on, why use a __foo__ name?
+| >The majority of __foo__ names are for things you shouldn't reference
+| >yourself
+|=20
+| To my mind, the main reason is to avoid name clashes. Protocol
+| methods often may need to be added to just about any class,
+| and using a __foo__ name greatly reduces the chance of it
+| coinciding with some pre-existing class-specific method.
+
+Might not the adder of a class specific method make the same argument?
+If they really want a class _specific_ method, ought thy not to be using
+the __foo style, thus avoiding clashes anyway?
+
+The __json__ name make me uncomfortable; to my mind __foo_ names belong
+to the language in order to implement/override stuff like [], not to a
+library hook.
+
+| Anyway, you don't call it yourself in this case either -- it's
+| called by the proposed json-serialising framework.
+
+I'm curious; what's the special benefit to JSON here? I don't mean JSON
+is unpopular or horrible, but I can see people going to a __xml__ hook
+for a proposed XML serialisation framework, and __sql__ for db storage,
+and ...
+
+I'm doing a little serialisation myself for another purpose. My code
+gets classes that want serialisation to register themselves with the
+serialisation module thus:
+
+  # DB is a NodeDB instance, which can store various objects
+  DB.register_type(class, tobytes, frombytes)
+
+where class is the class desiring special serialisation and tobytes and
+=66rombytes are callables; tobytes takes an instance of the class and
+returns the byte serialisation and frombytes does the reverse.
+
+No special names needed and no __foo__ special name reservation.
+
+Why wouldn't one just extend the json module with a "serialise this"
+and "unserialise this" type registry?
+
+Cheers,
+--=20
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+You can listen to what everybody says, but the fact remains that you've got
+to get out there and do the thing yourself.     - Joan Sutherland

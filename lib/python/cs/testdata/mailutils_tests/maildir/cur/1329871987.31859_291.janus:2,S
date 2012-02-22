@@ -1,0 +1,42 @@
+Date: Thu, 12 Aug 2010 14:16:37 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: python-list@python.org
+Subject: Re: How to capture all the environment variables from shell?
+Message-ID: <20100812041637.GA14479@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <pan.2010.08.12.00.27.44.937000@nowhere.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 1497
+
+On 12Aug2010 01:28, Nobody <nobody@nowhere.com> wrote:
+| On Wed, 11 Aug 2010 13:08:59 +1000, Cameron Simpson wrote:
+| > The reason .bashrc gets overused for envars, aside from ignorance and
+| > propagated bad habits, is that in a GUI desktop the setup sequence is
+| > often a bit backwards. A conventional terminal/console login means you
+| > get a login shell that sources your .{bash_}profile. And from there one
+| > would start a GUI and all the .profile stuff has been run Once, as it
+| > should be. But when the login itself is a GUI the various terminals get
+| > started _before_ the .profile stuff gets sourced, because the terminal
+| > is started by the desktop manager. Once common "fix" for this is to
+| > make all new terminals run login shells. Ugh, but it does work.
+| 
+| Er, not really. If you don't source your ~/.profile (etc) from e.g.
+| ~/.xsession, GUI applications don't get to see the environment settings
+| therein. The environment isn't just for shells.
+
+I think we're in violent agreement here. I arrange to do exactly that in
+my own desktop setups.
+
+However, the ones that ship with distros generally don't, possibly because a
+shell-aborting error in the .profile (or unwanted interaction etc) will abort
+the GUI login/desktop-setup.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+The Puritan hated bear-baiting, not because it gave pain to the bear, but
+because it gave pleasure to the spectator. - Macaulay, History of England

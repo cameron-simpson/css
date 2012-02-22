@@ -1,0 +1,34 @@
+Date: Fri, 18 Feb 2011 10:29:21 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Alister Ware <alister.ware@ntlworld.com>
+Cc: python-list@python.org
+Subject: Re: Newbie getting desperate with for
+Message-ID: <20110217232921.GA18261@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20110217214037.GA25438@cskk.homeip.net>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 854
+
+On 18Feb2011 08:40, I wrote:
+| On 17Feb2011 18:40, Alister Ware <alister.ware@ntlworld.com> wrote:
+| | On Thu, 17 Feb 2011 16:42:05 +0800, Werner wrote:
+| | > On 17/02/11 16:39, Chris Rebert wrote:
+| | >> On Thu, Feb 17, 2011 at 12:27 AM, Werner <wdahn@netfront.net> wrote:
+| | >>> I have a trivially simple piece of code called timewaster.py:
+| | >>> ____________________________________________________
+| | >>> while True:
+| [...]
+| | may I ask what is the purpose of this code segment, it does not look like 
+| | it would achieve much?
+[... long shebang description...]
+
+Hmm, looks like maybe you meant the original python snippet.
+If so, my apologies for the long misanswer.
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+I was gratified to be able to answer promptly and I did.
+I said I didn't know.   - Mark Twain

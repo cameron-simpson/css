@@ -1,0 +1,47 @@
+Date: Fri, 30 Apr 2010 15:37:21 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Stefan Behnel <stefan_ml@behnel.de>
+Cc: python-list@python.org
+Subject: Re: replacing words in HTML file
+Message-ID: <20100430053721.GA12553@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <hrdp1r$ois$2@dough.gmane.org>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 1064
+
+On 30Apr2010 07:15, Stefan Behnel <stefan_ml@behnel.de> wrote:
+| Cameron Simpson, 30.04.2010 00:47:
+| >Here's a function from a script I wrote to bulk edit a web site. I was
+| >replacing OBJECT and EMBED nodes with modern versions:
+| >
+| >   def recurse(node):
+| >     global didmod
+| >     [...]
+| >           didmod=True
+| >           continue
+| >         recurse(O)
+| >
+| >The calling end looks like this:
+| >
+| >   SOUP = BeautifulSoup(srctext)
+| >   didmod = False        # icky global set by recurse()
+| >   recurse(SOUP)
+| >   if didmod:
+| >     srctext = str(SOUP)
+| >
+| >If didmod becomes True we recompute srctext and resave the file (or save it
+| >to a copy).
+| 
+| You should rethink your naming in the above code and remove the need
+| for a global variable.
+
+Absolutely. It was a quick hack, not something I was intending anyone
+else to use.
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+[I]n the current environment, it's really hard to ascribe to stupidity
+what can be adequately explained by malice. - Jordin Kare

@@ -1,0 +1,51 @@
+Date: Mon, 14 Jun 2010 16:09:59 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: madhuri vio <madhuri.vio@gmail.com>
+Cc: pythonlist <python-list@python.org>
+Subject: Re: file handling
+Message-ID: <20100614060959.GA17757@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <AANLkTil5x60dW7hp6nV1IR10oa5duYAcZisWAEWmAVEg@mail.gmail.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 2149
+
+On 14Jun2010 11:05, madhuri vio <madhuri.vio@gmail.com> wrote:
+| i have a doubt about ...this..can u look into this..
+| 
+| a = open("human.odt","r")
+| b = a.readlines()
+| print b
+| 
+| and i get d output something else...
+| 
+| python monday.py
+| ["PK\x03\x04\x14\x00\x00\x00\x00\x00\xd6+\xce<^\xc62\x0c'\x00\x00\x00'\x00\x00\x00\x08\x00\x00\x00mimetypeapplication/vnd.oasis.opendocument.textPK\x03\x04\x14\x00\x00\x00\x00\x00\xd6+\xce<\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x1a\x00\x00\x00Configurations2/statusbar/PK\x03\x04\x14\x00\x08\x00\x08\x00\xd6+\xce<\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'\x00\x00\x00Configurations2/accelerator/current.xml\x03\x00PK\x07\x08\x00\x00\x00\x00\x02\x00\x00\x00\x00\x00\x00\x00PK\x03\x04\x14\x00\x00\x00\x00\x00\xd6+\xce<\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x18\x00\x00\x00Configurations2/floater/PK\x03\x04\x14\x00\x00\x00\x00\x00\xd6+\xce<\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x1a\x00\x00\x00Configurations2/popupmenu/PK\x03\x04\x14\x00\x00\x00\x00\x00\xd6+\xce<\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x1c\x00\x00\x00Configurations2/progressbar/PK\x03\x04\x14\x00\x00\x00\x00\
+| 
+| something of this sort...i have asked this doubt earlier..noe i am unable to
+| proceed...
+
+ODT files are _not_ text files. If I recall they are ZIP files containing
+XML, but I've never checked. There is more info here:
+  http://en.wikipedia.org/wiki/OpenDocument
+
+readlines is for text files. You have opened the file for "r" (but not
+in "binary" mode - see the "b" letter in the python "open"
+documentation) and read the input, which has been broken into chunks
+based on newline bytes in the file. It is not a meaningful thing to do
+to an ODT file.
+
+You might try searching for "processing open document format with python"
+or something like that.
+
+You haven't, btw, said what you hoped to achieve above. I'm presuming
+you're after the "text" content of the ODT document.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Any technology that is distinguishable from magic is insufficiently advanced.
+- Colin Druitt <colind@ram.net.au>

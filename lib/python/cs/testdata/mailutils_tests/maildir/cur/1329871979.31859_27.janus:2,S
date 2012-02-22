@@ -1,0 +1,125 @@
+Return-Path: <python-ideas-bounces+cs=zip.com.au@python.org>
+Delivered-To: unknown
+Received: from mail.zip.com.au (125.255.95.3) by janus.home with POP3-SSL; 05
+  Feb 2012 02:19:01 -0000
+Delivered-To: cs@zipworld.com.au
+Received: from mailin4-syd3.pacific.net.au (mailin4-syd3.pacific.net.au [125.255.92.145])
+	by mailstore2.syd.pacific.net.au (Postfix) with ESMTP id C64984D551
+	for <cs@zipworld.com.au>; Sun,  5 Feb 2012 13:18:39 +1100 (EST)
+Received: from mail.python.org (unknown [82.94.164.166])
+	by mailin4-syd3.pacific.net.au (Postfix) with ESMTP id 266674D808C
+	for <cs@zip.com.au>; Sun,  5 Feb 2012 13:18:39 +1100 (EST)
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3TgbFl2TlzzMK5
+	for <cs@zip.com.au>; Sun,  5 Feb 2012 03:18:35 +0100 (CET)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=python.org; s=200901;
+	t=1328408315; bh=+lT8eULuHMOd+znIWYzNqkw/Tnz+wsVfOnsJNoBe+So=;
+	h=Date:From:To:Message-ID:MIME-Version:In-Reply-To:References:Cc:
+	 Subject:List-Id:List-Unsubscribe:List-Archive:List-Post:List-Help:
+	 List-Subscribe:Content-Type:Content-Transfer-Encoding:Sender;
+	b=slG7rta8kj7oLeSgqJXaudyN2qF3RbxS57hbxHqKmw6dfS9pFXvq0NVaHyADzOupC
+	 vU/PPsXRZwv0MQQ2CKw/GtwEzwJSDd0wLQ7FOcvHpInIbH3OVp+oct0Uo4b7+zh98S
+	 Wafw0OFKyd9b19eU5Wxr+7kOFKAsRVT2ksm3Yvg0=
+X-Original-To: python-ideas@python.org
+Delivered-To: python-ideas@mail.python.org
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3TgbF16T1HzMDp
+	for <python-ideas@python.org>; Sun,  5 Feb 2012 03:17:57 +0100 (CET)
+X-Spam-Status: OK 0.000
+X-Spam-Evidence: '*H*': 1.00; '*S*': 0.00; 'attribute': 0.07;
+	'received:edu.au': 0.07; 'subject:object': 0.07; 'ugly': 0.07;
+	'all).': 0.09; 'descriptor': 0.09; 'namespace': 0.09; "object's":
+	0.09; 'subject:access': 0.09; 'underlying': 0.09; 'protocol':
+	0.15; 'subject:was': 0.15; 'caveats': 0.16; 'from:addr:cs': 0.16;
+	'from:addr:zip.com.au': 0.16; 'from:name:cameron simpson': 0.16;
+	'it).': 0.16; 'message-id:@cskk.homeip.net': 0.16; 'nick': 0.16;
+	'received:202.125.174': 0.16; 'received:202.125.174.133': 0.16;
+	'received:boardofstudies.nsw.edu.au': 0.16;
+	'received:cskk.homeip.net': 0.16;
+	'received:harvey.boardofstudies.nsw.edu.au': 0.16;
+	'received:homeip.net': 0.16; 'received:nsw.edu.au': 0.16;
+	'subject:set': 0.16; 'subject:syntax': 0.16; 'syntax': 0.16;
+	'wrote:': 0.18; 'cc:no real name:2**0': 0.21; 'header:In-Reply-
+	To:1': 0.22; 'assigning': 0.23; 'subject: \n\t': 0.28; "i'm":
+	0.28; 'cc:addr:python.org': 0.29; 'parent': 0.30; '(the': 0.30;
+	"i've": 0.32; 'objects': 0.32; 'header:User-Agent:1': 0.33;
+	'daniel': 0.34; 'done': 0.34; 'subject:/': 0.34; 'short,': 0.34;
+	'something': 0.35; 'actively': 0.36; 'received:au': 0.36;
+	'cc:2**1': 0.36; 'instead,': 0.37; 'charset:us-ascii': 0.37;
+	'subject:with': 0.37; 'some': 0.38; 'think': 0.38; 'should': 0.38;
+	'(with': 0.39; 'suggestions': 0.39; 'strong': 0.39; 'subject: (':
+	0.40; 'dedicated': 0.61; 'making': 0.64; 'received:202': 0.66;
+	'subject:like': 0.67; 'cc:addr:python': 0.84; 'webster': 0.84
+Received: from localhost (HELO mail.python.org) (127.0.0.1)
+	by albatross.python.org with SMTP; 05 Feb 2012 03:17:57 +0100
+Received: from harvey.boardofstudies.nsw.edu.au
+	(mail2.rack1.boardofstudies.nsw.edu.au [202.125.174.133])
+	by mail.python.org (Postfix) with ESMTP
+	for <python-ideas@python.org>; Sun,  5 Feb 2012 03:17:57 +0100 (CET)
+Received: from cskk.homeip.net (localhost.localdomain [127.0.0.1])
+	by harvey.boardofstudies.nsw.edu.au (Postfix) with ESMTP id 49BC74D3B67;
+	Sun,  5 Feb 2012 13:17:44 +1100 (EST)
+Received: by janus.cskk.homeip.net (Postfix, from userid 1000)
+	id 32C01100419B7; Sun,  5 Feb 2012 13:17:44 +1100 (EST)
+Date: Sun, 5 Feb 2012 13:17:44 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Nick Coghlan <ncoghlan@gmail.com>
+Message-ID: <20120205021744.GA8647@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <CADiSq7cTM+TLvof8BYfVroHbZqZUYH9bHVOzAdauux13hLa2ag@mail.gmail.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+References: <CADiSq7cTM+TLvof8BYfVroHbZqZUYH9bHVOzAdauux13hLa2ag@mail.gmail.com>
+Cc: python-ideas@python.org
+Subject: Re: Shorthand syntax for get/set/delattr (was Re:
+	Dict-like object	with property access)
+X-BeenThere: python-ideas@python.org
+X-Mailman-Version: 2.1.12
+Precedence: list
+List-Id: Discussions of speculative Python language ideas
+	<python-ideas.python.org>
+List-Unsubscribe: <http://mail.python.org/mailman/options/python-ideas>,
+	<mailto:python-ideas-request@python.org?subject=unsubscribe>
+List-Archive: <http://mail.python.org/pipermail/python-ideas>
+List-Post: <mailto:python-ideas@python.org>
+List-Help: <mailto:python-ideas-request@python.org?subject=help>
+List-Subscribe: <http://mail.python.org/mailman/listinfo/python-ideas>,
+	<mailto:python-ideas-request@python.org?subject=subscribe>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Sender: python-ideas-bounces+cs=zip.com.au@python.org
+Errors-To: python-ideas-bounces+cs=zip.com.au@python.org
+X-Cats2Procmailrc-Rule: cats/home: python  python-ideas    sender:python-ideas-bounces+cs=zip.com.au@python.org
+X-Label: python-ideas
+Content-Length: 1096
+
+On 05Feb2012 10:20, Nick Coghlan <ncoghlan@gmail.com> wrote:
+[...]
+| In short, I think proposals for dedicated syntax for dynamic attribute
+| access are misguided - instead, such efforts should go into enhancing
+| vars() to return objects that support *full* dict-style access to the
+| underlying object's attribute namespace (with descriptor protocol
+| support and all).
+
++10
+
+_Where_ do you people find the time to write these well thought out posts?
+
+I'm very much for making vars() better supported (the docs have caveats
+about assigning to it). All the syntax suggestions I've seen look
+cumbersome or ugly and some are actively misleading to my eye (did I really
+see an "<-" in there?)
+
+ I see my random sig quote picker has worked well again:-)
+
+ Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+A strong conviction that something must be done is the parent of many
+bad measures.   - Daniel Webster
+_______________________________________________
+Python-ideas mailing list
+Python-ideas@python.org
+http://mail.python.org/mailman/listinfo/python-ideas

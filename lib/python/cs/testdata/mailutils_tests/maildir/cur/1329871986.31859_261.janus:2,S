@@ -1,0 +1,54 @@
+Date: Fri, 15 Oct 2010 14:45:35 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Steve Howell <showell30@yahoo.com>
+Cc: python-list@python.org
+Subject: Re: extract method with generators
+Message-ID: <20101015034535.GA10137@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <71a1ab11-32d8-4988-a4ae-7d16febd75a7@s24g2000pri.googlegroups.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 1227
+
+On 14Oct2010 20:11, Steve Howell <showell30@yahoo.com> wrote:
+| Is there a way to extract code out of a generator function f() into
+| g() and be able to have f() yield g()'s result without this idiom?:
+| 
+|   for g_result in g():
+|     yield g_result
+| 
+| It feels like a clumsy hindrance to refactoring, to have to introduce
+| a local variable and a loop.
+
+This sounds like the "yield from" proposal that had discussion some
+months ago. Your above idiom would become:
+
+  yield from g()
+
+See PEP 380:
+  http://www.python.org/dev/peps/pep-0380/
+Short answer, not available yet.
+
+A Google search on:
+
+  python pep "yield from"
+
+found some implementations at activestate, such as this:
+
+  http://code.activestate.com/recipes/577153-yet-another-python-implementation-of-pep-380-yield/
+
+which lets you decorate an existing generator so that you can write:
+
+  yield _from(gen())
+
+where gen() is the decorated generator.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+What I want is Facts. Teach these boys and girls nothing but Facts.  Facts
+alone are wanted in life. Plant nothing else, and root out everything else.
+        - Charles Dickens    John Huffam   1812-1870  Hard Times [1854]

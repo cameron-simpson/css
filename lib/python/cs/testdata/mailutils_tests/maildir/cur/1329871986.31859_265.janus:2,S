@@ -1,0 +1,83 @@
+Date: Thu, 23 Sep 2010 08:31:36 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: James Yonan <james@openvpn.net>
+Cc: python-ideas@python.org
+Subject: Re: Python needs a standard asynchronous return object
+Message-ID: <20100922223136.GA23975@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <4C97D50F.1000908@openvpn.net>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 2557
+
+On 20Sep2010 15:41, James Yonan <james@openvpn.net> wrote:
+[...]
+| * Develop a full-featured standard async result type and reactor
+| model to facilitate interoperability of different async libraries.
+| This would consist of a standard async result type and an abstract
+| base class for a reactor model.
+| 
+| * Let PEP 3148 focus on the problem of thread and process pooling
+| and leverage on the above async result type.
+| 
+| The semantics that a general async type should support include:
+| 
+| 1. Semantics that allow you to define a callback channel for results
+| and and optionally a separate channel for exceptions as well.
+| 
+| 2. Semantics that offer the flexibility of working with async
+| results at the callback level or at the generator level (having a
+| separate channel for exceptions makes it easy for the generator
+| decorator implementation (that facilitates "yield
+| function_returning_async_object()") to dispatch exceptions into the
+| caller).
+| 
+| 3. Semantics that can easily be used to pass results and exceptions
+| back from thread or process pools.
+[...]
+
+Just to address this particular aspect (return types and notification),
+I have my own futures-like module, where the equivalent of a Future is
+called a LateFunction.
+
+There are only 3 basic types of return in my model:
+
+  there's a .report() method in the main (Executor equivalent) class
+  that yields LateFunctions as they complete.
+
+  A LateFunction has two basic get-the result methods. Having made a
+  LateFunction:
+    LF = Later.defer(func)
+
+  You can either go:
+    result = LF()
+  This waits for func's ompletion and returns func's return value.
+  If func raises an exception, this raises that exception.
+
+  Or you can go:
+    result, exc_info = LF.wait()
+  which returns:
+    result, None
+  if func completed without exception and
+    None, exc_info
+  if an exception was raised, where exc_info is a 3-tuple as from
+  sys.exc_info().
+
+At any rate, when looking for completion you can either get
+LateFunctions as they complete via .report(), or function results plain
+(that may raise exceptions) or function (results xor exceptions).
+
+This makes implementing the separate streams (results vs exceptions) models
+trivial if it is desired while keeping the LateFunction interface simple
+(few interface methods).
+
+Yes, I know there's no timeout stuff in there :-(
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+By God, Mr. Chairman, at this moment I stand astonished at my own moderation!
+        - Baron Robert Clive of Plassey

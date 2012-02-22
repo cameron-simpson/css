@@ -1,0 +1,143 @@
+Return-Path: <python-list-bounces+cs=zip.com.au@python.org>
+Delivered-To: unknown
+Received: from mail.zip.com.au (125.255.95.3:995) by janus.home with
+  POP3-SSL; 14 Feb 2012 09:56:31 -0000
+Delivered-To: cs@zipworld.com.au
+Received: from mailin3-syd3.pacific.net.au (mailin3-syd3.pacific.net.au [125.255.92.144])
+	by mailstore1.syd.pacific.net.au (Postfix) with ESMTP id 106D394BD0
+	for <cs@zipworld.com.au>; Tue, 14 Feb 2012 20:55:07 +1100 (EST)
+Received: from mail.python.org (unknown [82.94.164.166])
+	by mailin3-syd3.pacific.net.au (Postfix) with ESMTP id AB9C840009E
+	for <cs@zip.com.au>; Tue, 14 Feb 2012 20:57:25 +1100 (EST)
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3TnJyH0PvFzPhh
+	for <cs@zip.com.au>; Tue, 14 Feb 2012 10:55:03 +0100 (CET)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=python.org; s=200901;
+	t=1329213303; bh=bYw9TS2cjIiaoONS1msOuACR9uef+BJUh6SxaPqL4sk=;
+	h=Date:From:To:Subject:Message-ID:MIME-Version:In-Reply-To:
+	 References:Cc:List-Id:List-Unsubscribe:List-Archive:List-Post:
+	 List-Help:List-Subscribe:Content-Type:Content-Transfer-Encoding:
+	 Sender;
+	b=zEe7ttgCgYiZbGaikKidPK/dmt1nh1AmpUBcGYnaVi2wWVcAr5R5ikFZNtpQFpkOL
+	 IYH8FSeVS2nmwkN30/SlUoPQi56R78WpG9gPB+p3aDRRpD+ZEOc+NOvAELTEB2QY7U
+	 lgCLCrrQ62YAe/WgOFUaV9Y6ZGlLqNC3dJ1llAKk=
+X-Original-To: python-list@python.org
+Delivered-To: python-list@mail.python.org
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3TnJv51yq4zPjb
+	for <python-list@python.org>; Tue, 14 Feb 2012 10:52:17 +0100 (CET)
+X-Spam-Status: OK 0.002
+X-Spam-Evidence: '*H*': 1.00; '*S*': 0.00; 'context': 0.04;
+	'received:edu.au': 0.07; 'weekend,': 0.07; 'subject:method': 0.09;
+	'"test"': 0.16; 'a()': 0.16; 'btw:': 0.16; 'from:addr:cs': 0.16;
+	'from:addr:zip.com.au': 0.16; 'from:name:cameron simpson': 0.16;
+	'message-id:@cskk.homeip.net': 0.16; 'out?': 0.16;
+	'received:202.125.174': 0.16; 'received:202.125.174.133': 0.16;
+	'received:boardofstudies.nsw.edu.au': 0.16;
+	'received:cskk.homeip.net': 0.16;
+	'received:harvey.boardofstudies.nsw.edu.au': 0.16;
+	'received:homeip.net': 0.16; 'received:nsw.edu.au': 0.16;
+	'subject: \n ': 0.16; 'subject:instance': 0.16; 'throwaway': 0.16;
+	'cc:addr:python-list': 0.16; 'question.': 0.16; 'wrote:': 0.18;
+	'instance': 0.18; 'reason,': 0.18; 'maybe': 0.21; 'header:In-
+	Reply-To:1': 0.22; 'static': 0.24; 'cc:2**0': 0.26; 'code': 0.26;
+	'figure': 0.26; 'second': 0.28; 'class': 0.29; 'problem': 0.29;
+	'cc:addr:python.org': 0.29; 'correct': 0.29; 'invoke': 0.30;
+	'outer': 0.30; 'do.': 0.31; 'sufficient': 0.32; 'rest': 0.32;
+	'there': 0.33; 'header:User-Agent:1': 0.33; 'it.': 0.33; 'too':
+	0.33; 'decide': 0.33; 'object': 0.33; 'normally': 0.34;
+	'wondering': 0.34; 'all.': 0.34; 'be,': 0.34; 'curious': 0.34;
+	'test.': 0.34; 'something': 0.35; 'received:au': 0.36; 'question':
+	0.36; 'but': 0.37; 'charset:us-ascii': 0.37; 'some': 0.38;
+	'useful': 0.38; 'subject:how': 0.39; 'application': 0.40; 'week.':
+	0.40; 'might': 0.40; 'simple': 0.61; 'your': 0.61; 'making': 0.64;
+	'received:202': 0.66; 'course.': 0.66; 'cameron': 0.77; 'often,':
+	0.84; 'subject:tell': 0.91; 'arise': 0.96
+Received: from localhost (HELO mail.python.org) (127.0.0.1)
+	by albatross.python.org with SMTP; 14 Feb 2012 10:52:17 +0100
+Received: from harvey.boardofstudies.nsw.edu.au
+	(mail2.rack1.boardofstudies.nsw.edu.au [202.125.174.133])
+	by mail.python.org (Postfix) with ESMTP
+	for <python-list@python.org>; Tue, 14 Feb 2012 10:52:16 +0100 (CET)
+Received: from janus.cskk.homeip.net (localhost.localdomain [127.0.0.1])
+	by harvey.boardofstudies.nsw.edu.au (Postfix) with ESMTP id 600894D3B66;
+	Tue, 14 Feb 2012 20:52:08 +1100 (EST)
+Received: by janus.cskk.homeip.net (Postfix, from userid 1000)
+	id 900B42005A97D; Tue, 14 Feb 2012 20:52:23 +1100 (EST)
+Date: Tue, 14 Feb 2012 20:52:23 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Zheng Li <dllizheng@gmail.com>
+Subject: Re: how to tell a method is classmethod or static method or instance
+	method
+Message-ID: <20120214095223.GA1107@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <9150D72E-0014-4D45-A7C2-758D7BE5F3CD@gmail.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+References: <9150D72E-0014-4D45-A7C2-758D7BE5F3CD@gmail.com>
+Cc: python-list <python-list@python.org>
+X-BeenThere: python-list@python.org
+X-Mailman-Version: 2.1.12
+Precedence: list
+List-Id: General discussion list for the Python programming language
+	<python-list.python.org>
+List-Unsubscribe: <http://mail.python.org/mailman/options/python-list>,
+	<mailto:python-list-request@python.org?subject=unsubscribe>
+List-Archive: <http://mail.python.org/pipermail/python-list>
+List-Post: <mailto:python-list@python.org>
+List-Help: <mailto:python-list-request@python.org?subject=help>
+List-Subscribe: <http://mail.python.org/mailman/listinfo/python-list>,
+	<mailto:python-list-request@python.org?subject=subscribe>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Sender: python-list-bounces+cs=zip.com.au@python.org
+Errors-To: python-list-bounces+cs=zip.com.au@python.org
+X-Cats2Procmailrc-Rule: cats/home: python  python-list     sender:python-list-bounces+cs=zip.com.au@python.org
+X-Label: python-list
+Content-Length: 1513
+
+On 14Feb2012 13:13, Zheng Li <dllizheng@gmail.com> wrote:
+| > On 13Feb2012 15:59, Zheng Li <dllizheng@gmail.com> wrote:
+| > | how to tell a method is class method or static method or instance method?
+| > 
+| > Maybe a better question is:
+| >  under what circumstances do you need to figure this out? 
+|
+| I can get "method1" of class "Test" by
+| a = getattr(Test, "method1")
+| 
+| and I also want know how to invoke it
+| a()	or	a(Test())
+
+Normally:
+
+  a(T)
+
+where T is an object of type/class Test. So your second approach is
+notionally correct (aside from making a throwaway object that is then
+discarded).
+
+| BTW:
+| I don't see what the problem is if I ask a question just because I am curious about it.
+
+There's nothing wrong with it at all.
+
+But often, questions arise from some other circumstances and this one is
+of such a flavour that if you wanted this code in a real application it
+would _often_ be the wrong solution to seek, because normally you know
+how to call something - it is not normally useful to introspect it to
+decide what to do.
+
+So I was wondering what the outer context might be, because there may
+well have been a better solution to the situation that brought up the
+specific question.
+
+Simple curiosity is sufficient reason, of course.
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Too young to rest on the weekend, too old to rest during the week.
+        - Mark Randol <ryvw50@email.sps.mot.com>
+-- 
+http://mail.python.org/mailman/listinfo/python-list

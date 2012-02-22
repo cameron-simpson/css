@@ -1,0 +1,50 @@
+Date: Mon, 22 Sep 2008 14:32:17 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: python-list@python.org
+Subject: Re: Why are "broken iterators" broken?
+Message-ID: <20080922043217.GA10077@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <gb5t65$k2$1@ger.gmane.org>
+User-Agent: Mutt/1.5.18 (2008-05-17)
+Content-Length: 1710
+
+On 21Sep2008 18:36, Fredrik Lundh <fredrik@pythonware.com> wrote:
+> Roy Smith wrote:
+>> There are plausible examples of collections which grow while you're  
+>> iterating over them.  I'm thinking specifically of a queue in a  
+>> multi-threaded application.  One thread pushes work onto the back of 
+>> the queue while another pops from the front.  The queue could certainly 
+>> go empty at times.  But, maybe a Python iterator is just the wrong way 
+>> to model such behavior.
+>
+> you probably want the consumer thread to block when it catches up with  
+> the producer, rather than exit.
+> (that's the default behaviour of Python's Queue object, btw)
+
+It sounds like he wants non-blocking behaviour in his consumer.
+A common example is "try to gather a lot of stuff into a single packet,
+but send a smaller packet promptly if there isn't much stuff".
+
+You could make the next() method return a sentinal value like None
+when the queue is empty. That would mean your consumer must recognise
+the special value and also precludes delivering that value through the
+queue. I'm not convinced my suggestion here is any better than just
+doubling up every call to next() with an empty() check immediately
+beforehand.
+
+You could write a trivial wrapping generator to take the original
+blocking queue and return a sentinel value on empty, too.
+
+My suggestion is also an excellent way of getting programs that
+fail-busy (i.e. they spin out) if you make a logic error in your
+consumer. Ouch.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Kill, v.t.  To create a vacancy without nominating a successor.
+Ambrose Bierce (1842-1914), U.S. author. The Devil's Dictionary (1881-1906).

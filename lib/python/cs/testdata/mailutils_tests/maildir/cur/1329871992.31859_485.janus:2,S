@@ -1,0 +1,174 @@
+Date: Sun, 26 Apr 2009 11:51:13 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: =?utf-8?B?Ik1hcnRpbiB2LiBMw7Z3aXMiIDxtYXJ0aW5Adi5sb2V3aXMuZGU+?=
+Cc: Python List <python-list@python.org>,
+	Python-Dev <python-dev@python.org>
+Subject: Re: PEP 383: Non-decodable Bytes in System Character Interfaces
+Message-ID: <20090426015113.GA17300@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: inline
+Content-Transfer-Encoding: 8bit
+In-Reply-To: <49F2FD10.9080302@v.loewis.de>
+User-Agent: Mutt/1.5.18 (2008-05-17)
+Content-Length: 6526
+
+On 25Apr2009 14:07, "Martin v. Löwis" <martin@v.loewis.de> wrote:
+| Cameron Simpson wrote:
+| > On 22Apr2009 08:50, Martin v. Löwis <martin@v.loewis.de> wrote:
+| > | File names, environment variables, and command line arguments are
+| > | defined as being character data in POSIX;
+| > 
+| > Specific citation please? I'd like to check the specifics of this.
+| For example, on environment variables:
+| http://opengroup.org/onlinepubs/007908799/xbd/envvar.html
+[...]
+| http://opengroup.org/onlinepubs/007908799/xsh/execve.html
+[...]
+
+Thanks.
+
+| > So you're proposing that all POSIX OS interfaces (which use byte strings)
+| > interpret those byte strings into Python3 str objects, with a codec
+| > that will accept arbitrary byte sequences losslessly and is totally
+| > reversible, yes?
+| 
+| Correct.
+| 
+| > And, I hope, that the os.* interfaces silently use it by default.
+| 
+| Correct.
+
+Ok, then I'm probably good with the PEP. Though I have a quite strong
+desire to be able to work in bytes at need without doing multiple
+encode/decode steps.
+
+| > | Applications that need to process the original byte
+| > | strings can obtain them by encoding the character strings with the
+| > | file system encoding, passing "python-escape" as the error handler
+| > | name.
+| > 
+| > -1
+| > This last sentence kills the idea for me, unless I'm missing something.
+| > Which I may be, of course.
+| > POSIX filesystems _do_not_ have a file system encoding.
+| 
+| Why is that a problem for the PEP?
+
+Because you said above "by encoding the character strings with the file
+system encoding", which is a fiction.
+
+| > If I'm writing a general purpose UNIX tool like chmod or find, I expect
+| > it to work reliably on _any_ UNIX pathname. It must be totally encoding
+| > blind. If I speak to the os.* interface to open a file, I expect to hand
+| > it bytes and have it behave.
+| 
+| See the other messages. If you want to do that, you can continue to.
+| 
+| > I'm very much in favour of being able to work in strings for most
+| > purposes, but if I use the os.* interfaces on a UNIX system it is
+| > necessary to be _able_ to work in bytes, because UNIX file pathnames
+| > are bytes.
+| 
+| Please re-read the PEP. It provides a way of being able to access any
+| POSIX file name correctly, and still pass strings.
+| 
+| > If there isn't a byte-safe os.* facility in Python3, it will simply be
+| > unsuitable for writing low level UNIX tools.
+| 
+| Why is that? The mechanism in the PEP is precisely defined to allow
+| writing low level UNIX tools.
+
+Then implicitly it's byte safe. Clearly I'm being unclear; I mean
+original OS-level byte strings must be obtainable undamaged, and it must
+be possible to create/work on OS objects starting with a byte string as
+the pathname.
+
+| > Finally, I have a small python program whose whole purpose in life
+| > is to transcode UNIX filenames before transfer to a MacOSX HFS
+| > directory, because of HFS's enforced particular encoding. What approach
+| > should a Python app take to transcode UNIX pathnames under your scheme?
+| 
+| Compute the corresponding character strings, and use them.
+
+In Python2 I've been going (ignoring checks for unchanged names):
+
+  - Obtain the old name and interpret it into a str() "correctly".
+    I mean here that I go:
+      unicode_name = unicode(name, srcencoding)
+    in old Python2 speak. name is a bytes string obtained from listdir()
+    and srcencoding is the encoding known to have been used when the old name
+    was constructed. Eg iso8859-1.
+  - Compute the new name in the desired encoding. For MacOSX HFS,
+    that's:
+      utf8_name = unicodedata.normalize('NFD',unicode_name).encode('utf8')
+    Still in Python2 speak, that's a byte string.
+  - os.rename(name, utf8_name)
+
+Under your scheme I imagine this is amended. I would change your
+listdir_b() function as follows:
+
+  def listdir_b(bytestring, fse=None):
+       if fse is None:
+           fse = sys.getfilesystemencoding()
+       string = bytestring.decode(fse, "python-escape")
+       for fn in os.listdir(string):
+           yield fn.encoded(fse, "python-escape")
+
+So, internally, os.listdir() takes a string and encodes it to an
+_unspecified_ encoding in bytes, and opens the directory with that
+byte string using POSIX opendir(3).
+
+How does listdir() ensure that the byte string it passes to the underlying
+opendir(3) is identical to 'bytestring' as passed to listdir_b()?
+
+It seems from the PEP that "On POSIX systems, Python currently applies the
+locale's encoding to convert the byte data to Unicode". Your extension
+is to augument that by expressing the non-decodable byte sequences in a
+non-conflicting way for reversal later, yes?
+
+That seems to double the complexity of my example application, since
+it wants to interpret the original bytes in a caller-specified fashion,
+not using the locale defaults.
+
+So I must go:
+
+  def macify(dirname, srcencoding):
+    # I need this to reverse your encoding scheme
+    fse = sys.getfilesystemencoding()
+    # I'll pretend dirname is ready for use
+    # it possibly has had to undergo the inverse of what happens inside
+    # the loop below
+    for fn in listdir(dirname):
+      # listdir reads POSIX-bytes from readdir(3)
+      # then encodes using the locale encoding, with your escape addition
+      bytename = fn.encoded(fse, "python-escape")
+      oldname = unicode(bytename, srcencoding)
+      newbytename = unicodedata.normalize('NFD',unicode_name).encode('utf8')
+      newname = newbytename.decode(fse, "python-escape")
+      if fn != newname:
+        os.rename(fn, newname)
+
+And I'm sure there's some os.path.join() complexity I have omitted.
+
+Is that correct? You'll note I need to recode the oldname unicode string
+because I don't know that fse is the same as the required target MacOSX
+UTF8 NFD encoding.
+
+So if my changes above are correct WRT the PEP, I grant that this
+is still doable in your scheme. But it would be far far easier with a
+bytes API. And let us not consider threads or other effects from locale
+changes during the loop run.
+
+I forget what was decided with the pure-bytes interfaces (out of scope
+for your PEP). Would there be a posix module with a bytes API?
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+The old day of Perl's try-it-before-you-use-it are long as gone.  Nowadays
+you can write as many as 20..100 lines of Perl without hitting a bug in the
+perl implementation.    - Ilya Zakharevich <ilya@math.ohio-state.edu>,
+                          in the perl-porters list, 22sep1998

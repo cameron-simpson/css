@@ -1,0 +1,183 @@
+Date: Sun, 13 Jun 2010 15:10:57 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: rantingrick <rantingrick@gmail.com>
+Cc: python-list@python.org
+Subject: Re: Community (A Modest Proposal)
+Message-ID: <20100613051057.GA28472@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <8d93f1e1-1c49-4abc-832c-5501b6109f03@a16g2000prg.googlegroups.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 8296
+
+On 12Jun2010 20:09, rantingrick <rantingrick@gmail.com> wrote:
+| I think the Python community is broken. I think we don't really "have"
+| a community. It's more like a handful of negitive people at the top
+| and every one else is chopped liver.
+
+Hmm. I think this is an overreaction. I must be chopped liver myself,
+though I've rarely felt outright rejected here.
+
+Of course, me not being part of the core" and all, everything below is
+merely my opinion.
+
+| Just today i saw another chance to contribute code to Python's stdlib,
+| but then that nagging feeling of "Whats the use, these people are just
+| going to discredit you and never accept code from you just because
+| they hate you". Sadly though the only damage is done to Python.
+
+The stdlib isn't where code should start.
+
+Code should start on your machine, probably then post to
+http://pypi.python.org/pypi when it's usable (and, in your opinion at
+least, _useful_) if you want others to have easy access.
+
+Stuff for the stdlib needs to serve a widely felt need, solve the
+problem in a well defined way and be both clean in interface and
+practially bugfree. This is because _everyone_ who uses python gets a
+copy of the stdlib and should be able to rely on it totally for what
+facilities it does provide.
+
+| For those who are not aware my very first post to c.l.p (and Usenet)
+| was about 1.5 years ago. At that time i saw a void that Python could
+| fill nicely as a simple scripting language for an very quickly
+| advancing 3D modeling application (Google SketchUp). (You can search
+| the archives for a thread called..."Help, Google SketchUp needs a
+| Python API" if you are interested.)
+
+A direct link to the start of thread would have been nice... Anyway,
+I've just searched it out and read chunk of it.
+
+Your enthusiasm is encouraging, but you _do_ start by bagging Ruby and
+saying nobody can find it easy to use. This is clearly false given how
+many people like it so much - it certainly appears very succinct to my
+eye from the examples I've seen, and it _will_ appeal strong to people
+of a mathematical bent and likely fans of functional languages.
+
+Then as the thread progresses you rant somewhat about how nobdy is
+jumping in to join your quest to bring Python to SketchUp, and complain
+that nobody is prepared to advocate for python in another arena.
+
+You're doing this wrong:
+
+  - you need to produce a prototyple yourself first, however small
+
+  - you need to not bag out Ruby, especially if you're going to
+    go and repeat the exercise in the existing Ruby-centric list
+
+  - you need to _not_ expect help on your pet project here in python-list;
+    the place you're going to find SketchUp enthusiasts is the SketchUp list,
+    not here; go and ask "can someone help me make a Python API paralleling
+    the Ruby API" _there_!
+
+
+| So i my first thought was to find out if anyone was interested in
+| starting this project up. So i posted my ideas and to my complete and
+| utter surprise i was lynched by the Python community as a heretic...."
+| How dare you ask other people to help do what you should be doing
+| yourself "... well that was the "Sunday school" version of the
+| responses i received. I was discredited and mobbed for no apparent
+| reason except that i had the balls to ask the question in the first
+| place. I was only looking to get feedback, but the endless hoards
+| insisted that "they" new my intentions better than *I*.
+
+I've read some of these responses. You're misreading things, or coming
+with unrealistic expectations.
+
+You did get a "put up of shut up" response; this was blunt, but you
+really do need to bring stuff to the party yourself. There are many many
+people who think "something should be done" for a variety of somethings.
+But for your pet "something" you must provide a start of your own; my
+incomplete scan of the thread suggests that _here_, in c.l.p/python-list,
+you are the sole SketchUp scripting enthusiast.
+So you should be looking for supporters there, not here.
+
+| Why was the reaction so negative? Well i will admit some fault in the
+| fact that i trashed Ruby pretty bad. I felt everything i said was true
+| IMO then as is now (mostly). People should have a right to opinions.
+| However since i was such an "unknown" and you could say a "newbie",
+| was this reaction warranted? I think not, and it speaks volumes to the
+| negative attitudes within this community.
+
+No, it speaks volumes to your expectations. c.l.p is, in my experience,
+an _extremely_ civil group. Occasionally blunt, but almost invariably
+willing to listen to reason and examples, and to critique examples.
+In this list there is a very strong ethic (for want of a word) for use
+cases as justification for "need".
+
+So in this instance I would expect you to start in the SketchUp group
+and find someone to help you write an API, even as a layer that calls
+the Ruby API.
+
+In c.l.p, I would think it reasonable to come here and say
+"I have this code [href to code, or inline small snippet reproducing the
+issue" and I can't find enough Python expertise in the SketchUp list to
+solve this problem".
+
+It is _not_ reasonable to expect non-SketchUp users to make you an API
+or to go to the SketchUp list to support you.
+
+Python advocacy seems to be by example, not cheerleading.
+
+| This brings me to a new question. How many really exceptional Python
+| programmers have been left out OR pushed out because of the extreme
+| narcissism of the "core" python group. And when i say "core" i am
+| speaking of the handful of people who hang out here discrediting and
+| mobbing anybody they see as a threat to their superiority. They clutch
+| to power like a hated dictator because that is all they have left.
+| 
+| You people need to get a life, drop your narcissistic attitudes and be
+| more helpful, friendly, and welcoming to the wider world. This
+| community is not a community, its a "Cosa Nostra". Your predator like
+| behaviors are bleeding the spirit of Python's community. This
+| community does not belong to you or me or even GvR, we all share an
+| equal piece. And no matter how much, or little, each of use
+| contribute, we all share an equally divided peice.
+
+Bah.
+
+Your supposed "community" is a discussion place for people with Python
+interest. A co-operative anarchy, like a lot of things. It is not a
+club or other formal grouping.
+
+Aside from the core devs of the language implementors and the real
+maintainer of the various library packages, everyone else is here to
+have on-topic, usually technical, discussions about python. _Nobody_
+is under an obligation to assist. Complaining because others don't share
+your particular itch _will_ get you negative responses.
+
+| I have spoken with "other" Python programmers (far more advanced than
+| myself) who echo this sentiment. However unlike me they cannot afford
+| to sacrifice their image to this group, EVEN if the group is at fault!
+| However this behavior is causing Python to suffer from lack of diverse
+| developers, and shrinks the pool of those who wish to participate.
+| 
+| But i'll tell you one thing, you will never bleed me dry because i am
+| stronger than all! I will be a thorn in your sides every time you pick
+| on a newbie. I will point out every negative comment you make, it will
+| not be hidden as you like.
+
+You don't need to need to hide; list members can killfile you as they
+see fit, and not be particularly bothered. Their choice:-)
+
+| Whether i am accepted or assassinated i
+| will create an irreversible butterfly affect that no organization of
+| negativity can endure. I will bring some positive attitudes to this
+| group if it's the last thing i do! That will be my contribution to
+| this group, and it may just save the Python community as a whole!
+
+Hmm. Your efforts are misdirected. It would be better to devote your
+energies to implementing something useful, such as your API.
+
+Other list members surely have enough on their plates; I don't have enough
+time to work on my own stuff, and I don't even have a life!  Nobody needs
+to do this stuff for you unless they personally want the same thing.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Weakness is a better teacher than strength.  Weakness must learn to
+understand the obstacles that strength brushes aside. - Mason Cooley

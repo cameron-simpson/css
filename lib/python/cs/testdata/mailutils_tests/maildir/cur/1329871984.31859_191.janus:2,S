@@ -1,0 +1,47 @@
+Date: Sat, 21 May 2011 15:40:20 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: James Mills <prologic@shortcircuit.net.au>
+Cc: python list <python-list@python.org>
+Subject: Re: Overuse of try/except/else?
+Message-ID: <20110521054020.GA32313@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <BANLkTikAZbUxnqA2o-Gu439Vn44P_mFeZA@mail.gmail.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 1397
+
+On 11May2011 13:37, James Mills <prologic@shortcircuit.net.au> wrote:
+| On Tue, May 10, 2011 at 7:34 PM, Jean-Michel Pichavant
+| <jeanmichel@sequans.com> wrote:
+| > You can reraise the exception without loosing the stack trace.
+| >
+| > try:
+| > ...
+| > except SomeException, exc:
+| > log(exc)
+| > print 'Hello world'
+| > raise # "raise exc" would loose the original stack trace
+| 
+| Valid point :) However I was referring to real experience
+| where I've seen code that "catches all any any exception"
+| and simply logs it.
+
+I've put code like that in a worker thread occasionally, because there's
+nobody "outside" to catch it; the submitter's attention is elsewhere.
+
+These days I think I'd use a LateFunction (a facility of my own which is
+a lot like the futures module) which returns a callable when you submit
+a function; the worker thread runs the submitted function and catches the
+return value or raised exception. Anyone who calls the returned callable
+later gets the return value or the exception reraised as appropriate,
+so one can avoid the dangerous "catch everything and log" scenario.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Observing the first balloon ascent in Paris, [Ben] Franklin heard a scoffer
+ask, "What good is it?"  He spoke for a generation of scientists in
+his retort, "What good is a newly born infant?" - John F. Kasson

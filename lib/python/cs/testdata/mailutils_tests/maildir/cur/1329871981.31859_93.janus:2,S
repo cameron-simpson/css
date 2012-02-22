@@ -1,0 +1,53 @@
+Date: Sat, 8 Oct 2011 10:04:25 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Michael Foord <fuzzyman@gmail.com>
+Cc: Diego Mascialino <dmascialino@gmail.com>, python-ideas@python.org
+Subject: Re: Proporsal: Show an alert in traceback when the source file is
+ newer than compiled code (issue8087)
+Message-ID: <20111007230425.GA10077@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: inline
+Content-Transfer-Encoding: 8bit
+In-Reply-To: <CAKCKLWwmOi=fNJvOdGuJ8dOtQ4=58kAbbQQozkewyf3o_hL+EQ@mail.gmail.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+Content-Length: 1275
+
+On 07Oct2011 23:59, Michael Foord <fuzzyman@gmail.com> wrote:
+| On 7 October 2011 20:53, Diego Mascialino <dmascialino@gmail.com> wrote:
+| > Hello,  I opened this issue a long time ago, and Éric Araujo said that
+| > it should be discussed on this list.
+[...]
+| > The problem is that the source shown is updated, but the executed code
+| > is old, because it wasn't reloaded.
+| >
+| > Feature request:
+| >
+| > If the source code shown was modified after import time and it wasn't
+| > reloaded, a warning message should be shown.
+| >
+| > Example:
+| >
+| > Traceback (most recent call last):
+| >  File "<stdin>", line 1, in <module>
+| >  File "mod.py", line 2, in f      WARNING: Modified after import!
+| >    a,b,c = 1,2,3
+| > ValueError: need more than 2 values to unpack
+| >
+| > or something like that.
+| >
+| 
+| That would mean every function call would need to check the age of the
+| source file and bytecode file on disk and compare!
+
+Only when the traceback was being printed. You would need to stash the
+modtime at import for later reference.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Ed Campbell's <ed@Tekelex.Com> pointers for long trips:
+2. Figure out the most money you could possibly spend, and take at least
+   double.

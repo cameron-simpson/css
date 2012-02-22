@@ -1,0 +1,89 @@
+Date: Wed, 18 Aug 2010 14:31:22 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: =?utf-8?B?zp3Or866zr/Pgg==?= <nikos.the.gr33k@gmail.com>
+Cc: python-list@python.org
+Subject: Re: String substitution VS proper mysql escaping
+Message-ID: <20100818043122.GA27336@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: inline
+Content-Transfer-Encoding: 8bit
+In-Reply-To: <3046f7fd-c4d3-4d40-a5ea-44407e724731@i31g2000yqm.googlegroups.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 2152
+
+On 17Aug2010 20:15, Νίκος <nikos.the.gr33k@gmail.com> wrote:
+| ===============================
+| cursor.execute( ''' SELECT host, hits, date FROM visitors WHERE page =
+| '%s' ORDER BY date DESC ''' % (page) )
+| ===============================
+| 
+| Someone told me NOT to do string substitution ("%") on SQL statements
+| and to let MySQLdb do it
+| for me, with proper escaping like the following
+| 
+| ===============================
+| cursor.execute('''SELECT host, hits, date FROM visitors WHERE page=%s
+|         ORDER BY date DESC''', (page,))
+| ===============================
+| 
+| The difference is that if some external source can control "page",
+| and
+| they put in a value like
+|         100 ; DELETE FROM visitors; SELECT * FROM visitors
+| i will be losing my database table data.
+
+That other difference is that the mysql dialect support knows how to
+correctly escape a string for insertion into an SQL statement. You may
+not, or may forget to pre-escape the string, etc. Using the MySQLdb
+stuff do it for you is reliable and robust.
+
+| a) I wanted to ask what is proper escaping mean and why after variable
+| page syntax has a comma
+
+Because this:
+
+  (page)
+
+means the same thing as:
+
+  page
+
+i.e. the argument to the "%" operator is just the string in page.
+
+This:
+
+  (page,)
+
+is a _tuple_ containing a single element, the page variable.
+A bit like:
+
+  [page]
+
+which is a list containing a single element. The trailing comma is
+needed to tell python you want to use a tuple, not the bare string.
+
+The "%" operator has special knowledge that is it is passed as string instead
+of a list or tuple or other sequence then it should act _as_ _if_ it had been
+passed a single element tuple containing the string.
+
+Otherwise, because a string _is_ a sequence the "%" might want to treat
+the string "foo" as the sequence:
+
+  ("f", "o", "o")
+
+Run these three loops to see the difference:
+
+  for s in "foo":
+    print s
+  for s in ("foo"):
+    print s
+  for s in ("foo",):
+    print s
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+I couldn't think of anything else to do with it, so I put it on the web.

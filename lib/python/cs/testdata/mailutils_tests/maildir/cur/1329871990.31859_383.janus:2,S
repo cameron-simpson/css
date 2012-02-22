@@ -1,0 +1,29 @@
+Date: Mon, 19 Apr 2010 11:41:08 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Antoine Pitrou <solipsis@pitrou.net>
+Cc: python-dev@python.org
+Subject: Re: Python 2.7b1 and argparse's version action
+Message-ID: <20100419014108.GA26874@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <loom.20100419T005030-610@post.gmane.org>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 599
+
+On 18Apr2010 22:52, Antoine Pitrou <solipsis@pitrou.net> wrote:
+| Steven Bethard <steven.bethard <at> gmail.com> writes:
+| > I
+| > need to a see a consensus from a variety of developers that
+| > "--version" is the right answer, and not "-V/--version", etc.
+| 
+| Both are ok for me. "-v" as a shortcut for "--version" looks wrong, though.
+| "-v" is almost always used for verbosity these days.
+
+My view is the same.
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+By dint of railing at idiots one runs the risk of becoming idiotic oneself.
+        - Gustave Flaubert

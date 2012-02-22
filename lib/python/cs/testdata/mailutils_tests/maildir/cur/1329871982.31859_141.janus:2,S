@@ -1,0 +1,58 @@
+Date: Tue, 23 Aug 2011 08:46:36 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Tomas =?utf-8?B?TGlk6W4gPHRvbWFzLmxpZGVuLnByaXZhdEBnbWFpbC5jb20+?=
+Cc: python-list@python.org
+Subject: Re: Order of addresses returned by socket.gethostbyname_ex()
+Message-ID: <20110822224636.GA5704@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: inline
+Content-Transfer-Encoding: 8bit
+In-Reply-To: <bed10d56-f5dc-4ffc-b42b-1eeec5d6c619@w11g2000vbp.googlegroups.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+Content-Length: 1883
+
+On 22Aug2011 04:29, Tomas Lid�n <tomas.liden.privat@gmail.com> wrote:
+| On 22 Aug, 12:06, Cameron Simpson <c...@zip.com.au> wrote:
+| > It would not surprise me if the order was related to the order a scan of
+| > the system interfaces yields information, and I would imagine that may
+| > be influenced by the order in which the interfaces were initialised.
+| >
+| > So getting the LAN first may merely be fortuitous.
+| > I wouldn't rely on it, especially if interfaces come and go.
+| 
+| We did try to disable/enable the interfaces in different orders, but
+| always got the same return order from gethostbyname_ex(). So it looked
+| pretty stable (on that specific OS). There's been some testing on
+| Linux as well, but since this should be used in a general cross
+| platform tool we wanted to check the exact behaviour of the method.
+| 
+| > What if you queried your routing table instead? Usually there's just one
+| > default route, and hopefully it would be configured to use the "best"
+| > interface.
+| 
+| Hmm... perhaps. How would you do that?
+
+On UNIX systems (and, I think, also Windows systems) you'd run the command:
+
+  netstat -rn
+
+or use the "route" command. (This avoids using operating system calls
+directly - the command will know what to do itself.)
+
+I seem to recall that Windows has the netstat command as well (possibly
+because, IIRC, they pulled in the BSD UNIX IP stack for their first IP
+implementation).
+
+Anyway, by popening the netstat command you can pull the "default" (or
+"0.0.0.0") route from its output. Then see if the interface listed there
+corresponds to what you need to know.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Then again, it's probably really because your average Australian doesn't give
+a shit about anything that doesn't increase the price of beer.
+        - Murray Chapman <muzzle@cs.uq.oz.au>

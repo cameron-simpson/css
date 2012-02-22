@@ -1,0 +1,63 @@
+Date: Wed, 14 Jul 2010 10:32:48 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: joblack <johannes.black@gmail.com>
+Cc: python-list@python.org
+Subject: Re: Errno 9] Bad file descriptor
+Message-ID: <20100714003248.GA23169@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <e8bafad1-3cae-4b4e-9a36-1cffdab72178@r27g2000yqb.googlegroups.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 1617
+
+On 13Jul2010 05:56, joblack <johannes.black@gmail.com> wrote:
+| Thanks for the answers so far. It's not my code I'm just curious how
+| that could happen:
+| 
+| Starting point:
+| ...
+|         self.status['text'] = 'Processing ...'
+|         try:
+|             cli_main(argv)
+|         except Exception, e:
+|             self.status['text'] = 'Error: ' + str(e)
+|             return
+| ...
+| cli_main:
+| 
+|     keypath, inpath, outpath = argv[1:]
+| ...
+|     with open(inpath, 'rb') as inf:
+|         serializer = PDFSerializer(inf, keypath)
+|         with open(outpath, 'wb') as outf:
+|             filenr = outf.fileno()
+|             serializer.dump(outf)
+|     return 0
+| 
+| PDFSerializer.dump:
+| 
+|     def dump(self, outf):
+|         self.outf = outf
+| ...
+
+
+See that you set serializer.outf to the outf you open in cli_main?
+Any attempt to use serializer _after_ exiting the "with open(outpath,
+'wb') as outf" will use serializer.outf, but the outf is now closed.
+And thus its file descriptor is invalid.
+
+BTW, by catching Exception in the starting point code you prevent
+yourself seeing exactly which line throws the error. It is usualy a bad
+idea to catch broad things like "Exception". It is normally better to
+place try/except around very small pieces of code and to catch very
+specific things. That way you know exactly what's going wrong and don't
+quietly catch all sorts of unplanned stuff.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+When buying and selling are controlled by legislation, the first things
+bought and sold are the legislators. - P.J. O'Rourke

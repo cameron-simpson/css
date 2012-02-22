@@ -1,0 +1,134 @@
+Return-Path: <python-list-bounces+cs=zip.com.au@python.org>
+Delivered-To: unknown
+Received: from mail.zip.com.au (125.255.95.3) by janus.home with POP3-SSL; 30
+  Nov 2011 03:35:01 -0000
+Delivered-To: cs@zipworld.com.au
+Received: from mailin4-syd3.pacific.net.au (mailin4-syd3.pacific.net.au [125.255.92.145])
+	by mailstore1.syd.pacific.net.au (Postfix) with ESMTP id 6AAE721D7F
+	for <cs@zipworld.com.au>; Wed, 30 Nov 2011 14:33:36 +1100 (EST)
+Received: from mail.python.org (unknown [82.94.164.166])
+	by mailin4-syd3.pacific.net.au (Postfix) with ESMTP id B9DFB4D8078
+	for <cs@zip.com.au>; Wed, 30 Nov 2011 14:33:35 +1100 (EST)
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3StS5B0yqZzMsk
+	for <cs@zip.com.au>; Wed, 30 Nov 2011 04:33:34 +0100 (CET)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=python.org; s=200901;
+	t=1322624014; bh=7V3fCu2u2mqX1b5+1n3M1spbsHc6QYcOxQRpi5QA6wk=;
+	h=Date:From:To:Subject:Message-ID:MIME-Version:In-Reply-To:
+	 References:Cc:List-Id:List-Unsubscribe:List-Archive:List-Post:
+	 List-Help:List-Subscribe:Content-Type:Content-Transfer-Encoding:
+	 Sender;
+	b=JxKGhONfD/fZKi2T4x11KRulqBmAz4+/3034enKKYd+ArNHJLs7kRwXsYG0KZvDEd
+	 XBXRv4fKxkMPduWrdw3QcORyZ4Kf8xirA/0fgBjfzbqIlmj+AaomUGHEYkNH8Edrhm
+	 VhcNxu4z5H/Nu/4WuKa4D5INoC6ez4pUA1hybGQ8=
+X-Original-To: python-list@python.org
+Delivered-To: python-list@mail.python.org
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3StS214sVqzM4G
+	for <python-list@python.org>; Wed, 30 Nov 2011 04:30:49 +0100 (CET)
+X-Spam-Status: OK 0.000
+X-Spam-Evidence: '*H*': 1.00; '*S*': 0.00; 'example:': 0.03;
+	'(especially': 0.07; 'practice,': 0.07; 'received:edu.au': 0.07;
+	'"no"': 0.09; 'accidental': 0.09; 'surprising': 0.09;
+	'to:addr:python.list': 0.09; 'to:addr:tim.thechases.com': 0.09;
+	'to:name:tim chase': 0.09; 'preference': 0.15; '*less*': 0.16;
+	'climbers,': 0.16; 'from:addr:cs': 0.16; 'from:addr:zip.com.au':
+	0.16; 'from:name:cameron simpson': 0.16; 'kern': 0.16; 'message-
+	id:@cskk.homeip.net': 0.16; 'ones)': 0.16; 'received:202.125.174':
+	0.16; 'received:202.125.174.133': 0.16;
+	'received:boardofstudies.nsw.edu.au': 0.16;
+	'received:cskk.homeip.net': 0.16;
+	'received:harvey.boardofstudies.nsw.edu.au': 0.16;
+	'received:homeip.net': 0.16; 'received:nsw.edu.au': 0.16;
+	'subject:asking': 0.16; 'subject:questions': 0.16; 'usually.':
+	0.16; 'cc:addr:python-list': 0.16; 'wrote:': 0.18; 'seems': 0.20;
+	'cc:no real name:2**0': 0.20; 'cheers,': 0.20; 'header:In-Reply-
+	To:1': 0.22; 'cc:addr:gmail.com': 0.28; 'not.': 0.28; 'depends':
+	0.28; 'cc:addr:python.org': 0.29; 'generally': 0.30; 'context,':
+	0.30; 'now?': 0.30; 'subject:?': 0.31; 'header:User-Agent:1':
+	0.33; 'actually': 0.33; 'there': 0.33; 'here,': 0.35; 'skip:" 20':
+	0.35; 'received:au': 0.36; 'question': 0.36; 'cc:2**1': 0.36;
+	'charset:us-ascii': 0.37; 'but': 0.37; 'doing': 0.38; 'some':
+	0.38; "it's": 0.40; 'selection': 0.40; 'hope': 0.61; 'matter':
+	0.61; 'your': 0.61; 'received:202': 0.66; 'needing': 0.68;
+	'press': 0.72; 'cameron': 0.73; '(oh': 0.84; '(y/n)': 0.84;
+	'uniform': 0.84
+Received: from localhost (HELO mail.python.org) (127.0.0.1)
+	by albatross.python.org with SMTP; 30 Nov 2011 04:30:49 +0100
+Received: from harvey.boardofstudies.nsw.edu.au
+	(mail2.rack1.boardofstudies.nsw.edu.au [202.125.174.133])
+	by mail.python.org (Postfix) with ESMTP
+	for <python-list@python.org>; Wed, 30 Nov 2011 04:30:49 +0100 (CET)
+Received: from cskk.homeip.net (localhost.localdomain [127.0.0.1])
+	by harvey.boardofstudies.nsw.edu.au (Postfix) with ESMTP id ABB164D3B56;
+	Wed, 30 Nov 2011 14:30:38 +1100 (EST)
+Received: by janus.cskk.homeip.net (Postfix, from userid 1000)
+	id 8F82E100419B7; Wed, 30 Nov 2011 14:30:38 +1100 (EST)
+Date: Wed, 30 Nov 2011 14:30:38 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Tim Chase <python.list@tim.thechases.com>
+Subject: Re: cmd.Cmd asking questions?
+Message-ID: <20111130033038.GA19431@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <4ED53496.6070408@tim.thechases.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+References: <4ED53496.6070408@tim.thechases.com>
+Cc: python-list@python.org, Robert Kern <robert.kern@gmail.com>
+X-BeenThere: python-list@python.org
+X-Mailman-Version: 2.1.12
+Precedence: list
+List-Id: General discussion list for the Python programming language
+	<python-list.python.org>
+List-Unsubscribe: <http://mail.python.org/mailman/options/python-list>,
+	<mailto:python-list-request@python.org?subject=unsubscribe>
+List-Archive: <http://mail.python.org/pipermail/python-list>
+List-Post: <mailto:python-list@python.org>
+List-Help: <mailto:python-list-request@python.org?subject=help>
+List-Subscribe: <http://mail.python.org/mailman/listinfo/python-list>,
+	<mailto:python-list-request@python.org?subject=subscribe>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Sender: python-list-bounces+cs=zip.com.au@python.org
+Errors-To: python-list-bounces+cs=zip.com.au@python.org
+X-Cats2Procmailrc-Rule: cats/home: python  python-list     sender:python-list-bounces+cs=zip.com.au@python.org
+X-Label: python-list
+Content-Length: 1306
+
+On 29Nov2011 13:37, Tim Chase <python.list@tim.thechases.com> wrote:
+| On 11/28/11 06:27, Robert Kern wrote:
+[...]
+| >I actually have a preference for needing to press enter for
+| >Y/N answers, too. It's distinctly *less* uniform to have some
+| >questions requiring an enter and some not. It can be
+| >unpleasantly surprising to the user, too.
+| 
+| After playing with it, allowing for a default Y/N value seems to
+| make it a one-key selection via <enter>, but allow for
+| less-surprising behavior as you detail.
+
+As a matter of good practice, I like default responses (especially
+yes/no ones) to default to the safer/more-conservative choice, and
+generally to default to "no", with the question suitably framed so that
+"no" means "safer/more-conservative".
+
+In this way an accidental unthinking <enter> has less chance of doing
+damage. What that means depends on context, but I hope you take the point.
+
+(Oh yes, traditionally the default is also capitalised to be evident.)
+
+Example:
+
+  Remove your database now? (y/N)
+
+I would want <enter> to mean "no" here, usually.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+There are old climbers, and there are bold climbers; but there are no old
+bold climbers.
+-- 
+http://mail.python.org/mailman/listinfo/python-list

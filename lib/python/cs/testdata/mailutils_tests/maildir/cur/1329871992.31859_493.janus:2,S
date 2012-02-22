@@ -1,0 +1,65 @@
+Date: Sat, 16 May 2009 07:59:05 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: python-list@python.org
+Subject: Re: How to catch str exception?
+Message-ID: <20090515215905.GA823@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <7xeiuqkss5.fsf@ruckus.brouhaha.com>
+User-Agent: Mutt/1.5.19 (2009-01-05)
+Content-Length: 2469
+
+On 15May2009 13:36,  <> wrote:
+| "anuraguniyal@yahoo.com" <anuraguniyal@yahoo.com> writes:
+| > there are many such exceptions and hence it is not feasible to catch
+| > them all or know them all unless i go thru src code.
+| 
+| But that is true of all exceptions.  The alternative seems to be a
+| "checked exception" scheme like Java's, which in practice imposes a
+| huge pain on programmers, who have to modify type signatures all up
+| and down the call hierarchy every time they raise another exception at
+| the bottom level.
+
+I used to think that too, but it's not entirely true.
+
+Aside: I loved the discipline that comes with Java's interface strictness
+but found the language felt cumbersome; Python's duck typing approach
+is far simpler to work with but lets you be a lot sloppier because many
+implementation shortcomings will only show at runtime, whereas Java's
+rigidity can be used to catch a lot of stuff at compile time.
+
+Anyway, to the exception thing: if you're throwing a "new" type of
+exception then either you've changes the object model and Java rightly
+complains, if you're breaking the object encapsulation and you should
+be catching the new exceptions fairly low down and either handling it or
+raising a "conformant" exception the caller expected. This isually happens
+across a type boundary; for example a data structure that just happens to
+use an SQL db for backing structure should be catching any SQL exceptions
+and recasting them to an appropriate outer exception for the user,
+probably inserting the underlying SQL exception into the new exception
+as an attribute.
+
+Anyway, my basic point here is that the asserting that your have to
+"modify type signatures all up and down the call hierarchy every time they
+raise another exception" should have a fairly limited scope. Unexpected
+exceptions _shouldn't_ be happening. We routinely write stuff like:
+
+  try:
+    n = int(foo)
+  except ValueError, e:
+    print >>sys.stderr, "not an integer: %s" % foo
+
+If int() starts throwing non-ValueError exceptions then many many
+programs break. Java would prevent one from changing int() in such
+a fashion outright. Python requires the self-discipline on the part of
+the implementer of int() to raise only ValueError exceptions, and
+internally handle anything else at a lower level.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Widget. It's got a widget. A lovely widget. A widget it has got.
+        - Jack Dee

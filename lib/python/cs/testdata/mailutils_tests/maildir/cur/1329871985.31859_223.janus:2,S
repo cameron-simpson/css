@@ -1,0 +1,39 @@
+Date: Thu, 30 Dec 2010 20:04:44 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: smainklh@free.fr
+Cc: python-list@python.org
+Subject: Re: os.path.isfile and wildcard for directory name
+Message-ID: <20101230090444.GA15318@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <1293698166.4d1c447655828@imp.free.fr>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 751
+
+On 30Dec2010 09:36, smainklh@free.fr <smainklh@free.fr> wrote:
+| I want to test if a file exists but my path contain a directory name that
+| differs from a server to another.
+| In shell i would have done something like that :
+| #!/bin/bash
+| mypath=/dire*/directory02/
+| myfile=filename
+| myfile=toto
+| if [ -f $mypath/$myfile ]
+[...]
+
+Check out the glob module:
+  http://docs.python.org/library/glob.html#module-glob
+
+Use it to do the glob, then os.path.isfile with a path constructed from
+the result:
+
+  http://docs.python.org/library/os.path.html#os.path.isfile
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Any company large enough to have a research lab
+is large enough not to listen to it. - Alan Kay

@@ -1,0 +1,29 @@
+Date: Mon, 19 Jan 2009 10:10:55 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: seaworthyjeremy@gmail.com
+Subject: Re: Can Python manipulate PE structure or bytes?
+Message-ID: <20090118231055.GA16491@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <b97fb016-c11a-4979-ac96-caccf60dc603@y1g2000pra.googlegroups.com>
+User-Agent: Mutt/1.5.18 (2008-05-17)
+Content-Length: 617
+
+[ This reply is off-list. ]
+
+On 18Jan2009 14:18, seaworthyjeremy@gmail.com <seaworthyjeremy@gmail.com> wrote:
+| I'm interested in Python and wanted to know if Python can manipulate
+| PE structure and bytes. Also what are its limits?
+
+It would be helpful if you defined what a "PE structure" is,
+via a reply to your own list post.
+
+Python can manipulate bytes. You're going to have to give a lot more
+information about your task before you get much more useful answers
+though.
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+If it can't be turned off, it's not a feature. - Karl Heuer

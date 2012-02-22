@@ -1,0 +1,76 @@
+Date: Sat, 2 May 2009 07:39:28 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: =?//TRANSLIT?B?Ik1hcnRpbiB2LiBM9ndpcyIgPG1hcnRpbkB2LmxvZXdpcy5kZT4=?=
+Cc: Zooko O'Whielacronx <zookog@gmail.com>,
+	Python-Dev <python-dev@python.org>
+Subject: Re: PEP 383 and GUI libraries
+Message-ID: <20090501213928.GA15679@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <49FB2596.1090706@v.loewis.de>
+User-Agent: Mutt/1.5.18 (2008-05-17)
+Content-Length: 2910
+
+On 01May2009 18:38, Martin v. L?wis <martin@v.loewis.de> wrote:
+| > Okay, I am wrong about this.  Having a flag to remember whether I had to
+| > fall back to the utf-8b trick is one method to implement my requirement,
+| > but my actual requirement is this:
+| > 
+| > Requirement: either the unicode string or the bytes are faithfully
+| > transmitted from one system to another.
+| 
+| I don't understand this requirement very well, in particular not
+| the "faithfully" part.
+| 
+| > That is: if you read a filename from the filesystem, and transmit that
+| > filename to another system and use it, then there are two cases:
+| 
+| What do you mean by "use it"? Things like opening files? How does
+| that work? In general, a file name valid on one system is invalid
+| on a different system - or, at least, refers to a different file
+| over there. This is independent of encodings.
+
+I think he's doing a file transfer of some kind and needs to preserve
+the names. Or I would guess the two systems are not both UNIX or there
+is some subtlety not yet mentioned, or he'd just use tar or some other
+byte-level UNIX tool.
+
+| > Requirement 1: the byte string was valid in the encoding of source
+| > system, in which case the unicode name is faithfully transmitted
+| > (i.e. the bytes that finally land on the target system are the result of
+| > sourcebytes.decode(source_sys_encoding).encode(target_sys_encoding).
+| 
+| In all your descriptions, I'm puzzled as to where exactly you get
+| the source bytes from. If you use the PEP 383 interfaces, you will
+| start with character strings, not byte strings, always.
+
+But if both system do present POSIX layers, it's bytes underneath and
+the system tools will natively use bytes. He wants to ensure that he can
+read using python, using listdir, and elsewhere when he writing using
+python, preserve the bytes layer. I think.
+
+In fact it sounds like he may be translating valid unicode and carefully not
+altering byte names that don't decode. That in turn implies that the codec
+may be different on the two systems.
+
+| > Okay, I find it surprisingly easy to make subtle errors in this encoding
+| > stuff, so please let me know if you spot one.  Is it true that
+| > srcbytes.encode(srcencoding, 'python-escape').decode('utf-8',
+| > 'python-escape') will always produce srcbytes ? 
+| 
+| I think you mixed up bytes and unicode here: if srcbytes is indeed
+| a bytes object, then you can't apply .encode to it.
+
+I think he has encode/decode swapped (I did too back in the uber-thread;
+if your mapping is one-to-one the distinction is almost arbitrary).
+
+However, his assertion/hope is true only if srcencoding == 'utf-8'.
+The PEP itself says that it works if the decode and encode use the same
+mapping.
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+"How do you know I'm Mad?" asked Alice.
+"You must be," said the Cat, "or you wouldn't have come here."

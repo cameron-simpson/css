@@ -1,0 +1,66 @@
+Date: Thu, 12 Aug 2010 08:12:49 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Tim Harig <usernet@ilthio.net>
+Cc: python-list@python.org
+Subject: Re: Line-by-line processing when stdin is not a tty
+Message-ID: <20100811221249.GA3087@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <i3u5ds$49a$1@speranza.aioe.org>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 2553
+
+On 11Aug2010 12:35, Tim Harig <usernet@ilthio.net> wrote:
+| > The buffering is a performance choice. Every write requires a context
+| > switch from userspace to kernel space, and availability of data in the
+| > pipe will wake up a downstream process blocked trying to read.
+| > It is far more efficient to do as few such copies as possible, [...]
+| 
+| Right, I don't question the optimization.  I question whether the
+| intelligence that performes that optimation should be placed within cat or
+| whether it should be placed within the shell.  It seems to me that the
+| shell has a better idea of how the command is being used and can therefore
+| make a better decision about whether or not buffering is appropriate.
+
+I would argue it's not much better placed, though it would be nice if
+the control could be issued from there. But it can't.
+
+Regarding the former, in this pipeline:
+
+  cat some files... | python filter program | something else
+
+how shall the shell know if the python filter (to take the OP's case)
+wants its input line buffered (rare) or block buffered (usually ok)?
+
+What might be useful would be a way to attach an attribute to a pipe
+or other file descriptor indicating the desired buffering behaviour
+that writers to the file descriptor should adopt.
+
+Of course, the ugly sides to that are how many buffering regimes should
+it be possible to express and how and when should the upstream (writing)
+program decide to check? In a pipeline the pipes are made _before_ any
+of the programs commence because the programs need to be attached to the
+pipes (this is done before the programs themselves are dispatched). So,
+_after_ dispatch the python-wanting-line-buffering issues an ioctl on
+the pipe saying "I want line buffering". However, the upstream program
+may well already have commenced operation before that happens. It may
+even have run to completion before that happens! So, shall all upstream
+programs be required to poll? How often? On every write? Shall they
+receive a signal? What if they don't catch it? If the downstream
+program _requires_ line buffering then the whole situation is racey
+and unreliable.
+
+You can see that on reflection this isn't easy to resolve cleanly from
+_outside_ the writing program.
+
+To do it from inside requires all programs to sprout an option like
+GNU cat's -u option.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+What progress we are making. In the Middle Ages they would have burned
+me. Now they are content with burning my books. - Sigmund Freud

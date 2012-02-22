@@ -1,0 +1,245 @@
+Return-Path: <python-list-bounces+cs=zip.com.au@python.org>
+Delivered-To: unknown
+Received: from mail.zip.com.au (125.255.95.3:995) by janus.home with
+  POP3-SSL; 17 Feb 2012 00:37:39 -0000
+Delivered-To: cs@zipworld.com.au
+Received: from mailin3-syd3.pacific.net.au (mailin3-syd3.pacific.net.au [125.255.92.144])
+	by mailstore2.syd.pacific.net.au (Postfix) with ESMTP id D617D4E7C0
+	for <cs@zipworld.com.au>; Fri, 17 Feb 2012 11:36:53 +1100 (EST)
+Received: from mail.python.org (unknown [82.94.164.166])
+	by mailin3-syd3.pacific.net.au (Postfix) with ESMTP id B8F554000B6
+	for <cs@zip.com.au>; Fri, 17 Feb 2012 11:39:10 +1100 (EST)
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3TpwQk6YgqzNtD
+	for <cs@zip.com.au>; Fri, 17 Feb 2012 01:36:46 +0100 (CET)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=python.org; s=200901;
+	t=1329439006; bh=EuvpABkW9Citsd2rTEKTHik/oUgMLa1ZosM6tKmjSV0=;
+	h=Date:From:To:Subject:Message-ID:MIME-Version:In-Reply-To:
+	 References:Cc:List-Id:List-Unsubscribe:List-Archive:List-Post:
+	 List-Help:List-Subscribe:Content-Type:Content-Transfer-Encoding:
+	 Sender;
+	b=bQh0UTgIYyKNLHNgDXcrcXvY5YGcumg19ktv4DZJYtZtg4B7hap5sM1pZCv8mvU8s
+	 xht2oTAIVtVciieJrC9u69qfBTNLx6Dd17eSLhiGfeDgj/oy6eikiRbPiobPO3Ptut
+	 bSM15SwFSzchdq6G2eXTQkWjNHStJdsLEIvGWsWE=
+X-Original-To: python-list@python.org
+Delivered-To: python-list@mail.python.org
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3TpwLb0XHKzPXH
+	for <python-list@python.org>; Fri, 17 Feb 2012 01:33:11 +0100 (CET)
+X-Spam-Status: OK 0.000
+X-Spam-Evidence: '*H*': 1.00; '*S*': 0.00; 'bug': 0.02; 'example:':
+	0.03; 'library,': 0.05; 'over,': 0.05; 'suppose': 0.05; 'bug.':
+	0.07; 'bytes.': 0.07; 'function,': 0.07; 'received:edu.au': 0.07;
+	'seemed': 0.07; 'python': 0.08; "'''": 0.09; 'append': 0.09;
+	'bash': 0.09; 'bug,': 0.09; 'called.': 0.09; 'caller': 0.09;
+	'etc).': 0.09; 'fetch': 0.09; 'subject:python': 0.10; 'def': 0.13;
+	'binary': 0.13; 'subject:file': 0.13; 'fixed.': 0.15; '"get"':
+	0.16; '(again,': 0.16; 'above?': 0.16; 'already.': 0.16;
+	'around!': 0.16; 'copied.': 0.16; 'digests': 0.16; 'docstring':
+	0.16; 'extracting': 0.16; 'feature?': 0.16; 'from:addr:cs': 0.16;
+	'from:addr:zip.com.au': 0.16; 'from:name:cameron simpson': 0.16;
+	'mechanisms,': 0.16; 'message-id:@cskk.homeip.net': 0.16;
+	'overloaded': 0.16; 'received:202.125.174': 0.16;
+	'received:202.125.174.133': 0.16;
+	'received:boardofstudies.nsw.edu.au': 0.16;
+	'received:cskk.homeip.net': 0.16;
+	'received:harvey.boardofstudies.nsw.edu.au': 0.16;
+	'received:homeip.net': 0.16; 'received:nsw.edu.au': 0.16; 'tmp':
+	0.16; 'cc:addr:python-list': 0.16; 'wrote:': 0.18; 'bytes': 0.18;
+	'subject:skip:s 10': 0.18; 'working.': 0.18; 'help.': 0.19;
+	'digest': 0.19; 'seems': 0.20; 'cheers,': 0.20; 'checked': 0.21;
+	'cc:no real name:2**0': 0.21; 'trying': 0.21; 'badly': 0.21;
+	'file,': 0.21; "doesn't": 0.22; 'header:In-Reply-To:1': 0.22;
+	'earlier': 0.23; 'btw,': 0.23; 'end,': 0.23; 'here?': 0.23;
+	'indentation': 0.23; 'issuing': 0.23; 'pieces': 0.23; 'tests.':
+	0.23; 'command': 0.24; 'byte': 0.24; 'elements': 0.24; 'extract':
+	0.24; 'hopefully': 0.24; 'fix': 0.25; 'creating': 0.25; 'mode':
+	0.25; 'tests': 0.25; 'cc:2**0': 0.26; 'code.': 0.26; 'noticed':
+	0.26; 'code': 0.26; 'testing': 0.26; 'function': 0.27; 'looks':
+	0.27; 'says': 0.27; 'missed': 0.28; 'script': 0.28; 'posted':
+	0.29; 'class': 0.29; 'problem': 0.29; 'cc:addr:python.org': 0.29;
+	'server': 0.30; 'lines': 0.30; '"python"': 0.30; 'far,': 0.30;
+	'lock': 0.30; 'new.': 0.30; 'precision': 0.30; 'quoting': 0.30;
+	'tail': 0.30; 'yesterday,': 0.30; '(the': 0.30; 'changes': 0.30;
+	'actually': 0.31; 'file.': 0.31; 'values': 0.32; 'ftp': 0.32;
+	'good.': 0.32; 'rest': 0.32; 'thanks': 0.32; 'does': 0.32;
+	'actual': 0.32; 'list': 0.32; 'header:User-Agent:1': 0.33; 'it.':
+	0.33; 'instead': 0.33; 'test': 0.34; 'file': 0.34; 'record': 0.34;
+	'17,': 0.34; 'describing': 0.34; 'parse': 0.34; 'pass.': 0.34;
+	'principle': 0.34; 'test.': 0.34; 'received:202': 0.66; 'course.':
+	0.66; 'arrive': 0.67; 'hurry': 0.67; 'emails.': 0.68; 'kept':
+	0.68; 'wish': 0.68; 'care': 0.71; 'reply,': 0.73; 'blank': 0.74;
+	'records': 0.74; 'cameron': 0.77; 'ideas.': 0.77; 'inbox.': 0.78;
+	'"yes': 0.84; 'dir,': 0.84; 'domain?': 0.84; 'excellent.': 0.84;
+	'filesystem.': 0.84; 'grabbing': 0.84; 'doubling': 0.91
+Received: from localhost (HELO mail.python.org) (127.0.0.1)
+	by albatross.python.org with SMTP; 17 Feb 2012 01:33:11 +0100
+Received: from harvey.boardofstudies.nsw.edu.au
+	(mail2.rack1.boardofstudies.nsw.edu.au [202.125.174.133])
+	by mail.python.org (Postfix) with ESMTP
+	for <python-list@python.org>; Fri, 17 Feb 2012 01:33:10 +0100 (CET)
+Received: from janus.cskk.homeip.net (localhost.localdomain [127.0.0.1])
+	by harvey.boardofstudies.nsw.edu.au (Postfix) with ESMTP id 53CB14D3B66;
+	Fri, 17 Feb 2012 11:33:01 +1100 (EST)
+Received: by janus.cskk.homeip.net (Postfix, from userid 1000)
+	id C177320074600; Fri, 17 Feb 2012 11:33:24 +1100 (EST)
+Date: Fri, 17 Feb 2012 11:33:24 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Sherif Shehab Aldin <silentquote@gmail.com>
+Subject: Re: python file synchronization
+Message-ID: <20120217003324.GA15685@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <CAH3xUCLbKS_4jP=hhwj04GyDghhzVKSnus_+kdei87ruQQ_L4g@mail.gmail.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+References: <CAH3xUCLbKS_4jP=hhwj04GyDghhzVKSnus_+kdei87ruQQ_L4g@mail.gmail.com>
+Cc: python-list@python.org
+X-BeenThere: python-list@python.org
+X-Mailman-Version: 2.1.12
+Precedence: list
+List-Id: General discussion list for the Python programming language
+	<python-list.python.org>
+List-Unsubscribe: <http://mail.python.org/mailman/options/python-list>,
+	<mailto:python-list-request@python.org?subject=unsubscribe>
+List-Archive: <http://mail.python.org/pipermail/python-list>
+List-Post: <mailto:python-list@python.org>
+List-Help: <mailto:python-list-request@python.org?subject=help>
+List-Subscribe: <http://mail.python.org/mailman/listinfo/python-list>,
+	<mailto:python-list-request@python.org?subject=subscribe>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Sender: python-list-bounces+cs=zip.com.au@python.org
+Errors-To: python-list-bounces+cs=zip.com.au@python.org
+X-Cats2Procmailrc-Rule: cats/home: python  python-list     sender:python-list-bounces+cs=zip.com.au@python.org
+X-Label: python-list
+Content-Length: 5078
+
+On 16Feb2012 22:11, Sherif Shehab Aldin <silentquote@gmail.com> wrote:
+| First sorry for my very very late reply, has been overloaded at work last
+| week :(
+
+Me too.
+
+There's no hurry at my end, take your time.
+
+[...]
+| > Can a simple byte count help here? Copy the whole file with FTP. From
+| > the new copy, extract the bytes from the last byte count offset onward.
+| > Then parse the smaller file, extracting whole records for use by (C).
+| > That way you can just keep the unparsed tail (partial record I imagine)
+| > around for the next fetch.
+| >
+| > Looking at RFC959 (the FTP protocol):
+| >
+| >  http://www.w3.org/Protocols/rfc959/4_FileTransfer.html
+| >
+| > it looks like you can do a partial file fetch, also, by issuing a REST
+| > (restart) command to set a file offset and then issuing a RETR (retrieve)
+| > command to get the rest of the file. These all need to be in binary mode
+| > of course.
+| >
+| > So in principle you could track the byte offset of what you have fetched
+| > with FTP so far, and fetch only what is new.
+| 
+|  I am actually grabbing the file from ftp with a bash script using lftp, It
+| seemed a simple task for python at the beginning and then I noticed the
+| many problems. I have checked lftp and did not know how to continue
+| downloading a file. Do I have to use ftp library, may be in python so I can
+| use that feature?
+
+Looking at "man lftp" I see that the "get" command has a "-c" option
+(for "continue"). That probably does it for you. Should be easy to test:
+
+  - make big file on FTP server
+  - fetch with lftp (interactively - this is all just to check)
+  - append a little data to the file on the server
+     date >> the-big-file
+  - refetch:
+      get -c the-big-file
+
+and see how much data gets copied. Hopefully just the new bytes.
+
+[...]
+| > | After searching more yesterday, I found that local mv is atomic, so
+| > instead
+| > | of creating the lock files, I will copy the new diffs to tmp dir, and
+| > after
+| > | the copy is over, mv it to actual diffs dir, that will avoid reading It
+| > | while It's still being copied.
+| >
+| > Yes, this sounds good. Provided the mv is on the same filesystem.
+[...]
+| > Yes they are in same file system, I am making sure of that ;)
+
+Good.
+
+BTW, when replying inline try to make sure your new text has clean blank
+lines above and below and has not kept the indentation quote markers.
+See above that your "Yes they are in same file system" seems to be at
+the same indentation as my earlier sentence above? That made your reply
+look like part of the quote instead of a reply, and I nearly missed it.
+
+[...]
+| > It is also useful to make simple tests of small pieces of the code.
+| > So make the code to get part of the data a simple function, and write
+| > tests to execute it in a few ways (no new data, part of a record,
+| > several records etc).
+| >
+| > You are right, my problem is that I don't care about testing until my code
+| grows badly and then I notice what I got myself into :)
+
+(Again, see the quoting level?)
+
+One approach to get into testing slowly is to make a test for your bug.
+Suppose something is not working. Write a small function that exhibits
+the bug, as small as possible. That is now a test function! When you fix
+the bug, the test function will pass. Keep it around!
+
+Some projects have tests for every bug report that gets fixed.
+
+Another approach to growing a test suite is to write out a good docstring
+for somthing, describing with precision what the function arranges
+i.e. not the internal mechanisms, but what the caller can rely on being
+true after the function has been called. Then write a test function that
+calls the main function and then checks each thing the docstring says
+should be true. Each check is a test.
+
+Trite example:
+
+  def double(x):
+    ''' Return double the value of `x`.
+        The return value will be twice `x`.
+        The return value will be even.
+    '''
+    return x * 2
+
+  class Tests(unitest.TestCase):
+    def test_double(self):
+      for x in 0, 3, 17, 100:           # test a few different values
+        x2 = double(x)
+        self.assertEqual(x2, x + x)     # test doubling
+        self.assertEqual(x2 % 2, 0)     # test evenness
+
+You can see that writing out the guarentees in the docstring assists in
+writing some tests.
+
+| > I really appreciate your help. I am trying to learn from the mailing list,
+| I noticed many interesting posts in the list already. I wish I could read
+| the python-list same way.. but unfortunately the mail digest they send is
+| quiet annoying :(
+
+I do not use digests - I have my subscription set to individual emails.
+Just arrange that your mailer files then in a "python" mail folder when
+they arrive so they do not clutter your inbox.
+
+| Many thanks to you, and I will keep you posted if I got other ideas. :)
+
+Excellent. Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Q: How does a hacker fix a function which doesn't work for all of the elements in its domain?
+A: He changes the domain.
+-- 
+http://mail.python.org/mailman/listinfo/python-list

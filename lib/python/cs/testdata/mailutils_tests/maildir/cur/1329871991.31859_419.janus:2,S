@@ -1,0 +1,39 @@
+Date: Tue, 3 Nov 2009 18:30:46 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Antoine Pitrou <solipsis@pitrou.net>
+Cc: python-dev@python.org
+Subject: Re: Python-Dev Retrieve an arbitrary element from a
+ set?withoutremoving it
+Message-ID: <20091103073046.GA31310@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <loom.20091102T111744-750@post.gmane.org>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 984
+
+On 02Nov2009 10:21, Antoine Pitrou <solipsis@pitrou.net> wrote:
+| Cameron Simpson <cs <at> zip.com.au> writes:
+| > 
+| > Personally, I'm for the iteration spec in a lot of ways.
+| > 
+| > Firstly, a .get()/.pick() that always returns the same element feels
+| > horrible. Is there anyone here who _likes_ it?
+| 
+| I do. Since the caller is asking for an arbitrary element, returning the same
+| element is legitimate. It's funny how people seem to have a problem with the
+| word "arbitrary" :)
+| 
+| And I'm -1 on any implicit iteration attaching some state to the object. If you
+| want to iterate, there's already an obvious way to it.
+
+Good point. Colour me convinced by this.
+
+I suggest the doco is really clear about the word arbitrary:-)
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+I must really get a thinner pencil. I can't manage this one a bit. It writes
+all manner of things I don't intend.
+        - rheney@csugrad.cs.vt.edu (Bolo Mk XXXIX)

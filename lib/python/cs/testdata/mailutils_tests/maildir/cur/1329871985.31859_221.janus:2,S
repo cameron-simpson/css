@@ -1,0 +1,39 @@
+Date: Wed, 5 Jan 2011 08:20:51 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Chris Weisiger <cweisiger@msg.ucsf.edu>
+Cc: Pythonmac-sig <pythonmac-sig@python.org>
+Subject: Re: Escaping commandline strings
+Message-ID: <20110104212051.GA22579@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <AANLkTik8E7h8-tQW2=F5F30uKe_D99YYtu=0DvYLKzCO@mail.gmail.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 981
+
+On 04Jan2011 12:21, Chris Weisiger <cweisiger@msg.ucsf.edu> wrote:
+| I want to sanitize some strings (e.g. escape apostrophes, spaces, etc.)
+| before passing them to the commandline via subprocess. Unfortunately I can't
+| seem to find any built-in function to do this. Am I really going to have to
+| write up my own sanitizer? Not that it'd be much effort, but I'd much rather
+| use an official function than risk forgetting something.
+
+If it is for Bourne shell syntax, it's almost too simple to put in a
+library: put into single quotes and replace all inner single quotes
+with:
+
+  '\''
+
+You can play games with strings that are safe to not quote, etc but the
+above is very simple and reliable. Something like (untested):
+
+  "'"+s.replace("'", "'\\''")+"'"
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+You Know You're in the SCA When...
+        ...the tunes you unconsciously hum are in Latin.
+                - Cailfind ingen Grainne

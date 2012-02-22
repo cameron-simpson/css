@@ -1,0 +1,202 @@
+Return-Path: <python-list-bounces+cs=zip.com.au@python.org>
+Delivered-To: unknown
+Received: from mail.zip.com.au (125.255.95.3) by janus.home with POP3-SSL; 03
+  Nov 2010 20:53:02 -0000
+Delivered-To: cs@zipworld.com.au
+Received: from mailin2.pacific.net.au (mailin2.pacific.net.au [61.8.0.81])
+	by mailstore2.syd.pacific.net.au (Postfix) with ESMTP id F3EAA3C4E
+	for <cs@zipworld.com.au>; Thu,  4 Nov 2010 07:52:01 +1100 (EST)
+Received: from mail.python.org (unknown [82.94.164.166])
+	by mailin2.pacific.net.au (Postfix) with ESMTP id 54A0A19C17A
+	for <cs@zip.com.au>; Thu,  4 Nov 2010 07:52:01 +1100 (EST)
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 628CCEE9C8
+	for <cs@zip.com.au>; Wed,  3 Nov 2010 21:51:58 +0100 (CET)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=python.org; s=200901;
+	t=1288817518; bh=kttgHsJyRxXAfNr+e91dkFQ9+EN6dAeJjiWJU3VaYdU=;
+	h=Date:From:To:Subject:Message-ID:MIME-Version:In-Reply-To:
+	 References:Cc:List-Id:List-Unsubscribe:List-Archive:List-Post:
+	 List-Help:List-Subscribe:Content-Type:Content-Transfer-Encoding:
+	 Sender;
+	b=JeLYpowdWy2zucyDxRAeYt1OiczpVNaeui62UADSP9PCPF0ZyqTuTGoRgATAnHYTI
+	 rCBMzOW0dhjXJwSJ7AdNr4MHCluXka1/httv77az1HNFV/vegxQMdhJgE2PuDytxTS
+	 R0SJjBKL4Aj7s1HUbV1GSSGa7PIcsDw2wBbZvTXM=
+X-Original-To: python-list@python.org
+Delivered-To: python-list@mail.python.org
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id B8234EE9F7
+	for <python-list@python.org>; Wed,  3 Nov 2010 21:48:14 +0100 (CET)
+X-Spam-Status: OK 0.000
+X-Spam-Evidence: '*H*': 1.00; '*S*': 0.00; 'python.': 0.05;
+	'subject:Python': 0.05; 'instance': 0.05; 'parameter': 0.05;
+	'library': 0.06; 'think,': 0.07; 'typed': 0.07; 'python': 0.08;
+	'dislike': 0.09; 'exceptions': 0.09; 'tends': 0.09; 'values,':
+	0.09; 'yields': 0.09; 'output': 0.10; 'wrote:': 0.13; 'argument':
+	0.13; 'read.': 0.13; 'suspect': 0.15; 'adjacent': 0.16;
+	'beginners.': 0.16; 'docs,': 0.16; 'docs.': 0.16; 'from:addr:cs':
+	0.16; 'from:addr:zip.com.au': 0.16; 'from:name:cameron simpson':
+	0.16; 'imho.': 0.16; 'language?': 0.16; 'message-
+	id:@cskk.homeip.net': 0.16; 'parameters,': 0.16; 'prose': 0.16;
+	'received:202.125.174': 0.16; 'received:202.125.174.133': 0.16;
+	'received:boardofstudies.nsw.edu.au': 0.16;
+	'received:cskk.homeip.net': 0.16;
+	'received:harvey.boardofstudies.nsw.edu.au': 0.16;
+	'received:homeip.net': 0.16; 'received:nsw.edu.au': 0.16;
+	'stored.': 0.16; 'url:html)': 0.16; 'url:manual': 0.16; 'api':
+	0.17; 'subject:skip:d 10': 0.17; 'code.': 0.18; 'cc:no real
+	name:2**0': 0.18; 'seems': 0.18; 'cc:addr:python-list': 0.18;
+	'java,': 0.19; 'modules': 0.19; 'cc:2**0': 0.21; 'initial': 0.22;
+	'(or': 0.22; 'gregory': 0.23; 'module.': 0.23; 'received:edu.au':
+	0.23; 'responses.': 0.23; 'header:In-Reply-To:1': 0.23; 'trying':
+	0.23; 'java': 0.24; 'cases': 0.24; '(with': 0.25; 'url:blog':
+	0.25; 'code': 0.25; "i'm": 0.27; 'language': 0.27; 'structure':
+	0.28; 'compare': 0.28; 'url:library': 0.28; "i've": 0.28;
+	'functions.': 0.28; 'index': 0.28; 'core': 0.30; 'least': 0.30;
+	'convenience': 0.30; 'differences': 0.30; 'etc).': 0.30;
+	'feelings': 0.30; 'useless': 0.30; 'anyone': 0.30; 'however,':
+	0.30; 'cc:addr:python.org': 0.30; 'generally': 0.30; 'google':
+	0.31; '(the': 0.31; 'cross': 0.32; "doesn't": 0.32; 'does': 0.33;
+	'url:docs': 0.33; 'stuff': 0.33; 'follows:': 0.34; 'where': 0.34;
+	'header:User-Agent:1': 0.34; 'explicit': 0.34; 'function.': 0.34;
+	'slow': 0.34; 'structured': 0.34; 'difficult': 0.34; 'else': 0.34;
+	'but': 0.35; 'enough': 0.35; 'using': 0.35; 'skip:o 20': 0.35;
+	'towards': 0.36; 'open': 0.36; 'help': 0.36; 'works': 0.37;
+	'still': 0.37; 'url:uk': 0.37; 'docs': 0.38; 'php': 0.38; 'allow':
+	0.38; 'close': 0.38; 'names': 0.38; 'charset:us-ascii': 0.38;
+	'should': 0.38; 'subject:: ': 0.38; 'fact': 0.38; 'though': 0.39;
+	'url:python': 0.39; 'url:org': 0.39; 'could': 0.39; 'former':
+	0.39; 'leads': 0.39; 'strong': 0.39; 'really': 0.39; 'some': 0.39;
+	'your': 0.60; 'url:net': 0.61; 'true': 0.61; 'ease': 0.63; 'job.':
+	0.63; 'relevant': 0.66; 'dress': 0.67; 'visit': 0.69;
+	'collection': 0.71; 'friend': 0.72; 'contrary': 0.73; 'url:php':
+	0.78; 'to:addr:yahoo.com': 0.84; '(see:': 0.84; 'contextual':
+	0.84; 'paragraphs': 0.84; 'relevance': 0.84; 'setups': 0.84;
+	'stems': 0.84; 'url:functions': 0.84; 'contrast': 0.91; 'locally':
+	0.91; 'pleasant': 0.91; 'url:function': 0.91; 'whole.': 0.91
+Received: from localhost (HELO mail.python.org) (127.0.0.1)
+	by albatross.python.org with SMTP; 03 Nov 2010 21:48:14 +0100
+Received: from harvey.boardofstudies.nsw.edu.au
+	(mail2.rack1.boardofstudies.nsw.edu.au [202.125.174.133])
+	by mail.python.org (Postfix) with ESMTP
+	for <python-list@python.org>; Wed,  3 Nov 2010 21:48:13 +0100 (CET)
+Received: from cskk.homeip.net (localhost.localdomain [127.0.0.1])
+	by harvey.boardofstudies.nsw.edu.au (Postfix) with ESMTP id 0CC834D396D;
+	Thu,  4 Nov 2010 07:48:10 +1100 (EST)
+Received: by janus.cskk.homeip.net (Postfix, from userid 1000)
+	id E7AFD100419B7; Thu,  4 Nov 2010 07:48:09 +1100 (EST)
+Date: Thu, 4 Nov 2010 07:48:09 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: jk <sanjo_ie@yahoo.com>
+Subject: Re: Python documentation too difficult for beginners
+Message-ID: <20101103204809.GA5306@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <e3aeabe9-17aa-4956-91dd-b9b8716b0ee6@t13g2000yqm.googlegroups.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+References: <e3aeabe9-17aa-4956-91dd-b9b8716b0ee6@t13g2000yqm.googlegroups.com>
+Cc: python-list@python.org
+X-BeenThere: python-list@python.org
+X-Mailman-Version: 2.1.12
+Precedence: list
+List-Id: General discussion list for the Python programming language
+	<python-list.python.org>
+List-Unsubscribe: <http://mail.python.org/mailman/options/python-list>,
+	<mailto:python-list-request@python.org?subject=unsubscribe>
+List-Archive: <http://mail.python.org/pipermail/python-list>
+List-Post: <mailto:python-list@python.org>
+List-Help: <mailto:python-list-request@python.org?subject=help>
+List-Subscribe: <http://mail.python.org/mailman/listinfo/python-list>,
+	<mailto:python-list-request@python.org?subject=subscribe>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Sender: python-list-bounces+cs=zip.com.au@python.org
+Errors-To: python-list-bounces+cs=zip.com.au@python.org
+X-Cats2Procmailrc-Rule: cats/home: python  python-list     sender:python-list-bounces+cs=zip.com.au@python.org
+X-Label: python-list
+Content-Length: 3629
+
+On 02Nov2010 03:42, jk <sanjo_ie@yahoo.com> wrote:
+| I've been coding in PHP and Java for years, and their documentation is
+| concise, well structured and easy to scan.
+
+While I agree about Java, at least the core Java docs, and javadoc
+output in general (_great_ cross referencing!) I have mixed feelings
+about the PHP docs. Though I suspect that stems from a dislike of the
+PHP library API in general more than the docs, perhaps.
+
+| Others have mentioned this apparently for years (see:
+| http://stackoverflow.com/questions/4046166/easy-to-navigate-online-python-reference-manual/4070851
+| and http://www.russellbeattie.com/blog/python-library-docs-still-suck
+| and http://xahlee.org/perl-python/xlali_skami_cukta.html).
+| 
+| Compare for instance the differences in ease of use, and speed of use,
+| of these:
+| 
+| http://docs.python.org/library/functions.html#open
+| http://uk.php.net/manual/en/function.fopen.php
+| 
+| The former is difficult to find (try searching for 'open' in the
+| search box and see what you get).
+
+I confess I almost never use the search box - as you say the result
+relevance can be dodgy.
+
+However, I do find the docs easy to use and pleasant to read on the
+whole. My use is as follows:
+
+  For speed and convenience I have the docs locally stored.
+
+  I open the front page and then usually both the modules and index in
+  adjacent brwoser tabs.
+
+  I go to the index if I'm not sure of the module.
+
+The strength of the index is that it tends to contain stuff that people
+thought should be indexed (versus searches, which often have no
+contextual understanding of the text, so their relevance is weaker).
+The weakness of the index is that it can be hard to pick the relevant
+entry. Open-link-in-new-tab is my friend here:-(
+
+| It is simply a collection of
+| paragraphs without strong enough contrast to differentiate the
+| different parts - parameters, parameter values, return types,
+| exceptions and related functions. It is slow to read and doesn't allow
+| easy visual scanning.
+
+That is true (the scanning). But by contrast, it does read like prose
+and lends itself to a visit that gets you a complete feel for the
+function.
+
+[...]
+| Has anyone else struggled while trying to learn the language? The
+| whole documentation system seems geared towards people who already
+| know what they're looking for and is close to useless for beginners.
+| I'm not the only one who finds google an easier way to find
+| documentation about python.
+
+I certainly don't find the core docs hard to use (with some exceptions;
+I still don't really understand the urllib stuff for the cases where
+configuration is needed - weird proxy setups etc).
+
+I've only been using Python for a few years and have generally found
+that language easy to learn and the docs easy to read. I rarely reach
+for The Google unless I'm seeking examples; the docs could do with a few
+more of these IMHO.
+
+I understand the attraction of the structured layout javadoc yields but
+find it leads to "drier" documentation. It also works well for Java
+because it is strongly typed - a great deal of the structure in the docs
+can come directly from the code because argument counts, names and types
+are always explicit (or deducable).
+
+These are just initial responses. Now to wade the whole thread:-)
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+On the contrary of what you may think, your hacker is fully aware
+of your company's dress code. He is fully aware of the fact that it
+doesn't help him to do his job.
+- Gregory Hosler <gregory.hosler@eno.ericsson.se>
+-- 
+http://mail.python.org/mailman/listinfo/python-list

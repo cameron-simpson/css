@@ -1,0 +1,36 @@
+Date: Tue, 21 Jun 2011 22:06:04 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Steven D'Aprano <steve+comp.lang.python@pearwood.info>
+Cc: python-list@python.org
+Subject: Re: break in a module
+Message-ID: <20110621120604.GA29422@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20110621100442.GA7089@cskk.homeip.net>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 575
+
+On 21Jun2011 20:04, I wrote:
+| So the caller does an:
+| 
+|   import foo
+| 
+| as normal, with no special wrapping. And the module goes:
+| 
+|   spam()
+|   if condition:
+|     raise StopIteration
+|   ham()
+|   cheese()
+
+Of course, that should be StopImport, not StopIteration.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Agree, for Law is costly. -- Very good advice to litigious Persons, founded
+upon Reason and Experience; for many Times the Charges of a Suit exceed the
+Value of the Thing in Dispute. - Bailey's dictionary, 1736

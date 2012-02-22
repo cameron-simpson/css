@@ -1,0 +1,48 @@
+Date: Fri, 17 Sep 2010 14:38:26 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: mark.pelletier@asrcms.com
+Cc: python-list@python.org
+Subject: Re: Too many threads
+Message-ID: <20100917043826.GA21464@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <716be5f9-79b9-43c7-9c04-0454d015086d@j30g2000vbr.googlegroups.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 1172
+
+On 16Sep2010 09:55, mark.pelletier@asrcms.com <mark.pelletier@asrcms.com> wrote:
+| For some reason, the tasks I put into my thread pool occasionally get
+| run more than once.
+| 
+| Here's the code:
+
+You need to post your _exact_ code. I had to change:
+  from queue import Queue
+into
+  from Queue import Queue
+So: _do_ you have a "queue" (lowercase) module? Is it buggy?
+
+Let's pretend not.
+
+Using the standard Queue module I can't reproduce your problem and your
+code looks correct to my eye.
+
+However, it is possible that the output stream used by print() is not
+thread safe. In which case your multiple outputs may stem from output
+buffer mishandling and not from your thread pool.
+
+Make another Queue to receice items, change _worker() to .put(item) onto
+it and collect form the queue and print in the program's main code. That
+way only one thread (the main one) will be trying to print(), removing the
+possibility of mismanagement of the output if print() is not thread safe.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Rules of Optimization:
+Rule 1: Don't do it.
+Rule 2 (for experts only): Don't do it yet.
+- M.A. Jackson

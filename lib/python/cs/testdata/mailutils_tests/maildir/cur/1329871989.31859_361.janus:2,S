@@ -1,0 +1,33 @@
+Date: Thu, 6 May 2010 16:00:27 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Nobody <nobody@nowhere.com>
+Cc: python-list@python.org
+Subject: Re: strange interaction between open and cwd
+Message-ID: <20100506060026.GA6171@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <pan.2010.05.06.04.24.29.329000@nowhere.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 794
+
+On 06May2010 05:24, Nobody <nobody@nowhere.com> wrote:
+| On Thu, 06 May 2010 10:21:45 +1000, Cameron Simpson wrote:
+| 
+| > Look at the st_rdev field (== the device holding this inode).
+| > When that changes, you've crossed a mount mount point.
+| 
+| st_dev reports the device on which the inode resides.
+| 
+| st_rdev is only meaningul if the inode type is block device (S_IFBLK) or
+| character device (S_IFCHR), in which case it identifies the device to
+| which the inode refers, e.g.:
+
+Gah. Yes, you're quite right. st_dev is what I should have been citing.
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+It's better, when you're riding with someone you don't know so well, to stick
+to the inside line - it's easier to avoid the bits...
+        - Barry Sheene

@@ -1,0 +1,63 @@
+Date: Fri, 18 Jun 2010 09:30:31 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Gabriel Genellina <gagsl-py2@yahoo.com.ar>
+Cc: python-list@python.org
+Subject: Re: basic doubt
+Message-ID: <20100617233031.GA29059@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: inline
+Content-Transfer-Encoding: 8bit
+In-Reply-To: <op.vefqd9qcx6zn5v@lepton.softlabbsas.com.ar>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 1846
+
+On 17Jun2010 05:11, Gabriel Genellina <gagsl-py2@yahoo.com.ar> wrote:
+| En Thu, 17 Jun 2010 02:06:54 -0300, madhuri vio
+| <madhuri.vio@gmail.com> escribió:
+| 
+| >def h(self,event):
+| >    handle = open("myco.fasta","r")
+| >    for seq_record in SeqIO.parse(handle, "fasta"):
+| >         messenger_rna = coding_myco.fasta.transcribe()
+| >         han1 = open("mycorna.fasta","wU")
+| >         han1.close()
+| >         return self.messenger_rna
+| >
+| >
+| >the error is...
+| >
+| >File "/usr/lib/python2.6/lib-tk/Tkinter.py", line 1413, in __call__
+| >    return self.func(*args)
+| >TypeError: h() takes exactly 2 arguments (0 given)
+| >
+| > ia m unable to debug...i am stuck
+| 
+| This is just a guess, but looks like your h function is a plain
+| function, not a method, so it doesn't take a "self" parameter. Also,
+| you are probably using it in some place where the callback doesn't
+| receive any additional arguments (like a Button command).
+| Try with def f(): ...
+| If it doesn't work, show us the part where h is used.
+
+And have a look at the documentation for the "functools" module,
+particularly the "partial" function:
+
+  f2 = functools.partial(f, arg1, arg2, ...)
+
+Then calling f2() will call f(arg1, arg2, ...). So you can pass "f2"
+to an event handler. Of course, this means you need to know arg1 etc in
+advance.
+
+However, you really do need to show the calling end of your code.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+You see: Mr. Drogo, he married poor Miss Primula Brandybuck.  She was our Mr.
+Bilbo's first cousin on the mother's side (her mother being the youngest of
+the Old Took's daughters); and Mr. Drogo was his second cousin.  So Mr. Frodo
+is his first *and* second cousin, once removed either way, as the saying is,
+if you follow me.       - the Gaffer, _Lord_of_the_Rings_

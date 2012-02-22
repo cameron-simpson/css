@@ -1,0 +1,142 @@
+Return-Path: <python-ideas-bounces+cs=zip.com.au@python.org>
+Delivered-To: unknown
+Received: from mail.zip.com.au (125.255.95.3:995) by janus.home with
+  POP3-SSL; 18 Feb 2012 23:07:58 -0000
+Delivered-To: cs@zipworld.com.au
+Received: from mailin4-syd3.pacific.net.au (mailin4-syd3.pacific.net.au [125.255.92.145])
+	by mailstore2.syd.pacific.net.au (Postfix) with ESMTP id 5E5603C06
+	for <cs@zipworld.com.au>; Sun, 19 Feb 2012 10:05:39 +1100 (EST)
+Received: from mail.python.org (unknown [82.94.164.166])
+	by mailin4-syd3.pacific.net.au (Postfix) with ESMTP id B477B4D8085
+	for <cs@zip.com.au>; Sun, 19 Feb 2012 10:05:38 +1100 (EST)
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3Tr6JZ74zfzQD4
+	for <cs@zip.com.au>; Sun, 19 Feb 2012 00:05:34 +0100 (CET)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=python.org; s=200901;
+	t=1329606335; bh=6o89PG+rpiErR36yU3HN7v6pAGHpK8oBHJzUILGiNzM=;
+	h=Date:From:To:Message-ID:MIME-Version:In-Reply-To:References:Cc:
+	 Subject:List-Id:List-Unsubscribe:List-Archive:List-Post:List-Help:
+	 List-Subscribe:Content-Type:Content-Transfer-Encoding:Sender;
+	b=Zahv+GMVsy6S4fOs2kLmEVCivPyBPvHwW6zUDeqc+C/xlToTu9K/fSrfK1gWQ48J3
+	 eSSmnJqXdtC4bNPYaZsZYrFJ5cdsDLOcYP4k8vcGXonJrZrHAZbIgrungVj6CE904u
+	 BkWPmnQ0KAnkzoSami9egA+G5hVG7WH+Vpmgp2WY=
+X-Original-To: python-ideas@python.org
+Delivered-To: python-ideas@mail.python.org
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3Tr6Ht2Fp8zPJx
+	for <python-ideas@python.org>; Sun, 19 Feb 2012 00:04:58 +0100 (CET)
+X-Spam-Status: OK 0.000
+X-Spam-Evidence: '*H*': 1.00; '*S*': 0.00; 'thread,': 0.04;
+	'infinite': 0.07; 'received:edu.au': 0.07; 'threads,': 0.07;
+	'concurrency': 0.09; 'generators': 0.09; 'loop.': 0.09; 'matt':
+	0.09; 'c++': 0.12; 'algorithmic': 0.16; 'antoine': 0.16; 'bound,':
+	0.16; 'capacity.': 0.16; 'cleanly': 0.16; 'from:addr:cs': 0.16;
+	'from:addr:zip.com.au': 0.16; 'from:name:cameron simpson': 0.16;
+	'interwoven': 0.16; 'message-id:@cskk.homeip.net': 0.16;
+	'myself;': 0.16; 'pitrou': 0.16; 'received:202.125.174': 0.16;
+	'received:202.125.174.133': 0.16;
+	'received:boardofstudies.nsw.edu.au': 0.16;
+	'received:cskk.homeip.net': 0.16;
+	'received:harvey.boardofstudies.nsw.edu.au': 0.16;
+	'received:homeip.net': 0.16; 'received:nsw.edu.au': 0.16; 'some)':
+	0.16; 'subject:channel': 0.16; 'synchronous': 0.16; 'wrote:':
+	0.18; 'appropriate.': 0.18; 'wrap': 0.18; 'cheers,': 0.20; 'cc:no
+	real name:2**0': 0.21; "doesn't": 0.22; 'header:In-Reply-To:1':
+	0.22; 'feb': 0.22; 'item.': 0.23; 'locking': 0.23; 'pair': 0.23;
+	'fine': 0.24; 'do,': 0.25; 'sat,': 0.25; 'cc:2**0': 0.26;
+	'channel': 0.28; 'separate': 0.28; 'pass': 0.29; 'sends': 0.29;
+	'problem': 0.29; 'cc:addr:python.org': 0.29; 'queue': 0.30;
+	"didn't": 0.30; 'quite': 0.31; 'actually': 0.31; 'thread': 0.32;
+	'does': 0.32; 'header:User-Agent:1': 0.33; 'algorithms': 0.34;
+	'purely': 0.34; 'be.': 0.35; '(for': 0.35; 'received:au': 0.36;
+	'two': 0.36; 'but': 0.37; 'charset:us-ascii': 0.37; 'another':
+	0.37; 'skip:_ 10': 0.38; 'allows': 0.38; 'event': 0.38; 'some':
+	0.38; 'useful': 0.38; 'data': 0.38; 'subject: (': 0.40; 'point':
+	0.40; 'might': 0.40; 'easy': 0.60; 'your': 0.61; 'kind': 0.62;
+	'here': 0.64; 'act': 0.65; 'alternative': 0.65; 'received:202':
+	0.66; 'yourself': 0.69; 'become': 0.69; 'cameron': 0.77; '+0800':
+	0.84; 'csp': 0.84; 'joiner': 0.84; 'receiver': 0.93
+Received: from localhost (HELO mail.python.org) (127.0.0.1)
+	by albatross.python.org with SMTP; 19 Feb 2012 00:04:58 +0100
+Received: from harvey.boardofstudies.nsw.edu.au
+	(mail2.rack1.boardofstudies.nsw.edu.au [202.125.174.133])
+	by mail.python.org (Postfix) with ESMTP
+	for <python-ideas@python.org>; Sun, 19 Feb 2012 00:04:57 +0100 (CET)
+Received: from janus.cskk.homeip.net (localhost.localdomain [127.0.0.1])
+	by harvey.boardofstudies.nsw.edu.au (Postfix) with ESMTP id 1052E4D3B67;
+	Sun, 19 Feb 2012 10:04:56 +1100 (EST)
+Received: by janus.cskk.homeip.net (Postfix, from userid 1000)
+	id A26F82005A971; Sun, 19 Feb 2012 10:05:25 +1100 (EST)
+Date: Sun, 19 Feb 2012 10:05:25 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Antoine Pitrou <solipsis@pitrou.net>
+Message-ID: <20120218230525.GA14740@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <20120218200108.2b72ab9f@pitrou.net>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+References: <20120218200108.2b72ab9f@pitrou.net>
+Cc: python-ideas@python.org
+Subject: Re: channel (synchronous queue)
+X-BeenThere: python-ideas@python.org
+X-Mailman-Version: 2.1.12
+Precedence: list
+List-Id: Discussions of speculative Python language ideas
+	<python-ideas.python.org>
+List-Unsubscribe: <http://mail.python.org/mailman/options/python-ideas>,
+	<mailto:python-ideas-request@python.org?subject=unsubscribe>
+List-Archive: <http://mail.python.org/pipermail/python-ideas>
+List-Post: <mailto:python-ideas@python.org>
+List-Help: <mailto:python-ideas-request@python.org?subject=help>
+List-Subscribe: <http://mail.python.org/mailman/listinfo/python-ideas>,
+	<mailto:python-ideas-request@python.org?subject=subscribe>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Sender: python-ideas-bounces+cs=zip.com.au@python.org
+Errors-To: python-ideas-bounces+cs=zip.com.au@python.org
+X-Cats2Procmailrc-Rule: cats/home: python  python-ideas    sender:python-ideas-bounces+cs=zip.com.au@python.org
+X-Label: python-ideas
+Content-Length: 1941
+
+On 18Feb2012 20:01, Antoine Pitrou <solipsis@pitrou.net> wrote:
+| On Sat, 18 Feb 2012 23:38:06 +0800
+| Matt Joiner <anacrolix@gmail.com> wrote:
+| > Recently (for some) the CSP style of channel has become quite popular
+| > in concurrency implementations. This kind of channel allows sends that
+| > do not complete until a receiver has actually taken the item. The
+| > existing  queue.Queue would act like this if it didn't treat a queue
+| > size of 0 as infinite capacity.
+| > 
+| > In particular, I find channels to have value when sending data between
+| > threads, where it doesn't make sense to proceed until some current
+| > item has been accepted. This is useful when items are not purely CPU
+| > bound, and so generators are not appropriate.
+| 
+| What is the point to process the data in another thread, if you are
+| going to block on the result anyway?
+
+Synchronisation. Shrug. I use synchronous channels myself; they are a
+fine basic facility. The problem with Queues et al is that they are
+inherently _asynchronous_ and you have to work hard to wrap locking
+around it when you want interlocking cogs.
+
+Also, it is perfectly reasonable in many circumstances to use a thread
+for algorithmic clarity, just like you might use a generator or a
+coroutine in suitable circumstances. Here one does it not so that some
+work may process in parallel but to cleanly write two algorithms that
+pass information between each other but are otherwise as separate as an
+aother pair of functions might be. The alternative may be a complicated
+interwoven event loop.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+C makes it easy for you to shoot yourself in the foot.  C++ makes that
+harder, but when you do, it blows away your whole leg.
+- Bjarne Stroustrup
+_______________________________________________
+Python-ideas mailing list
+Python-ideas@python.org
+http://mail.python.org/mailman/listinfo/python-ideas

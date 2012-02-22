@@ -1,0 +1,32 @@
+Date: Sat, 27 Nov 2010 08:50:33 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Akand Islam <sohel807@gmail.com>
+Cc: python-list@python.org
+Subject: Re: Matlab equivalent syntax in Python
+Message-ID: <20101126215033.GA26585@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <99f8ef31-646e-4e9c-912d-e607389d5191@r31g2000prg.googlegroups.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 645
+
+On 26Nov2010 13:15, Akand Islam <sohel807@gmail.com> wrote:
+| Thanks for your posting. Like, here is the following Matlab codes
+| which I am trying to transform into Python. Here you
+| will find "profile clear, profile on, profile off, profile resume,
+| profile viewer, and drawnow" syntaxes. So, what will be these
+| equivalents
+| in Python?
+
+I would start by looking at the "profile" python module:
+
+  http://docs.python.org/library/profile.html#module-profile
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Their are thre mistakes in this sentence.
+        - Rob Ray DoD#33333 <rray@linden.msvu.ca>

@@ -1,0 +1,39 @@
+Date: Fri, 13 Jan 2012 10:24:59 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Ben Finney <ben+python@benfinney.id.au>
+Cc: python-ideas@python.org
+Subject: Re: os.listdir default to '.'
+Message-ID: <20120112232459.GA32459@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: inline
+Content-Transfer-Encoding: 8bit
+In-Reply-To: <87ipkg7e2l.fsf@benfinney.id.au>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+Content-Length: 869
+
+On 13Jan2012 09:26, Ben Finney <ben+python@benfinney.id.au> wrote:
+| Cameron Simpson <cs@zip.com.au> writes:
+| > I think it should be '.' [instead of ‘os.path.curdir’].
+| >
+| > It is possible to arrange directory permissions so that you can't open
+| > curdir because it traverses a directory to which one lacks permissions,
+| > but you can still open '.'.
+| 
+| What distinction are you drawing?
+| 
+|     >>> os.path.curdir
+|     '.'
+
+A totally bogus distinction. I had os.getcwd() in my head instead.
+Please ignore my post:-(
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+This signature was originally recorded on analog equipment. While we have
+attempted to preserve the meaning of the original, the high resolution of
+this media may reveal limitations of the source.
+        - paul-michael agapow <agapow@latcs1.oz.au>

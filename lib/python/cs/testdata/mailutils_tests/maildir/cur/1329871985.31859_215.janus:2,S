@@ -1,0 +1,131 @@
+Return-Path: <python-list-bounces+cs=zip.com.au@python.org>
+Delivered-To: unknown
+Received: from mail.zip.com.au (125.255.95.3) by janus.home with POP3-SSL; 17
+  Feb 2011 04:39:02 -0000
+Delivered-To: cs@zipworld.com.au
+Received: from mailin1.pacific.net.au (mailin1.pacific.net.au [61.8.0.80])
+	by mailstore2.syd.pacific.net.au (Postfix) with ESMTP id 6873F56740
+	for <cs@zipworld.com.au>; Thu, 17 Feb 2011 15:37:05 +1100 (EST)
+Received: from mail.python.org (unknown [82.94.164.166])
+	by mailin1.pacific.net.au (Postfix) with ESMTP id BAA1C184314
+	for <cs@zip.com.au>; Thu, 17 Feb 2011 15:37:04 +1100 (EST)
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 8294EEE9A3
+	for <cs@zip.com.au>; Thu, 17 Feb 2011 05:37:01 +0100 (CET)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=python.org; s=200901;
+	t=1297917421; bh=TOhxT7Oee1XtspJ7Ylsw+3if8npW6n6/YGXD8ZX1l64=;
+	h=Date:From:To:Subject:Message-ID:MIME-Version:In-Reply-To:
+	 References:Cc:List-Id:List-Unsubscribe:List-Archive:List-Post:
+	 List-Help:List-Subscribe:Content-Type:Content-Transfer-Encoding:
+	 Sender;
+	b=o+roVnJbY3gRasdeOzVtuxeNkIc72gf2VLJDIbW4Ers1acYQQ/1FXtEY0lZ+d2S+9
+	 GOzUMwkS24iLZ1CDusAj6wXY4ez/60shjyVVcyX6iCahKa9/XesvzXVeppncTwKsTs
+	 HcBByVceyYbhpnkoMu/QOhgJeuxmMubaRb0lC6jo=
+X-Original-To: python-list@python.org
+Delivered-To: python-list@mail.python.org
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 51B5AEE988
+	for <python-list@python.org>; Thu, 17 Feb 2011 05:34:10 +0100 (CET)
+X-Spam-Status: OK 0.000
+X-Spam-Evidence: '*H*': 1.00; '*S*': 0.00; 'subject:bug': 0.04;
+	'width': 0.05; 'received:edu.au': 0.07; 'terry': 0.07; 'python':
+	0.07; 'anna': 0.09; 'unix,': 0.09; 'this:': 0.11; '>>>': 0.12;
+	'output': 0.13; 'am,': 0.14; 'possibly': 0.15; 'wrote:': 0.15;
+	'from:addr:cs': 0.16; 'from:addr:zip.com.au': 0.16;
+	'from:name:cameron simpson': 0.16; 'message-id:@cskk.homeip.net':
+	0.16; 'received:202.125.174': 0.16; 'received:202.125.174.133':
+	0.16; 'received:boardofstudies.nsw.edu.au': 0.16;
+	'received:cskk.homeip.net': 0.16;
+	'received:harvey.boardofstudies.nsw.edu.au': 0.16;
+	'received:homeip.net': 0.16; 'received:nsw.edu.au': 0.16; 'reedy':
+	0.16; 'temp': 0.16; 'ignore': 0.17; 'command': 0.17; 'idle': 0.20;
+	'cc:no real name:2**0': 0.20; 'cc:2**0': 0.21; 'cheers,': 0.22;
+	'cc:addr:python-list': 0.23; 'header:In-Reply-To:1': 0.23;
+	'version.': 0.24; "i'm": 0.26; 'string': 0.30; 'subject:?': 0.30;
+	'character': 0.30; 'sorry,': 0.30; 'helpful.': 0.32;
+	'cc:addr:python.org': 0.32; 'actually': 0.32; 'received:au': 0.32;
+	'window': 0.34; 'skip:" 10': 0.35; 'header:User-Agent:1': 0.36;
+	'should': 0.36; 'print': 0.36; 'windows,': 0.36; 'charset:us-
+	ascii': 0.37; 'file.': 0.38; 'skip:s 20': 0.40; 'characters':
+	0.40; 'cameron': 0.60; 'post.': 0.60; 'received:202.125': 0.60;
+	'refuse': 0.60; 'received:202': 0.61; 'kindly': 0.64;
+	'subject:this': 0.78; 'escaping': 0.84; 'russell': 0.91
+Received: from localhost (HELO mail.python.org) (127.0.0.1)
+	by albatross.python.org with SMTP; 17 Feb 2011 05:34:10 +0100
+Received: from harvey.boardofstudies.nsw.edu.au
+	(mail2.rack1.boardofstudies.nsw.edu.au [202.125.174.133])
+	by mail.python.org (Postfix) with ESMTP
+	for <python-list@python.org>; Thu, 17 Feb 2011 05:34:09 +0100 (CET)
+Received: from cskk.homeip.net (localhost.localdomain [127.0.0.1])
+	by harvey.boardofstudies.nsw.edu.au (Postfix) with ESMTP id 83D614D3B54;
+	Thu, 17 Feb 2011 15:34:00 +1100 (EST)
+Received: by janus.cskk.homeip.net (Postfix, from userid 1000)
+	id 64419100419B7; Thu, 17 Feb 2011 15:34:00 +1100 (EST)
+Date: Thu, 17 Feb 2011 15:34:00 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Terry Reedy <tjreedy@udel.edu>
+Subject: Re: Is this a bug of str.join?
+Message-ID: <20110217043400.GA8981@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <ijgvtu$5mm$1@dough.gmane.org>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+References: <ijgvtu$5mm$1@dough.gmane.org>
+Cc: python-list@python.org
+X-BeenThere: python-list@python.org
+X-Mailman-Version: 2.1.12
+Precedence: list
+List-Id: General discussion list for the Python programming language
+	<python-list.python.org>
+List-Unsubscribe: <http://mail.python.org/mailman/options/python-list>,
+	<mailto:python-list-request@python.org?subject=unsubscribe>
+List-Archive: <http://mail.python.org/pipermail/python-list>
+List-Post: <mailto:python-list@python.org>
+List-Help: <mailto:python-list-request@python.org?subject=help>
+List-Subscribe: <http://mail.python.org/mailman/listinfo/python-list>,
+	<mailto:python-list-request@python.org?subject=subscribe>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Sender: python-list-bounces+cs=zip.com.au@python.org
+Errors-To: python-list-bounces+cs=zip.com.au@python.org
+X-Cats2Procmailrc-Rule: cats/home: python  python-list     sender:python-list-bounces+cs=zip.com.au@python.org
+X-Label: python-list
+Content-Length: 1140
+
+On 16Feb2011 12:01, Terry Reedy <tjreedy@udel.edu> wrote:
+| On 2/16/2011 1:32 AM, fireinice wrote:
+| >I'm sorry, I found it should be the terminal width caused visual
+| >problem, please kindly ignore this post.
+| 
+| For future reference, the way to get more info about what is really
+| in a string is to print its repr(), or even its list() version.
+| Len() is also helpful. On Windows, both the Command Prompt window
+| and IDLE refuse to expand tabs, so
+| 
+| >>> s='\t'.join(('a','b','c'))
+| >>> str(s)
+| 'a\tb\tc'
+| >>> repr(s)
+| "'a\\tb\\tc'"
+| >>> len(s)
+| 5
+| >>> list(s)
+| ['a', '\t', 'b', '\t', 'c']
+
+And on UNIX, a common way to inspect program output at the character
+level is like this:
+
+  python my_python-program | od -c
+
+possibly sent off into a temp file. That will let you see what character
+are actually escaping from the program (versus terry's suggestion, which
+is good for looking at the characters before they escape).
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+I'm not making any of this up you know. - Anna Russell
+-- 
+http://mail.python.org/mailman/listinfo/python-list

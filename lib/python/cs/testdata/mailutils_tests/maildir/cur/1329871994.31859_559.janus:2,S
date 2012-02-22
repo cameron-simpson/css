@@ -1,0 +1,104 @@
+Date: Mon, 18 Aug 2008 15:11:59 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: python-list@python.org
+Subject: Re: Python does not get environment variable when using cron.
+Message-ID: <20080818051159.GA24075@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <48a8f4fe$0$17182$742ec2ed@news.sonic.net>
+User-Agent: Mutt/1.5.18 (2008-05-17)
+Content-Length: 3498
+
+On 17Aug2008 21:25, John Nagle <nagle@animats.com> wrote:
+> Stephen Cattaneo wrote:
+>> I am attempting to execute an automated test (written in Python) via
+>> cron.  I have to check the HOSTNAME variable as part of the test, oddly
+>> under cron the HOSTNAME environment variable is not in the os.environ
+>> dictionary.  I know that cron runs in a subshell that does not have all
+>> of the normally set environment variables.  HOSTNAME is not one of those
+>> variables, it is set even in cron's subshell.  Why doesn't python get
+>> this variable?  Is this a bug in python2.4?  
+
+Because $HOSTNAME is a bash specific variable, set by bash but NOT
+EXPORTED! Like $0 and a bunch of other "private" variables, subprocesses
+do not inherit this value. From "man bash":
+
+
+   Shell Variables
+       The following variables are set by the shell:
+       [...]
+       HOSTNAME
+              Automatically set to the name of the current host.
+
+Note that "set" does not imply "exported". Only exported vairables are
+seen by subprocesses.
+
+>    Cron doesn't normally use a shell at all.  It just runs the
+> requested program in a subprocess. So there's no shell involved,
+> and you don't get a shell-type user environment.
+
+This statement is false.
+
+Cron hands _all_ jobs to a shell. From "man 5 crontab":
+
+   The ``sixth'' field (the rest of the line) specifies the command to be
+   run.  The entire command portion of the line, up to a newline or % char-
+   acter, will be executed by /bin/sh or by the shell specified in the SHELL
+   variable of the cronfile. 
+
+That's from Vixie cron, but all UNIX crons hand the command part of the
+cron line to a shell, usually /bin/sh.
+
+You're probably confused by the fact that cron does not invoke "login" shells
+(with their associated initialisation from /etc/profile and $HOME/.profile).
+
+>  If you have
+> a crontab line like
+> 10 3 * * * /usr/bin/python someprogram.py
+> there's no shell.
+
+Not so. A shell will be interpreting the string "/usr/bin/python
+someprogram.py", mch as happens when you type this on the command line.
+
+
+>  You can try
+> 10 3 * * * /bin/sh /usr/bin/python someprogram.py
+>    which will load a shell, which in turn will load Python.
+
+Even more not so. The command "/bin/sh /usr/bin/python someprogram.py"
+will attempt to parse the file "/usr/bin/python" as though it were a
+shell script. That's almost certainly not what you wanted.
+
+To do what you describe requires the line:
+
+  /bin/sh -c '/usr/bin/python someprogram.py'
+
+which hands the command string "/usr/bin/python someprogram.py" to
+/bin/sh for interpretation. Were you to do this as a cron line, the
+string: "/bin/sh -c '/usr/bin/python someprogram.py'" would be handed
+to /bin/sh for interpretation. That interpreter in turn then hands
+"/usr/bin/python someprogram.py" to /bin/sh for interpretation.
+
+A parent-child nested process listing (with some fake quoting tossed in
+to show the strings) would look like this:
+
+  /bin/sh -c "/bin/sh -c '/usr/bin/python someprogram.py'"
+    /bin/sh -c '/usr/bin/python someprogram.py'
+      /usr/bin/python someprogram.py
+
+i.e. three process alive.
+
+> Or, in Python, you can use "socket.gethostname()", which will
+> get you the host name used for networking purposes.
+
+Or, on a cron line (after the time fields, omitted here):
+
+  HOSTNAME=`hostname`; export HOSTNAME; python someprogram.py
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+186,282 miles per second - Not just a good idea, It's the Law!

@@ -1,0 +1,60 @@
+Date: Sun, 29 Mar 2009 13:10:43 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: python-list@python.org
+Subject: Re: PID lockfile
+Message-ID: <20090329021043.GA13316@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: inline
+Content-Transfer-Encoding: 8bit
+In-Reply-To: <87zlf5qi4z.fsf@benfinney.id.au>
+User-Agent: Mutt/1.5.18 (2008-05-17)
+Content-Length: 2065
+
+On 29Mar2009 11:37, Ben Finney <ben+python@benfinney.id.au> wrote:
+| aahz@pythoncraft.com (Aahz) writes:
+| > In article <87iqlwvemo.fsf@benfinney.id.au>,
+| > Ben Finney  <bignose+hates-spam@benfinney.id.au> wrote:
+| > >In the case of the â€˜lockfileâ€™ library, Skip is aiming for a
+| > >cross-platform solution, with atomic behaviour; he has implemented
+| > >lock acquisition with a â€˜linkâ€™ operation on Unix, and a
+| > >â€˜mkdirâ€™ operation on Windows.
+
+I've been using mkdir on UNIX for my own locks; also an NFS-safe
+operation needing no file-level locks. I've also seen
+open("lockfile",O_RDWR,0) suggested; since it atomicly makes a
+non-writable file, only the first opener gets to succeed.
+
+| > >But both of those, of course, create a new file. What I want is to
+| > >lock an existing file. Is â€˜lockfâ€™ particularly prone to
+| > >cross-platform troubles on Unix variants?
+
+NFS can be run without a lock daemon, and I have vague recollections
+of NFS lock daemons not talking to each other on different platforms
+(eg Solaris vs Linux or Linux vs *BSD). I have no idea if that is still
+a current issue.
+
+| > IIUC, you must use something like Skip's trick to work correctly with
+| > NFS.
+| 
+| Okay. But is that something that needs to be accommodated with,
+| specifically, PID file handling? Why would a PID file ever need to be
+| on NFS storage instead of local?
+
+If you're talking about a system daemon, maybe never; at any rate it is
+rare. However there's plenty of occasions when I want to start a daemon,
+as me, for my own personal purposes. It doesn't do any uid/gid juggling
+or privilege dropping, but it's a perfectly reasonable thing to want to
+use your daemon module to do everything else (detach, pid locks, etc).
+
+Conbine that with "my home dir is NFS shared across our LAN" and you're
+instantly into routine lockfile-on-NFS land.
+
+I speak as one who was in that circumstance in my former life.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+NFS: Not a File System

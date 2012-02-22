@@ -1,0 +1,30 @@
+Date: Sat, 23 Jan 2010 08:41:52 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: python-list@python.org
+Subject: Re: looking for Python live code reloading IDEs
+Message-ID: <20100122214151.GA29661@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: inline
+Content-Transfer-Encoding: 8bit
+In-Reply-To: <1161e21d-489c-40f6-a239-ca5c585abb6b@y23g2000yqm.googlegroups.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 728
+
+On 22Jan2010 13:19, Mike Driscoll <kyosohma@gmail.com> wrote:
+| On Jan 22, 3:16 am, George Oliver <georgeolive...@gmail.com> wrote:
+| > hi, I'm wondering if there are any Python programming environments
+| > that enable live code reloading, for example something like the Scheme-
+| > based impromptu (but also meant for any kind of Python program, not
+| > just audio/visual generation).
+| >
+| > Currently I do this directly in my editor (for game development), but
+| > I'm curious if there are other options.
+| 
+| Maybe you could get an idea from TurboGears or Django. They seem to
+| reload their environments when a file is saved.
+
+CherrypPy too.
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/

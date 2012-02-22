@@ -1,0 +1,64 @@
+Date: Mon, 25 May 2009 09:13:21 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: andrew@reurbanise.co.nz,
+	Python bindings for Oracle Berkeley DB <pybsddb@argo.es>
+Subject: Re: Snapshotting / replicating bdb
+Message-ID: <20090524231321.GA24291@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <1243199654.6694.2.camel@localhost>
+User-Agent: Mutt/1.5.19 (2009-01-05)
+Content-Length: 2035
+
+On 25May2009 09:14, andrew <andrew@reurbanise.co.nz> wrote:
+| Excellent, thanks for that, Jesus. Looks like copying the database files
+| is the way to go.
+| 
+| Cheers, Andrew.
+| 
+| On Fri, 2009-05-22 at 13:06 +0200, Jesus Cea wrote:
+| > > production databases are under constant load, and when I try to run a
+| > > table scan of one of them (2M objects) it tends to kill the database
+| > > for some unknown reason. Hence I want to try doing this analysis
+| > > against a separate, readonly version.
+| 
+| (snip)
+| > I would use the "copy" approach :).
+| > 
+| > If you have a "decent" operating system, like Solaris 10 under ZFS, you
+| > can snapshot&clone your database live, with zero overhead and only a
+| > couple of seconds, independently of the size of it. Then you run your
+| > read-only code in the clone, and when done you delete the clone and the
+| > snapshot, all in seconds and with your main application running live.
+| > This is what I actually use daily.
+
+I would point out, in case it wasn't made clear in an earlier post, that
+like copying filesystems, copying database files shoud be surrounded by
+some sort of sync function:
+
+  db.freeze()
+  ...copy/snapshot the db...
+  db.unfreeze()
+
+where the freeze operation stops the db and flushes data to the db files
+so that the on-disc data structures are consistent. Otherwise your "copy"
+can grab a "sane" view of the data.
+
+While you can get away with a plain copy/snapshot a lot of the time
+because a lot of database files "just grow" for inserts etc, it is not
+fundamentally safe or reliable without a surrounding freeze/unfreeze
+wrapper.
+
+In principle the "freeze" does not need to be a very expensive operation;
+it has no need to complete active transactions or anything, merely
+to ensure the on-disc data is safe and static. It does need to be a
+database-provided operation.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+My venus fly trap is higher up the food chain than I am.
+        - simon@ohm.york.ac.uk (Simon Klyne)

@@ -1,0 +1,42 @@
+Date: Wed, 21 Jul 2010 08:35:45 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Michael Foord <fuzzyman@voidspace.org.uk>
+Cc: Nick Coghlan <ncoghlan@gmail.com>, python-dev@python.org
+Subject: Re: mkdir -p in python
+Message-ID: <20100720223545.GA16998@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <4C45D3B6.1020701@voidspace.org.uk>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 1107
+
+On 20Jul2010 17:49, Michael Foord <fuzzyman@voidspace.org.uk> wrote:
+| On 20/07/2010 14:43, Nick Coghlan wrote:
+| >On Tue, Jul 20, 2010 at 11:09 PM, Steven D'Aprano<steve@pearwood.info>  wrote:
+| >>I'm -0 on adding an argument to os.makedirs, +0 on adding a variant
+| >>function to os, and +0.5 on adding the variant to the shutil module.
+| >shutil seems like the place for it to me. The subtlety of getting the
+| >error suppression correct makes it worth implementing this once and
+| >for all I think.
+| 
+| Really - so we have two almost identical functions with slightly
+| different behaviour in different standard library modules?
+
+Three if you count os.mkdir itself as well.
+
+| Aren't
+| the Python APIs for working with files and paths confused enough
+| already. That seems crazy to me and a switch on os.makedirs much
+| more sensible.
+
++1 from me. Hasn't the BDFL blessed this particular suggestion too?
+
+Disclaimer: I am _not_ a dev.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+I am not a free man, I am a number. - Beirne Konarski <beirnek@summitis.com>

@@ -1,0 +1,114 @@
+Return-Path: <python-list-bounces+cs=zip.com.au@python.org>
+Delivered-To: unknown
+Received: from mail.zip.com.au (125.255.95.3) by janus.home with POP3-SSL; 01
+  Feb 2012 04:59:01 -0000
+Delivered-To: cs@zipworld.com.au
+Received: from mailin4-syd3.pacific.net.au (mailin4-syd3.pacific.net.au [125.255.92.145])
+	by mailstore2.syd.pacific.net.au (Postfix) with ESMTP id 6EC9F7B64
+	for <cs@zipworld.com.au>; Wed,  1 Feb 2012 15:58:18 +1100 (EST)
+Received: from mail.python.org (unknown [82.94.164.166])
+	by mailin4-syd3.pacific.net.au (Postfix) with ESMTP id C41824D8094
+	for <cs@zip.com.au>; Wed,  1 Feb 2012 15:58:17 +1100 (EST)
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3TdBzp1bLGzQB9
+	for <cs@zip.com.au>; Wed,  1 Feb 2012 05:58:14 +0100 (CET)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=python.org; s=200901;
+	t=1328072294; bh=YRtGnrKs4WOeK/z6OXfiebR99ZeMz+F8b54ZcabHNiA=;
+	h=Date:From:To:Subject:Message-ID:MIME-Version:In-Reply-To:
+	 References:Cc:List-Id:List-Unsubscribe:List-Archive:List-Post:
+	 List-Help:List-Subscribe:Content-Type:Content-Transfer-Encoding:
+	 Sender;
+	b=LJVphq5cxCvpOHsOupcjmBI7Qr660lJuxatMYUBSxfkVm0Ls8AtqY2gKaLhZmBu6x
+	 FxlG2pD24cVLlIxcxMT82yQ6OTH7oKikIEaJ4QbcW8wNlRwNccig9xELztzUc+L8rb
+	 Jc0qUxO5QiI3VC8xO4pp5s2kC4CBB9GzN6J2ujJo=
+X-Original-To: python-list@python.org
+Delivered-To: python-list@mail.python.org
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3TdBwc1yB0zQB5
+	for <python-list@python.org>; Wed,  1 Feb 2012 05:55:28 +0100 (CET)
+X-Spam-Status: OK 0.015
+X-Spam-Evidence: '*H*': 0.97; '*S*': 0.00; 'received:edu.au': 0.07;
+	'cc:addr:python-list': 0.15; 'from:addr:cs': 0.16;
+	'from:addr:zip.com.au': 0.16; 'from:name:cameron simpson': 0.16;
+	'message-id:@cskk.homeip.net': 0.16; 'paulo': 0.16;
+	'received:202.125.174': 0.16; 'received:202.125.174.133': 0.16;
+	'received:boardofstudies.nsw.edu.au': 0.16;
+	'received:cskk.homeip.net': 0.16;
+	'received:harvey.boardofstudies.nsw.edu.au': 0.16;
+	'received:homeip.net': 0.16; 'received:nsw.edu.au': 0.16; 'thru':
+	0.16; 'wrote:': 0.16; 'this?': 0.19; 'seems': 0.19; 'cheers,':
+	0.20; 'suggest': 0.20; 'cc:no real name:2**0': 0.21;
+	'subject:list': 0.21; 'header:In-Reply-To:1': 0.22; 'alan': 0.23;
+	'cc:2**0': 0.25; 'effect': 0.28; 'lab': 0.28;
+	'cc:addr:python.org': 0.29; 'btw,': 0.30; 'iterating': 0.30;
+	'kay': 0.30; 'quite': 0.31; 'it.': 0.33; 'header:User-Agent:1':
+	0.33; 'thank': 0.35; 'copying': 0.35; 'things': 0.35;
+	'received:au': 0.36; 'charset:us-ascii': 0.36; 'run': 0.37;
+	'unless': 0.37; 'enough': 0.37; 'think': 0.38; 'subject:from':
+	0.39; 'subject:: ': 0.39; 'difference': 0.40; 'most': 0.60;
+	'company': 0.61; 'hope': 0.61; 'your': 0.61; 'cost': 0.62;
+	'received:202': 0.65; 'cameron': 0.77; 'subject:2nd': 0.84;
+	'timings': 0.84; 'subject:huge': 0.91
+Received: from localhost (HELO mail.python.org) (127.0.0.1)
+	by albatross.python.org with SMTP; 01 Feb 2012 05:55:28 +0100
+Received: from harvey.boardofstudies.nsw.edu.au
+	(mail2.rack1.boardofstudies.nsw.edu.au [202.125.174.133])
+	by mail.python.org (Postfix) with ESMTP
+	for <python-list@python.org>; Wed,  1 Feb 2012 05:55:27 +0100 (CET)
+Received: from cskk.homeip.net (localhost.localdomain [127.0.0.1])
+	by harvey.boardofstudies.nsw.edu.au (Postfix) with ESMTP id 55F164D3B66;
+	Wed,  1 Feb 2012 15:55:24 +1100 (EST)
+Received: by janus.cskk.homeip.net (Postfix, from userid 1000)
+	id 307CC100419B7; Wed,  1 Feb 2012 15:55:24 +1100 (EST)
+Date: Wed, 1 Feb 2012 15:55:24 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Paulo da Silva <psdasilva@netcabo.pt>
+Subject: Re: Iterate from 2nd element of a huge list
+Message-ID: <20120201045523.GA16772@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <jgabs9$btl$1@speranza.aioe.org>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+References: <jgabs9$btl$1@speranza.aioe.org>
+Cc: python-list@python.org
+X-BeenThere: python-list@python.org
+X-Mailman-Version: 2.1.12
+Precedence: list
+List-Id: General discussion list for the Python programming language
+	<python-list.python.org>
+List-Unsubscribe: <http://mail.python.org/mailman/options/python-list>,
+	<mailto:python-list-request@python.org?subject=unsubscribe>
+List-Archive: <http://mail.python.org/pipermail/python-list>
+List-Post: <mailto:python-list@python.org>
+List-Help: <mailto:python-list-request@python.org?subject=help>
+List-Subscribe: <http://mail.python.org/mailman/listinfo/python-list>,
+	<mailto:python-list-request@python.org?subject=subscribe>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Sender: python-list-bounces+cs=zip.com.au@python.org
+Errors-To: python-list-bounces+cs=zip.com.au@python.org
+X-Cats2Procmailrc-Rule: cats/home: python  python-list     sender:python-list-bounces+cs=zip.com.au@python.org
+X-Label: python-list
+Content-Length: 737
+
+On 01Feb2012 03:34, Paulo da Silva <p_s_d_a_s_i_l_v_a@netcabo.pt> wrote:
+| Em 01-02-2012 03:16, Paulo da Silva escreveu:
+| > I think iter is nice for what I need.
+| > Thank you very much to all who responded.
+| 
+| BTW, iter seems faster than iterating thru mylist[1:]!
+
+I would hope the difference can be attributed to the cost of copying
+mylist[1:]. Do your timings suggest this? (Remembering also that for
+most benchmarking you need to run things many times unless the effect
+is quite large).
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Any company large enough to have a research lab
+is large enough not to listen to it. - Alan Kay
+-- 
+http://mail.python.org/mailman/listinfo/python-list

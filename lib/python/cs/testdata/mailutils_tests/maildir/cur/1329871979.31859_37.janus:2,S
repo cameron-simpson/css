@@ -1,0 +1,266 @@
+Return-Path: <python-list-bounces+cs=zip.com.au@python.org>
+Delivered-To: unknown
+Received: from mail.zip.com.au (125.255.95.3) by janus.home with POP3-SSL; 24
+  Jan 2012 00:03:58 -0000
+Delivered-To: cs@zipworld.com.au
+Received: from mailin4-syd3.pacific.net.au (mailin4-syd3.pacific.net.au [125.255.92.145])
+	by mailstore1.syd.pacific.net.au (Postfix) with ESMTP id 73AD1148173
+	for <cs@zipworld.com.au>; Tue, 24 Jan 2012 11:02:25 +1100 (EST)
+Received: from mail.python.org (unknown [82.94.164.166])
+	by mailin4-syd3.pacific.net.au (Postfix) with ESMTP id C8ABB4D8077
+	for <cs@zip.com.au>; Tue, 24 Jan 2012 11:02:16 +1100 (EST)
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3TX8nz2GzQzPww
+	for <cs@zip.com.au>; Tue, 24 Jan 2012 01:02:15 +0100 (CET)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=python.org; s=200901;
+	t=1327363335; bh=os8wGvAMvb0FVNaVN8BIztzXNIVZnEC9M72SkkkRkow=;
+	h=Date:From:To:Subject:Message-ID:MIME-Version:In-Reply-To:
+	 References:Cc:List-Id:List-Unsubscribe:List-Archive:List-Post:
+	 List-Help:List-Subscribe:Content-Type:Content-Transfer-Encoding:
+	 Sender;
+	b=Ux+juwyuTnYC73dChCsm/bySSo+hUYAbkSsfIk5JUDuOHT3Ly7uCWFxCJ5h1bzYV7
+	 B27LZeiEgpVkqoDGlnhSKkBhy3MDapX/jfDJMLKexacVtjkXe7aLGqI3bhKcgDz+/f
+	 4H0XIpLJm9+1JCN78A9nDhxrgJWiE4bTmWfVttsw=
+X-Original-To: python-list@python.org
+Delivered-To: python-list@mail.python.org
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3TX8kl37XtzPww
+	for <python-list@python.org>; Tue, 24 Jan 2012 00:59:27 +0100 (CET)
+X-Spam-Status: OK 0.001
+X-Spam-Evidence: '*H*': 1.00; '*S*': 0.00; 'else:': 0.03; 'elif':
+	0.04; 'string.': 0.04; 'value,': 0.04; 'received:edu.au': 0.07;
+	'removes': 0.07; 'snippet': 0.07; 'python': 0.08; 'bug:': 0.09;
+	'exception.': 0.09; 'operation,': 0.09; 'pathological': 0.09;
+	'readable': 0.09; 'output': 0.10; 'def': 0.13; 'cc:addr:python-
+	list': 0.15; 'this:': 0.15; 'bus.': 0.16; 'caches': 0.16; 'ends,':
+	0.16; 'event):': 0.16; 'from:addr:cs': 0.16;
+	'from:addr:zip.com.au': 0.16; 'from:name:cameron simpson': 0.16;
+	'grows.': 0.16; 'message-id:@cskk.homeip.net': 0.16; 'polls':
+	0.16; 'received:202.125.174': 0.16; 'received:202.125.174.133':
+	0.16; 'received:boardofstudies.nsw.edu.au': 0.16;
+	'received:cskk.homeip.net': 0.16;
+	'received:harvey.boardofstudies.nsw.edu.au': 0.16;
+	'received:homeip.net': 0.16; 'received:nsw.edu.au': 0.16;
+	'reports?': 0.16; 'self.buffer': 0.16; 'simpler.': 0.16;
+	'simplicity,': 0.16; 'stream.': 0.16; 'throws': 0.16; 'wrote:':
+	0.16; 'rewrite': 0.18; '(which': 0.19; 'cheers,': 0.20; 'memory':
+	0.20; 'later': 0.21; 'cc:no real name:2**0': 0.21; 'header:In-
+	Reply-To:1': 0.22; 'extending': 0.23; 'fine,': 0.23; 'string':
+	0.24; 'cc:2**0': 0.25; 'code': 0.25; 'code.': 0.26; 'module':
+	0.26; 'code,': 0.27; 'fix': 0.27; "i'm": 0.27; 'raise': 0.28;
+	'bugs': 0.28; 'script': 0.28; 'pass': 0.28; 'assuming': 0.28;
+	'matches': 0.28; 'reports,': 0.28; 'sends': 0.28; 'skip:b 20':
+	0.29; 'cc:addr:python.org': 0.29; 'seem': 0.29; 'fairly': 0.30;
+	'generally': 0.30; '(unless': 0.30; 'buffer,': 0.30; 'compiling':
+	0.30; 'throwing': 0.30; 'app': 0.31; 'updated': 0.32; 'values':
+	0.32; 'does': 0.32; 'changes': 0.32; 'actual': 0.32; 'break':
+	0.32; 'header:User-Agent:1': 0.33; 'there': 0.33; 'too': 0.34;
+	'certain': 0.34; 'away.': 0.34; 'parse': 0.34; '...': 0.35;
+	'running': 0.35; 'trouble': 0.35; 'suggestions': 0.35; 'project':
+	0.35; 'external': 0.35; 'regular': 0.35; 'data.': 0.36;
+	'received:au': 0.36; 'things,': 0.36; 'charset:us-ascii': 0.36;
+	'but': 0.37; 'hello,': 0.37; 'another': 0.37; 'using': 0.37;
+	'enough': 0.37; 'could': 0.37; 'some': 0.38; 'think': 0.38;
+	'characters': 0.38; 'point': 0.39; 'else': 0.39; 'appreciated.':
+	0.39; 'data,': 0.39; 'help': 0.39; 'missing': 0.39; 'subject:: ':
+	0.39; 'change': 0.40; 'data': 0.40; 'more': 0.61; 'your': 0.61;
+	'below': 0.63; 'skip:1 10': 0.63; 'below.': 0.63; 'ever': 0.64;
+	'here': 0.64; 'making': 0.65; 'believe': 0.65; 'received:202':
+	0.65; 'cause': 0.66; 'gathering': 0.67; 'noise': 0.67; 'stated':
+	0.70; 'serial': 0.71; '(one': 0.73; 'cameron': 0.77; 'stream':
+	0.77; 'grabs': 0.84; 'lex': 0.84; 'luck.': 0.84; 'me:': 0.84;
+	'problem...': 0.84; 'regexps': 0.84; 'regexps.': 0.84; 'remarks':
+	0.84; 'running,': 0.84; 'slow.': 0.84; 'subject:stream': 0.84;
+	'uncertain': 0.91
+Received: from localhost (HELO mail.python.org) (127.0.0.1)
+	by albatross.python.org with SMTP; 24 Jan 2012 00:59:27 +0100
+Received: from harvey.boardofstudies.nsw.edu.au
+	(mail2.rack1.boardofstudies.nsw.edu.au [202.125.174.133])
+	by mail.python.org (Postfix) with ESMTP
+	for <python-list@python.org>; Tue, 24 Jan 2012 00:59:26 +0100 (CET)
+Received: from cskk.homeip.net (localhost.localdomain [127.0.0.1])
+	by harvey.boardofstudies.nsw.edu.au (Postfix) with ESMTP id B23A24D3B66;
+	Tue, 24 Jan 2012 10:49:41 +1100 (EST)
+Received: by janus.cskk.homeip.net (Postfix, from userid 1000)
+	id 9B4F8100419B7; Tue, 24 Jan 2012 10:49:41 +1100 (EST)
+Date: Tue, 24 Jan 2012 10:49:41 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: "M.Pekala" <mcdpekala@gmail.com>
+Subject: Re: Parsing a serial stream too slowly
+Message-ID: <20120123234941.GA19278@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <d250b98e-6409-474b-ba56-146e5b490e01@l1g2000vbc.googlegroups.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+References: <d250b98e-6409-474b-ba56-146e5b490e01@l1g2000vbc.googlegroups.com>
+Cc: python-list@python.org
+X-BeenThere: python-list@python.org
+X-Mailman-Version: 2.1.12
+Precedence: list
+List-Id: General discussion list for the Python programming language
+	<python-list.python.org>
+List-Unsubscribe: <http://mail.python.org/mailman/options/python-list>,
+	<mailto:python-list-request@python.org?subject=unsubscribe>
+List-Archive: <http://mail.python.org/pipermail/python-list>
+List-Post: <mailto:python-list@python.org>
+List-Help: <mailto:python-list-request@python.org?subject=help>
+List-Subscribe: <http://mail.python.org/mailman/listinfo/python-list>,
+	<mailto:python-list-request@python.org?subject=subscribe>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Sender: python-list-bounces+cs=zip.com.au@python.org
+Errors-To: python-list-bounces+cs=zip.com.au@python.org
+X-Cats2Procmailrc-Rule: cats/home: python  python-list     sender:python-list-bounces+cs=zip.com.au@python.org
+X-Label: python-list
+Content-Length: 5118
+
+On 23Jan2012 13:48, M.Pekala <mcdpekala@gmail.com> wrote:
+| Hello, I am having some trouble with a serial stream on a project I am
+| working on. I have an external board that is attached to a set of
+| sensors. The board polls the sensors, filters them, formats the
+| values, and sends the formatted values over a serial bus. The serial
+| stream comes out like $A1234$$B-10$$C987$,  where "$A.*$" is a sensor
+| value, "$B.*$" is a sensor value, "$C.*$" is a sensor value, ect...
+| 
+| When one sensor is running my python script grabs the data just fine,
+| removes the formatting, and throws it into a text control box. However
+| when 3 or more sensors are running, I get output like the following:
+| 
+| Sensor 1: 373
+| Sensor 2: 112$$M-160$G373
+| Sensor 3: 763$$A892$
+| 
+| I am fairly certain this means that my code is running too slow to
+| catch all the '$' markers. Below is the snippet of code I believe is
+| the cause of this problem...
+
+Your code _is_ slow, but as you can see above you're not missing data,
+you're gathering too much data.
+
+Some point by point remarks below. The actual _bug_ is your use of ".*"
+in your regexps. Some change suggestions below the code.
+
+| def OnSerialRead(self, event):
+| 	text = event.data
+| 	self.sensorabuffer = self.sensorabuffer + text
+| 	self.sensorbbuffer = self.sensorbbuffer + text
+| 	self.sensorcbuffer = self.sensorcbuffer + text
+
+Slow and memory wasteful. Supposing a sensor never reports? You will
+accumulate an ever growing buffer string. And extending a string gets
+expensive as it grows.
+
+| 	if sensoraenable:
+| 		sensorresult = re.search(r'\$A.*\$.*', self.sensorabuffer )
+
+Slow and buggy.
+
+The slow: You're compiling the regular expression _every_ time you come
+here (unless the re module caches things, which I seem to recall it may.
+But that efficiency is only luck.
+
+The bug: supposing you get multiple sensor reports, like this:
+
+  $A1$$B2$$C3$
+
+Your regexp matches the whole thing! Because ".*" is greedy.
+You want "[^$]*" - characters that are not a "$".
+
+
+| 			if sensorresult:
+| 				s = sensorresult.group(0)
+| 				s = s[2:-1]
+| 				if self.sensor_enable_chkbox.GetValue():
+| 					self.SensorAValue = s
+| 				self.sensorabuffer = ''
+
+What if there are multiple values in the buffer? After fixing your
+regexp you will now be throwing them away. Better to go:
+
+  self.sensorabuffer = self.sensorabuffer[sensorresult.end():]
+
+[...]
+| I think that regex is too slow for this operation, but I'm uncertain
+| of another method in python that could be faster. A little help would
+| be appreciated.
+
+Regex _is_ slow. It is good for flexible lexing, but generally Not
+Fast. It can be faster than in-Python lexing because the inner
+interpreation of the regex is C code, but is often overkill when speed
+matters. (Which you may find it does not for your app - fix the bugs
+first and see how it behaves).
+
+I would be making the following changes if it were me:
+
+  - keep only one buffer, and parse it into sensor "tokens"
+    pass each token to the right sensor as needed
+
+  - don't use regexps
+    this is a speed thing; if you code is more readable with regexps and
+    still faster enough you may not do this
+
+To these ends, untested attempt 1 (one buffer, lex into tokens, still
+using regexps):
+
+    re_token = re.compile( r'\$([A-Z])([^$]*)\$' )
+
+    def OnSerialRead(self, event):
+        # accessing a local var is quicker and more readable
+        buffer = self.buffer
+
+        text = event.data
+        buffer += text
+
+        m = re_token.search(buffer)
+        while m:
+            sensor, value = m.group(1), m.group(2)
+            buffer = buffer[m.end():]
+            if sensor == 'A':
+                # ...
+            elif sensor == 'B':
+                # ...
+            else:
+                warning("unsupported sensor: %s", sensor)
+
+        # stash the updated buffer for later
+        self.buffer = buffer
+
+I'm assuming here that you can get noise in the serial stream. If you
+are certain to get only clean "$Ax$" sequences and nothing else you can
+make the code much simpler. And faster again.
+
+Pretending clean data and no regexps:
+
+    def OnSerialRead(self, event):
+        # accessing a local var is quicker and more readable
+        buffer = self.buffer
+
+        text = event.data
+        buffer += text
+
+        while buffer:
+            if not buffer.startswith('$'):
+                raise ValueError("bad data in buffer! code rewrite needed!")
+            mark2 = buffer.find('$', 1)
+            if mark2 < 0:
+                # end of token not present
+                # look again later
+                break
+            token = buffer[1:mark2]
+            buffer = buffer[mark2+1:]
+
+            if not token:
+                raise ValueError("no data in packet!")
+            sensorm value = token[1], token[1:]
+
+            ... hand off to sensors as above ...
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+If your new theorem can be stated with great simplicity, then there
+will exist a pathological exception.    - Adrian Mathesis
+-- 
+http://mail.python.org/mailman/listinfo/python-list

@@ -1,0 +1,49 @@
+Date: Sat, 26 Feb 2011 08:49:25 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Bruce Leban <bruce@leapyear.org>
+Cc: Greg Ewing <greg.ewing@canterbury.ac.nz>, python-ideas@python.org
+Subject: Re: A couple of with statement ideas
+Message-ID: <20110225214925.GA15019@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <AANLkTimWJxouLxast8oAbA6OJL4SPyyB+Cb7xwz0J=Wq@mail.gmail.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 1493
+
+On 25Feb2011 13:14, Bruce Leban <bruce@leapyear.org> wrote:
+| On Fri, Feb 25, 2011 at 12:55 PM, Greg Ewing <greg.ewing@canterbury.ac.nz>
+|  wrote:
+| > From: Nick Coghlan
+| > > It's at least a much larger set than it was back when AMK noticed the
+| > > deep terminology confusion in the first version of the with statement
+| > > and context management documentation (which was when Guido applied the
+| > > Zen and dropped the __context__ method from the protocol).
+| >
+| > I'm in favour of the idea, but the terminology problem still
+| > needs to be solved. I think it's important that the name of the
+| > object implementing this protocol not have the word "context" in
+| > it *anywhere*.
+| >
+| > I like __with__ as the special method name, as it very obviously
+| > suggests a tight connection with the with-statement.
+| 
+| If the field returns a context manager, then the natural name to my mind
+| would be __context_manager__.
+
+It's very long... but accurate.
+
+| What I don't like about __with__ is that it's not a noun and doesn't tell me
+| what value the attribute has or what I would do with it.
+
+"enter" and "exit" aren't nouns either. I guess they are events though,
+whereas __with__ is supposed to return something. Grammar aside I like
+__with__, personally, since __context__ seems to be out.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+BROCCOLI!! THE ONLY VEGETABLE THAT SOUNDS LIKE AN ADVERB!!
+        - ken@aiai.ed.ac.uk (Ken Johnson)

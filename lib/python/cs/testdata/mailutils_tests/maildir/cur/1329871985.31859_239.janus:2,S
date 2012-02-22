@@ -1,0 +1,32 @@
+Date: Wed, 3 Nov 2010 22:32:29 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: John Bond <lists@asd-group.com>
+Cc: python-list@python.org
+Subject: Re: What people are using to access this mailing list
+Message-ID: <20101103113229.GA6045@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <loom.20101103T090016-344@post.gmane.org>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 748
+
+On 03Nov2010 08:02, John Bond <lists@asd-group.com> wrote:
+| Hope this isn't too O/T - I was just wondering how people read/send to this 
+| mailing list, eg. normal email client, gmane, some other software or online 
+| service?
+| 
+| My normal inbox is getting unmanageable, and I think I need to find a new way 
+| of following this and other lists.
+
+I use mutt to read my python folder.
+
+I use getmail to collect email via POP and deliver via procmail, which files
+this list (and python-ideas etc) into a "python" folder, out of my main
+inbox.
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+It is impossible to travel faster than light, and certainly not desirable as
+ones hat keeps blowing off.     - Woody Allen

@@ -1,0 +1,40 @@
+Date: Sun, 12 Sep 2010 08:26:40 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Daniel Fetchinson <fetchinson@googlemail.com>
+Cc: Python <python-list@python.org>
+Subject: Re: How Python works: What do you know about support for negative
+ indices?
+Message-ID: <20100911222640.GA28076@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <AANLkTi=DjsHazCpC8rWzHy3iE8B4VOzJ7dmH91nkNcRD@mail.gmail.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 1047
+
+On 10Sep2010 12:46, Daniel Fetchinson <fetchinson@googlemail.com> wrote:
+| > Raymond Hettinger <python@rcn.com> writes:
+| >> It doesn't seem to be common knowledge when and how a[x] gets
+| >> translated to a[x+len(x)].  So, here's a short info post on how Python
+| >> supports negative indices for sequences.
+| >
+| > Thanks for this. Could you post your messages using a channel that
+| > doesn't arbitrarily split your paragraphs into long-short-long-short
+| > lines?
+| 
+| It came across fine for me as well (gmail with basic html interface).
+| 
+| > It makes paragraphs burdensome to read, and I skipped most of the
+| > message because of that.
+| 
+| You might want to switch to a client where you do not have this problem.
+
+It was fine for me too, using mutt (fixed width text interface, 80
+column terminal).
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+A monkey has the right to copy what he sees other monkeys doing.
+Shouldn't humans have equivalent rights?
+- Alien Being <http://slashdot.org/~Alien%20Being>

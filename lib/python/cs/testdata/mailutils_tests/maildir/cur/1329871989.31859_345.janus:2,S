@@ -1,0 +1,37 @@
+Date: Tue, 1 Jun 2010 21:08:29 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: pradeepbpin <pradeepbpin@gmail.com>
+Cc: python-list@python.org
+Subject: Re: Hashbang error
+Message-ID: <20100601110829.GA9697@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <7c7f86a0-2522-4958-b6e0-b1e4f4ea16cf@u3g2000prl.googlegroups.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 922
+
+On 01Jun2010 03:56, pradeepbpin <pradeepbpin@gmail.com> wrote:
+| I use gVim as an editor to create python scripts on a windows machine.
+| To run the same script on my ubuntu machine, I added a hashbang line
+| to the script. Now when I run this script from command line of ubuntu,
+| I get a bad interpreter error, like below
+| 
+| /usr/bin/python^M: bad interpreter: No such file or directory
+| 
+| This, I understand, is due to the interpretation of newline character
+| at the end of the hashbang.
+| 
+| I have checked and found out that this does not happen if I create the
+| script in Ubuntu with gVim.
+| 
+| Now, how can I avoid this error when I create the script on a windows
+| machine?
+
+The standard approach is to copy the file to the unix machine and use
+the dos2unix command.
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+A pessimist is an optimist in full possession of the facts.

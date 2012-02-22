@@ -1,0 +1,196 @@
+Date: Tue, 28 Apr 2009 12:11:17 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Glenn Linderman <v+python@g.nevcal.com>
+Cc: =?utf-8?B?IlwiTWFydGluIHYuIEzDtndpc1wiIEBjc2trLmhvbWVpcC5uZXQiIDxtYXJ0?=
+	=?utf-8?B?aW5Adi5sb2V3aXMuZGU+?=,
+	Python-Dev <python-dev@python.org>
+Subject: Re: PEP 383: Non-decodable Bytes in System Character Interfaces
+Message-ID: <20090428021117.GA25536@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <49F658A5.7080807@g.nevcal.com>
+User-Agent: Mutt/1.5.18 (2008-05-17)
+Content-Length: 8400
+
+On 27Apr2009 18:15, Glenn Linderman <v+python@g.nevcal.com> wrote:
+>>>>> The problem with this, and other preceding schemes that have been
+>>>>> discussed here, is that there is no means of ascertaining whether a
+>>>>> particular file name str was obtained from a str API, or was funny-
+>>>>> decoded from a bytes API... and thus, there is no means of reliably
+>>>>> ascertaining whether a particular filename str should be passed to a
+>>>>> str API, or funny-encoded back to bytes.
+>>>>>         
+>>>> Why is it necessary that you are able to make this distinction?
+>>>>       
+>>> It is necessary that programs (not me) can make the distinction, so 
+>>> that  it knows whether or not to do the funny-encoding or not.
+>>>     
+>>
+>> I would say this isn't so. It's important that programs know if they're
+>> dealing with strings-for-filenames, but not that they be able to figure
+>> that out "a priori" if handed a bare string (especially since they
+>> can't:-)
+>
+> So you agree they can't... that there are data puns.   (OK, you may not  
+> have thought that through)
+
+I agree you can't examine a string and know if it came from the os.* munging
+or from someone else's munging.
+
+I totally disagree that this is a problem.
+
+There may be puns. So what? Use the right strings for the right purpose
+and all will be well.
+
+I think what is missing here, and missing from Martin's PEP, is some
+utility functions for the os.* namespace.
+
+PROPOSAL: add to the PEP the following functions:
+
+  os.fsdecode(bytes) -> funny-encoded Unicode
+    This is what os.listdir() does to produce the strings it hands out.
+  os.fsencode(funny-string) -> bytes
+    This is what open(filename,..) does to turn the filename into bytes
+    for the POSIX open.
+  os.pathencode(your-string) -> funny-encoded-Unicode
+    This is what you must do to a de novo string to turn it into a
+    string suitable for use by open.
+    Importantly, for most strings not hand crafted to have weird
+    sequences in them, it is a no-op. But it will recode your puns
+    for survival.
+
+and for me, I would like to see:
+
+  os.setfilesystemencoding(coding)
+
+Currently os.getfilesystemencoding() returns you the encoding based on
+the current locale, and (I trust) the os.* stuff encodes on that basis.
+setfilesystemencoding() would override that, unless coding==None in what
+case it reverts to the former "use the user's current locale" behaviour.
+(We have locale "C" for what one might otherwise expect None to mean:-)
+
+The idea here is to let to program control the codec used for filenames
+for special purposes, without working indirectly through the locale.
+
+>>> If a name is  funny-decoded when the name is accessed by a directory 
+>>> listing, it needs  to be funny-encoded in order to open the file.
+>>
+>> Hmm. I had thought that legitimate unicode strings already get transcoded
+>> to bytes via the mapping specified by sys.getfilesystemencoding()
+>> (the user's locale). That already happens I believe, and Martin's
+>> scheme doesn't change this. He's just funny-encoding non-decodable byte
+>> sequences, not the decoded stuff that surrounds them.
+>
+> So assume a non-decodable sequence in a name.  That puts us into  
+> Martin's funny-decode scheme.  His funny-decode scheme produces a bare  
+> string, indistinguishable from a bare string that would be produced by a  
+> str API that happens to contain that same sequence.  Data puns.
+
+See my proposal above. Does it address your concerns? A program still
+must know the providence of the string, and _if_ you're working with
+non-decodable sequences in a names then you should transmute then into
+the funny encoding using the os.pathencode() function described above.
+
+In this way the punning issue can be avoided.
+
+_Lacking_ such a function, your punning concern is valid.
+
+> So when open is handed the string, should it open the file with the name  
+> that matches the string, or the file with the name that funny-decodes to  
+> the same string?  It can't know, unless it knows that the string is a  
+> funny-decoded string or not.
+
+True. open() should always expect a funny-encoded name.
+
+>> So it is already the case that strings get decoded to bytes by
+>> calls like open(). Martin isn't changing that.
+>
+> I thought the process of converting strings to bytes is called encoding.  
+> You seem to be calling it decoding?
+
+My head must be standing in the wrong place. Yes, I probably mean
+encoding here. I'm trying to accompany these terms with little pictures
+like "string->bytes" to avoid confusion.
+
+>> I suppose if your program carefully constructs a unicode string riddled
+>> with half-surrogates etc and imagines something specific should happen
+>> to them on the way to being POSIX bytes then you might have a problem...
+>
+> Right.  Or someone else's program does that.  I only want to use Unicode  
+> file names.  But if those other file names exist, I want to be able to  
+> access them, and not accidentally get a different file.
+
+Point taken. And I think addressed by the utility function proposed
+above.
+
+[...snip normal versus odd chars for the funny-encoding ...]
+>> Also, by avoiding reuse of legitimate characters in the encoding we can
+>> avoid your issue with losing track of where a string came from;
+>> legitimate characters are currently untouched by Martin's scheme, except
+>> for the normal "bytes<->string via the user's locale" translation that
+>> must already happen, and there you're aided by byets and strings being
+>> different types.
+>
+> There are abnormal characters, but there are no illegal characters.   
+
+I though half-surrogates were illegal in well formed Unicode. I confess
+to being weak in this area. By "legitimate" above I meant things like
+half-surrogates which, like quarks, should not occur alone?
+
+> NTFS permits any 16-bit "character" code, including abnormal ones,  
+> including half-surrogates, and including full surrogate sequences that  
+> decode to PUA characters.  POSIX permits all byte sequences, including  
+> things that look like UTF-8, things that don't look like UTF-8, things  
+> that look like half-surrogates, and things that look like full surrogate  
+> sequences that decode to PUA characters.
+
+Sure. I'm not really talking about what filesystem will accept at
+the native layer, I was talking in the python funny-encoded space.
+
+[..."escaping is necessary"... I agree...]
+>>> I'm certainly not experienced enough in Python development processes 
+>>> or  internals to attempt such, as yet.  But somewhere in 25 years of  
+>>> programming, I picked up the knowledge that if you want to have a 
+>>> 1-to-1  reversible mapping, you have to avoid data puns, mappings of 
+>>> two  different data values into a single data value.  Your PEP, as 
+>>> first  written, didn't seem to do that... since there are two 
+>>> interfaces from  which to obtain data values, one performing a 
+>>> mapping from bytes to  "funny invalid" Unicode, and the other 
+>>> performing no mapping, but  accepting any sort of Unicode, possibly 
+>>> including "funny invalid"  Unicode, the possibility of data puns 
+>>> seems to exist.  I may be  misunderstanding something about the use 
+>>> cases that prevent these two  sources of "funny invalid" Unicode from 
+>>> ever coexisting, but if so,  perhaps you could point it out, or 
+>>> clarify the PEP.
+>>
+>> Please elucidate the "second source" of strings. I'm presuming you mean
+>> strings egenrated from scratch rather than obtained by something like
+>> listdir().
+>>   
+>
+> POSIX has byte APIs for strings, that's one source, that is most under  
+> discussion.  Windows has both bytes and 16-bit APIs for strings... the  
+> 16-bit APIs are generally mapped directly to UTF-16, but are not checked  
+> for UTF-16 validity, so all of Martin's funny-decoded files could be  
+> used for Windows file names on the 16-bit APIs.
+
+These are existing file objects, I'll take them as source 1. They get
+encoded for release by os.listdir() et al.
+
+> And yes, strings can be  
+> generated from scratch.
+
+I take this to be source 2.
+
+I think I agree with all the discussion that followed, and think the
+real problem is lack of utlities functions to funny-encode source 2
+strings for use. hence the proposal above.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Be smart, be safe, be paranoid.
+        - Ryan Cousineau, courier@compdyn.com DoD#863, KotRB, KotKWaWCRH

@@ -1,0 +1,89 @@
+Date: Tue, 24 Jan 2012 19:23:43 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Steven D'Aprano <steve+comp.lang.python@pearwood.info>
+Cc: python-list@python.org
+Subject: Re: Parsing a serial stream too slowly
+Message-ID: <20120124082343.GA20222@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <4f1e3cb5$0$11127$c3e8da3@news.astraweb.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+Content-Length: 2983
+
+On 24Jan2012 05:08, Steven D'Aprano <steve+comp.lang.python@pearwood.info> wrote:
+| On Tue, 24 Jan 2012 10:49:41 +1100, Cameron Simpson wrote:
+| 
+| > | def OnSerialRead(self, event):
+| > | 	text = event.data
+| > | 	self.sensorabuffer = self.sensorabuffer + text 
+| > | 	self.sensorbbuffer = self.sensorbbuffer + text 
+| > | 	self.sensorcbuffer = self.sensorcbuffer + text
+| > 
+| > Slow and memory wasteful. Supposing a sensor never reports? You will
+| > accumulate an ever growing buffer string. And extending a string gets
+| > expensive as it grows.
+| 
+| I admit I haven't read this entire thread, but one thing jumps out at me. 
+| It looks like the code is accumulating strings by repeated + 
+| concatenation. This is risky.
+| 
+| In general, you should accumulate strings into a list buffer, then join 
+| them into a single string in one call:
+| 
+| buffer = []
+| while something:
+|     buffer.append(text)
+| return ''.join(buffer)
+
+Yeah, but the OP needs to examine the string after every packet arrival,
+so he doesn't get to defer the joining of the strings.
+
+| Use of repeated string addition risks slow quadratic behaviour. The OP is 
+| reporting slow behaviour... alarms bells ring.
+
+He's _inferring_ slow behaviour from the wrong results he was getting.
+In fact he doesn't have slow behaviour (in that python isn't slow enough
+in his case to cause trouble).
+
+[...snip references to more depth on string concatenation...]
+
+| > The slow: You're compiling the regular expression _every_ time you come
+| > here (unless the re module caches things, which I seem to recall it may.
+| 
+| It does.
+| 
+| > But that efficiency is only luck.
+| 
+| More deliberate design than good luck :)
+
+The luck is in his program benefiting from it, not the decision of the
+re authors to cache the source->compiled mapping.
+
+| > Regex _is_ slow. It is good for flexible lexing, but generally Not Fast.
+| 
+| I hope I will never be mistaken for a re fanboy, but credit where credit 
+| is due: if you need the full power of a regex, you almost certainly can't 
+| write anything in Python that will beat the re module. 
+
+Indeed not. But many many uses of the re module are for trivial lexing
+stuff that is way simpler than the complexities involved in regexps
+themselves (parse regexp, compiler from parse, parse string from regexp
+compilation).
+
+And perhaps equally important, regexps are both cryptic and powerful, a
+combination that makes it very easy to write either highly expensive
+regexps or bighly buggy regexps - in his case a small regexp error was
+his bug, and programs speed had nothing to do with it.
+
+His program did have inefficiencies though, which were worth discussing.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+There are two ways of dealing with this problem: one is complicated and
+messy, and the other is simple and very elegant. We don't have much time
+left, so I'll just show you the complicated and messy way.
+- Richard Feynman, 1981

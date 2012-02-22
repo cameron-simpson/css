@@ -1,0 +1,33 @@
+Date: Sun, 5 Apr 2009 18:21:44 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: python-list@python.org
+Subject: Re: Accessing mail box tree of Thunderbird/Seamonkey?
+Message-ID: <20090405082144.GA26172@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <50697b2c0904050116h44f92b15s110b7dde338882c8@mail.gmail.com>
+User-Agent: Mutt/1.5.18 (2008-05-17)
+Content-Length: 992
+
+On 05Apr2009 01:16, Chris Rebert <clp2@rebertia.com> wrote:
+| On Sun, Apr 5, 2009 at 1:04 AM, robert <robert@nowhere.invalid> wrote:
+| > Is there a API/possibilty for reading&writing (live) in the mail box tree of
+| > Thunderbird/Seamonkey with Python?
+| 
+| >From what I can google, they're already in mbox format, so you can use
+| mailbox.mbox to read/write to them.
+| See http://docs.python.org/library/mailbox.html#mailbox.mbox
+
+But you should probably _not_ have thunderbird open when you modify them; it
+expects exclusive access. Also, if you modify a file you should probably
+remove the corresponding .sdb file, which is a cache of Thunderbird's
+knowledge of the mbox contents (header values and probably message offsets
+within the file).
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+..And in all of Babylonia there was wailing and gnashing of teeth, till
+the prophets bade the multitudes get a grip on themselves and shape up.
+        - Woody Allen

@@ -1,0 +1,39 @@
+Date: Wed, 5 May 2010 10:10:01 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Baz Walter <bazwal@ftml.net>
+Cc: python-list@python.org
+Subject: Re: strange interaction between open and cwd
+Message-ID: <20100505001000.GA8666@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <4BE025AC.7070309@ftml.net>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 1024
+
+On 04May2010 14:48, Baz Walter <bazwal@ftml.net> wrote:
+| On 04/05/10 09:08, Gregory Ewing wrote:
+| >Grant Edwards wrote:
+| >>except that Python objects can form a generalized graph, and Unix
+| >>filesystems are constrained to be a tree.
+| >
+| >Actually I believe that root is allowed to create arbitrary
+| >hard links to directories in Unix, so it's possible to turn
+| >the file system in to a general graph. It's highly
+| >unrecommended, though, because it confuses the heck out of
+| >programs that recursively traverse directories (which is
+| >why only root is allowed to do it).
+| 
+| i think there are versions of mac osx that use hard-linked
+| directories in their backup systems.
+
+I believe TimeMachine exploits that.
+
+I think one can make loops with recursive mounts.
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+You can't go around hoping that most people have sterling moral characters.
+The most you can hope for is that people will pretend that they do.
+        - Fran Lebowitz

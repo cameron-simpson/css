@@ -1,0 +1,46 @@
+Date: Tue, 4 May 2010 11:36:58 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Baz Walter <bazwal@ftml.net>
+Cc: python-list@python.org
+Subject: Re: strange interaction between open and cwd
+Message-ID: <20100504013658.GA25409@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <4BDEDC73.1020301@ftml.net>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 1383
+
+On 03May2010 15:23, Baz Walter <bazwal@ftml.net> wrote:
+| On 03/05/10 14:46, Peter Otten wrote:
+| >Baz Walter wrote:
+| >
+| >>attempting to remove the cwd would produce an error). but how can python
+| >>determine the parent directory of a directory that no longer exists?
+| >
+| >My tentative explanation would be that the directory, namely the inode,
+| >still exists -- only the entry for it in its parent directory is gone.
+| >
+| >So "one level up from here" is still a valid operation, but there is no
+| >longer a path in the file system associated with "here".
+| 
+| so "here" must always be available somehow, even if getcwd() fails
+
+Well, yeah. Just like an open file handle on a file you have subsequently
+removed still exists. Remember that the directory tree is a digraph, and
+(historically at least, and probably for real in many filesystems) '.' and
+'..' are just pointers to "here" and "up".
+
+Your rmdir has detached the current directory from the one that was
+"up", but the "up" pointer still references the old parent.
+
+There's just no filesystem path that refers to your current directory
+any more (except '.'). Just like a detached object in python really.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Everything that can be invented has been invented.
+        - Charles H. Duell, Commissioner, U.S. Office of Patents, 1899.

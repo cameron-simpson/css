@@ -1,0 +1,147 @@
+Return-Path: <python-ideas-bounces+cs=zip.com.au@python.org>
+Delivered-To: unknown
+Received: from mail.zip.com.au (125.255.95.3) by janus.home with POP3-SSL; 26
+  Apr 2011 07:21:03 -0000
+Delivered-To: cs@zipworld.com.au
+Received: from mailin1.pacific.net.au (mailin1.pacific.net.au [61.8.0.80])
+	by mailstore2.syd.pacific.net.au (Postfix) with ESMTP id DE0A7B4E
+	for <cs@zipworld.com.au>; Tue, 26 Apr 2011 17:19:30 +1000 (EST)
+Received: from mail.python.org (unknown [82.94.164.166])
+	by mailin1.pacific.net.au (Postfix) with ESMTP id 42AB2184016
+	for <cs@zip.com.au>; Tue, 26 Apr 2011 17:19:30 +1000 (EST)
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3QJbQS5MmWz7Llf
+	for <cs@zip.com.au>; Tue, 26 Apr 2011 09:19:28 +0200 (CEST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=python.org; s=200901;
+	t=1303802368; bh=jyzI+M3JDzZYy+OFyw3X1N1vYPvT7Z4j5zWdjC3Ec8I=;
+	h=Date:From:To:Message-ID:MIME-Version:In-Reply-To:References:Cc:
+	 Subject:List-Id:List-Unsubscribe:List-Archive:List-Post:List-Help:
+	 List-Subscribe:Content-Type:Content-Transfer-Encoding:Sender;
+	b=kRyRu77v5/lpDRcV9zzO5gffAGJ/bqNjT7nMdJKU+X95M4K710w7dKwR5pGSOIG9H
+	 XBwgt4WleUU0jkdI89hWhzymLyU889rUZLw0+Wb2K+wHEVej79OoLAChhhqV8gVx+6
+	 JJw78mMr32DfqcNCJcMTbkR2J7su4tEMbYYww/9A=
+X-Original-To: python-ideas@python.org
+Delivered-To: python-ideas@mail.python.org
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3QJbKc3DQNz7Ljc
+	for <python-ideas@python.org>; Tue, 26 Apr 2011 09:15:16 +0200 (CEST)
+X-Spam-Status: OK 0.003
+X-Spam-Evidence: '*H*': 0.99; '*S*': 0.00; 'warnings': 0.05;
+	'indeed,': 0.07; 'received:edu.au': 0.07; 'foo': 0.09; 'syntax':
+	0.12; 'wrote:': 0.14; '"as"': 0.16; '"from': 0.16; '14:26,': 0.16;
+	'contrived': 0.16; 'downside': 0.16; 'fp:': 0.16; 'from:addr:cs':
+	0.16; 'from:addr:zip.com.au': 0.16; 'from:name:cameron simpson':
+	0.16; 'furman': 0.16; 'message-id:@cskk.homeip.net': 0.16;
+	'received:202.125.174': 0.16; 'received:202.125.174.133': 0.16;
+	'received:boardofstudies.nsw.edu.au': 0.16;
+	'received:cskk.homeip.net': 0.16;
+	'received:harvey.boardofstudies.nsw.edu.au': 0.16;
+	'received:homeip.net': 0.16; 'received:nsw.edu.au': 0.16; 'so...':
+	0.16; 'syntactic': 0.16; 'heavily': 0.16; 'fair': 0.19; 'cc:no
+	real name:2**0': 0.20; 'cc:2**0': 0.20; 'cheers,': 0.20;
+	'language': 0.20; 'programming': 0.20; 'variable': 0.21; 'header
+	:In-Reply-To:1': 0.22; "aren't": 0.22; 'compared': 0.22; 'name?':
+	0.23; 'ones.': 0.23; 'worst': 0.23; 'example': 0.24; 'parameters':
+	0.26; "i'm": 0.26; 'instead': 0.26; 'error': 0.29; "python's":
+	0.29; 'named': 0.30; 'cc:addr:python.org': 0.31; 'later.': 0.31;
+	'logic': 0.31; 'actual': 0.31; 'language.': 0.31; 'all,': 0.31;
+	'import': 0.32; 'several': 0.33; 'using': 0.34; 'header:User-
+	Agent:1': 0.35; 'point': 0.35; 'usually': 0.36; 'quite': 0.36;
+	'received:au': 0.36; 'getting': 0.36; 'charset:us-ascii': 0.36;
+	'less': 0.38; 'but': 0.38; 'pretty': 0.38; 'used': 0.38; 'though':
+	0.38; 'errors': 0.39; 'where': 0.39; 'i.e.': 0.40; 'simple': 0.60;
+	'below': 0.63; 'here': 0.65; 'received:202': 0.66; 'show': 0.67;
+	'dot': 0.68; 'become': 0.70; 'reserved.': 0.79; '"foo"': 0.84;
+	'governance': 0.84; 'many?': 0.84; 'springs': 0.84; 'mistaken':
+	0.91; 'mistakes': 0.91; 'proposal,': 0.91; 'subject:Make': 0.95
+Received: from localhost (HELO mail.python.org) (127.0.0.1)
+	by albatross.python.org with SMTP; 26 Apr 2011 09:15:16 +0200
+Received: from harvey.boardofstudies.nsw.edu.au
+	(mail2.rack1.boardofstudies.nsw.edu.au [202.125.174.133])
+	by mail.python.org (Postfix) with ESMTP
+	for <python-ideas@python.org>; Tue, 26 Apr 2011 09:15:15 +0200 (CEST)
+Received: from cskk.homeip.net (localhost.localdomain [127.0.0.1])
+	by harvey.boardofstudies.nsw.edu.au (Postfix) with ESMTP id 1D7E04D3B56;
+	Tue, 26 Apr 2011 17:15:05 +1000 (EST)
+Received: by janus.cskk.homeip.net (Postfix, from userid 1000)
+	id DA3C8100419B7; Tue, 26 Apr 2011 17:15:04 +1000 (EST)
+Date: Tue, 26 Apr 2011 17:15:04 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Ethan Furman <ethan@stoneleaf.us>
+Message-ID: <20110426071504.GA19427@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <4DB5E6ED.40904@stoneleaf.us>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+References: <4DB5E6ED.40904@stoneleaf.us>
+Cc: python-ideas@python.org
+Subject: Re: Make all keywords legal as an identifier
+X-BeenThere: python-ideas@python.org
+X-Mailman-Version: 2.1.12
+Precedence: list
+List-Id: Discussions of speculative Python language ideas
+	<python-ideas.python.org>
+List-Unsubscribe: <http://mail.python.org/mailman/options/python-ideas>,
+	<mailto:python-ideas-request@python.org?subject=unsubscribe>
+List-Archive: <http://mail.python.org/pipermail/python-ideas>
+List-Post: <mailto:python-ideas@python.org>
+List-Help: <mailto:python-ideas-request@python.org?subject=help>
+List-Subscribe: <http://mail.python.org/mailman/listinfo/python-ideas>,
+	<mailto:python-ideas-request@python.org?subject=subscribe>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Sender: python-ideas-bounces+cs=zip.com.au@python.org
+Errors-To: python-ideas-bounces+cs=zip.com.au@python.org
+X-Cats2Procmailrc-Rule: cats/home: python  python-ideas    sender:python-ideas-bounces+cs=zip.com.au@python.org
+X-Label: python-ideas
+Content-Length: 1757
+
+On 25Apr2011 14:26, Ethan Furman <ethan@stoneleaf.us> wrote:
+| haael wrote:
+| >First of all, many nouns are reserved, i.e. "object" or "class".
+| 
+| Many?  Aren't we still at less than 50 words total?  Pretty
+| infinitesimal when compared with the 100,000+ words in the English
+| language.
+| 
+| >Second: variable names are usually nouns indeed, but functions and
+| >methods are often verbs, while named parameters can be
+| >prepositions and adverbs. [...]
+| >Python kidnapped many verbs and prepositions and made them reserved.
+| 
+| See above.  This is a ridiculous exaggeration.
+
+Though to be fair, Python's using a fair number of the very heavily used
+ones.
+
+Personally I'm -1 on the proposal, especially the leading dot part.
+
+One downside that springs to mind is a weakness in C: the syntax is
+so... lexically complete... that quite often a syntactic programming
+error can get warnings about well below the actual error, and several
+easy mistakes are syntacticly valid and only show as logic errors later.
+The standard example is = instead of ==.
+
+My point here is that the more valid but mistaken forms the language
+allows, the easier it is for simple errors to become logic errors.
+
+Contrived examples:
+
+  # getting the "as" name from "foo"
+  from foo import as
+  # but did I mean "from foo import this as that" ?
+
+  # is this now a syntax error, since "as" is a name?
+  with open("foo") as fp:
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+The worst tyrannies were the ones where a governance required its own logic on
+every embedded node. - Vernor Vinge
+_______________________________________________
+Python-ideas mailing list
+Python-ideas@python.org
+http://mail.python.org/mailman/listinfo/python-ideas

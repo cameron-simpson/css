@@ -1,0 +1,65 @@
+Date: Sun, 14 Feb 2010 12:37:08 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: exarkun@twistedmatrix.com
+Cc: python-list@python.org, maligree@gmail.com
+Subject: Re: threading and signals - main thread solely responsible for
+ signal handling?
+Message-ID: <20100214013708.GA4636@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20100213172226.26099.213963272.divmod.xquotient.1291@localhost.localdomain>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 2036
+
+On 13Feb2010 17:22, exarkun@twistedmatrix.com <exarkun@twistedmatrix.com> wrote:
+| On 04:43 pm, maligree@gmail.com wrote:
+| >The main part of my script is a function that does many long reads
+| >(urlopen, it's looped). Since I'm hell-bent on employing SIGINFO to
+| >display some stats, I needed to run foo() as a seperate thread to
+| >avoid getting errno 4 (interrupted system call) errors (which occur if
+| >SIGINFO is received while urlopen is setting itself up/waiting for a
+| >response). This does the job, SIGINFO is handled without ever brutally
+| >interrupting urlopen.
+| >
+| >The problem is that after starting foo as a thread, my main thread has
+| >nothing left to do - unless it receives a signal, and I am forced to
+| >keep it in some sort of loop so that ANY signal handling can still
+| >occur. I thought I'd just occupy it with a simple while 1: pass loop
+| >but that, unfortunately, means 100% CPU usage.
+[...]
+| 
+| MRAB suggested you time.sleep() in a loop, which is probably fine.
+| However, if you want to have even /less/ activity than that in the
+| main thread, take a look at signal.pause().
+
+Funnily enough I coded this issue just a few weeks ago, and my main
+program looks like this:
+
+  def main(argv):
+    xit = 0
+    cmd = os.path.basename(argv[0])
+    SM = SystemManager()
+    [...set up a bunch of subsystems...]
+    SM.startAll()
+    try:
+      signal.pause()
+    except KeyboardInterrupt:
+      warn("KeyboardInterrupt interrupts pause()")
+      xit = 1
+    SM.close()
+    SM.join()
+    return xit
+
+So SM.close() tells all the subsystems to close and finish up.  That largely
+involved putting the "EOF" sentinel value on a lot of Queues, causes the
+subsystems to cease processing stuff.  The separate SM.join() does the actaul
+waiting for everything.
+
+This makes for clean and timely shutdown for me.
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+If your new theorem can be stated with great simplicity, then there
+will exist a pathological exception.    - Adrian Mathesis

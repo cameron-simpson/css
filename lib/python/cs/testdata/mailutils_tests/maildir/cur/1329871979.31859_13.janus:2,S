@@ -1,0 +1,213 @@
+Return-Path: <python-list-bounces+cs=zip.com.au@python.org>
+Delivered-To: unknown
+Received: from mail.zip.com.au (125.255.95.3) by janus.home with POP3-SSL; 08
+  Feb 2012 10:03:01 -0000
+Delivered-To: cs@zipworld.com.au
+Received: from mailin3-syd3.pacific.net.au (mailin3-syd3.pacific.net.au [125.255.92.144])
+	by mailstore2.syd.pacific.net.au (Postfix) with ESMTP id B58A14D934
+	for <cs@zipworld.com.au>; Wed,  8 Feb 2012 21:02:28 +1100 (EST)
+Received: from mail.python.org (unknown [82.94.164.166])
+	by mailin3-syd3.pacific.net.au (Postfix) with ESMTP id F2430400075
+	for <cs@zip.com.au>; Wed,  8 Feb 2012 21:04:39 +1100 (EST)
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3TjdPZ41wnzN9p
+	for <cs@zip.com.au>; Wed,  8 Feb 2012 11:02:26 +0100 (CET)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=python.org; s=200901;
+	t=1328695346; bh=utuV4xwolLCoz6WFRvC83uEm0YkxrrwneKKNOwXXUVE=;
+	h=Date:From:To:Subject:Message-ID:MIME-Version:In-Reply-To:
+	 References:Cc:List-Id:List-Unsubscribe:List-Archive:List-Post:
+	 List-Help:List-Subscribe:Content-Type:Content-Transfer-Encoding:
+	 Sender;
+	b=hgDLVZ84ZDzzeoBHaifV9COW//wRhNiGJI+V0NdKR5DOhv8dY3XK0wrdCWkD8FvbQ
+	 2axahhS8K+pdeZAnCsalad44EEm7w7MzTgA9tITR5aC2L89R4wMLFSC0ASvn1nIeWJ
+	 gCUSTlwkh9irTszufHNwBcrCskwoUdpy+o6EHgYc=
+X-Original-To: python-list@python.org
+Delivered-To: python-list@mail.python.org
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3TjdLQ2DGkzN3P
+	for <python-list@python.org>; Wed,  8 Feb 2012 10:59:42 +0100 (CET)
+X-Spam-Status: OK 0.000
+X-Spam-Evidence: '*H*': 1.00; '*S*': 0.00; 'example:': 0.03; 'skip':
+	0.04; 'over,': 0.05; 'bits': 0.07; 'function,': 0.07;
+	'received:edu.au': 0.07; 'added,': 0.09; 'context.': 0.09;
+	'etc).': 0.09; 'fetch': 0.09; 'filename': 0.09; 'ftp,': 0.09;
+	'grow,': 0.09; 'parsing': 0.09; 'rename': 0.09; 'throw': 0.09;
+	'subject:python': 0.10; 'binary': 0.13; 'subject:file': 0.13;
+	'(write': 0.16; 'absence.': 0.16; 'briefly,': 0.16; 'bugs,': 0.16;
+	'confuses': 0.16; 'copied,': 0.16; 'copied.': 0.16; 'extracting':
+	0.16; 'fetches': 0.16; 'filesystem': 0.16; 'from:addr:cs': 0.16;
+	'from:addr:zip.com.au': 0.16; 'from:name:cameron simpson': 0.16;
+	'ignores': 0.16; 'message-id:@cskk.homeip.net': 0.16; 'mounting':
+	0.16; 'nfs,': 0.16; 'pause': 0.16; 'received:202.125.174': 0.16;
+	'received:202.125.174.133': 0.16;
+	'received:boardofstudies.nsw.edu.au': 0.16;
+	'received:cskk.homeip.net': 0.16;
+	'received:harvey.boardofstudies.nsw.edu.au': 0.16;
+	'received:homeip.net': 0.16; 'received:nsw.edu.au': 0.16; 'tmp':
+	0.16; 'cc:addr:python-list': 0.16; 'wrote:': 0.18; 'bytes': 0.18;
+	'subject:skip:s 10': 0.18; 'cheers,': 0.20; 'cc:no real
+	name:2**0': 0.21; 'trying': 0.21; '(but': 0.21; 'file,': 0.21;
+	'discussion': 0.22; "doesn't": 0.22; 'header:In-Reply-To:1': 0.22;
+	'(b)': 0.23; 'here?': 0.23; 'issuing': 0.23; 'pieces': 0.23;
+	'testing,': 0.23; 'command': 0.24; 'byte': 0.24; 'extract': 0.24;
+	'creating': 0.25; 'exercise': 0.25; 'mode': 0.25; 'tests': 0.25;
+	'cc:2**0': 0.26; 'code.': 0.26; 'code': 0.26; 'testing': 0.26;
+	'function': 0.27; 'looks': 0.27; 'code,': 0.28; 'remote': 0.28;
+	'bit': 0.28; 'forgot': 0.29; 'cc:addr:python.org': 0.29; 'server':
+	0.30; 'far,': 0.30; 'lock': 0.30; 'new.': 0.30; 'tail': 0.30;
+	'yesterday,': 0.30; '(the': 0.30; 'equivalent': 0.31; 'actually':
+	0.31; 'file.': 0.31; 'version': 0.32; 'ftp': 0.32; 'good.': 0.32;
+	'web.': 0.32; 'rest': 0.32; 'thanks': 0.32; 'actual': 0.32;
+	'implement': 0.32; 'there': 0.33; "can't": 0.33; 'header:User-
+	Agent:1': 0.33; 'it.': 0.33; 'instead': 0.33; 'test': 0.34;
+	'file': 0.34; 'normally': 0.34; 'record': 0.34; 'running': 0.34;
+	'(a)': 0.34; 'function.': 0.34; 'parse': 0.34; 'principle': 0.34;
+	'help,': 0.35; 'presence': 0.36; 'received:au': 0.36; 'example,':
+	0.37; 'offset': 0.37; 'partial': 0.37; 'solutions.': 0.37; 'but':
+	0.37; 'machine': 0.37; 'charset:us-ascii': 0.37; 'using': 0.37;
+	'could': 0.38; 'several': 0.38; 'useful': 0.38; 'problems': 0.38;
+	'data': 0.38; 'files': 0.39; 'feed': 0.39; 'smaller': 0.39;
+	'url:org': 0.39; 'data,': 0.39; 'being': 0.40; 'more': 0.61;
+	'simple': 0.61; 'your': 0.61; 'teach': 0.61; 'provided': 0.62;
+	'reply': 0.64; 'received:202': 0.66; 'course.': 0.66; 'show':
+	0.66; 'records': 0.74; 'cameron': 0.77; 'bandwidth.': 0.84;
+	'dir,': 0.84; 'filesystem.': 0.84; 'grabs': 0.84; 'mock': 0.84
+Received: from localhost (HELO mail.python.org) (127.0.0.1)
+	by albatross.python.org with SMTP; 08 Feb 2012 10:59:42 +0100
+Received: from harvey.boardofstudies.nsw.edu.au
+	(mail2.rack1.boardofstudies.nsw.edu.au [202.125.174.133])
+	by mail.python.org (Postfix) with ESMTP
+	for <python-list@python.org>; Wed,  8 Feb 2012 10:59:41 +0100 (CET)
+Received: from cskk.homeip.net (localhost.localdomain [127.0.0.1])
+	by harvey.boardofstudies.nsw.edu.au (Postfix) with ESMTP id 037AA4D3B67;
+	Wed,  8 Feb 2012 20:59:37 +1100 (EST)
+Received: by janus.cskk.homeip.net (Postfix, from userid 1000)
+	id DCA7D100419B7; Wed,  8 Feb 2012 20:59:36 +1100 (EST)
+Date: Wed, 8 Feb 2012 20:59:36 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Sherif Shehab Aldin <silentquote@gmail.com>
+Subject: Re: python file synchronization
+Message-ID: <20120208095936.GA31545@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <CAH3xUCKhxxb77oXVcA+Ld-+G7NnYdBEYHwCheaTU3C06OhRu6g@mail.gmail.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+References: <CAH3xUCKhxxb77oXVcA+Ld-+G7NnYdBEYHwCheaTU3C06OhRu6g@mail.gmail.com>
+Cc: python-list@python.org
+X-BeenThere: python-list@python.org
+X-Mailman-Version: 2.1.12
+Precedence: list
+List-Id: General discussion list for the Python programming language
+	<python-list.python.org>
+List-Unsubscribe: <http://mail.python.org/mailman/options/python-list>,
+	<mailto:python-list-request@python.org?subject=unsubscribe>
+List-Archive: <http://mail.python.org/pipermail/python-list>
+List-Post: <mailto:python-list@python.org>
+List-Help: <mailto:python-list-request@python.org?subject=help>
+List-Subscribe: <http://mail.python.org/mailman/listinfo/python-list>,
+	<mailto:python-list-request@python.org?subject=subscribe>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Sender: python-list-bounces+cs=zip.com.au@python.org
+Errors-To: python-list-bounces+cs=zip.com.au@python.org
+X-Cats2Procmailrc-Rule: cats/home: python  python-list     sender:python-list-bounces+cs=zip.com.au@python.org
+X-Label: python-list
+Content-Length: 4209
+
+[ Please reply inline; it makes the discussion read like a converation,
+  with context. - Cameron
+]
+
+On 08Feb2012 08:57, Sherif Shehab Aldin <silentquote@gmail.com> wrote:
+| Thanks a lot for your help, I just forgot to state that the FTP server is
+| not under my command, I can't control how the file grow, or how the records
+| are added, I can only login to It, copy the whole file.
+
+Oh. That's a pity.
+
+| The reason why I am parsing the file and trying to get the diffs between
+| the new file and the old one, and copy it to new_file.time_stamp is that I
+| need to cut down the file size so when server (C) grabs the file, It grabs
+| only new data, also to cut down the network bandwidth.
+
+Can a simple byte count help here? Copy the whole file with FTP. From
+the new copy, extract the bytes from the last byte count offset onward.
+Then parse the smaller file, extracting whole records for use by (C).
+That way you can just keep the unparsed tail (partial record I imagine)
+around for the next fetch.
+
+Looking at RFC959 (the FTP protocol):
+
+  http://www.w3.org/Protocols/rfc959/4_FileTransfer.html
+
+it looks like you can do a partial file fetch, also, by issuing a REST
+(restart) command to set a file offset and then issuing a RETR (retrieve)
+command to get the rest of the file. These all need to be in binary mode
+of course.
+
+So in principle you could track the byte offset of what you have fetched
+with FTP so far, and fetch only what is new.
+
+| One of my problems was after mounting server (B) diffs_dir into Server (A)
+| throw NFS, I used to create filename.lock first into server (B) local file
+| then start copy filename to server (B) then remove filename.lock, so when
+| the daemon running on server (C) parses the files in the local_diffs dir,
+| ignores the files that are still being copied,
+| 
+| After searching more yesterday, I found that local mv is atomic, so instead
+| of creating the lock files, I will copy the new diffs to tmp dir, and after
+| the copy is over, mv it to actual diffs dir, that will avoid reading It
+| while It's still being copied.
+
+Yes, this sounds good. Provided the mv is on the same filesystem.
+
+For example: "mv /tmp/foo /home/username/foo" is actually a copy and not
+a rename because /tmp is normally a different filesystem from /home.
+
+| Sorry if the above is bit confusing, the system is bit complex.
+
+Complex systems often need fiddly solutions.
+
+| Also there is one more factor that confuses me, I am so bad in testing, and
+| I am trying to start actually implement unit testing to test my code, what
+| I find hard is how to test code like the one that do the copy, mv and so,
+| also the code that fetch data from the web.
+
+Ha. I used to be very bad at testing, now I am improving and am merely
+weak.
+
+One approach to testing is to make a mock up of the other half of the
+system, and test against the mockup.
+
+For example, you have code to FTP new data and then feed it to (C). You
+don't control the server side of the FTP. So you might make a small mock
+up program that writes valid (but fictitious) data records progressively
+to a local data file (write record, flush, pause briefly, etc). If you
+can FTP to your own test machine you could then treat _that_ growing
+file as the remote server's data file.
+
+Then you could copy it progressively using a byte count to keep track of
+the bits you have seen to skip them, and the the
+
+If you can't FTP to your test system, you could abstract out the "fetch
+part of this file by FTP" into its own function. Write an equivalent
+function that fetches part of a local file just by opening it.
+
+Then you could use the local file version in a test that doesn't
+actually do the FTP, but could exercise the rest of it.
+
+It is also useful to make simple tests of small pieces of the code.
+So make the code to get part of the data a simple function, and write
+tests to execute it in a few ways (no new data, part of a record,
+several records etc).
+
+There are many people better than I to teach testing.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Testing can show the presence of bugs, but not their absence.   - Dijkstra
+-- 
+http://mail.python.org/mailman/listinfo/python-list

@@ -1,0 +1,84 @@
+Date: Fri, 30 Apr 2010 08:47:27 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: james_027 <cai.haibin@gmail.com>
+Cc: python-list@python.org
+Subject: Re: replacing words in HTML file
+Message-ID: <20100429224727.GA17186@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: inline
+Content-Transfer-Encoding: 8bit
+In-Reply-To: <1f73997c-c482-4f6a-96d1-75622c87042c@p5g2000pri.googlegroups.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 2585
+
+On 29Apr2010 05:03, james_027 <cai.haibin@gmail.com> wrote:
+| On Apr 29, 5:31 am, Cameron Simpson <c...@zip.com.au> wrote:
+| > On 28Apr2010 22:03, Daniel Fetchinson <fetchin...@googlemail.com> wrote:
+| > | > Any idea how I can replace words in a html file? Meaning only the
+| > | > content will get replace while the html tags, javascript, & css are
+| > | > remain untouch.
+[...]
+| > The only way to get this right is to parse the file, then walk the doc
+| > tree enditing only the text parts.
+| >
+| > The BeautifulSoup module (3rd party, but a single .py file and trivial to
+| > fetch and use, though it has some dependencies) does a good job of this,
+| > coping even with typical not quite right HTML. It gives you a parse
+| > tree you can easily walk, and you can modify it in place and write it
+| > straight back out.
+| 
+| Thanks for all your input. Cameron Simpson get the idea of what I am
+| trying to do. I've been looking at beautiful soup so far I don't know
+| how to perform search and replace within it.
+
+Well the BeautifulSoup web page helped me:
+  http://www.crummy.com/software/BeautifulSoup/documentation.html
+
+Here's a function from a script I wrote to bulk edit a web site. I was
+replacing OBJECT and EMBED nodes with modern versions:
+
+  def recurse(node):
+    global didmod
+    for O in node.contents:
+      if isinstance(O,Tag):
+        for attr in 'src', 'href':
+          if attr in O:
+            rurl=O[attr]
+            rurlpath=pathwrt(rurl,SRCPATH)
+            if not os.path.exists(rurlpath):
+              print >>sys.stderr, "%s: MISSING: %s" % (SRCPATH, rurlpath,)
+        O2=None
+        if O.name == "object":
+          O2, SUBOBJ = fixmsobj(O)
+        elif O.name == "embed":
+          O2, SUBOBJ = fixembed(O)
+        if O2 is not None:
+          O.replaceWith(O2)
+          SUBOBJ.replaceWith(O)
+          ##print >>sys.stderr, "%s: update: new OBJECT: %s" % (SRCPATH, str(O2), )
+          didmod=True
+          continue
+        recurse(O)
+
+but you have only to change it a little to modify things that aren't Tag
+objects. The calling end looks like this:
+
+  with open(SRCPATH) as srcfp:
+    srctext = srcfp.read()
+  SOUP = BeautifulSoup(srctext)
+  didmod = False        # icky global set by recurse()
+  recurse(SOUP)
+  if didmod:
+    srctext = str(SOUP)
+
+If didmod becomes True we recompute srctext and resave the file (or save it
+to a copy).
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Democracy is the theory that the people know what they want, and deserve to
+get it good and hard.   - H.L. Mencken

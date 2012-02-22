@@ -1,0 +1,58 @@
+Date: Tue, 16 Jun 2009 10:43:27 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Greg Ewing <greg.ewing@canterbury.ac.nz>
+Cc: python-dev@python.org
+Subject: Re: io.BufferedReader.peek() Behaviour in python3.1
+Message-ID: <20090616004327.GA15853@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
+In-Reply-To: <4A36D75F.5070805@canterbury.ac.nz>
+User-Agent: Mutt/1.5.19 (2009-01-05)
+Content-Length: 1846
+
+On 16Jun2009 11:21, Greg Ewing <greg.ewing@canterbury.ac.nz> wrote:
+> Cameron Simpson wrote:
+>> It seems like whenever I want to do some kind of opportunistic but
+>> non-blocking stuff with a remote service
+>
+> Do you actually do this with buffered streams?
+
+Sure, in C, python and perl quite happily. In some circumstances.
+Provided you're careful about when to fflush() it can all go quite
+smoothly. It's certainly not applicable to everything.
+
+> I find
+> it's better to steer well clear of buffered I/O objects
+> when doing non-blocking stuff, because they don't play
+> well with other things like select().
+
+Ah, the non-blockingness. Well that's the rub. I normally avoid
+non-blocking requirements by using threads, so that the thread gathering
+=66rom the stream can block. Then the consumer can poll a Queue from the
+worker thread, etc.
+
+I really don't like select(/poll/epoll etc) much; aside from select's
+scaling issues with lots of files (hence poll/epoll) there are high
+performance things where having an event loop using select is a good
+way to go, but I generally prefer using threads and/or generators
+to make the code clear (single flow of control, single task for the
+block of code, etc) if there's no reason not to.
+
+> Anyhow, I wouldn't be opposed to having a way of looking
+> into the buffer, but it should be a separate API  --
+> preferably with a better name than peek0(), which gives
+> no clue at all about what it does differently from peek().
+
+Indeed, though arguably read1() is a lousy name too, on the same basis.
+My itch is that peek() _feels_ like it should be "look into the buffer"
+but actually can block and/or change the buffer.
+
+Cheers,
+--=20
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+You can't wait for inspiration.  You have to go after it with a club.
+        - Jack London

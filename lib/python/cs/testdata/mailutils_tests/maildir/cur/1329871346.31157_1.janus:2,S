@@ -1,0 +1,133 @@
+Return-Path: <python-ideas-bounces+cs=zip.com.au@python.org>
+Delivered-To: unknown
+Received: from mail.zip.com.au (125.255.95.3:995) by janus.home with
+  POP3-SSL; 19 Feb 2012 10:06:22 -0000
+Delivered-To: cs@zipworld.com.au
+Received: from mailin3-syd3.pacific.net.au (mailin3-syd3.pacific.net.au [125.255.92.144])
+	by mailstore2.syd.pacific.net.au (Postfix) with ESMTP id AF7B9784E
+	for <cs@zipworld.com.au>; Sun, 19 Feb 2012 21:05:29 +1100 (EST)
+Received: from mail.python.org (unknown [82.94.164.166])
+	by mailin3-syd3.pacific.net.au (Postfix) with ESMTP id 7A30640008E
+	for <cs@zip.com.au>; Sun, 19 Feb 2012 21:07:51 +1100 (EST)
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3TrNxt2njQzQ6y
+	for <cs@zip.com.au>; Sun, 19 Feb 2012 11:05:22 +0100 (CET)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=python.org; s=200901;
+	t=1329645922; bh=8K95sLQ60fpjYO5tIq2VdwEF1TR5kPsBKtuO1OxKiJo=;
+	h=Date:From:To:Message-ID:MIME-Version:In-Reply-To:References:Cc:
+	 Subject:List-Id:List-Unsubscribe:List-Archive:List-Post:List-Help:
+	 List-Subscribe:Content-Type:Content-Transfer-Encoding:Sender;
+	b=oQ9Nl0HTaCfbklGuOH5VdNrZfZ+q9E3UXPqw7VegH9LzcGDjLWZmnyXBO1XFnOlmj
+	 MuznZzuLlNHh67PDmHeDY7DrnRhqnvO4rIxPj7YJ8oGiYDL8tr6v56c4txbacinzcO
+	 6bh/60U96Wdr0TBrxQ2njtcOY8k6v/uh7fsMV/Hc=
+X-Original-To: python-ideas@python.org
+Delivered-To: python-ideas@mail.python.org
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3TrNx93C4CzNcr
+	for <python-ideas@python.org>; Sun, 19 Feb 2012 11:04:45 +0100 (CET)
+X-Spam-Status: OK 0.011
+X-Spam-Evidence: '*H*': 0.98; '*S*': 0.00; 'received:edu.au': 0.07;
+	'removes': 0.07; 'matt': 0.09; 'essentially': 0.10; 'boolean':
+	0.16; 'channel.': 0.16; 'from:addr:cs': 0.16;
+	'from:addr:zip.com.au': 0.16; 'from:name:cameron simpson': 0.16;
+	'message-id:@cskk.homeip.net': 0.16; 'received:202.125.174': 0.16;
+	'received:202.125.174.133': 0.16;
+	'received:boardofstudies.nsw.edu.au': 0.16;
+	'received:cskk.homeip.net': 0.16;
+	'received:harvey.boardofstudies.nsw.edu.au': 0.16;
+	'received:homeip.net': 0.16; 'received:nsw.edu.au': 0.16;
+	'subject:channel': 0.16; 'synchronous': 0.16; 'worse.': 0.16;
+	'wrote:': 0.18; 'cc:no real name:2**0': 0.21; 'header:In-Reply-
+	To:1': 0.22; 'mode': 0.25; 'saying': 0.26; 'cc:2**0': 0.26;
+	'code': 0.26; 'variable': 0.28; 'channel': 0.28; 'condition.':
+	0.29; 'class': 0.29; 'cc:addr:python.org': 0.29; '"but': 0.30;
+	'asynchronous': 0.30; 'locks': 0.30; 'queue': 0.30; 'equivalent':
+	0.31; 'shared': 0.31; 'typically': 0.32; 'header:User-Agent:1':
+	0.33; 'david': 0.35; 'received:au': 0.36; 'run': 0.37; 'but':
+	0.37; 'charset:us-ascii': 0.37; 'could': 0.38; 'some': 0.38;
+	'sometimes': 0.38; 'e.g.': 0.39; 'i.e.': 0.39; 'that.': 0.39;
+	"i'd": 0.39; '(with': 0.39; 'subject: (': 0.40; 'put': 0.40;
+	'more': 0.61; 'provided': 0.62; 'direction.': 0.64;
+	'received:202': 0.66; 'cameron': 0.77; 'condition"': 0.84; 'deed':
+	0.84; 'mechanism.': 0.84; 'wood': 0.84; 'seriously,': 0.91;
+	'receiver': 0.93
+Received: from localhost (HELO mail.python.org) (127.0.0.1)
+	by albatross.python.org with SMTP; 19 Feb 2012 11:04:45 +0100
+Received: from harvey.boardofstudies.nsw.edu.au
+	(mail2.rack1.boardofstudies.nsw.edu.au [202.125.174.133])
+	by mail.python.org (Postfix) with ESMTP
+	for <python-ideas@python.org>; Sun, 19 Feb 2012 11:04:44 +0100 (CET)
+Received: from janus.cskk.homeip.net (localhost.localdomain [127.0.0.1])
+	by harvey.boardofstudies.nsw.edu.au (Postfix) with ESMTP id 9EEF84D3B67;
+	Sun, 19 Feb 2012 21:04:41 +1100 (EST)
+Received: by janus.cskk.homeip.net (Postfix, from userid 1000)
+	id A932D2007460E; Sun, 19 Feb 2012 21:05:12 +1100 (EST)
+Date: Sun, 19 Feb 2012 21:05:12 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Sturla Molden <sturla@molden.no>
+Message-ID: <20120219100512.GA31747@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <4F404968.5070000@molden.no>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+References: <4F404968.5070000@molden.no>
+Cc: python-ideas@python.org
+Subject: Re: channel (synchronous queue)
+X-BeenThere: python-ideas@python.org
+X-Mailman-Version: 2.1.12
+Precedence: list
+List-Id: Discussions of speculative Python language ideas
+	<python-ideas.python.org>
+List-Unsubscribe: <http://mail.python.org/mailman/options/python-ideas>,
+	<mailto:python-ideas-request@python.org?subject=unsubscribe>
+List-Archive: <http://mail.python.org/pipermail/python-ideas>
+List-Post: <mailto:python-ideas@python.org>
+List-Help: <mailto:python-ideas-request@python.org?subject=help>
+List-Subscribe: <http://mail.python.org/mailman/listinfo/python-ideas>,
+	<mailto:python-ideas-request@python.org?subject=subscribe>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Sender: python-ideas-bounces+cs=zip.com.au@python.org
+Errors-To: python-ideas-bounces+cs=zip.com.au@python.org
+X-Cats2Procmailrc-Rule: cats/home: python  python-ideas    sender:python-ideas-bounces+cs=zip.com.au@python.org
+X-Label: python-ideas
+Content-Length: 1477
+
+On 19Feb2012 01:59, Sturla Molden <sturla@molden.no> wrote:
+| Den 19.02.2012 01:39, skrev Matt Joiner:
+| >
+| > Yes, channels can allow for this, but as with locks directionality and 
+| > ordering matter. Typically messages will only run in a particular 
+| > direction.
+| >
+| 
+| Actually, it was only a synchronous MPI_Recv that did this in MPI, a 
+| synchronous
+| MPI_Send would have been even worse. Which is why MPI got the
+| asynchronous method MPI_Irecv...
+| 
+| Sounds like you just want a barrier or a condition primitive. E.g. have 
+| the sender
+| call .wait() on a condition and let the receiver call .notify() the 
+| condition.
+
+A condition is essentially a boolean (with waiting).
+A channel is a value passing mechanism.
+Sometimes you really do want a zero-storage Queue i.e. a channel.
+
+Saying "but you could put a value in a shared variable and just use a
+condition" removes the abstraction/metaphor. If I was thinking that way
+more than once in some code I'd write a small class to do that. And it would
+be a channel!
+
+Seriously, a channel is semanticly equivalent to a zero-storage Queue, which
+is a mode not provided by the current Queue implementation.
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+No good deed shall go unpunished!       - David Wood <davewood@teleport.com>
+_______________________________________________
+Python-ideas mailing list
+Python-ideas@python.org
+http://mail.python.org/mailman/listinfo/python-ideas

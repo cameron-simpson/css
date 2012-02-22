@@ -1,0 +1,107 @@
+Return-Path: <python-ideas-bounces+cs=zip.com.au@python.org>
+Delivered-To: unknown
+Received: from mail.zip.com.au (125.255.95.3:995) by janus.home with
+  POP3-SSL; 11 Feb 2012 23:19:26 -0000
+Delivered-To: cs@zipworld.com.au
+Received: from mailin3-syd3.pacific.net.au (mailin3-syd3.pacific.net.au [125.255.92.144])
+	by mailstore2.syd.pacific.net.au (Postfix) with ESMTP id 9A70E3C81
+	for <cs@zipworld.com.au>; Sun, 12 Feb 2012 10:18:47 +1100 (EST)
+Received: from mail.python.org (unknown [82.94.164.166])
+	by mailin3-syd3.pacific.net.au (Postfix) with ESMTP id 3AF6040007C
+	for <cs@zip.com.au>; Sun, 12 Feb 2012 10:21:03 +1100 (EST)
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3Tlpx14vyyzNMX
+	for <cs@zip.com.au>; Sun, 12 Feb 2012 00:18:45 +0100 (CET)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=python.org; s=200901;
+	t=1329002325; bh=j2e/kCNDWL5fkBrYbv9CGk9dTEyJ0ZEiIAG8jD4GSEc=;
+	h=Date:From:To:Message-ID:MIME-Version:In-Reply-To:References:Cc:
+	 Subject:List-Id:List-Unsubscribe:List-Archive:List-Post:List-Help:
+	 List-Subscribe:Content-Type:Content-Transfer-Encoding:Sender;
+	b=v/pqOxcycvVusdb+f/eL8LOD/DIsGVswXXQ6KmB/KztgrCO3cnftLprWyTyQeWytD
+	 FbxMHYRMrDoZMEz5Mxq80RFY6oog3UYVb+yXtG2Gd6NUReJPp3OaTv6SsA23wZGEQC
+	 rHrYVQor8iheRZoXzLoh1+3u3ODaIUh3RRabgJYs=
+X-Original-To: python-ideas@python.org
+Delivered-To: python-ideas@mail.python.org
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3TlpwJ2vR7zNMX
+	for <python-ideas@python.org>; Sun, 12 Feb 2012 00:18:08 +0100 (CET)
+X-Spam-Status: OK 0.001
+X-Spam-Evidence: '*H*': 1.00; '*S*': 0.00; '(python': 0.05;
+	'subject:Python': 0.05; 'received:edu.au': 0.07; 'python': 0.08;
+	'(there': 0.09; 'url:peps': 0.09; '2.7': 0.13; '4.x': 0.16;
+	'from:addr:cs': 0.16; 'from:addr:zip.com.au': 0.16;
+	'from:name:cameron simpson': 0.16; 'message-id:@cskk.homeip.net':
+	0.16; 'received:202.125.174': 0.16; 'received:202.125.174.133':
+	0.16; 'received:boardofstudies.nsw.edu.au': 0.16;
+	'received:cskk.homeip.net': 0.16;
+	'received:harvey.boardofstudies.nsw.edu.au': 0.16;
+	'received:homeip.net': 0.16; 'received:nsw.edu.au': 0.16;
+	'schwartz': 0.16; 'to:addr:pearwood.info': 0.16; 'to:addr:steve':
+	0.16; "to:name:steven d'aprano": 0.16; 'wrote:': 0.18; 'stick':
+	0.18; 'header:In-Reply-To:1': 0.22; 'pep': 0.23; 'url:dev': 0.23;
+	'cc:2**0': 0.26; 'posted': 0.29; 'cc:addr:python.org': 0.29;
+	'exist.': 0.30; 'pure': 0.32; 'header:User-Agent:1': 0.33;
+	'steven': 0.34; 'something': 0.35; 'url:python': 0.35;
+	'received:au': 0.36; 'charset:us-ascii': 0.37; 'url:org': 0.39;
+	'reached': 0.61; 'received:202': 0.66; 'favour': 0.73; 'cameron':
+	0.77; 'subject:3000': 0.84; 'enemies': 0.91; 'subject:%': 0.97
+Received: from localhost (HELO mail.python.org) (127.0.0.1)
+	by albatross.python.org with SMTP; 12 Feb 2012 00:18:08 +0100
+Received: from harvey.boardofstudies.nsw.edu.au
+	(mail2.rack1.boardofstudies.nsw.edu.au [202.125.174.133])
+	by mail.python.org (Postfix) with ESMTP
+	for <python-ideas@python.org>; Sun, 12 Feb 2012 00:18:07 +0100 (CET)
+Received: from janus.cskk.homeip.net (localhost.localdomain [127.0.0.1])
+	by harvey.boardofstudies.nsw.edu.au (Postfix) with ESMTP id A9E584D3B66;
+	Sun, 12 Feb 2012 10:17:58 +1100 (EST)
+Received: by janus.cskk.homeip.net (Postfix, from userid 1000)
+	id 2CF97200583C3; Sun, 12 Feb 2012 10:18:06 +1100 (EST)
+Date: Sun, 12 Feb 2012 10:18:06 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Steven D'Aprano <steve@pearwood.info>
+Message-ID: <20120211231805.GA7853@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <4F341561.3050409@pearwood.info>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+References: <4F341561.3050409@pearwood.info>
+Cc: python-ideas <python-ideas@python.org>
+Subject: Re: Python 3000 TIOBE -3%
+X-BeenThere: python-ideas@python.org
+X-Mailman-Version: 2.1.12
+Precedence: list
+List-Id: Discussions of speculative Python language ideas
+	<python-ideas.python.org>
+List-Unsubscribe: <http://mail.python.org/mailman/options/python-ideas>,
+	<mailto:python-ideas-request@python.org?subject=unsubscribe>
+List-Archive: <http://mail.python.org/pipermail/python-ideas>
+List-Post: <mailto:python-ideas@python.org>
+List-Help: <mailto:python-ideas-request@python.org?subject=help>
+List-Subscribe: <http://mail.python.org/mailman/listinfo/python-ideas>,
+	<mailto:python-ideas-request@python.org?subject=subscribe>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Sender: python-ideas-bounces+cs=zip.com.au@python.org
+Errors-To: python-ideas-bounces+cs=zip.com.au@python.org
+X-Cats2Procmailrc-Rule: cats/home: python  python-ideas    sender:python-ideas-bounces+cs=zip.com.au@python.org
+X-Label: python-ideas
+Content-Length: 692
+
+On 10Feb2012 05:50, Steven D'Aprano <steve@pearwood.info> wrote:
+| Python 4.x (Python 4000) is pure vapourware. It it irresponsible to tell 
+| people to stick to Python 2.7 (there will be no 2.8) in favour of something 
+| which may never exist.
+| 
+| http://www.python.org/dev/peps/pep-0404/
+
+Please tell me this PEP number is deliberate!
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Once I reached adulthood, I never had enemies until I posted to Usenet.
+        - Barry Schwartz <bbs@hankel.rutgers.edu>
+_______________________________________________
+Python-ideas mailing list
+Python-ideas@python.org
+http://mail.python.org/mailman/listinfo/python-ideas

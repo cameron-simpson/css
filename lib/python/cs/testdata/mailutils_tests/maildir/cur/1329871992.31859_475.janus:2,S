@@ -1,0 +1,85 @@
+Date: Tue, 28 Apr 2009 10:42:32 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: =?utf-8?B?Ik1hcnRpbiB2LiBM77+9d2lzIiA8bWFydGluQHYubG9ld2lzLmRlPg==?=
+Cc: Glenn Linderman <v+python@g.nevcal.com>, python-dev@python.org
+Subject: Re: PEP 383: Non-decodable Bytes in System  Character Interfaces
+Message-ID: <20090428004232.GA12325@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: inline
+Content-Transfer-Encoding: 8bit
+In-Reply-To: <49F60C0B.9000905@v.loewis.de>
+User-Agent: Mutt/1.5.18 (2008-05-17)
+Content-Length: 3770
+
+On 27Apr2009 21:48, Martin v. L�wis <martin@v.loewis.de> wrote:
+| >>> There are still issues regarding how Windows and POSIX programs that
+| >>> are  sharing cross-mounted file systems might communicate file names
+| >>> between  each other, which is not at all clear from the PEP.  If this
+| >>> is an  insoluble or un-addressed issue, it should be stated.  (It is
+| >>> probably  insoluble, due to there being multiple ways that the
+| >>> cross-mounted file  systems might translate names; but if there are,
+| >>> can we learn something  from the rules the mounting systems use, to
+| >>> be compatible with (one of)  them, or not.
+| >>
+| >> I'd say that's out of scope. A windows filesystem mounted on a UNIX host
+| >> should probably be mounted with a mapping to translate the Windows
+| >> Unicode names into whatever the sysadmin deems the locally most apt
+| >> byte encoding. But sys.getfilesystemencoding() is based on the current
+| >> user's locale settings, which need not be the same.
+| >>   
+| > 
+| > And if it were, what would it do with files that can't be encoded with
+| > the locally most apt byte encoding? 
+| 
+| As Cameron says: it's out of the scope of the PEP. It really depends how
+| the operating system deals with them. Most likely, the files are not
+| accessible - not only not from Python, but also not accessible from
+| any other Unix program.
+
+Well... If the files exist and the encoding of the mount software
+permits, there will be a sequence of bytes for the filename, and it
+will be accessible to a pure UNIX byte-speaking program. It will also
+be accessible from Python, because the os.* calls convert both ways:
+bytes->string an string->bytes as required. Martin's PEP just makes that
+lossless, which current it is not.
+
+Conversely, if the mount software refuses to map the filename to a POSIX
+byte string, the file won't exist, or will refuse to be created. For a
+concrete example we have but to observe my macify program I was trying
+to counter the PEP with (I'm now a convert, btw). It is to run on a real
+UNIX system and recode filenames into UTF-8 NFD, _prior_ to rsyncing
+to a Mac. Why? Because the MacOSX HFS filesystem refuses to accept byte
+strings not parsable by that encoding, and my music rsyncs were exploding,
+refusing to create files on the target Mac.
+
+And there's probably some grey area where a dodgy mount software will present
+names that can't be used.
+
+There's a supposed counter example in another followup post which I'll
+address there, since it seemed a little bogus to me.
+
+I think that, almost independent of this PEP, there should be an
+os.fsencode() function that takes a byte string (as a POSIX OS call
+will take) and performs the _same_ byte->string encoding that listdir()
+and friends are doing under the hood. And a partner os.fsdecode() for
+string->bytes. That will save a lot of wheel respoking and probably make
+it easier for people to think about this.
+
+Aside: thinking on that, perhaps those functions should be in posix.*,
+or alternatively would a Windows system offer them in os.* to produce
+native UTF-16 byte strings; useless for the WIndows API which cleanly
+takes unicode (I gather) but perhaps handy for people hacking filesystems
+directly or something like that.  (Except I gather from a former existence
+that there is a multitude of on-disk filename encoding under WIndows
+depending how old your filesystems are and if they're FAT or NTFS, etc).
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Your eyes are weary from staring at the CRT.  You feel sleepy.  Notice how
+restful it is to watch the cursor blink.  Close your eyes.  The opinions
+stated above are yours.  You cannot imagine why you ever felt otherwise.
+        - gabrielh@tplrd.tpl.oz.au

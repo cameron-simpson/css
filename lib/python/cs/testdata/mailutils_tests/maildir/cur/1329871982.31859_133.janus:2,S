@@ -1,0 +1,75 @@
+Date: Thu, 8 Sep 2011 10:23:14 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: comp.lang.python@googlegroups.com
+Cc: python-list@python.org
+Subject: Re: Best way to check that you are at the beginning (the end) of an
+ iterable?
+Message-ID: <20110908002314.GA15766@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <d53bfc89-b402-49a6-bd4a-baa28d708f8e@glegroupsg2000goo.googlegroups.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+Content-Length: 2412
+
+On 07Sep2011 16:22, Laurent <laurent.payot@gmail.com> wrote:
+| I totally understand the performance issue that an hypothetical
+| "istail" would bring, even if I think it would just be the programmer's
+| responsibility not to use it when it's not certain that an end can
+| be detected.
+
+The trouble with these things is that their presence leads to stallable
+code, often in libraries. Let the programmer write code dependent on
+istail() without thinking of the stall case (or even the gratuitous
+execution case, as in a generator with side effects in calling .next())
+and have that buried in a utilities function.
+
+Facilities like feof() in C and eof in Pascal already lead to lots of
+code that runs happily with flat files and behaves badly in interactive
+or piped input. It is _so_ easy to adopt a style like:
+
+  while not eof(filehandle):
+    line = filehandle.nextline()
+    ...
+
+that is it often thought that having offered the eof() function is a
+design error. (Of course in the example above the usual python idiom
+would win out from existing habit, but there are plenty of other
+situations where is would just be _easy_ to rely of istail() in whatever
+form.)
+
+| But I don't see why *adding* something like "ishead" would be so bad
+| (at worse by using a boolean somewhere as you mentioned).
+
+It is not awful, but as remarked:
+  - extra storage cost to _every_ iterable, for a rarely used facility
+  - extra runtime cost to maintain the state
+  - _retroactive_ burden on _every_ iterator implementation presently
+    existing; every iterator sudden needs to implement and offer this
+    extra facility to be generate purpose use
+  - it is easy to provide the facility on the rare occasions when it is
+    needed
+
+Personally, I think point 3 above is the killer and 1 and 2 are serious
+counter arguments.
+
+| Anyway I was just asking if there is something better than enumerate. So
+| the answer is no? The fact that I have to create a tuple with an
+| incrementing integer for something as simple as checking that I'm at
+| the head just sounds awfully unpythonic to me.
+
+You can just use a boolean if you like. I have plent of loops like:
+
+  first = true
+  for i in iterable:
+    if first:
+      blah ...
+    ...
+    first = False
+
+Cheap and easy. Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Bye and bye, God caught his eye, - Epitaph for a waiter by David McCord

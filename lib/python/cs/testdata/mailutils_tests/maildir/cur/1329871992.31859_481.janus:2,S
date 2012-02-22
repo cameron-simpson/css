@@ -1,0 +1,41 @@
+Date: Sat, 25 Apr 2009 14:22:47 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Toshio Kuratomi <a.badger@gmail.com>
+Cc: Terry Reedy <tjreedy@udel.edu>, python-dev@python.org
+Subject: Re: PEP 383: Non-decodable Bytes in System Character Interfaces
+Message-ID: <20090425042247.GA26029@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <49F26578.60603@gmail.com>
+User-Agent: Mutt/1.5.18 (2008-05-17)
+Content-Length: 1160
+
+On 24Apr2009 18:20, Toshio Kuratomi <a.badger@gmail.com> wrote:
+| Terry Reedy wrote:
+| > Is NUL \0 allowed in POSIX file names?  If not, could that be used as an
+| > escape char.  If it is not legal, then custom translated strings that
+| > escape in the wild would raise a red flag as soon as something else
+| > tried to use them.
+| > 
+| AFAIK NUL should be okay but I haven't read a specification to reach
+| that conclusion.  Is that a proposal?  Should I go find someone who has
+| read the relevant standards to find out?
+
+NUL cannot occur in a POSIX file path, if for no other reason than that
+the API uses C strings, which are NUL terminated.
+
+So, yes, you could use NUL as an escape character if you're sure you're
+never dealing with _non_POSIX pathnames:-)
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+| I'm the female partner of a climber (I don't climb) and until now, I was
+| under the impression that climbers are cool people, but alas, you had to
+| ruin it for me.
+*REAL* climbers are crude, impolite, solitary, abrupt, arrogant.  Sport
+climbers are cool.
+        - Rene Tio <tor@bnr.ca> in rec.climbing

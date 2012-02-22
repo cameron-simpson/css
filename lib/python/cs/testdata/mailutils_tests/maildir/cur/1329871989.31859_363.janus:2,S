@@ -1,0 +1,41 @@
+Date: Thu, 6 May 2010 10:21:45 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Baz Walter <bazwal@ftml.net>
+Cc: python-list@python.org
+Subject: Re: strange interaction between open and cwd
+Message-ID: <20100506002144.GA26948@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <4BE16327.5050209@ftml.net>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 1001
+
+On 05May2010 13:23, Baz Walter <bazwal@ftml.net> wrote:
+| here's what i get on my system, where '/dev/sda1' and '/dev/sda6'
+| are mounted at '/boot' and '/home' respectively:
+| 
+| >>> os.stat('/').st_ino
+| 2L
+| >>> os.stat('/usr').st_ino
+| 212993L
+| >>> os.stat('/boot').st_ino
+| 2L
+| >>> os.stat('/home').st_ino
+| 2L
+| >>>
+| 
+| if the algorithm is climbing up from '/home/baz/tmp/xxx', what does
+| it do when it searches os.listdir('../../../..')? how can it tell
+| whether 'boot' or 'home' is the correct next parent if it only
+| checks the inode number? i think the algorithm would at least need
+| to take account of changes in the current device id. not sure
+| whether that would be enough to cover all cases, though.
+
+Look at the st_rdev field (== the device holding this inode).
+When that changes, you've crossed a mount mount point.
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Usenet is essentially a HUGE group of people passing notes in class. --R. Kadel

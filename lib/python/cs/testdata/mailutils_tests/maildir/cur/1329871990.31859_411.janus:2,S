@@ -1,0 +1,42 @@
+Date: Sun, 3 Jan 2010 15:02:38 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: cassiope <fpm@u.washington.edu>
+Cc: python-list@python.org
+Subject: Re: IOError - cannot create file (linux daemon-invoked script)
+Message-ID: <20100103040238.GA15992@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <7804e895-e543-4ac7-b3f3-2c06c716394d@j4g2000yqe.googlegroups.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 1093
+
+On 02Jan2010 15:21, cassiope <fpm@u.washington.edu> wrote:
+| [...]  I want
+| to save a copy of the email in a particular directory which is
+| accessible to the Windows clients via samba.
+| 
+| The strange thing is that even with the right user-id, I cannot seem
+| to write to the directory, getting an IOError exception.  Changing the
+| directory to world-writable fixes this.  I can confirm the uid and gid
+| for the script by having the script print these values just before
+| trying to create/write the file.  Becoming the same lesser user, I
+| have no problem writing a file to the same directory.
+
+Can you show us:
+  - the directory user and group ownership and permissions
+  - the daemon's user and group values?
+
+You can also strace your daemon:
+
+  strace -f -e trace=file your-daemon your-daemon-args... 2>strace.out
+
+and then examine the log for the precise UNIX-level failure.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Money won't buy happiness, but it will pay the salary of a large research
+staff to study the problem. - Bill Vaughan

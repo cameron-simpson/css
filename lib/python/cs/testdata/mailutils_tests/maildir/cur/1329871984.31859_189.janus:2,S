@@ -1,0 +1,41 @@
+Date: Thu, 9 Jun 2011 14:28:22 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Nitin Pawar <nitinpawar432@gmail.com>
+Cc: TheSaint <nobody@nowhere.net.no>, python-list@python.org
+Subject: Re: The pythonic way equal to "whoami"
+Message-ID: <20110609042822.GA14530@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
+In-Reply-To: <BANLkTikvt1tr+Ov8sVi3LdzOoxxHKiTQeQ@mail.gmail.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 833
+
+On 07Jun2011 20:22, Nitin Pawar <nitinpawar432@gmail.com> wrote:
+| import getpass
+| user =3D getpass.getuser()
+|=20
+| On Tue, Jun 7, 2011 at 7:54 PM, TheSaint <nobody@nowhere.net.no> wrote:
+| > I was trying to find out whose the program launcher, but os.environ['US=
+ER']
+| > returns the user whom owns the desktop environment, regardless the prog=
+ram
+| > is called by root.
+| > I'd like to know it, so the program will run with the right privileges.
+[...]
+
+=46rom the getuser() doco:
+
+  Get the username from the environment or password database.
+  First try various environment variables, then the password database
+
+So, no, wrong suggestion.
+
+Cheers,
+--=20
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Dangerous stuff, science.  Lots of us not fit for it.
+        - H.C. Bailey, _The Long Dinner_

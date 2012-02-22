@@ -1,0 +1,143 @@
+Return-Path: <python-ideas-bounces+cs=zip.com.au@python.org>
+Delivered-To: unknown
+Received: from mail.zip.com.au (125.255.95.3) by janus.home with POP3-SSL; 08
+  Mar 2011 01:21:03 -0000
+Delivered-To: cs@zipworld.com.au
+Received: from mailin2.pacific.net.au (mailin2.pacific.net.au [61.8.0.81])
+	by mailstore1.syd.pacific.net.au (Postfix) with ESMTP id DB7AC5115
+	for <cs@zipworld.com.au>; Tue,  8 Mar 2011 12:20:02 +1100 (EST)
+Received: from mail.python.org (unknown [82.94.164.166])
+	by mailin2.pacific.net.au (Postfix) with ESMTP id 4212919C15F
+	for <cs@zip.com.au>; Tue,  8 Mar 2011 12:20:02 +1100 (EST)
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id AB6BAEE9F0
+	for <cs@zip.com.au>; Tue,  8 Mar 2011 02:20:00 +0100 (CET)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=python.org; s=200901;
+	t=1299547200; bh=vDrygrA6IAckIkVg3azJl+AG3U17oA+3HGi+9aK2Dk0=;
+	h=Date:From:To:Message-ID:MIME-Version:In-Reply-To:References:Cc:
+	 Subject:List-Id:List-Unsubscribe:List-Archive:List-Post:List-Help:
+	 List-Subscribe:Content-Type:Content-Transfer-Encoding:Sender;
+	b=m4kZWV1qZeNx1nNs8tyFfnzBuobtLpxtYlv2U71v8YwafAfekE3K5bT+vD+5o8gEe
+	 gGb9SOtH9Rnr1cK2XaFkhTOxjp9XrgUBWIzurn9P5kjyIJ6ywiwqyku1pPfSF7qf/w
+	 hD7vY+LjpOyRxe34IBYNt9GKTGAqNCXHW2h1gqdI=
+X-Original-To: python-ideas@python.org
+Delivered-To: python-ideas@mail.python.org
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id C5BE0EE98E
+	for <python-ideas@python.org>; Tue,  8 Mar 2011 02:19:26 +0100 (CET)
+X-Spam-Status: OK 0.000
+X-Spam-Evidence: '*H*': 1.00; '*S*': 0.00; 'guido': 0.04;
+	'desirable.': 0.07; 'forcing': 0.07; 'received:edu.au': 0.07;
+	'python': 0.07; 'bind': 0.09; 'consistency.': 0.09; 'fred': 0.09;
+	'this:': 0.11; 'def': 0.13; 'wrote:': 0.14; '"as"': 0.16; "'as'":
+	0.16; "'as'.": 0.16; 'escher,': 0.16; 'eternal': 0.16;
+	'from:addr:cs': 0.16; 'from:addr:zip.com.au': 0.16;
+	'from:name:cameron simpson': 0.16; 'message-id:@cskk.homeip.net':
+	0.16; 'received:202.125.174': 0.16; 'received:202.125.174.133':
+	0.16; 'received:boardofstudies.nsw.edu.au': 0.16;
+	'received:cskk.homeip.net': 0.16;
+	'received:harvey.boardofstudies.nsw.edu.au': 0.16;
+	'received:homeip.net': 0.16; 'received:nsw.edu.au': 0.16;
+	'rossum': 0.16; 'thoroughly.': 0.16; "wouldn't": 0.18;
+	'happening': 0.19; 'cc:no real name:2**0': 0.20; 'cc:2**0': 0.20;
+	'cheers,': 0.20; 'seems': 0.21; 'header:In-Reply-To:1': 0.22;
+	'right.': 0.22; 'sound': 0.22; 'problem?': 0.23; 'uses.': 0.23;
+	'greg': 0.25; 'regardless': 0.26; 'van': 0.27; "doesn't": 0.28;
+	'named': 0.30; 'seem': 0.30; 'cc:addr:python.org': 0.31; 'ewing':
+	0.31; 'uses': 0.34; 'header:User-Agent:1': 0.35; 'douglas': 0.35;
+	'received:au': 0.36; 'charset:us-ascii': 0.36; 'else': 0.37;
+	'consistent': 0.38; 'thread': 0.38; 'but': 0.38; 'current': 0.38;
+	'anything': 0.38; 'could': 0.39; 'subject: (': 0.39; 'takes':
+	0.40; 'necessarily': 0.40; 'might': 0.40; 'give': 0.61; 'unique':
+	0.63; 'account': 0.65; 'law.': 0.65; 'received:202': 0.66;
+	'special': 0.66; 'golden': 0.68; 'subject:The': 0.69; 'eye,': 0.84
+Received: from localhost (HELO mail.python.org) (127.0.0.1)
+	by albatross.python.org with SMTP; 08 Mar 2011 02:19:26 +0100
+Received: from harvey.boardofstudies.nsw.edu.au
+	(mail2.rack1.boardofstudies.nsw.edu.au [202.125.174.133])
+	by mail.python.org (Postfix) with ESMTP
+	for <python-ideas@python.org>; Tue,  8 Mar 2011 02:19:26 +0100 (CET)
+Received: from cskk.homeip.net (localhost.localdomain [127.0.0.1])
+	by harvey.boardofstudies.nsw.edu.au (Postfix) with ESMTP id 640D94D3B57;
+	Tue,  8 Mar 2011 12:10:27 +1100 (EST)
+Received: by janus.cskk.homeip.net (Postfix, from userid 1000)
+	id 4F095100419B7; Tue,  8 Mar 2011 12:10:27 +1100 (EST)
+Date: Tue, 8 Mar 2011 12:10:27 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Greg Ewing <greg.ewing@canterbury.ac.nz>
+Message-ID: <20110308011027.GA24112@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <4D7034D8.4030103@canterbury.ac.nz>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+References: <4D7034D8.4030103@canterbury.ac.nz>
+Cc: python-ideas@python.org
+Subject: Re: Assignment decorators (Re: The Descriptor
+	Protocol...)
+X-BeenThere: python-ideas@python.org
+X-Mailman-Version: 2.1.12
+Precedence: list
+List-Id: Discussions of speculative Python language ideas
+	<python-ideas.python.org>
+List-Unsubscribe: <http://mail.python.org/mailman/options/python-ideas>,
+	<mailto:python-ideas-request@python.org?subject=unsubscribe>
+List-Archive: <http://mail.python.org/pipermail/python-ideas>
+List-Post: <mailto:python-ideas@python.org>
+List-Help: <mailto:python-ideas-request@python.org?subject=help>
+List-Subscribe: <http://mail.python.org/mailman/listinfo/python-ideas>,
+	<mailto:python-ideas-request@python.org?subject=subscribe>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Sender: python-ideas-bounces+cs=zip.com.au@python.org
+Errors-To: python-ideas-bounces+cs=zip.com.au@python.org
+X-Cats2Procmailrc-Rule: cats/home: python  python-ideas    sender:python-ideas-bounces+cs=zip.com.au@python.org
+X-Label: python-ideas
+Content-Length: 1487
+
+On 04Mar2011 13:39, Greg Ewing <greg.ewing@canterbury.ac.nz> wrote:
+| Guido van Rossum wrote:
+| 
+| >Eek! All other uses of 'as' in Python have the target on the right.
+| 
+| Well, it doesn't necessarily have to be 'as'. It could be
+| 
+|   def Fred = namedtuple('x y z')
+| 
+| but that wouldn't give as much of a clue that something
+| special is happening in the middle.
+| 
+| Is the reversal really all that much of a problem? It makes
+| sense when you read it as an English sentence: "Define
+| Fred as a named tuple." Just like all the other uses of
+| "as" mean what they seem to mean.
+
+No, just the reverse of what all the other uses of "as" mean:-(
+
+This:
+
+  def namedtuple('x y z') as Fred
+
+is consistent with current uses.
+
+It is ugly/confusing to my eye, but I really need to read this thread more
+thoroughly.
+
+| Given that each existing use of 'as' has its own unique
+| quirks, forcing 'as' to always bind on the right regardless
+| of anything else might be seen as a foolish consistency.
+
+Doesn't seem foolish to me. Seems grammatically sound and highly
+desirable.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Hofstadter's Law: It always takes longer than you expect, even when you take
+into account Hofstadter's Law.
+- Douglas Hosfstadter, Godel, Escher, Bach: an Eternal Golden Braid
+_______________________________________________
+Python-ideas mailing list
+Python-ideas@python.org
+http://mail.python.org/mailman/listinfo/python-ideas

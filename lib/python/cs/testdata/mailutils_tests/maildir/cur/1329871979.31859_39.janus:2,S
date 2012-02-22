@@ -1,0 +1,142 @@
+Return-Path: <python-list-bounces+cs=zip.com.au@python.org>
+Delivered-To: unknown
+Received: from mail.zip.com.au (125.255.95.3) by janus.home with POP3-SSL; 16
+  Jan 2012 01:49:02 -0000
+Delivered-To: cs@zipworld.com.au
+Received: from mailin3-syd3.pacific.net.au (mailin3-syd3.pacific.net.au [125.255.92.144])
+	by mailstore1.syd.pacific.net.au (Postfix) with ESMTP id 0BD711B1E0
+	for <cs@zipworld.com.au>; Mon, 16 Jan 2012 12:48:31 +1100 (EST)
+Received: from mail.python.org (unknown [82.94.164.166])
+	by mailin3-syd3.pacific.net.au (Postfix) with ESMTP id 8035340008A
+	for <cs@zip.com.au>; Mon, 16 Jan 2012 12:50:08 +1100 (EST)
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3TRHX52lcqzNHn
+	for <cs@zip.com.au>; Mon, 16 Jan 2012 02:48:21 +0100 (CET)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=python.org; s=200901;
+	t=1326678501; bh=PCXOPwq9IzTxovNHA+OjRzdTHWPpfJwRi6xZQkfB0Yc=;
+	h=Date:From:To:Subject:Message-ID:MIME-Version:In-Reply-To:
+	 References:Cc:List-Id:List-Unsubscribe:List-Archive:List-Post:
+	 List-Help:List-Subscribe:Content-Type:Content-Transfer-Encoding:
+	 Sender;
+	b=yvC+TjcN8ZYld+//P/rPUW4PXMNPZ2AUFjJk3p8vxKGPpyNiJoRVPE/KQSKS4tBFz
+	 f7z6el1ohK9pE4P+31deYbkyzn16b16+Zu6n4A4oSHImzrUVhMdTSjZPBq3gTIPriW
+	 PNk3yUqkjxQz15Ld18OIeJ7ZgEKXPwxGk3QMl+nw=
+X-Original-To: python-list@python.org
+Delivered-To: python-list@mail.python.org
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3TRHSz0C5nzMsJ
+	for <python-list@python.org>; Mon, 16 Jan 2012 02:45:39 +0100 (CET)
+X-Spam-Status: OK 0.003
+X-Spam-Evidence: '*H*': 0.99; '*S*': 0.00; 'disciplines': 0.07;
+	'received:edu.au': 0.07; 'stuff,': 0.07; 'subject:while': 0.07;
+	'tab': 0.07; 'subject:Problem': 0.09; 'subject:file': 0.13;
+	'cc:addr:python-list': 0.15; '"cat': 0.16; 'from:addr:cs': 0.16;
+	'from:addr:zip.com.au': 0.16; 'from:name:cameron simpson': 0.16;
+	'message-id:@cskk.homeip.net': 0.16; 'mode;': 0.16; 'pty': 0.16;
+	'received:202.125.174': 0.16; 'received:202.125.174.133': 0.16;
+	'received:boardofstudies.nsw.edu.au': 0.16;
+	'received:cskk.homeip.net': 0.16;
+	'received:harvey.boardofstudies.nsw.edu.au': 0.16;
+	'received:homeip.net': 0.16; 'received:nsw.edu.au': 0.16;
+	'wrote:': 0.16; 'linux': 0.17; '>>>': 0.18; 'expansion': 0.18;
+	'rewrite': 0.18; 'jan': 0.19; 'cheers,': 0.20; 'cc:no real
+	name:2**0': 0.21; 'header:In-Reply-To:1': 0.22; 'changed': 0.23;
+	'obviously': 0.23; 'expanded': 0.23; 'cc:2**0': 0.25; 'mode':
+	0.25; 'expect': 0.26; 'fix': 0.27; 'print': 0.29;
+	'cc:addr:python.org': 0.29; "ain't": 0.30; 'invoke': 0.30;
+	'certainly': 0.32; 'actually': 0.32; 'does': 0.32; 'that,': 0.32;
+	"can't": 0.32; 'header:User-Agent:1': 0.33; 'instead': 0.33;
+	'solaris': 0.34; 'something': 0.35; 'expanding': 0.35; 'file':
+	0.35; 'received:au': 0.36; 'charset:us-ascii': 0.36; 'run': 0.37;
+	'but': 0.37; 'using': 0.37; 'created': 0.38; 'subject:with': 0.38;
+	'think': 0.38; 'should': 0.38; 'ok,': 0.39; 'subject:: ': 0.39;
+	'most': 0.60; 'quick': 0.60; 'your': 0.61; 'received:202': 0.65;
+	'show': 0.67; 'ali': 0.67; 'discipline': 0.67; 'present.': 0.67;
+	'spaces': 0.73; 'cameron': 0.77; '12:42': 0.84; 'saqib': 0.84;
+	'so:': 0.84; 'spaces.': 0.84; 'glance': 0.91
+Received: from localhost (HELO mail.python.org) (127.0.0.1)
+	by albatross.python.org with SMTP; 16 Jan 2012 02:45:39 +0100
+Received: from harvey.boardofstudies.nsw.edu.au
+	(mail2.rack1.boardofstudies.nsw.edu.au [202.125.174.133])
+	by mail.python.org (Postfix) with ESMTP
+	for <python-list@python.org>; Mon, 16 Jan 2012 02:45:38 +0100 (CET)
+Received: from cskk.homeip.net (localhost.localdomain [127.0.0.1])
+	by harvey.boardofstudies.nsw.edu.au (Postfix) with ESMTP id A38824D3B63;
+	Mon, 16 Jan 2012 12:45:35 +1100 (EST)
+Received: by janus.cskk.homeip.net (Postfix, from userid 1000)
+	id 8E82E100419B7; Mon, 16 Jan 2012 12:45:35 +1100 (EST)
+Date: Mon, 16 Jan 2012 12:45:35 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Saqib Ali <saqib.ali.75@gmail.com>
+Subject: Re: Problem while doing a cat on a tabbed file with pexpect
+Message-ID: <20120116014535.GA12750@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <d7eb5c72-f6e5-4776-b91f-79efd00931fa@o13g2000vbf.googlegroups.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+References: <d7eb5c72-f6e5-4776-b91f-79efd00931fa@o13g2000vbf.googlegroups.com>
+Cc: python-list@python.org
+X-BeenThere: python-list@python.org
+X-Mailman-Version: 2.1.12
+Precedence: list
+List-Id: General discussion list for the Python programming language
+	<python-list.python.org>
+List-Unsubscribe: <http://mail.python.org/mailman/options/python-list>,
+	<mailto:python-list-request@python.org?subject=unsubscribe>
+List-Archive: <http://mail.python.org/pipermail/python-list>
+List-Post: <mailto:python-list@python.org>
+List-Help: <mailto:python-list-request@python.org?subject=help>
+List-Subscribe: <http://mail.python.org/mailman/listinfo/python-list>,
+	<mailto:python-list-request@python.org?subject=subscribe>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Sender: python-list-bounces+cs=zip.com.au@python.org
+Errors-To: python-list-bounces+cs=zip.com.au@python.org
+X-Cats2Procmailrc-Rule: cats/home: python  python-list     sender:python-list-bounces+cs=zip.com.au@python.org
+X-Label: python-list
+Content-Length: 1547
+
+On 15Jan2012 16:14, Saqib Ali <saqib.ali.75@gmail.com> wrote:
+| The file me.txt does indeed contain tabs. I created it with vi.
+| 
+| >>> text = open("me.txt", "r").read()
+| >>> print "\t" in text
+| True
+| 
+| % od -c me.txt
+| 0000000   A  \t   B  \t   C  \n
+| 0000006
+| 
+| % ls -al me.txt
+| -rw-r--r--   1 myUser    myGroup   6 Jan 15 12:42 me.txt
+
+Ok, your file does indeed contain TABs.
+
+Therefre something is turning the TABs into spaces. Pexpect should be
+opening a pty and reading from that, and I do not expect that to expand
+TABs. So:
+
+  1: Using subprocess.Popen, invoke "cat me.txt" and check the result
+     for TABs.
+
+  2: Using pexpect, run "cat me.txt" instead of "/bin/tcsh" (eliminates a
+     layer of complexity; I don't actually expect changed behaviour) and
+     check for TABs.
+
+On your Solaris system, read "man termios". Does it have an "expand
+TABs" mode switch? This is about the only thing I can think of that
+would produce your result - the pty terminal discipline is expanding
+TABs for your (unwanted!) - cat is writing TABs to the terminal and the
+terminal is passing expanded spaces to pexpect. Certainly terminal line
+disciplines do rewrite stuff, most obviously "\n" into "\r\n", but a
+quick glance through termios on a Linux box does not show a tab
+expansion mode; I do not have access to a Solaris box at present.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Maintainer's Motto: If we can't fix it, it ain't broke.
+-- 
+http://mail.python.org/mailman/listinfo/python-list

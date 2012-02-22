@@ -1,0 +1,115 @@
+Return-Path: <python-ideas-bounces+cs=zip.com.au@python.org>
+Delivered-To: unknown
+Received: from mail.zip.com.au (125.255.95.3) by janus.home with POP3-SSL; 11
+  Jan 2012 06:17:02 -0000
+Delivered-To: cs@zipworld.com.au
+Received: from mailin3-syd3.pacific.net.au (mailin3-syd3.pacific.net.au [125.255.92.144])
+	by mailstore2.syd.pacific.net.au (Postfix) with ESMTP id 9D0816ACA
+	for <cs@zipworld.com.au>; Wed, 11 Jan 2012 17:16:22 +1100 (EST)
+Received: from mail.python.org (unknown [82.94.164.166])
+	by mailin3-syd3.pacific.net.au (Postfix) with ESMTP id 25E63400092
+	for <cs@zip.com.au>; Wed, 11 Jan 2012 17:17:54 +1100 (EST)
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3TNKjT4RNtzQqM
+	for <cs@zip.com.au>; Wed, 11 Jan 2012 07:16:13 +0100 (CET)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=python.org; s=200901;
+	t=1326262573; bh=96fnrDu01c7LB4VPRRQIaVl7AD/Qp8Q5iu6zOSQLcDg=;
+	h=Date:From:To:Message-ID:MIME-Version:In-Reply-To:References:Cc:
+	 Subject:List-Id:List-Unsubscribe:List-Archive:List-Post:List-Help:
+	 List-Subscribe:Content-Type:Content-Transfer-Encoding:Sender;
+	b=uCjb8Gf067p8u/6PoD2DuuQ43HuGFxAPOQKnOel7qv1ZQNKvsrx1pL4OhCEGDPXIv
+	 zU4WYqpW5AFakqfh4GcaHVKJpPHg6xmVWq1HQ1oQtb8NK+cQ8KXJ/vrTNwQoVqTRkX
+	 oMRwhmIqSdaXQGNV67Vl/w8x+HUa6joldh46e1ug=
+X-Original-To: python-ideas@python.org
+Delivered-To: python-ideas@mail.python.org
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3TNKhm1SM4zQqK
+	for <python-ideas@python.org>; Wed, 11 Jan 2012 07:15:36 +0100 (CET)
+X-Spam-Status: OK 0.005
+X-Spam-Evidence: '*H*': 0.99; '*S*': 0.00; 'received:edu.au': 0.07;
+	'flush': 0.09; 'subject:()': 0.09; 'argument': 0.15; 'cousin':
+	0.16; 'from:addr:cs': 0.16; 'from:addr:zip.com.au': 0.16;
+	'from:name:cameron simpson': 0.16; 'history.': 0.16; 'message-
+	id:@cskk.homeip.net': 0.16; 'newline."': 0.16;
+	'received:202.125.174': 0.16; 'received:202.125.174.133': 0.16;
+	'received:boardofstudies.nsw.edu.au': 0.16;
+	'received:cskk.homeip.net': 0.16;
+	'received:harvey.boardofstudies.nsw.edu.au': 0.16;
+	'received:homeip.net': 0.16; 'received:nsw.edu.au': 0.16;
+	'subject:Pythonic': 0.16; 'subject:print': 0.16; 'wrote:': 0.18;
+	'jan': 0.19; 'seems': 0.20; 'cc:no real name:2**0': 0.20; 'header
+	:In-Reply-To:1': 0.22; 'cc:2**0': 0.24; 'keyword': 0.24; 'expect':
+	0.26; 'cc:addr:python.org': 0.29; 'pm,': 0.29; 'carl': 0.30;
+	"i've": 0.31; "i'll": 0.31; 'header:User-Agent:1': 0.33; 'it.':
+	0.34; 'received:au': 0.36; 'none': 0.37; 'charset:us-ascii': 0.37;
+	'spent': 0.38; 'johnson': 0.39; 'subject': 0.62; 'family': 0.63;
+	'life': 0.64; 'received:202': 0.66; 'tracking': 0.70; 'cameron':
+	0.73; 'sweet': 0.77; '2012,': 0.84; 'devoted': 0.84; 'flushing':
+	0.84
+Received: from localhost (HELO mail.python.org) (127.0.0.1)
+	by albatross.python.org with SMTP; 11 Jan 2012 07:15:36 +0100
+Received: from harvey.boardofstudies.nsw.edu.au
+	(mail2.rack1.boardofstudies.nsw.edu.au [202.125.174.133])
+	by mail.python.org (Postfix) with ESMTP
+	for <python-ideas@python.org>; Wed, 11 Jan 2012 07:15:35 +0100 (CET)
+Received: from cskk.homeip.net (localhost.localdomain [127.0.0.1])
+	by harvey.boardofstudies.nsw.edu.au (Postfix) with ESMTP id A4A634D3B54;
+	Wed, 11 Jan 2012 17:15:31 +1100 (EST)
+Received: by janus.cskk.homeip.net (Postfix, from userid 1000)
+	id 8E1CC100419B7; Wed, 11 Jan 2012 17:15:31 +1100 (EST)
+Date: Wed, 11 Jan 2012 17:15:31 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: "Carl M. Johnson" <cmjohnson.mailinglist@gmail.com>
+Message-ID: <20120111061531.GA2804@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <BDE209E9-03D4-46E4-9325-927E5F725AE8@gmail.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+References: <BDE209E9-03D4-46E4-9325-927E5F725AE8@gmail.com>
+Cc: python-ideas@python.org
+Subject: Re: Pythonic buffering in Py3 print()
+X-BeenThere: python-ideas@python.org
+X-Mailman-Version: 2.1.12
+Precedence: list
+List-Id: Discussions of speculative Python language ideas
+	<python-ideas.python.org>
+List-Unsubscribe: <http://mail.python.org/mailman/options/python-ideas>,
+	<mailto:python-ideas-request@python.org?subject=unsubscribe>
+List-Archive: <http://mail.python.org/pipermail/python-ideas>
+List-Post: <mailto:python-ideas@python.org>
+List-Help: <mailto:python-ideas-request@python.org?subject=help>
+List-Subscribe: <http://mail.python.org/mailman/listinfo/python-ideas>,
+	<mailto:python-ideas-request@python.org?subject=subscribe>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Sender: python-ideas-bounces+cs=zip.com.au@python.org
+Errors-To: python-ideas-bounces+cs=zip.com.au@python.org
+X-Cats2Procmailrc-Rule: cats/home: python  python-ideas    sender:python-ideas-bounces+cs=zip.com.au@python.org
+X-Label: python-ideas
+Content-Length: 1007
+
+On 09Jan2012 22:49, Carl M. Johnson <cmjohnson.mailinglist@gmail.com> wrote:
+| On Jan 9, 2012, at 7:52 PM, INADA Naoki wrote:
+| > What about adding flush=False keyword argument to print()?
+| 
+| I would expect flush=False to mean "please don't flush this right now,
+| even if I do use a newline."
+| 
+| flush=None?
+
++1 from me, if None means "honour the file's default flushing
+behaviour".
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Since I've mentioned the subject of geneology, I'll repeat a story I heard
+about a poor fellow over on airstrip one.  Seems he spent the most recent
+thirty years of his life tracking down his family history.  Spent hundreds
+of pounds, traveled, devoted his life to it.  Then, last month, a cousin
+told him he was adopted.  Ahhh, sweet irony.
+        - Tim_Mefford <tim@physics.orst.edu>
+_______________________________________________
+Python-ideas mailing list
+Python-ideas@python.org
+http://mail.python.org/mailman/listinfo/python-ideas

@@ -1,0 +1,46 @@
+Date: Sun, 17 Jul 2011 09:08:57 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Masklinn <masklinn@masklinn.net>
+Cc: Terry Reedy <tjreedy@udel.edu>, python-ideas@python.org
+Subject: Re: Deprecate str.find
+Message-ID: <20110716230857.GA2174@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: inline
+Content-Transfer-Encoding: 8bit
+In-Reply-To: <75B5F6EE-03E4-4DFD-9B97-C02E74C687EC@masklinn.net>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+Content-Length: 1469
+
+On 16Jul2011 22:21, Masklinn <masklinn@masklinn.net> wrote:
+| On 2011-07-16, at 21:52 , Terry Reedy wrote:
+| > On 7/16/2011 2:46 PM, Terry Reedy wrote:
+| >> On 7/15/2011 6:50 PM, Cameron Simpson wrote:
+| >>> str.find does not have a failure mode, it has string found and string
+| >>> not found.
+| >> 
+| >> Not finding == failure to find == failure to match an implied re.
+| > Indeed, negative values such as -1 are standard error/failure
+| > return codes for functions that normally return nonnegative ints and
+| > that written in statically typed languages without catchable exceptions
+|
+| … or type systems worth using. And that's for those which are
+| 0-indexed of course, especially for finding sub-sequences.
+| 
+| And interestingly, the function corresponding to `str.find` in libc
+| returns `NULL` in case of failure, not −1 (its return value is a
+| pointer to the first occurrence of the needle in the haysack).
+
+Though if you're thinking NULL is equivalent to None (which is often is
+conceptually), let's remember that in C NULL is just a pointer value; it
+is a sentinal, but not a different type. So NULL here is in some ways
+akin to -1 in Python's find return. You still need to test for it; not
+all platforms will (for example) segfault if NULL is dereferenced.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+There's no need to worry about death, it will not happen in your lifetime.
+        - Raymond Smullyan

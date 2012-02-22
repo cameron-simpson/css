@@ -1,0 +1,121 @@
+Return-Path: <python-list-bounces+cs=zip.com.au@python.org>
+Delivered-To: unknown
+Received: from mail.zip.com.au (125.255.95.3) by janus.home with POP3-SSL; 23
+  Dec 2011 19:51:02 -0000
+Delivered-To: cs@zipworld.com.au
+Received: from mailin4-syd3.pacific.net.au (mailin4-syd3.pacific.net.au [125.255.92.145])
+	by mailstore2.syd.pacific.net.au (Postfix) with ESMTP id 2D9A74BC9C
+	for <cs@zipworld.com.au>; Sat, 24 Dec 2011 06:50:44 +1100 (EST)
+Received: from mail.python.org (unknown [82.94.164.166])
+	by mailin4-syd3.pacific.net.au (Postfix) with ESMTP id 7C88C4D809D
+	for <cs@zip.com.au>; Sat, 24 Dec 2011 06:50:43 +1100 (EST)
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3T90h22MMvzMk7
+	for <cs@zip.com.au>; Fri, 23 Dec 2011 20:50:42 +0100 (CET)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=python.org; s=200901;
+	t=1324669842; bh=Gf/4QYxgyURtIze1mWLLiqGa/y16YUlUeetY+zh3KgU=;
+	h=Date:From:To:Subject:Message-ID:MIME-Version:In-Reply-To:
+	 References:Cc:List-Id:List-Unsubscribe:List-Archive:List-Post:
+	 List-Help:List-Subscribe:Content-Type:Content-Transfer-Encoding:
+	 Sender;
+	b=VH72j4t0IFkzF4mWToQHg536ahpJUf/BCh6I5Nof+dlMi4hCYbop10fdLyJP7bVG6
+	 YQCx81yy6RQGEmOtGSAy2LMa2vq9a375LS+kgIsLecvGHmDQ9VY9B5W0/sbbBilp8A
+	 8vd11XPf0lXpSSGb9cysIBUJ8ze8afkfR8VC1hh0=
+X-Original-To: python-list@python.org
+Delivered-To: python-list@mail.python.org
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3T90cs0pzSzMdw
+	for <python-list@python.org>; Fri, 23 Dec 2011 20:47:57 +0100 (CET)
+X-Spam-Status: OK 0.013
+X-Spam-Evidence: '*H*': 0.97; '*S*': 0.00; 'option,': 0.07;
+	'received:edu.au': 0.07; 'context.': 0.09; 'statement.': 0.09;
+	'beam': 0.16; 'from:addr:cs': 0.16; 'from:addr:zip.com.au': 0.16;
+	'from:name:cameron simpson': 0.16; 'gradually': 0.16; 'message-
+	id:@cskk.homeip.net': 0.16; 'received:202.125.174': 0.16;
+	'received:202.125.174.133': 0.16;
+	'received:boardofstudies.nsw.edu.au': 0.16;
+	'received:cskk.homeip.net': 0.16;
+	'received:harvey.boardofstudies.nsw.edu.au': 0.16;
+	'received:homeip.net': 0.16; 'received:nsw.edu.au': 0.16; 'cc:addr
+	:python-list': 0.16; 'linux': 0.17; 'wrote:': 0.18; 'file,': 0.19;
+	'cheers,': 0.20; 'header:In-Reply-To:1': 0.22; 'figure': 0.23;
+	'locking': 0.23; 'mode': 0.25; 'windows': 0.26; 'exit': 0.29;
+	'cc:addr:python.org': 0.29; 'closing': 0.30; 'least': 0.30; '(as':
+	0.31; 'subject:?': 0.31; "isn't": 0.33; 'header:User-Agent:1':
+	0.33; 'read,': 0.34; 'file': 0.36; 'received:au': 0.36; 'cc:2**1':
+	0.36; 'charset:us-ascii': 0.37; 'but': 0.37; 'open': 0.38;
+	'useful': 0.38; 'being': 0.39; "couldn't": 0.39; 'opened': 0.64;
+	'received:202': 0.66; 'cam': 0.67; 'cameron': 0.73; 'hate': 0.73;
+	'race': 0.77; 'disastrous': 0.84; 'rebate': 0.84; 'up;': 0.84;
+	'contents,': 0.91; 'death,': 0.93; 'subject: $': 0.97
+Received: from localhost (HELO mail.python.org) (127.0.0.1)
+	by albatross.python.org with SMTP; 23 Dec 2011 20:47:57 +0100
+Received: from harvey.boardofstudies.nsw.edu.au
+	(mail2.rack1.boardofstudies.nsw.edu.au [202.125.174.133])
+	by mail.python.org (Postfix) with ESMTP
+	for <python-list@python.org>; Fri, 23 Dec 2011 20:47:56 +0100 (CET)
+Received: from cskk.homeip.net (localhost.localdomain [127.0.0.1])
+	by harvey.boardofstudies.nsw.edu.au (Postfix) with ESMTP id A6E254D3B56;
+	Sat, 24 Dec 2011 06:47:53 +1100 (EST)
+Received: by janus.cskk.homeip.net (Postfix, from userid 1000)
+	id 9050B100419B7; Sat, 24 Dec 2011 06:47:53 +1100 (EST)
+Date: Sat, 24 Dec 2011 06:47:53 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Devin Jeanpierre <jeanpierreda@gmail.com>
+Subject: Re: Idiom for shelling out to $EDITOR/$PAGER?
+Message-ID: <20111223194753.GA23781@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <CABicbJLEC+Dtr=XTDSHpENrhLWnpjR12mzgJNnZ-_yy2mTRqZw@mail.gmail.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+References: <CABicbJLEC+Dtr=XTDSHpENrhLWnpjR12mzgJNnZ-_yy2mTRqZw@mail.gmail.com>
+Cc: Python <python-list@python.org>
+X-BeenThere: python-list@python.org
+X-Mailman-Version: 2.1.12
+Precedence: list
+List-Id: General discussion list for the Python programming language
+	<python-list.python.org>
+List-Unsubscribe: <http://mail.python.org/mailman/options/python-list>,
+	<mailto:python-list-request@python.org?subject=unsubscribe>
+List-Archive: <http://mail.python.org/pipermail/python-list>
+List-Post: <mailto:python-list@python.org>
+List-Help: <mailto:python-list-request@python.org?subject=help>
+List-Subscribe: <http://mail.python.org/mailman/listinfo/python-list>,
+	<mailto:python-list-request@python.org?subject=subscribe>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Sender: python-list-bounces+cs=zip.com.au@python.org
+Errors-To: python-list-bounces+cs=zip.com.au@python.org
+X-Cats2Procmailrc-Rule: cats/home: python  python-list     sender:python-list-bounces+cs=zip.com.au@python.org
+X-Label: python-list
+Content-Length: 1109
+
+On 23Dec2011 02:21, Devin Jeanpierre <jeanpierreda@gmail.com> wrote:
+| > Anyway, look it up; it has an autodelete mode etc.
+| 
+| The autodelete isn't useful in this context. The file needs to be
+| closed and then reopened again; with the autodelete option, the
+| closing would delete the file, preventing it from being opened by the
+| text editor or reopened to check contents.
+| 
+| (As far as I know, the race condition inherent in this is unavoidable.
+| At least on windows, but I couldn't figure out any other way on Linux
+| either.)
+
+You can fire off the editor from inside the with statement.
+Write contents, flush, edit, open T.name for read, read, close, exit
+with statement.
+
+Windows may hate you for this with its locking behaviour for open files,
+but it will work for UNIX.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+The elliptical cam has gradually slid up the beam shaft and caught on the
+flange rebate dislodging the gripley, with disastrous results.
+        - Death, 'Reaper Man' (Pratchett)
+-- 
+http://mail.python.org/mailman/listinfo/python-list

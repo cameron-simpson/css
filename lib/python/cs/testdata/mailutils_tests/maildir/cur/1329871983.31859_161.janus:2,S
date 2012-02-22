@@ -1,0 +1,76 @@
+Date: Sun, 17 Jul 2011 14:12:23 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Steven D'Aprano <steve+comp.lang.python@pearwood.info>
+Cc: python-list@python.org
+Subject: Re: Tabs -vs- Spaces: Tabs should have won.
+Message-ID: <20110717041223.GA2393@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <4e225255$0$29990$c3e8da3$5496439d@news.astraweb.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+Content-Length: 2795
+
+On 17Jul2011 13:09, Steven D'Aprano <steve+comp.lang.python@pearwood.info> wrote:
+| Cameron Simpson wrote:
+| > On 16Jul2011 09:51, rantingrick <rantingrick@gmail.com> trolled:
+| > |  Evidence: Tabs ARE superior!
+| > | --------------------------------------------------
+| > | I have begun to believe that tabs are far more superior to spaces
+| > 
+| > Please Rick: you need at least three things to use the term "more
+| > superior". With only two, you just have superior. It grates.
+| 
+| Really? If you just say "superior", how do you know if it's more superior or
+| less superior?
+
+Neither. We can learn from the sage Dumpty, who writes:
+
+  `When I use a word,' Humpty Dumpty said in rather a scornful tone, `it
+  means just what I choose it to mean -- neither more nor less.'
+
+| > Personally, I prefer spaces to tabs, at least fgor my Python code and
+| > generally anyway. Why? Well to some extent because I share files with
+| > another who uses 4 position tabs. Editing these is a real nightmare if
+| > one uses 8 position tabs (as I do, the common editor/terminal default
+| > these days). 
+| 
+| I can't fathom why 8 position tabs were *ever* the default, let alone why
+| they are still the default.
+
+Shrug. I imagine it's enough to be useful. An 80 column display gets 8
+tab stops (not counting the edges). Personally I find 8 a little more
+than I would like, but 6 is displeasing and 4 may be frustratingly small
+for some users. I used to indent in 3s at uni, 5 is odd, 7 is just weird
+and 2 seems almost not worth the effort. And 1 is taken.
+
+Today's lesson is brought to you by the number 37, the lowest arbitrary
+number.
+
+| > For pure indentation you may get sane (if wider that liked) 
+| > results, bit any multicolumn stuff is badly broken by the mismatch.
+| >
+| > Personally, I like to use the tab _key_ as an input device, but to have
+| > my editor write real spaces to the file in consequence. With pure
+| > spaces, the text is laid out reliably for us both. And so I have my
+| > editor set to that behaviour.
+| 
+| I have reluctantly come to do the same thing. There is a plethora of broken
+| tools out there that don't handle tabs well, and consequently even though
+| tabs for indentation are objectively better, I use spaces because it is
+| less worse than the alternative.
+| 
+| Victory of worse-is-better.
+
+Yeah. Worse is at least reliable in this scheme.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+It is time. Awaken, sleepers, for yet another herd of slow moving prey has
+swept into Peevetown, unaware of the sure fate of the fools that disturb the
+inhabitants. Shall it be a rending of flesh, and the lamentations of the
+sorely afflicted, or shall we be buried in a sea of drivel?
+        - Woulffe <shampton@muddcs.claremont.edu>

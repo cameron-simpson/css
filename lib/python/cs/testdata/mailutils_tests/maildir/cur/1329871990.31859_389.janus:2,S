@@ -1,0 +1,46 @@
+Date: Sun, 11 Apr 2010 18:12:15 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Chris Rebert <clp2@rebertia.com>
+Cc: Ted Larson Freeman <freeman@alumni.stanford.org>,
+	python-list@python.org
+Subject: Re: SEC proposes the use of Python and XML
+Message-ID: <20100411081215.GA26498@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <m2v50697b2c1004102305y55f795a9gf4bdbc720bab4877@mail.gmail.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 1416
+
+On 10Apr2010 23:05, Chris Rebert <clp2@rebertia.com> wrote:
+| On Sat, Apr 10, 2010 at 9:13 PM, Ted Larson Freeman
+| <freeman@alumni.stanford.org> wrote:
+| > This week the SEC proposed new requirements for asset-backed
+| > securities that include the use of XML and Python:
+| >
+| > "The asset-level information would be provided according to proposed
+| > standards and in a tagged data format using eXtensible Markup Language
+| > (XML). In addition, we are proposing to require, along with the
+| > prospectus filing, the filing of a computer program of the contractual
+| > cash flow provisions expressed as downloadable source code in Python,
+| > a commonly used open source interpretive programming language."
+| 
+| I guess we've now gone from "executable pseudocode" to "executable
+| legal code" :-)
+
+And not before time, either :-(
+
+But unless they require it to be usable as unit tests (eg running as
+validation of a live transaction stream, or in some audit mode) it may be
+less useful than one might hope. Of course, if they're gone as far as
+requiring python code, perhaps that's exactly what they hope to be able to
+do.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+One of the guys in my homebrew club is a mailman. He says that one of the
+requirements to work for the post office is to be able to work the slide on a
+9mm while laughing.     - Phillip J. Birmingham

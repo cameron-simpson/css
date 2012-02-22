@@ -1,0 +1,181 @@
+Return-Path: <python-dev-bounces+cs=zip.com.au@python.org>
+Delivered-To: unknown
+Received: from mail.zip.com.au (125.255.95.3) by janus.home with POP3-SSL; 07
+  Oct 2011 13:21:02 -0000
+Delivered-To: cs@zipworld.com.au
+Received: from mailin3-syd3.pacific.net.au (mailin3-syd3.pacific.net.au [125.255.92.144])
+	by mailstore2.syd.pacific.net.au (Postfix) with ESMTP id F0CD86A43
+	for <cs@zipworld.com.au>; Sat,  8 Oct 2011 00:20:55 +1100 (EST)
+Received: from mail.python.org (unknown [82.94.164.166])
+	by mailin3-syd3.pacific.net.au (Postfix) with ESMTP id 3B8174000EB
+	for <cs@zip.com.au>; Sat,  8 Oct 2011 00:21:44 +1100 (EST)
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3SFSqM4zqLzPGw
+	for <cs@zip.com.au>; Fri,  7 Oct 2011 13:12:15 +0200 (CEST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=python.org; s=200901;
+	t=1317985935; bh=kWzW46Et+Zfl4QAIFqI/bMEYqgmCbtK4e3CiUp9vkIU=;
+	h=Date:From:To:Message-ID:MIME-Version:In-Reply-To:References:Cc:
+	 Subject:List-Id:List-Unsubscribe:List-Archive:List-Post:List-Help:
+	 List-Subscribe:Content-Type:Content-Transfer-Encoding:Sender;
+	b=iIcQph7gLVbp2lRNEZKHYf4o2ybLNb0JTeJbF8wcCssNRn2+puk9Q5wGPy3aHy1P7
+	 P1Q8QBRDvjgdII5Q2I5fy1HduTNZaKyQK7V6BWhjsG8bEm9JlPbqJ9DJ1xK5tFLxwT
+	 S3lCxBZ1Y8HVUHAUO9dANapdSYL+NSXtuAqYIBtE=
+X-Original-To: python-dev@python.org
+Delivered-To: python-dev@mail.python.org
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3SFSnX6VKJzPN6
+	for <python-dev@python.org>; Fri,  7 Oct 2011 13:10:40 +0200 (CEST)
+X-Spam-Status: OK 0.000
+X-Spam-Evidence: '*H*': 1.00; '*S*': 0.00; 'oct': 0.02; 'example:':
+	0.03; 'permissions': 0.04; '(of': 0.05; 'stuff.': 0.05; 'suppose':
+	0.05; 'bits': 0.07; 'function,': 0.07; 'nasty': 0.07;
+	'received:edu.au': 0.07; 'subject:when': 0.07; 'suite.': 0.07;
+	'scripts': 0.09; 'am,': 0.12; 'broken': 0.12; 'developer': 0.12;
+	'subject:Issue': 0.15; '"don\'t': 0.16; '"rm': 0.16; '"test"':
+	0.16; 'cleans': 0.16; 'from:addr:cs': 0.16;
+	'from:addr:zip.com.au': 0.16; 'from:name:cameron simpson': 0.16;
+	'message-id:@cskk.homeip.net': 0.16; 'passes.': 0.16; 'presuming':
+	0.16; 'received:202.125.174': 0.16; 'received:202.125.174.133':
+	0.16; 'received:boardofstudies.nsw.edu.au': 0.16;
+	'received:cskk.homeip.net': 0.16;
+	'received:harvey.boardofstudies.nsw.edu.au': 0.16;
+	'received:homeip.net': 0.16; 'received:nsw.edu.au': 0.16;
+	'subject:): ': 0.16; "why's": 0.16; 'wrote:': 0.16; 'cheers,':
+	0.18; 'exists': 0.18; 'that?': 0.18; 'defined': 0.19; 'cc:no real
+	name:2**0': 0.20; "haven't": 0.20; 'header:In-Reply-To:1': 0.22;
+	'equally': 0.23; "shouldn't": 0.23; "user's": 0.23; 'permission':
+	0.24; 'shell': 0.24; 'code': 0.25; 'tests': 0.25; 'translation':
+	0.25; 'suggestion': 0.26; '(in': 0.26; 'code.': 0.26; '"the':
+	0.26; "i'm": 0.27; 'compile': 0.29; 'extreme': 0.29;
+	'cc:addr:python.org': 0.30; 'accidentally': 0.30; 'build,': 0.30;
+	'user.': 0.31; 'list': 0.32; 'subject: \n\t': 0.32; 'source':
+	0.33; 'there': 0.33; 'header:User-Agent:1': 0.34; 'fail': 0.34;
+	'test': 0.34; 'root': 0.34; 'totally': 0.35; 'object': 0.35;
+	'regular': 0.35; 'unless': 0.36; 'charset:us-ascii': 0.36;
+	'received:au': 0.36; 'doing': 0.36; 'useful': 0.36; 'bother':
+	0.37; 'good.': 0.37; 'machine': 0.37; 'run': 0.37; 'but': 0.37;
+	'especially': 0.37; 'think': 0.38; 'cc:2**2': 0.38; 'largely':
+	0.38; 'should': 0.38; 'subject:: ': 0.39; 'suggestions': 0.39;
+	'either': 0.39; 'user': 0.39; 'equal': 0.39; 'data': 0.39;
+	'subject: (': 0.39; 'sense': 0.39; 'might': 0.40; "it's": 0.40;
+	'pdf': 0.40; 'thinking': 0.40; 'law': 0.63; 'skip:$ 10': 0.63;
+	'full': 0.63; 'marked': 0.64; 'here': 0.65; 'received:202': 0.66;
+	'secure': 0.66; 'taking': 0.66; 'view': 0.67; '"do': 0.67;
+	'cameron': 0.67; 'procedure.': 0.67; 'safe': 0.69; '1st': 0.70;
+	'failure': 0.73; 'have.': 0.77; ':).': 0.84; 'contrast,': 0.84;
+	'economist': 0.84; 'glyph': 0.84; 'coverage:': 0.91; 'glance':
+	0.91; 'render': 0.91
+Received: from localhost (HELO mail.python.org) (127.0.0.1)
+	by albatross.python.org with SMTP; 07 Oct 2011 13:10:40 +0200
+Received: from harvey.boardofstudies.nsw.edu.au
+	(mail2.rack1.boardofstudies.nsw.edu.au [202.125.174.133])
+	by mail.python.org (Postfix) with ESMTP
+	for <python-dev@python.org>; Fri,  7 Oct 2011 13:10:40 +0200 (CEST)
+Received: from cskk.homeip.net (localhost.localdomain [127.0.0.1])
+	by harvey.boardofstudies.nsw.edu.au (Postfix) with ESMTP id BED234D3B5C;
+	Fri,  7 Oct 2011 22:10:36 +1100 (EST)
+Received: by janus.cskk.homeip.net (Postfix, from userid 1000)
+	id AB59F100419B7; Fri,  7 Oct 2011 22:10:36 +1100 (EST)
+Date: Fri, 7 Oct 2011 22:10:36 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Glyph <glyph@twistedmatrix.com>
+Message-ID: <20111007111036.GA22483@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <1F9D0431-B24C-410E-9282-0E498EF024BF@twistedmatrix.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+References: <1F9D0431-B24C-410E-9282-0E498EF024BF@twistedmatrix.com>
+Cc: "Stephen J. Turnbull" <stephen@xemacs.org>, python-dev@python.org,
+	Andrew Bennetts <andrew@bemusement.org>, Terry Reedy <tjreedy@udel.edu>
+Subject: Re: cpython (3.2): Issue #11956:
+	Skip	test_import.test_unwritable_directory on FreeBSD when run as
+X-BeenThere: python-dev@python.org
+X-Mailman-Version: 2.1.12
+Precedence: list
+List-Id: Python core developers <python-dev.python.org>
+List-Unsubscribe: <http://mail.python.org/mailman/options/python-dev>,
+	<mailto:python-dev-request@python.org?subject=unsubscribe>
+List-Archive: <http://mail.python.org/pipermail/python-dev>
+List-Post: <mailto:python-dev@python.org>
+List-Help: <mailto:python-dev-request@python.org?subject=help>
+List-Subscribe: <http://mail.python.org/mailman/listinfo/python-dev>,
+	<mailto:python-dev-request@python.org?subject=subscribe>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Sender: python-dev-bounces+cs=zip.com.au@python.org
+Errors-To: python-dev-bounces+cs=zip.com.au@python.org
+X-Cats2Procmailrc-Rule: cats/home: python  python-dev      sender:python-dev-bounces+cs=zip.com.au@python.org
+X-Label: python-dev
+Content-Length: 3250
+
+On 07Oct2011 06:50, Glyph <glyph@twistedmatrix.com> wrote:
+| On Oct 7, 2011, at 6:40 AM, Cameron Simpson wrote:
+| > I think that the build and the tests should be different security
+| > scopes/zones/levels: different users or different VMs. Andrew's
+| > suggestion of a VM-for-tests sounds especially good.
+| 
+| To me, "build" and "test" are largely the same function, since a build
+| whose tests haven't been run is just a bag of bits :).  But in the sense
+| that root should never be required to do a build, I don't see a reason
+| to bother supporting that configuration: it makes sense to always do
+| the build as a regular user.
+
+I don't mean buid as root and test as regular user, I mean build as regular
+user and test as different user. This can be used to prevent the test user
+from having write permission to the built code.
+
+My thinking is that the "build" is a well defined set of "safe"
+operations: copy the source (safe, just a data copy), compile the source
+(safe, presuming bug-free compiler). Of course I'm glossing over any
+autoconfiguration shell scripts and makefiles full of source-code-supplied
+shell commands - nasty nasty.
+
+Basicly I was taking the view that a "build" should be a safe "source
+code to machine code" translation process.
+
+By contrast, the tests _run_ the somewhat-unknown test suite. Not an
+inherently "safe" procedure.
+
+Think of the build being like a PDF viewer rendering a document to the
+display. And the tests as being the user reading a list of instructions
+off that display and doing stuff. It ought to be safe to render the PDF;
+the user's actions are "unsafe".
+
+| > And that I think the as-root tests suite shouldn't run unless the
+| > not-root test suite passes.
+| 
+| Why's that?  The as-root VM needs to be equally secure either way,
+| and it's a useful data point to see that the as-root tests *didn't*
+| break, if they didn't; this way a developer can tell at a glance that
+| the failure is either a test that needs to be marked as 'root only'
+| or a change that causes permissions to be required that it shouldn't have.
+| 
+| (In general I object to suggestions of the form "don't run the tests
+| unless X", unless X is a totally necessary pre-requisite like "the
+| compile finished".)
+
+Suppose a test is dangerously broken through ineptitude or even malice.
+Extreme example: a test makes a bunch of test files and cleans up with
+"rm -r /". (Non-malicious scenario: "rm -r ${testdatatree}/", with
+$testdatatree accidentally undefined, eg through a typo.)
+
+Such a test will fail when unprivileged. (Of course a mlicious test
+might say "do not set off the bomb unless I am root":-)
+
+The point here is security, not test coverage: if a procedure is known
+to be broken as a regular user, is it not highly unsafe to then run it
+as root?
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+1st Law Economists: For every economist there exists an equal and opposite
+                    economist.
+2nd Law Economists: They're both always wrong!
+_______________________________________________
+Python-Dev mailing list
+Python-Dev@python.org
+http://mail.python.org/mailman/listinfo/python-dev
+Unsubscribe: http://mail.python.org/mailman/options/python-dev/cs%40zip.com.au

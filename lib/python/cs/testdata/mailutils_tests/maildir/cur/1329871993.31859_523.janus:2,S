@@ -1,0 +1,38 @@
+Date: Fri, 13 Mar 2009 13:00:47 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Antoine Pitrou <solipsis@pitrou.net>
+Cc: python-dev@python.org
+Subject: Re: Python-Dev] wait time [was: Ext4 data loss
+Message-ID: <20090313020047.GA8432@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <loom.20090313T003418-37@post.gmane.org>
+User-Agent: Mutt/1.5.18 (2008-05-17)
+Content-Length: 1081
+
+On 13Mar2009 00:35, Antoine Pitrou <solipsis@pitrou.net> wrote:
+| R. David Murray <rdmurray <at> bitdance.com> writes:
+| > Seriously, though, the point is that IMO an application should not be
+| > calling fsync unless it provides a way for that behavior to be controlled
+| > by the user.
+| 
+| But whether an application does it or not is none of Python's business, is it?
+| What is the disagreement exactly?
+
+When the app is written in python, it bears on python's business. The
+dispute seems to me to be largely (a) should python libraries call
+fsync() and the like on their own, and when (b) whether there should be
+class methods to control this. For myself, the answer for (a) is broadly
+no and for (b) preferably yes, in which case my answer to (a) becomes
+"default to no fsyncness unless asked".
+
+Then the behaviour of the app becomes something to criticise or not
+and python can go in its was with a clear conscience.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+DRM: the functionality of refusing to function. - Richard Stallman

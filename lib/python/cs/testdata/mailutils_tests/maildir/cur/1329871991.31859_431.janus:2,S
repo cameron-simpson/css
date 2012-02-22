@@ -1,0 +1,36 @@
+Date: Wed, 1 Jul 2009 08:39:41 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: cgoldberg <cgoldberg@gmail.com>
+Cc: python-list@python.org
+Subject: Re: handling https sites
+Message-ID: <20090630223941.GA8395@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <de527827-d27f-4340-836d-72d912d18637@l32g2000vba.googlegroups.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 724
+
+On 26Jun2009 09:34, cgoldberg <cgoldberg@gmail.com> wrote:
+| > Is there any module in python to open https
+| > sites through a proxy.
+| 
+| yes, you can use "urllib2".
+| 
+| from the urllib2 docs:
+| "The default is to read the list of proxies from the environment
+| variables"
+| 
+| So if you have a proxy setup, it should detect it from your
+| environment vars.  If you want to specify something different, you
+| want to build an opener with a ProxyHandler:
+| 
+| http://docs.python.org/library/urllib2.html#urllib2.ProxyHandler
+
+Except that HTTPS through a proxy doesn't work:
+  http://bugs.python.org/issue1424152
+
+There's a patch under review.
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/

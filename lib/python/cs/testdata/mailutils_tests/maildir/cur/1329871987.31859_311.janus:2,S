@@ -1,0 +1,79 @@
+Date: Sun, 25 Jul 2010 09:55:00 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Navkirat Singh <navkirats@gmail.com>
+Cc: python-list@python.org
+Subject: Re: Multiprocessing zombie processes
+Message-ID: <20100724235500.GA19364@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <A47D8667-49C4-4DAF-B11D-D3A2B8503218@gmail.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+X-Cats2Procmailrc-Rule: /home/cameron/mail/spool-out/.cats2procmailrc: +me     .       .
+Content-Length: 2843
+
+[ Please don't top post. Post below so that things read like a
+  conversation. (And trim excess quoted junk.) It doesn't take long and
+  makes things a lot easier for your readers. ]
+
+On 25Jul2010 04:41, Navkirat Singh <navkirats@gmail.com> wrote:
+| On 25-Jul-2010, at 4:37 AM, Navkirat Singh wrote:
+| > I have been meddling around with forking and multiprocessing. Now
+| > both of them spawn new processes from parent (atleast from what I have
+| > understood). I have been able to reproduce a zombie state in a fork with:
+| > 
+| > import os,time
+| > print('before fork',os.getpid())
+| > pid = os.fork()
+| > if pid:
+| > 	print('child: ',pid)
+| > 	time.sleep(120)
+| > 
+| > Now doing a ps ax | grep <pid> I can find a zombie child process,
+| > but I am not being able to reproduce the same with multiprocessing. Am
+| > I missing something? Or multiprocessing does not have the zombie problem?
+|
+| OK I wanted zombie processes and have been able to regenerate them with multiprocessing. Now lets see how I can handle them. 
+
+A zombie process is a fairly common thing and nothing to panic about
+usually.
+
+When you have a normal, running process it has an entry in the
+system process table (that "ps" shows) that points at it and shows its
+state.
+
+When a process exits, its exit status (exit code, whether it exited
+normally or from a signal, and if so which signal, some stats) _remain_
+in the process table as a record of the exit status. This is shown as a
+"zombie" process in "ps" - a process which has exited and whose exit
+status is hanging around waiting to be collected.
+
+After the process' parent has issued a wait() call to collect the status
+the process slot if released and the :zombie" is gone.
+
+In your fork() example above, if that's the whole program, the child
+exits immediately and the parent has not waited for it.
+
+If the parent exits without waiting for all its children, the init
+process (process 1) inherits them, and it collects the statuses.
+
+Having a few zombies lying around isn't a disaster provided your program
+does get around to waiting for them at some point (or if your main
+program is short lived, so they get reaped by init after it exits).
+It's only a process table slot after all - little memory is needed for
+it.
+
+A program that spawns a lot of children and never waits for them _is_
+bad in the long run. Process ids are often 2-byte integers on many
+systems for it's quite feasible to fill the table, and depending on the
+kernel's process table implementation a big process table might have other
+performance side effects.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+I'm behind a corporate Exchange Server which seems to have            
+changed recently to converting everything it sees to HTML.             
+How embarrassing. - Dan Espen <despen@telcordia.com>

@@ -1,0 +1,79 @@
+Date: Thu, 25 Sep 2008 12:03:13 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Tim Arnold <a_jtim@bellsouth.net>
+Cc: python-list@python.org
+Subject: Re: multiple processes, private working directories
+Message-ID: <20080925020313.GA1786@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <57cdd3f1-cde8-45f5-b9d9-3eef32010bda@l43g2000hsh.googlegroups.com>
+User-Agent: Mutt/1.5.18 (2008-05-17)
+X-Cats2Procmailrc-Rule: /home/cameron/mail/spool-out/.cats2procmailrc, line 4: +me     .       .
+Content-Length: 2188
+
+On 24Sep2008 18:27, Tim Arnold <a_jtim@bellsouth.net> wrote:
+| I have a bunch of processes to run and each one needs its own working
+| directory. I'd also like to know when all of the processes are
+| finished.
+| 
+| (1) First thought was threads, until I saw that os.chdir was process-
+| global.
+
+Yep. But do you need separate working directories?
+As opposed to having the thread state include a notional working
+directory and constructing file paths within it.
+
+| (2) Next thought was fork, but I don't know how to signal when each
+| child is finished.
+
+Open a pipe (os.pipe()). Have a parent process to track state.
+
+Fork each child.
+
+In each child: close the read end of the pipe. Do stuff. When finished,
+close the write end of the pipe.
+
+In the parent, after forking all children: close the write end of the
+pipe. Read from the read end. When all the children have finished
+they will have closed all the write ends and you will see EOF
+on the read end of the pipe.
+
+For extra credit you can have the children write some sort of
+success/failure byte to the pipe before closing. Counting and examinine
+these bytes in the parent can tell you about individual failure if you
+care.
+
+| (3) Current thought is to break the process from a method into a
+| external
+| script; call the script in separate threads.  This is the only way I
+| can see
+| to give each process a separate dir (external process fixes that), and
+| I can
+| find out when each process is finished (thread fixes that).
+
+Yeah, that'll work:
+
+  for child in 1 2 3 4 5 6 ...
+  do
+    mkdir workdir
+    ( cd work-dir; run-child ) &
+  done
+  wait
+
+| Am I missing something? Is there a better way? I hate to rewrite this
+| method
+| as a script since I've got a lot of object metadata that I'll have to
+| regenerate with each call of the script.
+
+See the pipe scheme in point (2) above. Doubtless there are other
+methods, but pipes are each shared resources with the right behaviour.
+I'd prefer method (1) myself, assuming you have control of the working
+file paths.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+If everyone is thinking alike, then someone isn't thinking.     - Patton

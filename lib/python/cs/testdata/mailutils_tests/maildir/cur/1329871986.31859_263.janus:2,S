@@ -1,0 +1,59 @@
+Date: Tue, 5 Oct 2010 09:49:40 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Adam Tauno Williams <awilliam@whitemice.org>
+Cc: python-list@python.org
+Subject: Re: resource module returns just zeros
+Message-ID: <20101004224940.GA19175@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <1286197364.3936.5.camel@linux-yu4c.site>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 1943
+
+On 04Oct2010 09:02, Adam Tauno Williams <awilliam@whitemice.org> wrote:
+| I'm using a call to the resource module's getrusage method.  On openSUSE
+| this works, on CentOS [python26-2.6.5-3.el5] it 'works' but just returns
+| zeros for the memory utilization values.
+| 
+| resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+| 
+| openSUSE: returns 5512
+| CentOS:   returns 0
+| 
+| Anyone know what condition causes this?  Or is there a better /
+| more-reliable way to check memory utilization of the current process?
+
+Long standing Linux shortcoming. "man getrusage" on a handy Gentoo box
+says:
+
+  The structure definition shown at the start of this page was taken from
+  4.3BSD Reno.  Not all fields are meaningful under Linux.  In Linux  2.4
+  only  the fields ru_utime, ru_stime, ru_minflt, and ru_majflt are
+  maintained.  Since Linux 2.6, ru_nvcsw and ru_nivcsw are  also maintained. 
+  Since Linux 2.6.22, ru_inblock and ru_oublock are also maintained.
+
+I ran across this deficiency a few years back hoping to get some memory
+stats for some software engineeers in a former life.
+
+I suggest you compare the kernel versions on your systems; CentOS tracks
+RedHat, which keeps moderately old kernel revisions (because the kernel
+revision stays stable over a given release - such stability is one of
+the things you get with such a distro).
+
+There's the ps command, antoher amazingly differing command across
+platforms (though usually compatible on a given tool distro - your Linux
+boxen will has GNU ps).
+
+Also look in /proc - the info may be available there - I expect that's
+where a Linux ps gets a lot of info.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+I do not like this word 'bomb'. It is not a bomb.  It is a device which
+is exploding.   - Jacques Le Blanc, French Ambassador to New Zealand,
+                  on the tests of nuclear "exploding devices"
+                  in French Polynesia.

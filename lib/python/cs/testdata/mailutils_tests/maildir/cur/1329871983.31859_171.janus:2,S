@@ -1,0 +1,39 @@
+Date: Sat, 16 Jul 2011 08:37:41 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Billy Mays <81282ed9a88799d21e77957df2d84bd6514d9af6@myhashismyemail.com>
+Cc: python-list@python.org
+Subject: Re: Looking for general advice on complex program
+Message-ID: <20110715223741.GA18822@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <ivq6ej$vpp$2@speranza.aioe.org>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 1172
+
+On 15Jul2011 16:03, Billy Mays <81282ed9a88799d21e77957df2d84bd6514d9af6@myhashismyemail.com> wrote:
+| I remember reading that file locking doesn't work on network mounted
+| drives (specifically nfs mounts), but you might be able to simply
+| create a 'lock' (mydoc.xml.lock or the like) file for the XML doc in
+| question.  If that file exists you could either hang or silently
+| give up.  Not sure if that helps.
+
+There are two approaches to this. Plain old make-a-file won't work - it
+is racy (and as mentioned, you can't rely on the various lock
+facilities).
+
+You can create a file while your umask is 0777; it will be non-writable
+immediately (no chmod required), preventing another attempt to make it.
+
+My personal habit is to make a directory for the lock; mkdir
+also can't happen twice to the same name, you don't need to fiddle you
+umask (racy and annoying, and problematic if you're using multiple
+threads), _and_ you can put meta info inside it, like pid files etc.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+I had a wierd dream with Ken Thompson in it once.
+        - George Politis <george@research.canon.com.au>

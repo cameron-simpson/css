@@ -1,0 +1,91 @@
+Date: Sun, 19 Feb 2012 09:58:43 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: python-list@python.org
+Subject: Re: parse a profile
+Message-ID: <20120218225843.GA13559@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <4F3FF166.500@mrabarnett.plus.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+Content-Length: 2347
+
+On 18Feb2012 18:43, MRAB <python@mrabarnett.plus.com> wrote:
+| On 18/02/2012 16:34, Jason Friedman wrote:
+| > I have a file I use for shell scripts that looks like this:
+| >
+| > export VAR1=/path/to/dir
+| > export VAR2=7
+| > export VAR3=${VAR1}/further/path
+| > # comment
+| > . /another/file
+| >
+| > And a file /another/file:
+| > export VAR4=database-name
+| >
+| > Is there an existing package that will read such a file and return a
+| > dictionary like this:
+| > {
+| >      'VAR1': '/path/to/dir',
+| >      'VAR2': 7,
+| >      'VAR3': '/path/to/dir/further/path',
+| >      'VAR4': 'database-name',
+| > }
+| 
+| I would probably do something like this:
+| 
+| import re
+| 
+| # Parse the file into a dict.
+| with open(path) as f:
+|      d = dict(re.findall(r"(?m)^export (VAR\d+)=(.*)", f.read()))
+| 
+| # Expand any references.
+| for key, value in d.items():
+|      d[key] = re.sub(r"\$\{(VAR\d+)\}", lambda m: d[m.group(1)], value)
+
+Which fails on the ". /anther/file" step, alas. Jason's point is
+probably that it may be arbitrary shell.
+
+I suspect I would write a shell wrapper like this:
+
+  #!/bin/sh
+  exec 3>&1 1>&2
+  . /path/to/jason/s/file
+  exec 1>&3 3>&-
+  env
+
+then from inside Python call the shell to run the wrapper.
+Read the output of "env" and diff it against os.environ.
+Populate the dictionary with the values that have changed.
+
+Crude untested sketch:
+
+  newvars = {}
+  for envline in subprocess.blah(... run the wrapper script above ...):
+    if not envline.endswith('\n'):
+      raise ValueError("unexpected EOF")
+    envline = envline[:-1]
+    try:
+      var, value = line.split('=', 1)
+    except ValueError:
+      # ouch!
+      continue
+    oldvalue = os.environ.get(var)
+    if oldvalue is None or oldvalue != value:
+      newvars[var] = value
+
+You can put the wrapper script as a single inline piece of shell to
+avoid the separate file once debugged.
+
+Just a thought. Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+[...] post-block actions should be allowed everywhere, not just on
+subroutines. The ALWAYS keyword was agreed upon as a good way of doing
+this, although POST was also suggested. This lead to the semi-inevitable
+rehash of the try- catch exception handling debate. According to John
+Porter, "There is no try, there is only do. :-)"
+- from the perl6 development discussion

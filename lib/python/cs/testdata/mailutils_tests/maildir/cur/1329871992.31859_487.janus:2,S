@@ -1,0 +1,41 @@
+Date: Fri, 24 Apr 2009 09:32:45 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: =?utf-8?B?Ik1hcnRpbiB2LiBM77+9d2lzIiA8bWFydGluQHYubG9ld2lzLmRlPg==?=
+Cc: Python-Dev <python-dev@python.org>,
+	Python List <python-list@python.org>
+Subject: Re: PEP 383: Non-decodable Bytes in System Character Interfaces
+Message-ID: <20090423233245.GA6401@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20090423232712.GA31693@cskk.homeip.net>
+User-Agent: Mutt/1.5.18 (2008-05-17)
+Content-Length: 1391
+
+On 24Apr2009 09:27, I wrote:
+| If I'm writing a general purpose UNIX tool like chmod or find, I expect
+| it to work reliably on _any_ UNIX pathname. It must be totally encoding
+| blind. If I speak to the os.* interface to open a file, I expect to hand
+| it bytes and have it behave. As an explicit example, I would be just fine
+| with python's open(filename, "w") to take a string and encode it for use,
+| but _not_ ok for os.open() to require me to supply a string and cross
+| my fingers and hope something sane happens when it is turned into bytes
+| for the UNIX system call.
+| 
+| I'm very much in favour of being able to work in strings for most
+| purposes, but if I use the os.* interfaces on a UNIX system it is
+| necessary to be _able_ to work in bytes, because UNIX file pathnames
+| are bytes.
+
+Just to follow up to my own words here, I would be ok for all the
+pure-byte stuff to be off in the "posix" module if os.* goes pure
+character instead of bytes or bytes+strings.
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+... that, in a few years, all great physical constants will have been
+approximately estimated, and that the only occupation which will be
+left to men of science will be to carry these measurements to another
+place of decimals.      - James Clerk Maxwell (1813-1879)
+                          Scientific Papers 2, 244, October 1871

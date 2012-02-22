@@ -1,0 +1,49 @@
+Date: Thu, 16 Sep 2010 13:33:50 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Rodrick Brown <rodrick.brown@gmail.com>
+Cc: python-list@python.org
+Subject: Re: How do you preserve time values with date.datefromtimestamp()
+Message-ID: <20100916033350.GA10543@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <AANLkTimBQj_eEB5pKG0xcZB4fUcd7v-OJs8BmHUX4_xZ@mail.gmail.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 1111
+
+On 15Sep2010 22:31, Rodrick Brown <rodrick.brown@gmail.com> wrote:
+| I'm doing something like
+| 
+| >>> today = datetime.date.fromtimestamp(1284584357.241863)
+| >>> today.ctime()
+| 'Wed Sep 15 00:00:00 2010'
+| 
+| Why isn't the time field being populated what I expect is to see something
+| like Wed Sep 15 2010 16:59:17:241863
+
+Because you asked for a "date". A "date" only has day resolution.
+It's like going:
+
+  i = int(1.234)
+
+which quite legitimately results in "1" (the interger, not a string).
+
+You want a datetime, thus:
+
+  >>> today = datetime.datetime.fromtimestamp(1284584357.241863)  
+  >>> today
+  datetime.datetime(2010, 9, 16, 6, 59, 17, 241863)
+  >>> today.ctime()
+  'Thu Sep 16 06:59:17 2010'
+
+Note that .ctime() is a specific historic time reporting format of very
+limited utility - you're a lot better off not considering it as a
+storage value or as a value to print, unless you actually need to work
+in the domains where it is used.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Tiggers don't like honey.       - A.A.Milne, The House at Pooh Corner

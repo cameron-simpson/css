@@ -1,0 +1,33 @@
+Date: Sun, 17 Jul 2011 09:17:33 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Raymond Hettinger <raymond.hettinger@gmail.com>
+Cc: Devin Jeanpierre <jeanpierreda@gmail.com>,
+	Python-Ideas <python-ideas@python.org>
+Subject: Re: Deprecate str.find
+Message-ID: <20110716231733.GA3954@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <733331DF-3BB2-4879-A984-707CA2D0D094@gmail.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+Content-Length: 737
+
+On 16Jul2011 15:52, Raymond Hettinger <raymond.hettinger@gmail.com> wrote:
+| On Jul 16, 2011, at 3:15 PM, Devin Jeanpierre wrote:
+| > Slicing was brought up as a use-case where you can use a default
+| > without checking.
+| 
+| This thread has lost contact with reality.  It started with the
+| reasonable observation that many uses of str.find could
+| be replaced with a simple test using the in-operator.
+
+To be fair here, Mike's OP also mentioned that -1 is easy to misuse if
+not checked because it it still numeric.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Of course, I realize that the rain in the UK is much wetter than the rain
+we get here...  - Eric Gunnerson <gunnerso@halcyon.com>

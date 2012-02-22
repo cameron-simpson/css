@@ -1,0 +1,379 @@
+Date: Wed, 29 Apr 2009 09:06:55 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Glenn Linderman <v+python@g.nevcal.com>
+Cc: martin@v.loewis.de, Python-Dev <python-dev@python.org>
+Subject: Re: PEP 383: Non-decodable Bytes in System Character Interfaces
+Message-ID: <20090428230655.GA23830@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <49F6A7C0.6090105@g.nevcal.com>
+User-Agent: Mutt/1.5.18 (2008-05-17)
+Content-Length: 17067
+
+I think I may be able to resolve Glenn's issues with the scheme lower
+down (through careful use of definitions and hand waving).
+
+On 27Apr2009 23:52, Glenn Linderman <v+python@g.nevcal.com> wrote:
+> On approximately 4/27/2009 7:11 PM, came the following characters from  
+> the keyboard of Cameron Simpson:
+[...]
+>> There may be puns. So what? Use the right strings for the right purpose
+>> and all will be well.
+>>
+>> I think what is missing here, and missing from Martin's PEP, is some
+>> utility functions for the os.* namespace.
+>>
+>> PROPOSAL: add to the PEP the following functions:
+>>
+>>   os.fsdecode(bytes) -> funny-encoded Unicode
+>>     This is what os.listdir() does to produce the strings it hands out.
+>>   os.fsencode(funny-string) -> bytes
+>>     This is what open(filename,..) does to turn the filename into bytes
+>>     for the POSIX open.
+>>   os.pathencode(your-string) -> funny-encoded-Unicode
+>>     This is what you must do to a de novo string to turn it into a
+>>     string suitable for use by open.
+>>     Importantly, for most strings not hand crafted to have weird
+>>     sequences in them, it is a no-op. But it will recode your puns
+>>     for survival.
+[...]
+>>> So assume a non-decodable sequence in a name.  That puts us into   
+>>> Martin's funny-decode scheme.  His funny-decode scheme produces a 
+>>> bare  string, indistinguishable from a bare string that would be 
+>>> produced by a  str API that happens to contain that same sequence.  
+>>> Data puns.
+>>>     
+>>
+>> See my proposal above. Does it address your concerns? A program still
+>> must know the providence of the string, and _if_ you're working with
+>> non-decodable sequences in a names then you should transmute then into
+>> the funny encoding using the os.pathencode() function described above.
+>>
+>> In this way the punning issue can be avoided.
+>> _Lacking_ such a function, your punning concern is valid.
+>
+> Seems like one would also desire os.pathdecode to do the reverse.
+
+Yes.
+
+> And  
+> also versions that take or produce bytes from funny-encoded strings.
+
+Isn't that the first two functions above?
+
+> Then, if programs were re-coded to perform these transformations on what  
+> you call de novo strings, then the scheme would work.
+> But I think a large part of the incentive for the PEP is to try to  
+> invent a scheme that intentionally allows for the puns, so that programs  
+> do not need to be recoded in this manner, and yet still work.  I don't  
+> think such a scheme exists.
+
+I agree no such scheme exists. I don't think it can, just using strings.
+
+But _unless_ you have made a de novo handcrafted string with
+ill-formed sequences in it, you don't need to bother because you
+won't _have_ puns. If Martin's using half surrogates to encode
+"undecodable" bytes, then no normal string should conflict because a
+normal string will contain _only_ Unicode scalar values. Half surrogate
+code points are not such.
+
+The advantage here is that unless you've deliberately constructed an
+ill-formed unicode string, you _do_not_ need to recode into
+funny-encoding, because you are already compatible. Somewhat like one
+doesn't need to recode ASCII into UTF-8, because ASCII is unchanged.
+
+> If there is going to be a required transformation from de novo strings  
+> to funny-encoded strings, then why not make one that people can actually  
+> see and compare and decode from the displayable form, by using  
+> displayable characters instead of lone surrogates?
+
+Because that would _not_ be a no-op for well formed Unicode strings.
+
+That reason is sufficient for me.
+
+I consider the fact that well-formed Unicode -> funny-encoded is a no-op
+to be an enormous feature of Martin's scheme.
+
+Unless I'm missing something, there _are_no_puns_ between funny-encoded
+strings and well formed unicode strings.
+
+>>>> I suppose if your program carefully constructs a unicode string riddled
+>>>> with half-surrogates etc and imagines something specific should happen
+>>>> to them on the way to being POSIX bytes then you might have a problem...
+>>>>       
+>>> Right.  Or someone else's program does that.
+
+I've just spent a cosy 20 minutes with my copy of Unicode 5.0 and a
+coffee, reading section 3.9 (Unicode Encoding Forms).
+
+I now do not believe your scenario makes sense.
+
+Someone can construct a Python3 string containing code points that
+includes surrogates. Granted.
+
+However such a string is not meaningful because it is not well-formed
+(D85).  It's ill-formed (D84). It is not sane to expect it to
+translate into a POSIX byte sequence, be it UTF-8 or anything else,
+unless it is accompanied by some kind of explicit mapping provided by
+the programmer.  Absent that mapping, it's nonsense in much the same
+way that a non-decodable UTF-8 byte sequence is nonsense.
+
+For example, Martin's funny-encoding is such an explicit mapping.
+
+>>>I only want to use 
+>>> Unicode  file names.  But if those other file names exist, I want to 
+>>> be able to  access them, and not accidentally get a different file.
+
+But those other names _don't_ exist.
+
+>>>> Also, by avoiding reuse of legitimate characters in the encoding we can
+>>>> avoid your issue with losing track of where a string came from;
+>>>> legitimate characters are currently untouched by Martin's scheme, except
+>>>> for the normal "bytes<->string via the user's locale" translation that
+>>>> must already happen, and there you're aided by byets and strings being
+>>>> different types.
+>>>>       
+>>> There are abnormal characters, but there are no illegal characters.   
+>>
+>> I though half-surrogates were illegal in well formed Unicode. I confess
+>> to being weak in this area. By "legitimate" above I meant things like
+>> half-surrogates which, like quarks, should not occur alone?
+>
+> "Illegal" just means violating the accepted rules.
+
+I think that either we've lost track of what each other is saying,
+or you're wrong here. And my poor terminology hasn't been helping.
+
+What we've got:
+
+  (1) Byte sequence files names in the POSIX file system.
+      It doesn't matter whether the underlying storage is a real POSIX
+      filesystem or mostly POSIX one like MacOSX HFS or a remotely
+      attached non-POSIX filesystem like a Windows one, because we're
+      talking through the POSIX API, and it is handing us byte
+      sequences, which will expect may contain anything except a NUL.
+
+  (2) Under Martin's scheme, os.listdir() et al hand us (and accept)
+      funny-encoded Python3 strings, which are strings of Unicode code
+      units (D77).
+      Particularly, if there were bytes in the POSIX byte string that
+      did not decode into Unicode scalar values (D76) then each such
+      byte is encoded as a surrogate (D71,72,73,74).
+
+      it is important to note here that because surrogates are _not_
+      Unicode scalar values, the is no punning between the two sets
+      of values.
+
+  (3) Other Python3 strings that have not been through Martin's mangler
+      in either direction. Ordinary strings.
+
+Your concern is that, handed a string, a programmer could misuse (3) as
+(2) or vice versa because of punning.
+
+In a well-formed unicode string there are no surrogates; surrogates only
+occur in UTF-16 _encodings_ of Unicode strings (D75).
+
+Therefore, it _is_ possible to inspect a string, if one cared, to see if
+it is funny-encoded or "raw". One may get two different answers:
+
+  - If there are surrogate code units then it must be funny-encoded
+    and will therefore work perfectly if handed to a os.* interface.
+
+  - If there are no surrogate code units the it may be funny encoded or it
+    may not have been through Martin's funny-encoder, you can't tell.
+    However, this doesn't matter because the encoder is a no-op for such
+    strings.
+    Therefore it will work perfectly if handed to an os.* interface.
+
+The only gap in this is a specially crated string containing surrogate
+code points that did not come via Martin's encoder. But such a string
+cannot come from a user interface, which will accept only characters
+and there only include unicode scalar values.
+
+Such a string can only be explicitly constructed (eg with a \uD802
+code point). And if something constructs such a string, it must have in
+mind an explicit interpretation of those code points, which means it is
+the _constructor_ on whom the burden of translation lies.
+
+Does this make sesne to you, or have you a counter example in mind?
+
+> In this case, the  
+> accepted rules are those enforced by the file system (at the bytes or  
+> str API levels), and by Python (for the str manipulations).  None of  
+> those rules outlaw lone surrogates.  Hence, while all of the systems  
+> under discussion can handle all Unicode characters in one way or  
+> another, none of them require that all Unicode rules are followed.  Yes,  
+> you are correct that lone surrogates are illegal in Unicode.  No, none  
+> of the accepted rules for these systems require Unicode.
+
+However, Martin's scheme explicitly translates these ill-formed
+sequences into Python3 strings and back, losslessly. You can have
+surrogates in the filesystem storage/API on Windows. You can have
+non-UTF-8-decodable sequences in the POSIX filesystem layer too.
+They're all taken in and handled.
+
+In Python3 space, one might have a bytes object with a raw POSIX
+byte filename in it. Presumably one can also have a byte string with a
+raw (UTF-16) WIndows filename in it. They're not strings, so no
+confusion.
+
+But there's no _string_ for these things without a matching
+string<->bytestring mapping associated with it.
+
+If you have a Python3 string which is well-formed Unicode, then you can
+hand it to the os.* interfaces and the Right Thing will happen (on
+Windows just because it stored Unicode and on POSIX provided you agree
+that your locale/getfilesystemencoding() is the right thing).
+
+If you have a string that isn't well-formed, then the meaning of any
+code points which are not Unicode scalar values is not well defined
+without some auxiliary stuff in the app.
+
+>>> NTFS permits any 16-bit "character" code, including abnormal ones,   
+>>> including half-surrogates, and including full surrogate sequences 
+>>> that  decode to PUA characters.  POSIX permits all byte sequences, 
+>>> including  things that look like UTF-8, things that don't look like 
+>>> UTF-8, things  that look like half-surrogates, and things that look 
+>>> like full surrogate  sequences that decode to PUA characters.
+
+See above. I think this is addressed.
+
+[...]
+>> These are existing file objects, I'll take them as source 1. They get
+>> encoded for release by os.listdir() et al.
+>>   
+>>> And yes, strings can be  generated from scratch.
+>>
+>> I take this to be source 2.
+>
+> One variation of source 2 is reading output from other programs, such as  
+> ls (POSIX) or dir (Windows).
+
+Sure. But that is reading byte sequences, and one must again know the
+encoding. If that is known and the input decoded happily into Unicode
+scalar values, then there is no issue. If the input didn't decode, then
+one must make some decision about what the non-decodable bits mean.
+
+>> I think I agree with all the discussion that followed, and think the
+>> real problem is lack of utlities functions to funny-encode source 2
+>> strings for use. hence the proposal above.
+>
+> I think we understand each other now.  I think your proposal could work,  
+> Cameron, although when recoding applications to use your proposal, I'd  
+> find it easier to use the "file name object" that others have proposed.   
+> I think that because either your proposal or the object proposals  
+> require recoding the application, that they will not be accepted.  I  
+> think that because the PEP 383 allows data puns, that it should not be  
+> accepted in its present form.
+
+I'm of the option now that the puns can only occur when the source 2
+string has surrogates, and either those surrogates are chosen to match
+the funny-encoding, in which case the pun is not a pun, or the
+surrogates are chosen according to a different scheme in which case
+source 2 is obliged to provide a mapping.
+
+A source 2 string of only Unicode scalar values doesn't need remapping.
+
+> I think your if your proposal is accepted, that it then becomes possible  
+> to use an encoding that uses visible characters, which makes it easier  
+> for people to understand and verify.  An encoding such as the one I  
+> suggested, but perhaps using a more obscure character, if there is one,  
+> but yet doesn't violate true Unicode.
+
+I think any scheme that uses any Unicode scalar value as an escape
+character _inherently_ introduces puns, and puns that are easier to
+encounter.
+
+I think the real strength of Martin's scheme is exactly that bytes strings
+that needed the funny-encoding _do_ produce ill-formed Unicode strings,
+because such strings _cannot_ conflict with well-formed strings.
+
+I think your desire for a human readable encoding is valid, but it should
+be a further purely "presentation" step, somewhat like quoted-printable
+encoding in MIME, and not the scheme used by Martin.
+
+> I think it should transform all  
+> data, from str and bytes interfaces, and produce only str values  
+> containing conforming Unicode, escaping all the non-conforming sequences  
+> in some manner.  This would make the strings truly readable, as long as  
+> fonts for all the characters are available.
+
+But I think it would just move the punning. A human readable string with
+readable escapes in it may be funny-encoded. _Or_ it may be "raw", with
+funny-encoded yet to happen; after all only might weirdly be dealing
+with a filename which contained post-funny-encode visible sequences in
+it.
+
+SO you're right back to _guessing_ what you're looking at.
+
+WIth the surrogate scheme you only have to guess if there are surrogates,
+but then you _know_ that you're dealing with a special encoding scheme;
+it is certain - the guess is about which scheme.
+
+If you're working in a domain with no ill-formed strings you never need
+to worry at all.
+
+With a visible/printable-encoding such as you advocate the guess is about
+whether the scheme have even been used, which is why I think it is worse.
+
+> And I had already suggested  
+> the utility functions you are suggesting, actually, in my first tirade  
+> against PEP 383 (search for "The encode and decode functions should be  
+> available for coders to use, that code to external
+> interfaces, either OS or 3rd party packages, that do not use this  
+> encoding scheme").
+
+I must have missed that sentence. But it sounds like we want the same
+facilities at least.
+
+> The solution that was proposed in the lead up to releasing Python 3.0  
+> was to offer both bytes and str interfaces (so we have those), and then  
+> for those that want to have a single portable implementation that can  
+> access all data, an object that encapsulates the differences, and the  
+> variant system APIs.  (file system is one, command line is another,  
+> environment is another, I'm not sure if there are more.)  I haven't  
+> heard if any progress on such an encapsulating object has been made; the  
+> people that proposed such have been rather quiet about this PEP.  I  
+> would expect that an object implementation would provide display  
+> strings, and APIs to submit de novo str and bytes values to an object,  
+> which would run the appropriate encoding on them.
+
+I think covering these other cases is quite messy, if only because
+there's not even agreement amonst existing command line apps about all
+that stuff.
+
+Regarding "APIs to submit de novo str and bytes values to an object,  
+which would run the appropriate encoding on them" I think such a
+facility for de novo strings must require the caller to provide a
+handler/mapper for the not-well-formed parts of such strings if they
+occur.
+
+> Programs that want to use str interfaces on POSIX will see a subset of  
+> files on systems that contain files whose bytes filenames are not  
+> decodable.
+
+Not under Martin's scheme, because all bytes filenames _are_ decoded.
+
+> If a sysadmin wants to standardize on UTF-8 names  
+> universally, they can use something like convmv to clean up existing  
+> file names that don't conform.  Programs that use str interfaces on  
+> POSIX system will work fine, but with a subset of the files.  When that  
+> is unacceptable, they can either be recoded to use the bytes interfaces,  
+> or the hopefully forthcoming object encapsulation.  The issue then will  
+> be what technique will be used to transform bytes into display names,  
+> but since the display names would never be fed back to the objects  
+> directly (but the object would have an interface to accept de novo str  
+> and de novo bytes) then it is just a display issue, and one that uses  
+> visible characters would seem more useful in my mind, than one that uses  
+> half-surrogates or PUAs.
+
+I agree it might be handy to have a display function, but isn't repr()
+exactly that, now I think of it?
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+"waste cycles drawing trendy 3D junk"   - Mac Eudora v3 config option

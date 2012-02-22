@@ -1,0 +1,42 @@
+Date: Tue, 23 Nov 2010 13:59:29 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Neal Becker <ndbecker2@gmail.com>
+Cc: python-list@python.org
+Subject: Re: bug? mmap doesn't like 0-length files
+Message-ID: <20101123025929.GA27420@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <icf5kk$h0p$1@dough.gmane.org>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 987
+
+On 22Nov2010 20:33, Neal Becker <ndbecker2@gmail.com> wrote:
+|  mmap.mmap (f.fileno(), 0, prot=mmap.PROT_READ)
+| error: [Errno 22] Invalid argument
+| 
+| According to http://docs.python.org/library/mmap.html, mmap on _windows_ 
+| doesn't accept 0-length file.  But this was tested on linux.  Is this a bug?  
+| 
+| I don't see anything in linux man-page about the underlying C mmap function 
+| not accepting 0-length files.
+
+On a local Gentoo Linux box mmap(2) says in the ERRORS section:
+
+  EINVAL We don't like addr, length, or offset (e.g., they are too
+         large, or not aligned on a page boundary).
+
+  EINVAL (since Linux 2.6.12) length was 0.
+
+  EINVAL flags contained neither MAP_PRIVATE or MAP_SHARED, or contained both
+         of these values.
+
+Sure looks like a length of 0 is disliked.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Carpe Daemon - Seize the Background Process
+        - Paul Tomblin <ab401@freenet2.carleton.ca>

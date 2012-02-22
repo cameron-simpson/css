@@ -1,0 +1,44 @@
+Date: Wed, 14 Dec 2011 06:11:27 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Eelco <hoogendoorn.eelco@gmail.com>
+Cc: python-list@python.org
+Subject: Re: Verbose and flexible args and kwargs syntax
+Message-ID: <20111213191126.GA1363@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: inline
+Content-Transfer-Encoding: 8bit
+In-Reply-To: <d6a73ede-4ad9-4380-b9c1-5da30850e764@o1g2000vbe.googlegroups.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+Content-Length: 1301
+
+On 13Dec2011 00:30, Eelco <hoogendoorn.eelco@gmail.com> wrote:
+| On Dec 13, 1:27 am, alex23 <wuwe...@gmail.com> wrote:
+| > On Dec 13, 3:12 am, Eelco <hoogendoorn.ee...@gmail.com> wrote:
+| > > But to relate it to the topic of this thread: no, the syntax does not
+| > > allow one to select the type of the resulting sequence. It always
+| > > constructs a list.
+| >
+| > So by this argument, _every_ function that returns a list should take
+| > an optional argument to specify an alternative form of sequence.
+| >
+| > What, exactly, is so onerous about coercing your list to _whatever_
+| > type you want? You know, like everybody else has been.
+| >
+| > What does this _gain_ you other than one less line of code?
+| 
+| 1) Turning two lines of code into a single more readable one is
+| nothing to scoff at
+| 2) After-the-fact conversion is O(n), getting the view you want right
+| away is O(1)
+
+Regarding (2), it has already cost you O(n) to get there. So your O(1)
+is a little ingenuous.
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+I'm a volunteer EMT-I on our local ambulance service; one of our Paramedics
+calls squid style motorcycle accidents "ZoomSplats", as in "we had a good
+ZoomSplat the other night". ;-)
+        - Scott <traurig@rapnet.sanders.lockheed.com>

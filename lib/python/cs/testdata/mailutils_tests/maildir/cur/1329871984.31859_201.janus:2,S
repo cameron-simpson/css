@@ -1,0 +1,129 @@
+Return-Path: <python-ideas-bounces+cs=zip.com.au@python.org>
+Delivered-To: unknown
+Received: from mail.zip.com.au (125.255.95.3) by janus.home with POP3-SSL; 26
+  Apr 2011 07:47:02 -0000
+Delivered-To: cs@zipworld.com.au
+Received: from mailin1.pacific.net.au (mailin1.pacific.net.au [61.8.0.80])
+	by mailstore1.syd.pacific.net.au (Postfix) with ESMTP id 14D0B660AA
+	for <cs@zipworld.com.au>; Tue, 26 Apr 2011 17:46:06 +1000 (EST)
+Received: from mail.python.org (unknown [82.94.164.166])
+	by mailin1.pacific.net.au (Postfix) with ESMTP id 6C70218407A
+	for <cs@zip.com.au>; Tue, 26 Apr 2011 17:46:05 +1000 (EST)
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3QJc154cv6z7LlL
+	for <cs@zip.com.au>; Tue, 26 Apr 2011 09:46:01 +0200 (CEST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=python.org; s=200901;
+	t=1303803961; bh=Lrxm8/Be8K0ddF8Nv1i+Fsu4Moc7zZqqfRtR1RygLMk=;
+	h=Date:From:To:Message-ID:MIME-Version:In-Reply-To:References:Cc:
+	 Subject:List-Id:List-Unsubscribe:List-Archive:List-Post:List-Help:
+	 List-Subscribe:Content-Type:Content-Transfer-Encoding:Sender;
+	b=h2louJyKzrZLGcQMm1shagnfKZv+4Yg+o9uFbTNLXvubZ1fDmLHFRh/k0rDL4340d
+	 WZSQLv9wS+2cvkmosifnAOVvg4UUy/O1cSshKMV/mJab2iypxo0yrrvX3eR+4wn+ny
+	 ZTILKMU4U37O0fwmWedChWAAAQSo3krl7YMi1wnE=
+X-Original-To: python-ideas@python.org
+Delivered-To: python-ideas@mail.python.org
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3QJbyF2fQxz7LlL
+	for <python-ideas@python.org>; Tue, 26 Apr 2011 09:43:33 +0200 (CEST)
+X-Spam-Status: OK 0.001
+X-Spam-Evidence: '*H*': 1.00; '*S*': 0.00; 'pascal': 0.07;
+	'received:edu.au': 0.07; 'identifier,': 0.09; 'trailing': 0.09;
+	'syntax': 0.12; 'wrote:': 0.14; '"with"': 0.16; 'allowed,': 0.16;
+	'clash': 0.16; 'feeling.': 0.16; 'from:addr:cs': 0.16;
+	'from:addr:zip.com.au': 0.16; 'from:name:cameron simpson': 0.16;
+	'graham': 0.16; 'identifier': 0.16; 'identifiers': 0.16; 'message-
+	id:@cskk.homeip.net': 0.16; 'namespace,': 0.16; 'non-python':
+	0.16; 'received:202.125.174': 0.16; 'received:202.125.174.133':
+	0.16; 'received:boardofstudies.nsw.edu.au': 0.16;
+	'received:cskk.homeip.net': 0.16;
+	'received:harvey.boardofstudies.nsw.edu.au': 0.16;
+	'received:homeip.net': 0.16; 'received:nsw.edu.au': 0.16;
+	'underscore': 0.16; 'stuff': 0.18; 'keyword': 0.19; 'cc:no real
+	name:2**0': 0.20; 'cc:2**0': 0.20; 'cheers,': 0.20; 'not.': 0.22;
+	'header:In-Reply-To:1': 0.22; "i'm": 0.26; 'chris': 0.27; 'error':
+	0.29; 'certainly': 0.29; 'named': 0.30; 'cc:addr:python.org':
+	0.31; 'andy': 0.31; 'character.': 0.31; 'preceding': 0.31; 'does':
+	0.31; 'import': 0.32; "i've": 0.33; 'things': 0.33; 'bit': 0.33;
+	'sometimes': 0.33; 'there': 0.35; 'characters': 0.35; 'header
+	:User-Agent:1': 0.35; 'received:au': 0.36; 'charset:us-ascii':
+	0.36; 'some': 0.37; 'exactly': 0.37; 'but': 0.38; 'current': 0.38;
+	'help': 0.39; 'mike': 0.39; 'word,': 0.39; 'how': 0.39; 'add':
+	0.39; 'i.e.': 0.40; 'would': 0.40; 'world': 0.65; 'received:202':
+	0.66; 'dot': 0.68; 'proposal': 0.68; 'heights': 0.84; 'speaks':
+	0.84; 'woodward': 0.84; 'subject:Make': 0.95
+Received: from localhost (HELO mail.python.org) (127.0.0.1)
+	by albatross.python.org with SMTP; 26 Apr 2011 09:43:33 +0200
+Received: from harvey.boardofstudies.nsw.edu.au
+	(mail2.rack1.boardofstudies.nsw.edu.au [202.125.174.133])
+	by mail.python.org (Postfix) with ESMTP
+	for <python-ideas@python.org>; Tue, 26 Apr 2011 09:43:32 +0200 (CEST)
+Received: from cskk.homeip.net (localhost.localdomain [127.0.0.1])
+	by harvey.boardofstudies.nsw.edu.au (Postfix) with ESMTP id CF8BC4D3B56;
+	Tue, 26 Apr 2011 17:43:30 +1000 (EST)
+Received: by janus.cskk.homeip.net (Postfix, from userid 1000)
+	id A5ECB100419B7; Tue, 26 Apr 2011 17:43:30 +1000 (EST)
+Date: Tue, 26 Apr 2011 17:43:30 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: haael <haael@interia.pl>
+Message-ID: <20110426074330.GA25296@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <4DB5DAB2.6090305@interia.pl>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+References: <4DB5DAB2.6090305@interia.pl>
+Cc: python-ideas@python.org
+Subject: Re: Make all keywords legal as an identifier
+X-BeenThere: python-ideas@python.org
+X-Mailman-Version: 2.1.12
+Precedence: list
+List-Id: Discussions of speculative Python language ideas
+	<python-ideas.python.org>
+List-Unsubscribe: <http://mail.python.org/mailman/options/python-ideas>,
+	<mailto:python-ideas-request@python.org?subject=unsubscribe>
+List-Archive: <http://mail.python.org/pipermail/python-ideas>
+List-Post: <mailto:python-ideas@python.org>
+List-Help: <mailto:python-ideas-request@python.org?subject=help>
+List-Subscribe: <http://mail.python.org/mailman/listinfo/python-ideas>,
+	<mailto:python-ideas-request@python.org?subject=subscribe>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Sender: python-ideas-bounces+cs=zip.com.au@python.org
+Errors-To: python-ideas-bounces+cs=zip.com.au@python.org
+X-Cats2Procmailrc-Rule: cats/home: python  python-ideas    sender:python-ideas-bounces+cs=zip.com.au@python.org
+X-Label: python-ideas
+Content-Length: 1464
+
+On 25Apr2011 22:33, haael <haael@interia.pl> wrote:
+| @ Mike Graham
+| >>Of course, if a keyword is not preceded by a dot, it would be treated as a
+| >>reserved word, just like now.
+| >>>with = 3  # syntax error
+| >I don't see how this is a real improvement over the current
+| >convention, to add a trailing underscore, so that programs really
+| >needing to use the name "with" would use "with_". [...]
+| But the trailing underscore is treated as a part of an identifier,
+| while the preceding dot is not. This is important if I want to have
+| an identifier named exactly "with", with no other characters (no pun
+| itended).
+| 
+| As I said, I want sometimes to import some non-Python namespace,
+| i.e. a Pascal program. If all identifiers are allowed, there would
+| never be a clash of reserved words.
+
+Does your proposal help with non-Python namespaces with different
+identifier rules? I know this is a little snarky, but I've certainly
+seen real world stuff with "$" as a valid identifier character.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+But then, I'm only 50. Things may well get a bit much for me when I
+reach the gasping heights of senile decrepitude of which old Andy
+Woodward speaks with such feeling.
+        - Chris Malcolm, cam@uk.ac.ed.aifh, DoD #205
+_______________________________________________
+Python-ideas mailing list
+Python-ideas@python.org
+http://mail.python.org/mailman/listinfo/python-ideas

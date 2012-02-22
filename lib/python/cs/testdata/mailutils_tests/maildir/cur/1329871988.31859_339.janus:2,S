@@ -1,0 +1,48 @@
+Date: Mon, 14 Jun 2010 17:16:59 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: madhuri vio <madhuri.vio@gmail.com>
+Cc: python-list@python.org
+Subject: Re: file handling
+Message-ID: <20100614071659.GA26325@cskk.homeip.net>
+Reply-To: python-list@python.org
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <AANLkTimXOIjvgEbXqdCmuR3qLk_ZHTCsyEJzKe8Q_PRM@mail.gmail.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 1192
+
+Please don't top post; post below and trim the content.
+Also, please do a reply-to-all to keep the discussion on the list.
+
+Further content is below...
+
+On 14Jun2010 11:44, madhuri vio <madhuri.vio@gmail.com> wrote:
+| On Mon, Jun 14, 2010 at 11:39 AM, Cameron Simpson <cs@zip.com.au> wrote:
+| > ODT files are _not_ text files. If I recall they are ZIP files containing
+| > XML, but I've never checked. There is more info here:
+| >  http://en.wikipedia.org/wiki/OpenDocument
+| 
+| i have renamed the odt file to human and read it in the
+| "rb" mode....still i get the same reply....
+| 
+| a = open("human","rb")
+| print a.readlines()
+
+Renaming a file in no way changes its content. So of course you get the
+same result.
+
+You also write:
+| when i did it thru a text editor...i am able to read it and
+
+It might help if you said _what_ text editor you used. Some GUI text
+editors like TextEdit on a Mac can understand word processor files.
+"Plain" text editors will show you binary stuff like your python program
+did.
+
+| unable to do the same thru a word document...
+
+I have no idea what this sentence means, however.
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/

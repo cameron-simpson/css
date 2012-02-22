@@ -1,0 +1,39 @@
+Date: Mon, 13 Feb 2012 18:23:39 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Zheng Li <dllizheng@gmail.com>
+Cc: python-list <python-list@python.org>
+Subject: Re: how to tell a method is classmethod or static method or instance
+ method
+Message-ID: <20120213072339.GA9132@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <E064CE77-0EB1-4D0B-9A47-E515EA621248@gmail.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+Content-Length: 884
+
+On 13Feb2012 15:59, Zheng Li <dllizheng@gmail.com> wrote:
+| how to tell a method is class method or static method or instance method?
+
+Maybe a better question is:
+  under what circumstances do you need to figure this out? 
+
+I'm actually quite serious here. Please outline what circumstances cause
+you to want to ask and answer this question.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Reason #173 to fear technology:
+
+    o       o       o       o       o       o      <o      <o>
+   ^|\     ^|^     v|^     v|v     |/v     |X|      \|      |
+    /\      >\     /<       >\     /<       >\     /<       >\
+
+    o>      o       o       o       o       o       o       o
+    \       x      </      <|>     </>     <\>     <)>      |\
+   /<       >\     /<       >\     /<       >\      >>      L
+
+             Mr. email does the Macarena.

@@ -1,0 +1,35 @@
+Date: Tue, 20 Apr 2010 15:23:12 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: alex23 <wuwei23@gmail.com>
+Cc: python-list@python.org
+Subject: Re: dict.keys() and dict.values() are always the same order, is it?
+Message-ID: <20100420052312.GA23755@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: inline
+Content-Transfer-Encoding: 8bit
+In-Reply-To: <1dbfd11a-057c-42b9-a665-534181585264@z21g2000pre.googlegroups.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 789
+
+On 19Apr2010 21:31, alex23 <wuwei23@gmail.com> wrote:
+| Cameron Simpson <c...@zip.com.au> wrote:
+| >   If items(), keys(), values(), iteritems(), iterkeys(), and
+| >   itervalues() are called with no intervening modifications to the
+| >   dictionary, the lists will directly correspond. This allows the
+| >   creation of (value, key) pairs using zip(): pairs = zip(d.values(),
+| >   d.keys()).
+| 
+| I stand corrected. Thanks Cameron.
+
+Oh, I was all ready to say what you said, but decided to check the docs
+myself first:-)
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+I really don't like :-) symbols as well. I feel that if you can't see the pie
+coming, you deserve whipped cream up your nose.
+        - robd@cherry.cray.com (rob derrick)

@@ -1,0 +1,141 @@
+Return-Path: <python-ideas-bounces+cs=zip.com.au@python.org>
+Delivered-To: unknown
+Received: from mail.zip.com.au (125.255.95.3) by janus.home with POP3-SSL; 12
+  Jan 2012 01:45:02 -0000
+Delivered-To: cs@zipworld.com.au
+Received: from mailin4-syd3.pacific.net.au (mailin4-syd3.pacific.net.au [125.255.92.145])
+	by mailstore1.syd.pacific.net.au (Postfix) with ESMTP id 934609531D
+	for <cs@zipworld.com.au>; Thu, 12 Jan 2012 12:44:50 +1100 (EST)
+Received: from mail.python.org (unknown [82.94.164.166])
+	by mailin4-syd3.pacific.net.au (Postfix) with ESMTP id E8E3F4D8089
+	for <cs@zip.com.au>; Thu, 12 Jan 2012 12:44:46 +1100 (EST)
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3TNqdn5lRzzN75
+	for <cs@zip.com.au>; Thu, 12 Jan 2012 02:44:45 +0100 (CET)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=python.org; s=200901;
+	t=1326332685; bh=VhmfrJYAxv2ZBrhkgWPnsTxju5DzWXXXG8kuPInUnE8=;
+	h=Date:From:To:Message-ID:MIME-Version:In-Reply-To:References:Cc:
+	 Subject:List-Id:List-Unsubscribe:List-Archive:List-Post:List-Help:
+	 List-Subscribe:Content-Type:Content-Transfer-Encoding:Sender;
+	b=QGrQourfmxeowf47b0HVvdo/0tfmD/L7bWowVML6+byO+xydbfOHmppJWgaIgz0gJ
+	 yTMf3N1xj1MPonM0WqsqrP/+nBUA4wI/eVpXx0u2Tkx/8xfHWlJkYc+gERnXIoH33W
+	 7PLCczwCYV/7+uHYTPMKIPicCWliK/89wMb3JXLE=
+X-Original-To: python-ideas@python.org
+Delivered-To: python-ideas@mail.python.org
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3TNqXr1QJ1zNF7
+	for <python-ideas@python.org>; Thu, 12 Jan 2012 02:40:28 +0100 (CET)
+X-Spam-Status: OK 0.000
+X-Spam-Evidence: '*H*': 1.00; '*S*': 0.00; 'sorts': 0.04;
+	'received:edu.au': 0.07; 'terry': 0.07; 'default)': 0.09; 'flush':
+	0.09; 'subject:()': 0.09; '"calling': 0.16; '"to': 0.16;
+	'elsewhere,': 0.16; 'from:addr:cs': 0.16; 'from:addr:zip.com.au':
+	0.16; 'from:name:cameron simpson': 0.16; 'message-
+	id:@cskk.homeip.net': 0.16; 'received:202.125.174': 0.16;
+	'received:202.125.174.133': 0.16;
+	'received:boardofstudies.nsw.edu.au': 0.16;
+	'received:cskk.homeip.net': 0.16;
+	'received:harvey.boardofstudies.nsw.edu.au': 0.16;
+	'received:homeip.net': 0.16; 'received:nsw.edu.au': 0.16; 'reedy':
+	0.16; 'shallow': 0.16; 'stdout': 0.16; 'subject:Pythonic': 0.16;
+	'subject:print': 0.16; 'wording': 0.16; 'wrote:': 0.18;
+	'slightly': 0.19; '(which': 0.19; 'cc:no real name:2**0': 0.20;
+	'cheers,': 0.20; '(but': 0.21; 'wrote': 0.22; 'header:In-Reply-
+	To:1': 0.22; 'concise': 0.23; "shouldn't": 0.23; 'skip:` 20':
+	0.23; 'defined': 0.24; 'steve': 0.24; 'cc:2**0': 0.24; 'specify':
+	0.24; 'suspect': 0.24; '(and': 0.28; 'cc:addr:python.org': 0.29;
+	'pm,': 0.29; 'example': 0.29; 'seem': 0.30; 'btw,': 0.30;
+	'controls': 0.30; 'discussion.': 0.30; 'gap': 0.30; 'now)': 0.30;
+	"i've": 0.31; 'does': 0.32; 'values': 0.32; 'aid': 0.32;
+	'appearance': 0.32; 'changes': 0.32; 'idea': 0.32; 'comment':
+	0.32; 'header:User-Agent:1': 0.33; 'there': 0.33; 'it.': 0.34;
+	'file.': 0.34; 'doc': 0.34; 'here,': 0.35; 'issue': 0.35;
+	'unless': 0.35; 'post': 0.36; 'file': 0.36; 'received:au': 0.36;
+	'charset:us-ascii': 0.37; 'skip:" 10': 0.37; 'but': 0.37;
+	'problems': 0.37; 'screen': 0.38; "i'd": 0.39; 'your': 0.61;
+	'immediate': 0.65; 'received:202': 0.66; 'special': 0.68;
+	'cameron': 0.73; 'gas': 0.84; 'doubt,': 0.84; 'flushing': 0.84;
+	'streams': 0.84
+Received: from localhost (HELO mail.python.org) (127.0.0.1)
+	by albatross.python.org with SMTP; 12 Jan 2012 02:40:28 +0100
+Received: from harvey.boardofstudies.nsw.edu.au
+	(mail2.rack1.boardofstudies.nsw.edu.au [202.125.174.133])
+	by mail.python.org (Postfix) with ESMTP
+	for <python-ideas@python.org>; Thu, 12 Jan 2012 02:40:27 +0100 (CET)
+Received: from cskk.homeip.net (localhost.localdomain [127.0.0.1])
+	by harvey.boardofstudies.nsw.edu.au (Postfix) with ESMTP id A83564D3B54;
+	Thu, 12 Jan 2012 12:40:17 +1100 (EST)
+Received: by janus.cskk.homeip.net (Postfix, from userid 1000)
+	id 917A2100419B7; Thu, 12 Jan 2012 12:40:17 +1100 (EST)
+Date: Thu, 12 Jan 2012 12:40:17 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Terry Reedy <tjreedy@udel.edu>
+Message-ID: <20120112014017.GA14688@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <jel8mm$bb0$1@dough.gmane.org>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+References: <jel8mm$bb0$1@dough.gmane.org>
+Cc: python-ideas@python.org
+Subject: Re: Pythonic buffering in Py3 print()
+X-BeenThere: python-ideas@python.org
+X-Mailman-Version: 2.1.12
+Precedence: list
+List-Id: Discussions of speculative Python language ideas
+	<python-ideas.python.org>
+List-Unsubscribe: <http://mail.python.org/mailman/options/python-ideas>,
+	<mailto:python-ideas-request@python.org?subject=unsubscribe>
+List-Archive: <http://mail.python.org/pipermail/python-ideas>
+List-Post: <mailto:python-ideas@python.org>
+List-Help: <mailto:python-ideas-request@python.org?subject=help>
+List-Subscribe: <http://mail.python.org/mailman/listinfo/python-ideas>,
+	<mailto:python-ideas-request@python.org?subject=subscribe>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Sender: python-ideas-bounces+cs=zip.com.au@python.org
+Errors-To: python-ideas-bounces+cs=zip.com.au@python.org
+X-Cats2Procmailrc-Rule: cats/home: python  python-ideas    sender:python-ideas-bounces+cs=zip.com.au@python.org
+X-Label: python-ideas
+Content-Length: 1791
+
+On 11Jan2012 19:15, Terry Reedy <tjreedy@udel.edu> wrote:
+| On 1/11/2012 6:02 PM, Cameron Simpson wrote:
+| >Better if we only specify behaviour for True (flush now) and
+| >None/default/missing (flush default) and make it slightly clear that
+| >other values do not have defined behaviour.
+| 
+| That was the intent of my suggested doc rewording -- file controls
+| flushing unless flush=True is given. What I wrote on the issue was a
+| first try and I suspect that there are other and perhaps better
+| concise wordings. Post one on the issue if you have one. (But
+| writing in 'doc style' is not always easy ;-).
+
+Do I comment here, or in #11633 (which is closed) or in #13761?
+We seem to have multiple streams of discussion.
+
+BTW, regarding #11633, I don't like your sentence:
+
+  Use ``sys.stdout.flush()`` to ensure immediate appearance on a screen
+
+Shouldn't that be "*file*.flush()" ? I would _not_ want to give a
+shallow reader the idea that flushing stdout magicly sorts their
+problems with a specific file. And I've seen that level of logical gap
+in various questions on python-list (and elsewhere, of course).
+
+I'd also change "ensure immediate appearance on a screen" to "ensure
+immediate output, for example to ensure appearance on a screen".
+Again, it changes the wording from "to perform this specific special
+case call flush" to "calling flush does blah, for example to aid this
+specific case".
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+When in doubt, gas it. It may not solve the problem, but it ends the suspense.
+        - Steve Moonitz (92 Ducati 900ss) <stevem@ew.timeinc.com>
+_______________________________________________
+Python-ideas mailing list
+Python-ideas@python.org
+http://mail.python.org/mailman/listinfo/python-ideas

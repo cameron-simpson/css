@@ -1,0 +1,79 @@
+Date: Mon, 2 Nov 2009 16:29:00 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Chris Bergstresser <chris@subtlety.com>
+Cc: Steven D'Aprano <steve@pearwood.info>, python-dev@python.org
+Subject: Re: Retrieve an arbitrary element from a set withoutremoving it
+Message-ID: <20091102052900.GA25160@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <7b0045ed0910301843y7059d316s8a851142b78b7aeb@mail.gmail.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 3161
+
+On 30Oct2009 20:43, Chris Bergstresser <chris@subtlety.com> wrote:
+| On Fri, Oct 30, 2009 at 8:29 PM, Steven D'Aprano <steve@pearwood.info> wrote:
+| >> > Iterating over an iterable is
+| >> > what iterators are for.
+| >
+| > set.get(), or set.pick() as Wikipedia calls it, isn't for iterating over
+| > sets. It is for getting an arbitrary element from the set.
+[...]
+| > The purpose is to
+| > return an arbitrary item each time it is called. If two threads get the
+| > same element, that's not a problem; if one thread misses an element
+| > because another thread grabbed it first, that's not a problem either.
+| > If people prefer a random element instead, I have no problem with
+| > that -- personally I think that's overkill, but maybe that's just me.
+| 
+|    I also think returning a random one is overkill, in the base set.
+| And I'd have the base implementation do the simplest thing possible:
+| return a fixed element (either the first returned when iterated over,
+| or the last stored, or whatever's easiest based on the internals).
+| For me, leaving the choice of *which* element to return on each call
+| is a feature.  It allows subclasses to change the behavior to support
+| other use cases, like a random or round-robin behavior.
+
+Personally, I'm for the iteration spec in a lot of ways.
+
+Firstly, a .get()/.pick() that always returns the same element feels
+horrible. Is there anyone here who _likes_ it?
+
+Secondly, I think the thread-unsafe arguments are weak. Question: is the
+existing set iteration scheme thread safe? i.e. does it return a fresh
+iterator that a thread can happily use concurrently while another thread
+uses its own iterator?  (Absent set modifications). If the answer is yes,
+then I don't buy the thread-unsafe complaints - there are already plenty
+of thread unsafe things much as lots of iterators will break in the face
+of changes to the data structures over which they're iterating. If
+iter(set) gets you a safe iterator (absent set modification and multiple
+users of that iterator) then thread safe methods exist and are easy to
+use. No presently thread-safe program is going to be broken by adding an
+iterating .get() method.
+
+Thirdly, an iteration-like .get() is dead easy to provide: you just keep a
+_single_, cycling, internal iterator made on demand the same way __iter__
+already works. So why not do just do it? There's no need to construct it
+before anyone calls .get() the first time. Somewhat like:
+
+  def get(self):
+    for x in self:
+      return x
+    raise something here
+
+but not making a new iterator for every caller. Indeed, making a new
+iterater per caller, in addition to being expensive, might easily return
+the same element to every caller.
+
+Do anyone feel an iteration capable .get() unduely burdens subclasses
+that want to impement different .get()s? Both the suggested potential
+subclass choices (round robin and random) suggest iteration capable
+.get()s (presuming "random" means "shuffle order" rather than potentially
+returning the same element twice).
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Why doesn't DOS ever say EXCELLENT command or filename?

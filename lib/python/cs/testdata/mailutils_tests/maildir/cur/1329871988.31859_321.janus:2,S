@@ -1,0 +1,119 @@
+Date: Tue, 13 Jul 2010 17:17:06 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Jia Hu <hujia06@gmail.com>
+Cc: python-list@python.org
+Subject: Re: write a .txt file
+Message-ID: <20100713071705.GA22054@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <AANLkTil8jap3EbFMtmmzfjNYfJHRM_A3l3YO92yVLsf4@mail.gmail.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 3952
+
+On 13Jul2010 02:46, Jia Hu <hujia06@gmail.com> wrote:
+| Hi:
+| 
+| Do you mean the following code?
+| 
+| #!/usr/bin/python
+| # OS: Ubuntu
+| import subprocess
+| fileName = open ('final.txt', 'a')
+| fileName.write ('%s %s %s \n' % (12,25,9))
+| 
+| fileName.flush()   # add
+| fileName.close()  # add
+
+You should not need the .close().
+
+| desLrr = subprocess.Popen('ls -a >> final.txt', shell=True)  # change to "ls
+| -a"
+
+You're still not waiting for the Popen subprocess to finish before
+continuing.
+
+| fileName=open ('final.txt', 'a')
+
+You shouldn't need the open() if you skip the .close()
+
+| fileName.seek(0,2)
+
+If you _do_ do an open(..., "a") then you don't need the seek - append
+mode will write at the end for you.
+
+| fileName.write ('%s %s %s \n' % (85,25,12))
+| fileName.close()
+| 
+| I run that, the result showed the list of file is located after the number
+| list 85 25 12
+| Is that possible that I put the fileName.flush() in a wrong position ?
+| I am new to Python and do not quite understand the "flush" concept.
+
+First: please don't top post. Post below the relevant points as I do
+above, like a conversation. That way it is clear exactly what each
+remark is for.
+
+Second: "flush" is a general idea used with buffers.
+
+When you .write() to a file the data does not normally go directly to
+disc.  This is because a real write to the disc is expensive in time
+(the CPU is much much faster than a hard drive).
+
+Also, a OS-level "write", which transfers the data from your program into
+the OS's buffers (where it queues, for eventual writing to the disc)
+is _also_ a comparitively expensive operation. So when you .write()
+in python (or C using stdio, and in many other languages) the data is
+normally kept in a memory buffer inside your program. Only when that
+buffer is filled is an OS-level "write" done. In this way, OS calls are
+few. This is a performance gain.
+
+So, in your program, when you .write() your first line of numbers
+the data has not been handed to the OS at all, and therefore the
+"final.txt" file has not seen it. A .flush() call is an explicit request
+to empty the buffer, making an OS-level "write" immediately. In your
+program, this is necessary to get the data to "final.txt" before the
+"echo" or "ls" commands are run.
+
+If you .close() a file, that also empties the buffer. But it also closes
+the file! SO you need to re-open it. For your purposes, a .flush() is
+enough and leaves the file open for you to continue using it later.
+
+Regarding the .seek(): after the "echo" or "ls" command has run
+the file  has grown. Python's "file" object does not know the file has
+grown because it was not involved. So a .seek(0 is needed to position
+Python's .write() location to the end of the file instead of where it
+though things were.
+
+Um. Because you have opened the file in 'a' mode you should not need the
+.seek() - an "append" mode file will always write to the end of the
+file.
+
+So: your first problem only requires a .flush(), to empty the buffer
+before "echo" or "ls" runs. However, you still have not waited for the
+"echo" or "ls" to finish - Popen kicks the command off, but it will run
+at the same time as your program! Call:
+
+  desLrr.wait()
+
+to wait for the "echo" or "ls" to finish before continuing!
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Quick Guide to Resources to break crypto systems of given strength:
+Difficulty Resources required
+ 2**0      Pencil and paper
+ 2**8      Pencil and paper and a lot of patience
+ 2**16     Warez d00d with a Commodore 64
+ 2**32     Amateur with an average PC
+ 2**40     Smart amateur with a good PC
+ 2**56     Network of workstations, custom-built hardware
+ 2**64     Thousands of PCs working together for several years
+ 2**80     NSA, Microsoft, the Illuminati
+ 2**128    Cubic kilometers of sci-fi nanotech
+ 2**160    Dyson spheres
+Eddy L O Jansson and Matthew Skala, from:
+http://hem.passagen.se/eddy1/reveng/cp4/cp4break.html

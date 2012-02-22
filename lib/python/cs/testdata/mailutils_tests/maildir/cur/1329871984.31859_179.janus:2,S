@@ -1,0 +1,70 @@
+Date: Fri, 15 Jul 2011 17:44:03 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Steven D'Aprano <steve+comp.lang.python@pearwood.info>
+Cc: python-list@python.org
+Subject: Re: None versus MISSING sentinel -- request for design feedback
+Message-ID: <20110715074403.GA827@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <4e1fd009$0$29986$c3e8da3$5496439d@news.astraweb.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 2053
+
+On 15Jul2011 15:28, Steven D'Aprano <steve+comp.lang.python@pearwood.info> wrote:
+| In favour of None: it's already there, no extra code required. People may
+| expect it to work.
+
+Broadly, I like this one for the reasons you cite.
+
+| Against None: it's too easy to mistakenly add None to a data set by mistake,
+| because functions return None by default.
+
+This is a hazard everywhere, but won't such a circumstance normally
+break lots of stuff anyway? What's an example scenario for getting None
+by accident but still a bunch of non-None values? The main one I can
+imagine is a function with a return path that accidentally misses the
+value something, eg:
+
+  def f(x):
+    if blah:
+      return 7
+    ...
+    if foo:
+      return 0
+    # whoops!
+
+
+I suppose there's no scope for having the append-to-the-list step sanity
+check for the sentinel (be it None or otherwise)?
+
+| In favour of a dedicated MISSING singleton: it's obvious from context. It's
+| not a lot of work to implement compared to using None. Hard to accidentally
+| include it by mistake. If None does creep into the data by accident, you
+| get a nice explicit exception.
+
+I confess to being about to discard None as a sentinel in a bit of my
+own code, but only to allow None to be used as a valid value, using the
+usual idiom:
+
+  class IQ(Queue):
+    def __init__(self, ...):
+      self._sentinel = object()
+      ...
+
+| Against MISSING: users may expect to be able to choose their own sentinel by
+| assigning to MISSING. I don't want to support that.
+
+Well, we don't have readonly values to play with :-(
+Personally I'd do what I did above: give it a "private" name like
+_MISSING so that people should expect to have inside (and unsupported,
+unguarenteed) knowledge if they fiddle with it. Or are you publishing
+the sentinal's name to your callers i.e. may they really return _MISSING
+legitimately from their functions?
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+What's fair got to do with it? It's going to happen.    - Lawrence of Arabia

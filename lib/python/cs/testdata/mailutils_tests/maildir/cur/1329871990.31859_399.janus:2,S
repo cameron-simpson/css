@@ -1,0 +1,85 @@
+Date: Sun, 14 Feb 2010 17:12:06 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Kyp <kyp@stsci.edu>
+Cc: python-list@python.org
+Subject: Re: iglob performance no better than glob
+Message-ID: <20100214061206.GA31131@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: inline
+Content-Transfer-Encoding: 8bit
+In-Reply-To: <449a19de-42f7-4ae3-8099-99c27572adc8@m16g2000yqc.googlegroups.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 2762
+
+On 31Jan2010 16:23, Kyp <kyp@stsci.edu> wrote:
+| On Jan 31, 2:44 pm, Peter Otten <__pete...@web.de> wrote:
+| > Kyp wrote:
+| > > I have a dir with a large # of files that I need to perform operations
+| > > on, but only needing to access a subset of the files, i.e. the first
+| > > 100 files.
+| > > Using glob is very slow, so I ran across iglob, which returns an
+| > > iterator, which seemed just like what I wanted. I could iterate over
+| > > the files that I wanted, not having to read the entire dir.
+[...]
+| > > So the iglob was faster, but accessing the first file took about the
+| > > same time as glob.glob.
+| >
+| > > Here's some code to compare glob vs. iglob performance,  it outputs
+| > > the time before/after a glob.iglob('*.*') files.next() sequence and a
+| > > glob.glob('*.*') sequence.
+| >
+| > > #!/usr/bin/env python
+| >
+| > > import glob,time
+| > > print '\nTest of glob.iglob'
+| > > print 'before       iglob:', time.asctime()
+| > > files = glob.iglob('*.*')
+| > > print 'after        iglob:',time.asctime()
+| > > print files.next()
+| > > print 'after files.next():', time.asctime()
+| >
+| > > print '\nTest of glob.glob'
+| > > print 'before        glob:', time.asctime()
+| > > files = glob.glob('*.*')
+| > > print 'after         glob:',time.asctime()
+| >
+| > > Here are the results:
+| >
+| > > Test of glob.iglob
+| > > before       iglob: Sun Jan 31 11:09:08 2010
+| > > after        iglob: Sun Jan 31 11:09:08 2010
+| > > foo.bar
+| > > after files.next(): Sun Jan 31 11:09:59 2010
+| >
+| > > Test of glob.glob
+| > > before        glob: Sun Jan 31 11:09:59 2010
+| > > after         glob: Sun Jan 31 11:10:51 2010
+| >
+| > > The results are about the same for the 2 approaches, both took about
+| > > 51 seconds. Am I doing something wrong with iglob?
+| >
+| > No, but iglob() being lazy is pointless in your case because it uses
+| > os.listdir() and fnmatch.filter() underneath which both read the whole
+| > directory before returning anything.
+| >
+| > > Is there a way to get the first X # of files from a dir with lots of
+| > > files, that does not take a long time to run?
+| >
+| > Here's my attempt. [...open directory and read native format...]
+
+I'd be inclined first to time os.listdir('.') versus glob.lgo('*.*').
+
+Glob routines tend to lstat() every matching name to ensure the path
+exists. That's very slow. If you just do os.listdir() and choose your
+100 nmaes, you only need to stat (or just try to open) them.
+
+So time glob.glob("*.*") versus os.listdir(".") first.
+
+Generally, with a large directory, stat time will change performance
+immensely.
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Usenet is essentially a HUGE group of people passing notes in class. --R. Kadel

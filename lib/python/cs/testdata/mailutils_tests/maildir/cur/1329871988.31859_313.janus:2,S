@@ -1,0 +1,63 @@
+Date: Wed, 21 Jul 2010 16:22:27 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Sturla Molden <sturla@molden.no>
+Cc: python-ideas@python.org
+Subject: Re: Add faster locks to the threading module?
+Message-ID: <20100721062226.GA12223@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <4C4644A9.3040502@molden.no>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 2129
+
+On 21Jul2010 02:51, Sturla Molden <sturla@molden.no> wrote:
+| Thread synchronization with threading.Lock can be expensive. But
+| consider this: Why should the active thread need to aquire a mutex,
+| when it already holds one? That would be the GIL.
+| 
+| Instead of acqiring a lock (and possibly inducing thread swiching
+| etc.), it could just deny the other threads access to the GIL for a
+| while. The cost of that synchronization method would be completely
+| amortized, as check intervals happen anyway.
+[...]
+| The usecase for this "gillock" is about the same as for a spinlock
+| C. We want synchronization for a breif period of time, but don't
+| want the overhead of aquiring a mutex.
+
+But a spinlock _does_ acquire a mutex, unless I misremember.
+
+It is just that instead of using a more expensive mutex mechanism that
+deschedules the caller until available it sits there banging its head
+against a very lightweight (not descheduling) mutex until it gets it;
+the efficiency is entirely reliant on _all_ users of the spinlock doing
+very little inside the located period.
+
+And therein lies one of my two misgivings about this idea: users of this
+must be very careful at all times to do Very Little inside the lock.
+Just like a spinlock. This seems very easy to misuse.
+
+The other misgiving is one you've already mentioned in passing:
+
+  P.S. A gillock working like the ctypes code above is of course very
+  dangerous. If a C extension releases the GIL while _Py_Ticker is
+  astronomic, we have a very bad situation... But real code could try
+  to safeguard against this. E.g. Py_BEGIN_ALLOW_THREADS and
+  Py_END_ALLOW_THREADS could be defined to do nothing if _Py_Ticker is
+  above some ridiculous threshold.
+
+Suppose someone goes:
+
+  with threadsafe():
+    x = fp.read(1)
+
+and the read blocks? It looks like trivial code but I think the I/O
+stuff will release the GIL over a read. Now you're not safe any more.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+The ZZR-1100 is not the bike for me, but the day they invent "nerf" roads
+and ban radars I'll be the first in line......AMCN

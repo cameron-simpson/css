@@ -1,0 +1,106 @@
+Return-Path: <python-ideas-bounces+cs=zip.com.au@python.org>
+Delivered-To: unknown
+Received: from mail.zip.com.au (125.255.95.3) by janus.home with POP3-SSL; 01
+  Nov 2010 03:31:02 -0000
+Delivered-To: cs@zipworld.com.au
+Received: from mailin2.pacific.net.au (mailin2.pacific.net.au [61.8.0.81])
+	by mailstore2.syd.pacific.net.au (Postfix) with ESMTP id 563A56A30
+	for <cs@zipworld.com.au>; Mon,  1 Nov 2010 14:30:12 +1100 (EST)
+Received: from mail.python.org (unknown [82.94.164.166])
+	by mailin2.pacific.net.au (Postfix) with ESMTP id A2A8A19C122
+	for <cs@zip.com.au>; Mon,  1 Nov 2010 14:30:11 +1100 (EST)
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 11577EE9E7
+	for <cs@zip.com.au>; Mon,  1 Nov 2010 04:30:10 +0100 (CET)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=python.org; s=200901;
+	t=1288582210; bh=Fv+Xv1RTnjGEWwoqfxxQy/Fu6TSuI8VgcwRvmQw526M=;
+	h=Date:From:To:Message-ID:MIME-Version:In-Reply-To:References:Cc:
+	 Subject:List-Id:List-Unsubscribe:List-Archive:List-Post:List-Help:
+	 List-Subscribe:Content-Type:Content-Transfer-Encoding:Sender;
+	b=qf1q7CGbs7OJPbSObbQmSKL1jwV/8hFCzbyShlWRJ4LxGmURJ1T6zORnWalnLTgqd
+	 Sn1kDa2yyrsoTwlW3zCAZ8dtAquLoWjVHv3nHFZo5k+h82zGNdVVRGnscVZQ6Ac2S/
+	 iXDuL7Iegpv5xaQWX+Hist/464mBsBBrnTwgroUU=
+X-Original-To: python-ideas@python.org
+Delivered-To: python-ideas@mail.python.org
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id EDD85EE987
+	for <python-ideas@python.org>; Mon,  1 Nov 2010 04:29:38 +0100 (CET)
+X-Spam-Status: OK 0.003
+X-Spam-Evidence: '*H*': 0.99; '*S*': 0.00; 'pep': 0.09; 'wrote:':
+	0.13; 'verbal': 0.13; 'protocol': 0.15; 'adopted': 0.16;
+	'from:addr:cs': 0.16; 'from:addr:zip.com.au': 0.16;
+	'from:name:cameron simpson': 0.16; 'message-id:@cskk.homeip.net':
+	0.16; 'received:202.125.174': 0.16; 'received:202.125.174.133':
+	0.16; 'received:boardofstudies.nsw.edu.au': 0.16;
+	'received:cskk.homeip.net': 0.16;
+	'received:harvey.boardofstudies.nsw.edu.au': 0.16;
+	'received:homeip.net': 0.16; 'received:nsw.edu.au': 0.16;
+	'url:dev': 0.16; 'url:peps': 0.16; 'cc:no real name:2**0': 0.18;
+	'cc:2**0': 0.21; 'received:edu.au': 0.23; 'header:In-Reply-To:1':
+	0.23; 'code': 0.25; 'stefan': 0.30; 'cc:addr:python.org': 0.30;
+	'discussion': 0.30; 'it.': 0.32; 'conference': 0.33; 'header:User-
+	Agent:1': 0.34; 'using': 0.35; 'think': 0.37; 'still': 0.37;
+	'aid': 0.38; 'charset:us-ascii': 0.38; 'should': 0.38; 'subject::
+	': 0.38; 'url:python': 0.39; 'url:org': 0.39; 'really': 0.39;
+	'some': 0.39; 'me.': 0.40; 'wired': 0.67; 'victor': 0.91
+Received: from localhost (HELO mail.python.org) (127.0.0.1)
+	by albatross.python.org with SMTP; 01 Nov 2010 04:29:38 +0100
+Received: from harvey.boardofstudies.nsw.edu.au
+	(mail2.rack1.boardofstudies.nsw.edu.au [202.125.174.133])
+	by mail.python.org (Postfix) with ESMTP
+	for <python-ideas@python.org>; Mon,  1 Nov 2010 04:29:38 +0100 (CET)
+Received: from cskk.homeip.net (localhost.localdomain [127.0.0.1])
+	by harvey.boardofstudies.nsw.edu.au (Postfix) with ESMTP id EF0BB4D396D;
+	Mon,  1 Nov 2010 14:29:29 +1100 (EST)
+Received: by janus.cskk.homeip.net (Postfix, from userid 1000)
+	id D3E09100419B7; Mon,  1 Nov 2010 14:29:29 +1100 (EST)
+Date: Mon, 1 Nov 2010 14:29:29 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Stefan Behnel <stefan_ml@behnel.de>
+Message-ID: <20101101032929.GA22908@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <iakeve$6mn$1@dough.gmane.org>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+References: <iakeve$6mn$1@dough.gmane.org>
+Cc: python-ideas@python.org
+Subject: Re: Accepting "?" as a valid character for
+	identifiers
+X-BeenThere: python-ideas@python.org
+X-Mailman-Version: 2.1.12
+Precedence: list
+List-Id: Discussions of speculative Python language ideas
+	<python-ideas.python.org>
+List-Unsubscribe: <http://mail.python.org/mailman/options/python-ideas>,
+	<mailto:python-ideas-request@python.org?subject=unsubscribe>
+List-Archive: <http://mail.python.org/pipermail/python-ideas>
+List-Post: <mailto:python-ideas@python.org>
+List-Help: <mailto:python-ideas-request@python.org?subject=help>
+List-Subscribe: <http://mail.python.org/mailman/listinfo/python-ideas>,
+	<mailto:python-ideas-request@python.org?subject=subscribe>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Sender: python-ideas-bounces+cs=zip.com.au@python.org
+Errors-To: python-ideas-bounces+cs=zip.com.au@python.org
+X-Cats2Procmailrc-Rule: cats/home: python  python-ideas    python-ideas@python.org
+X-Label: python-ideas
+Content-Length: 687
+
+On 31Oct2010 20:10, Stefan Behnel <stefan_ml@behnel.de> wrote:
+| Hmm, that reminds me. I think we should reconsider PEP 3117. There's
+| still some value in it.
+| http://www.python.org/dev/peps/pep-3117/
+
+Hmm. It really needs an update: Victor Borge's pronunciation protocol
+should be adopted to aid verbal discussion of code using the proposed
+extensions.
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+quantum-dot anti-counterfeiting
+- overhead by WIRED at the Intelligent Printing conference Oct2006
+_______________________________________________
+Python-ideas mailing list
+Python-ideas@python.org
+http://mail.python.org/mailman/listinfo/python-ideas

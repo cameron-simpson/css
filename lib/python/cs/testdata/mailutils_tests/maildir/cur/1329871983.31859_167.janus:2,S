@@ -1,0 +1,33 @@
+Date: Sun, 17 Jul 2011 09:24:37 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: comp.lang.python@googlegroups.com
+Cc: python-list@python.org,
+	Billy Mays <81282ed9a88799d21e77957df2d84bd6514d9af6@myhashismyemail.com>
+Subject: Re: Looking for general advice on complex program
+Message-ID: <20110716232437.GA5780@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <5db1e650-54c2-46c4-bafc-496579f9c26c@glegroupsg2000goo.googlegroups.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+Content-Length: 867
+
+On 16Jul2011 10:37, Josh English <Joshua.R.English@gmail.com> wrote:
+| You use a directory as lock mechanism. I think I get how that works.
+| When you're done manipulating the file, do you just remove the director?
+
+Yes. The advantages of a directory are twofold: you can't mkdir() twice
+while you can usually open the same file for write more than once (hence
+the umask 0777 thing, to prevent that); secondly you can put stuff in it
+though that makes removing the directory more work when you're done with
+it.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+THE LOST WORLD is based on (so loosely as to re-define "based on" as
+"with the same title as") Michael Crichton's sequel novel, which
+introduced us to a second island where dinosaurs were being genetically
+engineered.     - Scott Renshaw on _Jurassic_Park_'s sequel

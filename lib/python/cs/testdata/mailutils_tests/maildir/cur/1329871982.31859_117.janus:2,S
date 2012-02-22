@@ -1,0 +1,195 @@
+Return-Path: <python-list-bounces+cs=zip.com.au@python.org>
+Delivered-To: unknown
+Received: from mail.zip.com.au (125.255.95.3) by janus.home with POP3-SSL; 17
+  Sep 2011 23:27:02 -0000
+Delivered-To: cs@zipworld.com.au
+Received: from mailin3-syd3.pacific.net.au (mailin3-syd3.pacific.net.au [125.255.92.144])
+	by mailstore2.syd.pacific.net.au (Postfix) with ESMTP id CF0D06A87
+	for <cs@zipworld.com.au>; Sun, 18 Sep 2011 09:26:33 +1000 (EST)
+Received: from mail.python.org (unknown [82.94.164.166])
+	by mailin3-syd3.pacific.net.au (Postfix) with ESMTP id 19B3840009D
+	for <cs@zip.com.au>; Sun, 18 Sep 2011 09:27:08 +1000 (EST)
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3S1V3q6166zP22
+	for <cs@zip.com.au>; Sun, 18 Sep 2011 01:26:31 +0200 (CEST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=python.org; s=200901;
+	t=1316301991; bh=VuLCPsqJE0YROrFq8OACUsnqA6MKaQbFMwQ9cDWETZ8=;
+	h=Date:From:To:Subject:Message-ID:MIME-Version:In-Reply-To:
+	 References:Cc:List-Id:List-Unsubscribe:List-Archive:List-Post:
+	 List-Help:List-Subscribe:Content-Type:Content-Transfer-Encoding:
+	 Sender;
+	b=mfg2Uiw4JYHF/exnVTRG8AsREVGu0BU0jsjqbv8gXDYajAIVqFd1ZQGKfY0sPF3/5
+	 gASMJg1LBoKVsVr9iJONVmlHuD+3DKxhCNISXEWMw5Ym0Igretl/fkz+ukIclhhzao
+	 YzWEjS6lWHNx4BJhmqUJjAMjkwBcdH8h9r6m49z4=
+X-Original-To: python-list@python.org
+Delivered-To: python-list@mail.python.org
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3S1V0j6mv5zNvX
+	for <python-list@python.org>; Sun, 18 Sep 2011 01:23:49 +0200 (CEST)
+X-Spam-Status: OK 0.000
+X-Spam-Evidence: '*H*': 1.00; '*S*': 0.00; 'context': 0.04; 'handler':
+	0.04; 'typing': 0.04; 'correspond': 0.07; 'interpreter': 0.07;
+	'received:edu.au': 0.07; 'stuff,': 0.07; 'threads,': 0.07;
+	'typed': 0.07; 'unexpected': 0.07; 'python': 0.08; '(there': 0.09;
+	'deprecated': 0.09; 'exceptions': 0.09; 'exceptions,': 0.09;
+	'object;': 0.09; 'url.': 0.09; 'am,': 0.12; 'exception': 0.12;
+	'library': 0.15; 'subject:was': 0.15; '(eg': 0.16; 'abort': 0.16;
+	'forking': 0.16; 'from:addr:cs': 0.16; 'from:addr:zip.com.au':
+	0.16; 'from:name:cameron simpson': 0.16; 'it...': 0.16; 'message-
+	id:@cskk.homeip.net': 0.16; 'mutex': 0.16; 'posix': 0.16;
+	'received:202.125.174': 0.16; 'received:202.125.174.133': 0.16;
+	'received:boardofstudies.nsw.edu.au': 0.16;
+	'received:cskk.homeip.net': 0.16;
+	'received:harvey.boardofstudies.nsw.edu.au': 0.16;
+	'received:homeip.net': 0.16; 'received:nsw.edu.au': 0.16; 'rogue':
+	0.16; 'subject:Killing': 0.16; 'subject:expression': 0.16;
+	'subject:regular': 0.16; 'subject:threads': 0.16; 'thing?': 0.16;
+	'threading': 0.16; 'try/except': 0.16; 'upset': 0.16; 'cc:addr
+	:python-list': 0.16; 'looked': 0.16; 'this:': 0.16; 'wrote:':
+	0.16; 'cheers,': 0.18; 'avoiding': 0.18; 'interesting.': 0.18;
+	'programming': 0.20; 'cc:no real name:2**0': 0.20; 'java': 0.21;
+	'maybe': 0.21; 'discussion': 0.22; "doesn't": 0.22; 'steve': 0.22;
+	'header:In-Reply-To:1': 0.22; 'locking': 0.23; 'sep': 0.23; 'pm,':
+	0.24; 'checked': 0.24; 'code': 0.25; 'code.': 0.26; "i'm": 0.27;
+	'separate': 0.28; 'otherwise.': 0.28; 'sat,': 0.28; 'facility':
+	0.29; "won't": 0.29; 'asking': 0.29; 'cc:addr:python.org': 0.30;
+	'cc:addr:gmail.com': 0.30; 'commands,': 0.30; 'concern.': 0.30;
+	'robust': 0.30; 'sun,': 0.30; 'threads': 0.30; 'programmers':
+	0.31; 'seem': 0.31; 'chris': 0.32; 'subject: \n\t': 0.32; 'used,':
+	0.32; 'objects': 0.32; 'does': 0.32; 'implement': 0.32; 'app':
+	0.33; 'sort': 0.33; "can't": 0.33; 'there': 0.33; "i've": 0.34;
+	'...': 0.34; 'header:User-Agent:1': 0.34; 'causing': 0.34;
+	'nobody': 0.34; 'quite': 0.34; 'setting': 0.34; '17,': 0.34;
+	'flag': 0.34; 'latter': 0.34; 'mental': 0.34; 'stopping': 0.34;
+	'here,': 0.35; 'hold': 0.35; 'object': 0.35; 'charset:us-ascii':
+	0.36; 'received:au': 0.36; 'doing': 0.36; 'issue': 0.36;
+	'cc:2**1': 0.36; 'checks': 0.37; 'else,': 0.37; 'thread': 0.37;
+	'but': 0.37; 'two': 0.37; 'could': 0.38; 'strong': 0.38; 'some':
+	0.38; 'should': 0.38; 'subject:: ': 0.39; 'sets': 0.39;
+	'difficult': 0.39; 'url:docs': 0.39; 'order': 0.62; 'managers':
+	0.62; 'fashion': 0.64; 'act': 0.65; 'received:202': 0.66; 'view':
+	0.67; 'cameron': 0.67; 'high': 0.67; 'air': 0.70; 'anytime': 0.71;
+	'offer': 0.72; 'anywhere,': 0.73; 'low': 0.73; 'offering': 0.75;
+	'concerns': 0.80; 'programs,': 0.80; '5:00': 0.84; 'supposedly':
+	0.84; 'troubles': 0.84; 'killing': 0.91; 'regions': 0.93;
+	'subject:long': 0.93; 'tied': 0.93
+Received: from localhost (HELO mail.python.org) (127.0.0.1)
+	by albatross.python.org with SMTP; 18 Sep 2011 01:23:49 +0200
+Received: from harvey.boardofstudies.nsw.edu.au
+	(mail2.rack1.boardofstudies.nsw.edu.au [202.125.174.133])
+	by mail.python.org (Postfix) with ESMTP
+	for <python-list@python.org>; Sun, 18 Sep 2011 01:23:49 +0200 (CEST)
+Received: from cskk.homeip.net (localhost.localdomain [127.0.0.1])
+	by harvey.boardofstudies.nsw.edu.au (Postfix) with ESMTP id B2FC74D3B56;
+	Sun, 18 Sep 2011 09:23:38 +1000 (EST)
+Received: by janus.cskk.homeip.net (Postfix, from userid 1000)
+	id 9B4D5100419B7; Sun, 18 Sep 2011 09:23:38 +1000 (EST)
+Date: Sun, 18 Sep 2011 09:23:38 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Chris Rebert <clp2@rebertia.com>
+Subject: Re: Killing threads (was Re: Cancel or timeout a long running
+	regular expression)
+Message-ID: <20110917232338.GA22838@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <CAMZYqRRKF8vivo132xrq3C-r8oJmuUdmoVZiXBMSf7K5XaO_eQ@mail.gmail.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+References: <CAMZYqRRKF8vivo132xrq3C-r8oJmuUdmoVZiXBMSf7K5XaO_eQ@mail.gmail.com>
+Cc: python-list@python.org
+X-BeenThere: python-list@python.org
+X-Mailman-Version: 2.1.12
+Precedence: list
+List-Id: General discussion list for the Python programming language
+	<python-list.python.org>
+List-Unsubscribe: <http://mail.python.org/mailman/options/python-list>,
+	<mailto:python-list-request@python.org?subject=unsubscribe>
+List-Archive: <http://mail.python.org/pipermail/python-list>
+List-Post: <mailto:python-list@python.org>
+List-Help: <mailto:python-list-request@python.org?subject=help>
+List-Subscribe: <http://mail.python.org/mailman/listinfo/python-list>,
+	<mailto:python-list-request@python.org?subject=subscribe>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Sender: python-list-bounces+cs=zip.com.au@python.org
+Errors-To: python-list-bounces+cs=zip.com.au@python.org
+X-Cats2Procmailrc-Rule: cats/home: python  python-list     sender:python-list-bounces+cs=zip.com.au@python.org
+X-Label: python-list
+Content-Length: 3489
+
+On 17Sep2011 15:27, Chris Rebert <clp2@rebertia.com> wrote:
+| On Sat, Sep 17, 2011 at 2:35 PM, Chris Angelico <rosuav@gmail.com> wrote:
+| > On Sun, Sep 18, 2011 at 5:00 AM, Nobody <nobody@nowhere.com> wrote:
+| >> The only robust solution is to use a separate process (threads won't
+| >> suffice, as they don't have a .kill() method).
+| >
+| > Forking a thread to discuss threads.... ahem.
+| >
+| > Why is it that threads can't be killed? Do Python threads correspond
+| > to OS-provided threads (eg POSIX threads on Linux)? Every OS threading
+| > library I've seen has some way of killing threads, although I've not
+| > looked in detail into POSIX threads there (there seem to be two
+| > options, pthread_kill and pthread_cancel, that could be used, but I've
+| > not used either). If nothing else, it ought to be possible to
+| > implement a high level kill simply by setting a flag that the
+| > interpreter will inspect every few commands, the same way that
+| > KeyboardInterrupt is checked for.
+| >
+| > Is it just that nobody's implemented it, or is there a good reason for
+| > avoiding offering this sort of thing?
+| 
+| It's possible that the reason is analogous to why Java has deprecated
+| its equivalent, Thread.stop():
+| http://download.oracle.com/javase/1.4.2/docs/guide/misc/threadPrimitiveDeprecation.html
+
+Interesting. A lot of that discussion concerns exceptions that the Java
+app is unprepared for. Java's strong typing includes the throwable
+exceptions, so that's a quite legitimate concern. The aborting mutex
+regions thing is also very real. Conversely, Python can have unexpected
+exceptions anywhere, anytime because it is not strongly typed in this
+way. That doesn't make it magicly robust against this, but does mean
+this is _already_ an issue in Python programs, threaded or otherwise.
+
+Context managers can help a lot here, in that they offer a reliable
+exception handler in a less ad hoc fashion than try/except because it
+is tied to the locking object; but they won't magicly step in save
+your basic:
+
+  with my_lock:
+    stuff...
+
+Personally I'm of the view that thread stopping should be part of the
+overt program logic, not a low level facility (such as causing a
+ThreadDeath exception asynchronously). The latter has all the troubles
+in the cited URL. Doing it overtly would go like this:
+
+  ... outside ...
+  that_thread.stop()    # sets the "stopping" flag on the thread object
+  that_thread.join()    # and now maybe we wait for it...
+
+  ... thread code ...
+  ... do stuff, eg:
+  with my_lock:
+    muck about ...
+  if thread.stopping:
+    abort now, _outside_ the mutex
+  ...
+
+This avoids the issue of aborting in the middle of supposedly mutex-safe
+code. It still requires scattering checks on thread.stopping through
+library code such as the OP's rogue regexp evaluator.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+One measure of `programming complexity' is the number of mental objects you
+have to keep in mind simultaneously in order to understand a program.  The
+mental juggling act is one of the most difficult aspects of programming and
+is the reason programming requires more concentration than other activities.
+It is the reason programmers get upset about `quick interruptions' -- such
+interruptions are tantamount to asking a juggler to keep three balls in the
+air and hold your groceries at the same time.
+        - Steve McConnell, _Code Complete_
+-- 
+http://mail.python.org/mailman/listinfo/python-list

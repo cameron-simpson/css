@@ -1,0 +1,32 @@
+Date: Wed, 11 Mar 2009 14:02:12 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: python-dev@python.org
+Subject: Re: Ext4 data loss
+Message-ID: <20090311030212.GA15763@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <loom.20090311T021758-280@post.gmane.org>
+User-Agent: Mutt/1.5.18 (2008-05-17)
+Content-Length: 916
+
+On 11Mar2009 02:20, Antoine Pitrou <solipsis@pitrou.net> wrote:
+| Christian Heimes <lists <at> cheimes.de> writes:
+| > I agree with you, fsync() shouldn't be called by default. I didn't plan
+| > on adding fsync() calls all over our code. However I like to suggest a
+| > file.sync() method and a synced flag for files to make the job of
+| > application developers easier.
+| 
+| We already have os.fsync() and os.fdatasync(). Should the sync() (and
+| datasync()?) method be added as an object-oriented convenience?
+
+I can imagine plenty of occasions when there may not be an available
+file descriptor to hand to os.fsync() et al. Having sync() and
+datasync() methods in the object would obviate the need for the caller
+to know the object internals.
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+I must construct my own System, or be enslaved to another Man's.
+        - William Blake

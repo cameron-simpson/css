@@ -1,0 +1,34 @@
+Date: Mon, 13 Feb 2012 18:21:05 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: "Stephen J. Turnbull" <stephen@xemacs.org>
+Cc: Jim Jewett <jimjjewett@gmail.com>, python-ideas@python.org,
+	Terry Reedy <tjreedy@udel.edu>
+Subject: Re: Py3 unicode impositions
+Message-ID: <20120213072105.GA8419@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <87r4xzdzfe.fsf@uwakimon.sk.tsukuba.ac.jp>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+Content-Length: 621
+
+On 13Feb2012 15:23, Stephen J. Turnbull <stephen@xemacs.org> wrote:
+| Cameron Simpson writes:
+|  > At least with Python 3 you find out early that you're doing something
+|  > dodgy.
+| 
+| The point is that there is a use case for "doing something dodgy."
+| See Paul Moore's subthread for an example and discussion.
+
+Yes.
+
+| However, I think people who do something dodgy should be forced to
+| make it explicit in their code.
+
+I think I agree here, too.
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+There are old climbers, and there are bold climbers; but there are no old
+bold climbers.

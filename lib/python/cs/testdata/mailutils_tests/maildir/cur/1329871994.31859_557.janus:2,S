@@ -1,0 +1,24 @@
+Date: Tue, 22 Jul 2008 15:37:44 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: python-dev@python.org
+Subject: Re: fileobj.read(float): warning or error?
+Message-ID: <20080722053744.GA11290@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <200807212117.14485.victor.stinner@haypocalc.com>
+User-Agent: Mutt/1.5.18 (2008-05-17)
+Content-Length: 528
+
+On 21Jul2008 21:17, Victor Stinner <victor.stinner@haypocalc.com> wrote:
+| Well, the real problem is os.urandom(4.2) which goes to an unlimited loop:
+|   while len(bytes) < n:
+|       bytes += read(_urandomfd, n - len(bytes))
+| because read(0.2) works as read(0) :-/
+
+Leaving aside the 0.2 => 0 converstion, shouldn't read() raise an
+exception if asked for < 1 bytes? Or is there a legitimate use for read(0)
+with which I was not previously aware?
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/

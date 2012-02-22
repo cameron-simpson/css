@@ -1,0 +1,182 @@
+Return-Path: <python-list-bounces+cs=zip.com.au@python.org>
+Delivered-To: unknown
+Received: from mail.zip.com.au (125.255.95.3) by janus.home with POP3-SSL; 10
+  Sep 2011 08:53:02 -0000
+Delivered-To: cs@zipworld.com.au
+Received: from mailin3-syd3.pacific.net.au (mailin3-syd3.pacific.net.au [125.255.92.144])
+	by mailstore2.syd.pacific.net.au (Postfix) with ESMTP id CFD856AB5
+	for <cs@zipworld.com.au>; Sat, 10 Sep 2011 18:52:36 +1000 (EST)
+Received: from mail.python.org (unknown [82.94.164.166])
+	by mailin3-syd3.pacific.net.au (Postfix) with ESMTP id 124C140005F
+	for <cs@zip.com.au>; Sat, 10 Sep 2011 18:53:03 +1000 (EST)
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3Rwq0c1FdhzNYW
+	for <cs@zip.com.au>; Sat, 10 Sep 2011 10:52:32 +0200 (CEST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=python.org; s=200901;
+	t=1315644752; bh=Ss1/Ic8pYqJdAceoUzRaOQegnXChJ129t2qSXhLWOGg=;
+	h=Date:From:To:Subject:Message-ID:MIME-Version:In-Reply-To:
+	 References:Cc:List-Id:List-Unsubscribe:List-Archive:List-Post:
+	 List-Help:List-Subscribe:Content-Type:Content-Transfer-Encoding:
+	 Sender;
+	b=J1eUAcU3o+3LQETAuyqj5KBihZ1tCwzme1n9n0B09EjDh3eKEyM7Abmynvn61V3xn
+	 e0GMG1AGgt7F2hyphBL+2fFxMdWqE2Y3Dned/U0MKJIj6dEoyLMDSTyR270BzoEdep
+	 FkMa0YFLoZXwGYe7NTdIqIs5y/GFGyvYe9ioYkwk=
+X-Original-To: python-list@python.org
+Delivered-To: python-list@mail.python.org
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3RwpxT20hyzNVd
+	for <python-list@python.org>; Sat, 10 Sep 2011 10:49:49 +0200 (CEST)
+X-Spam-Status: OK 0.000
+X-Spam-Evidence: '*H*': 1.00; '*S*': 0.00; 'plenty': 0.03; '2.7':
+	0.04; 'encoded': 0.05; 'does.': 0.07; 'pypy': 0.07;
+	'received:edu.au': 0.07; 'wrapper': 0.07; 'python': 0.08;
+	'caller': 0.09; 'ironpython': 0.09; 'relies': 0.09; 'subprocess':
+	0.09; 'unix,': 0.09; 'considers': 0.16; 'from:addr:cs': 0.16;
+	'from:addr:zip.com.au': 0.16; 'from:name:cameron simpson': 0.16;
+	"function's": 0.16; 'hint': 0.16; 'message-id:@cskk.homeip.net':
+	0.16; 'nonzero': 0.16; 'received:202.125.174': 0.16;
+	'received:202.125.174.133': 0.16;
+	'received:boardofstudies.nsw.edu.au': 0.16;
+	'received:cskk.homeip.net': 0.16;
+	'received:harvey.boardofstudies.nsw.edu.au': 0.16;
+	'received:homeip.net': 0.16; 'received:nsw.edu.au': 0.16;
+	'stuff)': 0.16; 'text:': 0.16; 'cc:addr:python-list': 0.16;
+	'written': 0.16; 'wrote:': 0.16; 'continuing': 0.17; 'language':
+	0.17; 'cheers,': 0.18; 'specifies': 0.18; 'appropriate': 0.20;
+	'cc:no real name:2**0': 0.20; 'so.': 0.22; 'stuff': 0.22;
+	'cc:2**0': 0.22; 'header:In-Reply-To:1': 0.22; 'incorrect': 0.23;
+	'code': 0.25; '(in': 0.26; 'code.': 0.26; '"the': 0.26;
+	'function': 0.27; 'depends': 0.28; 'anyway.': 0.29; 'exit': 0.29;
+	'explicitly': 0.29; 'true,': 0.29; 'cc:addr:python.org': 0.30;
+	'(unless': 0.30; 'implicitly': 0.30; 'important,': 0.30;
+	'(including': 0.30; 'specified': 0.31; 'error': 0.32;
+	'developers': 0.32; 'dependent': 0.32; 'minor': 0.32; 'does':
+	0.32; 'anyone': 0.32; 'usually': 0.32; 'app': 0.33; 'it.': 0.33;
+	'probably': 0.33; 'calling': 0.33; 'however,': 0.34; 'header:User-
+	Agent:1': 0.34; 'things': 0.34; 'do?': 0.34; 'function.': 0.34;
+	'limitations': 0.34; 'rather': 0.35; 'charset:us-ascii': 0.36;
+	'core': 0.36; 'received:au': 0.36; 'but': 0.37; 'steven': 0.38;
+	'platform': 0.38; 'should': 0.38; 'subject:: ': 0.39; 'correctly':
+	0.39; 'returned': 0.39; 'either': 0.39; "there's": 0.39; 'define':
+	0.39; 'called': 0.40; 'course.': 0.63; 'received:202': 0.66;
+	'guarantee': 0.66; 'cameron': 0.67; 'special': 0.67; 'imagine':
+	0.71; 'limitations.': 0.84; 'noting': 0.84; 'died': 0.97
+Received: from localhost (HELO mail.python.org) (127.0.0.1)
+	by albatross.python.org with SMTP; 10 Sep 2011 10:49:49 +0200
+Received: from harvey.boardofstudies.nsw.edu.au
+	(mail2.rack1.boardofstudies.nsw.edu.au [202.125.174.133])
+	by mail.python.org (Postfix) with ESMTP
+	for <python-list@python.org>; Sat, 10 Sep 2011 10:49:48 +0200 (CEST)
+Received: from cskk.homeip.net (localhost.localdomain [127.0.0.1])
+	by harvey.boardofstudies.nsw.edu.au (Postfix) with ESMTP id EFBEB4D3B56;
+	Sat, 10 Sep 2011 18:49:38 +1000 (EST)
+Received: by janus.cskk.homeip.net (Postfix, from userid 1000)
+	id D871D100419B7; Sat, 10 Sep 2011 18:49:38 +1000 (EST)
+Date: Sat, 10 Sep 2011 18:49:38 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Steven D'Aprano <steve+comp.lang.python@pearwood.info>
+Subject: Re: killing a script
+Message-ID: <20110910084938.GA14021@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <4e6abc95$0$29995$c3e8da3$5496439d@news.astraweb.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+References: <4e6abc95$0$29995$c3e8da3$5496439d@news.astraweb.com>
+Cc: python-list@python.org
+X-BeenThere: python-list@python.org
+X-Mailman-Version: 2.1.12
+Precedence: list
+List-Id: General discussion list for the Python programming language
+	<python-list.python.org>
+List-Unsubscribe: <http://mail.python.org/mailman/options/python-list>,
+	<mailto:python-list-request@python.org?subject=unsubscribe>
+List-Archive: <http://mail.python.org/pipermail/python-list>
+List-Post: <mailto:python-list@python.org>
+List-Help: <mailto:python-list-request@python.org?subject=help>
+List-Subscribe: <http://mail.python.org/mailman/listinfo/python-list>,
+	<mailto:python-list-request@python.org?subject=subscribe>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Sender: python-list-bounces+cs=zip.com.au@python.org
+Errors-To: python-list-bounces+cs=zip.com.au@python.org
+X-Cats2Procmailrc-Rule: cats/home: python  python-list     sender:python-list-bounces+cs=zip.com.au@python.org
+X-Label: python-list
+Content-Length: 2976
+
+On 10Sep2011 11:25, Steven D'Aprano <steve+comp.lang.python@pearwood.info> wrote:
+| Cameron Simpson wrote:
+| > My copy of the 2.7 docs says:
+| >   This is implemented by calling the Standard C function system(), and
+| >   has the same limitations.
+| > and sure enough, "man 3 system" says:
+| 
+| I don't consider having to look up documentation for a function in a
+| completely different language (in this case, C) as "documented behaviour of
+| os.system". 
+
+You're kidding, surely? A wrapper function for a system supplied function
+should recite everything about the wrapped function's behaviour (including
+the system dependent stuff) in the wrapper doco?
+
+| Does the C standard define the behaviour of system(), or is that
+| implementation dependent?
+
+The standard specifies the core behaviour - the behaviour guarrenteed to
+be present everywhere. Plenty of stuff has platform dependent minor
+nuances. As long as portable code relies only on the standard behaviour
+everybody wins.
+
+| It sounds to me that the Python developers are
+| implicitly refusing responsibility for the detailed behaviour of os.system
+| by noting that it depends on the C function.
+
+Of course they are, and they are right to do so. But noting that it
+calls the standard function does guarrentee various things about what it
+does.
+
+| What do Jython, PyPy and
+| IronPython do?
+| 
+| Perhaps the docs for os.system should explicitly note that the behaviour is
+| implementation dependent, rather than just hint at it. Either that or
+| explicitly state what os.system does.
+
+I find it hard to understand how anyone can read this text:
+
+  This is implemented by calling the Standard C function system(), and
+  has the same limitations
+
+and not imagine it to be dependent on the specification for system().
+
+| > Continuing with the Python docs for os.system: 
+| > 
+| >   On Unix, the return value is the exit status of the process encoded in
+| >   the format specified for wait().
+| > 
+| > and it is easy to inspect that value for "the subprocess died from a
+| > signal". Not inspecting the exit status correctly will always be an
+| > opportunity for incorrect app behaviour.
+| 
+| Except that the subprocess can catch the KeyboardInterrupt before exiting,
+
+This is very true, though such programs usually have a special reason to
+do so - the default aborting behaviour is often sufficient.
+
+| and there's no guarantee that it will return an appropriate error code.
+
+Of course. However, the subprocess should still exit with a nonzero exit
+status (unless it it written badly). If the caller considers success of
+the called program to be important, it should probably be aborting if
+the returned value is nonzero anyway.
+
+But yeah, people should probably be reaching for subprocess if they want
+to notice SIGINT specially.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+But pessimism IS realism!       - D.L.Bahr
+-- 
+http://mail.python.org/mailman/listinfo/python-list

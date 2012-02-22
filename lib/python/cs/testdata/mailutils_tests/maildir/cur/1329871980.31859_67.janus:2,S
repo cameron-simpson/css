@@ -1,0 +1,96 @@
+Date: Fri, 23 Dec 2011 17:02:18 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Tim Chase <python.list@tim.thechases.com>
+Cc: Python <python-list@python.org>
+Subject: Re: Idiom for shelling out to $EDITOR/$PAGER?
+Message-ID: <20111223060218.GA28472@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <4EF4009E.8010109@tim.thechases.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+Content-Length: 2706
+
+On 22Dec2011 22:16, Tim Chase <python.list@tim.thechases.com> wrote:
+| After a little searching, I've not been able to come up with what
+| I'd consider canonical examples of consider calling an external
+| editor/pager on a file and reading the results back in.  (most of my
+| results are swamped by people asking about editors written in
+| Python, or what the best editors for Python code are)
+| 
+| The pseudocode would be something like
+| 
+|   def edit_text(data):
+|     temp_fname = generate_temp_name()
+|     try:
+|       f = file(temp_fname, 'w')
+|       f.write(data)
+|       f.close()
+|       before = info(temp_fname) # maybe stat+checksum?
+|       editor = find_sensible_editor()
+|       subprocess.call([editor, temp_fname])
+|       if before == info(temp_fname):
+|         return None
+|       else:
+|         return file(temp_fname).read()
+|     finally:
+|       delete_if_exists(temp_fname)
+| 
+| However there are things to watch out for in this lousy code:
+| 
+| -race conditions, unique naming, and permissions on the temp file
+
+NamedTemporaryFile is your friend.
+
+| -proper & efficient detection of file-change, to know whether the
+| user actually did anything
+
+Wait for the editor to exit?
+In that scenario I go for:
+  - wait for edit to exit
+  - if exit status 0 and file non-empty, trust it
+    (subject to parse issues afterwards of course)
+
+| -cross-platform determination of a sensible editor (that blocks
+| rather than spawns), using platform conventions like
+| os.environ['EDITOR']
+
+os.environment.get('EDITOR', 'vi')?
+
+Some platforms have an executable called "editor" that solves that
+problem (absent $EDITOR); MacOSX has "open", though it won't be running
+a blocking editor, alas.
+
+You may need some knowledge of the local system. On a terminal? Easy,
+use $EDITOR. No terminal, but $DISPLAY? xterm -e "$EDITOR temp_file",
+or the like. No terminal, no $DISPLAY, macosx? I have an incantation
+somewhere...
+
+| -cleanup deletion of the temp-file
+
+NamedTemporaryFile is your friend.
+
+| I presume the code for spawning $PAGER on some content would look
+| pretty similar.
+
+Yep.
+
+| Any good example code (or blog posts, or other links) that has been
+| battle-tested?
+
+Hmm. Nothing directly to had, but regarding the temp file:
+
+  # write contents of the file `fp` into a temp file
+  with NamedTemporaryFile('w', dir=os.path.join(self.dir, 'tmp')) as T:
+    T.write(fp.read())
+  ... do stuff with T.name (the temp file name).
+
+Anyway, look it up; it has an autodelete mode etc.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+I have always been a welly man myself. They are superb in wet grass, let
+alone lagoons of pig shit.      - Julian Macassey

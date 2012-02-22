@@ -1,0 +1,110 @@
+Return-Path: <python-list-bounces+cs=zip.com.au@python.org>
+Delivered-To: unknown
+Received: from mail.zip.com.au (125.255.95.3) by janus.home with POP3-SSL; 25
+  Oct 2010 00:17:02 -0000
+Delivered-To: cs@zipworld.com.au
+Received: from mailin2.pacific.net.au (mailin2.pacific.net.au [61.8.0.81])
+	by mailstore1.syd.pacific.net.au (Postfix) with ESMTP id 3717995511
+	for <cs@zipworld.com.au>; Mon, 25 Oct 2010 11:16:16 +1100 (EST)
+Received: from mail.python.org (unknown [82.94.164.166])
+	by mailin2.pacific.net.au (Postfix) with ESMTP id 8B5AF19C157
+	for <cs@zip.com.au>; Mon, 25 Oct 2010 11:16:15 +1100 (EST)
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id A3429EE9CE
+	for <cs@zip.com.au>; Mon, 25 Oct 2010 02:16:12 +0200 (CEST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=python.org; s=200901;
+	t=1287965772; bh=1BwHRpXsmSlAxk+h9RAEh4Xj3dsAjpzzY7MCGxaNCfQ=;
+	h=Date:From:To:Subject:Message-ID:MIME-Version:In-Reply-To:
+	 References:Cc:List-Id:List-Unsubscribe:List-Archive:List-Post:
+	 List-Help:List-Subscribe:Content-Type:Content-Transfer-Encoding:
+	 Sender;
+	b=PGU5D4/e0Zc5xQR1aJmoW3p1waChashV2lXepiswm0txBb6AxOZWpj5YnxYUqlLKU
+	 o8vDWOt2YLOVxB9gnx7Jy4pbZIMJeQZUZDwwEAh49WcSmyqqk0ySa5IMgXyxgNZs2M
+	 asGXCdWyR4KquO9eH6iTgjzSvOKfyCYYWEKt/Czw=
+X-Original-To: python-list@python.org
+Delivered-To: python-list@mail.python.org
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 0297DEE99D
+	for <python-list@python.org>; Mon, 25 Oct 2010 02:13:31 +0200 (CEST)
+X-Spam-Status: OK 0.005
+X-Spam-Evidence: '*H*': 0.99; '*S*': 0.00; 'cc:addr:python-list':
+	0.05; 'linear': 0.07; 'assumed': 0.09; 'wrote:': 0.13;
+	'from:addr:cs': 0.16; 'from:addr:zip.com.au': 0.16;
+	'from:name:cameron simpson': 0.16; 'message-id:@cskk.homeip.net':
+	0.16; 'received:202.125.174': 0.16; 'received:202.125.174.133':
+	0.16; 'received:boardofstudies.nsw.edu.au': 0.16;
+	'received:cskk.homeip.net': 0.16;
+	'received:harvey.boardofstudies.nsw.edu.au': 0.16;
+	'received:homeip.net': 0.16; 'received:nsw.edu.au': 0.16;
+	'cheers,': 0.18; 'cc:no real name:2**0': 0.18; 'header:In-Reply-
+	To:1': 0.21; 'cc:2**0': 0.22; 'received:edu.au': 0.23; 'with.':
+	0.24; 'code': 0.25; "didn't": 0.25; 'example': 0.27; "i'm": 0.28;
+	'meant': 0.29; 'describe': 0.29; 'cc:addr:python.org': 0.29;
+	'indeed.': 0.31; 'stefan': 0.31; 'there': 0.34; 'subject:: ':
+	0.34; 'header:User-Agent:1': 0.34; 'occur': 0.35; 'snippet': 0.35;
+	'think': 0.37; 'charset:us-ascii': 0.38; 'me.': 0.38; 'question':
+	0.39; 'your': 0.60; 'men': 0.64; 'edmund': 0.84;
+	'subject:entries': 0.84; 'evil': 0.91; 'suspected': 0.93
+Received: from localhost (HELO mail.python.org) (127.0.0.1)
+	by albatross.python.org with SMTP; 25 Oct 2010 02:13:30 +0200
+Received: from harvey.boardofstudies.nsw.edu.au
+	(mail2.rack1.boardofstudies.nsw.edu.au [202.125.174.133])
+	by mail.python.org (Postfix) with ESMTP
+	for <python-list@python.org>; Mon, 25 Oct 2010 02:13:30 +0200 (CEST)
+Received: from cskk.homeip.net (localhost.localdomain [127.0.0.1])
+	by harvey.boardofstudies.nsw.edu.au (Postfix) with ESMTP id 440454D39CA;
+	Mon, 25 Oct 2010 11:13:27 +1100 (EST)
+Received: by janus.cskk.homeip.net (Postfix, from userid 1000)
+	id 2F401100419B7; Mon, 25 Oct 2010 11:13:27 +1100 (EST)
+Date: Mon, 25 Oct 2010 11:13:27 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Stefan Schwarzer <sschwarzer@sschwarzer.net>
+Subject: Re: yield all entries of an iterable
+Message-ID: <20101025001327.GA20338@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <4CC4C341.8030304@sschwarzer.net>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+References: <4CC4C341.8030304@sschwarzer.net>
+Cc: python-list@python.org
+X-BeenThere: python-list@python.org
+X-Mailman-Version: 2.1.12
+Precedence: list
+List-Id: General discussion list for the Python programming language
+	<python-list.python.org>
+List-Unsubscribe: <http://mail.python.org/mailman/options/python-list>,
+	<mailto:python-list-request@python.org?subject=unsubscribe>
+List-Archive: <http://mail.python.org/pipermail/python-list>
+List-Post: <mailto:python-list@python.org>
+List-Help: <mailto:python-list-request@python.org?subject=help>
+List-Subscribe: <http://mail.python.org/mailman/listinfo/python-list>,
+	<mailto:python-list-request@python.org?subject=subscribe>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Sender: python-list-bounces+cs=zip.com.au@python.org
+Errors-To: python-list-bounces+cs=zip.com.au@python.org
+X-Cats2Procmailrc-Rule: cats/home: python  python-list     sender:python-list-bounces+cs=zip.com.au@python.org
+X-Label: python-list
+Content-Length: 653
+
+On 25Oct2010 01:37, Stefan Schwarzer <sschwarzer@sschwarzer.net> wrote:
+| From the question and the code snippet the OP gave I assumed
+| he meant that there already was a sequence (i. e. linear
+| structure) to begin with.
+
+I suspected that was your interpretation.
+
+| By the way, I think a well-known example of what you
+| describe is `os.walk`.
+
+Indeed. I'm surprised it didn't occur to me.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+The only thing necessary for the triumph of evil is for good men to do nothing.
+        - Edmund Burke (1729-1797)
+-- 
+http://mail.python.org/mailman/listinfo/python-list

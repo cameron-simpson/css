@@ -1,0 +1,49 @@
+Date: Tue, 16 Nov 2010 12:30:06 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: python-list@python.org
+Subject: Re: Help: Guide needed in trying to delete/flush the content of a
+ fifo file.
+Message-ID: <20101116013006.GA15879@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <4CE19C4D.2030403@mrabarnett.plus.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 1392
+
+On 15Nov2010 20:47, MRAB <python@mrabarnett.plus.com> wrote:
+| On 15/11/2010 11:03, Ton wrote:
+| >Hi Mrab,
+| >  Thanks for your immediate reply , can you please guide me with any
+| >tool or library function which i can flush my fifo content .. i use
+| >os.mkfifo() to make the fifo. Or is there any other way i could do
+| >this ...
+| >Thanks
+| 
+| Ah, you're using pipes; I thought you might've been using a queue. I
+| don't know of a way of flushing a pipe.
+
+I think the nearest thing you can do is empty it with a read().
+On many systems (AFAIR) a stat of a pipe returns the amount of buffered
+data, so you could go (untested - some of the following method names
+will probably be wrong, too) something like:
+
+  buffered = os.fstat(fifo.fileno())
+  if buffered > 0:
+    fifo.read(buffered)
+
+Of course it is all a bit racy, as data may arrive after the stat,
+but arbitrarily "flush"ing the pipe has equivalent problems.
+
+| I wonder whether it's a good idea for the producer to keep filling the
+| fifo, because the consumer know how 'old' the info is when it arrives,
+| and there's your problem of discarding stale info. Perhaps the producer
+| should wait until the consumer has sent an acknowledgement before
+| sending more info.
+
+I agree with this statement.
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+In the end, winning is the only safety. - Kerr Avon

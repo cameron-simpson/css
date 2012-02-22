@@ -1,0 +1,99 @@
+Return-Path: <python-dev-bounces+cs=zip.com.au@python.org>
+X-Spam-Checker-Version: SpamAssassin 3.2.1-gr1 (2007-05-02) on janus.home
+X-Spam-Level: 
+X-Spam-Status: No, score=-0.6 required=3.0 tests=BAYES_00,FAKE_REPLY_C
+	autolearn=no version=3.2.1-gr1
+Delivered-To: unknown
+Received: from mail.zip.com.au (61.8.0.24) by janus.home with POP3-SSL; 22
+  Jul 2008 22:29:47 -0000
+Delivered-To: cs@zipworld.com.au
+Received: from mailin2.pacific.net.au (mailin2.pacific.net.au [61.8.0.81])
+	by mailstore2.syd.pacific.net.au (Postfix) with ESMTP id 250463C0E
+	for <cs@zipworld.com.au>; Wed, 23 Jul 2008 08:29:23 +1000 (EST)
+Received: from smtp-vbr16.xs4all.nl (unknown [194.109.24.36])
+	by mailin2.pacific.net.au (Postfix) with ESMTP id 76D20185D37
+	for <cs@zip.com.au>; Wed, 23 Jul 2008 08:29:22 +1000 (EST)
+Received: from bag.python.org (bag.python.org [194.109.207.14])
+	by smtp-vbr16.xs4all.nl (8.13.8/8.13.8) with ESMTP id m6MMTJT1075394
+	for <cs@zip.com.au>; Wed, 23 Jul 2008 00:29:20 +0200 (CEST)
+	(envelope-from python-dev-bounces+cs=zip.com.au@python.org)
+Received: from bag.python.org (bag [127.0.0.1])
+	by bag.python.org (Postfix) with ESMTP id B96CA1E4020
+	for <cs@zip.com.au>; Wed, 23 Jul 2008 00:29:19 +0200 (CEST)
+X-Original-To: python-dev@python.org
+Delivered-To: python-dev@bag.python.org
+Received: from bag.python.org (bag [127.0.0.1])
+	by bag.python.org (Postfix) with ESMTP id 147171E400C
+	for <python-dev@python.org>; Wed, 23 Jul 2008 00:28:56 +0200 (CEST)
+Received: from bag (HELO bag.python.org) (127.0.0.1)
+	by bag.python.org with SMTP; 23 Jul 2008 00:28:55 +0200
+Received: from scorpius.boardofstudies.nsw.edu.au
+	(mail1.boardofstudies.nsw.edu.au [202.125.174.132])
+	by bag.python.org (Postfix) with ESMTP
+	for <python-dev@python.org>; Wed, 23 Jul 2008 00:28:47 +0200 (CEST)
+Received: from cskk.homeip.net (localhost.localdomain [127.0.0.1])
+	by scorpius.boardofstudies.nsw.edu.au (Postfix) with ESMTP id
+	92A7A4D19AB
+	for <python-dev@python.org>; Wed, 23 Jul 2008 08:28:45 +1000 (EST)
+Received: by janus.cskk.homeip.net (Postfix, from userid 1000)
+	id 6D57110042A2C; Wed, 23 Jul 2008 08:28:45 +1000 (EST)
+Date: Wed, 23 Jul 2008 08:28:44 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: python-dev@python.org
+Message-id: <20080722222844.GA23074@cskk.homeip.net>
+Mime-version: 1.0
+Content-disposition: inline
+In-reply-to: <alpine.DEB.1.00.0807222053270.6381@alice>
+User-agent: Mutt/1.5.18 (2008-05-17)
+Subject: Re: fileobj.read(float): warning or error?
+X-BeenThere: python-dev@python.org
+X-Mailman-Version: 2.1.10
+Precedence: list
+List-Id: Python core developers <python-dev.python.org>
+List-Unsubscribe: <http://mail.python.org/mailman/options/python-dev>,
+	<mailto:python-dev-request@python.org?subject=unsubscribe>
+List-Archive: <http://mail.python.org/pipermail/python-dev>
+List-Post: <mailto:python-dev@python.org>
+List-Help: <mailto:python-dev-request@python.org?subject=help>
+List-Subscribe: <http://mail.python.org/mailman/listinfo/python-dev>,
+	<mailto:python-dev-request@python.org?subject=subscribe>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Sender: python-dev-bounces+cs=zip.com.au@python.org
+Errors-To: python-dev-bounces+cs=zip.com.au@python.org
+X-Virus-Scanned: by XS4ALL Virus Scanner
+X-Cats2Procmailrc-Rule: cats/home, line 99: python  python-dev      sender:python-dev-bounces+cs=zip.com.au@python.org
+X-Label: python-dev
+Content-Length: 1268
+
+On 22Jul2008 20:56, John J Lee <jjl@pobox.com> wrote:
+> On Tue, 22 Jul 2008, Cameron Simpson wrote:
+> [...]
+>> Leaving aside the 0.2 => 0 converstion, shouldn't read() raise an
+>> exception if asked for < 1 bytes? Or is there a legitimate use for read(0)
+>> with which I was not previously aware?
+>
+> http://docs.python.org/lib/bltin-file-objects.html
+>
+> read([size])
+>
+> ... If the size argument is negative or omitted, read all data until EOF  
+> is reached. ...
+
+Hmm, yeah, but 0 is not negative and not omitted so this does not apply.
+
+Personally I'm not very fond of that spec; I'm good with the omitted size
+provoking a "read everything" mode but I'd rather a non-numeric value like
+None rather than a negative one (eg the conventional "def read(size=None)")
+if an explicit size should do so. That way bad arithmetic in the caller
+could have a chance of triggering an exception from read instead of a
+silent (and to my taste, nasty) "slurp the file" mode.
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+_______________________________________________
+Python-Dev mailing list
+Python-Dev@python.org
+http://mail.python.org/mailman/listinfo/python-dev
+Unsubscribe: http://mail.python.org/mailman/options/python-dev/cs%40zip.com.au
+

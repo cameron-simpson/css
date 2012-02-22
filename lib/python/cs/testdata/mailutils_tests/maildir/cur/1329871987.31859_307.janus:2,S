@@ -1,0 +1,102 @@
+Date: Wed, 28 Jul 2010 07:55:20 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Raymond Hettinger <raymond.hettinger@gmail.com>
+Cc: Alex Gaynor <alex.gaynor@gmail.com>, python-ideas@python.org
+Subject: Re: Non-boolean return from __contains__
+Message-ID: <20100727215519.GA1674@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <6B58DE7F-F50D-4A55-8C95-F084BFBFA11E@gmail.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 3299
+
+On 25Jul2010 11:48, Raymond Hettinger <raymond.hettinger@gmail.com> wrote:
+| On Jul 25, 2010, at 11:15 AM, Alex Gaynor wrote:
+| > Recently I've been wondering why __contains__ casts all of it's
+| > returns to be boolean values.  Specifically I'd like to propose that
+| > __contains__'s return values be passed directly back as the result of
+| > the `in` operation.
+| 
+| x = y in z          # where x is a non boolean.
+| 
+| Yuck.
+| 
+| One of the beautiful aspects of __contains__ is that its simply signature
+| allows it to be used polymorphically throughout the whole language.
+
+Didn't we have the dual of this argument a week or so ago, where rantingrick
+was complaining that ints could be used as booleans, and that it was simply
+appalling? That Python should immediately make 0 also behave as True because
+he didn't feel it was "empty". His argument was widely opposed, and IMHO
+rightly so.
+
+Personally, I'm +0.5 on the proposal:
+
+- because Python already allows pretty much anything to be used
+  in a Boolean context, this means that anything can be "used
+  polymorphically throughout the whole language", to use your term
+  above; I do not think it breaks anything
+
+- do any of the other comparison methods enforce Booleanness?
+  ==/__eq__ doesn't and I didn't think the others did.
+  All that is required for functionality is sane choice of return
+  value by the implementors.
+
+- have you used SQLAlchemy?
+  Its SQL constrction by writing:
+
+    .select([...columns...],
+            table.c.COL1 == 3)
+
+  is extremely programmer friendly, and works directly off overloading the
+  column object's .__eq__() method to return something that gets made into a
+  robust SQL query later.
+
+I'm going to snip two of your paragraphs here and proceed to:
+| There is no "natural" interpretation of an in-operator returning
+| a non-boolean.
+
+There is in the SQLAlchemy example above; "in" with an SQLA column
+object would return a hook to make a "value in (a,b,c,...)" SQL
+expression.
+
+It is all about context, and in Python the .__* methods let objects
+provide the context for evaluation of expressions - that's what
+polymorphism does for us.
+
+The proposal changes nothing for pre-existing uses. It in no way causes:
+
+  False in [False]
+
+to return False, because it doesn't change bool.__contains__.
+The proposal it to not coerce the result of __contains__ to bool(),
+allowing _new_ objects to return a more nuanced result for __contains__
+for their own purposes.
+
+As long as that make sense in the use context, I believe this is a plus
+and not a minus. We can all write nonsensical code by implementing
+__eq__ with gibberish. So what?
+
+| If the above snippet assigns "foo" to x, what
+| does that mean? If it assigns -10, what does that mean?
+
+In current Python, it means "true".
+
+| Language design is about associating meanings (semantics)
+| with syntax.  ISTM, this would be poor design.
+
+We already allow programmers to do that all over the place with the
+special methods. This proposal removes an apparently arbitrary
+restriction on __contains__ that doesn't seem to be applied to the other
+comparators.
+
++0.5, verging on +1.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+It is in those arenas that he previously extinguished himself.
+        - Chuck Rogers

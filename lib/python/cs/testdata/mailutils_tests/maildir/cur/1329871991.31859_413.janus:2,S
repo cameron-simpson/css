@@ -1,0 +1,65 @@
+Date: Fri, 1 Jan 2010 08:59:38 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Phlip <phlip2005@gmail.com>
+Cc: python-list@python.org
+Subject: Re: change an exception's message and re-raise it
+Message-ID: <20091231215938.GA26356@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <97c21727-ed6d-4be4-8c22-24b7beccd7bb@e27g2000yqd.googlegroups.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 1548
+
+On 31Dec2009 12:18, Phlip <phlip2005@gmail.com> wrote:
+| Pythonistas:
+| 
+| I need to do this:
+| 
+|   try:
+|      deep_arcane_layer()
+|   except e:
+|     e.message = 'the deep arcane layer says: ' + e.message
+|     raise e
+| 
+| The point is I need to augment that layer's exceptions with extra
+| information that I know about that layer.
+
+Doesn't the above work (modulo changing the right exception attributes)?
+
+I've got a context manager that does something like this.
+It is hampered by the fact that not all exceptions have the same
+internal structure, for historic reasons I believe.
+
+So I've got this ugly stuff in the __exit__ method:
+
+  if exc_value is not None:
+    if hasattr(exc_value, 'args') and len(exc_value.args) > 0:
+      exc_value.args = [pfx + ": " + str(exc_value.args[0])] \
+                     + list(exc_value.args[1:])
+    else:
+      # we can't modify this - at least report the current prefix
+      # state
+      sys.stderr.write("%s: Pfx.__exit__: exc_value = %s\n" % (pfx,
+repr(exc_value),))
+
+You can see I modify the .args value.
+The method returns False to let the exception percolate back out
+the stack.
+
+The "else" part is to handle exceptions I can't change, so for now I've
+just printing the "pfx" context on stderr as the exception bubbles out.
+Nasty.
+
+The calling code looks like this:
+
+  with Pfx("some tag"):
+    ... suite ...
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+There is this special biologist word we use for 'stable'. It is 'dead'.
+        - Jack Cohen

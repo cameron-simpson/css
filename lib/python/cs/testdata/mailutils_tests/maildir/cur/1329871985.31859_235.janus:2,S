@@ -1,0 +1,45 @@
+Date: Thu, 18 Nov 2010 13:58:49 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Chris Rebert <crebert@ucsd.edu>
+Cc: Neil Berg <nberg@atmos.ucla.edu>, python-list@python.org
+Subject: Re: returning results from function
+Message-ID: <20101118025849.GA17150@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: inline
+Content-Transfer-Encoding: 8bit
+In-Reply-To: <AANLkTi=fZSO9-Y+_QG4DdTV3Y1nGdd_m+j-nwdKmguFz@mail.gmail.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 1236
+
+On 11Nov2010 15:29, Chris Rebert <crebert@ucsd.edu> wrote:
+| > On Nov 11, 2010, at 1:54 PM, Chris Rebert wrote:
+| >> On Thu, Nov 11, 2010 at 1:16 PM, Neil Berg <nberg@atmos.ucla.edu> wrote:
+| >> time_y = ncfile.variables['time_y'][:] # (time,int) [yrs]
+| >> time_m = ncfile.variables['time_m'][:] # (time,int) [mnths]
+| >> time_d = ncfile.variables['time_d'][:] # (time,int) [days]
+| >> time_h = ncfile.variables['time_h'][:]    # (time,float) [hrs]
+| >> ntim =len(time_h)
+| >> for tim_idx in range(0,ntim):
+| >>        local_date = utc_to_local(time_y[tim_idx],time_m[tim_idx],time_d[tim_idx],int(time_h[tim_idx]))
+| >>        ***Here is where I'd like to see the returned values so I can create new arrays that store them *****
+| 
+| Add:
+|     print(local_date)
+| Or if you want to be fancy:
+|     print("%.4d-%.2d-%.2d  %.2d" % local_date)
+
+It's worth noting that if you know the number of return arguments you
+can do this:
+
+  locyr, locmm, locdd, lochh = itc_to_local(.......)
+
+and then easily use the individual values.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Admit Nothing.  Blame Everyone.  Be Bitter.
+        - Matt Hopkins, DoD #1197, <matt@crawfish.math.tulane.edu>

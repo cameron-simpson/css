@@ -1,0 +1,35 @@
+Date: Fri, 11 Sep 2009 16:06:58 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: "Gregory P. Smith" <greg@krypto.org>
+Cc: Thomas Wouters <thomas@python.org>, yairchu@gmail.com,
+	python-dev@python.org, Nick Coghlan <ncoghlan@gmail.com>,
+	Martin =?utf-8?B?di4gTMO2d2lz?= <martin@v.loewis.de>,
+	Rotem Yaari <vmalloc@gmail.com>, Neal Norwitz <nnorwitz@gmail.com>
+Subject: Re: pthreads, fork, import, and execvp
+Message-ID: <20090911060658.GA19749@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <52dc1c820907251025j4db82363yea166be14a012ada@mail.gmail.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 807
+
+On 25Jul2009 10:25, Gregory P. Smith <greg@krypto.org> wrote:
+| On Thu, Jul 23, 2009 at 4:28 PM, Thomas Wouters<thomas@python.org> wrote:
+| > So attached (and at http://codereview.appspot.com/96125/show ) is a
+| > preliminary fix, correcting the problem with os.fork(), os.forkpty() and
+| > os.fork1(). This doesn't expose a general API for C code to use, for two
+| > reasons: it's not easy, and I need this fix more than I need the API change
+| > :-) (I actually need this fix myself for Python 2.4, but it applies fairly
+| > cleanly.)
+| 
+| This looks good to me.
+[...]
+
+Where's this stand with respect to the upcoming Python 2.6.3?
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Life is pleasant. Death is peaceful. It's the transition that's troublesome.
+- Isaac Asimov

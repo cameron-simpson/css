@@ -1,0 +1,41 @@
+Date: Wed, 29 Apr 2009 12:33:53 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Antoine Pitrou <solipsis@pitrou.net>
+Cc: python-dev@python.org
+Subject: Re: Python-Dev PEP 383: Non-decodable Bytes in System
+	Character?Interfaces
+Message-ID: <20090429023353.GA11210@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <loom.20090428T114723-520@post.gmane.org>
+User-Agent: Mutt/1.5.18 (2008-05-17)
+Content-Length: 1071
+
+On 28Apr2009 11:49, Antoine Pitrou <solipsis@pitrou.net> wrote:
+| Paul Moore <p.f.moore <at> gmail.com> writes:
+| > 
+| > I've yet to hear anyone claim that they would have an actual problem
+| > with a specific piece of code they have written.
+| 
+| Yep, that's the problem. Lots of theoretical problems noone has ever encountered
+| brought up against a PEP which resolves some actual problems people encounter on
+| a regular basis.
+| 
+| For the record, I'm +1 on the PEP being accepted and implemented as soon as
+| possible (preferably before 3.1).
+
+I am also +1 on this.
+
+I would like utility functions to perform:
+  os-bytes->funny-encoded
+  funny-encoded->os-bytes
+or explicit example code snippets for same in the PEP text.
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+This person is currently undergoing electric shock therapy at Agnews
+Developmental Center in San Jose, California. All his opinions are static,
+please ignore him.  Thank you,  Nurse Ratched
+- the sig quote of Bob "Another beer, please" Christ <bhatch@netcom.com>

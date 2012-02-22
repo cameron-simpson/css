@@ -1,0 +1,47 @@
+Date: Thu, 6 Oct 2011 13:46:46 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Terry Reedy <tjreedy@udel.edu>
+Cc: python-dev@python.org
+Subject: Re: cpython (3.2): Issue #11956: Skip
+ test_import.test_unwritable_directory on FreeBSD when run as
+Message-ID: <20111006024646.GA17029@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <j6j0h1$d0j$2@dough.gmane.org>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+Content-Length: 1362
+
+On 05Oct2011 21:33, Terry Reedy <tjreedy@udel.edu> wrote:
+| On 10/5/2011 8:07 PM, Antoine Pitrou wrote:
+| >On Thu, 6 Oct 2011 10:55:07 +1100 Cameron Simpson<cs@zip.com.au>  wrote:
+| >>Equally, why on earth are you running tests as root!?!?!?!?! Madness.
+| >>It's as bad as compiling stuff as root etc etc. A bad idea all around,
+| >>securitywise.
+| >>
+| >>Especially, I would think, a builtbot. "Oh, let's fetch some shiny new
+| >>code and run it as the system superuser."
+| >
+| >Said buildbot probably runs in a VM.
+
+Which gets post validated from outside via some magic sanity test?
+Which gets wiped and rerun from a clean image for the next build?
+
+| A different perspective is that running buildbot tests as root does
+| not reflect the experience of non-root users. It seems some tests
+| need to be run both ways just for correctness testing.
+
+Surely VERY FEW tests need to be run as root, and they need careful
+consideration. The whole thing (build, full test suite) should
+not run as root.
+
+Am I really the only person who feels unease about this scenario?
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Observing the first balloon ascent in Paris, [Ben] Franklin heard a scoffer
+ask, "What good is it?"  He spoke for a generation of scientists in
+his retort, "What good is a newly born infant?" - John F. Kasson

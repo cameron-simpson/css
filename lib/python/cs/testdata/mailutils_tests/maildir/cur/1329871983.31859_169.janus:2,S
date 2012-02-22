@@ -1,0 +1,45 @@
+Date: Sun, 17 Jul 2011 09:19:41 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: comp.lang.python@googlegroups.com
+Cc: python-list@python.org
+Subject: Re: Looking for general advice on complex program
+Message-ID: <20110716231941.GA4694@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <db4bc5fa-8a8e-4a0e-a2d0-3065dc3c740e@glegroupsg2000goo.googlegroups.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+Content-Length: 1336
+
+On 16Jul2011 10:34, Josh English <Joshua.R.English@gmail.com> wrote:
+| I found a FileLock (lost the link and it's not in the code) that uses
+| context managers to create a ".lock" file in the same directory of the
+| file. It uses os.unlink to delete the .lock file but I don't know if
+| this deletes the file or just removes it from the directory and leaves
+| the memory filled.
+
+os.unlink removes the filename. On all sane systems, if that is the last
+reference to the file (no other names, no open file handles) then the
+memory/storage is also released.
+
+| If it does, I don't know if the OS will overwrite
+| that memory. I'm afraid of taking up lots of space that I don't need
+| with this program.
+
+Don't be.
+
+| The docs indicate that Unix recovers the memory, but I'm not sure about Windows.
+
+I confess to disliking Windows, but I do not believe it is that broken.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Last month, my alumni/ae association sent out a questionnaire. One of the
+questions they asked was my/my household's annual income. The choices were:
+(a) Less than $25,000, (b) $25,001-50,000, (c) $50,001-100,000,
+(d) $100,001-250,000, (e) $250,001-500,000, (f) $500,001-1,000,000,
+(g) $1,000,000 or more. Yeah, right. Nice median.
+        - Dan Hillman, dcah100@cus.cam.ac.uk

@@ -1,0 +1,80 @@
+Date: Fri, 23 Apr 2010 15:37:15 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: python-list@python.org
+Subject: question about an exciting gotcha for unittests (and elsewhere) ...
+Message-ID: <20100423053715.GA12138@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 2379
+
+I've run into a problem unittesting something I'm writing.
+
+I have a little node tracking class I'm using to track items and
+attributes.  An item is a "Node" object, and the collection is a
+"NodeDB".
+
+So I'm writing some unittests, thus:
+
+  class Node(dict): [...]
+  class NodeDB(dic): [...]
+  class Backend(object):
+    def serialise(self, value):
+      ''' Convert a value for external string storage.
+      '''
+      if isinstance(value, Node): [...]
+        return ":%s:%s" % (value.type, value.name)
+      t = type(value)
+      assert t in (str,int), repr(t)+" "+repr(value)+" "+repr(Node)
+      [...]
+
+  class TestAll(unittest.TestCase):
+    def setUp(self):
+      from cs.nodedb.sqla import Backend_SQLAlchemy
+      self.backend=Backend_SQLAlchemy('sqlite:///:memory:')
+      self.db=NodeDB(backend=self.backend)
+    def test01serialise(self):
+      H = self.db.newNode('HOST', 'foo')
+      for value in 1, 'str1', ':str2', '::', H:
+        s = self.backend.serialise(value)
+        assert type(s) is str
+        self.assert_(value == self.backend.deserialise(s))
+    [...]
+
+  if __name__ == '__main__':
+    import sqlalchemy
+    print 'SQLAlchemy version =', sqlalchemy.__version__
+    unittest.main()
+
+and it's failing. I've traced the failure cause, ending up with this
+assertion message from the end of serialise() above:
+
+  AssertionError: <class '__main__.Node'> HOST:foo:{} <class 'cs.nodedb.node.Node'>
+
+Experienced users will see at once what's happened: I've made a Node
+myself in the test using the local class, and the Node class is thus
+__main__.Node. However, my sql Backend class has independently imported
+the "Node" and "Backend" classes from "cs.nodedb.node". So when _it_
+calls serialise(), "Node" is "cs.nodedb.node.Node".
+
+And lo, the:
+
+  if isinstance(value, Node):
+
+test at the top of serialise() fails.
+
+What's a sensible way of doing this correctly?
+
+I _don't_ want to duck-type the Node and merely test for "type" and "name"
+values, because I want to be rather picky about what gets into the backend
+database - the wrong types indicate bad app code, and should not be allowed
+to introduce corrupt database values.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+That particular mistake will not be repeated.  There are plenty of mistakes
+left that have not yet been used. - Andy Tanenbaum <ast@cs.vu.nl>

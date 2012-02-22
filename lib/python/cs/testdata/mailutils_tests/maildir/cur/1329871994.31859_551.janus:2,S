@@ -1,0 +1,33 @@
+Date: Fri, 5 Sep 2008 13:53:44 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: python-list@python.org
+Subject: Re: Converting .doc to .txt in Linux
+Message-ID: <20080905035344.GA10761@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <0cf7e30e-1429-4d7b-b342-42319b61cff5@i24g2000prf.googlegroups.com>
+User-Agent: Mutt/1.5.18 (2008-05-17)
+Content-Length: 939
+
+On 04Sep2008 12:54, patrick.waldo@gmail.com <patrick.waldo@gmail.com> wrote:
+| I had previously asked a similar question,
+| http://groups.google.com/group/comp.lang.python/browse_thread/thread/2953d6d5d8836c4b/9dc901da63d8d059?lnk=gst&q=convert+doc+txt#9dc901da63d8d059
+| 
+| but at that point I was using Windows and now I am using Linux.
+| Basically, I have some .doc files that I need to convert into txt
+| files encoded in utf-8.  However, win32com.client doesn't work in
+| Linux.
+
+I use the "antiword" or "catdoc" commands to convert .doc to text.
+Call them from popen or subprocess from Python, if you must use Python
+(I'd just write a shell script for such a task myself unless its embedded
+in a larger python context).
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Please do not send me Microsoft Word files.
+http://en.nothingisreal.com/wiki/Please_don't_send_me_Microsoft_Word_documents

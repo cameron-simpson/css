@@ -1,0 +1,119 @@
+Return-Path: <python-dev-bounces+cs=zip.com.au@python.org>
+X-Spam-Checker-Version: SpamAssassin 3.2.1-gr1 (2007-05-02) on janus.home
+X-Spam-Level: 
+X-Spam-Status: No, score=-0.6 required=3.0 tests=BAYES_00,FAKE_REPLY_C
+	autolearn=no version=3.2.1-gr1
+Delivered-To: unknown
+Received: from mail.zip.com.au (61.8.0.24) by janus.home with POP3-SSL; 23
+  Jul 2008 02:52:50 -0000
+Delivered-To: cs@zipworld.com.au
+Received: from mailin1.pacific.net.au (mailin1.pacific.net.au [61.8.0.80])
+	by mailstore1.syd.pacific.net.au (Postfix) with ESMTP id A3A6CA303B
+	for <cs@zipworld.com.au>; Wed, 23 Jul 2008 12:52:41 +1000 (EST)
+Received: from smtp-vbr13.xs4all.nl (unknown [194.109.24.33])
+	by mailin1.pacific.net.au (Postfix) with ESMTP id E5B531616D9
+	for <cs@zip.com.au>; Wed, 23 Jul 2008 12:52:40 +1000 (EST)
+Received: from bag.python.org (bag.python.org [194.109.207.14])
+	by smtp-vbr13.xs4all.nl (8.13.8/8.13.8) with ESMTP id m6MMm9Lp030315
+	for <cs@zip.com.au>; Wed, 23 Jul 2008 00:48:59 +0200 (CEST)
+	(envelope-from python-dev-bounces+cs=zip.com.au@python.org)
+Received: from bag.python.org (bag [127.0.0.1])
+	by bag.python.org (Postfix) with ESMTP id 714391E401D
+	for <cs@zip.com.au>; Wed, 23 Jul 2008 00:48:59 +0200 (CEST)
+X-Original-To: python-dev@python.org
+Delivered-To: python-dev@bag.python.org
+Received: from bag.python.org (bag [127.0.0.1])
+	by bag.python.org (Postfix) with ESMTP id B96921E400E
+	for <python-dev@python.org>; Wed, 23 Jul 2008 00:46:40 +0200 (CEST)
+Received: from bag (HELO bag.python.org) (127.0.0.1)
+	by bag.python.org with SMTP; 23 Jul 2008 00:46:40 +0200
+Received: from scorpius.boardofstudies.nsw.edu.au
+	(mail1.boardofstudies.nsw.edu.au [202.125.174.132])
+	by bag.python.org (Postfix) with ESMTP
+	for <python-dev@python.org>; Wed, 23 Jul 2008 00:46:31 +0200 (CEST)
+Received: from cskk.homeip.net (localhost.localdomain [127.0.0.1])
+	by scorpius.boardofstudies.nsw.edu.au (Postfix) with ESMTP id
+	1BBDC4D19AB
+	for <python-dev@python.org>; Wed, 23 Jul 2008 08:46:30 +1000 (EST)
+Received: by janus.cskk.homeip.net (Postfix, from userid 1000)
+	id E30CD10042A2C; Wed, 23 Jul 2008 08:46:29 +1000 (EST)
+Date: Wed, 23 Jul 2008 08:46:29 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: python-dev@python.org
+Message-id: <20080722224629.GA24798@cskk.homeip.net>
+Mime-version: 1.0
+Content-disposition: inline
+In-reply-to: <Pine.LNX.4.64.0807212328340.23485@lappy>
+User-agent: Mutt/1.5.18 (2008-05-17)
+Subject: Re: fileobj.read(float): warning or error?
+X-BeenThere: python-dev@python.org
+X-Mailman-Version: 2.1.10
+Precedence: list
+List-Id: Python core developers <python-dev.python.org>
+List-Unsubscribe: <http://mail.python.org/mailman/options/python-dev>,
+	<mailto:python-dev-request@python.org?subject=unsubscribe>
+List-Archive: <http://mail.python.org/pipermail/python-dev>
+List-Post: <mailto:python-dev@python.org>
+List-Help: <mailto:python-dev-request@python.org?subject=help>
+List-Subscribe: <http://mail.python.org/mailman/listinfo/python-dev>,
+	<mailto:python-dev-request@python.org?subject=subscribe>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Sender: python-dev-bounces+cs=zip.com.au@python.org
+Errors-To: python-dev-bounces+cs=zip.com.au@python.org
+X-Virus-Scanned: by XS4ALL Virus Scanner
+X-Cats2Procmailrc-Rule: cats/home, line 99: python  python-dev      sender:python-dev-bounces+cs=zip.com.au@python.org
+X-Label: python-dev
+Content-Length: 1947
+
+On 21Jul2008 23:35, Leif Walsh <leif.walsh@gmail.com> wrote:
+| On Tue, 22 Jul 2008, Cameron Simpson wrote:
+| > Leaving aside the 0.2 => 0 converstion, shouldn't read() raise an
+| > exception if asked for < 1 bytes? Or is there a legitimate use for
+| > read(0) with which I was not previously aware?
+| 
+| I think read(0) should be a no-op, just like it is in libc.  This lets
+| you write 'read(bytes)' without worrying about checking bytes, and
+| also lets you silently stop reading when you have no more space, like
+| in the following:
+| 
+| buf = f.read(max(bytes_left, page_size))
+| while buf:
+|   process(buf)  # updates bytes_left
+|   buf = f.read(max(bytes_left, page_size))
+
+[ Don't you mean "min()"? Unimportant. ]
+
+I see the convenience here, but doubt I'd ever do that myself.
+I'd write the above like this:
+
+  while bytes_left > 0:
+    buf = f.read(max(bytes_left, page_size))
+    if buf == 0:
+      break
+    process(buf)  # updates bytes_left
+
+I'm kind of picky about doing things exactly as often as required and no
+more. Especially things that call another facility.
+
+read(0) itself must internally have a check for size == 0 anyway, so
+it's not like the overall system is less complex. If we're unlucky it
+could trickle all the way down to an OS system call to read(2) (UNIX,
+substitute as suitable elsewhere) and for a no-op that would be overkill
+by far. The only way the read() implementation would avoid that is by
+doing the test on size anyway. But since read() is opaque IMO it is
+better to avoid it at the upper level if we know it will produce
+nothing.
+
+Which leaves me unconvinced of the utility of this mode.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+_______________________________________________
+Python-Dev mailing list
+Python-Dev@python.org
+http://mail.python.org/mailman/listinfo/python-dev
+Unsubscribe: http://mail.python.org/mailman/options/python-dev/cs%40zip.com.au
+

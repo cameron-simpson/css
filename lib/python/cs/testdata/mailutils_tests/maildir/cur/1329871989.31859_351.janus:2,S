@@ -1,0 +1,29 @@
+Date: Fri, 21 May 2010 11:46:38 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Ben Finney <ben+python@benfinney.id.au>
+Cc: python-dev@python.org
+Subject: Re: Reasons behind misleading TypeError message when passing the
+ wrong number of arguments to a method
+Message-ID: <20100521014638.GA28209@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: inline
+Content-Transfer-Encoding: 8bit
+In-Reply-To: <87iq6jgglt.fsf@benfinney.id.au>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 650
+
+On 20May2010 17:46, Ben Finney <ben+python@benfinney.id.au> wrote:
+| Would it help if the traceback showed the ‘repr()’ of each of the
+| arguments received? That way it would be much clearer when the instance
+| was received as the first argument.
+
+I've occasionally passed large or deep dicts etc to functions and foolishly
+printed their repr in debug statements. They can be... wordy.  Maybe a
+cropped repr, or the .__class__ attribute?
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Every technical corrigendum is met by an equally troublesome new defect report.
+        - Norman Diamond <diamond@jit.dec.com>

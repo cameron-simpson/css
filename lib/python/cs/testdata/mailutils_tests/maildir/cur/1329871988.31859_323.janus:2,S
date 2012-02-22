@@ -1,0 +1,49 @@
+Date: Tue, 13 Jul 2010 16:16:29 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Jia Hu <hujia06@gmail.com>
+Cc: python-list@python.org
+Subject: Re: write a .txt file
+Message-ID: <20100713061629.GA14142@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <AANLkTimoavO6J3KJnTIwnypOyc8ynGUcFGbUQS_gw9BG@mail.gmail.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 993
+
+On 12Jul2010 21:28, Jia Hu <hujia06@gmail.com> wrote:
+| I have a problem about how to generate a specific.txt file. I use the
+| following code:
+| 
+| #!/usr/bin/python
+| # OS: Ubuntu
+| import subprocess
+| fileName = open ('final.txt', 'a')
+| fileName.write ('%s %s %s \n' % (12,25,9))
+
+String still in Python's buffer, not yet in the file. Add:
+
+  fileName.flush()
+
+to ensure data in file before running echo.
+
+| desLrr = subprocess.Popen('echo "hello" >> final.txt ', shell=True)
+
+Command dispatched, but not yet waited for. So your Python program proceeds
+and writes to the file _before_ the echo command gets to run.
+
+Wait for desLrr to complete before proceeding.
+
+| fileName.seek(0,2)
+| fileName.write ('%s %s %s \n' % (85,25,12))
+| fileName.close()
+
+And the rest is ok.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+We tend to overestimate the short-term impact of technological change and
+underestimate its long-term impact.     - Amara's Law

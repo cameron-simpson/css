@@ -1,0 +1,37 @@
+Date: Tue, 16 Jun 2009 12:03:11 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: MRAB <python@mrabarnett.plus.com>
+Cc: python-dev@python.org
+Subject: Re: io.BufferedReader.peek() Behaviour in python3.1
+Message-ID: <20090616020311.GA31250@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <4A36F2DE.3010007@mrabarnett.plus.com>
+User-Agent: Mutt/1.5.19 (2009-01-05)
+Content-Length: 1025
+
+On 16Jun2009 02:18, MRAB <python@mrabarnett.plus.com> wrote:
+>> My itch is that peek() _feels_ like it should be "look into the buffer"
+>> but actually can block and/or change the buffer.
+>>
+> Can block, but not if you don't want it too. You might just want to see
+> what, if anything, is currently available, up to n bytes.
+
+Am I missing something?
+
+In the face of an _empty_ buffer (which I can't tell from outside) how
+do I prevent peek() blocking? More generally, if I go peek(n) and if n >
+bytes_in_buffer_right_now and the raw stream would block if a raw read
+is done?
+
+My concerns would go away if I could probe the buffer content size;
+then I could ensure peek(n) chose n <= the content size. If that's not
+enough, my problem - I can choose to read-and-block or go away and come
+back later.
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+If all around you is darkness and you feel you're contending in vain,
+then the light at the end of the tunnel is the front of an oncoming train.

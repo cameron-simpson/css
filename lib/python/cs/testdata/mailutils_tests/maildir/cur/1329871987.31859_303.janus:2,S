@@ -1,0 +1,37 @@
+Date: Sat, 31 Jul 2010 10:39:24 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Ray <rui.vapps@gmail.com>
+Cc: python-list@python.org
+Subject: Re: os.fork on linux defunct
+Message-ID: <20100731003924.GA17823@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: inline
+Content-Transfer-Encoding: 8bit
+In-Reply-To: <77a879cc-94ab-4e2a-a4af-a6945a5b8e9d@q16g2000prf.googlegroups.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 781
+
+On 30Jul2010 15:09, Ray <rui.vapps@gmail.com> wrote:
+| On Jul 30, 6:03 pm, Ray <rui.va...@gmail.com> wrote:
+| > I'm running python 2.4 on linux. I use python os.fork run tcpdump, but
+| > after I kill the forked process (tcpdump) in linux it shows defunct
+[...]
+| > after I call kill() it will kill tcpdump (capture will stop) but on
+| > linux, ps shows tcpdump as defunct process
+| > what am I missing?
+| > thanks for any help.
+| 
+| I think I found it. need to call os.wait()
+
+Yep. "defunct" == "zombie". See:
+
+  http://code.activestate.com/lists/python-list/580569/
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Talk is the bastard redheaded stepchild of email and the telephone.
+        - Geoff Miller, geoffm@purplehaze.Corp.Sun.COM

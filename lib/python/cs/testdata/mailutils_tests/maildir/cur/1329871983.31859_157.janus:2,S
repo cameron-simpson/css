@@ -1,0 +1,84 @@
+Date: Sat, 16 Jul 2011 08:50:50 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Mike Graham <mikegraham@gmail.com>
+Cc: Python-Ideas <python-ideas@python.org>,
+	Guido van Rossum <guido@python.org>
+Subject: Re: Deprecate str.find
+Message-ID: <20110715225050.GA20485@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <CAEBZo3OatLO7uEE=bf41vjfw_HgnG1AD_EF_KWdhzQW-5tf4eg@mail.gmail.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 2516
+
+On 15Jul2011 12:12, Mike Graham <mikegraham@gmail.com> wrote:
+| On Fri, Jul 15, 2011 at 10:57 AM, Guido van Rossum <guido@python.org> wrote:
+| > However, in many cases absence of the string is not an error -- you
+| > just need to do something else. [...]
+| 
+| It isn't necessarily an error if the substring is not in the string
+| (though it sometimes is), but it is an exceptional case.
+
+No it isn't, IMO. It's simply the _other_ case.
+
+| Python uses
+| exceptions pretty liberally most places -- it isn't necessarily an
+| error if an iterator is exhausted or if float("4.2 bad user input") is
+| called or if BdbQuit was raised. In these cases, an exception can be
+| perfectly expected to indicate that what happened is different from
+| the information used in a return value.
+
+In all the cases you cite the exception indicates failure of the
+operation: .next() has nothing to "next" to, float is being handed
+garbage etc.
+
+str.find does not have a failure mode, it has string found and string
+not found.
+
+| Making a Python user write a try/except block when she wants to handle
+| both the cases "substring is in s" and "substring isn't in s" seems
+| perfectly fine to me and, really, preferable to the if statement
+| required to handle these two cases.
+
+You don't find try/except wordy and opaque? I find "if" more idiomatic
+most of the time.
+
+Not to mention vague: it can often be quite hard to be sure the raised
+exception came from just the operation you imagine it came from. With
+str.find there's little scope for vagueness I agree (unless you aren't
+really using a str, but a duck-type). But plenty of:
+
+  try:
+    x = foofunc(y)
+  except IndexError, e:
+    ...
+
+is subject to uncaught IndexError arbitrarily deep in foofunc's call
+stack.
+
+| The base two cases really are about the same:
+[... try ... excpt ...]
+| vs.
+| 
+| i = s.find(sub)
+| if i == -1:
+|     do_something()
+| 
+| But what if I forgot to handle the special case? [...]
+| In this second case, I get the value of -1. Later I can use it as an
+| index, use it in a slice, or perform arithmetic on it. This can
+| introduce seemingly-unrelated values later on, making this especially
+| hard to track down.
+
+I agree it may be a pity that str.find doesn't return None on string not
+found, which would generally raise an exception on an attempt to use it
+as a number.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Any company large enough to have a research lab
+is large enough not to listen to it. - Alan Kay

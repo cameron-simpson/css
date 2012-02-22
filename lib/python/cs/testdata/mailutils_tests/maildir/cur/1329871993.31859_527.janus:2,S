@@ -1,0 +1,46 @@
+Date: Thu, 12 Mar 2009 16:46:03 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Gideon <gideon.simpson@gmail.com>
+Cc: python-list@python.org
+Subject: Re: nohup and os.system
+Message-ID: <20090312054603.GA12497@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20090312053710.GA9615@cskk.homeip.net>
+User-Agent: Mutt/1.5.18 (2008-05-17)
+Content-Length: 1094
+
+On 12Mar2009 16:37, I wrote:
+| With nohup, the outputs of cmd1 and cmd2 are going to the nohup.out
+| file, and thus are set to block buffering. Unless cmd1 and cmd2 have
+| special command line switches to get them to line buffer (or no-buffer)
+| your only recourse is to attach them to terminals, thus tricking them
+| into doing line buffering again. Fortunately, this is made convenient by
+| the script command. For example, try changing the string "cmd1" into the
+| string:
+| 
+|   script -a -q -f nohup.out cmd1
+| 
+| (You will probably need GNU script for the -f option; see "man script"
+| for details, or just try it.)
+
+This is platform dependent. You might need to change cmd1 into:
+
+  script -a -q -f -c 'cmd1' nohup.out
+
+and thus:
+
+  os.system('''script -a -q -f -c 'cmd1' nohup.out''')
+
+in your batch.py (note the differing quotes).
+
+Anyway, see "man script" on your system for the correct invocation.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+A man with one watch knows what time it is; a man with two watches is
+never sure. - Lee Segall

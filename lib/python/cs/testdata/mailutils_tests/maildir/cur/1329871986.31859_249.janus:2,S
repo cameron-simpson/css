@@ -1,0 +1,54 @@
+Date: Sat, 18 Sep 2010 07:05:46 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: python-ideas <python-ideas@python.org>
+Subject: Re: New 3.x restriction on number of keyword arguments
+Message-ID: <20100917210546.GA32088@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <4C93CE55.1030308@mrabarnett.plus.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 1806
+
+On 17Sep2010 21:23, MRAB <python@mrabarnett.plus.com> wrote:
+| On 17/09/2010 21:00, Raymond Hettinger wrote:
+| >One of the use cases for named tuples is to have them be
+| >automatically created from a SQL query or CSV header.  Sometimes (but
+| >not often), those can have a huge number of columns.  In Python 2.x,
+| >it worked just fine -- we had a test for a named tuple with 5000
+| >fields.  In Python 3.x, there is a SyntaxError when there are more
+| >than 255 fields.
+| >
+| >The origin of the change was a hack to fit positional argument counts
+| >and keyword-only argument counts in a single oparg in the python
+| >opcode encoding.
+[...]
+| >Is there any support here for trying to get smarter about the
+| >keyword-only argument implementation? [...]
+|
+| Strings can be any length, lists can be any length, even the humble int
+| can be any length!
+| It does seem unPythonic to have a low limit like that.
+
+A big +10 from me. Implementation internals should not cause language
+level limitations.
+
+If there's a (entirely reasonable IMHO) desire to get
+the opcode small, the count should be encoded in a compact be extendable
+form. (I speak here with no idea how inflexible the opcode readers are.)
+
+As an example, I use a personal encoding for natural numbers scheme
+where values below 128 fit in one byte, 128 or more set the top bit on
+leading bytes to indicate followon bytes, so values up to 16383 fit in
+two bytes and so on arbitrarily. Compact and simple but unbounded.
+
+Is something like that tractable for the Python opcodes?
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+I am returning this otherwise good typing paper to you because someone has
+printed gibberish all over it and put your name at the top.
+        - English Professor, Ohio University

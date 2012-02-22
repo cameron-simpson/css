@@ -1,0 +1,68 @@
+Date: Mon, 15 Jun 2009 11:00:46 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Greg Ewing <greg.ewing@canterbury.ac.nz>
+Cc: python-dev@python.org
+Subject: Re: io.BufferedReader.peek() Behaviour in python3.1
+Message-ID: <20090615010046.GA30997@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <4A358C57.3060004@canterbury.ac.nz>
+User-Agent: Mutt/1.5.19 (2009-01-05)
+Content-Length: 2345
+
+On 15Jun2009 11:48, Greg Ewing <greg.ewing@canterbury.ac.nz> wrote:
+>> For myself, I'd expect more often to want to see if there's stuff in the
+>> buffer _without_ doing any raw reads at all.
+>
+> What uses do you have in mind for that?
+
+It seems like whenever I want to do some kind of opportunistic but
+non-blocking stuff with a remote service (eg something I have a
+packetising connection to, such as a TCP stream) I want to be able
+to see if there's "more stuff" to gather up before issuing a "flush"
+operation. And I want to be able to do that in a non-blocking way,
+much as a Queue has a non-blocking get() method.
+
+As an example, I've got the occasional protocol handler where it has to
+make a remote query. To avoid deadlock, the stream must be flushed after
+write()ing the query packet. However, flushing on every such packet is
+horribly wasteful if you know you have a bunch of them (for example,
+the caller is asking a bunch of questions). It is far far more efficient
+to write() each packet without flushes, keep the knowledge that a flush
+is needed, and flush when there's nothing more pending. That way the
+lower layer has maximum opportunity to pack data into packets.
+
+All that presumes another thread reading responses, which is how I generally
+write this stuff anyway, otherwise a full buffer will deadlock too.
+
+So your dispatch thread inner loop looks like this:
+
+  # single consumer, so Q.empty() implies ok to Q.get()
+  needFlush = False
+  while not Q.empty():
+    P=Q.get()
+    if P.needFlush:
+      needFlush = True
+    out.write(P.serialise())
+  if needFlush:
+    out.flush()
+
+In this scheme, there _are_ packets that don't need a flush, because nobody
+is waiting on their response.
+
+Anyway, if I were reading from an IO object instead of a Queue I'd want
+to poll for "buffer empty". If there isn't an empty buffer I know there
+will be a packet worth of data coming immediately and I can pick it up
+with regular read()s, just as I'm doing with Q.get() above. But if the
+buffer is empty I can drop out of the "pick it all up now" loop and
+flush().
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+If you take something apart and put it back together again enough times, you
+will eventually have enough parts left over to build a second one.
+        - Ayse Sercan <ayse@netcom.com>

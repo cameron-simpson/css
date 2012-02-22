@@ -1,0 +1,40 @@
+Date: Fri, 17 Sep 2010 15:22:59 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Ned Deily <nad@acm.org>
+Cc: python-list@python.org
+Subject: Re: Too many threads
+Message-ID: <20100917052259.GA28454@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <nad-7DF700.22144516092010@news.gmane.org>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 915
+
+On 16Sep2010 22:14, Ned Deily <nad@acm.org> wrote:
+| In article <20100917043826.GA21464@cskk.homeip.net>,
+|  Cameron Simpson <cs@zip.com.au> wrote:
+| 
+| > On 16Sep2010 09:55, mark.pelletier@asrcms.com <mark.pelletier@asrcms.com> 
+| > wrote:
+| > | For some reason, the tasks I put into my thread pool occasionally get
+| > | run more than once.
+| > | 
+| > | Here's the code:
+| > 
+| > You need to post your _exact_ code. I had to change:
+| >   from queue import Queue
+| > into
+| >   from Queue import Queue
+| > So: _do_ you have a "queue" (lowercase) module? Is it buggy?
+| 
+| The OP is probably using Python 3.
+
+Ah, that explains the print(). Anyone know if print() is thread safe in
+python 3?
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+If I repent anything, it is very likely to be my good behavior.
+    What demon possessed me that I behaved so well?     - Henry David Thoreau

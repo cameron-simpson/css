@@ -1,0 +1,40 @@
+Date: Mon, 26 Apr 2010 13:41:23 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Tim Golden <mail@timgolden.me.uk>
+Cc: python@bdurham.com
+Subject: Re: Best practice way to detect internet connectivity under Python
+ 2.6/Windows
+Message-ID: <20100426034123.GA32186@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <4B94D3BC.8040808@timgolden.me.uk>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 1048
+
+[ Off list, because this thread is very old. - Cameron ]
+
+On 08Mar2010 10:38, Tim Golden <mail@timgolden.me.uk> wrote:
+| On 08/03/2010 02:41, python@bdurham.com wrote:
+| >Is the best pratice way to detect internet connectivity under
+| >Windows (using Python 2.6) simply to attempt to access a known
+| >internet website using urllib or urlib2 wrapped in a try/except
+| >construct?
+| 
+| Well, in theory you could use the Internet API:
+|   http://msdn.microsoft.com/en-us/library/aa383996%28VS.85%29.aspx
+| which is exposed via the win32inet module:
+|   http://timgolden.me.uk/pywin32-docs/win32inet.html
+| but I'd just do a socket connection to port 80 (or some known port
+| on some known server)  with a reasonable timeout.
+
+FYI, I have a shell script that relies looking for an active "default route".
+Being UNIX, it examines the output of "netstat -rn" but I'm sure there's an
+equivalent Windows API.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Donuts!  Is there anything they can't do?       - Homer

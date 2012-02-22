@@ -1,0 +1,44 @@
+Date: Sat, 17 Jan 2009 09:39:37 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Michele Petrazzo <michele.petrazzo@TOGLIunipex.it>
+Subject: Re: subprocess and PPID
+Message-ID: <20090116223937.GA6287@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <geu8ss$cn4$1@nnrp-beta.newsland.it>
+User-Agent: Mutt/1.5.18 (2008-05-17)
+Content-Length: 1399
+
+This is quite old email, so I've taken it off-list.
+
+On 06Nov2008 09:12, Michele Petrazzo <michele.petrazzo@TOGLIunipex.it> wrote:
+> saju.pillai@gmail.com wrote:
+>> To reliably have the child exit when the parent exits, you would have
+>>  to poll for the parent from the child and do a exit when the child  
+>> detects that the parent has gone away.
+>
+> Like said, I haven't the control of the sources, so I can't.
+
+Leaving aside the prctl() between fork and exec, or via a wrapper, there is a
+another alternative. Create a manager process as well as all the other things.
+
+If you have access to the multiprocessing module this is pretty easy
+because it has a Queue object for passing data between forked python
+processes. Without multiprocessing, you need pipe/fork and then just
+print to the pipe. Anyway:
+
+  - make a communication stream, either via multiprocessing.Queue or using
+    os.pipe
+  - fork a manager process either via multiprocessing.Process or os.fork
+  - the manager process, a child or your main program, receives the pids of
+    your subprocess.Popen children. It monitors the parent, and kills
+    the children of the parent goes away. You can probe the parent with
+    os.kill using signal 0.
+  - the parent process uses Popen as normal and prints the pids to the
+    management process.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/

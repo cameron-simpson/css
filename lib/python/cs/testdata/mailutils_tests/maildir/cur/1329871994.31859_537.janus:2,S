@@ -1,0 +1,64 @@
+Date: Thu, 8 Jan 2009 12:55:30 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: "Ken D'Ambrosio" <ken@jots.org>
+Cc: python-list@python.org
+Subject: Re: Regular Expressions...
+Message-ID: <20090108015530.GA13974@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <41178.75.67.222.25.1231375881.squirrel@webmail.jots.org>
+User-Agent: Mutt/1.5.18 (2008-05-17)
+Content-Length: 1702
+
+On 07Jan2009 19:51, Ken D'Ambrosio <ken@jots.org> wrote:
+| Hi, all.  As a recovering Perl guy, I have to admit I don't quite "get"
+| the re module.  For example, I'd like to do a few things (I'm going to use
+| phone numbers, 'cause that's what I'm currently dealing with):
+| 12345678900 -- How would I:
+| - Get just the area code?
+| - Get just the seven-digit number?
+| 
+| In Perl, I'd so something like
+| m/^1(...)(.......)/;
+| and then I'd have the numbers in $1 and $2, respectively.  But the Python
+| stuff simply isn't clicking for me.  If anyone could supply concrete
+| examples of how to do the problem, above, that would be terrific.
+
+I presume you're consulting this:
+  http://docs.python.org/library/re.html#module-re
+
+Something like this (untested):
+
+  import re
+  phone = '12345678900'
+  num_re = re.compile('^1(...)(.......)')
+
+num_re is now a regular expression object:
+  http://docs.python.org/library/re.html#regular-expression-objects
+much as you get from a "precompiled" perl regular expression.
+
+  m = num_re.match(phone)
+
+m is now the result of a match against the phone number:
+  http://docs.python.org/library/re.html#id1
+
+m.group(0) is what was matched by the whole expression. m.group(1) is perl's
+$1, m.group(2) is $2 etc.
+For example:
+
+  area_code = m.group(1)
+
+There is also an expand() method that accepts \1, \2 etc in its
+template. For direct substitutions (as in perl's s/this/that/) there is
+the regular expression object sub() method.
+
+It's a bit more broken out than you normally get in perl, but the pieces
+are all there.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Teamwork is essential. It lets you blame someone else.

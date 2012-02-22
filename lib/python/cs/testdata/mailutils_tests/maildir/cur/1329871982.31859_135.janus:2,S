@@ -1,0 +1,248 @@
+Return-Path: <python-list-bounces+cs=zip.com.au@python.org>
+Delivered-To: unknown
+Received: from mail.zip.com.au (125.255.95.3) by janus.home with POP3-SSL; 07
+  Sep 2011 22:53:01 -0000
+Delivered-To: cs@zipworld.com.au
+Received: from mailin4-syd3.pacific.net.au (mailin4-syd3.pacific.net.au [125.255.92.145])
+	by mailstore2.syd.pacific.net.au (Postfix) with ESMTP id 6BEBE3C78
+	for <cs@zipworld.com.au>; Thu,  8 Sep 2011 08:51:21 +1000 (EST)
+Received: from mail.python.org (unknown [82.94.164.166])
+	by mailin4-syd3.pacific.net.au (Postfix) with ESMTP id C30734D80AE
+	for <cs@zip.com.au>; Thu,  8 Sep 2011 08:51:20 +1000 (EST)
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3RvKln1t9hzNSl
+	for <cs@zip.com.au>; Thu,  8 Sep 2011 00:51:17 +0200 (CEST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=python.org; s=200901;
+	t=1315435877; bh=6gXlssHRJxK6San6jQ5JFH8V75/8mkjys28H4LWEBPo=;
+	h=Date:From:To:Subject:Message-ID:MIME-Version:In-Reply-To:
+	 References:Cc:List-Id:List-Unsubscribe:List-Archive:List-Post:
+	 List-Help:List-Subscribe:Content-Type:Content-Transfer-Encoding:
+	 Sender;
+	b=dyPHptLCOEsdLXVIskjJHENrGxRqmpEWd/lh/0VDkGJzYBYKWHtvD+MMQ2lhMtNbY
+	 kgMJGnaWXf85yVzah6vLxGQrFdx0fjoNvPNm858VGpRM4D3T6g4QyNqyb3SDOjtRKv
+	 Uuo4vGmX3SUQ+YtzF1Vyjpn65nViPkWhZWwy33zY=
+X-Original-To: python-list@python.org
+Delivered-To: python-list@mail.python.org
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3RvKhf72PDzNNX
+	for <python-list@python.org>; Thu,  8 Sep 2011 00:48:34 +0200 (CEST)
+X-Spam-Status: OK 0.000
+X-Spam-Evidence: '*H*': 1.00; '*S*': 0.00; 'else:': 0.03; 'context':
+	0.04; 'value,': 0.04; '3.2': 0.05; 'below)': 0.05; 'function,':
+	0.07; 'method,': 0.07; 'received:edu.au': 0.07; 'roll': 0.07;
+	'wrapper': 0.07; 'python': 0.08; "'''": 0.09; 'first:': 0.09;
+	'function:': 0.09; 'none:': 0.09; 'pos': 0.09; 'question?': 0.09;
+	'to:addr:comp.lang.python': 0.09; 'def': 0.15; 'case.': 0.15;
+	'"on': 0.16; '(%s,': 0.16; '(eg': 0.16; 'boolean': 0.16;
+	'definite': 0.16; 'fixes.': 0.16; 'from:addr:cs': 0.16;
+	'from:addr:zip.com.au': 0.16; 'from:name:cameron simpson': 0.16;
+	'it).': 0.16; 'iterable,': 0.16; 'iterator': 0.16; 'message-
+	id:@cskk.homeip.net': 0.16; 'occasions': 0.16; 'pipeline.': 0.16;
+	'pos,': 0.16; 'received:202.125.174': 0.16;
+	'received:202.125.174.133': 0.16;
+	'received:boardofstudies.nsw.edu.au': 0.16;
+	'received:cskk.homeip.net': 0.16;
+	'received:harvey.boardofstudies.nsw.edu.au': 0.16;
+	'received:homeip.net': 0.16; 'received:nsw.edu.au': 0.16; 'sees':
+	0.16; 'selects': 0.16; 'simplest': 0.16; 'subject:iterable': 0.16;
+	'tackling': 0.16; 'value"': 0.16; 'worse.': 0.16; 'cc:addr:python-
+	list': 0.16; 'possibly': 0.16; 'this:': 0.16; 'wrote:': 0.16;
+	"wouldn't": 0.17; '(i.e.': 0.17; 'language': 0.17; 'cheers,':
+	0.18; 'cc:no real name:2**0': 0.20; 'wrote': 0.20; 'memory': 0.21;
+	'(like': 0.21; 'file,': 0.21; 'maybe': 0.21; 'cc:2**0': 0.22;
+	'header:In-Reply-To:1': 0.22; '(or': 0.23; 'convenience': 0.23;
+	'code': 0.25; "i'm": 0.27; 'function': 0.27; 'code,': 0.28;
+	'raise': 0.28; '(see': 0.28; 'loop': 0.28; 'yield': 0.29;
+	'conference': 0.29; 'print': 0.29; 'cc:addr:python.org': 0.30;
+	'example': 0.30; 'lines': 0.30; 'iterating': 0.30; 'proposing':
+	0.30; 'class': 0.30; 'ago': 0.31; 'functional': 0.31; 'list:':
+	0.31; 'skip:b 30': 0.31; 'subject:?': 0.31; 'shows': 0.32; 'adds':
+	0.32; 'answers': 0.32; 'minor': 0.32; 'subject: \n\t': 0.32;
+	'objects': 0.32; 'actually': 0.33; "can't": 0.33; 'there': 0.33;
+	'wondering': 0.33; 'done': 0.34; 'header:User-Agent:1': 0.34;
+	'try:': 0.34; 'charset:us-ascii': 0.36; 'beginning': 0.36;
+	'received:au': 0.36; 'none': 0.37; 'element': 0.37; 'note,': 0.37;
+	'reasons': 0.37; 'using': 0.37; 'but': 0.37; 'something': 0.37;
+	'two': 0.37; 'could': 0.38; 'some': 0.38; 'subject:: ': 0.39;
+	'aside': 0.39; 'enough': 0.39; 'subject: (': 0.39; 'where': 0.40;
+	'personal': 0.60; 'more': 0.60; 'easily': 0.61; 'your': 0.61;
+	'world.': 0.64; 'cost': 0.65; 'received:202': 0.66; 'intelligent':
+	0.66; 'cameron': 0.67; 'storage': 0.67; 'yourself': 0.67;
+	'subject:are': 0.70; 'wired': 0.73; 'article': 0.76;
+	'connection.': 0.77; 'subject:you': 0.81; 'overhead,': 0.84;
+	'stall': 0.84; 'subject:Best': 0.93
+Received: from localhost (HELO mail.python.org) (127.0.0.1)
+	by albatross.python.org with SMTP; 08 Sep 2011 00:48:34 +0200
+Received: from harvey.boardofstudies.nsw.edu.au
+	(mail2.rack1.boardofstudies.nsw.edu.au [202.125.174.133])
+	by mail.python.org (Postfix) with ESMTP
+	for <python-list@python.org>; Thu,  8 Sep 2011 00:48:34 +0200 (CEST)
+Received: from cskk.homeip.net (localhost.localdomain [127.0.0.1])
+	by harvey.boardofstudies.nsw.edu.au (Postfix) with ESMTP id B61344D3B56;
+	Thu,  8 Sep 2011 08:48:24 +1000 (EST)
+Received: by janus.cskk.homeip.net (Postfix, from userid 1000)
+	id 9E690100419B7; Thu,  8 Sep 2011 08:48:24 +1000 (EST)
+Date: Thu, 8 Sep 2011 08:48:24 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: comp.lang.python@googlegroups.com
+Subject: Re: Best way to check that you are at the beginning (the end) of an
+	iterable?
+Message-ID: <20110907224824.GA29885@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <264a83d7-aa43-4e36-b39e-3e67488279b6@glegroupsg2000goo.googlegroups.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+References: <264a83d7-aa43-4e36-b39e-3e67488279b6@glegroupsg2000goo.googlegroups.com>
+Cc: python-list@python.org
+X-BeenThere: python-list@python.org
+X-Mailman-Version: 2.1.12
+Precedence: list
+List-Id: General discussion list for the Python programming language
+	<python-list.python.org>
+List-Unsubscribe: <http://mail.python.org/mailman/options/python-list>,
+	<mailto:python-list-request@python.org?subject=unsubscribe>
+List-Archive: <http://mail.python.org/pipermail/python-list>
+List-Post: <mailto:python-list@python.org>
+List-Help: <mailto:python-list-request@python.org?subject=help>
+List-Subscribe: <http://mail.python.org/mailman/listinfo/python-list>,
+	<mailto:python-list-request@python.org?subject=subscribe>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Sender: python-list-bounces+cs=zip.com.au@python.org
+Errors-To: python-list-bounces+cs=zip.com.au@python.org
+X-Cats2Procmailrc-Rule: cats/home: python  python-list     sender:python-list-bounces+cs=zip.com.au@python.org
+X-Label: python-list
+Content-Length: 4465
+
+On 07Sep2011 14:35, Laurent <laurent.payot@gmail.com> wrote:
+| What is the simplest way to check that you are at the beginning or at
+| the end of an iterable? I'm using enumerate with Python 3.2 (see below)
+| but I'm wondering if there would be a better way.
+| 
+| l = ['a', 'b', 'a', 'c']
+| 
+| for pos, i in enumerate(l):
+|     if pos == 0:
+|         print("head =", i)
+|     else:
+|         print(i)
+| 
+| I know that Python is not exactly a functional language but wouldn't
+| something like "ishead()" or "istail()" be useful?
+
+There are a few reasons these do not exist out of the box (quite aside
+from how easy it is to do on the occasions you actually want it).
+Tackling ishead and istail in turn...
+
+The "ishead()" would need to be a top level function (like "len()")
+because if it were an iterator method, every iterator would need to have
+it implemented; currently the number of methods needed to roll your own
+iterator is just two (iter and next). ishead() could be done as a top
+level function, though it would need the storage cost of an additional
+state value to every iterator (i.e. a "first" boolean or equivalent). So
+you'd be proposing more memory cost and possibly a retrospective code
+change for all the existing planetwide code, for a minor convenient. As
+you note, enumerate gets you a pos value, and it is easy enough to write
+a for loop like this:
+
+  first = True
+  for i in iterable_thing:
+    if first:
+      print "head =", i
+    else:
+      print i
+    first = False
+
+Your istail() is much worse.
+
+A generator would need to do lookahead to answer istail() in the general
+case. Consider iterating over the lines in a file, or better still the
+lines coming from a pipeline. Or iteraing over packets received on a
+network connection. You can't answer "istail()" there until you have
+seen the next line/packet (or EOF/connection close). And that may be an
+arbitrary amount of time in the future. You're going to stall your whole
+program for such a question?
+
+You can do this easily enough for yourself as an itertools-like thing:
+write a wrapper generator that answers ishead() and istail() for
+arbitrary iterators. Completely untested example code:
+
+  class BoundSensitiveIterator(object):
+    def __init__(self, subiter):
+      self.sofar = 0
+      self.subiter = subiter
+      self.pending = ()
+    def iter(self):
+      return self
+    def next(self):
+      self.sofar += 1
+      if self.pending is None:
+        raise StopIteration
+      if self.pending:
+        nxt = self.pending[0]
+        self.pending = ()
+        return nxt
+      return self.subiter.next()
+    def ishead(self):
+      # maybe <= 1, depending on what you want it to mean
+      return self.sofar == 1
+    def istail(self):
+      if self.pending is None:
+        return True
+      if self.pending:
+        return False
+      try:
+        nxt = self.subiter.next()
+      except StopIteration:
+        self.pending = None
+        return True
+      else:
+        self.pending = (nxt,)
+        return False
+
+  I = BoundSensitiveIterator(other_iterable)
+  for n in I:
+    print n, "ishead =", I.ishead(), "istail =", I.istail()
+
+You can see it adds some performance and storage overhead, and of course
+may stall if you every ask istail() of an "on demand" iterable.
+
+About the only time I do this is my personal "the()" convenience
+function:
+
+  def the(list, context=None):
+    ''' Returns the first element of an iterable, but requires there to be
+        exactly one.
+    '''
+    icontext="expected exactly one value"
+    if context is not None:
+      icontext=icontext+" for "+context
+
+    first=True
+    for elem in list:
+      if first:
+        it=elem
+        first=False
+      else:
+        raise IndexError, "%s: got more than one element (%s, %s, ...)" \
+                          % (icontext, it, elem)
+
+    if first:
+      raise IndexError, "%s: got no elements" % icontext
+      
+    return it
+
+Which I use as a definite article in places where an iterable _should_
+yield exactly one result (eg SQL SELECTs that _ought_ to get exactly
+one hit). I can see I wrote that a long time ago - it could do with some
+style fixes. And a code scan shows it sees little use:-)
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Electronic cardboard blurs the line between printed objects and the virtual
+world.  - overhead by WIRED at the Intelligent Printing conference Oct2006
+-- 
+http://mail.python.org/mailman/listinfo/python-list

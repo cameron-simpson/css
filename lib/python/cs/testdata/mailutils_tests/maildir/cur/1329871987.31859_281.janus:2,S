@@ -1,0 +1,36 @@
+Date: Fri, 27 Aug 2010 18:03:37 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Sylvain Mora <sylvain.mora@googlemail.com>
+Cc: python-dev@python.org
+Subject: Re: Update Shell profile for ZSH on Mac OS
+Message-ID: <20100827080337.GA17653@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <AE735D9D-8281-473E-94AA-979ED43BCB46@gmail.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 883
+
+On 26Aug2010 14:37, Sylvain Mora <sylvain.mora@googlemail.com> wrote:
+| I use python for more than a year now and i bought a MacBook in July. I
+| installed Python 2.7 using the .dmg archive on the official website. After
+| the installation I launched the Update Shell Profile.command script,
+| but it doesn't work with ZSH. That's why I have write a small patch to
+| be able to use this script with ZSH shell.
+| 
+| He simply set the path fo zsh shell.
+[...]
+| +zsh)
+| +        PR="${HOME}/.zshenv"
+
+The equivalent of .profile/.bash_profile in zsh is the .zprofile file.
+The .zshenv is not where your account setup should live and is not what
+should be used in this patch.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Shape without form, shade without colour,
+Paralysed force, gesture without motion;        - T.S. Eliot, _The Hollow Men_

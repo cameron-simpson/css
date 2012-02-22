@@ -1,0 +1,60 @@
+Date: Sat, 10 Sep 2011 08:29:02 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Steven D'Aprano <steve+comp.lang.python@pearwood.info>
+Cc: python-list@python.org
+Subject: Re: killing a script
+Message-ID: <20110909222902.GA25985@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <4e6a0382$0$29982$c3e8da3$5496439d@news.astraweb.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+Content-Length: 1783
+
+On 09Sep2011 22:16, Steven D'Aprano <steve+comp.lang.python@pearwood.info> wrote:
+| Hans Mulder wrote:
+| > On 9/09/11 11:07:24, Steven D'Aprano wrote:
+| >> Sure enough, I now have to hit Ctrl-C repeatedly, once per invocation of
+| >> script.py. While script.py is running, it receives the Ctrl-C, the
+| >> calling process does not.
+| > 
+| > You misinterpret what you are seeing: the calling process *does* receive
+| > the ctrl-C, it just chooses to ignore it. 
+| >
+| > This is documented behaviour of os.system. 
+| 
+| Documented where? Neither the on-line documentation nor the function
+| docstring mentions anything about it that I can see:
+| 
+| http://docs.python.org/py3k/library/os.html#os.system
+
+My copy of the 2.7 docs says:
+
+  This is implemented by calling the Standard C function system(), and
+  has the same limitations.
+
+and sure enough, "man 3 system" says:
+
+  The system() function hands the argument command to the command
+  interpreter sh(1).  The calling process waits for the shell to finish
+  executing the command, ignoring SIGINT and SIGQUIT, and blocking
+  SIGCHLD.
+
+os.system() is very convenient for simple stuff, but one size does not
+fit all. Continuing with the Python docs for os.system:
+
+  On Unix, the return value is the exit status of the process encoded in
+  the format specified for wait().
+
+and it is easy to inspect that value for "the subprocess died from a
+signal". Not inspecting the exit status correctly will always be an
+opportunity for incorrect app behaviour.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Mac OS X. Because making Unix user-friendly is easier than debugging Windows.
+- Mike Dawson, Macintosh Systems Administrator and Consultation.
+  mdawson@mac.com http://herowars.onestop.net

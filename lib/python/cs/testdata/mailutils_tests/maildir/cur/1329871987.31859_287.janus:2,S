@@ -1,0 +1,46 @@
+Date: Wed, 11 Aug 2010 22:18:58 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Tim Harig <usernet@ilthio.net>
+Cc: python-list@python.org
+Subject: Re: Line-by-line processing when stdin is not a tty
+Message-ID: <20100811121858.GA5495@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <i3tu89$57f$1@speranza.aioe.org>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 1665
+
+On 11Aug2010 10:32, Tim Harig <usernet@ilthio.net> wrote:
+| On 2010-08-11, Wolfgang Rohdewald <wolfgang@rohdewald.de> wrote:
+| > On Mittwoch 11 August 2010, Cameron Simpson wrote:
+| >> Usually you either
+| >> need an option on the upstream program to tell it to line
+| >> buffer explicitly
+| >
+| > once cat had an option -u doing exactly that but nowadays
+| > -u seems to be ignored
+| >
+| > http://www.opengroup.org/onlinepubs/009695399/utilities/cat.html
+| 
+| I have to wonder why cat knows or cares.  Since we are referring to
+| a single directional pipe, there is no fear of creating any kind of
+| race condition.  In general, I would expect that the shell opens the
+| pipe (pipe()), fork()s, closes its own 0 or 1 descriptor as appropriate
+| for each child,  copies (dup()) one the file descriptors to the
+| appropriate file descriptor for the child process, and exec()s to call
+| the new process.  Neither of the processes, in general, needs to know
+| anything other the to write and read from their given descriptors.
+
+The buffering is a performance choice. Every write requires a context
+switch from userspace to kernel space, and availability of data in the
+pipe will wake up a downstream process blocked trying to read.
+
+It is far more efficient to do as few such copies as possible, so where
+interaction (as you point out) is one way it's usually better to write
+data in larger chunks. But when writing to a terminal, ostensibly for a
+human to read, line buffering is generally better (for exactly the issue
+the OP tripped over - humans expect stuff to happen as it occurs).
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/

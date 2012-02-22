@@ -1,0 +1,41 @@
+Date: Sat, 7 May 2011 14:30:09 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: python-ideas <python-ideas@python.org>
+Subject: Re: 1_000_000
+Message-ID: <20110507043009.GA15772@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <4DC4872D.60004@mrabarnett.plus.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 721
+
+On 07May2011 00:41, MRAB <python@mrabarnett.plus.com> wrote:
+| As far as I remember, Ada also permits it,
+
+That's where I first encountered it myself.
+
+| but has the rule that it can
+| occur only between digits. If we follow that, then:
+| 
+|     1_2345_6789 => Yes
+|     1_2_3_4_5 => Yes
+|     1_234_6789 => Yes
+|     1_ => No
+|     _1 => No
+|     1__234 => No
+|     9.876_543_210 => Yes
+|     9._876_543_210 => No
+|     9_.876_543_210 => No
+|     0xFEFF_0042 => Yes
+|     int('123_456') => Yes
+
++1 to this.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+It is impossible to travel faster than light, and certainly not desirable as
+ones hat keeps blowing off.     - Woody Allen

@@ -1,0 +1,77 @@
+Date: Sat, 27 Feb 2010 15:11:15 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Arjun <arjun.chennu@gmail.com>
+Cc: python-list@python.org
+Subject: Re: How to end TCP socket data while using readline()?
+Message-ID: <20100227041115.GA24869@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <273a2d1e-cff5-4759-a59d-6ccfefddfa40@e1g2000yqh.googlegroups.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 2239
+
+On 26Feb2010 10:39, Arjun <arjun.chennu@gmail.com> wrote:
+| Hi, I have a small script that runs a TCP server. A client connects to
+| this server and transmits a stored file line-by-line, and then waits
+| for a confirmation "done". However, when I run them the first loop
+| never really ends -- as the TCP server keeps expecting more data. I am
+| using a file-like-object, and so somehow I have to communicate to the
+| server that it is the end-of-file.
+| 
+| here is some server code
+| <snip>
+|             sock1.bind(('', port))
+|             print "Listening at port: ", port
+|             sock1.listen(1)      # listening socket
+|             (conn, addr) = sock1.accept()    # connected socket
+|             print 'Client (localhost) port: ', addr[1]
+| 
+|             cf = conn.makefile('r',0)    # file like obj for socket
+[...]
+|         print 'close'
+|         cf.flush()
+|         cf.close()
+|         sfp.close()
+[...]
+
+Too many files. It's not that hard! Or shouldn't be.
+
+| So what I am wondering is:
+| 
+| 1. Using a file-like object means that the socket becomes uni-
+| directional, until the mode of the file object is changed from 'r' to
+| 'w' (or vice versa). This seems inefficient, and rather unPythonesque.
+| Can somebody tell me if there is a more elegant way of receiving all
+| the lines from the client, and then sending a "done" message to the
+| client?
+
+Get the socket. It is a file descriptor (or in may be a python "socket"
+object with a file descriptor inside).
+
+Open _two_ "file" objects on it using
+  from_file = os.fdopen(fd_of_socket, "r")
+  to_file = os.fdopen(fd_of_socket, "w").
+
+Use the same:
+  print >>to_file, 'close'
+  to_file.flush()
+method as you're using already.
+Read from to_file as needed.
+
+The same scheme should work in both server and client:
+
+Don't look for EOF, watch the input line flow.
+
+You might need to use readline() instead of the file-by-line iteration stuff,
+which I seem to recall has some sort of problem handing out the "latest"
+line.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+It's better, when you're riding with someone you don't know so well, to stick
+to the inside line - it's easier to avoid the bits...
+        - Barry Sheene

@@ -1,0 +1,55 @@
+Date: Mon, 18 Jul 2011 08:14:16 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: rantingrick <rantingrick@gmail.com>
+Cc: python-list@python.org
+Subject: Re: Tabs -vs- Spaces: Tabs should have won.
+Message-ID: <20110717221416.GA12441@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: inline
+Content-Transfer-Encoding: 8bit
+In-Reply-To: <1e48a20c-1d87-4247-96fd-5565e3034bfe@en1g2000vbb.googlegroups.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+Content-Length: 2039
+
+On 17Jul2011 09:53, rantingrick <rantingrick@gmail.com> wrote:
+| On Jul 17, 4:49 am, "Anders J. Munch" <2...@jmunch.dk> wrote:
+| > Originally, tabs were a navigation device: When you press the tab key, you skip
+| > ahead to the next tab column.  The notion that whitespace characters are
+| > inserted into the text would have been very alien to someone using text
+| > processing software anno 1970.  Same thing with space and enter; on typewriters
+| > the space bar doesn't "type" anything onto the paper, it moves to the next
+| > column, and that thinking carried over to computers.
+| 
+| And how much longer are we going to live in the past? Who cares about
+| backward compatible tabs.
+
+Anders was explaining, not supporting-for-the-future.
+
+| Mandate the four space tab now! Mandate that
+| Python takes four space and four space only! We shall lead the charge
+| for universal tab unity in all programming languages.
+
+You really don't know what you're talking about, do you? If Python
+mandates this (hahaha!) the Perl crowd will immediately move to a more
+advanced standard, likely 5 space indents (nicely decimalisable) while
+indenting by two tabs (to flexibly leave room for more intermediate
+logic to be inserted later with less diff noise, which they will find
+hard to distinguish from program code).
+
+| > The reason the tab stop is a full 8 positions: for faster navigation.  If it
+| > were 3 positions, it would take forever to skip from the start of line to column
+| > 60.  You'd appreciate that, if you were e.g. writing a fiduciary report with
+| > some text to the left and two number columns to the right, back in the day
+| > before spreadsheets and word processor tables.
+| 
+| Just in case you were not aware this the year 2011. Spreadsheets have
+| been around for a LONG time. Stop living the past.
+
+The past was better. Always was and will be increasingly so in the
+future. Stop fighting the tide!
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Pardon my driving, I'm trying to reload.

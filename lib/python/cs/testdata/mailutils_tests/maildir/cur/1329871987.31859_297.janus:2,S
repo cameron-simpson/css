@@ -1,0 +1,56 @@
+Date: Tue, 27 Jul 2010 10:06:02 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Peng Yu <pengyu.ut@gmail.com>
+Cc: python-list@python.org
+Subject: Re: How to capture all the environment variables from shell?
+Message-ID: <20100727000602.GA22711@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <AANLkTinxxECYL1s0Y3OzTBJ2cbSCLjzCMOTeHe+Jg4NQ@mail.gmail.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 1200
+
+On 26Jul2010 18:36, Peng Yu <pengyu.ut@gmail.com> wrote:
+| R_HOME is set in my shell (bash). But os.environ doesn't have it. I'm
+| not sure what it does when os module is imported. But it seems that
+| os.environ doesn't capture all the environment variable from the
+| shell. Could anybody let me know what is the correct way to inherent
+| all the environment variables form the shell?
+| 
+| $ echo $R_HOME
+| /opt/R-2.11.1
+| $ cat main.py
+| #!/usr/bin/env python
+| 
+| import os
+| 
+| print os.environ['R_HOME']
+| $ ./main.py
+| Traceback (most recent call last):
+|   File "./main.py", line 5, in <module>
+|     print os.environ['R_HOME']
+|   File "/opt/Python-2.6.5/lib/python2.6/UserDict.py", line 22, in __getitem__
+|     raise KeyError(key)
+| KeyError: 'R_HOME'
+
+Sounds like R_HOME is not exported.
+
+Try these in your shell:
+
+  set | grep R_HOME
+  export | grep R_HOME
+
+Then, presuming it shows only in the first command:
+
+  export R_HOME
+
+and then try your python script again.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+It is an approved maxim in war, never to do what the enemy wishes you to
+do, for this reason alone, that he desires it.  - Napoleon

@@ -1,0 +1,75 @@
+Date: Wed, 29 Apr 2009 13:27:40 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Glenn Linderman <v+python@g.nevcal.com>
+Cc: =?utf-8?B?Ik1hcnRpbiB2LiBMw7Z3aXMiIDxtYXJ0aW5Adi5sb2V3aXMuZGU+?=,
+	Python Dev <python-dev@python.org>
+Subject: Re: PEP 383: Non-decodable Bytes in System Character Interfaces
+Message-ID: <20090429032740.GA31335@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: inline
+Content-Transfer-Encoding: 8bit
+In-Reply-To: <49F768F3.8080304@g.nevcal.com>
+User-Agent: Mutt/1.5.18 (2008-05-17)
+Content-Length: 2611
+
+On 28Apr2009 13:37, Glenn Linderman <v+python@g.nevcal.com> wrote:
+> On approximately 4/28/2009 1:25 PM, came the following characters from  
+> the keyboard of Martin v. Löwis:
+>>> The UTF-8b representation suffers from the same potential ambiguities as
+>>> the PUA characters... 
+>>
+>> Not at all the same ambiguities. Here, again, the two choices:
+>>
+>> A. use PUA characters to represent undecodable bytes, in particular for
+>>    UTF-8 (the PEP actually never proposed this to happen).
+>>    This introduces an ambiguity: two different files in the same
+>>    directory may decode to the same string name, if one has the PUA
+>>    character, and the other has a non-decodable byte that gets decoded
+>>    to the same PUA character.
+>>
+>> B. use UTF-8b, representing the byte will ill-formed surrogate codes.
+>>    The same ambiguity does *NOT* exist. If a file on disk already
+>>    contains an invalid surrogate code in its file name, then the UTF-8b
+>>    decoder will recognize this as invalid, and decode it byte-for-byte,
+>>    into three surrogate codes. Hence, the file names that are different
+>>    on disk are also different in memory. No ambiguity.
+>
+> C. File on disk with the invalid surrogate code, accessed via the str  
+> interface, no decoding happens, matches in memory the file on disk with  
+> the byte that translates to the same surrogate, accessed via the bytes  
+> interface.  Ambiguity.
+
+Is this a Windows example, or (now I think on it) an equivalent POSIX example
+of using the PEP where the locale encoding is UTF-16?
+
+In either case, I would say one could make an argument for being stricter
+in reading in OS-native sequences. Grant that NTFS doesn't prevent
+half-surrogates in filenames, and likewise that POSIX won't because to
+the OS they're just bytes. On decoding, require well-formed data. When
+you hit ill-formed data, treat the nasty half surrogate as a PAIR of
+bytes to be escaped in the resulting decode.
+
+Ambiguity avoided.
+
+I'm more concerned with your (yours? someone else's?) mention of shift
+characters. I'm unfamiliar with these encodings: to translate such a
+thing into a Latin example, is it the case that there are schemes with
+valid encodings that look like:
+
+  [SHIFT] a b c
+
+which would produce "ABC" in unicode, which is ambiguous with:
+
+  A B C
+
+which would also produce "ABC"?
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Helicopters are considerably more expensive [than fixed wing aircraft],
+which is only right because they don't actually fly, but just beat
+the air into submission.        - Paul Tomblin

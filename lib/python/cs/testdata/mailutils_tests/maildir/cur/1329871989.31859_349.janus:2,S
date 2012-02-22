@@ -1,0 +1,29 @@
+Date: Thu, 27 May 2010 08:35:05 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: kj <no.email@please.post>
+Cc: python-list@python.org
+Subject: Re: atexit/signal for non-interactive jobs
+Message-ID: <20100526223505.GA2647@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <htjvp2$4t5$1@reader1.panix.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 673
+
+On 26May2010 20:19, kj <no.email@please.post> wrote:
+| If I start the script interactively and after a few seconds (i.e.
+| before it terminates) I hit Ctrl-C (which sends a TERM signal to
+| the process), the wrapup function gets called as desired (although
+| this action appears to be triggered by atexit, and not by the
+| handler for SIGTERM, which apparently never gets called).
+
+I hate to tell you this, but ^C sends SIGINT, not SIGTERM.
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+To have no errors
+Would be life without meaning
+No struggle, no joy
+- Haiku Error Messages http://www.salonmagazine.com/21st/chal/1998/02/10chal2.html

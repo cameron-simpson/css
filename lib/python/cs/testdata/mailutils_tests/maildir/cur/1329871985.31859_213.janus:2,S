@@ -1,0 +1,111 @@
+Date: Fri, 18 Feb 2011 08:40:37 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Alister Ware <alister.ware@ntlworld.com>
+Cc: python-list@python.org
+Subject: Re: Newbie getting desperate with for
+Message-ID: <20110217214037.GA25438@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <kYd7p.23644$P95.9059@newsfe05.ams2>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 3751
+
+On 17Feb2011 18:40, Alister Ware <alister.ware@ntlworld.com> wrote:
+| On Thu, 17 Feb 2011 16:42:05 +0800, Werner wrote:
+| 
+| > On 17/02/11 16:39, Chris Rebert wrote:
+| >> On Thu, Feb 17, 2011 at 12:27 AM, Werner <wdahn@netfront.net> wrote:
+| >>> I have a trivially simple piece of code called timewaster.py:
+| >>> ____________________________________________________
+| >>> while True:
+[...]
+| >>> It runs fine with Eric but when I try to run it from shell...
+| >>>> ./timewaster.py
+| >>> ./timewaster.py: line 4: syntax error near unexpected token `('
+| >>> ./timewaster.py: line 4: `    for i in range(10):'
+[...]
+| >> Looks like it's being run as a shell script rather than through the
+| >> Python interpreter (hence why the error is not in the form of an
+| >> exception with a traceback).
+| >> 
+| >> Try adding:
+| >> #!/usr/bin/env python
+| >> 
+| >> as the first line in your file. This tells the shell to run the script
+| >> using Python.
+[...]
+| may I ask what is the purpose of this code segment, it does not look like 
+| it would achieve much?
+
+When you run a command from the shell, it first tries to directly execv()
+it, which calls the kernel to load and execute the file. If the file is
+not a kernel compatibly file, the shell then presumes the file is a
+shell script and interprets it as shell commands.
+
+Thus the original error message, since it is Python code and not shell
+code.
+
+The shebang line:
+
+  #!/usr/bin/env python
+
+is a special piece of script syntax recognised _by_the_kernel_, which
+makes the script something the kernel will handle. If a file's first two
+characters are:
+
+  #!
+
+then the kernel reads the remainder of that line as a command to be used
+to execute the script by appending the script pathname. So the line
+supplied causes the kernel to execute the command:
+
+  /usr/bin/env python the-path-to-the-script ...
+
+where "..." would be any additional arguments you supplied on the
+command line. In this way, many scripting languages can be "directly"
+executed.
+
+These two characters were chosen because "#" is a comment character in
+many/most UNIX scripting languages and because "!" is the traditional
+UNIX indicator for a "shell escape" it tools like editors, where one
+indicates that one wants to run an external shell comand by preceeding
+it with a "!" "(bang"), eg:
+
+  ! ls
+
+and variations.
+
+Now, it is usual to provide the direct path to the interpreter, eg:
+
+  #!/bin/sh
+  #!/usr/bin/python
+
+etc. However, some some things that path may vary from system to system.
+On POSIX systems, /bin/sh is guarenteed to be present at that location,
+but python or perl may be in /usr/bin or /usr/local/bin etc.
+The #! syntax _requires_ an absolute path to the executable.
+If the executable may be in different places (because the script author
+is shipping a script that will run on some unknown system) this is a
+problem.
+
+The "env" command is actually a special hook for setting environment
+variables before running a command, but without extra arguments is can
+be used to rely on $PATH to find the command. So the command:
+
+  /usr/bin/env python
+
+incantation finds "the python that would normally be run", without
+needing to know the install path of the python executable.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+A common criticism of the Internet is that it is dominated by the crude, the
+uninformed, the immature, the smug, the untalented, the repetitious, the
+pathetic, the hostile, the deluded, the self-righteous, and the shrill.  This
+criticism overlooks the fact that the Internet also offers -- for the savvy
+individual who knows where to look -- the tasteless and the borderline insane.
+        - _A brief History of Computing #12_ Heck <jim@comms2.calstate.edu>

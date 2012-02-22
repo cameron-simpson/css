@@ -1,0 +1,140 @@
+Return-Path: <python-dev-bounces+cs=zip.com.au@python.org>
+Delivered-To: unknown
+Received: from mail.zip.com.au (125.255.95.3) by janus.home with POP3-SSL; 08
+  Oct 2011 01:43:02 -0000
+Delivered-To: cs@zipworld.com.au
+Received: from mailin4-syd3.pacific.net.au (mailin4-syd3.pacific.net.au [125.255.92.145])
+	by mailstore2.syd.pacific.net.au (Postfix) with ESMTP id 723793C36
+	for <cs@zipworld.com.au>; Sat,  8 Oct 2011 12:42:23 +1100 (EST)
+Received: from mail.python.org (unknown [82.94.164.166])
+	by mailin4-syd3.pacific.net.au (Postfix) with ESMTP id C015D4D80B3
+	for <cs@zip.com.au>; Sat,  8 Oct 2011 12:42:22 +1100 (EST)
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3SFr7H0tVNzPHG
+	for <cs@zip.com.au>; Sat,  8 Oct 2011 03:42:19 +0200 (CEST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=python.org; s=200901;
+	t=1318038139; bh=/R+tv8oXzOFrjhFaPAWiXOtSB38ZlH4PMKYkBe8n+qc=;
+	h=Date:From:To:Message-ID:MIME-Version:In-Reply-To:References:Cc:
+	 Subject:List-Id:List-Unsubscribe:List-Archive:List-Post:List-Help:
+	 List-Subscribe:Content-Type:Content-Transfer-Encoding:Sender;
+	b=xzPw4O3h7Y/iiqk2q8ISQuGYIOXvAN6Q7Y0v8uYV344iA1IJTh5XjldeohswKyTD7
+	 7Ri/uVJ5vzCaWpI+VGsHRKezX4jN4FlLDJUChjWo7jHJeQKA5E3S65eQuXyMkRu50N
+	 0xU3BPr0xwlom4H+keEnXmL3LUPHXdUC2KpIWxz8=
+X-Original-To: python-dev@python.org
+Delivered-To: python-dev@mail.python.org
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3SFr5T0zHJzNnm
+	for <python-dev@python.org>; Sat,  8 Oct 2011 03:40:45 +0200 (CEST)
+X-Spam-Status: OK 0.003
+X-Spam-Evidence: '*H*': 0.99; '*S*': 0.00; 'received:edu.au': 0.07;
+	'subject:when': 0.07; 'terry': 0.07; 'foord': 0.09; 'am,': 0.12;
+	'subject:Issue': 0.15; '>>to': 0.16; '>on': 0.16; 'arbitrarily':
+	0.16; 'from:addr:cs': 0.16; 'from:addr:zip.com.au': 0.16;
+	'from:name:cameron simpson': 0.16; 'message-id:@cskk.homeip.net':
+	0.16; 'non-admin': 0.16; 'received:202.125.174': 0.16;
+	'received:202.125.174.133': 0.16;
+	'received:boardofstudies.nsw.edu.au': 0.16;
+	'received:cskk.homeip.net': 0.16;
+	'received:harvey.boardofstudies.nsw.edu.au': 0.16;
+	'received:homeip.net': 0.16; 'received:nsw.edu.au': 0.16; 'reedy':
+	0.16; 'subject:): ': 0.16; 'wrote:': 0.16; "wouldn't": 0.17;
+	'admin': 0.18; 'cheers,': 0.18; 'cc:no real name:2**0': 0.20;
+	'mechanism': 0.21; 'header:In-Reply-To:1': 0.22; 'runs': 0.23;
+	'(without': 0.23; 'default,': 0.23; 'vs.': 0.23; 'testing': 0.24;
+	'code': 0.25; 'tests': 0.25; 'code.': 0.26; 'windows': 0.26;
+	"i'm": 0.27; 'code,': 0.28; 'users.': 0.28; 'concern': 0.28;
+	'correct': 0.28; 'pass': 0.29; 'environment': 0.29;
+	'cc:addr:python.org': 0.30; 'builder': 0.30; 'differently': 0.30;
+	'invoke': 0.30; 'user.': 0.31; 'seem': 0.31; 'michael': 0.31;
+	'subject: \n\t': 0.32; 'anyone': 0.32; 'too': 0.33; 'header:User-
+	Agent:1': 0.34; 'setting': 0.34; 'consensus': 0.34; 'solaris':
+	0.34; 'pretty': 0.35; 'charset:us-ascii': 0.36; 'received:au':
+	0.36; 'cc:2**1': 0.36; 'executing': 0.37; 'machine': 0.37; 'run':
+	0.37; 'but': 0.37; 'should': 0.38; 'easier': 0.38; 'subject:: ':
+	0.39; 'correctly': 0.39; 'privileged': 0.39; 'user': 0.39; 'case':
+	0.39; 'subject: (': 0.39; 'where': 0.40; 'more': 0.60; 'world':
+	0.62; 'apps': 0.63; 'believe': 0.65; 'valuable': 0.65;
+	'received:202': 0.66; 'cameron': 0.67; 'resources,': 0.67; 'care':
+	0.71; 'anything.': 0.71; 'cutting': 0.73; 'glyph': 0.84;
+	'isolated': 0.84; 'malicious': 0.84; 'sum': 0.89
+Received: from localhost (HELO mail.python.org) (127.0.0.1)
+	by albatross.python.org with SMTP; 08 Oct 2011 03:40:45 +0200
+Received: from harvey.boardofstudies.nsw.edu.au
+	(mail2.rack1.boardofstudies.nsw.edu.au [202.125.174.133])
+	by mail.python.org (Postfix) with ESMTP
+	for <python-dev@python.org>; Sat,  8 Oct 2011 03:40:44 +0200 (CEST)
+Received: from cskk.homeip.net (localhost.localdomain [127.0.0.1])
+	by harvey.boardofstudies.nsw.edu.au (Postfix) with ESMTP id 2320B4D3B5C;
+	Sat,  8 Oct 2011 12:40:42 +1100 (EST)
+Received: by janus.cskk.homeip.net (Postfix, from userid 1000)
+	id 0F3D4100419B7; Sat,  8 Oct 2011 12:40:42 +1100 (EST)
+Date: Sat, 8 Oct 2011 12:40:41 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Michael Foord <fuzzyman@voidspace.org.uk>
+Message-ID: <20111008014041.GA28402@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <4E8F95B9.8030508@voidspace.org.uk>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+References: <4E8F95B9.8030508@voidspace.org.uk>
+Cc: python-dev@python.org, Terry Reedy <tjreedy@udel.edu>
+Subject: Re: cpython (3.2): Issue #11956:
+	Skip	test_import.test_unwritable_directory on FreeBSD when run as
+X-BeenThere: python-dev@python.org
+X-Mailman-Version: 2.1.12
+Precedence: list
+List-Id: Python core developers <python-dev.python.org>
+List-Unsubscribe: <http://mail.python.org/mailman/options/python-dev>,
+	<mailto:python-dev-request@python.org?subject=unsubscribe>
+List-Archive: <http://mail.python.org/pipermail/python-dev>
+List-Post: <mailto:python-dev@python.org>
+List-Help: <mailto:python-dev-request@python.org?subject=help>
+List-Subscribe: <http://mail.python.org/mailman/listinfo/python-dev>,
+	<mailto:python-dev-request@python.org?subject=subscribe>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Sender: python-dev-bounces+cs=zip.com.au@python.org
+Errors-To: python-dev-bounces+cs=zip.com.au@python.org
+X-Cats2Procmailrc-Rule: cats/home: python  python-dev      sender:python-dev-bounces+cs=zip.com.au@python.org
+X-Label: python-dev
+Content-Length: 1738
+
+On 08Oct2011 01:13, Michael Foord <fuzzyman@voidspace.org.uk> wrote:
+| On 08/10/2011 00:19, Terry Reedy wrote:
+| >On 10/7/2011 6:18 AM, Glyph wrote:
+| >
+| >>To sum up what I believe is now the consensus from this thread:
+| >>
+| >> 1. Anyone setting up a buildslave should take care to invoke the build
+| >>    in an environment where an out-of-control buildbot, potentially
+| >>    executing arbitrarily horrible and/or malicious code, should not
+| >>    damage anything. Builders should always be isolated from valuable
+| >>    resources, although the specific mechanism of isolation may differ.
+| >>    A virtual machine is a good default, but may not be sufficient;
+| >>    other tools for cutting of the builder from the outside world would
+| >>    be chroot jails, solaris zones, etc.
+| >> 2. Code runs differently as privileged vs. unprivileged users.
+| >
+| >My particular concern with testing as an unprivileged user comes
+| >from experience with too many (commercial, post-XP) Windows
+| >programs that only run correctly as admin (without an obvious good
+| >reason).
+| 
+| It would seem that for this use case it is more important that all
+| tests pass when run as a *non-admin* user.
+
+I'm pretty sure that's what Terry meant; if these apps were tested non-admin
+they wouldn't need to run as "admin (without an obvious good reason".
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+It is easier to optimize correct code than to correct optimized code.
+- Bill Harlan
+_______________________________________________
+Python-Dev mailing list
+Python-Dev@python.org
+http://mail.python.org/mailman/listinfo/python-dev
+Unsubscribe: http://mail.python.org/mailman/options/python-dev/cs%40zip.com.au

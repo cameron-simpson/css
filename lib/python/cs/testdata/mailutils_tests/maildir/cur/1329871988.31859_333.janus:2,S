@@ -1,0 +1,63 @@
+Date: Wed, 16 Jun 2010 09:01:02 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Alexander Belopolsky <alexander.belopolsky@gmail.com>
+Cc: "M.-A. Lemburg" <mal@egenix.com>, python-ideas@python.org
+Subject: Re: Rename time module to "posixtime"
+Message-ID: <20100615230102.GA8439@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <AANLkTikG0VQnq-zwKSByW2rqc4_w9l1oWIFdS2QNmOLw@mail.gmail.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 2349
+
+On 15Jun2010 10:47, Alexander Belopolsky <alexander.belopolsky@gmail.com> wrote:
+| On Tue, Jun 15, 2010 at 4:07 AM, M.-A. Lemburg <mal@egenix.com> wrote:
+| > Alexander Belopolsky wrote:
+| >> One of the common complains about working with time values in Python,
+| >> is that it some functionality is available in time module, some in
+| >> datetime module and some in both.
+| ..
+| > I'm not sure I understand the point in renaming the module.
+| 
+| I've reread my post and have to admit that I did not explain this
+| point clearly.  There are currently three different ways to represent
+| a point in time: datetime object, unix timestamp, and a 9-element time
+| tuple.  While the datetime module has its share of criticism, its
+| interfaces are more user friendly and more "pythonic" than C inspired
+| time module interfaces.
+
+Personally, I would be happy to see unix-timestamp and datetime object,
+and see the time tuples go away.
+
+The tuples are a direct mirror of the unix "struct tm" structures and and
+should really only be visible in a "posixtime" module of some kind - the
+datetime objects are their direct equivalents anyway to my mind and should be
+what are dealt with for human calendar stuff.
+
+However, the unix timestamps should stay (or anything equivalent that
+measures real world seconds, but since any epoch will do for that purpose
+and we've got the unix one in use I'd stay with it). They represent an
+absolute timeframe and let one do direct arithmetic. If I'm not doing
+calendar things (or only doing them for presentation) then the unix
+timestamp is usually my preferred time item.
+
+| Conversions between timestamp/timetuple and datetime are quite awkward
+| as well. We have datetime.timetuple(), but no fromtimetuple() (you
+| have to write cryptic datetime(*tt[:6]).  With timestamps, it is the
+| opposite.  We have a full compliment of
+| fromtimestamp/utcfromtimestamp, but no functions to go in the opposite
+| direction.
+
+Yes, awful. Having spent a fair chunk of yesterday trying to obtain an
+adapter (or chain of adapters) to join a 3G modem to an antenna with a
+different end, I feel your pain. And I've felt it with the time
+functions too.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+A man with one watch knows what time it is; a man with two watches is
+never sure. - Lee Segall

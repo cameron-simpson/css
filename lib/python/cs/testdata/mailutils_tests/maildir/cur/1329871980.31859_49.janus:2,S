@@ -1,0 +1,36 @@
+Date: Fri, 13 Jan 2012 10:26:04 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Sven Marnach <sven@marnach.net>
+Cc: python-ideas@python.org
+Subject: Re: os.listdir default to '.'
+Message-ID: <20120112232604.GA914@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20120112221136.GA32550@pantoffel-wg.de>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+Content-Length: 750
+
+On 12Jan2012 22:11, Sven Marnach <sven@marnach.net> wrote:
+| Cameron Simpson schrieb am Fr, 13. Jan 2012, um 08:32:23 +1100:
+| > On 12Jan2012 15:14, Rob Cliffe <rob.cliffe@btinternet.com> wrote:
+| > | Strictly speaking I think the default value should be
+| > | os.path.curdir, not specifically '.'
+| [...]
+| >   -1 for os.curdir() being opendir's default.
+| 
+| There's a misunderstanding here.  You are confusing 'os.getcwd()' and
+| 'os.curdir'.
+
+Yes.
+
+Please ignore the rest of that post, based as it is on a brain fart on
+my part.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+It must be public fact, because I'm not the only one who knows about it.
+        - Stefan A. Werner <iczer-1!saw@uunet.uu.net>

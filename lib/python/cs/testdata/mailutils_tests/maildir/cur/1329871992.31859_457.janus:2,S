@@ -1,0 +1,37 @@
+Date: Wed, 29 Apr 2009 12:40:26 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Thomas Breuel <tmbdev@gmail.com>
+Cc: Antoine Pitrou <solipsis@pitrou.net>, python-dev@python.org
+Subject: Re: PEP 383: Non-decodable Bytes in System Character Interfaces
+Message-ID: <20090429024026.GA15177@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <7e51d15d0904280537n22168cfl16c58f727be1755e@mail.gmail.com>
+User-Agent: Mutt/1.5.18 (2008-05-17)
+Content-Length: 1083
+
+On 28Apr2009 14:37, Thomas Breuel <tmbdev@gmail.com> wrote:
+| But the biggest problem with the proposal is that it isn't needed: if you
+| want to be able to turn arbitrary byte sequences into unicode strings and
+| back, just set your encoding to iso8859-15.  That already works and it
+| doesn't require any changes.
+
+No it doesn't. It does transcode without throwing exceptions. On POSIX.
+(On Windows? I doubt it - windows isn't using an 8-bit scheme. I
+believe.) But it utter destorys any hope of working in any other locale
+nicely. The PEP lets you work losslessly in other locales.
+
+It _may_ require some app care for particular very weird strings
+that don't come from the filesystem, but as far as I can see only in
+circumstances where such care would be needed anyway i.e. you've got to
+do special stuff for weirdness in the first place. Weird == "ill-formed
+unicode string" here.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+I just kept it wide-open thinking it would correct itself.
+Then I ran out of talent.       - C. Fittipaldi

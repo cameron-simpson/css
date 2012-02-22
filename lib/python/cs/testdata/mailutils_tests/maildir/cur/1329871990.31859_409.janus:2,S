@@ -1,0 +1,39 @@
+Date: Mon, 4 Jan 2010 10:00:28 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: cassiope <fpm@u.washington.edu>
+Cc: python-list@python.org
+Subject: Re: IOError - cannot create file (linux daemon-invoked script)
+Message-ID: <20100103230028.GA11635@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: inline
+Content-Transfer-Encoding: 8bit
+In-Reply-To: <8617a8f1-7567-4728-9568-9d03245df1fd@j24g2000yqa.googlegroups.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 1011
+
+On 03Jan2010 14:20, cassiope <fpm@u.washington.edu> wrote:
+| On Jan 2, 8:02 pm, Cameron Simpson <c...@zip.com.au> wrote:
+| > Can you show us:
+| >   - the directory user and group ownership and permissions
+| >   - the daemon's user and group values?
+| 
+| Directory permissions: 774
+
+That's unusual - why the "4"? Directories with read but no search (1)
+are of limited use. (Not none - it's only unusual, not insane).
+
+| Directory ownership: "lesser user", "special group" where /etc/group
+| has "special group" members including the "lesser user", as well as
+| those who are expected to use the daemon, but not root.
+| Script ownership: "lesser user"; permissions 755
+| Daemon ownership: root; permissions: 755 (always started by root).
+
+And the script/daemon _runs_ as the "lesser user"?
+
+If so, superficially the permissions look like they should work.
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+I couldn't think of anything else to do with it, so I put it on the web.

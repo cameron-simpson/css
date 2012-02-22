@@ -1,0 +1,75 @@
+Date: Fri, 23 Apr 2010 22:03:29 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Peter Otten <__peter__@web.de>
+Cc: python-list@python.org
+Subject: Re: question about an exciting gotcha for unittests (and
+ elsewhere) ...
+Message-ID: <20100423120329.GA539@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <hqs033$h1v$00$1@news.t-online.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 2478
+
+On 23Apr2010 13:25, Peter Otten <__peter__@web.de> wrote:
+| Cameron Simpson wrote:
+| > and it's failing. I've traced the failure cause, ending up with this
+| > assertion message from the end of serialise() above:
+| > 
+| >   AssertionError: <class '__main__.Node'> HOST:foo:{} <class
+| >   'cs.nodedb.node.Node'>
+| > 
+| > Experienced users will see at once what's happened: I've made a Node
+| > myself in the test using the local class, and the Node class is thus
+| > __main__.Node. However, my sql Backend class has independently imported
+| > the "Node" and "Backend" classes from "cs.nodedb.node". So when _it_
+| > calls serialise(), "Node" is "cs.nodedb.node.Node".
+| >
+| > And lo, the:
+| >   if isinstance(value, Node):
+| > test at the top of serialise() fails.
+| > 
+| > What's a sensible way of doing this correctly?
+| 
+| Move the unit tests into a separate script and have that import the module 
+| cs.nodedb.node. 
+
+Hmm. I have been very attracted by the idea of having the unittest in
+the module itself, and run if I "run" the module alone (instead of
+importing it).
+
+Conversely, I've also got a few modules that are standalone programs
+and running _then_ runs the app, not a bunch of tests.
+
+Having the tests elsewhere would solve the problem as you say; an import
+of the module is what "real" code will be doing and, as my misadventure
+above demonstrates, that's a different thing as far as namespaces go.
+
+| In general, avoid importing a module and at the same time using it as the 
+| main script.
+
+Fsir enough - that's a succinct description of what I did wrong.
+
+| When persistent objects are involved "the same time" can even 
+| spread over distinct runs of separate scripts accessing the same data.
+
+Good point; this is another thing to add to my reluctance to use
+persistent objects. Persistent _data_, sure, and my little nodedb
+package is exactly such an animal, but not persistent objects.
+
+| Obvious? But you asked for a /sensible/ way.
+
+Indeed. Thanks for the suggestion. I'll try to pursue it; the rest of my
+thread shows I've worked around some of the problem but the workaround
+still depends somewhat on the package internal dependencies and going
+your way with a separate test script that does a proper import will
+avoid that weakness.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Thought: Why does man kill?  He kills for food.  And not only for
+food: frequently there must be a beverage.      - Woody Allen

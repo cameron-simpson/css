@@ -1,0 +1,62 @@
+Date: Fri, 23 Oct 2009 12:01:09 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Bahadir Balban <bilgehan.balban@gmail.com>
+Cc: Jean-Michel Pichavant <jeanmichel@sequans.com>, python-list@python.org
+Subject: Re: Terminating python script easily
+Message-ID: <20091023010109.GA20050@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: inline
+Content-Transfer-Encoding: 8bit
+In-Reply-To: <f436bfaf0910220603h2607c664y746f7e71c28de2d6@mail.gmail.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 2124
+
+On 22Oct2009 16:03, Bahadir Balban <bilgehan.balban@gmail.com> wrote:
+| On Thu, Oct 22, 2009 at 4:01 PM, Jean-Michel Pichavant
+| <jeanmichel@sequans.com> wrote:
+| > Balban wrote:
+| >> I have a python build script that calls various commands, some using
+| >> os.system().
+| >>
+| >> Often, if I want to terminate the script prematurely, I press ctrl-c,
+| >> but I have to do this many times before I can kill the script for
+| >> good. I was wondering is there a way that I define a signal handler
+| >> and kill the whole thing at once with a single ctrl-c? Perhaps I
+| >> should  also call my other scripts with a method other than os.system
+| >> () as well?
+| >
+| > you may want to use subprocess instead of os.system.
+| > On catching CTRL+C, you kill all the pid started with subprocess and exit
+| > the script smoothly.
+| 
+| Hmm. OK, this is what I suspected I needed. So no explicit signal
+| catching is required I guess.
+
+But the funny thing is that this shouldn't be necessary. On a UNIX
+system, ^C sends SIGINT to all the processes in the process group on the
+terminal. Only those who have specially caught SIGINT will fail to exit.
+
+Of course, plenty of programs do catch SIGINT for tidy-up purposes, but
+all who do should be tidying up and then exiting promptly.
+
+Unless the subprocess module specially protects its children from SIGINT
+I would _hope_ they'd all just quit. Obviously that's not the case
+though.
+
+I don't speak with knowledge of what subprocess does, only knowledge of what
+should happen on a UNIX system via ^C and what _does_ happen on a UNIX system
+unless some app goes out of its way to break^Wchange that behaviour.
+
+I do know that ^C doesn't always terminate my threaded python stuff cleanly,
+and I think I recall that such stuff is only delivered to the main thread of
+a python program, thus requiring special handle to tidy up other stuff.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+No team manager will tell you this; but they all want to see you
+come walking back into the pits sometimes, carrying the steering wheel.
+        - Mario Andretti

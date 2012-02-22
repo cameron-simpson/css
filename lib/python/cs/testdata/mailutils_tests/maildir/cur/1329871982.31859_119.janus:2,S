@@ -1,0 +1,38 @@
+Date: Sun, 18 Sep 2011 09:27:54 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: python-list@python.org
+Subject: Re: os independent rename
+Message-ID: <20110917232754.GA24525@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <pan.2011.09.17.19.18.21.518000@nowhere.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+Content-Length: 1077
+
+On 17Sep2011 20:18, Nobody <nobody@nowhere.com> wrote:
+| On Sat, 17 Sep 2011 20:28:32 +0430, Lee Harr wrote:
+| > So, what is the best way to do this that will
+| > behave the same across operating systems?
+| 
+| Delete the destination first, but after checking that it isn't the same as
+| the source.
+
+This is usually a step that the UNIX os.rename is designed to avoid.
+By deleting first, there is a window where the destination doesn't exist
+at all. Also, if the subsequent rename fails, the destination is missing
+long term. os.rename() on UNIX specifies that after the call either the
+new items is at destination (success) or the old item is (failure).
+Either way you still have a valid destination object.
+
+So you're breaking the model that os.rename() strives explicitly to
+provide.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Q: How many user support people does it take to change a light bulb?
+A: We have an exact copy of the light bulb here and it seems to be
+   working fine.  Can you tell me what kind of system you have?

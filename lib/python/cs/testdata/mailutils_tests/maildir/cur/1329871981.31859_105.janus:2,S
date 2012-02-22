@@ -1,0 +1,194 @@
+Return-Path: <python-dev-bounces+cs=zip.com.au@python.org>
+Delivered-To: unknown
+Received: from mail.zip.com.au (125.255.95.3) by janus.home with POP3-SSL; 07
+  Oct 2011 02:15:02 -0000
+Delivered-To: cs@zipworld.com.au
+Received: from mailin3-syd3.pacific.net.au (mailin3-syd3.pacific.net.au [125.255.92.144])
+	by mailstore2.syd.pacific.net.au (Postfix) with ESMTP id 8AF606A43
+	for <cs@zipworld.com.au>; Fri,  7 Oct 2011 13:13:28 +1100 (EST)
+Received: from mail.python.org (unknown [82.94.164.166])
+	by mailin3-syd3.pacific.net.au (Postfix) with ESMTP id A3144400086
+	for <cs@zip.com.au>; Fri,  7 Oct 2011 13:14:16 +1100 (EST)
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3SFDsf2TbczPQX
+	for <cs@zip.com.au>; Fri,  7 Oct 2011 04:13:26 +0200 (CEST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=python.org; s=200901;
+	t=1317953606; bh=EykxN6MkYv3aqIpxs+zQz1gX4hnPfvcIiCMx5EyjqaY=;
+	h=Date:From:To:Message-ID:MIME-Version:In-Reply-To:References:Cc:
+	 Subject:List-Id:List-Unsubscribe:List-Archive:List-Post:List-Help:
+	 List-Subscribe:Content-Type:Content-Transfer-Encoding:Sender;
+	b=vL9m0VTQUZoBlYG0CIE9ZFqxfhi8/bswp58rRPKFp5/zVeFT5RIiT8dIi5r7I8iiM
+	 Vv7RdKDKXoxb2TX803/tpMgYmMrxMLDKx0wzolR8rCoLAcpzd0z+HsLIDwnvGE8tPD
+	 apazluPmvNr2N6OG9slMQcqBNIFfknsEuiGUDmk4=
+X-Original-To: python-dev@python.org
+Delivered-To: python-dev@mail.python.org
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3SFDqr5CVBzPPT
+	for <python-dev@python.org>; Fri,  7 Oct 2011 04:11:52 +0200 (CEST)
+X-Spam-Status: OK 0.000
+X-Spam-Evidence: '*H*': 1.00; '*S*': 0.00; 'oct': 0.02; 'permissions':
+	0.04; '(except': 0.05; 'distinct': 0.05; 'instance': 0.05;
+	'behave': 0.07; 'coders': 0.07; 'imply': 0.07; 'indeed,': 0.07;
+	'received:edu.au': 0.07; 'seemed': 0.07; 'subject:when': 0.07;
+	'terry': 0.07; 'tests,': 0.07; 'all?': 0.09; 'buildbot': 0.09;
+	'correctness': 0.09; 'fetch': 0.09; 'privileges': 0.09; 'ssh':
+	0.09; 'suggestion.': 0.09; 'subject:Issue': 0.15; 'codebase,':
+	0.16; 'filesystem': 0.16; 'from:addr:cs': 0.16;
+	'from:addr:zip.com.au': 0.16; 'from:name:cameron simpson': 0.16;
+	'hmm.': 0.16; 'it).': 0.16; 'logic.': 0.16; 'message-
+	id:@cskk.homeip.net': 0.16; 'rebuilt,': 0.16;
+	'received:202.125.174': 0.16; 'received:202.125.174.133': 0.16;
+	'received:boardofstudies.nsw.edu.au': 0.16;
+	'received:cskk.homeip.net': 0.16;
+	'received:harvey.boardofstudies.nsw.edu.au': 0.16;
+	'received:homeip.net': 0.16; 'received:nsw.edu.au': 0.16; 'root,':
+	0.16; 'special,': 0.16; 'subject:): ': 0.16; 'subset': 0.16;
+	'possibly': 0.16; 'wrote:': 0.16; 'linux': 0.17; 'cheers,': 0.18;
+	'arguments': 0.18; 'cc:no real name:2**0': 0.20; 'seems': 0.20;
+	'appears': 0.20; 'primarily': 0.21; 'header:In-Reply-To:1': 0.22;
+	'builds': 0.23; 'fundamental': 0.23; 'gregory': 0.23; "shouldn't":
+	0.23; 'tests.': 0.23; 'testing': 0.24; 'permission': 0.24; 'code':
+	0.25; 'tests': 0.25; '(in': 0.26; "i'm": 0.27; 'host': 0.27;
+	'beyond': 0.28; 'reflect': 0.28; 'users.': 0.28; 'environment':
+	0.29; 'cc:addr:python.org': 0.30; 'definition': 0.30;
+	'environment.': 0.30; 'not.': 0.30; 'i/o': 0.30; 'semantics':
+	0.30; 'tool.': 0.30; 'yes.': 0.30; 'error': 0.32; 'andrew': 0.32;
+	'certainly': 0.32; 'like.': 0.32; 'subject: \n\t': 0.32; 'does':
+	0.32; 'source': 0.33; 'agree': 0.33; 'it.': 0.33; 'instead': 0.33;
+	'however,': 0.34; '...': 0.34; 'header:User-Agent:1': 0.34;
+	'describe': 0.34; 'test': 0.34; 'things': 0.34; "we're": 0.34;
+	'deploy': 0.34; 'root': 0.34; 'typical': 0.34; 'running': 0.35;
+	'certain': 0.35; 'anything': 0.36; 'file': 0.36; 'fri,': 0.36;
+	'received:au': 0.36; 'created': 0.36; 'useful': 0.36; '(from':
+	0.37; 'bother': 0.37; 'convenient': 0.37; 'depend': 0.37; 'run':
+	0.37; 'but': 0.37; 'especially': 0.37; 'install': 0.37; 'could':
+	0.38; 'think': 0.38; 'cc:2**2': 0.38; 'configured': 0.38; 'too,':
+	0.38; 'some': 0.38; 'should': 0.38; 'subject:: ': 0.39; 'e.g.':
+	0.39; 'ways': 0.39; 'enough': 0.39; 'user': 0.39; "there's": 0.39;
+	'why': 0.39; 'subject: (': 0.39; "i'd": 0.40; 'setup': 0.40;
+	'might': 0.40; "it's": 0.40; 'where': 0.40; 'more': 0.60; 'your':
+	0.61; 'received:202': 0.66; 'cameron': 0.67; 'special': 0.67;
+	'concerns': 0.80; 'beer,': 0.84; 'endowed': 0.84; 'glyph': 0.84;
+	'instinct': 0.84; 'isolated': 0.84; 'pristine': 0.84; 'special.':
+	0.84; 'pursuit': 0.91
+Received: from localhost (HELO mail.python.org) (127.0.0.1)
+	by albatross.python.org with SMTP; 07 Oct 2011 04:11:52 +0200
+Received: from harvey.boardofstudies.nsw.edu.au
+	(mail2.rack1.boardofstudies.nsw.edu.au [202.125.174.133])
+	by mail.python.org (Postfix) with ESMTP
+	for <python-dev@python.org>; Fri,  7 Oct 2011 04:11:51 +0200 (CEST)
+Received: from cskk.homeip.net (localhost.localdomain [127.0.0.1])
+	by harvey.boardofstudies.nsw.edu.au (Postfix) with ESMTP id 0B3434D3B5C;
+	Fri,  7 Oct 2011 13:11:40 +1100 (EST)
+Received: by janus.cskk.homeip.net (Postfix, from userid 1000)
+	id E6E2D100419B7; Fri,  7 Oct 2011 13:11:39 +1100 (EST)
+Date: Fri, 7 Oct 2011 13:11:39 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Andrew Bennetts <andrew@bemusement.org>
+Message-ID: <20111007021139.GA19224@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <20111007014648.GE25682@flay.puzzling.org>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+References: <20111007014648.GE25682@flay.puzzling.org>
+Cc: Glyph <glyph@twistedmatrix.com>, Terry Reedy <tjreedy@udel.edu>,
+	python-dev@python.org
+Subject: Re: cpython (3.2): Issue #11956:
+	Skip	test_import.test_unwritable_directory on FreeBSD when run as
+X-BeenThere: python-dev@python.org
+X-Mailman-Version: 2.1.12
+Precedence: list
+List-Id: Python core developers <python-dev.python.org>
+List-Unsubscribe: <http://mail.python.org/mailman/options/python-dev>,
+	<mailto:python-dev-request@python.org?subject=unsubscribe>
+List-Archive: <http://mail.python.org/pipermail/python-dev>
+List-Post: <mailto:python-dev@python.org>
+List-Help: <mailto:python-dev-request@python.org?subject=help>
+List-Subscribe: <http://mail.python.org/mailman/listinfo/python-dev>,
+	<mailto:python-dev-request@python.org?subject=subscribe>
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: base64
+Sender: python-dev-bounces+cs=zip.com.au@python.org
+Errors-To: python-dev-bounces+cs=zip.com.au@python.org
+X-Cats2Procmailrc-Rule: cats/home: python  python-dev      sender:python-dev-bounces+cs=zip.com.au@python.org
+X-Label: python-dev
+Content-Length: 5970
+
+T24gMDdPY3QyMDExIDEyOjQ2LCBBbmRyZXcgQmVubmV0dHMgPGFuZHJld0BiZW11c2VtZW50Lm9y
+Zz4gd3JvdGU6CnwgT24gRnJpLCBPY3QgMDcsIDIwMTEgYXQgMDg6Mjc6MDFBTSArMTEwMCwgQ2Ft
+ZXJvbiBTaW1wc29uIHdyb3RlOgp8IFvigKZdCnwgPiB8ID4+IHJ1bm5pbmcgYnVpbGRib3QgdGVz
+dHMgYXMgcm9vdCBkb2VzIG5vdCByZWZsZWN0IHRoZSBleHBlcmllbmNlIG9mCnwgPiB8ID4+IG5v
+bi1yb290IHVzZXJzLiBJdCBzZWVtcyBzb21lIHRlc3RzIG5lZWQgdG8gYmUgcnVuIGJvdGggd2F5
+cyBqdXN0IGZvcgp8ID4gfCA+PiBjb3JyZWN0bmVzcyB0ZXN0aW5nLgp8ID4gfCAKfCA+IHwgKGV4
+Y2VwdCBJJ2Qgc2F5ICJhbGwiLCBub3QgInNvbWUiKQp8ID4gCnwgPiBOby4gVGVycnkgaXMgcmln
+aHQgYW5kIHlvdSBhcmUgLi4uIG5vdC4gTW9zdCB0ZXN0cyBuZWVkIG5vIHNwZWNpYWwKfCA+IHBy
+aXZpbGVnZXMgLSB0aGV5J3JlIHRlc3RpbmcgbGFuZ3VhZ2UvbGlicmFyeSBzZW1hbnRpY3MgdGhh
+dCBkbyBub3QKfCA+IGRlcGVuZCBvbiB0aGUgc3lzdGVtIGZhY2lsaXRpZXMgbXVjaCwgYW5kIHdo
+ZW4gdGhleSBkbyB0aGV5IHNob3VsZCB3b3JrCnwgPiBmb3IgdW5wcml2aWxlZ2VkIHVzZXJzLgp8
+IAp8IFlvdSBjb3VsZCBhbHNvIHNheSB0aGF0IG1vc3QgdGVzdHMgdGhhdCB3b3JrIG9uIExpbnV4
+IHdvcmsgb24gRnJlZUJTRAp8IHRvbywgc28gd2hlbiB0aGV5IHdvcmsgb24gTGludXggdGhleSBz
+aG91bGQgd29yayBmb3IgRnJlZUJTRCB0b2/igKYgc28gd2h5CnwgYm90aGVyIHJ1bm5pbmcgdGVz
+dHMgb24gRnJlZUJTRCBhdCBhbGw/ICBUaGUgcmVhc29uIGlzIGJlY2F1c2UgdGhlCnwgYXNzdW1w
+dGlvbnMgYmVoaW5kIHRoYXQg4oCcc2hvdWxk4oCdIGFyZSB3cm9uZyBmcmVxdWVudGx5IGVub3Vn
+aCB0byBtYWtlIGl0Cnwgd29ydGggcnVubmluZyB0ZXN0cyBpbiBib3RoIGVudmlyb25tZW50cy4K
+CkZvciB0aG9yb3VnaG5lc3MsIHllcy4KCnwgTGlrZSBHbHlwaCwgSSB0aGluayB0aGF0IOKAnHJ1
+bm5pbmcgYXMgcm9vdOKAnSBpcyBzdWZmaWNpZW50bHkgZGlmZmVyZW50CnwgZW52aXJvbm1lbnQg
+dG8g4oCccnVubmluZyBhcyB0eXBpY2FsIHVzZXLigJ0gKGluIHRlcm1zIG9mIGhvdyBQT1NJWC1s
+aWtlCnwgc3lzdGVtcyBiZWhhdmUgdy5yLnQuIHRvIHRoaW5ncyBsaWtlIHBlcm1pc3Npb25zIGNo
+ZWNrcykgdG8gbWFrZSBpdAp8IHdvcnRod2hpbGUgdG8gcmVndWxhcmx5IHJ1biB0aGUgd2hvbGUg
+dGVzdCBzdWl0ZSBhcyByb290LgoKSG1tLiBHbHlwaCBzZWVtZWQgdG8gYmUgYXJndWluZyBib3Ro
+IHdheXMgLSB0aGF0IGV2ZXJ5dGhpbmcgc2hvdWxkIGJlCnRlc3RlZCBhcyByb290LCBhbmQgYWxz
+byB0aGF0IHJvb3QgaXMgbm90IHNwZWNpYWwuIEkgaGF2ZSB1bmVhc2Ugb3ZlciB0aGUKZm9ybWVy
+IGFuZCBkaXNhZ3JlZW1lbnQgb3ZlciB0aGUgbGF0dGVyLgoKfCA+IEhPV0VWRVIsIHRoZSB3aG9s
+ZSBzdWl0ZSBzaG91bGQgbm90IGJlIF90ZXN0ZWRfIGFzIHJvb3QgYmVjYXVzZSB0aGUgY29kZQp8
+ID4gYmVpbmcgdGVzdGluZyBpcyBieSBkZWZpbml0aW9uIHVudHJ1c3RlZC4KfCAKfCBObywgdGhh
+dCBqdXN0IG1lYW5zIHlvdSBzaG91bGRuJ3QgdHJ1c3QgKnJvb3QqLiAgV2hpY2ggaXMgd2hlcmUg
+YSBWTSBpcwp8IGEgdmVyeSB1c2VmdWwgdG9vbC4gIFlvdSBjYW4gaGF2ZSB0aGUg4oCcYXMgcm9v
+dOKAnSBlbnZpcm9ubWVudCBmb3IgeW91cgp8IHRlc3RzIHdpdGhvdXQgdGhlIG5lZWQgdG8gaGF2
+ZSBhbnl0aGluZyBpbXBvcnRhbnQgdHJ1c3QgaXQuCnwgCnwgPiBSb290IF9pc18gc3BlY2lhbCwg
+d2l0aGluIHRoZSBob3N0IGFuZCB3aXRoIHNjb3BlIHRvIG1pc2JlaGF2ZSBiZXlvbmQKfCA+IHRo
+ZSBob3N0Lgp8ID4gMTogVGhlIHBlcm1pc3Npb24gc3lzdGVtIGRvZXMgX25vdF8gYmVoYXZlIHRo
+ZSBzYW1lIGZvciByb290IGFzIGZvcgp8ID4gICAgb3RoZXIgdXNlcnMuCnwgCnwgVGhvc2UgYXJl
+IGFyZ3VtZW50cyAqZm9yKiBydW5uaW5nIHRlc3RzIGFzIHJvb3QhCgpJIHRoaW5rIHRoZXkncmUg
+YXJndW1lbnRzIGZvciBydW5uaW5nIF9zcGVjaWZpY18gdGVzdHMgYXMgcm9vdC4gRmlsZSBJL08K
+YmFzZWQgdGVzdHMgcHJpbWFyaWx5IEkgd291bGQgc3VwcG9zZSwgdGhvdWdoIG15IGZpcnN0IGlu
+c3RpbmN0IHdvdWxkIGJlCnRvIGNvbnN0cmFpbiBldmVuIHRoZXNlIHRvIHBlcm1pc3Npb24gcmVs
+YXRlZCB0ZXN0cy4KCnwgPiAyOiBSb290IF9jYW5fIGNvcnJ1cHQgdGhpbmdzIGFueXdoZXJlIGlu
+IHRoZSBzeXN0ZW0gKHdpdGhpbiB0aGUgVk0sIG9mCnwgPiAgICBjb3Vyc2UsIGJ1dCB0aGUgYnVp
+bHRib3QgaXMgYSBzdWJzZXQgb2YgaXQpLiBBIG5vcm1hbCB1bnByaXZpbGVnZWQgdXNlcgp8IAp8
+IFRoaXMgYXBwZWFycyB0byBiZSBhIGtleSBlcnJvciBpbiB5b3VyIGxvZ2ljLiAgVGhlcmUncyBu
+byBmdW5kYW1lbnRhbAp8IHJlYXNvbiB3aHkg4oCcdGVzdHMgcnVuIGFzIHJvb3QgaW5zaWRlIGEg
+Vk3igJ0gbXVzdCBuZWNlc3NhcmlseSBpbXBseQp8IOKAnGJ1aWxkYm90IHByb2Nlc3MgaXMgcnVu
+IGluc2lkZSB0aGF0IHNhbWUgVk0gYW5kIGlzIHRoZXJlZm9yZSB2dWxuZXJhYmxlCnwgdG8gY29k
+ZSBpbiB0aGF0IHRlc3QgcnVuLuKAnQoKSW5kZWVkLCBJIGhhZCBubyBjb25zaWRlcmVkIHRoYXQg
+dGhlIHRlc3RzIG1pZ2h0IGJlIHJ1biBpbiBhIHNwZWNpYWwgVk0KZGlzdGluY3QgZnJvbSB0aGUg
+YnVpbGQgZW52aXJvbm1lbnQuIEluIHRoYXQgc2V0dXAgbW9zdCBvZiBteSBjb25jZXJucwphcmUg
+bW9vdC4KCnwgSXQgbWF5IGJlIG1vcmUgY29udmVuaWVudCB0byBkZXBsb3kgaXQgdGhhdCB3YXks
+IGJ1dCBJJ20gc3VyZSBpdCdzCnwgcG9zc2libGUgdG8gaGF2ZSBhIGJ1aWxkc2xhdmUgY29uZmln
+dXJlZCB0byBlLmcuIHN0YXJ0IGEgcHJpc3RpbmUgVk0KfCAoZnJvbSBhIHNuYXBzaG90IHdpdGgg
+YWxsIHRoZSBuZWNlc3NhcnkgYnVpbGQgZGVwZW5kZW5jaWVzIGluc3RhbGxlZCkgYW5kCnwgdmlh
+IFNTSCBjb3B5IHRoZSB0aGUgc291cmNlIGludG8gaXQsIGJ1aWxkIGl0LCBydW4gaXQsIGFuZCBy
+ZXBvcnQgdGhlCnwgcmVzdWx0cy4gIFRoZSBWTSBjb3VsZCBiZSBmdWxseSBpc29sYXRlZCBmcm9t
+IHRoZSByZWFsIG5ldHdvcmsgYW5kCnwgZmlsZXN5c3RlbSBldGMgaWYgeW91IGxpa2UuCnwgCnwg
+R2l2ZW4gdGhhdCBpdCBpcyBjZXJ0YWlubHkgcG9zc2libGUgdG8gcnVuIHRlc3RzIGFzIHJvb3Qg
+YWJvdXQgYXMKfCBzZWN1cmVseSBhcyBydW5uaW5nIHRoZW0gd2l0aG91dCByb290LCBkbyB5b3Ug
+c3RpbGwgZmVlbCBpdCBpcyBub3Qgd29ydGgKfCBydW5uaW5nIHRoZSB0ZXN0cyBhcyByb290PwoK
+Tm90IGluIHRoZSBzdHlsZSB5b3UgZGVzY3JpYmUgYWJvdmUuIFRvIGNsYXJpZnk6IEkgYWdyZWUg
+d2l0aCB5b3VyCnN1Z2dlc3Rpb24uCgp8ID4gVGhlIHBydWRlbnQgd2F5IHRvIHJ1biB0aGUgYnVp
+bGRib3RzLCBlc3BlY2lhbGx5IGlmIHRoZXkgY3ljbGUgKHJlZmV0Y2gKfCA+IG5ld2VyIGNvZGVi
+YXNlLCByZWJ1aWx0LCByZXRlc3QpIGluc3RlYWQgb2YgKHNjcnViIFZNLCByZWluc3RhbGwsCnwg
+PiBpbnN0YWxsIGJ1aWx0IHN5c3RlbSwgZXRjKSBpczoKfCA+IAp8ID4gICAtIGEgdXNlciB0byBm
+ZXRjaCBzb3VyY2UgYW5kIGRpc3BhdGNoIGJ1aWxkcwp8ID4gICAtIHBvc3NpYmx5IGEgZGlzdGlu
+Y3QgdXNlciB0byBydW4gdGhlIGJ1aWxkcwp8ID4gICAtIGRlZmluaXRlbHkgYSBkaXN0aW5jdCB1
+c2VyIHRvIHJ1biB0aGUgdGVzdCBzdWl0ZQp8IAp8IElmIHdlJ3JlIHRhbGtpbmcgcHJ1ZGVuY2Us
+IHRoZW4gc3VyZWx5IHMvdXNlci9WTS8gaXMgZXZlbiBiZXR0ZXIgOikKClllcy4gQW5kIGEgZGlz
+dGluY3QgVk0gaW5zdGFuY2UgZm9yIHRoZSByb290IGFuZCBub24tcm9vdCB0ZXN0cywgdG9vLgoK
+Q2hlZXJzLAotLSAKQ2FtZXJvbiBTaW1wc29uIDxjc0B6aXAuY29tLmF1PiBEb0QjNzQzCmh0dHA6
+Ly93d3cuY3Nray5lem9zaG9zdGluZy5jb20vY3MvCgphbGwgY29kZXJzIGFyZSBjcmVhdGVkIGVx
+dWFsOyB0aGF0IHRoZXkgYXJlIGVuZG93ZWQgd2l0aCBjZXJ0YWluCnVuYWxpZW5hYmxlIHJpZ2h0
+cywgb2YgdGhlc2UgYXJlIGJlZXIsIG5ldCBjb25uZWN0aXZpdHksIGFuZCB0aGUKcHVyc3VpdCBv
+ZiBidWdmaXhlcy4uLiAgLSBHcmVnb3J5IFIgQmxvY2sKX19fX19fX19fX19fX19fX19fX19fX19f
+X19fX19fX19fX19fX19fX19fX19fX18KUHl0aG9uLURldiBtYWlsaW5nIGxpc3QKUHl0aG9uLURl
+dkBweXRob24ub3JnCmh0dHA6Ly9tYWlsLnB5dGhvbi5vcmcvbWFpbG1hbi9saXN0aW5mby9weXRo
+b24tZGV2ClVuc3Vic2NyaWJlOiBodHRwOi8vbWFpbC5weXRob24ub3JnL21haWxtYW4vb3B0aW9u
+cy9weXRob24tZGV2L2NzJTQwemlwLmNvbS5hdQo=

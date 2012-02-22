@@ -1,0 +1,137 @@
+Date: Sun, 20 Feb 2011 09:27:24 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Roy Smith <roy@panix.com>
+Cc: python-list@python.org
+Subject: Re: How to use Python well?
+Message-ID: <20110219222723.GA25807@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <roy-5C8892.22280818022011@news.panix.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 5786
+
+On 18Feb2011 22:28, Roy Smith <roy@panix.com> wrote:
+| In article <878vxcbudn.fsf@benfinney.id.au>,
+|  Ben Finney <ben+python@benfinney.id.au> wrote:
+| 
+| > This collection of a great deal of documentation for the operating
+| > system into a single ???manual??? is one reason why users like man pages so
+| > much: we want to find anything installed on the system documented in
+| > that one place.
+| 
+| What made man pages such a great technology back in the 70's was exactly 
+| what Ben is saying.  Everything was on-line and instantly available for 
+| quick reference.  Not to mention that you could use man as just another 
+| cog in the unix toolset and do things like grep all of /usr/man for a 
+| term (or an error message which appeared and you didn't know what had 
+| produced it).  These were astonishing advances in usability vs. having 
+| printed manuals (which may or may not have been available to you).
+| 
+| But, today we have such better tools available.  HTML, for example.  
+| Whether it's a wiki or the generated output of sphinx/doxygen/etc, HTML 
+| provides for a much richer presentation.  Which is more convenient: 
+| having the signal(3) man page reference "sigaction(2)" textually, or 
+| having it be a clickable link that can take me right there?  HTML also 
+| gives you much greater formatting flexibility than what's still 
+| basically 35-year old nroff.
+
+But HTML is just presentation. There are _plenty_ of manual page
+renderers that write HTML. (Example: http://www.FreeBSD.org/cgi/man.cgi)
+Complete with clickable links to other manual pages etc. That can all
+be done automatically. And has _nothing_ to do with the source being in
+nroff format. And the source needn't be in nroff format, either. I have
+a bunch of man pages in POD format, which renders to an assortment of
+formats including nroff output.
+
+Your argument above is a fine argument for saying that HTML is a very
+valuable presentation format, especially if well cross referenced.
+But it is irrelevant to the usefulness of man pages.
+
+| If, for whatever reason, you're still wed to plain text, even info gives 
+| you much better capabilities than man.  At least you get basic stuff 
+| like menus, document hierarchy, cross-linking, and browsing history.
+
+Any yet I (and others, based on stuff I've seen) find info to be a
+disaster. Why?
+
+ - it forces the reader to use a non-standard pager to look
+   at info, typically the utterly weird one that comes with the info
+   command. The user using a terminal _should_ get to use their own pager
+   because their fingers know how to drive it. Info, in its tiny pieces
+   of text linked to other tiny pieces of text form, does not lend itself
+   to this and the browser it does offer on a terminal is arcane.
+
+   But see below (*).
+
+ - the info pages end up as a scattering of tiny cross linked (if
+   you're lucky) pieces with little information on one place/page.
+   So you can't, for example, stand at the top of the doco page and
+   search for a term.
+
+Frankly, info is usually a step backward, speaking as a reader.
+
+* I grew enraged at the prevalence of "GNU" unix tools with only info
+  for doco, and no manual pages or manual pages that said "we don't put
+  anything useful here, go read the info pages, the stuff here may not
+  even be maintained" (I'm serious - see the bottom of a lot of the
+  rather trite manual pages that ship with GNU this/that/the-other).
+
+  So enraged that I wrote a couple of tools called info2pod and
+  info2man that read postcompiled info output (the
+  binary-mixed-with-text stuff info files ship as, post install)
+  and join it all up again into a single flat text output that _can_ be
+  paged and searched. And a modified "man" command that can include info
+  dirs in the $MANPATH and thus present info as a man page. It is a
+  little ugly, but at least it clubs info into usability.
+  Example:
+
+    % man screen
+    1:  /usr/share/man/man1/screen.1.bz2
+    2:  /usr/share/info/screen.info-2.bz2
+    3:  /usr/share/info/screen.info-4.bz2
+    4:  /usr/share/info/screen.info-5.bz2
+    5:  /usr/share/info/screen.info-1.bz2
+    6:  /usr/share/info/screen.info-3.bz2
+    7:  /usr/share/info/screen.info.bz2
+    which entry? 
+
+  Choosing (1) gets you "man screen" as usual, choosing (7) gets you the
+  whole screen info stuff flattened and presented as a single page, where
+  you can _search_ for what you want.
+
+  URL: http://www.cskk.ezoshosting.com/cs/css/#key-doc
+
+| I'm not saying that help text is the be-all and end-all for 
+| documentation.  I'm just saying that if you're going to do more than 
+| help text, it's hard to imagine putting any effort into producing man 
+| pages.
+
+Hard for you, maybe. As someone whole consistently finds well written
+(terse yet complete) man pages _much_ more useful than many other supposed
+documentation, I find it hard to imagine lack of man pages as other than
+a failure.
+
+There are exceptions of course. The python doco at python.org is pretty
+good. Wikipedia is often very good. But many wikis and other "rich and
+easy to author" systems are awful. Incomplete and badly fragmented.
+A lot of that can be laid to "documentation as an afterthought"
+mentality, but I also feel that having a manual page as a _single_ item
+contributes a lot to getting it all down.
+
+Writing man pages in nroff is a bit tedious (though actually not all
+that hard). Generating man pages from POD or some other similarly friendly
+format is easy and desirable.
+
+| Except possibly as the automated output of some multi-target 
+| documentation system which produces them as a by-product of producing 
+| other, richer, formats.
+
+Tick.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+It looked like documentation, so I threw it out.        - unknown luser

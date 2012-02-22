@@ -1,0 +1,158 @@
+Return-Path: <python-ideas-bounces+cs=zip.com.au@python.org>
+Delivered-To: unknown
+Received: from mail.zip.com.au (125.255.95.3) by janus.home with POP3-SSL; 12
+  Jan 2012 21:35:01 -0000
+Delivered-To: cs@zipworld.com.au
+Received: from mailin3-syd3.pacific.net.au (mailin3-syd3.pacific.net.au [125.255.92.144])
+	by mailstore1.syd.pacific.net.au (Postfix) with ESMTP id D5F5568B7C
+	for <cs@zipworld.com.au>; Fri, 13 Jan 2012 08:33:11 +1100 (EST)
+Received: from mail.python.org (unknown [82.94.164.166])
+	by mailin3-syd3.pacific.net.au (Postfix) with ESMTP id 71673400073
+	for <cs@zip.com.au>; Fri, 13 Jan 2012 08:34:47 +1100 (EST)
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3TPL0w2RlXzMB8
+	for <cs@zip.com.au>; Thu, 12 Jan 2012 22:33:04 +0100 (CET)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=python.org; s=200901;
+	t=1326403984; bh=V+QzpCuWiI0QUOxjMwHYhx8r4xEw2bFRpK/srMBBrVI=;
+	h=Date:From:To:Message-ID:MIME-Version:In-Reply-To:References:Cc:
+	 Subject:List-Id:List-Unsubscribe:List-Archive:List-Post:List-Help:
+	 List-Subscribe:Content-Type:Content-Transfer-Encoding:Sender;
+	b=sEv+jdmrc3S6fBUvGQbQL33AFiJXsNAbZE4+5BdDdbURdVVb2STaXQT3ET+qAgUQ8
+	 S6VHYhIEEZsauaglOQLpBbftO0ptLfnUSwln9K8EPxOpODi46UI5mVyvY7gOTTN+B5
+	 YGK7OEkrsvidjNN7BqIreTfHBNwriv/3VgVjxg2A=
+X-Original-To: python-ideas@python.org
+Delivered-To: python-ideas@mail.python.org
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3TPL0C09bVzM8r
+	for <python-ideas@python.org>; Thu, 12 Jan 2012 22:32:27 +0100 (CET)
+X-Spam-Status: OK 0.004
+X-Spam-Evidence: '*H*': 0.99; '*S*': 0.00; 'permissions': 0.04;
+	'string.': 0.04; 'received:edu.au': 0.07; 'python': 0.08;
+	'compute': 0.09; 'default.': 0.09; 'effect.': 0.09;
+	'historically': 0.09; '2.7': 0.13; 'argument': 0.15; 'ant': 0.16;
+	'basename': 0.16; 'dirname': 0.16; 'from:addr:cs': 0.16;
+	'from:addr:zip.com.au': 0.16; 'from:name:cameron simpson': 0.16;
+	'glue': 0.16; 'lexical': 0.16; 'message-id:@cskk.homeip.net':
+	0.16; 'not;': 0.16; 'opendir': 0.16; 'received:202.125.174': 0.16;
+	'received:202.125.174.133': 0.16;
+	'received:boardofstudies.nsw.edu.au': 0.16;
+	'received:cskk.homeip.net': 0.16;
+	'received:harvey.boardofstudies.nsw.edu.au': 0.16;
+	'received:homeip.net': 0.16; 'received:nsw.edu.au': 0.16;
+	'wrote:': 0.16; 'cheers,': 0.20; 'cc:no real name:2**0': 0.21;
+	'header:In-Reply-To:1': 0.22; '(on': 0.23; 'referring': 0.23;
+	'string': 0.24; 'cc:2**0': 0.25; 'code': 0.25; 'guess': 0.25;
+	"i'm": 0.27; 'explicitly': 0.28; 'cc:addr:python.org': 0.29;
+	'(and': 0.29; '(maybe': 0.30; 'logic': 0.30; 'specifically': 0.30;
+	'least': 0.30; 'me?': 0.32; "can't": 0.32; 'sort': 0.32; 'it.':
+	0.33; 'header:User-Agent:1': 0.33; 'there': 0.33; 'implies': 0.34;
+	'operations': 0.34; 'trouble': 0.35; '(for': 0.35; 'properties':
+	0.36; 'received:au': 0.36; 'similar': 0.36; 'went': 0.36;
+	'suddenly': 0.36; 'charset:us-ascii': 0.36; 'run': 0.37; 'but':
+	0.37; 'some': 0.38; 'think': 0.38; 'easier': 0.38; 'open': 0.38;
+	'should': 0.38; 'finding': 0.39; 'possible.': 0.39; 'being': 0.39;
+	'speaking': 0.39; 'doing': 0.39; 'subject:: ': 0.39; 'platforms':
+	0.40; 'more': 0.61; 'worth': 0.61; 'afraid': 0.63; 'hands': 0.64;
+	'received:202': 0.65; 'fan': 0.66; 'walking': 0.67; 'special':
+	0.67; 'billion': 0.73; 'cameron': 0.77; 'why?': 0.77; '(may':
+	0.84; 'entry,': 0.84; 'hands.': 0.84; 'mount': 0.84; 'thin': 0.84;
+	'to:addr:btinternet.com': 0.84; 'wiring': 0.84; 'slip': 0.91
+Received: from localhost (HELO mail.python.org) (127.0.0.1)
+	by albatross.python.org with SMTP; 12 Jan 2012 22:32:27 +0100
+Received: from harvey.boardofstudies.nsw.edu.au
+	(mail2.rack1.boardofstudies.nsw.edu.au [202.125.174.133])
+	by mail.python.org (Postfix) with ESMTP
+	for <python-ideas@python.org>; Thu, 12 Jan 2012 22:32:26 +0100 (CET)
+Received: from cskk.homeip.net (localhost.localdomain [127.0.0.1])
+	by harvey.boardofstudies.nsw.edu.au (Postfix) with ESMTP id 79A4E4D3B54;
+	Fri, 13 Jan 2012 08:32:23 +1100 (EST)
+Received: by janus.cskk.homeip.net (Postfix, from userid 1000)
+	id 60B33100419B7; Fri, 13 Jan 2012 08:32:23 +1100 (EST)
+Date: Fri, 13 Jan 2012 08:32:23 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Rob Cliffe <rob.cliffe@btinternet.com>
+Message-ID: <20120112213223.GA7309@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <4F0EF8E6.6030002@btinternet.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+References: <4F0EF8E6.6030002@btinternet.com>
+Cc: python-ideas@python.org
+Subject: Re: os.listdir default to '.'
+X-BeenThere: python-ideas@python.org
+X-Mailman-Version: 2.1.12
+Precedence: list
+List-Id: Discussions of speculative Python language ideas
+	<python-ideas.python.org>
+List-Unsubscribe: <http://mail.python.org/mailman/options/python-ideas>,
+	<mailto:python-ideas-request@python.org?subject=unsubscribe>
+List-Archive: <http://mail.python.org/pipermail/python-ideas>
+List-Post: <mailto:python-ideas@python.org>
+List-Help: <mailto:python-ideas-request@python.org?subject=help>
+List-Subscribe: <http://mail.python.org/mailman/listinfo/python-ideas>,
+	<mailto:python-ideas-request@python.org?subject=subscribe>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Sender: python-ideas-bounces+cs=zip.com.au@python.org
+Errors-To: python-ideas-bounces+cs=zip.com.au@python.org
+X-Cats2Procmailrc-Rule: cats/home: python  python-ideas    sender:python-ideas-bounces+cs=zip.com.au@python.org
+X-Label: python-ideas
+Content-Length: 2401
+
+On 12Jan2012 15:14, Rob Cliffe <rob.cliffe@btinternet.com> wrote:
+| In Python 2.5 you can at least say os.listdir('') which had the same effect.
+| In Python 2.7 you can't.
+| 
+| Strictly speaking I think the default value should be
+| os.path.curdir, not specifically '.'
+| +1 from me
+
+I think it should be '.'.
+
+It is possible to arrange directory permissions so that you can't open
+curdir because it traverses a directory to which one lacks permissions,
+but you can still open '.'.  Correspondingly, there can be times you can
+opendir('.') but not compute curdir (for access reasons); an unpleasant
+situation but possible (maybe not on platforms where the OS hands you
+curdir like Linux; historically UNIX platforms compute it by consulting
+the mount table and walking some directories.
+
+| +1 on allowing the empty string argument again (may avoid breaking
+| some old code)
+
+I used to be a fan of the '' UNIX string referring to the current
+directory (on the tenuous but cool logic that '' lets the kernel hand you
+the current directory directly, while '.' implies _opening_ the current
+directory and finding its '.' entry, and opening that:-) but not any
+more - it makes more trouble than its worth (and I think it went away
+in POSIX).
+
+'.' has better lexical properties than '' - it makes dirname and basename and
+similar operations easier to code and think about because it is not an empty
+string.
+
+opendir() should be as thin a glue around the OS's opendir as possible.
+On that basis I'm good with a default argument value but bad on explicitly
+supporting '' as meaning the current directory when the OS may not;
+it would at least mean wiring special knowledge into os.opendir for
+that string.
+
+I guess I'm:
+  +1 for '.' being opendir's default.
+  -0.5 for '' being opendir's default.
+  -1 for os.curdir() being opendir's default.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+I'M NOT afraid of insects talking over the world, and you know why?  It would
+take about a billion ant just to aim a gun at me, let alone fire it.  And
+know what I'm doing while they're aiming ti at me?  I just sort of slip off
+to the side, and then suddenly run up and kick the gun out of their hands.
+        - Jack Handey
+_______________________________________________
+Python-ideas mailing list
+Python-ideas@python.org
+http://mail.python.org/mailman/listinfo/python-ideas

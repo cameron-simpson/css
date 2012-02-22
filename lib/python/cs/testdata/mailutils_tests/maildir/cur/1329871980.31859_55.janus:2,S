@@ -1,0 +1,122 @@
+Return-Path: <python-ideas-bounces+cs=zip.com.au@python.org>
+Delivered-To: unknown
+Received: from mail.zip.com.au (125.255.95.3) by janus.home with POP3-SSL; 11
+  Jan 2012 00:47:01 -0000
+Delivered-To: cs@zipworld.com.au
+Received: from mailin3-syd3.pacific.net.au (mailin3-syd3.pacific.net.au [125.255.92.144])
+	by mailstore2.syd.pacific.net.au (Postfix) with ESMTP id 17F914DF61
+	for <cs@zipworld.com.au>; Wed, 11 Jan 2012 11:45:31 +1100 (EST)
+Received: from mail.python.org (unknown [82.94.164.166])
+	by mailin3-syd3.pacific.net.au (Postfix) with ESMTP id 4FD1840008C
+	for <cs@zip.com.au>; Wed, 11 Jan 2012 11:47:02 +1100 (EST)
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3TNBMk1qsWzPtM
+	for <cs@zip.com.au>; Wed, 11 Jan 2012 01:45:22 +0100 (CET)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=python.org; s=200901;
+	t=1326242722; bh=fJzCB0H7IsfHIkTGUYFmH6xBTkwAtQA2FGBgW5YGzSc=;
+	h=Date:From:To:Message-ID:MIME-Version:In-Reply-To:References:
+	 Subject:List-Id:List-Unsubscribe:List-Archive:List-Post:List-Help:
+	 List-Subscribe:Content-Type:Content-Transfer-Encoding:Sender;
+	b=braKKzVkJEGKrLZeX1x+XSP1mvgLxT1Mot4r8HTOHz2Fy5k+1OD2EVucOUjsc4K76
+	 iZNl2056dhFWlkksB0pa0iA+oAbvDGVuZeB4Vmhmn+03v1mbEuJfna4MyyLiaY9/j8
+	 j2ndUVR8/M7g5v4sD3qoGkZFpkLwdQWsV+q0MJZE=
+X-Original-To: python-ideas@python.org
+Delivered-To: python-ideas@mail.python.org
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3TNBM123xBzPtK
+	for <python-ideas@python.org>; Wed, 11 Jan 2012 01:44:45 +0100 (CET)
+X-Spam-Status: OK 0.035
+X-Spam-Evidence: '*H*': 0.93; '*S*': 0.00; 'subject:Posting': 0.03;
+	'received:edu.au': 0.07; 'googling': 0.09; 'chunks': 0.16;
+	'from:addr:cs': 0.16; 'from:addr:zip.com.au': 0.16;
+	'from:name:cameron simpson': 0.16; 'hides': 0.16; 'hits.': 0.16;
+	'message-id:@cskk.homeip.net': 0.16; 'oleg': 0.16;
+	'received:202.125.174': 0.16; 'received:202.125.174.133': 0.16;
+	'received:boardofstudies.nsw.edu.au': 0.16;
+	'received:cskk.homeip.net': 0.16;
+	'received:harvey.boardofstudies.nsw.edu.au': 0.16;
+	'received:homeip.net': 0.16; 'received:nsw.edu.au': 0.16;
+	'trimming': 0.16; 'wrote:': 0.18; 'jan': 0.19; 'this?': 0.19;
+	'cheers,': 0.20; 'stuff': 0.22; "doesn't": 0.22; 'header:In-Reply-
+	To:1': 0.22; 'google,': 0.23; 'produces': 0.23; 'keyword': 0.24;
+	"i'm": 0.26; 'missed': 0.28; 'keeps': 0.30; '(since': 0.30;
+	'archived': 0.30; 'mentioning': 0.30; 'tue,': 0.32; 'header:User-
+	Agent:1': 0.33; 'anything': 0.34; 'received:au': 0.36; 'charset
+	:us-ascii': 0.37; 'except': 0.37; 'experience,': 0.38; 'put':
+	0.38; 'client': 0.39; 'to:addr:python.org': 0.40; 'huge': 0.61;
+	'browser': 0.61; 'worth': 0.61; 'harder': 0.64; 'received:202':
+	0.66; 'plus': 0.66; '2012': 0.67; 'bottom': 0.68; 'relevant':
+	0.70; 'flow': 0.71; 'cameron': 0.73; 'to:addr:python-ideas': 0.78;
+	'-0500,': 0.84; 'bridge.': 0.84; 'irrelevant': 0.84; 'objection.':
+	0.84; 'signature.': 0.84; 'yours': 0.85; 'god,': 0.93; 'traffic.':
+	0.96
+Received: from localhost (HELO mail.python.org) (127.0.0.1)
+	by albatross.python.org with SMTP; 11 Jan 2012 01:44:45 +0100
+Received: from harvey.boardofstudies.nsw.edu.au
+	(mail2.rack1.boardofstudies.nsw.edu.au [202.125.174.133])
+	by mail.python.org (Postfix) with ESMTP
+	for <python-ideas@python.org>; Wed, 11 Jan 2012 01:44:44 +0100 (CET)
+Received: from cskk.homeip.net (localhost.localdomain [127.0.0.1])
+	by harvey.boardofstudies.nsw.edu.au (Postfix) with ESMTP id C69C64D3B54
+	for <python-ideas@python.org>; Wed, 11 Jan 2012 11:44:43 +1100 (EST)
+Received: by janus.cskk.homeip.net (Postfix, from userid 1000)
+	id B6328100419B7; Wed, 11 Jan 2012 11:44:43 +1100 (EST)
+Date: Wed, 11 Jan 2012 11:44:43 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: python-ideas@python.org
+Message-ID: <20120111004443.GA31682@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <20120110133047.GD21299@iskra.aviel.ru>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+References: <20120110133047.GD21299@iskra.aviel.ru>
+Subject: Re: Posting style
+X-BeenThere: python-ideas@python.org
+X-Mailman-Version: 2.1.12
+Precedence: list
+List-Id: Discussions of speculative Python language ideas
+	<python-ideas.python.org>
+List-Unsubscribe: <http://mail.python.org/mailman/options/python-ideas>,
+	<mailto:python-ideas-request@python.org?subject=unsubscribe>
+List-Archive: <http://mail.python.org/pipermail/python-ideas>
+List-Post: <mailto:python-ideas@python.org>
+List-Help: <mailto:python-ideas-request@python.org?subject=help>
+List-Subscribe: <http://mail.python.org/mailman/listinfo/python-ideas>,
+	<mailto:python-ideas-request@python.org?subject=subscribe>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Sender: python-ideas-bounces+cs=zip.com.au@python.org
+Errors-To: python-ideas-bounces+cs=zip.com.au@python.org
+X-Cats2Procmailrc-Rule: cats/home: python  python-ideas    sender:python-ideas-bounces+cs=zip.com.au@python.org
+X-Label: python-ideas
+Content-Length: 1165
+
+On 10Jan2012 17:30, Oleg Broytman <phd@phdru.name> wrote:
+| On Tue, Jan 10, 2012 at 08:13:42AM -0500, Devin Jeanpierre wrote:
+| > I don't really understand the objection. My mail client hides unbroken
+| > quotes at the bottom of an email, so that I don't see anything except
+| > what you quoted (if I read my own email), plus my signature. I take it
+| > yours doesn't do this?
+| 
+|    When I do googling through web-archives I use web browser to read
+| what I found. Google, in my experience, produces the most relevant
+| results.
+
+It is worth mentioning (since I routinely see it missed it these
+discussions) that leaving huge chunks of untrimmed quotes makes it much
+harder to find the _relevant_ archived message because of all the
+irrelevant keyword hits.
+
+Quote trimming helps put relevant stuff in the email flow and keeps
+irrelevant stuff out.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+I swear to god, officer, I'm fixing this bridge. Just go divert traffic.
+_______________________________________________
+Python-ideas mailing list
+Python-ideas@python.org
+http://mail.python.org/mailman/listinfo/python-ideas

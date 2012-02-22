@@ -1,0 +1,169 @@
+Return-Path: <python-ideas-bounces+cs=zip.com.au@python.org>
+Delivered-To: unknown
+Received: from mail.zip.com.au (125.255.95.3) by janus.home with POP3-SSL; 04
+  Dec 2010 22:03:02 -0000
+Delivered-To: cs@zipworld.com.au
+Received: from mailin1.pacific.net.au (mailin1.pacific.net.au [61.8.0.80])
+	by mailstore1.syd.pacific.net.au (Postfix) with ESMTP id CB614698D3
+	for <cs@zipworld.com.au>; Sun,  5 Dec 2010 09:01:33 +1100 (EST)
+Received: from mail.python.org (unknown [82.94.164.166])
+	by mailin1.pacific.net.au (Postfix) with ESMTP id 3071E1840DB
+	for <cs@zip.com.au>; Sun,  5 Dec 2010 09:01:33 +1100 (EST)
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 023D1EEA10
+	for <cs@zip.com.au>; Sat,  4 Dec 2010 23:01:32 +0100 (CET)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=python.org; s=200901;
+	t=1291500092; bh=8N+jbami0Utl+QRjLdCgA3dCb9RsCdES1wHNVZSpWdg=;
+	h=Date:From:To:Message-ID:MIME-Version:In-Reply-To:References:Cc:
+	 Subject:List-Id:List-Unsubscribe:List-Archive:List-Post:List-Help:
+	 List-Subscribe:Content-Type:Content-Transfer-Encoding:Sender;
+	b=n6ZcTgW8ZlbmhOdCsRQQK2VPVIL2zuTSq4gRU0jyWMQVWUaJSv+HF6CcxvsYDYarG
+	 YdK51//+j0xxtAzf1ENudIqM92CC4BAMQXAURLZ1aVSlLWSo7WZvGQ7gvKv1Yj5y9B
+	 CFBGABcJBEbeJVGJFpIrT+k4zGxJ3Ozc1bseECeM=
+X-Original-To: python-ideas@python.org
+Delivered-To: python-ideas@mail.python.org
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id EC928EE9E2
+	for <python-ideas@python.org>; Sat,  4 Dec 2010 23:00:58 +0100 (CET)
+X-Spam-Status: OK 0.001
+X-Spam-Evidence: '*H*': 1.00; '*S*': 0.00; 'else:': 0.03;
+	'exception.': 0.09; 'exceptions': 0.09; 'this:': 0.10; 'wrote:':
+	0.14; 'arbitrarily': 0.16; "computer's": 0.16; 'from:addr:cs':
+	0.16; 'from:addr:zip.com.au': 0.16; 'from:name:cameron simpson':
+	0.16; 'instances,': 0.16; 'janssen': 0.16; 'message-
+	id:@cskk.homeip.net': 0.16; 'occur.': 0.16;
+	'received:202.125.174': 0.16; 'received:202.125.174.133': 0.16;
+	'received:boardofstudies.nsw.edu.au': 0.16;
+	'received:cskk.homeip.net': 0.16;
+	'received:harvey.boardofstudies.nsw.edu.au': 0.16;
+	'received:homeip.net': 0.16; 'received:nsw.edu.au': 0.16;
+	'subject:non': 0.16; 'things)': 0.16; 'try/except': 0.16;
+	'unhandled': 0.16; 'cheers,': 0.17; 'variable': 0.18; 'stack':
+	0.18; 'right.': 0.21; '(which': 0.22; 'helper': 0.23; 'objects,':
+	0.23; 'reason,': 0.23; 'received:edu.au': 0.23; 'header:In-Reply-
+	To:1': 0.23; '(and': 0.23; 'all.': 0.24; 'things.': 0.24;
+	'variables': 0.24; 'code': 0.25; 'handling': 0.25; 'function':
+	0.27; "i'm": 0.28; 'problem': 0.28; 'bother': 0.28; 'happening':
+	0.28; 'example': 0.29; 'bundle': 0.30; 'catching': 0.30; 'types.':
+	0.30; 'except': 0.30; 'cc:addr:python.org': 0.30; 'properly':
+	0.31; 'cc:addr:gmail.com': 0.32; 'steve': 0.32; 'thinking': 0.32;
+	'no.': 0.33; 'requires': 0.33; 'convert': 0.33; 'skip:z 10': 0.33;
+	'purely': 0.34; 'try:': 0.34; 'there': 0.34; 'header:User-
+	Agent:1': 0.34; 'complex': 0.35; 'using': 0.35; 'but': 0.36;
+	'test': 0.37; 'charset:us-ascii': 0.37; 'two': 0.38; 'either':
+	0.38; 'cc:2**1': 0.38; 'might': 0.38; 'variety': 0.39; 'some':
+	0.39; 'around': 0.40; "it's": 0.40; 'property': 0.63; 'simple':
+	0.63; 'obtain': 0.64; 'here': 0.64; 'wide': 0.64; 'prefer': 0.65;
+	'risk': 0.71; 'expects': 0.84; 'pleasures': 0.84; 'truly,': 0.84;
+	'ultimate': 0.93
+Received: from localhost (HELO mail.python.org) (127.0.0.1)
+	by albatross.python.org with SMTP; 04 Dec 2010 23:00:58 +0100
+Received: from harvey.boardofstudies.nsw.edu.au
+	(mail2.rack1.boardofstudies.nsw.edu.au [202.125.174.133])
+	by mail.python.org (Postfix) with ESMTP
+	for <python-ideas@python.org>; Sat,  4 Dec 2010 23:00:58 +0100 (CET)
+Received: from cskk.homeip.net (localhost.localdomain [127.0.0.1])
+	by harvey.boardofstudies.nsw.edu.au (Postfix) with ESMTP id B527E4D39C7;
+	Sun,  5 Dec 2010 09:00:54 +1100 (EST)
+Received: by janus.cskk.homeip.net (Postfix, from userid 1000)
+	id A260C100419B7; Sun,  5 Dec 2010 09:00:54 +1100 (EST)
+Date: Sun, 5 Dec 2010 09:00:54 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Bill Janssen <janssen@parc.com>
+Message-ID: <20101204220054.GA16042@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <28819.1291083724@parc.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+References: <28819.1291083724@parc.com>
+Cc: python-ideas <python-ideas@python.org>
+Subject: Re: `issubclass` shouldn't be raising exceptions for
+	non-type inputs
+X-BeenThere: python-ideas@python.org
+X-Mailman-Version: 2.1.12
+Precedence: list
+List-Id: Discussions of speculative Python language ideas
+	<python-ideas.python.org>
+List-Unsubscribe: <http://mail.python.org/mailman/options/python-ideas>,
+	<mailto:python-ideas-request@python.org?subject=unsubscribe>
+List-Archive: <http://mail.python.org/pipermail/python-ideas>
+List-Post: <mailto:python-ideas@python.org>
+List-Help: <mailto:python-ideas-request@python.org?subject=help>
+List-Subscribe: <http://mail.python.org/mailman/listinfo/python-ideas>,
+	<mailto:python-ideas-request@python.org?subject=subscribe>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Sender: python-ideas-bounces+cs=zip.com.au@python.org
+Errors-To: python-ideas-bounces+cs=zip.com.au@python.org
+X-Cats2Procmailrc-Rule: cats/home: python  python-ideas    sender:python-ideas-bounces+cs=zip.com.au@python.org
+X-Label: python-ideas
+Content-Length: 2459
+
+On 29Nov2010 18:22, Bill Janssen <janssen@parc.com> wrote:
+| Nick Coghlan <ncoghlan@gmail.com> wrote:
+| > As far as the original post's request goes, no. issubclass expects to
+| > be given two types. If you have an insanely polymorphic variable that
+| > can contain a wide variety of objects, only some of which are type
+| > instances, then either use isinstance to check first as you are
+| > already doing, or a try-except block to convert the TypeError to a
+| > False result (and bundle the combined test into a helper function if
+| > you're doing it a lot).
+| 
+| Right.  Use isinstance instead; that's what it's there for.
+| 
+| But handling exceptions properly really requires thinking about which
+| might occur, and what to do if they do occur.  If you don't do that
+| preemptive thinking about exceptionality, you might as well not bother
+| catching them at all.
+
+My problem with try/except (which leads me to be reluctant to use it
+except around really really simple things) is that you don't know what threw
+the exception.
+
+Consider:
+
+  if obj.foo == 0:
+    # handle 0
+  else:
+    x = y / obj.foo
+
+The try/except verision goes like this:
+
+  try:
+    x = y / obj.foo
+  except ZeroDivisionError:
+    # handle 0
+
+Now, the reason I'm using "obj.foo" here is that obj.foo may be a property
+or otherwise inplemented by __getattr__; arbitrarily complex code may
+be happening to obtain the value it returns. The upshot of that is that
+even this very simple looking code may be an unhandled ZeroDivisionError
+from deeper in the call stack - I don't know it came from the division
+visible in the code example above.
+
+For this reason, I will usually prefer to go the if/else route, and if I
+go the try/except route I will often have a lot of leading gumph to get
+everything into purely local variables just to avoid the risk shown
+above:
+
+  z = obj.foo   # gumph
+  try:
+    x = y / z
+  except ZeroDivisionError:
+    # handle 0
+
+The obfuscation from the leading gumph can often outweigh the brazen
+pleasures of the try/except leap into the unknown:-)
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Truly, the ultimate demonstration of the computer's utility is that it
+continues to be indispensable in spite of those who run the things.
+        - Steve Glass, in e-mail
+_______________________________________________
+Python-ideas mailing list
+Python-ideas@python.org
+http://mail.python.org/mailman/listinfo/python-ideas

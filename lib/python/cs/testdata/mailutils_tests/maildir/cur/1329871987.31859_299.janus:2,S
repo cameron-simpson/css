@@ -1,0 +1,52 @@
+Date: Fri, 6 Aug 2010 08:31:28 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: ghazel@gmail.com
+Cc: Gregory Ewing <greg.ewing@canterbury.ac.nz>,
+	Python-Ideas <python-ideas@python.org>
+Subject: Re: Cofunctions - an enhancement to yield-from
+Message-ID: <20100805223128.GA2910@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: inline
+Content-Transfer-Encoding: 8bit
+In-Reply-To: <AANLkTinB0T0gCk+Z7aXAtp8U4qnm2ezHvaiv4D-mY57f@mail.gmail.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 1386
+
+On 02Aug2010 23:16, ghazel@gmail.com <ghazel@gmail.com> wrote:
+| On Mon, Aug 2, 2010 at 11:17 PM, Gregory Ewing
+| <greg.ewing@canterbury.ac.nz> wrote:
+| > Would you be interested in a system which requires marking
+| > calls to coroutines, but tells you immediately when you
+| > have forgotten to mark such a call?
+| >
+| > It might work something like this:
+| >
+| > 1. In a cofunction, a call to another cofunction must
+| >   be marked with 'cocall', e,g.
+| >
+| >   z = cocall f(x, y)
+| >
+| > 2. Cofunctions *cannot* be called normally -- they do
+| >   not have a __call__ method, only a __cocall__ method.
+| >
+| > So if you try to call a cofunction without using cocall,
+| > you get an exception. If you try to call an ordinary function
+| > using cocall, you get an exception. If you try to use cocall
+| > but forget to declare the function with codef, you get an
+| > exception (because cocall would only be allowed inside a
+| > cofunction).
+| 
+| I like this idea.
+
+Having just caught up with this thread, my first thought on reading the
+opening post was that it could do with (2), above. So a big +1 from me.
+It avoids misuse by failing early, and makes the failure reason obvious.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+... you could spend *all day* customizing the title bar.  Believe me.  I
+speak from experience.  - Matt Welsh

@@ -1,0 +1,89 @@
+Date: Wed, 11 Mar 2009 11:31:52 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: python-dev@python.org
+Subject: Re: Ext4 data loss
+Message-ID: <20090311003152.GA15370@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20090310220915.GA15302@amk-desktop.matrixgroup.net>
+User-Agent: Mutt/1.5.18 (2008-05-17)
+Content-Length: 3244
+
+On 10Mar2009 18:09, A.M. Kuchling <amk@amk.ca> wrote:
+| On Tue, Mar 10, 2009 at 09:11:38PM +0100, Christian Heimes wrote:
+| > Python's file type doesn't use fsync() and be the victim of the very
+| > same issue, too. Should we do anything about it?
+
+IMHO, beyond _offering_ an fsync method, no.
+
+| The mailbox module tries to be careful and always fsync() before
+| closing files, because mail messages are pretty important.
+
+Can it be turned off? I hadn't realised this.
+
+| The
+| various *dbm modules mostly have .sync() method.  
+| 
+| dumbdbm.py doesn't call fsync(), AFAICT; _commit() writes stuff and
+| closes the file, but doesn't call fsync().
+| 
+| sqlite3 doesn't have a sync() or flush() call.  Does SQLite handle
+| this itself?
+
+Yeah, most obnoxiously. There's a longstanding firefox bug about the
+horrendous performance side effects of sqlite's zeal in this regard:
+
+  https://bugzilla.mozilla.org/show_bug.cgi?id=421482
+
+At least there's now an (almost undocumented) preference to disable it,
+which I do on a personal basis.
+
+| The tarfile, zipfile, and gzip/bzip2 classes don't seem to use fsync()
+| at all, either implicitly or by having methods for calling them.
+| Should they?  What about cookielib.CookieJar?
+
+I think they should not do this implicitly. By all means let a user
+issue policy.
+
+In case you hadn't guessed, I fall into the "never fsync" group,
+something of a simplification of my real position. In my opinion,
+deciding to fsync is almost always a user policy decision, not an app
+decision. An app talks to the OS; if the OS' filesystem has accepted
+responsibility for the data (as it has after a successful fflush, for
+example) then normally the app should have no further responsibility;
+that is _exactly_ what the OS is responsible for.
+
+Recovery is what backups are for, generally speaking.
+All this IMHO, of course.
+
+Of course there are some circumstances where one might fsync, as part
+of one's risk mitigation policies (eg database checkpointing etc). But
+whenever you do this you're basicly saying you don't trust the OS
+abstraction of the hardware and also imposing an inherent performance
+bottleneck.
+
+With things like ext3 (and ext4 may well be the same - I have not
+checked) an fsync doesn't just sync that file data and metadata, it does
+a whole-filesystem sync. Really expensive. If underlying libraries do that
+quietly and without user oversight/control then this failure to trust the
+OS puts an unresolvable bottlneck on various things, and as an app scales
+up in I/O or operational throughput or as a library or facility becomes
+"higher level" (i.e. _involving_ more and more underlying complexity or
+number of basic operations) the more intrusive and unfixable such a low
+level "auto-fsync" would become.
+
+Also, how far do you want to go to assure integrity for particular
+filesystems' integrity issues/behaviours? Most filesystems sync to disc
+regularly (or frequently, at any rate) anyway. What's too big a window
+of potential loss?
+
+For myself, I'm against libraries that implicitly do fsyncs, especially
+if the user can't issue policy about it.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+If it can't be turned off, it's not a feature. - Karl Heuer

@@ -1,0 +1,65 @@
+Date: Wed, 16 Jun 2010 08:36:50 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Michael Torrie <torriem@gmail.com>
+Cc: python-list@python.org
+Subject: Re: Community (A Modest Proposal)
+Message-ID: <20100615223649.GA5040@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <4C177F66.4020808@gmail.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 2433
+
+On 15Jun2010 07:25, Michael Torrie <torriem@gmail.com> wrote:
+| In some languages, due to the size and complexity of the libraries, an
+| IDE is essential.  Java is one of those languages.
+
+Hmm. I'm in the "terminals are my IDE" camp. I never felt any need to
+use an IDE when I was using Java. Indeed, the highly linked and cross
+referenced nature of javadoc output made the docs so helpful that I
+doubt I would ever want in-editor completion/prompting.
+
+So "essential"? No. For people comfortable in IDEs, they're probably
+very helpful.
+
+| C++ development also
+| highly benefits.  Any compiled language also benefits from the project
+| management and build management tools that an IDE provides.
+
+And there's the rub. IDEs tend to force the programmer into their tools,
+rather than letting the programmer choose the tools. The xterms+vim
+approach is really "your desktop is the IDE". The programmer can use
+their preferred editor, their preferred terminal or interactive code
+interpreter, their preferred document viewer, their preferred build tool
+(vi[m], rxvt-unicode, web browser, myke respectively for me). If the IDE
+doesn't integrate _your_ preferred tools, the IDE isn't helping you.
+
+| Project and
+| build management and code completion are the killer features of IDEs.
+| Vim has some code completion, but it's nowhere as easy to use or
+| complete as in Visual Studio.
+| 
+| With python I can usually get away with one interactive python session,
+| a vim editor, my Python in a nutshell book, and the python.org docs.
+| That's largely because python's standard libraries have help strings,
+| and python lets you navigate the live object space.  Also it helps that
+| Python's libraries don't get hung up quite so much on patterns and
+| LongDescriptiveNames.
+
+I'm not a fan of code completion; I find it annoying and cumbersome. But
+that is just me. My fingers speak vi (indeed, I'm writing this email in
+vi as well) and don't want to learn a suite of extras. I'm sure an adept
+user of an IDE can produce syntactically correct and correctly spelt
+code text faster than I, but I don't think that's where the majority of
+my screen time goes.
+
+Good docs (clean well indexed HTML, like javadoc and the python docs)
+and a good HTML reader for me, rather than code completion.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+DRM: the functionality of refusing to function. - Richard Stallman

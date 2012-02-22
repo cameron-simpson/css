@@ -1,0 +1,55 @@
+Date: Sun, 20 Jun 2010 20:58:55 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Stefan Behnel <stefan_ml@behnel.de>
+Cc: python-list@python.org
+Subject: Re: Pick items from list with probability based upon property of
+ list  member ?
+Message-ID: <20100620105855.GA15910@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <hvkref$ovn$1@dough.gmane.org>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 1694
+
+On 20Jun2010 12:44, Stefan Behnel <stefan_ml@behnel.de> wrote:
+| southof40, 20.06.2010 12:19:
+| >I have list of of N Vehicle objects - the only possible vehicles are
+| >cars, bikes, trucks.
+| >
+| >I want to select an object from the list with a probability of : cars
+| >0.7, bikes 0.3, trucks 0.1.
+| >
+| >I've currently implemented this by creating another list in which each
+| >car object from the original list appears 7 times, each bike 3 times
+| >and each truck once. I then pick at random from that list.
+| >
+| >This works but seems very clunky to me.
+| 
+| Why? It's a very simple, generic, easy to understand and fast
+| solution to the problem.
+
+Only 3 out of 4, if you want to be precise in your selections.
+Supposing he wants probabilities 0.7432, 0.3765, 0.1087654 ?
+The required list needs to be Very Long to achieve an accurate
+representation, and thus Very Slow to construct/populate.
+
+A faster approach is to make a list represention the sum of the
+proportions as one counts along the choices, thus 0.7, 1.0, 1.1 in the
+example given (0.7, 0.7+0.3, 0.7+0.3+0.1). Then choose a value in the
+range 0.0 to the total (1.1) using the pseudo-random function of your
+choice, such as that in the random module. Then binary search the list
+for the matching item.
+
+The list scales linearly as the number of choices, not exponentially
+with the precision of the proportions. The search is logarithmic with
+the number of choices. Beyond a very small number of choices the former
+will dominate.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+... you could spend *all day* customizing the title bar.  Believe me.  I
+speak from experience.  - Matt Welsh

@@ -1,0 +1,50 @@
+Date: Thu, 29 Apr 2010 07:31:25 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Daniel Fetchinson <fetchinson@googlemail.com>
+Cc: python-list@python.org
+Subject: Re: replacing words in HTML file
+Message-ID: <20100428213125.GA21118@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <o2ifbe2e2101004281303k2e3f8a90h3e52e1482a135a66@mail.gmail.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 1273
+
+On 28Apr2010 22:03, Daniel Fetchinson <fetchinson@googlemail.com> wrote:
+| > Any idea how I can replace words in a html file? Meaning only the
+| > content will get replace while the html tags, javascript, & css are
+| > remain untouch.
+| 
+| I'm not sure what you tried and what you haven't but as a first trial
+| you might want to
+| 
+| <untested>
+| 
+| f = open( 'new.html', 'w' )
+| f.write( open( 'index.html' ).read( ).replace( 'replace-this', 'with-that' ) )
+| f.close( )
+| 
+| </untested>
+
+If 'replace-this' occurs inside the javascript etc or happens to be an
+HTML tag name, it will get mangled. The OP didn't want that.
+
+The only way to get this right is to parse the file, then walk the doc
+tree enditing only the text parts.
+
+The BeautifulSoup module (3rd party, but a single .py file and trivial to
+fetch and use, though it has some dependencies) does a good job of this,
+coping even with typical not quite right HTML. It gives you a parse
+tree you can easily walk, and you can modify it in place and write it
+straight back out.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+The Web site you seek
+cannot be located but
+endless others exist
+- Haiku Error Messages http://www.salonmagazine.com/21st/chal/1998/02/10chal2.html

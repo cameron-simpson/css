@@ -1,0 +1,120 @@
+Return-Path: <python-list-bounces+cs=zip.com.au@python.org>
+Delivered-To: unknown
+Received: from mail.zip.com.au (125.255.95.3) by janus.home with POP3-SSL; 03
+  Jan 2012 01:59:02 -0000
+Delivered-To: cs@zipworld.com.au
+Received: from mailin4-syd3.pacific.net.au (mailin4-syd3.pacific.net.au [125.255.92.145])
+	by mailstore1.syd.pacific.net.au (Postfix) with ESMTP id 8E50E1461D3
+	for <cs@zipworld.com.au>; Tue,  3 Jan 2012 12:58:12 +1100 (EST)
+Received: from mail.python.org (unknown [82.94.164.166])
+	by mailin4-syd3.pacific.net.au (Postfix) with ESMTP id E36A44D8088
+	for <cs@zip.com.au>; Tue,  3 Jan 2012 12:58:11 +1100 (EST)
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3THJMQ3VG9zMry
+	for <cs@zip.com.au>; Tue,  3 Jan 2012 02:58:10 +0100 (CET)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=python.org; s=200901;
+	t=1325555890; bh=bo2tCBu2q6c9+bUXzmKgiXI23DjnlteWCd3/Bgjz85s=;
+	h=Date:From:To:Subject:Message-ID:MIME-Version:In-Reply-To:
+	 References:Cc:List-Id:List-Unsubscribe:List-Archive:List-Post:
+	 List-Help:List-Subscribe:Content-Type:Content-Transfer-Encoding:
+	 Sender;
+	b=Oh1b5Fbc8G2uo05Ypduew92Ri3EmO0kK+3toXyTpLl1NRePb0m5jKa9WG+TnnqYqT
+	 01XgQ1c+bls4BTnju+vP9q3jOL33aayNDzBZbtVjnNhDXg1TYyeVIcMBzGoqTEf/VV
+	 DzMs0Jh1dkvNQnqt3i1e/u6bYH58Ajy4vROXSrBo=
+X-Original-To: python-list@python.org
+Delivered-To: python-list@mail.python.org
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3THJH62BYczPrC
+	for <python-list@python.org>; Tue,  3 Jan 2012 02:54:26 +0100 (CET)
+X-Spam-Status: OK 0.000
+X-Spam-Evidence: '*H*': 1.00; '*S*': 0.00; 'else:': 0.03; 'example:':
+	0.03; 'indeed,': 0.07; 'received:edu.au': 0.07; 'anyway': 0.09;
+	'exception': 0.12; 'darren': 0.16; 'e.errno': 0.16; 'errno': 0.16;
+	'from:addr:cs': 0.16; 'from:addr:zip.com.au': 0.16;
+	'from:name:cameron simpson': 0.16; 'message-id:@cskk.homeip.net':
+	0.16; 'posix': 0.16; 'pythonic': 0.16; 'received:202.125.174':
+	0.16; 'received:202.125.174.133': 0.16;
+	'received:boardofstudies.nsw.edu.au': 0.16;
+	'received:cskk.homeip.net': 0.16;
+	'received:harvey.boardofstudies.nsw.edu.au': 0.16;
+	'received:homeip.net': 0.16; 'received:nsw.edu.au': 0.16; 'cc:addr
+	:python-list': 0.16; 'wrote:': 0.18; 'cc:no real name:2**0': 0.20;
+	'cheers,': 0.20; 'maybe': 0.21; 'header:In-Reply-To:1': 0.22;
+	'precise': 0.23; 'cc:2**0': 0.24; 'import': 0.27; 'raise': 0.28;
+	'pass': 0.29; 'cc:addr:python.org': 0.29; 'error': 0.29;
+	'correct': 0.29; 'header:User-Agent:1': 0.33; 'probably': 0.34;
+	'symbol': 0.34; 'try:': 0.34; 'something': 0.35; 'received:au':
+	0.36; '...': 0.36; 'subject:with': 0.36; 'charset:us-ascii': 0.37;
+	'but': 0.37; 'except': 0.37; 'think': 0.37; 'should': 0.39;
+	'else': 0.39; "it's": 0.40; 'more': 0.61; 'received:202': 0.66;
+	'cameron': 0.73; 'chek': 0.84; 'mandates': 0.84
+Received: from localhost (HELO mail.python.org) (127.0.0.1)
+	by albatross.python.org with SMTP; 03 Jan 2012 02:54:26 +0100
+Received: from harvey.boardofstudies.nsw.edu.au
+	(mail2.rack1.boardofstudies.nsw.edu.au [202.125.174.133])
+	by mail.python.org (Postfix) with ESMTP
+	for <python-list@python.org>; Tue,  3 Jan 2012 02:54:25 +0100 (CET)
+Received: from cskk.homeip.net (localhost.localdomain [127.0.0.1])
+	by harvey.boardofstudies.nsw.edu.au (Postfix) with ESMTP id 9267C4D3B56;
+	Tue,  3 Jan 2012 12:44:58 +1100 (EST)
+Received: by janus.cskk.homeip.net (Postfix, from userid 1000)
+	id 7D7C8100419B7; Tue,  3 Jan 2012 12:44:58 +1100 (EST)
+Date: Tue, 3 Jan 2012 12:44:58 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Devin Jeanpierre <jeanpierreda@gmail.com>
+Subject: Re: Avoid race condition with Popen.send_signal
+Message-ID: <20120103014458.GA26520@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <CABicbJKPmckzRwKa9BgTzP8p+nVO98eKh2s1=ZDjBSoY-N1OvQ@mail.gmail.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+References: <CABicbJKPmckzRwKa9BgTzP8p+nVO98eKh2s1=ZDjBSoY-N1OvQ@mail.gmail.com>
+Cc: python-list@python.org
+X-BeenThere: python-list@python.org
+X-Mailman-Version: 2.1.12
+Precedence: list
+List-Id: General discussion list for the Python programming language
+	<python-list.python.org>
+List-Unsubscribe: <http://mail.python.org/mailman/options/python-list>,
+	<mailto:python-list-request@python.org?subject=unsubscribe>
+List-Archive: <http://mail.python.org/pipermail/python-list>
+List-Post: <mailto:python-list@python.org>
+List-Help: <mailto:python-list-request@python.org?subject=help>
+List-Subscribe: <http://mail.python.org/mailman/listinfo/python-list>,
+	<mailto:python-list-request@python.org?subject=subscribe>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Sender: python-list-bounces+cs=zip.com.au@python.org
+Errors-To: python-list-bounces+cs=zip.com.au@python.org
+X-Cats2Procmailrc-Rule: cats/home: python  python-list     sender:python-list-bounces+cs=zip.com.au@python.org
+X-Label: python-list
+Content-Length: 826
+
+On 02Jan2012 20:31, Devin Jeanpierre <jeanpierreda@gmail.com> wrote:
+| > I think that catching the exception is probably the most Pythonic way.
+| 
+| It's the only correct way.
+
+Indeed, but be precise - chek that it _is_ error 3, or more portably,
+errno.ESRCH. POSIX probably mandates that that is a 3, but the symbol
+should track the local system if it differs. Example:
+
+  import errno
+  ...
+  try:
+    ...signal...
+  except OSError, e:
+    if e.errno == errno.ESRCH:
+      pass      # or maybe an info log message
+    else:
+      raise     # something else wrong - raise exception anyway
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+WHAT"S A ""K3WL D00D"" AND WH3R3 CAN 1 G3T S0M3!!!!!!!!!!!????????
+        - Darren Embry
+-- 
+http://mail.python.org/mailman/listinfo/python-list

@@ -1,0 +1,112 @@
+Date: Fri, 7 Oct 2011 08:27:01 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Glyph <glyph@twistedmatrix.com>
+Cc: Terry Reedy <tjreedy@udel.edu>, python-dev@python.org
+Subject: Re: cpython (3.2): Issue #11956: Skip
+ test_import.test_unwritable_directory on FreeBSD when run as
+Message-ID: <20111006212701.GA10627@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <E98BC9EF-2891-4928-98A8-41ED0BB2F7DC@twistedmatrix.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+Content-Length: 4256
+
+On 06Oct2011 04:26, Glyph <glyph@twistedmatrix.com> wrote:
+| On Oct 5, 2011, at 10:46 PM, Cameron Simpson wrote:
+| > Surely VERY FEW tests need to be run as root, and they need careful
+| > consideration. The whole thing (build, full test suite) should
+| > not run as root.
+| 
+| This is news to me - is most of Python not supported to run as root?
+| I was under the impression that Python was supposed to run correctly as
+| root, and therefore there should be some buildbots dedicated to running
+| it that way.  If only a few small parts of the API are supposed to work
+| perhaps this should be advertised more clearly in the documentation?
+
+Pretending the snark to be slightly serious: you've missed the point.
+The builtbots are building unreliable code, that being the point of the
+test suite. Doing unpredictable stuff as root is bad juju.
+
+Running the builtbots and their tests should not be run as root except
+for a very few special tests, and those few need careful consideration
+and sandboxing.
+
+| Ahem.  Sorry for the snark, I couldn't resist.  As terry more reasonably put it:
+| 
+| >> running buildbot tests as root does not reflect the experience of
+| >> non-root users. It seems some tests need to be run both ways just for
+| >> correctness testing.
+| 
+| (except I'd say "all", not "some")
+
+No. Terry is right and you are ... not. Most tests need no special
+privileges - they're testing language/library semantics that do not
+depend on the system facilities much, and when they do they should work
+for unprivileged users.
+
+Of course they _should_ work as root (barring the few tests like the
+issue cited, where things are expected to fail but don't because root is
+unconstrained by the permission system).
+
+HOWEVER, the whole suite should not be _tested_ as root because the code
+being testing is by definition untrusted.
+
+| > Am I really the only person who feels unease about this scenario?
+| 
+| More seriously: apparently you are not, but I am quite surprised by
+| that revelation.  You should be :).  The idea of root as a special,
+| magical place where real ultimate power resides is quite silly.  "root"
+| is a title, like "king".  You're not just "root", you're root _of_
+| something.  If the thing that you are root of is a dedicated virtual
+| machine with no interesting data besides the code under test, then this
+| is quite a lot like being a regular user in a similarly boring place.
+| It's like having the keys to an empty safe.
+
+Sadly, _no_.
+
+Root _is_ special, within the host and with scope to misbehave beyond
+the host.
+
+1: The permission system does _not_ behave the same for root as for
+   other users.
+
+2: Root _can_ corrupt things anywhere in the system (within the VM, of
+   course, but the builtbot is a subset of it). A normal unprivileged user
+   will not have write permission to thing like:
+     the OS image
+     the compilers
+     the system commands
+     other user data areas
+   all of which offer avenues to corrupt the built/test scenario.
+   And if it is not a special purpose VM, the corrupt things for other
+   uses and users of the system.
+
+3: Root can also do other fun things like modify the network interfaces,
+   including changing/adding IP addresss and MAC addresses. Which means that
+   unless the VM (_if_ it is a VM) is running on a totally unroutable
+   special purpose virtual network, it is possible to use the VM to
+   pretend to be other machines on the same net and so forth.
+
+The prudent way to run the buildbots, especially if they cycle (refetch
+newer codebase, rebuilt, retest) instead of (scrub VM, reinstall,
+install built system, etc) is:
+
+  - a user to fetch source and dispatch builds
+  - possibly a distinct user to run the builds
+  - definitely a distinct user to run the test suite
+
+And none of those be root.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Sorry, but at DoD minimum speed it is impossible to speak. There is just
+too much wind noise.  At that speed I am spending all my concentration
+allowance on riding, and cannot afford anymore thought for words.
+However, when I finish a ride and the bike is in the garage cooling down,
+the single word that comes to mind is:
+    BEER.
+        - Jack Tavares, tavares@balrog, DoD#0570

@@ -1,0 +1,50 @@
+Date: Sat, 7 May 2011 14:29:11 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Calvin Spealman <ironfroggy@gmail.com>
+Cc: Bruce Leban <bruce@leapyear.org>,
+	python-ideas <python-ideas@python.org>
+Subject: Re: 1_000_000
+Message-ID: <20110507042911.GA14472@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <BANLkTimA6ipZ5BJL53wsqki8VCqvVzP7ww@mail.gmail.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 1276
+
+On 06May2011 19:55, Calvin Spealman <ironfroggy@gmail.com> wrote:
+| I am +0 on the whole idea, but +0.5 if is not an underscore, which I
+| think is ugly.
+
+I think the underscore is one of the better choices:
+
+  - it is very visible, unlike a dot or comma
+
+  - it is "low" or "flat", not intruding into the glyph space of the
+    digits, leaving things easy to read
+
+  - it is already widely used (perl (sorry), Ada (where I first
+    encountered it now that someone ele has mentioned it, etc)
+    i.e. it is a pre-existing idom with successful use
+
+| Would it conflict with any other syntax rules if
+| numbers allowed a space separator?
+| 
+| for i in range(1 111 111):
+|     foo(i)
+| 
+| It looks cleaner and in a fixed-font should be just as obvious about
+| separator placement.
+
+I'm very -1 on this one. Like another recent proposal it take a common
+typing error and turns it into legal syntax. Code that once would fail
+to compile because the author dropped a comma between values now runs,
+with silent breakage (the new stuff isn't even the wrong type!)
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+It's there as a sop to former Ada programmers.  :-)
+        - Larry Wall regarding 10_000_000 in <11556@jpl-devvax.JPL.NASA.GOV>

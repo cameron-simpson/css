@@ -1,0 +1,143 @@
+Return-Path: <python-dev-bounces+cs=zip.com.au@python.org>
+Delivered-To: unknown
+Received: from mail.zip.com.au (125.255.95.3) by janus.home with POP3-SSL; 22
+  Jul 2011 10:01:02 -0000
+Delivered-To: cs@zipworld.com.au
+Received: from mailin1.pacific.net.au (mailin1.pacific.net.au [61.8.0.80])
+	by mailstore1.syd.pacific.net.au (Postfix) with ESMTP id 84CB493C3F
+	for <cs@zipworld.com.au>; Fri, 22 Jul 2011 20:00:37 +1000 (EST)
+Received: from mail.python.org (unknown [82.94.164.166])
+	by mailin1.pacific.net.au (Postfix) with ESMTP id C82101840D6
+	for <cs@zip.com.au>; Fri, 22 Jul 2011 20:00:36 +1000 (EST)
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3RL6tC2C1wzMpF
+	for <cs@zip.com.au>; Fri, 22 Jul 2011 12:00:35 +0200 (CEST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=python.org; s=200901;
+	t=1311328835; bh=ZDXbvrAl+g2iY6rK3/VtmT3DyV2zqDZbQC7/PrjcNLY=;
+	h=Date:From:To:Message-ID:MIME-Version:In-Reply-To:References:Cc:
+	 Subject:List-Id:List-Unsubscribe:List-Archive:List-Post:List-Help:
+	 List-Subscribe:Content-Type:Content-Transfer-Encoding:Sender;
+	b=qJVuFwHxiEfNwRyOZjuaZ4xwIO2UbnCoxN/dll7wBR4ZlzUA3x8frfS8c64PtuwpE
+	 n8zjedRXWo1a5o0oSgKzCWGiNGgS8AVOO37VXMsTwsdaBMn1ZvrKDorGVVFOF2tbNK
+	 uGcBBai74IRRPtgSiJCpE5ScECW71LDTkwB/DhOA=
+X-Original-To: python-dev@python.org
+Delivered-To: python-dev@mail.python.org
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3RL6rJ07hwzMl6
+	for <python-dev@python.org>; Fri, 22 Jul 2011 11:58:56 +0200 (CEST)
+X-Spam-Status: OK 0.001
+X-Spam-Evidence: '*H*': 1.00; '*S*': 0.00; 'circular': 0.03; 'plenty':
+	0.04; 'deferred': 0.07; 'received:edu.au': 0.07; 'all?': 0.09;
+	'caller': 0.09; 'csv': 0.09; "module's": 0.09; 'wrote:': 0.15;
+	'defer': 0.16; 'from:addr:cs': 0.16; 'from:addr:zip.com.au': 0.16;
+	'from:name:cameron simpson': 0.16; 'innocuous': 0.16; 'message-
+	id:@cskk.homeip.net': 0.16; 'received:202.125.174': 0.16;
+	'received:202.125.174.133': 0.16;
+	'received:boardofstudies.nsw.edu.au': 0.16;
+	'received:cskk.homeip.net': 0.16;
+	'received:harvey.boardofstudies.nsw.edu.au': 0.16;
+	'received:homeip.net': 0.16; 'received:nsw.edu.au': 0.16;
+	'sqlalchemy': 0.16; 'subject:considered': 0.16; 'subject:lock':
+	0.16; 'workaround': 0.16; 'executing': 0.19; 'importing': 0.19;
+	'cheers,': 0.19; 'seems': 0.20; 'cc:2**0': 0.21; 'header:In-Reply-
+	To:1': 0.22; 'body.': 0.23; 'locking': 0.23; 'code': 0.24; 'greg':
+	0.25; '(or': 0.25; 'loaded': 0.25; 'performing': 0.26; 'function':
+	0.26; "i'm": 0.27; 'import': 0.29; 'facility': 0.29;
+	'cc:addr:python.org': 0.30; 'fairly': 0.30; 'module': 0.30;
+	'ewing': 0.30; 'imported': 0.30; 'lock': 0.30; 'use?': 0.30;
+	'patrick': 0.32; 'rather': 0.33; "what's": 0.33; 'header:User-
+	Agent:1': 0.34; 'there': 0.34; "can't": 0.34; 'things': 0.34;
+	'example,': 0.35; 'backend': 0.35; 'trigger': 0.35; 'hold': 0.36;
+	'charset:us-ascii': 0.36; 'received:au': 0.36; 'aspect': 0.37;
+	'depend': 0.37; 'things,': 0.37; 'some': 0.37; 'but': 0.37;
+	'could': 0.37; 'subject:: ': 0.38; 'something': 0.38; 'two': 0.38;
+	'put': 0.38; 'common': 0.39; 'might': 0.39; 'where': 0.40;
+	'released': 0.62; 'received:202': 0.66; 'limit': 0.66; 'cameron':
+	0.67; 'storage': 0.67; '100': 0.72; 'protect': 0.76; 'calls,':
+	0.84; 'episode': 0.84; 'expects': 0.84; 'long?': 0.84;
+	'subject:Import': 0.84; 'presumably': 0.93; 'things:': 0.93
+Received: from localhost (HELO mail.python.org) (127.0.0.1)
+	by albatross.python.org with SMTP; 22 Jul 2011 11:58:56 +0200
+Received: from harvey.boardofstudies.nsw.edu.au
+	(mail2.rack1.boardofstudies.nsw.edu.au [202.125.174.133])
+	by mail.python.org (Postfix) with ESMTP
+	for <python-dev@python.org>; Fri, 22 Jul 2011 11:58:55 +0200 (CEST)
+Received: from cskk.homeip.net (localhost.localdomain [127.0.0.1])
+	by harvey.boardofstudies.nsw.edu.au (Postfix) with ESMTP id 7E7E04D3B56;
+	Fri, 22 Jul 2011 19:58:46 +1000 (EST)
+Received: by janus.cskk.homeip.net (Postfix, from userid 1000)
+	id 61830100419B7; Fri, 22 Jul 2011 19:58:46 +1000 (EST)
+Date: Fri, 22 Jul 2011 19:58:46 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Greg Ewing <greg.ewing@canterbury.ac.nz>
+Message-ID: <20110722095846.GA32631@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <4E2942F3.3090704@canterbury.ac.nz>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+References: <4E2942F3.3090704@canterbury.ac.nz>
+Cc: Python Dev <python-dev@python.org>
+Subject: Re: Import lock considered mysterious
+X-BeenThere: python-dev@python.org
+X-Mailman-Version: 2.1.12
+Precedence: list
+List-Id: Python core developers <python-dev.python.org>
+List-Unsubscribe: <http://mail.python.org/mailman/options/python-dev>,
+	<mailto:python-dev-request@python.org?subject=unsubscribe>
+List-Archive: <http://mail.python.org/pipermail/python-dev>
+List-Post: <mailto:python-dev@python.org>
+List-Help: <mailto:python-dev-request@python.org?subject=help>
+List-Subscribe: <http://mail.python.org/mailman/listinfo/python-dev>,
+	<mailto:python-dev-request@python.org?subject=subscribe>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Sender: python-dev-bounces+cs=zip.com.au@python.org
+Errors-To: python-dev-bounces+cs=zip.com.au@python.org
+X-Cats2Procmailrc-Rule: cats/home: python  python-dev      sender:python-dev-bounces+cs=zip.com.au@python.org
+X-Label: python-dev
+Content-Length: 1840
+
+On 22Jul2011 21:29, Greg Ewing <greg.ewing@canterbury.ac.nz> wrote:
+[...]
+| This whole episode seems to have resulted from a collision
+| between two rather obscure things: that import statements
+| involve locking things,
+
+Necessary to avoid performing the module definitons twice when a module
+is imported twice, surely?
+
+| and that some fairly innocuous
+| looking calls, such as s.encode('ascii'), can trigger an
+| import.
+
+There are plenty of occasions where an import might be deferred until a
+function call - it is a common workaround for otherwise circular
+imports. Personally I also sometimes defer an import if I'm importing
+something "large" that the module would only depend upon on in unusual
+(or anyway, often avoidable) circumstances; for example, a facility not
+in the stdlib, which a caller might avoid requiring by choosing a
+different aspect of the importing module such as choosing a CSV storage
+backend over and SQLalchemy backend.
+
+| Is it really necessary to hold the import lock for so long?
+| Presumably the import lock is there to protect access to
+| things like sys.modules. Is that all? Could it be released
+| after the module code is loaded and sys.modules has been
+| updated, but before executing the module body?
+
+Sometimes names are made by executing the module body.
+Since one expects to access the module's names after the import, how is
+this avoidable?
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+What's the point of having Nebraska if we can't put it to its highest and
+best use?       - Patrick Bedard arguing for a 100 mph speed limit
+_______________________________________________
+Python-Dev mailing list
+Python-Dev@python.org
+http://mail.python.org/mailman/listinfo/python-dev
+Unsubscribe: http://mail.python.org/mailman/options/python-dev/cs%40zip.com.au

@@ -1,0 +1,32 @@
+Date: Tue, 16 Jun 2009 13:20:53 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Mark Seaborn <mrs@mythic-beasts.com>
+Cc: python-dev@python.org
+Subject: Re: Avoiding file descriptors leakage in subprocess.Popen()
+Message-ID: <20090616032053.GA15938@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20090614.164255.343165597.mrs@localhost.localdomain>
+User-Agent: Mutt/1.5.19 (2009-01-05)
+Content-Length: 688
+
+On 14Jun2009 16:42, Mark Seaborn <mrs@mythic-beasts.com> wrote:
+| I use a convenience function like this, so that GC takes care of the FDs:
+| 
+| def make_pipe():
+|     read_fd, write_fd = os.pipe()
+|     return os.fdopen(read_fd, "r"), os.fdopen(write_fd, "w")
+
+Not guarrenteed to be timely. The try/except at least closes things as
+control passes out of the relevant scope. I don't think all pythons
+do immediate ref-counted GC.
+
+But it's very neat!
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Trust the computer industry to shorten Year 2000 to Y2K. It was this
+thinking that caused the problem in the first place.
+- Mark Ovens <marko@uk.radan.com>

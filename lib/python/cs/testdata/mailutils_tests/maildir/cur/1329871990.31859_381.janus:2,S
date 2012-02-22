@@ -1,0 +1,69 @@
+Date: Wed, 21 Apr 2010 12:11:22 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Neal Becker <ndbecker2@gmail.com>
+Cc: python-dev@python.org
+Subject: Re: argparse ambiguity handling
+Message-ID: <20100421021122.GA2916@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <hqkv7p$9gk$1@dough.gmane.org>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 1913
+
+On 20Apr2010 15:27, Neal Becker <ndbecker2@gmail.com> wrote:
+| Steven Bethard wrote:
+| 
+| > On Tue, Apr 20, 2010 at 11:55 AM, Neal Becker <ndbecker2@gmail.com> wrote:
+| >> I've noticed argparse ambiguity handling has changed a bit over last few
+| >> revisions.
+| >>
+| >> I have cases where 1 valid input is a prefix of another:
+| >>
+| >> e.g.:
+| >> '--string'
+| >> '--string2'
+| >>
+| >> With the most recent 1.1, the behavior is:
+| >>
+| >> --string=hello
+| >>
+| >> is accepted, while:
+| >>
+| >> --strin=hello
+| >>
+| >> is marked as ambiguous.
+| >>
+| >> I'm OK with this, but just want to know if there is agreement that this
+| >> is the behavior we want.
+| > 
+| > I don't have a strong feeling about this. What was the behavior before?
+| > Steve
+| 
+| At least 1 earlier version said that even exact match was ambiguous.
+| 
+| I have a preference to allow at least exact matches to succeed even in the 
+| case of ambiguity - mainly because I accidentally created this already once, 
+| and I feel it's better to at least work somewhat.  Not sure if there is any 
+| more elegant solution.  OTOH, I feel this is somewhat inelegant, as it 
+| appears to treat exact match as a special case.
+
+I think the new behaviour is desirable. Plenty of commands have both
+--foo and --foo-tweak. Usually because --foo came first and --foo-tweak
+came later, or simply because --foo is the simple and obvious and
+commonly wanted mode and --foo-tweak is a special case.
+
+Real world example: rsync and the --delete* options. I'm sure plenty of
+others can be found.
+
+The new behaviour makes this doable. The old behaviour made it
+unimplementable. Maybe it is desirable to be _able_ to forbid this
+arguably-ambiguous option set, but I definitely feel that the current
+behaviour should be available.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+If it wasn't for lawyers, we wouldn't need them.

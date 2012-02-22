@@ -1,0 +1,48 @@
+Date: Mon, 27 Apr 2009 17:55:49 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Glenn Linderman <v+python@g.nevcal.com>
+Cc: =?utf-8?B?Ik1hcnRpbiB2LiBMw7Z3aXMiIDxtYXJ0aW5Adi5sb2V3aXMuZGU+?=,
+	python-dev@python.org
+Subject: Re: PEP 383: Non-decodable Bytes in System  Character Interfaces
+Message-ID: <20090427075549.GA4418@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <49F5532D.2090700@g.nevcal.com>
+User-Agent: Mutt/1.5.18 (2008-05-17)
+Content-Length: 1762
+
+On 26Apr2009 23:39, Glenn Linderman <v+python@g.nevcal.com> wrote:
+[...snip...]
+> There are still issues regarding how Windows and POSIX programs that are  
+> sharing cross-mounted file systems might communicate file names between  
+> each other, which is not at all clear from the PEP.  If this is an  
+> insoluble or un-addressed issue, it should be stated.  (It is probably  
+> insoluble, due to there being multiple ways that the cross-mounted file  
+> systems might translate names; but if there are, can we learn something  
+> from the rules the mounting systems use, to be compatible with (one of)  
+> them, or not.
+
+I'd say that's out of scope. A windows filesystem mounted on a UNIX host
+should probably be mounted with a mapping to translate the Windows
+Unicode names into whatever the sysadmin deems the locally most apt
+byte encoding. But sys.getfilesystemencoding() is based on the current user's
+locale settings, which need not be the same.
+
+> Together with your change to avoid using PUA characters, and the rule  
+> suggested by MRAB in another branch of this thread, of treating  
+> half-surrogates as invalid byte sequences may avoid the data puns I'm  
+> concerned about.
+>
+> It is not clear how half-surrogate characters would be displayed, when  
+> the user prints or displays such a file name string.  It would seem that  
+> programs that display file names to users might still have issues with  
+> such; an escaping mechanism that uses displayable characters would have  
+> an advantage there.
+
+Wouldn't any escaping mechanism that uses displayable characters
+require visually mangling occurences of those characters that
+legitimately occur in the original?
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/

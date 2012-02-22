@@ -1,0 +1,263 @@
+Return-Path: <python-ideas-bounces+cs=zip.com.au@python.org>
+Delivered-To: unknown
+Received: from mail.zip.com.au (125.255.95.3) by janus.home with POP3-SSL; 05
+  Dec 2010 02:15:02 -0000
+Delivered-To: cs@zipworld.com.au
+Received: from mailin2.pacific.net.au (mailin2.pacific.net.au [61.8.0.81])
+	by mailstore2.syd.pacific.net.au (Postfix) with ESMTP id 85B3E6A1E
+	for <cs@zipworld.com.au>; Sun,  5 Dec 2010 13:14:44 +1100 (EST)
+Received: from mail.python.org (unknown [82.94.164.166])
+	by mailin2.pacific.net.au (Postfix) with ESMTP id D8FBD19C16A
+	for <cs@zip.com.au>; Sun,  5 Dec 2010 13:14:43 +1100 (EST)
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 7BE33EEA56
+	for <cs@zip.com.au>; Sun,  5 Dec 2010 03:14:42 +0100 (CET)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=python.org; s=200901;
+	t=1291515282; bh=u5wuXHsz3BiABRm6Xc0E6bhqkHX2D7nBiRaAxYdjyxM=;
+	h=Date:From:To:Message-ID:MIME-Version:In-Reply-To:References:Cc:
+	 Subject:List-Id:List-Unsubscribe:List-Archive:List-Post:List-Help:
+	 List-Subscribe:Content-Type:Content-Transfer-Encoding:Sender;
+	b=kXoiSsK346f3i1WS5hNBlAXHNXNddqNUVVqiA3DZt9wh4LGRDrNYdpNofFyWFr5Xj
+	 NaAXPoPEMni4Qy6f1Qa9qRCn9Naboq86mfjEfW/e4AYyd/KwQKbQeNa810i6DRg7cz
+	 xGeftj+kS8By2pudbzWaJkTSqITPVYw5f2Pcd7wY=
+X-Original-To: python-ideas@python.org
+Delivered-To: python-ideas@mail.python.org
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id A859DEE9E6
+	for <python-ideas@python.org>; Sun,  5 Dec 2010 03:14:09 +0100 (CET)
+X-Spam-Status: OK 0.000
+X-Spam-Evidence: '*H*': 1.00; '*S*': 0.00; 'bug': 0.02; 'else:': 0.03;
+	'2.x': 0.05; 'sure.': 0.05; 'bug.': 0.07; 'raises': 0.07;
+	'written.': 0.07; '(assuming': 0.09; 'accidentally': 0.09;
+	'ambiguity': 0.09; 'bare': 0.09; 'exception.': 0.09; 'exceptions':
+	0.09; 'ioerror:': 0.09; 'none:': 0.09; 'specific.': 0.09;
+	'values,': 0.09; 'this:': 0.10; '>>>': 0.11; 'wrote:': 0.14;
+	'def': 0.14; 'holds': 0.15; 'traceback': 0.15; 'maybe': 0.15;
+	'*less*': 0.16; '>or': 0.16; 'arbitrarily': 0.16; 'bugs,': 0.16;
+	'except:': 0.16; 'expected.': 0.16; 'failure.': 0.16; 'file"':
+	0.16; 'file")': 0.16; 'from:addr:cs': 0.16;
+	'from:addr:zip.com.au': 0.16; 'from:name:cameron simpson': 0.16;
+	'message-id:@cskk.homeip.net': 0.16; 'name):': 0.16; 'propagate':
+	0.16; 'received:202.125.174': 0.16; 'received:202.125.174.133':
+	0.16; 'received:boardofstudies.nsw.edu.au': 0.16;
+	'received:cskk.homeip.net': 0.16;
+	'received:harvey.boardofstudies.nsw.edu.au': 0.16;
+	'received:homeip.net': 0.16; 'received:nsw.edu.au': 0.16;
+	'reinstall': 0.16; 'runtime.': 0.16; 'safe!': 0.16; 'subject:non':
+	0.16; 'sure,': 0.16; 'thrown': 0.16; 'to:addr:steve': 0.16;
+	'travel.': 0.16; 'try/except': 0.16; 'unhandled': 0.16; 'versus':
+	0.16; 'advance': 0.17; 'cheers,': 0.17; 'seems': 0.17;
+	'interesting.': 0.18; 'part,': 0.18; 'stack': 0.18; 'exception':
+	0.19; 'cc:2**0': 0.21; '(or': 0.21; 'differ': 0.23;
+	'received:edu.au': 0.23; 'vs.': 0.23; 'header:In-Reply-To:1':
+	0.23; 'permission': 0.24; 'equivalent': 0.25; 'code': 0.25;
+	'handling': 0.25; 'skip:e 20': 0.26; 'reporting': 0.27; 'fail':
+	0.28; "i'm": 0.28; "can't": 0.28; 'happening': 0.28; 'testing':
+	0.28; 'perhaps': 0.29; 'class': 0.29; 'example': 0.29; 'feeling':
+	0.30; 'generally': 0.30; 'except': 0.30; 'cc:addr:python.org':
+	0.30; '...': 0.31; 'actually': 0.31; 'skip:o 20': 0.31;
+	'exceptional': 0.31; 'error': 0.32; 'else': 0.32; 'decide': 0.33;
+	'do.': 0.33; "aren't": 0.33; 'caught': 0.33; 'skip:z 10': 0.33;
+	'under': 0.33; "we're": 0.34; '[...]': 0.34; 'like:': 0.34;
+	'treated': 0.34; 'try:': 0.34; 'raise': 0.34; 'there': 0.34;
+	'header:User-Agent:1': 0.34; 'complex': 0.35; 'point': 0.35;
+	'using': 0.35; 'skip:" 10': 0.35; 'but': 0.36; 'anything': 0.36;
+	'skip:_ 10': 0.36; 'open': 0.36; 'sounds': 0.36; 'test': 0.37;
+	'charset:us-ascii': 0.37; 'case,': 0.37; 'concern': 0.38;
+	'particularly': 0.38; 'fact': 0.38; 'might': 0.38; 'should': 0.38;
+	'too': 0.39; 'some': 0.39; 'not,': 0.39; 'could': 0.40; 'your':
+	0.61; 'easy': 0.61; 'property': 0.63; 'simple': 0.63; 'happen':
+	0.63; 'obtain': 0.64; 'here': 0.64; 'risks': 0.67; 'strategy':
+	0.68; 'wish': 0.70; 'fear': 0.72; 'race': 0.72; 'failure': 0.75;
+	'else.': 0.79; 'strict': 0.79; '"did': 0.84; 'catches': 0.91;
+	'many,': 0.91; 'presumably': 0.91; 'realm': 0.91; 'well:': 0.91
+Received: from localhost (HELO mail.python.org) (127.0.0.1)
+	by albatross.python.org with SMTP; 05 Dec 2010 03:14:09 +0100
+Received: from harvey.boardofstudies.nsw.edu.au
+	(mail2.rack1.boardofstudies.nsw.edu.au [202.125.174.133])
+	by mail.python.org (Postfix) with ESMTP
+	for <python-ideas@python.org>; Sun,  5 Dec 2010 03:14:08 +0100 (CET)
+Received: from cskk.homeip.net (localhost.localdomain [127.0.0.1])
+	by harvey.boardofstudies.nsw.edu.au (Postfix) with ESMTP id 67C724D39C7;
+	Sun,  5 Dec 2010 13:14:05 +1100 (EST)
+Received: by janus.cskk.homeip.net (Postfix, from userid 1000)
+	id 50571100419B7; Sun,  5 Dec 2010 13:14:05 +1100 (EST)
+Date: Sun, 5 Dec 2010 13:14:05 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Steven D'Aprano <steve@pearwood.info>
+Message-ID: <20101205021405.GA13140@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <4CFAE7F5.4070801@pearwood.info>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+References: <4CFAE7F5.4070801@pearwood.info>
+Cc: python-ideas <python-ideas@python.org>
+Subject: Re: `issubclass` shouldn't be raising exceptions for
+	non-type inputs
+X-BeenThere: python-ideas@python.org
+X-Mailman-Version: 2.1.12
+Precedence: list
+List-Id: Discussions of speculative Python language ideas
+	<python-ideas.python.org>
+List-Unsubscribe: <http://mail.python.org/mailman/options/python-ideas>,
+	<mailto:python-ideas-request@python.org?subject=unsubscribe>
+List-Archive: <http://mail.python.org/pipermail/python-ideas>
+List-Post: <mailto:python-ideas@python.org>
+List-Help: <mailto:python-ideas-request@python.org?subject=help>
+List-Subscribe: <http://mail.python.org/mailman/listinfo/python-ideas>,
+	<mailto:python-ideas-request@python.org?subject=subscribe>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Sender: python-ideas-bounces+cs=zip.com.au@python.org
+Errors-To: python-ideas-bounces+cs=zip.com.au@python.org
+X-Cats2Procmailrc-Rule: cats/home: python  python-ideas    sender:python-ideas-bounces+cs=zip.com.au@python.org
+X-Label: python-ideas
+Content-Length: 5295
+
+On 05Dec2010 12:16, Steven D'Aprano <steve@pearwood.info> wrote:
+| Cameron Simpson wrote:
+| >The try/except verision goes like this:
+| >
+| >  try:
+| >    x = y / obj.foo
+| >  except ZeroDivisionError:
+| >    # handle 0
+| >
+| >Now, the reason I'm using "obj.foo" here is that obj.foo may be a property
+| >or otherwise inplemented by __getattr__; arbitrarily complex code may
+| >be happening to obtain the value it returns. The upshot of that is that
+| >even this very simple looking code may be an unhandled ZeroDivisionError
+| >from deeper in the call stack - I don't know it came from the division
+| >visible in the code example above.
+| 
+| That's true. But if obj.foo raises ZeroDivisionError, perhaps you
+| should be treating this as equivalent to x/0 and continue,
+| particularly if you have no control over the obj.foo. What else are
+| you going to do (assuming that letting the exception propagate is
+| not an option)?
+
+Well, that's the point: if the ZeroDivision came from my divide
+presumably I have a strategy to handle that because it is expected. But
+if it came from inside the implementation of obj.foo then more likely I
+should let the exception propagate, because it is _not_ the cricumstance
+for which my try/except was accomodating.
+
+| In any case, if you want to guard against such bugs, you can inspect
+| the traceback and decide what to do. This is particularly easy in
+| Python3.x, but possible in 2.x as well:
+| 
+| >>> class K:
+| ...     def __getattr__(self, name):
+| ...         raise ZeroDivisionError
+| ...
+| >>>
+| >>> try:
+| ...     1/K().spam
+| ... except ZeroDivisionError as e:
+| ...     if e.__traceback__.tb_next is None:
+| ...             print("handle division by zero")
+| ...     else:
+| ...             print("handle bug in __getattr__")
+| ...
+| handle bug in __getattr__
+
+Interesting.
+But this is easier to read and maintain than the if/else form how?
+
+| And it's not like the if test catches all possible errors. There are
+| many potential error conditions that aren't caught by something
+| like:
+| 
+| if obj.foo != 0:
+|     print(x/obj.foo)
+| else:
+|     # handle 0
+
+Of course there are; it's an example to illustrate the ambiguity of the
+received exception versus the concreteness of a failed if-test.
+
+[...]
+| If you fear that obj.foo could contain arbitrarily complex code that
+| may accidentally raise ZeroDivisionError (or anything else!), the
+| same holds for __ne__. Once you stop trusting your values, you can't
+| trust *anything* -- maybe object.foo has the __eq__ and __ne__
+| reversed. Who knows?
+
+Sure, but this is the realm of the _unhandled_ circumstance.  With the
+try/except I will easily try to handle that circumstance in the _mistaken_
+belief that it is a specific failure I was ready for.
+
+| How defensively do you code?
+
+More defensively than many, in my experience.
+
+In particular, I generally want to be sure that an "exceptional" circumstance
+I'm handling really is the anticipated circumstance, and not something
+totally else. With exceptions you don't know that without cumbersome
+inspection of the thrown exception. The point of the example is that one
+can write code for an anticipated circumstance, but that code should
+_not_ run for the unanticipated circumstance. This is easy with the
+if/else because the test is specific.
+
+[...]
+| You're right that the try...except idiom is subject to false
+| positives. It might, under some (presumably rare) circumstances,
+| catch an exception which should be treated as a bug. But the
+| if...else idiom is subject to both false positives and false
+| negatives: your test may be too strict, or it may be not strict
+| enough.
+
+My test may be accurate or not, sure. But inaccuracy is a coding bug on
+my part, not an exceptional circumstance that might legitimately happen
+at any runtime.
+
+| Or both at the same time. Or the thing you are testing may
+| be subject to race conditions:
+| 
+| if os.exists(pathname):
+|     # This is NOT safe!
+|     fp = open(pathname)
+| else:
+|     print("no such file")
+| 
+| vs.
+| 
+| try:
+|     fp = open(pathname)
+| except IOError:
+|     print("no such file")
+| 
+| It seems to me that the LBYL idiom is actually *less* safe than the
+| exception handling idiom.
+
+Not as written. I take your point about the race and in fact _do_ go for
+try/except there because I'm after "did the open succeed?", something
+that can't be tested in advance without time travel.
+
+But I would be writing it like this:
+
+  try:
+    fp = open(pathname)
+  except:
+    # disaster!
+
+and feeling awful about the bare except. But the fact of th matter is that
+an open may fail for many reasons, not just I/O. And in fact your example is
+a classic case of my concern with try/except - you're reporting "no such
+file" when in fact there may be other reasons eg a permission failure. You're
+doing just what I wish to avoid: _misdiagnosing_ an exception and acting on
+that diagnosis.
+
+It sounds like we're both aware of the pros and cons but differ in what
+risks to accept.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+"What do you want to reinstall today?"  - Bob O`Bob <obob@shell3.ba.best.com>
+_______________________________________________
+Python-ideas mailing list
+Python-ideas@python.org
+http://mail.python.org/mailman/listinfo/python-ideas

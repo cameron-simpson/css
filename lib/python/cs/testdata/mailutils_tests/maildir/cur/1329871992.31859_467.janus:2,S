@@ -1,0 +1,41 @@
+Date: Thu, 30 Apr 2009 08:45:32 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: "Stephen J. Turnbull" <stephen@xemacs.org>
+Cc: Baptiste Carvello <baptiste13z@free.fr>, python-dev@python.org
+Subject: Re: PEP 383: Non-decodable Bytes in System Character Interfaces
+Message-ID: <20090429224532.GA11604@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <87d4avk3f9.fsf@uwakimon.sk.tsukuba.ac.jp>
+User-Agent: Mutt/1.5.18 (2008-05-17)
+Content-Length: 1448
+
+On 29Apr2009 22:14, Stephen J. Turnbull <stephen@xemacs.org> wrote:
+| Baptiste Carvello writes:
+|  > By contrast, if the new utf-8b codec would *supercede* the old one,
+|  > \udcxx would always mean raw bytes (at least on UCS-4 builds, where
+|  > surrogates are unused). Thus ambiguity could be avoided.
+| 
+| Unfortunately, that's false.  It could have come from a literal string
+| (similar to the text above ;-), a C extension, or a string slice (on
+| 16-bit builds), and there may be other ways to do it.  The only way to
+| avoid ambiguity is to change the definition of a Python string to be
+| *valid* Unicode (possibly with Python extensions such as PEP 383 for
+| internal use only).  But Guido has rejected that in the past;
+| validation is the application's problem, not Python's.
+| 
+| Nor is a UCS-4 build exempt.  IIRC Guido specifically envisioned
+| Python strings being used to build up code point sequences to be
+| directly output, which means that a UCS-4 string might none-the-less
+| contain surrogates being added to a string intended to be sent as
+| UTF-16 output simply by truncating the 32-bit code units to 16 bits.
+
+Wouldn't you then be bypassing the implicit encoding anyway, at least to
+some extent, and thus not trip over the PEP?
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Clemson is the Harvard of cardboard packaging.
+- overhead by WIRED at the Intelligent Printing conference Oct2006

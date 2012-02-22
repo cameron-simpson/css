@@ -1,0 +1,36 @@
+Date: Sat, 10 Dec 2011 18:37:23 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Tim Chase <python.list@tim.thechases.com>
+Cc: Python <python-list@python.org>
+Subject: Re: Obtaining user information
+Message-ID: <20111210073723.GA939@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <4EE2B990.2030908@tim.thechases.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+Content-Length: 926
+
+On 09Dec2011 19:44, Tim Chase <python.list@tim.thechases.com> wrote:
+| Currently I can get the currently-logged-in-userid via
+| getpass.getuser() which would yield something like "tchase".
+
+_If_ you're on a terminal. _And_ that's exactly what you want.
+Personally I need to the name of geteuid() or getuid() more often.
+
+| Is there a cross-platform way to get the full username (such as from
+| the GECOS field of /etc/passed or via something like NetUserGetInfo
+| on Win32 so I'd get "Tim Chase" instead?
+
+Hmm. Doesn't windows have a posix layer?
+
+  pwd.getpwnam(os.getuid())[4].split(',')[0]
+
+is the best I've got. ANd it probably doesn't work in Windows:-(
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+There's not a woman in his book, the plot hinges on unkindness to
+animals, and the black characters mostly drown by chapter 29.
+        - P J O'Rourke parodying a PC review of Moby Dick

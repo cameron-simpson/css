@@ -1,0 +1,68 @@
+Date: Wed, 11 Mar 2009 13:59:00 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: python-dev@python.org
+Subject: Re: Ext4 data loss
+Message-ID: <20090311025900.GA13613@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20090311021451.GA21406@amk.local>
+User-Agent: Mutt/1.5.18 (2008-05-17)
+Content-Length: 2395
+
+On 10Mar2009 22:14, A.M. Kuchling <amk@amk.ca> wrote:
+| On Wed, Mar 11, 2009 at 11:31:52AM +1100, Cameron Simpson wrote:
+| > On 10Mar2009 18:09, A.M. Kuchling <amk@amk.ca> wrote:
+| > | The mailbox module tries to be careful and always fsync() before
+| > | closing files, because mail messages are pretty important.
+| > 
+| > Can it be turned off? I hadn't realised this.
+| 
+| No, there's no way to turn it off (well, you could delete 'fsync' from
+| the os module).
+
+Ah. For myself, were I writing a high load mailbox tool (eg a mail filer
+or more to the point, a mail refiler - which I do actually intend to) I
+would want to be able to do a huge mass of mailbox stuff and then
+possibly issue a sync at the end. For "unix mbox" that might be ok but
+for maildirs I'd imagine it leads to an fsync per message.
+
+| > | The tarfile, zipfile, and gzip/bzip2 classes don't seem to use fsync()
+| > | at all, either implicitly or by having methods for calling them.
+| > | Should they?  What about cookielib.CookieJar?
+| > 
+| > I think they should not do this implicitly. By all means let a user
+| > issue policy.
+| 
+| The problem is that in some cases the user can't issue policy.  For
+| example, look at dumbdbm._commit().  It renames a file to a backup,
+| opens a new file object, writes to it, and closes it.  A caller can't
+| fsync() because the file object is created, used, and closed
+| internally.  With zipfile, you could at least access the .fp attribute
+| to sync it (though is the .fp documented as part of the interface?).
+
+I didn't so much mean giving the user an fsync hook so much as publishing a
+flag such as ".do_critical_fsyncs" inside the dbm or zipfile object. If true,
+issue fsyncs at appropriate times.
+
+| In other words, do we need to ensure that all the relevant library
+| modules expose an interface to allow requesting a sync, or getting the
+| file descriptor in order to sync it?
+
+With a policy flag you could solve the control issue even for things
+which don't expose the fd such as your dumbdbm._commit() example.
+If you supply both a flag and an fsync() method it becomes easy for
+a user of a module to go:
+
+  obj = get_dbm_handle(....)
+  obj.do_critical_fsyncs = False
+  ... do lots and lots of stuff ...
+  obj.fsync()
+  obj.close()
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+In the end, winning is the only safety. - Kerr Avon

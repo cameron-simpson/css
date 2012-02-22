@@ -1,0 +1,234 @@
+Return-Path: <python-list-bounces+cs=zip.com.au@python.org>
+Delivered-To: unknown
+Received: from mail.zip.com.au (125.255.95.3) by janus.home with POP3-SSL; 16
+  Jul 2011 23:59:02 -0000
+Delivered-To: cs@zipworld.com.au
+Received: from mailin1.pacific.net.au (mailin1.pacific.net.au [61.8.0.80])
+	by mailstore2.syd.pacific.net.au (Postfix) with ESMTP id 345D76B65
+	for <cs@zipworld.com.au>; Sun, 17 Jul 2011 09:57:36 +1000 (EST)
+Received: from mail.python.org (unknown [82.94.164.166])
+	by mailin1.pacific.net.au (Postfix) with ESMTP id 8A2D1184288
+	for <cs@zip.com.au>; Sun, 17 Jul 2011 09:57:35 +1000 (EST)
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3RGnkj6yRWzMst
+	for <cs@zip.com.au>; Sun, 17 Jul 2011 01:57:33 +0200 (CEST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=python.org; s=200901;
+	t=1310860654; bh=FZAGG64mZuHuGl6Jt2GOB55u128J8w120sxCLNrVkOg=;
+	h=Date:From:To:Subject:Message-ID:MIME-Version:In-Reply-To:
+	 References:Cc:List-Id:List-Unsubscribe:List-Archive:List-Post:
+	 List-Help:List-Subscribe:Content-Type:Content-Transfer-Encoding:
+	 Sender;
+	b=Nylzi3wumRHA8OFhaGGdYr4K08PQzjOWB94nkuebRz8LbKAT5Ag1+M/sB/R9G7A07
+	 nLUweKmiJkN+wL0OdEt5bRTxjzRSIkp1r6vxGSg6VJ9IXABydc9Gna9ar5jIdoftCR
+	 QuG3A4BX7tcHEhuPUHyTNMpogP02vVWiM/WYvWv4=
+X-Original-To: python-list@python.org
+Delivered-To: python-list@mail.python.org
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3RGndD440rzMrc
+	for <python-list@python.org>; Sun, 17 Jul 2011 01:52:48 +0200 (CEST)
+X-Spam-Status: OK 0.001
+X-Spam-Evidence: '*H*': 1.00; '*S*': 0.00; 'plenty': 0.04; 'sure.':
+	0.05; 'width': 0.05; 'forcing': 0.07; 'formatting': 0.07;
+	'received:edu.au': 0.07; 'rules.': 0.07; 'tab': 0.07; 'python':
+	0.08; 'chose': 0.09; 'deliberately': 0.09; 'rule.': 0.09;
+	'programmer': 0.11; 'broken': 0.12; 'already.': 0.16; 'backspace':
+	0.16; 'both.': 0.16; 'columns': 0.16; 'conclusion:': 0.16;
+	'docstrings': 0.16; 'fancy': 0.16; 'formatting.': 0.16;
+	'freedoms': 0.16; 'from:addr:cs': 0.16; 'from:addr:zip.com.au':
+	0.16; 'from:name:cameron simpson': 0.16; 'indent': 0.16; 'message-
+	id:@cskk.homeip.net': 0.16; 'pythons': 0.16; 'rantingrick': 0.16;
+	'received:202.125.174': 0.16; 'received:202.125.174.133': 0.16;
+	'received:boardofstudies.nsw.edu.au': 0.16;
+	'received:cskk.homeip.net': 0.16;
+	'received:harvey.boardofstudies.nsw.edu.au': 0.16;
+	'received:homeip.net': 0.16; 'received:nsw.edu.au': 0.16; 'sane':
+	0.16; 'selfish': 0.16; 'side.': 0.16; 'sure,': 0.16;
+	'syntactical': 0.16; 'versus': 0.16; 'folks': 0.16; 'cc:addr
+	:python-list': 0.16; 'continuing': 0.17; 'programming': 0.18;
+	'cheers,': 0.19; 'language': 0.20; "haven't": 0.21; 'input': 0.21;
+	'cc:2**0': 0.21; 'badly': 0.22; 'cc:no real name:2**0': 0.22;
+	'header:In-Reply-To:1': 0.22; 'stuff': 0.22; 'foster': 0.23;
+	'indentation': 0.23; 'personally,': 0.23; 'obviously': 0.23;
+	'code': 0.24; 'extent': 0.25; '(or': 0.25; 'specified': 0.25;
+	'do,': 0.28; '(see': 0.28; 'right.': 0.28; 'bit': 0.28; 'correct':
+	0.29; 'anyway.': 0.29; 'fixed': 0.29; '"the': 0.29;
+	'cc:addr:python.org': 0.30; 'example': 0.30; '"good': 0.30;
+	'argue': 0.30; 'controlled': 0.30; 'yet': 0.30; 'least': 0.31;
+	'required.': 0.31; 'shared': 0.32; 'source': 0.32; 'cases': 0.32;
+	'pure': 0.32; 'generally': 0.33; 'anyone': 0.33; 'header:User-
+	Agent:1': 0.34; 'decide': 0.34; 'there': 0.34; '(as': 0.34;
+	'tools.': 0.34; 'things': 0.34; 'community': 0.35; 'uses': 0.35;
+	'charset:us-ascii': 0.36; 'file': 0.36; 'received:au': 0.36;
+	'rules': 0.36; 'themselves.': 0.37; 'some': 0.37; 'languages':
+	0.37; 'but': 0.37; 'could': 0.37; 'using': 0.37; 'another': 0.38;
+	'user': 0.38; 'subject:: ': 0.38; 'authors': 0.38; 'media,': 0.38;
+	'think': 0.38; 'run': 0.39; 'common': 0.39; 'case': 0.39;
+	'should': 0.39; 'flexibility': 0.39; 'leading': 0.61; 'stop':
+	0.61; 'bring': 0.62; 'our': 0.63; 'world': 0.65; 'road': 0.66;
+	'received:202': 0.66; 'believe': 0.66; 'proposal': 0.67; 'view':
+	0.67; 'cameron': 0.67; 'guides': 0.67; 'lights': 0.67; 'mandate':
+	0.67; 'share': 0.68; 'freedom': 0.68; 'spaces': 0.73; 'why?':
+	0.73; 'care': 0.73; 'superior': 0.74; 'subject:have': 0.74;
+	'physical': 0.78; 'promote': 0.81; 'claims': 0.82; 'adhere': 0.84;
+	'begun': 0.84; 'days).': 0.84; 'dent': 0.84; 'freedom?': 0.84;
+	'laid': 0.84; 'on?': 0.84; 'reasoning': 0.84; 'subject:should':
+	0.84; 'cater': 0.93; 'device,': 0.93
+Received: from localhost (HELO mail.python.org) (127.0.0.1)
+	by albatross.python.org with SMTP; 17 Jul 2011 01:52:48 +0200
+Received: from harvey.boardofstudies.nsw.edu.au
+	(mail2.rack1.boardofstudies.nsw.edu.au [202.125.174.133])
+	by mail.python.org (Postfix) with ESMTP
+	for <python-list@python.org>; Sun, 17 Jul 2011 01:52:47 +0200 (CEST)
+Received: from cskk.homeip.net (localhost.localdomain [127.0.0.1])
+	by harvey.boardofstudies.nsw.edu.au (Postfix) with ESMTP id C25C14D3B56;
+	Sun, 17 Jul 2011 09:52:45 +1000 (EST)
+Received: by janus.cskk.homeip.net (Postfix, from userid 1000)
+	id AB4E9100419B7; Sun, 17 Jul 2011 09:52:45 +1000 (EST)
+Date: Sun, 17 Jul 2011 09:52:45 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: rantingrick <rantingrick@gmail.com>
+Subject: Re: Tabs -vs- Spaces: Tabs should have won.
+Message-ID: <20110716235245.GA8685@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <cfbc97eb-29a2-488c-ab62-e0364f752e68@t7g2000vbv.googlegroups.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+References: <cfbc97eb-29a2-488c-ab62-e0364f752e68@t7g2000vbv.googlegroups.com>
+Cc: python-list@python.org
+X-BeenThere: python-list@python.org
+X-Mailman-Version: 2.1.12
+Precedence: list
+List-Id: General discussion list for the Python programming language
+	<python-list.python.org>
+List-Unsubscribe: <http://mail.python.org/mailman/options/python-list>,
+	<mailto:python-list-request@python.org?subject=unsubscribe>
+List-Archive: <http://mail.python.org/pipermail/python-list>
+List-Post: <mailto:python-list@python.org>
+List-Help: <mailto:python-list-request@python.org?subject=help>
+List-Subscribe: <http://mail.python.org/mailman/listinfo/python-list>,
+	<mailto:python-list-request@python.org?subject=subscribe>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Sender: python-list-bounces+cs=zip.com.au@python.org
+Errors-To: python-list-bounces+cs=zip.com.au@python.org
+X-Cats2Procmailrc-Rule: cats/home: python  python-list     sender:python-list-bounces+cs=zip.com.au@python.org
+X-Label: python-list
+Content-Length: 5013
+
+On 16Jul2011 09:51, rantingrick <rantingrick@gmail.com> trolled:
+|  Evidence: Tabs ARE superior!
+| --------------------------------------------------
+| I have begun to believe that tabs are far more superior to spaces
+
+Please Rick: you need at least three things to use the term "more
+superior". With only two, you just have superior. It grates.
+
+Personally, I prefer spaces to tabs, at least fgor my Python code and
+generally anyway. Why? Well to some extent because I share files with
+another who uses 4 position tabs. Editing these is a real nightmare if
+one uses 8 position tabs (as I do, the common editor/terminal default
+these days). For pure indentation you may get sane (if wider that liked)
+results, bit any multicolumn stuff is badly broken by the mismatch.
+
+Personally, I like to use the tab _key_ as an input device, but to have
+my editor write real spaces to the file in consequence. With pure
+spaces, the text is laid out reliably for us both. And so I have my
+editor set to that behaviour.
+
+[...]
+| 3) Tabs create freedom in the form of user controlled indention.
+
+Only for leading indentation, not following indentation.
+Consider docstrings and other stuff with embedded fixed witdh layout.
+
+| Indention width should be a choice of the reader NOT the author.
+
+Sure, perhaps.
+
+| 4) Tabs remove the need for complicated indention/detention tools.
+| With "tabs only" you no longer need those fancy tools to indent or de-
+| dent after a tab or backspace key-press. THAT IS EXACTLY WHY TABS
+| WHERE INVENTED! Why are we not using this technology? Why are we
+| continuing to promote spaces when tabs are obviously more superior?
+
+Again with the more superior:-( Tabs were devised to lay out multiple
+columns reliably on physical media, to produce tabular output. But your
+proposal really only works for leading indents in a fixed with system,
+not multiple indents on the same line (see my 4 versus 8 example
+above).
+
+| --------------------------------------------------
+|  Conclusion: There IS freedom in unity!
+| --------------------------------------------------
+| When you can create a mandate that brings both UNITY and FREEDOM to
+| your community you know you made the correct choice! Tabs are both
+| unity and freedom at the same time because tabs UNIFY the code base
+| whist giving FREEDOM to view source in any indentation with WITHOUT
+| extra formatting required.
+| 
+| Source code must follow rules. And source code authors must follow
+| these rule. Anyone who claims that syntactical rules in a programming
+| language are evil because these rules "somehow" quell freedom is just
+| a complete nut job. Programming languages MUST have rules or
+| ambiguities will run a muck and bring the entire system crashing down.
+
+"Amuck" is one word you know...
+
+Anyway, plenty of systems have abiguities, many very deliberate. It is
+_good_ design in many cases to deliberately leave various things
+unspecified - it allows flexibility in implementation. Provided enough
+is specified to meet the use case one should often stop at that point.
+
+| Some would argue that allowing both tabs and spaces is freedom,
+| however this line of reasoning is flawed. Allowing a programmer to
+| format his code in way he pleases is bad, bad, bad. As a member of a
+| community we must all format our code in the same manner.
+
+This leads me to think you're just trolling.
+
+In a particular grouping of shared code I will adhere to the agreed upon
+style guides (almost always). But forcing _your_ style guide on all
+Python users? You can just f- off.
+
+| Would it be wise for folks to choose which side of the road to drive
+| on?
+
+Sure. But so much of the world chose the _wrong_ side. I drive on the
+left, as do all right thinking people.
+
+| Would it be wise for folks to choose which red lights to stop at (or
+| not stop at)?
+
+They do already.
+
+| Would it be wise to allow people to kill other people in the name of
+| freedom?
+
+I thought they did this, too.
+
+| If we continue along this flawed line of reasoning then one could
+| extrapolate just about any excuse for any action under the guise of
+| personal freedom. These people are selfish by nature and they don't
+| care about their own responsibilities to a greater community. They
+| exist only to please themselves. We (as a community) should not care
+| what they think until they decide to stop being selfish.
+| 
+| We should never create languages that cater to the selfish. Our rules
+| must take in consideration the "good of the many", and NEVER "the good
+| of the few". We should ALWAYS give our community freedoms; but only
+| the freedoms that foster unity! Tabs meet both criteria and as such
+| should be Pythons only token for indention formatting.
+
+It must be nice to always be right.
+
+In fact, I know it is, being so myself. You haven't yet reached that
+happy state.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Will you come quietly, or shall I use earplugs?
+-- 
+http://mail.python.org/mailman/listinfo/python-list

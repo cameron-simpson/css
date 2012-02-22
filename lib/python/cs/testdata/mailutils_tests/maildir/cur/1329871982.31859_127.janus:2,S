@@ -1,0 +1,62 @@
+Date: Fri, 9 Sep 2011 10:03:34 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Steven D'Aprano <steve+comp.lang.python@pearwood.info>
+Cc: python-list@python.org
+Subject: Re: killing a script
+Message-ID: <20110909000334.GA9300@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <4e5c6376$0$29983$c3e8da3$5496439d@news.astraweb.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+Content-Length: 2034
+
+On 30Aug2011 14:13, Steven D'Aprano <steve+comp.lang.python@pearwood.info> wrote:
+| On Tue, 30 Aug 2011 08:53 am Arnaud Delobelle wrote:
+| >> Yes, but if I am not mistaken, that will require me to put a line or
+| >> two after each os.system call. That's almost like whack-a-mole at the
+| >> code level rather than the Control-C level. OK, not a huge deal for
+| >> one script, but I was hoping for something simpler. I was hoping I
+| >> could put one line at the top of the script and be done with it.
+| > 
+| > Write a function!  That's what they're for after all :)
+| 
+| I'm not sure that this is actually as simple as that, especially using
+| os.system.
+| 
+| As I understand it, the scenario is this:
+| 
+| The main script looks something like this:
+| 
+| for x in whatever:
+|     os.system('something.py x')
+| 
+| Each time through the loop, a new Python process is started. Each process
+| runs in the foreground, capturing standard input, and so hitting Ctrl-C
+| kills *that* process, not the main script. Unless, by chance, the Ctrl-C
+| happens after the system call returns, but before the next one starts, it
+| is completely invisible to the parent process (the main script). Wrapping
+| os.system in a function does nothing to fix that.
+
+Presuming you're talking about UNIX, this is not correct.
+
+Ctrl-C at the terminal delivers SIGINT to _every_ process in the controlling
+process group for the terminal. It also has _nothing_ to do with the standard
+input.
+
+When you run a script, yea even a Python script, thus:
+
+  myscript ...
+
+then job control capable shells (all of them, these days) put the python
+process running "myscript" in its own process group as the leader
+(being, initially, the only process in the group). If myscript forks
+other processes, as happens in os.system(), they are _also_ in that
+process group. _ALL_ of them receive the SIGINT from your Ctrl-C.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+DRM: the functionality of refusing to function. - Richard Stallman

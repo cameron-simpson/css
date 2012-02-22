@@ -1,0 +1,43 @@
+Date: Mon, 7 Nov 2011 18:52:55 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Antoine Pitrou <solipsis@pitrou.net>
+Cc: python-ideas@python.org
+Subject: Re: raising an exception type doesn't instantiate it until it gets
+ caught
+Message-ID: <20111107075255.GA16482@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20111107040453.594180e6@pitrou.net>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+Content-Length: 1334
+
+On 07Nov2011 04:04, Antoine Pitrou <solipsis@pitrou.net> wrote:
+| On Mon, 7 Nov 2011 12:03:46 +1000
+| Nick Coghlan <ncoghlan@gmail.com> wrote:
+| > > I'm not sure that it's still that important -- in fact I'm not sure Python 3
+| > > still has this behavior.
+| > 
+| > I'm fairly sure it does (it was the 3.x version of ceval that I was
+| > reading to remind myself of how the stack unwinding process actually
+| > works and the call to PyErr_NormalizeException() is still in there).
+| > It's just that without the multiple argument forms of the raise
+| > statement, pure Python code can only exploit it for exceptions without
+| > any arguments (so it still works for the StopIteration optimisation).
+| 
+| It's too late for me to go and take a look, but I'm not sure it does.
+| Unless the performance loss is significant, I would be in favour of
+| simplifying all this and always instantiating exceptions. Exception
+| handling in the eval loop and exception "normalization" is a nasty area
+| of the interpreter.
+
+I presume StopIteration would get instantiated to a singleton, like
+NoneType to None? Just asking.
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Login incorrect.
+Only perfect spellers may
+enter this system.
+- Haiku Error Messages http://www.salonmagazine.com/21st/chal/1998/02/10chal2.html

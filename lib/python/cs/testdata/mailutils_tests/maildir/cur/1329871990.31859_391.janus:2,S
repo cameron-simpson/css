@@ -1,0 +1,33 @@
+Date: Tue, 30 Mar 2010 15:41:11 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Stephen Hansen <apt.shansen@gmail.invalid>
+Cc: python-list@python.org
+Subject: Re: GIF89A and PIL
+Message-ID: <20100330044111.GA684@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <2010032719445464825-aptshansen@gmailinvalid>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 885
+
+On 27Mar2010 19:44, Stephen Hansen <apt.shansen@gmail.invalid> wrote:
+| Yeah, I don't expect much from PNG. The images are very small but I
+| might be sending a LOT of them over a pipe which is fairly tight, so
+| 50-60 bytes matters. That's why I selected GIF.
+
+How well does a stream of XPM files compress? Probably not enough, I
+would guess. Just wondering.
+
+Do you need to move a "standard" image format around? If everything's
+16x16 8 bit colour (and if, with luck, they share a colour map) maybe
+you can ship raw bytes expressing what you want.
+
+How colourful are these GIFs?
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+What I want is Facts. Teach these boys and girls nothing but Facts.  Facts
+alone are wanted in life. Plant nothing else, and root out everything else.
+        - Charles Dickens    John Huffam   1812-1870  Hard Times [1854]

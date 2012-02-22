@@ -1,0 +1,63 @@
+Date: Tue, 21 Jun 2011 20:04:43 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Steven D'Aprano <steve+comp.lang.python@pearwood.info>
+Cc: python-list@python.org
+Subject: Re: break in a module
+Message-ID: <20110621100442.GA7089@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <4dfc2084$0$30002$c3e8da3$5496439d@news.astraweb.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 1689
+
+On 18Jun2011 03:50, Steven D'Aprano <steve+comp.lang.python@pearwood.info> wrote:
+| On Sat, 18 Jun 2011 12:36:42 +1000, Cameron Simpson wrote:
+| > Just to throw another approach into the mix (because I was thinking
+| > about the "finally" word), what about:
+| > 
+| >   raise StopImport
+| > 
+| > along the lines of generators' "raise StopIteration".
+| > 
+| > Then the import machinery can catch it, no new keyword is needed and no
+| > existing keyword needs feature creeping.
+| 
+| The only problem is that the importing module needs to catch it, or else 
+| you get a traceback. The importer shouldn't need to care what goes in 
+| inside the module.
+
+I was thinking the import mechanism itself would catch it, not the user
+of the "import" statement. Just as this:
+
+  for i in iterator:
+    ...
+
+quietly ceases the loop when the iterator raises StopIteration, the
+importer would consider a module that raised StopImport during the import
+to have finished its import successfully.
+
+So the caller does an:
+
+  import foo
+
+as normal, with no special wrapping. And the module goes:
+
+  spam()
+  if condition:
+    raise StopIteration
+  ham()
+  cheese()
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+In article <323C4DB9.6A76@ss1.csd.sc.edu>, lhartley@ss1.csd.sc.edu wrote:
+| It still is true that the best touring bike is the one that you are
+| riding right now.  Anything can be used for touring.  As long as you
+| can travel, you are touring.
+I beleive such true and profound statements are NOT allowed to be posted
+in this newsgroup, and are also against the charter.  You've been warned.
+        - Randy Davis DoD #0013 <randy@agames.com> in rec.moto

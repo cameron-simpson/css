@@ -1,0 +1,161 @@
+Return-Path: <python-list-bounces+cs=zip.com.au@python.org>
+Delivered-To: unknown
+Received: from mail.zip.com.au (125.255.95.3) by janus.home with POP3-SSL; 01
+  Sep 2011 22:47:02 -0000
+Delivered-To: cs@zipworld.com.au
+Received: from mailin2.pacific.net.au (mailin2.pacific.net.au [61.8.0.81])
+	by mailstore1.syd.pacific.net.au (Postfix) with ESMTP id EC489A3011
+	for <cs@zipworld.com.au>; Fri,  2 Sep 2011 08:46:08 +1000 (EST)
+Received: from mail.python.org (unknown [82.94.164.166])
+	by mailin2.pacific.net.au (Postfix) with ESMTP id 4E3F019C15E
+	for <cs@zip.com.au>; Fri,  2 Sep 2011 08:46:08 +1000 (EST)
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3RqdwX1vd9zN1n
+	for <cs@zip.com.au>; Fri,  2 Sep 2011 00:46:04 +0200 (CEST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=python.org; s=200901;
+	t=1314917164; bh=7+WzlgFl84g2kbKTAU/iIQ9v5VXuRdWyC5Iz6rxsdsM=;
+	h=Date:From:To:Subject:Message-ID:MIME-Version:In-Reply-To:
+	 References:Cc:List-Id:List-Unsubscribe:List-Archive:List-Post:
+	 List-Help:List-Subscribe:Content-Type:Content-Transfer-Encoding:
+	 Sender;
+	b=RztMCOsRbBlESJvzsyRTLKS3Z3gqKYDU3fK9dxWjiaq8FnW9UjIr2kC8R+vdBwA56
+	 RDj2q8gEH73gQi+uHxsj+qCD/wXT34Oje0l6PgUgcfXuztLW+4XnA2iWDexlawi8kQ
+	 LQ6gKzgE8aVqw0qvh6k1GuW7Nys/QidjkT2ARBQ4=
+X-Original-To: python-list@python.org
+Delivered-To: python-list@mail.python.org
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3RqdsJ1HmCzN8d
+	for <python-list@python.org>; Fri,  2 Sep 2011 00:43:16 +0200 (CEST)
+X-Spam-Status: OK 0.000
+X-Spam-Evidence: '*H*': 1.00; '*S*': 0.00; 'python,': 0.01; 'python.':
+	0.04; 'concurrent': 0.04; 'thread,': 0.04; 'cpython': 0.05;
+	'distinct': 0.05; 'subject:Python': 0.06; 'received:edu.au': 0.07;
+	'space.': 0.07; 'python': 0.08; 'executes': 0.09; 'ids': 0.09;
+	'mapped': 0.09; 'cores': 0.16; 'from:addr:cs': 0.16;
+	'from:addr:zip.com.au': 0.16; 'from:name:cameron simpson': 0.16;
+	'iirc': 0.16; 'jython': 0.16; 'message-id:@cskk.homeip.net': 0.16;
+	'received:202.125.174': 0.16; 'received:202.125.174.133': 0.16;
+	'received:boardofstudies.nsw.edu.au': 0.16;
+	'received:cskk.homeip.net': 0.16;
+	'received:harvey.boardofstudies.nsw.edu.au': 0.16;
+	'received:homeip.net': 0.16; 'received:nsw.edu.au': 0.16;
+	'systems)': 0.16; 'threading': 0.16; 'cc:addr:python-list': 0.16;
+	'wrote:': 0.16; 'language': 0.17; 'cheers,': 0.18; 'shipped':
+	0.18; 'java,': 0.19; 'cc:no real name:2**0': 0.20; 'java': 0.21;
+	"doesn't": 0.22; 'cc:2**0': 0.22; 'header:In-Reply-To:1': 0.22;
+	'(on': 0.23; 'mix': 0.23; 'somehow': 0.23; 'pm,': 0.24; 'suspect':
+	0.24; 'expect': 0.25; 'code': 0.25; 'creating': 0.25; 'code.':
+	0.26; 'windows': 0.26; 'seeing': 0.28; 'separate': 0.28; 'tend':
+	0.28; 'cc:addr:python.org': 0.30; 'module': 0.30; 'confused':
+	0.30; 'hansen': 0.30; 'letting': 0.30; 'signals': 0.30; 'threads':
+	0.30; 'threads.': 0.30; 'error': 0.32; 'actual': 0.32; 'comment':
+	0.32; "isn't": 0.33; 'it.': 0.33; 'actually': 0.33; "can't": 0.33;
+	'...': 0.34; 'header:User-Agent:1': 0.34; 'but,': 0.34; 'fault':
+	0.34; 'charset:us-ascii': 0.36; 'received:au': 0.36; 'created':
+	0.36; 'are.': 0.37; 'mechanisms': 0.37; 'thread': 0.37; 'listed':
+	0.37; 'model': 0.37; 'using': 0.37; 'but': 0.37; 'think': 0.38;
+	'george': 0.38; 'some': 0.38; 'subject:: ': 0.39; 'expensive':
+	0.39; 'word,': 0.39; 'why': 0.39; "i'd": 0.40; 'where': 0.40;
+	'more': 0.60; 'address': 0.61; 'ever': 0.65; 'share': 0.65;
+	'received:202': 0.66; 'offer.': 0.66; 'show': 0.67; 'cameron':
+	0.67; 'offer': 0.72; 'offering': 0.75; 'advantages': 0.77; '"all':
+	0.84; 'displayed.': 0.84; 'lightweight': 0.84; 'ps.': 0.84;
+	'scheduling,': 0.84; 'mistaken': 0.91
+Received: from localhost (HELO mail.python.org) (127.0.0.1)
+	by albatross.python.org with SMTP; 02 Sep 2011 00:43:16 +0200
+Received: from harvey.boardofstudies.nsw.edu.au
+	(mail2.rack1.boardofstudies.nsw.edu.au [202.125.174.133])
+	by mail.python.org (Postfix) with ESMTP
+	for <python-list@python.org>; Fri,  2 Sep 2011 00:43:15 +0200 (CEST)
+Received: from cskk.homeip.net (localhost.localdomain [127.0.0.1])
+	by harvey.boardofstudies.nsw.edu.au (Postfix) with ESMTP id BB8C74D3B56;
+	Fri,  2 Sep 2011 08:43:01 +1000 (EST)
+Received: by janus.cskk.homeip.net (Postfix, from userid 1000)
+	id 9FB50100419B7; Fri,  2 Sep 2011 08:43:01 +1000 (EST)
+Date: Fri, 2 Sep 2011 08:43:01 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Stephen Hansen <me+list/python@ixokai.io>
+Subject: Re: Threads in Python
+Message-ID: <20110901224301.GA8878@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <4E6006D4.9080106@ixokai.io>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+References: <4E6006D4.9080106@ixokai.io>
+Cc: python-list@python.org
+X-BeenThere: python-list@python.org
+X-Mailman-Version: 2.1.12
+Precedence: list
+List-Id: General discussion list for the Python programming language
+	<python-list.python.org>
+List-Unsubscribe: <http://mail.python.org/mailman/options/python-list>,
+	<mailto:python-list-request@python.org?subject=unsubscribe>
+List-Archive: <http://mail.python.org/pipermail/python-list>
+List-Post: <mailto:python-list@python.org>
+List-Help: <mailto:python-list-request@python.org?subject=help>
+List-Subscribe: <http://mail.python.org/mailman/listinfo/python-list>,
+	<mailto:python-list-request@python.org?subject=subscribe>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Sender: python-list-bounces+cs=zip.com.au@python.org
+Errors-To: python-list-bounces+cs=zip.com.au@python.org
+X-Cats2Procmailrc-Rule: cats/home: python  python-list     sender:python-list-bounces+cs=zip.com.au@python.org
+X-Label: python-list
+Content-Length: 2375
+
+On 01Sep2011 15:27, Stephen Hansen <me+list/python@ixokai.io> wrote:
+| On 9/1/11 2:45 PM, George Kovoor wrote:
+| > Why doesn't python threads show an associated PID?  On spawning python
+| > threads using the threading module I can only see the main thread's pid on
+| > using top or ps unix command, no  subprocesses are displayed. In otherwords
+| > top or ps in not aware of any subprocesses created using threading module in
+| > python.
+| >
+| > Whereas in Java , creating threads will result in separate pid , these
+| > subprocesses can be listed using top or ps. Java threads get mapped to the
+| > cores in the system.
+| 
+| I think you're confused about what threads and subprocesses are. They
+| are completely different mechanisms for concurrent code. Threads never
+| show up on top or ps, in any language ... or the language isn't offering
+| threads. I don't know Java, so I can't really comment on it much, but it
+| may be misusing the 'thread' word, but I somehow doubt it. I suspect
+| you're just mistaken about what Java is offering.
+
+No, you're mistaken about the threading models on offer.
+
+Some systems offer a threading model where threads can have distinct
+process ids; the only real criterion is that they share the same address
+space.
+
+The advantages of separate process ids for threads include letting
+the OS arrange their scheduling, delivery of signals (on UNIX systems)
+to a particular thread, ability to use multiple cores. On the flipside,
+threads with distinct process ids tend to be more expensive to set up
+and may be more expensive in thread switching.
+
+Java has long shipped with multiple threading implementations; IIRC
+"green threads" is an "all in one process id" model that can be used on
+any platform.
+
+Some use a mix of heavyweight (threads with distinct pids) and
+lightweight threads.
+
+| But, in Python, only one thread actually ever executes actual Python
+| code at any given time.
+
+In CPython this is true. Other implementations like Jython can use
+other threading models; I'd expect Jython to take a lot of advantage of
+Java's native threads.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Seeing my great fault
+Through darkening blue windows
+I begin again
+- Haiku Error Messages http://www.salonmagazine.com/21st/chal/1998/02/10chal2.html
+-- 
+http://mail.python.org/mailman/listinfo/python-list

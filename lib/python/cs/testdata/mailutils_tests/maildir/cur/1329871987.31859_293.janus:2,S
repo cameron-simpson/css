@@ -1,0 +1,48 @@
+Date: Wed, 11 Aug 2010 13:16:01 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: "Steven W. Orr" <steveo@syslang.net>
+Cc: python-list@python.org
+Subject: Re: How to capture all the environment variables from shell?
+Message-ID: <20100811031601.GA4188@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <20100811030859.GA2279@cskk.homeip.net>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 1435
+
+On 11Aug2010 13:08, I wrote:
+| On 10Aug2010 10:07, Steven W. Orr <steveo@syslang.net> wrote:
+[...]
+| | After that, and again, be aware that the .bashrc alone is executed for login
+| | shells *which are not interactive*. for example:
+| | 
+| | ssh somemachine 'echo Hello'
+| | 
+| | This command will *not*  go through the .bash_profile but it will go through the
+| | .bashrc.
+| 
+| No, only interactive shells use the .bashrc.
+
+And then I read more closely and saw this in "man bash":
+
+  Bash attempts to determine when it is being run  by  the  remote shell
+  daemon,  usually  rshd.  If bash determines it is being run by rshd,
+  it reads and executes commands from ~/.bashrc, if that file exists and
+  is readable.  It will not do this if invoked as sh.  The --norc option
+  may be used to inhibit this behavior, and the --rcfile option may  be
+  used to  force  another  file to be read, but rshd does not generally
+  invoke the shell with those options or allow them to be specified.
+
+Frankly, bash's startup behaviour is so corrupt (well, capricious anway)
+that I despair of it; I use zsh when possible. It also tries to be all
+things to all people, but is a bit saner. (And it doesn't hardwire ^W
+either!)
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+To be positive: To be mistaken at the top of one's voice.
+Ambrose Bierce (1842-1914), U.S. author. The Devil's Dictionary (1881-1906).

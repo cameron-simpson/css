@@ -1,0 +1,80 @@
+Date: Wed, 17 Jun 2009 11:27:19 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Greg Ewing <greg.ewing@canterbury.ac.nz>
+Cc: python-dev@python.org
+Subject: Re: io.BufferedReader.peek() Behaviour in python3.1
+Message-ID: <20090617012719.GA19974@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <4A3822DE.2040503@canterbury.ac.nz>
+User-Agent: Mutt/1.5.19 (2009-01-05)
+Content-Length: 2918
+
+On 17Jun2009 10:55, Greg Ewing <greg.ewing@canterbury.ac.nz> wrote:
+> Cameron Simpson wrote:
+>> I normally avoid
+>> non-blocking requirements by using threads, so that the thread gathering
+>> from the stream can block.
+>
+> If you have a thread dedicated to reading from that
+> stream, then I don't see why you need to peek into
+> the buffer. Just have it loop reading a packet at a
+> time and put each completed packet in the queue.
+> If several packets arrive at once, it'll loop around
+> that many times before blocking.
+
+Yes, this is true. But people not using threads, or at any rate not
+dedicating a thread to the reading task, don't have such luxury.
+
+Are we disputing the utility of being able to ask "how much might I
+read/peek without blocking"? Or disputing the purpose of peek, which
+feels to me like it should/might ask that question, but doesn't.
+
+[...]
+>> My itch is that peek() _feels_ like it should be "look into the buffer"
+>> but actually can block and/or change the buffer.
+>
+> My problem with the idea of looking into the buffer
+> is that it crosses levels of abstraction. A buffered
+> stream is supposed to behave the same way as a
+> deterministic non-buffered stream, with the buffer
+> being an internal optimisation detail that doesn't
+> exist as far as the outside world is concerned.
+>
+> Sometimes it's pragmatic to break the abstraction,
+> but it should be made very obvious when you're doing
+> that. So I'd prefer something like peek_buffer() to
+> make it perfectly clear what's being done.
+>
+> Anything else such as peek() that doesn't explicitly
+> mention the buffer should fit into the abstraction
+> properly.
+
+It's perfectly possible, even reasonable, to avoid talking about the
+buffer at all. I'd be happy not to mention the buffer.
+
+For example, one can readily imagine the buffered stream being capable
+of querying its input raw stream if there's "available now" data.
+
+The raw stream can sometimes know if a read of a given size would
+block, or be able to ask what size read will not block. As a concrete
+example, the UNIX FIONREAD ioctl can generally query a file descriptor
+for instantly-available  data (== in the OS buffer).  I've also used
+UNIXen where your can fstat() a pipe and use the st_size field to test
+for available unread data in the pipe buffer. Raw streams which can't
+do that would return 0 (== can't guarentee any non-blocking data) unless
+the stream itself also had a buffer of its own and it wasn't empty.
+
+So I would _want_ the spec for available_data() (new lousy name) to talk
+about "data available without blocking", allowing the implementation to
+use data in the IO buffer and/or to query the raw stream, etc.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+For those who understand, NO explanation is needed,
+for those who don't understand, NO explanation will be given!
+        - Davey D <decoster@vnet.ibm.com>

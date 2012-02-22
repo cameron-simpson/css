@@ -1,0 +1,118 @@
+Return-Path: <python-ideas-bounces+cs=zip.com.au@python.org>
+Delivered-To: unknown
+Received: from mail.zip.com.au (125.255.95.3) by janus.home with POP3-SSL; 30
+  Dec 2010 06:01:02 -0000
+Delivered-To: cs@zipworld.com.au
+Received: from mailin2.pacific.net.au (mailin2.pacific.net.au [61.8.0.81])
+	by mailstore2.syd.pacific.net.au (Postfix) with ESMTP id 763A13961
+	for <cs@zipworld.com.au>; Thu, 30 Dec 2010 16:59:34 +1100 (EST)
+Received: from mail.python.org (unknown [82.94.164.166])
+	by mailin2.pacific.net.au (Postfix) with ESMTP id CE94F19C16A
+	for <cs@zip.com.au>; Thu, 30 Dec 2010 16:59:33 +1100 (EST)
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 4AED4EEB25
+	for <cs@zip.com.au>; Thu, 30 Dec 2010 06:59:32 +0100 (CET)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=python.org; s=200901;
+	t=1293688772; bh=5iBa1ZHjfKiQccwdyOHo4EHkQHs0NuelnPfBiwA6xeY=;
+	h=Date:From:To:Message-ID:MIME-Version:In-Reply-To:References:Cc:
+	 Subject:List-Id:List-Unsubscribe:List-Archive:List-Post:List-Help:
+	 List-Subscribe:Content-Type:Content-Transfer-Encoding:Sender;
+	b=hvyrbMc6t7/dsxqzr7+2VfE4p2w4uSOpsbgP2+vXKmbLUwimbyqHfRDZy538M9bbM
+	 SCFSC7bz8QmL3WfEKKwAg4sF2eqPQHC9TZPOCdmt7c79YmdmhNs8i/18PAxZOpiiR1
+	 JxQ+9CrapWRT6DUeMkWZftmwvZ5XXSWs7ZViV0pc=
+X-Original-To: python-ideas@python.org
+Delivered-To: python-ideas@mail.python.org
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 1DCA7EE9C3
+	for <python-ideas@python.org>; Thu, 30 Dec 2010 06:59:00 +0100 (CET)
+X-Spam-Status: OK 0.000
+X-Spam-Evidence: '*H*': 1.00; '*S*': 0.00; 'debug': 0.03; 'wed,':
+	0.05; 'prints': 0.07; 'semantic': 0.07; 'output': 0.10; 'dec':
+	0.12; 'am,': 0.13; 'debugging': 0.13; 'wrote:': 0.14;
+	'subject:python': 0.15; 'definition,': 0.16; 'expression,': 0.16;
+	'from:addr:cs': 0.16; 'from:addr:zip.com.au': 0.16;
+	'from:name:cameron simpson': 0.16; 'message-id:@cskk.homeip.net':
+	0.16; 'received:202.125.174': 0.16; 'received:202.125.174.133':
+	0.16; 'received:boardofstudies.nsw.edu.au': 0.16;
+	'received:cskk.homeip.net': 0.16;
+	'received:harvey.boardofstudies.nsw.edu.au': 0.16;
+	'received:homeip.net': 0.16; 'received:nsw.edu.au': 0.16;
+	'shell:': 0.16; 'subject:result': 0.16; 'cheers,': 0.17;
+	'received:edu.au': 0.23; 'header:In-Reply-To:1': 0.23;
+	'possible,': 0.24; 'no,': 0.25; 'code': 0.25; 'not.': 0.25;
+	'paul': 0.27; 'changing': 0.29; 'fred': 0.30;
+	'cc:addr:python.org': 0.30; 'cc:addr:gmail.com': 0.32; 'fairly':
+	0.32; 'it.': 0.32; 'option': 0.33; 'enough': 0.33; 'does': 0.33;
+	'header:User-Agent:1': 0.34; 'brian': 0.35; 'but': 0.36; 'charset
+	:us-ascii': 0.37; 'change.': 0.37; 'cc:2**1': 0.38; 'subject:: ':
+	0.39; 'moore': 0.67; 'lucky': 0.67; 'subject:should': 0.84
+Received: from localhost (HELO mail.python.org) (127.0.0.1)
+	by albatross.python.org with SMTP; 30 Dec 2010 06:59:00 +0100
+Received: from harvey.boardofstudies.nsw.edu.au
+	(mail2.rack1.boardofstudies.nsw.edu.au [202.125.174.133])
+	by mail.python.org (Postfix) with ESMTP
+	for <python-ideas@python.org>; Thu, 30 Dec 2010 06:58:59 +0100 (CET)
+Received: from cskk.homeip.net (localhost.localdomain [127.0.0.1])
+	by harvey.boardofstudies.nsw.edu.au (Postfix) with ESMTP id B63684D3B54;
+	Thu, 30 Dec 2010 16:53:32 +1100 (EST)
+Received: by janus.cskk.homeip.net (Postfix, from userid 1000)
+	id 92C6F100419B7; Thu, 30 Dec 2010 16:53:32 +1100 (EST)
+Date: Thu, 30 Dec 2010 16:53:32 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Fred Drake <fdrake@acm.org>
+Message-ID: <20101230055332.GA31585@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <AANLkTikbqiXMiVO=gQ4SE-gN3EVDHDwBknsq+apwkA9C@mail.gmail.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+References: <AANLkTikbqiXMiVO=gQ4SE-gN3EVDHDwBknsq+apwkA9C@mail.gmail.com>
+Cc: Python-Ideas <python-ideas@python.org>
+Subject: Re: python -c "..." should output result like the
+	interpreter
+X-BeenThere: python-ideas@python.org
+X-Mailman-Version: 2.1.12
+Precedence: list
+List-Id: Discussions of speculative Python language ideas
+	<python-ideas.python.org>
+List-Unsubscribe: <http://mail.python.org/mailman/options/python-ideas>,
+	<mailto:python-ideas-request@python.org?subject=unsubscribe>
+List-Archive: <http://mail.python.org/pipermail/python-ideas>
+List-Post: <mailto:python-ideas@python.org>
+List-Help: <mailto:python-ideas-request@python.org?subject=help>
+List-Subscribe: <http://mail.python.org/mailman/listinfo/python-ideas>,
+	<mailto:python-ideas-request@python.org?subject=subscribe>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Sender: python-ideas-bounces+cs=zip.com.au@python.org
+Errors-To: python-ideas-bounces+cs=zip.com.au@python.org
+X-Cats2Procmailrc-Rule: cats/home: python  python-ideas    sender:python-ideas-bounces+cs=zip.com.au@python.org
+X-Label: python-ideas
+Content-Length: 920
+
+On 29Dec2010 10:27, Fred Drake <fdrake@acm.org> wrote:
+| On Wed, Dec 29, 2010 at 9:40 AM, Paul Moore <p.f.moore@gmail.com> wrote:
+| > I like the idea, but that's a fairly big semantic change. What about
+| > adding an -e option that takes an expression, and prints its value?
+| 
+| +1
+| 
+| Changing -c would be unacceptable.
+
+Likewise.
+
+My -1 on having -c output the final value is as for the shell:
+does "sh -c sh-cmd" have an implied echo? No, and lucky we are that it
+does not.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Debugging is twice as hard as writing the code in the first place.
+Therefore, if you write the code as cleverly as possible, you are,
+by definition, not smart enough to debug it. - Brian W. Kernighan
+_______________________________________________
+Python-ideas mailing list
+Python-ideas@python.org
+http://mail.python.org/mailman/listinfo/python-ideas

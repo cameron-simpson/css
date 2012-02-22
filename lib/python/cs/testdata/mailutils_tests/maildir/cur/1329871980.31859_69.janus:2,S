@@ -1,0 +1,135 @@
+Return-Path: <python-list-bounces+cs=zip.com.au@python.org>
+Delivered-To: unknown
+Received: from mail.zip.com.au (125.255.95.3) by janus.home with POP3-SSL; 23
+  Dec 2011 01:33:02 -0000
+Delivered-To: cs@zipworld.com.au
+Received: from mailin4-syd3.pacific.net.au (mailin4-syd3.pacific.net.au [125.255.92.145])
+	by mailstore1.syd.pacific.net.au (Postfix) with ESMTP id 5AF674048
+	for <cs@zipworld.com.au>; Fri, 23 Dec 2011 12:32:28 +1100 (EST)
+Received: from mail.python.org (unknown [82.94.164.166])
+	by mailin4-syd3.pacific.net.au (Postfix) with ESMTP id AB9814D80A3
+	for <cs@zip.com.au>; Fri, 23 Dec 2011 12:32:14 +1100 (EST)
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3T8XJY1W2ZzPjF
+	for <cs@zip.com.au>; Fri, 23 Dec 2011 02:32:13 +0100 (CET)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=python.org; s=200901;
+	t=1324603933; bh=pHNrQs8HHhI0nhYCZ+wKB7mR12dVBDqoOYPmas5Dd7I=;
+	h=Date:From:To:Subject:Message-ID:MIME-Version:In-Reply-To:
+	 References:Cc:List-Id:List-Unsubscribe:List-Archive:List-Post:
+	 List-Help:List-Subscribe:Content-Type:Content-Transfer-Encoding:
+	 Sender;
+	b=PLEq1mo0X9U4BK6DPLn7cj1sJtMLpFOJYsgXPRIdojZa7sYsgGRGXZdKu0dCwNviH
+	 iJLWGFKp9WTJESMSlFqbkDdfkWAjLIvxvmvGKdoH+pEsXC4FtrKJYpUh48ZnwLC/GI
+	 LrMC3j+VQFOlt9wpM+TNQj6r1RZY2AUhk0ywi0zs=
+X-Original-To: python-list@python.org
+Delivered-To: python-list@mail.python.org
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3T8XFL1rXSzPjL
+	for <python-list@python.org>; Fri, 23 Dec 2011 02:29:26 +0100 (CET)
+X-Spam-Status: OK 0.000
+X-Spam-Evidence: '*H*': 1.00; '*S*': 0.00; 'mrab': 0.04; 'sorts':
+	0.04; 'string.': 0.04; 'received:edu.au': 0.07; 'terminated':
+	0.07; 'python': 0.08; 'relies': 0.09; 'output': 0.10; 'am,': 0.12;
+	'from:addr:cs': 0.16; 'from:addr:zip.com.au': 0.16;
+	'from:name:cameron simpson': 0.16; 'guess...': 0.16; 'message-
+	id:@cskk.homeip.net': 0.16; 'read()': 0.16;
+	'received:202.125.174': 0.16; 'received:202.125.174.133': 0.16;
+	'received:boardofstudies.nsw.edu.au': 0.16;
+	'received:cskk.homeip.net': 0.16;
+	'received:harvey.boardofstudies.nsw.edu.au': 0.16;
+	'received:homeip.net': 0.16; 'received:nsw.edu.au': 0.16; 'cc:addr
+	:python-list': 0.16; 'this:': 0.16; 'wrote:': 0.18; 'bytes': 0.18;
+	'cc:no real name:2**0': 0.20; 'cheers,': 0.20; 'suggest': 0.20;
+	'header:In-Reply-To:1': 0.22; 'cc:2**0': 0.24; 'command': 0.24;
+	'byte': 0.24; 'timely': 0.25; 'module': 0.26; 'function': 0.27;
+	'gather': 0.29; 'cc:addr:python.org': 0.29; 'url:wiki': 0.29;
+	'lines': 0.30; 'joined': 0.32; 'header:User-Agent:1': 0.33;
+	'named': 0.33; 'file.': 0.34; 'parse': 0.34; 'received:au': 0.36;
+	'charset:us-ascii': 0.37; 'skip:" 10': 0.37; 'but': 0.37;
+	"there's": 0.37; 'using': 0.38; 'purposes': 0.38; 'some': 0.38;
+	'url:org': 0.39; "it's": 0.40; 'third': 0.40; 'your': 0.61;
+	'life': 0.64; 'kindly': 0.65; 'manner': 0.65; 'received:202':
+	0.66; 'cameron': 0.73; 'alternative.': 0.84
+Received: from localhost (HELO mail.python.org) (127.0.0.1)
+	by albatross.python.org with SMTP; 23 Dec 2011 02:29:26 +0100
+Received: from harvey.boardofstudies.nsw.edu.au
+	(mail2.rack1.boardofstudies.nsw.edu.au [202.125.174.133])
+	by mail.python.org (Postfix) with ESMTP
+	for <python-list@python.org>; Fri, 23 Dec 2011 02:29:25 +0100 (CET)
+Received: from cskk.homeip.net (localhost.localdomain [127.0.0.1])
+	by harvey.boardofstudies.nsw.edu.au (Postfix) with ESMTP id 523694D3B56;
+	Fri, 23 Dec 2011 12:21:40 +1100 (EST)
+Received: by janus.cskk.homeip.net (Postfix, from userid 1000)
+	id 3D554100419B7; Fri, 23 Dec 2011 12:21:40 +1100 (EST)
+Date: Fri, 23 Dec 2011 12:21:40 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: Mac Smith <macsmith.us@gmail.com>
+Subject: Re: reading multiline output
+Message-ID: <20111223012140.GA29153@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <FFB26576-7928-4E01-8D56-26071FDB39CE@gmail.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+References: <FFB26576-7928-4E01-8D56-26071FDB39CE@gmail.com>
+Cc: python-list@python.org
+X-BeenThere: python-list@python.org
+X-Mailman-Version: 2.1.12
+Precedence: list
+List-Id: General discussion list for the Python programming language
+	<python-list.python.org>
+List-Unsubscribe: <http://mail.python.org/mailman/options/python-list>,
+	<mailto:python-list-request@python.org?subject=unsubscribe>
+List-Archive: <http://mail.python.org/pipermail/python-list>
+List-Post: <mailto:python-list@python.org>
+List-Help: <mailto:python-list-request@python.org?subject=help>
+List-Subscribe: <http://mail.python.org/mailman/listinfo/python-list>,
+	<mailto:python-list-request@python.org?subject=subscribe>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Sender: python-list-bounces+cs=zip.com.au@python.org
+Errors-To: python-list-bounces+cs=zip.com.au@python.org
+X-Cats2Procmailrc-Rule: cats/home: python  python-list     sender:python-list-bounces+cs=zip.com.au@python.org
+X-Label: python-list
+Content-Length: 1726
+
+On 23Dec2011 06:37, Mac Smith <macsmith.us@gmail.com> wrote:
+| On 23-Dec-2011, at 6:17 AM, MRAB wrote:
+| > On 23/12/2011 00:33, Mac Smith wrote:
+| >> I have started HandBrakeCLI using subprocess.popen but the output is
+| >> multiline and not terminated with \n so i am not able to read it
+| >> using readline() while the HandBrakeCLI is running. kindly suggest
+| >> some alternative. i have attached the output in a file.
+| >> 
+| > The lines are terminated with \r, so read with read() and then split on
+| > "\r".
+| 
+| read() will read the complete output and than i will be able to parse
+| it, i want to read the output of the command in realtime.
+
+You can read a limited number of bytes - for your purposes this needs to
+be 1 byte at a time. Very inefficient, but you can do what you need.
+Write a little function that gathers single bytes until "\r" and then
+returns them joined into a string.
+
+Traditionally the way to work with "interactive" facilities like this is
+often the "expect" command, and I gather there's a third party Python
+module named "pexpect" with that functionality. This:
+  http://www.noah.org/wiki/pexpect
+
+And then there's all sorts of read-with-timeout games you can play I
+guess...
+
+Note that all this relies on HandBrakeCLI emitting its progress messages
+in a timely (== unbuffered) manner when its output is a pipe...
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+It's better to be DoD and cool, than to get a life and be uncool!
+        - _Harley Davidson & The Marlboro Man_
+          (slightly paraphrased by Roar Larsen, DoD#463
+                                   <Roar.Larsen@termo.unit.no>)
+-- 
+http://mail.python.org/mailman/listinfo/python-list

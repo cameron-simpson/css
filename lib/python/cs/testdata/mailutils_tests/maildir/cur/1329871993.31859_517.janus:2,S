@@ -1,0 +1,59 @@
+Date: Thu, 12 Mar 2009 08:43:44 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: python-dev@python.org
+Subject: Re: Ext4 data loss
+Message-ID: <20090311214344.GA28718@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=us-ascii
+Content-Disposition: inline
+In-Reply-To: <49B77FD7.8030807@online.de>
+User-Agent: Mutt/1.5.18 (2008-05-17)
+Content-Length: 2195
+
+On 11Mar2009 10:09, Joachim K?nig <him@online.de> wrote:
+> Guido van Rossum wrote:
+>> On Tue, Mar 10, 2009 at 1:11 PM, Christian Heimes <lists@cheimes.de> wrote:
+>>> [...]
+>>> https://bugs.edge.launchpad.net/ubuntu/+source/linux/+bug/317781/comments/54.
+>>> [...]
+>> If I understand the post properly, it's up to the app to call fsync(),
+>> and it's only necessary when you're doing one of the rename dances, or
+>> updating a file in place. Basically, as he explains, fsync() is a very
+>> heavyweight operation; I'm against calling it by default anywhere.
+>>   
+> To me, the flaw seem to be in the close() call (of the operating  
+> system). I'd expect the data to be
+> in a persistent state once the close() returns. So there would be no  
+> need to fsync if the file gets closed anyway.
+
+Not really. On the whole, flush() means "the object has handed all data
+to the OS".  close() means "the object has handed all data to the OS
+and released the control data structures" (OS file descriptor release;
+like the OS, the python interpreter may release python stuff later too).
+
+By contrast, fsync() means "the OS has handed filesystem changes to the
+disc itself". Really really slow, by comparison with memory. It is Very
+Expensive, and a very different operation to close().
+
+[...snip...]
+> Why has this ext4 problem not come up for other filesystems?
+
+The same problems exist for all disc based filesystems to a greater of
+lesser degree; the OS always does some buffering and therefore there
+is a gap between what the OS has accepted from you (and thus made
+visible to other apps using the OS) and the physical data structures
+on disc. Ext2/3/4 tend to do whole disc sync when just asked to fsync,
+probably because it really is only feasible to say "get to a particular
+checkpoint in the journal". Many other filesystems will have similar
+degrees of granularity, perhaps not all.
+
+Anyway, fsync is a much bigger ask than close, and should be used very
+sparingly.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+If I repent anything, it is very likely to be my good behavior.
+    What demon possessed me that I behaved so well?     - Henry David Thoreau

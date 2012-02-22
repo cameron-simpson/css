@@ -1,0 +1,134 @@
+Return-Path: <python-list-bounces+cs=zip.com.au@python.org>
+Delivered-To: unknown
+Received: from mail.zip.com.au (125.255.95.3) by janus.home with POP3-SSL; 10
+  Sep 2011 23:55:02 -0000
+Delivered-To: cs@zipworld.com.au
+Received: from mailin4-syd3.pacific.net.au (mailin4-syd3.pacific.net.au [125.255.92.145])
+	by mailstore1.syd.pacific.net.au (Postfix) with ESMTP id 5F2AB94986
+	for <cs@zipworld.com.au>; Sun, 11 Sep 2011 09:53:35 +1000 (EST)
+Received: from mail.python.org (unknown [82.94.164.166])
+	by mailin4-syd3.pacific.net.au (Postfix) with ESMTP id AD95A4D80CD
+	for <cs@zip.com.au>; Sun, 11 Sep 2011 09:53:34 +1000 (EST)
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3RxC0F2FNwzNlh
+	for <cs@zip.com.au>; Sun, 11 Sep 2011 01:53:33 +0200 (CEST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=python.org; s=200901;
+	t=1315698813; bh=wGpOCWPUP/HxOuv61qY3YMDQQ71zmQ3KUb9qE7f4/Tc=;
+	h=Date:From:To:Subject:Message-ID:MIME-Version:In-Reply-To:
+	 References:Cc:List-Id:List-Unsubscribe:List-Archive:List-Post:
+	 List-Help:List-Subscribe:Content-Type:Content-Transfer-Encoding:
+	 Sender;
+	b=Ly4Xs5MsqCwgW9yGm9B57WXEjLagLdsaUG+jK6xYdpkVfkC4qqmixSMLX0kQnKO3w
+	 Pk2Hnj8Wf8Xrn/+h/GIOB5IqtCC5hy0ggyG0EUEqEgYS4teKpF+FOtAe+nujIPeEdf
+	 bc8kqF8IhGsstLKRCcjF8EkpI+ZF77ff8BA18qiA=
+X-Original-To: python-list@python.org
+Delivered-To: python-list@mail.python.org
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3RxBx56nknzNWp
+	for <python-list@python.org>; Sun, 11 Sep 2011 01:50:49 +0200 (CEST)
+X-Spam-Status: OK 0.001
+X-Spam-Evidence: '*H*': 1.00; '*S*': 0.00; 'received:edu.au': 0.07;
+	'*is*': 0.09; 'either.': 0.09; 'oh,': 0.09; 'subject:python':
+	0.11; 'library': 0.15; 'carefully.': 0.16; 'caution:': 0.16;
+	'chdir': 0.16; 'from:addr:cs': 0.16; 'from:addr:zip.com.au': 0.16;
+	'from:name:cameron simpson': 0.16; 'handed': 0.16; 'message-
+	id:@cskk.homeip.net': 0.16; 'pathname': 0.16;
+	'received:202.125.174': 0.16; 'received:202.125.174.133': 0.16;
+	'received:boardofstudies.nsw.edu.au': 0.16;
+	'received:cskk.homeip.net': 0.16;
+	'received:harvey.boardofstudies.nsw.edu.au': 0.16;
+	'received:homeip.net': 0.16; 'received:nsw.edu.au': 0.16;
+	'subject:command': 0.16; 'cc:addr:python-list': 0.16; 'wrote:':
+	0.16; "wouldn't": 0.17; 'cheers,': 0.18; 'cc:no real name:2**0':
+	0.20; 'seems': 0.20; "doesn't": 0.22; 'cc:2**0': 0.22; 'header:In-
+	Reply-To:1': 0.22; 'structure': 0.23; 'assumes': 0.23; 'happen.':
+	0.23; 'implicit': 0.23; 'sep': 0.23; 'command': 0.24; 'sat,':
+	0.28; 'pass': 0.29; 'cc:addr:python.org': 0.30; 'logic': 0.30;
+	'changes': 0.31; 'least': 0.31; 'usual': 0.31; 'generally': 0.32;
+	'done': 0.34; 'header:User-Agent:1': 0.34; 'rather': 0.35;
+	'starting': 0.36; 'charset:us-ascii': 0.36; 'file': 0.36;
+	'received:au': 0.36; 'affects': 0.37; 'something': 0.37; 'think':
+	0.38; 'steven': 0.38; 'some': 0.38; 'subject:: ': 0.39; 'client':
+	0.39; 'else': 0.39; 'subject: (': 0.39; "it's": 0.40; 'your':
+	0.61; 'kind': 0.61; 'believe': 0.65; 'friends': 0.66;
+	'received:202': 0.66; 'cameron': 0.67; 'special': 0.67; 'biggie':
+	0.84
+Received: from localhost (HELO mail.python.org) (127.0.0.1)
+	by albatross.python.org with SMTP; 11 Sep 2011 01:50:49 +0200
+Received: from harvey.boardofstudies.nsw.edu.au
+	(mail2.rack1.boardofstudies.nsw.edu.au [202.125.174.133])
+	by mail.python.org (Postfix) with ESMTP
+	for <python-list@python.org>; Sun, 11 Sep 2011 01:50:49 +0200 (CEST)
+Received: from cskk.homeip.net (localhost.localdomain [127.0.0.1])
+	by harvey.boardofstudies.nsw.edu.au (Postfix) with ESMTP id 713034D3B56;
+	Sun, 11 Sep 2011 09:50:46 +1000 (EST)
+Received: by janus.cskk.homeip.net (Postfix, from userid 1000)
+	id 59293100419B7; Sun, 11 Sep 2011 09:50:46 +1000 (EST)
+Date: Sun, 11 Sep 2011 09:50:46 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: "Waldek M." <wm@localhost.localdomain>
+Subject: Re: what's the command for (cd ..) in python
+Message-ID: <20110910235046.GA12648@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <5yll66t4xv3j.dlg@localhost.localdomain>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+References: <5yll66t4xv3j.dlg@localhost.localdomain>
+Cc: python-list@python.org
+X-BeenThere: python-list@python.org
+X-Mailman-Version: 2.1.12
+Precedence: list
+List-Id: General discussion list for the Python programming language
+	<python-list.python.org>
+List-Unsubscribe: <http://mail.python.org/mailman/options/python-list>,
+	<mailto:python-list-request@python.org?subject=unsubscribe>
+List-Archive: <http://mail.python.org/pipermail/python-list>
+List-Post: <mailto:python-list@python.org>
+List-Help: <mailto:python-list-request@python.org?subject=help>
+List-Subscribe: <http://mail.python.org/mailman/listinfo/python-list>,
+	<mailto:python-list-request@python.org?subject=subscribe>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Sender: python-list-bounces+cs=zip.com.au@python.org
+Errors-To: python-list-bounces+cs=zip.com.au@python.org
+X-Cats2Procmailrc-Rule: cats/home: python  python-list     sender:python-list-bounces+cs=zip.com.au@python.org
+X-Label: python-list
+Content-Length: 1582
+
+On 10Sep2011 15:57, Waldek M. <wm@localhost.localdomain> wrote:
+| On Sat, 10 Sep 2011 21:11:32 +1000, Steven D'Aprano wrote:
+| > The main one that comes to mind is os.walk, which has this to say:
+| > 
+| >     Caution:  if you pass a relative pathname for top, don't change the
+| >     current working directory between resumptions of walk.  walk never
+| >     changes the current directory, and assumes that the client doesn't
+| >     either.
+| > 
+| > Seems like a reasonable assumption to me.
+| 
+| Oh, that kind of functions.
+| Yes, that *is* surely reasonable, just as mixing chdir/mkdir/remove
+| and whatever else that affects the directory structure is not a good idea,
+| or at least something to be done carefully.
+| I just wouldn't think to give it some special credit.
+
+It's like umask and friends - they affect a program-wide implicit state.
+Umask affects default new file permissions, chdir affects starting point
+for relative pathnames, etc. All implicit.
+
+The usual biggie with chdir is that of course your program may have been
+handed relative file pathnames on the command line. They need resolving
+_before_ any chdiring happens, if chdiring is going to happen.
+
+For this kind of reason chdir, umask et al are generally best used in
+top level logic only rather than inside library functions.
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+It's hard to believe that something as rational as the metric system was
+invented by the French. - Henry O. Farad <lrc@netcom.COM>
+-- 
+http://mail.python.org/mailman/listinfo/python-list

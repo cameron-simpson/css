@@ -1,0 +1,166 @@
+Return-Path: <python-list-bounces+cs=zip.com.au@python.org>
+Delivered-To: unknown
+Received: from mail.zip.com.au (125.255.95.3) by janus.home with POP3-SSL; 06
+  Nov 2011 20:49:02 -0000
+Delivered-To: cs@zipworld.com.au
+Received: from mailin3-syd3.pacific.net.au (mailin3-syd3.pacific.net.au [125.255.92.144])
+	by mailstore1.syd.pacific.net.au (Postfix) with ESMTP id E536732442
+	for <cs@zipworld.com.au>; Mon,  7 Nov 2011 07:47:12 +1100 (EST)
+Received: from mail.python.org (unknown [82.94.164.166])
+	by mailin3-syd3.pacific.net.au (Postfix) with ESMTP id 9C3B2400097
+	for <cs@zip.com.au>; Mon,  7 Nov 2011 07:47:28 +1100 (EST)
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3Sc88t6ZFQzNLQ
+	for <cs@zip.com.au>; Sun,  6 Nov 2011 21:47:10 +0100 (CET)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=python.org; s=200901;
+	t=1320612430; bh=7IsLOMIDqIWCTh36ifOsqMjxrxt7kYpajJrzr69+G6Y=;
+	h=Date:From:To:Subject:Message-ID:MIME-Version:In-Reply-To:
+	 References:Cc:List-Id:List-Unsubscribe:List-Archive:List-Post:
+	 List-Help:List-Subscribe:Content-Type:Content-Transfer-Encoding:
+	 Sender;
+	b=QviMXyBYMfubjGJ3f5tBk9CrvRr79+T369Thz3wSL2ABBVvBt4MkpoJuHZqXCYRaG
+	 kXpDpQ8/VPmWpTsMUmaoyJKXXxAG0eu3Xtq9zGo4tBTQjjwaG09Jn5FUyE4s9+h7jf
+	 nZVT1vCRpX2ggqCOeDbYYQYArdssLyJ36ovLU9PI=
+X-Original-To: python-list@python.org
+Delivered-To: python-list@mail.python.org
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3Sc85k2JSxzMr4
+	for <python-list@python.org>; Sun,  6 Nov 2011 21:44:26 +0100 (CET)
+X-Spam-Status: OK 0.000
+X-Spam-Evidence: '*H*': 1.00; '*S*': 0.00; 'python,': 0.01;
+	'subject:Python': 0.06; 'exception,': 0.07; 'forth.': 0.07;
+	'received:edu.au': 0.07; 'python': 0.08; 'foo': 0.09; 'linux.':
+	0.09; 'broken': 0.12; 'debugging': 0.13; 'argument': 0.15;
+	'cc:addr:python-list': 0.15; 'changing:': 0.16; 'collects': 0.16;
+	'finder': 0.16; 'from:addr:cs': 0.16; 'from:addr:zip.com.au':
+	0.16; 'from:name:cameron simpson': 0.16; 'gene': 0.16; 'is",':
+	0.16; 'logic.': 0.16; 'message-id:@cskk.homeip.net': 0.16;
+	'received:202.125.174': 0.16; 'received:202.125.174.133': 0.16;
+	'received:boardofstudies.nsw.edu.au': 0.16;
+	'received:cskk.homeip.net': 0.16;
+	'received:harvey.boardofstudies.nsw.edu.au': 0.16;
+	'received:homeip.net': 0.16; 'received:nsw.edu.au': 0.16; 'linux':
+	0.17; 'cheers,': 0.18; 'wrote:': 0.18; 'driver': 0.18; 'trying':
+	0.21; 'cc:no real name:2**0': 0.21; 'subject:please': 0.21;
+	'runs': 0.23; 'indentation': 0.23; 'header:In-Reply-To:1': 0.23;
+	'command': 0.24; 'suspect': 0.24; 'cc:2**0': 0.25; '"the': 0.26;
+	'raise': 0.27; 'script': 0.28; 'fixed': 0.28; 'looks': 0.28;
+	'cc:addr:python.org': 0.29; 'print': 0.29; "i'll": 0.31; 'least':
+	0.31; 'value.': 0.32; 'usually': 0.32; "isn't": 0.32; 'there':
+	0.33; 'header:User-Agent:1': 0.33; 'test': 0.34; 'null': 0.34;
+	'(for': 0.35; 'received:au': 0.36; 'charset:us-ascii': 0.36;
+	'but': 0.37; 'run': 0.38; 'some': 0.38; 'perhaps': 0.38; 'enough':
+	0.38; 'subject:: ': 0.39; 'more': 0.60; 'link': 0.63; 'our': 0.63;
+	'received:202': 0.65; 'here:': 0.66; 'instantly': 0.67; 'day':
+	0.67; 'flow': 0.71; 'cameron': 0.73; 'greetings': 0.74; 'error-
+	free.': 0.84; 'me:': 0.84; 'nss': 0.84; 'roads': 0.91
+Received: from localhost (HELO mail.python.org) (127.0.0.1)
+	by albatross.python.org with SMTP; 06 Nov 2011 21:44:26 +0100
+Received: from harvey.boardofstudies.nsw.edu.au
+	(mail2.rack1.boardofstudies.nsw.edu.au [202.125.174.133])
+	by mail.python.org (Postfix) with ESMTP
+	for <python-list@python.org>; Sun,  6 Nov 2011 21:44:25 +0100 (CET)
+Received: from cskk.homeip.net (localhost.localdomain [127.0.0.1])
+	by harvey.boardofstudies.nsw.edu.au (Postfix) with ESMTP id AF9FE4D3B56;
+	Mon,  7 Nov 2011 07:34:29 +1100 (EST)
+Received: by janus.cskk.homeip.net (Postfix, from userid 1000)
+	id 9B7A3100419B7; Mon,  7 Nov 2011 07:34:29 +1100 (EST)
+Date: Mon, 7 Nov 2011 07:34:29 +1100
+From: Cameron Simpson <cs@zip.com.au>
+To: gene heskett <gheskett@wdtv.com>
+Subject: Re: Python lesson please
+Message-ID: <20111106203429.GA4790@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <201111061314.43744.gheskett@wdtv.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+References: <201111061314.43744.gheskett@wdtv.com>
+Cc: python-list@python.org
+X-BeenThere: python-list@python.org
+X-Mailman-Version: 2.1.12
+Precedence: list
+List-Id: General discussion list for the Python programming language
+	<python-list.python.org>
+List-Unsubscribe: <http://mail.python.org/mailman/options/python-list>,
+	<mailto:python-list-request@python.org?subject=unsubscribe>
+List-Archive: <http://mail.python.org/pipermail/python-list>
+List-Post: <mailto:python-list@python.org>
+List-Help: <mailto:python-list-request@python.org?subject=help>
+List-Subscribe: <http://mail.python.org/mailman/listinfo/python-list>,
+	<mailto:python-list-request@python.org?subject=subscribe>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Sender: python-list-bounces+cs=zip.com.au@python.org
+Errors-To: python-list-bounces+cs=zip.com.au@python.org
+X-Cats2Procmailrc-Rule: cats/home: python  python-list     sender:python-list-bounces+cs=zip.com.au@python.org
+X-Label: python-list
+Content-Length: 1741
+
+On 06Nov2011 13:14, gene heskett <gheskett@wdtv.com> wrote:
+| Greetings experts:
+| 
+| I just dl'd the duqu driver finder script from a link to NSS on /., and 
+| fixed enough of the tabs in it to make it run error-free.  At least python 
+| isn't having a litter of cows over the indentation now.
+| 
+| But it also runs instantly on linux.
+| 
+| This line looks suspect to me:
+|  rootdir = sys.argv[1]
+| 
+| And I have a suspicion it is null on a linux box.
+
+That line collects the first command line argument. sys.argv is the
+command line; argv[0] is the command name, argv[1] the first argument
+and so forth.
+
+Also, if there is no first argument then trying to access argv[1] will
+raise an IndexError exception, not return a null value.
+
+If you're this new to python, note that easy debugging statements can be
+written:
+
+  print >>sys.stderr, "the value of foo is", foo
+
+and so forth.
+
+Perhaps more relevantly:
+
+If you have unmangled a lot of tabs, remember that control flow is
+indentation based in python, and you may have broken some logic.
+(For this reason a number of us set our editors to work only in spaces).
+
+Anyway, while changing:
+
+  statement1
+  statement2
+
+into:
+
+  statement1
+    statement2
+
+will usually make python complain, changing:
+
+  if some test here:
+    statement1
+    statement2
+
+into:
+
+  if some test here:
+    statement1
+  statement2
+
+just means that statement2 is no longer inside the if-statement, and
+elicit no compaints. But will elicit bugs!
+
+Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+The ZZR-1100 is not the bike for me, but the day they invent "nerf" roads
+and ban radars I'll be the first in line......AMCN
+-- 
+http://mail.python.org/mailman/listinfo/python-list

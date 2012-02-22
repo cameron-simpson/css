@@ -1,0 +1,52 @@
+Date: Mon, 28 Sep 2009 17:01:40 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Peng Yu <pengyu.ut@gmail.com>
+Cc: python-list@python.org
+Subject: Re: Why the file mode of .pyc files has x?
+Message-ID: <20090928070140.GA27748@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: inline
+Content-Transfer-Encoding: 8bit
+In-Reply-To: <366c6f340909260824va2340bai6964378b541e9a3e@mail.gmail.com>
+User-Agent: Mutt/1.5.20 (2009-06-14)
+Content-Length: 1223
+
+On 26Sep2009 10:24, Peng Yu <pengyu.ut@gmail.com> wrote:
+| > [steve@sylar test]$ ls -l
+| > total 16
+| > -rw-rw-r-- 1 steve steve  6 2009-09-26 23:06 test.py
+| > -rw-rw-r-- 1 steve steve 94 2009-09-26 23:08 test.pyc
+| >
+| > Have you checked the umask of your system?
+| 
+| Here are my test case. If the .py file has the 'x' mode, the
+| corresponding .pyc file also has the 'x' mode after the .py file is
+| imported.
+
+Yes, I see this too.
+
+| pengy@selenium:~/test/python/pyc_mode$ umask
+| 0077
+| pengy@selenium:~/test/python/pyc_mode$ ll
+| total 8
+| -rw------- 1 pengy lilab  29 2009-09-26 10:10:45 main.py
+| -rwx------ 1 pengy lilab 106 2009-09-26 10:19:17 test.py
+[...]
+| pengy@selenium:~/test/python/pyc_mode$ python main.py
+| in_test_func
+| pengy@selenium:~/test/python/pyc_mode$ ll
+| total 12
+| -rw------- 1 pengy lilab  29 2009-09-26 10:10:45 main.py
+| -rwx------ 1 pengy lilab 106 2009-09-26 10:19:17 test.py
+| -rwx------ 1 pengy lilab 339 2009-09-26 10:20:39 test.pyc
+
+This happens for me with python 2.6 x86_64 on gentoo.
+
+You're not alone.
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+Reaching consensus in a group often is confused with finding the right
+answer. - Norman Maier

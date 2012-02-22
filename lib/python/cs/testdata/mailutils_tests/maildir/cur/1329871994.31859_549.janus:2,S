@@ -1,0 +1,44 @@
+Date: Thu, 11 Sep 2008 14:58:54 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: process <circularfunc@gmail.com>
+Subject: Re: which of these 2 quicksorts is faster?
+Message-ID: <20080911045854.GA23110@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Disposition: inline
+Content-Transfer-Encoding: quoted-printable
+In-Reply-To: <5fd41cf4-59c6-4d4d-bf4d-681e5bc88e6f@79g2000hsk.googlegroups.com>
+User-Agent: Mutt/1.5.18 (2008-05-17)
+Content-Length: 1255
+
+[ Off list. - Cameron ]
+
+On 10Sep2008 03:52, process <circularfunc@gmail.com> wrote:
+| On Sep 10, 12:29=C2=A0pm, Fredrik Lundh <fred...@pythonware.com> wrote:
+| > process wrote:
+| > > qsort can handle bigger lists it seems, making less recursive calls
+| > > before finishing(quicksort blows the stack when sorting
+| > > range(100,-1000,-1).
+| > > qsort does more work though right? is there a way to speed up that?
+| > > is the built-in sort not defined recursively?
+| >
+| > what makes you think you can write a better sort than the built-in
+| > algorithm by typing in some toy quick-sort implementations from a
+| > "sorting for dummies" article?
+|=20
+| Where did I write that I was trying to do that? I am merely trying to
+| learn.
+| Get some social skills dude.
+
+=46rom a quick scan of the replies, it is apparent that most people did
+not realise that you were trying to understand approaches to coding
+quicksort and that your question about the built-in one was by way of
+seeking insight. Indeed, I can read your text both ways if I try.
+
+Might be worth a calm clarification post, to keep discussion civil and
+to get it back on the track you originally sought.
+
+Cheers,
+--=20
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/

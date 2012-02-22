@@ -1,0 +1,138 @@
+Return-Path: <python-list-bounces+cs=zip.com.au@python.org>
+Delivered-To: unknown
+Received: from mail.zip.com.au (125.255.95.3) by janus.home with POP3-SSL; 08
+  Sep 2011 22:43:01 -0000
+Delivered-To: cs@zipworld.com.au
+Received: from mailin4-syd3.pacific.net.au (mailin4-syd3.pacific.net.au [125.255.92.145])
+	by mailstore1.syd.pacific.net.au (Postfix) with ESMTP id 0B36D94B05
+	for <cs@zipworld.com.au>; Fri,  9 Sep 2011 08:42:32 +1000 (EST)
+Received: from mail.python.org (unknown [82.94.164.166])
+	by mailin4-syd3.pacific.net.au (Postfix) with ESMTP id 59C924D808B
+	for <cs@zip.com.au>; Fri,  9 Sep 2011 08:42:31 +1000 (EST)
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3RvxW95dwPzNV7
+	for <cs@zip.com.au>; Fri,  9 Sep 2011 00:42:29 +0200 (CEST)
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/simple; d=python.org; s=200901;
+	t=1315521749; bh=Pb5cAwzaYO1hEFx0x1VX38rc3N0rzlkO3700t83MSuI=;
+	h=Date:From:To:Subject:Message-ID:MIME-Version:In-Reply-To:
+	 References:Cc:List-Id:List-Unsubscribe:List-Archive:List-Post:
+	 List-Help:List-Subscribe:Content-Type:Content-Transfer-Encoding:
+	 Sender;
+	b=XUGIingiJdNUjGmUzXK5CiocakRXtr7xebopvAxcC7lyOHrY4o519IQQa3sPee3jJ
+	 V5qqH90B8nwwMfVyhApkVKtfRTEQkPX5bAtEUahV9iaEzwLrnGOoNgg5TqtAschCm7
+	 AfmNUAAfIGTyGhqXg8Prj6wEVAqWP1jVRGi8pP6o=
+X-Original-To: python-list@python.org
+Delivered-To: python-list@mail.python.org
+Received: from albatross.python.org (localhost [127.0.0.1])
+	by mail.python.org (Postfix) with ESMTP id 3RvxS430v9zNS9
+	for <python-list@python.org>; Fri,  9 Sep 2011 00:39:48 +0200 (CEST)
+X-Spam-Status: OK 0.008
+X-Spam-Evidence: '*H*': 0.98; '*S*': 0.00; 'happily': 0.07;
+	'received:edu.au': 0.07; 'eof': 0.09; 'eof,': 0.09; 'forgotten':
+	0.15; '>or': 0.16; 'from:addr:cs': 0.16; 'from:addr:zip.com.au':
+	0.16; 'from:name:cameron simpson': 0.16; 'input.': 0.16; 'message-
+	id:@cskk.homeip.net': 0.16; 'piped': 0.16; 'received:202.125.174':
+	0.16; 'received:202.125.174.133': 0.16;
+	'received:boardofstudies.nsw.edu.au': 0.16;
+	'received:cskk.homeip.net': 0.16;
+	'received:harvey.boardofstudies.nsw.edu.au': 0.16;
+	'received:homeip.net': 0.16; 'received:nsw.edu.au': 0.16;
+	'subject:iterable': 0.16; 'cc:addr:python-list': 0.16; 'wrote:':
+	0.16; 'cheers,': 0.18; 'cc:no real name:2**0': 0.20; 'badly':
+	0.21; 'cc:2**0': 0.22; 'header:In-Reply-To:1': 0.22; 'runs': 0.23;
+	'(or': 0.23; 'pascal': 0.23; '"the': 0.26; 'thanks.': 0.26;
+	'function': 0.27; 'problem': 0.28; "won't": 0.29;
+	'cc:addr:python.org': 0.30; '"in': 0.30; '"who': 0.30; 'behaves':
+	0.30; 'means,': 0.30; 'peer': 0.30; 'subject:?': 0.31; 'chris':
+	0.32; 'minor': 0.32; 'subject: \n\t': 0.32; 'yet': 0.32; '...':
+	0.34; 'header:User-Agent:1': 0.34; 'causing': 0.34; 'like:': 0.34;
+	'charset:us-ascii': 0.36; 'received:au': 0.36; 'skip:" 10': 0.36;
+	'"you': 0.37; 'but': 0.37; 'subject:: ': 0.39; 'subject: (': 0.39;
+	'your': 0.61; 'free': 0.63; 'here:': 0.65; 'received:202': 0.66;
+	'"what': 0.67; 'cameron': 0.67; 'subject:are': 0.70;
+	'encountered': 0.73; 'article': 0.76; 'stream': 0.77;
+	'subject:you': 0.81; '"whose': 0.84; 'adopt': 0.84; 'hook': 0.84;
+	'subject:Best': 0.93
+Received: from localhost (HELO mail.python.org) (127.0.0.1)
+	by albatross.python.org with SMTP; 09 Sep 2011 00:39:48 +0200
+Received: from harvey.boardofstudies.nsw.edu.au
+	(mail2.rack1.boardofstudies.nsw.edu.au [202.125.174.133])
+	by mail.python.org (Postfix) with ESMTP
+	for <python-list@python.org>; Fri,  9 Sep 2011 00:39:47 +0200 (CEST)
+Received: from cskk.homeip.net (localhost.localdomain [127.0.0.1])
+	by harvey.boardofstudies.nsw.edu.au (Postfix) with ESMTP id 09ADE4D3B56;
+	Fri,  9 Sep 2011 08:39:45 +1000 (EST)
+Received: by janus.cskk.homeip.net (Postfix, from userid 1000)
+	id E5075100419B7; Fri,  9 Sep 2011 08:39:44 +1000 (EST)
+Date: Fri, 9 Sep 2011 08:39:44 +1000
+From: Cameron Simpson <cs@zip.com.au>
+To: Chris Torek <nospam@torek.net>
+Subject: Re: Best way to check that you are at the beginning (the end) of an
+	iterable?
+Message-ID: <20110908223944.GA28756@cskk.homeip.net>
+MIME-Version: 1.0
+Content-Disposition: inline
+In-Reply-To: <j4aj1302fg0@news3.newsguy.com>
+User-Agent: Mutt/1.5.21 (2010-09-15)
+References: <j4aj1302fg0@news3.newsguy.com>
+Cc: python-list@python.org
+X-BeenThere: python-list@python.org
+X-Mailman-Version: 2.1.12
+Precedence: list
+List-Id: General discussion list for the Python programming language
+	<python-list.python.org>
+List-Unsubscribe: <http://mail.python.org/mailman/options/python-list>,
+	<mailto:python-list-request@python.org?subject=unsubscribe>
+List-Archive: <http://mail.python.org/pipermail/python-list>
+List-Post: <mailto:python-list@python.org>
+List-Help: <mailto:python-list-request@python.org?subject=help>
+List-Subscribe: <http://mail.python.org/mailman/listinfo/python-list>,
+	<mailto:python-list-request@python.org?subject=subscribe>
+Content-Type: text/plain; charset="us-ascii"
+Content-Transfer-Encoding: 7bit
+Sender: python-list-bounces+cs=zip.com.au@python.org
+Errors-To: python-list-bounces+cs=zip.com.au@python.org
+X-Cats2Procmailrc-Rule: cats/home: python  python-list     sender:python-list-bounces+cs=zip.com.au@python.org
+X-Label: python-list
+Content-Length: 1745
+
+On 08Sep2011 14:21, Chris Torek <nospam@torek.net> wrote:
+| In article <mailman.854.1315441399.27778.python-list@python.org>
+| Cameron Simpson  <cs@zip.com.au> wrote:
+| >Facilities like feof() in C and eof in Pascal already lead to lots of
+| >code that runs happily with flat files and behaves badly in interactive
+| >or piped input. It is _so_ easy to adopt a style like:
+| >
+| >  while not eof(filehandle):
+| >    line = filehandle.nextline()
+| >    ...
+| 
+| Minor but important point here: eof() in Pascal is predictive (uses
+| a "crystal ball" to peer into the future to see whether EOF is is
+| about to occur -- which really means, reads ahead, causing that
+| interactivity problem you mentioned), but feof() in C is "post-dictive".
+| The feof(stream) function returns a false value if the stream has
+| not yet encountered an EOF, but your very next attempt to read from
+| it may (or may not) immediately encounter that EOF.
+
+Thanks. I had forgotten this nuance. Cheers,
+-- 
+Cameron Simpson <cs@zip.com.au> DoD#743
+http://www.cskk.ezoshosting.com/cs/
+
+                          "Where am I?"
+                        "In the Village."
+                       "What do you want?"
+                         "Information."
+                    "Whose side are you on?"
+"That would be telling. We want information. Information. Information!"
+                       "You won't get it!"
+                 "By hook or by crook, we will."
+                         "Who are you?"
+                       "The new number 2."
+                       "Who is number 1?"
+                       "You are number 6."
+              "I am not a number, I am a free man!"
+                           [Laughter]
+-- 
+http://mail.python.org/mailman/listinfo/python-list
