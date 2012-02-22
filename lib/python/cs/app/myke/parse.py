@@ -83,6 +83,164 @@ def nsstr(namespaces):
                  for ns in namespaces
                )
 
+class Modifier(object):
+  ''' Base class for modifiers.
+  '''
+  def __init__(self, context, modtext):
+    self.context = context
+    self.modtext = modtext
+
+  def __str__(self):
+    return "%s: modifier: %s" % (self.context, self.modtext)
+
+  def words(self, text):
+    return [ word for word in text.split() if len(word) > 0 ]
+
+  def foreach(self, text, f):
+    ''' Apply the operator function `f` to each word in `text`.
+        Return the results joined together with spaces.
+    '''
+    return " ".join( [ word for word in map(f, self.words(text)) if len(word) > 0 ] )
+
+class ModDirpart(Modifier):
+  ''' A modifier to get the directory part of a filename.
+  '''
+
+  def __call__(self, text, namespaces):
+    return self.foreach(text, os.path.dirname)
+
+class ModFilepart(Modifier):
+  ''' A modifier to get the file part of a filename.
+  '''
+
+  def __call__(self, text, namespaces):
+    return self.foreach(text, os.path.basename)
+
+class ModifierSplit1(Modifier):
+  ''' A modifier that splits a word on a separator and returns one half.
+  '''
+
+  def __init__(self, context, modtext, separator, keepright, rightmost):
+    Modifier.__init__(self, context, modtext)
+    self.separator = separator
+    self.keepright = keepright
+    self.rightmost = rightmost
+
+  def splitword(self, word):
+    sep = self.separator
+    keepright = self.keepright
+    right = self.rightmost
+    return (word.rsplit(sep, 1) if right else word.split(sep, 1))[ 1 if keepright else 0 ]
+
+  def __call__(self, text, namespaces):
+    return self.foreach( self.splitword )
+
+class ModPrefixLong(Modifier):
+  def __init__(self, context, modtext, separator):
+    ModifierSplit1.__init__(self, context, modtext, separator, False, True)
+
+class ModPrefixShort(Modifier):
+  def __init__(self, context, modtext, separator):
+    ModifierSplit1.__init__(self, context, modtext, separator, False, False)
+
+class ModSuffixLong(Modifier):
+  def __init__(self, context, modtext, separator):
+    ModifierSplit1.__init__(self, context, modtext, separator, True, True)
+
+class ModSuffixShort(Modifier):
+  def __init__(self, context, modtext, separator):
+    ModifierSplit1.__init__(self, context, modtext, separator, True, False)
+
+class ModUnique(Modifier):
+  def __call__(self, text, namespaces):
+    seen = set()
+    words = []
+    for word in self.words(text):
+      if word not in seen:
+        seen.add(word)
+        words.append(word)
+    return " ".join(words)
+
+class ModNormpath(Modifier):
+  def __call__(self, text, namespaces):
+    return self.foreach(os.path.normpath)
+
+class ModGlob(Modifier):
+  def __init__(self, context, modtext, muststat, lax):
+    Modifier.__init__(self, context, modtext)
+    self.muststat = muststat
+    self.lax = lax
+  def __call__(self, text, namespaces):
+    globbed = []
+    for ptn in self.words(text):
+      with Pfx("glob(\"%s\")" % (ptn,)):
+        matches = glob.glob(ptn)
+        if matches:
+          if self.muststat:
+            for match in matches:
+              with Pfx(match):
+                os.stat(match)
+          globbed.extend(matches)
+        else:
+          if not self.lax:
+            raise ValueError("no matches")
+    return " ".join(globbed)
+
+class ModEval(Modifier):
+  def __call__(self, text, namespaces):
+    return parseMacroExpression(self.context, text)[0](self.context, namespaces)
+
+class ModSubstitute(Modifier):
+  def __init__(self, context, modtext, regexp_mexpr, replacement):
+    Modifier.__init__(self, context, modtext)
+    self.regexp_mexpr = regexp_mexpr
+    self.replacement = replacement
+  def __call__(self, text, namespaces):
+    return re.sub(regexp_mexpr(self.context, namespaces), self.replacement, text)
+
+class ModFromFiles(Modifier):
+  def __init__(self, context, modtext, lax):
+    Modifier.__init__(self, context, modtext)
+    self.lax = lax
+  def __call__(self, text, namespaces):
+    newwords = []
+    for filename in self.words(text):
+      with Pfx(filename):
+        try:
+          with open(filename) as fp:
+            newwords.extend(self.words(fp.read()))
+        except IOError, e:
+          if not lax:
+            raise
+          else:
+            warning("%s", e)
+
+class ModSelectRegexp(Modifier):
+  def __init__(self, context, modtext, regexp_mexpr, invert):
+    Modifier.__init__(self, context, modtext)
+    self.regexp_mexpr = regexp_mexpr
+    self.invert = bool(invert)
+  def __call__(self, text):
+    invert = self.invert
+    regexp = re.compile(self.regexp_mexpr(self.context, namespaces))
+    f = lambda word: word if invert ^ bool(regexp.search(word)) else ''
+    return self.foreach(text, f)
+
+class ModSelectRange(Modifier):
+  def __init__(self, context, modtext, range, invert):
+    Modifier.__init__(self, context, modtext)
+    self.range = range
+    self.invert = bool(invert)
+  def __call__(self, text):
+    invert = self.invert
+    range = self.range
+    newwords = []
+    i = 0
+    for word in self.words(text):
+      if (i in range) ^ invert:
+        newwords.append(word)
+    return " ".join(newwords)
+
 class Macro(object):
   ''' A macro definition.
   '''
