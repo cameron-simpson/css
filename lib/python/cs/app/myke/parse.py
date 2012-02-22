@@ -12,7 +12,7 @@ import re
 from string import whitespace, letters, digits
 import unittest
 from cs.lex import get_chars, get_other_chars, get_white, get_identifier
-from cs.logutils import Pfx, error, info, debug, exception
+from cs.logutils import Pfx, error, warning, info, debug, exception
 
 # mapping of special macro names to evaluation functions
 SPECIAL_MACROS = { '.':         lambda c, ns: os.getcwd(),       # TODO: cache
@@ -789,6 +789,21 @@ class MacroTerm(object):
               text = re.sub(mexpr(context, namespaces), rep, text)
             else:
               raise NotImplementedError('unimplemented ":" modifier')
+          elif modifier == '<' or modifier == '<?':
+            lax = modifier == '<?'
+            newwords = []
+            for word in text.split():
+              if word:
+                with Pfx(word):
+                  try:
+                    with open(word) as wfp:
+                      newwords.extend(fp.read().split())
+                  except IOError, e:
+                    if not lax:
+                      raise
+                    else:
+                      warning("%s", e)
+            text = " ".join(newwords)
           else:
             raise NotImplementedError('unimplemented macro modifier')
 
