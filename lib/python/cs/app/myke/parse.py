@@ -630,6 +630,25 @@ def parseMacro(context, text=None, offset=0):
           modifiers.append(modifier+submname)
           continue
 
+        if ch == ':':
+          _, offset = get_white(text, offset+1)
+          if offset == len(text):
+            raise ParseError(context, offset, 'missing opening delimiter in :,ptn,rep,')
+          ch = text[offset]
+          if ch == mmark2:
+            raise ParseError(context, offset, 'found closing bracket instead of leading delimiter in :,ptn,rep,')
+          if ch.isalnum():
+            raise ParseError(context, offset, 'invalid delimiter in :,ptn,rep, - must be nonalphanumeric')
+          delim = ch
+          offset += 1
+          try:
+            ptn, repl, _ = text[offset:].split(delim, 2)
+          except ValueError:
+            raise ParseError(context, offset, 'incomplete :%sptn%srep%s' % (delim, delim, delim))
+          offset = len(text) - len(_)
+          modifiers.append("%s%s%s%s" % (delim, ptn, delim, repl))
+          continue
+
         raise ParseError(context, offset, 'unknown macro modifier "%s": "%s"' % (ch, text[offset:]))
 
       except ParseError, e:
