@@ -58,11 +58,14 @@ class Maker(object):
 
   def __str__(self):
     return '%s<Maker>' % (cs.misc.cmd,)
+
   def _queue(self, func, name, priority):
     return self._makeQ.submit(func, name=name, priority=priority)
 
   @property
   def namespaces(self):
+    ''' The namespaces for this Maker: the built namespaces plus the special macros.
+    '''
     return self._namespaces + [ SPECIAL_MACROS ]
 
   @property
@@ -84,25 +87,38 @@ class Maker(object):
     return _makefiles
 
   def add_appendfile(self, filename):
+    ''' Add another Mykefile as from the :append directive, to be
+        sourced after the main sequence of Mykefiles.
+    '''
     self.appendfiles.append(filename)
 
   def debug_make(self, msg, *a, **kw):
+    ''' Issue an INFO log message if the "make" debugging flag is set.
+    '''
     if self.debug.make:
       info(msg, *a, **kw)
 
   def debug_parse(self, msg, *a, **kw):
+    ''' Issue an INFO log message if the "parse" debugging flag is set.
+    '''
     if self.debug.parse:
       info(msg, *a, **kw)
 
   def making(self, target):
+    ''' Add this target to the set of "in progress" targets.
+    '''
     with self.active_lock:
       self.active.add(target)
 
   def made(self, target, status):
+    ''' Remove this target from the set of "in progress" targets.
+    '''
     with self.active_lock:
       self.active.remove(target)
 
   def cancel_all(self):
+    ''' Cancel all "in progress" targets.
+    '''
     with self._active_lock:
       Ts = list(self.active)
     for T in Ts:
@@ -212,6 +228,12 @@ class Maker(object):
     return args, badopts
 
   def loadMakefiles(self, makefiles, parent_context=None):
+    ''' Load the specified Makefiles.
+	Each top level Makefile named gets its own namespace prepended
+	to the namespaces list. In this way later top level Makefiles'
+        definitions override ealier ones while still detecting conflicts
+        within a particular Makefile.
+    '''
     for makefile in makefiles:
       self.debug_parse("load makefile: %s", makefile)
       first_target = None
@@ -271,6 +293,9 @@ class Target(object):
            )
 
   def cancel(self):
+    ''' Cancel this Target.
+        Actions will cease as soon as decorum allows.
+    '''
     self.maker.debug_make("CANCEL %s", self)
     self.cancelled = True
 
@@ -399,7 +424,7 @@ class Action(object):
       if M.no_action:
         return True
       M.debug_make("shell command: %s", shcmd)
-      argv = (target.shell, '-c', shcmd)
+      argv = (target.shell, '-xc', shcmd)
       debug("Popen(%s,..)", argv)
       P = Popen(argv, close_fds=True)
       retcode = P.wait()
