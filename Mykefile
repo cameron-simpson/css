@@ -21,14 +21,14 @@ pmsets	= lib/perl/cs
 pmset(set) = $('$(set)/*.pm' EG?) \
 	     $('$(set)/*/*.pm' EG?) \
 	     $('$(set)/*/*/*.pm' EG?)
-pmsetmans(set) = $(MANDIR)/man3/$(('$(pmset($(set)))' Es[/]P s:|/|::|)).3
-pmsethtml(set) = $(htmandir)/$(('$(pmset($(set)))' Es[/]P s:|/|::|)).3.html
+pmsetmans(set) = $(MANDIR)/man3/$(('$(pmset($(set)))' Es[/]P :|/|::|)).3
+pmsethtml(set) = $(htmandir)/$(('$(pmset($(set)))' Es[/]P :|/|::|)).3.html
 pmmans = $('$$(pmsetmans($((pmsets))))' EE)
 pmhtml = $('$$(pmsethtml($((pmsets))))' EE)
 podman(podf) = $(MANDIR)/man$(podf FPS)/$(podf FP)
 podmans = $('$$(podman($(("man/*.pod" G))))' EE)
-pmFromMan(manf) = lib/$(manf FP s:|::|/|).pm
-pmFromHtml(html) = lib/$(html FPP s:|::|/|).pm
+pmFromMan(manf) = lib/$(manf FP :|::|/|).pm
+pmFromHtml(html) = lib/$(html FPP :|::|/|).pm
 podFromMan(manf) = man/$(manf F).pod
 
 subdirs = $('*/.' GD)
