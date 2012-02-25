@@ -91,7 +91,13 @@ class Modifier(object):
     self.modtext = modtext
 
   def __str__(self):
-    return "%s: modifier: %s" % (self.context, self.modtext)
+    return "<Mod %s %s>" % (self.context, self.modtext)
+
+  def __call__(self, text, namespaces):
+    with Pfx("%r %s" % (text, self)):
+      ntext = self.modify(text, namespaces)
+      info("%r -> %r", text, ntext)
+    return ntext
 
   def words(self, text):
     return [ word for word in text.split() if len(word) > 0 ]
@@ -106,14 +112,14 @@ class ModDirpart(Modifier):
   ''' A modifier to get the directory part of a filename.
   '''
 
-  def __call__(self, text, namespaces):
+  def modify(self, text, namespaces):
     return self.foreach(text, os.path.dirname)
 
 class ModFilepart(Modifier):
   ''' A modifier to get the file part of a filename.
   '''
 
-  def __call__(self, text, namespaces):
+  def modify(self, text, namespaces):
     return self.foreach(text, os.path.basename)
 
 class ModifierSplit1(Modifier):
@@ -132,7 +138,7 @@ class ModifierSplit1(Modifier):
     right = self.rightmost
     return (word.rsplit(sep, 1) if right else word.split(sep, 1))[ 1 if keepright else 0 ]
 
-  def __call__(self, text, namespaces):
+  def modify(self, text, namespaces):
     return self.foreach( text, self.splitword )
 
 class ModPrefixLong(ModifierSplit1):
@@ -152,7 +158,7 @@ class ModSuffixShort(ModifierSplit1):
     ModifierSplit1.__init__(self, context, modtext, separator, True, True)
 
 class ModUnique(Modifier):
-  def __call__(self, text, namespaces):
+  def modify(self, text, namespaces):
     seen = set()
     words = []
     for word in self.words(text):
@@ -162,7 +168,7 @@ class ModUnique(Modifier):
     return " ".join(words)
 
 class ModNormpath(Modifier):
-  def __call__(self, text, namespaces):
+  def modify(self, text, namespaces):
     return self.foreach(os.path.normpath)
 
 class ModGlob(Modifier):
@@ -170,7 +176,7 @@ class ModGlob(Modifier):
     Modifier.__init__(self, context, modtext)
     self.muststat = muststat
     self.lax = lax
-  def __call__(self, text, namespaces):
+  def modify(self, text, namespaces):
     globbed = []
     for ptn in self.words(text):
       with Pfx("glob(\"%s\")" % (ptn,)):
@@ -187,7 +193,7 @@ class ModGlob(Modifier):
     return " ".join(globbed)
 
 class ModEval(Modifier):
-  def __call__(self, text, namespaces):
+  def modify(self, text, namespaces):
     return parseMacroExpression(self.context, text)[0](self.context, namespaces)
 
 class ModSubstitute(Modifier):
@@ -195,14 +201,14 @@ class ModSubstitute(Modifier):
     Modifier.__init__(self, context, modtext)
     self.regexp_mexpr = regexp_mexpr
     self.replacement = replacement
-  def __call__(self, text, namespaces):
+  def modify(self, text, namespaces):
     return re.sub(regexp_mexpr(self.context, namespaces), self.replacement, text)
 
 class ModFromFiles(Modifier):
   def __init__(self, context, modtext, lax):
     Modifier.__init__(self, context, modtext)
     self.lax = lax
-  def __call__(self, text, namespaces):
+  def modify(self, text, namespaces):
     newwords = []
     for filename in self.words(text):
       with Pfx(filename):
@@ -221,7 +227,7 @@ class ModSelectRegexp(Modifier):
     Modifier.__init__(self, context, modtext)
     self.regexp_mexpr = regexp_mexpr
     self.invert = bool(invert)
-  def __call__(self, text, namespaces):
+  def modify(self, text, namespaces):
     invert = self.invert
     regexp = re.compile(self.regexp_mexpr(self.context, namespaces))
     f = lambda word: word if invert ^ bool(regexp.search(word)) else ''
@@ -232,7 +238,7 @@ class ModSelectRange(Modifier):
     Modifier.__init__(self, context, modtext)
     self.range = range
     self.invert = bool(invert)
-  def __call__(self, text, namespaces):
+  def modify(self, text, namespaces):
     invert = self.invert
     range = self.range
     newwords = []
@@ -247,7 +253,7 @@ class ModSubstitute(Modifier):
     Modifier.__init__(self, context, modtext)
     self.ptn = ptn
     self.repl = repl
-  def __call__(self, text, namespaces):
+  def modify(self, text, namespaces):
     regexp_mexpr, _ = parseMacroExpression(self.context, text=self.ptn)
     return re.compile(regexp_mexpr(self.context, namespaces)).sub(self.repl, text)
 
@@ -256,7 +262,7 @@ class ModSetOp(Modifier):
     Modifier.__init__(self, context, modtext)
     self.op = op
     self.macroname = macroname
-  def __call__(self, text, namespaces):
+  def modify(self, text, namespaces):
     words = set(self.words(text))
     subwords = set(self.words(nsget(namespaces, self.macroname)(self.context, namespaces)))
     if self.op == '-':
