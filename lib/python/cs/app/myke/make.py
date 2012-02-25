@@ -322,10 +322,11 @@ class Target(object):
       self.maker.debug_make("commence make: %d actions, prereqs = %s", len(self.actions), self.prereqs)
       dep_status_LFs = []
       for dep in self.prereqs:
+        D = self.maker[dep]
         if self.cancelled:
           break
-        self.make.debug_make("request dependency: %s", dep)
-        dep_status_LFs.append(dep.make(self.maker))
+        self.maker.debug_make("request dependency: %s", dep)
+        dep_status_LFs.append(D.make(self.maker))
       if self.cancelled:
         D_ok = False
       else:
