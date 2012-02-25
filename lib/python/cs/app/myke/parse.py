@@ -133,21 +133,21 @@ class ModifierSplit1(Modifier):
     return (word.rsplit(sep, 1) if right else word.split(sep, 1))[ 1 if keepright else 0 ]
 
   def __call__(self, text, namespaces):
-    return self.foreach( self.splitword )
+    return self.foreach( text, self.splitword )
 
-class ModPrefixLong(Modifier):
+class ModPrefixLong(ModifierSplit1):
   def __init__(self, context, modtext, separator):
     ModifierSplit1.__init__(self, context, modtext, separator, False, True)
 
-class ModPrefixShort(Modifier):
+class ModPrefixShort(ModifierSplit1):
   def __init__(self, context, modtext, separator):
     ModifierSplit1.__init__(self, context, modtext, separator, False, False)
 
-class ModSuffixLong(Modifier):
+class ModSuffixLong(ModifierSplit1):
   def __init__(self, context, modtext, separator):
     ModifierSplit1.__init__(self, context, modtext, separator, True, False)
 
-class ModSuffixShort(Modifier):
+class ModSuffixShort(ModifierSplit1):
   def __init__(self, context, modtext, separator):
     ModifierSplit1.__init__(self, context, modtext, separator, True, True)
 
@@ -214,13 +214,14 @@ class ModFromFiles(Modifier):
             raise
           else:
             warning("%s", e)
+    return " ".join(newwords)
 
 class ModSelectRegexp(Modifier):
   def __init__(self, context, modtext, regexp_mexpr, invert):
     Modifier.__init__(self, context, modtext)
     self.regexp_mexpr = regexp_mexpr
     self.invert = bool(invert)
-  def __call__(self, text):
+  def __call__(self, text, namespaces):
     invert = self.invert
     regexp = re.compile(self.regexp_mexpr(self.context, namespaces))
     f = lambda word: word if invert ^ bool(regexp.search(word)) else ''
@@ -231,7 +232,7 @@ class ModSelectRange(Modifier):
     Modifier.__init__(self, context, modtext)
     self.range = range
     self.invert = bool(invert)
-  def __call__(self, text):
+  def __call__(self, text, namespaces):
     invert = self.invert
     range = self.range
     newwords = []
@@ -240,6 +241,33 @@ class ModSelectRange(Modifier):
       if (i in range) ^ invert:
         newwords.append(word)
     return " ".join(newwords)
+
+class ModSubstitute(Modifier):
+  def __init__(self, context, modtext, ptn, repl):
+    Modifier.__init__(self, context, modtext)
+    self.ptn = ptn
+    self.repl = repl
+  def __call__(self, text, namespaces):
+    regexp_mexpr, _ = parseMacroExpression(self.context, text=self.ptn)
+    return re.compile(regexp_mexpr(self.context, namespaces)).sub(self.repl, text)
+
+class ModSetOp(Modifier):
+  def __init__(self, context, modtext, op, macroname):
+    Modifier.__init__(self, context, modtext)
+    self.op = op
+    self.macroname = macroname
+  def __call__(self, text, namespaces):
+    words = set(self.words(text))
+    subwords = set(self.words(nsget(namespaces, self.macroname)(self.context, namespaces)))
+    if self.op == '-':
+      words -= subwords
+    elif self.op == '+':
+      words += subwords
+    elif self.op == '*':
+      words ^= subwords
+    else:
+      raise NotImplementedError("unimplemented set op \"%s\"" % (self.op,))
+    return " ".join(words)
 
 class Macro(object):
   ''' A macro definition.
@@ -746,88 +774,113 @@ def parseMacro(context, text=None, offset=0):
           # whitespace
           offset += 1
           continue
-
         if ch == '?':
           raise ParseError(context, offset, 'bare query "?" found in modifiers at: %s' % (text[offset:],))
-        pos = SIMPLE_MODIFIERS.find(ch)
-        if pos >= 0:
-          modifier = ch
-          offset += 1
-          if offset < len(text) and text[offset] == '?':
-            if pos >= len(SIMPLE_MODIFIERS) or SIMPLE_MODIFIERS[pos+1] != '?':
-              raise ParseError(context, offset, 'modifier "%s" does not accept a query "?"' % (ch,))
-            modifier += '?'
-            offset += 1
-          modifiers.append(modifier)
-          continue
 
-        if ch in 'PpSs':
-          modifier = ch
+        mod0 = ch
+        modargs = ()
+        with Pfx(mod0):
+          offset0 = offset
           offset += 1
-          sep = '.'
-          if offset < len(text) and text[offset] == '[':
-            # [x] separator specification
-            offset += 1
+
+          if mod0 == 'D':
+            modclass = ModDirpart
+          elif mod0 == 'E':
+            modclass = ModEval
+          elif mod0 == 'F':
+            modclass = ModFilepart
+          elif mod0 == 'G':
+            modclass = ModGlob
+            if offset < len(text) and text[offset] == '?':
+              offset += 1
+              modargs = (False, True,)
+            else:
+              modargs = (False, False,)
+          elif mod0 == 'g':
+            modclass = ModGlob
+            if offset < len(text) and text[offset] == '?':
+              offset += 1
+              modargs = (True, True,)
+            else:
+              modargs = (True, False,)
+          elif mod0 in 'PpSs':
+            if offset < len(text) and text[offset] == '[':
+              offset += 1
+              if offset >= len(text):
+                raise ParseError(context, offset, 'missing separator')
+              sep = text[offset]
+              offset += 1
+              if offset >= len(text) or text[offset] != ']':
+                raise ParseError(context, offset, 'missing closing "]"')
+              offset += 1
+            else:
+              sep = '.'
+            modargs = (sep,)
+            if mod0 == 'P':
+              modclass = ModPrefixLong
+            elif mod0 == 'p':
+              modclass = ModPrefixShort
+            elif mod0 == 'S':
+              modclass = ModSuffixShort
+            elif mod0 == 's':
+              modclass = ModSuffixLong
+            else:
+              raise NotImplementedError("parse error: unhandled PpSs letter \"%s\"" % (mod0,))
+          elif mod0 == '<':
+            modclass = ModFromFiles
+            if offset < len(text) and text[offset] == '?':
+              offset += 1
+              modargs = (True,)
+            else:
+              modargs = (False,)
+          elif mod0 in '-+*':
+            modclass = ModSetOp
+            _, offset = get_white(text, offset+1)
+            submname, offset = get_identifier(text, offset)
+            if not submname:
+              raise ParseError(context, moffset, 'missing macro name after "-" modifier')
+            modargs = (mod0, submname)
+          elif mod0 == ':':
+            _, offset = get_white(text, offset)
             if offset >= len(text):
-              raise ParseError(context, offset, 'incomplete %s[sep] modifier - missing separator' % (modifier,))
-            sep = text[offset]
+              raise ParseError(context, offset, 'missing opening delimiter in :,ptn,rep,')
+            delim = text[offset]
+            if delim == mmark2:
+              raise ParseError(context, offset, 'found closing bracket instead of leading delimiter in :,ptn,rep,')
+            if delim.isalnum():
+              raise ParseError(context, offset, 'invalid delimiter in :,ptn,rep, - must be nonalphanumeric')
+            modclass = ModSubstitute
             offset += 1
-            if offset >= len(text) or text[offset] != ']':
-              raise ParseError(context, offset, 'incomplete %s[sep] modifier - missing ]' % (modifier,))
-            offset += 1
-          modifiers.append(modifier + sep)
-          continue
+            try:
+              ptn, repl, etc = text[offset:].split(delim, 2)
+            except ValueError:
+              raise ParseError(context, offset, 'incomplete :%sptn%srep%s' % (delim, delim, delim))
+            offset = len(text) - len(etc)
+            modargs = (ptn, repl)
+          else:
+            invert = False
+            if ch == '!':
+              invert = True
+              # !/regexp/ or !{commalist}?
+              _, offset2 = get_white(text, offset+1)
+              if offset2 == len(text) or text[offset2] not in '/{':
+                raise ParseError(context, offset2, '"!" not followed by /regexp/ or {comma-list}')
+              offset = offset2
+              ch = text[offset]
 
-        if ch in '-+*':
-          modifier = ch
-          moffset = offset
-          _, offset = get_white(text, offset+1)
-          submname, offset = get_identifier(text, offset)
-          if not submname:
-            raise ParseError(context, moffset, 'missing macro name after "-" modifier')
-          modifiers.append(modifier+submname)
-          continue
+            if ch == '/':
+              modclass = ModSelectRegexp
+              offset += 1
+              mexpr, end = parseMacroExpression(context, text=text, offset=offset, stopchars='/')
+              if end >= len(text):
+                raise ParseError(context, offset, 'incomplete /regexp/')
+              assert text[end] == '/'
+              offset = end+1
+              modargs = (mexpr, invert)
+            else:
+              raise ParseError(context, offset0, 'unknown macro modifier "%s": "%s"' % (mod0, text[offset0:]))
 
-        if ch == ':':
-          _, offset = get_white(text, offset+1)
-          if offset == len(text):
-            raise ParseError(context, offset, 'missing opening delimiter in :,ptn,rep,')
-          ch = text[offset]
-          if ch == mmark2:
-            raise ParseError(context, offset, 'found closing bracket instead of leading delimiter in :,ptn,rep,')
-          if ch.isalnum():
-            raise ParseError(context, offset, 'invalid delimiter in :,ptn,rep, - must be nonalphanumeric')
-          delim = ch
-          offset += 1
-          try:
-            ptn, repl, _ = text[offset:].split(delim, 2)
-          except ValueError:
-            raise ParseError(context, offset, 'incomplete :%sptn%srep%s' % (delim, delim, delim))
-          offset = len(text) - len(_)
-          modifiers.append("%s%s%s%s" % (delim, ptn, delim, repl))
-          continue
-
-        has_not = False
-        if ch == '!':
-          has_not = True
-          # !/regexp/ or !{commalist}?
-          _, offset2 = get_white(text, offset+1)
-          if offset2 == len(text) or text[offset2] not in '/{':
-            raise ParseError(context, offset2, '"!" not followed by /regexp/ or {comma-list}')
-          offset = offset2
-          ch = text[offset]
-
-        if ch == '/':
-          modifier = ch
-          offset += 1
-          mexpr, end = parseMacroExpression(context, text=text, offset=offset, stopchars='/')
-          if end == len(text):
-            raise ParseError(context, offset, 'incomplete /regexp/')
-          modifiers.append( modifier + ("!" if has_not else ".") + text[offset:end] )
-          offset = end+1
-          continue
-
-        raise ParseError(context, offset, 'unknown macro modifier "%s": "%s"' % (ch, text[offset:]))
+          modifiers.append(modclass(context, text[offset0:offset], *modargs))
 
       except ParseError, e:
         error("%s", e)
@@ -903,92 +956,8 @@ class MacroTerm(object):
         text = macro(context, namespaces, *param_values)
 
       for modifier in self.modifiers:
-        with Pfx(modifier):
-          mod0 = modifier[0]
-          if modifier == 'E':
-            mexpr, offset = parseMacroExpression(self.context, text)
-            assert offset == len(text)
-            text = mexpr(context, namespaces)
-          elif modifier == 'D':
-            text = " ".join( os.path.dirname(s) for s in text.split() if len(s) )
-          elif modifier == 'F':
-            text = " ".join( os.path.basename(s) for s in text.split() if len(s) )
-          elif modifier == 'G' or modifier == 'G?':
-            lax = modifier == 'G?'
-            globs = []
-            for ptn in text.split():
-              if len(ptn):
-                with Pfx("glob(\"%s\")" % (ptn,)):
-                  globbed = glob.glob(ptn)
-                  if globbed:
-                    globs.append(globbed)
-                  else:
-                    if not lax:
-                      raise ValueError("no matches")
-            text = " ".join(chain(*globs))
-          elif mod0 in 'PpSs':
-            mode, sep = modifier
-            with Pfx("\"%s\"" % (text,)):
-              if mode == 'P':
-                text, _ = text.rsplit(sep, 1)
-              elif mode == 'p':
-                text, _ = text.split(sep, 1)
-              elif mode == 'S':
-                _, text = text.rsplit(sep, 1)
-              elif mode == 's':
-                _, text = text.split(sep, 1)
-              else:
-                raise NotImplementedError('unimplemented macro modifier')
-          elif modifier == 'v':
-            # TODO: accept lax?
-            text = ' '.join( MacroTerm(context, word)(context, namespaces) for word in text.split() )
-          elif mod0 in '-+*':
-            mod1 = modifier[1:]
-            words = set( word for word in text.split() if word )
-            M = nsget(namespaces, mod1)
-            if not M:
-              raise ValueError("no macro $(%s)" % (mod1,))
-            subwords = set( subword for subword in M(context, namespaces).split() if subword )
-            if mod0 == '-':
-              words -= subwords
-            elif mod0 == '+':
-              words += subwords
-            elif mod0 == '*':
-              words &= subwords
-            else:
-              raise NotImplementedError('unimplemented set modifier \"%s\"' % (mod0,))
-            text = " ".join(words)
-          elif mod0 == ':':
-            delim = modifier[1]
-            if not isalnum(delim):
-              ptn, rep, _ = modifier[2:].split(delim, 2)
-              assert len(_) == 0, 'bad :,ptn,rep, modifier'
-              mexpr, _ = parseMacroExpression(self.context, ptn)
-              text = re.sub(mexpr(context, namespaces), rep, text)
-            else:
-              raise NotImplementedError('unimplemented ":" modifier')
-          elif modifier == '<' or modifier == '<?':
-            lax = modifier == '<?'
-            newwords = []
-            for word in text.split():
-              if word:
-                with Pfx(word):
-                  try:
-                    with open(word) as wfp:
-                      newwords.extend(fp.read().split())
-                  except IOError, e:
-                    if not lax:
-                      raise
-                    else:
-                      warning("%s", e)
-            text = " ".join(newwords)
-          elif mod0 == '/':
-            has_not = modifier[1] == '!'
-            regexp_mexpr, _ = parseMacroExpression(context, text=modifier[2:])
-            regexp = re.compile(regexp_mexpr(context, namespaces))
-            text = " ".join( [ word for word in text.split() if has_not ^ bool(regexp.search(word)) ] )
-          else:
-            raise NotImplementedError('unimplemented macro modifier')
+        with Pfx("\"%s\" %s" % (text, modifier)):
+          text = modifier(text, namespaces)
 
       return text
 
