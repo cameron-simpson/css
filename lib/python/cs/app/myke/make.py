@@ -107,18 +107,21 @@ class Maker(object):
   def making(self, target):
     ''' Add this target to the set of "in progress" targets.
     '''
+    self.debug_make("note target \"%s\" as active", target.name)
     with self.active_lock:
       self.active.add(target)
 
   def made(self, target, status):
     ''' Remove this target from the set of "in progress" targets.
     '''
+    self.debug_make("note target \"%s\" as inactive (status=%s)", target.name, status)
     with self.active_lock:
       self.active.remove(target)
 
   def cancel_all(self):
     ''' Cancel all "in progress" targets.
     '''
+    self.debug_make("cancel_all!")
     with self._active_lock:
       Ts = list(self.active)
     for T in Ts:
@@ -341,6 +344,7 @@ class Target(object):
   def _make(self):
     ''' Make the target. Private function submtted to the make queue.
     '''
+    self.maker.debug_make("%s: commencing _make()...", self.name)
     self.maker.making(self)
     made = False
     with Pfx("make %s" % (self.name,)):
