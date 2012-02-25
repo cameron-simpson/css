@@ -145,11 +145,11 @@ class ModPrefixShort(Modifier):
 
 class ModSuffixLong(Modifier):
   def __init__(self, context, modtext, separator):
-    ModifierSplit1.__init__(self, context, modtext, separator, True, True)
+    ModifierSplit1.__init__(self, context, modtext, separator, True, False)
 
 class ModSuffixShort(Modifier):
   def __init__(self, context, modtext, separator):
-    ModifierSplit1.__init__(self, context, modtext, separator, True, False)
+    ModifierSplit1.__init__(self, context, modtext, separator, True, True)
 
 class ModUnique(Modifier):
   def __call__(self, text, namespaces):
