@@ -1,0 +1,24 @@
+#!/bin/sh
+#
+# Read Apache access_log lines and group successive 206 (partial response)
+# codes into single entries. This is to allow generation of a log
+# file from which analog will make saner computations, because it
+# looks like IE presents PDFs directly and uses many partial fetches
+# to gather data progressively, resulting is insanely hit apparent
+# hit rates in analog reports.
+#       - Cameron Simpson <cs@zip.com.au>
+#
+
+awk '
+        { ip=$1
+          dt=$4
+          uri=$7
+          code=$9
+
+          tag = ip " " uri " " code
+          if (code != "206" || tag != lasttag) {
+            ##print "tag=["tag"]", "code="code, "lasttag=["lasttag"]", "code != 206 ==>", (code != "206")
+            print
+            lasttag = tag
+          }
+        }' ${1+"$@"}
