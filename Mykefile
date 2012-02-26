@@ -38,6 +38,8 @@ scriptmandir = $(MANDIR)/man1
 scriptmans = $(scriptmandir)/$((allscripts)).1
 scriptfromman(manf) = $(manf FP)
 
+rsync = set-x rsync -i
+
 _help:
         @echo '_test              - do syntax checks and self tests'
         @echo '_home              - deploy scripts to ~/bin etc'
@@ -56,8 +58,7 @@ _test:
 _home:
         skip=`hg status | sed -n 's:^? \(.*\):--exclude=/\1:p'` \
         binskip=`hg status | sed -n 's:^? bin/\(.*\):--exclude=/\1:p'` \
-        set-x \\
-        qrsync -a --delete \\
+        $(rsync) -aO --delete \\
                 --include=/CHANGELOG.txt \\
                 $$binskip \\
                 --include=synonyms/ \\
@@ -66,17 +67,17 @@ _home:
                 --exclude=/\*/ \\
                 bin/. $(HOME)/bin/. \
         bosskip=`hg status | sed -n 's:^? bin-bos/\(.*\):--exclude=/\1:p'` \
-        set-x qrsync -a $$bosskip bin-bos/. $(HOME)/bin-bos/. \
+        $(rsync) -aO $$bosskip bin-bos/. $(HOME)/bin-bos/. \
         csskip=`hg status | sed -n 's:^? bin-cs/\(.*\):--exclude=/\1:p'` \
-        set-x qrsync -a $$csskip \\
+        $(rsync) -aO $$csskip \\
                 --exclude=/testzap \\
                 --exclude=/testpageurls \\
                 bin-cs/. $(HOME)/bin-cs/. \
         libskip=`hg status | sed -n 's:^? lib/\(.*\):--exclude=/\1:p'` \
-        set-x \\
-        qrsync -a --delete \\
+        $(rsync) -aO --delete \\
                 --include=/CHANGELOG.txt \\
                 $$libskip \\
+                --exclude=testdata/ \\
                 --exclude=*.pyc \\
                 --exclude=*.swp \\
                 lib/. $(HOME)/lib/.
