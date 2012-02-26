@@ -45,6 +45,10 @@ if badopts:
   sys.stderr.write(usage)
   sys.exit(2)
 
+if multiAddrs:
+  import re
+  leadingAddrRe = re.compile(r'[^ ,]*,( |%20)*')
+
 zones={}
 defaultZone=None
 
@@ -146,10 +150,7 @@ class LogFile:
     self.lineno=0
 
   def lines(self):
-    global cmd, requireOrdering, multiAddrs
-    if multiAddrs:
-      import re
-      leadingAddrRe = re.compile(r'[^ ,]*,( |%20)*')
+    global cmd, requireOrdering, multiAddrs, leadingAddrRe
 
     olddt=None
     for line in self.fp:
