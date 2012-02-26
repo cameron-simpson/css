@@ -420,36 +420,44 @@ class Action(object):
     self._lock = allocate_lock()
 
   def __str__(self):
-    prline = self.line.replace('\n', '\\n')
+    prline = self.line.rstrip().replace('\n', '\\n')
     return "<Action %s %s>" % (self.variant, prline)
 
   def act(self, target):
-    debug("start _act...")
-    M = target.maker
-    v = self.variant
-    if v == 'shell':
-      shcmd = self.mexpr(self.context, target.namespaces)
-      if not self.silent:
-        print shcmd
-      if M.no_action:
+    with Pfx(str(self)):
+      debug("start _act...")
+      M = target.maker
+      mdebug = M.debug_make
+      v = self.variant
+      if v == 'shell':
+        debug("shell command")
+        shcmd = self.mexpr(self.context, target.namespaces)
+        if not self.silent:
+          print shcmd
+        if M.no_action:
+          mdebug("OK (maker.no_action)")
+          return True
+        argv = (target.shell, '-c', shcmd)
+        mdebug("Popen(%s,..)", argv)
+        P = Popen(argv, close_fds=True)
+        retcode = P.wait()
+        mdebug("retcode = %d", retcode)
+        return retcode == 0
+
+      if v == 'make':
+        subtargets = self.mexpr.eval().split()
+        mdebug("targets = %s", subtargets)
+        for submake in subtargets:
+          self.maker[submake].make()
+        for submake in submakes:
+          status = self.maker[submake].status
+          mdebug("%s submake %s status = %s", ("OK" if status else "FAILED"), submake, status)
+          if not status:
+            return False
+        mdebug("OK all submakes, return True")
         return True
-      M.debug_make("shell command: %s", shcmd)
-      argv = (target.shell, '-xc', shcmd)
-      debug("Popen(%s,..)", argv)
-      P = Popen(argv, close_fds=True)
-      retcode = P.wait()
-      return retcode == 0
 
-    if v == 'make':
-      subtargets = self.mexpr.eval().split()
-      for submake in subtargets:
-        self.maker[submake].make()
-      for submake in submakes:
-        if not self.maker[submake].status:
-          return False
-      return True
-
-    raise NotImplementedError, "unsupported variant: %s" % (self.variant,)
+      raise NotImplementedError, "unsupported variant: %s" % (self.variant,)
 
 if __name__ == '__main__':
   from . import main, default_cmd
