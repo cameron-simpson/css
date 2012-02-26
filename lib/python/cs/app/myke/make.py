@@ -35,7 +35,7 @@ class Maker(object):
     ''' Initialise a Maker.
     '''
     if parallel is None:
-      parallel = 1
+      parallel = 100
     self.parallel = parallel
     self.debug = Flags()
     self.debug.debug = False    # logging.DEBUG noise
@@ -169,7 +169,8 @@ class Maker(object):
       if target in targets:
         T = targets[target]
       else:
-        T = targets[target] = Target(target, self)
+        raise ValueError("unknown Target \"%s\"" % (target,))
+        ##T = targets[target] = Target(target, self)
     return T
 
   def setDebug(self, flag, value):
@@ -344,43 +345,48 @@ class Target(object):
   def _make(self):
     ''' Make the target. Private function submtted to the make queue.
     '''
-    self.maker.debug_make("%s: commencing _make()...", self.name)
+    mdebug = self.maker.debug_make
+    mdebug("%s: COMMENCING _make()...", self.name)
     self.maker.making(self)
     made = False
     with Pfx("make %s" % (self.name,)):
-      self.maker.debug_make("commence make: %d actions, prereqs = %s", len(self.actions), self.prereqs)
+      mdebug("commence make: %d actions, prereqs = %s", len(self.actions), self.prereqs)
       dep_status_LFs = []
       for dep in self.prereqs:
         D = self.maker[dep]
         if self.cancelled:
           break
-        self.maker.debug_make("request dependency: %s", dep)
+        mdebug("request dependency: %s", dep)
         dep_status_LFs.append(D.make(self.maker))
       if self.cancelled:
         D_ok = False
       else:
         D_ok = True
-        self.maker.debug_make("wait for dependencies...")
+        mdebug("wait for dependencies...")
         for LF in report_LFs(dep_status_LFs):
           dep, status = LF()
           if not LF():
             d_ok = False
-            self.maker.debug_make("%s FAILED", dep)
+            mdebug("FAILED %s", dep)
             break
+          mdebug("OK %s", dep)
           if self.cancelled:
+            mdebug("CANCELLED: not waiting for more dependencies")
             break
         if self.cancelled:
+          mdebug("CANCELLED: considering dependencies not ok")
           D_ok = False
         if not D_ok:
-          self.maker.debug_make("prerequisites FAILED, skip actions")
+          mdebug("prerequisites FAILED, skip actions")
           if self.maker.fail_fast:
+            mdebug("fail_fast: cancel all maker targets")
             self.maker.cancel_all()
         else:
           A_ok = True
           for action in self.actions:
-            self.maker.debug_make("dispatch action: %s", action)
+            mdebug("dispatch action: %s", action)
             A_status = action.act(self)
-            self.maker.debug_make("action status = %s: %s", A_status, action)
+            mdebug("%s action: %s", ("OK" if A_status else "FAILED"), action)
             if not A_status:
               A_ok = False
               break
@@ -390,7 +396,7 @@ class Target(object):
             A_ok = False
           if A_ok:
             made = True
-      self.maker.debug_make("OK" if made else "FAILED")
+      mdebug("OK" if made else "FAILED")
       if not made and self.name not in self.maker.precious:
           try:
             os.remove(self.name)
@@ -398,7 +404,7 @@ class Target(object):
             if e.errno != errno.ENOENT:
               error("%s", e)
           else:
-            self.make.debug_make("removed %s")
+            mdebug("removed %s")
       self.maker.made(self, made)
       return self, made
 

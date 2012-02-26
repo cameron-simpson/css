@@ -47,7 +47,7 @@ class FileContext(_FileContext):
   def __str__(self):
     tag = "%s:%d" % (self.filename, self.lineno)
     if self.parent:
-      tag = str(parent) + ": " + tag
+      tag = str(parent) + "::" + tag
     return tag
 
 class ParseError(SyntaxError):
@@ -96,7 +96,7 @@ class Modifier(object):
   def __call__(self, text, namespaces):
     with Pfx("%r %s" % (text, self)):
       ntext = self.modify(text, namespaces)
-      info("%r -> %r", text, ntext)
+      ##info("%r -> %r", text, ntext)
     return ntext
 
   def words(self, text):
