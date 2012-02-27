@@ -13,13 +13,14 @@ import cs.misc
 
 setup_logging()
 
-usage='''Usage: %s [-O] logfiles
+usage='''Usage: %s [-M] [-O] /fixed-string/ logfiles
   -M    Accept multiple leading IP addresses on a line, emit the last.
   -O    Require strict ordering in the input log files.
 ''' % (cs.misc.cmd,)
 
 requireOrdering=False
 multiAddrs=False
+fgrep=None
 badopts=False
 
 try:
@@ -36,6 +37,10 @@ if not badopts:
       requireOrdering=True
     else:
       assert True, "%s: unhandled option: %s" % (cmd, opt)
+
+  if args and len(args[0]) > 2 and args[0].startswith('/') and args[0].endswith('/'):
+    fgrep = args[0][1:-1]
+    args.pop(0)
 
   if len(args) < 1:
     error("missing logfiles")
@@ -150,7 +155,7 @@ class LogFile:
     self.lineno=0
 
   def lines(self):
-    global cmd, requireOrdering, multiAddrs, leadingAddrRe
+    global cmd, requireOrdering, multiAddrs, leadingAddrRe, fgrep
 
     olddt=None
     for line in self.fp:
@@ -159,6 +164,9 @@ class LogFile:
         warn("%s, line %d: unexpected EOF: %s",
              self.filename, self.lineno, line)
         break
+
+      if fgrep is not None and fgrep not in line:
+        continue
 
       line=line[:-1]
 
