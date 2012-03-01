@@ -14,6 +14,11 @@ from cs.threads import AdjustableSemaphore, IterablePriorityQueue, \
 from cs.misc import seq
 from cs.logutils import Pfx, info, debug
 
+STATE_PENDING = 0       # function not yet dispatched
+STATE_RUNNING = 1       # function executing
+STATE_DONE = 2          # function complete
+STATE_CANCELLED = 3     # function cancelled
+
 class _Late_context_manager(object):
   ''' The _Late_context_manager is a context manager to run a suite via an
       existing Later object. Example usage:
@@ -76,7 +81,68 @@ class _Late_context_manager(object):
       raise lf_exc_type, lf_exc_info
     return True
 
-class LateFunction(object):
+class PendingFunction(object):
+  ''' Common state for LateFunctions and OnDemandFunctions.
+  '''
+
+  def __init__(self, func, *a, **kw):
+    if a or kw:
+      func = partial(func, *a, **kw)
+    self.func = func
+    self.state = STATE_PENDING
+    self.result = None
+    self._lock = allocate_lock()
+
+  @property
+  def ready(self):
+    return self.state == STATE_DONE or self.state == STATE_CANCELLED
+  done = ready
+
+  @property
+  def cancelled(self):
+    return self.state == STATE_CANCELLED
+
+  def cancel(self):
+    ''' Cancel this function.
+        If self.state is STATE_PENDING or STATE_CANCELLED, return True.
+        Otherwise return False (too late to cancel).
+    '''
+    with self._lock:
+      state = self.state
+      if state == STATE_PENDING:
+        self.state = STATE_CANCELLED
+        self.func = None
+      elif state == STATE_RUNNING or state == STATE_DONE:
+        return False
+    return True
+
+class OnDemandFunction(PendingFunction):
+  ''' Wrap a callable, call it later.
+      Like a LateFunction, you can call the wrapper many times; the
+      inner function will only run once.
+  '''
+
+  def __init__(self, func, *a, **kw):
+    PendingFunction.__init__(self, func, *a, **kw)
+
+  def __call__(self):
+    with self._lock:
+      if self.state == STATE_PENDING:
+        self.state = STATE_RUNNING
+        result, exc_info = None, (None, None, None)
+        try:
+          result = func()
+        except:
+          exc_info = sys.exc_info()
+        self.result = result, exc_info[0], exc_info[1], exc_info[2]
+        self.state = STATE_DONE
+        self.func = None
+    result, exc_type, exc_value, exc_traceback = self.result
+    if exc_type:
+      raise exc_type, exc_value, exc_traceback
+    return result
+
+class LateFunction(PendingFunction):
   ''' State information about a pending function.
       A LateFunction is callable, so a synchronous call can be done like this:
 
@@ -111,24 +177,17 @@ class LateFunction(object):
             timeout for wait()
   '''
 
-  _PENDING = 0
-  _RUNNING = 1
-  _DONE = 2
-  _CANCELLED = 3
-
   def __init__(self, later, func, name=None):
     ''' Initialise a LateFunction.
         `later` is the controlling Later instance.
         `func` is the callable for later execution.
         `name`, if supplied, specifies an identifying name for the LateFunction.
     '''
-    self.later = later
-    self.func = func
+    PendingFunction.__init__(self, func)
     if name is None:
       name = "LateFunction-%d" % (seq(),)
-    self.__name__ = name
-    self.state = LateFunction._PENDING
-    self._lock = allocate_lock()
+    self.name = name
+    self.later = later
     self._join_lock = allocate_lock()
     self._join_cond = Condition()
     self._join_notifiers = []
@@ -136,24 +195,12 @@ class LateFunction(object):
   def __str__(self):
     return "<LateFunction %s>" % (self.name,)
 
-  @property
-  def name(self):
-    return self.__name__
-
-  @property
-  def done(self):
-    return self.state == LateFunction._DONE or self.state == LateFunction._CANCELLED
-
-  @property
-  def cancelled(self):
-    return self.state == LateFunction._CANCELLED
-
   def _dispatch(self):
     ''' ._dispatch() is called by the Later class instance's worker thread.
         It causes the function to be handed to a thread for execution.
     '''
     with self._lock:
-      assert self.state == LateFunction._PENDING
+      assert self.state == STATE_PENDING
       self.later._workers.dispatch(self.func, deliver=self.__getResult)
       self.func = None
 
@@ -161,10 +208,13 @@ class LateFunction(object):
     ''' Cancel this LateFunction.
     '''
     with self._lock:
-      if self.state == LateFunction._PENDING:
-        self.__getResult( (None, None, None, None), newstate=LateFunction._CANCELLED )
-      else:
-        info("%s.cancel(), but state=%s" % (self, self.state))
+      if self.state == STATE_PENDING:
+        self.__getResult( (None, None, None, None), newstate=STATE_CANCELLED )
+        return True
+      if self.state == STATE_CANCELLED:
+        return True
+    info("%s.cancel(), but state=%s" % (self, self.state))
+    return False
 
   def __getResult(self, result, newstate=None):
     ''' __getResult() is called by a worker thread to report
@@ -175,7 +225,7 @@ class LateFunction(object):
           None, exc_type, exc_value, exc_traceback
     '''
     if newstate is None:
-      newstate = LateFunction._DONE
+      newstate = STATE_DONE
     # collect the result and release the capacity
     with self._join_lock:
       self.result = result
