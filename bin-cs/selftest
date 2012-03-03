@@ -10,7 +10,7 @@ cmd=`basename "$0"`
 
 main()
 {
-  usage="Usage: $cmd [-v] [-x] [--python pylibdir pysubtree]..."
+  usage="Usage: $cmd [-v] [-x] [--python pylibdir pysubtree [modules...]]..."
 
   trace=${DEBUG:+set-x}
   vecho=:
@@ -33,8 +33,21 @@ main()
       --python)
         pylibdir=$2
         pysubdir=$3
-        shift; shift
-        test_python "$pylibdir" "$pysubdir" || return $?
+        shift; shift; shift
+        pymodules=
+        while [ $# -gt 0 ]
+        do
+          case "$1" in
+            [a-z]*)
+              pymodules="$pymodules $1"
+              shift
+              continue
+              ;;
+          esac
+          break
+        done
+        test_python "$pylibdir" "$pysubdir" $pymodules || return $?
+        continue
         ;;
       --)
         shift; break ;;
@@ -85,10 +98,32 @@ stateful()
   [ -s "$_s_statefile" ]
 }
 
+list_python_files()
+{
+  [ $# -gt 2 ] \
+  || { echo "$cmd: Usage: test_python pylibdir pysubdir [modules...]" >&2
+       return 2
+     }
+  _lpf_pylibdir=$1
+  _lpf_pysubdir=$2
+  shift; shift
+
+  if [ $# -gt 0 ]
+  then
+    for _lpf_module
+    do
+      echo "$_lpf_pylibdir/"`echo "$_lpf_module" | tr . /`.py
+    done
+  else
+    find "$_lpf_pylibdir/$_lpf_pysubdir" -type f -name \*.py -print
+  fi \
+  | sort
+}
+
 test_python()
 {
-  [ $# = 2 ] \
-  || { echo "$cmd: Usage: test_python pylibdir pysubdir" >&2
+  [ $# -ge 2 ] \
+  || { echo "$cmd: Usage: test_python pylibdir pysubdir [modules...]" >&2
        return 2
      }
 
@@ -101,8 +136,7 @@ test_python()
     _tpy_xit=0
 
     $vecho "syntax check $_tpy_pylibdir/$_tpy_pysubdir ..."
-    find "$_tpy_pylibdir/$_tpy_pysubdir" -type f -name \*.py -print \
-    | sort \
+    list_python_files "$_tpy_pylibdir" "$_tpy_pysubdir" ${1+"$@"} \
     | \
     ( xit=0 
       while read -r py 
@@ -114,8 +148,7 @@ test_python()
     ) || _tpy_xit=1
 
     $vecho "import check $_tpy_pylibdir/$_tpy_pysubdir ..."
-    find "$_tpy_pylibdir/$_tpy_pysubdir" -type f -name \*.py -print \
-    | sort \
+    list_python_files "$_tpy_pylibdir" "$_tpy_pysubdir" ${1+"$@"} \
     | \
     ( xit=0 
       while read -r py 
@@ -128,8 +161,7 @@ test_python()
     ) || _tpy_xit=1
 
     $vecho "unit test $_tpy_pylibdir/$_tpy_pysubdir ..."
-    find "$_tpy_pylibdir/$_tpy_pysubdir" -type f -name \*.py -print \
-    | sort \
+    list_python_files "$_tpy_pylibdir" "$_tpy_pysubdir" ${1+"$@"} \
     | \
     ( xit=0 
       while read -r py 
