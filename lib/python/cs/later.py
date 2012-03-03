@@ -92,6 +92,8 @@ class PendingFunction(object):
     self.state = STATE_PENDING
     self.result = None
     self._lock = allocate_lock()
+    self.join_cond = Condition()
+    self.notifiers = []
 
   @property
   def ready(self):
@@ -112,9 +114,66 @@ class PendingFunction(object):
       if state == STATE_PENDING:
         self.state = STATE_CANCELLED
         self.func = None
+        self.set_result( (None, None) )
       elif state == STATE_RUNNING or state == STATE_DONE:
         return False
     return True
+
+  def set_result(self, result):
+    ''' set_result() is called by a worker thread to report completion of the
+        function.
+        The argument `result` is a 2-tuple as produced by cs.threads.WorkerThreadPool:
+          func_result, None
+        or:
+          None, exc_info
+        where exc_info is (exc_type, exc_value, exc_traceback).
+    '''
+    # collect the result and release the capacity
+    with self._lock:
+      if self.state != STATE_CANCELLED:
+        self.state = STATE_DONE
+        self.result = result
+      notifiers = list(self.notifiers)
+    for notifier in notifiers:
+      notifier(self)
+    with self.join_cond:
+      self.join_cond.notify_all()
+
+  def wait(self):
+    ''' Calling the .wait() method waits for the function to run to
+        completion and returns a tuple as for the WorkerThreadPool's
+        .dispatch() return queue:
+        On completion the sequence:
+          func_result, None, None, None
+        is returned.
+        On an exception the sequence:
+          None, exec_type, exc_value, exc_traceback
+        is returned.
+    '''
+    self.join()
+    return self.result
+
+  def join(self):
+    ''' Wait for the function to complete.
+        The function return value is available as self.result.
+    '''
+    with self.join_cond:
+      if self.done:
+        return
+      self.join_cond.wait()
+      assert self.done
+
+  def notify(self, notifier):
+    ''' After the function completes, run notifier(self).
+        If the function has already completed this will happen immediately.
+        Note: if you'd rather `self` got put on some Queue `Q`, supply `Q.put`.
+    '''
+    with self._lock:
+      if not self.done:
+        self.notifiers.append(notifier)
+        notifier = None
+    if notifier is not None:
+      notifier(self)
 
 class OnDemandFunction(PendingFunction):
   ''' Wrap a callable, call it later.
@@ -126,17 +185,18 @@ class OnDemandFunction(PendingFunction):
     PendingFunction.__init__(self, func, *a, **kw)
 
   def __call__(self):
+    do_func = False
     with self._lock:
       if self.state == STATE_PENDING:
+        do_func = True
         self.state = STATE_RUNNING
-        result, exc_info = None, None
-        try:
-          result = func()
-        except:
-          exc_info = sys.exc_info()
-        self.result = result, exc_info
-        self.state = STATE_DONE
-        self.func = None
+    if do_func:
+      result, exc_info = None, None
+      try:
+        result = self.func()
+      except:
+        exc_info = sys.exc_info()
+      self.set_result( (result, exc_info) )
     result, exc_info = self.result
     if exc_info:
       exc_type, exc_value, exc_traceback = exc_info
@@ -189,9 +249,6 @@ class LateFunction(PendingFunction):
       name = "LateFunction-%d" % (seq(),)
     self.name = name
     self.later = later
-    self._join_lock = allocate_lock()
-    self._join_cond = Condition()
-    self._join_notifiers = []
 
   def __str__(self):
     return "<LateFunction %s>" % (self.name,)
@@ -202,94 +259,26 @@ class LateFunction(PendingFunction):
     '''
     with self._lock:
       assert self.state == STATE_PENDING
+      self.state = STATE_RUNNING
       self.later._workers.dispatch(self.func, deliver=self.set_result)
       self.func = None
 
-  def cancel(self):
-    ''' Cancel this LateFunction.
-    '''
-    with self._lock:
-      if self.state == STATE_PENDING:
-        self.state = STATE_CANCELLED
-        self.set_result( (None, None) )
-        return True
-      if self.state == STATE_CANCELLED:
-        return True
-    info("%s.cancel(), but state=%s" % (self, self.state))
-    return False
-
-  def set_result(self, result):
-    ''' set_result() is called by a worker thread to report completion of the
-        function.
-        The argument `result` is a 2-tuple as produced by cs.threads.WorkerThreadPool:
-          func_result, None
-        or:
-          None, exc_info
-        where exc_info is (exc_type, exc_value, exc_traceback).
-    '''
-    # collect the result and release the capacity
-    with self._join_lock:
-      if self.state != STATE_CANCELLED:
-        self.state = STATE_DONE
-        self.result = result
-      notifiers = list(self._join_notifiers)
-    self.later.capacity.release()
-    self.later.running.remove(self)
-    self.later.debug("completed %s", self)
-    for notifier in notifiers:
-      notifier(self)
-    with self._join_cond:
-      self._join_cond.notify_all()
-
-  def __call__(self, *args, **kwargs):
+  def __call__(self):
     ''' Calling the object waits for the function to run to completion
         and returns the function return value.
         If the function threw an exception that exception is reraised.
     '''
-    assert not args
-    assert not kwargs
     result, exc_info = self.wait()
     if exc_info:
       exc_type, exc_value, exc_traceback = exc_info
       raise exc_type, exc_value, exc_traceback
     return result
 
-  def wait(self):
-    ''' Calling the .wait() method waits for the function to run to
-        completion and returns a tuple as for the WorkerThreadPool's
-        .dispatch() return queue:
-        On completion the sequence:
-          func_result, None, None, None
-        is returned.
-        On an exception the sequence:
-          None, exec_type, exc_value, exc_traceback
-        is returned.
-    '''
-    self.join()
-    return self.result
-
-  def join(self):
-    ''' Wait for the function to complete.
-        The function return value is available as self.result.
-    '''
-    with self._join_cond:
-      with self._join_lock:
-        if self.done:
-          return
-      self._join_cond.wait()
-      assert self.done
-
-  def notify(self, notifier):
-    ''' After the function completes, run notifier(self).
-        If the function has already completed this will happen immediately.
-        Note: if you'd rather `self` got put on some Queue `Q`, supply `Q.put`.
-    '''
-    with self._join_lock:
-      if not self.done:
-        self._join_notifiers.append(notifier)
-        notifier = None
-    if notifier is not None:
-      notifier(self)
+  def set_result(self, result):
+    self.later.capacity.release()
+    self.later.running.remove(self)
+    self.later.debug("completed %s", self)
+    PendingFunction.set_result(self, result)
 
 class Later(object):
   ''' A management class to queue function calls for later execution.
@@ -426,6 +415,18 @@ class Later(object):
       self.running.add(LF)
       self.debug("dispatched %s", LF)
       LF._dispatch()
+
+  def bg(self, func, *a, **kw):
+    ''' Queue a function to run right now, ignoring the Later's capacity and
+        priority system. This is really an easy way to utilise the Later's
+        thread pool and get back a handy LateFunction for result collection.
+    '''
+    if a or kw:
+      func = partial(func, *a, **kw)
+    LF = LateFunction(self, func)
+    self.running.add(LF)
+    LF._dispatch()
+    return LF
 
   def ready(self, **kwargs):
     ''' Awful name.
