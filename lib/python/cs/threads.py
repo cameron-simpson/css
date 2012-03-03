@@ -87,7 +87,7 @@ class WorkerThreadPool(object):
   def _handler(self, Hdesc):
     ''' The code run by each handler thread.
 	Read a function `func`, return queue `retq` and delivery
-	function `deliver` from the function queue,
+	function `deliver` from the function queue.
         Run func().
         On completion the result is the sequence:
           func_result, None

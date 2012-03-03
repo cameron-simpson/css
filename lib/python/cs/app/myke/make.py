@@ -305,7 +305,7 @@ class Target(object):
 
   def make(self, maker):
     ''' Request that this target be made.
-        Return the LateFunc that will report the madeness.
+        Return the LateFunction that will report the madeness.
         Check the .status property to find out how things went;
         it will block if necessary.
     '''
