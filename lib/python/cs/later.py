@@ -227,12 +227,11 @@ class LateFunction(PendingFunction):
           None, exc_info
         where exc_info is (exc_type, exc_value, exc_traceback).
     '''
-    if newstate is None:
-      newstate = STATE_DONE
     # collect the result and release the capacity
     with self._join_lock:
-      self.result = result
-      self.state = newstate
+      if self.state != STATE_CANCELLED:
+        self.state = STATE_DONE
+        self.result = result
       notifiers = list(self._join_notifiers)
     self.later.capacity.release()
     self.later.running.remove(self)
