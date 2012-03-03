@@ -202,7 +202,7 @@ class LateFunction(PendingFunction):
     '''
     with self._lock:
       assert self.state == STATE_PENDING
-      self.later._workers.dispatch(self.func, deliver=self.__getResult)
+      self.later._workers.dispatch(self.func, deliver=self.set_result)
       self.func = None
 
   def cancel(self):
@@ -210,20 +210,21 @@ class LateFunction(PendingFunction):
     '''
     with self._lock:
       if self.state == STATE_PENDING:
-        self.__getResult( (None, None, None, None), newstate=STATE_CANCELLED )
+        self.set_result( (None, None), newstate=STATE_CANCELLED )
         return True
       if self.state == STATE_CANCELLED:
         return True
     info("%s.cancel(), but state=%s" % (self, self.state))
     return False
 
-  def __getResult(self, result, newstate=None):
-    ''' __getResult() is called by a worker thread to report
+  def set_result(self, result, newstate=None):
+    ''' set_result() is called by a worker thread to report
         completion of the function.
-        The argument `result` is a 4-tuple as produced by cs.threads.WorkerThreadPool:
-          func_result, None, None, None
+        The argument `result` is a 2-tuple as produced by cs.threads.WorkerThreadPool:
+          func_result, None
         or:
-          None, exc_type, exc_value, exc_traceback
+          None, exc_info
+        where exc_info is (exc_type, exc_value, exc_traceback).
     '''
     if newstate is None:
       newstate = STATE_DONE
