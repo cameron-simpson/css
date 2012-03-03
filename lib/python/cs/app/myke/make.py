@@ -314,13 +314,6 @@ class Target(object):
         self.maker = maker
     return self._status_func
 
-  def make2(self, maker):
-    with self._lock:
-      if self.maker is None:
-        self.maker = maker
-    prereqs = []        # list of required items
-    assert False
-
   @property
   def _status_func(self):
     with self._lock:
