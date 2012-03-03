@@ -210,16 +210,17 @@ class LateFunction(PendingFunction):
     '''
     with self._lock:
       if self.state == STATE_PENDING:
-        self.set_result( (None, None), newstate=STATE_CANCELLED )
+        self.state = STATE_CANCELLED
+        self.set_result( (None, None) )
         return True
       if self.state == STATE_CANCELLED:
         return True
     info("%s.cancel(), but state=%s" % (self, self.state))
     return False
 
-  def set_result(self, result, newstate=None):
-    ''' set_result() is called by a worker thread to report
-        completion of the function.
+  def set_result(self, result):
+    ''' set_result() is called by a worker thread to report completion of the
+        function.
         The argument `result` is a 2-tuple as produced by cs.threads.WorkerThreadPool:
           func_result, None
         or:
