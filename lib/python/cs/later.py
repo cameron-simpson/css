@@ -129,16 +129,17 @@ class OnDemandFunction(PendingFunction):
     with self._lock:
       if self.state == STATE_PENDING:
         self.state = STATE_RUNNING
-        result, exc_info = None, (None, None, None)
+        result, exc_info = None, None
         try:
           result = func()
         except:
           exc_info = sys.exc_info()
-        self.result = result, exc_info[0], exc_info[1], exc_info[2]
+        self.result = result, exc_info
         self.state = STATE_DONE
         self.func = None
-    result, exc_type, exc_value, exc_traceback = self.result
-    if exc_type:
+    result, exc_info = self.result
+    if exc_info:
+      exc_type, exc_value, exc_traceback = exc_info
       raise exc_type, exc_value, exc_traceback
     return result
 
