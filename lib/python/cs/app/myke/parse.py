@@ -993,11 +993,10 @@ class TestAll(unittest.TestCase):
   def test20parseMakeLines(self):
     from StringIO import StringIO
     from .make import Maker
-    M = Maker()
-    parsed = list(parseMakefile(M, StringIO("abc = def\n")))
-    self.assertEquals(len(parsed), 1)
-    self.assertEquals([ type(O) for O in parsed ], [ Macro ])
-    M.close()
+    with Maker() as M:
+      parsed = list(parseMakefile(M, StringIO("abc = def\n")))
+      self.assertEquals(len(parsed), 1)
+      self.assertEquals([ type(O) for O in parsed ], [ Macro ])
 
 if __name__ == '__main__':
   unittest.main()

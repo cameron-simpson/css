@@ -47,7 +47,6 @@ class Maker(object):
     self.fail_fast = True
     self.no_action = False
     self.default_target = None
-    self._makeQ = Later(self.parallel, name=cs.misc.cmd)
     self._makefiles = []
     self.appendfiles = []
     self.macros = {}
@@ -58,10 +57,20 @@ class Maker(object):
     self.active_lock = allocate_lock()
     self._namespaces = []
 
-  def close(self):
+  def __enter__(self):
+    ''' Context manager entry.
+        Prepare the _makeQ.
+    '''
+    self._makeQ = Later(self.parallel, name=cs.misc.cmd)
+    return self
+
+  def __exit__(self, exc_type, exc_val, exc_tb):
+    ''' Exit handler.
+        Close the _makeQ.
+    '''
     self.debug_make("%s.close()", self)
     self._makeQ.close()
-    self._makeQ = None
+    return False
 
   @property
   def namespaces(self):

@@ -13,35 +13,33 @@ def main(argv):
   cmd, args = argv[0], argv[1:]
   setup_logging(cmd)
 
-  M = Maker()
-  try:
-    args, badopts = M.getopt(args)
-  except GetoptError, e:
-    warning("bad options: %s", e)
-    badopts = True
-  if badopts:
-    print >>sys.stderr, usage % (cmd,)
-    return 2
+  with Maker() as M:
+    try:
+      args, badopts = M.getopt(args)
+    except GetoptError, e:
+      warning("bad options: %s", e)
+      badopts = True
+    if badopts:
+      print >>sys.stderr, usage % (cmd,)
+      return 2
 
-  M.loadMakefiles(M.makefiles)
-  M.loadMakefiles(M.appendfiles)
+    M.loadMakefiles(M.makefiles)
+    M.loadMakefiles(M.appendfiles)
 
-  if args:
-    targets = args
-  else:
-    target = M.default_target
-    if target is None:
-      targets = ()
+    if args:
+      targets = args
     else:
-      targets = (M.default_target,)
+      target = M.default_target
+      if target is None:
+        targets = ()
+      else:
+        targets = (M.default_target,)
 
-  if not targets:
-    error("no default target")
-    xit = 1
-  else:
-    xit = 0 if M.make(targets) else 1
-
-  M.close()
+    if not targets:
+      error("no default target")
+      xit = 1
+    else:
+      xit = 0 if M.make(targets) else 1
 
   return xit
 
