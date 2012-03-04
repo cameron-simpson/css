@@ -17,7 +17,7 @@ else:
 from collections import deque
 if sys.hexversion < 0x02060000: from sets import Set as set
 from cs.misc import seq
-from cs.logutils import Pfx, LogTime, error, warning, debug, exception, OBSOLETE
+from cs.logutils import Pfx, LogTime, error, warning, debug, exception, OBSOLETE, D
 from cs.misc import seq
 
 class WorkerThreadPool(object):
@@ -87,7 +87,7 @@ class WorkerThreadPool(object):
   def _handler(self, Hdesc):
     ''' The code run by each handler thread.
 	Read a function `func`, return queue `retq` and delivery
-	function `deliver` from the function queue,
+	function `deliver` from the function queue.
         Run func().
         On completion the result is the sequence:
           func_result, None
@@ -206,10 +206,20 @@ class Channel(object):
         state="ERROR"
     return "<cs.threads.Channel %s>" % (state,)
 
+  def __call__(self, *a):
+    ''' Call the Channel.
+        With no arguments, do a .get().
+        With an argument, do a .put().
+    '''
+    if a:
+      return self.put(*a)
+    return self.get()
+
   def get(self):
     ''' Read a value from the Channel.
         Blocks until someone put()s to the Channel.
     '''
+    debug("CHANNEL: %s.get()", self)
     if self.closed:
       raise ValueError, "%s.get() on closed Channel" % (self,)
     with self.__get_lock:
@@ -221,18 +231,21 @@ class Channel(object):
       delattr(self,'_value')
       with self.__lock:
         self._nreaders -= 1
+    debug("CHANNEL: %s.get() got %r", self, value)
     return value
 
   def put(self, value):
     ''' Write a value to the Channel.
         Blocks until a corresponding get() occurs.
     '''
+    debug("CHANNEL: %s.put(%r)", self, value)
     if self.closed:
       raise ValueError, "%s: closed, but put(%s)" % (self, value)
     with self.__put_lock:
       self.__writable.acquire()   # prevent other writers
       self._value = value
       self.__readable.release()   # allow a reader
+    debug("CHANNEL: %s.put(%r) completed", self, value)
 
   def close(self):
     with self.__lock:

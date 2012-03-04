@@ -41,6 +41,8 @@ def main(argv):
   else:
     xit = 0 if M.make(targets) else 1
 
+  M.close()
+
   return xit
 
 if __name__ == '__main__':
