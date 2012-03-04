@@ -550,7 +550,7 @@ def parseMakefile(M, fp, parent_context=None):
 
         action_list = []
         for target in target_mexpr(context, M.namespaces).split():
-          yield Target(target, context, prereqs=prereqs_mexpr, postprereqs=postprereqs_mexpr, actions=action_list)
+          yield Target(M, target, context, prereqs=prereqs_mexpr, postprereqs=postprereqs_mexpr, actions=action_list)
         continue
 
         raise ParseError(context, 0, 'unparsed line')
