@@ -997,6 +997,7 @@ class TestAll(unittest.TestCase):
     parsed = list(parseMakefile(M, StringIO("abc = def\n")))
     self.assertEquals(len(parsed), 1)
     self.assertEquals([ type(O) for O in parsed ], [ Macro ])
+    M.close()
 
 if __name__ == '__main__':
   unittest.main()
