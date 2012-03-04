@@ -12,7 +12,7 @@ import time
 from cs.threads import AdjustableSemaphore, IterablePriorityQueue, \
                        WorkerThreadPool, TimerQueue
 from cs.misc import seq
-from cs.logutils import Pfx, info, debug
+from cs.logutils import Pfx, info, debug, D
 
 STATE_PENDING = 0       # function not yet dispatched
 STATE_RUNNING = 1       # function executing
@@ -202,6 +202,18 @@ class OnDemandFunction(PendingFunction):
       exc_type, exc_value, exc_traceback = exc_info
       raise exc_type, exc_value, exc_traceback
     return result
+
+def CallableValue(value):
+  ''' Return a callable that returns the supplied value.
+      This wraps the value in an OnDemandFunction for compatability
+      with other PendingFunctions.
+      Of course, if you don't need .wait() et al you can just use:
+        lambda: value
+      instead.
+  '''
+  F = OnDemandFunction(lambda: None)
+  F.set_result( (value, None) )
+  return F
 
 class LateFunction(PendingFunction):
   ''' State information about a pending function.
