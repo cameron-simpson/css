@@ -12,7 +12,7 @@ import logging
 from subprocess import Popen
 from thread import allocate_lock
 import cs.misc
-from cs.later import Later, report as report_LFs
+from cs.later import Later, report as report_LFs, CallableValue
 from cs.logutils import Pfx, info, error, debug, D
 from cs.threads import Channel
 from .parse import SPECIAL_MACROS, Macro, MacroExpression, \
@@ -506,7 +506,7 @@ class Action(object):
           print shcmd
         if M.no_action:
           mdebug("OK (maker.no_action)")
-          return True
+          return CallableValue(True) if as_func else True
         return M.defer(self._shcmd, target, shcmd)
 
       if v == 'make':
@@ -518,9 +518,9 @@ class Action(object):
           status = self.maker[submake].status
           mdebug("%s submake %s status = %s", ("OK" if status else "FAILED"), submake, status)
           if not status:
-            return False
+            return CallableValue(False) if as_func else False
         mdebug("OK all submakes, return True")
-        return True
+        return CallableValue(True) if as_func else True
 
       raise NotImplementedError, "unsupported variant: %s" % (self.variant,)
 
