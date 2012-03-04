@@ -100,8 +100,9 @@ stateful()
 
 list_python_files()
 {
-  [ $# -gt 2 ] \
+  [ $# -ge 2 ] \
   || { echo "$cmd: Usage: test_python pylibdir pysubdir [modules...]" >&2
+       echo "  got $# args: 0=$0 $*" >&2
        return 2
      }
   _lpf_pylibdir=$1
@@ -124,6 +125,7 @@ test_python()
 {
   [ $# -ge 2 ] \
   || { echo "$cmd: Usage: test_python pylibdir pysubdir [modules...]" >&2
+       echo "  got $# args: 0=$0 $*" >&2
        return 2
      }
 
