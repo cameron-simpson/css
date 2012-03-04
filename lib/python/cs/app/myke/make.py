@@ -126,7 +126,7 @@ class Maker(object):
     ''' Cancel all "in progress" targets.
     '''
     self.debug_make("cancel_all!")
-    with self._active_lock:
+    with self.active_lock:
       Ts = list(self.active)
     for T in Ts:
       T.cancel()
@@ -148,7 +148,10 @@ class Maker(object):
       LFs = []
       for target in targets:
         mdebug("make(%s)" % (target,))
-        T = self[target]
+        if isinstance(target, str):
+          T = self[target]
+        else:
+          T = target
         LFs.append(T.make(as_func=True))
       mdebug("collect make statuses...")
       for LF in report_LFs(LFs):
