@@ -41,7 +41,7 @@ scriptfromman(manf) = $(manf FP)
 rsync = set-x rsync -i
 
 _help:
-        @echo '_test              - do syntax checks and self tests'
+        @echo '_test              - do syntax checks and self tests (may set \$$MYKE_TEST_PYTHON_MODULES if desired)'
         @echo '_home              - deploy scripts to ~/bin etc'
         @echo '_deploy            - deploy current release to /opt/css'
         @echo '_publish_ezos      - deploy current release to /opt/css, ezos'
@@ -53,7 +53,7 @@ _help:
 
 _test:
         find lib/python -type f -name '*.py[co]' -exec rm {} \;
-        ./bin-cs/selftest -v --python lib/python cs
+        set -x; ./bin-cs/selftest -v --python lib/python cs $$MYKE_TEST_PYTHON_MODULES
 
 _home:
         skip=`hg status | sed -n 's:^? \(.*\):--exclude=/\1:p'` \

@@ -13,7 +13,8 @@ from subprocess import Popen
 from thread import allocate_lock
 import cs.misc
 from cs.later import Later, report as report_LFs
-from cs.logutils import Pfx, info, error, debug
+from cs.logutils import Pfx, info, error, debug, D
+from cs.threads import Channel
 from .parse import SPECIAL_MACROS, Macro, MacroExpression, \
                    parseMakefile, parseMacroExpression
 
@@ -31,11 +32,12 @@ class Maker(object):
   ''' Main class representing a set of dependencies to make.
   '''
 
-  def __init__(self, parallel=None):
+  def __init__(self, parallel=1):
     ''' Initialise a Maker.
+        `parallel`: the degree of parallelism of shell actions.
     '''
-    if parallel is None:
-      parallel = 100
+    if parallel < 1:
+      raise ValueError("expected positive integer for parallel, got: %s" % (parallel,))
     self.parallel = parallel
     self.debug = Flags()
     self.debug.debug = False    # logging.DEBUG noise
@@ -45,7 +47,7 @@ class Maker(object):
     self.fail_fast = True
     self.no_action = False
     self.default_target = None
-    self._makeQ = None
+    self._makeQ = Later(self.parallel, name=cs.misc.cmd)
     self._makefiles = []
     self.appendfiles = []
     self.macros = {}
@@ -59,8 +61,10 @@ class Maker(object):
   def __str__(self):
     return '%s<Maker>' % (cs.misc.cmd,)
 
-  def _queue(self, func, name, priority):
-    return self._makeQ.submit(func, name=name, priority=priority)
+  def close(self):
+    self.debug_make("%s.close()", self)
+    self._makeQ.close()
+    self._makeQ = None
 
   @property
   def namespaces(self):
@@ -122,44 +126,44 @@ class Maker(object):
     ''' Cancel all "in progress" targets.
     '''
     self.debug_make("cancel_all!")
-    with self._active_lock:
+    with self.active_lock:
       Ts = list(self.active)
     for T in Ts:
       T.cancel()
 
+  def defer(self, func, *a, **kw):
+    self.debug_make("defer %s(*%r, **%r)" % (func, a, kw))
+    return self._makeQ.defer(func, *a, **kw)
+
+  def bg(self, func, *a, **kw):
+    self.debug_make("bg %s(*%r, **%r)" % (func, a, kw))
+    return self._makeQ.bg(func, *a, **kw)
+
   def make(self, targets):
     ''' Make a bunch of targets.
     '''
+    mdebug = self.debug_make
     with Pfx("%s.make(%s)" % (self, targets)):
-      with Later(self.parallel, name=cs.misc.cmd) as MQ:
-        ok = True
-        self._makeQ = MQ
-        Tlist = []
-        for target in targets:
-          if type(target) is str:
-            T = self._targets.get(target)
-            if not T:
-              error("don't know how to make %s", target)
-              ok = False
-              if self.fail_fast:
-                break
-              else:
-                continue
-          else:
-            T = target
-          T.make(self)
-          Tlist.append(T)
-        for T in Tlist:
-          debug("%s: collect status...", T)
-          T_ok = T.status
-          self.debug_make("%s: status = %s", T, T_ok)
-          if not T_ok:
-            error("make %s fails", T)
-            ok = False
-            if self.fail_fast:
-              break
-      self._makeQ = None
-      return ok
+      ok = True
+      LFs = []
+      for target in targets:
+        mdebug("make(%s)" % (target,))
+        if isinstance(target, str):
+          T = self[target]
+        else:
+          T = target
+        LFs.append(T.make(as_func=True))
+      mdebug("collect make statuses...")
+      for LF in report_LFs(LFs):
+        T_ok = LF()
+        assert T_ok is True or T_ok is False
+        mdebug("status = %s", T_ok)
+        if not T_ok:
+          error("FAILed")
+          ok = False
+          if self.fail_fast:
+            break
+    return ok
 
   def __getitem__(self, target):
     ''' Return the specified Target.
@@ -260,23 +264,24 @@ class Maker(object):
 
 class Target(object):
 
-  def __init__(self, name, context, prereqs, postprereqs, actions):
+  def __init__(self, maker, name, context, prereqs, postprereqs, actions):
     ''' Initialise a new target.
+        `maker`: the Maker with which this Target is associated.
         `context`: the file context, for citations.
         `name`: the name of the target.
         `prereqs`: macro expression to produce prereqs.
         `postprereqs`: macro expression to produce post prereqs.
     '''
+    self.maker = maker
     self.context = context
     self.name = name
     self.shell = SHELL
     self._prereqs = prereqs
     self._postprereqs = postprereqs
     self.cancelled = False
-    self.maker = None
     self.actions = actions
     self.state = "unmade"
-    self._statusLF = None
+    self._status = None
     self._lock = allocate_lock()
 
   def __str__(self):
@@ -296,117 +301,177 @@ class Target(object):
              ]
            )
 
-  def cancel(self):
-    ''' Cancel this Target.
-        Actions will cease as soon as decorum allows.
-    '''
-    self.maker.debug_make("CANCEL %s", self)
-    self.cancelled = True
-
-  def make(self, maker):
-    ''' Request that this target be made.
-        Return the LateFunc that will report the madeness.
-        Check the .status property to find out how things went;
-        it will block if necessary.
-    '''
-    with self._lock:
-      if self.maker is None:
-        self.maker = maker
-    return self._status_func
-
-  @property
-  def _status_func(self):
-    with self._lock:
-      if self._statusLF is None:
-        self.maker.debug_make("queue make(%s)", self.name)
-        self._statusLF = self.maker._queue(self._make, name="make "+self.name, priority=PRI_MAKE)
-    return self._statusLF
-
-  @property
-  def status(self):
-    ''' Return the madeness of this target, True for successfully
-        made, False for failure to make.
-        Internally it dispatches a LateFunction to make the target
-        at need.
-    '''
-    debug("%s: wait for status...", self)
-    return self._status_func()
-
   @property
   def prereqs(self):
     ''' Return the prerequisite target names.
     '''
-    with self._lock:
-      prereqs = self._prereqs
-      if isinstance(prereqs, MacroExpression):
-        self._prereqs = prereqs(self.context, self.namespaces).split()
+    prereqs = self._prereqs
+    if isinstance(prereqs, MacroExpression):
+      self._prereqs = prereqs(self.context, self.namespaces).split()
     return self._prereqs
 
-  def _make(self):
-    ''' Make the target. Private function submtted to the make queue.
+  def cancel(self):
+    ''' Cancel this Target.
+        Actions will cease as soon as decorum allows.
     '''
-    mdebug = self.maker.debug_make
-    mdebug("%s: COMMENCING _make()...", self.name)
-    self.maker.making(self)
-    made = False
-    with Pfx("make %s" % (self.name,)):
-      mdebug("commence make: %d actions, prereqs = %s", len(self.actions), self.prereqs)
-      dep_status_LFs = []
-      for dep in self.prereqs:
-        D = self.maker[dep]
-        if self.cancelled:
-          break
-        mdebug("request dependency: %s", dep)
-        dep_status_LFs.append(D.make(self.maker))
-      if self.cancelled:
-        D_ok = False
-      else:
-        D_ok = True
-        mdebug("wait for dependencies...")
-        for LF in report_LFs(dep_status_LFs):
-          dep, status = LF()
-          if not LF():
-            d_ok = False
-            mdebug("FAILED %s", dep)
-            break
-          mdebug("OK %s", dep)
-          if self.cancelled:
-            mdebug("CANCELLED: not waiting for more dependencies")
-            break
-        if self.cancelled:
-          mdebug("CANCELLED: considering dependencies not ok")
-          D_ok = False
-        if not D_ok:
-          mdebug("prerequisites FAILED, skip actions")
-          if self.maker.fail_fast:
-            mdebug("fail_fast: cancel all maker targets")
-            self.maker.cancel_all()
-        else:
-          A_ok = True
-          for action in self.actions:
-            mdebug("dispatch action: %s", action)
-            A_status = action.act(self)
-            mdebug("%s action: %s", ("OK" if A_status else "FAILED"), action)
-            if not A_status:
-              A_ok = False
+    self.maker.debug_make("%s: CANCEL", self)
+    self.cancelled = True
+
+  def make(self, as_func=False):
+    ''' Request that this target be made.
+        Return its status.
+        This will be either True or False if the make is complete.
+        If the make is incomplete it will return a PendingFunction.
+        Return the LateFunction that will report the madeness.
+        Check the .status property to find out how things went;
+        it will block if necessary.
+    '''
+    with self._lock:
+      status = self._status
+      if self._status is None:
+        status = self._status = self._make()
+    if as_func and (status is True or status is False):
+      # not just a lambda because the caller may want to use Later.report()
+      status = CallableValue(status)
+    return status
+
+  @property
+  def status(self):
+    ''' Return the make status of this Target.
+        This will be either True or False if the make is complete.
+        If the make is incomplete it will return a PendingFunction.
+    '''
+    # avoid recursion between this and make()
+    status = self._status
+    D("0: status = %r" % (status,))
+    if status is None:
+      status = self._status = self.make()
+      D("1: status = %r" % (status,))
+    # collapse status if make complete
+    if status is not True and status is not False:
+      D("status = %r" % (status,))
+      if status.ready:
+        status = self._status = status()
+    return status
+
+  @property
+  def ok(self):
+    ''' Return the madeness of this target, True for successfully
+        made, False for failure to make.
+        This will block if necessary for the make to complete.
+    '''
+    status = self.status
+    if status is not True and status is not False:
+      self.maker.debug_make("%s: wait for make...", self)
+      status = status()
+    return status
+
+  def _make(self, retq=None):
+    ''' Commence making this Target.
+        If `retq` is None this is the outermost call:
+          Return True or False if the make can complete without blocking.
+          Otherwise return a PendingFunction that will complete later.
+          This endeavours to do as much as possible without queuing
+          a PendingFunction in order to minimise the number of threads
+          in play, hence the unusual return signature.
+        Otherwise this is an inner recursive/deferred PendingFunction:
+          If we complete without blocking, put True or False onto retq.
+          Otherwise queue a background function to block.
+    '''
+    M = self.maker
+    mdebug = M.debug_make
+
+    if retq is None:
+      self.LFs = []
+      self.pending_targets = list(self.prereqs)
+      self.pending_actions = list(self.actions)
+
+    # process pending tasks
+    # - collect outstanding results and inspect
+    # - if ok, queue more targets or an action
+    # - repeat until not ok or nothing pending
+    ok = True
+    with Pfx("make %s" % (self,)):
+      while ok:
+        # wait for requirements, if any
+        LFs = self.LFs
+        if LFs:
+          self.LFs = []
+          for LF in report_LFs(LFs):
+            ok = LF()
+            if not ok:
+              mdebug("requirement FAILed")
+              if M.fail_fast:
+                M.cancel_all()
               break
             if self.cancelled:
+              mdebug("CANCELLED")
+              ok = False
               break
-          if self.cancelled:
-            A_ok = False
-          if A_ok:
-            made = True
-      mdebug("OK" if made else "FAILED")
-      if not made and self.name not in self.maker.precious:
-          try:
-            os.remove(self.name)
-          except OSError, e:
-            if e.errno != errno.ENOENT:
-              error("%s", e)
+
+        if not ok:
+          break
+
+        # requirements complete, proceed with outstanding stuff
+        # any outstanding items to queue for making?
+        targets = self.pending_targets
+        if targets:
+          self.pending_targets = []
+          for dep in targets:
+            with Pfx(dep):
+              self.LFs.append(M[dep].makeX(as_func=True))
+        else:
+          # any outstanding actions?
+          actions = self.pending_actions
+          if actions:
+            self.LFs.append(actions.pop(0).act(self, as_func=True))
+
+        # We're trying to minimise the number of threads in play.
+        # Therefore, any "ready" LateFunctions get gathered here.
+	# We apply the same failure code as earlier, but skip the
+	# poll of self.cancelled.
+        LFs = self.LFs
+        self.LFs = []
+        for LF in LFs:
+          if LF.ready:
+            ok = LF()
+            if not ok:
+              mdebug("requirement FAILed")
+              if M.fail_fast:
+                M.cancel_all()
+              break
           else:
-            mdebug("removed %s")
-      self.maker.made(self, made)
-      return self, made
+            self.LFs.append(LF)
+
+        # failure, abort
+        if not ok:
+          break
+
+        # nothing pending?
+        if not self.LFs:
+          break
+
+        # we must delay for the unready items
+        outer = retq is None
+        if outer:
+          # make a Channel to collect the result
+          retq = Channel()
+        # queue a blocking function
+        with Pfx("QUEUE BLOCKING BG FUNCTION"):
+          M.bg(self._make, retq)
+        if outer:
+          # return a LateFunction to collect from the Channel
+          with Pfx("QUEUE COLLECTING BG FUNCTION"):
+            LF = M.bg(retq)
+          return LF
+        return
+
+      # we have a result - ok or not
+      if retq is None:
+        return ok
+
+      # report the status upstream
+      retq.put(ok)
 
 class Action(object):
 
@@ -416,16 +481,21 @@ class Action(object):
     self.line = line
     self.mexpr, _ = parseMacroExpression(context, line)
     self.silent = silent
-    self._statusLF = None
     self._lock = allocate_lock()
 
   def __str__(self):
     prline = self.line.rstrip().replace('\n', '\\n')
     return "<Action %s %s>" % (self.variant, prline)
 
-  def act(self, target):
-    with Pfx(str(self)):
-      debug("start _act...")
+  def act(self, target, as_func=False):
+    ''' Request that this action occur.
+        `target`: the Target reqesting this action.
+        Return its status.
+        This will be either True or False if the action completed without
+        blocking. If the action blocked it will return a PendingFunction.
+    '''
+    with Pfx("%s.act(target=%s, as_func=%s)" % (self, target, as_func)):
+      debug("start act...")
       M = target.maker
       mdebug = M.debug_make
       v = self.variant
@@ -437,12 +507,7 @@ class Action(object):
         if M.no_action:
           mdebug("OK (maker.no_action)")
           return True
-        argv = (target.shell, '-c', shcmd)
-        mdebug("Popen(%s,..)", argv)
-        P = Popen(argv, close_fds=True)
-        retcode = P.wait()
-        mdebug("retcode = %d", retcode)
-        return retcode == 0
+        return M.defer(self._shcmd, target, shcmd)
 
       if v == 'make':
         subtargets = self.mexpr.eval().split()
@@ -458,6 +523,16 @@ class Action(object):
         return True
 
       raise NotImplementedError, "unsupported variant: %s" % (self.variant,)
+
+  def _shcmd(self, target, shcmd):
+    with Pfx("%s.act: shcmd=%r" % (self, shcmd)):
+      mdebug = target.maker.debug_make
+      argv = (target.shell, '-c', shcmd)
+      mdebug("Popen(%s,..)", argv)
+      P = Popen(argv, close_fds=True)
+      retcode = P.wait()
+      mdebug("retcode = %d", retcode)
+      return retcode == 0
 
 if __name__ == '__main__':
   from . import main, default_cmd

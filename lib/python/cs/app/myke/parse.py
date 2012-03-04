@@ -550,7 +550,7 @@ def parseMakefile(M, fp, parent_context=None):
 
         action_list = []
         for target in target_mexpr(context, M.namespaces).split():
-          yield Target(target, context, prereqs=prereqs_mexpr, postprereqs=postprereqs_mexpr, actions=action_list)
+          yield Target(M, target, context, prereqs=prereqs_mexpr, postprereqs=postprereqs_mexpr, actions=action_list)
         continue
 
         raise ParseError(context, 0, 'unparsed line')
@@ -997,6 +997,7 @@ class TestAll(unittest.TestCase):
     parsed = list(parseMakefile(M, StringIO("abc = def\n")))
     self.assertEquals(len(parsed), 1)
     self.assertEquals([ type(O) for O in parsed ], [ Macro ])
+    M.close()
 
 if __name__ == '__main__':
   unittest.main()
