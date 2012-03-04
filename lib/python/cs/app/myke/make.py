@@ -58,9 +58,6 @@ class Maker(object):
     self.active_lock = allocate_lock()
     self._namespaces = []
 
-  def __str__(self):
-    return '%s<Maker>' % (cs.misc.cmd,)
-
   def close(self):
     self.debug_make("%s.close()", self)
     self._makeQ.close()
@@ -143,7 +140,7 @@ class Maker(object):
     ''' Make a bunch of targets.
     '''
     mdebug = self.debug_make
-    with Pfx("%s.make(%s)" % (self, targets)):
+    with Pfx("%s.make(%s)" % (self, " ".join(targets))):
       ok = True
       LFs = []
       for target in targets:
