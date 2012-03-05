@@ -1,4 +1,4 @@
-#!/bin/sh -ue
+#!/bin/sh
 #
 # Freshmeat release: 2011-02-19
 #
@@ -84,6 +84,8 @@
 # =back
 #
 
+set -ue
+
 trace=
 vecho=:
 symlink=LATEST
@@ -93,6 +95,7 @@ linkonly=
 rrsync=rsync
 usehbinclude=1
 usehbfiles=1
+linkrepair=
 rsopts=
 rsdelete=--delete
 verbose=
@@ -101,26 +104,28 @@ imode=
 
 cmd=`basename "$0"`
 usage="Usage:
-	$cmd [options...] [host:]source backupdir [otherbackupdirs...] [rsyncopts...]
-	$cmd [options...] --no-rsync parent
+  $cmd [options...] [host:]source backupdir [otherbackupdirs...] [rsyncopts...]
+  $cmd [options...] --no-rsync parent
 
-        -i, --itemize-changes
-                        Passed to rsync, result slightly filtered by histbackup.
-	-v, --verbose	Verbose. Also passed to rsync.
-	-x		Trace execution. Recite linktree and rsync invocations.
-	--no-delete     Don't pass --delete to rsync.
-        --delete        Pass --delete to rsync.
-	--delete-excluded
-			Pass --delete --delete-excluded to rsync.
-        --no-hbfiles    Do not honour the .hbfiles file in the backup directory.
-        --no-hbinclude  Do not honour the .hbinclude file in the backup directory.
-	--no-rsync      Don't do the rsync pass - just set up the new link tree
-			and report its basename.
-	--rsync-path rrsync Execute the command \"rrsync\" as the remote rsync.
-			Passed to rsync.
-	--symlink name	Make a symlink named \"name\" pointing at the latest backup.
-			Default: $symlink
-			Use the empty string for no symlink."
+  -i, --itemize-changes
+                Passed to rsync, result slightly filtered by histbackup.
+  -v, --verbose	Verbose. Also passed to rsync.
+  -x		Trace execution. Recite linktree and rsync invocations.
+  --no-delete   Don't pass --delete to rsync.
+  --delete      Pass --delete to rsync.
+  --delete-excluded
+                Pass --delete --delete-excluded to rsync.
+  --no-hbfiles  Do not honour the .hbfiles file in the backup directory.
+  --no-hbinclude Do not honour the .hbinclude file in the backup directory.
+  --no-rsync    Don't do the rsync pass - just set up the new link tree and
+                report its basename.
+  --link-fail-repair Proceed even if the linktree step fails, presumably due
+                to hard link limit reached.
+  --rsync-path rrsync Execute the command \"rrsync\" as the remote rsync.
+                Passed to rsync.
+  --symlink name Make a symlink named \"name\" pointing at the latest backup.
+                 Default: $symlink
+                 Supply the empty string for no symlink."
 
 badopts=
 
@@ -165,6 +170,15 @@ do
       linkonly=1
       ;;
 
+    # =item --link-fail-repair
+    #
+    # Proceed even if the linktree step fails, presumably due to
+    # reaching the filesystem hard link limit. Does a repair rsync
+    # from the previous to new backup before proceeding.
+    #
+    --link-fail-repair)
+      linkrepair=1
+      ;;
     # =item --delete
     #
     # Passed to rsync.
@@ -402,7 +416,17 @@ then
     $echo "existing backup: linking $lastbackup to $thisbackup ..."
     if ( cd "$dest" || exit 1
          mklinktree "$lastbackup" "$thisbackup" \
-         || { dolink=; $trace rm -rf "$thisbackup"; false; }
+         || \
+         if [ $linkrepair ] \
+         && [ -d "$thisbackup" ] \
+         && $trace rsync -a "$lastbackup/." "$thisbackup/."
+         then
+           :
+         else
+           dolink=
+           $trace rm -rf "$thisbackup"
+           false
+         fi
        )
     then
       ok=1
