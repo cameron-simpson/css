@@ -419,7 +419,7 @@ then
          || \
          if [ $linkrepair ] \
          && [ -d "$thisbackup" ] \
-         && $trace rsync -a "$lastbackup/." "$thisbackup/."
+         && $trace rsync -a "$dest/$lastbackup/." "$dest/$thisbackup/."
          then
            :
          else
