@@ -24,9 +24,8 @@ from cs.later import Later, report as reportLFs
 from cs.logutils import info, debug, warning, Pfx, D
 from cs.serialise import toBS, fromBS
 from cs.threads import Q1, Get1, NestingOpenClose
-from cs.venti import defaults, totext
-from cs.venti.datafile import DataFile
-from cs.venti.hash import Hash_SHA1
+from . import defaults, totext
+from .hash import Hash_SHA1
 
 class BasicStore(NestingOpenClose):
   ''' Core functions provided by all Stores.
@@ -297,6 +296,14 @@ class MappingStore(BasicStore):
 
   def sync(self):
     debug("%s: sync() is a no-op", self)
+
+def GDBMStore(dir):
+  from .datafile import GDBMDataDir
+  return MappingStore(GDBMDataDr(dir))
+
+def KyotoStore(dir):
+  from .datafile import KyotoDataDir
+  return MappingStore(KyotoDataDr(dir))
 
 if __name__ == '__main__':
   import cs.venti.store_tests

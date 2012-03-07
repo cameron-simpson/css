@@ -44,6 +44,8 @@ class DataFile(object):
 
   @property
   def fp(self):
+    ''' Property returning the file object of the open file.
+    '''
     fp = self._fp
     if not fp:
       with self._lock:
@@ -54,7 +56,7 @@ class DataFile(object):
 
   @property
   def size(self):
-    ''' Return the size of this file.
+    ''' Property returning the size of this file.
     '''
     size = self._size
     if size is None:
@@ -152,18 +154,18 @@ class DataDir(object):
     self._open = {}
     self._n = None
 
+  def _openIndex(self):
+    raise NotImplementedError
+
   def pathto(self, rpath):
     ''' Return a pathname within the DataDir given `rpath`, a path
         relative to the DataDir.
     '''
     return os.path.join(self.dir, rpath)
 
-  def _openIndex(self):
-    raise NotImplementedError
-
   @property
   def index(self):
-    ''' Return the index mapping.
+    ''' Property returning the index mapping.
     '''
     I = self._index
     if not I:
@@ -190,16 +192,21 @@ class DataDir(object):
     return toBS(n) + toBS(offset)
 
   def __getitem__(self, hash):
+    ''' Return the uncompressed data associated with the supplied hash.
+    '''
     n, offset = self.decodeIndexEntry(self.index[hash])
     return self.open(n).readdata(offset)
 
   def __setitem__(self, hash, data):
+    ''' Store the supplied `data`.
+        A sanity check is done against the supplied `hash`.
+    '''
     h = self.store(data)
     assert h == hash, "hash mismatch: given %s but computed %s" % (hash, h)
 
   def store(self, data):
     ''' Store a data block, update index.
-        Returns hash as sanity check.
+        Return the block hash as sanity check.
     '''
     h = self.hash(data)
     I = self.index
@@ -211,7 +218,7 @@ class DataDir(object):
 
   @property
   def n(self):
-    ''' The ordinal of the currently open data file.
+    ''' The index of the currently open data file.
     '''
     with self._lock:
       if self._n is None:
@@ -230,6 +237,8 @@ class DataDir(object):
     return n
 
   def set_n(self, n):
+    ''' Set the current file index to `n`.
+    '''
     self._n = n
 
   def contains(self, h):
@@ -273,14 +282,18 @@ class DataDir(object):
 class GDBMDataDir(DataDir):
   ''' A DataDir with a GDBM index.
   '''
-  def __init__(self, dirpath):
-    DataDir.__init__(self, dirpath)
-    self._index = None
-
   def _openIndex(self):
     import gdbm
     gdbmpath = self.pathto("index.gdbm")
     return gdbm.open(gdbmpath, "cf")
+
+
+class KyotoCabinetDataDir(DataDir):
+  ''' An DataDir attached to a KyotoCabinet index.
+  '''
+  def _getIndex(self):
+    from cs.kyoto import KyotoCabinet
+    return KyotoIndex(os.path.join(self.dirpath, "index.kch"))
 
 if __name__ == '__main__':
   import cs.venti.datafile_tests
