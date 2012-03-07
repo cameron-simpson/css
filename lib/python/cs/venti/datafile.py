@@ -172,15 +172,25 @@ class DataDir(object):
       with self._lock:
         I = self._index
         if not I:
-          indexpath = self.pathto(self.indexname)
-          needscan = not os.path.exists(indexpath)
           I = self._index = self._openIndex()
-          if needscan:
-            with Pfx("scan %d" % (n,)):
-              for n in self.datafileindices():
-                for offset, flags, data in self.open(n):
-                  I[self.hash(data)] = self.encodeIndexEntry(n, offset)
     return I
+
+  @property
+  def indexpath(self):
+    return self.pathto(self.indexname)
+
+  @property
+  def hasindexfile(self):
+    return os.path.exists(self.indexpath)
+
+  def scan(self, hashfunc, indices=None):
+    if indices is None:
+      indices = self.datafileindices
+    with Pfx("scan %d" % (n,)):
+      for n in indices:
+        D = self.open(n)
+        for offset, flags, data in D.scan():
+          I[hashfunc(data)] = self.encodeIndexEntry(n, offset)
 
   @staticmethod
   def decodeIndexEntry(entry):
@@ -205,23 +215,14 @@ class DataDir(object):
     return self.open(n).readdata(offset)
 
   def __setitem__(self, hash, data):
-    ''' Store the supplied `data`.
-        A sanity check is done against the supplied `hash`.
+    ''' Store the supplied `data` indexed by `hash`.
     '''
-    h = self.store(data)
-    assert h == hash, "hash mismatch: given %s but computed %s" % (hash, h)
-
-  def store(self, data):
-    ''' Store a data block, update index.
-        Return the block hash as sanity check.
-    '''
-    h = self.hash(data)
     I = self.index
-    if h not in I:
+    if hash not in I:
       n = self.n
       D = self.open(n)
       offset = D.savedata(data)
-      I[h] = self.encodeIndexEntry(n, offset)
+      I[hash] = self.encodeIndexEntry(n, offset)
 
   @property
   def n(self):
