@@ -172,7 +172,14 @@ class DataDir(object):
       with self._lock:
         I = self._index
         if not I:
+          indexpath = self.pathto(self.indexname)
+          needscan = not os.path.exists(indexpath)
           I = self._index = self._openIndex()
+          if needscan:
+            with Pfx("scan %d" % (n,)):
+              for n in self.datafileindices():
+                for offset, flags, data in self.open(n):
+                  I[self.hash(data)] = self.encodeIndexEntry(n, offset)
     return I
 
   @staticmethod
@@ -282,18 +289,22 @@ class DataDir(object):
 class GDBMDataDir(DataDir):
   ''' A DataDir with a GDBM index.
   '''
+
+  indexname = "index.gdbm"
+
   def _openIndex(self):
     import gdbm
-    gdbmpath = self.pathto("index.gdbm")
+    gdbmpath = self.pathto(self.indexname)
     return gdbm.open(gdbmpath, "cf")
 
 
 class KyotoCabinetDataDir(DataDir):
   ''' An DataDir attached to a KyotoCabinet index.
   '''
+  indexname = "index.kch"
   def _getIndex(self):
     from cs.kyoto import KyotoCabinet
-    return KyotoIndex(os.path.join(self.dirpath, "index.kch"))
+    return KyotoIndex(os.path.join(self.dirpath, self.indexname))
 
 if __name__ == '__main__':
   import cs.venti.datafile_tests
