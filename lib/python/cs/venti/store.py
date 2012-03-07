@@ -240,12 +240,12 @@ def Store(store_spec):
       return KyotoCabinetStore(storepath)
     raise ValueError("unsupported file store: %s" % (storepath,))
   if scheme == "exec":
-    from cs.venti.stream import StreamStore
+    from .stream import StreamStore
     from subprocess import Popen, PIPE
     P = Popen(spec, shell=True, stdin=PIPE, stdout=PIPE)
     return StreamStore("exec:"+spec, P.stdin, P.stdout)
   if scheme == "tcp":
-    from cs.venti.tcp import TCPStore
+    from .tcp import TCPStore
     host, port = spec.rsplit(':', 1)
     if len(host) == 0:
       host = '127.0.0.1'
@@ -254,7 +254,7 @@ def Store(store_spec):
     # TODO: path to remote vt command
     # TODO: $VT_SSH envvar
     import cs.sh
-    from cs.venti.stream import StreamStore
+    from .stream import StreamStore
     from subprocess import Popen, PIPE
     assert spec.startswith('//') and not spec.startswith('///'), \
            "bad spec ssh:%s, expect ssh://target/remote-spec" % (spec,)

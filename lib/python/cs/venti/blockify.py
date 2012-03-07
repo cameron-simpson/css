@@ -12,7 +12,7 @@ from cs.logutils import debug
 from cs.threads import IterableQueue
 from cs.misc import eachOf
 from cs.venti import defaults
-from cs.venti.block import Block, IndirectBlock
+from .block import Block, IndirectBlock
 
 MIN_BLOCKSIZE = 80      # less than this seems silly
 MAX_BLOCKSIZE = 16383   # fits in 2 octets BS-encoded

@@ -17,7 +17,7 @@ from cs.serialise import toBS, fromBSfp
 from cs.lex import unctrl
 from cs.threads import Q1, IterableQueue
 from cs.lex import hexify
-from cs.venti.store import BasicStore
+from .store import BasicStore
 
 class RqType(int):
   ''' Debugging wrapper for int, reporting symbolic names of op codes.

@@ -4,7 +4,7 @@ import sys
 from thread import allocate_lock
 from cs.serialise import toBS, fromBS
 from cs.venti import defaults, totext
-from cs.venti.hash import Hash_SHA1, HASH_SHA1_T
+from .hash import Hash_SHA1, HASH_SHA1_T
 
 F_BLOCK_INDIRECT = 0x01 # indirect block
 F_BLOCK_HASHTYPE = 0x02 # hash type explicit

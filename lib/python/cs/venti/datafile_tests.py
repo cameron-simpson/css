@@ -6,7 +6,7 @@
 
 import sys
 import unittest
-from cs.venti.datafile import DataFile, DataDir
+from .datafile import DataFile, DataDir
 
 class TestAll(unittest.TestCase):
 
