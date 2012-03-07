@@ -278,11 +278,11 @@ class MappingStore(BasicStore):
   ''' A Store built on an arbitrary mapping object.
   '''
 
-  def __init__(self, M, name=None, capacity=None):
+  def __init__(self, mapping, name=None, capacity=None):
     if name is None:
-      name = "MappingStore(%s)" % (M,)
+      name = "MappingStore(%s)" % (mapping,)
     BasicStore.__init__(self, name, capacity=capacity)
-    self.mapping = M
+    self.mapping = mapping
 
   def add(self, block):
     h = self.hash(block)
@@ -297,132 +297,6 @@ class MappingStore(BasicStore):
 
   def sync(self):
     debug("%s: sync() is a no-op", self)
-
-class IndexedFileStore(BasicStore):
-  ''' A file-based Store which keeps data in flat files, compressed.
-      Subclasses must implement the method ._getIndex() to obtain the
-      associated index object (for example, a gdbm file) to the data files.
-
-      The flat files are named n.vtd, and contain (usually) compressed blocks.
-  '''
-
-  def __init__(self, dirpath, capacity=None):
-    ''' Initialise this IndexedFileStore.
-        `dirpath` specifies the directory in which the files and their index live.
-    '''
-    BasicStore.__init__(self, dirpath, capacity=capacity)
-    with Pfx("IndexedFileStore(%s)" % (dirpath,)):
-      self.dirpath = dirpath
-      self._index = self._getIndex()
-      self._storeMap = self.__loadStoreMap()
-      mapkeys = self._storeMap.keys()
-      if mapkeys:
-        self._n = max(mapkeys)
-      else:
-        self._n = None
-
-  @property
-  def n(self):
-    ''' The ordinal of the currently open data file.
-    '''
-    with self._lock:
-      if self._n is None:
-        self._n = self.__anotherDataFile()
-    return self._n
-
-  def _getIndex(self):
-    raise NotImplementedError
-
-  def __loadStoreMap(self):
-    ''' Load a mapping from existing store data file ordinals to store data
-        filenames, thus:
-          0 => 0.vtd
-        etc.
-    '''
-    M = {}
-    with Pfx(self.dirpath):
-      for name in os.listdir(self.dirpath):
-        if name.endswith('.vtd'):
-          pfx = name[:-4]
-          if pfx.isdigit():
-            pfxn = int(pfx)
-            if str(pfxn) == pfx:
-              # valid number.vtd store name
-              M[pfxn] = DataFile(os.path.join(self.dirpath, name))
-              continue
-          warning("ignoring bad .vtd file name: %s" % (name, ))
-    return M
-
-  def __anotherDataFile(self):
-    ''' Create a new, empty data file and return its index.
-    '''
-    mapkeys = self._storeMap.keys()
-    if mapkeys:
-      n = max(mapkeys)
-    else:
-      n = 0
-    while True:
-      n += 1
-      if n in self._storeMap:
-        # shouldn't happen?
-        continue
-      pathname = os.path.join(self.dirpath, "%d.vtd" % (n,))
-      if os.path.exists(pathname):
-        continue
-      self._storeMap[n] = DataFile(pathname)
-      return n
-
-  def add(self, data):
-    ''' Add data bytes to the store, return the hashcode.
-    '''
-    assert type(data) is str, "expected str, got: %r" % (data,)
-    assert not self.readonly
-    h = self.hash(data)
-    if h not in self._index:
-      n = self.n
-      datafile = self._storeMap[n]
-      offset = datafile.saveData(data)
-      ## TODO: infer noFlish somehow? if not noFlush:
-      datafile.flush()
-      self._index[h] = encodeIndexEntry(n, offset)
-    return h
-
-  def get(self, h, default=None):
-    I = self._index.get(h)
-    if I is None:
-      return default
-    n, offset = decodeIndexEntry(I)
-    assert n >= 0
-    assert offset >= 0
-    return self._storeMap[n].readData(offset)
-
-  def contains(self, h):
-    ''' Check if the specified hash is present in the store.
-    '''
-    with self._lock:
-      return h in self._index
-
-  def flush(self):
-    for datafile in self._storeMap.values():
-      datafile.flush()
-
-  def sync(self):
-    self.flush()
-    self._index.sync()
-
-def decodeIndexEntry(entry):
-  ''' Parse an index entry into n (data file index) and offset.
-  '''
-  n, _ = fromBS(entry)
-  offset, _ = fromBS(_)
-  if len(_) > 0:
-    raise ValueError, "can't decode index entry: %s" % (hexlify(entry),)
-  return n, offset
-
-def encodeIndexEntry(n, offset):
-  ''' Prepare an index entry from data file index and offset.
-  '''
-  return toBS(n) + toBS(offset)
 
 if __name__ == '__main__':
   import cs.venti.store_tests
