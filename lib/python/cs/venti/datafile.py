@@ -15,6 +15,8 @@ from cs.serialise import toBS, fromBS, fromBSfp
 F_COMPRESSED = 0x01
 
 class DataFlags(int):
+  ''' Subclass of int to label stuff nicely.
+  '''
 
   def __repr__(self):
     return "<DataFlags %d>" % (self,)
@@ -38,20 +40,27 @@ class DataFile(object):
     self.pathname = pathname
     self._fp = None
     self._lock = allocate_lock()
+    self._size = None
 
   @property
   def fp(self):
-    with self._lock:
-      if self._fp is None:
-        self._fp = open(self.pathname, "a+b")
-    return self._fp
+    fp = self._fp
+    if not fp:
+      with self._lock:
+        fp = self._fp
+        if fp is None:
+          fp = self._fp = open(self.pathname, "a+b")
+    return fp
 
+  @property
   def size(self):
     ''' Return the size of this file.
-        TODO: This is quite expensive if we call it a lot (which DataDir may).
-              We should track it as we add data.
     '''
-    return os.fstat(self.fp.fileno).st_size
+    size = self._size
+    if size is None:
+      with self._lock:
+        size = self._size = os.fstat(self.fp.fileno).st_size
+    return size
 
   def scan(self, uncompress=False):
     ''' Scan the data file and yield (offset, flags, zdata) tuples.
@@ -117,6 +126,7 @@ class DataFile(object):
       fp.write(toBS(flags))
       fp.write(toBS(len(data)))
       fp.write(data)
+      self._size = fp.tell()
     return offset
 
   def flush(self):
