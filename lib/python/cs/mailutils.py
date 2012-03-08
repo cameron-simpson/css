@@ -39,20 +39,21 @@ class Maildir(mailbox.Maildir):
     if not ismaildir(dir):
       raise ValueError, "not a Maildir: %s" % (dir,)
     self.dir = dir
-    self._hostpart = socket.gethostname() \
-                          .replace('/', '_') \
-                          .replace(':', '_')
-    self._pid = os.getpid()
-    self._lock = allocate_lock()
     self._msgmap = None
+    self._pid = None
+    self._hostpart = None
+    self._lock = allocate_lock()
+
+  @locked_property
+  def pid(self):
+    return os.getpid()
+
+  @locked_property
+  def hostpart(self):
+    return socket.gethostname().replace('/', '_').replace(':', '_')
 
   @locked_property
   def msgmap(self):
-    if self._msgmap is None:
-      self._msgmap = self._scan()
-    return self._msgmap
-
-  def _scan(self):
     ''' Scan the maildir, return key->message-info mapping.
     '''
     msgmap = {}
