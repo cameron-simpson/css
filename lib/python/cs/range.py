@@ -226,7 +226,7 @@ class Range(object):
     R2 = self.intersection(other)
     self._spans = R2._spans
     R2._spans = []
-  
+
   def __iand__(self, other):
     self.intersection_update(other)
     return self

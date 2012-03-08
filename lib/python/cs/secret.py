@@ -56,7 +56,7 @@ def list(path=None):
   ks=ss.keys()
   ks.sort()
   return ks
-  
+
 def mysql(secret,db):
   import MySQLdb
   if type(secret) is str or not(hasattr(secret,'__keys__') or hasattr(secret,'keys')):

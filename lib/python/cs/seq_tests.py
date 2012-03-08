@@ -21,7 +21,7 @@ class TestSeq(unittest.TestCase):
     self.assertEqual( list(imerge([1,2,3],[1,4,7],[2,5,6])),
                       [1,1,2,2,3,4,5,6,7]
                     )
- 
+
 def selftest(argv):
   unittest.main(__name__, None, argv)
 

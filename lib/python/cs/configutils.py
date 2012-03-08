@@ -83,7 +83,7 @@ class ConfigSectionWatcher(object):
     if CP.has_section(section):
       K.update(CP.options(section))
     return list(K)
-    
+
   def __getitem__(self, item):
     CP = self.configwatcher.parser
     section = self.section

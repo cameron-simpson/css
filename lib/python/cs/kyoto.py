@@ -24,7 +24,7 @@ class KyotoCabinet(object):
     return "<%s %s>" % (type(self), self.dbpath)
 
   __str__ = __repr__
-    
+
   def __len__(self):
     return self.db.count()
 

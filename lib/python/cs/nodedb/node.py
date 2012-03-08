@@ -76,7 +76,7 @@ class _AttrList(list):
   ''' An _AttrList is a list subtype that understands Nodes
       and .ATTR[s] attribute access and drives a backend.
   '''
-  
+
   def __init__(self, node, attr, _items=None):
     ''' Initialise an _AttrList.
         `node` is the node to which this _AttrList is attached.

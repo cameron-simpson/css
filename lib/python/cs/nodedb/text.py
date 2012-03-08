@@ -191,7 +191,7 @@ def commatext_to_tokens(text):
           word, text = text, ''
         word = word.strip()
         yield word
-  
+
 def commatext_to_values(text, nodedb, doCreate=False):
   ''' Parse a comma separated list of human friendly values and yield values.
      `nodedb` os the context nodedb, or None.

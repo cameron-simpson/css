@@ -111,7 +111,7 @@ class Condition_Regexp(_Condition):
                self.atstart,
                self.regexptxt
              )
-  
+
   def match(self, M, state):
     for hdr in self.headernames:
       for value in M.get_all(hdr, ()):

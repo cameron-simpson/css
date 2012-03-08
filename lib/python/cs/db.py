@@ -412,7 +412,7 @@ class DirectKeyedTableView:
 
   def rowWhere(self,row):
     return self.__key2where(self.rowKey(row))
-    
+
   def whereClause(self,where=None):
     if where is not None:
       if self.__constraint is not None:

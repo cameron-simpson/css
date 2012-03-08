@@ -115,7 +115,7 @@ class LRU(dict):
   def __iter__(self):
     for k in self.keys():
       return k
- 
+
 class Cache:
   def __init__(self,backend):
     _caches.append(self)

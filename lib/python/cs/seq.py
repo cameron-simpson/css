@@ -132,7 +132,7 @@ class TestAll(unittest.TestCase):
     self.assertEqual( list(imerge([1,2,3],[1,4,7],[2,5,6])),
                       [1,1,2,2,3,4,5,6,7]
                     )
- 
+
 if __name__ == '__main__':
   import sys
   import cs.seq_tests

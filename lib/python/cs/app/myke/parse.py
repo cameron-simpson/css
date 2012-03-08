@@ -43,7 +43,7 @@ class FileContext(_FileContext):
     if parent is not None:
       assert type(parent) is FileContext, "parent should be FileContext, got %s" % (type(parent),)
     _FileContext.__init__(self, filename, lineno, text, parent)
-    
+
   def __str__(self):
     tag = "%s:%d" % (self.filename, self.lineno)
     if self.parent:

@@ -42,14 +42,14 @@ class Blockifier(object):
 
   def addBlock(self, B):
     self.Q.put(B)
-  
+
   def close(self):
     self.Q.close()
     self.T.join()
     self.T = None
     self.Q = None
     return self.topBlock
- 
+
 def topIndirectBlock(blockSource):
   ''' Return a top Block for a stream of Blocks.
   '''

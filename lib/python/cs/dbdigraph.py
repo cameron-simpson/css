@@ -366,7 +366,7 @@ class DBDiGraphNode:
         nodes.extend(edge.connectedNodes(upstream=upstream))
       else:
         nodes.append(edge)
-    
+
     # constrain by type if specified
     if type is not None:
       nodes=[N for N in nodes if N.TYPE == type]

@@ -27,7 +27,7 @@ def rmlockfile(lockfile,fd):
   '''
   os.close(fd)
   os.unlink(lockfile)
- 
+
 def cacheEntries(cachefile=dnscache,lockfile=dnscachelock):
   ''' A generator that yields the contents of analog's DNS cache file as a
       sequence of:

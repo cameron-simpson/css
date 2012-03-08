@@ -81,7 +81,7 @@ def lastlinelen(s):
 
 DQ_RE=re.compile(r'"(([^\\"]|\\[\\"])*)"')
 nq_re=re.compile(r'\S+')
- 
+
 def get_dqstring(s):
   ''' Read a double quoted string from the start of `s`.
       Return the decoded string and the remainder of `s`.
@@ -109,11 +109,11 @@ def parseline(line):
       else:
         error("aborting parseline at: %s", line)
         return None
-  
+
     line=string.lstrip(line)
- 
+
   return words
- 
+
 # strip quotes from a "quoted string"
 dqch_re=re.compile(r'([^\\]|\\.)')
 def undq(s):
@@ -123,9 +123,9 @@ def undq(s):
     if bs > 0: result+=s[:bs]
     result.append(s[bs+1])
     s=s[bs+2:]
-      
+
   result+=s
-      
+
   return result
 
 def htmlify(s,nbsp=False):
