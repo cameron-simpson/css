@@ -42,7 +42,7 @@ class Maildir(mailbox.Maildir):
                           .replace('/', '_') \
                           .replace(':', '_')
     self._pid = os.getpid()
-    self._lock = allocate_lock
+    self._lock = allocate_lock()
     self._msgmap = None
 
   @property
