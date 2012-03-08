@@ -220,7 +220,7 @@ def mergeDatedRecordsSQL(table,keyFields,idField=None,constraint=None,cropOverla
       reference, a list of fields that consitute a comparison key, and
       idField that should unqiuely identify a row (default 'ID'),
       an optional SQL constraint and an operation mode (cropOverlaps, default
-      False).  
+      False).
 
       When cropOverlaps is False, overlapping identical records, as
       determined from the keyFields tuple, are merged.
@@ -237,7 +237,7 @@ def mergeDatedRecordsSQL(table,keyFields,idField=None,constraint=None,cropOverla
       == True) is used to tidy up overlapping values; keyFields should
       inclide START_DATE, END_DATE and value fields that identify the scope
       of the record (such as a reference to an entity to which the other
-      values apply) but _not_ value fields that are "just values".  
+      values apply) but _not_ value fields that are "just values".
   '''
   if type(keyFields) is str:
     keyFields=(keyFields,)
@@ -371,7 +371,7 @@ class DirectKeyedTableView:
     assert len(self.__keyColumns) == 1, \
       "getitems("+repr(keylist)+") on multikey table "+self.name+"["+",".join(self.__keyColumns)+"]"
     return self.selectRows("%s IN (%s)" \
-                           % (self.__keyColumns[0], 
+                           % (self.__keyColumns[0],
                               ",".join(sqlise(k) for k in keylist)))
 
   def __setitem__(self,key,value):

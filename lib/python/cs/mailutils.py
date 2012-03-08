@@ -216,7 +216,7 @@ class Maildir(mailbox.Maildir):
   get_message = __getitem__
 
   def get_headers(self, key):
-    ''' Return the headers of the specified message as 
+    ''' Return the headers of the specified message as
     '''
     with self.open(key) as mfp:
       return read_message(mfp, headersonly=True)

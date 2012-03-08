@@ -1116,7 +1116,7 @@ class NodeDB(dict):
         values = N[attr]
         ovalues = N2.get(attr, ())
         if values != ovalues:
-          fp.write("set %s:%s %s=%s\n" % (t, name, attr, 
+          fp.write("set %s:%s %s=%s\n" % (t, name, attr,
                                           ",".join( [ self.totoken(V, node=N2, attr=attr) for V in values ] )))
     return xit
 

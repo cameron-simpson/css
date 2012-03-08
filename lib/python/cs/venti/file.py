@@ -14,7 +14,7 @@ from cs.threads import IterableQueue
 
 def storeFilename(filename, name, rsize=None, matchBlocks=None, verbosefp=None):
   ''' Store the file named `filename`.
-      Return 
+      Return
   '''
   with Pfx(filename):
     if verbosefp:
@@ -167,7 +167,7 @@ class WriteNewFile:
     self.__topRef.put(topIndirectBlock(blocksOf(self.__sink)))
 
 class WriteOverFile:
-  ''' A File-like class that overwrites an existing 
+  ''' A File-like class that overwrites an existing
   '''
   def __init__(self):
     raise NotImplementedError

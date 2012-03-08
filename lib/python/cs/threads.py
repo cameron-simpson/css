@@ -282,7 +282,7 @@ class Channel(object):
 ##  returnChannel(ch)
 ##  return result
 
-class IterableQueue(Queue): 
+class IterableQueue(Queue):
   ''' A Queue implementing the iterator protocol.
       Note: Iteration stops when a None comes off the Queue.
       TODO: supply sentinel item, default None.
@@ -325,7 +325,7 @@ class IterableQueue(Queue):
       raise StopIteration
     return item
 
-class IterablePriorityQueue(PriorityQueue): 
+class IterablePriorityQueue(PriorityQueue):
   ''' A PriorityQueue implementing the iterator protocol.
       Note: Iteration stops when a None comes off the Queue.
       TODO: supply sentinel item, default None.

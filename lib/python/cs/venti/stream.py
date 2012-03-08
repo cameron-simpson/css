@@ -68,7 +68,7 @@ def encodeGetResult(tag, block):
   assert len(block) > 0
   if block is None:
     return toBS(tag) + enc_GET + toBS(0)
-  return toBS(tag) + enc_GET + toBS(len(block)) + block 
+  return toBS(tag) + enc_GET + toBS(len(block)) + block
 
 def encodeContainsResult(tag, yesno):
   return toBS(tag) + enc_CONTAINS + toBS(1 if yesno else 0)
@@ -160,7 +160,7 @@ class StreamDaemon(object):
     SQ = self._streamQ
     with Pfx("%s._process_requests" % (self,)):
       for rqTag, rqType, rqData in decodeRequestStream(fp):
-        # submit request - will 
+        # submit request - will
         SQ.defer(self._process_request, rqTag, rqType, rqData)
 
   def _process_request(self, rqTag, rqType, rqData):

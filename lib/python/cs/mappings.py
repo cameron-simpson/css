@@ -180,7 +180,7 @@ class MethodicalList(AttributableList):
         >>> class O(object):
         ...   def x(self):
         ...     return id(self)
-        ... 
+        ...
         >>> Os=[ O(), O(), O() ]
         >>> ML = MethodicalList( Os )
         >>> print ML.x()
@@ -222,7 +222,7 @@ class FallbackDict(defaultdict):
   '''
 
   def __init__(self, otherdict):
-    ''' 
+    '''
     '''
     defaultdict.__init__(self)
     self.__otherdict = otherdict

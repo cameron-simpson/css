@@ -24,7 +24,7 @@ def decodeBlock(s, justone=False):
         [BS(hashtype)[BS(hashlen)]]
         hash
       If the optional parameter 'justone' if false, return the Block or
-      IndirectBlock, and the tail of 's'.  
+      IndirectBlock, and the tail of 's'.
       If the optional paramater 'justone' is true, check the tail is
       empty and return just the Block.
   '''

@@ -62,7 +62,7 @@ def topIndirectBlock(blockSource):
   # replace the blockSource with another level of fullIndirectBlocks()
   # reading from the two fetched blocks and the tail of the surrent
   # blockSource then lather, rinse, repeat.
-  #    
+  #
   while True:
     try:
       topblock = blockSource.next()

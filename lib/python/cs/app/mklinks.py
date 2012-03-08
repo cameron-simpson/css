@@ -210,7 +210,7 @@ class FileInfo(object):
   def isfile(self):
     return S_ISREG(self.lstat.st_mode)
 
-  @property 
+  @property
   def ikey(self):
     S = self.lstat
     return IKey(S.st_ino, S.st_dev)

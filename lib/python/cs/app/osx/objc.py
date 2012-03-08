@@ -4,7 +4,7 @@
 # Tweaks sys.path if necessary.
 # Includes some type conversion.
 #       - Cameron Simpson <cs@zip.com.au> 29jun2011
-# 
+#
 
 import sys
 objc_path = '/System/Library/Frameworks/Python.framework/Versions/Current/Extras/lib/python/PyObjC'
