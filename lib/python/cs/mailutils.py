@@ -16,6 +16,7 @@ from tempfile import NamedTemporaryFile
 from StringIO import StringIO
 from thread import allocate_lock
 import time
+from cs.threads import locked_property
 from cs.misc import seq
 
 def read_message(mfp, headersonly=False):
@@ -45,7 +46,7 @@ class Maildir(mailbox.Maildir):
     self._lock = allocate_lock()
     self._msgmap = None
 
-  @property
+  @locked_property
   def msgmap(self):
     if self._msgmap is None:
       self._msgmap = self._scan()
