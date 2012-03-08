@@ -860,6 +860,25 @@ class FuncMultiQueue(object):
   def __init__(self, *a, **kw):
     raise Error, "FuncMultiQueue OBSOLETE, use cs.later.Later instead"
 
+def locked_property(func, lock_name='_lock', prop_name=None, unset_object=None):
+  ''' A property whose access is controlled by a lock if unset.
+  '''
+  if prop_name is None:
+    prop_name = '_' + func.func_name
+  def getprop(self):
+    ''' Attempt lockless fetch of property first.
+        Use lock if property is unset.
+    '''
+    p = getattr(self, prop_name)
+    if p is unset_object:
+      with getattr(self, lock_name):
+        p = getattr(self, prop_name)
+        if p is unset_object:
+          p = func(self)
+          setattr(self, prop_name, p)
+    return p
+  return property(getprop)
+
 if __name__ == '__main__':
   import cs.threads_tests
   cs.threads_tests.selftest(sys.argv)
