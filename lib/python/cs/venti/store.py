@@ -233,10 +233,8 @@ def Store(store_spec):
     # TODO: after tokyocabinet available, probe for index file name
     storepath = os.path.abspath(spec)
     if os.path.isdir(storepath):
-      from .gdbmstore import GDBMStore
       return GDBMStore(os.path.abspath(spec))
     if storepath.endswith('.kch'):
-      from .kyotostore import KyotoCabinetStore
       return KyotoCabinetStore(storepath)
     raise ValueError("unsupported file store: %s" % (storepath,))
   if scheme == "exec":
