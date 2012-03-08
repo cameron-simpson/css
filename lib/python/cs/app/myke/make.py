@@ -207,8 +207,8 @@ class Maker(object):
 
   def getopt(self, args, options=None):
     ''' Parse command line options.
-	Returns (args, badopts) being remaining command line arguments
-	and the error state (unparsed or invalid options encountered).
+        Returns (args, badopts) being remaining command line arguments
+        and the error state (unparsed or invalid options encountered).
     '''
     badopts = False
     opts, args = getopt.getopt(args, 'deikmnpqrstuvxENRj:D:S:f:')
@@ -243,8 +243,8 @@ class Maker(object):
 
   def loadMakefiles(self, makefiles, parent_context=None):
     ''' Load the specified Makefiles.
-	Each top level Makefile named gets its own namespace prepended
-	to the namespaces list. In this way later top level Makefiles'
+        Each top level Makefile named gets its own namespace prepended
+        to the namespaces list. In this way later top level Makefiles'
         definitions override ealier ones while still detecting conflicts
         within a particular Makefile.
     '''
@@ -434,8 +434,8 @@ class Target(object):
 
         # We're trying to minimise the number of threads in play.
         # Therefore, any "ready" LateFunctions get gathered here.
-	# We apply the same failure code as earlier, but skip the
-	# poll of self.cancelled.
+        # We apply the same failure code as earlier, but skip the
+        # poll of self.cancelled.
         LFs = self.LFs
         self.LFs = []
         for LF in LFs:

@@ -138,9 +138,9 @@ class FileInfoDB(dict):
   def find_primary(self, fi):
     ''' Locate the primary for `fi`.
         If there is a designated primary for `fi.ikey`, return it.
-	If not, look for an identical file. If found, designate it
-	as the primary for that ikey and return it. Otherwise
-	designate `fi` as the primary and return it.
+        If not, look for an identical file. If found, designate it
+        as the primary for that ikey and return it. Otherwise
+        designate `fi` as the primary and return it.
     '''
     ikey = fi.ikey
     try:

@@ -82,8 +82,8 @@ class _AttrList(list):
         `node` is the node to which this _AttrList is attached.
         `attr` is the _singular_ form of the attribute name.
         `_items` is a private parameter for prepopulating an _AttrList.
-	  Usually this is one not attached to a Node, such as one
-	  derived from the .Xs notation.
+          Usually this is one not attached to a Node, such as one
+          derived from the .Xs notation.
 
         TODO: we currently do not rely on the backend to preserve ordering so
               lots of operations just ask the backend to totally resave the
@@ -495,8 +495,8 @@ class Node(dict):
     ''' Update this Node with new attributes, optionally removing
         extraneous attributes.
         `new_attrs` is a mapping from an attribute name to a value list.
-	If `delete_missing` is supplied true, remove attribute not
-	specified in `new_attrs`.
+        If `delete_missing` is supplied true, remove attribute not
+        specified in `new_attrs`.
     '''
     with Pfx("%s.update" % (self,)):
       # add new attributes
@@ -623,11 +623,11 @@ class NodeDB(dict):
 
   def useNoNode(self):
     ''' Enable "no node" mode.
-	After this call, a reference to a missing .ATTR will return
-	a dummy Node that can itself be deferenced further. This
-	permits casual use of expressions like: someNode.THIS.THAT.
-	The "no node" dummy node returns false in boolean contexts,
-	unlike regular Nodes which are true.
+        After this call, a reference to a missing .ATTR will return
+        a dummy Node that can itself be deferenced further. This
+        permits casual use of expressions like: someNode.THIS.THAT.
+        The "no node" dummy node returns false in boolean contexts,
+        unlike regular Nodes which are true.
     '''
     if self.noNode is None:
       self.noNode = _NoNode(self)
@@ -860,10 +860,10 @@ class NodeDB(dict):
   def fromtoken(self, valuetxt, node=None, attr=None, doCreate=False):
     ''' Method to extract a token from the start of a string, for use
         in the named attribute `attr`.
-	It is intended to be overridden by subclasses to add
-	recognition for domain specific things such as IP addresses.
-	overrides should fall back to this method if they do not
-	recognise their special syntaxes.
+        It is intended to be overridden by subclasses to add
+        recognition for domain specific things such as IP addresses.
+        overrides should fall back to this method if they do not
+        recognise their special syntaxes.
         This is to be used to parse human friendly value lists.
         Conversely, totext() and fromtext() below are for external data storage.
     '''

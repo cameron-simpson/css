@@ -449,7 +449,7 @@ class Later(object):
   def submit(self, func, priority=None, delay=None, when=None, name=None, pfx=None):
     ''' Submit the callable `func` for later dispatch.
         Return the corresponding LateFunction for result collection.
-	If the parameter `priority` is not None then use it as the priority
+        If the parameter `priority` is not None then use it as the priority
         otherwise use the default priority.
         If the parameter `delay` is not None, delay consideration of
         this function until `delay` seconds from now.
@@ -504,8 +504,8 @@ class Later(object):
           self.submitargs(params, func, i)
         where `i` is an element of `iter`.
         Handy for submitting a batch of jobs.
-	Caution: being a generator, the functions are not submitted
-	until the caller iterates over the returned generator.
+        Caution: being a generator, the functions are not submitted
+        until the caller iterates over the returned generator.
         Examples:
           L.multisubmit(f, xrange(100))
     '''

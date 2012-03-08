@@ -127,8 +127,8 @@ class Range(object):
 
   def __contains__(self, x):
     ''' Test `x` to see if it is wholly contained in this Range.
-	`x` may be another Range, a single int or an iterable
-	yielding a pair of ints.
+        `x` may be another Range, a single int or an iterable
+        yielding a pair of ints.
     '''
     t = type(x)
     if t is Range:
@@ -154,8 +154,8 @@ class Range(object):
 
   def dual(self, start=None, end=None):
     ''' Return an iterable of the spans not in this range.
-	If `start` is omitted, start at the minimum of 0 and the
-	lowest span in the Range.
+        If `start` is omitted, start at the minimum of 0 and the
+        lowest span in the Range.
         If `end` is omitted, use the maximum span in the Range.
     '''
     # TODO: implement this!
