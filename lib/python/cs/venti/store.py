@@ -297,11 +297,11 @@ class MappingStore(BasicStore):
 
 def GDBMStore(dir):
   from .datafile import GDBMDataDir
-  return MappingStore(GDBMDataDr(dir))
+  return MappingStore(GDBMDataDir(dir))
 
 def KyotoStore(dir):
   from .datafile import KyotoDataDir
-  return MappingStore(KyotoDataDr(dir))
+  return MappingStore(KyotoDataDir(dir))
 
 if __name__ == '__main__':
   import cs.venti.store_tests
