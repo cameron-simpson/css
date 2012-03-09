@@ -7,9 +7,9 @@ import os
 import sys
 from threading import Thread
 from cs.logutils import Pfx, info
-from cs.venti.dir import FileDirent
-from cs.venti.meta import Meta
-from cs.venti.blockify import blockFromFile
+from .dir import FileDirent
+from .meta import Meta
+from .blockify import blockFromFile
 from cs.threads import IterableQueue
 
 def storeFilename(filename, name, rsize=None, matchBlocks=None, verbosefp=None):

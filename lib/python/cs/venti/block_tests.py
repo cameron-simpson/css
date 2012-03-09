@@ -8,7 +8,7 @@ import sys
 import unittest
 ##from cs.logutils import D
 from cs.venti import totext
-from cs.venti.block import Block, IndirectBlock
+from .block import Block, IndirectBlock
 
 class TestAll(unittest.TestCase):
 
@@ -18,7 +18,7 @@ class TestAll(unittest.TestCase):
 
   def testSHA1(self):
     import random
-    from cs.venti.cache import MemCacheStore
+    from .cache import MemCacheStore
     S = MemCacheStore()
     with S:
       IB = IndirectBlock()

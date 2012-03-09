@@ -17,8 +17,8 @@ import time
 from datetime import datetime
 from cs.lex import unctrl
 from cs.venti import totext, fromtext
-from cs.venti.dir import Dir, decodeDirent, storeDir
-from cs.venti.file import storeFilename
+from .dir import Dir, decodeDirent, storeDir
+from .file import storeFilename
 from cs.logutils import Pfx, error
 
 def archive(arfile, path, verbosefp=None,

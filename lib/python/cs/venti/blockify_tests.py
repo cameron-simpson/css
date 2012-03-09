@@ -6,7 +6,7 @@
 
 import sys
 import unittest
-from cs.venti.blockify import blocksOf, Blockifier
+from .blockify import blocksOf, Blockifier
 
 class TestAll(unittest.TestCase):
 
@@ -25,7 +25,7 @@ class TestAll(unittest.TestCase):
     ##for b in blocks: print "[", b.data, "]"
 
   def test01blockifier(self):
-    from cs.venti.cache import MemCacheStore
+    from .cache import MemCacheStore
     with MemCacheStore():
       BL = Blockifier()
       alldata = []

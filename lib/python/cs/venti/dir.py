@@ -8,9 +8,9 @@ if sys.hexversion < 0x02060000:
   from sets import Set as set
 from thread import allocate_lock
 from cs.logutils import Pfx, debug, error, info, warning
-from cs.venti.block import decodeBlock
-from cs.venti.blockify import blockFromString
-from cs.venti.meta import Meta
+from .block import decodeBlock
+from .blockify import blockFromString
+from .meta import Meta
 from cs.venti import totext, fromtext
 from cs.lex import hexify
 from cs.misc import seq
@@ -460,7 +460,7 @@ class Dir(Dirent):
   def open(self, name):
     ''' Open the entry named `name` as a readable file-like object.
     '''
-    from cs.venti.file import ReadFile
+    from .file import ReadFile
     return ReadFile(self[name].getBlock())
 
   def mkdir(self, name):

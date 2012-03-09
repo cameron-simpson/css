@@ -10,7 +10,7 @@ if sys.hexversion >= 0x02050000:
 else:
   from sha import new as sha1
 import unittest
-from cs.venti.hash import Hash_SHA1
+from .hash import Hash_SHA1
 
 class TestAll(unittest.TestCase):
 

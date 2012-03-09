@@ -8,7 +8,7 @@ from __future__ import with_statement
 from Queue import Queue
 import cs.later
 from cs.lex import hexify
-from cs.venti.store import BasicStore
+from .store import BasicStore
 
 class CacheStore(BasicStore):
   ''' A CacheStore is a Store front end to a pair of other Stores, a backend

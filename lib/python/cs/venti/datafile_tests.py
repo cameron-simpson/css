@@ -6,7 +6,7 @@
 
 import sys
 import unittest
-from cs.venti.datafile import DataFile
+from .datafile import DataFile, DataDir
 
 class TestAll(unittest.TestCase):
 
@@ -33,17 +33,26 @@ class TestAll(unittest.TestCase):
     import random
     return os.urandom(random.randint(0, maxsize))
 
+  def test000IndexEntry(self):
+    import random
+    for count in range(100):
+      rand_n = random.randint(0, 65536)
+      rand_offset = random.randint(0, 65536)
+      n, offset = DataDir.decodeIndexEntry(DataDir.encodeIndexEntry(rand_n, rand_offset))
+      self.assertEqual(rand_n, n)
+      self.assertEqual(rand_offset, offset)
+
   def test00store1(self):
     ''' Save a single block.
     '''
-    self.data.saveData(self._genblock())
+    self.data.savedata(self._genblock())
 
   def test01fetch1(self):
     ''' Save and the retrieve a single block.
     '''
-    self.data.saveData(self._genblock())
+    self.data.savedata(self._genblock())
     self.data.close()
-    self.data.readData(0)
+    self.data.readdata(0)
 
   def test02randomblocks(self):
     ''' Save 100 random blocks, close, retrieve in random order.
@@ -52,13 +61,13 @@ class TestAll(unittest.TestCase):
     blocks = {}
     for _ in range(100):
       data = self._genblock()
-      offset = self.data.saveData(data)
+      offset = self.data.savedata(data)
       blocks[offset] = data
     self.data.close()
     offsets = blocks.keys()
     random.shuffle(offsets)
     for offset in offsets:
-      data = self.data.readData(offset)
+      data = self.data.readdata(offset)
       self.assertTrue(data == blocks[offset])
 
 def selftest(argv):
