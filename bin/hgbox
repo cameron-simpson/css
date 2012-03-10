@@ -213,10 +213,20 @@ withhgoutmap()
           echo "$cmd: $hgoutmap:$lineno: invalid inside path: $inside" >&2
           ok=
           continue
+          ;;
       esac
       case "$outside" in
         '~/'*)
           outside=$HOME/`expr "x$outside" : 'x..\(.*\)'`
+          ;;
+        ./* | ../* )
+          echo "$cmd: $hgoutmap:$lineno: invalid outside path: $outside" >&2
+          ok=
+          continue
+          ;;
+        /*)
+          ;;
+        *)outside=$HOME/$outside
           ;;
       esac
       if [ ! -d "$outside/." ]
