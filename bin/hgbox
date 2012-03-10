@@ -31,6 +31,10 @@ usage="Usage:
     Initialise new sets, both locally and at the master.
   $cmd [options...] ls
     List sets.
+  $cmd [options...] modset set +setdir=realdir...
+    Modify a set:
+      +setdir=realdir   Add \"realdir\" to the directories in this
+                        set as the in-set directory \"setdir\".
   $cmd [options...] sync [-q] [sets...]
     Sync local sets. Update master unless -q (quick).
  Options:
@@ -97,6 +101,20 @@ else
     ls) [ $# = 0 ] || { echo "$cmd: $op: extra arguments: $*" >&2
                         badopts=1
                       }
+        ;;
+    modset)
+        if [ $# = 0 ]
+        then
+          echo "$cmd: $op: missing set" >&2
+          badopts=1
+          set='(missing)'
+        else
+          set=$1
+          shift
+        fi
+        [ $# -gt 0 ] || { echo "$cmd: $op $set: missing modifications" >&2
+                          badopts=1
+                        }
         ;;
     sync)
         sync_quick=
@@ -220,8 +238,44 @@ xit=0
 case "$op" in
   ls)
     cd "$hglocalbase"
-    $trace ls -d [a-z]*
-    exit $?
+    $trace ls -d [a-z]* || xit=1
+    exit $xit
+    ;;
+
+  modset)
+    cd "$hglocalbase/$set"
+    for mod
+    do
+      case "$mod" in
+        +?*=?*)
+          ok=1
+          setdir=`expr "x$mod" : 'x.\([^=]*\)=.*'`
+          [ ! -e "$setdir" ] || { echo "$cmd: $op $set: setdir already exists: $setdir" >&2
+                                  ok=
+                                }
+          realdir=`expr "x$mod" : 'x.[^=]*=\(.*\)'`
+          [ -d "$realdir/." ] || { echo "$cmd: $op $set: realdir does not exist: $realdir" >&2
+                                   ok=
+                                 }
+          realdir2=`printf '%s\n' "$realdir" | entilde`
+          [ -d "$realdir2/." ] || { echo "$cmd: $op $set: realdir does not exist: $realdir2" >&2
+                                    ok=
+                                  }
+          if [ $ok ] && [ -t 0 ] && ask "$cmd: $op $set: add $setdir <-> $realdir"
+          then
+            $trace mkdir -p "$setdir"
+            [ -s .hgbox-outside ] || { >>.hgbox-outside; $trace hg add .hgbox-outside; }
+            $trace echo "$setdir $realdir" >>.hgbox-outside
+            $hg commit -m "map $setdir to $realdir2" .hgbox-outside
+          fi
+          ;;
+        *)echo "$cmd: $op $set: unrecognised modification: $1" >&2
+          xit=1
+          break
+          ;;
+      esac
+    done
+    exit $xit
     ;;
 esac
 
