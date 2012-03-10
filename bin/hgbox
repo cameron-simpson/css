@@ -258,9 +258,6 @@ case "$op" in
                                    ok=
                                  }
           realdir2=`printf '%s\n' "$realdir" | entilde`
-          [ -d "$realdir2/." ] || { echo "$cmd: $op $set: realdir does not exist: $realdir2" >&2
-                                    ok=
-                                  }
           if [ $ok ] && [ -t 0 ] && ask "$cmd: $op $set: add $setdir <-> $realdir"
           then
             $trace mkdir -p "$setdir"
