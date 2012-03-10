@@ -10,16 +10,21 @@ set -ue
 : ${OPTCSS:=/opt/css}
 
 cmd=`basename "$0"`
-Usage="Usage: $cmd [-x] hgurl command [args...]"
+usage="Usage:
+  $cmd [-x] hgurl command [args...]
+  $cmd [-x] [--init] hgurl"
 
 badopts=
 
 trace=${DEBUG:+set-x}
 roptcss=$OPTCSS
+doinit=
 
 while [ $# -gt 0 ]
 do
   case $1 in
+    --init)
+        doinit=1 ;;
     -x) trace=set-x ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option $1" >&2
@@ -52,19 +57,31 @@ else
       ;;
   esac
 
-  if [ $# = 0 ]
+  if [ $doinit ]
   then
-    echo "$cmd: missing command" >&2
-    badopts=1
+    if [ $# -gt 0 ]
+    then
+      echo "$cmd: command forbidden with --init" >&2
+      badopts=1
+    fi
+  else
+    if [ $# = 0 ]
+    then
+      echo "$cmd: missing command" >&2
+      badopts=1
+    fi
   fi
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-set -- incd "$path" "$@"
+if [ $doinit ]
+then set -- hg init "$path"
+else set -- incd "$path" "$@"
+fi
+
 if [ -n "$host" ]
-then
-  set -- sshx -n "$host" "$roptcss/bin/with-opt-css" -- "$@"
+then set -- sshx -n "$host" "$roptcss/bin/with-opt-css" -- "$@"
 fi
 
 $trace "$@"
