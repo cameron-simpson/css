@@ -15,8 +15,9 @@
 set -ue
 
 : ${HGBOX:=$HOME/var/hgbox}
+: ${HGBOX_MASTER:=ssh://home/va/hgbox-MASTER}
 
-hgmasterbase=ssh://home/var/hgbox-MASTER
+hgmasterbase=$HGBOX_MASTER
 hglocalbase=$HGBOX
 
 cmd=`basename "$0"`
@@ -32,7 +33,7 @@ usage="Usage:
     Sync local sets. Update master unless -q (quick).
  Options:
   -L local      Specify local base. Default from \$HGBOX: $hglocalbase
-  -R remote     Specify remote master base. Default: $hgmasterbase
+  -R remote     Specify remote master base. Default from \$HGBOX_MASTER: $hgmasterbase
   -n            No action. Recite actions.
   -q            Quiet.
   -v            Verbose.
