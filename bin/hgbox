@@ -31,7 +31,7 @@ usage="Usage:
     Initialise new sets, both locally and at the master.
   $cmd [options...] ls
     List sets.
-  $cmd [options...] modset set +setdir=realdir...
+  $cmd [options...] modset set +innerdir=outerdir...
     Modify a set:
       +setdir=realdir   Add \"realdir\" to the directories in this
                         set as the in-set directory \"setdir\".
@@ -209,6 +209,10 @@ with_hg_outmap()
     do
       lineno=`expr $lineno + 1`
       case "$inside" in
+        '' | \#* )
+          # skip comments and blank lines
+          continue
+          ;;
         /* | .* | */ | */. | */.. | */./* | */../* )
           echo "$cmd: $hgoutmap:$lineno: invalid inside path: $inside" >&2
           ok=
@@ -259,22 +263,53 @@ case "$op" in
       case "$mod" in
         +?*=?*)
           ok=1
-          setdir=`expr "x$mod" : 'x.\([^=]*\)=.*'`
-          [ ! -e "$setdir" ] || { echo "$cmd: $op $set: setdir already exists: $setdir" >&2
-                                  ok=
-                                }
-          realdir=`expr "x$mod" : 'x.[^=]*=\(.*\)'`
-          [ -d "$realdir/." ] || { echo "$cmd: $op $set: realdir does not exist: $realdir" >&2
-                                   ok=
-                                 }
-          realdir2=`printf '%s\n' "$realdir" | entilde`
-          if [ $ok ] && [ -t 0 ] && ask "$cmd: $op $set: add $setdir <-> $realdir"
+          innerdir=`expr "x$mod" : 'x.\([^=]*\)=.*'`
+          outerdir=`expr "x$mod" : 'x.[^=]*=\(.*\)'`
+          case "$innerdir" in
+            /* | ./* | ../* | */./* | */../* | */. | */.. | */ )
+              echo "$cmd: $op $set: invalid innerdir: $innerdir" >&2
+              ok=
+              continue
+              ;;
+          esac
+          # normalise outderdir
+          case "$outerdir" in
+            ./* | ../* | */./* | */../* | */. | */.. )
+              echo "$cmd: $op $set: invalid outerdir: $outerdir" >&2
+              ok=
+              continue
+              ;;
+            "$HOME"/*)
+              realouterdir=$outerdir
+              outerdir=`expr "x$outerdir" : "x$HOME/"'\(.*\)'`
+              ;;
+            /*)
+              realouterdir=$outerdir
+              ;;
+            *)realouterdir=$HOME/outerdir
+              ;;
+          esac
+          if [ $ok ]
           then
-            $trace mkdir -p "$setdir"
-            [ -s .hgbox-outside ] || { >>.hgbox-outside; $trace hg add .hgbox-outside; }
-            $trace echo "$setdir $realdir" >>.hgbox-outside
-            $hg commit -m "map $setdir to $realdir2" .hgbox-outside
+            if [ -e "$innerdir" ]
+            then
+              echo "$cmd: $op $set: innerdir already exists: $innerdir" >&2
+              ok=
+            fi
+            if [ ! -d "$realouterdir/." ]
+            then
+              echo "$cmd: $op $set: outerdir is not a directory: $realouterdir" >&2
+              ok=
+            fi
           fi
+          if [ $ok ] && [ -t 0 ] && ask "$cmd: $op $set: add $innerdir <-> $outerdir"
+          then
+            $trace mkdir -p "$innerdir"
+            [ -s .hgbox-outside ] || { >>.hgbox-outside; $trace hg add .hgbox-outside; }
+            $trace echo "$innerdir $outerdir" >>.hgbox-outside
+            $hg commit -m "map $innerdir to $outerdir" .hgbox-outside
+          fi
+          [ $ok ] || xit=1
           ;;
         *)echo "$cmd: $op $set: unrecognised modification: $1" >&2
           xit=1
