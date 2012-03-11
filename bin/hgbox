@@ -33,8 +33,10 @@ usage="Usage:
     List sets.
   $cmd [options...] modset set +innerdir=outerdir...
     Modify a set:
-      +setdir=realdir   Add \"realdir\" to the directories in this
-                        set as the in-set directory \"setdir\".
+      +innerdir=outerdir        Add \"outerdir\" to the directories in this
+                                set as the in-set directory \"innerdir\".
+      -innerdir                 Remove \"innerdir\" from the directories to
+                                sync.
   $cmd [options...] sync [-q] [sets...]
     Sync local sets. Update master unless -q (quick).
  Options:
@@ -308,6 +310,30 @@ case "$op" in
             [ -s .hgbox-outside ] || { >>.hgbox-outside; $trace hg add .hgbox-outside; }
             $trace echo "$innerdir $outerdir" >>.hgbox-outside
             $hg commit -m "map $innerdir to $outerdir" .hgbox-outside
+          fi
+          [ $ok ] || xit=1
+          ;;
+        -?*)
+          ok=1
+          innerdir=`expr "x$mod" : 'x.\(.*\)'`
+          case "$innerdir" in
+            /* | ./* | ../* | */./* | */../* | */. | */.. | */ )
+              echo "$cmd: $op $set: invalid innerdir: $innerdir" >&2
+              ok=
+              continue
+              ;;
+          esac
+          if [ $ok ]
+          then
+            grep "^$innerdir " .hgbox-outside \
+            || { echo "$cmd: $op $set: innerdir not in .hgbox-outside: $innerdir" >&2
+                 ok=
+               }
+          fi
+          if [ $ok ]
+          then
+            $trace bsed "s^$innerdir # &" .hgbox-outside
+            $hg commit -m "do not sync $innerdir" .hgbox-outside
           fi
           [ $ok ] || xit=1
           ;;
