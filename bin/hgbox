@@ -195,8 +195,8 @@ sync_out()
   $trace rsync -r --delete $rsopts "$@" "$sync_out_inside/" "$sync_out_outside/" >&2
 }
 
-# usage: withhgoutmap command-accepting-inside-then-outside-then-args
-withhgoutmap()
+# usage: with_hg_outmap command-accepting-inside-then-outside-then-args
+with_hg_outmap()
 {
   ok=1
   hgoutmap=.hgbox-outside
@@ -302,7 +302,7 @@ do
         if [ $force_export ] \
         || { [ -t 0 ] && ask "really export from $hgbox to exterior directories"; }
         then
-          withhgoutmap sync_out
+          with_hg_outmap sync_out
         else
           echo "$cmd: $op: $hgbox: aborting" >&2
           exit 1
@@ -317,7 +317,7 @@ do
       sync)
         cd "$hgbox" || exit 1
 
-        withhgoutmap sync_in
+        with_hg_outmap sync_in
 
         hgstat=`$hg stat`
         if [ -n "$hgstat" ]
@@ -330,7 +330,7 @@ do
         then
           [ $silent ] || echo "$set: import from $rhgbox"
           $hg fetch "$rhgbox"
-          withhgoutmap sync_out
+          with_hg_outmap sync_out
 
           [ $silent ] || echo "$set: export to $rhgbox"
           $hg push "$rhgbox"
