@@ -11,15 +11,17 @@ cssweb=$HOME/@/ezos/html/cs/css
 adzapweb=$HOME/@/adzapper.sf/html/scripts
 rev=
 updateweb=1
+force=
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-r rev] [target-dir]"
+usage="Usage: $cmd [-f] [-r rev] [target-dir]"
 
 badopts=
 
 while [ $# -gt 0 ]
 do
   case $1 in
+    -f) force=1 ;;
     -r) rev=$2; updateweb=; shift ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
@@ -56,7 +58,7 @@ fi
 
 xit=0
 
-needhost $HOMEHOST@home || exit 2
+[ $force ] || needhost $HOMEHOST@home || exit 2
 
 umask 22
 
