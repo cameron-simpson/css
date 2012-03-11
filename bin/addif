@@ -1,9 +1,11 @@
-#!/bin/sh -u
+#!/bin/sh
 #
 # Add a logical interface with the specified address.
 # Allocates a fresh logical interface on the fly.
 #	- Cameron Simpson <cs@zip.com.au> 12may2005
 #
+
+set -ue
 
 : ${ADDIF:=eth0}	# default base interface
 : ${ADDIF_LOW:=1}	# default base subinterface number
@@ -38,7 +40,13 @@ do
   shift
 done
 
-[ $# = 0 ] && { echo "$cmd: missing ipaddrs" >&2; badopts=1; }
+if [ $# = 0 ]
+then
+  echo "$cmd: missing ipaddrs" >&2
+  badopts=1
+else
+  [ "x$*" = x- ] && set -- `cat`
+fi
 
 # check final baseif
 synok=1
@@ -67,6 +75,12 @@ fi
 xit=0
 
 os=`uname -s` || exit 1
+usecolons=
+case "$os" in
+  # the BSDs have much saner ifconfig use
+  OpenBSD|Darwin|FreeBSD|NetBSD) ;;
+  *) usecolons=1 ;;
+esac
 
 if [ -z "$netmask" ]
 then
@@ -77,9 +91,19 @@ then
 		       }
 fi
 
+if [ $usecolons ]
+then
+  inuse=`ifconfig -a | sed -n "s/^$baseif"':\\([0-9][0-9]*\\) .*/\\1/p' | tr '\012' ' '`
+  n=1
+fi
+
 for host
 do
-  set -- `hostips "$host"`
+  case "$host" in
+    *[a-z]* | *-* )
+      set -- `hostips "$host"` ;;
+    *)set -- "$host" ;;
+  esac
   if [ $# = 0 ]
   then
     echo "$cmd: no ip addresses for \"$host\"" >&2
@@ -89,23 +113,22 @@ do
 
   for ipaddr
   do
-    case "$os" in
-      OpenBSD|Darwin|FreeBSD)
-	# no silly :n logical interfaces for BSD!
-	( set -x; $trace ifconfig "$baseif" alias "$ipaddr" netmask "$netmask" ) || xit=1
-	;;
-      *)
-	# choose the next free interface number
-	nextn=`ifconfig -a \
-	       | sed -n "s/^$baseif"':\\([0-9][0-9]*\\) .*/\\1/p' \
-	       | awk "BEGIN     { n=$basen }
-		      \\$1 >= n { n=\\$1+1 }
-		    END       { print n }"` || exit 1
-	# apply and then bump $basen
-	( set -x; $trace ifconfig "$baseif:$nextn" "$ipaddr" netmask "$netmask" ) || xit=1
-	basen=`expr "$nextn" + 1`
-	;;
-    esac
+    if [ $usecolons ]
+    then
+      # choose new interface number
+      while :
+      do  case " $inuse " in
+            *" $n "*)     n=$(( n + 1 )) ;;
+            *)            break ;;
+          esac
+      done
+      # apply and then bump $basen
+      ( set -x; $trace ifconfig "$baseif:$nextn" "$ipaddr" netmask "$netmask" ) || xit=1
+      inuse="$inuse $n"
+    else
+      # no silly :n logical interfaces for BSD!
+      ( set -x; $trace ifconfig "$baseif" alias "$ipaddr" netmask "$netmask" ) || xit=1
+    fi
   done
 done
 
