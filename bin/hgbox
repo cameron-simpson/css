@@ -382,6 +382,12 @@ do
       init)
         $inhg --init "$rhgbox"
         $hg clone "$rhgbox" "$hgbox"
+        cd "$hgbox"
+        echo '[merge-tools]' >>hgrc
+        echo 'merge-dumb.args = $local $other > $output'cat >>hgrc
+        echo '[merge-patterns]' >>hgrc
+        $hg add hgrc
+        $hg commit -m 'initial hgrc for merge information' hgrc
         ;;
 
       sync)
