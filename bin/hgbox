@@ -198,6 +198,15 @@ sync_out()
 }
 
 # usage: with_hg_outmap command-accepting-inside-then-outside-then-args
+#
+# Read lines from the .hgbox-outside file and issue the supplied command for each.
+# Each non-comment line takes the form:
+#       inside outside hgmap_args
+# being a directory within the repository (inside) and a directory
+# outside the repository (outside). The variable $hgmap_args is set to any
+# remaining arguments, which are -exclude and +include shorthand
+# for rsync options.
+#
 with_hg_outmap()
 {
   ok=1
