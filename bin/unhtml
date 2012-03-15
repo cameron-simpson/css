@@ -52,7 +52,7 @@ fi \
 | html-unsplit \
 | sed 's|</ *[Aa] *>|&|g' | tr '\015' '\012' \
 | if [ $mangle ]
-  then perl -pe 's:<a\s[^>]*\bhref=("[^#"][^"]*"|'\''[^#'\''][^'\'']*'\''|[^#"'\''>\s][^\s>]*)[^>]*>\s*(.*)</a>:$2 &lt;$1&gt;:gi'
+  then perl -pe 's:<a\s[^>]*\bhref=("[^#"][^"]*"|'\''[^#'\''][^'\'']*'\''|[^#"'\''>\s][^\s>]*)[^>]*>\s*(.*)</a>:$2<blockquote><small>$2<br>&lt;$1&gt;</small></blockquote>:gi'
   else cat
   fi \
 | (: set -x; w3m $cols -dump -T text/html) \
