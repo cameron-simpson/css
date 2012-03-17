@@ -71,6 +71,8 @@ fi
     if [ ! -e "$dst" ]
     then
       echo "no $dst, moving $src to destination"
+      dstd=`dirname "$dst"`
+      [ -d "$dstd/." ] || $trace mkdir -p "$dstd"
       $trace mv -i -- "$src" "$dst"
     else
       if cmp -s "$src" "$dst"
