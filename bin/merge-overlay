@@ -1,0 +1,90 @@
+#!/bin/sh
+#
+# Merge two directories by overlaying on on the other and using a
+# merge command to combine conflicting files.
+#       - Cameron Simpson <cs@zip.com.au> 17feb2012
+#
+
+set -ue
+
+cmd=`basename "$0"`
+usage="Usage: $cmd srcdir dstdir [merge-command] [find-opts...]"
+
+badopts=
+
+trace=set-x
+xopt=-x
+merge_command=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing srcdir" >&2
+  badopts=1
+else
+  srcdir=$1
+  shift
+  [ -d "$srcdir/." ] || { echo "$cmd: srcdir not a directory: $srcdir" >&2; exit 2; }
+fi
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing dstdir" >&2
+  badopts=1
+else
+  dstdir=$1
+  shift
+  [ -d "$dstdir/." ] || { echo "$cmd: dstdir not a directory: $dstdir" >&2; exit 2; }
+fi
+
+if [ $# -gt 0 ]
+then
+  case "$1" in
+    -*) ;;
+    *)  merge_command=$1; shift ;;
+  esac
+fi
+
+if [ -z "$badopts" ]
+then
+  realsrc=`cd "$srcdir" && pwd`
+  realdst=`cd "$dstdir" && pwd`
+  if [ "x$realsrc" = "x$realdst" ]
+  then
+    echo "$cmd: srcdir and dstdir are the same place! aborting" >&2
+    badopts=1
+  fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+( set -ue
+  cd "$srcdir"
+  exec find . -type f ${1+"$@"} -print
+) \
+| sort \
+| \
+( set -ue
+  while read -r rpath
+  do
+    src=$srcdir/$rpath
+    dst=$dstdir/$rpath
+    if [ ! -e "$dst" ]
+    then
+      echo "no $dst, moving $src to destination"
+      $trace mv -i -- "$src" "$dst"
+    else
+      if cmp -s "$src" "$dst"
+      then
+        echo "identical $src and $dst, removing source"
+        $trace rm "$src"
+      else
+        if [ -n "$merge_command" ] \
+        && $trace rewriteif $xopt -d "$dst" "$merge_command" "$src" "$dst"
+        then
+          echo "merged $src -> $dst, removing source"
+          $trace rm "$src"
+        fi
+      fi
+    fi
+  done
+)
