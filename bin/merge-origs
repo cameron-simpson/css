@@ -1,0 +1,57 @@
+#!/bin/sh
+#
+# Merge .orig file litter with main files using the specified merge command.
+#       - Cameron Simpson <cs@zip.com.au> 17mar2012
+#
+
+cmd=`basename "$0"`
+usage="Usage: $cmd merge-command files..."
+
+trace=set-x
+xopt=-x
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing merge-command" >&2
+  badopts=1
+else
+  merge_command=$1
+  shift
+  if [ $# = 0 ]
+  then
+    echo "$cmd: missing files" >&2
+    badopts=1
+  fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+merge_orig()
+{ [ $# = 1 ] || { echo "Usage: merge_orig foo.orig" >&2; exit 2; }
+  _mo_orig=$1
+  case "$_mo_orig" in
+    *.orig) ;;
+    *) echo "merge_orig: not a .orig file: $_mo_orig" >&2
+       return 1
+       ;;
+  esac
+  _mo_master=`dirname "$_mo_orig"`/`basename "$_mo_orig" .orig`
+  $trace rewriteif "$xopt" -d "$_mo_master" "$merge_command" "$_mo_master" "$_mo_orig" \
+  && $trace rm -- "$_mo_orig"
+}
+
+for path
+do
+  if [ -d "$path/." ]
+  then
+    find "$path/." -type f -name \*.orig \
+    | while read -r orig
+      do
+        merge_orig "$orig"
+      done
+  else
+    merge_orig "$path"
+  fi
+done
