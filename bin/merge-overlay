@@ -73,18 +73,18 @@ fi
       echo "no $dst, moving $src to destination"
       dstd=`dirname "$dst"`
       [ -d "$dstd/." ] || $trace mkdir -p "$dstd"
-      $trace mv -i -- "$src" "$dst"
+      mv -i -- "$src" "$dst"
     else
       if cmp -s "$src" "$dst"
       then
         echo "identical $src and $dst, removing source"
-        $trace rm "$src"
+        rm "$src"
       else
         if [ -n "$merge_command" ] \
         && $trace rewriteif $xopt -d "$dst" "$merge_command" "$src" "$dst"
         then
           echo "merged $src -> $dst, removing source"
-          $trace rm "$src"
+          rm "$src"
         fi
       fi
     fi
