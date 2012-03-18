@@ -51,7 +51,7 @@ def main(argv):
     opts, argv = getopt(argv, 'qu')
   except GetoptError, e:
     warning("%s", e)
-    batops = true
+    badopts = True
     opts = ()
 
   for opt, val in opts:
@@ -101,9 +101,9 @@ def main(argv):
         error("unsupported op")
         badopts = True
 
-    if badopts:
-      print >>sys.stderr, usage % (cmd, cmd,)
-      xit = 2
+  if badopts:
+    print(usage % (cmd, cmd), file=sys.stderr)
+    xit = 2
 
   return xit
 
