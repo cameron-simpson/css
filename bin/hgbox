@@ -37,8 +37,10 @@ usage="Usage:
                                 set as the in-set directory \"innerdir\".
       -innerdir                 Remove \"innerdir\" from the directories to
                                 sync.
-  $cmd [options...] sync [-q] [sets...]
+  $cmd [options...] sync [-m message] [-q] [sets...]
     Sync local sets. Update master unless -q (quick).
+    -q: Quick. Do not update master.
+    -m: Specify commit message.
  Options:
   -L local      Specify local base. Default from \$HGBOX: $hglocalbase
   -R remote     Specify remote master base. Default from \$HGBOX_MASTER: $hgmasterbase
@@ -120,11 +122,20 @@ else
         ;;
     sync)
         sync_quick=
-        if [ $# -gt 0 ] && [ "x$1" = x-q ]
-        then
+        commit_message=
+        while [ $# -gt 0 ]
+        do
+          case "$1" in
+            -q) sync_quick=1 ;;
+            -m) commit_message=$2; shift ;;
+            --) shift; break ;;
+            -?*)echo "$cmd $op: unrecognised option: $1" >&2
+                badopts=1
+                ;;
+            *)  break ;;
+          esac
           shift
-          sync_quick=1
-        fi
+        done
         [ $# -gt 0 ] || set -- `cd "$hglocalbase"; echo [a-z]*`
         ;;
     *)  echo "$cmd: unsupported op: $op" >&2
@@ -164,7 +175,7 @@ sync_in()
     esac
   done
   [ $silent ] || echo "$set: import from $sync_in_outside"
-  $trace rsync -r --delete $rsopts "$@" "$sync_in_outside/" "$sync_in_inside/" >&2
+  $trace rsync -i -r --delete $rsopts "$@" "$sync_in_outside/" "$sync_in_inside/" >&2
 }
 
 sync_out()
@@ -194,7 +205,7 @@ sync_out()
     esac
   done
   [ $silent ] || echo "$set: export to $sync_out_outside"
-  $trace rsync -r --delete $rsopts "$@" "$sync_out_inside/" "$sync_out_outside/" >&2
+  $trace rsync -i -r --delete $rsopts "$@" "$sync_out_inside/" "$sync_out_outside/" >&2
 }
 
 # usage: with_hg_outmap command-accepting-inside-then-outside-then-args
@@ -297,7 +308,7 @@ case "$op" in
             /*)
               realouterdir=$outerdir
               ;;
-            *)realouterdir=$HOME/outerdir
+            *)realouterdir=$HOME/$outerdir
               ;;
           esac
           if [ $ok ]
@@ -399,7 +410,8 @@ do
         if [ -n "$hgstat" ]
         then
           $hg addremove
-          $hg commit -m "sync in `hostname`:`pwd` `date +'%Y-%m-%d-%H:%M:%S'`"
+          commit_message=${commit_message:-"$cmd sync in `hostname`:`pwd` `date +'%Y-%m-%d-%H:%M:%S'`"}
+          $hg commit -m "$commit_message"
         fi
 
         if not [ $sync_quick ]
