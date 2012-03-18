@@ -81,7 +81,7 @@ done
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 conf=$reportdir/analog.conf
-imagesdir=$reportdir/images
+imagesdir=$reportdir
 
 [ -d "$reportdir/." ] || $trace mkdir "$reportdir"
 echo "OUTFILE $reportdir/index.html" >>"$patchfile"
