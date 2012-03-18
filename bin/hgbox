@@ -49,7 +49,7 @@ usage="Usage:
   -v            Verbose.
   -x            Trace execution of actions."
 
-rsopts=-ptgolH
+rsopts=-ptgolHO
 trace= ##set-x
 verbose=
 silent=
@@ -148,6 +148,7 @@ fi
 
 hg="$trace hg"
 inhg="$trace inhg $xopt"
+rsync="$trace rsync -i"
 
 sync_in()
 {
@@ -175,7 +176,7 @@ sync_in()
     esac
   done
   [ $silent ] || echo "$set: import from $sync_in_outside"
-  $trace rsync -i -r --delete $rsopts "$@" "$sync_in_outside/" "$sync_in_inside/" >&2
+  $rsync -r --delete $rsopts "$@" "$sync_in_outside/" "$sync_in_inside/" >&2
 }
 
 sync_out()
@@ -205,7 +206,7 @@ sync_out()
     esac
   done
   [ $silent ] || echo "$set: export to $sync_out_outside"
-  $trace rsync -i -r --delete $rsopts "$@" "$sync_out_inside/" "$sync_out_outside/" >&2
+  $rsync -r --delete $rsopts "$@" "$sync_out_inside/" "$sync_out_outside/" >&2
 }
 
 # usage: with_hg_outmap command-accepting-inside-then-outside-then-args
