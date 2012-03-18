@@ -597,7 +597,7 @@ class Pilfer(object):
       url_func = self.action_map.get(action)
       if url_func is None:
         raise ValueError("unknown action")
-        L = url_io(url_func, (), self, U, *( arg_string.split(',') if len(arg_string) else () ))
+      L = url_io(url_func, (), self, U, *( arg_string.split(',') if len(arg_string) else () ))
       return L
 
   # actions that work on the whole list of in-play URLs
