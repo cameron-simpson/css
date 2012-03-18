@@ -4,14 +4,17 @@
 #       - Cameron Simpson <cs@zip.com.au> 26dec2011
 #
 
-from __future__ import with_statement
+from __future__ import with_statement, print_function
 import os.path
 import sys
 from itertools import chain
 from BeautifulSoup import BeautifulSoup, Tag, BeautifulStoneSoup
+from netrc import netrc
 from StringIO import StringIO
 import socket
-from urllib2 import urlopen, Request, HTTPError, URLError
+from urllib2 import urlopen, Request, HTTPError, URLError, \
+		    HTTPPasswordMgrWithDefaultRealm, HTTPBasicAuthHandler, \
+		    build_opener
 from urlparse import urlparse, urljoin
 from HTMLParser import HTMLParseError
 try:
@@ -38,7 +41,7 @@ def URL(U, referer, user_agent=None):
 
 class _URL(unicode):
   ''' Utility class to do simple stuff to URLs.
-      Subclasses str.
+      Subclasses unicode.
   '''
 
   def __init__(self, s, referer=None, user_agent=None):
@@ -57,6 +60,7 @@ class _URL(unicode):
     self._content_type = None
     self._parsed = None
     self._xml = None
+    self._opener = None
 
   def _fetch(self):
     ''' Fetch the URL content.
@@ -69,8 +73,10 @@ class _URL(unicode):
       hdrs['User-Agent'] = self.user_agent if self.user_agent else 'css'
       url = 'file://'+self if self.startswith('/') else self
       rq = Request(url, None, hdrs)
+      auth_handler = HTTPBasicAuthHandler(NetrcHTTPPasswordMgr())
+      opener = build_opener(auth_handler)
       debug("urlopen(%s[%r])", url, hdrs)
-      rsp = urlopen(rq)
+      rsp = opener.open(rq)
       H = rsp.info()
       self._content_type = H.gettype()
       self._content = rsp.read()
@@ -374,8 +380,26 @@ class URLs(object):
                  self.context,
                  mode)
 
+class NetrcHTTPPasswordMgr(HTTPPasswordMgrWithDefaultRealm):
+  ''' A subclass of HTTPPasswordMgrWithDefaultRealm that consults
+      the .netrc file if no overriding credentials have been stored.
+  '''
+
+  def __init__(self, netrcfile=None):
+    HTTPPasswordMgrWithDefaultRealm.__init__(self)
+    self._netrc = netrc(netrcfile)
+
+  def find_user_password(self, realm, authuri):
+    user, password = HTTPPasswordMgrWithDefaultRealm.find_user_password(self, realm, authuri)
+    if user is None:
+      U = _URL(authuri)
+      netauth = self._netrc.authenticators(U.hostname)
+      if netauth is not None:
+        user, account, password = netauth
+    return user, password
+
 if __name__ == '__main__':
   import cs.logutils
   cs.logutils.setup_logging()
   UU = URLs( [ 'http://www.mirror.aarnet.edu.au/' ], mode=URLs.MODE_SKIP )
-  print list(UU.hrefs().hrefs())
+  print(list(UU.hrefs().hrefs()))
