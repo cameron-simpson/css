@@ -123,7 +123,7 @@ class BasicStore(NestingOpenClose):
     return self._defer(self.sync)
 
   def _defer(self, func, *args, **kwargs):
-    return self.__funcQ.defer(func, *args, **kwargs)
+    return self.__funcQ.defer(via(self, func, *args, **kwargs))
 
   ###################
   ## Special methods.
