@@ -1,0 +1,4 @@
+#!/bin/sh
+# ls sorted by size, with size. - Cameron Simpson <cs@zip.com.au> 19mar2012
+set -x
+exec ls -1Sshr ${1+"$@"}
