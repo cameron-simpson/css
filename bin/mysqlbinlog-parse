@@ -4,9 +4,25 @@
 #       - Cameron Simpson <cs@zip.com.au> 01may2009
 #
 
-from cs.app.mysql import BinLogParser
+import os.path
 import sys
+from cs.app.mysql import BinLogParser
+from cs.logutils import Pfx, setup_logging
 
-P=BinLogParser()
-P.parse(sys.stdin)
-P.report()
+def main(argv):
+  cmd = os.path.basename(argv.pop(0))
+  usage = 'Usage: %s mysqlbinlog-options...'
+  setup_logging(cmd)
+  xit = 0
+  P = BinLogParser()
+  by_thread, by_dbname = P.collate_queries(P.parse(sys.stdin))
+  report(by_thread, by_dbname)
+  return xit
+
+def report(by_thread, by_dbname):
+  for dbname in sorted(by_dbname.keys()):
+    Qs = by_dbname[dbname]
+    print sum([Q.exec_time for Q in Qs]), dbname
+
+if __name__ == '__main__':
+  sys.exit(main(sys.argv))
