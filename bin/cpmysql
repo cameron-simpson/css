@@ -350,6 +350,13 @@ pull_db()
       ;;
   esac
 
+  # pull the schema if we're saving to a directory
+  case "$dst" in
+    /*)
+      mysqlcmd_src -f mysqldump --opt --no-data "$_pull_srcdb" >"$dst/$_pull_dstdb.schema"
+      ;;
+  esac
+
   # pull each table individually
   case "$src" in
     /*)
