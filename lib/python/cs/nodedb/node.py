@@ -423,7 +423,7 @@ class Node(dict):
   def __getattr__(self, attr):
     ''' Support .ATTR[s] and .inTYPE.
     '''
-    # .inTYPE -> referring nodes if this TYPE
+    # .inTYPE -> referring nodes of type TYPE
     if attr.startswith('in') and len(attr) > 2:
       k, plural = parseUC_sAttr(attr[2:])
       if k and not plural:
@@ -518,16 +518,16 @@ class Node(dict):
     '''
     self.nodedb.dump(fp, nodes=(self,))
 
-  def assign(self, assignment):
+  def assign(self, assignment, doCreate=False):
     from .text import commatext_to_values
     lvalue, rvalue = assignment.split('=', 1)
     k, plural = parseUC_sAttr(lvalue)
     assert k, "invalid lvalue: %s" % (lvalue,)
-    self[k] = list(commatext_to_values(rvalue, self.nodedb))
+    self[k] = list(commatext_to_values(rvalue, self.nodedb, doCreate=doCreate))
 
-  def safe_substitute(self, s):
+  def substitute(self, s, safe=False):
     ''' Construct a CurlyTemplate for the supplied string `s`
-        and return the result of it .safe_substitute() method
+        and return the result of its .substitute() method
         with this Node as 'self' in an EvalMapping.
     '''
     if False:
@@ -536,11 +536,15 @@ class Node(dict):
       from cs.curlytplt import CurlyTemplate, EvalMapping
       T = CurlyTemplate(s)
       M = EvalMapping(locals={ 'self': self })
-      return T.safe_substitute(M)
+      return T.safe_substitute(M) if safe else T.substitute(M)
 
     from cs.curlytplt import curly_substitute, EvalMapping
     M = EvalMapping(locals={ 'self': self })
-    return curly_substitute(s, mapfn = lambda foo: M[foo], safe=True)
+    with Pfx(str(self)):
+      return curly_substitute(s, mapfn = lambda foo: M[foo], safe=safe)
+
+  def safe_substitute(self, s):
+    return self.substitute(s, safe=True)
 
 class _NoNode(Node):
   ''' If a NodeDB has a non-None .noNode attribute, normally it
@@ -1023,6 +1027,8 @@ class NodeDB(dict):
             namelist = sorted([ N.name for N in self.type(t) if fnmatch.fnmatch(N.name, n) ])
           else:
             namelist = (n, )
+          if not namelist:
+            warn("no Nodes of type \"%s\"", t)
           for n in namelist:
             N = self.get( (t, n), doCreate=doCreate )
             if N is None:
@@ -1153,25 +1159,11 @@ class NodeDB(dict):
     '''
     xit = 0
     if not args:
-      raise GetoptError("expected TYPE:* arguments")
+      raise GetoptError("missing arguments")
     for arg in args:
       with Pfx('"%s"' % (arg,)):
-        if arg.endswith(":*"):
-          nodetype = arg[:-2]
-          for N in self.type(nodetype):
-            print str(N)
-#           attrnames = N.attrs.keys()
-#           attrnames.sort()
-#           fields = {}
-#           for attrname in attrnames:
-#             F = [ str(v) for v in getattr(N, attrname+'s') ]
-#             if len(F) == 1:
-#               fields[attrname] = F[0]
-#             else:
-#               fields[attrname+'s'] = F
-#           print str(N), fields
-        else:
-          raise GetoptError("unsupported argument; expected TYPE:*")
+        for N in self.nodespec(arg):
+          print str(N)
     return xit
 
   def cmd_new(self, args, doCreate=True):

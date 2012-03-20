@@ -16,7 +16,7 @@ if sys.hexversion < 0x02060000:
   import simplejson as json
 else:
   import json
-from cs.logutils import Pfx, error, info
+from cs.logutils import Pfx, error, info, warning
 from cs.mappings import parseUC_sAttr
 import cs.sh
 from .node import Node, nodekey
@@ -237,7 +237,7 @@ def fromtoken(token, nodedb, doCreate=False):
   try:
     t, name = nodekey(token)
   except ValueError:
-    warn("can't infer Node from \"%s\", returning string" % (token,))
+    warning("can't infer Node from \"%s\", returning string" % (token,))
     return token
 
   N = nodedb.get( (t, name), doCreate=doCreate )
