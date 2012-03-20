@@ -53,12 +53,12 @@ def nodekey(*args):
     else:
       raise ValueError, "nodekey() takes (TYPE, NAME) args or a single arg: args=%s" % ( args, )
 
-    if type(t) is not str:
-      raise ValueError, "expected TYPE to be a string"
+    if type(t) not in (str, unicode):
+      raise ValueError, "expected TYPE to be a string: %s" % (`t`,)
     if type(name) is int:
       name = str(name)
-    elif type(name) is not str:
-      raise ValueError, "expected NAME to be a string"
+    elif type(name) not in (str, unicode):
+      raise ValueError, "expected NAME to be a string: %s" % (`name`,)
     if not t.isupper() and t != '_':
       raise ValueError, "invalid TYPE, not upper case or _"
     if not len(name):
