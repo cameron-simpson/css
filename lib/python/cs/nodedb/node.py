@@ -536,10 +536,24 @@ class Node(dict):
 
   def assign(self, assignment, doCreate=False):
     from .text import commatext_to_values
-    lvalue, rvalue = assignment.split('=', 1)
+    eqpos = assignment.find('=')
+    pleqpos = assignment.find('+=')
+    if eqpos > 0 and (pleqpos < 0 or pleqpos > eqpos):
+      lvalue, rvalue = assignment.split('=', 1)
+      append = False
+    elif pleqpos > 0 and (eqpos < 0 or eqpos > pleqpos):
+      lvalue, rvalue = assignment.split('+=', 1)
+      append = True
+    else:
+      raise ValueError("assign: cannot choose = or +=: %s" % (assignment,))
     k, plural = parseUC_sAttr(lvalue)
-    assert k, "invalid lvalue: %s" % (lvalue,)
-    self[k] = list(commatext_to_values(rvalue, self.nodedb, doCreate=doCreate))
+    if not k:
+      raise ValueError("invalid lvalue: %s" % (lvalue,))
+    values = list(commatext_to_values(rvalue, self.nodedb, doCreate=doCreate))
+    if append:
+      self[k].extend(values)
+    else:
+      self[k] = values
 
   def substitute(self, s, safe=False):
     ''' Construct a CurlyTemplate for the supplied string `s`
@@ -730,7 +744,7 @@ class NodeDB(dict):
     return [ t for t in byType.keys() if byType[t] ]
 
   def __contains__(self, item):
-    key = nodekey(item)
+    key = self.nodekey(item)
     return dict.__contains__(self, key)
 
   def get(self, item, default=None, doCreate=False):
@@ -779,6 +793,33 @@ class NodeDB(dict):
       self._forgetNode(self[key])
     dict.__setitem__(self, key, N)
     self._noteNode(N)
+
+  def nodekey(self, *args):
+    ''' Convert some sort of key to a (TYPE, NAME) tuple.
+        Sanity check the values.
+        Return (TYPE, NAME).
+    '''
+    if len(args) == 2:
+      t, name = args
+      assert type(t) is str
+      assert type(name) is str
+    elif len(args) == 1:
+      item = args[0]
+      if type(item) is str:
+        # TYPE:NAME
+        t, name = item.split(':', 1)
+      else:
+        # (TYPE, NAME)
+        t, name = item
+        assert type(t) is str
+        assert type(name) is str
+      assert t.isupper(), "TYPE should be upper case, got \"%s\"" % (t,)
+      assert len(name) > 0
+      k, plural = parseUC_sAttr(t)
+      assert k is not None and not plural
+    else:
+      raise TypeError, "nodekey() takes (TYPE, NAME) args or a single arg: args=%s" % ( args, )
+    return t, name
 
   def newNode(self, *args):
     ''' Create and register a new Node.
