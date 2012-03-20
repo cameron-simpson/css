@@ -536,10 +536,24 @@ class Node(dict):
 
   def assign(self, assignment, doCreate=False):
     from .text import commatext_to_values
-    lvalue, rvalue = assignment.split('=', 1)
+    eqpos = assignment.find('=')
+    pleqpos = assignment.find('+=')
+    if eqpos > 0 and (pleqpos < 0 or pleqpos > eqpos):
+      lvalue, rvalue = assignment.split('=', 1)
+      append = False
+    elif pleqpos > 0 and (eqpos < 0 or eqpos > pleqpos):
+      lvalue, rvalue = assignment.split('+=', 1)
+      append = True
+    else:
+      raise ValueError("assign: cannot choose = or +=: %s" % (assignment,))
     k, plural = parseUC_sAttr(lvalue)
-    assert k, "invalid lvalue: %s" % (lvalue,)
-    self[k] = list(commatext_to_values(rvalue, self.nodedb, doCreate=doCreate))
+    if not k:
+      raise ValueError("invalid lvalue: %s" % (lvalue,))
+    values = list(commatext_to_values(rvalue, self.nodedb, doCreate=doCreate))
+    if append:
+      self[k].extend(values)
+    else:
+      self[k] = values
 
   def substitute(self, s, safe=False):
     ''' Construct a CurlyTemplate for the supplied string `s`
