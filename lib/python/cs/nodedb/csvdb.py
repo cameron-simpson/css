@@ -5,6 +5,7 @@
 #
 
 import csv
+import io
 import os
 import os.path
 from types import StringTypes
@@ -41,6 +42,7 @@ def read_csv_file(fp, skipHeaders=False, noHeaders=False):
   oattr = None
   for row in r:
     t, n, attr, value = row
+    value = value.decode('utf-8')
     if attr.endswith('s'):
       # revert older plural dump format
       warn("loading old plural attribute: %s" % (attr,))
@@ -79,7 +81,8 @@ def write_csv_file(fp, nodedata, noHeaders=False):
   '''
   if type(fp) is str:
     with Pfx("write_csv_file(%s)" % (fp,)):
-      with open(fp, "wb") as csvfp:
+      ##with io.open(fp, 'w', io.DEFAULT_BUFFER_SIZE, 'utf-8') as csvfp:
+      with open(fp, 'wb') as csvfp:
         write_csv_file(csvfp, nodedata, noHeaders=noHeaders)
     return
 
@@ -97,10 +100,10 @@ def write_csv_file(fp, nodedata, noHeaders=False):
           wt = t
         else:
           # same type
-          wt = ""
-        w.writerow( (wt, name, attr, value) )
-        attr = ""
-        name = ""
+          wt = u''
+        w.writerow( (wt.encode('utf-8'), name.encode('utf-8'), attr.encode('utf-8'), value.encode('utf-8')) )
+        attr = u''
+        name = u''
 
 class Backend_CSVFile(Backend):
 
