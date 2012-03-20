@@ -8,6 +8,7 @@
 import sys
 import re
 import string
+import unittest
 from itertools import product
 from cs.logutils import Pfx
 
@@ -80,6 +81,58 @@ def curly_substitute(s, mapfn, safe=False, permute=False):
 
   subst = ''.join(strings)
   return subst
+
+def curly_substitute_permute(s, mapfn, safe=False):
+  ''' Replace '{foo}' and '{{foo}}' patterns in `s` according to `mapfn(foo)`.
+
+      If `safe` (default False), values of 'foo' that throw an exception from
+      mapfn are replaced by '{foo}' or '{{foo}}'. Otherwise the exception is
+      rethrown.
+
+      Yield a sequence of replaced strings replaced as for
+      'curly_substitute(..., permute=True)'.
+  '''
+  sofar = 0
+  strings = []
+  for M in re_CURLYCURLY_SIMPLE.finditer(s):
+    strings.append(s[sofar:M.start()])
+    foo = M.group('doublebraced')
+    if foo:
+      try:
+        repl = list(mapfn(foo))
+      except Exception, e:
+        if not safe:
+          raise
+        repl = [M.group()]
+      if len(repl) == 0:
+        # zero instances - yield no strings
+        return
+      if len(repl) == 1:
+        # one instance - treat like plain '{foo}' and fall through
+        repl = repl[0]
+      else:
+        # multiple strings - expand the RHS and permute
+        tail = list(curly_substitute_permute(s[M.end():], mapfn, safe=safe))
+        head = ''.join(strings)
+        for prod in product( repl, tail ):
+          yield ''.join( (head, str(prod[0]), prod[1]) )
+        return
+    else:
+      foo = M.group('braced')
+      try:
+        repl = str(mapfn(M.group('braced')))
+      except Exception, e:
+        if not safe:
+          raise
+        repl = M.group()
+    strings.append(repl)
+    sofar = M.end()
+
+  if sofar < len(s):
+    strings.append(s[sofar:])
+
+  subst = ''.join(strings)
+  yield subst
 
 def curly_substitute_permute(s, mapfn, safe=False):
   ''' Replace '{foo}' and '{{foo}}' patterns in `s` according to `mapfn(foo)`.
