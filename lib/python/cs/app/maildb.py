@@ -133,7 +133,6 @@ class MessageNode(Node):
           msgq.append(M2)
 
 TypeFactory = { 'MESSAGE':      MessageNode,
-                'PERSON':       PersonNode,
                 'ADDRESS':      AddressNode,
               }
 
@@ -154,9 +153,9 @@ class _MailDB(NodeDB):
   def _createNode(self, t, name):
     ''' Create a new Node of the specified type.
     '''
-    if t not in TypeFactory:
-      raise ValueError("unsupported type \"%s\"" % (t,))
-    return TypeFactory[t](t, name, self)
+    if t in TypeFactory:
+      return TypeFactory[t](t, name, self)
+    return NodeDB._createNode(self, t, name)
 
   def getAddressNode(self, addr):
     ''' Obtain the AddressNode for the specified address `addr`.

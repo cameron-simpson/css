@@ -62,10 +62,12 @@ def nodekey(*args):
     else:
       raise ValueError, "nodekey() takes (TYPE, NAME) args or a single arg: args=%s" % ( args, )
 
-    if type(t) is not str:
-      raise ValueError, "expected TYPE to be a string"
-    if type(name) is not str:
-      raise ValueError, "expected NAME to be a string"
+    if type(t) not in (str, unicode):
+      raise ValueError, "expected TYPE to be a string: %s" % (`t`,)
+    if type(name) is int:
+      name = str(name)
+    elif type(name) not in (str, unicode):
+      raise ValueError, "expected NAME to be a string: %s" % (`name`,)
     if not t.isupper() and t != '_':
       raise ValueError, "invalid TYPE, not upper case or _"
     if not len(name):
@@ -187,11 +189,12 @@ class _AttrList(list):
     # turn iterator into tuple
     if not noBackend and type(values) not in (list, tuple):
       values = tuple(values)
-    if not noBackend:
-      N = self.node
-      self.nodedb._backend.extendAttr(N.type, N.name, self.attr, values)
-    list.extend(self, values)
-    self.__additemrefs(values)
+    if len(values) > 0:
+      if not noBackend:
+        N = self.node
+        self.nodedb._backend.extendAttr(N.type, N.name, self.attr, values)
+      list.extend(self, values)
+      self.__additemrefs(values)
 
   def insert(self, index, value):
     value = list.insert(self, index, value)
@@ -438,6 +441,10 @@ class Node(dict):
 
   def __getattr__(self, attr):
     ''' Support .ATTR[s] and .inTYPE.
+
+        .inTYPE returns Nodes of type TYPE which refer to this Node.
+        .ATTR returns the value of ATTR. There must be exactly one.
+        .ATTRs returns the values of ATTR.
     '''
     # .inTYPE -> referring nodes of type TYPE
     if attr.startswith('in') and len(attr) > 2:
