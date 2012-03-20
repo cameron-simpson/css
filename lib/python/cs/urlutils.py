@@ -8,7 +8,7 @@ from __future__ import with_statement, print_function
 import os.path
 import sys
 from itertools import chain
-from BeautifulSoup import BeautifulSoup, Tag, BeautifulStoneSoup
+from bs4 import BeautifulSoup, Tag, BeautifulStoneSoup
 from netrc import netrc
 from StringIO import StringIO
 import socket
@@ -21,7 +21,9 @@ try:
   import xml.etree.cElementTree as ElementTree
 except ImportError:
   import xml.etree.ElementTree as ElementTree
+from threading import RLock
 from cs.logutils import Pfx, pfx_iter, debug, error, warning, exception
+from cs.threads import locked_property
 
 def URL(U, referer, user_agent=None):
   ''' Factory function to return a _URL object from a URL string.
@@ -49,6 +51,9 @@ class _URL(unicode):
     self.user_agent = user_agent if user_agent else self.referer.user_agent if self.referer else None
     self._parts = None
     self.flush()
+    self._lock = RLock()
+    self._content = None
+    self._parsed = None
 
   def flush(self):
     ''' Forget all cached content.
@@ -94,12 +99,11 @@ class _URL(unicode):
     self._content = content
     return content
 
-  @property
+  @locked_property
   def content(self):
     ''' The URL content as a string.
     '''
-    if self._content is None:
-      self._fetch()
+    self._fetch()
     return self._content
 
   @property
@@ -120,20 +124,19 @@ class _URL(unicode):
       return ''
     return hostname.split('.', 1)[1]
 
-  @property
+  @locked_property
   def parsed(self):
     ''' The URL content parsed as HTML by BeautifulSoup.
     '''
-    if self._parsed is None:
-      content = self.content
-      try:
-        self._parsed = BeautifulSoup(content.decode('utf-8', 'replace'))
-      except Exception, e:
-        exception("%s: .parsed: BeautifulSoup(unicode(content)) fails: %s", self, e)
-        with open("cs.urlutils-unparsed.html", "wb") as bs:
-          bs.write(self.content)
-        self._parsed = None
-    return self._parsed
+    content = self.content
+    try:
+      P = BeautifulSoup(content.decode('utf-8', 'replace'))
+    except Exception, e:
+      exception("%s: .parsed: BeautifulSoup(unicode(content)) fails: %s", self, e)
+      with open("cs.urlutils-unparsed.html", "wb") as bs:
+        bs.write(self.content)
+      raise
+    return P
 
   @property
   def xml(self):
