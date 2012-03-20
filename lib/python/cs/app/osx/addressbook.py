@@ -9,6 +9,8 @@
 #   /System/Library/Frameworks/Python.framework/Versions/2.6/Extras/lib/python/PyObjC
 # so I may need to add that to sys.path in for other python installs.
 #
+# - Cameron Simpson <cs@zip.com.au>
+#
 
 import pprint
 import sys
@@ -17,7 +19,12 @@ from thread import allocate_lock
 from AddressBook import ABAddressBook
 from .objc import convertObjCtype
 
+from cs.logutils import setup_logging, Pfx, warn
+
+AB_FLAGS_ORGANIZATION = 0x01
+
 def main(argv):
+  setup_logging()
   from cs.app.maildb import MailDB
   import os.path
   AB = AddressBookWrapper()
@@ -25,13 +32,13 @@ def main(argv):
   ##print "dir(AB.address_book) =",
   ##pprint.pprint(dir(AB.address_book))
   for P in AB.people:
-    pprint.pprint(P)
+    ##pprint.pprint(P)
     updateNodeDB(MDB, [P])
-    break
-  for G in AB.people:
+  for G in AB.groups:
     pprint.pprint(G)
     break
   ##pprint.pprint(dir(AB.address_book.people()[0]))
+  MDB.close()
 
 class AddressBookWrapper(object):
   ''' Wrapper class for Mac OSX AddressBook with more pythonic facilities.
@@ -111,7 +118,7 @@ def mtime(abperson, default=None):
 
 def contactByOSXUID(maildb, uid):
   for contact in maildb.CONTACTs:
-    if contact.OSX_AB_UID == uid:
+    if uid in contact.OSX_AB_UIDs:
       return contact
   return None
 
@@ -119,18 +126,67 @@ def updateNodeDB(maildb, people):
   ''' Update the specified `maildb` with the addressbook `people`.
   '''
   for person in people:
-    uid = person['UID']
-    C = contactByOSXUID(maildb, uid)
-    if not C:
-      C = maildb.newNode('CONTACT', maildb.seq())
-      C.OSX_AB_UID = uid
-    lastUpdate = C.get('OSX_AB_LAST_UPDATE', 0)
-    abMTime = mtime(person, 0)
-    if abMTime > lastUpdate:
-      print "UPDATE USER %s" % (C,)
-      ## C.OSX_AB_LAST_UPDATE = abMTime
-    else:
-      print "SKIP USER %s: abMTime=%s, lastUpdate=%s" % (C,abMTime,lastUpdate)
+    cite = '%s %s/%s' % ( person.get('First',''), person.get('Last',''), person.get('Organization','') )
+    with Pfx('updateNodeDB: %s' % (cite,)):
+      uid = person['UID']
+      C = contactByOSXUID(maildb, uid)
+      if not C:
+        C = maildb.seqNode('CONTACT')
+        C.OSX_AB_UID = str(uid)
+      lastUpdate = C.get0('OSX_AB_LAST_UPDATE', 0)
+      abMTime = mtime(person, 0)
+      print "USER %s: abMTime=%s, lastUpdate=%s" % (cite,abMTime,lastUpdate)
+      if abMTime > lastUpdate:
+        print "UPDATE USER %s" % (cite,)
+        ## C.OSX_AB_LAST_UPDATE = abMTime
+        ok = True
+        for k, v in person.items():
+          if k in ('UID', 'Creation', 'Modification'):
+            pass
+          elif k == 'ABPersonFlags':
+            if v & AB_FLAGS_ORGANIZATION:
+              C.FLAGs.add('ORGANIZATION')
+              v &= ~AB_FLAGS_ORGANIZATION
+            if v != 0:
+              warn("unhandled ABPersonFlags: 0x%x", v)
+              ok = False
+          elif k == 'First':
+            C.FIRST_NAME = v
+          elif k == 'Last':
+            C.LAST_NAME = v
+          elif k == 'Organization':
+            C.ORGANIZATION = v
+          # TODO: split job title into one per org
+          elif k == 'JobTitle':
+            C.JOB_TITLE = v
+          elif k == 'Email':
+            C.EMAIL_ADDRESSes.update(v)
+          elif k == 'Phone':
+            C.TELEPHONEs.update(v)
+          elif k == 'Address':
+            for addr in v:
+              if addr not in C.ADDRESSes:
+                N = maildb.seqNode('ADDRESS')
+                N.COUNTRY = str(addr.get('Country', ''))
+                N.STATE = str(addr.get('State', ''))
+                N.STREETs = [ line for line in map(lambda it : it.strip(), addr.get('Street', '').split('\n')) if len(line) ]
+                N.POSTAL_CODE = str(addr.get('ZIP', ''))
+                C.ADDRESSes.append(N)
+          elif k == 'Note':
+            v = v.strip()
+            if v:
+              C.NOTEs.add(v)
+          elif k == 'URLs':
+            C.URLs.update( url for url in map(lambda U: U.strip(), v) )
+          else:
+            warn("unhandled AB key: %s", k)
+            pprint.pprint(person)
+            ok = False
+        if ok:
+          print "SKIP OSX_AB_LAST_UPDATE uptdate"
+          ##C.OSX_AB_LAST_UPDATE = abMTime
+      else:
+        print "SKIP USER %s" % (cite,)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
