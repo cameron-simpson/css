@@ -104,7 +104,7 @@ class Maildir(mailbox.Maildir):
     now = time.time()
     secs = int(now)
     subsecs = now-secs
-    key = '%d.#%dM%dP%d' % (secs, seq(), subsecs * 1e6, self._pid)
+    key = '%d.#%dM%dP%d' % (secs, seq(), subsecs * 1e6, self.pid)
     assert self.validkey(key), "invalid new key: %s" % (key,)
     return key
 
@@ -151,16 +151,22 @@ class Maildir(mailbox.Maildir):
       T.write(fp.read())
     return self.save_filepath(T.name, key=key)
 
+  def keypath(self, key):
+    subdir, msgbase = self.msgmap[key]
+    return os.path.join(self.dir, subdir, msgbase)
+
   def open(self, key, mode='r'):
     ''' Open the file storing the message specified by `key`.
     '''
-    subdir, msgbase = self.msgmap[key]
-    return open(os.path.join(self.dir, subdir, msgbase), mode=mode)
+    return open(self.keypath(key), mode=mode)
 
   def get_file(key):
     return self.open(key, mode='rb')
 
   def add(self, message, key=None):
+    ''' Add a message to the Maildir.
+        `message` may be an email.message.Message instance or a path to a file.
+    '''
     if type(message) in (str, unicode):
       return self.save_filepath(message, key=key)
     if isinstance(message, email.message.Message):
