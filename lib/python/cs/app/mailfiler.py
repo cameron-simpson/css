@@ -54,14 +54,19 @@ def main(argv, stdin=None):
   MDB = MailDB(mdburl, readonly=True)
 
   M = email.parser.Parser().parse(stdin)
-  state = State()
+  state = State(MDB, os.environ)
   state.groups = MDB.groups
   state.vars = {}
   filed = list(rules.file_message(M, state))
   return 0 if filed else 1
 
 class State(object):
-  pass
+  
+  def __init__(self, mdb, environ=None):
+    if environ is None:
+      environ = os.environ
+    self.maildb = mdb
+    self.environ = dict(environ)
 
 F_HALT = 0x01   # halt rule processing if this rule matches
 F_ALERT = 0x02  # issue an alert if this rule matches
@@ -69,7 +74,7 @@ F_ALERT = 0x02  # issue an alert if this rule matches
 re_QSTR = re.compile(r'"([^"\\]|\\.)*"')
 re_UNQSTR = re.compile(r'[^,\s]+')
 re_HEADERLIST = re.compile(r'([a-z][\-a-z0-9]*(,[a-z][\-a-z0-9]*)*):', re.I)
-re_ASSIGN = re.compile(r'[a-z]\w+=', re.I)
+re_ASSIGN = re.compile(r'([a-z]\w+)=', re.I)
 
 def get_qstr(s):
   ''' Extract a quoted string from the start of `s`.
@@ -219,13 +224,15 @@ def parserules(fp):
             yield R
           continue
 
-        m = re_ASSIGN.match(line)
-        if m:
-          yield Rule_Assign(line)
-          continue
-
         # new rule
         R = Rule()
+
+        m = re_ASSIGN.match(line)
+        if m:
+          R.actions.append( ('ASSIGN', (m.group(1), line[m.end():])) )
+          yield R
+          R = None
+          continue
 
         if line.startswith('+'):
           R.flags &= ~F_HALT
@@ -321,10 +328,11 @@ class Rules(list):
 
   def file_message(self, M, state):
     ''' File message `M` according to the rules.
-        Yield (R, filed) for each rule that matches; `filed` is the
+        Yield (R, filed) for each rule that matches; `filed` is a list of the
         filing locations from each fired action.
     '''
-    applied = []
+    savepath = None
+    saved_to = []
     for R in self:
       debug("try rule: %s", R)
       if R.match(M, state):
@@ -333,13 +341,34 @@ class Rules(list):
           info("action = %r, arg = %r", action, arg)
           if action == 'SAVE':
             savepath = None
-            mdir = Maildir(os.path.join(os.environ['MAILDIR'], arg))
-            warn("SAVE to %s", mdir.dir)
-            mdir.add(savepath if savepath is not None else M)
+            mdirpath = os.path.join(state.environ['MAILDIR'], arg)
+            mdir = Maildir(mdirpath)
+            info("SAVE to %s", mdir.dir)
+            key = mdir.add(savepath if savepath is not None else M)
+            savepath = mdir.keypath(key)
+            saved_to.append(mdirpath)
+          elif action == 'ASSIGN':
+            envvar, s = arg
+            state.environ[envvar] = envsub(s, state.environ)
+            info("ASSIGN %s=%s", envvar, state.environ[envvar])
+          else:
+            raise RuntimeError("unimplemented action \"%s\"" % action)
           filed.append( (action, arg) )
         yield R, filed
         if R.flags & F_HALT:
           break
+    if not saved_to:
+      dflt = state.environ.get('DEFAULT')
+      if dflt is None:
+        warn("message matched no rules, and no $DEFAULT")
+      else:
+        mdirpath = dflt
+        mdir = Maildir(mdirpath)
+        info("SAVE to default %s", mdir.dir)
+        mdir.add(savepath if savepath is not None else M)
+        saved_to.append(mdirpath)
+    else:
+      info("SAVED_TO = %r", saved_to)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
