@@ -6,6 +6,7 @@
 
 from __future__ import with_statement
 import os
+from os.path import isabs, abspath, dirname
 import sys
 import shutil
 from tempfile import NamedTemporaryFile
@@ -92,6 +93,16 @@ def rewrite(filepath, data,
       if backup_ext:
         shutil.copy2(filepath, filepath + backup_ext)
       shutil.copyfile(T.name, filepath)
+
+def abspath_from_file(path, from_file):
+  ''' Return the absolute path if `path` with respect to `from_file`,
+      as one might do for an include file.
+  '''
+  if not isabs(path):
+    if not isabs(from_file):
+      from_file = abspath(from_file)
+    path = os.path.join(dirname(from_file), path)
+  return path
 
 if __name__ == '__main__':
   import cs.fileutils_tests
