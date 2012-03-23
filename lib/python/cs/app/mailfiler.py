@@ -11,7 +11,10 @@ import re
 import sys
 import mailbox
 if sys.hexversion < 0x02060000: from sets import Set as set
-from cs.logutils import Pfx, setup_logging, info, warning, error
+from cs.env import envsub
+from cs.fileutils import abspath_from_file
+from cs.lex import get_white, get_nonwhite
+from cs.logutils import Pfx, setup_logging, debug, info, warning, error
 from cs.mailutils import Maildir, read_message
 from cs.app.maildb import MailDB
 
@@ -44,8 +47,7 @@ def main(argv, stdin=None):
     return 2
 
   rules = Rules()
-  with open(rulefile) as rfp:
-    rules.load(rfp)
+  rules.load(rulefile)
 
   if mdburl is None:
     mdburl = os.environ['MAILDB']
@@ -169,11 +171,18 @@ class Rule(object):
 def parserules(fp):
   ''' Read rules from `fp`, yield Rules.
   '''
+  if type(fp) is str:
+    with open(fp) as rfp:
+      for R in parserules(rfp):
+        yield R
+    return
+
+  filename = fp.name
   lineno = 0
   R = None
   for line in fp:
     lineno += 1
-    with Pfx("%s:%d" % (fp.name, lineno)):
+    with Pfx("%s:%d" % (filename, lineno)):
       if not line.endswith('\n'):
         raise ValueError("short line at EOF")
 
@@ -197,6 +206,18 @@ def parserules(fp):
         if R:
           yield R
         R = None
+
+        if line.startswith('<<'):
+          # include another categories file
+          _, offset = get_white(line, offset=2)
+          subfilename, offset = get_nonwhite(line, offset=offset)
+          if not subfilename:
+            raise ValueError, "missing filename"
+          subfilename = envsub(subfilename)
+          subfilename = abspath_from_file(subfilename, filename)
+          for R in parserules(subfilename):
+            yield R
+          continue
 
         m = re_ASSIGN.match(line)
         if m:
@@ -305,15 +326,15 @@ class Rules(list):
     '''
     applied = []
     for R in self:
-      print >>sys.stderr, "try rule:", R
+      debug("try rule: %s", R)
       if R.match(M, state):
         filed = []
         for action, arg in R.actions:
-          print >>sys.stderr, "action =", repr(action), "arg =", repr(arg)
+          info("action = %r, arg = %r", action, arg)
           if action == 'SAVE':
             savepath = None
             mdir = Maildir(os.path.join(os.environ['MAILDIR'], arg))
-            print >>sys.stderr, "SAVE to %s" % (mdir.dir,)
+            warn("SAVE to %s", mdir.dir)
             mdir.add(savepath if savepath is not None else M)
           filed.append( (action, arg) )
         yield R, filed
