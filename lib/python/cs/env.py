@@ -1,6 +1,7 @@
 import os
 import string
 import types
+from cs.lex import get_identifier
 
 def getLogin(uid=None):
   import pwd
@@ -18,6 +19,25 @@ baseEnv={
   'VARRUN':     '$HOME/var/run',
   'TMPDIR':     '/tmp',
 }
+
+def envsub(s, environ=None):
+  if environ is None:
+    environ = os.environ
+  strs = []
+  opos = 0
+  while True:
+    pos = s.find('$', opos)
+    if pos < 0:
+      strs.append(s[opos:])
+      break
+    if pos > opos:
+      strs.append(s[opos:pos])
+    id, offset = get_identifier(s, pos+1)
+    if not id:
+      raise ValueError("missing envvar name, offset %d: %s" % (pos, s))
+    strs.append(environ.get(id, ''))
+    opos = offset
+  return ''.join(strs)
 
 class Env(object):
   def __init__(self,environ=None,base=None):
