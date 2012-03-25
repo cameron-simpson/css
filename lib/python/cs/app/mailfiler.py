@@ -57,7 +57,10 @@ def main(argv, stdin=None):
   state = State(MDB, os.environ)
   state.groups = MDB.groups
   state.vars = {}
-  filed = list(rules.file_message(M, state))
+  filed = []
+  for R, saved_to, ok_actions, failed_actions in list(rules.file_message(M, state)):
+    print repr(R), saved_to, repr(ok_actions), repr(failed_actions)
+    filed.extend(saved_to)
   return 0 if filed else 1
 
 class State(object):
@@ -328,36 +331,47 @@ class Rules(list):
 
   def file_message(self, M, state):
     ''' File message `M` according to the rules.
-        Yield (R, filed) for each rule that matches; `filed` is a list of the
-        filing locations from each fired action.
+        Yield (R, ok_actions, failed_actions) for each rule `R` that matches;
+        If the $DEFAULT rule fires the `R` will be None.
+        `ok_actions` is a list of (action, arg) from `R.actions`.
+        `failed` is a list of (action, arg, exception).
     '''
     savepath = None
-    saved_to = []
+    all_saved_to = []
     for R in self:
       debug("try rule: %s", R)
       if R.match(M, state):
-        filed = []
+        saved_to = []
+        ok_actions = []
+        failed_actions = []
         for action, arg in R.actions:
-          info("action = %r, arg = %r", action, arg)
-          if action == 'SAVE':
-            savepath = None
-            mdirpath = os.path.join(state.environ['MAILDIR'], arg)
-            mdir = Maildir(mdirpath)
-            info("SAVE to %s", mdir.dir)
-            key = mdir.add(savepath if savepath is not None else M)
-            savepath = mdir.keypath(key)
-            saved_to.append(mdirpath)
-          elif action == 'ASSIGN':
-            envvar, s = arg
-            state.environ[envvar] = envsub(s, state.environ)
-            info("ASSIGN %s=%s", envvar, state.environ[envvar])
+          try:
+            info("action = %r, arg = %r", action, arg)
+            if action == 'SAVE':
+              savepath = None
+              mdirpath = os.path.join(state.environ['MAILDIR'], arg)
+              mdir = Maildir(mdirpath)
+              info("SAVE to %s", mdir.dir)
+              key = mdir.add(savepath if savepath is not None else M)
+              savepath = mdir.keypath(key)
+              saved_to.append(mdirpath)
+            elif action == 'ASSIGN':
+              envvar, s = arg
+              state.environ[envvar] = envsub(s, state.environ)
+              info("ASSIGN %s=%s", envvar, state.environ[envvar])
+            else:
+              raise RuntimeError("unimplemented action \"%s\"" % action)
+          except NameError:
+            raise
+          except Exception, e:
+            failed_actions.append( (action, arg, e) )
           else:
-            raise RuntimeError("unimplemented action \"%s\"" % action)
-          filed.append( (action, arg) )
-        yield R, filed
+            ok_actions.append( (action, arg) )
+        yield R, saved_to, ok_actions, failed_actions
+        all_saved_to.extend(saved_to)
         if R.flags & F_HALT:
           break
-    if not saved_to:
+    if not all_saved_to:
       dflt = state.environ.get('DEFAULT')
       if dflt is None:
         warn("message matched no rules, and no $DEFAULT")
@@ -366,9 +380,9 @@ class Rules(list):
         mdir = Maildir(mdirpath)
         info("SAVE to default %s", mdir.dir)
         mdir.add(savepath if savepath is not None else M)
-        saved_to.append(mdirpath)
-    else:
-      info("SAVED_TO = %r", saved_to)
+        all_saved_to.append(mdirpath)
+        yield None, [mdirpath], ('SAVE', dflt), ()
+    info("SAVED_TO = %r", saved_to)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
