@@ -4,6 +4,7 @@
 #       - Cameron Simpson <cs@zip.com.au> 22may2011
 #
 
+from collections import namedtuple
 from email.utils import getaddresses
 import email.parser
 import os
@@ -16,6 +17,7 @@ from cs.fileutils import abspath_from_file
 from cs.lex import get_white, get_nonwhite
 from cs.logutils import Pfx, setup_logging, debug, info, warning, error
 from cs.mailutils import Maildir, read_message
+from cs.misc import O, slist
 from cs.app.maildb import MailDB
 
 def main(argv, stdin=None):
@@ -58,21 +60,19 @@ def main(argv, stdin=None):
   state.groups = MDB.groups
   state.vars = {}
   filed = []
-  for R, saved_to, ok_actions, failed_actions in list(rules.file_message(M, state)):
-    print repr(R), saved_to, repr(ok_actions), repr(failed_actions)
-    filed.extend(saved_to)
+  for report in rules.filter(M, state):
+    print report.rule, report.saved_to, repr(report.ok_actions), repr(report.failed_actions)
+    filed.extend(report.saved_to)
   return 0 if filed else 1
 
-class State(object):
-  
+class State(O):
+ 
   def __init__(self, mdb, environ=None):
     if environ is None:
       environ = os.environ
     self.maildb = mdb
     self.environ = dict(environ)
-
-F_HALT = 0x01   # halt rule processing if this rule matches
-F_ALERT = 0x02  # issue an alert if this rule matches
+    self.flags = O()
 
 re_QSTR = re.compile(r'"([^"\\]|\\.)*"')
 re_UNQSTR = re.compile(r'[^,\s]+')
@@ -96,85 +96,6 @@ def get_qstr(s):
     qs = qs[:spos] + qs[spos+1:]
     pos = spos + 1
   return qs, etc
-
-def message_addresses(M, hdrs):
-  ''' Yield (realname, address) pairs from all the named headers.
-  '''
-  for hdr in hdrs:
-    for realname, address in getaddresses(M.get_all(hdr, ())):
-      yield realname, address
-
-class _Condition(object):
-  pass
-
-class Condition_Regexp(_Condition):
-
-  def __init__(self, headernames, atstart, regexp):
-    self.headernames = headernames
-    self.atstart = atstart
-    self.regexp = re.compile(regexp)
-    self.regexptxt = regexp
-
-  def __str__(self):
-    return "<C_RE:%s:atstart=%s:%s>" \
-           % ( ','.join(self.headernames),
-               self.atstart,
-               self.regexptxt
-             )
-
-  def match(self, M, state):
-    for hdr in self.headernames:
-      for value in M.get_all(hdr, ()):
-        if self.atstart:
-          if self.regexp.match(value):
-            return True
-        else:
-          if self.regexp.search(value):
-            return True
-    return False
-
-class Condition_AddressMatch(_Condition):
-
-  def __init__(self, headernames, addrkeys):
-    self.headernames = headernames
-    self.addrkeys = [ k for k in addrkeys if len(k) > 0 ]
-
-  def __str__(self):
-    return "<C_ADDR:%s:%s>" \
-           % ( ','.join(self.headernames),
-               '|'.join(self.addrkeys)
-             )
-
-  def match(self, M, state):
-    for realname, address in message_addresses(M, self.headernames):
-      for key in self.addrkeys:
-        if key.startswith('{{') and key.endswith('}}'):
-          key = key[2:-2].lower()
-          if key not in state.groups:
-            warning("%s: unknown group {{%s}}, I know: %s", self, key, state.groups.keys())
-            continue
-          if address in state.groups[key]:
-            return True
-        elif address.lower() == key.lower():
-          return True
-    return False
-
-class Rule(object):
-
-  def __init__(self):
-    self.conditions = []
-    self.actions = []
-    self.flags = 0
-
-  def __str__(self):
-    return "<RULE:%s:flags=%s:...>" \
-           % (', '.join([str(C) for C in self.conditions]), self.flags)
-
-  def match(self, M, state):
-    for C in self.conditions:
-      if not C.match(M, state):
-        return False
-    return True
 
 def parserules(fp):
   ''' Read rules from `fp`, yield Rules.
@@ -238,13 +159,13 @@ def parserules(fp):
           continue
 
         if line.startswith('+'):
-          R.flags &= ~F_HALT
+          R.flags.halt = False
           line = line[1:]
         elif line.startswith('='):
-          R.flags |= F_HALT
+          R.flags.halt = True
           line = line[1:]
         if line.startswith('!'):
-          R.flags |= F_ALERT
+          R.flags.alert = True
           line = line[1:]
 
         # gather targets
@@ -315,9 +236,106 @@ def parserules(fp):
   if R is not None:
     yield R
 
+def message_addresses(M, hdrs):
+  ''' Yield (realname, address) pairs from all the named headers.
+  '''
+  for hdr in hdrs:
+    for realname, address in getaddresses(M.get_all(hdr, ())):
+      yield realname, address
+
+class _Condition(O):
+  pass
+
+class Condition_Regexp(_Condition):
+
+  def __init__(self, headernames, atstart, regexp):
+    self.headernames = headernames
+    self.atstart = atstart
+    self.regexp = re.compile(regexp)
+    self.regexptxt = regexp
+
+  def match(self, M, state):
+    for hdr in self.headernames:
+      for value in M.get_all(hdr, ()):
+        if self.atstart:
+          if self.regexp.match(value):
+            return True
+        else:
+          if self.regexp.search(value):
+            return True
+    return False
+
+class Condition_AddressMatch(_Condition):
+
+  def __init__(self, headernames, addrkeys):
+    self.headernames = headernames
+    self.addrkeys = [ k for k in addrkeys if len(k) > 0 ]
+
+  def match(self, M, state):
+    for realname, address in message_addresses(M, self.headernames):
+      for key in self.addrkeys:
+        if key.startswith('{{') and key.endswith('}}'):
+          key = key[2:-2].lower()
+          if key not in state.groups:
+            warning("%s: unknown group {{%s}}, I know: %s", self, key, state.groups.keys())
+            continue
+          if address in state.groups[key]:
+            return True
+        elif address.lower() == key.lower():
+          return True
+    return False
+
+FilterReport = namedtuple('FilterReport',
+                          'rule matched saved_to ok_actions failed_actions')
+
+class Rule(O):
+
+  def __init__(self):
+    self.conditions = slist()
+    self.actions = slist()
+    self.flags = O()
+    self.flags.alert = False
+    self.flags.halt = False
+
+  def match(self, M, state):
+    for C in self.conditions:
+      if not C.match(M, state):
+        return False
+    return True
+
+  def filter(self, M, state, msgpath=None):
+    saved_to = []
+    ok_actions = []
+    failed_actions = []
+    matched = self.match(M, state)
+    if matched:
+      for action, arg in self.actions:
+        try:
+          info("action = %r, arg = %r", action, arg)
+          if action == 'SAVE':
+            mdirpath = os.path.join(state.environ['MAILDIR'], arg)
+            mdir = Maildir(mdirpath)
+            info("SAVE to %s", mdir.dir)
+            key = mdir.add(msgpath if msgpath is not None else M)
+            msgpath = mdir.keypath(key)
+            saved_to.append(mdirpath)
+          elif action == 'ASSIGN':
+            envvar, s = arg
+            state.environ[envvar] = envsub(s, state.environ)
+            info("ASSIGN %s=%s", envvar, state.environ[envvar])
+          else:
+            raise RuntimeError("unimplemented action \"%s\"" % action)
+        except NameError:
+          raise
+        except Exception, e:
+          failed_actions.append( (action, arg, e) )
+        else:
+          ok_actions.append( (action, arg) )
+    return FilterReport(self, matched, saved_to, ok_actions, failed_actions)
+
 class Rules(list):
   ''' Simple subclass of list storing rules, with methods to load
-      rules and file a message using the rules.
+      rules and filter a message using the rules.
   '''
 
   def __init__(self):
@@ -329,60 +347,55 @@ class Rules(list):
     '''
     self.extend(list(parserules(fp)))
 
-  def file_message(self, M, state):
-    ''' File message `M` according to the rules.
-        Yield (R, ok_actions, failed_actions) for each rule `R` that matches;
-        If the $DEFAULT rule fires the `R` will be None.
-        `ok_actions` is a list of (action, arg) from `R.actions`.
-        `failed` is a list of (action, arg, exception).
+  def filter(self, M, state):
+    ''' Filter message `M` according to the rules.
+        Yield FilterReports for each rule consulted.
+        If no rules matches and $DEFAULT is set, yield a FilterReport for
+        filing to $DEFAULT, with .rule set to None.
     '''
+    done = False
     savepath = None
-    all_saved_to = []
+    matches = 0
     for R in self:
-      debug("try rule: %s", R)
-      if R.match(M, state):
-        saved_to = []
-        ok_actions = []
-        failed_actions = []
-        for action, arg in R.actions:
+      report = R.filter(M, state, savepath)
+      yield report
+      if report.matched:
+        matches += 1
+        if report.saved_to:
+          if savepath is None:
+            savepath = report.saved_to[0]
+        if R.flags.halt:
+          done = True
+          break
+      else:
+        if report.saved_to:
+          raise RunTimeError("matched is False, but saved_to = %s" % (saved_to,))
+    if not done:
+      if matches:
+        dflt = state.environ.get('DEFAULT')
+        if dflt is None:
+          warn("message matched no rules, and no $DEFAULT")
+        else:
+          matched = False
+          saved_to = []
+          ok_actions = []
+          failed_actions = []
+          mdirpath = dflt
+          action, arg = ('SAVE', mdirpath)
           try:
-            info("action = %r, arg = %r", action, arg)
-            if action == 'SAVE':
-              savepath = None
-              mdirpath = os.path.join(state.environ['MAILDIR'], arg)
-              mdir = Maildir(mdirpath)
-              info("SAVE to %s", mdir.dir)
-              key = mdir.add(savepath if savepath is not None else M)
-              savepath = mdir.keypath(key)
-              saved_to.append(mdirpath)
-            elif action == 'ASSIGN':
-              envvar, s = arg
-              state.environ[envvar] = envsub(s, state.environ)
-              info("ASSIGN %s=%s", envvar, state.environ[envvar])
-            else:
-              raise RuntimeError("unimplemented action \"%s\"" % action)
+            mdir = Maildir(mdirpath)
+            info("SAVE to default %s", mdir.dir)
+            key = mdir.add(savepath if savepath is not None else M)
+            msgpath = mdir.keypath(key)
+            saved_to.append(msgpath)
+            matched = True
           except NameError:
             raise
           except Exception, e:
             failed_actions.append( (action, arg, e) )
           else:
             ok_actions.append( (action, arg) )
-        yield R, saved_to, ok_actions, failed_actions
-        all_saved_to.extend(saved_to)
-        if R.flags & F_HALT:
-          break
-    if not all_saved_to:
-      dflt = state.environ.get('DEFAULT')
-      if dflt is None:
-        warn("message matched no rules, and no $DEFAULT")
-      else:
-        mdirpath = dflt
-        mdir = Maildir(mdirpath)
-        info("SAVE to default %s", mdir.dir)
-        mdir.add(savepath if savepath is not None else M)
-        all_saved_to.append(mdirpath)
-        yield None, [mdirpath], ('SAVE', dflt), ()
-    info("SAVED_TO = %r", saved_to)
+          yield FilterReport(None, matched, saved_to, ok_actions, failed_actions)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
