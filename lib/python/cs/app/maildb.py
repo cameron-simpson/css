@@ -15,11 +15,13 @@ import os
 import unittest
 
 def main(argv):
+  argv = list(argv)
   cmd = os.path.basename(argv.pop(0))
   usage = '''Usage:
     %s [-m mdburl] op [op-args...]
     Ops:
       import-addresses < addresses.txt
+        group,... rfc2822-address
       list-groups [groups...]''' \
     % (cmd,)
   setup_logging(cmd)
@@ -29,11 +31,11 @@ def main(argv):
   mdburl = None
 
   try:
-    opts, args = getopt(argv[1:], 'm:')
+    opts, argv = getopt(argv, 'm:')
   except GetoptError, e:
     error("unrecognised option: %s: %s"% (e.opt, e.msg))
     badopts = True
-    opts, args = [], []
+    opts, argv = [], []
 
   for opt, val in opts:
     if opt == '-m':
