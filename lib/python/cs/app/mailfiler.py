@@ -61,7 +61,9 @@ def main(argv, stdin=None):
   state.vars = {}
   filed = []
   for report in rules.filter(M, state):
-    print report.rule, report.saved_to, repr(report.ok_actions), repr(report.failed_actions)
+    if report.matched:
+      for saved_to in report.saved_to:
+        print "%s %s => %s" % (M['from'], M['subject'], saved_to)
     filed.extend(report.saved_to)
   return 0 if filed else 1
 
