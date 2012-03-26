@@ -16,6 +16,7 @@ from tempfile import NamedTemporaryFile
 from StringIO import StringIO
 from thread import allocate_lock
 import time
+from cs.logutils import debug
 from cs.threads import locked_property
 from cs.misc import seq
 
@@ -43,6 +44,12 @@ class Maildir(mailbox.Maildir):
     self._pid = None
     self._hostpart = None
     self._lock = allocate_lock()
+    self.flush()
+
+  def flush(self):
+    ''' Forget state.
+    '''
+    self._msgmap = None
 
   @locked_property
   def pid(self):
@@ -179,7 +186,9 @@ class Maildir(mailbox.Maildir):
 
   def remove(self, key):
     subdir, msgbase = self.msgmap[key]
-    os.remove(os.path.join(self.dir, subdir, msgbase))
+    msgpath = os.path.join(self.dir, subdir, msgbase)
+    debug("%s: remove key %s: %s", self, key, msgpath)
+    os.remove(msgpath)
     del self.msgmap[key]
   discard = remove
   __delitem__ = remove
