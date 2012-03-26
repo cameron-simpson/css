@@ -80,6 +80,7 @@ re_QSTR = re.compile(r'"([^"\\]|\\.)*"')
 re_UNQSTR = re.compile(r'[^,\s]+')
 re_HEADERLIST = re.compile(r'([a-z][\-a-z0-9]*(,[a-z][\-a-z0-9]*)*):', re.I)
 re_ASSIGN = re.compile(r'([a-z]\w+)=', re.I)
+re_INGROUP = re.compile(r'\(\s*[a-z]\w+(\s*|\s*[a-z]\w+)*\s*\)', re.I)
 
 def get_qstr(s):
   ''' Extract a quoted string from the start of `s`.
@@ -203,12 +204,12 @@ def parserules(fp):
           try:
             tag, line = line.split(None, 1)
           except ValueError:
-            raise ValueError, "missing tag"
+            raise ValueError("missing tag")
         R.tag = tag
 
       # condition
       if len(line) == 0:
-        raise ValueError, "missing condition"
+        raise ValueError("missing condition")
 
       # . always matches - don't bother storing it
       if line == '.':
@@ -231,8 +232,19 @@ def parserules(fp):
           atstart = False
         C = Condition_Regexp(headernames, atstart, regexp)
       else:
-        addrkeys = [ w.strip() for w in line.split(',') ]
-        C = Condition_AddressMatch(headernames, addrkeys)
+        # (group[,group...])
+        m = re_INGROUP.match(line)
+        if m:
+          group_names = set( w.strip() for w in line.split(',') )
+          line = line[m.end():].rstrip()
+          if line:
+            raise ValueError("extra text after groups: %s" % (line,))
+          C = Condition_InGroups(headernames, group_names)
+        else:
+          # just a comma separated list of addresses
+          # TODO: should be RFC2822 list instead?
+          addrkeys = [ w.strip() for w in line.split(',') ]
+          C = Condition_AddressMatch(headernames, addrkeys)
       R.conditions.append(C)
 
   if R is not None:
@@ -284,6 +296,20 @@ class Condition_AddressMatch(_Condition):
           if address in state.groups[key]:
             return True
         elif address.lower() == key.lower():
+          return True
+    return False
+
+class Condition_InGroups(_Condition):
+
+  def __init__(self, headername, group_names):
+    self.headername = headernames
+    self.group_names = group_names
+
+  def match(self, M, state):
+    MDB = state.maildb
+    for realname, address in message_addresses(M, self.headernames):
+      for group_name in self.group_names:
+        if address in MDB.group(group_name):
           return True
     return False
 
