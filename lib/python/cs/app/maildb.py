@@ -94,6 +94,15 @@ class AddressNode(Node):
   def realname(self):
     return self.REALNAME
 
+  def groups(self):
+    return [ G for G in self.nodedb.groups if self.name in G ]
+
+  def in_group(self, group_name):
+    G = self.nodedb.groups.get(group_name)
+    if G is None:
+      return False
+    return self.name in G
+
 class MessageNode(Node):
 
   @property
