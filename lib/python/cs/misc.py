@@ -745,3 +745,20 @@ class HasFlags:
       if type(self[self.__flagfield]) is str:
         flagv=",".join(flagv)
       self[self.__flagfield]=flagv
+
+class O(object):
+  ''' A bare object subclass to allow storing arbitrary attributes.
+  '''
+
+  def __str__(self):
+    return ( "<%s %s>"
+             % ( self.__class__.__name__,
+                 ",".join([ "%s=%s" % (attr, getattr(self, attr))
+                            for attr in sorted(dir(self)) if attr[0].isalpha()
+                          ])
+               )
+           )
+
+class slist(list):
+  def __str__(self):
+    return "[" + ",".join(str(e) for e in self) + "]"
