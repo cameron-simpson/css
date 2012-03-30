@@ -8,16 +8,19 @@ from collections import namedtuple
 from email.utils import getaddresses
 import email.parser
 import os
+import os.path
 import re
 import sys
 import mailbox
 if sys.hexversion < 0x02060000: from sets import Set as set
+from thread import allocate_lock
 from cs.env import envsub
 from cs.fileutils import abspath_from_file
 from cs.lex import get_white, get_nonwhite
-from cs.logutils import Pfx, setup_logging, debug, info, warning, error
+from cs.logutils import Pfx, setup_logging, debug, info, warning, error, D
 from cs.mailutils import Maildir, read_message
 from cs.misc import O, slist
+from cs.threads import locked_property
 from cs.app.maildb import MailDB
 
 def main(argv, stdin=None):
@@ -26,46 +29,60 @@ def main(argv, stdin=None):
   argv = list(argv)
   cmd = argv.pop(0)
   setup_logging(cmd)
-  usage = 'Usage: %s rulefile maildb < message' % (cmd,)
+  usage = 'Usage: %s filter maildir' % (cmd,)
   mdburl = None
   badopts = False
 
-  if len(argv) == 0:
-    warning("missing rulefile")
+  if not argv:
+    warning("missing op")
     badopts = True
   else:
-    rulefile = argv.pop(0)
-    if not os.path.isfile(rulefile):
-      warning("rulefile: not a file: %s", rulefile)
-      badopts = True
-  if len(argv) > 0:
-    mdburl = argv.pop(0)
-  if len(argv) > 0:
-    warning("extra arguments: %s" % (' '.join(argv),))
-    badopts = True
+    op = argv.pop(0)
+    with Pfx(op):
+      if op == 'filter':
+        if not argv:
+          warning("missing maildir")
+          badopts = True
+        else:
+          mdirpath = argv.pop(0)
+          if argv:
+            warning("extra arguments after maildir: %s", " ".join(argv))
+            badopts = True
+      else:
+        warning("unrecognised op: %s", op)
+        badopts = True
 
   if badopts:
     print >>sys.stderr, usage
     return 2
 
-  rules = Rules()
-  rules.load(rulefile)
+  with Pfx(op):
+    if op == 'filter':
+      if mdburl is None:
+        mdburl = os.environ['MAILDB']
+      D("get maildb %s", mdburl)
+      MDB = MailDB(mdburl, readonly=True)
+      D("got maildb, get WatchedMaildir(%s,..)", mdirpath)
+      MW = WatchedMaildir(mdirpath, MDB)
+      D("got maildir, call filter()")
+      for key, reports in MW.filter():
+        D("key = %s, did: %s", key, reports)
+      D("filtered")
+      return 0
 
-  if mdburl is None:
-    mdburl = os.environ['MAILDB']
-  MDB = MailDB(mdburl, readonly=True)
+      M = email.parser.Parser().parse(stdin)
+      state = State(MDB, os.environ)
+      state.groups = MDB.groups
+      state.vars = {}
+      filed = []
+      for report in rules.filter(M, state):
+        if report.matched:
+          for saved_to in report.saved_to:
+            print "%s %s => %s" % (M['from'], M['subject'], saved_to)
+        filed.extend(report.saved_to)
+      return 0 if filed else 1
 
-  M = email.parser.Parser().parse(stdin)
-  state = State(MDB, os.environ)
-  state.groups = MDB.groups
-  state.vars = {}
-  filed = []
-  for report in rules.filter(M, state):
-    if report.matched:
-      for saved_to in report.saved_to:
-        print "%s %s => %s" % (M['from'], M['subject'], saved_to)
-    filed.extend(report.saved_to)
-  return 0 if filed else 1
+    raise RunTimeError("unimplemented op")
 
 class State(O):
  
@@ -257,6 +274,18 @@ def message_addresses(M, hdrs):
     for realname, address in getaddresses(M.get_all(hdr, ())):
       yield realname, address
 
+def resolve_maildir(mdirpath, environ=None):
+  ''' Return a new Maildir based on mdirpath.
+  '''
+  if not os.path.isabs(mdirpath):
+    if mdirpath.startswith('./') or mdirpath.startswith('../'):
+      mdirpath = os.path.abspath(mdirpath)
+    else:
+      if environ is None:
+        environ = os.environ
+      mdirpath = os.path.join(environ['MAILDIR'], mdirpath)
+  return Maildir(mdirpath)
+
 class _Condition(O):
   pass
 
@@ -342,7 +371,7 @@ class Rule(O):
           info("action = %r, arg = %r", action, arg)
           if action == 'SAVE':
             mdirpath = os.path.join(state.environ['MAILDIR'], arg)
-            mdir = Maildir(mdirpath)
+            mdir = resolve_maildir(mdirpath)
             info("SAVE to %s", mdir.dir)
             key = mdir.add(msgpath if msgpath is not None else M)
             msgpath = mdir.keypath(key)
@@ -411,7 +440,7 @@ class Rules(list):
           mdirpath = dflt
           action, arg = ('SAVE', mdirpath)
           try:
-            mdir = Maildir(mdirpath)
+            mdir = resolve_maildir(mdirpath)
             info("SAVE to default %s", mdir.dir)
             key = mdir.add(savepath if savepath is not None else M)
             msgpath = mdir.keypath(key)
@@ -424,6 +453,63 @@ class Rules(list):
           else:
             ok_actions.append( (action, arg) )
           yield FilterReport(None, matched, saved_to, ok_actions, failed_actions)
+
+class WatchedMaildir(O):
+  ''' A class to monitor a Maildir and filter messages.
+  '''
+
+  def __init__(self, mdir, maildb, rules_file=None):
+    self.mdir = resolve_maildir(mdir)
+    if rules_file is None:
+      rules_file = os.path.join(self.mdir.dir, '.rules')
+    self.rules_file = rules_file
+    self._rules = None
+    self.maildb = maildb
+    self.lurking = set()
+    self._lock = allocate_lock()
+    self.flush()
+
+  def flush(self):
+    ''' Forget state.
+        The set of lurkers is emptied.
+    '''
+    self.lurking = set()
+
+  @locked_property
+  def rules(self):
+    rules = Rules()
+    rules.load(self.rules_file)
+    return rules
+
+  def filter(self):
+    ''' Scan Maildir contents.
+        Yield (key, FilterReports) for all messages filed.
+	Update the set of lurkers with any keys not removed to prevent
+	filtering on subsequent calls.
+    '''
+    with Pfx("%s: filter" % (self,)):
+      mdir = self.mdir
+      for key in mdir.keys():
+        if key in self.lurking:
+          debug("skip processed key: %s", key)
+          continue
+        M = mdir[key]
+        state = State(self.maildb)
+        filed = []
+        reports = []
+        for report in self.rules.filter(M, state):
+          if report.matched:
+            reports.append(report)
+            for saved_to in report.saved_to:
+              print "%s %s => %s" % (M['from'], M['subject'], saved_to)
+          filed.extend(report.saved_to)
+        if filed and False:
+          info("remove key %s", key)
+          mdir.remove(key)
+        else:
+          debug("lurk key %s", key)
+          self.lurking.add(key)
+        yield key, reports
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
