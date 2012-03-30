@@ -17,7 +17,7 @@ from thread import allocate_lock
 from cs.env import envsub
 from cs.fileutils import abspath_from_file
 from cs.lex import get_white, get_nonwhite
-from cs.logutils import Pfx, setup_logging, debug, info, warning, error, D
+from cs.logutils import Pfx, setup_logging, debug, info, warning, error, D, LogTime
 from cs.mailutils import Maildir, read_message
 from cs.misc import O, slist
 from cs.threads import locked_property
@@ -65,8 +65,9 @@ def main(argv, stdin=None):
       D("got maildb, get WatchedMaildir(%s,..)", mdirpath)
       MW = WatchedMaildir(mdirpath, MDB)
       D("got maildir, call filter()")
-      for key, reports in MW.filter():
-        D("key = %s, did: %s", key, reports)
+      with LogTime("MW.filter()", threshold=0.0):
+        for key, reports in MW.filter():
+          D("key = %s, did: %s", key, reports)
       D("filtered")
       return 0
 
@@ -92,6 +93,25 @@ class State(O):
     self.maildb = mdb
     self.environ = dict(environ)
     self.flags = O()
+    self.current_message = None
+
+  def addresses(self, M, *headers):
+    ''' Return the core addresses from the supplies Message and headers.
+        Caches results for rapid rule evaluation.
+    '''
+    if M is not self.current_message:
+      self.current_message = M
+      self.header_addresses = {}
+    if len(headers) != 1:
+      addrs = set()
+      for header in headers:
+        addrs.update(self.addresses(M, header))
+      return addrs
+    header = headers[0]
+    hamap = self.header_addresses
+    if header not in hamap:
+      hamap[header] = set( [ A for A, N in message_addresses(M, (header,)) ] )
+    return hamap[header]
 
 re_QSTR = re.compile(r'"([^"\\]|\\.)*"')
 re_UNQSTR = re.compile(r'[^,\s]+')
@@ -315,7 +335,7 @@ class Condition_AddressMatch(_Condition):
     self.addrkeys = [ k for k in addrkeys if len(k) > 0 ]
 
   def match(self, M, state):
-    for realname, address in message_addresses(M, self.headernames):
+    for address in state.addresses(M, *self.headernames):
       for key in self.addrkeys:
         if key.startswith('{{') and key.endswith('}}'):
           key = key[2:-2].lower()
@@ -336,7 +356,7 @@ class Condition_InGroups(_Condition):
 
   def match(self, M, state):
     MDB = state.maildb
-    for realname, address in message_addresses(M, self.headernames):
+    for address in state.addresses(M, *self.headernames):
       for group_name in self.group_names:
         if address in MDB.group(group_name):
           return True
@@ -477,8 +497,10 @@ class WatchedMaildir(O):
 
   @locked_property
   def rules(self):
-    rules = Rules()
-    rules.load(self.rules_file)
+    with LogTime("load %s" % (self.rules_file,), threshold=0.0):
+      rules = Rules()
+      rules.load(self.rules_file)
+    D("%d rules", len(rules))
     return rules
 
   def filter(self):
@@ -487,29 +509,30 @@ class WatchedMaildir(O):
 	Update the set of lurkers with any keys not removed to prevent
 	filtering on subsequent calls.
     '''
-    with Pfx("%s: filter" % (self,)):
+    with Pfx("%s: filter" % (self.mdir.dir,)):
       mdir = self.mdir
       for key in mdir.keys():
         if key in self.lurking:
           debug("skip processed key: %s", key)
           continue
-        M = mdir[key]
-        state = State(self.maildb)
-        filed = []
-        reports = []
-        for report in self.rules.filter(M, state):
-          if report.matched:
-            reports.append(report)
-            for saved_to in report.saved_to:
-              print "%s %s => %s" % (M['from'], M['subject'], saved_to)
-          filed.extend(report.saved_to)
-        if filed and False:
-          info("remove key %s", key)
-          mdir.remove(key)
-        else:
-          debug("lurk key %s", key)
-          self.lurking.add(key)
-        yield key, reports
+        with LogTime("key = %s" % (key,), threshold=0.0):
+          M = mdir[key]
+          state = State(self.maildb)
+          filed = []
+          reports = []
+          for report in self.rules.filter(M, state):
+            if report.matched:
+              reports.append(report)
+              for saved_to in report.saved_to:
+                print "%s %s => %s" % (M['from'], M['subject'], saved_to)
+            filed.extend(report.saved_to)
+          if filed and False:
+            info("remove key %s", key)
+            mdir.remove(key)
+          else:
+            debug("lurk key %s", key)
+            self.lurking.add(key)
+          yield key, reports
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
