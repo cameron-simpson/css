@@ -67,7 +67,8 @@ def main(argv, stdin=None):
       D("got maildir, call filter()")
       with LogTime("MW.filter()", threshold=0.0):
         for key, reports in MW.filter():
-          D("key = %s, did: %s", key, reports)
+          ##D("key = %s, did: %s", key, reports)
+          pass
       D("filtered")
       return 0
 
@@ -388,18 +389,18 @@ class Rule(O):
     if matched:
       for action, arg in self.actions:
         try:
-          info("action = %r, arg = %r", action, arg)
+          debug("action = %r, arg = %r", action, arg)
           if action == 'SAVE':
             mdirpath = os.path.join(state.environ['MAILDIR'], arg)
             mdir = resolve_maildir(mdirpath)
-            info("SAVE to %s", mdir.dir)
+            debug("SAVE to %s", mdir.dir)
             key = mdir.add(msgpath if msgpath is not None else M)
             msgpath = mdir.keypath(key)
             saved_to.append(mdirpath)
           elif action == 'ASSIGN':
             envvar, s = arg
             state.environ[envvar] = envsub(s, state.environ)
-            info("ASSIGN %s=%s", envvar, state.environ[envvar])
+            debug("ASSIGN %s=%s", envvar, state.environ[envvar])
           else:
             raise RuntimeError("unimplemented action \"%s\"" % action)
         except NameError:
@@ -461,7 +462,7 @@ class Rules(list):
           action, arg = ('SAVE', mdirpath)
           try:
             mdir = resolve_maildir(mdirpath)
-            info("SAVE to default %s", mdir.dir)
+            debug("SAVE to default %s", mdir.dir)
             key = mdir.add(savepath if savepath is not None else M)
             msgpath = mdir.keypath(key)
             saved_to.append(msgpath)
@@ -510,29 +511,35 @@ class WatchedMaildir(O):
 	filtering on subsequent calls.
     '''
     with Pfx("%s: filter" % (self.mdir.dir,)):
-      mdir = self.mdir
-      for key in mdir.keys():
-        if key in self.lurking:
-          debug("skip processed key: %s", key)
-          continue
-        with LogTime("key = %s" % (key,), threshold=0.0):
-          M = mdir[key]
-          state = State(self.maildb)
-          filed = []
-          reports = []
-          for report in self.rules.filter(M, state):
-            if report.matched:
-              reports.append(report)
-              for saved_to in report.saved_to:
-                print "%s %s => %s" % (M['from'], M['subject'], saved_to)
-            filed.extend(report.saved_to)
-          if filed and False:
-            info("remove key %s", key)
-            mdir.remove(key)
-          else:
-            debug("lurk key %s", key)
-            self.lurking.add(key)
-          yield key, reports
+      nmsgs = 0
+      skipped = 0
+      with LogTime("all keys") as TK:
+        mdir = self.mdir
+        for key in mdir.keys():
+          if key in self.lurking:
+            debug("skip processed key: %s", key)
+            skipped += 1
+            continue
+          nmsgs += 1
+          with LogTime("key = %s" % (key,), threshold=0.0):
+            M = mdir[key]
+            state = State(self.maildb)
+            filed = []
+            reports = []
+            for report in self.rules.filter(M, state):
+              if report.matched:
+                reports.append(report)
+                for saved_to in report.saved_to:
+                  print "%s %s => %s" % (M['from'], M['subject'], saved_to)
+              filed.extend(report.saved_to)
+            if filed and False:
+              info("remove key %s", key)
+              mdir.remove(key)
+            else:
+              debug("lurk key %s", key)
+              self.lurking.add(key)
+            yield key, reports
+      D("filtered %d messages (%d skipped) in %5.3fs", nmsgs, skipped, TK.elapsed)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
