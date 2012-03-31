@@ -543,9 +543,10 @@ class WatchedMaildir(O):
                 for saved_to in report.saved_to:
                   print "%s %s => %s" % (M['from'], M['subject'], saved_to)
               filed.extend(report.saved_to)
-            if filed and False:
+            if filed:
               info("remove key %s", key)
               mdir.remove(key)
+              self.lurking.discard(key)
             else:
               debug("lurk key %s", key)
               self.lurking.add(key)
