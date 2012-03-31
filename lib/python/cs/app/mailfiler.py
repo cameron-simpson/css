@@ -7,11 +7,14 @@
 from collections import namedtuple
 from email.utils import getaddresses
 import email.parser
+from getopt import getopt, GetoptError
+from logging import DEBUG
+import mailbox
 import os
 import os.path
 import re
 import sys
-import mailbox
+from time import sleep
 if sys.hexversion < 0x02060000: from sets import Set as set
 from thread import allocate_lock
 from cs.env import envsub
@@ -29,7 +32,7 @@ def main(argv, stdin=None):
   argv = list(argv)
   cmd = argv.pop(0)
   setup_logging(cmd)
-  usage = 'Usage: %s filter maildir' % (cmd,)
+  usage = 'Usage: %s filter [-d delay] maildirs...' % (cmd,)
   mdburl = None
   badopts = False
 
@@ -40,14 +43,35 @@ def main(argv, stdin=None):
     op = argv.pop(0)
     with Pfx(op):
       if op == 'filter':
+        delay = None
+        no_remove = False
+        try:
+          opts, argv = getopt(argv, 'd:n')
+        except GetoptError, e:
+          warning("%s", e)
+          badopts = True
+        for opt, val in opts:
+          with Pfx(opt):
+            if opt == '-d':
+              try:
+                delay = int(val)
+              except ValueError, e:
+                warning("%s: %s", e, val)
+                badopts = True
+              else:
+                if delay <= 0:
+                  warning("delay must be positive, got: %d", delay)
+                  badopts = True
+            elif opt == '-n':
+              no_remove = True
+            else:
+              warning("unimplemented option")
+              badopts = True
         if not argv:
-          warning("missing maildir")
+          warning("missing maildirs")
           badopts = True
         else:
-          mdirpath = argv.pop(0)
-          if argv:
-            warning("extra arguments after maildir: %s", " ".join(argv))
-            badopts = True
+          mdirpaths = argv
       else:
         warning("unrecognised op: %s", op)
         badopts = True
@@ -60,16 +84,20 @@ def main(argv, stdin=None):
     if op == 'filter':
       if mdburl is None:
         mdburl = os.environ['MAILDB']
+      maildirs = []
       D("get maildb %s", mdburl)
       MDB = MailDB(mdburl, readonly=True)
-      D("got maildb, get WatchedMaildir(%s,..)", mdirpath)
-      MW = WatchedMaildir(mdirpath, MDB)
-      D("got maildir, call filter()")
-      with LogTime("MW.filter()", threshold=0.0):
-        for key, reports in MW.filter():
-          ##D("key = %s, did: %s", key, reports)
-          pass
-      D("filtered")
+      maildirs = [ WatchedMaildir(mdirpath, MDB) for mdirpath in mdirpaths ]
+      while True:
+        for MW in maildirs:
+          with LogTime("MW.filter()", threshold=0.0):
+            for key, reports in MW.filter(no_remove=no_remove):
+              ##D("key = %s, did: %s", key, reports)
+              pass
+        if delay is None:
+          break
+        debug("sleep %d", delay)
+        sleep(delay)
       return 0
 
       M = email.parser.Parser().parse(stdin)
@@ -148,6 +176,7 @@ def parserules(fp):
     return
 
   filename = fp.name
+  info("PARSE RULES: %s", filename)
   lineno = 0
   R = None
   for line in fp:
@@ -454,7 +483,7 @@ class Rules(list):
       if matches:
         dflt = state.environ.get('DEFAULT')
         if dflt is None:
-          warn("message matched no rules, and no $DEFAULT")
+          warning("message matched no rules, and no $DEFAULT")
         else:
           matched = False
           saved_to = []
@@ -514,14 +543,15 @@ class WatchedMaildir(O):
       self._rules = new_rules
       self._rules_mtime = new_mtime
 
-  def filter(self):
+  def filter(self, no_remove=False):
     ''' Scan Maildir contents.
         Yield (key, FilterReports) for all messages filed.
 	Update the set of lurkers with any keys not removed to prevent
 	filtering on subsequent calls.
     '''
-    self.update_rules()
     with Pfx("%s: filter" % (self.mdir.dir,)):
+      self.update_rules()
+      self.mdir.flush()
       nmsgs = 0
       skipped = 0
       with LogTime("all keys") as TK:
@@ -532,7 +562,7 @@ class WatchedMaildir(O):
             skipped += 1
             continue
           nmsgs += 1
-          with LogTime("key = %s" % (key,), threshold=0.0):
+          with LogTime("key = %s" % (key,), threshold=0.0, level=DEBUG):
             M = mdir[key]
             state = State(self.maildb)
             filed = []
@@ -543,8 +573,8 @@ class WatchedMaildir(O):
                 for saved_to in report.saved_to:
                   print "%s %s => %s" % (M['from'], M['subject'], saved_to)
               filed.extend(report.saved_to)
-            if filed:
-              info("remove key %s", key)
+            if filed and not no_remove:
+              debug("remove key %s", key)
               mdir.remove(key)
               self.lurking.discard(key)
             else:
