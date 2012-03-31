@@ -10,7 +10,7 @@ import os
 import os.path
 from types import StringTypes
 import sys
-from cs.logutils import Pfx, error, warn , info
+from cs.logutils import Pfx, error, warning , info
 from . import NodeDB
 from .node import _NoBackend
 
@@ -27,48 +27,56 @@ def read_csv_file(fp, skipHeaders=False, noHeaders=False):
           yield csvnode
     return
   csvnode = None
-  r = csv.reader(fp)
-  if not noHeaders:
-    hdrrow = r.next()
-    if not skipHeaders:
-      if hdrrow != ['TYPE', 'NAME', 'ATTR', 'VALUE']:
-        raise ValueError, \
-              "bad header row, expected TYPE, NAME, ATTR, VALUE but got: %s" \
-              % (hdrrow,)
-  attrmap = None
-  otype = None
-  oname = None
-  oattr = None
-  for row in r:
-    t, n, attr, value = row
-    value = value.decode('utf-8')
-    if attr.endswith('s'):
-      # revert older plural dump format
-      warning("loading old plural attribute: %s" % (attr,))
-      k, plural = parseUC_sAttr(attr)
-      if k is None:
-        raise ValueError, "failed to parse attribute name: %s" % (attr,)
-      attr = k
-    if t == "":
-      assert otype is not None
-      t = otype
-    if n == "":
-      assert oname is not None
-      n = oname
-    if t != otype or n != oname:
-      if attrmap is not None:
-        yield otype, oname, attrmap
-      attrmap = {}
-    if attr == "":
-      assert oattr is not None
-      attr = oattr
-      attrmap[attr].append(value)
-    else:
-      attrmap[attr]=[value]
-    otype, oname, oattr = t, n, attr
-  if attrmap is not None:
-    yield otype, oname, attrmap
-  return
+  with Pfx("csvreader(%s)" % (fp,)):
+    r = csv.reader(fp)
+    rownum = 0
+    if not noHeaders:
+      hdrrow = r.next()
+      rownum += 1
+      if not skipHeaders:
+        if hdrrow != ['TYPE', 'NAME', 'ATTR', 'VALUE']:
+          raise ValueError, \
+                "bad header row, expected TYPE, NAME, ATTR, VALUE but got: %s" \
+                % (hdrrow,)
+    attrmap = None
+    otype = None
+    oname = None
+    oattr = None
+    for row in r:
+      rownum += 1
+      t, n, attr, value = row
+      try:
+        value = value.decode('utf-8')
+      except UnicodeDecodeError, e:
+        warning("row %d: %s, using errors=replace", rownum, e)
+        value = value.decode('utf-8', errors='replace')
+      if attr.endswith('s'):
+        # revert older plural dump format
+        warning("loading old plural attribute: %s" % (attr,))
+        k, plural = parseUC_sAttr(attr)
+        if k is None:
+          raise ValueError, "failed to parse attribute name: %s" % (attr,)
+        attr = k
+      if t == "":
+        assert otype is not None
+        t = otype
+      if n == "":
+        assert oname is not None
+        n = oname
+      if t != otype or n != oname:
+        if attrmap is not None:
+          yield otype, oname, attrmap
+        attrmap = {}
+      if attr == "":
+        assert oattr is not None
+        attr = oattr
+        attrmap[attr].append(value)
+      else:
+        attrmap[attr]=[value]
+      otype, oname, oattr = t, n, attr
+    if attrmap is not None:
+      yield otype, oname, attrmap
+    return
 
 def write_csv_file(fp, nodedata, noHeaders=False):
   ''' Iterate over the supplied `nodedata`, a sequence of:
