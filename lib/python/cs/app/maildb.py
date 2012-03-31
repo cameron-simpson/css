@@ -15,11 +15,13 @@ import os
 import unittest
 
 def main(argv):
+  argv = list(argv)
   cmd = os.path.basename(argv.pop(0))
   usage = '''Usage:
     %s [-m mdburl] op [op-args...]
     Ops:
       import-addresses < addresses.txt
+        group,... rfc2822-address
       list-groups [groups...]''' \
     % (cmd,)
   setup_logging(cmd)
@@ -29,11 +31,11 @@ def main(argv):
   mdburl = None
 
   try:
-    opts, args = getopt(argv[1:], 'm:')
+    opts, argv = getopt(argv, 'm:')
   except GetoptError, e:
     error("unrecognised option: %s: %s"% (e.opt, e.msg))
     badopts = True
-    opts, args = [], []
+    opts, argv = [], []
 
   for opt, val in opts:
     if opt == '-m':
@@ -91,6 +93,15 @@ class AddressNode(Node):
   @property
   def realname(self):
     return self.REALNAME
+
+  def groups(self):
+    return [ G for G in self.nodedb.groups if self.name in G ]
+
+  def in_group(self, group_name):
+    G = self.nodedb.groups.get(group_name)
+    if G is None:
+      return False
+    return self.name in G
 
 class MessageNode(Node):
 
@@ -174,16 +185,25 @@ class _MailDB(NodeDB):
       A.REALNAME = realname
     return A
 
+  def group(self, group_name):
+    ''' Return the set of addresses in the group `group_name`.
+        Create the set if necessary.
+    '''
+    Gs = self.groups
+    G = Gs.get(group_name)
+    if G is None:
+      Gs[group_name] = G = set()
+    return G
+
   def scan_groups(self, addrs=None):
+    ''' Iterate over `addrs` (default self.ADDRESSes) and populate
+        the group sets.
+    '''
     if addrs is None:
       addrs = self.ADDRESSes
     for A in addrs:
-      for group in A.GROUPs:
-        if group in self.groups:
-          G = self.groups[group]
-        else:
-          G = self.groups[group] = set()
-        G.add(A.name)
+      for group_name in A.GROUPs:
+        self.group(group_name).add(A.name)
 
   def getMessageNode(self, message_id):
     ''' Obtain the Node for the specified Message-ID `message_id`.

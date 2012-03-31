@@ -219,6 +219,13 @@ def get_white(s, offset=0):
   '''
   return get_chars(s, string.whitespace, offset=offset)
 
+def get_nonwhite(s, offset=0):
+  ''' Scan the string `s` for characters not in string.whitespace starting at
+      `offset` (default 0).
+      Return (match, new_offset).
+  '''
+  return get_other_chars(s, string.whitespace, offset=offset)
+
 def get_identifier(s, offset=0):
   ''' Scan the string `s` for an identifier (letter or underscore followed by
       letters, digits or underscores) starting at `offset` (default 0).

@@ -1216,7 +1216,7 @@ class NodeDB(dict):
     if len(args) != 1:
       raise GetoptError("expected a single TYPE:key")
     N = self[args[0]]
-    from cs.nodedb.text import editNode
+    from .text import editNode
     editNode(N, doCreate=True)
     return 0
 
@@ -1416,6 +1416,8 @@ def NodeDBFromURL(url, readonly=False, klass=None):
     _, ext = os.path.splitext(base)
     if ext == '.csv':
       return NodeDBFromURL('file-csv://'+url, readonly=readonly, klass=klass)
+    if ext == '.kch':
+      return NodeDBFromURL('file-kch://'+url, readonly=readonly, klass=klass)
     if ext == '.tch':
       return NodeDBFromURL('file-tch://'+url, readonly=readonly, klass=klass)
     if ext == '.sqlite':
@@ -1427,15 +1429,23 @@ def NodeDBFromURL(url, readonly=False, klass=None):
     markend = markpos + 3
     scheme = url[:markpos]
     if scheme == 'file-csv':
-      from cs.nodedb.csvdb import Backend_CSVFile
+      from .csvdb import Backend_CSVFile
       dbpath = url[markend:]
       backend = Backend_CSVFile(dbpath, readonly=readonly)
       db = klass(backend, readonly=readonly)
       _NodeDBsByURL[url] = db
       return db
 
+    if scheme == 'file-kch':
+      from .kyotocab import Backend_KyotoCabinet
+      dbpath = url[markend:]
+      backend = Backend_KyotoCabinet(dbpath, readonly=readonly)
+      db = klass(backend, readonly=readonly)
+      _NodeDBsByURL[url] = db
+      return db
+
     if scheme == 'file-tch':
-      from cs.nodedb.tokcab import Backend_TokyoCabinet
+      from .tokcab import Backend_TokyoCabinet
       dbpath = url[markend:]
       backend = Backend_TokyoCabinet(dbpath, readonly=readonly)
       db = klass(backend, readonly=readonly)
@@ -1447,7 +1457,7 @@ def NodeDBFromURL(url, readonly=False, klass=None):
       # TODO: mysql: URLs will leak user and password - strip first for key
       ####assert not url.startswith('sqlite:///:memory:'), \
       ####       "sorry, \"%s\" isn't a singleton URL" % (url,)
-      from cs.nodedb.sqla import Backend_SQLAlchemy
+      from .sqla import Backend_SQLAlchemy
       dbpath = url
       backend = Backend_SQLAlchemy(dbpath, readonly=readonly)
       db = klass(backend, readonly=readonly)
@@ -1458,6 +1468,8 @@ def NodeDBFromURL(url, readonly=False, klass=None):
   if os.path.isfile(url):
     if url.endswith('.csv'):
       return NodeDBFromURL('file-csv://'+os.path.abspath(url), readonly=readonly, klass=klass)
+    if url.endswith('.kch'):
+      return NodeDBFromURL('file-kch://'+os.path.abspath(url), readonly=readonly, klass=klass)
     if url.endswith('.tch'):
       return NodeDBFromURL('file-tch://'+os.path.abspath(url), readonly=readonly, klass=klass)
 

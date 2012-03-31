@@ -470,6 +470,7 @@ class LogTime(object):
     self.warnLevel = warnLevel
   def __enter__(self):
     self.start = time.time()
+    return self
   def __exit__(self, exc_type, exc_value, traceback):
     now = time.time()
     elapsed = now - self.start

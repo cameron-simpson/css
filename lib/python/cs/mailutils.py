@@ -16,6 +16,7 @@ from tempfile import NamedTemporaryFile
 from StringIO import StringIO
 from thread import allocate_lock
 import time
+from cs.logutils import debug, D
 from cs.threads import locked_property
 from cs.misc import seq
 
@@ -43,6 +44,13 @@ class Maildir(mailbox.Maildir):
     self._pid = None
     self._hostpart = None
     self._lock = allocate_lock()
+    self.flush()
+
+  def flush(self):
+    ''' Forget state.
+    '''
+    debug("flush %s: _msgmap = None", self.dir)
+    self._msgmap = None
 
   @locked_property
   def pid(self):
@@ -56,6 +64,7 @@ class Maildir(mailbox.Maildir):
   def msgmap(self):
     ''' Scan the maildir, return key->message-info mapping.
     '''
+    debug("compute msgmap for %s", self.dir)
     msgmap = {}
     for subdir in 'new', 'cur':
       subdirpath = os.path.join(self.dir, subdir)
@@ -104,7 +113,7 @@ class Maildir(mailbox.Maildir):
     now = time.time()
     secs = int(now)
     subsecs = now-secs
-    key = '%d.#%dM%dP%d' % (secs, seq(), subsecs * 1e6, self._pid)
+    key = '%d.#%dM%dP%d' % (secs, seq(), subsecs * 1e6, self.pid)
     assert self.validkey(key), "invalid new key: %s" % (key,)
     return key
 
@@ -151,16 +160,22 @@ class Maildir(mailbox.Maildir):
       T.write(fp.read())
     return self.save_filepath(T.name, key=key)
 
+  def keypath(self, key):
+    subdir, msgbase = self.msgmap[key]
+    return os.path.join(self.dir, subdir, msgbase)
+
   def open(self, key, mode='r'):
     ''' Open the file storing the message specified by `key`.
     '''
-    subdir, msgbase = self.msgmap[key]
-    return open(os.path.join(self.dir, subdir, msgbase), mode=mode)
+    return open(self.keypath(key), mode=mode)
 
   def get_file(key):
     return self.open(key, mode='rb')
 
   def add(self, message, key=None):
+    ''' Add a message to the Maildir.
+        `message` may be an email.message.Message instance or a path to a file.
+    '''
     if type(message) in (str, unicode):
       return self.save_filepath(message, key=key)
     if isinstance(message, email.message.Message):
@@ -173,7 +188,9 @@ class Maildir(mailbox.Maildir):
 
   def remove(self, key):
     subdir, msgbase = self.msgmap[key]
-    os.remove(os.path.join(self.dir, subdir, msgbase))
+    msgpath = os.path.join(self.dir, subdir, msgbase)
+    debug("%s: remove key %s: %s", self, key, msgpath)
+    os.remove(msgpath)
     del self.msgmap[key]
   discard = remove
   __delitem__ = remove
@@ -262,9 +279,6 @@ class Maildir(mailbox.Maildir):
     '''
     for key in self.iterkeys():
       return key, self.get_headers(key)
-
-  def flush(self):
-    pass
 
   def lock(self):
     self._lock.acquire()

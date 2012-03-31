@@ -5,7 +5,9 @@
 #
 
 from __future__ import with_statement
+import errno
 import os
+from os.path import isabs, abspath, dirname
 import sys
 import shutil
 from tempfile import NamedTemporaryFile
@@ -92,6 +94,48 @@ def rewrite(filepath, data,
       if backup_ext:
         shutil.copy2(filepath, filepath + backup_ext)
       shutil.copyfile(T.name, filepath)
+
+def abspath_from_file(path, from_file):
+  ''' Return the absolute path if `path` with respect to `from_file`,
+      as one might do for an include file.
+  '''
+  if not isabs(path):
+    if not isabs(from_file):
+      from_file = abspath(from_file)
+    path = os.path.join(dirname(from_file), path)
+  return path
+
+def poll_updated(path, old_mtime, reload):
+  ''' Poll a file for modification.
+      Call reload(path) if the file is newer than `old_mtime`.
+      Return (new_mtime, reload(path)) if the file was updated
+      and was unchanged during the reload().
+      Otherwise return (None, None).
+      This may raise an OSError if the `path` cannot be os.stat()ed
+      and of course for any exceptions that occur calling `reload`.
+      If `missing_ok` is true then a failure to os.stat() that
+      raises OSError with ENOENT will just return (None, None).
+  '''
+  try:
+    s = os.stat(path)
+  except OSError, e:
+    if e.errno == errno.ENOENT:
+      if missing_ok:
+        return None, None
+    raise
+  if old_mtime is None or s.st_mtime > old_mtime:
+    new_mtime = s.st_mtime
+    R = reload(path)
+    try:
+      s = os.stat(path)
+    except OSError, e:
+      if e.errno == errno.ENOENT:
+        if missing_ok:
+          return None, None
+      raise
+    if new_mtime == s.st_mtime:
+      return new_mtime, R
+  return None, None
 
 if __name__ == '__main__':
   import cs.fileutils_tests
