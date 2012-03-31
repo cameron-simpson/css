@@ -16,7 +16,7 @@ from tempfile import NamedTemporaryFile
 from StringIO import StringIO
 from thread import allocate_lock
 import time
-from cs.logutils import debug
+from cs.logutils import debug, D
 from cs.threads import locked_property
 from cs.misc import seq
 
@@ -49,6 +49,7 @@ class Maildir(mailbox.Maildir):
   def flush(self):
     ''' Forget state.
     '''
+    debug("flush %s: _msgmap = None", self.dir)
     self._msgmap = None
 
   @locked_property
@@ -63,6 +64,7 @@ class Maildir(mailbox.Maildir):
   def msgmap(self):
     ''' Scan the maildir, return key->message-info mapping.
     '''
+    debug("compute msgmap for %s", self.dir)
     msgmap = {}
     for subdir in 'new', 'cur':
       subdirpath = os.path.join(self.dir, subdir)
@@ -277,9 +279,6 @@ class Maildir(mailbox.Maildir):
     '''
     for key in self.iterkeys():
       return key, self.get_headers(key)
-
-  def flush(self):
-    pass
 
   def lock(self):
     self._lock.acquire()
