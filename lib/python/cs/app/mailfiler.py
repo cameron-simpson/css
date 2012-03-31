@@ -85,13 +85,12 @@ def main(argv, stdin=None):
       if mdburl is None:
         mdburl = os.environ['MAILDB']
       maildirs = []
-      D("get maildb %s", mdburl)
-      MDB = MailDB(mdburl, readonly=True)
-      maildirs = [ WatchedMaildir(mdirpath, MDB) for mdirpath in mdirpaths ]
+      mailinfo = MailInfo(mdburl)
+      maildirs = [ WatchedMaildir(mdirpath) for mdirpath in mdirpaths ]
       while True:
         for MW in maildirs:
           with LogTime("MW.filter()", threshold=0.0):
-            for key, reports in MW.filter(no_remove=no_remove):
+            for key, reports in MW.filter(mailinfo, no_remove=no_remove):
               ##D("key = %s, did: %s", key, reports)
               pass
         if delay is None:
@@ -115,13 +114,20 @@ def main(argv, stdin=None):
     raise RunTimeError("unimplemented op")
 
 class State(O):
+  ''' State information for rule evaluation.
+      .mailinfo MailDB wrapper with access methods.
+      .environ  Storage for variable settings.
+  '''
  
-  def __init__(self, mdb, environ=None):
+  def __init__(self, mailinfo, environ=None):
+    ''' `mailinfo`: MailDB wrapper with access methods.
+        `environ`:  Mapping if initial variable names.
+                    Default from os.environ.
+    '''
     if environ is None:
       environ = os.environ
-    self.maildb = mdb
+    self.mailinfo = mailinfo
     self.environ = dict(environ)
-    self.flags = O()
     self.current_message = None
 
   def addresses(self, M, *headers):
@@ -385,10 +391,10 @@ class Condition_InGroups(_Condition):
     self.group_names = group_names
 
   def match(self, M, state):
-    MDB = state.maildb
+    minfo = state.mailinfo
     for address in state.addresses(M, *self.headernames):
       for group_name in self.group_names:
-        if address in MDB.group(group_name):
+        if address in minfo.group(group_name):
           return True
     return False
 
@@ -506,18 +512,39 @@ class Rules(list):
             ok_actions.append( (action, arg) )
           yield FilterReport(None, matched, saved_to, ok_actions, failed_actions)
 
+class MailInfo(O):
+  ''' Mail external information.
+      Includes a maildb and access methods.
+  '''
+
+  def __init__(self, maildb_path):
+    self.maildb_path = maildb_path
+    self.maildb_mtime = None
+    self.maildb = None
+
+  def update_maildb(self):
+    new_mtime, new_maildb = poll_updated(self.maildb_path,
+                                        self.maildb_mtime,
+                                        lambda path: MailDB(path, readonly=True))
+    if new_mtime:
+      self.maildb = new_maildb
+      self.maildb_mtime = new_mtime
+
+  @property
+  def group(self):
+    return self.maildb.group
+
 class WatchedMaildir(O):
   ''' A class to monitor a Maildir and filter messages.
   '''
 
-  def __init__(self, mdir, maildb, rules_file=None):
+  def __init__(self, mdir, rules_file=None):
     self.mdir = resolve_maildir(mdir)
     if rules_file is None:
       rules_file = os.path.join(self.mdir.dir, '.rules')
     self.rules_file = rules_file
-    self._rules = None
-    self._rules_mtime = None
-    self.maildb = maildb
+    self.rules = None
+    self.rules_mtime = None
     self.lurking = set()
     self._lock = allocate_lock()
     self.flush()
@@ -528,30 +555,24 @@ class WatchedMaildir(O):
     '''
     self.lurking = set()
 
-  @locked_property
-  def rules(self):
-    with LogTime("load %s" % (self.rules_file,), threshold=0.0):
-      rules = Rules(self.rules_file)
-      D("%d rules", len(rules))
-    return rules
-
   def update_rules(self):
     new_mtime, new_rules = poll_updated(self.rules_file,
-                                        self._rules_mtime,
+                                        self.rules_mtime,
                                         lambda path: Rules(path))
     if new_mtime:
-      self._rules = new_rules
-      self._rules_mtime = new_mtime
+      self.rules = new_rules
+      self.rules_mtime = new_mtime
 
-  def filter(self, no_remove=False):
+  def filter(self, mailinfo, no_remove=False):
     ''' Scan Maildir contents.
         Yield (key, FilterReports) for all messages filed.
 	Update the set of lurkers with any keys not removed to prevent
 	filtering on subsequent calls.
     '''
     with Pfx("%s: filter" % (self.mdir.dir,)):
-      self.update_rules()
       self.mdir.flush()
+      self.update_rules()
+      mailinfo.update_maildb()
       nmsgs = 0
       skipped = 0
       with LogTime("all keys") as TK:
@@ -564,7 +585,7 @@ class WatchedMaildir(O):
           nmsgs += 1
           with LogTime("key = %s" % (key,), threshold=0.0, level=DEBUG):
             M = mdir[key]
-            state = State(self.maildb)
+            state = State(mailinfo)
             filed = []
             reports = []
             for report in self.rules.filter(M, state):
