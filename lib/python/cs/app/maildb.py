@@ -1,10 +1,6 @@
 #!/usr/bin/python -tt
 
 from __future__ import with_statement
-from cs.logutils import setup_logging, Pfx, info, warning, error, D
-from cs.mail import ismaildir, ismbox, messagesFromPath
-from cs.nodedb import NodeDB, Node, NodeDBFromURL
-from cs.misc import the
 from collections import deque
 from getopt import getopt, GetoptError
 from email.utils import getaddresses, parseaddr, formataddr
@@ -13,6 +9,11 @@ import logging
 import sys
 import os
 import unittest
+from cs.logutils import setup_logging, Pfx, info, warning, error, D
+from cs.mail import ismaildir, ismbox, messagesFromPath
+from cs.nodedb import NodeDB, Node, NodeDBFromURL
+from cs.threads import locked_property
+from cs.misc import the
 
 def main(argv):
   argv = list(argv)
@@ -62,16 +63,19 @@ def main(argv):
           mdb.close()
       elif op == 'list-groups':
         if len(argv):
-          groups = argv
+          group_names = argv
         else:
-          groups = sorted(mdb.groups.keys())
-        for group in groups:
-          G = mdb.getAddressGroupNode(group)
-          if not G:
+          group_names = sorted(mdb.address_groups.keys())
+        for group_name in group_names:
+          address_group = get(mdb.address_groups, group_name)
+          if not address_group:
             error("no such group: %s", group)
             xit = 1
             continue
-          print group, ", ".join(A.formatted for A in G.ADDRESSes)
+          for address in address_group:
+            A = mdb['ADDRESS', address]
+            print group, ", ".join(mdb['ADDRESS', address].formatted
+                                   for address in address_group)
       else:
         error("unsupported op")
         badopts = True
@@ -95,11 +99,12 @@ class AddressNode(Node):
     return self.REALNAME
 
   def groups(self):
-    return [ G for G in self.nodedb.groups if self.name in G ]
+    return [ address_group for address_group in self.nodedb.address_groups
+             if self.name in address_group ]
 
   def in_group(self, group_name):
-    G = self.nodedb.groups.get(group_name)
-    if G is None:
+    address_group = self.nodedb.address_groups.get(group_name)
+    if address_group is None:
       return False
     return self.name in G
 
@@ -158,8 +163,7 @@ class _MailDB(NodeDB):
 
   def __init__(self, backend, readonly=False):
     NodeDB.__init__(self, backend, readonly=readonly)
-    self.groups = {}    # map of groupname to set of addresses
-    self.scan_groups()
+    self._address_groups = None
 
   def _createNode(self, t, name):
     ''' Create a new Node of the specified type.
@@ -185,25 +189,29 @@ class _MailDB(NodeDB):
       A.REALNAME = realname
     return A
 
-  def group(self, group_name):
+  def address_group(self, group_name):
     ''' Return the set of addresses in the group `group_name`.
         Create the set if necessary.
     '''
-    Gs = self.groups
-    G = Gs.get(group_name)
-    if G is None:
-      Gs[group_name] = G = set()
-    return G
+    address_groups = self.address_groups
+    address_group = address_groups.get(group_name)
+    if address_group is None:
+      address_groups[group_name] = address_group = set()
+    return address_group
 
-  def scan_groups(self, addrs=None):
-    ''' Iterate over `addrs` (default self.ADDRESSes) and populate
-        the group sets.
+  @locked_property
+  def address_groups(self):
+    ''' Compute the address_group sets.
     '''
-    if addrs is None:
-      addrs = self.ADDRESSes
-    for A in addrs:
+    address_groups = {}
+    for A in self.ADDRESSes:
       for group_name in A.GROUPs:
-        self.group(group_name).add(A.name)
+        address_group = ( address_groups[group_name]
+                          if group_name in address_groups
+                          else set()
+                        )
+        address_group.add(A.name)
+    return address_groups
 
   def getMessageNode(self, message_id):
     ''' Obtain the Node for the specified Message-ID `message_id`.
@@ -267,7 +275,7 @@ class _MailDB(NodeDB):
   def importAddresses(self, fp):
     ''' Import addresses into groups from the file `fp`.
         Import lines are of the form:
-          group[,...] email address
+          group[,...] email_address
     '''
     with Pfx(str(fp)):
       lineno = 0
@@ -291,7 +299,7 @@ class _MailDB(NodeDB):
             error("bad address: %s: %s", addr, e)
             continue
           A.GROUPs.update(groups.split(','))
-          self.scan_groups([A])
+      self._address_groups = None
 
 if __name__ == '__main__':
   sys.exit(main(list(sys.argv)))
