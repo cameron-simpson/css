@@ -15,7 +15,7 @@ import mailbox
 if sys.hexversion < 0x02060000: from sets import Set as set
 from thread import allocate_lock
 from cs.env import envsub
-from cs.fileutils import abspath_from_file
+from cs.fileutils import abspath_from_file, poll_updated
 from cs.lex import get_white, get_nonwhite
 from cs.logutils import Pfx, setup_logging, debug, info, warning, error, D, LogTime
 from cs.mailutils import Maildir, read_message
@@ -416,9 +416,11 @@ class Rules(list):
       rules and filter a message using the rules.
   '''
 
-  def __init__(self):
+  def __init__(self, rules_file=None):
     list.__init__(self)
     self.vars = {}
+    if rules_file is not None:
+      self.load(rules_file)
 
   def load(self, fp):
     ''' Import an open rule file.
@@ -485,6 +487,7 @@ class WatchedMaildir(O):
       rules_file = os.path.join(self.mdir.dir, '.rules')
     self.rules_file = rules_file
     self._rules = None
+    self._rules_mtime = None
     self.maildb = maildb
     self.lurking = set()
     self._lock = allocate_lock()
@@ -499,10 +502,17 @@ class WatchedMaildir(O):
   @locked_property
   def rules(self):
     with LogTime("load %s" % (self.rules_file,), threshold=0.0):
-      rules = Rules()
-      rules.load(self.rules_file)
-    D("%d rules", len(rules))
+      rules = Rules(self.rules_file)
+      D("%d rules", len(rules))
     return rules
+
+  def update_rules(self):
+    new_mtime, new_rules = poll_updated(self.rules_file,
+                                        self._rules_mtime,
+                                        lambda path: Rules(path))
+    if new_mtime:
+      self._rules = new_rules
+      self._rules_mtime = new_mtime
 
   def filter(self):
     ''' Scan Maildir contents.
@@ -510,6 +520,7 @@ class WatchedMaildir(O):
 	Update the set of lurkers with any keys not removed to prevent
 	filtering on subsequent calls.
     '''
+    self.update_rules()
     with Pfx("%s: filter" % (self.mdir.dir,)):
       nmsgs = 0
       skipped = 0
