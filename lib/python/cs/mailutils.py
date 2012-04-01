@@ -21,7 +21,22 @@ from cs.threads import locked_property
 from cs.misc import seq
 
 def read_message(mfp, headersonly=False):
+  ''' Read a Message from a file-like object `mfp`.
+      If `headeronly` is true, read just the message headers.
+  '''
   return email.parser.Parser().parse(mfp, headersonly=headersonly)
+
+def read_message_file(pathname, headersonly=False):
+    ''' Read a Message from a file named by `pathname`.
+	The Message's .pathname property will contain `ptahname`.
+    '''
+    with open(pathname) as mfp:
+      if headersonly:
+        M = read_message(mfp, headersonly=headersonly)
+      else:
+        M = mailbox.Message(mfp)
+    M.pathname = pathname
+    return M
 
 def ismaildir(path):
   ''' Test if 'path' points at a Maildir directory.
@@ -128,35 +143,42 @@ class Maildir(mailbox.Maildir):
         By default a hardlink is attempted unless `nolink` is supplied true.
         Return the key for the saved message.
     '''
-    if key is None:
-      key = self.newkey()
-    elif not self.validkey(key):
-      raise ValueError, "invalid key: %s" % (key,)
-      if key in self.msgmap:
-        raise ValueError, "key already in Maildir: %s" % (key,)
-    tmppath = os.path.join(self.dir, 'tmp', key)
-    if os.path.exists(tmppath):
-      raise ValueError, "temp file already in Maildir: %s" % (tmppath,)
-    if not nolink:
-      try:
-        os.link(filepath, tmppath)
-      except OSError:
+    with Pfx("save_filepath(%s)" % (filepath,)):
+      if key is None:
+        key = self.newkey()
+      elif not self.validkey(key):
+        raise ValueError, "invalid key: %s" % (key,)
+        if key in self.msgmap:
+          raise ValueError, "key already in Maildir: %s" % (key,)
+      tmppath = os.path.join(self.dir, 'tmp', key)
+      if os.path.exists(tmppath):
+        raise ValueError, "temp file already in Maildir: %s" % (tmppath,)
+      if not nolink:
+        try:
+          debug("hardlink %s => %s", filepath, tmppath)
+          os.link(filepath, tmppath)
+        except OSError:
+          debug("copyfile %s => %s", filepath, tmppath)
+          shutil.copyfile(filepath, tmppath)
+      else:
+        debug("copyfile %s => %s", filepath, tmppath)
         shutil.copyfile(filepath, tmppath)
-    else:
-      shutil.copyfile(filepath, tmppath)
-    newpath = os.path.join(self.dir, 'new', key)
-    try:
-      os.rename(tmppath, newpath)
-    except:
-      os.unlink(tmppath)
-      raise
-    return key
+      newpath = os.path.join(self.dir, 'new', key)
+      try:
+        debug("rename %s => %s", tmppath, newpath)
+        os.rename(tmppath, newpath)
+      except:
+        debug("unlink %s", tmppath)
+        os.unlink(tmppath)
+        raise
+      return key
 
   def save_file(self, fp, key=None):
     ''' Save the contents of the file-like object `fp` into the Maildir.
         Return the key for the saved message.
     '''
     with NamedTemporaryFile('w', dir=os.path.join(self.dir, 'tmp')) as T:
+      debug("create new file %s for key %s", T.name, key)
       T.write(fp.read())
     return self.save_filepath(T.name, key=key)
 
@@ -230,8 +252,11 @@ class Maildir(mailbox.Maildir):
       self[key] = message
 
   def __getitem__(self, key):
-    with self.open(key) as mfp:
-      return mailbox.Message(mfp)
+    ''' Return a mailbox.Message loaded from the message with key `key`.
+	The Message's .pathname property contains .keypath(key),
+	the pathname to the message file.
+    '''
+    return read_message_file(self.keypath(key))
   get_message = __getitem__
 
   def get_headers(self, key):
