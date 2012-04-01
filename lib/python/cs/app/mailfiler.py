@@ -30,7 +30,7 @@ def main(argv, stdin=None):
   if stdin is None:
     stdin = sys.stdin
   argv = list(argv)
-  cmd = argv.pop(0)
+  cmd = os.path.basename(argv.pop(0))
   setup_logging(cmd)
   usage = 'Usage: %s filter [-d delay] maildirs...' % (cmd,)
   mdburl = None
