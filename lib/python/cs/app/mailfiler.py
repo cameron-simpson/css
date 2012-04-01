@@ -546,7 +546,9 @@ def save_to_maildir(mdir, M):
     msgpath = M.pathname
   except AttributeError:
     msgpath = None
-  return mdir.keypath(mdir.add(msgpath if msgpath is not None else M))
+  savepath = mdir.keypath(mdir.add(msgpath if msgpath is not None else M))
+  D("%s %s", M['from'], savepath)
+  return savepath
 
 class WatchedMaildir(O):
   ''' A class to monitor a Maildir and filter messages.
