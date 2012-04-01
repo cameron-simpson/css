@@ -16,7 +16,7 @@ from tempfile import NamedTemporaryFile
 from StringIO import StringIO
 from thread import allocate_lock
 import time
-from cs.logutils import debug, D
+from cs.logutils import Pfx, debug, D
 from cs.threads import locked_property
 from cs.misc import seq
 
@@ -146,6 +146,7 @@ class Maildir(mailbox.Maildir):
     with Pfx("save_filepath(%s)" % (filepath,)):
       if key is None:
         key = self.newkey()
+        debug("new key = %s", key)
       elif not self.validkey(key):
         raise ValueError, "invalid key: %s" % (key,)
         if key in self.msgmap:
@@ -171,6 +172,7 @@ class Maildir(mailbox.Maildir):
         debug("unlink %s", tmppath)
         os.unlink(tmppath)
         raise
+      self.msgmap[key] = ('new', key)
       return key
 
   def save_file(self, fp, key=None):
