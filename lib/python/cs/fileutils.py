@@ -105,7 +105,7 @@ def abspath_from_file(path, from_file):
     path = os.path.join(dirname(from_file), path)
   return path
 
-def poll_updated(path, old_mtime, reload):
+def poll_updated(path, old_mtime, reload, missing_ok=False):
   ''' Poll a file for modification.
       Call reload(path) if the file is newer than `old_mtime`.
       Return (new_mtime, reload(path)) if the file was updated
