@@ -135,6 +135,7 @@ class State(O):
         Caches results for rapid rule evaluation.
     '''
     if M is not self.current_message:
+      # new message - discard cache
       self.current_message = M
       self.header_addresses = {}
     if len(headers) != 1:
@@ -416,7 +417,25 @@ class Rule(O):
         return False
     return True
 
-  def filter(self, M, state, msgpath=None):
+  def save_to(self, mdir, M):
+    ''' Save the Message `M` to the Maildir `mdir`.
+    '''
+    if type(mdir) is str:
+      return self.save_to(self, M, Maildir(mdir))
+    try:
+      msgpath = M.pathname
+    except AttributeError:
+      msgpath = None
+    mdir.add(msgpath if msgpath is not None else M)
+    if msgpath is None:
+      msgpath = mdir.keypath(key)
+    return msgpath
+
+  def filter(self, M, state):
+    try:
+      msgpath = M.pathname
+    except AttributeError:
+      msgpath = None
     saved_to = []
     ok_actions = []
     failed_actions = []
@@ -426,12 +445,12 @@ class Rule(O):
         try:
           debug("action = %r, arg = %r", action, arg)
           if action == 'SAVE':
-            mdirpath = os.path.join(state.environ['MAILDIR'], arg)
-            mdir = resolve_maildir(mdirpath)
+            mdir = resolve_maildir(arg)
             debug("SAVE to %s", mdir.dir)
-            key = mdir.add(msgpath if msgpath is not None else M)
-            msgpath = mdir.keypath(key)
-            saved_to.append(mdirpath)
+            saved_msgpath = self.save_to(mdir, M)
+            if msgpath is None:
+              msgpath = saved_msgpath
+            saved_to.append(saved_msgpath)
           elif action == 'ASSIGN':
             envvar, s = arg
             state.environ[envvar] = envsub(s, state.environ)
@@ -469,16 +488,12 @@ class Rules(list):
         filing to $DEFAULT, with .rule set to None.
     '''
     done = False
-    savepath = None
     matches = 0
     for R in self:
-      report = R.filter(M, state, savepath)
+      report = R.filter(M, state)
       yield report
       if report.matched:
         matches += 1
-        if report.saved_to:
-          if savepath is None:
-            savepath = report.saved_to[0]
         if R.flags.halt:
           done = True
           break
@@ -498,11 +513,12 @@ class Rules(list):
           mdirpath = dflt
           action, arg = ('SAVE', mdirpath)
           try:
-            mdir = resolve_maildir(mdirpath)
+            mdir = resolve_maildir(arg)
             debug("SAVE to default %s", mdir.dir)
-            key = mdir.add(savepath if savepath is not None else M)
-            msgpath = mdir.keypath(key)
-            saved_to.append(msgpath)
+            saved_msgpath = self.save_to(mdir, M)
+            if msgpath is None:
+              msgpath = saved_msgpath
+            saved_to.append(saved_msgpath)
             matched = True
           except NameError:
             raise
@@ -585,6 +601,7 @@ class WatchedMaildir(O):
           nmsgs += 1
           with LogTime("key = %s" % (key,), threshold=0.0, level=DEBUG):
             M = mdir[key]
+            msgpath = mdir.keypath(key)
             state = State(mailinfo)
             filed = []
             reports = []
