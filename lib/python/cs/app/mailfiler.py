@@ -213,9 +213,9 @@ def parserules(fp):
           yield R
         R = None
 
-        if line.startswith('<<'):
+        if line.startswith('<'):
           # include another categories file
-          _, offset = get_white(line, offset=2)
+          _, offset = get_white(line, offset=1)
           subfilename, offset = get_nonwhite(line, offset=offset)
           if not subfilename:
             raise ValueError, "missing filename"
