@@ -417,20 +417,6 @@ class Rule(O):
         return False
     return True
 
-  def save_to(self, mdir, M):
-    ''' Save the Message `M` to the Maildir `mdir`.
-    '''
-    if type(mdir) is str:
-      return self.save_to(self, M, Maildir(mdir))
-    try:
-      msgpath = M.pathname
-    except AttributeError:
-      msgpath = None
-    mdir.add(msgpath if msgpath is not None else M)
-    if msgpath is None:
-      msgpath = mdir.keypath(key)
-    return msgpath
-
   def filter(self, M, state):
     try:
       msgpath = M.pathname
@@ -447,7 +433,7 @@ class Rule(O):
           if action == 'SAVE':
             mdir = resolve_maildir(arg)
             debug("SAVE to %s", mdir.dir)
-            saved_msgpath = self.save_to(mdir, M)
+            saved_msgpath = mdir.keypath(save_to_maildir(mdir, M))
             if msgpath is None:
               msgpath = saved_msgpath
             saved_to.append(saved_msgpath)
@@ -457,7 +443,7 @@ class Rule(O):
             debug("ASSIGN %s=%s", envvar, state.environ[envvar])
           else:
             raise RuntimeError("unimplemented action \"%s\"" % action)
-        except NameError:
+        except (AttributeError, NameError):
           raise
         except Exception, e:
           failed_actions.append( (action, arg, e) )
@@ -515,12 +501,12 @@ class Rules(list):
           try:
             mdir = resolve_maildir(arg)
             debug("SAVE to default %s", mdir.dir)
-            saved_msgpath = self.save_to(mdir, M)
+            saved_msgpath = mdir.keypath(save_to_maildir(mdir, M))
             if msgpath is None:
               msgpath = saved_msgpath
             saved_to.append(saved_msgpath)
             matched = True
-          except NameError:
+          except (AttributeError, NameError):
             raise
           except Exception, e:
             failed_actions.append( (action, arg, e) )
@@ -549,6 +535,18 @@ class MailInfo(O):
   @property
   def group(self):
     return self.maildb.group
+
+def save_to_maildir(mdir, M):
+  ''' Save the Message `M` to the Maildir `mdir`.
+  '''
+  debug("save_to_maildir(%s,M)", mdir)
+  if type(mdir) is str:
+    return save_to_maildir(Maildir(mdir), M)
+  try:
+    msgpath = M.pathname
+  except AttributeError:
+    msgpath = None
+  return mdir.keypath(mdir.add(msgpath if msgpath is not None else M))
 
 class WatchedMaildir(O):
   ''' A class to monitor a Maildir and filter messages.
