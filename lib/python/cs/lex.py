@@ -1,3 +1,5 @@
+import base64
+import quopri
 import string
 from StringIO import StringIO
 import re
@@ -181,6 +183,37 @@ def texthexify(s, shiftin='[', shiftout=']', whitelist_re=None):
     chunks.append(hexify(s[sofar:]))
 
   return ''.join(chunks)
+
+# regexp to match RFC2047 text chunks
+re_RFC2047 = re.compile(r'=\?([^?]+)\?([QB])\?([^?]*)\?=', re.I)
+
+def unrfc2047(s):
+  ''' Accept a string containing RFC2047 text encodings (or the whitespace
+      littered varieties that come from some low quality mail clients) and
+      decode them into flat Unicode.
+  '''
+  chunks = []
+  sofar = 0
+  for m in re_RFC2047.finditer(s):
+    start = m.start()
+    end = m.end()
+    if start > sofar:
+      chunks.append(s[sofar:start])
+    enccset = m.group(1)
+    enctype = m.group(2).upper()
+    enctext = m.group(3)
+    if enctype == 'B':
+      enctext = base64.b64decode(enctext)
+    elif enctype == 'Q':
+      enctext = quopri.decodestring(enctext)
+    else:
+      raise ValueError("unhandled RFC2047 string: %s" % (m.group(),))
+    enctext = enctext.decode(enccset)
+    chunks.append(enctext)
+    sofar = end
+  if sofar < len(s):
+    chunks.append(s[sofar:])
+  return u''.join(chunks)
 
 def untexthexify(s, shiftin='[', shiftout=']'):
   chunks = []
