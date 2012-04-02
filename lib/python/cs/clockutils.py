@@ -59,12 +59,15 @@ UNIXClock = lambda: _SingleUNIXClock
 
 class SyntheticMonotonic(object):
     flags = T_MONOTONIC
-    def __init__(self):
+    def __init__(self, base_clock=None):
+        if base_clock is None:
+            base_clock = UNIXClock()
         self.__last = None
+        self.__base = base_clock
     @property
     def now(self):
         last = self.__last
-        t = time()
+        t = self.__base.now
         if last is None or last < t:
             self.__last = t
         else:
