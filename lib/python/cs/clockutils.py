@@ -19,7 +19,7 @@ T_HIRES = 0x01      # high resolution
 T_MONOTONIC = 0x02  # never goes backwards
 T_STEADY = 0x04     # never steps
 
-def get_clock(flags, clocklist=None):
+def get_clock(flags=0, clocklist=None):
     ''' Return a Clock based on the supplied `flags`.
         The returned clock shall have all the requested flags.
         If no clock matches, return None.
@@ -42,16 +42,45 @@ def steady_clock(other_flags=0):
     return get_clock(T_STEADY|T_HIRES|other_flags, STEADY_CLOCKS) \
         or get_clock(T_STEADY|other_flags, STEADY_CLOCKS)
 
-def hr_clock(other_flags=0):
+def hires_clock(other_flags=0):
     return get_clock(T_HIRES|T_STEADY|other_flags, HIRES_CLOCKS) \
         or get_clock(T_HIRES|other_flags, HIRES_CLOCKS)
+
+_global_monotonic = None
+
+def monotonic():
+    global _global_monotonic
+    if _global_monotonic is None:
+        _global_monotonic = monotonic_clock()
+        if _global_monotonic is None:
+            raise RunTimeError("no monotonic clock available")
+    return _global_monotonic.now()
+
+_global_hires = None
+
+def hires():
+    global _global_hires
+    if _global_hires is None:
+        _global_hires = hires()
+        if _global_hires is None:
+            raise RunTimeError("no hires clock available")
+    return _global_hires.now()
+
+_global_steady = None
+
+def steady():
+    global _global_steady
+    if _global_steady is None:
+        _global_steady = steady()
+        if _global_steady is None:
+            raise RunTimeError("no steady clock available")
+    return _global_steady.now()
 
 ClockEntry = namedtuple('ClockEntry', 'flags factory')
 ALL_CLOCKS = []
 
 class _UNIXClock(object):
     flags = 0
-    @property
     def now(self):
         return time()
 _SingleUNIXClock = _UNIXClock()
@@ -64,10 +93,9 @@ class SyntheticMonotonic(object):
             base_clock = UNIXClock()
         self.__last = None
         self.__base = base_clock
-    @property
     def now(self):
         last = self.__last
-        t = self.__base.now
+        t = self.__base.now()
         if last is None or last < t:
             self.__last = t
         else:
