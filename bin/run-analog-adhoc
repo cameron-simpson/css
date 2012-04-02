@@ -98,7 +98,7 @@ do
       then
         for logfile in $logptn
         do
-          [ -s "$logfile" ] || { echo "$cmd: skip missing $logfile" >&2
+          [ -f "$logfile" ] || { echo "$cmd: skip missing $logfile" >&2
                                  continue
                                }
           case "$logfile" in
