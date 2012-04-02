@@ -4,6 +4,7 @@
 #       - Cameron Simpson <cs@zip.com.au> 22may2011
 #
 
+from __future__ import print_function
 from collections import namedtuple
 from email.utils import getaddresses
 import email.parser
@@ -77,7 +78,7 @@ def main(argv, stdin=None):
         badopts = True
 
   if badopts:
-    print >>sys.stderr, usage
+    print(usage, file=sys.stderr)
     return 2
 
   with Pfx(op):
@@ -99,18 +100,6 @@ def main(argv, stdin=None):
         sleep(delay)
       return 0
 
-      M = email.parser.Parser().parse(stdin)
-      state = State(MDB, os.environ)
-      state.groups = MDB.groups
-      state.vars = {}
-      filed = []
-      for report in rules.filter(M, state):
-        if report.matched:
-          for saved_to in report.saved_to:
-            print "%s %s => %s" % (M['from'], M['subject'], saved_to)
-        filed.extend(report.saved_to)
-      return 0 if filed else 1
-
     raise RunTimeError("unimplemented op")
 
 class State(O):
@@ -129,6 +118,18 @@ class State(O):
     self.mailinfo = mailinfo
     self.environ = dict(environ)
     self.current_message = None
+    self._log = None
+
+  def log(self, *a):
+    log = self._log
+    if log is None:
+      log = sys.stdout
+    print(*a, file=log)
+
+  def logto(self, logfilepath):
+    if self._log:
+      self._log.close()
+    self._log = open(logfilepath, "a")
 
   def addresses(self, M, *headers):
     ''' Return the core addresses from the supplies Message and headers.
@@ -441,6 +442,8 @@ class Rule(O):
             envvar, s = arg
             state.environ[envvar] = envsub(s, state.environ)
             debug("ASSIGN %s=%s", envvar, state.environ[envvar])
+            if envvar == 'LOGFILE':
+              state.logto(state.environ[envvar])
           else:
             raise RuntimeError("unimplemented action \"%s\"" % action)
         except (AttributeError, NameError):
@@ -612,7 +615,7 @@ class WatchedMaildir(O):
               if report.matched:
                 reports.append(report)
                 for saved_to in report.saved_to:
-                  print "%s %s => %s" % (M['from'], M['subject'], saved_to)
+                  state.log(M['from'], M['subject'], saved_to)
               filed.extend(report.saved_to)
             if filed and not no_remove:
               debug("remove key %s", key)
