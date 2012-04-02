@@ -525,6 +525,8 @@ class MailInfo(O):
     self.maildb = None
 
   def update_maildb(self):
+    ''' Update the MailDB if it gets modified.
+    '''
     new_mtime, new_maildb = poll_updated(self.maildb_path,
                                          self.maildb_mtime,
                                          lambda path: MailDB(path,
