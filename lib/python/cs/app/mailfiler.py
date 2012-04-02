@@ -431,7 +431,7 @@ class Rule(O):
         try:
           debug("action = %r, arg = %r", action, arg)
           if action == 'SAVE':
-            mdir = resolve_maildir(arg)
+            mdir = resolve_maildir(arg, state.environ)
             debug("SAVE to %s", mdir.dir)
             saved_msgpath = mdir.keypath(save_to_maildir(mdir, M))
             if msgpath is None:
@@ -499,7 +499,7 @@ class Rules(list):
           mdirpath = dflt
           action, arg = ('SAVE', mdirpath)
           try:
-            mdir = resolve_maildir(arg)
+            mdir = resolve_maildir(arg, state.environ)
             debug("SAVE to default %s", mdir.dir)
             saved_msgpath = mdir.keypath(save_to_maildir(mdir, M))
             if msgpath is None:
