@@ -76,9 +76,6 @@ def steady():
             raise RunTimeError("no steady clock available")
     return _global_steady.now()
 
-ClockEntry = namedtuple('ClockEntry', 'flags factory')
-ALL_CLOCKS = []
-
 class _UNIXClock(object):
     flags = 0
     def now(self):
@@ -101,6 +98,9 @@ class SyntheticMonotonic(object):
         else:
             t = last
         return t
+
+ClockEntry = namedtuple('ClockEntry', 'flags factory')
+ALL_CLOCKS = []
 
 # a simple synthetic montonic clock
 # may skew with respect to other instances
