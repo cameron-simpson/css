@@ -76,12 +76,32 @@ def steady():
             raise RunTimeError("no steady clock available")
     return _global_steady.now()
 
+# now assemble the list of platform clocks
+
+ClockEntry = namedtuple('ClockEntry', 'flags factory')
+
+ALL_CLOCKS = []
+
+# load system specific clocks here
+# in notional order of preference
+
+# now load general clocks
+
+# always provide good old time.time()
 class _UNIXClock(object):
     flags = 0
     def now(self):
         return time()
 _SingleUNIXClock = _UNIXClock()
 UNIXClock = lambda: _SingleUNIXClock
+
+ALL_CLOCKS.append( ClockEntry(_UNIXClock.flags, UNIXClock) )
+
+# an example synthetic clock, coming after time.time()
+# because I think synthetic clocks should be less desired
+# - they tend to have side effects; but perhaps offered anyway because
+# they can offer flag combinations not always presented by the system
+# clocks
 
 class SyntheticMonotonic(object):
     flags = MONOTONIC
@@ -99,15 +119,9 @@ class SyntheticMonotonic(object):
             t = last
         return t
 
-ClockEntry = namedtuple('ClockEntry', 'flags factory')
-ALL_CLOCKS = []
-
 # a simple synthetic montonic clock
 # may skew with respect to other instances
 ALL_CLOCKS.append( ClockEntry(SyntheticMonotonic.flags, SyntheticMonotonic) )
-
-# always provide good old time.time()
-ALL_CLOCKS.append( ClockEntry(_UNIXClock.flags, UNIXClock) )
 
 # With more clocks, these will be ALL_CLOCKS listed in order of preference
 # for these types i.e. MONTONIC_CLOCKS will list only monotonic clocks
