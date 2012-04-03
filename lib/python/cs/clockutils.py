@@ -15,9 +15,9 @@
 from collections import namedtuple
 from time import time
 
-T_HIRES = 0x01      # high resolution
-T_MONOTONIC = 0x02  # never goes backwards
-T_STEADY = 0x04     # never steps
+HIRES = 0x01      # high resolution
+MONOTONIC = 0x02  # never goes backwards
+STEADY = 0x04     # never steps
 
 def get_clock(flags=0, clocklist=None):
     ''' Return a Clock based on the supplied `flags`.
@@ -35,16 +35,16 @@ def montonic_clock(other_flags=0):
     ''' Try to return a hires monotonic clock, otherwise any monotonic
         clock.
     '''
-    return get_clock(T_MONTONIC|T_HIRES|other_flags, MONOTONIC_CLOCKS) \
-        or get_clock(T_MONOTONIC|other_flags, MONOTONIC_CLOCKS)
+    return get_clock(MONTONIC|HIRES|other_flags, MONOTONIC_CLOCKS) \
+        or get_clock(MONOTONIC|other_flags, MONOTONIC_CLOCKS)
 
 def steady_clock(other_flags=0):
-    return get_clock(T_STEADY|T_HIRES|other_flags, STEADY_CLOCKS) \
-        or get_clock(T_STEADY|other_flags, STEADY_CLOCKS)
+    return get_clock(STEADY|HIRES|other_flags, STEADY_CLOCKS) \
+        or get_clock(STEADY|other_flags, STEADY_CLOCKS)
 
 def hires_clock(other_flags=0):
-    return get_clock(T_HIRES|T_STEADY|other_flags, HIRES_CLOCKS) \
-        or get_clock(T_HIRES|other_flags, HIRES_CLOCKS)
+    return get_clock(HIRES|STEADY|other_flags, HIRES_CLOCKS) \
+        or get_clock(HIRES|other_flags, HIRES_CLOCKS)
 
 _global_monotonic = None
 
@@ -87,7 +87,7 @@ _SingleUNIXClock = _UNIXClock()
 UNIXClock = lambda: _SingleUNIXClock
 
 class SyntheticMonotonic(object):
-    flags = T_MONOTONIC
+    flags = MONOTONIC
     def __init__(self, base_clock=None):
         if base_clock is None:
             base_clock = UNIXClock()
