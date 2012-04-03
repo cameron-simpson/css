@@ -111,7 +111,7 @@ ALL_CLOCKS.append( ClockEntry(_UNIXClock.flags, UNIXClock) )
 
 # With more clocks, these will be ALL_CLOCKS listed in order of preference
 # for these types i.e. MONTONIC_CLOCKS will list only monotonic clocks
-# in order or quality (an arbitrary measure, perhaps).
+# in order of quality (an arbitrary measure, perhaps).
 MONTONIC_CLOCKS = ALL_CLOCKS
 HIRES_CLOCKS = ALL_CLOCKS
 STEADY_CLOCKS = ALL_CLOCKS
