@@ -103,6 +103,8 @@ ALL_CLOCKS.append( ClockEntry(_UNIXClock.flags, UNIXClock) )
 # they can offer flag combinations not always presented by the system
 # clocks
 
+# a simple synthetic montonic clock
+# may skew with respect to other instances
 class SyntheticMonotonic(object):
     flags = MONOTONIC
     def __init__(self, base_clock=None):
@@ -119,8 +121,6 @@ class SyntheticMonotonic(object):
             t = last
         return t
 
-# a simple synthetic montonic clock
-# may skew with respect to other instances
 ALL_CLOCKS.append( ClockEntry(SyntheticMonotonic.flags, SyntheticMonotonic) )
 
 # With more clocks, these will be ALL_CLOCKS listed in order of preference
