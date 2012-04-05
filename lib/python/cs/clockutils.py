@@ -20,16 +20,23 @@ MONOTONIC = 0x02  # never goes backwards
 STEADY = 0x04     # never steps
 
 def get_clock(flags=0, clocklist=None):
-    ''' Return a Clock based on the supplied `flags`.
+    ''' Return a clock based on the supplied `flags`.
         The returned clock shall have all the requested flags.
         If no clock matches, return None.
+    '''
+    for clock in get_clocks(flags=flags, clocklist=clocklist):
+      return clock
+    return None
+
+def get_clocks(flags=0, clocklist=None):
+    ''' Yield all clocks matching the supplied `flags`.
+        The returned clocks shall have all the requested flags.
     '''
     if clocklist is None:
         clocklist = ALL_CLOCKS
     for clock in clocklist:
         if clock.flags & flags == flags:
-            return clock.factory()
-    return None
+            yield clock.factory()
 
 def montonic_clock(other_flags=0):
     ''' Try to return a hires monotonic clock, otherwise any monotonic
