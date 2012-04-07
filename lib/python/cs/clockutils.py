@@ -14,10 +14,17 @@
 
 from collections import namedtuple
 from time import time
+import os
+
+# the module exposing OS clock features
+_time = os
 
 HIRES = 0x01      # high resolution
 MONOTONIC = 0x02  # never goes backwards
 STEADY = 0x04     # never steps
+WALLCLOCK = 0x08  # tracks real world time
+RUNTIME = 0x10    # track system run time - stops when system suspended
+SYNTHETIC = 0x20  # a synthetic clock, computed from other clocks
 
 def get_clock(flags=0, clocklist=None):
     ''' Return a clock based on the supplied `flags`.
@@ -85,24 +92,153 @@ def steady():
 
 # now assemble the list of platform clocks
 
+class _Clock(object):
+    ''' A _Clock is the private base class of clock objects.
+        A clock has the following mandatory attributes:
+            .flags  Feature flags describing the clock.
+        A clock may have the following optional attributes:
+            .epoch  If present, the offset from time.time()'s epoch
+                    of this clock's epoch(). Not all clocks have epochs; some
+                    measure elapsed time from an unknown point and only the  
+                    difference in two measurements is useful.
+            .resolution
+		            The resolution of the underlying clock facility's
+                    reporting units. That actual acuracy of the reported
+		            time may vary with adjustments and the real
+		            accuracy of the underlying OS clock facility
+		            (which in turn may be dependent on the precision
+		            of some hardware clock).
+        A clock must also supply the following methods:
+            .now()  Report the current time in seconds, a float.
+    '''
+    def __init__(self):
+        ''' Set instance attributes from class attributes, suitable
+        to singleton clocks.
+        '''
+        klass = self.__class__
+        self.flags = klass.flags
+        for attr in 'epoch', 'resolution':
+            try:
+                attrval = getattr(klass, attr)
+            except AttributeError:
+                pass
+            else:
+                setattr(self, attr, attrval)
+
 ClockEntry = namedtuple('ClockEntry', 'flags factory')
 
 ALL_CLOCKS = []
 
+def _SingletonClockEntry( klass ):
+  ''' Construct a ClockEntry for a Singleton class, typical for system clocks.
+  '''
+  klock = klass()
+  return ClockEntry( klass.flags, lambda: klock )
+
+# always provide good old time.time()
+# provide no flags - this is a fallback - totally implementation agnostic
+class _TimeDotTimeClock(_Clock):
+    flags = 0
+    epoch = 0
+    def now(self):
+        return time()
+ALL_CLOCKS.append( _SingletonClockEntry(_TimeDotTimeClock) )
+
 # load system specific clocks here
 # in notional order of preference
 
-# now load general clocks
+if os.name == "nt":
 
-# always provide good old time.time()
-class _UNIXClock(object):
-    flags = 0
-    def now(self):
-        return time()
-_SingleUNIXClock = _UNIXClock()
-UNIXClock = lambda: _SingleUNIXClock
+    class _NT_GetSystemTimeAsFileTimeClock(_Clock):
+        flags = WALLCLOCK
+        epoch = EPOCH_16010101T000000   # 01jan1601
+                                        # a negative value wrt 01jan1970
+        resolution = 0.0000001          # 100 nanosecond units
+                                        # accuracy HW dependent?
+        def now():
+            # convert 100-nanosecond intervals since 1601 to UNIX style seconds
+            return ( _time._GetSystemTimeAsFileTime() / 10000000
+                   + NT_GetSystemTimeAsFileTimeClock.epoch
+                   )
+    ALL_CLOCKS.append( _SingletonClockEntry(_NT_GetSystemTimeAsFileTimeClock) )
 
-ALL_CLOCKS.append( ClockEntry(_UNIXClock.flags, UNIXClock) )
+else:
+
+    # presuming clock_gettime() and clock_getres() exposed in the os
+    # module, along with the clock id names
+    if hasattr(_time, "clock_gettime"):
+        try:
+            clk_id = _time.CLOCK_REALTIME
+        except AttributeError:
+            pass
+        else:
+            try:
+                timespec = _time.clock_getres(clk_id)
+            except OSError:
+                pass
+            else:
+                class _UNIX_CLOCK_REALTIME(_Clock):
+                    epoch = 0
+                    flags = WALLCLOCK
+                    resolution = timespec.tv_sec + timespec.tv_nsec / 1000000000
+                    def now():
+                        timespec = _time.clock_gettime(_time.CLOCK_REALTIME)
+                        return timespec.tv_sec + timespec.tv_nsec / 1000000000
+                ALL_CLOCKS.append( _SingletonClockEntry(_UNIX_CLOCK_REALTIME) )
+        try:
+            clk_id = _time.CLOCK_MONOTONIC
+        except AttributeError:
+            pass
+        else:
+            try:
+                timespec = _time.clock_getres(clk_id)
+            except OSError:
+                pass
+            else:
+                class _UNIX_CLOCK_MONOTONIC(_Clock):
+                    flags = MONOTONIC|STEADY
+                    resolution = timespec.tv_sec + timespec.tv_nsec / 1000000000
+                    def now():
+                        timespec = _time.clock_gettime(_time.CLOCK_MONOTONIC)
+                        return timespec.tv_sec + timespec.tv_nsec / 1000000000
+                ALL_CLOCKS.append( _SingletonClockEntry(_UNIX_CLOCK_MONOTONIC) )
+        try:
+            clk_id = _time.CLOCK_MONOTONIC_RAW
+        except AttributeError:
+            pass
+        else:
+            try:
+                timespec = _time.clock_getres(clk_id)
+            except OSError:
+                pass
+            else:
+                class _UNIX_CLOCK_MONOTONIC_RAW(_Clock):
+                    flags = MONOTONIC_STEADY
+                    resolution = timespec.tv_sec + timespec.tv_nsec / 1000000000
+                    def now():
+                        timespec = _time.clock_gettime(_time.CLOCK_MONOTONIC_RAW)
+                        return timespec.tv_sec + timespec.tv_nsec / 1000000000
+                ALL_CLOCKS.append( _SingletonClockEntry(_UNIX_CLOCK_MONOTONIC_RAW) )
+
+    if hasattr(_time, "gettimeofday"):
+        class _UNIX_gettimeofday(_Clock):
+            epoch = 0
+            flags = WALLCLOCK
+            resolution = 0.000001
+            def now(self):
+                timeval = _time.gettimeofday()
+                return timeval.tv_sec + timeval.tv_usec / 1000000
+        ALL_CLOCKS.append( _SingletonClockEntry(_UNIX_gettimeofday) )
+
+    if hasattr(_time, "ftime"):
+        class _UNIX_ftime(_Clock):
+            epoch = 0
+            flags = WALLCLOCK
+            resolution = 0.001
+            def now(self):
+                timeb = _time.ftime()
+                return timeb.time + timeb.millitm / 1000
+        ALL_CLOCKS.append( _SingletonClockEntry(_UNIX_ftime) )
 
 # an example synthetic clock, coming after time.time()
 # because I think synthetic clocks should be less desired
@@ -112,11 +248,21 @@ ALL_CLOCKS.append( ClockEntry(_UNIXClock.flags, UNIXClock) )
 
 # a simple synthetic montonic clock
 # may skew with respect to other instances
-class SyntheticMonotonic(object):
-    flags = MONOTONIC
+# Steven D'Aprano wrote a better one
+class SyntheticMonotonic(_Clock):
+    flags = SYNTHETIC|MONOTONIC
     def __init__(self, base_clock=None):
+        _Clock.__init__(self)
         if base_clock is None:
-            base_clock = UNIXClock()
+            base_clock = _TimeDotTimeClock()
+        self.base_clock = base_clock
+        for attr in 'epoch', 'resolution':
+            try:
+                attrval = getattr(base_clock, attr)
+            except AttributeError:
+                pass
+            else:
+                setattr(self, attr, attrval)
         self.__last = None
         self.__base = base_clock
     def now(self):
@@ -136,3 +282,6 @@ ALL_CLOCKS.append( ClockEntry(SyntheticMonotonic.flags, SyntheticMonotonic) )
 MONTONIC_CLOCKS = ALL_CLOCKS
 HIRES_CLOCKS = ALL_CLOCKS
 STEADY_CLOCKS = ALL_CLOCKS
+
+if __name__ == '__main__':
+    print "ALL_CLOCKS =", repr(ALL_CLOCKS)
