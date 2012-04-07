@@ -19,12 +19,13 @@ import os
 # the module exposing OS clock features
 _time = os
 
-HIRES = 0x01      # high resolution
+HIGHRES = 0x01    # high resolution
 MONOTONIC = 0x02  # never goes backwards
-STEADY = 0x04     # never steps
-WALLCLOCK = 0x08  # tracks real world time
-RUNTIME = 0x10    # track system run time - stops when system suspended
-SYNTHETIC = 0x20  # a synthetic clock, computed from other clocks
+STEADY = 0x04     # never steps; implies MONOTONIC
+ADJUSTED = 0x08   # may be adjusted, for example by NTP
+WALLCLOCK = 0x10  # tracks real world time, will usually be ADJUSTED too
+RUNTIME = 0x20    # track system run time - stops when system suspended
+SYNTHETIC = 0x40  # a synthetic clock, computed from other clocks
 
 def get_clock(flags=0, clocklist=None):
     ''' Return a clock based on the supplied `flags`.
@@ -45,20 +46,20 @@ def get_clocks(flags=0, clocklist=None):
         if clock.flags & flags == flags:
             yield clock.factory()
 
-def montonic_clock(other_flags=0):
+def monotonic_clock(other_flags=0):
     ''' Try to return a hires monotonic clock, otherwise any monotonic
         clock.
     '''
-    return get_clock(MONTONIC|HIRES|other_flags, MONOTONIC_CLOCKS) \
+    return get_clock(MONOTONIC|HIGHRES|other_flags, MONOTONIC_CLOCKS) \
         or get_clock(MONOTONIC|other_flags, MONOTONIC_CLOCKS)
 
 def steady_clock(other_flags=0):
-    return get_clock(STEADY|HIRES|other_flags, STEADY_CLOCKS) \
+    return get_clock(STEADY|HIGHRES|other_flags, STEADY_CLOCKS) \
         or get_clock(STEADY|other_flags, STEADY_CLOCKS)
 
 def hires_clock(other_flags=0):
-    return get_clock(HIRES|STEADY|other_flags, HIRES_CLOCKS) \
-        or get_clock(HIRES|other_flags, HIRES_CLOCKS)
+    return get_clock(HIGHRES|STEADY|other_flags, HIGHRES_CLOCKS) \
+        or get_clock(HIGHRES|other_flags, HIGHRES_CLOCKS)
 
 _global_monotonic = None
 
@@ -155,12 +156,24 @@ if os.name == "nt":
                                         # a negative value wrt 01jan1970
         resolution = 0.0000001          # 100 nanosecond units
                                         # accuracy HW dependent?
-        def now():
+        def now(self):
             # convert 100-nanosecond intervals since 1601 to UNIX style seconds
             return ( _time._GetSystemTimeAsFileTime() / 10000000
                    + NT_GetSystemTimeAsFileTimeClock.epoch
                    )
     ALL_CLOCKS.append( _SingletonClockEntry(_NT_GetSystemTimeAsFileTimeClock) )
+
+    class _NT_GetTickCount64(_Clock):
+        ''' Based on
+                http://msdn.microsoft.com/en-us/library/windows/desktop/ms724411%28v=vs.85%29.aspx
+            Note this this specificly disavows high resolution.
+        '''
+        flags = RUNTIME|MONOTONIC
+        resolution = 0.001
+        def now(self):
+            msecs = _time.GetTickCount64()
+            return msecs / 1000
+    ALL_CLOCKS.append( _SingletonClockEntry(_NT_GetTickCount64) )
 
 else:
 
@@ -246,7 +259,7 @@ else:
 # they can offer flag combinations not always presented by the system
 # clocks
 
-# a simple synthetic montonic clock
+# a simple synthetic monotonic clock
 # may skew with respect to other instances
 # Steven D'Aprano wrote a better one
 class SyntheticMonotonic(_Clock):
@@ -277,11 +290,13 @@ class SyntheticMonotonic(_Clock):
 ALL_CLOCKS.append( ClockEntry(SyntheticMonotonic.flags, SyntheticMonotonic) )
 
 # With more clocks, these will be ALL_CLOCKS listed in order of preference
-# for these types i.e. MONTONIC_CLOCKS will list only monotonic clocks
+# for these types i.e. MONOTONIC_CLOCKS will list only monotonic clocks
 # in order of quality (an arbitrary measure, perhaps).
-MONTONIC_CLOCKS = ALL_CLOCKS
-HIRES_CLOCKS = ALL_CLOCKS
+MONOTONIC_CLOCKS = ALL_CLOCKS
+HIGHRES_CLOCKS = ALL_CLOCKS
 STEADY_CLOCKS = ALL_CLOCKS
 
 if __name__ == '__main__':
     print "ALL_CLOCKS =", repr(ALL_CLOCKS)
+    for clock in get_clocks():
+        print "clock = %r" % (clock,)
