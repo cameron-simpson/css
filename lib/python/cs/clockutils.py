@@ -91,6 +91,36 @@ def steady():
             raise RunTimeError("no steady clock available")
     return _global_steady.now()
 
+class _Clock_Flags(int):
+    ''' int with human friendly str() and repr() for clock flags.
+    '''
+
+    _flag_names = (
+        'HIGHRES',
+        'MONOTONIC',
+        'STEADY',
+        'ADJUSTED',
+        'WALLCLOCK',
+        'RUNTIME',
+        'SYNTHETIC',
+    )
+
+    def __str__(self):
+        f = self
+        G = globals()
+        names = []
+        for name in _Clock_Flags._flag_names:
+            n = G[name]
+            if f & n:
+                names.append(name)
+                f &= ~n
+        if f:
+            names.append('0x%02x' % f)
+        return '|'.join(names) if names else '0'
+
+    def __repr__(self):
+        return '<%s %02x %s>' % (self.__class__.__name__, self, self)
+
 # now assemble the list of platform clocks
 
 class _Clock(object):
@@ -117,7 +147,7 @@ class _Clock(object):
         to singleton clocks.
         '''
         klass = self.__class__
-        self.flags = klass.flags
+        self.flags = _Clock_Flags(klass.flags)
         for attr in 'epoch', 'resolution':
             try:
                 attrval = getattr(klass, attr)
