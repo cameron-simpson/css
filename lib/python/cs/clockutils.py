@@ -134,11 +134,11 @@ class _Clock(object):
                     difference in two measurements is useful.
             .resolution
 		            The resolution of the underlying clock facility's
-                    reporting units. That actual acuracy of the reported
-		            time may vary with adjustments and the real
-		            accuracy of the underlying OS clock facility
-		            (which in turn may be dependent on the precision
-		            of some hardware clock).
+                    reporting units. The clock can never be more precise than
+                    this value. The actual accuracy of the reported time may
+                    vary with adjustments and the real accuracy of the
+                    underlying OS clock facility (which in turn may be
+                    dependent on the precision of some hardware clock).
         A clock must also supply the following methods:
             .now()  Report the current time in seconds, a float.
     '''
