@@ -209,7 +209,7 @@ else:
                 pass
             else:
                 class _UNIX_CLOCK_MONOTONIC(_Clock):
-                    flags = MONOTONIC|STEADY
+                    flags = MONOTONIC|STEADY|ADJUSTED
                     resolution = timespec.tv_sec + timespec.tv_nsec / 1000000000
                     def now():
                         timespec = _time.clock_gettime(_time.CLOCK_MONOTONIC)
@@ -246,7 +246,7 @@ else:
     if hasattr(_time, "ftime"):
         class _UNIX_ftime(_Clock):
             epoch = 0
-            flags = WALLCLOCK
+            flags = WALLCLOCK|ADJUSTED
             resolution = 0.001
             def now(self):
                 timeb = _time.ftime()
