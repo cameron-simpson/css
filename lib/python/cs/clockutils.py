@@ -126,6 +126,15 @@ class _Clock(object):
             else:
                 setattr(self, attr, attrval)
 
+    def __repr__(self):
+        props = [self.__class__.__name__]
+        for attr in sorted( [ attr for attr in dir(self)
+                              if attr
+                                 and attr[0].isalpha()
+                                 and attr not in ('now',)] ):
+            props.append("%s=%s" % (attr, getattr(self, attr)))
+        return "<" + " ".join(props) + ">"
+
 ClockEntry = namedtuple('ClockEntry', 'flags factory')
 
 ALL_CLOCKS = []
@@ -180,6 +189,7 @@ else:
     # presuming clock_gettime() and clock_getres() exposed in the os
     # module, along with the clock id names
     if hasattr(_time, "clock_gettime"):
+
         try:
             clk_id = _time.CLOCK_REALTIME
         except AttributeError:
@@ -198,6 +208,7 @@ else:
                         timespec = _time.clock_gettime(_time.CLOCK_REALTIME)
                         return timespec.tv_sec + timespec.tv_nsec / 1000000000
                 ALL_CLOCKS.append( _SingletonClockEntry(_UNIX_CLOCK_REALTIME) )
+
         try:
             clk_id = _time.CLOCK_MONOTONIC
         except AttributeError:
@@ -215,6 +226,7 @@ else:
                         timespec = _time.clock_gettime(_time.CLOCK_MONOTONIC)
                         return timespec.tv_sec + timespec.tv_nsec / 1000000000
                 ALL_CLOCKS.append( _SingletonClockEntry(_UNIX_CLOCK_MONOTONIC) )
+
         try:
             clk_id = _time.CLOCK_MONOTONIC_RAW
         except AttributeError:
@@ -226,12 +238,48 @@ else:
                 pass
             else:
                 class _UNIX_CLOCK_MONOTONIC_RAW(_Clock):
-                    flags = MONOTONIC_STEADY
+                    flags = MONOTONIC|STEADY
                     resolution = timespec.tv_sec + timespec.tv_nsec / 1000000000
                     def now():
                         timespec = _time.clock_gettime(_time.CLOCK_MONOTONIC_RAW)
                         return timespec.tv_sec + timespec.tv_nsec / 1000000000
                 ALL_CLOCKS.append( _SingletonClockEntry(_UNIX_CLOCK_MONOTONIC_RAW) )
+
+        try:
+            clk_id = _time.CLOCK_PROCESS_CPUTIME_ID
+        except AttributeError:
+            pass
+        else:
+            try:
+                timespec = _time.clock_getres(clk_id)
+            except OSError:
+                pass
+            else:
+                class _UNIX_CLOCK_PROCESS_CPUTIME_ID(_Clock):
+                    flags = MONOTONIC
+                    resolution = timespec.tv_sec + timespec.tv_nsec / 1000000000
+                    def now():
+                        timespec = _time.clock_gettime(_time.CLOCK_PROCESS_CPUTIME_ID)
+                        return timespec.tv_sec + timespec.tv_nsec / 1000000000
+                ALL_CLOCKS.append( _SingletonClockEntry(_CLOCK_PROCESS_CPUTIME_ID) )
+
+        try:
+            clk_id = _time.CLOCK_THREAD_CPUTIME_ID
+        except AttributeError:
+            pass
+        else:
+            try:
+                timespec = _time.clock_getres(clk_id)
+            except OSError:
+                pass
+            else:
+                class _UNIX_CLOCK_THREAD_CPUTIME_ID(_Clock):
+                    flags = MONOTONIC
+                    resolution = timespec.tv_sec + timespec.tv_nsec / 1000000000
+                    def now():
+                        timespec = _time.clock_gettime(_time.CLOCK_THREAD_CPUTIME_ID)
+                        return timespec.tv_sec + timespec.tv_nsec / 1000000000
+                ALL_CLOCKS.append( _SingletonClockEntry(_CLOCK_CLOCK_THREAD_CPUTIME_ID) )
 
     if hasattr(_time, "gettimeofday"):
         class _UNIX_gettimeofday(_Clock):
