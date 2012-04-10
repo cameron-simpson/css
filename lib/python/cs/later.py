@@ -542,12 +542,26 @@ class Later(object):
     ''' Queue the function `func` for later dispatch using the
         default priority with the spcified arguments `*a` and `**kw`.
         Return the corresponding LateFunction for result collection.
+        `func` may optionally be preceeded by a mapping `params` containing
+        parameters for `priority`, `delay`, and `when`.
         Equivalent to:
-          submit(functools.partial(func, *a, **kw))
+          submit(functools.partial(func, *a, **kw), **params)
     '''
+    if not a:
+      raise RunTimeError('defer: missing func')
+    if callable(func):
+      params = {}
+    else:
+      params = func
+      func = a.pop(0)
+      if not callable(func):
+        raise RunTimeError('defer: neither params nor func is callable')
     if a or kw:
       func = partial(func, *a, **kw)
-    return self.submit(func)
+    return self.submit(func, **params)
+
+  def __call__(self, *a, **kw):
+    return self.defer(*a, **kw)()
 
   @contextmanager
   def priority(self, pri):
