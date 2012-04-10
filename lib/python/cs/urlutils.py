@@ -23,6 +23,7 @@ except ImportError:
   import xml.etree.ElementTree as ElementTree
 from threading import RLock
 from cs.logutils import Pfx, pfx_iter, debug, error, warning, exception
+from cs.mappings import parseUC_sAttr
 from cs.threads import locked_property
 
 def URL(U, referer, user_agent=None):
@@ -55,6 +56,15 @@ class _URL(unicode):
     self._content = None
     self._parsed = None
 
+  def __getattr__(self, attr):
+    k, plural = parseUC_sAttr(attr)
+    if k:
+      nodes = self.parsed.findAll(k.lower())
+      if plural:
+        return nodes
+      return the(nodes)
+    return 
+
   def flush(self):
     ''' Forget all cached content.
     '''
@@ -73,14 +83,12 @@ class _URL(unicode):
     with Pfx("_fetch(%s)" % (self,)):
       hdrs = {}
       if self.referer:
-        debug("referer = %s", self.referer)
         hdrs['Referer'] = self.referer
       hdrs['User-Agent'] = self.user_agent if self.user_agent else 'css'
       url = 'file://'+self if self.startswith('/') else self
       rq = Request(url, None, hdrs)
       auth_handler = HTTPBasicAuthHandler(NetrcHTTPPasswordMgr())
       opener = build_opener(auth_handler)
-      debug("urlopen(%s[%r])", url, hdrs)
       rsp = opener.open(rq)
       H = rsp.info()
       self._content_type = H.gettype()
@@ -241,7 +249,7 @@ class _URL(unicode):
 
   @property
   def baseurl(self):
-    for B in self.findAll('base'):
+    for B in self.BASEs:
       try:
         base = B['href']
       except KeyError:
@@ -259,7 +267,7 @@ class _URL(unicode):
     ''' All 'href=' values from the content HTML 'A' tags.
         If `absolute`, resolve the sources with respect to our URL.
     '''
-    for A in self.findAll('a'):
+    for A in self.As:
       try:
         href = A['href']
       except KeyError:
@@ -393,6 +401,7 @@ class NetrcHTTPPasswordMgr(HTTPPasswordMgrWithDefaultRealm):
       netauth = self._netrc.authenticators(U.hostname)
       if netauth is not None:
         user, account, password = netauth
+        debug("find_user_password(%r, %r): netrc: user=%r password=%r", realm, authuri, user, password)
     return user, password
 
 if __name__ == '__main__':
