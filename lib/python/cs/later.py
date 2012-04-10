@@ -12,7 +12,7 @@ import time
 from cs.threads import AdjustableSemaphore, IterablePriorityQueue, \
                        WorkerThreadPool, TimerQueue
 from cs.misc import seq
-from cs.logutils import Pfx, info, debug, D
+from cs.logutils import Pfx, info, warning, debug, D
 
 STATE_PENDING = 0       # function not yet dispatched
 STATE_RUNNING = 1       # function executing
@@ -302,7 +302,7 @@ class Later(object):
       functions that may be queued up; the default is 0 (no limit).
       Calls to submit functions when the inbound limit is reached block
       until some functions are dispatched.
-      The `name` paraeter may be used to supply an identifying name
+      The `name` parameter may be used to supply an identifying name
       for this instance.
   '''
   def __init__(self, capacity, inboundCapacity=0, name=None):
@@ -402,13 +402,15 @@ class Later(object):
 
   def close(self):
     with Pfx("%s.close()" % (self,)):
-      assert not self.closed
-      self.closed = True
-      if self._timerQ:
-        self._timerQ.close()
-      self._LFPQ.close()
-      self._dispatchThread.join()
-      self._workers.close()
+      if self.closed:
+        warning("close of closed Later %r", self)
+      else:
+        self.closed = True
+        if self._timerQ:
+          self._timerQ.close()
+        self._LFPQ.close()
+        self._dispatchThread.join()
+        self._workers.close()
 
   def _dispatcher(self):
     ''' Read LateFunctions from the inbound queue as capacity is available
@@ -460,8 +462,8 @@ class Later(object):
         If the parameter `pfx` is not None, submit pfx.func(func);
           see cs.logutils.Pfx's .func method for details.
     '''
-    assert delay is None or when is None, \
-           "you can't specify both delay= and when= (%s, %s)" % (delay, when)
+    if delay is not None and when is not None:
+      raise ValueError("you can't specify both delay= and when= (%s, %s)" % (delay, when))
     if priority is None:
       priority = self._priority
     elif type(priority) is int:
