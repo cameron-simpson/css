@@ -501,7 +501,7 @@ class Later(object):
   def multisubmit(self, params, func, iter):
     ''' Generator that iterates over `iter`, submitting function calls and
         yielding the corresponding LateFunctions, specificly calling:
-          self.submitargs(params, func, i)
+          self.defer(params, func, i)
         where `i` is an element of `iter`.
         Handy for submitting a batch of jobs.
         Caution: being a generator, the functions are not submitted
@@ -510,33 +510,7 @@ class Later(object):
           L.multisubmit(f, xrange(100))
     '''
     for i in iter:
-      yield self.submitargs(params, func, i)
-
-  def submitargs(self, params, func, *args, **kwargs):
-    ''' Submit a function with arguments for later dispatch.
-        Return the corresponding LateFunction for result collection.
-        The `params` parameter is a dictionary whose members correspond to
-        the `priority`, `delay`, `when` parameters of submit().
-        For example:
-          LF = L.submitargs( {'priority': 2, 'delay': 3},
-                             func, 1, 2, 3, d=4, e=5 )
-        is equivalent to:
-          LF = L.submit(partial(func, 1, 2, 3, d=4, e=5),
-                        priority=2, delay=3)
-        Each results in a call to:
-          func(1, 2, 3, d=4, e=5)
-        at least 3 seconds from now.
-    '''
-    return self.submit(partial(func, *args, **kwargs), **params)
-
-  def pdefer(self, priority, func, *a, **kw):
-    ''' Queue the function `func` for later dispatch using the
-        specified `priority` with the spcified arguments `*a` and `**kw`.
-        Return the corresponding LateFunction for result collection.
-    '''
-    if a or kw:
-      func = partial(func, *a, **kw)
-    return self.submit(func, priority=priority)
+      yield self.defer(params, func, i)
 
   def defer(self, func, *a, **kw):
     ''' Queue the function `func` for later dispatch using the
