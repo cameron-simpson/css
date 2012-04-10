@@ -102,6 +102,8 @@ class PendingFunction(object):
 
   @property
   def cancelled(self):
+    ''' Test whether this PendingFunction has been cancelled.
+    '''
     return self.state == STATE_CANCELLED
 
   def cancel(self):
@@ -142,12 +144,12 @@ class PendingFunction(object):
   def wait(self):
     ''' Calling the .wait() method waits for the function to run to
         completion and returns a tuple as for the WorkerThreadPool's
-        .dispatch() return queue:
+        .dispatch() return queue.
         On completion the sequence:
           func_result, None, None, None
         is returned.
         On an exception the sequence:
-          None, exec_type, exc_value, exc_traceback
+          None, exc_type, exc_value, exc_traceback
         is returned.
     '''
     self.join()
@@ -276,7 +278,7 @@ class LateFunction(PendingFunction):
       self.func = None
 
   def __call__(self):
-    ''' Calling the object waits for the function to run to completion
+    ''' Calling the LateFunction waits for the function to run to completion
         and returns the function return value.
         If the function threw an exception that exception is reraised.
     '''
