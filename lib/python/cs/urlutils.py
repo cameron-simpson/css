@@ -8,7 +8,7 @@ from __future__ import with_statement, print_function
 import os.path
 import sys
 from itertools import chain
-from BeautifulSoup import BeautifulSoup, Tag, BeautifulStoneSoup
+from bs4 import BeautifulSoup, Tag, BeautifulStoneSoup
 from netrc import netrc
 from StringIO import StringIO
 import socket
@@ -21,7 +21,10 @@ try:
   import xml.etree.cElementTree as ElementTree
 except ImportError:
   import xml.etree.ElementTree as ElementTree
+from threading import RLock
 from cs.logutils import Pfx, pfx_iter, debug, error, warning, exception
+from cs.mappings import parseUC_sAttr
+from cs.threads import locked_property
 
 def URL(U, referer, user_agent=None):
   ''' Factory function to return a _URL object from a URL string.
@@ -49,6 +52,18 @@ class _URL(unicode):
     self.user_agent = user_agent if user_agent else self.referer.user_agent if self.referer else None
     self._parts = None
     self.flush()
+    self._lock = RLock()
+    self._content = None
+    self._parsed = None
+
+  def __getattr__(self, attr):
+    k, plural = parseUC_sAttr(attr)
+    if k:
+      nodes = self.parsed.findAll(k.lower())
+      if plural:
+        return nodes
+      return the(nodes)
+    return 
 
   def flush(self):
     ''' Forget all cached content.
@@ -68,14 +83,12 @@ class _URL(unicode):
     with Pfx("_fetch(%s)" % (self,)):
       hdrs = {}
       if self.referer:
-        debug("referer = %s", self.referer)
         hdrs['Referer'] = self.referer
       hdrs['User-Agent'] = self.user_agent if self.user_agent else 'css'
       url = 'file://'+self if self.startswith('/') else self
       rq = Request(url, None, hdrs)
       auth_handler = HTTPBasicAuthHandler(NetrcHTTPPasswordMgr())
       opener = build_opener(auth_handler)
-      debug("urlopen(%s[%r])", url, hdrs)
       rsp = opener.open(rq)
       H = rsp.info()
       self._content_type = H.gettype()
@@ -94,12 +107,11 @@ class _URL(unicode):
     self._content = content
     return content
 
-  @property
+  @locked_property
   def content(self):
     ''' The URL content as a string.
     '''
-    if self._content is None:
-      self._fetch()
+    self._fetch()
     return self._content
 
   @property
@@ -120,20 +132,19 @@ class _URL(unicode):
       return ''
     return hostname.split('.', 1)[1]
 
-  @property
+  @locked_property
   def parsed(self):
     ''' The URL content parsed as HTML by BeautifulSoup.
     '''
-    if self._parsed is None:
-      content = self.content
-      try:
-        self._parsed = BeautifulSoup(content.decode('utf-8', 'replace'))
-      except Exception, e:
-        exception("%s: .parsed: BeautifulSoup(unicode(content)) fails: %s", self, e)
-        with open("cs.urlutils-unparsed.html", "wb") as bs:
-          bs.write(self.content)
-        self._parsed = None
-    return self._parsed
+    content = self.content
+    try:
+      P = BeautifulSoup(content.decode('utf-8', 'replace'))
+    except Exception, e:
+      exception("%s: .parsed: BeautifulSoup(unicode(content)) fails: %s", self, e)
+      with open("cs.urlutils-unparsed.html", "wb") as bs:
+        bs.write(self.content)
+      raise
+    return P
 
   @property
   def xml(self):
@@ -238,7 +249,7 @@ class _URL(unicode):
 
   @property
   def baseurl(self):
-    for B in self.findAll('base'):
+    for B in self.BASEs:
       try:
         base = B['href']
       except KeyError:
@@ -250,19 +261,13 @@ class _URL(unicode):
 
   @property
   def title(self):
-    Ts = self.findAll('title')
-    if not Ts:
-      return ""
-    s = Ts[0].string
-    if s is None:
-      return ""
-    return s
+    return self.parsed.title.string
 
   def hrefs(self, absolute=False):
     ''' All 'href=' values from the content HTML 'A' tags.
         If `absolute`, resolve the sources with respect to our URL.
     '''
-    for A in self.findAll('a'):
+    for A in self.As:
       try:
         href = A['href']
       except KeyError:
@@ -396,6 +401,7 @@ class NetrcHTTPPasswordMgr(HTTPPasswordMgrWithDefaultRealm):
       netauth = self._netrc.authenticators(U.hostname)
       if netauth is not None:
         user, account, password = netauth
+        debug("find_user_password(%r, %r): netrc: user=%r password=%r", realm, authuri, user, password)
     return user, password
 
 if __name__ == '__main__':
