@@ -500,6 +500,7 @@ class Pilfer(object):
           if url == U:
             yield U
             return
+    debug("SKIP unseen URL: %s", U)
 
   def url_unseen(self, U, urlsfile=None):
     ''' Scan urlsfile, yield U if not present.
@@ -511,6 +512,7 @@ class Pilfer(object):
         for line in ufp:
           url = line.strip()
           if url == U:
+            debug("SKIP seen URL: %s", U)
             return
     yield U
 
