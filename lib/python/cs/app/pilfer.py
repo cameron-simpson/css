@@ -639,8 +639,6 @@ class Pilfer(object):
         'xmltext':      lambda P, U, match: XML(U).findall(match),
       }
 
-
-
 if __name__ == '__main__':
   import sys
   sys.exit(main(sys.argv))
