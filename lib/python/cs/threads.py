@@ -874,7 +874,9 @@ def locked_property(func, lock_name='_lock', prop_name=None, unset_object=None):
       with getattr(self, lock_name):
         p = getattr(self, prop_name)
         if p is unset_object:
+          ##debug("compute %s...", prop_name)
           p = func(self)
+          ##debug("compute %s: %r", prop_name, p)
           setattr(self, prop_name, p)
     return p
   return property(getprop)
