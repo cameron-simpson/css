@@ -521,15 +521,13 @@ class Later(object):
         Equivalent to:
           submit(functools.partial(func, *a, **kw), **params)
     '''
-    if not a:
-      raise RunTimeError('defer: missing func')
     if callable(func):
       params = {}
     else:
       params = func
       func = a.pop(0)
       if not callable(func):
-        raise RunTimeError('defer: neither params nor func is callable')
+        raise RuntimeError('defer: neither params nor func is callable')
     if a or kw:
       func = partial(func, *a, **kw)
     return self.submit(func, **params)
