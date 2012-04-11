@@ -282,3 +282,26 @@ def get_other_chars(s, stopchars, offset=0):
   while offset < len(s) and s[offset] not in stopchars:
     offset += 1
   return s[ooffset:offset], offset
+
+re_QSTR = re.compile(r'"([^"\\]|\\.)*"')
+
+def get_qstr(s, offset):
+  ''' Extract a quoted string from the start of `s`.
+      Return:
+        qs, offset
+      where `qs` is the quoted string after replacing slosh-char with char
+      and `offset` is the offset of the first character after the quoted string.
+  '''
+  m = re_QSTR.match(s, offset)
+  if not m:
+    raise ValueError("no quoted string here: "+s)
+  qs = m.group()[1:-1]
+  offset = m.end()
+
+  # decode the quoted string
+  pos = 0
+  spos = qs.find('\\', pos)
+  while spos >= 0:
+    qs = qs[:spos] + qs[spos+1:]
+    pos = spos + 1
+  return qs, offset

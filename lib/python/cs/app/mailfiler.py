@@ -20,7 +20,7 @@ if sys.hexversion < 0x02060000: from sets import Set as set
 from thread import allocate_lock
 from cs.env import envsub
 from cs.fileutils import abspath_from_file, watched_file_property
-from cs.lex import get_white, get_nonwhite
+from cs.lex import get_white, get_nonwhite, get_qstr
 from cs.logutils import Pfx, setup_logging, debug, info, warning, error, D, LogTime
 from cs.mailutils import Maildir, read_message
 from cs.misc import O, slist
@@ -150,29 +150,10 @@ class State(O):
       hamap[header] = set( [ A for A, N in message_addresses(M, (header,)) ] )
     return hamap[header]
 
-re_QSTR = re.compile(r'"([^"\\]|\\.)*"')
 re_UNQSTR = re.compile(r'[^,\s]+')
 re_HEADERLIST = re.compile(r'([a-z][\-a-z0-9]*(,[a-z][\-a-z0-9]*)*):', re.I)
 re_ASSIGN = re.compile(r'([a-z]\w+)=', re.I)
 re_INGROUP = re.compile(r'\(\s*[a-z]\w+(\s*|\s*[a-z]\w+)*\s*\)', re.I)
-
-def get_qstr(s):
-  ''' Extract a quoted string from the start of `s`.
-      Return:
-        qs, etc
-      where `qs` is the quoted string after replacing slosh-char
-      with char and `etc` is the text after the quoted string.
-  '''
-  m = re_QSTR.match(s)
-  if not m:
-    raise ValueError, "no quoted string here: "+s
-  qs, etc = m.group()[1:-1], s[m.end():]
-  pos = 0
-  spos = qs.find('\\', pos)
-  while spos >= 0:
-    qs = qs[:spos] + qs[spos+1:]
-    pos = spos + 1
-  return qs, etc
 
 def parserules(fp):
   ''' Read rules from `fp`, yield Rules.
@@ -204,19 +185,17 @@ def parserules(fp):
       if not line:
         continue
 
-      if line[0].isspace():
-        # continuation - advance to condition
-        line = line.lstrip()
-      else:
+      _, offset = get_white(line, 0)
+      if not _:
         # new rule
         # yield old rule if in progress
         if R:
           yield R
         R = None
 
-        if line.startswith('<'):
+        if line[offset] == '<':
           # include another categories file
-          _, offset = get_white(line, offset=1)
+          _, offset = get_white(line, offset+1)
           subfilename, offset = get_nonwhite(line, offset=offset)
           if not subfilename:
             raise ValueError, "missing filename"
@@ -229,34 +208,34 @@ def parserules(fp):
         # new rule
         R = Rule()
 
-        m = re_ASSIGN.match(line)
+        m = re_ASSIGN.match(line, offset)
         if m:
           R.actions.append( ('ASSIGN', (m.group(1), line[m.end():])) )
           yield R
           R = None
           continue
 
-        if line.startswith('+'):
+        if line[offset] == '+':
           R.flags.halt = False
-          line = line[1:]
-        elif line.startswith('='):
+          offset += 1
+        elif line[offset] == '=':
           R.flags.halt = True
-          line = line[1:]
-        if line.startswith('!'):
+          offset += 1
+        if line[offset] == '!':
           R.flags.alert = True
-          line = line[1:]
+          offset += 1
 
         # gather targets
-        while len(line) and not line[0].isspace():
-          if line.startswith('"'):
-            target, line = get_qstr(line)
+        while offset < len(line) and not line[offset].isspace():
+          if line[offset] == '"':
+            target, offset = get_qstr(line, offset)
           else:
-            m = re_UNQSTR.match(line)
+            m = re_UNQSTR.match(line, offset)
             if m:
               target = m.group()
-              line = line[m.end():]
+              offset = m.end()
             else:
-              error("parse failure at: "+line)
+              error("parse failure at %d: %s", offset, line)
               raise ValueError, "syntax error"
           if target.startswith('|'):
             R.actions.append( ('PIPE', target[1:]) )
@@ -264,42 +243,41 @@ def parserules(fp):
             R.actions.append( ('MAIL', target) )
           else:
             R.actions.append( ('SAVE', target) )
-          if line.startswith(','):
-            line = line[1:]
+          if offset < len(line) and line[offset] == ',':
+            offset += 1
 
         # gather tag
-        line = line.lstrip()
-        if len(line) == 0:
-          raise ValueError, "missing tag"
-        if line.startswith('"'):
-          tag, line = get_qstr(line)
-          # advance to condition
-          line = line.lstrip()
+        _, offset = get_white(line, offset)
+        if not _ or offset == len(line):
+          R.tag = ''
+          warning("no tag or condition")
+          continue
+        if line[offset] == '"':
+          tag, offset = get_qstr(line, offset)
         else:
-          try:
-            tag, line = line.split(None, 1)
-          except ValueError:
-            raise ValueError("missing tag")
-        R.tag = tag
+          tag, offset = get_nonwhite(line, offset)
 
       # condition
-      if len(line) == 0:
-        raise ValueError("missing condition")
+      if not _ or offset == len(line):
+        warning("no condition")
+        continue
 
-      # . always matches - don't bother storing it
-      if line == '.':
+      # . always matches - don't bother storing it as a test
+      if line[offset:] == '.':
         continue
 
       # leading hdr1,hdr2,...:
-      m = re_HEADERLIST.match(line)
+      m = re_HEADERLIST.match(line, offset)
       if m:
         headernames = [ H.lower() for H in m.group(1).split(',') if H ]
-        line = line[m.end():]
+        offset = m.end()
+        if offset == len(line):
+          raise ValueError("missing match after header names")
       else:
         headernames = ('to', 'cc', 'bcc')
 
-      if line.startswith('/'):
-        regexp = line[1:]
+      if line[offset] == '/':
+        regexp = line[offset+1:]
         if regexp.startswith('^'):
           atstart = True
           regexp = regexp[1:]
@@ -308,7 +286,7 @@ def parserules(fp):
         C = Condition_Regexp(headernames, atstart, regexp)
       else:
         # (group[,group...])
-        m = re_INGROUP.match(line)
+        m = re_INGROUP.match(line, offset)
         if m:
           group_names = set( w.strip() for w in line.split(',') )
           line = line[m.end():].rstrip()
@@ -318,7 +296,7 @@ def parserules(fp):
         else:
           # just a comma separated list of addresses
           # TODO: should be RFC2822 list instead?
-          addrkeys = [ w.strip() for w in line.split(',') ]
+          addrkeys = [ w.strip() for w in line[offset:].split(',') ]
           C = Condition_AddressMatch(headernames, addrkeys)
       R.conditions.append(C)
 
