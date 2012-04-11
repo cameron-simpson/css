@@ -33,7 +33,7 @@ def main(argv, stdin=None):
   argv = list(argv)
   cmd = os.path.basename(argv.pop(0))
   setup_logging(cmd)
-  usage = 'Usage: %s filter [-d delay] maildirs...' % (cmd,)
+  usage = 'Usage: %s filter [-d delay] [-n] maildirs...' % (cmd,)
   mdburl = None
   badopts = False
 
