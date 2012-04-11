@@ -355,10 +355,10 @@ class Condition_AddressMatch(_Condition):
       for key in self.addrkeys:
         if key.startswith('{{') and key.endswith('}}'):
           key = key[2:-2].lower()
-          if key not in state.groups:
-            warning("%s: unknown group {{%s}}, I know: %s", self, key, state.groups.keys())
+          if key not in state.mailinfo.groups:
+            warning("%s: unknown group {{%s}}, I know: %s", self, key, state.mailinfo.groups.keys())
             continue
-          if address in state.groups[key]:
+          if address in state.mailinfo.groups[key]:
             return True
         elif address.lower() == key.lower():
           return True
