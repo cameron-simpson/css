@@ -237,12 +237,7 @@ def parserules(fp):
             else:
               error("parse failure at %d: %s", offset, line)
               raise ValueError, "syntax error"
-          if target.startswith('|'):
-            R.actions.append( ('PIPE', target[1:]) )
-          elif '@' in target:
-            R.actions.append( ('MAIL', target) )
-          else:
-            R.actions.append( ('SAVE', target) )
+          R.actions.append( ('TARGET', target) )
           if offset < len(line) and line[offset] == ',':
             offset += 1
 
@@ -409,13 +404,20 @@ class Rule(O):
       for action, arg in self.actions:
         try:
           debug("action = %r, arg = %r", action, arg)
-          if action == 'SAVE':
-            mdir = resolve_maildir(arg, state.environ)
-            debug("SAVE to %s", mdir.dir)
-            saved_msgpath = mdir.keypath(save_to_maildir(mdir, M))
-            if msgpath is None:
-              msgpath = saved_msgpath
-            saved_to.append(saved_msgpath)
+          if action == 'TARGET':
+            saved_to.append(self._target(target, M, state))
+            target = envsub(arg, state.environ)
+            if target.startswith('|'):
+              assert False, "pipes not implements"
+            elif '@' in target:
+              assert False, "email forwarding not implemented"
+            else:
+              mdir = resolve_maildir(arg, state.environ)
+              debug("SAVE to %s", mdir.dir)
+              saved_msgpath = mdir.keypath(save_to_maildir(mdir, M))
+              if msgpath is None:
+                msgpath = saved_msgpath
+              saved_to.append(saved_msgpath)
           elif action == 'ASSIGN':
             envvar, s = arg
             state.environ[envvar] = envsub(s, state.environ)
@@ -478,7 +480,7 @@ class Rules(list):
           ok_actions = []
           failed_actions = []
           mdirpath = dflt
-          action, arg = ('SAVE', mdirpath)
+          action, arg = ('TARGET', mdirpath)
           try:
             mdir = resolve_maildir(arg, state.environ)
             debug("SAVE to default %s", mdir.dir)
