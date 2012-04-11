@@ -150,7 +150,7 @@ class State(O):
       hamap[header] = set( [ A for A, N in message_addresses(M, (header,)) ] )
     return hamap[header]
 
-re_UNQSTR = re.compile(r'[^,\s]+')
+re_UNQWORD = re.compile(r'[^,\s]+')
 re_HEADERLIST = re.compile(r'([a-z][\-a-z0-9]*(,[a-z][\-a-z0-9]*)*):', re.I)
 re_ASSIGN = re.compile(r'([a-z]\w+)=', re.I)
 re_INGROUP = re.compile(r'\(\s*[a-z]\w+(\s*|\s*[a-z]\w+)*\s*\)', re.I)
@@ -230,7 +230,7 @@ def parserules(fp):
           if line[offset] == '"':
             target, offset = get_qstr(line, offset)
           else:
-            m = re_UNQSTR.match(line, offset)
+            m = re_UNQWORD.match(line, offset)
             if m:
               target = m.group()
               offset = m.end()
