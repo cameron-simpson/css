@@ -110,12 +110,12 @@ def abspath_from_file(path, from_file):
 def watch_file(path, old_mtime, reload_file, missing_ok=False):
   ''' Watch a file for modification by polling its mtime.
       Call reload_file(path) if the file is newer than `old_mtime`.
-      Return (new_mtime, reload_file(path)) if the file was updated
-      and was unchanged during the reload_file().
+      Return (new_mtime, reload_file(path)) if the file was updated and was
+      unchanged (stable mtime and size) during the reload_file().
       Otherwise return (None, None).
       This may raise an OSError if the `path` cannot be os.stat()ed
       and of course for any exceptions that occur calling `reload_file`.
-      If `missing_ok` is true then a failure to os.stat() that
+      If `missing_ok` is true then a failure to os.stat() which
       raises OSError with ENOENT will just return (None, None).
   '''
   try:
