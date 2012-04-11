@@ -19,7 +19,7 @@ from time import sleep
 if sys.hexversion < 0x02060000: from sets import Set as set
 from thread import allocate_lock
 from cs.env import envsub
-from cs.fileutils import abspath_from_file, watch_file
+from cs.fileutils import abspath_from_file, watched_file_property
 from cs.lex import get_white, get_nonwhite
 from cs.logutils import Pfx, setup_logging, debug, info, warning, error, D, LogTime
 from cs.mailutils import Maildir, read_message
@@ -523,20 +523,12 @@ class MailInfo(O):
   '''
 
   def __init__(self, maildb_path):
-    self.maildb_path = maildb_path
-    self.maildb_mtime = None
-    self.maildb = None
+    self._maildb_path = maildb_path
 
-  def update_maildb(self):
-    ''' Update the MailDB if it gets modified.
-    '''
-    new_mtime, new_maildb = watch_file(self.maildb_path,
-                                       self.maildb_mtime,
-                                       lambda path: MailDB(path,
-                                                           readonly=True))
-    if new_mtime:
-      self.maildb = new_maildb
-      self.maildb_mtime = new_mtime
+  @watched_file_property
+  def maildb(self, path):
+    warning("load maildb(%s)", path)
+    return MailDB(path, readonly=True)
 
   @property
   def group(self):
@@ -560,16 +552,15 @@ class WatchedMaildir(O):
   ''' A class to monitor a Maildir and filter messages.
   '''
 
-  def __init__(self, mdir, rules_file=None):
+  def __init__(self, mdir, rules_path=None):
     self.mdir = resolve_maildir(mdir)
-    if rules_file is None:
-      rules_file = os.path.join(self.mdir.dir, '.rules')
-    self.rules_file = rules_file
-    self.rules = None
-    self.rules_mtime = None
+    if rules_path is None:
+      rules_path = os.path.join(self.mdir.dir, '.rules')
+    self._rules_path = rules_path
+    self._rules_lock = allocate_lock()
     self.lurking = set()
-    self._lock = allocate_lock()
     self.flush()
+    warning("%d rules", len(self.rules))
 
   def flush(self):
     ''' Forget state.
@@ -577,13 +568,9 @@ class WatchedMaildir(O):
     '''
     self.lurking = set()
 
-  def update_rules(self):
-    new_mtime, new_rules = watch_file(self.rules_file,
-                                        self.rules_mtime,
-                                        lambda path: Rules(path))
-    if new_mtime:
-      self.rules = new_rules
-      self.rules_mtime = new_mtime
+  @watched_file_property
+  def rules(self, rules_path):
+    return Rules(rules_path)
 
   def filter(self, mailinfo, no_remove=False):
     ''' Scan Maildir contents.
@@ -593,8 +580,6 @@ class WatchedMaildir(O):
     '''
     with Pfx("%s: filter" % (self.mdir.dir,)):
       self.mdir.flush()
-      self.update_rules()
-      mailinfo.update_maildb()
       nmsgs = 0
       skipped = 0
       with LogTime("all keys") as TK:
