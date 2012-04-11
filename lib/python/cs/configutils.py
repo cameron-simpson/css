@@ -11,17 +11,26 @@ if sys.hexversion < 0x03000000:
   import ConfigParser as configparser
 else:
   import configparser
+from cs.fileutils import watch_file
 from cs.logutils import Pfx, info
 
 class ConfigWatcher(object):
   ''' A monitor for a windows style .ini file.
       The current SafeConfigParser object is present in the .parser attribute.
   '''
-  def __init__(self, cfgpath):
-    self.cfgpath = cfgpath
-    self.mtime = None
-    self.parser = configparser.SafeConfigParser()
+  def __init__(self, cfg_path):
+    self.cfg_path = cfg_path
+    self.cfg_mtime = None
     self.poll()
+    assert self.parser is not None
+
+  def _reload(self, cfg_path):
+    ''' Read the specified config file, return the populated ConfigParser.
+    '''
+    CP = configparser.SafeConfigParser()
+    with open(cfg_path) as fp:
+      CP.readfp(fp)
+    return CP
 
   def poll(self):
     ''' Poll the config file for changes.
@@ -31,42 +40,33 @@ class ConfigWatcher(object):
         If there are new changes, the new parser is saved as the .parser
         attribute.
     '''
-    cfgpath = self.cfgpath
-    result = None
-    ##with NoExceptions(None):
-    if os.path.isfile(cfgpath):
-      s = os.stat(cfgpath)
-      if self.mtime is None or s.st_mtime > self.mtime:
-        CP = configparser.SafeConfigParser()
-        with open(cfgpath) as fp:
-          CP.readfp(fp)
-        s2 = os.stat(cfgpath)
-        if s2.st_mtime == s.st_mtime and s2.st_size == s.st_size:
-           self.mtime = s.st_mtime
-           info("new config loaded from %s" % (cfgpath,))
-           result = self.parser = CP
-    return result
+    new_mtime, new_parser = watch_file(self.cfg_path,
+                                       self.cfg_mtime,
+                                       self._reload)
+    if new_mtime:
+      self.cfg_time = new_mtime
+      self.parser = new_parser
 
 class ConfigSectionWatcher(object):
   ''' A class for monitoring a particular clause in a config file
       and self updating if needed when poll() is called.
   '''
-  def __init__(self, cfgpath, section, defaults=None):
+  def __init__(self, cfg_path, section, defaults=None):
     ''' Initialise a ConfigSectionWatcher to monitor a particular section
         of a config file.
     '''
-    if not os.path.isabs(cfgpath):
-      cfgpath = os.path.abspath(cfgpath)
-    self.cfgpath = cfgpath
+    if not os.path.isabs(cfg_path):
+      cfg_path = os.path.abspath(cfg_path)
+    self.cfg_path = cfg_path
     self.section = section
     self.defaults = defaults
-    self.configwatcher = ConfigWatcher(cfgpath)
+    self.configwatcher = ConfigWatcher(cfg_path)
 
   def poll(self):
     self.configwatcher.poll()
 
   def __str__(self):
-    return "%s[%s]%r" % (self.cfgpath, self.section, self)
+    return "%s[%s]%r" % (self.cfg_path, self.section, self)
 
   def __repr__(self):
     d = {}

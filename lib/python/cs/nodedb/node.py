@@ -808,8 +808,6 @@ class NodeDB(dict):
     '''
     if len(args) == 2:
       t, name = args
-      assert type(t) is str
-      assert type(name) is str
     elif len(args) == 1:
       item = args[0]
       if type(item) is str:
@@ -818,14 +816,19 @@ class NodeDB(dict):
       else:
         # (TYPE, NAME)
         t, name = item
-        assert type(t) is str
-        assert type(name) is str
-      assert t.isupper(), "TYPE should be upper case, got \"%s\"" % (t,)
+    else:
+      raise ValueError("nodekey: expected 1 or 2 args, got: %r" % (args,))
+
+    assert type(t) is str
+    assert type(name) is str
+
+    # sanity check type form
+    if t != '_':
+      assert t.isupper(), "TYPE should be upper case, got %r" % (t,)
       assert len(name) > 0
       k, plural = parseUC_sAttr(t)
-      assert k is not None and not plural
-    else:
-      raise TypeError, "nodekey() takes (TYPE, NAME) args or a single arg: args=%s" % ( args, )
+      assert k is not None and not plural, "got TYPE == %r" % (t,)
+
     return t, name
 
   def newNode(self, *args):

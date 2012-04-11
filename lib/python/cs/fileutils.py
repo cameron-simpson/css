@@ -105,8 +105,8 @@ def abspath_from_file(path, from_file):
     path = os.path.join(dirname(from_file), path)
   return path
 
-def poll_updated(path, old_mtime, reload, missing_ok=False):
-  ''' Poll a file for modification.
+def watch_file(path, old_mtime, reload, missing_ok=False):
+  ''' Watch a file for modification by polling its mtime.
       Call reload(path) if the file is newer than `old_mtime`.
       Return (new_mtime, reload(path)) if the file was updated
       and was unchanged during the reload().
@@ -125,6 +125,7 @@ def poll_updated(path, old_mtime, reload, missing_ok=False):
     raise
   if old_mtime is None or s.st_mtime > old_mtime:
     new_mtime = s.st_mtime
+    new_size = s.st_size
     R = reload(path)
     try:
       s = os.stat(path)
@@ -133,7 +134,7 @@ def poll_updated(path, old_mtime, reload, missing_ok=False):
         if missing_ok:
           return None, None
       raise
-    if new_mtime == s.st_mtime:
+    if new_mtime == s.st_mtime and new_size == s.st_size:
       return new_mtime, R
   return None, None
 

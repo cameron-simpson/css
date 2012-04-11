@@ -19,7 +19,7 @@ from time import sleep
 if sys.hexversion < 0x02060000: from sets import Set as set
 from thread import allocate_lock
 from cs.env import envsub
-from cs.fileutils import abspath_from_file, poll_updated
+from cs.fileutils import abspath_from_file, watch_file
 from cs.lex import get_white, get_nonwhite
 from cs.logutils import Pfx, setup_logging, debug, info, warning, error, D, LogTime
 from cs.mailutils import Maildir, read_message
@@ -578,7 +578,7 @@ class WatchedMaildir(O):
     self.lurking = set()
 
   def update_rules(self):
-    new_mtime, new_rules = poll_updated(self.rules_file,
+    new_mtime, new_rules = watch_file(self.rules_file,
                                         self.rules_mtime,
                                         lambda path: Rules(path))
     if new_mtime:
