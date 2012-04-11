@@ -530,10 +530,10 @@ class MailInfo(O):
   def update_maildb(self):
     ''' Update the MailDB if it gets modified.
     '''
-    new_mtime, new_maildb = poll_updated(self.maildb_path,
-                                         self.maildb_mtime,
-                                         lambda path: MailDB(path,
-                                                             readonly=True))
+    new_mtime, new_maildb = watch_file(self.maildb_path,
+                                       self.maildb_mtime,
+                                       lambda path: MailDB(path,
+                                                           readonly=True))
     if new_mtime:
       self.maildb = new_maildb
       self.maildb_mtime = new_mtime
