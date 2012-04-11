@@ -118,8 +118,6 @@ def watch_file(path, old_mtime, reload_file, missing_ok=False):
       If `missing_ok` is true then a failure to os.stat() that
       raises OSError with ENOENT will just return (None, None).
   '''
-  print >>sys.stderr, ("watch_file(path=%r, old_mtime=%r, reload_file=%r, missing_ok=%r)",
-          path, old_mtime, reload_file, missing_ok)
   try:
     s = os.stat(path)
   except OSError, e:
