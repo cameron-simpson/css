@@ -6,11 +6,13 @@
 
 from __future__ import with_statement
 import errno
+from functools import partial
 import os
 from os.path import isabs, abspath, dirname
 import sys
 import shutil
 from tempfile import NamedTemporaryFile
+import time
 import unittest
 
 def saferename(oldpath, newpath):
@@ -105,17 +107,19 @@ def abspath_from_file(path, from_file):
     path = os.path.join(dirname(from_file), path)
   return path
 
-def watch_file(path, old_mtime, reload, missing_ok=False):
+def watch_file(path, old_mtime, reload_file, missing_ok=False):
   ''' Watch a file for modification by polling its mtime.
-      Call reload(path) if the file is newer than `old_mtime`.
-      Return (new_mtime, reload(path)) if the file was updated
-      and was unchanged during the reload().
+      Call reload_file(path) if the file is newer than `old_mtime`.
+      Return (new_mtime, reload_file(path)) if the file was updated
+      and was unchanged during the reload_file().
       Otherwise return (None, None).
       This may raise an OSError if the `path` cannot be os.stat()ed
-      and of course for any exceptions that occur calling `reload`.
+      and of course for any exceptions that occur calling `reload_file`.
       If `missing_ok` is true then a failure to os.stat() that
       raises OSError with ENOENT will just return (None, None).
   '''
+  print >>sys.stderr, ("watch_file(path=%r, old_mtime=%r, reload_file=%r, missing_ok=%r)",
+          path, old_mtime, reload_file, missing_ok)
   try:
     s = os.stat(path)
   except OSError, e:
@@ -126,7 +130,7 @@ def watch_file(path, old_mtime, reload, missing_ok=False):
   if old_mtime is None or s.st_mtime > old_mtime:
     new_mtime = s.st_mtime
     new_size = s.st_size
-    R = reload(path)
+    R = reload_file(path)
     try:
       s = os.stat(path)
     except OSError, e:
@@ -137,6 +141,44 @@ def watch_file(path, old_mtime, reload, missing_ok=False):
     if new_mtime == s.st_mtime and new_size == s.st_size:
       return new_mtime, R
   return None, None
+
+def watched_file_property(func, prop_name=None, unset_object=None, poll_rate=1):
+  ''' A property whose value reloads if a file changes.
+      `func` accepts the file path and returns the new value.
+      The property {prop_name}_lock controls access to the property.
+      The properties {prop_name}_mtime, {prop_name}_path track the
+      associated file state.
+      The property {prop_name}_lastpoll track the last poll time.
+  '''
+  if prop_name is None:
+    prop_name = '_' + func.func_name
+  lock_name = prop_name + '_lock'
+  mtime_name = prop_name + '_mtime'
+  path_name = prop_name + '_path'
+  lastpoll_name = prop_name + '_lastpoll'
+  def getprop(self):
+    ''' Attempt lockless fetch of property first.
+        Use lock if property is unset.
+    '''
+    with getattr(self, lock_name):
+      now = time.time()
+      then = getattr(self, lastpoll_name, None)
+      if then is None or then + poll_rate <= now:
+        setattr(self, lastpoll_name, now)
+        old_mtime = getattr(self, mtime_name, None)
+        new_mtime, value = watch_file(getattr(self, path_name),
+                                      old_mtime,
+                                      partial(func, self),
+                                      missing_ok=True)
+        if new_mtime:
+          setattr(self, prop_name, value)
+          setattr(self, mtime_name, new_mtime)
+        else:
+          value = getattr(self, prop_name)
+      else:
+        value = getattr(self, prop_name)
+    return value
+  return property(getprop)
 
 if __name__ == '__main__':
   import cs.fileutils_tests
