@@ -16,7 +16,7 @@ from tempfile import NamedTemporaryFile
 from StringIO import StringIO
 from thread import allocate_lock
 import time
-from cs.logutils import Pfx, debug, D
+from cs.logutils import Pfx, warning, debug, D
 from cs.threads import locked_property
 from cs.misc import seq
 
@@ -61,10 +61,12 @@ class Maildir(mailbox.Maildir):
     self._lock = allocate_lock()
     self.flush()
 
+  def __str__(self):
+    return "<%s %s>" % (self.__class__.__name__, self.dir)
+
   def flush(self):
     ''' Forget state.
     '''
-    debug("flush %s: _msgmap = None", self.dir)
     self._msgmap = None
 
   @locked_property
@@ -183,6 +185,12 @@ class Maildir(mailbox.Maildir):
       debug("create new file %s for key %s", T.name, key)
       T.write(fp.read())
     return self.save_filepath(T.name, key=key)
+
+  def save_message(self, M, key=None):
+    ''' Save the contents of the Message `M` into the Maildir.
+        Return the key for the saved message.
+    '''
+    return save_file(self, StringIO(str(M)), key=key)
 
   def keypath(self, key):
     subdir, msgbase = self.msgmap[key]
