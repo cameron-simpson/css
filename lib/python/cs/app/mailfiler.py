@@ -429,7 +429,7 @@ class Condition_AddressMatch(_Condition):
 class Condition_InGroups(_Condition):
 
   def __init__(self, headername, group_names):
-    self.headername = headernames
+    self.headername = headername
     self.group_names = group_names
 
   def match(self, state):
