@@ -206,14 +206,15 @@ class _MailDB(NodeDB):
   @locked_property
   def address_groups(self):
     ''' Compute the address_group sets.
+        Return the mapping.
     '''
     address_groups = {}
     for A in self.ADDRESSes:
       for group_name in A.GROUPs:
-        address_group = ( address_groups[group_name]
-                          if group_name in address_groups
-                          else set()
-                        )
+        if group_name in address_groups:
+          address_group = address_groups[group_name]
+        else:
+          address_group = address_groups[group_name] = set()
         address_group.add(A.name)
     return address_groups
 
