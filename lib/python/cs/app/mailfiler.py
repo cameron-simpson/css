@@ -17,6 +17,8 @@ import re
 import sys
 from time import sleep
 if sys.hexversion < 0x02060000: from sets import Set as set
+import subprocess
+from tempfile import TemporaryFile
 from thread import allocate_lock
 from cs.env import envsub
 from cs.fileutils import abspath_from_file, watched_file_property
@@ -34,7 +36,6 @@ def main(argv, stdin=None):
   cmd = os.path.basename(argv.pop(0))
   setup_logging(cmd)
   usage = 'Usage: %s filter [-d delay] [-n] maildirs...' % (cmd,)
-  mdburl = None
   badopts = False
 
   if not argv:
@@ -83,15 +84,11 @@ def main(argv, stdin=None):
 
   with Pfx(op):
     if op == 'filter':
-      if mdburl is None:
-        mdburl = os.environ['MAILDB']
-      maildirs = []
-      mailinfo = MailInfo(mdburl)
       maildirs = [ WatchedMaildir(mdirpath) for mdirpath in mdirpaths ]
       while True:
         for MW in maildirs:
           with LogTime("MW.filter()", threshold=0.0):
-            for key, reports in MW.filter(mailinfo, no_remove=no_remove):
+            for key, reports in MW.filter(os.environ['MAILDB'], no_remove=no_remove):
               ##D("key = %s, did: %s", key, reports)
               pass
         if delay is None:
@@ -102,53 +99,134 @@ def main(argv, stdin=None):
 
     raise RunTimeError("unimplemented op")
 
-class State(O):
+def resolve_maildir_path(mdirpath, maildir_root):
+  ''' Return the full path to the requested maildir.
+  '''
+  if not os.path.isabs(mdirpath):
+    if mdirpath.startswith('./') or mdirpath.startswith('../'):
+      mdirpath = os.path.abspath(mdirpath)
+    else:
+      mdirpath = os.path.join(maildir_root, mdirpath)
+  return mdirpath
+
+class RuleState(O):
   ''' State information for rule evaluation.
-      .mailinfo MailDB wrapper with access methods.
+      .message  Current message.
+      .maildb MailDB.
       .environ  Storage for variable settings.
   '''
  
-  def __init__(self, mailinfo, environ=None):
-    ''' `mailinfo`: MailDB wrapper with access methods.
-        `environ`:  Mapping if initial variable names.
+  maildirs = {}
+
+  def __init__(self, M, maildb_path, environ=None):
+    ''' `M`:        The Message object to be filed.
+        `maildb_path`: Pathname of a MailDB file with access methods.
+        `environ`:  Mapping of initial variable names.
                     Default from os.environ.
     '''
+    self.message = M
+    self.message_path = None
+    self._maildb_path = maildb_path
+    self._maildb_lock = allocate_lock()
     if environ is None:
       environ = os.environ
-    self.mailinfo = mailinfo
     self.environ = dict(environ)
-    self.current_message = None
+    self.message_path = None
     self._log = None
 
+  def maildir(self, mdirpath):
+    ''' Return the Maildir derived from mdirpath.
+    '''
+    mdirpath = resolve_maildir_path(mdirpath, self.environ['MAILDIR'])
+    if mdirpath not in self.maildirs:
+      self.maildirs[mdirpath] = Maildir(mdirpath)
+    return self.maildirs[mdirpath]
+
+  @property
+  def message(self):
+    return self._message
+
+  @message.setter
+  def message(self, new_message):
+    self._message = new_message
+    self.header_addresses = {}
+
   def log(self, *a):
+    ''' Log a message.
+    '''
     log = self._log
     if log is None:
       log = sys.stdout
     print(*a, file=log)
 
   def logto(self, logfilepath):
+    ''' Direct log messages to the supplied `logfilepath`.
+    '''
     if self._log:
       self._log.close()
     self._log = open(logfilepath, "a")
 
-  def addresses(self, M, *headers):
+  @watched_file_property
+  def maildb(self, path):
+    warning("load maildb(%s)", path)
+    assert False
+    return MailDB(path, readonly=True)
+
+  @property
+  def groups(self):
+    ''' The group mapping from the MailDB.
+    '''
+    return self.maildb.address_groups
+
+  def addresses(self, *headers):
     ''' Return the core addresses from the supplies Message and headers.
         Caches results for rapid rule evaluation.
     '''
-    if M is not self.current_message:
+    M = self.message
+    if M is not self.message:
       # new message - discard cache
-      self.current_message = M
+      self.message = M
       self.header_addresses = {}
     if len(headers) != 1:
       addrs = set()
       for header in headers:
-        addrs.update(self.addresses(M, header))
+        addrs.update(self.addresses(header))
       return addrs
     header = headers[0]
     hamap = self.header_addresses
     if header not in hamap:
       hamap[header] = set( [ A for A, N in message_addresses(M, (header,)) ] )
     return hamap[header]
+
+  def save_to_maildir(self, mdir):
+    M = self.message
+    path = self.message_path
+    if path is None:
+      savekey = mdir.save_message(M)
+    else:
+      savekey = mdir.save_filepath(path)
+    warning("SAVE %s to %s", M['message-id'], savekey)
+    self.message_path = mdir.keypath(savekey)
+    return self.message_path
+
+  def sendmail(self, address, mfp=None):
+    ''' Dispatch the Message `M` to the email address `address`.
+    '''
+    if mfp is None:
+      message_path = state.message_path
+      if message_path:
+        with open(message_path) as mfp:
+          return self.sendmail(address, mfp)
+      else:
+        with TemporaryFile('w+') as mfp:
+          mfp.write(str(self.message))
+          mfp.flush()
+          mfp.seek(0)
+          return self.sendmail(address, mfp)
+    retcode = subprocess.call([state.environ.get('SENDMAIL', 'sendmail'), '-oi', address],
+                              env=state.environ,
+                              stdin=mfp)
+    return retcode == 0
 
 re_UNQWORD = re.compile(r'[^,\s]+')
 re_HEADERLIST = re.compile(r'([a-z][\-a-z0-9]*(,[a-z][\-a-z0-9]*)*):', re.I)
@@ -305,18 +383,6 @@ def message_addresses(M, hdrs):
     for realname, address in getaddresses(M.get_all(hdr, ())):
       yield realname, address
 
-def resolve_maildir(mdirpath, environ=None):
-  ''' Return a new Maildir based on mdirpath.
-  '''
-  if not os.path.isabs(mdirpath):
-    if mdirpath.startswith('./') or mdirpath.startswith('../'):
-      mdirpath = os.path.abspath(mdirpath)
-    else:
-      if environ is None:
-        environ = os.environ
-      mdirpath = os.path.join(environ['MAILDIR'], mdirpath)
-  return Maildir(mdirpath)
-
 class _Condition(O):
   pass
 
@@ -328,7 +394,8 @@ class Condition_Regexp(_Condition):
     self.regexp = re.compile(regexp)
     self.regexptxt = regexp
 
-  def match(self, M, state):
+  def match(self, state):
+    M = state.message
     for hdr in self.headernames:
       for value in M.get_all(hdr, ()):
         if self.atstart:
@@ -345,15 +412,15 @@ class Condition_AddressMatch(_Condition):
     self.headernames = headernames
     self.addrkeys = [ k for k in addrkeys if len(k) > 0 ]
 
-  def match(self, M, state):
-    for address in state.addresses(M, *self.headernames):
+  def match(self, state):
+    for address in state.addresses(*self.headernames):
       for key in self.addrkeys:
         if key.startswith('{{') and key.endswith('}}'):
           key = key[2:-2].lower()
-          if key not in state.mailinfo.groups:
-            warning("%s: unknown group {{%s}}, I know: %s", self, key, state.mailinfo.groups.keys())
+          if key not in state.groups:
+            warning("%s: unknown group {{%s}}, I know: %s", self, key, state.groups.keys())
             continue
-          if address in state.mailinfo.groups[key]:
+          if address in state.groups[key]:
             return True
         elif address.lower() == key.lower():
           return True
@@ -365,11 +432,10 @@ class Condition_InGroups(_Condition):
     self.headername = headernames
     self.group_names = group_names
 
-  def match(self, M, state):
-    minfo = state.mailinfo
-    for address in state.addresses(M, *self.headernames):
+  def match(self, state):
+    for address in state.addresses(*self.headernames):
       for group_name in self.group_names:
-        if address in minfo.group(group_name):
+        if address in state.group(group_name):
           return True
     return False
 
@@ -385,45 +451,37 @@ class Rule(O):
     self.flags.alert = False
     self.flags.halt = False
 
-  def match(self, M, state):
+  def match(self, state):
     for C in self.conditions:
-      if not C.match(M, state):
+      if not C.match(state):
         return False
     return True
 
-  def filter(self, M, state):
-    try:
-      msgpath = M.pathname
-    except AttributeError:
-      msgpath = None
+  def filter(self, state):
     saved_to = []
     ok_actions = []
     failed_actions = []
-    matched = self.match(M, state)
+    matched = self.match(state)
     if matched:
       for action, arg in self.actions:
         try:
           debug("action = %r, arg = %r", action, arg)
           if action == 'TARGET':
-            saved_to.append(self._target(target, M, state))
             target = envsub(arg, state.environ)
             if target.startswith('|'):
               assert False, "pipes not implements"
             elif '@' in target:
-              assert False, "email forwarding not implemented"
+              if state.sendmail(target):
+                saved_to.append(target)
             else:
-              mdir = resolve_maildir(arg, state.environ)
-              debug("SAVE to %s", mdir.dir)
-              saved_msgpath = mdir.keypath(save_to_maildir(mdir, M))
-              if msgpath is None:
-                msgpath = saved_msgpath
-              saved_to.append(saved_msgpath)
+              mdir = state.maildir(arg)
+              saved_to.append(mdir.keypath(state.save_to_maildir(mdir)))
           elif action == 'ASSIGN':
             envvar, s = arg
-            state.environ[envvar] = envsub(s, state.environ)
-            debug("ASSIGN %s=%s", envvar, state.environ[envvar])
+            value = state.environ[envvar] = envsub(s, state.environ)
+            debug("ASSIGN %s=%s", envvar, value)
             if envvar == 'LOGFILE':
-              state.logto(state.environ[envvar])
+              state.logto(value)
           else:
             raise RuntimeError("unimplemented action \"%s\"" % action)
         except (AttributeError, NameError):
@@ -450,7 +508,7 @@ class Rules(list):
     '''
     self.extend(list(parserules(fp)))
 
-  def filter(self, M, state):
+  def filter(self, state):
     ''' Filter message `M` according to the rules.
         Yield FilterReports for each rule consulted.
         If no rules matches and $DEFAULT is set, yield a FilterReport for
@@ -459,7 +517,7 @@ class Rules(list):
     done = False
     matches = 0
     for R in self:
-      report = R.filter(M, state)
+      report = R.filter(state)
       yield report
       if report.matched:
         matches += 1
@@ -482,12 +540,8 @@ class Rules(list):
           mdirpath = dflt
           action, arg = ('TARGET', mdirpath)
           try:
-            mdir = resolve_maildir(arg, state.environ)
-            debug("SAVE to default %s", mdir.dir)
-            saved_msgpath = mdir.keypath(save_to_maildir(mdir, M))
-            if msgpath is None:
-              msgpath = saved_msgpath
-            saved_to.append(saved_msgpath)
+            mdir = state.maildir(arg)
+            saved_to.append(state.save_to_maildir(mdir))
             matched = True
           except (AttributeError, NameError):
             raise
@@ -497,43 +551,12 @@ class Rules(list):
             ok_actions.append( (action, arg) )
           yield FilterReport(None, matched, saved_to, ok_actions, failed_actions)
 
-class MailInfo(O):
-  ''' Mail external information.
-      Includes a maildb and access methods.
-  '''
-
-  def __init__(self, maildb_path):
-    self._maildb_path = maildb_path
-
-  @watched_file_property
-  def maildb(self, path):
-    warning("load maildb(%s)", path)
-    return MailDB(path, readonly=True)
-
-  @property
-  def group(self):
-    return self.maildb.group
-
-def save_to_maildir(mdir, M):
-  ''' Save the Message `M` to the Maildir `mdir`.
-  '''
-  debug("save_to_maildir(%s,M)", mdir)
-  if type(mdir) is str:
-    return save_to_maildir(Maildir(mdir), M)
-  try:
-    msgpath = M.pathname
-  except AttributeError:
-    msgpath = None
-  savepath = mdir.keypath(mdir.add(msgpath if msgpath is not None else M))
-  D("%s %s", M['from'], savepath)
-  return savepath
-
 class WatchedMaildir(O):
   ''' A class to monitor a Maildir and filter messages.
   '''
 
   def __init__(self, mdir, rules_path=None):
-    self.mdir = resolve_maildir(mdir)
+    self.mdir = Maildir(resolve_maildir_path(mdir, os.environ['MAILDIR']))
     if rules_path is None:
       rules_path = os.path.join(self.mdir.dir, '.rules')
     self._rules_path = rules_path
@@ -552,7 +575,7 @@ class WatchedMaildir(O):
   def rules(self, rules_path):
     return Rules(rules_path)
 
-  def filter(self, mailinfo, no_remove=False):
+  def filter(self, maildb_path, no_remove=False):
     ''' Scan Maildir contents.
         Yield (key, FilterReports) for all messages filed.
 	Update the set of lurkers with any keys not removed to prevent
@@ -572,11 +595,11 @@ class WatchedMaildir(O):
           nmsgs += 1
           with LogTime("key = %s" % (key,), threshold=0.0, level=DEBUG):
             M = mdir[key]
-            msgpath = mdir.keypath(key)
-            state = State(mailinfo)
+            state = RuleState(M, maildb_path)
+            state.message_path = mdir.keypath(key)
             filed = []
             reports = []
-            for report in self.rules.filter(M, state):
+            for report in self.rules.filter(state):
               if report.matched:
                 reports.append(report)
                 for saved_to in report.saved_to:
