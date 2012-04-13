@@ -35,7 +35,7 @@ def main(argv, stdin=None):
   argv = list(argv)
   cmd = os.path.basename(argv.pop(0))
   setup_logging(cmd)
-  usage = 'Usage: %s filter [-d delay] [-n] maildirs...' % (cmd,)
+  usage = 'Usage: %s monitor [-d delay] [-n] maildirs...' % (cmd,)
   badopts = False
 
   if not argv:
@@ -44,7 +44,7 @@ def main(argv, stdin=None):
   else:
     op = argv.pop(0)
     with Pfx(op):
-      if op == 'filter':
+      if op == 'monitor':
         justone = False
         delay = None
         no_remove = False
@@ -87,7 +87,7 @@ def main(argv, stdin=None):
     return 2
 
   with Pfx(op):
-    if op == 'filter':
+    if op == 'monitor':
       maildir_cache = {}
       filter_modes = FilterModes(justone=justone,
                                  delay=delay,
