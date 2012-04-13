@@ -45,16 +45,20 @@ def main(argv, stdin=None):
     op = argv.pop(0)
     with Pfx(op):
       if op == 'filter':
+        justone = False
         delay = None
         no_remove = False
+        no_save = False
         try:
-          opts, argv = getopt(argv, 'd:n')
+          opts, argv = getopt(argv, '1d:nN')
         except GetoptError, e:
           warning("%s", e)
           badopts = True
         for opt, val in opts:
           with Pfx(opt):
-            if opt == '-d':
+            if opt == '-1':
+              justone = True
+            elif opt == '-d':
               try:
                 delay = int(val)
               except ValueError, e:
@@ -84,20 +88,36 @@ def main(argv, stdin=None):
 
   with Pfx(op):
     if op == 'filter':
-      maildirs = [ WatchedMaildir(mdirpath) for mdirpath in mdirpaths ]
+      maildir_cache = {}
+      filter_modes = FilterModes(justone=justone,
+                                 delay=delay,
+                                 no_remove=no_remove,
+                                 no_save=no_save,
+                                 maildb_path=os.environ['MAILDB'],
+                                 maildir_cache={})
+      maildirs = [ WatchedMaildir(mdirpath, filter_modes=filter_modes)
+                   for mdirpath in mdirpaths
+                 ]
       while True:
         for MW in maildirs:
           with LogTime("MW.filter()", threshold=0.0):
-            for key, reports in MW.filter(os.environ['MAILDB'], no_remove=no_remove):
-              ##D("key = %s, did: %s", key, reports)
-              pass
+            for key, reports in MW.filter():
+              D("%s => %s", key, [R.saved_to for R in reports if len(R.saved_to)])
         if delay is None:
           break
-        debug("sleep %d", delay)
+        debug("sleep %ds", delay)
         sleep(delay)
       return 0
 
     raise RunTimeError("unimplemented op")
+
+def maildir_from_name(mdirname, maildir_root, maildir_cache):
+    ''' Return the Maildir derived from mdirpath.
+    '''
+    mdirpath = resolve_maildir_path(mdirname, maildir_root)
+    if mdirpath not in maildir_cache:
+      maildir_cache[mdirpath] = Maildir(mdirpath)
+    return maildir_cache[mdirpath]
 
 def resolve_maildir_path(mdirpath, maildir_root):
   ''' Return the full path to the requested maildir.
@@ -109,6 +129,21 @@ def resolve_maildir_path(mdirpath, maildir_root):
       mdirpath = os.path.join(maildir_root, mdirpath)
   return mdirpath
 
+class FilterModes(O):
+
+  def __init__(self, **kw):
+    self._maildb_path = kw.pop('maildb_path')
+    self._maildb_lock = allocate_lock()
+    O.__init__(self, **kw)
+
+  @watched_file_property
+  def maildb(self, path):
+    warning("load maildb(%s)", path)
+    return MailDB(path, readonly=True)
+
+  def maildir(self, mdirname, environ=None):
+    return maildir_from_name(mdirname, environ, self.maildir_cache)
+
 class RuleState(O):
   ''' State information for rule evaluation.
       .message  Current message.
@@ -118,29 +153,26 @@ class RuleState(O):
  
   maildirs = {}
 
-  def __init__(self, M, maildb_path, environ=None):
-    ''' `M`:        The Message object to be filed.
-        `maildb_path`: Pathname of a MailDB file with access methods.
-        `environ`:  Mapping of initial variable names.
-                    Default from os.environ.
+  def __init__(self, M, outer_state, environ=None):
+    ''' `M`:           The Message object to be filed.
+        `outer_state`: External state object, with maildb etc.
+        `environ`:     Mapping of initial variable names.
+                       Default from os.environ.
     '''
     self.message = M
     self.message_path = None
-    self._maildb_path = maildb_path
-    self._maildb_lock = allocate_lock()
+    self.outer_state = outer_state
     if environ is None:
       environ = os.environ
     self.environ = dict(environ)
-    self.message_path = None
     self._log = None
 
+  @property
+  def maildb(self):
+    return self.outer_state.maildb
+
   def maildir(self, mdirpath):
-    ''' Return the Maildir derived from mdirpath.
-    '''
-    mdirpath = resolve_maildir_path(mdirpath, self.environ['MAILDIR'])
-    if mdirpath not in self.maildirs:
-      self.maildirs[mdirpath] = Maildir(mdirpath)
-    return self.maildirs[mdirpath]
+    return self.outer_state.maildir(mdirpath, self.environ)
 
   @property
   def message(self):
@@ -165,12 +197,6 @@ class RuleState(O):
     if self._log:
       self._log.close()
     self._log = open(logfilepath, "a")
-
-  @watched_file_property
-  def maildb(self, path):
-    warning("load maildb(%s)", path)
-    assert False
-    return MailDB(path, readonly=True)
 
   @property
   def groups(self):
@@ -199,13 +225,14 @@ class RuleState(O):
     return hamap[header]
 
   def save_to_maildir(self, mdir):
+    D("SAVE_TO_MAILDIR(%s)...", mdir)
     M = self.message
     path = self.message_path
     if path is None:
       savekey = mdir.save_message(M)
     else:
       savekey = mdir.save_filepath(path)
-    warning("SAVE %s to %s", M['message-id'], savekey)
+    D("SAVE %s to %s", M['message-id'], savekey)
     self.message_path = mdir.keypath(savekey)
     return self.message_path
 
@@ -447,9 +474,7 @@ class Rule(O):
   def __init__(self):
     self.conditions = slist()
     self.actions = slist()
-    self.flags = O()
-    self.flags.alert = False
-    self.flags.halt = False
+    self.flags = O(alert=False, halt=False)
 
   def match(self, state):
     for C in self.conditions:
@@ -465,16 +490,18 @@ class Rule(O):
     if matched:
       for action, arg in self.actions:
         try:
-          debug("action = %r, arg = %r", action, arg)
+          D("ACTION = %r, arg = %r", action, arg)
           if action == 'TARGET':
             target = envsub(arg, state.environ)
             if target.startswith('|'):
-              assert False, "pipes not implements"
+              assert False, "pipes not implemented"
             elif '@' in target:
+              D("SAVE TO EMAIL %s", target)
               if state.sendmail(target):
                 saved_to.append(target)
             else:
-              mdir = state.maildir(arg)
+              D("SAVE TO MAILDIR %s", target)
+              mdir = state.maildir(target)
               saved_to.append(mdir.keypath(state.save_to_maildir(mdir)))
           elif action == 'ASSIGN':
             envvar, s = arg
@@ -533,6 +560,7 @@ class Rules(list):
         if dflt is None:
           warning("message matched no rules, and no $DEFAULT")
         else:
+          D("SAVE TO MAILDIR DEFAULT %s", dflt)
           matched = False
           saved_to = []
           ok_actions = []
@@ -546,6 +574,7 @@ class Rules(list):
           except (AttributeError, NameError):
             raise
           except Exception, e:
+            warning("%s: %s", action, e)
             failed_actions.append( (action, arg, e) )
           else:
             ok_actions.append( (action, arg) )
@@ -555,8 +584,9 @@ class WatchedMaildir(O):
   ''' A class to monitor a Maildir and filter messages.
   '''
 
-  def __init__(self, mdir, rules_path=None):
+  def __init__(self, mdir, filter_modes, rules_path=None):
     self.mdir = Maildir(resolve_maildir_path(mdir, os.environ['MAILDIR']))
+    self.filter_modes = filter_modes
     if rules_path is None:
       rules_path = os.path.join(self.mdir.dir, '.rules')
     self._rules_path = rules_path
@@ -575,7 +605,7 @@ class WatchedMaildir(O):
   def rules(self, rules_path):
     return Rules(rules_path)
 
-  def filter(self, maildb_path, no_remove=False):
+  def filter(self):
     ''' Scan Maildir contents.
         Yield (key, FilterReports) for all messages filed.
 	Update the set of lurkers with any keys not removed to prevent
@@ -595,7 +625,7 @@ class WatchedMaildir(O):
           nmsgs += 1
           with LogTime("key = %s" % (key,), threshold=0.0, level=DEBUG):
             M = mdir[key]
-            state = RuleState(M, maildb_path)
+            state = RuleState(M, self.filter_modes)
             state.message_path = mdir.keypath(key)
             filed = []
             reports = []
@@ -605,7 +635,7 @@ class WatchedMaildir(O):
                 for saved_to in report.saved_to:
                   state.log(M['from'], M['subject'], saved_to)
               filed.extend(report.saved_to)
-            if filed and not no_remove:
+            if filed and not self.filter_modes.no_remove:
               debug("remove key %s", key)
               mdir.remove(key)
               self.lurking.discard(key)
@@ -613,6 +643,8 @@ class WatchedMaildir(O):
               debug("lurk key %s", key)
               self.lurking.add(key)
             yield key, reports
+          if self.filter_modes.justone:
+            break
       D("filtered %d messages (%d skipped) in %5.3fs", nmsgs, skipped, TK.elapsed)
 
 if __name__ == '__main__':
