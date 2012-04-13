@@ -748,6 +748,7 @@ class HasFlags:
 
 class O(object):
   ''' A bare object subclass to allow storing arbitrary attributes.
+      It also has a nicer default str() action, and an aggressive repr().
   '''
 
   def __str__(self):
