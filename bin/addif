@@ -123,7 +123,7 @@ do
           esac
       done
       # apply and then bump $basen
-      ( set -x; $trace ifconfig "$baseif:$nextn" "$ipaddr" netmask "$netmask" ) || xit=1
+      ( set -x; $trace ifconfig "$baseif:$n" "$ipaddr" netmask "$netmask" ) || xit=1
       inuse="$inuse $n"
     else
       # no silly :n logical interfaces for BSD!
