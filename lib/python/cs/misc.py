@@ -751,6 +751,14 @@ class O(object):
       It also has a nicer default str() action, and an aggressive repr().
   '''
 
+  def __init__(self, **kw):
+    ''' Initialise this O.
+        Fill in attributes from any keyword arguments if supplied.
+        This call can be omitted in subclasses if desired.
+    '''
+    for k in kw:
+      setattr(self, k, kw[k])
+
   def __str__(self):
     return ( "<%s %s>"
              % ( self.__class__.__name__,
