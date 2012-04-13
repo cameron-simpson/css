@@ -92,11 +92,11 @@ class AddressNode(Node):
 
   @property
   def formatted(self):
-    return formataddr( (self.REALNAME, self.name) )
+    return formataddr( (self.realname, self.name) )
 
   @property
   def realname(self):
-    return self.REALNAME
+    return getattr(self, REALNAME, '')
 
   def groups(self):
     return [ address_group for address_group in self.nodedb.address_groups
@@ -174,8 +174,11 @@ class _MailDB(NodeDB):
 
   def getAddressNode(self, addr):
     ''' Obtain the AddressNode for the specified address `addr`.
-        If the optional parameter `name` is specified and
-        the Node has no .REALNAME attribute, sets .REALNAME to `name`.
+        If `addr` is a string, parse it into `realname` and `coreaddr`
+        components. Otherwise, `addr` is expected to be a 2-tuple of
+        `realname` and `coreaddr`.
+        If the AddressNode has no .REALNAME and `realname` is not empty,
+        update the AddressNode from `realname`.
     '''
     if type(addr) is str:
       realname, coreaddr = parseaddr(addr)
@@ -185,7 +188,8 @@ class _MailDB(NodeDB):
     if  len(coreaddr) == 0:
       raise ValueError("core(%r) => %r" % (addr, coreaddr))
     A = self.get( ('ADDRESS', coreaddr), doCreate=True)
-    if 'REALNAME' not in A or not len(A.REALNAME):
+    Aname = A.realname
+    if not len(Aname) and len(realname) > 0:
       A.REALNAME = realname
     return A
 
@@ -202,14 +206,15 @@ class _MailDB(NodeDB):
   @locked_property
   def address_groups(self):
     ''' Compute the address_group sets.
+        Return the mapping.
     '''
     address_groups = {}
     for A in self.ADDRESSes:
       for group_name in A.GROUPs:
-        address_group = ( address_groups[group_name]
-                          if group_name in address_groups
-                          else set()
-                        )
+        if group_name in address_groups:
+          address_group = address_groups[group_name]
+        else:
+          address_group = address_groups[group_name] = set()
         address_group.add(A.name)
     return address_groups
 
