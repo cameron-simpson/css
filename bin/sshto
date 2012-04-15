@@ -23,8 +23,7 @@ pfxstderr=
 sshopts=        # options for each ssh invocation
 lsshopts=       # options for the outermost ssh invocation
                 # this will include $sshopts
-mycfg=$HOME/.ssh/config
-[ -s "$mycfg" -a -r "$mycfg" ] && lsshopts="$lsshopts -F '$mycfg'"
+sshcfg=$HOME/.ssh/config
 topt=
 fopt=
 presh=
@@ -33,7 +32,7 @@ setx=:
 cmd=`basename "$0"` || cmd=$0
 usage="Usage: $cmd [ssh-options...] [sshcfg=value...] [user@]host[![user2@]host2...] [command ...]
 	ssh-options...	Passed to all ssh commands.
-	sshcfg=value	Transmuted to -o 'sshcfg value' and added to ssh-option.
+	sshcfg=value	Transmuted to -o 'sshcfg value' and added to ssh-options.
         -v              Verbose. Passed to all ssh commands. Turns on additional tracing.
 	-z, +z		Pass -o Compression yes/no to ssh.
 	-E		Run login setup at far end."
@@ -72,7 +71,8 @@ do
     -l) loginpart=$2
         shift
         ;;
-    -[Fil]) lsshopts="$lsshopts $1 "`shqstr "$2"`
+    -F) sshcfg=$2; shift ;;
+    -[il]) lsshopts="$lsshopts $1 "`shqstr "$2"`
         shift
         ##echo "lsshopts=[$lsshopts]" >&2
         ;;
@@ -83,7 +83,7 @@ do
     	sshopts="$sshopts $1 "`shqstr "$2"`
 	shift
 	;;
-    -[bceiIlmopFLRD]?*)
+    -[bceiIlmopLRD]?*)
         sshopts=$sshopts\ `shqstr "$1"`
 	;;
     -P) needoptcss=1 pfxstderr=1 ;;
@@ -122,6 +122,8 @@ then
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ -s "$sshcfg" -a -r "$sshcfg" ] && lsshopts="-F "`shqstr "$sshcfg"`" $lsshopts"
 
 [ -t 0 -a -t 1 ] && topt=-t
 
