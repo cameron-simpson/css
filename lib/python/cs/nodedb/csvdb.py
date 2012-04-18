@@ -10,7 +10,7 @@ import os
 import os.path
 from types import StringTypes
 import sys
-from cs.logutils import Pfx, error, warning , info
+from cs.logutils import Pfx, error, warning , info, D
 from . import NodeDB
 from .node import _NoBackend
 
@@ -108,7 +108,13 @@ def write_csv_file(fp, nodedata, noHeaders=False):
         else:
           # same type
           wt = u''
-        w.writerow( (wt.encode('utf-8'), name.encode('utf-8'), attr.encode('utf-8'), value.encode('utf-8')) )
+        ## # hideous workaround for CSV C module forcing ascii text :-(
+        wt8 = wt.encode('utf-8')
+        name8 = name.encode('utf-8')
+        attr8 = attr.encode('utf-8')
+        uvalue = value if type(value) else unicode(value, 'iso8859-1')
+        value8 = uvalue.encode('utf-8')
+        w.writerow( (wt8, name8, attr8, value8) )
         attr = u''
         name = u''
 
