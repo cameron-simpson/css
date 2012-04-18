@@ -258,7 +258,7 @@ class RuleState(O):
 re_UNQWORD = re.compile(r'[^,\s]+')
 re_HEADERLIST = re.compile(r'([a-z][\-a-z0-9]*(,[a-z][\-a-z0-9]*)*):', re.I)
 re_ASSIGN = re.compile(r'([a-z]\w+)=', re.I)
-re_INGROUP = re.compile(r'\(\s*[a-z]\w+(\s*|\s*[a-z]\w+)*\s*\)', re.I)
+re_INGROUP = re.compile(r'\(\s*[a-z]\w+(\s*\|\s*[a-z]\w+)*\s*\)', re.I)
 
 def parserules(fp):
   ''' Read rules from `fp`, yield Rules.
@@ -385,10 +385,10 @@ def parserules(fp):
           atstart = False
         C = Condition_Regexp(headernames, atstart, regexp)
       else:
-        # (group[,group...])
+        # (group[|group...])
         m = re_INGROUP.match(line, offset)
         if m:
-          group_names = set( w.strip() for w in line.split(',') )
+          group_names = set( w.strip() for w in line.split('|') )
           line = line[m.end():].rstrip()
           if line:
             raise ValueError("extra text after groups: %s" % (line,))

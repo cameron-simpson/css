@@ -96,7 +96,7 @@ class AddressNode(Node):
 
   @property
   def realname(self):
-    return getattr(self, REALNAME, '')
+    return getattr(self, 'REALNAME', '')
 
   def groups(self):
     return [ address_group for address_group in self.nodedb.address_groups

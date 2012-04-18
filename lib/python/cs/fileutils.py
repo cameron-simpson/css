@@ -127,7 +127,8 @@ def watch_file(path, old_mtime, reload_file, missing_ok=False):
     raise
   if old_mtime is None or s.st_mtime > old_mtime:
     new_mtime = s.st_mtime
-    new_size = s.st_size
+    # require these four to be unchanged across the reload
+    new_stat = (new_mtime, s.st_size, s.st_dev, s.st_ino)
     R = reload_file(path)
     try:
       s = os.stat(path)
@@ -136,7 +137,9 @@ def watch_file(path, old_mtime, reload_file, missing_ok=False):
         if missing_ok:
           return None, None
       raise
-    if new_mtime == s.st_mtime and new_size == s.st_size:
+    # make sure file was unchanged
+    new_new_stat = (s.st_mtime, s.st_size, s.st_dev, s.st_ino)
+    if new_stat == new_new_stat:
       return new_mtime, R
   return None, None
 
