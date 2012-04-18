@@ -1,0 +1,51 @@
+#!/bin/sh
+#
+# Multi-rsync. Run rsyncs in parallel to multiple hosts, prefix output.
+#       - Cameron Simpson <cs@zip.com.au> 19apr2012
+#
+
+set -ue
+
+trace=${DEBUG:+set-x}
+
+cmd=$0
+usage="Usage: $cmd hostlist [rsync-opts...] src dst"
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing hostlist" >&2
+  badopts=1
+else
+  hostlist=$1
+  shift
+fi
+
+if [ $# -lt 2 ]
+then
+  echo "$cmd: missing src or dst" >&2
+  badopts=1
+else
+  # get last arg
+  eval "dst=\${$#}"
+  # now keep all but last arg
+  nargs=$#
+  pos=0
+  for arg
+  do
+    pos=$((pos+1))
+    [ $pos = 1 ] && set --
+    [ $pos = $nargs ] || set -- ${1+"$@"} "$arg"
+  done
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+(
+  for host in $(hostlist "$hostlist")
+  do
+    pfx "$host" $trace rsync "$@" "$host:$dst" &
+  done
+  wait
+)
