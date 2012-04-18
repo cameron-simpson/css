@@ -12,7 +12,7 @@ ezoscgi=$ezos/cgi-bin
 ezoshtml=$ezos/html
 ezoscss=$ezoshtml/cs/css
 
-syncezos-rc
+##syncezos-rc
 
 pfx "$cmd ezos:public_html" \
   qrsync -rptlH --delete \
