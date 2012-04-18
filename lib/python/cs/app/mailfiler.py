@@ -147,7 +147,7 @@ class FilterModes(O):
 class RuleState(O):
   ''' State information for rule evaluation.
       .message  Current message.
-      .maildb MailDB.
+      .maildb   MailDB.
       .environ  Storage for variable settings.
   '''
  
@@ -388,7 +388,7 @@ def parserules(fp):
         # (group[|group...])
         m = re_INGROUP.match(line, offset)
         if m:
-          group_names = set( w.strip() for w in line.split('|') )
+          group_names = set( w.strip().lower() for w in line.split('|') )
           line = line[m.end():].rstrip()
           if line:
             raise ValueError("extra text after groups: %s" % (line,))
