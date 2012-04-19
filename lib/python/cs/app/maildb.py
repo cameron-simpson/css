@@ -67,15 +67,13 @@ def main(argv):
         else:
           group_names = sorted(mdb.address_groups.keys())
         for group_name in group_names:
-          address_group = get(mdb.address_groups, group_name)
+          address_group = mdb.address_groups.get(group_name)
           if not address_group:
-            error("no such group: %s", group)
+            error("no such group: %s", group_name)
             xit = 1
             continue
-          for address in address_group:
-            A = mdb['ADDRESS', address]
-            print group, ", ".join(mdb['ADDRESS', address].formatted
-                                   for address in address_group)
+          print group_name, ", ".join(mdb['ADDRESS', address].formatted
+                                      for address in address_group)
       else:
         error("unsupported op")
         badopts = True
