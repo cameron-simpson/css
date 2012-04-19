@@ -208,7 +208,8 @@ class _MailDB(NodeDB):
     ''' Compute the address_group sets.
         Return the mapping.
     '''
-    address_groups = {}
+    address_groups = { 'all': set() }
+    all = address_groups['all']
     for A in self.ADDRESSes:
       for group_name in A.GROUPs:
         if group_name in address_groups:
@@ -216,6 +217,7 @@ class _MailDB(NodeDB):
         else:
           address_group = address_groups[group_name] = set()
         address_group.add(A.name)
+        all.add(A.name)
     return address_groups
 
   def getMessageNode(self, message_id):
