@@ -159,39 +159,38 @@ class _PfxThreadState(threading.local):
 
   def __init__(self):
     self.raise_needs_prefix = False
-    self.old = []
+    self.stack = []
 
   @property
   def cur(self):
     ''' .cur is the current/topmost Pfx instance.
     '''
-    if not self.old:
-      self.push(Pfx(cs.misc.cmd))
-    return self.old[-1]
+    stack = self.stack
+    if not stack:
+      # I'd do this in __init__ except that cs.misc.cmd may get set too late
+      stack.append(Pfx(cs.misc.cmd))
+    return stack[-1]
 
   @property
   def prefix(self):
     ''' Return the prevailing message prefix.
     '''
-    stack = list(self.old)
-    stack.reverse()
     marks = []
-    for P in stack:
-      marks.append(P._mark)
+    for P in reversed(list(self.stack)):
+      marks.append(P.umark)
       if P.absolute:
         break
-    marks.reverse()
-    return ': '.join(marks)
+    return u': '.join(reversed(marks))
 
-  def push(self, P):
+  def append(self, P):
     ''' Push a new Pfx instance onto the stack.
     '''
-    self.old.append(P)
+    self.stack.append(P)
 
   def pop(self):
     ''' Pop a Pfx instance from the stack.
     '''
-    return self.old.pop()
+    return self.stack.pop()
 
 def OBSOLETE(func):
   ''' Decorator for obsolete functions.
@@ -239,8 +238,11 @@ else:
       self.log(logging.CRITICAL, msg, *args, **kwargs)
 
 class Pfx_LoggerAdapter(myLoggerAdapter):
+  ''' A LoggerAdpater to insert the current prefix onto log messages.
+  '''
+
   def process(self, msg, kwargs):
-    prefix = _prefix.prefix
+    prefix = Pfx._state.prefix
     if len(prefix) > 0:
       msg = prefix.replace('%', '%%') + ": " + msg
     return msg, kwargs
@@ -287,80 +289,32 @@ class Pfx(object):
   '''
 
   # instantiate the thread-local state object
-  _prefix = _PfxThreadState()
+  _state = _PfxThreadState()
 
   def __init__(self, mark, absolute=False, loggers=None):
-    if isinstance(mark, unicode):
-      self._mark = mark
-    else:
-      try:
-        self._mark = unicode(mark, 'utf-8', 'error')
-      except UnicodeDecodeError, e:
-        warning("%s: mark = %s %r", e, type(mark), mark)
-        self._mark = unicode(mark, 'utf-8', 'replace')
-    ##import traceback
-    ##print >>sys.stderr, ":\n    ".join([ "PFX: %s" % (self._mark,) ] + [ repr(s) for s in traceback.extract_stack(None, 2) ])
+    self.mark = mark
+    self._umark = None
+    self.absolute = absolute
+    self._loggers = loggers
+    self._loggerAdapters = None
+
     self.absolute = absolute
     if loggers is not None:
       if not hasattr(loggers, '__getitem__'):
         loggers = (loggers, )
-    self.logto(loggers)
-
-  @property
-  def mark(self):
-    ''' Return the message prefix for use with this Pfx.
-    '''
-    if self.absolute:
-      return self._mark
-    _prefix = self._prefix
-    mark = _prefix.prefix
-    if _prefix.cur is not self:
-      mark = mark + ': ' + self._mark
-    return mark
-
-  def logto(self, newLoggers):
-    ''' Define the Loggers anew.
-    '''
-    self._loggers = newLoggers
-    self._loggerAdapters = None
-
-  def func(self, func, *a, **kw):
-    ''' Return a function that will run the supplied function `func`
-        within a surrounding Pfx context with the current mark string.
-        This is intended for deferred call facilities like
-        WorkerThreadPool, Later, and futures.
-    '''
-    pfx2 = Pfx(self.mark, absolute=True, loggers=self.loggers)
-    def pfxfunc():
-      with pfx2:
-        return func(*a, **kw)
-    return pfxfunc
-
-  @property
-  def loggers(self):
-    if self._loggerAdapters is None:
-      _loggers = self._loggers
-      if _loggers is None:
-        # get the Logger list from an ancestor
-        for P in self._prefix.old:
-          if P._loggers is not None:
-            _loggers = P._loggers
-            break
-        if _loggers is None:
-          _loggers = (logging.getLogger(),)
-      self._loggerAdapters = list( Pfx_LoggerAdapter(L, {}) for L in _loggers )
-    return self._loggerAdapters
+      self.logto(loggers)
 
   def __enter__(self):
-    _prefix = self._prefix
-    _prefix.push(self)
-    _prefix.raise_needs_prefix = True
+    self._stack.append(self)
+    _state = self._state
+    _state.append(self)
+    _state.raise_needs_prefix = True
 
   def __exit__(self, exc_type, exc_value, traceback):
-    _prefix = self._prefix
+    _state = self._state
     if exc_value is not None:
-      if _prefix.raise_needs_prefix:
-        prefix = self.mark
+      if _state.raise_needs_prefix:
+        prefix = self._stack.prefix
         ##debug("Pfx.__exit__: exc_value = %r .[%s] %s, PREFIX = %s", exc_value, sorted(dir(exc_value)), ", ".join([ "%s = %r" % (a, `getattr(exc_value, a)`) for a in sorted(dir(exc_value)) ]), prefix)
         if hasattr(exc_value, 'message'):
           exc_value.message = prefix + ": " + exc_value.message
@@ -391,9 +345,62 @@ class Pfx(object):
           sys.stderr.flush()
           error("%s: %s", prefix, exc_value)
         # prevent outer Pfx wrappers from hacking stuff as well
-        _prefix.raise_needs_prefix = False
-    _prefix.pop()
+        _state.raise_needs_prefix = False
+    _state.pop()
     return False
+
+  @property
+  def umark(self):
+    ''' Return the unicode message mark for use with this Pfx.
+        Used by Pfx._state.prefix to compute to full prefix.
+    '''
+    u = self._umark
+    if u is None:
+      mark = self.mark
+      if not isinstance(mark, unicode):
+        if not isinstance(mark, str):
+          mark = str(mark)
+        try:
+          u = unicode(mark, 'utf-8', 'error')
+        except UnicodeDecodeError, e:
+          warning("%s: mark = %s %r", e, type(mark), mark)
+          u = unicode(mark, 'utf-8', 'replace')
+        self._umark = u
+    return u
+
+  def logto(self, newLoggers):
+    ''' Define the Loggers anew.
+    '''
+    self._loggers = newLoggers
+    self._loggerAdapters = None
+
+  def func(self, func, *a, **kw):
+    ''' Return a function that will run the supplied function `func`
+        within a surrounding Pfx context with the current mark string.
+        This is intended for deferred call facilities like
+        WorkerThreadPool, Later, and futures.
+    '''
+    pfx2 = Pfx(self.mark, absolute=True, loggers=self.loggers)
+    def pfxfunc():
+      with pfx2:
+        return func(*a, **kw)
+    return pfxfunc
+
+  @property
+  def loggers(self):
+    ''' Return the loggers (actually wrapping LoggerAdapters) to use for this Pfx.
+    '''
+    if self._loggerAdapters is None:
+      # get the Logger list from an ancestor
+      _loggers = None
+      for P in reversed(self._state.stack):
+        if P._loggers is not None:
+          _loggers = P._loggers
+          break
+      if _loggers is None:
+        _loggers = (logging.getLogger(),)
+      self._loggerAdapters = list( Pfx_LoggerAdapter(L, {}) for L in _loggers )
+    return self._loggerAdapters
 
   enter = __enter__
   exit = __exit__
@@ -421,9 +428,9 @@ class Pfx(object):
 
 # Logger public functions
 def exception(msg, *args):
-  Pfx._prefix.cur.exception(msg, *args)
+  Pfx._state.cur.exception(msg, *args)
 def log(level, msg, *args, **kwargs):
-  Pfx._prefix.cur.log(level, msg, *args, **kwargs)
+  Pfx._state.cur.log(level, msg, *args, **kwargs)
 def debug(msg, *args, **kwargs):
   log(logging.DEBUG, msg, *args, **kwargs)
 def info(msg, *args, **kwargs):
