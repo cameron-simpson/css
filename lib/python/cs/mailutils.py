@@ -6,6 +6,7 @@
 
 import email.message
 import email.parser
+from itertools import chain
 import mailbox
 import os
 import os.path
@@ -28,7 +29,7 @@ def read_message(mfp, headersonly=False):
 
 def read_message_file(pathname, headersonly=False):
     ''' Read a Message from a file named by `pathname`.
-	The Message's .pathname property will contain `ptahname`.
+	The Message's .pathname property will contain `pathname`.
     '''
     with open(pathname) as mfp:
       if headersonly:
@@ -37,6 +38,12 @@ def read_message_file(pathname, headersonly=False):
         M = mailbox.Message(mfp)
     M.pathname = pathname
     return M
+
+def message_addresses(M, header_names):
+  ''' Return a sequence of the address texts from the Message `M` in
+      the headers named by `header_names`.
+  '''
+  return chain( M.get_all(hdr, ()) for header_name in header_names )
 
 def ismaildir(path):
   ''' Test if 'path' points at a Maildir directory.
