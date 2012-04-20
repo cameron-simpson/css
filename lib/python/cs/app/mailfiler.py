@@ -142,7 +142,7 @@ class FilterModes(O):
     return MailDB(path, readonly=True)
 
   def maildir(self, mdirname, environ=None):
-    return maildir_from_name(mdirname, environ, self.maildir_cache)
+    return maildir_from_name(mdirname, environ['MAILDIR'], self.maildir_cache)
 
 class RuleState(O):
   ''' State information for rule evaluation.
@@ -169,6 +169,7 @@ class RuleState(O):
 
   @property
   def maildb(self):
+    warning("get RuleState.maildb")
     return self.outer_state.maildb
 
   def maildir(self, mdirpath):
@@ -221,7 +222,7 @@ class RuleState(O):
     header = headers[0]
     hamap = self.header_addresses
     if header not in hamap:
-      hamap[header] = set( [ A for A, N in message_addresses(M, (header,)) ] )
+      hamap[header] = set( [ A for N, A in message_addresses(M, (header,)) ] )
     return hamap[header]
 
   def save_to_maildir(self, mdir):
@@ -311,7 +312,7 @@ def parserules(fp):
           continue
 
         # new rule
-        R = Rule()
+        R = Rule(filename=filename, lineno=lineno)
 
         m = re_ASSIGN.match(line, offset)
         if m:
@@ -356,6 +357,7 @@ def parserules(fp):
           tag, offset = get_qstr(line, offset)
         else:
           tag, offset = get_nonwhite(line, offset)
+        _, offset = get_white(line, offset)
 
       # condition
       if not _ or offset == len(line):
@@ -388,12 +390,19 @@ def parserules(fp):
         # (group[|group...])
         m = re_INGROUP.match(line, offset)
         if m:
-          group_names = set( w.strip().lower() for w in line.split('|') )
-          line = line[m.end():].rstrip()
-          if line:
+          group_names = set( w.strip().lower() for w in m.group()[1:-1].split('|') )
+          offset = m.end()
+          if offset < len(line):
             raise ValueError("extra text after groups: %s" % (line,))
           C = Condition_InGroups(headernames, group_names)
         else:
+          if '(ME)' in line:
+            error("MISMATCH AT: %s", line[offset:])
+            error("    LINE IS: %s", line)
+            sys.exit(1)
+          if line[offset] == '(':
+            error("FAILED GROUP MATCH AT: %s", line[offset:])
+            sys.exit(1)
           # just a comma separated list of addresses
           # TODO: should be RFC2822 list instead?
           addrkeys = [ w.strip() for w in line[offset:].split(',') ]
@@ -455,15 +464,20 @@ class Condition_AddressMatch(_Condition):
 
 class Condition_InGroups(_Condition):
 
-  def __init__(self, headername, group_names):
-    self.headername = headername
+  def __init__(self, headernames, group_names):
+    self.headernames = headernames
     self.group_names = group_names
 
   def match(self, state):
+    warning("Condition_InGroups.match...")
     for address in state.addresses(*self.headernames):
       for group_name in self.group_names:
-        if address in state.group(group_name):
-          return True
+        warning("try %s against (%s)", address, group_name)
+        group = state.groups.get(group_name)
+        if not group:
+          warning("no group named %s: known = %s", group_name, sorted(state.groups.keys()))
+        if group and address in group:
+            return True
     return False
 
 FilterReport = namedtuple('FilterReport',
@@ -471,7 +485,9 @@ FilterReport = namedtuple('FilterReport',
 
 class Rule(O):
 
-  def __init__(self):
+  def __init__(self, filename, lineno):
+    self.filename = filename
+    self.lineno = lineno
     self.conditions = slist()
     self.actions = slist()
     self.flags = O(alert=False, halt=False)
@@ -483,41 +499,42 @@ class Rule(O):
     return True
 
   def filter(self, state):
-    saved_to = []
-    ok_actions = []
-    failed_actions = []
-    matched = self.match(state)
-    if matched:
-      for action, arg in self.actions:
-        try:
-          D("ACTION = %r, arg = %r", action, arg)
-          if action == 'TARGET':
-            target = envsub(arg, state.environ)
-            if target.startswith('|'):
-              assert False, "pipes not implemented"
-            elif '@' in target:
-              D("SAVE TO EMAIL %s", target)
-              if state.sendmail(target):
-                saved_to.append(target)
+    M = state.message
+    with Pfx("%s:%d" % (self.filename, self.lineno)):
+      saved_to = []
+      ok_actions = []
+      failed_actions = []
+      matched = self.match(state)
+      if matched:
+        for action, arg in self.actions:
+          try:
+            if action == 'TARGET':
+              target = envsub(arg, state.environ)
+              if target.startswith('|'):
+                assert False, "pipes not implemented"
+              elif '@' in target:
+                D("SAVE TO EMAIL %s", target)
+                if state.sendmail(target):
+                  saved_to.append(target)
+              else:
+                D("SAVE TO MAILDIR %s", target)
+                mdir = state.maildir(target)
+                saved_to.append(mdir.keypath(state.save_to_maildir(mdir)))
+            elif action == 'ASSIGN':
+              envvar, s = arg
+              value = state.environ[envvar] = envsub(s, state.environ)
+              debug("ASSIGN %s=%s", envvar, value)
+              if envvar == 'LOGFILE':
+                state.logto(value)
             else:
-              D("SAVE TO MAILDIR %s", target)
-              mdir = state.maildir(target)
-              saved_to.append(mdir.keypath(state.save_to_maildir(mdir)))
-          elif action == 'ASSIGN':
-            envvar, s = arg
-            value = state.environ[envvar] = envsub(s, state.environ)
-            debug("ASSIGN %s=%s", envvar, value)
-            if envvar == 'LOGFILE':
-              state.logto(value)
+              raise RuntimeError("unimplemented action \"%s\"" % action)
+          except (AttributeError, NameError):
+            raise
+          except Exception, e:
+            failed_actions.append( (action, arg, e) )
           else:
-            raise RuntimeError("unimplemented action \"%s\"" % action)
-        except (AttributeError, NameError):
-          raise
-        except Exception, e:
-          failed_actions.append( (action, arg, e) )
-        else:
-          ok_actions.append( (action, arg) )
-    return FilterReport(self, matched, saved_to, ok_actions, failed_actions)
+            ok_actions.append( (action, arg) )
+      return FilterReport(self, matched, saved_to, ok_actions, failed_actions)
 
 class Rules(list):
   ''' Simple subclass of list storing rules, with methods to load
