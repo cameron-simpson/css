@@ -314,9 +314,8 @@ class Pfx(object):
     if exc_value is not None:
       if _state.raise_needs_prefix:
         prefix = self._state.prefix
-        ##debug("Pfx.__exit__: exc_value = %r .[%s] %s, PREFIX = %s", exc_value, sorted(dir(exc_value)), ", ".join([ "%s = %r" % (a, `getattr(exc_value, a)`) for a in sorted(dir(exc_value)) ]), prefix)
         if hasattr(exc_value, 'message'):
-          exc_value.message = prefix + ": " + exc_value.message
+          exc_value.message = prefix + ": " + str(exc_value.message)
         if hasattr(exc_value, 'reason'):
           if isinstance(exc_value.reason, StringTypes):
             exc_value.reason = prefix + ": " + exc_value.reason
