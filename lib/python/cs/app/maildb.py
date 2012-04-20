@@ -11,18 +11,23 @@ import os
 import unittest
 from cs.logutils import setup_logging, Pfx, info, warning, error, D
 from cs.mail import ismaildir, ismbox, messagesFromPath
+from cs.mailutils import message_addresses
 from cs.nodedb import NodeDB, Node, NodeDBFromURL
 from cs.threads import locked_property
 from cs.misc import the
 
-def main(argv):
+def main(argv, stdin=None):
+  if stdin is None:
+    stdin = sys.stdin
   argv = list(argv)
   cmd = os.path.basename(argv.pop(0))
   usage = '''Usage:
     %s [-m mdburl] op [op-args...]
     Ops:
       import-addresses < addresses.txt
-        group,... rfc2822-address
+        File format:
+          group,... rfc2822-address
+      learn-addresses group,... < rfc822.xt
       list-groups [groups...]''' \
     % (cmd,)
   setup_logging(cmd)
@@ -55,11 +60,11 @@ def main(argv):
     op = argv.pop(0)
     with Pfx(op):
       if op == 'import-addresses':
-        if sys.stdin.isatty():
+        if stdin.isatty():
           error("stdin is a tty, file expected")
-          xit=2
+          badopts = True
         else:
-          mdb.importAddresses(sys.stdin)
+          mdb.importAddresses(stdin)
           mdb.close()
       elif op == 'list-groups':
         if len(argv):
@@ -74,6 +79,17 @@ def main(argv):
             continue
           print group_name, ", ".join(mdb['ADDRESS', address].formatted
                                       for address in address_group)
+      elif op == 'learn-addresses':
+        if not len(argv):
+          error("missing groups")
+          badopts = True
+        else:
+          group_names = [ name for name in argv.pop(0).split(',') if name ]
+          if len(argv):
+            error("extra arguments after groups: %s", argv)
+            badopts = True
+          else:
+            mdb.importAddresses_from_message(stdin)
       else:
         error("unsupported op")
         badopts = True
@@ -305,6 +321,15 @@ class _MailDB(NodeDB):
             continue
           A.GROUPs.update(groups.split(','))
       self._address_groups = None
+
+  def importAddresses_from_message(self, M, group_names):
+    if isinstance(M, str):
+      pathname = M
+      with Pfx(pathname):
+        with open(pathname) as mfp:
+          return self.importAddresses_from_message(read_message(mfp, headersonly=True))
+    for addrtext in message_addresses(M, ('from', 'to', 'cc', 'bcc', 'resent-to', 'resent-cc', 'reply-to')):
+      self.getAddressNode(addrtext).GROUPs.update(group_names)
 
 if __name__ == '__main__':
   sys.exit(main(list(sys.argv)))
