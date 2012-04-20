@@ -305,7 +305,6 @@ class Pfx(object):
       self.logto(loggers)
 
   def __enter__(self):
-    self._stack.append(self)
     _state = self._state
     _state.append(self)
     _state.raise_needs_prefix = True
@@ -314,7 +313,7 @@ class Pfx(object):
     _state = self._state
     if exc_value is not None:
       if _state.raise_needs_prefix:
-        prefix = self._stack.prefix
+        prefix = self._state.prefix
         ##debug("Pfx.__exit__: exc_value = %r .[%s] %s, PREFIX = %s", exc_value, sorted(dir(exc_value)), ", ".join([ "%s = %r" % (a, `getattr(exc_value, a)`) for a in sorted(dir(exc_value)) ]), prefix)
         if hasattr(exc_value, 'message'):
           exc_value.message = prefix + ": " + exc_value.message
