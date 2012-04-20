@@ -21,23 +21,19 @@ from cs.logutils import Pfx, warning, debug, D
 from cs.threads import locked_property
 from cs.misc import seq
 
-def read_message(mfp, headersonly=False):
-  ''' Read a Message from a file-like object `mfp`.
-      If `headeronly` is true, read just the message headers.
+def Message(M, headersonly=False):
+  ''' Factory function to accept a file or filename and return an
+      email.message.Message.
   '''
+  if isinstance(M, str):
+    pathname = M
+    with Pfx(pathname):
+      with open(pathname) as mfp:
+        M = Message(mfp, headersonly=headersonly)
+        M.pathname = pathname
+        return M
+  mfp = M
   return email.parser.Parser().parse(mfp, headersonly=headersonly)
-
-def read_message_file(pathname, headersonly=False):
-    ''' Read a Message from a file named by `pathname`.
-	The Message's .pathname property will contain `pathname`.
-    '''
-    with open(pathname) as mfp:
-      if headersonly:
-        M = read_message(mfp, headersonly=headersonly)
-      else:
-        M = mailbox.Message(mfp)
-    M.pathname = pathname
-    return M
 
 def message_addresses(M, header_names):
   ''' Return a sequence of the address texts from the Message `M` in
@@ -273,14 +269,14 @@ class Maildir(mailbox.Maildir):
 	The Message's .pathname property contains .keypath(key),
 	the pathname to the message file.
     '''
-    return read_message_file(self.keypath(key))
+    return Message(self.keypath(key))
   get_message = __getitem__
 
   def get_headers(self, key):
     ''' Return the headers of the specified message as
     '''
     with self.open(key) as mfp:
-      return read_message(mfp, headersonly=True)
+      return Message(mfp, headersonly=True)
 
   def get_string(self, key):
     return self[key].as_string()
