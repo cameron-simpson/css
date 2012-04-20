@@ -24,7 +24,7 @@ from cs.env import envsub
 from cs.fileutils import abspath_from_file, watched_file_property
 from cs.lex import get_white, get_nonwhite, get_qstr
 from cs.logutils import Pfx, setup_logging, debug, info, warning, error, D, LogTime
-from cs.mailutils import Maildir, read_message
+from cs.mailutils import Maildir
 from cs.misc import O, slist
 from cs.threads import locked_property
 from cs.app.maildb import MailDB
