@@ -285,6 +285,10 @@ def pfxtag(tag, loggers=None):
 class Pfx(object):
   ''' A context manager to maintain a per-thread stack of message prefices.
   '''
+
+  # instantiate the thread-local state object
+  _prefix = _PfxThreadState()
+
   def __init__(self, mark, absolute=False, loggers=None):
     if isinstance(mark, unicode):
       self._mark = mark
@@ -308,7 +312,7 @@ class Pfx(object):
     '''
     if self.absolute:
       return self._mark
-    global _prefix
+    _prefix = self._prefix
     mark = _prefix.prefix
     if _prefix.cur is not self:
       mark = mark + ': ' + self._mark
@@ -338,7 +342,7 @@ class Pfx(object):
       _loggers = self._loggers
       if _loggers is None:
         # get the Logger list from an ancestor
-        for P in _prefix.old:
+        for P in self._prefix.old:
           if P._loggers is not None:
             _loggers = P._loggers
             break
@@ -348,12 +352,12 @@ class Pfx(object):
     return self._loggerAdapters
 
   def __enter__(self):
-    global _prefix
+    _prefix = self._prefix
     _prefix.push(self)
     _prefix.raise_needs_prefix = True
 
   def __exit__(self, exc_type, exc_value, traceback):
-    global _prefix
+    _prefix = self._prefix
     if exc_value is not None:
       if _prefix.raise_needs_prefix:
         prefix = self.mark
@@ -415,14 +419,11 @@ class Pfx(object):
   def critical(self, msg, *args, **kwargs):
     self.log(logging.CRITICAL, msg, *args, **kwargs)
 
-# instantiate the thread-local state object
-_prefix = _PfxThreadState()
-
 # Logger public functions
 def exception(msg, *args):
-  _prefix.cur.exception(msg, *args)
+  Pfx._prefix.cur.exception(msg, *args)
 def log(level, msg, *args, **kwargs):
-  _prefix.cur.log(level, msg, *args, **kwargs)
+  Pfx._prefix.cur.log(level, msg, *args, **kwargs)
 def debug(msg, *args, **kwargs):
   log(logging.DEBUG, msg, *args, **kwargs)
 def info(msg, *args, **kwargs):
