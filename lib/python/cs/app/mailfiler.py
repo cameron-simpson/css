@@ -9,6 +9,7 @@ from collections import namedtuple
 from email.utils import getaddresses
 import email.parser
 from getopt import getopt, GetoptError
+import io
 from logging import DEBUG
 import mailbox
 import os
@@ -20,9 +21,10 @@ if sys.hexversion < 0x02060000: from sets import Set as set
 import subprocess
 from tempfile import TemporaryFile
 from thread import allocate_lock
+import time
 from cs.env import envsub
 from cs.fileutils import abspath_from_file, watched_file_property
-from cs.lex import get_white, get_nonwhite, get_qstr
+from cs.lex import get_white, get_nonwhite, get_qstr, unrfc2047
 from cs.logutils import Pfx, setup_logging, debug, info, warning, error, D, LogTime
 from cs.mailutils import Maildir
 from cs.misc import O, slist
@@ -102,7 +104,7 @@ def main(argv, stdin=None):
         for MW in maildirs:
           with LogTime("MW.filter()", threshold=0.0):
             for key, reports in MW.filter():
-              D("%s => %s", key, [R.saved_to for R in reports if len(R.saved_to)])
+              pass
         if delay is None:
           break
         debug("sleep %ds", delay)
@@ -165,11 +167,12 @@ class RuleState(O):
     if environ is None:
       environ = os.environ
     self.environ = dict(environ)
+    self.reuse_maildir = False
+    self.used_maildirs = set()
     self._log = None
 
   @property
   def maildb(self):
-    warning("get RuleState.maildb")
     return self.outer_state.maildb
 
   def maildir(self, mdirpath):
@@ -190,14 +193,14 @@ class RuleState(O):
     log = self._log
     if log is None:
       log = sys.stdout
-    print(*a, file=log)
+    print(*[ unicode(s) for s in a], file=log)
 
   def logto(self, logfilepath):
     ''' Direct log messages to the supplied `logfilepath`.
     '''
     if self._log:
       self._log.close()
-    self._log = open(logfilepath, "a")
+    self._log = io.open(logfilepath, "a", encoding='utf-8')
 
   @property
   def groups(self):
@@ -205,9 +208,19 @@ class RuleState(O):
     '''
     return self.maildb.address_groups
 
+  def ingroup(self, coreaddr, group_name):
+    ''' Test if a core address is a member of the named group.
+    '''
+    group = self.groups.get(group_name)
+    if group is None:
+      warning("unknown group: %s", group_name)
+      self.groups[group_name] = set()
+      return False
+    return coreaddr.lower() in group
+
   def addresses(self, *headers):
-    ''' Return the core addresses from the supplies Message and headers.
-        Caches results for rapid rule evaluation.
+    ''' Return the core addresses from the current Message and supplied
+        `headers`. Caches results for rapid rule evaluation.
     '''
     M = self.message
     if M is not self.message:
@@ -226,15 +239,19 @@ class RuleState(O):
     return hamap[header]
 
   def save_to_maildir(self, mdir):
-    D("SAVE_TO_MAILDIR(%s)...", mdir)
+    mdirpath = mdir.dir
+    if self.reuse_maildir or mdirpath not in self.used_maildirs:
+      self.used_maildirs.add(mdirpath)
+    else:
+      return None
     M = self.message
     path = self.message_path
     if path is None:
       savekey = mdir.save_message(M)
     else:
       savekey = mdir.save_filepath(path)
-    D("SAVE %s to %s", M['message-id'], savekey)
     self.message_path = mdir.keypath(savekey)
+    self.log("    OK %s => %s" % (M['message-id'], self.message_path))
     return self.message_path
 
   def sendmail(self, address, mfp=None):
@@ -254,6 +271,7 @@ class RuleState(O):
     retcode = subprocess.call([state.environ.get('SENDMAIL', 'sendmail'), '-oi', address],
                               env=state.environ,
                               stdin=mfp)
+    self.log("    %s %s => %s" % (("OK" if retcode == 0 else "FAIL"), M['message-id'], address))
     return retcode == 0
 
 re_UNQWORD = re.compile(r'[^,\s]+')
@@ -452,11 +470,9 @@ class Condition_AddressMatch(_Condition):
     for address in state.addresses(*self.headernames):
       for key in self.addrkeys:
         if key.startswith('{{') and key.endswith('}}'):
-          key = key[2:-2].lower()
-          if key not in state.groups:
-            warning("%s: unknown group {{%s}}, I know: %s", self, key, state.groups.keys())
-            continue
-          if address in state.groups[key]:
+          warning("OBSOLETE address key: %s", key)
+          group_name = key[2:-2].lower()
+          if state.ingroup(address, group_name):
             return True
         elif address.lower() == key.lower():
           return True
@@ -469,15 +485,11 @@ class Condition_InGroups(_Condition):
     self.group_names = group_names
 
   def match(self, state):
-    warning("Condition_InGroups.match...")
     for address in state.addresses(*self.headernames):
       for group_name in self.group_names:
-        warning("try %s against (%s)", address, group_name)
-        group = state.groups.get(group_name)
-        if not group:
-          warning("no group named %s: known = %s", group_name, sorted(state.groups.keys()))
-        if group and address in group:
-            return True
+        if state.ingroup(address, group_name):
+          debug("match %s to (%s)", address, group_name)
+          return True
     return False
 
 FilterReport = namedtuple('FilterReport',
@@ -491,6 +503,7 @@ class Rule(O):
     self.conditions = slist()
     self.actions = slist()
     self.flags = O(alert=False, halt=False)
+    self.default_rule = None
 
   def match(self, state):
     for C in self.conditions:
@@ -511,27 +524,32 @@ class Rule(O):
             if action == 'TARGET':
               target = envsub(arg, state.environ)
               if target.startswith('|'):
-                assert False, "pipes not implemented"
+                raise NotImplementedError("pipes not implemented, not saving to %r" % (target,))
               elif '@' in target:
-                D("SAVE TO EMAIL %s", target)
                 if state.sendmail(target):
                   saved_to.append(target)
               else:
-                D("SAVE TO MAILDIR %s", target)
                 mdir = state.maildir(target)
-                saved_to.append(mdir.keypath(state.save_to_maildir(mdir)))
+                savepath = state.save_to_maildir(mdir)
+                if savepath:
+                  saved_to.append(savepath)
             elif action == 'ASSIGN':
               envvar, s = arg
               value = state.environ[envvar] = envsub(s, state.environ)
               debug("ASSIGN %s=%s", envvar, value)
               if envvar == 'LOGFILE':
                 state.logto(value)
+              elif envvar == 'DEFAULT':
+                R = state.default_rule = Rule(self.filename, self.lineno)
+                R.actions.append( ('TARGET', value) )
             else:
               raise RuntimeError("unimplemented action \"%s\"" % action)
           except (AttributeError, NameError):
             raise
           except Exception, e:
+            warning("EXCEPTION %r", e)
             failed_actions.append( (action, arg, e) )
+            raise
           else:
             ok_actions.append( (action, arg) )
       return FilterReport(self, matched, saved_to, ok_actions, failed_actions)
@@ -572,30 +590,13 @@ class Rules(list):
         if report.saved_to:
           raise RunTimeError("matched is False, but saved_to = %s" % (saved_to,))
     if not done:
-      if matches:
-        dflt = state.environ.get('DEFAULT')
-        if dflt is None:
+      if not matches:
+        R = state.default_rule
+        if not R:
           warning("message matched no rules, and no $DEFAULT")
         else:
-          D("SAVE TO MAILDIR DEFAULT %s", dflt)
-          matched = False
-          saved_to = []
-          ok_actions = []
-          failed_actions = []
-          mdirpath = dflt
-          action, arg = ('TARGET', mdirpath)
-          try:
-            mdir = state.maildir(arg)
-            saved_to.append(state.save_to_maildir(mdir))
-            matched = True
-          except (AttributeError, NameError):
-            raise
-          except Exception, e:
-            warning("%s: %s", action, e)
-            failed_actions.append( (action, arg, e) )
-          else:
-            ok_actions.append( (action, arg) )
-          yield FilterReport(None, matched, saved_to, ok_actions, failed_actions)
+          warning("running DEFAULT: %s", R)
+          yield R.filter(state)
 
 class WatchedMaildir(O):
   ''' A class to monitor a Maildir and filter messages.
@@ -644,13 +645,17 @@ class WatchedMaildir(O):
             M = mdir[key]
             state = RuleState(M, self.filter_modes)
             state.message_path = mdir.keypath(key)
+            state.logto(envsub("$HOME/var/log/mailfiler"))
+            state.log("%s %s %s" % (time.strftime("%Y-%m-%d %H:%M:%S"), unrfc2047(M['from']), unrfc2047(M['subject'])))
+            state.log("  "+mdir.keypath(key))
             filed = []
             reports = []
             for report in self.rules.filter(state):
               if report.matched:
                 reports.append(report)
                 for saved_to in report.saved_to:
-                  state.log(M['from'], M['subject'], saved_to)
+                  pass
+                  state.log(M['from'], unrfc2047(M['subject']), saved_to)
               filed.extend(report.saved_to)
             if filed and not self.filter_modes.no_remove:
               debug("remove key %s", key)
@@ -662,7 +667,7 @@ class WatchedMaildir(O):
             yield key, reports
           if self.filter_modes.justone:
             break
-      D("filtered %d messages (%d skipped) in %5.3fs", nmsgs, skipped, TK.elapsed)
+      info("filtered %d messages (%d skipped) in %5.3fs", nmsgs, skipped, TK.elapsed)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
