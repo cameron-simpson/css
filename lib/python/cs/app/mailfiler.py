@@ -102,6 +102,7 @@ def main(argv, stdin=None):
                  ]
       while True:
         for MW in maildirs:
+          debug("process %s", MW.mdir.dir)
           with LogTime("MW.filter()", threshold=0.0):
             for key, reports in MW.filter():
               pass
@@ -577,12 +578,12 @@ class Rules(list):
         filing to $DEFAULT, with .rule set to None.
     '''
     done = False
-    matches = 0
+    saved_to = []
     for R in self:
       report = R.filter(state)
       yield report
       if report.matched:
-        matches += 1
+        saved_to.extend(report.saved_to)
         if R.flags.halt:
           done = True
           break
@@ -590,13 +591,20 @@ class Rules(list):
         if report.saved_to:
           raise RunTimeError("matched is False, but saved_to = %s" % (saved_to,))
     if not done:
-      if not matches:
+      if not saved_to:
         R = state.default_rule
         if not R:
-          warning("message matched no rules, and no $DEFAULT")
+          warning("message not saved and no $DEFAULT")
         else:
-          warning("running DEFAULT: %s", R)
-          yield R.filter(state)
+          report = R.filter(state)
+          if not report.matched:
+            raise RunTimeError("default rule faled to match! %r", R)
+          saved_to.extend(report.saved_to)
+          if not saved_to:
+            warning("message not saved by any rules")
+          yield report
+      else:
+        debug("%d filings, skipping DEFAULT", len(saved_to))
 
 class WatchedMaildir(O):
   ''' A class to monitor a Maildir and filter messages.
@@ -646,23 +654,20 @@ class WatchedMaildir(O):
             state = RuleState(M, self.filter_modes)
             state.message_path = mdir.keypath(key)
             state.logto(envsub("$HOME/var/log/mailfiler"))
-            state.log("%s %s %s" % (time.strftime("%Y-%m-%d %H:%M:%S"), unrfc2047(M['from']), unrfc2047(M['subject'])))
+            state.log(u"%s %s %s" % (time.strftime("%Y-%m-%d %H:%M:%S"), unrfc2047(M['from']), unrfc2047(M['subject'])))
             state.log("  "+mdir.keypath(key))
-            filed = []
+            saved_to = []
             reports = []
             for report in self.rules.filter(state):
               if report.matched:
                 reports.append(report)
-                for saved_to in report.saved_to:
-                  pass
-                  state.log(M['from'], unrfc2047(M['subject']), saved_to)
-              filed.extend(report.saved_to)
-            if filed and not self.filter_modes.no_remove:
+                saved_to.extend(report.saved_to)
+            if saved_to and not self.filter_modes.no_remove:
               debug("remove key %s", key)
               mdir.remove(key)
               self.lurking.discard(key)
             else:
-              debug("lurk key %s", key)
+              warning("message not saved, lurking key %s", key)
               self.lurking.add(key)
             yield key, reports
           if self.filter_modes.justone:
