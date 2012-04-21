@@ -255,8 +255,10 @@ class RuleState(O):
     self.log("    OK %s => %s" % (M['message-id'], self.message_path))
     return self.message_path
 
-  def sendmail(self, address, mfp=None):
-    ''' Dispatch the Message `M` to the email address `address`.
+  def pipe_message(self, argv, mfp=None):
+    ''' Pipe a message to the command specific by `argv`.
+        `mfp` is a file containing the message text.
+        If `mfp` is None, use the text of the current message.
     '''
     if mfp is None:
       message_path = state.message_path
@@ -268,12 +270,17 @@ class RuleState(O):
           mfp.write(str(self.message))
           mfp.flush()
           mfp.seek(0)
-          return self.sendmail(address, mfp)
-    retcode = subprocess.call([state.environ.get('SENDMAIL', 'sendmail'), '-oi', address],
-                              env=state.environ,
-                              stdin=mfp)
-    self.log("    %s %s => %s" % (("OK" if retcode == 0 else "FAIL"), M['message-id'], address))
+          return self.pipe_message(argv, mfp)
+    retcode = subprocess.call(argv, env=state.environ, stdin=mfp)
+    self.log("    %s %s => | %s" % (("OK" if retcode == 0 else "FAIL"), M['message-id'], argv))
     return retcode == 0
+
+  def sendmail(self, address, mfp=None):
+    ''' Dispatch a message to `address`.
+        `mfp` is a file containing the message text.
+        If `mfp` is None, use the text of the current message.
+    '''
+    return self.pipe_message([state.environ.get('SENDMAIL', 'sendmail'), '-oi', address], mfp=mfp)
 
 re_UNQWORD = re.compile(r'[^,\s]+')
 re_HEADERLIST = re.compile(r'([a-z][\-a-z0-9]*(,[a-z][\-a-z0-9]*)*):', re.I)
@@ -525,13 +532,20 @@ class Rule(O):
             if action == 'TARGET':
               target = envsub(arg, state.environ)
               if target.startswith('|'):
-                raise NotImplementedError("pipes not implemented, not saving to %r" % (target,))
+                shcmd = target[1:]
+                if state.pipe_message(['/bin/sh', '-c', shcmd]):
+                  saved_to.append(target)
+                else:
+                  raise RunTimeError("failed to pipe to %s" % (target,))
               elif '@' in target:
                 if state.sendmail(target):
                   saved_to.append(target)
+                else:
+                  raise RunTimeError("failed to sendmail to %s" % (target,))
               else:
                 mdir = state.maildir(target)
                 savepath = state.save_to_maildir(mdir)
+                # we get None if the message has already been saved here
                 if savepath:
                   saved_to.append(savepath)
             elif action == 'ASSIGN':
@@ -553,6 +567,7 @@ class Rule(O):
             raise
           else:
             ok_actions.append( (action, arg) )
+            
       return FilterReport(self, matched, saved_to, ok_actions, failed_actions)
 
 class Rules(list):
