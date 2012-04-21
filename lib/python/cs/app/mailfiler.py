@@ -261,7 +261,7 @@ class RuleState(O):
         If `mfp` is None, use the text of the current message.
     '''
     if mfp is None:
-      message_path = state.message_path
+      message_path = self.message_path
       if message_path:
         with open(message_path) as mfp:
           return self.sendmail(address, mfp)
@@ -271,7 +271,7 @@ class RuleState(O):
           mfp.flush()
           mfp.seek(0)
           return self.pipe_message(argv, mfp)
-    retcode = subprocess.call(argv, env=state.environ, stdin=mfp)
+    retcode = subprocess.call(argv, env=self.environ, stdin=mfp)
     self.log("    %s %s => | %s" % (("OK" if retcode == 0 else "FAIL"), M['message-id'], argv))
     return retcode == 0
 
@@ -280,7 +280,7 @@ class RuleState(O):
         `mfp` is a file containing the message text.
         If `mfp` is None, use the text of the current message.
     '''
-    return self.pipe_message([state.environ.get('SENDMAIL', 'sendmail'), '-oi', address], mfp=mfp)
+    return self.pipe_message([self.environ.get('SENDMAIL', 'sendmail'), '-oi', address], mfp=mfp)
 
 re_UNQWORD = re.compile(r'[^,\s]+')
 re_HEADERLIST = re.compile(r'([a-z][\-a-z0-9]*(,[a-z][\-a-z0-9]*)*):', re.I)
