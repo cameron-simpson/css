@@ -192,6 +192,8 @@ def unrfc2047(s):
       littered varieties that come from some low quality mail clients) and
       decode them into flat Unicode.
   '''
+  if not isinstance(s, unicode):
+    s = unicode(s, 'iso8859-1')
   chunks = []
   sofar = 0
   for m in re_RFC2047.finditer(s):
