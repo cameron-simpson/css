@@ -669,9 +669,10 @@ class WatchedMaildir(O):
             state = RuleState(M, self.filter_modes)
             state.message_path = mdir.keypath(key)
             state.logto(envsub("$HOME/var/log/mailfiler"))
-            state.log(u"%s %s %s" % (time.strftime("%Y-%m-%d %H:%M:%S"),
-                                     unrfc2047(M.get('from', '_no_from')),
-                                     unrfc2047(M.get('subject', '_no_subject'))))
+            state.log( (u"%s %s %s" % (time.strftime("%Y-%m-%d %H:%M:%S"),
+                                       unrfc2047(M.get('from', '_no_from')),
+                                       unrfc2047(M.get('subject', '_no_subject'))))
+                       .replace('\n', ' ') )
             state.log("  "+mdir.keypath(key))
             saved_to = []
             reports = []
