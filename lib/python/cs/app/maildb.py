@@ -219,7 +219,8 @@ class _MailDB(NodeDB):
 
   @locked_property
   def address_groups(self):
-    ''' Compute the address_group sets.
+    ''' Compute the address_group sets, a mapping of GOUP names to a
+        set of A.name.lower().
         Return the mapping.
     '''
     address_groups = { 'all': set() }
@@ -230,7 +231,7 @@ class _MailDB(NodeDB):
           address_group = address_groups[group_name]
         else:
           address_group = address_groups[group_name] = set()
-        address_group.add(A.name)
+        address_group.add(A.name.lower())
         all.add(A.name)
     return address_groups
 
