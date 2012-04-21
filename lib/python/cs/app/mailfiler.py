@@ -542,7 +542,7 @@ class Rule(O):
                 state.logto(value)
               elif envvar == 'DEFAULT':
                 R = state.default_rule = Rule(self.filename, self.lineno)
-                R.actions.append( ('TARGET', value) )
+                R.actions.append( ('TARGET', '$DEFAULT') )
             else:
               raise RuntimeError("unimplemented action \"%s\"" % action)
           except (AttributeError, NameError):
