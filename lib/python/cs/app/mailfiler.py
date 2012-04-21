@@ -264,7 +264,7 @@ class RuleState(O):
       message_path = self.message_path
       if message_path:
         with open(message_path) as mfp:
-          return self.sendmail(address, mfp)
+          return self.pipe_message(argv, mfp)
       else:
         with TemporaryFile('w+') as mfp:
           mfp.write(str(self.message))
