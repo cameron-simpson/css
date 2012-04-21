@@ -272,7 +272,7 @@ class RuleState(O):
           mfp.seek(0)
           return self.pipe_message(argv, mfp)
     retcode = subprocess.call(argv, env=self.environ, stdin=mfp)
-    self.log("    %s %s => | %s" % (("OK" if retcode == 0 else "FAIL"), M['message-id'], argv))
+    self.log("    %s %s => | %s" % (("OK" if retcode == 0 else "FAIL"), self.message['message-id'], argv))
     return retcode == 0
 
   def sendmail(self, address, mfp=None):
