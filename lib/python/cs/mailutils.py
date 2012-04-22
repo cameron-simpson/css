@@ -187,7 +187,8 @@ class Maildir(mailbox.Maildir):
     with NamedTemporaryFile('w', dir=os.path.join(self.dir, 'tmp')) as T:
       debug("create new file %s for key %s", T.name, key)
       T.write(fp.read())
-    return self.save_filepath(T.name, key=key)
+      T.flush()
+      return self.save_filepath(T.name, key=key)
 
   def save_message(self, M, key=None):
     ''' Save the contents of the Message `M` into the Maildir.
