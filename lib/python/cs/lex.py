@@ -192,6 +192,7 @@ def unrfc2047(s):
       littered varieties that come from some low quality mail clients) and
       decode them into flat Unicode.
   '''
+  from cs.logutils import warning
   if not isinstance(s, unicode):
     s = unicode(s, 'iso8859-1')
   chunks = []
@@ -209,8 +210,12 @@ def unrfc2047(s):
     elif enctype == 'Q':
       enctext = quopri.decodestring(enctext)
     else:
-      raise ValueError("unhandled RFC2047 string: %s" % (m.group(),))
-    enctext = enctext.decode(enccset)
+      raise RunTimeError("unhandled RFC2047 string: %r" % (m.group(),))
+    try:
+      enctext = enctext.decode(enccset)
+    except UnicodeDecodeError, e:
+      warning("%r: %e", enctext, e)
+      enctext = enctext.decode(enccset, 'replace')
     chunks.append(enctext)
     sofar = end
   if sofar < len(s):
