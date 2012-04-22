@@ -193,7 +193,7 @@ class Maildir(mailbox.Maildir):
     ''' Save the contents of the Message `M` into the Maildir.
         Return the key for the saved message.
     '''
-    return save_file(self, StringIO(str(M)), key=key)
+    return self.save_file(self, StringIO(str(M)), key=key)
 
   def keypath(self, key):
     subdir, msgbase = self.msgmap[key]
