@@ -7,6 +7,7 @@
 from __future__ import print_function
 from collections import namedtuple
 from email.utils import getaddresses
+from email import message_from_string
 import email.parser
 from getopt import getopt, GetoptError
 import io
@@ -239,21 +240,29 @@ class RuleState(O):
       hamap[header] = set( [ A for N, A in message_addresses(M, (header,)) ] )
     return hamap[header]
 
-  def save_to_maildir(self, mdir):
+  def save_to_maildir(self, mdir, label):
     mdirpath = mdir.dir
     if self.reuse_maildir or mdirpath not in self.used_maildirs:
       self.used_maildirs.add(mdirpath)
     else:
       return None
     M = self.message
-    path = self.message_path
+    if label and M.get('x-label', '') != label:
+      # modifying message - make copy
+      path = None
+      M = message_from_string(M.as_string())
+      M['X-Label'] = label
+    else:
+      path = self.message_path
     if path is None:
       savekey = mdir.save_message(M)
     else:
       savekey = mdir.save_filepath(path)
-    self.message_path = mdir.keypath(savekey)
-    self.log("    OK %s => %s" % (M['message-id'], self.message_path))
-    return self.message_path
+    savepath = mdir.keypath(savekey)
+    if not path and not label:
+      self.message_path = savepath
+    self.log("    OK %s => %s" % (M['message-id'], savepath))
+    return savepath
 
   def pipe_message(self, argv, mfp=None):
     ''' Pipe a message to the command specific by `argv`.
@@ -373,16 +382,19 @@ def parserules(fp):
           if offset < len(line) and line[offset] == ',':
             offset += 1
 
-        # gather tag
+        # gather label
         _, offset = get_white(line, offset)
         if not _ or offset == len(line):
-          R.tag = ''
-          warning("no tag or condition")
+          R.label = ''
+          warning("no label or condition")
           continue
         if line[offset] == '"':
-          tag, offset = get_qstr(line, offset)
+          label, offset = get_qstr(line, offset)
         else:
-          tag, offset = get_nonwhite(line, offset)
+          label, offset = get_nonwhite(line, offset)
+        if label == '.':
+          label = ''
+        R.label = label
         _, offset = get_white(line, offset)
 
       # condition
@@ -511,6 +523,7 @@ class Rule(O):
     self.conditions = slist()
     self.actions = slist()
     self.flags = O(alert=False, halt=False)
+    self.label = ''
     self.default_rule = None
 
   def match(self, state):
@@ -544,7 +557,7 @@ class Rule(O):
                   raise RunTimeError("failed to sendmail to %s" % (target,))
               else:
                 mdir = state.maildir(target)
-                savepath = state.save_to_maildir(mdir)
+                savepath = state.save_to_maildir(mdir, self.label)
                 # we get None if the message has already been saved here
                 if savepath:
                   saved_to.append(savepath)
