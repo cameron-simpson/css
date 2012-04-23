@@ -206,7 +206,11 @@ def unrfc2047(s):
     enctype = m.group(2).upper()
     enctext = m.group(3)
     if enctype == 'B':
-      enctext = base64.b64decode(enctext)
+      try:
+        enctext = base64.b64decode(enctext)
+      except TypeError, e:
+        warning("%r: %e", enctext, e)
+        enctext = m.group()
     elif enctype == 'Q':
       enctext = quopri.decodestring(enctext)
     else:
