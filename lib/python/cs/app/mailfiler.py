@@ -164,7 +164,6 @@ class RuleState(O):
                        Default from os.environ.
     '''
     self.message = M
-    self.message_path = None
     self.outer_state = outer_state
     if environ is None:
       environ = os.environ
@@ -187,6 +186,7 @@ class RuleState(O):
   @message.setter
   def message(self, new_message):
     self._message = new_message
+    self.message_path = None
     self.header_addresses = {}
 
   def log(self, *a):
