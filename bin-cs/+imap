@@ -37,6 +37,7 @@ eval `fetchmailclause -f "$fmrc" "$IMAP_SERVICE" | sed -n 'y/	/ /; s/^\([^ ][^ ]
 IMAP_FOLDERROOT=imaps://$fm_user@$fm_host/
 export IMAP_FOLDERROOT
 
-exec $trace + +s +t \
+exec $trace mutt \
+        -e "set folder=$IMAP_FOLDERROOT" \
 	-e "set imap_pass=\"$fm_pass\"" \
-	imaps://$fm_user@$fm_host/INBOX
+	-f +INBOX
