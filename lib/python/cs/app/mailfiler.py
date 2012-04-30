@@ -205,7 +205,10 @@ class RuleState(O):
     '''
     if self._log:
       self._log.close()
-    self._log = io.open(logfilepath, "a", encoding='utf-8')
+    try:
+      self._log = io.open(logfilepath, "a", encoding='utf-8')
+    except OSError, e:
+      self.log("open(%s): %s" % (logfilepath, e))
 
   @property
   def groups(self):
