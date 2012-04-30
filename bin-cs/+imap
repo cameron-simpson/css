@@ -6,13 +6,16 @@
 
 : ${IMAP_SERVICE:=default}
 
+subfolder=INBOX
+
 cmd=`basename "$0"`
-usage="Usage: $cmd [[user:pass@]server]"
+usage="Usage: $cmd [[user:pass@]server] [subfolder]"
 
 fmrc=$HOME/.fetchmailrc
 trace=set-x
 
 [ $# = 0 ] || { IMAP_SERVICE=$1; shift; }
+[ $# = 0 ] || { subfolder=$1; shift; }
 
 sv_user=
 sv_pass=
@@ -40,4 +43,4 @@ export IMAP_FOLDERROOT
 exec $trace mutt \
         -e "set folder=$IMAP_FOLDERROOT" \
 	-e "set imap_pass=\"$fm_pass\"" \
-	-f +INBOX
+	-f "+$subfolder"
