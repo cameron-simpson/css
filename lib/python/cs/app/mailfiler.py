@@ -195,7 +195,10 @@ class RuleState(O):
     log = self._log
     if log is None:
       log = sys.stdout
-    print(*[ unicode(s) for s in a], file=log)
+    try:
+      print(*[ unicode(s) for s in a], file=log)
+    except UnicodeDecodeError, e:
+      print("RuleState.log: %s: a=%r" % (e, a), file=sys.stderr)
 
   def logto(self, logfilepath):
     ''' Direct log messages to the supplied `logfilepath`.
