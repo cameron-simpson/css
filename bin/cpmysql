@@ -340,7 +340,7 @@ pull_db()
   # pull the schema if we're saving to a directory
   case "$dst" in
     /*)
-      gzip_to "dst/$_pull_dstdb.schema.gz" \
+      gzip_to "$dst/$_pull_dstdb.schema.gz" \
         mysqlcmd_src -f mysqldump --opt --no-data "$_pull_srcdb"
       ;;
   esac
