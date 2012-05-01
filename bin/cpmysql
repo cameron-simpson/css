@@ -10,7 +10,6 @@
 
 trace=eecho
 doit=
-dorewriteif=
 newfile=
 rwflags=
 bytable=
@@ -23,6 +22,7 @@ usage="Usage: $cmd [-N] [-q] [-R] -T [-x] src dst [databases...]
         Default is to do nothing, and recite a plan of action.
   -R    Use rewriteif to rewrite dump files.
         This avoids a date change if there is no data change.
+        Now always the case; option supported for backward compatability.
   -T    Do a table based copy. Now mandatory.
   -x    Trace execution.
         Default is to do nothing, and recite a plan of action.
@@ -52,7 +52,7 @@ do
   case $1 in
     -N) newfile=1 rwflags="$rwflags -N" ;;
     -q) doit=1 trace= ;;
-    -R) dorewriteif=1 ;;
+    -R) echo "$cmd: warning: -R option deprecated; it is now the default" >&2 ;;
     -T) bytable=1 ;;
     -x) doit=1 trace=set-x rwflags="$rwflags -x" ;;
     --)	shift; break ;;
@@ -263,6 +263,14 @@ mysqlcmd_dst()
               "$dst_host" "$dst_port" "$dst_socket" "$@"
 }
 
+# Usage: gzip_to gzfile command
+gzip_to()
+{
+  _gzip_to_file=$1; shift
+  [ -f "$_gzip_to_file" ] || >>"$_gzip_to_file"
+  "$@" | $trace rewriteif $rwflags "$_gzip_to_file" gzip -n --fast
+}
+
 # pull_table srcdb dstdb tablename
 pull_table()
 { _pull_table_srcdb=$1
@@ -297,29 +305,8 @@ pull_table()
     fi \
   | case "$dst" in
       /*)
-        $trace sed '1{/^-- MySQL dump [0-9]/d;};${/^-- Dump completed on /d;}' \
-        | \
-        { gzout=$dst/$_pull_table_dstdb.$_pull_table.sql.gz
-          set -- gzip -n --fast
-          if [ $dorewriteif ]
-          then
-            [ -f "$gzout" ] || >>"$gzout"
-            $trace rewriteif $rwflags "$gzout" "$@"
-          else
-            if [ $newfile ]
-            then
-              tmpf=$dst/.cpmysql$$.gz
-              if ( [ $doit ] && exec >"$tmpf"
-                   exec $trace "$@"
-                 )
-              then  $trace mv "$tmpf" "$gzout"
-              else  $trace rm "$tmpf"
-              fi
-            else
-              $trace "$@" >"$gzout"
-            fi
-          fi
-        }
+        gzip_to "$dst/$_pull_table_dstdb.$_pull_table.sql.gz" \
+          $trace sed '1{/^-- MySQL dump [0-9]/d;};${/^-- Dump completed on /d;}'
         ;;
       *)
         mysqlcmd_dst mysql "$_pull_table_dstdb"
@@ -353,7 +340,8 @@ pull_db()
   # pull the schema if we're saving to a directory
   case "$dst" in
     /*)
-      mysqlcmd_src -f mysqldump --opt --no-data "$_pull_srcdb" >"$dst/$_pull_dstdb.schema"
+      gzip_to "$dst/$_pull_dstdb.schema.gz" \
+        mysqlcmd_src -f mysqldump --opt --no-data "$_pull_srcdb"
       ;;
   esac
 
