@@ -1,0 +1,4 @@
+#!/bin/sh
+which python3.3 >/dev/null 2>&1 && exec python3.3 ${1+"$@"}
+echo "$0: no python 3.3, aborting: $0 $*" >&2
+exit 1
