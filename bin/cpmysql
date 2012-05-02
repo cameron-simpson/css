@@ -15,6 +15,8 @@ rwflags=
 bytable=
 dfltport=3306
 
+shcmd_mysqldump_clean=`shqstr sed '1{/^-- MySQL dump [0-9]/d;};${/^-- Dump completed on /d;}'`
+
 cmd=`basename "$0"` || cmd=$0
 usage="Usage: $cmd [-N] [-q] [-R] -T [-x] src dst [databases...]
   -N    Make a new output file instead of rewriting an existing one.
@@ -227,7 +229,9 @@ fi
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 # run mysql command (mysqldump etc) using the supplied user/pass/host/port/sock
+#
 # Usage: _mysqlcmd user password host port socket [-f] command [args...]
+#
 _mysqlcmd()
 { mc_user=$1 mc_pass=$2 mc_h=$3 mc_p=$4 mc_s=$5
   shift; shift; shift; shift; shift
@@ -240,23 +244,38 @@ _mysqlcmd()
   shift
   if [ -n "$mc_h" ]
   then
+    # use -h host
     mc_trace="$mc_cmd -u $mc_user -p.. -h $mc_h   -P $mc_p ${1+$*}"
     set -- -u "$mc_user" "-p$mc_pass"  -h "$mc_h" -P "$mc_p" ${1+"$@"}
   else
+    # use -S socket
     mc_trace="$mc_cmd -u $mc_user -p.. -S $mc_s $*"
     set -- -u "$mc_user" "-p$mc_pass"  -S "$mc_s"            ${1+"$@"}
   fi
   [ -z "$trace" ] || eecho "$mc_trace"  # conceals the password string
-  [ -z "$doit" ] || tag_fd 2 "$mysqlcmd_pfx:$mc_cmd" "$mc_cmd" ${1+"$@"}
+  if [ $doit ]
+  then
+    set -- "$mc_cmd" ${1+"$@"}
+    [ "x$mc_cmd" = xmysqldump ] && set -- filter_fd 1 "set -x; $shcmd_mysqldump_clean" "$@"
+    tag_fd 2 "$mysqlcmd_pfx:$mc_cmd" "$@"
+  fi
   doit=$mc_odoit
 }
+
 # run a mysql command against the source database
+#
+# Usage: mysqlcmd_src [-f] command [args...]
+#
 mysqlcmd_src()
 { mysqlcmd_pfx=$src_pfx \
     _mysqlcmd "$src_user" "$src_password" \
               "$src_host" "$src_port" "$src_socket" "$@"
 }
+
 # run a mysql command against the destination database
+#
+# Usage: mysqlcmd_dst [-f] command [args...]
+#
 mysqlcmd_dst()
 { mysqlcmd_pfx=$dst_pfx \
     _mysqlcmd "$dst_user" "$dst_password" \
@@ -267,6 +286,7 @@ mysqlcmd_dst()
 gzip_to()
 {
   _gzip_to_file=$1; shift
+  [ $# -gt 0 ] || set -- cat
   [ -f "$_gzip_to_file" ] || >>"$_gzip_to_file"
   "$@" | $trace rewriteif $rwflags "$_gzip_to_file" gzip -n --fast
 }
@@ -304,13 +324,8 @@ pull_table()
       fi
     fi \
   | case "$dst" in
-      /*)
-        gzip_to "$dst/$_pull_table_dstdb.$_pull_table.sql.gz" \
-          $trace sed '1{/^-- MySQL dump [0-9]/d;};${/^-- Dump completed on /d;}'
-        ;;
-      *)
-        mysqlcmd_dst mysql "$_pull_table_dstdb"
-        ;;
+      /*) gzip_to "$dst/$_pull_table_dstdb.$_pull_table.sql.gz" ;;
+      *)  mysqlcmd_dst mysql "$_pull_table_dstdb" ;;
     esac
 }
 
