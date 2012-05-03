@@ -1,0 +1,200 @@
+#!/bin/sh
+#
+# Pull missing histbackup trees from a remote host.
+# This tries to hard link associated backups but does only one
+# snapshot at a time to avoid blowing the memory.
+#       - Cameron Simpson <cs@zip.com.au>
+#
+
+set -ue
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-e ssh] [-P] [remotehost:]other-tree this-tree subdir-pattern [matching-parent-pattern]
+  -e ssh        Specify ssh command. Default from $RSYNC_RSH or
+                'ssh -F $HOME/.ssh/config'.
+  -P            Parallelise on second lowest level name.
+  Example:
+    $cmd -P oldserver:/backup/vhosts /backup/vhosts 'aeryn*/*' '*'
+  would pull all backups matching:
+    oldserver:/backup/vhosts/aeryn*/*/YYYY-MM-DD
+  into
+    /backup/vhosts
+  looking for
+    /backup/vhosts/*/BASENAME/YYYY-MM-DD
+  and
+    /backup/vhosts/*/BASENAME/LATEST
+  as --link-dest options for each backup named:
+    oldserver:/backup/vhosts/aeryn*/BASENAME/YYYY-MM-DD
+  parallelising on each 'aeryn*' name."
+
+parallel=
+trace=set-x
+base=/backup/vhosts/rackA
+rbase=/backup/vhosts-MOVING
+ssh=${RSYNC_RSH:-'ssh -F $HOME/.ssh/config'}
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -e) ssh=$2; shift ;;
+    -P) parallel=1 ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing [remotehost:]other-tree" >&2
+  badopts=1
+else
+  remote=$1
+  shift
+  case "$remote" in
+    *:*)        rhost=`expr "x$remote" : 'x\([^:]*\):.*'`
+                rpath=`expr "x$remote" : 'x[^:]*:\(.*\)'`
+                rhost_colon=$rhost:
+                ;;
+    *)          rhost=
+                rpath=$remote
+                rhost_colon=
+                ;;
+  esac
+fi
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing this-tree" >&2
+  badopts=1
+else
+  local=$1
+  shift
+fi
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing subdir-pattern" >&2
+  badopts=1
+else
+  subdirptn=$1
+  shift
+  if [ $# = 0 ]
+  then
+    parentptn=$(dirname $(dirname "$subdirptn"))/*
+  else
+    parentptn=$1
+    shift
+  fi
+fi
+
+if [ $# -gt 0 ]
+then
+  echo "$cmd: extra arguments: $*" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+RSYNC_RSH=$ssh
+export RSYNC_RSH
+
+rpathlen=${#rpath}
+rpathlen1=$((rpathlen + 1))
+qrpath=`shqstr "$rpath"`
+
+rshcmd()
+{
+  if [ -n "$rhost" ]
+  then  $ssh "$rhost" "$*"
+  else  sh -c "$*"
+  fi
+}
+
+remote()
+{
+  if [ -n "$rhost" ]
+  then
+    _remote_shcmd=`shqstr "$@"`
+    rshcmd "$_remote_shcmd"
+  else
+    "$@"
+  fi
+}
+
+rsubdirs=$(
+  rshcmd "ls -d $qrpath/$subdirptn/." | sed -n 's|\/\.$||p' | sort -u
+)
+
+basedirs=$(
+  for rsubdir in $rsubdirs
+  do basename "$rsubdir"
+  done | sort -u
+)
+
+upperdirs=$(
+  for rsubdir in $rsubdirs
+  do basename $(dirname "$rsubdir")
+  done | sort -u
+)
+
+echo "basedirs = $basedirs"
+echo "upperdirs = $upperdirs"
+
+# we parallelise on upperdir
+( 
+  for upperdir in $upperdirs
+  do
+    for basedir in $basedirs
+    do
+      for rsubdir in $rsubdirs
+      do
+        # reject mismatches
+        case "$rsubdir" in
+          */"$upperdir/$basedir") ;; *) continue ;;
+        esac
+        rsubdirtail=${rsubdir:$rpathlen1}
+        localdir=$local/$rsubdirtail
+
+        # enumerate dated subdirs
+        for date in $(remote ls "$rsubdir" | grep '^20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]' | sort -r)
+        do
+          tag=$upperdir/$basedir/$date
+          echo "$tag"
+          localdatedir=$localdir/$date
+
+          ( set -ue
+            set -- rsync -i -aHO --delete
+            case "$basedir" in
+              boardofstudies)
+                eecho "$tag: exclude /cache/*"
+                set -- "$@" '--exclude=/cache/*' --delete-excluded
+                ;;
+              studentsonline.bos.nsw.edu.au)
+                eecho "$tag: exclude /data/*/scanning/"
+                set -- "$@" '--exclude=/data/*/scanning/*' --delete-excluded
+                ;;
+            esac
+            max_lds=20
+            for od in \
+              "$local"/$parentptn/"$basedir/$date" \
+              "$local"/$parentptn/"$basedir/LATEST"
+            do
+              [ ! -d "$od/." ] || set -- "$@" "--link-dest=$od/"
+              max_lds=$((max_lds - 1))
+              [ "$max_lds" -gt 0 ] || break
+            done
+            [ -d "$localdatedir/" ] || $trace mkdir "$localdatedir"
+            pfx "$upperdir/$basedir/$date" \
+              "$@" "$rhost_colon$rsubdir/$date/" "$localdatedir/"
+          ) || exit 1
+        done
+      done
+    done &
+  done
+
+  wait
+)
