@@ -2,6 +2,12 @@
 #
 # Pull mysql databases from one mysql server to another.
 # Adapted from dumpmysql and loadmysql.
+#
+# Output files have the following names:
+#       db.table.sql.gz         TABLE dump.
+#       db.schema.gz            DATABASE schema dump.
+#       user@host.grants.gz     USER GRANTs dump.
+#
 #	- Cameron Simpson <cs@zip.com.au> 28dec2006
 #
 
@@ -378,6 +384,38 @@ pull_db()
     done
 }
 
+# dump GRANTs
+case "$dst" in
+  /*)
+    case "$src" in
+      /*) ;;
+      *)
+        dbusers=$(
+          echo 'select User, Host from user' \
+          | mysqlcmd_src -f mysql mysql \
+          | awk 'NR > 1 { print $1 "@" $2 }' \
+          | sort
+        )
+        echo "dbusers =" $dbusers
+        for dbuser in $dbusers
+        do
+          sqluser=$(echo "$dbuser" | sed 's/\(.*\)@\(.*\)/`\1`@`\2`/')
+          echo "show grants for $sqluser" \
+          | mysqlcmd_src -f mysql \
+          | \
+          { read grants for who
+            read grant usage on blah to who etc
+            echo "$grant $usage $on $blah $to $who $etc"
+            sed 's/,  */,/g' | sort -k 4
+          } \
+          | gzip_to "$dst/$dbuser.grants.gz"
+        done
+        ;;
+    esac
+    ;;
+esac
+
+# select TABLEs if unspecified
 if [ $# = 0 ]
 then
   set -- `case "$src" in
@@ -397,6 +435,7 @@ then
          `
 fi
 
+# dump TABLEs
 for db
 do
   pull_db "$db" || exit 1
