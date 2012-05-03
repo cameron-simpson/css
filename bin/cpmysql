@@ -13,11 +13,13 @@
 
 : ${USER:=`id -un`}
 : ${MYSQL_LOGIN:=$USER}
+: ${NOTIFY:=$USER}
 
 trace=eecho
 doit=
 newfile=
 rwflags=
+Drwflags=
 bytable=
 dfltport=3306
 
@@ -25,6 +27,7 @@ shcmd_mysqldump_clean=`shqstr sed '1{/^-- MySQL dump [0-9]/d;};${/^-- Dump compl
 
 cmd=`basename "$0"` || cmd=$0
 usage="Usage: $cmd [-N] [-q] [-R] -T [-x] src dst [databases...]
+  -D    Email diffs of schemae and GRANTs to \$NOTIFY: $NOTIFY
   -N    Make a new output file instead of rewriting an existing one.
   -q    Execute quietly.
         Default is to do nothing, and recite a plan of action.
@@ -58,6 +61,7 @@ badopts=
 while [ $# -gt 0 ]
 do
   case $1 in
+    -D) Drwflags="-D $NOTIFY" ;;
     -N) newfile=1 rwflags="$rwflags -N" ;;
     -q) doit=1 trace= ;;
     -R) echo "$cmd: warning: -R option deprecated; it is now the default" >&2 ;;
@@ -291,10 +295,16 @@ mysqlcmd_dst()
 # Usage: gzip_to gzfile command
 gzip_to()
 {
+  _gzip_rwflags=
+  if [ "x$1" = x-D ]
+  then
+    _gzip_rwflags="-D $1"
+    shift; shift
+  fi
   _gzip_to_file=$1; shift
   [ $# -gt 0 ] || set -- cat
   [ -f "$_gzip_to_file" ] || >>"$_gzip_to_file"
-  "$@" | $trace rewriteif $rwflags "$_gzip_to_file" gzip -n --fast
+  "$@" | $trace rewriteif $rwflags $_gzip_rwflags "$_gzip_to_file" gzip -n --fast
 }
 
 # pull_table srcdb dstdb tablename
@@ -361,7 +371,7 @@ pull_db()
   # pull the schema if we're saving to a directory
   case "$dst" in
     /*)
-      gzip_to "$dst/$_pull_dstdb.schema.gz" \
+      gzip_to $Drwflags "$dst/$_pull_dstdb.schema.gz" \
         mysqlcmd_src -f mysqldump --opt --no-data "$_pull_srcdb"
       ;;
   esac
@@ -408,7 +418,7 @@ case "$dst" in
             echo "$grant $usage $on $blah $to $who $etc"
             sed 's/,  */,/g' | sort -k 4
           } \
-          | gzip_to "$dst/$dbuser.grants.gz"
+          | gzip_to $Drwflags "$dst/$dbuser.grants.gz"
         done
         ;;
     esac
