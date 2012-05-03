@@ -13,6 +13,7 @@ usage="Usage: $cmd [-e ssh] [-P] [remotehost:]other-tree this-tree subdir-patter
   -e ssh        Specify ssh command. Default from $RSYNC_RSH or
                 'ssh -F $HOME/.ssh/config'.
   -P            Parallelise on second lowest level name.
+  -v            Verbose.
   Example:
     $cmd -P oldserver:/backup/vhosts /backup/vhosts 'aeryn*/*' '*'
   would pull all backups matching:
@@ -28,6 +29,8 @@ usage="Usage: $cmd [-e ssh] [-P] [remotehost:]other-tree this-tree subdir-patter
   parallelising on each 'aeryn*' name."
 
 parallel=
+echo=echo
+vecho=:
 trace=set-x
 base=/backup/vhosts/rackA
 rbase=/backup/vhosts-MOVING
@@ -40,6 +43,7 @@ do
   case $1 in
     -e) ssh=$2; shift ;;
     -P) parallel=1 ;;
+    -v) echo=echo vecho=echo ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
     *)  break ;;
@@ -141,9 +145,6 @@ upperdirs=$(
   done | sort -u
 )
 
-echo "basedirs = $basedirs"
-echo "upperdirs = $upperdirs"
-
 # we parallelise on upperdir
 ( 
   for upperdir in $upperdirs
@@ -156,6 +157,7 @@ echo "upperdirs = $upperdirs"
         case "$rsubdir" in
           */"$upperdir/$basedir") ;; *) continue ;;
         esac
+        $echo "$upperdir/$basedir: `date`"
         rsubdirtail=${rsubdir:$rpathlen1}
         localdir=$local/$rsubdirtail
 
@@ -163,7 +165,7 @@ echo "upperdirs = $upperdirs"
         for date in $(remote ls "$rsubdir" | grep '^20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]' | sort -r)
         do
           tag=$upperdir/$basedir/$date
-          echo "$tag"
+          $vecho "$tag"
           localdatedir=$localdir/$date
 
           ( set -ue
@@ -194,6 +196,7 @@ echo "upperdirs = $upperdirs"
         done
       done
     done &
+    [ $parallel ] || wait
   done
 
   wait
