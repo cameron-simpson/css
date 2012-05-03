@@ -1,8 +1,10 @@
-#!/bin/sh -u
+#!/bin/sh
 #
 # Rewrite the named file if the input differs.
 #	- Cameron Simpson <cs@zip.com.au> 19may2000
 #
+
+set -ue
 
 : ${TMPDIR:=/tmp}
 : ${DIFFOPTS='-u'}
@@ -12,6 +14,7 @@ usage="Usage: $cmd [options...] [--] filename [command args...]
 	-0	Rewrite the file even if the input is empty.
         -C      Require the file to change; error if the new file is the same.
 	-d	Do a diff of the file changes.
+        -D diffto Do a diff of file changes and email to \"diffto\".
         -n      No action. Recite underlying commands.
         -N      Make a new file if the content is different.
                 This means \"mv tempfile filename\" instead of
@@ -23,6 +26,7 @@ trace=${DEBUG:+set-x}
 rw0=
 doit=1
 dodiff=
+diffto=
 verbose=
 diff=diff
 newfile=
@@ -36,6 +40,7 @@ do
     -0)	rw0=1 ;;
     -C) mustchange=1 ;;
     -d)	dodiff=1 ;;
+    -D) dodiff=1 diffto=$2; shift ;;
     -n) trace=eecho doit= dodiff= ;;
     -N) newfile=1 ;;
     -v)	verbose=1 ;;
@@ -90,7 +95,13 @@ then
 fi
 
 [ $verbose ] && echo "rewrite $file"
-[ $dodiff  ] && $diff $DIFFOPTS "$file" "$tmp"
+if [ $dodiff  ]
+then
+  if [ -n "$diffto" ]
+  then  $diff $DIFFOPTS "$file" "$tmp" | mailif -s "DIFF: $file" "$diffto"
+  else  $diff $DIFFOPTS "$file" "$tmp" || :
+  fi
+fi
 if if [ $newfile ]
    then  $trace mv "$tmp" "$file"
    else  $trace cat "$tmp" >"$file"
