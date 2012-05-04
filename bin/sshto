@@ -112,6 +112,7 @@ then
     badopts=1
   else
     host=$1; shift
+    [ -n "$host" ] || { echo "$cmd: host may not be empty" >&2; badopts=1; }
   fi
 fi
 
