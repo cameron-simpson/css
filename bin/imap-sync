@@ -12,7 +12,7 @@ set -ue
 : ${LOGDIR:=$HOME/var/log}
 
 cmd=`basename "$0"`
-usage="Usage: $cmd here there folders...
+usage="Usage: $cmd [-d debug] [-q] [-u ui] [-x] here there folders...
   here  A directory containing maildir folders.
   there An IMAP server reference of the form:
           [username[:password]@]hostname[:port][/prepath]"
@@ -20,6 +20,27 @@ usage="Usage: $cmd here there folders...
 badopts=
 
 logdir=$LOGDIR/offlineimap
+ui=TTYUI
+##ui=Blinkenlights
+debug=
+flags=
+trace=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -d) debug=$2; shift ;;
+    -q) flags="$flags $1" ;;
+    -u) ui=$2; shift ;;
+    -x) trace=set-x ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
 
 if [ $# = 0 ]
 then
@@ -87,17 +108,17 @@ esac
 rep_here=`printf '%s\n' "$here" | tr -s / _`
 rep_there=$username@$there:$port
 account=$rep_here::$rep_there
-folders=`for f; do echo "$prepath$f"; done | tr '\012' ,`
+folders=$(for f; do echo "$prepath$f"; done | tr '\012' , | sed 's/,$//')
 logfile=$logdir/$account-`date '+%Y%m%dT%H%M%S'`-$$
 
 cfg=$tmppfx.cfg
 exec 3>"$cfg"
+
 cat <<X >&3
 [general]
 accounts = $account
 metadata = $OFFLINEIMAP_META
-ui = TTYUI
-##ui = Blinkenlights
+ui = $ui
 fsync = false
 
 [Account $account]
@@ -114,12 +135,15 @@ type = IMAP
 nametrans = lambda foldername: foldername[len('$prepath'):] if foldername.startswith('$prepath') else foldername
 remotehost = $there
 remoteuser = $username
+remoteport = $port
 ##remotepassword = $password
 remotepassfile = ~/private/passwd.$rep_there
 X
 
 exec 3>&-
-##cat "$cfg"
 
-set -x
-exec offlineimap -c "$cfg" -f "$folders" -l "$logfile"
+cat "$cfg" >>"$logfile"
+
+$trace offlineimap $flags -c "$cfg" -d "$debug" -f "$folders" -l "$logfile"
+
+##cat "$logfile"
