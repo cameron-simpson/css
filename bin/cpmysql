@@ -266,7 +266,7 @@ _mysqlcmd()
   if [ $doit ]
   then
     set -- "$mc_cmd" ${1+"$@"}
-    [ "x$mc_cmd" = xmysqldump ] && set -- filter_fd 1 "set -x; $shcmd_mysqldump_clean" "$@"
+    [ "x$mc_cmd" = xmysqldump ] && set -- filter_fd 1 "$shcmd_mysqldump_clean" "$@"
     tag_fd 2 "$mysqlcmd_pfx:$mc_cmd" "$@"
   fi
   doit=$mc_odoit
@@ -403,7 +403,7 @@ case "$dst" in
         dbusers=$(
           echo 'select User, Host from user' \
           | mysqlcmd_src -f mysql mysql \
-          | awk 'NR > 1 { print $1 "@" $2 }' \
+          | awk -F '	' 'NR > 1 { print $1 "@" $2 }' \
           | sort
         )
         echo "dbusers =" $dbusers
