@@ -194,7 +194,7 @@ class _MailDB(NodeDB):
         If the AddressNode has no .REALNAME and `realname` is not empty,
         update the AddressNode from `realname`.
     '''
-    if type(addr) is str:
+    if isinstance(addr, str):
       realname, coreaddr = parseaddr(addr)
     else:
       realname, coreaddr = addr
@@ -325,7 +325,7 @@ class _MailDB(NodeDB):
 
   def importAddresses_from_message(self, M, group_names):
     if isinstance(M, (str, file)):
-      return self.importAddresses_from_message(Message(M))
+      return self.importAddresses_from_message(Message(M), group_names)
     for addrtext in message_addresses(M, ('from', 'to', 'cc', 'bcc', 'resent-to', 'resent-cc', 'reply-to')):
       self.getAddressNode(addrtext).GROUPs.update(group_names)
 
