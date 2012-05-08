@@ -11,7 +11,7 @@ import os
 import unittest
 from cs.logutils import setup_logging, Pfx, info, warning, error, D
 from cs.mail import ismaildir, ismbox, messagesFromPath
-from cs.mailutils import message_addresses
+from cs.mailutils import message_addresses, Message
 from cs.nodedb import NodeDB, Node, NodeDBFromURL
 from cs.threads import locked_property
 from cs.misc import the
@@ -89,7 +89,7 @@ def main(argv, stdin=None):
             error("extra arguments after groups: %s", argv)
             badopts = True
           else:
-            mdb.importAddresses_from_message(stdin)
+            mdb.importAddresses_from_message(stdin, group_names)
       else:
         error("unsupported op")
         badopts = True
@@ -324,11 +324,8 @@ class _MailDB(NodeDB):
       self._address_groups = None
 
   def importAddresses_from_message(self, M, group_names):
-    if isinstance(M, str):
-      pathname = M
-      with Pfx(pathname):
-        with open(pathname) as mfp:
-          return self.importAddresses_from_message(read_message(mfp, headersonly=True))
+    if isinstance(M, (str, file)):
+      return self.importAddresses_from_message(Message(M))
     for addrtext in message_addresses(M, ('from', 'to', 'cc', 'bcc', 'resent-to', 'resent-cc', 'reply-to')):
       self.getAddressNode(addrtext).GROUPs.update(group_names)
 
