@@ -1,9 +1,24 @@
-#!/bin/sh -ue
+#!/bin/sh
 #
 # Add new email addresses from a mail message.
 #       - Cameron Simpson <cs@zip.com.au> 26apr2008
 #
 
+set -ue
+
 [ $# = 1 ] || { echo "Usage: $0 category <message" >&2; exit 2; }
+
 : ${CS_ALIASES=$HOME/rc/mail/aliases2}
-cs-aliases -f "$CS_ALIASES" new | sed "s/^/$1 /" >>"$CS_ALIASES"
+: ${MAILDB:=$HOME/rc/mail/db.csv}
+: ${TMPDIR:=/tmp}
+
+tmpf=$TMPDIR/addrs.$$
+trap 'rm -f "$tmpf"' 0
+trap 'rm -f "$tmpf"; exit 1' 1 2 3 15
+
+cat >"$tmpf"
+
+set -x
+
+cs-aliases -f "$CS_ALIASES" new <"$tmpf" | sed "s/^/$1 /" >>"$CS_ALIASES"
+maildb -m "$MAILDB" learn-addresses "$1" <"$tmpf"
