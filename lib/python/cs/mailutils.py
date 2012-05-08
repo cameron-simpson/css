@@ -6,6 +6,7 @@
 
 import email.message
 import email.parser
+from email.utils import getaddresses
 from itertools import chain
 import mailbox
 import os
@@ -36,10 +37,11 @@ def Message(M, headersonly=False):
   return email.parser.Parser().parse(mfp, headersonly=headersonly)
 
 def message_addresses(M, header_names):
-  ''' Return a sequence of the address texts from the Message `M` in
-      the headers named by `header_names`.
+  ''' Yield (realname, address) pairs from all the named headers.
   '''
-  return chain( M.get_all(hdr, ()) for header_name in header_names )
+  for header_name in header_names:
+    for realname, address in getaddresses(M.get_all(header_name, ())):
+      yield realname, address
 
 def ismaildir(path):
   ''' Test if 'path' points at a Maildir directory.

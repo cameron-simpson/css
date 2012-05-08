@@ -6,7 +6,6 @@
 
 from __future__ import print_function
 from collections import namedtuple
-from email.utils import getaddresses
 from email import message_from_string
 import email.parser
 from getopt import getopt, GetoptError
@@ -27,7 +26,7 @@ from cs.env import envsub
 from cs.fileutils import abspath_from_file, watched_file_property
 from cs.lex import get_white, get_nonwhite, get_qstr, unrfc2047
 from cs.logutils import Pfx, setup_logging, debug, info, warning, error, D, LogTime
-from cs.mailutils import Maildir
+from cs.mailutils import Maildir, message_addresses
 from cs.misc import O, slist
 from cs.threads import locked_property
 from cs.app.maildb import MailDB
@@ -455,13 +454,6 @@ def parserules(fp):
 
   if R is not None:
     yield R
-
-def message_addresses(M, hdrs):
-  ''' Yield (realname, address) pairs from all the named headers.
-  '''
-  for hdr in hdrs:
-    for realname, address in getaddresses(M.get_all(hdr, ())):
-      yield realname, address
 
 class _Condition(O):
   pass
