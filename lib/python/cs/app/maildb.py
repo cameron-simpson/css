@@ -93,6 +93,8 @@ def main(argv, stdin=None):
       else:
         error("unsupported op")
         badopts = True
+      if xit == 0 and not badopts:
+        mdb.sync()
 
   if badopts:
     error(usage)
