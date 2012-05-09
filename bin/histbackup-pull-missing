@@ -10,6 +10,7 @@ set -ue
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [-e ssh] [-P] [remotehost:]other-tree this-tree subdir-pattern [matching-parent-pattern]
+  -a            Pull all backups, not just missing dates.
   -e ssh        Specify ssh command. Default from $RSYNC_RSH or
                 'ssh -F $HOME/.ssh/config'.
   -P            Parallelise on second lowest level name.
@@ -28,6 +29,7 @@ usage="Usage: $cmd [-e ssh] [-P] [remotehost:]other-tree this-tree subdir-patter
     oldserver:/backup/vhosts/aeryn*/BASENAME/YYYY-MM-DD
   parallelising on each 'aeryn*' name."
 
+all=
 parallel=
 echo=echo
 vecho=:
@@ -41,6 +43,7 @@ badopts=
 while [ $# -gt 0 ]
 do
   case $1 in
+    -a) all=1 ;;
     -e) ssh=$2; shift ;;
     -P) parallel=1 ;;
     -v) echo=echo vecho=echo ;;
@@ -165,8 +168,10 @@ upperdirs=$(
         for date in $(remote ls "$rsubdir" | grep '^20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]' | sort -r)
         do
           tag=$upperdir/$basedir/$date
-          $vecho "$tag"
           localdatedir=$localdir/$date
+          [ $all ] || [ ! -d "$localdatedir/." ] || continue
+
+          $vecho "$tag"
 
           ( set -ue
             set -- rsync -i -aHO --delete
