@@ -85,7 +85,7 @@ fi
 ismaildir "$omaildir" || $trace maildir "$omaildir"
 
 [ -n "$MAIL_IMAPSYNC" ] \
-&& $trace imap-sync $imapsyncopts "$MAILDIR" "$MAIL_IMAPSYNC" "$foldername" "$old/$foldername"
+&& $trace imap-sync $imapsyncopts "$MAILDIR" "$MAIL_IMAPSYNC" "$foldername" "$old/$foldername" out spool spool-in spool-out
 
 # where to take copies - presumes sendmail=sendmesg-fcc in muttrc
 SENDMESG_FCC="$maildir +spool-out"
