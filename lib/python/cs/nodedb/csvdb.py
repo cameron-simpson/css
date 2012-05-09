@@ -133,8 +133,9 @@ class Backend_CSVFile(_NoBackend):
   def sync(self):
     ''' Update the CSV file.
     '''
-    assert not self.nodedb.readonly
-    if not self.nodedb.readonly:
+    if self.nodedb.readonly:
+      error("sync on readonly %s", self)
+    else:
       write_csv_file(self.csvpath, self.nodedb.nodedata())
 
   def iteritems(self):
