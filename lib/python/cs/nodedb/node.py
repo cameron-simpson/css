@@ -715,7 +715,14 @@ class NodeDB(dict):
     '''
     return Node(t, name, self)
 
+  def sync(self):
+    ''' Synchronise: update the backend to match the current frontend state.
+    '''
+    self._backend.sync()
+
   def close(self):
+    ''' Close this NodeDB.
+    '''
     self._backend.close()
 
   def type(self, t):
