@@ -20,7 +20,9 @@ usage="Usage: $cmd [-d debug] [-q] [-u ui] [-x] here there folders...
 badopts=
 
 logdir=$LOGDIR/offlineimap
-ui=TTYUI
+##ui=TTYUI
+ui=basic
+local_inbox=me
 ##ui=Blinkenlights
 debug=
 flags=
@@ -105,45 +107,105 @@ case "$there" in
   *)    port=143 ;;
 esac
 
-rep_here=`printf '%s\n' "$here" | tr -s / _`
+case "$here" in
+  $HOME/*)
+    len=${#HOME}
+    len=$((len+1))
+    rep_here=${here:$len}
+    ;;
+  *)rep_here=$here
+esac
+rep_here=`printf '%s\n' "$rep_here" | tr -s / _`
 rep_there=$username@$there:$port
 account=$rep_here::$rep_there
 folders=$(for f; do echo "$prepath$f"; done | tr '\012' , | sed 's/,$//')
-logfile=$logdir/$account-`date '+%Y%m%dT%H%M%S'`-$$
+##logfile=$logdir/$account-`date '+%Y%m%dT%H%M%S'`-$$
+logfile=$logdir/$account
 
 cfg=$tmppfx.cfg
-exec 3>"$cfg"
+pyfile=$tmppfx.py
 
-cat <<X >&3
+cat <<X >"$cfg"
 [general]
 accounts = $account
 metadata = $OFFLINEIMAP_META
 ui = $ui
 fsync = false
+pythonfile = $pyfile
 
 [Account $account]
 localrepository = $rep_here
 remoterepository = $rep_there
+##presynchook = echo PRESYNC
+##postynchook = echo POSTSYNC
 
 [Repository $rep_here]
 type = Maildir
 localfolders = $here
-nametrans = lambda foldername: '$prepath' + foldername
+nametrans = lambda f: here2there(f)
+sep = /
 
 [Repository $rep_there]
 type = IMAP
-nametrans = lambda foldername: foldername[len('$prepath'):] if foldername.startswith('$prepath') else foldername
+nametrans = lambda f: there2here(f)
 remotehost = $there
 remoteuser = $username
 remoteport = $port
 ##remotepassword = $password
 remotepassfile = ~/private/passwd.$rep_there
+folderfilter = lambda f: use_folder(f)
 X
 
-exec 3>&-
+cat <<X >"$pyfile"
+#!/usr/bin/python
 
+import sys
+
+prepath = '$prepath'
+local_inbox = '$local_inbox'
+folders = [ folder for folder in '$folders'.split(',') if folder ]
+
+def use_folder(f):
+  global folders
+  useit = f in folders
+  ##if 'auspc' in f or 'hg' in f:
+  ##  print >>sys.stderr, "useit=%r, f=%r, folders=%r" % (useit, f, folders)
+  return useit
+
+def here2there(foldername):
+  global prepath
+  of = foldername
+  foldername = prepath + foldername
+  ##print >>sys.stderr, "here2there: %r -> %r" % (of, foldername)
+  return foldername
+
+def there2here(foldername):
+  global prepath
+  of = foldername
+  if foldername == 'INBOX':
+    foldername = local_inbox
+  elif foldername.startswith(prepath):
+    foldername = foldername[len(prepath):]
+  else:
+    if use_folder(foldername):
+      print >>sys.stderr, "there2here: unrecognised foldername %r, unchanged" % (foldername,)
+  ##print >>sys.stderr, "there2here: %r -> %r" % (of, foldername)
+  return foldername
+X
+
+set -- $HOME/bin-local/offlineimap $flags -1 -c "$cfg" -a "$account" -d "$debug" -l "$logfile" ##--info
+
+echo >>"$logfile"
+echo >>"$logfile"
+date >>"$logfile"
+echo "$*" >>"$logfile"
+$trace "$@"
+xit=$?
+echo >>"$logfile"
+echo "Config:" >>"$logfile"
 cat "$cfg" >>"$logfile"
+echo >>"$logfile"
+echo "Python:" >>"$logfile"
+cat "$pyfile" >>"$logfile"
 
-$trace offlineimap $flags -c "$cfg" -d "$debug" -f "$folders" -l "$logfile"
-
-##cat "$logfile"
+exit $xit
