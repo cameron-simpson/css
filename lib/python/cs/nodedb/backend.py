@@ -125,6 +125,9 @@ class Backend(_BackendMappingMixin):
     ##assert False, "OBSOLETE"
     return self.nodedb.fromtext(value)
 
+  def sync(self):
+    raise NotImplementedError
+
   def close(self):
     raise NotImplementedError
 
@@ -153,6 +156,8 @@ class Backend(_BackendMappingMixin):
 class _NoBackend(Backend):
   ''' Dummy backend for emphemeral in-memory NodeDBs.
   '''
+  def sync(self):
+    pass
   def close(self):
     pass
   def extendAttr(self, type, name, attr, values):
