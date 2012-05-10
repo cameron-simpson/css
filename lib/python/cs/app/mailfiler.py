@@ -103,7 +103,7 @@ def main(argv, stdin=None):
       while True:
         for MW in maildirs:
           debug("process %s", MW.mdir.dir)
-          with LogTime("MW.filter()", threshold=0.0):
+          with LogTime("%s.filter()" % (MW,), threshold=1.0):
             for key, reports in MW.filter():
               pass
         if delay is None:
@@ -647,6 +647,10 @@ class WatchedMaildir(O):
     self.flush()
     warning("%d rules", len(self.rules))
 
+  def __str__(self):
+    return "<WatchedMaildir %s modes=%s, %d rules, %d lurking>" \
+           % (self.mdir, self.filter_modes, len(self.rules), len(self.lurking))
+
   def flush(self):
     ''' Forget state.
         The set of lurkers is emptied.
@@ -675,7 +679,7 @@ class WatchedMaildir(O):
             skipped += 1
             continue
           nmsgs += 1
-          with LogTime("key = %s" % (key,), threshold=0.0, level=DEBUG):
+          with LogTime("key = %s" % (key,), threshold=1.0, level=DEBUG):
             M = mdir[key]
             state = RuleState(M, self.filter_modes)
             state.message_path = mdir.keypath(key)
@@ -701,7 +705,8 @@ class WatchedMaildir(O):
             yield key, reports
           if self.filter_modes.justone:
             break
-      info("filtered %d messages (%d skipped) in %5.3fs", nmsgs, skipped, TK.elapsed)
+      if nmsgs or TK.elapsed >= 0.2:
+        info("filtered %d messages (%d skipped) in %5.3fs", nmsgs, skipped, TK.elapsed)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
