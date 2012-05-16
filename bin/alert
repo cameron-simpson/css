@@ -4,26 +4,62 @@
 #	- Cameron Simpson <cs@zip.com.au>
 #
 
-cmd=$0
-usage="Usage: $cmd [-c colour] [echo-args...]"
+set -ue
 
+: ${OS:=`uname -s | tr '[A-Z]' '[a-z]'`}
 : ${LOGDIR:=$HOME/var/log}
 : ${ALERTLOG:=$LOGDIR/alert-local}
-exec >>"$ALERTLOG"
-badopts=
+
+cmd=$0
+usage="Usage: $cmd [-c colour] [-G] {-|echo-args...]}"
+
 colour=
-case $1 in
-  -c) colour=$2; shift; shift ;;
-  --) shift ;;
-  -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1; shift ;;
+growl=
+case "$OS" in
+  darwin)       growl=1 ;;
 esac
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -c) colour=$2; shift ;;
+    -G) growl=1 ;;
+    +G) growl= ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing \"-\" or echo-args" >&2
+  badopts=1
+else
+  case "$*" in
+    -)  set -- "`cat`" ;;
+  esac
+fi
+
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
-[ $# = 0 ] && set -- "`cat`"
+
+xit=0
+
+exec >>"$ALERTLOG"
+
 if [ -n "$colour" ]
 then  colour_echo "$colour" "$*"
 else  echo "$*"
+fi || xit=1
+
+if [ $growl ]
+then
+  growlnotify -m "$*" || xit=1
 fi
-case $ARCH in
-  apple.*.darwin)
-    growlnotify -m "$*" ;;
-esac
+
+exit $xit
