@@ -91,6 +91,7 @@ xit=0
 
 lastbase=
 lasthost=
+termmode=-window
 for target in `hostlist "$targets"`
 do
   case "$target" in
@@ -157,8 +158,9 @@ do
     set -- envssh $RTERM_SSHOPTS $sshx11opt $sshopts -- "$host" "$qcmd"
     [ $doscript ] && set -- logscript -m "$name: $msg" $nomsgopt -- "$name" "$@"
 
-    exec $trace term $termopts -n "$name" -e "$@"
+    exec $trace term $termmode $termopts -n "$name" -e "$@"
   ) || xit=1
+  termmode=-tab
 done
 
 exit $xit
