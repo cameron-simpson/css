@@ -140,8 +140,9 @@ case "$OS,$TERM,$DISPLAY" in
     wd=`/bin/pwd`
     qwd=`shqstr "$wd"`
     ( echo '#!/bin/sh'
+      echo "rm -f $qrunme"
       dumpenv -f -sh
-      printf "%s\n" ": set -x; rm -f $qrunme; cd $qwd; exec $qcmd"
+      printf "%s\n" ": set -x; cd $qwd; exec $qcmd"
     ) >"$runme"
     $trace chmod u+rx "$runme"
     case $windowmode in
@@ -152,8 +153,10 @@ case "$OS,$TERM,$DISPLAY" in
               ;;
     esac
     app=iTerm
+    # inherently async, so turn off our own async
+    async=
     set -- \
-      osascript \
+      set-x osascript \
         -e 'tell app "'"$app"'"
               set myterm to ('"$itermterm"')
               tell myterm
