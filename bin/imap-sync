@@ -12,7 +12,7 @@ set -ue
 : ${LOGDIR:=$HOME/var/log}
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-d debug] [-q] [-u ui] [-x] here there folders...
+usage="Usage: $cmd [-1] [-d debug] [-q] [-u ui] [-x] here there folders...
   here  A directory containing maildir folders.
   there An IMAP server reference of the form:
           [username[:password]@]hostname[:port][/prepath]"
@@ -32,7 +32,7 @@ while [ $# -gt 0 ]
 do
   case $1 in
     -d) debug=$2; shift ;;
-    -q) flags="$flags $1" ;;
+    -1 | -q) flags="$flags $1" ;;
     -u) ui=$2; shift ;;
     -x) trace=set-x ;;
     --) shift; break ;;
@@ -193,7 +193,7 @@ def there2here(foldername):
   return foldername
 X
 
-set -- $HOME/bin-local/offlineimap $flags -1 -c "$cfg" -a "$account" -d "$debug" -l "$logfile" ##--info
+set -- $HOME/bin-local/offlineimap $flags -c "$cfg" -a "$account" -d "$debug" -l "$logfile" ##--info
 
 echo >>"$logfile"
 echo >>"$logfile"
