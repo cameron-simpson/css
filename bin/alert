@@ -59,7 +59,8 @@ fi || xit=1
 
 if [ $growl ]
 then
-  growlnotify -m "$*" || xit=1
+  # try growlnotify, otherwise hope /dev/tty is an iTerm
+  growlnotify -m "$*" || echo $'\e]9;$*\a' >/dev/tty || xit=1
 fi
 
 exit $xit
