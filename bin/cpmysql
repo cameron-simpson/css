@@ -406,7 +406,6 @@ case "$dst" in
           | awk -F '	' 'NR > 1 { print $1 "@" $2 }' \
           | sort
         )
-        echo "dbusers =" $dbusers
         for dbuser in $dbusers
         do
           sqluser=$(echo "$dbuser" | sed 's/\(.*\)@\(.*\)/`\1`@`\2`/')
