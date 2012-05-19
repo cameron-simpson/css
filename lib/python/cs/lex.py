@@ -217,6 +217,9 @@ def unrfc2047(s):
       raise RunTimeError("unhandled RFC2047 string: %r" % (m.group(),))
     try:
       enctext = enctext.decode(enccset)
+    except LookupError, e:
+      warning("%r: %e", enctext, e)
+      enctext = enctext.decode('iso8859-1')
     except UnicodeDecodeError, e:
       warning("%r: %e", enctext, e)
       enctext = enctext.decode(enccset, 'replace')
