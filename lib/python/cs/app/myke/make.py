@@ -516,12 +516,12 @@ class Action(object):
         return M.defer(self._shcmd, target, shcmd)
 
       if v == 'make':
-        subtargets = self.mexpr.eval().split()
+        subtargets = self.mexpr(self.context, target.namespaces).split()
         mdebug("targets = %s", subtargets)
         for submake in subtargets:
-          self.maker[submake].make()
+          M[submake].make()
         for submake in submakes:
-          status = self.maker[submake].status
+          status = M[submake].status
           mdebug("%s submake %s status = %s", ("OK" if status else "FAILED"), submake, status)
           if not status:
             return CallableValue(False) if as_func else False
