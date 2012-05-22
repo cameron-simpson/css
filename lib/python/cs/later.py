@@ -12,7 +12,7 @@ import time
 from cs.threads import AdjustableSemaphore, IterablePriorityQueue, \
                        WorkerThreadPool, TimerQueue
 from cs.misc import seq
-from cs.logutils import Pfx, info, debug, D
+from cs.logutils import Pfx, info, warning, debug, D
 
 STATE_PENDING = 0       # function not yet dispatched
 STATE_RUNNING = 1       # function executing
@@ -102,6 +102,8 @@ class PendingFunction(object):
 
   @property
   def cancelled(self):
+    ''' Test whether this PendingFunction has been cancelled.
+    '''
     return self.state == STATE_CANCELLED
 
   def cancel(self):
@@ -142,12 +144,12 @@ class PendingFunction(object):
   def wait(self):
     ''' Calling the .wait() method waits for the function to run to
         completion and returns a tuple as for the WorkerThreadPool's
-        .dispatch() return queue:
+        .dispatch() return queue.
         On completion the sequence:
           func_result, None, None, None
         is returned.
         On an exception the sequence:
-          None, exec_type, exc_value, exc_traceback
+          None, exc_type, exc_value, exc_traceback
         is returned.
     '''
     self.join()
@@ -276,7 +278,7 @@ class LateFunction(PendingFunction):
       self.func = None
 
   def __call__(self):
-    ''' Calling the object waits for the function to run to completion
+    ''' Calling the LateFunction waits for the function to run to completion
         and returns the function return value.
         If the function threw an exception that exception is reraised.
     '''
@@ -302,7 +304,7 @@ class Later(object):
       functions that may be queued up; the default is 0 (no limit).
       Calls to submit functions when the inbound limit is reached block
       until some functions are dispatched.
-      The `name` paraeter may be used to supply an identifying name
+      The `name` parameter may be used to supply an identifying name
       for this instance.
   '''
   def __init__(self, capacity, inboundCapacity=0, name=None):
@@ -402,13 +404,15 @@ class Later(object):
 
   def close(self):
     with Pfx("%s.close()" % (self,)):
-      assert not self.closed
-      self.closed = True
-      if self._timerQ:
-        self._timerQ.close()
-      self._LFPQ.close()
-      self._dispatchThread.join()
-      self._workers.close()
+      if self.closed:
+        warning("close of closed Later %r", self)
+      else:
+        self.closed = True
+        if self._timerQ:
+          self._timerQ.close()
+        self._LFPQ.close()
+        self._dispatchThread.join()
+        self._workers.close()
 
   def _dispatcher(self):
     ''' Read LateFunctions from the inbound queue as capacity is available
@@ -460,8 +464,8 @@ class Later(object):
         If the parameter `pfx` is not None, submit pfx.func(func);
           see cs.logutils.Pfx's .func method for details.
     '''
-    assert delay is None or when is None, \
-           "you can't specify both delay= and when= (%s, %s)" % (delay, when)
+    if delay is not None and when is not None:
+      raise ValueError("you can't specify both delay= and when= (%s, %s)" % (delay, when))
     if priority is None:
       priority = self._priority
     elif type(priority) is int:
@@ -501,7 +505,7 @@ class Later(object):
   def multisubmit(self, params, func, iter):
     ''' Generator that iterates over `iter`, submitting function calls and
         yielding the corresponding LateFunctions, specificly calling:
-          self.submitargs(params, func, i)
+          self.defer(params, func, i)
         where `i` is an element of `iter`.
         Handy for submitting a batch of jobs.
         Caution: being a generator, the functions are not submitted
@@ -510,44 +514,30 @@ class Later(object):
           L.multisubmit(f, xrange(100))
     '''
     for i in iter:
-      yield self.submitargs(params, func, i)
-
-  def submitargs(self, params, func, *args, **kwargs):
-    ''' Submit a function with arguments for later dispatch.
-        Return the corresponding LateFunction for result collection.
-        The `params` parameter is a dictionary whose members correspond to
-        the `priority`, `delay`, `when` parameters of submit().
-        For example:
-          LF = L.submitargs( {'priority': 2, 'delay': 3},
-                             func, 1, 2, 3, d=4, e=5 )
-        is equivalent to:
-          LF = L.submit(partial(func, 1, 2, 3, d=4, e=5),
-                        priority=2, delay=3)
-        Each results in a call to:
-          func(1, 2, 3, d=4, e=5)
-        at least 3 seconds from now.
-    '''
-    return self.submit(partial(func, *args, **kwargs), **params)
-
-  def pdefer(self, priority, func, *a, **kw):
-    ''' Queue the function `func` for later dispatch using the
-        specified `priority` with the spcified arguments `*a` and `**kw`.
-        Return the corresponding LateFunction for result collection.
-    '''
-    if a or kw:
-      func = partial(func, *a, **kw)
-    return self.submit(func, priority=priority)
+      yield self.defer(params, func, i)
 
   def defer(self, func, *a, **kw):
     ''' Queue the function `func` for later dispatch using the
         default priority with the spcified arguments `*a` and `**kw`.
         Return the corresponding LateFunction for result collection.
+        `func` may optionally be preceeded by a mapping `params` containing
+        parameters for `priority`, `delay`, and `when`.
         Equivalent to:
-          submit(functools.partial(func, *a, **kw))
+          submit(functools.partial(func, *a, **kw), **params)
     '''
+    if callable(func):
+      params = {}
+    else:
+      params = func
+      func = a.pop(0)
+      if not callable(func):
+        raise RuntimeError('defer: neither params nor func is callable')
     if a or kw:
       func = partial(func, *a, **kw)
-    return self.submit(func)
+    return self.submit(func, **params)
+
+  def __call__(self, *a, **kw):
+    return self.defer(*a, **kw)()
 
   @contextmanager
   def priority(self, pri):

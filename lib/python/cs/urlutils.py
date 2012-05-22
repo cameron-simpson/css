@@ -9,6 +9,11 @@ import os.path
 import sys
 from itertools import chain
 from bs4 import BeautifulSoup, Tag, BeautifulStoneSoup
+try:
+  import lxml
+  BS4MODE = 'lxml'
+except ImportError:
+  BS4MODE = None
 from netrc import netrc
 from StringIO import StringIO
 import socket
@@ -138,7 +143,7 @@ class _URL(unicode):
     '''
     content = self.content
     try:
-      P = BeautifulSoup(content.decode('utf-8', 'replace'))
+      P = BeautifulSoup(content.decode('utf-8', 'replace'), BS4MODE)
     except Exception, e:
       exception("%s: .parsed: BeautifulSoup(unicode(content)) fails: %s", self, e)
       with open("cs.urlutils-unparsed.html", "wb") as bs:
