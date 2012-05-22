@@ -1,6 +1,6 @@
 #!/usr/bin/python -tt
 #
-# Stuff to do with sequences.
+# Stuff to do with sequences and iterables.
 #       - Cameron Simpson <cs@zip.com.au> 20jul2008
 #
 
@@ -89,13 +89,15 @@ def NamedTuple(fields,iter=()):
   return NamedTupleClassFactory(*fields)(iter)
 
 def imerge(*seqs):
-  ''' Merge a list of sequences in order.
-      It relies on the source sequences being ordered and their elements
-      being comparable, through slightly misordered sequences (for example,
-      as extracted from web server logs) will produce slightly misordered
-      results, as the merging is done on the basis of the front elements
-      of each sequence.
+  ''' Merge an iterable of ordered iterables in order.
+      It relies on the source iterables being ordered and their elements
+      being comparable, through slightly misordered iterables (for example,
+      as extracted from web server logs) will produce only slightly
+      misordered results, as the merging is done on the basis of the front
+      elements of each iterable.
   '''
+  assert isinstance(seqs, (tuple, list)), \
+    "expected *seqs to be tuple or list, got %s" % (type(seqs),)
   #TODO: don't pop(), iterate
   seqs = list( iter(s) for s in seqs )
 
