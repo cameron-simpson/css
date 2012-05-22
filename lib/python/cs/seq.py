@@ -89,7 +89,7 @@ def NamedTuple(fields,iter=()):
   '''
   return NamedTupleClassFactory(*fields)(iter)
 
-def imerge(*seqs):
+def imerge(*iters):
   ''' Merge an iterable of ordered iterables in order.
       It relies on the source iterables being ordered and their elements
       being comparable, through slightly misordered iterables (for example,
@@ -97,26 +97,25 @@ def imerge(*seqs):
       misordered results, as the merging is done on the basis of the front
       elements of each iterable.
   '''
-  seqs = list(seqs)
-  # prime the list of head elements with (value, seq)
+  # prime the list of head elements with (value, iter)
   heap = []
-  for S in seqs:
-    S = iter(S)
+  for I in iters:
+    I = iter(I)
     try:
-      head = S.next()
+      head = I.next()
     except StopIteration:
       pass
     else:
-      heapq.heappush(heap, (head, S))
+      heapq.heappush(heap, (head, I))
   while heap:
-    head, S = heapq.heappop(heap)
+    head, I = heapq.heappop(heap)
     yield head
     try:
-      head = S.next()
+      head = I.next()
     except StopIteration:
       pass
     else:
-      heapq.heappush(heap, (head, S))
+      heapq.heappush(heap, (head, I))
 
 if __name__ == '__main__':
   import sys
