@@ -6,6 +6,7 @@
 
 import bisect
 import unittest
+import heapq
 
 class Range(list):
   def __init__(self,values=(),step=1):
@@ -96,37 +97,26 @@ def imerge(*seqs):
       misordered results, as the merging is done on the basis of the front
       elements of each iterable.
   '''
-  assert isinstance(seqs, (tuple, list)), \
-    "expected *seqs to be tuple or list, got %s" % (type(seqs),)
-  #TODO: don't pop(), iterate
-  seqs = list( iter(s) for s in seqs )
-
-  # prime the list of head elements
-  heads = list(None for i in range(len(seqs)))
-  i=0
-  while i < len(seqs):
+  seqs = list(seqs)
+  # prime the list of head elements with (value, seq)
+  heap = []
+  for S in seqs:
+    S = iter(S)
     try:
-      heads[i] = seqs[i].next()
+      head = S.next()
     except StopIteration:
-      seqs.pop(i)
-      heads.pop(i)
-      continue
-    i += 1
-
-  # yield leading items in order
-  while len(heads) > 0:
-    choice = 0
-    head = heads[0]
-    for i in range(1, len(seqs)):
-      if heads[i] < head:
-        choice = i
-        head = heads[i]
+      pass
+    else:
+      heapq.heappush(heap, (head, S))
+  while heap:
+    head, S = heapq.heappop(heap)
     yield head
     try:
-      heads[choice] = seqs[choice].next()
+      head = S.next()
     except StopIteration:
-      heads.pop(choice)
-      seqs.pop(choice)
+      pass
+    else:
+      heapq.heappush(heap, (head, S))
 
 class TestAll(unittest.TestCase):
 
