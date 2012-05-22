@@ -43,8 +43,11 @@ cmdpid=$$
     if kill -0 $cmdpid 2>/dev/null
     then
 	echo "$0: timed out after $timeout seconds: $*" >&2
-	exec 2>/dev/null
-	kill $sigopt $cmdpid && { sleep 2; kill -9 $cmdpid; }
+	if ( set -x; kill $sigopt $cmdpid )
+        then
+            sleep 2
+            kill -0 $cmdpid 2>/dev/null && ( set -x; kill -9 $cmdpid )
+        fi
     fi
   ) &
 )
