@@ -7,6 +7,7 @@
 import bisect
 import unittest
 import heapq
+import itertools
 
 class Range(list):
   def __init__(self,values=(),step=1):
@@ -116,6 +117,39 @@ def imerge(*iters):
       pass
     else:
       heapq.heappush(heap, (head, I))
+
+def onetoone(func):
+  ''' A decorator for a method of a sequence to merge the results of
+      passing every element of the sequence to the function, expecting a
+      single value back.
+      Example:
+        class X(list):
+          @onetoone
+          def lower(self, item):
+            return item.lower()
+        strs = X(['Abc', 'Def'])
+        lower_strs = X.lower()
+  '''
+  def gather(self, *a, **kw):
+    for item in self:
+      yield func(item, *a, **kw)
+  return gather
+
+def onetomany(func):
+  ''' A decorator for a method of a sequence to merge the results of
+      passing every element of the sequence to the function, expecting
+      multiple values back.
+      Example:
+        class X(list):
+          @onetoone
+          def chars(self, item):
+            return item
+        strs = X(['Abc', 'Def'])
+        all_chars = X.chars()
+  '''
+  def gather(self, *a, **kw):
+    return itertools.chain(*[ func(item) for item in self ])
+  return gather
 
 if __name__ == '__main__':
   import sys
