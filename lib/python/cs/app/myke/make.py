@@ -179,8 +179,7 @@ class Maker(object):
       if target in targets:
         T = targets[target]
       else:
-        raise ValueError("unknown Target \"%s\"" % (target,))
-        ##T = targets[target] = Target(target, self)
+        T = targets[target] = Target(self, target, context=None, prereqs=(), postprereqs=(), actions=[])
     return T
 
   def setDebug(self, flag, value):
@@ -425,7 +424,7 @@ class Target(object):
           self.pending_targets = []
           for dep in targets:
             with Pfx(dep):
-              self.LFs.append(M[dep].makeX(as_func=True))
+              self.LFs.append(M[dep].make(as_func=True))
         else:
           # any outstanding actions?
           actions = self.pending_actions
@@ -518,8 +517,7 @@ class Action(object):
       if v == 'make':
         subtargets = self.mexpr(self.context, target.namespaces).split()
         mdebug("targets = %s", subtargets)
-        for submake in subtargets:
-          M[submake].make()
+        submakes = [ M[subtarget].make() for subtarget in subtargets ]
         for submake in submakes:
           status = M[submake].status
           mdebug("%s submake %s status = %s", ("OK" if status else "FAILED"), submake, status)
