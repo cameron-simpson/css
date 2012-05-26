@@ -768,6 +768,13 @@ class O(object):
                )
            )
 
+def unimplemented(func):
+  ''' Decorator for stub methods that must be implemented by a stub class.
+  '''
+  def wrapper(self, *a, **kw):
+    raise NotImplementedError("%s.%s(*%s, **%s)" % (type(self), func.func_name, a, kw))
+  return wrapper
+
 class slist(list):
   def __str__(self):
     return "[" + ",".join(str(e) for e in self) + "]"
