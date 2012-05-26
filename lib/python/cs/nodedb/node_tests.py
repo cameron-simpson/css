@@ -7,11 +7,12 @@
 import sys
 import unittest
 from . import NodeDB, Node
+from .mappingdb import MappingBackend
 
 class TestAll(unittest.TestCase):
 
   def setUp(self):
-    self.db = NodeDB(backend=None)
+    self.db = NodeDB(backend=MappingBackend({}))
 
   def test01serialise(self):
     H = self.db.newNode('HOST', 'foo')
