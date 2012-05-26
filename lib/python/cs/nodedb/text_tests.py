@@ -6,13 +6,14 @@
 
 import sys
 import unittest
-from cs.nodedb.text import totoken, fromtoken, get_commatext
+from .text import totoken, fromtoken, get_commatext
+from .mappingdb import MappingBackend
 
 class TestTokeniser(unittest.TestCase):
 
   def setUp(self):
     from .node import NodeDB
-    self.db = NodeDB(backend=None)
+    self.db = NodeDB(backend=MappingBackend({}))
 
   def test01tokenise(self):
     ''' Test totoken(). '''
