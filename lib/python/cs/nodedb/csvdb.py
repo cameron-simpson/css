@@ -12,7 +12,7 @@ from types import StringTypes
 import sys
 from cs.logutils import Pfx, error, warning , info, D
 from . import NodeDB
-from .node import _NoBackend
+from .backend import Backend
 
 def read_csv_file(fp, skipHeaders=False, noHeaders=False):
   ''' Read a CSV file in vertical format (TYPE,NAME,ATTR,VALUE),
@@ -118,10 +118,10 @@ def write_csv_file(fp, nodedata, noHeaders=False):
         attr = u''
         name = u''
 
-class Backend_CSVFile(_NoBackend):
+class Backend_CSVFile(Backend):
 
   def __init__(self, csvpath, readonly=False):
-    self.readonly = readonly
+    Backend.__init__(self, readonly=readonly)
     self.csvpath = csvpath
 
   def __str__(self):
@@ -149,6 +149,9 @@ class Backend_CSVFile(_NoBackend):
   def itervalues(self):
     for item in self.iteritems():
       yield item[1]
+
+  def __setitem__(self, key, N):
+    self.changed = True
 
 if __name__ == '__main__':
   import cs.nodedb.csvdb_tests
