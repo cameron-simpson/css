@@ -5,6 +5,8 @@
 #
 
 import unittest
+from cs.logutils import D
+from cs.misc import unimplemented
 
 class _BackendMappingMixin(object):
   ''' A mapping interface to be presented by all Backends.
@@ -16,10 +18,11 @@ class _BackendMappingMixin(object):
   def keys(self):
     return list(self.iterkeys())
 
+  @unimplemented
   def iterkeys(self):
     ''' Yield (type, name) tuples for all nodes in the backend database.
     '''
-    raise NotImplementedError
+    pass
 
   def items(self):
     return list(self.iteritems())
@@ -40,11 +43,12 @@ class _BackendMappingMixin(object):
     for key in self.iterkeys():
       yield self[key]
 
+  @unimplemented
   def __getitem__(self, key):
     ''' Return a dict with a mapping of attr => values for the
         specified node key.
     '''
-    raise NotImplementedError
+    pass
 
   def get(self, key, default):
     try:
@@ -53,11 +57,13 @@ class _BackendMappingMixin(object):
       return default
     return value
 
+  @unimplemented
   def __setitem__(self, key, node_dict):
-    raise NotImplementedError
+    pass
 
+  @unimplemented
   def __delitem__(self, key):
-    raise NotImplementedError
+    pass
 
   __hash__ = None
 
@@ -84,15 +90,13 @@ class Backend(_BackendMappingMixin):
   ''' Base class for NodeDB backends.
   '''
 
+  def __init__(self, readonly):
+    self.nodedb = None
+    self.readonly = readonly
+    self.changed = False
+
   def __str__(self):
     return type(self).__name__
-
-  def set_nodedb(self, nodedb):
-    ''' Set the nodedb controlling this backend.
-        Called by NodeDB.__init__().
-    '''
-    assert not hasattr(self, 'nodedb')
-    self.nodedb = nodedb
 
   def nodedata(self):
     ''' Yield node data in:
@@ -100,7 +104,8 @@ class Backend(_BackendMappingMixin):
         form.
     '''
     for k, attrmap in self.iteritems():
-      yield k[0], k[1], attrmap
+      k1, k2 = k
+      yield k1, k2, attrmap
 
   def apply_to(self, nodedb):
     ''' Apply the nodedata from this backend to a NodeDB.
@@ -125,57 +130,35 @@ class Backend(_BackendMappingMixin):
     ##assert False, "OBSOLETE"
     return self.nodedb.fromtext(value)
 
+  @unimplemented
   def sync(self):
-    raise NotImplementedError
+    pass
 
+  @unimplemented
   def close(self):
-    raise NotImplementedError
+    pass
 
-  def saveAttrs(self, attrs):
+  def setAttr(self, t, name, attr, values):
     ''' Save the full contents of this attribute list.
     '''
-    N = attrs.node
-    attr = attrs.attr
-    self.delAttr(N.type, N.name, attr)
-    if attrs:
-      self.extendAttr(N.type, N.name, attr, attrs)
+    self.delAttr(t, name, attr)
+    if values:
+      self.extendAttr(t, name, attr, values)
 
-  def extendAttr(self, N, attr, values):
+  @unimplemented
+  def extendAttr(self, t, name, attr, values):
     ''' Append values to the named attribute.
     '''
-    raise NotImplementedError
+    pass
 
-  def delAttr(self, N, attr):
+  @unimplemented
+  def delAttr(self, t, name, attr):
     ''' Remove all values from the named attribute.
     '''
-    raise NotImplementedError
+    pass
 
-  def set1Attr(self, N, attr, value):
-    raise NotImplementedError
-
-class _NoBackend(Backend):
-  ''' Dummy backend for emphemeral in-memory NodeDBs.
-  '''
-  def sync(self):
-    pass
-  def close(self):
-    pass
-  def extendAttr(self, type, name, attr, values):
-    pass
-  def delAttr(self, type, name, attr):
-    pass
-  def set1Attr(self, type, name, attr, value):
-    pass
-  def iterkeys(self):
-    if False:
-      yield None
-
-  def __getitem__(self, key):
-    raise KeyError
-  def __setitem__(self, key, N):
-    pass
-  def __delitem__(self, key):
-    pass
+  def set1Attr(self, t, name, attr, value):
+    return self.setAttr(t, name, attr, (value,))
 
 class _QBackend(Backend):
   ''' A backend to accept updates and queue them for asynchronous
@@ -192,9 +175,6 @@ class _QBackend(Backend):
     self._T = Thread(target=self._drain)
     self._T.start()
 
-  def sync(self):
-    raise NotImplementedError
-
   def close(self):
     self._Q.close()
     self._T.join()
@@ -204,16 +184,16 @@ class _QBackend(Backend):
     for what, args in self._Q:
       what(*args)
 
-  def newNode(self, N):
-    self._Q.put( (self.backend.newNode, (N,)) )
-  def delNode(self, N):
-    self._Q.put( (self.backend.delNode, (N,)) )
-  def extendAttr(self, N, attr, values):
-    self._Q.put( (self.backend.extendAttr, (N, attr, values)) )
-  def set1Attr(self, N, attr, value):
-    self._Q.put( (self.backend.set1Attr, (N, attr, value)) )
-  def delAttr(self, N, attr):
-    self._Q.put( (self.backend.delAttr, (N, attr)) )
+  def newNode(self, t, name):
+    self._Q.put( (self.backend.newNode, (t, name,)) )
+  def delNode(self, t, name):
+    self._Q.put( (self.backend.delNode, (t, name,)) )
+  def extendAttr(self, t, name, attr, values):
+    self._Q.put( (self.backend.extendAttr, (t, name, attr, values)) )
+  def set1Attr(self, t, name, attr, value):
+    self._Q.put( (self.backend.set1Attr, (t, name, attr, value)) )
+  def delAttr(self, t, name, attr):
+    self._Q.put( (self.backend.delAttr, (t, name, attr)) )
 
 class TestAll(unittest.TestCase):
 
