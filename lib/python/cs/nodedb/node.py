@@ -19,7 +19,6 @@ from cs.lex import str1
 from cs.misc import the, get0
 from cs.mappings import parseUC_sAttr
 from cs.logutils import Pfx, D, error, warning, info, debug, exception
-from .backend import _NoBackend
 from .export import edit_csv_wide, export_csv_wide
 
 # regexp to match TYPE:name
@@ -134,6 +133,16 @@ class _AttrList(list):
       return ".%ss[...]" % (self.attr,)
     return "%s.%ss" % (str(self.node), self.attr)
 
+  def _save(self):
+    ''' Rewrite our value completely in the backend.
+    '''
+    N = self.node
+    self.nodedb._backend.setAttr(N.type, N.name, self.attr, self)
+
+  def _extend(self, values):
+    N = self.node
+    self.nodedb._backend.extendAttr(N.type, N.name, self.attr, values)
+
   def __delitem__(self, index):
     if type(index) is int:
       items = (self[index],)
@@ -141,7 +150,7 @@ class _AttrList(list):
       items = itertools.islice(self, index)
     value = list.__delitem__(self, index)
     self.__delitemrefs(items)
-    self.nodedb._backend.saveAttrs(self)
+    self._save()
     return value
 
   def __delslice__(self, i, j):
@@ -150,7 +159,7 @@ class _AttrList(list):
   def __iadd__(self, other):
     self.__additemrefs(other)
     value = list.__iadd__(self, other)
-    self.nodedb._backend.saveAttrs(self)
+    self._save()
     return value
 
   def __imul__(self, other):
@@ -158,7 +167,7 @@ class _AttrList(list):
     value = list.__imul__(self, other)
     self.__additemrefs(self)
     self.__delitemrefs(oitems)
-    self.nodedb._backend.saveAttrs(self)
+    self._save()
     return value
 
   def __setitem__(self, index, value):
@@ -173,55 +182,51 @@ class _AttrList(list):
     self.__delitemrefs(ovalues)
     list.__setitem__(self, index, values)
     self.__additemrefs(values)
-    self.nodedb._backend.saveAttrs(self)
+    self._save()
 
   def __setslice__(self, i, j, values):
     self[max(0, i):max(0, j):] = values
 
-  def append(self, value, noBackend=False):
-    if not noBackend:
-      N = self.node
-      self.nodedb._backend.extendAttr(N.type, N.name, self.attr, (value,))
-    list.append(self, value)
-    self.__additemrefs((value,))
+  def append(self, value):
+    self.extend((value,))
 
-  def extend(self, values, noBackend=False):
+  def extend(self, values):
     # turn iterator into tuple
-    if not noBackend and type(values) not in (list, tuple):
+    if not isinstance(values, (list, tuple)):
       values = tuple(values)
     if len(values) > 0:
-      if not noBackend:
-        N = self.node
-        self.nodedb._backend.extendAttr(N.type, N.name, self.attr, values)
       list.extend(self, values)
       self.__additemrefs(values)
+      self._extend(values)
 
   def insert(self, index, value):
+    N = self.node
     value = list.insert(self, index, value)
-    self.nodedb._backend.saveAttrs(self)
     self.__additemrefs((value,))
+    self._save()
     return value
 
   def pop(self, index=-1):
     value = list.pop(self, index)
-    self.nodedb._backend.saveAttrs(self)
     self.__delitemrefs((value,))
+    self.nodedb._backend.saveAttrs(self)
+    self._save()
     return value
 
   def remove(self, value):
     list.remove(self, value)
-    self.nodedb._backend.saveAttrs(self)
+    self._save()
     self.__delitemrefs(value)
 
-  def reverse(self, *args):
-    list.reverse(self, *args)
-    if self:
-      self.nodedb._backend.saveAttrs(self)
+  def reverse(self):
+    if len(self) > 0:
+      list.reverse(self, *args)
+      self._save()
 
   def sort(self, *args):
-    list.sort(self, *args)
-    if self:
-      self.nodedb._backend.saveAttrs(self)
+    if len(self) > 0:
+      list.sort(self, *args)
+      self._save()
 
   def __getattr__(self, attr):
     ''' Using a .ATTR[s] attribute on an _AttrList indirects through
@@ -422,8 +427,8 @@ class Node(dict):
     k, plural = parseUC_sAttr(item)
     if k is None:
       raise KeyError, repr(item)
-    assert not plural and k not in ('NAME', 'TYPE'), \
-           "forbidden index: %r" % (item,)
+    if plural or item in ('NAME', 'TYPE'):
+      raise KeyError, "forbidden index: %r" % (item,)
     values = self.get(k)
     if len(values):
       # discard old values (removes reverse map)
@@ -632,12 +637,12 @@ class NodeDB(dict):
     # run initially with no backend
     # load data from backend
     # attach backend to collect updates
-    self._backend = _NoBackend()
     self.__nodesByType = {}
-    if backend is not None:
-      backend.set_nodedb(self)
-      backend.apply_to(self)
-      self._backend = backend
+    # load data with no backend, then attach backend
+    self._backend = None
+    backend.nodedb = self
+    backend.apply_to(self)
+    self._backend = backend
 
   def __str__(self):
     return "%s[_backend=%s]" % (type(self).__name__, self._backend)
