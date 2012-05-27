@@ -32,8 +32,9 @@ class Backend_TokyoCabinet(Backend):
                    ))
     self.tclock = allocate_lock()
 
+  @unimplemented
   def sync(self):
-    raise NotImplementedError
+    pass
 
   def close(self):
     if self.tcdb is None:

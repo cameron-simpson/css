@@ -12,6 +12,7 @@ from sqlalchemy.orm import mapper, sessionmaker
 from sqlalchemy.sql import and_, or_, not_, asc
 from sqlalchemy.sql.expression import distinct
 from cs.logutils import Pfx, error, warning, debug
+from cs.misc import unimplemented
 from . import NodeDB, Backend
 
 def NODESTable(metadata, name=None):
@@ -173,8 +174,9 @@ class Backend_SQLAlchemy(Backend):
 ##      return N
 ##    return Backend.fromtext(self, text)
 
+  @unimplemented
   def sync(self):
-    raise NotImplementedError
+    pass
 
   def close(self):
     warning("cs.nodedb.sqla.Backend_SQLAlchemy.close() unimplemented")

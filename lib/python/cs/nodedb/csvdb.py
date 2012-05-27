@@ -140,7 +140,7 @@ def write_csvrow(csvw, t, name, attr, valuetext):
       Note that `valuetext` is a preserialised value as computed by
       NodeDB.totext(value).
   '''
-  # hideous workaround for CSV C module forcing ascii text :-(
+  # hideous workaround for CSV C module forcing ASCII text :-(
   # compute flat 8-bit encodings for supplied strings
   wt8 = t.encode('utf-8')
   name8 = name.encode('utf-8')
