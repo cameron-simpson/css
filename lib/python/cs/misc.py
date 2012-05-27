@@ -748,8 +748,10 @@ class HasFlags:
 
 class O(object):
   ''' A bare object subclass to allow storing arbitrary attributes.
-      It also has a nicer default str() action, and an aggressive repr().
+      It also has a nicer default str() action.
   '''
+
+  O_recurse = True
 
   def __init__(self, **kw):
     ''' Initialise this O.
@@ -760,13 +762,20 @@ class O(object):
       setattr(self, k, kw[k])
 
   def __str__(self):
-    return ( "<%s %s>"
-             % ( self.__class__.__name__,
-                 ",".join([ "%s=%s" % (attr, getattr(self, attr))
-                            for attr in sorted(dir(self)) if attr[0].isalpha()
-                          ])
-               )
-           )
+    recurse = self.O_recurse
+    self.O_recurse = False
+    s = ( "<%s %s>"
+          % ( self.__class__.__name__,
+              ",".join([ ( "%s=%s" % (attr, getattr(self, attr))
+                           if recurse else
+                           "%s=%s" % (attr, type(getattr(self, attr)))
+                         )
+                         for attr in sorted(dir(self)) if attr[0].isalpha()
+                       ])
+            )
+        )
+    self.O_recurse = recurse
+    return s
 
 def unimplemented(func):
   ''' Decorator for stub methods that must be implemented by a stub class.
