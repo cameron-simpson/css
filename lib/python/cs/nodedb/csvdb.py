@@ -14,69 +14,91 @@ from cs.logutils import Pfx, error, warning , info, D
 from . import NodeDB
 from .backend import Backend
 
-def read_csv_file(fp, skipHeaders=False, noHeaders=False):
-  ''' Read a CSV file in vertical format (TYPE,NAME,ATTR,VALUE),
-      yield TYPE, NAME, {ATTR: UNPARSED_VALUES}
+def csv_rows(fp, skipHeaders=False, noHeaders=False):
+  ''' Read a CSV file in vertical format (TYPE,NAME,ATTR,VALUE) and fill
+      in the values implied by empty TYPE, NAME or ATTR columns (previous
+      row's value).
+      `fp` is the name of a CSV file to parse or an open file.
+      `skipHeaders` disables validation of the column header row if true.
+      `noHeaders` indicates there is no column header row if true.
   '''
-  if type(fp) is str:
-    with Pfx("read_csv_file(%s)" % (fp,)):
+  if isinstance(fp, (str, unicode)):
+    with Pfx("csv_rows(%s)" % (fp,)):
       with open(fp, "rb") as csvfp:
-        for csvnode in read_csv_file(csvfp,
-                                     skipHeaders=skipHeaders,
-                                     noHeaders=noHeaders):
-          yield csvnode
+        for row in csv_rows(csvfp,
+                            skipHeaders=skipHeaders,
+                            noHeaders=noHeaders):
+          yield row
     return
-  csvnode = None
   with Pfx("csvreader(%s)" % (fp,)):
     r = csv.reader(fp)
     rownum = 0
     if not noHeaders:
       hdrrow = r.next()
       rownum += 1
-      if not skipHeaders:
-        if hdrrow != ['TYPE', 'NAME', 'ATTR', 'VALUE']:
-          raise ValueError, \
-                "bad header row, expected TYPE, NAME, ATTR, VALUE but got: %s" \
-                % (hdrrow,)
-    attrmap = None
+      with Pfx("row %d" % (rownum,)):
+        if not skipHeaders:
+          if hdrrow != ['TYPE', 'NAME', 'ATTR', 'VALUE']:
+            raise ValueError(
+                    "bad header row, expected TYPE, NAME, ATTR, VALUE but got: %s"
+                    % (hdrrow,))
     otype = None
     oname = None
     oattr = None
     for row in r:
       rownum += 1
-      t, n, attr, value = row
-      try:
-        value = value.decode('utf-8')
-      except UnicodeDecodeError, e:
-        warning("row %d: %s, using errors=replace", rownum, e)
-        value = value.decode('utf-8', errors='replace')
-      if attr.endswith('s'):
-        # revert older plural dump format
-        warning("loading old plural attribute: %s" % (attr,))
-        k, plural = parseUC_sAttr(attr)
-        if k is None:
-          raise ValueError, "failed to parse attribute name: %s" % (attr,)
-        attr = k
-      if t == "":
-        assert otype is not None
-        t = otype
-      if n == "":
-        assert oname is not None
-        n = oname
-      if t != otype or n != oname:
-        if attrmap is not None:
-          yield otype, oname, attrmap
-        attrmap = {}
-      if attr == "":
-        assert oattr is not None
-        attr = oattr
-        attrmap[attr].append(value)
-      else:
-        attrmap[attr]=[value]
-      otype, oname, oattr = t, n, attr
-    if attrmap is not None:
-      yield otype, oname, attrmap
-    return
+      with Pfx("row %d" % (rownum,)):
+        t, n, attr, value = row
+        try:
+          value = value.decode('utf-8')
+        except UnicodeDecodeError, e:
+          warning("%s, using errors=replace", e)
+          value = value.decode('utf-8', errors='replace')
+        if t == "":
+          if otype is None:
+            raise ValueError("empty TYPE with no preceeding TYPE")
+          t = otype
+        else:
+          otype = t
+        if n == "":
+          if oname is None:
+            raise ValueError("empty NAME with no preceeding NAME")
+          n = oname
+        else:
+          oname = n
+        if attr == "":
+          if oattr is None:
+            raise ValueError("empty ATTR with no preceeding ATTR")
+          attr = oattr
+        else:
+          oattr = attr
+        yield t, name, attr, value
+
+def apply_csv_rows(nodedb, fp, skipHeaders=False, noHeaders=False):
+  ''' Read CSV data from `fp` as for csv_rows().
+      Apply values to the specified `nodedb`.
+      Honour the incremental notional for data:
+      - a NAME commencing with '=' discards any existing (TYPE, NAME)
+        and begins anew.
+      - an ATTR commencing with '=' discards any existing ATTR and
+        commences the ATTR anew
+      - an ATTR commencing with '-' discards any existing ATTR;
+        VALUE must be empty
+      Otherwise each VALUE is appended to any existing ATTR VALUEs.
+  '''
+  for t, name, attr, value in csv_rows(fp, skipHeaders=skipHeaders, noHeaders=noHeaders):
+    if name.startswith('='):
+      name = name[1:]
+      nodedb[t, name] = {}
+    if attr.startswith('='):
+      attr = attr[1:]
+      nodedb.setdefault((t, name), {})[attr] = ()
+    elif attr.startswith('-'):
+      if value != "":
+        raise ValueError("ATTR = \"%s\" but non-empty VALUE: %r" % (attr, value))
+      nodedb.setdefault((t, name), {})[attr] = ()
+      continue
+    nodedb[t, name][attr].append(value)
 
 def write_csv_file(fp, nodedata, noHeaders=False):
   ''' Iterate over the supplied `nodedata`, a sequence of:
@@ -124,9 +146,6 @@ class Backend_CSVFile(Backend):
     Backend.__init__(self, readonly=readonly)
     self.csvpath = csvpath
 
-  def __str__(self):
-    return "Backend_CSVFile[%s]" % (self.csvpath,)
-
   def close(self):
     self.sync()
 
@@ -138,6 +157,12 @@ class Backend_CSVFile(Backend):
     else:
       write_csv_file(self.csvpath, self.nodedb.nodedata())
 
+  def apply_nodedata(self):
+    raise NotImplementedError("no %s.apply_nodedata(), apply_to uses incremental mode" % (type(self),))
+
+  def apply_to(self, nodedb):
+    apply_csv_rows(nodedb, self.csvpath)
+    
   def iteritems(self):
     for t, name, attrmap in read_csv_file(self.csvpath):
       yield (t, name), attrmap
