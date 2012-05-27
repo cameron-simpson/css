@@ -95,9 +95,6 @@ class Backend(_BackendMappingMixin):
     self.readonly = readonly
     self.changed = False
 
-  def __str__(self):
-    return type(self).__name__
-
   def nodedata(self):
     ''' Yield node data in:
           type, name, attrmap
