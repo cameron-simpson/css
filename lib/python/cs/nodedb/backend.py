@@ -5,7 +5,7 @@
 #
 
 import unittest
-from cs.logutils import D
+from cs.logutils import D, OBSOLETE
 from cs.misc import unimplemented, O
 
 class _BackendMappingMixin(O):
@@ -111,6 +111,7 @@ class Backend(_BackendMappingMixin):
     '''
     nodedb.apply_nodedata(self.nodedata())
 
+  @OBSOLETE
   def totext(self, value):
     ''' Hook for subclasses that might do special encoding for their backend.
         Discouraged.
@@ -120,6 +121,7 @@ class Backend(_BackendMappingMixin):
     '''
     return self.nodedb.totext(value)
 
+  @OBSOLETE
   def fromtext(self, value):
     ''' Hook for subclasses that might do special decoding for their backend.
         Discouraged.
