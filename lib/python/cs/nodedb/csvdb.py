@@ -48,7 +48,7 @@ def csv_rows(fp, skipHeaders=False, noHeaders=False):
     for row in r:
       rownum += 1
       with Pfx("row %d" % (rownum,)):
-        t, n, attr, value = row
+        t, name, attr, value = row
         try:
           value = value.decode('utf-8')
         except UnicodeDecodeError, e:
@@ -60,12 +60,12 @@ def csv_rows(fp, skipHeaders=False, noHeaders=False):
           t = otype
         else:
           otype = t
-        if n == "":
+        if name == "":
           if oname is None:
             raise ValueError("empty NAME with no preceeding NAME")
-          n = oname
+          name = oname
         else:
-          oname = n
+          oname = name
         if attr == "":
           if oattr is None:
             raise ValueError("empty ATTR with no preceeding ATTR")
@@ -98,7 +98,7 @@ def apply_csv_rows(nodedb, fp, skipHeaders=False, noHeaders=False):
         raise ValueError("ATTR = \"%s\" but non-empty VALUE: %r" % (attr, value))
       nodedb.setdefault((t, name), {})[attr] = ()
       continue
-    nodedb[t, name][attr].append(value)
+    nodedb.setdefault((t, name), {}).setdefault(attr, []).append(nodedb.fromtext(value))
 
 def write_csv_file(fp, nodedata, noHeaders=False):
   ''' Iterate over the supplied `nodedata`, a sequence of:
@@ -106,7 +106,8 @@ def write_csv_file(fp, nodedata, noHeaders=False):
       and write to the file-like object `fp` in the vertical" CSV
       style. `fp` may also be a string in which case the named file
       is truncated and rewritten.
-      `attrmap` maps attribute names to sequences of serialised values.
+      `attrmap` maps attribute names to sequences of preserialised values as
+        computed by NodeDB.totext(value).
   '''
   if type(fp) is str:
     with Pfx("write_csv_file(%s)" % (fp,)):
@@ -115,14 +116,14 @@ def write_csv_file(fp, nodedata, noHeaders=False):
         write_csv_file(csvfp, nodedata, noHeaders=noHeaders)
     return
 
-  w = csv.writer(fp)
+  csvw = csv.writer(fp)
   if not noHeaders:
-    w.writerow( ('TYPE', 'NAME', 'ATTR', 'VALUE') )
+    csvw.writerow( ('TYPE', 'NAME', 'ATTR', 'VALUE') )
   otype = None
   for t, name, attrmap in nodedata:
     attrs = sorted(attrmap.keys())
     for attr in attrs:
-      for value in attrmap[attr]:
+      for valuetext in attrmap[attr]:
         if otype is None or otype != t:
           # new type
           otype = t
@@ -130,15 +131,23 @@ def write_csv_file(fp, nodedata, noHeaders=False):
         else:
           # same type
           wt = u''
-        ## # hideous workaround for CSV C module forcing ascii text :-(
-        wt8 = wt.encode('utf-8')
-        name8 = name.encode('utf-8')
-        attr8 = attr.encode('utf-8')
-        uvalue = value if type(value) else unicode(value, 'iso8859-1')
-        value8 = uvalue.encode('utf-8')
-        w.writerow( (wt8, name8, attr8, value8) )
+        write_csvrow(csvw, wt, name, attr, valuetext)
         attr = u''
         name = u''
+
+def write_csvrow(csvw, t, name, attr, valuetext):
+  ''' Encode and write a CSV row.
+      Note that `valuetext` is a preserialised value as computed by
+      NodeDB.totext(value).
+  '''
+  # hideous workaround for CSV C module forcing ascii text :-(
+  # compute flat 8-bit encodings for supplied strings
+  wt8 = t.encode('utf-8')
+  name8 = name.encode('utf-8')
+  attr8 = attr.encode('utf-8')
+  uvalue = valuetext if isinstance(valuetext, unicode) else unicode(valuetext, 'iso8859-1')
+  value8 = uvalue.encode('utf-8')
+  csvw.writerow( (wt8, name8, attr8, value8) )
 
 class Backend_CSVFile(Backend):
 
@@ -177,6 +186,18 @@ class Backend_CSVFile(Backend):
 
   def __setitem__(self, key, N):
     self.changed = True
+
+  def delAttr(self, t, name, attr):
+    self._append_csv_row(t, name, '-'+attr, '')
+
+  def extendAttr(self, t, name, attr, values):
+    for value in values:
+      self._append_csv_row(t, name, attr, value)
+
+  def _append_csv_row(self, t, name, attr, value):
+    with open(self.csvpath, "ab") as fp:
+      csvw = csv.writer(fp)
+      write_csvrow(csvw, t, name, attr, self.nodedb.totext(value))
 
 if __name__ == '__main__':
   import cs.nodedb.csvdb_tests
