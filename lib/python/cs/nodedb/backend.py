@@ -6,9 +6,9 @@
 
 import unittest
 from cs.logutils import D
-from cs.misc import unimplemented
+from cs.misc import unimplemented, O
 
-class _BackendMappingMixin(object):
+class _BackendMappingMixin(O):
   ''' A mapping interface to be presented by all Backends.
   '''
 
