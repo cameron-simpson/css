@@ -157,9 +157,6 @@ class Backend(_BackendMappingMixin):
     '''
     pass
 
-  def set1Attr(self, t, name, attr, value):
-    return self.setAttr(t, name, attr, (value,))
-
 class _QBackend(Backend):
   ''' A backend to accept updates and queue them for asynchronous
       completion via another backend.
@@ -190,8 +187,6 @@ class _QBackend(Backend):
     self._Q.put( (self.backend.delNode, (t, name,)) )
   def extendAttr(self, t, name, attr, values):
     self._Q.put( (self.backend.extendAttr, (t, name, attr, values)) )
-  def set1Attr(self, t, name, attr, value):
-    self._Q.put( (self.backend.set1Attr, (t, name, attr, value)) )
   def delAttr(self, t, name, attr):
     self._Q.put( (self.backend.delAttr, (t, name, attr)) )
 

@@ -40,7 +40,7 @@ class TestAll(unittest.TestCase):
     H = self.db.newNode('HOST', 'foo')
     H.Xs = [1,2,3,4,5]
 
-  def test12set1Attr(self):
+  def test12setAttr(self):
     H = self.db.newNode('HOST', 'foo')
     H.Y = 1
     H.Y = 2
