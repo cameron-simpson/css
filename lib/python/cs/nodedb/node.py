@@ -99,6 +99,14 @@ class _AttrList(list):
     if node is not None:
       self.nodedb = node.nodedb
 
+  def __str__(self):
+    return str(list(self))
+
+  def __repr__(self):
+    if self.node is None:
+      return ".%ss[...]" % (self.attr,)
+    return "%s.%ss" % (str(self.node), self.attr)
+
   def __delitemrefs(self, nodes):
     ''' Remove the reverse references of this attribute.
     '''
@@ -124,14 +132,6 @@ class _AttrList(list):
         continue
       if hasattr(N, 'name') and hasattr(N, 'type') and hasattr(N, 'nodedb'):
         addref(self.node, self.attr)
-
-  def __str__(self):
-    return str(list(self))
-
-  def __repr__(self):
-    if self.node is None:
-      return ".%ss[...]" % (self.attr,)
-    return "%s.%ss" % (str(self.node), self.attr)
 
   def _save(self):
     ''' Rewrite our value completely in the backend.
