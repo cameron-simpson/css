@@ -137,11 +137,11 @@ class _AttrList(list):
     ''' Rewrite our value completely in the backend.
     '''
     N = self.node
-    self.nodedb._backend.setAttr(N.type, N.name, self.attr, self)
+    self.nodedb.backend.setAttr(N.type, N.name, self.attr, self)
 
   def _extend(self, values):
     N = self.node
-    self.nodedb._backend.extendAttr(N.type, N.name, self.attr, values)
+    self.nodedb.backend.extendAttr(N.type, N.name, self.attr, values)
 
   def __delitem__(self, index):
     if type(index) is int:
@@ -209,7 +209,7 @@ class _AttrList(list):
   def pop(self, index=-1):
     value = list.pop(self, index)
     self.__delitemrefs((value,))
-    self.nodedb._backend.saveAttrs(self)
+    self.nodedb.backend.saveAttrs(self)
     self._save()
     return value
 
@@ -639,10 +639,10 @@ class NodeDB(dict, O):
     # attach backend to collect updates
     self.__nodesByType = {}
     # load data with no backend, then attach backend
-    self._backend = None
+    self.backend = None
     backend.nodedb = self
     backend.apply_to(self)
-    self._backend = backend
+    self.backend = backend
 
   __str__ = O.__str__
 
@@ -722,12 +722,12 @@ class NodeDB(dict, O):
   def sync(self):
     ''' Synchronise: update the backend to match the current frontend state.
     '''
-    self._backend.sync()
+    self.backend.sync()
 
   def close(self):
     ''' Close this NodeDB.
     '''
-    self._backend.close()
+    self.backend.close()
 
   def type(self, t):
     ''' Return the Nodes of the specified type `t`.
@@ -851,7 +851,7 @@ class NodeDB(dict, O):
       if (t, name) in self:
         raise KeyError, 'newNode(%s, %s): already exists' % (t, name)
       N = self[t, name] = self._createNode(t, name)
-      self._backend[t, name] = N
+      self.backend[t, name] = N
       self[t, name] = N
     return N
 
