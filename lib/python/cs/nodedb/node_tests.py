@@ -95,10 +95,10 @@ class TestAll(unittest.TestCase):
     self.assertRaises(AttributeError, getattr, H, 'NOATTR')
     self.db.useNoNode()
     N = H.NOATTR
-    self.assert_(N is self.db.noNode)
+    self.assert_(N is self.db._noNode)
     self.assert_(not bool(N), "bool(H.NOATTR) not False")
     N2 = N.NOATTR
-    self.assert_(N2 is self.db.noNode)
+    self.assert_(N2 is self.db._noNode)
     self.assert_(not bool(N2), "bool(H.NOATTR.NOATTR) not False")
 
   def testTokenisation(self):

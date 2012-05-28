@@ -467,9 +467,9 @@ class Node(dict):
         return values
       if len(values) == 1:
         return values[0]
-      if self.nodedb.noNode is None:
+      if self.nodedb._noNode is None:
         raise AttributeError, "%s.%s (values=%s %s, len=%s)" % (self, attr, type(values), values, len(values))
-      return self.nodedb.noNode
+      return self.nodedb._noNode
 
     raise AttributeError, str(self)+'.'+repr(attr)
 
@@ -596,7 +596,7 @@ class Node(dict):
     return self.substitute(s, safe=True)
 
 class _NoNode(Node):
-  ''' If a NodeDB has a non-None .noNode attribute, normally it
+  ''' If a NodeDB has a non-None ._noNode attribute, normally it
       will be a singleton (per-class) instance of _NoNode, a dummy Node
       that permits .ATTR deferences for easy use.
       The distinguishing feature of a _NoNode is that bool(noNode) is False.
@@ -631,7 +631,7 @@ class NodeDB(dict, O):
     dict.__init__(self)
     self._lock = allocate_lock()
     self.readonly = readonly
-    self.noNode = None
+    self._noNode = None
     self.__attr_type_registry = {}
     self.__attr_scheme_registry = {}
     # run initially with no backend
@@ -654,8 +654,8 @@ class NodeDB(dict, O):
         The "no node" dummy node returns false in boolean contexts,
         unlike regular Nodes which are true.
     '''
-    if self.noNode is None:
-      self.noNode = _NoNode(self)
+    if self._noNode is None:
+      self._noNode = _NoNode(self)
 
   class __AttrTypeRegistration(object):
     ''' An object to hold an attribute value type registration, with the
