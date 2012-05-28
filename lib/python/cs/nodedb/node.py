@@ -16,9 +16,9 @@ from threading import Thread
 from types import StringTypes
 from collections import namedtuple
 from cs.lex import str1
-from cs.misc import the, get0
 from cs.mappings import parseUC_sAttr
 from cs.logutils import Pfx, D, error, warning, info, debug, exception
+from cs.misc import the, get0, O
 from .export import edit_csv_wide, export_csv_wide
 
 # regexp to match TYPE:name
@@ -623,7 +623,7 @@ class _NoNode(Node):
       return Node.__getattr__(self, attr)
     return self
 
-class NodeDB(dict):
+class NodeDB(dict, O):
 
   _key = ('_', '_')     # index of metadata node
 
@@ -644,8 +644,7 @@ class NodeDB(dict):
     backend.apply_to(self)
     self._backend = backend
 
-  def __str__(self):
-    return "%s[_backend=%s]" % (type(self).__name__, self._backend)
+  __str__ = O.__str__
 
   def useNoNode(self):
     ''' Enable "no node" mode.
