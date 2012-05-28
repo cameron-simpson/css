@@ -1,44 +1,11 @@
 #!/usr/bin/python -tt
 
+from cs.lex import isUC_, parseUC_sAttr
 from cs.misc import the
 from collections import defaultdict
 from functools import partial
 from types import StringTypes
 import sys
-
-def isUC_(s):
-  ''' Check that a string matches ^[A-Z][A-Z_0-9]*$.
-  '''
-  if s.isalpha() and s.isupper():
-    return True
-  if len(s) < 1:
-    return False
-  if not s[0].isupper():
-    return False
-  for c in s[1:]:
-    if c != '_' and not c.isupper() and not c.isdigit():
-      return False
-  return True
-
-def parseUC_sAttr(attr):
-  ''' Take an attribute name and return (key, isplural).
-      FOO returns (FOO, False).
-      FOOs or FOOes returns (FOO, True).
-      Otherwise return (None, False).
-  '''
-  if len(attr) > 1:
-    if attr[-1] == 's':
-      if attr[-2] == 'e':
-        k=attr[:-2]
-        if isUC_(k):
-          return k, True
-      else:
-        k=attr[:-1]
-        if isUC_(k):
-          return k, True
-  if isUC_(attr):
-    return attr, False
-  return None, False
 
 class SeqMapUC_Attrs(object):
   ''' A wrapper for a mapping from keys (matching ^[A-Z][A-Z_0-9]*$)

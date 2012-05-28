@@ -15,8 +15,7 @@ from thread import allocate_lock
 from threading import Thread
 from types import StringTypes
 from collections import namedtuple
-from cs.lex import str1
-from cs.mappings import parseUC_sAttr
+from cs.lex import str1, parseUC_sAttr
 from cs.logutils import Pfx, D, error, warning, info, debug, exception
 from cs.misc import the, get0, O
 from .export import edit_csv_wide, export_csv_wide

@@ -13,9 +13,9 @@ import sys
 from types import StringTypes
 import cherrypy
 from cStringIO import StringIO
+from cs.lex import parseUC_sAttr
 from cs.logutils import info, warning, error, debug, D
 from cs.html import tok2s
-from cs.mappings import parseUC_sAttr
 from cs.nodedb import Node
 from .export import export_csv_wide
 from .html import TABLE_from_Node, TABLE_from_Nodes_wide, _noderef
