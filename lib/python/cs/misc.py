@@ -751,7 +751,7 @@ class O(object):
       It also has a nicer default str() action.
   '''
 
-  O_recurse = True
+  _O_recurse = True
 
   def __init__(self, **kw):
     ''' Initialise this O.
@@ -762,19 +762,24 @@ class O(object):
       setattr(self, k, kw[k])
 
   def __str__(self):
-    recurse = self.O_recurse
-    self.O_recurse = False
+    recurse = self._O_recurse
+    self._O_recurse = False
     s = ( "<%s %s>"
           % ( self.__class__.__name__,
-              ",".join([ ( "%s=%s" % (attr, getattr(self, attr))
+              ",".join([ ( "%s=%s" % (pattr, pvalue)
                            if recurse else
-                           "%s=%s" % (attr, type(getattr(self, attr)))
+                           "%s=%s" % (pattr, type(pvalue))
                          )
-                         for attr in sorted(dir(self)) if attr[0].isalpha()
+                         for pattr, pvalue
+                         in [ (attr, getattr(self, attr))
+                              for attr in sorted(dir(self))
+                              if attr[0].isalpha()
+                            ]
+                         if not callable(pvalue)
                        ])
             )
         )
-    self.O_recurse = recurse
+    self._O_recurse = recurse
     return s
 
 def unimplemented(func):
