@@ -28,10 +28,10 @@ class TestAll(NodeTestAll):
     N.X = 1
     N2 = self.db.newNode('SWITCH:sw1')
     N2.Ys = (9,8,7)
-    dbstate = str(self.db)
+    dbstate = dict(self.db)
     self.db.close()
     self.db = NodeDB(backend=Backend_CSVFile(self.dbpath))
-    dbstate2 = str(self.db)
+    dbstate2 = dict(self.db)
     self.assert_(dbstate == dbstate2, "db state differs:\n\t%s\n\t%s" % (dbstate, dbstate2))
 
   def tearDown(self):
