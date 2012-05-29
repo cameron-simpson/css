@@ -11,9 +11,9 @@ import time
 from thread import allocate_lock
 from threading import Semaphore, Thread, Timer
 if sys.hexversion < 0x03000000:
-  from Queue import Queue, PriorityQueue
+  from Queue import Queue, PriorityQueue, Full, Empty
 else:
-  from queue import Queue, PriorityQueue
+  from queue import Queue, PriorityQueue, Full, Empty
 from collections import deque
 if sys.hexversion < 0x02060000: from sets import Set as set
 from cs.misc import seq
@@ -288,18 +288,35 @@ class IterableQueue(Queue):
       TODO: supply sentinel item, default None.
   '''
 
+  sentinel = object()
+
   def __init__(self, *args, **kw):
     ''' Initialise the queue.
     '''
     Queue.__init__(self, *args, **kw)
-    self.closed=False
+    self.closed = False
+
+  def get(self, *a):
+    item = Queue.get(self, *a)
+    if item is self.sentinel:
+      Queue.put(self, self.sentinel)
+      raise Empty
+    return item
+
+  def get_nowait(self):
+    item = Queue.get_nowait(self)
+    if item is self.sentinel:
+      Queue.put(self, self.sentinel)
+      raise Empty
+    return item
 
   def put(self, item, *args, **kw):
     ''' Put an item on the queue.
     '''
     if self.closed:
-      raise ValueError, "put() on closed IterableQueue"
-    assert item is not None, "put(None) on IterableQueue"
+      raise Full("put() on closed IterableQueue")
+    if item is self.sentinel:
+      raise ValueError("put(sentinel) on IterableQueue")
     return Queue.put(self, item, *args, **kw)
 
   def _closeAtExit(self):
@@ -310,8 +327,8 @@ class IterableQueue(Queue):
     if self.closed:
       error("close() on closed IterableQueue")
     else:
-      self.closed=True
-      Queue.put(self,None)
+      self.closed = True
+      Queue.put(self, self.sentinel)
 
   def __iter__(self):
     ''' Iterable interface for the queue.
@@ -319,9 +336,9 @@ class IterableQueue(Queue):
     return self
 
   def next(self):
-    item=self.get()
-    if item is None:
-      Queue.put(self,None)      # for another iterator
+    try:
+      item = self.get()
+    except Empty:
       raise StopIteration
     return item
 
