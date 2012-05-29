@@ -17,7 +17,7 @@ from types import StringTypes
 from collections import namedtuple
 from cs.lex import str1, parseUC_sAttr
 from cs.logutils import Pfx, D, error, warning, info, debug, exception
-from cs.misc import the, get0, O
+from cs.misc import the, get0, O, unimplemented
 from .export import edit_csv_wide, export_csv_wide
 
 # regexp to match TYPE:name
@@ -140,7 +140,9 @@ class _AttrList(list):
 
   def _extend(self, values):
     N = self.node
-    self.nodedb.backend.extendAttr(N.type, N.name, self.attr, values)
+    backend = self.nodedb.backend
+    if backend:
+      backend.extendAttr(N.type, N.name, self.attr, values)
 
   def __delitem__(self, index):
     if type(index) is int:
@@ -308,6 +310,14 @@ class Node(dict):
       # .TYPE(key) is the at-need factory for a node
       return self.nodedb.make( (self.type, name) )
     raise TypeError, "only the NodeDB.TYPE metanode is callable"
+
+  @unimplemented
+  def setdefault(self, key, default):
+    ''' We don't use setdefault, and want to catch misuse.
+        If this gets implemented we will need to do type promotion of
+        non-_AttrLists etc.
+    '''
+    pass
 
   def seq(self):
     seqs = self.get('SEQ', (0,))
@@ -811,6 +821,14 @@ class NodeDB(dict, O):
     dict.__setitem__(self, key, N)
     self._noteNode(N)
 
+  @unimplemented
+  def setdefault(self, key, default):
+    ''' We don't use setdefault, and want to catch misuse.
+        If this gets implemented we will need to do type promotion of
+        non-Nodes, and maybe of foreign Nodes? All very problematic.
+    '''
+    pass
+
   def nodekey(self, *args):
     ''' Convert some sort of key to a (TYPE, NAME) tuple.
         Sanity check the values.
@@ -850,7 +868,8 @@ class NodeDB(dict, O):
       if (t, name) in self:
         raise KeyError, 'newNode(%s, %s): already exists' % (t, name)
       N = self[t, name] = self._createNode(t, name)
-      self.backend[t, name] = N
+      if self.backend:
+        self.backend[t, name] = N
       self[t, name] = N
     return N
 
