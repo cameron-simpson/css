@@ -656,7 +656,7 @@ class NodeDB(dict, O):
     if self._noNode is None:
       self._noNode = _NoNode(self)
 
-  class __AttrTypeRegistration(object):
+  class __AttrTypeRegistration(O):
     ''' An object to hold an attribute value type registration, with the
         following attributes:
           .type      the registered type
