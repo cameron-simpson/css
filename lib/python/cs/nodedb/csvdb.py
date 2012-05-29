@@ -8,9 +8,15 @@ import csv
 import io
 import os
 import os.path
-from types import StringTypes
 import sys
-from cs.logutils import Pfx, error, warning , info, D
+if sys.hexversion < 0x03000000:
+  from Queue import Full, Empty
+else:
+  from queue import Full, Empty
+from threading import Thread
+from types import StringTypes
+from cs.logutils import Pfx, error, warning, info, D
+from cs.threads import IterableQueue
 from . import NodeDB
 from .backend import Backend
 
@@ -155,8 +161,13 @@ class Backend_CSVFile(Backend):
   def __init__(self, csvpath, readonly=False):
     Backend.__init__(self, readonly=readonly)
     self.csvpath = csvpath
+    self._updateQ = IterableQueue()
+    self._update_thread = Thread(target=self._updater, args=(self._updateQ,))
+    self._update_thread.start()
 
   def close(self):
+    self._updateQ.close()
+    self._update_thread.join()
     self.sync()
 
   def sync(self):
@@ -196,10 +207,21 @@ class Backend_CSVFile(Backend):
       self._append_csv_row(t, name, attr, value)
 
   def _append_csv_row(self, t, name, attr, value):
-    with open(self.csvpath, "ab") as fp:
-      ##print >>sys.stderr, "_append_csv_row: t=%r, name=%r, attr=%r, value=%r" % (t, name, attr, value)
-      csvw = csv.writer(fp)
-      write_csvrow(csvw, t, name, attr, self.nodedb.totext(value))
+    self._updateQ.put( (t, name, attr, value) )
+
+  def _updater(self, Q):
+    ''' Read updates from the supplied IterableQueue and apply to the csv file.
+    '''
+    for t, name, attr, value in Q:
+      with open(self.csvpath, "ab") as fp:
+        csvw = csv.writer(fp)
+        write_csvrow(csvw, t, name, attr, self.nodedb.totext(value))
+        while True:
+          try:
+            t, name, attr, value = Q.get_nowait()
+          except Empty:
+            break
+        write_csvrow(csvw, t, name, attr, self.nodedb.totext(value))
 
 if __name__ == '__main__':
   import cs.nodedb.csvdb_tests
