@@ -98,7 +98,8 @@ def apply_csv_rows(nodedb, fp, skipHeaders=False, noHeaders=False):
         raise ValueError("ATTR = \"%s\" but non-empty VALUE: %r" % (attr, value))
       nodedb.setdefault((t, name), {})[attr] = ()
       continue
-    nodedb.setdefault((t, name), {}).setdefault(attr, []).append(nodedb.fromtext(value))
+    N = nodedb.get((t, name), doCreate=True)
+    N.get(attr).append(nodedb.fromtext(value))
 
 def write_csv_file(fp, nodedata, noHeaders=False):
   ''' Iterate over the supplied `nodedata`, a sequence of:
@@ -196,6 +197,7 @@ class Backend_CSVFile(Backend):
 
   def _append_csv_row(self, t, name, attr, value):
     with open(self.csvpath, "ab") as fp:
+      ##print >>sys.stderr, "_append_csv_row: t=%r, name=%r, attr=%r, value=%r" % (t, name, attr, value)
       csvw = csv.writer(fp)
       write_csvrow(csvw, t, name, attr, self.nodedb.totext(value))
 
