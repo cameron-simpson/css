@@ -218,7 +218,7 @@ class Backend_CSVFile(Backend):
         write_csvrow(csvw, t, name, attr, self.nodedb.totext(value))
         while True:
           try:
-            t, name, attr, value = Q.get_nowait()
+            t, name, attr, value = Q.get(True, 0.1)
           except Empty:
             break
         write_csvrow(csvw, t, name, attr, self.nodedb.totext(value))
