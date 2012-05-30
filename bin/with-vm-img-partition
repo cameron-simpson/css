@@ -91,12 +91,12 @@ case "$partition" in
 esac
 if $trace losetup "$loopdev" "$imgfile"
 then
-  if [ -n "$partition" ]
+  if $trace mkdir "$mountpoint"
   then
-    fdisk -l "$loopdev"
-    if $trace kpartx -av "$loopdev"
+    if [ -n "$partition" ]
     then
-      if $trace mkdir "$mountpoint"
+      fdisk -l "$loopdev"
+      if $trace kpartx -av "$loopdev"
       then
         if $trace mount -t "$fstype" -o "$rwmode" "$looppart" "$mountpoint"
         then
@@ -110,20 +110,15 @@ then
           else
             $trace "$@" || xit=$?
           fi
+          $trace sync
           $trace umount "$mountpoint" || xit=1
         else
           ls -la "$mapperdir/."
         fi
-        $trace rmdir "$mountpoint" || xit=1
-        $trace sync
       fi
       $trace sleep 1      # this seems to need a delay :-(
       $trace kpartx -dv "$loopdev" || xit=1
-    fi
-    $trace losetup -d "$loopdev" || xit=1
-  else
-    if $trace mkdir "$mountpoint"
-    then
+    else
       if $trace mount -t "$fstype" -o "$rwmode" "$loopdev" "$mountpoint"
       then
         VM_IMG_MOUNT=$mountpoint
@@ -136,14 +131,14 @@ then
         else
           $trace "$@" || xit=$?
         fi
+        $trace sync
         $trace umount "$mountpoint" || xit=1
-      else
-        ls -la "$mapperdir/."
       fi
-      $trace rmdir "$mountpoint" || xit=1
-      $trace sync
     fi
+    $trace rmdir "$mountpoint" || xit=1
+    $trace sync
   fi
+  $trace losetup -d "$loopdev" || xit=1
 fi
 
 exit $xit
