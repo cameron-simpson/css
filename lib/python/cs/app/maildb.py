@@ -56,45 +56,43 @@ def main(argv, stdin=None):
     error("missing op")
     badopts = True
   else:
-    mdb = MailDB(mdburl, readonly=False)
     op = argv.pop(0)
     with Pfx(op):
-      if op == 'import-addresses':
-        if stdin.isatty():
-          error("stdin is a tty, file expected")
-          badopts = True
-        else:
-          mdb.importAddresses(stdin)
-          mdb.close()
-      elif op == 'list-groups':
-        if len(argv):
-          group_names = argv
-        else:
-          group_names = sorted(mdb.address_groups.keys())
-        for group_name in group_names:
-          address_group = mdb.address_groups.get(group_name)
-          if not address_group:
-            error("no such group: %s", group_name)
-            xit = 1
-            continue
-          print group_name, ", ".join(mdb['ADDRESS', address].formatted
-                                      for address in address_group)
-      elif op == 'learn-addresses':
-        if not len(argv):
-          error("missing groups")
-          badopts = True
-        else:
-          group_names = [ name for name in argv.pop(0).split(',') if name ]
-          if len(argv):
-            error("extra arguments after groups: %s", argv)
+      with MailDB(mdburl, readonly=False) as mdb:
+        if op == 'import-addresses':
+          if stdin.isatty():
+            error("stdin is a tty, file expected")
             badopts = True
           else:
-            mdb.importAddresses_from_message(stdin, group_names)
-      else:
-        error("unsupported op")
-        badopts = True
-      if xit == 0 and not badopts:
-        mdb.sync()
+            mdb.importAddresses(stdin)
+            mdb.close()
+        elif op == 'list-groups':
+          if len(argv):
+            group_names = argv
+          else:
+            group_names = sorted(mdb.address_groups.keys())
+          for group_name in group_names:
+            address_group = mdb.address_groups.get(group_name)
+            if not address_group:
+              error("no such group: %s", group_name)
+              xit = 1
+              continue
+            print group_name, ", ".join(mdb['ADDRESS', address].formatted
+                                        for address in address_group)
+        elif op == 'learn-addresses':
+          if not len(argv):
+            error("missing groups")
+            badopts = True
+          else:
+            group_names = [ name for name in argv.pop(0).split(',') if name ]
+            if len(argv):
+              error("extra arguments after groups: %s", argv)
+              badopts = True
+            else:
+              mdb.importAddresses_from_message(stdin, group_names)
+        else:
+          error("unsupported op")
+          badopts = True
 
   if badopts:
     error(usage)
