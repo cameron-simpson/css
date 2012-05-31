@@ -22,8 +22,8 @@ try:
 except ImportError:
   import xml.etree.ElementTree as ElementTree
 from threading import RLock
+from cs.lex import parseUC_sAttr
 from cs.logutils import Pfx, pfx_iter, debug, error, warning, exception
-from cs.mappings import parseUC_sAttr
 from cs.threads import locked_property
 
 def URL(U, referer, user_agent=None):

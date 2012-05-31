@@ -32,8 +32,9 @@ class Backend_TokyoCabinet(Backend):
                    ))
     self.tclock = allocate_lock()
 
+  @unimplemented
   def sync(self):
-    raise NotImplementedError
+    pass
 
   def close(self):
     if self.tcdb is None:
@@ -114,13 +115,6 @@ class Backend_TokyoCabinet(Backend):
         self.tcdb.putcat(attrtag, '\0'+attrtexts)
       else:
         self.tcdb.put(attrtag, attrtexts)
-
-  def set1Attr(self, type, name, attr, value):
-    assert not self.nodedb.readonly
-    attrtag = self._attrtag(type, name, attr)
-    attrtexts = self.totext(value)
-    with self.tclock:
-      self.tcdb.put(attrtag, attrtexts)
 
   def delAttr(self, type, name, attr):
     assert not self.nodedb.readonly

@@ -12,6 +12,7 @@ from sqlalchemy.orm import mapper, sessionmaker
 from sqlalchemy.sql import and_, or_, not_, asc
 from sqlalchemy.sql.expression import distinct
 from cs.logutils import Pfx, error, warning, debug
+from cs.misc import unimplemented
 from . import NodeDB, Backend
 
 def NODESTable(metadata, name=None):
@@ -173,8 +174,9 @@ class Backend_SQLAlchemy(Backend):
 ##      return N
 ##    return Backend.fromtext(self, text)
 
+  @unimplemented
   def sync(self):
-    raise NotImplementedError
+    pass
 
   def close(self):
     warning("cs.nodedb.sqla.Backend_SQLAlchemy.close() unimplemented")
@@ -187,15 +189,6 @@ class Backend_SQLAlchemy(Backend):
                      'VALUE':   self.totext(value),
                    } for value in values ]
     self.attrs.insert().execute(ins_values)
-
-  def set1Attr(self, t, name, attr, value):
-    # special case, presumes there's only one VALUE
-    assert not self.nodedb.readonly
-    node_id = self.__IDbyTypeName[t, name]
-    self.attrs.update().where(and_(self.attrs.c.NODE_ID == node_id,
-                                   self.attrs.c.ATTR == attr)) \
-                       .values(VALUE=value) \
-                       .execute()
 
   def delAttr(self, t, name, attr):
     assert not self.nodedb.readonly

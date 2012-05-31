@@ -8,12 +8,13 @@ import sys
 import unittest
 from . import NodeDB
 from .export import export_rows_wide, import_rows_wide
+from .mappingdb import MappingBackend
 
 class TestAll(unittest.TestCase):
 
   def setUp(self):
     from . import NodeDB
-    db = self.db = NodeDB(backend=None)
+    db = self.db = NodeDB(backend=MappingBackend({}))
     N1 = self.N1 = db.newNode('HOST', 'host1')
     N1.ATTR1 = 1
     N2 = self.N2 = db.newNode('HOST', 'host2')

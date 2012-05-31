@@ -7,11 +7,12 @@
 import sys
 import unittest
 from . import NodeDB, Node
+from .mappingdb import MappingBackend
 
 class TestAll(unittest.TestCase):
 
   def setUp(self):
-    self.db = NodeDB(backend=None)
+    self.db = NodeDB(backend=MappingBackend({}))
 
   def test01serialise(self):
     H = self.db.newNode('HOST', 'foo')
@@ -39,7 +40,7 @@ class TestAll(unittest.TestCase):
     H = self.db.newNode('HOST', 'foo')
     H.Xs = [1,2,3,4,5]
 
-  def test12set1Attr(self):
+  def test12setAttr(self):
     H = self.db.newNode('HOST', 'foo')
     H.Y = 1
     H.Y = 2
@@ -94,10 +95,10 @@ class TestAll(unittest.TestCase):
     self.assertRaises(AttributeError, getattr, H, 'NOATTR')
     self.db.useNoNode()
     N = H.NOATTR
-    self.assert_(N is self.db.noNode)
+    self.assert_(N is self.db._noNode)
     self.assert_(not bool(N), "bool(H.NOATTR) not False")
     N2 = N.NOATTR
-    self.assert_(N2 is self.db.noNode)
+    self.assert_(N2 is self.db._noNode)
     self.assert_(not bool(N2), "bool(H.NOATTR.NOATTR) not False")
 
   def testTokenisation(self):

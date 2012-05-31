@@ -15,11 +15,9 @@ from thread import allocate_lock
 from threading import Thread
 from types import StringTypes
 from collections import namedtuple
-from cs.lex import str1
-from cs.misc import the, get0
-from cs.mappings import parseUC_sAttr
+from cs.lex import str1, parseUC_sAttr
 from cs.logutils import Pfx, D, error, warning, info, debug, exception
-from .backend import _NoBackend
+from cs.misc import the, get0, O, unimplemented
 from .export import edit_csv_wide, export_csv_wide
 
 # regexp to match TYPE:name
@@ -100,6 +98,14 @@ class _AttrList(list):
     if node is not None:
       self.nodedb = node.nodedb
 
+  def __str__(self):
+    return str(list(self))
+
+  def __repr__(self):
+    if self.node is None:
+      return ".%ss[...]" % (self.attr,)
+    return "%s.%ss" % (str(self.node), self.attr)
+
   def __delitemrefs(self, nodes):
     ''' Remove the reverse references of this attribute.
     '''
@@ -126,13 +132,17 @@ class _AttrList(list):
       if hasattr(N, 'name') and hasattr(N, 'type') and hasattr(N, 'nodedb'):
         addref(self.node, self.attr)
 
-  def __str__(self):
-    return str(list(self))
+  def _save(self):
+    ''' Rewrite our value completely in the backend.
+    '''
+    N = self.node
+    self.nodedb.backend.setAttr(N.type, N.name, self.attr, self)
 
-  def __repr__(self):
-    if self.node is None:
-      return ".%ss[...]" % (self.attr,)
-    return "%s.%ss" % (str(self.node), self.attr)
+  def _extend(self, values):
+    N = self.node
+    backend = self.nodedb.backend
+    if backend:
+      backend.extendAttr(N.type, N.name, self.attr, values)
 
   def __delitem__(self, index):
     if type(index) is int:
@@ -141,7 +151,7 @@ class _AttrList(list):
       items = itertools.islice(self, index)
     value = list.__delitem__(self, index)
     self.__delitemrefs(items)
-    self.nodedb._backend.saveAttrs(self)
+    self._save()
     return value
 
   def __delslice__(self, i, j):
@@ -150,7 +160,7 @@ class _AttrList(list):
   def __iadd__(self, other):
     self.__additemrefs(other)
     value = list.__iadd__(self, other)
-    self.nodedb._backend.saveAttrs(self)
+    self._save()
     return value
 
   def __imul__(self, other):
@@ -158,7 +168,7 @@ class _AttrList(list):
     value = list.__imul__(self, other)
     self.__additemrefs(self)
     self.__delitemrefs(oitems)
-    self.nodedb._backend.saveAttrs(self)
+    self._save()
     return value
 
   def __setitem__(self, index, value):
@@ -173,55 +183,51 @@ class _AttrList(list):
     self.__delitemrefs(ovalues)
     list.__setitem__(self, index, values)
     self.__additemrefs(values)
-    self.nodedb._backend.saveAttrs(self)
+    self._save()
 
   def __setslice__(self, i, j, values):
     self[max(0, i):max(0, j):] = values
 
-  def append(self, value, noBackend=False):
-    if not noBackend:
-      N = self.node
-      self.nodedb._backend.extendAttr(N.type, N.name, self.attr, (value,))
-    list.append(self, value)
-    self.__additemrefs((value,))
+  def append(self, value):
+    self.extend((value,))
 
-  def extend(self, values, noBackend=False):
+  def extend(self, values):
     # turn iterator into tuple
-    if not noBackend and type(values) not in (list, tuple):
+    if not isinstance(values, (list, tuple)):
       values = tuple(values)
     if len(values) > 0:
-      if not noBackend:
-        N = self.node
-        self.nodedb._backend.extendAttr(N.type, N.name, self.attr, values)
       list.extend(self, values)
       self.__additemrefs(values)
+      self._extend(values)
 
   def insert(self, index, value):
+    N = self.node
     value = list.insert(self, index, value)
-    self.nodedb._backend.saveAttrs(self)
     self.__additemrefs((value,))
+    self._save()
     return value
 
   def pop(self, index=-1):
     value = list.pop(self, index)
-    self.nodedb._backend.saveAttrs(self)
     self.__delitemrefs((value,))
+    self.nodedb.backend.saveAttrs(self)
+    self._save()
     return value
 
   def remove(self, value):
     list.remove(self, value)
-    self.nodedb._backend.saveAttrs(self)
+    self._save()
     self.__delitemrefs(value)
 
-  def reverse(self, *args):
-    list.reverse(self, *args)
-    if self:
-      self.nodedb._backend.saveAttrs(self)
+  def reverse(self):
+    if len(self) > 0:
+      list.reverse(self, *args)
+      self._save()
 
   def sort(self, *args):
-    list.sort(self, *args)
-    if self:
-      self.nodedb._backend.saveAttrs(self)
+    if len(self) > 0:
+      list.sort(self, *args)
+      self._save()
 
   def __getattr__(self, attr):
     ''' Using a .ATTR[s] attribute on an _AttrList indirects through
@@ -304,6 +310,14 @@ class Node(dict):
       # .TYPE(key) is the at-need factory for a node
       return self.nodedb.make( (self.type, name) )
     raise TypeError, "only the NodeDB.TYPE metanode is callable"
+
+  @unimplemented
+  def setdefault(self, key, default):
+    ''' We don't use setdefault, and want to catch misuse.
+        If this gets implemented we will need to do type promotion of
+        non-_AttrLists etc.
+    '''
+    pass
 
   def seq(self):
     seqs = self.get('SEQ', (0,))
@@ -422,8 +436,8 @@ class Node(dict):
     k, plural = parseUC_sAttr(item)
     if k is None:
       raise KeyError, repr(item)
-    assert not plural and k not in ('NAME', 'TYPE'), \
-           "forbidden index: %r" % (item,)
+    if plural or item in ('NAME', 'TYPE'):
+      raise KeyError, "forbidden index: %r" % (item,)
     values = self.get(k)
     if len(values):
       # discard old values (removes reverse map)
@@ -462,9 +476,9 @@ class Node(dict):
         return values
       if len(values) == 1:
         return values[0]
-      if self.nodedb.noNode is None:
+      if self.nodedb._noNode is None:
         raise AttributeError, "%s.%s (values=%s %s, len=%s)" % (self, attr, type(values), values, len(values))
-      return self.nodedb.noNode
+      return self.nodedb._noNode
 
     raise AttributeError, str(self)+'.'+repr(attr)
 
@@ -591,7 +605,7 @@ class Node(dict):
     return self.substitute(s, safe=True)
 
 class _NoNode(Node):
-  ''' If a NodeDB has a non-None .noNode attribute, normally it
+  ''' If a NodeDB has a non-None ._noNode attribute, normally it
       will be a singleton (per-class) instance of _NoNode, a dummy Node
       that permits .ATTR deferences for easy use.
       The distinguishing feature of a _NoNode is that bool(noNode) is False.
@@ -618,7 +632,7 @@ class _NoNode(Node):
       return Node.__getattr__(self, attr)
     return self
 
-class NodeDB(dict):
+class NodeDB(dict, O):
 
   _key = ('_', '_')     # index of metadata node
 
@@ -626,21 +640,20 @@ class NodeDB(dict):
     dict.__init__(self)
     self._lock = allocate_lock()
     self.readonly = readonly
-    self.noNode = None
+    self._noNode = None
     self.__attr_type_registry = {}
     self.__attr_scheme_registry = {}
     # run initially with no backend
     # load data from backend
     # attach backend to collect updates
-    self._backend = _NoBackend()
     self.__nodesByType = {}
-    if backend is not None:
-      backend.set_nodedb(self)
-      backend.apply_to(self)
-      self._backend = backend
+    # load data with no backend, then attach backend
+    self.backend = None
+    backend.nodedb = self
+    backend.apply_to(self)
+    self.backend = backend
 
-  def __str__(self):
-    return "%s[_backend=%s]" % (type(self).__name__, self._backend)
+  __str__ = O.__str__
 
   def useNoNode(self):
     ''' Enable "no node" mode.
@@ -650,10 +663,10 @@ class NodeDB(dict):
         The "no node" dummy node returns false in boolean contexts,
         unlike regular Nodes which are true.
     '''
-    if self.noNode is None:
-      self.noNode = _NoNode(self)
+    if self._noNode is None:
+      self._noNode = _NoNode(self)
 
-  class __AttrTypeRegistration(object):
+  class __AttrTypeRegistration(O):
     ''' An object to hold an attribute value type registration, with the
         following attributes:
           .type      the registered type
@@ -718,12 +731,12 @@ class NodeDB(dict):
   def sync(self):
     ''' Synchronise: update the backend to match the current frontend state.
     '''
-    self._backend.sync()
+    self.backend.sync()
 
   def close(self):
     ''' Close this NodeDB.
     '''
-    self._backend.close()
+    self.backend.close()
 
   def type(self, t):
     ''' Return the Nodes of the specified type `t`.
@@ -808,6 +821,14 @@ class NodeDB(dict):
     dict.__setitem__(self, key, N)
     self._noteNode(N)
 
+  @unimplemented
+  def setdefault(self, key, default):
+    ''' We don't use setdefault, and want to catch misuse.
+        If this gets implemented we will need to do type promotion of
+        non-Nodes, and maybe of foreign Nodes? All very problematic.
+    '''
+    pass
+
   def nodekey(self, *args):
     ''' Convert some sort of key to a (TYPE, NAME) tuple.
         Sanity check the values.
@@ -847,7 +868,8 @@ class NodeDB(dict):
       if (t, name) in self:
         raise KeyError, 'newNode(%s, %s): already exists' % (t, name)
       N = self[t, name] = self._createNode(t, name)
-      self._backend[t, name] = N
+      if self.backend:
+        self.backend[t, name] = N
       self[t, name] = N
     return N
 

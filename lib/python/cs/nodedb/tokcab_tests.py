@@ -36,8 +36,8 @@ class TestAll(NodeTestAll):
     N.X=1
     N2 = self.db.newNode('SWITCH:sw1')
     N2.Ys=(9,8,7)
-    dbstate = dict(self.db._backend)
-    self.db._backend.close()
+    dbstate = dict(self.db.backend)
+    self.db.backend.close()
     dbstate2 = dict(Backend_TokyoCabinet(self.dbpath))
     self.assert_(dbstate == dbstate2, "db state differs:\n\t%s\n\t%s" % (dbstate, dbstate2))
 

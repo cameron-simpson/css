@@ -10,6 +10,7 @@ from functools import partial
 import os
 from os.path import isabs, abspath, dirname
 import sys
+from contextlib import contextmanager
 import shutil
 from tempfile import NamedTemporaryFile
 import time
@@ -180,6 +181,33 @@ def watched_file_property(func, prop_name=None, unset_object=None, poll_rate=1):
         value = getattr(self, prop_name)
     return value
   return property(getprop)
+
+@contextmanager
+def lockfile(path, ext='.lock', block=False, poll_interval=0.1):
+  ''' A context manager which takes and holds a lock file.
+      `path`: the base associated with the lock file.
+      `ext`: the extension to the base used to construct the lock file name.
+             Default: ".lock"
+      `block`: if true and the lock file is already present, block until
+               it is free. This operated by polling every `poll_interval`
+               seconds, default 0.1s.
+      `poll_interval`: polling frequency in blocking mode.
+  '''
+  lockpath = path + ext
+  while True:
+    try:
+      lockfd = os.open(lockpath, os.O_CREAT|os.O_EXCL|os.O_RDWR, 0)
+    except OSError, e:
+      if e.errno == os.EEXIST:
+        if block:
+          sleep(poll_interval)
+          continue
+      raise
+    else:
+      break
+  os.close(lockfd)
+  yield 
+  os.remove(lockpath)
 
 if __name__ == '__main__':
   import cs.fileutils_tests
