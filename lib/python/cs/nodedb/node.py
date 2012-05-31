@@ -640,6 +640,7 @@ class NodeDB(dict, O):
     dict.__init__(self)
     self._lock = allocate_lock()
     self.readonly = readonly
+    self.closed = False
     self._noNode = None
     self.__attr_type_registry = {}
     self.__attr_scheme_registry = {}
@@ -654,6 +655,13 @@ class NodeDB(dict, O):
     self.backend = backend
 
   __str__ = O.__str__
+
+  def __enter__(self):
+    pass
+
+  def __exit__(self, exc_type, exc_value, traceback):
+    if not self.closed:
+      self.close()
 
   def useNoNode(self):
     ''' Enable "no node" mode.
@@ -737,6 +745,7 @@ class NodeDB(dict, O):
     ''' Close this NodeDB.
     '''
     self.backend.close()
+    self.closed = True
 
   def type(self, t):
     ''' Return the Nodes of the specified type `t`.
