@@ -15,6 +15,7 @@ else:
   from queue import Full, Empty
 from threading import Thread
 from types import StringTypes
+from cs.fileutils import lockfile
 from cs.logutils import Pfx, error, warning, info, D
 from cs.threads import IterableQueue
 from . import NodeDB
@@ -175,8 +176,10 @@ class Backend_CSVFile(Backend):
     '''
     if self.nodedb.readonly:
       error("sync on readonly %s", self)
-    else:
-      write_csv_file(self.csvpath, self.nodedb.nodedata())
+    elif self.changed:
+      with lockfile(self.csvpath, block=True):
+        write_csv_file(self.csvpath, self.nodedb.nodedata())
+      self.changed = False
 
   def apply_nodedata(self):
     raise NotImplementedError("no %s.apply_nodedata(), apply_to uses incremental mode" % (type(self),))
@@ -213,15 +216,16 @@ class Backend_CSVFile(Backend):
     ''' Read updates from the supplied IterableQueue and apply to the csv file.
     '''
     for t, name, attr, value in Q:
-      with open(self.csvpath, "ab") as fp:
-        csvw = csv.writer(fp)
-        write_csvrow(csvw, t, name, attr, self.nodedb.totext(value))
-        while True:
-          try:
-            t, name, attr, value = Q.get(True, 0.1)
-          except Empty:
-            break
-        write_csvrow(csvw, t, name, attr, self.nodedb.totext(value))
+      with lockfile(self.csvpath, block=True):
+        with open(self.csvpath, "ab") as fp:
+          csvw = csv.writer(fp)
+          write_csvrow(csvw, t, name, attr, self.nodedb.totext(value))
+          while True:
+            try:
+              t, name, attr, value = Q.get(True, 0.1)
+            except Empty:
+              break
+          write_csvrow(csvw, t, name, attr, self.nodedb.totext(value))
 
 if __name__ == '__main__':
   import cs.nodedb.csvdb_tests
