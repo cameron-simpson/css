@@ -200,7 +200,11 @@ class Backend_CSVFile(Backend):
       yield item[1]
 
   def __setitem__(self, key, N):
-    self.changed = True
+    # CSV DB Nodes only have attributes
+    t = N.type
+    name = N.name
+    for k, v in N.iteritems():
+      self.setAttr(t, name, k, v)
 
   def delAttr(self, t, name, attr):
     self._append_csv_row(t, name, '-'+attr, '')
