@@ -660,6 +660,7 @@ class NodeDB(dict, O):
     ''' Close this NodeDB.
     '''
     self.backend.close()
+    self.backend = None
     self.closed = True
 
   def sync(self):
