@@ -656,6 +656,17 @@ class NodeDB(dict, O):
 
   __str__ = O.__str__
 
+  def close(self):
+    ''' Close this NodeDB.
+    '''
+    self.backend.close()
+    self.closed = True
+
+  def sync(self):
+    ''' Synchronise: update the backend to match the current frontend state.
+    '''
+    self.backend.sync()
+
   def __enter__(self):
     return self
 
@@ -735,17 +746,6 @@ class NodeDB(dict, O):
         types.
     '''
     return Node(t, name, self)
-
-  def sync(self):
-    ''' Synchronise: update the backend to match the current frontend state.
-    '''
-    self.backend.sync()
-
-  def close(self):
-    ''' Close this NodeDB.
-    '''
-    self.backend.close()
-    self.closed = True
 
   def type(self, t):
     ''' Return the Nodes of the specified type `t`.
