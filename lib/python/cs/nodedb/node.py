@@ -657,7 +657,7 @@ class NodeDB(dict, O):
   __str__ = O.__str__
 
   def __enter__(self):
-    pass
+    return self
 
   def __exit__(self, exc_type, exc_value, traceback):
     if not self.closed:
