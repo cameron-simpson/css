@@ -129,12 +129,15 @@ class Backend(_BackendMappingMixin):
     ##assert False, "OBSOLETE"
     return self.nodedb.fromtext(value)
 
-  @unimplemented
-  def sync(self):
-    pass
+  def close(self):
+    ''' Basic close: sync, detach from NodeDB, mark as closed.
+    '''
+    self.sync()
+    self.nodedb = None
+    self.closed = True
 
   @unimplemented
-  def close(self):
+  def sync(self):
     pass
 
   def setAttr(self, t, name, attr, values):
