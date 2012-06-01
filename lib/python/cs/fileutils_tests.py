@@ -17,7 +17,7 @@ class Test(unittest.TestCase):
   def tearDown(self):
     pass
 
-  def test01compare(self):
+  def test_compare(self):
     data = "here are some data\n"
     with NamedTemporaryFile() as T1:
       T1.write(data)
@@ -29,7 +29,7 @@ class Test(unittest.TestCase):
         self.assertEquals( open(T2.name).read(), data, "bad data in %s" % (T2.name,) )
         self.assert_(compare(T1.name, T2.name), "mismatched data in %s and %s" % (T1.name, T2.name))
 
-  def test02rewrite(self):
+  def test_rewrite(self):
     from StringIO import StringIO
     olddata = "old data\n"
     newdata = "new data\n"
