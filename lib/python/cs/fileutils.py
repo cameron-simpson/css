@@ -9,6 +9,7 @@ import errno
 from functools import partial
 import os
 from os.path import isabs, abspath, dirname
+import errno
 import sys
 from contextlib import contextmanager
 import shutil
@@ -198,7 +199,7 @@ def lockfile(path, ext='.lock', block=False, poll_interval=0.1):
     try:
       lockfd = os.open(lockpath, os.O_CREAT|os.O_EXCL|os.O_RDWR, 0)
     except OSError, e:
-      if e.errno == os.EEXIST:
+      if e.errno == errno.EEXIST:
         if block:
           sleep(poll_interval)
           continue
