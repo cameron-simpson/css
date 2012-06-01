@@ -207,7 +207,7 @@ def lockfile(path, ext='.lock', block=False, poll_interval=0.1):
     else:
       break
   os.close(lockfd)
-  yield 
+  yield lockpath
   os.remove(lockpath)
 
 if __name__ == '__main__':
