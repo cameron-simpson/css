@@ -7,7 +7,7 @@
 import sys
 import unittest
 from tempfile import NamedTemporaryFile
-from cs.fileutils import compare, rewrite
+from .fileutils import compare, rewrite
 
 class Test(unittest.TestCase):
 
