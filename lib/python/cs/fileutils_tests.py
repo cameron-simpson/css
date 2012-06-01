@@ -48,7 +48,8 @@ class Test(unittest.TestCase):
     lockext = '.lock'
     lockpath = lockbase + lockext
     self.assert_( not os.path.exists(lockpath), "before lock, lock file already exists: %s" % (lockpath,))
-    with lockfile(lockbase):
+    with lockfile(lockbase) as lock:
+      self.assert_( lock == lockpath, "inside lock, expected \"%s\", got \"%s\"" % (lockpath, lock))
       self.assert_( os.path.exists(lockpath), "inside lock, lock file does not exist: %s" % (lockpath,))
     self.assert_( not os.path.exists(lockpath), "after lock: lock file still exists: %s" % (lockpath,))
 
@@ -57,7 +58,8 @@ class Test(unittest.TestCase):
     lockext = '.lock'
     lockpath = lockbase + lockext
     self.assert_( not os.path.exists(lockpath), "before lock, lock file already exists: %s" % (lockpath,))
-    with lockfile(lockbase):
+    with lockfile(lockbase) as lock:
+      self.assert_( lock == lockpath, "inside lock, expected \"%s\", got \"%s\"" % (lockpath, lock))
       self.assert_( os.path.exists(lockpath), "inside lock, lock file does not exist: %s" % (lockpath,))
       try:
         with lockfile(lockbase):
