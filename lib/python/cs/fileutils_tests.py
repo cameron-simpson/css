@@ -5,9 +5,12 @@
 #
 
 import sys
+import os
+import os.path
+import errno
 import unittest
 from tempfile import NamedTemporaryFile
-from .fileutils import compare, rewrite
+from .fileutils import compare, rewrite, lockfile
 
 class Test(unittest.TestCase):
 
@@ -39,6 +42,32 @@ class Test(unittest.TestCase):
       self.assertEquals( open(T1.name).read(), olddata, "bad old data in %s" % (T1.name,) )
       rewrite(T1.name, StringIO(newdata))
       self.assertEquals( open(T1.name).read(), newdata, "bad new data in %s" % (T1.name,) )
+
+  def test_lockfile_00_basic(self):
+    lockbase = 'testlock'
+    lockext = '.lock'
+    lockpath = lockbase + lockext
+    self.assert_( not os.path.exists(lockpath), "before lock, lock file already exists: %s" % (lockpath,))
+    with lockfile(lockbase):
+      self.assert_( os.path.exists(lockpath), "inside lock, lock file does not exist: %s" % (lockpath,))
+    self.assert_( not os.path.exists(lockpath), "after lock: lock file still exists: %s" % (lockpath,))
+
+  def test_lockfile_01_conflict(self):
+    lockbase = 'testlock'
+    lockext = '.lock'
+    lockpath = lockbase + lockext
+    self.assert_( not os.path.exists(lockpath), "before lock, lock file already exists: %s" % (lockpath,))
+    with lockfile(lockbase):
+      self.assert_( os.path.exists(lockpath), "inside lock, lock file does not exist: %s" % (lockpath,))
+      try:
+        with lockfile(lockbase):
+          self.assert_( False, "lock inside lock, should not happen: %s" % (lockpath,))
+      except OSError as e:
+        if e.errno == errno.EEXIST:
+          pass
+        else:
+          raise
+    self.assert_( not os.path.exists(lockpath), "after lock: lock file still exists: %s" % (lockpath,))
 
 def selftest(argv):
   unittest.main(__name__, None, argv)
