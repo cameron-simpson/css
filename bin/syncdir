@@ -32,7 +32,7 @@ xit=0
 for host
 do
   pfx "$host" \
-    rsync -i -aHC --exclude=\*.swp --exclude=\*~ --delete \
+    rsync -iO -aHC --exclude=\*.swp --exclude=\*~ --delete \
       "$dir/." "$host:$dir/." \
       &
 done

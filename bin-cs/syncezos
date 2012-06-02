@@ -15,7 +15,7 @@ ezoscss=$ezoshtml/cs/css
 ##syncezos-rc
 
 pfx "$cmd ezos:public_html" \
-  rsync -i -rptlH --delete \
+  rsync -iO -rptlH --delete \
 		--exclude=CVS/ \
 		--include=/cs --exclude=/cs/test/ --exclude=/cs/css/optcss \
 		--include=/fay \
@@ -23,6 +23,6 @@ pfx "$cmd ezos:public_html" \
 putcss -d optcss ezos
 
 ##syncezos-cgi
-##rsync -i -aHPW --delete --exclude=CVS/ $ezoscgi/. ezos:cgi-bin/.
+##rsync -iO -aHPW --delete --exclude=CVS/ $ezoscgi/. ezos:cgi-bin/.
 
 putacc ezos

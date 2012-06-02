@@ -144,7 +144,7 @@ do
       else
         logdir=logs/$loghost/$logpathdir__
         [ -d "$logdir" ] || set-x mkdir -p "$logdir"
-        pfx "$loghost" $trace rsync -ia "$loghost:$logptn" "$logdir/." || :
+        pfx "$loghost" $trace rsync -iOa "$loghost:$logptn" "$logdir/." || :
         echo "LOGFILE \"$logdir/$logptnbase\"" >>"$params_patch"
       fi
       ;;

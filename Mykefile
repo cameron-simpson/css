@@ -38,7 +38,7 @@ scriptmandir = $(MANDIR)/man1
 scriptmans = $(scriptmandir)/$((allscripts)).1
 scriptfromman(manf) = $(manf FP)
 
-rsync = rsync -i
+rsync = rsync -iO
 
 _help:
         @echo '_test              - do syntax checks and self tests (may set \$$MYKE_TEST_PYTHON_MODULES if desired)'

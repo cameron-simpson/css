@@ -148,7 +148,7 @@ fi
 
 hg="$trace hg"
 inhg="$trace inhg $xopt"
-rsync="$trace rsync -i"
+rsync="$trace rsync -iO"
 
 sync_in()
 {
