@@ -128,5 +128,5 @@ then
   hg-rss >"$dstdir/html/CHANGELOG.rss"
 
   echo "update $cssweb..."
-  pfx "$cssweb" qrsync -a --exclude=/optcss "$dstdir/html/" "$cssweb/"
+  pfx "$cssweb" rsync -i -a --exclude=/optcss "$dstdir/html/" "$cssweb/"
 fi

@@ -5,4 +5,4 @@
 
 ezos=$HOME/@/ezos
 
-pfx 'kath->ezos' qrsync -rptlH --delete $ezos/html/kath/. ezos:html/kath/.
+pfx 'kath->ezos' rsync -i -rptlH --delete $ezos/html/kath/. ezos:html/kath/.

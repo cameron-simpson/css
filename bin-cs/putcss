@@ -15,7 +15,7 @@ dstdir=$OPTCSS
 
 ( for host in `hostlist "$@"`
   do
-    pfx "$cmd $host" set-x qrsync -aH --delete "$srcdir/." "$host:$dstdir/." &
+    pfx "$cmd $host" rsync -i -aH --delete "$srcdir/." "$host:$dstdir/." &
     [ $async ] || wait
   done
   wait

@@ -1,6 +1,0 @@
-#!/bin/sh -ue
-#
-# A less noisy rsync output.
-#       - Cameron Simpson <cs@zip.com.au> 08oct2008
-#
-exec sed_fd 1 '/^$/d; /\/$/d' rsync -v ${1+"$@"}

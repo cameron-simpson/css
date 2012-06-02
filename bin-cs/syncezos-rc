@@ -9,7 +9,7 @@ ezos=$HOME/@/ezos
 rrcpath=$ezos/html/cs/rc
 
 pfx "$rrcpath" \
-  qrsync -rptlH --delete --delete-excluded \
+  rsync -i -rptlH --delete --delete-excluded \
 	--exclude=CVS/ \
 	--include='/mail' \
 	--include='/mail/mailcap' \
