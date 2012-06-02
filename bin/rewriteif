@@ -15,6 +15,8 @@ usage="Usage: $cmd [options...] [--] filename [command args...]
         -C      Require the file to change; error if the new file is the same.
 	-d	Do a diff of the file changes.
         -D diffto Do a diff of file changes and email to \"diffto\".
+        --diff-decode shcmd
+                Pipe file contents through 'sh -c shcmd' before diffing.
         -n      No action. Recite underlying commands.
         -N      Make a new file if the content is different.
                 This means \"mv tempfile filename\" instead of
@@ -27,6 +29,7 @@ rw0=
 doit=1
 dodiff=
 diffto=
+diffdecode=
 verbose=
 diff=diff
 newfile=
@@ -41,6 +44,8 @@ do
     -C) mustchange=1 ;;
     -d)	dodiff=1 ;;
     -D) dodiff=1 diffto=$2; shift ;;
+    --diff-decode)
+        diffdecode=$2; shift ;;
     -n) trace=eecho doit= dodiff= ;;
     -N) newfile=1 ;;
     -v)	verbose=1 ;;
@@ -72,7 +77,8 @@ if [ $newfile ]
 then  tmp=`dirname "$file"`/.rwi$$
 else  tmp=$TMPDIR/rwi$$
 fi
-trap 'rm -f "$tmp"' 0 1 2 13 15
+tmp2=$tmp.decoded
+trap 'rm -f "$tmp" "$tmp2"' 0 1 2 13 15
 
 ( [ $doit ] && exec >"$tmp"
   exec $trace "$@"
@@ -97,10 +103,15 @@ fi
 [ $verbose ] && echo "rewrite $file"
 if [ $dodiff  ]
 then
-  if [ -n "$diffto" ]
-  then  $diff $DIFFOPTS "$file" "$tmp" | mailif -s "DIFF: $file" "$diffto"
-  else  $diff $DIFFOPTS "$file" "$tmp" || :
-  fi
+  if [ -n "$diffdecode" ]
+  then  sh -c "$diffdecode" <"$tmp" >"$tmp2"
+        sh -c "$diffdecode" <"$file" | $diff $DIFFOPTS - "$tmp2"
+  else  $diff $DIFFOPTS "$file" "$tmp"
+  fi \
+  | if [ -n "$diffto" ]
+    then  mailif -s "DIFF: $file" "$diffto"
+    else  cat
+    fi
 fi
 if if [ $newfile ]
    then  $trace mv "$tmp" "$file"
