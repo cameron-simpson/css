@@ -298,7 +298,7 @@ gzip_to()
   _gzip_rwflags=
   if [ "x$1" = x-D ]
   then
-    _gzip_rwflags="-D $1"
+    _gzip_rwflags="-D $2"
     shift; shift
   fi
   _gzip_to_file=$1; shift
