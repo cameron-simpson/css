@@ -68,7 +68,10 @@ class Backend_SQLAlchemy(Backend):
     self.__IDbyTypeName = {}
 
   def close(self):
-    debug("Backend_SQLAlchemy.close()")
+    Backend.close(self)
+
+  def sync(self):
+    pass
 
   def _noteNodeKey(self, t, name, node_id):
     ''' Remember the mapping between db node_id and (type, name).

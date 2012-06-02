@@ -169,17 +169,18 @@ class Backend_CSVFile(Backend):
   def close(self):
     self._updateQ.close()
     self._update_thread.join()
-    self.sync()
+    Backend.close(self)
 
   def sync(self):
     ''' Update the CSV file.
     '''
-    if self.nodedb.readonly:
-      error("sync on readonly %s", self)
-    elif self.changed:
-      with lockfile(self.csvpath, block=True):
-        write_csv_file(self.csvpath, self.nodedb.nodedata())
-      self.changed = False
+    if self.changed:
+      if self.readonly:
+        error("%s: sync not done", self)
+      else:
+        with lockfile(self.csvpath, block=True):
+          write_csv_file(self.csvpath, self.nodedb.nodedata())
+        self.changed = False
 
   def apply_nodedata(self):
     raise NotImplementedError("no %s.apply_nodedata(), apply_to uses incremental mode" % (type(self),))
