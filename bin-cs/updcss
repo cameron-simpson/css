@@ -84,7 +84,7 @@ hg-apply-manifest-dates -r "$rev" "$dstdir"
          make-into-shell-functions misc stubs unsw
 
   mkdir -p lib/java
-  cp $HOME/lib/java/au.com.zip.cs.jar lib/java/
+  cp $HOME/lib/java/au.com.zip.cs.jar lib/java/ || echo FIX au.com.zip.cs.jar NEEDED >&2
 
   if false
   then
