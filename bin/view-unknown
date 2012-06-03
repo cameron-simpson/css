@@ -14,11 +14,12 @@ usage="Usage: $cmd [-x] [-t mimetype] {file|-} [[!]attribute...]
 	-x		trace execution of view subcommand.
 	-t mimetype	Supply type."
 
-##echo "$cmd: pid $$: argv=$*" >&2
-##echo "$cmd: pid $$: VIEW_UNKNOWN_FILENAME=$VIEW_UNKNOWN_FILENAME" >&2
-
 mtype=
-trace=	##set-x
+debug=${DEBUG:+echo}${DEBUG:-:}
+trace=${DEBUG:+set-x}
+
+$debug "$cmd: pid $$: argv=$*" >&2
+$debug "$cmd: pid $$: VIEW_UNKNOWN_FILENAME=$VIEW_UNKNOWN_FILENAME" >&2
 
 badopts=
 while [ $# -gt 0 ]

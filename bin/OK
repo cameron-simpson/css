@@ -18,7 +18,7 @@ set -ue
 
 dopfx=
 pfx=
-trace=  ##set-x
+trace=${DEBUG:+set-x}
 count_re=
 words=
 wordsep=

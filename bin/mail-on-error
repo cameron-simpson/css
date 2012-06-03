@@ -1,8 +1,10 @@
-#!/bin/sh -ue
+#!/bin/sh
 #
 # Run command. Send standard error by email if it fails.
 #       - Cameron Simpson <cs@zip.com.au> 13sep2009
 #
+
+set -ue
 
 : ${TMPDIR:=/tmp}
 
@@ -19,7 +21,7 @@ usage="Usage: $cmd [-x] [-s subject] [-S status] addresses command [args...]
         i.e. on a state change to error status."
 
 subj=
-trace=
+trace=${DEBUG:+set-x}
 statusfile=
 
 badopts=

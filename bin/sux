@@ -13,8 +13,8 @@ set -ue
 cmd=$0
 usage="Usage: $cmd [-] [-u user] [-x] [--] command [args...]"
 
-trace=
-setx=:
+trace=${DEBUG:+set-x}
+setx=${DEBUG:-:}${DEBUG:+set-x}
 suargs=
 user=root
 
