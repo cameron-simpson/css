@@ -13,9 +13,11 @@ set -ue
 : ${SSHTO_OPTS:=''}
 : ${SSHTO_CONFIG:=$HOME/.sshtorc}
 : ${SSHTO_PREFIX:=''}
+: ${SSHTO_RUSER:=''}
 
 oldstyle=
 cf=$SSHTO_CONFIG
+ruser=$SSHTO_RUSER
 needoptcss=
 dotrace=
 trace=${DEBUG:+set-x}  ##set-x
@@ -68,9 +70,12 @@ do
         setx='set -x'
 	sshopts="$sshopts $1"
 	;;
-    -l) loginpart=$2
-        shift
-        ;;
+    # rsync hands us this all on its own :-(
+    -l) loginpart=$2; shift ;;
+    # default explicit remote user for use, for example:
+    # RSYNC_RSH='sshto -u fred'
+    # to make x!joe@y!z into fred@x!joe@y!fred@z
+    -u) ruser=$2; shift ;;
     -F) sshcfg=$2; shift ;;
     -[il]) lsshopts="$lsshopts $1 "`shqstr "$2"`
         shift
@@ -116,7 +121,9 @@ then
   fi
 fi
 
-# workaround for rsync mangling my u1@h1!u2@h2 invocation
+# Workaround for rsync mangling my u1@h1!u2@h2 invocation.
+# Rsync cuts x@y arbitrarily and makes it into "-l x y",
+# which we now put back together.
 if [ -n "$loginpart" ]
 then
   host=$loginpart@$host
@@ -210,11 +217,21 @@ split_target()
   then
     while [ $# -gt 1 ]
     do
+      _st_target=$1
+      if [ -n "$ruser" ]
+      then
+        case "$_st_target" in
+          # explicitly omit $ruser at an interim step
+          @*)   _st_target=`expr "x$_st_target" : 'x.\(.*\)'` ;;
+          *@*)  ;;
+          *)    _st_target=$ruser@$_st_target ;;
+        esac
+      fi
       if [ -z "$_st_pcmd" ]
       then  _st_pcmd="ssh $lsshopts"    # first ssh gets the local ssh opts
       else  _st_pcmd="$_st_pcmd ssh"    # following ones just get ssh appended
       fi
-      _st_pcmd="${_st_pcmd} -A -T -x -e none -o batchmode=yes -o compression=no $1"
+      _st_pcmd="${_st_pcmd} -A -T -x -e none -o batchmode=yes -o compression=no $_st_target"
       if [ $needoptcss ]; then _st_pcmd="${_st_pcmd} $SSHTO_OPTCSS/bin/with-opt-css"; fi
       if [ $pfxstderr ];  then _st_pcmd="${_st_pcmd} tag_fd 2 $1"; fi
       if [ $dotrace ];    then _st_pcmd="${_st_pcmd} $trace"; fi
@@ -222,8 +239,17 @@ split_target()
     done
     _st_pcmd="$_st_pcmd nc %h %p"
   fi
-  ##DEBUG##[ -z "$_st_pcmd" ] || _st_pcmd="set-x $_st_pcmd"      # DEBUG
-  printf "%s %s\n" "$1" "$_st_pcmd"
+  _st_target=$1
+  if [ -n "$ruser" ]
+  then
+    case "$_st_target" in
+      # explicitly omit $ruser at an interim step
+      @*)   _st_target=`expr "x$_st_target" : 'x.\(.*\)'` ;;
+      *@*)  ;;
+      *)    _st_target=$ruser@$_st_target ;;
+    esac
+  fi
+  printf "%s %s\n" "$_st_target" "$_st_pcmd"
 }
 
 hostpath=`expand_hostpath "$host"`
@@ -237,6 +263,15 @@ then
       *!*)
         rhost=`expr "x$host" : 'x.*!\(.*\)'`
         host=` expr "x$host" : 'x\(.*\)!.*'`
+        if [ -n "$ruser" ]
+        then
+          case "$rhost" in
+            # explicitly omit $ruser at an interim step
+            @*)   rhost=`expr "x$rhost" : 'x.\(.*\)'` ;;
+            *@*)  ;;
+            *)    rhost=$ruser@$rhost ;;
+          esac
+        fi
         osshcmd=$sshcmd
         sshcmd="ssh $sshargv "`shqstr "$rhost" "$sshcmd"`
         ;;
