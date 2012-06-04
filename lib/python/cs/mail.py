@@ -11,6 +11,7 @@ import string
 import StringIO
 import re
 from contextlib import closing
+from cs.logutils import OBSOLETE
 from cs.misc import seq, saferename
 
 def ismhdir(path):
@@ -261,23 +262,7 @@ def openMaildir(path):
 
 re_rfc2407 = re.compile( r'=\?([^?]+)\?([^?]+)\?([^?]*)\?=' )
 
+@OBSOLETE
 def unrfc2047(s):
-  clean = []
-  sofar = 0
-  for m in re_rfc2407.findall(s):
-    pos = m.start()
-    if pos > sofar:
-      clean.append(s[sofar:pos])
-    charset, charencoding, text = m.groups()
-    if charencoding == 'Q':
-      text = unqp(text)
-    elif charencoding == 'B':
-      text = unb64(text)
-    else:
-      raise ValueError, "invalid rfc2047 encoding: %s" % (charencoding,)
-    clean.append(text.decode(text.decode(charset)))
-    sofar = m.end()
-  if sofar < len(s):
-    clean.append(s[sofar:])
-  return ''.join(clean)
-
+  from cs.lex import unrfc2047 as real_unrfc2047
+  return real_unrfc2047(s)
