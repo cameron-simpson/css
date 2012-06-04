@@ -13,7 +13,7 @@ from email.parser import Parser
 from email.utils import getaddresses, formataddr
 from getopt import GetoptError
 import cs.sh
-from cs.mail import unrfc2047
+from cs.lex import unrfc2047
 from cs.mailAddresses import addressKey, loadAddresses, addrsRegexp
 from cs.logutils import setup_logging, error, Pfx, warning
 import cs.misc
