@@ -30,7 +30,7 @@ def main(argv):
   force=False     # don't reset existing variables
   noAction=False  # don't exec command, recite var assignments on stdout
   isset=set()
-  filevars={}
+  var_values = {}
   doingFilevar=set()
   bootVal={}
 
@@ -53,7 +53,8 @@ def main(argv):
                     .split(':')):
     varfile = os.path.join(path, 'var')
     if os.path.isfile(varfile):
-      loadfilevars(varfile, env)
+      for var, value in filevars(varfile):
+        var_values[var] = value
 
   setvar("HOSTNAME")
   setvar("SYSTEMID")
@@ -236,17 +237,27 @@ def paramsubst(val):
 
   return newval
 
-def loadfilevars(path):
-  global filevars
-  for line in open(path):
-    assert line[-1:] == '\n', "%s: unexpected EOF" % path
-    if line[0] == '#' or line[0] == '\n':
-      continue
-    line=line[:-1]
-    eqpos=line.find('=')
-    assert eqpos > 0, "%s: bad line: %s" % (path, line)
-    var, val = line.split('=', 1)
-    filevars[var]=val
+def filevars(path):
+  ''' Return a list of (var, value) tuples from the specific file.
+  '''
+  items = []
+  with Pfx(path):
+    with open(path) as fp:
+      lineno = 0
+      for line in fp:
+        lineno += 1
+        with Pfx(lineno):
+          if not line.endswith('\n'):
+            raise ValueError('unexpected EOF: missing trailing newline')
+          line = line.strip()
+          if not line or line.startswith('#'):
+            continue
+          try:
+            var, value = line.split('=', 1)
+          except ValueError:
+            raise ValueError('missing "="')
+          items.append( (var, value) )
+  return items
 
 def listfilevars():
   global filevars
