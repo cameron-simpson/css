@@ -308,15 +308,14 @@ for opt, val in opts:
     error("unimplemented option: %s", opt)
     sys.exit(2)
 
-envpath=os.environ.get('ENVPATH')
-if envpath is None:
-  envpath='%s/.setvar:/etc/setvar' % env('HOME')
-envpath=envpath.split(':')
-renvpath=envpath[:]
-renvpath.reverse()
-
-for path in renvpath:
-  varfile=os.path.join(path,'var')
+home = env('HOME')
+for envdir in reversed(
+                os.environ
+                  .get('ENVPATH',
+                       '%s/.setvar-local:%s/.setvar:/etc/setvar'
+                       % (home,home,))
+                  .split(':')):
+  varfile = os.path.join(path, 'var')
   if os.path.isfile(varfile):
     loadfilevars(varfile)
 
