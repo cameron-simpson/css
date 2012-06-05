@@ -66,7 +66,8 @@ def main(argv):
     else:
       setvar(arg)
 
-  cleanpath('PATH','MANPATH','PYTHONPATH','PERL5LIB')
+  for var in 'PATH', 'MANPATH', 'PYTHONPATH', 'PERL5LIB':
+    environ[var] = cleanpath(environ[var])
 
   if noAction:
     import cs.sh
@@ -206,7 +207,6 @@ def setvar(var,val=None):
       os.environ[var]=val
       isset.add(var)
     return val
-
   val=env(var)
   if val is None:
     warn("failed to setvar(%s)", var)
@@ -330,19 +330,11 @@ def doFile(path):
     if len(oline) > 0:
       error("unterminated slosh line")
 
-def cleanpath(*vars):
-  for var in vars:
-    keep=[]
-    if var not in os.environ:
-      error("warning: cleanpath(%s): no such envvar", var)
-      continue
-    oval=os.environ[var]
-    for path in oval.split(':'):
-      if len(path) > 0 and os.path.exists(path):
-        if path not in keep:
-          keep.append(path)
-    nval=":".join(keep)
-    if oval != nval:
-      os.environ[var]=nval
+def cleanpath(path, sep=':'):
+  keep = []
+  for subpath in path.split(sep):
+    if subpath not in keep and os.path.exists(subpath):
+      keep.append(subpath)
+  return sep.join(keep)
 
 sys.exit(main(sys.argv))
