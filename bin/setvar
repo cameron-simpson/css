@@ -16,20 +16,67 @@
 from __future__ import with_statement
 from getopt import getopt, GetoptError
 import os
+import os.path
 import pwd
 import sys
 if sys.hexversion < 0x02060000: from sets import Set as set
 import cs.misc
 from cs.logutils import error, warn, info, debug, Pfx, setup_logging
 
-setup_logging()
+def main(argv):
+  cmd = os.path.basename(argv[0])
+  setup_logging(cmd)
 
-force=False     # don't reset existing variables
-noAction=False  # don't exec command, recite var assignments on stdout
-isset=set()
-filevars={}
-doingFilevar=set()
-bootVal={}
+  force=False     # don't reset existing variables
+  noAction=False  # don't exec command, recite var assignments on stdout
+  isset=set()
+  filevars={}
+  doingFilevar=set()
+  bootVal={}
+
+  opts, args = getopt(argv[1:], 'fn')
+  for opt, val in opts:
+    if opt == '-f':
+      force=True
+    elif opt == '-n':
+      noAction=True
+    else:
+      error("unimplemented option: %s", opt)
+      sys.exit(2)
+
+  home = env('HOME')
+  for envdir in reversed(
+                  os.environ
+                    .get('ENVPATH',
+                         '%s/.setvar-local:%s/.setvar:/etc/setvar'
+                         % (home,home,))
+                    .split(':')):
+    varfile = os.path.join(path, 'var')
+    if os.path.isfile(varfile):
+      loadfilevars(varfile, env)
+
+  setvar("HOSTNAME")
+  setvar("SYSTEMID")
+
+  if len(args) == 0:
+    args=('var *',)
+  for arg in args:
+    if ' ' in arg:
+      doCommand(arg.split())
+    else:
+      setvar(arg)
+
+  cleanpath('PATH','MANPATH','PYTHONPATH','PERL5LIB')
+
+  if noAction:
+    import cs.sh
+    vars=list(isset)
+    vars.sort()
+    for var in vars:
+      print "%s=%s; export %s;" % (var, cs.sh.quotestr(os.environ[var]), var)
+  else:
+    error("action mode not supported")
+    sys.exit(1)
 
 def env(var,dflt=''):
   ''' Obtain the value of an environment variable.
@@ -298,46 +345,4 @@ def cleanpath(*vars):
     if oval != nval:
       os.environ[var]=nval
 
-opts, args = getopt(sys.argv[1:], 'fn')
-for opt, val in opts:
-  if opt == '-f':
-    force=True
-  elif opt == '-n':
-    noAction=True
-  else:
-    error("unimplemented option: %s", opt)
-    sys.exit(2)
-
-home = env('HOME')
-for envdir in reversed(
-                os.environ
-                  .get('ENVPATH',
-                       '%s/.setvar-local:%s/.setvar:/etc/setvar'
-                       % (home,home,))
-                  .split(':')):
-  varfile = os.path.join(path, 'var')
-  if os.path.isfile(varfile):
-    loadfilevars(varfile)
-
-setvar("HOSTNAME")
-setvar("SYSTEMID")
-
-if len(args) == 0:
-  args=('var *',)
-for arg in args:
-  if ' ' in arg:
-    doCommand(arg.split())
-  else:
-    setvar(arg)
-
-cleanpath('PATH','MANPATH','PYTHONPATH','PERL5LIB')
-
-if noAction:
-  import cs.sh
-  vars=list(isset)
-  vars.sort()
-  for var in vars:
-    print "%s=%s; export %s;" % (var, cs.sh.quotestr(os.environ[var]), var)
-else:
-  error("action mode not supported")
-  sys.exit(1)
+sys.exit(main(sys.argv))
