@@ -4,6 +4,8 @@
 #	- Cameron Simpson <cs@zip.com.au>
 #
 
+set -ue
+
 : ${TMPDIR:=/tmp}
 
 cmd=`basename "$0"`
