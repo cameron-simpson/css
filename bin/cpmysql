@@ -13,7 +13,7 @@
 
 : ${USER:=`id -un`}
 : ${MYSQL_LOGIN:=$USER}
-: ${NOTIFY:=$USER}
+: ${NOTIFY:=${MAILTO:-${EMAIL:-$USER}}}
 
 trace=eecho
 doit=
