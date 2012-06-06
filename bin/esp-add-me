@@ -4,6 +4,9 @@
 #	- Cameron Simpson <cs@zip.com.au> 08feb96
 #
 
+set -ue
+: $EMAIL
+
 for addr
 do { echo "From: $addr"
      echo "Subject: add entry for $addr"
