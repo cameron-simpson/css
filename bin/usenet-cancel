@@ -1,7 +1,11 @@
 #!/bin/sh
 #
+# Cancel an usenet message. - Cameron Simpson <cs@zip.com.au>
+#
 
-eval "`setvar -n mail news`"
+set -ue
+: $EMAIL
+: $ORGANIZATION
 
 ng=
 case $1 in
