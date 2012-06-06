@@ -44,14 +44,14 @@ def main(argv):
       error("unimplemented option: %s", opt)
       sys.exit(2)
 
-  home = env('HOME')
+  home = env('HOME', force=force)
   for envdir in reversed(
                   os.environ
                     .get('ENVPATH',
                          '%s/.setvar-local:%s/.setvar:/etc/setvar'
                          % (home,home,))
                     .split(':')):
-    varfile = os.path.join(path, 'var')
+    varfile = os.path.join(envdir, 'var')
     if os.path.isfile(varfile):
       for var, value in filevars(varfile):
         var_values[var] = value
@@ -80,11 +80,10 @@ def main(argv):
     error("action mode not supported")
     sys.exit(1)
 
-def env(var,dflt=''):
+def env(var, force=False):
   ''' Obtain the value of an environment variable.
       Returns None (or default) if the value cannot be determined.
   '''
-  global force, isset
   if (not force or var in isset) and var in os.environ:
     return os.environ[var]
   if var not in doingFilevar:
@@ -96,10 +95,10 @@ def env(var,dflt=''):
   if val is not None:
     setvar(var,val)
   if val is None:
-    val=dflt
+    val=''
   return val
 
-def bootvar(var):
+def bootvar(var, force=False):
   ''' Compute the value of a variety of variables from scratch.
   '''
   if var in bootVal:
@@ -113,14 +112,14 @@ def bootvar(var):
   elif var == "HOME":
     val=pwd.getpwuid(os.geteuid())[5]
   elif var == "HOST":
-    hostname=env("HOSTNAME")
+    hostname=env("HOSTNAME", force=force)
     if '.' in hostname:
       host, hostdomain = hostname.split('.',1)
     else:
       host = hostname
     val=host
   elif var == "HOSTDOMAIN":
-    hostname=env("HOSTNAME")
+    hostname=env("HOSTNAME", force=force)
     host, hostdomain = hostname.split('.',1)
     val=hostdomain
   elif var == "HOSTNAME":
@@ -151,7 +150,7 @@ def bootvar(var):
     elif os.path.isfile('/etc/system-release'):
       vendor=open('/etc/system-release').read().split()[0]
     else:
-      opsys=env("OS")
+      opsys=env("OS", force=force)
       if opsys == "darwin":
         vendor="apple"
       elif opsys == "openbsd":
@@ -165,21 +164,21 @@ def bootvar(var):
   return val
 
 def filevarexts():
-  hostname=env("HOSTNAME")
+  hostname=env("HOSTNAME", force=force)
   if hostname is not None:
     yield "@%s" % hostname
-  host=env("HOST")
-  systemid=env("SYSTEMID")
+  host=env("HOST", force=force)
+  systemid=env("SYSTEMID", force=force)
   if host is not None:
     if systemid is not None:
       yield "@%s.%s" % (host, systemid)
     yield "@%s" % host
   if systemid is not None:
     yield "@%s" % systemid
-  arch=env("ARCH")
+  arch=env("ARCH", force=force)
   if arch is not None:
     yield ".%s" % arch
-  osname=env("OS")
+  osname=env("OS", force=force)
   if osname is not None:
     yield ".%s" % osname
   yield None
@@ -189,7 +188,6 @@ def filevar(var):
     warn("recursion in filevar(%s): %s", var, doingFilevar)
     return None
   doingFilevar.add(var)
-  global filevars
   for ext in filevarexts():
     if ext is None:
       evar=var
@@ -202,13 +200,13 @@ def filevar(var):
   doingFilevar.remove(var)
   return None
 
-def setvar(var,val=None):
+def setvar(var, val=None):
   if val is not None:
     if os.environ.get(var) != val:
       os.environ[var]=val
       isset.add(var)
     return val
-  val=env(var)
+  val=env(var, force=force)
   if val is None:
     warn("failed to setvar(%s)", var)
   else:
@@ -227,7 +225,7 @@ def paramsubst(val):
     val=val1[pos:]
     subvar=val1[:pos]
 
-    subval=env(subvar)
+    subval=env(subvar, force=force)
     if subval is None:
       warn("can't look up $%s", subvar)
     else:
@@ -260,7 +258,6 @@ def filevars(path):
   return items
 
 def listfilevars():
-  global filevars
   V=set()
   for v in filevars.keys():
     if '.' in v:
@@ -278,24 +275,23 @@ def doCommand(argv):
       arg=paramsubst(arg)
       if not os.path.isabs(arg):
         arg=os.path.join('/opt',arg)
-      setvar('PATH',"%s:%s/bin:%s/sbin" % (env('PATH',''), arg, arg))
-      setvar('MANPATH',"%s:%s/man:%s/share/man" % (env('MANPATH',''), arg, arg))
-      setvar('PERL5LIB',"%s:%s/lib/perl5:%s/lib/perl5/vendor_perl" % (env('PERL5LIB',''), arg, arg))
-      ##setvar('PYTHONPATH',"%s:%s/lib/python%s/site-packages:%s/lib/python%s" % (env('PYTHONPATH',''), arg, env('PYTHON_VV'), arg, env('PYTHON_VV')))
+      setvar('PATH',"%s:%s/bin:%s/sbin" % (env('PATH', force=force), arg, arg))
+      setvar('MANPATH',"%s:%s/man:%s/share/man" % (env('MANPATH', force=force), arg, arg))
+      setvar('PERL5LIB',"%s:%s/lib/perl5:%s/lib/perl5/vendor_perl" % (env('PERL5LIB', force=force), arg, arg))
+      ##setvar('PYTHONPATH',"%s:%s/lib/python%s/site-packages:%s/lib/python%s" % (env('PYTHONPATH', force=force), arg, env('PYTHON_VV', force=force), arg, env('PYTHON_VV', force=force)))
   elif op == "insprefix":
     argv.reverse()
     for arg in argv:
       arg=paramsubst(arg)
       if not os.path.isabs(arg):
         arg=os.path.join('/opt',arg)
-      setvar('PATH',"%s/bin:%s/sbin:%s" % (arg, arg, env('PATH')))
-      setvar('MANPATH',"%s/man:%s/share/man:%s" % (arg, arg, env('MANPATH')))
-      setvar('PERL5LIB',"%s/lib/perl5:%s/lib/perl5/vendor_perl:%s" % (arg, arg, env('PERL5LIB')))
-      ##setvar('PYTHONPATH',"%s/lib/python%s:%s" % (arg, env('PYTHON_VV'), env('PYTHONPATH')))
+      setvar('PATH',"%s/bin:%s/sbin:%s" % (arg, arg, env('PATH', force=force)))
+      setvar('MANPATH',"%s/man:%s/share/man:%s" % (arg, arg, env('MANPATH', force=force)))
+      setvar('PERL5LIB',"%s/lib/perl5:%s/lib/perl5/vendor_perl:%s" % (arg, arg, env('PERL5LIB', force=force)))
+      ##setvar('PYTHONPATH',"%s/lib/python%s:%s" % (arg, env('PYTHON_VV', force=force), env('PYTHONPATH', force=force)))
   elif op == "python":
     exec " ".join(argv)
   elif op == "use":
-    global envpath
     for arg in argv:
       if os.path.isabs(arg):
         doFile(arg)
