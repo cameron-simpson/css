@@ -11,8 +11,7 @@ set -ue
 
 : ${TMPDIR:=/tmp}
 : ${USER:=`id -un`}
-: ${EMAIL:=$USER}
-: ${NOTIFY:=$EMAIL}
+: ${NOTIFY:=${MAILTO:-${EMAIL:-$USER}}}
 : ${OK:=OK:}
 : ${FAIL:=FAIL:}
 
@@ -37,7 +36,7 @@ usage="Usage: $cmd [options...] [--] command [args...]
         Recite \"label\" after OK/FAIL. Defaults to command.
   -N, --notify-on-error notifyaddr
         Email error output to notifyaddr on failure; uses mail-on-error.
-        Default from \$NOTIFY: $NOTIFY
+        Default from \$NOTIFY or \$MAILTO: $NOTIFY
   -P    Prefix output with the label.
   --prefix pfx
         Prefix output with \"pfx\"."
