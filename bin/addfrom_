@@ -5,10 +5,10 @@
 #	- Cameron Simpson <cs@zip.com.au> 08nov2002
 #
 
+set -ue
 
 from=`set \`date\`; echo "From $EMAIL $1 $2 $3 $4 $6"`
 
-##set -x
 exec sed -ne "
 1{
   i\\
