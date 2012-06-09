@@ -21,7 +21,7 @@ import pwd
 import sys
 if sys.hexversion < 0x02060000: from sets import Set as set
 import cs.misc
-from cs.logutils import error, warn, info, debug, Pfx, setup_logging
+from cs.logutils import error, warning, info, debug, Pfx, setup_logging
 
 def main(argv):
   cmd = os.path.basename(argv[0])
@@ -185,7 +185,7 @@ def filevarexts():
 
 def filevar(var):
   if var in doingFilevar:
-    warn("recursion in filevar(%s): %s", var, doingFilevar)
+    warning("recursion in filevar(%s): %s", var, doingFilevar)
     return None
   doingFilevar.add(var)
   for ext in filevarexts():
@@ -208,7 +208,7 @@ def setvar(var, val=None):
     return val
   val=env(var, force=force)
   if val is None:
-    warn("failed to setvar(%s)", var)
+    warning("failed to setvar(%s)", var)
   else:
     os.environ[var]=val
     isset.add(var)
@@ -227,7 +227,7 @@ def paramsubst(val):
 
     subval=env(subvar, force=force)
     if subval is None:
-      warn("can't look up $%s", subvar)
+      warning("can't look up $%s", subvar)
     else:
       newval+=subval
 
