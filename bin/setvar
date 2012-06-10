@@ -21,6 +21,7 @@ import pwd
 import sys
 if sys.hexversion < 0x02060000: from sets import Set as set
 from cs.env import envsub
+from cs.lex import get_identifier
 import cs.misc
 from cs.logutils import error, warning, info, debug, Pfx, setup_logging
 
@@ -35,7 +36,6 @@ def main(argv):
   for opt, val in opts:
     if opt == '-f':
       force=True
-      noAction=True
     else:
       error("unimplemented option: %s", opt)
       sys.exit(2)
@@ -63,7 +63,12 @@ def main(argv):
       setvar(arg, None, environ, vars)
 
   for var in 'PATH', 'MANPATH', 'PYTHONPATH', 'PERL5LIB':
-    environ[var] = cleanpath(environ[var])
+    try:
+      new_value = cleanpath(environ[var])
+    except ValueError:
+      pass
+    else:
+      environ[var] = new_value
 
   import cs.sh
   for var in sorted(vars):
@@ -127,7 +132,7 @@ def doCommand(argv, environ, vars):
   argv = argv[1:]
   if op == 'addprefix':
     for arg in argv:
-      arg = envsub(arg, environ=environ)
+      arg = envsub(arg, environ=environ, bare='$', default='')
       if not os.path.isabs(arg):
         arg=os.path.join('/opt',arg)
       setvar('PATH',
@@ -145,7 +150,7 @@ def doCommand(argv, environ, vars):
              vars)
   elif op == 'insprefix':
     for arg in reversed(argv):
-      arg = envsub(arg, environ=environ)
+      arg = envsub(arg, environ=environ, bare='$', default='')
       if not os.path.isabs(arg):
         arg=os.path.join('/opt',arg)
       setvar('PATH',
@@ -162,7 +167,7 @@ def doCommand(argv, environ, vars):
              environ,
              vars)
   elif op == 'python':
-    exec ' '.join(argv)
+    eval(' '.join(argv))
   elif op == 'use':
     for arg in argv:
       if os.path.isabs(arg):
@@ -175,8 +180,15 @@ def doCommand(argv, environ, vars):
             break
   elif op == 'var':
     for arg in argv:
-      for var in envsub(arg, environ=environ).split(' '):
-        setvar(var, None, environ, vars)
+      if arg == '*':
+        varlist = sorted(set( get_identifier(v)[0] for v in environ.keys() ))
+      else:
+        varlist = envsub(arg, environ=environ, bare='$', default='').split(' ')
+      for var in varlist:
+        try:
+          setvar(var, None, environ, vars)
+        except ValueError, e:
+          error(str(e))
   else:
     error("unsupported operation: %s", op)
 
@@ -221,7 +233,7 @@ class EnvMapping(dict):
         value = dict.__getitem__(self, var_ext)
       except KeyError:
         continue
-      return envsub(value, environ=self)
+      return envsub(value, environ=self, bare='$', default='')
     try:
       value = dict.__getitem__(self, var)
     except KeyError:
@@ -234,7 +246,7 @@ class EnvMapping(dict):
         self[var] = value
         return value
     else:
-      return envsub(value, environ=self)
+      return envsub(value, environ=self, bare='$', default='')
 
   def _boot(self, var):
     ''' Compute the value of a variety of variables from scratch.
