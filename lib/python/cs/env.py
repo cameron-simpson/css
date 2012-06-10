@@ -41,6 +41,10 @@ def getenv(var, default=None, environ=None, dosub=False):
   return value
 
 def envsub(s, environ=None):
+  ''' Replace substring of the form '$var' with the value of 'var' from environ.
+      `environ`: environment mapping, default os.environ.
+      Raises ValueError for a missing `environ` mapping.
+  '''
   if environ is None:
     environ = os.environ
   strs = []
