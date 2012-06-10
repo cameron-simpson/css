@@ -20,6 +20,18 @@ baseEnv={
   'TMPDIR':     '/tmp',
 }
 
+def getenv(var, default=None, environ=None, dosub=False):
+  if environ is None:
+    environ = os.environ
+  value = environ.get(var)
+  if value is None:
+    if default is None:
+      raise KeyError("getenv: $%s: unknown variable" % (var,))
+    value = default
+    if dosub:
+      value = envsub(value, environ=environ)
+  return value
+
 def envsub(s, environ=None):
   if environ is None:
     environ = os.environ
