@@ -20,6 +20,7 @@ import os.path
 import pwd
 import sys
 if sys.hexversion < 0x02060000: from sets import Set as set
+from cs.env import envsub
 import cs.misc
 from cs.logutils import error, warning, info, debug, Pfx, setup_logging
 
@@ -28,191 +29,45 @@ def main(argv):
   setup_logging(cmd)
 
   force=False     # don't reset existing variables
-  noAction=False  # don't exec command, recite var assignments on stdout
-  isset=set()
-  var_values = {}
-  doingFilevar=set()
-  bootVal={}
+  noAction=True  # don't exec command, recite var assignments on stdout
 
   opts, args = getopt(argv[1:], 'fn')
   for opt, val in opts:
     if opt == '-f':
       force=True
-    elif opt == '-n':
       noAction=True
     else:
       error("unimplemented option: %s", opt)
       sys.exit(2)
 
-  home = env('HOME', force=force)
-  for envdir in reversed(
-                  os.environ
-                    .get('ENVPATH',
-                         '%s/.setvar-local:%s/.setvar:/etc/setvar'
-                         % (home,home,))
-                    .split(':')):
+  # load up the environ mapping
+  environ = EnvMapping(os.environ)
+  home = environ['HOME']
+  envpath = environ.get('ENVPATH',
+                        '%s/.setvar-local:%s/.setvar:/etc/setvar'
+                        % (home, home))
+  for envdir in reversed(envpath.split(':')):
     varfile = os.path.join(envdir, 'var')
     if os.path.isfile(varfile):
       for var, value in filevars(varfile):
-        var_values[var] = value
-
-  setvar("HOSTNAME")
-  setvar("SYSTEMID")
+        environ[var] = value
 
   if len(args) == 0:
     args=('var *',)
+
+  vars = set()
   for arg in args:
     if ' ' in arg:
-      doCommand(arg.split())
+      doCommand(arg.split(), environ, vars)
     else:
-      setvar(arg)
+      setvar(arg, None, environ, vars)
 
   for var in 'PATH', 'MANPATH', 'PYTHONPATH', 'PERL5LIB':
     environ[var] = cleanpath(environ[var])
 
-  if noAction:
-    import cs.sh
-    vars=list(isset)
-    vars.sort()
-    for var in vars:
-      print "%s=%s; export %s;" % (var, cs.sh.quotestr(os.environ[var]), var)
-  else:
-    error("action mode not supported")
-    sys.exit(1)
-
-def env(var, force=False):
-  ''' Obtain the value of an environment variable.
-      Returns None (or default) if the value cannot be determined.
-  '''
-  if (not force or var in isset) and var in os.environ:
-    return os.environ[var]
-  if var not in doingFilevar:
-    val=filevar(var)
-  else:
-    val=None
-  if val is None:
-    val=bootvar(var)
-  if val is not None:
-    setvar(var,val)
-  if val is None:
-    val=''
-  return val
-
-def bootvar(var, force=False):
-  ''' Compute the value of a variety of variables from scratch.
-  '''
-  if var in bootVal:
-    return bootVal[var]
-  val=None
-  if var == "CPU":
-    cpu=os.uname()[4].lower()
-    if cpu == 'power macintosh':
-      cpu='ppc'
-    val=cpu
-  elif var == "HOME":
-    val=pwd.getpwuid(os.geteuid())[5]
-  elif var == "HOST":
-    hostname=env("HOSTNAME", force=force)
-    if '.' in hostname:
-      host, hostdomain = hostname.split('.',1)
-    else:
-      host = hostname
-    val=host
-  elif var == "HOSTDOMAIN":
-    hostname=env("HOSTNAME", force=force)
-    host, hostdomain = hostname.split('.',1)
-    val=hostdomain
-  elif var == "HOSTNAME":
-    ##import socket
-    ##val=socket.getfqdn()
-    val=os.popen('exec hostname').read()
-    assert len(val) > 1 and val[-1] == '\n'
-    val=val[:-1]
-  elif var == "OS":
-    opsys=os.uname()[0].lower()
-    if opsys == "sunos":
-      opsys='solaris'
-    val=opsys
-  elif var == "USER":
-    val=pwd.getpwuid(os.geteuid())[0]
-  elif var == "PYTHON_VV":
-    val="%s.%s" % sys.version_info[:2]
-  elif var == "VENDOR":
-    vendor=None
-    if os.path.isfile('/etc/fedora-release'):
-      vendor='fedora'
-    elif os.path.isfile('/etc/redhat-release'):
-      vendor='redhat'
-    elif os.path.isfile('/etc/gentoo-release'):
-      vendor='gentoo'
-    elif os.path.isfile('/etc/debian_version'):
-      vendor='debian'
-    elif os.path.isfile('/etc/system-release'):
-      vendor=open('/etc/system-release').read().split()[0]
-    else:
-      opsys=env("OS", force=force)
-      if opsys == "darwin":
-        vendor="apple"
-      elif opsys == "openbsd":
-        vendor="openbsd"
-      elif opsys == "freebsd":
-        vendor="freebsd"
-      else:
-        error("unknown VENDOR for OS=%s", opsys)
-    val=vendor
-  bootVal[var]=val
-  return val
-
-def filevarexts():
-  hostname=env("HOSTNAME", force=force)
-  if hostname is not None:
-    yield "@%s" % hostname
-  host=env("HOST", force=force)
-  systemid=env("SYSTEMID", force=force)
-  if host is not None:
-    if systemid is not None:
-      yield "@%s.%s" % (host, systemid)
-    yield "@%s" % host
-  if systemid is not None:
-    yield "@%s" % systemid
-  arch=env("ARCH", force=force)
-  if arch is not None:
-    yield ".%s" % arch
-  osname=env("OS", force=force)
-  if osname is not None:
-    yield ".%s" % osname
-  yield None
-
-def filevar(var):
-  if var in doingFilevar:
-    warning("recursion in filevar(%s): %s", var, doingFilevar)
-    return None
-  doingFilevar.add(var)
-  for ext in filevarexts():
-    if ext is None:
-      evar=var
-    else:
-      evar=var+ext
-    if evar in filevars:
-      doingFilevar.remove(var)
-      return paramsubst(filevars[evar])
-
-  doingFilevar.remove(var)
-  return None
-
-def setvar(var, val=None):
-  if val is not None:
-    if os.environ.get(var) != val:
-      os.environ[var]=val
-      isset.add(var)
-    return val
-  val=env(var, force=force)
-  if val is None:
-    warning("failed to setvar(%s)", var)
-  else:
-    os.environ[var]=val
-    isset.add(var)
-  return val
+  import cs.sh
+  for var in sorted(vars):
+    print "%s=%s; export %s;" % (var, cs.sh.quotestr(environ[var]), var)
 
 def paramsubst(val):
   newval=''
@@ -257,41 +112,58 @@ def filevars(path):
           items.append( (var, value) )
   return items
 
-def listfilevars():
-  V=set()
-  for v in filevars.keys():
-    if '.' in v:
-      v, v2 = v.split('.',1)
-    if '@' in v:
-      v, v2 = v.split('@',1)
-    V.add(v)
-  return V
+def setvar(var, value, environ, vars):
+  if value is None:
+    try:
+      value = environ[var]
+    except KeyError:
+      error("no definition for $%s, using empty value" % (var,))
+      value = ''
+  environ[var] = value
+  vars.add(var)
 
-def doCommand(argv):
-  op=argv[0]
-  argv=argv[1:]
-  if op == "addprefix":
+def doCommand(argv, environ, vars):
+  op = argv[0]
+  argv = argv[1:]
+  if op == 'addprefix':
     for arg in argv:
-      arg=paramsubst(arg)
+      arg = envsub(arg, environ=environ)
       if not os.path.isabs(arg):
         arg=os.path.join('/opt',arg)
-      setvar('PATH',"%s:%s/bin:%s/sbin" % (env('PATH', force=force), arg, arg))
-      setvar('MANPATH',"%s:%s/man:%s/share/man" % (env('MANPATH', force=force), arg, arg))
-      setvar('PERL5LIB',"%s:%s/lib/perl5:%s/lib/perl5/vendor_perl" % (env('PERL5LIB', force=force), arg, arg))
-      ##setvar('PYTHONPATH',"%s:%s/lib/python%s/site-packages:%s/lib/python%s" % (env('PYTHONPATH', force=force), arg, env('PYTHON_VV', force=force), arg, env('PYTHON_VV', force=force)))
-  elif op == "insprefix":
-    argv.reverse()
-    for arg in argv:
-      arg=paramsubst(arg)
+      setvar('PATH',
+             '%s:%s/bin:%s/sbin' % (environ['PATH'], arg, arg),
+             environ,
+             vars)
+      setvar('MANPATH',
+             '%s:%s/man:%s/share/man' % (environ['MANPATH'], arg, arg),
+             environ,
+             vars)
+      setvar('PERL5LIB',
+             '%s:%s/lib/perl5:%s/lib/perl5/vendor_perl'
+             % (environ['PERL5LIB'], arg, arg),
+             environ,
+             vars)
+  elif op == 'insprefix':
+    for arg in reversed(argv):
+      arg = envsub(arg, environ=environ)
       if not os.path.isabs(arg):
         arg=os.path.join('/opt',arg)
-      setvar('PATH',"%s/bin:%s/sbin:%s" % (arg, arg, env('PATH', force=force)))
-      setvar('MANPATH',"%s/man:%s/share/man:%s" % (arg, arg, env('MANPATH', force=force)))
-      setvar('PERL5LIB',"%s/lib/perl5:%s/lib/perl5/vendor_perl:%s" % (arg, arg, env('PERL5LIB', force=force)))
-      ##setvar('PYTHONPATH',"%s/lib/python%s:%s" % (arg, env('PYTHON_VV', force=force), env('PYTHONPATH', force=force)))
-  elif op == "python":
-    exec " ".join(argv)
-  elif op == "use":
+      setvar('PATH',
+             '%s/bin:%s/sbin:%s' % (arg, arg, environ['PATH']),
+             environ,
+             vars)
+      setvar('MANPATH',
+             '%s/man:%s/share/man:%s' % (arg, arg, environ['MANPATH']),
+             environ,
+             vars)
+      setvar('PERL5LIB',
+             '%s/lib/perl5:%s/lib/perl5/vendor_perl:%s'
+             % (arg, arg, environ['PERL5LIB']),
+             environ,
+             vars)
+  elif op == 'python':
+    exec ' '.join(argv)
+  elif op == 'use':
     for arg in argv:
       if os.path.isabs(arg):
         doFile(arg)
@@ -301,14 +173,10 @@ def doCommand(argv):
           if os.path.isfile(fpath):
             doFile(fpath)
             break
-  elif op == "var":
+  elif op == 'var':
     for arg in argv:
-      if arg == "*":
-        for var in listfilevars():
-          setvar(var)
-      else:
-        for var in paramsubst(arg).split(' '):
-          setvar(var)
+      for var in envsub(arg, environ=environ).split(' '):
+        setvar(var, None, environ, vars)
   else:
     error("unsupported operation: %s", op)
 
@@ -343,5 +211,112 @@ def cleanpath(path, sep=':'):
     if subpath not in keep and os.path.exists(subpath):
       keep.append(subpath)
   return sep.join(keep)
+
+class EnvMapping(dict):
+
+  def __getitem__(self, var):
+    for ext in self._exts():
+      var_ext = var + ext
+      try:
+        value = dict.__getitem__(self, var_ext)
+      except KeyError:
+        continue
+      return envsub(value, environ=self)
+    try:
+      value = dict.__getitem__(self, var)
+    except KeyError:
+      try:
+        value = self._boot(var)
+      except KeyError:
+        raise
+      else:
+        # save boot value for reuse
+        self[var] = value
+        return value
+    else:
+      return envsub(value, environ=self)
+
+  def _boot(self, var):
+    ''' Compute the value of a variety of variables from scratch.
+    '''
+    if var == "CPU":
+      cpu = os.uname()[4].lower()
+      if cpu == 'power macintosh':
+        cpu = 'ppc'
+      return cpu
+    if var == "HOME":
+      return pwd.getpwuid(os.geteuid())[5]
+    if var == "HOST":
+      hostname = self['HOSTNAME']
+      if '.' in hostname:
+        host, hostdomain = hostname.split('.', 1)
+      else:
+        host = hostname
+      return host
+    if var == "HOSTDOMAIN":
+      hostname = self['HOSTNAME']
+      if '.' in hostname:
+        host, hostdomain = hostname.split('.',1)
+        return hostdomain
+      raise KeyError
+    if var == "HOSTNAME":
+      val=os.popen('exec hostname').read()
+      if val.endswith('\n'):
+        return val[:-1]
+      raise KeyError
+    if var == "OS":
+      opsys = os.uname()[0].lower()
+      if opsys == "sunos":
+        opsys = 'solaris'
+      return opsys
+    if var == "USER":
+      return pwd.getpwuid(os.geteuid())[0]
+    if var == "PYTHON_VV":
+      return "%s.%s" % sys.version_info[:2]
+    if var == "VENDOR":
+      if os.path.isfile('/etc/fedora-release'):
+        return 'fedora'
+      if os.path.isfile('/etc/redhat-release'):
+        return 'redhat'
+      if os.path.isfile('/etc/gentoo-release'):
+        return 'gentoo'
+      if os.path.isfile('/etc/debian_version'):
+        return 'debian'
+      if os.path.isfile('/etc/system-release'):
+        return open('/etc/system-release').read().split()[0]
+      opsys = self['OS']
+      if opsys == "darwin":
+        return "apple"
+      if opsys == "openbsd":
+        return "openbsd"
+      if opsys == "freebsd":
+        return "freebsd"
+      raise KeyError('unknown VENDOR for OS=%s' % (opsys,))
+    raise KeyError
+
+  def _exts(self):
+    ''' Generator yielding
+          @$HOSTNAME
+          @$HOST.$SYSTEMID
+          @$HOST
+          .$ARCH
+          .$OS
+        if available for use in choosing variable values.
+    '''
+    v_arch = dict.get(self, 'ARCH')
+    v_hostname = dict.get(self, 'HOSTNAME')
+    v_host = dict.get(self, 'HOST')
+    v_os = dict.get(self, 'OS')
+    v_systemid = dict.get(self, 'SYSTEMID')
+    if v_hostname:
+      yield '@' + v_hostname
+    if v_host:
+      if v_systemid:
+        yield '@' + v_host + '.' + v_systemid
+      yield '@' + v_host
+    if v_arch:
+      yield '.' + v_arch
+    if v_os:
+      yield '.' + v_os
 
 sys.exit(main(sys.argv))
