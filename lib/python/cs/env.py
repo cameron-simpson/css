@@ -5,11 +5,14 @@ from cs.lex import get_identifier
 
 def getLogin(uid=None):
   import pwd
-  if uid is None: uid=os.geteuid()
+  if uid is None:
+    uid = os.geteuid()
   return pwd.getpwuid(uid)[0]
+
 def getHomeDir(login=None):
   import pwd
-  if login is None: login=getLogin()
+  if login is None:
+    login = getLogin()
   return pwd.getpwnam(login)[5]
 
 baseEnv={
