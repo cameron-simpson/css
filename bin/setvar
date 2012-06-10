@@ -27,18 +27,8 @@ from cs.logutils import error, warning, info, debug, Pfx, setup_logging
 
 def main(argv):
   cmd = os.path.basename(argv[0])
+  args = argv[1:]
   setup_logging(cmd)
-
-  force=False     # don't reset existing variables
-  noAction=True  # don't exec command, recite var assignments on stdout
-
-  opts, args = getopt(argv[1:], 'fn')
-  for opt, val in opts:
-    if opt == '-f':
-      force=True
-    else:
-      error("unimplemented option: %s", opt)
-      sys.exit(2)
 
   # load up the environ mapping
   environ = EnvMapping(os.environ)
@@ -104,7 +94,7 @@ def setvar(var, value, environ, vars):
     try:
       value = environ[var]
     except KeyError:
-      error("no definition for $%s, using empty value" % (var,))
+      ##error("no definition for $%s, using empty value" % (var,))
       value = ''
   environ[var] = value
   vars.add(var)
