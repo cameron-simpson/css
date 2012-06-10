@@ -79,7 +79,7 @@ def filevars(path):
         with Pfx(lineno):
           if not line.endswith('\n'):
             raise ValueError('unexpected EOF: missing trailing newline')
-          line = line.strip()
+          line = line.lstrip()
           if not line or line.startswith('#'):
             continue
           try:
