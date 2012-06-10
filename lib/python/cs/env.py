@@ -15,14 +15,6 @@ def getHomeDir(login=None):
     login = getLogin()
   return pwd.getpwnam(login)[5]
 
-baseEnv={
-  'USER':       getLogin,
-  'HOME':       getHomeDir,
-  'LOGDIR':     '$HOME/var/log',
-  'VARRUN':     '$HOME/var/run',
-  'TMPDIR':     '/tmp',
-}
-
 def getenv(var, default=None, environ=None, dosub=False):
   ''' Fetch environment value.
       `var`: name of variable to fetch.
@@ -76,77 +68,3 @@ def envsub(s, environ=None, bare=None, default=None):
         raise ValueError("missing envvar name, offset %d: %s" % (pos, s))
     opos = offset
   return ''.join(strs)
-
-class Env(object):
-  def __init__(self,environ=None,base=None):
-    if environ is None:
-      environ = os.environ
-    if base is None:
-      base = baseEnv
-    self.__environ=environ
-    self.__base={}
-    for k in base.keys():
-      self.__base[k]=base[k]
-
-  def get(self,name,dfltval=None,doenvsub=False):
-    if name in self.__environ:
-      val=self.__environ[name]
-    else:
-      if dfltval is not None:
-        if doenvsub:
-          val=self.envsub(dfltval)
-        else:
-          val=dfltval
-      elif name in self.__base:
-        base=self.__base[name]
-        t=type(base)
-        if t is str:
-          val=self.envsub(base)
-        elif t is types.FunctionType:
-          val=base()
-        else:
-          assert False, "unsupported baseEnv type %s: %r" % (t, base)
-      else:
-        raise IndexError
-
-      self.__environ[name]=val
-
-    return val
-
-  def __getitem__(self,name):
-    return self.get(name)
-
-  def envsub(self,s):
-    next=s.find('$')
-    if next < 0:
-      return s
-
-    expanded=''
-    while next >= 0:
-      expanded=expanded+s[:next]
-      s=s[next+1:]
-      endvar=0
-      while ( endvar < len(s)
-          and ( s[endvar] == '_'
-             or s[endvar] in string.ascii_letters
-             or (endvar > 0 and s[endvar] in string.digits)
-              )):
-        endvar=endvar+1
-
-      if endvar == 0:
-        expanded=expanded+'$'
-      else:
-        expanded=expanded+self[s[:endvar]]
-
-      s=s[endvar:]
-      next=s.find('$')
-
-    if len(s) > 0:
-      expanded=expanded+s
-
-    return expanded
-
-__dfltEnv=Env()
-
-def dflt(envvar,dfltval=None,doenvsub=False):
-  return __dfltEnv.get(envvar,dfltval=dfltval,doenvsub=doenvsub)
