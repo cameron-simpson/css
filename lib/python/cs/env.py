@@ -21,6 +21,14 @@ baseEnv={
 }
 
 def getenv(var, default=None, environ=None, dosub=False):
+  ''' Fetch environment value.
+      `var`: name of variable to fetch.
+      `default`: default value if not present. If not specified or None,
+          raise KeyError.
+      `environ`: environment mapping, default os.environ.
+      `dosub`: if true, use envsub() to perform environment variable
+          substitution on `default` if it used. Default value is False.
+  '''
   if environ is None:
     environ = os.environ
   value = environ.get(var)
