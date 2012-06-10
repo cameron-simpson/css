@@ -77,27 +77,6 @@ def main(argv):
   for var in sorted(vars):
     print "%s=%s; export %s;" % (var, cs.sh.quotestr(environ[var]), var)
 
-def paramsubst(val):
-  newval=''
-  while '$' in val:
-    val0, val1 = val.split('$',1)
-    newval+=val0
-    pos=0
-    while pos < len(val1) and (val1[pos].isalnum() or val1[pos] == '_'):
-      pos+=1
-    val=val1[pos:]
-    subvar=val1[:pos]
-
-    subval=env(subvar, force=force)
-    if subval is None:
-      warning("can't look up $%s", subvar)
-    else:
-      newval+=subval
-
-  newval+=val
-
-  return newval
-
 def filevars(path):
   ''' Return a list of (var, value) tuples from the specific file.
   '''
