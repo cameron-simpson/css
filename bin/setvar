@@ -42,10 +42,14 @@ def main(argv):
 
   # load up the environ mapping
   environ = EnvMapping(os.environ)
+  vars = set()
+
   home = environ['HOME']
-  envpath = environ.get('ENVPATH',
-                        '%s/.setvar-local:%s/.setvar:/etc/setvar'
-                        % (home, home))
+  envpath = setvar('ENVPATH',
+                   '%s/.setvar-local:%s/.setvar:/etc/setvar'
+                   % (home, home),
+                   environ,
+                   vars)
   for envdir in reversed(envpath.split(':')):
     varfile = os.path.join(envdir, 'var')
     if os.path.isfile(varfile):
@@ -55,7 +59,6 @@ def main(argv):
   if len(args) == 0:
     args=('var *',)
 
-  vars = set()
   for arg in args:
     if ' ' in arg:
       doCommand(arg.split(), environ, vars)
@@ -126,6 +129,7 @@ def setvar(var, value, environ, vars):
       value = ''
   environ[var] = value
   vars.add(var)
+  return value
 
 def doCommand(argv, environ, vars):
   op = argv[0]
@@ -171,12 +175,12 @@ def doCommand(argv, environ, vars):
   elif op == 'use':
     for arg in argv:
       if os.path.isabs(arg):
-        doFile(arg)
+        doFile(arg, environ, vars)
       else:
-        for path in envpath:
-          fpath=os.path.join(path,arg)
+        for path in environ['ENVPATH'].split(':'):
+          fpath = os.path.join(path, arg)
           if os.path.isfile(fpath):
-            doFile(fpath)
+            doFile(fpath, environ, vars)
             break
   elif op == 'var':
     for arg in argv:
@@ -192,30 +196,29 @@ def doCommand(argv, environ, vars):
   else:
     error("unsupported operation: %s", op)
 
-def doFile(path):
+def doFile(path, environ, vars):
   with Pfx(path):
     oline=""
+    lineno = 0
     for line in open(path):
-      if line[-1:] != '\n':
-        error("unexpected EOF")
+      lineno += 1
+      if not line.endswith('\n'):
+        error("unexpected EOF - missing newline")
         break
-      line=line[:-1]
-      if len(line) == 0 or line[-1] != '\\':
-        oline+=line
-        oline=oline.strip()
-        if len(oline) > 0 and oline[0] != '#':
-          eqpos=oline.find('=')
-          if eqpos > 0 \
-          and oline[0].isalpha() \
-          and sum([ c.isalnum() or c == '_' for c in oline[1:eqpos] ]) == eqpos-1:        # all() not available in 2.3
-            setvar(oline[:eqpos], paramsubst(oline[eqpos+1:]))
-          else:
-            doCommand(oline.split())
-        oline=""
+      line = line.strip()
+      if not line or line.startswith('#'):
+        continue
+      word1, offset = get_identifier(line)
+      if not word1:
+        error("no var= or command")
+        continue
+      if offset < len(line) and line[offset] == '=':
+        setvar(word1,
+               envsub(line[offset+1:], environ, bare='$', default=''),
+               environ,
+               vars)
       else:
-        oline+=" "+line[:-2]
-    if len(oline) > 0:
-      error("unterminated slosh line")
+        doCommand(line.split(), environ, vars)
 
 def cleanpath(path, sep=':'):
   keep = []
