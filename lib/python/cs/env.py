@@ -43,10 +43,13 @@ def getenv(var, default=None, environ=None, dosub=False):
       value = envsub(value, environ=environ)
   return value
 
-def envsub(s, environ=None):
+def envsub(s, environ=None, bare=None, default=None):
   ''' Replace substring of the form '$var' with the value of 'var' from environ.
       `environ`: environment mapping, default os.environ.
-      Raises ValueError for a missing `environ` mapping.
+      `bare`: string to replace a '$' with no following identifier;
+              a bare '$' raises ValueError if this is not specified.
+      `default`: value to substitute for unknown vars;
+              if `default` is None a ValueError is raised.
   '''
   if environ is None:
     environ = os.environ
@@ -60,9 +63,17 @@ def envsub(s, environ=None):
     if pos > opos:
       strs.append(s[opos:pos])
     id, offset = get_identifier(s, pos+1)
-    if not id:
-      raise ValueError("missing envvar name, offset %d: %s" % (pos, s))
-    strs.append(environ.get(id, ''))
+    if id:
+      value = environ.get(id, default)
+      if value is None:
+        raise ValueError("unknown envvar name $%s, offset %d: %s"
+                         % (id, pos, s))
+      strs.append(value)
+    else:
+      if bare is not None:
+        strs.append(bare)
+      else:
+        raise ValueError("missing envvar name, offset %d: %s" % (pos, s))
     opos = offset
   return ''.join(strs)
 
