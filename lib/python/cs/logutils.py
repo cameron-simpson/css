@@ -333,13 +333,15 @@ class Pfx(object):
               if len(exc_value.args) == 0:
                 args = prefix
               else:
-                args = [ prefix + ": " + unicode(exc_value.args[0]) ] \
-                                 + list(exc_value.args[1:])
+                args = [ prefix
+                       + ": "
+                       + unicode(exc_value.args[0])
+                       ] + list(exc_value.args[1:])
             exc_value.args = args
         else:
           # we can't modify this - at least report the current prefix state
-          sys.stderr.write("%s: Pfx.__exit__: exc_value = %r %s\n" \
-                           % (prefix, exc_value, dir(exc_value)))
+          sys.stderr.write("%s: Pfx.__exit__: exc_value = %s\n"
+                           % (prefix, cs.misc.O_str(exc_value)))
           sys.stderr.flush()
           error("%s: %s", prefix, exc_value)
         # prevent outer Pfx wrappers from hacking stuff as well
