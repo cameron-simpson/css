@@ -746,6 +746,23 @@ class HasFlags:
         flagv=",".join(flagv)
       self[self.__flagfield]=flagv
 
+def O_str(o, no_recurse=False):
+  return ( "<%s %s>"
+           % ( o.__class__.__name__,
+               ",".join([ ( "%s=%s" % (pattr, type(pvalue))
+                            if no_recurse else
+                            "%s=%s" % (pattr, pvalue)
+                          )
+                          for pattr, pvalue
+                          in [ (attr, getattr(o, attr))
+                               for attr in sorted(dir(o))
+                               if attr[0].isalpha()
+                             ]
+                          if not callable(pvalue)
+                        ])
+             )
+         )
+
 class O(object):
   ''' A bare object subclass to allow storing arbitrary attributes.
       It also has a nicer default str() action.
@@ -764,21 +781,7 @@ class O(object):
   def __str__(self):
     recurse = self._O_recurse
     self._O_recurse = False
-    s = ( "<%s %s>"
-          % ( self.__class__.__name__,
-              ",".join([ ( "%s=%s" % (pattr, pvalue)
-                           if recurse else
-                           "%s=%s" % (pattr, type(pvalue))
-                         )
-                         for pattr, pvalue
-                         in [ (attr, getattr(self, attr))
-                              for attr in sorted(dir(self))
-                              if attr[0].isalpha()
-                            ]
-                         if not callable(pvalue)
-                       ])
-            )
-        )
+    s = O_str(self, no_recurse = not recurse)
     self._O_recurse = recurse
     return s
 
