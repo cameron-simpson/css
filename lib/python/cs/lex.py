@@ -212,7 +212,11 @@ def unrfc2047(s):
         warning("%r: %e", enctext, e)
         enctext = m.group()
     elif enctype == 'Q':
-      enctext = quopri.decodestring(enctext)
+      try:
+        enctext = quopri.decodestring(enctext)
+      except UnicodeEncodeError, e:
+        warning("%r: %e", enctext, e)
+        ##enctext = enctext.decode('iso8859-1')
     else:
       raise RunTimeError("unhandled RFC2047 string: %r" % (m.group(),))
     try:
@@ -223,6 +227,9 @@ def unrfc2047(s):
     except UnicodeDecodeError, e:
       warning("%r: %e", enctext, e)
       enctext = enctext.decode(enccset, 'replace')
+    except UnicodeEncodeError, e:
+      warning("%r: %e", enctext, e)
+      ##enctext = enctext.decode(enccset, 'replace')
     chunks.append(enctext)
     sofar = end
   if sofar < len(s):
