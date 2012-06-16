@@ -11,7 +11,8 @@ users=${BACKUP_USERS:-backup}
 trace=set-x
 
 cmd=$0
-usage="Usage: $cmd [-r] [-U user,...] pathnames...
+usage="Usage: $cmd [-n] [-r] [-U user,...] pathnames...
+  -n            No action; recite planned actions.
   -r            Recursive.
   -U user,...   Specify user[s] to have read access.
                 Default, from \$BACKUP_USERS: $users"
@@ -23,6 +24,7 @@ badopts=
 while [ $# -gt 0 ]
 do
   case $1 in
+    -n) trace=echo ;;
     -r) recurse=1 ;;
     -U) users=$2; shift ;;
     --) shift; break ;;
@@ -50,12 +52,12 @@ then
   xit=0
   for user in $users
   do
-    $trace find "$@" \
-                \( ! -perm -4 -o -type d ! -perm -1 \) \
-                ! -user "$user" \
-                ! -group "$user" \
-                -print \
-    | $trace xxargs "$0" -U "$user" -- \
+    find "$@" \
+         \( ! -perm -4 -o -type d ! -perm -1 \) \
+         ! -user "$user" \
+         ! -group "$user" \
+         -print \
+    | xxargs "$0" -U "$user" -- \
     || xit=$?
   done
   exit $xit
@@ -69,13 +71,13 @@ do
   do
     [ -d "$pathname" -o -f "$pathname" ] || continue
     if [ -d "$pathname" ]
-    then  aclmode=r-x
-    else  aclmode=r
+    then  aclmode=r-x aclmode_re=r.x
+    else  aclmode=r   aclmode_re=r..
     fi
     getfacl --absolute-names -- "$pathname" \
-    | egrep "^(user:$user:$aclmode|other::$aclmode)" >/dev/null \
+    | egrep "^(user:$user:$aclmode_re|other::$aclmode_re)\$" >/dev/null \
     && continue
-    $trace setfacl -m "user:$user:$aclmode" -- "$pathname" || xit=1
+    $trace setfacl -m "user:$user:$aclmode" --mask -- "$pathname" || xit=1
   done
 done
 
