@@ -64,7 +64,9 @@ do
     -D) Drwflags="-D $NOTIFY" ;;
     -N) newfile=1 rwflags="$rwflags -N" ;;
     -q) doit=1 trace= ;;
-    -R) echo "$cmd: warning: -R option deprecated; it is now the default" >&2 ;;
+    -R) [ ! -t 2 ] \
+        || echo "$cmd: warning: -R option deprecated; it is now the default" >&2
+        ;;
     -T) bytable=1 ;;
     -x) doit=1 trace=set-x rwflags="$rwflags -x" ;;
     --)	shift; break ;;
