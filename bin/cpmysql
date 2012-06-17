@@ -279,7 +279,7 @@ _mysqlcmd()
 # Usage: mysqlcmd_src [-f] command [args...]
 #
 mysqlcmd_src()
-{ mysqlcmd_pfx=$src_pfx \
+{ mysqlcmd_pfx="$src_pfx($*)" \
     _mysqlcmd "$src_user" "$src_password" \
               "$src_host" "$src_port" "$src_socket" "$@"
 }
@@ -289,7 +289,7 @@ mysqlcmd_src()
 # Usage: mysqlcmd_dst [-f] command [args...]
 #
 mysqlcmd_dst()
-{ mysqlcmd_pfx=$dst_pfx \
+{ mysqlcmd_pfx="$dst_pfx($*)" \
     _mysqlcmd "$dst_user" "$dst_password" \
               "$dst_host" "$dst_port" "$dst_socket" "$@"
 }
