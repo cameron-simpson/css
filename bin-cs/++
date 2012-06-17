@@ -9,7 +9,7 @@
 
 cmd=`basename "$0"`
 usage="Usage:     $cmd [-A]   Update mairix index.
-	$cmd [-A] mairix-search-args... Search and display.
+	$cmd [-A] [-O] mairix-search-args... Search and display.
 	$cmd -I [-A|foldersets...] Index the specified foldersets."
 
 # help?
@@ -19,6 +19,7 @@ maildirs=
 tflag=-t
 alldirs=
 indexmode=
+ormode=
 trace=
 vflag=
 [ -t 1 ] && { vflag=-v trace=set-x; }
@@ -30,6 +31,7 @@ do
   case "$1" in
     -A)	alldirs=1 ;;
     -I)	indexmode=1 ;;
+    -O) ormode=1 ;;
     -n)	trace=echo ;;
     -t)	tflag=$1 ;;
     +t)	tflag= ;;
@@ -70,7 +72,7 @@ then
       [ -d "$dbdir/." ] || $trace mkdir -p "$dbdir" || { xit=1; continue; }
       dbpath=$dbdir/mairix.db
       [ -s "$rc" ] || mkmairixrc -d "$dir" --db "$dbpath" >"$rc" || { xit=1; continue; }
-      $trace mairix $vflag -f "$rc" || xit=1
+      $trace mairix $vflag -F -f "$rc" || xit=1
   done
   exit $xit
 fi
@@ -89,11 +91,20 @@ fi
 xit=0
 for dir
 do
+  eval "set -- $qargs"
   rc=$dir/.mairixrc
-  eval "$trace mairix -f '$rc' -o '$res' -a $tflag $qargs" || xit=1
+  if [ $ormode ]
+  then
+    for arg
+    do
+      $trace mairix -f "$rc" -o "$res" -a $tflag "$arg" || xit=1
+    done
+  else
+    $trace mairix -f "$rc" -o "$res" -a $tflag ${1+"$@"} || xit=1
+  fi
 done
 
-+ -e "set header_cache=$res" +t -f "$res" || xit=1
+$trace mutt -e "set header_cache=$res" -f "$res" || xit=1
 
 rm -r "$res"
 
