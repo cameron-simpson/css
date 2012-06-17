@@ -104,7 +104,7 @@ do
   fi
 done
 
-$trace mutt -e "set header_cache=$res" -f "$res" || xit=1
+$trace mutt -e "unset header_cache" -f "$res" || xit=1
 
 rm -r "$res"
 
