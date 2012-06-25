@@ -85,6 +85,8 @@ class Test(unittest.TestCase):
       for spec, result in (
                             ("{!r}", repr(P)),
                             ("{.basename}", os.path.basename(path)),
+                            ("{.dirname}", os.path.dirname(path)),
+                            ("{.abs}", os.path.abspath(path)),
                           ):
         self.assertEqual(format(P, spec), result,
                          "format(%r, %r) != %r" % (P, spec, result))
