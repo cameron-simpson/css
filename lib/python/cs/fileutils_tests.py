@@ -74,10 +74,20 @@ class Test(unittest.TestCase):
   def test_Pathname_01_attrs(self):
     for path in "a", "a/b", "a/b/c", "/a/b/c":
       P = Pathname(path)
-      self.assertEqual(P.dirname, os.path.dirname(path), "bad %r.dirname" % (path,))
-      self.assertEqual(P.basename, os.path.basename(path), "bad %r.basename" % (path,))
-      self.assertEqual(P.abs, os.path.abspath(path), "bad %r.abs" % (path,))
-      self.assertEqual(P.isabs, os.path.isabs(path), "bad %r.isabs" % (path,))
+      self.assertEqual(P.dirname, os.path.dirname(path),
+                       "bad %r.dirname" % (path,))
+      self.assertEqual(P.basename, os.path.basename(path),
+                       "bad %r.basename" % (path,))
+      self.assertEqual(P.abs, os.path.abspath(path),
+                       "bad %r.abs" % (path,))
+      self.assertEqual(P.isabs, os.path.isabs(path),
+                       "bad %r.isabs" % (path,))
+      for spec, result in (
+                            ("{!r}", repr(P)),
+                            ("{.basename}", os.path.basename(path)),
+                          ):
+        self.assertEqual(format(P, spec), result,
+                         "format(%r, %r) != %r" % (P, spec, result))
 
 def selftest(argv):
   unittest.main(__name__, None, argv)

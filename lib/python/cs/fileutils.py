@@ -218,6 +218,12 @@ class Pathname(str):
   def __init__(self, s):
     str.__init__(s)
 
+  def __format__(self, spec):
+    ''' Calling format(<Pathname>, spec) treat `spec` as a new style
+        formatting string with a single positional parameter of `self`.
+    '''
+    return spec.format(self)
+
   @property
   def dirname(self):
     return os.path.dirname(self)
