@@ -10,7 +10,7 @@ import os.path
 import errno
 import unittest
 from tempfile import NamedTemporaryFile
-from .fileutils import compare, rewrite, lockfile
+from .fileutils import compare, rewrite, lockfile, Pathname
 
 class Test(unittest.TestCase):
 
@@ -70,6 +70,14 @@ class Test(unittest.TestCase):
         else:
           raise
     self.assert_( not os.path.exists(lockpath), "after lock: lock file still exists: %s" % (lockpath,))
+
+  def test_Pathname_01_attrs(self):
+    for path in "a", "a/b", "a/b/c", "/a/b/c":
+      P = Pathname(path)
+      self.assertEqual(P.dirname, os.path.dirname(path), "bad %r.dirname" % (path,))
+      self.assertEqual(P.basename, os.path.basename(path), "bad %r.basename" % (path,))
+      self.assertEqual(P.abs, os.path.abspath(path), "bad %r.abs" % (path,))
+      self.assertEqual(P.isabs, os.path.isabs(path), "bad %r.isabs" % (path,))
 
 def selftest(argv):
   unittest.main(__name__, None, argv)

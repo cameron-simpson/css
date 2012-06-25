@@ -230,6 +230,10 @@ class Pathname(str):
   def abs(self):
     return os.path.abspath(self)
 
+  @property
+  def isabs(self):
+    return os.path.isabs(self)
+
 if __name__ == '__main__':
   import cs.fileutils_tests
   cs.fileutils_tests.selftest(sys.argv)
