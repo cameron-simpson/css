@@ -1,0 +1,119 @@
+#!/bin/sh -ue
+#
+# Emit a Nagios report for the status of MySQL replication.
+#       - Cameron Simpson <cs@zip.com.au> 15oct2008
+#
+
+nagios_state=-
+secret=/root/monitor.secret
+
+cmd=$0
+usage="Usage: $cmd [-N nagios-state-file] repl-end secret-file tag comment-words...
+  nagios-state-file     File to store the nagios SNMP line.
+                        Also appends to nagios-state-file.log
+                        \"-\" means write to standard output, no log.
+  repl-end              \"master\" or \"slave\".
+  secret-file           MySQL login credentials."
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -N) nagios_state=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+[ "x$nagios_state" = x- ] || [ -w "$nagios_state" ] \
+|| { echo "$cmd: nagios-state-file $nagios_state: not writable" >&2
+     badopts=1
+   }
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing repl-end" >&2
+  badopts=1
+else
+  repl_end=$1
+  shift
+  case "$repl_end" in
+    master|slave) ;;
+    *) echo "$cmd: $repl_end: bad repl-end, expected master or slave" >&2
+       badopts=1
+       ;;
+  esac
+  if [ $# = 0 ]
+  then
+    echo "$cmd: missing secret-file" >&2
+    badopts=1
+  else
+    secret=$1
+    shift
+    if [ $# = 0 ]
+    then
+      echo "$cmd: missing tag" >&2
+      badopts=1
+    else
+      tag=$1
+      shift
+    fi
+  fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+unset secretHOST secretLOGIN secretPASSWORD
+mysqlvars=`secret "$secret"`
+eval "$mysqlvars"
+
+when=`date`
+echo "show $repl_end status\\G" \
+| mysql -h "$secretHOST" "-u$secretLOGIN" "-p$secretPASSWORD" \
+| sed -n 's/^ *\([A-Z][_A-Za-z0-9]*\): */\1 /p' \
+| \
+{
+  mys_File=
+  mys_Position=
+  mys_Master_Log_File=
+  mys_Read_Master_Log_Pos=
+  mys_Slave_IO_Running=
+  mys_Slave_SQL_Running=
+  mys_Seconds_Behind_Master=
+  while read -r param value
+  do eval "mys_$param=\$value"
+  done
+  status=OK
+  summary=
+  case "$repl_end" in
+    master)
+        summary="File=$mys_File Position=$mys_Position"
+        [ -n "$mys_File" -a -n "$mys_Position" ] || status=CRITICAL
+        ;;
+    slave)
+        summary="behind=$mys_Seconds_Behind_Master slave_io_running=$mys_Slave_IO_Running slave_sql_running=$mys_Slave_SQL_Running master_log=$mys_Master_Log_File master_log_pos=$mys_Read_Master_Log_Pos"
+        case "$mys_Seconds_Behind_Master" in
+          0|1|2)  ;;
+          [3|4]*) status=WARNING ;;
+          *)    status=CRITICAL ;;
+        esac
+        [ "$mys_Slave_IO_Running" = Yes ] || status=CRITICAL
+        [ "$mys_Slave_SQL_Running" = Yes ] || status=CRITICAL
+        [ -n "$mys_Master_Log_File" -a -n "$mys_Read_Master_Log_Pos" ] || status=CRITICAL
+        ;;
+    *)  echo "$cmd: unimplemented repl-end \"$repl_end\"" >&2
+        status=CRITICAL
+        summary="unimplemented repl-end \"$repl_end\""
+        ;;
+  esac
+  [ "x$nagios_state" = x- ] \
+  || { echo "$when: $summary" >>"$nagios_state.log"
+       exec >"$nagios_state"
+     }
+  echo "$status: $* $summary"
+}
