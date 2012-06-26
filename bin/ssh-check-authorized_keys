@@ -1,0 +1,38 @@
+#!/bin/sh
+#
+# Check an ssh authorized_key file for invalid entres.
+#       - Cameron Simpson <cs@zip.com.au> 26jun2012
+#
+
+set -ue
+
+cmd=`basename "$0"`
+usage="Usage: $cmd authorized_keys_files..."
+
+[ $# -gt 0 ] || { echo "$cmd: missing authorized_keys_files" >&2; exit 2; }
+
+re_param='((command|from)="[^"]*"|(environment="[a-zA-Z_][a-zA-Z_0-9]*=[^"]*")|permitopen="[^":]+:[^"]+"|no-port-forwarding|no-X11-forwarding|no-agent-forwarding|no-pty|tunnel="[^"]*")'
+re_params="$re_param(,$re_param)*"
+re_keyline="^($re_params +)?(ssh-dss|ssh-rsa) +[^ ]+"
+
+xit=0
+
+for f
+do
+  if [ ! -s "$f" ]
+  then
+    echo "$cmd: $f: missing or empty file" >&2
+    xit=1
+    continue
+  fi
+  bad=`egrep -nv "$re_keyline" <"$f"` || :
+  if [ -n "$bad" ]
+  then
+    echo "$cmd: $f: bad lines" >&2
+    echo "$bad" | sed 's/^/  /' >&2
+    xit=1
+    continue
+  fi
+done
+
+exit $xit
