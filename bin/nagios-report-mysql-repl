@@ -4,14 +4,10 @@
 #       - Cameron Simpson <cs@zip.com.au> 15oct2008
 #
 
-nagios_state=-
 secret=/root/monitor.secret
 
 cmd=$0
-usage="Usage: $cmd [-N nagios-state-file] repl-end secret-file tag comment-words...
-  nagios-state-file     File to store the nagios SNMP line.
-                        Also appends to nagios-state-file.log
-                        \"-\" means write to standard output, no log.
+usage="Usage: $cmd repl-end secret-file comment-words...
   repl-end              \"master\" or \"slave\".
   secret-file           MySQL login credentials."
 
@@ -55,14 +51,6 @@ else
   else
     secret=$1
     shift
-    if [ $# = 0 ]
-    then
-      echo "$cmd: missing tag" >&2
-      badopts=1
-    else
-      tag=$1
-      shift
-    fi
   fi
 fi
 
@@ -72,7 +60,6 @@ unset secretHOST secretLOGIN secretPASSWORD
 mysqlvars=`secret "$secret"`
 eval "$mysqlvars"
 
-when=`date`
 echo "show $repl_end status\\G" \
 | mysql -h "$secretHOST" "-u$secretLOGIN" "-p$secretPASSWORD" \
 | sed -n 's/^ *\([A-Z][_A-Za-z0-9]*\): */\1 /p' \
@@ -111,9 +98,5 @@ echo "show $repl_end status\\G" \
         summary="unimplemented repl-end \"$repl_end\""
         ;;
   esac
-  [ "x$nagios_state" = x- ] \
-  || { echo "$when: $summary" >>"$nagios_state.log"
-       exec >"$nagios_state"
-     }
   echo "$status: $* $summary"
 }
