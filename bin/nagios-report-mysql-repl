@@ -13,24 +13,6 @@ usage="Usage: $cmd repl-end secret-file comment-words...
 
 badopts=
 
-while [ $# -gt 0 ]
-do
-  case $1 in
-    -N) nagios_state=$2; shift ;;
-    --) shift; break ;;
-    -?*)echo "$cmd: unrecognised option: $1" >&2
-        badopts=1
-        ;;
-    *)  break ;;
-  esac
-  shift
-done
-
-[ "x$nagios_state" = x- ] || [ -w "$nagios_state" ] \
-|| { echo "$cmd: nagios-state-file $nagios_state: not writable" >&2
-     badopts=1
-   }
-
 if [ $# = 0 ]
 then
   echo "$cmd: missing repl-end" >&2
