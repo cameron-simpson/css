@@ -10,11 +10,12 @@ cmd=`basename "$0"`
 
 main()
 {
-  usage="Usage: $cmd [-v] [-x] [--pycmd python-shcmd] [--python pylibdir pysubtree [modules...]]..."
+  usage="Usage: $cmd [-v] [-x] [--state statedir] [--pycmd python-shcmd] [--python pylibdir pysubtree [modules...]]..."
 
   trace=${DEBUG:+set-x}
   vecho=:
   vvecho=:
+  statedir=state
   pycmd='python -3 -tt'
   ##[ -t 1 ] && vecho=echo
 
@@ -31,6 +32,8 @@ main()
         vecho=echo
         vvecho=echo
         ;;
+      --state)
+        statedir=$2; shift ;;
       --pycmd)
         pycmd=$2; shift ;;
       --python)
@@ -78,7 +81,7 @@ stateful()
   _s_type=$1
   _s_srcfile=$2
   shift; shift
-  _s_statefile=state/$_s_type/$_s_srcfile
+  _s_statefile=$statedir/$_s_type/$_s_srcfile
   if [ "$_s_statefile" -nt "$_s_srcfile" ]
   then
     if [ -s "$_s_statefile" ]
