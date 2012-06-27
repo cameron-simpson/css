@@ -38,6 +38,9 @@ scriptmandir = $(MANDIR)/man1
 scriptmans = $(scriptmandir)/$((allscripts)).1
 scriptfromman(manf) = $(manf FP)
 
+py2files        = $("lib/python/cs/*.py lib/python/cs/*.py lib/python/cs/*/*/*.py" G)
+py3files        = $(py2files :|/python/|/python3/|)
+
 rsync = rsync -iO
 
 _help:
@@ -54,6 +57,15 @@ _help:
 _test:
         find lib/python -type f -name '*.py[co]' -exec rm {} \;
         set -x; ./bin-cs/selftest -v --python lib/python cs $$MYKE_TEST_PYTHON_MODULES
+
+_macrotest:
+        echo $(py2files)
+        echo $(py3files)
+_2to3:
+        :make $(py3files)
+
+$(py3files): lib/python/$(@ :|lib/python3/||)
+        echo "$@ <- $?"
 
 _home:
         @skip=`hg status | sed -n 's:^? \(.*\):--exclude=/\1:p'` \
