@@ -32,9 +32,10 @@ presh=
 setx=:
 
 cmd=`basename "$0"` || cmd=$0
-usage="Usage: $cmd [ssh-options...] [sshcfg=value...] [user@]host[![user2@]host2...] [command ...]
+usage="Usage: $cmd [-u dfltuser] [ssh-options...] [sshcfg=value...] [user@]host[![user2@]host2...] [command ...]
 	ssh-options...	Passed to all ssh commands.
 	sshcfg=value	Transmuted to -o 'sshcfg value' and added to ssh-options.
+        -u dfltuser     Default user for each step, default from \$SSHTO_RUSER.
         -v              Verbose. Passed to all ssh commands. Turns on additional tracing.
 	-z, +z		Pass -o Compression yes/no to ssh.
 	-E		Run login setup at far end."
