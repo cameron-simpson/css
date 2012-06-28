@@ -1,9 +1,9 @@
 import base64
 import quopri
 import string
-from StringIO import StringIO
 import re
 from binascii import hexlify as hexify, unhexlify as unhexify
+from cs.py3 import unicode
 
 ord_space=ord(' ')
 
@@ -208,33 +208,33 @@ def unrfc2047(s):
     if enctype == 'B':
       try:
         enctext = base64.b64decode(enctext)
-      except TypeError, e:
+      except TypeError as e:
         warning("%r: %e", enctext, e)
         enctext = m.group()
     elif enctype == 'Q':
       try:
         enctext = quopri.decodestring(enctext)
-      except UnicodeEncodeError, e:
+      except UnicodeEncodeError as e:
         warning("%r: %e", enctext, e)
         ##enctext = enctext.decode('iso8859-1')
     else:
       raise RunTimeError("unhandled RFC2047 string: %r" % (m.group(),))
     try:
       enctext = enctext.decode(enccset)
-    except LookupError, e:
+    except LookupError as e:
       warning("%r: %e", enctext, e)
       enctext = enctext.decode('iso8859-1')
-    except UnicodeDecodeError, e:
+    except UnicodeDecodeError as e:
       warning("%r: %e", enctext, e)
       enctext = enctext.decode(enccset, 'replace')
-    except UnicodeEncodeError, e:
+    except UnicodeEncodeError as e:
       warning("%r: %e", enctext, e)
       ##enctext = enctext.decode(enccset, 'replace')
     chunks.append(enctext)
     sofar = end
   if sofar < len(s):
     chunks.append(s[sofar:])
-  return u''.join(chunks)
+  return unicode('').join(chunks)
 
 def untexthexify(s, shiftin='[', shiftout=']'):
   chunks = []

@@ -10,11 +10,11 @@ import logging
 import os
 import sys
 import time
-from types import StringTypes
-from thread import allocate_lock
 import threading
+from threading import Lock
 import traceback
 import cs.misc
+from cs.py3 import unicode, StringTypes
 
 logging_level = logging.INFO
 
@@ -140,7 +140,7 @@ class NullHandler(logging.Handler):
   def emit(self, record):
     pass
 
-__logExLock = allocate_lock()
+__logExLock = Lock()
 def logException(exc_type, exc_value, exc_tb):
   ''' Replacement for sys.excepthook that reports via the cs.logutils
       logging wrappers.
@@ -180,7 +180,7 @@ class _PfxThreadState(threading.local):
       marks.append(P.umark)
       if P.absolute:
         break
-    return u': '.join(reversed(marks))
+    return unicode(': ').join(reversed(marks))
 
   def append(self, P):
     ''' Push a new Pfx instance onto the stack.
@@ -362,7 +362,7 @@ class Pfx(object):
           mark = str(mark)
         try:
           u = unicode(mark, 'utf-8', 'error')
-        except UnicodeDecodeError, e:
+        except UnicodeDecodeError as e:
           warning("%s: mark = %s %r", e, type(mark), mark)
           u = unicode(mark, 'utf-8', 'replace')
         self._umark = u
