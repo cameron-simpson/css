@@ -87,7 +87,7 @@ class Dirent(object):
   def tryUpdateStat(self, statpath):
     try:
       st = os.stat(statpath)
-    except OSError, e:
+    except OSError as e:
       error("stat(%s): %s", statpath, e)
       return False
     self.updateFromStat(st)
@@ -576,10 +576,10 @@ class Dir(Dirent):
                 E = D.storeFilename(filepath, filename,
                                 trust_size_mtime=trust_size_mtime,
                                 ignore_existing=ignore_existing)
-              except OSError, e:
+              except OSError as e:
                 error("%s", e)
                 ok = False
-              except IOError, e:
+              except IOError as e:
                 error("%s", e)
                 ok = False
 

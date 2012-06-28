@@ -53,7 +53,7 @@ def main(argv, stdin=None):
         no_save = False
         try:
           opts, argv = getopt(argv, '1d:nN')
-        except GetoptError, e:
+        except GetoptError as e:
           warning("%s", e)
           badopts = True
         for opt, val in opts:
@@ -63,7 +63,7 @@ def main(argv, stdin=None):
             elif opt == '-d':
               try:
                 delay = int(val)
-              except ValueError, e:
+              except ValueError as e:
                 warning("%s: %s", e, val)
                 badopts = True
               else:
@@ -196,7 +196,7 @@ class RuleState(O):
       log = sys.stdout
     try:
       print(*[ unicode(s) for s in a], file=log)
-    except UnicodeDecodeError, e:
+    except UnicodeDecodeError as e:
       print("RuleState.log: %s: a=%r" % (e, a), file=sys.stderr)
 
   def logto(self, logfilepath):
@@ -206,7 +206,7 @@ class RuleState(O):
       self._log.close()
     try:
       self._log = io.open(logfilepath, "a", encoding='utf-8')
-    except OSError, e:
+    except OSError as e:
       self.log("open(%s): %s" % (logfilepath, e))
 
   @property
@@ -572,7 +572,7 @@ class Rule(O):
               raise RuntimeError("unimplemented action \"%s\"" % action)
           except (AttributeError, NameError):
             raise
-          except Exception, e:
+          except Exception as e:
             warning("EXCEPTION %r", e)
             failed_actions.append( (action, arg, e) )
             raise

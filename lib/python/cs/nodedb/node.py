@@ -243,7 +243,7 @@ class _AttrList(list):
         return _AttrList(node=None, attr=k, _items=hits)
       try:
         hit = the(hits)
-      except IndexError, e:
+      except IndexError as e:
         raise AttributeError, "%s.%s: %s" % (self, attr, e)
       return hit
     raise AttributeError, '.'.join([str(self), attr])
@@ -813,7 +813,7 @@ class NodeDB(dict, O):
   def __getitem__(self, item):
     try:
       key = nodekey(item)
-    except ValueError, e:
+    except ValueError as e:
       raise KeyError, "can't get key %s: %s" % (item, e)
     N = dict.__getitem__(self, key)
     assert isinstance(N, Node), "__getitem(%s) got non-Node: %r" % (item, N)
@@ -1417,15 +1417,15 @@ class NodeDB(dict, O):
           def do_op(argline):
             try:
               args = list(get_commatexts(argline))
-            except ValueError, e:
+            except ValueError as e:
               error(str(e))
             else:
               with Pfx(op):
                 try:
                   fn(args)
-                except GetoptError, e:
+                except GetoptError as e:
                   error(str(e))
-                except ValueError, e:
+                except ValueError as e:
                   exception(str(e))
             return False
           do_op.__doc__ = fn.__doc__

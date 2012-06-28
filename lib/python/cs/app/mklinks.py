@@ -102,7 +102,7 @@ class FileInfoDB(dict):
       fi = FileInfo(path, self)
       try:
         fi.lstat
-      except OSError, e:
+      except OSError as e:
         error("%s: %s" % (path, e))
         return None
       self.learn(fi)

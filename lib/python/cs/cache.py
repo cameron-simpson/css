@@ -181,7 +181,7 @@ class Cache:
     self.__misses+=1
     try:
       value=self.__backend[key]
-    except IndexError, e:
+    except IndexError as e:
       value=None
 
     self.store(value,key)

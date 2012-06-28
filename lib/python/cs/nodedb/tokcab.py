@@ -69,7 +69,7 @@ class Backend_TokyoCabinet(Backend):
     for attrtag in self.attrtags():
       try:
         t, name, attr = attrtag.split(':', 2)
-      except ValueError, e:
+      except ValueError as e:
         raise ValueError("attrtag = %r: %s" % (attrtag, e))
       if (t, name) in seen:
         continue

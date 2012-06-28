@@ -36,7 +36,7 @@ def stop(pid, signum=SIGTERM, wait=None, do_SIGKILL=False):
       if wait == 0 or time.time() < then:
         try:
           os.kill(pid, 0)
-        except OSError, e:
+        except OSError as e:
           if e.errno != os.ESRCH:
             raise
           # process no longer present
@@ -45,7 +45,7 @@ def stop(pid, signum=SIGTERM, wait=None, do_SIGKILL=False):
         if do_SIGKILL:
           try:
             os.kill(pid, SIGKILL)
-          except OSError, e:
+          except OSError as e:
             if e.errno != os.ESRCH:
               raise
         return False

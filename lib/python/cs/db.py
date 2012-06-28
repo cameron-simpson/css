@@ -646,7 +646,7 @@ class TableRowWrapper(WithUC_Attrs):
     self.TableView=tableview
     try:
       self.TableRow=tableview[key]
-    except IndexError, e:
+    except IndexError as e:
       raise NoSuchRowError("no row with id "+str(id)+": "+repr(e))
 
   def table(self):

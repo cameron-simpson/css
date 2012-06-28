@@ -58,7 +58,7 @@ def csv_rows(fp, skipHeaders=False, noHeaders=False):
         t, name, attr, value = row
         try:
           value = value.decode('utf-8')
-        except UnicodeDecodeError, e:
+        except UnicodeDecodeError as e:
           warning("%s, using errors=replace", e)
           value = value.decode('utf-8', errors='replace')
         if t == "":

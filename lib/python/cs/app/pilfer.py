@@ -49,7 +49,7 @@ def main(argv):
 
   try:
     opts, argv = getopt(argv, 'qu')
-  except GetoptError, e:
+  except GetoptError as e:
     warning("%s", e)
     badopts = True
     opts = ()
@@ -350,7 +350,7 @@ class Pilfer(object):
   def new_save_dir(self, dir):
     try:
       os.makedirs(dir)
-    except OSError, e:
+    except OSError as e:
       if e.errno != errno.EEXIST:
         raise
       n = 2
@@ -358,7 +358,7 @@ class Pilfer(object):
         ndir = "%s-%d" % (dir, n)
         try:
           os.makedirs(ndir)
-        except OSError, e:
+        except OSError as e:
           if e.errno != errno.EEXIST:
             raise
           n += 1
@@ -401,7 +401,7 @@ class Pilfer(object):
           try:
             with open(saveas, "wb") as savefp:
               savefp.write(content)
-          except IOError, e:
+          except IOError as e:
             error("%s: %s", saveas, e)
       else:
         dir = self.url_save_dir(U)
@@ -427,7 +427,7 @@ class Pilfer(object):
       else:
         try:
           os.makedirs(dir)
-        except OSError, e:
+        except OSError as e:
           if e.errno != errno.EEXIST:
             raise
           if not overwrite_dir:
@@ -436,7 +436,7 @@ class Pilfer(object):
               ndir = "%s-%d" % (dir, n)
               try:
                 os.makedirs(ndir)
-              except OSError, e:
+              except OSError as e:
                 if e.errno != errno.EEXIST:
                   raise
                 n += 1
@@ -465,7 +465,7 @@ class Pilfer(object):
         savefp.write(content)
         savefp.close()
         U.flush()
-      except Exception, e:
+      except Exception as e:
         U.flush()
         exception("exception writing content: %s", e)
         os.remove(savepath)

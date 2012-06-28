@@ -228,7 +228,7 @@ class Maker(object):
               value = True
             try:
               self.setDebug(flag, value)
-            except AttributeError, e:
+            except AttributeError as e:
               error("bad flag %r: %s", flag, e)
               badopts = True
         elif opt == '-f':

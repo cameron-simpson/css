@@ -215,7 +215,7 @@ class ModFromFiles(Modifier):
         try:
           with open(filename) as fp:
             newwords.extend(self.words(fp.read()))
-        except IOError, e:
+        except IOError as e:
           if not lax:
             raise
           else:
@@ -433,7 +433,7 @@ def readMakefileLines(M, fp, parent_context=None):
           # in false branch of "if"; skip line
           continue
 
-      except SyntaxError, e:
+      except SyntaxError as e:
         error(e)
         continue
 
@@ -554,7 +554,7 @@ def parseMakefile(M, fp, parent_context=None):
         continue
 
         raise ParseError(context, 0, 'unparsed line')
-      except ParseError, e:
+      except ParseError as e:
         exception("%s", e)
 
   M.debug_parse("finish parse")
@@ -888,7 +888,7 @@ def parseMacro(context, text=None, offset=0):
 
           modifiers.append(modclass(context, text[offset0:offset], *modargs))
 
-      except ParseError, e:
+      except ParseError as e:
         error("%s", e)
         offset += 1
 
@@ -903,7 +903,7 @@ def parseMacro(context, text=None, offset=0):
     M = MacroTerm(context, mtext, modifiers, param_mexprs, permute=mpermute, literal=mliteral), offset
     return M
 
-  except IndexError, e:
+  except IndexError as e:
     raise ParseError(context, offset, 'parse incomplete, offset=%d, remainder: %s' % (offset, text[offset:]))
 
   raise ParseError(context, offset, 'unhandled parse failure at offset %d: %s' % (offset, text[offset:]))

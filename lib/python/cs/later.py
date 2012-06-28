@@ -231,7 +231,7 @@ class LateFunction(PendingFunction):
         LF = L.defer()
         try:
           x = LF()
-        except SomeException, e:
+        except SomeException as e:
           # handle the exception ...
 
       To avoid handling exceptions with try/except the .wait()

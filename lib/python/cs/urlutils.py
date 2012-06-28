@@ -139,7 +139,7 @@ class _URL(unicode):
     content = self.content
     try:
       P = BeautifulSoup(content.decode('utf-8', 'replace'))
-    except Exception, e:
+    except Exception as e:
       exception("%s: .parsed: BeautifulSoup(unicode(content)) fails: %s", self, e)
       with open("cs.urlutils-unparsed.html", "wb") as bs:
         bs.write(self.content)

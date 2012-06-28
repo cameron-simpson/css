@@ -47,7 +47,7 @@ def callSOAP(url,action,xml,retAction,retTypecode,onerror=None):
       onerror(action,xml,e)
     except urllib2.URLError, e:
       onerror(action,xml,e)
-    except AssertionError, e:
+    except AssertionError as e:
       onerror(action,xml,e)
     return ret
 

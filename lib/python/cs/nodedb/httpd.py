@@ -162,7 +162,7 @@ class NodesView(CherryPyNode):
       view = subpath.pop(0)
     try:
       N = self.top.nodedb[spec]
-    except KeyError, e:
+    except KeyError as e:
       raise cherrypy.HTTPError(404, "%s: %s" % (spec, e))
     if view == '':
       if hasattr(N, 'report'):

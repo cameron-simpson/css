@@ -35,7 +35,7 @@ def main(argv):
 
   try:
     opts, argv = getopt(argv, 'F:')
-  except GetoptError, e:
+  except GetoptError as e:
     error(e)
     badopts = True
   else:
@@ -65,7 +65,7 @@ def main(argv):
         else:
           warning("unrecognised operation")
           badopts = True
-      except GetoptError, e:
+      except GetoptError as e:
         warning(e)
         badopts = True
 
@@ -124,7 +124,7 @@ def mycnf_options(mycnf, section, optmap=None):
     options = mycnf_read(mycnf, section)
     for opt, value in options:
       optmap.setdefault(opt, []).append(value)
-  except IOError, e:
+  except IOError as e:
     options = ()
   return optmap
 
