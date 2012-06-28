@@ -8,7 +8,7 @@ import sys
 from collections import namedtuple
 import os
 import os.path
-from thread import allocate_lock
+from threading import Lock
 from zlib import compress, decompress
 from cs.serialise import toBS, fromBS, fromBSfp
 
@@ -39,7 +39,7 @@ class DataFile(object):
   def __init__(self, pathname):
     self.pathname = pathname
     self._fp = None
-    self._lock = allocate_lock()
+    self._lock = Lock()
     self._size = None
 
   @property
@@ -150,7 +150,7 @@ class DataDir(object):
   def __init__(self, dir):
     self.dir = dir
     self._index = None
-    self._lock = allocate_lock()
+    self._lock = Lock()
     self._open = {}
     self._n = None
 

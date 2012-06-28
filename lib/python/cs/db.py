@@ -16,7 +16,7 @@ import cs.secret
 import cs.cache
 from cs.logutils import error, warning
 from cs.misc import isodate, the, WithUC_Attrs
-from thread import allocate_lock
+from threading import Lock
 
 def today():
   return datetime.date.today()
@@ -50,7 +50,7 @@ class ConnWrapper:
   def __init__(self,getConn,*args):
     self.getConn=getConn
     self.getConnArgs=args
-    self.lock=allocate_lock()
+    self.lock=Lock()
     with self.lock:
       self.conn=getConn(*args)
   def attachConn(self):

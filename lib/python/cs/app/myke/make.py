@@ -10,7 +10,7 @@ import getopt
 from functools import partial
 import logging
 from subprocess import Popen
-from thread import allocate_lock
+from threading import Lock
 import cs.misc
 from cs.later import Later, report as report_LFs, CallableValue
 from cs.logutils import Pfx, info, error, debug, D
@@ -51,10 +51,10 @@ class Maker(object):
     self.appendfiles = []
     self.macros = {}
     self._targets = {}
-    self._targets_lock = allocate_lock()
+    self._targets_lock = Lock()
     self.precious = set()
     self.active = set()
-    self.active_lock = allocate_lock()
+    self.active_lock = Lock()
     self._namespaces = []
 
   def __enter__(self):
@@ -287,7 +287,7 @@ class Target(object):
     self.actions = actions
     self.state = "unmade"
     self._status = None
-    self._lock = allocate_lock()
+    self._lock = Lock()
 
   def __str__(self):
     return "{}[{}]:{}:{}".format(self.name, self.state, self._prereqs, self._postprereqs)
@@ -486,7 +486,7 @@ class Action(object):
     self.line = line
     self.mexpr, _ = parseMacroExpression(context, line)
     self.silent = silent
-    self._lock = allocate_lock()
+    self._lock = Lock()
 
   def __str__(self):
     prline = self.line.rstrip().replace('\n', '\\n')

@@ -10,7 +10,7 @@ from types import StringTypes
 import unittest
 import sys
 import thread
-from thread import allocate_lock
+from threading import Lock
 from tokyocabinet.hash import Hash as TCHash, HDBOREADER, HDBOWRITER, HDBOCREAT
 from cs.misc import seq
 from cs.logutils import error, Pfx
@@ -30,7 +30,7 @@ class Backend_TokyoCabinet(Backend):
                      if readonly
                      else HDBOWRITER | HDBOCREAT
                    ))
-    self.tclock = allocate_lock()
+    self.tclock = Lock()
 
   @unimplemented
   def sync(self):

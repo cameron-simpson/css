@@ -17,7 +17,7 @@ import pprint
 # need to import .objc first to tweak sys.path if necessary
 from .objc import convertObjCtype
 import time
-from thread import allocate_lock
+from threading import Lock
 from AddressBook import ABAddressBook
 from cs.logutils import setup_logging, Pfx, warn
 
@@ -50,7 +50,7 @@ class AddressBookWrapper(object):
     self.address_book = address_book
     self._people = None
     self._groups = None
-    self._lock = allocate_lock()
+    self._lock = Lock()
 
   @property
   def people(self):

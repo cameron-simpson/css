@@ -20,7 +20,7 @@ from time import sleep
 if sys.hexversion < 0x02060000: from sets import Set as set
 import subprocess
 from tempfile import TemporaryFile
-from thread import allocate_lock
+from threading import Lock
 import time
 from cs.env import envsub
 from cs.fileutils import abspath_from_file, watched_file_property
@@ -136,7 +136,7 @@ class FilterModes(O):
 
   def __init__(self, **kw):
     self._maildb_path = kw.pop('maildb_path')
-    self._maildb_lock = allocate_lock()
+    self._maildb_lock = Lock()
     O.__init__(self, **kw)
 
   @watched_file_property
@@ -642,7 +642,7 @@ class WatchedMaildir(O):
     if rules_path is None:
       rules_path = os.path.join(self.mdir.dir, '.rules')
     self._rules_path = rules_path
-    self._rules_lock = allocate_lock()
+    self._rules_lock = Lock()
     self.lurking = set()
     self.flush()
     warning("%d rules", len(self.rules))

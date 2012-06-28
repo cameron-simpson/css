@@ -11,7 +11,7 @@ if sys.hexversion < 0x02060000:
   from sets import Set as set
 import itertools
 from getopt import GetoptError
-from thread import allocate_lock
+from threading import Lock
 from threading import Thread
 from types import StringTypes
 from collections import namedtuple
@@ -638,7 +638,7 @@ class NodeDB(dict, O):
 
   def __init__(self, backend, readonly=False):
     dict.__init__(self)
-    self._lock = allocate_lock()
+    self._lock = Lock()
     self.readonly = readonly
     self.closed = False
     self._noNode = None

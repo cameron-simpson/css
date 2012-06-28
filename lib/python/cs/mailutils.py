@@ -16,7 +16,7 @@ import socket
 import shutil
 from tempfile import NamedTemporaryFile
 from StringIO import StringIO
-from thread import allocate_lock
+from threading import Lock
 import time
 from cs.logutils import Pfx, warning, debug, D
 from cs.threads import locked_property
@@ -63,7 +63,7 @@ class Maildir(mailbox.Maildir):
     self._msgmap = None
     self._pid = None
     self._hostpart = None
-    self._lock = allocate_lock()
+    self._lock = Lock()
     self.flush()
 
   def __str__(self):

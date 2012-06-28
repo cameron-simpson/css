@@ -6,7 +6,7 @@ import stat
 import sys
 if sys.hexversion < 0x02060000:
   from sets import Set as set
-from thread import allocate_lock
+from threading import Lock
 from cs.logutils import Pfx, debug, error, info, warning
 from .block import decodeBlock
 from .blockify import blockFromString
@@ -343,14 +343,14 @@ class Dir(Dirent):
         `parent`: parent Dir
         `content`: pre-existing Block with initial Dir content
     '''
-    self._lock = allocate_lock()
+    self._lock = Lock()
     if meta is None:
       meta = Meta()
     Dirent.__init__(self, D_DIR_T, name, meta)
     self.parent = parent
     self._precontent = content
     self._entries = None
-    self._entries_lock = allocate_lock()
+    self._entries_lock = Lock()
 
   @property
   def entries(self):

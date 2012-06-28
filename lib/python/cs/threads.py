@@ -8,7 +8,7 @@ from __future__ import with_statement
 from functools import partial
 import sys
 import time
-from thread import allocate_lock
+from threading import Lock
 from threading import Semaphore, Thread, Timer
 if sys.hexversion < 0x03000000:
   from Queue import Queue, PriorityQueue, Full, Empty
@@ -133,7 +133,7 @@ class AdjustableSemaphore(object):
     self.__sem = Semaphore(value)
     self.__value = value
     self.__name = name
-    self.__lock = allocate_lock()
+    self.__lock = Lock()
 
   def __enter__(self):
     with LogTime("%s(%d).__enter__: acquire" % (self.__name, self.__value)):
@@ -183,14 +183,14 @@ class Channel(object):
       Unlike a Queue(1), put() blocks waiting for the matching get().
   '''
   def __init__(self):
-    self.__readable = allocate_lock()
+    self.__readable = Lock()
     self.__readable.acquire()
-    self.__writable = allocate_lock()
+    self.__writable = Lock()
     self.__writable.acquire()
-    self.__get_lock = allocate_lock()
-    self.__put_lock = allocate_lock()
+    self.__get_lock = Lock()
+    self.__put_lock = Lock()
     self.closed = False
-    self.__lock = allocate_lock()
+    self.__lock = Lock()
     self._nreaders = 0
 
   def __str__(self):
@@ -392,7 +392,7 @@ class Cato9:
   def __init__(self,*args,**kwargs):
     self.__qs={}
     self.__q=IterableQueue(maxsize)
-    self.__lock=allocate_lock()
+    self.__lock=Lock()
     self.__closed=False
     Thread(target=self.__handle).start()
   def qsize(self):
@@ -447,7 +447,7 @@ class JobCounter:
   '''
   def __init__(self,name):
     self.__name=name
-    self.__lock=allocate_lock()
+    self.__lock=Lock()
     self.__sem=Semaphore(0)
     self.__n=0
     self.__onDone=None
@@ -515,7 +515,7 @@ class NestingOpenClose(object):
   '''
   def __init__(self):
     self.__count=0
-    self.__lock=allocate_lock()
+    self.__lock=Lock()
 
   def open(self):
     ''' Increment the open count.
@@ -617,7 +617,7 @@ class FuncQueue(NestingOpenClose):
 ''' A pool of Channels.
 '''
 __channels=[]
-__channelsLock=allocate_lock()
+__channelsLock=Lock()
 def getChannel():
   ''' Obtain a Channel object.
   '''
@@ -637,7 +637,7 @@ def returnChannel(ch):
 ''' A pool of _Q1 objects (single use Queue(1)s).
 '''
 __queues=[]
-__queuesLock=allocate_lock()
+__queuesLock=Lock()
 def Q1(name=None):
   ''' Obtain a _Q1 object (single use Queue(1), self disposing).
   '''
@@ -704,7 +704,7 @@ class PreQueue(Queue):
   def __init__(self,size=None):
     Queue.__init__(self,size)
     self.__preQ=[]
-    self.__preQLock=allocate_lock()
+    self.__preQLock=Lock()
   def get(self,block=True,timeout=None):
     with self.__preQLock:
       if len(self.__preQ) > 0:
@@ -723,7 +723,7 @@ class PreQueue(Queue):
 class DictMonitor(dict):
   def __init__(self,I={}):
     dict.__init__(self,I)
-    self.__lock=allocate_lock()
+    self.__lock=Lock()
   def __getitem__(self,k):
     with self.__lock:
       v=dict.__getitem__(self,k)
@@ -751,7 +751,7 @@ class TimerQueue(object):
     self.Q = PriorityQueue()    # queue of waiting jobs
     self.pending = None         # or (Timer, when, func)
     self.closed = False
-    self._lock = allocate_lock()
+    self._lock = Lock()
     self.mainRunning = False
     self.mainThread = Thread(target=self._main)
     self.mainThread.start()
