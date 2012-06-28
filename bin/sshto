@@ -293,4 +293,4 @@ else
   fi
 fi
 
-eval "exec $trace ssh $fopt $lsshopts $sshargv $host \"\$sshcmd\""
+eval "exec $trace ssh-unhupped $fopt $lsshopts $sshargv $host \"\$sshcmd\""
