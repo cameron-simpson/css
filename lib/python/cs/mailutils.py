@@ -228,7 +228,10 @@ class Maildir(mailbox.Maildir):
     subdir, msgbase = self.msgmap[key]
     msgpath = os.path.join(self.dir, subdir, msgbase)
     debug("%s: remove key %s: %s", self, key, msgpath)
-    os.remove(msgpath)
+    try:
+      os.remove(msgpath)
+    except OSError as e:
+      warning("%s: remove key %s: %s: %s", self, key, msgpath, e)
     del self.msgmap[key]
   discard = remove
   __delitem__ = remove
