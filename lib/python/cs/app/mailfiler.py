@@ -30,6 +30,7 @@ from cs.mailutils import Maildir, message_addresses
 from cs.misc import O, slist
 from cs.threads import locked_property
 from cs.app.maildb import MailDB
+from cs.py3 import unicode as u
 
 def main(argv, stdin=None):
   if stdin is None:
@@ -344,7 +345,7 @@ def parserules(fp):
           _, offset = get_white(line, offset+1)
           subfilename, offset = get_nonwhite(line, offset=offset)
           if not subfilename:
-            raise ValueError, "missing filename"
+            raise ValueError("missing filename")
           subfilename = envsub(subfilename)
           subfilename = abspath_from_file(subfilename, filename)
           for R in parserules(subfilename):
@@ -382,7 +383,7 @@ def parserules(fp):
               offset = m.end()
             else:
               error("parse failure at %d: %s", offset, line)
-              raise ValueError, "syntax error"
+              raise ValueError("syntax error")
           R.actions.append( ('TARGET', target) )
           if offset < len(line) and line[offset] == ',':
             offset += 1
@@ -684,9 +685,9 @@ class WatchedMaildir(O):
             state = RuleState(M, self.filter_modes)
             state.message_path = mdir.keypath(key)
             state.logto(envsub("$HOME/var/log/mailfiler"))
-            state.log( (u"%s %s %s" % (time.strftime("%Y-%m-%d %H:%M:%S"),
-                                       unrfc2047(M.get('from', '_no_from')),
-                                       unrfc2047(M.get('subject', '_no_subject'))))
+            state.log( (u("%s %s %s") % (time.strftime("%Y-%m-%d %H:%M:%S"),
+                                         unrfc2047(M.get('from', '_no_from')),
+                                         unrfc2047(M.get('subject', '_no_subject'))))
                        .replace('\n', ' ') )
             state.log("  "+mdir.keypath(key))
             saved_to = []

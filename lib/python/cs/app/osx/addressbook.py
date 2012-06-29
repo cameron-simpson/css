@@ -19,7 +19,7 @@ from .objc import convertObjCtype
 import time
 from threading import Lock
 from AddressBook import ABAddressBook
-from cs.logutils import setup_logging, Pfx, warn
+from cs.logutils import setup_logging, Pfx, warning, info, D
 
 AB_FLAGS_ORGANIZATION = 0x01
 
@@ -135,9 +135,9 @@ def updateNodeDB(maildb, people):
         C.OSX_AB_UID = str(uid)
       lastUpdate = C.get0('OSX_AB_LAST_UPDATE', 0)
       abMTime = mtime(person, 0)
-      print "USER %s: abMTime=%s, lastUpdate=%s" % (cite,abMTime,lastUpdate)
+      D("USER %s: abMTime=%s, lastUpdate=%s", cite, abMTime, lastUpdate)
       if abMTime > lastUpdate:
-        print "UPDATE USER %s" % (cite,)
+        print("UPDATE USER %s" % (cite,))
         ## C.OSX_AB_LAST_UPDATE = abMTime
         ok = True
         for k, v in person.items():
@@ -148,7 +148,7 @@ def updateNodeDB(maildb, people):
               C.FLAGs.add('ORGANIZATION')
               v &= ~AB_FLAGS_ORGANIZATION
             if v != 0:
-              warn("unhandled ABPersonFlags: 0x%x", v)
+              warning("unhandled ABPersonFlags: 0x%x", v)
               ok = False
           elif k == 'First':
             C.FIRST_NAME = v
@@ -179,14 +179,14 @@ def updateNodeDB(maildb, people):
           elif k == 'URLs':
             C.URLs.update( url for url in map(lambda U: U.strip(), v) )
           else:
-            warn("unhandled AB key: %s", k)
+            warning("unhandled AB key: %s", k)
             pprint.pprint(person)
             ok = False
         if ok:
-          print "SKIP OSX_AB_LAST_UPDATE uptdate"
+          info("SKIP OSX_AB_LAST_UPDATE uptdate")
           ##C.OSX_AB_LAST_UPDATE = abMTime
       else:
-        print "SKIP USER %s" % (cite,)
+        info("SKIP USER %s", cite)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))

@@ -1,7 +1,6 @@
 import os
 import sys
 import string
-from StringIO import StringIO
 
 def readn(fp, n):
   ''' Read exactly n bytes from a file, coping with short reads.

@@ -199,7 +199,7 @@ class DataDir(object):
     n, _ = fromBS(entry)
     offset, _ = fromBS(_)
     if len(_) > 0:
-      raise ValueError, "can't decode index entry: %s" % (hexlify(entry),)
+      raise ValueError("can't decode index entry: %s" % (hexlify(entry),))
     return n, offset
 
   @staticmethod

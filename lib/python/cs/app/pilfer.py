@@ -119,7 +119,7 @@ def url_io(func, onerror, *a, **kw):
   debug("url_io(%s, %s, %s, %s)...", func, onerror, a, kw)
   try:
     return func(*a, **kw)
-  except (URLError, HTTPError), e:
+  except (URLError, HTTPError) as e:
     warning("%s", e)
     return onerror
 
@@ -132,7 +132,7 @@ def url_io_iter(iter):
       i = iter.next()
     except StopIteration:
       break
-    except (URLError, HTTPError), e:
+    except (URLError, HTTPError) as e:
       warning("%s", e)
     else:
       yield i
@@ -266,7 +266,7 @@ class Pilfer(object):
             continue
           try:
             save_dir = self.url_save_dir(urls[0], ignore_save_dir=True)
-          except (HTTPError, URLError), e:
+          except (HTTPError, URLError) as e:
             error("%s: %s", urls[0], e)
             return ()
           self.save_dir = self.new_save_dir(save_dir)
@@ -386,14 +386,14 @@ class Pilfer(object):
     with Pfx(U):
       try:
         content = U.content
-      except (HTTPError, URLError), e:
+      except (HTTPError, URLError) as e:
         error("%s", e)
         return
       if a:
         a = list(a)
         saveas = a.pop(0)
         if a:
-          raise ValueError, "extra arguments to 'save': "+", ".join(a)
+          raise ValueError("extra arguments to 'save': "+", ".join(a))
         if saveas == '-':
           sys.stdout.write(content)
           sys.stdout.flush()
@@ -407,7 +407,7 @@ class Pilfer(object):
         dir = self.url_save_dir(U)
         try:
           self.url_save_full(U, dir, overwrite_dir=True)
-        except (HTTPError, URLError), e:
+        except (HTTPError, URLError) as e:
           error("%s", e)
           return
       yield U

@@ -3,6 +3,7 @@
 #       - Cameron Simpson <cs@zip.com.au> 01may2009
 #
 
+from __future__ import print_function
 from datetime import datetime
 import os.path
 import re
@@ -135,7 +136,7 @@ def mycnf_argv(argv, optmap=None):
     optmap = {}
   for arg in argv:
     if not arg.startswith('--'):
-      raise ValueError, "bad option, no leading --: "+arg
+      raise ValueError("bad option, no leading --: "+arg)
     try:
       option, value = arg[2:].split('=', 1)
     except ValueError:
@@ -169,7 +170,7 @@ def mysqld_run(mycnf, pid_file, argv, dofork=False):
       else:
         mysqld_argv.append('--' + opt + '=' + value)
   mysqld_argv.extend(argv)
-  print mysqld_argv
+  print(mysqld_argv)
   if dofork:
     pid = os.fork()
     if pid > 0:
@@ -177,7 +178,7 @@ def mysqld_run(mycnf, pid_file, argv, dofork=False):
         pfp.write("%d\n" % (os.getpid(),))
     return pid
   os.execvp(mysqld_argv[0], mysqld_argv)
-  raise RuntimeError, "NOTREACHED"
+  raise RuntimeError("NOTREACHED")
 
 def mysqld_start(mycnf, pid_file, argv):
   ''' Start a mysqld process. Write its process id to `pid_file`. Return the process id.
@@ -258,7 +259,6 @@ class BinLogParser(object):
         with Pfx(str(lineno)):
           assert line.endswith('\n'), "unexpected EOF: "+line
           line = line.expandtabs()
-          ##print >>sys.stderr, ">", line
 
           # ^#(\d\d)(\d\d)(\d\d) +(\d\d?):(\d\d):(\d\d) +server +id +(\d+) +end_log_pos +(\d+) +Query +thread_id=(\d+) +exec_time=(\d+) +error_code=(\d)+
           m = BinLogParser.re_QUERY_MARKER.match(line)
@@ -291,7 +291,6 @@ class BinLogParser(object):
              ##or line.startswith('DELIMITER ')
              ##or line.startswith('ROLLBACK')
           ):
-            ##print >>sys.stderr, "SKIP", line
             continue
 
           query_text += line
@@ -304,8 +303,8 @@ class BinLogParser(object):
 
 
   def report(self):
-    print "thread_ids = %s" % ([ T.thread_id for T in self.db_threads.values() ],)
-    print "%d queries" % (len(self.db_queries),)
+    print("thread_ids = %s" % ([ T.thread_id for T in self.db_threads.values() ],))
+    print("%d queries" % (len(self.db_queries),))
     by_time = {}
     by_dbname = {}
     for tid in self.db_threads.keys():
@@ -314,23 +313,23 @@ class BinLogParser(object):
         by_time.setdefault(Q.timestamp, []).append(Q)
         by_dbname.setdefault(Q.dbname, []).append(Q)
         if Q.exec_time > 0:
-          print tid, Q.exec_time, Q.query_text
+          print(tid, Q.exec_time, Q.query_text)
 
     timestamps = by_time.keys()
     timestamps.sort()
     for ts in timestamps:
       Qs = by_time[ts]
-      print ts, len(Qs), "queries"
+      print(ts, len(Qs), "queries")
       continue
-      print ts, Qs[0].query_text
+      print(ts, Qs[0].query_text)
       if len(Qs) > 1:
         for Q in Qs[1:]:
-          print "\t", Q.dbname, Q.query_text
+          print("\t", Q.dbname, Q.query_text)
 
     dbnames = by_dbname.keys()
     dbnames.sort()
     for dbname in dbnames:
-      print "%-16s %d queries" % (dbname, len(by_dbname[dbname]))
+      print("%-16s %d queries" % (dbname, len(by_dbname[dbname])))
 
   def collate_queries(self, queries):
     queries = list(queries)

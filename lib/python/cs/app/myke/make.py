@@ -1,6 +1,6 @@
 #!/usr/bin/python
-#
 
+from __future__ import print_function
 import sys
 if sys.hexversion < 0x02060000: from sets import Set as set
 import os
@@ -263,7 +263,7 @@ class Maker(object):
           self.debug_parse("add macro %s", O)
           ns[O.name] = O
         else:
-          raise ValueError, "parseMakefile({}): unsupported parse item received: {}{}".format(makefile, type(O), repr(O))
+          raise ValueError("parseMakefile({}): unsupported parse item received: {}{}".format(makefile, type(O), repr(O)))
       if first_target is not None:
         self.default_target = first_target
 
@@ -508,7 +508,7 @@ class Action(object):
         debug("shell command")
         shcmd = self.mexpr(self.context, target.namespaces)
         if not self.silent:
-          print shcmd
+          print(shcmd)
         if M.no_action:
           mdebug("OK (maker.no_action)")
           return CallableValue(True) if as_func else True
@@ -526,7 +526,7 @@ class Action(object):
         mdebug("OK all submakes, return True")
         return CallableValue(True) if as_func else True
 
-      raise NotImplementedError, "unsupported variant: %s" % (self.variant,)
+      raise NotImplementedError("unsupported variant: %s" % (self.variant,))
 
   def _shcmd(self, target, shcmd):
     with Pfx("%s.act: shcmd=%r" % (self, shcmd)):

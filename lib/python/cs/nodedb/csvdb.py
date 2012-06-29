@@ -18,6 +18,7 @@ from types import StringTypes
 from cs.fileutils import lockfile
 from cs.logutils import Pfx, error, warning, info, D
 from cs.threads import IterableQueue
+from cs.py3 import unicode as u
 from . import NodeDB
 from .backend import Backend
 
@@ -138,10 +139,10 @@ def write_csv_file(fp, nodedata, noHeaders=False):
           wt = t
         else:
           # same type
-          wt = u''
+          wt = u('')
         write_csvrow(csvw, wt, name, attr, valuetext)
-        attr = u''
-        name = u''
+        attr = u('')
+        name = u('')
 
 def write_csvrow(csvw, t, name, attr, valuetext):
   ''' Encode and write a CSV row.

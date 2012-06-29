@@ -130,10 +130,10 @@ class FileInfoDB(dict):
     assert fi.size == osize
 
   def __setitem__(self, k, v):
-    raise NotImplementedError, "populated by __getitem__"
+    raise NotImplementedError("populated by __getitem__")
 
   def __delitem__(self, k, v):
-    raise NotImplementedError, "populated by __getitem__"
+    raise NotImplementedError("populated by __getitem__")
 
   def find_primary(self, fi):
     ''' Locate the primary for `fi`.

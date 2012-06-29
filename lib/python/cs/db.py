@@ -14,8 +14,8 @@ import datetime
 if sys.hexversion < 0x02060000: from sets import Set as set
 import cs.secret
 import cs.cache
-from cs.logutils import error, warning
 from cs.misc import isodate, the, WithUC_Attrs
+from cs.logutils import error, warning
 from threading import Lock
 
 def today():
@@ -212,7 +212,7 @@ def mergeDatedRecords(table,keyFields,idField=None,constraint=None,cropOverlaps=
     if doit:
       table.dosql(sql)
     else:
-      print sql
+      info("mergeDatedRecords: %s", sql)
 
 def mergeDatedRecordsSQL(table,keyFields,idField=None,constraint=None,cropOverlaps=False):
   ''' mergeDatedRecordsSQL() is a generator that yields SQL statements to
@@ -248,8 +248,7 @@ def mergeDatedRecordsSQL(table,keyFields,idField=None,constraint=None,cropOverla
   for row in table.selectRows(where=constraint, modifiers='ORDER BY START_DATE, END_DATE, '+idField):
     start, end = row.START_DATE, row.END_DATE
     if start is not None and end is not None and start >= end:
-      print repr(row)
-      print "HUH - DELETE RECORD WITH EMPTY DATE RANGE"
+      warning("deleting record with empty date range: %r", row)
       yield 'DELETE FROM %s WHERE %s = %s' % (table.name, idField, sqlise(row[idField]))
       continue
 
@@ -407,7 +406,7 @@ class DirectKeyedTableView:
     if type(key) is not tuple:
       key=(key,)
     if type(key[0]) is tuple:
-      raise IndexError, "key is tuple of tuple: %r" % (key,)
+      raise IndexError("key is tuple of tuple: %r" % (key,))
     return " AND ".join(self.__allColumns[i]+' = '+sqlise(key[i]) for i in range(len(key)))
 
   def rowWhere(self,row):
@@ -616,9 +615,9 @@ class DirectRekeyedTableView(cs.cache.Cache):
     where=' AND '.join([self.keyFields[i]+" = "+sqlise(key[i]) for i in range(len(self.keyFields))])
     rows=self.table.selectRows(where)
     if len(rows) == 0:
-      raise IndexError, "no entries WHERE "+where
+      raise IndexError("no entries WHERE "+where)
     if len(rows) > 1:
-      raise IndexError, "multiple entries WHERE "+where+": "+",".join(rows)
+      raise IndexError("multiple entries WHERE "+where+": "+",".join(rows))
     return rows[0]
 
 class KeyedTableSubView(KeyedTableView):

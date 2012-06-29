@@ -110,16 +110,16 @@ def import_rows_wide(rows):
       if nrows == 1:
         hdrrow = row
         if len(hdrrow) < 2:
-          raise ValueError, "header row too short, expected at least TYPE and NAME: %s" % (hdrrow,)
+          raise ValueError("header row too short, expected at least TYPE and NAME: %s" % (hdrrow,))
         if hdrrow[0] != 'TYPE':
-          raise ValueError, "header row: element 0 should be 'TYPE', got: %r" % (hdrrow[0],)
+          raise ValueError("header row: element 0 should be 'TYPE', got: %r" % (hdrrow[0],))
         if hdrrow[1] != 'NAME':
-          raise ValueError, "header row: element 1 should be 'NAME', got: %s" % (hdrrow[1],)
+          raise ValueError("header row: element 1 should be 'NAME', got: %s" % (hdrrow[1],))
         continue
 
       if len(row) > len(hdrrow):
-        raise ValueError, "row %d: too many columns - expected %d, got %d" \
-                          (nrows, len(hdrrow), len(row))
+        raise ValueError("row %d: too many columns - expected %d, got %d"
+                         % (nrows, len(hdrrow), len(row)))
       if len(row) < len(hdrrow):
         # rows may come from human made CSV data - accept and pad short rows
         row.extend( [ None for i in range(len(hdrrow)-len(row)) ] )

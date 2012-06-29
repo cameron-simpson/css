@@ -1,6 +1,6 @@
 #!/usr/bin/python -tt
-#
 
+from __future__ import print_function
 import dbhash
 import struct
 
@@ -31,4 +31,4 @@ def addCacheEntries(entries,cachefile=dnscachefile):
 
 if __name__ == '__main__':
   for key, when, name in cacheEntries():
-    print key, when, name
+    print(key, when, name)

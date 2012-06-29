@@ -191,7 +191,7 @@ class Cache:
     # Note: we're looking up the backend, _not_ calling some subclass' findrowbykey()
     row=Cache.findrowByKey(self,key)
     if row is None:
-      raise IndexError, "no entry with key "+repr(key)
+      raise IndexError("no entry with key "+repr(key))
 
     return row
 

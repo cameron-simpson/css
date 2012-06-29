@@ -39,10 +39,10 @@ class FuseStore(Fuse):
     kw['prog'] = sys.argv[0]
     kw['usage'] = "Usage Message";
 
-    print "FuseStore:"
-    print "  args =", repr(args)
-    print "  kw =", repr(kw)
-    print "  fargs =", repr(fargs)
+    print("FuseStore:")
+    print("  args =", repr(args))
+    print("  kw =", repr(kw))
+    print("  fargs =", repr(fargs))
     Fuse.__init__(self, fuse_args=fargs, **kw)
     self.flags = 0
     self.multithreaded = 0
@@ -133,7 +133,7 @@ class FuseStore(Fuse):
       global mainFuseStore
       assert mainFuseStore is not None
       self.__Fuse = mainFuseStore
-      print "new __File: path =", path, "flags =", repr(flags), "mode =", repr(mode)
+      print("new __File: path =", path, "flags =", repr(flags), "mode =", repr(mode))
       self.file = os.fdopen(os.open("." + path, flags, *mode),
                             flag2mode(flags))
       self.fd = self.file.fileno()

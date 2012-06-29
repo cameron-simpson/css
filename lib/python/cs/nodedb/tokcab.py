@@ -38,7 +38,7 @@ class Backend_TokyoCabinet(Backend):
 
   def close(self):
     if self.tcdb is None:
-      raise ValueError, "%s.tcdb is None, .close() already called" % (self,)
+      raise ValueError("%s.tcdb is None, .close() already called" % (self,))
     with open("/dev/tty","w") as tty:
       tty.write("CLOSE TC %s\n" % (self.tcdb,))
     with self.tclock:

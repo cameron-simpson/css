@@ -14,7 +14,7 @@ class tzinfoHHMM(tzinfo):
     elif sign == '-':
       sign = -1
     else:
-      raise ValueError, "%s: invalid sign '%s', should be '+' or '-'" % (shhmm, sign,)
+      raise ValueError("%s: invalid sign '%s', should be '+' or '-'" % (shhmm, sign,))
     self._tzname = shhmm
     self.sign = sign
     self.hour = hour

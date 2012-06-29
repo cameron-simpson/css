@@ -15,12 +15,12 @@ import sys
 import socket
 import shutil
 from tempfile import NamedTemporaryFile
-from StringIO import StringIO
 from threading import Lock
 import time
 from cs.logutils import Pfx, warning, debug, D
 from cs.threads import locked_property
 from cs.misc import seq
+from cs.py3 import StringIO
 
 def Message(M, headersonly=False):
   ''' Factory function to accept a file or filename and return an
@@ -58,7 +58,7 @@ class Maildir(mailbox.Maildir):
 
   def __init__(self, dir):
     if not ismaildir(dir):
-      raise ValueError, "not a Maildir: %s" % (dir,)
+      raise ValueError("not a Maildir: %s" % (dir,))
     self.dir = dir
     self._msgmap = None
     self._pid = None
@@ -111,7 +111,7 @@ class Maildir(mailbox.Maildir):
     folderdir = os.path.join(self.dir, folder)
     if folder != '.' and ismaildir(folderdir):
       return Maildir(folderdir)
-    raise mailbox.NoSuchMailboxError, folderdir
+    raise mailbox.NoSuchMailboxError(folderdir)
 
   def add_folder(folder):
     folderpath = os.path.join(self.dir, folder)
@@ -123,7 +123,7 @@ class Maildir(mailbox.Maildir):
   def remove_folder(self, folder):
     F = self.get_folder(folder)
     for key in F.iterkeys():
-      raise mailbox.NotEmptyError, "not an empty Maildir"
+      raise mailbox.NotEmptyError("not an empty Maildir")
     folderpath = os.path.join(self.dir, folder)
     for subdir in 'tmp', 'new', 'cur':
       os.rmdir(os.path.join(folderdir, subdir))
@@ -155,12 +155,12 @@ class Maildir(mailbox.Maildir):
         key = self.newkey()
         debug("new key = %s", key)
       elif not self.validkey(key):
-        raise ValueError, "invalid key: %s" % (key,)
+        raise ValueError("invalid key: %s" % (key,))
         if key in self.msgmap:
-          raise ValueError, "key already in Maildir: %s" % (key,)
+          raise ValueError("key already in Maildir: %s" % (key,))
       tmppath = os.path.join(self.dir, 'tmp', key)
       if os.path.exists(tmppath):
-        raise ValueError, "temp file already in Maildir: %s" % (tmppath,)
+        raise ValueError("temp file already in Maildir: %s" % (tmppath,))
       if not nolink:
         try:
           debug("hardlink %s => %s", filepath, tmppath)
@@ -222,7 +222,7 @@ class Maildir(mailbox.Maildir):
         T.flush()
         key = self.save_filepath(T.name, key=key)
       return key
-    raise ValueError, "unsupported message type: %s" % (type(message),)
+    raise ValueError("unsupported message type: %s" % (type(message),))
 
   def remove(self, key):
     subdir, msgbase = self.msgmap[key]
@@ -257,7 +257,7 @@ class Maildir(mailbox.Maildir):
   def popitem(self):
     for key in self.iterkeys():
       return self.pop(key)
-    raise KeyError, "empty Maildir"
+    raise KeyError("empty Maildir")
 
   def update(self, arg):
     try:

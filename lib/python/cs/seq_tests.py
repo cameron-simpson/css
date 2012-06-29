@@ -4,7 +4,6 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
-from StringIO import StringIO
 import sys
 import unittest
 from cs.seq import imerge

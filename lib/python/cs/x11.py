@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+from __future__ import print_function
 from cs.misc import DictUCAttrs
 
 class Display(DictUCAttrs):
@@ -110,7 +111,7 @@ class Display(DictUCAttrs):
   def __getattr__(self,attr):
     if attr.isalpha() and attr.isupper():
       return self[attr]
-    raise AttributeError, "no attribute named "+attr
+    raise AttributeError("no attribute named "+attr)
 
   def window(self,wid):
     if id not in self.windows:
@@ -130,7 +131,7 @@ class Window(dict):
     import cs.sh
     for line in cs.sh.vpopen(("set-x","xwininfo","-display",self.display['DISPLAY'],"-id",str(self.wid))):
       line=line.lstrip()
-      print "W:", line
+      print("W:", line)
       if line.startswith("Absolute upper-left X:"):
         self.x=int(line[22:])
       elif line.startswith("Absolute upper-left Y:"):

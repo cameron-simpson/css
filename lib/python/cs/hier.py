@@ -3,11 +3,11 @@
 import re
 import os
 import os.path
-from cStringIO import StringIO
 import sys
 from cs.lex import lastlinelen
 import cs.io
 from cs.misc import DictUC_Attrs, T_SEQ, T_MAP, T_SCALAR, objFlavour as flavour
+from cs.py3 import StringIO
 
 DEFAULT_OPTS={'dictSep': ' =>',
               'bareWords': True,
@@ -293,7 +293,7 @@ class HierInput(_Hier):
     (value,line)=self.tok(line)
     line=line.lstrip()
     if len(line):
-      raise ValueError, "unparsed data on line: \""+line+"\", from original line: \""+oline+"\""
+      raise ValueError("unparsed data on line: \""+line+"\", from original line: \""+oline+"\"")
 
     return (key,value)
 
@@ -311,7 +311,7 @@ class HierInput(_Hier):
 
     m=safePrefixRe.match(s)
     if not m:
-      raise ValueError, "syntax error at: \""+s+"\""
+      raise ValueError("syntax error at: \""+s+"\"")
 
     safeTok = m.group()
     if safeTok.isdigit() and (len(safeTok) == 1 or safeTok[0] != '0'):
@@ -389,7 +389,7 @@ class HierInput(_Hier):
       elif s[:2] == '=>':
         s=s[2:]
       else:
-        raise ValueError, "expected \":\" or \"=>\", found: \""+s+"\""
+        raise ValueError("expected \":\" or \"=>\", found: \""+s+"\"")
 
       s=s.lstrip()
       (val,s)=self.tok(s)

@@ -5,6 +5,7 @@
 #       - Cameron Simpson <cs@zip.com.au> 25mar2008
 #
 
+from __future__ import print_function
 import sys
 from ZSI import SoapWriter, ParsedSoap, TC
 import ZSI.wstools.Utility
@@ -43,9 +44,9 @@ def callSOAP(url,action,xml,retAction,retTypecode,onerror=None):
     ret=None
     try:
       ret=callSOAP(url,action,xml,retAction,retTypecode,onerror=None)
-    except urllib2.HTTPError, e:
+    except urllib2.HTTPError as e:
       onerror(action,xml,e)
-    except urllib2.URLError, e:
+    except urllib2.URLError as e:
       onerror(action,xml,e)
     except AssertionError as e:
       onerror(action,xml,e)
@@ -148,12 +149,12 @@ class AutoObject(object):
         O=AutoObject()
         self.__dict__[attr]=O
         return O
-    raise AttributeError, "AutoObject has no attribute '%s'" % attr
+    raise AttributeError("AutoObject has no attribute '%s'" % attr)
   def __repr__(self):
     return "AO(%s)" % self
   def printAO(self,name):
     for s in str(self).split("\n"):
-      print "%s.%s" % (name, s)
+      print("%s.%s" % (name, s))
   def __str__(self):
     ks=self.__dict__.keys()
     ks.sort()

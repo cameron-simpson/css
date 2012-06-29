@@ -220,7 +220,7 @@ class _BasicDirent(Dirent):
   def __getitem__(self, name):
     if self.isdir:
       return self.asdir()[name]
-    raise KeyError, "\"%s\" not in %s" % (name, self)
+    raise KeyError("\"%s\" not in %s" % (name, self))
 
 def FileDirent(name, meta, block):
   ''' Factory function to return a Dirent for a file.

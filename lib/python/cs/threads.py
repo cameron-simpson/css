@@ -65,7 +65,7 @@ class WorkerThreadPool(object):
           see cs.logutils.Pfx's .func method for details.
     '''
     if self.closed:
-      raise ValueError, "%s: closed, but dispatch() called" % (self,)
+      raise ValueError("%s: closed, but dispatch() called" % (self,))
     if pfx is not None:
       func = pfx.func(func)
     idle = self.idle
@@ -112,7 +112,7 @@ class WorkerThreadPool(object):
         # this handler to the pool
         if retq is None and deliver is None:
           t, v, tb = sys.exc_info()
-          raise t, v, tb
+          raise t(v).with_traceback(tb)
         result = (None, sys.exc_info())
       finally:
         func = None     # release func+args
@@ -164,7 +164,7 @@ class AdjustableSemaphore(object):
         released.
     '''
     if newvalue <= 0:
-      raise ValueError, "invalid newvalue, should be > 0, got %s" % (newvalue,)
+      raise ValueError("invalid newvalue, should be > 0, got %s" % (newvalue,))
     with self.__lock:
       delta = newvalue-self.__value
       if delta > 0:
@@ -221,7 +221,7 @@ class Channel(object):
     '''
     debug("CHANNEL: %s.get()", self)
     if self.closed:
-      raise ValueError, "%s.get() on closed Channel" % (self,)
+      raise ValueError("%s.get() on closed Channel" % (self,))
     with self.__get_lock:
       with self.__lock:
         self._nreaders += 1
@@ -240,7 +240,7 @@ class Channel(object):
     '''
     debug("CHANNEL: %s.put(%r)", self, value)
     if self.closed:
-      raise ValueError, "%s: closed, but put(%s)" % (self, value)
+      raise ValueError("%s: closed, but put(%s)" % (self, value))
     with self.__put_lock:
       self.__writable.acquire()   # prevent other writers
       self._value = value
@@ -875,7 +875,7 @@ class TimerQueue(object):
 
 class FuncMultiQueue(object):
   def __init__(self, *a, **kw):
-    raise Error, "FuncMultiQueue OBSOLETE, use cs.later.Later instead"
+    raise Error("FuncMultiQueue OBSOLETE, use cs.later.Later instead")
 
 def locked_property(func, lock_name='_lock', prop_name=None, unset_object=None):
   ''' A property whose access is controlled by a lock if unset.
