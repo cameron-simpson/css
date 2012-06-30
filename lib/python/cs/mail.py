@@ -56,7 +56,7 @@ def messagesFromPath(path):
   elif os.path.ispath(path):
     return messagesFromMailFile(path)
   else:
-    raise ValueError, "%s: not a recognised mail store" % (path,)
+    raise ValueError("%s: not a recognised mail store" % (path,))
 
 def _messageFromMailFile(mailfp):
   return HeaderParser().parse(mailfp)
@@ -81,7 +81,7 @@ def messagesFromMBox(mbox):
         yield P.close()
       P = FeedParser()
     elif P is None:
-      raise ValueError, "line in UNIX mailbox before first From_ line"
+      raise ValueError("line in UNIX mailbox before first From_ line")
     else:
       P.feed(line)
   if P is not None:

@@ -4,7 +4,7 @@
 #       - Cameron Simpson <cs@zip.com.au> 26sep2010
 #
 
-from types import StringTypes
+from cs.py3 import StringTypes
 
 def collate(seq, attr, select=None):
   ''' Collate members of a sequence by some attribute.
@@ -14,7 +14,7 @@ def collate(seq, attr, select=None):
   '''
   if select is not None:
     t = type(select)
-    if t in StringTypes or t in (int, long, float):
+    if isinstance(t, StringTypes) or isinstance(t, (int, long, float)):
       select = (select,)
 
   collation = {}

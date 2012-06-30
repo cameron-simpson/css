@@ -110,14 +110,14 @@ class DBDiGraph:
     if type(nodeid) is tuple:
       return the(self.nodesByNameAndType(nodeid[0],*nodeid[1:]), repr(nodeid))
 
-    raise IndexError, "invalid index "+repr(nodeid)
+    raise IndexError("invalid index "+repr(nodeid))
 
   def __delitem__(self,nodeid):
     refids=self[nodeid].referringNodeids()
     warning("refids =", repr(refids))
     if len(refids) > 0:
       node=self[nodeid]
-      raise IndexError, "node %s has referring nodes: %s" % (node, ", ".join(self[id] for id in refids))
+      raise IndexError("node %s has referring nodes: %s" % (node, ", ".join(self[id] for id in refids)))
 
     del self.attrs[nodeid]
     del self.nodes[nodeid]
@@ -125,7 +125,7 @@ class DBDiGraph:
   def need(self,name,type):
     nodes=self.nodesByNameAndType(name,type)
     if len(nodes) > 1:
-      raise IndexError, "multiple nodes with index %r: %s" % ( ((name,type)), ", ".join(str(n) for n in nodes) )
+      raise IndexError("multiple nodes with index %r: %s" % ( ((name,type)), ", ".join(str(n) for n in nodes) ))
     if len(nodes) == 0:
       node=self.createNode(name,type)
     else:
@@ -230,7 +230,7 @@ class DBDiGraphNode:
       return self.digraph.nodes[self.id][attr]
     if testAllCaps(attr):
       return self.__fieldAccess(attr)
-    raise AttributeError, "node "+str(self)+" has no attribute named "+attr
+    raise AttributeError("node "+str(self)+" has no attribute named "+attr)
 
   def __setattr__(self,attr,value):
     if attr in self.__dict__ or attr in ('id', 'digraph'):
@@ -241,7 +241,7 @@ class DBDiGraphNode:
       self.__fieldAccess(attr,value)
       return
 
-    raise AttributeError, "node id="+str(self.id)+" has no attribute named "+attr
+    raise AttributeError("node id="+str(self.id)+" has no attribute named "+attr)
 
   def __fieldAccess(self,field,value=None):
     ''' Get or set the value of an attribute.
@@ -289,7 +289,7 @@ class DBDiGraphNode:
 
   def __delitem__(self,key):
     if key in NodeCoreAttributes:
-      raise IndexError, "can't delete NodeCoreAttribute "+key
+      raise IndexError("can't delete NodeCoreAttribute "+key)
 
     # TODO: recursively delete any linked hashes?
     del self.digraph.attrs[self.id][key]
@@ -309,7 +309,7 @@ class DBDiGraphNode:
   def getAttr(self,attr):
     ##warning(str(self)+": getAttr("+repr(attr)+")")
     if type(attr) is not str:
-      raise IndexError, "non-string attr: "+repr(attr)
+      raise IndexError("non-string attr: "+repr(attr))
     values=self.digraph.attrs[self.id]
     return values[attr]
 

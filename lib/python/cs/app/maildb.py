@@ -1,6 +1,6 @@
 #!/usr/bin/python -tt
 
-from __future__ import with_statement
+from __future__ import with_statement, print_function
 from collections import deque
 from getopt import getopt, GetoptError
 from email.utils import getaddresses, parseaddr, formataddr
@@ -38,7 +38,7 @@ def main(argv, stdin=None):
 
   try:
     opts, argv = getopt(argv, 'm:')
-  except GetoptError, e:
+  except GetoptError as e:
     error("unrecognised option: %s: %s"% (e.opt, e.msg))
     badopts = True
     opts, argv = [], []
@@ -77,8 +77,8 @@ def main(argv, stdin=None):
               error("no such group: %s", group_name)
               xit = 1
               continue
-            print group_name, ", ".join(mdb['ADDRESS', address].formatted
-                                        for address in address_group)
+            print(group_name, ", ".join(mdb['ADDRESS', address].formatted
+                                        for address in address_group))
         elif op == 'learn-addresses':
           if not len(argv):
             error("missing groups")
@@ -140,7 +140,7 @@ class MessageNode(Node):
         return M
       M = ps[0]
       if M is self:
-        raise ValueError, "%s: recursive PARENTs" % (M,)
+        raise ValueError("%s: recursive PARENTs" % (M,))
 
   def thread_walk(self, depthFirst=False):
     ''' Walk the threads from this message yielding MessageNodes.
@@ -264,7 +264,7 @@ class _MailDB(NodeDB):
       or not msgid.endswith('>')
       or msgid.find("@") < 0
        ):
-      raise ValueError, "invalid Message-ID: %s" % (msgid,)
+      raise ValueError("invalid Message-ID: %s" % (msgid,))
 
     M = self.getMessageNode(msgid)
     M.MESSAGE = msg
@@ -314,10 +314,9 @@ class _MailDB(NodeDB):
             continue
           if not len(addr):
             info("SKIP - no address")
-          ##print groups, addr
           try:
             A = self.getAddressNode(addr)
-          except ValueError, e:
+          except ValueError as e:
             error("bad address: %s: %s", addr, e)
             continue
           A.GROUPs.update(groups.split(','))

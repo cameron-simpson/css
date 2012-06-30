@@ -1,8 +1,9 @@
 #!/usr/bin/python
 
-from cs.logutils import error
+from __future__ import print_function
 from pwd import getpwuid
 from grp import getgrgid
+from cs.logutils import error
 
 def permbits_to_acl(bits):
   ''' Take a UNIX 3-bit permission value and return the ACL add-sub string.
@@ -144,4 +145,4 @@ class Meta(dict):
 
 if __name__ == '__main__':
   import os
-  print MetaFromStat(os.stat(__file__))
+  print(MetaFromStat(os.stat(__file__)))

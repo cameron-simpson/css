@@ -24,7 +24,7 @@ def saferename(oldpath, newpath):
   try:
     os.lstat(newpath)
     raise OSError(errno.EEXIST)
-  except OSError, e:
+  except OSError as e:
     if e.errno != errno.ENOENT:
       raise
     os.rename(oldpath, newpath)
@@ -77,7 +77,7 @@ def rewrite(filepath, data,
     if not empty_ok:
       st = os.stat(T.name)
       if st.st_size == 0:
-        raise ValueError, "no data in temp file"
+        raise ValueError("no data in temp file")
     if do_diff or not overwrite_anyway:
       # need to compare data
       if compare(T.name, filepath):
@@ -122,7 +122,7 @@ def watch_file(path, old_mtime, reload_file, missing_ok=False):
   '''
   try:
     s = os.stat(path)
-  except OSError, e:
+  except OSError as e:
     if e.errno == errno.ENOENT:
       if missing_ok:
         return None, None
@@ -134,7 +134,7 @@ def watch_file(path, old_mtime, reload_file, missing_ok=False):
     R = reload_file(path)
     try:
       s = os.stat(path)
-    except OSError, e:
+    except OSError as e:
       if e.errno == errno.ENOENT:
         if missing_ok:
           return None, None
@@ -198,7 +198,7 @@ def lockfile(path, ext='.lock', block=False, poll_interval=0.1):
   while True:
     try:
       lockfd = os.open(lockpath, os.O_CREAT|os.O_EXCL|os.O_RDWR, 0)
-    except OSError, e:
+    except OSError as e:
       if e.errno == errno.EEXIST:
         if block:
           sleep(poll_interval)

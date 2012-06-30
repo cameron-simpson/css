@@ -7,9 +7,7 @@ info = logging.info
 warning = logging.warning
 import string
 import time
-from types import TupleType, ListType, DictType, DictionaryType
-from StringIO import StringIO
-from thread import allocate_lock
+from threading import Lock
 if sys.hexversion < 0x02060000: from sets import Set as set
 from cs.lex import parseline, strlist
 from cs.fileutils import saferename
@@ -203,9 +201,9 @@ def objFlavour(obj):
       T_SCALAR: Anything else.
   """
   t = type(obj)
-  if t in (TupleType, ListType):
+  if isinstance(t, (tuple, list)):
     return T_SEQ
-  if t in (DictType, DictionaryType):
+  if isinstance(t, dict):
     return T_MAP
   if hasattr(obj, '__keys__') or hasattr(obj, 'keys'):
     return T_MAP
@@ -214,7 +212,7 @@ def objFlavour(obj):
   return T_SCALAR
 
 __seq = 0
-__seqLock = allocate_lock()
+__seqLock = Lock()
 def seq():
   ''' Allocate a new sequential number.
       Useful for creating unique tokens.
@@ -255,11 +253,12 @@ def the(list, context=None):
       it=elem
       first=False
     else:
-      raise IndexError, "%s: got more than one element (%s, %s, ...)" \
+      raise IndexError("%s: got more than one element (%s, %s, ...)"
                         % (icontext, it, elem)
+                      )
 
   if first:
-    raise IndexError, "%s: got no elements" % icontext
+    raise IndexError("%s: got no elements" % (icontext,))
 
   return it
 
@@ -548,7 +547,7 @@ def mkdirn(path):
     newpath=path+str(newn)
     try:
       os.mkdir(newpath)
-    except OSError, e:
+    except OSError as e:
       if sys.exc_value[0] == errno.EEXIST:
         # taken, try new value
         continue

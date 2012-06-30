@@ -68,7 +68,7 @@ def curly_substitute(s, mapfn, safe=False, permute=False):
     foo = M.group('braced')
     try:
       repl = str(mapfn(foo))
-    except Exception, e:
+    except Exception as e:
       if not safe:
         with Pfx(foo):
           raise
@@ -100,7 +100,7 @@ def curly_substitute_permute(s, mapfn, safe=False):
     if foo:
       try:
         repl = list(mapfn(foo))
-      except Exception, e:
+      except Exception as e:
         if not safe:
           raise
         repl = [M.group()]
@@ -121,7 +121,7 @@ def curly_substitute_permute(s, mapfn, safe=False):
       foo = M.group('braced')
       try:
         repl = str(mapfn(M.group('braced')))
-      except Exception, e:
+      except Exception as e:
         if not safe:
           raise
         repl = M.group()
@@ -152,7 +152,7 @@ def curly_substitute_permute(s, mapfn, safe=False):
     if foo:
       try:
         repl = list(mapfn(foo))
-      except Exception, e:
+      except Exception as e:
         if not safe:
           raise
         repl = [M.group()]
@@ -173,7 +173,7 @@ def curly_substitute_permute(s, mapfn, safe=False):
       foo = M.group('braced')
       try:
         repl = str(mapfn(M.group('braced')))
-      except Exception, e:
+      except Exception as e:
         if not safe:
           raise
         repl = M.group()
@@ -214,7 +214,7 @@ class EvalMapping(object):
   def __getitem__(self, expr):
     try:
       value = eval(expr, self.locals, self.globals)
-    except Exception, e:
+    except Exception as e:
       raise KeyError(str(e))
     return value
 

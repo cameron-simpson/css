@@ -36,7 +36,7 @@ class Secret(DictUC_Attrs):
         except IOError:
           continue
       if S is None:
-        raise IOError, "can't locate secret file for \"%s\"" % (secret,)
+        raise IOError("can't locate secret file for \"%s\"" % (secret,))
     dict.__init__(self,S)
 
 def list(path=None):
@@ -87,7 +87,6 @@ def mssql(secret, db=None):
     # transmute secret name into structure
     secret=get(secret)
 
-  print "secret =", repr(secret)
   host=secret['HOST']
   port=secret['PORT']
   database=secret['DATABASE']

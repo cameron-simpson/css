@@ -28,7 +28,7 @@ def convertObjCtype(o):
     return dict( [ (k, o[k]) for k in o.keys() ] )
   if t == objc._pythonify.OC_PythonInt:
     return int(o)
-  raise TypeError, "can't convert <%s %s>" % (t, o)
+  raise TypeError("can't convert <%s %s>" % (t, o))
 
 def convertNSDate(d):
   d_date, d_time, d_zone = d.description().split()

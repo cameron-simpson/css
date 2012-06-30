@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 import os
-from thread import allocate_lock
+from threading import Lock
 from types import StringTypes
 import sys
 import sqlalchemy
@@ -42,7 +42,7 @@ def ATTRSTable(metadata, name=None):
 class Backend_SQLAlchemy(Backend):
 
   def __init__(self, engine, nodes=None, attrs=None, readonly=False):
-    self._lock = allocate_lock()
+    self._lock = Lock()
     self.readonly = readonly
     if nodes is None:
       nodes = 'NODES'

@@ -49,7 +49,7 @@ def main(argv):
         DB = NodeDBFromURL(dburl)
         try:
           xit = DB.do_command([op] + argv)
-        except GetoptError, e:
+        except GetoptError as e:
           error("%s: %s", op, e)
           badopts = True
         else:

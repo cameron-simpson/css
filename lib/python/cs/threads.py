@@ -8,7 +8,7 @@ from __future__ import with_statement
 from functools import partial
 import sys
 import time
-from thread import allocate_lock
+from threading import Lock
 from threading import Semaphore, Thread, Timer
 if sys.hexversion < 0x03000000:
   from Queue import Queue, PriorityQueue, Full, Empty
@@ -65,7 +65,7 @@ class WorkerThreadPool(object):
           see cs.logutils.Pfx's .func method for details.
     '''
     if self.closed:
-      raise ValueError, "%s: closed, but dispatch() called" % (self,)
+      raise ValueError("%s: closed, but dispatch() called" % (self,))
     if pfx is not None:
       func = pfx.func(func)
     idle = self.idle
@@ -112,7 +112,7 @@ class WorkerThreadPool(object):
         # this handler to the pool
         if retq is None and deliver is None:
           t, v, tb = sys.exc_info()
-          raise t, v, tb
+          raise t(v).with_traceback(tb)
         result = (None, sys.exc_info())
       finally:
         func = None     # release func+args
@@ -133,7 +133,7 @@ class AdjustableSemaphore(object):
     self.__sem = Semaphore(value)
     self.__value = value
     self.__name = name
-    self.__lock = allocate_lock()
+    self.__lock = Lock()
 
   def __enter__(self):
     with LogTime("%s(%d).__enter__: acquire" % (self.__name, self.__value)):
@@ -164,7 +164,7 @@ class AdjustableSemaphore(object):
         released.
     '''
     if newvalue <= 0:
-      raise ValueError, "invalid newvalue, should be > 0, got %s" % (newvalue,)
+      raise ValueError("invalid newvalue, should be > 0, got %s" % (newvalue,))
     with self.__lock:
       delta = newvalue-self.__value
       if delta > 0:
@@ -183,14 +183,14 @@ class Channel(object):
       Unlike a Queue(1), put() blocks waiting for the matching get().
   '''
   def __init__(self):
-    self.__readable = allocate_lock()
+    self.__readable = Lock()
     self.__readable.acquire()
-    self.__writable = allocate_lock()
+    self.__writable = Lock()
     self.__writable.acquire()
-    self.__get_lock = allocate_lock()
-    self.__put_lock = allocate_lock()
+    self.__get_lock = Lock()
+    self.__put_lock = Lock()
     self.closed = False
-    self.__lock = allocate_lock()
+    self.__lock = Lock()
     self._nreaders = 0
 
   def __str__(self):
@@ -221,7 +221,7 @@ class Channel(object):
     '''
     debug("CHANNEL: %s.get()", self)
     if self.closed:
-      raise ValueError, "%s.get() on closed Channel" % (self,)
+      raise ValueError("%s.get() on closed Channel" % (self,))
     with self.__get_lock:
       with self.__lock:
         self._nreaders += 1
@@ -240,7 +240,7 @@ class Channel(object):
     '''
     debug("CHANNEL: %s.put(%r)", self, value)
     if self.closed:
-      raise ValueError, "%s: closed, but put(%s)" % (self, value)
+      raise ValueError("%s: closed, but put(%s)" % (self, value))
     with self.__put_lock:
       self.__writable.acquire()   # prevent other writers
       self._value = value
@@ -392,7 +392,7 @@ class Cato9:
   def __init__(self,*args,**kwargs):
     self.__qs={}
     self.__q=IterableQueue(maxsize)
-    self.__lock=allocate_lock()
+    self.__lock=Lock()
     self.__closed=False
     Thread(target=self.__handle).start()
   def qsize(self):
@@ -447,7 +447,7 @@ class JobCounter:
   '''
   def __init__(self,name):
     self.__name=name
-    self.__lock=allocate_lock()
+    self.__lock=Lock()
     self.__sem=Semaphore(0)
     self.__n=0
     self.__onDone=None
@@ -515,7 +515,7 @@ class NestingOpenClose(object):
   '''
   def __init__(self):
     self.__count=0
-    self.__lock=allocate_lock()
+    self.__lock=Lock()
 
   def open(self):
     ''' Increment the open count.
@@ -617,7 +617,7 @@ class FuncQueue(NestingOpenClose):
 ''' A pool of Channels.
 '''
 __channels=[]
-__channelsLock=allocate_lock()
+__channelsLock=Lock()
 def getChannel():
   ''' Obtain a Channel object.
   '''
@@ -637,7 +637,7 @@ def returnChannel(ch):
 ''' A pool of _Q1 objects (single use Queue(1)s).
 '''
 __queues=[]
-__queuesLock=allocate_lock()
+__queuesLock=Lock()
 def Q1(name=None):
   ''' Obtain a _Q1 object (single use Queue(1), self disposing).
   '''
@@ -704,7 +704,7 @@ class PreQueue(Queue):
   def __init__(self,size=None):
     Queue.__init__(self,size)
     self.__preQ=[]
-    self.__preQLock=allocate_lock()
+    self.__preQLock=Lock()
   def get(self,block=True,timeout=None):
     with self.__preQLock:
       if len(self.__preQ) > 0:
@@ -723,7 +723,7 @@ class PreQueue(Queue):
 class DictMonitor(dict):
   def __init__(self,I={}):
     dict.__init__(self,I)
-    self.__lock=allocate_lock()
+    self.__lock=Lock()
   def __getitem__(self,k):
     with self.__lock:
       v=dict.__getitem__(self,k)
@@ -751,7 +751,7 @@ class TimerQueue(object):
     self.Q = PriorityQueue()    # queue of waiting jobs
     self.pending = None         # or (Timer, when, func)
     self.closed = False
-    self._lock = allocate_lock()
+    self._lock = Lock()
     self.mainRunning = False
     self.mainThread = Thread(target=self._main)
     self.mainThread.start()
@@ -875,7 +875,7 @@ class TimerQueue(object):
 
 class FuncMultiQueue(object):
   def __init__(self, *a, **kw):
-    raise Error, "FuncMultiQueue OBSOLETE, use cs.later.Later instead"
+    raise Error("FuncMultiQueue OBSOLETE, use cs.later.Later instead")
 
 def locked_property(func, lock_name='_lock', prop_name=None, unset_object=None):
   ''' A property whose access is controlled by a lock if unset.

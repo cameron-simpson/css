@@ -1,6 +1,6 @@
 #!/usr/bin/python
-#
 
+from __future__ import print_function
 import sys
 if sys.hexversion < 0x02060000: from sets import Set as set
 import os
@@ -10,7 +10,7 @@ import getopt
 from functools import partial
 import logging
 from subprocess import Popen
-from thread import allocate_lock
+from threading import Lock
 import cs.misc
 from cs.later import Later, report as report_LFs, CallableValue
 from cs.logutils import Pfx, info, error, debug, D
@@ -51,10 +51,10 @@ class Maker(object):
     self.appendfiles = []
     self.macros = {}
     self._targets = {}
-    self._targets_lock = allocate_lock()
+    self._targets_lock = Lock()
     self.precious = set()
     self.active = set()
-    self.active_lock = allocate_lock()
+    self.active_lock = Lock()
     self._namespaces = []
 
   def __enter__(self):
@@ -228,7 +228,7 @@ class Maker(object):
               value = True
             try:
               self.setDebug(flag, value)
-            except AttributeError, e:
+            except AttributeError as e:
               error("bad flag %r: %s", flag, e)
               badopts = True
         elif opt == '-f':
@@ -263,7 +263,7 @@ class Maker(object):
           self.debug_parse("add macro %s", O)
           ns[O.name] = O
         else:
-          raise ValueError, "parseMakefile({}): unsupported parse item received: {}{}".format(makefile, type(O), repr(O))
+          raise ValueError("parseMakefile({}): unsupported parse item received: {}{}".format(makefile, type(O), repr(O)))
       if first_target is not None:
         self.default_target = first_target
 
@@ -287,7 +287,7 @@ class Target(object):
     self.actions = actions
     self.state = "unmade"
     self._status = None
-    self._lock = allocate_lock()
+    self._lock = Lock()
 
   def __str__(self):
     return "{}[{}]:{}:{}".format(self.name, self.state, self._prereqs, self._postprereqs)
@@ -486,7 +486,7 @@ class Action(object):
     self.line = line
     self.mexpr, _ = parseMacroExpression(context, line)
     self.silent = silent
-    self._lock = allocate_lock()
+    self._lock = Lock()
 
   def __str__(self):
     prline = self.line.rstrip().replace('\n', '\\n')
@@ -508,7 +508,7 @@ class Action(object):
         debug("shell command")
         shcmd = self.mexpr(self.context, target.namespaces)
         if not self.silent:
-          print shcmd
+          print(shcmd)
         if M.no_action:
           mdebug("OK (maker.no_action)")
           return CallableValue(True) if as_func else True
@@ -526,7 +526,7 @@ class Action(object):
         mdebug("OK all submakes, return True")
         return CallableValue(True) if as_func else True
 
-      raise NotImplementedError, "unsupported variant: %s" % (self.variant,)
+      raise NotImplementedError("unsupported variant: %s" % (self.variant,))
 
   def _shcmd(self, target, shcmd):
     with Pfx("%s.act: shcmd=%r" % (self, shcmd)):

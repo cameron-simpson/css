@@ -1,3 +1,4 @@
+from __future__ import print_function
 import atexit
 import cgi
 import cgitb; ##cgitb.enable()
@@ -235,7 +236,7 @@ class JSRPCCGI(CGI):
     while seqLen < len(path_info) and path_info[seqLen] != '/':
       seqLen+=1
     if seqLen == 0:
-      raise ValueError, "no sequence token at the start of PATH_INFO: "+repr(path_info)
+      raise ValueError("no sequence token at the start of PATH_INFO: "+repr(path_info))
 
     self.__seq=path_info[:seqLen]
     while seqLen < len(path_info) and path_info[seqLen] == '/':
@@ -388,7 +389,7 @@ def saveURL(url,dir=None):
   U=URL(url).open()
   filename=os.path.basename(U.geturl())
   if len(filename) == 0: filename="index.html"
-  print "filename =", filename
+  print("filename =", filename)
   F=file(filename,"w")
   data=U.read(8192)
   while len(data) > 0:

@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 import sys
-from thread import allocate_lock
+from threading import Lock
 from cs.serialise import toBS, fromBS
 from cs.venti import defaults, totext
 from .hash import Hash_SHA1, HASH_SHA1_T
@@ -64,7 +64,7 @@ class _Block(object):
   def __init__(self):
     self.indirect = None
     self._hashcode = None
-    self._hashcode_lock = allocate_lock()
+    self._hashcode_lock = Lock()
 
   def __str__(self):
     return self.textEncode()

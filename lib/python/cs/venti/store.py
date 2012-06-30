@@ -17,7 +17,7 @@ from binascii import hexlify
 import os
 import os.path
 import sys
-from thread import allocate_lock
+from threading import Lock
 from threading import Thread
 from Queue import Queue
 from cs.later import Later, report as reportLFs
@@ -71,7 +71,7 @@ class BasicStore(NestingOpenClose):
       self.logfp = None
       self.__funcQ = Later(capacity)
       self.hashclass = Hash_SHA1
-      self._lock = allocate_lock()
+      self._lock = Lock()
       self.readonly = False
       self.writeonly = False
 
