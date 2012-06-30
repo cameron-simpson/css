@@ -749,20 +749,23 @@ class HasFlags:
 def O_str(o, no_recurse=False):
   return ( "<%s %s>"
            % ( o.__class__.__name__,
-               ( str(o)
+               (    str(o)
                  if type(o) in (tuple,)
                  else
-                 ",".join([ ( "%s=%s" % (pattr, type(pvalue))
-                              if no_recurse else
-                              "%s=%s" % (pattr, pvalue)
-                            )
-                            for pattr, pvalue
-                            in [ (attr, getattr(o, attr))
-                                 for attr in sorted(dir(o))
-                                 if attr[0].isalpha()
-                               ]
-                            if not callable(pvalue)
-                          ])
+                       "<%s len=%d>" % (type(o), len(o))
+                    if type(o) in (set,)
+                    else
+                       ",".join([ ( "%s=%s" % (pattr, type(pvalue))
+                                    if no_recurse else
+                                    "%s=%s" % (pattr, pvalue)
+                                  )
+                                  for pattr, pvalue
+                                  in [ (attr, getattr(o, attr))
+                                       for attr in sorted(dir(o))
+                                       if attr[0].isalpha()
+                                     ]
+                                  if not callable(pvalue)
+                                ])
                )
              )
          )
