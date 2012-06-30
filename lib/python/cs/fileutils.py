@@ -8,7 +8,7 @@ from __future__ import with_statement
 import errno
 from functools import partial
 import os
-from os.path import isabs, abspath, dirname
+import os.path
 import errno
 import sys
 from contextlib import contextmanager
@@ -103,10 +103,10 @@ def abspath_from_file(path, from_file):
   ''' Return the absolute path if `path` with respect to `from_file`,
       as one might do for an include file.
   '''
-  if not isabs(path):
-    if not isabs(from_file):
-      from_file = abspath(from_file)
-    path = os.path.join(dirname(from_file), path)
+  if not os.path.isabs(path):
+    if not os.path.isabs(from_file):
+      from_file = os.path.abspath(from_file)
+    path = os.path.join(os.path.dirname(from_file), path)
   return path
 
 def watch_file(path, old_mtime, reload_file, missing_ok=False):
@@ -209,6 +209,36 @@ def lockfile(path, ext='.lock', block=False, poll_interval=0.1):
   os.close(lockfd)
   yield lockpath
   os.remove(lockpath)
+
+class Pathname(str):
+  ''' Subclass of str which presenting convenience properties useful for
+      fomat strings related to file paths.
+  '''
+
+  def __init__(self, s):
+    str.__init__(s)
+
+  def __format__(self, spec):
+    ''' Calling format(<Pathname>, spec) treat `spec` as a new style
+        formatting string with a single positional parameter of `self`.
+    '''
+    return spec.format(self)
+
+  @property
+  def dirname(self):
+    return os.path.dirname(self)
+
+  @property
+  def basename(self):
+    return os.path.basename(self)
+
+  @property
+  def abs(self):
+    return os.path.abspath(self)
+
+  @property
+  def isabs(self):
+    return os.path.isabs(self)
 
 if __name__ == '__main__':
   import cs.fileutils_tests

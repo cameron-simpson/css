@@ -37,7 +37,7 @@ def main(argv, stdin=None):
   argv = list(argv)
   cmd = os.path.basename(argv.pop(0))
   setup_logging(cmd)
-  usage = 'Usage: %s monitor [-d delay] [-n] maildirs...' % (cmd,)
+  usage = 'Usage: %s monitor [-1] [-d delay] [-n] maildirs...' % (cmd,)
   badopts = False
 
   if not argv:
