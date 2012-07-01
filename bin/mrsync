@@ -30,9 +30,15 @@ else
     [ $pos = $nargs ] || set -- ${1+"$@"} "$arg"
   done
   case "$dst" in
+    *@*:*)
+      userpfx=`expr "x$dst" : 'x\([^@]*@\).*'`
+      hostlist=`expr "x$dst" : 'x[^@]*@\([^:]*\):.*'`
+      dst=`expr "x$dst" : 'x[^@]*@[^:]*:\(.*\)' || :`
+      ;;
     *:*)
+      userpfx=
       hostlist=`expr "x$dst" : 'x\([^:]*\):.*'`
-      dst=`expr "x$dst" : 'x[^:]*:\(.*\)'`
+      dst=`expr "x$dst" : 'x[^:]*:\(.*\)' || :`
       ;;
     *)echo "$cmd: dst: missing hostlist: $dst" >&2
       badopts=1
@@ -45,7 +51,7 @@ fi
 (
   for host in $(hostlist "$hostlist")
   do
-    pfx "$host" $trace rsync "$@" "$host:$dst" &
+    pfx "$host" $trace rsync "$@" "$userpfx$host:$dst" &
   done
   wait
 )
