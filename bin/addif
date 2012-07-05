@@ -115,6 +115,16 @@ do
   do
     ipaddr=$1
     shift
+    case "$ipaddr" in
+      # convert a.b.c.d..e into sequence from a.b.c.d to a.b.c.e
+      *[0-9]..[1-9] | *[0-9]..[1-9][0-9] | *[0-9]..[1-9][0-9][0-9] )
+       prefix=`expr "x$ipaddr" : 'x\(.*[^0-9]\)[0-9][0-9]*\.\.[1-9][0-9]*'`
+       n1=`    expr "x$ipaddr" : 'x.*[^0-9]\([0-9][0-9]*\)\.\.[1-9][0-9]*'`
+       n2=`    expr "x$ipaddr" : 'x.*[^0-9][0-9][0-9]*\.\.\([1-9][0-9]*\)'`
+       set -- $( while [ $n1 -le $n2 ]; do echo "$prefix$n1"; n1=$(( n1 + 1 )); done ) ${1+"$@"}
+       continue
+       ;;
+    esac
     if [ $usecolons ]
     then
       # choose new interface number
