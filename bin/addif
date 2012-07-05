@@ -111,8 +111,10 @@ do
     continue
   fi
 
-  for ipaddr
+  while [ $# -gt 0 ]
   do
+    ipaddr=$1
+    shift
     if [ $usecolons ]
     then
       # choose new interface number
