@@ -755,7 +755,7 @@ def O_str(o, no_recurse=False):
                        "<%s len=%d>" % (type(o), len(o))
                     if type(o) in (set,)
                     else
-                       ",".join([ ( "%s=%s" % (pattr, type(pvalue))
+                       ",".join([ ( "%s=<%s>" % (pattr, type(pvalue).__name__)
                                     if no_recurse else
                                     "%s=%s" % (pattr, pvalue)
                                   )
