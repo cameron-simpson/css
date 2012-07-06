@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #
-# Assorted convenience functions for files.
+# Assorted convenience functions for files and filenames/pathnames.
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
