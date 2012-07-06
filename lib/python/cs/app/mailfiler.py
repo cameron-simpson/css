@@ -103,7 +103,7 @@ def main(argv, stdin=None):
       while True:
         for MW in maildirs:
           debug("process %s", MW.mdir.dir)
-          with LogTime("%s.filter()" % (MW,), threshold=1.0):
+          with LogTime("%s.filter()" % (MW.mdir,), threshold=1.0):
             for key, reports in MW.filter():
               pass
         if delay is None:
