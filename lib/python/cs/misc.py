@@ -747,6 +747,7 @@ class HasFlags:
       self[self.__flagfield]=flagv
 
 def O_str(o, no_recurse=False):
+  omit = getattr(o, '_O_omit', ())
   return ( "<%s %s>"
            % ( o.__class__.__name__,
                (    str(o)
@@ -763,6 +764,7 @@ def O_str(o, no_recurse=False):
                                   in [ (attr, getattr(o, attr))
                                        for attr in sorted(dir(o))
                                        if attr[0].isalpha()
+                                          and not attr in omit
                                      ]
                                   if not callable(pvalue)
                                 ])
