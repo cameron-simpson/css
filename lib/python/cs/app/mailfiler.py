@@ -135,6 +135,7 @@ def resolve_maildir_path(mdirpath, maildir_root):
 class FilterModes(O):
 
   def __init__(self, **kw):
+    self._O_omit = ('maildir_cache',)
     self._maildb_path = kw.pop('maildb_path')
     self._maildb_lock = allocate_lock()
     O.__init__(self, **kw)
