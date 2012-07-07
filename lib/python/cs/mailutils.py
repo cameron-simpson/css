@@ -57,6 +57,8 @@ class Maildir(mailbox.Maildir):
       Trust os.listdir, don't fsync, etc.
   '''
 
+  _prefixes = ( ('$MAILDIR/', '+'), ('$HOME/', '~/') )
+
   def __init__(self, dir):
     if not ismaildir(dir):
       raise ValueError, "not a Maildir: %s" % (dir,)
@@ -69,6 +71,10 @@ class Maildir(mailbox.Maildir):
 
   def __str__(self):
     return "<%s %s>" % (self.__class__.__name__, self.dir)
+
+  @property
+  def shortname(self):
+    return self.dir.shorten(prefixes=self._prefixes)
 
   def flush(self):
     ''' Forget state.
