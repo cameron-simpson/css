@@ -23,6 +23,11 @@ from cs.logutils import Pfx, warning, debug, D
 from cs.threads import locked_property
 from cs.misc import seq
 
+SHORTPATH_PREFIXES = ( ('$MAILDIR/', '+'), ('$HOME/', '~/') )
+
+def shortpath(path):
+  return Pathname(path).shorten(prefixes=SHORTPATH_PREFIXES)
+
 def Message(M, headersonly=False):
   ''' Factory function to accept a file or filename and return an
       email.message.Message.
@@ -57,8 +62,6 @@ class Maildir(mailbox.Maildir):
       Trust os.listdir, don't fsync, etc.
   '''
 
-  _prefixes = ( ('$MAILDIR/', '+'), ('$HOME/', '~/') )
-
   def __init__(self, dir):
     if not ismaildir(dir):
       raise ValueError, "not a Maildir: %s" % (dir,)
@@ -74,7 +77,7 @@ class Maildir(mailbox.Maildir):
 
   @property
   def shortname(self):
-    return self.dir.shorten(prefixes=self._prefixes)
+    return shortpath(self.dir)
 
   def flush(self):
     ''' Forget state.
@@ -207,7 +210,7 @@ class Maildir(mailbox.Maildir):
 
   def keypath(self, key):
     subdir, msgbase = self.msgmap[key]
-    return os.path.join(self.dir, subdir, msgbase)
+    return Pathname(os.path.join(self.dir, subdir, msgbase))
 
   def open(self, key, mode='r'):
     ''' Open the file storing the message specified by `key`.
