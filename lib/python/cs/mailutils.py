@@ -18,6 +18,7 @@ from tempfile import NamedTemporaryFile
 from StringIO import StringIO
 from thread import allocate_lock
 import time
+from cs.fileutils import Pathname
 from cs.logutils import Pfx, warning, debug, D
 from cs.threads import locked_property
 from cs.misc import seq
@@ -59,7 +60,7 @@ class Maildir(mailbox.Maildir):
   def __init__(self, dir):
     if not ismaildir(dir):
       raise ValueError, "not a Maildir: %s" % (dir,)
-    self.dir = dir
+    self.dir = Pathname(dir)
     self._msgmap = None
     self._pid = None
     self._hostpart = None
