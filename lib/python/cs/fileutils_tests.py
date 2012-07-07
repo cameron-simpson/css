@@ -4,6 +4,7 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
+from __future__ import print_function
 import sys
 import os
 import os.path
@@ -71,25 +72,40 @@ class Test(unittest.TestCase):
           raise
     self.assert_( not os.path.exists(lockpath), "after lock: lock file still exists: %s" % (lockpath,))
 
+  def _eq(self, a, b, opdesc):
+    ##if a == b:
+    ##  print("OK: %s: %r == %r" % (opdesc, a, b), file=sys.stderr)
+    self.assertEqual(a, b, "%s: got %r, expected %r" % (opdesc, a, b))
+
   def test_Pathname_01_attrs(self):
-    for path in "a", "a/b", "a/b/c", "/a/b/c":
+    home = '/a/b'
+    maildir = '/a/b/mail'
+    prefixes = ( ( '$MAILDIR/', '+' ), ( '$HOME/', '~/') )
+    environ = { 'HOME': home, 'MAILDIR': maildir }
+    for path, shortpath in (
+          ( "a",                "a" ),
+          ( "a/b",              "a/b" ),
+          ( "a/b/c",            "a/b/c" ),
+          ( "/a/b/c",           "~/c" ),
+          ( "/a/b/mail",        "~/mail" ),
+          ( "/a/b/mail/folder", "+folder" ),
+        ):
       P = Pathname(path)
-      self.assertEqual(P.dirname, os.path.dirname(path),
-                       "bad %r.dirname" % (path,))
-      self.assertEqual(P.basename, os.path.basename(path),
-                       "bad %r.basename" % (path,))
-      self.assertEqual(P.abs, os.path.abspath(path),
-                       "bad %r.abs" % (path,))
-      self.assertEqual(P.isabs, os.path.isabs(path),
-                       "bad %r.isabs" % (path,))
-      for spec, result in (
+      self._eq(P.dirname, os.path.dirname(path), "%r.dirname" % (path,))
+      self._eq(P.basename, os.path.basename(path), "%r.basename" % (path,))
+      self._eq(P.abs, os.path.abspath(path), "%r.abs" % (path,))
+      self._eq(P.isabs, os.path.isabs(path), "%r.isabs" % (path,))
+      self._eq(P.shorten(environ=environ, prefixes=prefixes),
+                       shortpath,
+                       "%r.shorten(environ=%r, prefixes=%r)"
+                         % (path, environ, prefixes))
+      for spec, expected in (
                             ("{!r}", repr(P)),
                             ("{.basename}", os.path.basename(path)),
                             ("{.dirname}", os.path.dirname(path)),
                             ("{.abs}", os.path.abspath(path)),
                           ):
-        self.assertEqual(format(P, spec), result,
-                         "format(%r, %r) != %r" % (P, spec, result))
+        self._eq(format(P, spec), expected, "format(%r, %r)" % (P, spec))
 
 def selftest(argv):
   unittest.main(__name__, None, argv)

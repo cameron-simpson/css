@@ -4,7 +4,7 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
-from __future__ import with_statement
+from __future__ import with_statement, print_function
 import errno
 from functools import partial
 import os
@@ -16,6 +16,7 @@ import shutil
 from tempfile import NamedTemporaryFile
 import time
 import unittest
+from cs.env import envsub
 
 def saferename(oldpath, newpath):
   ''' Rename a path using os.rename(), but raise an exception if the target
@@ -211,34 +212,55 @@ def lockfile(path, ext='.lock', block=False, poll_interval=0.1):
   os.remove(lockpath)
 
 class Pathname(str):
-  ''' Subclass of str which presenting convenience properties useful for
+  ''' Subclass of str presenting convenience properties useful for
       fomat strings related to file paths.
   '''
 
-  def __init__(self, s):
-    str.__init__(s)
+  _default_prefixes = ( ('$HOME/', '~/'), )
 
-  def __format__(self, spec):
-    ''' Calling format(<Pathname>, spec) treat `spec` as a new style
+  def __format__(self, fmt_spec):
+    ''' Calling format(<Pathname>, fmt_spec) treat `fmt_spec` as a new style
         formatting string with a single positional parameter of `self`.
     '''
-    return spec.format(self)
+    if fmt_spec == '':
+      return str(self)
+    return fmt_spec.format(self)
 
   @property
   def dirname(self):
-    return os.path.dirname(self)
+    return Pathname(os.path.dirname(self))
 
   @property
   def basename(self):
-    return os.path.basename(self)
+    return Pathname(os.path.basename(self))
 
   @property
   def abs(self):
-    return os.path.abspath(self)
+    return Pathname(os.path.abspath(self))
 
   @property
   def isabs(self):
     return os.path.isabs(self)
+
+  @property
+  def short(self):
+    return self.shorten()
+
+  def shorten(self, environ=None, prefixes=None):
+    ''' This pathname with the first matching leading prefix replaced.
+        `environ`: environment mapping if not os.environ
+        `prefixes`: iterable of (prefix, subst) to consider for replacement;
+                    each `prefix` is subject to environment variable
+                    substitution before consideration
+                    The default considers "$HOME/" for replacement by "~/".
+    '''
+    if prefixes is None:
+      prefixes = self._default_prefixes
+    for prefix, subst in prefixes:
+      prefix = envsub(prefix, environ)
+      if self.startswith(prefix):
+        return subst + self[len(prefix):]
+    return self
 
 if __name__ == '__main__':
   import cs.fileutils_tests
