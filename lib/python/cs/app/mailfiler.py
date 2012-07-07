@@ -26,7 +26,7 @@ from cs.env import envsub
 from cs.fileutils import abspath_from_file, watched_file_property
 from cs.lex import get_white, get_nonwhite, get_qstr, unrfc2047
 from cs.logutils import Pfx, setup_logging, debug, info, warning, error, D, LogTime
-from cs.mailutils import Maildir, message_addresses
+from cs.mailutils import Maildir, message_addresses, shortpath
 from cs.misc import O, slist
 from cs.threads import locked_property
 from cs.app.maildb import MailDB
@@ -267,7 +267,7 @@ class RuleState(O):
     savepath = mdir.keypath(savekey)
     if not path and not label:
       self.message_path = savepath
-    self.log("    OK %s => %s" % (M['message-id'], savepath))
+    self.log("    OK %s => %s" % (M['message-id'], shortpath(savepath)))
     return savepath
 
   def pipe_message(self, argv, mfp=None):
@@ -696,7 +696,7 @@ class WatchedMaildir(O):
                                        unrfc2047(M.get('from', '_no_from')),
                                        unrfc2047(M.get('subject', '_no_subject'))))
                        .replace('\n', ' ') )
-            state.log("  "+mdir.keypath(key))
+            state.log("  " + shortpath(mdir.keypath(key)))
             saved_to = []
             reports = []
             for report in self.rules.filter(state):
