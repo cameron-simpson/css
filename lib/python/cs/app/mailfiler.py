@@ -637,6 +637,8 @@ class WatchedMaildir(O):
   ''' A class to monitor a Maildir and filter messages.
   '''
 
+  _prefixes = ( ('$MAILDIR/', '+'), ('$HOME/', '~/') )
+
   def __init__(self, mdir, filter_modes, rules_path=None):
     self.mdir = Maildir(resolve_maildir_path(mdir, os.environ['MAILDIR']))
     self.filter_modes = filter_modes
@@ -650,7 +652,10 @@ class WatchedMaildir(O):
 
   def __str__(self):
     return "<WatchedMaildir %s modes=%s, %d rules, %d lurking>" \
-           % (self.mdir, self.filter_modes, len(self.rules), len(self.lurking))
+           % (self.mdir.shorten(prefixes=self._prefixes),
+              self.filter_modes,
+              len(self.rules),
+              len(self.lurking))
 
   def flush(self):
     ''' Forget state.
