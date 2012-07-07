@@ -102,8 +102,8 @@ def main(argv, stdin=None):
                  ]
       while True:
         for MW in maildirs:
-          debug("process %s", MW.mdir.dir)
-          with LogTime("%s.filter()" % (MW.mdir,), threshold=1.0):
+          debug("process %s", (MW.shortname,))
+          with LogTime("%s.filter()" % (MW.shortname,), threshold=1.0):
             for key, reports in MW.filter():
               pass
         if delay is None:
@@ -637,8 +637,6 @@ class WatchedMaildir(O):
   ''' A class to monitor a Maildir and filter messages.
   '''
 
-  _prefixes = ( ('$MAILDIR/', '+'), ('$HOME/', '~/') )
-
   def __init__(self, mdir, filter_modes, rules_path=None):
     self.mdir = Maildir(resolve_maildir_path(mdir, os.environ['MAILDIR']))
     self.filter_modes = filter_modes
@@ -652,10 +650,14 @@ class WatchedMaildir(O):
 
   def __str__(self):
     return "<WatchedMaildir %s modes=%s, %d rules, %d lurking>" \
-           % (self.mdir.shorten(prefixes=self._prefixes),
+           % (self.shortname,
               self.filter_modes,
               len(self.rules),
               len(self.lurking))
+
+  @property
+  def shortname(self):
+    return self.mdir.shortname
 
   def flush(self):
     ''' Forget state.
@@ -673,7 +675,7 @@ class WatchedMaildir(O):
 	Update the set of lurkers with any keys not removed to prevent
 	filtering on subsequent calls.
     '''
-    with Pfx("%s: filter" % (self.mdir.dir,)):
+    with Pfx("%s: filter" % (self.shortname,)):
       self.mdir.flush()
       nmsgs = 0
       skipped = 0
