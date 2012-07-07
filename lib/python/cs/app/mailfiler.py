@@ -590,13 +590,16 @@ class Rules(list):
   def __init__(self, rules_file=None):
     list.__init__(self)
     self.vars = {}
+    self.rule_files = set()
     if rules_file is not None:
       self.load(rules_file)
 
   def load(self, fp):
     ''' Import an open rule file.
     '''
-    self.extend(list(parserules(fp)))
+    new_rules = list(parserules(fp))
+    self.rule_files.update( R.filename for R in new_rules )
+    self.extend(new_rules)
 
   def filter(self, state):
     ''' Filter message `M` according to the rules.
