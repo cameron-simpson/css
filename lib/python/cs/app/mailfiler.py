@@ -110,18 +110,23 @@ def main(argv, stdin=None):
                                                rules_pattern.format(maildir=mdirpath)))
                    for mdirpath in mdirpaths
                  ]
-      while True:
+      try:
+        while True:
+          for MW in maildirs:
+            debug("process %s", (MW.shortname,))
+            with LogTime("%s.filter()" % (MW.shortname,), threshold=1.0):
+              for key, reports in MW.filter():
+                pass
+          if delay is None:
+            break
+          debug("sleep %ds", delay)
+          sleep(delay)
+        return 0
+      except KeyboardInterrupt:
         for MW in maildirs:
-          debug("process %s", (MW.shortname,))
-          with LogTime("%s.filter()" % (MW.shortname,), threshold=1.0):
-            for key, reports in MW.filter():
-              pass
-        if delay is None:
-          break
-        debug("sleep %ds", delay)
-        sleep(delay)
-      return 0
-    else
+          MW.close()
+        return 1
+    else:
       raise RunTimeError("unimplemented op")
 
 def maildir_from_name(mdirname, maildir_root, maildir_cache):
@@ -677,6 +682,9 @@ class WatchedMaildir(O):
         The set of lurkers is emptied.
     '''
     self.lurking = set()
+
+  def close(self):
+    self.filter_modes.maildb.close()
 
   @watched_file_property
   def rules(self, rules_path):
