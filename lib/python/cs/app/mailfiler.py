@@ -23,7 +23,7 @@ from tempfile import TemporaryFile
 from thread import allocate_lock
 import time
 from cs.env import envsub
-from cs.fileutils import abspath_from_file, watched_file_property
+from cs.fileutils import abspath_from_file, watched_file_property, Pathname
 from cs.lex import get_white, get_nonwhite, get_qstr, unrfc2047
 from cs.logutils import Pfx, setup_logging, debug, info, warning, error, D, LogTime
 from cs.mailutils import Maildir, message_addresses, shortpath
@@ -31,13 +31,15 @@ from cs.misc import O, slist
 from cs.threads import locked_property
 from cs.app.maildb import MailDB
 
+DEFAULT_MAILDIR_RULES = '$HOME/.mailfiler/{maildir.basename}'
+
 def main(argv, stdin=None):
   if stdin is None:
     stdin = sys.stdin
   argv = list(argv)
   cmd = os.path.basename(argv.pop(0))
   setup_logging(cmd)
-  usage = 'Usage: %s monitor [-1] [-d delay] [-n] maildirs...' % (cmd,)
+  usage = 'Usage: %s monitor [-1] [-d delay] [-n] [-N] [-R rules] maildirs...' % (cmd,)
   badopts = False
 
   if not argv:
@@ -51,8 +53,9 @@ def main(argv, stdin=None):
         delay = None
         no_remove = False
         no_save = False
+        rules_pattern = DEFAULT_MAILDIR_RULES
         try:
-          opts, argv = getopt(argv, '1d:nN')
+          opts, argv = getopt(argv, '1d:nNR:')
         except GetoptError, e:
           warning("%s", e)
           badopts = True
@@ -72,6 +75,10 @@ def main(argv, stdin=None):
                   badopts = True
             elif opt == '-n':
               no_remove = True
+            elif opt == '-N':
+              no_save = True
+            elif opt == '-R':
+              rules_pattern = val
             else:
               warning("unimplemented option")
               badopts = True
@@ -79,7 +86,7 @@ def main(argv, stdin=None):
           warning("missing maildirs")
           badopts = True
         else:
-          mdirpaths = argv
+          mdirpaths = [ Pathname(arg) for arg in argv ]
       else:
         warning("unrecognised op: %s", op)
         badopts = True
@@ -97,7 +104,10 @@ def main(argv, stdin=None):
                                  no_save=no_save,
                                  maildb_path=os.environ['MAILDB'],
                                  maildir_cache={})
-      maildirs = [ WatchedMaildir(mdirpath, filter_modes=filter_modes)
+      maildirs = [ WatchedMaildir(mdirpath,
+                                  filter_modes=filter_modes,
+                                  rules_path=envsub(
+                                               rules_pattern.format(maildir=mdirpath)))
                    for mdirpath in mdirpaths
                  ]
       while True:
