@@ -211,6 +211,24 @@ def lockfile(path, ext='.lock', block=False, poll_interval=0.1):
   yield lockpath
   os.remove(lockpath)
 
+DEFAULT_SHORTEN_PREFIXES = ( ('$HOME/', '~/'), )
+
+def shortpath(path, environ=None, prefixes=None):
+  ''' Return `path` with the first matching leading prefix replaced.
+      `environ`: environment mapping if not os.environ
+      `prefixes`: iterable of (prefix, subst) to consider for replacement;
+                  each `prefix` is subject to environment variable
+                  substitution before consideration
+                  The default considers "$HOME/" for replacement by "~/".
+  '''
+  if prefixes is None:
+    prefixes = DEFAULT_SHORTEN_PREFIXES
+  for prefix, subst in prefixes:
+    prefix = envsub(prefix, environ)
+    if path.startswith(prefix):
+      return subst + path[len(prefix):]
+  return path
+
 class Pathname(str):
   ''' Subclass of str presenting convenience properties useful for
       fomat strings related to file paths.
@@ -247,20 +265,7 @@ class Pathname(str):
     return self.shorten()
 
   def shorten(self, environ=None, prefixes=None):
-    ''' This pathname with the first matching leading prefix replaced.
-        `environ`: environment mapping if not os.environ
-        `prefixes`: iterable of (prefix, subst) to consider for replacement;
-                    each `prefix` is subject to environment variable
-                    substitution before consideration
-                    The default considers "$HOME/" for replacement by "~/".
-    '''
-    if prefixes is None:
-      prefixes = self._default_prefixes
-    for prefix, subst in prefixes:
-      prefix = envsub(prefix, environ)
-      if self.startswith(prefix):
-        return subst + self[len(prefix):]
-    return self
+    return shortpath(self, environ=environ, prefixes=prefixes)
 
 if __name__ == '__main__':
   import cs.fileutils_tests
