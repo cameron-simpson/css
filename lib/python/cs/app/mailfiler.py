@@ -121,8 +121,8 @@ def main(argv, stdin=None):
         debug("sleep %ds", delay)
         sleep(delay)
       return 0
-
-    raise RunTimeError("unimplemented op")
+    else
+      raise RunTimeError("unimplemented op")
 
 def maildir_from_name(mdirname, maildir_root, maildir_cache):
     ''' Return the Maildir derived from mdirpath.
