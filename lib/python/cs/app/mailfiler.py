@@ -152,7 +152,7 @@ class FilterModes(O):
 
   @watched_file_property
   def maildb(self, path):
-    warning("load maildb(%s)", path)
+    warning("load maildb(%s)", shortpath(path))
     return MailDB(path, readonly=True)
 
   def maildir(self, mdirname, environ=None):
@@ -322,12 +322,12 @@ def parserules(fp):
     return
 
   filename = fp.name
-  info("PARSE RULES: %s", filename)
+  info("PARSE RULES: %s", shortpath(filename))
   lineno = 0
   R = None
   for line in fp:
     lineno += 1
-    with Pfx("%s:%d" % (filename, lineno)):
+    with Pfx("%s:%d" % (shortpath(filename), lineno)):
       if not line.endswith('\n'):
         raise ValueError("short line at EOF")
 
