@@ -18,15 +18,15 @@ from tempfile import NamedTemporaryFile
 from StringIO import StringIO
 from thread import allocate_lock
 import time
-from cs.fileutils import Pathname
+from cs.fileutils import Pathname, shortpath as _shortpath
 from cs.logutils import Pfx, warning, debug, D
 from cs.threads import locked_property
 from cs.misc import seq
 
 SHORTPATH_PREFIXES = ( ('$MAILDIR/', '+'), ('$HOME/', '~/') )
 
-def shortpath(path):
-  return Pathname(path).shorten(prefixes=SHORTPATH_PREFIXES)
+def shortpath(path, environ=None):
+  return _shortpath(path, environ=environ, prefixes=SHORTPATH_PREFIXES)
 
 def Message(M, headersonly=False):
   ''' Factory function to accept a file or filename and return an
