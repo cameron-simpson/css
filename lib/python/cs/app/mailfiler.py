@@ -220,6 +220,7 @@ class RuleState(O):
     '''
     if self._log:
       self._log.close()
+      self._log = None
     try:
       self._log = io.open(logfilepath, "a", encoding='utf-8')
     except OSError, e:
