@@ -802,5 +802,8 @@ def unimplemented(func):
   return wrapper
 
 class slist(list):
+  ''' A list with a shorter str().
+  '''
+
   def __str__(self):
     return "[" + ",".join(str(e) for e in self) + "]"
