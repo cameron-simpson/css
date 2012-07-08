@@ -162,13 +162,17 @@ class Backend_CSVFile(Backend):
   def __init__(self, csvpath, readonly=False):
     Backend.__init__(self, readonly=readonly)
     self.csvpath = csvpath
-    self._updateQ = IterableQueue()
-    self._update_thread = Thread(target=self._updater, args=(self._updateQ,))
-    self._update_thread.start()
+    if self.readonly:
+      self._updateQ = None
+    else:
+      self._updateQ = IterableQueue()
+      self._update_thread = Thread(target=self._updater, args=(self._updateQ,))
+      self._update_thread.start()
 
   def close(self):
-    self._updateQ.close()
-    self._update_thread.join()
+    if self._updateQ:
+      self._updateQ.close()
+      self._update_thread.join()
     Backend.close(self)
 
   def sync(self):
