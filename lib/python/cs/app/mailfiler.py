@@ -175,7 +175,7 @@ class RuleState(O):
   def __init__(self, M, outer_state, environ=None):
     ''' `M`:           The Message object to be filed.
         `outer_state`: External state object, with maildb etc.
-        `environ`:     Mapping of initial variable names.
+        `environ`:     Mapping which supplies initial variable names.
                        Default from os.environ.
     '''
     self.message = M
