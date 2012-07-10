@@ -95,17 +95,20 @@ def apply_csv_rows(nodedb, fp, skipHeaders=False, noHeaders=False):
   '''
   for t, name, attr, value in csv_rows(fp, skipHeaders=skipHeaders, noHeaders=noHeaders):
     if name.startswith('='):
+      # discard node and start anew
       name = name[1:]
       nodedb[t, name] = {}
+    N = nodedb.make( (t, name) )
     if attr.startswith('='):
+      # reset attribute completely before appending value
       attr = attr[1:]
-      nodedb.setdefault((t, name), {})[attr] = ()
+      N[attr] = ()
     elif attr.startswith('-'):
+      # remove attribute
       if value != "":
         raise ValueError("ATTR = \"%s\" but non-empty VALUE: %r" % (attr, value))
-      nodedb.setdefault((t, name), {})[attr] = ()
+      N[attr] = ()
       continue
-    N = nodedb.get((t, name), doCreate=True)
     N.get(attr).append(nodedb.fromtext(value))
 
 def write_csv_file(fp, nodedata, noHeaders=False):
