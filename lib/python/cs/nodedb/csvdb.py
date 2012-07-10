@@ -105,6 +105,7 @@ def apply_csv_rows(nodedb, fp, skipHeaders=False, noHeaders=False):
       N[attr] = ()
     elif attr.startswith('-'):
       # remove attribute
+      attr = attr[1:]
       if value != "":
         raise ValueError("ATTR = \"%s\" but non-empty VALUE: %r" % (attr, value))
       N[attr] = ()
