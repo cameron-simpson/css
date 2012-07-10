@@ -136,7 +136,8 @@ class _AttrList(list):
     ''' Rewrite our value completely in the backend.
     '''
     N = self.node
-    self.nodedb.backend.setAttr(N.type, N.name, self.attr, self)
+    if self.nodedb.backend:
+      self.nodedb.backend.setAttr(N.type, N.name, self.attr, self)
 
   def _extend(self, values):
     N = self.node
