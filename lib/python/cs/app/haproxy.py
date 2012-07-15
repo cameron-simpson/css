@@ -102,7 +102,6 @@ class Stats(O):
       if not line1.startswith("# "):
         raise ValueError('1: expected header line commencing with "# ", got: ' + line1)
       cols = [ (col if len(col) else 'A') for col in line1[2:].split(',') ]
-      D("cols = %r", cols)
       rowifier = namedtuple('HAproxy_CSV_Row', cols)
       for row in csv.reader(fp):
         yield rowifier(*row)
