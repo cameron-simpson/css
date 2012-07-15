@@ -1,0 +1,2 @@
+#!/bin/sh
+exec py27+ -m cs.app.haproxy ${1+"$@"}
