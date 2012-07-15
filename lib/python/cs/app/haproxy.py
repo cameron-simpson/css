@@ -4,11 +4,71 @@
 #       - Cameron Simpson <cs@zip.com.au> 14jul2012
 #
 
+from __future__ import print_function
 from collections import namedtuple
 import csv
+import os.path
+import sys
 from urllib2 import urlopen
-from cs.logutils import Pfx, D
+from cs.logutils import setup_logging, Pfx, D, warning, error
 from cs.misc import O
+
+USAGE = '''Usage: {cmd} stats host:port print [columns...]'''
+
+def main(argv):
+  argv = list(argv)
+  cmd = os.path.basename(argv.pop(0))
+  setup_logging(cmd)
+  usage = USAGE.format(cmd=cmd)
+  xit = 1
+
+  badopts = False
+
+  if len(argv) == 0:
+    error("missing op")
+    badopts = True
+  else:
+    op = argv.pop(0)
+    with Pfx(op):
+      if op == "stats":
+        xit = op_stats(argv)
+      else:
+        error("unrecognised op")
+        badopts = True
+
+  if badopts:
+    print(usage, file=sys.stderr)
+    xit = 2
+
+  return xit
+
+def op_stats(argv):
+  argv = list(argv)
+  if len(argv) == 0:
+    error("missing host:port")
+    return 2
+
+  try:
+    host, port = argv.pop(0).rsplit(':', 1)
+    port = int(port)
+  except ValueError, e:
+    error("invalid host:port: %s" % (e,))
+    return 2
+
+  if len(argv) == 0:
+    error("missing subop")
+    return 2
+  op = argv.pop(0)
+  cols = argv
+
+  S = Stats(host, port)
+  for row in S.csvdata():
+    if cols:
+      print(*[ getattr(row, col) for col in cols ])
+    else:
+      print(*row)
+
+  return 0
 
 class Stats(O):
   ''' An interface to the stats report of a running HAproxy instance.
@@ -31,7 +91,6 @@ class Stats(O):
     '''
     return self.url + ';csv'
 
-  @property
   def csvdata(self):
     url = self.urlcsv
     with Pfx(url):
@@ -49,8 +108,4 @@ class Stats(O):
         yield rowifier(*row)
 
 if __name__ == '__main__':
-  import sys
-  host, port = sys.argv[1:]
-  port = int(port)
-  for row in Stats(host, port).csvdata:
-    print row
+  sys.exit(main(sys.argv))
