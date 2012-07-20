@@ -50,7 +50,7 @@ do
   esac
   parent=$1
   shift
-  ( IFS=: set -- $parent
+  ( IFS=:; set -- $parent
     if [ $# = 2 ]
     then
       echo "cache_peer $1 parent $2 0"
@@ -70,7 +70,7 @@ pid_filename $pidf
 access_log $zapdir/access.log
 cache_log $zapdir/cache.log
 cache_store_log /dev/null
-coredump_dir $zapdir/squid
+coredump_dir $zapdir
 cache_dir ufs $cachedir $ZAP_CACHESIZE 16 256
 # unzapped
 http_port localhost:3128
