@@ -38,6 +38,8 @@ exec 3>&1 1>"$directives"
 
 # preserve old ACLs
 grep '^acl ' <"$dfltrc"
+echo 'acl QUERY urlpath_regex cgi-bin \?'
+echo 'acl GMAP urlpath_regex google.com/[a-z]*\? google.com.au/[a-z]*\?'
 
 # emit cache_peer lines
 while [ $# -gt 0 ]
