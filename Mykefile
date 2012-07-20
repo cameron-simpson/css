@@ -75,7 +75,7 @@ _home:
                 $$binskip \\
                 --include=synonyms/ \\
                 --exclude=squid_redirect \\
-                --exclude=*.swp \\
+                --exclude=.*.swp \\
                 --exclude=/\*/ \\
                 bin/. $(HOME)/bin/. \
         bosskip=`hg status | sed -n 's:^? bin-bos/\(.*\):--exclude=/\1:p'` \
