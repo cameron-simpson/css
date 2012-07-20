@@ -1,59 +1,100 @@
 #!/bin/sh -u
 #
-# Dispatch my squid - generally runs an adzapper.
+# Dispatch an adzapper squid.
 #	- Cameron Simpson <cs@zip.com.au> 01jul2004
 #
 
 set -ue
 
+: ${ZAP_CACHESIZE:=10240}
 : ${VARRUN:=$HOME/var/run}
+: ${VARLOG:=$HOME/var/log}
+: ${TMPDIR:=/tmp}
 
-cmd=$0
+cmd=`basename "$0"`
 oargs=$*
-usage="Usage: $cmd [peers]"
+usage="Usage: $cmd [upstream-peers...] [squid-options...]"
 
 trace=set-x
-case "$OS" in
-  darwin)  dfltrc=/opt/local/etc/squid/squid.conf ;;
+case "`uname -s`" in
+  Darwin)  dfltrc=/opt/local/etc/squid/squid.conf ;;
   *)       dfltrc=/etc/squid/squid.conf ;;
 esac
 [ -s "$dfltrc" ] || { echo "$cmd: no default squid.conf? ($dfltrc)" >&2; exit 1; }
 
-rc=$HOME/tmp/squid.conf
-pidf=$VARRUN/squid.pid
-tplt=$HOME/rc/squid/tplt
+directives=$TMPDIR/$cmd.$$
+zapdir=$LOGDIR/adzapper
+piddir=$VARRUN
+pidf=$piddir/squid.pid
+rc=$HOME/var/adzapper/squid.conf
+cachedir=$HOME/var/adzapper/cache
 
 $trace killpidfile -w "$pidf"
 
 ## old proxy-mode standalone redirector
 ##exec alog squid_redirect squid_redirect -P "8080:$SQUID"
 
-(
-  echo "# Generated on `date`."
+exec 3>&1 1>"$directives"
+
+# preserve old ACLs
+grep '^acl ' <"$dfltrc"
+
+# emit cache_peer lines
+while [ $# -gt 0 ]
+do
+  case $1 in
+    # squid option terminates upstream peers
+    -*)     break ;;
+  esac
+  parent=$1
+  shift
+  ( IFS=: set -- $parent
+    if [ $# = 2 ]
+    then
+      echo "cache_peer $1 parent $2 0"
+    else
+      echo "$cmd: SKIPPING bad parent: $parent" >&2
+    fi
+  )
+done
+
+cat <<X
+url_rewrite_program $HOME/bin/squid_redirect
+url_rewrite_children 2
+
+# other directives
+visible_hostname $HOST.$MAILDOMAIN
+pid_filename $pidf
+access_log $zapdir/access.log
+cache_log $zapdir/cache.log
+cache_store_log /dev/null
+coredump_dir $zapdir/squid
+cache_dir ufs $cachedir $ZAP_CACHESIZE 16 256
+# unzapped
+http_port localhost:3128
+# zapped
+http_port localhost:8080
+acl nobannerport myport 8080
+redirector_access allow nobannerport
+cache allow GMAP
+cache deny QUERY
+##broken_vary_encoding allow apache
+http_access allow all
+shutdown_lifetime 2 seconds
+icp_access allow all
+X
+
+exec 1>&3 3>&-
+
+( echo "# Generated on `date`."
   echo "# $0 $oargs"
   echo
-  ( ##grep '^acl ' <"$dfltrc"
-    env SQUID_PIDFILE=$pidf envsub -p '\{\{([A-Z]\w*)\}\}' <"$tplt"
-    
-    for parent
-    do
-      ( IFS=: set -- $parent
-        if [ $# = 2 ]
-        then
-          echo "cache_peer $1 parent $2 0"
-        else
-          echo "$cmd: SKIPPING bad parent: $parent" >&2
-        fi
-      )
-    done
-    echo url_rewrite_program $HOME/bin/squid_redirect
-    ##echo redirect_program $HOME/bin/squid_redirect
-    echo url_rewrite_children 2
-  ) \
-  | patch-config -I -i "$dfltrc" \
-  | grep '^[^#]'
+  patch-config -I -i "$dfltrc" <"$directives" | grep '^[^#]'
 ) \
 | $trace rewriteif -d "$rc"
 
-cat "$rc"
-exec $trace alog squid/cache.log squid -f "$rc"
+for dir in $zapdir $cachedir $piddir
+do  [ -d "$dir" ] || $trace mkdir -p "$dir"
+done
+
+exec $trace squid -f "$rc" ${1+"$@"} -z
