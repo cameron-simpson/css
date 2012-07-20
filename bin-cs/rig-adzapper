@@ -97,4 +97,4 @@ for dir in $zapdir $cachedir $piddir
 do  [ -d "$dir" ] || $trace mkdir -p "$dir"
 done
 
-exec $trace squid -f "$rc" ${1+"$@"} -z
+exec $trace squid -f "$rc" ${1+"$@"}
