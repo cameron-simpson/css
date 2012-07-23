@@ -31,6 +31,7 @@ def timeFromISO(isodate, islocaltime=False):
 def ISOtime(gmtime):
   ''' Produce an ISO8601 timestamp string from a UNIX time.
   '''
+  import datetime
   dt = datetime.datetime.fromtimestamp(int(gmtime))
   if dt.microsecond != 0:
     from cs.logutils import warning
