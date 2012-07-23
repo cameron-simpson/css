@@ -10,7 +10,7 @@ UNIX_SALT_CHARS = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ012345678
 
 def unixcrypt(password, salt=None):
   if salt is None:
-    salt = randint(0,4095)
+    salt = random.randint(0,4095)
     salt = ( UNIX_SALT_CHARS[ salt % 64 ]
            + UNIX_SALT_CHARS[ (salt // 64) % 64 ]
            )
