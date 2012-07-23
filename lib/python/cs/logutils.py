@@ -322,7 +322,7 @@ class Pfx(object):
           else:
             warning("Pfx.__exit__: exc_value.reason is not a string: %r", exc_value.reason)
         if hasattr(exc_value, 'msg'):
-          exc_value.msg = prefix + ": " + exc_value.msg
+          exc_value.msg = prefix + ": " + str(exc_value.msg)
         if hasattr(exc_value, 'args'):
           args = exc_value.args
           if args:
