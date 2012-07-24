@@ -51,6 +51,7 @@ def main(argv):
       print "always_direct allow for_%s" % (proxname,)
     else:
       print "cache_peer_access %s allow for_%s" % (proxies[proxname], proxname,)
+      print "cache_peer_access %s deny all" % (proxies[proxname],)
 
 re_HAS_SCHEME = re.compile(r'^[a-z]+:')
 
