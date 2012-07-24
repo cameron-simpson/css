@@ -1,0 +1,25 @@
+#!/bin/sh
+#
+# Check SELinux status.
+#       - Cameron Simpson <cs@zip.com.au> 24jul2012
+#
+
+cmd=$0
+usage="Usage: $cmd [-q] hosts..."
+
+if [ $# -gt 0 ] && [ "x$1" = x-q ]
+then
+  shift
+  "$0" ${1+"$@"} | grep -v 'disabled$'
+  exit $?
+fi
+
+[ $# = 0 ] && { echo "$usage" >&2; exit 2; }
+
+( 
+  for host in $(hostlist "$@")
+  do
+    pfx "$host" ssho "$host" 'grep "^SELINUX=" /etc/sysconfig/selinux; /usr/sbin/sestatus | egrep "^(SELinux status|Current mode):"' &
+  done
+  wait
+)
