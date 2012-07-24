@@ -1,0 +1,69 @@
+#!/usr/bin/python
+#
+# Read peer access patterns and emit squid directives.
+#       - Cameron Simpson <cs@zip.com.au> 23jul2012
+#
+
+import re
+import sys
+from cs.env import envsub
+from cs.logutils import Pfx
+
+PEERAGE = "$HOME/.peerage"
+
+re_PROXY = re.compile('^([a-zA-Z]\w*)=')
+
+def main(argv):
+  argv = list(argv)
+  cmd = argv.pop(0)
+  peerage = envsub(PEERAGE)
+
+  peers = {}
+  proxies = {}
+
+  with Pfx(peerage):
+    with open(peerage) as pfp:
+      lineno = 0
+      for line in pfp:
+        with Pfx(lineno):
+          if not line.endswith('\n'):
+            raise ValueError("unexpected EOF, no newline")
+          line = line.strip()
+          if not line or line.startswith('#'):
+            continue
+          m = re_PROXY.match(line)
+          if m:
+            proxies[m.group(1)] = line[m.end():].lstrip()
+            continue
+          try:
+            proxname, etc = line.split(None, 1)
+          except ValueError:
+            proxname, etc = line, ''
+          if not etc:
+            continue
+          patterns = re.split('[\s,]+', etc)
+          peers.setdefault(proxname, []).extend(patterns)
+          for pattern in patterns:
+            print "acl for_%s %s" % (proxname, pattern_acl(pattern))
+  
+  for proxname in sorted(peers.keys()):
+    if proxname == 'DIRECT':
+      print "always_direct allow for_%s" % (proxname,)
+    else:
+      print "cache_peer_access %s allow for_%s" % (proxies[proxname], proxname,)
+
+re_HAS_SCHEME = re.compile(r'^[a-z]+:')
+
+def pattern_acl(pattern):
+  # /regex
+  if pattern.startswith('/'):
+    return "url_regex "+pattern
+  # scheme:...
+  if re_HAS_SCHEME.match(pattern):
+    return "url_regex ^"+pattern
+  if pattern.startswith("*."):
+    return "dstdomain "+pattern[1:]
+  return "dstdomain "+pattern
+
+if __name__ == '__main__':
+  sys.exit(main(sys.argv))
