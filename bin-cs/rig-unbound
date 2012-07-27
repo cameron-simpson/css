@@ -1,0 +1,102 @@
+#!/bin/sh
+#
+# Construct an unbound.conf(5) file then dispatch unbound(8).
+#       - Cameron Simpson <cs@zip.com.au> 26jul2012
+#
+
+set -ue
+
+cmd=`basename "$0"`
+usage="Usage: $cmd"
+
+: ${VARRUN:=$HOME/var/run}
+: ${LOGDIR:=$HOME/var/log}
+
+me=`id -un`
+trace=set-x
+pidfile=$VARRUN/unbound.pid
+wkdir=$HOME/var/unbound
+cf=$wkdir/unbound.conf
+log=$LOGDIR/unbound.log
+localzones="l local"
+
+for d in "$VARRUN" "$wkdir" "$LOGDIR"
+do  [ -d "$d/." ] || $trace mkdir "$d"
+done
+
+exec 3>&1 1>"$cf" </dev/null
+
+cat <<X
+server:
+  directory: "$wkdir"
+  username: "$me"
+  logfile: "$log"
+  log-queries: yes
+  pidfile: "$pidfile"
+  verbosity: 3      # uncomment and increase to get more logging.
+  # listen on all interfaces, answer queries from the local subnet.
+  interface: 127.0.0.1
+  ##access−control: 127.0.0.1 allow
+  access-control: 127.0.0.0/8 allow
+  chroot: ""
+X
+
+for zone in $localzones
+do
+  echo "local-zone: \"$zone.\" static"
+  while read ip hosts
+  do
+    case "$ip" in
+      127.0.0.*)
+        for host in $hosts
+        do
+          case "$host" in
+            *.local)
+              hostbase=`basename "$host" .local`
+              echo "  local-data: \"$hostbase.$zone. 10 IN A $ip\""
+              ;;
+          esac
+        done
+        ;;
+    esac
+  done </etc/hosts
+done
+
+echo 'local-zone: "127.in−addr.arpa." static'
+while read ip hosts
+do
+  case "$ip" in
+    127.0.0.*)
+      for host in $hosts
+      do
+        case "$host" in
+          *.local)
+            hostbase=`basename "$host" .local`
+            in_addr=
+            for octet in `echo $ip | tr . '\012' | reverse`
+            do  in_addr=$in_addr$octet.
+            done
+            for zone in $localzones
+            do
+              echo "  local-data: \"${in_addr}in-addr.arpa. 10 IN PTR $hostbase.$zone.\""
+            done
+            ;;
+        esac
+      done
+      ;;
+  esac
+done </etc/hosts
+
+cat <<X
+forward-zone:
+  name: "."
+  forward-addr: 10.0.0.138
+X
+
+exec >&3 3>&-
+
+set -x
+cd "$wkdir"
+$trace unbound-checkconf "$cf"
+[ ! -f "$pidfile" ] || $trace killpidfile "$pidfile"
+exec $trace sudo $trace unbound -c "$cf"
