@@ -4,10 +4,12 @@
 #       - Cameron Simpson <cs@zip.com.au> 23jul2012
 #
 
+from __future__ import print_function
 import re
 import sys
 from cs.env import envsub
 from cs.logutils import Pfx
+from cs.misc import O
 
 PEERAGE = "$HOME/.peerage"
 
@@ -19,12 +21,14 @@ def main(argv):
   peerage = envsub(PEERAGE)
 
   peers = {}
-  proxies = {}
+  proxies = Proxies()
+  proxies.add_proxy('DIRECT', None)
 
   with Pfx(peerage):
     with open(peerage) as pfp:
       lineno = 0
       for line in pfp:
+        lineno += 1
         with Pfx(lineno):
           if not line.endswith('\n'):
             raise ValueError("unexpected EOF, no newline")
@@ -33,7 +37,9 @@ def main(argv):
             continue
           m = re_PROXY.match(line)
           if m:
-            proxies[m.group(1)] = line[m.end():].lstrip()
+            proxname = m.group(1)
+            peername = line[m.end():].lstrip()
+            proxies.add_proxy(proxname, peername)
             continue
           try:
             proxname, etc = line.split(None, 1)
@@ -42,16 +48,16 @@ def main(argv):
           if not etc:
             continue
           patterns = re.split('[\s,]+', etc)
-          peers.setdefault(proxname, []).extend(patterns)
-          for pattern in patterns:
-            print "acl for_%s %s" % (proxname, pattern_acl(pattern))
-  
-  for proxname in sorted(peers.keys()):
-    if proxname == 'DIRECT':
-      print "always_direct allow for_%s" % (proxname,)
-    else:
-      print "cache_peer_access %s allow for_%s" % (proxies[proxname], proxname,)
-      print "cache_peer_access %s deny all" % (proxies[proxname],)
+          proxies[proxname].patterns.extend(patterns)
+
+  proxnames = sorted(proxies.keys())
+  for proxname in proxnames:
+    for acl in proxies[proxname].acls:
+      print(acl)
+
+  for proxname in proxnames:
+    for access in proxies[proxname].peer_access:
+      print(access)
 
 re_HAS_SCHEME = re.compile(r'^[a-z]+:')
 
@@ -65,6 +71,49 @@ def pattern_acl(pattern):
   if pattern.startswith("*."):
     return "dstdomain "+pattern[1:]
   return "dstdomain "+pattern
+
+class Proxies(dict):
+
+  def add_proxy(self, proxname, peername):
+    if proxname in self:
+      raise KeyError("proxy \"%s\" already seen" % (proxname,))
+    self[proxname] = Proxy(proxname, peername, self)
+
+class Proxy(O):
+
+  def __init__(self, name, peername, all_proxies):
+    self.name = name
+    self.peername = peername
+    self.patterns = []
+    self.all_proxies = all_proxies
+
+  @property
+  def acls(self):
+    for pattern in self.patterns:
+      yield "acl for_%s %s" % (self.name, pattern_acl(pattern))
+
+  @property
+  def other_proxies(self):
+    for proxname, proxy in sorted(self.all_proxies.items()):
+      if proxy is not self:
+        yield proxy
+
+  @property
+  def peer_access(self):
+    name = self.name
+    peername = self.peername
+    if name == 'DIRECT':
+      yield "always_direct allow for_%s" % (name,)
+    else:
+      yield "cache_peer_access %s deny for_DIRECT" % (peername,)
+      if self.patterns:
+        yield "cache_peer_access %s allow for_%s" % (peername, name,)
+        yield "cache_peer_access %s deny all" % (peername,)
+      else:
+        for proxy in self.other_proxies:
+          if proxy is not self and proxy.name != 'DIRECT':
+            yield "cache_peer_access %s deny for_%s" % (peername, proxy.name)
+        yield "cache_peer_access %s allow all" % (peername,)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
