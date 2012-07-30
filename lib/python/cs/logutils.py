@@ -291,15 +291,18 @@ class Pfx(object):
   # instantiate the thread-local state object
   _state = _PfxThreadState()
 
-  def __init__(self, mark, absolute=False, loggers=None, *mark_args):
-    self.mark = mark
-    self.mark_args = mark_args
-    self._umark = None
-    self.absolute = absolute
-    self._loggers = loggers
-    self._loggerAdapters = None
+  def __init__(self, mark, *args, **kwargs):
+    absolute = kwargs.pop('absolute', False)
+    loggers = kwargs.pop('loggers', None)
+    if kwargs:
+      raise TypeError("unsupported keyword arguments: %r" % (kwargs,))
 
+    self.mark = mark
+    self.mark_args = args
     self.absolute = absolute
+    self._umark = None
+    self._loggers = None
+    self._loggerAdapters = None
     if loggers is not None:
       if not hasattr(loggers, '__getitem__'):
         loggers = (loggers, )
@@ -369,7 +372,7 @@ class Pfx(object):
           warning("%s: mark = %s %r", e, type(mark), mark)
           u = unicode(mark, 'utf-8', 'replace')
       if self.mark_args:
-        u = u % mark_args
+        u = u % self.mark_args
       self._umark = u
     return u
 
