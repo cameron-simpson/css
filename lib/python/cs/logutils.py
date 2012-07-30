@@ -291,8 +291,9 @@ class Pfx(object):
   # instantiate the thread-local state object
   _state = _PfxThreadState()
 
-  def __init__(self, mark, absolute=False, loggers=None):
+  def __init__(self, mark, absolute=False, loggers=None, *mark_args):
     self.mark = mark
+    self.mark_args = mark_args
     self._umark = None
     self.absolute = absolute
     self._loggers = loggers
@@ -357,7 +358,9 @@ class Pfx(object):
     u = self._umark
     if u is None:
       mark = self.mark
-      if not isinstance(mark, unicode):
+      if isinstance(mark, unicode):
+        u = mark
+      else:
         if not isinstance(mark, str):
           mark = str(mark)
         try:
@@ -365,7 +368,9 @@ class Pfx(object):
         except UnicodeDecodeError, e:
           warning("%s: mark = %s %r", e, type(mark), mark)
           u = unicode(mark, 'utf-8', 'replace')
-        self._umark = u
+      if self.mark_args:
+        u = u % mark_args
+      self._umark = u
     return u
 
   def logto(self, newLoggers):
