@@ -13,7 +13,10 @@ set -ue
 
 cmd=`basename "$0"`
 oargs=$*
-usage="Usage: $cmd [upstream-peers...] [squid-options...]"
+usage="Usage: $cmd [upstream-peers...] [tag=value...] [squid-options...]
+  upstream-peers        Upstream peer specifications of the form \"host:port\".
+  tag=value             Tags to be written to the squid.conf as \"tag value\".
+  squid-options         Passed to squid on invocation."
 
 trace=set-x
 case "`uname -s`" in
@@ -46,7 +49,13 @@ while [ $# -gt 0 ]
 do
   case $1 in
     # squid option terminates upstream peers
-    -*)     break ;;
+    -*)
+      break ;;
+    [a-z]*=*)
+      printf '%s\n' "$1" | sed 's/=/ /'
+      shift
+      continue
+      ;;
   esac
   parent=$1
   shift
