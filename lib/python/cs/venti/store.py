@@ -63,7 +63,7 @@ class BasicStore(NestingOpenClose):
       deadlocks may ensue.
   '''
   def __init__(self, name, capacity=None):
-    with Pfx("BasicStore(%s,..)" % (name,)):
+    with Pfx("BasicStore(%s,..)", name):
       if capacity is None:
         capacity = 1
       NestingOpenClose.__init__(self)

@@ -46,7 +46,7 @@ def nodekey(*args):
       Subclasses can override this to parse special forms such as
       "hostname-ifname", which might return ('NIC', "hostname-ifname").
   '''
-  with Pfx("nodekey(%s)" % (args,)):
+  with Pfx("nodekey(%s)", args):
     if len(args) == 2:
       t, name = args
     elif len(args) == 1:
@@ -520,7 +520,7 @@ class Node(dict):
         If `delete_missing` is supplied true, remove attribute not
         specified in `new_attrs`.
     '''
-    with Pfx("%s.update" % (self,)):
+    with Pfx("%s.update", self):
       # add new attributes
       for attr in sorted(new_attrs.keys()):
         k, plural = parseUC_sAttr(attr)
@@ -1319,7 +1319,7 @@ class NodeDB(dict, O):
     if not args:
       raise GetoptError("missing arguments")
     for arg in args:
-      with Pfx('"%s"' % (arg,)):
+      with Pfx('%r', arg):
         for N in self.nodespec(arg):
           print str(N)
     return xit

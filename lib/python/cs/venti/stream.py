@@ -1,3 +1,4 @@
+#!/usr/bin/python
 #
 # Stream protocol for vt stores.
 #       - Cameron Simpson <cs@zip.com.au> 06dec2007
@@ -76,7 +77,7 @@ def encodeContainsResult(tag, yesno):
 def decodeRequestStream(fp):
   ''' Generator that yields (rqTag, rqType, info) from the request stream.
   '''
-  with Pfx("decodeRequestStream(%s)" % (fp,)):
+  with Pfx("decodeRequestStream(%s)", fp):
     while True:
       rqTag = fromBSfp(fp)
       if rqTag is None:
@@ -106,7 +107,7 @@ def decodeRequestStream(fp):
 def decodeResultStream(self):
   ''' Generator that yields (rqTag, rqType, result) from the result stream.
   '''
-  with Pfx("decodeResultStream(%s)" % (fp,)):
+  with Pfx("decodeResultStream(%s)", fp):
     while True:
       rqTag = fromBSfp(fp)
       if rqTag is None:
@@ -158,7 +159,7 @@ class StreamDaemon(object):
 
   def _process_request_stream(self, fp):
     SQ = self._streamQ
-    with Pfx("%s._process_requests" % (self,)):
+    with Pfx("%s._process_requests", self):
       for rqTag, rqType, rqData in decodeRequestStream(fp):
         # submit request - will
         SQ.defer(self._process_request, rqTag, rqType, rqData)

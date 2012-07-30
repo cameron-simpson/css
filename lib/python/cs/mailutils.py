@@ -160,7 +160,7 @@ class Maildir(mailbox.Maildir):
         By default a hardlink is attempted unless `nolink` is supplied true.
         Return the key for the saved message.
     '''
-    with Pfx("save_filepath(%s)" % (filepath,)):
+    with Pfx("save_filepath(%s)", filepath):
       if key is None:
         key = self.newkey()
         debug("new key = %s", key)

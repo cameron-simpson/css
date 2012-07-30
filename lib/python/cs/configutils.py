@@ -94,7 +94,7 @@ class ConfigSectionWatcher(object):
     return self.defaults[item]
 
   def get(self, item, default):
-    with Pfx("get(%s)" % item):
+    with Pfx("get(%s)", item):
       try:
         value = self[item]
       except KeyError:

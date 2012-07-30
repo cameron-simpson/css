@@ -127,7 +127,7 @@ def updateNodeDB(maildb, people):
   '''
   for person in people:
     cite = '%s %s/%s' % ( person.get('First',''), person.get('Last',''), person.get('Organization','') )
-    with Pfx('updateNodeDB: %s' % (cite,)):
+    with Pfx('updateNodeDB: %s', cite):
       uid = person['UID']
       C = contactByOSXUID(maildb, uid)
       if not C:

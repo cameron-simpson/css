@@ -239,7 +239,7 @@ class FileDirent(_BasicDirent):
   def restore(self, path, makedirs=False, verbosefp=None):
     ''' Restore this Dirent's file content to the name `path`.
     '''
-    with Pfx("FileDirent.restore(%s)"):
+    with Pfx("FileDirent.restore(%s)", path):
       if verbosefp is not None:
         verbosefp.write(path)
         verbosefp.write('\n')
@@ -520,7 +520,7 @@ class Dir(Dirent):
     ''' Update this Dir from the real file tree at `osdir`.
         Return True if no errors occurred.
     '''
-    with Pfx("updateFrom(%s,...)" % (osdir,)):
+    with Pfx("updateFrom(%s,...)", osdir):
       if verbosefp:
         print >>verbosefp, osdir+'/'
       if not os.path.isdir(osdir):
@@ -590,8 +590,8 @@ class Dir(Dirent):
     ''' Store as `filename` to file named by `filepath`.
     '''
     import  cs.venti.file
-    with Pfx("%s.storeFile(%s, %s, trust_size_mtime=%s, ignore_existing=%s"
-             % (self, filename, filepath, trust_size_mtime, ignore_existing)):
+    with Pfx("%s.storeFile(%s, %s, trust_size_mtime=%s, ignore_existing=%s",
+             self, filename, filepath, trust_size_mtime, ignore_existing):
       E = self.get(filename)
       if ignore_existing and E is not None:
         debug("already exists, skipping")
@@ -620,7 +620,7 @@ class Dir(Dirent):
   def restore(self, path, makedirs=False, recurse=False, verbosefp=None):
     ''' Restore this Dir as `path`.
     '''
-    with Pfx("Dir.restore(%s)"):
+    with Pfx("Dir.restore(%s)", path):
       if verbosefp is not None:
         verbosefp.write(path)
         verbosefp.write('\n')

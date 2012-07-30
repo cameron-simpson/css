@@ -45,7 +45,7 @@ def archive(arfile, path, verbosefp=None,
     if arfile != '-':
       arfp.close()
 
-  with Pfx("archive(%s)" % (path,)):
+  with Pfx("archive(%s)", path):
     if os.path.isdir(path):
       if oldE is not None and oldE.isdir:
         ok = oldE.updateFrom(path,

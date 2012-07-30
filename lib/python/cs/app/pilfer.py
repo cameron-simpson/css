@@ -83,7 +83,7 @@ def main(argv):
             lineno = 0
             for line in sys.stdin:
               lineno += 1
-              with Pfx("stdin:%d" % (lineno,)):
+              with Pfx("stdin:%d", lineno):
                 if not line.endswith('\n'):
                   raise ValueError("unexpected EOF - missing newline")
                 line = line.strip()
@@ -413,7 +413,7 @@ class Pilfer(object):
       yield U
 
   def url_save_full(self, U, dir=None, full_path=False, require_dir=False, overwrite_dir=False, overwrite_file=False):
-    with Pfx("save(%s)" % (U,)):
+    with Pfx("save(%s)", U):
       if dir is None:
         if self.save_dir:
           dir = self.save_dir
@@ -577,7 +577,7 @@ class Pilfer(object):
       action, arg_string = action.split(':', 1)
     else:
       arg_string = ""
-    with Pfx("%s(URLs...)%s" % (action, arg_string)):
+    with Pfx("%s(URLs...)%s", action, arg_string):
       url_func = self.action_map_all.get(action)
       if url_func is None:
         raise ValueError("unknown action")
@@ -593,7 +593,7 @@ class Pilfer(object):
       action, arg_string = action.split(':', 1)
     else:
       arg_string = ""
-    with Pfx("%s(%s)%s" % (action, U, arg_string)):
+    with Pfx("%s(%s)%s", action, U, arg_string):
       url_func = self.action_map.get(action)
       if url_func is None:
         raise ValueError("unknown action")

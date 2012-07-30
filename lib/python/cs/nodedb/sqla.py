@@ -118,7 +118,7 @@ class Backend_SQLAlchemy(Backend):
   def nodedata(self):
     ''' Pull all node data from the database.
     '''
-    with Pfx("%s.nodedata()..." % (self,)):
+    with Pfx("%s.nodedata()...", self):
       nodes = self.nodes
       attrs = self.attrs
       byID = self.__nodekeysByID

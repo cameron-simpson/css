@@ -149,7 +149,7 @@ class Maker(object):
     ''' Make a bunch of targets.
     '''
     mdebug = self.debug_make
-    with Pfx("%s.make(%s)" % (self, " ".join(targets))):
+    with Pfx("%s.make(%s)", self, " ".join(targets)):
       ok = True
       LFs = []
       for target in targets:
@@ -185,7 +185,7 @@ class Maker(object):
   def setDebug(self, flag, value):
     ''' Set or clear the named debug option.
     '''
-    with Pfx("setDebug(%r, %r)" % (flag, value)):
+    with Pfx("setDebug(%r, %r)", flag, value):
       if not flag.isalpha() or not hasattr(self.debug, flag):
         raise AttributeError(
                 "invalid debug flag, know: %s"
@@ -212,7 +212,7 @@ class Maker(object):
     badopts = False
     opts, args = getopt.getopt(args, 'deikmnpqrstuvxENRj:D:S:f:')
     for opt, value in opts:
-      with Pfx("%s" % (opt,)):
+      with Pfx(opt):
         if opt == '-d':
           # debug mode
           self.setDebug('make', True)
@@ -396,7 +396,7 @@ class Target(object):
     # - if ok, queue more targets or an action
     # - repeat until not ok or nothing pending
     ok = True
-    with Pfx("make %s" % (self,)):
+    with Pfx("make %s", self):
       while ok:
         # wait for requirements, if any
         LFs = self.LFs
@@ -499,7 +499,7 @@ class Action(object):
         This will be either True or False if the action completed without
         blocking. If the action blocked it will return a PendingFunction.
     '''
-    with Pfx("%s.act(target=%s, as_func=%s)" % (self, target, as_func)):
+    with Pfx("%s.act(target=%s, as_func=%s)", self, target, as_func):
       debug("start act...")
       M = target.maker
       mdebug = M.debug_make
@@ -529,7 +529,7 @@ class Action(object):
       raise NotImplementedError, "unsupported variant: %s" % (self.variant,)
 
   def _shcmd(self, target, shcmd):
-    with Pfx("%s.act: shcmd=%r" % (self, shcmd)):
+    with Pfx("%s.act: shcmd=%r", self, shcmd):
       mdebug = target.maker.debug_make
       argv = (target.shell, '-c', shcmd)
       mdebug("Popen(%s,..)", argv)

@@ -41,7 +41,7 @@ class TVWiz(object):
   def data(self):
     ''' A generator that yields MPEG2 data from the stream.
     '''
-    with Pfx("data(%s)" % (self.__dir,)):
+    with Pfx("data(%s)", self.__dir):
       T = self.trunc()
       lastFileNum = None
       for wizOffset, fileNum, flags, offset, size in T:

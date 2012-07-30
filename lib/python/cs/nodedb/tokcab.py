@@ -86,7 +86,7 @@ class Backend_TokyoCabinet(Backend):
         del db[attrtag]
 
   def __getitem__(self, key):
-    with Pfx("tc __getitem__(%r)" % (key,)):
+    with Pfx("tc __getitem__(%r)", key):
       d = {}
       db = self.tcdb
       with self.tclock:

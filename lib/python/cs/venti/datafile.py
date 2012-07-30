@@ -186,7 +186,7 @@ class DataDir(object):
   def scan(self, hashfunc, indices=None):
     if indices is None:
       indices = self.datafileindices
-    with Pfx("scan %d" % (n,)):
+    with Pfx("scan %d", n):
       for n in indices:
         D = self.open(n)
         for offset, flags, data in D.scan():

@@ -30,20 +30,20 @@ def csv_rows(fp, skipHeaders=False, noHeaders=False):
       `noHeaders` indicates there is no column header row if true.
   '''
   if isinstance(fp, (str, unicode)):
-    with Pfx("csv_rows(%s)" % (fp,)):
+    with Pfx("csv_rows(%s)", fp):
       with open(fp, "rb") as csvfp:
         for row in csv_rows(csvfp,
                             skipHeaders=skipHeaders,
                             noHeaders=noHeaders):
           yield row
     return
-  with Pfx("csvreader(%s)" % (fp,)):
+  with Pfx("csvreader(%s)", fp):
     r = csv.reader(fp)
     rownum = 0
     if not noHeaders:
       hdrrow = r.next()
       rownum += 1
-      with Pfx("row %d" % (rownum,)):
+      with Pfx("row %d", rownum):
         if not skipHeaders:
           if hdrrow != ['TYPE', 'NAME', 'ATTR', 'VALUE']:
             raise ValueError(
@@ -54,7 +54,7 @@ def csv_rows(fp, skipHeaders=False, noHeaders=False):
     oattr = None
     for row in r:
       rownum += 1
-      with Pfx("row %d" % (rownum,)):
+      with Pfx("row %d", rownum):
         t, name, attr, value = row
         try:
           value = value.decode('utf-8')
@@ -122,7 +122,7 @@ def write_csv_file(fp, nodedata, noHeaders=False):
         computed by NodeDB.totext(value).
   '''
   if type(fp) is str:
-    with Pfx("write_csv_file(%s)" % (fp,)):
+    with Pfx("write_csv_file(%s)", fp):
       ##with io.open(fp, 'w', io.DEFAULT_BUFFER_SIZE, 'utf-8') as csvfp:
       with open(fp, 'wb') as csvfp:
         write_csv_file(csvfp, nodedata, noHeaders=noHeaders)

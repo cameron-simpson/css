@@ -332,7 +332,7 @@ def parserules(fp):
   R = None
   for line in fp:
     lineno += 1
-    with Pfx("%s:%d" % (shortpath(filename), lineno)):
+    with Pfx("%s:%d", shortpath(filename), lineno):
       if not line.endswith('\n'):
         raise ValueError("short line at EOF")
 
@@ -548,7 +548,7 @@ class Rule(O):
 
   def filter(self, state):
     M = state.message
-    with Pfx("%s:%d" % (self.filename, self.lineno)):
+    with Pfx("%s:%d", self.filename, self.lineno):
       saved_to = []
       ok_actions = []
       failed_actions = []
@@ -696,7 +696,7 @@ class WatchedMaildir(O):
 	Update the set of lurkers with any keys not removed to prevent
 	filtering on subsequent calls.
     '''
-    with Pfx("%s: filter" % (self.shortname,)):
+    with Pfx("%s: filter", self.shortname):
       self.mdir.flush()
       nmsgs = 0
       skipped = 0

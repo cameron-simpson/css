@@ -170,7 +170,7 @@ def commatext_to_tokens(text):
       yield the token strings.
       Tokens are either quoted strings or chunks of non-comma non-whitespace.
   '''
-  with Pfx("commatext_to_tokens(%s)" % (text,)):
+  with Pfx("commatext_to_tokens(%s)", text):
     while len(text) > 0:
       if text[0].isspace():
         text = text.lstrip()

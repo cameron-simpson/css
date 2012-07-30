@@ -80,7 +80,7 @@ class _URL(unicode):
   def _fetch(self):
     ''' Fetch the URL content.
     '''
-    with Pfx("_fetch(%s)" % (self,)):
+    with Pfx("_fetch(%s)", self):
       hdrs = {}
       if self.referer:
         hdrs['Referer'] = self.referer

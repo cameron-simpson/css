@@ -94,7 +94,7 @@ class Modifier(object):
     return "<Mod %s %s>" % (self.context, self.modtext)
 
   def __call__(self, text, namespaces):
-    with Pfx("%r %s" % (text, self)):
+    with Pfx("%r %s", text, self):
       ntext = self.modify(text, namespaces)
       ##info("%r -> %r", text, ntext)
     return ntext
@@ -179,7 +179,7 @@ class ModGlob(Modifier):
   def modify(self, text, namespaces):
     globbed = []
     for ptn in self.words(text):
-      with Pfx("glob(\"%s\")" % (ptn,)):
+      with Pfx("glob(\"%s\")", ptn):
         matches = glob.glob(ptn)
         if matches:
           if self.muststat:
@@ -962,7 +962,7 @@ class MacroTerm(object):
         text = macro(context, namespaces, *param_values)
 
       for modifier in self.modifiers:
-        with Pfx("\"%s\" %s" % (text, modifier)):
+        with Pfx("\"%s\" %s", text, modifier):
           text = modifier(text, namespaces)
 
       return text

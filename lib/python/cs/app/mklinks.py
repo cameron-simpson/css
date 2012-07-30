@@ -62,7 +62,7 @@ def main(argv, stdin=None):
 
 def process(path, FDB, doit):
   xit = 0
-  with Pfx("process(%s)" % (path,)):
+  with Pfx("process(%s)", path):
     if os.path.isdir(path):
       for dirpath, dirnames, filenames in os.walk(path):
         for filename in sorted(filenames):
@@ -244,7 +244,7 @@ class FileInfo(object):
         If the hardlink fails, become our own primary.
     '''
     assert self.isfile
-    with Pfx("resolve(%s)" % (self.path,)):
+    with Pfx("resolve(%s)", self.path):
       prime = self.primary
       if prime is self or prime.ikey == self.ikey:
         return
@@ -254,11 +254,11 @@ class FileInfo(object):
       print("%s => %s" % (self.path, prime.path))
       if doit:
         with NamedTemporaryFile(dir=rdir) as tfp:
-          with Pfx("unlink(%s)" % (tfp.name,)):
+          with Pfx("unlink(%s)", tfp.name):
             os.unlink(tfp.name)
-          with Pfx("rename(%s, %s)" % (rpath, tfp.name)):
+          with Pfx("rename(%s, %s)", rpath, tfp.name):
             os.rename(rpath, tfp.name)
-          with Pfx("link(%s, %s)" % (prime.path, rpath)):
+          with Pfx("link(%s, %s)", prime.path, rpath):
             os.link(prime.path, rpath)
       self.db.relearn(self)
 
