@@ -11,6 +11,7 @@ usage="Usage: $cmd"
 
 : ${VARRUN:=$HOME/var/run}
 : ${LOGDIR:=$HOME/var/log}
+: ${UNBOUND_DNS_UPSTREAM:=}
 
 me=`id -un`
 trace=set-x
@@ -87,11 +88,14 @@ do
   esac
 done </etc/hosts
 
-cat <<X
-forward-zone:
-  name: "."
-  forward-addr: 10.0.0.138
+if [ -n "$UNBOUND_DNS_UPSTREAM" ]
+then
+  cat <<X
+  forward-zone:
+    name: "."
+    forward-addr: $UNBOUND_DNS_UPSTREAM
 X
+fi
 
 exec >&3 3>&-
 
