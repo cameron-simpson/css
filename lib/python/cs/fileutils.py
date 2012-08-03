@@ -17,6 +17,7 @@ from tempfile import NamedTemporaryFile
 import time
 import unittest
 from cs.env import envsub
+from cs.logutils import exception
 
 def saferename(oldpath, newpath):
   ''' Rename a path using os.rename(), but raise an exception if the target
@@ -161,8 +162,8 @@ def watched_file_property(func, prop_name=None, unset_object=None, poll_rate=1):
   path_name = prop_name + '_path'
   lastpoll_name = prop_name + '_lastpoll'
   def getprop(self):
-    ''' Attempt lockless fetch of property first.
-        Use lock if property is unset.
+    ''' Try to reload property value from file if the propety value
+        is stale and the file has been modified since the last reload.
     '''
     with getattr(self, lock_name):
       now = time.time()
@@ -170,15 +171,24 @@ def watched_file_property(func, prop_name=None, unset_object=None, poll_rate=1):
       if then is None or then + poll_rate <= now:
         setattr(self, lastpoll_name, now)
         old_mtime = getattr(self, mtime_name, None)
-        new_mtime, value = watch_file(getattr(self, path_name),
-                                      old_mtime,
-                                      partial(func, self),
-                                      missing_ok=True)
-        if new_mtime:
-          setattr(self, prop_name, value)
-          setattr(self, mtime_name, new_mtime)
-        else:
+        try:
+          new_mtime, value = watch_file(getattr(self, path_name),
+                                        old_mtime,
+                                        partial(func, self),
+                                        missing_ok=True)
+        except NameError:
+          raise
+        except AttributeError:
+          raise
+        except Exception:
+          exception("exception during watch_file")
           value = getattr(self, prop_name)
+        else:
+          if new_mtime:
+            setattr(self, prop_name, value)
+            setattr(self, mtime_name, new_mtime)
+          else:
+            value = getattr(self, prop_name)
       else:
         value = getattr(self, prop_name)
     return value
