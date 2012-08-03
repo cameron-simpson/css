@@ -52,7 +52,6 @@ class ConfigSectionWatcher(object):
     '''
     if not os.path.isabs(config_path):
       config_path = os.path.abspath(config_path)
-    self.config_path = config_path
     self.section = section
     self.defaults = defaults
     self.configwatcher = ConfigWatcher(config_path)
@@ -65,6 +64,10 @@ class ConfigSectionWatcher(object):
     for k in self.keys():
       d[k] = self[k]
     return repr(d)
+
+  @property
+  def config_path(self):
+    return self.configwatcher.path
 
   def keys(self):
     CP = self.configwatcher.parser
