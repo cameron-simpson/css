@@ -38,9 +38,12 @@ class ConfigWatcher(object):
   def config(self):
     return load_config(self.config_path)
 
+  @property
+  def path(self):
+    return self._config_path
+
 class ConfigSectionWatcher(object):
-  ''' A class for monitoring a particular clause in a config file
-      and self updating if needed when poll() is called.
+  ''' A class for monitoring a particular clause in a config file.
   '''
 
   def __init__(self, config_path, section, defaults=None):
@@ -53,9 +56,6 @@ class ConfigSectionWatcher(object):
     self.section = section
     self.defaults = defaults
     self.configwatcher = ConfigWatcher(config_path)
-
-  def poll(self):
-    self.configwatcher.poll()
 
   def __str__(self):
     return "%s[%s]%r" % (self.config_path, self.section, self)
