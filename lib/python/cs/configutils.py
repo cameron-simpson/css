@@ -11,62 +11,56 @@ if sys.hexversion < 0x03000000:
   import ConfigParser as configparser
 else:
   import configparser
-from cs.fileutils import watch_file
+from threading import Lock
+from cs.fileutils import watched_file_property
 from cs.logutils import Pfx, info
+
+def load_config(config_file, parser=None):
+  ''' Load a configuration from the named `config_file`.
+      If `parser` is missing or None, use configparser.SafeConfigParser.
+  '''
+  if parser is None:
+    parser = configparser.SafeConfigParser
+  CP = parser()
+  with open(cfg_path) as fp:
+    CP.readfp(fp) 
+  return CP
 
 class ConfigWatcher(object):
   ''' A monitor for a windows style .ini file.
       The current SafeConfigParser object is present in the .parser attribute.
   '''
-  def __init__(self, cfg_path):
-    self.cfg_path = cfg_path
-    self.cfg_mtime = None
-    self.poll()
-    assert self.parser is not None
+  def __init__(self, config_path):
+    self._config_path = config_path
+    self._config_mtime = None
+    self._config_lock = Lock()
+    self._config_lastpoll = None
 
-  def _reload(self, cfg_path):
-    ''' Read the specified config file, return the populated ConfigParser.
-    '''
-    CP = configparser.SafeConfigParser()
-    with open(cfg_path) as fp:
-      CP.readfp(fp)
-    return CP
-
-  def poll(self):
-    ''' Poll the config file for changes.
-        If the file is present and newer and doesn't change after the read
-        then return a fresh SafeConfigParser loaded from the file.
-        Otherwise return None, indicating no new changes available.
-        If there are new changes, the new parser is saved as the .parser
-        attribute.
-    '''
-    new_mtime, new_parser = watch_file(self.cfg_path,
-                                       self.cfg_mtime,
-                                       self._reload)
-    if new_mtime:
-      self.cfg_time = new_mtime
-      self.parser = new_parser
+  @watched_file_property
+  def config(self):
+    return load_config(self.config_path)
 
 class ConfigSectionWatcher(object):
   ''' A class for monitoring a particular clause in a config file
       and self updating if needed when poll() is called.
   '''
-  def __init__(self, cfg_path, section, defaults=None):
+
+  def __init__(self, config_path, section, defaults=None):
     ''' Initialise a ConfigSectionWatcher to monitor a particular section
         of a config file.
     '''
-    if not os.path.isabs(cfg_path):
-      cfg_path = os.path.abspath(cfg_path)
-    self.cfg_path = cfg_path
+    if not os.path.isabs(config_path):
+      config_path = os.path.abspath(config_path)
+    self.config_path = config_path
     self.section = section
     self.defaults = defaults
-    self.configwatcher = ConfigWatcher(cfg_path)
+    self.configwatcher = ConfigWatcher(config_path)
 
   def poll(self):
     self.configwatcher.poll()
 
   def __str__(self):
-    return "%s[%s]%r" % (self.cfg_path, self.section, self)
+    return "%s[%s]%r" % (self.config_path, self.section, self)
 
   def __repr__(self):
     d = {}
