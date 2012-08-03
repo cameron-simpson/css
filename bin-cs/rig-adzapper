@@ -88,7 +88,8 @@ http_port localhost:8080
 acl nobannerport myport 8080
 redirector_access allow nobannerport
 cache allow GMAP
-cache deny QUERY
+##cache deny QUERY
+cache allow all
 ##broken_vary_encoding allow apache
 http_access allow all
 shutdown_lifetime 2 seconds
