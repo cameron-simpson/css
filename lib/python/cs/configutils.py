@@ -32,9 +32,7 @@ class ConfigWatcher(object):
   '''
   def __init__(self, config_path):
     self._config_path = config_path
-    self._config_mtime = None
     self._config_lock = Lock()
-    self._config_lastpoll = None
 
   @watched_file_property
   def config(self):
