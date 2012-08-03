@@ -42,6 +42,13 @@ class ConfigWatcher(object):
   def path(self):
     return self._config_path
 
+  def as_dict(self):
+    d = {}
+    config = self.config
+    for section in config.sections():
+      d[section] = dict(config.items(section))
+    return d
+
 class ConfigSectionWatcher(object):
   ''' A class for monitoring a particular clause in a config file.
   '''
