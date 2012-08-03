@@ -17,7 +17,6 @@ from tempfile import NamedTemporaryFile
 import time
 import unittest
 from cs.env import envsub
-from cs.logutils import exception
 
 def saferename(oldpath, newpath):
   ''' Rename a path using os.rename(), but raise an exception if the target
@@ -181,7 +180,8 @@ def watched_file_property(func, prop_name=None, unset_object=None, poll_rate=1):
         except AttributeError:
           raise
         except Exception:
-          exception("exception during watch_file")
+          import cs.logutils
+          cs.logutils.exception("exception during watch_file")
           value = getattr(self, prop_name)
         else:
           if new_mtime:
