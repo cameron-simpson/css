@@ -93,8 +93,21 @@ then
   cat <<X
   forward-zone:
     name: "."
-    forward-addr: $UNBOUND_DNS_UPSTREAM
 X
+  for dnsup in $UNBOUND_DNS_UPSTREAM
+  do
+    case "$dnsup" in
+      [a-z]*)
+        resolv=$HOME/rc/dns/resolv-$dnsup.conf
+        $trace sed -n 's/^nameserver  *//p' "$resolv"
+        ;;
+      *)$trace echo "$dnsup"
+        ;;
+    esac
+  done \
+  | while read dnsip
+    do  echo "    forward-addr: $dnsip"
+    done
 fi
 
 exec >&3 3>&-
