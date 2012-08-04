@@ -15,14 +15,15 @@ from threading import Lock
 from cs.fileutils import watched_file_property
 from cs.logutils import Pfx, info
 
-def load_config(config_file, parser=None):
-  ''' Load a configuration from the named `config_file`.
+def load_config(config_path, parser=None):
+  ''' Load a configuration from the named `config_path`.
       If `parser` is missing or None, use configparser.SafeConfigParser.
+      Return the parser.
   '''
   if parser is None:
     parser = configparser.SafeConfigParser
   CP = parser()
-  with open(cfg_path) as fp:
+  with open(config_path) as fp:
     CP.readfp(fp) 
   return CP
 
@@ -64,7 +65,7 @@ class ConfigSectionWatcher(object):
     self.configwatcher = ConfigWatcher(config_path)
 
   def __str__(self):
-    return "%s[%s]%r" % (self.config_path, self.section, self)
+    return "%s[%s]%r" % (self.path, self.section, self)
 
   def __repr__(self):
     d = {}
@@ -73,24 +74,28 @@ class ConfigSectionWatcher(object):
     return repr(d)
 
   @property
-  def config_path(self):
+  def path(self):
     return self.configwatcher.path
 
+  @property
+  def config(self):
+    return self.configwatcher.config
+
   def keys(self):
-    CP = self.configwatcher.parser
+    config = self.config
     section = self.section
     K = set()
     if self.defaults:
       K.update(self.defaults.keys())
-    if CP.has_section(section):
+    if config.has_section(section):
       K.update(CP.options(section))
     return K
 
   def __getitem__(self, item):
-    CP = self.configwatcher.parser
+    config = self.config
     section = self.section
-    if CP.has_section(section) and CP.has_option(section, item):
-      return CP.get(section, item)
+    if config.has_section(section) and config.has_option(section, item):
+      return config.get(section, item)
     if self.defaults is None:
       raise KeyError, "%s: no defaults" % (item,)
     return self.defaults[item]
