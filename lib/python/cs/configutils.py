@@ -97,7 +97,7 @@ class ConfigSectionWatcher(object):
     if config.has_section(section) and config.has_option(section, item):
       return config.get(section, item)
     if self.defaults is None:
-      raise KeyError, "%s: no defaults" % (item,)
+      raise KeyError("%s: no defaults" % (item,))
     return self.defaults[item]
 
   def get(self, item, default):
