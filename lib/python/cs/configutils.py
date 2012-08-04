@@ -88,7 +88,7 @@ class ConfigSectionWatcher(object):
     if self.defaults:
       K.update(self.defaults.keys())
     if config.has_section(section):
-      K.update(CP.options(section))
+      K.update(config.options(section))
     return K
 
   def __getitem__(self, item):
