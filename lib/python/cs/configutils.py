@@ -117,3 +117,8 @@ class ConfigSectionWatcher(object):
       return True
     except KeyError:
       return False
+
+if __name__ == '__main__':
+  import sys
+  import cs.configutils_tests
+  cs.configutils_tests.selftest(sys.argv)
