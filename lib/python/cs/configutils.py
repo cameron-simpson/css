@@ -13,7 +13,7 @@ else:
   import configparser
 from threading import Lock
 from cs.fileutils import watched_file_property
-from cs.logutils import Pfx, info
+from cs.logutils import Pfx, info, D
 
 def load_config(config_path, parser=None):
   ''' Load a configuration from the named `config_path`.
