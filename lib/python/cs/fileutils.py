@@ -11,6 +11,7 @@ import os
 import os.path
 import errno
 import sys
+from collections import namedtuple
 from contextlib import contextmanager
 import shutil
 from tempfile import NamedTemporaryFile
@@ -110,11 +111,21 @@ def abspath_from_file(path, from_file):
     path = os.path.join(os.path.dirname(from_file), path)
   return path
 
-def watch_file(path, old_mtime, reload_file, missing_ok=False):
-  ''' Watch a file for modification by polling its mtime.
-      Call reload_file(path) if the file is newer than `old_mtime`.
-      Return (new_mtime, reload_file(path)) if the file was updated and was
-      unchanged (stable mtime and size) during the reload_file().
+_FileState = namedtuple('FileState', 'mtime size dev ino')
+def FileState(path, do_lstat=False):
+  ''' Return a signature object for a file state derived from os.stat
+      (or os.lstat if `do_lstat` is true).
+      This returns an object with mtime, size, dev and ino properties
+      and can be compared for equality with other signatures.
+  '''
+  s = os.lstat(path) if do_lstat else os.stat(path)
+  return _FileState(s.st_mtime, s.st_size, s.st_dev, s.st_ino)
+
+def watch_file(path, old_state, reload_file, missing_ok=False):
+  ''' Watch a file for modification by polling its state as obtained by FileState().
+      Call reload_file(path) if the state changes.
+      Return (new_state, reload_file(path)) if the file was modified and was
+      unchanged (stable state) beofre and after the reload_file().
       Otherwise return (None, None).
       This may raise an OSError if the `path` cannot be os.stat()ed
       and of course for any exceptions that occur calling `reload_file`.
@@ -122,28 +133,24 @@ def watch_file(path, old_mtime, reload_file, missing_ok=False):
       raises OSError with ENOENT will just return (None, None).
   '''
   try:
-    s = os.stat(path)
+    new_state = FileState(path)
   except OSError, e:
     if e.errno == errno.ENOENT:
       if missing_ok:
         return None, None
     raise
-  if old_mtime is None or s.st_mtime > old_mtime:
-    new_mtime = s.st_mtime
-    # require these four to be unchanged across the reload
-    new_stat = (new_mtime, s.st_size, s.st_dev, s.st_ino)
+  if old_state is None or old_state != new_state:
     R = reload_file(path)
     try:
-      s = os.stat(path)
+      new_new_state = FileState(path)
     except OSError, e:
       if e.errno == errno.ENOENT:
         if missing_ok:
           return None, None
       raise
     # make sure file was unchanged
-    new_new_stat = (s.st_mtime, s.st_size, s.st_dev, s.st_ino)
-    if new_stat == new_new_stat:
-      return new_mtime, R
+    if new_new_state == new_state:
+      return new_state, R
   return None, None
 
 def watched_file_property(func, prop_name=None, unset_object=None, poll_rate=1):
@@ -157,7 +164,7 @@ def watched_file_property(func, prop_name=None, unset_object=None, poll_rate=1):
   if prop_name is None:
     prop_name = '_' + func.func_name
   lock_name = prop_name + '_lock'
-  mtime_name = prop_name + '_mtime'
+  filestate_name = prop_name + '_filestate'
   path_name = prop_name + '_path'
   lastpoll_name = prop_name + '_lastpoll'
   def getprop(self):
@@ -169,10 +176,10 @@ def watched_file_property(func, prop_name=None, unset_object=None, poll_rate=1):
       then = getattr(self, lastpoll_name, None)
       if then is None or then + poll_rate <= now:
         setattr(self, lastpoll_name, now)
-        old_mtime = getattr(self, mtime_name, None)
+        old_filestate = getattr(self, filestate_name, None)
         try:
-          new_mtime, value = watch_file(getattr(self, path_name),
-                                        old_mtime,
+          new_filestate, value = watch_file(getattr(self, path_name),
+                                        old_filestate,
                                         partial(func, self),
                                         missing_ok=True)
         except NameError:
@@ -186,9 +193,9 @@ def watched_file_property(func, prop_name=None, unset_object=None, poll_rate=1):
           import cs.logutils
           cs.logutils.exception("exception during watch_file")
         else:
-          if new_mtime:
+          if new_filestate:
             setattr(self, prop_name, value)
-            setattr(self, mtime_name, new_mtime)
+            setattr(self, filestate_name, new_filestate)
           else:
             value = getattr(self, prop_name)
       else:
