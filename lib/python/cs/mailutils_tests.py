@@ -5,14 +5,14 @@
 #
 
 import os
-import os.path
+from os.path import dirname, join as joinpath
 import sys
 import time
 import unittest
 from cs.mailutils import Maildir
 
-testdatadir = os.path.join(os.path.dirname(__file__), 'testdata', 'cs.mailutils')
-testmaildir = os.path.join(testdatadir, 'maildir')
+testdatadir = joinpath(dirname(__file__), 'testdata', 'cs.mailutils')
+testmaildir = joinpath(testdatadir, 'maildir')
 
 class TestMaildir(unittest.TestCase):
 
