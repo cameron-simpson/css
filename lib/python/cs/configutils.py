@@ -36,8 +36,8 @@ class ConfigWatcher(object):
     self._config_lock = Lock()
 
   @watched_file_property
-  def config(self):
-    return load_config(self.config_path)
+  def config(self, path):
+    return load_config(path)
 
   @property
   def path(self):
