@@ -179,10 +179,12 @@ def watched_file_property(func, prop_name=None, unset_object=None, poll_rate=1):
           raise
         except AttributeError:
           raise
-        except Exception:
+        except Exception as e:
+          value = getattr(self, prop_name, unset_object)
+          if value is unset_object:
+            raise
           import cs.logutils
           cs.logutils.exception("exception during watch_file")
-          value = getattr(self, prop_name)
         else:
           if new_mtime:
             setattr(self, prop_name, value)
