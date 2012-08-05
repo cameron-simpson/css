@@ -11,7 +11,7 @@ import time
 import unittest
 from cs.mailutils import Maildir
 
-testdatadir = os.path.join(os.path.dirname(__file__), 'testdata', os.path.basename(__file__).rsplit('.', 1)[0])
+testdatadir = os.path.join(os.path.dirname(__file__), 'testdata', 'cs.mailutils')
 testmaildir = os.path.join(testdatadir, 'maildir')
 
 class TestMaildir(unittest.TestCase):
