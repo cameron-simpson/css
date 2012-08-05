@@ -75,13 +75,19 @@ class ConfigSectionWatcher(object):
 
   @property
   def path(self):
+    ''' The pathname of the config file.
+    '''
     return self.configwatcher.path
 
   @property
   def config(self):
+    ''' The current ConfigParser.
+    '''
     return self.configwatcher.config
 
   def keys(self):
+    ''' Return the fieldnames in this config section.
+    '''
     config = self.config
     section = self.section
     K = set()
