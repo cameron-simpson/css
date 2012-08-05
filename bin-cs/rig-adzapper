@@ -25,7 +25,10 @@ case "`uname -s`" in
 esac
 [ -s "$dfltrc" ] || { echo "$cmd: no default squid.conf? ($dfltrc)" >&2; exit 1; }
 
-directives=$TMPDIR/$cmd.$$
+tmppfx=$TMPDIR/$cmd.$$
+directives=$tmppfx.tags
+trap 'rm -f "$tmppfx.*"' 0 1 3 15
+
 zapdir=$LOGDIR/adzapper
 piddir=$VARRUN
 pidf=$piddir/squid.pid
