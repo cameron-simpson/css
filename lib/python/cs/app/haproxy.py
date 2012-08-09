@@ -9,7 +9,10 @@ from collections import namedtuple
 import csv
 import os.path
 import sys
-from urllib2 import urlopen
+try:
+  from urllib.request import urlopen
+except ImportError:
+  from urllib2 import urlopen
 from cs.logutils import setup_logging, Pfx, D, warning, error
 from cs.misc import O
 
