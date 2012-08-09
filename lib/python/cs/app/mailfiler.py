@@ -20,7 +20,7 @@ from time import sleep
 if sys.hexversion < 0x02060000: from sets import Set as set
 import subprocess
 from tempfile import TemporaryFile
-from thread import allocate_lock
+from threading import Lock
 import time
 from cs.env import envsub
 from cs.fileutils import abspath_from_file, watched_file_property, Pathname
@@ -30,6 +30,7 @@ from cs.mailutils import Maildir, message_addresses, shortpath
 from cs.misc import O, slist
 from cs.threads import locked_property
 from cs.app.maildb import MailDB
+from cs.py3 import unicode as u
 
 DEFAULT_MAILDIR_RULES = '$HOME/.mailfiler/{maildir.basename}'
 
@@ -56,7 +57,7 @@ def main(argv, stdin=None):
         rules_pattern = DEFAULT_MAILDIR_RULES
         try:
           opts, argv = getopt(argv, '1d:nNR:')
-        except GetoptError, e:
+        except GetoptError as e:
           warning("%s", e)
           badopts = True
         for opt, val in opts:
@@ -66,7 +67,7 @@ def main(argv, stdin=None):
             elif opt == '-d':
               try:
                 delay = int(val)
-              except ValueError, e:
+              except ValueError as e:
                 warning("%s: %s", e, val)
                 badopts = True
               else:
@@ -152,7 +153,7 @@ class FilterModes(O):
   def __init__(self, **kw):
     self._O_omit = ('maildir_cache',)
     self._maildb_path = kw.pop('maildb_path')
-    self._maildb_lock = allocate_lock()
+    self._maildb_lock = Lock()
     O.__init__(self, **kw)
 
   @watched_file_property
@@ -212,7 +213,7 @@ class RuleState(O):
       log = sys.stdout
     try:
       print(*[ unicode(s) for s in a], file=log)
-    except UnicodeDecodeError, e:
+    except UnicodeDecodeError as e:
       print("RuleState.log: %s: a=%r" % (e, a), file=sys.stderr)
 
   def logto(self, logfilepath):
@@ -222,7 +223,7 @@ class RuleState(O):
       self._log.close()
     try:
       self._log = io.open(logfilepath, "a", encoding='utf-8')
-    except OSError, e:
+    except OSError as e:
       self.log("open(%s): %s" % (logfilepath, e))
 
   @property
@@ -360,7 +361,7 @@ def parserules(fp):
           _, offset = get_white(line, offset+1)
           subfilename, offset = get_nonwhite(line, offset=offset)
           if not subfilename:
-            raise ValueError, "missing filename"
+            raise ValueError("missing filename")
           subfilename = envsub(subfilename)
           subfilename = abspath_from_file(subfilename, filename)
           for R in parserules(subfilename):
@@ -398,7 +399,7 @@ def parserules(fp):
               offset = m.end()
             else:
               error("parse failure at %d: %s", offset, line)
-              raise ValueError, "syntax error"
+              raise ValueError("syntax error")
           R.actions.append( ('TARGET', target) )
           if offset < len(line) and line[offset] == ',':
             offset += 1
@@ -588,7 +589,7 @@ class Rule(O):
               raise RuntimeError("unimplemented action \"%s\"" % action)
           except (AttributeError, NameError):
             raise
-          except Exception, e:
+          except Exception as e:
             warning("EXCEPTION %r", e)
             failed_actions.append( (action, arg, e) )
             raise
@@ -661,7 +662,7 @@ class WatchedMaildir(O):
     if rules_path is None:
       rules_path = os.path.join(self.mdir.dir, '.rules')
     self._rules_path = rules_path
-    self._rules_lock = allocate_lock()
+    self._rules_lock = Lock()
     self.lurking = set()
     self.flush()
     warning("%d rules", len(self.rules))
@@ -713,9 +714,9 @@ class WatchedMaildir(O):
             state = RuleState(M, self.filter_modes)
             state.message_path = mdir.keypath(key)
             state.logto(envsub("$HOME/var/log/mailfiler"))
-            state.log( (u"%s %s %s" % (time.strftime("%Y-%m-%d %H:%M:%S"),
-                                       unrfc2047(M.get('from', '_no_from')),
-                                       unrfc2047(M.get('subject', '_no_subject'))))
+            state.log( (u("%s %s %s") % (time.strftime("%Y-%m-%d %H:%M:%S"),
+                                         unrfc2047(M.get('from', '_no_from')),
+                                         unrfc2047(M.get('subject', '_no_subject'))))
                        .replace('\n', ' ') )
             state.log("  " + shortpath(mdir.keypath(key)))
             saved_to = []

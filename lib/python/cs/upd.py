@@ -1,5 +1,5 @@
 from __future__ import with_statement
-from thread import allocate_lock
+from threading import Lock
 import threading
 from contextlib import contextmanager
 import atexit
@@ -43,7 +43,7 @@ class UpdHandler(StreamHandler):
     self.__upd = Upd(strm)
     self.__nlLevel = nlLevel
     self.__ansi_mode = ansi_mode
-    self.__lock = allocate_lock()
+    self.__lock = Lock()
 
   def emit(self, logrec):
     with self.__lock:

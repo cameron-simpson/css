@@ -98,21 +98,21 @@ class Range(object):
     '''
     _spans = self._spans
     if type(_spans) is not list:
-      raise TypeError, "._spans should be a list"
+      raise TypeError("._spans should be a list")
     ospan = None
     for span in _spans:
       if type(span) is not list:
-        raise TypeError, "._spans elements should be lists, found "+repr(span)
+        raise TypeError("._spans elements should be lists, found "+repr(span))
       if len(span) != 2:
-        raise ValueError, "._spans elements should have length 2, found "+repr(span)
+        raise ValueError("._spans elements should have length 2, found "+repr(span))
       lo, hi = span
       if type(lo) is not int or type(hi) is not int:
-        raise TypeError, "._spans elements should be a pair of ints, found "+repr(span)
+        raise TypeError("._spans elements should be a pair of ints, found "+repr(span))
       if lo >= hi:
-        raise ValueError, "._spans elements should have low < high, found "+repr(span)
+        raise ValueError("._spans elements should have low < high, found "+repr(span))
       if ospan is not None:
         if ospan[1] >= lo:
-          raise ValueError, "._spans elements should be strictly greater than their predecessors, found "+repr(ospan)+", "+repr(span)
+          raise ValueError("._spans elements should be strictly greater than their predecessors, found "+repr(ospan)+", "+repr(span))
       ospan = span
 
   def __iter__(self):
@@ -138,7 +138,7 @@ class Range(object):
     else:
       x = list(x)
       if len(x) != 2:
-        raise ValueError, "__contains__ requires a Range, int or pair of ints, got %s" % (x,)
+        raise ValueError("__contains__ requires a Range, int or pair of ints, got %s" % (x,))
     _spans = self._spans
     ndx = bisect_left(self._spans, x)
     if ndx > 0 and x[0] < _spans[ndx][0]:
@@ -324,7 +324,7 @@ class Range(object):
         ndx -= 1
       span = _spans[ndx]
       if start < span[0] or end > span[1]:
-        raise KeyError, "[%s:%s] not a subset of %s" % (start, end, self)
+        raise KeyError("[%s:%s] not a subset of %s" % (start, end, self))
       if start == span[0]:
         if end == span[1]:
           print >>sys.stderr, "remove %s:%s from %s: delete span" % (start,end,span)
@@ -344,7 +344,7 @@ class Range(object):
     '''
     _spans = self._spans
     if len(_spans) == 0:
-      raise KeyError, "pop() from empty Range"
+      raise KeyError("pop() from empty Range")
     span = _spans[-1]
     start, end = _spans[-1]
     end -= 1

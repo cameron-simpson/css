@@ -5,7 +5,7 @@ from contextlib import contextmanager
 from functools import partial
 import sys
 from collections import deque
-from thread import allocate_lock
+from threading import Lock
 from threading import Thread, Condition
 from Queue import Queue
 import time
@@ -39,9 +39,9 @@ class _Late_context_manager(object):
                         'name': name,
                         'pfx': pfx,
                       }
-    self.commence = allocate_lock()
+    self.commence = Lock()
     self.commence.acquire()
-    self.complete = allocate_lock()
+    self.complete = Lock()
     self.commence.acquire()
 
   def __enter__(self):
@@ -78,7 +78,7 @@ class _Late_context_manager(object):
     self.latefunc = None
     lf_ret, lf_exc_info = W
     if lf_exc_info is not None:
-      raise lf_exc_type, lf_exc_info
+      raise lf_exc_type(lf_exc_info)
     return True
 
 class PendingFunction(object):
@@ -91,7 +91,7 @@ class PendingFunction(object):
     self.func = func
     self.state = STATE_PENDING
     self.result = None
-    self._lock = allocate_lock()
+    self._lock = Lock()
     self.join_cond = Condition()
     self.notifiers = []
 
@@ -200,7 +200,7 @@ class OnDemandFunction(PendingFunction):
     result, exc_info = self.result
     if exc_info:
       exc_type, exc_value, exc_traceback = exc_info
-      raise exc_type, exc_value, exc_traceback
+      raise exc_type(exc_value).with_traceback(exc_traceback)
     return result
 
 def CallableValue(value):
@@ -231,7 +231,7 @@ class LateFunction(PendingFunction):
         LF = L.defer()
         try:
           x = LF()
-        except SomeException, e:
+        except SomeException as e:
           # handle the exception ...
 
       To avoid handling exceptions with try/except the .wait()
@@ -283,7 +283,7 @@ class LateFunction(PendingFunction):
     result, exc_info = self.wait()
     if exc_info:
       exc_type, exc_value, exc_traceback = exc_info
-      raise exc_type, exc_value, exc_traceback
+      raise exc_type(exc_value).with_traceback(exc_traceback)
     return result
 
   def set_result(self, result):
@@ -325,7 +325,7 @@ class Later(object):
     self._LFPQ = IterablePriorityQueue(inboundCapacity)
     self._workers = WorkerThreadPool()
     self._dispatchThread = Thread(target=self._dispatcher)
-    self._lock = allocate_lock()
+    self._lock = Lock()
     self._dispatchThread.start()
 
   def __repr__(self):

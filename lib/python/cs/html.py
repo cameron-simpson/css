@@ -7,8 +7,7 @@
 import re
 import sys
 import urllib
-from types import StringTypes, IntType, LongType, FloatType
-import cStringIO
+from cs.py3 import StringTypes, StringIO
 
 # Characters safe to transcribe unescaped.
 textSafeRe = re.compile(r'[^<>&]+')
@@ -20,7 +19,7 @@ BR = ('BR',)
 def tok2s(*tokens):
   ''' Return transcription of token `tok` in HTML form.
   '''
-  fp = cStringIO.StringIO()
+  fp = StringIO()
   puttok(fp, *tokens)
   s = fp.getvalue()
   fp.close()
@@ -36,13 +35,11 @@ def puttok(fp, *tokens):
         Further elements are tokens contained within this token.
   '''
   for tok in tokens:
-    toktype = type(tok)
-
-    if toktype in StringTypes:
+    if isinstance(tok, StringTypes):
       puttext(fp, tok)
       continue
 
-    if toktype in (IntType, LongType, FloatType):
+    if isinstance(tok, (int, float)):
       puttext(fp, str(tok))
       continue
 
@@ -93,7 +90,7 @@ def puttok(fp, *tokens):
 def text2s(s, safeRe=None):
   ''' Return transcription of string in HTML safe form.
   '''
-  fp = cStringIO.StringIO()
+  fp = StringIO()
   puttext(fp, s, safeRe=safeRe)
   s = fp.getvalue()
   fp.close()

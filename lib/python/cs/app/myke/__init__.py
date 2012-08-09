@@ -16,7 +16,7 @@ def main(argv):
   with Maker() as M:
     try:
       args, badopts = M.getopt(args)
-    except GetoptError, e:
+    except GetoptError as e:
       warning("bad options: %s", e)
       badopts = True
     if badopts:

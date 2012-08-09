@@ -4,7 +4,7 @@
 #       - Cameron Simpson <cs@zip.com.au> 04jan2009
 #
 
-from thread import allocate_lock
+from threading import Lock
 from os import O_RDONLY, O_CREAT, O_EXCL
 import os
 import sys

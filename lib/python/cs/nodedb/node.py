@@ -1,6 +1,7 @@
 #!/usr/bin/python
 #
 
+from __future__ import print_function
 import os.path
 from cmd import Cmd
 import csv
@@ -11,13 +12,13 @@ if sys.hexversion < 0x02060000:
   from sets import Set as set
 import itertools
 from getopt import GetoptError
-from thread import allocate_lock
+from threading import Lock
 from threading import Thread
-from types import StringTypes
 from collections import namedtuple
 from cs.lex import str1, parseUC_sAttr
 from cs.logutils import Pfx, D, error, warning, info, debug, exception
 from cs.misc import the, get0, O, unimplemented
+from cs.py3 import StringTypes
 from .export import edit_csv_wide, export_csv_wide
 
 # regexp to match TYPE:name
@@ -58,18 +59,18 @@ def nodekey(*args):
         # (TYPE, NAME)
         t, name = item
     else:
-      raise ValueError, "nodekey() takes (TYPE, NAME) args or a single arg: args=%s" % ( args, )
+      raise ValueError("nodekey() takes (TYPE, NAME) args or a single arg: args=%s" % ( args, ))
 
     if type(t) not in (str, unicode):
-      raise ValueError, "expected TYPE to be a string: %r" % (t,)
+      raise ValueError("expected TYPE to be a string: %r" % (t,))
     if type(name) is int:
       name = str(name)
     elif type(name) not in (str, unicode):
-      raise ValueError, "expected NAME to be a string: %r" % (name,)
+      raise ValueError("expected NAME to be a string: %r" % (name,))
     if not t.isupper() and t != '_':
-      raise ValueError, "invalid TYPE, not upper case or _"
+      raise ValueError("invalid TYPE, not upper case or _")
     if not len(name):
-      raise ValueError, "empty NAME"
+      raise ValueError("empty NAME")
     return t, name
 
 class _AttrList(list):
@@ -244,10 +245,10 @@ class _AttrList(list):
         return _AttrList(node=None, attr=k, _items=hits)
       try:
         hit = the(hits)
-      except IndexError, e:
-        raise AttributeError, "%s.%s: %s" % (self, attr, e)
+      except IndexError as e:
+        raise AttributeError("%s.%s: %s" % (self, attr, e))
       return hit
-    raise AttributeError, '.'.join([str(self), attr])
+    raise AttributeError('.'.join([str(self), attr]))
 
   def where(self, **kw):
     ''' Return a new _AttrList consisting of elements from this list where
@@ -310,7 +311,7 @@ class Node(dict):
       # this Node it the "type" metanode
       # .TYPE(key) is the at-need factory for a node
       return self.nodedb.make( (self.type, name) )
-    raise TypeError, "only the NodeDB.TYPE metanode is callable"
+    raise TypeError("only the NodeDB.TYPE metanode is callable")
 
   @unimplemented
   def setdefault(self, key, default):
@@ -436,9 +437,9 @@ class Node(dict):
     '''
     k, plural = parseUC_sAttr(item)
     if k is None:
-      raise KeyError, repr(item)
+      raise KeyError(repr(item))
     if plural or item in ('NAME', 'TYPE'):
-      raise KeyError, "forbidden index: %r" % (item,)
+      raise KeyError("forbidden index: %r" % (item,))
     values = self.get(k)
     if len(values):
       # discard old values (removes reverse map)
@@ -450,7 +451,7 @@ class Node(dict):
   def __delitem__(self, item):
     k, plural = parseUC_sAttr(item)
     if k is None or plural:
-      raise KeyError, repr(item)
+      raise KeyError(repr(item))
     dict.__setitem__(self, k, ())
     dict.__delitem__(self, k)
 
@@ -478,10 +479,10 @@ class Node(dict):
       if len(values) == 1:
         return values[0]
       if self.nodedb._noNode is None:
-        raise AttributeError, "%s.%s (values=%s %s, len=%s)" % (self, attr, type(values), values, len(values))
+        raise AttributeError("%s.%s (values=%s %s, len=%s)" % (self, attr, type(values), values, len(values)))
       return self.nodedb._noNode
 
-    raise AttributeError, str(self)+'.'+repr(attr)
+    raise AttributeError(str(self)+'.'+repr(attr))
 
   def __setattr__(self, attr, value):
     ''' Support .ATTR[s] = value[s].
@@ -490,7 +491,7 @@ class Node(dict):
     if attr.startswith('in') and len(attr) > 2:
       k, plural = parseUC_sAttr(attr[2:])
       if k:
-        raise ValueError, "setting .%s is forbidden" % (attr,)
+        raise ValueError("setting .%s is forbidden" % (attr,))
 
     k, plural = parseUC_sAttr(attr)
     if k:
@@ -639,7 +640,7 @@ class NodeDB(dict, O):
 
   def __init__(self, backend, readonly=False):
     dict.__init__(self)
-    self._lock = allocate_lock()
+    self._lock = Lock()
     self.readonly = readonly
     self.closed = False
     self._noNode = None
@@ -758,7 +759,7 @@ class NodeDB(dict, O):
   def nodeByTypeName(self, t, name, doCreate=False):
     N = self.get( (t, name), doCreate=doCreate )
     if N is None:
-      raise KeyError, "no Node with key (%s,%s)" % (t, name)
+      raise KeyError("no Node with key (%s,%s)" % (t, name))
     return N
 
   def _noteNode(self, N):
@@ -792,7 +793,7 @@ class NodeDB(dict, O):
     except KeyError:
       if doCreate:
         if default is not None:
-          raise ValueError, "doCreate is True but default is %r" % (default,)
+          raise ValueError("doCreate is True but default is %r" % (default,))
         return self.newNode(item)
       return default
 
@@ -815,8 +816,8 @@ class NodeDB(dict, O):
   def __getitem__(self, item):
     try:
       key = nodekey(item)
-    except ValueError, e:
-      raise KeyError, "can't get key %s: %s" % (item, e)
+    except ValueError as e:
+      raise KeyError("can't get key %s: %s" % (item, e))
     N = dict.__getitem__(self, key)
     assert isinstance(N, Node), "__getitem(%s) got non-Node: %r" % (item, N)
     return N
@@ -878,7 +879,7 @@ class NodeDB(dict, O):
     t, name = nodekey(*args)
     with self._lock:
       if (t, name) in self:
-        raise KeyError, 'newNode(%s, %s): already exists' % (t, name)
+        raise KeyError('newNode(%s, %s): already exists' % (t, name))
       N = self[t, name] = self._createNode(t, name)
       if self.backend:
         self.backend[t, name] = N
@@ -947,7 +948,7 @@ class NodeDB(dict, O):
       if Ndb.SEQs == ss:
         return NodeDBFromURL(Ndb.URL)
 
-    raise ValueError, "unknown DB sequence number: %s; _.DBs = %s" % (s, N_.DBs)
+    raise ValueError("unknown DB sequence number: %s; _.DBs = %s" % (s, N_.DBs))
 
   def fromtoken(self, valuetxt, node=None, attr=None, doCreate=False):
     ''' Method to extract a token from the start of a string, for use
@@ -1036,7 +1037,7 @@ class NodeDB(dict, O):
       assert scheme[0].islower() and scheme.find(':',1) < 0, \
              "illegal scheme name: \"%s\"" % (scheme,)
       return ':'+scheme+':'+R.totext(value)
-    raise ValueError, "can't totext( <%s> %s )" % (type(value),value)
+    raise ValueError("can't totext( <%s> %s )" % (type(value),value))
 
   def fromtext(self, text, doCreate=True):
     ''' Convert a stored string into a value.
@@ -1051,7 +1052,7 @@ class NodeDB(dict, O):
       # plain string
       return text
     if len(text) < 2:
-      raise ValueError, "unparsable text \"%s\"" % (text,)
+      raise ValueError("unparsable text \"%s\"" % (text,))
     t1 = text[1:]
     if text.startswith('::'):
       # :string-with-leading-colon
@@ -1062,24 +1063,24 @@ class NodeDB(dict, O):
     if t1[0].isupper():
       # TYPE:NAME
       if t1.find(':', 1) < 0:
-        raise ValueError, "bad :TYPE:NAME \"%s\"" % (text,)
+        raise ValueError("bad :TYPE:NAME \"%s\"" % (text,))
       t, name = t1.split(':', 1)
       return self.nodeByTypeName(t, name, doCreate=doCreate)
     if t1[0].islower():
       # scheme:info
       if t1.find(':', 1) < 0:
-        raise ValueError, "bad :scheme:info \"%s\"" % (text,)
+        raise ValueError("bad :scheme:info \"%s\"" % (text,))
       scheme, info = t1.split(':', 1)
       R = self.__attr_scheme_registry.get(scheme, None)
       if R:
         return R.fromtext(info)
-      raise ValueError, "unsupported :scheme:info \"%s\"" % (text,)
+      raise ValueError("unsupported :scheme:info \"%s\"" % (text,))
     if t1[0] == '+':
       # :+seq:TYPE:NAME
       # obtain foreign Node from other NodeDB
       seqnum, t, name = t1[1:].split(':', 2)
       return self.otherDB(int(seqnum))[t, name]
-    raise ValueError, "unparsable text \"%s\"" % (text,)
+    raise ValueError("unparsable text \"%s\"" % (text,))
 
   def default_dump_nodes(self, typenames=None):
     ''' Yield the default sequence of Nodes to dump.
@@ -1103,7 +1104,7 @@ class NodeDB(dict, O):
       return self.dump_csv(fp, nodes)
     if fmt == 'csv_wide':
       return export_csv_wide(fp, nodes)
-    raise ValueError, "unsupported format '%s'" % (fmt,)
+    raise ValueError("unsupported format '%s'" % (fmt,))
 
   def dump_csv(self, fp, nodes):
     from .csvdb import write_csv_file
@@ -1181,7 +1182,7 @@ class NodeDB(dict, O):
       try:
         op_func = getattr(self, "cmd_" + op)
       except AttributeError:
-        raise GetoptError, "unknown operation"
+        raise GetoptError("unknown operation")
       return op_func(args)
 
   def cmd_update(self, args, fp=None):
@@ -1250,7 +1251,7 @@ class NodeDB(dict, O):
       attrtxt = args.pop(0)
       attrs = attrtxt.split(',')
     if args:
-      raise GetoptError, "extra arguments after nodes and attrs: %s" % (args,)
+      raise GetoptError("extra arguments after nodes and attrs: %s" % (args,))
     export_csv_wide(fp, nodes, attrs=attrs, all_nodes=True)
     return xit
 
@@ -1321,7 +1322,7 @@ class NodeDB(dict, O):
     for arg in args:
       with Pfx('%r', arg):
         for N in self.nodespec(arg):
-          print str(N)
+          print(str(N))
     return xit
 
   def cmd_new(self, args, doCreate=True):
@@ -1345,7 +1346,7 @@ class NodeDB(dict, O):
   def cmd_print(self, attrs):
     N = self[attrs.pop(0)]
     for attr in attrs:
-      print N.get0(attr, '')
+      print(N.get0(attr, ''))
     return 0
 
   def cmd_report(self, args):
@@ -1419,15 +1420,15 @@ class NodeDB(dict, O):
           def do_op(argline):
             try:
               args = list(get_commatexts(argline))
-            except ValueError, e:
+            except ValueError as e:
               error(str(e))
             else:
               with Pfx(op):
                 try:
                   fn(args)
-                except GetoptError, e:
+                except GetoptError as e:
                   error(str(e))
-                except ValueError, e:
+                except ValueError as e:
                   exception(str(e))
             return False
           do_op.__doc__ = fn.__doc__
@@ -1445,7 +1446,6 @@ _NodeDBsByURL = {}
 def NodeDBFromURL(url, readonly=False, klass=None):
   ''' Factory method to return singleton NodeDB instances.
   '''
-  ##print >>sys.stderr, "NodeDBFromURL: url =", url
   if klass is None:
     klass = NodeDB
 
@@ -1466,7 +1466,7 @@ def NodeDBFromURL(url, readonly=False, klass=None):
       return NodeDBFromURL('file-tch://'+url, readonly=readonly, klass=klass)
     if ext == '.sqlite':
       return NodeDBFromURL('sqlite://'+url, readonly=readonly, klass=klass)
-    raise ValueError, "unsupported NodeDB URL: "+url
+    raise ValueError("unsupported NodeDB URL: "+url)
 
   markpos = url.find('://')
   if markpos > 0:
@@ -1517,7 +1517,7 @@ def NodeDBFromURL(url, readonly=False, klass=None):
     if url.endswith('.tch'):
       return NodeDBFromURL('file-tch://'+os.path.abspath(url), readonly=readonly, klass=klass)
 
-  raise ValueError, "unsupported NodeDB URL: "+url
+  raise ValueError("unsupported NodeDB URL: "+url)
 
 if __name__ == '__main__':
   import cs.nodedb.node_tests

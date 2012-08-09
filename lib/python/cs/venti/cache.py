@@ -5,7 +5,6 @@
 #
 
 from __future__ import with_statement
-from Queue import Queue
 import cs.later
 from cs.lex import hexify
 from .store import BasicStore

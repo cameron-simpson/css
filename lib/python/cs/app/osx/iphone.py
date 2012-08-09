@@ -1,4 +1,5 @@
 import os
+from cs.logutils import D
 
 PLIST_IPHONE_SPRINGBOARD = \
         '/private/var/mobile/Library/Preferences/com.apple.springboard.plist'
@@ -43,7 +44,7 @@ class IPhoneIconList(list):
               appname = slot["displayIdentifier"]
               icon = {"displayIdentifier": appname}
             self.placeIcon(icon)
-    print "icons = %s" % (self,)
+    D("icons = %r", self)
 
   def placeIcon(self, icon, pos = None):
     ''' Place the supplied icon (which may be None).
@@ -63,9 +64,8 @@ class IPhoneIconList(list):
         or beyond.
     '''
     if not allowDupe and self._byApp.get(appname, ()):
-      print >>sys.stderr, \
-        "placeApp(%s, %d, allowDupe = %s): app exists at: %s" \
-        % (appname, startpos, allowDupe, self._byApp[appname])
+      D("placeApp(%s, %d, allowDupe = %s): app exists at: %s",
+        appname, startpos, allowDupe, self._byApp[appname])
     pos = startpos
     while pos < len(self) and self[pos] is not None:
       pos += 1

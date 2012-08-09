@@ -10,7 +10,7 @@ from types import StringTypes
 import unittest
 import sys
 import thread
-from thread import allocate_lock
+from threading import Lock
 from tokyocabinet.hash import Hash as TCHash, HDBOREADER, HDBOWRITER, HDBOCREAT
 from cs.misc import seq
 from cs.logutils import error, Pfx
@@ -30,7 +30,7 @@ class Backend_TokyoCabinet(Backend):
                      if readonly
                      else HDBOWRITER | HDBOCREAT
                    ))
-    self.tclock = allocate_lock()
+    self.tclock = Lock()
 
   @unimplemented
   def sync(self):
@@ -38,7 +38,7 @@ class Backend_TokyoCabinet(Backend):
 
   def close(self):
     if self.tcdb is None:
-      raise ValueError, "%s.tcdb is None, .close() already called" % (self,)
+      raise ValueError("%s.tcdb is None, .close() already called" % (self,))
     with open("/dev/tty","w") as tty:
       tty.write("CLOSE TC %s\n" % (self.tcdb,))
     with self.tclock:
@@ -69,7 +69,7 @@ class Backend_TokyoCabinet(Backend):
     for attrtag in self.attrtags():
       try:
         t, name, attr = attrtag.split(':', 2)
-      except ValueError, e:
+      except ValueError as e:
         raise ValueError("attrtag = %r: %s" % (attrtag, e))
       if (t, name) in seen:
         continue

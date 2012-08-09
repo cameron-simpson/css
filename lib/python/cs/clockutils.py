@@ -12,6 +12,7 @@
 #       - Cameron Simpson <cs@zip.com.au> 02apr2012
 #
 
+from __future__ import print_function
 from collections import namedtuple
 from time import time
 import os
@@ -402,7 +403,7 @@ HIGHRES_CLOCKS = ALL_CLOCKS
 STEADY_CLOCKS = ALL_CLOCKS
 
 if __name__ == '__main__':
-    print "ALL_CLOCKS =", repr(ALL_CLOCKS)
+    print("ALL_CLOCKS =", repr(ALL_CLOCKS))
     for clock in get_clocks():
-        print "clock = %r" % (clock,)
-        print clock.__class__.__doc__
+        print("clock = %r" % (clock,))
+        print(clock.__class__.__doc__)

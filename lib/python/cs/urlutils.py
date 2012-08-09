@@ -10,7 +10,6 @@ import sys
 from itertools import chain
 from bs4 import BeautifulSoup, Tag, BeautifulStoneSoup
 from netrc import netrc
-from StringIO import StringIO
 import socket
 from urllib2 import urlopen, Request, HTTPError, URLError, \
 		    HTTPPasswordMgrWithDefaultRealm, HTTPBasicAuthHandler, \
@@ -25,6 +24,7 @@ from threading import RLock
 from cs.lex import parseUC_sAttr
 from cs.logutils import Pfx, pfx_iter, debug, error, warning, exception
 from cs.threads import locked_property
+from cs.py3 import StringIO
 
 def URL(U, referer, user_agent=None):
   ''' Factory function to return a _URL object from a URL string.
@@ -101,7 +101,7 @@ class _URL(unicode):
     '''
     try:
       content = self.content
-    except (HTTPError, URLError, socket.error), e:
+    except (HTTPError, URLError, socket.error) as e:
       error("%s.get_content: %s", self, e)
       content = onerror
     self._content = content
@@ -139,7 +139,7 @@ class _URL(unicode):
     content = self.content
     try:
       P = BeautifulSoup(content.decode('utf-8', 'replace'))
-    except Exception, e:
+    except Exception as e:
       exception("%s: .parsed: BeautifulSoup(unicode(content)) fails: %s", self, e)
       with open("cs.urlutils-unparsed.html", "wb") as bs:
         bs.write(self.content)
@@ -302,7 +302,7 @@ def skip_errs(iterable):
       i = I.next()
     except StopIteration:
       break
-    except (URLError, HTTPError), e:
+    except (URLError, HTTPError) as e:
       warning("%s", e)
     else:
       debug("skip_errs: yield %r", i)

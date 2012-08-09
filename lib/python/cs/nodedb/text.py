@@ -147,7 +147,7 @@ def get_commatext(text, pos=0):
     if text[pos] == '"':
       m = re_JSON_STRING.match(text, pos)
       if not m:
-        raise ValueError, "invalid quoted string at: %s" % (text[pos:],)
+        raise ValueError("invalid quoted string at: %s" % (text[pos:],))
       pos = m.end()
     else:
       pos += 1
@@ -233,7 +233,7 @@ def fromtoken(token, nodedb, doCreate=False):
 
   N = nodedb.get( (t, name), doCreate=doCreate )
   if N is None:
-    raise ValueError, "no Node with key (%s, %s)" % (t, name)
+    raise ValueError("no Node with key (%s, %s)" % (t, name))
 
   return N
 
@@ -253,7 +253,7 @@ def totoken(value):
   if type(value) is int:
     return str(value)
 
-  raise ValueError, "can't turn into token: %r" % (value,)
+  raise ValueError("can't turn into token: %r" % (value,))
 
 if __name__ == '__main__':
   import cs.nodedb.text_tests

@@ -7,7 +7,7 @@
 #
 
 from __future__ import with_statement
-from thread import allocate_lock
+from threading import Lock
 from threading import Thread
 from Queue import Queue
 import sys
@@ -203,7 +203,7 @@ class StreamStore(BasicStore):
     self.sendRequestsFP = sendRequestsFP
     self.recvResultsFP = recvResultsFP
     self._requestQ = IterableQueue(128)
-    self._pendingLock = allocate_lock()
+    self._pendingLock = Lock()
     self._pending = {}
     self.writer = Thread(target=self._process_requests)
     self.writer.start()
