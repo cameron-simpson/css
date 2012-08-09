@@ -51,7 +51,7 @@ def op_stats(argv):
   try:
     host, port = argv.pop(0).rsplit(':', 1)
     port = int(port)
-  except ValueError, e:
+  except ValueError as e:
     error("invalid host:port: %s" % (e,))
     return 2
 
