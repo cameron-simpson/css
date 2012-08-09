@@ -10,8 +10,7 @@ import sys
 import os
 import unittest
 from cs.logutils import setup_logging, Pfx, info, warning, error, D
-from cs.mail import ismaildir, ismbox, messagesFromPath
-from cs.mailutils import message_addresses, Message
+from cs.mailutils import ismaildir, message_addresses, Message
 from cs.nodedb import NodeDB, Node, NodeDBFromURL
 from cs.threads import locked_property
 from cs.misc import the
@@ -240,13 +239,6 @@ class _MailDB(NodeDB):
     ''' Obtain the Node for the specified Message-ID `message_id`.
     '''
     return self.get( ('MESSAGE', message_id), doCreate=True)
-
-  def importPath(self, path):
-    ''' Import all the messages stored at `path`.
-    '''
-    with Pfx(path):
-      for M in messagesFromPath(path):
-        self.importMessage(M)
 
   def addrtexts_to_AddressNodes(self, addrtexts):
     return [ self.getAddressNode( (realname, addr), doCreate=True)
