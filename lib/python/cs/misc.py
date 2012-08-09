@@ -1,3 +1,4 @@
+from __future__ import print_function
 import os
 import os.path
 import errno
@@ -816,20 +817,20 @@ class _BitMask(int):
     '''
 
     def __str__(self):
-        f = self
-        n = 1
-        names = []
-        for name in self.bitnames:
-          if f & n:
-            names.append(name)
-            f &= ~n
-          n <<= 1
-        if n:
-          names.append("%d" % (n,))
-        return '|'.join(names) if names else '0'
+      f = self
+      n = 1
+      names = []
+      for name in self.bitnames:
+        if f & n:
+          names.append(name)
+          f &= ~n
+        n <<= 1
+      if n:
+        names.append("%d" % (n,))
+      return '|'.join(names) if names else '0'
 
     def __repr__(self):
-        return '<%s 0x%02x %s>' % (self.__class__.__name__, self, self)
+      return '<%s 0x%02x %s>' % (self.__class__.__name__, self, self)
 
     @property
     def vars(self):
@@ -843,5 +844,5 @@ class _BitMask(int):
 if __name__ == '__main__':
   B = BitMask('a', 'b', 'c')
   n = B(9)
-  print "%d => %s" % (n, n)
-  print "%r" % (n.vars,)
+  print("%d => %s" % (n, n))
+  print("%r" % (n.vars,))
