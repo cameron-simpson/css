@@ -798,7 +798,7 @@ def unimplemented(func):
   ''' Decorator for stub methods that must be implemented by a stub class.
   '''
   def wrapper(self, *a, **kw):
-    raise NotImplementedError("%s.%s(*%s, **%s)" % (type(self), func.func_name, a, kw))
+    raise NotImplementedError("%s.%s(*%s, **%s)" % (type(self), func.__name__, a, kw))
   return wrapper
 
 class slist(list):

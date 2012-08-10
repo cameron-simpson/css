@@ -162,7 +162,7 @@ def watched_file_property(func, prop_name=None, unset_object=None, poll_rate=1):
       The property {prop_name}_lastpoll track the last poll time.
   '''
   if prop_name is None:
-    prop_name = '_' + func.func_name
+    prop_name = '_' + func.__name__
   lock_name = prop_name + '_lock'
   filestate_name = prop_name + '_filestate'
   path_name = prop_name + '_path'

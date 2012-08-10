@@ -203,7 +203,7 @@ def OBSOLETE(func):
     frame = traceback.extract_stack(None, 2)[0]
     warning("OBSOLETE call to %s:%d %s(), called from %s:%d %s",
          func.func_code.co_filename, func.func_code.co_firstlineno,
-         func.func_name, frame[0], frame[1], frame[2])
+         func.__name__, frame[0], frame[1], frame[2])
     return func(*args, **kwargs)
   return wrapped
 
@@ -262,7 +262,7 @@ def pfx(func):
         def f(...):
   '''
   def wrapped(*args, **kwargs):
-    with Pfx(func.func_name):
+    with Pfx(func.__name__):
       return func(*args, **kwargs)
   return wrapped
 
@@ -275,7 +275,7 @@ def pfxtag(tag, loggers=None):
   '''
   def wrap(func):
     if tag is None:
-      wraptag = func.func_name
+      wraptag = func.__name__
     else:
       wraptag = tag
     def wrapped(*args, **kwargs):
