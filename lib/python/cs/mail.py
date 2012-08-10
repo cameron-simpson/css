@@ -14,33 +14,6 @@ from contextlib import closing
 from cs.logutils import OBSOLETE
 from cs.misc import seq, saferename
 
-def ismhdir(path):
-  ''' Test if 'path' points at an MH directory.
-  '''
-  return os.path.isfile(os.path.join(path,'.mh_sequences'))
-
-def ismaildir(path):
-  ''' Test if 'path' points at a Maildir directory.
-  '''
-  for subdir in ('new','cur','tmp'):
-    if not os.path.isdir(os.path.join(path,subdir)):
-      return False
-  return True
-
-def ismbox(path):
-  ''' Open path and check that its first line begins with "From ".
-  '''
-  fp=None
-  try:
-    fp=open(path)
-    from_ = fp.read(5)
-  except IOError:
-    if fp is not None:
-      fp.close()
-    return False
-  fp.close()
-  return from_ == 'From '
-
 def mailbox(path):
   if ismaildir(path):
     return pyMailbox.Maildir(path)
