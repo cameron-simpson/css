@@ -33,7 +33,7 @@ def main(argv):
       if target is None:
         targets = ()
       else:
-        targets = (M.default_target,)
+        targets = (M.default_target.name,)
 
     if not targets:
       error("no default target")
