@@ -265,7 +265,7 @@ class Maker(object):
           self.debug_parse("add macro %s", O)
           ns[O.name] = O
         else:
-          raise ValueError("parseMakefile({}): unsupported parse item received: {}{}".format(makefile, type(O), repr(O)))
+          raise ValueError("parseMakefile({}): unsupported parse item received: {}{!r}".format(makefile, type(O), O))
       if first_target is not None:
         self.default_target = first_target
 
