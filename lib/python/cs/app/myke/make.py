@@ -246,6 +246,8 @@ class Maker(object):
         to the namespaces list. In this way later top level Makefiles'
         definitions override ealier ones while still detecting conflicts
         within a particular Makefile.
+	Also, the default_target property is set to the first
+	encountered target if not yet set.
     '''
     for makefile in makefiles:
       self.debug_parse("load makefile: %s", makefile)
