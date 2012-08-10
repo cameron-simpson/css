@@ -246,6 +246,8 @@ class Maker(object):
         to the namespaces list. In this way later top level Makefiles'
         definitions override ealier ones while still detecting conflicts
         within a particular Makefile.
+	Also, the default_target property is set to the first
+	encountered target if not yet set.
     '''
     for makefile in makefiles:
       self.debug_parse("load makefile: %s", makefile)
@@ -263,7 +265,7 @@ class Maker(object):
           self.debug_parse("add macro %s", O)
           ns[O.name] = O
         else:
-          raise ValueError("parseMakefile({}): unsupported parse item received: {}{}".format(makefile, type(O), repr(O)))
+          raise ValueError("parseMakefile({}): unsupported parse item received: {}{!r}".format(makefile, type(O), O))
       if first_target is not None:
         self.default_target = first_target
 
