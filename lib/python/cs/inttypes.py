@@ -10,7 +10,7 @@ def BitMask(*bitnames):
     bm.bitnames = bitnames
     return bm
   return f
-  
+
 class _BitMask(int):
     ''' An int with human friendly str() and repr() for a bitmask or flag set.
     '''
@@ -40,8 +40,34 @@ class _BitMask(int):
         n <<= 1
       return d
 
+def Enum(*names):
+  n = 0
+  revnames = {}
+  for name in names:
+    revnames[name] = n
+    n += 1
+  def f(n):
+    en = _Enum(n)
+    en.names = names
+    en.revnames = revnames
+    return en
+  return f
+
+class _Enum(int):
+  ''' An int with human friendly str() and repr() for an enum counting from 0.
+  '''
+
+  def __str__(self):
+    try:
+      return self.names[self]
+    except IndexError:
+      return int.__str__(self)
+
 if __name__ == '__main__':
   B = BitMask('a', 'b', 'c')
   n = B(9)
   print("%d => %s" % (n, n))
   print("%r" % (n.vars,))
+  E = Enum('a', 'b', 'c')
+  n = E(2)
+  print("%d => %s" % (n, n))
