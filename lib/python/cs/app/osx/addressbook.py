@@ -21,6 +21,7 @@ import time
 from threading import Lock
 from AddressBook import ABAddressBook
 from cs.logutils import setup_logging, Pfx, warning, info, D
+from cs.threads import locked_property
 from cs.app.maildb import MailDB
 
 AB_FLAGS_ORGANIZATION = 0x01
@@ -53,15 +54,11 @@ class AddressBookWrapper(object):
     self._groups = None
     self._lock = Lock()
 
-  @property
+  @locked_property
   def people(self):
     ''' Return the cached list of decoded people.
     '''
-    if self._people is None:
-      with self._lock:
-        if self._people is None:
-          self._people = list(self.iterpeople())
-    return self._people
+    return list(self.iterpeople())
 
   def iterpeople(self):
     ''' Return an iterator that yields people from the addressbook
@@ -70,7 +67,9 @@ class AddressBookWrapper(object):
     for abPerson in self.address_book.people():
       yield dict( [ (k, convertObjCtype(abPerson.valueForProperty_(k)))
                     for k in abPerson.allProperties()
-                    if k not in ('com.apple.ABPersonMeProperty','com.apple.ABImageData',)
+                    if k not in ('com.apple.ABPersonMeProperty',
+                                 'com.apple.ABImageData',
+                                )
                   ] )
 
   @property
