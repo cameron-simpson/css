@@ -13,6 +13,7 @@ from Queue import Queue
 import sys
 if sys.hexversion < 0x02060000: from sets import Set as set
 from cs.misc import seq
+from cs.inttypes import Enum
 from cs.logutils import Pfx, info, debug, warning
 from cs.serialise import toBS, fromBSfp
 from cs.lex import unctrl
@@ -20,20 +21,7 @@ from cs.threads import Q1, IterableQueue
 from cs.lex import hexify
 from .store import BasicStore
 
-class RqType(int):
-  ''' Debugging wrapper for int, reporting symbolic names of op codes.
-  '''
-  def __str__(self):
-    if self == T_ADD:
-      s = "T_ADD"
-    elif self == T_GET:
-      s = "T_GET"
-    elif self == T_CONTAINS:
-      s = "T_CONTAINS"
-    else:
-      s = "UNKNOWN"
-    return "%s(%d)" % (s, self)
-
+RqType = Enum('T_ADD', 'T_GET', 'T_CONTAINS')
 T_ADD = RqType(0)       # block->hash
 T_GET = RqType(1)       # hash->block
 T_CONTAINS = RqType(2)     # hash->boolean
