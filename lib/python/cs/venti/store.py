@@ -75,6 +75,9 @@ class BasicStore(NestingOpenClose):
       self.readonly = False
       self.writeonly = False
 
+  def close(self):
+    self.__funcQ.close()
+
   def add(self, data):
     ''' Add the supplied data bytes to the store.
     '''
@@ -300,6 +303,9 @@ class MappingStore(BasicStore):
 
   def sync(self):
     debug("%s: sync() is a no-op", self)
+
+  def __len__(self):
+    return len(self.mapping)
 
 def GDBMStore(dir):
   from .datafile import GDBMDataDir
