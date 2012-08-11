@@ -209,10 +209,15 @@ class BasicStore(NestingOpenClose):
 def Store(store_spec):
   ''' Factory function to return an appropriate BasicStore subclass
       based on its argument:
+
         /path/to/store  A GDBMStore directory (later, tokyocabinet etc)
+
         |command        A subprocess implementing the streaming protocol.
+
         tcp:[host]:port Connect to a daemon implementing the streaming protocol.
+
         ssh://host/[store-designator-as-above]
+
         relative/path/to/store
                         If the string doesn't start with /, | or foo:
                         and specifies a directory then treat like
@@ -254,13 +259,14 @@ def Store(store_spec):
     import cs.sh
     from .stream import StreamStore
     from subprocess import Popen, PIPE
-    assert spec.startswith('//') and not spec.startswith('///'), \
-           "bad spec ssh:%s, expect ssh://target/remote-spec" % (spec,)
-    sshto, remotespec = spec[2:].split('/', 1)
-    rcmd = './bin/vt -S %s listen -' % cs.sh.quotestr(remotespec)
-    P = Popen( ['set-x', 'ssh', sshto, 'set -x; '+rcmd],
-               shell=False, stdin=PIPE, stdout=PIPE)
-    return StreamStore("ssh:"+spec, P.stdin, P.stdout)
+    if spec.startswith('//') and not spec.startswith('///'):
+      sshto, remotespec = spec[2:].split('/', 1)
+      rcmd = './bin/vt -S %s listen -' % (cs.sh.quotestr(remotespec),)
+      P = Popen( ['set-x', 'ssh', sshto, 'set -x; '+rcmd],
+                 shell=False, stdin=PIPE, stdout=PIPE)
+      return StreamStore("ssh:"+spec, P.stdin, P.stdout)
+    else:
+      raise ValueError("bad spec ssh:%s, expect ssh://target/remote-spec" % (spec,))
   raise ValueError("unsupported store scheme: %s" % (scheme,))
 
 def pullFromSerial(S1, S2):
