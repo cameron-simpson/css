@@ -12,6 +12,7 @@
 # - Cameron Simpson <cs@zip.com.au>
 #
 
+import os.path
 import sys
 import pprint
 # need to import .objc first to tweak sys.path if necessary
@@ -20,13 +21,13 @@ import time
 from threading import Lock
 from AddressBook import ABAddressBook
 from cs.logutils import setup_logging, Pfx, warning, info, D
+from cs.app.maildb import MailDB
 
 AB_FLAGS_ORGANIZATION = 0x01
 
 def main(argv):
-  setup_logging()
-  from cs.app.maildb import MailDB
-  import os.path
+  cmd = os.path.basename(argv[0])
+  setup_logging(cmd)
   AB = AddressBookWrapper()
   MDB = MailDB(os.path.abspath('maildb.csv'), readonly=False)
   ##print "dir(AB.address_book) =",
