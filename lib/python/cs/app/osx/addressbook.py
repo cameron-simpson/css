@@ -141,8 +141,15 @@ def updateNodeDB(maildb, people):
         ## C.OSX_AB_LAST_UPDATE = abMTime
         ok = True
         for k, v in person.items():
-          if k in ('UID', 'Creation', 'Modification'):
-            pass
+          if k in ('UID', 'Creation', 'Modification',
+                   'com.apple.carddavvcf',
+                   'com.apple.vcardhash',
+                   'com.apple.uuid',
+                   'com.apple.etag',
+                   'com.apple.collectionpath',
+                   'com.apple.synced',
+                  ):
+            info("ignore %s: %r", k, v)
           elif k == 'ABPersonFlags':
             if v & AB_FLAGS_ORGANIZATION:
               C.FLAGs.add('ORGANIZATION')
@@ -178,10 +185,8 @@ def updateNodeDB(maildb, people):
               C.NOTEs.add(v)
           elif k == 'URLs':
             C.URLs.update( url for url in map(lambda U: U.strip(), v) )
-          elif k in ('com.apple.carddavvcf',):
-            debug("ignore %s", k)
           else:
-            warning("unhandled AB key: %s", k)
+            warning("unhandled AB key: %s: %r", k, v)
             pprint.pprint(person)
             ok = False
         if ok:
