@@ -322,9 +322,12 @@ class Node(dict):
     pass
 
   def seq(self):
-    seqs = self.get('SEQ', (0,))
-    i = seqs[0] + 1
-    seqs[0] = i
+    seqs = self.SEQs
+    if seqs:
+      i = the(seqs)
+    else:
+      i = 0
+    self.SEQ = i + 1
     return i
 
   def seqNode(self):
@@ -860,8 +863,15 @@ class NodeDB(dict, O):
     else:
       raise ValueError("nodekey: expected 1 or 2 args, got: %r" % (args,))
 
-    assert type(t) is str
-    assert type(name) is str
+    # FIXME: ghastly hack
+    if type(t) is unicode:
+      t = str(t)
+    else:
+      assert type(t) is str, "t = %s %r" % (type(t), t)
+    if type(name) is unicode:
+      name = str(name)
+    else:
+      assert type(name) is str, "name = %s %r" % (type(name), name)
 
     # sanity check type form
     if t != '_':
