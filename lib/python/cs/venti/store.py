@@ -250,7 +250,7 @@ def Store(store_spec):
   if scheme == "tcp":
     from .tcp import TCPStore
     host, port = spec.rsplit(':', 1)
-    if len(host) == 0:
+    if not host:
       host = '127.0.0.1'
     return TCPStore((host, int(port)))
   if sheme == "ssh":
