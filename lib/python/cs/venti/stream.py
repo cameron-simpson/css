@@ -28,7 +28,7 @@ T_CONTAINS = RqType(2)     # hash->boolean
 
 # encode tokens once for performance
 enc_STORE = toBS(T_ADD)
-env_GET = toBS(T_GET)
+enc_GET = toBS(T_GET)
 enc_CONTAINS = toBS(T_CONTAINS)
 
 def encodeAdd(block):
@@ -42,7 +42,7 @@ def encodeGet(rqTag, h):
   ''' Accept a hash to be fetched, return the request tag and the request packet.
   '''
   tag = seq()
-  return tag, toBS(tag) + env_GET + toBS(len(h)) + h
+  return tag, toBS(tag) + enc_GET + toBS(len(h)) + h
 
 def encodeContains(rqTag, h):
   ''' Accept a hash to check for, return the request tag and the request packet.
