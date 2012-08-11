@@ -20,7 +20,7 @@ from .objc import convertObjCtype
 import time
 from threading import Lock
 from AddressBook import ABAddressBook
-from cs.logutils import setup_logging, Pfx, warning, info, D
+from cs.logutils import setup_logging, Pfx, warning, info, D, debug
 from cs.threads import locked_property
 from cs.app.maildb import MailDB
 
@@ -34,7 +34,7 @@ def main(argv):
   ##print "dir(AB.address_book) =",
   ##pprint.pprint(dir(AB.address_book))
   for P in AB.people:
-    ##pprint.pprint(P)
+    pprint.pprint(P)
     updateNodeDB(MDB, [P])
   for G in AB.groups:
     pprint.pprint(G)
@@ -178,6 +178,8 @@ def updateNodeDB(maildb, people):
               C.NOTEs.add(v)
           elif k == 'URLs':
             C.URLs.update( url for url in map(lambda U: U.strip(), v) )
+          elif k in ('com.apple.carddavvcf',):
+            debug("ignore %s", k)
           else:
             warning("unhandled AB key: %s", k)
             pprint.pprint(person)
