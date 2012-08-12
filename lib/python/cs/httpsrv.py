@@ -1,14 +1,17 @@
 from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
 import cs.hier
 import json
-import cs.www
 import base64
 import re
 import sys
+try:
+  from urllib.parse import unquote
+except ImportError:
+  from urllib import unquote
 
 class JSONRPC(HTTPServer):
   def __init__(self,bindaddr,base=None):
-    ''' Start a server bounce to the supplied bindaddr, a tuple of (ip-addr, port).
+    ''' Start a server bound to the supplied bindaddr, a tuple of (ip-addr, port).
         base is the DocumentRoot for requests and defaults to "/".
     '''
     if base is None: base='/'
@@ -86,7 +89,7 @@ class JSONRPCHandler(RequestHandler):
     seq=int(path[:slndx])
     self.headers['Content-Type']="application/x-javascript\r\n"
     jsontxt=path[slndx+1:]
-    jsontxt=cs.www.unhexify(jsontxt)
+    jsontxt=unquote(jsontxt)
     (args,unparsed)=cs.hier.tok(jsontxt)
     rpcres=self.server.rpc(self,args)
     if rpcres is None:

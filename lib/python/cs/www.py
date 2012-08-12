@@ -80,9 +80,6 @@ cookie_valRe=re.compile(r'([a-z][a-z0-9_]*)=([^;,\s]*)',re.I)
 def hexify(s,fp):
   fp.write(urllib.quote(s))
 
-def unhexify(s):
-  return urllib.unquote(s)
-
 def toqs(s):
   return urllib.quote_plus(s)
 

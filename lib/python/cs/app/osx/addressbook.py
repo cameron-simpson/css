@@ -12,6 +12,7 @@
 # - Cameron Simpson <cs@zip.com.au>
 #
 
+import os.path
 import sys
 import pprint
 # need to import .objc first to tweak sys.path if necessary
@@ -19,20 +20,21 @@ from .objc import convertObjCtype
 import time
 from threading import Lock
 from AddressBook import ABAddressBook
-from cs.logutils import setup_logging, Pfx, warning, info, D
+from cs.logutils import setup_logging, Pfx, warning, info, D, debug
+from cs.threads import locked_property
+from cs.app.maildb import MailDB
 
 AB_FLAGS_ORGANIZATION = 0x01
 
 def main(argv):
-  setup_logging()
-  from cs.app.maildb import MailDB
-  import os.path
+  cmd = os.path.basename(argv[0])
+  setup_logging(cmd)
   AB = AddressBookWrapper()
   MDB = MailDB(os.path.abspath('maildb.csv'), readonly=False)
   ##print "dir(AB.address_book) =",
   ##pprint.pprint(dir(AB.address_book))
   for P in AB.people:
-    ##pprint.pprint(P)
+    pprint.pprint(P)
     updateNodeDB(MDB, [P])
   for G in AB.groups:
     pprint.pprint(G)
@@ -52,15 +54,11 @@ class AddressBookWrapper(object):
     self._groups = None
     self._lock = Lock()
 
-  @property
+  @locked_property
   def people(self):
     ''' Return the cached list of decoded people.
     '''
-    if self._people is None:
-      with self._lock:
-        if self._people is None:
-          self._people = list(self.iterpeople())
-    return self._people
+    return list(self.iterpeople())
 
   def iterpeople(self):
     ''' Return an iterator that yields people from the addressbook
@@ -69,7 +67,9 @@ class AddressBookWrapper(object):
     for abPerson in self.address_book.people():
       yield dict( [ (k, convertObjCtype(abPerson.valueForProperty_(k)))
                     for k in abPerson.allProperties()
-                    if k not in ('com.apple.ABPersonMeProperty','com.apple.ABImageData',)
+                    if k not in ('com.apple.ABPersonMeProperty',
+                                 'com.apple.ABImageData',
+                                )
                   ] )
 
   @property
@@ -141,8 +141,15 @@ def updateNodeDB(maildb, people):
         ## C.OSX_AB_LAST_UPDATE = abMTime
         ok = True
         for k, v in person.items():
-          if k in ('UID', 'Creation', 'Modification'):
-            pass
+          if k in ('UID', 'Creation', 'Modification',
+                   'com.apple.carddavvcf',
+                   'com.apple.vcardhash',
+                   'com.apple.uuid',
+                   'com.apple.etag',
+                   'com.apple.collectionpath',
+                   'com.apple.synced',
+                  ):
+            info("ignore %s: %r", k, v)
           elif k == 'ABPersonFlags':
             if v & AB_FLAGS_ORGANIZATION:
               C.FLAGs.add('ORGANIZATION')
@@ -179,7 +186,7 @@ def updateNodeDB(maildb, people):
           elif k == 'URLs':
             C.URLs.update( url for url in map(lambda U: U.strip(), v) )
           else:
-            warning("unhandled AB key: %s", k)
+            warning("unhandled AB key: %s: %r", k, v)
             pprint.pprint(person)
             ok = False
         if ok:

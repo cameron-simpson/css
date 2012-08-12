@@ -4,7 +4,7 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
-from StringIO import StringIO
+from cs.py3 import StringIO
 import sys
 import unittest
 from cs.io import contlines
