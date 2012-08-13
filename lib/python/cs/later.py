@@ -346,6 +346,7 @@ class Later(object):
 
   def __enter__(self):
     debug("%s: __enter__", self)
+    return self
 
   def __exit__(self, exc_type, exc_val, exc_tb):
     ''' Exit handler: release the "complete" lock; the placeholder
@@ -394,13 +395,6 @@ class Later(object):
   def __del__(self):
     if not self.closed:
       self.close()
-
-  def __enter__(self):
-    return self
-
-  def __exit__(self, exc_type, exc_value, traceback):
-    self.close()
-    return False
 
   def close(self):
     with Pfx("%s.close()" % (self,)):
