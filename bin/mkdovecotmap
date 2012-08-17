@@ -6,6 +6,13 @@
 # maildir folder collection.
 #       - Cameron Simpson <cs@zip.com.au> 09feb2009
 #
+# Note: if you can configure dovecot to use LAYOUT=fs, that is far
+# better - you can use your nested maildirs directly without a script
+# like this.
+#
+# Example dovecot config line from Andre Klärner <kandre@ak-online.be>:
+#  mail_location = maildir:%h/Maildir:LAYOUT=fs
+#
 
 trace=eecho
 trace=set-x
