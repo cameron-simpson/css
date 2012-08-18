@@ -10,7 +10,7 @@ from cs.excutils import return_exc_info, returns_exc_info
 
 class TestExcUtils(unittest.TestCase):
 
-  def test00return_exc_info(self):
+  def test_return_exc_info(self):
     def divfunc(a, b):
       return a/b
     retval, exc_info = return_exc_info(divfunc, 4, 2)
@@ -20,7 +20,7 @@ class TestExcUtils(unittest.TestCase):
     self.assertTrue(retval is None)
     self.assertTrue(exc_info[0] is ZeroDivisionError)
 
-  def test00returns_exc_info(self):
+  def test_returns_exc_info(self):
     @returns_exc_info
     def divfunc(a, b):
       return a/b
