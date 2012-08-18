@@ -14,6 +14,7 @@ import threading
 from threading import Lock
 import traceback
 import cs.misc
+from cs.excutils import noexc
 from cs.py3 import unicode, StringTypes
 
 logging_level = logging.INFO
@@ -217,9 +218,11 @@ else:
       self.__L = L
       self.__extra = extra
     # Logger methods
+    @noexc
     def exception(self, msg, *args, **kwargs):
       msg, kwargs = self.process(msg, kwargs)
       self.__L.exception(msg, *args, **kwargs)
+    @noexc
     def log(self, level, msg, *args, **kwargs):
       msg, kwargs = self.process(msg, kwargs)
       self.__L.log(level, msg, *args, **kwargs)
@@ -417,6 +420,7 @@ class Pfx(object):
   def exception(self, msg, *args):
     for L in self.loggers:
       L.exception(msg, *args)
+  @noexc
   def log(self, level, msg, *args, **kwargs):
     for L in self.loggers:
       L.log(level, msg, *args, **kwargs)
@@ -437,6 +441,7 @@ class Pfx(object):
 # Logger public functions
 def exception(msg, *args):
   Pfx._state.cur.exception(msg, *args)
+@noexc
 def log(level, msg, *args, **kwargs):
   Pfx._state.cur.log(level, msg, *args, **kwargs)
 def debug(msg, *args, **kwargs):
