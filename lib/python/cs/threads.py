@@ -939,7 +939,7 @@ def runTree(items, operators, state, funcQ):
       # using a copy of the state
       new_operators = tuple([ (op_func, False) ] + operators)
       for item in items:
-        qops.append(funcQ.defer(runTree, (item,), new_operators, deepcopy(state), funcQ))
+        qops.append(funcQ.bg(runTree, (item,), new_operators, deepcopy(state), funcQ))
       operators = []
     else:
       qops.append(funcQ.defer(op_func, items, state))
