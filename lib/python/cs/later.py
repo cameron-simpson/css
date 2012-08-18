@@ -298,8 +298,8 @@ class Later(object):
   ''' A management class to queue function calls for later execution.
       If `capacity` is an int, it is used to size a Semaphore to constrain
       the number of dispatched functions which may be in play at a time.
-      If `capacity` is not an int it is presumed to already be a
-      suitable Semaphore-like object.
+      If `capacity` is not an int it is presumed to be a suitable
+      Semaphore-like object.
       `inboundCapacity` can be specified to limit the number of undispatched
       functions that may be queued up; the default is 0 (no limit).
       Calls to submit functions when the inbound limit is reached block
