@@ -186,12 +186,6 @@ class Loggable:
     t, result = self.logTime2(tag, func, *args, **kw)
     return result
 
-  def OBSOLETElogException(self, exc_type, exc_value, traceback, doSimpleExceptionReport=False):
-    self.logfn("EXCEPTION: %s(%s)" % (exc_type, exc_value))
-    if doSimpleExceptionReport:
-      ##NO##from cs.excutils import NoExceptions
-      NoExceptions.simpleExceptionReport(exc_type, exc_value, traceback, mark=self.__logMark)
-
 T_SEQ = 'ARRAY'
 T_MAP = 'HASH'
 T_SCALAR = 'SCALAR'

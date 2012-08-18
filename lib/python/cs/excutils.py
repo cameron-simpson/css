@@ -7,7 +7,6 @@
 import sys
 import logging
 import traceback
-from cs.logutils import log, warning, exception, error, D
 
 def return_exc_info(func, *args, **kwargs):
   ''' Run the supplied function and arguments.
@@ -49,6 +48,7 @@ def noexc(func):
       which I have had abort otherwise sensible code.
   '''
   def wrapper(*args, **kwargs):
+    from cs.logutils import exception, D
     try:
       return func(*args, **kwargs)
     except Exception as e:
@@ -88,22 +88,11 @@ class NoExceptions(object):
         # user supplied handler
         return self.__handler(exc_type, exc_value, tb)
       # report handled exception
+      from cs.logutils import exception, error
       exception("IGNORE  "+str(exc_type)+": "+str(exc_value))
       for line in traceback.format_tb(tb):
         error("IGNORE> "+line[:-1])
     return True
-
-  def simpleExceptionReport(exc_type, exc_value, traceback, mark=None, loglevel=logging.WARNING):
-    ''' Convenience method to log exceptions to standard error.
-    '''
-    if mark is None:
-      mark=cmd
-    else:
-      mark="%s: %s" % (cmd, mark)
-    log("%s: EXCEPTION: %s: %s [%s]" % (mark, exc_type, exc_value, traceback), level=loglevel)
-    return True
-  # backward compatible static method arrangement
-  simpleExceptionReport = staticmethod(simpleExceptionReport)
 
 if __name__ == '__main__':
   import cs.excutils_tests
