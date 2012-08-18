@@ -6,7 +6,7 @@
 
 import sys
 import unittest
-from cs.excutils import return_exc_info, returns_exc_info
+from cs.excutils import return_exc_info, returns_exc_info, noexc
 
 class TestExcUtils(unittest.TestCase):
 
@@ -30,6 +30,17 @@ class TestExcUtils(unittest.TestCase):
     retval, exc_info = divfunc(4, 0)
     self.assertTrue(retval is None)
     self.assertTrue(exc_info[0] is ZeroDivisionError)
+
+  def test_noexc(self):
+    def f(to_raise=None):
+      if to_raise is not None:
+        raise to_raise()
+      return True
+    self.assertIs(f(), True)
+    self.assertRaises(Exception, f, Exception)
+    f2 = noexc(f)
+    self.assertIs(f2(), True)
+    self.assertIs(f2(Exception), None)
 
 def selftest(argv):
   unittest.main(__name__, None, argv)

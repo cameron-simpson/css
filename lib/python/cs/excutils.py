@@ -7,7 +7,7 @@
 import sys
 import logging
 import traceback
-from cs.logutils import log, warning, exception, error
+from cs.logutils import log, warning, exception, error, D
 
 def return_exc_info(func, *args, **kwargs):
   ''' Run the supplied function and arguments.
@@ -40,11 +40,32 @@ def returns_exc_info(func):
     return return_exc_info(func, *args, **kwargs)
   return wrapper
 
+def noexc(func):
+  ''' Decorator to wrap a function which should never raise an exception.
+      Instead, any raised exception is attempted to be logged.
+      A significant side effect is of course that if the function raises an
+      exception it now return None.
+      My primary use case is actually to wrap logging functions,
+      which I have had abort otherwise sensible code.
+  '''
+  def wrapper(*args, **kwargs):
+    try:
+      return func(*args, **kwargs)
+    except Exception as e:
+      try:
+        exception("exception calling %s(%s, **(%s))", func.__name__, args, kwargs)
+      except Exception as e:
+        try:
+          D("exception calling %s(%s, **(%s)): %s", func.__name__, args, kwargs, e)
+        except Exception:
+          pass
+  return wrapper
+
 class NoExceptions(object):
   ''' A context manager to catch _all_ exceptions and log them.
       Arguably this should be a bare try...except but that's syntacticly
       noisy and separates the catch from the top.
-      For simple function calls return_exc_info() is preferred.
+      For simple function calls return_exc_info() is probably better.
   '''
 
   def __init__(self, handleException):
