@@ -346,10 +346,8 @@ class Pfx(object):
                        ] + list(exc_value.args[1:])
             exc_value.args = args
         else:
-          # we can't modify this - at least report the current prefix state
-          sys.stderr.write("%s: Pfx.__exit__: exc_value = %s\n"
-                           % (prefix, cs.misc.O_str(exc_value)))
-          sys.stderr.flush()
+          # we can't modify this exception - at least report the current prefix state
+          D("%s: Pfx.__exit__: exc_value = %s", prefix, cs.misc.O_str(exc_value))
           error("%s: %s", prefix, exc_value)
         # prevent outer Pfx wrappers from hacking stuff as well
         _state.raise_needs_prefix = False
