@@ -436,6 +436,10 @@ class Later(object):
     ''' Queue a function to run right now, ignoring the Later's capacity and
         priority system. This is really an easy way to utilise the Later's
         thread pool and get back a handy LateFunction for result collection.
+	It can be useful for transient control functions that
+	themselves queue things through the Later queuing system
+	but do not want to consume capacity themselves, thus avoiding
+	deadlock at the cost of ransient overthreading.
     '''
     if a or kw:
       func = partial(func, *a, **kw)
