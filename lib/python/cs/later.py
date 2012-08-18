@@ -146,11 +146,11 @@ class PendingFunction(object):
         completion and returns a tuple as for the WorkerThreadPool's
         .dispatch() return queue.
         On completion the sequence:
-          func_result, None, None, None
+          func_result, None
         is returned.
         On an exception the sequence:
-          None, exc_type, exc_value, exc_traceback
-        is returned.
+          None, exc_info
+        is returned where exc_info is a tuple of (exc_type, exc_value, exc_traceback).
     '''
     self.join()
     return self.result
