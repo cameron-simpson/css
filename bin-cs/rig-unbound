@@ -7,7 +7,7 @@
 set -ue
 
 cmd=`basename "$0"`
-usage="Usage: $cmd"
+usage="Usage: $cmd [upstream-forwards...]"
 
 : ${VARRUN:=$HOME/var/run}
 : ${LOGDIR:=$HOME/var/log}
@@ -20,6 +20,9 @@ wkdir=$HOME/var/unbound
 cf=$wkdir/unbound.conf
 log=$LOGDIR/unbound.log
 localzones="l local"
+
+# default upstream DNS servers
+[ $# -gt 0 ] || set -- $UNBOUND_DNS_UPSTREAM
 
 for d in "$VARRUN" "$wkdir" "$LOGDIR"
 do  [ -d "$d/." ] || $trace mkdir "$d"
@@ -92,18 +95,18 @@ do
   esac
 done </etc/hosts
 
-if [ -n "$UNBOUND_DNS_UPSTREAM" ]
+if [ $# -gt 0 ]
 then
   cat <<X
   forward-zone:
     name: "."
 X
-  for dnsup in $UNBOUND_DNS_UPSTREAM
+  for dnsup
   do
     case "$dnsup" in
       [a-z]*)
         resolv=$HOME/rc/dns/resolv-$dnsup.conf
-        $trace sed -n 's/^nameserver  *//p' "$resolv"
+        $trace sed -n 's/ *#.*//; s/^nameserver  *//p' "$resolv"
         ;;
       *)$trace echo "$dnsup"
         ;;
