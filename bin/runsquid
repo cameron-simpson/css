@@ -12,7 +12,7 @@ set -ue
 cmd=`basename "$0"`
 usage="Usage: $cmd [-D] [-f config] [-S squid] [-x] {flushall|start|stop|restart}"
 
-trace=eecho     ##set-x
+trace=
 xopt=
 squidopts=
 
