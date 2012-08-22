@@ -18,6 +18,9 @@ growl=
 case "$OS" in
   darwin)       growl=1 ;;
 esac
+if flag GROWL_DISABLE
+then  growl=
+fi
 
 badopts=
 
