@@ -21,9 +21,10 @@ def tmFromISO(isodate):
 
 def timeFromISO(isodate, islocaltime=False):
   '''  Parse an ISO8601 date string and return seconds since the epoch.
-       If islocal
+       If islocaltime is true convert using localtime(tm) otherwise use
+       gmtime(tm).
   '''
-  tm = tmFromISO(isoformat)
+  tm = tmFromISO(isodate)
   if islocaltime:
     return localtime(tm)
   return gmtime(tm)
