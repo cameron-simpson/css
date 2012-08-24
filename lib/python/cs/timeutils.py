@@ -4,6 +4,9 @@
 #       - Cameron Simpson <cs@zip.com.au> 01feb2010
 #
 
+import datetime
+import time
+
 def timeFunc(func, *args, **kw):
   ''' Run the supplied function and arguments.
       Return a the elapsed time in seconds and the function's own return value.
@@ -32,7 +35,6 @@ def timeFromISO(isodate, islocaltime=False):
 def ISOtime(gmtime):
   ''' Produce an ISO8601 timestamp string from a UNIX time.
   '''
-  import datetime
   dt = datetime.datetime.fromtimestamp(int(gmtime))
   if dt.microsecond != 0:
     from cs.logutils import warning
