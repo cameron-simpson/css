@@ -29,8 +29,8 @@ def timeFromISO(isodate, islocaltime=False):
   '''
   tm = tmFromISO(isodate)
   if islocaltime:
-    return localtime(tm)
-  return gmtime(tm)
+    return time.mktime(tm)
+  raise NotImplementedError("only localtime supported just now")
 
 def ISOtime(gmtime):
   ''' Produce an ISO8601 timestamp string from a UNIX time.
@@ -40,3 +40,11 @@ def ISOtime(gmtime):
     from cs.logutils import warning
     warning("ISOtime: fromtimestamp(%d).microsecond = %s", gmtime, dt.microsecond)
   return dt.isoformat()
+
+if __name__ == '__main__':
+  iso = '2012-08-24T11:12:13'
+  print "iso = %r" % (iso,)
+  tm = tmFromISO(iso)
+  print "tm = %r" % (tm,)
+  when = timeFromISO(iso, islocaltime=True)
+  print "time = %r" % (when,)
