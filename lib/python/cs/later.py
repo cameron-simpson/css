@@ -407,6 +407,7 @@ class Later(object):
       if self.closed:
         warning("close of closed Later %r", self)
       else:
+        info("closing...")
         self.closed = True
         if self._timerQ:
           self._timerQ.close()
@@ -441,6 +442,8 @@ class Later(object):
 	but do not want to consume capacity themselves, thus avoiding
 	deadlock at the cost of ransient overthreading.
     '''
+    if self.closed:
+      raise RunTimError("%s.bg(...) after close()")
     if a or kw:
       func = partial(func, *a, **kw)
     LF = LateFunction(self, func)
@@ -468,6 +471,8 @@ class Later(object):
         If the parameter `pfx` is not None, submit pfx.func(func);
           see cs.logutils.Pfx's .func method for details.
     '''
+    if self.closed:
+      raise RunTimError("%s.bg(...) after close()")
     if delay is not None and when is not None:
       raise ValueError("you can't specify both delay= and when= (%s, %s)" % (delay, when))
     if priority is None:
@@ -529,6 +534,8 @@ class Later(object):
         Equivalent to:
           submit(functools.partial(func, *a, **kw), **params)
     '''
+    if self.closed:
+      raise RunTimError("%s.bg(...) after close()")
     if callable(func):
       params = {}
     else:
