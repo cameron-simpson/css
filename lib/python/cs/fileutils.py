@@ -196,11 +196,7 @@ def watched_file_property(func, attr_name=None, unset_object=None, poll_rate=1):
           if new_filestate:
             setattr(self, attr_name, new_value)
             setattr(self, filestate_name, new_filestate)
-          else:
-            value = getattr(self, attr_name, unset_object)
-      else:
-        value = getattr(self, attr_name, unset_object)
-    return value
+    return getattr(self, attr_name, unset_object)
   return property(getprop)
 
 @contextmanager
