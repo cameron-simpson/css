@@ -11,7 +11,7 @@ if sys.hexversion < 0x03000000:
   from Queue import Queue
 else:
   from queue import Queue
-from cs.threads import TimerQueue, runTree
+from cs.threads import TimerQueue, runTree, RunTreeOp
 from cs.later import Later
 from cs.logutils import D
 
@@ -76,12 +76,12 @@ class TestRuntree(unittest.TestCase):
 
   def test__01_same(self):
     L = Later(1)
-    self.assertEquals(runTree( [1,2,3], [ (self.f_same, False) ], None, L), [1,2,3])
+    self.assertEquals(runTree( [1,2,3], [ RunTreeOp(self.f_same, False, False) ], None, L), [1,2,3])
     L.close()
 
   def test__01_same_fork(self):
     L = Later(1)
-    self.assertEquals(runTree( [1,2,3], [ (self.f_same, True) ], None, L), [1,2,3])
+    self.assertEquals(runTree( [1,2,3], [ RunTreeOp(self.f_same, True, True) ], None, L), [1,2,3])
     L.close()
 
 def selftest(argv):
