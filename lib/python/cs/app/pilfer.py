@@ -9,6 +9,7 @@ import sys
 import os
 import errno
 import os.path
+from copy import copy
 from itertools import chain
 import re
 if sys.hexversion < 0x02060000: from sets import Set as set
@@ -24,9 +25,10 @@ except ImportError:
   import xml.etree.ElementTree as ElementTree
 from cs.fileutils import watched_file_property
 from cs.later import Later
-from cs.logutils import setup_logging, logTo, Pfx, debug, error, warning, exception, pfx_iter
-from cs.threads import runTree
+from cs.logutils import setup_logging, logTo, Pfx, debug, error, warning, exception, pfx_iter, D
+from cs.threads import runTree, RunTreeOp
 from cs.urlutils import URL
+from cs.misc import O
 
 ARCHIVE_SUFFIXES = ( 'tar', 'tgz', 'tar.gz', 'tar.bz2', 'cpio', 'rar', 'zip', 'dmg' )
 IMAGE_SUFFIXES = ( 'png', 'jpg', 'jpeg', 'gif', 'ico', )
@@ -131,11 +133,11 @@ def unique(items, seen=None):
       yield I
       seen.add(I)
 
-class Pilfer(object):
+class Pilfer(O):
   ''' State for the pilfer app.
   '''
 
-  def __init__(self):
+  def __init__(self, **kw):
     self.flush_print = False
     self._print_to = None
     self.save_dir = None
@@ -145,10 +147,18 @@ class Pilfer(object):
     self._seen_urls = ()
     self._seen_urls_lock = Lock()
     self._seen_urls_path = '.urls-seen'
+    O.__init__(self, **kw)
+
+  def __copy__(self):
+    ''' Copy this Pilfer state item, handling the urls lock specially.
+    '''
+    return Pilfer(save_dir=self.save_dir,
+                  user_vars=dict(self.user_vars),
+                  _seen_urls_path=self._seen_urls_path,
+                 )
 
   @watched_file_property
   def seen_urls(self, filename):
-    D("DD: seen_urls(%s)...", filename)
     try:
       with open(filename) as fp:
         return set(fp.readlines())
@@ -544,47 +554,47 @@ def url_srcs(U, referrer=None):
 
 # actions that work on the whole list of in-play URLs
 MANY_TO_MANY = {
-      'sort':         lambda P, Us, *a, **kw: sorted(Us, *a, **kw),
-      'unique':       lambda P, Us: unique(Us),
-      'isarchive':    lambda P, Us: with_exts( Us, ARCHIVE_SUFFIXES ),
-      'isarchive':    lambda P, Us: with_exts( Us, ARCHIVE_SUFFIXES ),
-      'isimage':      lambda P, Us: with_exts( Us, IMAGE_SUFFIXES ),
-      'isvideo':      lambda P, Us: with_exts( Us, VIDEO_SUFFIXES ),
-      'samedomain':   lambda P, Us: [ U for U in Us if notNone(U.referer, "U.referer") and U.domain == U.referer.domain ],
-      'samehostname': lambda P, Us: [ U for U in Us if notNone(U.referer, "U.referer") and U.hostname == U.referer.hostname ],
-      'samescheme':   lambda P, Us: [ U for U in Us if notNone(U.referer, "U.referer") and U.scheme == U.referer.scheme ],
-      'seen':         lambda P, Us: [ U for U in Us if not P.seen(U) ],
-      'unseen':         lambda P, Us: [ U for U in Us if P.seen(U) ],
+      'sort':         lambda Us, P, *a, **kw: sorted(Us, *a, **kw),
+      'unique':       lambda Us, P: unique(Us),
+      'isarchive':    lambda Us, P: with_exts( Us, ARCHIVE_SUFFIXES ),
+      'isarchive':    lambda Us, P: with_exts( Us, ARCHIVE_SUFFIXES ),
+      'isimage':      lambda Us, P: with_exts( Us, IMAGE_SUFFIXES ),
+      'isvideo':      lambda Us, P: with_exts( Us, VIDEO_SUFFIXES ),
+      'samedomain':   lambda Us, P: [ U for U in Us if notNone(U.referer, "U.referer") and U.domain == U.referer.domain ],
+      'samehostname': lambda Us, P: [ U for U in Us if notNone(U.referer, "U.referer") and U.hostname == U.referer.hostname ],
+      'samescheme':   lambda Us, P: [ U for U in Us if notNone(U.referer, "U.referer") and U.scheme == U.referer.scheme ],
+      'seen':         lambda Us, P: [ U for U in Us if P.seen(U) ],
+      'unseen':       lambda Us, P: [ U for U in Us if not P.seen(U) ],
     }
 
 ONE_TO_MANY = {
-      'hrefs':        lambda P, U, *a: url_hrefs(U, *a),
-      'images':       lambda P, U, *a: with_exts(url_hrefs(U, *a), IMAGE_SUFFIXES ),
-      'iimages':      lambda P, U, *a: with_exts(url_srcs(U, *a), IMAGE_SUFFIXES ),
-      'srcs':         lambda P, U, *a: url_srcs(U, *a),
-      'xml':          lambda P, U, match: url_xml_find(U, match),
-      'xmltext':      lambda P, U, match: XML(U).findall(match),
+      'hrefs':        lambda U, P, *a: url_hrefs(U, *a),
+      'images':       lambda U, P, *a: with_exts(url_hrefs(U, *a), IMAGE_SUFFIXES ),
+      'iimages':      lambda U, P, *a: with_exts(url_srcs(U, *a), IMAGE_SUFFIXES ),
+      'srcs':         lambda U, P, *a: url_srcs(U, *a),
+      'xml':          lambda U, P, match: url_xml_find(U, match),
+      'xmltext':      lambda U, P, match: XML(U).findall(match),
     }
 
 # actions that work on individual URLs
 ONE_TO_ONE = {
-      'delay':        lambda P, U, delay: (sleep(float(delay)), U)[1],
-      'domain':       lambda P, U: URL(U, None).domain,
-      'hostname':     lambda P, U: URL(U, None).hostname,
-      'print':        lambda P, U: (print(U), U)[1],
-      'query':        lambda P, U, *a: url_query(U, *a),
-      'quote':        lambda P, U: quote(U),
-      'unquote':      lambda P, U: unquote(U),
-      'save':         lambda P, U, *a: url_io(P.url_save, (), U, *a),
-      'see':          lambda P, U: (P.see(U), U)[1],
-      'title':        lambda P, U: U.title,
-      'type':         lambda P, U: url_io(U.content_type, ""),
-      'xmlattr':      lambda P, U, attr: [ A for A in (ElementTree.XML(U).get(attr),) if A is not None ],
+      'delay':        lambda U, P, delay: (sleep(float(delay)), U)[1],
+      'domain':       lambda U, P: URL(U, None).domain,
+      'hostname':     lambda U, P: URL(U, None).hostname,
+      'print':        lambda U, P: (print(U), U)[1],
+      'query':        lambda U, P, *a: url_query(U, *a),
+      'quote':        lambda U, P: quote(U),
+      'unquote':      lambda U, P: unquote(U),
+      'save':         lambda U, P, *a: url_io(P.url_save, (), U, *a),
+      'see':          lambda U, P: (P.see(U), U)[1],
+      'title':        lambda U, P: U.title,
+      'type':         lambda U, P: url_io(U.content_type, ""),
+      'xmlattr':      lambda U, P, attr: [ A for A in (ElementTree.XML(U).get(attr),) if A is not None ],
     }
 
 def action_operator(action, many_to_many=None, one_to_many=None, one_to_one=None):
-  ''' Accept a string `action` and return an (op_func, op_fork) tuple
-      for use with cs.threads.runTree.
+  ''' Accept a string `action` and return a RunTreeOp for use with
+      cs.threads.runTree.
   '''
   with Pfx("%s", action):
     if many_to_many is None:
@@ -603,24 +613,39 @@ def action_operator(action, many_to_many=None, one_to_many=None, one_to_one=None
         else:
           kwargs[kwarg] = True
     if action in many_to_many:
-      func, fork = many_to_many.get(action), False
+      # many-to-many functions get passed straight in
+      func = many_to_many[action]
+      if kwargs:
+        func = partial(func, **kwargs)
+      op = RunTreeOp(func, False, False)
     elif action in one_to_many:
-      func, fork = one_to_many.get(action), True
-      func = lambda P, Us, **kw: chain( *[ func(P, U, **kw) for U in Us ] )
+      # one-to-many is converted into many-to-many
+      func = one_to_many[action]
+      if kwargs:
+        func = partial(func, **kwargs)
+      def conv(func):
+        def func2(Us, P):
+          return chain( *[ func(U, P) for U in Us ] )
+        return func2
+      op = RunTreeOp(conv(func), True, True)
     elif action in one_to_one:
-      func, fork = one_to_one.get(action), True
-      func = lambda P, Us, **kw: [ func(P, U, **kw) for U in Us ]
+      func = one_to_one[action]
+      if kwargs:
+        func = partial(func, **kwargs)
+      def conv(func, *a, **kw):
+        def func2(Us, P):
+          return [ func(U, P) for U in Us ]
+        return func2
+      op = RunTreeOp(conv(func), True, True)
     else:
       raise ValueError("unknown action")
-    if kwargs:
-      func = partial(func, **kwargs)
-    return ( lambda items, state: func(state, items), fork )
+    return op
 
 if __name__ == '__main__':
   import sys
   setup_logging(sys.argv[0])
   ops = [ action_operator(arg) for arg in sys.argv[1:] ]
-  print("ops = %r" % (ops,))
+  ##print("ops = %r" % (ops,))
   urls = [ 'http://mirror.aarnet.edu.au/', ]
   P = Pilfer()
   with Later(1) as PQ:
