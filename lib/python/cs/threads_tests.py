@@ -11,12 +11,16 @@ if sys.hexversion < 0x03000000:
   from Queue import Queue
 else:
   from queue import Queue
-from cs.threads import TimerQueue
+from cs.threads import TimerQueue, runTree, RunTreeOp
+from cs.later import Later
+from cs.logutils import D
 
 class TestTimerQueue(unittest.TestCase):
+
   def setUp(self):
     self.TQ = TimerQueue()
     self.Q = Queue()
+
   def tearDown(self):
     self.TQ.close()
 
@@ -34,7 +38,7 @@ class TestTimerQueue(unittest.TestCase):
     t1 = time.time()
     self.assert_(t1-t0 >= 1, "ran function earlier than now+1")
 
-  def test01timeorder1(self):
+  def test02timeorder1(self):
     t0 = time.time()
     self.TQ.add(time.time()+3, lambda: self.Q.put(3))
     self.TQ.add(time.time()+2, lambda: self.Q.put(2))
@@ -51,6 +55,34 @@ class TestTimerQueue(unittest.TestCase):
     self.assertEquals(z, 3, "expected 3, got z=%s" % (z,))
     t1 = time.time()
     self.assert_(t1-t0 < 3.1, "took more than 3.1s to get third result")
+
+class TestRuntree(unittest.TestCase):
+
+  @staticmethod
+  def f_same(items, state):
+    return items
+  @staticmethod
+  def f_incr(items, state):
+    return [ n+1 for n in items ]
+
+  def test_00_helpers(self):
+    self.assertEquals(self.f_same((1,), None), (1,))
+    self.assertEquals(self.f_incr((1,2), None), [2,3])
+
+  def test__01_no_operators(self):
+    L = Later(1)
+    self.assertEquals(runTree( [1,2,3], [], None, L), [1,2,3])
+    L.close()
+
+  def test__01_same(self):
+    L = Later(1)
+    self.assertEquals(runTree( [1,2,3], [ RunTreeOp(self.f_same, False, False) ], None, L), [1,2,3])
+    L.close()
+
+  def test__01_same_fork(self):
+    L = Later(1)
+    self.assertEquals(runTree( [1,2,3], [ RunTreeOp(self.f_same, True, True) ], None, L), [1,2,3])
+    L.close()
 
 def selftest(argv):
   unittest.main(__name__, None, argv)

@@ -9,20 +9,26 @@ import sys
 import os
 import errno
 import os.path
+from copy import copy
 from itertools import chain
 import re
 if sys.hexversion < 0x02060000: from sets import Set as set
 from getopt import getopt, GetoptError
 from string import Formatter
 from time import sleep
+from threading import Lock
 from urllib import quote, unquote
 from urllib2 import HTTPError, URLError
 try:
   import xml.etree.cElementTree as ElementTree
 except ImportError:
   import xml.etree.ElementTree as ElementTree
-from cs.logutils import setup_logging, logTo, Pfx, debug, error, warning, exception, pfx_iter
+from cs.fileutils import watched_file_property
+from cs.later import Later
+from cs.logutils import setup_logging, logTo, Pfx, debug, error, warning, exception, pfx_iter, D
+from cs.threads import runTree, RunTreeOp
 from cs.urlutils import URL
+from cs.misc import O
 
 ARCHIVE_SUFFIXES = ( 'tar', 'tgz', 'tar.gz', 'tar.bz2', 'cpio', 'rar', 'zip', 'dmg' )
 IMAGE_SUFFIXES = ( 'png', 'jpg', 'jpeg', 'gif', 'ico', )
@@ -112,37 +118,6 @@ def notNone(v, name="value"):
     raise ValueError("%s is None" % (name,))
   return True
 
-def url_io(func, onerror, *a, **kw):
-  ''' Call `func` and return its result.
-      If it raises URLError or HTTPError, report the error and return `onerror`.
-  '''
-  debug("url_io(%s, %s, %s, %s)...", func, onerror, a, kw)
-  try:
-    return func(*a, **kw)
-  except (URLError, HTTPError) as e:
-    warning("%s", e)
-    return onerror
-
-def url_io_iter(iter):
-  ''' Iterator over `iter` and yield its values.
-      If it raises URLError or HTTPError, report the error.
-  '''
-  while 1:
-    try:
-      i = iter.next()
-    except StopIteration:
-      break
-    except (URLError, HTTPError) as e:
-      warning("%s", e)
-    else:
-      yield i
-
-def url_hrefs(U, referrer=None):
-  return url_io_iter(URL(U, referrer).hrefs(absolute=True))
-
-def url_srcs(U, referrer=None):
-  return url_io_iter(URL(U, referrer).srcs(absolute=True))
-
 def url_xml_find(U, match):
   for found in url_io(URL(U, None).xmlFindall, (), match):
     yield ElementTree.tostring(found, encoding='utf-8')
@@ -158,17 +133,48 @@ def unique(items, seen=None):
       yield I
       seen.add(I)
 
-class Pilfer(object):
+class Pilfer(O):
   ''' State for the pilfer app.
   '''
 
-  def __init__(self):
+  def __init__(self, **kw):
     self.flush_print = False
     self._print_to = None
     self.save_dir = None
     self.user_agent = None
     self.user_vars = {}
     self._urlsfile = None
+    self._seen_urls = ()
+    self._seen_urls_lock = Lock()
+    self._seen_urls_path = '.urls-seen'
+    O.__init__(self, **kw)
+
+  def __copy__(self):
+    ''' Copy this Pilfer state item, handling the urls lock specially.
+    '''
+    return Pilfer(save_dir=self.save_dir,
+                  user_vars=dict(self.user_vars),
+                  _seen_urls_path=self._seen_urls_path,
+                 )
+
+  @watched_file_property
+  def seen_urls(self, filename):
+    try:
+      with open(filename) as fp:
+        return set(fp.readlines())
+    except IOError as e:
+      if e.errno == errno.ENOENT:
+        return ()
+      raise
+
+  def seen(self, U):
+    return U in self.seen_urls
+
+  def see(self, U):
+    with self._seen_urls_lock:
+      with open(self._seen_urls_path, "a") as fp:
+        fp.write(U)
+        fp.write("\n")
 
   def print(self, *a, **kw):
     print_to = kw.get('file', None)
@@ -472,173 +478,177 @@ class Pilfer(object):
         savefp.close()
         raise e
 
-  @property
-  def urlsfile(self):
-    if self._urlsfile is None:
-      self._urlsfile = '.urls-seen'
-    return self._urlsfile
-
-  def url_see(self, U, urlsfile=None):
-    ''' Add URL to urlsfile.
-    '''
-    if urlsfile is None:
-      urlsfile = self.urlsfile
-    with open(urlsfile, "a") as ufp:
-      ufp.write(U)
-      ufp.write("\n")
-    yield U
-
-  def url_seen(self, U, urlsfile=None):
-    ''' Scan urlsfile, yield U if present.
-    '''
-    if urlsfile is None:
-      urlsfile = self.urlsfile
-    if os.path.exists(urlsfile):
-      with open(urlsfile) as ufp:
-        for line in ufp:
-          url = line.strip()
-          if url == U:
-            yield U
-            return
-    debug("SKIP unseen URL: %s", U)
-
-  def url_unseen(self, U, urlsfile=None):
-    ''' Scan urlsfile, yield U if not present.
-    '''
-    if urlsfile is None:
-      urlsfile = self.urlsfile
-    if os.path.exists(urlsfile):
-      with open(urlsfile) as ufp:
-        for line in ufp:
-          url = line.strip()
-          if url == U:
-            debug("SKIP seen URL: %s", U)
-            return
-    yield U
-
-  def url_delay(self, U, delay, *a):
-    sleep(float(delay))
-    yield U
-
-  def with_exts(self, urls, suffixes, case_sensitive=False):
-    for U in urls:
-      ok = False
-      path = U.path
-      if not path.endswith('/'):
-        base = os.path.basename(path)
-        if not case_sensitive:
-          base = base.lower()
-          suffixes = [ sfx.lower() for sfx in suffixes ]
-        for sfx in suffixes:
-          if base.endswith('.'+sfx):
-            ok = True
-            break
-      if ok:
-        yield U
-      else:
-        debug("with_exts: discard %s", U)
-
-  def url_print(self, U, *args):
-    if not args:
-      args = (U,)
-    self.print(",".join( self.format_string(arg, U) for arg in args ))
-    yield U
-
-  def url_query(self, U, *a):
-    U = URL(U, None)
-    if not a:
-      yield U.query
-    qsmap = dict( [ ( qsp.split('=', 1) if '=' in qsp else (qsp, '') ) for qsp in U.query.split('&') ] )
-    yield ','.join( [ unquote(qsmap.get(qparam, '')) for qparam in a ] )
-
-  def url_print_type(self, U):
-    self.print(U, U.content_type)
-    yield U
-
-  def select_by_re(self, U, regexp):
-    m = regexp.search(U)
-    if m:
+def with_exts(urls, suffixes, case_sensitive=False):
+  for U in urls:
+    ok = False
+    path = U.path
+    if not path.endswith('/'):
+      base = os.path.basename(path)
+      if not case_sensitive:
+        base = base.lower()
+        suffixes = [ sfx.lower() for sfx in suffixes ]
+      for sfx in suffixes:
+        if base.endswith('.'+sfx):
+          ok = True
+          break
+    if ok:
       yield U
+    else:
+      debug("with_exts: discard %s", U)
 
-  def deselect_by_re(self, U, regexp):
-    m = regexp.search(U)
-    if not m:
-      yield U
+def url_delay(U, delay, *a):
+  sleep(float(delay))
+  yield U
 
-  def url_print_title(self, U):
-    self.print(U.title)
+def url_query(U, *a):
+  U = URL(U, None)
+  if not a:
+    yield U.query
+  qsmap = dict( [ ( qsp.split('=', 1) if '=' in qsp else (qsp, '') ) for qsp in U.query.split('&') ] )
+  yield ','.join( [ unquote(qsmap.get(qparam, '')) for qparam in a ] )
+
+def url_print_type(self, U):
+  self.print(U, U.content_type)
+  yield U
+
+def select_by_re(self, U, regexp):
+  m = regexp.search(U)
+  if m:
     yield U
 
-  def url_action_all(self, action, urls):
-    ''' Accept `action` and URL `urls`, yield results of action applied to all URLs.
-    '''
-    debug("url_action_all(%s, %s)", action, urls)
-    global actions
-    # gather arguments if any
-    if ':' in action:
-      action, arg_string = action.split(':', 1)
+def deselect_by_re(self, U, regexp):
+  m = regexp.search(U)
+  if not m:
+    yield U
+
+def url_io(func, onerror, *a, **kw):
+  ''' Call `func` and return its result.
+      If it raises URLError or HTTPError, report the error and return `onerror`.
+  '''
+  debug("url_io(%s, %s, %s, %s)...", func, onerror, a, kw)
+  try:
+    return func(*a, **kw)
+  except (URLError, HTTPError) as e:
+    warning("%s", e)
+    return onerror
+
+def url_io_iter(iter):
+  ''' Iterator over `iter` and yield its values.
+      If it raises URLError or HTTPError, report the error.
+  '''
+  while 1:
+    try:
+      i = iter.next()
+    except StopIteration:
+      break
+    except (URLError, HTTPError) as e:
+      warning("%s", e)
     else:
-      arg_string = ""
-    with Pfx("%s(URLs...)%s", action, arg_string):
-      url_func = self.action_map_all.get(action)
-      if url_func is None:
-        raise ValueError("unknown action")
-      return url_io(url_func, (), self, urls, *( arg_string.split(',') if len(arg_string) else () ))
+      yield i
 
-  def url_action(self, action, U):
-    ''' Accept `action` and URL `U`, yield results of action applied to URL.
-    '''
-    debug("url_action(%s, %s)", action, U)
-    global actions
-    # gather arguments if any
+def url_hrefs(U, referrer=None):
+  return url_io_iter(URL(U, referrer).hrefs(absolute=True))
+
+def url_srcs(U, referrer=None):
+  return url_io_iter(URL(U, referrer).srcs(absolute=True))
+
+# actions that work on the whole list of in-play URLs
+MANY_TO_MANY = {
+      'sort':         lambda Us, P, *a, **kw: sorted(Us, *a, **kw),
+      'unique':       lambda Us, P: unique(Us),
+      'isarchive':    lambda Us, P: with_exts( Us, ARCHIVE_SUFFIXES ),
+      'isarchive':    lambda Us, P: with_exts( Us, ARCHIVE_SUFFIXES ),
+      'isimage':      lambda Us, P: with_exts( Us, IMAGE_SUFFIXES ),
+      'isvideo':      lambda Us, P: with_exts( Us, VIDEO_SUFFIXES ),
+      'samedomain':   lambda Us, P: [ U for U in Us if notNone(U.referer, "U.referer") and U.domain == U.referer.domain ],
+      'samehostname': lambda Us, P: [ U for U in Us if notNone(U.referer, "U.referer") and U.hostname == U.referer.hostname ],
+      'samescheme':   lambda Us, P: [ U for U in Us if notNone(U.referer, "U.referer") and U.scheme == U.referer.scheme ],
+      'seen':         lambda Us, P: [ U for U in Us if P.seen(U) ],
+      'unseen':       lambda Us, P: [ U for U in Us if not P.seen(U) ],
+    }
+
+ONE_TO_MANY = {
+      'hrefs':        lambda U, P, *a: url_hrefs(U, *a),
+      'images':       lambda U, P, *a: with_exts(url_hrefs(U, *a), IMAGE_SUFFIXES ),
+      'iimages':      lambda U, P, *a: with_exts(url_srcs(U, *a), IMAGE_SUFFIXES ),
+      'srcs':         lambda U, P, *a: url_srcs(U, *a),
+      'xml':          lambda U, P, match: url_xml_find(U, match),
+      'xmltext':      lambda U, P, match: XML(U).findall(match),
+    }
+
+# actions that work on individual URLs
+ONE_TO_ONE = {
+      'delay':        lambda U, P, delay: (sleep(float(delay)), U)[1],
+      'domain':       lambda U, P: URL(U, None).domain,
+      'hostname':     lambda U, P: URL(U, None).hostname,
+      'print':        lambda U, P: (print(U), U)[1],
+      'query':        lambda U, P, *a: url_query(U, *a),
+      'quote':        lambda U, P: quote(U),
+      'unquote':      lambda U, P: unquote(U),
+      'save':         lambda U, P, *a: url_io(P.url_save, (), U, *a),
+      'see':          lambda U, P: (P.see(U), U)[1],
+      'title':        lambda U, P: U.title,
+      'type':         lambda U, P: url_io(U.content_type, ""),
+      'xmlattr':      lambda U, P, attr: [ A for A in (ElementTree.XML(U).get(attr),) if A is not None ],
+    }
+
+def action_operator(action, many_to_many=None, one_to_many=None, one_to_one=None):
+  ''' Accept a string `action` and return a RunTreeOp for use with
+      cs.threads.runTree.
+  '''
+  with Pfx("%s", action):
+    if many_to_many is None:
+      many_to_many = MANY_TO_MANY
+    if one_to_many is None:
+      one_to_many = ONE_TO_MANY
+    if one_to_one is None:
+      one_to_one = ONE_TO_ONE
+    kwargs = {}
     if ':' in action:
-      action, arg_string = action.split(':', 1)
+      action, kws = action.split(':', 1)
+      for kw in kws.split(','):
+        if '=' in kwarg:
+          kw, v = kw.split('=', 1)
+          kwargs[kw] = v
+        else:
+          kwargs[kwarg] = True
+    if action in many_to_many:
+      # many-to-many functions get passed straight in
+      func = many_to_many[action]
+      if kwargs:
+        func = partial(func, **kwargs)
+      op = RunTreeOp(func, False, False)
+    elif action in one_to_many:
+      # one-to-many is converted into many-to-many
+      func = one_to_many[action]
+      if kwargs:
+        func = partial(func, **kwargs)
+      def conv(func):
+        def func2(Us, P):
+          return chain( *[ func(U, P) for U in Us ] )
+        return func2
+      op = RunTreeOp(conv(func), True, True)
+    elif action in one_to_one:
+      func = one_to_one[action]
+      if kwargs:
+        func = partial(func, **kwargs)
+      def conv(func, *a, **kw):
+        def func2(Us, P):
+          return [ func(U, P) for U in Us ]
+        return func2
+      op = RunTreeOp(conv(func), True, True)
     else:
-      arg_string = ""
-    with Pfx("%s(%s)%s", action, U, arg_string):
-      url_func = self.action_map.get(action)
-      if url_func is None:
-        raise ValueError("unknown action")
-      L = url_io(url_func, (), self, U, *( arg_string.split(',') if len(arg_string) else () ))
-      return L
-
-  # actions that work on the whole list of in-play URLs
-  action_map_all = {
-        'sort':         lambda P, Us, *a, **kw: sorted(Us, *a, **kw),
-        'unique':       lambda P, Us: unique(Us),
-      }
-
-  # actions that work on individual URLs
-  action_map = {
-        'delay':        url_delay,
-        'domain':       lambda P, U: (URL(U, None).domain,),
-        'hostname':     lambda P, U: (URL(U, None).hostname,),
-        'hrefs':        lambda P, U, *a: url_hrefs(U, *a),
-        'images':       lambda P, U, *a: P.with_exts(url_hrefs(U, *a), IMAGE_SUFFIXES ),
-        'iimages':      lambda P, U, *a: P.with_exts(url_srcs(U, *a), IMAGE_SUFFIXES ),
-        'isarchive':    lambda P, U: P.with_exts( [U], ARCHIVE_SUFFIXES ),
-        'isarchive':    lambda P, U: P.with_exts( [U], ARCHIVE_SUFFIXES ),
-        'isimage':      lambda P, U: P.with_exts( [U], IMAGE_SUFFIXES ),
-        'isvideo':      lambda P, U: P.with_exts( [U], VIDEO_SUFFIXES ),
-        'print':        url_print,
-        'query':        url_query,
-        'quote':        lambda P, U: (quote(U),),
-        'unquote':      lambda P, U: (unquote(U),),
-        'samedomain':   lambda P, U: (U,) if notNone(U.referer, "U.referer") and U.domain == U.referer.domain else (),
-        'samehostname': lambda P, U: (U,) if notNone(U.referer, "U.referer") and U.hostname == U.referer.hostname else (),
-        'samescheme':   lambda P, U: (U,) if notNone(U.referer, "U.referer") and U.scheme == U.referer.scheme else (),
-        'save':         lambda P, U, *a: url_io(P.url_save, (), U, *a),
-        'see':          url_see,
-        'seen':         url_seen,
-        'srcs':         lambda P, U, *a: url_srcs(U, *a),
-        'title':        url_print_title,
-        'type':         lambda P, U: url_io(P.url_print_type, "", U),
-        'unseen':       url_unseen,
-        'xml':          lambda P, U, match: url_xml_find(U, match),
-        'xmlattr':      lambda P, U, attr: [ A for A in (ElementTree.XML(U).get(attr),) if A is not None ],
-        'xmltext':      lambda P, U, match: XML(U).findall(match),
-      }
+      raise ValueError("unknown action")
+    return op
 
 if __name__ == '__main__':
   import sys
+  setup_logging(sys.argv[0])
+  ops = [ action_operator(arg) for arg in sys.argv[1:] ]
+  ##print("ops = %r" % (ops,))
+  urls = [ 'http://mirror.aarnet.edu.au/', ]
+  P = Pilfer()
+  with Later(1) as PQ:
+    runTree(urls, ops, P, PQ)
+  sys.exit(0)
   sys.exit(main(sys.argv))

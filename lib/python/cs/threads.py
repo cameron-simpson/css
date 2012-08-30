@@ -5,6 +5,8 @@
 #
 
 from __future__ import with_statement
+from collections import namedtuple
+from copy import copy
 from functools import partial
 import sys
 import time
@@ -907,6 +909,61 @@ def via(cmanager, func, *a, **kw):
     with cmanager:
       return func(*a, **kw)
   return f
+
+RunTreeOp = namedtuple('RunTreeOp', 'func fork copy')
+
+def runTree(items, operators, state, funcQ):
+  ''' Descend an operation tree expressed as:
+        `items`: an iterable of items to evaluate
+        `operators`: an iterable of RunTreeOp instances
+          op.func is a function accepting an iterable of items and a state
+                        object, and returning result items to be passed to
+                        subsequence operators
+          op.fork       Fork a parallel chain of operations for each item.
+          op.copy       Copy the state object to the subsequent operations
+                        instead of passing the original.
+          If op.fork is true, for each current item call:
+            op.func((item,), deepcopy(state))
+          and run the remaining operators on the result, then collate
+          all the runs.
+          If op.fork is false, call:
+            op.func(items, state)
+          and run the remaining operators on the result.
+        `state`: a state object for use by op.func
+        `funcQ`: a cs.later.Later function queue to dispatch functions
+      Returns a list of results items.
+      This is the core algoritm underneath the cs.app.pilfer operation.
+  '''
+  from cs.later import report
+  operators = list(operators)
+  while operators:
+    op = operators.pop(0)
+    qops = []
+    if op.fork:
+      # push the function back on without a fork
+      # then queue a call per current item
+      # using a copy of the state
+      new_operators = tuple([ RunTreeOp(op.func, False, False) ] + operators)
+      for item in items:
+        substate = copy(state) if op.copy else state
+        qops.append(funcQ.bg(runTree, (item,), new_operators, substate, funcQ))
+      operators = []
+    else:
+      substate = copy(state) if op.copy else state
+      qops.append(funcQ.defer(op.func, items, substate))
+    new_items = []
+    for qop in qops:
+      subitems, exc_info = qop.wait()
+      if exc_info:
+        exc_type, exc_value, exc_traceback = exc_info
+        try:
+          raise exc_type, exc_value, exc_traceback
+        except:
+          exception("runTree()")
+      else:
+        new_items.extend(subitems)
+    items = new_items
+  return items
 
 if __name__ == '__main__':
   import cs.threads_tests

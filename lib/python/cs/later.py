@@ -146,11 +146,11 @@ class PendingFunction(object):
         completion and returns a tuple as for the WorkerThreadPool's
         .dispatch() return queue.
         On completion the sequence:
-          func_result, None, None, None
+          func_result, None
         is returned.
         On an exception the sequence:
-          None, exc_type, exc_value, exc_traceback
-        is returned.
+          None, exc_info
+        is returned where exc_info is a tuple of (exc_type, exc_value, exc_traceback).
     '''
     self.join()
     return self.result
@@ -298,8 +298,8 @@ class Later(object):
   ''' A management class to queue function calls for later execution.
       If `capacity` is an int, it is used to size a Semaphore to constrain
       the number of dispatched functions which may be in play at a time.
-      If `capacity` is not an int it is presumed to already be a
-      suitable Semaphore-like object.
+      If `capacity` is not an int it is presumed to be a suitable
+      Semaphore-like object.
       `inboundCapacity` can be specified to limit the number of undispatched
       functions that may be queued up; the default is 0 (no limit).
       Calls to submit functions when the inbound limit is reached block
@@ -401,6 +401,7 @@ class Later(object):
       if self.closed:
         warning("close of closed Later %r", self)
       else:
+        info("closing...")
         self.closed = True
         if self._timerQ:
           self._timerQ.close()
@@ -430,7 +431,13 @@ class Later(object):
     ''' Queue a function to run right now, ignoring the Later's capacity and
         priority system. This is really an easy way to utilise the Later's
         thread pool and get back a handy LateFunction for result collection.
+	It can be useful for transient control functions that
+	themselves queue things through the Later queuing system
+	but do not want to consume capacity themselves, thus avoiding
+	deadlock at the cost of ransient overthreading.
     '''
+    if self.closed:
+      raise RunTimError("%s.bg(...) after close()")
     if a or kw:
       func = partial(func, *a, **kw)
     LF = LateFunction(self, func)
@@ -458,6 +465,8 @@ class Later(object):
         If the parameter `pfx` is not None, submit pfx.func(func);
           see cs.logutils.Pfx's .func method for details.
     '''
+    if self.closed:
+      raise RunTimError("%s.bg(...) after close()")
     if delay is not None and when is not None:
       raise ValueError("you can't specify both delay= and when= (%s, %s)" % (delay, when))
     if priority is None:
@@ -519,6 +528,8 @@ class Later(object):
         Equivalent to:
           submit(functools.partial(func, *a, **kw), **params)
     '''
+    if self.closed:
+      raise RunTimError("%s.bg(...) after close()")
     if callable(func):
       params = {}
     else:

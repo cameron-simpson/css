@@ -121,7 +121,7 @@ def FileState(path, do_lstat=False):
   s = os.lstat(path) if do_lstat else os.stat(path)
   return _FileState(s.st_mtime, s.st_size, s.st_dev, s.st_ino)
 
-def watch_file(path, old_state, reload_file, missing_ok=False):
+def poll_file(path, old_state, reload_file, missing_ok=False):
   ''' Watch a file for modification by polling its state as obtained by FileState().
       Call reload_file(path) if the state changes.
       Return (new_state, reload_file(path)) if the file was modified and was
@@ -153,20 +153,20 @@ def watch_file(path, old_state, reload_file, missing_ok=False):
       return new_state, R
   return None, None
 
-def watched_file_property(func, prop_name=None, unset_object=None, poll_rate=1):
+def watched_file_property(func, attr_name=None, unset_object=None, poll_rate=1):
   ''' A property whose value reloads if a file changes.
       `func` accepts the file path and returns the new value.
-      The property {prop_name}_lock controls access to the property.
-      The properties {prop_name}_mtime, {prop_name}_path track the
+      The attribute {attr_name}_lock controls access to the property.
+      The attributes {attr_name}_filestate and {attr_name}_path track the
       associated file state.
-      The property {prop_name}_lastpoll track the last poll time.
+      The attribute {attr_name}_lastpoll tracks the last poll time.
   '''
-  if prop_name is None:
-    prop_name = '_' + func.__name__
-  lock_name = prop_name + '_lock'
-  filestate_name = prop_name + '_filestate'
-  path_name = prop_name + '_path'
-  lastpoll_name = prop_name + '_lastpoll'
+  if attr_name is None:
+    attr_name = '_' + func.__name__
+  lock_name = attr_name + '_lock'
+  filestate_name = attr_name + '_filestate'
+  path_name = attr_name + '_path'
+  lastpoll_name = attr_name + '_lastpoll'
   def getprop(self):
     ''' Try to reload property value from file if the propety value
         is stale and the file has been modified since the last reload.
@@ -178,7 +178,7 @@ def watched_file_property(func, prop_name=None, unset_object=None, poll_rate=1):
         setattr(self, lastpoll_name, now)
         old_filestate = getattr(self, filestate_name, None)
         try:
-          new_filestate, value = watch_file(getattr(self, path_name),
+          new_filestate, new_value = poll_file(getattr(self, path_name),
                                         old_filestate,
                                         partial(func, self),
                                         missing_ok=True)
@@ -187,20 +187,16 @@ def watched_file_property(func, prop_name=None, unset_object=None, poll_rate=1):
         except AttributeError:
           raise
         except Exception as e:
-          value = getattr(self, prop_name, unset_object)
-          if value is unset_object:
+          new_value = getattr(self, attr_name, unset_object)
+          if new_value is unset_object:
             raise
           import cs.logutils
-          cs.logutils.exception("exception during watch_file")
+          cs.logutils.exception("exception during poll_file, leaving .%s untouched", attr_name)
         else:
           if new_filestate:
-            setattr(self, prop_name, value)
+            setattr(self, attr_name, new_value)
             setattr(self, filestate_name, new_filestate)
-          else:
-            value = getattr(self, prop_name)
-      else:
-        value = getattr(self, prop_name)
-    return value
+    return getattr(self, attr_name, unset_object)
   return property(getprop)
 
 @contextmanager
