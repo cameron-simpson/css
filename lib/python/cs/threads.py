@@ -938,7 +938,6 @@ def runTree(items, operators, state, funcQ):
   operators = list(operators)
   while operators:
     op = operators.pop(0)
-    D("op = %r", op)
     qops = []
     if op.fork:
       # push the function back on without a fork
