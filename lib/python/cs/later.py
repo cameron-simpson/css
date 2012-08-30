@@ -401,7 +401,7 @@ class Later(object):
       if self.closed:
         warning("close of closed Later %r", self)
       else:
-        info("closing...")
+        debug("closing...")
         self.closed = True
         if self._timerQ:
           self._timerQ.close()
