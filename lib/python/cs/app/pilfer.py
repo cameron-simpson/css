@@ -99,10 +99,9 @@ def main(argv):
                 urls.append(URL(line, None, P.user_agent))
           else:
             urls = [ URL(url, None, P.user_agent) ]
-          urls = P.act(urls, argv)
-          if not quiet:
-            for url in urls:
-              P.print(url)
+          run_ops = [ action_operator(action) for action in argv ]
+          with Later(1) as PQ:
+            runTree(urls, run_ops, P, PQ)
       else:
         error("unsupported op")
         badopts = True
@@ -643,12 +642,4 @@ def action_operator(action, many_to_many=None, one_to_many=None, one_to_one=None
 
 if __name__ == '__main__':
   import sys
-  setup_logging(sys.argv[0])
-  ops = [ action_operator(arg) for arg in sys.argv[1:] ]
-  ##print("ops = %r" % (ops,))
-  urls = [ 'http://mirror.aarnet.edu.au/', ]
-  P = Pilfer()
-  with Later(1) as PQ:
-    runTree(urls, ops, P, PQ)
-  sys.exit(0)
   sys.exit(main(sys.argv))
