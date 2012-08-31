@@ -478,6 +478,20 @@ class Pilfer(O):
         savefp.close()
         raise e
 
+def has_exts(U, suffixes, case_sensitive=False):
+  ok = False
+  path = U.path
+  if not path.endswith('/'):
+    base = os.path.basename(path)
+    if not case_sensitive:
+      base = base.lower()
+      suffixes = [ sfx.lower() for sfx in suffixes ]
+    for sfx in suffixes:
+      if base.endswith('.'+sfx):
+        ok = True
+        break
+  return ok
+
 def with_exts(urls, suffixes, case_sensitive=False):
   for U in urls:
     ok = False
@@ -546,15 +560,6 @@ def url_srcs(U, referrer=None):
 MANY_TO_MANY = {
       'sort':         lambda Us, P, *a, **kw: sorted(Us, *a, **kw),
       'unique':       lambda Us, P: unique(Us),
-      'isarchive':    lambda Us, P: with_exts( Us, ARCHIVE_SUFFIXES ),
-      'isarchive':    lambda Us, P: with_exts( Us, ARCHIVE_SUFFIXES ),
-      'isimage':      lambda Us, P: with_exts( Us, IMAGE_SUFFIXES ),
-      'isvideo':      lambda Us, P: with_exts( Us, VIDEO_SUFFIXES ),
-      'samedomain':   lambda Us, P: [ U for U in Us if notNone(U.referer, "U.referer") and U.domain == U.referer.domain ],
-      'samehostname': lambda Us, P: [ U for U in Us if notNone(U.referer, "U.referer") and U.hostname == U.referer.hostname ],
-      'samescheme':   lambda Us, P: [ U for U in Us if notNone(U.referer, "U.referer") and U.scheme == U.referer.scheme ],
-      'seen':         lambda Us, P: [ U for U in Us if P.seen(U) ],
-      'unseen':       lambda Us, P: [ U for U in Us if not P.seen(U) ],
     }
 
 ONE_TO_MANY = {
@@ -591,8 +596,17 @@ def _search_re(U, P, regexp):
   return m
 
 ONE_TEST = {
-      'select_re':      _search_re,
-      'reject_re':      lambda U, P, regexp: not regexp.search(U),
+      'isarchive':    lambda U, P: has_exts( U, ARCHIVE_SUFFIXES ),
+      'isarchive':    lambda U, P: has_exts( U, ARCHIVE_SUFFIXES ),
+      'isimage':      lambda U, P: has_exts( U, IMAGE_SUFFIXES ),
+      'isvideo':      lambda U, P: has_exts( U, VIDEO_SUFFIXES ),
+      'reject_re':    lambda U, P, regexp: not regexp.search(U),
+      'samedomain':   lambda U, P: notNone(U.referer, "U.referer") and U.domain == U.referer.domain,
+      'samehostname': lambda U, P: notNone(U.referer, "U.referer") and U.hostname == U.referer.hostname,
+      'samescheme':   lambda U, P: notNone(U.referer, "U.referer") and U.scheme == U.referer.scheme,
+      'seen':         lambda U, P: P.seen(U),
+      'select_re':    _search_re,
+      'unseen':       lambda U, P: not P.seen(U),
     }
 
 def action_operator(action,
@@ -621,7 +635,6 @@ def action_operator(action,
         regexp = action[1:]
       kwargs['regexp'] = re.compile(regexp)
       action = 'select_re'
-      D("action = %r, regexp = %r, kwargs = %r", action, regexp, kwargs)
     # select URLs not matching regexp
     elif action.startswith('-/'):
       if action.endswith('/'):
