@@ -10,6 +10,7 @@ import os
 import errno
 import os.path
 from copy import copy
+from functools import partial
 from itertools import chain
 import re
 if sys.hexversion < 0x02060000: from sets import Set as set
@@ -510,16 +511,6 @@ def url_print_type(self, U):
   self.print(U, U.content_type)
   yield U
 
-def select_by_re(self, U, regexp):
-  m = regexp.search(U)
-  if m:
-    yield U
-
-def deselect_by_re(self, U, regexp):
-  m = regexp.search(U)
-  if not m:
-    yield U
-
 def url_io(func, onerror, *a, **kw):
   ''' Call `func` and return its result.
       If it raises URLError or HTTPError, report the error and return `onerror`.
@@ -580,6 +571,7 @@ ONE_TO_ONE = {
       'delay':        lambda U, P, delay: (sleep(float(delay)), U)[1],
       'domain':       lambda U, P: URL(U, None).domain,
       'hostname':     lambda U, P: URL(U, None).hostname,
+      'per':          lambda U, P: U,
       'print':        lambda U, P: (print(U), U)[1],
       'query':        lambda U, P, *a: url_query(U, *a),
       'quote':        lambda U, P: quote(U),
@@ -591,7 +583,23 @@ ONE_TO_ONE = {
       'xmlattr':      lambda U, P, attr: [ A for A in (ElementTree.XML(U).get(attr),) if A is not None ],
     }
 
-def action_operator(action, many_to_many=None, one_to_many=None, one_to_one=None):
+def _search_re(U, P, regexp):
+  ''' Search for `regexp` in `U`, return resulting MatchObject or None.
+      The result is also stored as `P.re` for subsequent use.
+  '''
+  m = P.re = regexp.search(U)
+  return m
+
+ONE_TEST = {
+      'select_re':      _search_re,
+      'reject_re':      lambda U, P, regexp: not regexp.search(U),
+    }
+
+def action_operator(action,
+                    many_to_many=None,
+                    one_to_many=None,
+                    one_to_one=None,
+                    one_test=None):
   ''' Accept a string `action` and return a RunTreeOp for use with
       cs.threads.runTree.
   '''
@@ -602,8 +610,27 @@ def action_operator(action, many_to_many=None, one_to_many=None, one_to_one=None
       one_to_many = ONE_TO_MANY
     if one_to_one is None:
       one_to_one = ONE_TO_ONE
+    if one_test is None:
+      one_test = ONE_TEST
     kwargs = {}
-    if ':' in action:
+    # select URLs matching regexp
+    if action.startswith('/'):
+      if action.endswith('/'):
+        regexp = action[1:-1]
+      else:
+        regexp = action[1:]
+      kwargs['regexp'] = re.compile(regexp)
+      action = 'select_re'
+      D("action = %r, regexp = %r, kwargs = %r", action, regexp, kwargs)
+    # select URLs not matching regexp
+    elif action.startswith('-/'):
+      if action.endswith('/'):
+        regexp = action[2:-1]
+      else:
+        regexp = action[2:]
+      kwargs['regexp'] = re.compile(regexp)
+      action = 'reject_re'
+    elif ':' in action:
       action, kws = action.split(':', 1)
       for kw in kws.split(','):
         if '=' in kwarg:
@@ -634,6 +661,18 @@ def action_operator(action, many_to_many=None, one_to_many=None, one_to_one=None
       def conv(func, *a, **kw):
         def func2(Us, P):
           return [ func(U, P) for U in Us ]
+        return func2
+      op = RunTreeOp(conv(func), True, True)
+    elif action in one_test:
+      func = one_test[action]
+      if kwargs:
+        func = partial(func, **kwargs)
+      def conv(func, *a, **kw):
+        def func2(Us, P):
+          for U in Us:
+            ok = func(U, P)
+            if ok:
+              yield U
         return func2
       op = RunTreeOp(conv(func), True, True)
     else:
