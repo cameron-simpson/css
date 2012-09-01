@@ -609,6 +609,32 @@ ONE_TEST = {
       'unseen':       lambda U, P: not P.seen(U),
     }
 
+re_ASSIGN = re.compile(r'([a-z]\w*)=')
+
+def conv_one_to_one(func):
+  ''' Convert a one-to-one function to a many to many.
+  '''
+  def func2(Us, P):
+    return [ func(U, P) for U in Us ]
+  return func2
+
+def conv_one_to_many(func):
+  ''' Convert a one-to-many function to many-to-many.
+  '''
+  def func2(Us, P):
+    return chain( *[ func(U, P) for U in Us ] )
+  return func2
+
+def conv_one_test(func):
+  ''' Convert a test-one function to many-to-many.
+  '''
+  def func2(Us, P):
+    for U in Us:
+      ok = func(U, P)
+      if ok:
+        yield U
+  return func2
+
 def action_operator(action,
                     many_to_many=None,
                     one_to_many=None,
@@ -643,53 +669,49 @@ def action_operator(action,
         regexp = action[2:]
       kwargs['regexp'] = re.compile(regexp)
       action = 'reject_re'
-    elif ':' in action:
-      action, kws = action.split(':', 1)
-      for kw in kws.split(','):
-        if '=' in kwarg:
-          kw, v = kw.split('=', 1)
-          kwargs[kw] = v
-        else:
-          kwargs[kwarg] = True
-    if action in many_to_many:
-      # many-to-many functions get passed straight in
-      func = many_to_many[action]
-      if kwargs:
-        func = partial(func, **kwargs)
-      op = RunTreeOp(func, False, False)
-    elif action in one_to_many:
-      # one-to-many is converted into many-to-many
-      func = one_to_many[action]
-      if kwargs:
-        func = partial(func, **kwargs)
-      def conv(func):
-        def func2(Us, P):
-          return chain( *[ func(U, P) for U in Us ] )
-        return func2
-      op = RunTreeOp(conv(func), True, True)
-    elif action in one_to_one:
-      func = one_to_one[action]
-      if kwargs:
-        func = partial(func, **kwargs)
-      def conv(func, *a, **kw):
-        def func2(Us, P):
-          return [ func(U, P) for U in Us ]
-        return func2
-      op = RunTreeOp(conv(func), True, True)
-    elif action in one_test:
-      func = one_test[action]
-      if kwargs:
-        func = partial(func, **kwargs)
-      def conv(func, *a, **kw):
-        def func2(Us, P):
-          for U in Us:
-            ok = func(U, P)
-            if ok:
-              yield U
-        return func2
-      op = RunTreeOp(conv(func), True, True)
     else:
-      raise ValueError("unknown action")
+      m = re_ASSIGN.match(action)
+      if m:
+        var = m.group(1)
+        value = action[m.end():]
+        def assign(U, P, var, value):
+          P.user_vars[var] = P.format(value)
+          return U
+      elif ':' in action:
+        action, kws = action.split(':', 1)
+        for kw in kws.split(','):
+          if '=' in kwarg:
+            kw, v = kw.split('=', 1)
+            kwargs[kw] = v
+          else:
+            kwargs[kwarg] = True
+      if action in many_to_many:
+        # many-to-many functions get passed straight in
+        func = many_to_many[action]
+        if kwargs:
+          func = partial(func, **kwargs)
+        op = RunTreeOp(func, False, False)
+      elif action in one_to_many:
+        # one-to-many is converted into many-to-many
+        func = one_to_many[action]
+        if kwargs:
+          func = partial(func, **kwargs)
+        func = conv_one_to_many(func)
+        op = RunTreeOp(func, True, True)
+      elif action in one_to_one:
+        func = one_to_one[action]
+        if kwargs:
+          func = partial(func, **kwargs)
+        func = conv_one_to_one(func)
+        op = RunTreeOp(func, True, True)
+      elif action in one_test:
+        func = one_test[action]
+        if kwargs:
+          func = partial(func, **kwargs)
+        func = conv_one_test(func)
+        op = RunTreeOp(func, True, True)
+      else:
+        raise ValueError("unknown action")
     return op
 
 if __name__ == '__main__':
