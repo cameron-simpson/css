@@ -685,34 +685,34 @@ def action_operator(action,
             kwargs[kw] = v
           else:
             kwargs[kwarg] = True
+      do_fork = False
+      do_copy = False
       if action in many_to_many:
         # many-to-many functions get passed straight in
         func = many_to_many[action]
         if kwargs:
           func = partial(func, **kwargs)
-        op = RunTreeOp(func, False, False)
       elif action in one_to_many:
         # one-to-many is converted into many-to-many
+        do_fork = True
         func = one_to_many[action]
         if kwargs:
           func = partial(func, **kwargs)
         func = conv_one_to_many(func)
-        op = RunTreeOp(func, True, True)
       elif action in one_to_one:
+        do_fork = True
         func = one_to_one[action]
         if kwargs:
           func = partial(func, **kwargs)
         func = conv_one_to_one(func)
-        op = RunTreeOp(func, True, True)
       elif action in one_test:
         func = one_test[action]
         if kwargs:
           func = partial(func, **kwargs)
         func = conv_one_test(func)
-        op = RunTreeOp(func, True, True)
       else:
         raise ValueError("unknown action")
-    return op
+      return RunTreeOp(func, do_fork, do_copy)
 
 if __name__ == '__main__':
   import sys
