@@ -63,6 +63,8 @@ re_HAS_SCHEME = re.compile(r'^[a-z]+:')
 
 def pattern_acl(pattern):
   # /regex
+  if pattern == '*':
+    return "src all"
   if pattern.startswith('/'):
     return "url_regex "+pattern
   # scheme:...
