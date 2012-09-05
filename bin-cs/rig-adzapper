@@ -65,7 +65,7 @@ do
   ( IFS=:; set -- $parent
     if [ $# = 2 ]
     then
-      echo "cache_peer $1 parent $2 0"
+      echo "cache_peer $1 parent $2 0 round-robin"
     else
       echo "$cmd: SKIPPING bad parent: $parent" >&2
     fi
