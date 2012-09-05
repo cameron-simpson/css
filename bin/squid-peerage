@@ -62,6 +62,8 @@ def main(argv):
 re_HAS_SCHEME = re.compile(r'^[a-z]+:')
 
 def pattern_acl(pattern):
+  ''' Return an ACL derived from the supplied pattern.
+  '''
   # /regex
   if pattern == '*':
     return "src all"
@@ -91,8 +93,30 @@ class Proxy(O):
 
   @property
   def acls(self):
+    ''' Define ACLs for our patterns, except "*".
+    '''
+    n = 0
+    oacl_type = None
     for pattern in self.patterns:
-      yield "acl for_%s %s" % (self.name, pattern_acl(pattern))
+      if pattern != "*":
+        acl = pattern_acl(pattern)
+        acl_type, acl_text = acl.split(None, 1)
+        if oacl_type is None or acl_type != oacl_type:
+          oacl_type = acl_type
+          acl_name = "for_%s_%d" % (self.name, n)
+          n += 1
+        yield "acl %s %s %s" % (acl_name, acl_type, acl_text)
+
+  @property
+  def acl_names(self):
+    ''' Enumerate the ACL names defained by .acls.
+    '''
+    seen = []
+    for acl in self.acls:
+      a, n, t = acl.split(None, 2)
+      if n not in seen:
+        yield n
+        seen.append(n)
 
   @property
   def other_proxies(self):
@@ -102,19 +126,33 @@ class Proxy(O):
 
   @property
   def peer_access(self):
+    ''' For the DIRECT peer, set always_direct.
+        For other peers, set cache_peer_access;
+          reject DIRECT patterns
+          allow our patterns except for "*"
+          reject other non-DIRECT peers' patterns
+          if "*" in our patterns, allow all
+    '''
     name = self.name
     peername = self.peername
     if name == 'DIRECT':
-      yield "always_direct allow for_%s" % (name,)
+      for acl_name in self.acl_names:
+        yield "always_direct allow %s" % (acl_name,)
+      for acl_name in self.acl_names:
+        yield "never_direct deny %s" % (acl_name,)
     else:
-      yield "cache_peer_access %s deny for_DIRECT" % (peername,)
-      if self.patterns:
-        yield "cache_peer_access %s allow for_%s" % (peername, name,)
-        yield "cache_peer_access %s deny all" % (peername,)
-      else:
-        for proxy in self.other_proxies:
-          if proxy is not self and proxy.name != 'DIRECT':
-            yield "cache_peer_access %s deny for_%s" % (peername, proxy.name)
+      for acl_name in self.all_proxies['DIRECT'].acl_names:
+        yield "cache_peer_access %s deny %s" % (peername, acl_name)
+      # allow our patterns (except "*")
+      for acl_name in self.acl_names:
+        yield "cache_peer_access %s allow %s" % (peername, acl_name)
+      # reject other proxies' patterns (except "*")
+      for oproxy in self.other_proxies:
+        if oproxy.name != 'DIRECT':
+          for acl_name in oproxy.acl_names:
+            yield "cache_peer_access %s deny %s" % (peername, acl_name)
+      # allow all others if "*" in our patterns
+      if "*" in self.patterns:
         yield "cache_peer_access %s allow all" % (peername,)
 
 if __name__ == '__main__':
