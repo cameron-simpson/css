@@ -97,6 +97,7 @@ cache allow all
 http_access allow all
 shutdown_lifetime 2 seconds
 icp_access allow all
+nonhierarchical_direct off
 X
 
 squid-peerage
@@ -106,7 +107,9 @@ exec 1>&3 3>&-
 ( echo "# Generated on `date`."
   echo "# $0 $oargs"
   echo
-  patch-config -I -i "$dfltrc" <"$directives" | grep '^[^#]'
+  patch-config -I -i "$dfltrc" <"$directives" \
+  | grep '^[^#]' \
+  | sed 's/^ *hierarchy_stoplist/##&/'
 ) \
 | $trace rewriteif -d "$rc"
 
