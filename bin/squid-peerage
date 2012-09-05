@@ -130,8 +130,11 @@ class Proxy(O):
         For other peers, set cache_peer_access;
           reject DIRECT patterns
           allow our patterns except for "*"
-          reject other non-DIRECT peers' patterns
-          if "*" in our patterns, allow all
+          if "*" in our patterns
+            reject other non-DIRECT peers' patterns
+            then allow all
+          else
+            reject all
     '''
     name = self.name
     peername = self.peername
@@ -146,14 +149,17 @@ class Proxy(O):
       # allow our patterns (except "*")
       for acl_name in self.acl_names:
         yield "cache_peer_access %s allow %s" % (peername, acl_name)
-      # reject other proxies' patterns (except "*")
-      for oproxy in self.other_proxies:
-        if oproxy.name != 'DIRECT':
-          for acl_name in oproxy.acl_names:
-            yield "cache_peer_access %s deny %s" % (peername, acl_name)
-      # allow all others if "*" in our patterns
       if "*" in self.patterns:
+        # reject other proxies' patterns (except "*")
+        for oproxy in self.other_proxies:
+          if oproxy.name != 'DIRECT':
+            for acl_name in oproxy.acl_names:
+              yield "cache_peer_access %s deny %s" % (peername, acl_name)
+        # allow all others
         yield "cache_peer_access %s allow all" % (peername,)
+      else:
+        # reject anything else not in our patterns
+        yield "cache_peer_access %s deny all" % (peername,)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
