@@ -546,6 +546,8 @@ def url_srcs(U, referrer=None):
 MANY_TO_MANY = {
       'sort':         lambda Us, P, *a, **kw: sorted(Us, *a, **kw),
       'unique':       lambda Us, P: unique(Us),
+      'first':        lambda Us, P: Us[:1],
+      'last':         lambda Us, P: Us[-1:],
     }
 
 ONE_TO_MANY = {
