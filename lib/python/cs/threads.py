@@ -34,6 +34,7 @@ class WorkerThreadPool(object):
     self.closed = False
     self.idle = deque()
     self.all = []
+    self._lock = Lock()
 
   def __str__(self):
     return self.name
@@ -71,20 +72,21 @@ class WorkerThreadPool(object):
     if pfx is not None:
       func = pfx.func(func)
     idle = self.idle
-    if idle:
-      # use an idle thread
-      Hdesc = idle.pop()
-    else:
-      # no available threads - make one
-      args = []
-      H = Thread(target=self._handler, args=args)
-      H.daemon = True
-      Hdesc = (H, IterableQueue())
-      self.all.append(Hdesc)
-      args.append(Hdesc)
-      debug("%s: start new worker thread", self)
-      H.start()
-    Hdesc[1].put( (func, retq, deliver) )
+    with self._lock:
+      if idle:
+        # use an idle thread
+        Hdesc = idle.pop()
+      else:
+        # no available threads - make one
+        args = []
+        H = Thread(target=self._handler, args=args)
+        H.daemon = True
+        Hdesc = (H, IterableQueue())
+        self.all.append(Hdesc)
+        args.append(Hdesc)
+        debug("%s: start new worker thread", self)
+        H.start()
+      Hdesc[1].put( (func, retq, deliver) )
 
   def _handler(self, Hdesc):
     ''' The code run by each handler thread.
@@ -125,7 +127,8 @@ class WorkerThreadPool(object):
         deliver(result)
         deliver = None
       result = None
-      self.idle.append( Hdesc )
+      with self._lock:
+        self.idle.append( Hdesc )
 
 class AdjustableSemaphore(object):
   ''' A semaphore whose value may be tuned after instantiation.
