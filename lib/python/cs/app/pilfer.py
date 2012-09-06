@@ -190,46 +190,6 @@ class Pilfer(O):
     while actions:
       action = actions.pop(0)
       with Pfx(action):
-        # depth first step at this point
-        if action == 'per':
-          urls = pfx_iter(action, chain( *[ list(self.act([U], list(actions))) for U in urls ] ) )
-          actions = ()
-          continue
-
-        # select URLs matching regexp
-        if action.startswith('/'):
-          if action.endswith('/'):
-            regexp = action[1:-1]
-          else:
-            regexp = action[1:]
-          regexp = re.compile(regexp)
-          urls = pfx_iter(action, chain( *[ self.select_by_re(U, regexp) for U in urls ] ) )
-          continue
-
-        # select URLs not matching regexp
-        if action.startswith('-/'):
-          if action.endswith('/'):
-            regexp = action[2:-1]
-          else:
-            regexp = action[2:]
-          regexp = re.compile(regexp)
-          urls = pfx_iter(action, chain( *[ self.deselect_by_re(U, regexp) for U in urls ] ) )
-          continue
-
-        # URL parent dir
-        if action == '..':
-          urls = pfx_iter(action, [ U.parent for U in urls ] )
-          continue
-
-        # select URLs ending in suffix
-        if action.startswith('.'):
-          if action.endswith('/i'):
-            exts, case = action[1:-2], False
-          else:
-            exts, case = action[1:], True
-          exts = exts.split(',')
-          urls = pfx_iter(action, self.with_exts(urls, suffixes=exts, case_sensitive=case) )
-          continue
 
         # s/this/that/g
         if len(action) > 4 and action.startswith('s') and not action[1].isalnum() and action[1] != '_':
@@ -565,6 +525,7 @@ ONE_TO_MANY = {
 
 # actions that work on individual URLs
 ONE_TO_ONE = {
+      '..':           lambda U, P: return URL(U, None).parent,
       'delay':        lambda U, P, delay: (sleep(float(delay)), U)[1],
       'domain':       lambda U, P: URL(U, None).domain,
       'hostname':     lambda U, P: URL(U, None).hostname,
@@ -597,6 +558,7 @@ ONE_TEST = {
       'samehostname': lambda U, P: notNone(U.referer, "U.referer") and U.hostname == U.referer.hostname,
       'samescheme':   lambda U, P: notNone(U.referer, "U.referer") and U.scheme == U.referer.scheme,
       'seen':         lambda U, P: P.seen(U),
+      'select_exts':  lambda U, P, exts, case: has_exts( U, exts, case_sensitive=case ),
       'select_re':    _search_re,
       'unseen':       lambda U, P: not P.seen(U),
     }
@@ -661,6 +623,16 @@ def action_operator(action,
         regexp = action[2:]
       kwargs['regexp'] = re.compile(regexp)
       action = 'reject_re'
+    # select URLs ending in particular extensions
+    elif action.startswith('.'):
+      if action.endswith('/i'):
+        exts, case = action[1:-2], False
+      else:
+        exts, case = action[1:], True
+      exts = exts.split(',')
+      kwargs['case'] = case
+      kwargs['exts'] = exts
+      action = 'select_exts'
     else:
       m = re_ASSIGN.match(action)
       if m:
