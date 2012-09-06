@@ -101,6 +101,7 @@ def main(argv):
           else:
             urls = [ URL(url, None, P.user_agent) ]
           run_ops = [ action_operator(action) for action in argv ]
+          ##D("run_ops = %r", run_ops)
           with Later(1) as PQ:
             runTree(urls, run_ops, P, PQ)
       else:
@@ -431,6 +432,9 @@ class Pilfer(O):
         raise e
 
 def has_exts(U, suffixes, case_sensitive=False):
+  ''' Test if the .path component of a URL ends in one of a list of suffixes.
+      Note that the .path component does not include the query_string.
+  '''
   ok = False
   path = U.path
   if not path.endswith('/'):
@@ -525,7 +529,7 @@ ONE_TO_MANY = {
 
 # actions that work on individual URLs
 ONE_TO_ONE = {
-      '..':           lambda U, P: return URL(U, None).parent,
+      '..':           lambda U, P: URL(U, None).parent,
       'delay':        lambda U, P, delay: (sleep(float(delay)), U)[1],
       'domain':       lambda U, P: URL(U, None).domain,
       'hostname':     lambda U, P: URL(U, None).hostname,
@@ -624,6 +628,8 @@ def action_operator(action,
       kwargs['regexp'] = re.compile(regexp)
       action = 'reject_re'
     # select URLs ending in particular extensions
+    elif action == '..':
+      pass
     elif action.startswith('.'):
       if action.endswith('/i'):
         exts, case = action[1:-2], False
@@ -649,34 +655,34 @@ def action_operator(action,
             kwargs[kw] = v
           else:
             kwargs[kwarg] = True
-      do_fork = False
-      do_copy = False
-      if action in many_to_many:
-        # many-to-many functions get passed straight in
-        func = many_to_many[action]
-        if kwargs:
-          func = partial(func, **kwargs)
-      elif action in one_to_many:
-        # one-to-many is converted into many-to-many
-        do_fork = True
-        func = one_to_many[action]
-        if kwargs:
-          func = partial(func, **kwargs)
-        func = conv_one_to_many(func)
-      elif action in one_to_one:
-        do_fork = True
-        func = one_to_one[action]
-        if kwargs:
-          func = partial(func, **kwargs)
-        func = conv_one_to_one(func)
-      elif action in one_test:
-        func = one_test[action]
-        if kwargs:
-          func = partial(func, **kwargs)
-        func = conv_one_test(func)
-      else:
-        raise ValueError("unknown action")
-      return RunTreeOp(func, do_fork, do_copy)
+    do_fork = False
+    do_copy = False
+    if action in many_to_many:
+      # many-to-many functions get passed straight in
+      func = many_to_many[action]
+      if kwargs:
+        func = partial(func, **kwargs)
+    elif action in one_to_many:
+      # one-to-many is converted into many-to-many
+      do_fork = True
+      func = one_to_many[action]
+      if kwargs:
+        func = partial(func, **kwargs)
+      func = conv_one_to_many(func)
+    elif action in one_to_one:
+      do_fork = True
+      func = one_to_one[action]
+      if kwargs:
+        func = partial(func, **kwargs)
+      func = conv_one_to_one(func)
+    elif action in one_test:
+      func = one_test[action]
+      if kwargs:
+        func = partial(func, **kwargs)
+      func = conv_one_test(func)
+    else:
+      raise ValueError("unknown action")
+    return RunTreeOp(func, do_fork, do_copy)
 
 if __name__ == '__main__':
   import sys
