@@ -169,6 +169,11 @@ class Pilfer(O):
       if e.errno != errno.ENOENT:
         warning("%s: %s", urlspath, e)
 
+  def set_user_vars(self, **kw):
+    v = self.user_vars
+    for k in kw:
+      v[k] = kw[k]
+
   def __copy__(self):
     ''' Copy this Pilfer state item, preserving shared state.
     '''
