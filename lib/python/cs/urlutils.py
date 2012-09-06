@@ -27,7 +27,7 @@ except ImportError:
   import xml.etree.ElementTree as ElementTree
 from threading import RLock
 from cs.lex import parseUC_sAttr
-from cs.logutils import Pfx, pfx_iter, debug, error, warning, exception
+from cs.logutils import Pfx, pfx_iter, debug, error, warning, exception, D
 from cs.threads import locked_property
 from cs.py3 import StringIO
 
