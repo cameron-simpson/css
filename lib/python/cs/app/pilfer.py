@@ -145,16 +145,37 @@ class Pilfer(O):
     self.user_agent = None
     self.user_vars = {}
     self._urlsfile = None
-    self.seen_urls = set()
+    self.seen_urls = None
+    self.seen_urls_path = '.urls-seen'
     self._seen_urls_lock = Lock()
     O.__init__(self, **kw)
+    if self.seen_urls is None:
+      self.seen_urls = set()
+      self.read_seen_urls()
+
+  def read_seen_urls(self, urlspath=None):
+    if urlspath is None:
+      urlspath = self.seen_urls_path
+    try:
+      with open(urlspath) as sfp:
+        lineno = 0
+        for line in sfp:
+          lineno += 1
+          if not line.endswith('\n'):
+            warning("%s:%d: unexpected EOF - no newline", urlspath, lineno)
+          else:
+            self.seen_urls.add(line[:-1])
+    except OSerror as e:
+      if e.errno != errno.ENOENT:
+        warning("%s: %s", urlspath, e)
 
   def __copy__(self):
-    ''' Copy this Pilfer state item, handling the urls lock specially.
+    ''' Copy this Pilfer state item, preserving shared state.
     '''
     return Pilfer(save_dir=self.save_dir,
                   user_vars=dict(self.user_vars),
-                  _seen_urls_path=self._seen_urls_path,
+                  seen_urls=self.seen_urls,
+                  _seen_urls_lock=self._seen_urls_lock,
                  )
 
   def seen(self, U):
@@ -165,7 +186,7 @@ class Pilfer(O):
     with self._seen_urls_lock:
       if U not in self.seen_urls:
         self.seen_urls.add(U)
-        with open(self._seen_urls_path, "a") as fp:
+        with open(self.seen_urls_path, "a") as fp:
           fp.write(U)
           fp.write("\n")
 
