@@ -139,9 +139,9 @@ class Pilfer(O):
   '''
 
   def __init__(self, **kw):
+    self._lock = Lock()
     self.flush_print = False
     self._print_to = None
-    self.save_dir = None
     self.user_agent = None
     self.user_vars = {}
     self._urlsfile = None
@@ -165,15 +165,14 @@ class Pilfer(O):
             warning("%s:%d: unexpected EOF - no newline", urlspath, lineno)
           else:
             self.seen_urls.add(line[:-1])
-    except OSerror as e:
+    except IOError as e:
       if e.errno != errno.ENOENT:
         warning("%s: %s", urlspath, e)
 
   def __copy__(self):
     ''' Copy this Pilfer state item, preserving shared state.
     '''
-    return Pilfer(save_dir=self.save_dir,
-                  user_vars=dict(self.user_vars),
+    return Pilfer(user_vars=dict(self.user_vars),
                   seen_urls=self.seen_urls,
                   _seen_urls_lock=self._seen_urls_lock,
                  )
@@ -200,6 +199,23 @@ class Pilfer(O):
     print(*a, **kw)
     if self.flush_print:
       print_to.flush()
+
+  def url_save_dir(self, U):
+    ''' Return the current URL save dir.
+        If unset, create one based on the URL `U`.
+        Return its path and also save the path in user_vars['save_dir'].
+    '''
+    with self._lock:
+      dir = self.user_vars.get('save_dir')
+      if dir is None:
+        dir = ( ("%s-%s--%s" % (U.hostname,
+                                os.path.dirname(U.path),
+                                '-'.join(U.title.split())))
+                .replace('/', '-')
+              )[:os.statvfs('.').f_namemax-6]
+        dir = new_dir(dir)
+        self.user_var['save_dir'] = dir
+    return dir
 
   def act(self, urls, actions):
     ''' Return an iterable of the results of the actions applied to the URLs.
@@ -327,41 +343,6 @@ class Pilfer(O):
     F = Formatter()
     return F.vformat(s, (), Pilfer.URLkeywords(U))
 
-  def new_save_dir(self, dir):
-    try:
-      os.makedirs(dir)
-    except OSError as e:
-      if e.errno != errno.EEXIST:
-        raise
-      n = 2
-      while True:
-        ndir = "%s-%d" % (dir, n)
-        try:
-          os.makedirs(ndir)
-        except OSError as e:
-          if e.errno != errno.EEXIST:
-            raise
-          n += 1
-          continue
-        dir = ndir
-        break
-    return dir
-
-  def url_save_dir(self, U, ignore_save_dir=False):
-    ''' Return save directory for supplied URL.
-    '''
-    U = URL(U, None)
-    U.get_content("")   # probe content
-    if not ignore_save_dir and self.save_dir:
-      dir = self.save_dir
-    else:
-      dir = ( ("%s-%s--%s" % (U.hostname,
-                              os.path.dirname(U.path),
-                              '-'.join(U.title.split())))
-              .replace('/', '-')
-            )[:os.statvfs('.').f_namemax-6]
-    return dir
-
   def url_save(self, U, *a):
     with Pfx(U):
       try:
@@ -451,6 +432,29 @@ class Pilfer(O):
         os.remove(savepath)
         savefp.close()
         raise e
+
+def new_dir(self, dir):
+  ''' Create the directory `dir` or `dir-n` if `dir` exists.
+      Return the path of the directory created.
+  '''
+  try:
+    os.makedirs(dir)
+  except OSError as e:
+    if e.errno != errno.EEXIST:
+      raise
+    n = 2
+    while True:
+      ndir = "%s-%d" % (dir, n)
+      try:
+        os.makedirs(ndir)
+      except OSError as e:
+        if e.errno != errno.EEXIST:
+          raise
+        n += 1
+        continue
+      dir = ndir
+      break
+  return dir
 
 def has_exts(U, suffixes, case_sensitive=False):
   ''' Test if the .path component of a URL ends in one of a list of suffixes.
@@ -554,7 +558,8 @@ ONE_TO_ONE = {
       'delay':        lambda U, P, delay: (sleep(float(delay)), U)[1],
       'domain':       lambda U, P: URL(U, None).domain,
       'hostname':     lambda U, P: URL(U, None).hostname,
-      'per':          lambda U, P: U,
+      'new_dir':      lambda U, P: (P.url_save_dir(U), U)[1],
+      'per':          lambda U, P: (P.set_user_vars(save_dir=None), U)[1],
       'print':        lambda U, P: (print(U), U)[1],
       'query':        lambda U, P, *a: url_query(U, *a),
       'quote':        lambda U, P: quote(U),
