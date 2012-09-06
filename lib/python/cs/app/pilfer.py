@@ -579,14 +579,15 @@ def _search_re(U, P, regexp):
   return m
 
 ONE_TEST = {
-      'isarchive':    lambda U, P: has_exts( U, ARCHIVE_SUFFIXES ),
-      'isarchive':    lambda U, P: has_exts( U, ARCHIVE_SUFFIXES ),
-      'isimage':      lambda U, P: has_exts( U, IMAGE_SUFFIXES ),
-      'isvideo':      lambda U, P: has_exts( U, VIDEO_SUFFIXES ),
+      'has_title':    lambda U, P: U.title is not None,
+      'is_archive':   lambda U, P: has_exts( U, ARCHIVE_SUFFIXES ),
+      'is_archive':   lambda U, P: has_exts( U, ARCHIVE_SUFFIXES ),
+      'is_image':     lambda U, P: has_exts( U, IMAGE_SUFFIXES ),
+      'is_video':     lambda U, P: has_exts( U, VIDEO_SUFFIXES ),
       'reject_re':    lambda U, P, regexp: not regexp.search(U),
-      'samedomain':   lambda U, P: notNone(U.referer, "U.referer") and U.domain == U.referer.domain,
-      'samehostname': lambda U, P: notNone(U.referer, "U.referer") and U.hostname == U.referer.hostname,
-      'samescheme':   lambda U, P: notNone(U.referer, "U.referer") and U.scheme == U.referer.scheme,
+      'same_domain':  lambda U, P: notNone(U.referer, "U.referer") and U.domain == U.referer.domain,
+      'same_hostname':lambda U, P: notNone(U.referer, "U.referer") and U.hostname == U.referer.hostname,
+      'same_scheme':  lambda U, P: notNone(U.referer, "U.referer") and U.scheme == U.referer.scheme,
       'seen':         lambda U, P: P.seen(U),
       'select_exts':  lambda U, P, exts, case: has_exts( U, exts, case_sensitive=case ),
       'select_re':    _search_re,
