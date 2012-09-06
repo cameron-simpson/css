@@ -691,6 +691,9 @@ def action_operator(action,
             kwargs[kwarg] = True
     do_fork = False
     do_copy = False
+    if action == "per":
+      do_fork = True
+      do_copy = True
     if action in many_to_many:
       # many-to-many functions get passed straight in
       func = many_to_many[action]
@@ -710,6 +713,7 @@ def action_operator(action,
         func = partial(func, **kwargs)
       func = conv_one_to_one(func)
     elif action in one_test:
+      do_fork = True
       func = one_test[action]
       if kwargs:
         func = partial(func, **kwargs)
