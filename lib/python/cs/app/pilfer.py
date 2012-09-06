@@ -144,9 +144,8 @@ class Pilfer(O):
     self.user_agent = None
     self.user_vars = {}
     self._urlsfile = None
-    self._seen_urls = ()
+    self.seen_urls = set()
     self._seen_urls_lock = Lock()
-    self._seen_urls_path = '.urls-seen'
     O.__init__(self, **kw)
 
   def __copy__(self):
@@ -157,24 +156,17 @@ class Pilfer(O):
                   _seen_urls_path=self._seen_urls_path,
                  )
 
-  @watched_file_property
-  def seen_urls(self, filename):
-    try:
-      with open(filename) as fp:
-        return set(fp.readlines())
-    except IOError as e:
-      if e.errno == errno.ENOENT:
-        return ()
-      raise
-
   def seen(self, U):
-    return U in self.seen_urls
+    with self._seen_urls_lock:
+      return U in self.seen_urls
 
   def see(self, U):
     with self._seen_urls_lock:
-      with open(self._seen_urls_path, "a") as fp:
-        fp.write(U)
-        fp.write("\n")
+      if U not in self.seen_urls:
+        self.seen_urls.add(U)
+        with open(self._seen_urls_path, "a") as fp:
+          fp.write(U)
+          fp.write("\n")
 
   def print(self, *a, **kw):
     print_to = kw.get('file', None)
