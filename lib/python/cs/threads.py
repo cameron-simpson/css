@@ -938,34 +938,38 @@ def runTree(items, operators, state, funcQ):
       This is the core algoritm underneath the cs.app.pilfer operation.
   '''
   from cs.later import report
-  operators = list(operators)
-  while operators:
-    op = operators.pop(0)
-    qops = []
-    if op.fork:
-      # push the function back on without a fork
-      # then queue a call per current item
-      # using a copy of the state
-      new_operators = tuple([ RunTreeOp(op.func, False, False) ] + operators)
-      for item in items:
-        substate = copy(state) if op.copy else state
-        qops.append(funcQ.bg(runTree, (item,), new_operators, substate, funcQ))
-      operators = []
-    else:
-      substate = copy(state) if op.copy else state
-      qops.append(funcQ.defer(op.func, items, substate))
-    new_items = []
-    for qop in qops:
-      subitems, exc_info = qop.wait()
-      if exc_info:
-        exc_type, exc_value, exc_traceback = exc_info
-        try:
-          raise exc_type, exc_value, exc_traceback
-        except:
-          exception("runTree()")
+  operationQ = deque()
+  operationQ.append( (items, operators, state) )
+  while operationQ:
+    items, operators, state = operationQ.popleft()
+    operators = list(operators)
+    while operators:
+      op = operators.pop(0)
+      qops = []
+      if op.fork:
+        # push the function back on without a fork
+        # then queue a call per current item
+        # using a copy of the state
+        new_operators = tuple([ RunTreeOp(op.func, False, False) ] + operators)
+        for item in items:
+          substate = copy(state) if op.copy else state
+          qops.append(funcQ.bg(runTree, (item,), new_operators, substate, funcQ))
+        operators = []
       else:
-        new_items.extend(subitems)
-    items = new_items
+        substate = copy(state) if op.copy else state
+        qops.append(funcQ.defer(op.func, items, substate))
+      new_items = []
+      for qop in qops:
+        subitems, exc_info = qop.wait()
+        if exc_info:
+          exc_type, exc_value, exc_traceback = exc_info
+          try:
+            raise exc_type, exc_value, exc_traceback
+          except:
+            exception("runTree()")
+        else:
+          new_items.extend(subitems)
+      items = new_items
   return items
 
 if __name__ == '__main__':
