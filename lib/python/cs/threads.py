@@ -925,6 +925,10 @@ def runTree(items, operators, state, funcQ):
           op.fork       Fork a parallel chain of operations for each item.
           op.copy       Copy the state object to the subsequent operations
                         instead of passing the original.
+	  op.branch     If op.branch is not None it should be a
+                        callable returning an iterable of RunTreeOps. A fresh
+                        runtree will be dispatched to process the operators
+                        with the current item list.
           If op.fork is true, for each current item call:
             op.func((item,), deepcopy(state))
           and run the remaining operators on the result, then collate
@@ -948,7 +952,7 @@ def runTree(items, operators, state, funcQ):
       qops = []
       if op.branch:
         # dispatch another runTree to follow the branch with the current item list
-        funcQ.bg(runTree, items, (RunTreeOp(op.branch, op.fork, op.copy, None),), state, funcQ)
+        funcQ.bg(runTree, items, op.branch(), state, funcQ)
       if op.fork:
         # push the function back on without a fork
         # then queue a call per current item
