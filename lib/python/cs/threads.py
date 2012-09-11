@@ -913,7 +913,7 @@ def via(cmanager, func, *a, **kw):
       return func(*a, **kw)
   return f
 
-RunTreeOp = namedtuple('RunTreeOp', 'func fork copy')
+RunTreeOp = namedtuple('RunTreeOp', 'func fork copy branch')
 
 def runTree(items, operators, state, funcQ):
   ''' Descend an operation tree expressed as:
@@ -946,11 +946,14 @@ def runTree(items, operators, state, funcQ):
     while operators:
       op = operators.pop(0)
       qops = []
+      if op.branch:
+        # dispatch another runTree to follow the branch with the current item list
+        funcQ.bg(runTree, items, (RunTreeOp(op.branch, op.fork, op.copy, None),), state, funcQ)
       if op.fork:
         # push the function back on without a fork
         # then queue a call per current item
         # using a copy of the state
-        new_operators = tuple([ RunTreeOp(op.func, False, False) ] + operators)
+        new_operators = tuple([ RunTreeOp(op.func, False, False, op.branch) ] + operators)
         for item in items:
           substate = copy(state) if op.copy else state
           qops.append(funcQ.bg(runTree, (item,), new_operators, substate, funcQ))
