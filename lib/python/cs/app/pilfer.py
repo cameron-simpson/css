@@ -691,6 +691,7 @@ def action_operator(action,
             kwargs[kwarg] = True
     do_fork = False
     do_copy = False
+    branch_func = None
     if action == "per":
       do_fork = True
       do_copy = True
@@ -720,7 +721,7 @@ def action_operator(action,
       func = conv_one_test(func)
     else:
       raise ValueError("unknown action")
-    return RunTreeOp(func, do_fork, do_copy)
+    return RunTreeOp(func, do_fork, do_copy, branch_func)
 
 if __name__ == '__main__':
   import sys
