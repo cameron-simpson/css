@@ -17,6 +17,7 @@ if sys.hexversion < 0x03000000:
 else:
   from queue import Queue, PriorityQueue, Full, Empty
 from collections import deque
+from itertools import chain
 if sys.hexversion < 0x02060000: from sets import Set as set
 from cs.misc import seq
 from cs.logutils import Pfx, LogTime, error, warning, debug, exception, OBSOLETE, D
@@ -915,16 +916,16 @@ def via(cmanager, func, *a, **kw):
 
 RunTreeOp = namedtuple('RunTreeOp', 'func fork copy branch')
 
-def runTree(items, operators, state, funcQ):
+def runTree(input, operators, state, funcQ):
   ''' Descend an operation tree expressed as:
-        `items`: an iterable of items to evaluate
+        `input`: an input object
         `operators`: an iterable of RunTreeOp instances
 	  NB: if an item of the iterator is callable, presume it
               to be a bare function and convert it to RunTreeOp(op, False,
               False, None).
-          op.func is a function accepting an iterable of items and a state
-                        object, and returning result items to be passed to
-                        subsequence operators
+          op.func is a function accepting the input and state objects,
+                        and returning a result to be passed as the input
+                        object to subsequence operators
           op.fork       Fork a parallel chain of operations for each item.
           op.copy       Copy the state object to the subsequent operations
                         instead of passing the original.
@@ -932,16 +933,16 @@ def runTree(items, operators, state, funcQ):
                         callable returning an iterable of RunTreeOps. A fresh
                         runtree will be dispatched to process the operators
                         with the current item list.
-          If op.fork is true, for each current item call:
-            op.func((item,), deepcopy(state))
-          and run the remaining operators on the result, then collate
-          all the runs.
+          If op.fork is true, iterate over the input object and for each item call:
+            op.func(item, deepcopy(state))
+	  Each return value should be iterable, and the iterables
+	  are chained together to produce the next input object.
           If op.fork is false, call:
-            op.func(items, state)
+            output = op.func(input, state)
           and run the remaining operators on the result.
         `state`: a state object for use by op.func
         `funcQ`: a cs.later.Later function queue to dispatch functions
-      Returns a list of results items.
+      Returns the final output.
       This is the core algoritm underneath the cs.app.pilfer operation.
   '''
   from cs.later import report
@@ -951,40 +952,48 @@ def runTree(items, operators, state, funcQ):
     op = operators.pop(0)
     if callable(op):
       op = RunTreeOp(func, False, False, None)
-    qops = []
     if op.branch:
       # dispatch another runTree to follow the branch with the current item list
-      bg.append( funcQ.bg(runTree, items, op.branch(), state, funcQ) )
+      bg.append( funcQ.bg(runTree, input, op.branch(), state, funcQ) )
     if op.func:
       if op.fork:
         # push the function back on without a fork
         # then queue a call per current item
         # using a copy of the state
-        new_operators = tuple([ RunTreeOp(op.func, False, False, op.branch) ] + operators)
-        for item in items:
+        suboperators = tuple([ RunTreeOp(op.func, False, False, op.branch) ] + operators)
+        qops = []
+        for item in input:
           substate = copy(state) if op.copy else state
-          qops.append(funcQ.bg(runTree, (item,), new_operators, substate, funcQ))
+          qops.append(funcQ.bg(runTree, (item,), suboperators, substate, funcQ))
+        outputs = []
+        for qop in qops:
+          output, exc_info = qop.wait()
+          if exc_info:
+            exc_type, exc_value, exc_traceback = exc_info
+            try:
+              raise exc_type, exc_value, exc_traceback
+            except:
+              exception("runTree()")
+          else:
+            outputs.append(output)
+        output = chain(*outputs)
         operators = []
       else:
         substate = copy(state) if op.copy else state
-        qops.append(funcQ.defer(op.func, items, substate))
-      new_items = []
-      for qop in qops:
-        subitems, exc_info = qop.wait()
+        qop = funcQ.defer(op.func, input, substate)
+        output, exc_info = qop.wait()
         if exc_info:
           exc_type, exc_value, exc_traceback = exc_info
           try:
             raise exc_type, exc_value, exc_traceback
           except:
             exception("runTree()")
-        else:
-          new_items.extend(subitems)
-      items = new_items
+      input = output
 
   # wait for any asynchronous runs to complete
   # also report exceptions raised
   for bgf in bg:
-    bg_items, exc_info = bgf.wait()
+    bg_output, exc_info = bgf.wait()
     if exc_info:
       exc_type, exc_value, exc_traceback = exc_info
       try:
@@ -992,7 +1001,7 @@ def runTree(items, operators, state, funcQ):
       except:
         exception("runTree()")
 
-  return items
+  return input
 
 if __name__ == '__main__':
   import cs.threads_tests
