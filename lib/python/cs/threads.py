@@ -943,36 +943,50 @@ def runTree(items, operators, state, funcQ):
   '''
   from cs.later import report
   operators = list(operators)
+  bg = []
   while operators:
     op = operators.pop(0)
     qops = []
     if op.branch:
       # dispatch another runTree to follow the branch with the current item list
-      funcQ.bg(runTree, items, op.branch(), state, funcQ)
-    if op.fork:
-      # push the function back on without a fork
-      # then queue a call per current item
-      # using a copy of the state
-      new_operators = tuple([ RunTreeOp(op.func, False, False, op.branch) ] + operators)
-      for item in items:
-        substate = copy(state) if op.copy else state
-        qops.append(funcQ.bg(runTree, (item,), new_operators, substate, funcQ))
-      operators = []
-    else:
-      substate = copy(state) if op.copy else state
-      qops.append(funcQ.defer(op.func, items, substate))
-    new_items = []
-    for qop in qops:
-      subitems, exc_info = qop.wait()
-      if exc_info:
-        exc_type, exc_value, exc_traceback = exc_info
-        try:
-          raise exc_type, exc_value, exc_traceback
-        except:
-          exception("runTree()")
+      bg.append( funcQ.bg(runTree, items, op.branch(), state, funcQ) )
+    if op.func:
+      if op.fork:
+        # push the function back on without a fork
+        # then queue a call per current item
+        # using a copy of the state
+        new_operators = tuple([ RunTreeOp(op.func, False, False, op.branch) ] + operators)
+        for item in items:
+          substate = copy(state) if op.copy else state
+          qops.append(funcQ.bg(runTree, (item,), new_operators, substate, funcQ))
+        operators = []
       else:
-        new_items.extend(subitems)
-    items = new_items
+        substate = copy(state) if op.copy else state
+        qops.append(funcQ.defer(op.func, items, substate))
+      new_items = []
+      for qop in qops:
+        subitems, exc_info = qop.wait()
+        if exc_info:
+          exc_type, exc_value, exc_traceback = exc_info
+          try:
+            raise exc_type, exc_value, exc_traceback
+          except:
+            exception("runTree()")
+        else:
+          new_items.extend(subitems)
+      items = new_items
+
+  # wait for any asynchronous runs to complete
+  # also report exceptions raised
+  for bgf in bg:
+    bg_items, exc_info = bgf.wait()
+    if exc_info:
+      exc_type, exc_value, exc_traceback = exc_info
+      try:
+        raise exc_type, exc_value, exc_traceback
+      except:
+        exception("runTree()")
+
   return items
 
 if __name__ == '__main__':
