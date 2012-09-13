@@ -919,6 +919,9 @@ def runTree(items, operators, state, funcQ):
   ''' Descend an operation tree expressed as:
         `items`: an iterable of items to evaluate
         `operators`: an iterable of RunTreeOp instances
+	  NB: if an item of the iterator is callable, presume it
+              to be a bare function and convert it to RunTreeOp(op, False,
+              False, None).
           op.func is a function accepting an iterable of items and a state
                         object, and returning result items to be passed to
                         subsequence operators
@@ -946,6 +949,8 @@ def runTree(items, operators, state, funcQ):
   bg = []
   while operators:
     op = operators.pop(0)
+    if callable(op):
+      op = RunTreeOp(func, False, False, None)
     qops = []
     if op.branch:
       # dispatch another runTree to follow the branch with the current item list
