@@ -58,9 +58,14 @@ class TestTimerQueue(unittest.TestCase):
 
 class TestRuntree(unittest.TestCase):
 
+  # A many to many identity function.
   @staticmethod
-  def f_same(items, state):
-    return items
+  def f_same(input, state):
+    return input
+  # A one to (one,) identity function.
+  @staticmethod
+  def f_same_one2many(input, state):
+    return (input,)
   @staticmethod
   def f_incr(items, state):
     return [ n+1 for n in items ]
@@ -76,12 +81,12 @@ class TestRuntree(unittest.TestCase):
 
   def test__01_same(self):
     L = Later(1)
-    self.assertEquals(runTree( [1,2,3], [ RunTreeOp(self.f_same, False, False, None) ], None, L), [1,2,3])
+    self.assertEquals(runTree( [1,2,3], [ RunTreeOp(self.f_same, None, False, None) ], None, L), [1,2,3])
     L.close()
 
   def test__01_same_fork(self):
     L = Later(1)
-    self.assertEquals(list(runTree( [1,2,3], [ RunTreeOp(self.f_same, True, True, None) ], None, L)), [1,2,3])
+    self.assertEquals(list(runTree( [1,2,3], [ RunTreeOp(self.f_same_one2many, 'FORK', True, None) ], None, L)), [1,2,3])
     L.close()
 
 def selftest(argv):

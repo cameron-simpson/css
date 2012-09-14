@@ -913,7 +913,22 @@ def via(cmanager, func, *a, **kw):
       return func(*a, **kw)
   return f
 
-RunTreeOp = namedtuple('RunTreeOp', 'func mode copystate branch')
+_RunTreeOp = namedtuple('RunTreeOp', 'func mode copystate branch')
+
+def RunTreeOp(func, mode, copy, branch):
+  ok = True
+  if func is not None and not callable(func):
+    error("RunTreeOp: bad func: %r", func)
+    ok = False
+  if mode is not None and mode not in ('PARALLEL', 'FORK'):
+    error("RunTreeOp: bad mode: %r", mode)
+    ok = False
+  if branch is not None and not callable(branch):
+    error("RunTreeOp: bad branch: %r", branch)
+    ok = False
+  if not ok:
+    raise ValueError("invalid RunTreeOp() call")
+  return _RunTreeOp(func, mode, copy, branch)
 
 def runTree(input, operators, state, funcQ):
   ''' Descend an operation tree expressed as:
@@ -959,6 +974,7 @@ def runTree(input, operators, state, funcQ):
       This is the core algorithm underneath the cs.app.pilfer operation.
   '''
   from cs.later import report
+  input0 = input
   operators = list(operators)
   bg = []
   while operators:
@@ -1000,11 +1016,11 @@ def runTree(input, operators, state, funcQ):
         # push the function back on without a fork
         # then queue a call per current item
         # using a copy of the state
-        suboperators = tuple([ RunTreeOp(op.func, False, False, op.branch) ] + operators)
+        suboperators = tuple([ RunTreeOp(op.func, None, False, op.branch) ] + operators)
         qops = []
         for item in input:
           substate = copy(state) if op.copystate else state
-          qops.append(funcQ.bg(runTree, (item,), suboperators, substate, funcQ))
+          qops.append(funcQ.bg(runTree, item, suboperators, substate, funcQ))
         outputs = []
         for qop in qops:
           output, exc_info = qop.wait()
