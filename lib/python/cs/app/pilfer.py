@@ -562,12 +562,12 @@ ONE_TO_MANY = {
 # actions that work on individual URLs
 ONE_TO_ONE = {
       '..':           lambda U, P: URL(U, None).parent,
-      'delay':        lambda U, P, delay: (sleep(float(delay)), U)[1],
+      'delay':        lambda U, P, delay: (U, sleep(float(delay)))[0],
       'domain':       lambda U, P: URL(U, None).domain,
       'hostname':     lambda U, P: URL(U, None).hostname,
-      'new_dir':      lambda U, P: (P.url_save_dir(U), U)[1],
-      'per':          lambda U, P: (P.set_user_vars(save_dir=None), U)[1],
-      'print':        lambda U, P: (print(U), U)[1],
+      'new_dir':      lambda U, P: (U, P.url_save_dir(U))[0],
+      'per':          lambda U, P: (U, P.set_user_vars(save_dir=None))[0],
+      'print':        lambda U, P: (U, print(U))[0],
       'query':        lambda U, P, *a: url_query(U, *a),
       'quote':        lambda U, P: quote(U),
       'unquote':      lambda U, P: unquote(U),
@@ -604,28 +604,20 @@ ONE_TEST = {
 re_ASSIGN = re.compile(r'([a-z]\w*)=')
 
 def conv_one_to_one(func):
-  ''' Convert a one-to-one function to a many to many.
+  ''' Convert a one-to-one function to a one to many.
   '''
-  def func2(Us, P):
-    return [ func(U, P) for U in Us ]
-  return func2
-
-def conv_one_to_many(func):
-  ''' Convert a one-to-many function to many-to-many.
-  '''
-  def func2(Us, P):
-    return chain( *[ func(U, P) for U in Us ] )
-  return func2
+  def func_one_to_one(U, P):
+    yield func(U, P)
+  return func_one_to_one
 
 def conv_one_test(func):
-  ''' Convert a test-one function to many-to-many.
+  ''' Convert a test-one function to one-to-many.
   '''
-  def func2(Us, P):
-    for U in Us:
-      ok = func(U, P)
-      if ok:
-        yield U
-  return func2
+  def func_one_test(U, P):
+    ok = func(U, P)
+    if ok:
+      yield U
+  return func_one_test
 
 def action_operator(action,
                     many_to_many=None,
@@ -689,11 +681,11 @@ def action_operator(action,
             kwargs[kw] = v
           else:
             kwargs[kwarg] = True
-    do_fork = False
+    op_mode = None
     do_copystate = False
     branch_func = None
     if action == "per":
-      do_fork = True
+      op_mode = 'FORK'
       do_copystate = True
     if action in many_to_many:
       # many-to-many functions get passed straight in
@@ -702,26 +694,25 @@ def action_operator(action,
         func = partial(func, **kwargs)
     elif action in one_to_many:
       # one-to-many is converted into many-to-many
-      do_fork = True
+      op_mode = 'PARALLEL'
       func = one_to_many[action]
       if kwargs:
         func = partial(func, **kwargs)
-      func = conv_one_to_many(func)
     elif action in one_to_one:
-      do_fork = True
+      op_mode = 'PARALLEL'
       func = one_to_one[action]
       if kwargs:
         func = partial(func, **kwargs)
       func = conv_one_to_one(func)
     elif action in one_test:
-      do_fork = True
+      op_mode = 'PARALLEL'
       func = one_test[action]
       if kwargs:
         func = partial(func, **kwargs)
       func = conv_one_test(func)
     else:
       raise ValueError("unknown action")
-    return RunTreeOp(func, do_fork, do_copystate, branch_func)
+    return RunTreeOp(func, op_mode, do_copystate, branch_func)
 
 if __name__ == '__main__':
   import sys
