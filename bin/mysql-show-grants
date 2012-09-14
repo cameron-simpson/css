@@ -23,11 +23,15 @@ else
   user=$1
   shift
   case "$user" in
-    ALL)
+    LIST)
       $trace echo 'select User, Host from user' \
       | $trace mysql ${1+"$@"} mysql \
       | awk -F '	' 'NR > 1 { print $1 "@" $2 }' \
-      | sort \
+      | sort
+      exit 0
+      ;;
+    ALL)
+      $trace "$0" LIST ${1+"$@"} \
       | \
       { xit=0
         while read user
