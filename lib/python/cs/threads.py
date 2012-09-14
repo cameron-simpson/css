@@ -914,7 +914,7 @@ def via(cmanager, func, *a, **kw):
       return func(*a, **kw)
   return f
 
-RunTreeOp = namedtuple('RunTreeOp', 'func fork copy branch')
+RunTreeOp = namedtuple('RunTreeOp', 'func fork copystate branch')
 
 def runTree(input, operators, state, funcQ):
   ''' Descend an operation tree expressed as:
@@ -927,8 +927,8 @@ def runTree(input, operators, state, funcQ):
                         and returning a result to be passed as the input
                         object to subsequence operators
           op.fork       Fork a parallel chain of operations for each item.
-          op.copy       Copy the state object to the subsequent operations
-                        instead of passing the original.
+          op.copystate  Copy the state object for this and subsequent operations
+                        instead of using the original.
 	  op.branch     If op.branch is not None it should be a
                         callable returning an iterable of RunTreeOps. A fresh
                         runtree will be dispatched to process the operators
@@ -963,7 +963,7 @@ def runTree(input, operators, state, funcQ):
         suboperators = tuple([ RunTreeOp(op.func, False, False, op.branch) ] + operators)
         qops = []
         for item in input:
-          substate = copy(state) if op.copy else state
+          substate = copy(state) if op.copystate else state
           qops.append(funcQ.bg(runTree, (item,), suboperators, substate, funcQ))
         outputs = []
         for qop in qops:
@@ -979,7 +979,7 @@ def runTree(input, operators, state, funcQ):
         output = chain(*outputs)
         operators = []
       else:
-        substate = copy(state) if op.copy else state
+        substate = copy(state) if op.copystate else state
         qop = funcQ.defer(op.func, input, substate)
         output, exc_info = qop.wait()
         if exc_info:

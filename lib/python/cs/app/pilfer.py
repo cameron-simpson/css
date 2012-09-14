@@ -690,11 +690,11 @@ def action_operator(action,
           else:
             kwargs[kwarg] = True
     do_fork = False
-    do_copy = False
+    do_copystate = False
     branch_func = None
     if action == "per":
       do_fork = True
-      do_copy = True
+      do_copystate = True
     if action in many_to_many:
       # many-to-many functions get passed straight in
       func = many_to_many[action]
@@ -721,7 +721,7 @@ def action_operator(action,
       func = conv_one_test(func)
     else:
       raise ValueError("unknown action")
-    return RunTreeOp(func, do_fork, do_copy, branch_func)
+    return RunTreeOp(func, do_fork, do_copystate, branch_func)
 
 if __name__ == '__main__':
   import sys
