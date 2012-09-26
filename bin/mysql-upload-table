@@ -1,0 +1,36 @@
+#!/bin/sh
+#
+# Upload a table to a MySQL database from a single table mysqldump output.
+#       - Cameron Simpson <cs@zip.com.au> 25sep2012
+#
+
+set -ue
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-x] secret dbname tablename[:newtablename] <table-dump.sql"
+
+trace=eecho
+
+[ "x$1" = x-x ] && { shift; trace=set-x; }
+[ $# = 3 ] || { echo "$usage" >&2; exit 2; }
+secret=$1
+dbname=$2
+tablename=$3
+case "$tablename" in
+  *:*)
+      newtablename=`expr "x$tablename" : 'x[^:]*:\(.*\)'`
+      tablename=`   expr "x$tablename" : 'x\([^:]*\):.*'`
+      ;;
+  *)  newtablename=$tablename ;;
+esac
+
+[ -t 0 ] && { echo "$cmd: I will not read from a tty" >&2; exit 1; }
+
+secret_txt=`secret "$secret"` || exit 1
+eval "$secret_txt"
+dbuser=$secretLOGIN
+dbpassword=$secretPASSWORD
+dbhost=$secretHOST
+
+$trace sed "s/ \`$tablename\`/ \`$newtablename\`/" \
+| $trace mysql -h "$dbhost" "-u$dbuser" "-p$dbpassword" -c "$dbname"
