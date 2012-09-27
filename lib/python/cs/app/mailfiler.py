@@ -176,7 +176,7 @@ class RuleState(O):
   def __init__(self, M, outer_state, environ=None):
     ''' `M`:           The Message object to be filed.
         `outer_state`: External state object, with maildb etc.
-        `environ`:     Mapping of initial variable names.
+        `environ`:     Mapping which supplies initial variable names.
                        Default from os.environ.
     '''
     self.message = M
@@ -221,6 +221,7 @@ class RuleState(O):
     '''
     if self._log:
       self._log.close()
+      self._log = None
     try:
       self._log = io.open(logfilepath, "a", encoding='utf-8')
     except OSError as e:
