@@ -200,7 +200,7 @@ class _MailDB(NodeDB):
       realname, coreaddr = addr
     coreaddr = coreaddr.lower()
     if  len(coreaddr) == 0:
-      raise ValueError("core(%r) => %r" % (addr, coreaddr))
+      raise ValueError("getAddressNode(addr=%r): coreaddr => %r" % (addr, coreaddr))
     A = self.get( ('ADDRESS', coreaddr), doCreate=True)
     Aname = A.realname
     if not len(Aname) and len(realname) > 0:
