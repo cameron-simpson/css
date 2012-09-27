@@ -318,8 +318,11 @@ class _MailDB(NodeDB):
   def importAddresses_from_message(self, M, group_names):
     if isinstance(M, (str, file)):
       return self.importAddresses_from_message(Message(M), group_names)
-    for addrtext in message_addresses(M, ('from', 'to', 'cc', 'bcc', 'resent-to', 'resent-cc', 'reply-to')):
-      self.getAddressNode(addrtext).GROUPs.update(group_names)
+    for realname, coreaddr in message_addresses(M,
+                                                ('from', 'to', 'cc', 'bcc',
+                                                 'resent-to', 'resent-cc',
+                                                 'reply-to')):
+      self.getAddressNode( (realname, coreaddr) ).GROUPs.update(group_names)
 
 if __name__ == '__main__':
   sys.exit(main(list(sys.argv)))
