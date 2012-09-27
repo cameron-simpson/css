@@ -46,8 +46,14 @@ def message_addresses(M, header_names):
   ''' Yield (realname, address) pairs from all the named headers.
   '''
   for header_name in header_names:
-    for realname, address in getaddresses(M.get_all(header_name, ())):
-      yield realname, address
+    hdrs = M.get_all(header_name, ())
+    for hdr in hdrs:
+      if hdr != 'undisclosed-recipients:;':
+        for realname, address in getaddresses( (hdr,) ):
+          if len(address) == 0:
+            warning("message_addresses(M, %r): header_name %r: hdr=%r: getaddresses() => (%r, %r)",
+                    header_names, header_name, hdr, realname, address)
+          yield realname, address
 
 def ismhdir(path):
   ''' Test if `path` points at an MH directory.
