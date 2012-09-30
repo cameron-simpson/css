@@ -217,7 +217,7 @@ def lockfile(path, ext='.lock', block=False, poll_interval=0.1):
     except OSError as e:
       if e.errno == errno.EEXIST:
         if block:
-          sleep(poll_interval)
+          time.sleep(poll_interval)
           continue
       raise
     else:
