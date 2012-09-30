@@ -191,6 +191,12 @@ class Backend_CSVFile(Backend):
           write_csv_file(self.csvpath, self.nodedb.nodedata())
         self.changed = False
 
+  def rewrite(self):
+    ''' Force a complete rewrite of the CSV file.
+    '''
+    self.changed = True
+    self.sync()
+
   def apply_nodedata(self):
     raise NotImplementedError("no %s.apply_nodedata(), apply_to uses incremental mode" % (type(self),))
 
@@ -239,7 +245,7 @@ class Backend_CSVFile(Backend):
               t, name, attr, value = Q.get(True, 0.1)
             except Empty:
               break
-          write_csvrow(csvw, t, name, attr, self.nodedb.totext(value))
+            write_csvrow(csvw, t, name, attr, self.nodedb.totext(value))
 
 if __name__ == '__main__':
   import cs.nodedb.csvdb_tests
