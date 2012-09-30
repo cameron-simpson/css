@@ -8,10 +8,12 @@ from itertools import chain
 import logging
 import sys
 import os
+import tempfile
 import unittest
 from cs.logutils import setup_logging, Pfx, info, warning, error, D
 from cs.mailutils import ismaildir, message_addresses, Message
 from cs.nodedb import NodeDB, Node, NodeDBFromURL
+import cs.sh
 from cs.threads import locked_property
 from cs.misc import the
 
@@ -23,6 +25,7 @@ def main(argv, stdin=None):
   usage = '''Usage:
     %s [-m mdburl] op [op-args...]
     Ops:
+      edit-group group
       import-addresses < addresses.txt
         File format:
           group,... rfc2822-address
@@ -57,26 +60,26 @@ def main(argv, stdin=None):
   else:
     op = argv.pop(0)
     with Pfx(op):
-      with MailDB(mdburl, readonly=False) as mdb:
+      with MailDB(mdburl, readonly=False) as MDB:
         if op == 'import-addresses':
           if stdin.isatty():
             error("stdin is a tty, file expected")
             badopts = True
           else:
-            mdb.importAddresses(stdin)
-            mdb.close()
+            MDB.importAddresses(stdin)
+            MDB.close()
         elif op == 'list-groups':
           if len(argv):
             group_names = argv
           else:
-            group_names = sorted(mdb.address_groups.keys())
+            group_names = sorted(MDB.address_groups.keys())
           for group_name in group_names:
-            address_group = mdb.address_groups.get(group_name)
+            address_group = MDB.address_groups.get(group_name)
             if not address_group:
               error("no such group: %s", group_name)
               xit = 1
               continue
-            print(group_name, ", ".join(mdb['ADDRESS', address].formatted
+            print(group_name, ", ".join(MDB['ADDRESS', address].formatted
                                         for address in address_group))
         elif op == 'learn-addresses':
           if not len(argv):
@@ -88,7 +91,19 @@ def main(argv, stdin=None):
               error("extra arguments after groups: %s", argv)
               badopts = True
             else:
-              mdb.importAddresses_from_message(stdin, group_names)
+              MDB.importAddresses_from_message(stdin, group_names)
+        elif op == 'edit-group':
+          if not len(argv):
+            error("missing group")
+            badopts = True
+          else:
+            group = argv.pop(0)
+            if len(argv):
+              error("extra arguments after group \"%s\": %s", group, argv)
+              badopts = True
+            else:
+              edit_group(MDB, group)
+              MDB.rewrite()
         else:
           error("unsupported op")
           badopts = True
@@ -98,6 +113,45 @@ def main(argv, stdin=None):
     xit = 2
 
   return xit
+
+def edit_group(MDB, group):
+  return edit_groupness(MDB, [ A for A in MDB.ADDRESSes if group in A.GROUPs ])
+
+def edit_groupness(MDB, addresses):
+  ''' Modify the group memberships of the supplied addresses.
+      Removed addresses are not modified.
+  '''
+  with Pfx("edit_groupness()"):
+    As = sorted( addresses,
+                 ( lambda A1, A2: cmp(A1.realname.lower(), A2.realname.lower()) ),
+               )
+    with tempfile.NamedTemporaryFile(suffix='.txt') as T:
+      with Pfx(T.name):
+        with open(T.name, "w") as ofp:
+          for A in As:
+            ofp.write("%-15s %s\n" % (",".join(sorted(A.GROUPs)), A.formatted))
+        editor = os.environ.get('EDITOR', 'vi')
+        xit = os.system("%s %s" % (editor, cs.sh.quotestr(T.name)))
+        if xit != 0:
+          # TODO: catch SIGINT etc?
+          raise RunTimeError("error editing \"%s\"" % (T.name,))
+        new_groups = {}
+        with open(T.name) as ifp:
+          lineno = 0
+          for line in ifp:
+            lineno += 1
+            with Pfx("%d", lineno):
+              if not line.endswith("\n"):
+                raise ValueError("truncated file, missing trailing newline")
+              line = line.rstrip()
+              groups, addrtext = line.split(None, 1)
+              groups = [ group for group in groups.split(',') if group ]
+              A = MDB.getAddressNode(addrtext)
+              new_groups.setdefault(A, set()).update(groups)
+    # apply groups of whichever addresses survived
+    for A, groups in new_groups.items():
+      if set(A.GROUPs) != groups:
+        A.GROUPs = groups
 
 PersonNode = Node
 
@@ -178,6 +232,11 @@ class _MailDB(NodeDB):
     self._O_omit = ('address_groups',)
     NodeDB.__init__(self, backend, readonly=readonly)
     self._address_groups = None
+
+  def rewrite(self):
+    ''' Force a complete rewrite of the CSV file.
+    '''
+    self.backend.rewrite()
 
   def _createNode(self, t, name):
     ''' Create a new Node of the specified type.
