@@ -306,9 +306,14 @@ class Node(dict):
     '''
     return True
 
+  def __hash__(self):
+    ''' Hash function, based on name, type and nodedb id.
+    '''
+    return hash(self.name)^hash(self.type)^id(self.nodedb)
+
   def __call__(self, name):
     if self.name == '_':
-      # this Node it the "type" metanode
+      # this Node is the "type" metanode
       # .TYPE(key) is the at-need factory for a node
       return self.nodedb.make( (self.type, name) )
     raise TypeError("only the NodeDB.TYPE metanode is callable")
@@ -386,9 +391,9 @@ class Node(dict):
 
   def __cmp__(self, other):
     ''' Nodes compare by type and then name and then id(Node).
-        Note that two Nodes that compare equal can thus still return non-zero
-        from cmp().
     '''
+    if self == other:
+      return 0
     try:
       c = cmp(self.type, other.type)
       if c != 0:
@@ -412,11 +417,6 @@ class Node(dict):
     except AttributeError:
       return False
     return True
-
-  def __hash__(self):
-    ''' Hash function, based on name, type and nodedb id.
-    '''
-    return hash(self.name)^hash(self.type)^id(self.nodedb)
 
   def get(self, k, default=None):
     ''' Fetch the item specified.
