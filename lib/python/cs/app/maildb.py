@@ -5,6 +5,7 @@ from collections import deque
 from getopt import getopt, GetoptError
 from email.utils import getaddresses, parseaddr, formataddr
 from itertools import chain
+import codecs
 import logging
 import sys
 import os
@@ -127,16 +128,17 @@ def edit_groupness(MDB, addresses):
                )
     with tempfile.NamedTemporaryFile(suffix='.txt') as T:
       with Pfx(T.name):
-        with open(T.name, "w") as ofp:
+        with codecs.open(T.name, "w", "utf-8") as ofp:
           for A in As:
-            ofp.write("%-15s %s\n" % (",".join(sorted(A.GROUPs)), A.formatted))
+            line = "%-15s %s\n" % (",".join(sorted(A.GROUPs)), A.formatted)
+            ofp.write(line)
         editor = os.environ.get('EDITOR', 'vi')
         xit = os.system("%s %s" % (editor, cs.sh.quotestr(T.name)))
         if xit != 0:
           # TODO: catch SIGINT etc?
           raise RunTimeError("error editing \"%s\"" % (T.name,))
         new_groups = {}
-        with open(T.name) as ifp:
+        with codecs.open(T.name, "r", "utf-8") as ifp:
           lineno = 0
           for line in ifp:
             lineno += 1
@@ -253,7 +255,7 @@ class _MailDB(NodeDB):
         If the AddressNode has no .REALNAME and `realname` is not empty,
         update the AddressNode from `realname`.
     '''
-    if isinstance(addr, str):
+    if isinstance(addr, (str, unicode)):
       realname, coreaddr = parseaddr(addr)
     else:
       realname, coreaddr = addr
