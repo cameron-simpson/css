@@ -122,7 +122,7 @@ def edit_groupness(MDB, addresses):
       Removed addresses are not modified.
   '''
   with Pfx("edit_groupness()"):
-    As = sorted( addresses,
+    As = sorted( set(addresses),
                  ( lambda A1, A2: cmp(A1.realname.lower(), A2.realname.lower()) ),
                )
     with tempfile.NamedTemporaryFile(suffix='.txt') as T:
