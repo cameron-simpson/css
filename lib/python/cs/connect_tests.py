@@ -28,11 +28,20 @@ class TestConnect(unittest.TestCase):
     # read less than 0 bytes of data
     self.assertRaises(ValueError, BF.read, 0, -1)
 
-  def test_01_DataQueue_00(self):
+  def test_01_DataQueue_00empty(self):
     DQ = DataQueue()
     print "DQ =", DQ
     self.assertRaises(ValueError, DQ.upto, -1)
     self.assertRaises(ValueError, DQ.upto, 1)
+    DQ.close()
+
+  def test_01_DataQueue_00write(self):
+    DQ = DataQueue()
+    print "DQ =", DQ
+    DQ.write("abc")
+    print "DQ =", DQ
+    DQ.write("def")
+    print "DQ =", DQ
     DQ.close()
 
 def selftest(argv):
