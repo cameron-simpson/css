@@ -42,11 +42,10 @@ class _BufferFile(O):
         if len(r) == 0:
           break
         data += r
-        size -= size(r)
+        size -= len(r)
       return data
 
   def close(self):
-    info("%s.close()", self)
     self._file.close()
     self._file = None
 
@@ -81,7 +80,6 @@ class DataQueue(O):
     ''' Allocate a new buffer file and store it on the end of self.buffers.
     '''
     BF = _BufferFile(self.high)
-    info("%s._new_buffer: %s", self, BF)
     self.buffers.append(BF)
     return BF
 
@@ -171,7 +169,10 @@ class DataQueue(O):
     if self.size == 0:
       return b''
     BF = self.buffers[0]
-    return BF.read(self.low, min(size, BF.size - (self.low-BF.offset)))
+    used = self.low - BF.offset
+    assert used >= 0
+    size = min(size, BF.size - used)
+    return BF.read(self.low, size)
 
 if __name__ == '__main__':
   import sys
