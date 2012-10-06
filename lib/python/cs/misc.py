@@ -553,9 +553,12 @@ def mkdirn(path):
     return newpath
 
 def tmpdir():
-  tmpdir=os.environ.setdefault('TMPDIR', '')
-  if len(tmpdir) == 0:
-    tmpdir='/tmp'
+  ''' Return the pathname of the default temporary directory for scratch data,
+      $TMPDIR or '/tmp'.
+  '''
+  tmpdir = os.environ.get('TMPDIR')
+  if tmpdir is None:
+    tmpdir = '/tmp'
   return tmpdir
 
 def tmpdirn(tmp=None):
