@@ -16,12 +16,16 @@ class _BufferFile(O):
   '''
 
   def __init__(self, offset):
+    ''' Initialise an empty buffer, recording the data logical start as `offset`.
+    '''
     self._file = TemporaryFile(dir=tmpdir())
     self.offset = offset
     self.size = 0
     self._lock = Lock()
 
   def append(self, data):
+    ''' Append `data` to the file.
+    '''
     with self._lock:
       self._file.seek(self.size)
       self._file.write(data)
@@ -29,7 +33,7 @@ class _BufferFile(O):
 
   def read(self, where, size):
     ''' Read up to `size` bytes starting at `where`.
-        DO not forget that the _BufferFile starts at self.offset.
+        Do not forget that the _BufferFile starts at self.offset.
     '''
     with self._lock:
       if where < self.offset or size < 0 or where + size > self.size:
@@ -46,8 +50,11 @@ class _BufferFile(O):
       return data
 
   def close(self):
-    self._file.close()
-    self._file = None
+    ''' Close the _BufferFile and render ._file unusable.
+    '''
+    with self._lock:
+      self._file.close()
+      self._file = None
 
 class DataQueue(O):
   ''' An object to hold queued data, with a notion of what has been sent.
