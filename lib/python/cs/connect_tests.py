@@ -19,6 +19,8 @@ class TestConnect(unittest.TestCase):
   def test00DataQueue(self):
     DQ = DataQueue()
     print "DQ =", DQ
+    self.assertRaises(ValueError, DQ.sent, -1)
+    self.assertRaises(ValueError, DQ.sent, 1)
     DQ.close()
 
 def selftest(argv):
