@@ -420,6 +420,7 @@ class Pfx(object):
       L.exception(msg, *args)
   @noexc
   def log(self, level, msg, *args, **kwargs):
+    ## to debug format errors ## D("msg=%r, args=%r, kwargs=%r", msg, args, kwargs)
     for L in self.loggers:
       L.log(level, msg, *args, **kwargs)
   def debug(self, msg, *args, **kwargs):
