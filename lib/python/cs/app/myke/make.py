@@ -57,6 +57,7 @@ class Maker(O):
     self.active = set()
     self._active_lock = Lock()
     self._namespaces = []
+    self._O_omit = ('makefiles', 'namespaces', )
 
   def __enter__(self):
     ''' Context manager entry.
