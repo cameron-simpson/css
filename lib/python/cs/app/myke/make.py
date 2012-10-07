@@ -15,6 +15,7 @@ import cs.misc
 from cs.later import Later, report as report_LFs, CallableValue
 from cs.logutils import Pfx, info, error, debug, D
 from cs.threads import Channel
+from cs.misc import O
 from .parse import SPECIAL_MACROS, Macro, MacroExpression, \
                    parseMakefile, parseMacroExpression
 
@@ -25,10 +26,10 @@ PRI_ACTION = 0
 PRI_MAKE   = 1
 PRI_PREREQ = 2
 
-class Flags(object):
+class Flags(O):
   pass
 
-class Maker(object):
+class Maker(O):
   ''' Main class representing a set of dependencies to make.
   '''
 
@@ -54,7 +55,7 @@ class Maker(object):
     self._targets_lock = Lock()
     self.precious = set()
     self.active = set()
-    self.active_lock = Lock()
+    self._active_lock = Lock()
     self._namespaces = []
 
   def __enter__(self):
@@ -118,21 +119,21 @@ class Maker(object):
     ''' Add this target to the set of "in progress" targets.
     '''
     self.debug_make("note target \"%s\" as active", target.name)
-    with self.active_lock:
+    with self._active_lock:
       self.active.add(target)
 
   def made(self, target, status):
     ''' Remove this target from the set of "in progress" targets.
     '''
     self.debug_make("note target \"%s\" as inactive (status=%s)", target.name, status)
-    with self.active_lock:
+    with self._active_lock:
       self.active.remove(target)
 
   def cancel_all(self):
     ''' Cancel all "in progress" targets.
     '''
     self.debug_make("cancel_all!")
-    with self.active_lock:
+    with self._active_lock:
       Ts = list(self.active)
     for T in Ts:
       T.cancel()
@@ -269,7 +270,7 @@ class Maker(object):
       if first_target is not None:
         self.default_target = first_target
 
-class Target(object):
+class Target(O):
 
   def __init__(self, maker, name, context, prereqs, postprereqs, actions):
     ''' Initialise a new target.
@@ -480,7 +481,7 @@ class Target(object):
       # report the status upstream
       retq.put(ok)
 
-class Action(object):
+class Action(O):
 
   def __init__(self, context, variant, line, silent=False):
     self.context = context
