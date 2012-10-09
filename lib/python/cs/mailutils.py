@@ -18,7 +18,7 @@ from tempfile import NamedTemporaryFile
 from threading import Lock
 import time
 from cs.fileutils import Pathname, shortpath as _shortpath
-from cs.logutils import Pfx, warning, debug, D
+from cs.logutils import Pfx, info, warning, debug, D
 from cs.threads import locked_property
 from cs.misc import seq
 from cs.py3 import StringIO
@@ -90,14 +90,34 @@ def ismaildir(path):
       return False
   return True
 
+def make_maildir(path):
+  ''' Create a new maildir at `path`.
+      The path must not already exist.
+  '''
+  info("make_maildir %s", path)
+  made = []
+  os.mkdir(path)
+  made.append(path)
+  for subdir in 'tmp', 'new', 'cur':
+    subdirpath = os.path.join(path, subdir)
+    try:
+      os.mkdir(subdirpath)
+    except OSError:
+      for dir in reversed(made):
+        os.rmdir(dir)
+      raise
+    made.append(subdirpath)
+
 class Maildir(mailbox.Maildir):
   ''' A faster Maildir interface.
       Trust os.listdir, don't fsync, etc.
   '''
 
-  def __init__(self, dir):
+  def __init__(self, dir, create=False):
     if not ismaildir(dir):
-      raise ValueError("not a Maildir: %s" % (dir,))
+      if not create:
+        raise ValueError("not a Maildir: %s" % (dir,))
+      make_maildir(dir)
     self.dir = Pathname(dir)
     self._msgmap = None
     self._pid = None
@@ -157,11 +177,9 @@ class Maildir(mailbox.Maildir):
     raise mailbox.NoSuchMailboxError(folderdir)
 
   def add_folder(folder):
-    folderpath = os.path.join(self.dir, folder)
-    os.mkdir(folderpath)
-    for subdir in 'tmp', 'new', 'cur':
-      os.mkdir(os.path.join(folderdir, subdir))
-    return Maildir(folderdir)
+    folderdir = os.path.join(self.dir, folder)
+    make_maildir(folderdir)
+    return get_folder(folder)
 
   def remove_folder(self, folder):
     F = self.get_folder(folder)
