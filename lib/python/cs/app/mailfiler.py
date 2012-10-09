@@ -135,7 +135,7 @@ def maildir_from_name(mdirname, maildir_root, maildir_cache):
     '''
     mdirpath = resolve_maildir_path(mdirname, maildir_root)
     if mdirpath not in maildir_cache:
-      maildir_cache[mdirpath] = Maildir(mdirpath)
+      maildir_cache[mdirpath] = Maildir(mdirpath, create=True)
     return maildir_cache[mdirpath]
 
 def resolve_maildir_path(mdirpath, maildir_root):
@@ -284,7 +284,7 @@ class RuleState(O):
     savepath = mdir.keypath(savekey)
     if not path and not label:
       self.message_path = savepath
-    self.log("    OK %s => %s" % (M['message-id'], shortpath(savepath)))
+    self.log("    OK %s" % (shortpath(savepath),))
     return savepath
 
   def pipe_message(self, argv, mfp=None):
@@ -304,7 +304,7 @@ class RuleState(O):
           mfp.seek(0)
           return self.pipe_message(argv, mfp)
     retcode = subprocess.call(argv, env=self.environ, stdin=mfp)
-    self.log("    %s %s => | %s" % (("OK" if retcode == 0 else "FAIL"), self.message['message-id'], argv))
+    self.log("    %s => | %s" % (("OK" if retcode == 0 else "FAIL"), argv))
     return retcode == 0
 
   def sendmail(self, address, mfp=None):
@@ -715,10 +715,11 @@ class WatchedMaildir(O):
             state = RuleState(M, self.filter_modes)
             state.message_path = mdir.keypath(key)
             state.logto(envsub("$HOME/var/log/mailfiler"))
-            state.log( (u("%s %s %s") % (time.strftime("%Y-%m-%d %H:%M:%S"),
-                                         unrfc2047(M.get('from', '_no_from')),
+            state.log( (u("%s %s") % (time.strftime("%Y-%m-%d %H:%M:%S"),
                                          unrfc2047(M.get('subject', '_no_subject'))))
                        .replace('\n', ' ') )
+            state.log("  " + unrfc2047(M.get('from', '_no_from')))
+            state.log("  " + M['message-id'])
             state.log("  " + shortpath(mdir.keypath(key)))
             saved_to = []
             reports = []
