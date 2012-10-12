@@ -20,5 +20,10 @@ cat >"$tmpf"
 
 set -x
 
-cs-aliases -f "$CS_ALIASES" new <"$tmpf" | sed "s/^/$1 /" >>"$CS_ALIASES"
-maildb -m "$MAILDB" learn-addresses "$1" <"$tmpf"
+( exec <"$tmpf"
+  cs-aliases -f "$CS_ALIASES" new | sed "s/^/$1 /" >>"$CS_ALIASES" &
+)
+
+( exec <"$tmpf"
+  maildb -m "$MAILDB" learn-addresses "$1" <"$tmpf" &
+)
