@@ -83,16 +83,26 @@ def main(argv, stdin=None):
             print(group_name, ", ".join(MDB['ADDRESS', address].formatted
                                         for address in address_group))
         elif op == 'learn-addresses':
+          only_ungrouped = False
+          if len(argv) and argv[0] == '--ungrouped':
+            argv.pop(0)
+            only_ungrouped = True
           if not len(argv):
             error("missing groups")
             badopts = True
           else:
-            group_names = [ name for name in argv.pop(0).split(',') if name ]
+            group_names = argv.pop(0)
+            group_names = [ name for name in group_names.split(',') if name ]
             if len(argv):
               error("extra arguments after groups: %s", argv)
               badopts = True
             else:
-              MDB.importAddresses_from_message(stdin, group_names)
+              if only_ungrouped:
+                for A in MDB.importAddresses_from_message(stdin, ()):
+                  if not A.GROUPs:
+                    A.GROUPs.update(group_names)
+              else:
+                MDB.importAddresses_from_message(stdin, group_names)
         elif op == 'edit-group':
           if not len(argv):
             error("missing group")
@@ -374,16 +384,27 @@ class _MailDB(NodeDB):
             error("bad address: %s: %s", addr, e)
             continue
           A.GROUPs.update(groups.split(','))
+      # forget the old mapping
       self._address_groups = None
 
-  def importAddresses_from_message(self, M, group_names):
+  def importAddresses_from_message(self, M, group_names, header_names=None):
+    ''' Import the addresses found in the message `M`.
+        Add then to the groups named in `group_names`.
+        Specific header lines to consult may be specified in
+        `header_names`, which defaults to ( 'from', 'to', 'cc', 'bcc',
+        'resent-to', 'resent-cc', 'reply-to' ).
+    '''
+    if header_names is None:
+      header_names = ( 'from', 'to', 'cc', 'bcc', 'resent-to', 'resent-cc',
+                       'reply-to' )
+    addrs = set()
     if isinstance(M, (str, file)):
       return self.importAddresses_from_message(Message(M), group_names)
-    for realname, coreaddr in message_addresses(M,
-                                                ('from', 'to', 'cc', 'bcc',
-                                                 'resent-to', 'resent-cc',
-                                                 'reply-to')):
-      self.getAddressNode( (realname, coreaddr) ).GROUPs.update(group_names)
+    for realname, coreaddr in message_addresses(M, header_names):
+      A = self.getAddressNode( (realname, coreaddr) )
+      A.GROUPs.update(group_names)
+      addrs.add(A)
+    return addrs
 
 if __name__ == '__main__':
   sys.exit(main(list(sys.argv)))
