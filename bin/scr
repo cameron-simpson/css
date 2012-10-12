@@ -136,7 +136,7 @@ fi
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 which screen >/dev/null \
-|| { [ $detached ] && set -- acon "$@"
+|| { [ $detached ] && set -- bgproc -p /dev/null "$@"
      echo "$cmd: no screen command? just running: $*" >&2
      exec $trace "$@"
    }
