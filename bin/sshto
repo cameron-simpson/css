@@ -288,9 +288,9 @@ else
   if [ $# -gt 0 ]
   then
     # quote the ProxyCommand for use in $lsshopts
-    qpc=`shqstr "ProxyCommand $*"`
+    qpc=`shqstr "ProxyCommand ignhup $*"`
     lsshopts="$lsshopts -o $qpc -o StrictHostKeyChecking=no"
   fi
 fi
 
-eval "exec $trace ssh-unhupped $fopt $lsshopts $sshargv $host \"\$sshcmd\""
+eval "exec $trace ssh $fopt $lsshopts $sshargv $host \"\$sshcmd\""

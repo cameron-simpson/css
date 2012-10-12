@@ -1,3 +1,0 @@
-#!/bin/sh
-sedcmd=`shqstr sed '${/^Killed by signal 1\.$/d;}'`
-exec filter_fd 2 "exec $sedcmd" ssh ${1+"$@"}
