@@ -565,12 +565,14 @@ class Rule(O):
                 if state.pipe_message(['/bin/sh', '-c', shcmd]):
                   saved_to.append(target)
                 else:
-                  raise RunTimeError("failed to pipe to %s" % (target,))
+                  error("failed to pipe to %s", target)
+                  failed_actions.append( (action, arg, "pipe "+target) )
               elif '@' in target:
                 if state.sendmail(target):
                   saved_to.append(target)
                 else:
-                  raise RunTimeError("failed to sendmail to %s" % (target,))
+                  error("failed to sendmail to %s", target)
+                  failed_actions.append( (action, arg, "sendmail "+target) )
               else:
                 mdir = state.maildir(target)
                 savepath = state.save_to_maildir(mdir, self.label)
