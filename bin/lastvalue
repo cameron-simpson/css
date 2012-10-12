@@ -80,14 +80,3 @@ then  echo "$value" >>"$param"
 else  echo "$value" >"$param"
 fi
 exit 0
-
-##addcmd='echo "$value"'
-##
-##if [ $append ]
-##then  addcmd="$addcmd >>\"\$param\""
-##else  addcmd="$addcmd  >\"\$param\""
-##fi
-##
-####con echo "lastvalue $param=$value"
-##export param value
-##exec lock "lastvalue_$param" sh -c "$addcmd"
