@@ -24,7 +24,7 @@ try:
   import xml.etree.cElementTree as ElementTree
 except ImportError:
   import xml.etree.ElementTree as ElementTree
-from cs.fileutils import watched_file_property
+from cs.fileutils import file_property
 from cs.later import Later
 from cs.logutils import setup_logging, logTo, Pfx, debug, error, warning, exception, pfx_iter, D
 from cs.threads import runTree, RunTreeOp
