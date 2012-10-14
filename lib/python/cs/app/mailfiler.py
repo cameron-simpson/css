@@ -23,7 +23,7 @@ from tempfile import TemporaryFile
 from threading import Lock
 import time
 from cs.env import envsub
-from cs.fileutils import abspath_from_file, watched_file_property, Pathname
+from cs.fileutils import abspath_from_file, file_property, Pathname
 from cs.lex import get_white, get_nonwhite, get_qstr, unrfc2047
 from cs.logutils import Pfx, setup_logging, debug, info, warning, error, D, LogTime
 from cs.mailutils import Maildir, message_addresses, shortpath
@@ -156,7 +156,7 @@ class FilterModes(O):
     self._maildb_lock = Lock()
     O.__init__(self, **kw)
 
-  @watched_file_property
+  @file_property
   def maildb(self, path):
     warning("load maildb(%s)", shortpath(path))
     return MailDB(path, readonly=True)
@@ -690,7 +690,7 @@ class WatchedMaildir(O):
   def close(self):
     self.filter_modes.maildb.close()
 
-  @watched_file_property
+  @file_property
   def rules(self, rules_path):
     return Rules(rules_path)
 
