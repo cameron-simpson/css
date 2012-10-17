@@ -210,6 +210,7 @@ def lockfile(path, ext='.lock', block=False, poll_interval=0.1):
                seconds, default 0.1s.
       `poll_interval`: polling frequency in blocking mode.
   '''
+  start = None
   lockpath = path + ext
   while True:
     try:
@@ -217,6 +218,18 @@ def lockfile(path, ext='.lock', block=False, poll_interval=0.1):
     except OSError as e:
       if e.errno == errno.EEXIST:
         if block:
+          if start is None:
+            start = time.time()
+            complaint_last = start
+            complaint_interval = 1.0
+          else:
+            now = time.time()
+            if now - complaint_last >= complaint_interval:
+              from cs.logutils import warning
+              warning("cs.fileutils.lockfile: pid %d waited %ds for \"%s\"",
+                      os.getpid(), now - start, lockpath)
+              complaint_last = now
+              complaint_interval *= 2
           time.sleep(poll_interval)
           continue
       raise
