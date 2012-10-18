@@ -18,6 +18,7 @@ from tempfile import NamedTemporaryFile
 import time
 import unittest
 from cs.env import envsub
+from cs.timeutils import TimeoutError
 
 def saferename(oldpath, newpath):
   ''' Rename a path using os.rename(), but raise an exception if the target
@@ -200,16 +201,17 @@ def watched_file_property(func, attr_name=None, unset_object=None, poll_rate=1):
   return property(getprop)
 
 @contextmanager
-def lockfile(path, ext='.lock', block=False, poll_interval=0.1):
+def lockfile(path, ext='.lock', poll_interval=0.1, timeout=None):
   ''' A context manager which takes and holds a lock file.
       `path`: the base associated with the lock file.
       `ext`: the extension to the base used to construct the lock file name.
              Default: ".lock"
-      `block`: if true and the lock file is already present, block until
-               it is free. This operated by polling every `poll_interval`
-               seconds, default 0.1s.
-      `poll_interval`: polling frequency in blocking mode.
+      `timeout`: maximum time to wait before failing,
+                 default None (wait forever).
+      `poll_interval`: polling frequency when timeout is not 0.
   '''
+  if timeout is not None and timeout < 0:
+    raise ValueError("timeout should be None or >= 0, not %r" % (timeout,))
   start = None
   lockpath = path + ext
   while True:
@@ -217,21 +219,35 @@ def lockfile(path, ext='.lock', block=False, poll_interval=0.1):
       lockfd = os.open(lockpath, os.O_CREAT|os.O_EXCL|os.O_RDWR, 0)
     except OSError as e:
       if e.errno == errno.EEXIST:
-        if block:
-          if start is None:
-            start = time.time()
-            complaint_last = start
-            complaint_interval = 1.0
-          else:
-            now = time.time()
-            if now - complaint_last >= complaint_interval:
-              from cs.logutils import warning
-              warning("cs.fileutils.lockfile: pid %d waited %ds for \"%s\"",
-                      os.getpid(), now - start, lockpath)
-              complaint_last = now
-              complaint_interval *= 2
-          time.sleep(poll_interval)
-          continue
+        if timeout is not None and timeout <= 0:
+          # immediate failure
+          raise
+        now = time.time()
+        # post: timeout is None or timeout > 0
+        if start is None:
+          # first try - set up counters
+          start = now
+          complaint_last = start
+          complaint_interval = 1.0
+        else:
+          if now - complaint_last >= complaint_interval:
+            from cs.logutils import warning
+            warning("cs.fileutils.lockfile: pid %d waited %ds for \"%s\"",
+                    os.getpid(), now - start, lockpath)
+            complaint_last = now
+            complaint_interval *= 2
+        # post: start is set
+        if timeout is None:
+          sleep_for = poll_interval
+        else:
+          sleep_for = min(poll_interval, start + timeout - now)
+        # test for timeout
+        if sleep_for <= 0:
+          raise TimeoutError("cs.fileutils.lockfile: pid %d timed out on lockfile \"%s\""
+                               % (os.getpid(), lockpath),
+                             timeout)
+        time.sleep(poll_interval)
+        continue
       raise
     else:
       break
