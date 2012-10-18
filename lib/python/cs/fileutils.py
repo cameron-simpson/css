@@ -175,25 +175,27 @@ def make_file_property(attr_name=None, unset_object=None, poll_rate=1):
       associated file state.
       The attribute {attr_name}_lastpoll tracks the last poll time.
   '''
-  def file_property(func):
+  def made_file_property(func):
     if attr_name is None:
-      attr_name = '_' + func.__name__
-    lock_name = attr_name + '_lock'
-    filestate_name = attr_name + '_filestate'
-    path_name = attr_name + '_path'
-    lastpoll_name = attr_name + '_lastpoll'
+      attr_value = '_' + func.__name__
+    else:
+      attr_value = attr_name
+    attr_lock = attr_value + '_lock'
+    attr_filestate = attr_value + '_filestate'
+    attr_path = attr_value + '_path'
+    attr_lastpoll = attr_value + '_lastpoll'
     def getprop(self):
       ''' Try to reload the property value from the file if the propety value
           is stale and the file has been modified since the last reload.
       '''
-      with getattr(self, lock_name):
+      with getattr(self, attr_lock):
         now = time.time()
-        then = getattr(self, lastpoll_name, None)
+        then = getattr(self, attr_lastpoll, None)
         if then is None or then + poll_rate <= now:
-          setattr(self, lastpoll_name, now)
-          old_filestate = getattr(self, filestate_name, None)
+          setattr(self, attr_lastpoll, now)
+          old_filestate = getattr(self, attr_filestate, None)
           try:
-            new_filestate, new_value = poll_file(getattr(self, path_name),
+            new_filestate, new_value = poll_file(getattr(self, attr_path),
                                           old_filestate,
                                           partial(func, self),
                                           missing_ok=True)
@@ -202,18 +204,18 @@ def make_file_property(attr_name=None, unset_object=None, poll_rate=1):
           except AttributeError:
             raise
           except Exception as e:
-            new_value = getattr(self, attr_name, unset_object)
+            new_value = getattr(self, attr_value, unset_object)
             if new_value is unset_object:
               raise
             import cs.logutils
-            cs.logutils.exception("exception during poll_file, leaving .%s untouched", attr_name)
+            cs.logutils.exception("exception during poll_file, leaving .%s untouched", attr_value)
           else:
             if new_filestate:
-              setattr(self, attr_name, new_value)
-              setattr(self, filestate_name, new_filestate)
-      return getattr(self, attr_name, unset_object)
+              setattr(self, attr_value, new_value)
+              setattr(self, attr_filestate, new_filestate)
+      return getattr(self, attr_value, unset_object)
     return property(getprop)
-  return file_property
+  return made_file_property
 
 @contextmanager
 def lockfile(path, ext='.lock', block=False, poll_interval=0.1):
