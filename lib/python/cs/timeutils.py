@@ -7,6 +7,14 @@
 import datetime
 import time
 
+class TimeoutError(StandardError):
+  def __init__(self, message, timeout=None):
+    if timeout is None:
+      msg = "timeout exceeded"
+    else:
+      msg = "timeout exceeded (%s)" % (timeout,)
+    StandardError.__init__(self, msg)
+
 def timeFunc(func, *args, **kw):
   ''' Run the supplied function and arguments.
       Return a the elapsed time in seconds and the function's own return value.
