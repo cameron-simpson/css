@@ -187,7 +187,7 @@ class Backend_CSVFile(Backend):
       if self.readonly:
         error("%s: sync not done", self)
       else:
-        with lockfile(self.csvpath, block=True):
+        with lockfile(self.csvpath):
           write_csv_file(self.csvpath, self.nodedb.nodedata())
         self.changed = False
 
@@ -236,7 +236,7 @@ class Backend_CSVFile(Backend):
     ''' Read updates from the supplied IterableQueue and apply to the csv file.
     '''
     for t, name, attr, value in Q:
-      with lockfile(self.csvpath, block=True):
+      with lockfile(self.csvpath):
         with open(self.csvpath, "ab") as fp:
           csvw = csv.writer(fp)
           write_csvrow(csvw, t, name, attr, self.nodedb.totext(value))
