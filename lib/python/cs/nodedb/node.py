@@ -679,7 +679,14 @@ class NodeDB(dict, O):
 
   def __exit__(self, exc_type, exc_value, traceback):
     if not self.closed:
-      self.close()
+      try:
+        self.close()
+      except Exception as e:
+        if exc_type:
+          error("%s.__exit__: self.close() raised %r", self, e)
+        else:
+          raise
+    return False
 
   def useNoNode(self):
     ''' Enable "no node" mode.
