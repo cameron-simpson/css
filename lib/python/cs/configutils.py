@@ -12,7 +12,7 @@ if sys.hexversion < 0x03000000:
 else:
   import configparser
 from threading import Lock
-from cs.fileutils import watched_file_property
+from cs.fileutils import file_property
 from cs.logutils import Pfx, info, D
 
 def load_config(config_path, parser=None):
@@ -35,7 +35,7 @@ class ConfigWatcher(object):
     self._config_path = config_path
     self._config_lock = Lock()
 
-  @watched_file_property
+  @file_property
   def config(self, path):
     return load_config(path)
 
