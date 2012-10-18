@@ -140,7 +140,8 @@ def edit_groupness(MDB, addresses):
       with Pfx(T.name):
         with codecs.open(T.name, "w", "utf-8") as ofp:
           for A in As:
-            line = "%-15s %s\n" % (",".join(sorted(A.GROUPs)), A.formatted)
+            groups = sorted(set(A.GROUPs))
+            line = "%-15s %s\n" % (",".join(groups), A.formatted)
             ofp.write(line)
         editor = os.environ.get('EDITOR', 'vi')
         xit = os.system("%s %s" % (editor, cs.sh.quotestr(T.name)))
