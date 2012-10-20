@@ -7,6 +7,8 @@
 cmd=$0
 usage="Usage: $cmd [-l {log|logfile}] [remark...]"
 trace=  ##set-x
+echo=:
+[ -t 2 ] && echo=eecho
 
 : ${LOGDIR:=$HOME/var/log}
 : ${DLOG_WHEN:=`date`}
@@ -17,10 +19,9 @@ if not flag DLOG_LOCAL && [ "x$HOST" != "x$HOMEHOST" ]
 then
   if flag DLOG_REMOTE_DISABLE
   then
-    : echo "flag DLOG_REMOTE_DISABLE: logging locally"
+    $echo "flag DLOG_REMOTE_DISABLE: logging locally"
   else
-    qcmd=`shqstr ./bin/with-login-env dlog ${1+"$@"}`
-    exec $trace ssh "$HOMEHOST" "$qcmd"
+    exec $trace sshx "$HOMEHOST" ./bin/with-login-env dlog ${1+"$@"}
   fi
 fi
 
