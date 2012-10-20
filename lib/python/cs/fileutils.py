@@ -156,6 +156,7 @@ def poll_file(path, old_state, reload_file, missing_ok=False):
 
 def file_property(func):
   ''' A property whose value reloads if a file changes.
+      This is just the default mode for make_file_property().
       `func` accepts the file path and returns the new value.
       The underlying attribute name is '_' + func.__name__,
       the default from make_file_property().
@@ -176,6 +177,15 @@ def file_property(func):
             with open(self._foo_path) as foofp:
               value = len(foofp.read())
             return value
+
+      The load function is called on the first access and on every
+      access thereafter where the associated file's FileState() has
+      changes and the time since the last successful load exceeds
+      the poll_rate (1s). Races are largely circumvented by ignoring
+      reloads that trwo exceptions or where the FileState() before
+      the load differs from the FileState() after the load (indicating
+      the file was in flux during the load); the next poll will
+      retry.
   '''
   return make_file_property()(func)
 
@@ -202,6 +212,15 @@ def make_file_property(attr_name=None, unset_object=None, poll_rate=1):
             with open(self._foo_path) as foofp:
               value = len(foofp.read())
             return value
+
+      The load function is called on the first access and on every
+      access thereafter where the associated file's FileState() has
+      changes and the time since the last successful load exceeds
+      the poll_rate (default 1s). Races are largely circumvented
+      by ignoring reloads that trwo exceptions or where the FileState()
+      before the load differs from the FileState() after the load
+      (indicating the file was in flux during the load); the next
+      poll will retry.
   '''
   def made_file_property(func):
     if attr_name is None:
