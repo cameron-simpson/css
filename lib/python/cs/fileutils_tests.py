@@ -9,6 +9,7 @@ import sys
 import os
 import os.path
 import errno
+import time
 import unittest
 from tempfile import NamedTemporaryFile
 from .fileutils import compare, rewrite, lockfile, Pathname
@@ -17,10 +18,16 @@ from .timeutils import TimeoutError
 class Test(unittest.TestCase):
 
   def setUp(self):
-    pass
+    self.lockbase = 'cs.fileutils_tests_testlock'
+    self.lockext = '.lock'
+    self.lockpath = self.lockbase + self.lockext
 
   def tearDown(self):
-    pass
+    try:
+      os.remove(self.lockpath)
+    except OSError as e:
+      if e.errno != errno.ENOENT:
+        raise
 
   def test_compare(self):
     data = "here are some data\n"
@@ -46,9 +53,8 @@ class Test(unittest.TestCase):
       self.assertEquals( open(T1.name).read(), newdata, "bad new data in %s" % (T1.name,) )
 
   def test_lockfile_00_basic(self):
-    lockbase = 'testlock'
-    lockext = '.lock'
-    lockpath = lockbase + lockext
+    lockbase = self.lockbase
+    lockpath = self.lockpath
     self.assert_( not os.path.exists(lockpath), "before lock, lock file already exists: %s" % (lockpath,))
     with lockfile(lockbase) as lock:
       self.assert_( lock == lockpath, "inside lock, expected \"%s\", got \"%s\"" % (lockpath, lock))
@@ -56,9 +62,8 @@ class Test(unittest.TestCase):
     self.assert_( not os.path.exists(lockpath), "after lock: lock file still exists: %s" % (lockpath,))
 
   def test_lockfile_01_conflict(self):
-    lockbase = 'testlock'
-    lockext = '.lock'
-    lockpath = lockbase + lockext
+    lockbase = self.lockbase
+    lockpath = self.lockpath
     self.assert_( not os.path.exists(lockpath), "before lock, lock file already exists: %s" % (lockpath,))
     with lockfile(lockbase) as lock:
       self.assert_( lock == lockpath, "inside lock, expected \"%s\", got \"%s\"" % (lockpath, lock))
@@ -68,6 +73,24 @@ class Test(unittest.TestCase):
           self.assert_( False, "lock inside lock, should not happen: %s" % (lockpath,))
       except TimeoutError:
         pass
+    self.assert_( not os.path.exists(lockpath), "after lock: lock file still exists: %s" % (lockpath,))
+
+  def test_lockfile_02_timeout(self):
+    lockbase = self.lockbase
+    lockpath = self.lockpath
+    self.assert_( not os.path.exists(lockpath), "before lock, lock file already exists: %s" % (lockpath,))
+    with lockfile(lockbase) as lock:
+      self.assert_( lock == lockpath, "inside lock, expected \"%s\", got \"%s\"" % (lockpath, lock))
+      self.assert_( os.path.exists(lockpath), "inside lock before nested lock attempt, lock file does not exist: %s" % (lockpath,))
+      start = time.time()
+      try:
+        with lockfile(lockbase, timeout=0.5):
+          self.assert_( False, "lock inside lock, should not happen: %s" % (lockpath,))
+      except TimeoutError:
+        end = time.time()
+        self.assert_( end - start >= 0.5, "nested lock timeout took less than 0.5s" )
+        self.assert_( end - start <= 0.6, "nested lock timeout took more than 0.6s" )
+      self.assert_( os.path.exists(lockpath), "inside lock after nested lock attempt, lock file does not exist: %s" % (lockpath,))
     self.assert_( not os.path.exists(lockpath), "after lock: lock file still exists: %s" % (lockpath,))
 
   def _eq(self, a, b, opdesc):
