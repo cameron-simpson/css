@@ -63,7 +63,7 @@ class Test(unittest.TestCase):
       self.assert_( lock == lockpath, "inside lock, expected \"%s\", got \"%s\"" % (lockpath, lock))
       self.assert_( os.path.exists(lockpath), "inside lock, lock file does not exist: %s" % (lockpath,))
       try:
-        with lockfile(lockbase):
+        with lockfile(lockbase, timeout=0):
           self.assert_( False, "lock inside lock, should not happen: %s" % (lockpath,))
       except OSError as e:
         if e.errno == errno.EEXIST:
