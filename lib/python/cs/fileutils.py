@@ -264,7 +264,7 @@ def lockfile(path, ext='.lock', poll_interval=0.1, timeout=None):
         # test for timeout
         if sleep_for <= 0:
           raise TimeoutError("cs.fileutils.lockfile: pid %d timed out on lockfile \"%s\""
-                               % (os.getpid(), lockpath),
+                             % (os.getpid(), lockpath),
                              timeout)
         time.sleep(poll_interval)
         continue
