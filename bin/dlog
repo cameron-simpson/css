@@ -19,7 +19,7 @@ if not flag DLOG_LOCAL && [ "x$HOST" != "x$HOMEHOST" ]
 then
   if flag DLOG_REMOTE_DISABLE
   then
-    $echo "flag DLOG_REMOTE_DISABLE: logging locally"
+    $echo "$cmd: flag DLOG_REMOTE_DISABLE: logging locally"
   else
     exec $trace sshx "$HOMEHOST" ./bin/with-login-env dlog ${1+"$@"}
   fi
