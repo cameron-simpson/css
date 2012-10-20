@@ -25,7 +25,7 @@ os=`uname -s` || exit 1
 for ipaddr
 do
   case "$os" in
-    OpenBSD)
+    OpenBSD|FreeBSD|Darwin)
       set -- `eth "$ipaddr" | sed -n 's/^\([a-z][a-z]*[0-9]*\)[^ ]* .*/\1/p'`
       ;;
     *)
@@ -51,6 +51,12 @@ do
   case "$os" in
     OpenBSD|FreeBSD)
       ifconfig -A >"$ocfg"
+      $trace ifconfig "$iface" -alias "$ipaddr" || xit=1
+      ifconfig -A | diff -u "$ocfg" -
+      rm "$ocfg"
+      ;;
+    Darwin)
+      ifconfig -a >"$ocfg"
       $trace ifconfig "$iface" -alias "$ipaddr" || xit=1
       ifconfig -a | diff -u "$ocfg" -
       rm "$ocfg"

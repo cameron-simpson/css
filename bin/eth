@@ -1,8 +1,11 @@
 #!/bin/sh
 os=`uname -s` || exit 1
 case "$os" in
-  OpenBSD)
+  OpenBSD|FreeBSD)
     ifconfig -A | ring -f - "inet $1 "
+    ;;
+  Darwin)
+    ifconfig -a | ring -f - "inet $1 "
     ;;
   *)
     ifconfig -a | ring -f - "inet addr:$1 "
