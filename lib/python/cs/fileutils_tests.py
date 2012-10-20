@@ -71,6 +71,8 @@ class Test(unittest.TestCase):
     self.assert_( not os.path.exists(lockpath), "after lock: lock file still exists: %s" % (lockpath,))
 
   def _eq(self, a, b, opdesc):
+    ''' Convenience wrapper for assertEqual.
+    '''
     ##if a == b:
     ##  print("OK: %s: %r == %r" % (opdesc, a, b), file=sys.stderr)
     self.assertEqual(a, b, "%s: got %r, expected %r" % (opdesc, a, b))
