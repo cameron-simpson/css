@@ -239,7 +239,9 @@ def lockfile(path, ext='.lock', poll_interval=0.1, timeout=None):
       if e.errno == errno.EEXIST:
         if timeout is not None and timeout <= 0:
           # immediate failure
-          raise
+          raise TimeoutError("cs.fileutils.lockfile: pid %d timed out on lockfile \"%s\""
+                             % (os.getpid(), lockpath),
+                             timeout)
         now = time.time()
         # post: timeout is None or timeout > 0
         if start is None:
