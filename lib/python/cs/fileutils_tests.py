@@ -12,6 +12,7 @@ import errno
 import unittest
 from tempfile import NamedTemporaryFile
 from .fileutils import compare, rewrite, lockfile, Pathname
+from .timeutils import TimeoutError
 
 class Test(unittest.TestCase):
 
@@ -63,13 +64,10 @@ class Test(unittest.TestCase):
       self.assert_( lock == lockpath, "inside lock, expected \"%s\", got \"%s\"" % (lockpath, lock))
       self.assert_( os.path.exists(lockpath), "inside lock, lock file does not exist: %s" % (lockpath,))
       try:
-        with lockfile(lockbase):
+        with lockfile(lockbase, timeout=0):
           self.assert_( False, "lock inside lock, should not happen: %s" % (lockpath,))
-      except OSError as e:
-        if e.errno == errno.EEXIST:
-          pass
-        else:
-          raise
+      except TimeoutError:
+        pass
     self.assert_( not os.path.exists(lockpath), "after lock: lock file still exists: %s" % (lockpath,))
 
   def _eq(self, a, b, opdesc):
