@@ -201,7 +201,7 @@ def make_file_property(attr_name=None, unset_object=None, poll_rate=1):
 
       The decorated function just loads the file content and returns
       the value computed from it. Example where .foo returns the
-      length of the file datai, polling no more often than once
+      length of the file data, polling no more often than once
       every 3 seconds:
 
         class C(object):
