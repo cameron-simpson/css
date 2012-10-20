@@ -163,6 +163,19 @@ def file_property(func):
       The attributes {attr_name}_filestate and {attr_name}_path track the
       associated file state.
       The attribute {attr_name}_lastpoll tracks the last poll time.
+
+      The decorated function just loads the file content and returns
+      the value computed from it. Example where .foo returns the
+      length of the file data:
+
+        class C(object):
+          def __init__(self):
+            self._foo_path = '.foorc'
+          @file_property
+          def foo(self):
+            with open(self._foo_path) as foofp:
+              value = len(foofp.read())
+            return value
   '''
   return make_file_property()(func)
 
@@ -175,6 +188,20 @@ def make_file_property(attr_name=None, unset_object=None, poll_rate=1):
       The attributes {attr_name}_filestate and {attr_name}_path track the
       associated file state.
       The attribute {attr_name}_lastpoll tracks the last poll time.
+
+      The decorated function just loads the file content and returns
+      the value computed from it. Example where .foo returns the
+      length of the file datai, polling no more often than once
+      every 3 seconds:
+
+        class C(object):
+          def __init__(self):
+            self._foo_path = '.foorc'
+          @make_file_property(poll_rate=3)
+          def foo(self):
+            with open(self._foo_path) as foofp:
+              value = len(foofp.read())
+            return value
   '''
   def made_file_property(func):
     if attr_name is None:
