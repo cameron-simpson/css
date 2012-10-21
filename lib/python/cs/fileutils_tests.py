@@ -33,7 +33,7 @@ class TestFileProperty(object):
     with open(path) as fp:
       data = fp.read()
     return data
-  @make_file_property(poll_rate=2.0)
+  @make_file_property(poll_rate=3.0)
   def test2(self, path):
     with open(path) as fp:
       data = fp.read()
