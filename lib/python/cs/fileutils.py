@@ -275,7 +275,7 @@ def make_files_property(attr_name=None, unset_object=None, poll_rate=1):
       associated files' state.
       The attribute {attr_name}_lastpoll tracks the last poll time.
   '''
-  def made_file_property(func):
+  def made_files_property(func):
     if attr_name is None:
       attr_value = '_' + func.__name__
     else:
@@ -293,19 +293,24 @@ def make_files_property(attr_name=None, unset_object=None, poll_rate=1):
         then = getattr(self, attr_lastpoll, None)
         if then is None or then + poll_rate <= now:
           setattr(self, attr_lastpoll, now)
-          changed = False
-          for path, old_filestate in zip(getattr(self, attr_paths), getattr(self, attr_filestates)):
-            try:
-              new_filestate = FileState(path)
-            except OSError as e:
-              changed = True
-              break
-            if old_filestate != new_filestate:
-              changed = True
-              break
+          old_paths = getattr(self, attr_paths)
+          old_filestates = getattr(self, attr_filestates, None)
+          if old_filestates is None:
+            changed = True
+          else:
+            changed = False
+            for path, old_filestate in zip(old_paths, old_filestates):
+              try:
+                new_filestate = FileState(path)
+              except OSError as e:
+                changed = True
+                break
+              if old_filestate != new_filestate:
+                changed = True
+                break
           if changed:
             try:
-              new_paths, new_value = func(self)
+              new_paths, new_value = func(self, old_paths)
               new_filestates = [ FileState(new_paths) for new_paths in new_paths ]
             except NameError:
               raise
@@ -323,7 +328,7 @@ def make_files_property(attr_name=None, unset_object=None, poll_rate=1):
               setattr(self, attr_filestates, new_filestates)
       return getattr(self, attr_value, unset_object)
     return property(getprop)
-  return made_file_property
+  return made_files_property
 
 @contextmanager
 def lockfile(path, ext='.lock', poll_interval=0.1, timeout=None):
