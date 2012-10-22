@@ -141,6 +141,7 @@ def poll_file(path, old_state, reload_file, missing_ok=False):
         return None, None
     raise
   if old_state is None or old_state != new_state:
+    # first stat or changed stat
     R = reload_file(path)
     try:
       new_new_state = FileState(path)
@@ -156,6 +157,7 @@ def poll_file(path, old_state, reload_file, missing_ok=False):
 
 def file_property(func):
   ''' A property whose value reloads if a file changes.
+      This is just the default mode for make_file_property().
       `func` accepts the file path and returns the new value.
       The underlying attribute name is '_' + func.__name__,
       the default from make_file_property().
@@ -163,6 +165,28 @@ def file_property(func):
       The attributes {attr_name}_filestate and {attr_name}_path track the
       associated file state.
       The attribute {attr_name}_lastpoll tracks the last poll time.
+
+      The decorated function just loads the file content and returns
+      the value computed from it. Example where .foo returns the
+      length of the file data:
+
+        class C(object):
+          def __init__(self):
+            self._foo_path = '.foorc'
+          @file_property
+          def foo(self):
+            with open(self._foo_path) as foofp:
+              value = len(foofp.read())
+            return value
+
+      The load function is called on the first access and on every
+      access thereafter where the associated file's FileState() has
+      changes and the time since the last successful load exceeds
+      the poll_rate (1s). Races are largely circumvented by ignoring
+      reloads that trwo exceptions or where the FileState() before
+      the load differs from the FileState() after the load (indicating
+      the file was in flux during the load); the next poll will
+      retry.
   '''
   return make_file_property()(func)
 
@@ -175,6 +199,29 @@ def make_file_property(attr_name=None, unset_object=None, poll_rate=1):
       The attributes {attr_name}_filestate and {attr_name}_path track the
       associated file state.
       The attribute {attr_name}_lastpoll tracks the last poll time.
+
+      The decorated function just loads the file content and returns
+      the value computed from it. Example where .foo returns the
+      length of the file data, polling no more often than once
+      every 3 seconds:
+
+        class C(object):
+          def __init__(self):
+            self._foo_path = '.foorc'
+          @make_file_property(poll_rate=3)
+          def foo(self):
+            with open(self._foo_path) as foofp:
+              value = len(foofp.read())
+            return value
+
+      The load function is called on the first access and on every
+      access thereafter where the associated file's FileState() has
+      changes and the time since the last successful load exceeds
+      the poll_rate (default 1s). Races are largely circumvented
+      by ignoring reloads that trwo exceptions or where the FileState()
+      before the load differs from the FileState() after the load
+      (indicating the file was in flux during the load); the next
+      poll will retry.
   '''
   def made_file_property(func):
     if attr_name is None:
@@ -218,6 +265,66 @@ def make_file_property(attr_name=None, unset_object=None, poll_rate=1):
     return property(getprop)
   return made_file_property
 
+def make_files_property(attr_name=None, unset_object=None, poll_rate=1):
+  ''' Construct a decorator that watches multiple associated files.
+      `attr_name`: the underlying attribute, default: '_' + func.__name__
+      `unset_object`: the sentinel value for "uninitialised", default: None
+      `poll_rate`: how often in seconds to poll the file for changes, default: 1
+      The attribute {attr_name}_lock controls access to the property.
+      The attributes {attr_name}_filestates and {attr_name}_paths track the
+      associated files' state.
+      The attribute {attr_name}_lastpoll tracks the last poll time.
+  '''
+  def made_file_property(func):
+    if attr_name is None:
+      attr_value = '_' + func.__name__
+    else:
+      attr_value = attr_name
+    attr_lock = attr_value + '_lock'
+    attr_filestates = attr_value + '_filestates'
+    attr_paths = attr_value + '_paths'
+    attr_lastpoll = attr_value + '_lastpoll'
+    def getprop(self):
+      ''' Try to reload the property value from the file if the propety value
+          is stale and the file has been modified since the last reload.
+      '''
+      with getattr(self, attr_lock):
+        now = time.time()
+        then = getattr(self, attr_lastpoll, None)
+        if then is None or then + poll_rate <= now:
+          setattr(self, attr_lastpoll, now)
+          changed = False
+          for path, old_filestate in zip(getattr(self, attr_paths), getattr(self, attr_filestates)):
+            try:
+              new_filestate = FileState(path)
+            except OSError as e:
+              changed = True
+              break
+            if old_filestate != new_filestate:
+              changed = True
+              break
+          if changed:
+            try:
+              new_paths, new_value = func(self)
+              new_filestates = [ FileState(new_paths) for new_paths in new_paths ]
+            except NameError:
+              raise
+            except AttributeError:
+              raise
+            except Exception as e:
+              new_value = getattr(self, attr_value, unset_object)
+              if new_value is unset_object:
+                raise
+              import cs.logutils
+              cs.logutils.exception("exception reloading .%s, keeping cached value", attr_value)
+            else:
+              setattr(self, attr_value, new_value)
+              setattr(self, attr_paths, new_paths)
+              setattr(self, attr_filestates, new_filestates)
+      return getattr(self, attr_value, unset_object)
+    return property(getprop)
+  return made_file_property
+
 @contextmanager
 def lockfile(path, ext='.lock', poll_interval=0.1, timeout=None):
   ''' A context manager which takes and holds a lock file.
@@ -239,7 +346,9 @@ def lockfile(path, ext='.lock', poll_interval=0.1, timeout=None):
       if e.errno == errno.EEXIST:
         if timeout is not None and timeout <= 0:
           # immediate failure
-          raise
+          raise TimeoutError("cs.fileutils.lockfile: pid %d timed out on lockfile \"%s\""
+                             % (os.getpid(), lockpath),
+                             timeout)
         now = time.time()
         # post: timeout is None or timeout > 0
         if start is None:
@@ -262,7 +371,7 @@ def lockfile(path, ext='.lock', poll_interval=0.1, timeout=None):
         # test for timeout
         if sleep_for <= 0:
           raise TimeoutError("cs.fileutils.lockfile: pid %d timed out on lockfile \"%s\""
-                               % (os.getpid(), lockpath),
+                             % (os.getpid(), lockpath),
                              timeout)
         time.sleep(poll_interval)
         continue

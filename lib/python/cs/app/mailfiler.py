@@ -457,13 +457,8 @@ def parserules(fp):
             raise ValueError("extra text after groups: %s" % (line,))
           C = Condition_InGroups(headernames, group_names)
         else:
-          if '(ME)' in line:
-            error("MISMATCH AT: %s", line[offset:])
-            error("    LINE IS: %s", line)
-            sys.exit(1)
           if line[offset] == '(':
-            error("FAILED GROUP MATCH AT: %s", line[offset:])
-            sys.exit(1)
+            raise ValueError("incomplete group match at: %s" % (line[offset:]))
           # just a comma separated list of addresses
           # TODO: should be RFC2822 list instead?
           addrkeys = [ w.strip() for w in line[offset:].split(',') ]

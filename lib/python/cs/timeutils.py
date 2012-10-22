@@ -10,9 +10,9 @@ import time
 class TimeoutError(StandardError):
   def __init__(self, message, timeout=None):
     if timeout is None:
-      msg = "timeout exceeded"
+      msg = "%s: timeout exceeded" % (message,)
     else:
-      msg = "timeout exceeded (%s)" % (timeout,)
+      msg = "%s: timeout exceeded (%ss)" % (message, timeout,)
     StandardError.__init__(self, msg)
 
 def timeFunc(func, *args, **kw):
