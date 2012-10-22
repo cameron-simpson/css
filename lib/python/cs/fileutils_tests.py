@@ -13,8 +13,19 @@ from threading import Lock
 import time
 import unittest
 from tempfile import NamedTemporaryFile
-from .fileutils import compare, rewrite, lockfile, Pathname, file_property, make_file_property
+from .fileutils import compare, rewrite, lockfile, Pathname, \
+                        file_property, make_file_property, \
+                        make_files_property
 from .timeutils import TimeoutError
+from .logutils import D
+
+def sleep(delay):
+  t0 = time.time()
+  time.sleep(delay)
+  elapsed = time.time() - t0
+  if elapsed < delay:
+    D("time.sleep(%ss) took only %ss", delay, elapsed)
+    sleep(delay - elapsed)
 
 class TestFileProperty(object):
   def __init__(self):
@@ -32,12 +43,37 @@ class TestFileProperty(object):
   def test1(self, path):
     with open(path) as fp:
       data = fp.read()
+    ##D("test1 loads \"%s\" => %s", path, data)
     return data
   @make_file_property(poll_rate=0.3)
   def test2(self, path):
     with open(path) as fp:
       data = fp.read()
+    ##D("test2 loads \"%s\" => %s", path, data)
     return data
+
+class TestFilesProperty(object):
+  def __init__(self):
+    self._test1_paths = ('testfileprop1',)
+    self._test1_lock = Lock()
+    self._test2_paths = ('testfileprop2',)
+    self._test2_lock = Lock()
+  def write1(self, data):
+    with open(self._test1_paths[0], "w") as fp:
+      fp.write(data)
+  def write2(self, data):
+    with open(self._test2_paths[0], "w") as fp:
+      fp.write(data)
+  ##@files_property
+  ##def test1(self, path0):
+  ##  with open(path0) as fp:
+  ##    data = fp.read()
+  ##  return (path0,), data
+  @make_files_property(poll_rate=0.3)
+  def test2(self, paths):
+    with open(paths[0]) as fp:
+      data = fp.read()
+    return (paths[0],), data
 
 class Test(unittest.TestCase):
 
@@ -47,12 +83,16 @@ class Test(unittest.TestCase):
     self.lockext = '.lock'
     self.lockpath = self.lockbase + self.lockext
     self.fileprop = None
+    self.filesprop = None
 
   def tearDown(self):
     tidyup = [ self.proppath, self.lockpath ]
     if self.fileprop:
       tidyup.append(self.fileprop._test1_path)
       tidyup.append(self.fileprop._test2_path)
+    if self.filesprop:
+      tidyup.extend(self.filesprop._test1_paths)
+      tidyup.extend(self.filesprop._test2_paths)
     for path in tidyup:
       try:
         os.remove(path)
@@ -134,7 +174,7 @@ class Test(unittest.TestCase):
     data1 = PC.test1
     # too soon after last poll
     self.assert_(data1 is None)
-    time.sleep(1.1)
+    sleep(1.1)
     data1 = PC.test1
     self.assertEquals(data1, "data1 value 1")
     # NB: data value changes length because the file timestamp might not
@@ -144,7 +184,7 @@ class Test(unittest.TestCase):
     data1 = PC.test1
     # too soon after last poll
     self.assertEquals(data1, "data1 value 1")
-    time.sleep(1)
+    sleep(1)
     data1 = PC.test1
     self.assertEquals(data1, "data1 value 1b")
     os.remove(PC._test1_path)
@@ -152,7 +192,7 @@ class Test(unittest.TestCase):
     data1 = PC.test1
     # too soon to poll
     self.assertEquals(data1, "data1 value 1b")
-    time.sleep(1)
+    sleep(1)
     # poll should fail and keep cached value
     data1 = PC.test1
     self.assertEquals(data1, "data1 value 1b")
@@ -161,7 +201,7 @@ class Test(unittest.TestCase):
     data1 = PC.test1
     # too soon to poll
     self.assertEquals(data1, "data1 value 1b")
-    time.sleep(1)
+    sleep(1)
     # poll should succeed and load new value
     data1 = PC.test1
     self.assertEquals(data1, "data1 value 1bc")
@@ -176,11 +216,11 @@ class Test(unittest.TestCase):
     data2 = PC.test2
     # too soon after last poll
     self.assert_(data2 is None)
-    time.sleep(0.1)
+    sleep(0.1)
     data2 = PC.test2
     # still soon after last poll
     self.assert_(data2 is None)
-    time.sleep(0.2)
+    sleep(0.2)
     data2 = PC.test2
     self.assertEquals(data2, "data2 value 1")
     PC.write2("data2 value 1b")
@@ -188,14 +228,11 @@ class Test(unittest.TestCase):
     data2 = PC.test2
     # too soon after last poll
     self.assertEquals(data2, "data2 value 1")
-    time.sleep(0.1)
+    sleep(0.1)
     data2 = PC.test2
     # still too soon after last poll
     self.assertEquals(data2, "data2 value 1")
-    t0 = time.time()
-    time.sleep(0.3)
-    t1 = time.time()
-    self.assertGreaterEqual(t1-t0, 0.2)
+    sleep(0.3)
     data2 = PC.test2
     self.assertEquals(data2, "data2 value 1b")
     os.remove(PC._test2_path)
@@ -203,7 +240,7 @@ class Test(unittest.TestCase):
     data2 = PC.test2
     # too soon to poll
     self.assertEquals(data2, "data2 value 1b")
-    time.sleep(0.3)
+    sleep(0.3)
     # poll should fail and keep cached value
     data2 = PC.test2
     self.assertEquals(data2, "data2 value 1b")
@@ -212,7 +249,56 @@ class Test(unittest.TestCase):
     data2 = PC.test2
     # too soon to poll
     self.assertEquals(data2, "data2 value 1b")
-    time.sleep(0.3)
+    sleep(0.3)
+    # poll should succeed and load new value
+    data2 = PC.test2
+    self.assertEquals(data2, "data2 value 1bc")
+
+  def test_make_files_property_01(self):
+    PC = self.filesprop = TestFilesProperty()
+    self.assert_(not os.path.exists(PC._test2_paths[0]))
+    with self.assertRaises(IOError) as cmgr:
+      data2 = PC.test2
+    self.assertEqual(cmgr.exception.errno, errno.ENOENT)
+    PC.write2("data2 value 1")
+    self.assert_(os.path.exists(PC._test2_paths[0]))
+    data2 = PC.test2
+    # too soon after last poll
+    self.assert_(data2 is None)
+    sleep(0.1)
+    data2 = PC.test2
+    # still soon after last poll
+    self.assert_(data2 is None)
+    sleep(0.2)
+    data2 = PC.test2
+    self.assertEquals(data2, "data2 value 1")
+    PC.write2("data2 value 1b")
+    self.assert_(os.path.exists(PC._test2_paths[0]))
+    data2 = PC.test2
+    # too soon after last poll
+    self.assertEquals(data2, "data2 value 1")
+    sleep(0.1)
+    data2 = PC.test2
+    # still too soon after last poll
+    self.assertEquals(data2, "data2 value 1")
+    sleep(0.3)
+    data2 = PC.test2
+    self.assertEquals(data2, "data2 value 1b")
+    os.remove(PC._test2_paths[0])
+    self.assert_(not os.path.exists(PC._test2_paths[0]))
+    data2 = PC.test2
+    # too soon to poll
+    self.assertEquals(data2, "data2 value 1b")
+    sleep(0.3)
+    # poll should fail and keep cached value
+    data2 = PC.test2
+    self.assertEquals(data2, "data2 value 1b")
+    PC.write2("data2 value 1bc")
+    self.assert_(os.path.exists(PC._test2_paths[0]))
+    data2 = PC.test2
+    # too soon to poll
+    self.assertEquals(data2, "data2 value 1b")
+    sleep(0.3)
     # poll should succeed and load new value
     data2 = PC.test2
     self.assertEquals(data2, "data2 value 1bc")
