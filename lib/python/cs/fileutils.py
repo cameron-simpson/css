@@ -141,6 +141,7 @@ def poll_file(path, old_state, reload_file, missing_ok=False):
         return None, None
     raise
   if old_state is None or old_state != new_state:
+    # first stat or changed stat
     R = reload_file(path)
     try:
       new_new_state = FileState(path)
