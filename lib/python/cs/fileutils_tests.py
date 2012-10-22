@@ -134,7 +134,7 @@ class Test(unittest.TestCase):
     data1 = PC.test1
     # too soon after last poll
     self.assert_(data1 is None)
-    time.sleep(1)
+    time.sleep(1.1)
     data1 = PC.test1
     self.assertEquals(data1, "data1 value 1")
     # NB: data value changes length because the file timestamp might not
