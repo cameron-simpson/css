@@ -296,10 +296,9 @@ def files_property(func):
       access thereafter where an associated file's FileState() has
       changed and the time since the last successful load exceeds
       the poll_rate (1s). An attempt at avoiding races is made by
-      ignoring reloads that raise exceptions.
-
-      Note that the single file decorator file_property has stronger
-      change checking.
+      ignoring reloads that raise exceptions and ignoring reloads
+      where files that were stat()ed during the change check have
+      changed state after the load.
   '''
   return make_files_property()(func)
 
@@ -333,10 +332,9 @@ def make_files_property(attr_name=None, unset_object=None, poll_rate=1):
       access thereafter where an associated file's FileState() has
       changed and the time since the last successful load exceeds
       the poll_rate (default 1s). An attempt at avoiding races is made by
-      ignoring reloads that raise exceptions.
-
-      Note that the single file decorator make_files_property has stronger
-      change checking.
+      ignoring reloads that raise exceptions and ignoring reloads
+      where files that were stat()ed during the change check have
+      changed state after the load.
   '''
   def made_files_property(func):
     if attr_name is None:
@@ -358,23 +356,27 @@ def make_files_property(attr_name=None, unset_object=None, poll_rate=1):
           setattr(self, attr_lastpoll, now)
           old_paths = getattr(self, attr_paths)
           old_filestates = getattr(self, attr_filestates, None)
+          preload_filestate_map = {}
           if old_filestates is None:
             changed = True
           else:
             changed = False
+	    # Instead of breaking out of the loop below on the first change
+	    # found we actually stat every file path because we want to
+            # maximise the coverage of the stability check after the load.
             for path, old_filestate in zip(old_paths, old_filestates):
               try:
                 new_filestate = FileState(path)
               except OSError as e:
                 changed = True
-                break
-              if old_filestate != new_filestate:
-                changed = True
-                break
+              else:
+                preload_filestate_map[path] = new_filestate
+                if old_filestate != new_filestate:
+                  changed = True
           if changed:
             try:
               new_paths, new_value = func(self, old_paths)
-              new_filestates = [ FileState(new_paths) for new_paths in new_paths ]
+              new_filestates = [ FileState(new_path) for new_path in new_paths ]
             except NameError:
               raise
             except AttributeError:
@@ -386,9 +388,18 @@ def make_files_property(attr_name=None, unset_object=None, poll_rate=1):
               import cs.logutils
               cs.logutils.exception("exception reloading .%s, keeping cached value", attr_value)
             else:
-              setattr(self, attr_value, new_value)
-              setattr(self, attr_paths, new_paths)
-              setattr(self, attr_filestates, new_filestates)
+              # examine new filestates in case they changed during load
+              # _if_ we knew about them from the earlier load
+              stable = True
+              for path, new_filestate in zip(new_paths, new_filestates):
+                if path in preload_filestate_map:
+                  if preload_filestate_map[path] != new_filestate:
+                    stable = False
+                    break
+              if stable:
+                setattr(self, attr_value, new_value)
+                setattr(self, attr_paths, new_paths)
+                setattr(self, attr_filestates, new_filestates)
       return getattr(self, attr_value, unset_object)
     return property(getprop)
   return made_files_property
