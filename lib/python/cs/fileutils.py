@@ -181,9 +181,9 @@ def file_property(func):
 
       The load function is called on the first access and on every
       access thereafter where the associated file's FileState() has
-      changes and the time since the last successful load exceeds
+      changed and the time since the last successful load exceeds
       the poll_rate (1s). Races are largely circumvented by ignoring
-      reloads that trwo exceptions or where the FileState() before
+      reloads that raise exceptions or where the FileState() before
       the load differs from the FileState() after the load (indicating
       the file was in flux during the load); the next poll will
       retry.
@@ -216,9 +216,9 @@ def make_file_property(attr_name=None, unset_object=None, poll_rate=1):
 
       The load function is called on the first access and on every
       access thereafter where the associated file's FileState() has
-      changes and the time since the last successful load exceeds
+      changed and the time since the last successful load exceeds
       the poll_rate (default 1s). Races are largely circumvented
-      by ignoring reloads that trwo exceptions or where the FileState()
+      by ignoring reloads that raise exceptions or where the FileState()
       before the load differs from the FileState() after the load
       (indicating the file was in flux during the load); the next
       poll will retry.
@@ -265,6 +265,44 @@ def make_file_property(attr_name=None, unset_object=None, poll_rate=1):
     return property(getprop)
   return made_file_property
 
+def files_property(func):
+  ''' A property whose value reloads if any of a list of files changes.
+      This is just the default mode for make_files_property().
+      `func` accepts the file path and returns the new value.
+      The underlying attribute name is '_' + func.__name__,
+      the default from make_files_property().
+      The attribute {attr_name}_lock controls access to the property.
+      The attributes {attr_name}_filestates and {attr_name}_paths track the
+      associated file states.
+      The attribute {attr_name}_lastpoll tracks the last poll time.
+
+      The decorated function is passed the current list of files
+      and returns the new list of files and the associated value.
+      One example use would be a configuration file with recurive
+      include operations; the inner function would parse the first
+      file in the list, and the parse would accumulate this filename
+      and those of any included files so that they can be monitored,
+      triggering a fresh parse if one changes. Example:
+
+        class C(object):
+          def __init__(self):
+            self._foo_path = '.foorc'
+          @files_property
+          def foo(self,paths):
+            new_paths, result = parse(paths[0])
+            return new_paths, result
+
+      The load function is called on the first access and on every
+      access thereafter where an associated file's FileState() has
+      changed and the time since the last successful load exceeds
+      the poll_rate (1s). An attempt at avoiding races if made by
+      ignoring reloads that raise exceptions.
+
+      Note that the single file decorator file_property has stronger
+      change checking.
+  '''
+  return make_files_property()(func)
+
 def make_files_property(attr_name=None, unset_object=None, poll_rate=1):
   ''' Construct a decorator that watches multiple associated files.
       `attr_name`: the underlying attribute, default: '_' + func.__name__
@@ -274,6 +312,31 @@ def make_files_property(attr_name=None, unset_object=None, poll_rate=1):
       The attributes {attr_name}_filestates and {attr_name}_paths track the
       associated files' state.
       The attribute {attr_name}_lastpoll tracks the last poll time.
+
+      The decorated function is passed the current list of files
+      and returns the new list of files and the associated value.
+      One example use would be a configuration file with recurive
+      include operations; the inner function would parse the first
+      file in the list, and the parse would accumulate this filename
+      and those of any included files so that they can be monitored,
+      triggering a fresh parse if one changes. Example:
+
+        class C(object):
+          def __init__(self):
+            self._foo_path = '.foorc'
+          @files_property
+          def foo(self,paths):
+            new_paths, result = parse(paths[0])
+            return new_paths, result
+
+      The load function is called on the first access and on every
+      access thereafter where an associated file's FileState() has
+      changed and the time since the last successful load exceeds
+      the poll_rate (1s). An attempt at avoiding races if made by
+      ignoring reloads that raise exceptions.
+
+      Note that the single file decorator make_files_property has stronger
+      change checking.
   '''
   def made_files_property(func):
     if attr_name is None:
