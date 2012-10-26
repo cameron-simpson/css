@@ -295,7 +295,7 @@ def files_property(func):
       The load function is called on the first access and on every
       access thereafter where an associated file's FileState() has
       changed and the time since the last successful load exceeds
-      the poll_rate (1s). An attempt at avoiding races if made by
+      the poll_rate (1s). An attempt at avoiding races is made by
       ignoring reloads that raise exceptions.
 
       Note that the single file decorator file_property has stronger
@@ -332,7 +332,7 @@ def make_files_property(attr_name=None, unset_object=None, poll_rate=1):
       The load function is called on the first access and on every
       access thereafter where an associated file's FileState() has
       changed and the time since the last successful load exceeds
-      the poll_rate (1s). An attempt at avoiding races if made by
+      the poll_rate (default 1s). An attempt at avoiding races is made by
       ignoring reloads that raise exceptions.
 
       Note that the single file decorator make_files_property has stronger
