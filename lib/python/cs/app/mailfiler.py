@@ -691,7 +691,7 @@ class WatchedMaildir(O):
     path0 = rules_paths[0]
     R = Rules(path0)
     # produce rules file list with base file at index 0
-    paths = [ path0 ] + [ path for path in R.rules_files if path != path0 ]
+    paths = [ path0 ] + [ path for path in R.rule_files if path != path0 ]
     return paths, R
 
   def filter(self):
