@@ -158,7 +158,7 @@ class FilterModes(O):
 
   @file_property
   def maildb(self, path):
-    warning("load maildb(%s)", shortpath(path))
+    info("reload maildb %s", shortpath(path))
     return MailDB(path, readonly=True)
 
   def maildir(self, mdirname, environ=None):
@@ -167,7 +167,7 @@ class FilterModes(O):
 class RuleState(O):
   ''' State information for rule evaluation.
       .message  Current message.
-      .maildb   MailDB.
+      .maildb   Current MailDB.
       .environ  Storage for variable settings.
   '''
  
@@ -695,7 +695,7 @@ class WatchedMaildir(O):
     return paths, R
 
   def filter(self):
-    ''' Scan Maildir contents.
+    ''' Scan this spool Maildir for messages to filter.
         Yield (key, FilterReports) for all messages filed.
 	Update the set of lurkers with any keys not removed to prevent
 	filtering on subsequent calls.
