@@ -11,7 +11,7 @@ exec </dev/null
 cmd=`basename "$0"`
 usage="Usage: $cmd [-D when] [-d logdir] headline"
 
-when=today
+when=
 logdir=$LOGDIR/daily
 
 badopts=
@@ -40,8 +40,15 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-daycode=`date -d "$when" "+%Y-%m-%d"`
-hhmm=`date -d "$when" "+%H:%M"`
+if [ -n "$when" ]
+then
+  # not portable - needs GNU date :-(
+  daycode=`date -d "$when" "+%Y-%m-%d"`
+  hhmm=`date -d "$when" "+%H:%M"`
+else
+  daycode=`date "+%Y-%m-%d"`
+  hhmm=`date "+%H:%M"`
+fi
 logdir=$logdir/$daycode
 
 [ -d "$logdir/." ] || mkdir -- "$logdir"
