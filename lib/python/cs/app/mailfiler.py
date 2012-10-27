@@ -699,7 +699,7 @@ class WatchedMaildir(O):
       self.mdir.flush()
       nmsgs = 0
       skipped = 0
-      with LogTime("all keys") as TK:
+      with LogTime("all keys") as all_keys_time:
         mdir = self.mdir
         for key in mdir.keys():
           if key in self.lurking:
@@ -734,8 +734,8 @@ class WatchedMaildir(O):
             yield key, reports
           if self.filter_modes.justone:
             break
-      if nmsgs or TK.elapsed >= 0.2:
-        info("filtered %d messages (%d skipped) in %5.3fs", nmsgs, skipped, TK.elapsed)
+      if nmsgs or all_keys_time.elapsed >= 0.2:
+        info("filtered %d messages (%d skipped) in %5.3fs", nmsgs, skipped, all_keys_time.elapsed)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
