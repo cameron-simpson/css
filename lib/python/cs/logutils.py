@@ -8,6 +8,7 @@ from __future__ import with_statement
 import codecs
 import logging
 import os
+import os.path
 import sys
 import time
 import threading
@@ -39,7 +40,6 @@ def setup_logging(cmd=None, main_log=None, format=None, level=None, upd_mode=Non
   '''
   global logging_level
   if cmd is None:
-    import os.path
     cmd = os.path.basename(sys.argv[0])
   cs.misc.cmd = cmd
   if main_log is None:
