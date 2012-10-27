@@ -49,6 +49,20 @@ def ISOtime(gmtime):
     warning("ISOtime: fromtimestamp(%d).microsecond = %s", gmtime, dt.microsecond)
   return dt.isoformat()
 
+def sleep(delay):
+  if delay < 0:
+    raise ValueError("cs.timeutils.sleep: delay should be >= 0, given %g", delay)
+  t0 = time.time()
+  end = t0 + delay
+  while t0 < end:
+    delay = end - t0
+    time.sleep(delay)
+    elapsed = time.time() - t0
+    if elapsed < delay:
+      from cs.logutils import warning
+      warning("time.sleep(%ss) took only %ss", delay, elapsed)
+    t0 = time.time()
+
 if __name__ == '__main__':
   iso = '2012-08-24T11:12:13'
   print "iso = %r" % (iso,)

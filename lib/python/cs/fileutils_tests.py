@@ -16,16 +16,8 @@ from tempfile import NamedTemporaryFile
 from .fileutils import compare, rewrite, lockfile, Pathname, \
                         file_property, make_file_property, \
                         make_files_property
-from .timeutils import TimeoutError
+from .timeutils import TimeoutError, sleep
 from .logutils import D
-
-def sleep(delay):
-  t0 = time.time()
-  time.sleep(delay)
-  elapsed = time.time() - t0
-  if elapsed < delay:
-    D("time.sleep(%ss) took only %ss", delay, elapsed)
-    sleep(delay - elapsed)
 
 class TestFileProperty(object):
   def __init__(self):
