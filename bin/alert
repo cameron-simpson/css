@@ -11,14 +11,20 @@ set -ue
 : ${ALERTLOG:=$LOGDIR/alert-local}
 
 cmd=$0
-usage="Usage: $cmd [-c colour] [-G] {-|echo-args...]}"
+usage="Usage: $cmd [-c colour] [-G] [-s subtitle] [-t title] {-|echo-args...]}"
 
 colour=
 growl=
+tnotify=1
+title=
+subtitle=
 case "$OS" in
-  darwin)       growl=1 ;;
+  darwin)
+    growl=1
+    tnotify=1
+    ;;
 esac
-if flag GROWL_DISABLE
+if flag -w GROWL_DISABLE
 then  growl=
 fi
 
@@ -30,6 +36,8 @@ do
     -c) colour=$2; shift ;;
     -G) growl=1 ;;
     +G) growl= ;;
+    -t) title=$2; shift ;;
+    -s) subtitle=$2; shift ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
         badopts=1
@@ -53,6 +61,10 @@ fi
 
 xit=0
 
+message=$*
+[ -n "$subtitle" ] && set -- "$subtitle;" ${1+"$@"}
+[ -n "$title" ] && set -- "$title:" ${1+"$@"}
+
 exec >>"$ALERTLOG"
 
 if [ -n "$colour" ]
@@ -60,10 +72,17 @@ then  colour_echo "$colour" "$*"
 else  echo "$*"
 fi || xit=1
 
+dlog "ALERT: $*"
+
 if [ $growl ]
 then
   # try growlnotify, otherwise hope /dev/tty is an iTerm
   growlnotify -m "$*" || echo $'\e]9;$*\a' >/dev/tty || xit=1
+fi
+
+if [ $tnotify ]
+then
+  terminal-notifier -title "$title" -subtitle "$subtitle" -message "$message"
 fi
 
 exit $xit
