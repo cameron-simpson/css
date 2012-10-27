@@ -23,7 +23,7 @@ from tempfile import TemporaryFile
 from threading import Lock
 import time
 from cs.env import envsub
-from cs.fileutils import abspath_from_file, file_property, Pathname
+from cs.fileutils import abspath_from_file, file_property, files_property, Pathname
 from cs.lex import get_white, get_nonwhite, get_qstr, unrfc2047
 from cs.logutils import Pfx, setup_logging, debug, info, warning, error, D, LogTime
 from cs.mailutils import Maildir, message_addresses, shortpath
@@ -659,7 +659,7 @@ class WatchedMaildir(O):
     self.filter_modes = filter_modes
     if rules_path is None:
       rules_path = os.path.join(self.mdir.dir, '.rules')
-    self._rules_path = rules_path
+    self._rules_paths = [ rules_path ]
     self._rules_lock = Lock()
     self.lurking = set()
     self.flush()
@@ -685,9 +685,14 @@ class WatchedMaildir(O):
   def close(self):
     self.filter_modes.maildb.close()
 
-  @file_property
-  def rules(self, rules_path):
-    return Rules(rules_path)
+  @files_property
+  def rules(self, rules_paths):
+    # base file is at index 0
+    path0 = rules_paths[0]
+    R = Rules(path0)
+    # produce rules file list with base file at index 0
+    paths = [ path0 ] + [ path for path in R.rules_files if path != path0 ]
+    return paths, R
 
   def filter(self):
     ''' Scan Maildir contents.
