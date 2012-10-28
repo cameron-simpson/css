@@ -15,7 +15,7 @@ usage="Usage: $cmd [-c colour] [-G] [-s subtitle] [-t title] {-|echo-args...]}"
 
 colour=
 growl=
-tnotify=1
+tnotify=
 title=
 subtitle=
 case "$OS" in
