@@ -65,7 +65,7 @@ do
     +t)	topt= ;;
     -f) fopt=-f ;;
     -E)	presh=$env_presh ;;
-    -v) needoptcss=1
+    -V) needoptcss=1
         dotrace=1
         trace=set-x
         setx='set -x'
@@ -78,14 +78,15 @@ do
     # to make x!joe@y!z into fred@x!joe@y!fred@z
     -u) ruser=$2; shift ;;
     -F) sshcfg=$2; shift ;;
-    -[il]) lsshopts="$lsshopts $1 "`shqstr "$2"`
+    -v) lsshopts="$lsshopts $1" ;;
+    -[ilo]) lsshopts="$lsshopts $1 "`shqstr "$2"`
         shift
         ##echo "lsshopts=[$lsshopts]" >&2
         ;;
     -[aAgknNqsTxXYC1246])
 	sshopts="$sshopts $1"
 	;;
-    -[bceImopLRD])
+    -[bceImpLRD])
     	sshopts="$sshopts $1 "`shqstr "$2"`
 	shift
 	;;
