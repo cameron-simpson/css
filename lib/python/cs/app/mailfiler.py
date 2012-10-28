@@ -625,15 +625,18 @@ class Rules(list):
     saved_to = []
     for R in self:
       report = R.filter(state)
-      yield report
+      M = state.M
       if report.matched:
         saved_to.extend(report.saved_to)
+        if R.flags.alert:
+          self.alert("%s: %s" % (M.get('from', '').strip(), M.get('subject', '').strip()))
         if R.flags.halt:
           done = True
           break
       else:
         if report.saved_to:
           raise RunTimeError("matched is False, but saved_to = %s" % (saved_to,))
+      yield report
     if not done:
       if not saved_to:
         R = state.default_rule
@@ -649,6 +652,12 @@ class Rules(list):
           yield report
       else:
         debug("%d filings, skipping DEFAULT", len(saved_to))
+
+  def alert(self, alert_message):
+    xit = subprocess.call(['alert', 'MAILFILER: ' + alert_message])
+    if xit != 0:
+      warning("non-zero exit from alert: %d", xit)
+    return xit
 
 class WatchedMaildir(O):
   ''' A class to monitor a Maildir and filter messages.
