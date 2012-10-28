@@ -55,7 +55,9 @@ done
 
 if [ $# = 0 ]
 then
-  echo "$cmd: no targets" >&2
+  echo "$cmd: no targets supplied" >&2
+  sed -n 's/^ *[Hh][Oo][Ss][Tt][ 	][ 	]*/  /p' "$sshcfg" >&2
+  echo >&2
   badopts=1
 fi
 
@@ -184,7 +186,9 @@ case "$target" in
                     /^[Hh][Oo][Ss][Tt] .*'"$target"' /s/^[^ ]*  *\([^ ][^ ]*\).*/\1/p' "$sshcfg"`
     if [ $# = 0 ]
     then
-      echo "$cmd: group \"$target\" not applied to any Hosts" >&2
+      echo "$cmd: group \"$target\" not applied to any Hosts in $sshcfg" >&2
+      sed -n 's/^ *[Hh][Oo][Ss][Tt][ 	][ 	]*/  /p' "$sshcfg" >&2
+      echo >&2
       exit 1
     fi
     [ $# = 1 ] || exec "$0" $opts -- "$@"
@@ -245,14 +249,11 @@ do
   flag -w "$target_disable_flag" && { sleep "$polltime"; continue; }
   ok2portfwd                  || { sleep "$polltime"; continue; }
 
+  sshopts=-n
+  [ -n "$cfg_command" ] || sshopts="$sshopts -N"
   $trace \
     tag_fd 2 "$target" \
-    sshto \
-      -n -F "$sshcfg" "$target" \
-      "( $cfg_command ) </dev/null &
-     "'exec 1>&2
-       while sleep 61 && printf " "; do :; done
-      ' \
+    sshto $sshopts -F "$sshcfg" "$target" "$cfg_command" \
     >>"$cfg_outlog" </dev/null &
   sshpid=$!
   subprocs="$subprocs $sshpid"
