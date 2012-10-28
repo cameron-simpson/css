@@ -616,16 +616,16 @@ class Rules(list):
     self.extend(new_rules)
 
   def filter(self, state):
-    ''' Filter message `M` according to the rules.
+    ''' Filter the current message according to the rules.
         Yield FilterReports for each rule consulted.
-        If no rules matches and $DEFAULT is set, yield a FilterReport for
+        If no rule matches and $DEFAULT is set, yield a FilterReport for
         filing to $DEFAULT, with .rule set to None.
     '''
     done = False
     saved_to = []
     for R in self:
       report = R.filter(state)
-      M = state.M
+      M = state.message
       if report.matched:
         saved_to.extend(report.saved_to)
         if R.flags.alert:
