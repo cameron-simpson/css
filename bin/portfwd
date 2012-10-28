@@ -133,7 +133,6 @@ for sig in HUP INT TERM
 do
   trap "sig=$sig
         echo \"\$cmd: received SIG\$sig\"
-        set -vx
         [ -z \"\$subprocs\" ] || synckill -v -s \"\$sig\" \$subprocs
         exit 1
        " "$sig"
@@ -214,7 +213,7 @@ while :
 do
   # reload config on every pass
   cfg_pidfile=portfwd.$target.pid
-  cfg_command=:
+  cfg_command=
   cfg_outlog=portfwd-$target    # /dev/null
   cfg_monitor=
   if [ -s "$fwdcfg" ]
@@ -253,11 +252,13 @@ do
   [ -n "$cfg_command" ] || sshopts="$sshopts -N"
   $trace \
     tag_fd 2 "$target" \
-    sshto $sshopts -F "$sshcfg" "$target" "$cfg_command" \
+    sshto $sshopts -F "$sshcfg" \
+      -o "PermitLocalCommand=yes" -o "LocalCommand=</dev/null alert CONNECTED: sshpf $target &" \
+      "$target" "$cfg_command" \
     >>"$cfg_outlog" </dev/null &
   sshpid=$!
   subprocs="$subprocs $sshpid"
-  [ $first ] || alert "RESTARTED: sshpf $target [pid $sshpid]" &
+  [ $first ] || alert "RESTARTING: sshpf $target [pid $sshpid]" &
 
   # start monitor
   if [ -n "$cfg_monitor" ]
