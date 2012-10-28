@@ -67,6 +67,16 @@ exec </dev/null
 xit=0
 
 message=$*
+if [ -z "$title" ]
+then
+  tag=`expr "x$message" : 'x\([A-Z][A-Z0-9_]*\):  *' || :`
+  if [ -n "$tag" ]
+  then
+    title=$tag
+    message=`expr "x$message" : 'x[A-Z][A-Z0-9_]*:  *\(.*\)' || :`
+  fi
+fi
+set -- $message
 [ -n "$subtitle" ] && set -- "$subtitle;" ${1+"$@"}
 [ -n "$title" ] && set -- "$title:" ${1+"$@"}
 
