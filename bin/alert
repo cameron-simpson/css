@@ -59,18 +59,18 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+exec </dev/null
+
 xit=0
 
 message=$*
 [ -n "$subtitle" ] && set -- "$subtitle;" ${1+"$@"}
 [ -n "$title" ] && set -- "$title:" ${1+"$@"}
 
-exec >>"$ALERTLOG"
-
 if [ -n "$colour" ]
 then  colour_echo "$colour" "$*"
 else  echo "$*"
-fi || xit=1
+fi >>"$ALERTLOG" || xit=1
 
 dlog "ALERT: $*"
 
@@ -82,7 +82,7 @@ fi
 
 if [ $tnotify ]
 then
-  terminal-notifier -title "$title" -subtitle "$subtitle" -message "$message"
+  terminal-notifier -title "$title" -subtitle "$subtitle" -message "$message" >/dev/null
 fi
 
 exit $xit
