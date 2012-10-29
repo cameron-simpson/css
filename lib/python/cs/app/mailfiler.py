@@ -40,7 +40,17 @@ def main(argv, stdin=None):
   argv = list(argv)
   cmd = os.path.basename(argv.pop(0))
   setup_logging(cmd)
-  usage = 'Usage: %s monitor [-1] [-d delay] [-n] [-N] [-R rules] maildirs...' % (cmd,)
+  usage = ( '''Usage: %s monitor [-1] [-d delay] [-n] [-N] [-R rules_pattern] maildirs...
+  -1  File at most 1 message per Maildir.
+  -d delay
+      Delay between runs in seconds.
+      Default is to make only one run over the Maildirs.
+  -n  No remove. Keep filed messages in the origin Maildir.
+  -R rules_pattern
+      Specify the rules file pattern used to specify rules files from Maildir names.
+      Default: %s'''
+            % (cmd, DEFAULT_MAILDIR_RULES)
+          )
   badopts = False
 
   if not argv:

@@ -1,0 +1,71 @@
+
+=head1 NAME
+
+mailfiler - rules file format
+
+=head1 DESCRIPTION
+
+The mailfiler(1cs) command's monitor watches Maildirs for newly
+arrived messages and files them according to a sequence of rules.
+
+Blank lines and lines commencing with an octothorpe ('#') are ignored.
+
+A line commencing with a less-than symbol ('<') is an "include" directive.
+The following word is the name of a file whose contents are read as though they
+appeared at this point in the rules file.
+If the filename is relative, it is resolved with respect to the
+directory part of the filename of the current rules file.
+
+A line commencing with an identifier and an equals symbol ('=') is
+an environment variable assignment.
+
+Other lines are mail filing rules, of the general form:
+
+  [!][=]targets tag condition
+
+A line commencing with whitespace is considered to be an additional
+condition to be ANDed with the preceeding line's rule conditions:
+
+  [!][=]targets tag condition1
+                    condition2
+                    condition3
+
+Rules may commences with either or both of the following mode indicators:
+
+  ! An exclaimation symbol ('!') indicates that an alert should be
+    emitted at the end of filing if this rule was matched.
+
+  = An equals symbol ('=') indicates that rule processing should
+    cease at this rule if it matches. Normally all matching rules are
+    applied.
+
+The "targets" is a comma separated list of mail destinations; a
+target takes the form of a sequence of nonwhitespace non-comma
+characters, or a string value in double quotes.
+
+A target commencing with a pipe symbol ('|') is considered a command
+to run with the message text on its standard input.
+If the command exits with a zero exit status is it considered to have run successfully.
+
+Otherwise, a target containing an "at" symbol ('@') is considered
+an email address to which to send a copy of the message.
+It the mail system accepts the message it is considered to have been dispatched successfully.
+
+Otherwise, a target is considered to indicate a Maildir into which the message should be placed.
+
+The message must be successfully delivered to all targets of all matching
+rules for the filter run to be considered successfully filtered.
+If the message matched no rules, delivery is attempted to the targets
+specified by the $DEFAULT environment variable.
+
+If all delivery attempt succeeded, the original message is remove from the Maildir.
+Otherwise the message remains in the Maildir and is ignored on subsequent polls.
+
+=head1 SEE ALSO
+
+mailfiler(1cs)
+
+=head1 AUTHOR
+
+Cameron Simpson E<lt>cs@zip.com.auE<gt>
+
