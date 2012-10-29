@@ -1,12 +1,11 @@
 
 =head1 NAME
 
-vt - data structures used in the vt(1) Venti-like system
 mailfiler - a Maildir monitor for filing email messages
 
 =head1 SYNOPSIS
 
-  mailfiler monitor [-1] [-d delay] [-n] [-N] [-R rules_pattern] maildirs...
+mailfiler monitor [-1] [-d delay] [-n] [-N] [-R rules_pattern] maildirs...
 
 =head1 DESCRIPTION
 
@@ -17,7 +16,7 @@ to simple text rules as described in mailfiler(5cs).
 
 =head2 monitor
 
-IN the "monitor" mode I<mailfiler> watched the specified I<maildirs> for email messages
+In the "monitor" mode I<mailfiler> watched the specified I<maildirs> for email messages
 and files each according to a sequence of rules in the matching rules file
 (see mailfiler(5cs)).
 
