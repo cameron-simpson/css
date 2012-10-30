@@ -6,7 +6,7 @@
 # Output files have the following names:
 #       db.table.sql.gz         TABLE dump.
 #       db.schema.gz            DATABASE schema dump.
-#       user@host.grants.gz     USER GRANTs dump.
+#       user@host.grants        USER GRANTs dump.
 #
 #	- Cameron Simpson <cs@zip.com.au> 28dec2006
 #
@@ -416,6 +416,8 @@ case "$dst" in
         for dbuser in $dbusers
         do
           sqluser=$(echo "$dbuser" | sed 's/\(.*\)@\(.*\)/`\1`@`\2`/')
+          grantfile=$dst/$dbuser.grants
+          >>"$grantfile"
           echo "show grants for $sqluser" \
           | mysqlcmd_src -f mysql \
           | \
@@ -424,7 +426,7 @@ case "$dst" in
             echo "$grant $usage $on $blah $to $who $etc"
             sed 's/,  */,/g' | sort -k 4
           } \
-          | gzip_to $Drwflags "$dst/$dbuser.grants.gz"
+          | $trace rewriteif $Drwflags "$grantfile"
         done
         ;;
     esac
