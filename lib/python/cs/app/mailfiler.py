@@ -275,10 +275,9 @@ class RuleState(O):
 
   def save_to_maildir(self, mdir, label):
     mdirpath = mdir.dir
-    if self.reuse_maildir or mdirpath not in self.used_maildirs:
-      self.used_maildirs.add(mdirpath)
-    else:
-      return None
+    if mdirpath in self.used_maildirs:
+      if not self.reuse_maildir:
+        return None
     M = self.message
     if label and M.get('x-label', '') != label:
       # modifying message - make copy
@@ -533,8 +532,13 @@ class Condition_InGroups(_Condition):
           return True
     return False
 
-FilterReport = namedtuple('FilterReport',
+_FilterReport = namedtuple('FilterReport',
                           'rule matched saved_to ok_actions failed_actions')
+def FilterReport(rule, matched, saved_to, ok_actions, failed_actions):
+  if not matched:
+    if saved_to:
+      raise RunTimeError("matched(%r) and not saved_to(%r)" % (matched, saved_to))
+  return _FilterReport(rule, matched, saved_to, ok_actions, failed_actions)
 
 class Rule(O):
 
@@ -545,7 +549,6 @@ class Rule(O):
     self.actions = slist()
     self.flags = O(alert=False, halt=False)
     self.label = ''
-    self.default_rule = None
 
   def match(self, state):
     for C in self.conditions:
@@ -562,18 +565,21 @@ class Rule(O):
       matched = self.match(state)
       if matched:
         for action, arg in self.actions:
+          ok = False
           try:
             if action == 'TARGET':
               target = envsub(arg, state.environ)
               if target.startswith('|'):
                 shcmd = target[1:]
                 if state.pipe_message(['/bin/sh', '-c', shcmd]):
+                  ok = True
                   saved_to.append(target)
                 else:
                   error("failed to pipe to %s", target)
                   failed_actions.append( (action, arg, "pipe "+target) )
               elif '@' in target:
                 if state.sendmail(target):
+                  ok = True
                   saved_to.append(target)
                 else:
                   error("failed to sendmail to %s", target)
@@ -581,12 +587,16 @@ class Rule(O):
               else:
                 mdir = state.maildir(target)
                 savepath = state.save_to_maildir(mdir, self.label)
+                ok = True
                 # we get None if the message has already been saved here
-                if savepath:
+                if savepath is not None:
                   saved_to.append(savepath)
+                else:
+                  debug("repeated filing to maildir, skipping %s", mdir)
             elif action == 'ASSIGN':
               envvar, s = arg
               value = state.environ[envvar] = envsub(s, state.environ)
+              ok = True
               debug("ASSIGN %s=%s", envvar, value)
               if envvar == 'LOGFILE':
                 state.logto(value)
@@ -602,8 +612,12 @@ class Rule(O):
             failed_actions.append( (action, arg, e) )
             raise
           else:
-            ok_actions.append( (action, arg) )
-            
+            if ok:
+              ok_actions.append( (action, arg) )
+        if not saved_to:
+          debug("MATCHED but no saved_to: %s", self)
+        else:
+          debug("MATCHED and saved_to=%s: %s", saved_to, self)
       return FilterReport(self, matched, saved_to, ok_actions, failed_actions)
 
 class Rules(list):
@@ -637,21 +651,24 @@ class Rules(list):
       report = R.filter(state)
       M = state.message
       if report.matched:
+        if not report.saved_to:
+          debug("matched but not saved_to: %s", R)
         saved_to.extend(report.saved_to)
         if R.flags.alert:
           self.alert("%s: %s" % (M.get('from', '').strip(), M.get('subject', '').strip()))
-        if R.flags.halt:
-          done = True
-          break
       else:
         if report.saved_to:
           raise RunTimeError("matched is False, but saved_to = %s" % (saved_to,))
       yield report
+      if report.matched:
+        if R.flags.halt:
+          done = True
+          break
     if not done:
       if not saved_to:
         R = state.default_rule
         if not R:
-          warning("message not saved and no $DEFAULT")
+          warning("NO DEFAULT: message not saved and no $DEFAULT")
         else:
           report = R.filter(state)
           if not report.matched:
@@ -661,7 +678,7 @@ class Rules(list):
             warning("message not saved by any rules")
           yield report
       else:
-        debug("%d filings, skipping DEFAULT", len(saved_to))
+        debug("%d filings, skipping $DEFAULT", len(saved_to))
 
   def alert(self, alert_message):
     xit = subprocess.call(['alert', 'MAILFILER: ' + alert_message])
@@ -748,13 +765,20 @@ class WatchedMaildir(O):
               if report.matched:
                 reports.append(report)
                 saved_to.extend(report.saved_to)
-            if saved_to and not self.filter_modes.no_remove:
-              debug("remove key %s", key)
+              else:
+                if report.saved_to:
+                  error("UNMATCHED RULE: saved_to=%s", report.saved_to)
+            if not saved_to:
+              state.log("ERROR: message not saved, lurking key %s", key)
+              error("message not saved, lurking key %s", key)
+              self.lurking.add(key)
+            elif self.filter_modes.no_remove:
+              state.log("no_remove: message not removed, lurking key %s", key)
+              self.lurking.add(key)
+            else:
+              info("remove message key %s", key)
               mdir.remove(key)
               self.lurking.discard(key)
-            else:
-              warning("message not saved, lurking key %s", key)
-              self.lurking.add(key)
             yield key, reports
           if self.filter_modes.justone:
             break
