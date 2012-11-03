@@ -1,0 +1,30 @@
+#!/bin/sh -u
+#
+# Add this message's Subject: line as a pattern in the spam rules.
+#       - Cameron Simpson <cs@zip.com.au> 03nov2012
+#
+
+set -ue
+
+: ${TMPDIR:=/tmp}
+: ${NOTIFY:=$EMAIL}
+
+cmd=`basename "$0"` || exit 1
+usage="Usage: $cmd < email"
+
+tmpf=$TMPDIR/$cmd$$
+trap 'rm -f "$tmpf"' 0 1 2 13 15
+
+filer=$HOME/rc/mail/filer/spam-subj
+
+cat >"$tmpf" || exit 1
+
+eval `mhdrs -sh < "$tmpf" | sed 's/^/hdr_/'`
+subj=$hdr_SUBJECT
+[ -n "$subj" ]
+re_subj=\^$(printf "%s\n" "$subj" | sed '2,$d; s/\\/&&/g')
+[ -n "$re_subj" ]
+
+( cat "$filer"
+  echo "spam SPAM-SUBJ subject:/$re_subj"
+) | rewriteif -D "$NOTIFY" "$filer" sort -u
