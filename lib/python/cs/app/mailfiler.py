@@ -488,8 +488,8 @@ class Condition_Regexp(_Condition):
     self.regexp = re.compile(regexp)
     self.regexptxt = regexp
 
-  def match(self, state):
-    M = state.message
+  def match(self, filtering):
+    M = filtering.message
     for hdr in self.headernames:
       for value in M.get_all(hdr, ()):
         if self.atstart:
@@ -506,13 +506,13 @@ class Condition_AddressMatch(_Condition):
     self.headernames = headernames
     self.addrkeys = [ k for k in addrkeys if len(k) > 0 ]
 
-  def match(self, state):
-    for address in state.addresses(*self.headernames):
+  def match(self, filtering):
+    for address in filtering.addresses(*self.headernames):
       for key in self.addrkeys:
         if key.startswith('{{') and key.endswith('}}'):
           warning("OBSOLETE address key: %s", key)
           group_name = key[2:-2].lower()
-          if state.ingroup(address, group_name):
+          if filtering.ingroup(address, group_name):
             return True
         elif address.lower() == key.lower():
           return True
@@ -524,10 +524,10 @@ class Condition_InGroups(_Condition):
     self.headernames = headernames
     self.group_names = group_names
 
-  def match(self, state):
-    for address in state.addresses(*self.headernames):
+  def match(self, filtering):
+    for address in filtering.addresses(*self.headernames):
       for group_name in self.group_names:
-        if state.ingroup(address, group_name):
+        if filtering.ingroup(address, group_name):
           debug("match %s to (%s)", address, group_name)
           return True
     return False
@@ -550,43 +550,43 @@ class Rule(O):
     self.flags = O(alert=False, halt=False)
     self.label = ''
 
-  def match(self, state):
+  def match(self, filtering):
     for C in self.conditions:
-      if not C.match(state):
+      if not C.match(filtering):
         return False
     return True
 
-  def filter(self, state):
-    M = state.message
+  def filter(self, filtering):
+    M = filtering.message
     with Pfx("%s:%d", self.filename, self.lineno):
       saved_to = []
       ok_actions = []
       failed_actions = []
-      matched = self.match(state)
+      matched = self.match(filtering)
       if matched:
         for action, arg in self.actions:
           ok = False
           try:
             if action == 'TARGET':
-              target = envsub(arg, state.environ)
+              target = envsub(arg, filtering.environ)
               if target.startswith('|'):
                 shcmd = target[1:]
-                if state.pipe_message(['/bin/sh', '-c', shcmd]):
+                if filtering.pipe_message(['/bin/sh', '-c', shcmd]):
                   ok = True
                   saved_to.append(target)
                 else:
                   error("failed to pipe to %s", target)
                   failed_actions.append( (action, arg, "pipe "+target) )
               elif '@' in target:
-                if state.sendmail(target):
+                if filtering.sendmail(target):
                   ok = True
                   saved_to.append(target)
                 else:
                   error("failed to sendmail to %s", target)
                   failed_actions.append( (action, arg, "sendmail "+target) )
               else:
-                mdir = state.maildir(target)
-                savepath = state.save_to_maildir(mdir, self.label)
+                mdir = filtering.maildir(target)
+                savepath = filtering.save_to_maildir(mdir, self.label)
                 ok = True
                 # we get None if the message has already been saved here
                 if savepath is not None:
@@ -595,13 +595,13 @@ class Rule(O):
                   debug("repeated filing to maildir, skipping %s", mdir)
             elif action == 'ASSIGN':
               envvar, s = arg
-              value = state.environ[envvar] = envsub(s, state.environ)
+              value = filtering.environ[envvar] = envsub(s, filtering.environ)
               ok = True
               debug("ASSIGN %s=%s", envvar, value)
               if envvar == 'LOGFILE':
-                state.logto(value)
+                filtering.logto(value)
               elif envvar == 'DEFAULT':
-                R = state.default_rule = Rule(self.filename, self.lineno)
+                R = filtering.default_rule = Rule(self.filename, self.lineno)
                 R.actions.append( ('TARGET', '$DEFAULT') )
             else:
               raise RuntimeError("unimplemented action \"%s\"" % action)
@@ -639,7 +639,7 @@ class Rules(list):
     self.rule_files.update( R.filename for R in new_rules )
     self.extend(new_rules)
 
-  def filter(self, state):
+  def filter(self, filtering):
     ''' Filter the current message according to the rules.
         Yield FilterReports for each rule consulted.
         If no rule matches and $DEFAULT is set, yield a FilterReport for
@@ -648,8 +648,8 @@ class Rules(list):
     done = False
     saved_to = []
     for R in self:
-      report = R.filter(state)
-      M = state.message
+      report = R.filter(filtering)
+      M = filtering.message
       if report.matched:
         if not report.saved_to:
           debug("matched but not saved_to: %s", R)
@@ -666,11 +666,11 @@ class Rules(list):
           break
     if not done:
       if not saved_to:
-        R = state.default_rule
+        R = filtering.default_rule
         if not R:
           warning("NO DEFAULT: message not saved and no $DEFAULT")
         else:
-          report = R.filter(state)
+          report = R.filter(filtering)
           if not report.matched:
             raise RunTimeError("default rule faled to match! %r", R)
           saved_to.extend(report.saved_to)
@@ -750,18 +750,18 @@ class WatchedMaildir(O):
           nmsgs += 1
           with LogTime("key = %s" % (key,), threshold=1.0, level=DEBUG):
             M = mdir[key]
-            state = FilteringState(M, self.filter_modes)
-            state.message_path = mdir.keypath(key)
-            state.logto(envsub("$HOME/var/log/mailfiler"))
-            state.log( (u("%s %s") % (time.strftime("%Y-%m-%d %H:%M:%S"),
+            filtering = FilteringState(M, self.filter_modes)
+            filtering.message_path = mdir.keypath(key)
+            filtering.logto(envsub("$HOME/var/log/mailfiler"))
+            filtering.log( (u("%s %s") % (time.strftime("%Y-%m-%d %H:%M:%S"),
                                          unrfc2047(M.get('subject', '_no_subject'))))
                        .replace('\n', ' ') )
-            state.log("  " + unrfc2047(M.get('from', '_no_from')))
-            state.log("  " + M['message-id'])
-            state.log("  " + shortpath(mdir.keypath(key)))
+            filtering.log("  " + unrfc2047(M.get('from', '_no_from')))
+            filtering.log("  " + M['message-id'])
+            filtering.log("  " + shortpath(mdir.keypath(key)))
             saved_to = []
             reports = []
-            for report in self.rules.filter(state):
+            for report in self.rules.filter(filtering):
               if report.matched:
                 reports.append(report)
                 saved_to.extend(report.saved_to)
@@ -769,11 +769,11 @@ class WatchedMaildir(O):
                 if report.saved_to:
                   error("UNMATCHED RULE: saved_to=%s", report.saved_to)
             if not saved_to:
-              state.log("ERROR: message not saved, lurking key %s", key)
+              filtering.log("ERROR: message not saved, lurking key %s", key)
               error("message not saved, lurking key %s", key)
               self.lurking.add(key)
             elif self.filter_modes.no_remove:
-              state.log("no_remove: message not removed, lurking key %s", key)
+              filtering.log("no_remove: message not removed, lurking key %s", key)
               self.lurking.add(key)
             else:
               info("remove message key %s", key)
