@@ -174,8 +174,8 @@ class FilterModes(O):
   def maildir(self, mdirname, environ=None):
     return maildir_from_name(mdirname, environ['MAILDIR'], self.maildir_cache)
 
-class RuleState(O):
-  ''' State information for rule evaluation.
+class FilteringState(O):
+  ''' Filtering state information used during rule evaluation.
       .message  Current message.
       .maildb   Current MailDB.
       .environ  Storage for variable settings.
@@ -224,7 +224,7 @@ class RuleState(O):
     try:
       print(*[ unicode(s) for s in a], file=log)
     except UnicodeDecodeError as e:
-      print("RuleState.log: %s: a=%r" % (e, a), file=sys.stderr)
+      print("FilteringState.log: %s: a=%r" % (e, a), file=sys.stderr)
 
   def logto(self, logfilepath):
     ''' Direct log messages to the supplied `logfilepath`.
@@ -750,7 +750,7 @@ class WatchedMaildir(O):
           nmsgs += 1
           with LogTime("key = %s" % (key,), threshold=1.0, level=DEBUG):
             M = mdir[key]
-            state = RuleState(M, self.filter_modes)
+            state = FilteringState(M, self.filter_modes)
             state.message_path = mdir.keypath(key)
             state.logto(envsub("$HOME/var/log/mailfiler"))
             state.log( (u("%s %s") % (time.strftime("%Y-%m-%d %H:%M:%S"),
