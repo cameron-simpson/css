@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #
-# Handler for rulesets in the format of cats2procmailrc(1cs).
+# Handler for rulesets similar to the format of cats2procmailrc(1cs).
 #       - Cameron Simpson <cs@zip.com.au> 22may2011
 #
 
