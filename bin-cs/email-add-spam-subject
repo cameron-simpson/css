@@ -22,7 +22,7 @@ cat >"$tmpf" || exit 1
 eval `mhdrs -sh < "$tmpf" | sed 's/^/hdr_/'`
 subj=$hdr_SUBJECT
 [ -n "$subj" ]
-re_subj=\^$(printf "%s\n" "$subj" | sed '2,$d; s/[\[]()|$*?\\]/\\&/g')
+re_subj=\^$(printf "%s\n" "$subj" | sed '2,$d; s/[\[]()|$+*?\\]/\\&/g')
 [ -n "$re_subj" ]
 
 ( cat "$filer"
