@@ -7,7 +7,6 @@
 set -ue
 
 : ${TMPDIR:=/tmp}
-: ${NOTIFY:=$EMAIL}
 
 cmd=`basename "$0"` || exit 1
 usage="Usage: $cmd < email"
@@ -27,4 +26,4 @@ re_subj=\^$(printf "%s\n" "$subj" | sed '2,$d; s/[^-A-Za-z0-9_, 	]/\\&/g')
 
 ( cat "$filer"
   echo "=spam SPAM-SUBJ subject:/$re_subj"
-) | rewriteif -D "$NOTIFY" "$filer" sort -u
+) | rewriteif "$filer" sort -u
