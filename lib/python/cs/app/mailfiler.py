@@ -183,14 +183,14 @@ class FilteringState(O):
  
   maildirs = {}
 
-  def __init__(self, M, outer_state, environ=None):
+  def __init__(self, M, filter_modes, environ=None):
     ''' `M`:           The Message object to be filed.
-        `outer_state`: External state object, with maildb etc.
+        `filter_modes`: External state object, with maildb etc.
         `environ`:     Mapping which supplies initial variable names.
                        Default from os.environ.
     '''
     self.message = M
-    self.outer_state = outer_state
+    self.filter_modes = filter_modes
     if environ is None:
       environ = os.environ
     self.environ = dict(environ)
@@ -200,10 +200,10 @@ class FilteringState(O):
 
   @property
   def maildb(self):
-    return self.outer_state.maildb
+    return self.filter_modes.maildb
 
   def maildir(self, mdirpath):
-    return self.outer_state.maildir(mdirpath, self.environ)
+    return self.filter_modes.maildir(mdirpath, self.environ)
 
   @property
   def message(self):
