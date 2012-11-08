@@ -11,7 +11,8 @@ echo=:
 [ -t 2 ] && echo=eecho
 
 : ${LOGDIR:=$HOME/var/log}
-: ${DLOG_WHEN:=`date`}
+
+when=${DLOG_WHEN:-}
 
 [ -t 0 ] && exec </dev/null
 
@@ -30,6 +31,9 @@ logname=dlog-quick
 case "$logname" in /*) ;; *) logname=$LOGDIR/$logname ;; esac
 [ $# = 0 ] && exec pageif cat "$logname"
 
-ts=`date -d "$DLOG_WHEN" '+%Y-%m-%d-%H:%M:%S'`
+if [ -n "$when" ]
+then  ts=`date -d "$DLOG_WHEN" '+%Y-%m-%d-%H:%M:%S'`
+else  ts=`date '+%Y-%m-%d-%H:%M:%S'`
+fi
 echo "$ts $*" >>"$logname"
 exec buglog -B dlog "$*"
