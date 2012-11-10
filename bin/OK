@@ -22,6 +22,7 @@ count_re=
 words=
 wordsep=
 notifyaddr=${NOTIFY:-}
+quiet=
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [options...] [--] command [args...]
@@ -39,7 +40,8 @@ usage="Usage: $cmd [options...] [--] command [args...]
         Default from \$NOTIFY or \$MAILTO: $NOTIFY
   -P    Prefix output with the label.
   --prefix pfx
-        Prefix output with \"pfx\"."
+        Prefix output with \"pfx\".
+  -q    Quiet. Only report failures."
 
 badopts=
 
@@ -57,6 +59,8 @@ do
       notifyaddr=$2; shift ;;
     -P)
       dopfx=1 ;;
+    -q)
+      quiet=1 ;;
     --prefix)
       dopfx=1 pfx=$2; shift ;;
     --ok)
@@ -120,7 +124,7 @@ fi
 
 if [ $xit = 0 ]
 then
-  echo "$OK $words"
+  [ $quiet ] || echo "$OK $words"
 else
   echo "$FAIL $words"
 fi
