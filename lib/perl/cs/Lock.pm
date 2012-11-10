@@ -54,9 +54,7 @@ $cs::Lock::Whingeafter=5;	# 5 consecutive lock failures? start saying so
 
 $cs::Lock::Lockdir=(length $ENV{LOCKDIR}
 		   ? $ENV{LOCKDIR}
-		   : -d cs::Misc::tmpDir()."/locks/."
-		     ? cs::Misc::tmpDir()."/locks"
-		     : "$ENV{HOME}/.locks"
+		   : "$ENV{HOME}/.locks"
 		   );
 
 =head1 GENERAL FUNCTIONS
