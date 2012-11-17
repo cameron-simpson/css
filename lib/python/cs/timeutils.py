@@ -7,13 +7,13 @@
 import datetime
 import time
 
-class TimeoutError(StandardError):
+class TimeoutError(Exception):
   def __init__(self, message, timeout=None):
     if timeout is None:
       msg = "%s: timeout exceeded" % (message,)
     else:
       msg = "%s: timeout exceeded (%ss)" % (message, timeout,)
-    StandardError.__init__(self, msg)
+    Exception.__init__(self, msg)
 
 def timeFunc(func, *args, **kw):
   ''' Run the supplied function and arguments.
