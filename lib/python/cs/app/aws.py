@@ -7,6 +7,7 @@
 #       - Cameron Simpson <cs@zip.com.au> 17nov2012
 #
 
+from threading import Lock
 from boto.ec2.connection import EC2Connection
 from cs.threads import locked_property
 from cs.misc import O
@@ -20,6 +21,7 @@ class EC2(O):
     '''
     self.access_key_id = access_key_id
     self.access_key_secret = access_key_secret
+    self._lock = Lock()
 
   def _EC2Connection(self):
     return EC2Connection(self.access_key_id, self.access_key_secret)
