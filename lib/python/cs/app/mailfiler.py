@@ -189,6 +189,7 @@ class FilteringState(O):
         `environ`:     Mapping which supplies initial variable names.
                        Default from os.environ.
     '''
+    self.default_rule = None
     self.message = M
     self.filter_modes = filter_modes
     if environ is None:
