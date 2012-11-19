@@ -12,7 +12,7 @@ if sys.hexversion < 0x02060000:
   from sets import Set as set
 import itertools
 from getopt import GetoptError
-from threading import Lock
+from threading import RLock
 from threading import Thread
 from collections import namedtuple
 from cs.lex import str1, parseUC_sAttr
@@ -643,7 +643,7 @@ class NodeDB(dict, O):
 
   def __init__(self, backend, readonly=False):
     dict.__init__(self)
-    self._lock = Lock()
+    self._lock = RLock()
     self.readonly = readonly
     self.closed = False
     self._noNode = None
