@@ -324,8 +324,14 @@ class FilteringState(O):
     return self.pipe_message([self.environ.get('SENDMAIL', 'sendmail'), '-oi', address], mfp=mfp)
 
 re_UNQWORD = re.compile(r'[^,\s]+')
+
+# header[,header,...]:
 re_HEADERLIST = re.compile(r'([a-z][\-a-z0-9]*(,[a-z][\-a-z0-9]*)*):', re.I)
+
+# identifier=
 re_ASSIGN = re.compile(r'([a-z]\w+)=', re.I)
+
+# group membership test: (A|B|C|...)
 re_INGROUP = re.compile(r'\(\s*[a-z]\w+(\s*\|\s*[a-z]\w+)*\s*\)', re.I)
 
 def parserules(fp):
