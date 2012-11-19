@@ -279,15 +279,12 @@ class _MailDB(NodeDB):
       A.REALNAME = realname
     return A
 
+  @locked_property
   def address_group(self, group_name):
     ''' Return the set of addresses in the group `group_name`.
         Create the set if necessary.
     '''
-    address_groups = self.address_groups
-    address_group = address_groups.get(group_name)
-    if address_group is None:
-      address_groups[group_name] = address_group = set()
-    return address_group
+    return self.address_groups.set_default(group_name, set())
 
   @locked_property
   def address_groups(self):
@@ -298,13 +295,13 @@ class _MailDB(NodeDB):
     address_groups = { 'all': set() }
     all = address_groups['all']
     for A in self.ADDRESSes:
+      coreaddr = A.name
+      if coreaddr != coreaddr.lower():
+        warning('ADDRESS %r does not have a lowercase .name attribute: %s', A, A.name)
       for group_name in A.GROUPs:
-        if group_name in address_groups:
-          address_group = address_groups[group_name]
-        else:
-          address_group = address_groups[group_name] = set()
-        address_group.add(A.name.lower())
-        all.add(A.name)
+        address_group = address_groups.set_default(group_name, set())
+        address_group.add(coreaddr)
+        all.add(coreaddr)
     return address_groups
 
   def getMessageNode(self, message_id):
