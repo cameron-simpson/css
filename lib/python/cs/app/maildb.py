@@ -309,7 +309,7 @@ class _MailDB(NodeDB):
     '''
     return self.get( ('MESSAGE', message_id), doCreate=True)
 
-  def addrtexts_to_AddressNodes(self, *addrtexts):
+  def getAddressNodes(self, *addrtexts):
     return [ self.getAddressNode( (realname, addr), doCreate=True)
              for realname, addr
              in getaddresses(addrtexts)
@@ -333,9 +333,9 @@ class _MailDB(NodeDB):
     M.SUBJECT = msg['subject']
     if 'date' in msg:
       M.DATE = msg['date']
-    M.FROMs = self.addrtexts_to_AddressNodes(*msg.get_all('from', []))
+    M.FROMs = self.getAddressNodes(*msg.get_all('from', []))
     addrs = {}
-    M.RECIPIENTS = self.addrtexts_to_AddressNodes(
+    M.RECIPIENTS = self.getAddressNodes(
                        *chain( msg.get_all(hdr, [])
                                for hdr
                                in ('to', 'cc', 'bcc', 'resent-to', 'resent-cc')
