@@ -8,6 +8,8 @@ import sys
 from os.path import basename, dirname, join as joinpath
 import unittest
 from cs.app.mailfiler import parserules
+from cs.logutils import D
+from cs.misc import slist
 
 testdatadir = joinpath(dirname(__file__), 'testdata', 'cs.app.mailfiler')
 test_rules_file = joinpath(testdatadir, 'rules')
@@ -21,7 +23,8 @@ class TestMailFiler(unittest.TestCase):
     pass
 
   def testRulesParse(self):
-    rules = list(parserules(test_rules_file))
+    rules = slist(parserules(test_rules_file))
+    ##D("rules = %s", rules)
 
 def selftest(argv):
   unittest.main(__name__, None, argv)
