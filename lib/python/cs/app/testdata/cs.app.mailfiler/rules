@@ -4,4 +4,4 @@
 < rules-include
 
 # include file in subdirectory
-< subdir/subrules
+< rules-subdir/subrules
