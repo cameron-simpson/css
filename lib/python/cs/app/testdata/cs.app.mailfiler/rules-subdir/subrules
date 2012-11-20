@@ -1,0 +1,4 @@
+# this rules file is to test including a rules file in a subdirectory
+
+# test including another file from the same subdirectory
+< subrules-include

@@ -1,0 +1,11 @@
+# test file for rule parser
+
+# include file beside this one
+< rules-include
+
+# include file in subdirectory
+< rules-subdir/subrules
+
+varname=value
+
+folder1 . list-id.contains("foo")
