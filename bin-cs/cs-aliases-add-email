@@ -8,22 +8,7 @@ set -ue
 
 [ $# = 1 ] || { echo "Usage: $0 category <message" >&2; exit 2; }
 
-: ${CS_ALIASES=$HOME/rc/mail/aliases2}
 : ${MAILDB:=$HOME/rc/mail/db.csv}
-: ${TMPDIR:=/tmp}
+export MAILDB
 
-tmpf=$TMPDIR/addrs.$$
-trap 'rm -f "$tmpf"' 0
-trap 'rm -f "$tmpf"; exit 1' 1 2 3 15
-
-cat >"$tmpf"
-
-set -x
-
-( exec <"$tmpf"
-  cs-aliases -f "$CS_ALIASES" new | sed "s/^/$1 /" >>"$CS_ALIASES" &
-)
-
-( exec <"$tmpf"
-  maildb -m "$MAILDB" learn-addresses "$1" <"$tmpf" &
-)
+maildb -m "$MAILDB" learn-addresses "$1"
