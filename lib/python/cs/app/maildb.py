@@ -159,8 +159,13 @@ def edit_groupness(MDB, addresses):
               line = line.rstrip()
               groups, addrtext = line.split(None, 1)
               groups = [ group for group in groups.split(',') if group ]
-              A = MDB.getAddressNode(addrtext)
-              new_groups.setdefault(A, set()).update(groups)
+              As = set()
+              for realname, addr in getaddresses((addrtext,)):
+                A = MDB.getAddress(addr)
+                new_groups.setdefault(A, set()).update(groups)
+                realname = realname.strip()
+                if realname and realname != A.realname:
+                  A.REALNAME = realname
     # apply groups of whichever addresses survived
     for A, groups in new_groups.items():
       if set(A.GROUPs) != groups:
