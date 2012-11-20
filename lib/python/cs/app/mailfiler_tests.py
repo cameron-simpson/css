@@ -24,7 +24,7 @@ class TestMailFiler(unittest.TestCase):
 
   def testRulesParse(self):
     rules = slist(parserules(test_rules_file))
-    ##D("rules = %s", rules)
+    D("rules = %s", rules)
 
 def selftest(argv):
   unittest.main(__name__, None, argv)

@@ -259,6 +259,7 @@ class FilteringState(O):
         `headers`. Caches results for rapid rule evaluation.
     '''
     M = self.message
+    # TODO: this test for cache flush is bogus, never succeeds
     if M is not self.message:
       # new message - discard cache
       self.message = M
@@ -334,6 +335,9 @@ re_ASSIGN = re.compile(r'([a-z]\w+)=', re.I)
 
 # group membership test: (A|B|C|...)
 re_INGROUP = re.compile(r'\(\s*[a-z]\w+(\s*\|\s*[a-z]\w+)*\s*\)', re.I)
+
+# header[,header,...].func(
+re_HEADERFUNCTION = re.compile(r'([a-z][\-a-z0-9]*(,[a-z][\-a-z0-9]*)*)\.([a-z][_a-z0-9]*)\(', re.I)
 
 def parserules(fp):
   ''' Read rules from `fp`, yield Rules.
@@ -445,40 +449,65 @@ def parserules(fp):
       if line[offset:] == '.':
         continue
 
-      # leading hdr1,hdr2,...:
-      m = re_HEADERLIST.match(line, offset)
+      # leading hdr1,hdr2.func(
+      m = re_HEADERFUNCTION.match(line, offset)
       if m:
         headernames = [ H.lower() for H in m.group(1).split(',') if H ]
+        testfuncname = m.group(3)
+        D("HEADER FUNCTION: %s . %s", headernames, testfuncname)
         offset = m.end()
+        _, offset = get_white(line, offset)
         if offset == len(line):
-          raise ValueError("missing match after header names")
-      else:
-        headernames = ('to', 'cc', 'bcc')
-
-      if line[offset] == '/':
-        regexp = line[offset+1:]
-        if regexp.startswith('^'):
-          atstart = True
-          regexp = regexp[1:]
-        else:
-          atstart = False
-        C = Condition_Regexp(headernames, atstart, regexp)
-      else:
-        # (group[|group...])
-        m = re_INGROUP.match(line, offset)
-        if m:
-          group_names = set( w.strip().lower() for w in m.group()[1:-1].split('|') )
-          offset = m.end()
+          raise ValueError("missing argument to header function")
+        if line[offset] == '"':
+          teststring, offset = get_qstr(line, offset)
+          _, offset = get_white(line, offset)
+          if offset == len(line) or line[offset] != ')':
+            raise ValueError("missing closing parenthesis after header function argument")
+          offset += 1
+          _, offset = get_white(line, offset)
           if offset < len(line):
-            raise ValueError("extra text after groups: %s" % (line,))
-          C = Condition_InGroups(headernames, group_names)
+            raise ValueError("extra text after header function: %r" % (line[offset:],))
         else:
-          if line[offset] == '(':
-            raise ValueError("incomplete group match at: %s" % (line[offset:]))
-          # just a comma separated list of addresses
-          # TODO: should be RFC2822 list instead?
-          addrkeys = [ w.strip() for w in line[offset:].split(',') ]
-          C = Condition_AddressMatch(headernames, addrkeys)
+          raise ValueError("unexpected argument to header function, expected double quoted string")
+        C = Condition_HeaderFunction(headernames, testfuncname, teststring)
+      else:
+        D("NOT HEADER FUNCTION: %s", line)
+        # leading hdr1,hdr2,...:
+        m = re_HEADERLIST.match(line, offset)
+        if m:
+          headernames = [ H.lower() for H in m.group(1).split(',') if H ]
+          offset = m.end()
+          if offset == len(line):
+            raise ValueError("missing match after header names")
+        else:
+          headernames = ('to', 'cc', 'bcc')
+        # headers:/regexp
+        if line[offset] == '/':
+          regexp = line[offset+1:]
+          if regexp.startswith('^'):
+            atstart = True
+            regexp = regexp[1:]
+          else:
+            atstart = False
+          C = Condition_Regexp(headernames, atstart, regexp)
+        else:
+          # headers:(group[|group...])
+          m = re_INGROUP.match(line, offset)
+          if m:
+            group_names = set( w.strip().lower() for w in m.group()[1:-1].split('|') )
+            offset = m.end()
+            if offset < len(line):
+              raise ValueError("extra text after groups: %s" % (line,))
+            C = Condition_InGroups(headernames, group_names)
+          else:
+            if line[offset] == '(':
+              raise ValueError("incomplete group match at: %s" % (line[offset:]))
+            # just a comma separated list of addresses
+            # TODO: should be RFC2822 list instead?
+            addrkeys = [ w.strip() for w in line[offset:].split(',') ]
+            C = Condition_AddressMatch(headernames, addrkeys)
+
       R.conditions.append(C)
 
   if R is not None:
@@ -536,6 +565,30 @@ class Condition_InGroups(_Condition):
       for group_name in self.group_names:
         if filtering.ingroup(address, group_name):
           debug("match %s to (%s)", address, group_name)
+          return True
+    return False
+
+class Condition_HeaderFunction(_Condition):
+
+  def __init__(self, headernames, funcname, teststring):
+    self.headernames = headernames
+    self.funcname = funcname
+    self.teststring = teststring
+    test_method = 'match_' + funcname
+    try:
+      self.testfunc = getattr(self, test_method)
+    except AttributeError:
+      raise ValueError("invalid header function .%s()" % (funcname,))
+
+  def match_contains(self, filtering, headername, headervalue):
+    return self.teststring in header_value
+
+  def match(self, filtering):
+    M = self.message
+    for headername in self.headernames:
+      for hdr in M.get_all(headername, ()):
+        if test_method(filtering, headername, headervalue):
+          debug("match .%s(%s): %s: %s", self.funcname, self.teststring, headername, hdr)
           return True
     return False
 

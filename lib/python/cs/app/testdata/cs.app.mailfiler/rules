@@ -7,3 +7,5 @@
 < rules-subdir/subrules
 
 varname=value
+
+folder1 . list-id.contains("foo")
