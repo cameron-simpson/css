@@ -452,15 +452,15 @@ def parserules(fp):
       # leading hdr1,hdr2.func(
       m = re_HEADERFUNCTION.match(line, offset)
       if m:
-        headernames = [ H.lower() for H in m.group(1).split(',') if H ]
+        header_names = [ H.lower() for H in m.group(1).split(',') if H ]
         testfuncname = m.group(3)
-        D("HEADER FUNCTION: %s . %s", headernames, testfuncname)
+        D("HEADER FUNCTION: %s . %s", header_names, testfuncname)
         offset = m.end()
         _, offset = get_white(line, offset)
         if offset == len(line):
           raise ValueError("missing argument to header function")
         if line[offset] == '"':
-          teststring, offset = get_qstr(line, offset)
+          test_string, offset = get_qstr(line, offset)
           _, offset = get_white(line, offset)
           if offset == len(line) or line[offset] != ')':
             raise ValueError("missing closing parenthesis after header function argument")
@@ -470,18 +470,18 @@ def parserules(fp):
             raise ValueError("extra text after header function: %r" % (line[offset:],))
         else:
           raise ValueError("unexpected argument to header function, expected double quoted string")
-        C = Condition_HeaderFunction(headernames, testfuncname, teststring)
+        C = Condition_HeaderFunction(header_names, testfuncname, test_string)
       else:
         D("NOT HEADER FUNCTION: %s", line)
         # leading hdr1,hdr2,...:
         m = re_HEADERLIST.match(line, offset)
         if m:
-          headernames = [ H.lower() for H in m.group(1).split(',') if H ]
+          header_names = [ H.lower() for H in m.group(1).split(',') if H ]
           offset = m.end()
           if offset == len(line):
             raise ValueError("missing match after header names")
         else:
-          headernames = ('to', 'cc', 'bcc')
+          header_names = ('to', 'cc', 'bcc')
         # headers:/regexp
         if line[offset] == '/':
           regexp = line[offset+1:]
@@ -490,7 +490,7 @@ def parserules(fp):
             regexp = regexp[1:]
           else:
             atstart = False
-          C = Condition_Regexp(headernames, atstart, regexp)
+          C = Condition_Regexp(header_names, atstart, regexp)
         else:
           # headers:(group[|group...])
           m = re_INGROUP.match(line, offset)
@@ -499,14 +499,14 @@ def parserules(fp):
             offset = m.end()
             if offset < len(line):
               raise ValueError("extra text after groups: %s" % (line,))
-            C = Condition_InGroups(headernames, group_names)
+            C = Condition_InGroups(header_names, group_names)
           else:
             if line[offset] == '(':
               raise ValueError("incomplete group match at: %s" % (line[offset:]))
             # just a comma separated list of addresses
             # TODO: should be RFC2822 list instead?
             addrkeys = [ w.strip() for w in line[offset:].split(',') ]
-            C = Condition_AddressMatch(headernames, addrkeys)
+            C = Condition_AddressMatch(header_names, addrkeys)
 
       R.conditions.append(C)
 
@@ -518,15 +518,15 @@ class _Condition(O):
 
 class Condition_Regexp(_Condition):
 
-  def __init__(self, headernames, atstart, regexp):
-    self.headernames = headernames
+  def __init__(self, header_names, atstart, regexp):
+    self.header_names = header_names
     self.atstart = atstart
     self.regexp = re.compile(regexp)
     self.regexptxt = regexp
 
   def match(self, filtering):
     M = filtering.message
-    for hdr in self.headernames:
+    for hdr in self.header_names:
       for value in M.get_all(hdr, ()):
         if self.atstart:
           if self.regexp.match(value):
@@ -538,12 +538,12 @@ class Condition_Regexp(_Condition):
 
 class Condition_AddressMatch(_Condition):
 
-  def __init__(self, headernames, addrkeys):
-    self.headernames = headernames
+  def __init__(self, header_names, addrkeys):
+    self.header_names = header_names
     self.addrkeys = [ k for k in addrkeys if len(k) > 0 ]
 
   def match(self, filtering):
-    for address in filtering.addresses(*self.headernames):
+    for address in filtering.addresses(*self.header_names):
       for key in self.addrkeys:
         if key.startswith('{{') and key.endswith('}}'):
           warning("OBSOLETE address key: %s", key)
@@ -556,12 +556,12 @@ class Condition_AddressMatch(_Condition):
 
 class Condition_InGroups(_Condition):
 
-  def __init__(self, headernames, group_names):
-    self.headernames = headernames
+  def __init__(self, header_names, group_names):
+    self.header_names = header_names
     self.group_names = group_names
 
   def match(self, filtering):
-    for address in filtering.addresses(*self.headernames):
+    for address in filtering.addresses(*self.header_names):
       for group_name in self.group_names:
         if filtering.ingroup(address, group_name):
           debug("match %s to (%s)", address, group_name)
@@ -570,25 +570,25 @@ class Condition_InGroups(_Condition):
 
 class Condition_HeaderFunction(_Condition):
 
-  def __init__(self, headernames, funcname, teststring):
-    self.headernames = headernames
+  def __init__(self, header_names, funcname, test_string):
+    self.header_names = header_names
     self.funcname = funcname
-    self.teststring = teststring
+    self.test_string = test_string
     test_method = 'match_' + funcname
     try:
-      self.testfunc = getattr(self, test_method)
+      self.test_func = getattr(self, test_method)
     except AttributeError:
       raise ValueError("invalid header function .%s()" % (funcname,))
 
-  def match_contains(self, filtering, headername, headervalue):
-    return self.teststring in header_value
+  def match_contains(self, filtering, header_name, header_value):
+    return self.test_string in header_value
 
   def match(self, filtering):
     M = self.message
-    for headername in self.headernames:
-      for hdr in M.get_all(headername, ()):
-        if test_method(filtering, headername, headervalue):
-          debug("match .%s(%s): %s: %s", self.funcname, self.teststring, headername, hdr)
+    for header_name in self.header_names:
+      for hdr in M.get_all(header_name, ()):
+        if test_method(filtering, header_name, header_value):
+          debug("match .%s(%s): %s: %s", self.funcname, self.test_string, header_name, hdr)
           return True
     return False
 
