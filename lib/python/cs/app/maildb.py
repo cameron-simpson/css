@@ -161,7 +161,7 @@ def edit_groupness(MDB, addresses):
               groups = [ group for group in groups.split(',') if group ]
               As = set()
               for realname, addr in getaddresses((addrtext,)):
-                A = MDB.getAddress(addr)
+                A = MDB.getAddressNode(addr)
                 new_groups.setdefault(A, set()).update(groups)
                 realname = realname.strip()
                 if realname and realname != A.realname:
