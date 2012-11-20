@@ -6,8 +6,8 @@
 
 import sys
 from os.path import basename, dirname, join as joinpath
-from cs.app.mailfiler import parserules
 import unittest
+from cs.app.mailfiler import parserules
 
 testdatadir = joinpath(dirname(__file__), 'testdata', 'cs.app.mailfiler')
 test_rules_file = joinpath(testdatadir, 'rules')
