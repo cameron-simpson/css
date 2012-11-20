@@ -1,0 +1,7 @@
+# test file for rule parser
+
+# include file beside this one
+< rules-include
+
+# include file in subdirectory
+< subdir/subrules
