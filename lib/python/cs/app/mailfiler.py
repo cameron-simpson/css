@@ -259,11 +259,6 @@ class FilteringState(O):
         `headers`. Caches results for rapid rule evaluation.
     '''
     M = self.message
-    # TODO: this test for cache flush is bogus, never succeeds
-    if M is not self.message:
-      # new message - discard cache
-      self.message = M
-      self.header_addresses = {}
     if len(headers) != 1:
       addrs = set()
       for header in headers:
