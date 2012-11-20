@@ -449,7 +449,6 @@ def parserules(fp):
       if m:
         header_names = [ H.lower() for H in m.group(1).split(',') if H ]
         testfuncname = m.group(3)
-        D("HEADER FUNCTION: %s . %s", header_names, testfuncname)
         offset = m.end()
         _, offset = get_white(line, offset)
         if offset == len(line):
@@ -467,7 +466,6 @@ def parserules(fp):
           raise ValueError("unexpected argument to header function, expected double quoted string")
         C = Condition_HeaderFunction(header_names, testfuncname, test_string)
       else:
-        D("NOT HEADER FUNCTION: %s", line)
         # leading hdr1,hdr2,...:
         m = re_HEADERLIST.match(line, offset)
         if m:
