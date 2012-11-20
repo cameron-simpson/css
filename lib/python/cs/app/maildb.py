@@ -249,7 +249,6 @@ class _MailDB(NodeDB):
   def __init__(self, backend, readonly=False):
     self._O_omit = ('address_groups',)
     NodeDB.__init__(self, backend, readonly=readonly)
-    self._address_groups = None
 
   def rewrite(self):
     ''' Force a complete rewrite of the CSV file.
