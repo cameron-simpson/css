@@ -125,7 +125,7 @@ def main(argv, stdin=None):
         while True:
           for MW in maildirs:
             debug("process %s", (MW.shortname,))
-            with LogTime("%s.filter()" % (MW.shortname,), threshold=1.0):
+            with LogTime("%s.filter()", MW.shortname, threshold=1.0):
               for key, reports in MW.filter():
                 pass
           if delay is None:
@@ -801,7 +801,7 @@ class WatchedMaildir(O):
             skipped += 1
             continue
           nmsgs += 1
-          with LogTime("key = %s" % (key,), threshold=1.0, level=DEBUG):
+          with LogTime("key = %s", key, threshold=1.0, level=DEBUG):
             M = mdir[key]
             filtering = FilteringState(M, self.filter_modes)
             filtering.message_path = mdir.keypath(key)
