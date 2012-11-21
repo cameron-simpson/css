@@ -476,7 +476,7 @@ class LogTime(object):
       code. After the run, the field .elapsed contains the elapsed time in
       seconds.
   '''
-  def __init__(self, tag, *args, threshold=None, level=None, warnThreshold=None, warnLevel=None):
+  def __init__(self, tag, threshold=None, level=None, warnThreshold=None, warnLevel=None, *args):
     if threshold is None:
       threshold = 1.0
     if level is None:
