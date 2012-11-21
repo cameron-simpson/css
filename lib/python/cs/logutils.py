@@ -476,7 +476,7 @@ class LogTime(object):
       code. After the run, the field .elapsed contains the elapsed time in
       seconds.
   '''
-  def __init__(self, tag, threshold=None, level=None, warnThreshold=None, warnLevel=None):
+  def __init__(self, tag, *args, threshold=None, level=None, warnThreshold=None, warnLevel=None):
     if threshold is None:
       threshold = 1.0
     if level is None:
@@ -484,6 +484,7 @@ class LogTime(object):
     if warnLevel is None:
       warnLevel = logging.WARNING
     self.tag = tag
+    self.tag_args = args
     self.threshold = threshold
     self.level = level
     self.warnThreshold = warnThreshold
@@ -498,6 +499,9 @@ class LogTime(object):
       level = self.level
       if self.warnThreshold is not None and elapsed >= self.warnThreshold:
         level = self.warnLevel
-      log(level, "%s: ELAPSED %5.3fs" % (self.tag, elapsed))
+      tag = self.tag
+      if self.tag_args:
+        tag = tag % self.tag_args
+      log(level, "%s: ELAPSED %5.3fs" % (tag, elapsed))
     self.elapsed = elapsed
     return False
