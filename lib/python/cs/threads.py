@@ -19,6 +19,7 @@ else:
 from collections import deque
 if sys.hexversion < 0x02060000: from sets import Set as set
 from cs.misc import seq
+from cs.excutils import transmute
 from cs.logutils import Pfx, LogTime, error, warning, debug, exception, OBSOLETE, D
 from cs.misc import seq
 
@@ -887,6 +888,7 @@ def locked_property(func, lock_name='_lock', prop_name=None, unset_object=None):
   '''
   if prop_name is None:
     prop_name = '_' + func.__name__
+  @transmute(AttributeError)
   def getprop(self):
     ''' Attempt lockless fetch of property first.
         Use lock if property is unset.
