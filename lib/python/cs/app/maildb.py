@@ -295,17 +295,21 @@ class _MailDB(NodeDB):
         set of A.name.lower().
         Return the mapping.
     '''
-    agroups = { 'all': set() }
-    all = agroups['all']
-    for A in self.ADDRESSes:
-      coreaddr = A.name
-      if coreaddr != coreaddr.lower():
-        warning('ADDRESS %r does not have a lowercase .name attribute: %s', A, A.name)
-      for group_name in A.GROUPs:
-        agroup = agroups.set_default(group_name, set())
-        agroup.add(coreaddr)
-        all.add(coreaddr)
-    return agroups
+    try:
+      agroups = { 'all': set() }
+      all = agroups['all']
+      for A in self.ADDRESSes:
+        coreaddr = A.name
+        if coreaddr != coreaddr.lower():
+          warning('ADDRESS %r does not have a lowercase .name attribute: %s', A, A.name)
+        for group_name in A.GROUPs:
+          agroup = agroups.setdefault(group_name, set())
+          agroup.add(coreaddr)
+          all.add(coreaddr)
+      return agroups
+    except AttributeError, e:
+      D("address_groups(): e = %r", e)
+      raise ValueError("disaster")
 
   def getMessageNode(self, message_id):
     ''' Obtain the Node for the specified Message-ID `message_id`.
