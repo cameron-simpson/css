@@ -283,7 +283,6 @@ class _MailDB(NodeDB):
       A.REALNAME = realname
     return A
 
-  @locked_property
   def address_group(self, group_name):
     ''' Return the set of addresses in the group `group_name`.
         Create the set if necessary.
@@ -296,17 +295,21 @@ class _MailDB(NodeDB):
         set of A.name.lower().
         Return the mapping.
     '''
-    address_groups = { 'all': set() }
-    all = address_groups['all']
-    for A in self.ADDRESSes:
-      coreaddr = A.name
-      if coreaddr != coreaddr.lower():
-        warning('ADDRESS %r does not have a lowercase .name attribute: %s', A, A.name)
-      for group_name in A.GROUPs:
-        address_group = address_groups.set_default(group_name, set())
-        address_group.add(coreaddr)
-        all.add(coreaddr)
-    return address_groups
+    try:
+      agroups = { 'all': set() }
+      all = agroups['all']
+      for A in self.ADDRESSes:
+        coreaddr = A.name
+        if coreaddr != coreaddr.lower():
+          warning('ADDRESS %r does not have a lowercase .name attribute: %s', A, A.name)
+        for group_name in A.GROUPs:
+          agroup = agroups.setdefault(group_name, set())
+          agroup.add(coreaddr)
+          all.add(coreaddr)
+      return agroups
+    except AttributeError, e:
+      D("address_groups(): e = %r", e)
+      raise ValueError("disaster")
 
   def getMessageNode(self, message_id):
     ''' Obtain the Node for the specified Message-ID `message_id`.

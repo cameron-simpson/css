@@ -61,6 +61,27 @@ def noexc(func):
           pass
   return wrapper
 
+def transmute(exc_from, exc_to=None):
+  ''' Decorator to transmute an inner exception to another exception type.
+      The motivating use case is properties in a class with a
+      __getattr__ method; if some inner operation of the property
+      function raises AttributeError then the property is bypassed
+      in favour of __getattr__. Confusion ensues.
+      In principle this can be an issue with any exception raised
+      from "deeper" in the call chain, which can be mistaken for a
+      "shallow" exception raise by the function itself.
+  '''
+  if exc_to is None:
+    exc_to = RuntimeError
+  def transmutor(func):
+    def wrapper(*a, **kw):
+      try:
+        return func(*a, **kw)
+      except exc_from as e:
+        raise exc_to("inner %s transmuted to %s: %s" % (type(e), exc_to, str(e)))
+    return wrapper
+  return transmutor
+
 class NoExceptions(object):
   ''' A context manager to catch _all_ exceptions and log them.
       Arguably this should be a bare try...except but that's syntacticly
