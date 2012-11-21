@@ -249,7 +249,6 @@ class _MailDB(NodeDB):
   def __init__(self, backend, readonly=False):
     self._O_omit = ('address_groups',)
     NodeDB.__init__(self, backend, readonly=readonly)
-    self._address_groups = None
 
   def rewrite(self):
     ''' Force a complete rewrite of the CSV file.
@@ -284,7 +283,6 @@ class _MailDB(NodeDB):
       A.REALNAME = realname
     return A
 
-  @locked_property
   def address_group(self, group_name):
     ''' Return the set of addresses in the group `group_name`.
         Create the set if necessary.
@@ -297,17 +295,17 @@ class _MailDB(NodeDB):
         set of A.name.lower().
         Return the mapping.
     '''
-    address_groups = { 'all': set() }
-    all = address_groups['all']
+    agroups = { 'all': set() }
+    all = agroups['all']
     for A in self.ADDRESSes:
       coreaddr = A.name
       if coreaddr != coreaddr.lower():
         warning('ADDRESS %r does not have a lowercase .name attribute: %s', A, A.name)
       for group_name in A.GROUPs:
-        address_group = address_groups.set_default(group_name, set())
-        address_group.add(coreaddr)
+        agroup = agroups.set_default(group_name, set())
+        agroup.add(coreaddr)
         all.add(coreaddr)
-    return address_groups
+    return agroups
 
   def getMessageNode(self, message_id):
     ''' Obtain the Node for the specified Message-ID `message_id`.
