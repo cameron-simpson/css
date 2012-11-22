@@ -7,7 +7,7 @@
 set -ue
 
 cmd=$0
-usage="Usage: $cmd [ssh-options...] hostlist command [args...]"
+usage="Usage: $cmd [--hostpfx] [ssh-options...] hostlist command [args...]"
 
 badopts=
 
@@ -16,6 +16,7 @@ first=1
 state=sshopts
 sshcmd=
 sshcmdsep=
+hostpfx=1
 for arg
 do
   [ $skip ] && { skip=; continue; }
@@ -23,6 +24,9 @@ do
   case "$state" in
     sshopts)
       case "$arg" in
+        --no-hostpfx)
+            hostpfx=
+            ;;
         -[aAgknNqsTxXYC1246])
             set -- ${1+"$@"} "$arg"
             ;;
@@ -74,10 +78,12 @@ esac
 
 exec </dev/null
 
-set -x
 for host in `hostlist "$hostlist"`
 do
-  ssh -n ${1+"$@"} -- "$host" "$sshcmd" &
+  ( set -- ssh -n ${1+"$@"} -- "$host" "$sshcmd"
+    [ $hostpfx ] && set -- pfx "$host" "$@"
+    exec "$@"
+  ) &
 done
 
 wait
