@@ -7,72 +7,46 @@
 set -ue
 
 cmd=$0
-usage="Usage: $cmd [--hostpfx] [ssh-options...] hostlist command [args...]"
+usage="Usage: $cmd [--no-hostpfx] [-e ssh] [ssh-options...] hostlist command [args...]"
 
 badopts=
 
-skip=
-first=1
-state=sshopts
-sshcmd=
-sshcmdsep=
-hostpfx=1
-for arg
+sshargs=
+dohostpfx=1
+while [ $# -gt 0 ]
 do
-  [ $skip ] && { skip=; continue; }
-  [ $first ] && set --
-  case "$state" in
-    sshopts)
-      case "$arg" in
-        --no-hostpfx)
-            hostpfx=
-            ;;
-        -[aAgknNqsTxXYC1246])
-            set -- ${1+"$@"} "$arg"
-            ;;
-        -[bceImpLRD])
-            set -- ${1+"$@"} "$arg" "$2"
-            skip=1
-            ;;
-        --) state=hostlist
-            ;;
-        -?*)echo "$cmd: unrecognised option: $arg" >&2
-            badopts=1
-            ;;
-        *)  hostlist=$arg
-            state=command
-            ;;
-      esac
-      ;;
-    hostlist)
-      hostlist=$arg
-      state=command
-      ;;
-    command)
-      sshcmd=$sshcmd$sshcmdsep$arg
-      sshcmdsep=' '
-      ;;
-    *)echo "$cmd: unknown parse state, ABORTING" >&2; exit 1
-      ;;
+  case $1 in
+    --no-hostpfx)
+        dohostpfx=
+        ;;
+    -[aAgknNqsTxXYC1246])
+        sshargs="$sshargs "`shqstr "$1"`
+        ;;
+    -[bceImpLRD])
+        sshargs="$sshargs "`shqstr "$1" "$2"`
+        ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
   esac
-  first=1
 done
 
-case "$state" in
-  sshopts|hostlist)
-    echo "$cmd: missing hostlist" >&2
-    badopts=1
-    ;;
-  command)
-    if [ -z "$sshcmdsep" ]
-    then
-      echo "$cmd: missing command" >&2
-      badopts=1
-    fi
-    ;;
-  *)echo "$cmd: unknown parse state, ABORTING" >&2; exit 1
-    ;;
-esac
+if [ $# = 0 ]
+then
+  echo "$cmd: missing hostlist" >&2
+  badopts=1
+else
+  hostlist=$1
+  shift
+fi
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing command" >&2
+  badopts=1
+fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
@@ -80,8 +54,9 @@ exec </dev/null
 
 for host in `hostlist "$hostlist"`
 do
-  ( set -- ssh -n ${1+"$@"} -- "$host" "$sshcmd"
-    [ $hostpfx ] && set -- pfx "$host" "$@"
+  ( sshargs="$sshargs "`shqstr "$host" "$@"`
+    eval "set -- ssh -n $sshargs"
+    [ $dohostpfx ] && set -- pfx "$host" "$@"
     exec "$@"
   ) &
 done
