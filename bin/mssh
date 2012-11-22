@@ -36,6 +36,7 @@ do
         ;;
     *)  break ;;
   esac
+  shift
 done
 
 if [ $# = 0 ]
