@@ -11,6 +11,7 @@ usage="Usage: $cmd [--no-hostpfx] [-e ssh] [ssh-options...] hostlist command [ar
 
 badopts=
 
+ssh=sshto
 sshargs=
 dohostpfx=1
 while [ $# -gt 0 ]
@@ -19,11 +20,15 @@ do
     --no-hostpfx)
         dohostpfx=
         ;;
+    -e) ssh=$2
+        shift
+        ;;
     -[aAgknNqsTxXYC1246])
         sshargs="$sshargs "`shqstr "$1"`
         ;;
-    -[bceImpLRD])
+    -[bcImpLRD])
         sshargs="$sshargs "`shqstr "$1" "$2"`
+        shift
         ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
