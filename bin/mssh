@@ -61,7 +61,7 @@ exec </dev/null
 for host in `hostlist "$hostlist"`
 do
   ( sshargs="$sshargs "`shqstr "$host" "$@"`
-    eval "set -- ssh -n $sshargs"
+    eval "set -- \"\$ssh\" -n $sshargs"
     [ $dohostpfx ] && set -- pfx "$host" "$@"
     exec "$@"
   ) &
