@@ -1,0 +1,83 @@
+#!/bin/sh
+#
+# Run the same command on multiple hosts.
+#       - Cameron Simpson <cs@zip.com.au> 22nov2012
+# 
+
+set -ue
+
+cmd=$0
+usage="Usage: $cmd [ssh-options...] hostlist command [args...]"
+
+badopts=
+
+skip=
+first=1
+state=sshopts
+sshcmd=
+sshcmdsep=
+for arg
+do
+  [ $skip ] && { skip=; continue; }
+  [ $first ] && set --
+  case "$state" in
+    sshopts)
+      case "$arg" in
+        -[aAgknNqsTxXYC1246])
+            set -- ${1+"$@"} "$arg"
+            ;;
+        -[bceImpLRD])
+            set -- ${1+"$@"} "$arg" "$2"
+            skip=1
+            ;;
+        --) state=hostlist
+            ;;
+        -?*)echo "$cmd: unrecognised option: $arg" >&2
+            badopts=1
+            ;;
+        *)  hostlist=$arg
+            state=command
+            ;;
+      esac
+      ;;
+    hostlist)
+      hostlist=$arg
+      state=command
+      ;;
+    command)
+      sshcmd=$sshcmd$sshcmdsep$arg
+      sshcmdsep=' '
+      ;;
+    *)echo "$cmd: unknown parse state, ABORTING" >&2; exit 1
+      ;;
+  esac
+  first=1
+done
+
+case "$state" in
+  sshopts|hostlist)
+    echo "$cmd: missing hostlist" >&2
+    badopts=1
+    ;;
+  command)
+    if [ -z "$sshcmdsep" ]
+    then
+      echo "$cmd: missing command" >&2
+      badopts=1
+    fi
+    ;;
+  *)echo "$cmd: unknown parse state, ABORTING" >&2; exit 1
+    ;;
+esac
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+exec </dev/null
+
+set -x
+for host in `hostlist "$hostlist"`
+do
+  ssh -n ${1+"$@"} -- "$host" "$sshcmd" &
+done
+
+wait
