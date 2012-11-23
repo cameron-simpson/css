@@ -32,6 +32,7 @@ class TestMailFiler(unittest.TestCase):
 
   def testParseRules(self):
     self._testSingleRule( "varname=value", ('ASSIGN', ('varname', 'value')) )
+    self._testSingleRule( "target . .", ('TARGET', 'target') )
 
   def testRulesParseFile(self):
     rules = slist(parserules(test_rules_file))
