@@ -55,6 +55,9 @@ class TestMailFiler(unittest.TestCase):
     self._testSingleRule( "!=target labelstr .",
                           ('TARGET', 'target'), 'labelstr',
                           (), O(alert=True, halt=True) )
+    self._testSingleRule( "=!target labelstr .",
+                          ('TARGET', 'target'), 'labelstr',
+                          (), O(alert=True, halt=True) )
     self._testSingleRule( "target . foo@bar",
                           ('TARGET', 'target'), '',
                           ( O(addrkeys='foo@bar', header_names=('to', 'cc', 'bcc')), ) )

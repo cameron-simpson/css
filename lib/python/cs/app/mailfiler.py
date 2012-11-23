@@ -402,15 +402,18 @@ def parserules(fp):
           R = None
           continue
 
-        if line[offset] == '+':
-          R.flags.halt = False
-          offset += 1
-        elif line[offset] == '=':
-          R.flags.halt = True
-          offset += 1
-        if line[offset] == '!':
-          R.flags.alert = True
-          offset += 1
+        while True:
+          if line[offset] == '+':
+            R.flags.halt = False
+            offset += 1
+          elif line[offset] == '=':
+            R.flags.halt = True
+            offset += 1
+          if line[offset] == '!':
+            R.flags.alert = True
+            offset += 1
+          else:
+            break
 
         # gather targets
         while offset < len(line) and not line[offset].isspace():
