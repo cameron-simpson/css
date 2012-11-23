@@ -49,6 +49,9 @@ class TestMailFiler(unittest.TestCase):
     self._testSingleRule( "=target labelstr .",
                           ('TARGET', 'target'), 'labelstr',
                           (), O(alert=False, halt=True) )
+    self._testSingleRule( "+target labelstr .",
+                          ('TARGET', 'target'), 'labelstr',
+                          (), O(alert=False, halt=False) )
     self._testSingleRule( "!target labelstr .",
                           ('TARGET', 'target'), 'labelstr',
                           (), O(alert=True, halt=False) )
