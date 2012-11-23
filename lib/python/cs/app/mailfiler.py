@@ -337,7 +337,7 @@ re_HEADERFUNCTION = re.compile(r'([a-z][\-a-z0-9]*(,[a-z][\-a-z0-9]*)*)\.([a-z][
 def parserules(fp):
   ''' Read rules from `fp`, yield Rules.
   '''
-  if type(fp) is str:
+  if isinstance(fp, (str, unicode)):
     with open(fp) as rfp:
       for R in parserules(rfp):
         yield R
