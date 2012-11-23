@@ -22,9 +22,19 @@ class TestMailFiler(unittest.TestCase):
   def tearDown(self):
     pass
 
-  def testRulesParse(self):
+  def _testSingleRule(self, rule_lines, action_tuple):
+    if isinstance(rule_lines, str):
+      rule_lines = (rule_lines,)
+    R, = list(parserules(rule_lines))
+    D("R = %s", R)
+    self.assertEquals(len(R.actions), 1)
+    self.assertEquals(R.actions[0], action_tuple)
+
+  def testParseRules(self):
+    self._testSingleRule( "varname=value", ('ASSIGN', ('varname', 'value')) )
+
+  def testRulesParseFile(self):
     rules = slist(parserules(test_rules_file))
-    D("rules = %s", rules)
 
 def selftest(argv):
   unittest.main(__name__, None, argv)
