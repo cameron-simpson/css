@@ -343,13 +343,17 @@ def parserules(fp):
         yield R
     return
 
-  filename = fp.name
-  info("PARSE RULES: %s", shortpath(filename))
+  filename = getattr(fp, 'name', None)
+  if filename is None:
+    label = str(type(fp))
+  else:
+    label = shortpath(filename)
+  info("PARSE RULES: %s", label)
   lineno = 0
   R = None
   for line in fp:
     lineno += 1
-    with Pfx("%s:%d", shortpath(filename), lineno):
+    with Pfx("%s:%d", label, lineno):
       if not line.endswith('\n'):
         raise ValueError("short line at EOF")
 
@@ -379,13 +383,16 @@ def parserules(fp):
           if not subfilename:
             raise ValueError("missing filename")
           subfilename = envsub(subfilename)
-          subfilename = abspath_from_file(subfilename, filename)
+          if filename:
+            subfilename = abspath_from_file(subfilename, filename)
+          else:
+            subfilename = os.path.abspath(subfilename)
           for R in parserules(subfilename):
             yield R
           continue
 
         # new rule
-        R = Rule(filename=filename, lineno=lineno)
+        R = Rule(filename=(filename if filename else label), lineno=lineno)
 
         m = re_ASSIGN.match(line, offset)
         if m:
