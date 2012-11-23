@@ -64,6 +64,9 @@ class TestMailFiler(unittest.TestCase):
     self._testSingleRule( "target . foo@bar",
                           ('TARGET', 'target'), '',
                           ( O(addrkeys='foo@bar', header_names=('to', 'cc', 'bcc')), ) )
+    self._testSingleRule( "target . from:foo@bar",
+                          ('TARGET', 'target'), '',
+                          ( O(addrkeys='foo@bar', header_names=('from',)), ) )
 
   def testRulesParseFile(self):
     rules = slist(parserules(test_rules_file))
