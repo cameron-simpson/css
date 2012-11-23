@@ -354,8 +354,9 @@ def parserules(fp):
   for line in fp:
     lineno += 1
     with Pfx("%s:%d", label, lineno):
-      if not line.endswith('\n'):
-        raise ValueError("short line at EOF")
+      if filename:
+        if not line.endswith('\n'):
+          raise ValueError("short line at EOF")
 
       # skip comments
       if line.startswith('#'):
