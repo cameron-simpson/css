@@ -8,6 +8,7 @@ from __future__ import print_function
 from collections import namedtuple
 from email import message_from_string
 import email.parser
+from email.utils import getaddresses
 from getopt import getopt, GetoptError
 import io
 from logging import DEBUG
@@ -509,7 +510,7 @@ def parserules(fp):
               raise ValueError("incomplete group match at: %s" % (line[offset:]))
             # just a comma separated list of addresses
             # TODO: should be RFC2822 list instead?
-            addrkeys = [ w.strip() for w in line[offset:].split(',') ]
+            addrkeys = [ coreaddr for realname, coreaddr in getaddresses( (line[offset:],) ) ]
             C = Condition_AddressMatch(header_names, addrkeys)
 
       R.conditions.append(C)
