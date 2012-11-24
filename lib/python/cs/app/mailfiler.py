@@ -481,7 +481,7 @@ def parserules(fp):
         # leading hdr1,hdr2,...:
         m = re_HEADERLIST.match(line, offset)
         if m:
-          header_names = [ H.lower() for H in m.group(1).split(',') if H ]
+          header_names = tuple( H.lower() for H in m.group(1).split(',') if H )
           offset = m.end()
           if offset == len(line):
             raise ValueError("missing match after header names")
@@ -545,7 +545,7 @@ class Condition_AddressMatch(_Condition):
 
   def __init__(self, header_names, addrkeys):
     self.header_names = header_names
-    self.addrkeys = [ k for k in addrkeys if len(k) > 0 ]
+    self.addrkeys = tuple( k for k in addrkeys if len(k) > 0 )
 
   def match(self, filtering):
     for address in filtering.addresses(*self.header_names):

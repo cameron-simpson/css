@@ -28,7 +28,7 @@ class TestMailFiler(unittest.TestCase):
     if flags is None:
       flags = O(alert=False, halt=False)
     R, = list(parserules(rule_lines))
-    D("R = %s", R)
+    ##D("R = %s", R)
     self.assertEquals(len(R.actions), 1)
     self.assertEquals(R.actions[0], action_tuple)
     self.assertEquals(R.label, labelstr)
@@ -38,9 +38,12 @@ class TestMailFiler(unittest.TestCase):
       self.assertEquals(len(R.conditions), len(conditions))
       for i in range(len(conditions)):
         C = conditions[i]
-        RC = R.conditions[i] = conditions[i]
+        RC = R.conditions[i]
+        ##D("C = %s", C)
         for attr in dir(C):
-          self.assertEquals(getattr(C, attr), getattr(RC, attr))
+          if attr[0].isalpha():
+            ##D("test attr %s: %s VS %s", attr, getattr(C, attr), getattr(RC, attr))
+            self.assertEquals(getattr(C, attr), getattr(RC, attr))
 
   def testParseRules(self):
     self._testSingleRule( "varname=value", ('ASSIGN', ('varname', 'value')), '', () )
@@ -63,16 +66,16 @@ class TestMailFiler(unittest.TestCase):
                           (), O(alert=True, halt=True) )
     self._testSingleRule( "target . foo@bar",
                           ('TARGET', 'target'), '',
-                          ( O(addrkeys='foo@bar', header_names=('to', 'cc', 'bcc')), ) )
+                          ( O(addrkeys=('foo@bar',), header_names=('to', 'cc', 'bcc')), ) )
     self._testSingleRule( "target . from:foo@bar",
                           ('TARGET', 'target'), '',
-                          ( O(addrkeys='foo@bar', header_names=('from',)), ) )
+                          ( O(addrkeys=('foo@bar',), header_names=('from',)), ) )
     self._testSingleRule( "target . to,cc:foo@bar",
                           ('TARGET', 'target'), '',
-                          ( O(addrkeys='foo@bar', header_names=('to', 'cc')), ) )
+                          ( O(addrkeys=('foo@bar',), header_names=('to', 'cc')), ) )
     self._testSingleRule( "target . to,cc:joe blogs <joe@bar>",
                           ('TARGET', 'target'), '',
-                          ( O(addrkeys='foo@bar', header_names=('to', 'cc')), ) )
+                          ( O(addrkeys=('joe@bar',), header_names=('to', 'cc')), ) )
 
   def testRulesParseFile(self):
     rules = slist(parserules(test_rules_file))
