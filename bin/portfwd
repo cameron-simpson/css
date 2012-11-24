@@ -163,10 +163,9 @@ fi
 
 if [ $# -gt 1 ]
 then
-  set -x
   for target
   do
-    "$0" --polling-route $opts -- "$target" &
+    set-x "$0" --polling-route $opts -- "$target" &
     subprocs="$subprocs $!"
   done
   wait
