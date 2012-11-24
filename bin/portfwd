@@ -253,12 +253,12 @@ do
   $trace \
     tag_fd 2 "$target" \
     sshto $sshopts -F "$sshcfg" \
-      -o "PermitLocalCommand=yes" -o "LocalCommand=</dev/null alert CONNECTED: sshpf $target &" \
+      -o "PermitLocalCommand=yes" -o "LocalCommand=</dev/null alert CONNECTED: $target &" \
       "$target" "$cfg_command" \
     >>"$cfg_outlog" </dev/null &
   sshpid=$!
   subprocs="$subprocs $sshpid"
-  [ $first ] || alert "RESTARTING: sshpf $target [pid $sshpid]" &
+  [ $first ] || alert "RESTARTING: $target [pid $sshpid]" &
 
   # start monitor
   if [ -n "$cfg_monitor" ]
@@ -273,7 +273,7 @@ do
     flag -w "$target_disable_flag" && break
     sleep "$polltime"
   done
-  alert "EXITED: sshpf $target [pid $sshpid]" &
+  alert "EXITED: $target [pid $sshpid]" &
   >"$cfg_pidfile"
   synckill -v $subprocs
   subprocs=
