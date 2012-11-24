@@ -589,11 +589,11 @@ class Condition_HeaderFunction(_Condition):
     return self.test_string in header_value
 
   def match(self, filtering):
-    M = self.message
+    M = filtering.message
     for header_name in self.header_names:
-      for hdr in M.get_all(header_name, ()):
-        if test_method(filtering, header_name, header_value):
-          debug("match .%s(%s): %s: %s", self.funcname, self.test_string, header_name, hdr)
+      for header_value in M.get_all(header_name, ()):
+        if self.test_func(filtering, header_name, header_value):
+          debug("match .%s(%s): %s: %s", self.funcname, self.test_string, header_name, header_value)
           return True
     return False
 
