@@ -245,8 +245,12 @@ do
   echo "$$" >"$cfg_pidfile"
 
   # if tunnel disabled, skip and check again in a bit
-  flag -w "$target_disable_flag" && { sleep "$polltime"; continue; }
-  ok2portfwd                  || { sleep "$polltime"; continue; }
+  if flag -w "$target_disable_flag"
+  then
+    sleep "$polltime"
+    continue
+  fi
+  ok2portfwd || { sleep "$polltime"; continue; }
 
   sshopts=-n
   [ -n "$cfg_command" ] || sshopts="$sshopts -N"
