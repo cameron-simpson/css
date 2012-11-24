@@ -459,7 +459,7 @@ def parserules(fp):
       # leading hdr1,hdr2.func(
       m = re_HEADERFUNCTION.match(line, offset)
       if m:
-        header_names = [ H.lower() for H in m.group(1).split(',') if H ]
+        header_names = tuple( H.lower() for H in m.group(1).split(',') if H )
         testfuncname = m.group(3)
         offset = m.end()
         _, offset = get_white(line, offset)
