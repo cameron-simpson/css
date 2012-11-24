@@ -1,0 +1,29 @@
+#!/bin/sh
+#
+
+cmd=$0
+usage="Usage: $cmd access@hostlist..."
+
+[ $# -gt 0 ] || { echo "$usage" >&2; exit 2; }
+
+xit=0
+
+for access
+do
+  case "$access" in
+    *?@*?)
+      acc=`expr "x$access" : 'x\(.*\)@.*'`
+      hostlist=`expr "x$access" : 'x.*@\(.*\)'`
+      for host in `hostlist "$hostlist"`
+      do
+        tag_fd 2 "$host" cfgmaker "$acc@$host" | pfx "$host" sed -n 's/^SetEnv\[\([^]]*\)\]: /\1 /p'
+      done
+      ;;
+    *)
+      echo "$cmd: bad access@hostlist: $access" >&2
+      xit=2
+      ;;
+  esac
+done
+
+exit $xit
