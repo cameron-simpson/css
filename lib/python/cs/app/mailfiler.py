@@ -8,6 +8,7 @@ from __future__ import print_function
 from collections import namedtuple
 from email import message_from_string
 import email.parser
+from email.utils import getaddresses
 from getopt import getopt, GetoptError
 import io
 from logging import DEBUG
@@ -125,7 +126,7 @@ def main(argv, stdin=None):
         while True:
           for MW in maildirs:
             debug("process %s", (MW.shortname,))
-            with LogTime("%s.filter()" % (MW.shortname,), threshold=1.0):
+            with LogTime("%s.filter()", MW.shortname, threshold=1.0):
               for key, reports in MW.filter():
                 pass
           if delay is None:
@@ -337,21 +338,26 @@ re_HEADERFUNCTION = re.compile(r'([a-z][\-a-z0-9]*(,[a-z][\-a-z0-9]*)*)\.([a-z][
 def parserules(fp):
   ''' Read rules from `fp`, yield Rules.
   '''
-  if type(fp) is str:
+  if isinstance(fp, (str, unicode)):
     with open(fp) as rfp:
       for R in parserules(rfp):
         yield R
     return
 
-  filename = fp.name
-  info("PARSE RULES: %s", shortpath(filename))
+  filename = getattr(fp, 'name', None)
+  if filename is None:
+    label = str(type(fp))
+  else:
+    label = shortpath(filename)
+  info("PARSE RULES: %s", label)
   lineno = 0
   R = None
   for line in fp:
     lineno += 1
-    with Pfx("%s:%d", shortpath(filename), lineno):
-      if not line.endswith('\n'):
-        raise ValueError("short line at EOF")
+    with Pfx("%s:%d", label, lineno):
+      if filename:
+        if not line.endswith('\n'):
+          raise ValueError("short line at EOF")
 
       # skip comments
       if line.startswith('#'):
@@ -379,13 +385,16 @@ def parserules(fp):
           if not subfilename:
             raise ValueError("missing filename")
           subfilename = envsub(subfilename)
-          subfilename = abspath_from_file(subfilename, filename)
+          if filename:
+            subfilename = abspath_from_file(subfilename, filename)
+          else:
+            subfilename = os.path.abspath(subfilename)
           for R in parserules(subfilename):
             yield R
           continue
 
         # new rule
-        R = Rule(filename=filename, lineno=lineno)
+        R = Rule(filename=(filename if filename else label), lineno=lineno)
 
         m = re_ASSIGN.match(line, offset)
         if m:
@@ -394,15 +403,18 @@ def parserules(fp):
           R = None
           continue
 
-        if line[offset] == '+':
-          R.flags.halt = False
-          offset += 1
-        elif line[offset] == '=':
-          R.flags.halt = True
-          offset += 1
-        if line[offset] == '!':
-          R.flags.alert = True
-          offset += 1
+        while True:
+          if line[offset] == '+':
+            R.flags.halt = False
+            offset += 1
+          elif line[offset] == '=':
+            R.flags.halt = True
+            offset += 1
+          if line[offset] == '!':
+            R.flags.alert = True
+            offset += 1
+          else:
+            break
 
         # gather targets
         while offset < len(line) and not line[offset].isspace():
@@ -469,7 +481,7 @@ def parserules(fp):
         # leading hdr1,hdr2,...:
         m = re_HEADERLIST.match(line, offset)
         if m:
-          header_names = [ H.lower() for H in m.group(1).split(',') if H ]
+          header_names = tuple( H.lower() for H in m.group(1).split(',') if H )
           offset = m.end()
           if offset == len(line):
             raise ValueError("missing match after header names")
@@ -498,7 +510,7 @@ def parserules(fp):
               raise ValueError("incomplete group match at: %s" % (line[offset:]))
             # just a comma separated list of addresses
             # TODO: should be RFC2822 list instead?
-            addrkeys = [ w.strip() for w in line[offset:].split(',') ]
+            addrkeys = [ coreaddr for realname, coreaddr in getaddresses( (line[offset:],) ) ]
             C = Condition_AddressMatch(header_names, addrkeys)
 
       R.conditions.append(C)
@@ -533,7 +545,7 @@ class Condition_AddressMatch(_Condition):
 
   def __init__(self, header_names, addrkeys):
     self.header_names = header_names
-    self.addrkeys = [ k for k in addrkeys if len(k) > 0 ]
+    self.addrkeys = tuple( k for k in addrkeys if len(k) > 0 )
 
   def match(self, filtering):
     for address in filtering.addresses(*self.header_names):
@@ -801,7 +813,7 @@ class WatchedMaildir(O):
             skipped += 1
             continue
           nmsgs += 1
-          with LogTime("key = %s" % (key,), threshold=1.0, level=DEBUG):
+          with LogTime("key = %s", key, threshold=1.0, level=DEBUG):
             M = mdir[key]
             filtering = FilteringState(M, self.filter_modes)
             filtering.message_path = mdir.keypath(key)
