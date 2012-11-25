@@ -601,7 +601,8 @@ ONE_TEST = {
       'unseen':       lambda U, P: not P.seen(U),
     }
 
-re_ASSIGN = re.compile(r'([a-z]\w*)=')
+re_COMPARE = re.compile(r'([a-z]\w*)==')
+re_ASSIGN  = re.compile(r'([a-z]\w*)=')
 
 def conv_one_to_one(func):
   ''' Convert a one-to-one function to a one to many.
@@ -666,21 +667,29 @@ def action_operator(action,
       kwargs['exts'] = exts
       action = 'select_exts'
     else:
-      m = re_ASSIGN.match(action)
+      m = re_COMPARE.match(action)
       if m:
         var = m.group(1)
         value = action[m.end():]
-        def assign(U, P, var, value):
-          P.user_vars[var] = P.format(value)
-          return U
-      elif ':' in action:
-        action, kws = action.split(':', 1)
-        for kw in kws.split(','):
-          if '=' in kwarg:
-            kw, v = kw.split('=', 1)
-            kwargs[kw] = v
-          else:
-            kwargs[kwarg] = True
+        k
+      else:
+        m = re_ASSIGN.match(action)
+        if m:
+          var = m.group(1)
+          value = action[m.end():]
+          def assign(U, P, var, value):
+            P.user_vars[var] = P.format(value)
+            return U
+        else:
+          # regular action: split off parameters if any
+          if ':' in action:
+            action, kws = action.split(':', 1)
+            for kw in kws.split(','):
+              if '=' in kwarg:
+                kw, v = kw.split('=', 1)
+                kwargs[kw] = v
+              else:
+                kwargs[kwarg] = True
     op_mode = None
     do_copystate = False
     branch_func = None
