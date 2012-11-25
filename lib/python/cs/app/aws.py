@@ -7,6 +7,7 @@
 #       - Cameron Simpson <cs@zip.com.au> 17nov2012
 #
 
+from contextlib import contextmanager
 from threading import RLock
 from boto.ec2.connection import EC2Connection
 from cs.logutils import D
@@ -26,6 +27,12 @@ class EC2(O):
     self.aws.region = region
     self._lock = RLock()
     self._O_omit = ('conn', 'regions', 'instances')
+
+  @contextmanager
+  def connection(self, **kwargs):
+    conn = self.connect(**kwargs)
+    yield conn
+    conn.close()
 
   def connect(self, **kwargs):
     ''' Get a boto.ec2.connection.EC2Connection.
@@ -50,9 +57,8 @@ class EC2(O):
   def regions(self):
     ''' Return a mapping from Region name to Region.
     '''
-    ec2 = self.connect(region=None)
-    RS = dict( [ (R.name, R) for R in ec2.get_all_regions() ] )
-    ec2.close()
+    with self.connection(region=None) as ec2:
+      RS = dict( [ (R.name, R) for R in ec2.get_all_regions() ] )
     return RS
 
   def region(self, name):
