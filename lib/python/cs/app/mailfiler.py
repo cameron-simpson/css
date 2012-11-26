@@ -536,7 +536,7 @@ class _Condition(O):
   def match(self, filtering):
     M = filtering.message
     for header_name in self.header_names:
-      for header_value in M.get_all(hdr, ()):
+      for header_value in M.get_all(header_name, ()):
         if self.test_value(filtering, header_name, header_value):
           if not flags.invert:
             return True
