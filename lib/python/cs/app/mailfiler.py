@@ -456,7 +456,7 @@ def parserules(fp):
 
       if line[offset] == '!':
         condition_flags.invert = True
-        _, offset = getwhite(line, offset+1)
+        _, offset = get_white(line, offset+1)
         if not _ or offset == len(line):
           warning('no condition after "!"')
           continue
