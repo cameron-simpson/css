@@ -32,6 +32,13 @@ from cs.threads import runTree, RunTreeOp
 from cs.urlutils import URL
 from cs.misc import O
 
+if os.environ.get('DEBUG', ''):
+  def X(tag, *a):
+    D("TRACE: "+tag, *a)
+else:
+  def X(*a):
+    pass
+
 ARCHIVE_SUFFIXES = ( 'tar', 'tgz', 'tar.gz', 'tar.bz2', 'cpio', 'rar', 'zip', 'dmg' )
 IMAGE_SUFFIXES = ( 'png', 'jpg', 'jpeg', 'gif', 'ico', )
 VIDEO_SUFFIXES = ( 'mp2', 'mp4', 'avi', 'wmv', )
