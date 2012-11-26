@@ -538,10 +538,10 @@ class _Condition(O):
     for header_name in self.header_names:
       for header_value in M.get_all(header_name, ()):
         if self.test_value(filtering, header_name, header_value):
-          if not flags.invert:
+          if not self.flags.invert:
             return True
         else:
-          if flags.invert:
+          if self.flags.invert:
             return True
     return False
 
