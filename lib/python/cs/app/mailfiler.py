@@ -346,15 +346,15 @@ def parserules(fp):
 
   filename = getattr(fp, 'name', None)
   if filename is None:
-    label = str(type(fp))
+    file_label = str(type(fp))
   else:
-    label = shortpath(filename)
-  info("PARSE RULES: %s", label)
+    file_label = shortpath(filename)
+  info("PARSE RULES: %s", file_label)
   lineno = 0
   R = None
   for line in fp:
     lineno += 1
-    with Pfx("%s:%d", label, lineno):
+    with Pfx("%s:%d", file_label, lineno):
       if filename:
         if not line.endswith('\n'):
           raise ValueError("short line at EOF")
@@ -394,7 +394,7 @@ def parserules(fp):
           continue
 
         # new rule
-        R = Rule(filename=(filename if filename else label), lineno=lineno)
+        R = Rule(filename=(filename if filename else file_label), lineno=lineno)
 
         m = re_ASSIGN.match(line, offset)
         if m:
