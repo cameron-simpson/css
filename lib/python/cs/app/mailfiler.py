@@ -448,9 +448,18 @@ def parserules(fp):
         _, offset = get_white(line, offset)
 
       # condition
+      condition_flags = O(invert=False)
+
       if not _ or offset == len(line):
-        warning("no condition")
+        warning('no condition')
         continue
+
+      if line[offset] == '!':
+        condition_flags.invert = True
+        _, offset = getwhite(line, offset+1)
+        if not _ or offset == len(line):
+          warning('no condition after "!"')
+          continue
 
       # . always matches - don't bother storing it as a test
       if line[offset:] == '.':
@@ -476,7 +485,7 @@ def parserules(fp):
             raise ValueError("extra text after header function: %r" % (line[offset:],))
         else:
           raise ValueError("unexpected argument to header function, expected double quoted string")
-        C = Condition_HeaderFunction(header_names, testfuncname, test_string)
+        C = Condition_HeaderFunction(condition_flags, header_names, testfuncname, test_string)
       else:
         # leading hdr1,hdr2,...:
         m = re_HEADERLIST.match(line, offset)
@@ -495,7 +504,7 @@ def parserules(fp):
             regexp = regexp[1:]
           else:
             atstart = False
-          C = Condition_Regexp(header_names, atstart, regexp)
+          C = Condition_Regexp(condition_flags, header_names, atstart, regexp)
         else:
           # headers:(group[|group...])
           m = re_INGROUP.match(line, offset)
@@ -504,14 +513,14 @@ def parserules(fp):
             offset = m.end()
             if offset < len(line):
               raise ValueError("extra text after groups: %s" % (line,))
-            C = Condition_InGroups(header_names, group_names)
+            C = Condition_InGroups(condition_flags, header_names, group_names)
           else:
             if line[offset] == '(':
               raise ValueError("incomplete group match at: %s" % (line[offset:]))
             # just a comma separated list of addresses
             # TODO: should be RFC2822 list instead?
             addrkeys = [ coreaddr for realname, coreaddr in getaddresses( (line[offset:],) ) ]
-            C = Condition_AddressMatch(header_names, addrkeys)
+            C = Condition_AddressMatch(condition_flags, header_names, addrkeys)
 
       R.conditions.append(C)
 
@@ -519,36 +528,44 @@ def parserules(fp):
     yield R
 
 class _Condition(O):
-  pass
+  
+  def __init__(self, flags, header_names):
+    self.flags = flags
+    self.header_names = header_names
+
+  def match(self, filtering):
+    M = filtering.message
+    for header_name in self.header_names:
+      for header_value in M.get_all(hdr, ()):
+        if self.test_value(filtering, header_name, header_value):
+          if not flags.invert:
+            return True
+        else:
+          if flags.invert:
+            return True
+    return False
 
 class Condition_Regexp(_Condition):
 
-  def __init__(self, header_names, atstart, regexp):
-    self.header_names = header_names
+  def __init__(self, flags, header_names, atstart, regexp):
+    _Condition.__init__(self, flags, header_names)
     self.atstart = atstart
     self.regexp = re.compile(regexp)
     self.regexptxt = regexp
 
-  def match(self, filtering):
-    M = filtering.message
-    for hdr in self.header_names:
-      for value in M.get_all(hdr, ()):
-        if self.atstart:
-          if self.regexp.match(value):
-            return True
-        else:
-          if self.regexp.search(value):
-            return True
-    return False
+  def test_value(self, filtering, header_name, header_value):
+    if self.atstart:
+      return self.regexp.match(header_value)
+    return self.regexp.search(header_value)
 
 class Condition_AddressMatch(_Condition):
 
-  def __init__(self, header_names, addrkeys):
-    self.header_names = header_names
+  def __init__(self, flags, header_names, addrkeys):
+    _Condition.__init__(self, flags, header_names)
     self.addrkeys = tuple( k for k in addrkeys if len(k) > 0 )
 
-  def match(self, filtering):
-    for address in filtering.addresses(*self.header_names):
+  def test_value(self, filtering, header_name, header_value):
+    for address in filtering.addresses(header_name):
       for key in self.addrkeys:
         if key.startswith('{{') and key.endswith('}}'):
           warning("OBSOLETE address key: %s", key)
@@ -561,12 +578,12 @@ class Condition_AddressMatch(_Condition):
 
 class Condition_InGroups(_Condition):
 
-  def __init__(self, header_names, group_names):
-    self.header_names = header_names
+  def __init__(self, flags, header_names, group_names):
+    _Condition.__init__(self, flags, header_names)
     self.group_names = group_names
 
-  def match(self, filtering):
-    for address in filtering.addresses(*self.header_names):
+  def test_value(self, filtering, header_name, header_value):
+    for address in filtering.addresses(header_name):
       for group_name in self.group_names:
         if filtering.ingroup(address, group_name):
           debug("match %s to (%s)", address, group_name)
@@ -575,27 +592,21 @@ class Condition_InGroups(_Condition):
 
 class Condition_HeaderFunction(_Condition):
 
-  def __init__(self, header_names, funcname, test_string):
-    self.header_names = header_names
+  def __init__(self, flags, header_names, funcname, test_string):
+    _Condition.__init__(self, flags, header_names)
     self.funcname = funcname
     self.test_string = test_string
-    test_method = 'match_' + funcname
+    test_method = 'test_func_' + funcname
     try:
       self.test_func = getattr(self, test_method)
     except AttributeError:
       raise ValueError("invalid header function .%s()" % (funcname,))
 
-  def match_contains(self, filtering, header_name, header_value):
-    return self.test_string in header_value
+  def test_value(self, filtering, header_name, header_value):
+    return self.test_func(filtering, header_name, header_value)
 
-  def match(self, filtering):
-    M = filtering.message
-    for header_name in self.header_names:
-      for header_value in M.get_all(header_name, ()):
-        if self.test_func(filtering, header_name, header_value):
-          debug("match .%s(%s): %s: %s", self.funcname, self.test_string, header_name, header_value)
-          return True
-    return False
+  def test_func_contains(self, filtering, header_name, header_value):
+    return self.test_string in header_value
 
 _FilterReport = namedtuple('FilterReport',
                           'rule matched saved_to ok_actions failed_actions')
@@ -616,6 +627,7 @@ class Rule(O):
     self.label = ''
 
   def match(self, filtering):
+    # all conditions must match
     for C in self.conditions:
       if not C.match(filtering):
         return False
