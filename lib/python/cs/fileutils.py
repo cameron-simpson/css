@@ -481,7 +481,7 @@ def shortpath(path, environ=None, prefixes=None):
 
 class Pathname(str):
   ''' Subclass of str presenting convenience properties useful for
-      fomat strings related to file paths.
+      format strings related to file paths.
   '''
 
   _default_prefixes = ( ('$HOME/', '~/'), )
