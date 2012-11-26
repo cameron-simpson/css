@@ -102,7 +102,7 @@ def main(argv):
             urls = [ URL(url, None, P.user_agent) ]
           run_ops = [ action_operator(action) for action in argv ]
           ##D("run_ops = %r", run_ops)
-          with Later(1) as PQ:
+          with Later(4) as PQ:
             runTree(urls, run_ops, P, PQ)
       else:
         error("unsupported op")
@@ -127,10 +127,13 @@ def unique(items, seen=None):
   ''' A generator that yields unseen items, as opposed to just
       stuffing them all into a set and returning the set.
   '''
+  ##items = list(items)
+  ##D("unique(items=%s,..)...", items)
   if seen is None:
     seen = set()
   for I in items:
     if I not in seen:
+      D("unique: yield I=%r", I)
       yield I
       seen.add(I)
 
@@ -628,15 +631,15 @@ def action_operator(action,
   ''' Accept a string `action` and return a RunTreeOp for use with
       cs.threads.runTree.
   '''
+  if many_to_many is None:
+    many_to_many = MANY_TO_MANY
+  if one_to_many is None:
+    one_to_many = ONE_TO_MANY
+  if one_to_one is None:
+    one_to_one = ONE_TO_ONE
+  if one_test is None:
+    one_test = ONE_TEST
   with Pfx("%s", action):
-    if many_to_many is None:
-      many_to_many = MANY_TO_MANY
-    if one_to_many is None:
-      one_to_many = ONE_TO_MANY
-    if one_to_one is None:
-      one_to_one = ONE_TO_ONE
-    if one_test is None:
-      one_test = ONE_TEST
     kwargs = {}
     # select URLs matching regexp
     if action.startswith('/'):
