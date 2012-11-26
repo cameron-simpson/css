@@ -478,7 +478,7 @@ class Later(object):
 	It can be useful for transient control functions that
 	themselves queue things through the Later queuing system
 	but do not want to consume capacity themselves, thus avoiding
-	deadlock at the cost of ransient overthreading.
+	deadlock at the cost of transient overthreading.
     '''
     if self.closed:
       raise RunTimError("%s.bg(...) after close()")
