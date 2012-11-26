@@ -90,7 +90,7 @@ class PendingFunction(object):
       func = partial(func, *a, **kw)
     self.func = func
     self.state = STATE_PENDING
-    self.result = None
+    self._result = None
     self._lock = Lock()
     self.join_cond = Condition()
     self.notifiers = []
@@ -111,15 +111,64 @@ class PendingFunction(object):
         If self.state is STATE_PENDING or STATE_CANCELLED, return True.
         Otherwise return False (too late to cancel).
     '''
+    notifiers = ()
     with self._lock:
       state = self.state
       if state == STATE_PENDING:
-        self.state = STATE_CANCELLED
         self.func = None
-        self.set_result( (None, None) )
+        self._result = (None, None)
+        self.state = STATE_CANCELLED
+        notifiers = list(self.notifiers)
+      elif state == STATE_CANCELLED:
+        pass
       elif state == STATE_RUNNING or state == STATE_DONE:
         return False
+      else:
+        raise RuntimeError("<%s>.state not one of (STATE_PENDING, STATE_CANCELLED, STATE_RUNNING, STATE_DONE): %r"
+                           % (self, state))
+    for notifier in notifiers:
+      notifier(self)
+    with self.join_cond:
+      self.join_cond.notify_all()
     return True
+
+  @property
+  def result(self):
+    with self._lock:
+      result = self._result
+    if result is None:
+      raise ValueError("<%s>.result not available, state=%s" % (self, self.state))
+    if len(result) != 2:
+      raise RuntimeError("<%s>.result not a 2-tuple: %r" % (self, result))
+    return result
+
+  @result.setter
+  def result(self, new_result):
+    ''' Set the result unless the function is already cancelled.
+        Alert people to completion.
+    '''
+    if len(new_result) != 2:
+      raise ValueError("<%s>.result.setter: expected a 2-tuple but got: %r"
+                       % (self, new_result))
+    with self._lock:
+      state = self.state
+      if state == STATE_CANCELLED:
+        # silently discard result
+        pass
+      elif state == STATE_RUNNING:
+        if self._result is not None:
+          raise ValueError("<%s>.result.setter: tried to set .result to %r but .result is already: %r"
+                           % (self, new_result, self._result))
+        self._result = new_result
+        self.state = STATE_DONE
+        notifiers = list(self.notifiers)
+      else:
+        raise RuntimeError("<%s>.state is one of (STATE_CANCELLED, STATE_RUNNING): %r"
+                           % (self, state))
+    for notifier in notifiers:
+      notifier(self)
+    with self.join_cond:
+      self.join_cond.notify_all()
 
   def set_result(self, result):
     ''' set_result() is called by a worker thread to report completion of the
@@ -130,16 +179,7 @@ class PendingFunction(object):
           None, exc_info
         where exc_info is (exc_type, exc_value, exc_traceback).
     '''
-    # collect the result and release the capacity
-    with self._lock:
-      if self.state != STATE_CANCELLED:
-        self.state = STATE_DONE
-        self.result = result
-      notifiers = list(self.notifiers)
-    for notifier in notifiers:
-      notifier(self)
-    with self.join_cond:
-      self.join_cond.notify_all()
+    self.result = result
 
   def wait(self):
     ''' Calling the .wait() method waits for the function to run to
