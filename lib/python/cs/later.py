@@ -285,7 +285,8 @@ class LateFunction(PendingFunction):
     result, exc_info = self.wait()
     if exc_info:
       exc_type, exc_value, exc_traceback = exc_info
-      raise exc_type(exc_value).with_traceback(exc_traceback)
+      raise exc_type, exc_value, exc_traceback
+      ##raise exc_type(exc_value).with_traceback(exc_traceback)
     return result
 
   def set_result(self, result):
