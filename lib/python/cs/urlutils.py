@@ -94,10 +94,12 @@ class _URL(unicode):
       rq = Request(url, None, hdrs)
       auth_handler = HTTPBasicAuthHandler(NetrcHTTPPasswordMgr())
       opener = build_opener(auth_handler)
+      debug("open URL...")
       rsp = opener.open(rq)
       H = rsp.info()
       self._content_type = H.gettype()
       self._content = rsp.read()
+      debug("URL: content-type=%s, length=%d", self._content_type, len(self._content))
       self._parsed = None
 
   def get_content(self, onerror=None):
