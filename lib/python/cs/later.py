@@ -375,8 +375,9 @@ class Later(object):
     self._dispatchThread.start()
 
   def __repr__(self):
-    return '<%s "%s" running=%d pending=%d delayed=%d closed=%s>' \
+    return '<%s "%s" capacity=%s running=%d pending=%d delayed=%d closed=%s>' \
            % ( self.__class__, self.name,
+               self.capacity,
                len(self.running),
                len(self.pending),
                len(self.delayed),
@@ -384,8 +385,8 @@ class Later(object):
              )
 
   def __str__(self):
-    return "<%s pending=%d running=%d delayed=%d>" \
-           % (self.name,
+    return "<%s[%s] pending=%d running=%d delayed=%d>" \
+           % (self.name, self.capacity,
               len(self.pending), len(self.running), len(self.delayed))
 
   def __enter__(self):
@@ -509,6 +510,7 @@ class Later(object):
         If the parameter `pfx` is not None, submit pfx.func(func);
           see cs.logutils.Pfx's .func method for details.
     '''
+    ##D("%s.submit()...", self)
     if self.closed:
       raise RunTimError("%s.bg(...) after close()")
     if delay is not None and when is not None:
