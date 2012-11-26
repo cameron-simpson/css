@@ -19,7 +19,7 @@ class TestLater(unittest.TestCase):
   def _delay(n):
     time.sleep(n)
     return n
-  class _Bang(BaseException):
+  class _Bang(Exception):
     pass
   @staticmethod
   def _bang():
