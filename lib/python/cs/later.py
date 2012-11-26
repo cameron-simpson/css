@@ -148,6 +148,9 @@ class PendingFunction(object):
         On completion the sequence:
           func_result, None
         is returned.
+        If the function was cancelled the sequence:
+          None, None
+        is returned.
         On an exception the sequence:
           None, exc_info
         is returned where exc_info is a tuple of (exc_type, exc_value, exc_traceback).
