@@ -8,7 +8,13 @@ mailfiler - rules file format
 The mailfiler(1cs) command's monitor watches Maildirs for newly
 arrived messages and files them according to a sequence of rules.
 
+=head1 SYNTAX
+
+=head2 Comments
+
 Blank lines and lines commencing with an octothorpe ('#') are ignored.
+
+=head2 Include Files
 
 A line commencing with a less-than symbol ('<') is an "include" directive.
 The following word is the name of a file whose contents are read as though they
@@ -16,12 +22,16 @@ appeared at this point in the rules file.
 If the filename is relative, it is resolved with respect to the
 directory part of the filename of the current rules file.
 
+=head2 Variable Assignments
+
 A line commencing with an identifier and an equals symbol ('=') is
 an environment variable assignment.
 
+=head2 Filing Rules
+
 Other lines are mail filing rules, of the general form:
 
-  [!][=]targets tag condition
+  [!][=]targets tag [!]condition
 
 A line commencing with whitespace is considered to be an additional
 condition to be ANDed with the preceeding line's rule conditions:
@@ -29,6 +39,8 @@ condition to be ANDed with the preceeding line's rule conditions:
   [!][=]targets tag condition1
                     condition2
                     condition3
+
+=head3 Delivery Flags
 
 Rules may commences with either or both of the following mode indicators:
 
@@ -39,19 +51,29 @@ Rules may commences with either or both of the following mode indicators:
     cease at this rule if it matches. Normally all matching rules are
     applied.
 
+=head3 Targets
+
 The "targets" is a comma separated list of mail destinations; a
 target takes the form of a sequence of nonwhitespace non-comma
 characters, or a string value in double quotes.
+
+=head4 Deliver to Program
 
 A target commencing with a pipe symbol ('|') is considered a command
 to run with the message text on its standard input.
 If the command exits with a zero exit status is it considered to have run successfully.
 
+=head4 Deliver to Email Address
+
 Otherwise, a target containing an "at" symbol ('@') is considered
 an email address to which to send a copy of the message.
 It the mail system accepts the message it is considered to have been dispatched successfully.
 
+=head4 Deliver to Maildir
+
 Otherwise, a target is considered to indicate a Maildir into which the message should be placed.
+
+=head3 Delivery
 
 The message must be successfully delivered to all targets of all matching
 rules for the filter run to be considered successfully filtered.
@@ -60,6 +82,47 @@ specified by the $DEFAULT environment variable.
 
 If all delivery attempt succeeded, the original message is remove from the Maildir.
 Otherwise the message remains in the Maildir and is ignored on subsequent polls.
+
+=head3 Conditions
+
+A condition may be preceeded by an exclaimation symbol ('!') to invert its meaning.
+Example:
+
+  !from:cs@zip.com.au
+
+matches a message not from "cs@zip.com.au".
+
+Conditions are tested against specific message headers. Unless
+specified, these headers are the 'To:', 'CC:' and 'BCC:' headers.
+Example:
+
+  cs@zip.com.au
+
+matches a message addressed to "cs@zip.com.au".
+
+A condition may be preceeded by a comma separated list of headers.
+Example:
+
+  to,from:cs@zip.com.au
+
+matches a message from "cs@zip.com.au" or addressed to "cs@zip.com.au" in the 'To:' header.
+
+A header may be tested against a regular expression instead of by email address:
+Example:
+
+  subject:/icewm-Bugs
+
+matches a message with the string "icewm-Bugs" in the 'Subject:' header.
+
+A header may be tested against a variety of special purpose functions
+accepting a double quoted string.
+Example:
+
+  list-id.contains("<squid-users.squid-cache.org>")
+
+matches a message with the string "<squid-users.squid-cache.org>" in the 'List-ID:' header.
+
+The list of available functions is as follows: B<contains>. (More to come.)
 
 =head1 SEE ALSO
 
