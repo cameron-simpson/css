@@ -48,7 +48,17 @@ class TestMailFiler(unittest.TestCase):
         for attr in dir(C):
           if attr[0].isalpha():
             D("test attr %s: %s VS %s", attr, getattr(C, attr), getattr(RC, attr))
-            self.assertEquals(getattr(C, attr), getattr(RC, attr))
+            if attr == 'flags':
+              Cflags = C.flags
+              RCflags = RC.flags
+              for flag_name in dir(RC.flags):
+                if flag_name[0].isalpha():
+                  if getattr(RCflags, flag_name):
+                    self.assert_(flag_name in Cflags, "\"%s\" in Rule but not expected" % (flag_name,))
+                  else:
+                    self.assert_(flag_name not in Cflags, "\"%s\" expected, but not in Rule" % (flag_name,))
+            else:
+              self.assertEquals(getattr(C, attr), getattr(RC, attr))
 
   def testParseRules(self):
     self._testSingleRule( "varname=value", ('ASSIGN', ('varname', 'value')), '', () )
@@ -71,7 +81,10 @@ class TestMailFiler(unittest.TestCase):
                           (), O(alert=True, halt=True) )
     self._testSingleRule( "target . foo@bar",
                           ('TARGET', 'target'), '',
-                          ( O(addrkeys=('foo@bar',), header_names=('to', 'cc', 'bcc')), ) )
+                          ( O(addrkeys=('foo@bar',), flags=(), header_names=('to', 'cc', 'bcc')), ) )
+    self._testSingleRule( "target . ! foo@bar",
+                          ('TARGET', 'target'), '',
+                          ( O(addrkeys=('foo@bar',), flags=('invert',), header_names=('to', 'cc', 'bcc')), ) )
     self._testSingleRule( "target . from:foo@bar",
                           ('TARGET', 'target'), '',
                           ( O(addrkeys=('foo@bar',), header_names=('from',)), ) )
