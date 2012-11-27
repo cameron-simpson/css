@@ -151,6 +151,7 @@ class Pilfer(O):
     self._lock = Lock()
     self.flush_print = False
     self._print_to = None
+    self._print_lock = Lock()
     self.user_agent = None
     self.user_vars = {}
     self._urlsfile = None
@@ -210,9 +211,10 @@ class Pilfer(O):
       if print_to is None:
         print_to = sys.stdout
     kw['file'] = print_to
-    print(*a, **kw)
-    if self.flush_print:
-      print_to.flush()
+    with self._print_lock:
+      print(*a, **kw)
+      if self.flush_print:
+        print_to.flush()
 
   def url_save_dir(self, U):
     ''' Return the current URL save dir.
@@ -603,7 +605,7 @@ ONE_TO_ONE = {
       'hostname':     lambda U, P: URL(U, None).hostname,
       'new_dir':      lambda U, P: (U, P.url_save_dir(U))[0],
       'per':          lambda U, P: (U, P.set_user_vars(save_dir=None))[0],
-      'print':        lambda U, P: (U, print(U))[0],
+      'print':        lambda U, P: (U, P.print(U))[0],
       'query':        lambda U, P, *a: url_query(U, *a),
       'quote':        lambda U, P: quote(U),
       'unquote':      lambda U, P: unquote(U),
