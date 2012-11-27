@@ -128,6 +128,9 @@ class WorkerThreadPool(object):
         result = (None, sys.exc_info())
       finally:
         func = None     # release func+args
+      with self._lock:
+        self.idle.append( Hdesc )
+        ##D("_handler released thread: idle = %s", self.idle)
       if retq is not None:
         debug("%s: worker thread: %r.put(result)...", self, retq)
         retq.put(result)
@@ -139,8 +142,7 @@ class WorkerThreadPool(object):
         debug("%s: worker thread: delivery done", self)
         deliver = None
       result = None
-      with self._lock:
-        self.idle.append( Hdesc )
+      debug("%s: worker thread: proceed to next function...", self)
 
 class AdjustableSemaphore(object):
   ''' A semaphore whose value may be tuned after instantiation.
