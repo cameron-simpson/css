@@ -649,28 +649,23 @@ def conv_one_to_one(func):
   def converted(items, *a, **kw):
     results = []
     for item in items:
-      results.append(func(item, *a, **kw))
-    return results
+      yield func(item, *a, **kw)
   return converted
 
 def conv_one_test(func):
   ''' Convert a test-one function to one-to-many.
   '''
   def converted(items, *a, **kw):
-    results = []
     for item in items:
       if func(item, *a, **kw):
-        results.append(item)
-    return results
+        yield item
   return converted
 
 def conv_one_to_many(func):
   def converted(items, *a, **kw):
-    results = []
     for item in items:
       for result in func(item, *a, **kw):
-        results.append(result)
-    return results
+        yield result
   return converted
 
 def action_operator(action,
