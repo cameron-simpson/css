@@ -123,7 +123,9 @@ def main(argv):
           debug("run_ops = %r", run_ops)
           with Later(jobs) as PQ:
             debug("urls = %s", urls)
-            runTree(urls, run_ops, P, PQ)
+            result = runTree(urls, run_ops, P, PQ)
+            result = list(result)
+            debug("final result = %s", result)
       else:
         error("unsupported op")
         badopts = True
@@ -231,10 +233,6 @@ class Pilfer(O):
     ''' Save the contents of the URL `U`.
     '''
     with Pfx(U):
-      dir = kw.pop('dir', None)
-      saveas = kw.pop('saveas', None)
-      if kw:
-        raise ValueError("unused parameters: %s" % (kw,))
       if saveas is None:
         saveas = U.basename
       if saveas == '-':
@@ -242,7 +240,7 @@ class Pilfer(O):
         sys.stdout.flush()
       else:
         with Pfx(saveas):
-          if not overwrite and os.exists(saveas):
+          if not overwrite and os.path.exists(saveas):
             warning("file exists, not saving")
           else:
             content = U.content
@@ -585,6 +583,7 @@ def action_operator(action,
     one_to_one = ONE_TO_ONE
   if one_test is None:
     one_test = ONE_TEST
+  action0 = action
   with Pfx("%s", action):
     kwargs = {}
     # select URLs matching regexp
@@ -703,7 +702,11 @@ def action_operator(action,
       raise ValueError("unknown action")
     if kwargs:
       func = partial(func, **kwargs)
-    return RunTreeOp(func, fork_input, fork_state, func_sig)
+    def trace_func(*a, **kw):
+      debug("do %s ...", action0)
+      with Pfx(action0):
+        return func(*a, **kw)
+    return RunTreeOp(trace_func, fork_input, fork_state, func_sig)
 
 if __name__ == '__main__':
   import sys
