@@ -109,8 +109,9 @@ def main(argv):
           else:
             urls = [ URL(url, None, P.user_agent) ]
           run_ops = [ action_operator(action) for action in argv ]
-          ##D("run_ops = %r", run_ops)
+          debug("run_ops = %r", run_ops)
           with Later(4) as PQ:
+            debug("urls = %s", urls)
             runTree(urls, run_ops, P, PQ)
       else:
         error("unsupported op")
@@ -135,13 +136,10 @@ def unique(items, seen=None):
   ''' A generator that yields unseen items, as opposed to just
       stuffing them all into a set and returning the set.
   '''
-  ##items = list(items)
-  ##D("unique(items=%s,..)...", items)
   if seen is None:
     seen = set()
   for I in items:
     if I not in seen:
-      D("unique: yield I=%r", I)
       yield I
       seen.add(I)
 
