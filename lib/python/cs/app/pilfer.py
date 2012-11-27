@@ -227,7 +227,7 @@ class Pilfer(O):
       if self.flush_print:
         print_to.flush()
 
-  def save_url(self, U, *a, **kw):
+  def save_url(self, U, saveas=None, dir=None, overwrite=False):
     ''' Save the contents of the URL `U`.
     '''
     with Pfx(U):
@@ -237,14 +237,17 @@ class Pilfer(O):
         raise ValueError("unused parameters: %s" % (kw,))
       if saveas is None:
         saveas = U.basename
-      content = U.content
       if saveas == '-':
-        sys.stdout.write(content)
+        sys.stdout.write(U.content)
         sys.stdout.flush()
       else:
-        with Pfx("%s", saveas):
-          with open(saveas, "wb") as savefp:
-            savefp.write(content)
+        with Pfx(saveas):
+          if not overwrite and os.exists(saveas):
+            warning("file exists, not saving")
+          else:
+            content = U.content
+            with open(saveas, "wb") as savefp:
+              savefp.write(content)
 
   def act(self, urls, actions):
     ''' Return an iterable of the results of the actions applied to the URLs.
