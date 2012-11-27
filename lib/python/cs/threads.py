@@ -74,10 +74,13 @@ class WorkerThreadPool(object):
       func = pfx.func(func)
     idle = self.idle
     with self._lock:
-      if idle:
+      debug("dispatch: idle = %s", idle)
+      if len(idle):
         # use an idle thread
         Hdesc = idle.pop()
+        debug("dispatch: reuse %s", Hdesc)
       else:
+        debug("dispatch: need new thread")
         # no available threads - make one
         args = []
         H = Thread(target=self._handler, args=args)
@@ -111,21 +114,29 @@ class WorkerThreadPool(object):
         result = func(), None
         debug("%s: worker thread: ran task: result = %s", self, result)
       except:
-        debug("%s: worker thread: ran task: exception!", self)
+        func = None     # release func+args
+        debug("%s: worker thread: ran task: exception! %r", self, sys.exc_info())
         # don't let exceptions go unhandled
         # if nobody is watching, raise the exception and don't return
         # this handler to the pool
         if retq is None and deliver is None:
           t, v, tb = sys.exc_info()
-          raise t(v).with_traceback(tb)
+          debug("%s: worker thread: reraise exception", self)
+          raise t, v, tb
+          ##raise t(v).with_traceback(tb)
+        debug("%s: worker thread: set result = (None, exc_info)", self)
         result = (None, sys.exc_info())
       finally:
         func = None     # release func+args
       if retq is not None:
+        debug("%s: worker thread: %r.put(result)...", self, retq)
         retq.put(result)
+        debug("%s: worker thread: %r.put(result) done", self, retq)
         retq = None
       if deliver is not None:
+        debug("%s: worker thread: deliver result...", self)
         deliver(result)
+        debug("%s: worker thread: delivery done", self)
         deliver = None
       result = None
       with self._lock:
