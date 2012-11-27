@@ -227,22 +227,24 @@ class Pilfer(O):
       if self.flush_print:
         print_to.flush()
 
-  def url_save_dir(self, U):
-    ''' Return the current URL save dir.
-        If unset, create one based on the URL `U`.
-        Return its path and also save the path in user_vars['save_dir'].
+  def save_url(self, U, *a, **kw):
+    ''' Save the contents of the URL `U`.
     '''
-    with self._lock:
-      dir = self.user_vars.get('save_dir')
-      if dir is None:
-        dir = ( ("%s-%s--%s" % (U.hostname,
-                                os.path.dirname(U.path),
-                                '-'.join(U.title.split())))
-                .replace('/', '-')
-              )[:os.statvfs('.').f_namemax-6]
-        dir = new_dir(dir)
-        self.user_var['save_dir'] = dir
-    return dir
+    with Pfx(U):
+      dir = kw.pop('dir', None)
+      saveas = kw.pop('saveas', None)
+      if kw:
+        raise ValueError("unused parameters: %s" % (kw,))
+      if saveas is None:
+        saveas = U.basename
+      content = U.content
+      if saveas == '-':
+        sys.stdout.write(content)
+        sys.stdout.flush()
+      else:
+        with Pfx("%s", saveas):
+          with open(saveas, "wb") as savefp:
+            savefp.write(content)
 
   def act(self, urls, actions):
     ''' Return an iterable of the results of the actions applied to the URLs.
@@ -369,96 +371,6 @@ class Pilfer(O):
     '''
     F = Formatter()
     return F.vformat(s, (), Pilfer.URLkeywords(U))
-
-  def url_save(self, U, *a):
-    with Pfx(U):
-      try:
-        content = U.content
-      except (HTTPError, URLError) as e:
-        error("%s", e)
-        return
-      if a:
-        a = list(a)
-        saveas = a.pop(0)
-        if a:
-          raise ValueError("extra arguments to 'save': "+", ".join(a))
-        if saveas == '-':
-          sys.stdout.write(content)
-          sys.stdout.flush()
-        else:
-          try:
-            with open(saveas, "wb") as savefp:
-              savefp.write(content)
-          except IOError as e:
-            error("%s: %s", saveas, e)
-      else:
-        dir = self.url_save_dir(U)
-        try:
-          self.url_save_full(U, dir, overwrite_dir=True)
-        except (HTTPError, URLError) as e:
-          error("%s", e)
-          return
-      yield U
-
-  def url_save_full(self, U, dir=None, full_path=False, require_dir=False, overwrite_dir=False, overwrite_file=False):
-    with Pfx("save(%s)", U):
-      if dir is None:
-        if self.save_dir:
-          dir = self.save_dir
-        elif full_path:
-          dir = os.path.join( '.', U.hostname, os.path.dirname(U.path), )
-        else:
-          dir = os.path.join( '.', U.hostname, os.path.basename(os.path.dirname(U.path)) )
-      if require_dir:
-        if not os.path.isdir(dir):
-          raise ValueError("not a directory: %s" % (dir,))
-      else:
-        try:
-          os.makedirs(dir)
-        except OSError as e:
-          if e.errno != errno.EEXIST:
-            raise
-          if not overwrite_dir:
-            n = 2
-            while True:
-              ndir = "%s-%d" % (dir, n)
-              try:
-                os.makedirs(ndir)
-              except OSError as e:
-                if e.errno != errno.EEXIST:
-                  raise
-                n += 1
-                continue
-              dir = ndir
-              break
-      filename = os.path.basename(U.path)
-      savepath = os.path.join(dir, filename)
-      if os.path.exists(savepath) and not overwrite_file:
-        n = 2
-        if '.' in filename:
-          filebase, fileext = filename.split('.', 1)
-          fileext = '.' + fileext
-        else:
-          filebase, fileext = filename, ''
-        while True:
-          nsavepath = os.path.join(dir, "%s-%d%s" % (filebase, n, fileext))
-          if not os.path.exists(nsavepath):
-            savepath = nsavepath
-            break
-          n += 1
-      debug("save to %s", savepath)
-      content = U.content
-      savefp = open(savepath, "wb")
-      try:
-        savefp.write(content)
-        savefp.close()
-        U.flush()
-      except Exception as e:
-        U.flush()
-        exception("exception writing content: %s", e)
-        os.remove(savepath)
-        savefp.close()
-        raise e
 
 def new_dir(self, dir):
   ''' Create the directory `dir` or `dir-n` if `dir` exists.
@@ -620,7 +532,7 @@ ONE_TO_ONE = {
       'query':        lambda U, P, *a: url_query(U, *a),
       'quote':        lambda U, P: quote(U),
       'unquote':      lambda U, P: unquote(U),
-      'save':         lambda U, P, *a: url_io(P.url_save, (), U, *a),
+      'save':         lambda U, P, **kw: (U, P.save_url(U, **kw))[0],
       'see':          lambda U, P: (U, P.see(U))[0],
       'substitute':   lambda U, P, **kw: substitute(U, kw['regexp'], kw['replacement'], kw['all']),
       'title':        lambda U, P: U.title if U.title else U,
