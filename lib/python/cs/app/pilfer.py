@@ -575,7 +575,7 @@ def url_io_iter(iter):
       yield i
 
 def url_hrefs(U, referrer=None):
-  return url_io_iter(URL(U, referrer).hrefs(absolute=True))
+  return list(url_io_iter(URL(U, referrer).hrefs(absolute=True)))
 
 def url_srcs(U, referrer=None):
   return url_io_iter(URL(U, referrer).srcs(absolute=True))
@@ -644,20 +644,34 @@ re_COMPARE = re.compile(r'([a-z]\w*)==')
 re_ASSIGN  = re.compile(r'([a-z]\w*)=')
 
 def conv_one_to_one(func):
-  ''' Convert a one-to-one function to a one to many.
+  ''' Convert a one-to-one function to a many to many.
   '''
-  def func_one_to_one(U, P):
-    yield func(U, P)
-  return func_one_to_one
+  def converted(items, *a, **kw):
+    results = []
+    for item in items:
+      results.append(func(item, *a, **kw))
+    return results
+  return converted
 
 def conv_one_test(func):
   ''' Convert a test-one function to one-to-many.
   '''
-  def func_one_test(U, P):
-    ok = func(U, P)
-    if ok:
-      yield U
-  return func_one_test
+  def converted(items, *a, **kw):
+    results = []
+    for item in items:
+      if func(item, *a, **kw):
+        results.append(item)
+    return results
+  return converted
+
+def conv_one_to_many(func):
+  def converted(items, *a, **kw):
+    results = []
+    for item in items:
+      for result in func(item, *a, **kw):
+        results.append(result)
+    return results
+  return converted
 
 def action_operator(action,
                     many_to_many=None,
@@ -766,12 +780,12 @@ def action_operator(action,
               offset = len(action)
             if offset < len(action):
               raise ValueError("parse error at: %s" % (action[offset:],))
-    op_mode = None
-    do_copystate = False
-    branch_func = None
+    fork_input = False
+    fork_state = False
     if action == "per":
+      raise ValueError("per needs fork_ops in addition to fork_state")
       op_mode = 'FORK'
-      do_copystate = True
+      fork_state = True
     if action in many_to_many:
       # many-to-many functions get passed straight in
       func = many_to_many[action]
@@ -779,25 +793,26 @@ def action_operator(action,
         func = partial(func, **kwargs)
     elif action in one_to_many:
       # one-to-many is converted into many-to-many
-      op_mode = 'PARALLEL'
+      fork_input = True
       func = one_to_many[action]
       if kwargs:
         func = partial(func, **kwargs)
+      func = conv_one_to_many(func)
     elif action in one_to_one:
-      op_mode = 'PARALLEL'
+      fork_input = True
       func = one_to_one[action]
       if kwargs:
         func = partial(func, **kwargs)
       func = conv_one_to_one(func)
     elif action in one_test:
-      op_mode = 'PARALLEL'
+      fork_input = True
       func = one_test[action]
       if kwargs:
         func = partial(func, **kwargs)
       func = conv_one_test(func)
     else:
       raise ValueError("unknown action")
-    return RunTreeOp(func, op_mode, do_copystate, branch_func)
+    return RunTreeOp(func, fork_input, fork_state)
 
 if __name__ == '__main__':
   import sys

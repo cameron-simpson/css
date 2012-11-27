@@ -948,43 +948,28 @@ def runTree(input, operators, state, funcQ):
         `input`: an input object
         `operators`: an iterable of RunTreeOp instances
 	  NB: if an item of the iterator is callable, presume it
-              to be a bare function and convert it to RunTreeOp(op, False,
-              False, None).
-          Each operator `op` has the following attributes:
-            op.func     A callable function accepting the input and state
-                        objects, and returning an output result to be passed
-                        as the input object to subsequent operators.  op.func
-                        may be None, in which case the function will not be
-                        called; this may be typical for op.branch operators.
-            op.mode     The function mode.
-                          If None, compute:
-                            output = op.func(input, state)
-                          If 'PARALLEL', iterate over the input object
-                            and for each item call:
-                              op.func(item, state)
-                            Each return value should be iterable, and the iterables
-                            are concatenated together to produce the output object.
-                          If 'FORK', iterate over the input object and for each item
-                            dispatch an asynchronous instance of
-                            runTree() whose `operators` iterable
-                            consists of a new RunTreeOp of the current
-                            function with op.mode=None and all the
-                            remaining operators. As with 'PARALLEL',
-                            each return value should be iterable, and
-                            the iterables are concatenated together to
-                            produce the output object. The remaining
-                            operators are discarded because they have
-                            been performed by the forks.
-            op.copystate Copy the state object for this and subsequent operations
-                         instead of using the original.
-            op.branch   If op.branch is not None it should be a callable
-                        returning an iterable of RunTreeOps. An asynchronous
-                        runTree will be dispatched to process these operators
-                        with the current item list.
-        `state`: a state object for use by op.func
-        `funcQ`: a cs.later.Later function queue to dispatch functions
+              to be a bare function and convert it to
+                RunTreeOp(func, False, False).
+        `state`: a state object to assist `func`.
+        `funcQ`: a cs.later.Later function queue to dispatch functions,
+                 or equivalent
       Returns the final output.
       This is the core algorithm underneath the cs.app.pilfer operation.
+
+      Each operator `op` has the following attributes:
+            op.func     A  many-to-many function taking a iterable of input
+			items and returning an iterable of output
+			items with the signature:
+                          func(inputs, state)
+            op.fork_input
+			Submit distinct calls to func( (item,), ...) for each
+                        item in input instead of passing input to a single call.
+                        `func` is still a many-to-many in signature but is
+                        handed 1-tuples of the input items to allow parallel
+                        execution.
+            op.fork_state
+                        Make a copy of the state object for this and
+                        subsequent operations instead of using the original.
   '''
   return runTree_inner(input, iter(operators), state, funcQ).get()
 
