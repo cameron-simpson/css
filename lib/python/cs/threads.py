@@ -149,10 +149,14 @@ class AdjustableSemaphore(object):
   '''
 
   def __init__(self, value=1, name="AdjustableSemaphore"):
+    self.limit0 = value
     self.__sem = Semaphore(value)
     self.__value = value
     self.__name = name
     self.__lock = Lock()
+
+  def __str__(self):
+    return "%s[%d]" % (self.__name, self.limit0)
 
   def __enter__(self):
     with LogTime("%s(%d).__enter__: acquire", self.__name, self.__value):
