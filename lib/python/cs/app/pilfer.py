@@ -45,9 +45,14 @@ ARCHIVE_SUFFIXES = ( 'tar', 'tgz', 'tar.gz', 'tar.bz2', 'cpio', 'rar', 'zip', 'd
 IMAGE_SUFFIXES = ( 'png', 'jpg', 'jpeg', 'gif', 'ico', )
 VIDEO_SUFFIXES = ( 'mp2', 'mp4', 'avi', 'wmv', )
 
+DEFAULT_JOBS = 4
+
 usage = '''Usage: %s [options...] op [args...]
   %s url URL actions...
   Options:
+    -j jobs
+        How many jobs (URL fetches, minor computations) to run at a time.
+        Default: %d
     -q  Quiet. Don't recite surviving URLs at the end.
     -u  Unbuffered. Flush print actions as they occur.'''
 
@@ -61,23 +66,27 @@ def main(argv):
 
   P = Pilfer()
   quiet = False
+  jobs = DEFAULT_JOBS
 
   badopts = False
 
   try:
-    opts, argv = getopt(argv, 'qu')
+    opts, argv = getopt(argv, 'j:qu')
   except GetoptError as e:
     warning("%s", e)
     badopts = True
     opts = ()
 
   for opt, val in opts:
-    if opt == '-q':
-      quiet = True
-    elif opt == '-u':
-      P.flush_print = True
-    else:
-      raise NotImplementedError("%s: unimplemented option" % (opt,))
+    with Pfx("%s", opt):
+      if opt == '-j':
+        jobs = int(val)
+      elif opt == '-q':
+        quiet = True
+      elif opt == '-u':
+        P.flush_print = True
+      else:
+        raise NotImplementedError("unimplemented option")
 
   if not argv:
     error("missing op")
@@ -112,7 +121,7 @@ def main(argv):
             urls = [ URL(url, None, P.user_agent) ]
           run_ops = [ action_operator(action) for action in argv ]
           debug("run_ops = %r", run_ops)
-          with Later(4) as PQ:
+          with Later(jobs) as PQ:
             debug("urls = %s", urls)
             runTree(urls, run_ops, P, PQ)
       else:
@@ -120,7 +129,7 @@ def main(argv):
         badopts = True
 
   if badopts:
-    print(usage % (cmd, cmd), file=sys.stderr)
+    print(usage % (cmd, cmd, DEFAULT_JOBS), file=sys.stderr)
     xit = 2
 
   return xit
