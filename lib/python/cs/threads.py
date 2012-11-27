@@ -934,13 +934,60 @@ def via(cmanager, func, *a, **kw):
 
 _RunTreeOp = namedtuple('RunTreeOp', 'func fork_input fork_state')
 
-def RunTreeOp(func, fork_input, fork_state):
+RUN_TREE_OP_MANY_TO_MANY = 0
+RUN_TREE_OP_ONE_TO_MANY = 1
+RUN_TREE_OP_ONE_TO_ONE = 2
+RUN_TREE_OP_SELECT = 3
+
+def _conv_one_to_many(func):
+  def converted(items, *a, **kw):
+    for item in items:
+      for result in func(item, *a, **kw):
+        yield result
+  return converted
+
+def _conv_one_to_one(func):
+  ''' Convert a one-to-one function to a many to many.
+  '''
+  def converted(items, *a, **kw):
+    results = []
+    for item in items:
+      yield func(item, *a, **kw)
+  return converted
+
+def _conv_select(func):
+  ''' Convert a test-one function to one-to-many.
+  '''
+  def converted(items, *a, **kw):
+    for item in items:
+      if func(item, *a, **kw):
+        yield item
+  return converted
+
+def RunTreeOp(func, fork_input, fork_state, func_sig=None):
+  if func_sig is None:
+    func_sig = RUN_TREE_OP_MANY_TO_MANY
+
   ok = True
+
   if func is not None and not callable(func):
     error("RunTreeOp: bad func: %r", func)
     ok = False
+  if func_sig == RUN_TREE_OP_MANY_TO_MANY:
+    pass
+  elif func_sig == RUN_TREE_OP_ONE_TO_MANY:
+    func = _conv_one_to_many(func)
+  elif func_sig == RUN_TREE_OP_ONE_TO_ONE:
+    func = _conv_one_to_one(func)
+  elif func_sig == RUN_TREE_OP_SELECT:
+    func = _conv_select(func)
+  else:
+    error("RunTreeOp: invalid function signature")
+    ok = False
+
   if not ok:
     raise ValueError("invalid RunTreeOp() call")
+
   return _RunTreeOp(func, fork_input, fork_state)
 
 def runTree(input, operators, state, funcQ):

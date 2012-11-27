@@ -28,7 +28,9 @@ from cs.fileutils import file_property
 from cs.later import Later
 from cs.lex import get_identifier
 from cs.logutils import setup_logging, logTo, Pfx, debug, error, warning, exception, pfx_iter, D
-from cs.threads import runTree, RunTreeOp
+from cs.threads import runTree, RunTreeOp, RUN_TREE_OP_MANY_TO_MANY, \
+                        RUN_TREE_OP_ONE_TO_MANY, RUN_TREE_OP_ONE_TO_ONE, \
+                        RUN_TREE_OP_SELECT
 from cs.urlutils import URL
 from cs.misc import O
 
@@ -643,31 +645,6 @@ ONE_TEST = {
 re_COMPARE = re.compile(r'([a-z]\w*)==')
 re_ASSIGN  = re.compile(r'([a-z]\w*)=')
 
-def conv_one_to_one(func):
-  ''' Convert a one-to-one function to a many to many.
-  '''
-  def converted(items, *a, **kw):
-    results = []
-    for item in items:
-      yield func(item, *a, **kw)
-  return converted
-
-def conv_one_test(func):
-  ''' Convert a test-one function to one-to-many.
-  '''
-  def converted(items, *a, **kw):
-    for item in items:
-      if func(item, *a, **kw):
-        yield item
-  return converted
-
-def conv_one_to_many(func):
-  def converted(items, *a, **kw):
-    for item in items:
-      for result in func(item, *a, **kw):
-        yield result
-  return converted
-
 def action_operator(action,
                     many_to_many=None,
                     one_to_many=None,
@@ -784,30 +761,25 @@ def action_operator(action,
     if action in many_to_many:
       # many-to-many functions get passed straight in
       func = many_to_many[action]
-      if kwargs:
-        func = partial(func, **kwargs)
+      func_sig = RUN_TREE_OP_MANY_TO_MANY
     elif action in one_to_many:
       # one-to-many is converted into many-to-many
       fork_input = True
       func = one_to_many[action]
-      if kwargs:
-        func = partial(func, **kwargs)
-      func = conv_one_to_many(func)
+      func_sig = RUN_TREE_OP_ONE_TO_MANY
     elif action in one_to_one:
       fork_input = True
       func = one_to_one[action]
-      if kwargs:
-        func = partial(func, **kwargs)
-      func = conv_one_to_one(func)
+      func_sig = RUN_TREE_OP_ONE_TO_ONE
     elif action in one_test:
       fork_input = True
       func = one_test[action]
-      if kwargs:
-        func = partial(func, **kwargs)
-      func = conv_one_test(func)
+      func_sig = RUN_TREE_OP_SELECT
     else:
       raise ValueError("unknown action")
-    return RunTreeOp(func, fork_input, fork_state)
+    if kwargs:
+      func = partial(func, **kwargs)
+    return RunTreeOp(func, fork_input, fork_state, func_sig)
 
 if __name__ == '__main__':
   import sys
