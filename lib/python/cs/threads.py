@@ -1006,7 +1006,7 @@ def runTree_inner(input, ops, state, funcQ, retq=None):
     debug("func_put: call func...")
     results = func(input, state)
     debug("func_put: called func, got: %s", results)
-    Q.put(results)
+    Q.put(list(results))
   nfuncs = 0
   for input in inputs:
     substate = copy(state) if fork_state else state
