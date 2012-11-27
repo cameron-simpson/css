@@ -74,10 +74,13 @@ class WorkerThreadPool(object):
       func = pfx.func(func)
     idle = self.idle
     with self._lock:
-      if idle:
+      debug("dispatch: idle = %s", idle)
+      if len(idle):
         # use an idle thread
         Hdesc = idle.pop()
+        debug("dispatch: reuse %s", Hdesc)
       else:
+        debug("dispatch: need new thread")
         # no available threads - make one
         args = []
         H = Thread(target=self._handler, args=args)
@@ -111,35 +114,49 @@ class WorkerThreadPool(object):
         result = func(), None
         debug("%s: worker thread: ran task: result = %s", self, result)
       except:
-        debug("%s: worker thread: ran task: exception!", self)
+        func = None     # release func+args
+        debug("%s: worker thread: ran task: exception! %r", self, sys.exc_info())
         # don't let exceptions go unhandled
         # if nobody is watching, raise the exception and don't return
         # this handler to the pool
         if retq is None and deliver is None:
           t, v, tb = sys.exc_info()
-          raise t(v).with_traceback(tb)
+          debug("%s: worker thread: reraise exception", self)
+          raise t, v, tb
+          ##raise t(v).with_traceback(tb)
+        debug("%s: worker thread: set result = (None, exc_info)", self)
         result = (None, sys.exc_info())
       finally:
         func = None     # release func+args
-      if retq is not None:
-        retq.put(result)
-        retq = None
-      if deliver is not None:
-        deliver(result)
-        deliver = None
-      result = None
       with self._lock:
         self.idle.append( Hdesc )
+        ##D("_handler released thread: idle = %s", self.idle)
+      if retq is not None:
+        debug("%s: worker thread: %r.put(result)...", self, retq)
+        retq.put(result)
+        debug("%s: worker thread: %r.put(result) done", self, retq)
+        retq = None
+      if deliver is not None:
+        debug("%s: worker thread: deliver result...", self)
+        deliver(result)
+        debug("%s: worker thread: delivery done", self)
+        deliver = None
+      result = None
+      debug("%s: worker thread: proceed to next function...", self)
 
 class AdjustableSemaphore(object):
   ''' A semaphore whose value may be tuned after instantiation.
   '''
 
   def __init__(self, value=1, name="AdjustableSemaphore"):
+    self.limit0 = value
     self.__sem = Semaphore(value)
     self.__value = value
     self.__name = name
     self.__lock = Lock()
+
+  def __str__(self):
+    return "%s[%d]" % (self.__name, self.limit0)
 
   def __enter__(self):
     with LogTime("%s(%d).__enter__: acquire", self.__name, self.__value):
@@ -915,143 +932,106 @@ def via(cmanager, func, *a, **kw):
       return func(*a, **kw)
   return f
 
-_RunTreeOp = namedtuple('RunTreeOp', 'func mode copystate branch')
+_RunTreeOp = namedtuple('RunTreeOp', 'func fork_input fork_state')
 
-def RunTreeOp(func, mode, copy, branch):
+def RunTreeOp(func, fork_input, fork_state):
   ok = True
   if func is not None and not callable(func):
     error("RunTreeOp: bad func: %r", func)
     ok = False
-  if mode is not None and mode not in ('PARALLEL', 'FORK'):
-    error("RunTreeOp: bad mode: %r", mode)
-    ok = False
-  if branch is not None and not callable(branch):
-    error("RunTreeOp: bad branch: %r", branch)
-    ok = False
   if not ok:
     raise ValueError("invalid RunTreeOp() call")
-  return _RunTreeOp(func, mode, copy, branch)
+  return _RunTreeOp(func, fork_input, fork_state)
 
 def runTree(input, operators, state, funcQ):
   ''' Descend an operation tree expressed as:
         `input`: an input object
         `operators`: an iterable of RunTreeOp instances
 	  NB: if an item of the iterator is callable, presume it
-              to be a bare function and convert it to RunTreeOp(op, False,
-              False, None).
-          Each operator `op` has the following attributes:
-            op.func     A callable function accepting the input and state
-                        objects, and returning an output result to be passed
-                        as the input object to subsequent operators.  op.func
-                        may be None, in which case the function will not be
-                        called; this may be typical for op.branch operators.
-            op.mode     The function mode.
-                          If None, compute:
-                            output = op.func(input, state)
-                          If 'PARALLEL', iterate over the input object
-                            and for each item call:
-                              op.func(item, state)
-                            Each return value should be iterable, and the iterables
-                            are concatenated together to produce the output object.
-                          If 'FORK', iterate over the input object and for each item
-                            dispatch an asynchronous instance of
-                            runTree() whose `operators` iterable
-                            consists of a new RunTreeOp of the current
-                            function with op.mode=None and all the
-                            remaining operators. As with 'PARALLEL',
-                            each return value should be iterable, and
-                            the iterables are concatenated together to
-                            produce the output object. The remaining
-                            operators are discarded because they have
-                            been performed by the forks.
-            op.copystate Copy the state object for this and subsequent operations
-                         instead of using the original.
-            op.branch   If op.branch is not None it should be a callable
-                        returning an iterable of RunTreeOps. An asynchronous
-                        runTree will be dispatched to process these operators
-                        with the current item list.
-        `state`: a state object for use by op.func
-        `funcQ`: a cs.later.Later function queue to dispatch functions
+              to be a bare function and convert it to
+                RunTreeOp(func, False, False).
+        `state`: a state object to assist `func`.
+        `funcQ`: a cs.later.Later function queue to dispatch functions,
+                 or equivalent
       Returns the final output.
       This is the core algorithm underneath the cs.app.pilfer operation.
+
+      Each operator `op` has the following attributes:
+            op.func     A  many-to-many function taking a iterable of input
+			items and returning an iterable of output
+			items with the signature:
+                          func(inputs, state)
+            op.fork_input
+			Submit distinct calls to func( (item,), ...) for each
+                        item in input instead of passing input to a single call.
+                        `func` is still a many-to-many in signature but is
+                        handed 1-tuples of the input items to allow parallel
+                        execution.
+            op.fork_state
+                        Make a copy of the state object for this and
+                        subsequent operations instead of using the original.
   '''
-  from cs.later import report
-  input0 = input
-  operators = list(operators)
-  bg = []
-  while operators:
-    op = operators.pop(0)
-    if callable(op):
-      op = RunTreeOp(func, None, False, None)
-    if op.branch:
-      # dispatch another runTree to follow the branch with the current item list
-      bg.append( funcQ.bg(runTree, input, op.branch(), state, funcQ) )
-    if op.func:
-      if op.mode is None:
-        substate = copy(state) if op.copystate else state
-        qop = funcQ.defer(op.func, input, substate)
-        output, exc_info = qop.wait()
-        if exc_info:
-          exc_type, exc_value, exc_traceback = exc_info
-          try:
-            raise exc_type, exc_value, exc_traceback
-          except:
-            exception("runTree()")
-      elif op.mode == 'PARALLEL':
-        qops = []
-        for item in input:
-          substate = copy(state) if op.copystate else state
-          qops.append(funcQ.defer(op.func, item, substate))
-        outputs = []
-        for qop in qops:
-          output, exc_info = qop.wait()
-          if exc_info:
-            exc_type, exc_value, exc_traceback = exc_info
-            try:
-              raise exc_type, exc_value, exc_traceback
-            except:
-              exception("runTree()")
-          else:
-            outputs.extend(output)
-        output = outputs
-      elif op.mode == 'FORK':
-        # push the function back on without a fork
-        # then queue a call per current item
-        # using a copy of the state
-        suboperators = tuple([ RunTreeOp(op.func, None, False, op.branch) ] + operators)
-        qops = []
-        for item in input:
-          substate = copy(state) if op.copystate else state
-          qops.append(funcQ.bg(runTree, item, suboperators, substate, funcQ))
-        outputs = []
-        for qop in qops:
-          output, exc_info = qop.wait()
-          if exc_info:
-            exc_type, exc_value, exc_traceback = exc_info
-            try:
-              raise exc_type, exc_value, exc_traceback
-            except:
-              exception("runTree()")
-          else:
-            outputs.extend(output)
-        output = outputs
-        operators = []
-      else:
-        raise ValueError("invalid RuntreeOp.mode: %r" % (op.mode,))
-      input = output
+  return runTree_inner(input, iter(operators), state, funcQ).get()
 
-  # wait for any asynchronous runs to complete
-  # also report exceptions raised
-  for bgf in bg:
-    bg_output, exc_info = bgf.wait()
-    if exc_info:
-      exc_type, exc_value, exc_traceback = exc_info
-      try:
-        raise exc_type, exc_value, exc_traceback
-      except:
-        exception("runTree()")
+def runTree_inner(input, ops, state, funcQ, retq=None):
+  ''' Submit function calls to evaluate `func` as specified.
+      Return a LateFunction to collect the final result.
+      `func` is a many-to-many function.
+  '''
+  debug("runTree_inner(input=%s, ops=%s, state=%s, funcQ=%s, retq=%s)...",
+    input, ops, state, funcQ, retq)
+  if retq is None:
+    retq = Channel()
 
-  return input
+  try:
+    op = ops.next()
+  except StopIteration:
+    funcQ.defer(lambda: retq.put(input))
+    return retq
+
+  func, fork_input, fork_state = op.func, op.fork_input, op.fork_state
+  if fork_input:
+    # iterable of single item iterables
+    inputs = ( (item,) for item in input )
+  else:
+    # 1-iterable of all-items iterables
+    inputs = (input,)
+
+  # submit function calls that put results onto a Queue
+  Q = Queue()
+  def func_put(Q, input, state):
+    ''' Call `func` with `input` and `state`.
+        Put results onto the Queue for collection.
+    '''
+    debug("func_put: call func...")
+    results = func(input, state)
+    debug("func_put: called func, got: %s", results)
+    Q.put(list(results))
+  nfuncs = 0
+  for input in inputs:
+    substate = copy(state) if fork_state else state
+    funcQ.defer(func_put, Q, input, substate)
+    nfuncs += 1
+
+  # now submit a function to collect the results
+  # if there are no more ops, put the outputs onto the retq
+  def func_get(Q, nfuncs):
+    debug("func_get(Q, nfuncs=%d)...", nfuncs)
+    outputs = []
+    while nfuncs > 0:
+      debug("func_get: %d results to collect, Q.get()...", nfuncs)
+      results = Q.get()
+      debug("func_get: Q.get() got: %s", results)
+      outputs.extend(results)
+      nfuncs -= 1
+    Q = None
+    # resubmit with new state etc
+    debug("func_get: queue another call to runTree_inner")
+    funcQ.defer(runTree_inner, outputs, ops, state, funcQ, retq)
+  funcQ.defer(func_get, Q, nfuncs)
+  Q = None
+
+  return retq
 
 if __name__ == '__main__':
   import cs.threads_tests

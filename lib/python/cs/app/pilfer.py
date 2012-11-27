@@ -26,10 +26,18 @@ except ImportError:
   import xml.etree.ElementTree as ElementTree
 from cs.fileutils import file_property
 from cs.later import Later
+from cs.lex import get_identifier
 from cs.logutils import setup_logging, logTo, Pfx, debug, error, warning, exception, pfx_iter, D
 from cs.threads import runTree, RunTreeOp
 from cs.urlutils import URL
 from cs.misc import O
+
+if os.environ.get('DEBUG', ''):
+  def X(tag, *a):
+    D("TRACE: "+tag, *a)
+else:
+  def X(*a):
+    pass
 
 ARCHIVE_SUFFIXES = ( 'tar', 'tgz', 'tar.gz', 'tar.bz2', 'cpio', 'rar', 'zip', 'dmg' )
 IMAGE_SUFFIXES = ( 'png', 'jpg', 'jpeg', 'gif', 'ico', )
@@ -101,8 +109,9 @@ def main(argv):
           else:
             urls = [ URL(url, None, P.user_agent) ]
           run_ops = [ action_operator(action) for action in argv ]
-          ##D("run_ops = %r", run_ops)
-          with Later(1) as PQ:
+          debug("run_ops = %r", run_ops)
+          with Later(4) as PQ:
+            debug("urls = %s", urls)
             runTree(urls, run_ops, P, PQ)
       else:
         error("unsupported op")
@@ -142,6 +151,7 @@ class Pilfer(O):
     self._lock = Lock()
     self.flush_print = False
     self._print_to = None
+    self._print_lock = Lock()
     self.user_agent = None
     self.user_vars = {}
     self._urlsfile = None
@@ -201,9 +211,10 @@ class Pilfer(O):
       if print_to is None:
         print_to = sys.stdout
     kw['file'] = print_to
-    print(*a, **kw)
-    if self.flush_print:
-      print_to.flush()
+    with self._print_lock:
+      print(*a, **kw)
+      if self.flush_print:
+        print_to.flush()
 
   def url_save_dir(self, U):
     ''' Return the current URL save dir.
@@ -496,6 +507,33 @@ def with_exts(urls, suffixes, case_sensitive=False):
     else:
       debug("with_exts: discard %s", U)
 
+def substitute(src, regexp, replacement, replace_all):
+  ''' Perform a regexp substitution on `src`.
+      `replacement` is a format string for the replacement text
+      using the str.format method.
+      The matched groups from the regexp take the positional arguments 1..n,
+      with 0 used for the whole matched string.
+      The keyword arguments consist of '_' for the whole matched string
+      and any named groups.
+  '''
+  debug("SUBSTITUTE: src=%r, regexp=%r, replacement=%r, replace_all=%s)...",
+        src, regexp.pattern, replacement, replace_all)
+  strs = []
+  sofar = 0
+  for m in regexp.finditer(src):
+    repl_args = [ m.group(0) ] + list(m.groups())
+    repl_kw = { '_': m.group(0) }
+    repl_kw.update(m.groupdict())
+    strs.append(src[sofar:m.start()])
+    strs.append(replacement.format(*repl_args, **repl_kw))
+    sofar = m.end()
+    if not replace_all:
+      break
+  strs.append(src[sofar:])
+  result = ''.join(strs)
+  debug("SUBSTITUTE: src=%r, result=%r", src, result)
+  return result
+
 def url_delay(U, delay, *a):
   sleep(float(delay))
   yield U
@@ -537,7 +575,7 @@ def url_io_iter(iter):
       yield i
 
 def url_hrefs(U, referrer=None):
-  return url_io_iter(URL(U, referrer).hrefs(absolute=True))
+  return list(url_io_iter(URL(U, referrer).hrefs(absolute=True)))
 
 def url_srcs(U, referrer=None):
   return url_io_iter(URL(U, referrer).srcs(absolute=True))
@@ -567,12 +605,13 @@ ONE_TO_ONE = {
       'hostname':     lambda U, P: URL(U, None).hostname,
       'new_dir':      lambda U, P: (U, P.url_save_dir(U))[0],
       'per':          lambda U, P: (U, P.set_user_vars(save_dir=None))[0],
-      'print':        lambda U, P: (U, print(U))[0],
+      'print':        lambda U, P: (U, P.print(U))[0],
       'query':        lambda U, P, *a: url_query(U, *a),
       'quote':        lambda U, P: quote(U),
       'unquote':      lambda U, P: unquote(U),
       'save':         lambda U, P, *a: url_io(P.url_save, (), U, *a),
       'see':          lambda U, P: (U, P.see(U))[0],
+      'substitute':   lambda U, P, **kw: substitute(U, kw['regexp'], kw['replacement'], kw['all']),
       'title':        lambda U, P: U.title if U.title else U,
       'type':         lambda U, P: url_io(U.content_type, ""),
       'xmlattr':      lambda U, P, attr: [ A for A in (ElementTree.XML(U).get(attr),) if A is not None ],
@@ -601,23 +640,33 @@ ONE_TEST = {
       'unseen':       lambda U, P: not P.seen(U),
     }
 
-re_ASSIGN = re.compile(r'([a-z]\w*)=')
+re_COMPARE = re.compile(r'([a-z]\w*)==')
+re_ASSIGN  = re.compile(r'([a-z]\w*)=')
 
 def conv_one_to_one(func):
-  ''' Convert a one-to-one function to a one to many.
+  ''' Convert a one-to-one function to a many to many.
   '''
-  def func_one_to_one(U, P):
-    yield func(U, P)
-  return func_one_to_one
+  def converted(items, *a, **kw):
+    results = []
+    for item in items:
+      yield func(item, *a, **kw)
+  return converted
 
 def conv_one_test(func):
   ''' Convert a test-one function to one-to-many.
   '''
-  def func_one_test(U, P):
-    ok = func(U, P)
-    if ok:
-      yield U
-  return func_one_test
+  def converted(items, *a, **kw):
+    for item in items:
+      if func(item, *a, **kw):
+        yield item
+  return converted
+
+def conv_one_to_many(func):
+  def converted(items, *a, **kw):
+    for item in items:
+      for result in func(item, *a, **kw):
+        yield result
+  return converted
 
 def action_operator(action,
                     many_to_many=None,
@@ -627,15 +676,15 @@ def action_operator(action,
   ''' Accept a string `action` and return a RunTreeOp for use with
       cs.threads.runTree.
   '''
+  if many_to_many is None:
+    many_to_many = MANY_TO_MANY
+  if one_to_many is None:
+    one_to_many = ONE_TO_MANY
+  if one_to_one is None:
+    one_to_one = ONE_TO_ONE
+  if one_test is None:
+    one_test = ONE_TEST
   with Pfx("%s", action):
-    if many_to_many is None:
-      many_to_many = MANY_TO_MANY
-    if one_to_many is None:
-      one_to_many = ONE_TO_MANY
-    if one_to_one is None:
-      one_to_one = ONE_TO_ONE
-    if one_test is None:
-      one_test = ONE_TEST
     kwargs = {}
     # select URLs matching regexp
     if action.startswith('/'):
@@ -653,9 +702,10 @@ def action_operator(action,
         regexp = action[2:]
       kwargs['regexp'] = re.compile(regexp)
       action = 'reject_re'
-    # select URLs ending in particular extensions
+    # parent
     elif action == '..':
       pass
+    # select URLs ending in particular extensions
     elif action.startswith('.'):
       if action.endswith('/i'):
         exts, case = action[1:-2], False
@@ -666,27 +716,71 @@ def action_operator(action,
       kwargs['exts'] = exts
       action = 'select_exts'
     else:
-      m = re_ASSIGN.match(action)
+      # varname== comparison
+      m = re_COMPARE.match(action)
       if m:
         var = m.group(1)
         value = action[m.end():]
-        def assign(U, P, var, value):
-          P.user_vars[var] = P.format(value)
-          return U
-      elif ':' in action:
-        action, kws = action.split(':', 1)
-        for kw in kws.split(','):
-          if '=' in kwarg:
-            kw, v = kw.split('=', 1)
-            kwargs[kw] = v
+        k
+      else:
+        # varname= assignment
+        m = re_ASSIGN.match(action)
+        if m:
+          var = m.group(1)
+          value = action[m.end():]
+          def assign(U, P, var, value):
+            P.user_vars[var] = P.format(value)
+            return U
+        else:
+          # regular action: split off parameters if any
+          name, offset = get_identifier(action)
+          if not name:
+            raise ValueError("unparsed action")
+          # s/this/that/
+          if name == 's':
+            if offset == len(action):
+              raise ValueError("missing delimiter")
+            delim = action[offset]
+            delim2pos = action.find(delim, offset+1)
+            if delim2pos < offset+1:
+              raise ValueError("missing second delimiter")
+            regexp = action[offset+1:delim2pos]
+            if not regexp:
+              raise ValueError("empty regexp")
+            delim3pos = action.find(delim, delim2pos+1)
+            if delim3pos < delim2pos+1:
+              raise ValueError("missing third delimiter")
+            repl_format = action[delim2pos+1:delim3pos]
+            offset = delim3pos+1
+            if offset < len(action) and action[offset] == 'g':
+              repl_all = True
+              offset += 1
+            else:
+              repl_all = False
+            if offset < len(action):
+              raise ValueError("unparsed action at: %s" % (action[offset:],))
+            action = 'substitute'
+            debug("s: regexp=%r, replacement=%r, repl_all=%s", regexp, repl_format, repl_all)
+            kwargs['regexp'] = re.compile(regexp)
+            kwargs['replacement'] = repl_format
+            kwargs['all'] = repl_all
           else:
-            kwargs[kwarg] = True
-    op_mode = None
-    do_copystate = False
-    branch_func = None
+            if offset < len(action) and action[offset] == ':':
+              for kw in action[offset+1:].split(','):
+                if '=' in kwarg:
+                  kw, v = kw.split('=', 1)
+                  kwargs[kw] = v
+                else:
+                  kwargs[kwarg] = True
+              offset = len(action)
+            if offset < len(action):
+              raise ValueError("parse error at: %s" % (action[offset:],))
+    fork_input = False
+    fork_state = False
     if action == "per":
+      raise ValueError("per needs fork_ops in addition to fork_state")
       op_mode = 'FORK'
-      do_copystate = True
+      fork_state = True
     if action in many_to_many:
       # many-to-many functions get passed straight in
       func = many_to_many[action]
@@ -694,25 +788,26 @@ def action_operator(action,
         func = partial(func, **kwargs)
     elif action in one_to_many:
       # one-to-many is converted into many-to-many
-      op_mode = 'PARALLEL'
+      fork_input = True
       func = one_to_many[action]
       if kwargs:
         func = partial(func, **kwargs)
+      func = conv_one_to_many(func)
     elif action in one_to_one:
-      op_mode = 'PARALLEL'
+      fork_input = True
       func = one_to_one[action]
       if kwargs:
         func = partial(func, **kwargs)
       func = conv_one_to_one(func)
     elif action in one_test:
-      op_mode = 'PARALLEL'
+      fork_input = True
       func = one_test[action]
       if kwargs:
         func = partial(func, **kwargs)
       func = conv_one_test(func)
     else:
       raise ValueError("unknown action")
-    return RunTreeOp(func, op_mode, do_copystate, branch_func)
+    return RunTreeOp(func, fork_input, fork_state)
 
 if __name__ == '__main__':
   import sys
