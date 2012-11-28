@@ -1049,7 +1049,9 @@ def runTree_inner(input, ops, state, funcQ, retq=None):
   LFs = []
   for input in inputs:
     substate = copy(state) if fork_state else state
-    LF = funcQ.defer(func, input, substate)
+    def submit_func(func, input, substate):
+      return list(func(input, substate))
+    LF = funcQ.defer(submit_func, func, input, substate)
     LFs.append(LF)
 
   # now submit a function to collect the results
