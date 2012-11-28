@@ -1,0 +1,7 @@
+#!/bin/sh
+#
+# Turn whitespace in filenames into an underscore.
+#       - Cameron Simpson <cs@zip.com.au> 28nov2012
+#
+
+exec frename 's/\s+/_/g' ${1+"$@"}
