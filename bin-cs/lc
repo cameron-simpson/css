@@ -15,7 +15,7 @@ do
   shift
 done
 
-exec lwrename2 $rnopts -- \
+exec frename $rnopts -- \
 	'if (m:[^/]+$:)
 	 { $lhs=$`; $rhs=$&;
 	   $rhs =~ s/\%([0-9a-f][0-9a-f])/chr(hex($1))/ieg;
