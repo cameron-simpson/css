@@ -158,6 +158,12 @@ def unique(items, seen=None):
 
 class Pilfer(O):
   ''' State for the pilfer app.
+      Notable attribute include:
+        .flush_print    Flush output after print(), default False.
+        .user_agent     Specify user-agent string, default None.
+        .user_vars      Mapping of user variables for arbitrary use.
+        .seen_urls      Default set of seen URLs, defaults to empty set.
+        .seen_urls_path Location of seen URLs file, default ".urls-seen".
   '''
 
   def __init__(self, **kw):
