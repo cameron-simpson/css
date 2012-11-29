@@ -583,6 +583,7 @@ def action_operator(action,
     one_to_one = ONE_TO_ONE
   if one_test is None:
     one_test = ONE_TEST
+  # parse action into function and kwargs
   action0 = action
   with Pfx("%s", action):
     kwargs = {}
@@ -675,6 +676,8 @@ def action_operator(action,
               offset = len(action)
             if offset < len(action):
               raise ValueError("parse error at: %s" % (action[offset:],))
+    # we now have a function
+    # construct a RunTreeOp with the right signature
     fork_input = False
     fork_state = False
     if action == "per":
