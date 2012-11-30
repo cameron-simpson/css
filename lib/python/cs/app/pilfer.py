@@ -183,6 +183,9 @@ class Pilfer(O):
       self.read_seen_urls()
 
   def read_seen_urls(self, urlspath=None):
+    ''' Read "seen" URLs from file `urlspath` (default self.seen_urls_path)
+        into the .seen_urls set.
+    '''
     if urlspath is None:
       urlspath = self.seen_urls_path
     try:
@@ -199,9 +202,9 @@ class Pilfer(O):
         warning("%s: %s", urlspath, e)
 
   def set_user_vars(self, **kw):
-    v = self.user_vars
-    for k in kw:
-      v[k] = kw[k]
+    ''' Update self.user_vars from the keyword arguments.
+    '''
+    self.user_vars.update(kw)
 
   def __copy__(self):
     ''' Copy this Pilfer state item, preserving shared state.
@@ -212,10 +215,14 @@ class Pilfer(O):
                  )
 
   def seen(self, U):
+    ''' Test if the URL `U` has been seen.
+    '''
     with self._seen_urls_lock:
       return U in self.seen_urls
 
   def see(self, U):
+    ''' Record the URL `U` as seen.
+    '''
     with self._seen_urls_lock:
       if U not in self.seen_urls:
         self.seen_urls.add(U)
