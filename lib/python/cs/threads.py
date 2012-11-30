@@ -1054,21 +1054,31 @@ def runTree_inner(input, ops, state, funcQ, retq=None):
     LF = funcQ.defer(submit_func, func, input, substate)
     LFs.append(LF)
 
-  # now submit a function to collect the results
-  # if there are no more ops, put the outputs onto the retq
-  def collate_and_requeue(LFs):
-    debug("collate_and_requeue(LFs=%s)...", LFs)
-    results = []
-    for LF in report(LFs):
-      result, exc_info = LF.wait()
-      if exc_info:
-        exception("exception: %s", exc_info[1])
-      else:
-        results.append(result)
-    # resubmit with new state etc
-    debug("func_get: queue another call to runTree_inner")
-    funcQ.defer(runTree_inner, chain(*results), ops, state, funcQ, retq)
-  funcQ.defer(collate_and_requeue, LFs)
+  # Now submit a function to collect the results.
+  # Each result is a list, courtesy of the submit_func wrapper above.
+  # Winnow the empty results, and discard remain ops if there are
+  # no overall results.
+  # If there are no more ops, put the outputs onto the retq.
+  def collate_and_requeue(LFs, ops):
+    with Pfx("collate_and_requeue %d LFs", len(LFs)):
+      debug("LFs=%s", LFs)
+      results = []
+      for LF in report(LFs):
+        result, exc_info = LF.wait()
+        if exc_info:
+          exception("exception: %s", exc_info[1])
+        elif result:
+            results.append(result)
+        else:
+          debug("empty result, discarding")
+      if not results:
+        debug("no results, discarding further ops: %s", list(ops))
+        ops = iter(())
+      # resubmit with new state etc
+      debug("func_get: queue another call to runTree_inner")
+      funcQ.defer(runTree_inner, chain(*results), ops, state, funcQ, retq)
+
+  funcQ.defer(collate_and_requeue, LFs, ops)
 
   return retq
 
