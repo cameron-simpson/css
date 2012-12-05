@@ -76,7 +76,7 @@ then
     message=`expr "x$message" : 'x[A-Z][A-Z0-9_]*:  *\(.*\)' || :`
   fi
 fi
-set -- $message
+set -- "$message"
 [ -n "$subtitle" ] && set -- "$subtitle;" ${1+"$@"}
 [ -n "$title" ] && set -- "$title:" ${1+"$@"}
 
