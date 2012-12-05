@@ -230,7 +230,11 @@ class Pilfer(O):
           fp.write(U)
           fp.write("\n")
 
-  def print(self, *a, **kw):
+  def print_url_string(self, U, **kw):
+    print_string = kw.pop('string', None)
+    if print_string is None:
+      print_string = '{url}'
+    print_string = self.format_string(print_string, U)
     print_to = kw.get('file', None)
     if print_to is None:
       print_to = self._print_to
@@ -238,7 +242,7 @@ class Pilfer(O):
         print_to = sys.stdout
     kw['file'] = print_to
     with self._print_lock:
-      print(*a, **kw)
+      print(print_string, **kw)
       if self.flush_print:
         print_to.flush()
 
@@ -350,6 +354,7 @@ class Pilfer(O):
 
     _approved = (
                   'archives',
+                  'basename',
                   'dirname',
                   'hrefs',
                   'images',
@@ -372,7 +377,7 @@ class Pilfer(O):
       url = self.url
       with Pfx(url):
         if k not in Pilfer.URLkeywords._approved:
-          raise KeyError(k)
+          raise KeyError("not in Pilfer.URLkeywords._approved: %s" % (k,))
         if k == 'url':
           return url
         try:
@@ -542,7 +547,7 @@ ONE_TO_ONE = {
       'hostname':     lambda U, P: URL(U, None).hostname,
       'new_dir':      lambda U, P: (U, P.url_save_dir(U))[0],
       'per':          lambda U, P: (U, P.set_user_vars(save_dir=None))[0],
-      'print':        lambda U, P: (U, P.print(U))[0],
+      'print':        lambda U, P, **kw: (U, P.print_url_string(U, **kw))[0],
       'query':        lambda U, P, *a: url_query(U, *a),
       'quote':        lambda U, P: quote(U),
       'unquote':      lambda U, P: unquote(U),
@@ -606,12 +611,15 @@ def action_operator(action,
     if func and (offset == len(action) or action[offset] == ':'):
       # ordinary function with arguments
       if offset < len(action):
-        for kw in action[offset+1:].split(','):
-          if '=' in kwarg:
-            kw, v = kw.split('=', 1)
-            kwargs[kw] = v
-          else:
-            kwargs[kwarg] = True
+        if func == 'print':
+          kwargs['string'] = action[offset+1:]
+        else:
+          for kw in action[offset+1:].split(','):
+            if '=' in kw:
+              kw, v = kw.split('=', 1)
+              kwargs[kw] = v
+            else:
+              kwargs[kw] = True
       if func == "per":
         op_mode = 'FORK'
         fork_state = True
@@ -686,7 +694,7 @@ def action_operator(action,
           kwargs['var'] = m.group(1)
           kwargs['value'] = action[m.end():]
           def func(U, P, var, value):
-            P.user_vars[var] = P.format(value, U)
+            P.user_vars[var] = P.format_string(value, U)
             return U
           func_sig = RUN_TREE_OP_ONE_TO_ONE
         else:
