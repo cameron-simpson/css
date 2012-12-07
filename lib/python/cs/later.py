@@ -155,7 +155,7 @@ class PendingFunction(object):
       if state == STATE_CANCELLED:
         # silently discard result
         pass
-      elif state == STATE_RUNNING:
+      elif state == STATE_RUNNING or state == STATE_PENDING:
         if self._result is not None:
           raise ValueError("<%s>.result.setter: tried to set .result to %r but .result is already: %r"
                            % (self, new_result, self._result))
@@ -163,7 +163,7 @@ class PendingFunction(object):
         self.state = STATE_DONE
         notifiers = list(self.notifiers)
       else:
-        raise RuntimeError("<%s>.state is one of (STATE_CANCELLED, STATE_RUNNING): %r"
+        raise RuntimeError("<%s>.state is not one of (STATE_CANCELLED, STATE_RUNNING): %r"
                            % (self, state))
     for notifier in notifiers:
       notifier(self)
