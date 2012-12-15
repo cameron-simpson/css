@@ -30,14 +30,19 @@ done
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-case $ARCH in
-  *.linux)
-    # GNU tar - ick!
-    set -- tar -x -v -B -b "$bsize" -f "$file" ${1+"$@"} ;;
-  *)
-    # real tar
-    set -- tar xvBbf "$bsize" "$file" ${1+"$@"} ;;
-esac
+gnutar=
+tar --version 2>/dev/null && gnutar=1
+
+if [ $gnutar ]
+then
+  # GNU tar - ick!
+  set -- tar -x -v -B -b "$bsize" -f "$file" ${1+"$@"}
+  perl_gnutar=1
+else
+  # real tar
+  set -- tar xvBbf "$bsize" "$file" ${1+"$@"}
+  perl_gnutar=0
+fi
 
 "$@" 2>&1 \
 | perl -e '
@@ -45,7 +50,7 @@ esac
     use cs::Upd;
     use cs::Units;
 
-    $gnutar=($ENV{ARCH} =~ /\.linux$/);
+    $gnutar='"$perl_gnutar"';
     $start=time;
     $bytes=0;
     undef $lastfile;
