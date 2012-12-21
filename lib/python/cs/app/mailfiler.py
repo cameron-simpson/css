@@ -271,7 +271,7 @@ class FilteringState(O):
       hamap[header] = set( [ A for N, A in message_addresses(M, (header,)) ] )
     return hamap[header]
 
-  def save_to_maildir(self, mdir, label):
+  def save_to_maildir(self, mdir, label, context):
     mdirpath = mdir.dir
     if mdirpath in self.used_maildirs:
       if not self.reuse_maildir:
@@ -291,10 +291,10 @@ class FilteringState(O):
     savepath = mdir.keypath(savekey)
     if not path and not label:
       self.message_path = savepath
-    self.log("    OK %s" % (shortpath(savepath),))
+    self.log("    OK %s (%s)" % (shortpath(savepath), context))
     return savepath
 
-  def pipe_message(self, argv, mfp=None):
+  def pipe_message(self, argv, mfp=None, context=None):
     ''' Pipe a message to the command specific by `argv`.
         `mfp` is a file containing the message text.
         If `mfp` is None, use the text of the current message.
@@ -303,23 +303,23 @@ class FilteringState(O):
       message_path = self.message_path
       if message_path:
         with open(message_path) as mfp:
-          return self.pipe_message(argv, mfp)
+          return self.pipe_message(argv, mfp=mfp, context=context)
       else:
         with TemporaryFile('w+') as mfp:
           mfp.write(str(self.message))
           mfp.flush()
           mfp.seek(0)
-          return self.pipe_message(argv, mfp)
+          return self.pipe_message(argv, mfp=mfp, context=context)
     retcode = subprocess.call(argv, env=self.environ, stdin=mfp)
-    self.log("    %s => | %s" % (("OK" if retcode == 0 else "FAIL"), argv))
+    self.log("    %s => | %s (%s)" % (("OK" if retcode == 0 else "FAIL"), argv, context))
     return retcode == 0
 
-  def sendmail(self, address, mfp=None):
+  def sendmail(self, address, mfp=None, context=None):
     ''' Dispatch a message to `address`.
         `mfp` is a file containing the message text.
         If `mfp` is None, use the text of the current message.
     '''
-    return self.pipe_message([self.environ.get('SENDMAIL', 'sendmail'), '-oi', address], mfp=mfp)
+    return self.pipe_message([self.environ.get('SENDMAIL', 'sendmail'), '-oi', address], mfp=mfp, context=context)
 
 re_UNQWORD = re.compile(r'[^,\s]+')
 
@@ -635,7 +635,8 @@ class Rule(O):
 
   def filter(self, filtering):
     M = filtering.message
-    with Pfx("%s:%d", self.filename, self.lineno):
+    context=("%s:%d" % (shortpath(self.filename), self.lineno))
+    with Pfx(context):
       saved_to = []
       ok_actions = []
       failed_actions = []
@@ -648,14 +649,14 @@ class Rule(O):
               target = envsub(arg, filtering.environ)
               if target.startswith('|'):
                 shcmd = target[1:]
-                if filtering.pipe_message(['/bin/sh', '-c', shcmd]):
+                if filtering.pipe_message(['/bin/sh', '-c', shcmd], context=context):
                   ok = True
                   saved_to.append(target)
                 else:
                   error("failed to pipe to %s", target)
                   failed_actions.append( (action, arg, "pipe "+target) )
               elif '@' in target:
-                if filtering.sendmail(target):
+                if filtering.sendmail(target, context=context):
                   ok = True
                   saved_to.append(target)
                 else:
@@ -663,7 +664,7 @@ class Rule(O):
                   failed_actions.append( (action, arg, "sendmail "+target) )
               else:
                 mdir = filtering.maildir(target)
-                savepath = filtering.save_to_maildir(mdir, self.label)
+                savepath = filtering.save_to_maildir(mdir, self.label, context=context)
                 ok = True
                 # we get None if the message has already been saved here
                 if savepath is not None:
