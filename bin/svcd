@@ -5,11 +5,15 @@
 #       - Cameron Simpson <cs@zip.com.au> 10dec2012
 #
 
+set -ue
+
 : ${LOGDIR:=$HOME/var/log}
 : ${VARRUN:=$HOME/var/run}
 
 logdir=$LOGDIR/svc
+name=
 disable_flag=
+pidfile=
 trace=set-x
 once=
 delay=1
@@ -56,7 +60,7 @@ fi
 
 ok()
 {
-  [ -z "$flag" ] || not flag -w "$disable_flag"
+  [ -z "$disable_flag" ] || not flag -w "$disable_flag"
   [ -z "$testcmd" ] || sh -c "$testcmd"
 }
 
