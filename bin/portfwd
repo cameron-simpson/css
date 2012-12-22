@@ -203,6 +203,15 @@ ok2portfwd()
   "$HOME/bin-local/do-portfwd"
 }
 
+# getconfig target
+#
+# Set cfg_* vars from $fwdcfg[$target].
+#
+getconfig()
+{ _gc_wcv=`[ ! -s "$fwdcfg" ] || winclausevars "$fwdcfg" "$1" cfg`
+  eval "$_gc_wcv"
+}
+
 cmd="$cmd $target"
 target_disable_flag=PORTFWD_DISABLE_`echo "$target" | tr '[a-z-]' '[A-Z_]'`
 
@@ -215,11 +224,7 @@ do
   cfg_command=
   cfg_outlog=portfwd-$target    # /dev/null
   cfg_monitor=
-  if [ -s "$fwdcfg" ]
-  then
-    wcv=`winclausevars "$fwdcfg" "$target" cfg`
-    eval "$wcv"
-  fi
+  getconfig "$target"
   case $cfg_pidfile in
     /*) ;; *) cfg_pidfile=$VARRUN/$cfg_pidfile ;;
   esac
