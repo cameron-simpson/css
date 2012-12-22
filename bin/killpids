@@ -1,0 +1,64 @@
+#!/bin/sh -u
+#
+# Kill the specified pids, optionally wait for termination.
+#	- Cameron Simpson <cs@zip.com.au> 15jan2005
+#
+
+trace=set-x
+sigopt=-TERM	# use USR1 if aiming at fetchmail daemon
+dowait=
+killafter=
+
+cmd=$0
+usage="Usage: $cmd [-d pidfiledir] [-u] [-w] [-W seconds] [-signal] pids...
+	-w	Wait for processes to exit.
+	-W	Wait seconds for processes to exit, then send SIGKILL.
+	-signal	Initial signal to send. Passed to kill(1)."
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    -w)	dowait=1 ;;
+    -W)	killafter=$2; shift ;;
+    -[0-9]* | -[A-Z]* )
+	sigopt=$1
+	;;
+    --)	shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+	badopts=1
+	;;
+    *)	break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missings pids" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+pass=1
+while [ $# -gt 0 ]
+do
+  livepids=
+  for pid
+  do $trace kill $sigopt "$pid" && livepids="$livepids $pid"
+  done
+
+  [ -n "$livepids" ] || break
+  [ $dowait ] || break
+  set -- $livepids
+
+  sleep 1
+
+  sigopt=-0
+  pass=`expr "$pass" + 1`
+  [ -n "$killafter" ] && [ "$pass" -ge "$killafter" ] && sigopt=-9
+done
+
+exit 0
