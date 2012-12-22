@@ -62,7 +62,6 @@ then
             ok=
           fi
       done
-      [ $ok ] || { ask "Remove $pidfile" <&3 && rm "./$pidfile"; }
     }
   done
   exit 0
