@@ -9,8 +9,8 @@
 trace=set-x
 sigopt=-TERM	# use USR1 if aiming at fetchmail daemon
 dounlink=
-dowait=
-killafter=
+wopt=
+Wopt=
 
 cmd=$0
 usage="Usage: $cmd [-d pidfiledir] [-u] [-w] [-W seconds] [-signal] pidfiles...
@@ -27,8 +27,8 @@ do
   case "$1" in
     -d)	VARRUN=$2; shift ;;
     -u)	dounlink=1 ;;
-    -w)	dowait=1 ;;
-    -W)	killafter=$2; shift ;;
+    -w)	wopt=$1 ;;
+    -W)	Wopt="-W $2" ;;
     -[0-9]* | -[A-Z]* )
 	sigopt=$1
 	;;
@@ -56,7 +56,7 @@ then
       while read pid
       do  if kill -0 "$pid" 2>/dev/null
           then
-            echo "$pidfile	$pid"
+            echo "$pidfile	$pid" `ps -o args -p "$pid" 2>/dev/null | sed 1d`
           else
             echo "$pidfile	$pid MISSING"
             ok=
@@ -81,21 +81,4 @@ do
   [ $dounlink ] && rm "$pidfile"
 done
 
-pass=1
-while [ -n "$pids" ]
-do
-  livepids=
-  for pid in $pids
-  do $trace kill $sigopt "$pid" && livepids="$livepids $pid"
-  done
-
-  [ -n "$livepids" ] || break
-  [ $dowait ] || break
-
-  pids=$livepids
-  sleep 1
-
-  sigopt=-0
-  pass=`expr "$pass" + 1`
-  [ -n "$killafter" ] && [ "$pass" -ge "$killafter" ] && sigopt=-9
-done
+exec killpids $wopt $Wopt $sigopt -- "$@"
