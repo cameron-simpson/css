@@ -1,7 +1,8 @@
 #!/bin/sh -u
 #
 # Kill the specified pids, optionally wait for termination.
-#	- Cameron Simpson <cs@zip.com.au> 15jan2005
+# Main logic excised from killpidfile, which now calls this.
+#	- Cameron Simpson <cs@zip.com.au> 22dec2012
 #
 
 trace=set-x
