@@ -48,7 +48,7 @@ while [ $# -gt 0 ]
 do
   livepids=
   for pid
-  do $trace kill $sigopt "$pid" && livepids="$livepids $pid"
+  do  $trace kill $sigopt "$pid" 2>/dev/null && livepids="$livepids $pid"
   done
 
   [ -n "$livepids" ] || break
