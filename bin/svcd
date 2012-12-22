@@ -1,0 +1,91 @@
+#!/bin/sh
+#
+# Daemon to run and restart a command that provides a service, such
+# as an ssh port forward.
+#       - Cameron Simpson <cs@zip.com.au> 10dec2012
+#
+
+: ${LOGDIR:=$HOME/var/log}
+: ${VARRUN:=$HOME/var/run}
+
+logdir=$LOGDIR/svc
+disable_flag=
+trace=set-x
+once=
+delay=1
+testcmd=
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-1] [-n name] [-t testcmd] [-x] command [args...]"
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -1) once=1 ;;
+    -n) name=$2; shift ;;
+    -t) testcmd=$2; shift ;;
+    -x) trace=set-x ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing command" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+pidfile=
+if [ -n "$name" ]
+then
+  [ -z "$pidfile" ] && pidfile=$VARRUN/$name.pid
+  [ -z "$disable_flag" ] && flag=DISABLE_`echo "$name" | tr '[a-z]' '[A-Z]'`
+  pfx="$cmd $name"
+else
+  pfx="$cmd $1"
+fi
+
+ok()
+{
+  [ -z "$flag" ] || not flag -w "$disable_flag"
+  [ -z "$testcmd" ] || sh -c "$testcmd"
+}
+
+killsubproc()
+{
+  if [ -n "$pidfile" ]
+  then [ ! -s "$pidfile" ] || $trace killpidfile -W 5 -- "$pidfile"
+  else [ -z "$subpid" ] || $trace killpids -W 5 -- "$subpid"
+  fi
+}
+
+(
+  subpid=
+  trap 'killsubproc; exit 1' 1 2 3 15
+
+  while :
+  do
+    if ok
+    then
+      pfx "$pfx" $trace "$@" &
+      subpid=$!
+      [ -n "$pidfile" ] && echo "$subpid" >"$pidfile"
+      wait
+      subpid=
+      [ -n "$pidfile" ] && rm -f "$pidfile"
+      [ $once ] && break
+    fi
+    $trace sleep $delay
+  done
+)
+
+exit 0
