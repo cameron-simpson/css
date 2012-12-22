@@ -22,7 +22,7 @@ while [ $# -gt 0 ]
 do
   case "$1" in
     -w)	dowait=1 ;;
-    -W)	killafter=$2; shift ;;
+    -W)	dowait=1 killafter=$2; shift ;;
     -[0-9]* | -[A-Z]* )
 	sigopt=$1
 	;;
