@@ -12,7 +12,7 @@ set -ue
 
 logdir=$LOGDIR/svc
 name=
-disable_flag=
+flag_disable=
 pidfile=
 trace=set-x
 once=
@@ -52,7 +52,7 @@ fi
 if [ -n "$name" ]
 then
   [ -z "$pidfile" ] && pidfile=$VARRUN/$name.pid
-  [ -z "$disable_flag" ] && flag=DISABLE_`echo "$name" | tr '[a-z]' '[A-Z]'`
+  [ -z "$flag_disable" ] && flag_disable=`echo "$name" | tr '[a-z]' '[A-Z]'`_DISABLE
   pfx="$cmd $name"
 else
   pfx="$cmd $1"
@@ -60,8 +60,9 @@ fi
 
 ok()
 {
-  [ -z "$disable_flag" ] || not flag -w "$disable_flag"
-  [ -z "$testcmd" ] || sh -c "$testcmd"
+  [ -z "$flag_disable" ] || not flag -w "$flag_disable" || return 1
+  [ -z "$testcmd" ] || sh -c "$testcmd" || return 1
+  return 0
 }
 
 killsubproc()
