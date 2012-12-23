@@ -208,8 +208,11 @@ ok2portfwd()
 # Set cfg_* vars from $fwdcfg[$target].
 #
 getconfig()
-{ _gc_wcv=`[ ! -s "$fwdcfg" ] || winclausevars "$fwdcfg" "$1" cfg`
-  eval "$_gc_wcv"
+{ if [ -s "$fwdcfg" ]
+  then
+    _gc_wcv=`winclausevars "$fwdcfg" "$1" cfg`
+    eval "$_gc_wcv"
+  fi
 }
 
 cmd="$cmd $target"
