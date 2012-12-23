@@ -240,10 +240,9 @@ do
       synckill -v "$opid" || :
       >"$cfg_pidfile"
       exit 0
-    else
-      echo "$cmd: no valid pid to kill in $cfg_pidfile" >&2
-      exit 1
     fi
+    echo "$cmd: no valid pid to kill in $cfg_pidfile" >&2
+    exit 1
   fi
 
   echo "$$" >"$cfg_pidfile"
