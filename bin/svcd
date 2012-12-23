@@ -16,7 +16,8 @@ disable_flag=
 pidfile=
 trace=set-x
 once=
-delay=1
+testrate=7
+killtime=5
 testcmd=
 
 cmd=`basename "$0"`
@@ -48,7 +49,6 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-pidfile=
 if [ -n "$name" ]
 then
   [ -z "$pidfile" ] && pidfile=$VARRUN/$name.pid
@@ -67,8 +67,8 @@ ok()
 killsubproc()
 {
   if [ -n "$pidfile" ]
-  then [ ! -s "$pidfile" ] || $trace killpidfile -W 5 -- "$pidfile"
-  else [ -z "$subpid" ] || $trace killpids -W 5 -- "$subpid"
+  then [ ! -s "$pidfile" ] || $trace killpidfile -W "$killtime" -- "$pidfile"
+  else [ -z "$subpid" ] || $trace killpids -W "$killtime" -- "$subpid"
   fi
 }
 
@@ -80,15 +80,25 @@ killsubproc()
   do
     if ok
     then
+      # dispatch actual service process
       pfx "$pfx" $trace "$@" &
       subpid=$!
       [ -n "$pidfile" ] && echo "$subpid" >"$pidfile"
+
+      # dispatch monitor to terminate service daemon if no longer ok to run
+      ( while kill -0 "$subpid" 2>/dev/null && ok
+        do  sleep "$testrate"
+        done &
+      )
+
+      kill -0 "$subpid" 2>/dev/null && killsubproc
       wait
       subpid=
+
       [ -n "$pidfile" ] && rm -f "$pidfile"
       [ $once ] && break
     fi
-    $trace sleep $delay
+    $trace sleep "$testrate"
   done
 )
 
