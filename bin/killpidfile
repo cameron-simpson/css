@@ -28,7 +28,7 @@ do
     -d)	VARRUN=$2; shift ;;
     -u)	dounlink=1 ;;
     -w)	wopt=$1 ;;
-    -W)	Wopt="-W $2" ;;
+    -W)	Wopt="-W $2"; shift ;;
     -[0-9]* | -[A-Z]* )
 	sigopt=$1
 	;;
