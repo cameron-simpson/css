@@ -1,6 +1,6 @@
 #!/bin/sh -ue
 #
-# Run named port forwards indefinitely.
+# Run the named port forwards indefinitely.
 #       - Cameron Simpson <cs@zip.com.au> 08jul2008
 #
 
