@@ -58,6 +58,12 @@ else
   pfx="$cmd $1"
 fi
 
+if [ -n "$pidfile" ] && pid=`ifpid -q -v "$pidfile"`
+then
+  echo "$cmd: $pidfile: already running, pid $pid:" `ps -o args -p "$pid" 2>/dev/null | sed 1d` >&2
+  exit 1
+fi
+
 ok()
 {
   [ -z "$flag_disable" ] || not flag -w "$flag_disable" || return 1
