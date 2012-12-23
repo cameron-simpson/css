@@ -14,18 +14,12 @@ set -ue
 
 trace=set-x
 once=
-stop=
 sshcfg=$PORTFWD_SSH_CONFIG
 fwdcfg=$PORTFWD_CONFIG
-polltime=11
-retrytime=2
-polling_default_route=
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-1] [-F ssh_config] [-stop] targets...
+usage="Usage: $cmd [-1] [-F ssh_config] targets...
   -1    Once. Do not restart the tunnel if it dies.
-  -stop Stop named port forwards instead of starting them.
-  --polling-route Default route poller already running.
   -F    Ssh configuration file with clause for target.
         Default from \$PORTFWD_SSH_CONFIG: $sshcfg
 If a target starts with an upper case letter it is taken to be a group name,
@@ -38,12 +32,8 @@ badopts=
 while [ $# -gt 0 ]
 do
   case $1 in
-    -1) once=1 opts="$opts $1" ;;
+    -1) once=1 ;;
     -F) sshcfg=$2 opts="$opts $1 $2"; shift ;;
-    -stop)
-        stop=1 opts="$opts $1" ;;
-    --polling-route)
-        polling_default_route=1 ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
         badopts=1
@@ -61,147 +51,62 @@ then
   badopts=1
 fi
 
-[ $badopts ] && { echo "$usage" >&2; exit 2; }
-
-ssh-add -l >/dev/null \
-|| { echo "$cmd: no ssh-agent, aborting" >&2
-     exit 1
-   }
-
-# function to send SIGTERM (default) to a process and wait for it to exit
-# synckill [-v] [-s sig] [--] pids...
-synckill()
-{ _sk_me=$$
-  ( subprocs=
-    verbose=
-    sig=TERM
-    max=5
-    xit=0
-    while [ $# -gt 0 ]
-    do
-      case $1 in
-        -v)       verbose=1 ;;
-        -s)       sig=$2; shift ;;
-        --)       shift; break ;;
-        -?)       echo "$cmd: synckill: unrecognised option: $1" >&2
-                  xit=2
-                  ;;
-        *)        break ;;
-      esac
-      shift
-    done
-    pids=$*
-    [ $verbose ] && printf "%s" "$cmd: synckill $pids"
-    $trace kill -s "$sig" $pids || :
-    pollsig=0
-    while [ -n "$pids" ] && sleep 1
-    do
-      [ $verbose ] && printf .
-      case $max in
-        0)    pollsig=KILL ;;
-        1|2)  pollsig=TERM
-              max=`expr $max - 1` || :
-              ;;
-        *)    pollsig=0
-              max=`expr $max - 1` || :
-              ;;
-      esac
-      npids=
-      for pid in $pids
-      do
-        if [ "x$pid" = "x$_sk_me" ]
-        then
-          echo "ERROR: trying to kill myself! [pid=$pid]" >&2
-        else
-          if $trace kill -s "$pollsig" "$pid" 2>/dev/null
-          then  npids="$npids $pid"
-          fi
-        fi
-      done
-      pids=$npids
-    done
-    [ $verbose ] && echo
-    exit $xit
-  )
-  return $?
-}
-
-subprocs=
-
-# catch some signals and propagate to children
-for sig in HUP INT TERM
+# transmute group names into hosts
+first=1
+for target
 do
-  trap "sig=$sig
-        echo \"\$cmd: received SIG\$sig\"
-        [ -z \"\$subprocs\" ] || synckill -v -s \"\$sig\" \$subprocs
-        exit 1
-       " "$sig"
+  [ $first ] && set --
+  case "$target" in
+    [A-Z]*)
+      onargs=$#
+      set -- ${1+"$@"} \
+             `sed -n 'y/	/ /
+                      s/$/ /
+                      s/^  *//
+                      s/  */  /g
+                      /^[Hh][Oo][Ss][Tt] .*'"$target"' /s/^[^ ]*  *\([^ A-Z][^ ]*\).*/\1/p' "$sshcfg"`
+      if [ $# = $onargs ]
+      then
+        echo "$cmd: group \"$target\" does not match any Hosts in $sshcfg" >&2
+        sed -n 's/^ *[Hh][Oo][Ss][Tt][ 	][ 	]*/  /p' "$sshcfg" >&2
+        echo >&2
+        badopts=1
+      fi
+      ;;
+    *)set -- ${1+"$@"} "$target"
+      ;;
+  esac
 done
 
-not()
-{ "$@" || return 0
-  return 1
-}
-
-poll_default_route()
-{ if netstat -rn | egrep '^(default|0\.0\.0\.0) +[1-9]' >/dev/null
-  then  flag PORTFWD_DEFAULT_ROUTE 1
-  else  flag PORTFWD_DEFAULT_ROUTE 0
-  fi
-}
-
-if not [ $polling_default_route ]
-then
-  while :
-  do
-    poll_default_route
-    sleep "$polltime"
-  done &
-  subprocs="$subprocs $!"
-  polling_default_route=1
-fi
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 if [ $# -gt 1 ]
 then
-  for target
-  do
-    set-x "$0" --polling-route $opts -- "$target" &
-    subprocs="$subprocs $!"
-  done
-  wait
+  # multiple targets - dispatch portfwd for each
+  ( for target
+    do
+      set-x "$0" $opts -- "$target" &
+    done
+    wait
+  )
   exit $?
 fi
 
 target=$1
 shift
 
-case "$target" in
-  [A-Z]*)
-    set -- `sed -n 'y/	/ /
-                    s/$/ /
-                    s/^  *//
-                    s/  */  /g
-                    /^[Hh][Oo][Ss][Tt] .*'"$target"' /s/^[^ ]*  *\([^ ][^ ]*\).*/\1/p' "$sshcfg"`
-    if [ $# = 0 ]
-    then
-      echo "$cmd: group \"$target\" not applied to any Hosts in $sshcfg" >&2
-      sed -n 's/^ *[Hh][Oo][Ss][Tt][ 	][ 	]*/  /p' "$sshcfg" >&2
-      echo >&2
-      exit 1
-    fi
-    [ $# = 1 ] || exec "$0" $opts -- "$@"
-    ;;
-esac
-
-ok2portfwd()
-{
-  flag -w PORTFWD_ANYWAY && return 0
-  flag -w PORTFWD_DISABLE && return 1
-  flag -w PORTFWD_DEFAULT_ROUTE || return 1
-  ssh-add -l >/dev/null || return 1
-  [ -x "$HOME/bin-local/do-portfwd" ] || return 0
-  "$HOME/bin-local/do-portfwd"
-}
+# run main restart outer control via svcd
+[ $once ] \
+|| exec set-x \
+          svcd -n "PORTFWD_$target" \
+               -t 'flag -w PORTFWD_ANYWAY && exit 0
+                   flag -w PORTFWD_DISABLE && exit 1
+                   ssh-add -l >/dev/null || exit 1
+                   netstat -rn | egrep '\''^(default|0\.0\.0\.0) +[1-9]'\'' >/dev/null || exit 1
+                   [ -x "$HOME/bin-local/do-portfwd" ] || exit 0
+                   "$HOME/bin-local/do-portfwd"
+                  ' \
+               -- "$0" -1 $opts -- "$target"
 
 # getconfig target
 #
@@ -216,88 +121,28 @@ getconfig()
 }
 
 cmd="$cmd $target"
-target_disable_flag=PORTFWD_DISABLE_`echo "$target" | tr '[a-z-]' '[A-Z_]'`
 
-xit=0
-first=1
-while :
-do
-  # reload config on every pass
-  cfg_pidfile=portfwd.$target.pid
-  cfg_command=
-  cfg_outlog=portfwd-$target    # /dev/null
-  cfg_monitor=
-  getconfig "$target"
-  case $cfg_pidfile in
-    /*) ;; *) cfg_pidfile=$VARRUN/$cfg_pidfile ;;
-  esac
-  case $cfg_outlog in
-    /*) ;; *) cfg_outlog=$LOGDIR/$cfg_outlog ;;
-  esac
+# reload config on every pass
+cfg_pidfile=portfwd.$target.pid
+cfg_command=
+cfg_outlog=portfwd-$target    # /dev/null
+cfg_monitor=
+getconfig "$target"
+case $cfg_pidfile in
+  /*) ;; *) cfg_pidfile=$VARRUN/$cfg_pidfile ;;
+esac
+case $cfg_outlog in
+  /*) ;; *) cfg_outlog=$LOGDIR/$cfg_outlog ;;
+esac
 
-  if [ "$stop" ]
-  then
-    if opid=`ifpid -q -v "$cfg_pidfile"`
-    then
-      printf "%s" "$cmd: stopping $target, pid $opid "
-      synckill -v "$opid" || :
-      >"$cfg_pidfile"
-      exit 0
-    fi
-    echo "$cmd: no valid pid to kill in $cfg_pidfile" >&2
-    exit 1
-  fi
+sshopts=-n
+[ -n "$cfg_command" ] || sshopts="$sshopts -N"
 
-  echo "$$" >"$cfg_pidfile"
-
-  # if tunnel disabled, skip and check again in a bit
-  if flag -w "$target_disable_flag"
-  then
-    sleep "$polltime"
-    continue
-  fi
-  ok2portfwd || { sleep "$polltime"; continue; }
-
-  sshopts=-n
-  [ -n "$cfg_command" ] || sshopts="$sshopts -N"
-  $trace \
-    tag_fd 2 "$target" \
-    sshto $sshopts -F "$sshcfg" \
-      -o "PermitLocalCommand=yes" -o "LocalCommand=</dev/null alert CONNECTED: $target &" \
-      "$target" "$cfg_command" \
-    >>"$cfg_outlog" </dev/null &
-  sshpid=$!
-  subprocs="$subprocs $sshpid"
-  [ $first ] || alert "RESTARTING: $target [pid $sshpid]" &
-
-  # start monitor
-  if [ -n "$cfg_monitor" ]
-  then
-    sh -c "$cfg_monitor" &
-    subprocs="$subprocs $!"
-  fi
-
-  # wait for tunnel to exit or tunnel permission to expire
-  while kill -0 "$sshpid" && ok2portfwd
-  do
-    flag -w "$target_disable_flag" && break
-    sleep "$polltime"
-  done
-  alert "EXITED: $target [pid $sshpid]" &
-  >"$cfg_pidfile"
-  synckill -v $subprocs
-  subprocs=
-
-  [ $once ] && break
-
-  # pause before restart, and indefinitely if no tunnel permission
-  while :
-  do
-    sleep "$retrytime"
-    ok2portfwd && break
-  done
-
-  first=
-done
-
-exit $xit
+alert "STARTING: $target"
+$trace \
+  tag_fd 2 "$target" \
+  sshto $sshopts -F "$sshcfg" \
+    -o "PermitLocalCommand=yes" -o "LocalCommand=</dev/null alert CONNECTED: $target &" \
+    "$target" "$cfg_command" \
+  >>"$cfg_outlog" </dev/null
+alert "EXITED: $target"
