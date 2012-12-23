@@ -87,8 +87,11 @@ killsubproc()
       [ -n "$pidfile" ] && echo "$subpid" >"$pidfile"
 
       # dispatch monitor to terminate service daemon if no longer ok to run
-      ( ( while kill -0 "$subpid" 2>/dev/null && ok
-          do  sleep "$testrate"
+      ( ( while :
+          do
+            sleep "$testrate"
+            kill -0 "$subpid" 2>/dev/null || break
+            ok || break
           done
           kill -0 "$subpid" 2>/dev/null && killsubproc
         ) &
