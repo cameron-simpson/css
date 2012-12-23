@@ -90,7 +90,7 @@ killsubproc()
       ( ( while :
           do
             sleep "$testrate"
-            kill -0 "$subpid" 2>/dev/null || break
+            kill -0 "$subpid" 2>/dev/null || exit 0
             ok || break
           done
           kill -0 "$subpid" 2>/dev/null && killsubproc
