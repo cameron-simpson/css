@@ -13,6 +13,7 @@ set -ue
 : ${USER:=`id -un`}
 
 trace=set-x
+setx=${DEBUG:-:}${DEBUG:+set -x}
 once=
 sshcfg=$PORTFWD_SSH_CONFIG
 fwdcfg=$PORTFWD_CONFIG
@@ -81,7 +82,7 @@ done
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 subpids=
-trap 'set -x; [ -z "$subpids" ] || killpids $subpids; exit 1' 1 2 3 15
+trap '$setx; : PORTFWD TRAP "subpids=[$subpids]"; [ -z "$subpids" ] || killpids $subpids; exit 1' 1 2 3 15
 
 if [ $# -gt 1 ]
 then
