@@ -76,8 +76,18 @@ do
     ./* | ../* | /* ) ;;
     *) pidfile=$VARRUN/$pidfile ;;
   esac
-  pids=$pids\ `cat "$pidfile"`
+  npids=`cat "$pidfile"`
+  if [ -n "$npids" ]
+  then  pids="$pids $npids"
+  else  echo "$cmd: $pidfile: no pids!" >&2
+  fi
   [ $dounlink ] && rm "$pidfile"
 done
 
-exec killpids $wopt $Wopt $sigopt -- "$@"
+if [ -z "$pids" ]
+then
+  echo "$cmd: nothing to kill!" >&2
+  exit 1
+fi
+
+exec killpids $wopt $Wopt $sigopt -- $pids
