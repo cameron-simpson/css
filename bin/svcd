@@ -74,7 +74,7 @@ ok()
 killsubproc()
 {
   if [ -n "$pidfile" ]
-  then [ ! -s "$pidfile" ] || $trace killpidfile -W "$killtime" -- "$pidfile"
+  then [ ! -s "$pidfile" ] || $trace sh -x killpidfile -W "$killtime" -- "$pidfile"
   else [ -z "$subpid" ] || $trace killpids -W "$killtime" -- "$subpid"
   fi
 }
@@ -82,7 +82,7 @@ killsubproc()
 subpid=
 trap 'killsubproc; exit 1' 1 2 3 15
 
-while :
+while : SVCD MAIN LOOP "$pfx"
 do
   if ok
   then
@@ -92,7 +92,7 @@ do
     [ -n "$pidfile" ] && echo "$subpid" >"$pidfile"
 
     # dispatch monitor to terminate service daemon if no longer ok to run
-    ( ( while :
+    ( ( while : SVCD SUBPID MONITOR "$pfx"
         do
           sleep "$testrate"
           kill -0 "$subpid" 2>/dev/null || exit 0
@@ -102,7 +102,7 @@ do
       ) &
     )
 
-    wait "$subpid"
+    wait "$subpid" || not kill -0 "$subpid" 2>/dev/null || killsubproc
     subpid=
     [ -n "$pidfile" ] && rm -f "$pidfile"
 
