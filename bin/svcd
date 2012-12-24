@@ -104,8 +104,8 @@ do
 
     wait "$subpid"
     subpid=
-
     [ -n "$pidfile" ] && rm -f "$pidfile"
+
     [ $once ] && break
   fi
   $trace sleep "$testrate"
