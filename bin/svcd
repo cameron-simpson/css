@@ -79,38 +79,36 @@ killsubproc()
   fi
 }
 
-(
-  subpid=
-  trap 'killsubproc; exit 1' 1 2 3 15
+subpid=
+trap 'killsubproc; exit 1' 1 2 3 15
 
-  while :
-  do
-    if ok
-    then
-      # dispatch actual service process
-      pfx "$pfx" $trace "$@" &
-      subpid=$!
-      [ -n "$pidfile" ] && echo "$subpid" >"$pidfile"
+while :
+do
+  if ok
+  then
+    # dispatch actual service process
+    pfx "$pfx" $trace "$@" &
+    subpid=$!
+    [ -n "$pidfile" ] && echo "$subpid" >"$pidfile"
 
-      # dispatch monitor to terminate service daemon if no longer ok to run
-      ( ( while :
-          do
-            sleep "$testrate"
-            kill -0 "$subpid" 2>/dev/null || exit 0
-            ok || break
-          done
-          kill -0 "$subpid" 2>/dev/null && killsubproc
-        ) &
-      )
+    # dispatch monitor to terminate service daemon if no longer ok to run
+    ( ( while :
+        do
+          sleep "$testrate"
+          kill -0 "$subpid" 2>/dev/null || exit 0
+          ok || break
+        done
+        kill -0 "$subpid" 2>/dev/null && killsubproc
+      ) &
+    )
 
-      wait
-      subpid=
+    wait "$subpid"
+    subpid=
 
-      [ -n "$pidfile" ] && rm -f "$pidfile"
-      [ $once ] && break
-    fi
-    $trace sleep "$testrate"
-  done
-)
+    [ -n "$pidfile" ] && rm -f "$pidfile"
+    [ $once ] && break
+  fi
+  $trace sleep "$testrate"
+done
 
 exit 0
