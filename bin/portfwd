@@ -56,7 +56,7 @@ fi
 first=1
 for target
 do
-  [ $first ] && set --
+  [ $first ] && { set --; first=; }
   case "$target" in
     [A-Z]*)
       onargs=$#
