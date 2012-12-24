@@ -80,15 +80,21 @@ done
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+subpids=
+trap 'set -x; [ -z "$subpids" ] || killpids $subpids; exit 1' 1 2 3 15
+
 if [ $# -gt 1 ]
 then
   # multiple targets - dispatch portfwd for each
-  ( for target
+  ( subpids=
+    for target
     do
       set-x "$0" $opts -- "$target" &
     done
     wait
-  )
+  ) &
+  subpids="$subpids $!"
+  wait
   exit $?
 fi
 
@@ -144,5 +150,7 @@ $trace \
   sshto $sshopts -F "$sshcfg" \
     -o "PermitLocalCommand=yes" -o "LocalCommand=</dev/null alert CONNECTED: $target &" \
     "$target" "$cfg_command" \
-  >>"$cfg_outlog" </dev/null
+  >>"$cfg_outlog" </dev/null &
+subpids="$subpids $!"
+wait
 alert "EXITED: $target"
