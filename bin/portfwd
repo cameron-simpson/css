@@ -146,12 +146,12 @@ sshopts=-n
 [ -n "$cfg_command" ] || sshopts="$sshopts -N"
 
 alert "STARTING: $target"
-$trace \
-  tag_fd 2 "$target" \
-  sshto $sshopts -F "$sshcfg" \
-    -o "PermitLocalCommand=yes" -o "LocalCommand=</dev/null alert CONNECTED: $target &" \
-    "$target" "$cfg_command" \
-  >>"$cfg_outlog" </dev/null &
+tag_fd 2 "$target" \
+  $trace \
+    sshto $sshopts -F "$sshcfg" \
+      -o "PermitLocalCommand=yes" -o "LocalCommand=</dev/null alert CONNECTED: $target &" \
+      "$target" "$cfg_command" \
+    >>"$cfg_outlog" </dev/null &
 subpids="$subpids $!"
 wait
 alert "EXITED: $target"
