@@ -74,7 +74,7 @@ ok()
 killsubproc()
 {
   if [ -n "$pidfile" ]
-  then [ ! -s "$pidfile" ] || $trace sh -x killpidfile -W "$killtime" -- "$pidfile"
+  then [ ! -s "$pidfile" ] || $trace killpidfile -W "$killtime" -- "$pidfile"
   else [ -z "$subpid" ] || $trace killpids -W "$killtime" -- "$subpid"
   fi
 }
