@@ -31,6 +31,9 @@ done
 
 [ $# -gt 0 ] && [ "x$1" = x!  ] && { invert=1; shift; }
 
+debug=${DEBUG:+1}
+[ -n "$debug" ] || { [ -s "$flagdir/FLAG_DEBUG" ] && debug=1; }
+
 if [ $# = 0 ]
 then
   cd "$flagdir" || exit 1
@@ -79,13 +82,16 @@ fi
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 flagfile=$flagdir/$flagname
+[ $debug ] && echo "$0: flagfile=$flagfile" >&2
 
 if [ $setstate ]
 then
   [ -d "$flagdir/." ] || needdir "$flagdir" || exit 1
   if [ $newstate ]
-  then  echo 1 >"$flagfile" || exit 1
-  else  : >"$flagfile"      || exit 1
+  then  [ $debug ] && echo "$0: $flagfile -> 1" >&2
+        echo 1 >"$flagfile" || exit 1
+  else  [ $debug ] && echo "$0: $flagfile -> ''" >&2
+        : >"$flagfile"      || exit 1
   fi
   exit 0
 fi
