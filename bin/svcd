@@ -52,7 +52,7 @@ fi
 if [ -n "$name" ]
 then
   [ -z "$pidfile" ] && pidfile=$VARRUN/$name.pid
-  [ -z "$flag_disable" ] && flag_disable=`echo "$name" | tr '[a-z]' '[A-Z]'`_DISABLE
+  [ -z "$flag_disable" ] && flag_disable=`echo "$name" | tr -- '-[a-z]' '_[A-Z]'`_DISABLE
   pfx="$cmd $name"
 else
   pfx="$cmd $1"
