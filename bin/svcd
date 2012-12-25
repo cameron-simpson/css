@@ -23,7 +23,18 @@ dolock=
 lockname=
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-1] [-n name] [-t testcmd] [-x] command [args...]"
+usage="Usage: $cmd [-1] [-l] [-L lockname] [-n name] [-t testcmd] [-x] command [args...]
+  -1    Run command only once.
+  -l    Use lock \"svcd-<name>\" to prevent multiple instances of this svcd.
+  -L lockname
+        Use lock \"lockname\" to prevent multiple instances of this svcd.
+  -n name
+        Specify a name for this svcd.
+        If specified, also create a pid file at $VARRUN/name.pid for the command.
+  -t testcmd
+        Run the test command \"testcmd\" periodically to govern whether the
+        command should be active.
+  -x    Trace execution."
 
 badopts=
 
