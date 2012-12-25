@@ -29,7 +29,7 @@ def load_config(config_path, parser=None):
 
 class ConfigWatcher(object):
   ''' A monitor for a windows style .ini file.
-      The current SafeConfigParser object is present in the .parser attribute.
+      The current SafeConfigParser object is present in the .config attribute.
   '''
   def __init__(self, config_path):
     self._config_path = config_path
