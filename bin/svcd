@@ -19,19 +19,25 @@ once=
 testrate=7
 killtime=5
 testcmd=
+dolock=
+lockname=
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [-1] [-n name] [-t testcmd] [-x] command [args...]"
 
 badopts=
 
+opts=
+
 while [ $# -gt 0 ]
 do
   case $1 in
-    -1) once=1 ;;
+    -1) once=1 opts="$opts $1" ;;
+    -l) dolock=1 ;;
+    -L) dolock=1 lockname=$2; shift ;;
     -n) name=$2; shift ;;
     -t) testcmd=$2; shift ;;
-    -x) trace=set-x ;;
+    -x) trace=set-x opts="$opts $1" ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
         badopts=1
@@ -47,12 +53,31 @@ then
   badopts=1
 fi
 
+if [ $dolock ]
+then
+  # derive lock name if unspecified
+  if [ -z "$lockname" ]
+  then
+    if [ -z "$name" ]
+    then
+      echo "$cmd: no lock name (-L) and no svcd name (-n)" >&2
+      badopts=1
+    else
+      lockname=svcd-$name
+    fi
+  fi
+fi
+
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+[ $dolock ] \
+&& exec $trace lock -1 "$lockname" "$0" $opts -n "$name" -t "$testcmd" -- "$@"
 
 if [ -n "$name" ]
 then
   [ -z "$pidfile" ] && pidfile=$VARRUN/$name.pid
-  [ -z "$flag_disable" ] && flag_disable=`echo "$name" | tr -- '-[a-z]' '_[A-Z]'`_DISABLE
+  [ -z "$flag_disable" ] \
+  && flag_disable=`echo "$name" | tr -- '-[a-z]' '_[A-Z]'`_DISABLE
   pfx="$cmd $name"
 else
   pfx="$cmd $1"
