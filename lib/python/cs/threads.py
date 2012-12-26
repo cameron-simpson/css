@@ -1027,14 +1027,20 @@ def runTree_inner(input, ops, state, funcQ, retq=None):
   from cs.later import report
   debug("runTree_inner(input=%s, ops=%s, state=%s, funcQ=%s, retq=%s)...",
     input, ops, state, funcQ, retq)
-  if retq is None:
-    retq = Channel()
 
   try:
     op = ops.next()
   except StopIteration:
+    if retq is None:
+      # initial runTree_inner: return a gettable
+      return Get1(input)
     retq.put(input)
+    # redundant return of retq for consistency
     return retq
+
+  # prepare a Channel for the result if not yet set
+  if retq is None:
+    retq = Channel()
 
   func, fork_input, fork_state = op.func, op.fork_input, op.fork_state
   if fork_input:
@@ -1070,6 +1076,7 @@ def runTree_inner(input, ops, state, funcQ, retq=None):
         else:
           debug("empty result, discarding")
       if not results:
+        # short circuit if the result set becomes empty
         debug("no results, discarding further ops: %s", list(ops))
         ops = iter(())
       # resubmit with new state etc
@@ -1078,6 +1085,7 @@ def runTree_inner(input, ops, state, funcQ, retq=None):
 
   funcQ.defer(collate_and_requeue, LFs, ops)
 
+  # the first runTree_inner gets to return the retq for result collection
   return retq
 
 if __name__ == '__main__':
