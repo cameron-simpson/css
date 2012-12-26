@@ -22,7 +22,7 @@ if sys.hexversion < 0x02060000: from sets import Set as set
 from cs.misc import seq
 from cs.excutils import transmute
 from cs.logutils import Pfx, LogTime, error, warning, debug, exception, OBSOLETE, D
-from cs.misc import seq
+from cs.misc import seq, O
 
 class WorkerThreadPool(object):
   ''' A pool of worker threads to run functions.
@@ -706,20 +706,21 @@ class _Q1(Queue):
     _returnQ1(self)
     return item
 
-class Get1:
+class Get1(O):
   ''' A single use storage container with a .get() method,
       so it looks like a Channel or a Q1.
       It is intended for functions with an asynchronous calling interface
       (i.e. a function that returns a "channel" from which to read the result)
       but synchronous internals - the result is obtained and wrapped in a
       Get1() for retrieval.
+      Note: it does _not_ have any blocking behaviour or locks.
   '''
-  def __init__(self,value):
-    self.__value=value
-  def put(self,value):
-    self.__value=value
+  def __init__(self, value):
+    self.value = value
+  def put(self, value):
+    self.value = value
   def get(self):
-    return self.__value
+    return self.value
 
 class PreQueue(Queue):
   ''' A Queue with push-back and iteration.
