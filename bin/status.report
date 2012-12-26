@@ -10,7 +10,13 @@ set -ue
 cmd=`basename "$0"`
 usage="Usage:
   $cmd [-/ sep] [--] prefix command [args...]
-  $cmd [-/ sep] -F config [--] prefix [clausenames...]"
+  $cmd [-/ sep] -F config [--] prefix [clausenames...]
+
+  sep   Regular expression separating field name from value.
+  config A .ini file with clauses such as:
+          [sysctl]
+          command = sysctl -a
+          sep = : "
 
 dflt_sep_re='[ \t][ \t]*'
 
