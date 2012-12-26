@@ -13,7 +13,13 @@ else:
   from queue import Queue
 from cs.threads import TimerQueue, runTree, RunTreeOp, RUN_TREE_OP_ONE_TO_MANY
 from cs.later import Later
-from cs.logutils import D
+##from cs.logutils import D
+
+def D(msg, *a):
+  if a:
+    msg = msg % a
+  with open('/dev/tty', 'a') as tty:
+    print >>tty, msg
 
 class TestTimerQueue(unittest.TestCase):
 
