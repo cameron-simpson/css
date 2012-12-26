@@ -94,7 +94,7 @@ class TestRuntree(unittest.TestCase):
 
   def test__01_same(self):
     L = Later(1)
-    self.assertEquals(runTree( [1,2,3], [ RunTreeOp(self.f_same, None, False, None) ], None, L), [1,2,3])
+    self.assertEquals(list(runTree( [1,2,3], [ RunTreeOp(self.f_same, False, False, None) ], None, L )), [1,2,3])
     L.close()
 
   def test__01_same_fork(self):
