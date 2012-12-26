@@ -24,7 +24,7 @@ from cs.excutils import transmute
 from cs.logutils import Pfx, LogTime, error, warning, debug, exception, OBSOLETE, D
 from cs.misc import seq, O
 
-class WorkerThreadPool(object):
+class WorkerThreadPool(O):
   ''' A pool of worker threads to run functions.
   '''
 
@@ -37,9 +37,6 @@ class WorkerThreadPool(object):
     self.idle = deque()
     self.all = []
     self._lock = Lock()
-
-  def __str__(self):
-    return self.name
 
   def __repr__(self):
     return '<WorkerThreadPool "%s">' % (self.name,)
