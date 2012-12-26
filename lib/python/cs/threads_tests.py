@@ -64,6 +64,13 @@ class TestTimerQueue(unittest.TestCase):
 
 class TestRuntree(unittest.TestCase):
 
+  def setUp(self):
+    self.TQ = TimerQueue()
+    self.Q = Queue()
+
+  def tearDown(self):
+    self.TQ.close()
+
   # A many to many identity function.
   @staticmethod
   def f_same(input, state):
