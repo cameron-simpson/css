@@ -13,8 +13,8 @@ main()
   usage="Usage: $cmd [-v] [-x] [--state statedir] [--pycmd python-shcmd] [--python pylibdir pysubtree [modules...]]..."
 
   trace=${DEBUG:+set-x}
-  vecho=:
-  vvecho=:
+  vecho=${DEBUG:+echo}${DEBUG:-:}
+  vvecho=${DEBUG:+echo}${DEBUG:-:}
   statedir=state
   pycmd='python -3 -tt'
   ##[ -t 1 ] && vecho=echo
