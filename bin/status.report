@@ -1,6 +1,7 @@
 #!/bin/sh
 #
-# Generate a status report of similar form to sysctl output 
+# Generate a status report of similar form to sysctl output.
+# Very useful for readability/diffing/parsing.
 #       - Cameron Simpson <cs@zip.com.au> 26dec2012
 #
 
