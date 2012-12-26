@@ -13,6 +13,7 @@ else:
   import configparser
 from threading import Lock
 from cs.fileutils import file_property
+from cs.threads import locked_property
 from cs.logutils import Pfx, info, D
 
 def load_config(config_path, parser=None):
@@ -34,6 +35,7 @@ class ConfigWatcher(object):
   def __init__(self, config_path):
     self._config_path = config_path
     self._config_lock = Lock()
+    self._mapping = None
 
   @file_property
   def config(self, path):
@@ -44,11 +46,23 @@ class ConfigWatcher(object):
     return self._config_path
 
   def as_dict(self):
+    ''' Construct and return a dictionary containing an entry for each section
+        whose value is a dictionary of section items and values.
+    '''
     d = {}
     config = self.config
     for section in config.sections():
       d[section] = dict(config.items(section))
     return d
+
+  @locked_property
+  def mapping(self):
+    ''' The current config as a mapping as returned by as_dict().
+    '''
+    return self.as_dict()
+
+  def __getitem__(self, section):
+    return self.mapping[section]
 
 class ConfigSectionWatcher(object):
   ''' A class for monitoring a particular clause in a config file.
@@ -98,13 +112,7 @@ class ConfigSectionWatcher(object):
     return K
 
   def __getitem__(self, item):
-    config = self.config
-    section = self.section
-    if config.has_section(section) and config.has_option(section, item):
-      return config.get(section, item)
-    if self.defaults is None:
-      raise KeyError("%s: no defaults" % (item,))
-    return self.defaults[item]
+    return self.configwatcher.mapping[item]
 
   def get(self, item, default):
     with Pfx("get(%s)", item):

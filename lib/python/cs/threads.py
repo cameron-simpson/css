@@ -1072,7 +1072,7 @@ def runTree_inner(input, ops, state, funcQ, retq=None):
         if exc_info:
           exception("exception: %s", exc_info[1])
         elif result:
-            results.append(result)
+          results.append(result)
         else:
           debug("empty result, discarding")
       if not results:
