@@ -1,3 +1,3 @@
 #!/bin/sh
 status.report -/ = rc_conf grep '^[^#]' /etc/rc.conf | grep carp
-status.report -/ ' *[:=] *' sysctl sysctl -a | grep carp
+status.report -/ ' *[:=] *' sysctl sysctl net.inet.carp
