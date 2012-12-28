@@ -11,4 +11,4 @@ set -ue
 : ${MAILDB:=$HOME/rc/mail/db.csv}
 export MAILDB
 
-maildb -m "$MAILDB" learn-addresses "$1"
+maildb -m "$MAILDB" learn-addresses --ungrouped "$1"
