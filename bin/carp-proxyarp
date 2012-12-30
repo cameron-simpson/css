@@ -85,7 +85,7 @@ exec \
              carpif='$carpif'
              carpstate='$state'
            "'state=`carp-state "$carpif"`
-             [ "x$state" = "$carpstate" ]
+             [ "x$state" = "x$carpstate" ]
             ' \
          -T "$testrate" \
-         $trace ping -S "$srcaddr" "$upaddr"
+         $trace ping -q -S "$srcaddr" "$upaddr"
