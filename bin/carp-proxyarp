@@ -1,0 +1,89 @@
+#!/bin/sh
+#
+# Watch a CARP interface for MASTER status.
+# When MASTER, ping a target from the interface's primary address.
+# This is used to advertise the physical location of the MASTER to an
+# upstream multiswitch VLAN, and thus to advertise the CARP failover.
+# Note that if the upstream loses internal connectivity then both
+# CARP servers will become masters at the same time.
+# This is bad, unless pfsync is working between them.
+#       - Cameron Simpson <cs@zip.com.au> 30dec2012
+#
+
+set -ue
+
+trace=set-x
+state=MASTER
+srcaddr=
+testrate=2
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-s STATE] [-S srcaddr] carpif upstreamaddr
+  -s STATE      State to wait for. Default: $state
+  -S srcaddr    Source address for ping. Default from carpif.
+  carpif        CARP interface to monitor.
+  upstreamaddr  Target address for ping."
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    -s) state=$2; shift ;;
+    -S) srcaddr=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing carpif" >&2
+  badopts=1
+else
+  carpif=$1
+  shift
+fi
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing upstreamaddr" >&2
+  badopts=1
+else
+  upaddr=$1
+  shift
+fi
+
+if [ $# -gt 0 ]
+then
+  echo "$cmd: extra arguments after upstreamaddr: $*" >&2
+  badopts=1
+fi
+
+if [ -z "$srcaddr" ]
+then
+  srcaddr=`ifconfig "$carpif" | sed -n 's/.*inet \([^ ][^ ]*\) .*/\1/p'`
+  if [ -z "$srcaddr" ]
+  then
+    echo "$cmd: cannot compute srcaddr from carpif $carpif" >&2
+    badopts=1
+  fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+exec \
+  $trace \
+    svcd -n "proxyarp-$carpif" \
+         -t "set -ue
+             carpif='$carpif'
+             carpstate='$state'
+           "'state=`carp-state "$carpif"`
+             [ "x$state" = "$carpstate" ]
+            ' \
+         -T "$testrate" \
+         $trace ping -S "$srcaddr" "$upaddr"
