@@ -34,6 +34,8 @@ usage="Usage: $cmd [-1] [-l] [-L lockname] [-n name] [-t testcmd] [-x] command [
   -t testcmd
         Run the test command \"testcmd\" periodically to govern whether the
         command should be active.
+  -T testrate
+        Interval between test polls in seconds. Default: $testrate
   -x    Trace execution."
 
 badopts=
@@ -48,6 +50,7 @@ do
     -L) dolock=1 lockname=$2; shift ;;
     -n) name=$2; shift ;;
     -t) testcmd=$2; shift ;;
+    -T) testrate=$2; shift ;;
     -x) trace=set-x opts="$opts $1" ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
