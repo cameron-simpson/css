@@ -44,6 +44,7 @@ if [ $# = 0 ]
 then
   echo "$cmd: missing carpif" >&2
   badopts=1
+  carpif=
 else
   carpif=$1
   shift
@@ -53,6 +54,7 @@ if [ $# = 0 ]
 then
   echo "$cmd: missing upstreamaddr" >&2
   badopts=1
+  upaddr=
 else
   upaddr=$1
   shift
@@ -64,7 +66,7 @@ then
   badopts=1
 fi
 
-if [ -z "$srcaddr" ]
+if [ -z "$srcaddr" -a -n "$carpif" ]
 then
   srcaddr=`ifconfig "$carpif" | sed -n 's/.*inet \([^ ][^ ]*\) .*/\1/p'`
   if [ -z "$srcaddr" ]
