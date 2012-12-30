@@ -1,0 +1,21 @@
+#!/bin/sh
+#
+# Run identical tcpdumps on multiple interfaces.
+#       - Cameron Simpson <cs@zip.com.au> 30dec2012
+#
+
+usage="Usage: $0 interface,... [tcpdump-args...]"
+
+[ $# -ge 2 ] || { echo "$usage" >&2; exit 2; }
+
+ifaces=$1
+shift
+
+(
+  for iface in `echo "$ifaces" | tr , ' '`
+  do
+    pfx "$iface" tcpdump -l -i "$iface" ${1+"$@"} &
+  done
+
+  wait
+)
