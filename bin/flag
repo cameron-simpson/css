@@ -86,12 +86,17 @@ flagfile=$flagdir/$flagname
 
 if [ $setstate ]
 then
-  [ -d "$flagdir/." ] || needdir "$flagdir" || exit 1
   if [ $newstate ]
-  then  [ $debug ] && echo "$0: $flagfile -> 1" >&2
-        echo 1 >"$flagfile" || exit 1
-  else  [ $debug ] && echo "$0: $flagfile -> ''" >&2
-        : >"$flagfile"      || exit 1
+  then
+    # not ok for file to be missing
+    [ $debug ] && echo "$0: $flagfile -> 1" >&2
+    [ -d "$flagdir/." ] || needdir "$flagdir" || exit 1
+    echo 1 >"$flagfile" || exit 1
+  else
+    # it is ok for the file to be missing
+    [ $debug ] && echo "$0: $flagfile -> ''" >&2
+    [ -d "$flagdir/." ] || needdir "$flagdir" || exit 0
+    : >"$flagfile" || exit 0
   fi
   exit 0
 fi
