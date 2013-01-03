@@ -1,0 +1,41 @@
+#!/bin/sh
+#
+# Report attributes of specified interface.
+#       - Cameron Simpson <cs@zip.com.au> 03jan2013
+#
+
+set -ue
+
+cmd=`basename "$0"`
+usage="Usage: $cmd ifname"
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing ifname" >&2
+  badopts=1
+else
+  ifname=$1
+  shift
+  case "$ifname" in
+    [a-z]*) ;;
+    *)  echo "$cmd: invalid ifname: $ifname" >&2
+        badopts=
+        ;;
+  esac
+fi
+
+if [ $# -gt 0 ]
+then
+  echo "$cmd: extra arguments: $*" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+ifconfig "$ifname" \
+| sed '1{
+        s/^[a-z][^ 	]*//
+      }
+      s/^[ 	]*//'
