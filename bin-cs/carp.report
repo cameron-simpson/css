@@ -1,3 +1,13 @@
 #!/bin/sh
 status.report -/ = rc_conf grep '^[^#]' /etc/rc.conf | grep carp
 status.report -/ ' *[:=] *' sysctl sysctl net.inet.carp
+ifconfig -a \
+| sed -n 's/^\(carp[0-9][0-9]*\).*/\1/p' \
+| sort \
+| while read ifname
+  do
+    ( echo "state "`carp-state "$ifname"`
+      ifconfig-lines "$ifname" | awk '{print NR, $0}'
+    ) \
+    | status.report -/ ' ' ifconfig.$ifname cat
+  done
