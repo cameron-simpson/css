@@ -49,5 +49,8 @@ def playlist_date(s):
   return datetime.datetime.strptime( s, '%d/%m/%y %I:%S %p' )
 
 if __name__ == '__main__':
-  for item in read_playlist('/Users/cameron/Documents/tag-mellow.txt'):
-    print(item)
+  import sys
+  for path in sys.argv[1:]:
+    print(path)
+    for item in read_playlist('/Users/cameron/Documents/tag-mellow.txt'):
+      print(item)
