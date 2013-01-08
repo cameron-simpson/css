@@ -28,6 +28,14 @@ class EC2(O):
     self._lock = RLock()
     self._O_omit = ('conn', 'regions', 'instances')
 
+  def __enter__(self):
+    return self
+
+  def __exit__(self, exc_type, exc_value, traceback):
+    D("EC2.__exit__ ...")
+    self.conn.close()
+    return False
+
   @contextmanager
   def connection(self, **kwargs):
     conn = self.connect(**kwargs)
@@ -35,7 +43,7 @@ class EC2(O):
     conn.close()
 
   def connect(self, **kwargs):
-    ''' Get a boto.ec2.connection.EC2Connection.
+    ''' Obtain a boto.ec2.connection.EC2Connection.
         Missing `aws_access_key_id`, `aws_secret_access_key`, `region`
         arguments come from the corresponding EC2 attributes.
     '''
@@ -57,8 +65,8 @@ class EC2(O):
   def regions(self):
     ''' Return a mapping from Region name to Region.
     '''
-    with self.connection(region=None) as ec2:
-      RS = dict( [ (R.name, R) for R in ec2.get_all_regions() ] )
+    with self.connection(region=None) as ec2conn:
+      RS = dict( [ (R.name, R) for R in ec2conn.get_all_regions() ] )
     return RS
 
   def region(self, name):
@@ -79,3 +87,8 @@ class EC2(O):
       yield "    %s @ %s %s" % (R.id, R.region.name, dir(R))
       for I in R.instances:
         yield "      %s %s %s" % (I, I.public_dns_name, dir(I))
+
+if __name__ == '__main__':
+  with EC2(region='ap-southeast-2') as ec2:
+    for line in ec2.report():
+      print line
