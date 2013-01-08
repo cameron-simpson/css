@@ -178,44 +178,58 @@ if __name__ == '__main__':
 
   argv=list(sys.argv)
   cmd=os.path.basename(argv.pop(0))
-  usage="Usage: %s [-L location] command [args...]"
+  usage="Usage: %s {s3|ec2} [-L location] command [args...]"
   setup_logging(cmd)
 
   location = None
 
   badopts = False
 
-  try:
-    opts, argv = getopt(argv, 'L:')
-  except GetoptError as e:
-    error("bad option: %s", e)
-    badopts = True
-    opts = ()
-
-  for opt, val in opts:
-    if opt == '-L':
-      location = val
-    else:
-      error("unimplemented option: %s", opt)
-      badopts = True
-
   if not argv:
-    error("missing command")
+    error("missing s3 or ec2")
     badopts = True
   else:
-    command = argv.pop(0)
-    command_method = "cmd_" + command
-    if not hasattr(S3, command_method):
-      error("unimplemented command: %s", command)
-      badopts = True
+    mode = argv.pop(0)
+    if mode == 's3':
+      klass = S3
+    elif mode == 'ec2':
+      klass = EC2
     else:
-      with Pfx(command):
-        with S3(location=location) as s3:
-          try:
-            xit = getattr(s3, command_method)(argv)
-          except GetoptError as e:
-            error("%s", e)
-            badopts = True
+      error("unknown mode, I expect \"s3\" or \"ec2\", got \"%s\"", mode)
+      badopts = True
+
+    with Pfx(mode):
+      try:
+        opts, argv = getopt(argv, 'L:')
+      except GetoptError as e:
+        error("bad option: %s", e)
+        badopts = True
+        opts = ()
+
+      for opt, val in opts:
+        if opt == '-L':
+          location = val
+        else:
+          error("unimplemented option: %s", opt)
+          badopts = True
+
+      if not argv:
+        error("missing command")
+        badopts = True
+      else:
+        command = argv.pop(0)
+        command_method = "cmd_" + command
+        if not hasattr(klass, command_method):
+          error("unimplemented command: %s", command)
+          badopts = True
+        else:
+          with Pfx(command):
+            with klass(location=location) as aws:
+              try:
+                xit = getattr(aws, command_method)(argv)
+              except GetoptError as e:
+                error("%s", e)
+                badopts = True
 
   if badopts:
     print(usage % (cmd,), file=sys.stderr)
