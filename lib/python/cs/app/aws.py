@@ -32,11 +32,14 @@ class EC2(O):
     return self
 
   def __exit__(self, exc_type, exc_value, traceback):
-    D("EC2.__exit__ ...")
     self.conn.close()
     return False
 
   def __getattr__(self, attr):
+    ''' Intercept public attributes.
+        Support:
+          Region name with '-' replaced by '_' -> RegionInfo
+    '''
     if not attr.startswith('_'):
       dashed = attr.replace('_', '-')
       if dashed in self.regions:
@@ -45,6 +48,8 @@ class EC2(O):
 
   @contextmanager
   def connection(self, **kwargs):
+    ''' Return a context manager for a Connection.
+    '''
     conn = self.connect(**kwargs)
     yield conn
     conn.close()
@@ -66,6 +71,8 @@ class EC2(O):
 
   @locked_property
   def conn(self):
+    ''' The default connection, on demand.
+    '''
     return self.connect()
 
   @locked_property
@@ -83,9 +90,13 @@ class EC2(O):
 
   @property
   def reservations(self):
+    ''' Return Reservations in the default Connection.
+    '''
     return self.conn.get_all_instances()
 
   def report(self):
+    ''' Report AWS info. Debugging/testing method.
+    '''
     yield str(self)
     yield "  regions: " + str(self.regions)
     yield "  reservations: " + str(self.reservations)
