@@ -18,10 +18,14 @@ srcaddr=
 testrate=2
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-s STATE] [-S srcaddr] carpif upstreamaddr
+usage="Usage: $cmd [-s STATE] [-S srcaddr] carpif[,carpif...] upstreamaddr
   -s STATE      State to wait for. Default: $state
   -S srcaddr    Source address for ping. Default from carpif.
   carpif        CARP interface to monitor.
+		Multiple carp interfaces may be specified as a
+		commas or space separated list.
+		The first carp interface is used to obtain the
+		default srcaddr if -S is not used.
   upstreamaddr  Target address for ping."
 
 badopts=
@@ -42,12 +46,25 @@ done
 
 if [ $# = 0 ]
 then
-  echo "$cmd: missing carpif" >&2
+  echo "$cmd: missing carpifs" >&2
   badopts=1
   carpif=
 else
-  carpif=$1
+  carpifs=$1
   shift
+  # turn commas into spaces
+  case "$carpifs" in
+    *,*)
+      carpifs=`echo $carpifs | tr , ' '`
+      ;;
+  esac
+  # use the first interface specially
+  carpif=`echo $carpifs | sed 's/ .*//'`
+  if [ -z "$carpif" ]
+  then
+    echo "$cmd: empty carpif list" >&2
+    badopts=1
+  fi
 fi
 
 if [ $# = 0 ]
@@ -82,10 +99,14 @@ exec \
   $trace \
     svcd -n "proxyarp-$carpif" \
          -t "set -ue
-             carpif='$carpif'
+             carpifs='$carpifs'
              carpstate='$state'
-           "'state=`carp-state "$carpif"`
-             [ "x$state" = "x$carpstate" ]
+           "'for carpif in $carpifs
+             do
+               state=`carp-state "$carpif"`
+               [ "x$state" = "x$carpstate" ] || exit 1
+             done
+             exit 0
             ' \
          -T "$testrate" \
          $trace ping -q -S "$srcaddr" "$upaddr"
