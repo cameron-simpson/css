@@ -7,11 +7,12 @@
 #       - Cameron Simpson <cs@zip.com.au> 17nov2012
 #
 
+from __future__ import print_function
 from contextlib import contextmanager
 from threading import RLock
 from boto.ec2.connection import EC2Connection
 from boto.s3.connection import S3Connection, Location
-from cs.logutils import D
+from cs.logutils import setup_logging, D, error, Pfx
 from cs.threads import locked_property
 from cs.misc import O, O_str
 
@@ -62,6 +63,11 @@ class _AWS(O):
     ''' Return the Region with the specified `name`.
     '''
     return self.regions[name]
+
+  def cmd_report(self, argv):
+    for line in self.report():
+      print(line)
+    return 0
 
 class EC2(_AWS):
 
@@ -166,7 +172,53 @@ if __name__ == '__main__':
   ##  print
   ##  R = ec2.us_east_1
   ##  print O_str(R)
+  import sys
+  import os.path
+  from getopt import getopt, GetoptError
 
-  with S3(location=Location.APSoutheast) as s3:
-    for line in s3.report():
-      print line
+  argv=list(sys.argv)
+  cmd=os.path.basename(argv.pop(0))
+  usage="Usage: %s [-L location] command [args...]"
+  setup_logging(cmd)
+
+  location = None
+
+  badopts = False
+
+  try:
+    opts, argv = getopt(argv, 'L:')
+  except GetoptError as e:
+    error("bad option: %s", e)
+    badopts = True
+    opts = ()
+
+  for opt, val in opts:
+    if opt == '-L':
+      location = val
+    else:
+      error("unimplemented option: %s", opt)
+      badopts = True
+
+  if not argv:
+    error("missing command")
+    badopts = True
+  else:
+    command = argv.pop(0)
+    command_method = "cmd_" + command
+    if not hasattr(S3, command_method):
+      error("unimplemented command: %s", command)
+      badopts = True
+    else:
+      with Pfx(command):
+        with S3(location=location) as s3:
+          try:
+            xit = getattr(s3, command_method)(argv)
+          except GetoptError as e:
+            error("%s", e)
+            badopts = True
+
+  if badopts:
+    print(usage % (cmd,), file=sys.stderr)
+    sys.exit(2)
+
+  sys.exit(xit)
