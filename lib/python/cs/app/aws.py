@@ -156,6 +156,8 @@ class S3(_AWS):
     ''' Report AWS info. Debugging/testing method.
     '''
     yield str(self)
+    for name in sorted(self._buckets.keys()):
+      yield "  %s => %s" % (name, self._buckets[name])
 
 if __name__ == '__main__':
   ##with EC2(region='ap-southeast-2') as ec2:
