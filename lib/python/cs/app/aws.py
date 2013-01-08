@@ -10,6 +10,7 @@
 from contextlib import contextmanager
 from threading import RLock
 from boto.ec2.connection import EC2Connection
+from boto.s3.connection import S3Connection, Location
 from cs.logutils import D
 from cs.threads import locked_property
 from cs.misc import O, O_str
@@ -34,17 +35,6 @@ class _AWS(O):
   def __exit__(self, exc_type, exc_value, traceback):
     self.conn.close()
     return False
-
-  def __getattr__(self, attr):
-    ''' Intercept public attributes.
-        Support:
-          Region name with '-' replaced by '_' -> RegionInfo
-    '''
-    if not attr.startswith('_'):
-      dashed = attr.replace('_', '-')
-      if dashed in self.regions:
-        return self.region(dashed)
-    raise AttributeError(attr)
 
   @contextmanager
   def connection(self, **kwargs):
@@ -74,6 +64,17 @@ class _AWS(O):
     return self.regions[name]
 
 class EC2(_AWS):
+
+  def __getattr__(self, attr):
+    ''' Intercept public attributes.
+        Support:
+          Region name with '-' replaced by '_' -> RegionInfo
+    '''
+    if not attr.startswith('_'):
+      dashed = attr.replace('_', '-')
+      if dashed in self.regions:
+        return self.region(dashed)
+    raise AttributeError(attr)
 
   def connect(self, **kwargs):
     ''' Obtain a boto.ec2.connection.EC2Connection.
@@ -108,10 +109,62 @@ class EC2(_AWS):
       for I in R.instances:
         yield "      %s %s %s" % (I, I.public_dns_name, O_str(I))
 
+class S3(_AWS):
+
+  def __init__(self, **kwargs):
+    if 'location' in kwargs:
+      self.default_location = kwargs.pop('location')
+    else:
+      self.default_location = Location.DEFAULT
+    self._buckets = {}
+    _AWS.__init__(self, **kwargs)
+    D("S3 = %s", self)
+
+  def connect(self, **kwargs):
+    ''' Obtain a boto.s3.connection.S3Connection.
+        Missing `aws_access_key_id`, `aws_secret_access_key`, `region`
+        arguments come from the corresponding S3 attributes.
+    '''
+    for kw in ('aws_access_key_id', 'aws_secret_access_key'):
+      if kw not in kwargs:
+        kwargs[kw] = getattr(self.aws, kw[4:], None)
+    return S3Connection(**kwargs)
+
+  def bucket(self, name):
+    ''' Return an S3 bucket.
+	TODO: contrive that self.conn.lookup() does not block other
+	stuff unnecessarily.
+    '''
+    with self._lock:
+      if name in self._buckets:
+        B = self._buckets[name]
+      else:
+        B = self._buckets[name] = self.conn.lookup(name)
+    return B
+
+  def create_bucket(self, name, location=None):
+    ''' Create a new S3 bucket.
+    '''
+    if location is None:
+      location = self.default_location
+    B = self.conn.create_bucket(name, location)
+    with self._lock:
+      self._buckets[name] = B
+    return B
+
+  def report(self):
+    ''' Report AWS info. Debugging/testing method.
+    '''
+    yield str(self)
+
 if __name__ == '__main__':
-  with EC2(region='ap-southeast-2') as ec2:
-    for line in ec2.report():
+  ##with EC2(region='ap-southeast-2') as ec2:
+  ##  for line in ec2.report():
+  ##    print line
+  ##  print
+  ##  R = ec2.us_east_1
+  ##  print O_str(R)
+
+  with S3(location=Location.APSoutheast) as s3:
+    for line in s3.report():
       print line
-    print
-    R = ec2.us_east_1
-    print O_str(R)
