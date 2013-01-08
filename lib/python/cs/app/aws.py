@@ -14,7 +14,7 @@ from cs.logutils import D
 from cs.threads import locked_property
 from cs.misc import O, O_str
 
-class EC2(O):
+class _AWS(O):
   ''' Convenience wrapper for EC2 connections.
   '''
 
@@ -54,21 +54,6 @@ class EC2(O):
     yield conn
     conn.close()
 
-  def connect(self, **kwargs):
-    ''' Obtain a boto.ec2.connection.EC2Connection.
-        Missing `aws_access_key_id`, `aws_secret_access_key`, `region`
-        arguments come from the corresponding EC2 attributes.
-    '''
-    for kw in ('aws_access_key_id', 'aws_secret_access_key'):
-      if kw not in kwargs:
-        kwargs[kw] = getattr(self.aws, kw[4:], None)
-    for kw in ('region',):
-      if kw not in kwargs:
-        kwargs[kw] = getattr(self.aws, kw, None)
-    if isinstance(kwargs.get('region', None), (str, unicode)):
-      kwargs['region'] = self.region(kwargs['region'])
-    return EC2Connection(**kwargs)
-
   @locked_property
   def conn(self):
     ''' The default connection, on demand.
@@ -87,6 +72,23 @@ class EC2(O):
     ''' Return the Region with the specified `name`.
     '''
     return self.regions[name]
+
+class EC2(_AWS):
+
+  def connect(self, **kwargs):
+    ''' Obtain a boto.ec2.connection.EC2Connection.
+        Missing `aws_access_key_id`, `aws_secret_access_key`, `region`
+        arguments come from the corresponding EC2 attributes.
+    '''
+    for kw in ('aws_access_key_id', 'aws_secret_access_key'):
+      if kw not in kwargs:
+        kwargs[kw] = getattr(self.aws, kw[4:], None)
+    for kw in ('region',):
+      if kw not in kwargs:
+        kwargs[kw] = getattr(self.aws, kw, None)
+    if isinstance(kwargs.get('region', None), (str, unicode)):
+      kwargs['region'] = self.region(kwargs['region'])
+    return EC2Connection(**kwargs)
 
   @property
   def reservations(self):
@@ -110,7 +112,6 @@ if __name__ == '__main__':
   with EC2(region='ap-southeast-2') as ec2:
     for line in ec2.report():
       print line
-    print
     print
     R = ec2.us_east_1
     print O_str(R)
