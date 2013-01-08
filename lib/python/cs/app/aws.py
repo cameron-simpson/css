@@ -12,7 +12,7 @@ from threading import RLock
 from boto.ec2.connection import EC2Connection
 from cs.logutils import D
 from cs.threads import locked_property
-from cs.misc import O
+from cs.misc import O, O_str
 
 class EC2(O):
   ''' Convenience wrapper for EC2 connections.
@@ -84,9 +84,9 @@ class EC2(O):
     yield "  reservations: " + str(self.reservations)
     for R in self.reservations:
       region = R.region
-      yield "    %s @ %s %s" % (R.id, R.region.name, dir(R))
+      yield "    %s @ %s %s" % (R.id, R.region.name, O_str(R))
       for I in R.instances:
-        yield "      %s %s %s" % (I, I.public_dns_name, dir(I))
+        yield "      %s %s %s" % (I, I.public_dns_name, O_str(I))
 
 if __name__ == '__main__':
   with EC2(region='ap-southeast-2') as ec2:
