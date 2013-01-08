@@ -36,6 +36,13 @@ class EC2(O):
     self.conn.close()
     return False
 
+  def __getattr__(self, attr):
+    if not attr.startswith('_'):
+      dashed = attr.replace('_', '-')
+      if dashed in self.regions:
+        return self.region(dashed)
+    raise AttributeError(attr)
+
   @contextmanager
   def connection(self, **kwargs):
     conn = self.connect(**kwargs)
@@ -92,3 +99,7 @@ if __name__ == '__main__':
   with EC2(region='ap-southeast-2') as ec2:
     for line in ec2.report():
       print line
+    print
+    print
+    R = ec2.us_east_1
+    print O_str(R)
