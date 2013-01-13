@@ -20,15 +20,14 @@ class _AWS(O):
   ''' Convenience wrapper for EC2 connections.
   '''
 
-  def __init__(self, aws_access_key_id=None, aws_secret_access_key=None, region=None):
+  def __init__(self, aws_access_key_id=None, aws_secret_access_key=None):
     ''' Initialise the EC2 with access id and secret.
     '''
     self.aws = O()
     self.aws.access_key_id = aws_access_key_id
     self.aws.secret_access_key = aws_secret_access_key
-    self.aws.region = region
     self._lock = RLock()
-    self._O_omit = ('conn', 'regions', 'instances')
+    self._O_omit.append('conn')
 
   def __enter__(self):
     return self
@@ -70,6 +69,13 @@ class _AWS(O):
     return 0
 
 class EC2(_AWS):
+
+  def __init__(self, aws_access_key_id=None, aws_secret_access_key=None, region=None):
+    ''' Initialise the EC2 with access id and secret.
+    '''
+    _AWS.__init__(self, aws_access_key_id=aws_access_key_id, aws_secret_access_key=aws_secret_access_key)
+    self.aws.region = region
+    self._O_omit.extend( ('regions', 'instances') )
 
   def __getattr__(self, attr):
     ''' Intercept public attributes.
@@ -117,13 +123,13 @@ class EC2(_AWS):
 
 class S3(_AWS):
 
-  def __init__(self, **kwargs):
-    if 'location' in kwargs:
-      self.default_location = kwargs.pop('location')
-    else:
+  def __init__(self, aws_access_key_id=None, aws_secret_access_key=None, location=None, **kwargs):
+    ''' Initialise the S3 with access id and secret.
+    '''
+    _AWS.__init__(self, aws_access_key_id=aws_access_key_id, aws_secret_access_key=aws_secret_access_key)
+    if 'location' is None:
       self.default_location = Location.DEFAULT
     self._buckets = {}
-    _AWS.__init__(self, **kwargs)
     D("S3 = %s", self)
 
   def connect(self, **kwargs):
