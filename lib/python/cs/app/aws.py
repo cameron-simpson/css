@@ -10,6 +10,8 @@
 from __future__ import print_function
 from contextlib import contextmanager
 from threading import RLock
+import os.path
+from getopt import getopt, GetoptError
 from boto.ec2.connection import EC2Connection
 from boto.s3.connection import S3Connection, Location
 from cs.logutils import setup_logging, D, error, Pfx
@@ -17,9 +19,6 @@ from cs.threads import locked_property
 from cs.misc import O, O_str
 
 def main(argv, stderr=None):
-  import os.path
-  from getopt import getopt, GetoptError
-
   if stderr is None:
     stderr = sys.stderr
 
