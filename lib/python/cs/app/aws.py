@@ -125,19 +125,6 @@ class _AWS(O):
     '''
     return self.connect()
 
-  @locked_property
-  def regions(self):
-    ''' Return a mapping from Region name to Region.
-    '''
-    with self.connection(region=None) as ec2conn:
-      RS = dict( [ (R.name, R) for R in ec2conn.get_all_regions() ] )
-    return RS
-
-  def region(self, name):
-    ''' Return the Region with the specified `name`.
-    '''
-    return self.regions[name]
-
   def cmd_report(self, argv):
     for line in self.report():
       print(line)
@@ -177,6 +164,19 @@ class EC2(_AWS):
     if isinstance(kwargs.get('region', None), (str, unicode)):
       kwargs['region'] = self.region(kwargs['region'])
     return EC2Connection(**kwargs)
+
+  @locked_property
+  def regions(self):
+    ''' Return a mapping from Region name to Region.
+    '''
+    with self.connection(region=None) as ec2conn:
+      RS = dict( [ (R.name, R) for R in ec2conn.get_all_regions() ] )
+    return RS
+
+  def region(self, name):
+    ''' Return the Region with the specified `name`.
+    '''
+    return self.regions[name]
 
   @property
   def reservations(self):
