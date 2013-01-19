@@ -781,6 +781,7 @@ class O(object):
         Fill in attributes from any keyword arguments if supplied.
         This call can be omitted in subclasses if desired.
     '''
+    self._O_omit = []
     for k in kw:
       setattr(self, k, kw[k])
 
