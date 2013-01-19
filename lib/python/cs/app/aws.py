@@ -204,6 +204,8 @@ class S3(_AWS):
     _AWS.__init__(self, aws_access_key_id=aws_access_key_id, aws_secret_access_key=aws_secret_access_key)
     if 'location' is None:
       self.default_location = Location.DEFAULT
+    else:
+      self.default_location = location
     self._buckets = {}
     D("S3 = %s", self)
 
