@@ -240,12 +240,26 @@ class S3(_AWS):
       self._buckets[name] = B
     return B
 
+  def all_buckets(self):
+    return self.conn.get_all_buckets()
+
   def report(self):
     ''' Report AWS info. Debugging/testing method.
     '''
     yield str(self)
     for name in sorted(self._buckets.keys()):
       yield "  %s => %s" % (name, self._buckets[name])
+
+  def cmd_list(self, argv):
+    badopts = False
+    if argv:
+      error("extra arguments: %s", " ".join(argv))
+      badopts = True
+    if badopts:
+      raise GetoptError("invalid invocation")
+    for B in self.all_buckets():
+      D("B = %r", B)
+      D("B = %s", B)
 
   def cmd_new(self, argv):
     badopts = False
