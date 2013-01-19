@@ -71,7 +71,13 @@ def main(argv, stderr=None):
           badopts = True
         else:
           with Pfx(command):
-            with klass(location=location) as aws:
+            if mode == 'ec2':
+              aws = klass(region=location)
+            elif mode == 's3':
+              aws = klass(location=location)
+            else:
+              raise RuntimeError("unimplemented mode: %s" % (mode,))
+            with aws:
               try:
                 xit = getattr(aws, command_method)(argv)
               except GetoptError as e:
