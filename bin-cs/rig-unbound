@@ -20,6 +20,7 @@ wkdir=$HOME/var/unbound
 cf=$wkdir/unbound.conf
 log=$LOGDIR/unbound.log
 localzones="l local"
+cnames=$HOME/rc/dns/cnames
 
 # default upstream DNS servers
 [ $# -gt 0 ] || set -- $UNBOUND_DNS_UPSTREAM
@@ -94,6 +95,21 @@ do
       ;;
   esac
 done </etc/hosts
+
+set -x
+if [ -s "$cnames" ]
+then
+  echo 'local-zone: "cname." static'
+  while read cname name
+  do
+    ipaddrs=`host "$name" | sed -n 's/[^ ][^ ]* has address \([0-9][0-9.]*\)$/\1/p'`
+    for ipaddr in $ipaddrs
+    do
+      echo "  local-data: \"${cname}.cname. 10 IN A ${ipaddr}\""
+    done
+  done <"$cnames"
+fi
+set +x
 
 if [ $# -gt 0 ]
 then
