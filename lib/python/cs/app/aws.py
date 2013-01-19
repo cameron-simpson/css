@@ -91,6 +91,7 @@ class _AWS(O):
   def __init__(self, aws_access_key_id=None, aws_secret_access_key=None):
     ''' Initialise the EC2 with access id and secret.
     '''
+    O.__init__(self)
     self.aws = O()
     self.aws.access_key_id = aws_access_key_id
     self.aws.secret_access_key = aws_secret_access_key
