@@ -247,6 +247,21 @@ class S3(_AWS):
     for name in sorted(self._buckets.keys()):
       yield "  %s => %s" % (name, self._buckets[name])
 
+  def cmd_new(self, argv):
+    badopts = False
+    if not argv:
+      error("missing bucket name")
+      badopts = True
+    else:
+      bucket_name = argv.pop(0)
+    if argv:
+      error("extra arguments after bucket_name: %s", " ".join(argv))
+      badopts = True
+    if badopts:
+      raise GetoptError("invalid invocation")
+    B = self.create_bucket(bucket_name)
+    print("new bucket \"%s\": %s" % (bucket_name, B))
+
 if __name__ == '__main__':
   import sys
   sys.exit(main(sys.argv))
