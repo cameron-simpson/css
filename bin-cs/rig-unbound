@@ -96,7 +96,6 @@ do
   esac
 done </etc/hosts
 
-set -x
 if [ -s "$cnames" ]
 then
   echo 'local-zone: "cname." static'
@@ -109,7 +108,6 @@ then
     done
   done <"$cnames"
 fi
-set +x
 
 if [ $# -gt 0 ]
 then
