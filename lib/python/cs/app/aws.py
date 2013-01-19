@@ -16,6 +16,74 @@ from cs.logutils import setup_logging, D, error, Pfx
 from cs.threads import locked_property
 from cs.misc import O, O_str
 
+def main(argv, stderr=None):
+  import os.path
+  from getopt import getopt, GetoptError
+
+  if stderr is None:
+    stderr = sys.stderr
+
+  argv=list(sys.argv)
+  cmd=os.path.basename(argv.pop(0))
+  usage="Usage: %s {s3|ec2} [-L location] command [args...]"
+  setup_logging(cmd)
+
+  location = None
+
+  badopts = False
+
+  if not argv:
+    error("missing s3 or ec2")
+    badopts = True
+  else:
+    mode = argv.pop(0)
+    if mode == 's3':
+      klass = S3
+    elif mode == 'ec2':
+      klass = EC2
+    else:
+      error("unknown mode, I expect \"s3\" or \"ec2\", got \"%s\"", mode)
+      badopts = True
+
+    with Pfx(mode):
+      try:
+        opts, argv = getopt(argv, 'L:')
+      except GetoptError as e:
+        error("bad option: %s", e)
+        badopts = True
+        opts = ()
+
+      for opt, val in opts:
+        if opt == '-L':
+          location = val
+        else:
+          error("unimplemented option: %s", opt)
+          badopts = True
+
+      if not argv:
+        error("missing command")
+        badopts = True
+      else:
+        command = argv.pop(0)
+        command_method = "cmd_" + command
+        if not hasattr(klass, command_method):
+          error("unimplemented command: %s", command)
+          badopts = True
+        else:
+          with Pfx(command):
+            with klass(location=location) as aws:
+              try:
+                xit = getattr(aws, command_method)(argv)
+              except GetoptError as e:
+                error("%s", e)
+                badopts = True
+
+  if badopts:
+    print(usage % (cmd,), file=stderr)
+    xit = 2
+
+  return xit
+
 class _AWS(O):
   ''' Convenience wrapper for EC2 connections.
   '''
@@ -172,73 +240,5 @@ class S3(_AWS):
       yield "  %s => %s" % (name, self._buckets[name])
 
 if __name__ == '__main__':
-  ##with EC2(region='ap-southeast-2') as ec2:
-  ##  for line in ec2.report():
-  ##    print line
-  ##  print
-  ##  R = ec2.us_east_1
-  ##  print O_str(R)
   import sys
-  import os.path
-  from getopt import getopt, GetoptError
-
-  argv=list(sys.argv)
-  cmd=os.path.basename(argv.pop(0))
-  usage="Usage: %s {s3|ec2} [-L location] command [args...]"
-  setup_logging(cmd)
-
-  location = None
-
-  badopts = False
-
-  if not argv:
-    error("missing s3 or ec2")
-    badopts = True
-  else:
-    mode = argv.pop(0)
-    if mode == 's3':
-      klass = S3
-    elif mode == 'ec2':
-      klass = EC2
-    else:
-      error("unknown mode, I expect \"s3\" or \"ec2\", got \"%s\"", mode)
-      badopts = True
-
-    with Pfx(mode):
-      try:
-        opts, argv = getopt(argv, 'L:')
-      except GetoptError as e:
-        error("bad option: %s", e)
-        badopts = True
-        opts = ()
-
-      for opt, val in opts:
-        if opt == '-L':
-          location = val
-        else:
-          error("unimplemented option: %s", opt)
-          badopts = True
-
-      if not argv:
-        error("missing command")
-        badopts = True
-      else:
-        command = argv.pop(0)
-        command_method = "cmd_" + command
-        if not hasattr(klass, command_method):
-          error("unimplemented command: %s", command)
-          badopts = True
-        else:
-          with Pfx(command):
-            with klass(location=location) as aws:
-              try:
-                xit = getattr(aws, command_method)(argv)
-              except GetoptError as e:
-                error("%s", e)
-                badopts = True
-
-  if badopts:
-    print(usage % (cmd,), file=sys.stderr)
-    sys.exit(2)
-
-  sys.exit(xit)
+  sys.exit(main(sys.argv))
