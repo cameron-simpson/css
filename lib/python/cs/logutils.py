@@ -321,19 +321,11 @@ class Pfx(object):
     if exc_value is not None:
       if _state.raise_needs_prefix:
         prefix = self._state.prefix
-        if hasattr(exc_value, 'message'):
-          exc_value.message = prefix + ": " + str(exc_value.message)
-        if hasattr(exc_value, 'reason'):
-          if isinstance(exc_value.reason, StringTypes):
-            exc_value.reason = prefix + ": " + exc_value.reason
-          else:
-            warning("Pfx.__exit__: exc_value.reason is not a string: %r", exc_value.reason)
-        if hasattr(exc_value, 'msg'):
-          exc_value.msg = prefix + ": " + str(exc_value.msg)
         if hasattr(exc_value, 'args'):
           args = exc_value.args
           if args:
             if isinstance(args, StringTypes):
+              D("%s: expected args to be a tuple, got %r", prefix, args)
               args = prefix + ": " + args
             else:
               args = list(args)
@@ -345,6 +337,15 @@ class Pfx(object):
                        + unicode(exc_value.args[0])
                        ] + list(exc_value.args[1:])
             exc_value.args = args
+        elif hasattr(exc_value, 'message'):
+          exc_value.message = prefix + ": " + str(exc_value.message)
+        elif hasattr(exc_value, 'reason'):
+          if isinstance(exc_value.reason, StringTypes):
+            exc_value.reason = prefix + ": " + exc_value.reason
+          else:
+            warning("Pfx.__exit__: exc_value.reason is not a string: %r", exc_value.reason)
+        elif hasattr(exc_value, 'msg'):
+          exc_value.msg = prefix + ": " + str(exc_value.msg)
         else:
           # we can't modify this exception - at least report the current prefix state
           D("%s: Pfx.__exit__: exc_value = %s", prefix, cs.misc.O_str(exc_value))
