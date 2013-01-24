@@ -15,6 +15,7 @@ from getopt import getopt, GetoptError
 from boto.ec2.connection import EC2Connection
 from boto.s3.connection import S3Connection, Location
 from cs.logutils import setup_logging, D, error, Pfx
+from cs.mappings import LRUCache
 from cs.threads import locked_property
 from cs.misc import O, O_str
 
@@ -218,8 +219,8 @@ class S3(_AWS):
         kwargs[kw] = getattr(self.aws, kw[4:], None)
     return S3Connection(**kwargs)
 
-  def bucket(self, name):
-    ''' Return an S3 bucket.
+  def bucket(self, name, do_create=False, new=False):
+    ''' Return an S3 Bucket.
 	TODO: contrive that self.conn.lookup() does not block other
 	stuff unnecessarily.
     '''
@@ -227,26 +228,30 @@ class S3(_AWS):
       if name in self._buckets:
         B = self._buckets[name]
       else:
-        B = self._buckets[name] = self.conn.lookup(name)
+        try:
+          buck = self.conn.lookup(name)
+        except KeyError:
+          if not do_create:
+            raise
+          buck = self.conn.create_bucket(name, self.default_location)
+        B = self._buckets[name] = Bucket(self, buck)
     return B
 
-  def create_bucket(self, name, location=None):
-    ''' Create a new S3 bucket.
+  def keys(self):
+    ''' Return a list of the bucket names.
     '''
-    if location is None:
-      location = self.default_location
-    B = self.conn.create_bucket(name, location)
-    with self._lock:
-      self._buckets[name] = B
-    return B
+    return [ B.name for B in self.conn.get_all_buckets() ]
 
-  def all_buckets(self):
-    return self.conn.get_all_buckets()
+  def __getitem__(self, key):
+    ''' Return the Bucket object with the specified name.
+    '''
+    return self.bucket(key)
 
   def report(self):
     ''' Report AWS info. Debugging/testing method.
     '''
     yield str(self)
+    yield "Cached buckets:"
     for name in sorted(self._buckets.keys()):
       yield "  %s => %s" % (name, self._buckets[name])
 
@@ -257,9 +262,12 @@ class S3(_AWS):
       badopts = True
     if badopts:
       raise GetoptError("invalid invocation")
-    for B in self.all_buckets():
-      D("B = %r", B)
-      D("B = %s", B)
+    for name in self.keys():
+      print(name)
+      B = self[name]
+      for key in B:
+        D("key: %s %r" % (key, key))
+        print(B[key])
 
   def cmd_new(self, argv):
     badopts = False
@@ -275,6 +283,49 @@ class S3(_AWS):
       raise GetoptError("invalid invocation")
     B = self.create_bucket(bucket_name)
     print("new bucket \"%s\": %s" % (bucket_name, B))
+
+class BucketMapping(O):
+
+  def __init__(self, B):
+    self.bucket = B
+
+  def __iter__(self):
+    for k in self.bucket._bucket:
+      yield k.name
+
+  keys = __iter__
+
+  def __getitem__(self, key):
+    if isinstance(key, (str, unicode)):
+      okey = key
+      key = self.bucket._bucket.get_key(key)
+    else:
+      raise TypeError("invalid key type, expected str/unicode, got %s" % (type(key),))
+    return key.get_contents_as_string()
+
+class Bucket(O):
+
+  def __init__(self, s3, buck):
+    O.__init__(self)
+    self.s3 = s3
+    self._bucket = buck
+    self._cache = LRUCache(1024, BucketMapping(self))
+
+  @property
+  def name(self):
+    return self._bucket.name
+
+  def keys(self):
+    return self._cache.keys()
+
+  __iter__ = keys
+
+  def __getitem__(self, key):
+    D("key = %r", key)
+    return self._cache[key]
+
+  def __setitem__(self, key, value):
+    self._cache[key] = value
 
 if __name__ == '__main__':
   import sys
