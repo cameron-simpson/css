@@ -218,7 +218,7 @@ class LRUCache(O):
     s = self._seq
     s += 1
     self._cache[key][0] = s
-    self._lru.append( (k, s) )
+    self._lru.append( (key, s) )
     self._seq = s
 
   def _trim(self):
