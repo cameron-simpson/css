@@ -1,11 +1,12 @@
 #!/usr/bin/python -tt
 
-from cs.lex import isUC_, parseUC_sAttr
-from cs.misc import the
-from collections import defaultdict
+from collections import defaultdict, deque
 from functools import partial
+from threading import Lock
 from types import StringTypes
 import sys
+from cs.lex import isUC_, parseUC_sAttr
+from cs.misc import the, O
 
 class SeqMapUC_Attrs(object):
   ''' A wrapper for a mapping from keys (matching ^[A-Z][A-Z_0-9]*$)
@@ -198,3 +199,92 @@ class FallbackDict(defaultdict):
     if key not in self:
       return self.__otherdict[key]
     raise KeyError(key)
+
+class LRUCache(O):
+  ''' A least recently used cache mapping layer for another mapping.
+  '''
+
+  def __init__(self, maxsize, backing):
+    if maxsize < 1:
+      raise ValueError("maxsize needs to be >= 1, received: %s" % (maxsize,))
+    self.maxsize = maxsize
+    self.backing = backing
+    self._cache = {}    # mapping of key => [seq, value]
+    self._seq = 0
+    self._lru = deque()
+    self._lock = Lock()
+
+  def _touch(self, key):
+    s = self._seq
+    s += 1
+    self._cache[key][0] = s
+    self._lru.append( (k, s) )
+    self._seq = s
+
+  def _trim(self):
+    lru = self._lru
+    cache = self._cache
+    while self.size() > self.maxsize and len(lru):
+      k, s = lru.popleft()
+      t = cache.get(k, None)
+      if t is None:
+        D("%s._trim: key %r not in _cache!", self, k)
+      else:
+        if t < s:
+          D("%s._trim: latest touch (%s) < old touch (%s)", self, t, s)
+        elif t == s:
+          # key not touched since placed on the queue, discard it
+          D("discard key %s", key)
+          del cache[k]
+        else:
+          # t > s: key use since this queue item, ignore
+          pass
+
+  def size(self):
+    ''' The default size metric for the cache: number of cached elements.
+    '''
+    return len(self._cache)
+
+  def keys(self):
+    return self.backing.keys()
+
+  def iterkeys(self):
+    return self.backing.iterkeys()
+
+  def iteritems(self):
+    for key in self.iterkeys():
+      yield key, self[key]
+
+  def itervalues(self):
+    for key in self.iterkeys():
+      yield self[key]
+
+  def __len__(self):
+    return len(self.backing)
+
+  def __setitem__(self, key, value):
+    self.backing[key] = value
+    self._cache[key] = [0, value]
+    self._touch(key)
+    self._trim()
+
+  def __getitem__(self, key):
+    sk = self._cache.get(key, None)
+    if sk:
+      self._touch(key)
+      return sk[1]
+    value = self.backing[key]
+    self._cache[key] = [0, value]
+    self._touch(key)
+    return value
+
+  def __contains__(self, key):
+    if key in self._cache:
+      self._touch(key)
+      return True
+    return key in self.backing
+
+  def __delitem__(self, key):
+    del self.backing[key]
+    if key in self._cache:
+      del self._cache[key]
