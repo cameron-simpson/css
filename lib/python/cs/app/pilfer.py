@@ -230,7 +230,11 @@ class Pilfer(O):
           fp.write(U)
           fp.write("\n")
 
-  def print(self, *a, **kw):
+  def print_url_string(self, U, **kw):
+    print_string = kw.pop('string', None)
+    if print_string is None:
+      print_string = '{url}'
+    print_string = self.format_string(print_string, U)
     print_to = kw.get('file', None)
     if print_to is None:
       print_to = self._print_to
@@ -238,7 +242,7 @@ class Pilfer(O):
         print_to = sys.stdout
     kw['file'] = print_to
     with self._print_lock:
-      print(*a, **kw)
+      print(print_string, **kw)
       if self.flush_print:
         print_to.flush()
 
@@ -350,6 +354,7 @@ class Pilfer(O):
 
     _approved = (
                   'archives',
+                  'basename',
                   'dirname',
                   'hrefs',
                   'images',
@@ -372,7 +377,7 @@ class Pilfer(O):
       url = self.url
       with Pfx(url):
         if k not in Pilfer.URLkeywords._approved:
-          raise KeyError(k)
+          raise KeyError("not in Pilfer.URLkeywords._approved: %s" % (k,))
         if k == 'url':
           return url
         try:
@@ -542,7 +547,7 @@ ONE_TO_ONE = {
       'hostname':     lambda U, P: URL(U, None).hostname,
       'new_dir':      lambda U, P: (U, P.url_save_dir(U))[0],
       'per':          lambda U, P: (U, P.set_user_vars(save_dir=None))[0],
-      'print':        lambda U, P: (U, P.print(U))[0],
+      'print':        lambda U, P, **kw: (U, P.print_url_string(U, **kw))[0],
       'query':        lambda U, P, *a: url_query(U, *a),
       'quote':        lambda U, P: quote(U),
       'unquote':      lambda U, P: unquote(U),
@@ -572,7 +577,6 @@ ONE_TEST = {
       'same_hostname':lambda U, P: notNone(U.referer, "U.referer") and U.hostname == U.referer.hostname,
       'same_scheme':  lambda U, P: notNone(U.referer, "U.referer") and U.scheme == U.referer.scheme,
       'seen':         lambda U, P: P.seen(U),
-      'select_exts':  lambda U, P, exts, case: has_exts( U, exts, case_sensitive=case ),
       'select_re':    _search_re,
       'unseen':       lambda U, P: not P.seen(U),
     }
@@ -597,17 +601,57 @@ def action_operator(action,
   if one_test is None:
     one_test = ONE_TEST
   # parse action into function and kwargs
-  action0 = action
   with Pfx("%s", action):
+    action0 = action
+    func = None
+    fork_input = False
+    fork_state = False
     kwargs = {}
+    func, offset = get_identifier(action)
+    if func and (offset == len(action) or action[offset] == ':'):
+      # ordinary function with arguments
+      if offset < len(action):
+        if func == 'print':
+          kwargs['string'] = action[offset+1:]
+        else:
+          for kw in action[offset+1:].split(','):
+            if '=' in kw:
+              kw, v = kw.split('=', 1)
+              kwargs[kw] = v
+            else:
+              kwargs[kw] = True
+      if func == "per":
+        op_mode = 'FORK'
+        fork_state = True
+        raise ValueError("per needs fork_ops in addition to fork_state")
+      elif func in many_to_many:
+        # many-to-many functions get passed straight in
+        func = many_to_many[func]
+        func_sig = RUN_TREE_OP_MANY_TO_MANY
+      elif func in one_to_many:
+        # one-to-many is converted into many-to-many
+        fork_input = True
+        func = one_to_many[func]
+        func_sig = RUN_TREE_OP_ONE_TO_MANY
+      elif func in one_to_one:
+        fork_input = True
+        func = one_to_one[func]
+        func_sig = RUN_TREE_OP_ONE_TO_ONE
+      elif func in one_test:
+        fork_input = True
+        func = one_test[func]
+        func_sig = RUN_TREE_OP_SELECT
+      else:
+        raise ValueError("unknown action named \"%s\"" % (name,))
     # select URLs matching regexp
-    if action.startswith('/'):
+    elif action.startswith('/'):
       if action.endswith('/'):
         regexp = action[1:-1]
       else:
         regexp = action[1:]
       kwargs['regexp'] = re.compile(regexp)
-      action = 'select_re'
+      func = lambda U, P, regexp: regexp.search(U)
+      func_sig = RUN_TREE_OP_SELECT
     # select URLs not matching regexp
     elif action.startswith('-/'):
       if action.endswith('/'):
@@ -615,10 +659,12 @@ def action_operator(action,
       else:
         regexp = action[2:]
       kwargs['regexp'] = re.compile(regexp)
-      action = 'reject_re'
+      func = lambda U, P, regexp: regexp.search(U)
+      func_sig = RUN_TREE_OP_SELECT
     # parent
     elif action == '..':
-      pass
+      func = lambda U, P: U.parent
+      func_sig = RUN_TREE_OP_ONE_TO_ONE
     # select URLs ending in particular extensions
     elif action.startswith('.'):
       if action.endswith('/i'):
@@ -628,23 +674,29 @@ def action_operator(action,
       exts = exts.split(',')
       kwargs['case'] = case
       kwargs['exts'] = exts
-      action = 'select_exts'
+      func = lambda U, P, exts, case: has_exts( U, exts, case_sensitive=case ),
+      func_sig = RUN_TREE_OP_SELECT
     else:
       # varname== comparison
       m = re_COMPARE.match(action)
       if m:
-        var = m.group(1)
-        value = action[m.end():]
-        k
+        kwargs['var'] = m.group(1)
+        kwargs['value'] = action[m.end():]
+        def func(U, P, var, value):
+          if var not in P.user_vars:
+            return False
+          return P.user_vars[var] == P.format(value, U)
+        func_sig = RUN_TREE_OP_SELECT
       else:
         # varname= assignment
         m = re_ASSIGN.match(action)
         if m:
-          var = m.group(1)
-          value = action[m.end():]
-          def assign(U, P, var, value):
-            P.user_vars[var] = P.format(value)
+          kwargs['var'] = m.group(1)
+          kwargs['value'] = action[m.end():]
+          def func(U, P, var, value):
+            P.user_vars[var] = P.format_string(value, U)
             return U
+          func_sig = RUN_TREE_OP_ONE_TO_ONE
         else:
           # regular action: split off parameters if any
           name, offset = get_identifier(action)
@@ -673,7 +725,7 @@ def action_operator(action,
               repl_all = False
             if offset < len(action):
               raise ValueError("unparsed action at: %s" % (action[offset:],))
-            action = 'substitute'
+            func = 'substitute'
             debug("s: regexp=%r, replacement=%r, repl_all=%s", regexp, repl_format, repl_all)
             kwargs['regexp'] = re.compile(regexp)
             kwargs['replacement'] = repl_format
@@ -689,34 +741,36 @@ def action_operator(action,
               offset = len(action)
             if offset < len(action):
               raise ValueError("parse error at: %s" % (action[offset:],))
-    # we now have a function
-    # construct a RunTreeOp with the right signature
-    fork_input = False
-    fork_state = False
-    if action == "per":
-      raise ValueError("per needs fork_ops in addition to fork_state")
-      op_mode = 'FORK'
-      fork_state = True
-    if action in many_to_many:
-      # many-to-many functions get passed straight in
-      func = many_to_many[action]
-      func_sig = RUN_TREE_OP_MANY_TO_MANY
-    elif action in one_to_many:
-      # one-to-many is converted into many-to-many
-      fork_input = True
-      func = one_to_many[action]
-      func_sig = RUN_TREE_OP_ONE_TO_MANY
-    elif action in one_to_one:
-      fork_input = True
-      func = one_to_one[action]
-      func_sig = RUN_TREE_OP_ONE_TO_ONE
-    elif action in one_test:
-      fork_input = True
-      func = one_test[action]
-      func_sig = RUN_TREE_OP_SELECT
-    else:
-      raise ValueError("unknown action")
+
+      if func is None:
+        # we now have just the function name
+        # construct a RunTreeOp with the right signature
+        if action == "per":
+          raise ValueError("per needs fork_ops in addition to fork_state")
+          op_mode = 'FORK'
+          fork_state = True
+        if action in many_to_many:
+          # many-to-many functions get passed straight in
+          func = many_to_many[action]
+          func_sig = RUN_TREE_OP_MANY_TO_MANY
+        elif action in one_to_many:
+          # one-to-many is converted into many-to-many
+          fork_input = True
+          func = one_to_many[action]
+          func_sig = RUN_TREE_OP_ONE_TO_MANY
+        elif action in one_to_one:
+          fork_input = True
+          func = one_to_one[action]
+          func_sig = RUN_TREE_OP_ONE_TO_ONE
+        elif action in one_test:
+          fork_input = True
+          func = one_test[action]
+          func_sig = RUN_TREE_OP_SELECT
+        else:
+          raise ValueError("unknown action")
+
     if kwargs:
+      D("func = %r", func)
       func = partial(func, **kwargs)
     def trace_func(*a, **kw):
       debug("do %s ...", action0)
