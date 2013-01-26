@@ -52,9 +52,18 @@ class _URL(unicode):
       Subclasses unicode.
   '''
 
-  def __init__(self, s, referer=None, user_agent=None):
+  def __init__(self, s, referer=None, user_agent=None, opener=None):
+    ''' Initialise the _URL.
+        `s`: the string defining the URL.
+        `referer`: the referring URL.
+        `user_agent`: User-Agent string, inherited from `referer` if unspecified,
+                  "css" if no referer.
+        `opener`: urllib2 opener object, inherited from `referer` if unspecified,
+                  made at need if no referer.
+    '''
     self.referer = URL(referer) if referer else referer
     self.user_agent = user_agent if user_agent else self.referer.user_agent if self.referer else None
+    self.opener = opener if opener else referer.opener if referer else None
     self._parts = None
     self.flush()
     self._lock = RLock()
@@ -92,8 +101,10 @@ class _URL(unicode):
       hdrs['User-Agent'] = self.user_agent if self.user_agent else 'css'
       url = 'file://'+self if self.startswith('/') else self
       rq = Request(url, None, hdrs)
-      auth_handler = HTTPBasicAuthHandler(NetrcHTTPPasswordMgr())
-      opener = build_opener(auth_handler)
+      opener = self.opener
+      if not opener:
+        auth_handler = HTTPBasicAuthHandler(NetrcHTTPPasswordMgr())
+        opener = build_opener(auth_handler)
       debug("open URL...")
       rsp = opener.open(rq)
       H = rsp.info()
