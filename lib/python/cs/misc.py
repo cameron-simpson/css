@@ -743,31 +743,51 @@ class HasFlags:
         flagv=",".join(flagv)
       self[self.__flagfield]=flagv
 
-def O_str(o, no_recurse=False):
-  omit = getattr(o, '_O_omit', ())
-  return ( "<%s %s>"
+def O_str(o, no_recurse=False, seen=None):
+  from cs.logutils import D
+  if seen is None:
+    seen = set()
+  t = type(o)
+  if t in (str, unicode):
+    return repr(o)
+  if t in (tuple,int,float,bool):
+    return str(o)
+  if t is dict:
+    o2 = dict( [ (k, str(v)) for k, v in o.iteritems() ] )
+    return str(o2)
+  try:
+    omit = o._O_omit
+  except AttributeError:
+    omit = ()
+  seen.add(id(o))
+  D("type %s", o.__class__.__name__)
+  s = ( "<%s %s>"
            % ( o.__class__.__name__,
-               (    str(o)
-                 if type(o) in (tuple,)
-                 else
-                       "<%s len=%d>" % (type(o), len(o))
-                    if type(o) in (set,)
-                    else
-                       ",".join([ ( "%s=<%s>" % (pattr, type(pvalue).__name__)
-                                    if no_recurse else
-                                    "%s=%s" % (pattr, pvalue)
-                                  )
-                                  for pattr, pvalue
-                                  in [ (attr, getattr(o, attr))
-                                       for attr in sorted(dir(o))
-                                       if attr[0].isalpha()
-                                          and not attr in omit
-                                     ]
-                                  if not callable(pvalue)
-                                ])
-               )
-             )
+               (
+                   "<%s len=%d>" % (type(o), len(o))
+                if type(o) in (set,)
+                else
+                   ",".join([ ( "%s=<%s>" % (pattr, type(pvalue).__name__)
+                                if no_recurse else
+                                "%s=%s" % (pattr,
+                                           O_str(pvalue, no_recurse=no_recurse, seen=seen)
+                                             if id(pvalue) not in seen
+                                             else "<%s>" % (type(pvalue).__name__,)
+                                          )
+                              )
+                              for pattr, pvalue
+                              in [ (attr, getattr(o, attr))
+                                   for attr in sorted(dir(o))
+                                   if attr[0].isalpha()
+                                      and not attr in omit
+                                 ]
+                              if not hasattr(pvalue, '__call__')
+                            ])
+           )
          )
+     )
+  seen.remove(id(o))
+  return s
 
 class O(object):
   ''' A bare object subclass to allow storing arbitrary attributes.
