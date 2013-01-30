@@ -743,21 +743,32 @@ class HasFlags:
         flagv=",".join(flagv)
       self[self.__flagfield]=flagv
 
+def O_attrs(o):
+  ''' Yield attribute names from o which are pertinent to O_str.
+      Note: this calls getattr(o, attr) to inspect it in order to
+      prune callables.
+  '''
+  try:
+    omit = o._O_omit
+  except AttributeError:
+    omit = ()
+  for attr in sorted(dir(o)):
+    if attr[0].isalpha() and not attr in omit:
+      value = getattr(o, attr)
+      if not callable(value):
+        yield attr
+
 def O_str(o, no_recurse=False, seen=None):
   if seen is None:
     seen = set()
   t = type(o)
   if t in (str, unicode):
     return repr(o)
-  if t in (tuple,int,float,bool):
+  if t in (tuple,int,float,bool,list):
     return str(o)
   if t is dict:
     o2 = dict( [ (k, str(v)) for k, v in o.iteritems() ] )
     return str(o2)
-  try:
-    omit = o._O_omit
-  except AttributeError:
-    omit = ()
   seen.add(id(o))
   s = ( "<%s %s>"
            % ( o.__class__.__name__,
@@ -774,12 +785,7 @@ def O_str(o, no_recurse=False, seen=None):
                                           )
                               )
                               for pattr, pvalue
-                              in [ (attr, getattr(o, attr))
-                                   for attr in sorted(dir(o))
-                                   if attr[0].isalpha()
-                                      and not attr in omit
-                                 ]
-                              if not hasattr(pvalue, '__call__')
+                              in [ (attr, getattr(o, attr)) for attr in O_attrs(o) ]
                             ])
            )
          )
@@ -808,6 +814,12 @@ class O(object):
     s = O_str(self, no_recurse = not recurse)
     self._O_recurse = recurse
     return s
+
+  def __repr__(self):
+    return ( "O("
+           + ",".join( [ "%s=%r" % (attr, getattr(self, attr)) for attr in O_attrs(self) ] )
+           + ")"
+           )
 
 def unimplemented(func):
   ''' Decorator for stub methods that must be implemented by a stub class.
