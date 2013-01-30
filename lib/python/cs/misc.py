@@ -805,6 +805,7 @@ class O(object):
         Fill in attributes from any keyword arguments if supplied.
         This call can be omitted in subclasses if desired.
     '''
+    self._O_omit = []
     for k in kw:
       setattr(self, k, kw[k])
 
@@ -816,7 +817,8 @@ class O(object):
     return s
 
   def __repr__(self):
-    return ( "O("
+    return ( self.__class__.__name__
+           + "("
            + ",".join( [ "%s=%r" % (attr, getattr(self, attr)) for attr in O_attrs(self) ] )
            + ")"
            )
