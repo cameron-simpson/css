@@ -9,7 +9,7 @@ import sys
 from contextlib import contextmanager
 from subprocess import Popen, PIPE
 from cs.logutils import setup_logging, error, warning, D
-from cs.misc import O
+from cs.misc import O, O_attrs
 
 # location of MegaCLI executable
 MEGACLI = '/opt/MegaRAID/MegaCli/MegaCli64'
@@ -36,7 +36,21 @@ def main(argv):
     error(usage)
     return 2
 
-  print megacli_info()
+  D("MM")
+  M = megacli_info()
+  D("MM2")
+  print "M.attrs =", list(O_attrs(M))
+  for An in M.adapters:
+    print "Adapter", An
+    A = M.adapters[An]
+    for Vn in A.virtual_drives:
+      print "  Virtual Drive", Vn
+      V = A.virtual_drives[Vn]
+      print "    %d drives, size = %s%s, raid = %s" % (V.n_drives, V.size, V.size_units, V.raid_level)
+    print "  %d drives:" % (len(A.drives),)
+    for DRV in A.drives:
+      ##print "    attrs =", list(O_attrs(DRV))
+      print "    [%d:%d]: slot %d, %s" % (DRV.enclosure_device_id, DRV.device_id, DRV.slot_number, DRV.firmware_state)
 
 def megacli_info():
   ''' Read various megacli query command outputs and construct a
@@ -86,8 +100,8 @@ def megacli_info():
           info = raid_level
         elif attr in ('size', 'mirror_data', 'strip_size'):
           size, size_units = info.split()
-          size = float(size)
           setattr(o, attr+'_units', size_units)
+          info = float(size)
         elif heading == 'Number Of Drives':
           attr = 'n_drives'
           info = int(info)
@@ -141,6 +155,12 @@ def megacli_info():
         heading = heading.rstrip()
         info = info.lstrip()
         attr = heading.lower().replace(' ', '_')
+        try:
+          n = int(info)
+        except ValueError:
+          pass
+        else:
+          info = n
         setattr(o, attr, info)
         continue
       if line.startswith('Drive Temperature :'):
