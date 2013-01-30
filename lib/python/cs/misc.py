@@ -744,7 +744,6 @@ class HasFlags:
       self[self.__flagfield]=flagv
 
 def O_str(o, no_recurse=False, seen=None):
-  from cs.logutils import D
   if seen is None:
     seen = set()
   t = type(o)
@@ -760,7 +759,6 @@ def O_str(o, no_recurse=False, seen=None):
   except AttributeError:
     omit = ()
   seen.add(id(o))
-  D("type %s", o.__class__.__name__)
   s = ( "<%s %s>"
            % ( o.__class__.__name__,
                (
