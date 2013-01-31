@@ -757,6 +757,36 @@ class HasFlags:
         flagv=",".join(flagv)
       self[self.__flagfield]=flagv
 
+class O(object):
+  ''' A bare object subclass to allow storing arbitrary attributes.
+      It also has a nicer default str() action.
+  '''
+
+  _O_recurse = True
+
+  def __init__(self, **kw):
+    ''' Initialise this O.
+        Fill in attributes from any keyword arguments if supplied.
+        This call can be omitted in subclasses if desired.
+    '''
+    self._O_omit = []
+    for k in kw:
+      setattr(self, k, kw[k])
+
+  def __str__(self):
+    recurse = self._O_recurse
+    self._O_recurse = False
+    s = O_str(self, no_recurse = not recurse)
+    self._O_recurse = recurse
+    return s
+
+  def __repr__(self):
+    return ( self.__class__.__name__
+           + "("
+           + ",".join( [ "%s=%r" % (attr, getattr(self, attr)) for attr in O_attrs(self) ] )
+           + ")"
+           )
+
 def O_merge(o, _conflict=None, **kw):
   ''' Merge key:value pairs from a mapping into an O as attributes.
       Ignore keys that do not start with a letter.
@@ -831,33 +861,3 @@ def O_str(o, no_recurse=False, seen=None):
      )
   seen.remove(id(o))
   return s
-
-class O(object):
-  ''' A bare object subclass to allow storing arbitrary attributes.
-      It also has a nicer default str() action.
-  '''
-
-  _O_recurse = True
-
-  def __init__(self, **kw):
-    ''' Initialise this O.
-        Fill in attributes from any keyword arguments if supplied.
-        This call can be omitted in subclasses if desired.
-    '''
-    self._O_omit = []
-    for k in kw:
-      setattr(self, k, kw[k])
-
-  def __str__(self):
-    recurse = self._O_recurse
-    self._O_recurse = False
-    s = O_str(self, no_recurse = not recurse)
-    self._O_recurse = recurse
-    return s
-
-  def __repr__(self):
-    return ( self.__class__.__name__
-           + "("
-           + ",".join( [ "%s=%r" % (attr, getattr(self, attr)) for attr in O_attrs(self) ] )
-           + ")"
-           )
