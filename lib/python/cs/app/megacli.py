@@ -178,5 +178,27 @@ def megacli(*args):
   yield P.stdout
   P.wait()
 
+class Adapter(O):
+  pass
+class Virtual_Drive(O):
+  def __init__(self, **kw):
+    O.__init__(self, **kw)
+    self._O_omit.append('adapter')
+class Disk_Group(O):
+  def __init__(self, **kw):
+    O.__init__(self, **kw)
+    self._O_omit.append('adapter')
+class Span(O):
+  pass
+class Physical_Disk(O):
+  @property
+  def enc_slot(self):
+    return "%d:%d" % (self.enclosure_device_id, self.slot_number)
+  @property
+  def fru(self):
+    return self.ibm_fru_cru
+class Disk_Port(O):
+  pass
+
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
