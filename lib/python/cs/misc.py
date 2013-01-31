@@ -743,6 +743,31 @@ class HasFlags:
         flagv=",".join(flagv)
       self[self.__flagfield]=flagv
 
+def O_merge(o, _conflict=None, **kw):
+  ''' Merge key:value pairs from a mapping into an O as attributes.
+      Ignore keys that do not start with a letter.
+      New attributes or attributes whose values compare equal are
+      merged in. Unequal values are passed to:
+        _conflict(o, attr, old_value, new_value)
+      to resolve the conflict. If _conflict is omitted or None
+      a warning if printed and the new value not merged.
+  '''
+  for attr, value in kw.iteritems():
+    if not len(attr) or not attr[0].isalpha():
+      warning(".%s: ignoring, does not start with a letter")
+      continue
+    try:
+      ovalue = getattr(o, attr)
+    except AttributeError:
+      # new attribute - 
+      setattr(o, attr, value)
+    else:
+      if ovalue != value:
+        if _conflict is None:
+          warning(".%s: conflicting values: old=%s, new=%s", attr, ovalue, value)
+        else:
+          _conflict(o, attr, ovalue, value)
+
 def O_attrs(o):
   ''' Yield attribute names from o which are pertinent to O_str.
       Note: this calls getattr(o, attr) to inspect it in order to
