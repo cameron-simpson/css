@@ -804,6 +804,9 @@ class O(object):
         return False
     return True
 
+  def __ne__(self, other):
+    return not self.__eq__(other)
+
 # Assorted functions to working with O instances.
 # These are not methods because I don't want to pollute O subclasses
 # with lots of extra method noise.
