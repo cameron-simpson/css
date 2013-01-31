@@ -798,6 +798,10 @@ class O(object):
       if value != ovalue:
         # values not the same, not equal
         return False
+    for attr in O_attrs(other):
+      if not hasattr(self, attr):
+        # we lack an attribute of other, not equal
+        return False
     return True
 
 # Assorted functions to working with O instances.
