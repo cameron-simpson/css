@@ -819,7 +819,8 @@ def O_merge(o, _conflict=None, **kw):
   '''
   for attr, value in kw.iteritems():
     if not len(attr) or not attr[0].isalpha():
-      warning(".%s: ignoring, does not start with a letter")
+      if not attr.startswith('_O_'):
+        warning(".%s: ignoring, does not start with a letter", attr)
       continue
     try:
       ovalue = getattr(o, attr)
