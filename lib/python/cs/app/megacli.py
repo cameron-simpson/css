@@ -5,6 +5,7 @@
 #       - Cameron Simpson <cs@zip.com.au> 29jan2013
 #
 
+import re
 import sys
 from contextlib import contextmanager
 from subprocess import Popen, PIPE
@@ -13,6 +14,8 @@ from cs.misc import O, O_attrs
 
 # location of MegaCLI executable
 MEGACLI = '/opt/MegaRAID/MegaCli/MegaCli64'
+
+re_SPEED = re.compile('^(\d+(\.\d+)?)\s*(\S+)$')
 
 def main(argv):
   argv = list(argv)
