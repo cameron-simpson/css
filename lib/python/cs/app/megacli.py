@@ -196,7 +196,6 @@ def megacli_info():
   with Pfx("merge CfgDsply/PDlist"):
     Mphysical = O(adapters={})
     megacli_parse(['-PDlist', '-aAll'], Mphysical, mode_PDLIST)
-    D("Mphysical = %s", Mphysical)
     for A in Mphysical.adapters.values():
       disks = Mconfigured.adapters[A.number].physical_disks
       for enc_devid, DRV in A.physical_disks.items():
@@ -259,20 +258,20 @@ def megacli_parse(megacli_args, M, mode):
             if mode == mode_CFGDSPLY:
               if heading == 'Adapter':
                 An = info
-                D("new adapter %d", An)
+                ##D("new adapter %d", An)
                 A = M.adapters[info] = Adapter(number=An, disk_groups={}, physical_disks={}, virtual_drives={})
                 o = A
                 continue
               if heading == 'DISK GROUP':
                 DGn = info
-                D("new disk_group %d", DGn)
+                ##D("new disk_group %d", DGn)
                 A.disk_groups[DGn] = Disk_Group(adapter=A, number=DGn, spans={})
                 DG = A.disk_groups[DGn]
                 o = DG
                 continue
               if heading == 'SPAN':
                 SPn = info
-                D("new span %d", SPn)
+                ##D("new span %d", SPn)
                 DG.spans[SPn] = Span(disk_group=DG, number=SPn, arms={})
                 SP = DG.spans[SPn]
                 o = SP
@@ -281,13 +280,13 @@ def megacli_parse(megacli_args, M, mode):
                 Vn, Tn = info.split(' (Target Id: ', 1)
                 Vn = int(Vn)
                 Tn = int(Tn[:-1])
-                D("new virtual drive %d (target id %d)", Vn, Tn)
+                ##D("new virtual drive %d (target id %d)", Vn, Tn)
                 V = A.virtual_drives[Vn] = Virtual_Drive(adapter=A, number=Vn, physical_disks={})
                 o = V
                 continue
               if heading == 'Physical Disk':
                 DRVn = info
-                D("new physical disk %d", DRVn)
+                ##D("new physical disk %d", DRVn)
                 DRV = Physical_Disk(virtual_drive=V, number=DRVn, adapter=A)
                 V.physical_disks[DRVn] = DRV
                 DRV.virtual_drive = V
@@ -298,7 +297,6 @@ def megacli_parse(megacli_args, M, mode):
                 # new physical drive commences
                 if DRV is not None:
                   enc_devid = DRV.enc_devid
-                  D("PDLIST: note physical drive %s", enc_devid)
                   with Pfx("merge previous DRV [%s]", enc_devid):
                     if enc_devid in A.physical_disks:
                       O_merge(A.physical_disks[enc_devid], **DRV.__dict__)
@@ -339,7 +337,7 @@ def megacli_parse(megacli_args, M, mode):
               info = True
             elif info == 'No':
               info = False
-            D("%s.%s = %s", o.__class__.__name__, attr, info)
+            ##D("%s.%s = %s", o.__class__.__name__, attr, info)
             setattr(o, attr, info)
             continue
           warning("unparsed line: %s", line)
