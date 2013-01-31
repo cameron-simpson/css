@@ -787,6 +787,19 @@ class O(object):
            + ")"
            )
 
+  def __eq__(self, other):
+    for attr in O_attrs(self):
+      try:
+        ovalue = getattr(other, attr)
+      except AttributeError:
+        # other does not have attr, not equal
+        return False
+      value = getattr(self, attr)
+      if value != ovalue:
+        # values not the same, not equal
+        return False
+    return True
+
 # Assorted functions to working with O instances.
 # These are not methods because I don't want to pollute O subclasses
 # with lots of extra method noise.
