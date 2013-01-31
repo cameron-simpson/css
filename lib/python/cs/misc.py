@@ -787,6 +787,10 @@ class O(object):
            + ")"
            )
 
+# Assorted functions to working with O instances.
+# These are not methods because I don't want to pollute O subclasses
+# with lots of extra method noise.
+#
 def O_merge(o, _conflict=None, **kw):
   ''' Merge key:value pairs from a mapping into an O as attributes.
       Ignore keys that do not start with a letter.
