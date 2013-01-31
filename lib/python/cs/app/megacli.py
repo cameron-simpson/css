@@ -8,7 +8,7 @@
 import re
 import sys
 from contextlib import contextmanager
-from subprocess import Popen, PIPE
+from subprocess import call, Popen, PIPE
 from cs.logutils import setup_logging, error, warning, D, Pfx
 from cs.misc import O, O_attrs, O_merge
 
@@ -361,6 +361,12 @@ def megacli(*args):
   P = Popen(['set-x', MEGACLI] + list(args), stdout=PIPE, close_fds=True)
   yield P.stdout
   P.wait()
+
+def do_megacli(*args):
+  ''' Execute a megacli command as specified.
+      Return True if the exit code is 0, False otherwise.
+  '''
+  return call(['eecho', MEGACLI] + list(args)) == 0
 
 class Adapter(O):
   pass
