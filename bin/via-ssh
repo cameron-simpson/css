@@ -1,0 +1,46 @@
+#!/bin/sh
+#
+# Trite connection command to use in ssh ProxyCommand settings.
+#       - Cameron Simpson <cs@zip.com.au> 28jan2013
+#
+
+set -ue
+
+sshcfg=$HOME/.ssh/config
+
+cmd=$0
+usage="Usage: $cmd [-F ssh-config] via_ssh_host target_host target_port"
+
+badopts=
+
+if [ "x$1" = x-F ]
+then
+  sshcfg=$2
+  shift; shift
+fi
+
+if [ $# -lt 3 ]
+then
+  echo "$cmd: missing some of via_ssh_host target_host target_port" >&2
+  badopts=1
+else
+  via=$1
+  thost=$2
+  tport=$3
+  shift; shift; shift
+  if [ $# -gt 0 ]
+  then
+    echo "$cmd: extra arguments: $*" >&2
+    badopts=1
+  fi
+fi
+
+if [ ! -f "$sshcfg" ]
+then
+  echo "$cmd: missing ssh-config: $sshcfg" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+exec tag_fd 2 "$via" ssh -F "$sshcfg" -- "$via" exec nc "$thost" "$tport"
