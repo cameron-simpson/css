@@ -320,7 +320,7 @@ class MegaRAID(O):
         Return True if the exit code is 0, False otherwise.
     '''
     ## if really: trace=set-x else trace=eecho
-    return call(['eecho', self.meagcli] + list(args)) == 0
+    return call(['eecho', self.megacli] + list(args)) == 0
 
   def adapter_save(self, adapter, save_file):
     savepath = "%s-a%d" % (save_file, adapter)
