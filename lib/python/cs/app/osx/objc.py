@@ -33,6 +33,8 @@ def convertObjCtype(o):
     return unicode(o)
   if t is objc._pythonify.OC_PythonInt:
     return int(o)
+  if t is objc._pythonify.OC_PythonFloat:
+    return float(o)
   if hasattr(o, 'keys'):
     ##warning("pretending a dict - unrecognised <%s %s>", t, repr(o).replace("\n", ""))
     return dict( [ (k, o[k]) for k in o.keys() ] )
