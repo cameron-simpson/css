@@ -57,11 +57,11 @@ def main(argv):
             print "  Virtual Drive", Vn
             print "    %d drives, size = %s%s, raid = %s" % (len(V.physical_disks), V.size, V.size_units, V.raid_level)
             for DRVn, DRV in V.physical_disks.items():
-              print "      physical drive", DRV.enc_devid
+              print "      physical drive", DRV.enc_slot
           print "  %d drives:" % (len(A.physical_disks),)
           for DRV in A.physical_disks.values():
             ##print "    attrs =", list(O_attrs(DRV))
-            print "    [%s]: slot %d, VD %s, DG %s: %s %s %s, %s" % (DRV.enc_devid, DRV.slot_number,
+            print "    [%s]: dev_id %d, VD %s, DG %s: %s %s %s, %s" % (DRV.enc_slot, DRV.device_id,
                                                              getattr(DRV, 'virtual_drive', O(number=None)).number,
                                                              getattr(DRV, 'disk_group', O(number=None)).number,
                                                              DRV.fru, DRV.raw_size, DRV.raw_size_units,
@@ -112,20 +112,24 @@ class MegaRAID(O):
     for A in Mconfigured.adapters.values():
       for V in A.virtual_drives.values():
         for DRV in V.physical_disks.values():
-          A.physical_disks[DRV.enc_devid] = DRV
+          A.physical_disks[DRV.enc_slot] = DRV
 
     with Pfx("merge CfgDsply/PDlist"):
       Mphysical = self._parse(['-PDlist', '-aAll'], mode_PDLIST)
       for A in Mphysical.adapters.values():
         disks = Mconfigured.adapters[A.number].physical_disks
-        for enc_devid, DRV in A.physical_disks.items():
-          with Pfx(enc_devid):
-            if enc_devid in disks:
-              D("%s: merge PDlist DRV with Mconfigured DRV", enc_devid)
-              O_merge(disks[enc_devid], **DRV.__dict__)
+        for enc_slot, DRV in A.physical_disks.items():
+          with Pfx(enc_slot):
+            if enc_slot in disks:
+              D("%s: merge PDlist DRV with Mconfigured DRV", enc_slot)
+              DRV0 = disks[enc_slot]
+              if DRV0.inquiry_data != DRV.inquiry_data:
+                error("DRV inquiry_data mismatch, NOT merging: %r vs %r", DRV0.inquiry_data, DRV.inquiry_data)
+              else:
+                O_merge(DRV0, **DRV.__dict__)
             else:
-              D("%s: add new DRV to Mconfigured", enc_devid)
-              disks[enc_devid] = DRV
+              D("%s: add new DRV to Mconfigured", enc_slot)
+              disks[enc_slot] = DRV
         D("Mphysical merged")
 
     return Mconfigured
@@ -218,12 +222,16 @@ class MegaRAID(O):
                 if heading == 'Enclosure Device ID':
                   # new physical drive commences
                   if DRV is not None:
-                    enc_devid = DRV.enc_devid
-                    with Pfx("merge previous DRV [%s]", enc_devid):
-                      if enc_devid in A.physical_disks:
-                        O_merge(A.physical_disks[enc_devid], **DRV.__dict__)
+                    enc_slot = DRV.enc_slot
+                    with Pfx("merge previous DRV [%s]", enc_slot):
+                      if enc_slot in A.physical_disks:
+                        DRV0 = A.physical_disks[enc_slot]
+                        if DRV0.inquiry_data != DRV.inquiry_data:
+                          error("DRV inquiry_data mismatch, NOT merging: %r vs %r", DRV0.inquiry_data, DRV.inquiry_data)
+                        else:
+                          O_merge(DRV0, **DRV.__dict__)
                       else:
-                        A.physical_disks[enc_devid] = DRV
+                        A.physical_disks[enc_slot] = DRV
                   DRV = Physical_Disk()
                   o = DRV
               if attr in ('size', 'mirror_data', 'strip_size'):
@@ -267,19 +275,23 @@ class MegaRAID(O):
           # catch trailing drive
           if mode == mode_PDLIST:
             if DRV is not None:
-              enc_devid = DRV.enc_devid
-              D("PDLIST: note physical drive %s", enc_devid)
-              with Pfx("final merge previous DRV [%s]", enc_devid):
-                if enc_devid in A.physical_disks:
-                  O_merge(A.physical_disks[enc_devid], **DRV.__dict__)
+              enc_slot = DRV.enc_slot
+              D("PDLIST: note physical drive %s", enc_slot)
+              with Pfx("final merge previous DRV [%s]", enc_slot):
+                if enc_slot in A.physical_disks:
+                  DRV0 = A.physical_disks[enc_slot]
+                  if DRV0.inquiry_data != DRV.inquiry_data:
+                    error("DRV inquiry_data mismatch, NOT merging: %r vs %r", DRV0.inquiry_data, DRV.inquiry_data)
+                  else:
+                    O_merge(DRV0, **DRV.__dict__)
                 else:
-                  A.physical_disks[enc_devid] = DRV
+                  A.physical_disks[enc_slot] = DRV
 
         return M
 
-  def new_raid(self, level, enc_devids, adapter=0):
+  def new_raid(self, level, enc_slot, adapter=0):
     ''' Construct a new RAID device with specified RAID `level` on
-        `adapter` using the devices dspecified by `enc_devids`.
+        `adapter` using the devices dspecified by `enc_slot`.
     '''
     ## RAID 6 example: -CfgLdAdd -r6 [0:0,0:1,0:2,0:3,0:4,0:5,0:6] -a1
     ok = True
@@ -290,13 +302,13 @@ class MegaRAID(O):
       else:
         A = self.adapters[adapter]
         disks = A.physical_disks
-        for enc_devid in enc_devids:
-          with Pfx(enc_devid):
-            if enc_devid not in disks:
+        for enc_slot in enc_slot:
+          with Pfx(enc_slot):
+            if enc_slot not in disks:
               error("unknown disk")
               ok = False
             else:
-              DRV = A.physical_disks[enc_devid]
+              DRV = A.physical_disks[enc_slot]
               if DRV.firmware_state != 'Unconfigured(good), Spun Up':
                 error("rejecting drive, firmware state not unconfigured good: %s", DRV.firmware_state)
                 ok = False
@@ -304,7 +316,7 @@ class MegaRAID(O):
                 info("acceptable drive: %s", DRV.firmware_state)
     if not ok:
       return False
-    return self.docmd('-CfgLdAdd', '-r%d' % (level,), "[" + ",".join(enc_devids) + "]", '-a%d' % (adapter,))
+    return self.docmd('-CfgLdAdd', '-r%d' % (level,), "[" + ",".join(enc_slot) + "]", '-a%d' % (adapter,))
 
   @contextmanager
   def readcmd(self, *args):
@@ -343,8 +355,18 @@ class Span(O):
   pass
 class Physical_Disk(O):
   @property
-  def enc_devid(self):
-    return "%d:%d" % (self.enclosure_device_id, self.device_id)
+  def id(self):
+    ''' Unique identifier for drive, regrettably not what the megacli
+        wants to use.
+    '''
+    return "enc%d.devid%d" % (self.enclosure_device_id, self.device_id)
+
+  @property
+  def enc_slot(self):
+    ''' Identifier used by megacli, regretably not unique if enclosure
+        misconfigure/misinstalled.
+    '''
+    return "%d:%d" % (self.enclosure_device_id, self.slot_number)
   @property
   def fru(self):
     return self.ibm_fru_cru
