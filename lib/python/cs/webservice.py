@@ -13,7 +13,7 @@ from StringIO import StringIO
 import urllib2
 from cs.misc import objFlavour, T_MAP, T_SEQ, logLine
 import cs.logutils
-from cs.logutils import LogTime
+from cs.logutils import LogTime, Pfx, error
 
 def lather(obj,tc=None):
   ''' Serial a python object into SOAP, return the SOAP.
@@ -76,8 +76,12 @@ def HTTPError2str(e):
                e.fp.read().replace("\n","\n  ")
               )
 
-def logHTTPError(e,mark=None):
-  logLine(HTTPError2str(e),mark)
+def logHTTPError(e, mark=None):
+  if mark is None:
+    error(HTTPError2str(e))
+  else:
+    with Pfx(mark):
+      error(HTTPError2str(e))
 
 class BigElementProxy(ZSI.wstools.Utility.ElementProxy):
   ''' An ElementProxy with its canonicalize method
