@@ -194,15 +194,6 @@ def listpermute(lol):
   pright=listpermute(right)
   return [[item]+ritem for item in left for ritem in pright]
 
-def mailsubj(addrs, subj, body):
-  import cs.sh
-  pipe=cs.sh.vpopen(('set-x', 'mailsubj', '-s', subj)+addrs, mode="w")
-  pipe.write(body)
-  if len(body) > 0 and body[-1] != '\n':
-    pipe.write('\n')
-
-  return pipe.close() is None
-
 def runCommandPrompt(fnmap, prompt=None):
   ''' Accept a dict of the for key->(fn, help_string)
       and perform entered commands.
