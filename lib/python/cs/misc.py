@@ -13,30 +13,6 @@ if sys.hexversion < 0x02060000: from sets import Set as set
 from cs.lex import parseline, strlist
 from cs.fileutils import saferename
 
-class _NullUpd:
-  ''' A dummy class with the same duck type as cs.upd.Upd
-      used when cs.upd has not be instantiated by a program.
-  '''
-  def out(self, s):
-    if len(s) > 0:
-      print >>sys.stderr, s
-      sys.stderr.flush()
-    return ''
-  def nl(self, s):
-    print >>sys.stderr, s
-    sys.stderr.flush()
-    return ''
-  def state(self):
-    return ''
-  def close(self):
-    pass
-  def closed(self):
-    return False
-  def without(self, func, *args, **kw):
-    return func(*args, **kw)
-
-_defaultUpd = _NullUpd()
-
 T_SEQ = 'ARRAY'
 T_MAP = 'HASH'
 T_SCALAR = 'SCALAR'
