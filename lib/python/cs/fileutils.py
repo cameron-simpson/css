@@ -461,6 +461,82 @@ def lockfile(path, ext='.lock', poll_interval=0.1, timeout=None):
   yield lockpath
   os.remove(lockpath)
 
+def maxFilenameSuffix(dir, pfx):
+  from dircache import listdir
+  maxn=None
+  pfxlen=len(pfx)
+  for tail in [ e[pfxlen:] for e in listdir(dir)
+                if len(e) > pfxlen and e.startswith(pfx)
+              ]:
+    if tail.isdigit():
+      n=int(tail)
+      if maxn is None:
+        maxn=n
+      elif maxn < n:
+        maxn=n
+  return maxn
+
+def tmpfilename(dir=None):
+  if dir is None:
+    dir=tmpdir()
+  pfx = ".%s.%d." % (cmd, os.getpid())
+  n=maxFilenameSuffix(dir, pfx)
+  if n is None: n=0
+  return "%s%d" % (pfx, n)
+
+def mkdirn(path):
+  opath=path
+  if len(path) == 0:
+    path='.'+os.sep
+
+  if path.endswith(os.sep):
+    dir=path[:-len(os.sep)]
+    pfx=''
+  else:
+    dir=os.path.dirname(path)
+    if len(dir) == 0: dir='.'
+    pfx=os.path.basename(path)
+
+  if not os.path.isdir(dir):
+    return None
+
+  # do a quick scan of the directory to find
+  # if any names of the desired form already exist
+  # in order to start after them
+  maxn=maxFilenameSuffix(dir, pfx)
+  if maxn is None:
+    newn=0
+  else:
+    newn=maxn
+
+  while True:
+    newn += 1
+    newpath=path+str(newn)
+    try:
+      os.mkdir(newpath)
+    except OSError as e:
+      if sys.exc_value[0] == errno.EEXIST:
+        # taken, try new value
+        continue
+      error("mkdir(%s): %s", newpath, e)
+      return None
+    if len(opath) == 0:
+      newpath=os.path.basename(newpath)
+    return newpath
+
+def tmpdir():
+  ''' Return the pathname of the default temporary directory for scratch data,
+      $TMPDIR or '/tmp'.
+  '''
+  tmpdir = os.environ.get('TMPDIR')
+  if tmpdir is None:
+    tmpdir = '/tmp'
+  return tmpdir
+
+def tmpdirn(tmp=None):
+  if tmp is None: tmp=tmpdir()
+  return mkdirn(os.path.join(tmp, os.path.basename(sys.argv[0])))
+
 DEFAULT_SHORTEN_PREFIXES = ( ('$HOME/', '~/'), )
 
 def shortpath(path, environ=None, prefixes=None):
