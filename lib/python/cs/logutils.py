@@ -168,10 +168,11 @@ class _PfxThreadState(threading.local):
   def cur(self):
     ''' .cur is the current/topmost Pfx instance.
     '''
+    global cmd
     stack = self.stack
     if not stack:
-      # I'd do this in __init__ except that cs.misc.cmd may get set too late
-      stack.append(Pfx(cs.misc.cmd))
+      # I'd do this in __init__ except that cs.logutils.cmd may get set too late
+      stack.append(Pfx(cmd))
     return stack[-1]
 
   @property
