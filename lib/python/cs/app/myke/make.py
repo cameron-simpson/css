@@ -11,8 +11,8 @@ from functools import partial
 import logging
 from subprocess import Popen
 from threading import Lock
-import cs.misc
 from cs.later import Later, report as report_LFs, CallableValue
+import cs.logutils
 from cs.logutils import Pfx, info, error, debug, D
 from cs.threads import Channel
 from .parse import SPECIAL_MACROS, Macro, MacroExpression, \
@@ -61,7 +61,7 @@ class Maker(object):
     ''' Context manager entry.
         Prepare the _makeQ.
     '''
-    self._makeQ = Later(self.parallel, name=cs.misc.cmd)
+    self._makeQ = Later(self.parallel, name=cs.logutils.cmd)
     return self
 
   def __exit__(self, exc_type, exc_val, exc_tb):
@@ -86,10 +86,10 @@ class Maker(object):
     _makefiles = self._makefiles
     if not _makefiles:
       _makefiles = []
-      makerc = os.environ.get( (cs.misc.cmd+'rc').upper() )
+      makerc = os.environ.get( (cs.logutils.cmd+'rc').upper() )
       if makerc and os.path.exists(makerc):
         _makefiles.append(makerc)
-      makefile = os.path.basename(cs.misc.cmd).title() + 'file'
+      makefile = os.path.basename(cs.logutils.cmd).title() + 'file'
       _makefiles.append(makefile)
       self._makefiles = _makefiles
     if type(_makefiles) is not tuple:
