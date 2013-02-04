@@ -32,18 +32,6 @@ def objFlavour(obj):
     return T_SEQ
   return T_SCALAR
 
-def extend(arr, items):
-  warning("replace use of cs.misc.extend with array extend builtin")
-  for i in items:
-    arr.append(i)
-
-def index(seq, val):
-  warning("replace use of cs.misc.index with array index/find builtin")
-  for i in xrange(len(seq)-1):
-    if val == seq[i]:
-      return i
-  return -1
-
 def uniq(ary, canonical=None):
   assert False, "uniq() should be superceded by set()"
   u=[]
