@@ -59,40 +59,6 @@ def tb(limit=None):
 
   upd.out(oldUpd)
 
-def elapsedTime(func, *args, **kw):
-  ''' Call a function with the supplied arguments.
-      Return start time, end time and return value.
-  '''
-  t0 = time.time()
-  result = func(*args, **kw)
-  t1 = time.time()
-  return t0, t1, result
-
-def reportElapsedTime(tag, func, *args, **kw):
-  ''' Call a function with the supplied arguments.
-      Return its return value.
-      If isdebug, report elapsed time for the function.
-  '''
-  t, result = reportElapsedTimeTo(None, tag, func, *args, **kw)
-  return result
-
-def reportElapsedTimeTo(logfunc, tag, func, *args, **kw):
-  ''' Call a function with the supplied arguments.
-      Return its return value.
-      If isdebug, report elapsed time for the function.
-  '''
-  if isdebug:
-    old = out("%.100s" % " ".join((cmd_, tag, "...")))
-  t0, t1, result = elapsedTime(func, *args, **kw)
-  t = t1-t0
-  if True: ##t >= 0.01:
-    if logfunc is None:
-      logfunc = logLine
-    logfunc("TIME %6.4fs %s"%(t, tag))
-  if isdebug:
-    out(old)
-  return t, result
-
 T_SEQ = 'ARRAY'
 T_MAP = 'HASH'
 T_SCALAR = 'SCALAR'
