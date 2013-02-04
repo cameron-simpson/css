@@ -32,20 +32,6 @@ def objFlavour(obj):
     return T_SEQ
   return T_SCALAR
 
-def isodate(when=None):
-  ''' Return a date in ISO8601 YYYY-MM-DD format.
-  '''
-  from time import localtime, strftime
-  if when is None: when=localtime()
-  return strftime("%Y-%m-%d", when)
-
-def a2date(s):
-  ''' Create a date object from an ISO8601 YYYY-MM-DD date string.
-  '''
-  from date import date
-  from time import strptime
-  return date(*strptime(s, "%Y-%m-%d")[0:3])
-
 def eachOf(gs):
   ''' Return all the instances from a list of generators as a single generator.
   '''

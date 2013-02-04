@@ -15,9 +15,10 @@ if sys.hexversion < 0x02060000: from sets import Set as set
 from threading import Lock
 import cs.secret
 import cs.cache
+from cs.dateutils import isodate
 from cs.logutils import error, warning
 from cs.seq import the
-from cs.misc import isodate, WithUC_Attrs
+from cs.misc import WithUC_Attrs
 
 def today():
   return datetime.date.today()

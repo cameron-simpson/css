@@ -1,7 +1,8 @@
 #!/usr/bin/python
 #
 
-from datetime import tzinfo, timedelta
+from datetime import tzinfo, timedelta, date
+from time import localtime, strftime, strptime
 
 class tzinfoHHMM(tzinfo):
   ''' tzinfo class based on +HHMM / -HHMM strings.
@@ -28,3 +29,14 @@ class tzinfoHHMM(tzinfo):
 
   def tzname(self, dt):
     return self._tzname
+
+def isodate(when=None):
+  ''' Return a date in ISO8601 YYYY-MM-DD format.
+  '''
+  if when is None: when=localtime()
+  return strftime("%Y-%m-%d", when)
+
+def a2date(s):
+  ''' Create a date object from an ISO8601 YYYY-MM-DD date string.
+  '''
+  return date(*strptime(s, "%Y-%m-%d")[0:3])
