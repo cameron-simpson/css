@@ -10,7 +10,6 @@ import string
 import time
 if sys.hexversion < 0x02060000: from sets import Set as set
 from cs.lex import parseline, strlist
-from cs.fileutils import saferename
 
 T_SEQ = 'ARRAY'
 T_MAP = 'HASH'
@@ -100,46 +99,6 @@ class DictAttrs(dict):
     return self[attr]
   def __setattr__(self, attr, value):
     self[attr]=value
-
-def runCommandPrompt(fnmap, prompt=None):
-  ''' Accept a dict of the for key->(fn, help_string)
-      and perform entered commands.
-  '''
-  if prompt is None:
-    prompt = cmd+"> "
-  ok=True
-  while True:
-    try:
-      line=raw_input(cmd+"> ")
-    except EOFError:
-      break
-
-    if line is None:
-      return ok
-
-    line=string.lstrip(line)
-    if len(line) == 0 or line[0] == "#":
-      continue
-
-    words=parseline(line)
-    if words is None:
-      xit=1
-      error("syntax error in line: %s", line)
-      continue
-
-    op=words[0]
-    words=words[1:]
-    if op in fnmap:
-      if not fnmap[op][0](op, words):
-        ok=False
-      continue
-
-    xit=1
-    error("unsupported operation: %s", op)
-    ops=fnmap.keys()
-    ops.sort()
-    for op in ops:
-      warning("  %-7s %s", op, fnmap[op][1])
 
 def O_str(o, no_recurse=False):
   omit = getattr(o, '_O_omit', ())
