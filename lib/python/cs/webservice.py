@@ -11,7 +11,8 @@ from ZSI import SoapWriter, ParsedSoap, TC
 import ZSI.wstools.Utility
 from StringIO import StringIO
 import urllib2
-from cs.misc import cmd, objFlavour, T_MAP, T_SEQ, logLine
+from cs.misc import objFlavour, T_MAP, T_SEQ, logLine
+import cs.logutils
 from cs.logutils import LogTime
 
 def lather(obj,tc=None):
@@ -60,7 +61,7 @@ def callSOAP(url,action,xml,retAction,retTypecode,onerror=None):
     U = urllib2.urlopen(rq)
   I=U.info()
   assert I.type in ('text/xml', 'application/soap+xml'), \
-         "%s: expected text/xml, got \"%s\" from %s %s" % (cmd,I.type,action,url)
+         "%s: expected text/xml, got \"%s\" from %s %s" % (cs.logutils.cmd,I.type,action,url)
   retxml=''.join(U.readlines())
   with LogTime('callSOAP(%s): decode %d bytes of %s response', action, len(retxml), retAction):
     ret = xml2pyobj(retxml,retTypecode)
