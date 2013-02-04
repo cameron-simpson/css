@@ -20,7 +20,7 @@ import time
 from cs.fileutils import Pathname, shortpath as _shortpath
 from cs.logutils import Pfx, info, warning, debug, D
 from cs.threads import locked_property
-from cs.misc import seq
+from cs.seq import seq
 from cs.py3 import StringIO
 
 SHORTPATH_PREFIXES = ( ('$MAILDIR/', '+'), ('$HOME/', '~/') )

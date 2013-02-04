@@ -11,7 +11,7 @@ from Queue import Queue
 import time
 from cs.threads import AdjustableSemaphore, IterablePriorityQueue, \
                        WorkerThreadPool, TimerQueue
-from cs.misc import seq
+from cs.seq import seq
 from cs.logutils import Pfx, info, warning, debug, D
 
 STATE_PENDING = 0       # function not yet dispatched

@@ -19,10 +19,10 @@ else:
   from queue import Queue, PriorityQueue, Full, Empty
 from collections import deque
 if sys.hexversion < 0x02060000: from sets import Set as set
-from cs.misc import seq
+from cs.seq import seq
 from cs.excutils import transmute
 from cs.logutils import Pfx, LogTime, error, warning, debug, exception, OBSOLETE, D
-from cs.misc import seq, O
+from cs.misc import O
 
 class WorkerThreadPool(O):
   ''' A pool of worker threads to run functions.

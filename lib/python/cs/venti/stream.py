@@ -12,7 +12,7 @@ from threading import Thread
 from Queue import Queue
 import sys
 if sys.hexversion < 0x02060000: from sets import Set as set
-from cs.misc import seq
+from cs.seq import seq
 from cs.inttypes import Enum
 from cs.logutils import Pfx, info, debug, warning
 from cs.serialise import toBS, fromBSfp

@@ -12,7 +12,6 @@ import sys
 import thread
 from threading import Lock
 from tokyocabinet.hash import Hash as TCHash, HDBOREADER, HDBOWRITER, HDBOCREAT
-from cs.misc import seq
 from cs.logutils import error, Pfx
 from . import NodeDB, Backend
 from .node import nodekey

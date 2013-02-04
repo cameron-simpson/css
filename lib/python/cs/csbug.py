@@ -11,7 +11,8 @@ import socket
 import mailbox
 import cs.env
 import cs.sh
-from cs.misc import chomp, seq
+from cs.misc import chomp
+from cs.seq import seq
 from cs.logutils import info
 
 numericRe=re.compile('^(0|[1-9][0-9]*)$')

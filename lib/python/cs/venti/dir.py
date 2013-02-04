@@ -13,7 +13,7 @@ from .blockify import blockFromString
 from .meta import Meta
 from cs.venti import totext, fromtext
 from cs.lex import hexify
-from cs.misc import seq
+from cs.seq import seq
 from cs.serialise import toBS, fromBS
 
 uid_nobody = -1

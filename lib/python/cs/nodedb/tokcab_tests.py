@@ -11,7 +11,7 @@ sys.exit(0)
 import os
 import os.path
 import unittest
-from cs.misc import seq
+from cs.seq import seq
 from .node_tests import TestAll as NodeTestAll
 from . import NodeDB
 from .tokcab import Backend_TokyoCabinet
