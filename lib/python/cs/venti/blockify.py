@@ -10,7 +10,6 @@ import sys
 from threading import Thread
 from cs.logutils import debug
 from cs.threads import IterableQueue
-from cs.misc import eachOf
 from cs.venti import defaults
 from .block import Block, IndirectBlock
 
@@ -81,9 +80,9 @@ def topIndirectBlock(blockSource):
 
     # add a layer of indirection and repeat
     debug("push new fullIndirectBlocks()")
-    blockSource = fullIndirectBlocks(eachOf(([topblock,
-                                              nexttopblock
-                                             ], blockSource)))
+    blockSource = fullIndirectBlocks(chain( *([ topblock,
+                                                nexttopblock
+                                              ], blockSource)))
 
   assert False, "not reached"
 

@@ -32,13 +32,6 @@ def objFlavour(obj):
     return T_SEQ
   return T_SCALAR
 
-def eachOf(gs):
-  ''' Return all the instances from a list of generators as a single generator.
-  '''
-  for g in gs:
-    for i in g:
-      yield i
-
 def get0(seq, default=None):
   ''' Return first element of a sequence, or the default.
   '''
