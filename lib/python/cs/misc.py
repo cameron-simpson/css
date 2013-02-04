@@ -384,37 +384,6 @@ def runCommandPrompt(fnmap, prompt=None):
     for op in ops:
       warning("  %-7s %s", op, fnmap[op][1])
 
-# trivial wrapper for extension in subclasses
-class SeqWrapper:
-  def __init__(self, seq):
-    self.__seq=seq
-
-  def getSeq(self):
-    return self.__seq
-
-  def __len__(self):
-    return len(self.__seq)
-
-  def __getitem__(self, key):
-    return self.__seq[key]
-
-  def __setitem__(self, key, value):
-    self.__seq[key]=value
-
-  def __delitem__(self, key):
-    del(self.__seq[key])
-
-  def __iter__(self):
-    return [i for i in self.__seq]
-#    for i in self.__seq:
-#      yield i
-
-  def _updateAllValues(self, newvalues):
-    self.__seq=newvalues
-
-  def __repr__(self):
-    return repr(self.__seq)
-
 """ an object with an ordered set of keys eg SQL table row
 """
 class OrderedKeys:
@@ -445,31 +414,6 @@ class OrderedKeys:
     return self.keys()
 #    for k in self.keys():
 #      yield k
-
-class IndexedSeqWrapper(OrderedKeys, SeqWrapper):
-  def __init__(self, seq, names=None):
-    ##print "init IndexedSeqWrapper"
-    ##print "  seq=", repr(seq)
-    ##print "  keys=", repr(names)
-    SeqWrapper.__init__(self, seq)
-    OrderedKeys.__init__(self, names)
-
-  def __getitem__(self, key):
-    if type(key) is not int:
-      key=self.keyIndex(key)
-    return SeqWrapper.__getitem__(self, key)
-
-  def __setitem__(self, key, value):
-    if type(key) is not int:
-      key=self.keyIndex(key)
-    return SeqWrapper.__setitem__(self, key, value)
-
-  def __repr__(self):
-    d={}
-    okeys=self.keys()
-    for i in xrange(0, len(okeys)):
-      d[okeys[i]]=self[i]
-    return repr(d)
 
 class HasFlags:
   """ A collection of strings whose presence may be tested. """
