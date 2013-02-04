@@ -32,13 +32,6 @@ def objFlavour(obj):
     return T_SEQ
   return T_SCALAR
 
-def get0(seq, default=None):
-  ''' Return first element of a sequence, or the default.
-  '''
-  for i in seq:
-    return i
-  return default
-
 def extend(arr, items):
   warning("replace use of cs.misc.extend with array extend builtin")
   for i in items:

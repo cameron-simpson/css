@@ -17,8 +17,8 @@ from threading import Thread
 from collections import namedtuple
 from cs.lex import str1, parseUC_sAttr
 from cs.logutils import Pfx, D, error, warning, info, debug, exception
-from cs.misc import get0, O, unimplemented
-from cs.seq import the
+from cs.misc import O, unimplemented
+from cs.seq import the, get0
 from cs.py3 import StringTypes
 from .export import edit_csv_wide, export_csv_wide
 

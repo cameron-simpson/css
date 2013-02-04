@@ -48,6 +48,13 @@ def the(list, context=None):
 
   return it
 
+def get0(seq, default=None):
+  ''' Return first element of a sequence, or the default.
+  '''
+  for i in seq:
+    return i
+  return default
+
 class Range(list):
   def __init__(self,values=(),step=1):
     self.__step=step
