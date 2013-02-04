@@ -34,30 +34,8 @@ class _NullUpd:
     return False
   def without(self, func, *args, **kw):
     return func(*args, **kw)
+
 _defaultUpd = _NullUpd()
-
-def tb(limit=None):
-  ''' Print a stack backtrace.
-  '''
-  import traceback
-  global cmd__
-  global _defaultUpd
-  upd = _defaultUpd
-  oldUpd = upd.out('')
-
-  n = 0
-  for elem in traceback.format_list(traceback.extract_stack())[:-1]:
-    for line in elem.split("\n"):
-      if len(line) > 0:
-        sys.stderr.write(cmd__)
-        sys.stderr.write(line)
-        sys.stderr.write("\n")
-    if limit is not None:
-      n += 1
-      if n >= limit:
-        break
-
-  upd.out(oldUpd)
 
 T_SEQ = 'ARRAY'
 T_MAP = 'HASH'
