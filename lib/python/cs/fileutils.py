@@ -476,14 +476,6 @@ def maxFilenameSuffix(dir, pfx):
         maxn=n
   return maxn
 
-def tmpfilename(dir=None):
-  if dir is None:
-    dir=tmpdir()
-  pfx = ".%s.%d." % (cmd, os.getpid())
-  n=maxFilenameSuffix(dir, pfx)
-  if n is None: n=0
-  return "%s%d" % (pfx, n)
-
 def mkdirn(path):
   opath=path
   if len(path) == 0:
