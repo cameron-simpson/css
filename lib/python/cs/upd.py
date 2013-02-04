@@ -6,7 +6,6 @@ import atexit
 import logging
 from logging import StreamHandler
 from subprocess import Popen, PIPE
-import cs.misc
 from cs.ansi_colour import colourise
 from cs.logutils import Pfx
 from cs.lex import unctrl
