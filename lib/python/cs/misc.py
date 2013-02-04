@@ -59,54 +59,6 @@ def tb(limit=None):
 
   upd.out(oldUpd)
 
-_logPath = None
-_logFP = sys.stderr
-def logTo(logpath=None):
-  ''' Cause logging to go to the specified filename.
-      If logpath is omitted or None, return the current
-      log file object, which starts as sys.stderr.
-  '''
-  global _logPath, _logFP
-  if logpath is None:
-    return _logFP
-  TODO("port cs.misc.logTo() etc to logger module")
-  _logFP = open(logpath, "a")
-  _logPath = logpath
-def _logline(line, mark):
-  ''' Log a line with a prefix mark.
-  '''
-  global _logPath, _logFP
-  when = time.time()
-  pfx = "%d [%s]" % (when, mark)
-  try:
-    print >>_logFP, pfx, line.replace("\n", "\n%*s" % (len(pfx)+1, " "))
-    _logFP.flush()
-    if isdebug and _logFP is not sys.stderr:
-      pfx = "%s: %s:" % (cmd, mark)
-      print >>sys.stderr, pfx, line.replace("\n", "\n%*s" % (len(pfx)+1, " "))
-  except IOError:
-    pass
-
-def logLine(line, mark=None):
-  ''' Log a line, with optional prefix mark.
-  '''
-  if mark is None:
-    mark = cmd
-  return _defaultUpd.without(_logline, line, mark)
-
-def logFnLine(line, frame=None, prefix=None, mark=None):
-  ''' Log a line citing the calling function.
-  '''
-  if frame is None:
-    frame = sys._getframe(1)
-  elif type(frame) is int:
-    frame = sys._getframe(frame)
-  line = "%s [%s(), %s:%d]" \
-         % (line, frame.f_code.co_name, frame.f_code.co_filename, frame.f_lineno)
-  if prefix is not None:
-    line = prefix+": "+line
-  return logLine(line, mark=mark)
-
 def elapsedTime(func, *args, **kw):
   ''' Call a function with the supplied arguments.
       Return start time, end time and return value.
@@ -140,41 +92,6 @@ def reportElapsedTimeTo(logfunc, tag, func, *args, **kw):
   if isdebug:
     out(old)
   return t, result
-
-class Loggable:
-  ''' Base class for things that will use the above functions.
-  '''
-  def __init__(self, mark):
-    self.__logMark = cmd+"."+mark
-
-  def logmark(self, mark=None):
-    ''' Set the log line prefix mark.
-    '''
-    if mark is None:
-      mark = self.__logMark
-    else:
-      mark = self.__logMark+"."+mark
-    return mark
-
-  def log(self, line, mark=None):
-    ''' Log a line with optional prefix mark.
-    '''
-    logLine(line, mark=self.logmark(mark))
-
-  def logfn(self, line, mark=None, frame=None):
-    ''' Log a line with optional prefix mark, along with the calling function.
-    '''
-    if frame is None:
-      frame = sys._getframe(1)
-    logFnLine(line, mark=self.logmark(mark), frame=frame)
-
-  def logTime2(self, tag, func, *args, **kw):
-    global reportElapsedTimeTo
-    return reportElapsedTimeTo(self.log, tag, func, *args, **kw)
-
-  def logTime(self, tag, func, *args, **kw):
-    t, result = self.logTime2(tag, func, *args, **kw)
-    return result
 
 T_SEQ = 'ARRAY'
 T_MAP = 'HASH'
