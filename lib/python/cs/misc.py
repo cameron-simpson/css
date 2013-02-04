@@ -8,7 +8,6 @@ info = logging.info
 warning = logging.warning
 import string
 import time
-from threading import Lock
 if sys.hexversion < 0x02060000: from sets import Set as set
 from cs.lex import parseline, strlist
 from cs.fileutils import saferename
@@ -32,20 +31,6 @@ def objFlavour(obj):
   if hasattr(obj, '__iter__'):
     return T_SEQ
   return T_SCALAR
-
-__seq = 0
-__seqLock = Lock()
-def seq():
-  ''' Allocate a new sequential number.
-      Useful for creating unique tokens.
-  '''
-  global __seq
-  global __seqLock
-  __seqLock.acquire()
-  __seq += 1
-  n = __seq
-  __seqLock.release()
-  return n
 
 def isodate(when=None):
   ''' Return a date in ISO8601 YYYY-MM-DD format.

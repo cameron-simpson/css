@@ -8,6 +8,22 @@ import bisect
 import unittest
 import heapq
 import itertools
+from threading import Lock
+
+__seq = 0
+__seqLock = Lock()
+
+def seq():
+  ''' Allocate a new sequential number.
+      Useful for creating unique tokens.
+  '''
+  global __seq
+  global __seqLock
+  __seqLock.acquire()
+  __seq += 1
+  n = __seq
+  __seqLock.release()
+  return n
 
 class Range(list):
   def __init__(self,values=(),step=1):
