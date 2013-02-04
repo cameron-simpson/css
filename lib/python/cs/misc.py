@@ -415,42 +415,6 @@ class OrderedKeys:
 #    for k in self.keys():
 #      yield k
 
-class HasFlags:
-  """ A collection of strings whose presence may be tested. """
-  def __init__(self, flagfield='FLAGS'):
-    self.__flagfield=flagfield
-
-  def __flaglist(self):
-    flagv=self[self.__flagfield]
-    if flagv is None:
-      flagv=set(())
-    else:
-      if type(flagv) is str:
-        flagv=flagv.split(',')
-      if type(flagv) is not set:
-        flagv=set(flagv)
-
-    return flagv
-
-  def testFlag(self, flag):
-    return flag in self.__flaglist()
-
-  def setFlag(self, flag):
-    if not self.testFlag(flag):
-      flagv=self.__flaglist()
-      flagv.add(flag)
-      if type(self[self.__flagfield]) is str:
-        flagv=",".join(flagv)
-      self[self.__flagfield]=flagv
-
-  def clearFlag(self, flag):
-    if self.testFlag(flag):
-      flagv=self.__flaglist()
-      flagv.remove(flag)
-      if type(self[self.__flagfield]) is str:
-        flagv=",".join(flagv)
-      self[self.__flagfield]=flagv
-
 def O_str(o, no_recurse=False):
   omit = getattr(o, '_O_omit', ())
   return ( "<%s %s>"
