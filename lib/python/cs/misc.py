@@ -194,10 +194,6 @@ def listpermute(lol):
   pright=listpermute(right)
   return [[item]+ritem for item in left for ritem in pright]
 
-def dict2ary(d, keylist=None):
-  if keylist is None: keylist=sort(keys(d))
-  return [ [k, d[k]] for k in keylist ]
-
 def maxFilenameSuffix(dir, pfx):
   from dircache import listdir
   maxn=None
