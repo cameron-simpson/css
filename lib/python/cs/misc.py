@@ -60,19 +60,6 @@ def get0(seq, default=None):
     return i
   return default
 
-def winsize(f):
-  '''   Return a (rows, columns) tuple or None for the specified file object.
-  '''
-  fd = os.dup(f.fileno()) # obtain fresh fd to pass to the shell
-  sttycmd = "stty -a <&" + str(fd) + " 2>/dev/null"
-  stty = os.popen(sttycmd).read()
-  os.close(fd)
-  import re
-  m = re.compile(r' rows (\d+); columns (\d+)').search(stty)
-  if not m:
-    return None
-  return (int(m.group(1)), int(m.group(2)))
-
 # trim trailing newline, returning trimmied line
 # unlike perl, requires the newline to be present
 def chomp(s):
