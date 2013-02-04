@@ -11,7 +11,7 @@ from ZSI import SoapWriter, ParsedSoap, TC
 import ZSI.wstools.Utility
 from StringIO import StringIO
 import urllib2
-from cs.misc import objFlavour, T_MAP, T_SEQ, logLine
+from cs.misc import objFlavour, T_MAP, T_SEQ
 import cs.logutils
 from cs.logutils import LogTime, Pfx, error
 
