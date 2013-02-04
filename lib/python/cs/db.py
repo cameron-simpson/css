@@ -12,11 +12,12 @@ import string
 import types
 import datetime
 if sys.hexversion < 0x02060000: from sets import Set as set
+from threading import Lock
 import cs.secret
 import cs.cache
-from cs.misc import isodate, the, WithUC_Attrs
 from cs.logutils import error, warning
-from threading import Lock
+from cs.seq import the
+from cs.misc import isodate, WithUC_Attrs
 
 def today():
   return datetime.date.today()

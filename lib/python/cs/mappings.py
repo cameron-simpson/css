@@ -1,11 +1,11 @@
 #!/usr/bin/python -tt
 
-from cs.lex import isUC_, parseUC_sAttr
-from cs.misc import the
 from collections import defaultdict
 from functools import partial
 from types import StringTypes
 import sys
+from cs.lex import isUC_, parseUC_sAttr
+from cs.seq import the
 
 class SeqMapUC_Attrs(object):
   ''' A wrapper for a mapping from keys (matching ^[A-Z][A-Z_0-9]*$)

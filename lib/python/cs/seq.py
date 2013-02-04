@@ -25,6 +25,29 @@ def seq():
   __seqLock.release()
   return n
 
+def the(list, context=None):
+  ''' Returns the first element of an iterable, but requires there to be
+      exactly one.
+  '''
+  icontext="expected exactly one value"
+  if context is not None:
+    icontext=icontext+" for "+context
+
+  first=True
+  for elem in list:
+    if first:
+      it=elem
+      first=False
+    else:
+      raise IndexError("%s: got more than one element (%s, %s, ...)"
+                        % (icontext, it, elem)
+                      )
+
+  if first:
+    raise IndexError("%s: got no elements" % (icontext,))
+
+  return it
+
 class Range(list):
   def __init__(self,values=(),step=1):
     self.__step=step

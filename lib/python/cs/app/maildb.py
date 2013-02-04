@@ -16,7 +16,6 @@ from cs.mailutils import ismaildir, message_addresses, Message
 from cs.nodedb import NodeDB, Node, NodeDBFromURL
 import cs.sh
 from cs.threads import locked_property
-from cs.misc import the
 
 def main(argv, stdin=None):
   if stdin is None:

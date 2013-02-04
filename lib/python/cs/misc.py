@@ -46,29 +46,6 @@ def a2date(s):
   from time import strptime
   return date(*strptime(s, "%Y-%m-%d")[0:3])
 
-def the(list, context=None):
-  ''' Returns the first element of an iterable, but requires there to be
-      exactly one.
-  '''
-  icontext="expected exactly one value"
-  if context is not None:
-    icontext=icontext+" for "+context
-
-  first=True
-  for elem in list:
-    if first:
-      it=elem
-      first=False
-    else:
-      raise IndexError("%s: got more than one element (%s, %s, ...)"
-                        % (icontext, it, elem)
-                      )
-
-  if first:
-    raise IndexError("%s: got no elements" % (icontext,))
-
-  return it
-
 def eachOf(gs):
   ''' Return all the instances from a list of generators as a single generator.
   '''
