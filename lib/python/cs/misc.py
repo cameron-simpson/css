@@ -32,22 +32,6 @@ def objFlavour(obj):
     return T_SEQ
   return T_SCALAR
 
-def uniq(ary, canonical=None):
-  assert False, "uniq() should be superceded by set()"
-  u=[]
-  d={}
-  for a in ary:
-    if canonical is None:
-      ca=a
-    else:
-      ca=canonical(a)
-
-    if ca not in d:
-      u.append(a)
-      d[ca]=None
-
-  return u
-
 class WithUCAttrs:
   ''' An object where access to obj.FOO accesses obj['FOO']
       if FOO is all upper case.
