@@ -175,11 +175,6 @@ class LCSeq(CanonicalSeq):
   def __init__(self, seq):
     CanonicalSeq.__init__(self, seq, canonical=string.lower)
 
-# fill out an array with None to be at least "length" elements long
-def padlist(l, length):
-  if len(l) < length:
-    l+=[None]*(length-len(l))
-
 def listpermute(lol):
   # empty list
   if len(lol) == 0:
