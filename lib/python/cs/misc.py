@@ -60,12 +60,6 @@ def get0(seq, default=None):
     return i
   return default
 
-# trim trailing newline, returning trimmied line
-# unlike perl, requires the newline to be present
-def chomp(s):
-  assert s[-1] == '\n'
-  return s[:-1]
-
 def extend(arr, items):
   warning("replace use of cs.misc.extend with array extend builtin")
   for i in items:
