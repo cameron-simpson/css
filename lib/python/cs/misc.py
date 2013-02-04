@@ -13,16 +13,6 @@ if sys.hexversion < 0x02060000: from sets import Set as set
 from cs.lex import parseline, strlist
 from cs.fileutils import saferename
 
-def setcmd(ncmd):
-  ''' Set the cs.misc.cmd string and friends.
-  '''
-  global cmd, cmd_, cmd__
-  cmd = ncmd
-  cmd_ = cmd + ':'
-  cmd__ = cmd_ + ' '
-
-setcmd(os.path.basename(sys.argv[0]))
-
 class _NullUpd:
   ''' A dummy class with the same duck type as cs.upd.Upd
       used when cs.upd has not be instantiated by a program.
