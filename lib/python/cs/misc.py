@@ -384,37 +384,6 @@ def runCommandPrompt(fnmap, prompt=None):
     for op in ops:
       warning("  %-7s %s", op, fnmap[op][1])
 
-""" an object with an ordered set of keys eg SQL table row
-"""
-class OrderedKeys:
-  def __init__(self, names=None):
-    if names is not None:
-      self.setKeyOrder(names)
-
-  def setKeyOrder(self, names):
-    # compute column name index
-    ##print "SETKEYORDER: ", repr(names)
-    self.__keys=names
-    self.__keyIndex={}
-    i=0
-    for name in names:
-      self.__keyIndex[name]=i
-      i+=1
-
-  def keyIndex(self, key=None):
-    if key is None:
-      return self.__keyIndex
-    return self.__keyIndex[key]
-
-  def keys(self):
-    ##print "ORDEREDKEYS.keys()=", repr(self.__keys)
-    return self.__keys
-
-  def __iterkeys__(self):
-    return self.keys()
-#    for k in self.keys():
-#      yield k
-
 def O_str(o, no_recurse=False):
   omit = getattr(o, '_O_omit', ())
   return ( "<%s %s>"
