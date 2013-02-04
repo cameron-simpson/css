@@ -158,16 +158,3 @@ class Upd(object):
       old=self.out('', noStrip=noStrip)
       yield
       self.out(old, noStrip=True)
-
-@contextmanager
-def __dummyNoUpd():
-  yield
-
-def NoUpd(U=None):
-  ''' Return a context manager to disable the current Upd for the duration.
-  '''
-  if U is None:
-    if _defaultUpd is None:
-      return __dummyNoUpd()
-    U=_defaultUpd
-  return U._withoutContext()
