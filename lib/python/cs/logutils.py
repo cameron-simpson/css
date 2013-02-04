@@ -18,12 +18,14 @@ import cs.misc
 from cs.excutils import noexc
 from cs.py3 import unicode, StringTypes
 
+cmd = __file__
+
 logging_level = logging.INFO
 
-def setup_logging(cmd=None, main_log=None, format=None, level=None, upd_mode=None, ansi_mode=None):
+def setup_logging(cmd_name=None, main_log=None, format=None, level=None, upd_mode=None, ansi_mode=None):
   ''' Arrange basic logging setup for conventional UNIX command
       line error messaging.
-      Sets cs.misc.cmd to `cmd`.
+      Sets cs.logging.cmd to `cmd_name`.
       If `main_log` is None, the main log will go to sys.stderr; if
       `main_log` is a string, is it used as a filename to open in append
       mode; otherwise main_log should be a stream suitable for use
@@ -38,10 +40,10 @@ def setup_logging(cmd=None, main_log=None, format=None, level=None, upd_mode=Non
       using ANSI terminal sequences (currently only if cs.upd is used).
       Returns the logging level.
   '''
-  global logging_level
-  if cmd is None:
-    cmd = os.path.basename(sys.argv[0])
-  cs.misc.cmd = cmd
+  global logging_level, cmd
+  if cmd_name is None:
+    cmd_name = os.path.basename(sys.argv[0])
+  cmd = cmd_name
   if main_log is None:
     main_log = sys.stderr
   elif type(main_log) is str:
