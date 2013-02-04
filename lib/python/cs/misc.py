@@ -175,25 +175,6 @@ class LCSeq(CanonicalSeq):
   def __init__(self, seq):
     CanonicalSeq.__init__(self, seq, canonical=string.lower)
 
-def listpermute(lol):
-  # empty list
-  if len(lol) == 0:
-    return ()
-
-  # single element list
-  if len(lol) == 1:
-    return [[l] for l in lol[0]]
-
-  # short circuit if any element is empty
-  for l in lol:
-    if len(l) == 0:
-      return ()
-
-  left=lol[0]
-  right=lol[1:]
-  pright=listpermute(right)
-  return [[item]+ritem for item in left for ritem in pright]
-
 def runCommandPrompt(fnmap, prompt=None):
   ''' Accept a dict of the for key->(fn, help_string)
       and perform entered commands.
