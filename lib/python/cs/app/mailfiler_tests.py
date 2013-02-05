@@ -10,7 +10,7 @@ from os.path import basename, dirname, join as joinpath
 import unittest
 from cs.app.mailfiler import parserules
 from cs.logutils import D
-from cs.misc import O, slist
+from cs.obj import O, slist
 
 if not os.environ.get('DEBUG', ''):
   def D(*a):

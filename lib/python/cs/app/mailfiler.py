@@ -28,7 +28,7 @@ from cs.fileutils import abspath_from_file, file_property, files_property, Pathn
 from cs.lex import get_white, get_nonwhite, get_qstr, unrfc2047
 from cs.logutils import Pfx, setup_logging, debug, info, warning, error, D, LogTime
 from cs.mailutils import Maildir, message_addresses, shortpath
-from cs.misc import O, slist
+from cs.obj import O, slist
 from cs.threads import locked_property
 from cs.app.maildb import MailDB
 from cs.py3 import unicode as u
