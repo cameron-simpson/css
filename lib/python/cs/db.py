@@ -16,9 +16,9 @@ from threading import Lock
 import cs.secret
 import cs.cache
 from cs.dateutils import isodate
+from cs.obj import WithUC_Attrs
 from cs.logutils import error, warning
 from cs.seq import the
-from cs.misc import WithUC_Attrs
 
 def today():
   return datetime.date.today()

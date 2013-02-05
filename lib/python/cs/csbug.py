@@ -12,6 +12,7 @@ import mailbox
 import cs.env
 import cs.sh
 from cs.seq import seq
+from cs.fileutils import mkdirn
 from cs.logutils import info
 
 numericRe=re.compile('^(0|[1-9][0-9]*)$')
@@ -41,7 +42,7 @@ class BugSet:
     return [int(e) for e in os.listdir(self.root) if numericRe.match(e) and int(e) > 0]
 
   def newbug(self):
-    bugdir=cs.misc.mkdirn(self.root+'/')
+    bugdir=mkdirn(self.root+'/')
     return self[int(os.path.basename(bugdir))]
 
   def log(self,bugid,field,value):

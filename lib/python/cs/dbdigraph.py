@@ -7,7 +7,7 @@ from cs.hier import flavour, T_SEQ, T_MAP
 from cs.db import dosql, SQLQuery, sqlise, today
 import cs.cache
 from cs.seq import the
-from cs.misc import DictUC_Attrs
+from cs.obj import DictUC_Attrs
 
 NodeCoreAttributes=('NAME','TYPE')
 
