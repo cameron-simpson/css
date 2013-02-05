@@ -13,6 +13,7 @@ import thread
 from threading import Lock
 from tokyocabinet.hash import Hash as TCHash, HDBOREADER, HDBOWRITER, HDBOCREAT
 from cs.logutils import error, Pfx
+from cs.excutils import unimplemented
 from . import NodeDB, Backend
 from .node import nodekey
 

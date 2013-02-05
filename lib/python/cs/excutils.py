@@ -82,6 +82,13 @@ def transmute(exc_from, exc_to=None):
     return wrapper
   return transmutor
 
+def unimplemented(func):
+  ''' Decorator for stub methods that must be implemented by a stub class.
+  '''
+  def wrapper(self, *a, **kw):
+    raise NotImplementedError("%s.%s(*%s, **%s)" % (type(self), func.__name__, a, kw))
+  return wrapper
+
 class NoExceptions(object):
   ''' A context manager to catch _all_ exceptions and log them.
       Arguably this should be a bare try...except but that's syntacticly

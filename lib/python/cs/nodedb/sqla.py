@@ -11,8 +11,8 @@ from sqlalchemy import create_engine, \
 from sqlalchemy.orm import mapper, sessionmaker
 from sqlalchemy.sql import and_, or_, not_, asc
 from sqlalchemy.sql.expression import distinct
+from cs.excutils import unimplemented
 from cs.logutils import Pfx, error, warning, debug
-from cs.misc import unimplemented
 from . import NodeDB, Backend
 
 def NODESTable(metadata, name=None):

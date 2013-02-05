@@ -6,7 +6,8 @@
 
 import unittest
 from cs.logutils import D, OBSOLETE
-from cs.misc import unimplemented, O
+from cs.obj import O
+from cs.excutils import unimplemented
 
 class _BackendMappingMixin(O):
   ''' A mapping interface to be presented by all Backends.

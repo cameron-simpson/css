@@ -15,9 +15,10 @@ from getopt import GetoptError
 from threading import RLock
 from threading import Thread
 from collections import namedtuple
+from cs.excutils import unimplemented
+from cs.obj import O
 from cs.lex import str1, parseUC_sAttr
 from cs.logutils import Pfx, D, error, warning, info, debug, exception
-from cs.misc import O, unimplemented
 from cs.seq import the, get0
 from cs.py3 import StringTypes
 from .export import edit_csv_wide, export_csv_wide
