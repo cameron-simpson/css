@@ -20,7 +20,6 @@ def tcp_listening(localport,localaddr=None,nocache=False):
   if nocache or _cache_tcp_listens is None:
     netstat=os.popen("netstat -nl")
     _cache_tcp_listens={}
-    from cs.misc import chomp
     for line in netstat:
       line=chomp(line)
       fields=line.split()

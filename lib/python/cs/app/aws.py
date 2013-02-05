@@ -12,7 +12,7 @@ from threading import RLock
 from boto.ec2.connection import EC2Connection
 from cs.logutils import D
 from cs.threads import locked_property
-from cs.misc import O
+from cs.obj import O
 
 class EC2(O):
   ''' Convenience wrapper for EC2 connections.

@@ -9,7 +9,8 @@ from tempfile import TemporaryFile
 from threading import Lock, Thread
 from cs.logutils import warning, error, info, D, setup_logging
 from cs.threads import Channel
-from cs.misc import O, tmpdir
+from cs.obj import O
+from cs.fileutils import tmpdir
 
 class _BufferFile(O):
   ''' A buffer to store data from 

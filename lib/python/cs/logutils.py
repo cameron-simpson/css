@@ -14,8 +14,8 @@ import time
 import threading
 from threading import Lock
 import traceback
-import cs.misc
 from cs.excutils import noexc
+from cs.obj import O_str
 from cs.py3 import unicode, StringTypes
 
 cmd = __file__
@@ -350,7 +350,7 @@ class Pfx(object):
             exc_value.args = args
         else:
           # we can't modify this exception - at least report the current prefix state
-          D("%s: Pfx.__exit__: exc_value = %s", prefix, cs.misc.O_str(exc_value))
+          D("%s: Pfx.__exit__: exc_value = %s", prefix, O_str(exc_value))
           error("%s: %s", prefix, exc_value)
         # prevent outer Pfx wrappers from hacking stuff as well
         _state.raise_needs_prefix = False

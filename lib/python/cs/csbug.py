@@ -11,7 +11,6 @@ import socket
 import mailbox
 import cs.env
 import cs.sh
-from cs.misc import chomp
 from cs.seq import seq
 from cs.logutils import info
 

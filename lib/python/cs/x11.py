@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 from __future__ import print_function
-from cs.misc import DictUCAttrs
+from cs.obj import DictUCAttrs
 
 class Display(DictUCAttrs):
   def __init__(self,display=None):

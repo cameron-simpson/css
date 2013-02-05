@@ -3,7 +3,6 @@
 
 import sys
 from time import time
-from cs.misc import reportElapsedTime
 from cs.logutils import debug, warning
 
 class ChunkyString(str):

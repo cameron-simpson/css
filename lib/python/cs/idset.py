@@ -1,7 +1,8 @@
 import os
 import os.path
 import re
-from cs.misc import mkdirn, WithUCAttrs
+from cs.fileutils import mkdirn
+from cs.obj import WithUCAttrs
 
 numeric_re = re.compile(r'^(0|[1-9][0-9]*)$')
 def is_idnum(s):

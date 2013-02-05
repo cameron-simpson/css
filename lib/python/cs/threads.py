@@ -22,7 +22,7 @@ if sys.hexversion < 0x02060000: from sets import Set as set
 from cs.seq import seq
 from cs.excutils import transmute
 from cs.logutils import Pfx, LogTime, error, warning, debug, exception, OBSOLETE, D
-from cs.misc import O
+from cs.obj import O
 
 class WorkerThreadPool(O):
   ''' A pool of worker threads to run functions.

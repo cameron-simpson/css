@@ -32,7 +32,7 @@ from cs.threads import runTree, RunTreeOp, RUN_TREE_OP_MANY_TO_MANY, \
                         RUN_TREE_OP_ONE_TO_MANY, RUN_TREE_OP_ONE_TO_ONE, \
                         RUN_TREE_OP_SELECT
 from cs.urlutils import URL
-from cs.misc import O
+from cs.obj import O
 
 if os.environ.get('DEBUG', ''):
   def X(tag, *a):

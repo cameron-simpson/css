@@ -1,9 +1,9 @@
 import os
 import os.path
 import cs.hier
-from cs.misc import DictUC_Attrs
 import logging
 import cs.logutils
+from cs.obj import DictUC_Attrs
 
 def get(secret,path=None):
   return Secret(secret,path=path)

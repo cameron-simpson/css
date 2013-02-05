@@ -14,7 +14,7 @@ try:
 except ImportError:
   from urllib2 import urlopen
 from cs.logutils import setup_logging, Pfx, D, warning, error
-from cs.misc import O
+from cs.obj import O
 
 USAGE = '''Usage: {cmd} stats host:port print [columns...]'''
 

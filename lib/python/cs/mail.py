@@ -13,7 +13,7 @@ import re
 from contextlib import closing
 from cs.logutils import OBSOLETE
 from cs.seq import seq
-from cs.misc import saferename
+from cs.fileutils import saferename
 
 def mailbox(path):
   if ismaildir(path):
