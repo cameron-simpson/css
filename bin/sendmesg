@@ -91,7 +91,7 @@ __seqLock = allocate_lock()
 def seq():
   ''' Allocate a new sequential number.
       Useful for creating unique tokens.
-      Impl from cs.misc.
+      Impl from cs.seq.
   '''
   global __seq
   global __seqLock

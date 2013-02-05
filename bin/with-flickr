@@ -5,7 +5,7 @@
 #
 
 from cs.flickr import FlickrURL
-from cs.misc import cmd
+from cs.logutils import cmd
 import sys
 
 usage="Usage: %s imurl photo-page-URLs\n" % cmd

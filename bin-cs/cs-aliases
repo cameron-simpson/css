@@ -15,8 +15,8 @@ from getopt import GetoptError
 import cs.sh
 from cs.lex import unrfc2047
 from cs.mailAddresses import addressKey, loadAddresses, addrsRegexp
+import cs.logutils
 from cs.logutils import setup_logging, error, Pfx, warning
-import cs.misc
 
 aliases = environ.get('CS_ALIASES',
                       os.path.join(environ['HOME'], 'rc', 'mail', 'aliases2'))
@@ -27,7 +27,7 @@ new_syntax = 'MAILITEM'
 def main(argv):
   global aliases, byCategory, byAddress
   setup_logging()
-  cmd = cs.misc.cmd
+  cmd = cs.logutils.cmd
 
   usage = '''Usage:
   %s [-f aliasfile] [list]

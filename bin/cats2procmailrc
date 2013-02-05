@@ -310,8 +310,8 @@ import string
 from cStringIO import StringIO
 import re
 if sys.hexversion < 0x02060000: from sets import Set as set
-import cs.misc
 from cs.mailAddresses import loadAddresses, addrsRegexp
+import cs.logutils
 from cs.logutils import setup_logging, Pfx, error, warning, info, debug
 
 assign_re=re.compile(r'[a-z]\w+=', re.I)
@@ -320,7 +320,7 @@ hdrlist_re=re.compile(r'([a-z][\-a-z0-9]*(,[a-z][\-a-z0-9]*)*):', re.I)
 
 def main(argv):
   setup_logging()
-  cmd = cs.misc.cmd
+  cmd = cs.logutils.cmd
 
   trackRules=True       # add X-Cats2Procmailrc line to show rule
   useXLabel=False       # put tag in X-Label header instead of subject

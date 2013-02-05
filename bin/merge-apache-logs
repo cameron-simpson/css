@@ -8,15 +8,14 @@ import sys
 import time
 from getopt import getopt, GetoptError
 from datetime import datetime, timedelta
-from cs.logutils import setup_logging, error, warn
-import cs.misc
+from cs.logutils import setup_logging, error, warn, cmd
 
 setup_logging()
 
 usage='''Usage: %s [-M] [-O] /fixed-string/ logfiles
   -M    Accept multiple leading IP addresses on a line, emit the last.
   -O    Require strict ordering in the input log files.
-''' % (cs.misc.cmd,)
+''' % (cmd,)
 
 requireOrdering=False
 multiAddrs=False

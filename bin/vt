@@ -37,6 +37,7 @@ import os
 import os.path
 from getopt import getopt, GetoptError
 import datetime
+import cs.logutils
 from cs.logutils import Pfx, exception, error, debug, setup_logging, logTo, D
 from cs.venti import totext, fromtext, defaults
 from cs.venti.block import IndirectBlock, decodeBlocks
@@ -46,9 +47,8 @@ from cs.venti.cache import CacheStore, MemCacheStore
 from cs.venti.dir import Dir, resolve
 
 def main(argv):
-  import cs.misc
   setup_logging(upd_mode=False)
-  cmd = cs.misc.cmd
+  cmd = cs.logutils.cmd
   usage = '''Usage:
     %s [options...] ar tar-options paths..
     %s [options...] cat filerefs...

@@ -9,7 +9,7 @@ import re
 import sys
 from cs.env import envsub
 from cs.logutils import Pfx
-from cs.misc import O
+from cs.obj import O
 
 PEERAGE = "$HOME/.peerage"
 

@@ -9,7 +9,7 @@
 #
 
 import sys
-import cs.misc
+from cs.fileutils import mkdirn
 
 if len(sys.argv) != 2:
   sys.stderr.write("Usage: mkdirn dirpfx\n")
@@ -17,7 +17,7 @@ if len(sys.argv) != 2:
   sys.exit(2)
 
 base=sys.argv[1]
-dir=cs.misc.mkdirn(base)
+dir=mkdirn(base)
 if dir is None:
   sys.stderr.write("mkdirn: can't make next in sequence for prefix "+base+"\n")
   sys.stderr.flush()

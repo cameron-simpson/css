@@ -9,7 +9,6 @@
 import sys
 import re
 import string
-from cs.misc import chomp
 
 # crude address parsers
 RE_ADDR1=re.compile('<(.*@.*)>')

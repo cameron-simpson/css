@@ -15,7 +15,7 @@ from thread import allocate_lock
 from threading import Thread
 import cs.wini
 from cs.tail import tail
-from cs.misc import cmd, DictUC_Attrs
+from cs.logutils import cmd
 
 usage="Usage: %s configuration-file" % cmd
 
