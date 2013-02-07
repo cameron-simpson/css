@@ -306,7 +306,7 @@ class _MailDB(NodeDB):
           agroup.add(coreaddr)
           all.add(coreaddr)
       return agroups
-    except AttributeError, e:
+    except AttributeError as e:
       D("address_groups(): e = %r", e)
       raise ValueError("disaster")
 
