@@ -6,6 +6,7 @@ from threading import Lock
 from types import StringTypes
 import sys
 from cs.lex import isUC_, parseUC_sAttr
+from cs.obj import O
 from cs.seq import the
 
 class SeqMapUC_Attrs(object):
