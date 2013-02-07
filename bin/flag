@@ -4,14 +4,18 @@
 #       - Cameron Simpson <cs@zip.com.au> 25sep2006
 #
 
+trace=
+[ -t 2 ] && trace=set-x
 flagdir=$HOME/var/flags
 invert=
 makemissing=
+flushflags=
 
 cmd=$0
 usage="Usage: $0 [-d flagdir] [-w] [--] [!] [flagname [true|false|0|1]]
   -d flagdir    Specify directory to hold flag files.
-  -w            Update the flag file with the derived flag if missing."
+  -w            Update the flag file with the derived flag if missing.
+  -F            Flush flag. Delete files for false flags."
 
 badopts=
 
@@ -20,6 +24,7 @@ do
   case $1 in
     -d) flagdir=$2; shift ;;
     -w) makemissing=1 ;;
+    -F) flushflags=1 ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
         badopts=1
@@ -42,6 +47,10 @@ then
     if flag "$flag"
     then  echo "$flag	TRUE"
     else  echo "$flag	FALSE"
+          if [ $flushflags ]
+          then
+            [ ! -f "$flag" ] || $trace rm0 "$flag"
+          fi
     fi
   done
   exit 0
