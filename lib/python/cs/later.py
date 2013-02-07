@@ -8,7 +8,7 @@ import sys
 from collections import deque
 from threading import Lock
 from threading import Thread, Condition
-from Queue import Queue
+from cs.py3 import Queue
 import time
 from cs.threads import AdjustableSemaphore, IterablePriorityQueue, \
                        WorkerThreadPool, TimerQueue
