@@ -3,7 +3,7 @@
 from collections import defaultdict, deque
 from functools import partial
 from threading import Lock
-from types import StringTypes
+from cs.py3 import StringTypes
 import sys
 from cs.lex import isUC_, parseUC_sAttr
 from cs.obj import O
