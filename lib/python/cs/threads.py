@@ -23,6 +23,7 @@ from cs.seq import seq
 from cs.excutils import transmute
 from cs.logutils import Pfx, LogTime, error, warning, debug, exception, OBSOLETE, D
 from cs.obj import O
+from cs.py3 import raise3
 
 class WorkerThreadPool(O):
   ''' A pool of worker threads to run functions.
@@ -120,8 +121,7 @@ class WorkerThreadPool(O):
         if retq is None and deliver is None:
           t, v, tb = sys.exc_info()
           debug("%s: worker thread: reraise exception", self)
-          raise t, v, tb
-          ##raise t(v).with_traceback(tb)
+          raise3(t, v, tb)
         debug("%s: worker thread: set result = (None, exc_info)", self)
         result = (None, sys.exc_info())
       finally:

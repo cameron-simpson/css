@@ -8,7 +8,7 @@ import sys
 from collections import deque
 from threading import Lock
 from threading import Thread, Condition
-from cs.py3 import Queue
+from cs.py3 import Queue, raise3
 import time
 from cs.threads import AdjustableSemaphore, IterablePriorityQueue, \
                        WorkerThreadPool, TimerQueue
@@ -328,12 +328,7 @@ class LateFunction(PendingFunction):
     '''
     result, exc_info = self.wait()
     if exc_info:
-      exc_type, exc_value, exc_traceback = exc_info
-      if sys.hexversion >= 0x03000000:
-        raise exc_type(exc_value).with_traceback(exc_traceback)
-      else:
-        # subterfuge to let this pass a python3 parser; ugly
-        exec('raise exc_type, exc_value, exc_traceback')
+      raise3(*exc_info)
     return result
 
   def set_result(self, result):
