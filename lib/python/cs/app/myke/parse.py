@@ -9,7 +9,7 @@ import os
 import os.path
 from os.path import dirname, realpath, isabs
 import re
-from string import whitespace, letters, digits
+from string import whitespace, digits
 import unittest
 from cs.lex import get_chars, get_other_chars, get_white, get_identifier
 from cs.logutils import Pfx, error, warning, info, debug, exception
