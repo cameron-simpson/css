@@ -1,6 +1,7 @@
 #!/usr/bin/python
 #
 
+from __future__ import print_function
 from contextlib import contextmanager
 from functools import partial
 import sys
@@ -328,9 +329,11 @@ class LateFunction(PendingFunction):
     result, exc_info = self.wait()
     if exc_info:
       exc_type, exc_value, exc_traceback = exc_info
-      raise exc_value
-      ##raise exc_type, exc_value, exc_traceback
-      ##raise exc_type(exc_value).with_traceback(exc_traceback)
+      if sys.hexversion >= 0x03000000:
+        raise exc_type(exc_value).with_traceback(exc_traceback)
+      else:
+        # subterfuge to let this pass a python3 parser; ugly
+        exec('raise exc_type, exc_value, exc_traceback')
     return result
 
   def set_result(self, result):
