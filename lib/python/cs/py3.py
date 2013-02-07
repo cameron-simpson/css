@@ -14,12 +14,12 @@ if  sys.hexversion < 0x03000000:
   except ImportError:
     from StringIO import StringIO as BytesIO
   StringIO = BytesIO    # horribly wrong, I know
-  from Queue import Queue
+  from Queue import Queue, Full as Queue_Full, Empty as Queue_Empty
 else:
   unicode = str
   StringTypes = (str,)
   from io import BytesIO, StringIO
-  from queue import Queue
+  from queue import Queue, Full as Queue_Full, Empty as Queue_Empty
 
 def raise3(exc_type, exc_value, exc_traceback):
   if sys.hexversion >= 0x03000000:
