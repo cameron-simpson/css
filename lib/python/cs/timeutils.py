@@ -4,6 +4,7 @@
 #       - Cameron Simpson <cs@zip.com.au> 01feb2010
 #
 
+from __future__ import print_function
 import datetime
 import time
 
@@ -64,8 +65,8 @@ def sleep(delay):
 
 if __name__ == '__main__':
   iso = '2012-08-24T11:12:13'
-  print "iso = %r" % (iso,)
+  print("iso = %r" % (iso,))
   tm = tmFromISO(iso)
-  print "tm = %r" % (tm,)
+  print("tm = %r" % (tm,))
   when = timeFromISO(iso, islocaltime=True)
-  print "time = %r" % (when,)
+  print("time = %r" % (when,))
