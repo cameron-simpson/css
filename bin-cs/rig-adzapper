@@ -39,7 +39,13 @@ pidf=$piddir/squid.pid
 rc=$HOME/var/adzapper/squid.conf
 cachedir=$HOME/var/adzapper/cache
 
-$trace killpidfile -w "$pidf"
+if [ -s "$pidf" ]
+then
+  $trace killpidfile -w "$pidf"
+  rm -f "$pidf"
+else
+  echo "$cmd: warning: no pid file: $pidf" >&2
+fi
 
 ## old proxy-mode standalone redirector
 ##exec alog squid_redirect squid_redirect -P "8080:$SQUID"
