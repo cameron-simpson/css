@@ -20,3 +20,10 @@ else:
   StringTypes = (str,)
   from io import BytesIO, StringIO
   from queue import Queue
+
+def raise3(exc_type, exc_value, exc_traceback):
+  if sys.hexversion >= 0x03000000:
+    raise exc_type(exc_value).with_traceback(exc_traceback)
+  else:
+    # subterfuge to let this pass a python3 parser; ugly
+    exec('raise exc_type, exc_value, exc_traceback')
