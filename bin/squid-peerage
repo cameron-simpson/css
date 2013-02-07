@@ -20,6 +20,8 @@ def main(argv):
   cmd = argv.pop(0)
   peerage = envsub(PEERAGE)
 
+  ok = True
+
   peers = {}
   proxies = Proxies()
   proxies.add_proxy('DIRECT', None)
@@ -48,7 +50,15 @@ def main(argv):
           if not etc:
             continue
           patterns = re.split('[\s,]+', etc)
-          proxies[proxname].patterns.extend(patterns)
+          if proxname not in proxies:
+            error("invalid proxname: %s", proxname)
+            ok = False
+          else:
+            proxies[proxname].patterns.extend(patterns)
+
+    if not ok:
+      error("invalid specification")
+      return 1
 
   proxnames = sorted(proxies.keys())
   for proxname in proxnames:
@@ -58,6 +68,8 @@ def main(argv):
   for proxname in proxnames:
     for access in proxies[proxname].peer_access:
       print(access)
+
+  return 0
 
 re_HAS_SCHEME = re.compile(r'^[a-z]+:')
 
