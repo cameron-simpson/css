@@ -5,10 +5,10 @@
 #
 
 import sys
-from types import StringTypes
 import cherrypy
 from cStringIO import StringIO
 import cs.html
+from cs.py3 import StringTypes
 from cs.nodedb import Node
 from cs.nodedb.export import export_csv_wide
 from cs.logutils import info, warning, error, debug, D

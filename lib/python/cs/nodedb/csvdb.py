@@ -9,16 +9,11 @@ import io
 import os
 import os.path
 import sys
-if sys.hexversion < 0x03000000:
-  from Queue import Full, Empty
-else:
-  from queue import Full, Empty
 from threading import Thread
-from types import StringTypes
 from cs.fileutils import lockfile
 from cs.logutils import Pfx, error, warning, info, D
 from cs.threads import IterableQueue
-from cs.py3 import unicode as u
+from cs.py3 import unicode as u, StringTypes, Queue_Full as Full, Queue_Empty as Empty
 from . import NodeDB
 from .backend import Backend
 

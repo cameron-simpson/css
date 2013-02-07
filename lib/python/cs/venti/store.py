@@ -19,7 +19,7 @@ import os.path
 import sys
 from threading import Lock
 from threading import Thread
-from Queue import Queue
+from cs.py3 import Queue
 from cs.later import Later, report as reportLFs
 from cs.logutils import info, debug, warning, Pfx, D
 from cs.serialise import toBS, fromBS

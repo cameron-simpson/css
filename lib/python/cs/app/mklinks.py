@@ -13,12 +13,12 @@ from stat import S_ISREG
 from collections import namedtuple
 import filecmp
 from tempfile import NamedTemporaryFile
-from types import StringTypes
 if sys.hexversion >= 0x02050000:
   from hashlib import md5
 else:
   from md5 import md5
 from cs.logutils import setup_logging, Pfx, error, warn, info, debug
+from cs.py3 import StringTypes
 
 # amount of file to read and checksum before trying whole file compare
 HASH_PREFIX_SIZE = 8192

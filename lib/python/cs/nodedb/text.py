@@ -10,7 +10,7 @@ import os
 import re
 import tempfile
 import sys
-from types import StringTypes
+from cs.py3 import StringTypes
 if sys.hexversion < 0x02060000:
   import simplejson as json
 else:

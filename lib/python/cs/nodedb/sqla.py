@@ -2,7 +2,6 @@
 
 import os
 from threading import Lock
-from types import StringTypes
 import sys
 import sqlalchemy
 from sqlalchemy import create_engine, \
@@ -11,6 +10,7 @@ from sqlalchemy import create_engine, \
 from sqlalchemy.orm import mapper, sessionmaker
 from sqlalchemy.sql import and_, or_, not_, asc
 from sqlalchemy.sql.expression import distinct
+from cs.py3 import StringTypes
 from cs.excutils import unimplemented
 from cs.logutils import Pfx, error, warning, debug
 from . import NodeDB, Backend
