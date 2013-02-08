@@ -17,12 +17,19 @@ setx=${DEBUG:-:}${DEBUG:+set -x}
 once=
 sshcfg=$PORTFWD_SSH_CONFIG
 fwdcfg=$PORTFWD_CONFIG
+pfnames=
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [-1] [-F ssh_config] targets...
   -1    Once. Do not restart the tunnel if it dies.
   -F    Ssh configuration file with clause for target.
         Default from \$PORTFWD_SSH_CONFIG: $sshcfg
+  -P pfname
+	Require the named portfwd instance to have its CONNECTED
+	flag true before starting our ssh. For a pfname of \"foo\"
+	the flag \"PORTFWD_FOO_CONNECTED\" is tested. Multiple -P
+	options may be supplied.
+
 If a target starts with an upper case letter it is taken to be a group name,
 and the targets are found by finding the first hostname in Host clauses with
 the group name appended. Example: \"Host home ALL\""
@@ -35,6 +42,7 @@ do
   case $1 in
     -1) once=1 ;;
     -F) sshcfg=$2 opts="$opts $1 $2"; shift ;;
+    -P) pfnames="$pfnames $2"; shift ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
         badopts=1
@@ -102,17 +110,33 @@ fi
 target=$1
 shift
 
+flag_connected=PORTFWD_`echo "$target" | tr -- '-[a-z]' '_[A-Z]'`_CONNECTED
+pfflags=
+for pfname in $pfnames
+do
+  pfflags="$pfflags "PORTFWD_`echo "$pfname" | tr -- '-[a-z]' '_[A-Z]'`_CONNECTED
+done
+
+# construct svcd "ok to ssh" test command
+test_shcmd=' flag -w PORTFWD_ANYWAY && exit 0
+             flag -w PORTFWD_DISABLE && exit 1'
+for pfflag in $pfflags
+do
+  test_shcmd="$test_shcmd
+              flag -w '$pfflag' || exit 1"
+done
+test_shcmd=" $test_shcmd
+           "'ssh-add -l >/dev/null || exit 1
+             netstat -rn | egrep '\''^(default|0\.0\.0\.0) +[1-9]'\'' >/dev/null || exit 1
+             [ -x "$HOME/bin-local/do-portfwd" ] || exit 0
+             "$HOME/bin-local/do-portfwd"
+            '
+
 # run main restart outer control via svcd
 [ $once ] \
 || exec set-x \
           svcd -n "PORTFWD_$target" \
-               -t 'flag -w PORTFWD_ANYWAY && exit 0
-                   flag -w PORTFWD_DISABLE && exit 1
-                   ssh-add -l >/dev/null || exit 1
-                   netstat -rn | egrep '\''^(default|0\.0\.0\.0) +[1-9]'\'' >/dev/null || exit 1
-                   [ -x "$HOME/bin-local/do-portfwd" ] || exit 0
-                   "$HOME/bin-local/do-portfwd"
-                  ' \
+               -t "$test_shcmd" \
                -- "$0" -1 $opts -- "$target"
 
 # getconfig target
@@ -145,13 +169,15 @@ esac
 sshopts=-n
 [ -n "$cfg_command" ] || sshopts="$sshopts -N"
 
+flag -w "$flag_connected" 0
 alert "STARTING: $target"
 tag_fd 2 "$target" \
   $trace \
     sshto $sshopts -F "$sshcfg" \
-      -o "PermitLocalCommand=yes" -o "LocalCommand=</dev/null alert CONNECTED: $target &" \
+      -o "PermitLocalCommand=yes" -o "LocalCommand=flag -w '$flag_connected' 1; </dev/null alert CONNECTED: $target &" \
       "$target" "$cfg_command" \
     >>"$cfg_outlog" </dev/null &
 subpids="$subpids $!"
 wait
+flag -w "$flag_connected" 0
 alert "EXITED: $target"
