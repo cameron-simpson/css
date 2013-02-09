@@ -2,20 +2,24 @@
 
 import sys
 from threading import Lock
-from cs.serialise import toBS, fromBS
+from cs.serialise import get_bs, put_bs
 from cs.venti import defaults, totext
 from .hash import Hash_SHA1, HASH_SHA1_T
 
 F_BLOCK_INDIRECT = 0x01 # indirect block
 F_BLOCK_HASHTYPE = 0x02 # hash type explicit
 
-def decodeBlocks(s):
-  while len(s) > 0:
-    B, s = decodeBlock(s)
+def decodeBlocks(bs, offset=0):
+  ''' Process a bytes from the supplied `offset` (default 0).
+      Yield Blocks.
+  '''
+  while offset < len(bs):
+    B, offset = decodeBlock(bs, offset)
     yield B
 
-def decodeBlock(s, justone=False):
+def decodeBlock(bs, offset=0):
   ''' Decode a Block reference.
+      Return the Block and the new offset.
       Format is:
         BS(flags)
           0x01 indirect blockref
@@ -23,37 +27,31 @@ def decodeBlock(s, justone=False):
         BS(span)
         [BS(hashtype)[BS(hashlen)]]
         hash
-      If the optional parameter 'justone' if false, return the Block or
-      IndirectBlock, and the tail of 's'.
-      If the optional paramater 'justone' is true, check the tail is
-      empty and return just the Block.
   '''
-  s0 = s
-  flags, s = fromBS(s)
+  bs0 = bs
+  offset0 = offset
+  flags, offset = get_bs(bs, offset)
   unknown_flags = flags & ~(F_BLOCK_INDIRECT|F_BLOCK_HASHTYPE)
-  assert unknown_flags == 0, \
-         "unexpected flags value (0x%02x) with unsupported flags=0x%02x, s=%s" \
-         % (flags, unknown_flags, totext(s0))
-  span, s = fromBS(s)
+  if unknown_flags:
+    raise ValueError("unexpected flags value (0x%02x) with unsupported flags=0x%02x, bs[offset=%d:]=%r",
+                     flags, unknown_flags, bs0, offset0)
+  span, offset = get_bs(bs, offset)
   indirect = bool(flags & F_BLOCK_INDIRECT)
   if flags & F_BLOCK_HASHTYPE:
-    assert False, "unexpected flags & F_BLOCK_HASHTYPE"
-    hashenum, s = fromBS(s)
+    hashenum, offset = get_bs(bs, offset)
+    if hashenum != HASH_SHA1_T:
+      raise RuntimeError("unsupported hash enum %d, don't know if I need a hashlen here", hashenum)
   else:
     hashenum = HASH_SHA1_T
   if hashenum == HASH_SHA1_T:
-    hashcode, s = Hash_SHA1.decode(s)
+    hashcode, offset = Hash_SHA1.decode(s)
   else:
-    assert False, "unsupported hash enum %d" % (hashenum,)
-    # will read hlen here for some hash types
+    raise RuntimeError("unsupported hash enum %d", hashenum)
   if indirect:
     B = IndirectBlock(hashcode=hashcode, span=span)
   else:
     B = Block(hashcode=hashcode, span=span)
-  if justone:
-    assert len(s) == 0, "extra stuff after block ref: %s" % (totext(s),)
-    return B
-  return B, s
+  return B, offset
 
 def isBlock(o):
   return isinstance(o, _Block)
@@ -106,7 +104,7 @@ class _Block(object):
     hashcode = self.hashcode
     if hashcode.hashenum != HASH_SHA1_T:
       flags |= F_BLOCK_HASHTYPE
-    enc = "".join([toBS(flags), toBS(len(self)), hashcode.encode()])
+    enc = put_bs(flags) + put_bs(len(self)) + hashcode.encode()
     assert len(enc) >= 22
     return enc
 
