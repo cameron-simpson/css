@@ -73,4 +73,6 @@ def put_bs(n):
   while n > 0:
     bs.append( 0x80 | (n&0x7f) )
     n >>= 7
-  return bytes(reverse(bs))
+  bs = bytes(bs)
+  bs.reverse()
+  return bs
