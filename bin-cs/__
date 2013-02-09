@@ -4,5 +4,6 @@
 #       - Cameron Simpson <cs@zip.com.au> 28nov2012
 #
 
+[ $# -gt 0 ] || set -- *' '*
 set -x
 exec frename 's/\s+/_/g' ${1+"$@"}
