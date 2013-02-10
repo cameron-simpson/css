@@ -6,6 +6,8 @@ else:
 if sys.hexversion < 0x02060000:
   bytes = str
 from cs.lex import hexify
+from cs.logutils import D
+from cs.serialise import get_bs, put_bs
 
 # enums for hash types, used in encode/decode
 # TODO: use classes directly?
@@ -15,6 +17,23 @@ HASH_SIZE_DEFAULT = 20                            # default size of hash
                                                 # NEVER CHANGE HASH_SIZE!!!
 assert HASH_SIZE_DEFAULT == 20
 
+def decode(bs, offset=0):
+  ''' Decode a serialised hash.
+      Return the hash object and new offset.
+  '''
+  hashenum, offset = get_bs(bs, offset)
+  if hashenum == HASH_SHA1_T:
+    hashcls = Hash_SHA1
+  else:
+    raise ValueError("unsupported hashenum %d", hashenum)
+  hashlen = hashcls.hashlen
+  hashdata = bs[offset:offset+hashlen]
+  if len(hashdata) < hashlen:
+    raise ValueError("short hashdata, expected %d bytes, got %d: %r"
+                     % (hashlen, len(hashdata), hashdata))
+  offset += len(hashdata)
+  return hashcls(hashdata), offset
+
 class Hash_SHA1(bytes):
   hashlen = 20
   hashenum = HASH_SHA1_T
@@ -23,7 +42,7 @@ class Hash_SHA1(bytes):
     return hexify(self)
 
   def __repr__(self):
-    return "Hash_SHA1:"+hexify(self)
+    return "Hash_SHA1:" + hexify(self)
 
   @classmethod
   def fromData(cls, data):
@@ -39,20 +58,20 @@ class Hash_SHA1(bytes):
 
   def encode(self):
     ''' Return the serialised form of this hash object.
-        This presumes the reader will know the hash type,
-        and thus the decode() method to use.
     '''
-    # no hashenum, no hashlen, just raw hash
-    return self
+    # no hashenum and raw hash
+    return put_bs(self.hashenum) + self
 
   @classmethod
-  def decode(cls, encdata):
+  def decode(cls, encdata, offset=0):
     ''' Pull off the encoded hash from the start of the encdata.
         Return Hash_SHA1 object and tail of encdata.
     '''
-    hashcode = encdata[:cls.hashlen]
-    assert len(hashcode) == cls.hashlen, "encdata (%d bytes) too short" % (len(encdata),)
-    return cls.fromHashcode(hashcode), encdata[cls.hashlen:]
+    hashdata = encdata[offset:offset+cls.hashlen]
+    if len(hashdata) != cls.hashlen:
+      raise ValueError("short data? got %d bytes, expected %d: %r"
+                       % (len(hashdata), cls.hashlen, encdata[offset:offset+cls.hashlen]))
+    return cls.fromHashcode(hashdata), offset+len(hashdata)
 
 if __name__ == '__main__':
   import cs.venti.hash_tests
