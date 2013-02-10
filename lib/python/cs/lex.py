@@ -161,11 +161,14 @@ def dict2js(d):
 
 _texthexify_white_re = re.compile(r'[a-zA-Z0-9_\-+.,/]+')
 
-def texthexify(s, shiftin='[', shiftout=']', whitelist_re=None):
-  ''' Transcribe the byte string `s` to text.
+def texthexify(bs, shiftin='[', shiftout=']', whitelist_re=None):
+  ''' Transcribe the bytes `bs` to text.
       hexify() and texthexify() output strings may be freely
       concatenated and decoded with untexthexify().
   '''
+  # blond conversion of bytes to unicode so we can apply regexp
+  byte_coding = 'iso8859-1'
+  s = bs.decode(byte_coding)
   if whitelist_re is None:
     whitelist_re = _texthexify_white_re
   elif type(whitelist_re) is str:
@@ -182,13 +185,13 @@ def texthexify(s, shiftin='[', shiftout=']', whitelist_re=None):
     text = m.group(0)
     if len(text) >= inout_len:
       if offset > pos:
-        chunks.append(hexify(s[sofar:offset]))
+        chunks.append(hexify(bytes(s[sofar:offset], byte_coding)))
       chunks.append(shiftin + text + shiftout)
       sofar = m.end(0)
     pos = m.end(0)
 
   if sofar < len(s):
-    chunks.append(hexify(s[sofar:]))
+    chunks.append(hexify(bytes(s[sofar:], byte_coding)))
 
   return ''.join(chunks)
 
