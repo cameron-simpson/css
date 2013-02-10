@@ -1,9 +1,17 @@
 import base64
+import binascii
 import quopri
 import string
 import re
-from binascii import hexlify as hexify, unhexlify as unhexify
+import sys
 from cs.py3 import unicode
+
+unhexify = binascii.unhexlify
+if sys.hexversion >= 0x030000:
+  def hexify(bs):
+    return binascii.hexlify(bs).decode()
+else:
+  hexify = binascii.hexlify
 
 ord_space=ord(' ')
 
