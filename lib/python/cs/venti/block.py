@@ -44,6 +44,14 @@ def decodeBlock(bs, offset=0):
     B = Block(hashcode=hashcode, span=span)
   return B, offset
 
+def encodeBlocks(blocks):
+  ''' Return data bytes for an IndirectBlock.
+  '''
+  encs = []
+  for B in blocks:
+    encs.append(B.encode())
+  return b''.join(encs)
+
 def isBlock(o):
   return isinstance(o, _Block)
 
