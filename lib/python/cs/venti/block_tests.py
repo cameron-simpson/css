@@ -7,8 +7,9 @@
 import sys
 import unittest
 ##from cs.logutils import D
+from cs.logutils import D
 from cs.venti import totext
-from .block import Block, IndirectBlock
+from .block import Block, IndirectBlock, encodeBlocks
 
 class TestAll(unittest.TestCase):
 
@@ -21,20 +22,21 @@ class TestAll(unittest.TestCase):
     from .cache import MemCacheStore
     S = MemCacheStore()
     with S:
-      IB = IndirectBlock()
+      IB = []
       for i in range(10):
-        rs = ''.join( chr(random.randint(0, 255)) for x in range(100) )
+        rs = bytes( random.randint(0, 255) for x in range(100) )
         B = Block(data=rs)
         self.assertEqual(len(B), 100)
+        self.assertEqual(B.span, 100)
+        B.store()
         IB.append(B)
-        self.assertEqual(len(IB), (i+1)*100)
+      IB = IndirectBlock(data=encodeBlocks(IB))
       IB.store()
-      self.assertEqual(len(IB), 1000)
+      sp = IB.span
+      self.assertEqual(IB.span, 1000)
       IBH = IB.hashcode
-      IBdata = IB.data
-      ##D("IBdata = %s:%d:%r", type(IBdata), len(IBdata), IBdata,)
-      IB2data = IndirectBlock(hashcode=IBH, span=len(IBdata)).data
-      ##D("IB2data = %s:%d:%r", type(IB2data), len(IB2data), IB2data,)
+      IBdata = IB.all_data()
+      IB2data = IndirectBlock(hashcode=IBH).all_data()
       self.assertEqual(IBdata, IB2data, "IB:  %s\nIB2: %s" % (totext(IBdata), totext(IB2data)))
 
 def selftest(argv):
