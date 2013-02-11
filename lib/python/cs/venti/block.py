@@ -1,7 +1,8 @@
 #!/usr/bin/python
 
 import sys
-from threading import Lock
+from threading import RLock
+from cs.logutils import D
 from cs.serialise import get_bs, put_bs
 from cs.venti import defaults, totext
 from .hash import Hash_SHA1, HASH_SHA1_T
@@ -59,10 +60,13 @@ def isBlock(o):
 class _Block(object):
   # TODO: hashcode(), data(), blockdata() should use __getattr__
 
-  def __init__(self):
-    self.indirect = None
-    self._hashcode = None
-    self._hashcode_lock = Lock()
+  def __init__(self, data=None, hashcode=None, span=None):
+    if data is None and hashcode is None:
+      raise ValueError("one of data or hashcode must be not-None")
+    self._lock = RLock()
+    self._data = data
+    self._hashcode = hashcode
+    self._span = span
 
   def __str__(self):
     return self.textEncode()
