@@ -5,10 +5,9 @@ from threading import RLock
 from cs.logutils import D
 from cs.serialise import get_bs, put_bs
 from cs.venti import defaults, totext
-from .hash import Hash_SHA1, HASH_SHA1_T
+from .hash import Hash_SHA1, HASH_SHA1_T, HASH_SIZE_SHA1, decode as hash_decode
 
 F_BLOCK_INDIRECT = 0x01 # indirect block
-F_BLOCK_HASHTYPE = 0x02 # hash type explicit
 
 def decodeBlocks(bs, offset=0):
   ''' Process a bytes from the supplied `offset` (default 0).
@@ -26,28 +25,19 @@ def decodeBlock(bs, offset=0):
           0x01 indirect blockref
           0x02 non-SHA1 hashcode
         BS(span)
-        [BS(hashtype)[BS(hashlen)]]
         hash
   '''
   bs0 = bs
   offset0 = offset
   flags, offset = get_bs(bs, offset)
-  unknown_flags = flags & ~(F_BLOCK_INDIRECT|F_BLOCK_HASHTYPE)
+  ##D("flags=0x%02x", flags)
+  unknown_flags = flags & ~F_BLOCK_INDIRECT
   if unknown_flags:
-    raise ValueError("unexpected flags value (0x%02x) with unsupported flags=0x%02x, bs[offset=%d:]=%r",
-                     flags, unknown_flags, bs0, offset0)
+    raise ValueError("unexpected flags value (0x%02x) with unsupported flags=0x%02x, bs[offset=%d:]=%r"
+                     % (flags, unknown_flags, offset0, bs0[offset0:]))
   span, offset = get_bs(bs, offset)
   indirect = bool(flags & F_BLOCK_INDIRECT)
-  if flags & F_BLOCK_HASHTYPE:
-    hashenum, offset = get_bs(bs, offset)
-    if hashenum != HASH_SHA1_T:
-      raise RuntimeError("unsupported hash enum %d, don't know if I need a hashlen here", hashenum)
-  else:
-    hashenum = HASH_SHA1_T
-  if hashenum == HASH_SHA1_T:
-    hashcode, offset = Hash_SHA1.decode(s)
-  else:
-    raise RuntimeError("unsupported hash enum %d", hashenum)
+  hashcode, offset = hash_decode(bs, offset)
   if indirect:
     B = IndirectBlock(hashcode=hashcode, span=span)
   else:
