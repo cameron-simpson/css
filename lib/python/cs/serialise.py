@@ -4,6 +4,8 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
+from cs.logutils import D
+
 def fromBS(s):
   ''' Read an extensible value from the front of a string.
       Continuation octets have their high bit set.
@@ -57,7 +59,7 @@ def get_bs(bs, offset=0):
   offset += 1
   n = o & 0x7f
   while o & 0x80:
-    o = bs[used]
+    o = bs[offset]
     offset += 1
     n = (n<<7) | (o&0x7f)
   return n, offset
@@ -73,6 +75,4 @@ def put_bs(n):
   while n > 0:
     bs.append( 0x80 | (n&0x7f) )
     n >>= 7
-  bs = bytes(bs)
-  bs.reverse()
-  return bs
+  return bytes(reversed(bs))
