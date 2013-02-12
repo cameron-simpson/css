@@ -8,7 +8,7 @@
 from itertools import chain
 import sys
 from threading import Thread
-from cs.logutils import debug
+from cs.logutils import debug, D
 from cs.threads import IterableQueue
 from cs.venti import defaults
 from .block import Block, IndirectBlock
@@ -59,24 +59,24 @@ def topIndirectBlock(blockSource):
 
   # Fetch the first two indirect blocks from the generator.
   # If there is none, return a single empty direct block.
-  # If there is just one, return it.
-  # Otherwise there are two (implicitly: or more):
+  # If there is just one, return it directly.
+  # Otherwise there are at lelast two:
   # replace the blockSource with another level of fullIndirectBlocks()
   # reading from the two fetched blocks and the tail of the surrent
   # blockSource then lather, rinse, repeat.
   #
   while True:
     try:
-      topblock = blockSource.next()
+      topblock = next(blockSource)
     except StopIteration:
       # no blocks - return the empty block - no data
-      return Block(data="")
+      return Block(data=b'')
 
     # we have a full IndirectBlock
     # if there are more, replace our blockSource with
     #   fullIndirectBlocks(topblock + nexttopblock + blockSource)
     try:
-      nexttopblock = blockSource.next()
+      nexttopblock = next(blockSource)
     except StopIteration:
       # just one IndirectBlock - we're done
       return topblock
@@ -148,24 +148,25 @@ def fullIndirectBlocks(blockSource):
       necessarily be bundled into an IndirectBlock.
   '''
   S = defaults.S
-  iblock = IndirectBlock()
+  subblocks = []
   # how many subblock refs will fit in a block: flags(1)+span(2)+hash
-  max_subblocks = int(MAX_BLOCKSIZE/(3+S.hashclass.hashlen))
+  ## TODO: // ?
+  max_subblocks = int(MAX_BLOCKSIZE / (3+S.hashclass.HASHLEN_ENCODED))
   for block in blockSource:
-    if len(iblock.subblocks()) >= max_subblocks:
+    if len(subblocks) >= max_subblocks:
       # overflow
-      yield iblock
-      iblock = IndirectBlock()
-    block.store(discard=True)
-    iblock.append(block)
+      yield IndirectBlock(subblocks)
+      subblocks = []
+    block.store(flush=True)
+    subblocks.append(block)
 
   # handle the termination case
-  if len(iblock) > 0:
-    if len(iblock) == 1:
+  if len(subblocks) > 0:
+    if len(subblocks) == 1:
       # one block unyielded - don't bother wrapping into an iblock
-      block = iblock[0]
+      block = subblock[0]
     else:
-      block = iblock
+      block = IndirectBlock(subblocks)
     yield block
 
 def blocksOf(dataSource, vocab=None):
@@ -209,7 +210,7 @@ def blocksOf(dataSource, vocab=None):
           vocab = subVocab
         buf.append(data[:edgepos])
         data = data[edgepos:]
-        yield Block("".join(buf))
+        yield Block(data=b''.join(buf))
         buf = []
         buflen = 0
         continue
@@ -236,7 +237,7 @@ def blocksOf(dataSource, vocab=None):
 
   # no more data - yield remaining buffer
   if buflen > 0:
-    yield Block("".join(buf))
+    yield Block(data=b''.join(buf))
 
 class RollingHash(object):
   ''' Compute a rolling hash over 4 bytes of data.
@@ -253,11 +254,11 @@ class RollingHash(object):
     return self.n
 
   def findEdge(self, data, probe_len):
-    ''' Add characters from data to the rolling hash until probe_len characters
+    ''' Add bytes from data to the rolling hash until probe_len characters
         are accumulated or the magic hash code is encountered.
         Return the offset where the match was found, or -1 if no match.
-        POST: -1: probe_len characters added to the hash.
-              >=0: offset characters added to the hash
+        POST: -1: probe_len bytes added to the hash.
+              >=0: offset bytes added to the hash
     '''
     assert probe_len > 0
     probe_len = min(probe_len, len(data))
@@ -283,7 +284,7 @@ class Vocabulary(dict):
 
   def __init__(self, vocabDict=None):
     dict.__init__(self)
-    self.__startChars = ""
+    self.start_bytes = bytearray()
     if vocabDict is not None:
       for word in vocabDict:
         self.addWord(word, vocabDict[word])
@@ -303,52 +304,52 @@ class Vocabulary(dict):
       offset, subVocab = info
       subVocab = Vocabulary(subVocab)
     ch1 = word[0]
-    if ch1 not in self.__startChars:
-      self.__startChars += ch1
+    if ch1 not in self.start_bytes:
+      self.start_bytes.append(ch1)
       self[ch1] = []
     self[ch1].append( (word, offset, subVocab) )
 
-  def match(self, s, pos, endpos):
-    ''' Locate the earliest occurence in the string 's' of a vocabuary word.
+  def match(self, bs, pos, endpos):
+    ''' Locate the earliest occurence in the string 'bs' of a vocabuary word.
         Return (edgepos, word, offset, subVocab) for a match or None on no match.
         `edgepos` is the boundary position.
         `word` will be present at edgepos-offset.
         `subVocab` is the new vocabulary to use from this point, or None
         for no change.
     '''
-    assert pos >= 0 and pos < len(s)
-    assert endpos > pos and endpos <= len(s)
+    assert pos >= 0 and pos < len(bs)
+    assert endpos > pos and endpos <= len(bs)
     matched = None
-    for ch in self.__startChars:
+    for ch in self.start_bytes:
       wordlist = self[ch]
       findpos = pos
       while findpos < endpos:
-        cpos = s.find(ch, findpos, endpos)
+        cpos = bs.find(ch, findpos, endpos)
         if cpos < 0:
           break
         findpos = cpos + 1      # start here on next find
         for word, offset, subVocab in wordlist:
-          if s.startswith(word, cpos):
+          if bs.startswith(word, cpos):
             edgepos = cpos + offset
             matched = (edgepos, word, offset, subVocab)
             endpos = edgepos
             break
     return matched
 
-# TODO: reform as list of (str, offset, sublist).
+# TODO: reform as list of (bytes, offset, sublist).
 DFLT_VOCAB = Vocabulary({
-                "\ndef ": 1,          # python top level function
-                "\n  def ": 1,        # python class method, 2 space indent
-                "\n    def ": 1,      # python class method, 4 space indent
-                "\nclass ": 1,        # python top level class
-                "\npackage ": 1,      # perl package
-                "\n}\n\n": 3,         # C-ish function ending
-                "\n};\n\n": 3,        # JavaScript method assignment ending
-                "\nFrom ":            # UNIX mbox separator
+                b"\ndef ": 1,         # python top level function
+                b"\n  def ": 1,       # python class method, 2 space indent
+                b"\n    def ": 1,     # python class method, 4 space indent
+                b"\nclass ": 1,       # python top level class
+                b"\npackage ": 1,     # perl package
+                b"\n}\n\n": 3,        # C-ish function ending
+                b"\n};\n\n": 3,       # JavaScript method assignment ending
+                b"\nFrom ":           # UNIX mbox separator
                   [ 1,
-                    { "\n\n--": 2,    # MIME separators
-                      "\r\n\r\n--": 4,
-                      "\nFrom ": 1,
+                    { b"\n\n--": 2,   # MIME separators
+                      b"\r\n\r\n--": 4,
+                      b"\nFrom ": 1,
                     },
                   ],
               })
@@ -378,10 +379,10 @@ def mp3frames(fp):
   chunk = ''
   while True:
     while len(chunk) < 4:
-      s = fp.read(4-len(chunk))
-      if len(s) == 0:
+      bs = fp.read(4-len(chunk))
+      if len(bs) == 0:
         break
-      chunk += s
+      chunk += bs
     if len(chunk) == 0:
       return
     assert len(chunk) >= 4, "short data at end of fp"
@@ -448,10 +449,10 @@ def mp3frames(fp):
 
     ##print >>sys.stderr, "vid =", audio_vid, "layer =", layer, "has_crc =", has_crc, "frame_len =", frame_len, "bitrate =", bitrate, "samplingrate =", samplingrate, "padding =", padding
     while len(chunk) < frame_len:
-      s = fp.read(frame_len - len(chunk))
-      if len(s) == 0:
+      bs = fp.read(frame_len - len(chunk))
+      if len(bs) == 0:
         break
-      chunk += s
+      chunk += bs
     assert len(chunk) >= frame_len
 
     yield chunk[:frame_len]
