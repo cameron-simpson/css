@@ -356,12 +356,14 @@ class IterableQueue(Queue):
     '''
     return self
 
-  def next(self):
+  def __next__(self):
     try:
       item = self.get()
     except Empty:
       raise StopIteration
     return item
+
+  next == __next__
 
 class IterablePriorityQueue(PriorityQueue):
   ''' A PriorityQueue implementing the iterator protocol.
