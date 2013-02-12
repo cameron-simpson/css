@@ -58,13 +58,15 @@ def isBlock(o):
 
 class _Block(object):
 
-  def __init__(self, data=None, hashcode=None, span=None):
+  def __init__(self, data=None, hashcode=None, span=None, doStore=False, doFlush=False):
     if data is None and hashcode is None:
       raise ValueError("one of data or hashcode must be not-None")
     self._lock = RLock()
     self._data = data
     self._hashcode = hashcode
     self._span = span
+    if doStore:
+      self.store(doFlush)
 
   def __str__(self):
     return self.textEncode()
@@ -98,6 +100,8 @@ class _Block(object):
     return sp
 
   def _flush(self):
+    if self._hashcode is None:
+      self.store()
     self._data = None
 
   def __getitem__(self, index):
@@ -116,6 +120,12 @@ class _Block(object):
         If `discard` is true, release the block's data.
     '''
     hashcode = defaults.S.add(self.data)
+    if self._hashcode is None:
+      self._hashcode = hashcode
+    elif hashcode != self._hashcode:
+      raise RuntimeError(
+              "store()d hashcode does not match cache: self._hashcode=%r, stored=%r"
+              % (self._hashcode, hashcode))
     if flush:
       self._flush()
 
@@ -132,8 +142,6 @@ class _Block(object):
     if self.indirect:
       flags |= F_BLOCK_INDIRECT
     hashcode = self.hashcode
-    if hashcode.hashenum != HASH_SHA1_T:
-      flags |= F_BLOCK_HASHTYPE
     enc = put_bs(flags) + put_bs(self.span) + hashcode.encode()
     assert len(enc) >= 22
     return enc
