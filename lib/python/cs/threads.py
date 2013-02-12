@@ -13,17 +13,13 @@ import sys
 import time
 from threading import Lock
 from threading import Semaphore, Thread, Timer
-if sys.hexversion < 0x03000000:
-  from Queue import Queue, PriorityQueue, Full, Empty
-else:
-  from queue import Queue, PriorityQueue, Full, Empty
 from collections import deque
 if sys.hexversion < 0x02060000: from sets import Set as set
 from cs.seq import seq
 from cs.excutils import transmute
 from cs.logutils import Pfx, LogTime, error, warning, debug, exception, OBSOLETE, D
 from cs.obj import O
-from cs.py3 import raise3
+from cs.py3 import raise3, Queue, PriorityQueue, Queue_Full, Queue_Empty
 
 class WorkerThreadPool(O):
   ''' A pool of worker threads to run functions.
@@ -321,21 +317,21 @@ class IterableQueue(Queue):
     item = Queue.get(self, *a)
     if item is self.sentinel:
       Queue.put(self, self.sentinel)
-      raise Empty
+      raise Queue_Empty
     return item
 
   def get_nowait(self):
     item = Queue.get_nowait(self)
     if item is self.sentinel:
       Queue.put(self, self.sentinel)
-      raise Empty
+      raise Queue_Empty
     return item
 
   def put(self, item, *args, **kw):
     ''' Put an item on the queue.
     '''
     if self.closed:
-      raise Full("put() on closed IterableQueue")
+      raise Queue_Full("put() on closed IterableQueue")
     if item is self.sentinel:
       raise ValueError("put(sentinel) on IterableQueue")
     return Queue.put(self, item, *args, **kw)
@@ -359,7 +355,7 @@ class IterableQueue(Queue):
   def __next__(self):
     try:
       item = self.get()
-    except Empty:
+    except Queue_Empty:
       raise StopIteration
     return item
 
