@@ -100,8 +100,8 @@ class Test(unittest.TestCase):
       with NamedTemporaryFile() as T2:
         T2.write(data)
         T2.flush()
-        self.assertEquals( open(T1.name).read(), data, "bad data in %s" % (T1.name,) )
-        self.assertEquals( open(T2.name).read(), data, "bad data in %s" % (T2.name,) )
+        self.assertEqual( open(T1.name).read(), data, "bad data in %s" % (T1.name,) )
+        self.assertEqual( open(T2.name).read(), data, "bad data in %s" % (T2.name,) )
         self.assertTrue(compare(T1.name, T2.name), "mismatched data in %s and %s" % (T1.name, T2.name))
 
   def test_rewrite(self):
@@ -111,9 +111,9 @@ class Test(unittest.TestCase):
     with NamedTemporaryFile() as T1:
       T1.write(olddata)
       T1.flush()
-      self.assertEquals( open(T1.name).read(), olddata, "bad old data in %s" % (T1.name,) )
+      self.assertEqual( open(T1.name).read(), olddata, "bad old data in %s" % (T1.name,) )
       rewrite(T1.name, StringIO(newdata))
-      self.assertEquals( open(T1.name).read(), newdata, "bad new data in %s" % (T1.name,) )
+      self.assertEqual( open(T1.name).read(), newdata, "bad new data in %s" % (T1.name,) )
 
   def test_lockfile_00_basic(self):
     lockbase = self.lockbase
@@ -168,35 +168,35 @@ class Test(unittest.TestCase):
     self.assertTrue(data1 is None)
     sleep(1.1)
     data1 = PC.test1
-    self.assertEquals(data1, "data1 value 1")
+    self.assertEqual(data1, "data1 value 1")
     # NB: data value changes length because the file timestamp might not
     # due to 1s resolution in stat structures
     PC.write1("data1 value 1b")
     self.assertTrue(os.path.exists(PC._test1_path))
     data1 = PC.test1
     # too soon after last poll
-    self.assertEquals(data1, "data1 value 1")
+    self.assertEqual(data1, "data1 value 1")
     sleep(1)
     data1 = PC.test1
-    self.assertEquals(data1, "data1 value 1b")
+    self.assertEqual(data1, "data1 value 1b")
     os.remove(PC._test1_path)
     self.assertTrue(not os.path.exists(PC._test1_path))
     data1 = PC.test1
     # too soon to poll
-    self.assertEquals(data1, "data1 value 1b")
+    self.assertEqual(data1, "data1 value 1b")
     sleep(1)
     # poll should fail and keep cached value
     data1 = PC.test1
-    self.assertEquals(data1, "data1 value 1b")
+    self.assertEqual(data1, "data1 value 1b")
     PC.write1("data1 value 1bc")
     self.assertTrue(os.path.exists(PC._test1_path))
     data1 = PC.test1
     # too soon to poll
-    self.assertEquals(data1, "data1 value 1b")
+    self.assertEqual(data1, "data1 value 1b")
     sleep(1)
     # poll should succeed and load new value
     data1 = PC.test1
-    self.assertEquals(data1, "data1 value 1bc")
+    self.assertEqual(data1, "data1 value 1bc")
 
   def test_make_file_property_01(self):
     PC = self.fileprop = TestFileProperty()
@@ -214,37 +214,37 @@ class Test(unittest.TestCase):
     self.assertTrue(data2 is None)
     sleep(0.2)
     data2 = PC.test2
-    self.assertEquals(data2, "data2 value 1")
+    self.assertEqual(data2, "data2 value 1")
     PC.write2("data2 value 1b")
     self.assertTrue(os.path.exists(PC._test2_path))
     data2 = PC.test2
     # too soon after last poll
-    self.assertEquals(data2, "data2 value 1")
+    self.assertEqual(data2, "data2 value 1")
     sleep(0.1)
     data2 = PC.test2
     # still too soon after last poll
-    self.assertEquals(data2, "data2 value 1")
+    self.assertEqual(data2, "data2 value 1")
     sleep(0.3)
     data2 = PC.test2
-    self.assertEquals(data2, "data2 value 1b")
+    self.assertEqual(data2, "data2 value 1b")
     os.remove(PC._test2_path)
     self.assertTrue(not os.path.exists(PC._test2_path))
     data2 = PC.test2
     # too soon to poll
-    self.assertEquals(data2, "data2 value 1b")
+    self.assertEqual(data2, "data2 value 1b")
     sleep(0.3)
     # poll should fail and keep cached value
     data2 = PC.test2
-    self.assertEquals(data2, "data2 value 1b")
+    self.assertEqual(data2, "data2 value 1b")
     PC.write2("data2 value 1bc")
     self.assertTrue(os.path.exists(PC._test2_path))
     data2 = PC.test2
     # too soon to poll
-    self.assertEquals(data2, "data2 value 1b")
+    self.assertEqual(data2, "data2 value 1b")
     sleep(0.3)
     # poll should succeed and load new value
     data2 = PC.test2
-    self.assertEquals(data2, "data2 value 1bc")
+    self.assertEqual(data2, "data2 value 1bc")
 
   def test_make_files_property_01(self):
     PC = self.filesprop = TestFilesProperty()
@@ -263,37 +263,37 @@ class Test(unittest.TestCase):
     self.assertTrue(data2 is None)
     sleep(0.2)
     data2 = PC.test2
-    self.assertEquals(data2, "data2 value 1")
+    self.assertEqual(data2, "data2 value 1")
     PC.write2("data2 value 1b")
     self.assertTrue(os.path.exists(PC._test2_paths[0]))
     data2 = PC.test2
     # too soon after last poll
-    self.assertEquals(data2, "data2 value 1")
+    self.assertEqual(data2, "data2 value 1")
     sleep(0.1)
     data2 = PC.test2
     # still too soon after last poll
-    self.assertEquals(data2, "data2 value 1")
+    self.assertEqual(data2, "data2 value 1")
     sleep(0.3)
     data2 = PC.test2
-    self.assertEquals(data2, "data2 value 1b")
+    self.assertEqual(data2, "data2 value 1b")
     os.remove(PC._test2_paths[0])
     self.assertTrue(not os.path.exists(PC._test2_paths[0]))
     data2 = PC.test2
     # too soon to poll
-    self.assertEquals(data2, "data2 value 1b")
+    self.assertEqual(data2, "data2 value 1b")
     sleep(0.3)
     # poll should fail and keep cached value
     data2 = PC.test2
-    self.assertEquals(data2, "data2 value 1b")
+    self.assertEqual(data2, "data2 value 1b")
     PC.write2("data2 value 1bc")
     self.assertTrue(os.path.exists(PC._test2_paths[0]))
     data2 = PC.test2
     # too soon to poll
-    self.assertEquals(data2, "data2 value 1b")
+    self.assertEqual(data2, "data2 value 1b")
     sleep(0.3)
     # poll should succeed and load new value
     data2 = PC.test2
-    self.assertEquals(data2, "data2 value 1bc")
+    self.assertEqual(data2, "data2 value 1bc")
 
   def _eq(self, a, b, opdesc):
     ''' Convenience wrapper for assertEqual.

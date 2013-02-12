@@ -34,13 +34,13 @@ class TestMailFiler(unittest.TestCase):
       flags = O(alert=False, halt=False)
     R, = list(parserules(rule_lines))
     D("R = %s", R)
-    self.assertEquals(len(R.actions), 1)
-    self.assertEquals(R.actions[0], action_tuple)
-    self.assertEquals(R.label, labelstr)
-    self.assertEquals(R.flags.alert, flags.alert)
-    self.assertEquals(R.flags.halt, flags.halt)
+    self.assertEqual(len(R.actions), 1)
+    self.assertEqual(R.actions[0], action_tuple)
+    self.assertEqual(R.label, labelstr)
+    self.assertEqual(R.flags.alert, flags.alert)
+    self.assertEqual(R.flags.halt, flags.halt)
     if conditions is not None:
-      self.assertEquals(len(R.conditions), len(conditions))
+      self.assertEqual(len(R.conditions), len(conditions))
       for i in range(len(conditions)):
         C = conditions[i]
         RC = R.conditions[i]
@@ -58,7 +58,7 @@ class TestMailFiler(unittest.TestCase):
                   else:
                     self.assertTrue(flag_name not in Cflags, "\"%s\" expected, but not in Rule" % (flag_name,))
             else:
-              self.assertEquals(getattr(C, attr), getattr(RC, attr))
+              self.assertEqual(getattr(C, attr), getattr(RC, attr))
 
   def testParseRules(self):
     self._testSingleRule( "varname=value", ('ASSIGN', ('varname', 'value')), '', () )

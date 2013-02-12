@@ -65,6 +65,6 @@ if __name__ == '__main__':
     def test01selfread(self):
       lines = open(__file__).readlines()
       tlines = [ _ for _ in tail(open(__file__), seekwhence=os.SEEK_SET, quit_at_eof=True) ]
-      self.assertEquals(lines, tlines)
+      self.assertEqual(lines, tlines)
 
   unittest.main()

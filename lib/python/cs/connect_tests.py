@@ -18,7 +18,7 @@ class TestConnect(unittest.TestCase):
 
   def test_00_BufferFile_00(self):
     BF = _BufferFile(0)
-    self.assertEquals(b'', BF.read(0, 0))
+    self.assertEqual(b'', BF.read(0, 0))
     # read before the begiing of the file
     self.assertRaises(ValueError, BF.read, -1, 0)
     # read after the end of the file

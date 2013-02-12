@@ -50,15 +50,15 @@ class TestTimerQueue(unittest.TestCase):
     self.TQ.add(time.time()+2, lambda: self.Q.put(2))
     self.TQ.add(time.time()+1, lambda: self.Q.put(1))
     x = self.Q.get()
-    self.assertEquals(x, 1, "expected 1, got x=%s" % (x,))
+    self.assertEqual(x, 1, "expected 1, got x=%s" % (x,))
     t1 = time.time()
     self.assertTrue(t1-t0 < 1.1, "took more than 1.1s to get first result")
     y = self.Q.get()
-    self.assertEquals(y, 2, "expected 2, got y=%s" % (y,))
+    self.assertEqual(y, 2, "expected 2, got y=%s" % (y,))
     t1 = time.time()
     self.assertTrue(t1-t0 < 2.1, "took more than 2.1s to get second result")
     z = self.Q.get()
-    self.assertEquals(z, 3, "expected 3, got z=%s" % (z,))
+    self.assertEqual(z, 3, "expected 3, got z=%s" % (z,))
     t1 = time.time()
     self.assertTrue(t1-t0 < 3.1, "took more than 3.1s to get third result")
 
@@ -84,22 +84,22 @@ class TestRuntree(unittest.TestCase):
     return [ n+1 for n in items ]
 
   def test_00_helpers(self):
-    self.assertEquals(self.f_same((1,), None), (1,))
-    self.assertEquals(self.f_incr((1,2), None), [2,3])
+    self.assertEqual(self.f_same((1,), None), (1,))
+    self.assertEqual(self.f_incr((1,2), None), [2,3])
 
   def test__01_no_operators(self):
     L = Later(1)
-    self.assertEquals(runTree( [1,2,3], [], None, L), [1,2,3])
+    self.assertEqual(runTree( [1,2,3], [], None, L), [1,2,3])
     L.close()
 
   def test__01_same(self):
     L = Later(1)
-    self.assertEquals(list(runTree( [1,2,3], [ RunTreeOp(self.f_same, False, False, None) ], None, L )), [1,2,3])
+    self.assertEqual(list(runTree( [1,2,3], [ RunTreeOp(self.f_same, False, False, None) ], None, L )), [1,2,3])
     L.close()
 
   def test__01_same_fork(self):
     L = Later(1)
-    self.assertEquals(list(runTree( [1,2,3], [ RunTreeOp(self.f_same_one2many, True, True, RUN_TREE_OP_ONE_TO_MANY) ], None, L)), [1,2,3])
+    self.assertEqual(list(runTree( [1,2,3], [ RunTreeOp(self.f_same_one2many, True, True, RUN_TREE_OP_ONE_TO_MANY) ], None, L)), [1,2,3])
     L.close()
 
 def selftest(argv):

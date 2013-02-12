@@ -984,19 +984,19 @@ class TestAll(unittest.TestCase):
     self.assertEqual(str(M), '$.')
 
   def test10parseMacroExpr_PlainText(self):
-    self.assertEquals(parseMacroExpression(''),  ([], 0))
-    self.assertEquals(parseMacroExpression('x'), (['x'], 1))
-    self.assertEquals(parseMacroExpression(' '), ([], 1))
-    self.assertEquals(parseMacroExpression('x y'), (['x', ' ', 'y'], 3))
-    self.assertEquals(parseMacroExpression('abc  xyz'), (['abc', '  ', 'xyz'], 8))
+    self.assertEqual(parseMacroExpression(''),  ([], 0))
+    self.assertEqual(parseMacroExpression('x'), (['x'], 1))
+    self.assertEqual(parseMacroExpression(' '), ([], 1))
+    self.assertEqual(parseMacroExpression('x y'), (['x', ' ', 'y'], 3))
+    self.assertEqual(parseMacroExpression('abc  xyz'), (['abc', '  ', 'xyz'], 8))
 
   def test20parseMakeLines(self):
     from StringIO import StringIO
     from .make import Maker
     with Maker() as M:
       parsed = list(parseMakefile(M, StringIO("abc = def\n")))
-      self.assertEquals(len(parsed), 1)
-      self.assertEquals([ type(O) for O in parsed ], [ Macro ])
+      self.assertEqual(len(parsed), 1)
+      self.assertEqual([ type(O) for O in parsed ], [ Macro ])
 
 if __name__ == '__main__':
   unittest.main()

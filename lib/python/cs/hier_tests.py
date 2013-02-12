@@ -19,7 +19,7 @@ class TestHier(unittest.TestCase):
 
   def _testLoad(self, text, D):
     H = loadfp( StringIO(text) )
-    self.assertEquals(H, D)
+    self.assertEqual(H, D)
 
   def test01load(self):
     self._testLoad( "A 1\nB 2\n", { "A": 1, "B": 2} )

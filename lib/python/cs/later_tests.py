@@ -38,7 +38,7 @@ class TestLater(unittest.TestCase):
     F = partial(self._f, 3)
     LF = L.defer(F)
     x = LF()
-    self.assertEquals(x, 6)
+    self.assertEqual(x, 6)
 
   def test01two(self):
     # two sleep(2) in parallel
@@ -73,9 +73,9 @@ class TestLater(unittest.TestCase):
     F = partial(self._f, 5)
     LF = L.defer(F)
     x = LF()
-    self.assertEquals(x, 10)
+    self.assertEqual(x, 10)
     y = LF()
-    self.assertEquals(y, 10)
+    self.assertEqual(y, 10)
 
   def test04raise(self):
     # raise exception
@@ -92,7 +92,7 @@ class TestLater(unittest.TestCase):
     # compute 7*2 using .defer_with_args()
     LF = self.L.defer(self._f, 7)
     x = LF()
-    self.assertEquals(x, 14)
+    self.assertEqual(x, 14)
 
   def test07report(self):
     with Later(3) as L3:
@@ -100,7 +100,7 @@ class TestLater(unittest.TestCase):
       LF2 = L3.defer(self._delay, 2)
       LF3 = L3.defer(self._delay, 1)
       results = [ LF() for LF in report( (LF1, LF2, LF3) ) ]
-      self.assertEquals(results, [1, 2, 3])
+      self.assertEqual(results, [1, 2, 3])
 
   def test08delay(self):
     with Later(3) as L3:
