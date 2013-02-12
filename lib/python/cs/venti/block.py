@@ -110,10 +110,7 @@ class _Block(object):
     return self.data[index]
 
   def __len__(self):
-    if not self.indirect:
-      # avoid data fetch for direct blocks
-      return self.span
-    return len(self.data)
+    return self.span
 
   def store(self, flush=False):
     ''' Ensure this block is stored.
@@ -196,11 +193,11 @@ class IndirectBlock(_Block):
       TODO: allow data= initialisation, to decode raw iblock data
   '''
 
-  def __init__(self, subblocks=None, hashcode=None, span=None):
+  def __init__(self, subblocks=None, hashcode=None, span=None, doStore=False, doFlush=False):
     if subblocks is None:
-      _Block.__init__(hashcode=hashcode, span=span)
+      _Block.__init__(self, hashcode=hashcode, span=span, doStore=doStore, doFlush=doFlush)
     else:
-      _Block.__init__(self, data=encodeBlocks(subblocks))
+      _Block.__init__(self, data=encodeBlocks(subblocks), doStore=doStore, doFlush=doFlush)
     self.indirect = True
 
   @locked_property
