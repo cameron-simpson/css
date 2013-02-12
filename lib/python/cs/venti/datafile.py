@@ -101,13 +101,13 @@ class DataFile(object):
     flags = get_bsfp(fp)
     if flags is None:
       return None, None
-    assert (flags & ~F_COMPRESSED) == 0, "flags other than F_COMPRESSED: 0x%02x" % ((flags & ~F_COMPRESSED),)
+    if (flags & ~F_COMPRESSED) != 0:
+      raise ValueError("flags other than F_COMPRESSED: 0x%02x" % ((flags & ~F_COMPRESSED),))
     flags = DataFlags(flags)
     dsize = get_bsfp(fp)
     if dsize == 0:
-      data = ''
+      data = b''
     else:
-      assert dsize > 0, "expected dsize > 0, got dsize=%s" % (dsize,)
       data = fp.read(dsize)
     assert len(data) == dsize
     return flags, data
