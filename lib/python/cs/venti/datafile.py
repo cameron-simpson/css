@@ -10,7 +10,7 @@ import os
 import os.path
 from threading import Lock
 from zlib import compress, decompress
-from cs.serialise import toBS, fromBS, fromBSfp
+from cs.serialise import get_bs, put_bs, get_bsfp
 
 F_COMPRESSED = 0x01
 
@@ -98,12 +98,12 @@ class DataFile(object):
     ''' Retrieve the data bytes stored at the current file offset.
         The offset points at the flags ahead of the data bytes.
     '''
-    flags = fromBSfp(fp)
+    flags = get_bsfp(fp)
     if flags is None:
       return None, None
     assert (flags & ~F_COMPRESSED) == 0, "flags other than F_COMPRESSED: 0x%02x" % ((flags & ~F_COMPRESSED),)
     flags = DataFlags(flags)
-    dsize = fromBSfp(fp)
+    dsize = get_bsfp(fp)
     if dsize == 0:
       data = ''
     else:
@@ -125,8 +125,8 @@ class DataFile(object):
     with self._lock:
       fp.seek(0, 2)
       offset = fp.tell()
-      fp.write(toBS(flags))
-      fp.write(toBS(len(data)))
+      fp.write(put_bs(flags))
+      fp.write(put_bs(len(data)))
       fp.write(data)
       self._size = fp.tell()
     return offset
@@ -196,17 +196,17 @@ class DataDir(object):
   def decodeIndexEntry(entry):
     ''' Parse an index entry into n (data file index) and offset.
     '''
-    n, _ = fromBS(entry)
-    offset, _ = fromBS(_)
-    if len(_) > 0:
+    n, offset = get_bs(entry)
+    file_offset, offset = get_bs(entry, offset)
+    if offset != len(entry):
       raise ValueError("can't decode index entry: %s" % (hexlify(entry),))
-    return n, offset
+    return n, file_offset
 
   @staticmethod
   def encodeIndexEntry(n, offset):
     ''' Prepare an index entry from data file index and offset.
     '''
-    return toBS(n) + toBS(offset)
+    return put_bs(n) + put_bs(offset)
 
   def __getitem__(self, hash):
     ''' Return the uncompressed data associated with the supplied hash.
