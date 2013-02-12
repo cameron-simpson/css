@@ -163,7 +163,7 @@ test_python()
       while read -r py 
       do 
         pym=`expr "x$py" : "x$_tpy_pylibdir"'/\(.*\).py' | tr / .` 
-        stateful import "$py" "$_pyt_pycmd" -c "import $pym" \
+        stateful import "$py" "$_tpy_pycmd" -c "import $pym" \
         || xit=1
       done 
       exit $xit 
