@@ -4,8 +4,9 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
+from __future__ import print_function
 import sys
-print >>sys.stderr, "cs.nodedb.tokcab deprecated in favor of KyotoCabinet"
+print("cs.nodedb.tokcab deprecated in favor of KyotoCabinet", file=sys.stderr)
 sys.exit(0)
 
 import os
