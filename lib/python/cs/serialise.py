@@ -76,3 +76,23 @@ def put_bs(n):
     bs.append( 0x80 | (n&0x7f) )
     n >>= 7
   return bytes(reversed(bs))
+
+def get_bsfp(fp):
+  ''' Read an extensible value from a file.
+      Return None at EOF.
+  '''
+  bs = fp.read(1)
+  if len(bs) == 0:
+    return None
+  bss = [bs]
+  while bs[0] & 0x80:
+    ##debug("fromBSfp: reading another BS byte...")
+    bs = fp.read(1)
+    if len(bs) != 1:
+      raise ValueError("unexpected EOF")
+    bss.append(bs)
+  bs = b''.join(bss)
+  n, offset = get_bs(bs)
+  if offset != len(bs):
+    raise RuntimeError("failed decode of %r ==> n=%d, offset=%d" % (bs, n, offset))
+  return n
