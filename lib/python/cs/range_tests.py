@@ -54,7 +54,7 @@ class TestAll(unittest.TestCase):
     R1 = Range(self.items1)
     R2 = R1.copy()
     R2._check()
-    self.assert_(R1 is not R2, "R1 is R2")
+    self.assertTrue(R1 is not R2, "R1 is R2")
     self.assertEqual(R1, R2)
     self.assertEqual(R1._spans, R2._spans)
     self.assertEqual(list(R1.spans()), list(R2.spans()))
@@ -123,14 +123,14 @@ class TestAll(unittest.TestCase):
     R3._check()
     self.assertEqual(list(R3), self.items1minus2)
     self.assertEqual(list(list(R3.spans())), self.spans1minus2)
-    self.assert_(R1.issuperset(R3))
-    self.assert_(R3.issubset(R1))
+    self.assertTrue(R1.issuperset(R3))
+    self.assertTrue(R3.issubset(R1))
     R4 = R1 - R2
     R4._check()
     self.assertEqual(list(R4), self.items1minus2)
     self.assertEqual(list(list(R4.spans())), self.spans1minus2)
-    self.assert_(R1.issuperset(R4))
-    self.assert_(R4.issubset(R1))
+    self.assertTrue(R1.issuperset(R4))
+    self.assertTrue(R4.issubset(R1))
 
   def test17symmetric_difference(self):
     R1 = Range(self.items1)
@@ -146,7 +146,7 @@ class TestAll(unittest.TestCase):
     self.assertEqual(list(R4), self.items1xor2)
     self.assertEqual(list(list(R4.spans())), self.spans1xor2)
     self.assertEqual(R4, R3)
-    self.assert_(R4 is not R3, "R4 is R3")
+    self.assertTrue(R4 is not R3, "R4 is R3")
 
 def selftest(argv):
   unittest.main(__name__, None, argv)

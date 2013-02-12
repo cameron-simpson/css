@@ -27,7 +27,7 @@ class TestAll(unittest.TestCase):
                       [ N1.type, N1.name, N1.ATTR1, None ],
                       [ N2.type, N2.name, None,     N2.ATTR2 ],
                     )
-    self.assert_(rows == expected_rows)
+    self.assertTrue(rows == expected_rows)
 
   def test01export_rows_wide_02row_attrs(self):
     N1, N2 = self.N1, self.N2
@@ -35,7 +35,7 @@ class TestAll(unittest.TestCase):
     expected_rows = ( [ 'TYPE', 'NAME', 'ATTR1' ],
                       [ N1.type, N1.name, N1.ATTR1 ],
                     )
-    self.assert_(rows == expected_rows)
+    self.assertTrue(rows == expected_rows)
 
   def test01export_rows_wide_03row_attrs_allnodes(self):
     N1, N2 = self.N1, self.N2
@@ -44,7 +44,7 @@ class TestAll(unittest.TestCase):
                       [ N1.type, N1.name, N1.ATTR1 ],
                       [ N2.type, N2.name, None,    ],
                     )
-    self.assert_(rows == expected_rows)
+    self.assertTrue(rows == expected_rows)
 
   def test02import_rows_wide_01(self):
     input_rows = ( [ 'TYPE', 'NAME', 'ATTR1', 'ATTR2' ],
@@ -56,7 +56,7 @@ class TestAll(unittest.TestCase):
     expected_data = ( ( 'HOST', 'host1', {'ATTR1': [1]} ),
                       ( 'HOST', 'host2', {'ATTR2': [2,3]} ),
                     )
-    self.assert_(data == expected_data)
+    self.assertTrue(data == expected_data)
 
 def selftest(argv):
   unittest.main(__name__, None, argv)

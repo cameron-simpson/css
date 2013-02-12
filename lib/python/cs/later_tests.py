@@ -51,7 +51,7 @@ class TestLater(unittest.TestCase):
     y = LF2()
     again = time.time()
     elapsed = again - now
-    self.assert_(elapsed < 3, "elapsed (%s) >= 3, now = %s, again = %s" % (elapsed, now, again))
+    self.assertTrue(elapsed < 3, "elapsed (%s) >= 3, now = %s, again = %s" % (elapsed, now, again))
 
   def test02three(self):
     # three sleep(2), two in parallel, one delayed
@@ -65,7 +65,7 @@ class TestLater(unittest.TestCase):
     y = LF2()
     z = LF3()
     elapsed = time.time() - now
-    self.assert_(elapsed >= 4)
+    self.assertTrue(elapsed >= 4)
 
   def test03calltwice(self):
     # compute once, get result twice
