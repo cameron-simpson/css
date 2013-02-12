@@ -30,7 +30,7 @@ class TestAll(unittest.TestCase):
         self.assertEqual(B.span, 100)
         B.store()
         subblocks.append(B)
-      IB = IndirectBlock(subblock=subblocks, doStore=True, doFlush=true)
+      IB = IndirectBlock(subblocks=subblocks, doStore=True, doFlush=True)
       self.assertEqual(IB.span, 1000)
       IBH = IB.hashcode
       IBdata = IB.all_data()
