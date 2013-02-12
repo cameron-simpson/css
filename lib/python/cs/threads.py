@@ -359,7 +359,7 @@ class IterableQueue(Queue):
       raise StopIteration
     return item
 
-  next == __next__
+  next = __next__
 
 class IterablePriorityQueue(PriorityQueue):
   ''' A PriorityQueue implementing the iterator protocol.
@@ -396,12 +396,14 @@ class IterablePriorityQueue(PriorityQueue):
     '''
     return self
 
-  def next(self):
+  def __next__(self):
     item=self.get()
     if item is None:
       PriorityQueue.put(self,None)      # for another iterator
       raise StopIteration
     return item
+
+  next = __next__
 
 class Cato9:
   ''' A cat-o-nine-tails Queue-like object, fanning out put() items
@@ -1027,7 +1029,7 @@ def runTree_inner(input, ops, state, funcQ, retq=None):
     input, ops, state, funcQ, retq)
 
   try:
-    op = ops.next()
+    op = next(ops)
   except StopIteration:
     if retq is None:
       # initial runTree_inner: return a gettable
