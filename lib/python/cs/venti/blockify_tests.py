@@ -11,7 +11,7 @@ from .blockify import blocksOf, Blockifier
 class TestAll(unittest.TestCase):
 
   def setUp(self):
-    self.fp = open(__file__)
+    self.fp = open(__file__, "rb")
 
   def tearDown(self):
     self.fp.close()
