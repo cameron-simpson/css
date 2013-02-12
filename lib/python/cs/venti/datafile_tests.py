@@ -6,6 +6,7 @@
 
 import sys
 import unittest
+from cs.logutils import D
 from .datafile import DataFile, DataDir
 
 class TestAll(unittest.TestCase):
@@ -64,7 +65,7 @@ class TestAll(unittest.TestCase):
       offset = self.data.savedata(data)
       blocks[offset] = data
     self.data.close()
-    offsets = blocks.keys()
+    offsets = list(blocks.keys())
     random.shuffle(offsets)
     for offset in offsets:
       data = self.data.readdata(offset)
