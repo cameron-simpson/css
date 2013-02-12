@@ -9,7 +9,7 @@ import unittest
 ##from cs.logutils import D
 from cs.logutils import D
 from cs.venti import totext
-from .block import Block, IndirectBlock, encodeBlocks
+from .block import Block, IndirectBlock
 
 class TestAll(unittest.TestCase):
 
@@ -22,17 +22,15 @@ class TestAll(unittest.TestCase):
     from .cache import MemCacheStore
     S = MemCacheStore()
     with S:
-      IB = []
+      subblocks = []
       for i in range(10):
         rs = bytes( random.randint(0, 255) for x in range(100) )
         B = Block(data=rs)
         self.assertEqual(len(B), 100)
         self.assertEqual(B.span, 100)
         B.store()
-        IB.append(B)
-      IB = IndirectBlock(data=encodeBlocks(IB))
-      IB.store()
-      sp = IB.span
+        subblocks.append(B)
+      IB = IndirectBlock(subblock=subblocks, doStore=True, doFlush=true)
       self.assertEqual(IB.span, 1000)
       IBH = IB.hashcode
       IBdata = IB.all_data()
