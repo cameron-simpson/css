@@ -185,8 +185,6 @@ class IndirectBlock(_Block):
   ''' A preexisting indirect block.
       Indirect blocks come in two states, reflecting how how they are
       initialised.
-      If initialised without parameters the block is an empty array
-      of subblocks.
       The other way to initialise an IndirectBlock is with a hashcode and a
       span indicating the length of the data encompassed by the block; this is
       how a block is made from a directory entry or another indirect block.
@@ -198,8 +196,11 @@ class IndirectBlock(_Block):
       TODO: allow data= initialisation, to decode raw iblock data
   '''
 
-  def __init__(self, **kw):
-    _Block.__init__(self, **kw)
+  def __init__(self, subblocks=None, hashcode=None, span=None):
+    if subblocks is None:
+      _Block.__init__(hashcode=hashcode, span=span)
+    else:
+      _Block.__init__(self, data=encodeBlocks(subblocks))
     self.indirect = True
 
   @locked_property
