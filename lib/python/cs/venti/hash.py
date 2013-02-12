@@ -26,7 +26,7 @@ def decode(bs, offset=0):
     hashcls = Hash_SHA1
   else:
     raise ValueError("unsupported hashenum %d", hashenum)
-  hashlen = hashcls.hashlen
+  hashlen = hashcls.HASHLEN
   hashdata = bs[offset:offset+hashlen]
   if len(hashdata) < hashlen:
     raise ValueError("short hashdata, expected %d bytes, got %d: %r"
@@ -35,8 +35,8 @@ def decode(bs, offset=0):
   return hashcls(hashdata), offset
 
 class Hash_SHA1(bytes):
-  hashlen = 20
-  hashenum = HASH_SHA1_T
+  HASHLEN = 20
+  HASHENUM = HASH_SHA1_T
 
   def __str__(self):
     return hexify(self)
@@ -53,24 +53,28 @@ class Hash_SHA1(bytes):
 
   @classmethod
   def fromHashcode(cls, hashcode):
-    assert len(hashcode) == cls.hashlen
+    assert len(hashcode) == cls.HASHLEN
     return cls(hashcode)
 
   def encode(self):
     ''' Return the serialised form of this hash object.
     '''
     # no hashenum and raw hash
-    return put_bs(self.hashenum) + self
+    return put_bs(self.HASHENUM) + self
 
   @classmethod
   def decode(cls, encdata, offset=0):
     ''' Pull off the encoded hash from the start of the encdata.
         Return Hash_SHA1 object and tail of encdata.
     '''
-    hashdata = encdata[offset:offset+cls.hashlen]
-    if len(hashdata) != cls.hashlen:
+    hashenum = encdata[offset]
+    if hashenum != cls.HASHENUM:
+      raise ValueError("unexpected hashenum; expected 0x%02x, found 0x%02x", cls.HASHENUM, hashenum)
+    offset += 1
+    hashdata = encdata[offset:offset+cls.HASHLEN]
+    if len(hashdata) != cls.HASHLEN:
       raise ValueError("short data? got %d bytes, expected %d: %r"
-                       % (len(hashdata), cls.hashlen, encdata[offset:offset+cls.hashlen]))
+                       % (len(hashdata), cls.HASHLEN, encdata[offset:offset+cls.HASHLEN]))
     return cls.fromHashcode(hashdata), offset+len(hashdata)
 
 if __name__ == '__main__':
