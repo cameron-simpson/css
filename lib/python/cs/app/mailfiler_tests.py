@@ -54,9 +54,9 @@ class TestMailFiler(unittest.TestCase):
               for flag_name in dir(RC.flags):
                 if flag_name[0].isalpha():
                   if getattr(RCflags, flag_name):
-                    self.assert_(flag_name in Cflags, "\"%s\" in Rule but not expected" % (flag_name,))
+                    self.assertTrue(flag_name in Cflags, "\"%s\" in Rule but not expected" % (flag_name,))
                   else:
-                    self.assert_(flag_name not in Cflags, "\"%s\" expected, but not in Rule" % (flag_name,))
+                    self.assertTrue(flag_name not in Cflags, "\"%s\" expected, but not in Rule" % (flag_name,))
             else:
               self.assertEquals(getattr(C, attr), getattr(RC, attr))
 

@@ -52,7 +52,7 @@ main()
           esac
           break
         done
-        test_python "$pylibdir" "$pysubdir" $pymodules || return $?
+        test_python "$pycmd" "$pylibdir" "$pysubdir" $pymodules || return $?
         continue
         ;;
       --)
@@ -107,7 +107,7 @@ stateful()
 list_python_files()
 {
   [ $# -ge 2 ] \
-  || { echo "$cmd: Usage: test_python pylibdir pysubdir [modules...]" >&2
+  || { echo "$cmd: Usage: list_python_files pylibdir pysubdir [modules...]" >&2
        echo "  got $# args: 0=$0 $*" >&2
        return 2
      }
@@ -129,17 +129,18 @@ list_python_files()
 
 test_python()
 {
-  [ $# -ge 2 ] \
-  || { echo "$cmd: Usage: test_python pylibdir pysubdir [modules...]" >&2
+  [ $# -ge 3 ] \
+  || { echo "$cmd: Usage: test_python pycmd pylibdir pysubdir [modules...]" >&2
        echo "  got $# args: 0=$0 $*" >&2
        return 2
      }
 
   (
     set -ue
-    _tpy_pylibdir=$1
-    _tpy_pysubdir=$2
-    shift; shift
+    _tpy_pycmd=$1
+    _tpy_pylibdir=$2
+    _tpy_pysubdir=$3
+    shift; shift; shift
 
     _tpy_xit=0
 
@@ -162,7 +163,7 @@ test_python()
       while read -r py 
       do 
         pym=`expr "x$py" : "x$_tpy_pylibdir"'/\(.*\).py' | tr / .` 
-        stateful import "$py" $pycmd -c "import $pym" \
+        stateful import "$py" "$_tpy_pycmd" -c "import $pym" \
         || xit=1
       done 
       exit $xit 
@@ -177,7 +178,7 @@ test_python()
         unitest=`sed -n '${/^ *unittest\.main(/p;/^ *selftest(/p;}' "$py"` 
         [ -n "$unitest" ] || continue 
         pym=`expr "x$py" : "x$_tpy_pylibdir"'/\(.*\).py' | tr / .` 
-        stateful unittest "$py" python -tt -u -B -m "$pym" \
+        stateful unittest "$py" "$_tpy_pycmd" -tt -u -B -m "$pym" \
         || xit=1
       done 
       exit $xit 

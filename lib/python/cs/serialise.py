@@ -4,6 +4,8 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
+from cs.logutils import D
+
 def fromBS(s):
   ''' Read an extensible value from the front of a string.
       Continuation octets have their high bit set.
@@ -48,3 +50,49 @@ def toBS(n):
     s=chr(0x80|(n&0x7f))+s
     n>>=7
   return s
+
+def get_bs(bs, offset=0):
+  ''' Decode an unsigned value from a bytes at the specified `offset` (default 0).
+      Return the value and the new offset.
+  '''
+  o = bs[offset]
+  offset += 1
+  n = o & 0x7f
+  while o & 0x80:
+    o = bs[offset]
+    offset += 1
+    n = (n<<7) | (o&0x7f)
+  return n, offset
+
+def put_bs(n):
+  ''' Encode an unsigned value as an extensible octet sequence for decode by
+      get_bs().
+  '''
+  if n < 0:
+    raise ValueError("n < 0 (%r)", n)
+  bs = [ n&0x7f ]
+  n >>= 7
+  while n > 0:
+    bs.append( 0x80 | (n&0x7f) )
+    n >>= 7
+  return bytes(reversed(bs))
+
+def get_bsfp(fp):
+  ''' Read an extensible value from a file.
+      Return None at EOF.
+  '''
+  bs = fp.read(1)
+  if len(bs) == 0:
+    return None
+  bss = [bs]
+  while bs[0] & 0x80:
+    ##debug("fromBSfp: reading another BS byte...")
+    bs = fp.read(1)
+    if len(bs) != 1:
+      raise ValueError("unexpected EOF")
+    bss.append(bs)
+  bs = b''.join(bss)
+  n, offset = get_bs(bs)
+  if offset != len(bs):
+    raise RuntimeError("failed decode of %r ==> n=%d, offset=%d" % (bs, n, offset))
+  return n

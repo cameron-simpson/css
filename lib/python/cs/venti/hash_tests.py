@@ -10,7 +10,7 @@ if sys.hexversion >= 0x02050000:
 else:
   from sha import new as sha1
 import unittest
-from .hash import Hash_SHA1
+from .hash import Hash_SHA1, decode
 
 class TestAll(unittest.TestCase):
 
@@ -21,12 +21,12 @@ class TestAll(unittest.TestCase):
   def testSHA1(self):
     import random
     for _ in range(10):
-      rs = ''.join( chr(random.randint(0, 255)) for _ in range(100) )
+      rs = bytes( random.randint(0, 255) for _ in range(100) )
       H = Hash_SHA1.fromData(rs)
       self.assertEqual( sha1(rs).digest(), H )
       Hencode = H.encode()
-      H2, etc = Hash_SHA1.decode(Hencode)
-      self.assertEqual(len(etc), 0)
+      H2, offset = Hash_SHA1.decode(Hencode)
+      self.assertEqual(offset, len(Hencode))
       self.assertEqual(H, H2)
 
 def selftest(argv):

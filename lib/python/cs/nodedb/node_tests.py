@@ -21,20 +21,20 @@ class TestAll(unittest.TestCase):
       s = self.db.totext(value)
       sys.stderr.flush()
       assert type(s) is str
-      self.assert_(value == self.db.fromtext(s))
+      self.assertTrue(value == self.db.fromtext(s))
 
   def test02get(self):
     H = self.db.make('HOST:foo')
-    self.assert_(type(H) is Node)
-    self.assert_(H.type == 'HOST')
-    self.assert_(H.name == 'foo')
+    self.assertTrue(type(H) is Node)
+    self.assertTrue(H.type == 'HOST')
+    self.assertTrue(H.name == 'foo')
 
   def test10newNode(self):
     H = self.db.newNode('HOST', 'foo')
     self.assertEqual(len(H.ATTR1s), len(()) )
     self.assertRaises(AttributeError, getattr, H, 'ATTR2')
     H2 = self.db['HOST:foo']
-    self.assert_(H is H2, "made HOST:foo, but retrieving it got a different object")
+    self.assertTrue(H is H2, "made HOST:foo, but retrieving it got a different object")
 
   def test11setAttrs(self):
     H = self.db.newNode('HOST', 'foo')
@@ -65,9 +65,9 @@ class TestAll(unittest.TestCase):
     NIC1.IPADDR = '5.6.7.8'
     H.NICs = (NIC0, NIC1)
     NIC0refs = list(NIC0.references())
-    self.assert_(H in [ N for N, a, c in NIC0.references() ])
-    self.assert_(H in [ N for N, a, c in NIC1.references() ])
-    self.assert_(H not in [ N for N, a, c in H.references() ])
+    self.assertTrue(H in [ N for N, a, c in NIC0.references() ])
+    self.assertTrue(H in [ N for N, a, c in NIC1.references() ])
+    self.assertTrue(H not in [ N for N, a, c in H.references() ])
 
   def testWhere(self):
     H = self.db.newNode('HOST', 'foo')
@@ -77,7 +77,7 @@ class TestAll(unittest.TestCase):
     NIC1.IPADDR = '5.6.7.8'
     H.NICs = (NIC0, NIC1)
     subnics = H.NICs.where(IPADDR='1.2.3.4')
-    self.assert_(subnics == [NIC0])
+    self.assertTrue(subnics == [NIC0])
 
   def testInTYPE(self):
     H = self.db.newNode('HOST', 'foo')
@@ -86,20 +86,20 @@ class TestAll(unittest.TestCase):
     NIC1 = self.db.newNode('NIC', 'eth1')
     NIC1.IPADDR = '5.6.7.8'
     H.NICs = (NIC0, NIC1)
-    self.assert_(NIC0.inHOST == [H])
-    self.assert_(NIC0.inNIC == [])
+    self.assertTrue(NIC0.inHOST == [H])
+    self.assertTrue(NIC0.inNIC == [])
 
   def testNoNode(self):
     H = self.db.newNode('HOST', 'foo')
-    self.assert_(bool(H), "bool(H) not True")
+    self.assertTrue(bool(H), "bool(H) not True")
     self.assertRaises(AttributeError, getattr, H, 'NOATTR')
     self.db.useNoNode()
     N = H.NOATTR
-    self.assert_(N is self.db._noNode)
-    self.assert_(not bool(N), "bool(H.NOATTR) not False")
+    self.assertTrue(N is self.db._noNode)
+    self.assertTrue(not bool(N), "bool(H.NOATTR) not False")
     N2 = N.NOATTR
-    self.assert_(N2 is self.db._noNode)
-    self.assert_(not bool(N2), "bool(H.NOATTR.NOATTR) not False")
+    self.assertTrue(N2 is self.db._noNode)
+    self.assertTrue(not bool(N2), "bool(H.NOATTR.NOATTR) not False")
 
   def testTokenisation(self):
     H = self.db.newNode('HOST', 'foo')
@@ -127,12 +127,12 @@ class TestAll(unittest.TestCase):
     T = self.db.TESTTYPE
     N1 = T.seqNode()
     N2 = T.seqNode()
-    self.assert_(int(N1.name) < int(N2.name))
+    self.assertTrue(int(N1.name) < int(N2.name))
 
   def testSeqNode(self):
     N1 = self.db.seqNode()
     N2 = self.db.seqNode()
-    self.assert_(int(N1.name) < int(N2.name))
+    self.assertTrue(int(N1.name) < int(N2.name))
 
   def testTemplate(self):
     N = self.db.seqNode()

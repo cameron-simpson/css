@@ -6,12 +6,13 @@
 
 import sys
 import unittest
+from cs.logutils import D
 from .blockify import blocksOf, Blockifier
 
 class TestAll(unittest.TestCase):
 
   def setUp(self):
-    self.fp = open(__file__)
+    self.fp = open(__file__, "rb")
 
   def tearDown(self):
     self.fp.close()
@@ -19,7 +20,7 @@ class TestAll(unittest.TestCase):
   def test00blockifyAndRetrieve(self):
     data = self.fp.read()
     blocks = list(blocksOf([data]))
-    data2 = "".join( b.data for b in blocks )
+    data2 = b''.join( b.data for b in blocks )
     self.assertEqual(len(data), len(data2), "data mismatch: len(data)=%d, len(data2)=%d" % (len(data), len(data2)))
     self.assertEqual(data, data2, "data mismatch: data and data2 same length but contents differ")
     ##for b in blocks: print "[", b.data, "]"
@@ -33,9 +34,9 @@ class TestAll(unittest.TestCase):
         BL.add(data)
         alldata.append(data)
       top = BL.close()
-      alldata = ''.join(alldata)
-      stored = top[:]
-      self.assertEqual( ''.join(alldata), stored )
+      alldata = b''.join(alldata)
+      stored = top.all_data()
+      self.assertEqual( alldata, stored )
 
 def selftest(argv):
   unittest.main(__name__, None, argv)

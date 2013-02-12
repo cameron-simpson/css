@@ -102,7 +102,7 @@ class Test(unittest.TestCase):
         T2.flush()
         self.assertEquals( open(T1.name).read(), data, "bad data in %s" % (T1.name,) )
         self.assertEquals( open(T2.name).read(), data, "bad data in %s" % (T2.name,) )
-        self.assert_(compare(T1.name, T2.name), "mismatched data in %s and %s" % (T1.name, T2.name))
+        self.assertTrue(compare(T1.name, T2.name), "mismatched data in %s and %s" % (T1.name, T2.name))
 
   def test_rewrite(self):
     from StringIO import StringIO
@@ -118,61 +118,61 @@ class Test(unittest.TestCase):
   def test_lockfile_00_basic(self):
     lockbase = self.lockbase
     lockpath = self.lockpath
-    self.assert_( not os.path.exists(lockpath), "before lock, lock file already exists: %s" % (lockpath,))
+    self.assertTrue( not os.path.exists(lockpath), "before lock, lock file already exists: %s" % (lockpath,))
     with lockfile(lockbase) as lock:
-      self.assert_( lock == lockpath, "inside lock, expected \"%s\", got \"%s\"" % (lockpath, lock))
-      self.assert_( os.path.exists(lockpath), "inside lock, lock file does not exist: %s" % (lockpath,))
-    self.assert_( not os.path.exists(lockpath), "after lock: lock file still exists: %s" % (lockpath,))
+      self.assertTrue( lock == lockpath, "inside lock, expected \"%s\", got \"%s\"" % (lockpath, lock))
+      self.assertTrue( os.path.exists(lockpath), "inside lock, lock file does not exist: %s" % (lockpath,))
+    self.assertTrue( not os.path.exists(lockpath), "after lock: lock file still exists: %s" % (lockpath,))
 
   def test_lockfile_01_conflict(self):
     lockbase = self.lockbase
     lockpath = self.lockpath
-    self.assert_( not os.path.exists(lockpath), "before lock, lock file already exists: %s" % (lockpath,))
+    self.assertTrue( not os.path.exists(lockpath), "before lock, lock file already exists: %s" % (lockpath,))
     with lockfile(lockbase) as lock:
-      self.assert_( lock == lockpath, "inside lock, expected \"%s\", got \"%s\"" % (lockpath, lock))
-      self.assert_( os.path.exists(lockpath), "inside lock, lock file does not exist: %s" % (lockpath,))
+      self.assertTrue( lock == lockpath, "inside lock, expected \"%s\", got \"%s\"" % (lockpath, lock))
+      self.assertTrue( os.path.exists(lockpath), "inside lock, lock file does not exist: %s" % (lockpath,))
       try:
         with lockfile(lockbase, timeout=0):
-          self.assert_( False, "lock inside lock, should not happen: %s" % (lockpath,))
+          self.assertTrue( False, "lock inside lock, should not happen: %s" % (lockpath,))
       except TimeoutError:
         pass
-    self.assert_( not os.path.exists(lockpath), "after lock: lock file still exists: %s" % (lockpath,))
+    self.assertTrue( not os.path.exists(lockpath), "after lock: lock file still exists: %s" % (lockpath,))
 
   def test_lockfile_02_timeout(self):
     lockbase = self.lockbase
     lockpath = self.lockpath
-    self.assert_( not os.path.exists(lockpath), "before lock, lock file already exists: %s" % (lockpath,))
+    self.assertTrue( not os.path.exists(lockpath), "before lock, lock file already exists: %s" % (lockpath,))
     with lockfile(lockbase) as lock:
-      self.assert_( lock == lockpath, "inside lock, expected \"%s\", got \"%s\"" % (lockpath, lock))
-      self.assert_( os.path.exists(lockpath), "inside lock before nested lock attempt, lock file does not exist: %s" % (lockpath,))
+      self.assertTrue( lock == lockpath, "inside lock, expected \"%s\", got \"%s\"" % (lockpath, lock))
+      self.assertTrue( os.path.exists(lockpath), "inside lock before nested lock attempt, lock file does not exist: %s" % (lockpath,))
       start = time.time()
       try:
         with lockfile(lockbase, timeout=0.5):
-          self.assert_( False, "lock inside lock, should not happen: %s" % (lockpath,))
+          self.assertTrue( False, "lock inside lock, should not happen: %s" % (lockpath,))
       except TimeoutError:
         end = time.time()
-        self.assert_( end - start >= 0.5, "nested lock timeout took less than 0.5s" )
-        self.assert_( end - start <= 0.6, "nested lock timeout took more than 0.6s" )
-      self.assert_( os.path.exists(lockpath), "inside lock after nested lock attempt, lock file does not exist: %s" % (lockpath,))
-    self.assert_( not os.path.exists(lockpath), "after lock: lock file still exists: %s" % (lockpath,))
+        self.assertTrue( end - start >= 0.5, "nested lock timeout took less than 0.5s" )
+        self.assertTrue( end - start <= 0.6, "nested lock timeout took more than 0.6s" )
+      self.assertTrue( os.path.exists(lockpath), "inside lock after nested lock attempt, lock file does not exist: %s" % (lockpath,))
+    self.assertTrue( not os.path.exists(lockpath), "after lock: lock file still exists: %s" % (lockpath,))
 
   def test_file_property_00(self):
     PC = self.fileprop = TestFileProperty()
-    self.assert_(not os.path.exists(PC._test1_path))
+    self.assertTrue(not os.path.exists(PC._test1_path))
     data1 = PC.test1
-    self.assert_(data1 is None)
+    self.assertTrue(data1 is None)
     PC.write1("data1 value 1")
-    self.assert_(os.path.exists(PC._test1_path))
+    self.assertTrue(os.path.exists(PC._test1_path))
     data1 = PC.test1
     # too soon after last poll
-    self.assert_(data1 is None)
+    self.assertTrue(data1 is None)
     sleep(1.1)
     data1 = PC.test1
     self.assertEquals(data1, "data1 value 1")
     # NB: data value changes length because the file timestamp might not
     # due to 1s resolution in stat structures
     PC.write1("data1 value 1b")
-    self.assert_(os.path.exists(PC._test1_path))
+    self.assertTrue(os.path.exists(PC._test1_path))
     data1 = PC.test1
     # too soon after last poll
     self.assertEquals(data1, "data1 value 1")
@@ -180,7 +180,7 @@ class Test(unittest.TestCase):
     data1 = PC.test1
     self.assertEquals(data1, "data1 value 1b")
     os.remove(PC._test1_path)
-    self.assert_(not os.path.exists(PC._test1_path))
+    self.assertTrue(not os.path.exists(PC._test1_path))
     data1 = PC.test1
     # too soon to poll
     self.assertEquals(data1, "data1 value 1b")
@@ -189,7 +189,7 @@ class Test(unittest.TestCase):
     data1 = PC.test1
     self.assertEquals(data1, "data1 value 1b")
     PC.write1("data1 value 1bc")
-    self.assert_(os.path.exists(PC._test1_path))
+    self.assertTrue(os.path.exists(PC._test1_path))
     data1 = PC.test1
     # too soon to poll
     self.assertEquals(data1, "data1 value 1b")
@@ -200,23 +200,23 @@ class Test(unittest.TestCase):
 
   def test_make_file_property_01(self):
     PC = self.fileprop = TestFileProperty()
-    self.assert_(not os.path.exists(PC._test2_path))
+    self.assertTrue(not os.path.exists(PC._test2_path))
     data2 = PC.test2
-    self.assert_(data2 is None)
+    self.assertTrue(data2 is None)
     PC.write2("data2 value 1")
-    self.assert_(os.path.exists(PC._test2_path))
+    self.assertTrue(os.path.exists(PC._test2_path))
     data2 = PC.test2
     # too soon after last poll
-    self.assert_(data2 is None)
+    self.assertTrue(data2 is None)
     sleep(0.1)
     data2 = PC.test2
     # still soon after last poll
-    self.assert_(data2 is None)
+    self.assertTrue(data2 is None)
     sleep(0.2)
     data2 = PC.test2
     self.assertEquals(data2, "data2 value 1")
     PC.write2("data2 value 1b")
-    self.assert_(os.path.exists(PC._test2_path))
+    self.assertTrue(os.path.exists(PC._test2_path))
     data2 = PC.test2
     # too soon after last poll
     self.assertEquals(data2, "data2 value 1")
@@ -228,7 +228,7 @@ class Test(unittest.TestCase):
     data2 = PC.test2
     self.assertEquals(data2, "data2 value 1b")
     os.remove(PC._test2_path)
-    self.assert_(not os.path.exists(PC._test2_path))
+    self.assertTrue(not os.path.exists(PC._test2_path))
     data2 = PC.test2
     # too soon to poll
     self.assertEquals(data2, "data2 value 1b")
@@ -237,7 +237,7 @@ class Test(unittest.TestCase):
     data2 = PC.test2
     self.assertEquals(data2, "data2 value 1b")
     PC.write2("data2 value 1bc")
-    self.assert_(os.path.exists(PC._test2_path))
+    self.assertTrue(os.path.exists(PC._test2_path))
     data2 = PC.test2
     # too soon to poll
     self.assertEquals(data2, "data2 value 1b")
@@ -248,24 +248,24 @@ class Test(unittest.TestCase):
 
   def test_make_files_property_01(self):
     PC = self.filesprop = TestFilesProperty()
-    self.assert_(not os.path.exists(PC._test2_paths[0]))
+    self.assertTrue(not os.path.exists(PC._test2_paths[0]))
     with self.assertRaises(IOError) as cmgr:
       data2 = PC.test2
     self.assertEqual(cmgr.exception.errno, errno.ENOENT)
     PC.write2("data2 value 1")
-    self.assert_(os.path.exists(PC._test2_paths[0]))
+    self.assertTrue(os.path.exists(PC._test2_paths[0]))
     data2 = PC.test2
     # too soon after last poll
-    self.assert_(data2 is None)
+    self.assertTrue(data2 is None)
     sleep(0.1)
     data2 = PC.test2
     # still soon after last poll
-    self.assert_(data2 is None)
+    self.assertTrue(data2 is None)
     sleep(0.2)
     data2 = PC.test2
     self.assertEquals(data2, "data2 value 1")
     PC.write2("data2 value 1b")
-    self.assert_(os.path.exists(PC._test2_paths[0]))
+    self.assertTrue(os.path.exists(PC._test2_paths[0]))
     data2 = PC.test2
     # too soon after last poll
     self.assertEquals(data2, "data2 value 1")
@@ -277,7 +277,7 @@ class Test(unittest.TestCase):
     data2 = PC.test2
     self.assertEquals(data2, "data2 value 1b")
     os.remove(PC._test2_paths[0])
-    self.assert_(not os.path.exists(PC._test2_paths[0]))
+    self.assertTrue(not os.path.exists(PC._test2_paths[0]))
     data2 = PC.test2
     # too soon to poll
     self.assertEquals(data2, "data2 value 1b")
@@ -286,7 +286,7 @@ class Test(unittest.TestCase):
     data2 = PC.test2
     self.assertEquals(data2, "data2 value 1b")
     PC.write2("data2 value 1bc")
-    self.assert_(os.path.exists(PC._test2_paths[0]))
+    self.assertTrue(os.path.exists(PC._test2_paths[0]))
     data2 = PC.test2
     # too soon to poll
     self.assertEquals(data2, "data2 value 1b")

@@ -32,7 +32,7 @@ class TestAll(NodeTestAll):
     self.db.close()
     self.db = NodeDB(backend=Backend_CSVFile(self.dbpath))
     dbstate2 = dict(self.db)
-    self.assert_(dbstate == dbstate2, "db state differs:\n\t%s\n\t%s" % (dbstate, dbstate2))
+    self.assertTrue(dbstate == dbstate2, "db state differs:\n\t%s\n\t%s" % (dbstate, dbstate2))
 
   def tearDown(self):
     self.db.close()

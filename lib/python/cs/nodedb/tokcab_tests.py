@@ -4,8 +4,9 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
+from __future__ import print_function
 import sys
-print >>sys.stderr, "cs.nodedb.tokcab deprecated in favor of KyotoCabinet"
+print("cs.nodedb.tokcab deprecated in favor of KyotoCabinet", file=sys.stderr)
 sys.exit(0)
 
 import os
@@ -39,7 +40,7 @@ class TestAll(NodeTestAll):
     dbstate = dict(self.db.backend)
     self.db.backend.close()
     dbstate2 = dict(Backend_TokyoCabinet(self.dbpath))
-    self.assert_(dbstate == dbstate2, "db state differs:\n\t%s\n\t%s" % (dbstate, dbstate2))
+    self.assertTrue(dbstate == dbstate2, "db state differs:\n\t%s\n\t%s" % (dbstate, dbstate2))
 
 def selftest(argv):
   unittest.main(__name__, None, argv)
