@@ -36,8 +36,11 @@ class Blockifier(object):
       self.topBlock = topIndirectBlock(self.Q)
 
   def add(self, data):
-    self.Q.put(Block(data=data))
-    return self.S.add(data)
+    ''' Add data, return Block hashcode.
+    '''
+    B = Block(data=data, doStore=True, doFlush=True)
+    self.Q.put(B)
+    return B.hashcode
 
   def addBlock(self, B):
     self.Q.put(B)
