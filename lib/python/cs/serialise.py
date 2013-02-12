@@ -65,7 +65,7 @@ def get_bs(bs, offset=0):
   return n, offset
 
 def put_bs(n):
-  ''' Encode an unsigned value as an entensible octet sequence for decode by
+  ''' Encode an unsigned value as an extensible octet sequence for decode by
       get_bs().
   '''
   if n < 0:
