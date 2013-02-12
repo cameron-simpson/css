@@ -36,18 +36,18 @@ class TestConnect(unittest.TestCase):
 
   def test_01_DataQueue_01small(self):
     DQ = DataQueue()
-    DQ.write("abc")
-    DQ.write("def")
-    DQ.write("")        # need to sync with _writer thread
+    DQ.write(b"abc")
+    DQ.write(b"def")
+    DQ.write(b"")        # need to sync with _writer thread
     self.assertEqual(DQ.size, 6)
-    self.assertEqual(DQ.read(2), "ab")
-    self.assertEqual(DQ.read(3), "abc")
-    self.assertEqual(DQ.read(4), "abcd")
+    self.assertEqual(DQ.read(2), b"ab")
+    self.assertEqual(DQ.read(3), b"abc")
+    self.assertEqual(DQ.read(4), b"abcd")
     DQ.upto(3)
     self.assertEqual(DQ.size, 3)
-    self.assertEqual(DQ.read(2), "de")
-    self.assertEqual(DQ.read(3), "def")
-    self.assertEqual(DQ.read(4), "def")
+    self.assertEqual(DQ.read(2), b"de")
+    self.assertEqual(DQ.read(3), b"def")
+    self.assertEqual(DQ.read(4), b"def")
     DQ.upto(6)
     self.assertEqual(DQ.size, 0)
     DQ.close()
