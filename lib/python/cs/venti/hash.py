@@ -37,6 +37,8 @@ def decode(bs, offset=0):
 class Hash_SHA1(bytes):
   HASHLEN = 20
   HASHENUM = HASH_SHA1_T
+  HASHENUM_BS = put_bs(HASHENUM)
+  HASHLEN_ENCODED = len(HASHENUM_BS) + HASHLEN
 
   def __str__(self):
     return hexify(self)
@@ -60,7 +62,7 @@ class Hash_SHA1(bytes):
     ''' Return the serialised form of this hash object.
     '''
     # no hashenum and raw hash
-    return put_bs(self.HASHENUM) + self
+    return self.HASHENUM_BS + self
 
   @classmethod
   def decode(cls, encdata, offset=0):
