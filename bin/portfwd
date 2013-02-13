@@ -112,14 +112,21 @@ shift
 
 flag_connected=PORTFWD_`echo "$target" | tr -- '-[a-z]' '_[A-Z]'`_CONNECTED
 pfflags=
+pfpidfiles=
 for pfname in $pfnames
 do
   pfflags="$pfflags "PORTFWD_`echo "$pfname" | tr -- '-[a-z]' '_[A-Z]'`_CONNECTED
+  pfpidfiles="$pfpidfiles $VARRUN/portfwd.$pfname.pid"
 done
 
 # construct svcd "ok to ssh" test command
 test_shcmd=' flag -w PORTFWD_ANYWAY && exit 0
              flag -w PORTFWD_DISABLE && exit 1'
+for pfpidfile in $pfpidfiles
+do
+  test_shcmd="$test_shcmd
+              ifpid '$pfpidfile' || exit 1"
+done
 for pfflag in $pfflags
 do
   test_shcmd="$test_shcmd
