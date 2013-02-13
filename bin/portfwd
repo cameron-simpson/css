@@ -169,6 +169,13 @@ esac
 sshopts=-n
 [ -n "$cfg_command" ] || sshopts="$sshopts -N"
 
+if ifpid -q "$cfg_pidfile"
+then
+  echo "$cmd: $cfg_pidfile: process still running" >&2
+  pfx "$cmd: $cfg_pidfile" cat "$cfg_pidfile" >&2
+  exit 1
+fi
+
 flag -w "$flag_connected" 0
 alert "STARTING: $target"
 tag_fd 2 "$target" \
@@ -177,7 +184,9 @@ tag_fd 2 "$target" \
       -o "PermitLocalCommand=yes" -o "LocalCommand=flag -w '$flag_connected' 1; </dev/null alert CONNECTED: $target &" \
       "$target" "$cfg_command" \
     >>"$cfg_outlog" </dev/null &
-subpids="$subpids $!"
+sshpid=$!
+echo "$sshpid" >"$cfg_pidfile"
 wait
 flag -w "$flag_connected" 0
+>"$cfg_pidfile"; rm -f "$cfg_pidfile"
 alert "EXITED: $target"
