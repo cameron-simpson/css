@@ -152,16 +152,13 @@ getconfig()
 }
 
 cmd="$cmd $target"
+pidfile=$VARRUN/portfwd.$target.pid
 
 # reload config on every pass
-cfg_pidfile=portfwd.$target.pid
 cfg_command=
 cfg_outlog=portfwd-$target    # /dev/null
 cfg_monitor=
 getconfig "$target"
-case $cfg_pidfile in
-  /*) ;; *) cfg_pidfile=$VARRUN/$cfg_pidfile ;;
-esac
 case $cfg_outlog in
   /*) ;; *) cfg_outlog=$LOGDIR/$cfg_outlog ;;
 esac
@@ -169,10 +166,10 @@ esac
 sshopts=-n
 [ -n "$cfg_command" ] || sshopts="$sshopts -N"
 
-if ifpid -q "$cfg_pidfile"
+if ifpid -q "$pidfile"
 then
-  echo "$cmd: $cfg_pidfile: process still running" >&2
-  pfx "$cmd: $cfg_pidfile" cat "$cfg_pidfile" >&2
+  echo "$cmd: $pidfile: process still running" >&2
+  pfx "$cmd: $pidfile" cat "$pidfile" >&2
   exit 1
 fi
 
@@ -185,8 +182,8 @@ tag_fd 2 "$target" \
       "$target" "$cfg_command" \
     >>"$cfg_outlog" </dev/null &
 sshpid=$!
-echo "$sshpid" >"$cfg_pidfile"
+echo "$sshpid" >"$pidfile"
 wait
 flag -w "$flag_connected" 0
->"$cfg_pidfile"; rm -f "$cfg_pidfile"
+>"$pidfile"; rm -f "$pidfile"
 alert "EXITED: $target"
