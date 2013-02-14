@@ -98,7 +98,7 @@ then
   ( subpids=
     for target
     do
-      $trace "$0" $opts -- "$target" &
+      pfx "$target" $trace "$0" $opts -- "$target" &
     done
     wait
   ) &
