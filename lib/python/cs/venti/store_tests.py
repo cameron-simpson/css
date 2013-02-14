@@ -20,7 +20,7 @@ class TestAll(unittest.TestCase):
 
   def test01empty(self):
     S = self.S
-    self.assertEquals(len(S), 0)
+    self.assertEqual(len(S), 0)
 
 def selftest(argv):
   unittest.main(__name__, None, argv)

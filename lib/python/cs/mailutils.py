@@ -325,7 +325,7 @@ class Maildir(mailbox.Maildir):
 
   def update(self, arg):
     try:
-      km = arg.iteritems()
+      km = arg.items()
     except AttributeError:
       km = iter(arg)
     for key, message in km:

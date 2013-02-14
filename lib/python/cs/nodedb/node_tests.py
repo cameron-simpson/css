@@ -119,9 +119,9 @@ class TestAll(unittest.TestCase):
         (H, 'SUBHOST', 'foo'),
       ):
       token = self.db.totoken(value, H, attr=attr)
-      self.assertEquals(token, expected_token, "wrong tokenisation, expected %s but got %s" % (expected_token, token))
+      self.assertEqual(token, expected_token, "wrong tokenisation, expected %s but got %s" % (expected_token, token))
       value2 = self.db.fromtoken(token, node=H, attr=attr, doCreate=True)
-      self.assertEquals(value2, value, "round trip fails: %s -> %s -> %s" % (value, token, value2))
+      self.assertEqual(value2, value, "round trip fails: %s -> %s -> %s" % (value, token, value2))
 
   def testTYPENode(self):
     T = self.db.TESTTYPE
@@ -138,14 +138,14 @@ class TestAll(unittest.TestCase):
     N = self.db.seqNode()
     N.A = 1
     N.Bs = (2,3,4)
-    self.assertEquals(N.safe_substitute('tplt 0 {self}'), 'tplt 0 _:1')
-    self.assertEquals(N.safe_substitute('tplt 0a { self }'), 'tplt 0a { self }')
-    self.assertEquals(N.safe_substitute('tplt 1 {self.A}'), 'tplt 1 1')
-    self.assertEquals(N.safe_substitute('tplt 2 {self.As}'), 'tplt 2 [1]')
-    self.assertEquals(N.safe_substitute('tplt 3 {self.Bs}'), 'tplt 3 [2, 3, 4]')
-    self.assertEquals(N.safe_substitute('tplt 3 {{self.Bs}}'), 'tplt 3 2tplt 3 3tplt 3 4')
-    self.assertEquals(N.safe_substitute('tplt 4 {self.Cs}'), 'tplt 4 []')
-    self.assertEquals(N.safe_substitute('tplt 5 {self.C}'), 'tplt 5 {self.C}')
+    self.assertEqual(N.safe_substitute('tplt 0 {self}'), 'tplt 0 _:1')
+    self.assertEqual(N.safe_substitute('tplt 0a { self }'), 'tplt 0a { self }')
+    self.assertEqual(N.safe_substitute('tplt 1 {self.A}'), 'tplt 1 1')
+    self.assertEqual(N.safe_substitute('tplt 2 {self.As}'), 'tplt 2 [1]')
+    self.assertEqual(N.safe_substitute('tplt 3 {self.Bs}'), 'tplt 3 [2, 3, 4]')
+    self.assertEqual(N.safe_substitute('tplt 3 {{self.Bs}}'), 'tplt 3 2tplt 3 3tplt 3 4')
+    self.assertEqual(N.safe_substitute('tplt 4 {self.Cs}'), 'tplt 4 []')
+    self.assertEqual(N.safe_substitute('tplt 5 {self.C}'), 'tplt 5 {self.C}')
 
 def selftest(argv):
   unittest.main(__name__, None, argv)

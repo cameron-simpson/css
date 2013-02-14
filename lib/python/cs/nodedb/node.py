@@ -1140,7 +1140,7 @@ class NodeDB(dict, O):
       nodes = self.default_dump_nodes()
     for N in nodes:
       attrmap = {}
-      for attr, values in N.iteritems():
+      for attr, values in N.items():
         attrmap[attr] = [ self.totext(value) for value in values ]
       yield N.type, N.name, attrmap
 

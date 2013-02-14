@@ -16,17 +16,14 @@ class _BackendMappingMixin(O):
   def len(self):
     return len(self.keys())
 
-  def keys(self):
-    return list(self.iterkeys())
-
   @unimplemented
   def iterkeys(self):
     ''' Yield (type, name) tuples for all nodes in the backend database.
     '''
     pass
 
-  def items(self):
-    return list(self.iteritems())
+  def keys(self):
+    return list(self.iterkeys())
 
   def iteritems(self):
     ''' Yield ( (type, name), node_dict ) tuples for all nodes in
@@ -35,14 +32,17 @@ class _BackendMappingMixin(O):
     for key in self.iterkeys():
       yield key, self[key]
 
-  def values(self):
-    return list(self.itervalues())
+  def items(self):
+    return list(self.iteritems())
 
   def itervalues(self):
     ''' Yield node_dict for all nodes in the backend database.
     '''
     for key in self.iterkeys():
       yield self[key]
+
+  def values(self):
+    return list(self.itervalues())
 
   @unimplemented
   def __getitem__(self, key):

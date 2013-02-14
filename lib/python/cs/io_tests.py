@@ -18,7 +18,7 @@ class TestIO(unittest.TestCase):
     pass
 
   def _testContlines(self, text, lines):
-    self.assertEquals( list( contlines(StringIO(text)) ), lines )
+    self.assertEqual( list( contlines(StringIO(text)) ), lines )
 
   def test00contlines(self):
     self._testContlines("", [])

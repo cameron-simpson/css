@@ -52,7 +52,7 @@ def tail(fp,
 
 if __name__ == '__main__':
   import unittest
-  from cStringIO import StringIO
+  from cs.py3 import StringIO
 
   class TestTail(unittest.TestCase):
 
@@ -63,8 +63,10 @@ if __name__ == '__main__':
       pass
 
     def test01selfread(self):
-      lines = open(__file__).readlines()
-      tlines = [ _ for _ in tail(open(__file__), seekwhence=os.SEEK_SET, quit_at_eof=True) ]
-      self.assertEquals(lines, tlines)
+      with open(__file__) as src:
+        lines = src.readlines()
+      with open(__file__) as src:
+        tlines = [ _ for _ in tail(src, seekwhence=os.SEEK_SET, quit_at_eof=True) ]
+      self.assertEqual(lines, tlines)
 
   unittest.main()

@@ -27,7 +27,7 @@ class TestSeq(unittest.TestCase):
         return item.lower()
     L = C(['Abc', 'Def'])
     I2 = L.lower()
-    self.assertEquals( list(I2), ['abc', 'def'] )
+    self.assertEqual( list(I2), ['abc', 'def'] )
 
   def test_onetomany(self):
     class C(list):
@@ -36,7 +36,7 @@ class TestSeq(unittest.TestCase):
         return [ "<%s>" % (i,) for i in item ]
     L = C(['Abc', 'Def'])
     I2 = L.angles()
-    self.assertEquals( list(I2), ['<A>', '<b>', '<c>', '<D>', '<e>', '<f>'])
+    self.assertEqual( list(I2), ['<A>', '<b>', '<c>', '<D>', '<e>', '<f>'])
 
 def selftest(argv):
   unittest.main(__name__, None, argv)

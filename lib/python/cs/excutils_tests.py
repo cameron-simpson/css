@@ -14,7 +14,7 @@ class TestExcUtils(unittest.TestCase):
     def divfunc(a, b):
       return a/b
     retval, exc_info = return_exc_info(divfunc, 4, 2)
-    self.assertEquals(retval, 2)
+    self.assertEqual(retval, 2)
     self.assertTrue(exc_info is None)
     retval, exc_info = return_exc_info(divfunc, 4, 0)
     self.assertTrue(retval is None)
@@ -25,7 +25,7 @@ class TestExcUtils(unittest.TestCase):
     def divfunc(a, b):
       return a/b
     retval, exc_info = divfunc(4, 2)
-    self.assertEquals(retval, 2)
+    self.assertEqual(retval, 2)
     self.assertTrue(exc_info is None)
     retval, exc_info = divfunc(4, 0)
     self.assertTrue(retval is None)
