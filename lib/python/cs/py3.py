@@ -15,11 +15,19 @@ if  sys.hexversion < 0x03000000:
     from StringIO import StringIO as BytesIO
   StringIO = BytesIO    # horribly wrong, I know
   from Queue import Queue, PriorityQueue, Full as Queue_Full, Empty as Queue_Empty
+  dict_iteritems = dict.iteritems
+  dict_iterkeys = dict.iterkeys
+  dict_itervalues = dict.itervalues
+
 else:
+
   unicode = str
   StringTypes = (str,)
   from io import BytesIO, StringIO
   from queue import Queue, PriorityQueue, Full as Queue_Full, Empty as Queue_Empty
+  dict_iteritems = dict.items
+  dict_iterkeys = dict.keys
+  dict_itervalues = dict.values
 
 def raise3(exc_type, exc_value, exc_traceback):
   if sys.hexversion >= 0x03000000:
