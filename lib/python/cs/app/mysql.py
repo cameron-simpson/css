@@ -163,7 +163,7 @@ def mysqld_run(mycnf, pid_file, argv, dofork=False):
   pid_file = optmap['pid-file'][-1]
   optmap['pid-file'] = [pid_file]
   mysqld_argv = [ mysqld, '--no-defaults' ]
-  for opt, values in optmap.iteritems():
+  for opt, values in optmap.items():
     for value in values:
       if value is None:
         mysqld_argv.append('--' + opt)
