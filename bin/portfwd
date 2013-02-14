@@ -42,7 +42,7 @@ do
   case $1 in
     -1) once=1 ;;
     -F) sshcfg=$2 opts="$opts $1 $2"; shift ;;
-    -P) pfnames="$pfnames $2"; shift ;;
+    -P) pfnames="$pfnames $2" opts="$opts $1 $2"; shift ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
         badopts=1
