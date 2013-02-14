@@ -18,6 +18,9 @@ if  sys.hexversion < 0x03000000:
 else:
   unicode = str
   StringTypes = (str,)
+  dict.iteritems = dict.items
+  dict.iterkeys = dict.keys
+  dict.itervalues = dict.values
   from io import BytesIO, StringIO
   from queue import Queue, PriorityQueue, Full as Queue_Full, Empty as Queue_Empty
 
