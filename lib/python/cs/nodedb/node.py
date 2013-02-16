@@ -20,7 +20,7 @@ from cs.obj import O
 from cs.lex import str1, parseUC_sAttr
 from cs.logutils import Pfx, D, error, warning, info, debug, exception
 from cs.seq import the, get0
-from cs.py3 import StringTypes
+from cs.py3 import StringTypes, unicode
 from .export import edit_csv_wide, export_csv_wide
 
 # regexp to match TYPE:name
@@ -872,22 +872,27 @@ class NodeDB(dict, O):
     else:
       raise ValueError("nodekey: expected 1 or 2 args, got: %r" % (args,))
 
-    # FIXME: ghastly hack
-    if type(t) is unicode:
-      t = str(t)
-    else:
-      assert type(t) is str, "t = %s %r" % (type(t), t)
-    if type(name) is unicode:
-      name = str(name)
-    else:
-      assert type(name) is str, "name = %s %r" % (type(name), name)
+    if not isinstance(t, unicode):
+      if type(t) is str:
+        t = unicode(t)
+      else:
+        raise ValueError("TYPE should be unicode: %r" % (t,))
+
+    if not isinstance(name, unicode):
+      if type(name) is str:
+        name = unicode(name)
+      else:
+        raise ValueError("NAME should be unicode: %r" % (name,))
 
     # sanity check type form
     if t != '_':
-      assert t.isupper(), "TYPE should be upper case, got %r" % (t,)
-      assert len(name) > 0
+      if not t.isupper():
+        raise ValueError("TYPE should be upper case: %r" % (t,))
+      if len(name) < 1:
+        raise ValueError("NAME too short: %r" % (name,))
       k, plural = parseUC_sAttr(t)
-      assert k is not None and not plural, "got TYPE == %r" % (t,)
+      if k is None or plural:
+        raise ValueError("TYPE should be singluar upper case: %r" % (t,))
 
     return t, name
 
