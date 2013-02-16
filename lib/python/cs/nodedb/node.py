@@ -302,11 +302,13 @@ class Node(dict):
     self.nodedb = nodedb
     self._reverse = {}  # maps (OtherNode, ATTR) => count
 
-  def __nonzero__(self):
+  def __bool__(self):
     ''' bool(Node) returns True, unlike a dict.
         Conversely, the NoNode singleton returns False from bool().
     '''
     return True
+
+  __nonzero__ = __bool__
 
   def __hash__(self):
     ''' Hash function, based on name, type and nodedb id.
@@ -621,11 +623,13 @@ class _NoNode(Node):
   def __init__(self, nodedb):
     Node.__init__(self, '_NoNode', '<_NoNode>', nodedb)
 
-  def __nonzero__(self):
+  def __bool__(self):
     ''' A NodeDB's NoNode returns False from bool().
         Other Nodes return True.
     '''
     return False
+
+  __nonzero__ = __bool__
 
   def __str__(self):
     return "<NoNode>"
