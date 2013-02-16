@@ -91,7 +91,7 @@ class TestAll(unittest.TestCase):
 
   def testNoNode(self):
     H = self.db.newNode('HOST', 'foo')
-    self.assertTrue(bool(H), "bool(H) not True")
+    self.assertTrue(bool(H), "bool(H) not True: H = %r" % (H,))
     self.assertRaises(AttributeError, getattr, H, 'NOATTR')
     self.db.useNoNode()
     N = H.NOATTR
