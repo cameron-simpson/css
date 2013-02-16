@@ -36,6 +36,8 @@ done
 
 [ $# -gt 0 ] && [ "x$1" = x!  ] && { invert=1; shift; }
 
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
 debug=${DEBUG:+1}
 [ -n "$debug" ] || { [ -s "$flagdir/FLAG_DEBUG" ] && debug=1; }
 
