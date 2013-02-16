@@ -14,8 +14,8 @@ flushflags=
 cmd=$0
 usage="Usage: $0 [-d flagdir] [-w] [--] [!] [flagname [true|false|0|1]]
   -d flagdir    Specify directory to hold flag files.
-  -w            Update the flag file with the derived flag if missing.
-  -F            Flush flag. Delete files for false flags."
+  -w            Update/create the flag file with the derived flag if missing.
+  -F            Flush flags. Delete files for false flags."
 
 badopts=
 
