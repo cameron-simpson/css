@@ -6,6 +6,7 @@
 
 import sys
 import unittest
+from cs.logutils import D
 from . import NodeDB, Node
 from .mappingdb import MappingBackend
 
@@ -138,7 +139,8 @@ class TestAll(unittest.TestCase):
     N = self.db.seqNode()
     N.A = 1
     N.Bs = (2,3,4)
-    self.assertEqual(N.safe_substitute('tplt 0 {self}'), 'tplt 0 _:1')
+    ##D("N = %r", N)
+    self.assertEqual(N.safe_substitute('tplt 0 {self}'), 'tplt 0 _:0')
     self.assertEqual(N.safe_substitute('tplt 0a { self }'), 'tplt 0a { self }')
     self.assertEqual(N.safe_substitute('tplt 1 {self.A}'), 'tplt 1 1')
     self.assertEqual(N.safe_substitute('tplt 2 {self.As}'), 'tplt 2 [1]')
