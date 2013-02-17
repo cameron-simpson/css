@@ -1,0 +1,8 @@
+#!/bin/sh
+#
+# Convenience wrapper for command line form of cs.app.megacli.
+#       - Cameron Simpson <cs@zip.com.au>
+#
+
+set -uex
+exec python -m cs.app.megacli ${1+"$@"}
