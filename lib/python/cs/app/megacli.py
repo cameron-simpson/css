@@ -171,102 +171,109 @@ class MegaRAID(O):
               continue
             if ': ' in line:
               heading, info = line.split(': ', 1)
-              heading = heading.rstrip()
-              info = info.lstrip()
-              attr = heading.lower().replace(' ', '_').replace('.','').replace("'",'').replace('/','_')
-              try:
-                n = int(info)
-              except ValueError:
-                pass
-              else:
-                info = n
-              if mode == mode_CFGDSPLY:
-                if heading == 'Adapter':
-                  An = info
-                  ##D("new adapter %d", An)
-                  A = M.adapters[info] = Adapter(number=An, disk_groups={}, physical_disks={}, virtual_drives={})
-                  o = A
-                  continue
-                if heading == 'DISK GROUP':
-                  DGn = info
-                  ##D("new disk_group %d", DGn)
-                  A.disk_groups[DGn] = Disk_Group(adapter=A, number=DGn, spans={})
-                  DG = A.disk_groups[DGn]
-                  o = DG
-                  continue
-                if heading == 'SPAN':
-                  SPn = info
-                  ##D("new span %d", SPn)
-                  DG.spans[SPn] = Span(disk_group=DG, number=SPn, arms={})
-                  SP = DG.spans[SPn]
-                  o = SP
-                  continue
-                if heading == 'Virtual Drive':
-                  Vn, Tn = info.split(' (Target Id: ', 1)
-                  Vn = int(Vn)
-                  Tn = int(Tn[:-1])
-                  ##D("new virtual drive %d (target id %d)", Vn, Tn)
-                  V = A.virtual_drives[Vn] = Virtual_Drive(adapter=A, number=Vn, physical_disks={})
-                  o = V
-                  continue
-                if heading == 'Physical Disk':
-                  DRVn = info
-                  ##D("new physical disk %d", DRVn)
-                  DRV = Physical_Disk(virtual_drive=V, number=DRVn, adapter=A)
-                  V.physical_disks[DRVn] = DRV
-                  DRV.virtual_drive = V
-                  o = DRV
-                  continue
-              if mode == mode_PDLIST:
-                if heading == 'Enclosure Device ID':
-                  # new physical drive commences,
-                  # do housekeeping for previous drive and then proceed
-                  if DRV is not None:
-                    DRVid = DRV.id
-                    with Pfx("merge previous DRV %s", DRVid):
-                      if DRVid in A.physical_disks:
-                        O_merge(A.physical_disks[DRV.id], **DRV.__dict__)
-                      else:
-                        A.physical_disks[DRV.id] = DRV
-                  DRV = Physical_Disk()
-                  o = DRV
-              if attr in ('size', 'mirror_data', 'strip_size'):
-                size, size_units = info.split()
-                setattr(o, attr+'_units', size_units)
-                info = float(size)
-              elif attr in ('raw_size', 'non_coerced_size', 'coerced_size'):
-                size, size_units, sectors = info.split(None, 2)
-                setattr(o, attr+'_units', size_units)
-                if sectors.startswith('[0x') and sectors.endswith(' Sectors]'):
-                  setattr(o, attr+'_sectors', int(sectors[3:-9], 16))
-                else:
-                  warning("invalid sectors: %s", sectors)
-                info = float(size)
-              elif attr.endswith('_speed'):
-                m = re_SPEED.match(info)
-                if m:
-                  speed, speed_units = m.group(1), m.group(3)
-                  setattr(o, attr+'_units', speed_units)
-                  info = float(speed)
-                else:
-                  warning("failed to match re_SPEED against: %s", info)
-              elif attr in ('default_cache_policy', 'current_cache_policy'):
-                info = info.split(', ')
-              elif attr == 'drives_postion':
-                DPOS = O()
-                for posinfo in info.split(', '):
-                  dposk, dposv = posinfo.split(': ')
-                  setattr(DPOS, dposk.lower(), int(dposv))
-                attr = 'drive_position'
-                info = DPOS
-              elif info == 'Yes':
-                info = True
-              elif info == 'No':
-                info = False
-              ##D("%s.%s = %s", o.__class__.__name__, attr, info)
-              setattr(o, attr, info)
+            elif ' :' in line:
+              heading, info = line.split(' :', 1)
+            elif line.endswith(':'):
+              heading = line[:-1]
+              info = ''
+            else:
+              warning("unparsed line: %s", line)
               continue
-            warning("unparsed line: %s", line)
+            heading = heading.rstrip()
+            info = info.lstrip()
+            attr = heading.lower().replace(' ', '_').replace('.','').replace("'",'').replace('/','_')
+            try:
+              n = int(info)
+            except ValueError:
+              pass
+            else:
+              info = n
+            if mode == mode_CFGDSPLY:
+              if heading == 'Adapter':
+                An = info
+                ##D("new adapter %d", An)
+                A = M.adapters[info] = Adapter(number=An, disk_groups={}, physical_disks={}, virtual_drives={})
+                o = A
+                continue
+              if heading == 'DISK GROUP':
+                DGn = info
+                ##D("new disk_group %d", DGn)
+                A.disk_groups[DGn] = Disk_Group(adapter=A, number=DGn, spans={})
+                DG = A.disk_groups[DGn]
+                o = DG
+                continue
+              if heading == 'SPAN':
+                SPn = info
+                ##D("new span %d", SPn)
+                DG.spans[SPn] = Span(disk_group=DG, number=SPn, arms={})
+                SP = DG.spans[SPn]
+                o = SP
+                continue
+              if heading == 'Virtual Drive':
+                Vn, Tn = info.split(' (Target Id: ', 1)
+                Vn = int(Vn)
+                Tn = int(Tn[:-1])
+                ##D("new virtual drive %d (target id %d)", Vn, Tn)
+                V = A.virtual_drives[Vn] = Virtual_Drive(adapter=A, number=Vn, physical_disks={})
+                o = V
+                continue
+              if heading == 'Physical Disk':
+                DRVn = info
+                ##D("new physical disk %d", DRVn)
+                DRV = Physical_Disk(virtual_drive=V, number=DRVn, adapter=A)
+                V.physical_disks[DRVn] = DRV
+                DRV.virtual_drive = V
+                o = DRV
+                continue
+            if mode == mode_PDLIST:
+              if heading == 'Enclosure Device ID':
+                # new physical drive commences,
+                # do housekeeping for previous drive and then proceed
+                if DRV is not None:
+                  DRVid = DRV.id
+                  with Pfx("merge previous DRV %s", DRVid):
+                    if DRVid in A.physical_disks:
+                      O_merge(A.physical_disks[DRV.id], **DRV.__dict__)
+                    else:
+                      A.physical_disks[DRV.id] = DRV
+                DRV = Physical_Disk()
+                o = DRV
+            if attr in ('size', 'mirror_data', 'strip_size'):
+              size, size_units = info.split()
+              setattr(o, attr+'_units', size_units)
+              info = float(size)
+            elif attr in ('raw_size', 'non_coerced_size', 'coerced_size'):
+              size, size_units, sectors = info.split(None, 2)
+              setattr(o, attr+'_units', size_units)
+              if sectors.startswith('[0x') and sectors.endswith(' Sectors]'):
+                setattr(o, attr+'_sectors', int(sectors[3:-9], 16))
+              else:
+                warning("invalid sectors: %s", sectors)
+              info = float(size)
+            elif attr.endswith('_speed'):
+              m = re_SPEED.match(info)
+              if m:
+                speed, speed_units = m.group(1), m.group(3)
+                setattr(o, attr+'_units', speed_units)
+                info = float(speed)
+              else:
+                warning("failed to match re_SPEED against: %s", info)
+            elif attr in ('default_cache_policy', 'current_cache_policy'):
+              info = info.split(', ')
+            elif attr == 'drives_postion':
+              DPOS = O()
+              for posinfo in info.split(', '):
+                dposk, dposv = posinfo.split(': ')
+                setattr(DPOS, dposk.lower(), int(dposv))
+              attr = 'drive_position'
+              info = DPOS
+            elif info == 'Yes':
+              info = True
+            elif info == 'No':
+              info = False
+            ##D("%s.%s = %s", o.__class__.__name__, attr, info)
+            setattr(o, attr, info)
+            continue
 
           # catch trailing drive
           if mode == mode_PDLIST:
