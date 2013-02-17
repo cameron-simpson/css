@@ -12,7 +12,7 @@ from subprocess import call, Popen, PIPE
 from threading import Lock
 from cs.logutils import setup_logging, error, warning, info, D, Pfx
 from cs.threads import locked_property
-from cs.misc import O, O_attrs, O_merge
+from cs.obj import O, O_merge
 
 USAGE = '''Usage:
     %s report
@@ -60,7 +60,6 @@ def main(argv):
               print "      physical drive", DRV.id, "[%s]" % (DRV.enc_slot,)
           print "  %d drives:" % (len(A.physical_disks),)
           for DRV in A.physical_disks.values():
-            ##print "    attrs =", list(O_attrs(DRV))
             print "    %s [%s]: VD %s, DG %s: %s %s %s, %s" % (DRV.id, DRV.enc_slot,
                                                                getattr(DRV, 'virtual_drive', O(number=None)).number,
                                                                getattr(DRV, 'disk_group', O(number=None)).number,
