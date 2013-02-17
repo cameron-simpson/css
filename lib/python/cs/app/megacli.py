@@ -219,7 +219,8 @@ class MegaRAID(O):
                   continue
               if mode == mode_PDLIST:
                 if heading == 'Enclosure Device ID':
-                  # new physical drive commences
+                  # new physical drive commences,
+                  # do housekeeping for previous drive and then proceed
                   if DRV is not None:
                     DRVid = DRV.id
                     with Pfx("merge previous DRV %s", DRVid):
