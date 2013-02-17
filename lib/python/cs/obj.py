@@ -98,31 +98,86 @@ class DictAttrs(dict):
   def __setattr__(self, attr, value):
     self[attr]=value
 
-def O_str(o, no_recurse=False):
-  omit = getattr(o, '_O_omit', ())
-  return ( "<%s %s>"
+# Assorted functions for working with O instances.
+# These are not methods because I don't want to pollute O subclasses
+# with lots of extra method noise.
+#
+def O_merge(o, _conflict=None, **kw):
+  ''' Merge key:value pairs from a mapping into an O as attributes.
+      Ignore keys that do not start with a letter.
+      New attributes or attributes whose values compare equal are
+      merged in. Unequal values are passed to:
+        _conflict(o, attr, old_value, new_value)
+      to resolve the conflict. If _conflict is omitted or None
+      a warning if printed and the new value not merged.
+  '''
+  for attr, value in kw.iteritems():
+    if not len(attr) or not attr[0].isalpha():
+      if not attr.startswith('_O_'):
+        warning(".%s: ignoring, does not start with a letter", attr)
+      continue
+    try:
+      ovalue = getattr(o, attr)
+    except AttributeError:
+      # new attribute - 
+      setattr(o, attr, value)
+    else:
+      if ovalue != value:
+        if _conflict is None:
+          from cs.logutils import warning
+          warning(".%s: conflicting values: old=%s, new=%s", attr, ovalue, value)
+        else:
+          _conflict(o, attr, ovalue, value)
+
+def O_attrs(o):
+  ''' Yield attribute names from o which are pertinent to O_str.
+      Note: this calls getattr(o, attr) to inspect it in order to
+      prune callables.
+  '''
+  try:
+    omit = o._O_omit
+  except AttributeError:
+    omit = ()
+  for attr in sorted(dir(o)):
+    if attr[0].isalpha() and not attr in omit:
+      value = getattr(o, attr)
+      if not callable(value):
+        yield attr
+
+def O_str(o, no_recurse=False, seen=None):
+  if seen is None:
+    seen = set()
+  t = type(o)
+  if t in (str, unicode):
+    return repr(o)
+  if t in (tuple,int,float,bool,list):
+    return str(o)
+  if t is dict:
+    o2 = dict( [ (k, str(v)) for k, v in o.iteritems() ] )
+    return str(o2)
+  seen.add(id(o))
+  s = ( "<%s %s>"
            % ( o.__class__.__name__,
-               (    str(o)
-                 if type(o) in (tuple,)
-                 else
-                       "<%s len=%d>" % (type(o), len(o))
-                    if type(o) in (set,)
-                    else
-                       ",".join([ ( "%s=<%s>" % (pattr, type(pvalue).__name__)
-                                    if no_recurse else
-                                    "%s=%s" % (pattr, pvalue)
-                                  )
-                                  for pattr, pvalue
-                                  in [ (attr, getattr(o, attr))
-                                       for attr in sorted(dir(o))
-                                       if attr[0].isalpha()
-                                          and not attr in omit
-                                     ]
-                                  if not callable(pvalue)
-                                ])
-               )
-             )
+               (
+                   "<%s len=%d>" % (type(o), len(o))
+                if type(o) in (set,)
+                else
+                   ",".join([ ( "%s=<%s>" % (pattr, type(pvalue).__name__)
+                                if no_recurse else
+                                "%s=%s" % (pattr,
+                                           O_str(pvalue, no_recurse=no_recurse, seen=seen)
+                                             if id(pvalue) not in seen
+                                             else "<%s>" % (type(pvalue).__name__,)
+                                          )
+                              )
+                              for pattr, pvalue
+                              in [ (attr, getattr(o, attr)) for attr in O_attrs(o) ]
+                            ])
+           )
          )
+     )
+  seen.remove(id(o))
+  return s
 
 class O(object):
   ''' A bare object subclass to allow storing arbitrary attributes.
@@ -136,6 +191,7 @@ class O(object):
         Fill in attributes from any keyword arguments if supplied.
         This call can be omitted in subclasses if desired.
     '''
+    self._O_omit = []
     for k in kw:
       setattr(self, k, kw[k])
 
@@ -145,3 +201,16 @@ class O(object):
     s = O_str(self, no_recurse = not recurse)
     self._O_recurse = recurse
     return s
+
+  def __eq__(self, other):
+    attrs = tuple(O_attrs(self))
+    oattrs = tuple(O_attrs(other))
+    if attrs != oattrs:
+      return False
+    for attr in O_attrs(self):
+      if getattr(self, attr) != getattr(other, attr):
+        return False
+    return True
+
+  def __ne__(self, other):
+    return not (self == other)
