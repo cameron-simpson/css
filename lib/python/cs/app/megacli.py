@@ -274,16 +274,16 @@ class MegaRAID(O):
             setattr(o, attr, info)
             continue
 
-          # catch trailing drive
-          if mode == mode_PDLIST:
-            if DRV is not None:
-              DRVid = DRV.id
-              D("PDLIST: note physical drive %s", DRVid)
-              with Pfx("final merge previous DRV %s", DRVid):
-                if DRVid in A.physical_disks:
-                  O_merge(A.physical_disks[DRV.id], **DRV.__dict__)
-                else:
-                  A.physical_disks[DRV.id] = DRV
+        # catch trailing drive
+        if mode == mode_PDLIST:
+          if DRV is not None:
+            DRVid = DRV.id
+            D("PDLIST: note physical drive %s", DRVid)
+            with Pfx("final merge previous DRV %s", DRVid):
+              if DRVid in A.physical_disks:
+                O_merge(A.physical_disks[DRV.id], **DRV.__dict__)
+              else:
+                A.physical_disks[DRV.id] = DRV
 
         return M
 
