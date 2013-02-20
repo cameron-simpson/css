@@ -113,8 +113,14 @@ ok()
 killsubproc()
 {
   if [ -n "$pidfile" ]
-  then [ ! -s "$pidfile" ] || $trace killpidfile -W "$killtime" -- "$pidfile"
-  else [ -z "$subpid" ] || $trace killpids -W "$killtime" -- "$subpid"
+  then
+    if [ -s "$pidfile" ]
+    then
+      $trace killpidfile -W "$killtime" -- "$pidfile"
+      rm -f "$pidfile"
+    fi
+  else
+    [ -z "$subpid" ] || $trace killpids -W "$killtime" -- "$subpid"
   fi
 }
 
@@ -149,5 +155,7 @@ do
   fi
   $trace sleep "$testrate"
 done
+
+[ -n "$pidfile" ] && rm -f "$pidfile"
 
 exit 0
