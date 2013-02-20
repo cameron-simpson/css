@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Rsync my account from one place to another.
+# Rsync my account from one place to others.
 # Usually I use putacc to call this, but occasionally getacc.
 #	- Cameron Simpson <cs@zip.com.au> 29jun2004
 #
@@ -22,8 +22,9 @@ cd || exit 1
 
 stripslashes=`shqstr sed '/\/$/d; /^\.L\.\.[Tt]\.\.\.\.\.\. .* -> /d'`
 
+set -x
 filter_fd 1 "$stripslashes" \
-  rsync -rlptHCi --delete --exclude=CVS/ --exclude=\*.swp --exclude=\*~ \
+  mrsync -rlptHCi --delete --exclude=CVS/ --exclude=\*.swp --exclude=\*~ \
         "--include-from=$syncset" \
         ${1+"$@"} \
         "$from." "$to."
