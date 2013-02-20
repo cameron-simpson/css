@@ -36,9 +36,12 @@ done
 
 [ $force ] || needhost -v $HOMEHOST@home || exit 1
 
-cd || exit 1
-for hostlist
-do
-  pfx "$cmd $host" syncacc '' "$hostlist:" &
-done
-wait
+(
+  set -x
+  cd || exit 1
+  for hostlist
+  do
+    syncacc '' "$hostlist:" &
+  done
+  wait
+)
