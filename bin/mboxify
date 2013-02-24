@@ -1,0 +1,60 @@
+#!/bin/sh
+#
+# Convert a local mailbox into an mbox mailbox.
+#       - Cameron Simpson <cs@zip.com.au> 24feb2013
+#
+
+set -ue
+
+cmd=`basename "$0"`
+usage="Usage: $cmd mailbox"
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing mailbox" >&2
+  badopts=1
+else
+  mailbox=$1
+  shift
+  case "$mailbox" in
+    /*) ;; *) mailbox=`pwd`/$mailbox ;;
+  esac
+  if [ ! -e "$mailbox" ]
+
+  then
+    echo "$cmd: missing mailbox: $mailbox" >&2
+    badopts=1
+  fi
+fi
+
+if [ $# -gt 0 ]
+then
+  echo "$cmd: extra arguments: $*" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+mailboxtmp=$mailbox.tmp$$
+mailboxold=$mailbox.old$$
+
+set -x
+
+ismbox "$mailbox" && exit 0
+
+>>"$mailboxtmp"
+if mutt -n -F /dev/null -f "$mailbox" -e "set confirmappend=no; set delete=yes; push '<tag-pattern>.<enter><tag-prefix><save-message>$mailboxtmp<enter><sync-mailbox><exit>'"
+then
+  mv "$mailbox" "$mailboxold"
+  mv "$mailboxtmp" "$mailbox"
+  if ismaildir "$mailboxold"
+  then
+    rm0maildir "$mailboxold"
+  else
+    rmdir "$mailboxold"
+  fi
+else
+  rm -f "$mailboxtmp"
+fi
