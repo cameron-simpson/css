@@ -82,7 +82,12 @@ fi
 
 [ $runlocal ] || exec $trace sshx -E -t "$rhost" mailfolder -l -- "$foldername"
 
-ismaildir "$omaildir" || $trace maildir "$omaildir"
+if ismbox "$omaildir"
+then
+  :
+else
+  ismaildir "$omaildir" || >>"$omaildir"        ## $trace maildir "$omaildir"
+fi
 
 [ -n "$MAIL_IMAPSYNC" ] \
 && $trace imap-sync $imapsyncopts "$MAILDIR" "$MAIL_IMAPSYNC" "$foldername" "$old/$foldername" out spool spool-in spool-out
