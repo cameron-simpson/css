@@ -22,7 +22,6 @@ cd || exit 1
 
 stripslashes=`shqstr sed '/\/$/d; /^\.L\.\.[Tt]\.\.\.\.\.\. .* -> /d'`
 
-set -x
 filter_fd 1 "$stripslashes" \
   mrsync -rlptHCi --delete --exclude=CVS/ --exclude=\*.swp --exclude=\*~ \
         "--include-from=$syncset" \
