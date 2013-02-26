@@ -51,7 +51,7 @@ ismbox "$mailbox" && exit 0
 # make stub mbox
 >>"$mailboxtmp"
 
-if mutt -n -F /dev/null -f "$mailbox" -e "set confirmappend=no; set delete=yes; push '<tag-pattern>.<enter><tag-prefix><save-message>$mailboxtmp<enter><sync-mailbox><exit>'"
+if mutt -n -F /dev/null -f "$mailbox" -e "set sort=mailbox-order; set confirmappend=no; set delete=yes; push '<tag-pattern>.<enter><tag-prefix><save-message>$mailboxtmp<enter><sync-mailbox><exit>'"
 then
   mv "$mailbox" "$mailboxold"
   mv "$mailboxtmp" "$mailbox"
