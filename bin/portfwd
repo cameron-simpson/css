@@ -89,6 +89,7 @@ done
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+pidfile=
 subpids=
 trap '$setx; : PORTFWD TRAP "subpids=[$subpids]"; [ -z "$subpids" ] || killpids $subpids; [ -n "$pidfile" ] && { >"$pidfile"; rm -f "$pidfile"; }; exit 1' 1 2 3 15
 
