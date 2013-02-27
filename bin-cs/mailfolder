@@ -96,4 +96,4 @@ fi
 SENDMESG_FCC="$maildir +spool-out"
 export SENDMESG_FCC
 
-$trace mutt -f "$maildir" -e 'fcc-hook . $maildir'
+$trace mutt -f "$maildir" -e "fcc-hook . $maildir; save-hook . $omaildir"
