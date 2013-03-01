@@ -1,5 +1,7 @@
 #!/bin/sh
 #
+# NOTE: requires GNU sed. Or at any rate, a sed accepting \n for newline.
+#
 # Suck up mail item, emit header and body on one line for shell use as:
 #	read hdr body
 # Drops the colon from the header.
