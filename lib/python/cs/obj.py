@@ -140,9 +140,21 @@ def O_attrs(o):
     omit = ()
   for attr in sorted(dir(o)):
     if attr[0].isalpha() and not attr in omit:
-      value = getattr(o, attr)
+      try:
+        value = getattr(o, attr)
+      except AttributeError, e:
+        continue
       if not callable(value):
         yield attr
+
+def O_attritems(o):
+  for attr in O_attrs(o):
+    try:
+      value = getattr(o, attr)
+    except AttributeError, e:
+      continue
+    else:
+      yield attr, value
 
 def O_str(o, no_recurse=False, seen=None):
   if seen is None:
@@ -170,8 +182,7 @@ def O_str(o, no_recurse=False, seen=None):
                                              else "<%s>" % (type(pvalue).__name__,)
                                           )
                               )
-                              for pattr, pvalue
-                              in [ (attr, getattr(o, attr)) for attr in O_attrs(o) ]
+                              for pattr, pvalue in O_attritems(o)
                             ])
            )
          )
