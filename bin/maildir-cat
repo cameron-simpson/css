@@ -5,7 +5,7 @@
 #
 
 import sys
-from mailbox import Maildir
+from cs.mailutils import Maildir
 
 usage="Usage: "+sys.argv[0]+" maildir..."
 
@@ -14,9 +14,8 @@ if len(sys.argv) < 2:
   sys.exit(2)
 
 for path in sys.argv[1:]:
-  M=Maildir(path, factory=None)
-  for msg in M:
-    print msg.as_string(unixfrom=True)
+  Maildir(path).as_mbox(sys.stdout)
 
 sys.stdout.close()
+
 sys.exit(0)
