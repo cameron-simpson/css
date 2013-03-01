@@ -38,7 +38,7 @@ esac
 
 (
   delete_folder=$MAILDIR/O/$base
-  maildir "$delete_folder"
+  [ -e "$delete_folder" ] || >>"$delete_folder"
   echo "set my_folder_delete='$MAILDIR/O/$base'"
   echo "unhook save-hook; save-hook . \"\$my_folder_delete\""
 
