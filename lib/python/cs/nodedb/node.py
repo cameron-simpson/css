@@ -1111,6 +1111,8 @@ class NodeDB(dict, O):
       for N in nodes:
         yield N
 
+  __iter__ = default_dump_nodes
+
   def dump(self, fp, fmt='csv', nodes=None):
     ''' Write database nodes to the file `fp`.
         If `fmt` is "csv" (the default) use the archival "vertical"
