@@ -394,6 +394,21 @@ class Maildir(mailbox.Maildir):
   def close(self):
     pass
 
+  def as_mbox(self, fp, keys=None):
+    ''' Transcribe the contents of this maildir in UNIX mbox format to the
+        file `fp`.
+        The optional iterable `keys` designates the messages to transcribe.
+        The default is to transcribe all messages.
+    '''
+    if keys is None:
+      keys = self.iterkeys()
+    for key in keys:
+      with Pfx(key):
+        message = self[key]
+        text = message.as_string(unixfrom=True)
+        fp.write(text)
+        fp.write('\n')
+
 if __name__ == '__main__':
   import cs.mailutils_tests
   cs.mailutils_tests.selftest(sys.argv)
