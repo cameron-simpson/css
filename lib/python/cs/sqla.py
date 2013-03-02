@@ -8,8 +8,10 @@ from __future__ import print_function
 import sys
 import os.path
 from getopt import GetoptError
-import sqlalchemy
+from sqlalchemy import MetaData, create_engine
+from threading import RLock
 from cs.logutils import setup_logging, D, Pfx, error
+from cs.threads import locked_property
 from cs.obj import O
 
 usage = '''Usage: %s dburl op [args...]
@@ -34,7 +36,7 @@ def main(argv):
     badopts = True
   else:
     op = argv.pop(0)
-    DB = SQLA(ur=dburl)
+    DB = SQLA(dburl=dburl)
     with Pfx(op):
       try:
         try:
@@ -58,6 +60,25 @@ class SQLA(O):
 
   def __init__(self, dburl):
     self.dburl = dburl
+    self._lock = RLock()
+
+  @locked_property
+  def engine(self):
+    return create_engine(self.dburl, echo=len(os.environ.get('DEBUG','')) > 0)
+
+  @locked_property
+  def connection(self):
+    return self.engine.connect()
+
+  @locked_property
+  def metadata(self):
+    m = MetaData()
+    m.bind = self.engine
+    return m
+
+  def op_list(self, args):
+    for t in self.metadata.sorted_tables:
+      print(t.name)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
