@@ -457,7 +457,7 @@ def parserules(fp):
       if line[offset] == '!':
         condition_flags.invert = True
         _, offset = get_white(line, offset+1)
-        if not _ or offset == len(line):
+        if offset == len(line):
           warning('no condition after "!"')
           continue
 
@@ -534,16 +534,16 @@ class _Condition(O):
     self.header_names = header_names
 
   def match(self, filtering):
+    status = False
     M = filtering.message
     for header_name in self.header_names:
       for header_value in M.get_all(header_name, ()):
         if self.test_value(filtering, header_name, header_value):
-          if not self.flags.invert:
-            return True
-        else:
-          if self.flags.invert:
-            return True
-    return False
+          status = True
+          break
+    if self.flags.invert:
+      status = not status
+    return status
 
 class Condition_Regexp(_Condition):
 
