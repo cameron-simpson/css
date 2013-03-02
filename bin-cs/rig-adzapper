@@ -123,6 +123,8 @@ http_access allow all
 shutdown_lifetime 2 seconds
 icp_access allow all
 nonhierarchical_direct off
+maximum_single_addr_tries 4
+retry_on_error on
 X
 
 squid-peerage
