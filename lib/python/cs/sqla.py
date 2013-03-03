@@ -34,6 +34,15 @@ def main(argv):
     badopts = True
   else:
     dburl = argv.pop(0)
+    if dburl.startswith('$'):
+      envvar = dburl[1:]
+      try:
+        varval = os.environ[envvar]
+      except KeyError as e:
+        error("dburl: no such envvar: %s", dburl)
+        badopts = True
+      else:
+        dburl = varval
 
   if not argv:
     cmdloop = CmdLoop(dburl)
