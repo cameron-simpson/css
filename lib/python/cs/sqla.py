@@ -13,6 +13,7 @@ import shlex
 from sqlalchemy import MetaData, create_engine
 from threading import RLock
 from cs.logutils import setup_logging, D, Pfx, error
+from cs.seq import the
 from cs.threads import locked_property
 from cs.obj import O
 
@@ -46,8 +47,11 @@ def main(argv):
         try:
           opfunc = getattr(DB, 'op_'+op)
         except AttributeError as e:
-          error("unknown op")
-          badopts = True
+          if op in DB.table_names:
+            xit = DB.op_table([op] + argv)
+          else:
+            error("unknown op (table_names = %s)", DB.table_names)
+            badopts = True
         else:
           xit = opfunc(argv)
       except GetoptError as e:
@@ -86,11 +90,44 @@ class SQLA(O):
     m.reflect()
     return m.sorted_tables
 
+  @property
+  def table_names(self):
+    return [ t.name for t in self.tables ]
+
+  @locked_property
+  def t(self):
+    ts = O()
+    for tbl in self.tables:
+      setattr(ts, tbl.name, tbl)
+    return ts
+
   def op_list(self, args):
     if args:
       raise GetoptError("extra arguments: %s" % (' '.join(args),))
-    for t in self.tables:
-      print(t.name, type(t))
+    for tbl in self.tables:
+      print(tbl.name, type(tbl))
+
+  def op_table(self, args):
+    if not args:
+      raise GetoptError("missing table name")
+    table_name = args.pop(0)
+    with Pfx(table_name):
+      tbl = getattr(self.t, table_name)
+      if not args:
+        raise GetoptError("missing node name")
+      nodename = args.pop(0)
+      row = the(tbl.select(tbl.c.name == nodename).execute())
+      if not args:
+        for col in sorted(row.keys()):
+          print("%-14s: %s" % (col, row[col]))
+        return
+      for arg in args:
+        if '=' in arg:
+          col, value = arg.split('=', 1)
+          print("SET %s.%s = %s" % (nodename, col, value))
+        else:
+          col = arg
+          print("%s.%s = %s" % (nodename, col, row[col]))
 
 class CmdLoop(Cmd):
 
