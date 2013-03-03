@@ -125,6 +125,7 @@ class SQLA(O):
         if '=' in arg:
           col, value = arg.split('=', 1)
           print("SET %s.%s = %s" % (nodename, col, value))
+          tbl.update().where(tbl.c.name == nodename).values(**{col: value}).execute()
         else:
           col = arg
           print("%s.%s = %s" % (nodename, col, row[col]))
