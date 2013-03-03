@@ -76,9 +76,17 @@ class SQLA(O):
     m.bind = self.engine
     return m
 
+  @locked_property
+  def tables(self):
+    m = self.metadata
+    m.reflect()
+    return m.sorted_tables
+
   def op_list(self, args):
-    for t in self.metadata.sorted_tables:
-      print(t.name)
+    if args:
+      raise GetoptError("extra arguments: %s" % (' '.join(args),))
+    for t in self.tables:
+      print(t.name, type(t))
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
