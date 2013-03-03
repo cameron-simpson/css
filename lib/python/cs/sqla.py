@@ -114,11 +114,11 @@ class CmdLoop(Cmd):
       return True
     with Pfx(op):
       try:
-        fn = getattr(self.sqla, 'do_'+op)
+        fn = getattr(self.sqla, 'op_'+op)
       except AttributeError as e:
         error("unknown command")
       else:
-        fn(args)
+        fn(words)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
