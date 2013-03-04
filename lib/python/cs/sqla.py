@@ -45,28 +45,29 @@ def main(argv):
       else:
         dburl = varval
 
-  if not argv:
-    cmdloop = CmdLoop(dburl)
-    cmdloop.prompt = cmd+'> '
-    cmdloop.cmdloop()
-  else:
-    op = argv.pop(0)
-    DB = SQLA(dburl=dburl)
-    with Pfx(op):
-      try:
+  if not badopts:
+    if not argv:
+      cmdloop = CmdLoop(dburl)
+      cmdloop.prompt = cmd+'> '
+      cmdloop.cmdloop()
+    else:
+      op = argv.pop(0)
+      DB = SQLA(dburl=dburl)
+      with Pfx(op):
         try:
-          opfunc = getattr(DB, 'op_'+op)
-        except AttributeError as e:
-          if op in DB.table_names:
-            xit = DB.op_table([op] + argv)
+          try:
+            opfunc = getattr(DB, 'op_'+op)
+          except AttributeError as e:
+            if op in DB.table_names:
+              xit = DB.op_table([op] + argv)
+            else:
+              error("unknown op (table_names = %s)", DB.table_names)
+              badopts = True
           else:
-            error("unknown op (table_names = %s)", DB.table_names)
-            badopts = True
-        else:
-          xit = opfunc(argv)
-      except GetoptError as e:
-        error(str(e))
-        badopts = True
+            xit = opfunc(argv)
+        except GetoptError as e:
+          error(str(e))
+          badopts = True
 
   if badopts:
     print(usage % (cmd,), file=sys.stderr)
