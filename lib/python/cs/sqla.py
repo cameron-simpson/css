@@ -28,6 +28,7 @@ def main(argv):
 
   xit = 0
   badopts = False
+  dburl = None
 
   if not argv:
     error("missing dburl")
