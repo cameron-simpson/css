@@ -171,7 +171,10 @@ class CmdLoop(Cmd):
       try:
         fn = getattr(self.sqla, 'op_'+op)
       except AttributeError as e:
-        error("unknown command")
+        if op in self.sqla.table_names:
+          self.sqla.op_table([op] + words)
+        else:
+          error("unknown command")
       else:
         fn(words)
 
