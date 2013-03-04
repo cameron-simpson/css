@@ -153,6 +153,12 @@ class CmdLoop(Cmd):
   def emptyline(self):
     pass
 
+  def onecmd(self, line):
+    try:
+      return Cmd.onecmd(self, line)
+    except GetoptError as e:
+      error(str(e))
+
   def default(self, line):
     words = shlex.split(line, comments=True)
     print("words =", words)
