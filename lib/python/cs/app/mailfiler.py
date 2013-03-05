@@ -835,7 +835,7 @@ class WatchedMaildir(O):
                                          unrfc2047(M.get('subject', '_no_subject'))))
                        .replace('\n', ' ') )
             filtering.log("  " + unrfc2047(M.get('from', '_no_from')))
-            filtering.log("  " + M['message-id'])
+            filtering.log("  " + M.get('message-id', '<?>'))
             filtering.log("  " + shortpath(mdir.keypath(key)))
             saved_to = []
             reports = []
