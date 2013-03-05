@@ -1,7 +1,13 @@
 import os
 import re
-import string
-from cs.py3 import StringIO
+import sys
+if  sys.hexversion < 0x03000000:
+  try:
+    from cStringIO import StringIO
+  except ImportError:
+    from StringIO import StringIO
+else:
+  from io import StringIO
 
 sh_unsafe_re = re.compile(r'[^\-a-z0-9./]');
 
