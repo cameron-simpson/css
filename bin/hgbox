@@ -15,7 +15,7 @@
 set -ue
 
 : ${HGBOX:=$HOME/var/hgbox}
-: ${HGBOX_MASTER:=ssh://home/va/hgbox-MASTER}
+: ${HGBOX_MASTER:=ssh://home/var/hgbox-MASTER}
 
 hgmasterbase=$HGBOX_MASTER
 hglocalbase=$HGBOX
