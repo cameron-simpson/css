@@ -21,26 +21,27 @@ hgmasterbase=$HGBOX_MASTER
 hglocalbase=$HGBOX
 
 cmd=`basename "$0"`
-usage="Usage:
-  $cmd [options...] add sets...
-    Add named sets from master to local sets.
-  $cmd [options...] export [-f] [sets...]
-    Export files from the named sets. Destructively undoes local changes.
-    -f: Force export instead of asking.
-  $cmd [options...] init sets...
-    Initialise new sets, both locally and at the master.
-  $cmd [options...] ls
-    List sets.
-  $cmd [options...] modset set +innerdir=outerdir...
-    Modify a set:
-      +innerdir=outerdir        Add \"outerdir\" to the directories in this
-                                set as the in-set directory \"innerdir\".
-      -innerdir                 Remove \"innerdir\" from the directories to
-                                sync.
-  $cmd [options...] sync [-m message] [-q] [sets...]
-    Sync local sets. Update master unless -q (quick).
-    -q: Quick. Do not update master.
-    -m: Specify commit message.
+usage="Usage: $cmd [options...] op op-args...
+  Ops:
+    add sets...
+      Add named sets from master to local sets.
+    export [-f] [sets...]
+      Export files from the named sets. Destructively undoes local changes.
+      -f: Force export instead of asking.
+    init sets...
+      Initialise new sets, both locally and at the master.
+    ls
+      List sets.
+    modset set +innerdir=outerdir...
+      Modify a set:
+        +innerdir=outerdir        Add \"outerdir\" to the directories in this
+                                  set as the in-set directory \"innerdir\".
+        -innerdir                 Remove \"innerdir\" from the directories to
+                                  sync.
+    sync [-m message] [-q] [sets...]
+      Sync local sets. Update master unless -q (quick).
+      -q: Quick. Do not update master.
+      -m: Specify commit message.
  Options:
   -L local      Specify local base. Default from \$HGBOX: $hglocalbase
   -R remote     Specify remote master base. Default from \$HGBOX_MASTER: $hgmasterbase
