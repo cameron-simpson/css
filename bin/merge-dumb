@@ -2,13 +2,11 @@
 #
 # Dumbly merge two related files.
 #
-# This is aimed at merging files that accrue lines independently in at
+# This is aimed at merging files that accrue lines independently at
 # multiple sites, generally a common log file updated at multiple sites and
 # synched using systems like my hgbox script.
 # The motivating case on my part is timesheet files, where lines are
 # inserted independently on multiple hosts and merged at synch time.
-#
-# 
 #       - Cameron Simpson <cs@zip.com.au> 08jun2011
 # 
 
