@@ -166,7 +166,7 @@ hg_init()
     $hg clone "$rhgbox" "$hgbox"
     cd "$hgbox"
     echo '[merge-tools]' >>hgrc
-    echo 'merge-dumb.args = $local $other > $output'cat >>hgrc
+    echo 'merge-dumb.args = $local $other > $output' >>hgrc
     echo '[merge-patterns]' >>hgrc
     $hg add hgrc
     $hg commit -m 'initial hgrc for merge information' hgrc
