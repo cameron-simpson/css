@@ -89,12 +89,12 @@ main()
     op=$1
     shift
     case "$op" in
-      add)      hg_add ${1+"$@"} ;;
-      export)   hg_export ${1+"$@"} ;;
-      init)     hg_init ${1+"$@"} ;;
-      ls)       hg_ls ${1+"$@"} ;;
-      modset)   hg_modset ${1+"$@"} ;;
-      sync)     hg_sync ${1+"$@"} ;;
+      add)      hgb_add ${1+"$@"} ;;
+      export)   hgb_export ${1+"$@"} ;;
+      init)     hgb_init ${1+"$@"} ;;
+      ls)       hgb_ls ${1+"$@"} ;;
+      modset)   hgb_modset ${1+"$@"} ;;
+      sync)     hgb_sync ${1+"$@"} ;;
       *)        echo "$cmd: unsupported op: $op" >&2; badopts=1 ;;
     esac
     xit=$?
@@ -109,7 +109,7 @@ ABORT()
   exit 1
 }
 
-hg_add()
+hgb_add()
 {
   [ $# -gt 0 ] || { echo "$cmd: $op: missing sets" >&2
                     badopts=1
@@ -124,7 +124,7 @@ hg_add()
   done
 }
 
-hg_export()
+hgb_export()
 {
   force_export=
   if [ $# -gt 0 ] && [ "x$1" = x-f ]
@@ -151,7 +151,7 @@ hg_export()
   done
 }
 
-hg_init()
+hgb_init()
 {
   [ $# -gt 0 ] || { echo "$cmd: $op: missing sets" >&2
                     badopts=1
@@ -173,7 +173,7 @@ hg_init()
   done
 }
 
-hg_ls()
+hgb_ls()
 {
   [ $# = 0 ] || { echo "$cmd: $op: extra arguments: $*" >&2
                   badopts=1
@@ -184,7 +184,7 @@ hg_ls()
   $trace ls -d [a-z]* || xit=1
 }
 
-hg_modset()
+hgb_modset()
 {
   if [ $# = 0 ]
   then
@@ -287,7 +287,7 @@ hg_modset()
   return $xit
 }
 
-hg_sync()
+hgb_sync()
 {
   sync_quick=
   commit_message=
