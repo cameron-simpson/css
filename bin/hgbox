@@ -14,138 +14,322 @@
 
 set -ue
 
+# directory containing hgbox sets
 : ${HGBOX:=$HOME/var/hgbox}
+
+# default path to remote hgboxen
 : ${HGBOX_MASTER:=ssh://home/var/hgbox-MASTER}
 
-hgmasterbase=$HGBOX_MASTER
-hglocalbase=$HGBOX
+main()
+{
+  hgmasterbase=$HGBOX_MASTER
+  hglocalbase=$HGBOX
 
-cmd=`basename "$0"`
-usage="Usage: $cmd [options...] op op-args...
-  Ops:
-    add sets...
-      Add named sets from master to local sets.
-    export [-f] [sets...]
-      Export files from the named sets. Destructively undoes local changes.
-      -f: Force export instead of asking.
-    init sets...
-      Initialise new sets, both locally and at the master.
-    ls
-      List sets.
-    modset set +innerdir=outerdir...
-      Modify a set:
-        +innerdir=outerdir        Add \"outerdir\" to the directories in this
-                                  set as the in-set directory \"innerdir\".
-        -innerdir                 Remove \"innerdir\" from the directories to
-                                  sync.
-    sync [-m message] [-q] [sets...]
-      Sync local sets. Update master unless -q (quick).
-      -q: Quick. Do not update master.
-      -m: Specify commit message.
- Options:
-  -L local      Specify local base. Default from \$HGBOX: $hglocalbase
-  -R remote     Specify remote master base. Default from \$HGBOX_MASTER: $hgmasterbase
-  -n            No action. Recite actions.
-  -q            Quiet.
-  -v            Verbose.
-  -x            Trace execution of actions."
+  cmd=`basename "$0"`
+  usage="Usage: $cmd [options...] op op-args...
+    Ops:
+      add sets...
+        Add named sets from master to local sets.
+      export [-f] [sets...]
+        Export files from the named sets. Destructively undoes local changes.
+        -f: Force export instead of asking.
+      init sets...
+        Initialise new sets, both locally and at the master.
+      ls
+        List sets.
+      modset set +innerdir=outerdir...
+        Modify a set:
+          +innerdir=outerdir        Add \"outerdir\" to the directories in this
+                                    set as the in-set directory \"innerdir\".
+          -innerdir                 Remove \"innerdir\" from the directories to
+                                    sync.
+      sync [-m message] [-q] [sets...]
+        Sync local sets. Update master unless -q (quick).
+        -q: Quick. Do not update master.
+        -m: Specify commit message.
+   Options:
+    -L local      Specify local base. Default from \$HGBOX: $hglocalbase
+    -R remote     Specify remote master base. Default from \$HGBOX_MASTER: $hgmasterbase
+    -n            No action. Recite actions.
+    -q            Quiet.
+    -v            Verbose.
+    -x            Trace execution of actions."
 
-rsopts=-ptgolHO
-trace= ##set-x
-verbose=
-silent=
-xopt=
+  rsopts=-ptgolHO
+  trace= ##set-x
+  verbose=
+  silent=
+  xopt=
 
-badopts=
+  badopts=
 
-while [ $# -gt 0 ]
-do
-  case $1 in
-    -L) hglocalbase=$2; shift ;;
-    -R) hgmaster=$2; shift ;;
-    -n) trace=eecho ;;
-    -x) trace=set-x xopt=-x;;
-    -v) silent= verbose=1 ;;
-    -q) silent=1 verbose= ;;
-    --) shift; break ;;
-    -?*)echo "$cmd: unrecognised option: $1" >&2
-        badopts=1
-        ;;
-    *)  break ;;
-  esac
-  shift
-done
-
-if [ $# = 0 ]
-then
-  echo "$cmd: missing op" >&2
-  badopts=1
-else
-  op=$1
-  shift
-  case "$op" in
-    add)
-        [ $# -gt 0 ] || { echo "$cmd: $op: missing sets" >&2
-                          badopts=1
-                        }
-        ;;
-    export)
-        force_export=
-        if [ $# -gt 0 ] && [ "x$1" = x-f ]
-        then
-          shift
-          force_export=1
-        fi
-        [ $# -gt 0 ] || set -- `cd "$hglocalbase"; echo [a-z]*`
-        ;;
-    init)
-        [ $# -gt 0 ] || { echo "$cmd: $op: missing sets" >&2
-                          badopts=1
-                        }
-        ;;
-    ls) [ $# = 0 ] || { echo "$cmd: $op: extra arguments: $*" >&2
-                        badopts=1
-                      }
-        ;;
-    modset)
-        if [ $# = 0 ]
-        then
-          echo "$cmd: $op: missing set" >&2
+  while [ $# -gt 0 ]
+  do
+    case $1 in
+      -L) hglocalbase=$2; shift ;;
+      -R) hgmaster=$2; shift ;;
+      -n) trace=eecho ;;
+      -x) trace=set-x xopt=-x;;
+      -v) silent= verbose=1 ;;
+      -q) silent=1 verbose= ;;
+      --) shift; break ;;
+      -?*)echo "$cmd: unrecognised option: $1" >&2
           badopts=1
-          set='(missing)'
-        else
-          set=$1
-          shift
-        fi
-        [ $# -gt 0 ] || { echo "$cmd: $op $set: missing modifications" >&2
-                          badopts=1
-                        }
-        ;;
-    sync)
-        sync_quick=
-        commit_message=
-        while [ $# -gt 0 ]
-        do
-          case "$1" in
-            -q) sync_quick=1 ;;
-            -m) commit_message=$2; shift ;;
-            --) shift; break ;;
-            -?*)echo "$cmd $op: unrecognised option: $1" >&2
-                badopts=1
-                ;;
-            *)  break ;;
-          esac
-          shift
-        done
-        [ $# -gt 0 ] || set -- `cd "$hglocalbase"; echo [a-z]*`
-        ;;
-    *)  echo "$cmd: unsupported op: $op" >&2
-        badopts=1
-        ;;
-  esac
-fi
+          ;;
+      *)  break ;;
+    esac
+    shift
+  done
 
-[ $badopts ] && { echo "$usage" >&2; exit 2; }
+  if [ $# = 0 ]
+  then
+    echo "$cmd: missing op" >&2
+    badopts=1
+  else
+    op=$1
+    shift
+    case "$op" in
+      add)      hg_add ${1+"$@"} ;;
+      export)   hg_export ${1+"$@"} ;;
+      init)     hg_init ${1+"$@"} ;;
+      ls)       hg_ls ${1+"$@"} ;;
+      modset)   hg_modset ${1+"$@"} ;;
+      sync)     hg_sync ${1+"$@"} ;;
+      *)        echo "$cmd: unsupported op: $op" >&2; badopts=1 ;;
+    esac
+    xit=$?
+  fi
+
+  [ $badopts ] && { echo "$usage" >&2; return 2; }
+  return xit
+}
+
+ABORT()
+{ echo "$cmd: ABORT: $*" >&2
+  exit 1
+}
+
+hg_add()
+{
+  [ $# -gt 0 ] || { echo "$cmd: $op: missing sets" >&2
+                    badopts=1
+                  }
+  [ $badopts ] && return 2
+
+  for set
+  do
+    hgbox=$hglocalbase/$set
+    rhgbox=$hgmasterbase/$set
+    $hg clone "$rhgbox" "$hgbox" || return $?
+  done
+}
+
+hg_export()
+{
+  force_export=
+  if [ $# -gt 0 ] && [ "x$1" = x-f ]
+  then
+    shift
+    force_export=1
+  fi
+  [ $# -gt 0 ] || set -- `cd "$hglocalbase"; echo [a-z]*`
+  [ $badopts ] && return 2
+
+  cd "$hgbox" || exit 1
+  for set
+  do
+    hgbox=$hglocalbase/$set
+    rhgbox=$hgmasterbase/$set
+    if [ $force_export ] \
+    || { [ -t 0 ] && ask "really export from $hgbox to exterior directories"; }
+    then
+      with_hg_outmap sync_out
+    else
+      echo "$cmd: $op: $hgbox: aborting" >&2
+      return 1
+    fi
+  done
+}
+
+hg_init()
+{
+  [ $# -gt 0 ] || { echo "$cmd: $op: missing sets" >&2
+                    badopts=1
+                  }
+  [ $badopts ] && return 2
+
+  for set
+  do
+    hgbox=$hglocalbase/$set
+    rhgbox=$hgmasterbase/$set
+    $inhg --init "$rhgbox"
+    $hg clone "$rhgbox" "$hgbox"
+    cd "$hgbox"
+    echo '[merge-tools]' >>hgrc
+    echo 'merge-dumb.args = $local $other > $output'cat >>hgrc
+    echo '[merge-patterns]' >>hgrc
+    $hg add hgrc
+    $hg commit -m 'initial hgrc for merge information' hgrc
+  done
+}
+
+hg_ls()
+{
+  [ $# = 0 ] || { echo "$cmd: $op: extra arguments: $*" >&2
+                  badopts=1
+                }
+  [ $badopts ] && return 2
+  
+  cd "$hglocalbase"
+  $trace ls -d [a-z]* || xit=1
+}
+
+hg_modset()
+{
+  if [ $# = 0 ]
+  then
+    echo "$cmd: $op: missing set" >&2
+    badopts=1
+    set='(missing)'
+  else
+    set=$1
+    shift
+  fi
+  [ $# -gt 0 ] || { echo "$cmd: $op $set: missing modifications" >&2
+                    badopts=1
+                  }
+  [ $badopts ] && return 2
+
+  cd "$hglocalbase/$set" || return 1
+  for mod
+  do
+    case "$mod" in
+      +?*=?*)
+        ok=1
+        innerdir=`expr "x$mod" : 'x.\([^=]*\)=.*'`
+        outerdir=`expr "x$mod" : 'x.[^=]*=\(.*\)'`
+        case "$innerdir" in
+          /* | ./* | ../* | */./* | */../* | */. | */.. | */ )
+            echo "$cmd: $op $set: invalid innerdir: $innerdir" >&2
+            ok=
+            continue
+            ;;
+        esac
+        # normalise outderdir
+        case "$outerdir" in
+          ./* | ../* | */./* | */../* | */. | */.. )
+            echo "$cmd: $op $set: invalid outerdir: $outerdir" >&2
+            ok=
+            continue
+            ;;
+          "$HOME"/*)
+            realouterdir=$outerdir
+            outerdir=`expr "x$outerdir" : "x$HOME/"'\(.*\)'`
+            ;;
+          /*)
+            realouterdir=$outerdir
+            ;;
+          *)realouterdir=$HOME/$outerdir
+            ;;
+        esac
+        if [ $ok ]
+        then
+          if [ -e "$innerdir" ]
+          then
+            echo "$cmd: $op $set: innerdir already exists: $innerdir" >&2
+            ok=
+          fi
+          if [ ! -d "$realouterdir/." ]
+          then
+            echo "$cmd: $op $set: outerdir is not a directory: $realouterdir" >&2
+            ok=
+          fi
+        fi
+        if [ $ok ] && [ -t 0 ] && ask "$cmd: $op $set: add $innerdir <-> $outerdir"
+        then
+          $trace mkdir -p "$innerdir"
+          [ -s .hgbox-outside ] || { >>.hgbox-outside; $trace hg add .hgbox-outside; }
+          $trace echo "$innerdir $outerdir" >>.hgbox-outside
+          $hg commit -m "map $innerdir to $outerdir" .hgbox-outside
+        fi
+        [ $ok ] || xit=1
+        ;;
+      -?*)
+        ok=1
+        innerdir=`expr "x$mod" : 'x.\(.*\)'`
+        case "$innerdir" in
+          /* | ./* | ../* | */./* | */../* | */. | */.. | */ )
+            echo "$cmd: $op $set: invalid innerdir: $innerdir" >&2
+            ok=
+            continue
+            ;;
+        esac
+        if [ $ok ]
+        then
+          grep "^$innerdir " .hgbox-outside \
+          || { echo "$cmd: $op $set: innerdir not in .hgbox-outside: $innerdir" >&2
+               ok=
+             }
+        fi
+        if [ $ok ]
+        then
+          $trace bsed "s^$innerdir # &" .hgbox-outside
+          $hg commit -m "do not sync $innerdir" .hgbox-outside
+        fi
+        [ $ok ] || xit=1
+        ;;
+      *)echo "$cmd: $op $set: unrecognised modification: $1" >&2
+        xit=1
+        break
+        ;;
+    esac
+  done
+  return $xit
+}
+
+hg_sync()
+{
+  sync_quick=
+  commit_message=
+  while [ $# -gt 0 ]
+  do
+    case "$1" in
+      -q) sync_quick=1 ;;
+      -m) commit_message=$2; shift ;;
+      --) shift; break ;;
+      -?*)echo "$cmd $op: unrecognised option: $1" >&2
+          badopts=1
+          ;;
+      *)  break ;;
+    esac
+    shift
+  done
+  [ $# -gt 0 ] || set -- `cd "$hglocalbase"; echo [a-z]*`
+  [ $badopts ] && return 2
+
+  cd "$hgbox" || return 1
+
+  with_hg_outmap sync_in
+
+  hgstat=`$hg stat`
+  if [ -n "$hgstat" ]
+  then
+    $hg addremove
+    commit_message=${commit_message:-"$cmd sync in `hostname`:`pwd` `date +'%Y-%m-%d-%H:%M:%S'`"}
+    $hg commit -m "$commit_message"
+  fi
+
+  if not [ $sync_quick ]
+  then
+    [ $silent ] || echo "$set: import from $rhgbox"
+    $hg fetch "$rhgbox"
+    with_hg_outmap sync_out
+
+    [ $silent ] || echo "$set: export to $rhgbox"
+    $hg push "$rhgbox"
+    $inhg "$rhgbox" $hg up
+  fi
+}
 
 hg="$trace hg"
 inhg="$trace inhg $xopt"
@@ -270,165 +454,4 @@ with_hg_outmap()
   [ $ok ] || { echo "$cmd: ABORTING" >&2; return 1; }
 }
 
-xit=0
-
-# operations that do not iterate over set names
-case "$op" in
-  ls)
-    cd "$hglocalbase"
-    $trace ls -d [a-z]* || xit=1
-    exit $xit
-    ;;
-
-  modset)
-    cd "$hglocalbase/$set"
-    for mod
-    do
-      case "$mod" in
-        +?*=?*)
-          ok=1
-          innerdir=`expr "x$mod" : 'x.\([^=]*\)=.*'`
-          outerdir=`expr "x$mod" : 'x.[^=]*=\(.*\)'`
-          case "$innerdir" in
-            /* | ./* | ../* | */./* | */../* | */. | */.. | */ )
-              echo "$cmd: $op $set: invalid innerdir: $innerdir" >&2
-              ok=
-              continue
-              ;;
-          esac
-          # normalise outderdir
-          case "$outerdir" in
-            ./* | ../* | */./* | */../* | */. | */.. )
-              echo "$cmd: $op $set: invalid outerdir: $outerdir" >&2
-              ok=
-              continue
-              ;;
-            "$HOME"/*)
-              realouterdir=$outerdir
-              outerdir=`expr "x$outerdir" : "x$HOME/"'\(.*\)'`
-              ;;
-            /*)
-              realouterdir=$outerdir
-              ;;
-            *)realouterdir=$HOME/$outerdir
-              ;;
-          esac
-          if [ $ok ]
-          then
-            if [ -e "$innerdir" ]
-            then
-              echo "$cmd: $op $set: innerdir already exists: $innerdir" >&2
-              ok=
-            fi
-            if [ ! -d "$realouterdir/." ]
-            then
-              echo "$cmd: $op $set: outerdir is not a directory: $realouterdir" >&2
-              ok=
-            fi
-          fi
-          if [ $ok ] && [ -t 0 ] && ask "$cmd: $op $set: add $innerdir <-> $outerdir"
-          then
-            $trace mkdir -p "$innerdir"
-            [ -s .hgbox-outside ] || { >>.hgbox-outside; $trace hg add .hgbox-outside; }
-            $trace echo "$innerdir $outerdir" >>.hgbox-outside
-            $hg commit -m "map $innerdir to $outerdir" .hgbox-outside
-          fi
-          [ $ok ] || xit=1
-          ;;
-        -?*)
-          ok=1
-          innerdir=`expr "x$mod" : 'x.\(.*\)'`
-          case "$innerdir" in
-            /* | ./* | ../* | */./* | */../* | */. | */.. | */ )
-              echo "$cmd: $op $set: invalid innerdir: $innerdir" >&2
-              ok=
-              continue
-              ;;
-          esac
-          if [ $ok ]
-          then
-            grep "^$innerdir " .hgbox-outside \
-            || { echo "$cmd: $op $set: innerdir not in .hgbox-outside: $innerdir" >&2
-                 ok=
-               }
-          fi
-          if [ $ok ]
-          then
-            $trace bsed "s^$innerdir # &" .hgbox-outside
-            $hg commit -m "do not sync $innerdir" .hgbox-outside
-          fi
-          [ $ok ] || xit=1
-          ;;
-        *)echo "$cmd: $op $set: unrecognised modification: $1" >&2
-          xit=1
-          break
-          ;;
-      esac
-    done
-    exit $xit
-    ;;
-esac
-
-for set
-do
-  hgbox=$hglocalbase/$set
-  rhgbox=$hgmasterbase/$set
-
-  ( set -ue
-    case "$op" in
-      add)
-        $hg clone "$rhgbox" "$hgbox"
-        ;;
-
-      export)
-        cd "$hgbox" || exit 1
-        if [ $force_export ] \
-        || { [ -t 0 ] && ask "really export from $hgbox to exterior directories"; }
-        then
-          with_hg_outmap sync_out
-        else
-          echo "$cmd: $op: $hgbox: aborting" >&2
-          exit 1
-        fi
-        ;;
-
-      init)
-        $inhg --init "$rhgbox"
-        $hg clone "$rhgbox" "$hgbox"
-        cd "$hgbox"
-        echo '[merge-tools]' >>hgrc
-        echo 'merge-dumb.args = $local $other > $output'cat >>hgrc
-        echo '[merge-patterns]' >>hgrc
-        $hg add hgrc
-        $hg commit -m 'initial hgrc for merge information' hgrc
-        ;;
-
-      sync)
-        cd "$hgbox" || exit 1
-
-        with_hg_outmap sync_in
-
-        hgstat=`$hg stat`
-        if [ -n "$hgstat" ]
-        then
-          $hg addremove
-          commit_message=${commit_message:-"$cmd sync in `hostname`:`pwd` `date +'%Y-%m-%d-%H:%M:%S'`"}
-          $hg commit -m "$commit_message"
-        fi
-
-        if not [ $sync_quick ]
-        then
-          [ $silent ] || echo "$set: import from $rhgbox"
-          $hg fetch "$rhgbox"
-          with_hg_outmap sync_out
-
-          [ $silent ] || echo "$set: export to $rhgbox"
-          $hg push "$rhgbox"
-          $inhg "$rhgbox" $hg up
-        fi
-        ;;
-    esac
-  ) || xit=1
-done
-
-exit $xit
+main ${1+"$@"}
