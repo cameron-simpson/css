@@ -88,6 +88,9 @@ main()
   else
     op=$1
     shift
+    hg="$trace hg"
+    inhg="$trace inhg $xopt"
+    rsync="$trace rsync -iO"
     case "$op" in
       add)      hgb_add ${1+"$@"} ;;
       export)   hgb_export ${1+"$@"} ;;
@@ -101,7 +104,7 @@ main()
   fi
 
   [ $badopts ] && { echo "$usage" >&2; return 2; }
-  return xit
+  return $xit
 }
 
 ABORT()
@@ -330,10 +333,6 @@ hgb_sync()
     $inhg "$rhgbox" $hg up
   fi
 }
-
-hg="$trace hg"
-inhg="$trace inhg $xopt"
-rsync="$trace rsync -iO"
 
 sync_in()
 {
