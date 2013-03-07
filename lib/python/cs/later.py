@@ -6,8 +6,8 @@ from contextlib import contextmanager
 from functools import partial
 import sys
 from collections import deque
-from threading import Lock
-from threading import Thread, Condition
+import threading
+from threading import Lock, Thread, Condition
 from cs.py3 import Queue, raise3
 import time
 from cs.threads import AdjustableSemaphore, IterablePriorityQueue, \
@@ -19,6 +19,25 @@ STATE_PENDING = 0       # function not yet dispatched
 STATE_RUNNING = 1       # function executing
 STATE_DONE = 2          # function complete
 STATE_CANCELLED = 3     # function cancelled
+
+class _ThreadLocal(threading.local):
+  ''' Thread local state to provide implied context withing Later context managers.
+  '''
+
+  def __init__(self):
+    self.stack = []
+
+  @property
+  def current(self):
+    return self.stack[-1]
+
+  def push(self, L):
+    self.stack.append(L)
+
+  def pop(self):
+    return self.stack.pop()
+
+default = _ThreadLocal()
 
 class _Late_context_manager(object):
   ''' The _Late_context_manager is a context manager to run a suite via an
@@ -390,6 +409,8 @@ class Later(object):
 
   def __enter__(self):
     debug("%s: __enter__", self)
+    global default
+    default.push(self)
     return self
 
   def __exit__(self, exc_type, exc_val, exc_tb):
@@ -397,6 +418,8 @@ class Later(object):
         function is blocking on this, and will return on its release.
     '''
     debug("%s: __exit__: exc_type=%s", self, exc_type)
+    global default
+    default.pop()
     self.close()
     return False
 
