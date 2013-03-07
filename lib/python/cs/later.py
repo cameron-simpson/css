@@ -39,6 +39,12 @@ class _ThreadLocal(threading.local):
 
 default = _ThreadLocal()
 
+def later(func, *a, **kw):
+  ''' Queue a function using the current default Later.
+      Return the LateFunction.
+  '''
+  return default.current.defer(func, *a, **kw)
+
 class _Late_context_manager(object):
   ''' The _Late_context_manager is a context manager to run a suite via an
       existing Later object. Example usage:
