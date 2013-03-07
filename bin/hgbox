@@ -311,28 +311,33 @@ hgb_sync()
   [ $# -gt 0 ] || set -- `cd "$hglocalbase"; echo [a-z]*`
   [ $badopts ] && return 2
 
-  cd "$hgbox" || return 1
+  for set
+  do
+    hgbox=$hglocalbase/$set
+    rhgbox=$hgmasterbase/$set
+    cd "$hgbox" || return 1
 
-  with_hg_outmap sync_in
+    with_hg_outmap sync_in
 
-  hgstat=`$hg stat`
-  if [ -n "$hgstat" ]
-  then
-    $hg addremove
-    commit_message=${commit_message:-"$cmd sync in `hostname`:`pwd` `date +'%Y-%m-%d-%H:%M:%S'`"}
-    $hg commit -m "$commit_message"
-  fi
+    hgstat=`$hg stat`
+    if [ -n "$hgstat" ]
+    then
+      $hg addremove
+      commit_message=${commit_message:-"$cmd sync in `hostname`:`pwd` `date +'%Y-%m-%d-%H:%M:%S'`"}
+      $hg commit -m "$commit_message"
+    fi
 
-  if not [ $sync_quick ]
-  then
-    [ $silent ] || echo "$set: import from $rhgbox"
-    $hg fetch "$rhgbox"
-    with_hg_outmap sync_out
+    if not [ $sync_quick ]
+    then
+      [ $silent ] || echo "$set: import from $rhgbox"
+      $hg fetch "$rhgbox"
+      with_hg_outmap sync_out
 
-    [ $silent ] || echo "$set: export to $rhgbox"
-    $hg push "$rhgbox"
-    $inhg "$rhgbox" $hg up
-  fi
+      [ $silent ] || echo "$set: export to $rhgbox"
+      $hg push "$rhgbox"
+      $inhg "$rhgbox" $hg up
+    fi
+  done
 }
 
 sync_in()
