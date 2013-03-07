@@ -139,11 +139,11 @@ hgb_export()
   [ $# -gt 0 ] || set -- `cd "$hglocalbase"; echo [a-z]*`
   [ $badopts ] && return 2
 
-  cd "$hgbox" || exit 1
   for set
   do
     hgbox=$hglocalbase/$set
     rhgbox=$hgmasterbase/$set
+    cd "$hgbox" || exit 1
     if [ $force_export ] \
     || { [ -t 0 ] && ask "really export from $hgbox to exterior directories"; }
     then
