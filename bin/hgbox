@@ -91,6 +91,7 @@ main()
     hg="$trace hg"
     inhg="$trace inhg $xopt"
     rsync="$trace rsync -iO"
+    xit=0
     case "$op" in
       add)      hgb_add ${1+"$@"} ;;
       export)   hgb_export ${1+"$@"} ;;
