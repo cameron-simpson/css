@@ -21,6 +21,7 @@ from .parse import SPECIAL_MACROS, Macro, MacroExpression, \
 
 SHELL = '/bin/sh'
 
+# Later priority values
 # actions come first, to keep the queue narrower
 PRI_ACTION = 0
 PRI_MAKE   = 1
