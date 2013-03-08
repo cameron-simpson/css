@@ -270,7 +270,10 @@ class TargetMap(O):
       Raises KeyError for targets 
   '''
 
-  def init(self, maker):
+  def __init__(self, maker):
+    ''' Initialise the TargetMap.
+        `maker` is the Maker using this TargetMap.
+    '''
     self.maker = maker
     self.targets = {}
     self._lock = RLock()
@@ -293,12 +296,21 @@ class TargetMap(O):
     return targets[name]
 
   def _newTarget(self, maker, name, context, prereqs=(), postprereqs=(), actions=()):
+    ''' Construct a new Target.
+    '''
     return Target(maker, name, context, prereqs, postprereqs, actions)
 
   def __setitem__(self, name, target):
+    ''' Record new target in map.
+        Check that the name matches.
+        Reject duplicate names.
+    '''
+    if name != target.name:
+      raise ValueError("tried to record Target as %r, but target.name = %r"
+                       % (name, target.name))
     with self._lock:
       if name in self.targets:
-        raise KeyError("redefinition of Target %r" % (name,))
+        raise ValueError("redefinition of Target %r" % (name,))
       self.targets[name] = target
 
 class Target(O):
