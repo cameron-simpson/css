@@ -52,8 +52,7 @@ class Maker(O):
     self._makefiles = []
     self.appendfiles = []
     self.macros = {}
-    self._targets = {}
-    self._targets_lock = Lock()
+    self.targets = TargetMap()
     self.precious = set()
     self.active = set()
     self.active_lock = Lock()
@@ -173,16 +172,10 @@ class Maker(O):
             break
     return ok
 
-  def __getitem__(self, target):
+  def __getitem__(self, name):
     ''' Return the specified Target.
     '''
-    targets = self._targets
-    with self._targets_lock:
-      if target in targets:
-        T = targets[target]
-      else:
-        T = targets[target] = Target(self, target, context=None, prereqs=(), postprereqs=(), actions=[])
-    return T
+    return self.targets[name]
 
   def setDebug(self, flag, value):
     ''' Set or clear the named debug option.
