@@ -295,6 +295,12 @@ class TargetMap(O):
   def _newTarget(self, maker, name, context, prereqs=(), postprereqs=(), actions=()):
     return Target(maker, name, context, prereqs, postprereqs, actions)
 
+  def __setitem__(self, name, target):
+    with self._lock:
+      if name in self.targets:
+        raise KeyError("redefinition of Target %r" % (name,))
+      self.targets[name] = target
+
 class Target(O):
 
   def __init__(self, maker, name, context, prereqs, postprereqs, actions):
