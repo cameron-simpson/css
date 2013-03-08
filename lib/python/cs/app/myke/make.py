@@ -14,6 +14,7 @@ from threading import Lock
 from cs.later import Later, report as report_LFs, CallableValue
 import cs.logutils
 from cs.logutils import Pfx, info, error, debug, D
+from cs.obj import O
 from cs.threads import Channel
 from .parse import SPECIAL_MACROS, Macro, MacroExpression, \
                    parseMakefile, parseMacroExpression
@@ -25,10 +26,10 @@ PRI_ACTION = 0
 PRI_MAKE   = 1
 PRI_PREREQ = 2
 
-class Flags(object):
+class Flags(O):
   pass
 
-class Maker(object):
+class Maker(O):
   ''' Main class representing a set of dependencies to make.
   '''
 
@@ -269,7 +270,7 @@ class Maker(object):
       if first_target is not None:
         self.default_target = first_target
 
-class Target(object):
+class Target(O):
 
   def __init__(self, maker, name, context, prereqs, postprereqs, actions):
     ''' Initialise a new target.
@@ -480,7 +481,7 @@ class Target(object):
       # report the status upstream
       retq.put(ok)
 
-class Action(object):
+class Action(O):
 
   def __init__(self, context, variant, line, silent=False):
     self.context = context
