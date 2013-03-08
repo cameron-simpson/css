@@ -271,6 +271,37 @@ class Maker(O):
       if first_target is not None:
         self.default_target = first_target
 
+class TargetMap(O):
+  ''' A mapping interface to the known targets.
+      Makes targets as needed if inferrable.
+      Raises KeyError for targets 
+  '''
+
+  def init(self, maker):
+    self.maker = maker
+    self.targets = {}
+    self._lock = RLock()
+
+  def __getitem__(self, name):
+    ''' Return the Target for `name`.
+        Raises KeyError if the Target is unknown and not inferrable.
+    '''
+    targets = self.targets
+    if name not in targets:
+      with self._lock:
+        if name not in targets:
+          if os.path.exists(name):
+            T = _newTarget(self.maker, name, context=None)
+            T.state = 'made'
+            T._status = True
+          else:
+            raise KeyError("can't infer a Target to make %r" % (name,))
+          targets[name] = T
+    return targets[name]
+
+  def _newTarget(self, maker, name, context, prereqs=(), postprereqs=(), actions=()):
+    return Target(maker, name, context, prereqs, postprereqs, actions)
+
 class Target(O):
 
   def __init__(self, maker, name, context, prereqs, postprereqs, actions):
