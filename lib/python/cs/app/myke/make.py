@@ -10,7 +10,7 @@ import getopt
 from functools import partial
 import logging
 from subprocess import Popen
-from threading import Lock
+from threading import Lock, RLock
 from cs.later import Later, report as report_LFs, CallableValue
 import cs.logutils
 from cs.logutils import Pfx, info, error, debug, D
@@ -52,7 +52,7 @@ class Maker(O):
     self._makefiles = []
     self.appendfiles = []
     self.macros = {}
-    self.targets = TargetMap()
+    self.targets = TargetMap(self)
     self.precious = set()
     self.active = set()
     self.active_lock = Lock()
@@ -251,9 +251,10 @@ class Maker(O):
       self._namespaces.insert(0, ns)
       for O in parseMakefile(self, makefile, parent_context):
         if isinstance(O, Target):
+          # record this Target in the Maker
           T = O
           self.debug_parse("add target %s", T)
-          self._targets[T.name] = T
+          self.targets[T.name] = T
           if first_target is None:
             first_target = T
         elif isinstance(O, Macro):
