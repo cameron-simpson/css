@@ -38,7 +38,7 @@ scriptmandir = $(MANDIR)/man1
 scriptmans = $(scriptmandir)/$((allscripts)).1
 scriptfromman(manf) = $(manf FP)
 
-py2files        = $("lib/python/cs/*.py lib/python/cs/*.py lib/python/cs/*/*/*.py" G)
+py2files        = $("lib/python/cs/*.py lib/python/cs/*/*.py lib/python/cs/*/*/*.py" G)
 py3files        = $(py2files :|/python/|/python3/|)
 
 rsync = rsync -iO
