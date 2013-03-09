@@ -40,6 +40,8 @@ class Maker(O):
     '''
     if parallel < 1:
       raise ValueError("expected positive integer for parallel, got: %s" % (parallel,))
+    O.__init__(self)
+    self._O_omit.extend(['macros', 'targets', 'rules', 'namespaces'])
     self.parallel = parallel
     self.debug = Flags()
     self.debug.debug = False    # logging.DEBUG noise
@@ -337,6 +339,8 @@ class Target(O):
         `prereqs`: macro expression to produce prereqs.
         `postprereqs`: macro expression to produce post prereqs.
     '''
+    O.__init__(self)
+    self._O_omit.extend(['actions', 'namespaces'])
     self.maker = maker
     self.context = context
     self.name = name
@@ -354,6 +358,9 @@ class Target(O):
 
   @property
   def namespaces(self):
+    ''' The namespaces for this Target: the special per-Target macros,
+        the Maker's namespaces, the Maker's macros and the special macros.
+    '''
     return ( [ { '@':     lambda c, ns: self.name,
                  '/':     lambda c, ns: [ P.name for P in self.prereqs ],
                  # TODO: $? et al
