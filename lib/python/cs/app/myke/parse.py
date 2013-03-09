@@ -942,7 +942,7 @@ class MacroTerm(object):
     return '$%s%s%s%s%s' % ( ( '((' if self.permute else '(' ),
                              ('"%s"' % (self.text,) if self.literal else self.text),
                              ( ' ' if self.modifiers else '' ),
-                             ''.join(self.modifiers),
+                             ''.join( str(mod) for mod in self.modifiers ),
                              ( '))' if self.permute else ')' ),
                            )
 
