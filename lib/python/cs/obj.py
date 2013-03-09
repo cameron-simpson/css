@@ -167,25 +167,26 @@ def O_str(o, no_recurse=False, seen=None):
   if t is dict:
     o2 = dict( [ (k, str(v)) for k, v in o.iteritems() ] )
     return str(o2)
+  if t is set:
+    return 'set(%s)' % (','.join(sorted(o)))
   seen.add(id(o))
   s = ( "<%s %s>"
-           % ( o.__class__.__name__,
-               (
-                   "<%s len=%d>" % (type(o), len(o))
-                if type(o) in (set,)
-                else
-                   ",".join([ ( "%s=<%s>" % (pattr, type(pvalue).__name__)
-                                if no_recurse else
-                                "%s=%s" % (pattr,
-                                           O_str(pvalue, no_recurse=no_recurse, seen=seen)
-                                             if id(pvalue) not in seen
-                                             else "<%s>" % (type(pvalue).__name__,)
-                                          )
-                              )
-                              for pattr, pvalue in O_attritems(o)
-                            ])
+         % ( o.__class__.__name__,
+             (
+               ",".join([ ( "%s=<%s>" % (pattr, type(pvalue).__name__)
+                            if no_recurse else
+                            "%s=%s" % (pattr,
+                                       O_str(pvalue,
+                                             no_recurse=no_recurse,
+                                             seen=seen)
+                                         if id(pvalue) not in seen
+                                         else "<%s>" % (type(pvalue).__name__,)
+                                      )
+                          )
+                          for pattr, pvalue in O_attritems(o)
+                        ])
+             )
            )
-         )
      )
   seen.remove(id(o))
   return s
