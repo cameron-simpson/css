@@ -1098,20 +1098,28 @@ class DebuggingLock(O):
   '''
 
   def __init__(self):
-    filename, lineno = inspect.getframeinfo(inspect.stack()[1])[:2]
-    self.debug("%s.__init__() from %s:%d", self.__class__.__name__, filename, lineno)
+    filename, lineno = inspect.stack()[1][1:3]
     self.filename = filename
     self.lineno = lineno
+    self.label = 'DebuggingLock-%d[%s:%d]' % (id(self), filename, lineno)
+    debug("%s.__init__() from %s:%d", self.__class__.__name__, filename, lineno)
     self.lock = threading.Lock()
 
+  def __enter__(self):
+    self.lock.__enter__()
+    return self
+
+  def __exit__(self, *a):
+    return self.lock.__exit__(*a)
+
   def acquire(self):
-    filename, lineno = inspect.getframeinfo(inspect.stack()[0])[:2]
-    self.debug("%s.acquire() from %s:%d", self.__class__.__name__, filename, lineno)
+    filename, lineno = inspect.stack()[0][1:3]
+    debug("%s.acquire() from %s:%d", self.label, filename, lineno)
     self.lock.acquire()
 
   def release(self):
-    filename, lineno = inspect.getframeinfo(inspect.stack()[0])[:2]
-    self.debug("%s.release() from %s:%d", self.__class__.__name__, filename, lineno)
+    filename, lineno = inspect.stack()[0][1:3]
+    debug("%s.release() from %s:%d", self.label, filename, lineno)
     self.lock.release()
 
 class DebuggingRLock(O):
@@ -1121,20 +1129,32 @@ class DebuggingRLock(O):
   '''
 
   def __init__(self):
-    filename, lineno = inspect.getframeinfo(inspect.stack()[1])[:2]
-    self.debug("%s.__init__() from %s:%d", self.__class__.__name__, filename, lineno)
+    filename, lineno = inspect.stack()[1][1:3]
     self.filename = filename
     self.lineno = lineno
+    self.label = 'DebuggingLock-%d[%s:%d]' % (id(self), filename, lineno)
+    debug('%s.__init__() from %s:%d', self.label, filename, lineno)
     self.lock = threading.RLock()
 
+  def __enter__(self):
+    filename, lineno = inspect.stack()[0][1:3]
+    debug('%s:%d: %s.__enter__ ...', filename, lineno, self.label)
+    self.lock.__enter__()
+    return self
+
+  def __exit__(self, *a):
+    filename, lineno = inspect.stack()[0][1:3]
+    debug('%s:%d: %s.__exit__(*%s) ...', filename, lineno, self.label, a)
+    return self.lock.__exit__(*a)
+
   def acquire(self):
-    filename, lineno = inspect.getframeinfo(inspect.stack()[0])[:2]
-    self.debug("%s.acquire() from %s:%d", self.__class__.__name__, filename, lineno)
+    filename, lineno = inspect.stack()[0][1:3]
+    debug('%s:%d: %s.acquire()', filename, lineno, self.label)
     self.lock.acquire()
 
   def release(self):
-    filename, lineno = inspect.getframeinfo(inspect.stack()[0])[:2]
-    self.debug("%s.release() from %s:%d", self.__class__.__name__, filename, lineno)
+    filename, lineno = inspect.stack()[0][1:3]
+    debug('%s:%d: %s.release()', filename, lineo, self.label)
     self.lock.release()
 
 def Lock():
@@ -1150,7 +1170,7 @@ def RLock():
       then return a DebuggingRLock, otherwise a threading.RLock.
   '''
   if cs.logutils.logging_level <= logging.DEBUG:
-    return DebuggingRock()
+    return DebuggingRLock()
   return threading.RLock()
 
 if __name__ == '__main__':
