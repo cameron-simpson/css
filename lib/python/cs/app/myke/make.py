@@ -52,7 +52,9 @@ class Maker(O):
     self._makefiles = []
     self.appendfiles = []
     self.macros = {}
+    # autocreating mapping interface to Targets
     self.targets = TargetMap(self)
+    self.rules = {}
     self.precious = set()
     self.active = set()
     self.active_lock = Lock()
@@ -250,18 +252,26 @@ class Maker(O):
       ns = {}
       self._namespaces.insert(0, ns)
       for O in parseMakefile(self, makefile, parent_context):
-        if isinstance(O, Target):
-          # record this Target in the Maker
-          T = O
-          self.debug_parse("add target %s", T)
-          self.targets[T.name] = T
-          if first_target is None:
-            first_target = T
-        elif isinstance(O, Macro):
-          self.debug_parse("add macro %s", O)
-          ns[O.name] = O
-        else:
-          raise ValueError("parseMakefile({}): unsupported parse item received: {}{!r}".format(makefile, type(O), O))
+        with Pfx(O.context):
+          if isinstance(O, Target):
+            # record this Target in the Maker
+            T = O
+            self.debug_parse("add target %s", T)
+            if '%' in T.name:
+              # record this Target as a rule
+              self.rules[T.name] = T
+            else:
+              self.targets[T.name] = T
+              if first_target is None:
+                first_target = T
+          elif isinstance(O, Macro):
+            self.debug_parse("add macro %s", O)
+            ns[O.name] = O
+          else:
+            raise ValueError(
+                    "parseMakefile({}): unsupported parse item received: {}{!r}"
+                      .format(makefile, type(O), O)
+                  )
       if first_target is not None:
         self.default_target = first_target
 
