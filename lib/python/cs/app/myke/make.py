@@ -323,7 +323,8 @@ class TargetMap(O):
                        % (name, target.name))
     with self._lock:
       if name in self.targets:
-        raise ValueError("redefinition of Target %r" % (name,))
+        raise ValueError("redefinition of Target %r, previous definition from %s"
+                         % (name, self.targets[name].context))
       self.targets[name] = target
 
 class Target(O):
