@@ -287,12 +287,14 @@ class TargetMap(O):
     if name not in targets:
       with self._lock:
         if name not in targets:
+          T = _newTarget(self.maker, name, context=None)
           if os.path.exists(name):
-            T = _newTarget(self.maker, name, context=None)
             T.state = 'made'
             T._status = True
           else:
-            raise KeyError("can't infer a Target to make %r" % (name,))
+            error("can't infer a Target to make %r" % (name,))
+            T.state = 'failed'
+            T._status = False
           targets[name] = T
     return targets[name]
 
