@@ -10,7 +10,7 @@ import getopt
 from functools import partial
 import logging
 from subprocess import Popen
-from threading import Lock, RLock
+from cs.threads import Lock, RLock
 from cs.later import Later, report as report_LFs, CallableValue
 import cs.logutils
 from cs.logutils import Pfx, info, error, debug, D
