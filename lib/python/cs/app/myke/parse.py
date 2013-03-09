@@ -676,7 +676,7 @@ class MacroExpression(object):
       strs.append(" ".join( [ ''.join(wordlist) for wordlist in product(*wordlists) ] ))
 
     result = ''.join(strs)
-    debug("eval returns %s", result)
+    debug("eval returns %r", result)
     return result
 
 SIMPLE_MODIFIERS = 'DEG?Fv?<?'
