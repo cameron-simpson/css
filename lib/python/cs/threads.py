@@ -8,15 +8,18 @@ from __future__ import with_statement
 from collections import namedtuple
 from copy import copy
 from functools import partial
+import inspect
 from itertools import chain
 import sys
 import time
-from threading import Lock
-from threading import Semaphore, Thread, Timer
+import threading
+from threading import Lock, Semaphore, Thread, Timer
 from collections import deque
 if sys.hexversion < 0x02060000: from sets import Set as set
 from cs.seq import seq
 from cs.excutils import transmute
+import logging
+import cs.logutils
 from cs.logutils import Pfx, LogTime, error, warning, debug, exception, OBSOLETE, D
 from cs.obj import O
 from cs.py3 import raise3, Queue, PriorityQueue, Queue_Full, Queue_Empty
@@ -1087,6 +1090,68 @@ def runTree_inner(input, ops, state, funcQ, retq=None):
 
   # the first runTree_inner gets to return the retq for result collection
   return retq
+
+class DebuggingLock(O):
+  ''' Wrapper class for threading.Lock to trace creation and use.
+      cs.threads.Lock() returns on of these in debug mode or a raw
+      threading.Lock otherwise.
+  '''
+
+  def __init__(self):
+    filename, lineno = inspect.getframeinfo(inspect.stack()[1])[:2]
+    self.debug("%s.__init__() from %s:%d", self.__class__.__name__, filename, lineno)
+    self.filename = filename
+    self.lineno = lineno
+    self.lock = threading.Lock()
+
+  def acquire(self):
+    filename, lineno = inspect.getframeinfo(inspect.stack()[0])[:2]
+    self.debug("%s.acquire() from %s:%d", self.__class__.__name__, filename, lineno)
+    self.lock.acquire()
+
+  def release(self):
+    filename, lineno = inspect.getframeinfo(inspect.stack()[0])[:2]
+    self.debug("%s.release() from %s:%d", self.__class__.__name__, filename, lineno)
+    self.lock.release()
+
+class DebuggingRLock(O):
+  ''' Wrapper class for threading.RLock to trace creation and use.
+      cs.threads.RLock() returns on of these in debug mode or a raw
+      threading.RLock otherwise.
+  '''
+
+  def __init__(self):
+    filename, lineno = inspect.getframeinfo(inspect.stack()[1])[:2]
+    self.debug("%s.__init__() from %s:%d", self.__class__.__name__, filename, lineno)
+    self.filename = filename
+    self.lineno = lineno
+    self.lock = threading.RLock()
+
+  def acquire(self):
+    filename, lineno = inspect.getframeinfo(inspect.stack()[0])[:2]
+    self.debug("%s.acquire() from %s:%d", self.__class__.__name__, filename, lineno)
+    self.lock.acquire()
+
+  def release(self):
+    filename, lineno = inspect.getframeinfo(inspect.stack()[0])[:2]
+    self.debug("%s.release() from %s:%d", self.__class__.__name__, filename, lineno)
+    self.lock.release()
+
+def Lock():
+  ''' Factory function: if cs.logutils.logging_level <= logging.DEBUG
+      then return a DebuggingLock, otherwise a threading.Lock.
+  '''
+  if cs.logutils.logging_level <= logging.DEBUG:
+    return DebuggingLock()
+  return threading.Lock()
+
+def RLock():
+  ''' Factory function: if cs.logutils.logging_level <= logging.DEBUG
+      then return a DebuggingRLock, otherwise a threading.RLock.
+  '''
+  if cs.logutils.logging_level <= logging.DEBUG:
+    return DebuggingRock()
+  return threading.RLock()
 
 if __name__ == '__main__':
   import cs.threads_tests
