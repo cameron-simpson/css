@@ -30,7 +30,10 @@ def main(argv, stdin=None):
         File format:
           group,... rfc2822-address
       learn-addresses group,... < rfc822.xt
-      list-groups [groups...]''' \
+      list-groups [-A] [-G] [groups...]
+        -A Emit mutt alias lines.
+        -G Emit mutt group lines.
+        Using both -A and -G emits mutt aliases lines with the -group option.''' \
     % (cmd,)
   setup_logging(cmd)
 
@@ -46,10 +49,12 @@ def main(argv, stdin=None):
     opts, argv = [], []
 
   for opt, val in opts:
-    if opt == '-m':
-      mdburl = val
-    else:
-      raise GetoptError("unrecognised option: %s", opt)
+    with Pfx(opt):
+      if opt == '-m':
+        mdburl = val
+      else:
+        error("unrecognised option")
+        badopts = True
 
   if mdburl is None:
     mdburl = os.environ['MAILDB']
@@ -69,19 +74,46 @@ def main(argv, stdin=None):
             MDB.importAddresses(stdin)
             MDB.close()
         elif op == 'list-groups':
+          try:
+            opts, argv = getopt(argv, 'AG')
+          except GetoptError as e:
+            error("unrecognised option: %s: %s"% (e.opt, e.msg))
+            badopts = True
+            opts, argv = [], []
+          mutt_aliases = False
+          mutt_groups = False
+          for opt, val in opts:
+            with Pfx(opt):
+              if opt == '-A':
+                mutt_aliases = True
+              elif opt == '-G':
+                mutt_groups = True
+              else:
+                error("unrecognised option")
+                badopts = True
           if len(argv):
             group_names = argv
           else:
             group_names = sorted(MDB.address_groups.keys())
-          for group_name in group_names:
-            with Pfx(group_name):
-              address_group = MDB.address_groups.get(group_name)
-              if not address_group:
-                error('no such group')
-                xit = 1
-                continue
-              print(group_name, ", ".join(MDB['ADDRESS', address].formatted
-                                          for address in address_group))
+          if not badopts:
+            for group_name in group_names:
+              with Pfx(group_name):
+                address_group = MDB.address_groups.get(group_name)
+                if not address_group:
+                  error('no such group')
+                  xit = 1
+                  continue
+                address_list = ", ".join(MDB['ADDRESS', address].formatted
+                                         for address in address_group)
+                if mutt_aliases:
+                  print('alias', group_name, end='')
+                  if mutt_groups:
+                    print(' -group', group_name, end='')
+                elif mutt_groups:
+                  print('group', group_name, end='')
+                else:
+                  print(group_name, end='')
+                print(' '+address_list)
         elif op == 'learn-addresses':
           only_ungrouped = False
           if len(argv) and argv[0] == '--ungrouped':
