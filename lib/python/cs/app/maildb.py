@@ -74,13 +74,14 @@ def main(argv, stdin=None):
           else:
             group_names = sorted(MDB.address_groups.keys())
           for group_name in group_names:
-            address_group = MDB.address_groups.get(group_name)
-            if not address_group:
-              error("no such group: %s", group_name)
-              xit = 1
-              continue
-            print(group_name, ", ".join(MDB['ADDRESS', address].formatted
-                                        for address in address_group))
+            with Pfx(group_name):
+              address_group = MDB.address_groups.get(group_name)
+              if not address_group:
+                error('no such group')
+                xit = 1
+                continue
+              print(group_name, ", ".join(MDB['ADDRESS', address].formatted
+                                          for address in address_group))
         elif op == 'learn-addresses':
           only_ungrouped = False
           if len(argv) and argv[0] == '--ungrouped':
