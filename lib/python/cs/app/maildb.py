@@ -106,14 +106,14 @@ def main(argv, stdin=None):
                 address_list = ", ".join(MDB['ADDRESS', address].formatted
                                          for address in address_group)
                 if mutt_aliases:
-                  print('alias', group_name, end='')
+                  print('alias', end=' ')
                   if mutt_groups:
-                    print(' -group', group_name, end='')
+                    print('-group', group_name, end=' ')
                 elif mutt_groups:
-                  print('group', group_name, end='')
+                  print('group', end=' ')
                 else:
                   print(group_name, end='')
-                print(' '+address_list)
+                print(group_name, address_list)
         elif op == 'learn-addresses':
           only_ungrouped = False
           if len(argv) and argv[0] == '--ungrouped':
