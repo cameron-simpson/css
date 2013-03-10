@@ -18,6 +18,7 @@ once=
 sshcfg=$PORTFWD_SSH_CONFIG
 fwdcfg=$PORTFWD_CONFIG
 pfnames=
+sshopts=-n
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [-1] [-F ssh_config] targets...
@@ -29,6 +30,7 @@ usage="Usage: $cmd [-1] [-F ssh_config] targets...
 	flag true before starting our ssh. For a pfname of \"foo\"
 	the flag \"PORTFWD_FOO_CONNECTED\" is tested. Multiple -P
 	options may be supplied.
+  -v    Verbose. Passed to ssh.
 
 If a target starts with an upper case letter it is taken to be a group name,
 and the targets are found by finding the first hostname in Host clauses with
@@ -43,6 +45,7 @@ do
     -1) once=1 ;;
     -F) sshcfg=$2 opts="$opts $1 $2"; shift ;;
     -P) pfnames="$pfnames $2" opts="$opts $1 $2"; shift ;;
+    -v) opts="$opts $1"; sshopts="$sshopts $1" ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
         badopts=1
@@ -176,7 +179,6 @@ case $cfg_outlog in
   /*) ;; *) cfg_outlog=$LOGDIR/$cfg_outlog ;;
 esac
 
-sshopts=-n
 [ -n "$cfg_command" ] || sshopts="$sshopts -N"
 
 if ifpid -q "$pidfile"
