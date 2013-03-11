@@ -27,6 +27,12 @@ do
   shift
 done
 
+if [ -z "$reportdir" ]
+then
+  echo "$cmd: missing -d reportdir" >&2
+  badopts=1
+fi
+
 if [ $# = 0 ]
 then
   echo "$cmd: missing template-analog-config" >&2
