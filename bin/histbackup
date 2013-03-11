@@ -10,7 +10,9 @@
 #
 # histbackup [options...] [host:]source backupdir [otherbackupdirs...] [rsyncopts...]
 #
-# histbackup [options...] --no-rsync parent
+# histbackup [options...] --no-rsync backupdir
+#
+# histbackup [options...] [-- [rsyncopts...]]
 #
 # =head1 DESCRIPTION
 #
@@ -105,7 +107,8 @@ imode=
 cmd=`basename "$0"`
 usage="Usage:
   $cmd [options...] [host:]source backupdir [otherbackupdirs...] [rsyncopts...]
-  $cmd [options...] --no-rsync parent
+  $cmd [options...] --no-rsync backupdir
+  $cmd [options...] [-- [rsyncopts...]]
 
   -i, --itemize-changes
                 Passed to rsync, result slightly filtered by histbackup.
@@ -274,6 +277,10 @@ done
 # If the B<--no-rsync> option has been used, only the destination
 # directory appears after the options. It will be initialised for use.
 #
+# If neither the source not destination appear
+# it is expected that the destination is the current directory
+# and that the source is specified by the .hbsource file in the current directory.
+#
 # Otherwise, the source and destination appear.
 # These may be followed by I<otherbackupdirs>, the full paths of other directories like the one B<histbackup> is copying;
 # these will be handed to rsync(1) as B<--link-dest> options.
@@ -292,33 +299,52 @@ then
 	shift
     fi
 else
-    if [ $# -lt 2 ]
-    then
-        echo "$cmd: missing source or backupdir" >&2
-        badopts=1
-    else
-        src=$1 dest=$2
-        shift; shift
-        # gather other backup dirs, turn into --link-dest= options
-        obackup_count=0
-        while [ $# -gt 0 ]
-        do
-          case "x$1" in
-            x/*)
-              obackup=$1; shift
-              if [ "$obackup_count" -lt 20 ]
-              then
-                set -- ${1+"$@"} "--link-dest=$obackup"
-                obackup_count=`expr $obackup_count + 1`
-              else
-                $vecho "$cmd: warning: ignoring --link-dest=$obackup due to arbitrary rsync limit of 20 such" >&2
-              fi
-              ;;
-            *)break
-              ;;
-          esac
-        done
-    fi
+    case "$*" in
+      '' | -* )
+        # neither source nor backupdir: use .hbsource and "."
+        src=
+        dest=.
+        if [ ! -f .hbsource ]
+        then
+          echo "$cmd: missing .hbsource" >&2
+          badopts=1
+        else
+          src=$(<.hbsource)
+          [ -n "$src" ] || { echo "$cmd: empty source from .hbsource" >&2; badopts=1; }
+        fi
+        ;;
+      *)
+        echo "\$* = [$*]" >&2
+        # expect source _and_ backupdir
+        if [ $# -lt 2 ]
+        then
+            echo "$cmd: missing source or backupdir" >&2
+            badopts=1
+        else
+            src=$1 dest=$2
+            shift; shift
+            # gather other backup dirs, turn into --link-dest= options
+            obackup_count=0
+            while [ $# -gt 0 ]
+            do
+              case "x$1" in
+                x/*)
+                  obackup=$1; shift
+                  if [ "$obackup_count" -lt 20 ]
+                  then
+                    set -- ${1+"$@"} "--link-dest=$obackup"
+                    obackup_count=`expr $obackup_count + 1`
+                  else
+                    $vecho "$cmd: warning: ignoring --link-dest=$obackup due to arbitrary rsync limit of 20 such" >&2
+                  fi
+                  ;;
+                *)break
+                  ;;
+              esac
+            done
+        fi
+        ;;
+    esac
 fi
 
 if [ $linkonly ] && [ $# -gt 0 ]
