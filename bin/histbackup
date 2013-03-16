@@ -473,7 +473,7 @@ then
     if [ $symlink_unchanged ]
     then
       $vecho "checking for changes to $src from $lastbackup ..."
-      changes=`dorsync "$src" "$dest/$lastbackup" -niO`
+      changes=`dorsync "$src" "$dest/$lastbackup" -niO | sed 1q`
       if [ -z "$changes" ]
       then
         $vecho "no changes, symlinking last tree"
@@ -483,7 +483,6 @@ then
         exit
       else
         $vecho "changes, proceeding with regular backup ..."
-        $vecho "$changes"
       fi
     fi
     $vecho "existing backup: linking $lastbackup to $thisbackup ..."
