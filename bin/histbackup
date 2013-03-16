@@ -98,6 +98,7 @@ rrsync=rsync
 usehbinclude=1
 usehbfiles=1
 linkrepair=
+symlink_unchanged=
 rsopts=
 rsdelete=--delete
 verbose=
@@ -112,7 +113,7 @@ usage="Usage:
 
   -i, --itemize-changes
                 Passed to rsync, result slightly filtered by histbackup.
-  -v, --verbose	Verbose. Also passed to rsync.
+  -v, --verbose	Verbose. Note: _not_ passed to rsync.
   -x		Trace execution. Recite linktree and rsync invocations.
   --no-delete   Don't pass --delete to rsync.
   --delete      Pass --delete to rsync.
@@ -124,6 +125,10 @@ usage="Usage:
                 report its basename.
   --link-fail-repair Proceed even if the linktree step fails, presumably due
                 to hard link limit reached.
+  --symlink-if-unchanged
+                Just symlink the top level date if there are no changes.
+                Requires a prepass \"rsync -n\" but saves a lot of hardlinks
+                and time if the tree is often unchanged.
   --rsync-path rrsync Execute the command \"rrsync\" as the remote rsync.
                 Passed to rsync.
   --symlink name Make a symlink named \"name\" pointing at the latest backup.
@@ -182,6 +187,15 @@ do
     --link-fail-repair)
       linkrepair=1
       ;;
+    # =item --symlink-if-unchanged
+    #
+    # Symlink the top level date if there are no changes to the tree.
+    # This requires a prepass with "rsync -n" but saves time and
+    # hardlinks if there are no changes.
+    #
+    --symlink-if-unchanged)
+        symlink_unchanged=1
+        ;;
     # =item --delete
     #
     # Passed to rsync.
@@ -244,8 +258,7 @@ do
 
     # =item -v, --verbose
     #
-    # Turn on verbose mode;
-    # also passes B<-v> to rsync.
+    # Turn on verbose mode.
     #
     -v|--verbose)
       verbose=1
@@ -266,8 +279,6 @@ do
   esac
   shift
 done
-
-[ $verbose ] && rsopts="$rsopts -v"
 
 #
 # =back
@@ -314,7 +325,6 @@ else
         fi
         ;;
       *)
-        echo "\$* = [$*]" >&2
         # expect source _and_ backupdir
         if [ $# -lt 2 ]
         then
@@ -372,11 +382,6 @@ then
   exec 3>&1 1>&2
 fi
 
-if [ $verbose ]
-then  echo=echo
-else  echo=:
-fi
-
 if [ $imode ]
 then
   # filter out mention of directories, symlink times and hard links
@@ -419,7 +424,19 @@ then
 fi
 
 # locate to most recent backup, if any
-lastbackup=`cd "$dest" || exit 1; ls -dr [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]* 2>/dev/null | sed 1q`
+lastbackup=$(
+        cd "$dest" || exit 1
+        if [ $symlink_unchanged ]
+        then
+          # most recent actual directory tree
+          ls -drl [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]* 2>/dev/null \
+          | sed '/^d/!d; s/.* //; q'
+        else
+          # most recent directory or symlink
+          ls -dr [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]* 2>/dev/null \
+          | sed 1q
+        fi
+)
 
 today=`daycode` || exit 1
 thisbackup=$today
@@ -434,18 +451,48 @@ then
     fi
 fi
 
+dorsync()
+{ [ $# -ge 2 ] || { echo "Usage: dorsync src dst [extra-rsync-opts...]" >&2; exit 2; }
+  _drs_src=$1
+  _drs_dst=$2
+  shift; shift
+  case "$_drs_dst" in
+    /* | ./* | ../* ) ;; 
+    *) _drs_dst=./$_drs_dst ;;
+  esac
+  set -- rsync $rsopts -aH $rsdelete --rsync-path "$rrsync" ${1+"$@"} "$_drs_src/" "$_drs_dst/"
+  [ $imode ] && set -- filter_fd 1 "$filteroutput" "$@"
+  $trace "$@"
+}
+
 ok=
 
 dolink=1
 if [ -n "$lastbackup" -a -d "$dest/$lastbackup/." ]
 then
-    $echo "existing backup: linking $lastbackup to $thisbackup ..."
+    if [ $symlink_unchanged ]
+    then
+      $vecho "checking for changes to $src from $lastbackup ..."
+      changes=`dorsync "$src" "$dest/$lastbackup" -niO`
+      if [ -z "$changes" ]
+      then
+        $vecho "no changes, symlinking last tree"
+        ( cd "$dest" || exit 1
+          exec $trace ln -s "$lastbackup" "$thisbackup"
+        )
+        exit
+      else
+        $vecho "changes, proceeding with regular backup ..."
+        $vecho "$changes"
+      fi
+    fi
+    $vecho "existing backup: linking $lastbackup to $thisbackup ..."
     if ( cd "$dest" || exit 1
          mklinktree "$lastbackup" "$thisbackup" \
          || \
          if [ $linkrepair ] \
          && [ -d "$thisbackup" ] \
-         && $trace rsync -a "$lastbackup/." "$thisbackup/."
+         && $trace dorsync "$lastbackup" "$thisbackup"
          then
            :
          else
@@ -458,7 +505,7 @@ then
       ok=1
       if [ $linkonly ]
       then  echo "$dest/$thisbackup" >&3
-      else  $echo "updating $thisbackup from $src ..."
+      else  $vecho "updating $thisbackup from $src ..."
       fi
     fi
 else
@@ -468,19 +515,14 @@ else
         ls -la "$dest" >&2
         exit 1
     else
-        $echo "fresh backup, just copying source ..."
+        $vecho "fresh backup, just copying source ..."
         $trace mkdir "$dest/$thisbackup" && ok=1
     fi
 fi
 
 if [ $ok ] && [ -z "$linkonly" ]
 then
-  set -- rsync $rsopts -aH $rsdelete --rsync-path "$rrsync" ${1+"$@"} "$src/" "$dest/$thisbackup/"
-  if [ $imode ]
-  then
-    set -- filter_fd 1 "$filteroutput" "$@"
-  fi
-  $trace "$@" || ok=
+  dorsync "$src" "$dest/$thisbackup"
 fi
 
 if [ $ok ] && [ -n "$symlink" -a -d "$dest/$thisbackup/." ]
