@@ -521,7 +521,7 @@ fi
 
 if [ $ok ] && [ -z "$linkonly" ]
 then
-  dorsync "$src" "$dest/$thisbackup"
+  dorsync "$src" "$dest/$thisbackup" ${1+"$@"}
 fi
 
 if [ $ok ] && [ -n "$symlink" -a -d "$dest/$thisbackup/." ]
