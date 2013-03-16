@@ -1,0 +1,85 @@
+#!/bin/sh
+#
+# Walk an existing histbackup directory looking for adjacent identical
+# hardlinked trees that can be turned into symlinks, and symlink.
+#       - Cameron Simpson <cs@zip.com.au> 16mar2013
+#
+
+set -ue
+
+trace=set-x     ##eecho
+
+cmd=`basename "$0"`
+usage="Usage: $cmd histbackup-dir [dates...]"
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing histbackup-dir" >&2
+  badopts=1
+else
+  hbdir=$1
+  shift
+  if [ ! -d "$hbdir/." ]
+  then
+    echo "$cmd: histbackup-dir: not a directory: $hbdir" >&2
+    badopts=1
+  fi
+fi
+
+cd "$hbdir" || exit 1
+
+lastbak=
+
+for bakdir in [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]*
+do
+  # ignore backups that are already symlinks
+  [ -h "$bakdir" ] && continue
+
+  # if specific backups were specified, do not check backups not mentioned
+  if [ $# = 0 ]
+  then
+    docheck=1
+  else
+    case " $* " in
+      *" $bakdir "*)    docheck=1 ;;
+      *)                docheck= ;;
+    esac
+  fi
+
+  # not a directory? complain and ignore
+  if [ ! -d "$bakdir" ]
+  then
+    [ $docheck ] && echo "$cmd: $hbdir: not a directory, skipping: $bakdir" >&2
+    continue
+  fi
+
+  if [ -z "$lastbak" ]
+  then
+    # first actual backup; just remember it for next check
+    lastbak=$bakdir
+    continue
+  fi
+
+  # check this one? skip if not
+  [ $docheck ] || {
+    # note as most recent real directory
+    lastbak=$bakdir
+    continue
+  }
+
+  changes=`rsync -niO -aH "./$lastbak/" "./$bakdir/" | sed 1q`
+  if [ -n "$changes" ]
+  then
+    # note as most recent real directory
+    lastbak=$bakdir
+    continue
+  fi
+
+  # identical: symlink and discard old directory
+  tmp=.tmp$$-$bakdir
+  $trace mv "$bakdir" "$tmp"
+  $trace ln -i -s "$lastbak" "$bakdir"
+  $trace rm -rf "$tmp"
+done
