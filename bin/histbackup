@@ -335,6 +335,7 @@ else
             shift; shift
             # gather other backup dirs, turn into --link-dest= options
             obackup_count=0
+            obackup_options=
             while [ $# -gt 0 ]
             do
               case "x$1" in
@@ -342,7 +343,7 @@ else
                   obackup=$1; shift
                   if [ "$obackup_count" -lt 20 ]
                   then
-                    set -- ${1+"$@"} "--link-dest=$obackup"
+                    obackup_options="$obackup_options --link-dest=$obackup"
                     obackup_count=`expr $obackup_count + 1`
                   else
                     $vecho "$cmd: warning: ignoring --link-dest=$obackup due to arbitrary rsync limit of 20 such" >&2
@@ -521,7 +522,7 @@ fi
 
 if [ $ok ] && [ -z "$linkonly" ]
 then
-  dorsync "$src" "$dest/$thisbackup" ${1+"$@"}
+  dorsync "$src" "$dest/$thisbackup" ${1+"$@"} $obackup_options
 fi
 
 if [ $ok ] && [ -n "$symlink" -a -d "$dest/$thisbackup/." ]
