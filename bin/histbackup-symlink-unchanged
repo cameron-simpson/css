@@ -7,14 +7,16 @@
 
 set -ue
 
-trace=set-x     ##eecho
+trace=  ##set-x     ##eecho
 echo=:
 [ -t 1 ] && echo=echo
 
 cmd=`basename "$0"`
-usage="Usage: $cmd histbackup-dir [dates...]"
+usage="Usage: $cmd histbackup-dir [-x] [dates...]"
 
 badopts=
+
+[ $# -gt 0 ] && [ "x$1" = x-x ] && { trace=set-x; shift; }
 
 if [ $# = 0 ]
 then
