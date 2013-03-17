@@ -8,6 +8,8 @@
 set -ue
 
 trace=set-x     ##eecho
+echo=:
+[ -t 1 ] && echo=echo
 
 cmd=`basename "$0"`
 usage="Usage: $cmd histbackup-dir [dates...]"
@@ -74,8 +76,10 @@ do
   then
     # note as most recent real directory
     lastbak=$bakdir
+    $echo "$bakdir: has changes, note as most recent real directory"
     continue
   fi
+  $echo "$bakdir: unchanged, linking to $lastbak"
 
   # identical: symlink and discard old directory
   tmp=.tmp$$-$bakdir
