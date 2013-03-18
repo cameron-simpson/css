@@ -98,6 +98,7 @@ then
       fdisk -l "$loopdev"
       if $trace kpartx -av "$loopdev"
       then
+        ls -ldL "$looppart" || { $trace sleep 1; ls -ldL "$looppart"; }
         if $trace mount -t "$fstype" -o "$rwmode" "$looppart" "$mountpoint"
         then
           VM_IMG_MOUNT=$mountpoint
