@@ -38,6 +38,7 @@ lastbak=
 
 for bakdir in [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]*
 do
+  pfx=$hbdir/$bakdir
   # ignore backups that are already symlinks
   [ -h "$bakdir" ] && continue
 
@@ -55,7 +56,7 @@ do
   # not a directory? complain and ignore
   if [ ! -d "$bakdir" ]
   then
-    [ $docheck ] && echo "$cmd: $hbdir: not a directory, skipping: $bakdir" >&2
+    [ $docheck ] && echo "$cmd: $pfx: not a directory, skipping" >&2
     continue
   fi
 
@@ -78,10 +79,10 @@ do
   then
     # note as most recent real directory
     lastbak=$bakdir
-    $echo "$bakdir: has changes, note as most recent real directory"
+    $echo "$pfx: has changes, note as most recent real directory"
     continue
   fi
-  $echo "$bakdir: unchanged, linking to $lastbak"
+  $echo "$pfx: unchanged, linking to $lastbak"
 
   # identical: symlink and discard old directory
   tmp=.tmp$$-$bakdir
