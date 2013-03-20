@@ -8,7 +8,7 @@ import sys
 import time
 from getopt import getopt, GetoptError
 from datetime import datetime, timedelta
-from cs.logutils import setup_logging, error, warn, cmd
+from cs.logutils import setup_logging, error, warning, cmd
 
 setup_logging()
 
@@ -59,7 +59,7 @@ defaultZone=None
 def aptime(logline):
   fields = logline.split(' ')
   if len(fields) < 5:
-    ##warn("bad log line: %s", logline)
+    ##warning("bad log line: %s", logline)
     return None
 
   global defaultZone
@@ -105,7 +105,7 @@ def aptime(logline):
         dt=None
 
   if dt is None:
-    warn("bad human time in log line: %s", logline)
+    warning("bad human time in log line: %s", logline)
     return None
 
   # use defaultZone if tzinfo is not set
@@ -129,7 +129,7 @@ def aptime(logline):
     if len(tzinfo) != 5 \
     or tzinfo[0] not in '+-' \
     or not tzinfo[1:5].isdigit():
-      warn("bad timezone offset (%s) in log line: %s", tzinfo, logline)
+      warning("bad timezone offset (%s) in log line: %s", tzinfo, logline)
       return None
     tzoff=(int(tzinfo[1:3])*60+int(tzinfo[3:5]))*60
     if tzinfo[0] == '+':
@@ -160,7 +160,7 @@ class LogFile:
     for line in self.fp:
       self.lineno+=1
       if line[-1] != '\n':
-        warn("%s, line %d: unexpected EOF: %s",
+        warning("%s, line %d: unexpected EOF: %s",
              self.filename, self.lineno, line)
         break
 
