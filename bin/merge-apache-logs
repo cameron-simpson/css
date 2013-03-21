@@ -73,7 +73,7 @@ def main(argv):
     zoneSign = '-'
   defaultZone = "%s%02d%02d" % (zoneSign, int(tzoff/3600), int( int(tzoff/60) % 60))
 
-  queues = [ apdata(arg, defaultZone, requireOrdering, multiAddrs, fgrep)
+  queues = [ apdata(arg, zones, defaultZone, requireOrdering, multiAddrs, fgrep)
              for arg in args
            ]
 
@@ -82,7 +82,7 @@ def main(argv):
 
   return 0
 
-def aptime(logline, defaultZone):
+def aptime(logline, zones, defaultZone):
   ''' Compute a datetime object from the supplied Apache log line.
       `defaultZone` is the timezone to use if it cannot be deduced.
   '''
@@ -140,7 +140,6 @@ def aptime(logline, defaultZone):
   if tzinfo is None:
     tzinfo = defaultZone
 
-  global zones
   if tzinfo not in zones:
     if len(tzinfo) != 5 \
     or tzinfo[0] not in '+-' \
@@ -150,7 +149,7 @@ def aptime(logline, defaultZone):
     tzoff = (int(tzinfo[1:3])*60+int(tzinfo[3:5]))*60
     if tzinfo[0] == '+':
       tzoff = -tzoff
-    zones[tzinfo] = timedelta(0,tzoff)
+    zones[tzinfo] = timedelta(0, tzoff)
 
   tzoff = zones[tzinfo]
   dt += tzoff
@@ -159,7 +158,7 @@ def aptime(logline, defaultZone):
 
   return dt
 
-def apdata(fp, defaultZone, requireOrdering, multiAddrs, fgrep):
+def apdata(fp, zones, defaultZone, requireOrdering, multiAddrs, fgrep):
   ''' Generator to yield (dt, apline) from Apache log data `fp`.
   '''
   if isinstance(fp, str):
@@ -167,7 +166,7 @@ def apdata(fp, defaultZone, requireOrdering, multiAddrs, fgrep):
     with Pfx(filename):
       if filename.endswith('.gz'):
         with gzip.open(filename) if filename.endswith('.gz') else open(filename) as fp:
-          for dt, apline in apdata(fp, defaultZone, requireOrdering, multiAddrs, fgrep):
+          for dt, apline in apdata(fp, zones, defaultZone, requireOrdering, multiAddrs, fgrep):
             yield dt, apline
     return
 
@@ -186,7 +185,7 @@ def apdata(fp, defaultZone, requireOrdering, multiAddrs, fgrep):
         while m is not None:
           apline = apline[m.end():]
           m = re_MULTIADDRS.match(apline)
-      dt = aptime(apline, defaultZone)
+      dt = aptime(apline, zones, defaultZone)
       if dt is None:
         warning("cannot compute datetime, discarding line")
         continue
