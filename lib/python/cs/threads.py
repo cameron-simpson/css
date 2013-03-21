@@ -1112,14 +1112,14 @@ class DebuggingLock(O):
   def __exit__(self, *a):
     return self.lock.__exit__(*a)
 
-  def acquire(self):
+  def acquire(self, blocking=True):
     filename, lineno = inspect.stack()[0][1:3]
-    debug("%s.acquire() from %s:%d", self.label, filename, lineno)
-    self.lock.acquire()
+    debug("%s:%d: %s.acquire(%s)", filename, lineno, self.label, blocking)
+    self.lock.acquire(blocking)
 
   def release(self):
     filename, lineno = inspect.stack()[0][1:3]
-    debug("%s.release() from %s:%d", self.label, filename, lineno)
+    debug("%s:%d: %s.release()", filename, lineno, self.label)
     self.lock.release()
 
 class DebuggingRLock(O):
@@ -1147,10 +1147,10 @@ class DebuggingRLock(O):
     debug('%s:%d: %s.__exit__(*%s) ...', filename, lineno, self.label, a)
     return self.lock.__exit__(*a)
 
-  def acquire(self):
+  def acquire(self, blocking=True):
     filename, lineno = inspect.stack()[0][1:3]
-    debug('%s:%d: %s.acquire()', filename, lineno, self.label)
-    self.lock.acquire()
+    debug('%s:%d: %s.acquire(blocking=%s)', filename, lineno, self.label, blocking)
+    self.lock.acquire(blocking)
 
   def release(self):
     filename, lineno = inspect.stack()[0][1:3]
