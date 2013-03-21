@@ -13,6 +13,8 @@ from getopt import getopt, GetoptError
 from datetime import datetime, timedelta
 from cs.logutils import setup_logging, error, warning, cmd
 
+re_MULTIADDRS = re.compile(r'^[^ ,]*,( |%20)*')
+
 def main(argv):
   argv = list(argv)
   cmd = os.path.basename(argv.pop(0))
@@ -54,9 +56,6 @@ def main(argv):
   if badopts:
     sys.stderr.write(usage)
     sys.exit(2)
-
-  if multiAddrs:
-    leadingAddrRe = re.compile(r'^[^ ,]*,( |%20)*')
 
   zones = {}
   defaultZone = None
@@ -188,7 +187,7 @@ class LogFile:
     self.lineno = 0
 
   def lines(self):
-    global cmd, requireOrdering, multiAddrs, leadingAddrRe, fgrep
+    global cmd, requireOrdering, multiAddrs, fgrep
 
     olddt = None
     for line in self.fp:
@@ -204,10 +203,10 @@ class LogFile:
       line = line[:-1]
 
       if multiAddrs:
-        m = leadingAddrRe.match(line)
+        m = re_MULTIADDRS.match(line)
         while m is not None:
           line = line[m.end():]
-          m = leadingAddrRe.match(line)
+          m = re_MULTIADDRS.match(line)
 
       dt = aptime(line)
       if dt is None:
