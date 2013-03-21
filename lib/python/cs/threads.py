@@ -1101,7 +1101,7 @@ class DebuggingLock(O):
   '''
 
   def __init__(self):
-    filename, lineno = inspect.stack()[1][1:3]
+    filename, lineno = inspect.stack()[2][1:3]
     self.filename = filename
     self.lineno = lineno
     self.label = 'DebuggingLock-%d[%s:%d]' % (id(self), filename, lineno)
@@ -1117,7 +1117,7 @@ class DebuggingLock(O):
 
   def acquire(self, blocking=True):
     filename, lineno = inspect.stack()[0][1:3]
-    debug("%s:%d: %s.acquire(%s)", filename, lineno, self.label, blocking)
+    debug("%s:%d: %s.acquire(blocking=%s)", filename, lineno, self.label, blocking)
     self.lock.acquire(blocking)
 
   def release(self):
@@ -1132,7 +1132,7 @@ class DebuggingRLock(O):
   '''
 
   def __init__(self):
-    filename, lineno = inspect.stack()[1][1:3]
+    filename, lineno = inspect.stack()[2][1:3]
     self.filename = filename
     self.lineno = lineno
     self.label = 'DebuggingLock-%d[%s:%d]' % (id(self), filename, lineno)
