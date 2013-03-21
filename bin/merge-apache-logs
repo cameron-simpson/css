@@ -174,24 +174,23 @@ def apdata(fp, zones, defaultZone, requireOrdering, multiAddrs, fgrep):
   lineno = 0
   for apline in fp:
     lineno += 1
-    with Pfx("%d", lineno):
-      if not apline.endswith('\n'):
-        raise ValueError("missing trailing newline")
-      apline = apline[:-1]
-      if fgrep and fgrep not in apline:
-        continue
-      if multiAddrs:
+    if not apline.endswith('\n'):
+      raise ValueError("%s:%d: missing trailing newline" % (fp, lineno))
+    apline = apline[:-1]
+    if fgrep and fgrep not in apline:
+      continue
+    if multiAddrs:
+      m = re_MULTIADDRS.match(apline)
+      while m is not None:
+        apline = apline[m.end():]
         m = re_MULTIADDRS.match(apline)
-        while m is not None:
-          apline = apline[m.end():]
-          m = re_MULTIADDRS.match(apline)
-      dt = aptime(apline, zones, defaultZone)
-      if dt is None:
-        warning("cannot compute datetime, discarding line")
-        continue
-      if requireOrdering:
-        if olddt is not None and olddt > dt:
-          raise ValueError("out of order timestamps: old=%s, new=%s" % (olddt, dt))
+    dt = aptime(apline, zones, defaultZone)
+    if dt is None:
+      warning("%s:%d: cannot compute datetime, discarding line: %s", fp, lineno, apline)
+      continue
+    if requireOrdering:
+      if olddt is not None and olddt > dt:
+        raise ValueError("%s:%d: out of order timestamps: old=%s, new=%s" % (fp, lineno, olddt, dt))
 
     yield dt, apline
     olddt = dt
