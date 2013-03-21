@@ -6,6 +6,7 @@
 
 import sys
 import os.path
+import gzip
 import re
 import time
 from getopt import getopt, GetoptError
@@ -181,7 +182,6 @@ class LogFile:
   def __init__(self,filename):
     self.filename = filename
     if filename.endswith('.gz'):
-      import gzip
       self.fp = gzip.open(filename)
     else:
       self.fp = open(filename)
