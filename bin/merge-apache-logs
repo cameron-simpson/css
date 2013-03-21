@@ -5,56 +5,90 @@
 #
 
 import sys
+import os.path
+import re
 import time
 from getopt import getopt, GetoptError
 from datetime import datetime, timedelta
 from cs.logutils import setup_logging, error, warning, cmd
 
-setup_logging()
+def main(argv):
+  argv = list(argv)
+  cmd = os.path.basename(argv.pop(0))
+  setup_logging(cmd)
 
-usage='''Usage: %s [-M] [-O] /fixed-string/ logfiles
-  -M    Accept multiple leading IP addresses on a line, emit the last.
-  -O    Require strict ordering in the input log files.
+  usage='''Usage: %s [-M] [-O] /fixed-string/ logfiles
+    -M    Accept multiple leading IP addresses on a line, emit the last.
+    -O    Require strict ordering in the input log files.
 ''' % (cmd,)
 
-requireOrdering=False
-multiAddrs=False
-fgrep=None
-badopts=False
+  requireOrdering=False
+  multiAddrs=False
+  fgrep=None
+  badopts=False
 
-try:
-  opts, args = getopt(sys.argv[1:], 'MO')
-except GetoptError, e:
-  error(e)
-  badopts=True
-
-if not badopts:
-  for opt, value in opts:
-    if opt == '-M':
-      multiAddrs=True
-    elif opt == '-O':
-      requireOrdering=True
-    else:
-      assert True, "%s: unhandled option: %s" % (cmd, opt)
-
-  if args and len(args[0]) > 2 and args[0].startswith('/') and args[0].endswith('/'):
-    fgrep = args[0][1:-1]
-    args.pop(0)
-
-  if len(args) < 1:
-    error("missing logfiles")
+  try:
+    opts, args = getopt(sys.argv[1:], 'MO')
+  except GetoptError, e:
+    error(e)
     badopts=True
 
-if badopts:
-  sys.stderr.write(usage)
-  sys.exit(2)
+  if not badopts:
+    for opt, value in opts:
+      if opt == '-M':
+        multiAddrs=True
+      elif opt == '-O':
+        requireOrdering=True
+      else:
+        assert True, "%s: unhandled option: %s" % (cmd, opt)
 
-if multiAddrs:
-  import re
-  leadingAddrRe = re.compile(r'[^ ,]*,( |%20)*')
+    if args and len(args[0]) > 2 and args[0].startswith('/') and args[0].endswith('/'):
+      fgrep = args[0][1:-1]
+      args.pop(0)
 
-zones={}
-defaultZone=None
+    if len(args) < 1:
+      error("missing logfiles")
+      badopts=True
+
+  if badopts:
+    sys.stderr.write(usage)
+    sys.exit(2)
+
+  if multiAddrs:
+    leadingAddrRe = re.compile(r'^[^ ,]*,( |%20)*')
+
+  zones={}
+  defaultZone=None
+
+  queues = [ LogFile(arg).lines() for arg in args ]
+  lines  = [None] * len(queues)
+
+  while len(queues) > 0:
+    choice = None
+    i=0
+    while i < len(queues):
+      if lines[i] is None:
+        try:
+          nline, ndt = queues[i].next()
+        except StopIteration:
+          # EOF on file, remove file from queue
+          del queues[i]
+          del lines[i]
+          continue
+        lines[i] = (nline, ndt)
+
+      if choice is None or lines[i][1] < lines[choice][1]:
+        choice=i
+
+      i+=1
+
+    if choice is not None:
+      print lines[choice][0]
+      lines[choice]=None
+    else:
+      assert len(queues) == 0
+
+  return 0
 
 def aptime(logline):
   fields = logline.split(' ')
@@ -187,30 +221,5 @@ class LogFile:
 
       yield line, dt
 
-queues = [ LogFile(arg).lines() for arg in args ]
-lines  = [None] * len(queues)
-
-while len(queues) > 0:
-  choice = None
-  i=0
-  while i < len(queues):
-    if lines[i] is None:
-      try:
-        nline, ndt = queues[i].next()
-      except StopIteration:
-        # EOF on file, remove file from queue
-        del queues[i]
-        del lines[i]
-        continue
-      lines[i] = (nline, ndt)
-
-    if choice is None or lines[i][1] < lines[choice][1]:
-      choice=i
-
-    i+=1
-
-  if choice is not None:
-    print lines[choice][0]
-    lines[choice]=None
-  else:
-    assert len(queues) == 0
+if __name__ == '__main__':
+  sys.exit(main(sys.argv))
