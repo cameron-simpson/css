@@ -214,16 +214,19 @@ class Channel(object):
     self._nreaders = 0
 
   def __str__(self):
-    if self.__readable.locked():
-      if self.__writable.locked():
-        state="idle"
+    if self.__readable.acquire(False):
+      if self.__writable.acquire(False):
+        state = "ERROR(readable and writable)"
+        self.__writable.release()
       else:
-        state="get blocked waiting for put"
+        state = "put just happened, get imminent"
+      self.__readable.release()
     else:
-      if self.__writable.locked():
-        state="put just happened, get imminent"
+      if self.__writable.acquire(False):
+        state = "idle"
+        self.__writable.release()
       else:
-        state="ERROR"
+        state = "get blocked waiting for put"
     return "<cs.threads.Channel %s>" % (state,)
 
   def __call__(self, *a):
