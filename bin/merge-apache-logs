@@ -7,11 +7,12 @@
 import sys
 import os.path
 import gzip
+from heapq import merge
 import re
 import time
 from getopt import getopt, GetoptError
 from datetime import datetime, timedelta
-from cs.logutils import setup_logging, error, warning, cmd
+from cs.logutils import setup_logging, error, warning, Pfx
 
 re_MULTIADDRS = re.compile(r'^[^ ,]*,( |%20)*')
 
@@ -72,33 +73,12 @@ def main(argv):
     zoneSign = '-'
   defaultZone = "%s%02d%02d" % (zoneSign, int(tzoff/3600), int( int(tzoff/60) % 60))
 
-  queues = [ LogFile(arg).lines(defaultZone) for arg in args ]
-  lines  = [None] * len(queues)
+  queues = [ apdata(arg, defaultZone, requireOrdering, multiAddrs, fgrep)
+             for arg in args
+           ]
 
-  while len(queues) > 0:
-    choice = None
-    i = 0
-    while i < len(queues):
-      if lines[i] is None:
-        try:
-          nline, ndt = queues[i].next()
-        except StopIteration:
-          # EOF on file, remove file from queue
-          del queues[i]
-          del lines[i]
-          continue
-        lines[i] = (nline, ndt)
-
-      if choice is None or lines[i][1] < lines[choice][1]:
-        choice = i
-
-      i += 1
-
-    if choice is not None:
-      print lines[choice][0]
-      lines[choice] = None
-    else:
-      assert len(queues) == 0
+  for dt, apline in merge(*queues):
+    print apline
 
   return 0
 
@@ -179,48 +159,43 @@ def aptime(logline, defaultZone):
 
   return dt
 
-class LogFile:
-  def __init__(self,filename):
-    self.filename = filename
-    if filename.endswith('.gz'):
-      self.fp = gzip.open(filename)
-    else:
-      self.fp = open(filename)
-    self.lineno = 0
+def apdata(fp, defaultZone, requireOrdering, multiAddrs, fgrep):
+  ''' Generator to yield (dt, apline) from Apache log data `fp`.
+  '''
+  if isinstance(fp, str):
+    filename = fp
+    with Pfx(filename):
+      if filename.endswith('.gz'):
+        with gzip.open(filename) if filename.endswith('.gz') else open(filename) as fp:
+          for dt, apline in apdata(fp, defaultZone, requireOrdering, multiAddrs, fgrep):
+            yield dt, apline
+    return
 
-  def lines(self, defaultZone):
-    global cmd, requireOrdering, multiAddrs, fgrep
-
-    olddt = None
-    for line in self.fp:
-      self.lineno += 1
-      if line[-1] != '\n':
-        warning("%s, line %d: unexpected EOF: %s",
-             self.filename, self.lineno, line)
-        break
-
-      if fgrep is not None and fgrep not in line:
+  olddt = None
+  lineno = 0
+  for apline in fp:
+    lineno += 1
+    with Pfx("%d", lineno):
+      if not apline.endswith('\n'):
+        raise ValueError("missing trailing newline")
+      apline = apline[:-1]
+      if fgrep and fgrep not in apline:
         continue
-
-      line = line[:-1]
-
       if multiAddrs:
-        m = re_MULTIADDRS.match(line)
+        m = re_MULTIADDRS.match(apline)
         while m is not None:
-          line = line[m.end():]
-          m = re_MULTIADDRS.match(line)
-
-      dt = aptime(line, defaultZone)
+          apline = apline[m.end():]
+          m = re_MULTIADDRS.match(apline)
+      dt = aptime(apline, defaultZone)
       if dt is None:
+        warning("cannot compute datetime, discarding line")
         continue
-
       if requireOrdering:
-        assert olddt is None or olddt <= dt, \
-              "%s: %s, line %d: out of order timestamps: %s" \
-              % (cmd, self.filename, self.lineno, line)
-      olddt = dt
+        if olddt is not None and olddt > dt:
+          raise ValueError("out of order timestamps: old=%s, new=%s" % (olddt, dt))
 
-      yield line, dt
+    yield dt, apline
+    olddt = dt
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
