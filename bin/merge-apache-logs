@@ -163,11 +163,13 @@ def apdata(fp, zones, defaultZone, requireOrdering, multiAddrs, fgrep):
   '''
   if isinstance(fp, str):
     filename = fp
-    with Pfx(filename):
-      if filename.endswith('.gz'):
+    if filename.endswith('.gz'):
+      try:
         with gzip.open(filename) if filename.endswith('.gz') else open(filename) as fp:
           for dt, apline in apdata(fp, zones, defaultZone, requireOrdering, multiAddrs, fgrep):
             yield dt, apline
+      except IOError as e:
+        error("%s: %s", filename, e)
     return
 
   olddt = None
