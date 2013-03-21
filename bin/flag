@@ -7,6 +7,8 @@
 trace=
 [ -t 2 ] && trace=set-x
 flagdir=$HOME/var/flags
+quiet=
+qopt=
 invert=
 makemissing=
 flushflags=
@@ -14,6 +16,7 @@ flushflags=
 cmd=$0
 usage="Usage: $0 [-d flagdir] [-w] [--] [!] [flagname [true|false|0|1]]
   -d flagdir    Specify directory to hold flag files.
+  -q            Quiet. Do not report false flags in list mode.
   -w            Update/create the flag file with the derived flag if missing.
   -F            Flush flags. Delete files for false flags."
 
@@ -23,6 +26,7 @@ while [ $# -gt 0 ]
 do
   case $1 in
     -d) flagdir=$2; shift ;;
+    -q) quiet=1 qopt=$1 ;;
     -w) makemissing=1 ;;
     -F) flushflags=1 ;;
     --) shift; break ;;
@@ -47,12 +51,17 @@ then
   for flag in *
   do
     if flag "$flag"
-    then  echo "$flag	TRUE"
-    else  echo "$flag	FALSE"
-          if [ $flushflags ]
-          then
-            [ ! -f "$flag" ] || $trace rm0 "$flag"
-          fi
+    then
+      if [ $quiet ]
+      then  echo "$flag"
+      else  echo "$flag	TRUE"
+      fi
+    else
+      [ $quiet ] || echo "$flag	FALSE"
+      if [ $flushflags ]
+      then
+        [ ! -f "$flag" ] || $trace rm0 $qopt "$flag"
+      fi
     fi
   done
   exit 0
