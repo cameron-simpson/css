@@ -58,9 +58,21 @@ def main(argv):
     sys.exit(2)
 
   zones = {}
-  defaultZone = None
 
-  queues = [ LogFile(arg).lines() for arg in args ]
+  # compute defaultZone
+  tm = time.localtime()
+  if tm[8]:
+    tzoff = time.altzone
+  else:
+    tzoff = time.timezone
+  if tzoff < 0:
+    zoneSign = '+'
+    tzoff = -tzoff
+  else:
+    zoneSign = '-'
+  defaultZone = "%s%02d%02d" % (zoneSign, int(tzoff/3600), int( int(tzoff/60) % 60))
+
+  queues = [ LogFile(arg).lines(defaultZone) for arg in args ]
   lines  = [None] * len(queues)
 
   while len(queues) > 0:
@@ -90,13 +102,15 @@ def main(argv):
 
   return 0
 
-def aptime(logline):
+def aptime(logline, defaultZone):
+  ''' Compute a datetime object from the supplied Apache log line.
+      `defaultZone` is the timezone to use if it cannot be deduced.
+  '''
   fields = logline.split(' ')
   if len(fields) < 5:
     ##warning("bad log line: %s", logline)
     return None
 
-  global defaultZone
   dt = None
   tzinfo = None
 
@@ -144,18 +158,6 @@ def aptime(logline):
 
   # use defaultZone if tzinfo is not set
   if tzinfo is None:
-    if defaultZone is None:
-      tm = time.localtime()
-      if tm[8]:
-        tzoff = time.altzone
-      else:
-        tzoff = time.timezone
-      if tzoff < 0:
-        zoneSign = '+'
-        tzoff = -tzoff
-      else:
-        zoneSign = '-'
-      defaultZone = "%s%02d%02d" % (zoneSign, int(tzoff/3600), int( int(tzoff/60) % 60))
     tzinfo = defaultZone
 
   global zones
@@ -186,7 +188,7 @@ class LogFile:
       self.fp = open(filename)
     self.lineno = 0
 
-  def lines(self):
+  def lines(self, defaultZone):
     global cmd, requireOrdering, multiAddrs, fgrep
 
     olddt = None
@@ -208,7 +210,7 @@ class LogFile:
           line = line[m.end():]
           m = re_MULTIADDRS.match(line)
 
-      dt = aptime(line)
+      dt = aptime(line, defaultZone)
       if dt is None:
         continue
 
