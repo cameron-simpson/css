@@ -88,10 +88,22 @@ imagesdir=$reportdir
 
 [ -d "$reportdir/." ] || $trace mkdir "$reportdir"
 [ -d "$reportdir/hist/." ] || $trace mkdir "$reportdir/hist"
+hist=$reportdir/hist/webalizer.hist
+if [ -s "$hist" ]
+then  incr=yes
+else  incr=no
+fi
 echo "OutputDir $reportdir" >>"$patchfile"
-echo "HistoryName $reportdir/hist/webalizer.hist" >>"$patchfile"
+echo "HistoryName $hist" >>"$patchfile"
 echo "IncrementalName $reportdir/hist/webalizer.current" >>"$patchfile"
+echo "Incremental $incr" >>"$patchfile"
 
+>>"$conf"
 cat "$patchfile"
+ls -ld "$conf"
 $trace patch-config -I -o "$conf" "$tplt" "$patchfile"
-$trace merge-apache-logs "$@" | $trace webalizer -c "$conf" -
+ls -ld "$conf"
+tmplog=$reportdir/tmp.log.gz
+$trace merge-apache-logs -M "$@" | gzip -v -9 >$tmplog || :
+$trace webalizer -d -c "$conf" -d "$tmplog"
+$trace rm "$tmplog"
