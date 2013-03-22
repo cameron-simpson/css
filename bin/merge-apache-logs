@@ -86,7 +86,7 @@ def aptime(logline, zones, defaultZone):
   ''' Compute a datetime object from the supplied Apache log line.
       `defaultZone` is the timezone to use if it cannot be deduced.
   '''
-  fields = logline.split(' ')
+  fields = logline.split()
   if len(fields) < 5:
     ##warning("bad log line: %s", logline)
     return None
