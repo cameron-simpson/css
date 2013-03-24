@@ -32,6 +32,8 @@ else
   fi
 fi
 
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
 cd "$hbdir" || exit 1
 
 lastbak=
