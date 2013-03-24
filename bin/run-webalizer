@@ -105,5 +105,5 @@ $trace patch-config -I -o "$conf" "$tplt" "$patchfile"
 ls -ld "$conf"
 tmplog=$reportdir/tmp.log.gz
 $trace merge-apache-logs -M "$@" | gzip -v -9 >$tmplog || :
-$trace webalizer -d -c "$conf" -d "$tmplog"
+$trace webalizer -c "$conf" "$tmplog"
 $trace rm "$tmplog"
