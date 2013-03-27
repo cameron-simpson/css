@@ -192,7 +192,7 @@ flag -w "$flag_connected" 0
 alert "STARTING: $target"
 tag_fd 2 "$target" \
   $trace \
-    sshto $sshopts -F "$sshcfg" \
+    sshpf $sshopts -F "$sshcfg" \
       -o "PermitLocalCommand=yes" -o "LocalCommand=flag -w '$flag_connected' 1; </dev/null alert CONNECTED: $target &" \
       "$target" "$cfg_command" \
     >>"$cfg_outlog" </dev/null &
