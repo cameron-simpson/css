@@ -247,7 +247,7 @@ class Maildir(mailbox.Maildir):
       self.msgmap[key] = ('new', key)
       return key
 
-  def save_file(self, fp, key=None):
+  def save_file(self, fp, key=None, flags=''):
     ''' Save the contents of the file-like object `fp` into the Maildir.
         Return the key for the saved message.
     '''
@@ -255,13 +255,13 @@ class Maildir(mailbox.Maildir):
       debug("create new file %s for key %s", T.name, key)
       T.write(fp.read())
       T.flush()
-      return self.save_filepath(T.name, key=key)
+      return self.save_filepath(T.name, key=key, flags=flags)
 
-  def save_message(self, M, key=None):
+  def save_message(self, M, key=None, flags=''):
     ''' Save the contents of the Message `M` into the Maildir.
         Return the key for the saved message.
     '''
-    return self.save_file(StringIO(str(M)), key=key)
+    return self.save_file(StringIO(str(M)), key=key, flags=flags)
 
   def keypath(self, key):
     subdir, msgbase = self.msgmap[key]
