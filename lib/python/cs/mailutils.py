@@ -206,9 +206,11 @@ class Maildir(mailbox.Maildir):
        and ':' not in key \
        and '/' not in key
 
-  def save_filepath(self, filepath, key=None, nolink=False):
-    ''' Save a file into the Maildir.
+  def save_filepath(self, filepath, key=None, nolink=False, flags=''):
+    ''' Save the file specified by `filepath` into the Maildir.
         By default a hardlink is attempted unless `nolink` is supplied true.
+        The optional `flags` is a string consisting of flag letters listed at:
+          http://cr.yp.to/proto/maildir.html
         Return the key for the saved message.
     '''
     with Pfx("save_filepath(%s)", filepath):
@@ -233,6 +235,8 @@ class Maildir(mailbox.Maildir):
         debug("copyfile %s => %s", filepath, tmppath)
         shutil.copyfile(filepath, tmppath)
       newpath = os.path.join(self.dir, 'new', key)
+      if flags:
+        newpath += ':2,' + flags
       try:
         debug("rename %s => %s", tmppath, newpath)
         os.rename(tmppath, newpath)
