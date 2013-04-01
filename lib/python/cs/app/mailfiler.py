@@ -271,7 +271,7 @@ class FilteringState(O):
       hamap[header] = set( [ A for N, A in message_addresses(M, (header,)) ] )
     return hamap[header]
 
-  def save_to_maildir(self, mdir, label, context):
+  def save_to_maildir(self, mdir, label, context, flags=''):
     mdirpath = mdir.dir
     if mdirpath in self.used_maildirs:
       if not self.reuse_maildir:
@@ -285,9 +285,9 @@ class FilteringState(O):
     else:
       path = self.message_path
     if path is None:
-      savekey = mdir.save_message(M)
+      savekey = mdir.save_message(M, flags=flags)
     else:
-      savekey = mdir.save_filepath(path)
+      savekey = mdir.save_filepath(path, flags=flags)
     savepath = mdir.keypath(savekey)
     if not path and not label:
       self.message_path = savepath
