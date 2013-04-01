@@ -236,7 +236,7 @@ class Maildir(mailbox.Maildir):
         shutil.copyfile(filepath, tmppath)
       newbase = key
       if flags:
-        newbase += ':2,' + flags
+        newbase += ':2,' + ''.join(sorted(flags))
       newpath = os.path.join(self.dir, 'new', newbase)
       try:
         debug("rename %s => %s", tmppath, newpath)
