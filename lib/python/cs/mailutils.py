@@ -234,9 +234,10 @@ class Maildir(mailbox.Maildir):
       else:
         debug("copyfile %s => %s", filepath, tmppath)
         shutil.copyfile(filepath, tmppath)
-      newpath = os.path.join(self.dir, 'new', key)
+      newbase = key
       if flags:
-        newpath += ':2,' + flags
+        newbase += ':2,' + flags
+      newpath = os.path.join(self.dir, 'new', newbase)
       try:
         debug("rename %s => %s", tmppath, newpath)
         os.rename(tmppath, newpath)
@@ -244,7 +245,7 @@ class Maildir(mailbox.Maildir):
         debug("unlink %s", tmppath)
         os.unlink(tmppath)
         raise
-      self.msgmap[key] = ('new', key)
+      self.msgmap[key] = ('new', newbase)
       return key
 
   def save_file(self, fp, key=None, flags=''):
