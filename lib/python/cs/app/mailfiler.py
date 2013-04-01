@@ -664,7 +664,14 @@ class Rule(O):
                   failed_actions.append( (action, arg, "sendmail "+target) )
               else:
                 mdir = filtering.maildir(target)
-                savepath = filtering.save_to_maildir(mdir, self.label, context=context)
+                if self.flags.alert:
+                  maildir_flags = 'F'
+                else:
+                  maildir_flags = ''
+                savepath = filtering.save_to_maildir(mdir,
+                                                     self.label,
+                                                     context=context,
+                                                     flags=maildir_flags)
                 ok = True
                 # we get None if the message has already been saved here
                 if savepath is not None:
