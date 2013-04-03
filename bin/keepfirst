@@ -32,7 +32,6 @@ done
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-set -x
 exec awk "
           { key=$colexpr; "'
             if (!seen[key]) {
