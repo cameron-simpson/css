@@ -20,7 +20,7 @@ def tail(fp,
   partline = ''
   while True:
     pos = fp.tell()
-    size = os.fstat(fp.fileno())[6]
+    size = os.fstat(fp.fileno()).st_size
     busy = False
     while size > pos:
       rsize = min(size - pos, readsize)
