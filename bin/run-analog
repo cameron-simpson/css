@@ -9,10 +9,11 @@ set -ue
 : ${TMPDIR:=/tmp}
 
 cmd=`basename "$0"`
-usage="Usage: $cmd -d reportdir template-analog-config SETTING=value... {/path/to/logfile|/path/to/logdir}..."
+usage="Usage: $cmd -d reportdir [-n] template-analog-config SETTING=value... {/path/to/logfile|/path/to/logdir}..."
 
 trace=set-x
 reportdir=
+doit=1
 
 badopts=
 
@@ -20,6 +21,7 @@ while [ $# -gt 0 ]
 do
   case "$1" in
     -d) reportdir=$2; shift ;;
+    -n) doit= ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
     *)  break ;;
@@ -98,4 +100,7 @@ echo "IMAGEDIR $imagesdir" >>"$patchfile"
 
 cat "$patchfile"
 $trace patch-config -o "$conf" "$tplt" "$patchfile"
-$trace analog "+g$conf"
+if [ $doit ]
+then  $trace analog "+g$conf"
+else  echo SKIP analog "+g$conf"
+fi
