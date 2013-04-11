@@ -8,9 +8,10 @@ set -ue
 
 doit=1
 gwhost=${GETWIZ_HOST:-beyonwiz}
+regexpopt=
 
 cmd=$0
-usage="Usage: $cmd [-n] regexp [...getwizpnp.pl-options....]
+usage="Usage: $cmd [-n] {index-name|/regexp} [...getwizpnp.pl-options....]
   regexp        Matches against \"servicename#longtitle#date\"
                 in a case insensitive fashion.
                 Dates are \"Mon.D.YYYY_HH.MM\"
@@ -36,13 +37,18 @@ then
   echo "$cmd: missing regexp" >&2
   badopts=1
 else
-  regexp=$1
+  name=$1
   shift
+  case "$name" in
+    /*) name=`expr "x$name" : 'x.\(.*\)'`
+        regexpopt=--regexp
+        ;;
+  esac
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-set -- -H "$gwhost" --verbose --date --ts --regexp "$regexp" ${1+"$@"}
+set -- -H "$gwhost" --verbose --date --ts $regexpopt "$name" ${1+"$@"}
 [ $doit ] || set -- --list ${1+"$@"}
 
 perlscript=`which getWizPnP.pl`
