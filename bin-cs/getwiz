@@ -45,8 +45,9 @@ fi
 set -- -H "$gwhost" --verbose --date --ts --regexp "$regexp" ${1+"$@"}
 [ $doit ] || set -- --list ${1+"$@"}
 
+perlscript=`which getWizPnP.pl`
 unset http_proxy
 unset ftp_proxy
 
 set -x
-exec getWizPnP.pl ${1+"$@"}
+exec perl "$perlscript" ${1+"$@"}
