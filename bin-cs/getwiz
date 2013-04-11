@@ -1,0 +1,52 @@
+#!/bin/sh -ue
+#
+# Common getWizPnP incantation.
+#       - Cameron Simpson <cs@zip.com.au> 02jan2009
+#
+
+set -ue
+
+doit=1
+gwhost=${GETWIZ_HOST:-beyonwiz}
+
+cmd=$0
+usage="Usage: $cmd [-n] regexp [...getwizpnp.pl-options....]
+  regexp        Matches against \"servicename#longtitle#date\"
+                in a case insensitive fashion.
+                Dates are \"Mon.D.YYYY_HH.MM\"
+  -h host       Fetch from host. Default from \$GETWIZ_HOST: $gwhost
+  -n            No action. Recite matches."
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -n) doit= ;;
+    -h) gwhost=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing regexp" >&2
+  badopts=1
+else
+  regexp=$1
+  shift
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+set -- -H "$gwhost" --verbose --date --ts --regexp "$regexp" ${1+"$@"}
+[ $doit ] || set -- --list ${1+"$@"}
+
+unset http_proxy
+unset ftp_proxy
+
+set -x
+exec getWizPnP.pl ${1+"$@"}
