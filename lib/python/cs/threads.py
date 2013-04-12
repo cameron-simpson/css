@@ -411,61 +411,6 @@ class IterablePriorityQueue(PriorityQueue):
 
   next = __next__
 
-class Cato9:
-  ''' A cat-o-nine-tails Queue-like object, fanning out put() items
-      to an arbitrary number of handlers.
-  '''
-  @OBSOLETE
-  def __init__(self,*args,**kwargs):
-    self.__qs={}
-    self.__q=IterableQueue(maxsize)
-    self.__lock=Lock()
-    self.__closed=False
-    Thread(target=self.__handle).start()
-  def qsize(self):
-    return self.__q.qsize()
-  def put(self,item,block=True,timeout=None):
-    assert not self.__closed
-    self.__q.put(item,block,timeout)
-  def put_nowait(self,item):
-    assert not self.__closed
-    self.__q.put_nowait(item)
-  def close(self):
-    ''' Close the queue.
-    '''
-    self.__closed=True
-    with self.__lock:
-      qs=self.__qs
-      self.__qs={}
-    for k in qs.keys():
-      qs[k].close()
-  def __handle(self):
-    for item in self.__q:
-      with self.__lock:
-        for k in self.__qs.keys():
-          self.__qs[k].put(item)
-  def addHandler(self,handler):
-    ''' Add a handler function to the queue, returning an identifying token.
-        The handler will be called with each put() item.
-    '''
-    assert not self.__closed
-    tok=seq()
-    IQ=IterableQueue(1)
-    with self.__lock:
-      self.__qs[tok]=IQ
-    Thread(target=self.__handler,args=(IQ,handler)).start()
-    return tok
-  def __handler(self,IQ,handler):
-    for item in IQ:
-      handler(item)
-  def removeHandler(self,tok):
-    ''' Remove the handler corresponding to the supplied token.
-    '''
-    with self.__lock:
-      Q=self.__qs.pop(tok,None)
-    if Q is not None:
-      Q.close()
-
 class JobCounter:
   ''' A class to count and wait for outstanding jobs.
       As jobs are queued, JobCounter.inc() is called.
