@@ -16,12 +16,12 @@ class Trunc(object):
         http://openwiz.org/wiki/Recorded_Files#trunc_file
   '''
   def __init__(self, path):
-    self.__path = path
+    self.path = path
 
   def __iter__(self):
     ''' The iterator to yield record tuples.
     '''
-    fp = open(self.__path)
+    fp = open(self.path, "rb")
     while True:
       buf = fp.read(24)
       if len(buf) == 0:
@@ -31,24 +31,24 @@ class Trunc(object):
 
 class TVWiz(object):
   def __init__(self, wizdir):
-    self.__dir = wizdir
+    self.dir = wizdir
 
   def trunc(self):
     ''' Obtain a Trunc object for this TVWiz dir.
     '''
-    return Trunc(os.path.join(self.__dir, "trunc"))
+    return Trunc(os.path.join(self.dir, "trunc"))
 
   def data(self):
     ''' A generator that yields MPEG2 data from the stream.
     '''
-    with Pfx("data(%s)", self.__dir):
+    with Pfx("data(%s)", self.dir):
       T = self.trunc()
       lastFileNum = None
       for wizOffset, fileNum, flags, offset, size in T:
         if lastFileNum is None or lastFileNum != fileNum:
           if lastFileNum is not None:
             fp.close()
-          fp = open(os.path.join(self.__dir, "%04d"%fileNum))
+          fp = open(os.path.join(self.dir, "%04d" % (fileNum,)))
           filePos = 0
           lastFileNum = fileNum
         if filePos != offset:
