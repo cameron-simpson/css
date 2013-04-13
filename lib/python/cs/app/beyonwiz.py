@@ -9,8 +9,11 @@ import sys
 import os.path
 from collections import namedtuple
 import struct
+from threading import Lock
 from cs.logutils import Pfx, error, setup_logging
 from cs.obj import O
+from cs.threads import locked_property
+from cs.urlutils import URL
 
 def main(argv):
   args = list(argv)
@@ -36,6 +39,8 @@ def main(argv):
         if len(args) < 1:
           error("missing tvwizdirs")
           badopts = True
+      elif op == "test":
+        pass
       else:
         error("unrecognised operation")
         badopts = True
@@ -72,6 +77,10 @@ def main(argv):
       if chunkOff > 0:
         print "    final chunk of %d" % chunkSize
       print "  total %d" % total
+  elif op == "test":
+    host = args.pop(0)
+    print "host =", host, "args =", args
+    WizPnP(host).test()
   else:
     error("unsupported operation: %s" % op)
     xit = 2
@@ -147,6 +156,23 @@ class TVWiz(O):
     else:
       for buf in self.data():
         output.write(buf)
+
+class WizPnP(O):
+
+  def __init__(self, host, port=None):
+    if port is None:
+      port = 49152
+    self.host = host
+    self.port = port
+    self.base = URL('http://%s:%d/' % (host, port), None)
+    self._lock = Lock()
+
+  def test(self):
+    print self.tvdevicedesc_URL
+
+  @locked_property
+  def tvdevicedesc_URL(self):
+    return URL(self.base + 'tvdevicedesc.xml', self.base)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
