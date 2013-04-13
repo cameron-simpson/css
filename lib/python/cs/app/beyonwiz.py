@@ -90,20 +90,9 @@ def main(argv):
 
 TruncRecord = namedtuple('TruncRecord', 'wizOffset fileNum flags offset size')
 
-class Trunc(O):
-  ''' A parser for the "trunc" file in a TVWiz directory.
-      It is iterable, yielding tuples:
-        wizOffset, fileNum, flags, offset, size
-      as described at:
-        http://openwiz.org/wiki/Recorded_Files#trunc_file
+def parse_trunc(fp):
+  ''' An iterator to yield TruncRecord tuples.
   '''
-  def __init__(self, path):
-    self.path = path
-
-  def __iter__(self):
-    ''' The iterator to yield record tuples.
-    '''
-    fp = open(self.path, "rb")
     while True:
       buf = fp.read(24)
       if len(buf) == 0:
@@ -115,18 +104,19 @@ class TVWiz(O):
   def __init__(self, wizdir):
     self.dir = wizdir
 
-  def trunc(self):
-    ''' Obtain a Trunc object for this TVWiz dir.
+  def trunc_records(self):
+    ''' Generator to yield TruncRecords for this TVWiz directory.
     '''
-    return Trunc(os.path.join(self.dir, "trunc"))
+    with open(os.path.join(self.dir, "trunc")) as tfp:
+      for trec in parse_trunc(tfp):
+        yield trec
 
   def data(self):
     ''' A generator that yields MPEG2 data from the stream.
     '''
     with Pfx("data(%s)", self.dir):
-      T = self.trunc()
       lastFileNum = None
-      for rec in T:
+      for rec in self.trunc_records():
         wizOffset, fileNum, flags, offset, size  = rec
         if lastFileNum is None or lastFileNum != fileNum:
           if lastFileNum is not None:
