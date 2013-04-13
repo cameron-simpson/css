@@ -75,9 +75,6 @@ def main(argv):
 
   return xit
 
-if __name__ == '__main__':
-  sys.exit(main(sys.argv))
-
 class Trunc(object):
   ''' A parser for the "trunc" file in a TVWiz directory.
       It is iterable, yielding tuples:
