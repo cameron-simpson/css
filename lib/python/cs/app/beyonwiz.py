@@ -1,7 +1,8 @@
 #!/usr/bin/python
 #
 
-''' Classes to support access to Beyonwiz TVWiz data structures.
+''' Classes to support access to Beyonwiz TVWiz data structures
+    and Beyonwiz devices via the net.
 '''
 
 import sys
@@ -9,6 +10,7 @@ import os.path
 from collections import namedtuple
 import struct
 from cs.logutils import Pfx, error, setup_logging
+from cs.obj import O
 
 def main(argv):
   args = list(argv)
@@ -78,7 +80,7 @@ def main(argv):
 
 TruncRecord = namedtuple('TruncRecord', 'wizOffset fileNum flags offset size')
 
-class Trunc(object):
+class Trunc(O):
   ''' A parser for the "trunc" file in a TVWiz directory.
       It is iterable, yielding tuples:
         wizOffset, fileNum, flags, offset, size
@@ -99,7 +101,7 @@ class Trunc(object):
       assert len(buf) == 24
       yield TruncRecord(*struct.unpack("<QHHQL", buf))
 
-class TVWiz(object):
+class TVWiz(O):
   def __init__(self, wizdir):
     self.dir = wizdir
 
