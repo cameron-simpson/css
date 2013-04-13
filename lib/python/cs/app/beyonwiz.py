@@ -6,6 +6,7 @@
 
 import sys
 import os.path
+from collections import namedtuple
 import struct
 from cs.logutils import Pfx, error, setup_logging
 
@@ -75,6 +76,8 @@ def main(argv):
 
   return xit
 
+TruncRecord = namedtuple('TruncRecord', 'wizOffset fileNum flags offset size')
+
 class Trunc(object):
   ''' A parser for the "trunc" file in a TVWiz directory.
       It is iterable, yielding tuples:
@@ -94,7 +97,7 @@ class Trunc(object):
       if len(buf) == 0:
         break
       assert len(buf) == 24
-      yield struct.unpack("<QHHQL", buf)
+      yield TruncRecord(*struct.unpack("<QHHQL", buf))
 
 class TVWiz(object):
   def __init__(self, wizdir):
@@ -111,7 +114,8 @@ class TVWiz(object):
     with Pfx("data(%s)", self.dir):
       T = self.trunc()
       lastFileNum = None
-      for wizOffset, fileNum, flags, offset, size in T:
+      for rec in T:
+        wizOffset, fileNum, flags, offset, size  = rec
         if lastFileNum is None or lastFileNum != fileNum:
           if lastFileNum is not None:
             fp.close()
