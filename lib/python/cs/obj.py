@@ -134,9 +134,8 @@ def O_attrs(o):
       Note: this calls getattr(o, attr) to inspect it in order to
       prune callables.
   '''
-  try:
-    omit = o._O_omit
-  except AttributeError:
+  omit = getattr(o, '_O_omit', ())
+  if omit is None:
     omit = ()
   for attr in sorted(dir(o)):
     if attr[0].isalpha() and not attr in omit:
