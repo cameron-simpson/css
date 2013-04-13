@@ -9,7 +9,7 @@ import sys
 import os.path
 from collections import namedtuple
 import struct
-from threading import Lock
+from threading import Lock, RLock
 from xml.etree.ElementTree import XML
 from cs.logutils import Pfx, error, setup_logging
 from cs.obj import O
@@ -166,7 +166,7 @@ class WizPnP(O):
     self.host = host
     self.port = port
     self.base = URL('http://%s:%d/' % (host, port), None)
-    self._lock = Lock()
+    self._lock = RLock()
 
   def test(self):
     print self.tvdevicedesc_URL
