@@ -5,6 +5,7 @@
     and Beyonwiz devices via the net.
 '''
 
+from __future__ import print_function
 import sys
 import os.path
 from collections import namedtuple
@@ -47,7 +48,7 @@ def main(argv):
         badopts = True
 
   if badopts:
-    print >>sys.stderr, usage
+    print(usage, file=sys.stderr)
     return 2
 
   xit = 0
@@ -57,30 +58,31 @@ def main(argv):
       TVWiz(arg).copyto(sys.stdout)
   elif op == "scan":
     for arg in args:
-      print arg
+      print(arg)
       total = 0
       chunkSize = 0
       chunkOff = 0
       for wizOffset, fileNum, flags, offset, size in TVWiz(arg).trunc():
-        print "  wizOffset=%d, fileNum=%d, flags=%02x, offset=%d, size=%d" \
+        print("  wizOffset=%d, fileNum=%d, flags=%02x, offset=%d, size=%d" \
               % ( wizOffset, fileNum, flags, offset, size )
+             )
         total += size
         if chunkOff != wizOffset:
           skip = wizOffset - chunkOff
           if chunkSize == 0:
-            print "    %d skipped" % skip
+            print("    %d skipped" % skip)
           else:
-            print "    %d skipped, after a chunk of %d" % (skip, chunkSize)
+            print("    %d skipped, after a chunk of %d" % (skip, chunkSize))
           chunkOff = wizOffset
           chunkSize = 0
         chunkOff += size
         chunkSize += size
       if chunkOff > 0:
-        print "    final chunk of %d" % chunkSize
-      print "  total %d" % total
+        print("    final chunk of %d" % chunkSize)
+      print("  total %d" % total)
   elif op == "test":
     host = args.pop(0)
-    print "host =", host, "args =", args
+    print("host =", host, "args =", args)
     WizPnP(host).test()
   else:
     error("unsupported operation: %s" % op)
@@ -159,15 +161,15 @@ class WizPnP(O):
     self._lock = RLock()
 
   def test(self):
-    print self.tvdevicedesc_URL
-    print self._tvdevicedesc_XML
-    print self.specVersion
+    print(self.tvdevicedesc_URL)
+    print(self._tvdevicedesc_XML)
+    print(self.specVersion)
     for label, path in self.index:
-      print label, path
+      print(label, path)
 
   def url(self, subpath):
     U = URL(self.base + subpath, self.base)
-    print "url(%s) = %s" % (subpath, U)
+    print("url(%s) = %s" % (subpath, U))
     return U
 
   @locked_property
@@ -199,9 +201,9 @@ class WizPnP(O):
         continue
       try:
         label, path = line.split('|', 1)
-        print "label =", label, "path =", path
+        print("label =", label, "path =", path)
       except ValueError:
-        print "bad index line:", line
+        print("bad index line:", line)
       else:
         idx.append( (label, os.path.dirname(path)) )
     return idx
