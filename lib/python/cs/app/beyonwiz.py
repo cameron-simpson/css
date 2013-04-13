@@ -170,15 +170,23 @@ class WizPnP(O):
 
   def test(self):
     print self.tvdevicedesc_URL
-    print self.tvdevicedesc_XML
+    print self._tvdevicedesc_XML
+    print self.specVersion
 
   @locked_property
   def tvdevicedesc_URL(self):
     return URL(self.base + 'tvdevicedesc.xml', self.base)
 
   @locked_property
-  def tvdevicedesc_XML(self):
+  def _tvdevicedesc_XML(self):
     return XML(self.tvdevicedesc_URL.content)
+
+  @locked_property
+  def specVersion(self):
+    xml = self._tvdevicedesc_XML
+    specVersion = xml[0]
+    major, minor = specVersion
+    return int(major.text), int(minor.text)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
