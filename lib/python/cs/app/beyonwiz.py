@@ -172,10 +172,17 @@ class WizPnP(O):
     print self.tvdevicedesc_URL
     print self._tvdevicedesc_XML
     print self.specVersion
+    for label, path in self.index:
+      print label, path
+
+  def url(self, subpath):
+    U = URL(self.base + subpath, self.base)
+    print "url(%s) = %s" % (subpath, U)
+    return U
 
   @locked_property
   def tvdevicedesc_URL(self):
-    return URL(self.base + 'tvdevicedesc.xml', self.base)
+    return self.url('tvdevicedesc.xml')
 
   @locked_property
   def _tvdevicedesc_XML(self):
@@ -187,6 +194,32 @@ class WizPnP(O):
     specVersion = xml[0]
     major, minor = specVersion
     return int(major.text), int(minor.text)
+
+  @locked_property
+  def index_txt(self):
+    return self.url('index.txt').content
+
+  @locked_property
+  def index(self):
+    idx = []
+    for line in self.index_txt.split('\n'):
+      if line.endswith('\r'):
+        line = line[:-1]
+      if len(line) == 0:
+        continue
+      try:
+        label, path = line.split('|', 1)
+        print "label =", label, "path =", path
+      except ValueError:
+        print "bad index line:", line
+      else:
+        idx.append( (label, os.path.dirname(path)) )
+    return idx
+
+  def tvwiz_header(self, path):
+    ''' Fetch the bytes of the tvwiz header file for the specified recording path.
+    '''
+    return self.url(os.path.join(path, 'header.tvwiz'))
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
