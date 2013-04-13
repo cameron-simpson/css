@@ -10,6 +10,7 @@ import os.path
 from collections import namedtuple
 import struct
 from threading import Lock
+from xml.etree.ElementTree import XML
 from cs.logutils import Pfx, error, setup_logging
 from cs.obj import O
 from cs.threads import locked_property
@@ -169,10 +170,15 @@ class WizPnP(O):
 
   def test(self):
     print self.tvdevicedesc_URL
+    print self.tvdevicedesc_XML
 
   @locked_property
   def tvdevicedesc_URL(self):
     return URL(self.base + 'tvdevicedesc.xml', self.base)
+
+  @locked_property
+  def tvdevicedesc_XML(self):
+    return XML(self.tvdevicedesc_URL.content)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
