@@ -134,7 +134,7 @@ test_shcmd=' flag -w PORTFWD_ANYWAY && exit 0
 for pfpidfile in $pfpidfiles
 do
   test_shcmd="$test_shcmd
-              ifpid '$pfpidfile' || exit 1"
+              ifpid -q '$pfpidfile' || exit 1"
 done
 for pfflag in $pfflags
 do
