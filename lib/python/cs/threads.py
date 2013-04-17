@@ -274,6 +274,7 @@ class Result(object):
 
   def __init__(self):
     self.closed = False
+    self.ready = False
     self._get_lock = Lock()
     self._get_lock.acquire()
 
@@ -284,6 +285,7 @@ class Result(object):
       raise RuntimeError(".put when closed: self=%r", self)
     self.closed = True
     self.value = value
+    self.ready = True
     self._get_lock.release()
 
   def get(self):
