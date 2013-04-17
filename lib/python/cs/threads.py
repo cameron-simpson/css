@@ -207,11 +207,7 @@ class Channel(object):
     self.__readable.acquire()
     self.__writable = Lock()
     self.__writable.acquire()
-    self.__get_lock = Lock()
-    self.__put_lock = Lock()
     self.closed = False
-    self.__lock = Lock()
-    self._nreaders = 0
 
   def __str__(self):
     if self.__readable.acquire(False):
@@ -242,68 +238,62 @@ class Channel(object):
     ''' Read a value from the Channel.
         Blocks until someone put()s to the Channel.
     '''
-    debug("CHANNEL: %s.get()", self)
     if self.closed:
-      raise ValueError("%s.get() on closed Channel" % (self,))
-    with self.__get_lock:
-      with self.__lock:
-        self._nreaders += 1
-      self.__writable.release()   # allow someone to write
-      self.__readable.acquire()   # await writer and prevent other readers
-      value = self._value
-      delattr(self,'_value')
-      with self.__lock:
-        self._nreaders -= 1
-    debug("CHANNEL: %s.get() got %r", self, value)
+      raise RuntimeError("%s: closed", self)
+    # allow a writer to proceed
+    self.__writable.release()
+    # await a writer
+    self.__readable.acquire()
+    self.close()
+    value = self._value
+    delattr(self,'_value')
     return value
 
   def put(self, value):
     ''' Write a value to the Channel.
         Blocks until a corresponding get() occurs.
     '''
-    debug("CHANNEL: %s.put(%r)", self, value)
     if self.closed:
-      raise ValueError("%s: closed, but put(%s)" % (self, value))
-    with self.__put_lock:
-      self.__writable.acquire()   # prevent other writers
-      self._value = value
-      self.__readable.release()   # allow a reader
-    debug("CHANNEL: %s.put(%r) completed", self, value)
+      raise RuntimeError("%s: closed", self)
+    # block until there is a matching .get()
+    self.__writable.acquire()
+    self._value = value
+    # allow .get() to proceed
+    self.__readable.release()
 
   def close(self):
-    with self.__lock:
-      if self.closed:
-        warning("%s: .close() of closed Channel" % (self,))
-      else:
-        self.closed = True
-    with self.__lock:
-      nr = self._nreaders
-    for i in range(nr):
-      self.put(None)
+    if self.closed:
+      warning("%s: .close() of closed Channel" % (self,))
+    else:
+      self.closed = True
 
-  def __iter__(self):
-    ''' Iterator for consumers that operate on tasks arriving via this Channel.
+class Result(object):
+  ''' A blocking value store.
+      Getters block until a value is supplied.
+  '''
+
+  def __init__(self):
+    self.closed = False
+    self._get_lock = Lock()
+    self._get_lock.acquire()
+
+  def put(self, value):
+    ''' Store the value.
     '''
-    while not self.closed:
-      item = self.get()
-      if item is None and self.closed:
-        break
-      yield item
+    if self.closed:
+      raise RuntimeError(".put when closed: self=%r", self)
+    self.closed = True
+    self.value = value
+    self._get_lock.release()
 
-##def call(self,value,backChannel):
-##  ''' Asynchronous call to daemon via channel.
-##      Daemon should reply by .put()ing to the backChannel.
-##  '''
-##  self.put((value,backChannel))
-##
-##def call_s(self,value):
-##  ''' Synchronous call to daemon via channel.
-##  '''
-##  ch=getChannel()
-##  self.call(value,ch)
-##  result=ch.get()
-##  returnChannel(ch)
-##  return result
+  def get(self):
+    ''' Fetch the value.
+        Blocks until the value is put.
+        The value may be get()ed multiple times.
+    '''
+    self._get_lock.acquire()
+    self._get_lock.release()
+    return self.value
 
 class IterableQueue(Queue):
   ''' A Queue implementing the iterator protocol.
