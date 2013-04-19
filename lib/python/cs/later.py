@@ -7,11 +7,12 @@ from functools import partial
 import sys
 from collections import deque
 import threading
-from threading import Lock, Thread, Condition
+from threading import Thread, Condition
 from cs.py3 import Queue, raise3
 import time
 from cs.threads import AdjustableSemaphore, IterablePriorityQueue, \
-                       WorkerThreadPool, TimerQueue
+                       WorkerThreadPool, TimerQueue, \
+                       Lock
 from cs.seq import seq
 from cs.logutils import Pfx, info, warning, debug, D
 
@@ -340,6 +341,7 @@ class LateFunction(PendingFunction):
     ''' ._dispatch() is called by the Later class instance's worker thread.
         It causes the function to be handed to a thread for execution.
     '''
+    self.later.info("DISPATCH %s", self)
     with self._lock:
       assert self.state == STATE_PENDING
       self.state = STATE_RUNNING
@@ -357,9 +359,10 @@ class LateFunction(PendingFunction):
     return result
 
   def set_result(self, result):
+    self.later.info("COMPLETE %s: result = %r", self, result)
+    self.later.log_status()
     self.later.capacity.release()
     self.later.running.remove(self)
-    self.later.debug("completed %s", self)
     PendingFunction.set_result(self, result)
 
 class Later(object):
@@ -412,6 +415,14 @@ class Later(object):
     return "<%s[%s] pending=%d running=%d delayed=%d>" \
            % (self.name, self.capacity,
               len(self.pending), len(self.running), len(self.delayed))
+
+  def log_status(self):
+    for LF in list(self.delayed):
+      self.info("STATUS: delayed: %s", LF)
+    for LF in list(self.pending):
+      self.info("STATUS: pending: %s", LF)
+    for LF in list(self.running):
+      self.info("STATUS: running: %s", LF)
 
   def __enter__(self):
     debug("%s: __enter__", self)
@@ -474,12 +485,16 @@ class Later(object):
       if self.closed:
         warning("close of closed Later %r", self)
       else:
-        debug("closing...")
+        D("closing...")
         self.closed = True
         if self._timerQ:
+          D("closing the timer queue...")
           self._timerQ.close()
+        D("closing the submission priority queue...")
         self._LFPQ.close()
+        D("waiting for the dispatch thread...")
         self._dispatchThread.join()
+        D("closing the worker pool...")
         self._workers.close()
 
   def _dispatcher(self):
