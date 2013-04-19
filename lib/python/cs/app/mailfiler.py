@@ -271,7 +271,7 @@ class FilteringState(O):
       hamap[header] = set( [ A for N, A in message_addresses(M, (header,)) ] )
     return hamap[header]
 
-  def save_to_maildir(self, mdir, label, context):
+  def save_to_maildir(self, mdir, label, context, flags=''):
     mdirpath = mdir.dir
     if mdirpath in self.used_maildirs:
       if not self.reuse_maildir:
@@ -285,9 +285,9 @@ class FilteringState(O):
     else:
       path = self.message_path
     if path is None:
-      savekey = mdir.save_message(M)
+      savekey = mdir.save_message(M, flags=flags)
     else:
-      savekey = mdir.save_filepath(path)
+      savekey = mdir.save_filepath(path, flags=flags)
     savepath = mdir.keypath(savekey)
     if not path and not label:
       self.message_path = savepath
@@ -533,12 +533,12 @@ class _Condition(O):
     self.flags = flags
     self.header_names = header_names
 
-  def match(self, filtering):
+  def match(self, fstate):
     status = False
-    M = filtering.message
+    M = fstate.message
     for header_name in self.header_names:
       for header_value in M.get_all(header_name, ()):
-        if self.test_value(filtering, header_name, header_value):
+        if self.test_value(fstate, header_name, header_value):
           status = True
           break
     if self.flags.invert:
@@ -553,7 +553,7 @@ class Condition_Regexp(_Condition):
     self.regexp = re.compile(regexp)
     self.regexptxt = regexp
 
-  def test_value(self, filtering, header_name, header_value):
+  def test_value(self, fstate, header_name, header_value):
     if self.atstart:
       return self.regexp.match(header_value)
     return self.regexp.search(header_value)
@@ -564,13 +564,13 @@ class Condition_AddressMatch(_Condition):
     _Condition.__init__(self, flags, header_names)
     self.addrkeys = tuple( k for k in addrkeys if len(k) > 0 )
 
-  def test_value(self, filtering, header_name, header_value):
-    for address in filtering.addresses(header_name):
+  def test_value(self, fstate, header_name, header_value):
+    for address in fstate.addresses(header_name):
       for key in self.addrkeys:
         if key.startswith('{{') and key.endswith('}}'):
           warning("OBSOLETE address key: %s", key)
           group_name = key[2:-2].lower()
-          if filtering.ingroup(address, group_name):
+          if fstate.ingroup(address, group_name):
             return True
         elif address.lower() == key.lower():
           return True
@@ -582,10 +582,10 @@ class Condition_InGroups(_Condition):
     _Condition.__init__(self, flags, header_names)
     self.group_names = group_names
 
-  def test_value(self, filtering, header_name, header_value):
-    for address in filtering.addresses(header_name):
+  def test_value(self, fstate, header_name, header_value):
+    for address in fstate.addresses(header_name):
       for group_name in self.group_names:
-        if filtering.ingroup(address, group_name):
+        if fstate.ingroup(address, group_name):
           debug("match %s to (%s)", address, group_name)
           return True
     return False
@@ -602,10 +602,10 @@ class Condition_HeaderFunction(_Condition):
     except AttributeError:
       raise ValueError("invalid header function .%s()" % (funcname,))
 
-  def test_value(self, filtering, header_name, header_value):
-    return self.test_func(filtering, header_name, header_value)
+  def test_value(self, fstate, header_name, header_value):
+    return self.test_func(fstate, header_name, header_value)
 
-  def test_func_contains(self, filtering, header_name, header_value):
+  def test_func_contains(self, fstate, header_name, header_value):
     return self.test_string in header_value
 
 _FilterReport = namedtuple('FilterReport',
@@ -626,45 +626,52 @@ class Rule(O):
     self.flags = O(alert=False, halt=False)
     self.label = ''
 
-  def match(self, filtering):
+  def match(self, fstate):
     # all conditions must match
     for C in self.conditions:
-      if not C.match(filtering):
+      if not C.match(fstate):
         return False
     return True
 
-  def filter(self, filtering):
-    M = filtering.message
+  def filter(self, fstate):
+    M = fstate.message
     context=("%s:%d" % (shortpath(self.filename), self.lineno))
     with Pfx(context):
       saved_to = []
       ok_actions = []
       failed_actions = []
-      matched = self.match(filtering)
+      matched = self.match(fstate)
       if matched:
         for action, arg in self.actions:
           ok = False
           try:
             if action == 'TARGET':
-              target = envsub(arg, filtering.environ)
+              target = envsub(arg, fstate.environ)
               if target.startswith('|'):
                 shcmd = target[1:]
-                if filtering.pipe_message(['/bin/sh', '-c', shcmd], context=context):
+                if fstate.pipe_message(['/bin/sh', '-c', shcmd], context=context):
                   ok = True
                   saved_to.append(target)
                 else:
                   error("failed to pipe to %s", target)
                   failed_actions.append( (action, arg, "pipe "+target) )
               elif '@' in target:
-                if filtering.sendmail(target, context=context):
+                if fstate.sendmail(target, context=context):
                   ok = True
                   saved_to.append(target)
                 else:
                   error("failed to sendmail to %s", target)
                   failed_actions.append( (action, arg, "sendmail "+target) )
               else:
-                mdir = filtering.maildir(target)
-                savepath = filtering.save_to_maildir(mdir, self.label, context=context)
+                mdir = fstate.maildir(target)
+                if self.flags.alert:
+                  maildir_flags = 'F'
+                else:
+                  maildir_flags = ''
+                savepath = fstate.save_to_maildir(mdir,
+                                                     self.label,
+                                                     context=context,
+                                                     flags=maildir_flags)
                 ok = True
                 # we get None if the message has already been saved here
                 if savepath is not None:
@@ -673,13 +680,13 @@ class Rule(O):
                   debug("repeated filing to maildir, skipping %s", mdir)
             elif action == 'ASSIGN':
               envvar, s = arg
-              value = filtering.environ[envvar] = envsub(s, filtering.environ)
+              value = fstate.environ[envvar] = envsub(s, fstate.environ)
               ok = True
               debug("ASSIGN %s=%s", envvar, value)
               if envvar == 'LOGFILE':
-                filtering.logto(value)
+                fstate.logto(value)
               elif envvar == 'DEFAULT':
-                R = filtering.default_rule = Rule(self.filename, self.lineno)
+                R = fstate.default_rule = Rule(self.filename, self.lineno)
                 R.actions.append( ('TARGET', '$DEFAULT') )
             else:
               raise RuntimeError("unimplemented action \"%s\"" % action)
@@ -717,7 +724,7 @@ class Rules(list):
     self.rule_files.update( R.filename for R in new_rules )
     self.extend(new_rules)
 
-  def filter(self, filtering):
+  def filter(self, fstate):
     ''' Filter the current message according to the rules.
         Yield FilterReports for each rule consulted.
         If no rule matches and $DEFAULT is set, yield a FilterReport for
@@ -726,8 +733,8 @@ class Rules(list):
     done = False
     saved_to = []
     for R in self:
-      report = R.filter(filtering)
-      M = filtering.message
+      report = R.filter(fstate)
+      M = fstate.message
       if report.matched:
         if not report.saved_to:
           debug("matched but not saved_to: %s", R)
@@ -744,11 +751,11 @@ class Rules(list):
           break
     if not done:
       if not saved_to:
-        R = filtering.default_rule
+        R = fstate.default_rule
         if not R:
           warning("NO DEFAULT: message not saved and no $DEFAULT")
         else:
-          report = R.filter(filtering)
+          report = R.filter(fstate)
           if not report.matched:
             raise RunTimeError("default rule faled to match! %r", R)
           saved_to.extend(report.saved_to)
@@ -828,18 +835,18 @@ class WatchedMaildir(O):
           nmsgs += 1
           with LogTime("key = %s", key, threshold=1.0, level=DEBUG):
             M = mdir[key]
-            filtering = FilteringState(M, self.filter_modes)
-            filtering.message_path = mdir.keypath(key)
-            filtering.logto(envsub("$HOME/var/log/mailfiler"))
-            filtering.log( (u("%s %s") % (time.strftime("%Y-%m-%d %H:%M:%S"),
-                                         unrfc2047(M.get('subject', '_no_subject'))))
+            fstate = FilteringState(M, self.filter_modes)
+            fstate.message_path = mdir.keypath(key)
+            fstate.logto(envsub("$HOME/var/log/mailfiler"))
+            fstate.log( (u("%s %s") % (time.strftime("%Y-%m-%d %H:%M:%S"),
+                                       unrfc2047(M.get('subject', '_no_subject'))))
                        .replace('\n', ' ') )
-            filtering.log("  " + unrfc2047(M.get('from', '_no_from')))
-            filtering.log("  " + M.get('message-id', '<?>'))
-            filtering.log("  " + shortpath(mdir.keypath(key)))
+            fstate.log("  " + unrfc2047(M.get('from', '_no_from')))
+            fstate.log("  " + M.get('message-id', '<?>'))
+            fstate.log("  " + shortpath(mdir.keypath(key)))
             saved_to = []
             reports = []
-            for report in self.rules.filter(filtering):
+            for report in self.rules.filter(fstate):
               if report.matched:
                 reports.append(report)
                 saved_to.extend(report.saved_to)
@@ -847,11 +854,11 @@ class WatchedMaildir(O):
                 if report.saved_to:
                   error("UNMATCHED RULE: saved_to=%s", report.saved_to)
             if not saved_to:
-              filtering.log("ERROR: message not saved, lurking key %s", key)
+              fstate.log("ERROR: message not saved, lurking key %s", key)
               error("message not saved, lurking key %s", key)
               self.lurking.add(key)
             elif self.filter_modes.no_remove:
-              filtering.log("no_remove: message not removed, lurking key %s", key)
+              fstate.log("no_remove: message not removed, lurking key %s", key)
               self.lurking.add(key)
             else:
               info("remove message key %s", key)
