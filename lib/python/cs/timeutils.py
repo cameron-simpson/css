@@ -50,6 +50,10 @@ def ISOtime(gmtime):
   return dt.isoformat()
 
 def sleep(delay):
+  ''' time.sleep() sometimes sleeps significantly less that requested.
+      This function calls time.sleep() until at least `delay` seconds have
+      elapsed, trying to be precise.
+  '''
   if delay < 0:
     raise ValueError("cs.timeutils.sleep: delay should be >= 0, given %g", delay)
   t0 = time.time()
