@@ -341,6 +341,11 @@ class Result(object):
     self._get_lock.release()
     return self.value
 
+  def empty(self):
+    ''' Analogue to Queue.empty().
+    '''
+    return not self.ready
+
 class IterableQueue(Queue):
   ''' A Queue implementing the iterator protocol.
       Note: Iteration stops when a None comes off the Queue.
