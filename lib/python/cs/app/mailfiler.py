@@ -272,6 +272,9 @@ class FilteringState(O):
     return hamap[header]
 
   def save_to_maildir(self, mdir, label, context, flags=''):
+    ''' Save the current message to a Maildir unless we have already saved to
+        this maildir.
+    '''
     mdirpath = mdir.dir
     if mdirpath in self.used_maildirs:
       if not self.reuse_maildir:
