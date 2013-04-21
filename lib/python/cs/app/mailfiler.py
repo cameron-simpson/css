@@ -144,13 +144,13 @@ def main(argv, stdin=None):
 def maildir_from_name(mdirname, maildir_root, maildir_cache):
     ''' Return the Maildir derived from mdirpath.
     '''
-    mdirpath = resolve_maildir_path(mdirname, maildir_root)
+    mdirpath = resolve_mail_path(mdirname, maildir_root)
     if mdirpath not in maildir_cache:
       maildir_cache[mdirpath] = Maildir(mdirpath, create=True)
     return maildir_cache[mdirpath]
 
-def resolve_maildir_path(mdirpath, maildir_root):
-  ''' Return the full path to the requested maildir.
+def resolve_mail_path(mdirpath, maildir_root):
+  ''' Return the full path to the requested mail folder.
   '''
   if not os.path.isabs(mdirpath):
     if mdirpath.startswith('./') or mdirpath.startswith('../'):
@@ -776,7 +776,7 @@ class WatchedMaildir(O):
   '''
 
   def __init__(self, mdir, filter_modes, rules_path=None):
-    self.mdir = Maildir(resolve_maildir_path(mdir, os.environ['MAILDIR']))
+    self.mdir = Maildir(resolve_mail_path(mdir, os.environ['MAILDIR']))
     self.filter_modes = filter_modes
     if rules_path is None:
       rules_path = os.path.join(self.mdir.dir, '.rules')
