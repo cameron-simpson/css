@@ -420,7 +420,7 @@ def parserules(fp):
             R.flags.halt = True
             offset += 1
           if line[offset] == '!':
-            R.flags.alert = True
+            R.flags.alert += 1
             offset += 1
           else:
             break
@@ -632,7 +632,7 @@ class Rule(O):
     self.lineno = lineno
     self.conditions = slist()
     self.actions = slist()
-    self.flags = O(alert=False, halt=False)
+    self.flags = O(alert=0, halt=False)
     self.label = ''
 
   def match(self, fstate):
