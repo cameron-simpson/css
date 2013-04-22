@@ -207,6 +207,9 @@ class FilteringState(O):
   def maildir(self, mdirpath):
     return self.filter_modes.maildir(mdirpath, self.environ)
 
+  def resolve(foldername):
+    return resolve_mail_path(foldername, self.environ['MAILDIR'])
+
   @property
   def message(self):
     return self._message
@@ -681,7 +684,7 @@ class Rule(O):
                   error("failed to sendmail to %s", target)
                   failed_actions.append( (action, arg, "sendmail "+target) )
               else:
-                mailpath = resolve_mail_path(target, fstate.environ['MAILDIR'])
+                mailpath = fstate.resolve(target)
                 if not os.path.exists(mailpath):
                   make_maildir(mailpath)
                 if ismaildir(mailpath):
