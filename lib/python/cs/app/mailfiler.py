@@ -27,7 +27,7 @@ from cs.env import envsub
 from cs.fileutils import abspath_from_file, file_property, files_property, Pathname
 from cs.lex import get_white, get_nonwhite, get_qstr, unrfc2047
 from cs.logutils import Pfx, setup_logging, debug, info, warning, error, D, LogTime
-from cs.mailutils import Maildir, message_addresses, shortpath
+from cs.mailutils import Maildir, message_addresses, shortpath, ismaildir
 from cs.obj import O, slist
 from cs.threads import locked_property
 from cs.app.maildb import MailDB
@@ -672,21 +672,25 @@ class Rule(O):
                   error("failed to sendmail to %s", target)
                   failed_actions.append( (action, arg, "sendmail "+target) )
               else:
-                mdir = fstate.maildir(target)
-                if self.flags.alert:
-                  maildir_flags = 'F'
+                mailpath = resolve_mail_path(target)
+                if ismaildir(mailpath):
+                  mdir = fstate.maildir(target)
+                  if self.flags.alert:
+                    maildir_flags = 'F'
+                  else:
+                    maildir_flags = ''
+                  savepath = fstate.save_to_maildir(mdir,
+                                                       self.label,
+                                                       context=context,
+                                                       flags=maildir_flags)
+                  ok = True
+                  # we get None if the message has already been saved here
+                  if savepath is not None:
+                    saved_to.append(savepath)
+                  else:
+                    debug("repeated filing to maildir, skipping %s", mdir)
                 else:
-                  maildir_flags = ''
-                savepath = fstate.save_to_maildir(mdir,
-                                                     self.label,
-                                                     context=context,
-                                                     flags=maildir_flags)
-                ok = True
-                # we get None if the message has already been saved here
-                if savepath is not None:
-                  saved_to.append(savepath)
-                else:
-                  debug("repeated filing to maildir, skipping %s", mdir)
+                  fstate.save_to_mbox(mailpath, self.label, context=context)
             elif action == 'ASSIGN':
               envvar, s = arg
               value = fstate.environ[envvar] = envsub(s, fstate.environ)
