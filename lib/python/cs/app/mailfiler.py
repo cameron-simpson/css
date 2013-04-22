@@ -27,7 +27,7 @@ from cs.env import envsub
 from cs.fileutils import abspath_from_file, file_property, files_property, Pathname
 from cs.lex import get_white, get_nonwhite, get_qstr, unrfc2047
 from cs.logutils import Pfx, setup_logging, debug, info, warning, error, D, LogTime
-from cs.mailutils import Maildir, message_addresses, shortpath, ismaildir
+from cs.mailutils import Maildir, message_addresses, shortpath, ismaildir, make_maildir
 from cs.obj import O, slist
 from cs.threads import locked_property
 from cs.app.maildb import MailDB
@@ -673,6 +673,8 @@ class Rule(O):
                   failed_actions.append( (action, arg, "sendmail "+target) )
               else:
                 mailpath = resolve_mail_path(target)
+                if not os.path.exists(mailpath):
+                  make_maildir(mailpath)
                 if ismaildir(mailpath):
                   mdir = fstate.maildir(target)
                   if self.flags.alert:
