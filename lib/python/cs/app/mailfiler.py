@@ -540,7 +540,7 @@ def get_targets(s, offset):
       else:
         error("parse failure at %d: %s", offset, s)
         raise ValueError("syntax error")
-    targets.append( ('TARGET', target) )
+    targets.append(target)
     if offset < len(s) and s[offset] == ',':
       offset += 1
   return targets, offset
