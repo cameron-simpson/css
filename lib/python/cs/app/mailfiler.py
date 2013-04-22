@@ -758,7 +758,7 @@ class Rules(list):
           self.alert("%s: %s" % (M.get('from', '').strip(), M.get('subject', '').strip()))
       else:
         if report.saved_to:
-          raise RunTimeError("matched is False, but saved_to = %s" % (saved_to,))
+          error("matched is False, but saved_to = %s", saved_to)
       yield report
       if report.matched:
         if R.flags.halt:
