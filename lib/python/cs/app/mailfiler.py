@@ -297,6 +297,12 @@ class FilteringState(O):
     self.log("    OK %s (%s)" % (shortpath(savepath), context))
     return savepath
 
+  def save_to_mbox(self, mboxpath, label, context):
+    M = self.message
+    text = M.as_string(True)
+    with open(mboxpath, "a") as mboxfp:
+      mboxfp.write(text)
+
   def pipe_message(self, argv, mfp=None, context=None):
     ''' Pipe a message to the command specific by `argv`.
         `mfp` is a file containing the message text.
