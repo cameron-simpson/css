@@ -98,6 +98,7 @@ rrsync=rsync
 usehbinclude=1
 usehbfiles=1
 linkrepair=
+obackup_options=
 symlink_unchanged=
 rsopts=
 rsdelete=--delete
@@ -335,7 +336,6 @@ else
             shift; shift
             # gather other backup dirs, turn into --link-dest= options
             obackup_count=0
-            obackup_options=
             while [ $# -gt 0 ]
             do
               case "x$1" in
