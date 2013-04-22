@@ -672,7 +672,7 @@ class Rule(O):
                   error("failed to sendmail to %s", target)
                   failed_actions.append( (action, arg, "sendmail "+target) )
               else:
-                mailpath = resolve_mail_path(target)
+                mailpath = resolve_mail_path(target, fstate.environ['MAILDIR'])
                 if not os.path.exists(mailpath):
                   make_maildir(mailpath)
                 if ismaildir(mailpath):
