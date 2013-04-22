@@ -425,21 +425,9 @@ def parserules(fp):
           else:
             break
 
-        # gather targets
-        while offset < len(line) and not line[offset].isspace():
-          if line[offset] == '"':
-            target, offset = get_qstr(line, offset)
-          else:
-            m = re_UNQWORD.match(line, offset)
-            if m:
-              target = m.group()
-              offset = m.end()
-            else:
-              error("parse failure at %d: %s", offset, line)
-              raise ValueError("syntax error")
+        targets, offset = get_targets(line, offset)
+        for target in targets:
           R.actions.append( ('TARGET', target) )
-          if offset < len(line) and line[offset] == ',':
-            offset += 1
 
         # gather label
         _, offset = get_white(line, offset)
@@ -535,6 +523,27 @@ def parserules(fp):
 
   if R is not None:
     yield R
+
+def get_targets(s, offset):
+  ''' Parse list of targets from the string `s` strarting at `offset`.
+      Return the list of targets strings and the new offset.
+  '''
+  targets = []
+  while offset < len(s) and not s[offset].isspace():
+    if s[offset] == '"':
+      target, offset = get_qstr(s, offset)
+    else:
+      m = re_UNQWORD.match(s, offset)
+      if m:
+        target = m.group()
+        offset = m.end()
+      else:
+        error("parse failure at %d: %s", offset, s)
+        raise ValueError("syntax error")
+    targets.append( ('TARGET', target) )
+    if offset < len(s) and s[offset] == ',':
+      offset += 1
+  return targets, offset
 
 class _Condition(O):
   
