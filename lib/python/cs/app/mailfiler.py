@@ -876,7 +876,7 @@ class WatchedMaildir(O):
               fstate.log("no_remove: message not removed, lurking key %s", key)
               self.lurking.add(key)
             else:
-              info("remove message key %s", key)
+              debug("remove message key %s", key)
               mdir.remove(key)
               self.lurking.discard(key)
             yield key, reports
