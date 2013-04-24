@@ -182,7 +182,7 @@ class Monitor(object):
                 host.log(facility, level, report)
             else:
               report="%f %s %s %s %s %s\n" \
-                     % (time.time(), dmy, hms, test.NAME, path, line)
+                     % (now, dmy, hms, test.NAME, path, line)
               if test.ACTION_TYPE == 'FILE':
                 # ACTION_FILEs are shared - use lock
                 try:
