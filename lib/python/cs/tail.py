@@ -7,20 +7,21 @@
 import os
 import sys
 import time
-
-from cs.logutils import D
+from cs.logutils import D, error, warning, info
 
 def tail(fp,
          readsize=8192, polltime=1,
          seekoffset=0, seekwhence=os.SEEK_END,
-         quit_at_eof=False):
+         quit_at_eof=False,
+         follow_name=None):
   ''' Yield whole lines from a file.
   '''
   fp.seek(seekoffset, seekwhence)
   partline = ''
   while True:
     pos = fp.tell()
-    size = os.fstat(fp.fileno())[6]
+    fs = os.fstat(fp.fileno())
+    size = fs.st_size
     busy = False
     while size > pos:
       rsize = min(size - pos, readsize)
@@ -49,6 +50,19 @@ def tail(fp,
       return
     if not busy:
       time.sleep(polltime)
+      if follow_name is not None:
+        try:
+          s = os.stat(follow_name)
+        except OSError as e:
+          warning("%s: stat: %s", follow_name, e)
+        else:
+          if s.st_ino != fs.st_ino or s.st_dev != fs.st_dev:
+            try:
+              nfp = open(follow_name)
+            except OSError as e:
+              warning("%s: open: %s", follow_name, e)
+            else:
+              fp = nfp
 
 if __name__ == '__main__':
   import unittest
