@@ -57,12 +57,15 @@ def tail(fp,
           warning("%s: stat: %s", follow_name, e)
         else:
           if s.st_ino != fs.st_ino or s.st_dev != fs.st_dev:
+            info("switching to new file: %s", follow_name)
             try:
               nfp = open(follow_name)
             except OSError as e:
               warning("%s: open: %s", follow_name, e)
             else:
+              close(fp)
               fp = nfp
+              nfp = None
 
 if __name__ == '__main__':
   import unittest
