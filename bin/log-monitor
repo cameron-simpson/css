@@ -160,7 +160,7 @@ class Monitor(object):
     global cmd
     global ioLock
     tests=self.paths[path].TESTS
-    for line in tail(open(path)):
+    for line in tail(open(path), follow_name=path):
       assert line.endswith('\n')
       line=line[:-1]
       for regexpName in tests.keys():
