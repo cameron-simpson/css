@@ -17,14 +17,24 @@ import cs.wini
 from cs.tail import tail
 from cs.logutils import cmd
 
-usage="Usage: %s configuration-file" % cmd
+USAGE = "Usage: %s configuration-file"
 
-ioLock=allocate_lock()
+def main(argv):
+  global cmd, ioLock
+  argv = list(argv)
+  cmd = os.path.basename(argv.pop(0))
+  usage = USAGE % (cmd,)
 
-args=sys.argv[1:]
-if len(args) != 1:
-  print >>sys.stderr, usage
-  sys.exit(2)
+  ioLock=allocate_lock()
+
+  args=sys.argv[1:]
+  if len(args) != 1:
+    print >>sys.stderr, usage
+    return 2
+
+  M=Monitor(args[0])
+  M.join()
+  return 0
 
 syslogFacilities={ 'kern':      syslog.LOG_KERN,
                    'user':      syslog.LOG_USER,
@@ -200,6 +210,5 @@ class Monitor(object):
               else:
                 assert False, "unhandled ACTION_TYPE \"%s\"" % test.ACTION_TYPE
 
-M=Monitor(args[0])
-M.join()
-sys.exit(0)
+if __name__ == '__main__':
+  sys.exit(main(sys.argv))
