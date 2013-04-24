@@ -1,4 +1,4 @@
-#!/usr/bin/env py25+
+#!/usr/bin/env py27+
 #
 # Monitor log files.
 #       - Cameron Simpson <cs@zip.com.au> 18jul2008
@@ -15,7 +15,7 @@ from thread import allocate_lock
 from threading import Thread
 import cs.wini
 from cs.tail import tail
-from cs.logutils import cmd
+from cs.logutils import cmd, setup_logging
 
 USAGE = "Usage: %s configuration-file"
 
@@ -24,6 +24,7 @@ def main(argv):
   argv = list(argv)
   cmd = os.path.basename(argv.pop(0))
   usage = USAGE % (cmd,)
+  setup_logging(cmd)
 
   ioLock=allocate_lock()
 
