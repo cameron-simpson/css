@@ -23,9 +23,8 @@ case "$prefix" in
     ;;
 esac
 
-safechars='/,=@:{}.a-zA-Z0-9_'
+safechars='/,=@:.a-zA-Z0-9_'
 
 winclause "$file" "$clause" \
-| sed -n "s/^ *\\([a-zA-Z][a-zA-Z0-9_]*\\) *= */${prefix}_\\1=/p" \
-| sed "s;';\\\\';g
-       s;[^$safechars][^$safechars]*;'&';g"
+| sed -n 's/^ *\([a-zA-Z][a-zA-Z0-9_]*\) *= */'"$prefix"'_\1=/p' \
+| sed "s;[^$safechars][^$safechars]*;'&';g"
