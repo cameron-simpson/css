@@ -10,6 +10,7 @@ import os
 import os.path
 import sys
 from threading import Thread
+from cs.csvutils import csv_reader
 from cs.fileutils import lockfile
 from cs.logutils import Pfx, error, warning, info, D
 from cs.threads import IterableQueue
@@ -27,17 +28,18 @@ def csv_rows(fp, skipHeaders=False, noHeaders=False):
   '''
   if isinstance(fp, (str, unicode)):
     with Pfx("csv_rows(%s)", fp):
-      with open(fp, "rb") as csvfp:
+      # was "rb"
+      with open(fp, "r") as csvfp:
         for row in csv_rows(csvfp,
                             skipHeaders=skipHeaders,
                             noHeaders=noHeaders):
           yield row
     return
   with Pfx("csvreader(%s)", fp):
-    r = csv.reader(fp)
+    r = csv_reader(fp, encoding='utf-8')
     rownum = 0
     if not noHeaders:
-      hdrrow = r.next()
+      hdrrow = next(r)
       rownum += 1
       with Pfx("row %d", rownum):
         if not skipHeaders:
@@ -52,11 +54,6 @@ def csv_rows(fp, skipHeaders=False, noHeaders=False):
       rownum += 1
       with Pfx("row %d", rownum):
         t, name, attr, value = row
-        try:
-          value = value.decode('utf-8')
-        except UnicodeDecodeError as e:
-          warning("%s, using errors=replace", e)
-          value = value.decode('utf-8', errors='replace')
         if t == "":
           if otype is None:
             raise ValueError("empty TYPE with no preceeding TYPE")
