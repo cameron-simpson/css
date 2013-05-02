@@ -223,5 +223,7 @@ class O(object):
         return False
     return True
 
+  __hash__ = object.__hash__
+
   def __ne__(self, other):
     return not (self == other)
