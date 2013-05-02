@@ -36,6 +36,14 @@ if sys.hexversion < 0x03000000:
           row[i] == value
       yield row
 
+  def csv_writerow(csvw, row, encoding='utf-8'):
+    ''' Write the supplied row as strings encoded with the supplied `encoding`,
+        default 'utf-8'.
+    '''
+    for i in range(len(row)):
+      row[i] = unicode(row[i]).encode(encoding)
+    csvw.writerow(row)
+
 else:
 
   def csv_reader(fp, encoding='utf-8', errors='replace'):
@@ -43,3 +51,6 @@ else:
         Yield the rows.
     '''
     return csv.reader(fp)
+
+  def csv_writerow(csvw, row, encoding='utf-8'):
+    return csvw.writerow(row)
