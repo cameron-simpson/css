@@ -40,9 +40,7 @@ if sys.hexversion < 0x03000000:
     ''' Write the supplied row as strings encoded with the supplied `encoding`,
         default 'utf-8'.
     '''
-    for i in range(len(row)):
-      row[i] = unicode(row[i]).encode(encoding)
-    csvw.writerow(row)
+    csvw.writerow([ unicode(value).encode(encoding) for value in row ])
 
 else:
 
