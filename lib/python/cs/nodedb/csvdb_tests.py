@@ -14,14 +14,16 @@ from .node_tests import TestAll as NodeTestAll
 class TestAll(NodeTestAll):
 
   def setUp(self):
-    dbpath = 'test.csv'
-    self.dbpath = dbpath
-    if os.path.exists(dbpath):
-      os.remove(dbpath)
+    self.dbpath = 'test.csv'
+    self.lockpath = self.dbpath + '.lock'
+    if os.path.exists(self.dbpath):
+      os.remove(self.dbpath)
+    if os.path.exists(self.lockpath):
+      os.remove(self.lockpath)
     # create empty csv file
-    with open(dbpath, "w") as fp:
+    with open(self.dbpath, "w") as fp:
       fp.write("TYPE,NAME,ATTR,VALUE\n")
-    self.backend = Backend_CSVFile(dbpath)
+    self.backend = Backend_CSVFile(self.dbpath)
     self.db = NodeDB(backend=self.backend)
 
   def test22persist(self):
@@ -37,6 +39,8 @@ class TestAll(NodeTestAll):
 
   def tearDown(self):
     self.db.close()
+    if os.path.exists(self.lockpath):
+      os.remove(self.lockpath)
 
 def selftest(argv):
   unittest.main(__name__, None, argv)
