@@ -142,7 +142,7 @@ def O_attrs(o):
     if attr[0].isalpha() and not attr in omit:
       try:
         value = getattr(o, attr)
-      except AttributeError, e:
+      except AttributeError:
         continue
       if not callable(value):
         yield attr
@@ -151,7 +151,7 @@ def O_attritems(o):
   for attr in O_attrs(o):
     try:
       value = getattr(o, attr)
-    except AttributeError, e:
+    except AttributeError:
       continue
     else:
       yield attr, value
