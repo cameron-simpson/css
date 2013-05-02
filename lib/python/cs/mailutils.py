@@ -183,7 +183,7 @@ class Maildir(mailbox.Maildir):
 
   def remove_folder(self, folder):
     F = self.get_folder(folder)
-    for key in F.iterkeys():
+    for key in F.keys():
       raise mailbox.NotEmptyError("not an empty Maildir")
     folderpath = os.path.join(self.dir, folder)
     for subdir in 'tmp', 'new', 'cur':
@@ -324,7 +324,7 @@ class Maildir(mailbox.Maildir):
     return message
 
   def popitem(self):
-    for key in self.iterkeys():
+    for key in self.keys():
       return self.pop(key)
     raise KeyError("empty Maildir")
 

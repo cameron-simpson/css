@@ -18,7 +18,8 @@ class TestAll(NodeTestAll):
     self.dbpath = dbpath
     if os.path.exists(dbpath):
       os.remove(dbpath)
-    with open(dbpath, "wb") as fp:
+    # create empty csv file
+    with open(dbpath, "w") as fp:
       fp.write("TYPE,NAME,ATTR,VALUE\n")
     self.backend = Backend_CSVFile(dbpath)
     self.db = NodeDB(backend=self.backend)
