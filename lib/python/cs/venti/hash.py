@@ -71,7 +71,7 @@ class Hash_SHA1(bytes):
     '''
     hashenum = encdata[offset]
     if hashenum != cls.HASHENUM:
-      raise ValueError("unexpected hashenum; expected 0x%02x, found 0x%02x"
+      raise ValueError("unexpected hashenum; expected 0x%02x, found %r"
                        % (cls.HASHENUM, hashenum))
     offset += 1
     hashdata = encdata[offset:offset+cls.HASHLEN]
