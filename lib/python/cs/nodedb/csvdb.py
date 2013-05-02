@@ -10,11 +10,11 @@ import os
 import os.path
 import sys
 from threading import Thread
-from cs.csvutils import csv_reader
+from cs.csvutils import csv_reader, csv_writerow
 from cs.fileutils import lockfile
 from cs.logutils import Pfx, error, warning, info, D
 from cs.threads import IterableQueue
-from cs.py3 import unicode as u, StringTypes, Queue_Full as Full, Queue_Empty as Empty
+from cs.py3 import StringTypes, Queue_Full as Full, Queue_Empty as Empty
 from . import NodeDB
 from .backend import Backend
 
@@ -26,7 +26,7 @@ def csv_rows(fp, skipHeaders=False, noHeaders=False):
       `skipHeaders` disables validation of the column header row if true.
       `noHeaders` indicates there is no column header row if true.
   '''
-  if isinstance(fp, (str, unicode)):
+  if isinstance(fp, StringTypes):
     with Pfx("csv_rows(%s)", fp):
       # was "rb"
       with open(fp, "r") as csvfp:
@@ -123,7 +123,7 @@ def write_csv_file(fp, nodedata, noHeaders=False):
 
   csvw = csv.writer(fp)
   if not noHeaders:
-    csvw.writerow( ('TYPE', 'NAME', 'ATTR', 'VALUE') )
+    csv_writerow( csvw, ('TYPE', 'NAME', 'ATTR', 'VALUE') )
   otype = None
   for t, name, attrmap in nodedata:
     attrs = sorted(attrmap.keys())
@@ -135,24 +135,10 @@ def write_csv_file(fp, nodedata, noHeaders=False):
           wt = t
         else:
           # same type
-          wt = u('')
-        write_csvrow(csvw, wt, name, attr, valuetext)
-        attr = u('')
-        name = u('')
-
-def write_csvrow(csvw, t, name, attr, valuetext):
-  ''' Encode and write a CSV row.
-      Note that `valuetext` is a preserialised value as computed by
-      NodeDB.totext(value).
-  '''
-  # hideous workaround for CSV C module forcing ASCII text :-(
-  # compute flat 8-bit encodings for supplied strings
-  wt8 = t.encode('utf-8')
-  name8 = name.encode('utf-8')
-  attr8 = attr.encode('utf-8')
-  uvalue = valuetext if isinstance(valuetext, unicode) else unicode(valuetext, 'iso8859-1')
-  value8 = uvalue.encode('utf-8')
-  csvw.writerow( (wt8, name8, attr8, value8) )
+          wt = ''
+        csv_writerow(csvw, (wt, name, attr, valuetext))
+        attr = ''
+        name = ''
 
 class Backend_CSVFile(Backend):
 
@@ -211,7 +197,7 @@ class Backend_CSVFile(Backend):
     # CSV DB Nodes only have attributes
     t = N.type
     name = N.name
-    for k, v in N.iteritems():
+    for k, v in N.items():
       self.setAttr(t, name, k, v)
 
   def delAttr(self, t, name, attr):
@@ -231,13 +217,13 @@ class Backend_CSVFile(Backend):
       with lockfile(self.csvpath):
         with open(self.csvpath, "ab") as fp:
           csvw = csv.writer(fp)
-          write_csvrow(csvw, t, name, attr, self.nodedb.totext(value))
+          csv_writerow(csvw, (t, name, attr, self.nodedb.totext(value)))
           while True:
             try:
               t, name, attr, value = Q.get(True, 0.1)
             except Empty:
               break
-            write_csvrow(csvw, t, name, attr, self.nodedb.totext(value))
+            csv_writerow(csvw, (t, name, attr, self.nodedb.totext(value)))
 
 if __name__ == '__main__':
   import cs.nodedb.csvdb_tests
