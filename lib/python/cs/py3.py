@@ -6,7 +6,7 @@
 
 import sys
 
-if  sys.hexversion < 0x03000000:
+if sys.hexversion < 0x03000000:
   globals()['unicode'] = unicode
   from types import StringTypes
   try:
