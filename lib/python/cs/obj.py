@@ -3,6 +3,8 @@
 # Random stuff for "objects". - Cameron Simpson <cs@zip.com.au>
 #
 
+from cs.py3 import StringTypes
+
 class slist(list):
   ''' A list with a shorter str().
   '''
@@ -160,7 +162,7 @@ def O_str(o, no_recurse=False, seen=None):
   if seen is None:
     seen = set()
   t = type(o)
-  if t in (str, unicode):
+  if t in StringTypes:
     return repr(o)
   if t in (tuple,int,float,bool,list):
     return str(o)
