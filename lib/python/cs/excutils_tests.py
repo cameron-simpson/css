@@ -12,7 +12,7 @@ class TestExcUtils(unittest.TestCase):
 
   def test_return_exc_info(self):
     def divfunc(a, b):
-      return a/b
+      return a // b
     retval, exc_info = return_exc_info(divfunc, 4, 2)
     self.assertEqual(retval, 2)
     self.assertTrue(exc_info is None)
@@ -23,7 +23,7 @@ class TestExcUtils(unittest.TestCase):
   def test_returns_exc_info(self):
     @returns_exc_info
     def divfunc(a, b):
-      return a/b
+      return a // b
     retval, exc_info = divfunc(4, 2)
     self.assertEqual(retval, 2)
     self.assertTrue(exc_info is None)
