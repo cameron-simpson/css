@@ -105,7 +105,7 @@ class Test(unittest.TestCase):
         self.assertTrue(compare(T1.name, T2.name), "mismatched data in %s and %s" % (T1.name, T2.name))
 
   def test_rewrite(self):
-    from StringIO import StringIO
+    from cs.py3 import StringIO
     olddata = "old data\n"
     newdata = "new data\n"
     with NamedTemporaryFile(mode='w') as T1:
