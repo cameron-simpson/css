@@ -94,10 +94,10 @@ class Test(unittest.TestCase):
 
   def test_compare(self):
     data = "here are some data\n"
-    with NamedTemporaryFile() as T1:
+    with NamedTemporaryFile(mode='w') as T1:
       T1.write(data)
       T1.flush()
-      with NamedTemporaryFile() as T2:
+      with NamedTemporaryFile(mode='w') as T2:
         T2.write(data)
         T2.flush()
         self.assertEqual( open(T1.name).read(), data, "bad data in %s" % (T1.name,) )
@@ -108,11 +108,11 @@ class Test(unittest.TestCase):
     from StringIO import StringIO
     olddata = "old data\n"
     newdata = "new data\n"
-    with NamedTemporaryFile() as T1:
+    with NamedTemporaryFile(mode='w') as T1:
       T1.write(olddata)
       T1.flush()
       self.assertEqual( open(T1.name).read(), olddata, "bad old data in %s" % (T1.name,) )
-      rewrite(T1.name, StringIO(newdata))
+      rewrite(T1.name, StringIO(newdata), mode='w')
       self.assertEqual( open(T1.name).read(), newdata, "bad new data in %s" % (T1.name,) )
 
   def test_lockfile_00_basic(self):
