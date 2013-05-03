@@ -6,10 +6,12 @@
 
 set -ue
 
-: ${ZAP_CACHESIZE:=10240}
 : ${VARRUN:=$HOME/var/run}
 : ${VARLOG:=$HOME/var/log}
 : ${TMPDIR:=/tmp}
+: ${ZAP_CACHESIZE:=10240}
+: ${ZAP_LOGFILE:=$VARLOG/adzapper/redirect.log}
+export ZAP_LOGFILE
 
 dflt_listen=localhost:3128
 
