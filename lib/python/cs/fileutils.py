@@ -57,6 +57,7 @@ def compare(f1, f2, mode="rb"):
   return f1.read() == f2.read()
 
 def rewrite(filepath, data,
+            mode='w',
             backup_ext=None,
             do_rename=False,
             do_diff=None,
@@ -74,7 +75,7 @@ def rewrite(filepath, data,
       `filepath` after copying the permission bits.
       Otherwise (default), copy the tempfile to `filepath`.
   '''
-  with NamedTemporaryFile() as T:
+  with NamedTemporaryFile(mode=mode) as T:
     T.write(data.read())
     T.flush()
     if not empty_ok:
