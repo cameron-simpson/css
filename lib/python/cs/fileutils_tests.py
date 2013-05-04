@@ -56,11 +56,13 @@ class TestFilesProperty(object):
   def write2(self, data):
     with open(self._test2_paths[0], "w") as fp:
       fp.write(data)
+
   ##@files_property
   ##def test1(self, path0):
   ##  with open(path0) as fp:
   ##    data = fp.read()
   ##  return (path0,), data
+
   @make_files_property(poll_rate=0.3)
   def test2(self, paths):
     with open(paths[0]) as fp:
