@@ -387,7 +387,7 @@ def make_files_property(attr_name=None, unset_object=None, poll_rate=1):
               if new_value is unset_object:
                 raise
               import cs.logutils
-              cs.logutils.exception("exception reloading .%s, keeping cached value", attr_value)
+              cs.logutils.debug("exception reloading .%s, keeping cached value: %s", attr_value, e)
             else:
               # examine new filestates in case they changed during load
               # _if_ we knew about them from the earlier load
