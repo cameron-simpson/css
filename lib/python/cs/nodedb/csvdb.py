@@ -117,7 +117,7 @@ def write_csv_file(fp, nodedata, noHeaders=False):
   if type(fp) is str:
     with Pfx("write_csv_file(%s)", fp):
       ##with io.open(fp, 'w', io.DEFAULT_BUFFER_SIZE, 'utf-8') as csvfp:
-      with open(fp, 'wb') as csvfp:
+      with open(fp, 'w') as csvfp:
         write_csv_file(csvfp, nodedata, noHeaders=noHeaders)
     return
 
@@ -215,7 +215,7 @@ class Backend_CSVFile(Backend):
     '''
     for t, name, attr, value in Q:
       with lockfile(self.csvpath):
-        with open(self.csvpath, "ab") as fp:
+        with open(self.csvpath, "a") as fp:
           csvw = csv.writer(fp)
           csv_writerow(csvw, (t, name, attr, self.nodedb.totext(value)))
           while True:
