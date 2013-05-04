@@ -9,6 +9,7 @@ import sys
 if sys.hexversion < 0x03000000:
   globals()['unicode'] = unicode
   from types import StringTypes
+  from ConfigParser import ConfigParser
   try:
     from cStringIO import StringIO as BytesIO
   except ImportError:
@@ -26,6 +27,7 @@ else:
 
   unicode = str
   StringTypes = (str,)
+  from configparser import SafeConfigParser as ConfigParser
   from io import BytesIO, StringIO
   from queue import Queue, PriorityQueue, Full as Queue_Full, Empty as Queue_Empty
   def iteritems(o):
