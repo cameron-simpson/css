@@ -60,7 +60,7 @@ def sleep(delay):
     elapsed = time.time() - t0
     if elapsed < delay:
       from cs.logutils import warning
-      warning("time.sleep(%ss) took only %ss", delay, elapsed)
+      debug("time.sleep(%ss) took only %ss", delay, elapsed)
     t0 = time.time()
 
 if __name__ == '__main__':
