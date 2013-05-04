@@ -9,13 +9,13 @@ import sys
 if sys.hexversion < 0x03000000:
   globals()['unicode'] = unicode
   from types import StringTypes
-  from ConfigParser import ConfigParser
   try:
     from cStringIO import StringIO as BytesIO
   except ImportError:
     from StringIO import StringIO as BytesIO
   StringIO = BytesIO    # horribly wrong, I know
   from Queue import Queue, PriorityQueue, Full as Queue_Full, Empty as Queue_Empty
+  from ConfigParser import SafeConfigParser as ConfigParser
   def iteritems(o):
     return o.iteritems()
   def iterkeys(o):
@@ -27,9 +27,9 @@ else:
 
   unicode = str
   StringTypes = (str,)
-  from configparser import SafeConfigParser as ConfigParser
   from io import BytesIO, StringIO
   from queue import Queue, PriorityQueue, Full as Queue_Full, Empty as Queue_Empty
+  from configparser import ConfigParser
   def iteritems(o):
     return o.items()
   def iterkeys(o):
