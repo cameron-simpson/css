@@ -292,17 +292,16 @@ def get_nonwhite(s, offset=0):
   return get_other_chars(s, string.whitespace, offset=offset)
 
 def get_identifier(s, offset=0):
-  ''' Scan the string `s` for an identifier (letter or underscore followed by
+  ''' Scan the string `s` for an identifier (ASCII letter or underscore followed by
       letters, digits or underscores) starting at `offset` (default 0).
       Return (match, new_offset).
       The empty string and an unchanged offset will be returned if
       there is no leading letter/underscore.
   '''
   ch = s[offset]
-  if ch != '_' and not ch.isalpha():
+  if ch != '_' and ch not in string.ascii_letters:
     return '', offset
-  # NB: compute letters+digits now in case locale gets changed at runtime
-  idtail, offset = get_chars(s, string.letters + string.digits + '_', offset+1)
+  idtail, offset = get_chars(s, string.ascii_letters + string.digits + '_', offset+1)
   return ch + idtail, offset
 
 def get_other_chars(s, stopchars, offset=0):

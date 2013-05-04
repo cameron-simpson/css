@@ -31,7 +31,7 @@ from cs.mailutils import Maildir, message_addresses, shortpath, ismaildir, make_
 from cs.obj import O, slist
 from cs.threads import locked_property
 from cs.app.maildb import MailDB
-from cs.py3 import unicode as u
+from cs.py3 import unicode as u, StringTypes
 
 DEFAULT_MAILDIR_RULES = '$HOME/.mailfiler/{maildir.basename}'
 
@@ -347,7 +347,7 @@ re_HEADERFUNCTION = re.compile(r'([a-z][\-a-z0-9]*(,[a-z][\-a-z0-9]*)*)\.([a-z][
 def parserules(fp):
   ''' Read rules from `fp`, yield Rules.
   '''
-  if isinstance(fp, (str, unicode)):
+  if isinstance(fp, StringTypes):
     with open(fp) as rfp:
       for R in parserules(rfp):
         yield R

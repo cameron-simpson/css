@@ -7,10 +7,7 @@
 import os
 import os.path
 import sys
-if sys.hexversion < 0x03000000:
-  import ConfigParser as configparser
-else:
-  import configparser
+from cs.py3 import ConfigParser
 from threading import Lock
 from cs.fileutils import file_property
 from cs.threads import locked_property
@@ -18,11 +15,12 @@ from cs.logutils import Pfx, info, D
 
 def load_config(config_path, parser=None):
   ''' Load a configuration from the named `config_path`.
-      If `parser` is missing or None, use configparser.SafeConfigParser.
+      If `parser` is missing or None, use SafeConfigParser (just
+      ConfigParser in Python 3).
       Return the parser.
   '''
   if parser is None:
-    parser = configparser.SafeConfigParser
+    parser = ConfigParser
   CP = parser()
   with open(config_path) as fp:
     CP.readfp(fp) 

@@ -57,6 +57,7 @@ def compare(f1, f2, mode="rb"):
   return f1.read() == f2.read()
 
 def rewrite(filepath, data,
+            mode='w',
             backup_ext=None,
             do_rename=False,
             do_diff=None,
@@ -74,7 +75,7 @@ def rewrite(filepath, data,
       `filepath` after copying the permission bits.
       Otherwise (default), copy the tempfile to `filepath`.
   '''
-  with NamedTemporaryFile() as T:
+  with NamedTemporaryFile(mode=mode) as T:
     T.write(data.read())
     T.flush()
     if not empty_ok:
@@ -386,7 +387,7 @@ def make_files_property(attr_name=None, unset_object=None, poll_rate=1):
               if new_value is unset_object:
                 raise
               import cs.logutils
-              cs.logutils.exception("exception reloading .%s, keeping cached value", attr_value)
+              cs.logutils.debug("exception reloading .%s, keeping cached value: %s", attr_value, e)
             else:
               # examine new filestates in case they changed during load
               # _if_ we knew about them from the earlier load

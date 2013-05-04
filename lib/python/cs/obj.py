@@ -3,6 +3,8 @@
 # Random stuff for "objects". - Cameron Simpson <cs@zip.com.au>
 #
 
+from cs.py3 import StringTypes
+
 class slist(list):
   ''' A list with a shorter str().
   '''
@@ -142,7 +144,7 @@ def O_attrs(o):
     if attr[0].isalpha() and not attr in omit:
       try:
         value = getattr(o, attr)
-      except AttributeError, e:
+      except AttributeError:
         continue
       if not callable(value):
         yield attr
@@ -151,7 +153,7 @@ def O_attritems(o):
   for attr in O_attrs(o):
     try:
       value = getattr(o, attr)
-    except AttributeError, e:
+    except AttributeError:
       continue
     else:
       yield attr, value
@@ -160,7 +162,7 @@ def O_str(o, no_recurse=False, seen=None):
   if seen is None:
     seen = set()
   t = type(o)
-  if t in (str, unicode):
+  if t in StringTypes:
     return repr(o)
   if t in (tuple,int,float,bool,list):
     return str(o)
@@ -222,6 +224,8 @@ class O(object):
       if getattr(self, attr) != getattr(other, attr):
         return False
     return True
+
+  __hash__ = object.__hash__
 
   def __ne__(self, other):
     return not (self == other)
