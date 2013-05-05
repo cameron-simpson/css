@@ -68,11 +68,11 @@ class Meta(dict):
     self['a'] = ','.join(acl)
 
   def update_from_stat(self, st):
+    ''' Apply the contents of a stat object to this Meta.
+    '''
     self.mtime = st.st_mtime
     user = getpwuid(st.st_uid)[0]
     group = getgrgid(st.st_gid)[0]
-    uid = st.st_uid
-    gid = st.st_gid
     self.acl = ( "u:"+user+":"+permbits_to_acl( (st.st_mode>>6)&7 ),
                  "g:"+group+":"+permbits_to_acl( (st.st_mode>>3)&7 ),
                  "*:"+permbits_to_acl( (st.st_mode)&7 ),
