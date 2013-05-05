@@ -2,6 +2,7 @@
 
 from __future__ import print_function
 from collections import namedtuple
+from os import geteuid, getegid
 from pwd import getpwuid, getpwnam
 from grp import getgrgid, getgrnam
 from cs.logutils import error
@@ -150,8 +151,20 @@ class Meta(dict):
     ''' Return a stat object.
     '''
     user, group, st_mode = self.unixPerms()
-    st_uid = getpwnam(user).pw_uid
-    st_gid = getgrnam(group).gr_gid
+    if user is None:
+      st_uid = os.geteuid()
+    else:
+      try:
+        st_uid = getpwnam(user).pw_uid
+      except KeyError:
+        st_uid = os.geteuid()
+    if group is None:
+      st_gid = getegid()
+    else:
+      try:
+        st_gid = getgrnam(group).gr_gid
+      except KeyError:
+        st_gid = getegid()
     st_ino = None
     st_dev = None
     st_nlink = 1
