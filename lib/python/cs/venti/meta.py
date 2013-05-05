@@ -73,6 +73,10 @@ class Meta(dict):
     self.mtime = st.st_mtime
     user = getpwuid(st.st_uid)[0]
     group = getgrgid(st.st_gid)[0]
+    if ':' in user:
+      raise ValueError("invalid username for uid %d, colon forbidden: %s" % (st.st_uid, user))
+    if ':' in group:
+      raise ValueError("invalid groupname for gid %d, colon forbidden: %s" % (st.st_gid, group))
     self.acl = ( "u:"+user+":"+permbits_to_acl( (st.st_mode>>6)&7 ),
                  "g:"+group+":"+permbits_to_acl( (st.st_mode>>3)&7 ),
                  "*:"+permbits_to_acl( (st.st_mode)&7 ),
