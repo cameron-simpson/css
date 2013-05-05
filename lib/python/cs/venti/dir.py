@@ -312,7 +312,7 @@ def resolve(path, domkdir=False):
   ''' Take a path composed of a Dirent text representation with an optional
       "/sub/path/..." suffix.
       Decode the Dirent path and walk down the remaining path, except for the
-      last component. Return the final Dirent and the last path componenet,
+      last component. Return the final Dirent and the last path component,
       or None if there was no final path component.
   '''
   slashpos = path.find('/')
