@@ -1,9 +1,12 @@
 #!/usr/bin/python
 
 from __future__ import print_function
-from pwd import getpwuid
-from grp import getgrgid
+from collections import namedtuple
+from pwd import getpwuid, getpwnam
+from grp import getgrgid, getgrnam
 from cs.logutils import error
+
+Stat = namedtuple('Stat', 'st_mode st_ino st_dev st_nlink st_uid st_gid st_size st_atime st_mtime st_ctime')
 
 def permbits_to_acl(bits):
   ''' Take a UNIX 3-bit permission value and return the ACL add-sub string.
@@ -63,7 +66,7 @@ class Meta(dict):
   def acl(self, acl):
     self['a'] = ','.join(acl)
 
-  def updateFromStat(self, st):
+  def update_from_stat(self, st):
     self.mtime = st.st_mtime
     user = getpwuid(st.st_uid)[0]
     group = getgrgid(st.st_gid)[0]
@@ -143,6 +146,28 @@ class Meta(dict):
             elif s == 't': operms &= ~512
     return (user, group, (uperms<<6)+(gperms<<3)+operms)
 
+  def stat(self):
+    ''' Return a stat object.
+    '''
+    user, group, st_mode = self.unixPerms()
+    st_uid = getpwnam(user).pw_uid
+    st_gid = getgrnam(group).gr_gid
+    st_ino = None
+    st_dev = None
+    st_nlink = 1
+    st_size = None
+    st_atime = 0
+    st_mtime = 0
+    st_ctime = 0
+    return Stat(st_mode, st_ino, st_dev, st_nlink, st_uid, st_gid, st_size, st_atime, st_mtime, st_ctime)
+
+def MetaFromStat(st):
+  M = Meta()
+  M.update_from_stat(st)
+  return M
+
 if __name__ == '__main__':
   import os
-  print(MetaFromStat(os.stat(__file__)))
+  M = MetaFromStat(os.stat(__file__))
+  print(M)
+  print(M.stat())
