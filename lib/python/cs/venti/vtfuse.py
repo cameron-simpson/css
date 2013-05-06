@@ -10,18 +10,13 @@ from errno import ENOSYS
 import sys
 import os
 from cs.logutils import D
+from cs.obj import O
 
-def fusemount(mnt, D, S):
+def mount(mnt, D, S):
   ''' Run a FUSE filesystem with Dirent and backing Store.
   '''
-  FS = FuseStore(mnt, D, E)
-  D("calling FS.main...")
-  FS.main()
-
-# Horrible hack because the Fuse class doesn't seem to tell fuse file
-# objects which class instantiation they belong to.
-# I guess There Can Be Only One.
-mainFuseStore = None
+  FS = StoreFS(D, E)
+  FS.mount(mnt)
 
 class StoreFS(LoggingMixIn, Operations, O):
   ''' Class providing filesystem operations, suitable for passing
@@ -49,6 +44,8 @@ class StoreFS(LoggingMixIn, Operations, O):
     return self.D.resolve(path)
 
   def resolve2(self, path):
+    ''' Resolve path to Dirent.
+    '''
     D, basename = self.resolve(path)
     return D[basename]
 
@@ -112,9 +109,6 @@ class StoreFS(LoggingMixIn, Operations, O):
 
   class __File(object):
     def __init__(self, path, flags, *mode):
-      global mainFuseStore
-      assert mainFuseStore is not None
-      self.__Fuse = mainFuseStore
       print("new __File: path =", path, "flags =", repr(flags), "mode =", repr(mode))
       self.file = os.fdopen(os.open("." + path, flags, *mode),
                             flag2mode(flags))
