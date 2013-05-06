@@ -116,7 +116,7 @@ def main(argv):
     elif opt == '-S':
       dflt_vt_store = val
     else:
-      assert False, "unsupported option: %s" % (opt,)
+      raise RuntimeError("unhandled option: %s" % (opt,))
 
   # =back
   #
@@ -215,7 +215,9 @@ def main(argv):
     sys.stderr.write(usage)
     return 2
 
-  assert xit is not None, "exit code not set by operation"
+  if not isinstance(xit, int):
+    raise RuntimeError("exit code not set by operation: %r" % (xit,))
+
   return xit
 
 # =head1 COMMANDS
@@ -541,8 +543,9 @@ def ls(path, D, recurse, fp=None):
     files.sort()
     for name in files:
       E = D[name]
+      if E.isdir:
+        warning("%s: expected file, found directory", name)
       lsDirent(fp, E, name)
-      assert not E.isdir(), name+" should not be a directory!"
     for name in dirs:
       ls(os.path.join(path, name), D.chdir1(name), recurse, fp)
 
