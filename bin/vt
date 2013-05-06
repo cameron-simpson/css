@@ -436,7 +436,7 @@ def cmd_mount(args):
     error("%s: dirref - expected directory, not file", dirref)
     return 1
   import cs.venti.vtfuse
-  cs.venti.vtfuse.fusemount(args[1], S, E)
+  cs.venti.vtfuse.mount(args[1], E, S)
   return 0
 
 # =item B<pull> I<stores...>
