@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env py30+
 #
 # Command script for venti-ish implementation.
 #       - Cameron Simpson <cs@zip.com.au> 01may2007
@@ -427,7 +427,7 @@ def cmd_mount(args):
   if len(args) != 2:
     raise GetoptError("expected dirref and mountpoint")
   dirref, mountpoint = args
-  print "mount", args[0], args[1], "..."
+  print("mount", args[0], args[1], "...")
   if not os.path.isdir(mountpoint):
     error("%s: mountpoint is not a directory", mountpoint)
     return 1
@@ -467,7 +467,7 @@ def cmd_scan(args):
   with Pfx(datafile):
     dfp = DataFile(datafile)
     for offset, flags, data in dfp.scanData():
-      print Hash_SHA1.fromData(data), offset, flags, len(data)
+      print(Hash_SHA1.fromData(data), offset, flags, len(data))
     dfp.close()
   return 0
 
@@ -492,7 +492,7 @@ def cmd_unpack(args):
       for subD, _, files in D.walk(topdown=True):
         with subD:
           if len(subD.path) > 0 and not os.path.isdir(subD.path):
-            print "mkdir", subD.path
+            print("mkdir", subD.path)
             os.makedirs(subD.path)
           files.sort()
           for fname in files:
@@ -511,12 +511,12 @@ def cmd_unpack(args):
 def lsDirent(fp, E, name):
   B = E.getBlock()
   st = E.stat()
-  ##print "st=%s" % (st,)
+  ##print("st=%s" % (st,))
   st_mode, st_ino, st_dev, st_nlink, st_uid, st_gid, st_size, \
     st_atime, st_mtime, st_ctime = st
-  ##print "st_mtime=%s" % `st_mtime`
-  ##print "st_size=%s" % `st_size`
-  ##print "name=%s" % `name`
+  ##print("st_mtime=%s" % `st_mtime`)
+  ##print("st_size=%s" % `st_size`)
+  ##print("name=%s" % `name`)
   t = datetime.datetime.fromtimestamp(int(st_mtime))
   fp.write("%c %-41s %s %-6d %s\n" \
            % (('d' if E.isdir() else 'f'),
