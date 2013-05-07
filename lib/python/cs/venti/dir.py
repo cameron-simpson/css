@@ -21,17 +21,6 @@ gid_nogroup = -1
 
 # Directories (Dir, a subclass of dict) and directory entries (Dirent).
 
-def storeDir(path, aspath=None, trust_size_mtime=False, verbosefp=None):
-  ''' Store a real directory into a Store, return the new Dir.
-  '''
-  if aspath is None:
-    aspath = path
-  D = Dir(aspath)
-  ok = D.updateFrom(path, trust_size_mtime=trust_size_mtime, verbosefp=verbosefp)
-  if ok:
-    ok = D.tryUpdateStat(path)
-  return D, ok
-
 D_FILE_T = 0
 D_DIR_T = 1
 def D_type2str(type_):
@@ -83,15 +72,6 @@ class Dirent(object):
 
   def updateFromStat(self, st):
     self.meta.updateFromStat(st)
-
-  def tryUpdateStat(self, statpath):
-    try:
-      st = os.stat(statpath)
-    except OSError as e:
-      error("stat(%s): %s", statpath, e)
-      return False
-    self.updateFromStat(st)
-    return True
 
   def encode(self, noname=False):
     ''' Serialise the dirent.
@@ -308,31 +288,6 @@ def decodeDirent(s, justone=False):
     return E
   return E, s
 
-def resolve(path, domkdir=False):
-  ''' Take a path composed of a Dirent text representation with an optional
-      "/sub/path/..." suffix.
-      Decode the Dirent path and walk down the remaining path, except for the
-      last component. Return the final Dirent and the last path component,
-      or None if there was no final path component.
-  '''
-  slashpos = path.find('/')
-  if slashpos < 0:
-    D = decodeDirent(fromtext(path), justone=True)
-    subpath = []
-  else:
-    Dtext, subpath = path.split('/', 1)
-    D = decodeDirent(fromtext(Dtext), justone=True)
-    subpath = [s for s in subpath.split('/') if len(s) > 0]
-  if len(subpath) == 0:
-    return D, None
-  while len(subpath) > 1:
-    s = subpath.pop(0)
-    if domkdir:
-      D = D.mkdir(s)
-    else:
-      D = D.chdir1(s)
-  return D, subpath[0]
-
 class Dir(Dirent):
   ''' A directory.
   '''
@@ -510,80 +465,6 @@ class Dir(Dirent):
           raise ValueError("%s[name=%s] is not a directory" % (D, name))
       D = E
     return D
-
-  def updateFrom(self,
-                 osdir,
-                 trust_size_mtime=False,
-                 keep_missing=False,
-                 ignore_existing=False,
-                 verbosefp=None):
-    ''' Update this Dir from the real file tree at `osdir`.
-        Return True if no errors occurred.
-    '''
-    with Pfx("updateFrom(%s,...)", osdir):
-      if verbosefp:
-        print >>verbosefp, osdir+'/'
-      if not os.path.isdir(osdir):
-        raise ValueError("not a directory: %s" % (osdir,))
-      ok = self.tryUpdateStat(osdir)
-      osdirpfx = os.path.join(osdir, '')
-      for dirpath, dirnames, filenames in os.walk(osdir, topdown=False):
-        with Pfx(dirpath):
-          if dirpath == osdir:
-            D = self
-          else:
-            if not dirpath.startswith(osdirpfx):
-              raise ValueError("dirpath=%s, osdirpfx=%s" % (dirpath, osdirpfx))
-            subdirpath = dirpath[len(osdirpfx):]
-            D = self.makedirs(subdirpath)
-
-          if not keep_missing:
-            allnames = set(dirnames)
-            allnames.update(filenames)
-            Dnames = list(D.keys())
-            for name in Dnames:
-              if name not in allnames:
-                info("delete %s", name)
-                if verbosefp:
-                  print >>verbosefp, "delete", os.path.join(dirpath, name)
-                del D[name]
-
-          for dirname in sorted(dirnames):
-            subdirpath = os.path.join(dirpath, dirname)
-            if verbosefp:
-              print >>verbosefp, subdirpath+'/'
-            if dirname not in D:
-              E = D.mkdir(dirname)
-            else:
-              E = D[dirname]
-              if not E.isdir:
-                # old name is not a dir - toss it and make a dir
-                del D[dirname]
-                E = D.mkdir(dirname)
-            if not E.tryUpdateStat(subdirpath):
-              ok = False
-
-          for filename in sorted(filenames):
-            with Pfx(filename):
-              filepath = os.path.join(dirpath, filename)
-              if verbosefp:
-                print >>verbosefp, filepath
-              if not os.path.isfile(filepath):
-                warning("not a regular file, skipping")
-                continue
-
-              try:
-                E = D.storeFilename(filepath, filename,
-                                trust_size_mtime=trust_size_mtime,
-                                ignore_existing=ignore_existing)
-              except OSError as e:
-                error("%s", e)
-                ok = False
-              except IOError as e:
-                error("%s", e)
-                ok = False
-
-    return ok
 
   def storeFilename(self, filepath, filename,
                 trust_size_mtime=False, ignore_existing=False):
