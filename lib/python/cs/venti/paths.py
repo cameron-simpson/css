@@ -5,7 +5,7 @@
 #
 
 import os
-from cs.logutils import D, info
+from cs.logutils import D, info, warning
 
 def resolve(rootD, subpath, do_mkdir=False):
   ''' Descend from the Dir `rootD` via the path `subpath`.
