@@ -9,6 +9,12 @@ import sys
 if sys.hexversion < 0x03000000:
   globals()['unicode'] = unicode
   from types import StringTypes
+  def ustr(s, e='utf-8'):
+    ''' Upgrade str to unicode, if it is a str. Leave other types alone.
+    '''
+    if isinstance(s, str):
+      s = unicode(s, e)
+    return s
   try:
     from cStringIO import StringIO as BytesIO
   except ImportError:
@@ -27,6 +33,8 @@ else:
 
   unicode = str
   StringTypes = (str,)
+  def ustr(s, e='utf-8'):
+    return s
   from io import BytesIO, StringIO
   from queue import Queue, PriorityQueue, Full as Queue_Full, Empty as Queue_Empty
   from configparser import ConfigParser
