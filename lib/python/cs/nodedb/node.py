@@ -1033,7 +1033,7 @@ class NodeDB(dict, O):
     return cs.nodedb.text.totoken(value)
 
   def totext(self, value):
-    ''' Convert a value for external string storage.
+    ''' Convert a value for external Unicode string storage.
           text        The string "text" for strings not commencing with a colon.
           ::text      The string ":text" for strings commencing with a colon.
           :TYPE:name  Node of specified name and TYPE in local NodeDB.
@@ -1047,25 +1047,26 @@ class NodeDB(dict, O):
       if value.nodedb is self:
         # Node from local NodeDB
         assert value.type[0].isupper(), "non-UPPER type: %s" % (value.type,)
-        return ":%s:%s" % (value.type, value.name)
+        return u':%s:%s' % (value.type, value.name)
       odb, seqnum = self.nodedb.otherDB(value.nodedb.url)
-      return ":+%d:%s:%s" % (seqnum, value.type, value.name)
-    t = type(value)
-    if t in StringTypes:
+      return u':+%d:%s:%s' % (seqnum, value.type, value.name)
+    if isinstance(value, StringTypes):
+      # Python 2 upcode
+      if not isinstance(value, unicode):
+        value = unicode(value, 'iso8859-1')
       if value.startswith(':'):
-        return ':'+value
+        return u':'+value
       return value
+    t = type(value)
     if t is int:
-      s = str(value)
-      assert s[0].isdigit()
-      return ':' + s
+      return u':%d' % (value,)
     R = self.__attr_type_registry.get(t, None)
     if R:
       scheme = R.scheme
       assert scheme[0].islower() and scheme.find(':',1) < 0, \
              "illegal scheme name: \"%s\"" % (scheme,)
-      return ':'+scheme+':'+R.totext(value)
-    raise ValueError("can't totext( <%s> %s )" % (type(value),value))
+      return u':%s:%s' % (scheme, R.totext(value))
+    raise ValueError("can't totext( <%s> %r )" % (type(value), value))
 
   def fromtext(self, text, doCreate=True):
     ''' Convert a stored string into a value.
