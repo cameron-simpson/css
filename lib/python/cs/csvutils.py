@@ -33,7 +33,7 @@ if sys.hexversion < 0x03000000:
           except UnicodeDecodeError as e:
             warning("%s, using errors=%s", e, errors)
             value = value.decode('utf-8', errors=errors)
-          row[i] == value
+          row[i] = value
       yield row
 
   def csv_writerow(csvw, row, encoding='utf-8'):
