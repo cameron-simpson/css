@@ -457,10 +457,10 @@ def lockfile(path, ext='.lock', poll_interval=0.1, timeout=None):
         continue
       raise
     else:
+      os.close(lockfd)
+      yield lockpath
+      os.remove(lockpath)
       break
-  os.close(lockfd)
-  yield lockpath
-  os.remove(lockpath)
 
 def maxFilenameSuffix(dir, pfx):
   from dircache import listdir
