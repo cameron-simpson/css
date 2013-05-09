@@ -16,6 +16,7 @@ from cs.mailutils import ismaildir, message_addresses, Message
 from cs.nodedb import NodeDB, Node, NodeDBFromURL
 import cs.sh
 from cs.threads import locked_property
+from cs.py3 import StringTypes, ustr
 
 def main(argv, stdin=None):
   if stdin is None:
@@ -170,10 +171,11 @@ def edit_groupness(MDB, addresses):
                )
     with tempfile.NamedTemporaryFile(suffix='.txt') as T:
       with Pfx(T.name):
-        with codecs.open(T.name, "w", "utf-8") as ofp:
+        with codecs.open(T.name, "w", encoding="utf-8") as ofp:
           for A in As:
             groups = sorted(set(A.GROUPs))
-            line = "%-15s %s\n" % (",".join(groups), A.formatted)
+            af = A.formatted
+            line = u"%-15s %s\n" % (",".join(groups), A.formatted)
             ofp.write(line)
         editor = os.environ.get('EDITOR', 'vi')
         xit = os.system("%s %s" % (editor, cs.sh.quotestr(T.name)))
@@ -195,7 +197,7 @@ def edit_groupness(MDB, addresses):
               for realname, addr in getaddresses((addrtext,)):
                 A = MDB.getAddressNode(addr)
                 new_groups.setdefault(A, set()).update(groups)
-                realname = realname.strip()
+                realname = ustr(realname.strip())
                 if realname and realname != A.realname:
                   A.REALNAME = realname
     # apply groups of whichever addresses survived
@@ -209,11 +211,11 @@ class AddressNode(Node):
 
   @property
   def formatted(self):
-    return formataddr( (self.realname, self.name) )
+    return ustr( formataddr( (self.realname, self.name) ) )
 
   @property
   def realname(self):
-    return getattr(self, 'REALNAME', '')
+    return ustr( getattr(self, 'REALNAME', u'') )
 
   def groups(self):
     return [ address_group for address_group in self.nodedb.address_groups
@@ -302,7 +304,7 @@ class _MailDB(NodeDB):
         If the AddressNode has no .REALNAME and `realname` is not empty,
         update the AddressNode from `realname`.
     '''
-    if isinstance(addr, (str, unicode)):
+    if isinstance(addr, StringTypes):
       realname, coreaddr = parseaddr(addr)
     else:
       realname, coreaddr = addr
@@ -312,7 +314,7 @@ class _MailDB(NodeDB):
     A = self.get( ('ADDRESS', coreaddr), doCreate=True)
     Aname = A.realname
     if not len(Aname) and len(realname) > 0:
-      A.REALNAME = realname
+      A.REALNAME = ustr(realname)
     return A
 
   def address_group(self, group_name):
