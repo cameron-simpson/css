@@ -56,19 +56,19 @@ def csv_rows(fp, skipHeaders=False, noHeaders=False):
       rownum += 1
       with Pfx("row %d", rownum):
         t, name, attr, value = row
-        if t == "":
+        if t == '':
           if otype is None:
             raise ValueError("empty TYPE with no preceeding TYPE")
           t = otype
         else:
           otype = t
-        if name == "":
+        if name == '':
           if oname is None:
             raise ValueError("empty NAME with no preceeding NAME")
           name = oname
         else:
           oname = name
-        if attr == "":
+        if attr == '':
           if oattr is None:
             raise ValueError("empty ATTR with no preceeding ATTR")
           attr = oattr
