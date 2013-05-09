@@ -9,6 +9,8 @@ import io
 import os
 import os.path
 import sys
+import datetime
+from shutil import copyfile
 from threading import Thread
 from cs.csvutils import csv_reader, csv_writerow
 from cs.fileutils import lockfile
@@ -144,6 +146,7 @@ class Backend_CSVFile(Backend):
 
   def __init__(self, csvpath, readonly=False):
     Backend.__init__(self, readonly=readonly)
+    self.keep_backups = False
     self.csvpath = csvpath
     if self.readonly:
       self._updateQ = None
@@ -166,7 +169,11 @@ class Backend_CSVFile(Backend):
         error("%s: sync not done", self)
       else:
         with lockfile(self.csvpath):
+          backup = "%s.bak-%s" % (self.csvpath, datetime.datetime.now().isoformat())
+          copyfile(self.csvpath, backup)
           write_csv_file(self.csvpath, self.nodedb.nodedata())
+        if not self.keep_backups:
+          os.remove(backup)
         self.changed = False
 
   def rewrite(self):
