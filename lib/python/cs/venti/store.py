@@ -290,9 +290,10 @@ class MappingStore(BasicStore):
     BasicStore.__init__(self, name, capacity=capacity)
     self.mapping = mapping
 
-  def add(self, block):
-    h = self.hash(block)
-    self.mapping[h] = block
+  def add(self, data):
+    h = self.hash(data)
+    if h not in self.mapping:
+      self.mapping[h] = data
     return h
 
   def get(h, default=None):
