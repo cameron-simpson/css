@@ -496,47 +496,4 @@ class Dir(Dirent):
       if filename in self:
         del self[filename]
       self[filename] = E
-      return E
-
-  def restore(self, path, makedirs=False, recurse=False, verbosefp=None):
-    ''' Restore this Dir as `path`.
-    '''
-    with Pfx("Dir.restore(%s)", path):
-      if verbosefp is not None:
-        verbosefp.write(path)
-        verbosefp.write('\n')
-      if len(dirpath) and not os.path.isdir(path):
-        if makedirs:
-          os.makedirs(path)
-        else:
-          os.mkdir(path)
-      st = os.stat(path)
-      user, group, perms = self.meta.unixPerms()
-      if user is not None or group is not None:
-        os.chmod(path, perms)
-      if user is None:
-        uid = -1
-      else:
-        uid = pwd.getpwnam(user)[2]
-        if uid == st.st_uid:
-          uid = -1
-      if group is None:
-        gid = -1
-      else:
-        gid = grp.getgrnam(group)[2]
-        if gid == st.st_gid:
-          gid = -1
-      if uid != -1 or gid != -1:
-        os.chown(path, uid, gid)
-      if self.meta.mtime is not None:
-        os.utime(path, (st.st_atime, self.meta.mtime))
-    if recurse:
-      for filename in sorted(self.files()):
-        self[filename].restore(os.path.join(path, filename),
-                               makedirs=makedirs,
-                               verbosefp=verbosefp)
-      for dirname in sorted(self.dirs()):
-        self[dirname].restore(os.path.join(path, dirname),
-                              makedirs=makedirs,
-                              recurse=True,
-                              verbosefp=verbosefp)
+     return E
