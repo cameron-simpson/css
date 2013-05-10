@@ -92,13 +92,6 @@ class _Block(object):
       raise RuntimeError("tried to compute hashcode but _data is None")
     return defaults.S.hash(data)
 
-  @locked_property
-  def span(self):
-    sp = 0
-    for chunk in self.chunks:
-      sp += len(chunk)
-    return sp
-
   def _flush(self):
     if self._hashcode is None:
       self.store()
@@ -186,6 +179,10 @@ class Block(_Block):
   def leaves(self):
     yield self
 
+  @property
+  def span(self):
+    return len(self.data)
+
 class IndirectBlock(_Block):
   ''' A preexisting indirect block.
       Indirect blocks come in two states, reflecting how how they are
@@ -211,6 +208,15 @@ class IndirectBlock(_Block):
   @locked_property
   def subblocks(self):
     return tuple(decodeBlocks(self.data))
+
+  @locked_property
+  def span(self):
+    ''' The span of an IndirectBlock is the sum of the spans of the subblocks.
+    '''
+    sp = 0
+    for B in self.subblocks:
+      sp += B.span
+    return sp
 
   @property
   def leaves(self):
