@@ -916,8 +916,13 @@ def locked_property(func, lock_name='_lock', prop_name=None, unset_object=None):
         if p is unset_object:
           ##debug("compute %s...", prop_name)
           p = func(self)
-          ##warning("compute %s[%s].%s: %s", self, id(self), prop_name, type(p))
           setattr(self, prop_name, p)
+        else:
+          ##debug("inside lock, already computed %s", prop_name)
+          pass
+    else:
+      ##debug("outside lock, already computed %s", prop_name)
+      pass
     return p
   return property(getprop)
 
