@@ -112,7 +112,10 @@ def D(fmt, *args):
       bypassing the logging modules entirely.
       A quick'n'dirty debug tool.
   '''
-  sys.stderr.write(fmt % args)
+  msg = str(fmt)
+  if args:
+    msg = msg % args
+  sys.stderr.write(msg)
   sys.stderr.write("\n")
   sys.stderr.flush()
 
@@ -368,7 +371,7 @@ class Pfx(object):
       mark = ustr(self.mark)
       if not isinstance(mark, unicode):
         mark = unicode(mark)
-        u = mark
+      u = mark
       if self.mark_args:
         u = u % self.mark_args
       self._umark = u
