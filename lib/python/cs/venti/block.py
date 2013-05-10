@@ -58,44 +58,28 @@ def isBlock(o):
 
 class _Block(object):
 
-  def __init__(self, data=None, hashcode=None, span=None, doStore=False, doFlush=False):
+  def __init__(self, data=None, hashcode=None, span=None):
     if data is None and hashcode is None:
       raise ValueError("one of data or hashcode must be not-None")
-    self._lock = RLock()
-    self._data = data
-    self._hashcode = hashcode
+    if data is not None:
+      h = defaults.S.add(data)
+      if hashcode is None:
+        hashcode = h
+      elif h != hashcode:
+        raise ValueError("supplied hashcode %r != saved hash for data (%r : %r)" % (hashcode, h, data))
+    self.hashcode = hashcode
     self._span = span
-    if doStore:
-      self.store(doFlush)
+    self._lock = RLock()
 
   def __str__(self):
     return self.textEncode()
 
-  @locked_property
+  @property
   def data(self):
     ''' The direct data of this Block.
         i.e. _not_ the data implied by an indirect Block.
     '''
     return defaults.S[self.hashcode]
-
-  @locked_property
-  def hashcode(self):
-    ''' Return the hashcode for this block.
-        Compute the hashcode if unknown or if it does not match the default
-        store's default hashtype.
-        When the block's current hashcode is the wrong type and this is a
-        "hash only" block, the recompute has an implied fetch from the store
-        using the old/wrong hashcode, so the store must support both.
-    '''
-    data = self._data
-    if data is None:
-      raise RuntimeError("tried to compute hashcode but _data is None")
-    return defaults.S.hash(data)
-
-  def _flush(self):
-    if self._hashcode is None:
-      self.store()
-    self._data = None
 
   def __getitem__(self, index):
     ''' Return specified direct data.
@@ -103,21 +87,9 @@ class _Block(object):
     return self.data[index]
 
   def __len__(self):
-    return self.span
-
-  def store(self, flush=False):
-    ''' Ensure this block is stored.
-        If `discard` is true, release the block's data.
+    ''' The len(Block) is the length of the encompassed data.
     '''
-    hashcode = defaults.S.add(self.data)
-    if self._hashcode is None:
-      self._hashcode = hashcode
-    elif hashcode != self._hashcode:
-      raise RuntimeError(
-              "store()d hashcode does not match cache: self._hashcode=%r, stored=%r"
-              % (self._hashcode, hashcode))
-    if flush:
-      self._flush()
+    return self.span
 
   def encode(self):
     ''' Encode this Block for storage:
@@ -179,7 +151,7 @@ class Block(_Block):
   def leaves(self):
     yield self
 
-  @property
+  @locked_property
   def span(self):
     return len(self.data)
 
@@ -198,11 +170,11 @@ class IndirectBlock(_Block):
       TODO: allow data= initialisation, to decode raw iblock data
   '''
 
-  def __init__(self, subblocks=None, hashcode=None, span=None, doStore=False, doFlush=False):
+  def __init__(self, subblocks=None, hashcode=None, span=None):
     if subblocks is None:
-      _Block.__init__(self, hashcode=hashcode, span=span, doStore=doStore, doFlush=doFlush)
+      _Block.__init__(self, hashcode=hashcode, span=span)
     else:
-      _Block.__init__(self, data=encodeBlocks(subblocks), doStore=doStore, doFlush=doFlush)
+      _Block.__init__(self, data=encodeBlocks(subblocks))
     self.indirect = True
 
   @locked_property
