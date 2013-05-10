@@ -38,7 +38,7 @@ class Blockifier(object):
   def add(self, data):
     ''' Add data, return Block hashcode.
     '''
-    B = Block(data=data, doStore=True, doFlush=True)
+    B = Block(data=data)
     self.Q.put(B)
     return B.hashcode
 
