@@ -24,6 +24,7 @@ class TestAll(unittest.TestCase):
       subblocks = []
       for i in range(10):
         rs = bytes( random.randint(0, 255) for x in range(100) )
+        self.assertEqual(len(rs), 100)
         B = Block(data=rs)
         self.assertEqual(len(B), 100)
         self.assertEqual(B.span, 100)
