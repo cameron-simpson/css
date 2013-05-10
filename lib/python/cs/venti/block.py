@@ -150,7 +150,15 @@ class _Block(object):
     for leaf in self.leaves:
       yield leaf.data
 
+  def copyto(self, fp):
+    ''' Copy all data to the specified file `fp`.
+    '''
+    for chunk in chunks:
+      fp.write(chunk)
+
   def all_data(self):
+    ''' The entire data of this Block as a single bytes object.
+    '''
     return b''.join(self.chunks)
 
   def textEncode(self):

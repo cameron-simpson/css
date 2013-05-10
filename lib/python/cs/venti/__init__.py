@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
-''' A data store after the style of the Venti scheme.
+''' A data store after the style of the Venti scheme, but not at all binary
+    compatible.
 
     The Plan 9 Venti system is decribed here:
       http://library.pantek.com/general/plan9.documents/venti/venti.html
