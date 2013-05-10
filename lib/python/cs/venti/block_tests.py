@@ -31,10 +31,12 @@ class TestAll(unittest.TestCase):
         B.store()
         subblocks.append(B)
       IB = IndirectBlock(subblocks=subblocks, doStore=True, doFlush=True)
-      self.assertEqual(IB.span, 1000)
+      IBspan = IB.span
+      self.assertEqual(IBspan, 1000)
       IBH = IB.hashcode
       IBdata = IB.all_data()
-      IB2data = IndirectBlock(hashcode=IBH).all_data()
+      IB2 = IndirectBlock(hashcode=IBH)
+      IB2data = IB2.all_data()
       self.assertEqual(IBdata, IB2data, "IB:  %s\nIB2: %s" % (totext(IBdata), totext(IB2data)))
 
 def selftest(argv):
