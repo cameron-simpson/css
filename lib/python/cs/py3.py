@@ -13,7 +13,12 @@ if sys.hexversion < 0x03000000:
     ''' Upgrade str to unicode, if it is a str. Leave other types alone.
     '''
     if isinstance(s, str):
-      s = unicode(s, e)
+      try:
+        s = unicode(s, e, 'error')
+      except UnicodeDecodeError as ude:
+        from cs.logutils import warning
+        warning("cs.py3.ustr(): %s: s = %s %r", ude, type(s), s)
+        s = unicode(s, e, 'replace')
     return s
   try:
     from cStringIO import StringIO as BytesIO
