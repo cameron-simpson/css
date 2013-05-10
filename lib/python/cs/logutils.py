@@ -16,7 +16,7 @@ from threading import Lock
 import traceback
 from cs.excutils import noexc
 from cs.obj import O_str
-from cs.py3 import unicode, StringTypes
+from cs.py3 import unicode, StringTypes, ustr
 
 cmd = __file__
 
@@ -365,17 +365,10 @@ class Pfx(object):
     '''
     u = self._umark
     if u is None:
-      mark = self.mark
-      if isinstance(mark, unicode):
+      mark = ustr(self.mark)
+      if not isinstance(mark, unicode):
+        mark = unicode(mark)
         u = mark
-      else:
-        if not isinstance(mark, str):
-          mark = str(mark)
-        try:
-          u = unicode(mark, 'utf-8', 'error')
-        except UnicodeDecodeError as e:
-          warning("%s: mark = %s %r", e, type(mark), mark)
-          u = unicode(mark, 'utf-8', 'replace')
       if self.mark_args:
         u = u % self.mark_args
       self._umark = u
