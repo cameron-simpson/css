@@ -373,3 +373,7 @@ def parseUC_sAttr(attr):
   if isUC_(attr):
     return attr, False
   return None, False
+
+if __name__ == '__main__':
+  import cs.lex_tests
+  cs.lex_tests.selftest(sys.argv)
