@@ -21,8 +21,8 @@ from cs.lex import hexify
 from .store import BasicStore
 
 RqType = Enum('T_ADD', 'T_GET', 'T_CONTAINS')
-T_ADD = RqType(0)       # block->hash
-T_GET = RqType(1)       # hash->block
+T_ADD = RqType(0)       # data->hash
+T_GET = RqType(1)       # hash->data
 T_CONTAINS = RqType(2)     # hash->boolean
 
 # encode tokens once for performance
@@ -30,13 +30,13 @@ enc_STORE = put_bs(T_ADD)
 enc_GET = put_bs(T_GET)
 enc_CONTAINS = put_bs(T_CONTAINS)
 
-def encodeAdd(block):
-  ''' Accept a block to be added, return the request tag and the request packet.
+def encodeAdd(data):
+  ''' Accept a data block to be added, return the request tag and the request packet.
   '''
-  if len(block) < 1:
-    raise ValueError("expected non-empty block")
+  if len(data) < 1:
+    raise ValueError("expected non-empty data block")
   tag = seq()
-  return tag, put_bs(tag) + enc_STORE + put_bs(len(block)) + block
+  return tag, put_bs(tag) + enc_STORE + put_bs(len(data)) + data
 
 def encodeGet(rqTag, h):
   ''' Accept a hash to be fetched, return the request tag and the request packet.
@@ -53,12 +53,12 @@ def encodeContains(rqTag, h):
 def encodeAddResult(tag, h):
   return put_bs(tag) + enc_STORE + put_bs(len(h)) + h
 
-def encodeGetResult(tag, block):
-  if len(block) < 1:
-    raise ValueError("expected non-empty block")
-  if block is None:
+def encodeGetResult(tag, data):
+  if len(data) < 1:
+    raise ValueError("expected non-empty data block")
+  if data is None:
     return put_bs(tag) + enc_GET + put_bs(0)
-  return put_bs(tag) + enc_GET + put_bs(len(block)) + block
+  return put_bs(tag) + enc_GET + put_bs(len(data)) + data
 
 def encodeContainsResult(tag, yesno):
   return put_bs(tag) + enc_CONTAINS + put_bs(1 if yesno else 0)
@@ -77,12 +77,12 @@ def decodeRequestStream(fp):
         if rqType == T_ADD:
           size = get_bsfp(fp)
           if size == 0:
-            block = None
+            data = None
           else:
-            block = fp.read(size)
-            if len(block) != size:
-              raise ValueError("expected %d data bytes but got %d: %r", size, len(block), block)
-          yield rqTag, rqType, block
+            data = fp.read(size)
+            if len(data) != size:
+              raise ValueError("expected %d data bytes but got %d: %r", size, len(data), data)
+          yield rqTag, rqType, data
         elif rqType == T_GET or rqType == T_CONTAINS:
           hlen = get_bsfp(fp)
           if hlen < 1:
@@ -115,12 +115,12 @@ def decodeResultStream(self):
         elif rqType == T_GET:
           size = get_bsfp(fp)
           if size == 0:
-            block = None
+            data = None
           else:
-            block = fp.read(size)
-            if len(block) != size:
-              raise ValueError("expected %d data bytes but got %d: %r", size, len(block), block)
-          yield rqTag, rqType, block
+            data = fp.read(size)
+            if len(data) != size:
+              raise ValueError("expected %d data bytes but got %d: %r", size, len(data), data)
+          yield rqTag, rqType, data
         elif rqType == T_CONTAINS:
           yesno = bool(get_bsfp(fp))
           yield rqTag, rqType, yesno
@@ -202,17 +202,17 @@ class StreamStore(BasicStore):
     self.reader = Thread(target=self._process_results_stream)
     self.reader.start()
 
-  def add(self, block):
-    assert len(block) > 0
-    tag, packet = encodeAdd(block)
+  def add(self, data):
+    assert len(data) > 0
+    tag, packet = encodeAdd(data)
     return self._sendPacket(tag, packet).get()
 
   def get(self, h, default=None):
     tag, packet = encodeGet(h)
-    block = self._sendPacket(tag, packet).get()
-    if block is None:
+    data = self._sendPacket(tag, packet).get()
+    if data is None:
       return default
-    return block
+    return data
 
   def contains(self, h):
     tag, packet = encodeContains(h)
