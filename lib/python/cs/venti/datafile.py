@@ -186,7 +186,7 @@ class DataDir(O):
 
   def scan(self, hashfunc, indices=None):
     if indices is None:
-      indices = self.datafileindices
+      indices = self._datafileindices()
     with Pfx("scan %d", n):
       for n in indices:
         D = self.open(n)
@@ -238,7 +238,7 @@ class DataDir(O):
     ''' Return a free index not mapping to an existing data file.
     '''
     try:
-      n = max(self.datafileindices()) + 1
+      n = max(self._datafileindices()) + 1
     except ValueError:
       n = 0
     while os.path.exists(self.pathto(self.datafilename(n))):
@@ -276,9 +276,10 @@ class DataDir(O):
     '''
     return str(n) + '.vtd'
 
-  def datafileindices(self):
-    ''' Generator that yields the indices of datafiles present.
+  def _datafileindices(self):
+    ''' Return the indices of datafiles present.
     '''
+    indices = []
     for name in os.listdir(self.dir):
       if name.endswith('.vtd'):
         prefix = name[:-4]
@@ -286,7 +287,8 @@ class DataDir(O):
           n = int(prefix)
           if str(n) == prefix:
             if os.path.isfile(self.pathto(name)):
-              yield n
+              indices.append(n)
+    return indices
 
 class GDBMDataDir(DataDir):
   ''' A DataDir with a GDBM index.
