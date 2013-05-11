@@ -14,7 +14,7 @@ from cs.py3 import Queue
 from cs.seq import seq
 from cs.inttypes import Enum
 from cs.logutils import Pfx, info, debug, warning
-from cs.serialise import toBS, fromBSfp
+from cs.serialise import put_bs, get_bsfp
 from cs.lex import unctrl
 from cs.threads import Q1, IterableQueue
 from cs.lex import hexify
@@ -26,53 +26,53 @@ T_GET = RqType(1)       # hash->block
 T_CONTAINS = RqType(2)     # hash->boolean
 
 # encode tokens once for performance
-enc_STORE = toBS(T_ADD)
-enc_GET = toBS(T_GET)
-enc_CONTAINS = toBS(T_CONTAINS)
+enc_STORE = put_bs(T_ADD)
+enc_GET = put_bs(T_GET)
+enc_CONTAINS = put_bs(T_CONTAINS)
 
 def encodeAdd(block):
   ''' Accept a block to be added, return the request tag and the request packet.
   '''
   assert len(block) > 0
   tag = seq()
-  return tag, toBS(tag) + enc_STORE + toBS(len(block)) + block
+  return tag, put_bs(tag) + enc_STORE + put_bs(len(block)) + block
 
 def encodeGet(rqTag, h):
   ''' Accept a hash to be fetched, return the request tag and the request packet.
   '''
   tag = seq()
-  return tag, toBS(tag) + enc_GET + toBS(len(h)) + h
+  return tag, put_bs(tag) + enc_GET + put_bs(len(h)) + h
 
 def encodeContains(rqTag, h):
   ''' Accept a hash to check for, return the request tag and the request packet.
   '''
   tag = seq()
-  return tag, toBS(tag) + enc_CONTAINS + toBS(len(h)) + h
+  return tag, put_bs(tag) + enc_CONTAINS + put_bs(len(h)) + h
 
 def encodeAddResult(tag, h):
-  return toBS(tag) + enc_STORE + toBS(len(h)) + h
+  return put_bs(tag) + enc_STORE + put_bs(len(h)) + h
 
 def encodeGetResult(tag, block):
   assert len(block) > 0
   if block is None:
-    return toBS(tag) + enc_GET + toBS(0)
-  return toBS(tag) + enc_GET + toBS(len(block)) + block
+    return put_bs(tag) + enc_GET + put_bs(0)
+  return put_bs(tag) + enc_GET + put_bs(len(block)) + block
 
 def encodeContainsResult(tag, yesno):
-  return toBS(tag) + enc_CONTAINS + toBS(1 if yesno else 0)
+  return put_bs(tag) + enc_CONTAINS + put_bs(1 if yesno else 0)
 
 def decodeRequestStream(fp):
   ''' Generator that yields (rqTag, rqType, info) from the request stream.
   '''
   with Pfx("decodeRequestStream(%s)", fp):
     while True:
-      rqTag = fromBSfp(fp)
+      rqTag = get_bsfp(fp)
       if rqTag is None:
         # end of stream
         break
-      rqType = RqType(fromBSfp(fp))
+      rqType = RqType(get_bsfp(fp))
       if rqType == T_ADD:
-        size = fromBSfp(fp)
+        size = get_bsfp(fp)
         assert size >= 0, "negative size(%d) for T_ADD" % size
         if size == 0:
           block = None
@@ -81,7 +81,7 @@ def decodeRequestStream(fp):
           assert len(block) == size
         yield rqTag, rqType, block
       elif rqType == T_GET or rqType == T_CONTAINS:
-        hlen = fromBSfp(fp)
+        hlen = get_bsfp(fp)
         assert hlen > 0, \
                "nonpositive hash length(%d) for rqType=%s" % (hlen, rqType)
         h = fp.read(hlen)
@@ -96,19 +96,19 @@ def decodeResultStream(self):
   '''
   with Pfx("decodeResultStream(%s)", fp):
     while True:
-      rqTag = fromBSfp(fp)
+      rqTag = get_bsfp(fp)
       if rqTag is None:
         break
-      rqType = fromBSfp(fp)
+      rqType = get_bsfp(fp)
       if rqType == T_ADD:
-        hlen = fromBSfp(fp)
+        hlen = get_bsfp(fp)
         assert hlen > 0
         h = fp.read(hlen)
         assert len(h) == hlen, "read %d bytes, expected %d" \
                                  % (len(h), hlen)
         yield rqTag, rqType, h
       elif rqType == T_GET:
-        blen = fromBSfp(fp)
+        blen = get_bsfp(fp)
         assert blen >= 0
         if blen == 0:
           block = None
@@ -117,7 +117,7 @@ def decodeResultStream(self):
           assert len(block) == blen
         yield rqTag, rqType, block
       elif rqType == T_CONTAINS:
-        yesno = bool(fromBSfp(fp))
+        yesno = bool(get_bsfp(fp))
         yield rqTag, rqType, yesno
       else:
         assert False, "unhandled reply type %s" % rqType
