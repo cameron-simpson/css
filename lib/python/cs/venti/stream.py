@@ -33,7 +33,8 @@ enc_CONTAINS = put_bs(T_CONTAINS)
 def encodeAdd(block):
   ''' Accept a block to be added, return the request tag and the request packet.
   '''
-  assert len(block) > 0
+  if len(block) < 1:
+    raise ValueError("expected non-empty block")
   tag = seq()
   return tag, put_bs(tag) + enc_STORE + put_bs(len(block)) + block
 
@@ -53,7 +54,8 @@ def encodeAddResult(tag, h):
   return put_bs(tag) + enc_STORE + put_bs(len(h)) + h
 
 def encodeGetResult(tag, block):
-  assert len(block) > 0
+  if len(block) < 1:
+    raise ValueError("expected non-empty block")
   if block is None:
     return put_bs(tag) + enc_GET + put_bs(0)
   return put_bs(tag) + enc_GET + put_bs(len(block)) + block
@@ -70,26 +72,27 @@ def decodeRequestStream(fp):
       if rqTag is None:
         # end of stream
         break
-      rqType = RqType(get_bsfp(fp))
-      if rqType == T_ADD:
-        size = get_bsfp(fp)
-        assert size >= 0, "negative size(%d) for T_ADD" % size
-        if size == 0:
-          block = None
+      with Pfx(str(rqTag)):
+        rqType = RqType(get_bsfp(fp))
+        if rqType == T_ADD:
+          size = get_bsfp(fp)
+          if size == 0:
+            block = None
+          else:
+            block = fp.read(size)
+            if len(block) != size:
+              raise ValueError("expected %d data bytes but got %d: %r", size, len(block), block)
+          yield rqTag, rqType, block
+        elif rqType == T_GET or rqType == T_CONTAINS:
+          hlen = get_bsfp(fp)
+          if hlen < 1:
+            raise ValueError("expected hash length >= 1, but was told %d", hlen)
+          h = fp.read(hlen)
+          if len(h) != heln:
+            raise ValueError("expected %d hash data bytes but got %d: %r", size, len(h), h)
+          yield rqTag, rqType, h
         else:
-          block = fp.read(size)
-          assert len(block) == size
-        yield rqTag, rqType, block
-      elif rqType == T_GET or rqType == T_CONTAINS:
-        hlen = get_bsfp(fp)
-        assert hlen > 0, \
-               "nonpositive hash length(%d) for rqType=%s" % (hlen, rqType)
-        h = fp.read(hlen)
-        assert len(h) == hlen, \
-               "short read(%d) for rqType=%s, expected %d bytes" % (len(h), rqType, hlen)
-        yield rqTag, rqType, h
-      else:
-        assert False, "unsupported request type (%s)" % (rqType,)
+          raise RuntimeError("unimplemented request type")
 
 def decodeResultStream(self):
   ''' Generator that yields (rqTag, rqType, result) from the result stream.
@@ -99,28 +102,30 @@ def decodeResultStream(self):
       rqTag = get_bsfp(fp)
       if rqTag is None:
         break
-      rqType = get_bsfp(fp)
-      if rqType == T_ADD:
-        hlen = get_bsfp(fp)
-        assert hlen > 0
-        h = fp.read(hlen)
-        assert len(h) == hlen, "read %d bytes, expected %d" \
-                                 % (len(h), hlen)
-        yield rqTag, rqType, h
-      elif rqType == T_GET:
-        blen = get_bsfp(fp)
-        assert blen >= 0
-        if blen == 0:
-          block = None
+      with Pfx(str(rqTag)):
+        rqType = get_bsfp(fp)
+        if rqType == T_ADD:
+          hlen = get_bsfp(fp)
+          if hlen < 1:
+            raise ValueError("expected hash length >= 1, but was told %d", hlen)
+          h = fp.read(hlen)
+          if len(h) != heln:
+            raise ValueError("expected %d hash data bytes but got %d: %r", size, len(h), h)
+          yield rqTag, rqType, h
+        elif rqType == T_GET:
+          size = get_bsfp(fp)
+          if size == 0:
+            block = None
+          else:
+            block = fp.read(size)
+            if len(block) != size:
+              raise ValueError("expected %d data bytes but got %d: %r", size, len(block), block)
+          yield rqTag, rqType, block
+        elif rqType == T_CONTAINS:
+          yesno = bool(get_bsfp(fp))
+          yield rqTag, rqType, yesno
         else:
-          block = fp.read(blen)
-          assert len(block) == blen
-        yield rqTag, rqType, block
-      elif rqType == T_CONTAINS:
-        yesno = bool(get_bsfp(fp))
-        yield rqTag, rqType, yesno
-      else:
-        assert False, "unhandled reply type %s" % rqType
+          raise RuntimeError("unimplemented reply type")
 
 class StreamDaemon(object):
   ''' A daemon to handle requests from a stream and apply them to a backend
