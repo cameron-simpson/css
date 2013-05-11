@@ -255,15 +255,18 @@ def untexthexify(s, shiftin='[', shiftout=']'):
       break
     if hexlen > 0:
       hextext = s[:hexlen]
-      assert hexlen % 2 == 0, "uneven hex sequence \"%s\"" % (hextext,)
+      if hexlen % 2 != 0:
+        raise TypeError("uneven hex sequence \"%s\"" % (hextext,))
       chunks.append(unhexify(s[:hexlen]))
     s = s[hexlen+len(shiftin):]
     textlen = s.find(shiftout)
-    assert textlen >= 0, "missing shift out marker \"%s\"" % (shiftout,)
+    if textlen < 0:
+      raise TypeError("missing shift out marker \"%s\"" % (shiftout,))
     chunks.append(s[:textlen])
     s = s[textlen+len(shiftout):]
   if len(s) > 0:
-    assert len(s) % 2 == 0, "uneven hex sequence \"%s\"" % (s,)
+    if len(s) % 2 != 0:
+      raise TypeError("uneven hex sequence \"%s\"" % (s,))
     chunks.append(unhexify(s))
   return ''.join(chunks)
 
