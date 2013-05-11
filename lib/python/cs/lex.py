@@ -262,13 +262,16 @@ def untexthexify(s, shiftin='[', shiftout=']'):
     textlen = s.find(shiftout)
     if textlen < 0:
       raise TypeError("missing shift out marker \"%s\"" % (shiftout,))
-    chunks.append(s[:textlen])
+    if sys.hexversion < 0x03000000:
+      chunks.append(s[:textlen])
+    else:
+      chunks.append(b''.join( ord(c) for c in s[:textlen] ))
     s = s[textlen+len(shiftout):]
   if len(s) > 0:
     if len(s) % 2 != 0:
       raise TypeError("uneven hex sequence \"%s\"" % (s,))
     chunks.append(unhexify(s))
-  return ''.join(chunks)
+  return b''.join(chunks)
 
 def get_chars(s, gochars, offset=0):
   ''' Scan the string `s` for characters in `gochars` starting at `offset`
