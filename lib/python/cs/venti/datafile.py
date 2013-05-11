@@ -155,17 +155,11 @@ class DataDir(O):
     '''
     return os.path.join(self.dir, rpath)
 
-  @property
+  @locked_property
   def index(self):
     ''' Property returning the index mapping.
     '''
-    I = self._index
-    if not I:
-      with self._lock:
-        I = self._index
-        if not I:
-          I = self._index = self._openIndex()
-    return I
+    return self._openIndex()
 
   @property
   def indexpath(self):
