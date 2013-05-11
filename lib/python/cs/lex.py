@@ -265,7 +265,7 @@ def untexthexify(s, shiftin='[', shiftout=']'):
     if sys.hexversion < 0x03000000:
       chunks.append(s[:textlen])
     else:
-      chunks.append(b''.join( ord(c) for c in s[:textlen] ))
+      chunks.append(bytes( ord(c) for c in s[:textlen] ))
     s = s[textlen+len(shiftout):]
   if len(s) > 0:
     if len(s) % 2 != 0:

@@ -17,6 +17,8 @@ class TestLex(unittest.TestCase):
 
   def test00untexthexify(self):
     self.assertEqual(b'', untexthexify(''))
+    self.assertEqual(b'A', untexthexify('41'))
+    self.assertEqual(b'ABC', untexthexify('41[BC]'))
     self.assertRaises(TypeError, untexthexify, 'a')
 
 def selftest(argv):
