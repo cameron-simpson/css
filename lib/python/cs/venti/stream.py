@@ -10,7 +10,6 @@ from __future__ import with_statement
 from threading import Lock
 from threading import Thread
 import sys
-if sys.hexversion < 0x02060000: from sets import Set as set
 from cs.py3 import Queue
 from cs.seq import seq
 from cs.inttypes import Enum
