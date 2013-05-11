@@ -5,7 +5,7 @@
 #
 
 import unittest
-from cs.lex import untexthexify
+from cs.lex import texthexify, untexthexify
 
 class TestLex(unittest.TestCase):
 
@@ -20,6 +20,10 @@ class TestLex(unittest.TestCase):
     self.assertEqual(b'A', untexthexify('41'))
     self.assertEqual(b'ABC', untexthexify('41[BC]'))
     self.assertRaises(TypeError, untexthexify, 'a')
+
+  def test01texthexify(self):
+    self.assertEqual('', texthexify(b''))
+    self.assertEqual('00', texthexify(bytes( (0x00,) )))
 
 def selftest(argv):
   unittest.main(__name__, None, argv)
