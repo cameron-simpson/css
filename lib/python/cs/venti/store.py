@@ -22,7 +22,6 @@ from threading import Thread
 from cs.py3 import Queue
 from cs.later import Later, report as reportLFs
 from cs.logutils import info, debug, warning, Pfx, D
-from cs.serialise import toBS, fromBS
 from cs.threads import Q1, Get1, NestingOpenClose
 from . import defaults, totext
 from .hash import Hash_SHA1
