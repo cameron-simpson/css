@@ -10,6 +10,7 @@ import os
 import os.path
 from threading import Lock
 from zlib import compress, decompress
+from cs.obj import O
 from cs.serialise import get_bs, put_bs, get_bsfp
 
 F_COMPRESSED = 0x01
@@ -32,15 +33,15 @@ class DataFlags(int):
     assert flags == 0
     return s
 
-class DataFile(object):
+class DataFile(O):
   ''' A cs.venti data file, storing data chunks in compressed form.
   '''
 
   def __init__(self, pathname):
     self.pathname = pathname
     self._fp = None
-    self._lock = Lock()
     self._size = None
+    self._lock = Lock()
 
   @property
   def fp(self):
@@ -141,7 +142,7 @@ class DataFile(object):
         self._fp.close()
         self._fp = None
 
-class DataDir(object):
+class DataDir(O):
   ''' A mapping of hash->Block that manages a directory of DataFiles.
       Subclasses must implement the _openIndex() method, which
       should return a mapping to store and retrieve index information.
@@ -150,9 +151,9 @@ class DataDir(object):
   def __init__(self, dir):
     self.dir = dir
     self._index = None
-    self._lock = Lock()
     self._open = {}
     self._n = None
+    self._lock = Lock()
 
   def _openIndex(self):
     raise NotImplementedError
