@@ -14,7 +14,8 @@ from .meta import Meta
 from cs.venti import totext, fromtext
 from cs.lex import hexify
 from cs.seq import seq
-from cs.serialise import toBS, fromBS
+from cs.serialise import get_bs, put_bs
+from cs.threads import locked_property
 
 uid_nobody = -1
 gid_nogroup = -1
@@ -32,6 +33,50 @@ def D_type2str(type_):
 
 F_HASMETA = 0x01
 F_HASNAME = 0x02
+
+def decodeDirent(data, offset):
+  ''' Unserialise a Dirent, return (dirent, offset).
+      Input format: bs(type)bs(flags)[bs(metalen)meta][bs(namelen)name]block
+  '''
+  type_, offset = get_bs(data, offset)
+  flags, offset = get_bs(data, offset)
+  meta = None
+  if flags & F_HASMETA:
+    metalen, offset = get_bs(data, offset)
+    if metalen >= len(s):
+      raise ValueError("metalen %d >= len(s) %d" % (metalen, len(s)))
+    meta = s[:metalen]
+    s = s[metalen:]
+  meta = Meta(meta)
+  if flags & F_HASNAME:
+    namelen, offset = get_bs(data, offset)
+    if namelen >= len(s):
+      raise ValueError("namelen %d >= len(s) %d" % (namelen, len(s)))
+    name = s[:namelen]
+    s = s[namelen:]
+  else:
+    name = ""
+  block, s = decodeBlock(s)
+  if type_ == D_DIR_T:
+    E = Dir(name, meta=meta, parent=None, content=block)
+  elif type_ == D_FILE_T:
+    E = FileDirent(name, meta=meta, block=block)
+  else:
+    E = _BasicDirent(type_, name, meta, block)
+  return E, offset
+
+def decodeDirents(dirdata, offset=0):
+  ''' Yield Dirents from the supplied bytes `dirdata`.
+  '''
+  while offset < len(dirdata):
+    E, offset = decodeDirent(dirdata, offset)
+    if E.name is None or len(E.name) == 0:
+      # FIXME: skip unnamed dirent
+      warning("skip unnamed Dirent")
+      continue
+    if E.name == '.' or E.name == '..':
+      continue
+    yield E
 
 class Dirent(object):
   ''' Incomplete base class for Dirent objects.
@@ -252,72 +297,27 @@ class FileDirent(_BasicDirent):
       if self.meta.mtime is not None:
         os.utime(path, (st.st_atime, self.meta.mtime))
 
-def decodeDirent(s, justone=False):
-  ''' Unserialise a dirent, return object.
-      Input format: bs(type)bs(flags)[bs(metalen)meta][bs(namelen)name]block
-  '''
-  s0 = s
-  type_, s = fromBS(s)
-  flags, s = fromBS(s)
-  meta = None
-  if flags & F_HASMETA:
-    metalen, s = fromBS(s)
-    if metalen >= len(s):
-      raise ValueError("metalen %d >= len(s) %d" % (metalen, len(s)))
-    meta = s[:metalen]
-    s = s[metalen:]
-  meta = Meta(meta)
-  if flags & F_HASNAME:
-    namelen, s = fromBS(s)
-    if namelen >= len(s):
-      raise ValueError("namelen %d >= len(s) %d" % (namelen, len(s)))
-    name = s[:namelen]
-    s = s[namelen:]
-  else:
-    name = ""
-  block, s = decodeBlock(s)
-  if type_ == D_DIR_T:
-    E = Dir(name, meta=meta, parent=None, content=block)
-  elif type_ == D_FILE_T:
-    E = FileDirent(name, meta=meta, block=block)
-  else:
-    E = _BasicDirent(type_, name, meta, block)
-  if justone:
-    if len(s):
-      raise ValueError("unparsed stuff after decoding %s: %s" % (totext(s0), totext(s)))
-    return E
-  return E, s
-
 class Dir(Dirent):
   ''' A directory.
   '''
 
-  def __init__(self, name, meta=None, parent=None, content=None):
+  def __init__(self, name, meta=None, parent=None, dirblock=None):
     ''' Initialise this directory.
         `meta`: meta information
         `parent`: parent Dir
-        `content`: pre-existing Block with initial Dir content
+        `dirblock`: pre-existing Block with initial Dir content
     '''
     self._lock = Lock()
     if meta is None:
       meta = Meta()
     Dirent.__init__(self, D_DIR_T, name, meta)
     self.parent = parent
-    self._precontent = content
-    self._entries = None
-    self._entries_lock = Lock()
-
-  @property
-  def entries(self):
-    with self._entries_lock:
-      entries = self._entries
-      if entries is None:
-        entries = self._entries = {}
-        precontent = self._precontent
-        if precontent is not None:
-          self._precontent = None
-          self._loadDir(precontent.data)
-    return entries
+    self.entries = {}
+    if dirblock:
+      for E in decodeDirents(dirblock.data):
+        E.parent = self
+        self[E.name] = E
+    self._lock = Lock()
 
   def dirs(self):
     return [ name for name in self.keys() if self[name].isdir ]
@@ -325,28 +325,7 @@ class Dir(Dirent):
   def files(self):
     return [ name for name in self.keys() if self[name].isfile ]
 
-  def _loadDir(self, dirdata):
-    ''' Load Dirents from the supplied file-like object `fp`,
-        incorporate all the dirents into our mapping.
-    '''
-    while len(dirdata) > 0:
-      odirdata = dirdata
-      E, dirdata = decodeDirent(dirdata)
-      if len(dirdata) >= len(odirdata):
-        raise ValueError("dirdata did not shrink")
-      if not odirdata.endswith(dirdata):
-        raise ValueError("dirdata not a suffix of odirdata")
-      if E.name is None or len(E.name) == 0:
-        # FIXME: skip unnamed dirent
-        continue
-      if E.name == '.' or E.name == '..':
-        # FIXME: skip E.name
-        continue
-      if E.isdir:
-        E.parent = self
-      self._entries[E.name] = E
-
-  def __validname(self, name):
+  def _validname(self, name):
     return len(name) > 0 and name.find('/') < 0
 
   def get(self, name, dflt=None):
@@ -378,7 +357,7 @@ class Dir(Dirent):
     ''' Store a Dirent in the specified name slot.
     '''
     ##debug("<%s>[%s]=%s" % (self.name, name, E))
-    if not self.__validname(name):
+    if not self._validname(name):
       raise KeyError("invalid name: %s" % (name,))
     if name in self:
       raise KeyError("name already present: %s" % (name,))
@@ -387,7 +366,7 @@ class Dir(Dirent):
     self.entries[name] = E
 
   def __delitem__(self, name):
-    if not self.__validname(name):
+    if not self._validname(name):
       raise KeyError("invalid name: %s" % (name,))
     if name == '.' or name == '..':
       raise KeyError("refusing to delete . or ..: name=%s" % (name,))
@@ -496,4 +475,4 @@ class Dir(Dirent):
       if filename in self:
         del self[filename]
       self[filename] = E
-     return E
+    return E
