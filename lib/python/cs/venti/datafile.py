@@ -12,6 +12,7 @@ from threading import Lock
 from zlib import compress, decompress
 from cs.obj import O
 from cs.serialise import get_bs, put_bs, get_bsfp
+from cs.threads import locked_property
 
 F_COMPRESSED = 0x01
 
@@ -43,27 +44,17 @@ class DataFile(O):
     self._size = None
     self._lock = Lock()
 
-  @property
+  @locked_property
   def fp(self):
-    ''' Property returning the file object of the open file.
+    ''' Property returning the file object of the current open file.
     '''
-    fp = self._fp
-    if not fp:
-      with self._lock:
-        fp = self._fp
-        if fp is None:
-          fp = self._fp = open(self.pathname, "a+b")
-    return fp
+    return open(self.pathname, "a+b")
 
-  @property
+  @locked_property
   def size(self):
     ''' Property returning the size of this file.
     '''
-    size = self._size
-    if size is None:
-      with self._lock:
-        size = self._size = os.fstat(self.fp.fileno).st_size
-    return size
+    return os.fstat(self.fp.fileno).st_size
 
   def scan(self, uncompress=False):
     ''' Scan the data file and yield (offset, flags, zdata) tuples.
