@@ -6,13 +6,13 @@
 
 import os
 from socket import socket, SHUT_WR, SHUT_RD
-from SocketServer import ThreadingTCPServer, StreamRequestHandler
+from socketserver import TCPServer, ThreadingMixIn, StreamRequestHandler
 from .stream import StreamDaemon, StreamStore
 from cs.logutils import debug
 from cs.threads import NestingOpenClose
 
-class Server(ThreadingTCPServer, NestingOpenClose):
-  ''' A ThreadingTCPServer that accepts connections by StreamStore clients.
+class Server(ThreadingMixIn, TCPServer, NestingOpenClose):
+  ''' A threading TCPServer that accepts connections by StreamStore clients.
   '''
   def __init__(self, bindaddr, S):
     ThreadingTCPServer.__init__(self, bindaddr, _RequestHandler)
