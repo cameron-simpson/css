@@ -147,6 +147,9 @@ class DataDir(O):
     self._lock = Lock()
 
   def _openIndex(self):
+    ''' Subclasses must implement the _openIndex method, which returns a
+        mapping of hashcode to (datafile_index, datafile_offset).
+    '''
     raise NotImplementedError("%s: no _openIndex() method" % (self.__class__.__name__,))
 
   def pathto(self, rpath):
@@ -163,13 +166,20 @@ class DataDir(O):
 
   @property
   def indexpath(self):
+    ''' The file pathname of the index file.
+    '''
     return self.pathto(self.indexname)
 
   @property
   def hasindexfile(self):
+    ''' Property testing whether the index file exists.
+    '''
     return os.path.exists(self.indexpath)
 
   def scan(self, hashfunc, indices=None):
+    ''' Scan the specified datafiles (or all if `indices` is missing or None).
+        Record the data locations against the data hashcode in the index.
+    '''
     if indices is None:
       indices = self._datafileindices()
     with Pfx("scan %d", n):
@@ -210,14 +220,11 @@ class DataDir(O):
       offset = D.savedata(data)
       I[hash] = self.encodeIndexEntry(n, offset)
 
-  @property
+  @locked_property
   def n(self):
     ''' The index of the currently open data file.
     '''
-    with self._lock:
-      if self._n is None:
-        self._n = self.next_n()
-    return self._n
+    return self.next_n()
 
   def next_n(self):
     ''' Return a free index not mapping to an existing data file.
@@ -285,7 +292,6 @@ class GDBMDataDir(DataDir):
     import gdbm
     gdbmpath = self.pathto(self.indexname)
     return gdbm.open(gdbmpath, "cf")
-
 
 class KyotoCabinetDataDir(DataDir):
   ''' An DataDir attached to a KyotoCabinet index.
