@@ -147,7 +147,7 @@ class DataDir(O):
     self._lock = Lock()
 
   def _openIndex(self):
-    raise NotImplementedError
+    raise NotImplementedError("%s: no _openIndex() method" % (self.__class__.__name__,))
 
   def pathto(self, rpath):
     ''' Return a pathname within the DataDir given `rpath`, a path
