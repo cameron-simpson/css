@@ -1,7 +1,7 @@
 import base64
 import binascii
 import quopri
-import string
+from string import printable, whitespace, ascii_letters, digits
 import re
 import sys
 from cs.py3 import unicode
@@ -43,7 +43,7 @@ def unctrl(s,tabsize=8):
       ch2='\\v'
     else:
       o=ord(ch)
-      if o < ord_space or string.printable.find(ch) == -1:
+      if o < ord_space or printable.find(ch) == -1:
         if o >= 256:
           ch2="\\u%04x"%o
         else:
@@ -76,7 +76,7 @@ def tabpadding(padlen,tabsize=8,offset=0):
 def skipwhite(s,start=0):
   ''' Returns the location of next nonwhite in string.
   '''
-  while start < len(s) and s[start] in string.whitespace:
+  while start < len(s) and s[start] in whitespace:
     start+=1
   return start
 
@@ -159,40 +159,57 @@ def dict2js(d):
   import cs.json
   return cs.json.json(d)
 
-_texthexify_white_re = re.compile(r'[a-zA-Z0-9_\-+.,/]+')
+# characters that may appear in text sections of a texthexify result
+# Notation exclusions:
+#  \ - to avoid double in slosh escaped presentation
+#  % - likewise, for percent escaped presentation
+#  [ ] - the delimiters of course
+#  / - path separator
+#
+_texthexify_white_chars = ascii_letters + digits + '_-+.,'
 
-def texthexify(bs, shiftin='[', shiftout=']', whitelist_re=None):
+def texthexify(bs, shiftin='[', shiftout=']', whitelist=None):
   ''' Transcribe the bytes `bs` to text.
       hexify() and texthexify() output strings may be freely
       concatenated and decoded with untexthexify().
   '''
-  # blond conversion of bytes to unicode so we can apply regexp
-  byte_coding = 'iso8859-1'
-  s = bs.decode(byte_coding)
-  if whitelist_re is None:
-    whitelist_re = _texthexify_white_re
-  elif type(whitelist_re) is str:
-    whitelist_re = re.compile(whitelist_re)
+  if whitelist is None:
+    whitelist = _texthexify_white_chars
   inout_len = len(shiftin) + len(shiftout)
   chunks = []
-  sofar = 0
-  pos = 0
-  while pos < len(s):
-    m = whitelist_re.search(s, pos)
-    if not m:
-      break
-    offset = m.start(0)
-    text = m.group(0)
-    if len(text) >= inout_len:
-      if offset > pos:
-        chunks.append(hexify(bytes(s[sofar:offset], byte_coding)))
-      chunks.append(shiftin + text + shiftout)
-      sofar = m.end(0)
-    pos = m.end(0)
-
-  if sofar < len(s):
-    chunks.append(hexify(bytes(s[sofar:], byte_coding)))
-
+  offset = 0
+  offset0 = offset
+  inwhite = False
+  while offset < len(bs):
+    c = chr(bs[offset])
+    if inwhite:
+      if c not in whitelist:
+        inwhite = False
+        if offset - offset0 > inout_len:
+          chunk = ( shiftin
+                  + ''.join( chr(bs[o]) for o in range(offset0, offset) )
+                  + shiftout
+                  )
+        else:
+          chunk = hexify(bs[offset0:offset])
+        chunks.append(chunk)
+        offset0 = offset
+    else:
+      if c in whitelist:
+        inwhite = True
+        chunk = hexify(bs[offset0:offset])
+        chunks.append(chunk)
+        offset0 = offset
+    offset += 1
+  if offset > offset0:
+    if inwhite and offset - offset0 > inout_len:
+      chunk = ( shiftin
+              + ''.join( chr(bs[o]) for o in range(offset0, offset) )
+              + shiftout
+              )
+    else:
+      chunk = hexify(bs[offset0:offset])
+    chunks.append(chunk)
   return ''.join(chunks)
 
 # regexp to match RFC2047 text chunks
