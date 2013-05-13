@@ -6,6 +6,22 @@
 
 import os
 from cs.logutils import D, info, warning
+from . import defaults
+from .dir import Dir
+
+def get_rootD(path):
+  ''' Take a path starting with a hashcode designating a Dir block
+      and return the Dir and the remaining path.
+  '''
+  try:
+    hexpart, tail = path.split('/', 1)
+  except ValueError:
+    hexpart = path
+    tail = ''
+  S = defaults.S
+  h = S.hashclass(untexthexify(hexpart))
+  rootD = Dir('/', dirblock=S[h])
+  return rootD, tail
 
 def resolve(rootD, subpath, do_mkdir=False):
   ''' Descend from the Dir `rootD` via the path `subpath`.
