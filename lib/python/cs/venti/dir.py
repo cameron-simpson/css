@@ -4,18 +4,16 @@ import pwd
 import grp
 import stat
 import sys
-if sys.hexversion < 0x02060000:
-  from sets import Set as set
 from threading import Lock
 from cs.logutils import Pfx, debug, error, info, warning
-from .block import decodeBlock
-from .blockify import blockFromString
-from .meta import Meta
 from cs.venti import totext, fromtext
 from cs.lex import hexify
 from cs.seq import seq
 from cs.serialise import get_bs, put_bs
 from cs.threads import locked_property
+from .block import decodeBlock
+from .blockify import blockFromString
+from .meta import Meta
 
 uid_nobody = -1
 gid_nogroup = -1
