@@ -84,10 +84,10 @@ def strlist(ary,sep=", "):
   return sep.join([str(a) for a in ary])
 
 def lastlinelen(s):
-  """ length of text after last newline in string
-      initially used by cs.hier to compute effective text width
-  """
-  return len(s)-string.rfind(s,'\n')-1
+  ''' The length of text after the last newline in a string.
+      Initially used by cs.hier to compute effective text width.
+  '''
+  return len(s) - s.rfind('\n') - 1
 
 DQ_RE=re.compile(r'"(([^\\"]|\\[\\"])*)"')
 nq_re=re.compile(r'\S+')
@@ -105,7 +105,7 @@ def get_dqstring(s):
 # parse a line consisting of words or "quoted strings"
 def parseline(line):
   words=[]
-  line=string.lstrip(line)
+  line=line.lstrip()
   while len(line) > 0:
     m=DQ_RE.match(line)
     if m is not None:
