@@ -9,6 +9,29 @@ from cs.logutils import D, info, warning
 from . import defaults
 from .dir import Dir
 
+def hashpath_dir(hashpath, do_mkdir=False):
+  dir, name = hashpath_resolve(hashpath, do_mkdir=do_mkdir)
+  if name is not None:
+    if name in dir or not do_mkdir:
+      dir = dir.chdir1(name)
+    else:
+      dir = dir.mkdir(name)
+  return dir
+
+def hashpath_file(hashpath, do_create=False):
+  dir, name = hashpath_resolve(hashpath)
+  if name is None:
+    raise ValueError("no filename component: %s", hashpath)
+  if name in dir:
+    return dir[name]
+  if not do_create:
+    raise ValueError("no such file: %s", hashpath)
+  raise RuntimeError("file creation not yet implemented")
+
+def hashpath_resolve(hashpath, do_mkdir=False):
+  rootD, tail = get_rootD(hashpath)
+  return resolve(rootD, tail, domkdir=do_mkdir)
+
 def get_rootD(path):
   ''' Take a path starting with a hashcode designating a Dir block
       and return the Dir and the remaining path.
