@@ -44,7 +44,7 @@ from cs.venti.block import IndirectBlock, decodeBlocks
 from cs.venti.debug import dumpBlock
 from cs.venti.store import Store
 from cs.venti.cache import CacheStore, MemCacheStore
-from cs.venti.dir import Dir, resolve
+from cs.venti.paths import hashpath_dir, hashpath_file
 
 def main(argv):
   setup_logging(upd_mode=False)
@@ -411,9 +411,7 @@ def cmd_ls(args):
       first = False
     else:
       print
-    D, name = resolve(path)
-    if name is not None:
-      D = D.chdir1(name)
+    D = hashpath_dir(path)
     ls(path, D, recurse, sys.stdout)
   return 0
 
@@ -486,9 +484,7 @@ def cmd_unpack(args):
   xit = 0
   for path in args:
     with (path):
-      D, name = resolve(path)
-      if len(name) > 0:
-        D = D.chdir1(name)
+      D = hashpath_dir(path)
       for subD, _, files in D.walk(topdown=True):
         with subD:
           if len(subD.path) > 0 and not os.path.isdir(subD.path):
@@ -552,10 +548,8 @@ def ls(path, D, recurse, fp=None):
 def cat(path, fp=None):
   if fp is None:
     fp = sys.stdout
-  D, name = resolve(path)
-  if name is not None:
-    D = D[name]
-  block = D.getBlock()
+  F = hashpath_file(path)
+  block = F.getBlock()
   for B in block.leaves():
     fp.write(B.blockdata())
 
