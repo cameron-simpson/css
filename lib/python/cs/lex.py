@@ -174,6 +174,10 @@ def texthexify(bs, shiftin='[', shiftout=']', whitelist=None):
       hexify() and texthexify() output strings may be freely
       concatenated and decoded with untexthexify().
   '''
+  if sys.hexversion < 0x03000000:
+    bschr = lambda bs, ndx: bs[ndx]
+  else:
+    bschr = lambda bs, ndx: chr(bs[ndx])
   if whitelist is None:
     whitelist = _texthexify_white_chars
   inout_len = len(shiftin) + len(shiftout)
@@ -182,13 +186,13 @@ def texthexify(bs, shiftin='[', shiftout=']', whitelist=None):
   offset0 = offset
   inwhite = False
   while offset < len(bs):
-    c = chr(bs[offset])
+    c = bschr(bs, offset)
     if inwhite:
       if c not in whitelist:
         inwhite = False
         if offset - offset0 > inout_len:
           chunk = ( shiftin
-                  + ''.join( chr(bs[o]) for o in range(offset0, offset) )
+                  + ''.join( bschr(bs, o) for o in range(offset0, offset) )
                   + shiftout
                   )
         else:
@@ -205,7 +209,7 @@ def texthexify(bs, shiftin='[', shiftout=']', whitelist=None):
   if offset > offset0:
     if inwhite and offset - offset0 > inout_len:
       chunk = ( shiftin
-              + ''.join( chr(bs[o]) for o in range(offset0, offset) )
+              + ''.join( bschr(bs, o) for o in range(offset0, offset) )
               + shiftout
               )
     else:
