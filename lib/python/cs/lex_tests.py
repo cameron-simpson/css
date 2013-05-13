@@ -6,6 +6,7 @@
 
 import unittest
 from cs.lex import texthexify, untexthexify
+from cs.py3 import makebytes
 
 class TestLex(unittest.TestCase):
 
@@ -23,7 +24,7 @@ class TestLex(unittest.TestCase):
 
   def test01texthexify(self):
     self.assertEqual('', texthexify(b''))
-    self.assertEqual('00', texthexify(bytes( (0x00,) )))
+    self.assertEqual('00', texthexify(makebytes( (0x00,) )))
 
 def selftest(argv):
   unittest.main(__name__, None, argv)
