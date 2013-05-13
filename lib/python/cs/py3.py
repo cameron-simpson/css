@@ -7,8 +7,10 @@
 import sys
 
 if sys.hexversion < 0x03000000:
+
   globals()['unicode'] = unicode
   from types import StringTypes
+  makebytes = lambda bytevals: b''.join( chr(bv) for bv in bytevals )
   def ustr(s, e='utf-8'):
     ''' Upgrade str to unicode, if it is a str. Leave other types alone.
     '''
@@ -38,6 +40,7 @@ else:
 
   unicode = str
   StringTypes = (str,)
+  makebytes = bytes
   def ustr(s, e='utf-8'):
     return s
   from io import BytesIO, StringIO
