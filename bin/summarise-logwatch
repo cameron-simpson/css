@@ -141,5 +141,12 @@ s/  *$//
   d
 }
 
+/^-*- up2date Begin -*-$/,/^-*- up2date End -*-$/{
+  /^updateLoginInfo() login info$/d
+  /^\*\*Unmatched Entries\*\*$/d
+  p
+  d
+}
+
 /^$/d
 s/^/UNMATCHED: /
