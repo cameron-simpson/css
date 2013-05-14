@@ -40,8 +40,7 @@ import datetime
 import cs.logutils
 from cs.logutils import Pfx, exception, error, debug, setup_logging, logTo, D
 from cs.venti import totext, fromtext, defaults
-from cs.venti.block import IndirectBlock, decodeBlocks
-from cs.venti.debug import dumpBlock
+from cs.venti.block import Block, IndirectBlock
 from cs.venti.store import Store
 from cs.venti.cache import CacheStore, MemCacheStore
 from cs.venti.paths import hashpath_dir, hashpath_file
@@ -330,14 +329,14 @@ def cmd_catblock(args):
     args.pop(0)
   if not args:
     raise GetoptError("missing hashcodes")
-  for arg in args:
-    data = S[fromtext(arg)]
+  for hctext in args:
+    h = S.hashclass(fromtext(hctext))
     if indirect:
-      IB = IndirectBlock()
-      IB.extend(decodeBlocks(data))
-      dumpBlock(IB)
+      B = IndirectBlock(hashcode)
     else:
-      sys.stdout.write(data)
+      B = Block(hashcode)
+    for subB in B.leaves:
+      sys.stdout.write(subB.data)
   return 0
 
 # =item B<init> <dirpath>
