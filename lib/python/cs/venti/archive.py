@@ -3,9 +3,9 @@
 ''' Archive files for venti data.
 
     Archive files are records of data saved to a Store.
-    Lines are written to the archive file of the form:
+    Lines are appended to the archive file of the form:
 
-      unixtime dirent
+      isodatetime unixtime dirent
 
     where unixtime is UNIX time (seconds since epoch) and dirent is the text
     encoding of a cs.venti.dir.Dirent.
@@ -31,6 +31,7 @@ def archive(arfile, path, verbosefp=None,
   oldtime, oldE = None, None
   if arfile == '-':
     arfp = sys.stdin
+    # refuse to use terminal as input
     if arfp.isatty():
       arfp = None
   else:
@@ -38,8 +39,8 @@ def archive(arfile, path, verbosefp=None,
       arfp = open(arfile)
     except IOError:
       arfp = None
-  if arfp is not None:
-    for unixtime, E in getDirents(arfp):
+  if arfp:
+    for unixtime, E in read_Dirents(arfp):
       if E.name == path and (oldtime is None or unixtime >= oldtime):
         oldtime, oldE = unixtime, E
     if arfile != '-':
@@ -62,13 +63,13 @@ def archive(arfile, path, verbosefp=None,
 
     E.name = path
     if arfile is None:
-      writeDirent(sys.stdout, E)
+      write_Dirent(sys.stdout, E)
     else:
       if arfile == '-':
-        writeDirent(sys.stdout, E)
+        write_Dirent(sys.stdout, E)
       else:
         with open(arfile, "a") as arfp:
-          writeDirent(arfp, E)
+          write_Dirent(arfp, E)
   return ok
 
 def retrieve(arfile, paths=None):
@@ -84,7 +85,7 @@ def retrieve(arfile, paths=None):
       assert not arfp.isatty(), "stdin may not be a tty"
     else:
       arfp = open(arfile)
-    for unixtime, E in getDirents(arfp):
+    for unixtime, E in read_Dirents(arfp):
       if paths is None or E.name in paths:
         found[E.name] = E
     if arfile != '-':
@@ -111,20 +112,28 @@ def toc(arfile, paths=None, verbose=False, fp=None):
     else:
       toc_report(fp, path, E, verbose)
 
-def getDirents(fp):
+def read_Dirents(fp):
   ''' Generator to yield (unixtime, Dirent) from archive file.
   '''
+  lineno = 0
   for line in fp:
-    assert line.endswith('\n'), "%s: unexpected EOF" % (fp,)
-    isodate, unixtime, dent = line.split(None, 3)[:3]
-    when = float(unixtime)
-    E, etc = decodeDirent(fromtext(dent))
-    assert len(etc) == 0 or etc[0].iswhite(), \
-      "failed to decode dent %r: unparsed: %r" % (dent, etc)
+    with Pfx("%s:%d", fp, lineno):
+      lineno += 1
+      if not line.endswith('\n'):
+        raise ValueError("incomplete? no trailing newline")
+      line = line.rstrip()
+      # allow optional trailing text, which will be the E.name part normally
+      isodate, unixtime, dent = line.split(None, 3)[:3]
+      when = float(unixtime)
+      E, etc = decodeDirent(fromtext(dent))
+      if etc:
+        raise ValueError("incomplete Dirent parse: left with %r from %r" % (etc, dent))
+    # note: yield _outside_ Pfx
     yield when, E
 
-def writeDirent(fp, E, when=None):
-  ''' Write a Dirent to an archive file.
+def write_Dirent(fp, E, when=None):
+  ''' Write a Dirent to an archive file:
+        isodatetime unixtime totext(dirent) dirent.name
   '''
   if when is None:
     when = time.time()
