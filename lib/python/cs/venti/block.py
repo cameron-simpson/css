@@ -72,7 +72,7 @@ class _Block(object):
     self._lock = RLock()
 
   def __str__(self):
-    return self.textEncode()
+    return self.textencode()
 
   @property
   def data(self):
@@ -126,7 +126,7 @@ class _Block(object):
     '''
     return b''.join(self.chunks)
 
-  def textEncode(self):
+  def textencode(self):
     return totext(self.encode())
 
   def open(self, mode="rb"):

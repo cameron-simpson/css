@@ -96,7 +96,7 @@ class Dirent(object):
     self.d_ino = None
 
   def __str__(self):
-    return self.textEncode()
+    return self.textencode()
 
   def __repr__(self):
     return "Dirent(%s, %s, %s)" % (D_type2str, self.name, self.meta)
@@ -149,7 +149,7 @@ class Dirent(object):
          + name \
          + block.encode()
 
-  def textEncode(self):
+  def textencode(self):
     ''' Serialise the dirent as text.
         Output format: bs(type)bs(flags)[bs(metalen)meta][bs(namelen)name]block
     '''
@@ -178,7 +178,7 @@ class Dirent(object):
            + hexify(toBS(flags))
            + metatxt
            + nametxt
-           + block.textEncode()
+           + block.textencode()
            )
 
   # TODO: make size a property?
