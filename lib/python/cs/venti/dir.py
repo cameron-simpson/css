@@ -5,7 +5,7 @@ import grp
 import stat
 import sys
 from threading import Lock
-from cs.logutils import Pfx, debug, error, info, warning
+from cs.logutils import D, Pfx, debug, error, info, warning
 from cs.lex import hexify
 from cs.seq import seq
 from cs.serialise import get_bs, get_bsdata, put_bs, put_bsdata
@@ -355,8 +355,6 @@ class Dir(Dirent):
     ##debug("<%s>[%s]=%s" % (self.name, name, E))
     if not self._validname(name):
       raise KeyError("invalid name: %s" % (name,))
-    if name in self:
-      raise KeyError("name already present: %s" % (name,))
     if not isinstance(E, Dirent):
       raise ValueError("E is not a Dirent: <%s>%r" % (type(E), E))
     self.entries[name] = E
