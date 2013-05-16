@@ -19,7 +19,7 @@ from datetime import datetime
 from cs.lex import unctrl
 from cs.venti import totext, fromtext
 from .dir import decode_Dirent_text
-from .file import storeFilename
+from .paths import copy_in
 from cs.logutils import Pfx, error
 
 def archive(arfile, path,
@@ -52,17 +52,13 @@ def archive(arfile, path,
 
   with Pfx("archive(%s)", path):
     if os.path.isdir(path):
-      if oldE is not None and oldE.isdir:
-        ok = oldE.updateFrom(path,
-                     trust_size_mtime=trust_size_mtime,
-                     keep_missing=keep_missing,
-                     ignore_existing=ignore_existing)
-        E = oldE
-      else:
-        E, ok = storeDir(path, trust_size_mtime=trust_size_mtime)
+      if oldE is None or not oldE.isdir:
+        oldE = Dir(os.path.basename(path))
+      copy_in(path, oldE, delete=not keep_missing, ignore_existing=ignore_existing, trust_size_mtime=trust_size_mtime)
     else:
-      E = storeFilename(path, path)
-      ok = True
+      if oldE is None or not oldE.isfile:
+        oldE = FileDirent(os.path.basename(path))
+      copy_in(path, oldE, trust_size_mtime=trust_size_mtime)
 
     E.name = path
     if arfile is None:
