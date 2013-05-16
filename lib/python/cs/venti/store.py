@@ -139,7 +139,7 @@ class BasicStore(NestingOpenClose):
     '''
     block = self.get(h)
     if block is None:
-      raise KeyError
+      raise KeyError("missing hash %r" % (h,))
     return block
 
   def __enter__(self):
