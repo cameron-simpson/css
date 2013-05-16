@@ -60,7 +60,8 @@ class CacheStore(BasicStore):
   def add(self, data):
     h = self.cache.add(data)
     h2 = self.backend.add(data)
-    assert h == h2, "hash mismatch: h=%r, h2=%r" % (h, h2)
+    if h != h2:
+      raise RuntimeError("hash mismatch: h=%r, h2=%r, data=%r" % (h, h2, data))
     return h
 
   def prefetch(self, hs):
