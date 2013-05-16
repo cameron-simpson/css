@@ -37,6 +37,7 @@ import os
 import os.path
 from getopt import getopt, GetoptError
 import datetime
+from cs.debug import ifdebug, dump_debug_threads
 import cs.logutils
 from cs.logutils import Pfx, exception, error, warning, debug, setup_logging, logTo, D
 from cs.venti import totext, fromtext, defaults
@@ -201,11 +202,12 @@ def main(argv):
                 if useMemCache:
                   S = CacheStore(S, MemCacheStore())
                 with S:
-                  try:
-                    xit = op_func(args)
-                  except GetoptError as e:
-                    error("%s", e)
-                    badopts = True
+                  with Pfx(S):
+                    try:
+                      xit = op_func(args)
+                    except GetoptError as e:
+                      error("%s", e)
+                      badopts = True
 
   if S:
     S.close()
@@ -216,6 +218,9 @@ def main(argv):
 
   if not isinstance(xit, int):
     raise RuntimeError("exit code not set by operation: %r" % (xit,))
+
+  if ifdebug():
+    dump_debug_threads()
 
   return xit
 
