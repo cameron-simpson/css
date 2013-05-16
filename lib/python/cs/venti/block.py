@@ -62,6 +62,8 @@ class _Block(object):
     if data is None and hashcode is None:
       raise ValueError("one of data or hashcode must be not-None")
     if data is not None:
+      if span is None:
+        span = len(data)
       h = defaults.S.add(data)
       if hashcode is None:
         hashcode = h
