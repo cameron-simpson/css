@@ -7,12 +7,12 @@ from functools import partial
 import sys
 from collections import deque
 import threading
-from threading import Thread, Condition
+from threading import Condition
 from cs.py3 import Queue, raise3
 import time
+from cs.debug import Lock, RLock, Thread
 from cs.threads import AdjustableSemaphore, IterablePriorityQueue, \
-                       WorkerThreadPool, TimerQueue, \
-                       Lock
+                       WorkerThreadPool, TimerQueue
 from cs.seq import seq
 from cs.logutils import Pfx, info, warning, debug, D
 
