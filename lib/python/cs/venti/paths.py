@@ -5,7 +5,7 @@
 #
 
 import os
-from cs.logutils import D, info, warning
+from cs.logutils import Pfx, D, info, warning
 from .dir import decode_Dirent_text
 
 def dirent_dir(direntpath, do_mkdir=False):
@@ -50,10 +50,10 @@ def resolve(rootD, subpath, do_mkdir=False):
   subpaths = [ s for s in subpath.split('/') if s ]
   while len(subpaths) > 1:
     name = subpath.pop(0)
-    D = D.mkdir(name) if do_mkdir else D.chdir1(name)
+    rootD = rootD.mkdir(name) if do_mkdir else rootD.chdir1(name)
   if subpaths:
-    return D, subpaths[0]
-  return D, None
+    return rootD, subpaths[0]
+  return rootD, None
 
 def walk(rootD):
   ''' An analogue to os.walk to descend a vt Dir tree.
@@ -77,7 +77,7 @@ def copy_in(rootpath, rootD, delete=False, ignore_existing=False, trust_size_mti
   '''
   with Pfx("update_dir(%s)", rootpath):
     rootpath_prefix = rootpath + '/'
-    for ospath, dirs, files in os.walk(rootpath):
+    for ospath, dirnames, filenames in os.walk(rootpath):
       info(ospath)
       with Pfx(ospath):
         if ospath == rootpath:
@@ -86,10 +86,10 @@ def copy_in(rootpath, rootD, delete=False, ignore_existing=False, trust_size_mti
           D, name = resolve(rootD, ospath[len(rootpath_prefix):])
           D = D.chdir1(name)
 
-        if not os.path.isdir(rootdir):
+        if not os.path.isdir(rootpath):
           warning("not a directory?")
 
-        if not delete:
+        if delete:
           # Remove entries in D not present in the real filesystem
           allnames = set(dirnames)
           allnames.update(filenames)
