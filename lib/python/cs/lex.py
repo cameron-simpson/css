@@ -121,7 +121,7 @@ def parseline(line):
         error("aborting parseline at: %s", line)
         return None
 
-    line=string.lstrip(line)
+    line = line.lstrip()
 
   return words
 
@@ -310,14 +310,14 @@ def get_white(s, offset=0):
       `offset` (default 0).
       Return (match, new_offset).
   '''
-  return get_chars(s, string.whitespace, offset=offset)
+  return get_chars(s, whitespace, offset=offset)
 
 def get_nonwhite(s, offset=0):
   ''' Scan the string `s` for characters not in string.whitespace starting at
       `offset` (default 0).
       Return (match, new_offset).
   '''
-  return get_other_chars(s, string.whitespace, offset=offset)
+  return get_other_chars(s, whitespace, offset=offset)
 
 def get_identifier(s, offset=0):
   ''' Scan the string `s` for an identifier (ASCII letter or underscore followed by
@@ -327,9 +327,9 @@ def get_identifier(s, offset=0):
       there is no leading letter/underscore.
   '''
   ch = s[offset]
-  if ch != '_' and ch not in string.ascii_letters:
+  if ch != '_' and ch not in ascii_letters:
     return '', offset
-  idtail, offset = get_chars(s, string.ascii_letters + string.digits + '_', offset+1)
+  idtail, offset = get_chars(s, ascii_letters + digits + '_', offset+1)
   return ch + idtail, offset
 
 def get_other_chars(s, stopchars, offset=0):
