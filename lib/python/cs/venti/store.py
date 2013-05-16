@@ -74,9 +74,6 @@ class BasicStore(NestingOpenClose):
       self.readonly = False
       self.writeonly = False
 
-  def close(self):
-    self.__funcQ.close()
-
   def add(self, data):
     ''' Add the supplied data bytes to the store.
     '''
