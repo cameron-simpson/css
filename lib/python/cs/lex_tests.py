@@ -4,6 +4,7 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
+import sys
 import unittest
 from cs.lex import texthexify, untexthexify
 from cs.py3 import makebytes
