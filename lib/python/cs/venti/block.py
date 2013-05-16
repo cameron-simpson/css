@@ -2,7 +2,7 @@
 
 import sys
 from threading import RLock
-from cs.logutils import D
+from cs.logutils import D, debug
 from cs.serialise import get_bs, put_bs
 from cs.threads import locked_property
 from cs.venti import defaults, totext
@@ -31,7 +31,6 @@ def decodeBlock(bs, offset=0):
   bs0 = bs
   offset0 = offset
   flags, offset = get_bs(bs, offset)
-  ##D("flags=0x%02x", flags)
   unknown_flags = flags & ~F_BLOCK_INDIRECT
   if unknown_flags:
     raise ValueError("unexpected flags value (0x%02x) with unsupported flags=0x%02x, bs[offset=%d:]=%r"
