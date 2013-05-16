@@ -397,7 +397,7 @@ class Later(object):
     # inbound requests queue
     self._LFPQ = IterablePriorityQueue(inboundCapacity)
     self._workers = WorkerThreadPool()
-    self._dispatchThread = Thread(target=self._dispatcher)
+    self._dispatchThread = Thread(name=self.name+'._dispatcher', target=self._dispatcher)
     self._lock = Lock()
     self._dispatchThread.start()
 
