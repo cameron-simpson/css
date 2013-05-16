@@ -32,6 +32,17 @@ def D_type2str(type_):
 F_HASMETA = 0x01
 F_HASNAME = 0x02
 
+def decode_Dirent_text(text):
+  ''' Accept `text`, a text transcription of a Direct, such as from
+      Dirent.textencode(), and return the correspnding Dirent.
+  '''
+  data = fromtext(text)
+  E, offset = decodeDirent(data)
+  if offset < len(data):
+    raise ValueError("%r: not all text decoded: got %r with unparsed data %r"
+                     % (text, E, data[offset:]))
+  return E
+
 def decodeDirent(data, offset):
   ''' Unserialise a Dirent, return (dirent, offset).
       Input format: bs(type)bs(flags)[bs(namelen)name][bs(metalen)meta]block
