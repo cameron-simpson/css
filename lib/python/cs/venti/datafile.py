@@ -297,7 +297,7 @@ class GDBMDataDir(DataDir):
   def _openIndex(self):
     import dbm.gnu
     gdbmpath = self.pathto(self.indexname)
-    return dbm.gnu.open(gdbmpath, "cf")
+    return dbm.gnu.open(gdbmpath, "c")
 
 class KyotoCabinetDataDir(DataDir):
   ''' An DataDir attached to a KyotoCabinet index.
