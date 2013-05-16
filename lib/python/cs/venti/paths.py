@@ -6,11 +6,10 @@
 
 import os
 from cs.logutils import D, info, warning
-from . import defaults
-from .dir import Dir
+from .dir import decode_Dirent_text
 
-def hashpath_dir(hashpath, do_mkdir=False):
-  dir, name = hashpath_resolve(hashpath, do_mkdir=do_mkdir)
+def dirent_dir(direntpath, do_mkdir=False):
+  dir, name = dirent_resolve(direntpath, do_mkdir=do_mkdir)
   if name is not None:
     if name in dir or not do_mkdir:
       dir = dir.chdir1(name)
@@ -18,33 +17,30 @@ def hashpath_dir(hashpath, do_mkdir=False):
       dir = dir.mkdir(name)
   return dir
 
-def hashpath_file(hashpath, do_create=False):
-  dir, name = hashpath_resolve(hashpath)
+def dirent_file(direntpath, do_create=False):
+  dir, name = dirent_resolve(direntpath)
   if name is None:
-    raise ValueError("no filename component: %s", hashpath)
+    raise ValueError("no filename component: %s", direntpath)
   if name in dir:
     return dir[name]
   if not do_create:
-    raise ValueError("no such file: %s", hashpath)
+    raise ValueError("no such file: %s", direntpath)
   raise RuntimeError("file creation not yet implemented")
 
-def hashpath_resolve(hashpath, do_mkdir=False):
-  rootD, tail = get_rootD(hashpath)
+def dirent_resolve(direntpath, do_mkdir=False):
+  rootD, tail = get_dirent(direntpath)
   return resolve(rootD, tail, domkdir=do_mkdir)
 
-def get_rootD(path):
-  ''' Take a path starting with a hashcode designating a Dir block
-      and return the Dir and the remaining path.
+def get_dirent(direntpath):
+  ''' Take `direntpath` starting with a text transcription of a Dirent and
+      return the Dirent and the remaining path.
   '''
   try:
-    hexpart, tail = path.split('/', 1)
+    hexpart, tail = direntpath.split('/', 1)
   except ValueError:
-    hexpart = path
+    hexpart = direntpath
     tail = ''
-  S = defaults.S
-  h = S.hashclass(untexthexify(hexpart))
-  rootD = Dir('/', dirblock=S[h])
-  return rootD, tail
+  return decode_Dirent_text(hexpart), tail
 
 def resolve(rootD, subpath, do_mkdir=False):
   ''' Descend from the Dir `rootD` via the path `subpath`.
