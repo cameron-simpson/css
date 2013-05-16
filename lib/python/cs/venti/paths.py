@@ -114,16 +114,26 @@ def copy_in_dir(rootpath, rootD, delete=False, ignore_existing=False, trust_size
         for filename in sorted(filenames):
           with Pfx(filename):
             if ignore_existing and filename in dirD:
-              info("already Stored, skipping")
+              info("skipping, already Stored")
               continue
             filepath = os.path.join(ospath, filename)
             if not os.path.isfile(filepath):
               warning("not a regular file, skipping")
               continue
-            info("STORE %s", filepath)
-            # TODO: use existing file Dirent for comparison if any
+            matchBlocks = None
+            if filename in dirD:
+              fileE = dirD[filename]
+              B = fileE.getBlock()
+              if trust_size_mtime:
+                M = fileE.meta
+                st = os.stat(filepath)
+                if st.st_mtime == M.mtime and st.st_size == len(B):
+                  info("skipping, same mtime and size")
+                  continue
+              info("comparing with %s", B)
+              matchBlocks = B.leaves
             try:
-              E = copy_in_file(filepath)
+              E = copy_in_file(filepath, matchBlocks=matchBlocks)
             except OSError as e:
               error(str(e))
               continue
