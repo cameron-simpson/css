@@ -21,8 +21,8 @@ from cs.lex import unctrl
 from cs.logutils import D, Pfx, error
 from . import totext, fromtext
 from .blockify import blockFromFile
-from .dir import decode_Dirent_text, Dir, FileDirent
-from .paths import copy_in
+from .dir import decode_Dirent_text, Dir
+from .paths import copy_in_dir, copy_in_file
 
 def archive(arfile, path,
           trust_size_mtime=False,
@@ -63,13 +63,13 @@ def archive(arfile, path,
         E = Dir(os.path.basename(path))
       else:
         E = oldE
-      copy_in(path, E, delete=not keep_missing, ignore_existing=ignore_existing, trust_size_mtime=trust_size_mtime)
+      copy_in_dir(path, E, delete=not keep_missing,
+                  ignore_existing=ignore_existing,
+                  trust_size_mtime=trust_size_mtime)
+    elif not os.path.isfile(path):
+      error("not a regular file")
     else:
-      # TODO: incremental update mode to read the file in leaf sized
-      # chunks and hash compare against leaf block hashes
-      with open(path, 'rb') as fp:
-        topBlock = blockFromFile(fp)
-      E = FileDirent(os.path.basename(path), None, topBlock)
+      E = copy_in_file(path)
 
     E.name = path
     if arfile is None:
