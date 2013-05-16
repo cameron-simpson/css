@@ -294,6 +294,9 @@ class GDBMDataDir(DataDir):
 
   indexname = "index.gdbm"
 
+  def __str__(self):
+    return "GDBMDataDir(%s)" % (self.dir,)
+
   def _openIndex(self):
     import dbm.gnu
     gdbmpath = self.pathto(self.indexname)
