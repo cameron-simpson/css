@@ -68,7 +68,7 @@ class BasicStore(NestingOpenClose):
       NestingOpenClose.__init__(self)
       self.name = name
       self.logfp = None
-      self.__funcQ = Later(capacity)
+      self.__funcQ = Later(capacity, name="%s:Later(__funcQ)" % (self.name,))
       self.hashclass = Hash_SHA1
       self._lock = Lock()
       self.readonly = False
@@ -150,6 +150,9 @@ class BasicStore(NestingOpenClose):
     defaults.pushStore(self)
 
   def __exit__(self, exc_type, exc_value, traceback):
+    if exc_value:
+      import traceback as TB
+      TB.print_tb(traceback, file=sys.stderr)
     defaults.popStore()
     return NestingOpenClose.__exit__(self, exc_type, exc_value, traceback)
 
