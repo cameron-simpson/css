@@ -6,7 +6,8 @@
 
 import os
 from cs.logutils import Pfx, D, info, warning
-from .dir import decode_Dirent_text
+from .blockify import blockFromFile
+from .dir import decode_Dirent_text, FileDirent
 
 def dirent_dir(direntpath, do_mkdir=False):
   dir, name = dirent_resolve(direntpath, do_mkdir=do_mkdir)
@@ -72,63 +73,84 @@ def walk(rootD):
         subpath = dir
       pending.push( (subD, subpath) )
 
-def copy_in(rootpath, rootD, delete=False, ignore_existing=False, trust_size_mtime=False):
+def copy_in_dir(rootpath, rootD, delete=False, ignore_existing=False, trust_size_mtime=False):
   ''' Copy the os directory tree at `rootpath` over the Dir `rootD`.
   '''
-  with Pfx("update_dir(%s)", rootpath):
+  with Pfx("copy_in(%s)", rootpath):
     rootpath_prefix = rootpath + '/'
     for ospath, dirnames, filenames in os.walk(rootpath):
-      info(ospath)
+      D("%s: dirnames=%s, filenames=%s", ospath, dirnames, filenames)
       with Pfx(ospath):
         if ospath == rootpath:
-          D = rootD
+          dirD = rootD
         elif ospath.startswith(rootpath_prefix):
-          D, name = resolve(rootD, ospath[len(rootpath_prefix):])
-          D = D.chdir1(name)
+          dirD, name = resolve(rootD, ospath[len(rootpath_prefix):])
+          dirD = dirD.chdir1(name)
 
         if not os.path.isdir(rootpath):
           warning("not a directory?")
 
         if delete:
-          # Remove entries in D not present in the real filesystem
+          # Remove entries in dirD not present in the real filesystem
           allnames = set(dirnames)
           allnames.update(filenames)
-          Dnames = sorted(D.keys())
+          Dnames = sorted(dirD.keys())
           for name in Dnames:
             if name not in allnames:
               info("delete %s", name)
-              del D[name]
+              del dirD[name]
 
         for dirname in sorted(dirnames):
-          if dirname not in D:
-            D.mkdir(dirname)
-          else:
-            E = D[dirname]
-            if not E.isdir:
-              # old name is not a dir - toss it and make a dir
-              del D[dirname]
-              E = D.mkdir(dirname)
+          with Pfx("%s/", dirname):
+            if dirname not in dirD:
+              dirD.mkdir(dirname)
+            else:
+              E = dirD[dirname]
+              if not E.isdir:
+                # old name is not a dir - toss it and make a dir
+                del dirD[dirname]
+                E = dirD.mkdir(dirname)
 
         for filename in sorted(filenames):
-          filepath = os.path.join(ospath, filename)
-          if not os.path.isfile(filepath):
-            warning("not a regular file, skipping %s", filepath)
-            continue
-
+          with Pfx(filename):
+            if ignore_existing and filename in dirD:
+              info("already Stored, skipping")
+              continue
+            filepath = os.path.join(ospath, filename)
+            if not os.path.isfile(filepath):
+              warning("not a regular file, skipping")
+              continue
+            info("STORE %s", filepath)
+            # TODO: use existing file Dirent for comparison if any
             try:
-              E = D.storeFilename(filepath, filename,
-                              trust_size_mtime=trust_size_mtime,
-                              ignore_existing=ignore_existing)
+              E = copy_in_file(filepath)
             except OSError as e:
-              error("%s: %s", filepath, e)
+              error(str(e))
+              continue
             except IOError as e:
-              error("%s: %s", filepath, e)
+              error(str(e))
+              continue
+            dirD[filename] = E
+
+def copy_in_file(filepath, name=None, rsize=None, matchBlocks=None):
+  ''' Store the file named `filepath`.
+      Return the FileDirent.
+  '''
+  if name is None:
+    name = os.path.basename(filepath)
+  with Pfx(filepath):
+    with open(filepath, "rb") as sfp:
+      B = blockFromFile(sfp, rsize=rsize, matchBlocks=matchBlocks)
+      st = os.fstat(sfp.fileno())
+    E = FileDirent(name, None, B)
+    E.meta.update_from_stat(st)
+  return E
 
 def copy_out(rootD, rootpath, makedirs=False, delete=False, ignore_existing=False, trust_size_mtime=False):
   ''' Copy the Dir `rootD` onto the os directory `rootpath`.
       Notes: `delete` not implemented.
   '''
-  with Pfx("restore(rootpath=%s)", rootpath):
+  with Pfx("copy_out(rootpath=%s)", rootpath):
     if not os.path.isdir(rootpath):
       if makedirs:
         os.makedirs(rootpath)
