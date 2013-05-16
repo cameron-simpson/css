@@ -17,7 +17,7 @@ import time
 from datetime import datetime
 from cs.lex import unctrl
 from cs.venti import totext, fromtext
-from .dir import Dir, decodeDirent, storeDir
+from .dir import decode_Dirent_text
 from .file import storeFilename
 from cs.logutils import Pfx, error
 
@@ -127,9 +127,7 @@ def read_Dirents(fp):
       # allow optional trailing text, which will be the E.name part normally
       isodate, unixtime, dent = line.split(None, 3)[:3]
       when = float(unixtime)
-      E, etc = decodeDirent(fromtext(dent))
-      if etc:
-        raise ValueError("incomplete Dirent parse: left with %r from %r" % (etc, dent))
+      E = decode_Dirent_text(dent)
     # note: yield _outside_ Pfx
     yield when, E
 
