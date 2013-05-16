@@ -11,6 +11,7 @@
     encoding of a cs.venti.dir.Dirent.
 '''
 
+from __future__ import print_function
 import os
 import sys
 import time
@@ -98,9 +99,9 @@ def retrieve(arfile, paths=None):
 
 def toc_report(fp, path, E, verbose):
   if verbose:
-    print >>fp, path
+    print(path, file=fp)
   else:
-    print >>fp, E.meta, path
+    print(E.meta, path, file=fp)
   if E.isdir:
     for subpath in sorted(E.keys()):
       toc_report(fp, os.path.join(path, subpath), E[subpath], verbose)
