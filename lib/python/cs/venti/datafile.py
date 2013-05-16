@@ -82,7 +82,8 @@ class DataFile(O):
     with self._lock:
       fp.seek(offset)
       flags, data = self._readhere(fp)
-    assert flags is not None, "no data read from offset %d" % (offset,)
+    if flags is None:
+      raise RuntimeError("no data read from offset %d" % (offset,))
     if flags & F_COMPRESSED:
       data = decompress(data)
     return data
