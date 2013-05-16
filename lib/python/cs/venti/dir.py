@@ -11,7 +11,7 @@ from cs.seq import seq
 from cs.serialise import get_bs, get_bsdata, put_bs, put_bsdata
 from cs.threads import locked_property
 from . import totext, fromtext
-from .block import decodeBlock
+from .block import Block, decodeBlock
 from .blockify import blockFromString
 from .meta import Meta
 
@@ -130,10 +130,9 @@ class Dirent(object):
 
     if no_name:
       name = ""
-    elif name is None:
+    name = self.name
+    if name is None:
       name = ""
-    else:
-      name = self.name
     if name:
       namedata = put_bsdata(name.encode())
       flags |= F_HASNAME
@@ -372,13 +371,12 @@ class Dir(Dirent):
   def getBlock(self):
     ''' Return the top Block referring to an encoding of this Dir.
     '''
-    names = self.keys()
-    names.sort()
-    return blockFromString(
-            "".join( self[name].encode()
+    names = sorted(self.keys())
+    data = b''.join( self[name].encode()
                      for name in names
                      if name != '.' and name != '..'
-                   ))
+                   )
+    return Block(data=data)
 
   def rename(self, oldname, newname):
     ''' Rename entry `oldname` to entry `newname`.
