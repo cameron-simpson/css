@@ -1,0 +1,37 @@
+#!/bin/sh
+#
+# Read analog dnscache files, write merged files.
+#       - Cameron Simpson <cs@zip.com.au> 02apr2013
+#
+
+set -ue
+
+cmd=`basename "$0"`
+usage="Usage: $cmd -o out-dnscache dnscaches..."
+
+badopts=
+
+output=
+
+if [ $# -gt 0 ] && [ "x$1" = x-o ]
+then
+  shift
+  output=$1
+  shift
+fi
+
+if [ -z "$output" ]
+then
+  echo "$cmd: missing -o out-dnscache" >&2
+  badopts=1
+fi
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing dnscaches..." >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+sort -rn -- "$@" | keepfirst -2 | rewriteif "$output" sort -n

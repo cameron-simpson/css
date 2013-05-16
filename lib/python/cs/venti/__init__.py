@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
-''' A data store after the style of the Venti scheme.
+''' A data store after the style of the Venti scheme, but not at all binary
+    compatible.
 
     The Plan 9 Venti system is decribed here:
       http://library.pantek.com/general/plan9.documents/venti/venti.html
@@ -20,6 +21,7 @@
 '''
 
 import re
+from string import ascii_letters, digits
 import threading
 from cs.lex import texthexify, untexthexify
 
@@ -48,9 +50,14 @@ def fromtext(s):
   '''
   return untexthexify(s)
 
-_totext_white_re = re.compile(r'[-a-zA-Z0-9_+.,=/:;{}*]+')
+# Characters that may appear in text sections of a texthexify result.
+# Because we transcribe Dir blocks this way it includes some common
+# characters used for metadata.
+# Note: no path separator ("/") because we may accept this as a
+#       path pseudocomponent.
+_texthexify_white_chars = ascii_letters + digits + '_+.,=:;{}*'
 
 def totext(data):
   ''' Represent a byte sequence as a hex/text string.
   '''
-  return texthexify(data, whitelist_re = _totext_white_re)
+  return texthexify(data, whitelist=_texthexify_white_chars)

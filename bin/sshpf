@@ -1,0 +1,9 @@
+#!/bin/sh
+#
+# Ssh for port forwarding.
+#       - Cameron Simpson <cs@zip.com.au> 27mar2013
+#
+
+sshcfg=${SSHPF_CONFIG:-$HOME/rc/ssh/config-pf}
+
+exec ssh -n -F "$sshcfg" ${1+"$@"}

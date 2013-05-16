@@ -1,70 +1,98 @@
-#!/usr/bin/python -tt
+#!/usr/bin/env py26+
 #
 # Merge Apache access logs named on the command line.
 #       - Cameron Simpson <cs@zip.com.au> 30aug2007
 #
 
 import sys
+import os.path
+import gzip
+from heapq import merge
+import re
 import time
 from getopt import getopt, GetoptError
 from datetime import datetime, timedelta
-from cs.logutils import setup_logging, error, warn, cmd
+from cs.logutils import setup_logging, error, warning, Pfx
 
-setup_logging()
+re_MULTIADDRS = re.compile(r'^[^ ,]+ *,( |%20)*')
 
-usage='''Usage: %s [-M] [-O] /fixed-string/ logfiles
-  -M    Accept multiple leading IP addresses on a line, emit the last.
-  -O    Require strict ordering in the input log files.
+def main(argv):
+  argv = list(argv)
+  cmd = os.path.basename(argv.pop(0))
+  setup_logging(cmd)
+
+  usage = '''Usage: %s [-M] [-O] /fixed-string/ logfiles
+    -M    Accept multiple leading IP addresses on a line, emit the last.
+    -O    Require strict ordering in the input log files.
 ''' % (cmd,)
 
-requireOrdering=False
-multiAddrs=False
-fgrep=None
-badopts=False
+  requireOrdering = False
+  multiAddrs = False
+  fgrep = None
+  badopts = False
 
-try:
-  opts, args = getopt(sys.argv[1:], 'MO')
-except GetoptError, e:
-  error(e)
-  badopts=True
+  try:
+    opts, args = getopt(sys.argv[1:], 'MO')
+  except GetoptError, e:
+    error(e)
+    badopts = True
 
-if not badopts:
-  for opt, value in opts:
-    if opt == '-M':
-      multiAddrs=True
-    elif opt == '-O':
-      requireOrdering=True
-    else:
-      assert True, "%s: unhandled option: %s" % (cmd, opt)
+  if not badopts:
+    for opt, value in opts:
+      if opt == '-M':
+        multiAddrs = True
+      elif opt == '-O':
+        requireOrdering = True
+      else:
+        assert True, "%s: unhandled option: %s" % (cmd, opt)
 
-  if args and len(args[0]) > 2 and args[0].startswith('/') and args[0].endswith('/'):
-    fgrep = args[0][1:-1]
-    args.pop(0)
+    if args and len(args[0]) > 2 and args[0].startswith('/') and args[0].endswith('/'):
+      fgrep = args[0][1:-1]
+      args.pop(0)
 
-  if len(args) < 1:
-    error("missing logfiles")
-    badopts=True
+    if len(args) < 1:
+      error("missing logfiles")
+      badopts = True
 
-if badopts:
-  sys.stderr.write(usage)
-  sys.exit(2)
+  if badopts:
+    sys.stderr.write(usage)
+    sys.exit(2)
 
-if multiAddrs:
-  import re
-  leadingAddrRe = re.compile(r'[^ ,]*,( |%20)*')
+  zones = {}
 
-zones={}
-defaultZone=None
+  # compute defaultZone
+  tm = time.localtime()
+  if tm[8]:
+    tzoff = time.altzone
+  else:
+    tzoff = time.timezone
+  if tzoff < 0:
+    zoneSign = '+'
+    tzoff = -tzoff
+  else:
+    zoneSign = '-'
+  defaultZone = "%s%02d%02d" % (zoneSign, int(tzoff/3600), int( int(tzoff/60) % 60))
 
-def aptime(logline):
-  fields = logline.split(' ')
+  queues = [ apdata(arg, zones, defaultZone, requireOrdering, multiAddrs, fgrep)
+             for arg in args
+           ]
+
+  for dt, apline in merge(*queues):
+    print apline
+
+  return 0
+
+def aptime(logline, zones, defaultZone):
+  ''' Compute a datetime object from the supplied Apache log line.
+      `defaultZone` is the timezone to use if it cannot be deduced.
+  '''
+  fields = logline.split()
   if len(fields) < 5:
-    ##warn("bad log line: %s", logline)
+    ##warning("bad log line: %s", logline)
     return None
 
-  global defaultZone
-  dt=None
-  tzinfo=None
+  dt = None
+  tzinfo = None
 
   # try for desired "[DD/Mon/YYYY:HH:MM:SS +hhmm]" format
   humantime, tzinfo = fields[3], fields[4]
@@ -72,145 +100,102 @@ def aptime(logline):
   and humantime.startswith('[') \
   and tzinfo.endswith(']'):
     try:
-      dt=datetime.strptime(humantime, "[%d/%b/%Y:%H:%M:%S")
+      dt = datetime.strptime(humantime, "[%d/%b/%Y:%H:%M:%S")
     except ValueError, e:
-      dt=None
+      dt = None
     if dt is None:
-      tzinfo=None
+      tzinfo = None
     else:
-      tzinfo=tzinfo[:-1]
+      tzinfo = tzinfo[:-1]
 
   if dt is None:
-    tzinfo=None
+    tzinfo = None
     # try for undesired "[DD/Mon/YYYY:HH:MM:SS]" format
     humantime = fields[3]
     if len(humantime) == 22 \
     and humantime.startswith('[') \
     and humantime.endswith(']'):
       try:
-        dt=datetime.strptime(humantime, "[%d/%b/%Y:%H:%M:%S]")
+        dt = datetime.strptime(humantime, "[%d/%b/%Y:%H:%M:%S]")
       except ValueError, e:
-        dt=None
+        dt = None
 
   if dt is None:
-    tzinfo=None
+    tzinfo = None
     # try for undesired "[DD/Mon/YYYY HH:MM:SS]" format
-    humantime=" ".join(fields[3:5])
+    humantime = " ".join(fields[3:5])
     if len(humantime) == 22 \
     and humantime.startswith('[') \
     and humantime.endswith(']'):
       try:
-        dt=datetime.strptime(humantime, "[%d/%b/%Y %H:%M:%S]")
+        dt = datetime.strptime(humantime, "[%d/%b/%Y %H:%M:%S]")
       except ValueError, e:
-        dt=None
+        dt = None
 
   if dt is None:
-    warn("bad human time in log line: %s", logline)
+    warning("bad human time in log line: %s", logline)
     return None
 
   # use defaultZone if tzinfo is not set
   if tzinfo is None:
-    if defaultZone is None:
-      tm=time.localtime()
-      if tm[8]:
-        tzoff=time.altzone
-      else:
-        tzoff=time.timezone
-      if tzoff < 0:
-        zoneSign='+'
-        tzoff = -tzoff
-      else:
-        zoneSign='-'
-      defaultZone = "%s%02d%02d" % (zoneSign, int(tzoff/3600), int( int(tzoff/60) % 60))
-    tzinfo=defaultZone
+    tzinfo = defaultZone
 
-  global zones
   if tzinfo not in zones:
     if len(tzinfo) != 5 \
     or tzinfo[0] not in '+-' \
     or not tzinfo[1:5].isdigit():
-      warn("bad timezone offset (%s) in log line: %s", tzinfo, logline)
+      warning("bad timezone offset (%s) in log line: %s", tzinfo, logline)
       return None
-    tzoff=(int(tzinfo[1:3])*60+int(tzinfo[3:5]))*60
+    tzoff = (int(tzinfo[1:3])*60+int(tzinfo[3:5]))*60
     if tzinfo[0] == '+':
       tzoff = -tzoff
-    zones[tzinfo]=timedelta(0,tzoff)
+    zones[tzinfo] = timedelta(0, tzoff)
 
-  tzoff=zones[tzinfo]
+  tzoff = zones[tzinfo]
   dt += tzoff
 
   ##print "%s %s => %s" % (humantime, tzinfo, dt.isoformat())
 
   return dt
 
-class LogFile:
-  def __init__(self,filename):
-    self.filename=filename
+def apdata(fp, zones, defaultZone, requireOrdering, multiAddrs, fgrep):
+  ''' Generator to yield (dt, apline) from Apache log data `fp`.
+  '''
+  if isinstance(fp, str):
+    filename = fp
     if filename.endswith('.gz'):
-      import gzip
-      self.fp=gzip.open(filename)
-    else:
-      self.fp=open(filename)
-    self.lineno=0
-
-  def lines(self):
-    global cmd, requireOrdering, multiAddrs, leadingAddrRe, fgrep
-
-    olddt=None
-    for line in self.fp:
-      self.lineno+=1
-      if line[-1] != '\n':
-        warn("%s, line %d: unexpected EOF: %s",
-             self.filename, self.lineno, line)
-        break
-
-      if fgrep is not None and fgrep not in line:
-        continue
-
-      line=line[:-1]
-
-      if multiAddrs:
-        m=leadingAddrRe.match(line)
-        while m is not None:
-          line=line[m.end():]
-          m=leadingAddrRe.match(line)
-
-      dt=aptime(line)
-      if dt is None:
-        continue
-
-      if requireOrdering:
-        assert olddt is None or olddt <= dt, \
-              "%s: %s, line %d: out of order timestamps: %s" \
-              % (cmd, self.filename, self.lineno, line)
-      olddt=dt
-
-      yield line, dt
-
-queues = [ LogFile(arg).lines() for arg in args ]
-lines  = [None] * len(queues)
-
-while len(queues) > 0:
-  choice = None
-  i=0
-  while i < len(queues):
-    if lines[i] is None:
       try:
-        nline, ndt = queues[i].next()
-      except StopIteration:
-        # EOF on file, remove file from queue
-        del queues[i]
-        del lines[i]
-        continue
-      lines[i] = (nline, ndt)
+        with gzip.open(filename) if filename.endswith('.gz') else open(filename) as fp:
+          for dt, apline in apdata(fp, zones, defaultZone, requireOrdering, multiAddrs, fgrep):
+            yield dt, apline
+      except IOError as e:
+        error("%s: %s", filename, e)
+    return
 
-    if choice is None or lines[i][1] < lines[choice][1]:
-      choice=i
+  olddt = None
+  lineno = 0
+  for apline in fp:
+    lineno += 1
+    if not apline.endswith('\n'):
+      raise ValueError("%s:%d: missing trailing newline" % (fp, lineno))
+    apline = apline[:-1]
+    if fgrep and fgrep not in apline:
+      continue
+    if multiAddrs:
+      m = re_MULTIADDRS.match(apline)
+      while m is not None:
+        apline = apline[m.end():]
+        m = re_MULTIADDRS.match(apline)
+    dt = aptime(apline, zones, defaultZone)
+    if dt is None:
+      warning("%s:%d: cannot compute datetime, discarding line: %s", fp, lineno, apline)
+      continue
+    if requireOrdering:
+      if olddt is not None and olddt > dt:
+        raise ValueError("%s:%d: out of order timestamps: old=%s, new=%s" % (fp, lineno, olddt, dt))
 
-    i+=1
+    yield dt, apline
+    olddt = dt
 
-  if choice is not None:
-    print lines[choice][0]
-    lines[choice]=None
-  else:
-    assert len(queues) == 0
+if __name__ == '__main__':
+  sys.exit(main(sys.argv))

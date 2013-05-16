@@ -18,6 +18,7 @@ def main(argv):
 
   cmd = argv.pop(0)
   usage = "Usage: %s localfile otherfile\n" % (cmd,)
+
   if len(argv) != 2:
     sys.stderr.write(usage)
     return 2
@@ -29,6 +30,7 @@ def main(argv):
     locallines = localfp.readlines()
   with open(otherfile) as otherfp:
     otherlines = otherfp.readlines()
+
   localupto = 0
   otherupto = 0
   S = SequenceMatcher(None, locallines, otherlines)
@@ -44,20 +46,23 @@ def main(argv):
     otherupto = otherstart
 
     # check that the match section really matches
-    if locallines[localstart:localstart+length] != otherlines[otherstart:otherstart+length]:
+    if locallines[localstart:localstart+length] == otherlines[otherstart:otherstart+length]:
+      # recite the matching section
+      for line in locallines[localstart:localstart+length]:
+        sys.stdout.write(line)
+    else:
+      # this should never happen
+      # complain, pollute the output, and exit non-zero
       sys.stderr.write("%s: error: %s[%d:%d] does not match %s[%d:%d]\n"
                        % (cmd,
                           localfile, localstart+1, localstart+length+1,
                           otherfile, otherstart+1, otherstart+length+1))
       for line in locallines[localstart:localstart+length]:
-        sys.stderr.write("LOCAL: "+line)
+        sys.stdout.write("LOCAL: "+line)
       for line in otherlines[otherstart:otherstart+length]:
-        sys.stderr.write("OTHER: "+line)
-      raise ValueError, "match section does not match"
+        sys.stdout.write("OTHER: "+line)
+      xit = 1
 
-    # recite the matching section
-    for line in locallines[localstart:localstart+length]:
-      sys.stdout.write(line)
     localupto += length
     otherupto += length
 

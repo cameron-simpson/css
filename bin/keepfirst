@@ -1,13 +1,41 @@
-#!/usr/bin/awk -f
+#!/bin/sh
 #
 # Keep first instances of lines.
 # - Cameron Simpson <cs@zip.com.au>
 #
-# Converted to awk, made simple filter. - cameron
+# Converted to awk, made simple filter.
+# Accept key columns, parse with shell, invoke awk for processing.
 #
 
-{ if (!seen["x"$0])
-  { print
-    seen["x"$0]=1
-  }
-}
+cmd=`basename "$0"`
+usage="Usage: $cmd [-colnum[,colnum...]] [--] [files...]"
+
+colexpr='$0'
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    -[0-9]*)
+        colexpr=`expr "x$1" : 'x-\(.*\)'`
+        colexpr=`printf '%s\n' "$colexpr" | sed 's/[0-9][0-9]*/$&/g; s/,/ "," /g'`
+        ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+exec awk "
+          { key=$colexpr; "'
+            if (!seen[key]) {
+              print
+              seen[key]=1
+            }
+          }' ${1+"$@"}

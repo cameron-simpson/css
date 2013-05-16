@@ -1,10 +1,11 @@
 import base64
 import binascii
 import quopri
-import string
+from string import printable, whitespace, ascii_letters, digits
 import re
 import sys
 from cs.py3 import unicode
+from cs.logutils import D
 
 unhexify = binascii.unhexlify
 if sys.hexversion >= 0x030000:
@@ -43,7 +44,7 @@ def unctrl(s,tabsize=8):
       ch2='\\v'
     else:
       o=ord(ch)
-      if o < ord_space or string.printable.find(ch) == -1:
+      if o < ord_space or printable.find(ch) == -1:
         if o >= 256:
           ch2="\\u%04x"%o
         else:
@@ -76,7 +77,7 @@ def tabpadding(padlen,tabsize=8,offset=0):
 def skipwhite(s,start=0):
   ''' Returns the location of next nonwhite in string.
   '''
-  while start < len(s) and s[start] in string.whitespace:
+  while start < len(s) and s[start] in whitespace:
     start+=1
   return start
 
@@ -84,10 +85,10 @@ def strlist(ary,sep=", "):
   return sep.join([str(a) for a in ary])
 
 def lastlinelen(s):
-  """ length of text after last newline in string
-      initially used by cs.hier to compute effective text width
-  """
-  return len(s)-string.rfind(s,'\n')-1
+  ''' The length of text after the last newline in a string.
+      Initially used by cs.hier to compute effective text width.
+  '''
+  return len(s) - s.rfind('\n') - 1
 
 DQ_RE=re.compile(r'"(([^\\"]|\\[\\"])*)"')
 nq_re=re.compile(r'\S+')
@@ -105,7 +106,7 @@ def get_dqstring(s):
 # parse a line consisting of words or "quoted strings"
 def parseline(line):
   words=[]
-  line=string.lstrip(line)
+  line=line.lstrip()
   while len(line) > 0:
     m=DQ_RE.match(line)
     if m is not None:
@@ -120,7 +121,7 @@ def parseline(line):
         error("aborting parseline at: %s", line)
         return None
 
-    line=string.lstrip(line)
+    line = line.lstrip()
 
   return words
 
@@ -159,40 +160,61 @@ def dict2js(d):
   import cs.json
   return cs.json.json(d)
 
-_texthexify_white_re = re.compile(r'[a-zA-Z0-9_\-+.,/]+')
+# characters that may appear in text sections of a texthexify result
+# Notation exclusions:
+#  \ - to avoid double in slosh escaped presentation
+#  % - likewise, for percent escaped presentation
+#  [ ] - the delimiters of course
+#  / - path separator
+#
+_texthexify_white_chars = ascii_letters + digits + '_-+.,'
 
-def texthexify(bs, shiftin='[', shiftout=']', whitelist_re=None):
+def texthexify(bs, shiftin='[', shiftout=']', whitelist=None):
   ''' Transcribe the bytes `bs` to text.
       hexify() and texthexify() output strings may be freely
       concatenated and decoded with untexthexify().
   '''
-  # blond conversion of bytes to unicode so we can apply regexp
-  byte_coding = 'iso8859-1'
-  s = bs.decode(byte_coding)
-  if whitelist_re is None:
-    whitelist_re = _texthexify_white_re
-  elif type(whitelist_re) is str:
-    whitelist_re = re.compile(whitelist_re)
+  if sys.hexversion < 0x03000000:
+    bschr = lambda bs, ndx: bs[ndx]
+  else:
+    bschr = lambda bs, ndx: chr(bs[ndx])
+  if whitelist is None:
+    whitelist = _texthexify_white_chars
   inout_len = len(shiftin) + len(shiftout)
   chunks = []
-  sofar = 0
-  pos = 0
-  while pos < len(s):
-    m = whitelist_re.search(s, pos)
-    if not m:
-      break
-    offset = m.start(0)
-    text = m.group(0)
-    if len(text) >= inout_len:
-      if offset > pos:
-        chunks.append(hexify(bytes(s[sofar:offset], byte_coding)))
-      chunks.append(shiftin + text + shiftout)
-      sofar = m.end(0)
-    pos = m.end(0)
-
-  if sofar < len(s):
-    chunks.append(hexify(bytes(s[sofar:], byte_coding)))
-
+  offset = 0
+  offset0 = offset
+  inwhite = False
+  while offset < len(bs):
+    c = bschr(bs, offset)
+    if inwhite:
+      if c not in whitelist:
+        inwhite = False
+        if offset - offset0 > inout_len:
+          chunk = ( shiftin
+                  + ''.join( bschr(bs, o) for o in range(offset0, offset) )
+                  + shiftout
+                  )
+        else:
+          chunk = hexify(bs[offset0:offset])
+        chunks.append(chunk)
+        offset0 = offset
+    else:
+      if c in whitelist:
+        inwhite = True
+        chunk = hexify(bs[offset0:offset])
+        chunks.append(chunk)
+        offset0 = offset
+    offset += 1
+  if offset > offset0:
+    if inwhite and offset - offset0 > inout_len:
+      chunk = ( shiftin
+              + ''.join( bschr(bs, o) for o in range(offset0, offset) )
+              + shiftout
+              )
+    else:
+      chunk = hexify(bs[offset0:offset])
+    chunks.append(chunk)
   return ''.join(chunks)
 
 # regexp to match RFC2047 text chunks
@@ -255,17 +277,23 @@ def untexthexify(s, shiftin='[', shiftout=']'):
       break
     if hexlen > 0:
       hextext = s[:hexlen]
-      assert hexlen % 2 == 0, "uneven hex sequence \"%s\"" % (hextext,)
+      if hexlen % 2 != 0:
+        raise TypeError("uneven hex sequence \"%s\"" % (hextext,))
       chunks.append(unhexify(s[:hexlen]))
     s = s[hexlen+len(shiftin):]
     textlen = s.find(shiftout)
-    assert textlen >= 0, "missing shift out marker \"%s\"" % (shiftout,)
-    chunks.append(s[:textlen])
+    if textlen < 0:
+      raise TypeError("missing shift out marker \"%s\"" % (shiftout,))
+    if sys.hexversion < 0x03000000:
+      chunks.append(s[:textlen])
+    else:
+      chunks.append(bytes( ord(c) for c in s[:textlen] ))
     s = s[textlen+len(shiftout):]
   if len(s) > 0:
-    assert len(s) % 2 == 0, "uneven hex sequence \"%s\"" % (s,)
+    if len(s) % 2 != 0:
+      raise TypeError("uneven hex sequence \"%s\"" % (s,))
     chunks.append(unhexify(s))
-  return ''.join(chunks)
+  return b''.join(chunks)
 
 def get_chars(s, gochars, offset=0):
   ''' Scan the string `s` for characters in `gochars` starting at `offset`
@@ -282,27 +310,26 @@ def get_white(s, offset=0):
       `offset` (default 0).
       Return (match, new_offset).
   '''
-  return get_chars(s, string.whitespace, offset=offset)
+  return get_chars(s, whitespace, offset=offset)
 
 def get_nonwhite(s, offset=0):
   ''' Scan the string `s` for characters not in string.whitespace starting at
       `offset` (default 0).
       Return (match, new_offset).
   '''
-  return get_other_chars(s, string.whitespace, offset=offset)
+  return get_other_chars(s, whitespace, offset=offset)
 
 def get_identifier(s, offset=0):
-  ''' Scan the string `s` for an identifier (letter or underscore followed by
+  ''' Scan the string `s` for an identifier (ASCII letter or underscore followed by
       letters, digits or underscores) starting at `offset` (default 0).
       Return (match, new_offset).
       The empty string and an unchanged offset will be returned if
       there is no leading letter/underscore.
   '''
   ch = s[offset]
-  if ch != '_' and not ch.isalpha():
+  if ch != '_' and ch not in ascii_letters:
     return '', offset
-  # NB: compute letters+digits now in case locale gets changed at runtime
-  idtail, offset = get_chars(s, string.letters + string.digits + '_', offset+1)
+  idtail, offset = get_chars(s, ascii_letters + digits + '_', offset+1)
   return ch + idtail, offset
 
 def get_other_chars(s, stopchars, offset=0):
@@ -371,3 +398,7 @@ def parseUC_sAttr(attr):
   if isUC_(attr):
     return attr, False
   return None, False
+
+if __name__ == '__main__':
+  import cs.lex_tests
+  cs.lex_tests.selftest(sys.argv)

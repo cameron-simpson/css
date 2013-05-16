@@ -183,7 +183,7 @@ class Maildir(mailbox.Maildir):
 
   def remove_folder(self, folder):
     F = self.get_folder(folder)
-    for key in F.iterkeys():
+    for key in F.keys():
       raise mailbox.NotEmptyError("not an empty Maildir")
     folderpath = os.path.join(self.dir, folder)
     for subdir in 'tmp', 'new', 'cur':
@@ -206,9 +206,11 @@ class Maildir(mailbox.Maildir):
        and ':' not in key \
        and '/' not in key
 
-  def save_filepath(self, filepath, key=None, nolink=False):
-    ''' Save a file into the Maildir.
+  def save_filepath(self, filepath, key=None, nolink=False, flags=''):
+    ''' Save the file specified by `filepath` into the Maildir.
         By default a hardlink is attempted unless `nolink` is supplied true.
+        The optional `flags` is a string consisting of flag letters listed at:
+          http://cr.yp.to/proto/maildir.html
         Return the key for the saved message.
     '''
     with Pfx("save_filepath(%s)", filepath):
@@ -232,7 +234,10 @@ class Maildir(mailbox.Maildir):
       else:
         debug("copyfile %s => %s", filepath, tmppath)
         shutil.copyfile(filepath, tmppath)
-      newpath = os.path.join(self.dir, 'new', key)
+      newbase = key
+      if flags:
+        newbase += ':2,' + ''.join(sorted(flags))
+      newpath = os.path.join(self.dir, 'new', newbase)
       try:
         debug("rename %s => %s", tmppath, newpath)
         os.rename(tmppath, newpath)
@@ -240,10 +245,10 @@ class Maildir(mailbox.Maildir):
         debug("unlink %s", tmppath)
         os.unlink(tmppath)
         raise
-      self.msgmap[key] = ('new', key)
+      self.msgmap[key] = ('new', newbase)
       return key
 
-  def save_file(self, fp, key=None):
+  def save_file(self, fp, key=None, flags=''):
     ''' Save the contents of the file-like object `fp` into the Maildir.
         Return the key for the saved message.
     '''
@@ -251,13 +256,13 @@ class Maildir(mailbox.Maildir):
       debug("create new file %s for key %s", T.name, key)
       T.write(fp.read())
       T.flush()
-      return self.save_filepath(T.name, key=key)
+      return self.save_filepath(T.name, key=key, flags=flags)
 
-  def save_message(self, M, key=None):
+  def save_message(self, M, key=None, flags=''):
     ''' Save the contents of the Message `M` into the Maildir.
         Return the key for the saved message.
     '''
-    return self.save_file(StringIO(str(M)), key=key)
+    return self.save_file(StringIO(str(M)), key=key, flags=flags)
 
   def keypath(self, key):
     subdir, msgbase = self.msgmap[key]
@@ -319,7 +324,7 @@ class Maildir(mailbox.Maildir):
     return message
 
   def popitem(self):
-    for key in self.iterkeys():
+    for key in self.keys():
       return self.pop(key)
     raise KeyError("empty Maildir")
 

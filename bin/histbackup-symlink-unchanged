@@ -1,0 +1,94 @@
+#!/bin/sh
+#
+# Walk an existing histbackup directory looking for adjacent identical
+# hardlinked trees that can be turned into symlinks, and symlink.
+#       - Cameron Simpson <cs@zip.com.au> 16mar2013
+#
+
+set -ue
+
+trace=  ##set-x     ##eecho
+echo=:
+[ -t 1 ] && echo=echo
+
+cmd=`basename "$0"`
+usage="Usage: $cmd histbackup-dir [-x] [dates...]"
+
+badopts=
+
+[ $# -gt 0 ] && [ "x$1" = x-x ] && { trace=set-x; shift; }
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing histbackup-dir" >&2
+  badopts=1
+else
+  hbdir=$1
+  shift
+  if [ ! -d "$hbdir/." ]
+  then
+    echo "$cmd: histbackup-dir: not a directory: $hbdir" >&2
+    badopts=1
+  fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+cd "$hbdir" || exit 1
+
+lastbak=
+
+for bakdir in [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]*
+do
+  pfx=$hbdir/$bakdir
+  # ignore backups that are already symlinks
+  [ -h "$bakdir" ] && continue
+
+  # if specific backups were specified, do not check backups not mentioned
+  if [ $# = 0 ]
+  then
+    docheck=1
+  else
+    case " $* " in
+      *" $bakdir "*)    docheck=1 ;;
+      *)                docheck= ;;
+    esac
+  fi
+
+  # not a directory? complain and ignore
+  if [ ! -d "$bakdir" ]
+  then
+    [ $docheck ] && echo "$cmd: $pfx: not a directory, skipping" >&2
+    continue
+  fi
+
+  if [ -z "$lastbak" ]
+  then
+    # first actual backup; just remember it for next check
+    lastbak=$bakdir
+    continue
+  fi
+
+  # check this one? skip if not
+  [ $docheck ] || {
+    # note as most recent real directory
+    lastbak=$bakdir
+    continue
+  }
+
+  changes=`rsync -niO -aH "./$lastbak/" "./$bakdir/" | sed 1q`
+  if [ -n "$changes" ]
+  then
+    # note as most recent real directory
+    lastbak=$bakdir
+    $echo "$pfx: has changes, note as most recent real directory"
+    continue
+  fi
+  $echo "$pfx: unchanged, linking to $lastbak"
+
+  # identical: symlink and discard old directory
+  tmp=.tmp$$-$bakdir
+  $trace mv "$bakdir" "$tmp"
+  $trace ln -i -s "$lastbak" "$bakdir"
+  $trace rm -rf "$tmp"
+done

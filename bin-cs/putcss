@@ -4,19 +4,20 @@
 #	- Cameron Simpson <cs@zip.com.au> 18jan2004
 #
 
-: ${OPTCSS:=/opt/css}
+set -ue
 
 cmd=`basename "$0"` || cmd=$0
+usage="Usage: $cmd [-d dstdir] hostslists..."
+
+: ${OPTCSS:=/opt/css}
+
 async=1
 srcdir=$OPTCSS
 dstdir=$OPTCSS
 [ $# -gt 0 ] && [ "x$1" = x-d ] && { dstdir=$2; shift; shift; }
-[ $# = 0 ] && { echo "Usage: $cmd [-d dstdir] hosts..." >&2; exit 2; }
+[ $# = 0 ] && { echo "$usage" >&2; exit 2; }
 
-( for host in `hostlist "$@"`
-  do
-    pfx "$cmd $host" rsync -iO -aH --delete "$srcdir/." "$host:$dstdir/." &
-    [ $async ] || wait
-  done
-  wait
-)
+for hostlist
+do
+  mrsync -iO -aH --delete --delete-excluded '--exclude=*.pyc' "$srcdir/." "$hostlist:$dstdir/."
+done

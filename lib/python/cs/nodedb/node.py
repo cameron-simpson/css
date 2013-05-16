@@ -20,7 +20,7 @@ from cs.obj import O
 from cs.lex import str1, parseUC_sAttr
 from cs.logutils import Pfx, D, error, warning, info, debug, exception
 from cs.seq import the, get0
-from cs.py3 import StringTypes
+from cs.py3 import StringTypes, unicode
 from .export import edit_csv_wide, export_csv_wide
 
 # regexp to match TYPE:name
@@ -63,11 +63,11 @@ def nodekey(*args):
     else:
       raise ValueError("nodekey() takes (TYPE, NAME) args or a single arg: args=%s" % ( args, ))
 
-    if type(t) not in (str, unicode):
+    if type(t) not in StringTypes:
       raise ValueError("expected TYPE to be a string: %r" % (t,))
     if type(name) is int:
       name = str(name)
-    elif type(name) not in (str, unicode):
+    elif type(name) not in StringTypes:
       raise ValueError("expected NAME to be a string: %r" % (name,))
     if not t.isupper() and t != '_':
       raise ValueError("invalid TYPE, not upper case or _")
@@ -302,11 +302,13 @@ class Node(dict):
     self.nodedb = nodedb
     self._reverse = {}  # maps (OtherNode, ATTR) => count
 
-  def __nonzero__(self):
+  def __bool__(self):
     ''' bool(Node) returns True, unlike a dict.
         Conversely, the NoNode singleton returns False from bool().
     '''
     return True
+
+  __nonzero__ = __bool__
 
   def __hash__(self):
     ''' Hash function, based on name, type and nodedb id.
@@ -621,11 +623,13 @@ class _NoNode(Node):
   def __init__(self, nodedb):
     Node.__init__(self, '_NoNode', '<_NoNode>', nodedb)
 
-  def __nonzero__(self):
+  def __bool__(self):
     ''' A NodeDB's NoNode returns False from bool().
         Other Nodes return True.
     '''
     return False
+
+  __nonzero__ = __bool__
 
   def __str__(self):
     return "<NoNode>"
@@ -872,22 +876,27 @@ class NodeDB(dict, O):
     else:
       raise ValueError("nodekey: expected 1 or 2 args, got: %r" % (args,))
 
-    # FIXME: ghastly hack
-    if type(t) is unicode:
-      t = str(t)
-    else:
-      assert type(t) is str, "t = %s %r" % (type(t), t)
-    if type(name) is unicode:
-      name = str(name)
-    else:
-      assert type(name) is str, "name = %s %r" % (type(name), name)
+    if not isinstance(t, unicode):
+      if type(t) is str:
+        t = unicode(t)
+      else:
+        raise ValueError("TYPE should be unicode: %r" % (t,))
+
+    if not isinstance(name, unicode):
+      if type(name) is str:
+        name = unicode(name)
+      else:
+        raise ValueError("NAME should be unicode: %r" % (name,))
 
     # sanity check type form
     if t != '_':
-      assert t.isupper(), "TYPE should be upper case, got %r" % (t,)
-      assert len(name) > 0
+      if not t.isupper():
+        raise ValueError("TYPE should be upper case: %r" % (t,))
+      if len(name) < 1:
+        raise ValueError("NAME too short: %r" % (name,))
       k, plural = parseUC_sAttr(t)
-      assert k is not None and not plural, "got TYPE == %r" % (t,)
+      if k is None or plural:
+        raise ValueError("TYPE should be singluar upper case: %r" % (t,))
 
     return t, name
 
@@ -1024,7 +1033,7 @@ class NodeDB(dict, O):
     return cs.nodedb.text.totoken(value)
 
   def totext(self, value):
-    ''' Convert a value for external string storage.
+    ''' Convert a value for external Unicode string storage.
           text        The string "text" for strings not commencing with a colon.
           ::text      The string ":text" for strings commencing with a colon.
           :TYPE:name  Node of specified name and TYPE in local NodeDB.
@@ -1038,25 +1047,26 @@ class NodeDB(dict, O):
       if value.nodedb is self:
         # Node from local NodeDB
         assert value.type[0].isupper(), "non-UPPER type: %s" % (value.type,)
-        return ":%s:%s" % (value.type, value.name)
+        return u':%s:%s' % (value.type, value.name)
       odb, seqnum = self.nodedb.otherDB(value.nodedb.url)
-      return ":+%d:%s:%s" % (seqnum, value.type, value.name)
-    t = type(value)
-    if t in StringTypes:
+      return u':+%d:%s:%s' % (seqnum, value.type, value.name)
+    if isinstance(value, StringTypes):
+      # Python 2 upcode
+      if not isinstance(value, unicode):
+        value = unicode(value, 'iso8859-1')
       if value.startswith(':'):
-        return ':'+value
+        return u':'+value
       return value
+    t = type(value)
     if t is int:
-      s = str(value)
-      assert s[0].isdigit()
-      return ':' + s
+      return u':%d' % (value,)
     R = self.__attr_type_registry.get(t, None)
     if R:
       scheme = R.scheme
       assert scheme[0].islower() and scheme.find(':',1) < 0, \
              "illegal scheme name: \"%s\"" % (scheme,)
-      return ':'+scheme+':'+R.totext(value)
-    raise ValueError("can't totext( <%s> %s )" % (type(value),value))
+      return u':%s:%s' % (scheme, R.totext(value))
+    raise ValueError("can't totext( <%s> %r )" % (type(value), value))
 
   def fromtext(self, text, doCreate=True):
     ''' Convert a stored string into a value.

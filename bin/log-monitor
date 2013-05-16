@@ -1,4 +1,4 @@
-#!/usr/bin/env py25+
+#!/usr/bin/env py27+
 #
 # Monitor log files.
 #       - Cameron Simpson <cs@zip.com.au> 18jul2008
@@ -15,16 +15,27 @@ from thread import allocate_lock
 from threading import Thread
 import cs.wini
 from cs.tail import tail
-from cs.logutils import cmd
+from cs.logutils import cmd, setup_logging
 
-usage="Usage: %s configuration-file" % cmd
+USAGE = "Usage: %s configuration-file"
 
-ioLock=allocate_lock()
+def main(argv):
+  global cmd, ioLock
+  argv = list(argv)
+  cmd = os.path.basename(argv.pop(0))
+  usage = USAGE % (cmd,)
+  setup_logging(cmd)
 
-args=sys.argv[1:]
-if len(args) != 1:
-  print >>sys.stderr, usage
-  sys.exit(2)
+  ioLock=allocate_lock()
+
+  args=sys.argv[1:]
+  if len(args) != 1:
+    print >>sys.stderr, usage
+    return 2
+
+  M=Monitor(args[0])
+  M.join()
+  return 0
 
 syslogFacilities={ 'kern':      syslog.LOG_KERN,
                    'user':      syslog.LOG_USER,
@@ -149,7 +160,7 @@ class Monitor(object):
     global cmd
     global ioLock
     tests=self.paths[path].TESTS
-    for line in tail(open(path)):
+    for line in tail(open(path), follow_name=path):
       assert line.endswith('\n')
       line=line[:-1]
       for regexpName in tests.keys():
@@ -171,23 +182,18 @@ class Monitor(object):
                 host.log(facility, level, report)
             else:
               report="%f %s %s %s %s %s\n" \
-                     % (time.time(), dmy, hms, test.NAME, path, line)
+                     % (now, dmy, hms, test.NAME, path, line)
               if test.ACTION_TYPE == 'FILE':
                 # ACTION_FILEs are shared - use lock
-                fp=None
                 try:
                   fp=open(test.ACTION_FILENAME,"a")
-                  with ioLock:
-                    fp.write(report)
-                    fp.close()
                 except IOError, e:
                   print >>sys.stderr, \
                         "%s: %s: %s" % (cmd, test.ACTION_FILENAME, e)
-                if fp is not None:
-                  try:
+                else:
+                  with ioLock:
+                    fp.write(report)
                     fp.close()
-                  except IOError, e:
-                    pass
               elif test.ACTION_TYPE == 'PIPE':
                 # ACTION_PIPEs are per-test, no lock
                 test.ACTION_PIPE.write(report)
@@ -200,6 +206,5 @@ class Monitor(object):
               else:
                 assert False, "unhandled ACTION_TYPE \"%s\"" % test.ACTION_TYPE
 
-M=Monitor(args[0])
-M.join()
-sys.exit(0)
+if __name__ == '__main__':
+  sys.exit(main(sys.argv))

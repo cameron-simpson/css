@@ -10,7 +10,10 @@ import os
 import os.path
 from threading import Lock
 from zlib import compress, decompress
+from cs.logutils import D
+from cs.obj import O
 from cs.serialise import get_bs, put_bs, get_bsfp
+from cs.threads import locked_property
 
 F_COMPRESSED = 0x01
 
@@ -32,37 +35,27 @@ class DataFlags(int):
     assert flags == 0
     return s
 
-class DataFile(object):
+class DataFile(O):
   ''' A cs.venti data file, storing data chunks in compressed form.
   '''
 
   def __init__(self, pathname):
     self.pathname = pathname
     self._fp = None
-    self._lock = Lock()
     self._size = None
+    self._lock = Lock()
 
-  @property
+  @locked_property
   def fp(self):
-    ''' Property returning the file object of the open file.
+    ''' Property returning the file object of the current open file.
     '''
-    fp = self._fp
-    if not fp:
-      with self._lock:
-        fp = self._fp
-        if fp is None:
-          fp = self._fp = open(self.pathname, "a+b")
-    return fp
+    return open(self.pathname, "a+b")
 
-  @property
+  @locked_property
   def size(self):
     ''' Property returning the size of this file.
     '''
-    size = self._size
-    if size is None:
-      with self._lock:
-        size = self._size = os.fstat(self.fp.fileno).st_size
-    return size
+    return os.fstat(self.fp.fileno).st_size
 
   def scan(self, uncompress=False):
     ''' Scan the data file and yield (offset, flags, zdata) tuples.
@@ -141,7 +134,7 @@ class DataFile(object):
         self._fp.close()
         self._fp = None
 
-class DataDir(object):
+class DataDir(O):
   ''' A mapping of hash->Block that manages a directory of DataFiles.
       Subclasses must implement the _openIndex() method, which
       should return a mapping to store and retrieve index information.
@@ -150,12 +143,15 @@ class DataDir(object):
   def __init__(self, dir):
     self.dir = dir
     self._index = None
-    self._lock = Lock()
     self._open = {}
     self._n = None
+    self._lock = Lock()
 
   def _openIndex(self):
-    raise NotImplementedError
+    ''' Subclasses must implement the _openIndex method, which returns a
+        mapping of hashcode to (datafile_index, datafile_offset).
+    '''
+    raise NotImplementedError("%s: no _openIndex() method" % (self.__class__.__name__,))
 
   def pathto(self, rpath):
     ''' Return a pathname within the DataDir given `rpath`, a path
@@ -163,29 +159,30 @@ class DataDir(object):
     '''
     return os.path.join(self.dir, rpath)
 
-  @property
+  @locked_property
   def index(self):
     ''' Property returning the index mapping.
     '''
-    I = self._index
-    if not I:
-      with self._lock:
-        I = self._index
-        if not I:
-          I = self._index = self._openIndex()
-    return I
+    return self._openIndex()
 
   @property
   def indexpath(self):
+    ''' The file pathname of the index file.
+    '''
     return self.pathto(self.indexname)
 
   @property
   def hasindexfile(self):
+    ''' Property testing whether the index file exists.
+    '''
     return os.path.exists(self.indexpath)
 
   def scan(self, hashfunc, indices=None):
+    ''' Scan the specified datafiles (or all if `indices` is missing or None).
+        Record the data locations against the data hashcode in the index.
+    '''
     if indices is None:
-      indices = self.datafileindices
+      indices = self._datafileindices()
     with Pfx("scan %d", n):
       for n in indices:
         D = self.open(n)
@@ -208,6 +205,10 @@ class DataDir(object):
     '''
     return put_bs(n) + put_bs(offset)
 
+  # without this "in" tries to iterate over the mapping with int indices
+  def __contains__(self, hash):
+    return hash in self.index
+    
   def __getitem__(self, hash):
     ''' Return the uncompressed data associated with the supplied hash.
     '''
@@ -224,20 +225,17 @@ class DataDir(object):
       offset = D.savedata(data)
       I[hash] = self.encodeIndexEntry(n, offset)
 
-  @property
+  @locked_property
   def n(self):
     ''' The index of the currently open data file.
     '''
-    with self._lock:
-      if self._n is None:
-        self._n = self.next_n()
-    return self._n
+    return self.next_n()
 
   def next_n(self):
     ''' Return a free index not mapping to an existing data file.
     '''
     try:
-      n = max(self.datafileindices()) + 1
+      n = max(self._datafileindices()) + 1
     except ValueError:
       n = 0
     while os.path.exists(self.pathto(self.datafilename(n))):
@@ -260,14 +258,14 @@ class DataDir(object):
       datafile.flush()
     self.index.flush()
 
-  def open(n):
+  def open(self, n):
     ''' Obtain the Datafile indexed `n`.
     '''
     O = self._open
     with self._lock:
       D = O.get(n)
       if D is None:
-        D = O[n] = Datafile(self.pathto(self.datafilename(n)))
+        D = O[n] = DataFile(self.pathto(self.datafilename(n)))
     return D
 
   def datafilename(self, n):
@@ -275,9 +273,10 @@ class DataDir(object):
     '''
     return str(n) + '.vtd'
 
-  def datafileindices(self):
-    ''' Generator that yields the indices of datafiles present.
+  def _datafileindices(self):
+    ''' Return the indices of datafiles present.
     '''
+    indices = []
     for name in os.listdir(self.dir):
       if name.endswith('.vtd'):
         prefix = name[:-4]
@@ -285,7 +284,8 @@ class DataDir(object):
           n = int(prefix)
           if str(n) == prefix:
             if os.path.isfile(self.pathto(name)):
-              yield n
+              indices.append(n)
+    return indices
 
 class GDBMDataDir(DataDir):
   ''' A DataDir with a GDBM index.
@@ -294,10 +294,9 @@ class GDBMDataDir(DataDir):
   indexname = "index.gdbm"
 
   def _openIndex(self):
-    import gdbm
+    import dbm.gnu
     gdbmpath = self.pathto(self.indexname)
-    return gdbm.open(gdbmpath, "cf")
-
+    return dbm.gnu.open(gdbmpath, "cf")
 
 class KyotoCabinetDataDir(DataDir):
   ''' An DataDir attached to a KyotoCabinet index.

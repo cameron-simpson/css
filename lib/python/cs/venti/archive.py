@@ -3,43 +3,54 @@
 ''' Archive files for venti data.
 
     Archive files are records of data saved to a Store.
-    Lines are written to the archive file of the form:
+    Lines are appended to the archive file of the form:
 
-      unixtime dirent
+      isodatetime unixtime dirent
 
     where unixtime is UNIX time (seconds since epoch) and dirent is the text
     encoding of a cs.venti.dir.Dirent.
 '''
 
+from __future__ import print_function
 import os
 import sys
 import time
 from datetime import datetime
 from cs.lex import unctrl
-from cs.venti import totext, fromtext
-from .dir import Dir, decodeDirent, storeDir
-from .file import storeFilename
 from cs.logutils import Pfx, error
+from . import totext, fromtext
+from .blockify import blockFromFile
+from .dir import decode_Dirent_text, Dir, FileDirent
+from .paths import copy_in
 
-def archive(arfile, path, verbosefp=None,
+def archive(arfile, path,
           trust_size_mtime=False,
           keep_missing=False,
           ignore_existing=False):
   ''' Archive the named file path.
+      Get the last dirref from the `arfile`, if any, otherwise make a new Dir.
+      Store the `path` (updating the Dir).
+      Save the new dirref to `arfile`.
   '''
   # look for existing archive for comparison
   oldtime, oldE = None, None
   if arfile == '-':
     arfp = sys.stdin
+    # refuse to use terminal as input
     if arfp.isatty():
       arfp = None
   else:
-    try:
-      arfp = open(arfile)
-    except IOError:
-      arfp = None
-  if arfp is not None:
-    for unixtime, E in getDirents(arfp):
+    with Pfx(arfile):
+      try:
+        D("open %r ...", arfile)
+        arfp = open(arfile)
+      except OSError as e:
+        if e.errno == errno.E_NOENT:
+          arfp = None
+        else:
+          raise
+  if arfp:
+    for unixtime, E in read_Dirents(arfp):
       if E.name == path and (oldtime is None or unixtime >= oldtime):
         oldtime, oldE = unixtime, E
     if arfile != '-':
@@ -47,29 +58,27 @@ def archive(arfile, path, verbosefp=None,
 
   with Pfx("archive(%s)", path):
     if os.path.isdir(path):
-      if oldE is not None and oldE.isdir:
-        ok = oldE.updateFrom(path,
-                     trust_size_mtime=trust_size_mtime,
-                     keep_missing=keep_missing,
-                     ignore_existing=ignore_existing,
-                     verbosefp=verbosefp)
-        E = oldE
+      if oldE is None or not oldE.isdir:
+        E = Dir(os.path.basename(path))
       else:
-        E, ok = storeDir(path, trust_size_mtime=trust_size_mtime, verbosefp=verbosefp)
+        E = oldE
+      copy_in(path, E, delete=not keep_missing, ignore_existing=ignore_existing, trust_size_mtime=trust_size_mtime)
     else:
-      E = storeFilename(path, path,verbosefp=verbosefp)
-      ok = True
+      # TODO: incremental update mode to read the file in leaf sized
+      # chunks and hash compare against leaf block hashes
+      with open(path, 'rb') as fp:
+        topBlock = blockFromFile(fp)
+      E = FileDirent(os.path.basename(path), None, topBlock)
 
     E.name = path
     if arfile is None:
-      writeDirent(sys.stdout, E)
+      write_Dirent(sys.stdout, E)
     else:
       if arfile == '-':
-        writeDirent(sys.stdout, E)
+        write_Dirent(sys.stdout, E)
       else:
         with open(arfile, "a") as arfp:
-          writeDirent(arfp, E)
-  return ok
+          write_Dirent(arfp, E)
 
 def retrieve(arfile, paths=None):
   ''' Retrieve Dirents for the named file paths, or None if a
@@ -84,7 +93,7 @@ def retrieve(arfile, paths=None):
       assert not arfp.isatty(), "stdin may not be a tty"
     else:
       arfp = open(arfile)
-    for unixtime, E in getDirents(arfp):
+    for unixtime, E in read_Dirents(arfp):
       if paths is None or E.name in paths:
         found[E.name] = E
     if arfile != '-':
@@ -95,9 +104,9 @@ def retrieve(arfile, paths=None):
 
 def toc_report(fp, path, E, verbose):
   if verbose:
-    print >>fp, path
+    print(path, file=fp)
   else:
-    print >>fp, E.meta, path
+    print(E.meta, path, file=fp)
   if E.isdir:
     for subpath in sorted(E.keys()):
       toc_report(fp, os.path.join(path, subpath), E[subpath], verbose)
@@ -111,20 +120,26 @@ def toc(arfile, paths=None, verbose=False, fp=None):
     else:
       toc_report(fp, path, E, verbose)
 
-def getDirents(fp):
+def read_Dirents(fp):
   ''' Generator to yield (unixtime, Dirent) from archive file.
   '''
+  lineno = 0
   for line in fp:
-    assert line.endswith('\n'), "%s: unexpected EOF" % (fp,)
-    isodate, unixtime, dent = line.split(None, 3)[:3]
-    when = float(unixtime)
-    E, etc = decodeDirent(fromtext(dent))
-    assert len(etc) == 0 or etc[0].iswhite(), \
-      "failed to decode dent %r: unparsed: %r" % (dent, etc)
+    with Pfx("%s:%d", fp, lineno):
+      lineno += 1
+      if not line.endswith('\n'):
+        raise ValueError("incomplete? no trailing newline")
+      line = line.rstrip()
+      # allow optional trailing text, which will be the E.name part normally
+      isodate, unixtime, dent = line.split(None, 3)[:3]
+      when = float(unixtime)
+      E = decode_Dirent_text(dent)
+    # note: yield _outside_ Pfx
     yield when, E
 
-def writeDirent(fp, E, when=None):
-  ''' Write a Dirent to an archive file.
+def write_Dirent(fp, E, when=None):
+  ''' Write a Dirent to an archive file:
+        isodatetime unixtime totext(dirent) dirent.name
   '''
   if when is None:
     when = time.time()
@@ -132,7 +147,7 @@ def writeDirent(fp, E, when=None):
   fp.write(' ')
   fp.write(str(when))
   fp.write(' ')
-  fp.write(str(E))
+  fp.write(str(E.textencode()))
   fp.write(' ')
   fp.write(unctrl(E.name))
   fp.write('\n')

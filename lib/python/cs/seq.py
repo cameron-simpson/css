@@ -136,6 +136,10 @@ def NamedTuple(fields,iter=()):
   '''
   return NamedTupleClassFactory(*fields)(iter)
 
+class _MergeHeapItem(tuple):
+  def __lt__(self, other):
+    return self[0] < other[0]
+
 def imerge(*iters):
   ''' Merge an iterable of ordered iterables in order.
       It relies on the source iterables being ordered and their elements
@@ -149,20 +153,20 @@ def imerge(*iters):
   for I in iters:
     I = iter(I)
     try:
-      head = I.next()
+      head = next(I)
     except StopIteration:
       pass
     else:
-      heapq.heappush(heap, (head, I))
+      heapq.heappush(heap, _MergeHeapItem( (head, I)))
   while heap:
     head, I = heapq.heappop(heap)
     yield head
     try:
-      head = I.next()
+      head = next(I)
     except StopIteration:
       pass
     else:
-      heapq.heappush(heap, (head, I))
+      heapq.heappush(heap, _MergeHeapItem( (head, I)))
 
 def onetoone(func):
   ''' A decorator for a method of a sequence to merge the results of

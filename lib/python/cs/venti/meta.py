@@ -1,9 +1,13 @@
 #!/usr/bin/python
 
 from __future__ import print_function
-from pwd import getpwuid
-from grp import getgrgid
+from collections import namedtuple
+from os import geteuid, getegid
+from pwd import getpwuid, getpwnam
+from grp import getgrgid, getgrnam
 from cs.logutils import error
+
+Stat = namedtuple('Stat', 'st_mode st_ino st_dev st_nlink st_uid st_gid st_size st_atime st_mtime st_ctime')
 
 def permbits_to_acl(bits):
   ''' Take a UNIX 3-bit permission value and return the ACL add-sub string.
@@ -44,7 +48,9 @@ class Meta(dict):
           k, v = line.split(':', 1)
           self[k] = v
 
-  def encode(self):
+  def textencode(self):
+    ''' Encode the metadata in text form.
+    '''
     return "".join("%s:%s\n" % (k, self[k]) for k in sorted(self.keys()))
 
   @property
@@ -63,12 +69,16 @@ class Meta(dict):
   def acl(self, acl):
     self['a'] = ','.join(acl)
 
-  def updateFromStat(self, st):
+  def update_from_stat(self, st):
+    ''' Apply the contents of a stat object to this Meta.
+    '''
     self.mtime = st.st_mtime
     user = getpwuid(st.st_uid)[0]
     group = getgrgid(st.st_gid)[0]
-    uid = st.st_uid
-    gid = st.st_gid
+    if ':' in user:
+      raise ValueError("invalid username for uid %d, colon forbidden: %s" % (st.st_uid, user))
+    if ':' in group:
+      raise ValueError("invalid groupname for gid %d, colon forbidden: %s" % (st.st_gid, group))
     self.acl = ( "u:"+user+":"+permbits_to_acl( (st.st_mode>>6)&7 ),
                  "g:"+group+":"+permbits_to_acl( (st.st_mode>>3)&7 ),
                  "*:"+permbits_to_acl( (st.st_mode)&7 ),
@@ -143,6 +153,40 @@ class Meta(dict):
             elif s == 't': operms &= ~512
     return (user, group, (uperms<<6)+(gperms<<3)+operms)
 
+  def stat(self):
+    ''' Return a stat object.
+    '''
+    user, group, st_mode = self.unixPerms()
+    if user is None:
+      st_uid = os.geteuid()
+    else:
+      try:
+        st_uid = getpwnam(user).pw_uid
+      except KeyError:
+        st_uid = os.geteuid()
+    if group is None:
+      st_gid = getegid()
+    else:
+      try:
+        st_gid = getgrnam(group).gr_gid
+      except KeyError:
+        st_gid = getegid()
+    st_ino = None
+    st_dev = None
+    st_nlink = 1
+    st_size = None
+    st_atime = 0
+    st_mtime = 0
+    st_ctime = 0
+    return Stat(st_mode, st_ino, st_dev, st_nlink, st_uid, st_gid, st_size, st_atime, st_mtime, st_ctime)
+
+def MetaFromStat(st):
+  M = Meta()
+  M.update_from_stat(st)
+  return M
+
 if __name__ == '__main__':
   import os
-  print(MetaFromStat(os.stat(__file__)))
+  M = MetaFromStat(os.stat(__file__))
+  print(M)
+  print(M.stat())

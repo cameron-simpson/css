@@ -21,7 +21,7 @@ class TestMaildir(unittest.TestCase):
     M = Maildir(testmaildir)
     t1 = time.time()
     ##print >>sys.stderr, "Maildir(%s): %gs" % (testmaildir, t1-t0,)
-    keys = M.keys()
+    keys = list(M.keys())
     t2 = time.time()
     ##print >>sys.stderr, "Maildir(%s).keys(): %gs, %d keys" % (testmaildir, t2-t1, len(keys))
     for key in keys[:100]:

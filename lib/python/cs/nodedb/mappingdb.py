@@ -5,6 +5,9 @@
 #
 
 import sys
+from cs.py3 import iteritems as map_iteritems, \
+                   iterkeys as map_iterkeys, \
+                   itervalues as map_itervalues
 from cs.logutils import Pfx, error, warning , info, D
 from . import Node
 from .backend import Backend
@@ -22,14 +25,13 @@ class MappingBackend(Backend):
     pass
 
   def iteritems(self):
-    return self.mapping.iteritems()
+    return map_iteritems(self.mapping)
 
   def iterkeys(self):
-    return self.mapping.iterkeys()
+    return map_iterkeys(self.mapping)
 
   def itervalues(self):
-    for item in self.iteritems():
-      yield item[1]
+    return map_itervalues(self.mapping)
 
   def __getitem__(self, key):
     return self.mapping[key]

@@ -16,6 +16,7 @@ from cs.mailutils import ismaildir, message_addresses, Message
 from cs.nodedb import NodeDB, Node, NodeDBFromURL
 import cs.sh
 from cs.threads import locked_property
+from cs.py3 import StringTypes, ustr
 
 def main(argv, stdin=None):
   if stdin is None:
@@ -30,7 +31,10 @@ def main(argv, stdin=None):
         File format:
           group,... rfc2822-address
       learn-addresses group,... < rfc822.xt
-      list-groups [groups...]''' \
+      list-groups [-A] [-G] [groups...]
+        -A Emit mutt alias lines.
+        -G Emit mutt group lines.
+        Using both -A and -G emits mutt aliases lines with the -group option.''' \
     % (cmd,)
   setup_logging(cmd)
 
@@ -46,10 +50,12 @@ def main(argv, stdin=None):
     opts, argv = [], []
 
   for opt, val in opts:
-    if opt == '-m':
-      mdburl = val
-    else:
-      raise GetoptError("unrecognised option: %s", opt)
+    with Pfx(opt):
+      if opt == '-m':
+        mdburl = val
+      else:
+        error("unrecognised option")
+        badopts = True
 
   if mdburl is None:
     mdburl = os.environ['MAILDB']
@@ -69,18 +75,46 @@ def main(argv, stdin=None):
             MDB.importAddresses(stdin)
             MDB.close()
         elif op == 'list-groups':
+          try:
+            opts, argv = getopt(argv, 'AG')
+          except GetoptError as e:
+            error("unrecognised option: %s: %s"% (e.opt, e.msg))
+            badopts = True
+            opts, argv = [], []
+          mutt_aliases = False
+          mutt_groups = False
+          for opt, val in opts:
+            with Pfx(opt):
+              if opt == '-A':
+                mutt_aliases = True
+              elif opt == '-G':
+                mutt_groups = True
+              else:
+                error("unrecognised option")
+                badopts = True
           if len(argv):
             group_names = argv
           else:
             group_names = sorted(MDB.address_groups.keys())
-          for group_name in group_names:
-            address_group = MDB.address_groups.get(group_name)
-            if not address_group:
-              error("no such group: %s", group_name)
-              xit = 1
-              continue
-            print(group_name, ", ".join(MDB['ADDRESS', address].formatted
-                                        for address in address_group))
+          if not badopts:
+            for group_name in group_names:
+              with Pfx(group_name):
+                address_group = MDB.address_groups.get(group_name)
+                if not address_group:
+                  error('no such group')
+                  xit = 1
+                  continue
+                address_list = ", ".join(MDB['ADDRESS', address].formatted
+                                         for address in address_group)
+                if mutt_aliases:
+                  print('alias', end=' ')
+                  if mutt_groups:
+                    print('-group', group_name, end=' ')
+                elif mutt_groups:
+                  print('group', end=' ')
+                else:
+                  print(group_name, end='')
+                print(group_name, address_list)
         elif op == 'learn-addresses':
           only_ungrouped = False
           if len(argv) and argv[0] == '--ungrouped':
@@ -137,10 +171,11 @@ def edit_groupness(MDB, addresses):
                )
     with tempfile.NamedTemporaryFile(suffix='.txt') as T:
       with Pfx(T.name):
-        with codecs.open(T.name, "w", "utf-8") as ofp:
+        with codecs.open(T.name, "w", encoding="utf-8") as ofp:
           for A in As:
             groups = sorted(set(A.GROUPs))
-            line = "%-15s %s\n" % (",".join(groups), A.formatted)
+            af = A.formatted
+            line = u"%-15s %s\n" % (",".join(groups), A.formatted)
             ofp.write(line)
         editor = os.environ.get('EDITOR', 'vi')
         xit = os.system("%s %s" % (editor, cs.sh.quotestr(T.name)))
@@ -162,7 +197,7 @@ def edit_groupness(MDB, addresses):
               for realname, addr in getaddresses((addrtext,)):
                 A = MDB.getAddressNode(addr)
                 new_groups.setdefault(A, set()).update(groups)
-                realname = realname.strip()
+                realname = ustr(realname.strip())
                 if realname and realname != A.realname:
                   A.REALNAME = realname
     # apply groups of whichever addresses survived
@@ -176,11 +211,11 @@ class AddressNode(Node):
 
   @property
   def formatted(self):
-    return formataddr( (self.realname, self.name) )
+    return ustr( formataddr( (self.realname, self.name) ) )
 
   @property
   def realname(self):
-    return getattr(self, 'REALNAME', '')
+    return ustr( getattr(self, 'REALNAME', u'') )
 
   def groups(self):
     return [ address_group for address_group in self.nodedb.address_groups
@@ -269,7 +304,7 @@ class _MailDB(NodeDB):
         If the AddressNode has no .REALNAME and `realname` is not empty,
         update the AddressNode from `realname`.
     '''
-    if isinstance(addr, (str, unicode)):
+    if isinstance(addr, StringTypes):
       realname, coreaddr = parseaddr(addr)
     else:
       realname, coreaddr = addr
@@ -279,7 +314,7 @@ class _MailDB(NodeDB):
     A = self.get( ('ADDRESS', coreaddr), doCreate=True)
     Aname = A.realname
     if not len(Aname) and len(realname) > 0:
-      A.REALNAME = realname
+      A.REALNAME = ustr(realname)
     return A
 
   def address_group(self, group_name):

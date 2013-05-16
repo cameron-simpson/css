@@ -12,7 +12,7 @@ import re
 from string import whitespace, digits
 import unittest
 from cs.lex import get_chars, get_other_chars, get_white, get_identifier
-from cs.logutils import Pfx, error, warning, info, debug, exception
+from cs.logutils import Pfx, error, warning, info, debug, exception, D
 
 # mapping of special macro names to evaluation functions
 SPECIAL_MACROS = { '.':         lambda c, ns: os.getcwd(),       # TODO: cache
@@ -42,7 +42,6 @@ class FileContext(_FileContext):
     assert type(text) is str, "text should be str, got %s" % (type(text),)
     if parent is not None:
       assert type(parent) is FileContext, "parent should be FileContext, got %s" % (type(parent),)
-    _FileContext.__init__(self, filename, lineno, text, parent)
 
   def __str__(self):
     tag = "%s:%d" % (self.filename, self.lineno)
@@ -991,7 +990,7 @@ class TestAll(unittest.TestCase):
     self.assertEqual(parseMacroExpression('abc  xyz'), (['abc', '  ', 'xyz'], 8))
 
   def test20parseMakeLines(self):
-    from StringIO import StringIO
+    from cs.py3 import StringIO
     from .make import Maker
     with Maker() as M:
       parsed = list(parseMakefile(M, StringIO("abc = def\n")))

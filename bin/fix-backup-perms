@@ -8,14 +8,15 @@ set -ue
 
 recurse=
 users=${BACKUP_USERS:-backup}
-trace=set-x
+trace=
 
 cmd=$0
 usage="Usage: $cmd [-n] [-r] [-U user,...] pathnames...
   -n            No action; recite planned actions.
   -r            Recursive.
   -U user,...   Specify user[s] to have read access.
-                Default, from \$BACKUP_USERS: $users"
+                Default, from \$BACKUP_USERS: $users
+  -x            Trace execution."
 
 . /opt/css/env.sh
 
@@ -27,6 +28,7 @@ do
     -n) trace=echo ;;
     -r) recurse=1 ;;
     -U) users=$2; shift ;;
+    -x) trace=set-x ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
         badopts=1
