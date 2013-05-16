@@ -163,7 +163,7 @@ def fullIndirectBlocks(blockSource):
   if len(subblocks) > 0:
     if len(subblocks) == 1:
       # one block unyielded - don't bother wrapping into an iblock
-      block = subblock[0]
+      block = subblocks[0]
     else:
       block = IndirectBlock(subblocks)
     yield block
