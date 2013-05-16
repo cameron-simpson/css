@@ -29,9 +29,9 @@ class CacheStore(BasicStore):
     self.__closing = False
 
   def shutdown(self):
+    self.cache.shutdown()
+    self.backend.shutdown()
     BasicStore.shutdown(self)
-    self.cache.close()
-    self.backend.close()
 
   def flush(self):
     self.cache.flush()
@@ -93,6 +93,7 @@ class MemCacheStore(BasicStore):
 
   def flush(self):
     pass
+
   def sync(self):
     pass
 
