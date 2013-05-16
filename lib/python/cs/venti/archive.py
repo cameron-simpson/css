@@ -21,11 +21,14 @@ from .dir import Dir, decodeDirent, storeDir
 from .file import storeFilename
 from cs.logutils import Pfx, error
 
-def archive(arfile, path, verbosefp=None,
+def archive(arfile, path,
           trust_size_mtime=False,
           keep_missing=False,
           ignore_existing=False):
   ''' Archive the named file path.
+      Get the last dirref from the `arfile`, if any, otherwise make a new Dir.
+      Store the `path` (updating the Dir).
+      Save the new dirref to `arfile`.
   '''
   # look for existing archive for comparison
   oldtime, oldE = None, None
@@ -52,13 +55,12 @@ def archive(arfile, path, verbosefp=None,
         ok = oldE.updateFrom(path,
                      trust_size_mtime=trust_size_mtime,
                      keep_missing=keep_missing,
-                     ignore_existing=ignore_existing,
-                     verbosefp=verbosefp)
+                     ignore_existing=ignore_existing)
         E = oldE
       else:
-        E, ok = storeDir(path, trust_size_mtime=trust_size_mtime, verbosefp=verbosefp)
+        E, ok = storeDir(path, trust_size_mtime=trust_size_mtime)
     else:
-      E = storeFilename(path, path,verbosefp=verbosefp)
+      E = storeFilename(path, path)
       ok = True
 
     E.name = path
