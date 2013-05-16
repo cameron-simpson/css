@@ -6,11 +6,11 @@ import stat
 import sys
 from threading import Lock
 from cs.logutils import Pfx, debug, error, info, warning
-from cs.venti import totext, fromtext
 from cs.lex import hexify
 from cs.seq import seq
-from cs.serialise import get_bs, put_bs, put_bsdata
+from cs.serialise import get_bs, get_bsdata, put_bs, put_bsdata
 from cs.threads import locked_property
+from . import totext, fromtext
 from .block import decodeBlock
 from .blockify import blockFromString
 from .meta import Meta
@@ -34,26 +34,21 @@ F_HASNAME = 0x02
 
 def decodeDirent(data, offset):
   ''' Unserialise a Dirent, return (dirent, offset).
-      Input format: bs(type)bs(flags)[bs(metalen)meta][bs(namelen)name]block
+      Input format: bs(type)bs(flags)[bs(namelen)name][bs(metalen)meta]block
   '''
   type_, offset = get_bs(data, offset)
   flags, offset = get_bs(data, offset)
-  meta = None
-  if flags & F_HASMETA:
-    metalen, offset = get_bs(data, offset)
-    if metalen >= len(s):
-      raise ValueError("metalen %d >= len(s) %d" % (metalen, len(s)))
-    meta = s[:metalen]
-    s = s[metalen:]
-  meta = Meta(meta)
   if flags & F_HASNAME:
-    namelen, offset = get_bs(data, offset)
-    if namelen >= len(s):
-      raise ValueError("namelen %d >= len(s) %d" % (namelen, len(s)))
-    name = s[:namelen]
-    s = s[namelen:]
+    namedata, offset = get_bsdata(data, offset)
+    name = namedata.decode()
   else:
     name = ""
+  meta = None
+  if flags & F_HASMETA:
+    metadata, offset = get_bsdata(data, offset)
+    meta = Meta(metadata.decode())
+  else:
+    meta = Meta()
   block, s = decodeBlock(s)
   if type_ == D_DIR_T:
     E = Dir(name, meta=meta, parent=None, content=block)
@@ -122,16 +117,6 @@ class Dirent(object):
     '''
     flags = 0
 
-    meta = self.meta
-    if meta:
-      if not isinstance(meta, Meta):
-        raise TypeError("self.meta is not a Meta: <%s>%r" % (type(meta), meta))
-      metadata = put_bsdata(meta.encode())
-      if len(metadata) > 0:
-        flags |= F_HASMETA
-    else:
-      metadata = b''
-
     if no_name:
       name = ""
     elif name is None:
@@ -144,11 +129,21 @@ class Dirent(object):
     else:
       namedata = b''
 
+    meta = self.meta
+    if meta:
+      if not isinstance(meta, Meta):
+        raise TypeError("self.meta is not a Meta: <%s>%r" % (type(meta), meta))
+      metadata = put_bsdata(meta.encode())
+      if len(metadata) > 0:
+        flags |= F_HASMETA
+    else:
+      metadata = b''
+
     block = self.getBlock()
     return put_bs(self.type) \
          + put_bs(flags) \
-         + metadata \
          + namedata \
+         + metadata \
          + block.encode()
 
   def textencode(self):
@@ -161,9 +156,9 @@ class Dirent(object):
     if meta:
       if not isinstance(meta, Meta):
         raise TypeError("self.meta is not a Meta: <%s>%r" % (type(meta), meta))
-      metatxt = meta.encode()
+      metatxt = meta.textencode()
       if len(metatxt) > 0:
-        metatxt = hexify(toBS(len(metatxt))) + totext(metatxt)
+        metatxt = totext(put_bsdata(metatxt.encode()))
         flags |= F_HASMETA
     else:
       metatxt = ""
@@ -172,12 +167,12 @@ class Dirent(object):
     if name is None or len(name) == 0:
       nametxt = ""
     else:
-      nametxt = hexify(toBS(len(name))) + totext(name)
+      nametxt = totext(put_bsdata(name.encode()))
       flags |= F_HASNAME
 
     block = self.getBlock()
-    return ( hexify(toBS(self.type))
-           + hexify(toBS(flags))
+    return ( hexify(put_bs(self.type))
+           + hexify(put_bs(flags))
            + metatxt
            + nametxt
            + block.textencode()
