@@ -43,7 +43,6 @@ def archive(arfile, path,
   else:
     with Pfx(arfile):
       try:
-        D("open %r ...", arfile)
         arfp = open(arfile)
       except OSError as e:
         if e.errno == errno.ENOENT:
@@ -56,6 +55,13 @@ def archive(arfile, path,
         oldtime, oldE = unixtime, E
     if arfile != '-':
       arfp.close()
+    B = E.getBlock()
+    try:
+      refdata = B.data
+    except KeyError as e:
+      warning("%s: %r: can't load data from Store, ignoring",
+              arfile, B.hashcode)
+      oldtime, oldE = None, None
 
   with Pfx("archive(%s)", path):
     if os.path.isdir(path):
