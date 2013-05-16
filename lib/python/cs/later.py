@@ -10,7 +10,7 @@ import threading
 from threading import Condition
 from cs.py3 import Queue, raise3
 import time
-from cs.debug import Lock, RLock, Thread
+from cs.debug import ifdebug, Lock, RLock, Thread
 from cs.threads import AdjustableSemaphore, IterablePriorityQueue, \
                        WorkerThreadPool, TimerQueue
 from cs.seq import seq
@@ -381,6 +381,10 @@ class Later(object):
   def __init__(self, capacity, inboundCapacity=0, name=None):
     if name is None:
       name = "Later-%d" % (seq(),)
+    if ifdebug():
+      import inspect
+      filename, lineno = inspect.stack()[1][1:3]
+      name = "%s[%s:%d]" % (name, filename, lineno)
     debug("Later.__init__(capacity=%s, inboundCapacity=%s, name=%s)", capacity, inboundCapacity, name)
     if type(capacity) is int:
       capacity = AdjustableSemaphore(capacity)
@@ -485,16 +489,11 @@ class Later(object):
       if self.closed:
         warning("close of closed Later %r", self)
       else:
-        D("closing...")
         self.closed = True
         if self._timerQ:
-          D("closing the timer queue...")
           self._timerQ.close()
-        D("closing the submission priority queue...")
         self._LFPQ.close()
-        D("waiting for the dispatch thread...")
         self._dispatchThread.join()
-        D("closing the worker pool...")
         self._workers.close()
 
   def _dispatcher(self):
