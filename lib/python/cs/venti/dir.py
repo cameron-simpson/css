@@ -438,36 +438,5 @@ class Dir(Dirent):
         if not E.isdir:
           raise ValueError("%s[name=%s] is not a directory" % (D, name))
       D = E
+
     return D
-
-  def storeFilename(self, filepath, filename,
-                trust_size_mtime=False, ignore_existing=False):
-    ''' Store as `filename` to file named by `filepath`.
-    '''
-    import  cs.venti.file
-    with Pfx("%s.storeFile(%s, %s, trust_size_mtime=%s, ignore_existing=%s",
-             self, filename, filepath, trust_size_mtime, ignore_existing):
-      E = self.get(filename)
-      if ignore_existing and E is not None:
-        debug("already exists, skipping")
-        return E
-
-      if trust_size_mtime and E is not None and E.isfile:
-        st = os.stat(filepath)
-        if st.st_size == E.size() and int(st.st_mtime) == int(E.mtime):
-          debug("same size and mtime, skipping")
-          return E
-        debug("differing size(%s:%s)/mtime(%s:%s)",
-              st.st_size, E.size(),
-              int(st.st_mtime), int(E.mtime))
-
-      if E is None or not E.isfile:
-        matchBlocks = None
-      else:
-        matchBlocks = E.getBlock().leaves()
-
-      E = cs.venti.file.storeFilename(filepath, filename, matchBlocks=matchBlocks)
-      if filename in self:
-        del self[filename]
-      self[filename] = E
-    return E
