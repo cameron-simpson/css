@@ -16,8 +16,9 @@ import os
 import sys
 import time
 from datetime import datetime
+import errno
 from cs.lex import unctrl
-from cs.logutils import Pfx, error
+from cs.logutils import D, Pfx, error
 from . import totext, fromtext
 from .blockify import blockFromFile
 from .dir import decode_Dirent_text, Dir, FileDirent
@@ -45,7 +46,7 @@ def archive(arfile, path,
         D("open %r ...", arfile)
         arfp = open(arfile)
       except OSError as e:
-        if e.errno == errno.E_NOENT:
+        if e.errno == errno.ENOENT:
           arfp = None
         else:
           raise
