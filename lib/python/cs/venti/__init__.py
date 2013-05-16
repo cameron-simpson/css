@@ -53,7 +53,9 @@ def fromtext(s):
 # Characters that may appear in text sections of a texthexify result.
 # Because we transcribe Dir blocks this way it includes some common
 # characters used for metadata.
-_texthexify_white_chars = ascii_letters + digits + '_+.,=/:;{}*'
+# Note: no path separator ("/") because we may accept this as a
+#       path pseudocomponent.
+_texthexify_white_chars = ascii_letters + digits + '_+.,=:;{}*'
 
 def totext(data):
   ''' Represent a byte sequence as a hex/text string.
