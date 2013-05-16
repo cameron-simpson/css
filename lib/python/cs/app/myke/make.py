@@ -10,25 +10,27 @@ import getopt
 from functools import partial
 import logging
 from subprocess import Popen
-from threading import Lock
+from cs.threads import Lock, RLock
 from cs.later import Later, report as report_LFs, CallableValue
 import cs.logutils
 from cs.logutils import Pfx, info, error, debug, D
+from cs.obj import O
 from cs.threads import Channel
 from .parse import SPECIAL_MACROS, Macro, MacroExpression, \
                    parseMakefile, parseMacroExpression
 
 SHELL = '/bin/sh'
 
+# Later priority values
 # actions come first, to keep the queue narrower
 PRI_ACTION = 0
 PRI_MAKE   = 1
 PRI_PREREQ = 2
 
-class Flags(object):
+class Flags(O):
   pass
 
-class Maker(object):
+class Maker(O):
   ''' Main class representing a set of dependencies to make.
   '''
 
@@ -38,6 +40,8 @@ class Maker(object):
     '''
     if parallel < 1:
       raise ValueError("expected positive integer for parallel, got: %s" % (parallel,))
+    O.__init__(self)
+    self._O_omit.extend(['macros', 'targets', 'rules', 'namespaces'])
     self.parallel = parallel
     self.debug = Flags()
     self.debug.debug = False    # logging.DEBUG noise
@@ -50,8 +54,9 @@ class Maker(object):
     self._makefiles = []
     self.appendfiles = []
     self.macros = {}
-    self._targets = {}
-    self._targets_lock = Lock()
+    # autocreating mapping interface to Targets
+    self.targets = TargetMap(self)
+    self.rules = {}
     self.precious = set()
     self.active = set()
     self.active_lock = Lock()
@@ -171,16 +176,10 @@ class Maker(object):
             break
     return ok
 
-  def __getitem__(self, target):
+  def __getitem__(self, name):
     ''' Return the specified Target.
     '''
-    targets = self._targets
-    with self._targets_lock:
-      if target in targets:
-        T = targets[target]
-      else:
-        T = targets[target] = Target(self, target, context=None, prereqs=(), postprereqs=(), actions=[])
-    return T
+    return self.targets[name]
 
   def setDebug(self, flag, value):
     ''' Set or clear the named debug option.
@@ -255,21 +254,82 @@ class Maker(object):
       ns = {}
       self._namespaces.insert(0, ns)
       for O in parseMakefile(self, makefile, parent_context):
-        if isinstance(O, Target):
-          T = O
-          self.debug_parse("add target %s", T)
-          self._targets[T.name] = T
-          if first_target is None:
-            first_target = T
-        elif isinstance(O, Macro):
-          self.debug_parse("add macro %s", O)
-          ns[O.name] = O
-        else:
-          raise ValueError("parseMakefile({}): unsupported parse item received: {}{!r}".format(makefile, type(O), O))
+        with Pfx(O.context):
+          if isinstance(O, Target):
+            # record this Target in the Maker
+            T = O
+            self.debug_parse("add target %s", T)
+            if '%' in T.name:
+              # record this Target as a rule
+              self.rules[T.name] = T
+            else:
+              self.targets[T.name] = T
+              if first_target is None:
+                first_target = T
+          elif isinstance(O, Macro):
+            self.debug_parse("add macro %s", O)
+            ns[O.name] = O
+          else:
+            raise ValueError(
+                    "parseMakefile({}): unsupported parse item received: {}{!r}"
+                      .format(makefile, type(O), O)
+                  )
       if first_target is not None:
         self.default_target = first_target
 
-class Target(object):
+class TargetMap(O):
+  ''' A mapping interface to the known targets.
+      Makes targets as needed if inferrable.
+      Raises KeyError for targets 
+  '''
+
+  def __init__(self, maker):
+    ''' Initialise the TargetMap.
+        `maker` is the Maker using this TargetMap.
+    '''
+    self.maker = maker
+    self.targets = {}
+    self._lock = RLock()
+
+  def __getitem__(self, name):
+    ''' Return the Target for `name`.
+        Raises KeyError if the Target is unknown and not inferrable.
+    '''
+    targets = self.targets
+    if name not in targets:
+      with self._lock:
+        if name not in targets:
+          T = _newTarget(self.maker, name, context=None)
+          if os.path.exists(name):
+            T.state = 'made'
+            T._status = True
+          else:
+            error("can't infer a Target to make %r" % (name,))
+            T.state = 'failed'
+            T._status = False
+          targets[name] = T
+    return targets[name]
+
+  def _newTarget(self, maker, name, context, prereqs=(), postprereqs=(), actions=()):
+    ''' Construct a new Target.
+    '''
+    return Target(maker, name, context, prereqs, postprereqs, actions)
+
+  def __setitem__(self, name, target):
+    ''' Record new target in map.
+        Check that the name matches.
+        Reject duplicate names.
+    '''
+    if name != target.name:
+      raise ValueError("tried to record Target as %r, but target.name = %r"
+                       % (name, target.name))
+    with self._lock:
+      if name in self.targets:
+        raise ValueError("redefinition of Target %r, previous definition from %s"
+                         % (name, self.targets[name].context))
+      self.targets[name] = target
+
+class Target(O):
 
   def __init__(self, maker, name, context, prereqs, postprereqs, actions):
     ''' Initialise a new target.
@@ -279,6 +339,8 @@ class Target(object):
         `prereqs`: macro expression to produce prereqs.
         `postprereqs`: macro expression to produce post prereqs.
     '''
+    O.__init__(self)
+    self._O_omit.extend(['actions', 'namespaces'])
     self.maker = maker
     self.context = context
     self.name = name
@@ -296,6 +358,9 @@ class Target(object):
 
   @property
   def namespaces(self):
+    ''' The namespaces for this Target: the special per-Target macros,
+        the Maker's namespaces, the Maker's macros and the special macros.
+    '''
     return ( [ { '@':     lambda c, ns: self.name,
                  '/':     lambda c, ns: [ P.name for P in self.prereqs ],
                  # TODO: $? et al
@@ -480,7 +545,7 @@ class Target(object):
       # report the status upstream
       retq.put(ok)
 
-class Action(object):
+class Action(O):
 
   def __init__(self, context, variant, line, silent=False):
     self.context = context

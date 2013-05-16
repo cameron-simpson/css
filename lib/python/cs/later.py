@@ -6,12 +6,13 @@ from contextlib import contextmanager
 from functools import partial
 import sys
 from collections import deque
-from threading import Lock
+import threading
 from threading import Thread, Condition
 from cs.py3 import Queue, raise3
 import time
 from cs.threads import AdjustableSemaphore, IterablePriorityQueue, \
-                       WorkerThreadPool, TimerQueue
+                       WorkerThreadPool, TimerQueue, \
+                       Lock
 from cs.seq import seq
 from cs.logutils import Pfx, info, warning, debug, D
 
@@ -19,6 +20,31 @@ STATE_PENDING = 0       # function not yet dispatched
 STATE_RUNNING = 1       # function executing
 STATE_DONE = 2          # function complete
 STATE_CANCELLED = 3     # function cancelled
+
+class _ThreadLocal(threading.local):
+  ''' Thread local state to provide implied context withing Later context managers.
+  '''
+
+  def __init__(self):
+    self.stack = []
+
+  @property
+  def current(self):
+    return self.stack[-1]
+
+  def push(self, L):
+    self.stack.append(L)
+
+  def pop(self):
+    return self.stack.pop()
+
+default = _ThreadLocal()
+
+def later(func, *a, **kw):
+  ''' Queue a function using the current default Later.
+      Return the LateFunction.
+  '''
+  return default.current.defer(func, *a, **kw)
 
 class _Late_context_manager(object):
   ''' The _Late_context_manager is a context manager to run a suite via an
@@ -315,6 +341,7 @@ class LateFunction(PendingFunction):
     ''' ._dispatch() is called by the Later class instance's worker thread.
         It causes the function to be handed to a thread for execution.
     '''
+    self.later.info("DISPATCH %s", self)
     with self._lock:
       assert self.state == STATE_PENDING
       self.state = STATE_RUNNING
@@ -332,9 +359,10 @@ class LateFunction(PendingFunction):
     return result
 
   def set_result(self, result):
+    self.later.info("COMPLETE %s: result = %r", self, result)
+    self.later.log_status()
     self.later.capacity.release()
     self.later.running.remove(self)
-    self.later.debug("completed %s", self)
     PendingFunction.set_result(self, result)
 
 class Later(object):
@@ -388,8 +416,18 @@ class Later(object):
            % (self.name, self.capacity,
               len(self.pending), len(self.running), len(self.delayed))
 
+  def log_status(self):
+    for LF in list(self.delayed):
+      self.info("STATUS: delayed: %s", LF)
+    for LF in list(self.pending):
+      self.info("STATUS: pending: %s", LF)
+    for LF in list(self.running):
+      self.info("STATUS: running: %s", LF)
+
   def __enter__(self):
     debug("%s: __enter__", self)
+    global default
+    default.push(self)
     return self
 
   def __exit__(self, exc_type, exc_val, exc_tb):
@@ -397,6 +435,8 @@ class Later(object):
         function is blocking on this, and will return on its release.
     '''
     debug("%s: __exit__: exc_type=%s", self, exc_type)
+    global default
+    default.pop()
     self.close()
     return False
 
@@ -445,12 +485,16 @@ class Later(object):
       if self.closed:
         warning("close of closed Later %r", self)
       else:
-        debug("closing...")
+        D("closing...")
         self.closed = True
         if self._timerQ:
+          D("closing the timer queue...")
           self._timerQ.close()
+        D("closing the submission priority queue...")
         self._LFPQ.close()
+        D("waiting for the dispatch thread...")
         self._dispatchThread.join()
+        D("closing the worker pool...")
         self._workers.close()
 
   def _dispatcher(self):

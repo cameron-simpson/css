@@ -8,18 +8,63 @@ from __future__ import with_statement
 from collections import namedtuple
 from copy import copy
 from functools import partial
+import inspect
 from itertools import chain
 import sys
 import time
-from threading import Lock
+import threading
 from threading import Semaphore, Thread, Timer
 from collections import deque
 if sys.hexversion < 0x02060000: from sets import Set as set
 from cs.seq import seq
 from cs.excutils import transmute
+import logging
+import cs.logutils
 from cs.logutils import Pfx, LogTime, error, warning, debug, exception, OBSOLETE, D
 from cs.obj import O
 from cs.py3 import raise3, Queue, PriorityQueue, Queue_Full, Queue_Empty
+
+class DebugWrapper(O):
+  ''' Base class for classes presenting debugging wrappers.
+  '''
+
+  def __init__(self, **kw):
+    O.__init__(self, **kw)
+
+  def debug(self, msg, *a):
+    if a:
+      msg = msg % a
+    cs.logutils.debug(': '.join( (self.debug_label, msg) ))
+
+  @property
+  def debug_label(self):
+    info = '%s:%d' % (self.filename, self.lineno)
+    try:
+      context = self.context
+    except AttributeError:
+      pass
+    else:
+      info = ':'.join(info, str(context))
+    label = '%s-%d[%s]' % (self.__class__.__name__, id(self), info)
+    return label
+
+def Lock():
+  ''' Factory function: if cs.logutils.logging_level <= logging.DEBUG
+      then return a DebuggingLock, otherwise a threading.Lock.
+  '''
+  if cs.logutils.logging_level > logging.DEBUG:
+    return threading.Lock()
+  filename, lineno = inspect.stack()[1][1:3]
+  return DebuggingLock({'filename': filename, 'lineno': lineno})
+
+def RLock():
+  ''' Factory function: if cs.logutils.logging_level <= logging.DEBUG
+      then return a DebuggingRLock, otherwise a threading.RLock.
+  '''
+  if cs.logutils.logging_level > logging.DEBUG:
+    return threading.RLock()
+  filename, lineno = inspect.stack()[1][1:3]
+  return DebuggingRLock({'filename': filename, 'lineno': lineno})
 
 class WorkerThreadPool(O):
   ''' A pool of worker threads to run functions.
@@ -204,23 +249,22 @@ class Channel(object):
     self.__readable.acquire()
     self.__writable = Lock()
     self.__writable.acquire()
-    self.__get_lock = Lock()
-    self.__put_lock = Lock()
     self.closed = False
-    self.__lock = Lock()
-    self._nreaders = 0
 
   def __str__(self):
-    if self.__readable.locked():
-      if self.__writable.locked():
-        state="idle"
+    if self.__readable.acquire(False):
+      if self.__writable.acquire(False):
+        state = "ERROR(readable and writable)"
+        self.__writable.release()
       else:
-        state="get blocked waiting for put"
+        state = "put just happened, get imminent"
+      self.__readable.release()
     else:
-      if self.__writable.locked():
-        state="put just happened, get imminent"
+      if self.__writable.acquire(False):
+        state = "idle"
+        self.__writable.release()
       else:
-        state="ERROR"
+        state = "get blocked waiting for put"
     return "<cs.threads.Channel %s>" % (state,)
 
   def __call__(self, *a):
@@ -236,68 +280,71 @@ class Channel(object):
     ''' Read a value from the Channel.
         Blocks until someone put()s to the Channel.
     '''
-    debug("CHANNEL: %s.get()", self)
     if self.closed:
-      raise ValueError("%s.get() on closed Channel" % (self,))
-    with self.__get_lock:
-      with self.__lock:
-        self._nreaders += 1
-      self.__writable.release()   # allow someone to write
-      self.__readable.acquire()   # await writer and prevent other readers
-      value = self._value
-      delattr(self,'_value')
-      with self.__lock:
-        self._nreaders -= 1
-    debug("CHANNEL: %s.get() got %r", self, value)
+      raise RuntimeError("%s: closed", self)
+    # allow a writer to proceed
+    self.__writable.release()
+    # await a writer
+    self.__readable.acquire()
+    self.close()
+    value = self._value
+    delattr(self,'_value')
     return value
 
   def put(self, value):
     ''' Write a value to the Channel.
         Blocks until a corresponding get() occurs.
     '''
-    debug("CHANNEL: %s.put(%r)", self, value)
     if self.closed:
-      raise ValueError("%s: closed, but put(%s)" % (self, value))
-    with self.__put_lock:
-      self.__writable.acquire()   # prevent other writers
-      self._value = value
-      self.__readable.release()   # allow a reader
-    debug("CHANNEL: %s.put(%r) completed", self, value)
+      raise RuntimeError("%s: closed", self)
+    # block until there is a matching .get()
+    self.__writable.acquire()
+    self._value = value
+    # allow .get() to proceed
+    self.__readable.release()
 
   def close(self):
-    with self.__lock:
-      if self.closed:
-        warning("%s: .close() of closed Channel" % (self,))
-      else:
-        self.closed = True
-    with self.__lock:
-      nr = self._nreaders
-    for i in range(nr):
-      self.put(None)
+    if self.closed:
+      warning("%s: .close() of closed Channel" % (self,))
+    else:
+      self.closed = True
 
-  def __iter__(self):
-    ''' Iterator for consumers that operate on tasks arriving via this Channel.
+class Result(object):
+  ''' A blocking value store.
+      Getters block until a value is supplied.
+  '''
+
+  def __init__(self, name=None):
+    if name is None:
+      name = "Result%d" % (seq(),)
+    self.closed = False
+    self.ready = False
+    self._get_lock = Lock()
+    self._get_lock.acquire()
+
+  def put(self, value):
+    ''' Store the value.
     '''
-    while not self.closed:
-      item = self.get()
-      if item is None and self.closed:
-        break
-      yield item
+    if self.closed:
+      raise RuntimeError(".put when closed: self=%r", self)
+    self.closed = True
+    self.value = value
+    self.ready = True
+    self._get_lock.release()
 
-##def call(self,value,backChannel):
-##  ''' Asynchronous call to daemon via channel.
-##      Daemon should reply by .put()ing to the backChannel.
-##  '''
-##  self.put((value,backChannel))
-##
-##def call_s(self,value):
-##  ''' Synchronous call to daemon via channel.
-##  '''
-##  ch=getChannel()
-##  self.call(value,ch)
-##  result=ch.get()
-##  returnChannel(ch)
-##  return result
+  def get(self):
+    ''' Fetch the value.
+        Blocks until the value is put.
+        The value may be get()ed multiple times.
+    '''
+    self._get_lock.acquire()
+    self._get_lock.release()
+    return self.value
+
+  def empty(self):
+    ''' Analogue to Queue.empty().
+    '''
+    return not self.ready
 
 class IterableQueue(Queue):
   ''' A Queue implementing the iterator protocol.
@@ -404,61 +451,6 @@ class IterablePriorityQueue(PriorityQueue):
     return item
 
   next = __next__
-
-class Cato9:
-  ''' A cat-o-nine-tails Queue-like object, fanning out put() items
-      to an arbitrary number of handlers.
-  '''
-  @OBSOLETE
-  def __init__(self,*args,**kwargs):
-    self.__qs={}
-    self.__q=IterableQueue(maxsize)
-    self.__lock=Lock()
-    self.__closed=False
-    Thread(target=self.__handle).start()
-  def qsize(self):
-    return self.__q.qsize()
-  def put(self,item,block=True,timeout=None):
-    assert not self.__closed
-    self.__q.put(item,block,timeout)
-  def put_nowait(self,item):
-    assert not self.__closed
-    self.__q.put_nowait(item)
-  def close(self):
-    ''' Close the queue.
-    '''
-    self.__closed=True
-    with self.__lock:
-      qs=self.__qs
-      self.__qs={}
-    for k in qs.keys():
-      qs[k].close()
-  def __handle(self):
-    for item in self.__q:
-      with self.__lock:
-        for k in self.__qs.keys():
-          self.__qs[k].put(item)
-  def addHandler(self,handler):
-    ''' Add a handler function to the queue, returning an identifying token.
-        The handler will be called with each put() item.
-    '''
-    assert not self.__closed
-    tok=seq()
-    IQ=IterableQueue(1)
-    with self.__lock:
-      self.__qs[tok]=IQ
-    Thread(target=self.__handler,args=(IQ,handler)).start()
-    return tok
-  def __handler(self,IQ,handler):
-    for item in IQ:
-      handler(item)
-  def removeHandler(self,tok):
-    ''' Remove the handler corresponding to the supplied token.
-    '''
-    with self.__lock:
-      Q=self.__qs.pop(tok,None)
-    if Q is not None:
-      Q.close()
 
 class JobCounter:
   ''' A class to count and wait for outstanding jobs.
@@ -1092,6 +1084,130 @@ def runTree_inner(input, ops, state, funcQ, retq=None):
 
   # the first runTree_inner gets to return the retq for result collection
   return retq
+
+class DebuggingLock(DebugWrapper):
+  ''' Wrapper class for threading.Lock to trace creation and use.
+      cs.threads.Lock() returns on of these in debug mode or a raw
+      threading.Lock otherwise.
+  '''
+
+  def __init__(self, dkw, slow=2):
+    DebugWrapper.__init__(self, **dkw)
+    self.debug("__init__(slow=%r)", slow)
+    if slow <= 0:
+      raise ValueError("slow must be positive, received: %r" % (slow,))
+    self.slow = slow
+    self.lock = threading.Lock()
+    self.held = None
+
+  def __enter__(self):
+    ##self.lock.__enter__()
+    D("ENTER0")
+    self.acquire()
+    D("ENTER1")
+    return self
+
+  def __exit__(self, *a):
+    ##return self.lock.__exit__(*a)
+    self.release()
+    return False
+
+  def acquire(self, *a):
+    # quietly support Python 3 arguments after blocking parameter
+    blocking = True
+    if a:
+      blocking = a[0]
+      a = a[1:]
+    D("ACQUIRE0")
+    filename, lineno = inspect.stack()[1][1:3]
+    debug("%s:%d: acquire(blocking=%s)", filename, lineno, blocking)
+    D("ACQUIRE1")
+    if blocking:
+      D("ACQUIRE2")
+      # blocking
+      # try non-blocking first
+      # if successful, good
+      # otherwise spawn a monitoring thread to report on slow acquisition
+      # and block
+      taken = self.lock.acquire(False)
+      if not taken:
+        Q = Queue()
+        T = Thread(target=self._timed_acquire, args=(Q, filename, lineno))
+        T.daemon = True
+        T.start()
+        taken = self.lock.acquire(blocking, *a)
+        Q.put(taken)
+    else:
+      # non-blocking: do ordinary lock acquisition
+      taken = self.lock.acquire(blocking, *a)
+    if taken:
+      self.held = (filename, lineno)
+    return taken
+
+  def release(self):
+    filename, lineno = inspect.stack()[0][1:3]
+    debug("%s:%d: release()", filename, lineno)
+    self.held = None
+    self.lock.release()
+
+  def _timed_acquire(self, Q, filename, lineno):
+    ''' Block waiting for lock acquisition.
+        Report slow acquisition.
+	This would be inline above except that Python 2 Locks do
+	not have a timeout parameter, hence this thread.
+	This probably scales VERY badly if there is a lot of Lock
+	contention.
+    '''
+    slow = self.slow
+    sofar = 0
+    slowness = 0
+    while True:
+      try:
+        taken = Q.get(True, 1)
+      except Queue_Empty:
+        sofar += 1
+        slowness += 1
+        if slowness >= slow:
+          self.debug("from %s:%d: acquire: after %gs, held by %s", filename, lineno, sofar, self.held)
+          # complain more slowly next time
+          slowness = 0
+          slow += 1
+      else:
+        break
+
+class DebuggingRLock(DebugWrapper):
+  ''' Wrapper class for threading.RLock to trace creation and use.
+      cs.threads.RLock() returns on of these in debug mode or a raw
+      threading.RLock otherwise.
+  '''
+
+  def __init__(self, dkw):
+    D("dkw = %r", dkw)
+    DebugWrapper.__init__(self, **dkw)
+    self.debug('__init__')
+    self.lock = threading.RLock()
+
+  def __enter__(self):
+    filename, lineno = inspect.stack()[0][1:3]
+    self.debug('from %s:%d: __enter__ ...', filename, lineno)
+    self.lock.__enter__()
+    self.debug('from %s:%d: __enter__ ENTERED', filename, lineno)
+    return self
+
+  def __exit__(self, *a):
+    filename, lineno = inspect.stack()[0][1:3]
+    self.debug('%s:%d: __exit__(*%s) ...', filename, lineno, a)
+    return self.lock.__exit__(*a)
+
+  def acquire(self, blocking=True, timeout=-1):
+    filename, lineno = inspect.stack()[0][1:3]
+    self.debug('%s:%d: acquire(blocking=%s)', filename, lineno, blocking)
+    self.lock.acquire(blocking, timeout)
+
+  def release(self):
+    filename, lineno = inspect.stack()[0][1:3]
+    self.debug('%s:%d: release()', filename, lineo)
+    self.lock.release()
 
 if __name__ == '__main__':
   import cs.threads_tests
