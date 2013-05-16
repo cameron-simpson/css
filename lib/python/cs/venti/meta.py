@@ -38,20 +38,25 @@ class Meta(dict):
   def __init__(self, s=None):
     dict.__init__(self)
     if s is not None:
-      for line in s.split('\n'):
-        line = line.strip()
-        if len(line) == 0 or line.startswith('#'):
+      for metafield in s.split(';'):
+        metafield = metafield.strip()
+        if not metafield:
           continue
-        if line.find(':') < 1:
-          error("bad metadata line (no colon): %s" % (line,))
+        if metafield.find(':') < 1:
+          error("bad metadata field (no colon): %s" % (metafield,))
         else:
-          k, v = line.split(':', 1)
+          k, v = metafield.split(':', 1)
           self[k] = v
 
   def textencode(self):
     ''' Encode the metadata in text form.
     '''
-    return "".join("%s:%s\n" % (k, self[k]) for k in sorted(self.keys()))
+    return "".join("%s:%s;" % (k, self[k]) for k in sorted(self.keys()))
+
+  def encode(self):
+    ''' Encode the metadata in binary form: just text transcribed in UTF-8.
+    '''
+    return self.textencode().encode()
 
   @property
   def mtime(self):
@@ -154,7 +159,7 @@ class Meta(dict):
     return (user, group, (uperms<<6)+(gperms<<3)+operms)
 
   def stat(self):
-    ''' Return a stat object.
+    ''' Return a stat object computed from this Meta data.
     '''
     user, group, st_mode = self.unixPerms()
     if user is None:
