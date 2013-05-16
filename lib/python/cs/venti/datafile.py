@@ -10,6 +10,7 @@ import os
 import os.path
 from threading import Lock
 from zlib import compress, decompress
+from cs.logutils import D
 from cs.obj import O
 from cs.serialise import get_bs, put_bs, get_bsfp
 from cs.threads import locked_property
@@ -204,6 +205,10 @@ class DataDir(O):
     '''
     return put_bs(n) + put_bs(offset)
 
+  # without this "in" tries to iterate over the mapping with int indices
+  def __contains__(self, hash):
+    return hash in self.index
+    
   def __getitem__(self, hash):
     ''' Return the uncompressed data associated with the supplied hash.
     '''
@@ -253,14 +258,14 @@ class DataDir(O):
       datafile.flush()
     self.index.flush()
 
-  def open(n):
+  def open(self, n):
     ''' Obtain the Datafile indexed `n`.
     '''
     O = self._open
     with self._lock:
       D = O.get(n)
       if D is None:
-        D = O[n] = Datafile(self.pathto(self.datafilename(n)))
+        D = O[n] = DataFile(self.pathto(self.datafilename(n)))
     return D
 
   def datafilename(self, n):
