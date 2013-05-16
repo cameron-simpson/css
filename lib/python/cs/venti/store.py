@@ -295,8 +295,12 @@ class MappingStore(BasicStore):
       self.mapping[h] = data
     return h
 
-  def get(h, default=None):
-    return self.mapping.get(h, default)
+  def get(self, h, default=None):
+    try:
+      data = self.mapping[h]
+    except KeyError:
+      return default
+    return data
 
   def contains(self, h):
     return h in self.mapping
