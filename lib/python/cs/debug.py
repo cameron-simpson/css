@@ -45,14 +45,14 @@ def Thread(*a, **kw):
 def DEBUG(f):
   ''' Decorator to wrap functions in timing and value debuggers.
   '''
-  from cs.threads import Result
   if not ifdebug():
     return f
   def inner(*a, **kw):
+    from cs.threads import Result
     filename, lineno = inspect.stack()[1][1:3]
     n = seq()
     R = Result()
-    T = Thread(target=_debug_watcher, args=(filename, lineno, n, f.__name__, R))
+    T = threading.Thread(target=_debug_watcher, args=(filename, lineno, n, f.__name__, R))
     T.daemon = True
     T.start()
     debug("%s:%d: [%d] call %s(*%r, **%r)", filename, lineno, n, f.__name__, a, kw)
@@ -226,12 +226,29 @@ class DebuggingRLock(DebugWrapper):
     self.debug('%s:%d: release()', filename, lineo)
     self.lock.release()
 
+_debug_threads = set()
+
+def dump_debug_threads():
+  D("dump_debug_threads:")
+  for T in _debug_threads:
+    D("dump_debug_threads: thread %r: %r", T.name, T.debug_label)
+  D("dump_debug_threads done")
+
 class DebuggingThread(threading.Thread, DebugWrapper):
 
   def __init__(self, dkw, *a, **kw):
     DebugWrapper.__init__(self, **dkw)
     self.debug("NEW THREAD(*%r, **%r)", a, kw)
+    _debug_threads.add(self)
     return threading.Thread.__init__(self, *a, **kw)
+
+  @DEBUG
+  def join(self, timeout=None):
+    self.debug("join(timeout=%r)...", timeout)
+    retval = threading.Thread.join(self, timeout=timeout)
+    self.debug("join(timeout=%r) completed", timeout)
+    _debug_threads.discard(self)
+    return retval
 
 if __name__ == '__main__':
   setup_logging()
