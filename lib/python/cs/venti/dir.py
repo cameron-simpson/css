@@ -9,7 +9,7 @@ from cs.logutils import Pfx, debug, error, info, warning
 from cs.venti import totext, fromtext
 from cs.lex import hexify
 from cs.seq import seq
-from cs.serialise import get_bs, put_bs
+from cs.serialise import get_bs, put_bs, put_bsdata
 from cs.threads import locked_property
 from .block import decodeBlock
 from .blockify import blockFromString
@@ -116,9 +116,9 @@ class Dirent(object):
   def updateFromStat(self, st):
     self.meta.updateFromStat(st)
 
-  def encode(self, noname=False):
+  def encode(self, no_name=False):
     ''' Serialise the dirent.
-        Output format: bs(type)bs(flags)[bs(metalen)meta][bs(namelen)name]block
+        Output format: bs(type)bs(flags)[bsdata(metadata)][bsdata(name)]block
     '''
     flags = 0
 
@@ -126,27 +126,29 @@ class Dirent(object):
     if meta:
       if not isinstance(meta, Meta):
         raise TypeError("self.meta is not a Meta: <%s>%r" % (type(meta), meta))
-      metatxt = meta.encode()
-      if len(metatxt) > 0:
-        metatxt = toBS(len(metatxt))+metatxt
+      metadata = put_bsdata(meta.encode())
+      if len(metadata) > 0:
         flags |= F_HASMETA
     else:
-      metatxt = ""
+      metadata = b''
 
-    name = self.name
-    if noname:
+    if no_name:
       name = ""
-    elif name is not None and len(name) > 0:
-      name = toBS(len(name))+name
+    elif name is None:
+      name = ""
+    else:
+      name = self.name
+    if name:
+      namedata = put_bsdata(name.encode())
       flags |= F_HASNAME
     else:
-      name = ""
+      namedata = b''
 
     block = self.getBlock()
-    return toBS(self.type) \
-         + toBS(flags) \
-         + metatxt \
-         + name \
+    return put_bs(self.type) \
+         + put_bs(flags) \
+         + metadata \
+         + namedata \
          + block.encode()
 
   def textencode(self):
