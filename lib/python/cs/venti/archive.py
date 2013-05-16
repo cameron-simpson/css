@@ -17,10 +17,11 @@ import sys
 import time
 from datetime import datetime
 from cs.lex import unctrl
-from cs.venti import totext, fromtext
-from .dir import decode_Dirent_text
-from .paths import copy_in
 from cs.logutils import Pfx, error
+from . import totext, fromtext
+from .blockify import blockFromFile
+from .dir import decode_Dirent_text, Dir, FileDirent
+from .paths import copy_in
 
 def archive(arfile, path,
           trust_size_mtime=False,
@@ -40,6 +41,7 @@ def archive(arfile, path,
       arfp = None
   else:
     try:
+      D("open %r ...", arfile)
       arfp = open(arfile)
     except IOError:
       arfp = None
@@ -53,12 +55,16 @@ def archive(arfile, path,
   with Pfx("archive(%s)", path):
     if os.path.isdir(path):
       if oldE is None or not oldE.isdir:
-        oldE = Dir(os.path.basename(path))
-      copy_in(path, oldE, delete=not keep_missing, ignore_existing=ignore_existing, trust_size_mtime=trust_size_mtime)
+        E = Dir(os.path.basename(path))
+      else:
+        E = oldE
+      copy_in(path, E, delete=not keep_missing, ignore_existing=ignore_existing, trust_size_mtime=trust_size_mtime)
     else:
-      if oldE is None or not oldE.isfile:
-        oldE = FileDirent(os.path.basename(path))
-      copy_in(path, oldE, trust_size_mtime=trust_size_mtime)
+      # TODO: incremental update mode to read the file in leaf sized
+      # chunks and hash compare against leaf block hashes
+      with open(path, 'rb') as fp:
+        topBlock = blockFromFile(fp)
+      E = FileDirent(os.path.basename(path), None, topBlock)
 
     E.name = path
     if arfile is None:
@@ -69,7 +75,6 @@ def archive(arfile, path,
       else:
         with open(arfile, "a") as arfp:
           write_Dirent(arfp, E)
-  return ok
 
 def retrieve(arfile, paths=None):
   ''' Retrieve Dirents for the named file paths, or None if a
