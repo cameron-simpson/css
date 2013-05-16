@@ -37,7 +37,7 @@ def decode_Dirent_text(text):
       Dirent.textencode(), and return the correspnding Dirent.
   '''
   data = fromtext(text)
-  E, offset = decodeDirent(data)
+  E, offset = decodeDirent(data, 0)
   if offset < len(data):
     raise ValueError("%r: not all text decoded: got %r with unparsed data %r"
                      % (text, E, data[offset:]))
@@ -60,9 +60,9 @@ def decodeDirent(data, offset):
     meta = Meta(metadata.decode())
   else:
     meta = Meta()
-  block, s = decodeBlock(s)
+  block, offset = decodeBlock(data, offset)
   if type_ == D_DIR_T:
-    E = Dir(name, meta=meta, parent=None, content=block)
+    E = Dir(name, meta=meta, parent=None, dirblock=block)
   elif type_ == D_FILE_T:
     E = FileDirent(name, meta=meta, block=block)
   else:
