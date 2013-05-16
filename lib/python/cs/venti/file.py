@@ -3,38 +3,14 @@
 # File interfaces.      - Cameron Simpson <cs@zip.com.au>
 #
 
+from __future__ import print_function
 import os
 import sys
 from threading import Thread
 from cs.logutils import Pfx, info
-from .dir import FileDirent
 from .meta import Meta
 from .blockify import blockFromFile
 from cs.threads import IterableQueue
-
-def storeFilename(filename, name, rsize=None, matchBlocks=None, verbosefp=None):
-  ''' Store the file named `filename`.
-      Return
-  '''
-  with Pfx(filename):
-    if verbosefp:
-      print >>verbosefp, filename
-    with open(filename, "rb") as ifp:
-      E = storeFile(ifp, name=name, rsize=rsize, matchBlocks=matchBlocks)
-      st = os.fstat(ifp.fileno())
-    E.meta.updateFromStat(st)
-  return E
-
-def storeFile(ifp, name, rsize=None, matchBlocks=None, verbosefp=None):
-  ''' Store the data from ifp, return Dirent.
-      TODO: set M.mtime from ifp.fstat().
-  '''
-  info("storeFile(%s)", ifp)
-  if verbosefp:
-    print >>verbosefp, ifp
-  B = blockFromFile(ifp, rsize=rsize, matchBlocks=matchBlocks)
-  B.store()
-  return FileDirent(name, None, B)
 
 class ReadFile(object):
   ''' A read-only file interface supporting seek(), read(), readline(),
