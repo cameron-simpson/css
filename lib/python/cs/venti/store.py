@@ -22,7 +22,6 @@ from threading import Thread
 from cs.py3 import Queue
 from cs.later import Later, report as reportLFs
 from cs.logutils import info, debug, warning, Pfx, D
-from cs.serialise import toBS, fromBS
 from cs.threads import Q1, Get1, NestingOpenClose
 from . import defaults, totext
 from .hash import Hash_SHA1
@@ -290,9 +289,10 @@ class MappingStore(BasicStore):
     BasicStore.__init__(self, name, capacity=capacity)
     self.mapping = mapping
 
-  def add(self, block):
-    h = self.hash(block)
-    self.mapping[h] = block
+  def add(self, data):
+    h = self.hash(data)
+    if h not in self.mapping:
+      self.mapping[h] = data
     return h
 
   def get(h, default=None):

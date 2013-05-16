@@ -1,98 +1,77 @@
 #!/usr/bin/python
 #
 # Fuse interface to a Store.
+# Uses fusepy: https://github.com/terencehonles/fusepy
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
-from fuse import Fuse, FuseArgs   ## Direntry
+from fuse3 import FUSE, Operations, LoggingMixIn
 from errno import ENOSYS
 import sys
 import os
+from cs.logutils import D
+from cs.obj import O
 
-def fusemount(mnt, D, S):
+def mount(mnt, D, S):
   ''' Run a FUSE filesystem with Dirent and backing Store.
   '''
-  FS = FuseStore(mnt, D, E)
-  D("calling FS.main...")
-  FS.main()
+  FS = StoreFS(D, E)
+  FS.mount(mnt)
 
-# Horrible hack because the Fuse class doesn't seem to tell fuse file
-# objects which class instantiation they belong to.
-# I guess There Can Be Only One.
-mainFuseStore = None
+class StoreFS(LoggingMixIn, Operations, O):
+  ''' Class providing filesystem operations, suitable for passing
+      to a FUSE() constructor.
+  '''
 
-class FuseStore(Fuse):
-  def __init__(self, mnt, D, S, *args, **kw):
-    ''' Class to manage a FUSE mountpoint.
+  def __init__(self, D, S):
+    ''' Initilaise a new FUSE mountpoint.
         mnt: the mountpoint
         D: the root directory reference
         S: the Store to hold data
     '''
-    # HACK: record fuse class object for use by files :-(
-    global mainFuseStore
-    assert mainFuseStore is None, "multiple instantiations of FuseStore forbidden"
-    mainFuseStore = self
+    self.S =S
+    self.D = D
 
-    fargs = FuseArgs()
-    fargs.mountpoint = mnt
-    ##fargs = fargs.assemble()
-    kw['prog'] = sys.argv[0]
-    kw['usage'] = "Usage Message";
-
-    print("FuseStore:")
-    print("  args =", repr(args))
-    print("  kw =", repr(kw))
-    print("  fargs =", repr(fargs))
-    Fuse.__init__(self, fuse_args=fargs, **kw)
-    self.flags = 0
-    self.multithreaded = 0
-    ''' Keep a mapping of blockref (raw) to nlinks.
-        We will preserve the ones with nlinks > 1 or file permissions.
+  def mount(self, root):
+    ''' Attach this StoreFS to the specified path `root`.
+        Return the controlling FUSE object.
     '''
-    self.__inodes = {}
-    self.__mountpoint = mnt
-    self.__store = store
-    self.__root = D
-    self.file_class = self.__File
-    self.__out = None
+    return FUSE(self, root, foreground=True, nothreads=True)
 
-  def __OUT(self, *args):
-    if self.__out is None:
-      self.__out = open("/dev/pts/39", "w")
-      sys.stdout = self.__out
-      sys.stderr = self.__out
-    if len(args):
-      D(" ".join([str(x) for x in args])+"\n")
+  def resolve(self, path):
+    ''' Return (D, basename).
+    '''
+    return self.D.resolve(path)
 
-  def __abs(self, path):
-    assert path[0] == '/'
-    return os.path.join('/u/cameron/tmp', path[1:])
+  def resolve2(self, path):
+    ''' Resolve path to Dirent.
+    '''
+    D, basename = self.resolve(path)
+    return D[basename]
 
-  def __namei(self, path):
-    return self.__store.namei(path, self.__root.bref)
+  ##############
+  # FUSE support methods.
 
   def getattr(self, path):
-    self.__OUT("getattr", path)
-    E = self.__namei(path)
-    if E is None:
-      return None
-    return os.lstat(self.__abs(path))
+    return self.resolve2(path).meta.stat()
   def readlink(self, path):
     self.__OUT("readlink", path)
     return os.readlink(self.__abs(path))
-  def readdir(self, path, offset):
-    self.__OUT("readdir", path)
-    yield Direntry('.')
-    yield Direntry('..')
-    for e in os.listdir(self.__abs(path)):
-      self.__OUT("readdir yield %r" % (e,))
-      yield Direntry(e)
+  def readdir(self, path):
+    return ['.', '..'] + self.resolve2(path).keys()
   def unlink(self, path):
-    self.__OUT("unlink", path)
-    os.unlink(self.__abs(path))
+    D, basename = self.resolve(path)
+    if D[basename].isdir:
+      raise ValueError("%s: is a directory" % (path,))
+    del D[basename]
   def rmdir(self, path):
-    self.__OUT("rmdir", path)
-    os.rmdir(self.__abs(path))
+    D, basename = self.resolve(path)
+    E = D[basename]
+    if not E.isdir:
+      raise ValueError("%s: not a directory" % (path,))
+    if len(E.entires()) > 0:
+      raise ValueError("%s: not empty" % (path,))
+    del D[basename]
   def symlink(self, path, path1):
     self.__OUT("symlink", path)
     os.symlink(path, self.__abs(path1))
@@ -130,9 +109,6 @@ class FuseStore(Fuse):
 
   class __File(object):
     def __init__(self, path, flags, *mode):
-      global mainFuseStore
-      assert mainFuseStore is not None
-      self.__Fuse = mainFuseStore
       print("new __File: path =", path, "flags =", repr(flags), "mode =", repr(mode))
       self.file = os.fdopen(os.open("." + path, flags, *mode),
                             flag2mode(flags))

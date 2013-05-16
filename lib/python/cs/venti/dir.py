@@ -4,33 +4,21 @@ import pwd
 import grp
 import stat
 import sys
-if sys.hexversion < 0x02060000:
-  from sets import Set as set
 from threading import Lock
 from cs.logutils import Pfx, debug, error, info, warning
+from cs.lex import hexify
+from cs.seq import seq
+from cs.serialise import get_bs, get_bsdata, put_bs, put_bsdata
+from cs.threads import locked_property
+from . import totext, fromtext
 from .block import decodeBlock
 from .blockify import blockFromString
 from .meta import Meta
-from cs.venti import totext, fromtext
-from cs.lex import hexify
-from cs.seq import seq
-from cs.serialise import toBS, fromBS
 
 uid_nobody = -1
 gid_nogroup = -1
 
 # Directories (Dir, a subclass of dict) and directory entries (Dirent).
-
-def storeDir(path, aspath=None, trust_size_mtime=False, verbosefp=None):
-  ''' Store a real directory into a Store, return the new Dir.
-  '''
-  if aspath is None:
-    aspath = path
-  D = Dir(aspath)
-  ok = D.updateFrom(path, trust_size_mtime=trust_size_mtime, verbosefp=verbosefp)
-  if ok:
-    ok = D.tryUpdateStat(path)
-  return D, ok
 
 D_FILE_T = 0
 D_DIR_T = 1
@@ -43,6 +31,56 @@ def D_type2str(type_):
 
 F_HASMETA = 0x01
 F_HASNAME = 0x02
+
+def decode_Dirent_text(text):
+  ''' Accept `text`, a text transcription of a Direct, such as from
+      Dirent.textencode(), and return the correspnding Dirent.
+  '''
+  data = fromtext(text)
+  E, offset = decodeDirent(data)
+  if offset < len(data):
+    raise ValueError("%r: not all text decoded: got %r with unparsed data %r"
+                     % (text, E, data[offset:]))
+  return E
+
+def decodeDirent(data, offset):
+  ''' Unserialise a Dirent, return (dirent, offset).
+      Input format: bs(type)bs(flags)[bs(namelen)name][bs(metalen)meta]block
+  '''
+  type_, offset = get_bs(data, offset)
+  flags, offset = get_bs(data, offset)
+  if flags & F_HASNAME:
+    namedata, offset = get_bsdata(data, offset)
+    name = namedata.decode()
+  else:
+    name = ""
+  meta = None
+  if flags & F_HASMETA:
+    metadata, offset = get_bsdata(data, offset)
+    meta = Meta(metadata.decode())
+  else:
+    meta = Meta()
+  block, s = decodeBlock(s)
+  if type_ == D_DIR_T:
+    E = Dir(name, meta=meta, parent=None, content=block)
+  elif type_ == D_FILE_T:
+    E = FileDirent(name, meta=meta, block=block)
+  else:
+    E = _BasicDirent(type_, name, meta, block)
+  return E, offset
+
+def decodeDirents(dirdata, offset=0):
+  ''' Yield Dirents from the supplied bytes `dirdata`.
+  '''
+  while offset < len(dirdata):
+    E, offset = decodeDirent(dirdata, offset)
+    if E.name is None or len(E.name) == 0:
+      # FIXME: skip unnamed dirent
+      warning("skip unnamed Dirent")
+      continue
+    if E.name == '.' or E.name == '..':
+      continue
+    yield E
 
 class Dirent(object):
   ''' Incomplete base class for Dirent objects.
@@ -64,7 +102,7 @@ class Dirent(object):
     self.d_ino = None
 
   def __str__(self):
-    return self.textEncode()
+    return self.textencode()
 
   def __repr__(self):
     return "Dirent(%s, %s, %s)" % (D_type2str, self.name, self.meta)
@@ -84,49 +122,42 @@ class Dirent(object):
   def updateFromStat(self, st):
     self.meta.updateFromStat(st)
 
-  def tryUpdateStat(self, statpath):
-    try:
-      st = os.stat(statpath)
-    except OSError as e:
-      error("stat(%s): %s", statpath, e)
-      return False
-    self.updateFromStat(st)
-    return True
-
-  def encode(self, noname=False):
+  def encode(self, no_name=False):
     ''' Serialise the dirent.
-        Output format: bs(type)bs(flags)[bs(metalen)meta][bs(namelen)name]block
+        Output format: bs(type)bs(flags)[bsdata(metadata)][bsdata(name)]block
     '''
     flags = 0
+
+    if no_name:
+      name = ""
+    elif name is None:
+      name = ""
+    else:
+      name = self.name
+    if name:
+      namedata = put_bsdata(name.encode())
+      flags |= F_HASNAME
+    else:
+      namedata = b''
 
     meta = self.meta
     if meta:
       if not isinstance(meta, Meta):
         raise TypeError("self.meta is not a Meta: <%s>%r" % (type(meta), meta))
-      metatxt = meta.encode()
-      if len(metatxt) > 0:
-        metatxt = toBS(len(metatxt))+metatxt
+      metadata = put_bsdata(meta.encode())
+      if len(metadata) > 0:
         flags |= F_HASMETA
     else:
-      metatxt = ""
-
-    name = self.name
-    if noname:
-      name = ""
-    elif name is not None and len(name) > 0:
-      name = toBS(len(name))+name
-      flags |= F_HASNAME
-    else:
-      name = ""
+      metadata = b''
 
     block = self.getBlock()
-    return toBS(self.type) \
-         + toBS(flags) \
-         + metatxt \
-         + name \
+    return put_bs(self.type) \
+         + put_bs(flags) \
+         + namedata \
+         + metadata \
          + block.encode()
 
-  def textEncode(self):
+  def textencode(self):
     ''' Serialise the dirent as text.
         Output format: bs(type)bs(flags)[bs(metalen)meta][bs(namelen)name]block
     '''
@@ -136,9 +167,9 @@ class Dirent(object):
     if meta:
       if not isinstance(meta, Meta):
         raise TypeError("self.meta is not a Meta: <%s>%r" % (type(meta), meta))
-      metatxt = meta.encode()
+      metatxt = meta.textencode()
       if len(metatxt) > 0:
-        metatxt = hexify(toBS(len(metatxt))) + totext(metatxt)
+        metatxt = totext(put_bsdata(metatxt.encode()))
         flags |= F_HASMETA
     else:
       metatxt = ""
@@ -147,15 +178,15 @@ class Dirent(object):
     if name is None or len(name) == 0:
       nametxt = ""
     else:
-      nametxt = hexify(toBS(len(name))) + totext(name)
+      nametxt = totext(put_bsdata(name.encode()))
       flags |= F_HASNAME
 
     block = self.getBlock()
-    return ( hexify(toBS(self.type))
-           + hexify(toBS(flags))
+    return ( hexify(put_bs(self.type))
+           + hexify(put_bs(flags))
            + metatxt
            + nametxt
-           + block.textEncode()
+           + block.textencode()
            )
 
   # TODO: make size a property?
@@ -272,97 +303,27 @@ class FileDirent(_BasicDirent):
       if self.meta.mtime is not None:
         os.utime(path, (st.st_atime, self.meta.mtime))
 
-def decodeDirent(s, justone=False):
-  ''' Unserialise a dirent, return object.
-      Input format: bs(type)bs(flags)[bs(metalen)meta][bs(namelen)name]block
-  '''
-  s0 = s
-  type_, s = fromBS(s)
-  flags, s = fromBS(s)
-  meta = None
-  if flags & F_HASMETA:
-    metalen, s = fromBS(s)
-    if metalen >= len(s):
-      raise ValueError("metalen %d >= len(s) %d" % (metalen, len(s)))
-    meta = s[:metalen]
-    s = s[metalen:]
-  meta = Meta(meta)
-  if flags & F_HASNAME:
-    namelen, s = fromBS(s)
-    if namelen >= len(s):
-      raise ValueError("namelen %d >= len(s) %d" % (namelen, len(s)))
-    name = s[:namelen]
-    s = s[namelen:]
-  else:
-    name = ""
-  block, s = decodeBlock(s)
-  if type_ == D_DIR_T:
-    E = Dir(name, meta=meta, parent=None, content=block)
-  elif type_ == D_FILE_T:
-    E = FileDirent(name, meta=meta, block=block)
-  else:
-    E = _BasicDirent(type_, name, meta, block)
-  if justone:
-    if len(s):
-      raise ValueError("unparsed stuff after decoding %s: %s" % (totext(s0), totext(s)))
-    return E
-  return E, s
-
-def resolve(path, domkdir=False):
-  ''' Take a path composed of a Dirent text representation with an optional
-      "/sub/path/..." suffix.
-      Decode the Dirent path and walk down the remaining path, except for the
-      last component. Return the final Dirent and the last path componenet,
-      or None if there was no final path component.
-  '''
-  slashpos = path.find('/')
-  if slashpos < 0:
-    D = decodeDirent(fromtext(path), justone=True)
-    subpath = []
-  else:
-    Dtext, subpath = path.split('/', 1)
-    D = decodeDirent(fromtext(Dtext), justone=True)
-    subpath = [s for s in subpath.split('/') if len(s) > 0]
-  if len(subpath) == 0:
-    return D, None
-  while len(subpath) > 1:
-    s = subpath.pop(0)
-    if domkdir:
-      D = D.mkdir(s)
-    else:
-      D = D.chdir1(s)
-  return D, subpath[0]
-
 class Dir(Dirent):
   ''' A directory.
   '''
 
-  def __init__(self, name, meta=None, parent=None, content=None):
+  def __init__(self, name, meta=None, parent=None, dirblock=None):
     ''' Initialise this directory.
         `meta`: meta information
         `parent`: parent Dir
-        `content`: pre-existing Block with initial Dir content
+        `dirblock`: pre-existing Block with initial Dir content
     '''
     self._lock = Lock()
     if meta is None:
       meta = Meta()
     Dirent.__init__(self, D_DIR_T, name, meta)
     self.parent = parent
-    self._precontent = content
-    self._entries = None
-    self._entries_lock = Lock()
-
-  @property
-  def entries(self):
-    with self._entries_lock:
-      entries = self._entries
-      if entries is None:
-        entries = self._entries = {}
-        precontent = self._precontent
-        if precontent is not None:
-          self._precontent = None
-          self._loadDir(precontent.data)
-    return entries
+    self.entries = {}
+    if dirblock:
+      for E in decodeDirents(dirblock.data):
+        E.parent = self
+        self[E.name] = E
+    self._lock = Lock()
 
   def dirs(self):
     return [ name for name in self.keys() if self[name].isdir ]
@@ -370,28 +331,7 @@ class Dir(Dirent):
   def files(self):
     return [ name for name in self.keys() if self[name].isfile ]
 
-  def _loadDir(self, dirdata):
-    ''' Load Dirents from the supplied file-like object `fp`,
-        incorporate all the dirents into our mapping.
-    '''
-    while len(dirdata) > 0:
-      odirdata = dirdata
-      E, dirdata = decodeDirent(dirdata)
-      if len(dirdata) >= len(odirdata):
-        raise ValueError("dirdata did not shrink")
-      if not odirdata.endswith(dirdata):
-        raise ValueError("dirdata not a suffix of odirdata")
-      if E.name is None or len(E.name) == 0:
-        # FIXME: skip unnamed dirent
-        continue
-      if E.name == '.' or E.name == '..':
-        # FIXME: skip E.name
-        continue
-      if E.isdir:
-        E.parent = self
-      self._entries[E.name] = E
-
-  def __validname(self, name):
+  def _validname(self, name):
     return len(name) > 0 and name.find('/') < 0
 
   def get(self, name, dflt=None):
@@ -423,7 +363,7 @@ class Dir(Dirent):
     ''' Store a Dirent in the specified name slot.
     '''
     ##debug("<%s>[%s]=%s" % (self.name, name, E))
-    if not self.__validname(name):
+    if not self._validname(name):
       raise KeyError("invalid name: %s" % (name,))
     if name in self:
       raise KeyError("name already present: %s" % (name,))
@@ -432,7 +372,7 @@ class Dir(Dirent):
     self.entries[name] = E
 
   def __delitem__(self, name):
-    if not self.__validname(name):
+    if not self._validname(name):
       raise KeyError("invalid name: %s" % (name,))
     if name == '.' or name == '..':
       raise KeyError("refusing to delete . or ..: name=%s" % (name,))
@@ -511,80 +451,6 @@ class Dir(Dirent):
       D = E
     return D
 
-  def updateFrom(self,
-                 osdir,
-                 trust_size_mtime=False,
-                 keep_missing=False,
-                 ignore_existing=False,
-                 verbosefp=None):
-    ''' Update this Dir from the real file tree at `osdir`.
-        Return True if no errors occurred.
-    '''
-    with Pfx("updateFrom(%s,...)", osdir):
-      if verbosefp:
-        print >>verbosefp, osdir+'/'
-      if not os.path.isdir(osdir):
-        raise ValueError("not a directory: %s" % (osdir,))
-      ok = self.tryUpdateStat(osdir)
-      osdirpfx = os.path.join(osdir, '')
-      for dirpath, dirnames, filenames in os.walk(osdir, topdown=False):
-        with Pfx(dirpath):
-          if dirpath == osdir:
-            D = self
-          else:
-            if not dirpath.startswith(osdirpfx):
-              raise ValueError("dirpath=%s, osdirpfx=%s" % (dirpath, osdirpfx))
-            subdirpath = dirpath[len(osdirpfx):]
-            D = self.makedirs(subdirpath)
-
-          if not keep_missing:
-            allnames = set(dirnames)
-            allnames.update(filenames)
-            Dnames = list(D.keys())
-            for name in Dnames:
-              if name not in allnames:
-                info("delete %s", name)
-                if verbosefp:
-                  print >>verbosefp, "delete", os.path.join(dirpath, name)
-                del D[name]
-
-          for dirname in sorted(dirnames):
-            subdirpath = os.path.join(dirpath, dirname)
-            if verbosefp:
-              print >>verbosefp, subdirpath+'/'
-            if dirname not in D:
-              E = D.mkdir(dirname)
-            else:
-              E = D[dirname]
-              if not E.isdir:
-                # old name is not a dir - toss it and make a dir
-                del D[dirname]
-                E = D.mkdir(dirname)
-            if not E.tryUpdateStat(subdirpath):
-              ok = False
-
-          for filename in sorted(filenames):
-            with Pfx(filename):
-              filepath = os.path.join(dirpath, filename)
-              if verbosefp:
-                print >>verbosefp, filepath
-              if not os.path.isfile(filepath):
-                warning("not a regular file, skipping")
-                continue
-
-              try:
-                E = D.storeFilename(filepath, filename,
-                                trust_size_mtime=trust_size_mtime,
-                                ignore_existing=ignore_existing)
-              except OSError as e:
-                error("%s", e)
-                ok = False
-              except IOError as e:
-                error("%s", e)
-                ok = False
-
-    return ok
-
   def storeFilename(self, filepath, filename,
                 trust_size_mtime=False, ignore_existing=False):
     ''' Store as `filename` to file named by `filepath`.
@@ -615,47 +481,4 @@ class Dir(Dirent):
       if filename in self:
         del self[filename]
       self[filename] = E
-      return E
-
-  def restore(self, path, makedirs=False, recurse=False, verbosefp=None):
-    ''' Restore this Dir as `path`.
-    '''
-    with Pfx("Dir.restore(%s)", path):
-      if verbosefp is not None:
-        verbosefp.write(path)
-        verbosefp.write('\n')
-      if len(dirpath) and not os.path.isdir(path):
-        if makedirs:
-          os.makedirs(path)
-        else:
-          os.mkdir(path)
-      st = os.stat(path)
-      user, group, perms = self.meta.unixPerms()
-      if user is not None or group is not None:
-        os.chmod(path, perms)
-      if user is None:
-        uid = -1
-      else:
-        uid = pwd.getpwnam(user)[2]
-        if uid == st.st_uid:
-          uid = -1
-      if group is None:
-        gid = -1
-      else:
-        gid = grp.getgrnam(group)[2]
-        if gid == st.st_gid:
-          gid = -1
-      if uid != -1 or gid != -1:
-        os.chown(path, uid, gid)
-      if self.meta.mtime is not None:
-        os.utime(path, (st.st_atime, self.meta.mtime))
-    if recurse:
-      for filename in sorted(self.files()):
-        self[filename].restore(os.path.join(path, filename),
-                               makedirs=makedirs,
-                               verbosefp=verbosefp)
-      for dirname in sorted(self.dirs()):
-        self[dirname].restore(os.path.join(path, dirname),
-                              makedirs=makedirs,
-                              recurse=True,
-                              verbosefp=verbosefp)
+    return E

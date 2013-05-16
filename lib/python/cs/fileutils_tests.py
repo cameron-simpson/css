@@ -102,8 +102,12 @@ class Test(unittest.TestCase):
       with NamedTemporaryFile(mode='w') as T2:
         T2.write(data)
         T2.flush()
-        self.assertEqual( open(T1.name).read(), data, "bad data in %s" % (T1.name,) )
-        self.assertEqual( open(T2.name).read(), data, "bad data in %s" % (T2.name,) )
+        with open(T1.name) as t1fp:
+          t1data = t1fp.read()
+        with open(T2.name) as t2fp:
+          t2data = t2fp.read()
+        self.assertEqual( t1data, data, "bad data in %s" % (T1.name,) )
+        self.assertEqual( t2data, data, "bad data in %s" % (T2.name,) )
         self.assertTrue(compare(T1.name, T2.name), "mismatched data in %s and %s" % (T1.name, T2.name))
 
   def test_rewrite(self):
@@ -113,9 +117,13 @@ class Test(unittest.TestCase):
     with NamedTemporaryFile(mode='w') as T1:
       T1.write(olddata)
       T1.flush()
-      self.assertEqual( open(T1.name).read(), olddata, "bad old data in %s" % (T1.name,) )
+      with open(T1.name) as t1fp:
+        t1data = t1fp.read()
+      self.assertEqual( t1data, olddata, "bad old data in %s" % (T1.name,) )
       rewrite(T1.name, StringIO(newdata), mode='w')
-      self.assertEqual( open(T1.name).read(), newdata, "bad new data in %s" % (T1.name,) )
+      with open(T1.name) as t1fp:
+        t1data = t1fp.read()
+      self.assertEqual( t1data, newdata, "bad new data in %s" % (T1.name,) )
 
   def test_lockfile_00_basic(self):
     lockbase = self.lockbase

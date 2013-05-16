@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env py30+
 #
 # Command script for venti-ish implementation.
 #       - Cameron Simpson <cs@zip.com.au> 01may2007
@@ -40,11 +40,10 @@ import datetime
 import cs.logutils
 from cs.logutils import Pfx, exception, error, debug, setup_logging, logTo, D
 from cs.venti import totext, fromtext, defaults
-from cs.venti.block import IndirectBlock, decodeBlocks
-from cs.venti.debug import dumpBlock
+from cs.venti.block import Block, IndirectBlock
 from cs.venti.store import Store
 from cs.venti.cache import CacheStore, MemCacheStore
-from cs.venti.dir import Dir, resolve
+from cs.venti.paths import dirent_dir, dirent_file
 
 def main(argv):
   setup_logging(upd_mode=False)
@@ -78,7 +77,7 @@ def main(argv):
 
   try:
     opts, args = getopt(argv[1:], 'C:MS:')
-  except GetoptError, e:
+  except GetoptError as e:
     error("unrecognised option: %s: %s"% (e.opt, e.msg))
     badopts = True
     opts, args = [], []
@@ -116,7 +115,7 @@ def main(argv):
     elif opt == '-S':
       dflt_vt_store = val
     else:
-      assert False, "unsupported option: %s" % (opt,)
+      raise RuntimeError("unhandled option: %s" % (opt,))
 
   # =back
   #
@@ -175,7 +174,7 @@ def main(argv):
           # run without a context store
           try:
             xit = op_func(args)
-          except GetoptError, e:
+          except GetoptError as e:
             error("%s", e)
             badopts = True
         else:
@@ -204,7 +203,7 @@ def main(argv):
                 with S:
                   try:
                     xit = op_func(args)
-                  except GetoptError, e:
+                  except GetoptError as e:
                     error("%s", e)
                     badopts = True
 
@@ -215,7 +214,9 @@ def main(argv):
     sys.stderr.write(usage)
     return 2
 
-  assert xit is not None, "exit code not set by operation"
+  if not isinstance(xit, int):
+    raise RuntimeError("exit code not set by operation: %r" % (xit,))
+
   return xit
 
 # =head1 COMMANDS
@@ -229,10 +230,10 @@ def main(argv):
 #
 def cmd_ar(args):
   if len(args) < 1:
-    raise GetoptError, "missing options"
+    raise GetoptError("missing options")
   opts = args.pop(0)
   if len(opts) == 0:
-    raise GetoptError, "empty options"
+    raise GetoptError("empty options")
 
   badopts = False
   verbose = False
@@ -252,32 +253,26 @@ def cmd_ar(args):
     badopts = True
 
   if badopts:
-    raise GetoptError, "bad options"
+    raise GetoptError("bad options")
 
   xit = 0
 
   import cs.venti.archive
   
   if verbose:
-    if arfile == '-':
-      verbosefp = sys.stderr
-    else:
-      verbosefp = sys.stdout
-  else:
-    verbosefp = None
-
+    warning("cmd_ar: verbose specified but not implemented")
   if mode == 't':
     if args:
       paths = args
     else:
       paths = None
     with Pfx("tf %s" % (arfile,)):
-      cs.venti.archive.toc(arfile, paths, verbosefp)
+      cs.venti.archive.toc(arfile, paths)
   elif mode == 'u':
     for path in args:
       try:
-        ok = cs.venti.archive.archive(arfile, path, verbosefp, trust_size_mtime=True)
-      except IOError, e:
+        ok = cs.venti.archive.archive(arfile, path, trust_size_mtime=True)
+      except IOError as e:
         error("archive %s: %s" % (path, e))
         xit = 1
       else:
@@ -295,11 +290,11 @@ def cmd_ar(args):
           xit = 1
         else:
           if E.isdir:
-            E.restore(path, makedirs=True, recurse=True, verbosefp=verbosefp)
+            E.restore(path, makedirs=True, recurse=True)
           else:
-            E.restore(path, makedirs=True, verbosefp=verbosefp)
+            E.restore(path, makedirs=True)
   else:
-    raise GetoptError, "%s: unsupported mode" % (mode,)
+    raise GetoptError("%s: unsupported mode" % (mode,))
 
   return xit
 
@@ -309,7 +304,7 @@ def cmd_ar(args):
 #
 def cmd_cat(args):
   if not args:
-    raise GetoptError, "missing filerefs"
+    raise GetoptError("missing filerefs")
   for path in args:
     cat(path)
   return 0
@@ -327,15 +322,15 @@ def cmd_catblock(args):
     indirect = True
     args.pop(0)
   if not args:
-    raise GetoptError, "missing hashcodes"
-  for arg in args:
-    data = S[fromtext(arg)]
+    raise GetoptError("missing hashcodes")
+  for hctext in args:
+    h = S.hashclass(fromtext(hctext))
     if indirect:
-      IB = IndirectBlock()
-      IB.extend(decodeBlocks(data))
-      dumpBlock(IB)
+      B = IndirectBlock(hashcode)
     else:
-      sys.stdout.write(data)
+      B = Block(hashcode)
+    for subB in B.leaves:
+      sys.stdout.write(subB.data)
   return 0
 
 # =item B<init> <dirpath>
@@ -344,13 +339,13 @@ def cmd_catblock(args):
 #
 def cmd_init(args):
   if not args:
-    raise GetoptError, "missing dirpath"
+    raise GetoptError("missing dirpath")
   dirpath = args.pop(0)
   if args:
-    raise GetoptError, "extra arguments after dirpath: %s" % (' '.join(args),)
+    raise GetoptError("extra arguments after dirpath: %s" % (' '.join(args),))
   with Pfx(dirpath):
     if not os.path.isdir(dirpath):
-      raise GetoptError, "not a directory"
+      raise GetoptError("not a directory")
     with Store("file:"+dirpath):
       pass
   return 0
@@ -370,7 +365,7 @@ def cmd_init(args):
 #
 def cmd_listen(args):
   if len(args) != 1:
-    raise GetoptError, "expected a port"
+    raise GetoptError("expected a port")
   arg = args[0]
   if arg == '-':
     from cs.venti.stream import StreamDaemon
@@ -388,7 +383,7 @@ def cmd_listen(args):
       with cs.venti.tcp.Server((host, port), S) as srv:
         srv.serve_forever()
     else:
-      raise GetoptError, "invalid listen argument, I expect \"-\" or \"[host]:port\", got \"%s\"" % (arg,)
+      raise GetoptError("invalid listen argument, I expect \"-\" or \"[host]:port\", got \"%s\"" % (arg,))
   return 0
 
 # =item B<ls> [B<-R>] I<dirrefs...>
@@ -402,16 +397,14 @@ def cmd_ls(args):
     recurse = True
     args.pop(0)
   if not args:
-    raise GetoptError, "missing dirrefs"
+    raise GetoptError("missing dirrefs")
   first = True
   for path in args:
     if first:
       first = False
     else:
       print
-    D, name = resolve(path)
-    if name is not None:
-      D = D.chdir1(name)
+    D = dirent_dir(path)
     ls(path, D, recurse, sys.stdout)
   return 0
 
@@ -423,9 +416,9 @@ def cmd_ls(args):
 #
 def cmd_mount(args):
   if len(args) != 2:
-    raise GetoptError, "expected dirref and mountpoint"
+    raise GetoptError("expected dirref and mountpoint")
   dirref, mountpoint = args
-  print "mount", args[0], args[1], "..."
+  print("mount", args[0], args[1], "...")
   if not os.path.isdir(mountpoint):
     error("%s: mountpoint is not a directory", mountpoint)
     return 1
@@ -434,7 +427,7 @@ def cmd_mount(args):
     error("%s: dirref - expected directory, not file", dirref)
     return 1
   import cs.venti.vtfuse
-  cs.venti.vtfuse.fusemount(args[1], S, E)
+  cs.venti.vtfuse.mount(args[1], E, S)
   return 0
 
 # =item B<pull> I<stores...>
@@ -446,7 +439,7 @@ def cmd_mount(args):
 #
 def cmd_pull(args):
   if not args:
-    raise GetoptError, "missing stores"
+    raise GetoptError("missing stores")
   raise NotImplementedError
 
 # =item B<scan> I<datafile>
@@ -458,14 +451,14 @@ def cmd_pull(args):
 #
 def cmd_scan(args):
   if len(args) != 1:
-    raise GetoptError, "missing datafile"
+    raise GetoptError("missing datafile")
   datafile = args[0]
   from cs.venti.datafile import DataFile
   from cs.venti.hash import Hash_SHA1
   with Pfx(datafile):
     dfp = DataFile(datafile)
     for offset, flags, data in dfp.scanData():
-      print Hash_SHA1.fromData(data), offset, flags, len(data)
+      print(Hash_SHA1.fromData(data), offset, flags, len(data))
     dfp.close()
   return 0
 
@@ -480,17 +473,15 @@ def cmd_scan(args):
 #
 def cmd_unpack(args):
   if len(args) < 1:
-    raise GetoptError, "missing dirrefs"
+    raise GetoptError("missing dirrefs")
   xit = 0
   for path in args:
     with (path):
-      D, name = resolve(path)
-      if len(name) > 0:
-        D = D.chdir1(name)
+      D = dirent_dir(path)
       for subD, _, files in D.walk(topdown=True):
         with subD:
           if len(subD.path) > 0 and not os.path.isdir(subD.path):
-            print "mkdir", subD.path
+            print("mkdir", subD.path)
             os.makedirs(subD.path)
           files.sort()
           for fname in files:
@@ -509,12 +500,12 @@ def cmd_unpack(args):
 def lsDirent(fp, E, name):
   B = E.getBlock()
   st = E.stat()
-  ##print "st=%s" % (st,)
+  ##print("st=%s" % (st,))
   st_mode, st_ino, st_dev, st_nlink, st_uid, st_gid, st_size, \
     st_atime, st_mtime, st_ctime = st
-  ##print "st_mtime=%s" % `st_mtime`
-  ##print "st_size=%s" % `st_size`
-  ##print "name=%s" % `name`
+  ##print("st_mtime=%s" % `st_mtime`)
+  ##print("st_size=%s" % `st_size`)
+  ##print("name=%s" % `name`)
   t = datetime.datetime.fromtimestamp(int(st_mtime))
   fp.write("%c %-41s %s %-6d %s\n" \
            % (('d' if E.isdir() else 'f'),
@@ -541,18 +532,17 @@ def ls(path, D, recurse, fp=None):
     files.sort()
     for name in files:
       E = D[name]
+      if E.isdir:
+        warning("%s: expected file, found directory", name)
       lsDirent(fp, E, name)
-      assert not E.isdir(), name+" should not be a directory!"
     for name in dirs:
       ls(os.path.join(path, name), D.chdir1(name), recurse, fp)
 
 def cat(path, fp=None):
   if fp is None:
     fp = sys.stdout
-  D, name = resolve(path)
-  if name is not None:
-    D = D[name]
-  block = D.getBlock()
+  F = dirent_file(path)
+  block = F.getBlock()
   for B in block.leaves():
     fp.write(B.blockdata())
 
