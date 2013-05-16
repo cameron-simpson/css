@@ -253,15 +253,6 @@ class _BasicDirent(Dirent):
       return self.asdir()[name]
     raise KeyError("\"%s\" not in %s" % (name, self))
 
-def FileDirent(name, meta, block):
-  ''' Factory function to return a Dirent for a file.
-      Parameters:
-        `name`: the file name to store in the Dirent.
-        `meta`: the file meta data; may be None.
-        `block`: the top block of the file content.
-  '''
-  return _BasicDirent(D_FILE_T, name, meta, block)
-
 class FileDirent(_BasicDirent):
 
   def __init__(self, name, meta, block):
