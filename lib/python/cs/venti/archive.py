@@ -40,11 +40,15 @@ def archive(arfile, path,
     if arfp.isatty():
       arfp = None
   else:
-    try:
-      D("open %r ...", arfile)
-      arfp = open(arfile)
-    except IOError:
-      arfp = None
+    with Pfx(arfile):
+      try:
+        D("open %r ...", arfile)
+        arfp = open(arfile)
+      except OSError as e:
+        if e.errno == errno.E_NOENT:
+          arfp = None
+        else:
+          raise
   if arfp:
     for unixtime, E in read_Dirents(arfp):
       if E.name == path and (oldtime is None or unixtime >= oldtime):
