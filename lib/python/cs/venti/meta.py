@@ -48,7 +48,9 @@ class Meta(dict):
           k, v = line.split(':', 1)
           self[k] = v
 
-  def encode(self):
+  def textencode(self):
+    ''' Encode the metadata in text form.
+    '''
     return "".join("%s:%s\n" % (k, self[k]) for k in sorted(self.keys()))
 
   @property
