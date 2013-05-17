@@ -8,6 +8,7 @@ from functools import partial
 import sys
 import time
 import unittest
+from cs.timeutils import sleep
 from cs.later import Later, report
 
 class TestLater(unittest.TestCase):
@@ -17,7 +18,7 @@ class TestLater(unittest.TestCase):
     return x*2
   @staticmethod
   def _delay(n):
-    time.sleep(n)
+    sleep(n)
     return n
   class _Bang(Exception):
     pass
