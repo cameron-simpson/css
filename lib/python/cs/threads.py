@@ -744,15 +744,15 @@ class TimerQueue(object):
       self._cancel()
 
   def _cancel(self):
-      with self._lock:
-        if self.pending:
-          T, Twhen, Tfunc = self.pending
-          self.pending[2] = None
-          self.pending = None
-          T.cancel()
-        else:
-          Twhen, Tfunc = None, None
-      return Twhen, Tfunc
+    with self._lock:
+      if self.pending:
+        T, Twhen, Tfunc = self.pending
+        self.pending[2] = None
+        self.pending = None
+        T.cancel()
+      else:
+        Twhen, Tfunc = None, None
+    return Twhen, Tfunc
 
   def add(self, when, func):
     ''' Queue a new job to be called at 'when'.
