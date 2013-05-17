@@ -397,7 +397,7 @@ class Later(object):
     self.logger = None          # reporting; see logTo() method
     self.closed = False
     self._priority = (0,)
-    self._timerQ = None                    # queue for delayed requests
+    self._timerQ = None         # queue for delayed requests; instantiated at need
     # inbound requests queue
     self._LFPQ = IterablePriorityQueue(inboundCapacity)
     self._workers = WorkerThreadPool()
@@ -406,6 +406,13 @@ class Later(object):
     self._dispatchThread.start()
 
   def close(self):
+    ''' Shut down the Later instance:
+        - close the TimerQueue, if any, and wait for it to complete
+        - close the request queue
+        - wait for the job dispatcher to finish
+	- close the worker thread pool, which waits for any of its
+          outstanding threads to complete
+    '''
     with Pfx("%s.close()" % (self,)):
       if self.closed:
         warning("close of closed Later %r", self)
@@ -413,9 +420,10 @@ class Later(object):
         self.closed = True
         if self._timerQ:
           self._timerQ.close()
-        self._LFPQ.close()
-        self._dispatchThread.join()
-        self._workers.close()
+          self._timerQ.join()
+        self._LFPQ.close()              # prevent further submissions
+        self._dispatchThread.join()     # wait for all functions to be dispatched
+        self._workers.close()           # wait for all worker threads to complete
 
   def __repr__(self):
     return '<%s "%s" capacity=%s running=%d pending=%d delayed=%d closed=%s>' \
