@@ -202,12 +202,11 @@ def main(argv):
                 if useMemCache:
                   S = CacheStore(S, MemCacheStore())
                 with S:
-                  with Pfx(S):
-                    try:
-                      xit = op_func(args)
-                    except GetoptError as e:
-                      error("%s", e)
-                      badopts = True
+                  try:
+                    xit = op_func(args)
+                  except GetoptError as e:
+                    error("%s", e)
+                    badopts = True
 
   if S:
     S.close()
@@ -231,7 +230,9 @@ def main(argv):
 
 # =item B<ar> tar-like-options I<pathnames...>
 #
-# Archive or retrieve files.
+# Archive or retrieve files. Options: B<v> - verbose, B<A> - all
+# files, not just ones with new size/mtime, B<f> - specify archive
+# file.
 #
 def cmd_ar(args):
   if len(args) < 1:
@@ -242,6 +243,7 @@ def cmd_ar(args):
 
   badopts = False
   verbose = False
+  trust_size_mtime = True
   arfile = '-'
   mode = opts[0]
   for opt in opts[1:]:
@@ -249,6 +251,8 @@ def cmd_ar(args):
       arfile = args.pop(0)
     elif opt == 'v':
       verbose = True
+    elif opt == 'A':
+      trust_size_mtime = False
     else:
       error("%s: unsupported option", opt)
       badopts = True
@@ -276,7 +280,7 @@ def cmd_ar(args):
   elif mode == 'u':
     for path in args:
       try:
-        ok = cs.venti.archive.archive(arfile, path, trust_size_mtime=True)
+        ok = cs.venti.archive.archive(arfile, path, trust_size_mtime=trust_size_mtime)
       except IOError as e:
         error("archive %s: %s" % (path, e))
         xit = 1
