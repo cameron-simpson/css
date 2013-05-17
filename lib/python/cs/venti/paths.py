@@ -19,18 +19,18 @@ def dirent_dir(direntpath, do_mkdir=False):
   return dir
 
 def dirent_file(direntpath, do_create=False):
-  dir, name = dirent_resolve(direntpath)
+  E, name = dirent_resolve(direntpath)
   if name is None:
-    raise ValueError("no filename component: %s", direntpath)
-  if name in dir:
-    return dir[name]
+    return E
+  if name in E:
+    return E[name]
   if not do_create:
     raise ValueError("no such file: %s", direntpath)
   raise RuntimeError("file creation not yet implemented")
 
 def dirent_resolve(direntpath, do_mkdir=False):
   rootD, tail = get_dirent(direntpath)
-  return resolve(rootD, tail, domkdir=do_mkdir)
+  return resolve(rootD, tail, do_mkdir=do_mkdir)
 
 def get_dirent(direntpath):
   ''' Take `direntpath` starting with a text transcription of a Dirent and
