@@ -5,7 +5,7 @@
 #
 
 import os
-from cs.logutils import Pfx, D, info, warning
+from cs.logutils import Pfx, D, info, warning, error
 from .blockify import blockFromFile
 from .dir import decode_Dirent_text, FileDirent
 
@@ -79,7 +79,6 @@ def copy_in_dir(rootpath, rootD, delete=False, ignore_existing=False, trust_size
   with Pfx("copy_in(%s)", rootpath):
     rootpath_prefix = rootpath + '/'
     for ospath, dirnames, filenames in os.walk(rootpath):
-      D("%s: dirnames=%s, filenames=%s", ospath, dirnames, filenames)
       with Pfx(ospath):
         if ospath == rootpath:
           dirD = rootD
@@ -127,9 +126,12 @@ def copy_in_dir(rootpath, rootD, delete=False, ignore_existing=False, trust_size
               if trust_size_mtime:
                 M = fileE.meta
                 st = os.stat(filepath)
-                if st.st_mtime == M.mtime and st.st_size == len(B):
+                if st.st_mtime == M.mtime and st.st_size == B.span:
                   info("skipping, same mtime and size")
                   continue
+                else:
+                  debug("DIFFERING size/mtime: B.span=%d/M.mtime=%s VS st_size=%d/st_mtime=%s",
+                    B.span, M.mtime, st.st_size, st.st_mtime)
               info("comparing with %s", B)
               matchBlocks = B.leaves
             try:
@@ -152,6 +154,8 @@ def copy_in_file(filepath, name=None, rsize=None, matchBlocks=None):
     with open(filepath, "rb") as sfp:
       B = blockFromFile(sfp, rsize=rsize, matchBlocks=matchBlocks)
       st = os.fstat(sfp.fileno())
+      if B.span != st.st_size:
+        error("MISMATCH: %s: B.span=%d, st_size=%d", filepath, B.span, st.st_size)
     E = FileDirent(name, None, B)
     E.meta.update_from_stat(st)
   return E
