@@ -341,7 +341,7 @@ class LateFunction(PendingFunction):
     ''' ._dispatch() is called by the Later class instance's worker thread.
         It causes the function to be handed to a thread for execution.
     '''
-    self.later.info("DISPATCH %s", self)
+    self.later.debug("DISPATCH %s", self)
     with self._lock:
       assert self.state == STATE_PENDING
       self.state = STATE_RUNNING
@@ -359,7 +359,7 @@ class LateFunction(PendingFunction):
     return result
 
   def set_result(self, result):
-    self.later.info("COMPLETE %s: result = %r", self, result)
+    self.later.debug("COMPLETE %s: result = %r", self, result)
     self.later.log_status()
     self.later.capacity.release()
     self.later.running.remove(self)
@@ -434,11 +434,11 @@ class Later(object):
 
   def log_status(self):
     for LF in list(self.delayed):
-      self.info("STATUS: delayed: %s", LF)
+      self.debug("STATUS: delayed: %s", LF)
     for LF in list(self.pending):
-      self.info("STATUS: pending: %s", LF)
+      self.debug("STATUS: pending: %s", LF)
     for LF in list(self.running):
-      self.info("STATUS: running: %s", LF)
+      self.debug("STATUS: running: %s", LF)
 
   def __enter__(self):
     debug("%s: __enter__", self)
