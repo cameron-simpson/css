@@ -549,11 +549,13 @@ def ls(path, D, recurse, fp=None):
 
 def cat(path, fp=None):
   if fp is None:
-    fp = sys.stdout
-  F = dirent_file(path)
-  block = F.getBlock()
-  for B in block.leaves():
-    fp.write(B.blockdata())
+    with os.fdopen(sys.stdout.fileno(), "wb") as bfp:
+      return cat(path, bfp)
+  else:
+    F = dirent_file(path)
+    block = F.getBlock()
+    for B in block.leaves:
+      fp.write(B.data)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
