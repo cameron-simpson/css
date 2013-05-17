@@ -405,6 +405,18 @@ class Later(object):
     self._lock = Lock()
     self._dispatchThread.start()
 
+  def close(self):
+    with Pfx("%s.close()" % (self,)):
+      if self.closed:
+        warning("close of closed Later %r", self)
+      else:
+        self.closed = True
+        if self._timerQ:
+          self._timerQ.close()
+        self._LFPQ.close()
+        self._dispatchThread.join()
+        self._workers.close()
+
   def __repr__(self):
     return '<%s "%s" capacity=%s running=%d pending=%d delayed=%d closed=%s>' \
            % ( self.__class__, self.name,
@@ -483,18 +495,6 @@ class Later(object):
   def __del__(self):
     if not self.closed:
       self.close()
-
-  def close(self):
-    with Pfx("%s.close()" % (self,)):
-      if self.closed:
-        warning("close of closed Later %r", self)
-      else:
-        self.closed = True
-        if self._timerQ:
-          self._timerQ.close()
-        self._LFPQ.close()
-        self._dispatchThread.join()
-        self._workers.close()
 
   def _dispatcher(self):
     ''' Read LateFunctions from the inbound queue as capacity is available
