@@ -735,6 +735,8 @@ class TimerQueue(object):
   def close(self, cancel=False):
     ''' Close the TimerQueue. This forbids further job submissions.
         If `cancel` is supplied and true, cancel all pending jobs.
+	Note: it is still necessary to call TimerQueue.join() to
+	wait for all pending jobs.
     '''
     self.closed = True
     if self.Q.empty():
