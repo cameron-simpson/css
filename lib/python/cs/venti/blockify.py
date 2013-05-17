@@ -8,10 +8,11 @@
 from itertools import chain
 import sys
 from threading import Thread
+from cs.debug import ifdebug
 from cs.logutils import debug, D
 from cs.threads import IterableQueue
 from cs.venti import defaults
-from .block import Block, IndirectBlock
+from .block import Block, IndirectBlock, dump_block
 
 MIN_BLOCKSIZE = 80      # less than this seems silly
 MAX_BLOCKSIZE = 16383   # fits in 2 octets BS-encoded
@@ -60,9 +61,9 @@ def topIndirectBlock(blockSource):
   # Fetch the first two indirect blocks from the generator.
   # If there is none, return a single empty direct block.
   # If there is just one, return it directly.
-  # Otherwise there are at lelast two:
+  # Otherwise there are at least two:
   # replace the blockSource with another level of fullIndirectBlocks()
-  # reading from the two fetched blocks and the tail of the surrent
+  # reading from the two fetched blocks and the tail of the current
   # blockSource then lather, rinse, repeat.
   #
   while True:
@@ -83,17 +84,20 @@ def topIndirectBlock(blockSource):
 
     # add a layer of indirection and repeat
     debug("push new fullIndirectBlocks()")
-    blockSource = fullIndirectBlocks(chain( *([ topblock,
-                                                nexttopblock
-                                              ], blockSource)))
+    blockSource = fullIndirectBlocks(chain( ( topblock, nexttopblock ),
+                                            blockSource ))
 
-  assert False, "not reached"
-
-def blockFromString(s):
-  return topIndirectBlock(blocksOf([s]))
+  raise RuntimeError("SHOULD NEVER BE REACHED")
 
 def blockFromFile(fp, rsize=None, matchBlocks=None):
-  return topIndirectBlock(fileBlocks(fp, rsize=rsize, matchBlocks=matchBlocks))
+  ''' Return the top block spanning the data from the file `fp`,
+      open in binary mode.
+  '''
+  B = topIndirectBlock(fileBlocks(fp, rsize=rsize, matchBlocks=matchBlocks))
+  if ifdebug():
+    D("blockFromFile: B.span=%d, B.indirect=%s", B.span, B.indirect)
+    dump_block(B)
+  return B
 
 def fileBlocks(fp, rsize=None, matchBlocks=None):
   ''' Yield Blocks containing the content of this file.
@@ -106,15 +110,16 @@ def fileBlocks(fp, rsize=None, matchBlocks=None):
   if matchBlocks:
     # fetch Blocks from the comparison file until a mismatch
     for B in matchBlocks:
-      blen = len(B)
+      blen = B.span
       if blen == 0:
         continue
       data = fp.read(blen)
+      if len(data) != blen:
+        error("read %d bytes, required %d bytes", len(data), Blen)
       if len(data) == 0:
         return
       # compare hashcodes to avoid fetching data for B if we have its hash
       if defaults.S.hash(data) == B.hashcode:
-        debug("MATCH %d bytes", len(data))
         yield B
         data = None
         continue
@@ -137,10 +142,10 @@ def filedata(fp, rsize=None):
   else:
     assert rsize > 0
   while True:
-    s = fp.read(rsize)
-    if len(s) == 0:
+    data = fp.read(rsize)
+    if len(data) == 0:
       break
-    yield s
+    yield data
 
 def fullIndirectBlocks(blockSource):
   ''' A generator that yields full IndirectBlocks from an iterable
