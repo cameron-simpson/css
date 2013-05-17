@@ -73,7 +73,8 @@ def archive(arfile, path,
                   ignore_existing=ignore_existing,
                   trust_size_mtime=trust_size_mtime)
     elif not os.path.isfile(path):
-      error("not a regular file")
+      error("not a directory or regular file")
+      return
     else:
       E = copy_in_file(path)
 
