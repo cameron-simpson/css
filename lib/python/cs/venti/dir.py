@@ -12,7 +12,6 @@ from cs.serialise import get_bs, get_bsdata, put_bs, put_bsdata
 from cs.threads import locked_property
 from . import totext, fromtext
 from .block import Block, decodeBlock
-from .blockify import blockFromString
 from .meta import Meta
 
 uid_nobody = -1
