@@ -248,6 +248,23 @@ def chunksOf(B, start, stop=None):
     # we always start from the start of the next block
     start = 0
 
+def dump_block(B, fp=None, indent=''):
+  if fp is None:
+    fp = sys.stderr
+  data = B.data
+  if B.indirect:
+    subblocks = B.subblocks
+    print("%sIB.datalen=%d, span=%d, %d subblocks, hash=%s"
+          % (indent, len(data), B.span, len(subblocks), B.hashcode),
+          file=fp)
+    indent += '  '
+    for subB in subblocks:
+      dump_block(subB, fp=fp, indent=indent)
+  else:
+    print("%sB.datalen=%d, span=%d, hash=%s"
+          % (indent, len(data), B.span, B.hashcode),
+          file=fp)
+
 if __name__ == '__main__':
   import cs.venti.block_tests
   cs.venti.block_tests.selftest(sys.argv)
