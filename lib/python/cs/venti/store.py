@@ -70,9 +70,9 @@ class BasicStore(NestingOpenClose):
       self.logfp = None
       self.__funcQ = Later(capacity, name="%s:Later(__funcQ)" % (self.name,))
       self.hashclass = Hash_SHA1
-      self._lock = Lock()
       self.readonly = False
       self.writeonly = False
+      self._lock = Lock()
 
   def add(self, data):
     ''' Add the supplied data bytes to the store.
