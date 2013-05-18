@@ -45,6 +45,9 @@ class TestInttypes(unittest.TestCase):
     n = E(2)
     self.assertEqual(n, 2)
     self.assertEqual(str(n), 'c')
+    n2 = E(4)
+    self.assertEqual(n2, 4)
+    self.assertEqual(str(n2), '4')
 
 def selftest(argv):
   unittest.main(__name__, None, argv)
