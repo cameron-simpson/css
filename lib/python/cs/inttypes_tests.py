@@ -6,6 +6,7 @@
 
 import sys
 import unittest
+from cs.logutils import D
 from cs.inttypes import BitMask, Enum
 
 class TestInttypes(unittest.TestCase):
@@ -17,6 +18,7 @@ class TestInttypes(unittest.TestCase):
     pass
 
   def test00bitmask(self):
+    # basic bitmaskness and attribute access
     B = BitMask('a', 'b', 'c', 'd')
     n = B(9)
     self.assertEqual(str(n), "a|d")
@@ -25,6 +27,18 @@ class TestInttypes(unittest.TestCase):
     self.assertFalse(n.c)
     self.assertTrue(n.d)
     self.assertRaises(AttributeError, getattr, n, 'e')
+
+    # now check that another BitMask is indeed a distinct class
+    B2 = BitMask('A', 'B', 'C', 'D', 'E')
+    n2 = B2(7)
+    self.assertEqual(str(n2), "A|B|C")
+    self.assertTrue(n2.A)
+    self.assertTrue(n2.B)
+    self.assertTrue(n2.C)
+    self.assertFalse(n2.D)
+    self.assertFalse(n2.E)
+    self.assertRaises(AttributeError, getattr, n2, 'F')
+    self.assertRaises(AttributeError, getattr, n2, 'a')
 
   def test01Enum(self):
     E = Enum('a', 'b', 'c')
