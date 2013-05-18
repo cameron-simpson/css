@@ -4,10 +4,26 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
+import sys
+from cs.logutils import D
+
 def BitMask(*bitnames):
+  ''' Return a factory function for bitmasks, ints with friendly str/repr.
+      Accept individual bit names, most to least significant.
+  '''
+  bitnames = tuple(bitnames)
   def f(n):
     bm = _BitMask(n)
-    bm.bitnames = bitnames
+    bm._bitnames = bitnames
+    n = 1
+    values = {}
+    names = {}
+    for name in bitnames:
+      values[name] = n
+      names[n] = name
+      n <<= 1
+    bm._values = values
+    bm._names = names
     return bm
   return f
 
@@ -19,26 +35,24 @@ class _BitMask(int):
       f = self
       n = 1
       names = []
-      for name in self.bitnames:
+      for name in self._bitnames:
         if f & n:
           names.append(name)
           f &= ~n
         n <<= 1
-      if n:
+      if f > 0:
         names.append("%d" % (n,))
       return '|'.join(names) if names else '0'
 
     def __repr__(self):
       return '<%s 0x%02x %s>' % (self.__class__.__name__, self, self)
 
-    @property
-    def vars(self):
-      d = {}
-      n = 1
-      for name in self.bitnames:
-        d[name] = n
-        n <<= 1
-      return d
+    def __getattr__(self, attr):
+      ''' Flag mode: access bitmask by name as .name.
+      '''
+      if attr in self._bitnames:
+        return bool(self & self._values[attr])
+      raise AttributeError("%r not in %r", attr, self._bitnames)
 
 def Enum(*names):
   n = 0
@@ -64,10 +78,5 @@ class _Enum(int):
       return int.__str__(self)
 
 if __name__ == '__main__':
-  B = BitMask('a', 'b', 'c')
-  n = B(9)
-  print("%d => %s" % (n, n))
-  print("%r" % (n.vars,))
-  E = Enum('a', 'b', 'c')
-  n = E(2)
-  print("%d => %s" % (n, n))
+  import cs.inttypes_tests
+  cs.inttypes_tests.selftest(sys.argv)
