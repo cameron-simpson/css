@@ -11,25 +11,21 @@ def BitMask(*bitnames):
   ''' Return a factory function for bitmasks, ints with friendly str/repr.
       Accept individual bit names, most to least significant.
   '''
-  bitnames = tuple(bitnames)
-  def f(n):
-    bm = _BitMask(n)
-    bm._bitnames = bitnames
-    n = 1
-    values = {}
-    names = {}
-    for name in bitnames:
-      values[name] = n
-      names[n] = name
-      n <<= 1
-    bm._values = values
-    bm._names = names
-    return bm
-  return f
+  n = 1
+  values = {}
+  names = {}
+  for name in bitnames:
+    values[name] = n
+    names[n] = name
+    n <<= 1
 
-class _BitMask(int):
+  class B(int):
     ''' An int with human friendly str() and repr() for a bitmask or flag set.
     '''
+
+    _bitnames = tuple(bitnames)
+    _values = values
+    _names = names
 
     def __str__(self):
       f = self
@@ -52,7 +48,9 @@ class _BitMask(int):
       '''
       if attr in self._bitnames:
         return bool(self & self._values[attr])
-      raise AttributeError("%r not in %r", attr, self._bitnames)
+      raise AttributeError("%r not in %r" % (attr, self._bitnames))
+
+  return B
 
 def Enum(*names):
   n = 0
