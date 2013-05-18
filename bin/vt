@@ -38,6 +38,7 @@ import os.path
 from getopt import getopt, GetoptError
 import datetime
 from cs.debug import ifdebug, dump_debug_threads
+from cs.lex import hexify
 import cs.logutils
 from cs.logutils import Pfx, exception, error, warning, debug, setup_logging, logTo, D
 from cs.venti import totext, fromtext, defaults
@@ -516,13 +517,14 @@ def lsDirent(fp, E, name):
   ##print("st_size=%s" % `st_size`)
   ##print("name=%s" % `name`)
   t = datetime.datetime.fromtimestamp(int(st_mtime))
-  fp.write("%c %-41s %s %-6d %s\n" \
-           % (('d' if E.isdir() else 'f'),
-              B, t, st_size, name))
+  fp.write("%c %-41s %s %6d %s\n" \
+           % (('d' if E.isdir else 'f'),
+              hexify(B.hashcode), t, st_size, name))
 
 def ls(path, D, recurse, fp=None):
   if fp is None:
     fp = sys.stdout
+  fp.write('\n')
   fp.write(path)
   fp.write(":\n")
   if not recurse:
