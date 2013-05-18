@@ -5,9 +5,12 @@
 #
 
 import os
+from cs.inttypes import BitMask as FlagSet
 from cs.logutils import Pfx, D, info, warning, error
 from .blockify import blockFromFile
 from .dir import decode_Dirent_text, FileDirent
+
+CopyModes = FlagSet('delete', 'do_mkdir', 'ignore_existing', 'trust_size_mtime')
 
 def dirent_dir(direntpath, do_mkdir=False):
   dir, name = dirent_resolve(direntpath, do_mkdir=do_mkdir)
@@ -56,11 +59,13 @@ def resolve(rootD, subpath, do_mkdir=False):
     return rootD, subpaths[0]
   return rootD, None
 
-def walk(rootD):
+def walk(rootD, topdown=True):
   ''' An analogue to os.walk to descend a vt Dir tree.
       Yields Dir, relpath, dirs, files for each directory in the tree.
       The top directory (`rootD`) has the relpath ''.
   '''
+  if not topdown:
+    raise ValueError("cs.venti.paths.walk: topdown must be true, got %r" % (topdown,))
   pending = [ (rootD, '') ]
   while pending:
     thisD, relpath, dirs, files = pending.pop(0)
@@ -73,9 +78,12 @@ def walk(rootD):
         subpath = dir
       pending.push( (subD, subpath) )
 
-def copy_in_dir(rootpath, rootD, delete=False, ignore_existing=False, trust_size_mtime=False):
+def copy_in_dir(rootpath, rootD, modes=None):
   ''' Copy the os directory tree at `rootpath` over the Dir `rootD`.
+      `modes` is an optional CopyModes value.
   '''
+  if modes is None:
+    modes = CopyModes(0)
   with Pfx("copy_in(%s)", rootpath):
     rootpath_prefix = rootpath + '/'
     for ospath, dirnames, filenames in os.walk(rootpath):
@@ -89,7 +97,7 @@ def copy_in_dir(rootpath, rootD, delete=False, ignore_existing=False, trust_size
         if not os.path.isdir(rootpath):
           warning("not a directory?")
 
-        if delete:
+        if modes.delete:
           # Remove entries in dirD not present in the real filesystem
           allnames = set(dirnames)
           allnames.update(filenames)
@@ -112,7 +120,7 @@ def copy_in_dir(rootpath, rootD, delete=False, ignore_existing=False, trust_size
 
         for filename in sorted(filenames):
           with Pfx(filename):
-            if ignore_existing and filename in dirD:
+            if modes.ignore_existing and filename in dirD:
               info("skipping, already Stored")
               continue
             filepath = os.path.join(ospath, filename)
@@ -123,7 +131,7 @@ def copy_in_dir(rootpath, rootD, delete=False, ignore_existing=False, trust_size
             if filename in dirD:
               fileE = dirD[filename]
               B = fileE.getBlock()
-              if trust_size_mtime:
+              if modes.trust_size_mtime:
                 M = fileE.meta
                 st = os.stat(filepath)
                 if st.st_mtime == M.mtime and st.st_size == B.span:
@@ -160,23 +168,18 @@ def copy_in_file(filepath, name=None, rsize=None, matchBlocks=None):
     E.meta.update_from_stat(st)
   return E
 
-def copy_out(rootD, rootpath, makedirs=False, delete=False, ignore_existing=False, trust_size_mtime=False):
+def copy_out(rootD, rootpath, modes=None):
   ''' Copy the Dir `rootD` onto the os directory `rootpath`.
-      Notes: `delete` not implemented.
+      `modes` is an optional CopyModes value.
+      Notes: `modes.delete` not implemented.
   '''
   with Pfx("copy_out(rootpath=%s)", rootpath):
-    if not os.path.isdir(rootpath):
-      if makedirs:
-        os.makedirs(rootpath)
-    for thisD, relpath, dirs, files in walk(rootD):
+    for thisD, relpath, dirs, files in walk(rootD, topdown=True):
       if relpath:
         path = os.path.join(rootpath, relpath)
       else:
         path = rootpath
       with Pfx(path):
-        if not os.path.isdir(path):
-          info("mkdir")
-          os.path.mkdir(path)
         for filename in sorted(files):
           with Pfx(filename):
             E = thisD[filename]
@@ -184,7 +187,7 @@ def copy_out(rootD, rootpath, makedirs=False, delete=False, ignore_existing=Fals
               warning("vt source is not a file, skipping")
               continue
             filepath = os.path.join(path, filename)
-            if ignore_existing and os.path.exists(filepath):
+            if modes.ignore_existing and os.path.exists(filepath):
               debug("already exists, ignoring")
               continue
             try:
@@ -195,7 +198,7 @@ def copy_out(rootD, rootpath, makedirs=False, delete=False, ignore_existing=Fals
             else:
               B = E.getBlock()
               M = E.meta
-              if ( trust_size_mtime
+              if ( modes.trust_size_mtime
                and ( M.mtime is not None and M.mtime == st.st_mtime
                      and B.span == st.st_size
                    )
@@ -205,8 +208,23 @@ def copy_out(rootD, rootpath, makedirs=False, delete=False, ignore_existing=Fals
               # create or overwrite the file
               # TODO: backup mode in case of write errors
               with Pfx(filepath):
-                with open(filepath, "wb") as fp:
-                  for chunk in D[filename].getBlock().chunks():
-                    fp.write(chunk)
+                try:
+                  with open(filepath, "wb") as fp:
+                    for chunk in D[filename].getBlock().chunks():
+                      fp.write(chunk)
+                except OSError as e:
+                  if e.errno == errno.ENOENT:
+                    if modes.do_mkdir:
+                      info("mkdir(%s)", path)
+                      os.path.mkdir(path)
+                      with open(filepath, "wb") as fp:
+                        for chunk in D[filename].getBlock().chunks():
+                          fp.write(chunk)
+                    else:
+                      error("%s: presuming missing directory, skipping other files and subdirectories here", e)
+                      dirs[:] = []
+                      break
+                  else:
+                    raise
                 if M.mtime is not None:
                   os.utime(filepath, (st.st_atime, M.mtime))
