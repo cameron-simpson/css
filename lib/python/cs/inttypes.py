@@ -53,27 +53,19 @@ def BitMask(*bitnames):
   return B
 
 def Enum(*names):
-  n = 0
-  revnames = {}
-  for name in names:
-    revnames[name] = n
-    n += 1
-  def f(n):
-    en = _Enum(n)
-    en.names = names
-    en.revnames = revnames
-    return en
-  return f
 
-class _Enum(int):
-  ''' An int with human friendly str() and repr() for an enum counting from 0.
-  '''
+  class E(int):
+    ''' An int with human friendly str() and repr() for an enum counting from 0.
+    '''
+    _names = tuple(names)
 
-  def __str__(self):
-    try:
-      return self.names[self]
-    except IndexError:
-      return int.__str__(self)
+    def __str__(self):
+      try:
+        return self._names[self]
+      except IndexError:
+        return int.__str__(self)
+
+  return E
 
 if __name__ == '__main__':
   import cs.inttypes_tests
