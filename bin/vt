@@ -45,7 +45,7 @@ from cs.venti import totext, fromtext, defaults
 from cs.venti.block import Block, IndirectBlock, dump_block
 from cs.venti.store import Store
 from cs.venti.cache import CacheStore, MemCacheStore
-from cs.venti.paths import dirent_dir, dirent_file, dirent_resolve
+from cs.venti.paths import dirent_dir, dirent_file, dirent_resolve, CopyModes
 
 def main(argv):
   setup_logging(upd_mode=False)
@@ -245,7 +245,8 @@ def cmd_ar(args):
 
   badopts = False
   verbose = False
-  trust_size_mtime = True
+  modes = CopyModes()
+  modes.trust_size_mtime = True
   arfile = '-'
   mode = opts[0]
   for opt in opts[1:]:
@@ -254,7 +255,7 @@ def cmd_ar(args):
     elif opt == 'v':
       verbose = True
     elif opt == 'A':
-      trust_size_mtime = False
+      modes.trust_size_mtime = False
     else:
       error("%s: unsupported option", opt)
       badopts = True
@@ -282,7 +283,7 @@ def cmd_ar(args):
   elif mode == 'u':
     for path in args:
       try:
-        ok = cs.venti.archive.archive(arfile, path, trust_size_mtime=trust_size_mtime)
+        ok = cs.venti.archive.archive(arfile, path, modes)
       except IOError as e:
         error("archive %s: %s" % (path, e))
         xit = 1
@@ -295,7 +296,7 @@ def cmd_ar(args):
     else:
       paths = None
     with Pfx("xf %s" % (arfile,)):
-      for path, E in cs.venti.archive.retrieve(arfile, paths):
+      for path, E in cs.venti.archive.retrieve(arfile, paths, modes):
         if E is None:
           error("retrieve %s: not found" % (path,))
           xit = 1

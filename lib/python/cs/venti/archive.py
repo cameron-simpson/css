@@ -24,10 +24,7 @@ from .blockify import blockFromFile
 from .dir import decode_Dirent_text, Dir
 from .paths import copy_in_dir, copy_in_file
 
-def archive(arfile, path,
-          trust_size_mtime=False,
-          keep_missing=False,
-          ignore_existing=False):
+def archive(arfile, path, modes):
   ''' Archive the named file path.
       Get the last dirref from the `arfile`, if any, otherwise make a new Dir.
       Store the `path` (updating the Dir).
@@ -69,9 +66,7 @@ def archive(arfile, path,
         E = Dir(os.path.basename(path))
       else:
         E = oldE
-      copy_in_dir(path, E, delete=not keep_missing,
-                  ignore_existing=ignore_existing,
-                  trust_size_mtime=trust_size_mtime)
+      copy_in_dir(path, E, modes)
     elif not os.path.isfile(path):
       error("not a directory or regular file")
       return
