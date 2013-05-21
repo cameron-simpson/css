@@ -5,12 +5,12 @@
 #
 
 import os
-from cs.inttypes import BitMask as FlagSet
+from cs.inttypes import Flags
 from cs.logutils import Pfx, D, info, warning, error
 from .blockify import blockFromFile
 from .dir import decode_Dirent_text, FileDirent
 
-CopyModes = FlagSet('delete', 'do_mkdir', 'ignore_existing', 'trust_size_mtime')
+CopyModes = Flags('delete', 'do_mkdir', 'ignore_existing', 'trust_size_mtime')
 
 def dirent_dir(direntpath, do_mkdir=False):
   dir, name = dirent_resolve(direntpath, do_mkdir=do_mkdir)
