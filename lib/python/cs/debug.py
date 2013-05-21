@@ -9,6 +9,7 @@ import inspect
 import logging
 import threading
 import time
+from cs.py3 import Queue
 import cs.logutils
 from cs.logutils import infer_logging_level, debug, setup_logging, D
 from cs.obj import O
