@@ -207,7 +207,7 @@ class FilteringState(O):
   def maildir(self, mdirpath):
     return self.filter_modes.maildir(mdirpath, self.environ)
 
-  def resolve(foldername):
+  def resolve(self, foldername):
     return resolve_mail_path(foldername, self.environ['MAILDIR'])
 
   @property
