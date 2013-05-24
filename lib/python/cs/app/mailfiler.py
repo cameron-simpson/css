@@ -207,6 +207,9 @@ class FilteringState(O):
   def maildir(self, mdirpath):
     return self.filter_modes.maildir(mdirpath, self.environ)
 
+  def resolve(foldername):
+    return resolve_mail_path(foldername, self.environ['MAILDIR'])
+
   @property
   def message(self):
     return self._message
@@ -420,26 +423,14 @@ def parserules(fp):
             R.flags.halt = True
             offset += 1
           if line[offset] == '!':
-            R.flags.alert = True
+            R.flags.alert += 1
             offset += 1
           else:
             break
 
-        # gather targets
-        while offset < len(line) and not line[offset].isspace():
-          if line[offset] == '"':
-            target, offset = get_qstr(line, offset)
-          else:
-            m = re_UNQWORD.match(line, offset)
-            if m:
-              target = m.group()
-              offset = m.end()
-            else:
-              error("parse failure at %d: %s", offset, line)
-              raise ValueError("syntax error")
+        targets, offset = get_targets(line, offset)
+        for target in targets:
           R.actions.append( ('TARGET', target) )
-          if offset < len(line) and line[offset] == ',':
-            offset += 1
 
         # gather label
         _, offset = get_white(line, offset)
@@ -535,6 +526,27 @@ def parserules(fp):
 
   if R is not None:
     yield R
+
+def get_targets(s, offset):
+  ''' Parse list of targets from the string `s` strarting at `offset`.
+      Return the list of targets strings and the new offset.
+  '''
+  targets = []
+  while offset < len(s) and not s[offset].isspace():
+    if s[offset] == '"':
+      target, offset = get_qstr(s, offset)
+    else:
+      m = re_UNQWORD.match(s, offset)
+      if m:
+        target = m.group()
+        offset = m.end()
+      else:
+        error("parse failure at %d: %s", offset, s)
+        raise ValueError("syntax error")
+    targets.append(target)
+    if offset < len(s) and s[offset] == ',':
+      offset += 1
+  return targets, offset
 
 class _Condition(O):
   
@@ -632,7 +644,7 @@ class Rule(O):
     self.lineno = lineno
     self.conditions = slist()
     self.actions = slist()
-    self.flags = O(alert=False, halt=False)
+    self.flags = O(alert=0, halt=False)
     self.label = ''
 
   def match(self, fstate):
@@ -672,7 +684,7 @@ class Rule(O):
                   error("failed to sendmail to %s", target)
                   failed_actions.append( (action, arg, "sendmail "+target) )
               else:
-                mailpath = resolve_mail_path(target, fstate.environ['MAILDIR'])
+                mailpath = fstate.resolve(target)
                 if not os.path.exists(mailpath):
                   make_maildir(mailpath)
                 if ismaildir(mailpath):
@@ -758,7 +770,7 @@ class Rules(list):
           self.alert("%s: %s" % (M.get('from', '').strip(), M.get('subject', '').strip()))
       else:
         if report.saved_to:
-          raise RunTimeError("matched is False, but saved_to = %s" % (saved_to,))
+          error("matched is False, but saved_to = %s", saved_to)
       yield report
       if report.matched:
         if R.flags.halt:
