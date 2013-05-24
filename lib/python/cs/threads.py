@@ -268,7 +268,7 @@ class Channel(object):
     else:
       self.closed = True
 
-class Result(object):
+class Result(O):
   ''' A blocking value store.
       Getters block until a value is supplied.
   '''
@@ -278,18 +278,27 @@ class Result(object):
       name = "Result%d" % (seq(),)
     self.closed = False
     self.ready = False
+    self.notifiers = []
     self._get_lock = Lock()
     self._get_lock.acquire()
+    self._lock = Lock()
+
+  def __repr__(self):
+    return str(self)
 
   def put(self, value):
     ''' Store the value.
     '''
-    if self.closed:
-      raise RuntimeError(".put when closed: self=%r", self)
-    self.closed = True
-    self.value = value
-    self.ready = True
+    with self._lock:
+      if self.ready:
+        raise RuntimeError(".put when already ready: self=%r", self)
+      self.value = value
+      self.ready = True
+      notifiers = self.notifiers
+      self.notifiers = []
     self._get_lock.release()
+    for notifier in notifiers:
+      notifier(self)
 
   def get(self):
     ''' Fetch the value.
@@ -304,6 +313,18 @@ class Result(object):
     ''' Analogue to Queue.empty().
     '''
     return not self.ready
+
+  def notify(self, notifier):
+    ''' When the Result is ready, run notifier(self).
+        If the Result is already ready this will happen immediately.
+        Note: if you'd rather `self` got put on some Queue `Q`, supply `Q.put`.
+    '''
+    with self._lock:
+      if not self.ready:
+        self.notifiers.append(notifier)
+        notifier = None
+    if notifier is not None:
+      notifier(self)
 
 class IterableQueue(Queue):
   ''' A Queue implementing the iterator protocol.
