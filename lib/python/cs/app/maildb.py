@@ -104,8 +104,8 @@ def main(argv, stdin=None):
                   error('no such group')
                   xit = 1
                   continue
-                address_list = ", ".join(MDB['ADDRESS', address].formatted
-                                         for address in address_group)
+                address_list = ', '.join(sorted(MDB['ADDRESS', address].formatted
+                                                for address in address_group))
                 if mutt_aliases:
                   print('alias', end=' ')
                   if mutt_groups:
