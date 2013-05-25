@@ -9,7 +9,8 @@ import sys
 import time
 import unittest
 from cs.timeutils import sleep
-from cs.later import Later, report
+from cs.threads import report
+from cs.later import Later
 
 class TestLater(unittest.TestCase):
 
