@@ -13,7 +13,7 @@ from itertools import chain
 import sys
 import time
 import threading
-from threading import Semaphore, Timer
+from threading import Semaphore, Timer, Condition
 from collections import deque
 if sys.hexversion < 0x02060000: from sets import Set as set
 from cs.seq import seq
@@ -110,36 +110,40 @@ class WorkerThreadPool(O):
       debug("%s: worker thread: received task", self)
       try:
         debug("%s: worker thread: running task...", self)
-        result = func(), None
+        result = func()
         debug("%s: worker thread: ran task: result = %s", self, result)
       except:
-        func = None     # release func+args
+        result = None
+        exc_info = sys.exc_info()
         debug("%s: worker thread: ran task: exception! %r", self, sys.exc_info())
         # don't let exceptions go unhandled
         # if nobody is watching, raise the exception and don't return
         # this handler to the pool
         if retq is None and deliver is None:
-          t, v, tb = sys.exc_info()
           debug("%s: worker thread: reraise exception", self)
-          raise3(t, v, tb)
+          raise3(*exc_info)
         debug("%s: worker thread: set result = (None, exc_info)", self)
-        result = (None, sys.exc_info())
-      finally:
-        func = None     # release func+args
+      else:
+        exc_info = None
+      func = None     # release func+args
       with self._lock:
         self.idle.append( Hdesc )
         ##D("_handler released thread: idle = %s", self.idle)
+      tup = (result, exc_info)
       if retq is not None:
-        debug("%s: worker thread: %r.put(result)...", self, retq)
-        retq.put(result)
-        debug("%s: worker thread: %r.put(result) done", self, retq)
+        debug("%s: worker thread: %r.put(%s)...", self, retq, tup)
+        retq.put(tup)
+        debug("%s: worker thread: %r.put(%s) done", self, retq, tup)
         retq = None
       if deliver is not None:
-        debug("%s: worker thread: deliver result...", self)
-        deliver(result)
+        debug("%s: worker thread: deliver %s...", self, tup)
+        deliver(tup)
         debug("%s: worker thread: delivery done", self)
         deliver = None
+      # forget stuff
       result = None
+      exc_info = None
+      tup = None
       debug("%s: worker thread: proceed to next function...", self)
 
 class AdjustableSemaphore(object):
@@ -268,55 +272,145 @@ class Channel(object):
     else:
       self.closed = True
 
-class Result(O):
-  ''' A blocking value store.
-      Getters block until a value is supplied.
+ASYNCH_PENDING = 0       # function not yet dispatched
+ASYNCH_RUNNING = 1       # function executing
+ASYNCH_READY = 2         # function complete
+ASYNCH_CANCELLED = 3     # function cancelled
+
+class Asynchron(O):
+  ''' Common functionality for Results, LateFunctions and other
+      objects with asynchronous termination.
   '''
 
-  def __init__(self, name=None):
-    if name is None:
-      name = "Result%d" % (seq(),)
-    self.closed = False
-    self.ready = False
+  def __init__(self):
+    self.state = ASYNCH_PENDING
     self.notifiers = []
-    self._get_lock = Lock()
-    self._get_lock.acquire()
+    self.join_cond = Condition()
     self._lock = Lock()
 
-  def __repr__(self):
-    return str(self)
+  @property
+  def ready(self):
+    state = self.state
+    return state == ASYNCH_READY or state == ASYNCH_CANCELLED
 
-  def put(self, value):
-    ''' Store the value.
+  @property
+  def cancelled(self):
+    ''' Test whether this Asynchron has been cancelled.
     '''
-    with self._lock:
-      if self.ready:
-        raise RuntimeError(".put when already ready: self=%r", self)
-      self.value = value
-      self.ready = True
-      notifiers = self.notifiers
-      self.notifiers = []
-    self._get_lock.release()
-    for notifier in notifiers:
-      notifier(self)
+    return self.state == ASYNCH_CANCELLED
 
-  def get(self):
-    ''' Fetch the value.
-        Blocks until the value is put.
-        The value may be get()ed multiple times.
-    '''
-    self._get_lock.acquire()
-    self._get_lock.release()
-    return self.value
+  @property
+  def pending(self):
+    return self.state == ASYNCH_PENDING
 
   def empty(self):
     ''' Analogue to Queue.empty().
     '''
     return not self.ready
 
+  def cancel(self):
+    ''' Cancel this function.
+        If self.state is ASYNCH_PENDING or ASYNCH_CANCELLED, return True.
+        Otherwise return False (too late to cancel).
+    '''
+    notifiers = ()
+    with self._lock:
+      state = self.state
+      if state == ASYNCH_PENDING:
+        self.state = ASYNCH_CANCELLED
+        notifiers = list(self.notifiers)
+        self.notifiers = []
+      elif state == ASYNCH_CANCELLED:
+        pass
+      elif state == ASYNCH_RUNNING or state == ASYNCH_READY:
+        return False
+      else:
+        raise RuntimeError("<%s>.state not one of (ASYNCH_PENDING, ASYNCH_CANCELLED, ASYNCH_RUNNING, ASYNCH_READY): %r"
+                           % (self, state))
+    for notifier in notifiers:
+      notifier(self)
+    with self.join_cond:
+      self.join_cond.notify_all()
+    return True
+
+  @property
+  def result(self):
+    with self._lock:
+      if self.state == ASYNCH_READY:
+        return self._result
+    raise AttributeError("%s not ready: no .result attribute" % (self,))
+
+  @result.setter
+  def result(self, new_result):
+    self._complete(new_result, None)
+
+  @property
+  def exc_info(self):
+    with self._lock:
+      if self.state == ASYNCH_READY:
+        return self._exc_info
+    raise AttributeError("%s not ready: no .exc_info attribute" % (self,))
+
+  @exc_info.setter
+  def exc_info(self, exc_info):
+    self._complete(None, exc_info)
+
+  def _complete(self, result, exc_info):
+    ''' Set the result unless the function is already cancelled.
+        Alert people to completion.
+    '''
+    if result is not None and exc_info is not None:
+      raise ValueError("one of result or exc_info must be None, got (%r, %r)" % (result, exc_info))
+    with self._lock:
+      state = self.state
+      if state == ASYNCH_CANCELLED:
+        # silently discard result
+        pass
+      elif state == ASYNCH_RUNNING or state == ASYNCH_PENDING:
+        self._result = result
+        self._exc_info = exc_info
+        self.state = ASYNCH_READY
+      else:
+        raise RuntimeError("<%s>.state is not one of (ASYNCH_CANCELLED, ASYNCH_RUNNING): %r"
+                           % (self, state))
+    notifiers = self.notifiers
+    del self.notifiers
+    for notifier in notifiers:
+      notifier(self)
+    with self.join_cond:
+      self.join_cond.notify_all()
+
+  def wait(self):
+    ''' Calling the .wait() method waits for the function to run to
+        completion and returns a tuple as for the WorkerThreadPool's
+        .dispatch() return queue.
+        On completion the sequence:
+          func_result, None
+        is returned.
+        If the function was cancelled the sequence:
+          None, None
+        is returned.
+        On an exception the sequence:
+          None, exc_info
+        is returned where exc_info is a tuple of (exc_type, exc_value, exc_traceback).
+    '''
+    self.join()
+    return (self.result, self.exc_info)
+
+  def join(self):
+    ''' Wait for the function to complete.
+        The function return value is available as self.result.
+    '''
+    with self.join_cond:
+      if self.ready:
+        return
+      self.join_cond.wait()
+      if not self.ready:
+        raise RuntimeError("not ready?")
+
   def notify(self, notifier):
-    ''' When the Result is ready, run notifier(self).
-        If the Result is already ready this will happen immediately.
+    ''' After the function completes, run notifier(self).
+        If the function has already completed this will happen immediately.
         Note: if you'd rather `self` got put on some Queue `Q`, supply `Q.put`.
     '''
     with self._lock:
@@ -325,6 +419,37 @@ class Result(O):
         notifier = None
     if notifier is not None:
       notifier(self)
+
+
+class Result(Asynchron):
+  ''' A blocking value store.
+      Getters block until a value is supplied.
+  '''
+
+  def __init__(self, name=None):
+    Asynchron.__init__(self)
+    if name is None:
+      name = "Result%d" % (seq(),)
+    self._get_lock = Lock()
+    self._get_lock.acquire()
+
+  def __repr__(self):
+    return str(self)
+
+  def put(self, value):
+    ''' Store the value.
+    '''
+    self.result = value
+    self._get_lock.release()
+
+  def get(self):
+    ''' Fetch the value.
+        Blocks until the value is put.
+        The value may be get()ed multiple times.
+    '''
+    self._get_lock.acquire()
+    self._get_lock.release()
+    return self.result
 
 class IterableQueue(Queue):
   ''' A Queue implementing the iterator protocol.
