@@ -420,6 +420,20 @@ class Asynchron(O):
     if notifier is not None:
       notifier(self)
 
+def report(LFs):
+  ''' Report completed Asynchrons.
+      This is a generator that yields Asynchrons as they complete, useful
+      for waiting for a sequence of Asynchrons that may complete in an
+      arbitrary order.
+  '''
+  Q = Queue()
+  n = 0
+  notify = Q.put
+  for LF in LFs:
+    n += 1
+    LF.notify(notify)
+  for i in range(n):
+    yield Q.get()
 
 class Result(Asynchron):
   ''' A blocking value store.
@@ -1128,7 +1142,6 @@ def runTree_inner(input, ops, state, funcQ, retq=None):
       Return a LateFunction to collect the final result.
       `func` is a many-to-many function.
   '''
-  from cs.later import report
   debug("runTree_inner(input=%s, ops=%s, state=%s, funcQ=%s, retq=%s)...",
     input, ops, state, funcQ, retq)
 

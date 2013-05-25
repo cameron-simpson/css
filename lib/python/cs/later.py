@@ -658,21 +658,6 @@ class Later(object):
     yield
     self._priority = oldpri
 
-def report(LFs):
-  ''' Report completed LateFunctions.
-      This is a generator that yields LateFunctions as they complete, useful
-      for waiting for a sequence of LateFunctions that may complete in an
-      arbitrary order.
-  '''
-  Q = Queue()
-  n = 0
-  notify = Q.put
-  for LF in LFs:
-    n += 1
-    LF.notify(notify)
-  for i in range(n):
-    yield Q.get()
-
 if __name__ == '__main__':
   import cs.later_tests
   cs.later_tests.selftest(sys.argv)
