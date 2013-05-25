@@ -404,7 +404,7 @@ class Later(object):
       LF = pri_entry[-1]
       self.pending.remove(LF)
       self.running.add(LF)
-      self.warning("dispatched %s", LF)
+      self.debug("dispatched %s", LF)
       LF._dispatch()
 
   def bg(self, func, *a, **kw):
