@@ -404,7 +404,7 @@ class Later(object):
       LF = pri_entry[-1]
       self.pending.remove(LF)
       self.running.add(LF)
-      self.debug("dispatched %s", LF)
+      self.warning("dispatched %s", LF)
       LF._dispatch()
 
   def bg(self, func, *a, **kw):
@@ -520,7 +520,7 @@ class Later(object):
       raise RunTimError("%s.bg(...) after close()")
     if a:
       a = list(a)
-      params = {}
+    params = {}
     funcname = None
     while not callable(func):
       D("SKIPPING func=%r, not callable", func)
@@ -528,9 +528,9 @@ class Later(object):
         funcname = func
         func = a.pop(0)
         D("funcname = %r, func = %s", funcname, func)
-    else:
-      params = func
-      func = a.pop(0)
+      else:
+        params = func
+        func = a.pop(0)
     if funcname is not None:
       params['name'] = funcname
     if a or kw:
@@ -538,8 +538,84 @@ class Later(object):
     MLF = self.submit(func, **params)
     return MLF
 
-  def __call__(self, *a, **kw):
-    return self.defer(*a, **kw)()
+  def after(self, LFs, R, func, *a, **kw):
+    ''' Queue the function `func` for later dispatch using the
+        default priority with the spcified arguments `*a` and `**kw`.
+	This function will not be submitted until completion of
+	the supplied LateFunctions `LFs`.
+	If `R` is None a new cs.threads.Result is allocated to
+	accept the function return value.
+        After `func` completes its return value is passed to R.put().
+        The Result is returned.
+
+	Typical use case is as follows: suppose you're submitting
+	work via this Later object, and a submitted function itself
+	might submit more LateFunctions for which it must wait.
+	Code like this:
+
+          def f():
+            LF = L.defer(something)
+            return LF()
+
+	may deadlock if the Later is at capacity. The after() method
+	addresses this:
+
+          def f():
+            LF1 = L.defer(something)
+            LF2 = L.defer(somethingelse)
+            R = L.after( [LF1, LF2], None, when_done )
+            return R
+
+	This submits the when_done() function after the LFs have
+	completed without spawning a thread or using the Later's
+	capacity.
+
+	See the retry method for a convenience method that ses the
+	above pattern in a repeating style.
+    '''
+    if R is None:
+      R = Result()
+    LFs = list(LFs)
+    count = len(LFs)
+    countery = [count]  # to stop "count" looking like a local var inside the closure
+    def put_func():
+      ''' Function to defer: run `func` and pass its return value to R.put().
+      '''
+      R.put(func(*a, **kw))
+    def submit_func(LF):
+      ''' Notification function to submit `func` after sufficient invocations.
+      '''
+      countery[0] -= 1
+      if countery[0] == 0:
+        self.defer(put_func)
+    for LF in LFs:
+      LF.notify(submit_func)
+    return R
+
+  def retry(self, R, func, *a, **kw):
+    ''' Queue the call `func` for later dispatch and possible
+        repetition.
+	If `R` is None a new cs.threads.Result is allocated to
+	accept the function return value.
+        The return value from `func` should be a tuple:
+          LFs, result
+	where LFs, if not empty, is a sequence of LateFunctions
+	which should complete. After completion, `func` is queued
+	again.
+	When LFs is empty, result is passed to R.put() and `func`
+	is not requeued.
+    '''
+    if R is None:
+      R = Result()
+    def retry():
+      LFs = []
+      LFs, result = func(LFs, *a, **kw)
+      if LFs:
+        self.after(LFs, R, retry)
+      else:
+        R.put(result)
+    self.defer(retry)
+    return R
 
   @contextmanager
   def priority(self, pri):
