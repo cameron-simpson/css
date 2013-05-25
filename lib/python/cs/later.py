@@ -11,14 +11,10 @@ from cs.py3 import Queue, raise3
 import time
 from cs.debug import ifdebug, Lock, RLock, Thread
 from cs.threads import AdjustableSemaphore, IterablePriorityQueue, \
-                       WorkerThreadPool, TimerQueue
+                       WorkerThreadPool, TimerQueue, Result, \
+                       Asynchron, ASYNCH_RUNNING
 from cs.seq import seq
 from cs.logutils import Pfx, info, warning, debug, D
-
-STATE_PENDING = 0       # function not yet dispatched
-STATE_RUNNING = 1       # function executing
-STATE_DONE = 2          # function complete
-STATE_CANCELLED = 3     # function cancelled
 
 class _ThreadLocal(threading.local):
   ''' Thread local state to provide implied context withing Later context managers.
@@ -107,144 +103,13 @@ class _Late_context_manager(object):
       raise lf_exc_type(lf_exc_info)
     return True
 
-class PendingFunction(object):
-  ''' Common state for LateFunctions and OnDemandFunctions.
-  '''
+class PendingFunction(Asynchron):
 
   def __init__(self, func, *a, **kw):
+    Asynchron.__init__(self)
     if a or kw:
       func = partial(func, *a, **kw)
     self.func = func
-    self.state = STATE_PENDING
-    self._result = None
-    self._lock = Lock()
-    self.join_cond = Condition()
-    self.notifiers = []
-
-  @property
-  def ready(self):
-    return self.state == STATE_DONE or self.state == STATE_CANCELLED
-  done = ready
-
-  @property
-  def cancelled(self):
-    ''' Test whether this PendingFunction has been cancelled.
-    '''
-    return self.state == STATE_CANCELLED
-
-  def cancel(self):
-    ''' Cancel this function.
-        If self.state is STATE_PENDING or STATE_CANCELLED, return True.
-        Otherwise return False (too late to cancel).
-    '''
-    notifiers = ()
-    with self._lock:
-      state = self.state
-      if state == STATE_PENDING:
-        self.func = None
-        self._result = (None, None)
-        self.state = STATE_CANCELLED
-        notifiers = list(self.notifiers)
-      elif state == STATE_CANCELLED:
-        pass
-      elif state == STATE_RUNNING or state == STATE_DONE:
-        return False
-      else:
-        raise RuntimeError("<%s>.state not one of (STATE_PENDING, STATE_CANCELLED, STATE_RUNNING, STATE_DONE): %r"
-                           % (self, state))
-    for notifier in notifiers:
-      notifier(self)
-    with self.join_cond:
-      self.join_cond.notify_all()
-    return True
-
-  @property
-  def result(self):
-    with self._lock:
-      result = self._result
-    if result is None:
-      raise ValueError("<%s>.result not available, state=%s" % (self, self.state))
-    if len(result) != 2:
-      raise RuntimeError("<%s>.result not a 2-tuple: %r" % (self, result))
-    return result
-
-  @result.setter
-  def result(self, new_result):
-    ''' Set the result unless the function is already cancelled.
-        Alert people to completion.
-    '''
-    if len(new_result) != 2:
-      raise ValueError("<%s>.result.setter: expected a 2-tuple but got: %r"
-                       % (self, new_result))
-    with self._lock:
-      state = self.state
-      if state == STATE_CANCELLED:
-        # silently discard result
-        pass
-      elif state == STATE_RUNNING or state == STATE_PENDING:
-        if self._result is not None:
-          raise ValueError("<%s>.result.setter: tried to set .result to %r but .result is already: %r"
-                           % (self, new_result, self._result))
-        self._result = new_result
-        self.state = STATE_DONE
-        notifiers = list(self.notifiers)
-      else:
-        raise RuntimeError("<%s>.state is not one of (STATE_CANCELLED, STATE_RUNNING): %r"
-                           % (self, state))
-    for notifier in notifiers:
-      notifier(self)
-    with self.join_cond:
-      self.join_cond.notify_all()
-
-  def set_result(self, result):
-    ''' set_result() is called by a worker thread to report completion of the
-        function.
-        The argument `result` is a 2-tuple as produced by cs.threads.WorkerThreadPool:
-          func_result, None
-        or:
-          None, exc_info
-        where exc_info is (exc_type, exc_value, exc_traceback).
-    '''
-    self.result = result
-
-  def wait(self):
-    ''' Calling the .wait() method waits for the function to run to
-        completion and returns a tuple as for the WorkerThreadPool's
-        .dispatch() return queue.
-        On completion the sequence:
-          func_result, None
-        is returned.
-        If the function was cancelled the sequence:
-          None, None
-        is returned.
-        On an exception the sequence:
-          None, exc_info
-        is returned where exc_info is a tuple of (exc_type, exc_value, exc_traceback).
-    '''
-    self.join()
-    return self.result
-
-  def join(self):
-    ''' Wait for the function to complete.
-        The function return value is available as self.result.
-    '''
-    with self.join_cond:
-      if self.done:
-        return
-      self.join_cond.wait()
-      assert self.done
-
-  def notify(self, notifier):
-    ''' After the function completes, run notifier(self).
-        If the function has already completed this will happen immediately.
-        Note: if you'd rather `self` got put on some Queue `Q`, supply `Q.put`.
-    '''
-    with self._lock:
-      if not self.done:
-        self.notifiers.append(notifier)
-        notifier = None
-    if notifier is not None:
-      notifier(self)
 
 class OnDemandFunction(PendingFunction):
   ''' Wrap a callable, call it later.
@@ -252,23 +117,23 @@ class OnDemandFunction(PendingFunction):
       inner function will only run once.
   '''
 
-  def __init__(self, func, *a, **kw):
-    PendingFunction.__init__(self, func, *a, **kw)
-
   def __call__(self):
     do_func = False
     with self._lock:
-      if self.state == STATE_PENDING:
+      if self.pending:
         do_func = True
-        self.state = STATE_RUNNING
+        self.state = ASYNCH_RUNNING
+      else:
+        raise RuntimeError("state should be ASYNCH_PENDING but is %s" % (self.state))
     if do_func:
       result, exc_info = None, None
       try:
         result = self.func()
       except:
         exc_info = sys.exc_info()
-      self.set_result( (result, exc_info) )
-    result, exc_info = self.result
+        self.exc_info = exc_info
+      else:
+        self.result = result
     if exc_info:
       exc_type, exc_value, exc_traceback = exc_info
       raise exc_type(exc_value).with_traceback(exc_traceback)
@@ -283,7 +148,7 @@ def CallableValue(value):
       instead.
   '''
   F = OnDemandFunction(lambda: None)
-  F.set_result( (value, None) )
+  F.result = value
   return F
 
 class LateFunction(PendingFunction):
@@ -342,9 +207,10 @@ class LateFunction(PendingFunction):
     '''
     self.later.debug("DISPATCH %s", self)
     with self._lock:
-      assert self.state == STATE_PENDING
-      self.state = STATE_RUNNING
-      self.later._workers.dispatch(self.func, deliver=self.set_result)
+      if not self.pending:
+        raise RuntimeError("should be pending, but state = %s", self.state)
+      self.state = ASYNCH_RUNNING
+      self.later._workers.dispatch(self.func, deliver=self._worker_complete)
       self.func = None
 
   def __call__(self):
@@ -357,12 +223,13 @@ class LateFunction(PendingFunction):
       raise3(*exc_info)
     return result
 
-  def set_result(self, result):
-    self.later.debug("COMPLETE %s: result = %r", self, result)
-    self.later.log_status()
-    self.later.capacity.release()
-    self.later.running.remove(self)
-    PendingFunction.set_result(self, result)
+  def _worker_complete(self, work_result):
+    result, exc_info = work_result
+    self._complete(result, exc_info)
+
+  def _complete(self, result, exc_info):
+    PendingFunction._complete(self, result, exc_info)
+    self.later._completed(self, result, exc_info)
 
 class Later(object):
   ''' A management class to queue function calls for later execution.
@@ -425,11 +292,11 @@ class Later(object):
         self._workers.close()           # wait for all worker threads to complete
 
   def __repr__(self):
-    return '<%s "%s" capacity=%s running=%d pending=%d delayed=%d closed=%s>' \
-           % ( self.__class__, self.name,
+    return '<%s "%s" capacity=%s running=%d (%s) pending=%d (%s) delayed=%d closed=%s>' \
+           % ( self.__class__.__name__, self.name,
                self.capacity,
-               len(self.running),
-               len(self.pending),
+               len(self.running), ','.join( repr(LF.name) for LF in self.running ),
+               len(self.pending), ','.join( repr(LF.name) for LF in self.pending ),
                len(self.delayed),
                self.closed
              )
@@ -446,6 +313,12 @@ class Later(object):
       self.debug("STATUS: pending: %s", LF)
     for LF in list(self.running):
       self.debug("STATUS: running: %s", LF)
+
+  def _completed(self, LF, result, exc_info):
+    self.debug("COMPLETE %s: result = %r, exc_info = %r", LF, result, exc_info)
+    self.log_status()
+    self.capacity.release()
+    self.running.remove(LF)
 
   def __enter__(self):
     debug("%s: __enter__", self)
@@ -532,9 +405,14 @@ class Later(object):
     '''
     if self.closed:
       raise RunTimError("%s.bg(...) after close()")
+    funcname = None
+    if isinstance(func, str):
+      funcname = func
+      a = list(a)
+      func = a.pop(0)
     if a or kw:
       func = partial(func, *a, **kw)
-    LF = LateFunction(self, func)
+    LF = LateFunction(self, func, funcname)
     self.running.add(LF)
     LF._dispatch()
     return LF
@@ -618,23 +496,34 @@ class Later(object):
     ''' Queue the function `func` for later dispatch using the
         default priority with the spcified arguments `*a` and `**kw`.
         Return the corresponding LateFunction for result collection.
-        `func` may optionally be preceeded by a mapping `params` containing
-        parameters for `priority`, `delay`, and `when`.
+        `func` may optionally be preceeded by one or both of:
+          a string specifying the function's descriptive name
+	  a mapping containing parameters for `priority`,
+            `delay`, and `when`.
         Equivalent to:
           submit(functools.partial(func, *a, **kw), **params)
     '''
     if self.closed:
       raise RunTimError("%s.bg(...) after close()")
-    if callable(func):
+    if a:
+      a = list(a)
       params = {}
+    funcname = None
+    while not callable(func):
+      D("SKIPPING func=%r, not callable", func)
+      if isinstance(func, str):
+        funcname = func
+        func = a.pop(0)
+        D("funcname = %r, func = %s", funcname, func)
     else:
       params = func
       func = a.pop(0)
-      if not callable(func):
-        raise RuntimeError('defer: neither params nor func is callable')
+    if funcname is not None:
+      params['name'] = funcname
     if a or kw:
       func = partial(func, *a, **kw)
-    return self.submit(func, **params)
+    MLF = self.submit(func, **params)
+    return MLF
 
   def __call__(self, *a, **kw):
     return self.defer(*a, **kw)()
