@@ -7,7 +7,6 @@ from functools import partial
 import sys
 from collections import deque
 import threading
-from threading import Condition
 from cs.py3 import Queue, raise3
 import time
 from cs.debug import ifdebug, Lock, RLock, Thread
