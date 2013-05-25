@@ -271,6 +271,19 @@ class Later(object):
     self._lock = Lock()
     self._dispatchThread.start()
 
+  def __call__(self, func, *a, **kw):
+    ''' A Later object can be called with a function and arguments
+	with the effect of deferring the function and waiting for
+	it to complete, returning its return value.
+
+        Example:
+
+          def f(a):
+            return a*2
+          x = L(f, 3)   # x == 6
+    '''
+    return self.defer(func, *a, **kw)()
+
   def close(self):
     ''' Shut down the Later instance:
         - close the TimerQueue, if any, and wait for it to complete
