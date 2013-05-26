@@ -14,7 +14,7 @@ from cs.threads import AdjustableSemaphore, IterablePriorityQueue, \
                        WorkerThreadPool, TimerQueue, Result, \
                        Asynchron, ASYNCH_RUNNING
 from cs.seq import seq
-from cs.logutils import Pfx, info, warning, debug, D
+from cs.logutils import Pfx, info, warning, debug, D, OBSOLETE
 
 class _ThreadLocal(threading.local):
   ''' Thread local state to provide implied context withing Later context managers.
@@ -118,38 +118,24 @@ class OnDemandFunction(PendingFunction):
   '''
 
   def __call__(self):
-    do_func = False
     with self._lock:
-      if self.pending:
-        do_func = True
+      state = self.state
+      if state == ASYNC_CANCELLED:
+        raise CancellationError()
+      if state == ASYNCH_PENDING:
         self.state = ASYNCH_RUNNING
       else:
         raise RuntimeError("state should be ASYNCH_PENDING but is %s" % (self.state))
-    if do_func:
-      result, exc_info = None, None
-      try:
-        result = self.func()
-      except:
-        exc_info = sys.exc_info()
-        self.exc_info = exc_info
-      else:
-        self.result = result
-    if exc_info:
-      exc_type, exc_value, exc_traceback = exc_info
-      raise exc_type(exc_value).with_traceback(exc_traceback)
+    result, exc_info = None, None
+    try:
+      result = self.func()
+    except:
+      exc_info = sys.exc_info()
+      self.exc_info = exc_info
+      raise
+    else:
+      self.result = result
     return result
-
-def CallableValue(value):
-  ''' Return a callable that returns the supplied value.
-      This wraps the value in an OnDemandFunction for compatability
-      with other PendingFunctions.
-      Of course, if you don't need .wait() et al you can just use:
-        lambda: value
-      instead.
-  '''
-  F = OnDemandFunction(lambda: None)
-  F.result = value
-  return F
 
 class LateFunction(PendingFunction):
   ''' State information about a pending function.
@@ -213,15 +199,9 @@ class LateFunction(PendingFunction):
       self.later._workers.dispatch(self.func, deliver=self._worker_complete)
       self.func = None
 
-  def __call__(self):
-    ''' Calling the LateFunction waits for the function to run to completion
-        and returns the function return value.
-        If the function threw an exception that exception is reraised.
-    '''
-    result, exc_info = self.wait()
-    if exc_info:
-      raise3(*exc_info)
-    return result
+  @OBSOLETE
+  def wait(self):
+    return self.join()
 
   def _worker_complete(self, work_result):
     result, exc_info = work_result
@@ -523,7 +503,6 @@ class Later(object):
     params = {}
     funcname = None
     while not callable(func):
-      D("SKIPPING func=%r, not callable", func)
       if isinstance(func, str):
         funcname = func
         func = a.pop(0)
