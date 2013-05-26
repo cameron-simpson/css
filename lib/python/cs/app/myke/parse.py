@@ -12,7 +12,7 @@ import re
 from string import whitespace, letters, digits
 import unittest
 from cs.lex import get_chars, get_other_chars, get_white, get_identifier
-from cs.logutils import Pfx, error, warning, info, debug, exception
+from cs.logutils import Pfx, error, warning, info, debug, exception, D
 
 # mapping of special macro names to evaluation functions
 SPECIAL_MACROS = { '.':         lambda c, ns: os.getcwd(),       # TODO: cache
@@ -477,16 +477,19 @@ def parseMakefile(M, fp, parent_context=None):
               if offset == len(line):
                 raise ParseError(context, offset, "nothing to import")
               ok = True
+              missing_envvars = []
               for envvar in line[offset:].split():
                 if envvar:
                   envvalue = os.environ.get(envvar)
                   if envvalue is None:
                     error("no $%s" % (envvar,))
                     ok = False
+                    missing_envvars.append(envvar)
                   else:
                     yield Macro(context, envvar, (), envvalue.replace('$', '$$'))
               if not ok:
-                raise ValueError("missing environment variables")
+                raise ValueError("missing environment variables: %s"
+                                 % (missing_envvars,))
               continue
             if word == 'precious':
               if offset == len(line):
