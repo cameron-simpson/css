@@ -506,7 +506,6 @@ class Later(object):
       if isinstance(func, str):
         funcname = func
         func = a.pop(0)
-        D("funcname = %r, func = %s", funcname, func)
       else:
         params = func
         func = a.pop(0)
