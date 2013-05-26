@@ -2,7 +2,7 @@
 
 from getopt import GetoptError
 import sys
-from cs.logutils import setup_logging, warning, error, info
+from cs.logutils import setup_logging, warning, error, info, D
 from cs.app.myke.make import Maker
 
 default_cmd = 'myke'
@@ -13,33 +13,38 @@ def main(argv):
   cmd, args = argv[0], argv[1:]
   setup_logging(cmd)
 
-  with Maker() as M:
-    try:
-      args, badopts = M.getopt(args)
-    except GetoptError as e:
-      warning("bad options: %s", e)
-      badopts = True
-    if badopts:
-      print >>sys.stderr, usage % (cmd,)
-      return 2
+  M = Maker()
+  try:
+    args, badopts = M.getopt(args)
+  except GetoptError as e:
+    warning("bad options: %s", e)
+    badopts = True
+  if badopts:
+    print >>sys.stderr, usage % (cmd,)
+    return 2
 
-    M.loadMakefiles(M.makefiles)
-    M.loadMakefiles(M.appendfiles)
+  M.prepare()
 
-    if args:
-      targets = args
+  # defer __enter__ until after option parsing
+  M.loadMakefiles(M.makefiles)
+  M.loadMakefiles(M.appendfiles)
+
+  if args:
+    targets = args
+  else:
+    target = M.default_target
+    if target is None:
+      targets = ()
     else:
-      target = M.default_target
-      if target is None:
-        targets = ()
-      else:
-        targets = (M.default_target.name,)
+      targets = (M.default_target.name,)
 
-    if not targets:
-      error("no default target")
-      xit = 1
-    else:
-      xit = 0 if M.make(targets) else 1
+  if not targets:
+    error("no default target")
+    xit = 1
+  else:
+    xit = 0 if M.make(targets) else 1
+
+  M.close()
 
   return xit
 
