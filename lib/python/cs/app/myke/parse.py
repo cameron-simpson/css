@@ -476,16 +476,19 @@ def parseMakefile(M, fp, parent_context=None):
               if offset == len(line):
                 raise ParseError(context, offset, "nothing to import")
               ok = True
+              missing_envvars = []
               for envvar in line[offset:].split():
                 if envvar:
                   envvalue = os.environ.get(envvar)
                   if envvalue is None:
                     error("no $%s" % (envvar,))
                     ok = False
+                    missing_envvars.append(envvar)
                   else:
                     yield Macro(context, envvar, (), envvalue.replace('$', '$$'))
               if not ok:
-                raise ValueError("missing environment variables")
+                raise ValueError("missing environment variables: %s"
+                                 % (missing_envvars,))
               continue
             if word == 'precious':
               if offset == len(line):

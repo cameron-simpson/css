@@ -62,7 +62,7 @@ class Maker(O):
     self.rules = {}
     self.precious = set()
     self.active = set()
-    self.active_lock = Lock()
+    self._active_lock = Lock()
     self._namespaces = []
     ##T = Thread(target=self._ticker, args=())
     ##T.daemon = True
@@ -159,21 +159,21 @@ class Maker(O):
     ''' Add this target to the set of "in progress" targets.
     '''
     self.debug_make("note target \"%s\" as active", target.name)
-    with self.active_lock:
+    with self._active_lock:
       self.active.add(target)
 
   def made(self, target, status):
     ''' Remove this target from the set of "in progress" targets.
     '''
     self.debug_make("note target \"%s\" as inactive (status=%s)", target.name, status)
-    with self.active_lock:
+    with self._active_lock:
       self.active.remove(target)
 
   def cancel_all(self):
     ''' Cancel all "in progress" targets.
     '''
     self.debug_make("cancel_all!")
-    with self.active_lock:
+    with self._active_lock:
       Ts = list(self.active)
     for T in Ts:
       T.cancel()
