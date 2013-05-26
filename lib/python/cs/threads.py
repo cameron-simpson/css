@@ -346,7 +346,7 @@ class Asynchron(O):
   def result(self):
     with self._lock:
       state = self.state
-      if state == ASYNC_CANCELLED:
+      if state == ASYNCH_CANCELLED:
         raise CancellationError()
       if state == ASYNCH_READY:
         return self._result
