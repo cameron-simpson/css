@@ -600,6 +600,7 @@ class Action(O):
     ALF = target.maker.defer("%s:act[%s]" % (self,target,), self._act, R, target)
     return R
 
+  @DEBUG
   def _act(self, R, target):
     ''' Perform this Action on behalf of the Target `target`.
         Put the result onto `R`.
@@ -612,11 +613,12 @@ class Action(O):
       if v == 'shell':
         debug("shell command")
         shcmd = self.mexpr(self.context, target.namespaces)
-        if not self.silent:
+        if M.no_action or not self.silent:
           print(shcmd)
         if M.no_action:
           mdebug("OK (maker.no_action)")
-          return True
+          R.put(True)
+          return
         R.put(self._shcmd(target, shcmd))
         return
 
