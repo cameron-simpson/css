@@ -15,7 +15,8 @@ import time
 from cs.debug import DEBUG
 from cs.inttypes import Flags
 from cs.threads import Lock, RLock, Channel, Result, report as report_LFs, \
-        Asynchron, ASYNCH_PENDING, ASYNCH_RUNNING, ASYNCH_CANCELLED, ASYNCH_READY
+        Asynchron, ASYNCH_PENDING, ASYNCH_RUNNING, ASYNCH_CANCELLED, ASYNCH_READY, \
+        locked_property
 from cs.later import Later
 import cs.logutils
 from cs.logutils import Pfx, info, error, debug, D
@@ -400,7 +401,21 @@ class Target(Result):
     self.shell = SHELL
     self._prereqs = prereqs
     self._postprereqs = postprereqs
+    self.new_prereqs = []
     self.actions = actions
+    # build state:
+    #
+    # Out Of Date:
+    #  This target does not exist in the filesystem, or one of its
+    #  dependents is newly made or exists and is newer.
+    #  After successfully building each prerequisite, if the prereq
+    #  was new or the prereq exists and is newer than this Target,
+    #  then this target is marker out of date.
+    #  When all prereqs have been successfully build, if this Target
+    #  is out of date then it is marked as new and any actions queued.
+    #  
+    self.out_of_date = False
+    self.is_new = False
 
   def __str__(self):
     return "{}[{}]".format(self.name, self.madeness())
@@ -446,6 +461,14 @@ class Target(Result):
       self._prereqs = prereqs(self.context, self.namespaces).split()
     return self._prereqs
 
+  @locked_property
+  def mtime(self):
+    try:
+      s = os.stat(self.name)
+    except OSError:
+      return None
+    return s.st_mtime
+
   def cancel(self):
     ''' Cancel this Target.
         Actions will cease as soon as decorum allows.
@@ -465,7 +488,36 @@ class Target(Result):
         # queue the first unit of work
         self.maker.defer("%s:_make_partial" % (self,), self._make_partial)
 
-  @DEBUG
+  ## @DEBUG
+  def _apply_prereq(self, LF):
+    ''' Apply the consequences of the complete prereq LF.
+    '''
+    mdebug = self.maker.debug_make
+    if not LF.ready:
+      raise RuntimeError("%s._make_partial: %s not ready", self, LF)
+    if LF.result:
+      mdebug("%s: OK %s", self, LF)
+      try:
+        is_new = LF.is_new
+      except AttributeError:
+        # presuming not a Target
+        pass
+      else:
+        if is_new:
+          mdebug("%s: out of date because is_new(%s)", self, LF)
+          self.out_of_date = True
+        else:
+          LFmtime = getattr(LF, 'mtime', None)
+          if LFmtime is not None:
+            mtime = self.mtime
+            if mtime is None or LFmtime >= mtime:
+              mdebug("%s: out of date because older than %s", self, LF)
+              self.out_of_date = True
+    else:
+      mdebug("%s: FAIL from %s", self, LF)
+      self.result = False
+
+  ## @DEBUG
   def _make_partial(self):
     ''' The inner/recursive/deferred function from _make.
         Perform the next unit of work in making this Target.
@@ -479,13 +531,8 @@ class Target(Result):
     if LFs:
       self.LFS = []
       for LF in LFs:
-        if not LF.ready:
-          raise RuntimeError("%s._make_partial: %s not ready", self, LF)
-        if LF.result:
-          mdebug("%s: OK %s", self, LF)
-        else:
-          mdebug("%s: FAIL from %s", self, LF)
-          self.result = False
+        self._apply_prereq(LF)
+        if not LF.result:
           return
 
     LFs = []
@@ -494,6 +541,7 @@ class Target(Result):
     for dep in targets:
       T = M[dep]
       if T.ready:
+        self._apply_prereq(T)
         if T.result:
           mdebug("%s: OK: prereq \"%s\" successful", self, T)
         else:
@@ -504,7 +552,6 @@ class Target(Result):
         # require T an note it for consideration next time
         T.require()
         LFs.append(T)
-        self.pending_targets.append(T)
 
     if not LFs:
       # no pending targets, what about actions?
