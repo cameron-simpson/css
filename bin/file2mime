@@ -50,6 +50,7 @@ case "$type" in
                                           *)     mtype=application/msword ;;
                                         esac
                                         ;;
+    *': Composite Document File '*)     mtype=application/msword ;;
     *': '*'RIFF (little-endian) data, AVI') mtype=video/avi ;;
     *': uuencoded or xxencoded text'*)	mtype=application/x-uuencode ;;
     *': '*'PGP armored data signed message'*)
