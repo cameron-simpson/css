@@ -11,7 +11,7 @@ import threading
 import time
 from cs.py3 import Queue
 import cs.logutils
-from cs.logutils import infer_logging_level, debug, setup_logging, D
+from cs.logutils import infer_logging_level, debug, error, setup_logging, D
 from cs.obj import O
 from cs.seq import seq
 from cs.timeutils import sleep
@@ -58,7 +58,11 @@ def DEBUG(f):
     T.start()
     debug("%s:%d: [%d] call %s(*%r, **%r)", filename, lineno, n, f.__name__, a, kw)
     start = time.time()
-    result = f(*a, **kw)
+    try:
+      result = f(*a, **kw)
+    except Exception as e:
+      error("EXCEPTION from %s(*%s, **%s): %s", f, a, kw, e)
+      raise
     end = time.time()
     debug("%s:%d: [%d] called %s, elapsed %gs, got %r", filename, lineno, n, f.__name__, end - start, result)
     R.put(result)
