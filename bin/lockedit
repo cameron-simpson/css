@@ -31,7 +31,7 @@ file=$1; shift
 
 if [ $isfilt ]
 then
-    lock "$file" filteredit "$file" "$@"
+    lock -P "$file" filteredit "$file" "$@"
 else
-    lock "$file" "$@" "$file"
+    lock -P "$file" "$@" "$file"
 fi
