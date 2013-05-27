@@ -1,0 +1,42 @@
+#!/bin/sh
+#
+# Slightly racey lock testing wrapper for commands.
+# If the lock is present, comlain and abort.
+# otherwise take the lock and run the command.
+#       - Cameron Simpson <cs@zip.com.au> 27may2013
+# 
+
+cmd=`basename "$0"`
+usage="Usage: $cmd lockkey command [args...]"
+
+: ${LOCKDIR:=$HOME/.locks}
+export LOCKDIR
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing lockkey" >&2
+  badopts=1
+else
+  lockkey=$1
+  shift
+fi
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing command" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+lockdir=$LOCKDIR/$lockkey
+
+if [ -d "$lockdir" ]
+then
+  echo "$cmd: lock taken: $lockdir; SKIPPING $*" >&2
+  exit 1
+fi
+
+exec lock -- "$lockkey" "$@"
