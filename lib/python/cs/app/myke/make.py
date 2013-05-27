@@ -462,6 +462,7 @@ class Target(Result):
     return self._prereqs
 
   @locked_property
+  @DEBUG
   def mtime(self):
     try:
       s = os.stat(self.name)
@@ -488,7 +489,7 @@ class Target(Result):
         # queue the first unit of work
         self.maker.defer("%s:_make_partial" % (self,), self._make_partial)
 
-  ## @DEBUG
+  @DEBUG
   def _apply_prereq(self, LF):
     ''' Apply the consequences of the complete prereq LF.
     '''
@@ -517,7 +518,7 @@ class Target(Result):
       mdebug("%s: FAIL from %s", self, LF)
       self.result = False
 
-  ## @DEBUG
+  @DEBUG
   def _make_partial(self):
     ''' The inner/recursive/deferred function from _make.
         Perform the next unit of work in making this Target.
@@ -555,12 +556,16 @@ class Target(Result):
 
     if not LFs:
       # no pending targets, what about actions?
+      # if we're out of date or missing,
+      # queueu an action and mark ourselves is_new
       # if so, queue the first one
-      actions = self.pending_actions
-      if actions:
-        A = actions.pop(0)
-        mdebug("%s: queue action: %s", self, A)
-        LFs.append(A.act_later(self))
+      if self.out_of_date or self.mtime is None:
+        self.is_new = True
+        actions = self.pending_actions
+        if actions:
+          A = actions.pop(0)
+          mdebug("%s: queue action: %s", self, A)
+          LFs.append(A.act_later(self))
 
     if LFs:
       self.LFs = LFs
