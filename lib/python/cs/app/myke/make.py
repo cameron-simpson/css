@@ -356,10 +356,10 @@ class TargetMap(O):
         if name not in targets:
           T = self._newTarget(self.maker, name, context=None)
           if os.path.exists(name):
-            T._status = True
+            T.result = True
           else:
             error("can't infer a Target to make %r" % (name,))
-            T._status = False
+            T.result = False
           targets[name] = T
     return targets[name]
 
