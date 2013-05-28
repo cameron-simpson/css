@@ -354,7 +354,7 @@ class TargetMap(O):
     if name not in targets:
       with self._lock:
         if name not in targets:
-          T = _newTarget(self.maker, name, context=None)
+          T = self._newTarget(self.maker, name, context=None)
           if os.path.exists(name):
             T._status = True
           else:
