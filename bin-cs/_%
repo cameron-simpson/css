@@ -5,6 +5,6 @@
 #       - Cameron Simpson <cs@zip.com.au> 28nov2012
 #
 
-[ $# -gt 0 ] || set -- *' '*
+[ $# -gt 0 ] || set -- *'%'*
 set -x
 exec frename 's/%([\da-f][\da-f])/chr(hex($1))/eg; s/\s+/_/g' ${1+"$@"}
