@@ -28,9 +28,15 @@ fi
 
 if [ $# -gt 0 ]
 then
-    eval `"$0" "$refpid"`
+    envstuff=("$0" "$lastmtime")
+    eval "$envstuff"
     exec "$@"
 fi
+
+case $(uname -s) in
+  Linux)        mtime(){ stat -c '%Y' -- ${1+"$@"}; } ;;
+  *)            mtime(){ stat -f '%m' -- ${1+"$@"}; } ;;
+esac
 
 # test if a file is newer than $lastmtime
 isnewfile()
@@ -39,7 +45,7 @@ isnewfile()
 
   [ -f "$_inf_file" ] \
   && [ -s "$_inf_file" ] \
-  && _inf_mtime=`stat -f %m -- "$_inf_file"` \
+  && _inf_mtime=$(mtime "$_inf_file") \
   && [ "$_inf_mtime" -gt "$lastmtime" ]
 }
 
