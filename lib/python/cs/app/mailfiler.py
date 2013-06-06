@@ -305,6 +305,7 @@ class FilteringState(O):
     text = M.as_string(True)
     with open(mboxpath, "a") as mboxfp:
       mboxfp.write(text)
+    self.log("    OK >> %s (%s)" % (shortpath(mboxpath), context))
 
   def pipe_message(self, argv, mfp=None, context=None):
     ''' Pipe a message to the command specific by `argv`.
@@ -705,6 +706,8 @@ class Rule(O):
                     debug("repeated filing to maildir, skipping %s", mdir)
                 else:
                   fstate.save_to_mbox(mailpath, self.label, context=context)
+                  ok = True
+                  saved_to.append(mailpath)
             elif action == 'ASSIGN':
               envvar, s = arg
               value = fstate.environ[envvar] = envsub(s, fstate.environ)
