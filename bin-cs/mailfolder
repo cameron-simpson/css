@@ -64,7 +64,7 @@ else
         if needhost "$MAILHOMEHOST@$SYSTEMID"
         then  runlocal=1
         else  runlocal=
-              ismaildir "$maildir" && runlocal=1
+              { ismbox "$maildir" || ismaildir "$maildir"; } && runlocal=1
         fi
         ;;
     0)  runlocal=
@@ -72,7 +72,7 @@ else
   esac
 fi
 
-if [ $runlocal ] && not ismaildir "$maildir"
+if [ $runlocal ] && not ismbox "$maildir" && not ismaildir "$maildir"
 then
   echo "$cmd: not a maildir: $maildir" >&2
   badopts=1
