@@ -53,6 +53,7 @@ X
 for zone in $localzones
 do
   echo "local-zone: \"$zone.\" static"
+  exec </etc/hosts
   while read ip hosts
   do
     case "$ip" in
@@ -60,6 +61,10 @@ do
         for host in $hosts
         do
           case "$host" in
+            *.l)
+              hostbase=`basename "$host" .l`
+              echo "  local-data: \"$hostbase.$zone. 10 IN A $ip\""
+              ;;
             *.local)
               hostbase=`basename "$host" .local`
               echo "  local-data: \"$hostbase.$zone. 10 IN A $ip\""
@@ -68,10 +73,11 @@ do
         done
         ;;
     esac
-  done </etc/hosts
+  done
 done
 
 echo 'local-zone: "127.in−addr.arpa." static'
+exec </etc/hosts
 while read ip hosts
 do
   case "$ip" in
@@ -79,6 +85,17 @@ do
       for host in $hosts
       do
         case "$host" in
+          *.l)
+            hostbase=`basename "$host" .l`
+            in_addr=
+            for octet in `echo $ip | tr . '\012' | reverse`
+            do  in_addr=$in_addr$octet.
+            done
+            for zone in $localzones
+            do
+              echo "  local-data: \"${in_addr}in-addr.arpa. 10 IN PTR $hostbase.$zone.\""
+            done
+            ;;
           *.local)
             hostbase=`basename "$host" .local`
             in_addr=
@@ -94,7 +111,7 @@ do
       done
       ;;
   esac
-done </etc/hosts
+done
 
 if [ -s "$cnames" ]
 then
