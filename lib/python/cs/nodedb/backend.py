@@ -95,6 +95,7 @@ class Backend(_BackendMappingMixin):
     self.nodedb = None
     self.readonly = readonly
     self.changed = False
+    self.closed = False
 
   def nodedata(self):
     ''' Yield node data in:
