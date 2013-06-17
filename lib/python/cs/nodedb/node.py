@@ -15,11 +15,13 @@ from getopt import GetoptError
 from threading import RLock
 from threading import Thread
 from collections import namedtuple
+from cs.debug import RLock
 from cs.excutils import unimplemented
 from cs.obj import O
 from cs.lex import str1, parseUC_sAttr
 from cs.logutils import Pfx, D, error, warning, info, debug, exception
 from cs.seq import the, get0
+from cs.threads import locked
 from cs.py3 import StringTypes, unicode
 from .export import edit_csv_wide, export_csv_wide
 
@@ -670,9 +672,11 @@ class NodeDB(dict, O):
     backend.nodedb = self
     backend.apply_to(self)
     self.backend = backend
+    self._lock = RLock()
 
   __str__ = O.__str__
 
+  @locked
   def close(self):
     ''' Close this NodeDB.
     '''
@@ -681,6 +685,7 @@ class NodeDB(dict, O):
     self.backend = None
     self.closed = True
 
+  @locked
   def sync(self):
     ''' Synchronise: update the backend to match the current frontend state.
     '''
