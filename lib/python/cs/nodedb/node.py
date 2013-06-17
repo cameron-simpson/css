@@ -734,8 +734,8 @@ class NodeDB(dict, O):
                          totext, fromtext,
                          tobytes=None, frombytes=None):
     ''' Register an attribute value type for storage and retrieval in this
-        NodeDB. This permits the storage of values that are not the
-        presupported string, non-negative integer and Node types.
+        NodeDB. This permits the storage of values that are not
+        presupported: strings, non-negative integers and Nodes.
         Parameters:
           `t`, the value type to register
           `scheme`, the scheme label to use for the type
