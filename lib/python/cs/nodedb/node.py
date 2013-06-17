@@ -111,6 +111,10 @@ class _AttrList(list):
   def nodedb(self):
     return self.node.nodedb
 
+  @property
+  def backend(self):
+    return self.nodedb.backend
+
   def __delitemrefs(self, nodes):
     ''' Remove the reverse references of this attribute.
     '''
@@ -141,12 +145,12 @@ class _AttrList(list):
     ''' Rewrite our value completely in the backend.
     '''
     N = self.node
-    if self.nodedb.backend:
-      self.nodedb.backend.setAttr(N.type, N.name, self.attr, self)
+    if self.backend:
+      self.backend.setAttr(N.type, N.name, self.attr, self)
 
   def _extend(self, values):
     N = self.node
-    backend = self.nodedb.backend
+    backend = self.backend
     if backend:
       backend.extendAttr(N.type, N.name, self.attr, values)
 
@@ -216,7 +220,7 @@ class _AttrList(list):
   def pop(self, index=-1):
     value = list.pop(self, index)
     self.__delitemrefs((value,))
-    self.nodedb.backend.saveAttrs(self)
+    self.backend.saveAttrs(self)
     self._save()
     return value
 
