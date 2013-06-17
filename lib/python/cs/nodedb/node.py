@@ -98,8 +98,6 @@ class _AttrList(list):
       list.__init__(self)
     self.node = node
     self.attr = attr
-    if node is not None:
-      self.nodedb = node.nodedb
 
   def __str__(self):
     return str(list(self))
@@ -108,6 +106,10 @@ class _AttrList(list):
     if self.node is None:
       return ".%ss[...]" % (self.attr,)
     return "%s.%ss" % (str(self.node), self.attr)
+
+  @property
+  def nodedb(self):
+    return self.node.nodedb
 
   def __delitemrefs(self, nodes):
     ''' Remove the reverse references of this attribute.
