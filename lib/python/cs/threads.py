@@ -1015,6 +1015,14 @@ class FuncMultiQueue(object):
   def __init__(self, *a, **kw):
     raise Error("FuncMultiQueue OBSOLETE, use cs.later.Later instead")
 
+def locked(func):
+  ''' A decorator for monitor functions that must run within a lock.
+  '''
+  def lockfunc(self, *a, **kw):
+    with self._lock:
+      return func(*a, **kw)
+  return lockfunc
+
 def locked_property(func, lock_name='_lock', prop_name=None, unset_object=None):
   ''' A property whose access is controlled by a lock if unset.
   '''
