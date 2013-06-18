@@ -1020,7 +1020,7 @@ def locked(func):
   '''
   def lockfunc(self, *a, **kw):
     with self._lock:
-      return func(*a, **kw)
+      return func(self, *a, **kw)
   return lockfunc
 
 def locked_property(func, lock_name='_lock', prop_name=None, unset_object=None):
