@@ -410,8 +410,8 @@ class _MailDB(NodeDB):
     '''
     abbrevs = {}
     for A in self.ADDRESSes:
-      abbrev = A.get('ABBREVIATION', '')
-      if abbrev:
+      abbrev = A.abbreviation
+      if abbrev is not None:
         if abbrev in abbrevs:
           warning("abbrev %r: ignoring mapping to %s, already mapped to %s",
                   abbrev, A.name, abbrevs[abbrev])
