@@ -227,6 +227,21 @@ class AddressNode(Node):
       return False
     return self.name in G
 
+  def setAbbreviation(self, abbrev):
+    abbrevs = self.nodedb.abbreviations
+    if abbrev is None:
+
+    my_abbrev = self.get('ABBREVIATION')
+    if my_abbrev is not None and my_abbrev == abbrev:
+      return
+    if abbrev in abbrevs:
+      raise ValueError("%s.ABBREVIATION=%s: abbreviation already maps to %s"
+                       % (self.name, abbrev, abbrevs[abbrev]))
+    if my_abbrev is not None:
+      del abbrevs[my_abbrev]
+    abbrevs[abbrev] = self.name
+    self.ABBREVIATION = abbrev
+
 class MessageNode(Node):
 
   @property
