@@ -332,13 +332,15 @@ class _MailDB(NodeDB):
       return TypeFactory[t](t, name, self)
     return NodeDB._createNode(self, t, name)
 
-  def getAddressNode(self, addr):
+  def getAddressNode(self, addr, noCreate=False):
     ''' Obtain the AddressNode for the specified address `addr`.
         If `addr` is a string, parse it into `realname` and `coreaddr`
         components. Otherwise, `addr` is expected to be a 2-tuple of
         `realname` and `coreaddr`.
         If the AddressNode has no .REALNAME and `realname` is not empty,
         update the AddressNode from `realname`.
+        If `noCreate` is True (default False) and the address is not in the
+        MailDB, return None and do not create an AddressNode.
     '''
     if isinstance(addr, StringTypes):
       realname, coreaddr = parseaddr(addr)
@@ -347,7 +349,9 @@ class _MailDB(NodeDB):
     coreaddr = coreaddr.lower()
     if  len(coreaddr) == 0:
       raise ValueError("getAddressNode(addr=%r): coreaddr => %r" % (addr, coreaddr))
-    A = self.get( ('ADDRESS', coreaddr), doCreate=True)
+    A = self.get( ('ADDRESS', coreaddr), doCreate=not noCreate)
+    if noCreate and A is None:
+      return None
     Aname = A.realname
     if not len(Aname) and len(realname) > 0:
       A.REALNAME = ustr(realname)
