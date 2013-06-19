@@ -74,6 +74,11 @@ def main(argv, stdin=None):
           else:
             MDB.importAddresses(stdin)
             MDB.close()
+        elif op == 'list-abbreviations':
+          for A in MDB.ADDRESSes:
+            abbrev = A.abbreviation
+            if abbrev is not None:
+              print("%-15s %s", abbrev, A.formatted)
         elif op == 'list-groups':
           try:
             opts, argv = getopt(argv, 'AG')
