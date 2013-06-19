@@ -92,7 +92,7 @@ def main(argv, stdin=None):
           for A in MDB.ADDRESSes:
             abbrev = A.abbreviation
             if abbrev is not None:
-              print("%-15s %s", abbrev, A.formatted)
+              print("%-15s %s" % (abbrev, A.formatted))
         elif op == 'list-groups':
           try:
             opts, argv = getopt(argv, 'AG')
