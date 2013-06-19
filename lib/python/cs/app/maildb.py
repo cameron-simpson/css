@@ -74,6 +74,20 @@ def main(argv, stdin=None):
           else:
             MDB.importAddresses(stdin)
             MDB.close()
+        elif op == 'abbreviate':
+          if len(argv) != 2:
+            error("expected abbreviation and address, got: %r", argv)
+            badopts = True
+          if not badopts:
+            abbrev, addr = argv
+            A = MDB.getAddressNode(addr)
+            try:
+              A.abbreviation = abbrev
+            except ValueError as e:
+              error(e)
+              xit = 1
+            else:
+              MDB.rewrite()
         elif op == 'list-abbreviations':
           for A in MDB.ADDRESSes:
             abbrev = A.abbreviation
