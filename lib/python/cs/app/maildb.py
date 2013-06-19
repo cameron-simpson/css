@@ -229,8 +229,6 @@ class AddressNode(Node):
 
   def setAbbreviation(self, abbrev):
     abbrevs = self.nodedb.abbreviations
-    if abbrev is None:
-
     my_abbrev = self.get('ABBREVIATION')
     if my_abbrev is not None and my_abbrev == abbrev:
       return
