@@ -345,6 +345,21 @@ class _MailDB(NodeDB):
       D("address_groups(): e = %r", e)
       raise ValueError("disaster")
 
+  @locked_property
+  def abbreviations(self):
+    ''' Compute a mapping of abbreviations to their source address.
+    '''
+    abbrevs = {}
+    for A in self.ADDRESSes:
+      abbrev = A.get('ABBREVIATION', '')
+      if abbrev:
+        if abbrev in abbrevs:
+          warning("abbrev %r: ignoring mapping to %s, already mapped to %s",
+                  abbrev, A.name, abbrevs[abbrev])
+        else:
+          abbrevs[abbrev] = A.name
+    return abbrevs
+
   def getMessageNode(self, message_id):
     ''' Obtain the Node for the specified Message-ID `message_id`.
     '''
