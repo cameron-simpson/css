@@ -400,6 +400,14 @@ class _MailDB(NodeDB):
           abbrevs[abbrev] = A.name
     return abbrevs
 
+  def getAddressAbbreviation(self, addr):
+    ''' Return the addreviation of this address if known, else None.
+    '''
+    A = self.getAddressNode(addr, noCreate=True)
+    if A is None:
+      return None
+    return A.abbreviation
+
   def getMessageNode(self, message_id):
     ''' Obtain the Node for the specified Message-ID `message_id`.
     '''
