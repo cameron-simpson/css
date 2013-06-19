@@ -231,7 +231,15 @@ class AddressNode(Node):
   def abbreviation(self):
     return self.get0('ABBREVIATION')
 
-  def setAbbreviation(self, abbrev):
+  @abbreviation.setter
+  def abbreviation(self, abbrev):
+    return self._setAbbreviation(abbrev)
+
+  @abbreviation.deleter
+  def abbreviation(self):
+    return self._setAbbreviation(abbrev, None)
+
+  def _setAbbreviation(self, abbrev):
     abbrevs = self.nodedb.abbreviations
     my_abbrev = self.abbreviation
     if abbrev is None:
