@@ -74,7 +74,7 @@ def main(argv, stdin=None):
           else:
             MDB.importAddresses(stdin)
             MDB.close()
-        elif op == 'abbreviate':
+        elif op == 'abbreviate' or op == 'abbrev':
           if len(argv) != 2:
             error("expected abbreviation and address, got: %r", argv)
             badopts = True
@@ -88,7 +88,7 @@ def main(argv, stdin=None):
               xit = 1
             else:
               MDB.rewrite()
-        elif op == 'list-abbreviations':
+        elif op == 'list-abbreviations' or op == 'list-abbrevs':
           for A in MDB.ADDRESSes:
             abbrev = A.abbreviation
             if abbrev is not None:
