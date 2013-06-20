@@ -54,15 +54,15 @@ def main(argv, stdin=None):
 
   M = Message(stdin)
   with MailDB(mdburl, readonly=True) as MDB:
-    addrs_from = shortlist(M, ('from',))
-    addrs_to = shortlist(M, ('to', 'cc', 'bcc'))
+    addrs_from = shortlist(MDB, M, ('from',))
+    addrs_to = shortlist(MDB, M, ('to', 'cc', 'bcc'))
   subj = M.get('subject', '(no subject)')
   dlog = "%s: %s->%s %s %s" % (label, ",".join(addrs_from), ",".join(addrs_to), "".join(argv), subj)
 
   os.execlp('buglog', 'buglog', '-n', '-B', 'dlog', dlog)
   raise RuntimeError("NOTREACHED")
 
-def shortlist(M, hdrs):
+def shortlist(MDB, M, hdrs):
   L = []
   for realname, coreaddr in message_addresses(M, hdrs):
     A = MDB.getAddressNode( (realname, coreaddr), noCreate=True)
