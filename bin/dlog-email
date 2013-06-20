@@ -1,14 +1,82 @@
-#!/bin/sh -u
+#!/usr/bin/python
 #
 # Read an email message from stdin and log with dlog.
 #	- Cameron Simpson <cs@zip.com.au> 30oct2005
 #
 
-usage="Usage: $0 [label [preamble]]"
+import os.path
+import sys
+from getopt import getopt, GetoptError
+from cs.app.maildb import MailDB
+from cs.logutils import setup_logging
+from cs.mailutils import message_addresses, Message
 
-label=mail
-[ $# = 0 ] || { label=$1; shift; }
+usage = 'Usage: %s [-m mdburl] [label [preamble]] < email'
 
-mhdrs_sh=`mhdrs -sh | sed 's/^/HDR_/'`
-eval "$mhdrs_sh"
-exec buglog -n -B dlog "$label: email: $* $HDR_SUBJECT $HDR_FROM->$HDR_TO"
+def main(argv, stdin=None):
+  argv = list(argv)
+  if stdin is None:
+    stdin = sys.stdin
+
+  cmd = os.path.basename(argv.pop(0))
+  setup_logging(cmd)
+
+  xit = 0
+  badopts = False
+  mdburl = None
+
+  try:
+    opts, argv = getopt(argv, 'm:')
+  except GetoptError as e:
+    error("unrecognised option: %s: %s"% (e.opt, e.msg))
+    badopts = True
+    opts, argv = [], []
+
+  for opt, val in opts:
+    with Pfx(opt):
+      if opt == '-m':
+        mdburl = val
+      else:
+        error("unrecognised option")
+        badopts = True
+
+  if mdburl is None:
+    mdburl = os.environ['MAILDB']
+
+  if argv:
+    label = argv.pop(0)
+  else:
+    label = 'mail'
+
+  if badopts:
+    print(usage % cmd, sys.stderr)
+    return 2
+
+  M = Message(stdin)
+  with MailDB(mdburl, readonly=True) as MDB:
+    addrs_from = shortlist(M, ('from',))
+    addrs_to = shortlist(M, ('to', 'cc', 'bcc'))
+  subj = M.get('subject', '(no subject)')
+  dlog = "%s: %s->%s %s %s" % (label, ",".join(addrs_from), ",".join(addrs_to), "".join(argv), subj)
+
+  os.execlp('buglog', 'buglog', '-n', '-B', 'dlog', dlog)
+  raise RuntimeError("NOTREACHED")
+
+def shortlist(M, hdrs):
+  L = []
+  for realname, coreaddr in message_addresses(M, hdrs):
+    A = MDB.getAddressNode( (realname, coreaddr), noCreate=True)
+    if A is None:
+      short = coreaddr
+    else:
+      abbrev = A.abbreviation
+      if abbrev is None:
+        short = coreaddr
+      else:
+        short = abbrev
+    if short not in L:
+      L.append(short)
+  return L
+
+if __name__ == '__main__':
+  sys.exit(main(sys.argv))
