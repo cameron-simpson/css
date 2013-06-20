@@ -26,13 +26,15 @@ def main(argv, stdin=None):
   usage = '''Usage:
     %s [-m mdburl] op [op-args...]
     Ops:
-      abbreviate abbrev address (also "abbrev")
+      abbreviate abbrev address
+        (also "abbrev")
       edit-group group
       import-addresses < addresses.txt
         File format:
           group,... rfc2822-address
       learn-addresses group,... < rfc822.xt
-      list-abbreviations (also "list-abbrevs")
+      list-abbreviations [-A] [abbrevs...]
+        (also "list-abbrevs")
       list-groups [-A] [-G] [groups...]
         -A Emit mutt alias lines.
         -G Emit mutt group lines.
@@ -91,10 +93,37 @@ def main(argv, stdin=None):
             else:
               MDB.rewrite()
         elif op == 'list-abbreviations' or op == 'list-abbrevs':
-          for A in MDB.ADDRESSes:
-            abbrev = A.abbreviation
-            if abbrev is not None:
-              print("%-15s %s" % (abbrev, A.formatted))
+          try:
+            opts, argv = getopt(argv, 'A')
+          except GetoptError as e:
+            error("unrecognised option: %s: %s"% (e.opt, e.msg))
+            badopts = True
+            opts, argv = [], []
+          mutt_aliases = False
+          for opt, val in opts:
+            with Pfx(opt):
+              if opt == '-A':
+                mutt_aliases = True
+              else:
+                error("unrecognised option")
+                badopts = True
+          abbrevs = MDB.abbreviations
+          if len(argv):
+            abbrev_names = argv
+          else:
+            abbrev_names = sorted(abbrevs.keys())
+          if not badopts:
+            for abbrev in abbrev_names:
+              with Pfx(abbrev):
+                if abbrev in abbrevs:
+                  A = MDB.getAddressNode(abbrevs[abbrev])
+                  if mutt_aliases:
+                    print('alias', abbrev, A.formatted)
+                  else:
+                    print("%-15s %s" % (abbrev, A.formatted))
+                else:
+                  error("unknown abbreviation")
+                  xit = 1
         elif op == 'list-groups':
           try:
             opts, argv = getopt(argv, 'AG')
