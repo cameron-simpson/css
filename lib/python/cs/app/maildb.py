@@ -26,11 +26,13 @@ def main(argv, stdin=None):
   usage = '''Usage:
     %s [-m mdburl] op [op-args...]
     Ops:
+      abbreviate abbrev address (also "abbrev")
       edit-group group
       import-addresses < addresses.txt
         File format:
           group,... rfc2822-address
       learn-addresses group,... < rfc822.xt
+      list-abbreviations (also "list-abbrevs")
       list-groups [-A] [-G] [groups...]
         -A Emit mutt alias lines.
         -G Emit mutt group lines.
