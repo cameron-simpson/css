@@ -13,6 +13,7 @@
 
 import csv
 import sys
+from cs.io import CatchupLines
 
 if sys.hexversion < 0x03000000:
 
@@ -52,3 +53,15 @@ else:
 
   def csv_writerow(csvw, row, encoding='utf-8'):
     return csvw.writerow(row)
+
+def catchup(fp, partial=''):
+  ''' A generator to read CSV lines from fp until EOF, returning row tuples.
+      At EOF, yield the partial line remaining (an empty string if the file
+      is complete).
+      Accept an optional former partial line.
+  '''
+  catch_fp = CatchupLines(fp, partial)
+  r = csv_reader(catch_fp)
+  for row in r:
+    yield row
+  yield catch_fp.partial
