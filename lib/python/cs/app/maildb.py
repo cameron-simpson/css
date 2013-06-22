@@ -162,8 +162,6 @@ def main(argv, stdin=None):
                     print('-group', group_name, end=' ')
                 elif mutt_groups:
                   print('group', end=' ')
-                else:
-                  print(group_name, end='')
                 print(group_name, address_list)
         elif op == 'learn-addresses':
           only_ungrouped = False
