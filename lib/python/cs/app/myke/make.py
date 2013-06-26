@@ -391,6 +391,8 @@ class Target(Result):
         `name`: the name of the target.
         `prereqs`: macro expression to produce prereqs.
         `postprereqs`: macro expression to produce post prereqs.
+        `actions`: a sequence of actions to build this Target;
+                   a copy is stored so we can pop things off it per Target.
     '''
 
     Result.__init__(self)
@@ -402,7 +404,7 @@ class Target(Result):
     self._prereqs = prereqs
     self._postprereqs = postprereqs
     self.new_prereqs = []
-    self.actions = actions
+    self.actions = list(actions)
     # build state:
     #
     # Out Of Date:
