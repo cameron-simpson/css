@@ -431,7 +431,7 @@ class Target(Result):
       return "making"
     if state == ASYNCH_CANCELLED:
       return "cancelled"
-    if state != ASYNC_READY:
+    if state != ASYNCH_READY:
       raise RuntimeError("%s.madeness: unexpected state %s" % (self, state))
     return "made" if self.result else "FAILED"
 
