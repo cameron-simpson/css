@@ -141,22 +141,32 @@ class ModifierSplit1(Modifier):
     return self.foreach( text, self.splitword )
 
 class ModPrefixLong(ModifierSplit1):
+  ''' A modifier that splits on the last separator and returns the prefix.
+  '''
   def __init__(self, context, modtext, separator):
     ModifierSplit1.__init__(self, context, modtext, separator, False, True)
 
 class ModPrefixShort(ModifierSplit1):
+  ''' A modifier that splits on the first separator and returns the prefix.
+  '''
   def __init__(self, context, modtext, separator):
     ModifierSplit1.__init__(self, context, modtext, separator, False, False)
 
 class ModSuffixLong(ModifierSplit1):
+  ''' A modifier that splits on the first separator and returns the suffix.
+  '''
   def __init__(self, context, modtext, separator):
     ModifierSplit1.__init__(self, context, modtext, separator, True, False)
 
 class ModSuffixShort(ModifierSplit1):
+  ''' A modifier that splits on the last separator and returns the suffix.
+  '''
   def __init__(self, context, modtext, separator):
     ModifierSplit1.__init__(self, context, modtext, separator, True, True)
 
 class ModUnique(Modifier):
+  ''' A modifier which returns only the first occurence of each word in `text`.
+  '''
   def modify(self, text, namespaces):
     seen = set()
     words = []
@@ -167,10 +177,14 @@ class ModUnique(Modifier):
     return " ".join(words)
 
 class ModNormpath(Modifier):
+  ''' A modifier which returns os.path.normpath(word) for each word in `text`.
+  '''
   def modify(self, text, namespaces):
     return self.foreach(os.path.normpath)
 
 class ModGlob(Modifier):
+  ''' A modifier which returns each word of `text` replaced by its glob match.
+  '''
   def __init__(self, context, modtext, muststat, lax):
     Modifier.__init__(self, context, modtext)
     self.muststat = muststat
@@ -192,10 +206,16 @@ class ModGlob(Modifier):
     return " ".join(globbed)
 
 class ModEval(Modifier):
+  ''' A modifier which evaluates text as a macro expression.
+  '''
   def modify(self, text, namespaces):
+    ''' Evaluate `text` as a macro expression.
+    '''
     return parseMacroExpression(self.context, text)[0](self.context, namespaces)
 
 class ModSubstitute(Modifier):
+  ''' A modifier which returns `text` with 
+  '''
   def __init__(self, context, modtext, regexp_mexpr, replacement):
     Modifier.__init__(self, context, modtext)
     self.regexp_mexpr = regexp_mexpr
