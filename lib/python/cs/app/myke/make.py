@@ -196,7 +196,7 @@ class Maker(O):
   def after(self, LFs, func, *a, **kw):
     ''' Submit a function to be run after the supplied LateFunctions `LFs`.
     '''
-    self.debug_make("after %s(*%r, **%r)" % (func, a, kw))
+    self.debug_make("after %s call %s(*%r, **%r)" % (LFs, func, a, kw))
     return self._makeQ.after(LFs, func, *a, **kw)
 
   def make(self, targets):
@@ -386,10 +386,10 @@ class Target(Result):
 
   def __init__(self, maker, name, context, prereqs, postprereqs, actions):
     ''' Initialise a new target.
-        `maker`: the Maker with which this Target is associated.
-        `context`: the file context, for citations.
-        `name`: the name of the target.
-        `prereqs`: macro expression to produce prereqs.
+          `maker`: the Maker with which this Target is associated.
+          `context`: the file context, for citations.
+          `name`: the name of the target.
+          `prereqs`: macro expression to produce prereqs.
           `postprereqs`: macro expression to produce post-inference prereqs.
           `actions`: a list of actions to build this Target
 	The same actions list is shared amongst all Targets defined
@@ -493,36 +493,37 @@ class Target(Result):
         self.pending_targets = list(self.prereqs)
         self.pending_actions = list(self.actions)
         # queue the first unit of work
-        self.maker.defer("%s:_make_partial" % (self,), self._make_partial)
+        self.maker.defer("%s._make_partial" % (self,), self._make_partial)
 
   @DEBUG
   def _apply_prereq(self, LF):
     ''' Apply the consequences of the complete prereq LF.
     '''
-    mdebug = self.maker.debug_make
-    if not LF.ready:
-      raise RuntimeError("%s._make_partial: %s not ready", self, LF)
-    if LF.result:
-      mdebug("%s: OK %s", self, LF)
-      try:
-        is_new = LF.is_new
-      except AttributeError:
-        # presuming not a Target
-        pass
-      else:
-        if is_new:
-          mdebug("%s: out of date because is_new(%s)", self, LF)
-          self.out_of_date = True
+    with Pfx("%s._apply_prereqs(LF=%s)", self, LF):
+      mdebug = self.maker.debug_make
+      if not LF.ready:
+        raise RuntimeError("not ready")
+      if LF.result:
+        mdebug("OK")
+        try:
+          is_new = LF.is_new
+        except AttributeError:
+          # presuming not a Target
+          pass
         else:
-          LFmtime = getattr(LF, 'mtime', None)
-          if LFmtime is not None:
-            mtime = self.mtime
-            if mtime is None or LFmtime >= mtime:
-              mdebug("%s: out of date because older than %s", self, LF)
-              self.out_of_date = True
-    else:
-      mdebug("%s: FAIL from %s", self, LF)
-      self.result = False
+          if is_new:
+            mdebug("out of date because is_new(LF)")
+            self.out_of_date = True
+          else:
+            LFmtime = getattr(LF, 'mtime', None)
+            if LFmtime is not None:
+              mtime = self.mtime
+              if mtime is None or LFmtime >= mtime:
+                mdebug("out of date because older than LF")
+                self.out_of_date = True
+      else:
+        mdebug("FAIL")
+        self.result = False
 
   @DEBUG
   def _make_partial(self):
@@ -531,55 +532,67 @@ class Target(Result):
         If we complete without blocking, put True or False onto self.made.
         Otherwise queue a background function to block and resume.
     '''
-    M = self.maker
-    mdebug = M.debug_make
+    with Pfx(self.name):
+      M = self.maker
+      mdebug = M.debug_make
 
-    LFs = self.LFs
-    if LFs:
-      self.LFS = []
-      for LF in LFs:
-        self._apply_prereq(LF)
-        if not LF.result:
-          return
+      LFs = self.LFs
+      if LFs:
+        mdebug("collect LFs=%s", LFs)
+        self.LFS = []
+        for LF in LFs:
+          with Pfx(LF):
+            self._apply_prereq(LF)
+            if not LF.result:
+              mdebug("FAILed")
+              return
 
-    LFs = []
-    targets = self.pending_targets
-    self.pending_targets = []
-    for dep in targets:
-      T = M[dep]
-      if T.ready:
-        self._apply_prereq(T)
-        if T.result:
-          mdebug("%s: OK: prereq \"%s\" successful", self, T)
+      LFs = []
+      targets = self.pending_targets
+      self.pending_targets = []
+      for dep in targets:
+        with Pfx(T):
+          T = M[dep]
+          if T.ready:
+            self._apply_prereq(T)
+            if T.result:
+              mdebug("OK")
+            else:
+              mdebug("FAILed")
+              self.result = False
+              return
+          else:
+            # require T and note it for consideration next time
+            mdebug("not ready, requiring it...")
+            T.require()
+            LFs.append(T)
+
+      if not LFs:
+        # no pending targets, what about actions?
+        # if we're out of date or missing,
+        # queue an action and mark ourselves is_new
+        # if so, queue the first one
+        if self.out_of_date or self.mtime is None:
+          mdebug("need to make me (out_of_date=%r, mtime=%r)", self.out_of_date, self.mtime)
+          self.is_new = True
+          actions = self.pending_actions
+          if actions:
+            A = actions.pop(0)
+            mdebug("queue action: %s", A)
+            LFs.append(A.act_later(self))
+          else:
+            mdebug("no actions")
         else:
-          mdebug("%s: FAIL: prereq \"%s\" unsuccessful", self, T)
-          self.result = False
-          return
+          mdebug("not out of date (mtime=%r)", self.mtime)
+
+      if LFs:
+        self.LFs = LFs
+        mdebug("tasks still to do, requeuing")
+        self.maker.after(LFs, None, self._make_partial)
       else:
-        # require T an note it for consideration next time
-        T.require()
-        LFs.append(T)
-
-    if not LFs:
-      # no pending targets, what about actions?
-      # if we're out of date or missing,
-      # queueu an action and mark ourselves is_new
-      # if so, queue the first one
-      if self.out_of_date or self.mtime is None:
-        self.is_new = True
-        actions = self.pending_actions
-        if actions:
-          A = actions.pop(0)
-          mdebug("%s: queue action: %s", self, A)
-          LFs.append(A.act_later(self))
-
-    if LFs:
-      self.LFs = LFs
-      self.maker.after(LFs, None, self._make_partial)
-    else:
-      # all done, record success
-      mdebug("%s: SUCCESS", self)
-      self.result = True
+        # all done, record success
+        mdebug("SUCCESS")
+        self.result = True
 
 class Action(O):
 
