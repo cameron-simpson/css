@@ -390,9 +390,13 @@ class Target(Result):
         `context`: the file context, for citations.
         `name`: the name of the target.
         `prereqs`: macro expression to produce prereqs.
-        `postprereqs`: macro expression to produce post prereqs.
-        `actions`: a sequence of actions to build this Target;
-                   a copy is stored so we can pop things off it per Target.
+          `postprereqs`: macro expression to produce post-inference prereqs.
+          `actions`: a list of actions to build this Target
+	The same actions list is shared amongst all Targets defined
+	by a common clause in the Mykefile, and extends during the
+	Mykefile parse _after_ defining those Targets. So we do not modify it the class;
+        instead we extend .pending_actions when .require() is called the first time,
+        just as we for a :make directive.
     '''
 
     Result.__init__(self)
@@ -404,7 +408,7 @@ class Target(Result):
     self._prereqs = prereqs
     self._postprereqs = postprereqs
     self.new_prereqs = []
-    self.actions = list(actions)
+    self.actions = actions
     # build state:
     #
     # Out Of Date:
