@@ -47,6 +47,7 @@ class Maker(O):
     O.__init__(self)
     self._O_omit.extend(['macros', 'targets', 'rules', 'namespaces'])
     self.parallel = parallel
+    self._makeQ = None
     self.debug = MakeDebugFlags()
     self.debug.debug = False    # logging.DEBUG noise
     self.debug.flags = False    # watch debug flag settings
