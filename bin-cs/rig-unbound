@@ -21,6 +21,7 @@ cf=$wkdir/unbound.conf
 log=$LOGDIR/unbound.log
 localzones="l local"
 cnames=$HOME/rc/dns/cnames
+host_conf=$HOME/rc/dns/unbound.conf-fleet
 
 # default upstream DNS servers
 [ $# -gt 0 ] || set -- $UNBOUND_DNS_UPSTREAM
@@ -40,15 +41,12 @@ server:
   directory: "$wkdir"
   username: "$me"
   logfile: "$log"
-  log-queries: yes
   pidfile: "$pidfile"
+  log-queries: yes
   verbosity: 3      # uncomment and increase to get more logging.
-  # listen on all interfaces, answer queries from the local subnet.
-  interface: 127.0.0.1
-  ##access−control: 127.0.0.1 allow
-  access-control: 127.0.0.0/8 allow
-  chroot: ""
 X
+
+cat "$host_conf"
 
 for zone in $localzones
 do
