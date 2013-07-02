@@ -255,6 +255,7 @@ split_target()
 }
 
 hostpath=`expand_hostpath "$host"`
+[ -n "$hostpath" ] || { echo "$cmd: empty hostpath from \$host=$host" >&2; exit 1; }
 [ -z "$SSHTO_PREFIX" ] || hostpath="$SSHTO_PREFIX!$hostpath"
 if [ $oldstyle ]
 then
