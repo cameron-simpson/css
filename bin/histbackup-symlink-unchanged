@@ -12,7 +12,7 @@ echo=:
 [ -t 1 ] && echo=echo
 
 cmd=`basename "$0"`
-usage="Usage: $cmd histbackup-dir [-x] [dates...]"
+usage="Usage: $cmd [-x] histbackup-dir [dates...]"
 
 badopts=
 
