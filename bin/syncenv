@@ -28,7 +28,7 @@ fi
 
 if [ $# -gt 0 ]
 then
-    envstuff=("$0" "$lastmtime")
+    envstuff=$("$0" "$lastmtime")
     eval "$envstuff"
     exec "$@"
 fi
