@@ -223,7 +223,10 @@ def edit_groupness(MDB, addresses):
           for A in As:
             groups = sorted(set(A.GROUPs))
             af = A.formatted
-            line = u"%-15s %s\n" % (",".join(groups), A.formatted)
+            ab = A.abbreviation
+            if ab:
+              af = "=%s %s" % (ab, af)
+            line = u"%-15s %s\n" % (",".join(groups), af)
             ofp.write(line)
         editor = os.environ.get('EDITOR', 'vi')
         xit = os.system("%s %s" % (editor, cs.sh.quotestr(T.name)))
@@ -244,6 +247,14 @@ def edit_groupness(MDB, addresses):
               As = set()
               for realname, addr in getaddresses((addrtext,)):
                 A = MDB.getAddressNode(addr)
+                if realname.startswith('='):
+                  ab, realname = realname.split(None, 1)
+                  ab = ab[1:]
+                  if not ab:
+                    ab = None
+                else:
+                  ab = None
+                A.abbreviation = ab
                 new_groups.setdefault(A, set()).update(groups)
                 realname = ustr(realname.strip())
                 if realname and realname != A.realname:
@@ -285,7 +296,7 @@ class AddressNode(Node):
 
   @abbreviation.deleter
   def abbreviation(self):
-    return self._setAbbreviation(abbrev, None)
+    return self._setAbbreviation(None)
 
   def _setAbbreviation(self, abbrev):
     abbrevs = self.nodedb.abbreviations
