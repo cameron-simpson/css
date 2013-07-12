@@ -245,20 +245,23 @@ def edit_groupness(MDB, addresses):
               groups, addrtext = line.split(None, 1)
               groups = [ group for group in groups.split(',') if group ]
               As = set()
-              for realname, addr in getaddresses((addrtext,)):
-                A = MDB.getAddressNode(addr)
-                if realname.startswith('='):
-                  ab, realname = realname.split(None, 1)
-                  ab = ab[1:]
-                  if not ab:
-                    ab = None
-                else:
-                  ab = None
-                A.abbreviation = ab
-                new_groups.setdefault(A, set()).update(groups)
-                realname = ustr(realname.strip())
-                if realname and realname != A.realname:
-                  A.REALNAME = realname
+              with Pfx(addrtext):
+                for realname, addr in getaddresses((addrtext,)):
+                  with Pfx("realname=%r, addr=%r", realname, addr):
+                    A = MDB.getAddressNode(addr)
+                    if realname.startswith('='):
+                      with Pfx(repr(realname)):
+                        ab, realname = realname.split(None, 1)
+                        ab = ab[1:]
+                        if not ab:
+                          ab = None
+                    else:
+                      ab = None
+                    A.abbreviation = ab
+                    new_groups.setdefault(A, set()).update(groups)
+                    realname = ustr(realname.strip())
+                    if realname and realname != A.realname:
+                      A.REALNAME = realname
     # apply groups of whichever addresses survived
     for A, groups in new_groups.items():
       if set(A.GROUPs) != groups:
