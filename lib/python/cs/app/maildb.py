@@ -7,6 +7,7 @@ from email.utils import getaddresses, parseaddr, formataddr
 from itertools import chain
 import codecs
 import logging
+import re
 import sys
 import os
 import tempfile
@@ -29,6 +30,7 @@ def main(argv, stdin=None):
       abbreviate abbrev address
         (also "abbrev")
       edit-group group
+      edit-group /regexp/
       import-addresses < addresses.txt
         File format:
           group,... rfc2822-address
@@ -191,7 +193,9 @@ def main(argv, stdin=None):
           else:
             group = argv.pop(0)
             if len(argv):
-              error("extra arguments after group \"%s\": %s", group, argv)
+              error("extra arguments after %s \"%s\": %s",
+                    ('regexp' if group.startswith('/') else 'group'),
+                    group, argv)
               badopts = True
             else:
               edit_group(MDB, group)
@@ -207,7 +211,16 @@ def main(argv, stdin=None):
   return xit
 
 def edit_group(MDB, group):
-  return edit_groupness(MDB, [ A for A in MDB.ADDRESSes if group in A.GROUPs ])
+  if group.startswith('/'):
+    if group.endswith('/'):
+      rexp = group[1:-1]
+    else:
+      rexp = group[1:]
+    R = re.compile(rexp, re.I)
+    As = [ A for A in MDB.ADDRESSes if R.search(A.formatted) ]
+  else:
+    As = [ A for A in MDB.ADDRESSes if group in A.GROUPs ]
+  return edit_groupness(MDB, As)
 
 def edit_groupness(MDB, addresses):
   ''' Modify the group memberships of the supplied addresses.
