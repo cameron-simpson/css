@@ -343,7 +343,15 @@ re_HEADERLIST = re.compile(r'([a-z][\-a-z0-9]*(,[a-z][\-a-z0-9]*)*):', re.I)
 re_ASSIGN = re.compile(r'([a-z]\w+)=', re.I)
 
 # group membership test: (A|B|C|...)
-re_INGROUP = re.compile(r'\(\s*[a-z]\w+(\s*\|\s*[a-z]\w+)*\s*\)', re.I)
+# where A may be a WORD or @domain
+# indicating an address group name or an address ending in @domain
+re_WORD_s = '[a-z]\w+'
+re_atDOM_s = '@[-\w]+(\.[-\w]+)+'
+re_WORD_or_DOM_s = '(%s|%s)' % (re_WORD_s, re_atDOM_s)
+re_INGROUP_s = r'\(\s*%s(\s*\|\s*%s)*\s*\)' % (re_WORD_or_DOM_s,
+                                               re_WORD_or_DOM_s)
+## print("re_INGROUP = %r" % (re_INGROUP_s), file=sys.stderr)
+re_INGROUP = re.compile( re_INGROUP_s, re.I)
 
 # header[,header,...].func(
 re_HEADERFUNCTION = re.compile(r'([a-z][\-a-z0-9]*(,[a-z][\-a-z0-9]*)*)\.([a-z][_a-z0-9]*)\(', re.I)
@@ -607,7 +615,12 @@ class Condition_InGroups(_Condition):
   def test_value(self, fstate, header_name, header_value):
     for address in fstate.addresses(header_name):
       for group_name in self.group_names:
-        if fstate.ingroup(address, group_name):
+        if group_name.startswith('@') and address.endswith(group_name):
+          # address ending in @foo
+          debug("match %s to %s", address, group_name)
+          return True
+        elif fstate.ingroup(address, group_name):
+          # address in group "foo"
           debug("match %s to (%s)", address, group_name)
           return True
     return False
