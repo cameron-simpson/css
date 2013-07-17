@@ -615,10 +615,11 @@ class Condition_InGroups(_Condition):
   def test_value(self, fstate, header_name, header_value):
     for address in fstate.addresses(header_name):
       for group_name in self.group_names:
-        if group_name.startswith('@') and address.endswith(group_name):
-          # address ending in @foo
-          debug("match %s to %s", address, group_name)
-          return True
+        if group_name.startswith('@'):
+          if address.endswith(group_name):
+            # address ending in @foo
+            debug("match %s to %s", address, group_name)
+            return True
         elif fstate.ingroup(address, group_name):
           # address in group "foo"
           debug("match %s to (%s)", address, group_name)
