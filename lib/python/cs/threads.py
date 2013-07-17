@@ -396,7 +396,7 @@ class Asynchron(O):
         error("%s: calling notifier %s: %s", self, notifier, e)
 
   def join(self):
-    ''' Calling the .wait() method waits for the function to run to
+    ''' Calling the .join() method waits for the function to run to
         completion and returns a tuple as for the WorkerThreadPool's
         .dispatch() return queue, a tuple of:
           result, exc_info
@@ -1188,7 +1188,7 @@ def runTree_inner(input, ops, state, funcQ, retq=None):
       debug("LFs=%s", LFs)
       results = []
       for LF in report(LFs):
-        result, exc_info = LF.wait()
+        result, exc_info = LF.join()
         if exc_info:
           exception("exception: %s", exc_info[1])
         elif result:
