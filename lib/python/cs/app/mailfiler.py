@@ -616,8 +616,8 @@ class Condition_InGroups(_Condition):
     for address in fstate.addresses(header_name):
       for group_name in self.group_names:
         if group_name.startswith('@'):
+          # address ending in @foo
           if address.endswith(group_name):
-            # address ending in @foo
             debug("match %s to %s", address, group_name)
             return True
         elif fstate.ingroup(address, group_name):
