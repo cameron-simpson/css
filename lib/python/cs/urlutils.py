@@ -105,9 +105,10 @@ class _URL(unicode):
       if not opener:
         auth_handler = HTTPBasicAuthHandler(NetrcHTTPPasswordMgr())
         opener = build_opener(auth_handler)
-      debug("open URL...")
-      rsp = opener.open(rq)
+      with Pfx("open(%s)", rq):
+        rsp = opener.open(rq)
       H = rsp.info()
+      debug("info = %s", H)
       self._content_type = H.gettype()
       self._content = rsp.read()
       debug("URL: content-type=%s, length=%d", self._content_type, len(self._content))
