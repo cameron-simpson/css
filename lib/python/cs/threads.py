@@ -1190,7 +1190,9 @@ def runTree_inner(input, ops, state, funcQ, retq=None):
       for LF in report(LFs):
         result, exc_info = LF.join()
         if exc_info:
-          exception("exception: %s", exc_info[1])
+          exception("exception: %r", exc_info)
+          import traceback
+          traceback.print_tb(exc_info[2], None, sys.stderr)
         elif result:
           results.append(result)
         else:
