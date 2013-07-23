@@ -681,11 +681,11 @@ def action_operator(action,
           else:
             if offset < len(action) and action[offset] == ':':
               for kw in action[offset+1:].split(','):
-                if '=' in kwarg:
+                if '=' in kwargs:
                   kw, v = kw.split('=', 1)
                   kwargs[kw] = v
                 else:
-                  kwargs[kwarg] = True
+                  kwargs[kw] = True
               offset = len(action)
             if offset < len(action):
               raise ValueError("parse error at: %s" % (action[offset:],))
