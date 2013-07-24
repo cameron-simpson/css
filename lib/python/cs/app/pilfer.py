@@ -687,17 +687,14 @@ def action_operator(action,
             kwargs['replacement'] = repl_format
             kwargs['all'] = repl_all
           else:
-            D("action=%r, offset=%d", action, offset)
             if offset < len(action) and action[offset] == ':':
               kws = action[offset+1:].split(',')
               action = action[:offset]
               for kw in kws:
                 if '=' in kwargs:
                   kw, v = kw.split('=', 1)
-                  D("%s=%s", kw, v)
                   kwargs[kw] = v
                 else:
-                  D("%s=True", kw)
                   kwargs[kw] = True
               offset = len(action)
             if offset < len(action):
