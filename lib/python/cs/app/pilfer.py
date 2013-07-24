@@ -242,10 +242,18 @@ class Pilfer(O):
       if self.flush_print:
         print_to.flush()
 
-  def save_url(self, U, saveas=None, dir=None, overwrite=False):
+  def save_url(self, U, saveas=None, dir=None, overwrite=False, **kw):
     ''' Save the contents of the URL `U`.
     '''
-    with Pfx(U):
+    with Pfx("save_url(%s)", U):
+      if kw:
+        kws = sorted(kw.keys())
+        if len(kws) > 1:
+          raise ValueError("multiple `save' arguments: %s" % (kws,))
+        kw = kws[0]
+        if saveas is not None:
+          raise ValueError("saveas already specified (%s), illegal `save' argument: %s" % (saveas, kw))
+        saveas = kw
       if saveas is None:
         saveas = U.basename
       if saveas == '-':
