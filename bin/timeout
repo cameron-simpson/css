@@ -40,13 +40,13 @@ cmdpid=$$
     [ $left -gt 0 ] \
       && { kill -0 "$cmdpid" 2>/dev/null || exit 0; sleep $left; }
 
-    if kill -0 $cmdpid 2>/dev/null
+    if kill -0 "$cmdpid" 2>/dev/null
     then
 	echo "$0: timed out after $timeout seconds: $*" >&2
-	if ( set -x; kill $sigopt $cmdpid )
+	if ( set -x; kill $sigopt "$cmdpid" )
         then
             sleep 2
-            kill -0 $cmdpid 2>/dev/null && ( set -x; kill -9 $cmdpid )
+            kill -0 "$cmdpid" 2>/dev/null && ( set -x; kill -9 "$cmdpid" )
         fi
     fi
   ) &
