@@ -4,6 +4,8 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
+from cs.py3 import Queue, PriorityQueue, Queue_Full, Queue_Empty
+
 class IterableQueue(Queue):
   ''' A Queue implementing the iterator protocol.
       Note: Iteration stops when the sentinel comes off the Queue.
@@ -71,17 +73,21 @@ class IterablePriorityQueue(PriorityQueue):
       TODO: supply sentinel item, default None.
   '''
 
+  sentinel = object()
+
   def __init__(self, *args, **kw):
     ''' Initialise the queue.
     '''
     PriorityQueue.__init__(self, *args, **kw)
-    self.closed=False
+    self.closed = False
 
   def put(self, item, *args, **kw):
     ''' Put an item on the queue.
     '''
-    assert not self.closed, "put() on closed IterableQueue"
-    assert item is not None, "put(None) on IterableQueue"
+    if self.closed:
+      raise Queue_Full("put() on closed IterablePriorityQueue")
+    if item is self.sentinel:
+      raise ValueError("put(sentinel) on IterablePriorityQueue")
     return PriorityQueue.put(self, item, *args, **kw)
 
   def _closeAtExit(self):
@@ -90,10 +96,10 @@ class IterablePriorityQueue(PriorityQueue):
 
   def close(self):
     if self.closed:
-      error("close() on closed IterableQueue")
+      error("close() on closed IterablePriorityQueue")
     else:
       self.closed=True
-      PriorityQueue.put(self,None)
+      PriorityQueue.put(self, self.sentinel)
 
   def __iter__(self):
     ''' Iterable interface for the queue.
@@ -101,9 +107,9 @@ class IterablePriorityQueue(PriorityQueue):
     return self
 
   def __next__(self):
-    item=self.get()
-    if item is None:
-      PriorityQueue.put(self,None)      # for another iterator
+    item = self.get()
+    if item is self.sentinel:
+      PriorityQueue.put(self, self.sentinel)      # for another iterator
       raise StopIteration
     return item
 
