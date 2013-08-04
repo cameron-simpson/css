@@ -517,14 +517,14 @@ class Later(object):
     return MLF
 
   def after(self, LFs, R, func, *a, **kw):
-    ''' Queue the function `func` for later dispatch using the
-        default priority with the spcified arguments `*a` and `**kw`.
+    ''' Queue the function `func` for later dispatch after completion of `LFs`.
+        Return a Result for later collection of the function result.
+
 	This function will not be submitted until completion of
 	the supplied LateFunctions `LFs`.
 	If `R` is None a new cs.threads.Result is allocated to
 	accept the function return value.
-        After `func` completes its return value is passed to R.put().
-        The Result is returned.
+        After `func` completes, its return value is passed to R.put().
 
 	Typical use case is as follows: suppose you're submitting
 	work via this Later object, and a submitted function itself
@@ -548,26 +548,33 @@ class Later(object):
 	completed without spawning a thread or using the Later's
 	capacity.
 
-	See the retry method for a convenience method that ses the
+	See the retry method for a convenience method that uses the
 	above pattern in a repeating style.
     '''
     if R is None:
       R = Result()
     LFs = list(LFs)
     count = len(LFs)
-    countery = [count]  # to stop "count" looking like a local var inside the closure
     def put_func():
       ''' Function to defer: run `func` and pass its return value to R.put().
       '''
       R.put(func(*a, **kw))
-    def submit_func(LF):
-      ''' Notification function to submit `func` after sufficient invocations.
-      '''
-      countery[0] -= 1
-      if countery[0] == 0:
-        self.defer(put_func)
-    for LF in LFs:
-      LF.notify(submit_func)
+    if count == 0:
+      # nothing to wait for - queue the function immediately
+      self.defer(put_func)
+    else:
+      # create a notification function which submits put_func
+      # after sufficient notifications have been received
+      countery = [count]  # to stop "count" looking like a local var inside the closure
+      def submit_func(LF):
+        ''' Notification function to submit `func` after sufficient invocations.
+        '''
+        countery[0] -= 1
+        if countery[0] == 0:
+          self.defer(put_func)
+      # submit the notifications
+      for LF in LFs:
+        LF.notify(submit_func)
     return R
 
   def retry(self, R, func, *a, **kw):
