@@ -23,7 +23,8 @@ from cs.debug import Lock, RLock, Thread
 import cs.logutils
 from cs.logutils import Pfx, LogTime, error, warning, debug, exception, OBSOLETE, D
 from cs.obj import O
-from cs.py3 import raise3, Queue, PriorityQueue, Queue_Full, Queue_Empty
+from cs.queues import IterableQueue
+from cs.py3 import raise3, Queue, PriorityQueue
 
 class WorkerThreadPool(O):
   ''' A pool of worker threads to run functions.

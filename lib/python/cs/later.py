@@ -10,7 +10,8 @@ import threading
 from cs.py3 import Queue, raise3
 import time
 from cs.debug import ifdebug, Lock, RLock, Thread
-from cs.threads import AdjustableSemaphore, IterablePriorityQueue, \
+from cs.queues import IterablePriorityQueue
+from cs.threads import AdjustableSemaphore, \
                        WorkerThreadPool, TimerQueue, Result, \
                        Asynchron, ASYNCH_RUNNING
 from cs.seq import seq
