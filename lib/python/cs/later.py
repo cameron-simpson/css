@@ -12,8 +12,8 @@ import time
 from cs.debug import ifdebug, Lock, RLock, Thread
 from cs.queues import IterablePriorityQueue
 from cs.threads import AdjustableSemaphore, \
-                       WorkerThreadPool, TimerQueue, Result, \
-                       Asynchron, ASYNCH_RUNNING
+                       WorkerThreadPool, TimerQueue
+from cs.asynchron import Result, Asynchron, ASYNCH_RUNNING
 from cs.seq import seq
 from cs.logutils import Pfx, info, warning, debug, D, OBSOLETE
 
