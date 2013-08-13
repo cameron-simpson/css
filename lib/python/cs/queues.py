@@ -6,6 +6,64 @@
 
 from cs.debug import Lock, RLock, Thread
 from cs.py3 import Queue, PriorityQueue, Queue_Full, Queue_Empty
+from cs.obj import O
+
+class QueueIterator(O):
+
+  sentinel = object()
+
+  def __init__(self, q):
+    O.__init__(self, q=q)
+    self.closed = False
+
+  def __getattr__(self, attr):
+    return getattr(self.q, attr)
+
+  def get(self, *a):
+    q = self.q
+    item = q.get(*a)
+    if item is self.sentinel:
+      q.put(self.sentinel)
+      raise Queue_Empty
+    return item
+
+  def get_nowait(self):
+    q = self.q
+    item = q.get_nowait()
+    if item is self.sentinel:
+      q.put(self.sentinel)
+      raise Queue_Empty
+    return item
+
+  def put(self, item, *args, **kw):
+    ''' Put an item on the queue.
+    '''
+    if self.closed:
+      raise Queue_Full("queue closed")
+    if item is self.sentinel:
+      raise ValueError("put(sentinel)")
+    return q.put(item, *args, **kw)
+
+  def close(self):
+    if self.closed:
+      error("queue already closed")
+    else:
+      self.closed = True
+      self.q.put(self.sentinel)
+
+  def __iter__(self):
+    ''' Iterable interface for the queue.
+    '''
+    return self
+
+  def __next__(self):
+    try:
+      item = self.get()
+    except Queue_Empty:
+      raise StopIteration
+    return item
+
+  next = __next__
 
 class IterableQueue(Queue):
   ''' A Queue implementing the iterator protocol.
