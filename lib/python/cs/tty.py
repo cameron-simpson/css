@@ -8,7 +8,7 @@ from __future__ import print_function
 import os
 from subprocess import Popen, PIPE
 
-def winsize(fd):
+def ttysize(fd):
   ''' Return a (rows, columns) tuple for the specified file descriptor.
       If the window size cannot be determined, None will be returns
       for either or both of rows and columns.
