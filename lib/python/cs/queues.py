@@ -42,7 +42,7 @@ class QueueIterator(O):
       raise Queue_Full("queue closed")
     if item is self.sentinel:
       raise ValueError("put(sentinel)")
-    return q.put(item, *args, **kw)
+    return self.q.put(item, *args, **kw)
 
   def close(self):
     if self.closed:
