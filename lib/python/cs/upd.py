@@ -10,13 +10,13 @@ from cs.ansi_colour import colourise
 from cs.logutils import Pfx
 from cs.lex import unctrl
 
-instances=[]
+instances = []
 
 def cleanupAtExit():
   global instances
   for i in instances:
     i.close()
-  instances=()
+  instances = ()
 
 atexit.register(cleanupAtExit)
 
@@ -68,8 +68,8 @@ class Upd(object):
     if columns is None:
       columns = 80
       if backend.isatty():
-        P=Popen(['stty', '-a'], stdin=backend, stdout=PIPE)
-        stty=P.stdout.read()
+        P = Popen(['stty', '-a'], stdin=backend, stdout=PIPE)
+        stty = P.stdout.read()
         P.wait()
         P = None
         fields = [ _.strip() for _ in stty.split('\n')[0].split(';') ]
@@ -78,10 +78,10 @@ class Upd(object):
             columns = int(f[:-8])
           elif f.startswith("columns "):
             columns = int(f[8:])
-    self._backend=backend
+    self._backend = backend
     self.columns = columns
-    self._state=''
-    self._lock=threading.RLock()
+    self._state = ''
+    self._lock = threading.RLock()
     global instances
     instances.append(self)
 
@@ -137,7 +137,7 @@ class Upd(object):
   def close(self):
     if self._backend is not None:
       self.out('')
-      self._backend=None
+      self._backend = None
 
   def closed(self):
     return self._backend == None
@@ -155,6 +155,6 @@ class Upd(object):
   @contextmanager
   def _withoutContext(self,noStrip=False):
     with self._lock:
-      old=self.out('', noStrip=noStrip)
+      old = self.out('', noStrip=noStrip)
       yield
       self.out(old, noStrip=True)
