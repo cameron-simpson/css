@@ -9,6 +9,7 @@ from subprocess import Popen, PIPE
 from cs.ansi_colour import colourise
 from cs.logutils import Pfx
 from cs.lex import unctrl
+from cs.tty import ttysize
 
 instances = []
 
@@ -68,16 +69,9 @@ class Upd(object):
     if columns is None:
       columns = 80
       if backend.isatty():
-        P = Popen(['stty', '-a'], stdin=backend, stdout=PIPE)
-        stty = P.stdout.read()
-        P.wait()
-        P = None
-        fields = [ _.strip() for _ in stty.split('\n')[0].split(';') ]
-        for f in fields:
-          if f.endswith(' columns'):
-            columns = int(f[:-8])
-          elif f.startswith("columns "):
-            columns = int(f[8:])
+        r, c = ttysize(backend.fileno())
+        if c is not None:
+          columns = c
     self._backend = backend
     self.columns = columns
     self._state = ''
