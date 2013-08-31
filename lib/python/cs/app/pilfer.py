@@ -650,7 +650,7 @@ def action_operator(action,
         func = one_test[func]
         func_sig = RUN_TREE_OP_SELECT
       else:
-        raise ValueError("unknown action named \"%s\"" % (name,))
+        raise ValueError("unknown action named \"%s\"" % (func,))
     # select URLs matching regexp
     elif action.startswith('/'):
       if action.endswith('/'):
