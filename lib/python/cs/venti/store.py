@@ -20,7 +20,8 @@ import sys
 from threading import Lock
 from threading import Thread
 from cs.py3 import Queue
-from cs.later import Later, report as reportLFs
+from cs.asynchron import report as reportLFs
+from cs.later import Later
 from cs.logutils import info, debug, warning, Pfx, D
 from cs.threads import Q1, Get1, NestingOpenClose
 from . import defaults, totext

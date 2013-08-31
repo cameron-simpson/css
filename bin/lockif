@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # Slightly racey lock testing wrapper for commands.
-# If the lock is present, comlain and abort.
+# If the lock is present, complain and abort,
 # otherwise take the lock and run the command.
 #       - Cameron Simpson <cs@zip.com.au> 27may2013
 # 
