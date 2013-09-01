@@ -94,6 +94,7 @@ _home:
         pfx lib $(rsync) -aO --delete \\
                 --include=/CHANGELOG.txt \\
                 $$libskip \\
+                --exclude=/venv* \\
                 --exclude=testdata/ \\
                 --exclude=*.pyc \\
                 --exclude=*.swp \\
