@@ -652,6 +652,7 @@ def action_operator(action,
       else:
         raise ValueError("unknown action named \"%s\"" % (func,))
     # select URLs matching regexp
+    # /regexp/
     elif action.startswith('/'):
       if action.endswith('/'):
         regexp = action[1:-1]
@@ -661,6 +662,7 @@ def action_operator(action,
       func = lambda U, P, regexp: regexp.search(U)
       func_sig = RUN_TREE_OP_SELECT
     # select URLs not matching regexp
+    # -/regexp/
     elif action.startswith('-/'):
       if action.endswith('/'):
         regexp = action[2:-1]
@@ -670,6 +672,7 @@ def action_operator(action,
       func = lambda U, P, regexp: regexp.search(U)
       func_sig = RUN_TREE_OP_SELECT
     # parent
+    # ..
     elif action == '..':
       func = lambda U, P: U.parent
       func_sig = RUN_TREE_OP_ONE_TO_ONE
@@ -685,7 +688,8 @@ def action_operator(action,
       func = lambda U, P, exts, case: has_exts( U, exts, case_sensitive=case ),
       func_sig = RUN_TREE_OP_SELECT
     else:
-      # varname== comparison
+      # comparison
+      # varname==
       m = re_COMPARE.match(action)
       if m:
         kwargs['var'] = m.group(1)
@@ -696,7 +700,8 @@ def action_operator(action,
           return P.user_vars[var] == P.format(value, U)
         func_sig = RUN_TREE_OP_SELECT
       else:
-        # varname= assignment
+        # assignment
+        # varname=
         m = re_ASSIGN.match(action)
         if m:
           kwargs['var'] = m.group(1)
