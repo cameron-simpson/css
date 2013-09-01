@@ -119,13 +119,18 @@ def main(argv):
                 urls.append(URL(line, None, P.user_agent))
           else:
             urls = [ URL(url, None, P.user_agent) ]
-          run_ops = [ action_operator(action) for action in argv ]
-          debug("run_ops = %r", run_ops)
-          with Later(jobs) as PQ:
-            debug("urls = %s", urls)
-            result = runTree(urls, run_ops, P, PQ)
-            result = list(result)
-            debug("final result = %s", result)
+          try:
+            run_ops = [ action_operator(action) for action in argv ]
+          except ValueError as e:
+            error("invalid actions: %s", e)
+            badopts = True
+          else:
+            debug("run_ops = %r", run_ops)
+            with Later(jobs) as PQ:
+              debug("urls = %s", urls)
+              result = runTree(urls, run_ops, P, PQ)
+              result = list(result)
+              debug("final result = %s", result)
       else:
         error("unsupported op")
         badopts = True
