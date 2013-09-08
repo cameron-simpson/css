@@ -307,7 +307,7 @@ class FilteringState(O):
     self.log("    OK %s" % (shortpath(savepath)))
     return savepath
 
-  def save_to_mbox(self, mboxpath, label):
+  def save_to_mbox(self, mboxpath):
     M = self.message
     text = M.as_string(True)
     with open(mboxpath, "a") as mboxfp:
