@@ -312,7 +312,7 @@ class FilteringState(O):
     text = M.as_string(True)
     with open(mboxpath, "a") as mboxfp:
       mboxfp.write(text)
-    self.log("    OK >> %s (%s)" % (shortpath(mboxpath)))
+    self.log("    OK >> %s" % (shortpath(mboxpath)))
 
   def save_to_pipe(self, argv, mfp=None):
     ''' Pipe a message to the command specific by `argv`.
@@ -331,7 +331,7 @@ class FilteringState(O):
           mfp.seek(0)
           return self.save_to_pipe(argv, mfp=mfp)
     retcode = subprocess.call(argv, env=self.environ, stdin=mfp)
-    self.log("    %s => | %s (%s)" % (("OK" if retcode == 0 else "FAIL"), argv))
+    self.log("    %s => | %s" % (("OK" if retcode == 0 else "FAIL"), argv))
     return retcode == 0
 
   def sendmail(self, address, mfp=None):
