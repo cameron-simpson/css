@@ -26,7 +26,9 @@ import time
 from cs.env import envsub
 from cs.fileutils import abspath_from_file, file_property, files_property, Pathname
 from cs.lex import get_white, get_nonwhite, get_qstr, unrfc2047
-from cs.logutils import Pfx, setup_logging, debug, info, warning, error, D, LogTime
+from cs.logutils import Pfx, setup_logging, \
+                        debug, info, warning, error, exception, \
+                        D, LogTime
 from cs.mailutils import Maildir, message_addresses, shortpath, ismaildir, make_maildir
 from cs.obj import O, slist
 from cs.threads import locked_property
@@ -124,19 +126,18 @@ def main(argv, stdin=None):
                  ]
       try:
         while True:
-          for MW in maildirs:
-            debug("process %s", (MW.shortname,))
-            with LogTime("%s.filter()", MW.shortname, threshold=1.0):
-              for key, reports in MW.filter():
-                pass
+          for mdir in maildirs:
+            debug("process %s", (mdir.shortname,))
+            with LogTime("%s.filter()", mdir.shortname, threshold=1.0):
+              mdir.filter()
           if delay is None:
             break
           debug("sleep %ds", delay)
           sleep(delay)
         return 0
       except KeyboardInterrupt:
-        for MW in maildirs:
-          MW.close()
+        for mdir in maildirs:
+          mdir.close()
         return 1
     else:
       raise RunTimeError("unimplemented op")
@@ -169,7 +170,7 @@ class FilterModes(O):
 
   @file_property
   def maildb(self, path):
-    info("reload maildb %s", shortpath(path))
+    info("FilterModes: reload maildb %s", shortpath(path))
     return MailDB(path, readonly=True)
 
   def maildir(self, mdirname, environ=None):
@@ -177,28 +178,32 @@ class FilterModes(O):
 
 class FilteringState(O):
   ''' Filtering state information used during rule evaluation.
-      .message  Current message.
       .maildb   Current MailDB.
       .environ  Storage for variable settings.
+      .addresses(header)
+                Caching list of addresses from specified header.
   '''
  
   maildirs = {}
 
   def __init__(self, M, filter_modes, environ=None):
-    ''' `M`:           The Message object to be filed.
+    ''' `M`:           Message being filtered.
         `filter_modes`: External state object, with maildb etc.
         `environ`:     Mapping which supplies initial variable names.
                        Default from os.environ.
     '''
-    self.default_rule = None
-    self.message = M
-    self.filter_modes = filter_modes
     if environ is None:
       environ = os.environ
+    self.message = M
+    self.message_path = None
+    self.header_addresses = {}
+    self.default_target = None
+    self.filter_modes = filter_modes
     self.environ = dict(environ)
-    self.reuse_maildir = False
-    self.used_maildirs = set()
     self._log = None
+    self.targets = set()
+    self.labels = set()
+    self.flags = O(alert=False)
 
   @property
   def maildb(self):
@@ -209,16 +214,6 @@ class FilteringState(O):
 
   def resolve(self, foldername):
     return resolve_mail_path(foldername, self.environ['MAILDIR'])
-
-  @property
-  def message(self):
-    return self._message
-
-  @message.setter
-  def message(self, new_message):
-    self._message = new_message
-    self.message_path = None
-    self.header_addresses = {}
 
   def log(self, *a):
     ''' Log a message.
@@ -274,40 +269,52 @@ class FilteringState(O):
       hamap[header] = set( [ A for N, A in message_addresses(M, (header,)) ] )
     return hamap[header]
 
-  def save_to_maildir(self, mdir, label, context, flags=''):
+  def save_target(self, target):
+    with Pfx("save(%s)", target):
+      if target.startswith('|'):
+        shcmd = target[1:]
+        return self.save_to_pipe(['/bin/sh', '-c', shcmd])
+      elif '@' in target:
+        return self.sendmail(target)
+      else:
+        mailpath = self.resolve(target)
+        if not os.path.exists(mailpath):
+          make_maildir(mailpath)
+        if ismaildir(mailpath):
+          mdir = self.maildir(target)
+          if self.flags.alert:
+            maildir_flags = 'F'
+          else:
+            maildir_flags = ''
+          return self.save_to_maildir(mdir,
+                                      flags=maildir_flags)
+        return self.save_to_mbox(mailpath)
+
+  def save_to_maildir(self, mdir, flags=''):
     ''' Save the current message to a Maildir unless we have already saved to
         this maildir.
     '''
     mdirpath = mdir.dir
-    if mdirpath in self.used_maildirs:
-      if not self.reuse_maildir:
-        return None
     M = self.message
-    if label and M.get('x-label', '') != label:
-      # modifying message - make copy
-      path = None
-      M = message_from_string(M.as_string())
-      M['X-Label'] = label
-    else:
-      path = self.message_path
+    path = self.message_path
     if path is None:
       savekey = mdir.save_message(M, flags=flags)
     else:
       savekey = mdir.save_filepath(path, flags=flags)
     savepath = mdir.keypath(savekey)
-    if not path and not label:
+    if not path:
       self.message_path = savepath
-    self.log("    OK %s (%s)" % (shortpath(savepath), context))
+    self.log("    OK %s" % (shortpath(savepath)))
     return savepath
 
-  def save_to_mbox(self, mboxpath, label, context):
+  def save_to_mbox(self, mboxpath, label):
     M = self.message
     text = M.as_string(True)
     with open(mboxpath, "a") as mboxfp:
       mboxfp.write(text)
-    self.log("    OK >> %s (%s)" % (shortpath(mboxpath), context))
+    self.log("    OK >> %s (%s)" % (shortpath(mboxpath)))
 
-  def pipe_message(self, argv, mfp=None, context=None):
+  def save_to_pipe(self, argv, mfp=None):
     ''' Pipe a message to the command specific by `argv`.
         `mfp` is a file containing the message text.
         If `mfp` is None, use the text of the current message.
@@ -316,23 +323,29 @@ class FilteringState(O):
       message_path = self.message_path
       if message_path:
         with open(message_path) as mfp:
-          return self.pipe_message(argv, mfp=mfp, context=context)
+          return self.save_to_pipe(argv, mfp=mfp)
       else:
         with TemporaryFile('w+') as mfp:
           mfp.write(str(self.message))
           mfp.flush()
           mfp.seek(0)
-          return self.pipe_message(argv, mfp=mfp, context=context)
+          return self.save_to_pipe(argv, mfp=mfp)
     retcode = subprocess.call(argv, env=self.environ, stdin=mfp)
-    self.log("    %s => | %s (%s)" % (("OK" if retcode == 0 else "FAIL"), argv, context))
+    self.log("    %s => | %s (%s)" % (("OK" if retcode == 0 else "FAIL"), argv))
     return retcode == 0
 
-  def sendmail(self, address, mfp=None, context=None):
+  def sendmail(self, address, mfp=None):
     ''' Dispatch a message to `address`.
         `mfp` is a file containing the message text.
         If `mfp` is None, use the text of the current message.
     '''
-    return self.pipe_message([self.environ.get('SENDMAIL', 'sendmail'), '-oi', address], mfp=mfp, context=context)
+    return self.save_to_pipe([self.environ.get('SENDMAIL', 'sendmail'), '-oi', address], mfp=mfp)
+
+  def alert(self, alert_message):
+    xit = subprocess.call(['alert', 'MAILFILER: ' + alert_message])
+    if xit != 0:
+      warning("non-zero exit from alert: %d", xit)
+    return xit
 
 re_UNQWORD = re.compile(r'[^,\s]+')
 
@@ -616,8 +629,8 @@ class Condition_InGroups(_Condition):
     for address in fstate.addresses(header_name):
       for group_name in self.group_names:
         if group_name.startswith('@'):
+          # address ending in @foo
           if address.endswith(group_name):
-            # address ending in @foo
             debug("match %s to %s", address, group_name)
             return True
         elif fstate.ingroup(address, group_name):
@@ -662,92 +675,53 @@ class Rule(O):
     self.flags = O(alert=0, halt=False)
     self.label = ''
 
+  @property
+  def context(self):
+    return "%s:%d" % (shortpath(self.filename), self.lineno)
+
   def match(self, fstate):
+    ''' Test the message in fstate against this rule.
+    '''
     # all conditions must match
     for C in self.conditions:
       if not C.match(fstate):
         return False
     return True
 
-  def filter(self, fstate):
+  def apply(self, fstate):
+    ''' Apply this rule to the `fstate`.
+        The rule label, if any, is appended to the .labels attribute.
+        Each action is applied to the state.
+        Assignments update the .environ attribute.
+        Targets accrue in the .targets attribute.
+    '''
     M = fstate.message
-    context=("%s:%d" % (shortpath(self.filename), self.lineno))
-    with Pfx(context):
-      saved_to = []
-      ok_actions = []
-      failed_actions = []
-      matched = self.match(fstate)
-      if matched:
-        for action, arg in self.actions:
-          ok = False
-          try:
-            if action == 'TARGET':
-              target = envsub(arg, fstate.environ)
-              if target.startswith('|'):
-                shcmd = target[1:]
-                if fstate.pipe_message(['/bin/sh', '-c', shcmd], context=context):
-                  ok = True
-                  saved_to.append(target)
-                else:
-                  error("failed to pipe to %s", target)
-                  failed_actions.append( (action, arg, "pipe "+target) )
-              elif '@' in target:
-                if fstate.sendmail(target, context=context):
-                  ok = True
-                  saved_to.append(target)
-                else:
-                  error("failed to sendmail to %s", target)
-                  failed_actions.append( (action, arg, "sendmail "+target) )
-              else:
-                mailpath = fstate.resolve(target)
-                if not os.path.exists(mailpath):
-                  make_maildir(mailpath)
-                if ismaildir(mailpath):
-                  mdir = fstate.maildir(target)
-                  if self.flags.alert:
-                    maildir_flags = 'F'
-                  else:
-                    maildir_flags = ''
-                  savepath = fstate.save_to_maildir(mdir,
-                                                       self.label,
-                                                       context=context,
-                                                       flags=maildir_flags)
-                  ok = True
-                  # we get None if the message has already been saved here
-                  if savepath is not None:
-                    saved_to.append(savepath)
-                  else:
-                    debug("repeated filing to maildir, skipping %s", mdir)
-                else:
-                  fstate.save_to_mbox(mailpath, self.label, context=context)
-                  ok = True
-                  saved_to.append(mailpath)
-            elif action == 'ASSIGN':
-              envvar, s = arg
-              value = fstate.environ[envvar] = envsub(s, fstate.environ)
-              ok = True
-              debug("ASSIGN %s=%s", envvar, value)
-              if envvar == 'LOGFILE':
-                fstate.logto(value)
-              elif envvar == 'DEFAULT':
-                R = fstate.default_rule = Rule(self.filename, self.lineno)
-                R.actions.append( ('TARGET', '$DEFAULT') )
-            else:
-              raise RuntimeError("unimplemented action \"%s\"" % action)
-          except (AttributeError, NameError):
-            raise
-          except Exception as e:
-            warning("EXCEPTION %r", e)
-            failed_actions.append( (action, arg, e) )
-            raise
+    with Pfx(self.context):
+      if self.flags.alert:
+        fstate.flags.alert = True
+      if self.label:
+        fstate.labels.add(self.label)
+      for action, arg in self.actions:
+        try:
+          if action == 'TARGET':
+            target = envsub(arg, fstate.environ)
+            fstate.targets.add(target)
+          elif action == 'ASSIGN':
+            envvar, s = arg
+            value = fstate.environ[envvar] = envsub(s, fstate.environ)
+            debug("ASSIGN %s=%s", envvar, value)
+            if envvar == 'LOGFILE':
+              fstate.logto(value)
+            elif envvar == 'DEFAULT':
+              fstate.default_target = value
           else:
-            if ok:
-              ok_actions.append( (action, arg) )
-        if not saved_to:
-          debug("MATCHED but no saved_to: %s", self)
-        else:
-          debug("MATCHED and saved_to=%s: %s", saved_to, self)
-      return FilterReport(self, matched, saved_to, ok_actions, failed_actions)
+            raise RuntimeError("unimplemented action \"%s\"" % action)
+        except (AttributeError, NameError):
+          raise
+        except Exception as e:
+          warning("EXCEPTION %r", e)
+          failed_actions.append( (action, arg, e) )
+          raise
 
 class Rules(list):
   ''' Simple subclass of list storing rules, with methods to load
@@ -759,7 +733,8 @@ class Rules(list):
     self.vars = {}
     self.rule_files = set()
     if rules_file is not None:
-      self.load(rules_file)
+      with Pfx(rules_file):
+        self.load(rules_file)
 
   def load(self, fp):
     ''' Import an open rule file.
@@ -768,52 +743,17 @@ class Rules(list):
     self.rule_files.update( R.filename for R in new_rules )
     self.extend(new_rules)
 
-  def filter(self, fstate):
-    ''' Filter the current message according to the rules.
-        Yield FilterReports for each rule consulted.
-        If no rule matches and $DEFAULT is set, yield a FilterReport for
-        filing to $DEFAULT, with .rule set to None.
+  def match(self, fstate):
+    ''' Match the current message (fstate.message) against the rules.
+        Update fstate for matching rules.
     '''
-    done = False
-    saved_to = []
     for R in self:
-      report = R.filter(fstate)
-      M = fstate.message
-      if report.matched:
-        if not report.saved_to:
-          debug("matched but not saved_to: %s", R)
-        saved_to.extend(report.saved_to)
-        if R.flags.alert:
-          self.alert("%s: %s" % (M.get('from', '').strip(), M.get('subject', '').strip()))
-      else:
-        if report.saved_to:
-          error("matched is False, but saved_to = %s", saved_to)
-      yield report
-      if report.matched:
-        if R.flags.halt:
-          done = True
-          break
-    if not done:
-      if not saved_to:
-        R = fstate.default_rule
-        if not R:
-          warning("NO DEFAULT: message not saved and no $DEFAULT")
-        else:
-          report = R.filter(fstate)
-          if not report.matched:
-            raise RunTimeError("default rule faled to match! %r", R)
-          saved_to.extend(report.saved_to)
-          if not saved_to:
-            warning("message not saved by any rules")
-          yield report
-      else:
-        debug("%d filings, skipping $DEFAULT", len(saved_to))
-
-  def alert(self, alert_message):
-    xit = subprocess.call(['alert', 'MAILFILER: ' + alert_message])
-    if xit != 0:
-      warning("non-zero exit from alert: %d", xit)
-    return xit
+      with Pfx(R.context):
+        if R.match(fstate):
+          R.apply(fstate)
+          if R.flags.halt:
+            done = True
+            break
 
 class WatchedMaildir(O):
   ''' A class to monitor a Maildir and filter messages.
@@ -850,6 +790,14 @@ class WatchedMaildir(O):
   def close(self):
     self.filter_modes.maildb.close()
 
+  def lurk(self, key):
+    info("lurk %s", key)
+    self.lurking.add(key)
+
+  def unlurk(self, key):
+    info("unlurk %s", key)
+    self.lurking.remove(key)
+
   @files_property
   def rules(self, rules_paths):
     # base file is at index 0
@@ -872,47 +820,86 @@ class WatchedMaildir(O):
       with LogTime("all keys") as all_keys_time:
         mdir = self.mdir
         for key in mdir.keys():
-          if key in self.lurking:
-            debug("skip processed key: %s", key)
-            skipped += 1
-            continue
-          nmsgs += 1
-          with LogTime("key = %s", key, threshold=1.0, level=DEBUG):
-            M = mdir[key]
-            fstate = FilteringState(M, self.filter_modes)
-            fstate.message_path = mdir.keypath(key)
-            fstate.logto(envsub("$HOME/var/log/mailfiler"))
-            fstate.log( (u("%s %s") % (time.strftime("%Y-%m-%d %H:%M:%S"),
-                                       unrfc2047(M.get('subject', '_no_subject'))))
-                       .replace('\n', ' ') )
-            fstate.log("  " + unrfc2047(M.get('from', '_no_from')))
-            fstate.log("  " + M.get('message-id', '<?>'))
-            fstate.log("  " + shortpath(mdir.keypath(key)))
-            saved_to = []
-            reports = []
-            for report in self.rules.filter(fstate):
-              if report.matched:
-                reports.append(report)
-                saved_to.extend(report.saved_to)
+          with Pfx(key):
+            if key in self.lurking:
+              debug("skip processed key")
+              skipped += 1
+              continue
+
+            nmsgs += 1
+            with LogTime("key = %s", key, threshold=1.0, level=DEBUG):
+              M = mdir[key]
+              fstate = FilteringState(M, self.filter_modes)
+              fstate.message_path = mdir.keypath(key)
+              fstate.logto(envsub("$HOME/var/log/mailfiler"))
+              fstate.log( (u("%s %s") % (time.strftime("%Y-%m-%d %H:%M:%S"),
+                                         unrfc2047(M.get('subject', '_no_subject'))))
+                         .replace('\n', ' ') )
+              fstate.log("  " + unrfc2047(M.get('from', '_no_from')))
+              fstate.log("  " + M.get('message-id', '<?>'))
+              fstate.log("  " + shortpath(mdir.keypath(key)))
+
+              try:
+                self.rules.match(fstate)
+              except Exception as e:
+                exception("matching rules: %s", e)
+                self.lurk(key)
+                continue
+
+              if fstate.flags.alert:
+                M = fstate.message
+                fstate.alert("%s: %s" % (M.get('from', '').strip(), M.get('subject', '').strip()))
+
+              if not fstate.targets:
+                if fstate.default_target:
+                  fstate.targets.add(fstate.default_target)
+                else:
+                  error("no matching targets and no DEFAULT")
+                  self.lurk(key)
+                  continue
+
+              if fstate.labels:
+                xlabels = set()
+                for labelhdr in M.get_all('X-Label', ()):
+                  for label in labelhdr.split(','):
+                    label = label.split()
+                    if label:
+                      xlabels.add(label)
+                new_labels = fstate.labels - xlabels
+                if new_labels:
+                  # add labels to message
+                  fstate.labels.update(new_labels)
+                  fstate.message_path = None
+                  M = message_from_string(M.as_string())
+                  M['X-Label'] = ", ".join( sorted(list(fstate.labels)) )
+                  fstate.message = M
+
+              ok = True
+              for target in sorted(list(fstate.targets)):
+                with Pfx(target):
+                  try:
+                    fstate.save_target(target)
+                  except Exception as e:
+                    exception("saving to %r: %s", target, e)
+                    ok = False
+
+              if not ok:
+                self.lurk(key)
+                continue
+
+              if fstate.filter_modes.no_remove:
+                fstate.log("no_remove: message not removed, lurking key %s", key)
+                self.lurk(key)
               else:
-                if report.saved_to:
-                  error("UNMATCHED RULE: saved_to=%s", report.saved_to)
-            if not saved_to:
-              fstate.log("ERROR: message not saved, lurking key %s", key)
-              error("message not saved, lurking key %s", key)
-              self.lurking.add(key)
-            elif self.filter_modes.no_remove:
-              fstate.log("no_remove: message not removed, lurking key %s", key)
-              self.lurking.add(key)
-            else:
-              debug("remove message key %s", key)
-              mdir.remove(key)
-              self.lurking.discard(key)
-            yield key, reports
-          if self.filter_modes.justone:
-            break
+                debug("remove message key %s", key)
+                mdir.remove(key)
+                self.lurking.discard(key)
+            if fstate.filter_modes.justone:
+              break
+
       if nmsgs or all_keys_time.elapsed >= 0.2:
-        info("filtered %d messages (%d skipped) in %5.3fs", nmsgs, skipped, all_keys_time.elapsed)
+        info("filtered %d messages (%d skipped) in %5.3fs",
+             nmsgs, skipped, all_keys_time.elapsed)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
