@@ -171,12 +171,24 @@ cmd="$cmd $target"
 pidfile=`sshpidfile "$target"`
 
 # reload config on every pass
-cfg_command=
-cfg_outlog=portfwd-$target    # /dev/null
-cfg_monitor=
+# default command tails var/log/alert-local and wait for the parent sshd to exit
+cfg_command='pids=
+             [ ! -f var/log/alert-local ] || { tail -F var/log/alert-local & pids="$pids $!"; }
+             exec >&2
+             while kill -0 "$PPID"
+             do
+               sleep 5
+             done
+             [ -z "$pids" ] || kill $pids
+            '
+cfg_outlog=alert-$target
+cfg_errlog=portfwd-$target
 getconfig "$target"
 case $cfg_outlog in
   /*) ;; *) cfg_outlog=$LOGDIR/$cfg_outlog ;;
+esac
+case $cfg_errlog in
+  /*) ;; *) cfg_errlog=$LOGDIR/$cfg_errlog ;;
 esac
 
 [ -n "$cfg_command" ] || sshopts="$sshopts -N"
@@ -196,7 +208,7 @@ tag_fd 2 "$target" \
       -o 'PermitLocalCommand=yes' \
       -o "LocalCommand=flag -w '$flag_connected' 1; </dev/null alert CONNECTED: $target &" \
       "$target" "$cfg_command" \
-    >>"$cfg_outlog" </dev/null &
+    >>"$cfg_outlog" 2>>"$cfg_errlog" </dev/null &
 sshpid=$!
 echo "$sshpid" >"$pidfile"
 wait
