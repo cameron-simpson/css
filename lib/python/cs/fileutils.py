@@ -234,7 +234,7 @@ def make_file_property(attr_name=None, unset_object=None, poll_rate=1):
     attr_path = attr_value + '_path'
     attr_lastpoll = attr_value + '_lastpoll'
     def getprop(self):
-      ''' Try to reload the property value from the file if the propety value
+      ''' Try to reload the property value from the file if the property value
           is stale and the file has been modified since the last reload.
       '''
       with getattr(self, attr_lock):
@@ -347,7 +347,7 @@ def make_files_property(attr_name=None, unset_object=None, poll_rate=1):
     attr_paths = attr_value + '_paths'
     attr_lastpoll = attr_value + '_lastpoll'
     def getprop(self):
-      ''' Try to reload the property value from the file if the propety value
+      ''' Try to reload the property value from the file if the property value
           is stale and the file has been modified since the last reload.
       '''
       with getattr(self, attr_lock):
