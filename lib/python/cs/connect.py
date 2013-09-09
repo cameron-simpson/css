@@ -8,7 +8,7 @@ from collections import namedtuple
 from tempfile import TemporaryFile
 from threading import Lock, Thread
 from cs.logutils import warning, error, info, D, setup_logging
-from cs.threads import Channel
+from cs.queues import Channel
 from cs.obj import O
 from cs.fileutils import tmpdir
 

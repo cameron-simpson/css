@@ -11,7 +11,7 @@ if sys.hexversion < 0x03000000:
   from Queue import Queue
 else:
   from queue import Queue
-from cs.threads import Result, TimerQueue, runTree, RunTreeOp, RUN_TREE_OP_ONE_TO_MANY
+from cs.threads import TimerQueue, runTree, RunTreeOp, RUN_TREE_OP_ONE_TO_MANY
 from cs.later import Later
 ##from cs.logutils import D
 
@@ -20,31 +20,6 @@ def D(msg, *a):
     msg = msg % a
   with open('/dev/tty', 'a') as tty:
     print >>tty, msg
-
-class TestResult(unittest.TestCase):
-
-  def setUp(self):
-    self.R = Result()
-
-  def test00result(self):
-    R = self.R
-    self.assertFalse(R.ready)
-    countery = [0]
-    self.assertEqual(countery[0], 0)
-    def count(innerR):
-      countery[0] += 1
-    count(None)
-    self.assertEqual(countery[0], 1)
-    R.notify(count)
-    self.assertFalse(R.ready)
-    self.assertEqual(countery[0], 1)
-    R.put(9)
-    self.assertTrue(R.ready)
-    self.assertEqual(R.get(), 9)
-    self.assertEqual(countery[0], 2)
-    R.notify(count)
-    self.assertTrue(R.ready)
-    self.assertEqual(countery[0], 3)
 
 class TestTimerQueue(unittest.TestCase):
 
@@ -119,7 +94,10 @@ class TestRuntree(unittest.TestCase):
 
   def test__01_same(self):
     L = Later(1)
-    self.assertEqual(list(runTree( [1,2,3], [ RunTreeOp(self.f_same, False, False, None) ], None, L )), [1,2,3])
+    rt_ops = [ RunTreeOp(self.f_same, False, False, None) ]
+    rt_result = runTree( [1,2,3], [ RunTreeOp(self.f_same, False, False, None) ], None, L )
+    rt_result = list(rt_result)
+    self.assertEqual(rt_result, [1,2,3])
     L.close()
 
   def test__01_same_fork(self):

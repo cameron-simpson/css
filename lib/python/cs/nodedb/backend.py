@@ -8,6 +8,7 @@ import unittest
 from cs.logutils import D, OBSOLETE
 from cs.obj import O
 from cs.excutils import unimplemented
+from cs.queues import IterableQueue
 
 class _BackendMappingMixin(O):
   ''' A mapping interface to be presented by all Backends.

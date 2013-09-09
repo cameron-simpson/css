@@ -15,7 +15,7 @@ from threading import Thread
 from cs.csvutils import csv_reader, csv_writerow
 from cs.fileutils import lockfile
 from cs.logutils import Pfx, error, warning, info, D
-from cs.threads import IterableQueue
+from cs.queues import IterableQueue
 from cs.py3 import StringTypes, Queue_Full as Full, Queue_Empty as Empty
 from . import NodeDB
 from .backend import Backend
