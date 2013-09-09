@@ -550,7 +550,7 @@ def parserules(fp):
     yield R
 
 def get_targets(s, offset):
-  ''' Parse list of targets from the string `s` strarting at `offset`.
+  ''' Parse list of targets from the string `s` starting at `offset`.
       Return the list of targets strings and the new offset.
   '''
   targets = []
