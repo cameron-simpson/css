@@ -54,6 +54,21 @@ _help:
         @echo '_pending           - report unreleased changelog and [M]odified files'
         @echo '_release           - mark tip as new release'
         @echo '_freshmeat         - announce current release to freshmeat'
+        @echo '_updcss            - deploy current tip to /opt/css'
+        @echo '_tarball           - make a tarball of the tip'
+
+_updcss:
+        ./bin-cs/updcss
+
+_tarball:
+        set -uex \
+        rev=tip \
+        today=$$(daycode | tr -d -) \
+        tardir=css-$$rev-$$today \
+        tarball=$$tardir.tar.gz \
+        [ -d "$$tardir/." ] || mkdir "$$tardir" \
+        ./bin-cs/updcss -r "$$rev" "$$tardir" \
+        tar czf "$$tarball" "$$tardir"
 
 _test:
         find lib/python -type f -name '*.py[co]' -exec rm {} \;
