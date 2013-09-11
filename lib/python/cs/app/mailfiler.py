@@ -176,8 +176,8 @@ class FilterModes(O):
   def maildir(self, mdirname, environ=None):
     return maildir_from_name(mdirname, environ['MAILDIR'], self.maildir_cache)
 
-class FilteringState(O):
-  ''' Filtering state information used during rule evaluation.
+class Filer(O):
+  ''' A message filing object, filtering state information used during rule evaluation.
       .maildb   Current MailDB.
       .environ  Storage for variable settings.
       .addresses(header)
@@ -224,7 +224,7 @@ class FilteringState(O):
     try:
       print(*[ unicode(s) for s in a], file=log)
     except UnicodeDecodeError as e:
-      print("FilteringState.log: %s: a=%r" % (e, a), file=sys.stderr)
+      print("Filer.log: %s: a=%r" % (e, a), file=sys.stderr)
 
   def logto(self, logfilepath):
     ''' Direct log messages to the supplied `logfilepath`.
@@ -575,12 +575,12 @@ class _Condition(O):
     self.flags = flags
     self.header_names = header_names
 
-  def match(self, fstate):
+  def match(self, filer):
     status = False
-    M = fstate.message
+    M = filer.message
     for header_name in self.header_names:
       for header_value in M.get_all(header_name, ()):
-        if self.test_value(fstate, header_name, header_value):
+        if self.test_value(filer, header_name, header_value):
           status = True
           break
     if self.flags.invert:
@@ -595,7 +595,7 @@ class Condition_Regexp(_Condition):
     self.regexp = re.compile(regexp)
     self.regexptxt = regexp
 
-  def test_value(self, fstate, header_name, header_value):
+  def test_value(self, filer, header_name, header_value):
     if self.atstart:
       return self.regexp.match(header_value)
     return self.regexp.search(header_value)
@@ -606,8 +606,8 @@ class Condition_AddressMatch(_Condition):
     _Condition.__init__(self, flags, header_names)
     self.addrkeys = tuple( k for k in addrkeys if len(k) > 0 )
 
-  def test_value(self, fstate, header_name, header_value):
-    for address in fstate.addresses(header_name):
+  def test_value(self, filer, header_name, header_value):
+    for address in filer.addresses(header_name):
       address_lc = address.lower()
       for key in self.addrkeys:
         if address_lc == key.lower():
@@ -620,15 +620,15 @@ class Condition_InGroups(_Condition):
     _Condition.__init__(self, flags, header_names)
     self.group_names = group_names
 
-  def test_value(self, fstate, header_name, header_value):
-    for address in fstate.addresses(header_name):
+  def test_value(self, filer, header_name, header_value):
+    for address in filer.addresses(header_name):
       for group_name in self.group_names:
         if group_name.startswith('@'):
           # address ending in @foo
           if address.endswith(group_name):
             debug("match %s to %s", address, group_name)
             return True
-        elif address.lower() in fstate.group(group_name):
+        elif address.lower() in filer.group(group_name):
           # address in group "foo"
           debug("match %s to (%s)", address, group_name)
           return True
@@ -646,10 +646,10 @@ class Condition_HeaderFunction(_Condition):
     except AttributeError:
       raise ValueError("invalid header function .%s()" % (funcname,))
 
-  def test_value(self, fstate, header_name, header_value):
-    return self.test_func(fstate, header_name, header_value)
+  def test_value(self, filer, header_name, header_value):
+    return self.test_func(filer, header_name, header_value)
 
-  def test_func_contains(self, fstate, header_name, header_value):
+  def test_func_contains(self, filer, header_name, header_value):
     return self.test_string in header_value
 
 _FilterReport = namedtuple('FilterReport',
@@ -674,41 +674,41 @@ class Rule(O):
   def context(self):
     return "%s:%d" % (shortpath(self.filename), self.lineno)
 
-  def match(self, fstate):
-    ''' Test the message in fstate against this rule.
+  def match(self, filer):
+    ''' Test the message in filer against this rule.
     '''
     # all conditions must match
     for C in self.conditions:
-      if not C.match(fstate):
+      if not C.match(filer):
         return False
     return True
 
-  def apply(self, fstate):
-    ''' Apply this rule to the `fstate`.
+  def apply(self, filer):
+    ''' Apply this rule to the `filer`.
         The rule label, if any, is appended to the .labels attribute.
         Each action is applied to the state.
         Assignments update the .environ attribute.
         Targets accrue in the .targets attribute.
     '''
-    M = fstate.message
+    M = filer.message
     with Pfx(self.context):
       if self.flags.alert:
-        fstate.flags.alert = True
+        filer.flags.alert = True
       if self.label:
-        fstate.labels.add(self.label)
+        filer.labels.add(self.label)
       for action, arg in self.actions:
         try:
           if action == 'TARGET':
-            target = envsub(arg, fstate.environ)
-            fstate.targets.add(target)
+            target = envsub(arg, filer.environ)
+            filer.targets.add(target)
           elif action == 'ASSIGN':
             envvar, s = arg
-            value = fstate.environ[envvar] = envsub(s, fstate.environ)
+            value = filer.environ[envvar] = envsub(s, filer.environ)
             debug("ASSIGN %s=%s", envvar, value)
             if envvar == 'LOGFILE':
-              fstate.logto(value)
+              filer.logto(value)
             elif envvar == 'DEFAULT':
-              fstate.default_target = value
+              filer.default_target = value
           else:
             raise RuntimeError("unimplemented action \"%s\"" % action)
         except (AttributeError, NameError):
@@ -738,14 +738,14 @@ class Rules(list):
     self.rule_files.update( R.filename for R in new_rules )
     self.extend(new_rules)
 
-  def match(self, fstate):
-    ''' Match the current message (fstate.message) against the rules.
-        Update fstate for matching rules.
+  def match(self, filer):
+    ''' Match the current message (filer.message) against the rules.
+        Update filer for matching rules.
     '''
     for R in self:
       with Pfx(R.context):
-        if R.match(fstate):
-          R.apply(fstate)
+        if R.match(filer):
+          R.apply(filer)
           if R.flags.halt:
             done = True
             break
@@ -824,56 +824,56 @@ class WatchedMaildir(O):
             nmsgs += 1
             with LogTime("key = %s", key, threshold=1.0, level=DEBUG):
               M = mdir[key]
-              fstate = FilteringState(M, self.filter_modes)
-              fstate.message_path = mdir.keypath(key)
-              fstate.logto(envsub("$HOME/var/log/mailfiler"))
-              fstate.log( (u("%s %s") % (time.strftime("%Y-%m-%d %H:%M:%S"),
+              filer = Filer(M, self.filter_modes)
+              filer.message_path = mdir.keypath(key)
+              filer.logto(envsub("$HOME/var/log/mailfiler"))
+              filer.log( (u("%s %s") % (time.strftime("%Y-%m-%d %H:%M:%S"),
                                          unrfc2047(M.get('subject', '_no_subject'))))
                          .replace('\n', ' ') )
-              fstate.log("  " + unrfc2047(M.get('from', '_no_from')))
-              fstate.log("  " + M.get('message-id', '<?>'))
-              fstate.log("  " + shortpath(mdir.keypath(key)))
+              filer.log("  " + unrfc2047(M.get('from', '_no_from')))
+              filer.log("  " + M.get('message-id', '<?>'))
+              filer.log("  " + shortpath(mdir.keypath(key)))
 
               try:
-                self.rules.match(fstate)
+                self.rules.match(filer)
               except Exception as e:
                 exception("matching rules: %s", e)
                 self.lurk(key)
                 continue
 
-              if fstate.flags.alert:
-                M = fstate.message
-                fstate.alert("%s: %s" % (M.get('from', '').strip(), M.get('subject', '').strip()))
+              if filer.flags.alert:
+                M = filer.message
+                filer.alert("%s: %s" % (M.get('from', '').strip(), M.get('subject', '').strip()))
 
-              if not fstate.targets:
-                if fstate.default_target:
-                  fstate.targets.add(fstate.default_target)
+              if not filer.targets:
+                if filer.default_target:
+                  filer.targets.add(filer.default_target)
                 else:
                   error("no matching targets and no DEFAULT")
                   self.lurk(key)
                   continue
 
-              if fstate.labels:
+              if filer.labels:
                 xlabels = set()
                 for labelhdr in M.get_all('X-Label', ()):
                   for label in labelhdr.split(','):
                     label = label.split()
                     if label:
                       xlabels.add(label)
-                new_labels = fstate.labels - xlabels
+                new_labels = filer.labels - xlabels
                 if new_labels:
                   # add labels to message
-                  fstate.labels.update(new_labels)
-                  fstate.message_path = None
+                  filer.labels.update(new_labels)
+                  filer.message_path = None
                   M = message_from_string(M.as_string())
-                  M['X-Label'] = ", ".join( sorted(list(fstate.labels)) )
-                  fstate.message = M
+                  M['X-Label'] = ", ".join( sorted(list(filer.labels)) )
+                  filer.message = M
 
               ok = True
-              for target in sorted(list(fstate.targets)):
+              for target in sorted(list(filer.targets)):
                 with Pfx(target):
                   try:
-                    fstate.save_target(target)
+                    filer.save_target(target)
                   except Exception as e:
                     exception("saving to %r: %s", target, e)
                     ok = False
@@ -882,14 +882,14 @@ class WatchedMaildir(O):
                 self.lurk(key)
                 continue
 
-              if fstate.filter_modes.no_remove:
-                fstate.log("no_remove: message not removed, lurking key %s", key)
+              if filer.filter_modes.no_remove:
+                filer.log("no_remove: message not removed, lurking key %s", key)
                 self.lurk(key)
               else:
                 debug("remove message key %s", key)
                 mdir.remove(key)
                 self.lurking.discard(key)
-            if fstate.filter_modes.justone:
+            if filer.filter_modes.justone:
               break
 
       if nmsgs or all_keys_time.elapsed >= 0.2:
