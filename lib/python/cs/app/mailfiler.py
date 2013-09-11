@@ -243,15 +243,14 @@ class FilteringState(O):
     '''
     return self.maildb.address_groups
 
-  def ingroup(self, coreaddr, group_name):
-    ''' Test if a core address is a member of the named group.
+  def group(self, group_name):
+    ''' Return the set of addresses in the named group.
     '''
-    group = self.groups.get(group_name)
-    if group is None:
+    G = self.groups.get(group_name)
+    if G is None:
       warning("unknown group: %s", group_name)
-      self.groups[group_name] = set()
-      return False
-    return coreaddr.lower() in group
+      G = self.groups[group_name] = set()
+    return G
 
   def addresses(self, *headers):
     ''' Return the core addresses from the current Message and supplied
@@ -609,13 +608,9 @@ class Condition_AddressMatch(_Condition):
 
   def test_value(self, fstate, header_name, header_value):
     for address in fstate.addresses(header_name):
+      address_lc = address.lower()
       for key in self.addrkeys:
-        if key.startswith('{{') and key.endswith('}}'):
-          warning("OBSOLETE address key: %s", key)
-          group_name = key[2:-2].lower()
-          if fstate.ingroup(address, group_name):
-            return True
-        elif address.lower() == key.lower():
+        if address_lc == key.lower():
           return True
     return False
 
@@ -633,7 +628,7 @@ class Condition_InGroups(_Condition):
           if address.endswith(group_name):
             debug("match %s to %s", address, group_name)
             return True
-        elif fstate.ingroup(address, group_name):
+        elif address.lower() in fstate.group(group_name):
           # address in group "foo"
           debug("match %s to (%s)", address, group_name)
           return True
