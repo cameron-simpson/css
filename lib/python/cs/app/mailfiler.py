@@ -202,60 +202,61 @@ class Filer(O):
     self.labels = set()
     self.flags = O(alert=False)
 
-  def file(self, M, message_path=None):
-    ''' File the specified message `M`.
+  def file(self, M, rules, message_path=None):
+    ''' File the specified message `M` according to the supplied `rules`.
 	If specified and not None, the `message_path` parameter
 	specified the filename of the message, supporting hard linking
 	the message into a Maildir.
     '''
     self.message = M
     self.message_path = None
-    filer.logto(envsub("$HOME/var/log/mailfiler"))
-    filer.log( (u("%s %s") % (time.strftime("%Y-%m-%d %H:%M:%S"),
+    self.logto(envsub("$HOME/var/log/mailfiler"))
+    self.log( (u("%s %s") % (time.strftime("%Y-%m-%d %H:%M:%S"),
                                unrfc2047(M.get('subject', '_no_subject'))))
                .replace('\n', ' ') )
-    filer.log("  " + unrfc2047(M.get('from', '_no_from')))
-    filer.log("  " + M.get('message-id', '<?>'))
-    filer.log("  " + shortpath(mdir.keypath(key)))
+    self.log("  " + unrfc2047(M.get('from', '_no_from')))
+    self.log("  " + M.get('message-id', '<?>'))
+    if self.message_path:
+      self.log("  " + shortpath(self.message_path))
 
     try:
-      self.rules.match(filer)
+      rules.match(self)
     except Exception as e:
       exception("matching rules: %s", e)
       return False
 
-    if filer.flags.alert:
-      M = filer.message
-      filer.alert("%s: %s" % (M.get('from', '').strip(), M.get('subject', '').strip()))
+    if self.flags.alert:
+      M = self.message
+      self.alert("%s: %s" % (M.get('from', '').strip(), M.get('subject', '').strip()))
 
-    if not filer.targets:
-      if filer.default_target:
-        filer.targets.add(filer.default_target)
+    if not self.targets:
+      if self.default_target:
+        self.targets.add(self.default_target)
       else:
         error("no matching targets and no DEFAULT")
         return False
 
-    if filer.labels:
+    if self.labels:
       xlabels = set()
       for labelhdr in M.get_all('X-Label', ()):
         for label in labelhdr.split(','):
-          label = label.split()
+          label = label.strip()
           if label:
             xlabels.add(label)
-      new_labels = filer.labels - xlabels
+      new_labels = self.labels - xlabels
       if new_labels:
         # add labels to message
-        filer.labels.update(new_labels)
-        filer.message_path = None
+        self.labels.update(new_labels)
+        self.message_path = None
         M = message_from_string(M.as_string())
-        M['X-Label'] = ", ".join( sorted(list(filer.labels)) )
-        filer.message = M
+        M['X-Label'] = ", ".join( sorted(list(self.labels)) )
+        self.message = M
 
     ok = True
-    for target in sorted(list(filer.targets)):
+    for target in sorted(list(self.targets)):
       with Pfx(target):
         try:
-          filer.save_target(target)
+          self.save_target(target)
         except Exception as e:
           exception("saving to %r: %s", target, e)
           ok = False
@@ -883,7 +884,7 @@ class WatchedMaildir(O):
               M = mdir[key]
               filer = Filer(self.filter_modes)
 
-              ok = filer.file(M, mdir.keypath(key))
+              ok = filer.file(M, self.rules, mdir.keypath(key))
               if not ok:
                 self.lurk(key)
                 continue
