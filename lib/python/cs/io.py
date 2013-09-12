@@ -142,14 +142,18 @@ class CatchupLines(object):
 
   def __init__(self, fp, partial=''):
     self.fp = fp
-    self.partial = ''
+    self.partial = partial
 
   def __iter__(self):
     ''' Generator yielding complete lines from the text file `fp` until EOF.
     '''
+    partial = self.partial
     fp = self.fp
     while True:
       line = fp.readline()
+      if partial:
+        line = partial + line
+        partial = self.partial = ''
       if not line.endswith('\n'):
         break
       yield line
