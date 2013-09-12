@@ -134,6 +134,27 @@ class IndentedFile(OFileWrapper):
         nl=s.find('\n',off)
       OFileWrapper.write(self,s[off:])
 
+class CatchupLines(object):
+  ''' Tiny class to present an iterable that reads complete lines from a file
+      until EOF. After the iterator is exhausted, the .partial attribute
+      contains any left over incomplete line.
+  '''
+
+  def __init__(self, fp, partial=''):
+    self.fp = fp
+    self.partial = ''
+
+  def __iter__(self):
+    ''' Generator yielding complete lines from the text file `fp` until EOF.
+    '''
+    fp = self.fp
+    while True:
+      line = fp.readline()
+      if not line.endswith('\n'):
+        break
+      yield line
+    self.partial = line
+
 if __name__ == '__main__':
   import cs.io_tests
   cs.io_tests.selftest(sys.argv)

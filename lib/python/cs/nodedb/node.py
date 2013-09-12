@@ -15,11 +15,13 @@ from getopt import GetoptError
 from threading import RLock
 from threading import Thread
 from collections import namedtuple
+from cs.debug import RLock
 from cs.excutils import unimplemented
 from cs.obj import O
 from cs.lex import str1, parseUC_sAttr
 from cs.logutils import Pfx, D, error, warning, info, debug, exception
 from cs.seq import the, get0
+from cs.threads import locked
 from cs.py3 import StringTypes, unicode
 from .export import edit_csv_wide, export_csv_wide
 
@@ -98,8 +100,6 @@ class _AttrList(list):
       list.__init__(self)
     self.node = node
     self.attr = attr
-    if node is not None:
-      self.nodedb = node.nodedb
 
   def __str__(self):
     return str(list(self))
@@ -108,6 +108,14 @@ class _AttrList(list):
     if self.node is None:
       return ".%ss[...]" % (self.attr,)
     return "%s.%ss" % (str(self.node), self.attr)
+
+  @property
+  def nodedb(self):
+    return self.node.nodedb
+
+  @property
+  def backend(self):
+    return self.nodedb.backend
 
   def __delitemrefs(self, nodes):
     ''' Remove the reverse references of this attribute.
@@ -139,12 +147,12 @@ class _AttrList(list):
     ''' Rewrite our value completely in the backend.
     '''
     N = self.node
-    if self.nodedb.backend:
-      self.nodedb.backend.setAttr(N.type, N.name, self.attr, self)
+    if self.backend:
+      self.backend.setAttr(N.type, N.name, self.attr, self)
 
   def _extend(self, values):
     N = self.node
-    backend = self.nodedb.backend
+    backend = self.backend
     if backend:
       backend.extendAttr(N.type, N.name, self.attr, values)
 
@@ -214,7 +222,7 @@ class _AttrList(list):
   def pop(self, index=-1):
     value = list.pop(self, index)
     self.__delitemrefs((value,))
-    self.nodedb.backend.saveAttrs(self)
+    self.backend.saveAttrs(self)
     self._save()
     return value
 
@@ -664,9 +672,11 @@ class NodeDB(dict, O):
     backend.nodedb = self
     backend.apply_to(self)
     self.backend = backend
+    self._lock = RLock()
 
   __str__ = O.__str__
 
+  @locked
   def close(self):
     ''' Close this NodeDB.
     '''
@@ -675,6 +685,7 @@ class NodeDB(dict, O):
     self.backend = None
     self.closed = True
 
+  @locked
   def sync(self):
     ''' Synchronise: update the backend to match the current frontend state.
     '''
@@ -734,8 +745,8 @@ class NodeDB(dict, O):
                          totext, fromtext,
                          tobytes=None, frombytes=None):
     ''' Register an attribute value type for storage and retrieval in this
-        NodeDB. This permits the storage of values that are not the
-        presupported string, non-negative integer and Node types.
+        NodeDB. This permits the storage of values that are not
+        presupported: strings, non-negative integers and Nodes.
         Parameters:
           `t`, the value type to register
           `scheme`, the scheme label to use for the type
@@ -929,12 +940,6 @@ class NodeDB(dict, O):
       return self[key]
     except KeyError:
       return self.newNode(key)
-
-  @property
-  def _s(self):
-    ''' Return Nodes of type _.
-    '''
-    return self.__nodesByType.get('_', ())
 
   def seq(self):
     ''' Obtain a new sequence number for this NodeDB.

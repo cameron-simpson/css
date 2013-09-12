@@ -7,6 +7,7 @@
 import sys
 import unittest
 from cs.logutils import D
+from cs.py3 import StringTypes
 from . import NodeDB, Node
 from .mappingdb import MappingBackend
 
@@ -21,7 +22,7 @@ class TestAll(unittest.TestCase):
       sys.stderr.flush()
       s = self.db.totext(value)
       sys.stderr.flush()
-      assert type(s) is str
+      self.assertTrue(isinstance(s, StringTypes), "s is not stringy: %r" % (s,))
       self.assertTrue(value == self.db.fromtext(s))
 
   def test02get(self):
