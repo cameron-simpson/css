@@ -12,11 +12,11 @@ import sys
 import datetime
 from collections import namedtuple
 from shutil import copyfile
-from threading import Thread
+from threading import Condition
 from cs.csvutils import csv_reader, csv_writerow, catchup as csv_catchup
-from cs.debug import Lock, RLock
+from cs.debug import Lock, RLock, Thread
 from cs.fileutils import lockfile, FileState
-from cs.logutils import Pfx, error, warning, info, D
+from cs.logutils import Pfx, error, warning, info, debug, D
 from cs.threads import locked_property
 from cs.timeutils import sleep
 from cs.py3 import StringTypes, Queue, Queue_Full as Full, Queue_Empty as Empty
@@ -59,7 +59,6 @@ def read_csv_rows(lines, noHeaders=False):
 def resolve_csv_row(row, lastrow):
   ''' Transmute a CSV row, resolving omitted TYPE, NAME or ATTR fields.
   '''
-  D("RCR: row %d =%r, lastrow=%r", len(row), row, lastrow)
   t, name, attr, value = row
   if t == '':
     t = lastrow.type
@@ -97,9 +96,7 @@ def apply_csv_row(nodedb, row):
         VALUE must be empty
       Otherwise each VALUE is appended to any existing ATTR VALUEs.
   '''
-  D("row = %r", row)
   t, name, attr, value = row
-  D("row ok")
   if attr.startswith('-'):
     # remove attribute
     attr = attr[1:]
@@ -161,23 +158,30 @@ class Backend_CSVFile(Backend):
     self.keep_backups = False
     self.csvpath = csvpath
     self._updateQ = Queue(1024)
+    self._update_count = 0
+    self._updated_count = 0
     self._update_lock = RLock()
+    self._update_cond = Condition(self._update_lock)
     self._rewind()
     self._lock = Lock()
 
   @locked_property
   def _update_thread(self):
     T = Thread(target=self._monitor, args=(self._updateQ,))
-    D("start monitor thread...")
+    debug("start monitor thread...")
     T.start()
     return T
 
   def _queue(self, row):
     if self.readonly:
-      D("readonly: do not queue %r", row)
+      debug("readonly: do not queue %r", row)
+    elif self.closed:
+      raise RuntimeError("%s closed: not queuing %r" % (self, row))
     else:
-      D("queue %r", row)
+      debug("queue %r", row)
       self._updateQ.put(row)
+      with self._lock:
+        self._update_count += 1
 
   def close(self):
     Backend.close(self)
@@ -186,23 +190,30 @@ class Backend_CSVFile(Backend):
   def sync(self):
     ''' Update the CSV file.
     '''
-    if self.changed:
-      if self.readonly:
-        error("%s: readonly: sync not done", self)
-      else:
-        with lockfile(self.csvpath):
-          backup = "%s.bak-%s" % (self.csvpath, datetime.datetime.now().isoformat())
-          copyfile(self.csvpath, backup)
-          write_csv_file(self.csvpath, self.nodedb.nodedata())
-        if not self.keep_backups:
-          os.remove(backup)
-        self.changed = False
+    with self._lock:
+      update_count = self._update_count
+    while True:
+      with self._update_lock:
+        debug("polling self._updated_count (%d) - need (%d)", self._updated_count, update_count)
+        ready = self._updated_count >= update_count
+        if ready:
+          break
+        debug("sync: not ready, waiting for another notification")
+        self._update_cond.wait()
 
   def rewrite(self):
     ''' Force a complete rewrite of the CSV file.
     '''
-    self.changed = True
-    self.sync()
+    if self.readonly:
+      error("%s: readonly: sync not done", self)
+    else:
+      with lockfile(self.csvpath):
+        backup = "%s.bak-%s" % (self.csvpath, datetime.datetime.now().isoformat())
+        copyfile(self.csvpath, backup)
+        write_csv_file(self.csvpath, self.nodedb.nodedata())
+      if not self.keep_backups:
+        os.remove(backup)
+      self.changed = False
 
   def apply_nodedata(self):
     raise NotImplementedError("no %s.apply_nodedata(), apply_to uses incremental mode" % (type(self),))
@@ -247,8 +258,10 @@ class Backend_CSVFile(Backend):
       self._queue(CSVRow(t, name, attr, value))
 
   def _rewind(self):
+    ''' Rewind our access to the CSV file.
+    '''
     with self._update_lock:
-      D("_rewind %r", self.csvpath)
+      debug("_rewind %r", self.csvpath)
       self.csvstate = None        # tracked by _monitor_read_updates
       self.partial = ''           # tracked by _monitor_read_updates
       self.lastrow = NullCSVRow
@@ -278,7 +291,6 @@ class Backend_CSVFile(Backend):
     ''' Read CSV data from the current position of self.fp
         and update the NodeDB accordingly.
     '''
-    ##D("_monitor_read_updates ...")
     with self._update_lock:
       # optimisation: do nothing if file unchanged
       old_csvstate = self.csvstate
@@ -286,12 +298,12 @@ class Backend_CSVFile(Backend):
       if old_csvstate is not None and csvstate == old_csvstate:
         # file unchanged - avoid a lot of extra work
         return
-      D("CSV file changed: save new state %r for %r", csvstate, self.csvpath)
+      debug("CSV file changed: save new state %r for %r", csvstate, self.csvpath)
       self.csvstate = csvstate
 
       nodedb = self.nodedb
       if nodedb is None:
-        raise RuntimeError("self.nodedb = None!")
+        raise RuntimeError("self.nodedb = None! monitor thread started before nodedb init?")
       lastrow = NullCSVRow
       for row in csv_catchup(self.fp, self.partial):
         if isinstance(row, str):
@@ -310,19 +322,14 @@ class Backend_CSVFile(Backend):
             write our updates
           release lock
     '''
-    D("_monitor_write_updates ...")
     if updateQ.empty():
       error("_monitor_write_updates: updateQ is empty! should not happen!")
       return
     if self.readonly:
       raise RuntimeError("_monitor_write_updates called but we are readonly!")
-    D("getting _update_lock...")
     with self._update_lock:
-      D("locked, getting lockfile")
       with lockfile(self.csvpath):
-        D("lockfiled, reading updates")
         self._monitor_read_updates()
-        D("updated")
         if self.partial:
           error("_monitor_write_updates: incomplete data from _monitor_read_updates: %r", self.partial)
         elif self.fp.tell() != os.fstat(self.fp.fileno()).st_size:
@@ -344,11 +351,13 @@ class Backend_CSVFile(Backend):
             if attr[0].isalpha() and lastrow.attr is not None and attr == lastrow.attr:
               name = ''
             row = CSVRow(t, name, attr, value)
-            warning("_monitor_write_updates: append row: %s", row)
             csv_writerow(csvw, row)
+            with self._lock:
+              self._updated_count += 1
             lastrow = row
-          D("flush csv file")
           self.fp.flush()
+          # alert sync() users that updates have been committed
+          self._update_cond.notify_all()
 
 if __name__ == '__main__':
   from cs.logutils import setup_logging
