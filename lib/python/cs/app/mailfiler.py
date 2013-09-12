@@ -431,7 +431,7 @@ class Filer(O):
     '''
     if alert_message is None:
       alert_message = self.alert_message(self.message)
-    xit = subprocess.call(['alert', alert_message])
+    xit = subprocess.call([self.env('ALERT', 'alert'), alert_message])
     if xit != 0:
       warning("non-zero exit from alert: %d", xit)
     return xit
