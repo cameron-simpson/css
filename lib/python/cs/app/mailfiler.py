@@ -271,7 +271,7 @@ class Filer(O):
     return self.filter_modes.maildir(mdirpath, self.environ)
 
   def resolve(self, foldername):
-    return resolve_mail_path(foldername, self.environ['MAILDIR'])
+    return resolve_mail_path(foldername, self.MAILDIR)
 
   def log(self, *a):
     ''' Log a message.
@@ -330,6 +330,10 @@ class Filer(O):
     ''' Shorthand for environment lookup.
     '''
     return self.environ.get(envvar, default)
+
+  @property
+  def MAILDIR(self):
+    return self.env('MAILDIR', os.path.join(self.env('HOME', None), 'mail'))
 
   def save_target(self, target):
     with Pfx("save(%s)", target):
