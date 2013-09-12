@@ -326,6 +326,11 @@ class Filer(O):
       hamap[header] = set( [ A for N, A in message_addresses(M, (header,)) ] )
     return hamap[header]
 
+  def env(self, envvar, default):
+    ''' Shorthand for environment lookup.
+    '''
+    return self.environ.get(envvar, default)
+
   def save_target(self, target):
     with Pfx("save(%s)", target):
       if target.startswith('|'):
