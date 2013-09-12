@@ -405,7 +405,7 @@ class Filer(O):
         `mfp` is a file containing the message text.
         If `mfp` is None, use the text of the current message.
     '''
-    return self.save_to_pipe([self.environ.get('SENDMAIL', 'sendmail'), '-oi', address], mfp=mfp)
+    return self.save_to_pipe([self.env('SENDMAIL', 'sendmail'), '-oi', address], mfp=mfp)
 
   def alert(self, alert_message):
     xit = subprocess.call(['alert', 'MAILFILER: ' + alert_message])
