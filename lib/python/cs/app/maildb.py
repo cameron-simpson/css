@@ -398,7 +398,31 @@ class _MailDB(NodeDB):
   def rewrite(self):
     ''' Force a complete rewrite of the CSV file.
     '''
+    obackend = self.backend
+    self.backend = None
+    self.scrub()
+    self.backend = obackend
     self.backend.rewrite()
+
+  def scrub(self):
+    ''' Normalise some of the attributes.
+    '''
+    for N in self.ADDRESSes:
+      gs = N.GROUPs
+      if gs:
+        gsu = set(gs)
+        if len(gsu) < len(gs):
+          N.GROUPs = sorted(list(gsu))
+      rns = N.REALNAMEs
+      if rns:
+        rnsu = set(rns)
+        if len(rnsu) < len(rns):
+          N.REALNAMEs = rnsu
+      abs = N.ABBREVIATIONs
+      if abs:
+        absu = set(abs)
+        if len(absu) < len(abs):
+          N.ABBREVIATIONs = sorted(list(absu))
 
   def _createNode(self, t, name):
     ''' Create a new Node of the specified type.
