@@ -4,10 +4,14 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
+from threading import Condition
 import unittest
-from cs.logutils import D, OBSOLETE
+from cs.logutils import D, OBSOLETE, debug
 from cs.obj import O
+from cs.threads import locked_property
 from cs.excutils import unimplemented
+from cs.debug import Lock, RLock, Thread
+from cs.py3 import Queue, Queue_Full as Full, Queue_Empty as Empty
 
 class _BackendMappingMixin(O):
   ''' A mapping interface to be presented by all Backends.
@@ -87,7 +91,54 @@ class _BackendMappingMixin(O):
   def __ne__(self, other):
     return not self == other
 
-class Backend(_BackendMappingMixin):
+class _BackendUpdateQueue(O):
+  ''' Mixin to supplied the update queue and associated facilities.
+  '''
+
+  def __init__(self):
+    self._updateQ = Queue(1024)
+    self._update_count = 0
+    self._updated_count = 0
+    self._queue_updates = True
+    self._update_lock = RLock()
+    self._update_cond = Condition(self._update_lock)
+
+  @locked_property
+  def _update_thread(self):
+    T = Thread(target=self._monitor, args=(self._updateQ,))
+    debug("start monitor thread...")
+    T.start()
+    return T
+
+  def _queue(self, row):
+    ''' Queue the supplied row (TYPE, NAME, ATTR, VALUE) for the backend update thread.
+    '''
+    if self._queue_updates:
+      if self.readonly:
+        debug("readonly: do not queue %r", row)
+      elif self.closed:
+        raise RuntimeError("%s closed: not queuing %r" % (self, row))
+      else:
+        debug("queue %r", row)
+        self._updateQ.put(row)
+        with self._lock:
+          self._update_count += 1
+
+  def sync(self):
+    ''' Wait for the update queue to complete to the current update_count.
+    '''
+    with self._lock:
+      update_count = self._update_count
+    while True:
+      with self._update_lock:
+        debug("polling self._updated_count (%d) - need (%d)", self._updated_count, update_count)
+        ready = self._updated_count >= update_count
+        if ready:
+          break
+        debug("sync: not ready, waiting for another notification")
+        self._update_cond.wait()
+
+class Backend(_BackendMappingMixin, _BackendUpdateQueue):
   ''' Base class for NodeDB backends.
   '''
 
@@ -96,6 +147,9 @@ class Backend(_BackendMappingMixin):
     self.readonly = readonly
     self.changed = False
     self.closed = False
+    if not readonly:
+      _BackendUpdateQueue.__init__(self)
+    self._lock = Lock()
 
   def nodedata(self):
     ''' Yield node data in:
@@ -134,13 +188,10 @@ class Backend(_BackendMappingMixin):
   def close(self):
     ''' Basic close: sync, detach from NodeDB, mark as closed.
     '''
-    self.sync()
-    self.nodedb = None
     self.closed = True
-
-  @unimplemented
-  def sync(self):
-    pass
+    self.sync()
+    self._update_thread.join()
+    self.nodedb = None
 
   def setAttr(self, t, name, attr, values):
     ''' Save the full contents of this attribute list.
