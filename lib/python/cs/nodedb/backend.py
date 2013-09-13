@@ -161,39 +161,6 @@ class Backend(_BackendMappingMixin):
     '''
     pass
 
-class _QBackend(Backend):
-  ''' A backend to accept updates and queue them for asynchronous
-      completion via another backend.
-  '''
-
-  def __init__(self, backend, maxq=None):
-    if maxq is None:
-      maxq = 1024
-    else:
-      assert maxq > 0
-    self.backend = backend
-    self._Q = IterableQueue(maxq)
-    self._T = Thread(target=self._drain)
-    self._T.start()
-
-  def close(self):
-    self._Q.close()
-    self._T.join()
-    self._T = None
-
-  def _drain(self):
-    for what, args in self._Q:
-      what(*args)
-
-  def newNode(self, t, name):
-    self._Q.put( (self.backend.newNode, (t, name,)) )
-  def delNode(self, t, name):
-    self._Q.put( (self.backend.delNode, (t, name,)) )
-  def extendAttr(self, t, name, attr, values):
-    self._Q.put( (self.backend.extendAttr, (t, name, attr, values)) )
-  def delAttr(self, t, name, attr):
-    self._Q.put( (self.backend.delAttr, (t, name, attr)) )
-
 class TestAll(unittest.TestCase):
 
   def setUp(self):
