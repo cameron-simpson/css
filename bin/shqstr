@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #
 # Emit the arguments suitably quoted for passing via the shell.
 #	- Cameron Simpson <cs@zip.com.au> 22apr2001
