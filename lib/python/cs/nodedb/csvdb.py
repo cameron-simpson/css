@@ -10,111 +10,29 @@ import os
 import os.path
 import sys
 import datetime
-from collections import namedtuple
 from shutil import copyfile
-from threading import Condition
-from cs.csvutils import csv_reader, csv_writerow, catchup as csv_catchup
-from cs.debug import Lock, RLock, Thread
+from cs.csvutils import csv_reader, csv_writerow, CatchUp as CSV_CatchUp
 from cs.fileutils import lockfile, FileState
 from cs.logutils import Pfx, error, warning, info, debug, D
-from cs.threads import locked_property
-from cs.timeutils import sleep
 from cs.py3 import StringTypes, Queue, Queue_Full as Full, Queue_Empty as Empty
 from . import NodeDB
-from .backend import Backend
-
-CSVRow = namedtuple('CSVRow', 'type name attr value')
+from .backend import Backend, CSVRow
 
 # used to reset state in the don't-repeat-type/name/attr mode
 NullCSVRow = CSVRow(None, None, None, None)
 
-def read_csv_rows(lines, noHeaders=False):
-  ''' Read a CSV file in vertical format (TYPE,NAME,ATTR,VALUE) and fill
-      in the values implied by empty TYPE, NAME or ATTR columns (previous
-      row's value).
-      `lines` is an interable or the name of a CSV file.
-      `noHeaders` indicates there is no column header row if true.
-  '''
-  if isinstance(lines, StringTypes):
-    # was "rb"
-    with open(lines, "r") as csvfp:
-      for row in read_csv_rows(csvfp,
-                          noHeaders=noHeaders):
-        yield row
-    return
-
-  r = csv_reader(lines, encoding='utf-8')
-  if not noHeaders:
-    hdrrow = next(r)
-    if hdrrow != ['TYPE', 'NAME', 'ATTR', 'VALUE']:
-      raise ValueError(
-              "bad header row, expected TYPE, NAME, ATTR, VALUE but got: %s"
-              % (hdrrow,))
-  oldrow = NullCSVRow
-  for row in rows:
-    row = resolve_csv_row(row, lastrow)
-    yield row
-    lastrow = row
-
 def resolve_csv_row(row, lastrow):
   ''' Transmute a CSV row, resolving omitted TYPE, NAME or ATTR fields.
   '''
-  t, name, attr, value = row
-  if t == '':
-    t = lastrow.type
-  if name == '':
-    name = lastrow.name
-  if attr == '':
-    attr = lastrow.attr
-  return CSVRow(t, name, attr, value)
-
-def apply_csv_rows(nodedb, rows):
-  ''' Apply the `rows` to a NodeDB `nodedb`.
-      Rows is expected to be post-resolve_csv_row().
-      Honour the incremental notation for data:
-      - a NAME commencing with '=' discards any existing (TYPE, NAME)
-        and begins anew.
-      - an ATTR commencing with '=' discards any existing ATTR and
-        commences the ATTR anew
-      - an ATTR commencing with '-' discards any existing ATTR;
-        VALUE must be empty
-      Otherwise each VALUE is appended to any existing ATTR VALUEs.
-  '''
-  for row in rows:
-    apply_csv_row(nodedb, row)
-
-def apply_csv_row(nodedb, row):
-  ''' Apply the values from an individual CSV row.
-      Apply values to the specified `nodedb`.
-      Each row is expected to be post-resolve_csv_row().
-      Honour the incremental notation for data:
-      - a NAME commencing with '=' discards any existing (TYPE, NAME)
-        and begins anew.
-      - an ATTR commencing with '=' discards any existing ATTR and
-        commences the ATTR anew
-      - an ATTR commencing with '-' discards any existing ATTR;
-        VALUE must be empty
-      Otherwise each VALUE is appended to any existing ATTR VALUEs.
-  '''
-  t, name, attr, value = row
-  if attr.startswith('-'):
-    # remove attribute
-    attr = attr[1:]
-    if value != "":
-      raise ValueError("ATTR = \"%s\" but non-empty VALUE: %r" % (attr, value))
-    N[attr] = ()
-  else:
-    # add attribute
-    if name.startswith('='):
-      # discard node and start anew
-      name = name[1:]
-      nodedb[t, name] = {}
-    N = nodedb.make( (t, name) )
-    if attr.startswith('='):
-      # reset attribute completely before appending value
-      attr = attr[1:]
-      N[attr] = ()
-    N.get(attr).append(nodedb.fromtext(value))
+  with Pfx("row=%r, lastrow=%r", row, lastrow):
+    t, name, attr, value = row
+    if t == '':
+      t = lastrow[0]
+    if name == '':
+      name = lastrow[1]
+    if attr == '':
+      attr = lastrow[2]
+    return t, name, attr, value
 
 def write_csv_file(fp, nodedata, noHeaders=False):
   ''' Iterate over the supplied `nodedata`, a sequence of:
@@ -155,77 +73,63 @@ class Backend_CSVFile(Backend):
 
   def __init__(self, csvpath, readonly=False):
     Backend.__init__(self, readonly=readonly)
-    self.keep_backups = False
     self.csvpath = csvpath
-    self._updateQ = Queue(1024)
-    self._update_count = 0
-    self._updated_count = 0
-    self._update_lock = RLock()
-    self._update_cond = Condition(self._update_lock)
-    self._rewind()
-    self._lock = Lock()
-
-  @locked_property
-  def _update_thread(self):
-    T = Thread(target=self._monitor, args=(self._updateQ,))
-    debug("start monitor thread...")
-    T.start()
-    return T
-
-  def _queue(self, row):
-    if self.readonly:
-      debug("readonly: do not queue %r", row)
-    elif self.closed:
-      raise RuntimeError("%s closed: not queuing %r" % (self, row))
+    self.keep_backups = False
+    if readonly:
+      self.csvfp = open(csvpath, "r")
     else:
-      debug("queue %r", row)
-      self._updateQ.put(row)
-      with self._lock:
-        self._update_count += 1
+      self.csvfp = open(csvpath, "r+")
+    self.lastrow = None
 
-  def close(self):
-    Backend.close(self)
-    self._update_thread.join()
-
-  def sync(self):
-    ''' Update the CSV file.
+  def lockdata(self):
+    ''' Obtain an exclusive lock on the CSV file.
     '''
-    with self._lock:
-      update_count = self._update_count
-    while True:
-      with self._update_lock:
-        debug("polling self._updated_count (%d) - need (%d)", self._updated_count, update_count)
-        ready = self._updated_count >= update_count
-        if ready:
-          break
-        debug("sync: not ready, waiting for another notification")
-        self._update_cond.wait()
+    return lockfile(self.csvpath)
+
+  def init_nodedb(self):
+    with self._updates_off():
+      self._rewind()
+      for row in self.fetch_updates():
+        self.apply_csv_row(row)
+
+  def fetch_updates(self, header_row=None):
+    ''' Read CSV update rows from the current file position.
+        Yield resolved rows.
+    '''
+    raw_rows = CSV_CatchUp(self.csvfp, self.partial)
+    if header_row:
+      row = raw_rows.next()
+      if row != header_row:
+        raise RuntimeError(
+              "bad header row, expected %r, got: %r"
+              % (header_row, row))
+    fromtext = self.nodedb.fromtext
+    lastrow = self.lastrow
+    for row in raw_rows:
+      t, name, attr, value = resolve_csv_row(row, lastrow)
+      value = fromtext(value)
+      yield CSVRow(t, name, attr, value)
+      lastrow = row
+    self.partial = raw_rows.partial
+    self.lastrow = lastrow
 
   def rewrite(self):
     ''' Force a complete rewrite of the CSV file.
     '''
     if self.readonly:
-      error("%s: readonly: sync not done", self)
-    else:
-      with lockfile(self.csvpath):
+      error("%s: readonly: rewrite not done", self)
+      return
+
+    with self._update_lock:
+      self.csvfp.close()
+      with self.lockdata():
         backup = "%s.bak-%s" % (self.csvpath, datetime.datetime.now().isoformat())
         copyfile(self.csvpath, backup)
         write_csv_file(self.csvpath, self.nodedb.nodedata())
+        self.csvfp = open(csvpath, "r+")
+        self._fast_forward()
       if not self.keep_backups:
         os.remove(backup)
-      self.changed = False
-
-  def apply_nodedata(self):
-    raise NotImplementedError("no %s.apply_nodedata(), apply_to uses incremental mode" % (type(self),))
-
-  def apply_to(self, nodedb):
-    ''' Read the CSV file and apply the contents to the NodeDB.
-        The CSV file is expected to have a header row.
-    '''
-    T = self._update_thread
-    with self._update_lock:
-      self._rewind()
-      self._monitor_read_updates()
 
   def iteritems(self):
     for t, name, attrmap in read_csv_file(self.csvpath):
@@ -246,118 +150,42 @@ class Backend_CSVFile(Backend):
     for k, v in N.items():
       self.setAttr(t, name, k, v)
 
-  def delAttr(self, t, name, attr):
-    ''' Delete an attribute.
-    '''
-    self._queue(CSVRow(t, name, '-'+attr, ''))
-
-  def extendAttr(self, t, name, attr, values):
-    ''' Append values to an attribute.
-    '''
-    for value in values:
-      self._queue(CSVRow(t, name, attr, value))
-
   def _rewind(self):
     ''' Rewind our access to the CSV file.
     '''
-    with self._update_lock:
-      debug("_rewind %r", self.csvpath)
-      self.csvstate = None        # tracked by _monitor_read_updates
-      self.partial = ''           # tracked by _monitor_read_updates
-      self.lastrow = NullCSVRow
-      if self.readonly:
-        self.fp = open(self.csvpath, "r")
-      else:
-        self.fp = open(self.csvpath, "r+")
+    debug("_rewind %r", self.csvpath)
+    self.partial = ''
+    self.csvfp.seek(0, os.SEEK_SET)
 
-  def _monitor(self, updateQ):
-    delay = 0.1
-    writing = False
-    while True:
-      # run until self.closed and updateQ.empty
-      # to ensure all updates get written to the CSV file
-      is_empty = updateQ.empty()
-      if is_empty:
-        if self.closed:
-          break
-        # poll the file for updates
-        self._monitor_read_updates()
-      else:
-        # log updates to the file
-        self._monitor_write_updates(updateQ, delay)
-      sleep(delay)
-
-  def _monitor_read_updates(self):
-    ''' Read CSV data from the current position of self.fp
-        and update the NodeDB accordingly.
+  def _fast_forward(self):
+    ''' Advance our access to the CSV file to the end.
     '''
     with self._update_lock:
-      # optimisation: do nothing if file unchanged
-      old_csvstate = self.csvstate
-      csvstate = FileState(self.csvpath)
-      if old_csvstate is not None and csvstate == old_csvstate:
-        # file unchanged - avoid a lot of extra work
-        return
-      debug("CSV file changed: save new state %r for %r", csvstate, self.csvpath)
-      self.csvstate = csvstate
+      debug("_fast_forward %r", self.csvpath)
+      self._rewind()
+      self.csvfp.seek(0, os.SEEK_END)
 
-      nodedb = self.nodedb
-      if nodedb is None:
-        raise RuntimeError("self.nodedb = None! monitor thread started before nodedb init?")
-      lastrow = NullCSVRow
-      for row in csv_catchup(self.fp, self.partial):
-        if isinstance(row, str):
-          # last item is the left over partial line; save it
-          self.partial = row
-          break
-        row = resolve_csv_row(row, lastrow)
-        apply_csv_row(nodedb, row)
-        lastrow = row
-
-  def _monitor_write_updates(self, updateQ, delay):
-    ''' Copy current updates from updateQ and append the the CSV file.
-        Process:
-          take lock
-            catch up on outside updates
-            write our updates
-          release lock
+  def push_updates(self, csvrows):
+    ''' Apply the update rows from the iterable `csvrows` to the data file.
+        This assumes we already have access to the data file.
     '''
-    if updateQ.empty():
-      error("_monitor_write_updates: updateQ is empty! should not happen!")
-      return
-    if self.readonly:
-      raise RuntimeError("_monitor_write_updates called but we are readonly!")
-    with self._update_lock:
-      with lockfile(self.csvpath):
-        self._monitor_read_updates()
-        if self.partial:
-          error("_monitor_write_updates: incomplete data from _monitor_read_updates: %r", self.partial)
-        elif self.fp.tell() != os.fstat(self.fp.fileno()).st_size:
-          error("_monitor_write_updates: partial is empty, but fp.tell != ft.st_size: %r vs %r",
-                  self.fp.tell(), os.fstat(self.fp.fileno()).st_size)
-        else:
-          # now write CSV rows to the file and flush
-          csvw = csv.writer(self.fp)
-          lastrow = NullCSVRow
-          while True:
-            try:
-              t, name, attr, value = updateQ.get(True, delay)
-            except Empty:
-              break
-            if lastrow.type is not None and t == lastrow.type:
-              t = ''
-            if lastrow.name is not None and name == lastrow.name:
-              name = ''
-            if attr[0].isalpha() and lastrow.attr is not None and attr == lastrow.attr:
-              name = ''
-            row = CSVRow(t, name, attr, value)
-            csv_writerow(csvw, row)
-            with self._lock:
-              self._updated_count += 1
-            lastrow = row
-          self.fp.flush()
-          # alert sync() users that updates have been committed
-          self._update_cond.notify_all()
+    D("push_updates: write our own updates to %s", self.csvfp)
+    csvw = csv.writer(self.csvfp)
+    lastrow = NullCSVRow
+    for t, name, attr, value in csvrows:
+      if lastrow.type is not None and t == lastrow.type:
+        t = ''
+      if lastrow.name is not None and name == lastrow.name:
+        name = ''
+      if attr[0].isalpha() and lastrow.attr is not None and attr == lastrow.attr:
+        name = ''
+      row = CSVRow(t, name, attr, value)
+      D("push_updates: csv_writerow(%r)", row)
+      csv_writerow(csvw, row)
+      with self._lock:
+        self._updated_count += 1
+      lastrow = row
+    self.csvfp.flush()
 
 if __name__ == '__main__':
   from cs.logutils import setup_logging
