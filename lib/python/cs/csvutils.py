@@ -54,14 +54,28 @@ else:
   def csv_writerow(csvw, row, encoding='utf-8'):
     return csvw.writerow(row)
 
-def catchup(fp, partial=''):
-  ''' A generator to read CSV lines from fp until EOF, returning row tuples.
-      At EOF, yield the partial line remaining (an empty string if the file
-      is complete).
-      Accept an optional former partial line.
+class CatchUp(object):
+  ''' A CSV layer to cs.io.CatchupLines.
+      It is iterable, yields CSV data rows.
+      At the end of iteration the .partial attribute contains any
+      incomplete line.
+      It is reusable; another iteration will commence with that
+      partial line.
   '''
-  catch_fp = CatchupLines(fp, partial)
-  r = csv_reader(catch_fp)
-  for row in r:
-    yield row
-  yield catch_fp.partial
+
+  def __init__(self, fp, partial=''):
+    ''' Initialise the CatchUp with an open file `fp` and optional
+        partial line `partial`.
+    '''
+    self.fp = fp
+    self.partial = partial
+
+  def __iter__(self):
+    self.lines = CatchupLines(self.fp, self.partial)
+    for row in csv_reader(self.lines):
+      yield row
+    self.partial = self.lines.partial
+
+  def rewind(self):
+    self.fp.seek(0, os.SEEK_SET)
+    self.partial = ''
