@@ -668,10 +668,9 @@ class NodeDB(dict, O):
     # attach backend to collect updates
     self.__nodesByType = {}
     # load data with no backend, then attach backend
-    self.backend = None
     backend.nodedb = self
-    backend.apply_to(self)
     self.backend = backend
+    backend.init_nodedb()
     self._lock = RLock()
 
   __str__ = O.__str__
@@ -1148,7 +1147,7 @@ class NodeDB(dict, O):
     fp.flush()
 
   def nodedata(self, nodes=None):
-    ''' Generator to yield:
+    ''' Generator to yield this NodeDB's data in the form:
           type, name, attrmap
         ready to be written to external storage such as a CSV file
         or to be applied to another NodeDB.
@@ -1161,8 +1160,8 @@ class NodeDB(dict, O):
         attrmap[attr] = [ self.totext(value) for value in values ]
       yield N.type, N.name, attrmap
 
-  def apply_nodedata(self, nodedata, doCreate=True):
-    ''' Load `nodedata`, a sequence of:
+  def apply_nodedata(self, nodedata, doCreate=True, doExtend=False):
+    ''' Load `nodedata`, an iterable of:
           type, name, attrmap
         into this NodeDB.
     '''
@@ -1177,7 +1176,11 @@ class NodeDB(dict, O):
         mapping = {}
         for attr, values in attrmap.items():
           ##debug("set %s:%s.%s", t, name, attr)
-          mapping[attr] = [ self.fromtext(value) for value in values ]
+          values = [ self.fromtext(value) for value in values ]
+          if doExtend:
+            mapping[attr].extend(values)
+          else:
+            mapping[attr] = values
         N.apply(mapping)
 
   def nodespec(self, spec, doCreate=False):
