@@ -1,6 +1,5 @@
 import os
 import sys
-import string
 
 def readn(fp, n):
   ''' Read exactly n bytes from a file, coping with short reads.
