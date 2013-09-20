@@ -92,8 +92,8 @@ def main(argv, stdin=None):
             except ValueError as e:
               error(e)
               xit = 1
-            else:
-              MDB.rewrite()
+        elif op == 'compact':
+          MDB.rewrite()
         elif op == 'list-abbreviations' or op == 'list-abbrevs':
           try:
             opts, argv = getopt(argv, 'A')
