@@ -175,7 +175,7 @@ class _BackendUpdateQueue(O):
           break
         # poll for other updates
         self._update_fetch()
-      else:
+      elif not self.readonly:
         # apply our updates
         self._update_push(updateQ, delay)
       sleep(delay)
