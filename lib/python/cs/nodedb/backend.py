@@ -104,13 +104,14 @@ class _BackendUpdateQueue(O):
   '''
 
   def __init__(self):
-    self._updateQ = Queue(1024)
-    self._queue_updates = True
+    self._update_lock = RLock()
+    self._queue_updates = not self.readonly
     self._update_count = 0      # updates queued
     self._updated_count = 0     # updates applied
-    self._update_lock = RLock()
     self._update_cond = Condition(self._update_lock)
-    self._update_thread = self._start_update_thread()
+    if self.monitor or not self.readonly:
+      self._updateQ = Queue(1024)
+      self._update_thread = self._start_update_thread()
 
   def _start_update_thread(self):
     ''' Construct and start the update thread.
@@ -166,6 +167,15 @@ class _BackendUpdateQueue(O):
   def _update_monitor(self, updateQ, delay=POLL_DELAY):
     ''' Watch for updates from the NodeDB and from the backend.
     '''
+    if not self.monitor:
+      # not watching for other updates
+      # just read update queue and apply
+      while not self.closed:
+        row = updateQ.get()
+        self._update_push(updateQ, delay, row0=row)
+      return
+
+    # poll file regularly for updates
     while True:
       # run until self.closed and updateQ.empty
       # to ensure that all updates get written to backend
@@ -173,6 +183,8 @@ class _BackendUpdateQueue(O):
       if is_empty:
         if self.closed:
           break
+        if not self.monitor:
+          return
         # poll for other updates
         self._update_fetch()
       elif not self.readonly:
@@ -184,14 +196,12 @@ class _BackendUpdateQueue(O):
     ''' Read updates from the backing store
         and update the NodeDB accordingly.
     '''
-    if not self.monitor:
-      return
     with self._update_lock:
       with self._updates_off():
         for row in self.fetch_updates():
           self.apply_row(row)
 
-  def _update_push(self, updateQ, delay):
+  def _update_push(self, updateQ, delay, row0=None):
     ''' Copy current updates from updateQ and append to the backing store.
         Process:
           take data lock
@@ -209,6 +219,8 @@ class _BackendUpdateQueue(O):
         D("_update_push: read other updates...")
         self._update_fetch()
         def sendrows():
+          if row0:
+            yield row0
           while True:
             try:
               row = updateQ.get(True, delay)
@@ -234,8 +246,7 @@ class Backend(_BackendMappingMixin, _BackendUpdateQueue):
     self.monitor = monitor
     self.closed = False
     self._update_thread = None
-    if monitor or not readonly:
-      _BackendUpdateQueue.__init__(self)
+    _BackendUpdateQueue.__init__(self)
     self._lock = Lock()
 
   def nodedata(self):
