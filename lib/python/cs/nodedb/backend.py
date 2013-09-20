@@ -16,6 +16,9 @@ from cs.timeutils import sleep
 from cs.debug import Lock, RLock, Thread
 from cs.py3 import Queue, Queue_Full as Full, Queue_Empty as Empty
 
+# delay between update polls
+POLL_DELAY = 0.1
+
 CSVRow = namedtuple('CSVRow', 'type name attr value')
 
 class _BackendMappingMixin(O):
@@ -160,10 +163,9 @@ class _BackendUpdateQueue(O):
         debug("sync: not ready, waiting for another notification")
         self._update_cond.wait()
 
-  def _update_monitor(self, updateQ):
+  def _update_monitor(self, updateQ, delay=POLL_DELAY):
     ''' Watch for updates from the NodeDB and from the backend.
     '''
-    delay = 0.1
     while True:
       # run until self.closed and updateQ.empty
       # to ensure that all updates get written to backend
