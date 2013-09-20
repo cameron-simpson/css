@@ -73,7 +73,11 @@ def main(argv, stdin=None):
   else:
     op = argv.pop(0)
     with Pfx(op):
-      with MailDB(mdburl, readonly=False) as MDB:
+      readonly = op not in ('abbreviate', 'abbrev', 'compact',
+                            'edit-group', 'import-addresses',
+                            'learn-addresses',
+                           )
+      with MailDB(mdburl, readonly=readonly) as MDB:
         if op == 'import-addresses':
           if stdin.isatty():
             error("stdin is a tty, file expected")
