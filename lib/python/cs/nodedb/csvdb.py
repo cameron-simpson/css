@@ -64,8 +64,9 @@ def write_csv_file(fp, nodedata, noHeaders=False):
 
 class Backend_CSVFile(Backend):
 
-  def __init__(self, csvpath, readonly=False):
+  def __init__(self, csvpath, readonly=False, rewrite_inplace=False):
     Backend.__init__(self, readonly=readonly)
+    self.rewrite_inplace = rewrite_inplace
     self.csvpath = csvpath
     self.keep_backups = False
     if readonly:
@@ -116,10 +117,22 @@ class Backend_CSVFile(Backend):
     with self._update_lock:
       self.csvfp.close()
       with self.lockdata():
-        backup = "%s.bak-%s" % (self.csvpath, datetime.datetime.now().isoformat())
-        copyfile(self.csvpath, backup)
-        with open(self.csvpath, "w") as fp:
-          write_csv_file(fp, self.nodedb.nodedata())
+        if self.rewrite_inplace:
+          backup = "%s.bak-%s" % (self.csvpath, datetime.datetime.now().isoformat())
+          copyfile(self.csvpath, backup)
+          with open(self.csvpath, "w") as fp:
+            write_csv_file(fp, self.nodedb.nodedata())
+        else:
+          newfile = "%s.new-%s" % (self.csvpath, datetime.datetime.now().isoformat())
+          with open(newfile, "w") as fp:
+            write_csv_file(fp, self.nodedb.nodedata())
+          backup = "%s.bak-%s" % (self.csvpath, datetime.datetime.now().isoformat())
+          os.rename(self.csvpath, backup)
+          try:
+            os.rename(newfile, self.csvpath)
+          except:
+            error("rename(%s, %s): %s", newfile, self.csvpath, sys.exc_info)
+            os.rename(backup, self.csvpath)
         self.csvfp = open(csvpath, "r+")
         self._fast_forward()
       if not self.keep_backups:
