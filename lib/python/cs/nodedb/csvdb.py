@@ -43,13 +43,6 @@ def write_csv_file(fp, nodedata, noHeaders=False):
       `attrmap` maps attribute names to sequences of preserialised values as
         computed by NodeDB.totext(value).
   '''
-  if type(fp) is str:
-    with Pfx("write_csv_file(%s)", fp):
-      ##with io.open(fp, 'w', io.DEFAULT_BUFFER_SIZE, 'utf-8') as csvfp:
-      with open(fp, 'w') as csvfp:
-        write_csv_file(csvfp, nodedata, noHeaders=noHeaders)
-    return
-
   csvw = csv.writer(fp)
   if not noHeaders:
     csv_writerow( csvw, ('TYPE', 'NAME', 'ATTR', 'VALUE') )
@@ -125,7 +118,8 @@ class Backend_CSVFile(Backend):
       with self.lockdata():
         backup = "%s.bak-%s" % (self.csvpath, datetime.datetime.now().isoformat())
         copyfile(self.csvpath, backup)
-        write_csv_file(self.csvpath, self.nodedb.nodedata())
+        with open(self.csvpath, "w") as fp:
+          write_csv_file(fp, self.nodedb.nodedata())
         self.csvfp = open(csvpath, "r+")
         self._fast_forward()
       if not self.keep_backups:
