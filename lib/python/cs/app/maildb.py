@@ -29,6 +29,7 @@ def main(argv, stdin=None):
     Ops:
       abbreviate abbrev address
         (also "abbrev")
+      compact
       edit-group group
       edit-group /regexp/
       import-addresses < addresses.txt
