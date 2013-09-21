@@ -224,7 +224,10 @@ class DebuggingRLock(DebugWrapper):
   def acquire(self, blocking=True, timeout=-1):
     filename, lineno = inspect.stack()[0][1:3]
     self.debug('%s:%d: acquire(blocking=%s)', filename, lineno, blocking)
-    self.lock.acquire(blocking, timeout)
+    if timeout < 0:
+      self.lock.acquire(blocking)
+    else:
+      self.lock.acquire(blocking, timeout)
 
   def release(self):
     filename, lineno = inspect.stack()[0][1:3]
