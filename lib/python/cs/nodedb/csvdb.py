@@ -70,10 +70,19 @@ class Backend_CSVFile(Backend):
     self.csvpath = csvpath
     self.keep_backups = False
     if readonly:
-      self.csvfp = open(csvpath, "r")
+      self._open("r")
     else:
-      self.csvfp = open(csvpath, "r+")
+      self._open("r+")
     self.lastrow = None
+
+  def _open(self, mode):
+    self.csvfp = open(self.csvpath, mode)
+    self.csvstate = FileState(self.csvfp.fileno())
+
+  def _close(self):
+    self.csvfp.close()
+    self.csvfp = None
+    self.csvstate = None
 
   def lockdata(self):
     ''' Obtain an exclusive lock on the CSV file.
@@ -115,7 +124,7 @@ class Backend_CSVFile(Backend):
       return
 
     with self._update_lock:
-      self.csvfp.close()
+      self._close()
       with self.lockdata():
         if self.rewrite_inplace:
           backup = "%s.bak-%s" % (self.csvpath, datetime.datetime.now().isoformat())
@@ -133,7 +142,7 @@ class Backend_CSVFile(Backend):
           except:
             error("rename(%s, %s): %s", newfile, self.csvpath, sys.exc_info)
             os.rename(backup, self.csvpath)
-        self.csvfp = open(csvpath, "r+")
+        self._open("r+")
         self._fast_forward()
       if not self.keep_backups:
         os.remove(backup)
