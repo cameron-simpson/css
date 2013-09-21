@@ -188,10 +188,12 @@ class _AttrList(list):
       ovalues = (self[index],)
       values = (value,)
       index = slice(index, index+1)
-    else:
-      assert type(index) is slice
+    elif type(index) is slice:
       ovalues = itertools.islice(self, index.start, index.stop, index.step)
       values = list(value)
+    else:
+      raise TypeError("expected int or slice, got %s: %s[%r] = %s"
+                      % (type(index), self, index, value))
     self.__delitemrefs(ovalues)
     list.__setitem__(self, index, values)
     self.__additemrefs(values)
