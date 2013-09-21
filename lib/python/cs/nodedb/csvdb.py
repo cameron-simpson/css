@@ -69,13 +69,11 @@ class Backend_CSVFile(Backend):
     self.rewrite_inplace = rewrite_inplace
     self.csvpath = csvpath
     self.keep_backups = False
-    if readonly:
-      self._open("r")
-    else:
-      self._open("r+")
+    self._open()
     self.lastrow = None
 
-  def _open(self, mode):
+  def _open(self):
+    mode = "r" if self.readonly else "r+"
     self.csvfp = open(self.csvpath, mode)
     self.csvstate = FileState(self.csvfp.fileno())
 
@@ -99,6 +97,13 @@ class Backend_CSVFile(Backend):
     ''' Read CSV update rows from the current file position.
         Yield resolved rows.
     '''
+    new_state = FileState(self.csvfp.fileno())
+    if not self.csvstate.samefile(new_state):
+      # CSV file replaced, reload
+      self._close()
+      self.nodedb._scrub()
+      self._open()
+      self._rewind()
     raw_rows = CSV_CatchUp(self.csvfp, self.partial)
     if header_row:
       row = raw_rows.next()
@@ -142,7 +147,7 @@ class Backend_CSVFile(Backend):
           except:
             error("rename(%s, %s): %s", newfile, self.csvpath, sys.exc_info)
             os.rename(backup, self.csvpath)
-        self._open("r+")
+        self._open()
         self._fast_forward()
       if not self.keep_backups:
         os.remove(backup)
