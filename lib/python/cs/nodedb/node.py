@@ -202,6 +202,10 @@ class _AttrList(list):
   def __setslice__(self, i, j, values):
     self[max(0, i):max(0, j):] = values
 
+  def _scrub(self):
+    # remove all elements from this attribute
+    self[:] = ()
+
   def append(self, value):
     self.extend((value,))
 
@@ -339,6 +343,12 @@ class Node(dict):
         non-_AttrLists etc.
     '''
     pass
+
+  def _scrub(self):
+    ''' Remove all attribute values.
+    '''
+    for attr in self.keys():
+      self[attr]._scrub()
 
   def seq(self):
     seqs = self.SEQs
