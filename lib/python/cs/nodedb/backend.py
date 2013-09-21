@@ -170,8 +170,12 @@ class _BackendUpdateQueue(O):
     if not self.monitor:
       # not watching for other updates
       # just read update queue and apply
+      get_delay = 16 * delay
       while not self.closed:
-        row = updateQ.get()
+        try:
+          row = updateQ.get(True, get_delay)
+        except Empty:
+          continue
         self._update_push(updateQ, delay, row0=row)
       return
 
