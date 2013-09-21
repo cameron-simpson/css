@@ -215,7 +215,7 @@ class _BackendUpdateQueue(O):
     '''
     if self.readonly:
       raise RuntimeError("_update_push called but we are readonly!")
-    if updateQ.empty():
+    if row0 is None and updateQ.empty():
       error("_update_push: updateQ is empty! should not happen!")
       return
     with self._update_lock:
