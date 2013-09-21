@@ -8,7 +8,7 @@ from contextlib import contextmanager
 from threading import Condition
 from collections import namedtuple
 import unittest
-from cs.logutils import D, OBSOLETE, debug
+from cs.logutils import D, OBSOLETE, debug, error
 from cs.obj import O
 from cs.threads import locked_property
 from cs.excutils import unimplemented
