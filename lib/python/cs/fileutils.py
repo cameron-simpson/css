@@ -114,6 +114,8 @@ def abspath_from_file(path, from_file):
   return path
 
 _FileState = namedtuple('FileState', 'mtime size dev ino')
+_FileState.samefile = lambda self, other: self.dev == other.dev and self.ino == other.ino
+
 def FileState(path, do_lstat=False):
   ''' Return a signature object for a file state derived from os.stat
       (or os.lstat if `do_lstat` is true).
