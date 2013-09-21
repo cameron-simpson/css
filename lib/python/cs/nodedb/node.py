@@ -868,8 +868,10 @@ class NodeDB(dict, O):
     return N
 
   def __setitem__(self, item, N):
-    assert isinstance(N, Node), "tried to store non-Node: %r" % (N,)
-    assert N.nodedb is self, "tried to store foreign Node: %r" % (N,)
+    if not isinstance(N, Node):
+      raise TypeError("tried to store non-Node: %r" % (N,))
+    if N.nodedb is not self:
+      raise ValueError("tried to store foreign Node: %r" % (N,))
     key = nodekey(item)
     assert key == (N.type, N.name), \
            "tried to store Node(%s:%s) as key (%s:%s)" \
