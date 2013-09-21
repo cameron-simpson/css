@@ -119,10 +119,14 @@ _FileState.samefile = lambda self, other: self.dev == other.dev and self.ino == 
 def FileState(path, do_lstat=False):
   ''' Return a signature object for a file state derived from os.stat
       (or os.lstat if `do_lstat` is true).
-      This returns an object with mtime, size, dev and ino properties
+      `path` may also be an int, in which case os.fstat is used.
+      This returns an object with mtime, size, dev and ino attributes
       and can be compared for equality with other signatures.
   '''
-  s = os.lstat(path) if do_lstat else os.stat(path)
+  if type(path) is int:
+    s = os.fstat(path)
+  else:
+    s = os.lstat(path) if do_lstat else os.stat(path)
   return _FileState(s.st_mtime, s.st_size, s.st_dev, s.st_ino)
 
 def poll_file(path, old_state, reload_file, missing_ok=False):
