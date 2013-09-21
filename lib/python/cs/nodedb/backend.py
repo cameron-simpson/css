@@ -276,6 +276,13 @@ class Backend(_BackendMappingMixin, _BackendUpdateQueue):
       self._update_thread.join()
     self.nodedb = None
 
+  def _reload_nodedb(self):
+    ''' Toss all the data in the NodeDB and reload.
+    '''
+    with self._updates_off():
+      self.nodedb._scrub()
+      self.init_nodedb()
+
   def setAttr(self, t, name, attr, values):
     ''' Save the full contents of this attribute list.
     '''
