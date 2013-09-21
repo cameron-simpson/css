@@ -716,6 +716,13 @@ class NodeDB(dict, O):
           raise
     return False
 
+  def _scrub(self):
+    ''' Erase all the attribute data from the NodeDB.
+        Supports the backend reload facility.
+    '''
+    for key in list(self.keys()):
+      self[key]._scrub()
+
   def useNoNode(self):
     ''' Enable "no node" mode.
         After this call, a reference to a missing .ATTR will return
