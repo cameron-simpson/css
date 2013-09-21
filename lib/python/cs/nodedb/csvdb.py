@@ -193,19 +193,20 @@ class Backend_CSVFile(Backend):
     D("push_updates: write our own updates to %s", self.csvfp)
     csvw = csv.writer(self.csvfp)
     lastrow = NullCSVRow
-    for t, name, attr, value in csvrows:
+    for thisrow in csvrows:
+      t, name, attr, value = thisrow
       if lastrow.type is not None and t == lastrow.type:
         t = ''
       if lastrow.name is not None and name == lastrow.name:
         name = ''
       if attr[0].isalpha() and lastrow.attr is not None and attr == lastrow.attr:
         name = ''
-      row = CSVRow(t, name, attr, value)
-      D("push_updates: csv_writerow(%r)", row)
-      csv_writerow(csvw, row)
+      csvrow = CSVRow(t, name, attr, value)
+      D("push_updates: csv_writerow(%r)", csvrow)
+      csv_writerow(csvw, csvrow)
       with self._lock:
         self._updated_count += 1
-      lastrow = row
+      lastrow = thisrow
     self.csvfp.flush()
 
 if __name__ == '__main__':
