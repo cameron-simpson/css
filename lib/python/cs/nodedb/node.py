@@ -691,8 +691,7 @@ class NodeDB(dict, O):
   def close(self):
     ''' Close this NodeDB.
     '''
-    if self.backend:
-      self.backend.close()
+    self.backend.close()
     self.backend = None
     self.closed = True
 
