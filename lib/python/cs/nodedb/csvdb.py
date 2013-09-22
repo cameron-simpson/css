@@ -114,10 +114,10 @@ class Backend_CSVFile(Backend):
     fromtext = self.nodedb.fromtext
     lastrow = self.lastrow
     for row in raw_rows:
-      t, name, attr, value = resolve_csv_row(row, lastrow)
+      t, name, attr, value = fullrow = resolve_csv_row(row, lastrow)
       value = fromtext(value)
       yield CSVRow(t, name, attr, value)
-      lastrow = row
+      lastrow = fullrow
     self.partial = raw_rows.partial
     self.lastrow = lastrow
 
