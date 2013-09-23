@@ -201,8 +201,8 @@ class Backend_CSVFile(Backend):
         name = ''
       if attr[0].isalpha() and lastrow.attr is not None and attr == lastrow.attr:
         name = ''
-      csvrow = CSVRow(t, name, attr, value)
-      D("push_updates: csv_writerow(%r)", csvrow)
+      csvrow = CSVRow(t, name, attr, totext(value))
+      debug("push_updates: csv_writerow(%r)", csvrow)
       csv_writerow(csvw, csvrow)
       with self._lock:
         self._updated_count += 1
