@@ -18,12 +18,6 @@ class MappingBackend(Backend):
     Backend.__init__(self, readonly=readonly)
     self.mapping = mapping
 
-  def close(self):
-    pass
-
-  def sync(self):
-    pass
-
   def iteritems(self):
     return map_iteritems(self.mapping)
 
@@ -53,5 +47,5 @@ class MappingBackend(Backend):
     self.mapping[t, name].setdefault(attr, []).extend(values)
 
 if __name__ == '__main__':
-  import cs.nodedb.csvdb_tests
-  cs.nodedb.csvdb_tests.selftest(sys.argv)
+  import cs.nodedb.mappingdb_tests
+  cs.nodedb.mappingdb_tests.selftest(sys.argv)
