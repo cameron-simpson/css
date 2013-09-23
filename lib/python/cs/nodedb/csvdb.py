@@ -13,7 +13,7 @@ import datetime
 from shutil import copyfile
 from cs.csvutils import csv_reader, csv_writerow, CatchUp as CSV_CatchUp
 from cs.fileutils import lockfile, FileState
-from cs.logutils import Pfx, error, warning, info, debug, D
+from cs.logutils import Pfx, error, warning, info, debug, trace, D
 from cs.py3 import StringTypes, Queue, Queue_Full as Full, Queue_Empty as Empty
 from . import NodeDB
 from .backend import Backend, CSVRow
@@ -190,7 +190,8 @@ class Backend_CSVFile(Backend):
     ''' Apply the update rows from the iterable `csvrows` to the data file.
         This assumes we already have access to the data file.
     '''
-    D("push_updates: write our own updates to %s", self.csvfp)
+    trace("push_updates: write our own updates to %s", self.csvfp)
+    totext = self.nodedb.totext
     csvw = csv.writer(self.csvfp)
     lastrow = NullCSVRow
     for thisrow in csvrows:
