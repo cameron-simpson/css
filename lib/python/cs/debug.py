@@ -45,6 +45,10 @@ def Thread(*a, **kw):
   return DebuggingThread({'filename': filename, 'lineno': lineno}, *a, **kw)
 
 def thread_dump(Ts=None, fp=None):
+  ''' Write thread identifiers and stack traces to the file `fp`.
+      `Ts`: the Threads to dump; if unspecified use threading.enumerate().
+      `fp`: the file to which to write; if unspecified use sys.stderr.
+  '''
   import traceback
   if Ts is None:
     Ts = threading.enumerate()
