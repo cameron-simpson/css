@@ -239,15 +239,20 @@ class Backend(_BackendMappingMixin, _BackendUpdateQueue):
   ''' Base class for NodeDB backends.
   '''
 
-  def __init__(self, readonly, monitor=False):
+  def __init__(self, readonly, monitor=False, raw=False):
     ''' Initialise the Backend.
         `readonly`: this backend is readonly; do not write updates
         `monitor`:  (default False) this backend watches the backing store
                     for updates and loads them as found
+        `raw`: if true, this backend does not encode/decode values with
+		totext/fromtext; it must do its own reversible
+		storage of values. This is probably only appropriate
+		for in-memory stores.
     '''
     self.nodedb = None
     self.readonly = readonly
     self.monitor = monitor
+    self.raw = raw
     self.closed = False
     self._update_thread = None
     _BackendUpdateQueue.__init__(self)
@@ -269,7 +274,7 @@ class Backend(_BackendMappingMixin, _BackendUpdateQueue):
     '''
     nodedb = self.nodedb
     with self._updates_off():
-      nodedb.apply_nodedata(self.nodedata())
+      nodedb.apply_nodedata(self.nodedata(), raw=self.raw)
 
   def close(self):
     ''' Basic close: sync, detach from NodeDB, mark as closed.
