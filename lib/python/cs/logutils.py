@@ -445,6 +445,8 @@ def log(level, msg, *args, **kwargs):
   Pfx._state.cur.log(level, msg, *args, **kwargs)
 def debug(msg, *args, **kwargs):
   log(logging.DEBUG, msg, *args, **kwargs)
+# TODO: make tunable: set to warning if dev mode, etc
+trace = debug
 def info(msg, *args, **kwargs):
   log(logging.INFO, msg, *args, **kwargs)
 def warning(msg, *args, **kwargs):
