@@ -470,8 +470,6 @@ class Result(Asynchron):
 
 class IterableQueue(Queue):
   ''' A Queue implementing the iterator protocol.
-      Note: Iteration stops when a None comes off the Queue.
-      TODO: supply sentinel item, default None.
   '''
 
   sentinel = object()
