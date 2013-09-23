@@ -503,10 +503,6 @@ class IterableQueue(Queue):
       raise ValueError("put(sentinel) on IterableQueue")
     return Queue.put(self, item, *args, **kw)
 
-  def _closeAtExit(self):
-    if not self.closed:
-      self.close()
-
   def close(self):
     if self.closed:
       error("close() on closed IterableQueue")
@@ -546,10 +542,6 @@ class IterablePriorityQueue(PriorityQueue):
     assert not self.closed, "put() on closed IterableQueue"
     assert item is not None, "put(None) on IterableQueue"
     return PriorityQueue.put(self, item, *args, **kw)
-
-  def _closeAtExit(self):
-    if not self.closed:
-      self.close()
 
   def close(self):
     if self.closed:
