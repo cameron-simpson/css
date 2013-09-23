@@ -704,14 +704,7 @@ class NodeDB(dict, O):
     return self
 
   def __exit__(self, exc_type, exc_value, traceback):
-    if not self.closed:
-      try:
         self.close()
-      except Exception as e:
-        if exc_type:
-          error("%s.__exit__: self.close() raised %r", self, e)
-        else:
-          raise
     return False
 
   def _scrub(self):
