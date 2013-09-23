@@ -7,11 +7,12 @@
 from __future__ import print_function
 import inspect
 import logging
+import sys
 import threading
 import time
 from cs.py3 import Queue
 import cs.logutils
-from cs.logutils import infer_logging_level, debug, error, setup_logging, D
+from cs.logutils import infer_logging_level, debug, error, setup_logging, D, Pfx
 from cs.obj import O
 from cs.seq import seq
 from cs.timeutils import sleep
@@ -42,6 +43,24 @@ def Thread(*a, **kw):
     return threading.Thread(*a, **kw)
   filename, lineno = inspect.stack()[1][1:3]
   return DebuggingThread({'filename': filename, 'lineno': lineno}, *a, **kw)
+
+def thread_dump(Ts=None, fp=None):
+  import traceback
+  if Ts is None:
+    Ts = threading.enumerate()
+  if fp is None:
+    fp = sys.stderr
+  with Pfx("thread_dump"):
+    frames = sys._current_frames()
+    for T in Ts:
+      try:
+        frame = frames[T.ident]
+      except KeyError:
+        warning("no frame for Thread.ident=%s", T.ident)
+        continue
+      print("Thread", T.ident, T.name, file=fp)
+      traceback.print_stack(frame, None, fp)
+      print(file=fp)
 
 def DEBUG(f):
   ''' Decorator to wrap functions in timing and value debuggers.
@@ -267,3 +286,4 @@ if __name__ == '__main__':
     debug("leaving testfunc: returning x=%r", x)
     return x
   print("TESTFUNC", testfunc(9))
+  thread_dump()
