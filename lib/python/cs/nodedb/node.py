@@ -691,9 +691,8 @@ class NodeDB(dict, O):
   def close(self):
     ''' Close this NodeDB.
     '''
-    self.backend.close()
-    self.backend = None
     self.closed = True
+    self.backend.close()
 
   @locked
   def sync(self):
