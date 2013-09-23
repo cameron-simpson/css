@@ -704,7 +704,7 @@ class NodeDB(dict, O):
     return self
 
   def __exit__(self, exc_type, exc_value, traceback):
-        self.close()
+    self.close()
     return False
 
   def _scrub(self):
@@ -1172,10 +1172,11 @@ class NodeDB(dict, O):
         attrmap[attr] = [ self.totext(value) for value in values ]
       yield N.type, N.name, attrmap
 
-  def apply_nodedata(self, nodedata, doCreate=True, doExtend=False):
+  def apply_nodedata(self, nodedata, doCreate=True, doExtend=False, raw=False):
     ''' Load `nodedata`, an iterable of:
           type, name, attrmap
         into this NodeDB.
+        attrmap is a mapping from attribute name to a list of totext() values.
     '''
     with Pfx(str(self)):
       debug("apply_nodedata(..,doCreate=%s)...", doCreate)
@@ -1188,7 +1189,8 @@ class NodeDB(dict, O):
         mapping = {}
         for attr, values in attrmap.items():
           ##debug("set %s:%s.%s", t, name, attr)
-          values = [ self.fromtext(value) for value in values ]
+          if not raw:
+            values = [ self.fromtext(value) for value in values ]
           if doExtend:
             mapping[attr].extend(values)
           else:

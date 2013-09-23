@@ -15,7 +15,7 @@ from .backend import Backend
 class MappingBackend(Backend):
 
   def __init__(self, mapping, readonly=False):
-    Backend.__init__(self, readonly=readonly)
+    Backend.__init__(self, readonly=readonly, raw=True)
     self.mapping = mapping
 
   def iteritems(self):
