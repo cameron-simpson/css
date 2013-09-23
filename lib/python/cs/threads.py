@@ -480,7 +480,14 @@ class IterableQueue(Queue):
     Queue.__init__(self, *args, **kw)
     self.closed = False
 
+  def __str__(self):
+    return "IterableQueue(id=%s,len=%d)" % (id(self), len(self))
+
+  __len__ = Queue.qsize
+
   def get(self, *a):
+    ##if self.closed:
+    ##  D("%s.get: called after close()", self)
     item = Queue.get(self, *a)
     if item is self.sentinel:
       Queue.put(self, self.sentinel)
@@ -488,6 +495,8 @@ class IterableQueue(Queue):
     return item
 
   def get_nowait(self):
+    ##if self.closed:
+    ##  D("%s.get_nowait: called after close()", self)
     item = Queue.get_nowait(self)
     if item is self.sentinel:
       Queue.put(self, self.sentinel)
