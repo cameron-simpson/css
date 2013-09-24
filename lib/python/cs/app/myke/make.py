@@ -112,7 +112,7 @@ class Maker(O):
         Close the _makeQ.
     '''
     self.debug_make("%s.close()", self)
-    ##self._makeQ.close()
+    self.close()
     return False
 
   @property
