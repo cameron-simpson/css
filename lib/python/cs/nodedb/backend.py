@@ -10,7 +10,7 @@ from collections import namedtuple
 import unittest
 from cs.logutils import D, OBSOLETE, debug, error
 from cs.obj import O
-from cs.threads import locked_property
+from cs.threads import locked_property, IterableQueue
 from cs.excutils import unimplemented
 from cs.timeutils import sleep
 from cs.debug import Lock, RLock, Thread
@@ -19,6 +19,7 @@ from cs.py3 import Queue, Queue_Full as Full, Queue_Empty as Empty
 # delay between update polls
 POLL_DELAY = 0.1
 
+# convenience tuple of raw values
 CSVRow = namedtuple('CSVRow', 'type name attr value')
 
 class _BackendMappingMixin(O):
@@ -109,8 +110,10 @@ class _BackendUpdateQueue(O):
     self._update_count = 0      # updates queued
     self._updated_count = 0     # updates applied
     self._update_cond = Condition(self._update_lock)
+    self._updateQ = None
+    self._update_thread = None
     if self.monitor or not self.readonly:
-      self._updateQ = Queue(1024)
+      self._updateQ = IterableQueue(1024)
       self._update_thread = self._start_update_thread()
 
   def _start_update_thread(self):
@@ -122,6 +125,14 @@ class _BackendUpdateQueue(O):
     debug("start monitor thread...: %s", T)
     T.start()
     return T
+
+  def _update_close(self):
+    if self._updateQ:
+      self._updateQ.close()
+      self._updateQ = None
+    if self._update_thread:
+      self._update_thread.join()
+      self._update_thread = None
 
   @contextmanager
   def _updates_off(self):
@@ -170,12 +181,7 @@ class _BackendUpdateQueue(O):
     if not self.monitor:
       # not watching for other updates
       # just read update queue and apply
-      get_delay = 4 * delay
-      while not self.closed:
-        try:
-          row = updateQ.get(True, get_delay)
-        except Empty:
-          continue
+      for row in updateQ:
         self._update_push(updateQ, delay, row0=row)
       return
 
@@ -220,7 +226,6 @@ class _BackendUpdateQueue(O):
       return
     with self._update_lock:
       with self.lockdata():
-        D("_update_push: read other updates...")
         self._update_fetch()
         def sendrows():
           if row0:
@@ -281,8 +286,7 @@ class Backend(_BackendMappingMixin, _BackendUpdateQueue):
     '''
     self.closed = True
     self.sync()
-    if self._update_thread:
-      self._update_thread.join()
+    self._update_close()
     self.nodedb = None
 
   def _reload_nodedb(self):
