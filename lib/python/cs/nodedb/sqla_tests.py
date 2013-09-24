@@ -12,9 +12,13 @@ from .sqla import Backend_SQLAlchemy
 
 class TestAll(NodeTestAll):
 
+  def nodedb(self):
+    self.backend = Backend_SQLAlchemy('sqlite:///:memory:')
+    self.db = NodeDB(backend=self.backend)
+    return self.db
+
   def setUp(self):
-    self.backend=Backend_SQLAlchemy('sqlite:///:memory:')
-    self.db=NodeDB(backend=self.backend)
+    pass
 
 def selftest(argv):
   unittest.main(__name__, None, argv)
