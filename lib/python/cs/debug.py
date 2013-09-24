@@ -10,7 +10,7 @@ import logging
 import sys
 import threading
 import time
-from cs.py3 import Queue
+from cs.py3 import Queue, Queue_Empty
 import cs.logutils
 from cs.logutils import infer_logging_level, debug, error, setup_logging, D, Pfx
 from cs.obj import O
@@ -72,7 +72,7 @@ def DEBUG(f):
   if not ifdebug():
     return f
   def inner(*a, **kw):
-    from cs.threads import Result
+    from cs.asynchron import Result
     filename, lineno = inspect.stack()[1][1:3]
     n = seq()
     R = Result()

@@ -16,7 +16,8 @@ from cs.inttypes import Enum
 from cs.logutils import Pfx, info, debug, warning
 from cs.serialise import put_bs, get_bsfp
 from cs.lex import unctrl
-from cs.threads import Q1, IterableQueue
+from cs.queues import IterableQueue
+from cs.threads import Q1
 from cs.lex import hexify
 from .store import BasicStore
 

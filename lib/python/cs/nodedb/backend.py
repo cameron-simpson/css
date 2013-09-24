@@ -10,7 +10,8 @@ from collections import namedtuple
 import unittest
 from cs.logutils import D, OBSOLETE, debug, error
 from cs.obj import O
-from cs.threads import locked_property, IterableQueue
+from cs.threads import locked_property
+from cs.queues import IterableQueue
 from cs.excutils import unimplemented
 from cs.timeutils import sleep
 from cs.debug import Lock, RLock, Thread
@@ -18,9 +19,6 @@ from cs.py3 import Queue, Queue_Full as Full, Queue_Empty as Empty
 
 # delay between update polls
 POLL_DELAY = 0.1
-
-# convenience tuple of raw values
-CSVRow = namedtuple('CSVRow', 'type name attr value')
 
 class _BackendMappingMixin(O):
   ''' A mapping interface to be presented by all Backends.

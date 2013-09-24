@@ -9,14 +9,15 @@ from subprocess import Popen, PIPE
 from cs.ansi_colour import colourise
 from cs.logutils import Pfx
 from cs.lex import unctrl
+from cs.tty import ttysize
 
-instances=[]
+instances = []
 
 def cleanupAtExit():
   global instances
   for i in instances:
     i.close()
-  instances=()
+  instances = ()
 
 atexit.register(cleanupAtExit)
 
@@ -68,20 +69,13 @@ class Upd(object):
     if columns is None:
       columns = 80
       if backend.isatty():
-        P=Popen(['stty', '-a'], stdin=backend, stdout=PIPE)
-        stty=P.stdout.read()
-        P.wait()
-        P = None
-        fields = [ _.strip() for _ in stty.split('\n')[0].split(';') ]
-        for f in fields:
-          if f.endswith(' columns'):
-            columns = int(f[:-8])
-          elif f.startswith("columns "):
-            columns = int(f[8:])
-    self._backend=backend
+        r, c = ttysize(backend.fileno())
+        if c is not None:
+          columns = c
+    self._backend = backend
     self.columns = columns
-    self._state=''
-    self._lock=threading.RLock()
+    self._state = ''
+    self._lock = threading.RLock()
     global instances
     instances.append(self)
 
@@ -137,7 +131,7 @@ class Upd(object):
   def close(self):
     if self._backend is not None:
       self.out('')
-      self._backend=None
+      self._backend = None
 
   def closed(self):
     return self._backend == None
@@ -155,6 +149,6 @@ class Upd(object):
   @contextmanager
   def _withoutContext(self,noStrip=False):
     with self._lock:
-      old=self.out('', noStrip=noStrip)
+      old = self.out('', noStrip=noStrip)
       yield
       self.out(old, noStrip=True)
