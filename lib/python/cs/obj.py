@@ -170,7 +170,7 @@ def O_str(o, no_recurse=False, seen=None):
     o2 = dict( [ (k, str(v)) for k, v in o.iteritems() ] )
     return str(o2)
   if t is set:
-    return 'set(%s)' % (','.join(sorted(o)))
+    return 'set(%s)' % (','.join(sorted([ str(item) for item in o])))
   seen.add(id(o))
   s = ( "<%s %s>"
          % ( o.__class__.__name__,
