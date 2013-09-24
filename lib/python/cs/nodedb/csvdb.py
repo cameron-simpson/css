@@ -121,6 +121,7 @@ class Backend_CSVFile(Backend):
   def rewrite(self):
     ''' Force a complete rewrite of the CSV file.
     '''
+    trace("rewrite(%s)", self.csvpath)
     if self.readonly:
       error("%s: readonly: rewrite not done", self)
       return
@@ -171,7 +172,7 @@ class Backend_CSVFile(Backend):
   def _rewind(self):
     ''' Rewind our access to the CSV file.
     '''
-    debug("_rewind %r", self.csvpath)
+    trace("_rewind %r", self.csvpath)
     self.partial = ''
     self.csvfp.seek(0, os.SEEK_SET)
 
@@ -179,7 +180,7 @@ class Backend_CSVFile(Backend):
     ''' Advance our access to the CSV file to the end.
     '''
     with self._update_lock:
-      debug("_fast_forward %r", self.csvpath)
+      trace("_fast_forward %r", self.csvpath)
       self._rewind()
       self.csvfp.seek(0, os.SEEK_END)
 
