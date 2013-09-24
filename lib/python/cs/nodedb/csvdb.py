@@ -18,9 +18,6 @@ from cs.py3 import StringTypes, Queue, Queue_Full as Full, Queue_Empty as Empty
 from . import NodeDB
 from .backend import Backend, CSVRow
 
-# used to reset state in the don't-repeat-type/name/attr mode
-NullCSVRow = CSVRow(None, None, None, None)
-
 def resolve_csv_row(row, lastrow):
   ''' Transmute a CSV row, resolving omitted TYPE, NAME or ATTR fields.
   '''
@@ -193,15 +190,16 @@ class Backend_CSVFile(Backend):
     trace("push_updates: write our own updates to %s", self.csvfp)
     totext = self.nodedb.totext
     csvw = csv.writer(self.csvfp)
-    lastrow = NullCSVRow
+    lastrow = None
     for thisrow in csvrows:
       t, name, attr, value = thisrow
-      if lastrow.type is not None and t == lastrow.type:
-        t = ''
-      if lastrow.name is not None and name == lastrow.name:
-        name = ''
-      if attr[0].isalpha() and lastrow.attr is not None and attr == lastrow.attr:
-        name = ''
+      if lastrow:
+        if t == lastrow.type:
+          t = ''
+        if name == lastrow.name:
+          name = ''
+        if attr[0].isalpha() and attr == lastrow.attr:
+          name = ''
       csvrow = CSVRow(t, name, attr, totext(value))
       debug("push_updates: csv_writerow(%r)", csvrow)
       csv_writerow(csvw, csvrow)
