@@ -485,6 +485,9 @@ class IterableQueue(Queue):
 
   __len__ = Queue.qsize
 
+  def __nonzero__(self):
+    return True
+
   def get(self, *a):
     ##if self.closed:
     ##  D("%s.get: called after close()", self)
