@@ -21,11 +21,12 @@ from cs.py3 import unicode, StringTypes, ustr
 cmd = __file__
 
 logging_level = logging.INFO
+trace_level = logging.DEBUG
 
-def setup_logging(cmd_name=None, main_log=None, format=None, level=None, upd_mode=None, ansi_mode=None):
+def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=None, upd_mode=None, ansi_mode=None, trace_mode=None):
   ''' Arrange basic logging setup for conventional UNIX command
       line error messaging.
-      Sets cs.logging.cmd to `cmd_name`.
+      Sets cs.logging.cmd to `cmd_name`; default from sys.argv[0].
       If `main_log` is None, the main log will go to sys.stderr; if
       `main_log` is a string, is it used as a filename to open in append
       mode; otherwise main_log should be a stream suitable for use
@@ -33,78 +34,110 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, upd_mod
       If `format` is None, set format to "cmd: levelname: message".
       If `level` is None, infer a level from the environment using
       infer_logging_level().
-      If `upd_mode` is None, set it from main_log.isatty().
+      If `flags` is None, infer the flags from the environment using
+      infer_logging_level().
+      If `upd_mode` is None, set it to True if flags contains 'UPD',
+      otherwise to False if flags contains 'NOUPD', otherwise set
+      it from main_log.isatty().
       A true value causes the root logger to use cs.upd for logging.
       If `ansi_mode` is None, set it from main_log.isatty().
       A true value causes the root logger to colour certain logging levels
       using ANSI terminal sequences (currently only if cs.upd is used).
+      If `trace_mode` is None, set it according to the presence of
+      'TRACE' in flags.
+      If trace_mode is true, set the global trace_level to logging_level;
+      it defaults to logging.DEBUG.
       Returns the logging level.
   '''
-  global logging_level, cmd
+  global cmd, logging_level, trace_level
+
+  default_level, default_flags = infer_logging_level()
+  if level is None:
+    level = default_level
+  if flags is None:
+    flags = default_flags
+
   if cmd_name is None:
     cmd_name = os.path.basename(sys.argv[0])
   cmd = cmd_name
+
   if main_log is None:
     main_log = sys.stderr
   elif type(main_log) is str:
     main_log = open(main_log, "a")
   if main_log.encoding is None:
     main_log = codecs.getwriter("utf-8")(main_log)
+
   if format is None:
     format = cmd.replace('%','%%')+': %(levelname)s: %(message)s'
-  if level is None:
-    level, flags = infer_logging_level()
-    if upd_mode is None and 'NOUPD' in flags:
-      upd_mode = False
+
+  if trace_mode is None:
+    trace_mode = 'TRACE' in flags
+
   if upd_mode is None:
-    upd_mode = main_log.isatty()
+    if 'UPD' in flags:
+      upd_mode = True
+    elif 'NOUPD' in flags:
+      upd_mode = False
+    else:
+      upd_mode = main_log.isatty()
+
   if ansi_mode is None:
     ansi_mode = main_log.isatty()
+
   if upd_mode:
     from cs.upd import UpdHandler
     main_handler = UpdHandler(main_log, level, ansi_mode=ansi_mode)
   else:
     main_handler = logging.StreamHandler(main_log)
+
   rootLogger = logging.getLogger()
   rootLogger.setLevel(level)
   main_handler.setFormatter(logging.Formatter(format))
   rootLogger.addHandler(main_handler)
   logging_level = level
+  if trace_mode:
+    trace_level = logging_level
   return level
 
 def infer_logging_level():
   ''' Infer a logging level from the environment.
       Usually default to logging.WARNING, but if sys.stderr is a terminal,
       default to logging.INFO.
-      If the environment variable DEBUG is set:
-        "" or "0" => same as unset; leave default as above.
-        numeric non-zero => logging.DEBUG
+      Parse the environment variable $DEBUG as a comma separated
+      list of flags.
+      Examine the in sequence flags to affect the logging level:
+        numeric < 1 => logging.WARNING
+        numeric >= 1 and < 2: logging.INFO
+        numeric >= 2 => logging.DEBUG
         "DEBUG" => logging.DEBUG
         "INFO"  => logging.INFO
         "WARNING" => logging.WARNING
         "ERROR" => logging.ERROR
-      Return the inferred logging level.
+      Return the inferred logging level and the flags.
   '''
   level = logging.WARNING
   if sys.stderr.isatty():
     level = logging.INFO
-  env = os.environ.get('DEBUG', '')
-  if ',' in env:
-    env, flags = env.split(',', 1)
-  else:
-    flags = ''
-  flags = [ F.upper() for F in flags.split(',') if len(F) ]
-  if env != '' and env != '0':
-    level = logging.DEBUG
-    env = env.upper()
-    if env == 'DEBUG':
+  env_debug = os.environ.get('DEBUG', '')
+  flags = [ F.upper() for F in env_debug.split(',') if len(F) ]
+  for flag in flags:
+    if flag == 'DEBUG':
       level = logging.DEBUG
-    elif env == 'INFO':
+    elif flag == 'INFO':
       level = logging.INFO
-    elif env == 'WARN' or env == 'WARNING':
+    elif flag == 'WARN' or flag == 'WARNING':
       level = logging.WARNING
-    elif env == 'ERROR':
+    elif flag == 'ERROR':
       level = logging.ERROR
+    elif flag.isdigit():
+      flag_level = int(flag)
+      if flag_level < 1:
+        level = logging.WARNING
+      elif flag_level >= 2:
+        level = logging.DEBUG
+      else:
+        level = logging.INFO
   return level, flags
 
 def D(fmt, *args):
@@ -456,6 +489,8 @@ def error(msg, *args, **kwargs):
   log(logging.ERROR, msg, *args, **kwargs)
 def critical(msg, *args, **kwargs):
   log(logging.CRITICAL, msg, *args, **kwargs)
+def trace(msg, *args, **kwargs):
+  log(trace_level, msg, *args, **kwargs)
 
 def listargs(args, kwargs, tostr=None):
   ''' Take the list 'args' and dict 'kwargs' and return a list of

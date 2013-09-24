@@ -42,6 +42,7 @@ def ATTRSTable(metadata, name=None):
 class Backend_SQLAlchemy(Backend):
 
   def __init__(self, engine, nodes=None, attrs=None, readonly=False):
+    Backend.__init__(self, readonly=readonly)
     self._lock = Lock()
     self.readonly = readonly
     if nodes is None:

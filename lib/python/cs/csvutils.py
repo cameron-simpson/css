@@ -13,6 +13,7 @@
 
 import csv
 import sys
+from cs.io import CatchupLines
 
 if sys.hexversion < 0x03000000:
 
@@ -52,3 +53,29 @@ else:
 
   def csv_writerow(csvw, row, encoding='utf-8'):
     return csvw.writerow(row)
+
+class CatchUp(object):
+  ''' A CSV layer to cs.io.CatchupLines.
+      It is iterable, yields CSV data rows.
+      At the end of iteration the .partial attribute contains any
+      incomplete line.
+      It is reusable; another iteration will commence with that
+      partial line.
+  '''
+
+  def __init__(self, fp, partial=''):
+    ''' Initialise the CatchUp with an open file `fp` and optional
+        partial line `partial`.
+    '''
+    self.fp = fp
+    self.partial = partial
+
+  def __iter__(self):
+    self.lines = CatchupLines(self.fp, self.partial)
+    for row in csv_reader(self.lines):
+      yield row
+    self.partial = self.lines.partial
+
+  def rewind(self):
+    self.fp.seek(0, os.SEEK_SET)
+    self.partial = ''

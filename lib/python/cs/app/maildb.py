@@ -29,6 +29,7 @@ def main(argv, stdin=None):
     Ops:
       abbreviate abbrev address
         (also "abbrev")
+      compact
       edit-group group
       edit-group /regexp/
       import-addresses < addresses.txt
@@ -72,7 +73,11 @@ def main(argv, stdin=None):
   else:
     op = argv.pop(0)
     with Pfx(op):
-      with MailDB(mdburl, readonly=False) as MDB:
+      readonly = op not in ('abbreviate', 'abbrev', 'compact',
+                            'edit-group', 'import-addresses',
+                            'learn-addresses',
+                           )
+      with MailDB(mdburl, readonly=readonly) as MDB:
         if op == 'import-addresses':
           if stdin.isatty():
             error("stdin is a tty, file expected")
@@ -92,8 +97,8 @@ def main(argv, stdin=None):
             except ValueError as e:
               error(e)
               xit = 1
-            else:
-              MDB.rewrite()
+        elif op == 'compact':
+          MDB.rewrite()
         elif op == 'list-abbreviations' or op == 'list-abbrevs':
           try:
             opts, argv = getopt(argv, 'A')
@@ -398,7 +403,31 @@ class _MailDB(NodeDB):
   def rewrite(self):
     ''' Force a complete rewrite of the CSV file.
     '''
+    obackend = self.backend
+    self.backend = None
+    self.scrub()
+    self.backend = obackend
     self.backend.rewrite()
+
+  def scrub(self):
+    ''' Normalise some of the attributes.
+    '''
+    for N in self.ADDRESSes:
+      gs = N.GROUPs
+      if gs:
+        gsu = set(gs)
+        if len(gsu) < len(gs):
+          N.GROUPs = sorted(list(gsu))
+      rns = N.REALNAMEs
+      if rns:
+        rnsu = set(rns)
+        if len(rnsu) < len(rns):
+          N.REALNAMEs = rnsu
+      abs = N.ABBREVIATIONs
+      if abs:
+        absu = set(abs)
+        if len(absu) < len(abs):
+          N.ABBREVIATIONs = sorted(list(absu))
 
   def _createNode(self, t, name):
     ''' Create a new Node of the specified type.

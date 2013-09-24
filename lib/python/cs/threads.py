@@ -470,8 +470,6 @@ class Result(Asynchron):
 
 class IterableQueue(Queue):
   ''' A Queue implementing the iterator protocol.
-      Note: Iteration stops when a None comes off the Queue.
-      TODO: supply sentinel item, default None.
   '''
 
   sentinel = object()
@@ -482,7 +480,17 @@ class IterableQueue(Queue):
     Queue.__init__(self, *args, **kw)
     self.closed = False
 
+  def __str__(self):
+    return "IterableQueue(id=%s,len=%d)" % (id(self), len(self))
+
+  __len__ = Queue.qsize
+
+  def __nonzero__(self):
+    return True
+
   def get(self, *a):
+    ##if self.closed:
+    ##  D("%s.get: called after close()", self)
     item = Queue.get(self, *a)
     if item is self.sentinel:
       Queue.put(self, self.sentinel)
@@ -490,6 +498,8 @@ class IterableQueue(Queue):
     return item
 
   def get_nowait(self):
+    ##if self.closed:
+    ##  D("%s.get_nowait: called after close()", self)
     item = Queue.get_nowait(self)
     if item is self.sentinel:
       Queue.put(self, self.sentinel)
@@ -504,10 +514,6 @@ class IterableQueue(Queue):
     if item is self.sentinel:
       raise ValueError("put(sentinel) on IterableQueue")
     return Queue.put(self, item, *args, **kw)
-
-  def _closeAtExit(self):
-    if not self.closed:
-      self.close()
 
   def close(self):
     if self.closed:
@@ -548,10 +554,6 @@ class IterablePriorityQueue(PriorityQueue):
     assert not self.closed, "put() on closed IterableQueue"
     assert item is not None, "put(None) on IterableQueue"
     return PriorityQueue.put(self, item, *args, **kw)
-
-  def _closeAtExit(self):
-    if not self.closed:
-      self.close()
 
   def close(self):
     if self.closed:
@@ -1014,6 +1016,14 @@ class TimerQueue(object):
 class FuncMultiQueue(object):
   def __init__(self, *a, **kw):
     raise Error("FuncMultiQueue OBSOLETE, use cs.later.Later instead")
+
+def locked(func):
+  ''' A decorator for monitor functions that must run within a lock.
+  '''
+  def lockfunc(self, *a, **kw):
+    with self._lock:
+      return func(self, *a, **kw)
+  return lockfunc
 
 def locked_property(func, lock_name='_lock', prop_name=None, unset_object=None):
   ''' A property whose access is controlled by a lock if unset.
