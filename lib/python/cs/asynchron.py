@@ -8,7 +8,7 @@ import sys
 from cs.debug import Lock
 from cs.obj import O
 from cs.seq import seq
-from cs.py3 import Queue
+from cs.py3 import Queue, raise3
 
 ASYNCH_PENDING = 0       # result not ready or considered
 ASYNCH_RUNNING = 1       # result function running
