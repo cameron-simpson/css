@@ -346,7 +346,7 @@ class Backend(_BackendMappingMixin, _BackendUpdateQueue):
         # reset attribute completely before appending value
         attr = attr[1:]
         N[attr] = ()
-      N.get(attr).append(nodedb.fromtext(value))
+      N.get(attr).append(value)
 
 class TestAll(unittest.TestCase):
 
