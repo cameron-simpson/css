@@ -20,6 +20,9 @@ from cs.py3 import Queue, Queue_Full as Full, Queue_Empty as Empty
 # delay between update polls
 POLL_DELAY = 0.1
 
+# convenience tuple of raw values
+CSVRow = namedtuple('CSVRow', 'type name attr value')
+
 class _BackendMappingMixin(O):
   ''' A mapping interface to be presented by all Backends.
   '''
