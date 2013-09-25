@@ -112,16 +112,20 @@ class _BackendUpdateQueue(O):
     self._update_cond = Condition(self._update_lock)
     self._updateQ = None
     self._update_thread = None
-    if self.monitor or not self.readonly:
+    if not self.readonly:
       self._updateQ = IterableQueue(1024)
-      self._update_thread = self._start_update_thread()
 
-  def _start_update_thread(self):
+  def _update_start_thread(self):
     ''' Construct and start the update thread.
     '''
+    if self._update_thread is not None:
+      raise RuntimeError("second attempt to start Backend update thread")
+    self._update_ready = Lock()
+    self._update_ready.acquire()
     T = Thread(name="%s._update_thread" % (self,),
                target=self._update_monitor,
                args=(self._updateQ,))
+    self._update_thread = T
     debug("start monitor thread...: %s", T)
     T.start()
     return T
@@ -178,6 +182,10 @@ class _BackendUpdateQueue(O):
   def _update_monitor(self, updateQ, delay=POLL_DELAY):
     ''' Watch for updates from the NodeDB and from the backend.
     '''
+    self._open()
+    with self._updates_off():
+      self.nodedb.apply_nodedata(self.nodedata(), raw=self.raw)
+    self._update_ready.release()
     if not self.monitor:
       # not watching for other updates
       # just read update queue and apply
@@ -201,6 +209,7 @@ class _BackendUpdateQueue(O):
         # apply our updates
         self._update_push(updateQ, delay)
       sleep(delay)
+    self._close()
 
   def _update_fetch(self):
     ''' Read updates from the backing store
@@ -261,6 +270,8 @@ class Backend(_BackendMappingMixin, _BackendUpdateQueue):
     self.closed = False
     _BackendUpdateQueue.__init__(self)
     self._lock = Lock()
+    self._ready = Lock()
+    self._ready.acquire()
 
   def nodedata(self):
     ''' Yield node data in:
@@ -271,14 +282,22 @@ class Backend(_BackendMappingMixin, _BackendUpdateQueue):
       k1, k2 = k
       yield k1, k2, attrmap
 
+  def _import_nodedata(self):
+    ''' Method called by the monitor thread at commencement to load the
+	backend data into the NodeDB. Why in the monitor thread?
+	Because some libraries like SQLite refuse to work in multiple
+	threads.
+    '''
+    with self._updates_off():
+      nodedb.apply_nodedata(self.nodedata(), raw=self.raw)
+
   def init_nodedb(self):
     ''' Apply the nodedata from this backend to the NodeDB.
         This can be overridden by subclasses to provide some backend specific
         efficient implementation.
     '''
-    nodedb = self.nodedb
-    with self._updates_off():
-      nodedb.apply_nodedata(self.nodedata(), raw=self.raw)
+    self._update_start_thread()
+    self._update_ready.acquire()
 
   def close(self):
     ''' Basic close: sync, detach from NodeDB, mark as closed.
