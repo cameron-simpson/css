@@ -188,8 +188,9 @@ class _BackendUpdateQueue(O):
     if not self.monitor:
       # not watching for other updates
       # just read update queue and apply
-      for row in updateQ:
-        self._update_push(updateQ, delay, row0=row)
+      if not self.readonly:
+        for row in updateQ:
+          self._update_push(updateQ, delay, row0=row)
       return
 
     # poll file regularly for updates
