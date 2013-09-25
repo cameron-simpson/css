@@ -273,6 +273,10 @@ class Backend(_BackendMappingMixin, _BackendUpdateQueue):
     self._ready = Lock()
     self._ready.acquire()
 
+  def __str__(self):
+    return "%s(readonly=%s, monitor=%s, raw=%s)" \
+           % (self.__class__.__name__, self.readonly, self.monitor, self.raw)
+
   def nodedata(self):
     ''' Yield node data in:
           type, name, attrmap

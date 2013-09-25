@@ -685,7 +685,8 @@ class NodeDB(dict, O):
     backend.init_nodedb()
     self._lock = RLock()
 
-  __str__ = O.__str__
+  def __str__(self):
+    return "NodeDB(readonly=%s, backend=%s)" % (self.readonly, self.backend)
 
   @locked
   def close(self):
