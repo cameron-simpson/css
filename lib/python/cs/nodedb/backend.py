@@ -183,8 +183,7 @@ class _BackendUpdateQueue(O):
     ''' Watch for updates from the NodeDB and from the backend.
     '''
     self._open()
-    with self._updates_off():
-      self.nodedb.apply_nodedata(self.nodedata(), raw=self.raw)
+    self._import_nodedata()
     self._update_ready.release()
     if not self.monitor:
       # not watching for other updates
@@ -293,7 +292,7 @@ class Backend(_BackendMappingMixin, _BackendUpdateQueue):
 	threads.
     '''
     with self._updates_off():
-      nodedb.apply_nodedata(self.nodedata(), raw=self.raw)
+      self.nodedb.apply_nodedata(self.nodedata(), raw=self.raw)
 
   def init_nodedb(self):
     ''' Apply the nodedata from this backend to the NodeDB.
