@@ -6,6 +6,9 @@
 
 import os
 import re
+from collections import namedtuple
+
+WinSize = namedtuple('WinSize', 'rows columns')
 
 def winsize(f):
   '''   Return a (rows, columns) tuple or None for the specified file object.
@@ -17,4 +20,4 @@ def winsize(f):
   m = re.compile(r' rows (\d+); columns (\d+)').search(stty)
   if not m:
     return None
-  return (int(m.group(1)), int(m.group(2)))
+  return WinSize( int(m.group(1)), int(m.group(2)) )
