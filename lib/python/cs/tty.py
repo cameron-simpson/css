@@ -6,6 +6,7 @@
 
 import os
 import re
+from subprocess import Popen, PIPE
 from collections import namedtuple
 
 WinSize = namedtuple('WinSize', 'rows columns')
@@ -13,10 +14,11 @@ WinSize = namedtuple('WinSize', 'rows columns')
 def winsize(f):
   '''   Return a (rows, columns) tuple or None for the specified file object.
   '''
-  fd = os.dup(f.fileno()) # obtain fresh fd to pass to the shell
-  sttycmd = "stty -a <&" + str(fd) + " 2>/dev/null"
-  stty = os.popen(sttycmd).read()
-  os.close(fd)
+  P = Popen(['stty', '-a'], stdin=f, stdout=PIPE, universal_newlines=True)
+  stty = P.stdout.read()
+  xit = P.wait()
+  if xit != 0:
+    return None
   m = re.compile(r' rows (\d+); columns (\d+)').search(stty)
   if not m:
     return None
