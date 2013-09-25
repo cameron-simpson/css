@@ -88,7 +88,6 @@ class Backend_SQLAlchemy(Backend):
       node_id = self.__IDbyTypeName.get(nodekey)
       if node_id is not None:
         self._forgetNode( t, name, node_id )
-    node_id = self._node_id( t, name )
     for attr in N.keys():
       self.saveAttrs(N[attrs])
 
@@ -96,8 +95,10 @@ class Backend_SQLAlchemy(Backend):
     ''' Return the db node_id for the supplied type and name.
         Create a new node_id if unknown.
     '''
-    if (t, name) not in self.__IDbyTypeName:
-      assert not self.nodedb.readonly
+    node_id = self.__IDbyTypeName.get(t, name)
+    if node_id is None:
+      if self.nodedb.readonly:
+        raise RuntimeError("readonly: can't instantiate new NODE_ID for (%s, %s)" % (t, name))
       ins = self.nodes.insert().values(TYPE=t, NAME=name).execute()
       node_id = ins.lastrowid
       self._noteNodeKey(t, name, node_id)
@@ -188,7 +189,7 @@ class Backend_SQLAlchemy(Backend):
     lastrow = None
     for thisrow in csvrows:
       t, name, attr, value = thisrow
-      node_id = self.__IDbyTypeName[t, name]
+      node_id = self._node_id(t, name)
       if attr.startswith('-'):
         attr = attr[1:]
         if value != "":
