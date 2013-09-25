@@ -68,16 +68,10 @@ class Upd(object):
     if columns is None:
       columns = 80
       if backend.isatty():
-        P=Popen(['stty', '-a'], stdin=backend, stdout=PIPE)
-        stty=P.stdout.read()
-        P.wait()
-        P = None
-        fields = [ _.strip() for _ in stty.split('\n')[0].split(';') ]
-        for f in fields:
-          if f.endswith(' columns'):
-            columns = int(f[:-8])
-          elif f.startswith("columns "):
-            columns = int(f[8:])
+        from cs.tty import winsize
+        rc = winsize(backend)
+        if rc is not None:
+          columns = rc.columns
     self._backend=backend
     self.columns = columns
     self._state=''
