@@ -44,7 +44,6 @@ class Backend_SQLAlchemy(Backend):
 
   def __init__(self, engine, nodes=None, attrs=None, readonly=False):
     Backend.__init__(self, readonly=readonly)
-    self._lock = Lock()
     self.readonly = readonly
     if nodes is None:
       nodes = 'NODES'
@@ -54,11 +53,11 @@ class Backend_SQLAlchemy(Backend):
       engine = create_engine(engine, echo=len(os.environ.get('DEBUG','')) > 0)
     metadata=MetaData()
     metadata.bind = engine
-    if type(nodes) in StringTypes:
+    if isinstance(nodes, StringTypes):
       nodes=NODESTable(metadata, name=nodes)
     self.nodes=nodes
     Index('nametype', nodes.c.NAME, nodes.c.TYPE)
-    if type(attrs) is str:
+    if isinstance(attrs, StringTypes):
       attrs=ATTRSTable(metadata, name=attrs)
     self.attrs=attrs
     Index('attrvalue', attrs.c.ATTR, attrs.c.VALUE)
