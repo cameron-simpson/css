@@ -18,6 +18,12 @@ class MappingBackend(Backend):
     Backend.__init__(self, readonly=readonly, raw=True)
     self.mapping = mapping
 
+  def _open(self):
+    pass
+
+  def _close(self):
+    pass
+
   def iteritems(self):
     return map_iteritems(self.mapping)
 
