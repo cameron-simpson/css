@@ -10,7 +10,7 @@ from threading import Thread
 from cs.logutils import Pfx, info
 from .meta import Meta
 from .blockify import blockFromFile
-from cs.threads import IterableQueue
+from cs.queues import IterableQueue
 
 class ReadFile(object):
   ''' A read-only file interface supporting seek(), read(), readline(),

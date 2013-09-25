@@ -9,14 +9,15 @@ from subprocess import Popen, PIPE
 from cs.ansi_colour import colourise
 from cs.logutils import Pfx
 from cs.lex import unctrl
+from cs.tty import ttysize
 
-instances=[]
+instances = []
 
 def cleanupAtExit():
   global instances
   for i in instances:
     i.close()
-  instances=()
+  instances = ()
 
 atexit.register(cleanupAtExit)
 
@@ -74,8 +75,8 @@ class Upd(object):
           columns = rc.columns
     self._backend=backend
     self.columns = columns
-    self._state=''
-    self._lock=threading.RLock()
+    self._state = ''
+    self._lock = threading.RLock()
     global instances
     instances.append(self)
 
@@ -131,7 +132,7 @@ class Upd(object):
   def close(self):
     if self._backend is not None:
       self.out('')
-      self._backend=None
+      self._backend = None
 
   def closed(self):
     return self._backend == None
@@ -149,6 +150,6 @@ class Upd(object):
   @contextmanager
   def _withoutContext(self,noStrip=False):
     with self._lock:
-      old=self.out('', noStrip=noStrip)
+      old = self.out('', noStrip=noStrip)
       yield
       self.out(old, noStrip=True)

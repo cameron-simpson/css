@@ -4,15 +4,17 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
+from __future__ import print_function
 import os
-import re
 from subprocess import Popen, PIPE
 from collections import namedtuple
 
 WinSize = namedtuple('WinSize', 'rows columns')
 
-def winsize(f):
-  '''   Return a (rows, columns) tuple or None for the specified file object.
+def ttysize(fd):
+  ''' Return a (rows, columns) tuple for the specified file descriptor.
+      If the window size cannot be determined, None will be returns
+      for either or both of rows and columns.
   '''
   P = Popen(['stty', '-a'], stdin=f, stdout=PIPE, universal_newlines=True)
   stty = P.stdout.read()

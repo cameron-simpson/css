@@ -14,7 +14,7 @@ from shutil import copyfile
 from cs.csvutils import csv_reader, csv_writerow, CatchUp as CSV_CatchUp
 from cs.fileutils import lockfile, FileState
 from cs.logutils import Pfx, error, warning, info, debug, trace, D
-from cs.py3 import StringTypes, Queue, Queue_Full as Full, Queue_Empty as Empty
+from cs.py3 import StringTypes, Queue_Full as Full, Queue_Empty as Empty
 from . import NodeDB
 from .backend import Backend, CSVRow
 

@@ -14,10 +14,10 @@ from threading import Thread
 import time
 from cs.debug import DEBUG
 from cs.inttypes import Flags
-from cs.threads import Lock, RLock, Channel, Result, report as report_LFs, \
-        Asynchron, ASYNCH_PENDING, ASYNCH_RUNNING, ASYNCH_CANCELLED, ASYNCH_READY, \
-        locked_property
+from cs.threads import Lock, RLock, Channel, locked_property
 from cs.later import Later
+from cs.asynchron import Result, report as report_LFs, \
+        Asynchron, ASYNCH_PENDING, ASYNCH_RUNNING, ASYNCH_CANCELLED, ASYNCH_READY
 import cs.logutils
 from cs.logutils import Pfx, info, error, debug, D
 from cs.obj import O
@@ -112,7 +112,7 @@ class Maker(O):
         Close the _makeQ.
     '''
     self.debug_make("%s.close()", self)
-    ##self._makeQ.close()
+    self.close()
     return False
 
   @property
