@@ -66,7 +66,6 @@ class Backend_CSVFile(Backend):
     self.rewrite_inplace = rewrite_inplace
     self.csvpath = csvpath
     self.keep_backups = False
-    self._open()
     self.lastrow = None
 
   def _open(self):
@@ -84,7 +83,7 @@ class Backend_CSVFile(Backend):
     '''
     return lockfile(self.csvpath)
 
-  def init_nodedb(self):
+  def _import_nodedata(self):
     with self._updates_off():
       self._rewind()
       for row in self.fetch_updates():
