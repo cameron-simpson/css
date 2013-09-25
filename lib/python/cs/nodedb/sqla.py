@@ -170,7 +170,7 @@ class Backend_SQLAlchemy(Backend):
     nodes = self.nodes
     # load node keys
     for node_id, t, name in select( [ nodes.c.TYPE,
-                                      nodes.c.NAME
+                                      nodes.c.NAME,
                                     ] ).execute():
       yield t, name
 
@@ -202,7 +202,7 @@ class Backend_SQLAlchemy(Backend):
                                  self.attrs.c.ATTR == attr)).execute()
         self.attrs.insert().execute([ { 'NODE_ID': node_id,
                                         'ATTR':    attr,
-                                        'VALUE':   totext(value)
+                                        'VALUE':   totext(value),
                                       } ])
       with self._lock:
         self._updated_count += 1
