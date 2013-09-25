@@ -88,7 +88,7 @@ class Backend_CSVFile(Backend):
     with self._updates_off():
       self._rewind()
       for row in self.fetch_updates():
-        self.apply_csv_row(row)
+        self.import_csv_row(row)
 
   def fetch_updates(self, header_row=None):
     ''' Read CSV update rows from the current file position.

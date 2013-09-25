@@ -314,8 +314,8 @@ class Backend(_BackendMappingMixin, _BackendUpdateQueue):
     for value in values:
       self._update(CSVRow(t, name, attr, value))
 
-  def apply_csv_row(self, row):
-    ''' Apply the values from an individual CSV update row.
+  def import_csv_row(self, row):
+    ''' Apply the values from an individual CSV update row to the NodeDB.
         Each row is expected to be post-resolve_csv_row().
         Honour the incremental notation for data:
         - a NAME commencing with '=' discards any existing (TYPE, NAME)
