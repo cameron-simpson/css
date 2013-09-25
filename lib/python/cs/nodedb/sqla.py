@@ -95,7 +95,7 @@ class Backend_SQLAlchemy(Backend):
     ''' Return the db node_id for the supplied type and name.
         Create a new node_id if unknown.
     '''
-    node_id = self.__IDbyTypeName.get(t, name)
+    node_id = self.__IDbyTypeName.get( (t, name) )
     if node_id is None:
       if self.nodedb.readonly:
         raise RuntimeError("readonly: can't instantiate new NODE_ID for (%s, %s)" % (t, name))
