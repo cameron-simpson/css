@@ -8,12 +8,13 @@ import sqlalchemy
 from sqlalchemy import create_engine, \
                        MetaData, Table, Column, Index, Integer, String, \
                        select
+from sqlalchemy.pool import QueuePool
 from sqlalchemy.orm import mapper, sessionmaker
 from sqlalchemy.sql import and_, or_, not_, asc
 from sqlalchemy.sql.expression import distinct
 from cs.py3 import StringTypes
 from cs.excutils import unimplemented
-from cs.logutils import Pfx, error, warning, debug, trace
+from cs.logutils import Pfx, error, warning, debug, trace, D
 from . import NodeDB, Backend
 
 def NODESTable(metadata, name=None):
@@ -42,31 +43,37 @@ def ATTRSTable(metadata, name=None):
 
 class Backend_SQLAlchemy(Backend):
 
-  def __init__(self, engine, nodes=None, attrs=None, readonly=False):
+  def __init__(self, engine, nodes_name=None, attrs_name=None, readonly=False):
     Backend.__init__(self, readonly=readonly)
-    self.readonly = readonly
-    if nodes is None:
-      nodes = 'NODES'
-    if attrs is None:
-      attrs = 'ATTRS'
-    if type(engine) in StringTypes:
-      engine = create_engine(engine, echo=len(os.environ.get('DEBUG','')) > 0)
-    metadata=MetaData()
-    metadata.bind = engine
-    if isinstance(nodes, StringTypes):
-      nodes=NODESTable(metadata, name=nodes)
-    self.nodes=nodes
-    Index('nametype', nodes.c.NAME, nodes.c.TYPE)
-    if isinstance(attrs, StringTypes):
-      attrs=ATTRSTable(metadata, name=attrs)
-    self.attrs=attrs
-    Index('attrvalue', attrs.c.ATTR, attrs.c.VALUE)
-    self.engine=engine
-    metadata.create_all()
+    if isinstance(engine, StringTypes):
+      echo = len(os.environ.get('DEBUG','')) > 0
+    if isinstance(engine, StringTypes):
+      engine = create_engine(engine, poolclass=QueuePool, echo=echo)
+    if nodes_name is None:
+      nodes_name = 'NODES'
+    if attrs_name is None:
+      attrs_name = 'ATTRS'
+    self.engine = engine
+    self.nodes_name = nodes_name
+    self.attrs_name = attrs_name
 
     # forward and reverse (type, name) <=> node_id mappings
     self.__nodekeysByID = {}
     self.__IDbyTypeName = {}
+
+  def _open(self):
+    engine = self.engine
+    metadata=MetaData()
+    metadata.bind = engine
+    nodes = self.nodes = NODESTable(metadata, name=self.nodes_name)
+    Index('nametype', nodes.c.NAME, nodes.c.TYPE)
+    attrs = self.attrs = ATTRSTable(metadata, name=self.attrs_name)
+    Index('attrvalue', attrs.c.ATTR, attrs.c.VALUE)
+    metadata.create_all()
+    self.attrs.select().execute()
+
+  def _close(self):
+    raise RuntimeError("how to close .engine?")
 
   def _noteNodeKey(self, t, name, node_id):
     ''' Remember the mapping between db node_id and (type, name).
