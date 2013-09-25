@@ -259,7 +259,6 @@ class Backend(_BackendMappingMixin, _BackendUpdateQueue):
     self.monitor = monitor
     self.raw = raw
     self.closed = False
-    self._update_thread = None
     _BackendUpdateQueue.__init__(self)
     self._lock = Lock()
 
