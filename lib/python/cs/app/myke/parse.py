@@ -548,13 +548,9 @@ def parseMakefile(M, fp, parent_context=None):
             action_list.append(A)
             continue
 
-        m = RE_ASSIGNMENT.match(line)
-        if m:
-          macro_name = m.group(1)
-          params_text = m.group(3)
-          param_names = RE_COMMASEP.split(params_text) if params_text else ()
-          macro_text = line[m.end():].rstrip()
-          yield Macro(context, macro_name, param_names, macro_text)
+        macro = parseMacroAssignment(context, line)
+        if macro:
+          yield macro
           continue
 
         # presumably a target definition
@@ -580,6 +576,21 @@ def parseMakefile(M, fp, parent_context=None):
         exception("%s", e)
 
   M.debug_parse("finish parse")
+
+def parseMacroAssignment(context, assignment_text):
+  ''' Try to parse `assignment_text` as a macro definition.
+      If it does not look like an assignment (does not match RE_ASSIGNMENT),
+      return None.
+      Otherwise return a Macro.
+  '''
+  m = RE_ASSIGNMENT.match(assignment_text)
+  if not m:
+    return None
+  macro_name = m.group(1)
+  params_text = m.group(3)
+  param_names = RE_COMMASEP.split(params_text) if params_text else ()
+  macro_text = assignment_text[m.end():].rstrip()
+  return Macro(context, macro_name, param_names, macro_text)
 
 def parseMacroExpression(context, text=None, offset=0, stopchars=''):
   ''' A macro expression is a concatenation of permutations.
