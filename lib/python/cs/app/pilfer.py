@@ -690,7 +690,7 @@ def action_operator(action,
       exts = exts.split(',')
       kwargs['case'] = case
       kwargs['exts'] = exts
-      func = lambda U, P, exts, case: has_exts( U, exts, case_sensitive=case ),
+      func = lambda U, P, exts, case: has_exts( U, exts, case_sensitive=case )
       func_sig = RUN_TREE_OP_SELECT
     else:
       # comparison
@@ -790,7 +790,6 @@ def action_operator(action,
           raise ValueError("unknown action")
 
     if kwargs:
-      D("func = %r", func)
       func = partial(func, **kwargs)
     def trace_func(*a, **kw):
       debug("do %s ...", action0)
