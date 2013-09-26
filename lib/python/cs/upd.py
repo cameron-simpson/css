@@ -70,7 +70,7 @@ class Upd(object):
       columns = 80
       if backend.isatty():
         rc = ttysize(backend)
-        if rc is not None:
+        if rc.columns is not None:
           columns = rc.columns
     self._backend=backend
     self.columns = columns
