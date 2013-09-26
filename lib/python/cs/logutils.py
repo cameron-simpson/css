@@ -85,6 +85,14 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
   if ansi_mode is None:
     ansi_mode = main_log.isatty()
 
+  if 'TDUMP' in flags:
+    # do a thread dump to the main_log on SIGHUP
+    import signal
+    import cs.debug
+    def handler(sig, fr):
+      cs.debug.thread_dump(None, main_log)
+    signal.signal(signal.SIGHUP, handler)
+
   if upd_mode:
     from cs.upd import UpdHandler
     main_handler = UpdHandler(main_log, level, ansi_mode=ansi_mode)
