@@ -6,6 +6,7 @@
 
 from __future__ import print_function
 import os
+import re
 from subprocess import Popen, PIPE
 from collections import namedtuple
 
@@ -25,7 +26,7 @@ def ttysize(fd):
     return None
   m = re.compile(r' rows (\d+); columns (\d+)').search(stty)
   if m:
-    row, columns = int(m.group(1)), int(m.group(2)) )
+    rows, columns = int(m.group(1)), int(m.group(2))
   else:
-    row, columns = None, None
+    rows, columns = None, None
   return WinSize( rows, columns )
