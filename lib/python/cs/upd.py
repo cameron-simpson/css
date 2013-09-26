@@ -69,8 +69,7 @@ class Upd(object):
     if columns is None:
       columns = 80
       if backend.isatty():
-        from cs.tty import winsize
-        rc = winsize(backend)
+        rc = ttysize(backend)
         if rc is not None:
           columns = rc.columns
     self._backend=backend
