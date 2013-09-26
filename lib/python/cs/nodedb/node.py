@@ -184,23 +184,20 @@ class _AttrList(list):
     return value
 
   def __setitem__(self, index, value):
-    if type(index) is int:
+    if isinstance(index, int):
       ovalues = (self[index],)
       values = (value,)
       index = slice(index, index+1)
-    elif type(index) is slice:
+    elif isinstance(index, slice):
       ovalues = itertools.islice(self, index.start, index.stop, index.step)
       values = list(value)
     else:
-      raise TypeError("expected int or slice, got %s: %s[%r] = %s"
+      raise TypeError("expected index to be int or slice, got %s: %s[%r] = %s"
                       % (type(index), self, index, value))
     self.__delitemrefs(ovalues)
     list.__setitem__(self, index, values)
     self.__additemrefs(values)
     self._save()
-
-  def __setslice__(self, i, j, values):
-    self[max(0, i):max(0, j):] = values
 
   def _scrub(self):
     # remove all elements from this attribute
