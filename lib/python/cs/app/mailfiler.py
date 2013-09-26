@@ -66,10 +66,9 @@ def main(argv, stdin=None):
         justone = False
         delay = None
         no_remove = False
-        no_save = False
         rules_pattern = DEFAULT_MAILDIR_RULES
         try:
-          opts, argv = getopt(argv, '1d:nNR:')
+          opts, argv = getopt(argv, '1d:nR:')
         except GetoptError as e:
           warning("%s", e)
           badopts = True
@@ -89,8 +88,6 @@ def main(argv, stdin=None):
                   badopts = True
             elif opt == '-n':
               no_remove = True
-            elif opt == '-N':
-              no_save = True
             elif opt == '-R':
               rules_pattern = val
             else:
@@ -115,7 +112,6 @@ def main(argv, stdin=None):
       filter_modes = FilterModes(justone=justone,
                                  delay=delay,
                                  no_remove=no_remove,
-                                 no_save=no_save,
                                  maildb_path=os.environ['MAILDB'],
                                  maildir_cache={})
       maildirs = [ WatchedMaildir(mdirpath,

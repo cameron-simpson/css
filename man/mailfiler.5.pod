@@ -53,8 +53,8 @@ Rules may commences with either or both of the following mode indicators:
 
 =head3 Targets
 
-The "targets" is a comma separated list of mail destinations; a
-target takes the form of a sequence of nonwhitespace non-comma
+The "targets" is a comma separated list of mail destinations;
+a target takes the form of a sequence of nonwhitespace non-comma
 characters, or a string value in double quotes.
 
 =head4 Deliver to Program
@@ -67,20 +67,21 @@ If the command exits with a zero exit status is it considered to have run succes
 
 Otherwise, a target containing an "at" symbol ('@') is considered
 an email address to which to send a copy of the message.
-It the mail system accepts the message it is considered to have been dispatched successfully.
+If the mail system accepts the message it is considered to have been dispatched successfully.
 
 =head4 Deliver to Maildir
 
-Otherwise, a target is considered to indicate a Maildir into which the message should be placed.
+Otherwise, a target is considered to indicate a Maildir or a UNIX mbox
+into which the message should be placed.
 
 =head3 Delivery
 
 The message must be successfully delivered to all targets of all matching
 rules for the filter run to be considered successfully filtered.
-If the message matched no rules, delivery is attempted to the targets
+If the message matches no rules, delivery is attempted to the targets
 specified by the $DEFAULT environment variable.
 
-If all delivery attempt succeeded, the original message is remove from the Maildir.
+If all delivery attempts succeed, the original message is removed from the Maildir.
 Otherwise the message remains in the Maildir and is ignored on subsequent polls.
 
 =head3 Conditions
@@ -92,8 +93,8 @@ Example:
 
 matches a message not from "cs@zip.com.au".
 
-Conditions are tested against specific message headers. Unless
-specified, these headers are the 'To:', 'CC:' and 'BCC:' headers.
+Conditions are tested against specific message headers.
+Unless specified, these headers are the 'To:', 'CC:' and 'BCC:' headers.
 Example:
 
   cs@zip.com.au
