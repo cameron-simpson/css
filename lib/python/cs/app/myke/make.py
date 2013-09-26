@@ -93,7 +93,7 @@ class Maker(O):
     ''' Called after adjusting parameters.
     '''
     self._makeQ = Later(self.parallel, name=cs.logutils.cmd)
-    self._makeQ.logTo("later.log")
+    self._makeQ.logTo("myke-later.log")
 
   def close(self):
     self._makeQ.close()
