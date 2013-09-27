@@ -901,9 +901,9 @@ def parseMacro(context, text=None, offset=0):
             if ch == '!':
               invert = True
               # !/regexp/ or !{commalist}?
-              _, offset2 = get_white(text, offset+1)
+              _, offset2 = get_white(text, offset)
               if offset2 == len(text) or text[offset2] not in '/{':
-                raise ParseError(context, offset2, '"!" not followed by /regexp/ or {comma-list}')
+                raise ParseError(context, offset2, '"!" not followed by /regexp/ or {comma-list} at %r' % text[offset2:])
               offset = offset2
               ch = text[offset]
 
