@@ -575,9 +575,9 @@ class Target(Result):
       LFs = []
       targets = self.pending_targets
       self.pending_targets = []
-      for dep in targets:
-        with Pfx(T):
-          T = M[dep]
+      for T in targets:
+        with Pfx(str(T)):
+          T = M[T]
           if T.ready:
             self._apply_prereq(T)
             if T.result:
