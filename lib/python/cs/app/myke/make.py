@@ -188,12 +188,6 @@ class Maker(O):
     MLF = self._makeQ.defer(func, *a, **kw)
     return MLF
 
-  def bg(self, func, *a, **kw):
-    ''' Submit a function that does not count against the function quota.
-    '''
-    self.debug_make("bg %s(*%r, **%r)" % (func, a, kw))
-    return self._makeQ.bg(func, *a, **kw)
-
   def after(self, LFs, func, *a, **kw):
     ''' Submit a function to be run after the supplied LateFunctions `LFs`.
     '''
