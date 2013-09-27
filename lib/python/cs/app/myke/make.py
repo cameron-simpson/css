@@ -402,7 +402,6 @@ class Target(Result):
     self.shell = SHELL
     self._prereqs = prereqs
     self._postprereqs = postprereqs
-    self.new_prereqs = []
     self.actions = actions
     # build state:
     #
@@ -417,6 +416,7 @@ class Target(Result):
     #  
     self.out_of_date = False
     self.is_new = False
+    self.was_missing = self.mtime is None
 
   def __str__(self):
     return "{}[{}]".format(self.name, self.madeness())
@@ -442,8 +442,9 @@ class Target(Result):
         the Maker's namespaces, the Maker's macros and the special macros.
     '''
     return ( [ { '@':     lambda c, ns: self.name,
-                 '/':     lambda c, ns: [ P.name for P in self.prereqs ],
-                 # TODO: $? et al
+                 '/':     lambda c, ns: ' '.join(self.prereqs),
+                 '?':     lambda c, ns: ' '.join(self.new_prereqs),
+                 # TODO: $< et al
                },
              ]
            + self.maker.namespaces
@@ -462,6 +463,23 @@ class Target(Result):
       self._prereqs = prereqs(self.context, self.namespaces).split()
     return self._prereqs
 
+  @property
+  def new_prereqs(self):
+    ''' Return the new prerequisite target names.
+    '''
+    if self.was_missing:
+      return self.prereqs
+    Ps = []
+    for Pname in self.prereqs:
+      P = self.maker[Pname]
+      if not P.ready:
+        raise RuntimeError("%s: prereq %r not ready", self.name, Pname)
+      if self.older_than(P):
+        Ps.append(Pname)
+      else:
+        D("NOT NEW %r", Pname)
+    return Ps
+
   @locked_property
   @DEBUG
   def mtime(self):
@@ -470,6 +488,18 @@ class Target(Result):
     except OSError:
       return None
     return s.st_mtime
+
+  def older_than(self, other):
+    if self.was_missing:
+      return True
+    if isinstance(other, str):
+      other = self.maker[other]
+    if other.is_new:
+      return True
+    m = other.mtime
+    if m is None:
+      return False
+    return self.mtime < m
 
   def cancel(self):
     ''' Cancel this Target.
