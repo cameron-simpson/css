@@ -672,7 +672,7 @@ class Action(O):
         subTs = [ M[subtarget] for subtarget in subtargets ]
         def _act_after_make():
           ok = True
-          mdebug = M.make_debug
+          mdebug = M.debug_make
           for T in subTs:
             if T.result:
               mdebug("submake \"%s\" OK", T)
