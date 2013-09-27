@@ -329,7 +329,7 @@ class Maker(O):
 class TargetMap(O):
   ''' A mapping interface to the known targets.
       Makes targets as needed if inferrable.
-      Raise KeyError for targets for missing Targets which are not inferrable.
+      Raise KeyError for missing Targets which are not inferrable.
   '''
 
   def __init__(self, maker):
