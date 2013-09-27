@@ -630,10 +630,13 @@ class Action(O):
     self._lock = Lock()
 
   def __str__(self):
-    prline = self.line.rstrip().replace('\n', '\\n')
-    return "<Action %s %s>" % (self.variant, prline)
+    return "<Action %s %s:%d>" % (self.variant, self.context.filename, self.context.lineno)
 
   __repr__ = __str__
+
+  @property
+  def prline(self):
+    return self.line.rstrip().replace('\n', '\\n')
 
   def act_later(self, target):
     ''' Request that this Action occur on behalf of the Target `target`.
