@@ -16,7 +16,8 @@ devdir=.
 cmd=`basename "$0"`
 usage="Usage: $cmd [-d develdir] [-x] [command [args...]]
         -d develdir     Development source dir. Default: current directory.
-        -x              Trace invocation of command."
+        -x              Trace invocation of command.
+        +x              Do not trace invocation."
 
 badopts=
 
@@ -24,6 +25,7 @@ while [ $# -gt 0 ]
 do
   case $1 in
     -d) devdir=$2; shift ;;
+    +x) trace= ;;
     -x) trace=set-x ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
