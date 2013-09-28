@@ -55,9 +55,13 @@ class ParseError(SyntaxError):
       (which has a .parent attribute).
   '''
 
-  def __init__(self, context, offset, message):
+  def __init__(self, context, offset, message, *a):
     ''' Initialise a ParseError given a FileContext and the offset into `context.text`.
+        Accept optional arguments `*a` after the `message`; if supplied these
+        are embedded into `message` with %-formatting.
     '''
+    if a:
+      message = message % a
     self.msg = message
     self.filename = context.filename
     self.lineno = context.lineno
@@ -362,7 +366,7 @@ def readMakefileLines(M, fp, parent_context=None):
   for line in fp:
     lineno += 1
     if not line.endswith('\n'):
-      raise ParseError(context, len(line), '%s:%d: unexpected EOF (missing final newline)' % (filename, lineno))
+      raise ParseError(context, len(line), '%s:%d: unexpected EOF (missing final newline)', filename, lineno)
 
     if prevline is not None:
       # prepend previous continuation line if any
@@ -399,7 +403,7 @@ def readMakefileLines(M, fp, parent_context=None):
                 raise ParseError(context, offset, "missing macro name")
               _, offset = get_white(line, offset)
               if offset < len(line):
-                raise ParseError(context, offset, "extra arguments after macro name: %s" % (line[offset:],))
+                raise ParseError(context, offset, "extra arguments after macro name: %s", line[offset:])
               newIfState = [ False, True ]
               if all( [ item[0] for item in ifStack ] ):
                 newIfState[0] = nsget(M.namespaces, mname) is not None
@@ -411,7 +415,7 @@ def readMakefileLines(M, fp, parent_context=None):
                 raise ParseError(context, offset, "missing macro name")
               _, offset = get_white(line, offset)
               if offset < len(line):
-                raise ParseError(context, offset, "extra arguments after macro name: %s" % (line[offset:],))
+                raise ParseError(context, offset, "extra arguments after macro name: %s", line[offset:])
               newIfState = [ True, True ]
               if all( [ item[0] for item in ifStack ] ):
                 newIfState[0] = nsget(M.namespaces, mname) is None
@@ -750,7 +754,7 @@ def parseMacro(context, text=None, offset=0):
       mmark = ch
       mmark2 = '}'
     else:
-      raise ParseError(context, offset, 'invalid special macro "%s"' % (ch,))
+      raise ParseError(context, offset, 'invalid special macro "%s"', ch)
 
     # $((foo)) or ${{foo}} ?
     offset += 1
@@ -779,7 +783,7 @@ def parseMacro(context, text=None, offset=0):
             _, offset = get_white(text, offset+1)
             continue
           if text[offset] != ')':
-            raise ParseError(context, offset, 'macro paramaters: expected comma or closing parenthesis, found: '+text[offset:])
+            raise ParseError(context, offset, 'macro paramaters: expected comma or closing parenthesis, found: %s', text[offset:])
         offset += 1
     else:
       # must be "qtext" or a special macro name
@@ -798,7 +802,7 @@ def parseMacro(context, text=None, offset=0):
         mtext = q
         offset += 1
       else:
-        raise ParseError(context, offset, 'unknown special macro name "%s"' % (q,))
+        raise ParseError(context, offset, 'unknown special macro name "%s"', q)
 
     _, offset = get_white(text, offset)
 
@@ -814,7 +818,7 @@ def parseMacro(context, text=None, offset=0):
           offset += 1
           continue
         if ch == '?':
-          raise ParseError(context, offset, 'bare query "?" found in modifiers at: %s' % (text[offset:],))
+          raise ParseError(context, offset, 'bare query "?" found in modifiers at: %s', text[offset:])
 
         mod0 = ch
         modargs = ()
@@ -875,9 +879,10 @@ def parseMacro(context, text=None, offset=0):
           elif mod0 in '-+*':
             modclass = ModSetOp
             _, offset = get_white(text, offset+1)
+            # TODO: handle qstrs
             submname, offset = get_identifier(text, offset)
             if not submname:
-              raise ParseError(context, moffset, 'missing macro name after "-" modifier')
+              raise ParseError(context, moffset, 'missing macro name after "%s" modifier', mod0)
             modargs = (mod0, submname)
           elif mod0 == ':':
             _, offset = get_white(text, offset)
@@ -893,7 +898,7 @@ def parseMacro(context, text=None, offset=0):
             try:
               ptn, repl, etc = text[offset:].split(delim, 2)
             except ValueError:
-              raise ParseError(context, offset, 'incomplete :%sptn%srep%s' % (delim, delim, delim))
+              raise ParseError(context, offset, 'incomplete :%sptn%srep%s', delim, delim, delim)
             offset = len(text) - len(etc)
             modargs = (ptn, repl)
           else:
@@ -903,7 +908,7 @@ def parseMacro(context, text=None, offset=0):
               # !/regexp/ or !{commalist}?
               _, offset2 = get_white(text, offset)
               if offset2 == len(text) or text[offset2] not in '/{':
-                raise ParseError(context, offset2, '"!" not followed by /regexp/ or {comma-list} at %r' % text[offset2:])
+                raise ParseError(context, offset2, '"!" not followed by /regexp/ or {comma-list} at %r', text[offset2:])
               offset = offset2
               ch = text[offset]
 
@@ -917,7 +922,7 @@ def parseMacro(context, text=None, offset=0):
               offset = end+1
               modargs = (mexpr, invert)
             else:
-              raise ParseError(context, offset0, 'unknown macro modifier "%s": "%s"' % (mod0, text[offset0:]))
+              raise ParseError(context, offset0, 'unknown macro modifier "%s": "%s"', mod0, text[offset0:])
 
           modifiers.append(modclass(context, text[offset0:offset], *modargs))
 
@@ -937,9 +942,9 @@ def parseMacro(context, text=None, offset=0):
     return M
 
   except IndexError as e:
-    raise ParseError(context, offset, 'parse incomplete, offset=%d, remainder: %s' % (offset, text[offset:]))
+    raise ParseError(context, offset, 'parse incomplete, offset=%d, remainder: %s', offset, text[offset:])
 
-  raise ParseError(context, offset, 'unhandled parse failure at offset %d: %s' % (offset, text[offset:]))
+  raise ParseError(context, offset, 'unhandled parse failure at offset %d: %s', offset, text[offset:])
 
 class MacroTerm(object):
   ''' A macro reference such as $x or $(foo(a,b,c) xyz).
