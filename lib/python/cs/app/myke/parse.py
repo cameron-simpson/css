@@ -281,13 +281,18 @@ class ModSubstitute(Modifier):
     return re.compile(regexp_mexpr(self.context, namespaces)).sub(self.repl, text)
 
 class ModSetOp(Modifier):
-  def __init__(self, context, modtext, op, macroname):
+  def __init__(self, context, modtext, op, macroname, literal):
     Modifier.__init__(self, context, modtext)
     self.op = op
     self.macroname = macroname
+    self.literal = literal
   def modify(self, text, namespaces):
     words = set(self.words(text))
-    subwords = set(self.words(nsget(namespaces, self.macroname)(self.context, namespaces)))
+    if self.literal:
+      mtext = self.macroname
+    else:
+      mtext = nsget(namespaces, self.macroname)(self.context, namespaces)
+    subwords = set(self.words(mtext))
     if self.op == '-':
       words -= subwords
     elif self.op == '+':
@@ -880,10 +885,21 @@ def parseMacro(context, text=None, offset=0):
             modclass = ModSetOp
             _, offset = get_white(text, offset+1)
             # TODO: handle qstrs
-            submname, offset = get_identifier(text, offset)
-            if not submname:
-              raise ParseError(context, moffset, 'missing macro name after "%s" modifier', mod0)
-            modargs = (mod0, submname)
+            q = text[offset:offset+1]
+            if q == '"' or q == "'":
+              # 'qstr'
+              offset += 1
+              text_offset = offset
+              while text[offset] != q:
+                offset += 1
+              mtext = text[text_offset:offset]
+              offset += 1
+              modargs = (mod0, mtext, True)
+            else:
+              submname, offset = get_identifier(text, offset)
+              if not submname:
+                raise ParseError(context, moffset, 'missing macro name or string after "%s" modifier', mod0)
+              modargs = (mod0, submname, False)
           elif mod0 == ':':
             _, offset = get_white(text, offset)
             if offset >= len(text):
