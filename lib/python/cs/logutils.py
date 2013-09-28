@@ -368,35 +368,34 @@ class Pfx(object):
     if exc_value is not None:
       if _state.raise_needs_prefix:
         prefix = self._state.prefix
+        prefixify = lambda text: prefix + text.replace('\n', '\n' + prefix)
         if hasattr(exc_value, 'args'):
           args = exc_value.args
           if args:
             if isinstance(args, StringTypes):
               D("%s: expected args to be a tuple, got %r", prefix, args)
-              args = prefix + ": " + args
+              args = prefixify(args)
             else:
               args = list(args)
               if len(exc_value.args) == 0:
                 args = prefix
               else:
-                args = [ prefix
-                       + ": "
-                       + unicode(exc_value.args[0])
+                args = [ prefixify(unicode(exc_value.args[0]))
                        ] + list(exc_value.args[1:])
             exc_value.args = args
         elif hasattr(exc_value, 'message'):
-          exc_value.message = prefix + ": " + str(exc_value.message)
+          exc_value.message = prefixify(str(exc_value.message))
         elif hasattr(exc_value, 'reason'):
           if isinstance(exc_value.reason, StringTypes):
-            exc_value.reason = prefix + ": " + exc_value.reason
+            exc_value.reason = prefixify(exc_value.reason)
           else:
             warning("Pfx.__exit__: exc_value.reason is not a string: %r", exc_value.reason)
         elif hasattr(exc_value, 'msg'):
-          exc_value.msg = prefix + ": " + str(exc_value.msg)
+          exc_value.msg = prefixify(str(exc_value.msg))
         else:
           # we can't modify this exception - at least report the current prefix state
           D("%s: Pfx.__exit__: exc_value = %s", prefix, O_str(exc_value))
-          error("%s: %s", prefix, exc_value)
+          error(prefixify(str(exc_value)))
         # prevent outer Pfx wrappers from hacking stuff as well
         _state.raise_needs_prefix = False
     _state.pop()
