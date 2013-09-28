@@ -292,13 +292,13 @@ class ModSetOp(Modifier):
       mtext = self.macroname
     else:
       mtext = nsget(namespaces, self.macroname)(self.context, namespaces)
-    subwords = set(self.words(mtext))
+    subwords = self.words(mtext)
     if self.op == '-':
-      words -= subwords
+      words.difference_update(subwords)
     elif self.op == '+':
-      words += subwords
+      words.update(subwords)
     elif self.op == '*':
-      words ^= subwords
+      words = words.intersection(subwords)
     else:
       raise NotImplementedError("unimplemented set op \"%s\"" % (self.op,))
     return " ".join(words)
