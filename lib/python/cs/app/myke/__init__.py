@@ -15,7 +15,7 @@ def main(argv):
   cmd, args = argv[0], argv[1:]
   setup_logging(cmd)
 
-  M = Maker()
+  M = Maker(argv[0])
   try:
     args, badopts = M.getopt(args)
   except GetoptError as e:

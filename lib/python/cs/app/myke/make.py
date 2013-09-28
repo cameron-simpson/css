@@ -38,8 +38,9 @@ class Maker(O):
   ''' Main class representing a set of dependencies to make.
   '''
 
-  def __init__(self, parallel=1):
+  def __init__(self, makecmd, parallel=1):
     ''' Initialise a Maker.
+        `makecmd`: used to define $(MAKE), typically sys.argv[0].
         `parallel`: the degree of parallelism of shell actions.
     '''
     if parallel < 1:
@@ -65,7 +66,7 @@ class Maker(O):
     self.precious = set()
     self.active = set()
     self._active_lock = Lock()
-    self._namespaces = []
+    self._namespaces = [{ 'MAKE': makecmd.replace('$', '$$') }]
     ##T = Thread(target=self._ticker, args=())
     ##T.daemon = True
     ##D("DISPATCH TICKER")
