@@ -7,6 +7,7 @@ from functools import partial
 import sys
 from collections import deque
 import threading
+import traceback
 from cs.py3 import Queue, raise3
 import time
 from cs.debug import ifdebug, Lock, RLock, Thread
@@ -15,7 +16,7 @@ from cs.threads import AdjustableSemaphore, \
                        WorkerThreadPool, TimerQueue
 from cs.asynchron import Result, Asynchron, ASYNCH_RUNNING
 from cs.seq import seq
-from cs.logutils import Pfx, info, warning, debug, D, OBSOLETE
+from cs.logutils import Pfx, error, info, warning, debug, D, OBSOLETE
 
 class _ThreadLocal(threading.local):
   ''' Thread local state to provide implied context withing Later context managers.
@@ -206,6 +207,12 @@ class LateFunction(PendingFunction):
 
   def _worker_complete(self, work_result):
     result, exc_info = work_result
+    if exc_info:
+      warning("LateFunction<%s>._worker_completed: exc_info=%s", self.name, exc_info[1])
+      with Pfx('>>'):
+        for formatted in traceback.format_exception(*exc_info):
+          for line in formatted.rstrip().split('\n'):
+            warning(line)
     self._complete(result, exc_info)
 
   def _complete(self, result, exc_info):
