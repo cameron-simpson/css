@@ -32,7 +32,7 @@ pmFromHtml(html) = lib/$(html FPP :|::|/|).pm
 podFromMan(manf) = man/$(manf F).pod
 
 subdirs = $('*/.' GD)
-allscripts = $('bin/*' GF !/\./ + "rc.mobile")
+allscripts = $('bin/*' GF !/\./ + "bin/rc.mobile")
 
 scriptmandir = $(MANDIR)/man1
 scriptmans = $(scriptmandir)/$((allscripts)).1
