@@ -565,8 +565,6 @@ def parseMakefile(M, fp, parent_context=None):
         # presumably a target definition
         # gather up the target as a macro expression
         target_mexpr, offset = parseMacroExpression(context, stopchars=':')
-        if offset >= len(context.text):
-          print >>sys.stderr, "\n\noffset = %d\ncontext.text = [%s]\n\n" % (offset, context.text)
         if context.text[offset] != ':':
           raise ParseError(context, offset, "no colon in target definition")
         prereqs_mexpr, offset = parseMacroExpression(context, offset=offset+1, stopchars=':')
