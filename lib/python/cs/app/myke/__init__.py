@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+from __future__ import print_function
 from getopt import GetoptError
 import sys
 from cs.logutils import setup_logging, warning, error, info, D
@@ -21,7 +22,7 @@ def main(argv):
     warning("bad options: %s", e)
     badopts = True
   if badopts:
-    print >>sys.stderr, usage % (cmd,)
+    print(usage % (cmd,), file=sys.stderr)
     return 2
 
   # gather any macro assignments and apply
