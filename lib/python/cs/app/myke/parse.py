@@ -881,8 +881,7 @@ def parseMacro(context, text=None, offset=0):
               modargs = (False,)
           elif mod0 in '-+*':
             modclass = ModSetOp
-            _, offset = get_white(text, offset+1)
-            # TODO: handle qstrs
+            _, offset = get_white(text, offset)
             q = text[offset:offset+1]
             if q == '"' or q == "'":
               # 'qstr'
@@ -931,7 +930,7 @@ def parseMacro(context, text=None, offset=0):
               offset += 1
               mexpr, end = parseMacroExpression(context, text=text, offset=offset, stopchars='/')
               if end >= len(text):
-                raise ParseError(context, offset, 'incomplete /regexp/')
+                raise ParseError(context, offset, 'incomplete /regexp/: %r', text[offset:])
               assert text[end] == '/'
               offset = end+1
               modargs = (mexpr, invert)
