@@ -2,6 +2,7 @@ PREFIX          = /opt/css
 weblocal        = $(HOME)/@/ezos/html/cs/css
 ##hg_bitbucket    = https://bitbucket.org/cameron_simpson/css
 hg_bitbucket    = ssh://hg@bitbucket.org/cameron_simpson/css
+title           = Cameron Simpson's Scripts
 
 target  = bin
 
@@ -167,10 +168,10 @@ _podmans: $(podmans)
 
 $(podmans):     $(podFromMan($@))
         :make $(@D)/.
-        >>$@; $(rewrite) $@ pod2man --center="Cameron Simpson Scripts: $?" $?
+        >>$@; $(rewrite) $@ pod2man --center="$(title): $?" $?
         chmod 644 $@
         set -uex; htman=$(htmandir)/$(@F).html \
-        >>$$htman; $(rewrite) $$htman pod2html --title="Cameron Simpson Scripts: $?" $? \
+        >>$$htman; $(rewrite) $$htman pod2html --title="$(title): $?" $? \
         chmod 644 $$htman
 
 _pmmans: $(pmmans)
@@ -179,10 +180,10 @@ $(pmmans):	$(pmFromMan($@))
 	:make $(@D)/.
 	@if grep '^=head1 NAME' <$? >/dev/null \
 	then \
-	    >>$@; $(rewrite) $@ pod2man --center="Cameron Simpson Scripts: $?" $? \
+	    >>$@; $(rewrite) $@ pod2man --center="$(title): $?" $? \
 	    chmod 644 $@ \
 	    htman=$(htmandir)/$(@F).html \
-	    >>$$htman; $(rewrite) $$htman pod2html --title="Cameron Simpson Scripts: $?" $? \
+	    >>$$htman; $(rewrite) $$htman pod2html --title="$(title): $?" $? \
 	    chmod 644 $$htman \
 	else \
 	    : \
@@ -200,15 +201,15 @@ $(scriptmandir)/%.1: bin/%
 	 case "`sed 1q <$?`" in \
 	    '#!/usr/bin/perl'*) \
 		grep '^=head1 NAME' <$? >/dev/null || exit 0 \
-		>>$@; $(rewrite) $@ pod2man --release=CSS --section=1cs --center="Cameron Simpson's Scripts" $? \
-		>>$$htman; $(rewrite) $$htman pod2html --title="Cameron Simpson's Scripts: $?" $? \
+		>>$@; $(rewrite) $@ pod2man --release=CSS --section=1cs --center="$(title)" $? \
+		>>$$htman; $(rewrite) $$htman pod2html --title="$(title): $?" $? \
 		;; \
 	    *) \
 		grep '^# *=head1 NAME' <$? >/dev/null || exit 0 \
 		tmp=$${TMPDIR:-/tmp}/$(@F).$$ \
 		unhashpod <$? >$$tmp \
-		>>$@; $(rewrite) $@ pod2man --section=1cs --center="Cameron Simpson's Scripts" $$tmp \
-		>>$$htman; $(rewrite) $$htman pod2html --title="Cameron Simpson's Scripts: $?" $$tmp \
+		>>$@; $(rewrite) $@ pod2man --section=1cs --center="$(title)" $$tmp \
+		>>$$htman; $(rewrite) $$htman pod2html --title="$(title): $?" $$tmp \
 		rm $$tmp \
 		;; \
 	 esac \
