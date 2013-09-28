@@ -598,7 +598,7 @@ class Target(Result):
         # queue an action and mark ourselves is_new
         # if so, queue the first one
         if self.out_of_date or self.mtime is None:
-          mdebug("need to make me (out_of_date=%r, mtime=%r)", self.out_of_date, self.mtime)
+          mdebug("NEED TO MAKE %s (out_of_date=%r, mtime=%r)", self.name, self.out_of_date, self.mtime)
           self.is_new = True
           actions = self.pending_actions
           if actions:
@@ -650,46 +650,49 @@ class Action(O):
   @DEBUG
   def _act(self, R, target):
     ''' Perform this Action on behalf of the Target `target`.
-        Put the result onto `R`.
+        Arrange to put the result onto `R`.
     '''
     with Pfx("%s.act(target=%s)", self, target):
-      debug("start act...")
-      M = target.maker
-      mdebug = M.debug_make
-      v = self.variant
-      if v == 'shell':
-        debug("shell command")
-        shcmd = self.mexpr(self.context, target.namespaces)
-        if M.no_action or not self.silent:
-          print(shcmd)
-        if M.no_action:
-          mdebug("OK (maker.no_action)")
-          R.put(True)
+      try:
+        debug("start act...")
+        M = target.maker
+        mdebug = M.debug_make
+        v = self.variant
+        if v == 'shell':
+          debug("shell command")
+          shcmd = self.mexpr(self.context, target.namespaces)
+          if M.no_action or not self.silent:
+            print(shcmd)
+          if M.no_action:
+            mdebug("OK (maker.no_action)")
+            R.put(True)
+            return
+          R.put(self._shcmd(target, shcmd))
           return
-        R.put(self._shcmd(target, shcmd))
-        return
 
-      if v == 'make':
-        subtargets = self.mexpr(self.context, target.namespaces).split()
-        mdebug("targets = %s", subtargets)
-        subTs = [ M[subtarget] for subtarget in subtargets ]
-        def _act_after_make():
-          ok = True
-          mdebug = M.debug_make
+        if v == 'make':
+          subtargets = self.mexpr(self.context, target.namespaces).split()
+          mdebug("targets = %s", subtargets)
+          subTs = [ M[subtarget] for subtarget in subtargets ]
+          def _act_after_make():
+            ok = True
+            mdebug = M.debug_make
+            for T in subTs:
+              if T.result:
+                mdebug("submake \"%s\" OK", T)
+              else:
+                ok = False
+                mdebug("submake \"%s\" FAIL", T)
+            return ok
           for T in subTs:
-            if T.result:
-              mdebug("submake \"%s\" OK", T)
-            else:
-              ok = False
-              mdebug("submake \"%s\" FAIL", T)
-          return ok
-        for T in subTs:
-          mdebug("submake \"%s\"", T)
-          T.require()
-        target.maker.after(subTs, R, _act_after_make)
-        return
-
-      raise NotImplementedError("unsupported variant: %s" % (self.variant,))
+            mdebug("submake \"%s\"", T)
+            T.require()
+          target.maker.after(subTs, R, _act_after_make)
+          return
+        raise NotImplementedError("unsupported variant: %s" % (self.variant,))
+      except Exception as e:
+        error("action failed: %s", e)
+        R.put(False)
 
   def _shcmd(self, target, shcmd):
     with Pfx("%s.act: shcmd=%r", self, shcmd):
