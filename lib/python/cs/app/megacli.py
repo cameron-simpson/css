@@ -271,7 +271,10 @@ class MegaRAID(O):
             elif info == 'No':
               info = False
             ##D("%s.%s = %s", o.__class__.__name__, attr, info)
-            setattr(o, attr, info)
+            if o is None:
+              error("o is None, not setting .%s to %r", attr, info)
+            else:
+              setattr(o, attr, info)
             continue
 
         # catch trailing drive
