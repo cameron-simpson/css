@@ -495,7 +495,7 @@ class Later(object):
 
   def defer(self, func, *a, **kw):
     ''' Queue the function `func` for later dispatch using the
-        default priority with the spcified arguments `*a` and `**kw`.
+        default priority with the specified arguments `*a` and `**kw`.
         Return the corresponding LateFunction for result collection.
         `func` may optionally be preceeded by one or both of:
           a string specifying the function's descriptive name
@@ -509,16 +509,13 @@ class Later(object):
     if a:
       a = list(a)
     params = {}
-    funcname = None
     while not callable(func):
       if isinstance(func, str):
-        funcname = func
+        params['name'] = func
         func = a.pop(0)
       else:
-        params = func
+        params.update(func)
         func = a.pop(0)
-    if funcname is not None:
-      params['name'] = funcname
     if a or kw:
       func = partial(func, *a, **kw)
     MLF = self.submit(func, **params)
