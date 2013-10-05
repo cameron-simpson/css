@@ -628,7 +628,7 @@ class Later(object):
       except StopIteration:
         outQ.close()
       except Exception as e:
-        error("defer_iterable: collect: exception during iteration: %s", e)
+        error("defer_iterable: iterate_once: exception during iteration: %s", e)
         outQ.close()
       else:
         outQ.put(item)
