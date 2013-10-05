@@ -15,6 +15,7 @@ class QueueIterator(O):
   def __init__(self, q):
     O.__init__(self, q=q)
     self.closed = False
+    self.opens = 0
 
   def __getattr__(self, attr):
     return getattr(self.q, attr)
@@ -44,12 +45,17 @@ class QueueIterator(O):
       raise ValueError("put(sentinel)")
     return self.q.put(item, *args, **kw)
 
+  def open(self):
+    self.opens += 1
+
   def close(self):
     if self.closed:
       error("queue already closed")
     else:
-      self.closed = True
-      self.q.put(self.sentinel)
+      self.opens -= 1
+      if self.opens < 1:
+        self.closed = True
+        self.q.put(self.sentinel)
 
   def __iter__(self):
     ''' Iterable interface for the queue.
