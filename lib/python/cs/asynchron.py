@@ -6,6 +6,7 @@
 
 import sys
 from cs.debug import Lock
+from cs.logutils import error
 from cs.obj import O
 from cs.seq import seq
 from cs.py3 import Queue, raise3
@@ -131,7 +132,7 @@ class Asynchron(O):
       try:
         notifier(self)
       except Exception as e:
-        error("%s: calling notifier %s: %s", self, notifier, e)
+        error("%s: calling notifier %s: exc=%s", self, notifier, e)
 
   def join(self):
     ''' Calling the .join() method waits for the function to run to
