@@ -208,6 +208,7 @@ class LateFunction(PendingFunction):
   def _worker_complete(self, work_result):
     result, exc_info = work_result
     if exc_info:
+      if isinstance(exc_info[1], (NameError, AttributeError)):
       warning("LateFunction<%s>._worker_completed: exc_info=%s", self.name, exc_info[1])
       with Pfx('>>'):
         for formatted in traceback.format_exception(*exc_info):
