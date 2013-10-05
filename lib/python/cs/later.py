@@ -505,7 +505,7 @@ class Later(object):
           submit(functools.partial(func, *a, **kw), **params)
     '''
     if self.closed:
-      raise RunTimError("%s.bg(...) after close()")
+      raise RuntimeError("%s.bg(...) after close()")
     if a:
       a = list(a)
     params = {}
