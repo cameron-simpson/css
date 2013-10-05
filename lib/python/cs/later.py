@@ -619,13 +619,12 @@ class Later(object):
       outQ = IterableQueue()
     iterate = I.next
 
-    def collect(LF):
-      ''' Collect the item from `LF`.
-          Place it on the `outQ`.
-          Close the queue on end of iteration or other exception.
+    def iterate_once(iterate):
+      ''' Call `iterate`. Place the result on outQ.
+          Close the queue at end of iteration or other exception.
       '''
       try:
-        item = LF()
+        item = iterate()
       except StopIteration:
         outQ.close()
       except Exception as e:
@@ -633,12 +632,10 @@ class Later(object):
         outQ.close()
       else:
         outQ.put(item)
-        LF = self.defer(iterate)
-        self.after( (LF,), None, collect, LF )
+        self.defer(iterate_once, iterate)
 
     outQ.open()
-    LF = self.defer(iterate)
-    self.after( (LF,), None, collect, LF )
+    self.defer(iterate_once, iterate)
     return outQ
 
   @contextmanager
