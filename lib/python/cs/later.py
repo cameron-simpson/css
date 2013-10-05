@@ -11,7 +11,7 @@ import traceback
 from cs.py3 import Queue, raise3
 import time
 from cs.debug import ifdebug, Lock, RLock, Thread
-from cs.queues import IterablePriorityQueue
+from cs.queues import IterableQueue, IterablePriorityQueue
 from cs.threads import AdjustableSemaphore, \
                        WorkerThreadPool, TimerQueue
 from cs.asynchron import Result, Asynchron, ASYNCH_RUNNING
@@ -209,11 +209,11 @@ class LateFunction(PendingFunction):
     result, exc_info = work_result
     if exc_info:
       if isinstance(exc_info[1], (NameError, AttributeError)):
-      warning("LateFunction<%s>._worker_completed: exc_info=%s", self.name, exc_info[1])
-      with Pfx('>>'):
-        for formatted in traceback.format_exception(*exc_info):
-          for line in formatted.rstrip().split('\n'):
-            warning(line)
+        warning("LateFunction<%s>._worker_completed: exc_info=%s", self.name, exc_info[1])
+        with Pfx('>>'):
+          for formatted in traceback.format_exception(*exc_info):
+            for line in formatted.rstrip().split('\n'):
+              warning(line)
     self._complete(result, exc_info)
 
   def _complete(self, result, exc_info):
@@ -607,6 +607,38 @@ class Later(object):
         R.put(result)
     self.defer(retry)
     return R
+
+  def defer_iterable(self, I, outQ=None):
+    ''' Submit an iterable `I` for asynchronous stepwise iteration
+        to return results via the iterable Queue `outQ`.
+        If outQ is None, instantiate a new IterableQueue.
+        Return the iterable Queue.
+    '''
+    if outQ is None:
+      outQ = IterableQueue()
+    iterate = I.next
+
+    def collect(LF):
+      ''' Collect the item from `LF`.
+          Place it on the `outQ`.
+          Close the queue on end of iteration or other exception.
+      '''
+      try:
+        item = LF()
+      except StopIteration:
+        outQ.close()
+      except Exception as e:
+        error("defer_iterable: collect: exception during iteration: %s", e)
+        outQ.close()
+      else:
+        outQ.put(item)
+        LF = self.defer(iterate)
+        self.after( (LF,), None, collect, LF )
+
+    outQ.open()
+    LF = self.defer(iterate)
+    self.after( (LF,), None, collect, LF )
+    return outQ
 
   @contextmanager
   def priority(self, pri):
