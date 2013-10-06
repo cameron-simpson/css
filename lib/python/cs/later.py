@@ -609,7 +609,7 @@ class Later(object):
     self.defer(retry)
     return R
 
-  def defer_iterable(self, I, outQ=None):
+  def defer_iterator(self, I, outQ=None):
     ''' Submit an iterator `I` for asynchronous stepwise iteration
         to return results via the iterable Queue `outQ`.
         If outQ is None, instantiate a new IterableQueue.
@@ -619,7 +619,7 @@ class Later(object):
       outQ = IterableQueue()
     iterate = I.next
 
-    def iterate_once(iterate):
+    def iterate_once():
       ''' Call `iterate`. Place the result on outQ.
           Close the queue at end of iteration or other exception.
           Otherwise, requeue ourself to collect the next iteration value.
@@ -633,10 +633,10 @@ class Later(object):
         outQ.close()
       else:
         outQ.put(item)
-        self.defer(iterate_once, iterate)
+        self.defer(iterate_once)
 
     outQ.open()
-    self.defer(iterate_once, iterate)
+    self.defer(iterate_once)
     return outQ
 
   @contextmanager
