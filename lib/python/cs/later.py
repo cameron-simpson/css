@@ -610,7 +610,7 @@ class Later(object):
     return R
 
   def defer_iterable(self, I, outQ=None):
-    ''' Submit an iterable `I` for asynchronous stepwise iteration
+    ''' Submit an iterator `I` for asynchronous stepwise iteration
         to return results via the iterable Queue `outQ`.
         If outQ is None, instantiate a new IterableQueue.
         Return the iterable Queue.
@@ -622,6 +622,7 @@ class Later(object):
     def iterate_once(iterate):
       ''' Call `iterate`. Place the result on outQ.
           Close the queue at end of iteration or other exception.
+          Otherwise, requeue ourself to collect the next iteration value.
       '''
       try:
         item = iterate()
