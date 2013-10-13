@@ -6,6 +6,7 @@
 
 from cs.debug import Lock, RLock, Thread, trace_caller
 from cs.logutils import warning
+from cs.seq import seq
 from cs.py3 import Queue, PriorityQueue, Queue_Full, Queue_Empty
 from cs.obj import O
 
@@ -147,3 +148,72 @@ class Channel(object):
       warning("%s: .close() of closed Channel" % (self,))
     else:
       self.closed = True
+
+class PushQueue(O):
+  ''' A puttable object to look like a Queue.
+      Calling .put(item) calls a pushfunc supplied at initialisation to
+      trigger a function on data arrival.
+  '''
+
+  def __init__(self, L, pushfunc, outQ, is_iterable=False, name=None):
+    ''' Initialise the PushQueue with the Later `L`, callable
+	`pushfunc` and the output queue `outQ`.
+	`pushfunc` is a one-to-many function which accepts a single
+	  item of input and returns an iterable of outputs; it may
+	  be a generator.
+        `outQ` accepts results from the callable via its .put() method.
+        If `is_iterable``, submit `pushfunc(item)` via L.defer_iterable() to
+          allow a progressive feed to `outQ`.
+        Otherwise, submit `pushfunc` with `item` via L.defer().
+    '''
+    O.__init__(self)
+    if name is None:
+      name = "%s-%d" % (self.__class__.__name__, seq())
+    self.name = name
+    self.later = L
+    self.func = pushfunc
+    self.outQ = outQ
+    self.is_iterable = is_iterable
+    self.opens = 0
+    self.closed = False
+    self.LFs = []
+
+  def __str__(self):
+    return "PQ<%s>" % (self.name,)
+
+  def put(self, item):
+    ''' Receive a new item.
+        If self.func returns an iterator, submit via defer_iterable.
+        Otherwise, submit self.func(item) and after completion,
+        queue its results to outQ.
+    '''
+    if self.closed:
+      warning("%s.put(%s) when closed" % (self, item))
+    L = self.later
+    if self.is_iterable:
+      # add to the outQ opens; defer_iterable will close it
+      L.defer_iterable( self.func(item), self.outQ )
+    else:
+      # defer the computation then call _push_items which puts the results
+      # and closes outQ
+      LF = L.defer( self.func, item )
+      self.LFs.append(LF)
+      L.after( (LF,), None, self._push_items, LF )
+
+  def _push_items(self, LF):
+    ''' Handler to run after completion of `LF`.
+        Put the results of `LF` onto `outQ`.
+    '''
+    for item in LF():
+      self.outQ.put(item)
+    self.outQ.close()
+
+  ##@trace_caller
+  def open(self):
+    self.opens += 1
+
+  def close(self):
+    self.opens -= 1
+    if self.opens < 1:
+      self.closed = True
+      self.later.after( self.LFs, None, self.outQ.close )
