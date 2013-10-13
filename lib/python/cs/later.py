@@ -406,7 +406,7 @@ class Later(object):
 	deadlock at the cost of transient overthreading.
     '''
     if self.closed:
-      raise RunTimError("%s.bg(...) after close()")
+      warning("%s.bg(...) after close()", self)
     funcname = None
     if isinstance(func, str):
       funcname = func
@@ -441,7 +441,7 @@ class Later(object):
     '''
     ##D("%s.submit()...", self)
     if self.closed:
-      raise RunTimError("%s.bg(...) after close()")
+      warning("%s.submit(...) after close()", self)
     if delay is not None and when is not None:
       raise ValueError("you can't specify both delay= and when= (%s, %s)" % (delay, when))
     if priority is None:
@@ -507,7 +507,7 @@ class Later(object):
           submit(functools.partial(func, *a, **kw), **params)
     '''
     if self.closed:
-      raise RuntimeError("%s.bg(...) after close()")
+      warning("%s.defer(...) after close()", self)
     if a:
       a = list(a)
     params = {}
@@ -615,6 +615,7 @@ class Later(object):
     ''' Submit an iterable `I` for asynchronous stepwise iteration
         to return results via the iterable Queue `outQ`.
         If outQ is None, instantiate a new IterableQueue.
+        When the iteration is complete, calls outQ.close().
         Return the iterable Queue.
     '''
     if outQ is None:
