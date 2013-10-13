@@ -4,7 +4,8 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
-from cs.debug import Lock, RLock, Thread
+from cs.debug import Lock, RLock, Thread, trace_caller
+from cs.logutils import warning
 from cs.py3 import Queue, PriorityQueue, Queue_Full, Queue_Empty
 from cs.obj import O
 
@@ -50,7 +51,8 @@ class QueueIterator(O):
 
   def close(self):
     if self.closed:
-      error("queue already closed")
+      # TODO: possibly an error, must debug sometime
+      warning("%s.close: already closed", self)
     else:
       self.opens -= 1
       if self.opens < 1:
