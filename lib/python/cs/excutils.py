@@ -43,7 +43,7 @@ def noexc(func):
   ''' Decorator to wrap a function which should never raise an exception.
       Instead, any raised exception is attempted to be logged.
       A significant side effect is of course that if the function raises an
-      exception it now return None.
+      exception it now returns None.
       My primary use case is actually to wrap logging functions,
       which I have had abort otherwise sensible code.
   '''
