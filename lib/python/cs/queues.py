@@ -155,13 +155,15 @@ class PushQueue(O):
       trigger a function on data arrival.
   '''
 
-  def __init__(self, L, pushfunc, outQ, is_iterable=False, name=None):
+  def __init__(self, L, pushfunc, outQ, close_func=None, is_iterable=False, name=None):
     ''' Initialise the PushQueue with the Later `L`, callable
 	`pushfunc` and the output queue `outQ`.
 	`pushfunc` is a one-to-many function which accepts a single
 	  item of input and returns an iterable of outputs; it may
 	  be a generator.
         `outQ` accepts results from the callable via its .put() method.
+        `closefunc`, if specified an not None, is called after completion of
+          all calls to `pushfunc`.
         If `is_iterable``, submit `pushfunc(item)` via L.defer_iterable() to
           allow a progressive feed to `outQ`.
         Otherwise, submit `pushfunc` with `item` via L.defer().
@@ -216,4 +218,9 @@ class PushQueue(O):
     self.opens -= 1
     if self.opens < 1:
       self.closed = True
-      self.later.after( self.LFs, None, self.outQ.close )
+      LFs = self.LFs
+      if self.closefunc:
+        # run closefunc to completion before closing outQ
+        LFclose = self.later.after( LFs, None, self.closefunc )
+        LFs = (LFclose,)
+      self.later.after( LFs, None, self.outQ.close )
