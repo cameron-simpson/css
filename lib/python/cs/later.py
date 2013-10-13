@@ -611,15 +611,15 @@ class Later(object):
     self.defer(retry)
     return R
 
-  def defer_iterator(self, I, outQ=None):
-    ''' Submit an iterator `I` for asynchronous stepwise iteration
+  def defer_iterable(self, I, outQ=None):
+    ''' Submit an iterable `I` for asynchronous stepwise iteration
         to return results via the iterable Queue `outQ`.
         If outQ is None, instantiate a new IterableQueue.
         Return the iterable Queue.
     '''
     if outQ is None:
       outQ = IterableQueue()
-    iterate = I.next
+    iterate = iter(I).next
 
     def iterate_once():
       ''' Call `iterate`. Place the result on outQ.
@@ -631,7 +631,7 @@ class Later(object):
       except StopIteration:
         outQ.close()
       except Exception as e:
-        error("defer_iterator: iterate_once: exception during iteration: %s", e)
+        error("defer_iterable: iterate_once: exception during iteration: %s", e)
         outQ.close()
       else:
         outQ.put(item)
