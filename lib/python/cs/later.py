@@ -208,7 +208,7 @@ class LateFunction(PendingFunction):
   def _worker_complete(self, work_result):
     result, exc_info = work_result
     if exc_info:
-      if isinstance(exc_info[1], (NameError, AttributeError)):
+      if isinstance(exc_info[1], (NameError, AttributeError, RuntimeError)):
         warning("LateFunction<%s>._worker_completed: exc_info=%s", self.name, exc_info[1])
         with Pfx('>>'):
           for formatted in traceback.format_exception(*exc_info):
@@ -560,6 +560,8 @@ class Later(object):
     '''
     if R is None:
       R = Result()
+    elif not isinstance(R, Asynchron):
+      raise TypeError("Later.after(LFs, R, func, ...): expected Asynchron for R, got %r" % (R,))
     LFs = list(LFs)
     count = len(LFs)
     def put_func():
@@ -629,7 +631,7 @@ class Later(object):
       except StopIteration:
         outQ.close()
       except Exception as e:
-        error("defer_iterable: iterate_once: exception during iteration: %s", e)
+        error("defer_iterator: iterate_once: exception during iteration: %s", e)
         outQ.close()
       else:
         outQ.put(item)
