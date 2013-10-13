@@ -11,7 +11,7 @@ import traceback
 from cs.py3 import Queue, raise3
 import time
 from cs.debug import ifdebug, Lock, RLock, Thread
-from cs.queues import IterableQueue, IterablePriorityQueue
+from cs.queues import IterableQueue, IterablePriorityQueue, PushQueue
 from cs.threads import AdjustableSemaphore, \
                        WorkerThreadPool, TimerQueue
 from cs.asynchron import Result, Asynchron, ASYNCH_RUNNING
@@ -640,6 +640,30 @@ class Later(object):
 
     outQ.open()
     self.defer(iterate_once)
+    return outQ
+
+  def pipeline(self, filter_funcs, inputs, outQ=None):
+    ''' Construct a pipeline to be mediated by this Later queue.
+        `filter_funcs`: an iterable of filter functions accepting the
+          single items from the iterable `inputs`, returning an
+          iterable output.
+        `inputs`: the initial iterable inputs.
+        `outQ`: the optional output queue; if None, an IterableQueue() will be
+          allocated.
+        The output queue is returned.
+        If `filter_funcs` is empty, the inputs are returned.
+    '''
+    filter_funcs = list(filter_funcs)
+    if not filter_funcs:
+      return inputs
+    if outQ is None:
+      outQ = IterableQueue()
+    RHQ = outQ
+    while filter_funcs:
+      func = filter_funcs.pop()
+      PQ = PushQueue(self, func, RHQ, is_iterable=True)
+      RHQ = PQ
+    self.defer_iterable( inputs, RHQ )
     return outQ
 
   @contextmanager
