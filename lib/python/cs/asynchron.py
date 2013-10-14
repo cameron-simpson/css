@@ -95,6 +95,11 @@ class Asynchron(O):
   def result(self, new_result):
     self._complete(new_result, None)
 
+  def put(self, value):
+    ''' Store the value. Queue-like notation.
+    '''
+    self.result = value
+
   @property
   def exc_info(self):
     with self._lock:
@@ -197,15 +202,7 @@ def report(LFs):
   for i in range(n):
     yield Q.get()
 
-class Result(Asynchron):
-  ''' A blocking value store.
-      Getters block until a value is supplied.
-  '''
-
-  def put(self, value):
-    ''' Store the value.
-    '''
-    self.result = value
+Result = Asynchron
 
 if __name__ == '__main__':
   import cs.asynchron_tests
