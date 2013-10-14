@@ -114,6 +114,18 @@ class Asynchron(O):
   def exc_info(self, exc_info):
     self._complete(None, exc_info)
 
+  def call(self, func, *a, **kw):
+    ''' Have the Asynchron call `func(*a,**kw)` and store its values as
+        self.result.
+        If `func` raises an exception, store it as self.exc_info.
+    '''
+    try:
+      r = func(*a, **kw)
+    except:
+      self.exc_info = sys.exc_info
+    else:
+      self.result = r
+
   def _complete(self, result, exc_info):
     ''' Set the result.
         Alert people to completion.
