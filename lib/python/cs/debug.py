@@ -287,9 +287,10 @@ def trace_caller(func):
   def subfunc(*a, **kw):
     import traceback
     frame = traceback.extract_stack(None, 2)[0]
-    D("call to %s:%d %s(), called from %s:%d %s",
+    D("CALL %s()<%s:%d>, from %s:%d %s",
+         func.__name__,
          func.__code__.co_filename, func.__code__.co_firstlineno,
-         func.__name__, frame[0], frame[1], frame[2])
+         frame[0], frame[1], frame[2])
     return func(*a, **kw)
   return subfunc
 
