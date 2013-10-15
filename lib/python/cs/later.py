@@ -567,7 +567,7 @@ class Later(object):
     def put_func():
       ''' Function to defer: run `func` and pass its return value to R.put().
       '''
-      R.put(func(*a, **kw))
+      R.call(func, *a, **kw)
     if count == 0:
       # nothing to wait for - queue the function immediately
       self.defer(put_func)
