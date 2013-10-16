@@ -86,7 +86,7 @@ class WorkerThreadPool(O):
         args = []
         H = Thread(target=self._handler, args=args)
         H.daemon = True
-        Hdesc = (H, IterableQueue())
+        Hdesc = (H, IterableQueue(name="%s:IQ%d" % (self.name, seq())))
         self.all.append(Hdesc)
         args.append(Hdesc)
         debug("%s: start new worker thread", self)
