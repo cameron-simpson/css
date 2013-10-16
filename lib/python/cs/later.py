@@ -442,6 +442,10 @@ class Later(object):
     ##D("%s.submit()...", self)
     if self.closed:
       warning("%s.submit(...) after close()", self)
+    return self._submit(func, priority=priority, delay=delay, when=when, name=name, pfx=pfx)
+
+  def _submit(self, func, priority=None, delay=None, when=None, name=None, pfx=None):
+    ##D("%s.submit()...", self)
     if delay is not None and when is not None:
       raise ValueError("you can't specify both delay= and when= (%s, %s)" % (delay, when))
     if priority is None:
@@ -508,6 +512,9 @@ class Later(object):
     '''
     if self.closed:
       warning("%s.defer(...) after close()", self)
+    return self._defer(func, *a, **kw)
+
+  def _defer(self, func, *a, **kw):
     if a:
       a = list(a)
     params = {}
@@ -558,6 +565,11 @@ class Later(object):
 	See the retry method for a convenience method that uses the
 	above pattern in a repeating style.
     '''
+    if self.closed:
+      warning("%s.after(...) after close()", self)
+    return self._after(LFs, R, func, *a, **kw)
+
+  def _after(self, LFs, R, func, *a, **kw):
     if R is None:
       R = Result()
     elif not isinstance(R, Asynchron):
@@ -570,7 +582,8 @@ class Later(object):
       R.call(func, *a, **kw)
     if count == 0:
       # nothing to wait for - queue the function immediately
-      self.defer(put_func)
+      warning("Later.after: len(LFs) == 0, func=%s", func.__name__)
+      self._defer(put_func)
     else:
       # create a notification function which submits put_func
       # after sufficient notifications have been received
@@ -580,7 +593,7 @@ class Later(object):
         '''
         countery[0] -= 1
         if countery[0] == 0:
-          self.defer(put_func)
+          self._defer(put_func)
       # submit the notifications
       for LF in LFs:
         LF.notify(submit_func)
@@ -618,6 +631,11 @@ class Later(object):
         When the iteration is complete, calls outQ.close().
         Return the iterable Queue.
     '''
+    if self.closed:
+      warning("%s.defer_iterable after close", self)
+    return self._defer_iterable(I, outQ=outQ)
+
+  def _defer_iterable(self, I, outQ=None):
     if outQ is None:
       outQ = IterableQueue()
     iterate = iter(I).next
@@ -636,10 +654,10 @@ class Later(object):
         outQ.close()
       else:
         outQ.put(item)
-        self.defer(iterate_once)
+        D("iterate_once: DONE %s.put(%s), requeuing iterate_once", outQ, item)
+        self._defer(iterate_once)
 
-    outQ.open()
-    self.defer(iterate_once)
+    self._defer(iterate_once)
     return outQ
 
   def pipeline(self, filter_funcs, inputs, outQ=None):
@@ -653,6 +671,9 @@ class Later(object):
         The output queue is returned.
         If `filter_funcs` is empty, the inputs are returned.
     '''
+    return self._pipeline(filter_funcs, inputs, outQ=None)
+
+  def _pipeline(self, filter_funcs, inputs, outQ=None):
     filter_funcs = list(filter_funcs)
     if not filter_funcs:
       return inputs
@@ -663,7 +684,7 @@ class Later(object):
       func = filter_funcs.pop()
       PQ = PushQueue(self, func, RHQ, is_iterable=True)
       RHQ = PQ
-    self.defer_iterable( inputs, RHQ )
+    self._defer_iterable( inputs, RHQ )
     return outQ
 
   @contextmanager
