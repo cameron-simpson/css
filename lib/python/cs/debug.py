@@ -292,6 +292,7 @@ def trace_caller(func):
          func.__code__.co_filename, func.__code__.co_firstlineno,
          frame[2], frame[0], frame[1])
     return func(*a, **kw)
+  subfunc.__name__ = "trace_caller/subfunc/"+func.__name__
   return subfunc
 
 if __name__ == '__main__':
