@@ -661,7 +661,6 @@ class Later(object):
         outQ.close()
       else:
         outQ.put(item)
-        D("iterate_once: DONE %s.put(%s), requeuing iterate_once", outQ, item)
         self._defer(iterate_once)
 
     self._defer(iterate_once)
