@@ -212,9 +212,9 @@ class PushQueue(O):
     else:
       # defer the computation then call _push_items which puts the results
       # and closes outQ
-      LF = L.defer( self.func, item )
+      LF = L._defer( self.func_push, item )
       self.LFs.append(LF)
-      L.after( (LF,), None, self._push_items, LF )
+      L._after( (LF,), None, self._push_items, LF )
 
   # NB: reports and discards exceptions
   @noexc
