@@ -20,6 +20,7 @@ from cs.logutils import Pfx, error, info, warning, debug, D, OBSOLETE
 
 # function signature designators, used with Later.pipeline()
 FUNC_ONE_TO_MANY = 0
+FUNC_ONE_TO_ONE = 0
 FUNC_SELECTOR = 1
 FUNC_MANY_TO_MANY = 2
 
@@ -746,7 +747,10 @@ class Later(object):
       # expect a tuple
       func_sig, func = o
     func_final = None
-    if func_sig == FUNC_ONE_TO_MANY:
+    if func_sig == FUNC_ONE_TO_ONE:
+      def func_iter(item):
+        yield func(item)
+    elif func_sig == FUNC_ONE_TO_MANY:
       func_iter = func
     elif func_sig == FUNC_SELECTOR:
       def func_iter(item):
