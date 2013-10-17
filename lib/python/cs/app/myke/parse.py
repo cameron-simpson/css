@@ -1044,7 +1044,7 @@ class TestAll(unittest.TestCase):
   def test20parseMakeLines(self):
     from cs.py3 import StringIO
     from .make import Maker
-    with Maker() as M:
+    with Maker("myke") as M:
       parsed = list(parseMakefile(M, StringIO("abc = def\n")))
       self.assertEqual(len(parsed), 1)
       self.assertEqual([ type(O) for O in parsed ], [ Macro ])
