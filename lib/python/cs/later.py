@@ -10,13 +10,18 @@ import threading
 import traceback
 from cs.py3 import Queue, raise3
 import time
-from cs.debug import ifdebug, Lock, RLock, Thread
-from cs.queues import IterablePriorityQueue
+from cs.debug import ifdebug, Lock, RLock, Thread, trace_caller
+from cs.queues import IterableQueue, IterablePriorityQueue, PushQueue
 from cs.threads import AdjustableSemaphore, \
                        WorkerThreadPool, TimerQueue
 from cs.asynchron import Result, Asynchron, ASYNCH_RUNNING
 from cs.seq import seq
 from cs.logutils import Pfx, error, info, warning, debug, D, OBSOLETE
+
+# function signature designators, used with Later.pipeline()
+FUNC_ONE_TO_MANY = 0
+FUNC_SELECTOR = 1
+FUNC_MANY_TO_MANY = 2
 
 class _ThreadLocal(threading.local):
   ''' Thread local state to provide implied context withing Later context managers.
@@ -208,11 +213,12 @@ class LateFunction(PendingFunction):
   def _worker_complete(self, work_result):
     result, exc_info = work_result
     if exc_info:
-      warning("LateFunction<%s>._worker_completed: exc_info=%s", self.name, exc_info[1])
-      with Pfx('>>'):
-        for formatted in traceback.format_exception(*exc_info):
-          for line in formatted.rstrip().split('\n'):
-            warning(line)
+      if isinstance(exc_info[1], (NameError, AttributeError, RuntimeError)):
+        warning("LateFunction<%s>._worker_completed: exc_info=%s", self.name, exc_info[1])
+        with Pfx('>>'):
+          for formatted in traceback.format_exception(*exc_info):
+            for line in formatted.rstrip().split('\n'):
+              warning(line)
     self._complete(result, exc_info)
 
   def _complete(self, result, exc_info):
@@ -253,7 +259,7 @@ class Later(object):
     self._priority = (0,)
     self._timerQ = None         # queue for delayed requests; instantiated at need
     # inbound requests queue
-    self._LFPQ = IterablePriorityQueue(inboundCapacity)
+    self._LFPQ = IterablePriorityQueue(inboundCapacity, name="%s._LFPQ" % (self.name,))
     self._workers = WorkerThreadPool()
     self._dispatchThread = Thread(name=self.name+'._dispatcher', target=self._dispatcher)
     self._lock = Lock()
@@ -272,6 +278,7 @@ class Later(object):
     '''
     return self.defer(func, *a, **kw)()
 
+  ##@trace_caller
   def close(self):
     ''' Shut down the Later instance:
         - close the TimerQueue, if any, and wait for it to complete
@@ -291,6 +298,13 @@ class Later(object):
         self._LFPQ.close()              # prevent further submissions
         self._dispatchThread.join()     # wait for all functions to be dispatched
         self._workers.close()           # wait for all worker threads to complete
+
+  ## TODO
+  def idle(self):
+    ''' Wait for all active and pending jobs to complete, including
+        any jobs they may themselves queue.
+    '''
+    raise RuntimeError("UNIMPLEMENTED")
 
   def __repr__(self):
     return '<%s "%s" capacity=%s running=%d (%s) pending=%d (%s) delayed=%d closed=%s>' \
@@ -405,7 +419,7 @@ class Later(object):
 	deadlock at the cost of transient overthreading.
     '''
     if self.closed:
-      raise RunTimError("%s.bg(...) after close()")
+      warning("%s.bg(...) after close()", self)
     funcname = None
     if isinstance(func, str):
       funcname = func
@@ -438,9 +452,11 @@ class Later(object):
         If the parameter `pfx` is not None, submit pfx.func(func);
           see cs.logutils.Pfx's .func method for details.
     '''
-    ##D("%s.submit()...", self)
     if self.closed:
-      raise RunTimError("%s.bg(...) after close()")
+      warning("%s.submit(...) after close()", self)
+    return self._submit(func, priority=priority, delay=delay, when=when, name=name, pfx=pfx)
+
+  def _submit(self, func, priority=None, delay=None, when=None, name=None, pfx=None):
     if delay is not None and when is not None:
       raise ValueError("you can't specify both delay= and when= (%s, %s)" % (delay, when))
     if priority is None:
@@ -479,23 +495,25 @@ class Later(object):
 
     return LF
 
-  def multisubmit(self, params, func, iter):
-    ''' Generator that iterates over `iter`, submitting function calls and
-        yielding the corresponding LateFunctions, specificly calling:
-          self.defer(params, func, i)
-        where `i` is an element of `iter`.
+  def multisubmit(self, params, func, I):
+    ''' Generator that iterates over the iterable `I`, submitting
+	function calls and yielding the corresponding LateFunctions,
+	specificly calling:
+          self.defer(params, func, item)
+        where `i` is an element of `I`.
         Handy for submitting a batch of jobs.
         Caution: being a generator, the functions are not submitted
         until the caller iterates over the returned generator.
         Examples:
           L.multisubmit(f, xrange(100))
     '''
-    for i in iter:
-      yield self.defer(params, func, i)
+    for item in I:
+      yield self.defer(params, func, item)
 
+  ##@trace_caller
   def defer(self, func, *a, **kw):
     ''' Queue the function `func` for later dispatch using the
-        default priority with the spcified arguments `*a` and `**kw`.
+        default priority with the specified arguments `*a` and `**kw`.
         Return the corresponding LateFunction for result collection.
         `func` may optionally be preceeded by one or both of:
           a string specifying the function's descriptive name
@@ -505,20 +523,20 @@ class Later(object):
           submit(functools.partial(func, *a, **kw), **params)
     '''
     if self.closed:
-      raise RunTimError("%s.bg(...) after close()")
+      warning("%s.defer(...) after close()", self)
+    return self._defer(func, *a, **kw)
+
+  def _defer(self, func, *a, **kw):
     if a:
       a = list(a)
     params = {}
-    funcname = None
     while not callable(func):
       if isinstance(func, str):
-        funcname = func
+        params['name'] = func
         func = a.pop(0)
       else:
-        params = func
+        params.update(func)
         func = a.pop(0)
-    if funcname is not None:
-      params['name'] = funcname
     if a or kw:
       func = partial(func, *a, **kw)
     MLF = self.submit(func, **params)
@@ -559,17 +577,25 @@ class Later(object):
 	See the retry method for a convenience method that uses the
 	above pattern in a repeating style.
     '''
+    if self.closed:
+      warning("%s.after(...) after close()", self)
+    return self._after(LFs, R, func, *a, **kw)
+
+  def _after(self, LFs, R, func, *a, **kw):
     if R is None:
       R = Result()
+    elif not isinstance(R, Asynchron):
+      raise TypeError("Later.after(LFs, R, func, ...): expected Asynchron for R, got %r" % (R,))
     LFs = list(LFs)
     count = len(LFs)
     def put_func():
       ''' Function to defer: run `func` and pass its return value to R.put().
       '''
-      R.put(func(*a, **kw))
+      R.call(func, *a, **kw)
     if count == 0:
       # nothing to wait for - queue the function immediately
-      self.defer(put_func)
+      warning("Later.after: len(LFs) == 0, func=%s", func.__name__)
+      self._defer(put_func)
     else:
       # create a notification function which submits put_func
       # after sufficient notifications have been received
@@ -579,7 +605,7 @@ class Later(object):
         '''
         countery[0] -= 1
         if countery[0] == 0:
-          self.defer(put_func)
+          self._defer(put_func)
       # submit the notifications
       for LF in LFs:
         LF.notify(submit_func)
@@ -609,6 +635,135 @@ class Later(object):
         R.put(result)
     self.defer(retry)
     return R
+
+  def defer_iterable(self, I, outQ=None):
+    ''' Submit an iterable `I` for asynchronous stepwise iteration
+        to return results via the queue `outQ`.
+        `outQ` must have a .put method to accept items and a .close method to
+        indicate the end of items.
+        When the iteration is complete, call outQ.close().
+        If `outQ` is None, instantiate a new IterableQueue.
+        Return `outQ`.
+    '''
+    if self.closed:
+      warning("%s.defer_iterable after close", self)
+    return self._defer_iterable(I, outQ=outQ)
+
+  def _defer_iterable(self, I, outQ=None):
+    if outQ is None:
+      outQ = IterableQueue(name="IQ:defer_iterable:outQ%d" % seq())
+      outQ.open()
+    iterate = iter(I).next
+
+    def iterate_once():
+      ''' Call `iterate`. Place the result on outQ.
+          Close the queue at end of iteration or other exception.
+          Otherwise, requeue ourself to collect the next iteration value.
+      '''
+      try:
+        item = iterate()
+      except StopIteration:
+        outQ.close()
+      except Exception as e:
+        error("defer_iterable: iterate_once: exception during iteration: %s", e)
+        outQ.close()
+      else:
+        outQ.put(item)
+        self._defer(iterate_once)
+
+    self._defer(iterate_once)
+    return outQ
+
+  def pipeline(self, filter_funcs, inputs, outQ=None):
+    ''' Construct a pipeline to be mediated by this Later queue.
+        `filter_funcs`: an iterable of filter functions accepting the
+          single items from the iterable `inputs`, returning an
+          iterable output.
+        `inputs`: the initial iterable inputs.
+        `outQ`: the optional output queue; if None, an IterableQueue() will be
+          allocated.
+        The output queue is returned.
+        If `filter_funcs` is empty, the inputs are returned.
+
+        Example use:
+          outQ = L.pipeline(
+                  [
+                    ls,
+                    filter_ls,
+                    ( FUNC_MANY_TO_MANY, lambda items: sorted(list(items)) ),
+                  ],
+                  ('.', '..', '../..'),
+                 )
+          for item in outQ:
+            print(item)
+    '''
+    return self._pipeline(filter_funcs, inputs, outQ=None)
+
+  def _pipeline(self, filter_funcs, inputs, outQ=None):
+    filter_funcs = list(filter_funcs)
+    if not filter_funcs:
+      return inputs
+    if outQ is None:
+      outQ = IterableQueue(name="pipelineIQ")
+      outQ.open()
+    ##outQ.close = trace_caller(outQ.close)
+    RHQ = outQ
+    while filter_funcs:
+      func_sig, func_iter, func_final = self._pipeline_func(filter_funcs.pop())
+      count += 1
+      PQ = PushQueue(self, func_iter, RHQ, is_iterable=True, func_final=func_final, name="pipelinePQ%d"%count)
+      PQ.open()
+      RHQ = PQ
+    self._defer_iterable( inputs, RHQ )
+    return outQ
+
+  def _pipeline_func(self, o):
+    ''' Accept a pipeline element. Return (func_sig, func_iter, func_final).
+        A pipeline element is either a single function, in which case it is
+        presumed to be a one-to-many-generator with func_sig FUNC_ONE_TO_MANY,
+        or a tuple of (func_sig, func).
+        The returned func_iter and func_final take the following values according to func_sig:
+
+          func_sig              func_iter, func_final
+
+          FUNC_ONE_TO_MANY      func, None
+                                Example: a directory listing.
+
+          FUNC_SELECTOR         func is presumed to be a Boolean test, and
+                                func_iter is a generator that yields its
+                                argument if the test succeeds.
+                                func_final is None.
+                                Example: a test for inclusion.
+
+          FUNC_MANY_TO_MANY     func_iter is set to save its argument to a list and yield nothing.
+                                func_final applies func to the list and yields the results.
+                                Example: a sort.
+    '''
+    if callable(o):
+      func = o
+      func_sig = FUNC_ONE_TO_MANY
+    else:
+      # expect a tuple
+      func_sig, func = o
+    func_final = None
+    if func_sig == FUNC_ONE_TO_MANY:
+      func_iter = func
+    elif func_sig == FUNC_SELECTOR:
+      def func_iter(item):
+        if func(item):
+          yield item
+    elif func_sig == FUNC_MANY_TO_MANY:
+      gathered = []
+      def func_iter(item):
+        gathered.append(item)
+        if False:
+          yield
+      def func_final():
+        for item in func(gathered):
+          yield item
+    else:
+      raise ValueError("unsupported function signature %r" % (func_sig,))
+    return func_sig, func_iter, func_final
 
   @contextmanager
   def priority(self, pri):

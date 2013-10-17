@@ -6,6 +6,7 @@
 
 import sys
 from cs.debug import Lock
+from cs.logutils import error
 from cs.obj import O
 from cs.seq import seq
 from cs.py3 import Queue, raise3
@@ -94,6 +95,11 @@ class Asynchron(O):
   def result(self, new_result):
     self._complete(new_result, None)
 
+  def put(self, value):
+    ''' Store the value. Queue-like notation.
+    '''
+    self.result = value
+
   @property
   def exc_info(self):
     with self._lock:
@@ -107,6 +113,18 @@ class Asynchron(O):
   @exc_info.setter
   def exc_info(self, exc_info):
     self._complete(None, exc_info)
+
+  def call(self, func, *a, **kw):
+    ''' Have the Asynchron call `func(*a,**kw)` and store its values as
+        self.result.
+        If `func` raises an exception, store it as self.exc_info.
+    '''
+    try:
+      r = func(*a, **kw)
+    except:
+      self.exc_info = sys.exc_info
+    else:
+      self.result = r
 
   def _complete(self, result, exc_info):
     ''' Set the result.
@@ -131,7 +149,7 @@ class Asynchron(O):
       try:
         notifier(self)
       except Exception as e:
-        error("%s: calling notifier %s: %s", self, notifier, e)
+        error("%s: calling notifier %s: exc=%s", self, notifier, e)
 
   def join(self):
     ''' Calling the .join() method waits for the function to run to
@@ -196,15 +214,7 @@ def report(LFs):
   for i in range(n):
     yield Q.get()
 
-class Result(Asynchron):
-  ''' A blocking value store.
-      Getters block until a value is supplied.
-  '''
-
-  def put(self, value):
-    ''' Store the value.
-    '''
-    self.result = value
+Result = Asynchron
 
 if __name__ == '__main__':
   import cs.asynchron_tests

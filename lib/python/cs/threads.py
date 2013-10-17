@@ -86,7 +86,7 @@ class WorkerThreadPool(O):
         args = []
         H = Thread(target=self._handler, args=args)
         H.daemon = True
-        Hdesc = (H, IterableQueue())
+        Hdesc = (H, IterableQueue(name="%s:IQ%d" % (self.name, seq())))
         self.all.append(Hdesc)
         args.append(Hdesc)
         debug("%s: start new worker thread", self)
@@ -117,7 +117,8 @@ class WorkerThreadPool(O):
       except:
         result = None
         exc_info = sys.exc_info()
-        debug("%s: worker thread: ran task: exception! %r", self, sys.exc_info())
+        log_func = warning if isinstance(exc_info[1], (TypeError, NameError, AttributeError)) else debug
+        log_func("%s: worker thread: ran task: exception! %r", self, sys.exc_info())
         # don't let exceptions go unhandled
         # if nobody is watching, raise the exception and don't return
         # this handler to the pool
