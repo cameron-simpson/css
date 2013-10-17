@@ -5,7 +5,8 @@
 #
 
 from cs.debug import Lock, RLock, Thread, trace_caller
-from cs.logutils import warning
+from cs.excutils import noexc
+from cs.logutils import exception, warning, D
 from cs.seq import seq
 from cs.py3 import Queue, PriorityQueue, Queue_Full, Queue_Empty
 from cs.obj import O
@@ -48,14 +49,17 @@ class QueueIterator(O):
     ''' Put an item on the queue.
     '''
     if self.closed:
-      raise Queue_Full("queue closed")
+      warning("queue closed: item=%s", item)
+      ##raise Queue_Full("queue closed")
     if item is self.sentinel:
       raise ValueError("put(sentinel)")
     return self.q.put(item, *args, **kw)
 
+  ##@trace_caller
   def open(self):
     self.opens += 1
 
+  ##@trace_caller
   def close(self):
     if self.closed:
       # TODO: possibly an error, must debug sometime
@@ -75,7 +79,9 @@ class QueueIterator(O):
     try:
       item = self.get()
     except Queue_Empty:
+      ##D("IQ %s.__next__: Queue_Empty, STOPPING", self)
       raise StopIteration
+    ##D("IQ %s.__next__: item=%s", self, item)
     return item
 
   next = __next__
@@ -210,18 +216,24 @@ class PushQueue(O):
       self.LFs.append(LF)
       L.after( (LF,), None, self._push_items, LF )
 
+  # NB: reports and discards exceptions
+  @noexc
   def _push_items(self, LF):
     ''' Handler to run after completion of `LF`.
         Put the results of `LF` onto `outQ`.
     '''
+    try:
     for item in LF():
       self.outQ.put(item)
+    except Exception as e:
+      exception("%s._push_items: exception putting results of LF(): %s", self, e)
     self.outQ.close()
 
   ##@trace_caller
   def open(self):
     self.opens += 1
 
+  ##@trace_caller
   def close(self):
     self.opens -= 1
     if self.opens < 1:
