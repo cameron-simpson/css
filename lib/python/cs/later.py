@@ -254,7 +254,7 @@ class Later(object):
     self._priority = (0,)
     self._timerQ = None         # queue for delayed requests; instantiated at need
     # inbound requests queue
-    self._LFPQ = IterablePriorityQueue(inboundCapacity)
+    self._LFPQ = IterablePriorityQueue(inboundCapacity, name="%s._LFPQ" % (self.name,))
     self._workers = WorkerThreadPool()
     self._dispatchThread = Thread(name=self.name+'._dispatcher', target=self._dispatcher)
     self._lock = Lock()
@@ -644,7 +644,8 @@ class Later(object):
 
   def _defer_iterable(self, I, outQ=None):
     if outQ is None:
-      outQ = IterableQueue()
+      outQ = IterableQueue(name="IQ:defer_iterable:outQ%d" % seq())
+      outQ.open()
     iterate = iter(I).next
 
     def iterate_once():
@@ -684,7 +685,9 @@ class Later(object):
     if not filter_funcs:
       return inputs
     if outQ is None:
-      outQ = IterableQueue()
+      outQ = IterableQueue(name="pipelineIQ")
+      outQ.open()
+    ##outQ.close = trace_caller(outQ.close)
     RHQ = outQ
     while filter_funcs:
       func = filter_funcs.pop()
