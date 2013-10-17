@@ -165,51 +165,57 @@ class Channel(object):
 
 class PushQueue(O):
   ''' A puttable object to look like a Queue.
-      Calling .put(item) calls a pushfunc supplied at initialisation to
+      Calling .put(item) calls `func_push` supplied at initialisation to
       trigger a function on data arrival.
   '''
 
-  def __init__(self, L, pushfunc, outQ, close_func=None, is_iterable=False, name=None):
+  def __init__(self, L, func_push, outQ, func_final=None, is_iterable=False, name=None):
     ''' Initialise the PushQueue with the Later `L`, callable
-	`pushfunc` and the output queue `outQ`.
-	`pushfunc` is a one-to-many function which accepts a single
+	`func_push` and the output queue `outQ`.
+	`func_push` is a one-to-many function which accepts a single
 	  item of input and returns an iterable of outputs; it may
 	  be a generator.
         `outQ` accepts results from the callable via its .put() method.
-        `closefunc`, if specified an not None, is called after completion of
-          all calls to `pushfunc`.
-        If `is_iterable``, submit `pushfunc(item)` via L.defer_iterable() to
+        `func_final`, if specified and not None, is called after completion of
+          all calls to `func_push`.
+        If `is_iterable``, submit `func_push(item)` via L.defer_iterable() to
           allow a progressive feed to `outQ`.
-        Otherwise, submit `pushfunc` with `item` via L.defer().
+        Otherwise, submit `func_push` with `item` via L.defer().
     '''
     O.__init__(self)
     if name is None:
-      name = "%s-%d" % (self.__class__.__name__, seq())
+      name = "%s%d-%s" % (self.__class__.__name__, seq(), func_push.__name__)
     self.name = name
     self.later = L
-    self.func = pushfunc
+    self.func_push = func_push
     self.outQ = outQ
+    self.func_final = func_final
     self.is_iterable = is_iterable
     self.opens = 0
     self.closed = False
     self.LFs = []
 
   def __str__(self):
-    return "PQ<%s>" % (self.name,)
+    return "<%s>" % (self.name,)
 
   def put(self, item):
     ''' Receive a new item.
-        If self.func returns an iterator, submit via defer_iterable.
-        Otherwise, submit self.func(item) and after completion,
+	If self.is_iterable then presume that self.func_push returns
+	an iterator and submit self.func_push(item) to defer_iterable.
+        Otherwise, defer self.func_push(item) and after completion,
         queue its results to outQ.
     '''
     if self.closed:
       warning("%s.put(%s) when closed" % (self, item))
     L = self.later
+    self.outQ.open()
     if self.is_iterable:
       # add to the outQ opens; defer_iterable will close it
-      L.defer_iterable( self.func(item), self.outQ )
+      items = self.func_push(item)
+      items = list(items)
+      L._defer_iterable(items, self.outQ)
     else:
+      raise RuntimeError("PUSHQUEUE NOT IS_ITERABLE")
       # defer the computation then call _push_items which puts the results
       # and closes outQ
       LF = L._defer( self.func_push, item )
@@ -223,8 +229,8 @@ class PushQueue(O):
         Put the results of `LF` onto `outQ`.
     '''
     try:
-    for item in LF():
-      self.outQ.put(item)
+      for item in LF():
+        self.outQ.put(item)
     except Exception as e:
       exception("%s._push_items: exception putting results of LF(): %s", self, e)
     self.outQ.close()
@@ -239,8 +245,15 @@ class PushQueue(O):
     if self.opens < 1:
       self.closed = True
       LFs = self.LFs
-      if self.closefunc:
-        # run closefunc to completion before closing outQ
-        LFclose = self.later.after( LFs, None, self.closefunc )
+      self.LFs = []
+      if self.func_final:
+        # run func_final to completion before closing outQ
+        LFclose = self.later._after( LFs, None, self._run_func_final )
         LFs = (LFclose,)
-      self.later.after( LFs, None, self.outQ.close )
+      self.later._after( LFs, None, self.outQ.close )
+
+  def _run_func_final(self):
+    items = list(self.func_final())
+    outQ = self.outQ
+    for item in items:
+      outQ.put(item)
