@@ -633,10 +633,12 @@ class Later(object):
 
   def defer_iterable(self, I, outQ=None):
     ''' Submit an iterable `I` for asynchronous stepwise iteration
-        to return results via the iterable Queue `outQ`.
-        If outQ is None, instantiate a new IterableQueue.
-        When the iteration is complete, calls outQ.close().
-        Return the iterable Queue.
+        to return results via the queue `outQ`.
+        `outQ` must have a .put method to accept items and a .close method to
+        indicate the end of items.
+        When the iteration is complete, call outQ.close().
+        If `outQ` is None, instantiate a new IterableQueue.
+        Return `outQ`.
     '''
     if self.closed:
       warning("%s.defer_iterable after close", self)
