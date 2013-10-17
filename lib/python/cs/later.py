@@ -10,7 +10,7 @@ import threading
 import traceback
 from cs.py3 import Queue, raise3
 import time
-from cs.debug import ifdebug, Lock, RLock, Thread
+from cs.debug import ifdebug, Lock, RLock, Thread, trace_caller
 from cs.queues import IterableQueue, IterablePriorityQueue, PushQueue
 from cs.threads import AdjustableSemaphore, \
                        WorkerThreadPool, TimerQueue
@@ -273,6 +273,7 @@ class Later(object):
     '''
     return self.defer(func, *a, **kw)()
 
+  ##@trace_caller
   def close(self):
     ''' Shut down the Later instance:
         - close the TimerQueue, if any, and wait for it to complete
@@ -446,13 +447,11 @@ class Later(object):
         If the parameter `pfx` is not None, submit pfx.func(func);
           see cs.logutils.Pfx's .func method for details.
     '''
-    ##D("%s.submit()...", self)
     if self.closed:
       warning("%s.submit(...) after close()", self)
     return self._submit(func, priority=priority, delay=delay, when=when, name=name, pfx=pfx)
 
   def _submit(self, func, priority=None, delay=None, when=None, name=None, pfx=None):
-    ##D("%s.submit()...", self)
     if delay is not None and when is not None:
       raise ValueError("you can't specify both delay= and when= (%s, %s)" % (delay, when))
     if priority is None:
@@ -506,6 +505,7 @@ class Later(object):
     for item in I:
       yield self.defer(params, func, item)
 
+  ##@trace_caller
   def defer(self, func, *a, **kw):
     ''' Queue the function `func` for later dispatch using the
         default priority with the specified arguments `*a` and `**kw`.
