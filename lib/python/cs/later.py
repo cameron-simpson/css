@@ -293,6 +293,13 @@ class Later(object):
         self._dispatchThread.join()     # wait for all functions to be dispatched
         self._workers.close()           # wait for all worker threads to complete
 
+  ## TODO
+  def idle(self):
+    ''' Wait for all active and pending jobs to complete, including
+        any jobs they may themselves queue.
+    '''
+    raise RuntimeError("UNIMPLEMENTED")
+
   def __repr__(self):
     return '<%s "%s" capacity=%s running=%d (%s) pending=%d (%s) delayed=%d closed=%s>' \
            % ( self.__class__.__name__, self.name,
