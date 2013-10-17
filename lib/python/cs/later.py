@@ -18,6 +18,11 @@ from cs.asynchron import Result, Asynchron, ASYNCH_RUNNING
 from cs.seq import seq
 from cs.logutils import Pfx, error, info, warning, debug, D, OBSOLETE
 
+# function signature designators, used with Later.pipeline()
+FUNC_ONE_TO_MANY = 0
+FUNC_SELECTOR = 1
+FUNC_MANY_TO_MANY = 2
+
 class _ThreadLocal(threading.local):
   ''' Thread local state to provide implied context withing Later context managers.
   '''
@@ -679,6 +684,18 @@ class Later(object):
           allocated.
         The output queue is returned.
         If `filter_funcs` is empty, the inputs are returned.
+
+        Example use:
+          outQ = L.pipeline(
+                  [
+                    ls,
+                    filter_ls,
+                    ( FUNC_MANY_TO_MANY, lambda items: sorted(list(items)) ),
+                  ],
+                  ('.', '..', '../..'),
+                 )
+          for item in outQ:
+            print(item)
     '''
     return self._pipeline(filter_funcs, inputs, outQ=None)
 
@@ -691,12 +708,63 @@ class Later(object):
       outQ.open()
     ##outQ.close = trace_caller(outQ.close)
     RHQ = outQ
+    count = 0
     while filter_funcs:
-      func = filter_funcs.pop()
-      PQ = PushQueue(self, func, RHQ, is_iterable=True)
+      func_sig, func_iter, func_final = self._pipeline_func(filter_funcs.pop())
+      count += 1
+      PQ = PushQueue(self, func_iter, RHQ, is_iterable=True, func_final=func_final, name="pipelinePQ%d"%count)
+      PQ.open()
       RHQ = PQ
     self._defer_iterable( inputs, RHQ )
     return outQ
+
+  def _pipeline_func(self, o):
+    ''' Accept a pipeline element. Return (func_sig, func_iter, func_final).
+        A pipeline element is either a single function, in which case it is
+        presumed to be a one-to-many-generator with func_sig FUNC_ONE_TO_MANY,
+        or a tuple of (func_sig, func).
+        The returned func_iter and func_final take the following values according to func_sig:
+
+          func_sig              func_iter, func_final
+
+          FUNC_ONE_TO_MANY      func, None
+                                Example: a directory listing.
+
+          FUNC_SELECTOR         func is presumed to be a Boolean test, and
+                                func_iter is a generator that yields its
+                                argument if the test succeeds.
+                                func_final is None.
+                                Example: a test for inclusion.
+
+          FUNC_MANY_TO_MANY     func_iter is set to save its argument to a list and yield nothing.
+                                func_final applies func to the list and yields the results.
+                                Example: a sort.
+    '''
+    if callable(o):
+      func = o
+      func_sig = FUNC_ONE_TO_MANY
+    else:
+      # expect a tuple
+      func_sig, func = o
+    func_final = None
+    if func_sig == FUNC_ONE_TO_MANY:
+      func_iter = func
+    elif func_sig == FUNC_SELECTOR:
+      def func_iter(item):
+        if func(item):
+          yield item
+    elif func_sig == FUNC_MANY_TO_MANY:
+      gathered = []
+      def func_iter(item):
+        gathered.append(item)
+        if False:
+          yield
+      def func_final():
+        for item in func(gathered):
+          yield item
+    else:
+      raise ValueError("unsupported function signature %r" % (func_sig,))
+    return func_sig, func_iter, func_final
 
   @contextmanager
   def priority(self, pri):
