@@ -14,10 +14,16 @@ class QueueIterator(O):
 
   sentinel = object()
 
-  def __init__(self, q):
+  def __init__(self, q, name=None):
     O.__init__(self, q=q)
+    if name is None:
+      name = "QueueIterator-%d" % (seq(),)
+    self.name = name
     self.closed = False
     self.opens = 0
+
+  def __str__(self):
+    return "<%s:opens=%d,closed=%s>" % (self.name, self.opens, self.closed)
 
   def __getattr__(self, attr):
     return getattr(self.q, attr)
@@ -74,11 +80,13 @@ class QueueIterator(O):
 
   next = __next__
 
-def IterableQueue(*args, **kw):
-  return QueueIterator(Queue(*args, **kw))
+def IterableQueue(capacity=0, name=None, *args, **kw):
+  name = kw.pop('name', name)
+  return QueueIterator(Queue(capacity, *args, **kw), name=name)
 
-def IterablePriorityQueue(*args, **kw):
-  return QueueIterator(PriorityQueue(*args, **kw))
+def IterablePriorityQueue(capacity=0, name=None, *args, **kw):
+  name = kw.pop('name', name)
+  return QueueIterator(PriorityQueue(capacity, *args, **kw), name=name)
 
 class Channel(object):
   ''' A zero-storage data passage.
