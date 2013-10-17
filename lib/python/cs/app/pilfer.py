@@ -566,7 +566,7 @@ ONE_TO_ONE = {
       'unquote':      lambda U, P: unquote(U),
       'save':         lambda U, P, **kw: (U, P.save_url(U, **kw))[0],
       'see':          lambda U, P: (U, P.see(U))[0],
-      'substitute':   lambda U, P, **kw: substitute(U, kw['regexp'], kw['replacement'], kw['all']),
+      's':            substitute,
       'title':        lambda U, P: U.title if U.title else U,
       'type':         lambda U, P: url_io(U.content_type, ""),
       'xmlattr':      lambda U, P, attr: [ A for A in (ElementTree.XML(U).get(attr),) if A is not None ],
@@ -597,63 +597,85 @@ ONE_TEST = {
 re_COMPARE = re.compile(r'([a-z]\w*)==')
 re_ASSIGN  = re.compile(r'([a-z]\w*)=')
 
-def action_operator(action,
-                    many_to_many=None,
-                    one_to_many=None,
-                    one_to_one=None,
-                    one_test=None):
-  ''' Accept a string `action` and return a RunTreeOp for use with
-      cs.threads.runTree.
+def action_func(action):
+  ''' Accept a string `action` and return a tuple of:
+        func_sig, function
+      `func_sig` and `function` are used with Later.pipeline
+      and `kwargs` is used as extra parameters for `function`.
   '''
-  if many_to_many is None:
-    many_to_many = MANY_TO_MANY
-  if one_to_many is None:
-    one_to_many = ONE_TO_MANY
-  if one_to_one is None:
-    one_to_one = ONE_TO_ONE
-  if one_test is None:
-    one_test = ONE_TEST
+  function = None
+  kwargs = {}
   # parse action into function and kwargs
   with Pfx("%s", action):
     action0 = action
-    func = None
-    fork_input = False
-    fork_state = False
-    kwargs = {}
     func, offset = get_identifier(action)
-    if func and (offset == len(action) or action[offset] == ':'):
-      # ordinary function with arguments
-      if offset < len(action):
-        if func == 'print':
-          kwargs['string'] = action[offset+1:]
-        else:
-          for kw in action[offset+1:].split(','):
-            if '=' in kw:
-              kw, v = kw.split('=', 1)
-              kwargs[kw] = v
+    if func:
+      with Pfx("%s", func):
+        # an identifier
+        if func == 's':
+          # s/this/that/
+          if offset == len(action):
+            raise ValueError("missing delimiter")
+          delim = action[offset]
+          delim2pos = action.find(delim, offset+1)
+          if delim2pos < offset + 1:
+            raise ValueError("missing second delimiter (%r)" % (delim,))
+          regexp = action[offset+1:delim2pos]
+          if not regexp:
+            raise ValueError("empty regexp")
+          delim3pos = action.find(delim, delim2pos+1)
+          if delim3pos < delim2pos+1:
+            raise ValueError("missing third delimiter (%r)" % (delim,))
+          repl_format = action[delim2pos+1:delim3pos]
+          offset = delim3pos + 1
+          repl_all = False
+          repl_icase = False
+          re_flags = 0
+          while offset < len(action):
+            modchar = action[offset]
+            offset += 1
+            if modchar == 'g':
+              repl_all = True
+            elif modchar == 'i':
+              repl_icase = True
+              re_flags != re.IGNORECASE
             else:
-              kwargs[kw] = True
-      if func == "per":
-        op_mode = 'FORK'
-        fork_state = True
-        raise ValueError("per needs fork_ops in addition to fork_state")
-      elif func in many_to_many:
+              raise ValueError("unknown s///x modifier: %r" % (modchar,))
+          debug("s: regexp=%r, replacement=%r, repl_all=%s, repl_icase=%s", regexp, repl_format, repl_all, repl_icase)
+          kwargs['regexp'] = re.compile(regexp, flags=re_flags)
+          kwargs['replacement'] = repl_format
+          kwargs['all'] = repl_all
+          kwargs['icase'] = repl_icase
+        elif offset < len(action):
+          marker = action[offset]
+          if marker == ':':
+            # followed by :kw1=value,kw2=value,...
+            kwtext = action[offset+1:]
+            if func == "print":
+              # print is special - just a format string relying on current state
+              kwargs['string'] = kwtext
+            else:
+              for kw in kwtext.split(','):
+                if '=' in kw:
+                  kw, v = kw.split('=', 1)
+                  kwargs[kw] = v
+                else:
+                  kwargs[kw] = True
+          else:
+            raise ValueError("unrecognised marker %r" % (marker,))
+      if func in many_to_many:
         # many-to-many functions get passed straight in
-        func = many_to_many[func]
-        func_sig = RUN_TREE_OP_MANY_TO_MANY
+        function = many_to_many[func]
+        func_sig = FUNC_MANY_TO_MANY
       elif func in one_to_many:
-        # one-to-many is converted into many-to-many
-        fork_input = True
-        func = one_to_many[func]
-        func_sig = RUN_TREE_OP_ONE_TO_MANY
+        function = one_to_many[func]
+        func_sig = FUNC_ONE_TO_MANY
       elif func in one_to_one:
-        fork_input = True
-        func = one_to_one[func]
-        func_sig = RUN_TREE_OP_ONE_TO_ONE
+        function = one_to_one[func]
+        func_sig = FUNC_ONE_TO_ONE
       elif func in one_test:
-        fork_input = True
-        func = one_test[func]
-        func_sig = RUN_TREE_OP_SELECT
+        function = one_test[func]
+        func_sig = FUNC_SELECTOR
       else:
         raise ValueError("unknown action named \"%s\"" % (func,))
     # select URLs matching regexp
@@ -664,8 +686,8 @@ def action_operator(action,
       else:
         regexp = action[1:]
       kwargs['regexp'] = re.compile(regexp)
-      func = lambda U, P, regexp: regexp.search(U)
-      func_sig = RUN_TREE_OP_SELECT
+      function = lambda U, P, regexp: regexp.search(U)
+      func_sig = FUNC_SELECTOR
     # select URLs not matching regexp
     # -/regexp/
     elif action.startswith('-/'):
@@ -674,13 +696,13 @@ def action_operator(action,
       else:
         regexp = action[2:]
       kwargs['regexp'] = re.compile(regexp)
-      func = lambda U, P, regexp: regexp.search(U)
-      func_sig = RUN_TREE_OP_SELECT
+      function = lambda U, P, regexp: regexp.search(U)
+      func_sig = FUNC_SELECTOR
     # parent
     # ..
     elif action == '..':
-      func = lambda U, P: U.parent
-      func_sig = RUN_TREE_OP_ONE_TO_ONE
+      function = lambda U, P: U.parent
+      func_sig = FUNC_ONE_TO_ONE
     # select URLs ending in particular extensions
     elif action.startswith('.'):
       if action.endswith('/i'):
@@ -690,8 +712,8 @@ def action_operator(action,
       exts = exts.split(',')
       kwargs['case'] = case
       kwargs['exts'] = exts
-      func = lambda U, P, exts, case: has_exts( U, exts, case_sensitive=case )
-      func_sig = RUN_TREE_OP_SELECT
+      function = lambda U, P, exts, case: has_exts( U, exts, case_sensitive=case )
+      func_sig = FUNC_SELECTOR
     else:
       # comparison
       # varname==
@@ -699,11 +721,11 @@ def action_operator(action,
       if m:
         kwargs['var'] = m.group(1)
         kwargs['value'] = action[m.end():]
-        def func(U, P, var, value):
+        def function(U, P, var, value):
           if var not in P.user_vars:
             return False
           return P.user_vars[var] == P.format(value, U)
-        func_sig = RUN_TREE_OP_SELECT
+        func_sig = FUNC_SELECTOR
       else:
         # assignment
         # varname=
@@ -711,91 +733,22 @@ def action_operator(action,
         if m:
           kwargs['var'] = m.group(1)
           kwargs['value'] = action[m.end():]
-          def func(U, P, var, value):
+          def function(U, P, var, value):
             P.user_vars[var] = P.format_string(value, U)
             return U
-          func_sig = RUN_TREE_OP_ONE_TO_ONE
+          func_sig = FUNC_ONE_TO_ONE
         else:
-          # regular action: split off parameters if any
-          name, offset = get_identifier(action)
-          if not name:
-            raise ValueError("unparsed action")
-          # s/this/that/
-          if name == 's':
-            if offset == len(action):
-              raise ValueError("missing delimiter")
-            delim = action[offset]
-            delim2pos = action.find(delim, offset+1)
-            if delim2pos < offset+1:
-              raise ValueError("missing second delimiter")
-            regexp = action[offset+1:delim2pos]
-            if not regexp:
-              raise ValueError("empty regexp")
-            delim3pos = action.find(delim, delim2pos+1)
-            if delim3pos < delim2pos+1:
-              raise ValueError("missing third delimiter")
-            repl_format = action[delim2pos+1:delim3pos]
-            offset = delim3pos+1
-            if offset < len(action) and action[offset] == 'g':
-              repl_all = True
-              offset += 1
-            else:
-              repl_all = False
-            if offset < len(action):
-              raise ValueError("unparsed action at: %s" % (action[offset:],))
-            func = 'substitute'
-            debug("s: regexp=%r, replacement=%r, repl_all=%s", regexp, repl_format, repl_all)
-            kwargs['regexp'] = re.compile(regexp)
-            kwargs['replacement'] = repl_format
-            kwargs['all'] = repl_all
-          else:
-            if offset < len(action) and action[offset] == ':':
-              kws = action[offset+1:].split(',')
-              action = action[:offset]
-              for kw in kws:
-                if '=' in kwargs:
-                  kw, v = kw.split('=', 1)
-                  kwargs[kw] = v
-                else:
-                  kwargs[kw] = True
-              offset = len(action)
-            if offset < len(action):
-              raise ValueError("parse error at: %s" % (action[offset:],))
-
-      if func is None:
-        # we now have just the function name
-        # construct a RunTreeOp with the right signature
-        if action == "per":
-          raise ValueError("per needs fork_ops in addition to fork_state")
-          op_mode = 'FORK'
-          fork_state = True
-        if action in many_to_many:
-          # many-to-many functions get passed straight in
-          func = many_to_many[action]
-          func_sig = RUN_TREE_OP_MANY_TO_MANY
-        elif action in one_to_many:
-          # one-to-many is converted into many-to-many
-          fork_input = True
-          func = one_to_many[action]
-          func_sig = RUN_TREE_OP_ONE_TO_MANY
-        elif action in one_to_one:
-          fork_input = True
-          func = one_to_one[action]
-          func_sig = RUN_TREE_OP_ONE_TO_ONE
-        elif action in one_test:
-          fork_input = True
-          func = one_test[action]
-          func_sig = RUN_TREE_OP_SELECT
-        else:
-          raise ValueError("unknown action")
+          raise ValueError("unknown function %r" % (func,))
 
     if kwargs:
-      func = partial(func, **kwargs)
-    def trace_func(*a, **kw):
-      debug("do %s ...", action0)
+      function = partial(function, **kwargs)
+    func0 = function
+    def trace_function(*a, **kw):
+      debug("DO %s ...", action0)
       with Pfx(action0):
-        return func(*a, **kw)
-    return RunTreeOp(trace_func, fork_input, fork_state, func_sig)
+        return function(*a, **kw)
+    function = trace_function
+    return function, func_sig
 
 if __name__ == '__main__':
   import sys
