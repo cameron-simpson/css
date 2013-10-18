@@ -20,9 +20,9 @@ from cs.logutils import Pfx, error, info, warning, debug, D, OBSOLETE
 
 # function signature designators, used with Later.pipeline()
 FUNC_ONE_TO_MANY = 0
-FUNC_ONE_TO_ONE = 0
-FUNC_SELECTOR = 1
-FUNC_MANY_TO_MANY = 2
+FUNC_ONE_TO_ONE = 1
+FUNC_SELECTOR = 2
+FUNC_MANY_TO_MANY = 3
 
 class _ThreadLocal(threading.local):
   ''' Thread local state to provide implied context withing Later context managers.
