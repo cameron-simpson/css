@@ -144,7 +144,7 @@ class TestLater(unittest.TestCase):
     self.assertEquals( len(result), len(expected) )
     self.assertEquals( sorted(result), sorted(expected) )
 
-  def test09pipeline_03sort(self):
+  def test09pipeline_03a_sort(self):
     L = self.L
     items = ['a', 'b', 'c', 'g', 'f', 'e']
     expected = ['a', 'b', 'c', 'e', 'f', 'g']
@@ -155,6 +155,18 @@ class TestLater(unittest.TestCase):
     self.assertIsInstance(outQ, QueueIterator)
     result = list(outQ)
     self.assertEquals( result, sorted(items) )
+
+  def test09pipeline_03b_set(self):
+    L = self.L
+    items = ['a', 'b', 'c', 'g', 'f', 'e']
+    expected = ['a', 'b', 'c', 'e', 'f', 'g']
+    def func(x):
+      return set(x)
+    outQ = L.pipeline([ (FUNC_MANY_TO_MANY, func) ], items)
+    self.assertIsNot(outQ, items)
+    self.assertIsInstance(outQ, QueueIterator)
+    result = set(outQ)
+    self.assertEquals( result, set(items) )
 
   def test09pipeline_04select(self):
     L = self.L
