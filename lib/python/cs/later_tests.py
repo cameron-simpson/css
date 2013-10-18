@@ -169,6 +169,25 @@ class TestLater(unittest.TestCase):
     result = list(outQ)
     self.assertEquals( result, expected )
 
+  def test09pipeline_05two_by_two_bysort(self):
+    L = self.L
+    items = ['a', 'b', 'c', 'g', 'f', 'e']
+    expected = [ 'a', 'a', 'a', 'a',
+              'b', 'b', 'b', 'b',
+              'c', 'c', 'c', 'c',
+              'e', 'e', 'e', 'e',
+              'f', 'f', 'f', 'f',
+              'g', 'g', 'g', 'g',
+            ]
+    def double(x):
+      yield x
+      yield x
+    outQ = L.pipeline([ double, double, (FUNC_MANY_TO_MANY, sorted) ], items)
+    self.assertIsNot(outQ, items)
+    self.assertIsInstance(outQ, QueueIterator)
+    result = list(outQ)
+    self.assertEquals( result, expected )
+
 def selftest(argv):
   unittest.main(__name__, None, argv)
 
