@@ -114,9 +114,9 @@ def main(argv):
                 if not line or line.startswith('#'):
                   debug("SKIP: %s", line)
                   continue
-                urls.append(URL(line, None, P.user_agent))
+                urls.append(URL(line, None, user_agent=P.user_agent, scope=P))
           else:
-            urls = [ URL(url, None, P.user_agent) ]
+            urls = [ URL(url, None, user_agent=P.user_agent, scope=P) ]
           pipe_funcs = []
           for action in argv:
             try:
@@ -456,39 +456,37 @@ def url_srcs(U, referrer=None):
 
 # actions that work on the whole list of in-play URLs
 many_to_many = {
-      'sort':         lambda Us, P, *a, **kw: sorted(Us, *a, **kw),
-      'unique':       lambda Us, P: unique(Us),
-      'first':        lambda Us, P: Us[:1],
-      'last':         lambda Us, P: Us[-1:],
+      'sort':         lambda Us, *a, **kw: sorted(Us, *a, **kw),
+      'unique':       lambda Us: unique(Us),
+      'first':        lambda Us: Us[:1],
+      'last':         lambda Us: Us[-1:],
     }
 
 one_to_many = {
-      'hrefs':        lambda U, P, *a: url_hrefs(U, *a),
-      'images':       lambda U, P, *a: with_exts(url_hrefs(U, *a), IMAGE_SUFFIXES ),
-      'iimages':      lambda U, P, *a: with_exts(url_srcs(U, *a), IMAGE_SUFFIXES ),
-      'srcs':         lambda U, P, *a: url_srcs(U, *a),
-      'xml':          lambda U, P, match: url_xml_find(U, match),
-      'xmltext':      lambda U, P, match: XML(U).findall(match),
+      'hrefs':        lambda U, *a: url_hrefs(U, *a),
+      'images':       lambda U, *a: with_exts(url_hrefs(U, *a), IMAGE_SUFFIXES ),
+      'iimages':      lambda U, *a: with_exts(url_srcs(U, *a), IMAGE_SUFFIXES ),
+      'srcs':         lambda U, *a: url_srcs(U, *a),
+      'xml':          lambda U, match: url_xml_find(U, match),
+      'xmltext':      lambda U, match: XML(U).findall(match),
     }
 
 # actions that work on individual URLs
 one_to_one = {
-      '..':           lambda U, P: URL(U, None).parent,
+      '..':           lambda U: URL(U, None).parent,
       'delay':        lambda U, P, delay: (U, sleep(float(delay)))[0],
-      'domain':       lambda U, P: URL(U, None).domain,
-      'hostname':     lambda U, P: URL(U, None).hostname,
-      'new_dir':      lambda U, P: (U, P.url_save_dir(U))[0],
-      'per':          lambda U, P: (U, P.set_user_vars(save_dir=None))[0],
-      'print':        lambda U, P, **kw: (U, P.print_url_string(U, **kw))[0],
-      'query':        lambda U, P, *a: url_query(U, *a),
-      'quote':        lambda U, P: quote(U),
-      'unquote':      lambda U, P: unquote(U),
-      'save':         lambda U, P, **kw: (U, P.save_url(U, **kw))[0],
-      'see':          lambda U, P: (U, P.see(U))[0],
+      'domain':       lambda U: URL(U, None).domain,
+      'hostname':     lambda U: URL(U, None).hostname,
+      'print':        lambda U, **kw: (U, U.print_url_string(U, **kw))[0],
+      'query':        lambda U, *a: url_query(U, *a),
+      'quote':        lambda U: quote(U),
+      'unquote':      lambda U: unquote(U),
+      'save':         lambda U, **kw: (U, P.save_url(U, **kw))[0],
+      'see':          lambda U: (U, P.see(U))[0],
       's':            substitute,
-      'title':        lambda U, P: U.title if U.title else U,
-      'type':         lambda U, P: url_io(U.content_type, ""),
-      'xmlattr':      lambda U, P, attr: [ A for A in (ElementTree.XML(U).get(attr),) if A is not None ],
+      'title':        lambda U: U.title if U.title else U,
+      'type':         lambda U: url_io(U.content_type, ""),
+      'xmlattr':      lambda U, attr: [ A for A in (ElementTree.XML(U).get(attr),) if A is not None ],
     }
 
 def _search_re(U, P, regexp):
@@ -499,18 +497,18 @@ def _search_re(U, P, regexp):
   return m
 
 ONE_TEST = {
-      'has_title':    lambda U, P: U.title is not None,
-      'is_archive':   lambda U, P: has_exts( U, ARCHIVE_SUFFIXES ),
-      'is_archive':   lambda U, P: has_exts( U, ARCHIVE_SUFFIXES ),
-      'is_image':     lambda U, P: has_exts( U, IMAGE_SUFFIXES ),
-      'is_video':     lambda U, P: has_exts( U, VIDEO_SUFFIXES ),
-      'reject_re':    lambda U, P, regexp: not regexp.search(U),
-      'same_domain':  lambda U, P: notNone(U.referer, "U.referer") and U.domain == U.referer.domain,
-      'same_hostname':lambda U, P: notNone(U.referer, "U.referer") and U.hostname == U.referer.hostname,
-      'same_scheme':  lambda U, P: notNone(U.referer, "U.referer") and U.scheme == U.referer.scheme,
-      'seen':         lambda U, P: P.seen(U),
+      'has_title':    lambda U: U.title is not None,
+      'is_archive':   lambda U: has_exts( U, ARCHIVE_SUFFIXES ),
+      'is_archive':   lambda U: has_exts( U, ARCHIVE_SUFFIXES ),
+      'is_image':     lambda U: has_exts( U, IMAGE_SUFFIXES ),
+      'is_video':     lambda U: has_exts( U, VIDEO_SUFFIXES ),
+      'reject_re':    lambda U, regexp: not regexp.search(U),
+      'same_domain':  lambda U: notNone(U.referer, "U.referer") and U.domain == U.referer.domain,
+      'same_hostname':lambda U: notNone(U.referer, "U.referer") and U.hostname == U.referer.hostname,
+      'same_scheme':  lambda U: notNone(U.referer, "U.referer") and U.scheme == U.referer.scheme,
+      'seen':         lambda U: P.seen(U),
       'select_re':    _search_re,
-      'unseen':       lambda U, P: not P.seen(U),
+      'unseen':       lambda U: not P.seen(U),
     }
 
 re_COMPARE = re.compile(r'([a-z]\w*)==')
