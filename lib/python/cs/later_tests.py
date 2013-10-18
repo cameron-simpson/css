@@ -8,6 +8,8 @@ from functools import partial
 import sys
 import time
 import unittest
+from cs.logutils import D
+from cs.queues import QueueIterator
 from cs.timeutils import sleep
 from cs.threads import report
 from cs.later import Later
@@ -107,6 +109,40 @@ class TestLater(unittest.TestCase):
   def test08delay(self):
     with Later(3) as L3:
       LF1 = L3
+
+  def test09pipeline_00noop(self):
+    L = self.L
+    items = ['a', 'b', 'c', 'g', 'f', 'e']
+    outQ = L.pipeline([], items)
+    self.assertIs(outQ, items)
+    result = list(outQ)
+    self.assertEquals( items, result )
+
+  def test09pipeline_01idenitity(self):
+    L = self.L
+    items = ['a', 'b', 'c', 'g', 'f', 'e']
+    def func(x):
+      yield x
+    outQ = L.pipeline([ func ], items)
+    self.assertIsNot(outQ, items)
+    self.assertIsInstance(outQ, QueueIterator)
+    result = list(outQ)
+    self.assertEquals( items, result )
+
+  def test09pipeline_02double(self):
+    L = self.L
+    items = ['a', 'b', 'c', 'g', 'f', 'e']
+    expected = ['a', 'a', 'b', 'b', 'c', 'c', 'g', 'g', 'f', 'f', 'e', 'e']
+    def func(x):
+      yield x
+      yield x
+    outQ = L.pipeline([ func ], items)
+    self.assertIsNot(outQ, items)
+    self.assertIsInstance(outQ, QueueIterator)
+    result = list(outQ)
+    # values may be interleaved due to parallelism
+    self.assertEquals( len(result), len(expected) )
+    self.assertEquals( sorted(result), sorted(expected) )
 
 def selftest(argv):
   unittest.main(__name__, None, argv)
