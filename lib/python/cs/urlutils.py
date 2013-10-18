@@ -29,22 +29,15 @@ from threading import RLock
 from cs.lex import parseUC_sAttr
 from cs.logutils import Pfx, pfx_iter, debug, error, warning, exception, D
 from cs.threads import locked_property
-from cs.py3 import StringIO
+from cs.py3 import StringIO, ustr
 
-def URL(U, referer, user_agent=None):
+def URL(U, referer, **kw):
   ''' Factory function to return a _URL object from a URL string.
       Handing it a _URL object returns the object.
   '''
-  t = type(U)
-  if t is not _URL:
-    U = _URL(U)
-  if user_agent is None:
-    if referer and isinstance(referer, _URL):
-      user_agent = referer.user_agent
-  if user_agent:
-    U.user_agent = user_agent
-  if referer:
-    U.referer = URL(referer, None, user_agent=user_agent)
+  if not isinstance(U, _URL):
+    U = _URL(ustr(U))
+    U._init(referer, **kw)
   return U
 
 class _URL(unicode):
@@ -52,7 +45,7 @@ class _URL(unicode):
       Subclasses unicode.
   '''
 
-  def __init__(self, s, referer=None, user_agent=None, opener=None):
+  def _init(self, referer=None, user_agent=None, opener=None, scope=None):
     ''' Initialise the _URL.
         `s`: the string defining the URL.
         `referer`: the referring URL.
@@ -62,6 +55,7 @@ class _URL(unicode):
                   made at need if no referer.
     '''
     self.referer = URL(referer) if referer else referer
+    self._scope = scope if scope else self.referer._scope if self.referer else O()
     self.user_agent = user_agent if user_agent else self.referer.user_agent if self.referer else None
     self.opener = opener if opener else referer.opener if referer else None
     self._parts = None
@@ -77,7 +71,7 @@ class _URL(unicode):
       if plural:
         return nodes
       return the(nodes)
-    return 
+    return getattr(self._scope, attr)
 
   def flush(self):
     ''' Forget all cached content.
