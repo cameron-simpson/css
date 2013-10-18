@@ -12,7 +12,7 @@ from cs.logutils import D
 from cs.queues import QueueIterator
 from cs.timeutils import sleep
 from cs.threads import report
-from cs.later import Later
+from cs.later import Later, FUNC_MANY_TO_MANY
 
 class TestLater(unittest.TestCase):
 
@@ -143,6 +143,18 @@ class TestLater(unittest.TestCase):
     # values may be interleaved due to parallelism
     self.assertEquals( len(result), len(expected) )
     self.assertEquals( sorted(result), sorted(expected) )
+
+  def test09pipeline_02sort(self):
+    L = self.L
+    items = ['a', 'b', 'c', 'g', 'f', 'e']
+    expected = ['a', 'b', 'c', 'e', 'f', 'g']
+    def func(x):
+      return sorted(x)
+    outQ = L.pipeline([ (FUNC_MANY_TO_MANY, func) ], items)
+    self.assertIsNot(outQ, items)
+    self.assertIsInstance(outQ, QueueIterator)
+    result = list(outQ)
+    self.assertEquals( result, sorted(items) )
 
 def selftest(argv):
   unittest.main(__name__, None, argv)
