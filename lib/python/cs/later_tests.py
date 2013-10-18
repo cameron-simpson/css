@@ -181,7 +181,7 @@ class TestLater(unittest.TestCase):
     result = list(outQ)
     self.assertEquals( result, expected )
 
-  def test09pipeline_05two_by_two_bysort(self):
+  def test09pipeline_05two_by_two_by_sort(self):
     L = self.L
     items = ['a', 'b', 'c', 'g', 'f', 'e']
     expected = [ 'a', 'a', 'a', 'a',
