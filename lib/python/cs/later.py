@@ -709,6 +709,7 @@ class Later(object):
       outQ.open()
     ##outQ.close = trace_caller(outQ.close)
     RHQ = outQ
+    count = 0
     while filter_funcs:
       func_sig, func_iter, func_final = self._pipeline_func(filter_funcs.pop())
       count += 1
