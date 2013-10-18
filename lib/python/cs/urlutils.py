@@ -54,7 +54,7 @@ class _URL(unicode):
         `opener`: urllib2 opener object, inherited from `referer` if unspecified,
                   made at need if no referer.
     '''
-    self.referer = URL(referer) if referer else referer
+    self.referer = URL(referer, None) if referer else referer
     self._scope = scope if scope else self.referer._scope if self.referer else O()
     self.user_agent = user_agent if user_agent else self.referer.user_agent if self.referer else None
     self.opener = opener if opener else referer.opener if referer else None
