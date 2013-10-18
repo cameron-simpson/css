@@ -25,12 +25,10 @@ try:
 except ImportError:
   import xml.etree.ElementTree as ElementTree
 from cs.fileutils import file_property
-from cs.later import Later
+from cs.later import Later, FUNC_ONE_TO_ONE, FUNC_ONE_TO_MANY, FUNC_SELECTOR, FUNC_MANY_TO_MANY
 from cs.lex import get_identifier
 from cs.logutils import setup_logging, logTo, Pfx, debug, error, warning, exception, pfx_iter, D
-from cs.threads import runTree, RunTreeOp, RUN_TREE_OP_MANY_TO_MANY, \
-                        RUN_TREE_OP_ONE_TO_MANY, RUN_TREE_OP_ONE_TO_ONE, \
-                        RUN_TREE_OP_SELECT
+from cs.queues import IterableQueue
 from cs.urlutils import URL
 from cs.obj import O
 
@@ -119,18 +117,23 @@ def main(argv):
                 urls.append(URL(line, None, P.user_agent))
           else:
             urls = [ URL(url, None, P.user_agent) ]
-          try:
-            run_ops = [ action_operator(action) for action in argv ]
-          except ValueError as e:
-            error("invalid actions: %s", e)
-            badopts = True
-          else:
-            debug("run_ops = %r", run_ops)
-            with Later(jobs) as PQ:
-              debug("urls = %s", urls)
-              result = runTree(urls, run_ops, P, PQ)
-              result = list(result)
-              debug("final result = %s", result)
+          pipe_funcs = []
+          for action in argv:
+            try:
+              func_sig, function = action_func(action)
+            except ValueError as e:
+              error("invalid action %r: %s", action, e)
+              badopts = True
+            else:
+              pipe_funcs.append( (func_sig, function) )
+          if not badopts:
+            debug("pipe_funcs = %r", pipe_funcs)
+            debug("urls = %s", urls)
+            with Later(jobs) as L:
+              inQ = IterableQueue(128)
+              outQ = L.pipeline(pipe_funcs, urls)
+              result = list(outQ)
+              debug("final result = %r", result)
       else:
         error("unsupported op")
         badopts = True
@@ -536,14 +539,14 @@ def url_srcs(U, referrer=None):
   return url_io_iter(URL(U, referrer).srcs(absolute=True))
 
 # actions that work on the whole list of in-play URLs
-MANY_TO_MANY = {
+many_to_many = {
       'sort':         lambda Us, P, *a, **kw: sorted(Us, *a, **kw),
       'unique':       lambda Us, P: unique(Us),
       'first':        lambda Us, P: Us[:1],
       'last':         lambda Us, P: Us[-1:],
     }
 
-ONE_TO_MANY = {
+one_to_many = {
       'hrefs':        lambda U, P, *a: url_hrefs(U, *a),
       'images':       lambda U, P, *a: with_exts(url_hrefs(U, *a), IMAGE_SUFFIXES ),
       'iimages':      lambda U, P, *a: with_exts(url_srcs(U, *a), IMAGE_SUFFIXES ),
@@ -553,7 +556,7 @@ ONE_TO_MANY = {
     }
 
 # actions that work on individual URLs
-ONE_TO_ONE = {
+one_to_one = {
       '..':           lambda U, P: URL(U, None).parent,
       'delay':        lambda U, P, delay: (U, sleep(float(delay)))[0],
       'domain':       lambda U, P: URL(U, None).domain,
@@ -746,9 +749,9 @@ def action_func(action):
     def trace_function(*a, **kw):
       debug("DO %s ...", action0)
       with Pfx(action0):
-        return function(*a, **kw)
+        return func0(*a, **kw)
     function = trace_function
-    return function, func_sig
+    return func_sig, function
 
 if __name__ == '__main__':
   import sys
