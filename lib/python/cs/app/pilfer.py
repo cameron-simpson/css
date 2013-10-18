@@ -603,7 +603,7 @@ def action_func(action):
       else:
         regexp = action[1:]
       kwargs['regexp'] = re.compile(regexp)
-      function = lambda U, P, regexp: regexp.search(U)
+      function = lambda U, regexp: regexp.search(U)
       func_sig = FUNC_SELECTOR
     # select URLs not matching regexp
     # -/regexp/
@@ -613,7 +613,7 @@ def action_func(action):
       else:
         regexp = action[2:]
       kwargs['regexp'] = re.compile(regexp)
-      function = lambda U, P, regexp: regexp.search(U)
+      function = lambda U, regexp: regexp.search(U)
       func_sig = FUNC_SELECTOR
     # parent
     # ..
@@ -629,7 +629,7 @@ def action_func(action):
       exts = exts.split(',')
       kwargs['case'] = case
       kwargs['exts'] = exts
-      function = lambda U, P, exts, case: has_exts( U, exts, case_sensitive=case )
+      function = lambda U, exts, case: has_exts( U, exts, case_sensitive=case )
       func_sig = FUNC_SELECTOR
     else:
       # comparison
