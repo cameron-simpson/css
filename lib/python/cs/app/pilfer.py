@@ -447,7 +447,7 @@ def url_io_iter(iter):
       yield i
 
 def url_hrefs(U, referrer=None):
-  return list(url_io_iter(URL(U, referrer).hrefs(absolute=True)))
+  return url_io_iter(URL(U, referrer).hrefs(absolute=True))
 
 def url_srcs(U, referrer=None):
   return url_io_iter(URL(U, referrer).srcs(absolute=True))
