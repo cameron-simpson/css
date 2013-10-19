@@ -127,8 +127,6 @@ def main(argv):
             else:
               pipe_funcs.append( (func_sig, function) )
           if not badopts:
-            debug("pipe_funcs = %r", pipe_funcs)
-            debug("urls = %s", urls)
             with Later(jobs) as L:
               inQ = IterableQueue(128)
               outQ = L.pipeline(pipe_funcs, urls)
