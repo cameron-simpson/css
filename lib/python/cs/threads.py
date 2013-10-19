@@ -271,7 +271,7 @@ class JobCounter:
       self.__onDone=(func,args,kw)
       Thread(target=self._waitThenDo,args=args,kwargs=kw).start()
 
-class NestingOpenClose(object):
+class NestingOpenCloseMixin(object):
   ''' A context manager class to assist with with-statement based
       automatic shutdown.
       A count of active open()s is kept, and on the last close()
@@ -281,31 +281,28 @@ class NestingOpenClose(object):
       Multithread safe.
   '''
   def __init__(self):
-    self.__count=0
-    self.__lock=Lock()
+    self._opens = 0
 
   def open(self):
     ''' Increment the open count.
     '''
-    with self.__lock:
-      self.__count+=1
-    return self
+    with self._lock:
+      self._opens += 1
 
   def __enter__(self):
     self.open()
+    return self
 
   def close(self):
     ''' Decrement the open count.
         If the count goes to zero, call self.shutdown().
     '''
-    if self.__count != 0:
-      with self.__lock:
-        count = self.__count
-        assert count > 0, "self.count (%s) <= 0" % (count,)
+    with self._lock:
+      count = self.opens
         count -= 1
+      self.opens = count
         if count == 0:
           self.shutdown()
-        self.__count = count
 
   def __exit__(self, exc_type, exc_value, traceback):
     self.close()
