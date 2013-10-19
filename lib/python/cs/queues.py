@@ -11,6 +11,42 @@ from cs.seq import seq
 from cs.py3 import Queue, PriorityQueue, Queue_Full, Queue_Empty
 from cs.obj import O
 
+class NestingOpenCloseMixin(object):
+  ''' A mixin to count open and closes, and to call .shutdown() when the count goes to zero.
+      A count of active open()s is kept, and on the last close()
+      the object's .shutdown() method is called.
+      Use via the with-statement calls open()/close() for __enter__()
+      and __exit__().
+      Multithread safe.
+  '''
+  def __init__(self):
+    self._opens = 0
+
+  def open(self):
+    ''' Increment the open count.
+    '''
+    with self._lock:
+      self._opens += 1
+
+  def __enter__(self):
+    self.open()
+    return self
+
+  def close(self):
+    ''' Decrement the open count.
+        If the count goes to zero, call self.shutdown().
+    '''
+    with self._lock:
+      count = self.opens
+      count -= 1
+      self.opens = count
+    if count == 0:
+      self.shutdown()
+
+  def __exit__(self, exc_type, exc_value, traceback):
+    self.close()
+    return False
+
 class QueueIterator(O):
 
   sentinel = object()

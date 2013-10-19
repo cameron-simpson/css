@@ -271,43 +271,6 @@ class JobCounter:
       self.__onDone=(func,args,kw)
       Thread(target=self._waitThenDo,args=args,kwargs=kw).start()
 
-class NestingOpenCloseMixin(object):
-  ''' A context manager class to assist with with-statement based
-      automatic shutdown.
-      A count of active open()s is kept, and on the last close()
-      the object's .shutdown() method is called.
-      Use via the with-statement calls open()/close() for __enter__()
-      and __exit__().
-      Multithread safe.
-  '''
-  def __init__(self):
-    self._opens = 0
-
-  def open(self):
-    ''' Increment the open count.
-    '''
-    with self._lock:
-      self._opens += 1
-
-  def __enter__(self):
-    self.open()
-    return self
-
-  def close(self):
-    ''' Decrement the open count.
-        If the count goes to zero, call self.shutdown().
-    '''
-    with self._lock:
-      count = self.opens
-        count -= 1
-      self.opens = count
-        if count == 0:
-          self.shutdown()
-
-  def __exit__(self, exc_type, exc_value, traceback):
-    self.close()
-    return False
-
 ''' A pool of Channels.
 '''
 __channels=[]
