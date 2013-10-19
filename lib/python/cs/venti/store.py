@@ -23,11 +23,12 @@ from cs.py3 import Queue
 from cs.asynchron import report as reportLFs
 from cs.later import Later
 from cs.logutils import info, debug, warning, Pfx, D
-from cs.threads import Q1, Get1, NestingOpenClose
+from cs.queues import NestingOpenCloseMixin
+from cs.threads import Q1, Get1
 from . import defaults, totext
 from .hash import Hash_SHA1
 
-class BasicStore(NestingOpenClose):
+class BasicStore(NestingOpenCloseMixin):
   ''' Core functions provided by all Stores.
 
       A subclass should provide thread-safe implementations of the following
@@ -66,7 +67,7 @@ class BasicStore(NestingOpenClose):
     with Pfx("BasicStore(%s,..)", name):
       if capacity is None:
         capacity = 1
-      NestingOpenClose.__init__(self)
+      NestingOpenCloseMixin.__init__(self)
       self.name = name
       self.logfp = None
       self.__funcQ = Later(capacity, name="%s:Later(__funcQ)" % (self.name,))
@@ -144,7 +145,7 @@ class BasicStore(NestingOpenClose):
     return block
 
   def __enter__(self):
-    NestingOpenClose.__enter__(self)
+    self.open()
     defaults.pushStore(self)
 
   def __exit__(self, exc_type, exc_value, traceback):
@@ -152,7 +153,7 @@ class BasicStore(NestingOpenClose):
       import traceback as TB
       TB.print_tb(traceback, file=sys.stderr)
     defaults.popStore()
-    return NestingOpenClose.__exit__(self, exc_type, exc_value, traceback)
+    self.close()
 
   def __str__(self):
     return "Store(%s)" % self.name
@@ -168,7 +169,7 @@ class BasicStore(NestingOpenClose):
     raise NotImplementedError
 
   def shutdown(self):
-    ''' Called by final NestingOpenClose.close().
+    ''' Called by final NestingOpenCloseMixin.close().
     '''
     self.__funcQ.close()
 

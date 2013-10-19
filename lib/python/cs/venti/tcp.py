@@ -9,9 +9,9 @@ from socket import socket, SHUT_WR, SHUT_RD
 from socketserver import TCPServer, ThreadingMixIn, StreamRequestHandler
 from .stream import StreamDaemon, StreamStore
 from cs.logutils import debug
-from cs.threads import NestingOpenClose
+from cs.queues import NestingOpenCloseMixin
 
-class Server(ThreadingMixIn, TCPServer, NestingOpenClose):
+class Server(ThreadingMixIn, TCPServer, NestingOpenCloseMixin):
   ''' A threading TCPServer that accepts connections by StreamStore clients.
   '''
   def __init__(self, bindaddr, S):
