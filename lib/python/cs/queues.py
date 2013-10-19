@@ -37,9 +37,9 @@ class NestingOpenCloseMixin(object):
         If the count goes to zero, call self.shutdown().
     '''
     with self._lock:
-      count = self.opens
+      count = self._opens
       count -= 1
-      self.opens = count
+      self._opens = count
     if count == 0:
       self.shutdown()
 
@@ -57,7 +57,7 @@ class QueueIterator(O):
       name = "QueueIterator-%d" % (seq(),)
     self.name = name
     self.closed = False
-    self.opens = 0
+    self._opens = 0
 
   def __str__(self):
     return "<%s:opens=%d,closed=%s>" % (self.name, self.opens, self.closed)
