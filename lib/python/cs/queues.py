@@ -170,8 +170,8 @@ class PushQueue(O):
   '''
 
   def __init__(self, L, func_push, outQ, func_final=None, is_iterable=False, name=None):
-    ''' Initialise the PushQueue with the Later `L`, callable
-	`func_push` and the output queue `outQ`.
+    ''' Initialise the PushQueue with the Later `L`, the callable `func_push`
+        and the output queue `outQ`.
 	`func_push` is a one-to-many function which accepts a single
 	  item of input and returns an iterable of outputs; it may
 	  be a generator.
