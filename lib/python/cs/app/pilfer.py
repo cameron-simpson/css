@@ -629,6 +629,17 @@ def action_func(action):
       kwargs['exts'] = exts
       function = lambda U, exts, case: has_exts( U, exts, case_sensitive=case )
       func_sig = FUNC_SELECTOR
+    # select URLs not ending in particular extensions
+    elif action.startswith('-.'):
+      if action.endswith('/i'):
+        exts, case = action[2:-2], False
+      else:
+        exts, case = action[2:], True
+      exts = exts.split(',')
+      kwargs['case'] = case
+      kwargs['exts'] = exts
+      function = lambda U, exts, case: not has_exts( U, exts, case_sensitive=case )
+      func_sig = FUNC_SELECTOR
     else:
       # comparison
       # varname==
