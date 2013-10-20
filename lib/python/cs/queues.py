@@ -192,7 +192,7 @@ class Channel(object):
     else:
       self.closed = True
 
-class PushQueue(O):
+class PushQueue(NestingOpenCloseMixin, O):
   ''' A puttable object to look like a Queue.
       Calling .put(item) calls `func_push` supplied at initialisation to
       trigger a function on data arrival.
@@ -211,17 +211,16 @@ class PushQueue(O):
           allow a progressive feed to `outQ`.
         Otherwise, submit `func_push` with `item` via L.defer().
     '''
-    O.__init__(self)
     if name is None:
       name = "%s%d-%s" % (self.__class__.__name__, seq(), func_push.__name__)
+    O.__init__(self)
+    NestingOpenCloseMixin.__init__(self)
     self.name = name
     self.later = L
     self.func_push = func_push
     self.outQ = outQ
     self.func_final = func_final
     self.is_iterable = is_iterable
-    self.opens = 0
-    self.closed = False
     self.LFs = []
 
   def __str__(self):
@@ -264,22 +263,17 @@ class PushQueue(O):
       exception("%s._push_items: exception putting results of LF(): %s", self, e)
     self.outQ.close()
 
-  ##@trace_caller
-  def open(self):
-    self.opens += 1
-
-  ##@trace_caller
-  def close(self):
-    self.opens -= 1
-    if self.opens < 1:
-      self.closed = True
-      LFs = self.LFs
-      self.LFs = []
-      if self.func_final:
-        # run func_final to completion before closing outQ
-        LFclose = self.later._after( LFs, None, self._run_func_final )
-        LFs = (LFclose,)
-      self.later._after( LFs, None, self.outQ.close )
+  def shutdown(self):
+    ''' shutdown() is called by NestingOpenCloseMixin.close() to close
+        the outQ for real.
+    '''
+    LFs = self.LFs
+    self.LFs = []
+    if self.func_final:
+      # run func_final to completion before closing outQ
+      LFclose = self.later._after( LFs, None, self._run_func_final )
+      LFs = (LFclose,)
+    self.later._after( LFs, None, self.outQ.close )
 
   def _run_func_final(self):
     items = list(self.func_final())
