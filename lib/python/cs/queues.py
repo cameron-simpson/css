@@ -20,7 +20,6 @@ class NestingOpenCloseMixin(object):
       Multithread safe.
   '''
   def __init__(self):
-    self.closed = True
     self._opens = 0
 
   def open(self):
@@ -30,8 +29,6 @@ class NestingOpenCloseMixin(object):
       count = self._opens
       count += 1
       self._opens = count
-    if count == 1:
-      self.closed = False
 
   def __enter__(self):
     self.open()
@@ -46,8 +43,11 @@ class NestingOpenCloseMixin(object):
       count -= 1
       self._opens = count
     if count == 0:
-      self.closed = True
       self.shutdown()
+
+  @property
+  def closed(self):
+    return self._opens <= 0
 
   def __exit__(self, exc_type, exc_value, traceback):
     self.close()
@@ -62,7 +62,6 @@ class QueueIterator(O):
     if name is None:
       name = "QueueIterator-%d" % (seq(),)
     self.name = name
-    self.closed = False
     self._opens = 0
 
   def __str__(self):
