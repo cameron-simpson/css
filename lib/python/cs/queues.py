@@ -53,16 +53,16 @@ class NestingOpenCloseMixin(object):
     self.close()
     return False
 
-class QueueIterator(O):
+class QueueIterator(NestingOpenCloseMixin,O):
 
   sentinel = object()
 
   def __init__(self, q, name=None):
     O.__init__(self, q=q)
+    NestingOpenCloseMixin.__init__(self)
     if name is None:
       name = "QueueIterator-%d" % (seq(),)
     self.name = name
-    self._opens = 0
 
   def __str__(self):
     return "<%s:opens=%d,closed=%s>" % (self.name, self.opens, self.closed)
@@ -96,20 +96,8 @@ class QueueIterator(O):
       raise ValueError("put(sentinel)")
     return self.q.put(item, *args, **kw)
 
-  ##@trace_caller
-  def open(self):
-    self.opens += 1
-
-  ##@trace_caller
-  def close(self):
-    if self.closed:
-      # TODO: possibly an error, must debug sometime
-      warning("%s.close: already closed", self)
-    else:
-      self.opens -= 1
-      if self.opens < 1:
-        self.closed = True
-        self.q.put(self.sentinel)
+  def shutdown(self):
+    self.q.put(self.sentinel)
 
   def __iter__(self):
     ''' Iterable interface for the queue.
