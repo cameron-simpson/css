@@ -63,6 +63,7 @@ class QueueIterator(NestingOpenCloseMixin,O):
     if name is None:
       name = "QueueIterator-%d" % (seq(),)
     self.name = name
+    self._lock = Lock()
 
   def __str__(self):
     return "<%s:opens=%d,closed=%s>" % (self.name, self.opens, self.closed)
@@ -222,6 +223,7 @@ class PushQueue(NestingOpenCloseMixin, O):
     self.func_final = func_final
     self.is_iterable = is_iterable
     self.LFs = []
+    self._lock = Lock()
 
   def __str__(self):
     return "<%s>" % (self.name,)
