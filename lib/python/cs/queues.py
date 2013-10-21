@@ -19,8 +19,10 @@ class NestingOpenCloseMixin(object):
       and __exit__().
       Multithread safe.
   '''
-  def __init__(self):
+  def __init__(self, open=False):
     self._opens = 0
+    if open:
+      self.open()
 
   def open(self):
     ''' Increment the open count.
