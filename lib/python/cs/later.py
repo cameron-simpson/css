@@ -698,6 +698,8 @@ class Later(object):
           for item in outQ:
             print(item)
     '''
+    if self.closed:
+      warning("%s.pipeline after close", self)
     return self._pipeline(filter_funcs, inputs, outQ=None)
 
   def _pipeline(self, filter_funcs, inputs, outQ=None):
