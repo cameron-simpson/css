@@ -24,6 +24,7 @@ try:
   import xml.etree.cElementTree as ElementTree
 except ImportError:
   import xml.etree.ElementTree as ElementTree
+from cs.debug import thread_dump
 from cs.fileutils import file_property
 from cs.later import Later, FUNC_ONE_TO_ONE, FUNC_ONE_TO_MANY, FUNC_SELECTOR, FUNC_MANY_TO_MANY
 from cs.lex import get_identifier
@@ -130,7 +131,9 @@ def main(argv):
             with Later(jobs) as L:
               inQ = IterableQueue(128)
               outQ = L.pipeline(pipe_funcs, urls)
-              result = list(outQ)
+              result = []
+              for item in outQ:
+                result.append(item)
               debug("final result = %r", result)
       else:
         error("unsupported op")
