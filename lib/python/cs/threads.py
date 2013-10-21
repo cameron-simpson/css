@@ -24,35 +24,33 @@ import cs.logutils
 from cs.logutils import Pfx, LogTime, error, warning, debug, exception, OBSOLETE, D
 from cs.obj import O
 from cs.asynchron import report
-from cs.queues import IterableQueue, Channel
+from cs.queues import IterableQueue, Channel, NestingOpenCloseMixin
 from cs.py3 import raise3, Queue, PriorityQueue
 
-class WorkerThreadPool(O):
+class WorkerThreadPool(NestingOpenCloseMixin, O):
   ''' A pool of worker threads to run functions.
   '''
 
-  def __init__(self, name=None):
+  def __init__(self, name=None, open=False):
     if name is None:
       name = "WorkerThreadPool-%d" % (seq(),)
     debug("WorkerThreadPool.__init__(name=%s)", name)
     self.name = name
-    self.closed = False
+    self._lock = Lock()
+    O.__init__(self)
+    NestingOpenCloseMixin.__init__(self, open=open)
     self.idle = deque()
     self.all = []
-    self._lock = Lock()
 
   def __repr__(self):
     return '<WorkerThreadPool "%s">' % (self.name,)
 
-  def close(self):
-    ''' Close the pool.
+  def shutdown(self):
+    ''' Shut down the pool.
         Close all the request queues.
         Join all the worker threads.
         It is an error to call close() more than once.
     '''
-    if self.closed:
-      warning("%s: repeated close", self)
-    self.closed = True
     for H, HQ in self.all:
       HQ.close()
     for H, HQ in self.all:
@@ -86,7 +84,7 @@ class WorkerThreadPool(O):
         args = []
         H = Thread(target=self._handler, args=args)
         H.daemon = True
-        Hdesc = (H, IterableQueue(name="%s:IQ%d" % (self.name, seq())))
+        Hdesc = (H, IterableQueue(name="%s:IQ%d" % (self.name, seq()), open=True))
         self.all.append(Hdesc)
         args.append(Hdesc)
         debug("%s: start new worker thread", self)
