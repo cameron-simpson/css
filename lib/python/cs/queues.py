@@ -59,16 +59,16 @@ class QueueIterator(NestingOpenCloseMixin,O):
 
   sentinel = object()
 
-  def __init__(self, q, name=None):
-    O.__init__(self, q=q)
-    NestingOpenCloseMixin.__init__(self)
+  def __init__(self, q, name=None, open=False):
     if name is None:
       name = "QueueIterator-%d" % (seq(),)
-    self.name = name
     self._lock = Lock()
+    self.name = name
+    O.__init__(self, q=q)
+    NestingOpenCloseMixin.__init__(self, open=open)
 
   def __str__(self):
-    return "<%s:opens=%d,closed=%s>" % (self.name, self.opens, self.closed)
+    return "<%s:opens=%d,closed=%s>" % (self.name, self._opens, self.closed)
 
   def __getattr__(self, attr):
     return getattr(self.q, attr)
@@ -118,13 +118,15 @@ class QueueIterator(NestingOpenCloseMixin,O):
 
   next = __next__
 
-def IterableQueue(capacity=0, name=None, *args, **kw):
+def IterableQueue(capacity=0, name=None, open=False, *args, **kw):
   name = kw.pop('name', name)
-  return QueueIterator(Queue(capacity, *args, **kw), name=name)
+  open = kw.pop('open', open)
+  return QueueIterator(Queue(capacity, *args, **kw), name=name, open=open)
 
-def IterablePriorityQueue(capacity=0, name=None, *args, **kw):
+def IterablePriorityQueue(capacity=0, name=None, open=False, *args, **kw):
   name = kw.pop('name', name)
-  return QueueIterator(PriorityQueue(capacity, *args, **kw), name=name)
+  open = kw.pop('open', open)
+  return QueueIterator(PriorityQueue(capacity, *args, **kw), name=name, open=open)
 
 class Channel(object):
   ''' A zero-storage data passage.
@@ -201,7 +203,7 @@ class PushQueue(NestingOpenCloseMixin, O):
       trigger a function on data arrival.
   '''
 
-  def __init__(self, L, func_push, outQ, func_final=None, is_iterable=False, name=None):
+  def __init__(self, L, func_push, outQ, func_final=None, is_iterable=False, name=None, open=False):
     ''' Initialise the PushQueue with the Later `L`, the callable `func_push`
         and the output queue `outQ`.
 	`func_push` is a one-to-many function which accepts a single
@@ -216,16 +218,16 @@ class PushQueue(NestingOpenCloseMixin, O):
     '''
     if name is None:
       name = "%s%d-%s" % (self.__class__.__name__, seq(), func_push.__name__)
-    O.__init__(self)
-    NestingOpenCloseMixin.__init__(self)
     self.name = name
+    self._lock = Lock()
+    O.__init__(self)
+    NestingOpenCloseMixin.__init__(self, open=open)
     self.later = L
     self.func_push = func_push
     self.outQ = outQ
     self.func_final = func_final
     self.is_iterable = is_iterable
     self.LFs = []
-    self._lock = Lock()
 
   def __str__(self):
     return "<%s>" % (self.name,)
