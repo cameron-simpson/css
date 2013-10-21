@@ -261,7 +261,8 @@ class Later(object):
     self._timerQ = None         # queue for delayed requests; instantiated at need
     # inbound requests queue
     self._LFPQ = IterablePriorityQueue(inboundCapacity, name="%s._LFPQ" % (self.name,))
-    self._workers = WorkerThreadPool()
+    self._LFPQ.open()
+    self._workers = WorkerThreadPool(name=name+":WorkerThreadPool", open=True)
     self._dispatchThread = Thread(name=self.name+'._dispatcher', target=self._dispatcher)
     self._lock = Lock()
     self._dispatchThread.start()
@@ -652,8 +653,7 @@ class Later(object):
 
   def _defer_iterable(self, I, outQ=None):
     if outQ is None:
-      outQ = IterableQueue(name="IQ:defer_iterable:outQ%d" % seq())
-      outQ.open()
+      outQ = IterableQueue(name="IQ:defer_iterable:outQ%d" % seq(), open=True)
     iterate = iter(I).next
 
     def iterate_once():
@@ -705,16 +705,14 @@ class Later(object):
     if not filter_funcs:
       return inputs
     if outQ is None:
-      outQ = IterableQueue(name="pipelineIQ")
-      outQ.open()
+      outQ = IterableQueue(name="pipelineIQ", open=True)
     ##outQ.close = trace_caller(outQ.close)
     RHQ = outQ
     count = 0
     while filter_funcs:
       func_sig, func_iter, func_final = self._pipeline_func(filter_funcs.pop())
       count += 1
-      PQ = PushQueue(self, func_iter, RHQ, is_iterable=True, func_final=func_final, name="pipelinePQ%d"%count)
-      PQ.open()
+      PQ = PushQueue(self, func_iter, RHQ, is_iterable=True, func_final=func_final, name="pipelinePQ%d"%count, open=True)
       RHQ = PQ
     self._defer_iterable( inputs, RHQ )
     return outQ
