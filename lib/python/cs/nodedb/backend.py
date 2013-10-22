@@ -114,7 +114,7 @@ class _BackendUpdateQueue(O):
     self._updateQ = None
     self._update_thread = None
     if not self.readonly:
-      self._updateQ = IterableQueue(1024)
+      self._updateQ = IterableQueue(1024, open=True)
 
   def _update_start_thread(self):
     ''' Construct and start the update thread.
@@ -269,8 +269,8 @@ class Backend(_BackendMappingMixin, _BackendUpdateQueue):
     self.monitor = monitor
     self.raw = raw
     self.closed = False
-    _BackendUpdateQueue.__init__(self)
     self._lock = Lock()
+    _BackendUpdateQueue.__init__(self)
     self._ready = Lock()
     self._ready.acquire()
 
