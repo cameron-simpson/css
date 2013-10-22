@@ -675,7 +675,7 @@ class Later(object):
     self._defer(iterate_once)
     return outQ
 
-  def pipeline(self, filter_funcs, inputs, outQ=None, open=False):
+  def pipeline(self, filter_funcs, inputs=None, outQ=None, open=False):
     ''' Construct a function pipeline to be mediated by this Later queue.
         Return:
           input, output
@@ -686,8 +686,8 @@ class Later(object):
           single items from the iterable `inputs`, returning an
           iterable output.
 	`inputs`: the initial iterable inputs; this may be None.
-	  If None, it is expected that the caller will be supplying
-	  input items via `input.put()`.
+	  If missing or None, it is expected that the caller will
+	  be supplying input items via `input.put()`.
         `outQ`: the optional output queue; if None, an IterableQueue() will be
           allocated.
 
@@ -711,7 +711,7 @@ class Later(object):
       warning("%s.pipeline after close", self)
     return self._pipeline(filter_funcs, inputs, outQ=None)
 
-  def _pipeline(self, filter_funcs, inputs, outQ=None, open=False):
+  def _pipeline(self, filter_funcs, inputs=None, outQ=None, open=False):
     filter_funcs = list(filter_funcs)
     if not filter_funcs:
       raise ValueError("no filter_funcs")
