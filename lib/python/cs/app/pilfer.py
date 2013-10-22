@@ -49,6 +49,7 @@ DEFAULT_JOBS = 4
 
 usage = '''Usage: %s [options...] op [args...]
   %s url URL actions...
+      URL may be "-" to read URLs from standard input.
   Options:
     -j jobs
         How many jobs (URL fetches, minor computations) to run at a time.
