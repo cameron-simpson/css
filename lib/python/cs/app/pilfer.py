@@ -17,7 +17,7 @@ if sys.hexversion < 0x02060000: from sets import Set as set
 from getopt import getopt, GetoptError
 from string import Formatter
 from time import sleep
-from threading import Lock
+from threading import Lock, Thread
 from urllib import quote, unquote
 from urllib2 import HTTPError, URLError
 try:
@@ -125,6 +125,11 @@ def main(argv):
           if not badopts:
             with Later(jobs) as L:
               inQ, outQ = L.pipeline(pipe_funcs)
+              # dispatch a consumer of the output queue
+	      # (which will be empty, but needs to be consulted to
+	      # drain the run queue)
+              consumer = Thread(name="pilfer.consumer", target=lambda: list(outQ))
+              consumer.start()
               if url != '-':
                 # literal URL supplied, deliver to pipeline
                 inQ.put(url)
@@ -157,8 +162,7 @@ def main(argv):
                         continue
                       inQ.put(url)
               inQ.close()
-              # we need to consume outQ in order to complete the 
-              list(outQ)
+              consumer.join()
       else:
         error("unsupported op")
         badopts = True
