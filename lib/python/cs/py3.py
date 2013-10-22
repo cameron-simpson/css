@@ -35,6 +35,7 @@ if sys.hexversion < 0x03000000:
     return o.iterkeys()
   def itervalues(o):
     return o.itervalues()
+  input = raw_input
 
 else:
 

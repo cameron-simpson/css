@@ -30,6 +30,7 @@ from cs.lex import parseUC_sAttr
 from cs.logutils import Pfx, pfx_iter, debug, error, warning, exception, D
 from cs.threads import locked_property
 from cs.py3 import StringIO, ustr
+from cs.obj import O
 
 def URL(U, referer, **kw):
   ''' Factory function to return a _URL object from a URL string.

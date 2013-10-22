@@ -18,8 +18,17 @@ class NestingOpenCloseMixin(object):
       Use via the with-statement calls open()/close() for __enter__()
       and __exit__().
       Multithread safe.
+      This mixin uses the internal attribute _opens and relies on a
+      preexisting attribute _lock for locking.
   '''
+
   def __init__(self, open=False):
+    ''' Initialise the NestingOpenCloseMixin state.
+	If the optional parameter `open` is true, return the object in "open"
+        state (active opens == 1) otherwise closed (opens == 0).
+        The default is "closed" to optimise use as a context manager;
+        the __enter__ method will open the object.
+    '''
     self._opens = 0
     if open:
       self.open()
@@ -28,9 +37,7 @@ class NestingOpenCloseMixin(object):
     ''' Increment the open count.
     '''
     with self._lock:
-      count = self._opens
-      count += 1
-      self._opens = count
+      self._opens += 1
 
   def __enter__(self):
     self.open()
