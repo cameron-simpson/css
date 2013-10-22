@@ -129,8 +129,7 @@ def main(argv):
               pipe_funcs.append( (func_sig, function) )
           if not badopts:
             with Later(jobs) as L:
-              inQ = IterableQueue(128)
-              outQ = L.pipeline(pipe_funcs, urls)
+              inQ, outQ = L.pipeline(pipe_funcs, urls)
               result = []
               for item in outQ:
                 result.append(item)
