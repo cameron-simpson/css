@@ -32,6 +32,7 @@ from cs.logutils import setup_logging, logTo, Pfx, debug, error, warning, except
 from cs.queues import IterableQueue
 from cs.urlutils import URL
 from cs.obj import O
+from cs.py3 import input
 
 if os.environ.get('DEBUG', ''):
   def X(tag, *a):
@@ -103,22 +104,7 @@ def main(argv):
           badopts = True
         else:
           url = argv.pop(0)
-          if url == '-':
-            urls = []
-            lineno = 0
-            for line in sys.stdin:
-              lineno += 1
-              with Pfx("stdin:%d", lineno):
-                if not line.endswith('\n'):
-                  raise ValueError("unexpected EOF - missing newline")
-                line = line.strip()
-                if not line or line.startswith('#'):
-                  debug("SKIP: %s", line)
-                  continue
-                urls.append(URL(line, None, user_agent=P.user_agent, scope=P))
-          else:
-            urls = [ URL(url, None, user_agent=P.user_agent, scope=P) ]
-          pipe_funcs = []
+          pipe_funcs = [ lambda url: (URL(url, None, scope=P),) ]
           for action in argv:
             try:
               func_sig, function = action_func(action)
@@ -127,13 +113,42 @@ def main(argv):
               badopts = True
             else:
               pipe_funcs.append( (func_sig, function) )
+          pipe_funcs.append(lambda x: ())
           if not badopts:
             with Later(jobs) as L:
-              inQ, outQ = L.pipeline(pipe_funcs, urls)
-              result = []
-              for item in outQ:
-                result.append(item)
-              debug("final result = %r", result)
+              inQ, outQ = L.pipeline(pipe_funcs)
+              if url != '-':
+                # literal URL supplied, deliver to pipeline
+                inQ.put(url)
+              else:
+                try:
+                  do_prompt = sys.stdin.isatty()
+                except AttributeError:
+                  do_prompt = False
+                if do_prompt:
+                  # interactively prompt for URLs, deliver to pipeline
+                  prompt = cmd + ".url> "
+                  while True:
+                    try:
+                      url = input(prompt)
+                    except EOFError:
+                      break
+                    else:
+                      inQ.put(url)
+                else:
+                  # read URLs from non-interactive stdin, deliver to pipeline
+                  lineno = 0
+                  for line in sys.stdin:
+                    lineno += 1
+                    with Pfx("stdin:%d", lineno):
+                      if not line.endswith('\n'):
+                        raise ValueError("unexpected EOF - missing newline")
+                      line = line.strip()
+                      if not line or line.startswith('#'):
+                        debug("SKIP: %s", line)
+                        continue
+                      inQ.put(url)
+              inQ.close()
       else:
         error("unsupported op")
         badopts = True
