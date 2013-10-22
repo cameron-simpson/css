@@ -104,7 +104,10 @@ def main(argv):
           badopts = True
         else:
           url = argv.pop(0)
-          pipe_funcs = [ lambda url: (URL(url, None, scope=P),) ]
+          # commence the pipeline by converting strings to URL objects
+          def urlise(item):
+            yield URL(item, None, scope=P)
+          pipe_funcs = [urlise]
           for action in argv:
             try:
               func_sig, function = action_func(action)
@@ -113,7 +116,12 @@ def main(argv):
               badopts = True
             else:
               pipe_funcs.append( (func_sig, function) )
-          pipe_funcs.append(lambda x: ())
+          # append a function to discard inputs
+          # to avoid filling the outQ
+          def discard(item):
+            if False:
+              yield item
+          pipe_funcs.append(discard)
           if not badopts:
             with Later(jobs) as L:
               inQ, outQ = L.pipeline(pipe_funcs)
@@ -149,6 +157,8 @@ def main(argv):
                         continue
                       inQ.put(url)
               inQ.close()
+              # we need to consume outQ in order to complete the 
+              list(outQ)
       else:
         error("unsupported op")
         badopts = True
