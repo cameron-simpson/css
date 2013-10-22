@@ -113,8 +113,7 @@ class TestLater(unittest.TestCase):
   def test09pipeline_00noop(self):
     L = self.L
     items = ['a', 'b', 'c', 'g', 'f', 'e']
-    outQ = L.pipeline([], items)
-    self.assertIs(outQ, items)
+    inQ, outQ = L.pipeline([lambda x:x], items)
     result = list(outQ)
     self.assertEquals( items, result )
 
@@ -123,7 +122,7 @@ class TestLater(unittest.TestCase):
     items = ['a', 'b', 'c', 'g', 'f', 'e']
     def func(x):
       yield x
-    outQ = L.pipeline([ func ], items)
+    inQ, outQ = L.pipeline([ func ], items)
     self.assertIsNot(outQ, items)
     self.assertIsInstance(outQ, QueueIterator)
     result = list(outQ)
@@ -136,7 +135,7 @@ class TestLater(unittest.TestCase):
     def func(x):
       yield x
       yield x
-    outQ = L.pipeline([ func ], items)
+    inQ, outQ = L.pipeline([ func ], items)
     self.assertIsNot(outQ, items)
     self.assertIsInstance(outQ, QueueIterator)
     result = list(outQ)
@@ -150,7 +149,7 @@ class TestLater(unittest.TestCase):
     expected = ['a', 'b', 'c', 'e', 'f', 'g']
     def func(x):
       return sorted(x)
-    outQ = L.pipeline([ (FUNC_MANY_TO_MANY, func) ], items)
+    inQ, outQ = L.pipeline([ (FUNC_MANY_TO_MANY, func) ], items)
     self.assertIsNot(outQ, items)
     self.assertIsInstance(outQ, QueueIterator)
     result = list(outQ)
@@ -162,7 +161,7 @@ class TestLater(unittest.TestCase):
     expected = ['a', 'b', 'c', 'e', 'f', 'g']
     def func(x):
       return set(x)
-    outQ = L.pipeline([ (FUNC_MANY_TO_MANY, func) ], items)
+    inQ, outQ = L.pipeline([ (FUNC_MANY_TO_MANY, func) ], items)
     self.assertIsNot(outQ, items)
     self.assertIsInstance(outQ, QueueIterator)
     result = set(outQ)
@@ -175,7 +174,7 @@ class TestLater(unittest.TestCase):
     expected = ['a', 'c', 'f']
     def wanted(x):
       return x in want
-    outQ = L.pipeline([ (FUNC_SELECTOR, wanted) ], items)
+    inQ, outQ = L.pipeline([ (FUNC_SELECTOR, wanted) ], items)
     self.assertIsNot(outQ, items)
     self.assertIsInstance(outQ, QueueIterator)
     result = list(outQ)
@@ -194,7 +193,7 @@ class TestLater(unittest.TestCase):
     def double(x):
       yield x
       yield x
-    outQ = L.pipeline([ double, double, (FUNC_MANY_TO_MANY, sorted) ], items)
+    inQ, outQ = L.pipeline([ double, double, (FUNC_MANY_TO_MANY, sorted) ], items)
     self.assertIsNot(outQ, items)
     self.assertIsInstance(outQ, QueueIterator)
     result = list(outQ)

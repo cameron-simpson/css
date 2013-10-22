@@ -675,19 +675,28 @@ class Later(object):
     self._defer(iterate_once)
     return outQ
 
-  def pipeline(self, filter_funcs, inputs, outQ=None):
-    ''' Construct a pipeline to be mediated by this Later queue.
+  def pipeline(self, filter_funcs, inputs, outQ=None, open=False):
+    ''' Construct a function pipeline to be mediated by this Later queue.
+        Return:
+          input, output
+        where `input`` is a closeable queue on which more data items can be put
+        and `output` is an iterable from which result can be collected.
+
         `filter_funcs`: an iterable of filter functions accepting the
           single items from the iterable `inputs`, returning an
           iterable output.
-        `inputs`: the initial iterable inputs.
+	`inputs`: the initial iterable inputs; this may be None.
+	  If None, it is expected that the caller will be supplying
+	  input items via `input.put()`.
         `outQ`: the optional output queue; if None, an IterableQueue() will be
           allocated.
-        The output queue is returned.
-        If `filter_funcs` is empty, the inputs are returned.
 
-        Example use:
-          outQ = L.pipeline(
+        If `inputs` is None or `open` is true, the returned `input` requires
+        a call to `input.close()` when no further inputs are to be supplied.
+
+        Example use with presupplied 
+
+          input, output = L.pipeline(
                   [
                     ls,
                     filter_ls,
@@ -695,17 +704,17 @@ class Later(object):
                   ],
                   ('.', '..', '../..'),
                  )
-          for item in outQ:
+          for item in output:
             print(item)
     '''
     if self.closed:
       warning("%s.pipeline after close", self)
     return self._pipeline(filter_funcs, inputs, outQ=None)
 
-  def _pipeline(self, filter_funcs, inputs, outQ=None):
+  def _pipeline(self, filter_funcs, inputs, outQ=None, open=False):
     filter_funcs = list(filter_funcs)
     if not filter_funcs:
-      return inputs
+      raise ValueError("no filter_funcs")
     if outQ is None:
       outQ = IterableQueue(name="pipelineIQ", open=True)
     ##outQ.close = trace_caller(outQ.close)
@@ -716,8 +725,12 @@ class Later(object):
       count += 1
       PQ = PushQueue(self, func_iter, RHQ, is_iterable=True, func_final=func_final, name="pipelinePQ%d"%count, open=True)
       RHQ = PQ
-    self._defer_iterable( inputs, RHQ )
-    return outQ
+    if inputs is not None:
+      if open:
+        # extra open() so that defer_iterable doesn't perform the final close
+        RHQ.open()
+      self._defer_iterable( inputs, RHQ )
+    return RHQ, outQ
 
   def _pipeline_func(self, o):
     ''' Accept a pipeline element. Return (func_sig, func_iter, func_final).
