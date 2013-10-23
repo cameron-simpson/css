@@ -211,7 +211,6 @@ class Pilfer(O):
 
   def __init__(self, **kw):
     self._lock = Lock()
-    self._shared = PilferCommon()                  # common state - seen URLs, etc
     self.flush_print = False
     self._print_to = None
     self._print_lock = Lock()
@@ -219,6 +218,8 @@ class Pilfer(O):
     self.user_vars = {}
     self._urlsfile = None
     O.__init__(self, **kw)
+    if not hasattr(self, '_shared'):
+      self._shared = PilferCommon()                  # common state - seen URLs, etc
 
   def __copy__(self):
     ''' Copy this Pilfer state item, preserving shared state.
@@ -232,6 +233,17 @@ class Pilfer(O):
 
   def see(self, url, seenset='_'):
     self._shared.seen[seenset].add(url)
+
+  def _print(self, *a, **kw):
+    file = kw.pop('file', None)
+    if kw:
+      raise ValueError("unexpected kwargs %r" % (kw,))
+    with self._print_lock:
+      if file is None:
+        file = self._print_to if self._print_to else sys.stdout
+      print(*a, file=file)
+      if self.flush_print:
+        file.flush()
 
   def read_seen_urls(self, urlspath=None):
     ''' Read "seen" URLs from file `urlspath` (default self.seen_urls_path)
@@ -258,20 +270,10 @@ class Pilfer(O):
     self.user_vars.update(kw)
 
   def print_url_string(self, U, **kw):
-    print_string = kw.pop('string', None)
-    if print_string is None:
-      print_string = '{url}'
+    print_string = kw.pop('string', '{url}')
     print_string = self.format_string(print_string, U)
-    print_to = kw.get('file', None)
-    if print_to is None:
-      print_to = self._print_to
-      if print_to is None:
-        print_to = sys.stdout
-    kw['file'] = print_to
-    with self._print_lock:
-      print(print_string, **kw)
-      if self.flush_print:
-        print_to.flush()
+    file = kw.get('file', self._print_to)
+    self._print(print_string, file=file)
 
   def save_url(self, U, saveas=None, dir=None, overwrite=False, **kw):
     ''' Save the contents of the URL `U`.
