@@ -218,20 +218,13 @@ class Pilfer(O):
     self.user_agent = None
     self.user_vars = {}
     self._urlsfile = None
-    self.seen_urls = None
-    self.seen_urls_path = '.urls-seen'
-    self._seen_urls_lock = Lock()
     O.__init__(self, **kw)
-    if self.seen_urls is None:
-      self.seen_urls = set()
-      self.read_seen_urls()
 
   def __copy__(self):
     ''' Copy this Pilfer state item, preserving shared state.
     '''
     return Pilfer(user_vars=dict(self.user_vars),
-                  seen_urls=self.seen_urls,
-                  _seen_urls_lock=self._seen_urls_lock,
+                  _shared=self._shared,
                  )
 
   def seen(self, url, seenset='_'):
