@@ -9,6 +9,7 @@ import sys
 import os
 import errno
 import os.path
+from collections import defaultdict
 from copy import copy
 from functools import partial
 from itertools import chain
@@ -194,18 +195,23 @@ def unique(items, seen=None):
       yield I
       seen.add(I)
 
+class PilferCommon(O):
+
+  def __init__(self):
+    O.__init__(self)
+    self.seen = defaultdict(set)
+
 class Pilfer(O):
   ''' State for the pilfer app.
       Notable attribute include:
         .flush_print    Flush output after print(), default False.
         .user_agent     Specify user-agent string, default None.
         .user_vars      Mapping of user variables for arbitrary use.
-        .seen_urls      Default set of seen URLs, defaults to empty set.
-        .seen_urls_path Location of seen URLs file, default ".urls-seen".
   '''
 
   def __init__(self, **kw):
     self._lock = Lock()
+    self._shared = PilferCommon()                  # common state - seen URLs, etc
     self.flush_print = False
     self._print_to = None
     self._print_lock = Lock()
@@ -219,6 +225,20 @@ class Pilfer(O):
     if self.seen_urls is None:
       self.seen_urls = set()
       self.read_seen_urls()
+
+  def __copy__(self):
+    ''' Copy this Pilfer state item, preserving shared state.
+    '''
+    return Pilfer(user_vars=dict(self.user_vars),
+                  seen_urls=self.seen_urls,
+                  _seen_urls_lock=self._seen_urls_lock,
+                 )
+
+  def seen(self, url, seenset='_'):
+    return url in self._shared.seen[seenset]
+
+  def see(self, url, seenset='_'):
+    self._shared.seen[seenset].add(url)
 
   def read_seen_urls(self, urlspath=None):
     ''' Read "seen" URLs from file `urlspath` (default self.seen_urls_path)
@@ -243,30 +263,6 @@ class Pilfer(O):
     ''' Update self.user_vars from the keyword arguments.
     '''
     self.user_vars.update(kw)
-
-  def __copy__(self):
-    ''' Copy this Pilfer state item, preserving shared state.
-    '''
-    return Pilfer(user_vars=dict(self.user_vars),
-                  seen_urls=self.seen_urls,
-                  _seen_urls_lock=self._seen_urls_lock,
-                 )
-
-  def seen(self, U):
-    ''' Test if the URL `U` has been seen.
-    '''
-    with self._seen_urls_lock:
-      return U in self.seen_urls
-
-  def see(self, U):
-    ''' Record the URL `U` as seen.
-    '''
-    with self._seen_urls_lock:
-      if U not in self.seen_urls:
-        self.seen_urls.add(U)
-        with open(self.seen_urls_path, "a") as fp:
-          fp.write(U)
-          fp.write("\n")
 
   def print_url_string(self, U, **kw):
     print_string = kw.pop('string', None)
