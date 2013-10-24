@@ -547,145 +547,167 @@ def action_func(action):
   # parse action into function and kwargs
   with Pfx("%s", action):
     action0 = action
-    func, offset = get_identifier(action)
-    if func:
-      with Pfx("%s", func):
-        # an identifier
-        if func == 's':
-          # s/this/that/
-          if offset == len(action):
-            raise ValueError("missing delimiter")
-          delim = action[offset]
-          delim2pos = action.find(delim, offset+1)
-          if delim2pos < offset + 1:
-            raise ValueError("missing second delimiter (%r)" % (delim,))
-          regexp = action[offset+1:delim2pos]
-          if not regexp:
-            raise ValueError("empty regexp")
-          delim3pos = action.find(delim, delim2pos+1)
-          if delim3pos < delim2pos+1:
-            raise ValueError("missing third delimiter (%r)" % (delim,))
-          repl_format = action[delim2pos+1:delim3pos]
-          offset = delim3pos + 1
-          repl_all = False
-          repl_icase = False
-          re_flags = 0
-          while offset < len(action):
-            modchar = action[offset]
-            offset += 1
-            if modchar == 'g':
-              repl_all = True
-            elif modchar == 'i':
-              repl_icase = True
-              re_flags != re.IGNORECASE
-            else:
-              raise ValueError("unknown s///x modifier: %r" % (modchar,))
-          debug("s: regexp=%r, replacement=%r, repl_all=%s, repl_icase=%s", regexp, repl_format, repl_all, repl_icase)
-          kwargs['regexp'] = re.compile(regexp, flags=re_flags)
-          kwargs['replacement'] = repl_format
-          kwargs['all'] = repl_all
-          kwargs['icase'] = repl_icase
-        elif offset < len(action):
-          marker = action[offset]
-          if marker == ':':
-            # followed by :kw1=value,kw2=value,...
-            kwtext = action[offset+1:]
-            if func == "print":
-              # print is special - just a format string relying on current state
-              kwargs['string'] = kwtext
-            else:
-              for kw in kwtext.split(','):
-                if '=' in kw:
-                  kw, v = kw.split('=', 1)
-                  kwargs[kw] = v
-                else:
-                  kwargs[kw] = True
-          else:
-            raise ValueError("unrecognised marker %r" % (marker,))
-      if func in many_to_many:
-        # many-to-many functions get passed straight in
-        function = many_to_many[func]
-        func_sig = FUNC_MANY_TO_MANY
-      elif func in one_to_many:
-        function = one_to_many[func]
-        func_sig = FUNC_ONE_TO_MANY
-      elif func in one_to_one:
-        function = one_to_one[func]
-        func_sig = FUNC_ONE_TO_ONE
-      elif func in one_test:
-        function = one_test[func]
-        func_sig = FUNC_SELECTOR
-      else:
-        raise ValueError("unknown action named \"%s\"" % (func,))
-    # select URLs matching regexp
-    # /regexp/
-    elif action.startswith('/'):
-      if action.endswith('/'):
-        regexp = action[1:-1]
-      else:
-        regexp = action[1:]
-      kwargs['regexp'] = re.compile(regexp)
-      function = lambda U, regexp: regexp.search(U)
-      func_sig = FUNC_SELECTOR
-    # select URLs not matching regexp
-    # -/regexp/
-    elif action.startswith('-/'):
-      if action.endswith('/'):
-        regexp = action[2:-1]
-      else:
-        regexp = action[2:]
-      kwargs['regexp'] = re.compile(regexp)
-      function = lambda U, regexp: regexp.search(U)
-      func_sig = FUNC_SELECTOR
-    # parent
-    # ..
-    elif action == '..':
-      function = lambda U, P: U.parent
-      func_sig = FUNC_ONE_TO_ONE
-    # select URLs ending in particular extensions
-    elif action.startswith('.'):
-      if action.endswith('/i'):
-        exts, case = action[1:-2], False
-      else:
-        exts, case = action[1:], True
-      exts = exts.split(',')
-      kwargs['case'] = case
-      kwargs['exts'] = exts
-      function = lambda U, exts, case: has_exts( U, exts, case_sensitive=case )
-      func_sig = FUNC_SELECTOR
-    # select URLs not ending in particular extensions
-    elif action.startswith('-.'):
-      if action.endswith('/i'):
-        exts, case = action[2:-2], False
-      else:
-        exts, case = action[2:], True
-      exts = exts.split(',')
-      kwargs['case'] = case
-      kwargs['exts'] = exts
-      function = lambda U, exts, case: not has_exts( U, exts, case_sensitive=case )
+
+    # comparison
+    # varname==
+    m = re_COMPARE.match(action)
+    if m:
+      kw_var = m.group(1)
+      kw_value = action[m.end():]
+      function = lambda U: kw_var in U.user_vars and U.user_vars[kw_var] == U.format(kw_value, U)
       func_sig = FUNC_SELECTOR
     else:
-      # comparison
-      # varname==
-      m = re_COMPARE.match(action)
+      # assignment
+      # varname=
+      m = re_ASSIGN.match(action)
       if m:
-        kw_var = m.group(1)
-        kw_value = action[m.end():]
-        function = lambda U: var in U.user_vars and U.user_vars[kw_var] == U.format(kw_value, U)
-        func_sig = FUNC_SELECTOR
+        kwargs['var'] = m.group(1)
+        kwargs['value'] = action[m.end():]
+        def function(U, P, var, value):
+          P.user_vars[var] = P.format_string(value, U)
+          return U
+        func_sig = FUNC_ONE_TO_ONE
       else:
-        # assignment
-        # varname=
-        m = re_ASSIGN.match(action)
-        if m:
-          kwargs['var'] = m.group(1)
-          kwargs['value'] = action[m.end():]
-          def function(U, P, var, value):
-            P.user_vars[var] = P.format_string(value, U)
-            return U
+        # operator or s//
+        func, offset = get_identifier(action)
+        if func:
+          with Pfx("%s", func):
+            # an identifier
+            if func == 's':
+              # s/this/that/
+              if offset == len(action):
+                raise ValueError("missing delimiter")
+              delim = action[offset]
+              delim2pos = action.find(delim, offset+1)
+              if delim2pos < offset + 1:
+                raise ValueError("missing second delimiter (%r)" % (delim,))
+              regexp = action[offset+1:delim2pos]
+              if not regexp:
+                raise ValueError("empty regexp")
+              delim3pos = action.find(delim, delim2pos+1)
+              if delim3pos < delim2pos+1:
+                raise ValueError("missing third delimiter (%r)" % (delim,))
+              repl_format = action[delim2pos+1:delim3pos]
+              offset = delim3pos + 1
+              repl_all = False
+              repl_icase = False
+              re_flags = 0
+              while offset < len(action):
+                modchar = action[offset]
+                offset += 1
+                if modchar == 'g':
+                  repl_all = True
+                elif modchar == 'i':
+                  repl_icase = True
+                  re_flags != re.IGNORECASE
+                else:
+                  raise ValueError("unknown s///x modifier: %r" % (modchar,))
+              debug("s: regexp=%r, replacement=%r, repl_all=%s, repl_icase=%s", regexp, repl_format, repl_all, repl_icase)
+              kwargs['regexp'] = re.compile(regexp, flags=re_flags)
+              kwargs['replacement'] = repl_format
+              kwargs['all'] = repl_all
+              kwargs['icase'] = repl_icase
+            elif offset < len(action):
+              marker = action[offset]
+              if marker == ':':
+                # followed by :kw1=value,kw2=value,...
+                kwtext = action[offset+1:]
+                if func == "print":
+                  # print is special - just a format string relying on current state
+                  kwargs['string'] = kwtext
+                else:
+                  for kw in kwtext.split(','):
+                    if '=' in kw:
+                      kw, v = kw.split('=', 1)
+                      kwargs[kw] = v
+                    else:
+                      kwargs[kw] = True
+              else:
+                raise ValueError("unrecognised marker %r" % (marker,))
+          if func in many_to_many:
+            # many-to-many functions get passed straight in
+            function = many_to_many[func]
+            func_sig = FUNC_MANY_TO_MANY
+          elif func in one_to_many:
+            function = one_to_many[func]
+            func_sig = FUNC_ONE_TO_MANY
+          elif func in one_to_one:
+            function = one_to_one[func]
+            func_sig = FUNC_ONE_TO_ONE
+          elif func in one_test:
+            function = one_test[func]
+            func_sig = FUNC_SELECTOR
+          else:
+            raise ValueError("unknown action named \"%s\"" % (func,))
+        # select URLs matching regexp
+        # /regexp/
+        elif action.startswith('/'):
+          if action.endswith('/'):
+            regexp = action[1:-1]
+          else:
+            regexp = action[1:]
+          kwargs['regexp'] = re.compile(regexp)
+          function = lambda U, regexp: regexp.search(U)
+          func_sig = FUNC_SELECTOR
+        # select URLs not matching regexp
+        # -/regexp/
+        elif action.startswith('-/'):
+          if action.endswith('/'):
+            regexp = action[2:-1]
+          else:
+            regexp = action[2:]
+          kwargs['regexp'] = re.compile(regexp)
+          function = lambda U, regexp: regexp.search(U)
+          func_sig = FUNC_SELECTOR
+        # parent
+        # ..
+        elif action == '..':
+          function = lambda U, P: U.parent
           func_sig = FUNC_ONE_TO_ONE
+        # select URLs ending in particular extensions
+        elif action.startswith('.'):
+          if action.endswith('/i'):
+            exts, case = action[1:-2], False
+          else:
+            exts, case = action[1:], True
+          exts = exts.split(',')
+          kwargs['case'] = case
+          kwargs['exts'] = exts
+          function = lambda U, exts, case: has_exts( U, exts, case_sensitive=case )
+          func_sig = FUNC_SELECTOR
+        # select URLs not ending in particular extensions
+        elif action.startswith('-.'):
+          if action.endswith('/i'):
+            exts, case = action[2:-2], False
+          else:
+            exts, case = action[2:], True
+          exts = exts.split(',')
+          kwargs['case'] = case
+          kwargs['exts'] = exts
+          function = lambda U, exts, case: not has_exts( U, exts, case_sensitive=case )
+          func_sig = FUNC_SELECTOR
         else:
-          raise ValueError("unknown function %r" % (func,))
+          # comparison
+          # varname==
+          m = re_COMPARE.match(action)
+          if m:
+            kw_var = m.group(1)
+            kw_value = action[m.end():]
+            function = lambda U: var in U.user_vars and U.user_vars[kw_var] == U.format(kw_value, U)
+            func_sig = FUNC_SELECTOR
+          else:
+            # assignment
+            # varname=
+            m = re_ASSIGN.match(action)
+            if m:
+              kwargs['var'] = m.group(1)
+              kwargs['value'] = action[m.end():]
+              def function(U, P, var, value):
+                P.user_vars[var] = P.format_string(value, U)
+                return U
+              func_sig = FUNC_ONE_TO_ONE
+            else:
+              raise ValueError("unknown function %r" % (func,))
 
     if kwargs:
       function = partial(function, **kwargs)
