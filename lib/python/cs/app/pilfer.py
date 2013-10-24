@@ -245,31 +245,15 @@ class Pilfer(O):
       if self.flush_print:
         file.flush()
 
-  def read_seen_urls(self, urlspath=None):
-    ''' Read "seen" URLs from file `urlspath` (default self.seen_urls_path)
-        into the .seen_urls set.
-    '''
-    if urlspath is None:
-      urlspath = self.seen_urls_path
-    try:
-      with open(urlspath) as sfp:
-        lineno = 0
-        for line in sfp:
-          lineno += 1
-          if not line.endswith('\n'):
-            warning("%s:%d: unexpected EOF - no newline", urlspath, lineno)
-          else:
-            self.seen_urls.add(line[:-1])
-    except IOError as e:
-      if e.errno != errno.ENOENT:
-        warning("%s: %s", urlspath, e)
-
   def set_user_vars(self, **kw):
     ''' Update self.user_vars from the keyword arguments.
     '''
     self.user_vars.update(kw)
 
   def print_url_string(self, U, **kw):
+    ''' Print a string using approved URL attributes as the format dictionary.
+        See Pilfer.format_string.
+    '''
     print_string = kw.pop('string', '{url}')
     print_string = self.format_string(print_string, U)
     file = kw.get('file', self._print_to)
@@ -301,8 +285,10 @@ class Pilfer(O):
             with open(saveas, "wb") as savefp:
               savefp.write(content)
 
-  class URLkeywords(object):
-    ''' A proxy object to fetch approved attributes from a URL.
+  class Variables(object):
+    ''' A mapping object to set or fetch user variables or URL attributes.
+        Various URL attributes are known, and may not be assigned to.
+        This mapping is used with str.format to fill in {value}s.
     '''
 
     _approved = (
@@ -324,25 +310,38 @@ class Pilfer(O):
       self.url = U
 
     def keys(self):
-      return Pilfer.URLkeywords._approved
+      return set(Pilfer.URLkeywords._approved) + set(self.user_vars.keys())
 
     def __getitem__(self, k):
       url = self.url
       with Pfx(url):
-        if k not in Pilfer.URLkeywords._approved:
-          raise KeyError("not in Pilfer.URLkeywords._approved: %s" % (k,))
-        if k == 'url':
-          return url
-        try:
-          return getattr(url, k)
-        except AttributeError:
-          raise KeyError("no such attribute: .%s" % (k,))
+        if k in self._approved:
+          if k == 'url':
+            return url
+          try:
+            return getattr(url, k)
+          except AttributeError:
+            raise KeyError("no such attribute: .%s" % (k,))
+        else:
+          return url.user_vars[k]
+
+    def __setitem__(self, k, value):
+      url = self.url
+      with Pfx(url):
+        if k in self._approved:
+          raise KeyError("it is forbidden to assign to attribute .%s" % (k,))
+        else:
+          url.user_vars[k] = value
 
   def format_string(self, s, U):
     ''' Format a string using the URL as context.
     '''
-    F = Formatter()
-    return F.vformat(s, (), Pilfer.URLkeywords(U))
+    return Formatter().vformat(s, (), self.Variables(U))
+
+  def set_user_var(self, k, value, U, raw=False):
+    if not raw:
+      value = self.format_string(value, U)
+    self.Variables(U)[k] = value
 
 def new_dir(self, dir):
   ''' Create the directory `dir` or `dir-n` if `dir` exists.
@@ -555,16 +554,24 @@ def action_func(action):
       kw_var = m.group(1)
       kw_value = action[m.end():]
       function = lambda U: kw_var in U.user_vars and U.user_vars[kw_var] == U.format(kw_value, U)
+      def function(U):
+        D("compare user_vars[%s]...", kw_var)
+        uv = U.user_vars
+        if kw_var not in uv:
+          return False
+        v = U.format(kw_value, U)
+        D("compare user_vars[%s]: %r => %r", kw_var, kw_value, v)
+        return uv == v
       func_sig = FUNC_SELECTOR
     else:
       # assignment
       # varname=
       m = re_ASSIGN.match(action)
       if m:
-        kwargs['var'] = m.group(1)
-        kwargs['value'] = action[m.end():]
-        def function(U, P, var, value):
-          P.user_vars[var] = P.format_string(value, U)
+        kw_var = m.group(1)
+        kw_value = action[m.end():]
+        def function(U):
+          U.set_user_var(kw_var, kw_value, U)
           return U
         func_sig = FUNC_ONE_TO_ONE
       else:
@@ -687,27 +694,7 @@ def action_func(action):
           function = lambda U, exts, case: not has_exts( U, exts, case_sensitive=case )
           func_sig = FUNC_SELECTOR
         else:
-          # comparison
-          # varname==
-          m = re_COMPARE.match(action)
-          if m:
-            kw_var = m.group(1)
-            kw_value = action[m.end():]
-            function = lambda U: var in U.user_vars and U.user_vars[kw_var] == U.format(kw_value, U)
-            func_sig = FUNC_SELECTOR
-          else:
-            # assignment
-            # varname=
-            m = re_ASSIGN.match(action)
-            if m:
-              kwargs['var'] = m.group(1)
-              kwargs['value'] = action[m.end():]
-              def function(U, P, var, value):
-                P.user_vars[var] = P.format_string(value, U)
-                return U
-              func_sig = FUNC_ONE_TO_ONE
-            else:
-              raise ValueError("unknown function %r" % (func,))
+          raise ValueError("unknown function %r" % (func,))
 
     if kwargs:
       function = partial(function, **kwargs)
