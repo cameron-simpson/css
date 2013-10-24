@@ -669,12 +669,9 @@ def action_func(action):
       # varname==
       m = re_COMPARE.match(action)
       if m:
-        kwargs['var'] = m.group(1)
-        kwargs['value'] = action[m.end():]
-        def function(U, P, var, value):
-          if var not in P.user_vars:
-            return False
-          return P.user_vars[var] == P.format(value, U)
+        kw_var = m.group(1)
+        kw_value = action[m.end():]
+        function = lambda U: var in U.user_vars and U.user_vars[kw_var] == U.format(kw_value, U)
         func_sig = FUNC_SELECTOR
       else:
         # assignment
