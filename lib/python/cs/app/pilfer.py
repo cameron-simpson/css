@@ -110,14 +110,7 @@ def main(argv):
           def urlise(item):
             yield URL(item, None, scope=P)
           pipe_funcs = [urlise]
-          for action in argv:
-            try:
-              func_sig, function = action_func(action)
-            except ValueError as e:
-              error("invalid action %r: %s", action, e)
-              badopts = True
-            else:
-              pipe_funcs.append( (func_sig, function) )
+          pipe_funcs.extend(argv_pipefuncs(argv))
           # append a function to discard inputs
           # to avoid filling the outQ
           def discard(item):
@@ -174,6 +167,21 @@ def main(argv):
     xit = 2
 
   return xit
+
+def argv_pipefuncs(argv):
+  ''' Process command line strings and return a corresponding list
+      of functions to construct a Later.pipeline.
+  '''
+  pipe_funcs = []
+  for action in argv:
+    try:
+      func_sig, function = action_func(action)
+    except ValueError as e:
+      error("invalid action %r: %s", action, e)
+      badopts = True
+    else:
+      pipe_funcs.append( (func_sig, function) )
+  return pipe_funcs
 
 def notNone(v, name="value"):
   if v is None:
