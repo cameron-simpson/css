@@ -502,7 +502,7 @@ one_to_one = {
       'query':        lambda U, *a: url_query(U, *a),
       'quote':        lambda U: quote(U),
       'unquote':      lambda U: unquote(U),
-      'save':         lambda U, **kw: (U, P.save_url(U, **kw))[0],
+      'save':         lambda U, **kw: (U, U.save_url(U, **kw))[0],
       'see':          lambda U: (U, P.see(U))[0],
       's':            substitute,
       'title':        lambda U: U.title if U.title else U,
