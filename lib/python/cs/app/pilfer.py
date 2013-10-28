@@ -529,7 +529,7 @@ def _search_re(U, P, regexp):
   m = P.re = regexp.search(U)
   return m
 
-ONE_TEST = {
+one_test = {
       'has_title':    lambda U: U.title is not None,
       'is_archive':   lambda U: has_exts( U, ARCHIVE_SUFFIXES ),
       'is_archive':   lambda U: has_exts( U, ARCHIVE_SUFFIXES ),
