@@ -182,7 +182,7 @@ def argv_pipefuncs(argv):
     try:
       func_sig, function = action_func(action)
     except ValueError as e:
-      errors.append("invalid action %r: %s" % (action, e))
+      errors.append(str(e))
     else:
       pipe_funcs.append( (func_sig, function) )
   return pipe_funcs, errors
@@ -657,7 +657,7 @@ def action_func(action):
             function = one_test[func]
             func_sig = FUNC_SELECTOR
           else:
-            raise ValueError("unknown action named \"%s\"" % (func,))
+            raise ValueError("unknown action")
         # select URLs matching regexp
         # /regexp/
         elif action.startswith('/'):
