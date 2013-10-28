@@ -368,7 +368,7 @@ class Pfx(object):
     if exc_value is not None:
       if _state.raise_needs_prefix:
         prefix = self._state.prefix
-        prefixify = lambda text: prefix + text.replace('\n', '\n' + prefix)
+        prefixify = lambda text: prefix + ': ' + text.replace('\n', '\n'+prefix)
         if hasattr(exc_value, 'args'):
           args = exc_value.args
           if args:
