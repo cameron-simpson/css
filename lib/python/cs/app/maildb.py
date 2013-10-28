@@ -267,7 +267,7 @@ def edit_groupness(MDB, addresses):
                 for realname, addr in getaddresses((addrtext,)):
                   with Pfx("realname=%r, addr=%r", realname, addr):
                     A = MDB.getAddressNode(addr)
-                    if realname.startswith('='):
+                    if realname.startswith('=') and not realname.startswith('=?'):
                       with Pfx(repr(realname)):
                         ab, realname = realname.split(None, 1)
                         ab = ab[1:]
