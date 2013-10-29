@@ -616,7 +616,7 @@ def action_func(action):
         # operator or s//
         func, offset = get_identifier(action)
         if func:
-          with Pfx("%s", func):
+          with Pfx(func):
             # an identifier
             if func == 's':
               # s/this/that/
