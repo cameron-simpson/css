@@ -538,6 +538,7 @@ class FuncMultiQueue(object):
 
 def locked(func):
   ''' A decorator for monitor functions that must run within a lock.
+      Relies upon a ._lock attribute for locking.
   '''
   def lockfunc(self, *a, **kw):
     with self._lock:
