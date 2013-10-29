@@ -31,6 +31,7 @@ from cs.later import Later, FUNC_ONE_TO_ONE, FUNC_ONE_TO_MANY, FUNC_SELECTOR, FU
 from cs.lex import get_identifier
 from cs.logutils import setup_logging, logTo, Pfx, debug, error, warning, exception, pfx_iter, D
 from cs.queues import IterableQueue
+from cs.threads import locked_property
 from cs.urlutils import URL
 from cs.obj import O
 from cs.py3 import input
@@ -206,6 +207,31 @@ def unique(items, seen=None):
     if I not in seen:
       yield I
       seen.add(I)
+
+class PipeLine(O):
+  ''' Lazy pipeline.
+      Not even instantiated unless used.
+  '''
+
+  def __init__(self, L, pipe_funcs):
+    self._lock = Lock()
+    self.later = L
+    self.pipe_funcs = pipe_funcs
+
+  @locked_property
+  def pipeline(self):
+    inQ, outQ = self.later.pipeline(self.pipe_funcs)
+    return O(inQ=inQ, outQ=outQ)
+
+  def put(self, o):
+    return self.pipeline.inQ.put(o)
+
+  def close(self):
+    pipe = self._pipeline
+    if pipe:
+      self._pipeline = None
+      pipe.inQ.close()
+      pipe.outQ.close()
 
 class PilferCommon(O):
 
