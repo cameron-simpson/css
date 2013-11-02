@@ -664,7 +664,7 @@ def action_func(action):
                 raise ValueError("missing marker")
               marker = action[offset]
               offset += 1
-              pipe_name, offset = get_identifier(action, offset+1)
+              pipe_name, offset = get_identifier(action, offset)
               if not pipe_name:
                 raise ValueError("no pipe name")
               if offset < len(action):
