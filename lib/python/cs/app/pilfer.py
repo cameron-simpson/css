@@ -299,7 +299,9 @@ class Pilfer(O):
     '''
     print_string = kw.pop('string', '{url}')
     print_string = self.format_string(print_string, U)
-    file = kw.get('file', self._print_to)
+    file = kw.pop('file', self._print_to)
+    if kw:
+      warning("print_url_string: unexpected keyword arguments: %r", kw)
     self._print(print_string, file=file)
 
   def save_url(self, U, saveas=None, dir=None, overwrite=False, **kw):
