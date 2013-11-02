@@ -677,7 +677,12 @@ def action_func(action):
                 select_func = lambda U: True
               def function(U):
                 if select_func(U):
-                  U.pipe_queues[pipe_name].put(U)
+                  try:
+                    pipe = U.pipe_queues[pipe_name]
+                  except KeyError:
+                    error("no pipe named %r", pipe_name)
+                  else:
+                    pipe.put(U)
                 else:
                   yield U
               func_sig = FUNC_ONE_TO_MANY
