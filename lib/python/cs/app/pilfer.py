@@ -580,6 +580,7 @@ def action_func(action):
       and `kwargs` is used as extra parameters for `function`.
   '''
   function = None
+  func_sig = None
   kwargs = {}
   # parse action into function and kwargs
   with Pfx("%s", action):
@@ -652,6 +653,29 @@ def action_func(action):
               kwargs['replacement'] = repl_format
               kwargs['all'] = repl_all
               kwargs['icase'] = repl_icase
+            elif func == "divert":
+              # divert:pipe_name[:selector]
+              if offset == len(action):
+                raise ValueError("missing marker")
+              marker = action[offset]
+              offset += 1
+              pipe_name, offset = get_identifier(action, offset+1)
+              if not pipe_name:
+                raise ValueError("no pipe name")
+              if offset < len(action):
+                if marker != action[offset]:
+                  raise ValueError("expected second marker to match first: expetced %r, saw %r"
+                                   % (marker, action[offset]))
+                offset += 1
+                raise RuntimeError("selector_func parsing not implemented")
+              else:
+                select_func = lambda U: True
+              def function(U):
+                if select_func(U):
+                  U.pipe_queues[pipe_name].put(U)
+                else:
+                  yield U
+              func_sig = FUNC_ONE_TO_MANY
             elif offset < len(action):
               marker = action[offset]
               if marker == ':':
@@ -669,21 +693,27 @@ def action_func(action):
                       kwargs[kw] = True
               else:
                 raise ValueError("unrecognised marker %r" % (marker,))
-          if func in many_to_many:
-            # many-to-many functions get passed straight in
-            function = many_to_many[func]
-            func_sig = FUNC_MANY_TO_MANY
-          elif func in one_to_many:
-            function = one_to_many[func]
-            func_sig = FUNC_ONE_TO_MANY
-          elif func in one_to_one:
-            function = one_to_one[func]
-            func_sig = FUNC_ONE_TO_ONE
-          elif func in one_test:
-            function = one_test[func]
-            func_sig = FUNC_SELECTOR
+          if not function:
+            if func_sig is not None:
+              raise RuntimeError("func_sig is set (%r) but function is None" % (func_sig,))
+            if func in many_to_many:
+              # many-to-many functions get passed straight in
+              function = many_to_many[func]
+              func_sig = FUNC_MANY_TO_MANY
+            elif func in one_to_many:
+              function = one_to_many[func]
+              func_sig = FUNC_ONE_TO_MANY
+            elif func in one_to_one:
+              function = one_to_one[func]
+              func_sig = FUNC_ONE_TO_ONE
+            elif func in one_test:
+              function = one_test[func]
+              func_sig = FUNC_SELECTOR
+            else:
+              raise ValueError("unknown action")
           else:
-            raise ValueError("unknown action")
+            if func_sig is None:
+              raise RuntimeError("function is set (%r) but func_sig is None" % (function,))
         # select URLs matching regexp
         # /regexp/
         elif action.startswith('/'):
