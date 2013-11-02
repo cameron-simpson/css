@@ -61,7 +61,8 @@ class _URL(unicode):
     self.referer = URL(referer, None) if referer else referer
     self._scope = scope if scope else self.referer._scope if self.referer else O()
     self.user_agent = user_agent if user_agent else self.referer.user_agent if self.referer else None
-    self.opener = opener if opener else referer.opener if referer else None
+    if opener is not None:
+      self.opener = opener
     self._parts = None
     self.flush()
     self._lock = RLock()
@@ -92,7 +93,18 @@ class _URL(unicode):
     self._content_type = None
     self._parsed = None
     self._xml = None
-    self._opener = None
+
+  @property
+  def opener(self):
+    try:
+      o = self._scope.opener
+    except AttributeError:
+      try:
+        o = self.referer.opener
+      except AttributeError:
+        o = build_opener()
+        o.add_handler(HTTPBasicAuthHandler(NetrcHTTPPasswordMgr()))
+    return o
 
   def _fetch(self):
     ''' Fetch the URL content.
@@ -105,9 +117,6 @@ class _URL(unicode):
       url = 'file://'+self if self.startswith('/') else self
       rq = Request(url, None, hdrs)
       opener = self.opener
-      if not opener:
-        opener = build_opener()
-        opener.add_handler(HTTPBasicAuthHandler(NetrcHTTPPasswordMgr()))
       with Pfx("open(%s)", rq):
         rsp = opener.open(rq)
       H = rsp.info()
