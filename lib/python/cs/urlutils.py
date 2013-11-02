@@ -275,7 +275,10 @@ class _URL(unicode):
 
   @property
   def title(self):
-    return self.parsed.title.string
+    t = self.parsed.title
+    if t is None:
+      return ''
+    return t.string
 
   def hrefs(self, absolute=False):
     ''' All 'href=' values from the content HTML 'A' tags.
