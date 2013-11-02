@@ -54,6 +54,9 @@ class _URL(unicode):
                   "css" if no referer.
         `opener`: urllib2 opener object, inherited from `referer` if unspecified,
                   made at need if no referer.
+        `scope`: an assisting scope object, inherited from `referer` if unspecified,
+                  made at need if no referer. Attributes not found directly on self
+                  are sought on self._scope.
     '''
     self.referer = URL(referer, None) if referer else referer
     self._scope = scope if scope else self.referer._scope if self.referer else O()
@@ -66,6 +69,11 @@ class _URL(unicode):
     self._parsed = None
 
   def __getattr__(self, attr):
+    ''' Ad hoc attributes.
+        Upper case attributes named "FOO" parse the text and find the (sole) node named "foo".
+        Upper case attributes named "FOOs" parse the text and find all the nodes named "foo".
+        Otherwise, look the attribute up in self._scope.
+    '''
     k, plural = parseUC_sAttr(attr)
     if k:
       nodes = self.parsed.findAll(k.lower())
