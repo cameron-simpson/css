@@ -550,7 +550,7 @@ one_to_one = {
       'save':         lambda U, **kw: (U, U.save_url(U, **kw))[0],
       'see':          lambda U: (U, P.see(U))[0],
       's':            substitute,
-      'title':        lambda U: U.title if U.title else U,
+      'title':        lambda U: URL(U.title, referer=U) if U.title else U,
       'type':         lambda U: url_io(U.content_type, ""),
       'xmlattr':      lambda U, attr: [ A for A in (ElementTree.XML(U).get(attr),) if A is not None ],
     }
