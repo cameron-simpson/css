@@ -358,8 +358,8 @@ class Pilfer(O):
             return url
           try:
             return getattr(url, k)
-          except AttributeError:
-            raise KeyError("no such attribute: .%s" % (k,))
+          except AttributeError as e:
+            raise KeyError("no such attribute: .%s (%s)" % (k, e))
         else:
           return url.user_vars[k]
 
