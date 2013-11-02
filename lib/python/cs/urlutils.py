@@ -106,8 +106,8 @@ class _URL(unicode):
       rq = Request(url, None, hdrs)
       opener = self.opener
       if not opener:
-        auth_handler = HTTPBasicAuthHandler(NetrcHTTPPasswordMgr())
-        opener = build_opener(auth_handler)
+        opener = build_opener()
+        opener.add_handler(HTTPBasicAuthHandler(NetrcHTTPPasswordMgr()))
       with Pfx("open(%s)", rq):
         rsp = opener.open(rq)
       H = rsp.info()
