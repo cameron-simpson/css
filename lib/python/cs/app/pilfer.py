@@ -238,6 +238,7 @@ class PilferCommon(O):
   def __init__(self):
     O.__init__(self)
     self.seen = defaultdict(set)
+    self.pipe_queues = {}
 
 class Pilfer(O):
   ''' State for the pilfer app.
@@ -271,6 +272,10 @@ class Pilfer(O):
 
   def see(self, url, seenset='_'):
     self._shared.seen[seenset].add(url)
+
+  @property
+  def pipe_queues(self):
+    return self._shared.pipe_queues
 
   def _print(self, *a, **kw):
     file = kw.pop('file', None)
