@@ -20,7 +20,7 @@ from string import Formatter
 from time import sleep
 from threading import Lock, Thread
 from urllib import quote, unquote
-from urllib2 import HTTPError, URLError
+from urllib2 import HTTPError, URLError, build_opener, HTTPBasicAuthHandler
 try:
   import xml.etree.cElementTree as ElementTree
 except ImportError:
@@ -32,7 +32,7 @@ from cs.lex import get_identifier
 from cs.logutils import setup_logging, logTo, Pfx, debug, error, warning, exception, pfx_iter, D
 from cs.queues import IterableQueue
 from cs.threads import locked_property
-from cs.urlutils import URL
+from cs.urlutils import URL, NetrcHTTPPasswordMgr
 from cs.obj import O
 from cs.py3 import input
 
@@ -239,6 +239,8 @@ class PilferCommon(O):
     O.__init__(self)
     self.seen = defaultdict(set)
     self.pipe_queues = {}
+    self.opener = build_opener()
+    self.opener.add_handler(HTTPBasicAuthHandler(NetrcHTTPPasswordMgr()))
 
 class Pilfer(O):
   ''' State for the pilfer app.
