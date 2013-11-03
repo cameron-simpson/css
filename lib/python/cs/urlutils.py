@@ -177,12 +177,9 @@ class _URL(unicode):
       raise
     return P
 
-  @property
+  @locked_property
   def xml(self):
-    if self._xml is None:
-      content = self.content
-      self._xml = ElementTree.XML(content.decode('utf-8', 'replace'))
-    return self._xml
+    return ElementTree.XML(self.content.decode('utf-8', 'replace'))
 
   @property
   def parts(self):
