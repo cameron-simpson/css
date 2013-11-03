@@ -546,7 +546,8 @@ def locked(func):
   return lockfunc
 
 def locked_property(func, lock_name='_lock', prop_name=None, unset_object=None):
-  ''' A property whose access is controlled by a lock if unset.
+  ''' A thread safe property whose value is cached.
+      The lock is taken if the value needs to computed.
   '''
   if prop_name is None:
     prop_name = '_' + func.__name__
