@@ -29,7 +29,7 @@ from cs.debug import thread_dump
 from cs.fileutils import file_property
 from cs.later import Later, FUNC_ONE_TO_ONE, FUNC_ONE_TO_MANY, FUNC_SELECTOR, FUNC_MANY_TO_MANY
 from cs.lex import get_identifier
-from cs.logutils import setup_logging, logTo, Pfx, debug, error, warning, exception, pfx_iter, D
+from cs.logutils import setup_logging, logTo, Pfx, debug, error, warning, exception, trace, pfx_iter, D
 from cs.queues import IterableQueue
 from cs.threads import locked_property
 from cs.urlutils import URL, NetrcHTTPPasswordMgr
@@ -782,7 +782,7 @@ def action_func(action):
       function = partial(function, **kwargs)
     func0 = function
     def trace_function(*a, **kw):
-      debug("DO %s ...", action0)
+      trace("DO %s ...", action0)
       with Pfx(action0):
         return func0(*a, **kw)
     function = trace_function
