@@ -661,8 +661,7 @@ def action_func(action):
               debug("s: regexp=%r, replacement=%r, repl_all=%s, repl_icase=%s", regexp, repl_format, repl_all, repl_icase)
               kwargs['regexp'] = re.compile(regexp, flags=re_flags)
               kwargs['replacement'] = repl_format
-              kwargs['all'] = repl_all
-              kwargs['icase'] = repl_icase
+              kwargs['replace_all'] = repl_all
             elif func == "divert":
               # divert:pipe_name[:selector]
               if offset == len(action):
@@ -736,8 +735,9 @@ def action_func(action):
             regexp = action[1:-1]
           else:
             regexp = action[1:]
-          kwargs['regexp'] = re.compile(regexp)
-          function = lambda P, U, regexp: regexp.search(U)
+          regexp = re.compile(regexp)
+          function = lambda P, U: regexp.search(U)
+          function.__name__ = '/%s/' % (regexp,)
           func_sig = FUNC_SELECTOR
         # select URLs not matching regexp
         # -/regexp/
@@ -746,8 +746,9 @@ def action_func(action):
             regexp = action[2:-1]
           else:
             regexp = action[2:]
-          kwargs['regexp'] = re.compile(regexp)
-          function = lambda P, U, regexp: regexp.search(U)
+          regexp = re.compile(regexp)
+          function = lambda P, U: regexp.search(U)
+          function.__name__ = '-/%s/' % (regexp,)
           func_sig = FUNC_SELECTOR
         # parent
         # ..
@@ -761,9 +762,7 @@ def action_func(action):
           else:
             exts, case = action[1:], True
           exts = exts.split(',')
-          kwargs['case'] = case
-          kwargs['exts'] = exts
-          function = lambda P, U, exts, case: has_exts( U, exts, case_sensitive=case )
+          function = lambda P, U: has_exts( U, exts, case_sensitive=case )
           func_sig = FUNC_SELECTOR
         # select URLs not ending in particular extensions
         elif action.startswith('-.'):
@@ -772,9 +771,7 @@ def action_func(action):
           else:
             exts, case = action[2:], True
           exts = exts.split(',')
-          kwargs['case'] = case
-          kwargs['exts'] = exts
-          function = lambda P, U, exts, case: not has_exts( U, exts, case_sensitive=case )
+          function = lambda P, U: not has_exts( U, exts, case_sensitive=case )
           func_sig = FUNC_SELECTOR
         else:
           raise ValueError("unknown function %r" % (func,))
@@ -823,7 +820,7 @@ def action_func(action):
     def trace_function(*a, **kw):
       D("DO %s(a=%r,kw=%r) ...", action0, a, kw)
       with Pfx(action0):
-      return func1(*a, **kw)
+        return func1(*a, **kw)
     function = trace_function
     return func_sig, function
 
