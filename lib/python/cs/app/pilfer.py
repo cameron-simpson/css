@@ -556,6 +556,7 @@ one_to_one = {
       'type':         lambda P, U: url_io(U.content_type, ""),
       'xmlattr':      lambda P, U, attr: [ A for A in (ElementTree.XML(U).get(attr),) if A is not None ],
     }
+one_to_one_scoped = ('per',)
 
 def _search_re(P, U, regexp):
   ''' Search for `regexp` in `U`, return resulting MatchObject or None.
@@ -720,6 +721,7 @@ def action_func(action):
             elif func in one_to_one:
               function = one_to_one[func]
               func_sig = FUNC_ONE_TO_ONE
+              scoped = func in one_to_one_scoped
             elif func in one_test:
               function = one_test[func]
               func_sig = FUNC_SELECTOR
