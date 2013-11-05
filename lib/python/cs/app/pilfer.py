@@ -822,7 +822,7 @@ def action_func(action):
 
     def trace_function(*a, **kw):
       D("DO %s(a=%r,kw=%r) ...", action0, a, kw)
-      ##with Pfx(action0):
+      with Pfx(action0):
       return func1(*a, **kw)
     function = trace_function
     return func_sig, function
