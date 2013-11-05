@@ -545,7 +545,7 @@ one_to_one = {
       'domain':       lambda P, U: URL(U, None).domain,
       'hostname':     lambda P, U: URL(U, None).hostname,
       'per':          lambda P, U: URL(str(U), U.referer, scope=copy(U._scope)),
-      'print':        lambda P, U, **kw: (U, U.print_url_string(U, **kw))[0],
+      'print':        lambda P, U, **kw: (U, P.print_url_string(U, **kw))[0],
       'query':        lambda P, U, *a: url_query(U, *a),
       'quote':        lambda P, U: quote(U),
       'unquote':      lambda P, U: unquote(U),
