@@ -825,8 +825,7 @@ def action_func(action):
       D("DO %s(a=%r,kw=%r) ...", action0, a, kw)
       with Pfx(action0):
         return func1(*a, **kw)
-    function = trace_function
-    return func_sig, function
+    return func_sig, trace_function
 
 if __name__ == '__main__':
   import sys
