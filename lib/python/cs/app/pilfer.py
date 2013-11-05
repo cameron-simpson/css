@@ -781,7 +781,9 @@ def action_func(action):
     func0 = function
     if scoped:
       # the function takes (P, U) inputs and emits (P, U) outputs
-      func1 = func0
+      def func1(item, *a, **kw):
+        P, U = item
+        return func0(P, U, *a, **kw)
     else:
       if func_sig == FUNC_SELECTOR:
         def func1(item):
