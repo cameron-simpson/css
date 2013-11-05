@@ -787,7 +787,9 @@ def action_func(action):
       func1 = func0
     else:
       if func_sig == FUNC_SELECTOR:
-        func1 = func0
+        def func1(item):
+          P, U = item
+          return func0(P, U)
       elif func_sig == FUNC_ONE_TO_ONE:
         def func1(item, *a, **kw):
           P, U = item
