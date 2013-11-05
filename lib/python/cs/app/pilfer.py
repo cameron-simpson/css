@@ -20,7 +20,7 @@ from string import Formatter
 from time import sleep
 from threading import Lock, Thread
 from urllib import quote, unquote
-from urllib2 import HTTPError, URLError
+from urllib2 import HTTPError, URLError, build_opener, HTTPBasicAuthHandler
 try:
   import xml.etree.cElementTree as ElementTree
 except ImportError:
@@ -29,9 +29,10 @@ from cs.debug import thread_dump
 from cs.fileutils import file_property
 from cs.later import Later, FUNC_ONE_TO_ONE, FUNC_ONE_TO_MANY, FUNC_SELECTOR, FUNC_MANY_TO_MANY
 from cs.lex import get_identifier
-from cs.logutils import setup_logging, logTo, Pfx, debug, error, warning, exception, pfx_iter, D
+from cs.logutils import setup_logging, logTo, Pfx, debug, error, warning, exception, trace, pfx_iter, D
 from cs.queues import IterableQueue
-from cs.urlutils import URL
+from cs.threads import locked_property
+from cs.urlutils import URL, NetrcHTTPPasswordMgr
 from cs.obj import O
 from cs.py3 import input
 
@@ -108,22 +109,19 @@ def main(argv):
           url = argv.pop(0)
           # commence the pipeline by converting strings to URL objects
           def urlise(item):
-            yield URL(item, None, scope=P)
-          pipe_funcs = [urlise]
-          for action in argv:
-            try:
-              func_sig, function = action_func(action)
-            except ValueError as e:
-              error("invalid action %r: %s", action, e)
-              badopts = True
-            else:
-              pipe_funcs.append( (func_sig, function) )
-          # append a function to discard inputs
-          # to avoid filling the outQ
-          def discard(item):
-            if False:
-              yield item
-          pipe_funcs.append(discard)
+            yield P, URL(item, None, scope=P)
+          pipe_funcs, errors = argv_pipefuncs(argv)
+          if errors:
+            for err in errors:
+              error(err)
+            badopts = True
+          else:
+            # append a function to discard inputs
+            # to avoid filling the outQ
+            def discard(item):
+              if False:
+                yield item
+            pipe_funcs = [urlise] + pipe_funcs + [discard]
           if not badopts:
             with Later(jobs) as L:
               inQ, outQ = L.pipeline(pipe_funcs)
@@ -175,6 +173,21 @@ def main(argv):
 
   return xit
 
+def argv_pipefuncs(argv):
+  ''' Process command line strings and return a corresponding list
+      of functions to construct a Later.pipeline.
+  '''
+  errors = []
+  pipe_funcs = []
+  for action in argv:
+    try:
+      func_sig, function = action_func(action)
+    except ValueError as e:
+      errors.append(str(e))
+    else:
+      pipe_funcs.append( (func_sig, function) )
+  return pipe_funcs, errors
+
 def notNone(v, name="value"):
   if v is None:
     raise ValueError("%s is None" % (name,))
@@ -195,11 +208,39 @@ def unique(items, seen=None):
       yield I
       seen.add(I)
 
+class PipeLine(O):
+  ''' Lazy pipeline.
+      Not even instantiated unless used.
+  '''
+
+  def __init__(self, L, pipe_funcs):
+    self._lock = Lock()
+    self.later = L
+    self.pipe_funcs = pipe_funcs
+
+  @locked_property
+  def pipeline(self):
+    inQ, outQ = self.later.pipeline(self.pipe_funcs)
+    return O(inQ=inQ, outQ=outQ)
+
+  def put(self, o):
+    return self.pipeline.inQ.put(o)
+
+  def close(self):
+    pipe = self._pipeline
+    if pipe:
+      self._pipeline = None
+      pipe.inQ.close()
+      pipe.outQ.close()
+
 class PilferCommon(O):
 
   def __init__(self):
     O.__init__(self)
     self.seen = defaultdict(set)
+    self.pipe_queues = {}
+    self.opener = build_opener()
+    self.opener.add_handler(HTTPBasicAuthHandler(NetrcHTTPPasswordMgr()))
 
 class Pilfer(O):
   ''' State for the pilfer app.
@@ -234,6 +275,10 @@ class Pilfer(O):
   def see(self, url, seenset='_'):
     self._shared.seen[seenset].add(url)
 
+  @property
+  def pipe_queues(self):
+    return self._shared.pipe_queues
+
   def _print(self, *a, **kw):
     file = kw.pop('file', None)
     if kw:
@@ -256,23 +301,20 @@ class Pilfer(O):
     '''
     print_string = kw.pop('string', '{url}')
     print_string = self.format_string(print_string, U)
-    file = kw.get('file', self._print_to)
+    file = kw.pop('file', self._print_to)
+    if kw:
+      warning("print_url_string: unexpected keyword arguments: %r", kw)
     self._print(print_string, file=file)
 
   def save_url(self, U, saveas=None, dir=None, overwrite=False, **kw):
     ''' Save the contents of the URL `U`.
     '''
     with Pfx("save_url(%s)", U):
-      if kw:
-        kws = sorted(kw.keys())
-        if len(kws) > 1:
-          raise ValueError("multiple `save' arguments: %s" % (kws,))
-        kw = kws[0]
-        if saveas is not None:
-          raise ValueError("saveas already specified (%s), illegal `save' argument: %s" % (saveas, kw))
-        saveas = kw
+      save_dir = self.user_vars.get('save_dir', '.')
       if saveas is None:
-        saveas = U.basename
+        saveas = os.path.join(save_dir, U.basename)
+        if saveas.endswith('/'):
+          saveas += 'index.html'
       if saveas == '-':
         sys.stdout.write(U.content)
         sys.stdout.flush()
@@ -282,8 +324,11 @@ class Pilfer(O):
             warning("file exists, not saving")
           else:
             content = U.content
-            with open(saveas, "wb") as savefp:
-              savefp.write(content)
+            try:
+              with open(saveas, "wb") as savefp:
+                savefp.write(content)
+            except:
+              exception("save fails")
 
   class Variables(object):
     ''' A mapping object to set or fetch user variables or URL attributes.
@@ -320,8 +365,8 @@ class Pilfer(O):
             return url
           try:
             return getattr(url, k)
-          except AttributeError:
-            raise KeyError("no such attribute: .%s" % (k,))
+          except AttributeError as e:
+            raise KeyError("no such attribute: .%s (%s)" % (k, e))
         else:
           return url.user_vars[k]
 
@@ -401,7 +446,7 @@ def with_exts(urls, suffixes, case_sensitive=False):
     else:
       debug("with_exts: discard %s", U)
 
-def substitute(src, regexp, replacement, replace_all):
+def substitute(P, src, regexp, replacement, replace_all):
   ''' Perform a regexp substitution on `src`.
       `replacement` is a format string for the replacement text
       using the str.format method.
@@ -483,53 +528,54 @@ many_to_many = {
     }
 
 one_to_many = {
-      'hrefs':        lambda U, *a: url_hrefs(U, *a),
-      'images':       lambda U, *a: with_exts(url_hrefs(U, *a), IMAGE_SUFFIXES ),
-      'iimages':      lambda U, *a: with_exts(url_srcs(U, *a), IMAGE_SUFFIXES ),
-      'srcs':         lambda U, *a: url_srcs(U, *a),
-      'xml':          lambda U, match: url_xml_find(U, match),
-      'xmltext':      lambda U, match: XML(U).findall(match),
+      'hrefs':        lambda P, U, *a: url_hrefs(U, *a),
+      'images':       lambda P, U, *a: with_exts(url_hrefs(U, *a), IMAGE_SUFFIXES ),
+      'iimages':      lambda P, U, *a: with_exts(url_srcs(U, *a), IMAGE_SUFFIXES ),
+      'srcs':         lambda P, U, *a: url_srcs(U, *a),
+      'xml':          lambda P, U, match: url_xml_find(U, match),
+      'xmltext':      lambda P, U, match: XML(U).findall(match),
     }
 
 # actions that work on individual URLs
 one_to_one = {
-      '..':           lambda U: URL(U, None).parent,
-      'delay':        lambda U, P, delay: (U, sleep(float(delay)))[0],
-      'domain':       lambda U: URL(U, None).domain,
-      'hostname':     lambda U: URL(U, None).hostname,
-      'per':          lambda U: URL(str(U), U.referer, scope=copy(U._scope)),
-      'print':        lambda U, **kw: (U, U.print_url_string(U, **kw))[0],
-      'query':        lambda U, *a: url_query(U, *a),
-      'quote':        lambda U: quote(U),
-      'unquote':      lambda U: unquote(U),
-      'save':         lambda U, **kw: (U, P.save_url(U, **kw))[0],
-      'see':          lambda U: (U, P.see(U))[0],
+      '..':           lambda P, U: URL(U, None).parent,
+      'delay':        lambda P, U, delay: (U, sleep(float(delay)))[0],
+      'domain':       lambda P, U: URL(U, None).domain,
+      'hostname':     lambda P, U: URL(U, None).hostname,
+      'per':          lambda P, U: (copy(P), U),
+      'print':        lambda P, U, **kw: (U, P.print_url_string(U, **kw))[0],
+      'query':        lambda P, U, *a: url_query(U, *a),
+      'quote':        lambda P, U: quote(U),
+      'unquote':      lambda P, U: unquote(U),
+      'save':         lambda P, U, **kw: (U, P.save_url(U, **kw))[0],
+      'see':          lambda P, U: (U, P.see(U))[0],
       's':            substitute,
-      'title':        lambda U: U.title if U.title else U,
-      'type':         lambda U: url_io(U.content_type, ""),
-      'xmlattr':      lambda U, attr: [ A for A in (ElementTree.XML(U).get(attr),) if A is not None ],
+      'title':        lambda P, U: U.title,
+      'type':         lambda P, U: url_io(U.content_type, ""),
+      'xmlattr':      lambda P, U, attr: [ A for A in (ElementTree.XML(U).get(attr),) if A is not None ],
     }
+one_to_one_scoped = ('per',)
 
-def _search_re(U, P, regexp):
+def _search_re(P, U, regexp):
   ''' Search for `regexp` in `U`, return resulting MatchObject or None.
       The result is also stored as `P.re` for subsequent use.
   '''
   m = P.re = regexp.search(U)
   return m
 
-ONE_TEST = {
-      'has_title':    lambda U: U.title is not None,
-      'is_archive':   lambda U: has_exts( U, ARCHIVE_SUFFIXES ),
-      'is_archive':   lambda U: has_exts( U, ARCHIVE_SUFFIXES ),
-      'is_image':     lambda U: has_exts( U, IMAGE_SUFFIXES ),
-      'is_video':     lambda U: has_exts( U, VIDEO_SUFFIXES ),
-      'reject_re':    lambda U, regexp: not regexp.search(U),
-      'same_domain':  lambda U: notNone(U.referer, "U.referer") and U.domain == U.referer.domain,
-      'same_hostname':lambda U: notNone(U.referer, "U.referer") and U.hostname == U.referer.hostname,
-      'same_scheme':  lambda U: notNone(U.referer, "U.referer") and U.scheme == U.referer.scheme,
-      'seen':         lambda U: P.seen(U),
+one_test = {
+      'has_title':    lambda P, U: U.title is not None,
+      'is_archive':   lambda P, U: has_exts( U, ARCHIVE_SUFFIXES ),
+      'is_archive':   lambda P, U: has_exts( U, ARCHIVE_SUFFIXES ),
+      'is_image':     lambda P, U: has_exts( U, IMAGE_SUFFIXES ),
+      'is_video':     lambda P, U: has_exts( U, VIDEO_SUFFIXES ),
+      'reject_re':    lambda P, U, regexp: not regexp.search(U),
+      'same_domain':  lambda P, U: notNone(U.referer, "U.referer") and U.domain == U.referer.domain,
+      'same_hostname':lambda P, U: notNone(U.referer, "U.referer") and U.hostname == U.referer.hostname,
+      'same_scheme':  lambda P, U: notNone(U.referer, "U.referer") and U.scheme == U.referer.scheme,
+      'seen':         lambda P, U: P.seen(U),
       'select_re':    _search_re,
-      'unseen':       lambda U: not P.seen(U),
+      'unseen':       lambda P, U: not P.seen(U),
     }
 
 re_COMPARE = re.compile(r'([a-z]\w*)==')
@@ -542,6 +588,8 @@ def action_func(action):
       and `kwargs` is used as extra parameters for `function`.
   '''
   function = None
+  func_sig = None
+  scoped = False
   kwargs = {}
   # parse action into function and kwargs
   with Pfx("%s", action):
@@ -553,10 +601,10 @@ def action_func(action):
     if m:
       kw_var = m.group(1)
       kw_value = action[m.end():]
-      function = lambda U: kw_var in U.user_vars and U.user_vars[kw_var] == U.format(kw_value, U)
-      def function(U):
+      function = lambda P, U: kw_var in P.user_vars and P.user_vars[kw_var] == U.format(kw_value, U)
+      def function(P, U):
         D("compare user_vars[%s]...", kw_var)
-        uv = U.user_vars
+        uv = P.user_vars
         if kw_var not in uv:
           return False
         v = U.format(kw_value, U)
@@ -570,15 +618,15 @@ def action_func(action):
       if m:
         kw_var = m.group(1)
         kw_value = action[m.end():]
-        def function(U):
-          U.set_user_var(kw_var, kw_value, U)
+        def function(P, U):
+          P.set_user_var(kw_var, kw_value, U)
           return U
         func_sig = FUNC_ONE_TO_ONE
       else:
         # operator or s//
         func, offset = get_identifier(action)
         if func:
-          with Pfx("%s", func):
+          with Pfx(func):
             # an identifier
             if func == 's':
               # s/this/that/
@@ -612,8 +660,35 @@ def action_func(action):
               debug("s: regexp=%r, replacement=%r, repl_all=%s, repl_icase=%s", regexp, repl_format, repl_all, repl_icase)
               kwargs['regexp'] = re.compile(regexp, flags=re_flags)
               kwargs['replacement'] = repl_format
-              kwargs['all'] = repl_all
-              kwargs['icase'] = repl_icase
+              kwargs['replace_all'] = repl_all
+            elif func == "divert":
+              # divert:pipe_name[:selector]
+              if offset == len(action):
+                raise ValueError("missing marker")
+              marker = action[offset]
+              offset += 1
+              pipe_name, offset = get_identifier(action, offset)
+              if not pipe_name:
+                raise ValueError("no pipe name")
+              if offset < len(action):
+                if marker != action[offset]:
+                  raise ValueError("expected second marker to match first: expetced %r, saw %r"
+                                   % (marker, action[offset]))
+                offset += 1
+                raise RuntimeError("selector_func parsing not implemented")
+              else:
+                select_func = lambda P, U: True
+              def function(P, U):
+                if select_func(U):
+                  try:
+                    pipe = P.pipe_queues[pipe_name]
+                  except KeyError:
+                    error("no pipe named %r", pipe_name)
+                  else:
+                    pipe.put(U)
+                else:
+                  yield U
+              func_sig = FUNC_ONE_TO_MANY
             elif offset < len(action):
               marker = action[offset]
               if marker == ':':
@@ -631,21 +706,28 @@ def action_func(action):
                       kwargs[kw] = True
               else:
                 raise ValueError("unrecognised marker %r" % (marker,))
-          if func in many_to_many:
-            # many-to-many functions get passed straight in
-            function = many_to_many[func]
-            func_sig = FUNC_MANY_TO_MANY
-          elif func in one_to_many:
-            function = one_to_many[func]
-            func_sig = FUNC_ONE_TO_MANY
-          elif func in one_to_one:
-            function = one_to_one[func]
-            func_sig = FUNC_ONE_TO_ONE
-          elif func in one_test:
-            function = one_test[func]
-            func_sig = FUNC_SELECTOR
+          if not function:
+            if func_sig is not None:
+              raise RuntimeError("func_sig is set (%r) but function is None" % (func_sig,))
+            if func in many_to_many:
+              # many-to-many functions get passed straight in
+              function = many_to_many[func]
+              func_sig = FUNC_MANY_TO_MANY
+            elif func in one_to_many:
+              function = one_to_many[func]
+              func_sig = FUNC_ONE_TO_MANY
+            elif func in one_to_one:
+              function = one_to_one[func]
+              func_sig = FUNC_ONE_TO_ONE
+              scoped = func in one_to_one_scoped
+            elif func in one_test:
+              function = one_test[func]
+              func_sig = FUNC_SELECTOR
+            else:
+              raise ValueError("unknown action")
           else:
-            raise ValueError("unknown action named \"%s\"" % (func,))
+            if func_sig is None:
+              raise RuntimeError("function is set (%r) but func_sig is None" % (function,))
         # select URLs matching regexp
         # /regexp/
         elif action.startswith('/'):
@@ -653,8 +735,9 @@ def action_func(action):
             regexp = action[1:-1]
           else:
             regexp = action[1:]
-          kwargs['regexp'] = re.compile(regexp)
-          function = lambda U, regexp: regexp.search(U)
+          regexp = re.compile(regexp)
+          function = lambda P, U: regexp.search(U)
+          function.__name__ = '/%s/' % (regexp,)
           func_sig = FUNC_SELECTOR
         # select URLs not matching regexp
         # -/regexp/
@@ -663,13 +746,14 @@ def action_func(action):
             regexp = action[2:-1]
           else:
             regexp = action[2:]
-          kwargs['regexp'] = re.compile(regexp)
-          function = lambda U, regexp: regexp.search(U)
+          regexp = re.compile(regexp)
+          function = lambda P, U: regexp.search(U)
+          function.__name__ = '-/%s/' % (regexp,)
           func_sig = FUNC_SELECTOR
         # parent
         # ..
         elif action == '..':
-          function = lambda U, P: U.parent
+          function = lambda P, U: U.parent
           func_sig = FUNC_ONE_TO_ONE
         # select URLs ending in particular extensions
         elif action.startswith('.'):
@@ -678,9 +762,7 @@ def action_func(action):
           else:
             exts, case = action[1:], True
           exts = exts.split(',')
-          kwargs['case'] = case
-          kwargs['exts'] = exts
-          function = lambda U, exts, case: has_exts( U, exts, case_sensitive=case )
+          function = lambda P, U: has_exts( U, exts, case_sensitive=case )
           func_sig = FUNC_SELECTOR
         # select URLs not ending in particular extensions
         elif action.startswith('-.'):
@@ -689,9 +771,7 @@ def action_func(action):
           else:
             exts, case = action[2:], True
           exts = exts.split(',')
-          kwargs['case'] = case
-          kwargs['exts'] = exts
-          function = lambda U, exts, case: not has_exts( U, exts, case_sensitive=case )
+          function = lambda P, U: not has_exts( U, exts, case_sensitive=case )
           func_sig = FUNC_SELECTOR
         else:
           raise ValueError("unknown function %r" % (func,))
@@ -699,12 +779,51 @@ def action_func(action):
     if kwargs:
       function = partial(function, **kwargs)
     func0 = function
+    if scoped:
+      # the function takes (P, U) inputs and emits (P, U) outputs
+      def func1(item, *a, **kw):
+        P, U = item
+        return func0(P, U, *a, **kw)
+    else:
+      if func_sig == FUNC_SELECTOR:
+        def func1(item):
+          P, U = item
+          return func0(P, U)
+      elif func_sig == FUNC_ONE_TO_ONE:
+        def func1(item, *a, **kw):
+          P, U = item
+          return P, func0(P, U, *a, **kw)
+      elif func_sig == FUNC_ONE_TO_MANY:
+        def func1(item, *a, **kw):
+          P, U = item
+          for i in func0(P, U, *a, **kw):
+            yield P, i
+      elif func_sig == FUNC_MANY_TO_MANY:
+        def func1(items, *a, **kw):
+          if not isinstance(items, list):
+            items = list(items)
+          if items:
+            # preserve the first Pilfer context to attach to unknown items
+            P0 = items[0][0]
+            idmap = dict( [ ( id(item), item ) for item in items ] )
+            Ps = [ item[0] for item in items ]
+            Us = [ item[1] for item in items ]
+          else:
+            P0 = None
+            idmap = {}
+            Ps = []
+            Us = []
+          Us2 = func0(Ps, Us, *a, **kw)
+          Ps2 = [ idmap.get(id(U), P0) for U in Us2 ]
+          return zip(Ps2, Us2)
+      else:
+        raise RuntimeError("unhandled func_sig %r" % (func_sig,))
+
     def trace_function(*a, **kw):
-      debug("DO %s ...", action0)
+      D("DO %s(a=%r,kw=%r) ...", action0, a, kw)
       with Pfx(action0):
-        return func0(*a, **kw)
-    function = trace_function
-    return func_sig, function
+        return func1(*a, **kw)
+    return func_sig, trace_function
 
 if __name__ == '__main__':
   import sys

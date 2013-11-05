@@ -538,6 +538,7 @@ class FuncMultiQueue(object):
 
 def locked(func):
   ''' A decorator for monitor functions that must run within a lock.
+      Relies upon a ._lock attribute for locking.
   '''
   def lockfunc(self, *a, **kw):
     with self._lock:
@@ -545,7 +546,8 @@ def locked(func):
   return lockfunc
 
 def locked_property(func, lock_name='_lock', prop_name=None, unset_object=None):
-  ''' A property whose access is controlled by a lock if unset.
+  ''' A thread safe property whose value is cached.
+      The lock is taken if the value needs to computed.
   '''
   if prop_name is None:
     prop_name = '_' + func.__name__

@@ -596,7 +596,7 @@ class Later(object):
       R.call(func, *a, **kw)
     if count == 0:
       # nothing to wait for - queue the function immediately
-      warning("Later.after: len(LFs) == 0, func=%s", func.__name__)
+      debug("Later.after: len(LFs) == 0, func=%s", func.__name__)
       self._defer(put_func)
     else:
       # create a notification function which submits put_func
