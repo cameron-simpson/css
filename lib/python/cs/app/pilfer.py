@@ -310,16 +310,11 @@ class Pilfer(O):
     ''' Save the contents of the URL `U`.
     '''
     with Pfx("save_url(%s)", U):
-      if kw:
-        kws = sorted(kw.keys())
-        if len(kws) > 1:
-          raise ValueError("multiple `save' arguments: %s" % (kws,))
-        kw = kws[0]
-        if saveas is not None:
-          raise ValueError("saveas already specified (%s), illegal `save' argument: %s" % (saveas, kw))
-        saveas = kw
+      save_dir = self.user_vars.get('save_dir', '.')
       if saveas is None:
-        saveas = U.basename
+        saveas = os.path.join(save_dir, U.basename)
+        if saveas.endswith('/'):
+          saveas += 'index.html'
       if saveas == '-':
         sys.stdout.write(U.content)
         sys.stdout.flush()
@@ -329,8 +324,11 @@ class Pilfer(O):
             warning("file exists, not saving")
           else:
             content = U.content
-            with open(saveas, "wb") as savefp:
-              savefp.write(content)
+            try:
+              with open(saveas, "wb") as savefp:
+                savefp.write(content)
+            except:
+              exception("save fails")
 
   class Variables(object):
     ''' A mapping object to set or fetch user variables or URL attributes.
