@@ -549,7 +549,7 @@ one_to_one = {
       'query':        lambda P, U, *a: url_query(U, *a),
       'quote':        lambda P, U: quote(U),
       'unquote':      lambda P, U: unquote(U),
-      'save':         lambda P, U, **kw: (U, U.save_url(U, **kw))[0],
+      'save':         lambda P, U, **kw: (U, P.save_url(U, **kw))[0],
       'see':          lambda P, U: (U, P.see(U))[0],
       's':            substitute,
       'title':        lambda P, U: URL(U.title, referer=U) if U.title else U,
@@ -603,10 +603,10 @@ def action_func(action):
     if m:
       kw_var = m.group(1)
       kw_value = action[m.end():]
-      function = lambda P, U: kw_var in U.user_vars and U.user_vars[kw_var] == U.format(kw_value, U)
-      def function(U):
+      function = lambda P, U: kw_var in P.user_vars and P.user_vars[kw_var] == U.format(kw_value, U)
+      def function(P, U):
         D("compare user_vars[%s]...", kw_var)
-        uv = U.user_vars
+        uv = P.user_vars
         if kw_var not in uv:
           return False
         v = U.format(kw_value, U)
@@ -620,8 +620,8 @@ def action_func(action):
       if m:
         kw_var = m.group(1)
         kw_value = action[m.end():]
-        def function(U):
-          U.set_user_var(kw_var, kw_value, U)
+        def function(P, U):
+          P.set_user_var(kw_var, kw_value, U)
           return U
         func_sig = FUNC_ONE_TO_ONE
       else:
@@ -680,10 +680,10 @@ def action_func(action):
                 raise RuntimeError("selector_func parsing not implemented")
               else:
                 select_func = lambda P, U: True
-              def function(U):
+              def function(P, U):
                 if select_func(U):
                   try:
-                    pipe = U.pipe_queues[pipe_name]
+                    pipe = P.pipe_queues[pipe_name]
                   except KeyError:
                     error("no pipe named %r", pipe_name)
                   else:
