@@ -115,8 +115,10 @@ class WorkerThreadPool(NestingOpenCloseMixin, O):
       except:
         result = None
         exc_info = sys.exc_info()
+        D("EXCEPTION: %r", exc_info)
         log_func = warning if isinstance(exc_info[1], (TypeError, NameError, AttributeError)) else debug
         log_func("%s: worker thread: ran task: exception! %r", self, sys.exc_info())
+        raise
         # don't let exceptions go unhandled
         # if nobody is watching, raise the exception and don't return
         # this handler to the pool
