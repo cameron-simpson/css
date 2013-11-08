@@ -4,6 +4,7 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
+from threading import Condition
 from cs.debug import Lock, RLock, Thread, trace_caller
 from cs.excutils import noexc
 from cs.logutils import exception, warning, D
@@ -293,3 +294,56 @@ class PushQueue(NestingOpenCloseMixin, O):
     outQ = self.outQ
     for item in items:
       outQ.put(item)
+
+class NullQueue(NestingOpenCloseMixin, O):
+  ''' A queue-like object that discards its inputs.
+      Calls to .get() raise Queue_Empty.
+  '''
+
+  def __init__(self, blocking=False, name=None, open=False):
+    ''' Initialise the NullQueue.
+        `blocking`: if true, calls to .get() block until .shutdown().
+          Its default is False. 
+        `name`: a name for this NullQueue.
+    '''
+    if name is None:
+      name = "%s%d" % (self.__class__.__name__, seq())
+    self.name = name
+    self._lock = Lock()
+    self._close_cond = Condition(self._lock)
+    O.__init__(self)
+    NestingOpenCloseMixin.__init__(self, open=open)
+    self.blocking = blocking
+
+  def put(self, item):
+    ''' Put a value onto the Queue; it is discarded.
+    '''
+    pass
+
+  def get(self):
+    ''' Get the next value. Always raises Queue_Empty.
+        If .blocking, delay until .shutdown().
+    '''
+    if self.blocking:
+      with self._lock:
+        if not self.closed:
+          wait(self._close_cond)
+    raise Queue_Empty
+
+  def shutdown(self):
+    ''' Shut down the queue. Wakes up anything waiting on ._close_cond, such
+        as callers of .get() on a .blocking queue.
+    '''
+    with self._lock:
+      self._close_cond.notify_all()
+
+  def __iter__(self):
+    return self
+
+  def next(self):
+    try:
+      return self.get()
+    except Queue_Empty:
+      raise StopIteration
+
+NullQ = NullQueue(name='NullQ')
