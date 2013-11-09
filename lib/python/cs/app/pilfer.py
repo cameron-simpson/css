@@ -488,10 +488,6 @@ def url_query(U, *a):
   qsmap = dict( [ ( qsp.split('=', 1) if '=' in qsp else (qsp, '') ) for qsp in U.query.split('&') ] )
   yield ','.join( [ unquote(qsmap.get(qparam, '')) for qparam in a ] )
 
-def url_print_type(self, U):
-  self.print(U, U.content_type)
-  yield U
-
 def url_io(func, onerror, *a, **kw):
   ''' Call `func` and return its result.
       If it raises URLError or HTTPError, report the error and return `onerror`.
