@@ -560,13 +560,6 @@ one_to_one = {
     }
 one_to_one_scoped = ('per',)
 
-def _search_re(P, U, regexp):
-  ''' Search for `regexp` in `U`, return resulting MatchObject or None.
-      The result is also stored as `P.re` for subsequent use.
-  '''
-  m = P.re = regexp.search(U)
-  return m
-
 one_test = {
       'has_title':    lambda P, U: U.title is not None,
       'is_archive':   lambda P, U: has_exts( U, ARCHIVE_SUFFIXES ),
@@ -578,7 +571,7 @@ one_test = {
       'same_hostname':lambda P, U: notNone(U.referer, "U.referer") and U.hostname == U.referer.hostname,
       'same_scheme':  lambda P, U: notNone(U.referer, "U.referer") and U.scheme == U.referer.scheme,
       'seen':         lambda P, U: P.seen(U),
-      'select_re':    _search_re,
+      'select_re':    lambda P, U, regexp: regexp.search(U),
       'unseen':       lambda P, U: not P.seen(U),
     }
 
