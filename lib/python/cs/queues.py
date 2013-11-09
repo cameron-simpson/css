@@ -327,7 +327,7 @@ class NullQueue(NestingOpenCloseMixin, O):
     if self.blocking:
       with self._lock:
         if not self.closed:
-          wait(self._close_cond)
+          self._close_cond.wait()
     raise Queue_Empty
 
   def shutdown(self):
