@@ -30,7 +30,7 @@ from cs.fileutils import file_property
 from cs.later import Later, FUNC_ONE_TO_ONE, FUNC_ONE_TO_MANY, FUNC_SELECTOR, FUNC_MANY_TO_MANY
 from cs.lex import get_identifier
 from cs.logutils import setup_logging, logTo, Pfx, debug, error, warning, exception, trace, pfx_iter, D
-from cs.queues import IterableQueue
+from cs.queues import IterableQueue, NullQueue
 from cs.threads import locked_property
 from cs.urlutils import URL, NetrcHTTPPasswordMgr
 from cs.obj import O
@@ -117,20 +117,11 @@ def main(argv):
               error(err)
             badopts = True
           else:
-            # append a function to discard inputs
-            # to avoid filling the outQ
-            def discard(item):
-              if False:
-                yield item
-            pipe_funcs = [urlise] + pipe_funcs + [discard]
+            pipe_funcs = [urlise] + pipe_funcs
           if not badopts:
             with Later(jobs) as L:
-              inQ, outQ = L.pipeline(pipe_funcs)
-              # dispatch a consumer of the output queue
-	      # (which will be empty, but needs to be consulted to
-	      # drain the run queue)
-              consumer = Thread(name="pilfer.consumer", target=lambda: list(outQ))
-              consumer.start()
+              # construct
+              inQ, outQ = L.pipeline(pipe_funcs, outQ=NullQueue(blocking=True, open=True))
               if url != '-':
                 # literal URL supplied, deliver to pipeline
                 inQ.put(url)
@@ -164,7 +155,9 @@ def main(argv):
                       inQ.put(url)
               # indicate end of input
               inQ.close()
-              consumer.join()
+              # await processing of output
+              for item in outQ:
+                warning("MAIN: finalisation collected %r", item)
       else:
         error("unsupported op")
         badopts = True
