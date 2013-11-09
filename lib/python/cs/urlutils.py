@@ -120,10 +120,8 @@ class _URL(unicode):
       with Pfx("open(%s)", rq):
         rsp = opener.open(rq)
       H = rsp.info()
-      debug("info = %s", H)
       self._content_type = H.gettype()
       self._content = rsp.read()
-      debug("URL: content-type=%s, length=%d", self._content_type, len(self._content))
       self._parsed = None
 
   def get_content(self, onerror=None):
