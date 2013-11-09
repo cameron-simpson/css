@@ -815,8 +815,7 @@ def action_func(action):
             Ps = []
             Us = []
           Us2 = func0(Ps, Us, *a, **kw)
-          Ps2 = [ idmap.get(id(U), P0) for U in Us2 ]
-          return zip(Ps2, Us2)
+          return [ (idmap.get(id(U), P0), U) for U in Us2 ]
       else:
         raise RuntimeError("unhandled func_sig %r" % (func_sig,))
 
