@@ -210,7 +210,7 @@ def unique(items, seen=None):
 
 class PipeLine(O):
   ''' Lazy pipeline.
-      Not even instantiated unless used.
+      Not instantiated until used.
   '''
 
   def __init__(self, L, pipe_funcs):
@@ -220,6 +220,10 @@ class PipeLine(O):
 
   @locked_property
   def pipeline(self):
+    ''' Cause the instantiation of this pipeline.
+        Note that this pipeline discards its output.
+        Return an O with .inQ and .outQ attribtes.
+    '''
     inQ, outQ = self.later.pipeline(self.pipe_funcs)
     return O(inQ=inQ, outQ=outQ)
 
