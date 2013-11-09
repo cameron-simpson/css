@@ -108,6 +108,7 @@ def main(argv):
         else:
           url = argv.pop(0)
           # commence the pipeline by converting strings to URL objects
+          # and associating the initial Pilfer object as scope
           def urlise(item):
             yield P, URL(item, None, scope=P)
           pipe_funcs, errors = argv_pipefuncs(argv)
@@ -161,6 +162,7 @@ def main(argv):
                         debug("SKIP: %s", line)
                         continue
                       inQ.put(url)
+              # indicate end of input
               inQ.close()
               consumer.join()
       else:
@@ -242,7 +244,7 @@ class PilferCommon(O):
   def __init__(self):
     O.__init__(self)
     self.seen = defaultdict(set)
-    self.pipe_queues = {}
+    self.pipe_queues = {}       # mapping of names to PipeLines
     self.opener = build_opener()
     self.opener.add_handler(HTTPBasicAuthHandler(NetrcHTTPPasswordMgr()))
 
@@ -505,7 +507,7 @@ def url_io_iter(I):
       If the call raises URLError or HTTPError, report the error
       instead of aborting.
   '''
-  while 1:
+  while True:
     try:
       item = I.next()
     except StopIteration:
@@ -673,7 +675,7 @@ def action_func(action):
                 raise ValueError("no pipe name")
               if offset < len(action):
                 if marker != action[offset]:
-                  raise ValueError("expected second marker to match first: expetced %r, saw %r"
+                  raise ValueError("expected second marker to match first: expected %r, saw %r"
                                    % (marker, action[offset]))
                 offset += 1
                 raise RuntimeError("selector_func parsing not implemented")
@@ -820,7 +822,7 @@ def action_func(action):
         raise RuntimeError("unhandled func_sig %r" % (func_sig,))
 
     def trace_function(*a, **kw):
-      D("DO %s(a=%r,kw=%r) ...", action0, a, kw)
+      ##D("DO %s(a=(%d args),kw=%r): func1=%r ...", action0, len(a), kw, func1)
       with Pfx(action0):
         return func1(*a, **kw)
     return func_sig, trace_function
