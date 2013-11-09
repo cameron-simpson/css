@@ -709,7 +709,7 @@ class Later(object):
     '''
     if self.closed:
       warning("%s.pipeline after close", self)
-    return self._pipeline(filter_funcs, inputs, outQ=None)
+    return self._pipeline(filter_funcs, inputs, outQ=outQ, open=open)
 
   def _pipeline(self, filter_funcs, inputs=None, outQ=None, open=False):
     filter_funcs = list(filter_funcs)
