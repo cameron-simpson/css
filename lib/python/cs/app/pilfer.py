@@ -217,9 +217,17 @@ class PipeLine(O):
   def pipeline(self):
     ''' Cause the instantiation of this pipeline.
         Note that this pipeline discards its output.
-        Return an O with .inQ and .outQ attribtes.
+        Return an O with .inQ and .outQ attributes.
     '''
     inQ, outQ = self.later.pipeline(self.pipe_funcs)
+    return O(inQ=inQ, outQ=outQ)
+
+  def new_pipeline(self, inputs=None, outQ=None):
+    ''' Make a new instantiation of this pipeline receiving inputs
+        from `input`s and producing outputs on `outQ`.
+        Return an O with .inQ and .outQ attributes.
+    '''
+    inQ, outQ = self.later.pipeline(self.pipe_funcs, inputs=inputs, outQ=outQ)
     return O(inQ=inQ, outQ=outQ)
 
   def put(self, o):
@@ -657,8 +665,12 @@ def action_func(action):
               kwargs['regexp'] = re.compile(regexp, flags=re_flags)
               kwargs['replacement'] = repl_format
               kwargs['replace_all'] = repl_all
-            elif func == "divert":
+            elif func == "divert" or func == "pipe":
               # divert:pipe_name[:selector]
+              # pipe:pipe_name[:selector]
+              #
+              # Divert selected items to the named pipeline
+              # or filter selected items through an instance of the named pipeline.
               if offset == len(action):
                 raise ValueError("missing marker")
               marker = action[offset]
@@ -674,10 +686,13 @@ def action_func(action):
                 raise RuntimeError("selector_func parsing not implemented")
               else:
                 select_func = lambda P, U: True
+              do_divert = func == "divert"
+              if do_divert:
+                # function to divert selected items to a single named pipeline
               def function(P, U):
                 if select_func(U):
                   try:
-                    pipe = P.pipe_queues[pipe_name]
+                      pipe = P.pipe_queues[pipe_name].pipeline
                   except KeyError:
                     error("no pipe named %r", pipe_name)
                   else:
@@ -685,6 +700,25 @@ def action_func(action):
                 else:
                   yield U
               func_sig = FUNC_ONE_TO_MANY
+              else:
+                # A pipe runs all the items in this stream through
+                # an instance of the named pipeline.
+                # As such it is a many-to-many function.
+                def function(Ps, Us):
+                  try:
+                    D("pipe:%s: Ps=%r, Us=%r", pipe_name, Ps, Us)
+                    if Us:
+                      P = Ps[0]
+                      PL = P.pipe_queues[pipe_name].new_pipeline(inputs=zip(Ps, Us))
+                      D("pipe:%s: PL=%r", pipe_name, PL)
+                      for U in PL.outQ:
+                        D("pipe:%s: yield %r", pipe_name, U)
+                        yield U
+                      D("pipe:%s: COMPLETE", pipe_name)
+                  except Exception as e:
+                    exception("pipe: %s", e)
+                    raise
+                func_sig = FUNC_MANY_TO_MANY
             elif offset < len(action):
               marker = action[offset]
               if marker == ':':
