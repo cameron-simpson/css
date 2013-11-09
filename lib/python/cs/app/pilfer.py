@@ -529,10 +529,10 @@ def url_srcs(U, referrer=None):
 
 # actions that work on the whole list of in-play URLs
 many_to_many = {
-      'sort':         lambda Us, *a, **kw: sorted(Us, *a, **kw),
-      'unique':       lambda Us: unique(Us),
-      'first':        lambda Us: Us[:1],
-      'last':         lambda Us: Us[-1:],
+      'sort':         lambda Ps, Us, *a, **kw: sorted(Us, *a, **kw),
+      'unique':       lambda Ps, Us: unique(Us),
+      'first':        lambda Ps, Us: Us[:1],
+      'last':         lambda Ps, Us: Us[-1:],
     }
 
 one_to_many = {
