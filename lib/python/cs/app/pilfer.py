@@ -503,24 +503,32 @@ def url_io(func, onerror, *a, **kw):
     warning("%s", e)
     return onerror
 
-def url_io_iter(iter):
-  ''' Iterator over `iter` and yield its values.
-      If it raises URLError or HTTPError, report the error.
+def url_io_iter(I):
+  ''' Generator that calls `I.next()` until StopIteration, yielding
+      its values.
+      If the call raises URLError or HTTPError, report the error
+      instead of aborting.
   '''
   while 1:
     try:
-      i = iter.next()
+      item = I.next()
     except StopIteration:
       break
     except (URLError, HTTPError) as e:
       warning("%s", e)
     else:
-      yield i
+      yield item
 
 def url_hrefs(U, referrer=None):
+  ''' Yield the HREFs referenced by a URL.
+      Conceals URLError, HTTPError.
+  '''
   return url_io_iter(URL(U, referrer).hrefs(absolute=True))
 
 def url_srcs(U, referrer=None):
+  ''' Yield the SRCs referenced by a URL.
+      Conceals URLError, HTTPError.
+  '''
   return url_io_iter(URL(U, referrer).srcs(absolute=True))
 
 # actions that work on the whole list of in-play URLs
