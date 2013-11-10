@@ -97,7 +97,7 @@ def main(argv):
   else:
     op = argv.pop(0)
     if op.startswith('http://') or op.startswith('https://') :
-      # infer missing "url" op word
+      # push the URL back and infer missing "url" op word
       argv.insert(0, op)
       op ='url'
     with Pfx(op):
