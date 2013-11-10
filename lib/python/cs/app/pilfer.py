@@ -30,7 +30,7 @@ from cs.fileutils import file_property
 from cs.later import Later, FUNC_ONE_TO_ONE, FUNC_ONE_TO_MANY, FUNC_SELECTOR, FUNC_MANY_TO_MANY
 from cs.lex import get_identifier
 from cs.logutils import setup_logging, logTo, Pfx, debug, error, warning, exception, trace, pfx_iter, D
-from cs.queues import IterableQueue, NullQueue
+from cs.queues import IterableQueue, NullQueue, NullQ
 from cs.threads import locked_property
 from cs.urlutils import URL, NetrcHTTPPasswordMgr
 from cs.obj import O
@@ -107,25 +107,53 @@ def main(argv):
           badopts = True
         else:
           url = argv.pop(0)
-          # commence the pipeline by converting strings to URL objects
-          # and associating the initial Pilfer object as scope
-          def urlise(item):
-            yield P, URL(item, None, scope=P)
-          pipe_funcs, errors = argv_pipefuncs(argv)
+
+          # load any named pipeline definitions on the command line
+          while True:
+            pipe_name, pipe_funcs, argv2, errors = get_pipeline_spec(argv)
+            if pipe_name is None:
+              if errors:
+                raise RuntimeError("pipe_name is None but errors=%r", errors)
+              if pipe_funcs:
+                raise RuntimeError("pipe_name is None but pipe_funcs=%r", pipe_funcs)
+              break
+            argv = argv2
+            with Pfx("pipe %s", pipe_name):
+              if errors:
+                badopts = True
+                for err in errors:
+                  error(err)
+              else:
+                pipe_funcs
+                try:
+                  P.add_pipeline(pipe_name, pipe_funcs)
+                except KeyError as e:
+                  error("add_pipeline: %s", e)
+                  badopts = True
+
+          # gather up the remaining definition as the runing pipeline
+          pipe_funcs, errors = argv_pipefuncs(argv2)
+
+          # report accumulated errors and set badopts
           if errors:
             for err in errors:
               error(err)
             badopts = True
-          else:
-            pipe_funcs = [urlise] + pipe_funcs
           if not badopts:
             with Later(jobs) as L:
-              # construct
+              P.later = L
+              # commence the main pipeline by converting strings to URL objects
+              # and associating the initial Pilfer object as scope
+              def add_scope(U):
+                return P, URL(U, None, scope=P)
+              pipe_funcs.insert(0, (FUNC_ONE_TO_ONE, add_scope))
+              # construct the pipeline
               inQ, outQ = L.pipeline(pipe_funcs, outQ=NullQueue(blocking=True, open=True))
               if url != '-':
                 # literal URL supplied, deliver to pipeline
                 inQ.put(url)
               else:
+                # read URLs from stdin
                 try:
                   do_prompt = sys.stdin.isatty()
                 except AttributeError:
@@ -172,6 +200,7 @@ def argv_pipefuncs(argv):
   ''' Process command line strings and return a corresponding list
       of functions to construct a Later.pipeline.
   '''
+  debug("argv_pipefuncs(%r)", argv)
   errors = []
   pipe_funcs = []
   for action in argv:
@@ -182,6 +211,45 @@ def argv_pipefuncs(argv):
     else:
       pipe_funcs.append( (func_sig, function) )
   return pipe_funcs, errors
+
+def get_pipeline_spec(argv):
+  ''' Parse a leading pipeline specification from the list of strings `argv`.
+      Return (pipe_name, pipe_funcs, argv2, errors) where pipe_name is the
+      name of the pipe specification, pipe_funcs is a list of
+      (func_sig, function) pairs and `argv2` is the remaining list.
+      If there is no leading pipeline specification return None for
+      pipe_name and pipe_funcs.
+      Return parse errors in `errors`.
+  '''
+  errors = []
+  pipe_name = None
+  pipe_funcs = None
+  if not argv:
+    # no arguments, no spec
+    argv2 = argv
+  else:
+    arg = argv[0]
+    if not arg.endswith(':{'):
+      # not a start-of-spec
+      argv2 = argv
+    else:
+      pipe_name, offset = get_identifier(arg)
+      if not pipe_name or offset != len(arg)-2:
+        # still not a start-of-spec
+        argv2 = argv
+      else:
+        with Pfx(arg):
+          # started with "foo:{"; gather spec until "}"
+          for i in range(1, len(argv)):
+            if argv[i] == '}':
+              pipe_funcs, pferrors = argv_pipefuncs(argv[1:i])
+              errors.extend(pferrors)
+              argv2 = argv[i+1:]
+              break
+          if pipe_funcs is None:
+            errors.append('%s: missing closing "}"' % (arg,))
+            argv2 = argv[1:]
+  return pipe_name, pipe_funcs, argv2, errors
 
 def notNone(v, name="value"):
   if v is None:
@@ -204,14 +272,15 @@ def unique(items, seen=None):
       seen.add(I)
 
 class PipeLine(O):
-  ''' Lazy pipeline.
-      Not instantiated until used.
+  ''' Pipeline description.
+      It has a .pipeline property initialised at need; its value has a .inQ and .outQ
   '''
 
-  def __init__(self, L, pipe_funcs):
+  def __init__(self, name, pipe_funcs, P):
     self._lock = Lock()
-    self.later = L
+    self.name = name
     self.pipe_funcs = pipe_funcs
+    self.pilfer = P
 
   @locked_property
   def pipeline(self):
@@ -219,7 +288,7 @@ class PipeLine(O):
         Note that this pipeline discards its output.
         Return an O with .inQ and .outQ attributes.
     '''
-    inQ, outQ = self.later.pipeline(self.pipe_funcs)
+    inQ, outQ = self.pilfer.later.pipeline(self.pipe_funcs, outQ=NullQueue(blocking=True))
     return O(inQ=inQ, outQ=outQ)
 
   def new_pipeline(self, inputs=None, outQ=None):
@@ -227,7 +296,7 @@ class PipeLine(O):
         from `input`s and producing outputs on `outQ`.
         Return an O with .inQ and .outQ attributes.
     '''
-    inQ, outQ = self.later.pipeline(self.pipe_funcs, inputs=inputs, outQ=outQ)
+    inQ, outQ = self.pilfer.later.pipeline(self.pipe_funcs, inputs=inputs, outQ=outQ)
     return O(inQ=inQ, outQ=outQ)
 
   def put(self, o):
@@ -241,6 +310,9 @@ class PipeLine(O):
       pipe.outQ.close()
 
 class PilferCommon(O):
+  ''' Common state associated with all Pilfers.
+      Pipeline definitions, seen sets, etc.
+  '''
 
   def __init__(self):
     O.__init__(self)
@@ -285,6 +357,12 @@ class Pilfer(O):
   @property
   def pipe_queues(self):
     return self._shared.pipe_queues
+
+  def add_pipeline(self, pipe_name, pipe_funcs):
+    pqs = self.pipe_queues
+    if pipe_name in pqs:
+      raise KeyError("pipe %r already defined" % (pipe_name,))
+    pqs[pipe_name] = PipeLine(pipe_name, pipe_funcs, self)
 
   def _print(self, *a, **kw):
     file = kw.pop('file', None)
@@ -689,17 +767,17 @@ def action_func(action):
               do_divert = func == "divert"
               if do_divert:
                 # function to divert selected items to a single named pipeline
-              def function(P, U):
-                if select_func(U):
-                  try:
+                def function(P, U):
+                  if select_func(U):
+                    try:
                       pipe = P.pipe_queues[pipe_name].pipeline
-                  except KeyError:
-                    error("no pipe named %r", pipe_name)
+                    except KeyError:
+                      error("no pipe named %r", pipe_name)
+                    else:
+                      pipe.put(U)
                   else:
-                    pipe.put(U)
-                else:
-                  yield U
-              func_sig = FUNC_ONE_TO_MANY
+                    yield U
+                func_sig = FUNC_ONE_TO_MANY
               else:
                 # A pipe runs all the items in this stream through
                 # an instance of the named pipeline.
