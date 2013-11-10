@@ -768,7 +768,7 @@ def action_func(action):
               if do_divert:
                 # function to divert selected items to a single named pipeline
                 def function(P, U):
-                  if select_func(U):
+                  if select_func(P, U):
                     try:
                       pipe = P.pipe_queues[pipe_name].pipeline
                     except KeyError:
