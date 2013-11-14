@@ -774,7 +774,7 @@ def action_func(action):
                     except KeyError:
                       error("no pipe named %r", pipe_name)
                     else:
-                      pipe.put(U)
+                      pipe.inQ.put( (P, U) )
                   else:
                     yield U
                 func_sig = FUNC_ONE_TO_MANY
