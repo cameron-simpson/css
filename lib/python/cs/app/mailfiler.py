@@ -263,6 +263,7 @@ class Filer(O):
           exception("saving to %r: %s", target, e)
           ok = False
 
+    self.logflush()
     return ok
 
   @property
@@ -289,13 +290,25 @@ class Filer(O):
   def logto(self, logfilepath):
     ''' Direct log messages to the supplied `logfilepath`.
     '''
-    if self._log:
-      self._log.close()
-      self._log = None
+    if self._log and self._log_path == logfilepath:
+      return
+    self.logclose()
     try:
       self._log = io.open(logfilepath, "a", encoding='utf-8')
     except OSError as e:
       self.log("open(%s): %s" % (logfilepath, e))
+    else:
+      self._log_path = logfilepath
+
+  def logflush(self):
+    if self._log:
+      self._log.flush()
+
+  def logclose(self):
+    if self._log:
+      self._log.close()
+      self._log = None
+      self._log_path = None
 
   @property
   def groups(self):
