@@ -113,7 +113,9 @@ def main(argv, stdin=None):
                                  delay=delay,
                                  no_remove=no_remove,
                                  maildb_path=os.environ['MAILDB'],
-                                 maildir_cache={})
+                                 maildir_cache={},
+                                 msgiddb_path=os.environ.get('MESSAGEIDDB', envsub('$HOME/var/msgiddb.csv')),
+                                )
       maildirs = [ WatchedMaildir(mdirpath,
                                   filter_modes=filter_modes,
                                   rules_path=envsub(
@@ -162,6 +164,7 @@ class FilterModes(O):
     self._O_omit = ('maildir_cache',)
     self._maildb_path = kw.pop('maildb_path')
     self._maildb_lock = Lock()
+    self._msgiddb_path = kw.pop('msgiddb_path')
     O.__init__(self, **kw)
 
   @file_property
@@ -171,6 +174,10 @@ class FilterModes(O):
 
   def maildir(self, mdirname, environ=None):
     return maildir_from_name(mdirname, environ['MAILDIR'], self.maildir_cache)
+
+  @locked_property
+  def msgiddb(self):
+    return NodeDBFromURL(self._msgiddb_path)
 
 class Filer(O):
   ''' A message filing object, filtering state information used during rule evaluation.
