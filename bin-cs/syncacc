@@ -5,13 +5,23 @@
 #	- Cameron Simpson <cs@zip.com.au> 29jun2004
 #
 
+set -ue
+
+trace=set-x
+
 cmd=$0
 usage="Usage: $cmd from to [rsync-options...]"
 
 syncset=acc
+exclude='.*.swp *~ *.tmp CVS/ *.pyc'
 
 [ $# -ge 2 ] || { echo "$usage" >&2; exit 2; }
 from=$1 to=$2; shift; shift
+
+case "$to" in
+  *:)   tohosts=`expr "x$to" : 'x\(.*\):'` ;;
+  *)    tohosts= ;;
+esac
 
 case "$syncset" in
   /* | ./* | ../* ) ;;
@@ -22,8 +32,29 @@ cd || exit 1
 
 stripslashes=`shqstr sed '/\/$/d; /^\.L\.\.[Tt]\.\.\.\.\.\. .* -> /d'`
 
-filter_fd 1 "$stripslashes" \
-  mrsync -rlptHCi --delete --exclude=CVS/ --exclude=\*.swp --exclude=\*~ \
-        "--include-from=$syncset" \
+# dosync files_from from to
+dosync()
+{ [ $# -ge 3 ] || { echo "$cmd: dosync expects at least 3 args" >&2; exit 1; }
+  _ds_files=$1
+  _ds_from=$2
+  _ds_to=$3
+  shift; shift; shift
+
+  $trace \
+    mrsync -rlptOHCi --delete \
+        "--files-from=$_ds_files" \
+        '--exclude=.*.swp' \
+        '--exclude=*~' \
+        '--exclude=*.tmp' \
+        '--exclude=CVS/' \
+        '--exclude=*.pyc' \
         ${1+"$@"} \
-        "$from." "$to."
+        "$_ds_from." "$_ds_to."
+}
+
+dosync "$syncset" "$from" "$to" ${1+"$@"}
+for host in $(hostlist "$tohosts")
+do
+  ss=$syncset-$host
+  [ ! -s "$ss" ] || dosync "$ss" "$from" "$host:" ${1+"$@"}
+done
