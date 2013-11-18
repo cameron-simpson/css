@@ -731,17 +731,33 @@ class Condition_InGroups(_Condition):
     self.group_names = group_names
 
   def test_value(self, filer, header_name, header_value):
-    for address in filer.addresses(header_name):
-      for group_name in self.group_names:
-        if group_name.startswith('@'):
-          # address ending in @foo
-          if address.endswith(group_name):
-            debug("match %s to %s", address, group_name)
+    if header_name.lower() == 'message-id':
+      msgiddb = self.filer.msgiddb
+      msgids = [ v for v in header_value.split() if v ]
+      for msgid in msgids:
+        looked = False
+        for group_name in self.group_names:
+          if group_name.startswith('@'):
+            if msgid.endswith(groupname+'>'):
+              return True
+          else:
+            if not looked:
+              msgid_node = msgiddb.get( ('MESSAGE_ID', msgid) )
+            if msgid_node:
+              if group_name in msgid_node.GROUPs:
+                return True
+    else:
+      for address in filer.addresses(header_name):
+        for group_name in self.group_names:
+          if group_name.startswith('@'):
+            # address ending in @foo
+            if address.endswith(group_name):
+              debug("match %s to %s", address, group_name)
+              return True
+          elif address.lower() in filer.group(group_name):
+            # address in group "foo"
+            debug("match %s to (%s)", address, group_name)
             return True
-        elif address.lower() in filer.group(group_name):
-          # address in group "foo"
-          debug("match %s to (%s)", address, group_name)
-          return True
     return False
 
 class Condition_HeaderFunction(_Condition):
