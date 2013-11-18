@@ -270,6 +270,10 @@ class Filer(O):
   def maildb(self):
     return self.filter_modes.maildb
 
+  @property
+  def msgiddb(self):
+    return self.filter_modes.msgiddb
+
   def maildir(self, mdirpath):
     return self.filter_modes.maildir(mdirpath, self.environ)
 
