@@ -359,6 +359,11 @@ class Filer(O):
       if target.startswith('|'):
         shcmd = target[1:]
         return self.save_to_pipe(['/bin/sh', '-c', shcmd])
+      elif target.startswith('+'):
+        m = re_ADDHEADER.match(target)
+        hdr = m.group(1)
+        group_names = m.group(2).split(',')
+        return self.save_header(hdr, group_names)
       elif '@' in target:
         return self.sendmail(target)
       else:
@@ -374,6 +379,18 @@ class Filer(O):
           return self.save_to_maildir(mdir,
                                       flags=maildir_flags)
         return self.save_to_mbox(mailpath)
+
+  def save_header(self, hdr, group_names):
+    with Pfx("save_header(%s, %r)", hdr, group_names):
+      if hdr in ('message-id', 'references', 'in-reply-to'):
+        msgids = self.message[hdr].split()
+        for msgid in msgids:
+          debug("%s.GROUPs.update(%r)", msgid, group_names)
+          msgid_node = self.msgiddb.make( ('MESSAGE_ID', msgid) )
+          msgid_node.GROUPs.update(group_names)
+      else:
+        debug("%s.GROUPs.update(%r)", msgid, group_names)
+        raise RuntimeError("need to pull addresses from hdr and add to address groups")
 
   def save_to_maildir(self, mdir, flags=''):
     ''' Save the current message to a Maildir unless we have already saved to
