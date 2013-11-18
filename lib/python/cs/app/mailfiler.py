@@ -475,8 +475,16 @@ re_INGROUP_s = r'\(\s*%s(\s*\|\s*%s)*\s*\)' % (re_WORD_or_DOM_s,
 ## print("re_INGROUP = %r" % (re_INGROUP_s), file=sys.stderr)
 re_INGROUP = re.compile( re_INGROUP_s, re.I)
 
+re_HEADERNAME_s = r'[a-z][\-a-z0-9]*'
+
 # header[,header,...].func(
-re_HEADERFUNCTION = re.compile(r'([a-z][\-a-z0-9]*(,[a-z][\-a-z0-9]*)*)\.([a-z][_a-z0-9]*)\(', re.I)
+re_HEADERFUNCTION_s = r'(%s(,%s)*)\.(%s)\(' % (re_HEADERNAME_s, re_HEADERNAME_s, re_WORD_s)
+re_HEADERFUNCTION = re.compile(re_HEADERFUNCTION_s, re.I)
+
+# target syntax: add header values to named groups
+# +header(group|...)
+re_ADDHEADER_s = r'\+(%s)(%s)' % (re_HEADERNAME_s, re_INGROUP_s)
+re_ADDHEADER = re.compile(re_ADDHEADER_s, re.I)
 
 def parserules(fp):
   ''' Read rules from `fp`, yield Rules.
