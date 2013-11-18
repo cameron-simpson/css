@@ -735,15 +735,12 @@ class Condition_InGroups(_Condition):
       msgiddb = self.filer.msgiddb
       msgids = [ v for v in header_value.split() if v ]
       for msgid in msgids:
-        looked = False
+        msgid_node = msgiddb.get( ('MESSAGE_ID', msgid) )
         for group_name in self.group_names:
           if group_name.startswith('@'):
             if msgid.endswith(groupname+'>'):
               return True
-          else:
-            if not looked:
-              msgid_node = msgiddb.get( ('MESSAGE_ID', msgid) )
-            if msgid_node:
+          elif msgid_node:
               if group_name in msgid_node.GROUPs:
                 return True
     else:
