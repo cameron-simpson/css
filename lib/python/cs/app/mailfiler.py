@@ -731,7 +731,7 @@ class Condition_InGroups(_Condition):
     self.group_names = group_names
 
   def test_value(self, filer, header_name, header_value):
-    if header_name.lower() == 'message-id':
+    if header_name.lower() in ('message-id', 'references', 'in-reply-to'):
       msgiddb = self.filer.msgiddb
       msgids = [ v for v in header_value.split() if v ]
       for msgid in msgids:
