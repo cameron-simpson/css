@@ -739,9 +739,11 @@ class Condition_InGroups(_Condition):
         for group_name in self.group_names:
           if group_name.startswith('@'):
             if msgid.endswith(groupname+'>'):
+              debug("match %s to %s", msgid, group_name)
               return True
           elif msgid_node:
               if group_name in msgid_node.GROUPs:
+                debug("match %s to (%s)", msgid, group_name)
                 return True
     else:
       for address in filer.addresses(header_name):
