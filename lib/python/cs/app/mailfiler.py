@@ -674,6 +674,14 @@ def get_targets(s, offset):
   while offset < len(s) and not s[offset].isspace():
     if s[offset] == '"':
       target, offset = get_qstr(s, offset)
+    elif s[offset ] == '+':
+      m = re_ADDHEADER.match(s, offset)
+      if m:
+        target = m.group()
+        offset = m.end()
+      else:
+        error("parse failure, expected +header(groups) at %d: %s", offset, s)
+        raise ValueError("syntax error")
     else:
       m = re_UNQWORD.match(s, offset)
       if m:
