@@ -941,7 +941,8 @@ def action_func(action):
         raise RuntimeError("unhandled func_sig %r" % (func_sig,))
 
     def trace_function(*a, **kw):
-      ##D("DO %s(a=(%d args),kw=%r): func1=%r ...", action0, len(a), kw, func1)
+      ##D("DO %s(a=(%d args; %r),kw=%r)", action0, len(a), a, kw)
+      ##D("   funcPU<%s:%d>=%r %r ...", funcPU.func_code.co_filename, funcPU.func_code.co_firstlineno, funcPU, dir(funcPU))
       with Pfx(action0):
         warning("TEST1")
         try:
