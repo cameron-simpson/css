@@ -531,7 +531,7 @@ def with_exts(urls, suffixes, case_sensitive=False):
     else:
       debug("with_exts: discard %s", U)
 
-def substitute(P, src, regexp, replacement, replace_all):
+def substitute( (P, src), regexp, replacement, replace_all):
   ''' Perform a regexp substitution on `src`.
       `replacement` is a format string for the replacement text
       using the str.format method.
@@ -617,47 +617,47 @@ many_to_many = {
     }
 
 one_to_many = {
-      'hrefs':        lambda P, U, *a: url_hrefs(U, *a),
-      'images':       lambda P, U, *a: with_exts(url_hrefs(U, *a), IMAGE_SUFFIXES ),
-      'iimages':      lambda P, U, *a: with_exts(url_srcs(U, *a), IMAGE_SUFFIXES ),
-      'srcs':         lambda P, U, *a: url_srcs(U, *a),
-      'xml':          lambda P, U, match: url_xml_find(U, match),
-      'xmltext':      lambda P, U, match: XML(U).findall(match),
+      'hrefs':        lambda (P, U), *a: url_hrefs(U, *a),
+      'images':       lambda (P, U), *a: with_exts(url_hrefs(U, *a), IMAGE_SUFFIXES ),
+      'iimages':      lambda (P, U), *a: with_exts(url_srcs(U, *a), IMAGE_SUFFIXES ),
+      'srcs':         lambda (P, U), *a: url_srcs(U, *a),
+      'xml':          lambda (P, U), match: url_xml_find(U, match),
+      'xmltext':      lambda (P, U), match: XML(U).findall(match),
     }
 
 # actions that work on individual URLs
 one_to_one = {
-      '..':           lambda P, U: URL(U, None).parent,
-      'delay':        lambda P, U, delay: (U, sleep(float(delay)))[0],
-      'domain':       lambda P, U: URL(U, None).domain,
-      'hostname':     lambda P, U: URL(U, None).hostname,
-      'per':          lambda P, U: (copy(P), U),
-      'print':        lambda P, U, **kw: (U, P.print_url_string(U, **kw))[0],
-      'query':        lambda P, U, *a: url_query(U, *a),
-      'quote':        lambda P, U: quote(U),
-      'unquote':      lambda P, U: unquote(U),
-      'save':         lambda P, U, **kw: (U, P.save_url(U, **kw))[0],
-      'see':          lambda P, U: (U, P.see(U))[0],
+      '..':           lambda (P, U): URL(U, None).parent,
+      'delay':        lambda (P, U), delay: (U, sleep(float(delay)))[0],
+      'domain':       lambda (P, U): URL(U, None).domain,
+      'hostname':     lambda (P, U): URL(U, None).hostname,
+      'per':          lambda (P, U): (copy(P), U),
+      'print':        lambda (P, U), **kw: (U, P.print_url_string(U, **kw))[0],
+      'query':        lambda (P, U), *a: url_query(U, *a),
+      'quote':        lambda (P, U): quote(U),
+      'unquote':      lambda (P, U): unquote(U),
+      'save':         lambda (P, U), **kw: (U, P.save_url(U, **kw))[0],
+      'see':          lambda (P, U): (U, P.see(U))[0],
       's':            substitute,
-      'title':        lambda P, U: U.title,
-      'type':         lambda P, U: url_io(U.content_type, ""),
-      'xmlattr':      lambda P, U, attr: [ A for A in (ElementTree.XML(U).get(attr),) if A is not None ],
+      'title':        lambda (P, U): U.title,
+      'type':         lambda (P, U): url_io(U.content_type, ""),
+      'xmlattr':      lambda (P, U), attr: [ A for A in (ElementTree.XML(U).get(attr),) if A is not None ],
     }
 one_to_one_scoped = ('per',)
 
 one_test = {
-      'has_title':    lambda P, U: U.title is not None,
-      'is_archive':   lambda P, U: has_exts( U, ARCHIVE_SUFFIXES ),
-      'is_archive':   lambda P, U: has_exts( U, ARCHIVE_SUFFIXES ),
-      'is_image':     lambda P, U: has_exts( U, IMAGE_SUFFIXES ),
-      'is_video':     lambda P, U: has_exts( U, VIDEO_SUFFIXES ),
-      'reject_re':    lambda P, U, regexp: not regexp.search(U),
-      'same_domain':  lambda P, U: notNone(U.referer, "U.referer") and U.domain == U.referer.domain,
-      'same_hostname':lambda P, U: notNone(U.referer, "U.referer") and U.hostname == U.referer.hostname,
-      'same_scheme':  lambda P, U: notNone(U.referer, "U.referer") and U.scheme == U.referer.scheme,
-      'seen':         lambda P, U: P.seen(U),
-      'select_re':    lambda P, U, regexp: regexp.search(U),
-      'unseen':       lambda P, U: not P.seen(U),
+      'has_title':    lambda (P, U): U.title is not None,
+      'is_archive':   lambda (P, U): has_exts( U, ARCHIVE_SUFFIXES ),
+      'is_archive':   lambda (P, U): has_exts( U, ARCHIVE_SUFFIXES ),
+      'is_image':     lambda (P, U): has_exts( U, IMAGE_SUFFIXES ),
+      'is_video':     lambda (P, U): has_exts( U, VIDEO_SUFFIXES ),
+      'reject_re':    lambda (P, U), regexp: not regexp.search(U),
+      'same_domain':  lambda (P, U): notNone(U.referer, "U.referer") and U.domain == U.referer.domain,
+      'same_hostname':lambda (P, U): notNone(U.referer, "U.referer") and U.hostname == U.referer.hostname,
+      'same_scheme':  lambda (P, U): notNone(U.referer, "U.referer") and U.scheme == U.referer.scheme,
+      'seen':         lambda (P, U): P.seen(U),
+      'select_re':    lambda (P, U), regexp: regexp.search(U),
+      'unseen':       lambda (P, U): not P.seen(U),
     }
 
 re_COMPARE = re.compile(r'([a-z]\w*)==')
@@ -671,7 +671,7 @@ def action_func(action):
   '''
   function = None
   func_sig = None
-  scoped = False
+  scoped = False        # function output is (P,U), not just U
   kwargs = {}
   # parse action into function and kwargs
   with Pfx("%s", action):
@@ -683,7 +683,7 @@ def action_func(action):
     if m:
       kw_var = m.group(1)
       kw_value = action[m.end():]
-      function = lambda P, U: kw_var in P.user_vars and P.user_vars[kw_var] == U.format(kw_value, U)
+      function = lambda (P, U): kw_var in P.user_vars and P.user_vars[kw_var] == U.format(kw_value, U)
       def function(P, U):
         D("compare user_vars[%s]...", kw_var)
         uv = P.user_vars
@@ -763,10 +763,11 @@ def action_func(action):
                 offset += 1
                 raise RuntimeError("selector_func parsing not implemented")
               else:
-                select_func = lambda P, U: True
+                select_func = lambda (P, U): True
               do_divert = func == "divert"
               if do_divert:
                 # function to divert selected items to a single named pipeline
+                func_sig = FUNC_ONE_TO_MANY
                 def function(P, U):
                   if select_func(P, U):
                     try:
@@ -777,11 +778,12 @@ def action_func(action):
                       pipe.inQ.put( (P, U) )
                   else:
                     yield U
-                func_sig = FUNC_ONE_TO_MANY
               else:
                 # A pipe runs all the items in this stream through
                 # an instance of the named pipeline.
                 # As such it is a many-to-many function.
+                scoped = True
+                func_sig = FUNC_MANY_TO_MANY
                 def function(Ps, Us):
                   try:
                     D("pipe:%s: Ps=%r, Us=%r", pipe_name, Ps, Us)
@@ -796,7 +798,6 @@ def action_func(action):
                   except Exception as e:
                     exception("pipe: %s", e)
                     raise
-                func_sig = FUNC_MANY_TO_MANY
             elif offset < len(action):
               marker = action[offset]
               if marker == ':':
@@ -844,7 +845,7 @@ def action_func(action):
           else:
             regexp = action[1:]
           regexp = re.compile(regexp)
-          function = lambda P, U: regexp.search(U)
+          function = lambda (P, U): regexp.search(U)
           function.__name__ = '/%s/' % (regexp,)
           func_sig = FUNC_SELECTOR
         # select URLs not matching regexp
@@ -855,13 +856,13 @@ def action_func(action):
           else:
             regexp = action[2:]
           regexp = re.compile(regexp)
-          function = lambda P, U: regexp.search(U)
+          function = lambda (P, U): regexp.search(U)
           function.__name__ = '-/%s/' % (regexp,)
           func_sig = FUNC_SELECTOR
         # parent
         # ..
         elif action == '..':
-          function = lambda P, U: U.parent
+          function = lambda (P, U): U.parent
           func_sig = FUNC_ONE_TO_ONE
         # select URLs ending in particular extensions
         elif action.startswith('.'):
@@ -870,7 +871,7 @@ def action_func(action):
           else:
             exts, case = action[1:], True
           exts = exts.split(',')
-          function = lambda P, U: has_exts( U, exts, case_sensitive=case )
+          function = lambda (P, U): has_exts( U, exts, case_sensitive=case )
           func_sig = FUNC_SELECTOR
         # select URLs not ending in particular extensions
         elif action.startswith('-.'):
@@ -879,7 +880,7 @@ def action_func(action):
           else:
             exts, case = action[2:], True
           exts = exts.split(',')
-          function = lambda P, U: not has_exts( U, exts, case_sensitive=case )
+          function = lambda (P, U): not has_exts( U, exts, case_sensitive=case )
           func_sig = FUNC_SELECTOR
         else:
           raise ValueError("unknown function %r" % (func,))
@@ -887,27 +888,34 @@ def action_func(action):
     if kwargs:
       function = partial(function, **kwargs)
     func0 = function
+    # The pipeline itself passes (P, U) item tuples.
+    #
+    # All function accept a leading (P, U) tuple argument but emit only a U
+    # result (or just a Booleans for selectors). Therefore, unless "scoped"
+    # is true, we wrap each non-selector function to preserve the P component
+    # in the output.
+    #
     if scoped:
-      # the function takes (P, U) inputs and emits (P, U) outputs
-      def func1(item, *a, **kw):
-        P, U = item
-        return func0(P, U, *a, **kw)
+      funcPU = func0
     else:
       if func_sig == FUNC_SELECTOR:
-        def func1(item):
-          P, U = item
-          return func0(P, U)
+        funcPU = func0
       elif func_sig == FUNC_ONE_TO_ONE:
-        def func1(item, *a, **kw):
+        def funcPU(item, *a, **kw):
           P, U = item
-          return P, func0(P, U, *a, **kw)
+          return P, func0(item, *a, **kw)
       elif func_sig == FUNC_ONE_TO_MANY:
-        def func1(item, *a, **kw):
+        def funcPU(item, *a, **kw):
           P, U = item
-          for i in func0(P, U, *a, **kw):
+          for i in func0(item, *a, **kw):
             yield P, i
       elif func_sig == FUNC_MANY_TO_MANY:
-        def func1(items, *a, **kw):
+        # Many-to-many functions are different.
+        # We split out the Ps and Us from the input items
+        # and re-attach the P components by reverse mapping from the U results;
+        # unrecognised Us get associated with Ps[0].
+        #
+        def funcPU(items, *a, **kw):
           if not isinstance(items, list):
             items = list(items)
           if items:
@@ -929,7 +937,15 @@ def action_func(action):
     def trace_function(*a, **kw):
       ##D("DO %s(a=(%d args),kw=%r): func1=%r ...", action0, len(a), kw, func1)
       with Pfx(action0):
-        return func1(*a, **kw)
+        warning("TEST1")
+        try:
+          retval = funcPU(*a, **kw)
+        except Exception as e:
+          exception("TRACE: EXCEPTION: %s", e)
+          raise
+        ##D("DO %s: retval = %r", action0, retval)
+        return retval
+
     return func_sig, trace_function
 
 if __name__ == '__main__':
