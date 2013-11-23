@@ -779,6 +779,10 @@ def action_func(action):
                   else:
                     yield U
               else:
+                ## TODO: present as a one-to-many function
+                ##       yielding nothing but putting each
+                ##       item onto the pipeline
+                ##
                 # A pipe runs all the items in this stream through
                 # an instance of the named pipeline.
                 # As such it is a many-to-many function.
