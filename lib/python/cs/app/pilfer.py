@@ -124,7 +124,6 @@ def main(argv):
                 for err in errors:
                   error(err)
               else:
-                pipe_funcs
                 try:
                   P.add_pipeline(pipe_name, pipe_funcs)
                 except KeyError as e:
