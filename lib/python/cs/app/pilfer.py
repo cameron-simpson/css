@@ -636,7 +636,7 @@ one_to_one = {
       'query':        lambda (P, U), *a: url_query(U, *a),
       'quote':        lambda (P, U): quote(U),
       'unquote':      lambda (P, U): unquote(U),
-      'save':         lambda (P, U), **kw: (U, P.save_url(U, **kw))[0],
+      'save':         lambda (P, U), *a, **kw: (U, P.save_url(U, *a, **kw))[0],
       'see':          lambda (P, U): (U, P.see(U))[0],
       's':            substitute,
       'title':        lambda (P, U): U.title,
@@ -672,6 +672,7 @@ def action_func(action):
   function = None
   func_sig = None
   scoped = False        # function output is (P,U), not just U
+  args = []             # collect foo and foo=bar operator arguments
   kwargs = {}
   # parse action into function and kwargs
   with Pfx("%s", action):
@@ -818,7 +819,7 @@ def action_func(action):
                       kw, v = kw.split('=', 1)
                       kwargs[kw] = v
                     else:
-                      kwargs[kw] = True
+                      args.append(kw)
               else:
                 raise ValueError("unrecognised marker %r" % (marker,))
           if not function:
@@ -891,8 +892,6 @@ def action_func(action):
         else:
           raise ValueError("unknown function %r" % (func,))
 
-    if kwargs:
-      function = partial(function, **kwargs)
     func0 = function
     # The pipeline itself passes (P, U) item tuples.
     #
@@ -902,18 +901,20 @@ def action_func(action):
     # in the output.
     #
     if scoped:
-      funcPU = func0
+      def funcPU(item):
+        return func0(item, *args, **kwargs)
     else:
       if func_sig == FUNC_SELECTOR:
-        funcPU = func0
+        def funcPU(item):
+          return func0(item, *args, **kwargs)
       elif func_sig == FUNC_ONE_TO_ONE:
-        def funcPU(item, *a, **kw):
+        def funcPU(item):
           P, U = item
-          return P, func0(item, *a, **kw)
+          return P, func0(item, *args, **kwargs)
       elif func_sig == FUNC_ONE_TO_MANY:
-        def funcPU(item, *a, **kw):
+        def funcPU(item):
           P, U = item
-          for i in func0(item, *a, **kw):
+          for i in func0(item, *args, **kwargs):
             yield P, i
       elif func_sig == FUNC_MANY_TO_MANY:
         # Many-to-many functions are different.
@@ -921,7 +922,7 @@ def action_func(action):
         # and re-attach the P components by reverse mapping from the U results;
         # unrecognised Us get associated with Ps[0].
         #
-        def funcPU(items, *a, **kw):
+        def funcPU(items):
           if not isinstance(items, list):
             items = list(items)
           if items:
@@ -935,7 +936,7 @@ def action_func(action):
             idmap = {}
             Ps = []
             Us = []
-          Us2 = func0(Ps, Us, *a, **kw)
+          Us2 = func0(Ps, Us, *args, **kwargs)
           return [ (idmap.get(id(U), P0), U) for U in Us2 ]
       else:
         raise RuntimeError("unhandled func_sig %r" % (func_sig,))
