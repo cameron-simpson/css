@@ -54,11 +54,15 @@ class _URL(unicode):
                   "css" if no referer.
         `opener`: urllib2 opener object, inherited from `referer` if unspecified,
                   made at need if no referer.
+        `scope`: an assisting scope object, inherited from `referer` if unspecified,
+                  made at need if no referer. Attributes not found directly on self
+                  are sought on self._scope.
     '''
     self.referer = URL(referer, None) if referer else referer
     self._scope = scope if scope else self.referer._scope if self.referer else O()
     self.user_agent = user_agent if user_agent else self.referer.user_agent if self.referer else None
-    self.opener = opener if opener else referer.opener if referer else None
+    if opener is not None:
+      self.opener = opener
     self._parts = None
     self.flush()
     self._lock = RLock()
@@ -66,6 +70,11 @@ class _URL(unicode):
     self._parsed = None
 
   def __getattr__(self, attr):
+    ''' Ad hoc attributes.
+        Upper case attributes named "FOO" parse the text and find the (sole) node named "foo".
+        Upper case attributes named "FOOs" parse the text and find all the nodes named "foo".
+        Otherwise, look the attribute up in self._scope.
+    '''
     k, plural = parseUC_sAttr(attr)
     if k:
       nodes = self.parsed.findAll(k.lower())
@@ -84,7 +93,18 @@ class _URL(unicode):
     self._content_type = None
     self._parsed = None
     self._xml = None
-    self._opener = None
+
+  @property
+  def opener(self):
+    try:
+      o = self._scope.opener
+    except AttributeError:
+      try:
+        o = self.referer.opener
+      except AttributeError:
+        o = build_opener()
+        o.add_handler(HTTPBasicAuthHandler(NetrcHTTPPasswordMgr()))
+    return o
 
   def _fetch(self):
     ''' Fetch the URL content.
@@ -97,16 +117,11 @@ class _URL(unicode):
       url = 'file://'+self if self.startswith('/') else self
       rq = Request(url, None, hdrs)
       opener = self.opener
-      if not opener:
-        auth_handler = HTTPBasicAuthHandler(NetrcHTTPPasswordMgr())
-        opener = build_opener(auth_handler)
       with Pfx("open(%s)", rq):
         rsp = opener.open(rq)
       H = rsp.info()
-      debug("info = %s", H)
       self._content_type = H.gettype()
       self._content = rsp.read()
-      debug("URL: content-type=%s, length=%d", self._content_type, len(self._content))
       self._parsed = None
 
   def get_content(self, onerror=None):
@@ -160,12 +175,9 @@ class _URL(unicode):
       raise
     return P
 
-  @property
+  @locked_property
   def xml(self):
-    if self._xml is None:
-      content = self.content
-      self._xml = ElementTree.XML(content.decode('utf-8', 'replace'))
-    return self._xml
+    return ElementTree.XML(self.content.decode('utf-8', 'replace'))
 
   @property
   def parts(self):
@@ -275,7 +287,10 @@ class _URL(unicode):
 
   @property
   def title(self):
-    return self.parsed.title.string
+    t = self.parsed.title
+    if t is None:
+      return ''
+    return t.string
 
   def hrefs(self, absolute=False):
     ''' All 'href=' values from the content HTML 'A' tags.

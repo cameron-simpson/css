@@ -115,7 +115,7 @@ class WorkerThreadPool(NestingOpenCloseMixin, O):
       except:
         result = None
         exc_info = sys.exc_info()
-        log_func = warning if isinstance(exc_info[1], (TypeError, NameError, AttributeError)) else debug
+        log_func = exception if isinstance(exc_info[1], (TypeError, NameError, AttributeError)) else debug
         log_func("%s: worker thread: ran task: exception! %r", self, sys.exc_info())
         # don't let exceptions go unhandled
         # if nobody is watching, raise the exception and don't return
@@ -538,6 +538,7 @@ class FuncMultiQueue(object):
 
 def locked(func):
   ''' A decorator for monitor functions that must run within a lock.
+      Relies upon a ._lock attribute for locking.
   '''
   def lockfunc(self, *a, **kw):
     with self._lock:
@@ -545,7 +546,8 @@ def locked(func):
   return lockfunc
 
 def locked_property(func, lock_name='_lock', prop_name=None, unset_object=None):
-  ''' A property whose access is controlled by a lock if unset.
+  ''' A thread safe property whose value is cached.
+      The lock is taken if the value needs to computed.
   '''
   if prop_name is None:
     prop_name = '_' + func.__name__

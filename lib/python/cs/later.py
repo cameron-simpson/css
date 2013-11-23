@@ -596,7 +596,7 @@ class Later(object):
       R.call(func, *a, **kw)
     if count == 0:
       # nothing to wait for - queue the function immediately
-      warning("Later.after: len(LFs) == 0, func=%s", func.__name__)
+      debug("Later.after: len(LFs) == 0, func=%s", func.__name__)
       self._defer(put_func)
     else:
       # create a notification function which submits put_func
@@ -709,7 +709,7 @@ class Later(object):
     '''
     if self.closed:
       warning("%s.pipeline after close", self)
-    return self._pipeline(filter_funcs, inputs, outQ=None)
+    return self._pipeline(filter_funcs, inputs, outQ=outQ, open=open)
 
   def _pipeline(self, filter_funcs, inputs=None, outQ=None, open=False):
     filter_funcs = list(filter_funcs)
