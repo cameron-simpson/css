@@ -394,6 +394,7 @@ class Pilfer(O):
   def save_url(self, U, saveas=None, dir=None, overwrite=False, **kw):
     ''' Save the contents of the URL `U`.
     '''
+    debug("save_url(U=%r, saveas=%r, dir=%s, overwrite=%r, kw=%r)...", U, saveas, dir, overwrite, kw)
     with Pfx("save_url(%s)", U):
       save_dir = self.user_vars.get('save_dir', '.')
       if saveas is None:
