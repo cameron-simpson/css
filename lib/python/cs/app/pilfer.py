@@ -9,6 +9,7 @@ import sys
 import os
 import errno
 import os.path
+import shlex
 from collections import defaultdict
 from copy import copy
 from functools import partial
@@ -34,7 +35,7 @@ from cs.queues import IterableQueue, NullQueue, NullQ
 from cs.threads import locked_property
 from cs.urlutils import URL, NetrcHTTPPasswordMgr
 from cs.obj import O
-from cs.py3 import input
+from cs.py3 import input, ConfigParser
 
 if os.environ.get('DEBUG', ''):
   def X(tag, *a):
@@ -954,6 +955,20 @@ def action_func(action):
         return retval
 
     return func_sig, trace_function
+
+def loadrc(fp):
+  cfg = ConfigParser()
+  cfg.readfp(fp)
+  dflt_defns = cfg.defaults()
+  pipe_func_map = {}
+  for section in cfg.sections():
+    pipe_spec = cfg.get(section, 'pipe')
+    pipe_funcs, pferrors = argv_pipefuncs(shlex.split(pipe_spec))
+    if pferrors:
+      raise ValueError("%s: errors found" % (fp,))
+    debug("loadrc: %s: pipe = %s", section, pipe_spec)
+    pipe_func_map[section] = pipe_funcs
+  return dflt_defns, pipe_func_map
 
 if __name__ == '__main__':
   import sys
