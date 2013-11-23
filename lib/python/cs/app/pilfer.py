@@ -944,7 +944,6 @@ def action_func(action):
       ##D("DO %s(a=(%d args; %r),kw=%r)", action0, len(a), a, kw)
       ##D("   funcPU<%s:%d>=%r %r ...", funcPU.func_code.co_filename, funcPU.func_code.co_firstlineno, funcPU, dir(funcPU))
       with Pfx(action0):
-        warning("TEST1")
         try:
           retval = funcPU(*a, **kw)
         except Exception as e:
