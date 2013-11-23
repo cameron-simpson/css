@@ -788,16 +788,18 @@ def action_func(action):
                 # As such it is a many-to-many function.
                 scoped = True
                 func_sig = FUNC_MANY_TO_MANY
-                def function(Ps, Us):
+                def function(items):
+                  if not isinstance(items, list):
+                    items = list(utems)
                   try:
-                    D("pipe:%s: Ps=%r, Us=%r", pipe_name, Ps, Us)
-                    if Us:
-                      P = Ps[0]
-                      PL = P.pipe_queues[pipe_name].new_pipeline(inputs=zip(Ps, Us))
+                    D("pipe:%s: items=%r", pipe_name, items)
+                    if items:
+                      P = items[0][0]
+                      PL = P.pipe_queues[pipe_name].new_pipeline(inputs=items)
                       D("pipe:%s: PL=%r", pipe_name, PL)
-                      for U in PL.outQ:
-                        D("pipe:%s: yield %r", pipe_name, U)
-                        yield U
+                      for item in PL.outQ:
+                        D("pipe:%s: yield %r", pipe_name, item)
+                        yield item
                       D("pipe:%s: COMPLETE", pipe_name)
                   except Exception as e:
                     exception("pipe: %s", e)
