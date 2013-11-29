@@ -956,20 +956,59 @@ def action_func(action):
 
     return func_sig, trace_function
 
-def loadrc(fp):
+class PipeSpec(O):
+
+  def __init__(self, name, argv):
+    O.__init__(self)
+    self.name = name
+    self.argv = argv
+    self.errors = []
+    with Pfx(name):
+      pipe_funcs, errors = argv_pipefuncs(argv)
+      self.pipe_funcs = pipe_funcs
+      self.errors.extend(errors)
+
+class PilferRC(O):
+
+  def __init__(self, filename):
+    O.__init__(self)
+    self.filename = filename
+    self.print_flush = False
+    self.pipe_specs = {}
+    if filename is not None:
+      self.loadrc(filename)
+
+  def loadrc(self, fp):
+    ''' Read a pilferrc file and load pipeline definitions.
+    '''
+    with Pfx(self.filename):
   cfg = ConfigParser()
+      with open(self.filename) as fp:
   cfg.readfp(fp)
-  dflt_defns = cfg.defaults()
-  pipe_func_map = {}
+      dflts = cfg.defaults()
+      for dflt, value in cfg.defaults().iteritems():
+        if dflt == 'print_flush':
+          self.print_flush = cfg.getboolean('DEFAULT', dflt)
+        else:
+          warning("unrecognised [DEFAULTS].%s: %s" % (dflt, value))
   for section in cfg.sections():
+        with Pfx("[%s]", section):
     pipe_spec = cfg.get(section, 'pipe')
-    pipe_funcs, pferrors = argv_pipefuncs(shlex.split(pipe_spec))
-    if pferrors:
-      raise ValueError("%s: errors found" % (fp,))
     debug("loadrc: %s: pipe = %s", section, pipe_spec)
-    pipe_func_map[section] = pipe_funcs
-  return dflt_defns, pipe_func_map
+          self.pipe_specs[section] = PipeSpec(section, shlex.split(pipe_spec))
+
+  def __getitem__(self, pipename):
+    ''' Fetch PipeSpec by name.
+    '''
+    return self.pipe_specs[pipename]
+
+  def __setitem__(self, pipename, pipespec):
+    specs = self.pipespecs
+    if pipename in specs:
+      raise KeyError("repeated definition of pipe named %r", pipename)
+    specs[pipename] = pipespec
 
 if __name__ == '__main__':
   import sys
+  PilferRC('pilferrc')
   sys.exit(main(sys.argv))
