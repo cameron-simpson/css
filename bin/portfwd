@@ -13,7 +13,7 @@ set -ue
 : ${USER:=`id -un`}
 
 trace=set-x
-setx=${DEBUG:-:}${DEBUG:+set -x}
+setx='set -x'   ## ${DEBUG:-:}${DEBUG:+set -x}
 once=
 sshcfg=$PORTFWD_SSH_CONFIG
 fwdcfg=$PORTFWD_CONFIG
@@ -92,9 +92,19 @@ done
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+abort() {
+  $setx
+  : PORTFWD TRAP "subpids=[$subpids]"
+  [ -z "$subpids" ] || killpids $subpids
+  [ -n "$pidfile" ] && { >"$pidfile"; rm -f "$pidfile"; }
+  [ -n "$flag_connected" ] && flag -w "$flag_connected" 0
+  exit 1
+}
+
 pidfile=
 subpids=
-trap '$setx; : PORTFWD TRAP "subpids=[$subpids]"; [ -z "$subpids" ] || killpids $subpids; [ -n "$pidfile" ] && { >"$pidfile"; rm -f "$pidfile"; }; exit 1' 1 2 3 15
+flag_connected=
+trap 'abort' 1 2 3 15
 
 if [ $# -gt 1 ]
 then
@@ -210,6 +220,7 @@ tag_fd 2 "$target" \
       "$target" "$cfg_command" \
     >>"$cfg_outlog" 2>>"$cfg_errlog" </dev/null &
 sshpid=$!
+subpids="$subpids $sshpid"
 echo "$sshpid" >"$pidfile"
 wait
 flag -w "$flag_connected" 0
