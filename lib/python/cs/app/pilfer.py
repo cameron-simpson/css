@@ -54,6 +54,8 @@ usage = '''Usage: %s [options...] op [args...]
   %s url URL actions...
       URL may be "-" to read URLs from standard input.
   Options:
+    -c config
+        Load rc file.
     -j jobs
         How many jobs (URL fetches, minor computations) to run at a time.
         Default: %d
@@ -75,7 +77,7 @@ def main(argv):
   badopts = False
 
   try:
-    opts, argv = getopt(argv, 'j:qu')
+    opts, argv = getopt(argv, 'c:j:qu')
   except GetoptError as e:
     warning("%s", e)
     badopts = True
@@ -83,7 +85,10 @@ def main(argv):
 
   for opt, val in opts:
     with Pfx("%s", opt):
-      if opt == '-j':
+      if opt == '-c':
+        rc = PilferRC(val)
+        P.rcs.insert(0, rc)
+      elif opt == '-j':
         jobs = int(val)
       elif opt == '-q':
         quiet = True
@@ -1018,5 +1023,4 @@ class PilferRC(O):
 
 if __name__ == '__main__':
   import sys
-  PilferRC('pilferrc')
   sys.exit(main(sys.argv))
