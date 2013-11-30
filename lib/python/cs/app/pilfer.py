@@ -9,6 +9,7 @@ import sys
 import os
 import errno
 import os.path
+import shlex
 from collections import defaultdict
 from copy import copy
 from functools import partial
@@ -31,10 +32,10 @@ from cs.later import Later, FUNC_ONE_TO_ONE, FUNC_ONE_TO_MANY, FUNC_SELECTOR, FU
 from cs.lex import get_identifier
 from cs.logutils import setup_logging, logTo, Pfx, debug, error, warning, exception, trace, pfx_iter, D
 from cs.queues import IterableQueue, NullQueue, NullQ
-from cs.threads import locked_property
+from cs.threads import locked, locked_property
 from cs.urlutils import URL, NetrcHTTPPasswordMgr
 from cs.obj import O
-from cs.py3 import input
+from cs.py3 import input, ConfigParser
 
 if os.environ.get('DEBUG', ''):
   def X(tag, *a):
@@ -53,6 +54,8 @@ usage = '''Usage: %s [options...] op [args...]
   %s url URL actions...
       URL may be "-" to read URLs from standard input.
   Options:
+    -c config
+        Load rc file.
     -j jobs
         How many jobs (URL fetches, minor computations) to run at a time.
         Default: %d
@@ -74,7 +77,7 @@ def main(argv):
   badopts = False
 
   try:
-    opts, argv = getopt(argv, 'j:qu')
+    opts, argv = getopt(argv, 'c:j:qu')
   except GetoptError as e:
     warning("%s", e)
     badopts = True
@@ -82,7 +85,10 @@ def main(argv):
 
   for opt, val in opts:
     with Pfx("%s", opt):
-      if opt == '-j':
+      if opt == '-c':
+        rc = PilferRC(val)
+        P.rcs.insert(0, rc)
+      elif opt == '-j':
         jobs = int(val)
       elif opt == '-q':
         quiet = True
@@ -90,6 +96,12 @@ def main(argv):
         P.flush_print = True
       else:
         raise NotImplementedError("unimplemented option")
+
+  dflt_rc = os.environ.get('PILFERRC')
+  if dflt_rc:
+    with Pfx("$PILFERRC: %s", dflt_rc):
+      rc = PilferRC(dflt_rc)
+      P.rcs.append(rc)
 
   if not argv:
     error("missing op")
@@ -109,30 +121,28 @@ def main(argv):
           url = argv.pop(0)
 
           # load any named pipeline definitions on the command line
-          while True:
-            pipe_name, pipe_funcs, argv2, errors = get_pipeline_spec(argv)
-            if pipe_name is None:
-              if errors:
-                raise RuntimeError("pipe_name is None but errors=%r", errors)
-              if pipe_funcs:
-                raise RuntimeError("pipe_name is None but pipe_funcs=%r", pipe_funcs)
-              break
-            argv = argv2
-            with Pfx("pipe %s", pipe_name):
+          rc = PilferRC(None)
+          P.rcs.insert(0, rc)
+          while len(argv) and argv[0].endswith(':{'):
+            openarg = argv[0]
+            with Pfx(openarg):
+              spec, argv2, errors = get_pipeline_spec(argv)
+              argv = argv2
+              if spec is None:
+                errors.insert(0, "invalid pipe opening token: %r" % (openarg,))
               if errors:
                 badopts = True
                 for err in errors:
                   error(err)
               else:
-                pipe_funcs
                 try:
-                  P.add_pipeline(pipe_name, pipe_funcs)
+                  rc.add_pipespec(spec)
                 except KeyError as e:
-                  error("add_pipeline: %s", e)
+                  error("add pipe: %s", e)
                   badopts = True
 
           # gather up the remaining definition as the runing pipeline
-          pipe_funcs, errors = argv_pipefuncs(argv2)
+          pipe_funcs, errors = argv_pipefuncs(argv)
 
           # report accumulated errors and set badopts
           if errors:
@@ -213,17 +223,23 @@ def argv_pipefuncs(argv):
   return pipe_funcs, errors
 
 def get_pipeline_spec(argv):
-  ''' Parse a leading pipeline specification from the list of strings `argv`.
-      Return (pipe_name, pipe_funcs, argv2, errors) where pipe_name is the
-      name of the pipe specification, pipe_funcs is a list of
-      (func_sig, function) pairs and `argv2` is the remaining list.
-      If there is no leading pipeline specification return None for
-      pipe_name and pipe_funcs.
-      Return parse errors in `errors`.
+  ''' Parse a leading pipeline specification from the list of arguments `argv`.
+      A pipeline specification is specified by a leading argument
+      of the form "pipe_name:{", following arguments definition
+      functions for the pipeline, and a terminating argument of the
+      form "}".
+
+      Return `(spec, argv2, errors)` where `spec` is a PipeSpec
+      embodying the specification, `argv2` is the list of arguments
+      after the specification and `errors` is a list of error
+      messages encountered parsing the function arguments.
+
+      If the leading argument does not commence a function specification
+      then `spec` will be None and `argv2` will be `argv`.
   '''
   errors = []
   pipe_name = None
-  pipe_funcs = None
+  spec = None
   if not argv:
     # no arguments, no spec
     argv2 = argv
@@ -242,14 +258,14 @@ def get_pipeline_spec(argv):
           # started with "foo:{"; gather spec until "}"
           for i in range(1, len(argv)):
             if argv[i] == '}':
-              pipe_funcs, pferrors = argv_pipefuncs(argv[1:i])
-              errors.extend(pferrors)
+              spec = PipeSpec(pipe_name, argv[1:i])
+              errors.extend(spec.errors)
               argv2 = argv[i+1:]
               break
-          if pipe_funcs is None:
+          if spec is None:
             errors.append('%s: missing closing "}"' % (arg,))
             argv2 = argv[1:]
-  return pipe_name, pipe_funcs, argv2, errors
+  return spec, argv2, errors
 
 def notNone(v, name="value"):
   if v is None:
@@ -271,53 +287,17 @@ def unique(items, seen=None):
       yield I
       seen.add(I)
 
-class PipeLine(O):
-  ''' Pipeline description.
-      It has a .pipeline property initialised at need; its value has a .inQ and .outQ
-  '''
-
-  def __init__(self, name, pipe_funcs, P):
-    self._lock = Lock()
-    self.name = name
-    self.pipe_funcs = pipe_funcs
-    self.pilfer = P
-
-  @locked_property
-  def pipeline(self):
-    ''' Cause the instantiation of this pipeline.
-        Note that this pipeline discards its output.
-        Return an O with .inQ and .outQ attributes.
-    '''
-    inQ, outQ = self.pilfer.later.pipeline(self.pipe_funcs, outQ=NullQueue(blocking=True))
-    return O(inQ=inQ, outQ=outQ)
-
-  def new_pipeline(self, inputs=None, outQ=None):
-    ''' Make a new instantiation of this pipeline receiving inputs
-        from `input`s and producing outputs on `outQ`.
-        Return an O with .inQ and .outQ attributes.
-    '''
-    inQ, outQ = self.pilfer.later.pipeline(self.pipe_funcs, inputs=inputs, outQ=outQ)
-    return O(inQ=inQ, outQ=outQ)
-
-  def put(self, o):
-    return self.pipeline.inQ.put(o)
-
-  def close(self):
-    pipe = self._pipeline
-    if pipe:
-      self._pipeline = None
-      pipe.inQ.close()
-      pipe.outQ.close()
-
 class PilferCommon(O):
   ''' Common state associated with all Pilfers.
       Pipeline definitions, seen sets, etc.
   '''
 
   def __init__(self):
+    self._lock = Lock()
     O.__init__(self)
     self.seen = defaultdict(set)
-    self.pipe_queues = {}       # mapping of names to PipeLines
+    self.rcs = []               # chain of PilferRC libraries
+    self.diversions = {}        # global mapping of names to divert: pipelines
     self.opener = build_opener()
     self.opener.add_handler(HTTPBasicAuthHandler(NetrcHTTPPasswordMgr()))
 
@@ -354,15 +334,45 @@ class Pilfer(O):
   def see(self, url, seenset='_'):
     self._shared.seen[seenset].add(url)
 
-  @property
-  def pipe_queues(self):
-    return self._shared.pipe_queues
+  @locked
+  def diversion(self, pipe_name):
+    ''' Return the diversion named `pipe_name`.
+        A diversion enbodies a pipeline of the specified name.
+        There is only one of a given name in the shared state.
+        They are instantiated at need.
+    '''
+    diversions = self._shared.diversions
+    if pipe_name not in diversions:
+      spec = self.find_pipe_spec(pipe_name)
+      if spec is None:
+        raise KeyError("no diversion named %r and no pipe specification found" % (pipe_name,))
+      inQ, outQ = self.later.pipeline(spec.pipe_funcs, outQ=NullQueue(blocking=True))
+      diversions[pipe_name] = O(name=pipe_name, inQ=inQ, outQ=outQ)
+    return diversions[pipe_name]
 
-  def add_pipeline(self, pipe_name, pipe_funcs):
-    pqs = self.pipe_queues
-    if pipe_name in pqs:
-      raise KeyError("pipe %r already defined" % (pipe_name,))
-    pqs[pipe_name] = PipeLine(pipe_name, pipe_funcs, self)
+  def pipe_through(self, pipe_name, inputs):
+    ''' Create a new cs.later.Later.pipeline from the specification named `pipe_name`.
+        It will collect items from the iterable `inputs`.
+        Return the output Queue from which to get results.
+    '''
+    spec = self.find_pipe_spec(pipe_name)
+    if spec is None:
+      raise KeyError("no pipe specification named %r" % (pipe_name,))
+    inQ, outQ = self.later.pipeline(spec.pipe_funcs, inputs=inputs)
+    return outQ
+
+  def find_pipe_spec(self, pipe_name):
+    ''' Search for a PipeSpec of the specified name `pipe_name`.
+        Return the PipeSpec if found or None if not found.
+    '''
+    for rc in self.rcs:
+      if pipe_name in rc.pipe_specs:
+        return rc.pipe_specs[pipe_name]
+    return None
+
+  @property
+  def rcs(self):
+    return self._shared.rcs
 
   def _print(self, *a, **kw):
     file = kw.pop('file', None)
@@ -687,12 +697,10 @@ def action_func(action):
       kw_value = action[m.end():]
       function = lambda (P, U): kw_var in P.user_vars and P.user_vars[kw_var] == U.format(kw_value, U)
       def function(P, U):
-        D("compare user_vars[%s]...", kw_var)
         uv = P.user_vars
         if kw_var not in uv:
           return False
         v = U.format(kw_value, U)
-        D("compare user_vars[%s]: %r => %r", kw_var, kw_value, v)
         return uv == v
       func_sig = FUNC_SELECTOR
     else:
@@ -770,14 +778,15 @@ def action_func(action):
               if do_divert:
                 # function to divert selected items to a single named pipeline
                 func_sig = FUNC_ONE_TO_MANY
-                def function(P, U):
-                  if select_func(P, U):
+                def function(item):
+                  P, U = item
+                  if select_func(item):
                     try:
-                      pipe = P.pipe_queues[pipe_name].pipeline
+                      pipe = P.diversion(pipe_name)
                     except KeyError:
                       error("no pipe named %r", pipe_name)
                     else:
-                      pipe.inQ.put( (P, U) )
+                      pipe.inQ.put(item)
                   else:
                     yield U
               else:
@@ -794,15 +803,13 @@ def action_func(action):
                   if not isinstance(items, list):
                     items = list(utems)
                   try:
-                    D("pipe:%s: items=%r", pipe_name, items)
                     if items:
+		      # construct a pipeline based if the Pilfer
+		      # associated with the first item
                       P = items[0][0]
-                      PL = P.pipe_queues[pipe_name].new_pipeline(inputs=items)
-                      D("pipe:%s: PL=%r", pipe_name, PL)
-                      for item in PL.outQ:
-                        D("pipe:%s: yield %r", pipe_name, item)
+                      outQ = P.pipe_through(pipe_name, inputs=items)
+                      for item in outQ:
                         yield item
-                      D("pipe:%s: COMPLETE", pipe_name)
                   except Exception as e:
                     exception("pipe: %s", e)
                     raise
@@ -955,6 +962,70 @@ def action_func(action):
         return retval
 
     return func_sig, trace_function
+
+class PipeSpec(O):
+
+  def __init__(self, name, argv):
+    O.__init__(self)
+    self.name = name
+    self.argv = argv
+    self.errors = []
+    with Pfx(name):
+      pipe_funcs, errors = argv_pipefuncs(argv)
+      self.pipe_funcs = pipe_funcs
+      self.errors.extend(errors)
+
+class PilferRC(O):
+
+  def __init__(self, filename):
+    O.__init__(self)
+    self.filename = filename
+    self._lock = Lock()
+    self.print_flush = False
+    self.pipe_specs = {}
+    if filename is not None:
+      self.loadrc(filename)
+
+  @locked
+  def add_pipespec(self, spec, pipe_name=None):
+    ''' Add a PipeSpec to this Pilfer's collection, optionally with a different `pipe_name`.
+    '''
+    if pipe_name is None:
+      pipe_name = spec.name
+    specs = self.pipe_specs
+    if pipe_name in specs:
+      raise KeyError("pipe %r already defined" % (pipe_name,))
+    specs[pipe_name] = spec
+
+  def loadrc(self, fp):
+    ''' Read a pilferrc file and load pipeline definitions.
+    '''
+    with Pfx(self.filename):
+      cfg = ConfigParser()
+      with open(self.filename) as fp:
+        cfg.readfp(fp)
+      dflts = cfg.defaults()
+      for dflt, value in cfg.defaults().iteritems():
+        if dflt == 'print_flush':
+          self.print_flush = cfg.getboolean('DEFAULT', dflt)
+        else:
+          warning("unrecognised [DEFAULTS].%s: %s" % (dflt, value))
+      for section in cfg.sections():
+        with Pfx("[%s]", section):
+          pipe_spec = cfg.get(section, 'pipe')
+          debug("loadrc: %s: pipe = %s", section, pipe_spec)
+          self.pipe_specs[section] = PipeSpec(section, shlex.split(pipe_spec))
+
+  def __getitem__(self, pipename):
+    ''' Fetch PipeSpec by name.
+    '''
+    return self.pipe_specs[pipename]
+
+  def __setitem__(self, pipename, pipespec):
+    specs = self.pipespecs
+    if pipename in specs:
+      raise KeyError("repeated definition of pipe named %r", pipename)
+    specs[pipename] = pipespec
 
 if __name__ == '__main__':
   import sys
