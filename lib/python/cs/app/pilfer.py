@@ -213,17 +213,23 @@ def argv_pipefuncs(argv):
   return pipe_funcs, errors
 
 def get_pipeline_spec(argv):
-  ''' Parse a leading pipeline specification from the list of strings `argv`.
-      Return (pipe_name, pipe_funcs, argv2, errors) where pipe_name is the
-      name of the pipe specification, pipe_funcs is a list of
-      (func_sig, function) pairs and `argv2` is the remaining list.
-      If there is no leading pipeline specification return None for
-      pipe_name and pipe_funcs.
-      Return parse errors in `errors`.
+  ''' Parse a leading pipeline specification from the list of arguments `argv`.
+      A pipeline specification is specified by a leading argument
+      of the form "pipe_name:{", following arguments definition
+      functions for the pipeline, and a terminating argument of the
+      form "}".
+
+      Return `(spec, argv2, errors)` where `spec` is a PipeSpec
+      embodying the specification, `argv2` is the list of arguments
+      after the specification and `errors` is a list of error
+      messages encountered parsing the function arguments.
+
+      If the leading argument does not commence a function specification
+      then `spec` will be None and `argv2` will be `argv`.
   '''
   errors = []
   pipe_name = None
-  pipe_funcs = None
+  spec = None
   if not argv:
     # no arguments, no spec
     argv2 = argv
@@ -242,14 +248,14 @@ def get_pipeline_spec(argv):
           # started with "foo:{"; gather spec until "}"
           for i in range(1, len(argv)):
             if argv[i] == '}':
-              pipe_funcs, pferrors = argv_pipefuncs(argv[1:i])
-              errors.extend(pferrors)
+              spec = PipeSpec(pipe_name, argv[1:i])
+              errors.extend(spec.errors)
               argv2 = argv[i+1:]
               break
-          if pipe_funcs is None:
+          if spec is None:
             errors.append('%s: missing closing "}"' % (arg,))
             argv2 = argv[1:]
-  return pipe_name, pipe_funcs, argv2, errors
+  return spec, argv2, errors
 
 def notNone(v, name="value"):
   if v is None:
