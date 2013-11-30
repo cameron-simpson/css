@@ -97,6 +97,12 @@ def main(argv):
       else:
         raise NotImplementedError("unimplemented option")
 
+  dflt_rc = os.environ.get('PILFERRC')
+  if dflt_rc:
+    with Pfx("$PILFERRC: %s", dflt_rc):
+      rc = PilferRC(dflt_rc)
+      P.rcs.append(rc)
+
   if not argv:
     error("missing op")
     badopts = True
