@@ -696,7 +696,8 @@ def action_func(action):
       kw_var = m.group(1)
       kw_value = action[m.end():]
       function = lambda (P, U): kw_var in P.user_vars and P.user_vars[kw_var] == U.format(kw_value, U)
-      def function(P, U):
+      def function(item):
+        P, U = item
         uv = P.user_vars
         if kw_var not in uv:
           return False
@@ -710,7 +711,8 @@ def action_func(action):
       if m:
         kw_var = m.group(1)
         kw_value = action[m.end():]
-        def function(P, U):
+        def function(item):
+          P, U = item
           P.set_user_var(kw_var, kw_value, U)
           return U
         func_sig = FUNC_ONE_TO_ONE
