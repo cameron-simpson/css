@@ -131,7 +131,7 @@ def main(argv):
                   badopts = True
 
           # gather up the remaining definition as the runing pipeline
-          pipe_funcs, errors = argv_pipefuncs(argv2)
+          pipe_funcs, errors = argv_pipefuncs(argv)
 
           # report accumulated errors and set badopts
           if errors:
