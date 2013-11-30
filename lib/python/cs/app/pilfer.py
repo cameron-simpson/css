@@ -271,44 +271,6 @@ def unique(items, seen=None):
       yield I
       seen.add(I)
 
-class PipeLine(O):
-  ''' Pipeline description.
-      It has a .pipeline property initialised at need; its value has a .inQ and .outQ
-  '''
-
-  def __init__(self, name, pipe_funcs, P):
-    self._lock = Lock()
-    self.name = name
-    self.pipe_funcs = pipe_funcs
-    self.pilfer = P
-
-  @locked_property
-  def pipeline(self):
-    ''' Cause the instantiation of this pipeline.
-        Note that this pipeline discards its output.
-        Return an O with .inQ and .outQ attributes.
-    '''
-    inQ, outQ = self.pilfer.later.pipeline(self.pipe_funcs, outQ=NullQueue(blocking=True))
-    return O(inQ=inQ, outQ=outQ)
-
-  def new_pipeline(self, inputs=None, outQ=None):
-    ''' Make a new instantiation of this pipeline receiving inputs
-        from `input`s and producing outputs on `outQ`.
-        Return an O with .inQ and .outQ attributes.
-    '''
-    inQ, outQ = self.pilfer.later.pipeline(self.pipe_funcs, inputs=inputs, outQ=outQ)
-    return O(inQ=inQ, outQ=outQ)
-
-  def put(self, o):
-    return self.pipeline.inQ.put(o)
-
-  def close(self):
-    pipe = self._pipeline
-    if pipe:
-      self._pipeline = None
-      pipe.inQ.close()
-      pipe.outQ.close()
-
 class PilferCommon(O):
   ''' Common state associated with all Pilfers.
       Pipeline definitions, seen sets, etc.
