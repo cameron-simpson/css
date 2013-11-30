@@ -32,7 +32,7 @@ from cs.later import Later, FUNC_ONE_TO_ONE, FUNC_ONE_TO_MANY, FUNC_SELECTOR, FU
 from cs.lex import get_identifier
 from cs.logutils import setup_logging, logTo, Pfx, debug, error, warning, exception, trace, pfx_iter, D
 from cs.queues import IterableQueue, NullQueue, NullQ
-from cs.threads import locked_property
+from cs.threads import locked, locked_property
 from cs.urlutils import URL, NetrcHTTPPasswordMgr
 from cs.obj import O
 from cs.py3 import input, ConfigParser
@@ -285,7 +285,9 @@ class PilferCommon(O):
   def __init__(self):
     O.__init__(self)
     self.seen = defaultdict(set)
-    self.pipe_queues = {}       # mapping of names to PipeLines
+    self.rcs = []               # chain of PilferRC libraries
+    self.pipe_specs = {}
+    self.diversions = {}        # global mapping of names to divert: pipelines
     self.opener = build_opener()
     self.opener.add_handler(HTTPBasicAuthHandler(NetrcHTTPPasswordMgr()))
 
@@ -322,15 +324,48 @@ class Pilfer(O):
   def see(self, url, seenset='_'):
     self._shared.seen[seenset].add(url)
 
-  @property
-  def pipe_queues(self):
-    return self._shared.pipe_queues
+  @locked
+  def diversion(self, pipe_name):
+    ''' Return the diversion named `pipe_name`.
+        A diversion enbodies a pipeline of the specified name.
+        There is only one of a given name in the shared state.
+        They are instantiated at need.
+    '''
+    diversions = self._shared.diversions
+    if pipe_name not in diversions:
+      try:
+        spec = self.pipe_specs[pipe_name]
+      except KeyError:
+        raise KeyError("no diversion named %r" % (pipe_name,))
+      inQ, outQ = self.later.pipeline(spec.pipe_funcs, outQ=NullQueue(blocking=True))
+      diversions[pipe_name] = O(name=pipe_name, inQ=inQ, outQ=outQ)
+    return diversions[pipe_name]
 
-  def add_pipeline(self, pipe_name, pipe_funcs):
-    pqs = self.pipe_queues
-    if pipe_name in pqs:
+  def pipe_through(self, pipe_name, inputs):
+    ''' Create a new cs.later.Later.pipeline from the specification named `pipe_name`.
+        It will collect items from the iterable `inputs`.
+        Return the output Queue from which to get results.
+    '''
+    try:
+      spec = self.pipe_specs[pipe_name]
+    except KeyError:
+      raise KeyError("no pipe specification named %r" % (pipe_name,))
+    inQ, outQ = self.later.pipeline(spec.pipe_funcs, inputs=inputs)
+    return outQ
+
+  @property
+  def pipe_specs(self):
+    return self._shared.pipe_specs
+
+  def add_pipespec(self, spec, pipe_name=None):
+    ''' Add a PipeSpec to this Pilfer's collection, optionally with a different `pipe_name`.
+    '''
+    if pipe_name is None:
+      pipe_name = spec.name
+    specs = self.pipe_specs
+    if pipe_name in specs:
       raise KeyError("pipe %r already defined" % (pipe_name,))
-    pqs[pipe_name] = PipeLine(pipe_name, pipe_funcs, self)
+    specs[pipe_name] = spec
 
   def _print(self, *a, **kw):
     file = kw.pop('file', None)
@@ -741,7 +776,7 @@ def action_func(action):
                 def function(P, U):
                   if select_func(P, U):
                     try:
-                      pipe = P.pipe_queues[pipe_name].pipeline
+                      pipe = P.diversion(pipe_name)
                     except KeyError:
                       error("no pipe named %r", pipe_name)
                     else:
