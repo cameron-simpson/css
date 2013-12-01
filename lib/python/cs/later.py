@@ -16,7 +16,7 @@ from cs.threads import AdjustableSemaphore, \
                        WorkerThreadPool, TimerQueue
 from cs.asynchron import Result, Asynchron, ASYNCH_RUNNING
 from cs.seq import seq
-from cs.logutils import Pfx, error, info, warning, debug, D, OBSOLETE
+from cs.logutils import Pfx, PfxCallInfo, error, info, warning, debug, D, OBSOLETE
 
 # function signature designators, used with Later.pipeline()
 FUNC_ONE_TO_MANY = 0
@@ -455,7 +455,8 @@ class Later(object):
           see cs.logutils.Pfx's .func method for details.
     '''
     if self.closed:
-      warning("%s.submit(...) after close()", self)
+      with PfxCallInfo():
+        warning("%s.submit(...) after close()", self)
     return self._submit(func, priority=priority, delay=delay, when=when, name=name, pfx=pfx)
 
   def _submit(self, func, priority=None, delay=None, when=None, name=None, pfx=None):
