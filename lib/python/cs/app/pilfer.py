@@ -18,6 +18,7 @@ import re
 if sys.hexversion < 0x02060000: from sets import Set as set
 from getopt import getopt, GetoptError
 from string import Formatter
+from subprocess import Popen, PIPE
 from time import sleep
 from threading import Lock, Thread
 from urllib import quote, unquote
@@ -701,6 +702,10 @@ def action_func(action):
   with Pfx("%s", action):
     action0 = action
 
+    if action.startswith('!'):
+      # ! shell command
+      function, func_sig = action_shcmd(action[1:])
+    else:
     # comparison
     # varname==
     m = re_COMPARE.match(action)
@@ -976,6 +981,46 @@ def action_func(action):
         return retval
 
     return func_sig, trace_function
+
+def action_shcmd(shcmd):
+  ''' Return (function, func_sig) for a shell command.
+  '''
+  shcmd = shcmd.strip()
+  def function(item):
+    P, U = item
+    uv = P.user_vars
+    D("shcmd = %r, uv = %r", shcmd, uv)
+    try:
+      v = P.format_string(shcmd, U)
+    except KeyError as e:
+      warning("shcmd.format(%r): KeyError: %s", uv, e)
+    else:
+      D("shcmd => %r", v)
+      with Pfx(v):
+        with open('/dev/null') as fp0:
+          fd0 = fp0.fileno()
+          D("Popen(stdin=%r)...", fd0)
+          try:
+            subp = Popen(['/bin/sh' '-c', 'sh -uex; '+v], stdin=fd0, stdout=PIPE, close_fds=True)
+          except Exception as e:
+            exception("Popen: %r", e)
+          else:
+            D("Popen running: pid = %r", subp.pid)
+            D("read from Popen...")
+            for line in subp.stdout:
+              D("line = %r", line)
+              if line.endswith('\n'):
+                yield line[:-1]
+              else:
+                yield line
+            D("read complete, wating")
+            subp.wait()
+            D("wait complete")
+            xit = subp.returncode
+            if xit != 0:
+              warning("exit code = %d", xit)
+            D("shcmd done")
+  return function, FUNC_ONE_TO_MANY
 
 class PipeSpec(O):
 
