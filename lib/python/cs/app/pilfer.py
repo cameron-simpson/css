@@ -716,7 +716,7 @@ def action_func(action):
       # varname=
       m = re_ASSIGN.match(action)
       if m:
-          function, func_sig = action_compare(m.group(1), action[m.end():])
+          function, func_sig = action_assign(m.group(1), action[m.end():])
       else:
         # operator or s//
         func, offset = get_identifier(action)
