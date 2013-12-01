@@ -985,7 +985,7 @@ def action_shcmd(shcmd):
             subp = Popen(['/bin/sh', '-c', 'sh -uex; '+v], stdin=fd0, stdout=PIPE, close_fds=True)
           except Exception as e:
             exception("Popen: %r", e)
-          else:
+            return
             for line in subp.stdout:
               if line.endswith('\n'):
                 yield line[:-1]
