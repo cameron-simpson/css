@@ -5,9 +5,10 @@
 #
 
 from threading import Condition
+import time
 from cs.debug import Lock, RLock, Thread, trace_caller
 from cs.excutils import noexc
-from cs.logutils import exception, warning, D
+from cs.logutils import exception, warning, D, PfxCallInfo
 from cs.seq import seq
 from cs.py3 import Queue, PriorityQueue, Queue_Full, Queue_Empty
 from cs.obj import O
@@ -64,6 +65,10 @@ class NestingOpenCloseMixin(object):
     return False
 
 class QueueIterator(NestingOpenCloseMixin,O):
+  ''' A QueueIterator is a wrapper for a Queue (or ducktype) which
+      presents and iterator interface to collect items.
+      It does not offer the .get or .get_nowait methods.
+  '''
 
   sentinel = object()
 
@@ -78,37 +83,72 @@ class QueueIterator(NestingOpenCloseMixin,O):
   def __str__(self):
     return "<%s:opens=%d,closed=%s>" % (self.name, self._opens, self.closed)
 
-  def __getattr__(self, attr):
-    return getattr(self.q, attr)
-
-  def get(self, *a):
-    q = self.q
-    item = q.get(*a)
-    if item is self.sentinel:
-      q.put(self.sentinel)
-      raise Queue_Empty
-    return item
-
-  def get_nowait(self):
-    q = self.q
-    item = q.get_nowait()
-    if item is self.sentinel:
-      q.put(self.sentinel)
-      raise Queue_Empty
-    return item
+##  def __getattr__(self, attr):
+##    return getattr(self.q, attr)
+##
+##  def get(self, block=True, timeout=None):
+##    if block and timeout is None:
+##      # calling an indefinitiely blocking get if probably an 
+##      raise RuntimeError(".get(block=%r,timeout=%r) on QueueIterator", block, timeout)
+##    if block and timeout is not None:
+##      start = time.time()
+##    q = self.q
+##    item = q.get(block=block, timeout=timeout)
+##    # block must have been True since no exception raised
+##    while item is self.sentinel:
+##      # the sentinel should be ignored
+##      if timeout is None:
+##        if q.empty():
+##          q.put(item)
+##          continue
+##      else:
+##        now = time.time()
+##        elapsed = now - start
+##        timeout -= elapsed
+##        if timeout <= 0:
+##          if q.empty():
+##            raise Queue_Empty
+##      # timeout > 0 or queue not empty
+##      # get the next item, ignoring the sentinel
+##      try:
+##        item = q.get(block=block, timeout=timeout)
+##      except Queue_Empty:
+##        # put the sentinel back to prevent blocking another caller
+##        q._put(self.sentinel)
+##        raise
+##      q._put(self.sentinel)
+##    return item
+##
+##  def get_nowait(self):
+##    q = self.q
+##    item = q.get_nowait()
+##    if item is self.sentinel:
+##      q._put(self.sentinel)
+##      raise Queue_Empty
+##    return item
 
   def put(self, item, *args, **kw):
     ''' Put an item on the queue.
+        Warn if the queue is closed.
+        Reject if the `item` is the sentinel.
     '''
     if self.closed:
-      warning("queue closed: item=%s", item)
-      ##raise Queue_Full("queue closed")
+      with PfxCallInfo():
+        warning("queue closed: item=%s", item)
     if item is self.sentinel:
       raise ValueError("put(sentinel)")
+    return self._put(item, *args, **kw)
+
+  def _put(self, item, *args, **kw):
+    ''' Direct call to self.q.put() with not checks.
+    '''
     return self.q.put(item, *args, **kw)
 
   def shutdown(self):
-    self.q.put(self.sentinel)
+    ''' Support method for NestingOpenCloseMixin.shutdown.
+        Queue the sentinel object so that calls to .get() from .__next__ do not block.
+    '''
+    self._put(self.sentinel)
 
   def __iter__(self):
     ''' Iterable interface for the queue.
@@ -116,12 +156,20 @@ class QueueIterator(NestingOpenCloseMixin,O):
     return self
 
   def __next__(self):
-    try:
-      item = self.get()
-    except Queue_Empty:
-      ##D("IQ %s.__next__: Queue_Empty, STOPPING", self)
+    ''' Return the next item from the queue.
+        If the queue is closed, raise StopIteration.
+    '''
+    q = self.q
+    if self.closed and q.empty():
       raise StopIteration
-    ##D("IQ %s.__next__: item=%s", self, item)
+    try:
+      item = q.get()
+    except Queue_Empty:
+      raise StopIteration
+    if item is self.sentinel:
+      # put the sentinel back for other iterators
+      self._put(item)
+      raise StopIteration
     return item
 
   next = __next__
