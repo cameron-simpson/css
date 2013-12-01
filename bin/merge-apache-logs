@@ -14,7 +14,7 @@ from getopt import getopt, GetoptError
 from datetime import datetime, timedelta
 from cs.logutils import setup_logging, error, warning, Pfx
 
-re_MULTIADDRS = re.compile(r'^[^ ,]+ *,( |%20)*')
+re_MULTIADDRS = re.compile(r'^[^ ,]* *,( |%20)*')
 
 def main(argv):
   argv = list(argv)
