@@ -58,7 +58,12 @@ class NestingOpenCloseMixin(object):
 
   @property
   def closed(self):
-    return self._opens <= 0
+    if self._opens > 0:
+      return False
+    if self._opens < 0:
+      with PfxCallinfo():
+        warning("%r._opens < 0: %r", self, self._opens)
+    return True
 
   def __exit__(self, exc_type, exc_value, traceback):
     self.close()
