@@ -194,8 +194,16 @@ def main(argv):
               # indicate end of input
               inQ.close()
               # await processing of output
-              for item in outQ:
-                warning("MAIN: finalisation collected %r", item)
+              with Pfx("main pipeline"):
+                for item in outQ:
+                  warning("finalisation collected %r", item)
+              # await completion of other diversions also
+              for pipe_name, div in P.diversions.items():
+                with Pfx("divert:%s", pipe_name):
+                  outQ = div.outQ
+                  with Pfx(str(outQ)):
+                    for item in outQ:
+                      warning("finalisation collected %r", item)
       else:
         error("unsupported op")
         badopts = True
@@ -334,6 +342,10 @@ class Pilfer(O):
   def see(self, url, seenset='_'):
     self._shared.seen[seenset].add(url)
 
+  @property
+  def diversions(self):
+    return self._shared.diversions
+
   @locked
   def diversion(self, pipe_name):
     ''' Return the diversion named `pipe_name`.
@@ -341,7 +353,7 @@ class Pilfer(O):
         There is only one of a given name in the shared state.
         They are instantiated at need.
     '''
-    diversions = self._shared.diversions
+    diversions = self.diversions
     if pipe_name not in diversions:
       spec = self.find_pipe_spec(pipe_name)
       if spec is None:
