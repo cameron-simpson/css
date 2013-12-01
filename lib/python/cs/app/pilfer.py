@@ -710,17 +710,7 @@ def action_func(action):
     # varname==
     m = re_COMPARE.match(action)
     if m:
-      kw_var = m.group(1)
-      kw_value = action[m.end():]
-      function = lambda (P, U): kw_var in P.user_vars and P.user_vars[kw_var] == U.format(kw_value, U)
-      def function(item):
-        P, U = item
-        uv = P.user_vars
-        if kw_var not in uv:
-          return False
-        v = U.format(kw_value, U)
-        return uv == v
-      func_sig = FUNC_SELECTOR
+        function, func_sig = action_compare(m.group(1), action[m.end():])
     else:
       # assignment
       # varname=
@@ -1021,6 +1011,18 @@ def action_shcmd(shcmd):
               warning("exit code = %d", xit)
             D("shcmd done")
   return function, FUNC_ONE_TO_MANY
+
+def action_compare(var, value):
+  ''' Return (function, func_sig) for a variable value comparison.
+  '''
+  def function(item):
+    P, U = item
+    uv = P.user_vars
+    if var not in uv:
+      return False
+    v = U.format(value, U)
+    return uv == v
+  return function, FUNC_SELECTOR
 
 class PipeSpec(O):
 
