@@ -477,6 +477,18 @@ class Pfx(object):
   def critical(self, msg, *args, **kwargs):
     self.log(logging.CRITICAL, msg, *args, **kwargs)
 
+class PfxCallInfo(Pfx):
+  ''' Subclass of Pfx to insert current function an caller into messages.
+  '''
+
+  def __init__(self):
+    import traceback
+    grandcaller, caller, myframe = traceback.extract_stack(None, 3)
+    Pfx.__init__(self,
+                 "at %s:%d %s(), called from %s:%d %s()",
+                 caller[0], caller[1], caller[2],
+                 grandcaller[0], grandcaller[1], grandcaller[2])
+
 # Logger public functions
 def exception(msg, *args):
   Pfx._state.cur.exception(msg, *args)
