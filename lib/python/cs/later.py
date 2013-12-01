@@ -542,7 +542,7 @@ class Later(object):
         func = a.pop(0)
     if a or kw:
       func = partial(func, *a, **kw)
-    MLF = self.submit(func, **params)
+    MLF = self._submit(func, **params)
     return MLF
 
   def after(self, LFs, R, func, *a, **kw):
