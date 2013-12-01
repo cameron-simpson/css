@@ -716,13 +716,7 @@ def action_func(action):
       # varname=
       m = re_ASSIGN.match(action)
       if m:
-        kw_var = m.group(1)
-        kw_value = action[m.end():]
-        def function(item):
-          P, U = item
-          P.set_user_var(kw_var, kw_value, U)
-          return U
-        func_sig = FUNC_ONE_TO_ONE
+          function, func_sig = action_compare(m.group(1), action[m.end():])
       else:
         # operator or s//
         func, offset = get_identifier(action)
@@ -1023,6 +1017,17 @@ def action_compare(var, value):
     v = U.format(value, U)
     return uv == v
   return function, FUNC_SELECTOR
+
+def action_assign(var, value):
+  ''' Return (function, func_sig) for a variable value assignment.
+  '''
+  var = m.group(1)
+  value = action[m.end():]
+  def function(item):
+    P, U = item
+    P.set_user_var(var, value, U)
+    return U
+  return function, FUNC_ONE_TO_ONE
 
 class PipeSpec(O):
 
