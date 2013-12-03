@@ -498,21 +498,6 @@ class Later(object):
 
     return LF
 
-  def multisubmit(self, params, func, I):
-    ''' Generator that iterates over the iterable `I`, submitting
-	function calls and yielding the corresponding LateFunctions,
-	specificly calling:
-          self.defer(params, func, item)
-        where `i` is an element of `I`.
-        Handy for submitting a batch of jobs.
-        Caution: being a generator, the functions are not submitted
-        until the caller iterates over the returned generator.
-        Examples:
-          L.multisubmit(f, xrange(100))
-    '''
-    for item in I:
-      yield self.defer(params, func, item)
-
   ##@trace_caller
   def defer(self, func, *a, **kw):
     ''' Queue the function `func` for later dispatch using the
