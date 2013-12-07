@@ -290,17 +290,15 @@ class Later(NestingOpenCloseMixin):
 	- close the worker thread pool, which waits for any of its
           outstanding threads to complete
     '''
-    with Pfx("%s.close()" % (self,)):
-      if self.closed:
-        warning("close of closed Later %r", self)
-      else:
-        self.closed = True
-        if self._timerQ:
-          self._timerQ.close()
-          self._timerQ.join()
-        self._LFPQ.close()              # prevent further submissions
-        self._dispatchThread.join()     # wait for all functions to be dispatched
-        self._workers.close()           # wait for all worker threads to complete
+    with Pfx("%s.shutdown()" % (self,)):
+      if not self.closed:
+        raise RuntimeError("not closed!")
+      if self._timerQ:
+        self._timerQ.close()
+        self._timerQ.join()
+      self._LFPQ.close()              # prevent further submissions
+      self._dispatchThread.join()     # wait for all functions to be dispatched
+      self._workers.close()           # wait for all worker threads to complete
 
   ## TODO
   def idle(self):
