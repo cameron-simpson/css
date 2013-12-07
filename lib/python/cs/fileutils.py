@@ -483,18 +483,27 @@ def maxFilenameSuffix(dir, pfx):
         maxn=n
   return maxn
 
-def mkdirn(path):
+def mkdirn(path, sep=''):
+  if os.sep in sep:
+    raise ValueError(
+            "mkdirn(path=%r, sep=%r): sep contains os.sep (%r)"
+            % (path, sep, os.sep))
   opath=path
   if len(path) == 0:
     path='.'+os.sep
 
   if path.endswith(os.sep):
+    if sep:
+      raise ValueError(
+              "mkdirn(path=%r, sep=%r): using non-empty sep with a trailing %r seems nonsensical"
+              % (path, sep, os.sep))
     dir=path[:-len(os.sep)]
     pfx=''
   else:
     dir=os.path.dirname(path)
-    if len(dir) == 0: dir='.'
-    pfx=os.path.basename(path)
+    if len(dir) == 0:
+      dir='.'
+    pfx=os.path.basename(path)+sep
 
   if not os.path.isdir(dir):
     return None
@@ -510,7 +519,7 @@ def mkdirn(path):
 
   while True:
     newn += 1
-    newpath=path+str(newn)
+    newpath=path + sep + str(newn)
     try:
       os.mkdir(newpath)
     except OSError as e:
