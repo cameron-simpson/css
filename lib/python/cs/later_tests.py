@@ -111,11 +111,11 @@ class TestLater(unittest.TestCase):
       LF1 = L3
 
   def test09pipeline_00noop(self):
-    L = self.L
-    items = ['a', 'b', 'c', 'g', 'f', 'e']
-    inQ, outQ = L.pipeline([lambda x:x], items)
-    result = list(outQ)
-    self.assertEquals( items, result )
+    with Later(1) as L:
+      items = ['a', 'b', 'c', 'g', 'f', 'e']
+      inQ, outQ = L.pipeline([lambda x:x], items)
+      result = list(outQ)
+      self.assertEquals( items, result )
 
   def test09pipeline_01idenitity(self):
     L = self.L
