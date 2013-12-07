@@ -196,16 +196,29 @@ class LateFunction(PendingFunction):
   def __str__(self):
     return "<LateFunction %s>" % (self.name,)
 
+  @contextmanager
+  def _allow_submission(self, L):
+    old_allow_submit = L._allow_submit
+    L._allow_submit = True
+    yield
+    L._allow_submit = old_allow_submit
+
   def _dispatch(self):
     ''' ._dispatch() is called by the Later class instance's worker thread.
         It causes the function to be handed to a thread for execution.
     '''
-    self.later.debug("DISPATCH %s", self)
+    L = self.later
+    L.debug("DISPATCH %s", self)
     with self._lock:
       if not self.pending:
         raise RuntimeError("should be pending, but state = %s", self.state)
+      # wrap the function to permit it to submit more work
+      func = self.func
+      def run_func():
+        with self._allow_submission(L):
+          return func()
       self.state = ASYNCH_RUNNING
-      self.later._workers.dispatch(self.func, deliver=self._worker_complete)
+      L._workers.dispatch(run_func, deliver=self._worker_complete)
       self.func = None
 
   @OBSOLETE
@@ -227,6 +240,12 @@ class LateFunction(PendingFunction):
     PendingFunction._complete(self, result, exc_info)
     self.later._completed(self, result, exc_info)
 
+class _Later_ThreadLocal(threading.local):
+  ''' Thread local state for Later.
+  '''
+  def __init__(self):
+    self.allow_submit = None
+
 class Later(NestingOpenCloseMixin):
   ''' A management class to queue function calls for later execution.
       If `capacity` is an int, it is used to size a Semaphore to constrain
@@ -243,8 +262,7 @@ class Later(NestingOpenCloseMixin):
   def __init__(self, capacity, inboundCapacity=0, name=None, open=False):
     if name is None:
       name = "Later-%d" % (seq(),)
-    self._tl = threading.local()
-    self._tl.allow_submit = None
+    self._tl = _Later_ThreadLocal()
     self._lock = Lock()
     NestingOpenCloseMixin.__init__(self, open=open)
     if ifdebug():
@@ -416,6 +434,10 @@ class Later(NestingOpenCloseMixin):
   @property
   def _allow_submit(self):
     return self._tl.allow_submit
+
+  @_allow_submit.setter
+  def _allow_submit(self, value):
+    self._tl.allow_submit = value
 
   @property
   def submittable(self):
