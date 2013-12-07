@@ -243,6 +243,7 @@ class Later(NestingOpenCloseMixin):
   def __init__(self, capacity, inboundCapacity=0, name=None, open=False):
     if name is None:
       name = "Later-%d" % (seq(),)
+    self._lock = Lock()
     NestingOpenCloseMixin.__init__(self, open=open)
     if ifdebug():
       import inspect
@@ -265,7 +266,6 @@ class Later(NestingOpenCloseMixin):
     self._LFPQ.open()
     self._workers = WorkerThreadPool(name=name+":WorkerThreadPool", open=True)
     self._dispatchThread = Thread(name=self.name+'._dispatcher', target=self._dispatcher)
-    self._lock = Lock()
     self._dispatchThread.start()
 
   def __call__(self, func, *a, **kw):
