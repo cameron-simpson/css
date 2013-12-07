@@ -707,202 +707,202 @@ def action_func(action):
       # ! shell command
       function, func_sig = action_shcmd(action[1:])
     else:
-    # comparison
-    # varname==
-    m = re_COMPARE.match(action)
-    if m:
-        function, func_sig = action_compare(m.group(1), action[m.end():])
-    else:
-      # assignment
-      # varname=
-      m = re_ASSIGN.match(action)
+      # comparison
+      # varname==
+      m = re_COMPARE.match(action)
       if m:
-          function, func_sig = action_assign(m.group(1), action[m.end():])
+        function, func_sig = action_compare(m.group(1), action[m.end():])
       else:
-        # operator or s//
-        func, offset = get_identifier(action)
-        if func:
-          with Pfx(func):
-            # an identifier
-            if func == 's':
-              # s/this/that/
-              if offset == len(action):
-                raise ValueError("missing delimiter")
-              delim = action[offset]
-              delim2pos = action.find(delim, offset+1)
-              if delim2pos < offset + 1:
-                raise ValueError("missing second delimiter (%r)" % (delim,))
-              regexp = action[offset+1:delim2pos]
-              if not regexp:
-                raise ValueError("empty regexp")
-              delim3pos = action.find(delim, delim2pos+1)
-              if delim3pos < delim2pos+1:
-                raise ValueError("missing third delimiter (%r)" % (delim,))
-              repl_format = action[delim2pos+1:delim3pos]
-              offset = delim3pos + 1
-              repl_all = False
-              repl_icase = False
-              re_flags = 0
-              while offset < len(action):
-                modchar = action[offset]
-                offset += 1
-                if modchar == 'g':
-                  repl_all = True
-                elif modchar == 'i':
-                  repl_icase = True
-                  re_flags != re.IGNORECASE
-                else:
-                  raise ValueError("unknown s///x modifier: %r" % (modchar,))
-              debug("s: regexp=%r, replacement=%r, repl_all=%s, repl_icase=%s", regexp, repl_format, repl_all, repl_icase)
-              kwargs['regexp'] = re.compile(regexp, flags=re_flags)
-              kwargs['replacement'] = repl_format
-              kwargs['replace_all'] = repl_all
-            elif func == "divert" or func == "pipe":
-              # divert:pipe_name[:selector]
-              # pipe:pipe_name[:selector]
-              #
-              # Divert selected items to the named pipeline
-              # or filter selected items through an instance of the named pipeline.
-              if offset == len(action):
-                raise ValueError("missing marker")
-              marker = action[offset]
-              offset += 1
-              pipe_name, offset = get_identifier(action, offset)
-              if not pipe_name:
-                raise ValueError("no pipe name")
-              if offset < len(action):
-                if marker != action[offset]:
-                  raise ValueError("expected second marker to match first: expected %r, saw %r"
-                                   % (marker, action[offset]))
-                offset += 1
-                raise RuntimeError("selector_func parsing not implemented")
-              else:
-                select_func = lambda (P, U): True
-              do_divert = func == "divert"
-              if do_divert:
-                # function to divert selected items to a single named pipeline
-                func_sig = FUNC_ONE_TO_MANY
-                def function(item):
-                  P, U = item
-                  if select_func(item):
-                    try:
-                      pipe = P.diversion(pipe_name)
-                    except KeyError:
-                      error("no pipe named %r", pipe_name)
-                    else:
-                      pipe.inQ.put(item)
-                  else:
-                    yield U
-              else:
-                ## TODO: present as a one-to-many function
-                ##       yielding nothing but putting each
-                ##       item onto the pipeline
-                ##
-                # A pipe runs all the items in this stream through
-                # an instance of the named pipeline.
-                # As such it is a many-to-many function.
-                scoped = True
-                func_sig = FUNC_MANY_TO_MANY
-                def function(items):
-                  if not isinstance(items, list):
-                    items = list(utems)
-                  try:
-                    if items:
-		      # construct a pipeline based if the Pilfer
-		      # associated with the first item
-                      P = items[0][0]
-                      outQ = P.pipe_through(pipe_name, inputs=items)
-                      for item in outQ:
-                        yield item
-                  except Exception as e:
-                    exception("pipe: %s", e)
-                    raise
-            elif offset < len(action):
-              marker = action[offset]
-              if marker == ':':
-                # followed by :kw1=value,kw2=value,...
-                kwtext = action[offset+1:]
-                if func == "print":
-                  # print is special - just a format string relying on current state
-                  kwargs['string'] = kwtext
-                else:
-                  for kw in kwtext.split(','):
-                    if '=' in kw:
-                      kw, v = kw.split('=', 1)
-                      kwargs[kw] = v
-                    else:
-                      args.append(kw)
-              else:
-                raise ValueError("unrecognised marker %r" % (marker,))
-          if not function:
-            if func_sig is not None:
-              raise RuntimeError("func_sig is set (%r) but function is None" % (func_sig,))
-            if func in many_to_many:
-              # many-to-many functions get passed straight in
-              function = many_to_many[func]
-              func_sig = FUNC_MANY_TO_MANY
-            elif func in one_to_many:
-              function = one_to_many[func]
-              func_sig = FUNC_ONE_TO_MANY
-            elif func in one_to_one:
-              function = one_to_one[func]
-              func_sig = FUNC_ONE_TO_ONE
-              scoped = func in one_to_one_scoped
-            elif func in one_test:
-              function = one_test[func]
-              func_sig = FUNC_SELECTOR
-            else:
-              raise ValueError("unknown action")
-          else:
-            if func_sig is None:
-              raise RuntimeError("function is set (%r) but func_sig is None" % (function,))
-        # select URLs matching regexp
-        # /regexp/
-        elif action.startswith('/'):
-          if action.endswith('/'):
-            regexp = action[1:-1]
-          else:
-            regexp = action[1:]
-          regexp = re.compile(regexp)
-          function = lambda (P, U): regexp.search(U)
-          function.__name__ = '/%s/' % (regexp,)
-          func_sig = FUNC_SELECTOR
-        # select URLs not matching regexp
-        # -/regexp/
-        elif action.startswith('-/'):
-          if action.endswith('/'):
-            regexp = action[2:-1]
-          else:
-            regexp = action[2:]
-          regexp = re.compile(regexp)
-          function = lambda (P, U): regexp.search(U)
-          function.__name__ = '-/%s/' % (regexp,)
-          func_sig = FUNC_SELECTOR
-        # parent
-        # ..
-        elif action == '..':
-          function = lambda (P, U): U.parent
-          func_sig = FUNC_ONE_TO_ONE
-        # select URLs ending in particular extensions
-        elif action.startswith('.'):
-          if action.endswith('/i'):
-            exts, case = action[1:-2], False
-          else:
-            exts, case = action[1:], True
-          exts = exts.split(',')
-          function = lambda (P, U): has_exts( U, exts, case_sensitive=case )
-          func_sig = FUNC_SELECTOR
-        # select URLs not ending in particular extensions
-        elif action.startswith('-.'):
-          if action.endswith('/i'):
-            exts, case = action[2:-2], False
-          else:
-            exts, case = action[2:], True
-          exts = exts.split(',')
-          function = lambda (P, U): not has_exts( U, exts, case_sensitive=case )
-          func_sig = FUNC_SELECTOR
+        # assignment
+        # varname=
+        m = re_ASSIGN.match(action)
+        if m:
+          function, func_sig = action_assign(m.group(1), action[m.end():])
         else:
-          raise ValueError("unknown function %r" % (func,))
+          # operator or s//
+          func, offset = get_identifier(action)
+          if func:
+            with Pfx(func):
+              # an identifier
+              if func == 's':
+                # s/this/that/
+                if offset == len(action):
+                  raise ValueError("missing delimiter")
+                delim = action[offset]
+                delim2pos = action.find(delim, offset+1)
+                if delim2pos < offset + 1:
+                  raise ValueError("missing second delimiter (%r)" % (delim,))
+                regexp = action[offset+1:delim2pos]
+                if not regexp:
+                  raise ValueError("empty regexp")
+                delim3pos = action.find(delim, delim2pos+1)
+                if delim3pos < delim2pos+1:
+                  raise ValueError("missing third delimiter (%r)" % (delim,))
+                repl_format = action[delim2pos+1:delim3pos]
+                offset = delim3pos + 1
+                repl_all = False
+                repl_icase = False
+                re_flags = 0
+                while offset < len(action):
+                  modchar = action[offset]
+                  offset += 1
+                  if modchar == 'g':
+                    repl_all = True
+                  elif modchar == 'i':
+                    repl_icase = True
+                    re_flags != re.IGNORECASE
+                  else:
+                    raise ValueError("unknown s///x modifier: %r" % (modchar,))
+                debug("s: regexp=%r, replacement=%r, repl_all=%s, repl_icase=%s", regexp, repl_format, repl_all, repl_icase)
+                kwargs['regexp'] = re.compile(regexp, flags=re_flags)
+                kwargs['replacement'] = repl_format
+                kwargs['replace_all'] = repl_all
+              elif func == "divert" or func == "pipe":
+                # divert:pipe_name[:selector]
+                # pipe:pipe_name[:selector]
+                #
+                # Divert selected items to the named pipeline
+                # or filter selected items through an instance of the named pipeline.
+                if offset == len(action):
+                  raise ValueError("missing marker")
+                marker = action[offset]
+                offset += 1
+                pipe_name, offset = get_identifier(action, offset)
+                if not pipe_name:
+                  raise ValueError("no pipe name")
+                if offset < len(action):
+                  if marker != action[offset]:
+                    raise ValueError("expected second marker to match first: expected %r, saw %r"
+                                     % (marker, action[offset]))
+                  offset += 1
+                  raise RuntimeError("selector_func parsing not implemented")
+                else:
+                  select_func = lambda (P, U): True
+                do_divert = func == "divert"
+                if do_divert:
+                  # function to divert selected items to a single named pipeline
+                  func_sig = FUNC_ONE_TO_MANY
+                  def function(item):
+                    P, U = item
+                    if select_func(item):
+                      try:
+                        pipe = P.diversion(pipe_name)
+                      except KeyError:
+                        error("no pipe named %r", pipe_name)
+                      else:
+                        pipe.inQ.put(item)
+                    else:
+                      yield U
+                else:
+                  ## TODO: present as a one-to-many function
+                  ##       yielding nothing but putting each
+                  ##       item onto the pipeline
+                  ##
+                  # A pipe runs all the items in this stream through
+                  # an instance of the named pipeline.
+                  # As such it is a many-to-many function.
+                  scoped = True
+                  func_sig = FUNC_MANY_TO_MANY
+                  def function(items):
+                    if not isinstance(items, list):
+                      items = list(utems)
+                    try:
+                      if items:
+                        # construct a pipeline based if the Pilfer
+                        # associated with the first item
+                        P = items[0][0]
+                        outQ = P.pipe_through(pipe_name, inputs=items)
+                        for item in outQ:
+                          yield item
+                    except Exception as e:
+                      exception("pipe: %s", e)
+                      raise
+              elif offset < len(action):
+                marker = action[offset]
+                if marker == ':':
+                  # followed by :kw1=value,kw2=value,...
+                  kwtext = action[offset+1:]
+                  if func == "print":
+                    # print is special - just a format string relying on current state
+                    kwargs['string'] = kwtext
+                  else:
+                    for kw in kwtext.split(','):
+                      if '=' in kw:
+                        kw, v = kw.split('=', 1)
+                        kwargs[kw] = v
+                      else:
+                        args.append(kw)
+                else:
+                  raise ValueError("unrecognised marker %r" % (marker,))
+            if not function:
+              if func_sig is not None:
+                raise RuntimeError("func_sig is set (%r) but function is None" % (func_sig,))
+              if func in many_to_many:
+                # many-to-many functions get passed straight in
+                function = many_to_many[func]
+                func_sig = FUNC_MANY_TO_MANY
+              elif func in one_to_many:
+                function = one_to_many[func]
+                func_sig = FUNC_ONE_TO_MANY
+              elif func in one_to_one:
+                function = one_to_one[func]
+                func_sig = FUNC_ONE_TO_ONE
+                scoped = func in one_to_one_scoped
+              elif func in one_test:
+                function = one_test[func]
+                func_sig = FUNC_SELECTOR
+              else:
+                raise ValueError("unknown action")
+            else:
+              if func_sig is None:
+                raise RuntimeError("function is set (%r) but func_sig is None" % (function,))
+          # select URLs matching regexp
+          # /regexp/
+          elif action.startswith('/'):
+            if action.endswith('/'):
+              regexp = action[1:-1]
+            else:
+              regexp = action[1:]
+            regexp = re.compile(regexp)
+            function = lambda (P, U): regexp.search(U)
+            function.__name__ = '/%s/' % (regexp,)
+            func_sig = FUNC_SELECTOR
+          # select URLs not matching regexp
+          # -/regexp/
+          elif action.startswith('-/'):
+            if action.endswith('/'):
+              regexp = action[2:-1]
+            else:
+              regexp = action[2:]
+            regexp = re.compile(regexp)
+            function = lambda (P, U): regexp.search(U)
+            function.__name__ = '-/%s/' % (regexp,)
+            func_sig = FUNC_SELECTOR
+          # parent
+          # ..
+          elif action == '..':
+            function = lambda (P, U): U.parent
+            func_sig = FUNC_ONE_TO_ONE
+          # select URLs ending in particular extensions
+          elif action.startswith('.'):
+            if action.endswith('/i'):
+              exts, case = action[1:-2], False
+            else:
+              exts, case = action[1:], True
+            exts = exts.split(',')
+            function = lambda (P, U): has_exts( U, exts, case_sensitive=case )
+            func_sig = FUNC_SELECTOR
+          # select URLs not ending in particular extensions
+          elif action.startswith('-.'):
+            if action.endswith('/i'):
+              exts, case = action[2:-2], False
+            else:
+              exts, case = action[2:], True
+            exts = exts.split(',')
+            function = lambda (P, U): not has_exts( U, exts, case_sensitive=case )
+            func_sig = FUNC_SELECTOR
+          else:
+            raise ValueError("unknown function %r" % (func,))
 
     func0 = function
     # The pipeline itself passes (P, U) item tuples.
@@ -987,16 +987,59 @@ def action_shcmd(shcmd):
           except Exception as e:
             exception("Popen: %r", e)
             return
-            for line in subp.stdout:
-              if line.endswith('\n'):
-                yield line[:-1]
-              else:
-                yield line
-            subp.wait()
-            xit = subp.returncode
-            if xit != 0:
-              warning("exit code = %d", xit)
+        for line in subp.stdout:
+          if line.endswith('\n'):
+            yield line[:-1]
+          else:
+            yield line
+        subp.wait()
+        xit = subp.returncode
+        if xit != 0:
+          warning("exit code = %d", xit)
   return function, FUNC_ONE_TO_MANY
+
+def action_pipecmd(shcmd):
+  ''' Return (function, func_sig) for pipeline through a shell command.
+  '''
+  shcmd = shcmd.strip()
+  def function(items):
+    if not isinstance(items, list):
+      items = list(items)
+    if not items:
+      return
+    P, U = items[0]
+    uv = P.user_vars
+    try:
+      v = P.format_string(shcmd, U)
+    except KeyError as e:
+      warning("pipecmd.format(%r): KeyError: %s", uv, e)
+    else:
+      with Pfx(v):
+        # spawn the shell command
+        try:
+          subp = Popen(['/bin/sh', '-c', 'sh -uex; '+v], stdin=PIPE, stdout=PIPE, close_fds=True)
+        except Exception as e:
+          exception("Popen: %r", e)
+          return
+        # spawn a daemon thread to feed items to the pipe
+        def feedin():
+          for P, U in items:
+            print(U, file=subp.stdin)
+          subp.stdin.close()
+        T = Thread(target=feedin, name='feedin to %r' % (v,))
+        T.daemon = True
+        T.start()
+        # read lines from the pipe, trim trailing newlines and yield
+        for line in subp.stdout:
+          if line.endswith('\n'):
+            yield line[:-1]
+          else:
+            yield line
+        subp.wait()
+        xit = subp.returncode
+        if xit != 0:
+          warning("exit code = %d", xit)
+  return function, FUNC_MANY_TO_MANY
 
 def action_compare(var, value):
   ''' Return (function, func_sig) for a variable value comparison.
