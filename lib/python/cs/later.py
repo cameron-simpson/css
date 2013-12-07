@@ -350,7 +350,7 @@ class Later(NestingOpenCloseMixin):
         function is blocking on this, and will return on its release.
     '''
     debug("%s: __exit__: exc_type=%s", self, exc_type)
-    NestingOpenCloseMixin.__exit__(self, exc_type, exc_value, traceback)
+    NestingOpenCloseMixin.__exit__(self, exc_type, exc_val, exc_tb)
     global default
     default.pop()
     return False
