@@ -484,26 +484,30 @@ def maxFilenameSuffix(dir, pfx):
   return maxn
 
 def mkdirn(path, sep=''):
+  ''' Create a new directory named path+sep+n, where `n` exceeds any name already present.
+      `path`: the basic directory path.
+      `sep`: a separator between `path` and n. Default: ""
+  '''
   if os.sep in sep:
     raise ValueError(
             "mkdirn(path=%r, sep=%r): sep contains os.sep (%r)"
             % (path, sep, os.sep))
-  opath=path
+  opath = path
   if len(path) == 0:
-    path='.'+os.sep
+    path = '.'+os.sep
 
   if path.endswith(os.sep):
     if sep:
       raise ValueError(
               "mkdirn(path=%r, sep=%r): using non-empty sep with a trailing %r seems nonsensical"
               % (path, sep, os.sep))
-    dir=path[:-len(os.sep)]
-    pfx=''
+    dir = path[:-len(os.sep)]
+    pfx = ''
   else:
-    dir=os.path.dirname(path)
+    dir = os.path.dirname(path)
     if len(dir) == 0:
       dir='.'
-    pfx=os.path.basename(path)+sep
+    pfx = os.path.basename(path)+sep
 
   if not os.path.isdir(dir):
     return None
@@ -511,15 +515,15 @@ def mkdirn(path, sep=''):
   # do a quick scan of the directory to find
   # if any names of the desired form already exist
   # in order to start after them
-  maxn=maxFilenameSuffix(dir, pfx)
+  maxn = maxFilenameSuffix(dir, pfx)
   if maxn is None:
-    newn=0
+    newn = 0
   else:
-    newn=maxn
+    newn = maxn
 
   while True:
     newn += 1
-    newpath=path + sep + str(newn)
+    newpath = path + sep + str(newn)
     try:
       os.mkdir(newpath)
     except OSError as e:
@@ -529,7 +533,7 @@ def mkdirn(path, sep=''):
       error("mkdir(%s): %s", newpath, e)
       return None
     if len(opath) == 0:
-      newpath=os.path.basename(newpath)
+      newpath = os.path.basename(newpath)
     return newpath
 
 def tmpdir():
