@@ -243,6 +243,8 @@ class Later(NestingOpenCloseMixin):
   def __init__(self, capacity, inboundCapacity=0, name=None, open=False):
     if name is None:
       name = "Later-%d" % (seq(),)
+    self._tl = threading.local()
+    self._tl.allow_submit = None
     self._lock = Lock()
     NestingOpenCloseMixin.__init__(self, open=open)
     if ifdebug():
@@ -410,6 +412,22 @@ class Later(NestingOpenCloseMixin):
       self.running.add(LF)
       self.debug("dispatched %s", LF)
       LF._dispatch()
+
+  @property
+  def _allow_submit(self):
+    return self._tl.allow_submit
+
+  @property
+  def submittable(self):
+    ''' May new tasks be submitted?
+	This normally tracks "not self.closed", but running tasks
+	are wrapped in a thread local override to permit them to
+	submit further related tasks.
+    '''
+    override = self._allow_submit
+    if override is not None:
+      return override
+    return not self.closed
 
   def bg(self, func, *a, **kw):
     ''' Queue a function to run right now, ignoring the Later's capacity and
