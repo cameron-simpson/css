@@ -11,7 +11,8 @@ import traceback
 from cs.py3 import Queue, raise3
 import time
 from cs.debug import ifdebug, Lock, RLock, Thread, trace_caller
-from cs.queues import IterableQueue, IterablePriorityQueue, PushQueue
+from cs.queues import IterableQueue, IterablePriorityQueue, PushQueue, \
+                        NestingOpenCloseMixin
 from cs.threads import AdjustableSemaphore, \
                        WorkerThreadPool, TimerQueue
 from cs.asynchron import Result, Asynchron, ASYNCH_RUNNING
@@ -226,7 +227,7 @@ class LateFunction(PendingFunction):
     PendingFunction._complete(self, result, exc_info)
     self.later._completed(self, result, exc_info)
 
-class Later(object):
+class Later(NestingOpenCloseMixin):
   ''' A management class to queue function calls for later execution.
       If `capacity` is an int, it is used to size a Semaphore to constrain
       the number of dispatched functions which may be in play at a time.
@@ -239,9 +240,10 @@ class Later(object):
       The `name` parameter may be used to supply an identifying name
       for this instance.
   '''
-  def __init__(self, capacity, inboundCapacity=0, name=None):
+  def __init__(self, capacity, inboundCapacity=0, name=None, open=False):
     if name is None:
       name = "Later-%d" % (seq(),)
+    NestingOpenCloseMixin.__init__(self, open=open)
     if ifdebug():
       import inspect
       filename, lineno = inspect.stack()[1][1:3]
@@ -256,7 +258,6 @@ class Later(object):
     self.pending = set()        # undispatched LateFunctions
     self.running = set()        # running LateFunctions
     self.logger = None          # reporting; see logTo() method
-    self.closed = False
     self._priority = (0,)
     self._timerQ = None         # queue for delayed requests; instantiated at need
     # inbound requests queue
@@ -281,7 +282,7 @@ class Later(object):
     return self.defer(func, *a, **kw)()
 
   ##@trace_caller
-  def close(self):
+  def shutdown(self):
     ''' Shut down the Later instance:
         - close the TimerQueue, if any, and wait for it to complete
         - close the request queue
@@ -341,6 +342,7 @@ class Later(object):
     debug("%s: __enter__", self)
     global default
     default.push(self)
+    NestingOpenCloseMixin.__enter__(self)
     return self
 
   def __exit__(self, exc_type, exc_val, exc_tb):
@@ -348,9 +350,9 @@ class Later(object):
         function is blocking on this, and will return on its release.
     '''
     debug("%s: __exit__: exc_type=%s", self, exc_type)
+    NestingOpenCloseMixin.__exit__(self, exc_type, exc_value, traceback)
     global default
     default.pop()
-    self.close()
     return False
 
   def logTo(self, filename, logger=None, log_level=None):
