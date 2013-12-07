@@ -704,8 +704,11 @@ def action_func(action):
     action0 = action
 
     if action.startswith('!'):
-      # ! shell command
+      # ! shell command to generate items based off current item
       function, func_sig = action_shcmd(action[1:])
+    elif action.startswith('|'):
+      # | shell command to pipe though
+      function, func_sig = action_pipecmd(action[1:])
     else:
       # comparison
       # varname==
