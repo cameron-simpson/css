@@ -497,28 +497,28 @@ class Pilfer(O):
       value = self.format_string(value, U)
     self.Variables(U)[k] = value
 
-def new_dir(self, dir):
-  ''' Create the directory `dir` or `dir-n` if `dir` exists.
+def new_dir(dirpath):
+  ''' Create the directory `dirpath` or `dirpath-n` if `dirpath` exists.
       Return the path of the directory created.
   '''
   try:
-    os.makedirs(dir)
+    os.makedirs(dirpath)
   except OSError as e:
     if e.errno != errno.EEXIST:
       raise
-    n = 2
-    while True:
-      ndir = "%s-%d" % (dir, n)
-      try:
-        os.makedirs(ndir)
-      except OSError as e:
-        if e.errno != errno.EEXIST:
-          raise
-        n += 1
-        continue
-      dir = ndir
-      break
-  return dir
+    dirpath = mkdirn(dirpath, '-')
+  return dirpath
+
+def make_new_save_dir(Ps, Us):
+  D("make_new_save_dir: Ps is %r, Us is %r", Ps, Us)
+  if Ps:
+    P = Ps[0]
+    sd = P.user_vars.get('save_dir', '.')
+    nsd = new_dir(sd)
+    D("make_new_save_dir: made %r", nsd)
+    P.user_vars['save_dir'] = nsd
+  D("make_new_save_dir: returning %r", Us)
+  return Us
 
 def has_exts(U, suffixes, case_sensitive=False):
   ''' Test if the .path component of a URL ends in one of a list of suffixes.
@@ -638,6 +638,7 @@ many_to_many = {
       'unique':       lambda Ps, Us: unique(Us),
       'first':        lambda Ps, Us: Us[:1],
       'last':         lambda Ps, Us: Us[-1:],
+      'new_save_dir': make_new_save_dir,
     }
 
 one_to_many = {
