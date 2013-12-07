@@ -460,8 +460,8 @@ class Later(NestingOpenCloseMixin):
 	but do not want to consume capacity themselves, thus avoiding
 	deadlock at the cost of transient overthreading.
     '''
-    if self.closed:
-      warning("%s.bg(...) after close()", self)
+    if not self.submittable:
+      raise RuntimeError("%s.bg(...) but not self.submittable" % (self,))
     funcname = None
     if isinstance(func, str):
       funcname = func
@@ -494,9 +494,8 @@ class Later(NestingOpenCloseMixin):
         If the parameter `pfx` is not None, submit pfx.func(func);
           see cs.logutils.Pfx's .func method for details.
     '''
-    if self.closed:
-      with PfxCallInfo():
-        warning("%s.submit(...) after close()", self)
+    if not self.submittable:
+      raise RuntimeError("%s.submit(...) but not self.submittable" % (self,))
     return self._submit(func, priority=priority, delay=delay, when=when, name=name, pfx=pfx)
 
   def _submit(self, func, priority=None, delay=None, when=None, name=None, pfx=None):
@@ -550,8 +549,8 @@ class Later(NestingOpenCloseMixin):
         Equivalent to:
           submit(functools.partial(func, *a, **kw), **params)
     '''
-    if self.closed:
-      warning("%s.defer(...) after close()", self)
+    if not self.submittable:
+      raise RuntimeError("%s.defer(...) but not self.submittable" % (self,))
     return self._defer(func, *a, **kw)
 
   def _defer(self, func, *a, **kw):
@@ -605,8 +604,8 @@ class Later(NestingOpenCloseMixin):
 	See the retry method for a convenience method that uses the
 	above pattern in a repeating style.
     '''
-    if self.closed:
-      warning("%s.after(...) after close()", self)
+    if not self.submittable:
+      raise RuntimeError("%s.after(...) but not self.submittable" % (self,))
     return self._after(LFs, R, func, *a, **kw)
 
   def _after(self, LFs, R, func, *a, **kw):
@@ -673,8 +672,8 @@ class Later(NestingOpenCloseMixin):
         If `outQ` is None, instantiate a new IterableQueue.
         Return `outQ`.
     '''
-    if self.closed:
-      warning("%s.defer_iterable after close", self)
+    if not self.submittable:
+      raise RuntimeError("%s.defer_iterable(...) but not self.submittable" % (self,))
     return self._defer_iterable(I, outQ=outQ)
 
   def _defer_iterable(self, I, outQ=None):
@@ -733,8 +732,8 @@ class Later(NestingOpenCloseMixin):
           for item in output:
             print(item)
     '''
-    if self.closed:
-      warning("%s.pipeline after close", self)
+    if not self.submittable:
+      raise RuntimeError("%s.pipeline(...) but not self.submittable" % (self,))
     return self._pipeline(filter_funcs, inputs, outQ=outQ, open=open)
 
   def _pipeline(self, filter_funcs, inputs=None, outQ=None, open=False):
