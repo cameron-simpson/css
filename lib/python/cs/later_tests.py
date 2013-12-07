@@ -30,7 +30,7 @@ class TestLater(unittest.TestCase):
     raise TestLater._Bang()
 
   def setUp(self):
-    self.L = Later(2)
+    self.L = Later(2, open=True)
     self.L.logTo("/dev/tty")
 
   def tearDown(self):
