@@ -16,6 +16,7 @@ from cs.debug import DEBUG
 from cs.inttypes import Flags
 from cs.threads import Lock, RLock, Channel, locked_property
 from cs.later import Later
+from cs.queues import NestingOpenCloseMixin
 from cs.asynchron import Result, report as report_LFs, \
         Asynchron, ASYNCH_PENDING, ASYNCH_RUNNING, ASYNCH_CANCELLED, ASYNCH_READY
 import cs.logutils
@@ -34,7 +35,7 @@ PRI_PREREQ = 2
 
 MakeDebugFlags = Flags('debug', 'flags', 'make', 'parse')
 
-class Maker(O):
+class Maker(NestingOpenCloseMixin, O):
   ''' Main class representing a set of dependencies to make.
   '''
 
@@ -46,6 +47,8 @@ class Maker(O):
     if parallel < 1:
       raise ValueError("expected positive integer for parallel, got: %s" % (parallel,))
     O.__init__(self)
+    self._lock = Lock()
+    NestingOpenCloseMixin.__init__(self)
     self._O_omit.extend(['macros', 'targets', 'rules', 'namespaces'])
     self.parallel = parallel
     self._makeQ = None
@@ -96,7 +99,7 @@ class Maker(O):
     self._makeQ = Later(self.parallel, name=cs.logutils.cmd)
     self._makeQ.logTo("myke-later.log")
 
-  def close(self):
+  def shutdown(self):
     self._makeQ.close()
     self._makeQ = None
 
@@ -106,6 +109,8 @@ class Maker(O):
     '''
     if self._makeQ is None:
       self.prepare()
+    self._makeQ.open()
+    NestingOpenCloseMixin.__enter__(self)
     return self
 
   def __exit__(self, exc_type, exc_val, exc_tb):
@@ -113,7 +118,7 @@ class Maker(O):
         Close the _makeQ.
     '''
     self.debug_make("%s.close()", self)
-    self.close()
+    self._makeQ.close()
     return False
 
   @property
