@@ -56,9 +56,8 @@ def main(argv):
     error("no default target")
     xit = 1
   else:
-    xit = 0 if M.make(targets) else 1
-
-  M.close()
+    with M:
+      xit = 0 if M.make(targets) else 1
 
   return xit
 
