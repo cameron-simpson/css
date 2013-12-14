@@ -61,7 +61,7 @@ class NestingOpenCloseMixin(object):
     if self._opens > 0:
       return False
     if self._opens < 0:
-      with PfxCallinfo():
+      with PfxCallInfo():
         warning("%r._opens < 0: %r", self, self._opens)
     return True
 
