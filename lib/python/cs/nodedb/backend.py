@@ -114,7 +114,7 @@ class _BackendUpdateQueue(O):
     self._updateQ = None
     self._update_thread = None
     if not self.readonly:
-      self._updateQ = IterableQueue(1024, open=True)
+      self._updateQ = Queue(1024)
 
   def _update_start_thread(self):
     ''' Construct and start the update thread.
@@ -133,7 +133,7 @@ class _BackendUpdateQueue(O):
 
   def _update_close(self):
     if self._updateQ:
-      self._updateQ.close()
+      self._updateQ.put(None)
       self._updateQ = None
     if self._update_thread:
       self._update_thread.join()
@@ -190,7 +190,10 @@ class _BackendUpdateQueue(O):
       # not watching for other updates
       # just read update queue and apply
       if not self.readonly:
-        for row in updateQ:
+        while True:
+          row = updateQ.get()
+          if row is None:
+            break
           self._update_push(updateQ, delay, row0=row)
       return
 
