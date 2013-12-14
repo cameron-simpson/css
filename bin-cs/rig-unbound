@@ -11,7 +11,7 @@ usage="Usage: $cmd [upstream-forwards...]"
 
 : ${VARRUN:=$HOME/var/run}
 : ${LOGDIR:=$HOME/var/log}
-: ${UNBOUND_DNS_UPSTREAM:=}
+: ${UNBOUND_DNS_UPSTREAM:=}     # server set, eg: opennic
 
 me=`id -un`
 trace=set-x
@@ -44,6 +44,8 @@ server:
   pidfile: "$pidfile"
   log-queries: yes
   verbosity: 3      # uncomment and increase to get more logging.
+  ## # default is "3 2 1 0 0"
+  ## target−fetch−policy: "−1 −1 −1 −1 −1"
 X
 
 cat "$host_conf"
@@ -135,7 +137,7 @@ X
     case "$dnsup" in
       [a-z]*)
         resolv=$HOME/rc/dns/resolv-$dnsup.conf
-        $trace sed -n 's/ *#.*//; s/^nameserver  *//p' "$resolv"
+        $trace sed -n 's/ *#.*//; s/^nameserver  *//p' "$resolv" | shuffle
         ;;
       *)$trace echo "$dnsup"
         ;;
