@@ -878,7 +878,7 @@ def action_func(action):
             else:
               regexp = action[2:]
             regexp = re.compile(regexp)
-            function = lambda (P, U): regexp.search(U)
+            function = lambda (P, U): not regexp.search(U)
             function.__name__ = '-/%s/' % (regexp,)
             func_sig = FUNC_SELECTOR
           # parent
