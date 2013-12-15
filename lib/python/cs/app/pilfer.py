@@ -1059,8 +1059,6 @@ def action_compare(var, value):
 def action_assign(var, value):
   ''' Return (function, func_sig) for a variable value assignment.
   '''
-  var = m.group(1)
-  value = action[m.end():]
   def function(item):
     P, U = item
     P.set_user_var(var, value, U)
