@@ -1,0 +1,67 @@
+#!/bin/sh
+#
+# Ping multiple hosts in parallel.
+# Report status.
+#       - Cameron Simpson <cs@zip.com.au>
+#
+
+set -ue
+
+cmd=$0
+usage="Usage: $cmd /regexp/ hosts...
+  /regexp/      Apply the extended regexp to the IP addresses to select a
+                subset.
+  hosts         Host IPs or names. \"-\" specifies that names/ips
+                are to be read from standard input."
+
+regexp=.
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing arguments" >&2
+  badopts=1
+else
+  case "$1" in
+    /*/)        regexp=`expr "x$1" : 'x.\(.*\).'`
+                shift
+                ;;
+  esac
+  if [ $# = 0 ]
+  then
+    echo "$cmd: missing arguments" >&2
+    badopts=1
+  fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+for host
+do
+  if [ "x$host" = x- ]
+  then  cat
+  else  printf '%s\n' "$host"
+  fi
+done \
+| grep '^[^#]' \
+| while read -r host
+  do
+    case "$host" in
+      [0-9]*)   printf '%s\n' "$host" ;;
+      *)  hostips "$host" | sed "s/\$/ $host/";;
+    esac
+  done \
+| egrep "$regexp" \
+| \
+(
+  while read ip etc
+  do
+    if ping -c 3 -q "$ip" >/dev/null
+    then echo $ip GOOD ping $etc
+    else echo $ip BAD ping $etc
+    fi &
+  done
+  wait
+) \
+| sort
