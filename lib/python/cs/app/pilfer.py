@@ -724,6 +724,7 @@ one_test = {
 
 re_COMPARE = re.compile(r'([a-z]\w*)==')
 re_ASSIGN  = re.compile(r'([a-z]\w*)=')
+re_GROK    = re.compile(r'([a-z]\w*(\.[a-z]\w*)*)\.([_a-z]\w*)', re.I)
 
 def action_func(action):
   ''' Accept a string `action` and return a tuple of:
@@ -759,6 +760,10 @@ def action_func(action):
         if m:
           function, func_sig = action_assign(m.group(1), action[m.end():])
         else:
+          # catch "a.b.c" and convert to "grok:a.b.c"
+          m = re_GROK.match(action)
+          if m:
+            action = 'grok:' + action
           # operator or s//
           func, offset = get_identifier(action)
           if func:
@@ -834,29 +839,46 @@ def action_func(action):
                     else:
                       yield U
                 else:
-                  ## TODO: present as a one-to-many function
-                  ##       yielding nothing but putting each
-                  ##       item onto the pipeline
-                  ##
-                  # A pipe runs all the items in this stream through
-                  # an instance of the named pipeline.
-                  # As such it is a many-to-many function.
-                  scoped = True
+                  raise RuntimeError("pipe: not yet implemented")
+              elif func == 'grok' or func == 'grokall':
+                # grok:a.b.c.d[:args...]
+                # grokall:a.b.c.d[:args...]
+                #
+                # Import "d" from the python module "a.b.c".
+                #
+		# For grok, call d((P, U), kwargs) and apply the
+		# returned mapping to P.user_vars.
+                #
+		# From grokall, call d(Ps, Us, kwargs) and apply
+		# the returned mapping to each P.user_vars.
+                #
+                is_grokall = func == "grokall"
+                if offset == len(action):
+                  raise ValueError("missing marker")
+                marker = action[offset]
+                offset += 1
+                m = re_GROK.match(action[offset:])
+                if not m:
+                  raise ValueError("expected a.b.c.d name at \"%s\"" % (action[offset:],))
+                grok_module = m.group(1)
+                grok_funcname = m.group(3)
+                offset += m.end()
+                if offset < len(action):
+                  if marker != action[offset]:
+                    raise ValueError("expected second marker to match first: expected %r, saw %r"
+                                     % (marker, action[offset]))
+                  offset += 1
+                  raise RuntimeError("arguments to %s not yet implemented" % (func,))
+                if is_grokall:
                   func_sig = FUNC_MANY_TO_MANY
                   def function(items):
-                    if not isinstance(items, list):
-                      items = list(utems)
-                    try:
-                      if items:
-                        # construct a pipeline based if the Pilfer
-                        # associated with the first item
-                        P = items[0][0]
-                        outQ = P.pipe_through(pipe_name, inputs=items)
-                        for item in outQ:
-                          yield item
-                    except Exception as e:
-                      exception("pipe: %s", e)
-                      raise
+                    for P, U in items:
+                      yield P, grok(grok_module, grok_funcname, item)
+                else:
+                  func_sig = FUNC_ONE_TO_ONE
+                  def function( (P, U), *a, **kw):
+                    return grok(grok_module, grok_funcname, (P, U), *a, **kw)
+              # some other function: gather arguments
               elif offset < len(action):
                 marker = action[offset]
                 if marker == ':':
