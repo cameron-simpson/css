@@ -632,6 +632,43 @@ def url_srcs(U, referrer=None):
   '''
   return url_io_iter(URL(U, referrer).srcs(absolute=True))
 
+def grok(module_name, func_name, (P, U), *a, **kw):
+  ''' Grok performs a user-specified analysis on the URL U.
+      Import `func_name` from module `module_name`.
+      Call `func_name( (P, U), *a, **kw ).
+      Receive a mapping of variable names to values in return,
+      which is applied to P.set_user_vars().
+      Returns U, as this is a one-to-one function.
+  '''
+  with Pfx("call %s.%s( (P=%r, U=%r), *a=%r, **kw=%r )...", module_name, func_name, P, U, a, kw):
+    import importlib
+    try:
+      M = importlib.import_module(module_name)
+    except ImportError as e:
+      exception("%s", e)
+    else:
+      ##D("dir(M): %r", dir(M))
+      ##D("call %s.%s( (P=%r, U=%r), *a=%r, **kw=%r )...", module_name, func_name, P, U, a, kw)
+      try:
+        mfunc = getattr(M, func_name)
+      except AttributeError as e:
+        error("%s: no entry named %r: %s", module_name, func_name, e)
+      else:
+        try:
+          var_mapping = mfunc((P, U), *a, **kw)
+        except Exception as e:
+          exception("call")
+        else:
+          ##D("==> %r", var_mapping)
+          P.set_user_vars(**var_mapping)
+    return U
+
+def _test_grokfunc( (P, U), *a, **kw ):
+  v={ 'grok1': 'grok1value',
+      'grok2': 'grok2value',
+    }
+  return v
+
 # actions that work on the whole list of in-play URLs
 many_to_many = {
       'sort':         lambda Ps, Us, *a, **kw: sorted(Us, *a, **kw),
