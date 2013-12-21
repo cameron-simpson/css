@@ -970,7 +970,7 @@ def action_func(action):
     #
     # All functions accept a leading (P, U) tuple argument but most emit only
     # a U result (or just a Booleans for selectors).
-    # A few, like "per", emit a (P, U) because the change the "scope" P argument.
+    # A few, like "per", emit a (P, U) because they change the "scope" P argument.
     # If "scoped" is true, we expect the latter.
     # Otherwise we wrap FUNC_ONE_TO_ONE and FUNC_ONE_TO_MANY to emit the
     # supplied P value with their outputs.
