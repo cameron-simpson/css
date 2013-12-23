@@ -1188,11 +1188,11 @@ class PilferRC(O):
           warning("unrecognised [DEFAULTS].%s: %s" % (dflt, value))
       for action in cfg.options('actions'):
         self.action_map[action] = cfg.get('actions', action).strip()
-      for section in cfg.sections():
-        with Pfx("[%s]", section):
-          pipe_spec = cfg.get(section, 'pipe')
-          debug("loadrc: %s: pipe = %s", section, pipe_spec)
-          self.pipe_specs[section] = PipeSpec(section, shlex.split(pipe_spec))
+      for pipe_name in cfg.options('pipes'):
+        with Pfx('[pipes].%s', pipe_name):
+          pipe_spec = cfg.get('pipes', pipe_name)
+          debug("loadrc: pipe = %s", pipe_spec)
+          self.pipe_specs[pipe_name] = PipeSpec(pipe_name, shlex.split(pipe_spec))
 
   def __getitem__(self, pipename):
     ''' Fetch PipeSpec by name.
