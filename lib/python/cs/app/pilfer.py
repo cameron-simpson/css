@@ -624,17 +624,17 @@ def url_io_iter(I):
     else:
       yield item
 
-def url_hrefs(U, referrer=None):
+def url_hrefs(U):
   ''' Yield the HREFs referenced by a URL.
       Conceals URLError, HTTPError.
   '''
-  return url_io_iter(URL(U, referrer).hrefs(absolute=True))
+  return url_io_iter(URL(U, None).hrefs(absolute=True))
 
-def url_srcs(U, referrer=None):
+def url_srcs(U):
   ''' Yield the SRCs referenced by a URL.
       Conceals URLError, HTTPError.
   '''
-  return url_io_iter(URL(U, referrer).srcs(absolute=True))
+  return url_io_iter(URL(U, None).srcs(absolute=True))
 
 def grok(module_name, func_name, (P, U), *a, **kw):
   ''' Grok performs a user-specified analysis on the URL U.
