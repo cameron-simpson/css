@@ -99,9 +99,6 @@ class _URL(unicode):
     try:
       o = self._scope.opener
     except AttributeError:
-      try:
-        o = self.referer.opener
-      except AttributeError:
         o = build_opener()
         o.add_handler(HTTPBasicAuthHandler(NetrcHTTPPasswordMgr()))
     return o
