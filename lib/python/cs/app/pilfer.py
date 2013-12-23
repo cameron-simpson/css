@@ -683,10 +683,10 @@ many_to_many = {
     }
 
 one_to_many = {
-      'hrefs':        lambda (P, U), *a: url_hrefs(U, *a),
-      'images':       lambda (P, U), *a: with_exts(url_hrefs(U, *a), IMAGE_SUFFIXES ),
-      'iimages':      lambda (P, U), *a: with_exts(url_srcs(U, *a), IMAGE_SUFFIXES ),
-      'srcs':         lambda (P, U), *a: url_srcs(U, *a),
+      'hrefs':        lambda (P, U): url_hrefs(U),
+      'images':       lambda (P, U): with_exts(url_hrefs(U), IMAGE_SUFFIXES ),
+      'iimages':      lambda (P, U): with_exts(url_srcs(U), IMAGE_SUFFIXES ),
+      'srcs':         lambda (P, U): url_srcs(U),
       'xml':          lambda (P, U), match: url_xml_find(U, match),
       'xmltext':      lambda (P, U), match: XML(U).findall(match),
     }
