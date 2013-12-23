@@ -461,13 +461,15 @@ class Pilfer(O):
                   'videos',
                 )
 
-    def __init__(self, U):
+    def __init__(self, P, U):
+      self.pilfer = P
       self.url = U
 
     def keys(self):
-      return set(Pilfer.URLkeywords._approved) + set(self.user_vars.keys())
+      return set(self._approved) + set(self.pilfer.user_vars.keys())
 
     def __getitem__(self, k):
+      P = self.pilfer
       url = self.url
       with Pfx(url):
         if k in self._approved:
@@ -478,25 +480,26 @@ class Pilfer(O):
           except AttributeError as e:
             raise KeyError("no such attribute: .%s (%s)" % (k, e))
         else:
-          return url.user_vars[k]
+          return P.user_vars[k]
 
     def __setitem__(self, k, value):
+      P = self.pilfer
       url = self.url
       with Pfx(url):
         if k in self._approved:
           raise KeyError("it is forbidden to assign to attribute .%s" % (k,))
         else:
-          url.user_vars[k] = value
+          P.user_vars[k] = value
 
   def format_string(self, s, U):
     ''' Format a string using the URL as context.
     '''
-    return Formatter().vformat(s, (), self.Variables(U))
+    return Formatter().vformat(s, (), self.Variables(self, U))
 
   def set_user_var(self, k, value, U, raw=False):
     if not raw:
       value = self.format_string(value, U)
-    self.Variables(U)[k] = value
+    self.Variables(self, U)[k] = value
 
 def new_dir(dirpath):
   ''' Create the directory `dirpath` or `dirpath-n` if `dirpath` exists.
