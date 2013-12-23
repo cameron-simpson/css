@@ -142,7 +142,7 @@ def main(argv):
                   error("add pipe: %s", e)
                   badopts = True
 
-          # gather up the remaining definition as the runing pipeline
+          # gather up the remaining definition as the running pipeline
           pipe_funcs, errors = argv_pipefuncs(argv)
 
           # report accumulated errors and set badopts
