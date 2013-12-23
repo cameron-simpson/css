@@ -1158,6 +1158,7 @@ class PilferRC(O):
     self._lock = Lock()
     self.print_flush = False
     self.pipe_specs = {}
+    self.action_map = {}
     if filename is not None:
       self.loadrc(filename)
 
@@ -1185,6 +1186,8 @@ class PilferRC(O):
           self.print_flush = cfg.getboolean('DEFAULT', dflt)
         else:
           warning("unrecognised [DEFAULTS].%s: %s" % (dflt, value))
+      for action in cfg.options('actions'):
+        self.action_map[action] = cfg.get('actions', action).strip()
       for section in cfg.sections():
         with Pfx("[%s]", section):
           pipe_spec = cfg.get(section, 'pipe')
