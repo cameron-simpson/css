@@ -1188,7 +1188,7 @@ class PilferRC(O):
           warning("unrecognised [DEFAULTS].%s: %s" % (dflt, value))
       for action in cfg.options('actions'):
         with Pfx('[actions].%s', action):
-          self.action_map[action] = cfg.get('actions', action).strip()
+          self.action_map[action] = shlex.split(cfg.get('actions', action))
       for pipe_name in cfg.options('pipes'):
         with Pfx('[pipes].%s', pipe_name):
           pipe_spec = cfg.get('pipes', pipe_name)
