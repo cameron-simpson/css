@@ -37,8 +37,16 @@ def URL(U, referer, **kw):
       Handing it a _URL object returns the object.
   '''
   if not isinstance(U, _URL):
+    ##D("new U %r (ref=%r)", U, referer)
     U = _URL(ustr(U))
-    U._init(referer, **kw)
+    U._init(referer=referer, **kw)
+  else:
+    if U.referer is None and referer is not None:
+      ##D("old U %r, updating referer to %r", U, referer)
+      U.referer = referer
+    else:
+      ##D("old U %r (ignoring ref=%r)", U, referer)
+      pass
   return U
 
 class _URL(unicode):
@@ -99,8 +107,8 @@ class _URL(unicode):
     try:
       o = self._scope.opener
     except AttributeError:
-        o = build_opener()
-        o.add_handler(HTTPBasicAuthHandler(NetrcHTTPPasswordMgr()))
+      o = build_opener()
+      o.add_handler(HTTPBasicAuthHandler(NetrcHTTPPasswordMgr()))
     return o
 
   def _fetch(self):
