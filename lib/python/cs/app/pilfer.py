@@ -449,6 +449,7 @@ class Pilfer(O):
                   'archives',
                   'basename',
                   'dirname',
+                  'domain',
                   'hrefs',
                   'images',
                   'parent',
