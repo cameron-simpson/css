@@ -28,7 +28,7 @@ try:
 except ImportError:
   import xml.etree.ElementTree as ElementTree
 from cs.debug import thread_dump
-from cs.fileutils import file_property
+from cs.fileutils import file_property, mkdirn
 from cs.later import Later, FUNC_ONE_TO_ONE, FUNC_ONE_TO_MANY, FUNC_SELECTOR, FUNC_MANY_TO_MANY
 from cs.lex import get_identifier
 from cs.logutils import setup_logging, logTo, Pfx, debug, error, warning, exception, trace, pfx_iter, D
