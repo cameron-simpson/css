@@ -289,3 +289,57 @@ class LRUCache(O):
     del self.backing[key]
     if key in self._cache:
       del self._cache[key]
+
+def MappingChain(object):
+  ''' A mapping interface to a sequence of mappings.
+      It does not support __setitem__ at present; that is expected
+      to be managed via the backing mappings.
+  '''
+
+  def __init__(self, mappings=None, get_mappings=None):
+    ''' Initialise the MappingChain.
+        If `mappings` is not None, use it as the sequence of mappings.
+	If `get_mappings` is not None, it is used as a callable to
+	return the sequence of mappings.
+        Exactly one of `mappings` or `get_mappings` must be specified as not
+        None.
+    '''
+    if mappings is not None:
+      if get_mappings is None:
+        mappings = list(mappings)
+        self.get_mappings = lambda: mappings
+      else:
+        raise ValueError(
+                "cannot supply both mappings (%r) and get_mappings (%r)",
+                mappings, get_mappings)
+    else:
+      if get_mappings is not None:
+        self.get_mappings = get_mappings
+      else:
+        raise ValueError("one of mappings or get_mappings must be specified")
+
+  def __getitem__(self, key):
+    ''' Return the first value for `key` found in the mappings.
+        Raise KeyError if the key in not found in any mapping.
+    '''
+    for map in self.get_mappings():
+      try:
+        value = map[key]
+      except KeyError:
+        continue
+      return value
+    raise KeyError(key)
+
+  def get(self, key, default=None):
+    try:
+      return self[key]
+    except AttributeError:
+      return default
+
+  def keys(self):
+    ''' Return the union of the keys in the mappings.
+    '''
+    ks = set()
+    for map in self.get_mappings():
+      ks.update(map.keys())
+    return ks
