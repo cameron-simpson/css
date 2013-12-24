@@ -32,6 +32,7 @@ from cs.fileutils import file_property, mkdirn
 from cs.later import Later, FUNC_ONE_TO_ONE, FUNC_ONE_TO_MANY, FUNC_SELECTOR, FUNC_MANY_TO_MANY
 from cs.lex import get_identifier
 from cs.logutils import setup_logging, logTo, Pfx, debug, error, warning, exception, trace, pfx_iter, D
+from cs.mappings import MappingChain
 from cs.queues import IterableQueue, NullQueue, NullQ
 from cs.threads import locked, locked_property
 from cs.urlutils import URL, NetrcHTTPPasswordMgr
@@ -356,7 +357,7 @@ class Pilfer(O):
     '''
     diversions = self.diversions
     if pipe_name not in diversions:
-      spec = self.find_pipe_spec(pipe_name)
+      spec = self.pipes.get(pipe_name)
       if spec is None:
         raise KeyError("no diversion named %r and no pipe specification found" % (pipe_name,))
       inQ, outQ = self.later.pipeline(spec.pipe_funcs, outQ=NullQueue(blocking=True))
@@ -368,24 +369,31 @@ class Pilfer(O):
         It will collect items from the iterable `inputs`.
         Return the output Queue from which to get results.
     '''
-    spec = self.find_pipe_spec(pipe_name)
+    spec = self.pipes.get(pipe_name)
     if spec is None:
       raise KeyError("no pipe specification named %r" % (pipe_name,))
     inQ, outQ = self.later.pipeline(spec.pipe_funcs, inputs=inputs)
     return outQ
 
-  def find_pipe_spec(self, pipe_name):
-    ''' Search for a PipeSpec of the specified name `pipe_name`.
-        Return the PipeSpec if found or None if not found.
-    '''
-    for rc in self.rcs:
-      if pipe_name in rc.pipe_specs:
-        return rc.pipe_specs[pipe_name]
-    return None
-
   @property
   def rcs(self):
     return self._shared.rcs
+
+  def _rc_pipespecs(self):
+    for rc in self.rcs:
+      yield rc.pipe_specs
+
+  @property
+  def pipes(self):
+    return MappingChain(get_mappings=self._rc_pipespecs)
+
+  def _rc_action_maps(self):
+    for rc in self.rcs:
+      yield rc.action_map
+
+  @property
+  def action_maps(self):
+    return MappingChain(get_mappings=self._rc_action_maps)
 
   def _print(self, *a, **kw):
     file = kw.pop('file', None)
