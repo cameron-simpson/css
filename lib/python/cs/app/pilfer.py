@@ -869,41 +869,7 @@ def action_func(action):
               elif func == 'grok' or func == 'grokall':
                 # grok:a.b.c.d[:args...]
                 # grokall:a.b.c.d[:args...]
-                #
-                # Import "d" from the python module "a.b.c".
-                #
-		# For grok, call d((P, U), kwargs) and apply the
-		# returned mapping to P.user_vars.
-                #
-		# From grokall, call d(Ps, Us, kwargs) and apply
-		# the returned mapping to each P.user_vars.
-                #
-                is_grokall = func == "grokall"
-                if offset == len(action):
-                  raise ValueError("missing marker")
-                marker = action[offset]
-                offset += 1
-                m = re_GROK.match(action[offset:])
-                if not m:
-                  raise ValueError("expected a.b.c.d name at \"%s\"" % (action[offset:],))
-                grok_module = m.group(1)
-                grok_funcname = m.group(3)
-                offset += m.end()
-                if offset < len(action):
-                  if marker != action[offset]:
-                    raise ValueError("expected second marker to match first: expected %r, saw %r"
-                                     % (marker, action[offset]))
-                  offset += 1
-                  raise RuntimeError("arguments to %s not yet implemented" % (func,))
-                if is_grokall:
-                  func_sig = FUNC_MANY_TO_MANY
-                  def function(items):
-                    for P, U in items:
-                      yield P, grok(grok_module, grok_funcname, item)
-                else:
-                  func_sig = FUNC_ONE_TO_ONE
-                  def function( (P, U), *a, **kw):
-                    return grok(grok_module, grok_funcname, (P, U), *a, **kw)
+                function, func_sig = action_grok(func, action, offset)
               # some other function: gather arguments
               elif offset < len(action):
                 marker = action[offset]
@@ -1069,6 +1035,46 @@ def action_func(action):
         return retval
 
     return func_sig, trace_function
+
+def function(func, action, offset):
+  # grok:a.b.c.d[:args...]
+  # grokall:a.b.c.d[:args...]
+  #
+  # Import "d" from the python module "a.b.c".
+  #
+  # For grok, call d((P, U), kwargs) and apply the
+  # returned mapping to P.user_vars.
+  #
+  # From grokall, call d(Ps, Us, kwargs) and apply
+  # the returned mapping to each P.user_vars.
+  #
+  is_grokall = func == "grokall"
+  if offset == len(action):
+    raise ValueError("missing marker")
+  marker = action[offset]
+  offset += 1
+  m = re_GROK.match(action[offset:])
+  if not m:
+    raise ValueError("expected a.b.c.d name at \"%s\"" % (action[offset:],))
+  grok_module = m.group(1)
+  grok_funcname = m.group(3)
+  offset += m.end()
+  if offset < len(action):
+    if marker != action[offset]:
+      raise ValueError("expected second marker to match first: expected %r, saw %r"
+                       % (marker, action[offset]))
+    offset += 1
+    raise RuntimeError("arguments to %s not yet implemented" % (func,))
+  if is_grokall:
+    func_sig = FUNC_MANY_TO_MANY
+    def function(items):
+      for P, U in items:
+        yield P, grok(grok_module, grok_funcname, item)
+  else:
+    func_sig = FUNC_ONE_TO_ONE
+    def function( (P, U), *a, **kw):
+      return grok(grok_module, grok_funcname, (P, U), *a, **kw)
+  return func_sig, function
 
 def action_shcmd(shcmd):
   ''' Return (function, func_sig) for a shell command.
