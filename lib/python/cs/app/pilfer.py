@@ -1009,8 +1009,7 @@ def action_divert_pipe(func, action, offset):
     raise RuntimeError("selector_func parsing not implemented")
   else:
     select_func = lambda (P, U): True
-  do_divert = func == "divert"
-  if do_divert:
+  if func == "divert":
     # function to divert selected items to a single named pipeline
     func_sig = FUNC_ONE_TO_MANY
     scoped = False
@@ -1025,7 +1024,7 @@ def action_divert_pipe(func, action, offset):
           pipe.inQ.put(item)
       else:
         yield U
-  else:
+  elif func == "pipe":
     # gather all items and feed to an instance of the specified pipeline
     func_sig = FUNC_MANY_TO_MANY
     scoped = True
@@ -1041,6 +1040,8 @@ def action_divert_pipe(func, action, offset):
         outQ = P.pipe_through(pipe_name, pipe_items)
         for item in outQ:
           yield item
+  else:
+    raise ValueError("expected \"divert\" or \"pipe\", got func=%r" % (func,))
   return func_sig, function, scoped
 
 def function(func, action, offset):
