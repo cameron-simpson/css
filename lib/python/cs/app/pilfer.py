@@ -851,7 +851,14 @@ def action_func(action):
                     else:
                       yield U
                 else:
-                  raise RuntimeError("pipe: not yet implemented")
+                  # gather all items and feed to an instance of the specified pipeline
+                  func_sig = FUNC_MANY_TO_MANY
+                  scoped = True
+                  def function(items):
+                    P = items[0][0]
+                    outQ = P.pipe_through(pipe_name, items)
+                    for item in outQ:
+                      yield item
               elif func == 'grok' or func == 'grokall':
                 # grok:a.b.c.d[:args...]
                 # grokall:a.b.c.d[:args...]
@@ -981,7 +988,7 @@ def action_func(action):
     # The pipeline itself passes (P, U) item tuples.
     #
     # All functions accept a leading (P, U) tuple argument but most emit only
-    # a U result (or just a Booleans for selectors).
+    # a U result (or just a Boolean for selectors).
     # A few, like "per", emit a (P, U) because they change the "scope" P argument.
     # If "scoped" is true, we expect the latter.
     # Otherwise we wrap FUNC_ONE_TO_ONE and FUNC_ONE_TO_MANY to emit the
@@ -989,7 +996,7 @@ def action_func(action):
     # FUNC_MANY_TO_MANY functions have their own convoluted wrapper.
     #
     func0 = function
-    if scoped and func_sig not in (FUNC_ONE_TO_ONE, FUNC_ONE_TO_MANY):
+    if scoped and func_sig not in (FUNC_ONE_TO_ONE, FUNC_ONE_TO_MANY, FUNC_MANY_TO_MANY):
       raise RuntimeError("scoped is true but func_sig == %r" % (func_sig,))
     if func_sig == FUNC_SELECTOR:
       def funcPU(item):
@@ -1013,27 +1020,32 @@ def action_func(action):
           for i in func0(item, *args, **kwargs):
             yield P, i
     elif func_sig == FUNC_MANY_TO_MANY:
-      # Many-to-many functions are different.
-      # We split out the Ps and Us from the input items
-      # and re-attach the P components by reverse mapping from the U results;
-      # unrecognised Us get associated with Ps[0].
-      #
-      def funcPU(items):
-        if not isinstance(items, list):
-          items = list(items)
-        if items:
-          # preserve the first Pilfer context to attach to unknown items
-          P0 = items[0][0]
-          idmap = dict( [ ( id(item), item ) for item in items ] )
-          Ps = [ item[0] for item in items ]
-          Us = [ item[1] for item in items ]
-        else:
-          P0 = None
-          idmap = {}
-          Ps = []
-          Us = []
-        Us2 = func0(Ps, Us, *args, **kwargs)
-        return [ (idmap.get(id(U), P0), U) for U in Us2 ]
+      if scoped:
+        def funcPU(items):
+          return func0(items)
+      else:
+        # Many-to-many functions are different.
+        # We split out the Ps and Us from the input items.
+        # 
+        # and re-attach the P components by reverse mapping from the U results;
+        # unrecognised Us get associated with Ps[0].
+        #
+        def funcPU(items):
+          if not isinstance(items, list):
+            items = list(items)
+          if items:
+            # preserve the first Pilfer context to attach to unknown items
+            P0 = items[0][0]
+            idmap = dict( [ ( id(item), item ) for item in items ] )
+            Ps = [ item[0] for item in items ]
+            Us = [ item[1] for item in items ]
+          else:
+            P0 = None
+            idmap = {}
+            Ps = []
+            Us = []
+          Us2 = func0(Ps, Us, *args, **kwargs)
+          return [ (idmap.get(id(U), P0), U) for U in Us2 ]
     else:
       raise RuntimeError("unhandled func_sig %r" % (func_sig,))
 
