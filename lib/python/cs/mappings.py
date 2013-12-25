@@ -290,7 +290,7 @@ class LRUCache(O):
     if key in self._cache:
       del self._cache[key]
 
-def MappingChain(object):
+class MappingChain(object):
   ''' A mapping interface to a sequence of mappings.
       It does not support __setitem__ at present; that is expected
       to be managed via the backing mappings.
