@@ -322,9 +322,9 @@ class MappingChain(object):
     ''' Return the first value for `key` found in the mappings.
         Raise KeyError if the key in not found in any mapping.
     '''
-    for map in self.get_mappings():
+    for mapping in self.get_mappings():
       try:
-        value = map[key]
+        value = mapping[key]
       except KeyError:
         continue
       return value
@@ -340,6 +340,6 @@ class MappingChain(object):
     ''' Return the union of the keys in the mappings.
     '''
     ks = set()
-    for map in self.get_mappings():
-      ks.update(map.keys())
+    for mapping in self.get_mappings():
+      ks.update(mapping.keys())
     return ks
