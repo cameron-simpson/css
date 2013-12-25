@@ -336,6 +336,13 @@ class MappingChain(object):
     except AttributeError:
       return default
 
+  def __contains__(self, key):
+    try:
+      value = self[key]
+    except KeyError:
+      return False
+    return True
+
   def keys(self):
     ''' Return the union of the keys in the mappings.
     '''
