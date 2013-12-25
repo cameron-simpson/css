@@ -855,10 +855,17 @@ def action_func(action):
                   func_sig = FUNC_MANY_TO_MANY
                   scoped = True
                   def function(items):
-                    P = items[0][0]
-                    outQ = P.pipe_through(pipe_name, items)
-                    for item in outQ:
-                      yield item
+                    pipe_items = []
+                    for item in items:
+                      if select_func(item):
+                        pipe_items.append(item)
+                      else:
+                        yield item
+                    if pipe_items:
+                      P = pipe_items[0][0]
+                      outQ = P.pipe_through(pipe_name, pipe_items)
+                      for item in outQ:
+                        yield item
               elif func == 'grok' or func == 'grokall':
                 # grok:a.b.c.d[:args...]
                 # grokall:a.b.c.d[:args...]
