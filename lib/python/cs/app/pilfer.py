@@ -817,55 +817,7 @@ def action_func(action):
               elif func == "divert" or func == "pipe":
                 # divert:pipe_name[:selector]
                 # pipe:pipe_name[:selector]
-                #
-                # Divert selected items to the named pipeline
-                # or filter selected items through an instance of the named pipeline.
-                if offset == len(action):
-                  raise ValueError("missing marker")
-                marker = action[offset]
-                offset += 1
-                pipe_name, offset = get_identifier(action, offset)
-                if not pipe_name:
-                  raise ValueError("no pipe name")
-                if offset < len(action):
-                  if marker != action[offset]:
-                    raise ValueError("expected second marker to match first: expected %r, saw %r"
-                                     % (marker, action[offset]))
-                  offset += 1
-                  raise RuntimeError("selector_func parsing not implemented")
-                else:
-                  select_func = lambda (P, U): True
-                do_divert = func == "divert"
-                if do_divert:
-                  # function to divert selected items to a single named pipeline
-                  func_sig = FUNC_ONE_TO_MANY
-                  def function(item):
-                    P, U = item
-                    if select_func(item):
-                      try:
-                        pipe = P.diversion(pipe_name)
-                      except KeyError:
-                        error("no pipe named %r", pipe_name)
-                      else:
-                        pipe.inQ.put(item)
-                    else:
-                      yield U
-                else:
-                  # gather all items and feed to an instance of the specified pipeline
-                  func_sig = FUNC_MANY_TO_MANY
-                  scoped = True
-                  def function(items):
-                    pipe_items = []
-                    for item in items:
-                      if select_func(item):
-                        pipe_items.append(item)
-                      else:
-                        yield item
-                    if pipe_items:
-                      P = pipe_items[0][0]
-                      outQ = P.pipe_through(pipe_name, pipe_items)
-                      for item in outQ:
-                        yield item
+                func_sig, function, scoped = action_divert_pipe(func, action, offset)
               elif func == 'grok' or func == 'grokall':
                 # grok:a.b.c.d[:args...]
                 # grokall:a.b.c.d[:args...]
@@ -1035,6 +987,61 @@ def action_func(action):
         return retval
 
     return func_sig, trace_function
+
+def action_divert_pipe(func, action, offset):
+  # divert:pipe_name[:selector]
+  # pipe:pipe_name[:selector]
+  #
+  # Divert selected items to the named pipeline
+  # or filter selected items through an instance of the named pipeline.
+  if offset == len(action):
+    raise ValueError("missing marker")
+  marker = action[offset]
+  offset += 1
+  pipe_name, offset = get_identifier(action, offset)
+  if not pipe_name:
+    raise ValueError("no pipe name")
+  if offset < len(action):
+    if marker != action[offset]:
+      raise ValueError("expected second marker to match first: expected %r, saw %r"
+                       % (marker, action[offset]))
+    offset += 1
+    raise RuntimeError("selector_func parsing not implemented")
+  else:
+    select_func = lambda (P, U): True
+  do_divert = func == "divert"
+  if do_divert:
+    # function to divert selected items to a single named pipeline
+    func_sig = FUNC_ONE_TO_MANY
+    scoped = False
+    def function(item):
+      P, U = item
+      if select_func(item):
+        try:
+          pipe = P.diversion(pipe_name)
+        except KeyError:
+          error("no pipe named %r", pipe_name)
+        else:
+          pipe.inQ.put(item)
+      else:
+        yield U
+  else:
+    # gather all items and feed to an instance of the specified pipeline
+    func_sig = FUNC_MANY_TO_MANY
+    scoped = True
+    def function(items):
+      pipe_items = []
+      for item in items:
+        if select_func(item):
+          pipe_items.append(item)
+        else:
+          yield item
+      if pipe_items:
+        P = pipe_items[0][0]
+        outQ = P.pipe_through(pipe_name, pipe_items)
+        for item in outQ:
+          yield item
+  return func_sig, function, scoped
 
 def function(func, action, offset):
   # grok:a.b.c.d[:args...]
