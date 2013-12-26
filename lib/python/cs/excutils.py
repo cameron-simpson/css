@@ -61,6 +61,33 @@ def noexc(func):
           pass
   return wrapper
 
+def noexc_gen(func):
+  ''' Decorator to wrap a generator which should never raise an exception.
+      Instead, any raised exception is attempted to be logged and iteration ends.
+      My primary use case is wrapping generators chained in a pipeline,
+      as in cs.later.Later.pipeline.
+  '''
+  def wrapper(*args, **kwargs):
+    it = noexc(func)(*args, **kwargs)
+    if it is None:
+      return
+    while True:
+      try:
+        item = next(it)
+      except StopIteration:
+        return
+      except Exception as e:
+        try:
+          exception("exception calling next(%s(%s, **(%s)))", func.__name__, args, kwargs)
+        except Exception as e:
+          try:
+            D("exception calling next(%s(%s, **(%s))): %s", func.__name__, args, kwargs, e)
+          except Exception:
+            pass
+      else:
+        yield item
+  return wrapper
+
 def transmute(exc_from, exc_to=None):
   ''' Decorator to transmute an inner exception to another exception type.
       The motivating use case is properties in a class with a
