@@ -1222,6 +1222,7 @@ class PilferRC(O):
     self.print_flush = False
     self.pipe_specs = {}
     self.action_map = {}
+    self.seen_backing_files = {}
     if filename is not None:
       self.loadrc(filename)
 
@@ -1257,6 +1258,10 @@ class PilferRC(O):
           pipe_spec = cfg.get('pipes', pipe_name)
           debug("loadrc: pipe = %s", pipe_spec)
           self.pipe_specs[pipe_name] = PipeSpec(pipe_name, shlex.split(pipe_spec))
+      # load [seen] name=>backing_file mapping
+      for setname in cfg.options('seen'):
+        backing_file = envsub(cfg.get('seen', setname).strip())
+        self.seen_backing_files[setname] = backing_file
 
   def __getitem__(self, pipename):
     ''' Fetch PipeSpec by name.
