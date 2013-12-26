@@ -147,7 +147,7 @@ def main(argv):
                   badopts = True
 
           # gather up the remaining definition as the running pipeline
-          pipe_funcs, errors = argv_pipefuncs(argv)
+          pipe_funcs, errors = argv_pipefuncs(argv, P.action_map)
 
           # report accumulated errors and set badopts
           if errors:
@@ -219,14 +219,21 @@ def main(argv):
 
   return xit
 
-def argv_pipefuncs(argv):
+# TODO: recursion protection in action_map expansion
+def argv_pipefuncs(argv, action_map):
   ''' Process command line strings and return a corresponding list
       of functions to construct a Later.pipeline.
   '''
-  debug("argv_pipefuncs(%r)", argv)
+  rargv = list(reversed(argv))
   errors = []
   pipe_funcs = []
-  for action in argv:
+  while rargv:
+    action = rargv.pop()
+    func, offset = get_identifier(action)
+    if func and func in action_map:
+      expando = action_map[func]
+      rargv.extend(reversed(expando))
+      continue
     try:
       func_sig, function = action_func(action)
     except ValueError as e:
@@ -272,7 +279,6 @@ def get_pipeline_spec(argv):
           for i in range(1, len(argv)):
             if argv[i] == '}':
               spec = PipeSpec(pipe_name, argv[1:i])
-              errors.extend(spec.errors)
               argv2 = argv[i+1:]
               break
           if spec is None:
@@ -363,7 +369,12 @@ class Pilfer(O):
       spec = self.pipes.get(pipe_name)
       if spec is None:
         raise KeyError("no diversion named %r and no pipe specification found" % (pipe_name,))
-      inQ, outQ = self.later.pipeline(spec.pipe_funcs, outQ=NullQueue(blocking=True))
+      pipe_funcs, errors = spec.pipe_funcs(self.action_map)
+      if errors:
+        for err in errors:
+          error(err)
+        raise KeyError("invalid pipe specification for diversion named %r" % (pipe_name,))
+      inQ, outQ = self.later.pipeline(pipe_funcs, outQ=NullQueue(blocking=True))
       diversions[pipe_name] = O(name=pipe_name, inQ=inQ, outQ=outQ)
     return diversions[pipe_name]
 
@@ -375,7 +386,12 @@ class Pilfer(O):
     spec = self.pipes.get(pipe_name)
     if spec is None:
       raise KeyError("no pipe specification named %r" % (pipe_name,))
-    inQ, outQ = self.later.pipeline(spec.pipe_funcs, inputs=inputs)
+    pipe_funcs, errors = spec.pipe_funcs(self.action_map)
+    if errors:
+      for err in errors:
+        error(err)
+      raise KeyError("invalid pipe specification for diversion named %r" % (pipe_name,))
+    inQ, outQ = self.later.pipeline(pipe_funcs, inputs=inputs)
     return outQ
 
   @property
@@ -395,7 +411,7 @@ class Pilfer(O):
       yield rc.action_map
 
   @property
-  def action_maps(self):
+  def action_map(self):
     return MappingChain(get_mappings=self._rc_action_maps)
 
   def _print(self, *a, **kw):
@@ -662,8 +678,6 @@ def grok(module_name, func_name, (P, U), *a, **kw):
     except ImportError as e:
       exception("%s", e)
     else:
-      ##D("dir(M): %r", dir(M))
-      ##D("call %s.%s( (P=%r, U=%r), *a=%r, **kw=%r )...", module_name, func_name, P, U, a, kw)
       try:
         mfunc = getattr(M, func_name)
       except AttributeError as e:
@@ -674,7 +688,6 @@ def grok(module_name, func_name, (P, U), *a, **kw):
         except Exception as e:
           exception("call")
         else:
-          ##D("==> %r", var_mapping)
           P.set_user_vars(**var_mapping)
     return U
 
@@ -1188,11 +1201,11 @@ class PipeSpec(O):
     O.__init__(self)
     self.name = name
     self.argv = argv
-    self.errors = []
-    with Pfx(name):
-      pipe_funcs, errors = argv_pipefuncs(argv)
-      self.pipe_funcs = pipe_funcs
-      self.errors.extend(errors)
+
+  def pipe_funcs(self, action_map):
+    with Pfx(self.name):
+      pipe_funcs, errors = argv_pipefuncs(self.argv, action_map)
+    return pipe_funcs, errors
 
 class PilferRC(O):
 
