@@ -36,6 +36,7 @@ from cs.lex import get_identifier
 from cs.logutils import setup_logging, logTo, Pfx, debug, error, warning, exception, trace, pfx_iter, D
 from cs.mappings import MappingChain
 from cs.queues import IterableQueue, NullQueue, NullQ
+from cs.tail import tail
 from cs.threads import locked, locked_property
 from cs.urlutils import URL, NetrcHTTPPasswordMgr
 from cs.obj import O
@@ -1273,6 +1274,39 @@ class PilferRC(O):
     if pipename in specs:
       raise KeyError("repeated definition of pipe named %r", pipename)
     specs[pipename] = pipespec
+
+class SeenSet(object):
+  ''' A set-like collection with optional backing store file.
+  '''
+
+  def __init__(self, name, backing_file=None):
+    self.name = name
+    self.backing_file = backing_file
+    self.set = set()
+    if backing_file is not None:
+      T = Thread(target=self._tailer,
+                 name="SeenSet[%s]._tailer(%s)" % (name, backing_file,),
+                 args=(open(backing_file),))
+      T.daemon = True
+      T.start()
+
+  def _tailer(self, fp):
+    for line in tail(fp, seekwhence=os.SEEK_START):
+      item = line.rstrip()
+      D("SeenSet[%s:%s].add(%r)", self.name, self.backing_file, item)
+      self.add(line.rstrip(), foreign=True)
+
+  def add(self, s, foreign=False):
+    self.set.add(s)
+    if not foreign:
+      path = self.backing_file
+      if path:
+        with lockfile(path):
+          with open(path, "a") as fp:
+            print(s, file=fp)
+
+  def __contains__(self, item):
+    return item in self.set
 
 if __name__ == '__main__':
   import sys
