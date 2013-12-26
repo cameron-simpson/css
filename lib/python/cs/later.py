@@ -11,7 +11,7 @@ import traceback
 from cs.py3 import Queue, raise3
 import time
 from cs.debug import ifdebug, Lock, RLock, Thread, trace_caller
-from cs.excutils import noexc
+from cs.excutils import noexc_gen
 from cs.queues import IterableQueue, IterablePriorityQueue, PushQueue, \
                         NestingOpenCloseMixin
 from cs.threads import AdjustableSemaphore, \
@@ -781,31 +781,31 @@ class Later(NestingOpenCloseMixin):
                                 Example: a sort.
     '''
     if callable(o):
-      func = noexc(o)
+      func = noexc_gen(o)
       func_sig = FUNC_ONE_TO_MANY
     else:
       # expect a tuple
       func_sig, func = o
     func_final = None
     if func_sig == FUNC_ONE_TO_ONE:
-      @noexc
+      @noexc_gen
       def func_iter(item):
         yield func(item)
     elif func_sig == FUNC_ONE_TO_MANY:
-      func_iter = noexc(func)
+      func_iter = noexc_gen(func)
     elif func_sig == FUNC_SELECTOR:
-      @noexc
+      @noexc_gen
       def func_iter(item):
         if func(item):
           yield item
     elif func_sig == FUNC_MANY_TO_MANY:
       gathered = []
-      @noexc
+      @noexc_gen
       def func_iter(item):
         gathered.append(item)
         if False:
           yield
-      @noexc
+      @noexc_gen
       def func_final():
         for item in func(gathered):
           yield item
