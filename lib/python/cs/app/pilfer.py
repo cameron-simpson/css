@@ -322,6 +322,16 @@ class PilferCommon(O):
     self.opener = build_opener()
     self.opener.add_handler(HTTPBasicAuthHandler(NetrcHTTPPasswordMgr()))
 
+  @locked
+  def seenset(self, name):
+    ''' Return the SeenSet implementing the named "seen" set.
+    '''
+    seen = self.seen
+    if name not in seen:
+      backing_file = MappingChain(mappings=[ rc.seen_backing_files for rc in self.rcs ]).get(name)
+      seen[name] = SeenSet(name, backing_file)
+    return seen[name]
+
 class Pilfer(O):
   ''' State for the pilfer app.
       Notable attribute include:
@@ -350,10 +360,10 @@ class Pilfer(O):
                  )
 
   def seen(self, url, seenset='_'):
-    return url in self._shared.seen[seenset]
+    return url in self._shared.seenset(seenset)
 
   def see(self, url, seenset='_'):
-    self._shared.seen[seenset].add(url)
+    self._shared.seenset(seenset).add(url)
 
   @property
   def diversions(self):
