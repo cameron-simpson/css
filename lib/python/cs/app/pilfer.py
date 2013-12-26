@@ -29,6 +29,7 @@ except ImportError:
   import xml.etree.ElementTree as ElementTree
 from cs.debug import thread_dump
 from cs.env import envsub
+from cs.excutils import noexc_gen
 from cs.fileutils import file_property, mkdirn
 from cs.later import Later, FUNC_ONE_TO_ONE, FUNC_ONE_TO_MANY, FUNC_SELECTOR, FUNC_MANY_TO_MANY
 from cs.lex import get_identifier
@@ -1016,37 +1017,43 @@ def action_divert_pipe(func, action, offset):
   pipe_name, offset = get_identifier(action, offset)
   if not pipe_name:
     raise ValueError("no pipe name")
-  if offset < len(action):
+  if offset >= len(action):
+    sel_function = lambda (P, U): True
+  else:
     if marker != action[offset]:
       raise ValueError("expected second marker to match first: expected %r, saw %r"
                        % (marker, action[offset]))
-    offset += 1
-    raise RuntimeError("selector_func parsing not implemented")
-  else:
-    select_func = lambda (P, U): True
+    sel_func_sig, sel_function = action_func(action[offset+1:])
+    if sel_func_sig != FUNC_SELECTOR:
+      raise ValueError("expected selector function but found: %r" % (action[offset+1:],))
   if func == "divert":
     # function to divert selected items to a single named pipeline
     func_sig = FUNC_ONE_TO_MANY
     scoped = False
+    @noexc_gen
     def function(item):
       P, U = item
-      if select_func(item):
-        try:
-          pipe = P.diversion(pipe_name)
-        except KeyError:
-          error("no pipe named %r", pipe_name)
+      try:
+        if sel_function(item):
+          try:
+            pipe = P.diversion(pipe_name)
+          except KeyError:
+            error("no pipe named %r", pipe_name)
+          else:
+            pipe.inQ.put(item)
         else:
-          pipe.inQ.put(item)
-      else:
-        yield U
+          yield U
+      except Exception as e:
+        exception("OUCH")
   elif func == "pipe":
     # gather all items and feed to an instance of the specified pipeline
     func_sig = FUNC_MANY_TO_MANY
     scoped = True
+    @noexc_gen
     def function(items):
       pipe_items = []
       for item in items:
-        if select_func(item):
+        if sel_function(item):
           pipe_items.append(item)
         else:
           yield item
