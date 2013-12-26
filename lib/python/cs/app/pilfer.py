@@ -739,7 +739,7 @@ one_to_one = {
       'quote':        lambda (P, U): quote(U),
       'unquote':      lambda (P, U): unquote(U),
       'save':         lambda (P, U), *a, **kw: (U, P.save_url(U, *a, **kw))[0],
-      'see':          lambda (P, U): (U, P.see(U))[0],
+      'see':          lambda (P, U), *seensets: (U, [ P.see(U, seenset) for seenset in (seensets if seensets else ('_',)) ])[0],
       's':            substitute,
       'title':        lambda (P, U): U.title,
       'type':         lambda (P, U): url_io(U.content_type, ""),
@@ -757,9 +757,9 @@ one_test = {
       'same_domain':  lambda (P, U): notNone(U.referer, "%r.referer" % (U,)) and U.domain == U.referer.domain,
       'same_hostname':lambda (P, U): notNone(U.referer, "%r.referer" % (U,)) and U.hostname == U.referer.hostname,
       'same_scheme':  lambda (P, U): notNone(U.referer, "%r.referer" % (U,)) and U.scheme == U.referer.scheme,
-      'seen':         lambda (P, U): P.seen(U),
+      'seen':         lambda (P, U), *seensets: any( [ P.seen(U, seenset) for seenset in (seensets if seensets else ('_',)) ] ),
       'select_re':    lambda (P, U), regexp: regexp.search(U),
-      'unseen':       lambda (P, U): not P.seen(U),
+      'unseen':       lambda (P, U), *seensets: not any( [ P.seen(U, seenset) for seenset in (seensets if seensets else ('_',)) ] ),
     }
 
 re_COMPARE = re.compile(r'([a-z]\w*)==')
