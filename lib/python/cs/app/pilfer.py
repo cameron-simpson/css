@@ -30,7 +30,7 @@ except ImportError:
 from cs.debug import thread_dump
 from cs.env import envsub
 from cs.excutils import noexc_gen
-from cs.fileutils import file_property, mkdirn
+from cs.fileutils import file_property, mkdirn, lockfile
 from cs.later import Later, FUNC_ONE_TO_ONE, FUNC_ONE_TO_MANY, FUNC_SELECTOR, FUNC_MANY_TO_MANY
 from cs.lex import get_identifier
 from cs.logutils import setup_logging, logTo, Pfx, debug, error, warning, exception, trace, pfx_iter, D
@@ -1294,19 +1294,24 @@ class SeenSet(object):
     self.backing_file = backing_file
     self.set = set()
     if backing_file is not None:
+      with open(backing_file, "a"):
+        pass
       T = Thread(target=self._tailer,
                  name="SeenSet[%s]._tailer(%s)" % (name, backing_file,),
                  args=(open(backing_file),))
       T.daemon = True
       T.start()
+      sleep(0.1)
 
   def _tailer(self, fp):
-    for line in tail(fp, seekwhence=os.SEEK_START):
+    for line in tail(fp, seekwhence=os.SEEK_SET):
       item = line.rstrip()
-      D("SeenSet[%s:%s].add(%r)", self.name, self.backing_file, item)
       self.add(line.rstrip(), foreign=True)
 
   def add(self, s, foreign=False):
+    # avoid needlessly extending the backing file
+    if s in self.set:
+      return
     self.set.add(s)
     if not foreign:
       path = self.backing_file
