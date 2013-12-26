@@ -999,7 +999,6 @@ def action_func(action):
         except Exception as e:
           exception("TRACE: EXCEPTION: %s", e)
           raise
-        ##D("DO %s: retval = %r", action0, retval)
         return retval
 
     return func_sig, trace_function
