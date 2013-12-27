@@ -859,7 +859,7 @@ def action_func(action):
               elif func == 'grok' or func == 'grokall':
                 # grok:a.b.c.d[:args...]
                 # grokall:a.b.c.d[:args...]
-                function, func_sig = action_grok(func, action, offset)
+                func_sig, function = action_grok(func, action, offset)
               # some other function: gather arguments
               elif offset < len(action):
                 marker = action[offset]
@@ -1087,7 +1087,7 @@ def action_divert_pipe(func, action, offset):
     raise ValueError("expected \"divert\" or \"pipe\", got func=%r" % (func,))
   return func_sig, function, scoped
 
-def function(func, action, offset):
+def action_grok(func, action, offset):
   # grok:a.b.c.d[:args...]
   # grokall:a.b.c.d[:args...]
   #
