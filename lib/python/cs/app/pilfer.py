@@ -1273,7 +1273,7 @@ class PilferRC(O):
         with Pfx('[pipes].%s', pipe_name):
           pipe_spec = cfg.get('pipes', pipe_name)
           debug("loadrc: pipe = %s", pipe_spec)
-          self.pipe_specs[pipe_name] = PipeSpec(pipe_name, shlex.split(pipe_spec))
+          self.add_pipespec(PipeSpec(pipe_name, shlex.split(pipe_spec)))
       # load [seen] name=>backing_file mapping
       # NB: not yet envsub()ed
       for setname in cfg.options('seen'):
