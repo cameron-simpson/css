@@ -505,7 +505,7 @@ class Pilfer(O):
                   'path',
                   'referer',
                   'srcs',
-                  'title',
+                  'page_title',
                   'url',
                   'videos',
                 )
