@@ -1230,7 +1230,7 @@ class PilferRC(O):
     O.__init__(self)
     self.filename = filename
     self._lock = Lock()
-    self.print_flush = False
+    self.defaults = {}
     self.pipe_specs = {}
     self.action_map = {}
     self.seen_backing_files = {}
@@ -1255,12 +1255,7 @@ class PilferRC(O):
       cfg = ConfigParser()
       with open(self.filename) as fp:
         cfg.readfp(fp)
-      dflts = cfg.defaults()
-      for dflt, value in cfg.defaults().iteritems():
-        if dflt == 'print_flush':
-          self.print_flush = cfg.getboolean('DEFAULT', dflt)
-        else:
-          warning("unrecognised [DEFAULTS].%s: %s" % (dflt, value))
+      self.defaults.update(cfg.defaults().iteritems())
       for action in cfg.options('actions'):
         with Pfx('[actions].%s', action):
           self.action_map[action] = shlex.split(cfg.get('actions', action))
