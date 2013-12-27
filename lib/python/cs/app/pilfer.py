@@ -38,7 +38,7 @@ from cs.mappings import MappingChain
 from cs.queues import IterableQueue, NullQueue, NullQ
 from cs.tail import tail
 from cs.threads import locked, locked_property
-from cs.urlutils import URL, NetrcHTTPPasswordMgr
+from cs.urlutils import URL, isURL, NetrcHTTPPasswordMgr
 from cs.obj import O
 from cs.py3 import input, ConfigParser
 
@@ -633,6 +633,8 @@ def substitute( (P, src), regexp, replacement, replace_all):
   strs.append(src[sofar:])
   result = ''.join(strs)
   debug("SUBSTITUTE: src=%r, result=%r", src, result)
+  if isURL(src):
+    result = URL(result, src.referer)
   return result
 
 def url_delay(U, delay, *a):
