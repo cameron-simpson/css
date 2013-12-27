@@ -7,8 +7,8 @@
 from __future__ import with_statement, print_function
 import sys
 import os
-import errno
 import os.path
+import errno
 import shlex
 from collections import defaultdict
 from copy import copy
@@ -329,6 +329,16 @@ class PilferCommon(O):
     seen = self.seen
     if name not in seen:
       backing_file = MappingChain(mappings=[ rc.seen_backing_files for rc in self.rcs ]).get(name)
+      if backing_file is not None:
+        backing_file = envsub(backing_file)
+        if ( not os.path.isabs(backing_file)
+         and not backing_file.startswith('./')
+         and not backing_file.startswith('../')
+           ):
+          backing_basedir = MappingChain(mappings=[ rc.defaults for rc in self.rcs ]).get('seen_dir')
+          if backing_basedir is not None:
+            backing_basedir = envsub(backing_basedir)
+            backing_file = os.path.join(backing_basedir, backing_file)
       seen[name] = SeenSet(name, backing_file)
     return seen[name]
 
@@ -1265,8 +1275,9 @@ class PilferRC(O):
           debug("loadrc: pipe = %s", pipe_spec)
           self.pipe_specs[pipe_name] = PipeSpec(pipe_name, shlex.split(pipe_spec))
       # load [seen] name=>backing_file mapping
+      # NB: not yet envsub()ed
       for setname in cfg.options('seen'):
-        backing_file = envsub(cfg.get('seen', setname).strip())
+        backing_file = cfg.get('seen', setname).strip()
         self.seen_backing_files[setname] = backing_file
 
   def __getitem__(self, pipename):
