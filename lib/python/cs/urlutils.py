@@ -32,6 +32,11 @@ from cs.threads import locked_property
 from cs.py3 import StringIO, ustr
 from cs.obj import O
 
+def isURL(U):
+  ''' Test if an object `U` is an URL instance.
+  '''
+  return isinstance(U, _URL)
+
 def URL(U, referer, **kw):
   ''' Factory function to return a _URL object from a URL string.
       Handing it a _URL object returns the object.
@@ -291,7 +296,7 @@ class _URL(unicode):
     return self
 
   @property
-  def title(self):
+  def page_title(self):
     t = self.parsed.title
     if t is None:
       return ''
