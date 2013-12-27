@@ -333,7 +333,7 @@ class MappingChain(object):
   def get(self, key, default=None):
     try:
       return self[key]
-    except AttributeError:
+    except KeyError:
       return default
 
   def __contains__(self, key):
