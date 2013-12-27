@@ -11,9 +11,12 @@ from itertools import chain
 from bs4 import BeautifulSoup, Tag, BeautifulStoneSoup
 try:
   import lxml
-  BS4MODE = 'lxml'
 except ImportError:
-  BS4MODE = None
+  try:
+    if sys.stderr.isatty():
+      print("%s: warning: cannot import lxml for use with bs4" % (__file__,), file=sys.stderr)
+  except AttributeError:
+    pass
 from netrc import netrc
 import socket
 from urllib2 import urlopen, Request, HTTPError, URLError, \
@@ -176,8 +179,12 @@ class _URL(unicode):
     ''' The URL content parsed as HTML by BeautifulSoup.
     '''
     content = self.content
+    if self.context_type == 'text/html':
+      parser_names = ('html5lib', 'html.parser', 'lxml', 'xml')
+    else:
+      parser_names = ('lxml', 'xml')
     try:
-      P = BeautifulSoup(content.decode('utf-8', 'replace'), BS4MODE)
+      P = BeautifulSoup(content.decode('utf-8', 'replace'), parser_names)
     except Exception as e:
       exception("%s: .parsed: BeautifulSoup(unicode(content)) fails: %s", self, e)
       with open("cs.urlutils-unparsed.html", "wb") as bs:
