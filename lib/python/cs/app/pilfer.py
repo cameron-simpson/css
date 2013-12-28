@@ -862,6 +862,10 @@ def action_func(action):
                 # grok:a.b.c.d[:args...]
                 # grokall:a.b.c.d[:args...]
                 func_sig, function = action_grok(func, action, offset)
+              elif func == 'for':
+                # for:var=value
+                # warning: implies 'per'
+                func_sig, function, scoped = action_for(func, action, offset)
               # some other function: gather arguments
               elif offset < len(action):
                 marker = action[offset]
@@ -1087,6 +1091,29 @@ def action_divert_pipe(func, action, offset):
           yield item
   else:
     raise ValueError("expected \"divert\" or \"pipe\", got func=%r" % (func,))
+  return func_sig, function, scoped
+
+def action_for(func, action, offset):
+  # for:varname=values
+  #
+  func_sig = FUNC_ONE_TO_MANY
+  scoped = True
+  if offset == len(action) or action[offset] != ':':
+    raise ValueError("missing colon")
+  offset += 1
+  varname, offset = get_identifier(action, offset)
+  if not varname:
+    raise ValueError("missing varname")
+  if offset == len(action) or action[offset] != '=':
+    raise ValueError("missing =values")
+  values = action[offset+1:]
+  def function( (P, U) ):
+    # expand "values", split on whitespace, iterate with new Pilfer
+    value_list = P.format_string(values, U).split()
+    for value in value_list:
+      P2 = copy(P)
+      P2.set_user_vars(**{varname: value})
+      yield P2, U
   return func_sig, function, scoped
 
 def action_grok(func, action, offset):
