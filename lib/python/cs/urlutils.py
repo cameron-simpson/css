@@ -200,6 +200,12 @@ class _URL(unicode):
       raise
     return P
 
+  def feedparsed(self):
+    ''' A parse of the content via the feedparser module.
+    '''
+    import feedparser
+    return feedparser.parse(self.content)
+
   @locked_property
   def xml(self):
     return ElementTree.XML(self.content.decode('utf-8', 'replace'))
