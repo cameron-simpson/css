@@ -187,7 +187,7 @@ class _URL(unicode):
     ''' The URL content parsed as HTML by BeautifulSoup.
     '''
     content = self.content
-    if self.context_type == 'text/html':
+    if self.content_type == 'text/html':
       parser_names = ('html5lib', 'html.parser', 'lxml', 'xml')
     else:
       parser_names = ('lxml', 'xml')
