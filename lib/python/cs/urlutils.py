@@ -133,8 +133,7 @@ class _URL(unicode):
       with Pfx("open(%s)", rq):
         rsp = opener.open(rq)
       H = rsp.info()
-      self._content_type = H.gettype()
-      self._content_transfer_encoding = H.getencoding()
+      self._info = rsp.info()
       self._content = rsp.read()
       self._parsed = None
 
@@ -163,7 +162,7 @@ class _URL(unicode):
     '''
     if self._content is None:
       self._fetch()
-    return self._content_type
+    return self._info.gettype()
 
   @property
   def content_transfer_encoding(self):
@@ -171,7 +170,7 @@ class _URL(unicode):
     '''
     if self._content is None:
       self._fetch()
-    return self._content_transfer_encoding
+    return self._info.getencoding()
 
   @property
   def domain(self):
