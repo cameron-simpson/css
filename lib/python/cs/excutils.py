@@ -78,8 +78,8 @@ def noexc_gen(func):
         return
       except Exception as e:
         try:
-          exception("exception calling next(%s(%s, **(%s)))", func.__name__, args, kwargs)
-        except Exception as e:
+          exception("exception calling next(%s(%s, **(%s))): %s", func.__name__, args, kwargs, e)
+        except Exception as e2:
           try:
             D("exception calling next(%s(%s, **(%s))): %s", func.__name__, args, kwargs, e)
           except Exception:
