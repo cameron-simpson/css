@@ -49,10 +49,6 @@ else:
   def X(*a):
     pass
 
-ARCHIVE_SUFFIXES = ( 'tar', 'tgz', 'tar.gz', 'tar.bz2', 'cpio', 'rar', 'zip', 'dmg' )
-IMAGE_SUFFIXES = ( 'png', 'jpg', 'jpeg', 'gif', 'ico', )
-VIDEO_SUFFIXES = ( 'mp2', 'mp4', 'avi', 'wmv', )
-
 DEFAULT_JOBS = 4
 
 usage = '''Usage: %s [options...] op [args...]
@@ -732,8 +728,6 @@ many_to_many = {
 
 one_to_many = {
       'hrefs':        lambda (P, U): url_hrefs(U),
-      'images':       lambda (P, U): with_exts(url_hrefs(U), IMAGE_SUFFIXES ),
-      'iimages':      lambda (P, U): with_exts(url_srcs(U), IMAGE_SUFFIXES ),
       'srcs':         lambda (P, U): url_srcs(U),
       'xml':          lambda (P, U), match: url_xml_find(U, match),
       'xmltext':      lambda (P, U), match: XML(U).findall(match),
@@ -760,10 +754,6 @@ one_to_one_scoped = ('per',)
 
 one_test = {
       'has_title':    lambda (P, U): U.title is not None,
-      'is_archive':   lambda (P, U): has_exts( U, ARCHIVE_SUFFIXES ),
-      'is_archive':   lambda (P, U): has_exts( U, ARCHIVE_SUFFIXES ),
-      'is_image':     lambda (P, U): has_exts( U, IMAGE_SUFFIXES ),
-      'is_video':     lambda (P, U): has_exts( U, VIDEO_SUFFIXES ),
       'reject_re':    lambda (P, U), regexp: not regexp.search(U),
       'same_domain':  lambda (P, U): notNone(U.referer, "%r.referer" % (U,)) and U.domain == U.referer.domain,
       'same_hostname':lambda (P, U): notNone(U.referer, "%r.referer" % (U,)) and U.hostname == U.referer.hostname,
