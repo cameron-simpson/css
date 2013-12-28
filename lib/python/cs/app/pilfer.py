@@ -298,8 +298,8 @@ def url_xml_find(U, match):
     yield ElementTree.tostring(found, encoding='utf-8')
 
 def unique(items, seen=None):
-  ''' A generator that yields unseen items, as opposed to just
-      stuffing them all into a set and returning the set.
+  ''' A generator that yields unseen items progressively, as opposed
+      to just stuffing them all into a set and returning the set.
   '''
   if seen is None:
     seen = set()
