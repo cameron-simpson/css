@@ -753,7 +753,7 @@ one_to_one = {
 one_to_one_scoped = ('per',)
 
 one_test = {
-      'has_title':    lambda (P, U): U.title is not None,
+      'has_title':    lambda (P, U): U.page_title is not None,
       'reject_re':    lambda (P, U), regexp: not regexp.search(U),
       'same_domain':  lambda (P, U): notNone(U.referer, "%r.referer" % (U,)) and U.domain == U.referer.domain,
       'same_hostname':lambda (P, U): notNone(U.referer, "%r.referer" % (U,)) and U.hostname == U.referer.hostname,
