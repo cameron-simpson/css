@@ -134,6 +134,7 @@ class _URL(unicode):
         rsp = opener.open(rq)
       H = rsp.info()
       self._content_type = H.gettype()
+      self._content_transfer_encoding = H.getencoding()
       self._content = rsp.read()
       self._parsed = None
 
@@ -163,6 +164,14 @@ class _URL(unicode):
     if self._content is None:
       self._fetch()
     return self._content_type
+
+  @property
+  def content_transfer_encoding(self):
+    ''' The URL content MIME type.
+    '''
+    if self._content is None:
+      self._fetch()
+    return self._content_transfer_encoding
 
   @property
   def domain(self):
