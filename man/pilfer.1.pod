@@ -1,0 +1,378 @@
+
+=head1 NAME
+
+pilfer - a web data extractor
+
+=head1 SYNOPSIS
+
+pilfer [-c config] [-j jobs] [-q] [-u] [url] URL [pipeline-spec...] actions...
+
+=head1 DESCRIPTION
+
+The pilfer(1cs) command traverses web pages from a supplied starting page
+according to a sequence of actions supplied on the command line
+which act somewhat like a shell pipeline;
+each action is applied to the current list of URLs
+and the results passed to the subsequent actions.
+
+=head1 OPTIONS
+
+=over 4
+
+=item B<-c> I<config>
+
+Load the contents of the pilferrc(5) file I<config>,
+prepending it to the list of pilferrcs consulted.
+Pilferrcs may contain settings,
+"seen" set backing stores,
+action shorthands,
+and pipeline definitions.
+
+=item B<-j> I<jobs>
+
+Set the number of concurrent tasks to I<jobs>, default 4.
+
+=item B<-q>
+
+Quiet. Do not recite the final set of strings the emerge from the end of the pipeline.
+
+=item B<-u>
+
+Unbuffered. Flush print actions as they occur.
+
+=back
+
+=head1 URL MODE
+
+The B<url> operator introduces an URL from which to commence the traversal,
+passing it to the specified action pipeline.
+
+The action pipeline may be preceeded by some named definitions of other pipelines
+for use in the recipe. These are introduced with a word of the form I<name>B<:{>
+and ended with the word B<}>.
+(Note: zsh(1) users will find the setting "B<setopt IGNORE_CLOSE_BRACES>" useful
+in their shell configuration.)
+
+=head2 Operation
+
+Conceptually, the pipeline passes sets of URLs (strings) from one action to the next.
+Each action operates on the list and produces a new list of strings for use by the following action.
+Although the new list of strings may in principle not be actual URLs,
+usually they are and for convenience the following documentation will refer to them as URLs
+or the "item".
+
+In fact, most action operate on individual URLs from the list as they arrive
+and pass their result forward as it is generated,
+so an input URL which takes longer to process will not hold up the processing
+of other URLS;
+actions occur in parallel as inputs arrive,
+subject the overall job parallelism controlled by the B<-j> option.
+Only actions which work on the list as a whole, such as "B<sort>",
+wait for all their inputs to arrive before generating output URLs.
+
+=head3 Context
+
+Each URL has an associated context, initialised once at the start of the main pipeline.
+The context includes operating state such as variable names,
+user agent string,
+chain of pilferrc(5cs) files,
+named pipeline instances
+and "seen" sets.
+Most actions pass this unchanged context to the outputs from a given item.
+Some action such as "B<per>" or "B<for>" construct a copy of the existing context
+in order to provide item specific state for following actions.
+This copy has new copies of the variable names and user agent,
+but uses the same instances of the
+chain of pilferrc(5cs) files,
+named pipeline instances
+and "seen" sets.
+
+=head3 Variable Substitution
+
+Several actions accept arguments which are subject to variable name substitution.
+A string subject to substitution may contain replacement strings
+with the syntax of the Python Format Specification Mini-Language:
+
+  http://docs.python.org/2/library/string.html#formatspec
+
+The field names come from the URL's context variable names.
+Aside from any ad hoc names defined during the pipeline operation,
+several names are predefined, computed from the URL itself.
+These include:
+
+=head3 Seen Sets
+
+Pilfer keeps named sets of strings called "seen sets" to track known strings, typically URLs.
+The "see" action and the "seen" and "unseen" selection actions manipulate and consult these sets.
+
+For persistent state,
+it is possible to associate these sets with a backing file in the pilferrc(5cs) configuration,
+a simple flat text file of strings, one per line.
+Seen sets with backing files update the backing file immediately when a string is marked as seen,
+and other instances of pilfer(1cs) monitor their backing files and will see the addition.
+
+=over 4
+
+=item B<basename>
+
+The URL basename, essentially the final "file" part of the URL path.
+
+=item B<domain>
+
+The URL domain name part (the hostname with the leading component removed).
+
+=item B<hostname>
+
+The URL hostname part.
+
+=item B<url>
+
+The current URL.
+
+=back
+
+=head2 Actions
+
+=over 4
+
+=item B<..>
+
+Pass the parent of each item in the list, as dirname(1) does for file pathnames.
+
+=item [B<->]B<.>I<ext>
+
+Pass items ending in the file extension "B<.>I<ext>".
+With a leading "B<->", discard items ending in the file extension "B<.>I<ext>".
+
+=item [B<->]B</>I<regexp>[B</>]
+
+Pass items matching I<regexp>.
+With a leading "B<->", discard items matching I<regexp>.
+
+=item B<!>I<shcmd>
+
+Perform variable substitution on I<shcmd> and execute the result via the shell sh(1).
+Pass each line of output to the next action.
+
+=item B<|>I<shcmd>
+
+Pipe input list through I<shcmd>:
+if the current list is not empty,
+perform variable substitution on I<shcmd> using the first item's
+context and execute the result via the shell sh(1), supplying the
+current list of items as input.
+Pass each line of output to the next action.
+
+=item B<delay:>I<seconds>
+
+For each item, sleep for I<seconds> before passing it on.
+Note: this delays individual items in their traversal of the pipeline;
+parallelism will allow concurrent operation to proceed.
+
+=item B<domain>
+
+Pass the domain part of the URL; the hostname with the leading component removed.
+
+=item B<divert:>I<pipename>[B<:>I<selector>]
+
+Divert all items to the pipeline named I<pipename>.
+The pipeline will be created if missing.
+If the optional I<selector> is supplied,
+divert only items matching the selector and pass the rest.
+I<selector> may be any "selection" type action
+such as "B<.>I<ext>", "B</>I<regexp>B</>" or "B<same_scheme>".
+
+=item B<first>
+
+Pass only the first item in the list.
+
+=item B<for:>I<varname>B<=>I<values>
+
+Perform variable substiution on I<values> and then separate into values on whitespace.
+For each value, copy the current conext, set I<varname> to the value, and pass the context and item.
+
+=item [B<grok>:]I<modulename>B<.>I<callname>
+
+Grok the fullness of the current item;
+call an arbitrary python function for special purpose evaluation of an item.
+Import the python module named I<modulename>.
+Call I<modulename>B<.>I<callname>B<( (P,U) )>
+where B<P> is the item's pilfer context
+and B<U> is the item/URL.
+The callable should return a mapping of I<varname> to I<value>,
+typically a dict.
+This mapping will be applied to the current context's variables.
+
+=item [B<grokall>:]I<modulename>B<.>I<callname>
+
+Grok the fullness of the current list of items;
+call an arbitrary python function for special purpose evaluation of the item list.
+Import the python module named I<modulename>.
+Call I<modulename>B<.>I<callname>B<( items )>
+where B<items> is an iterable of B<(P,U)> tuples as for B<grok>.
+The callable should return a mapping of I<varname> to I<value>,
+typically a dict.
+This mapping will be applied each item context's variables.
+
+=item B<hostname>
+
+Pass the hostname part of the URL.
+
+=item B<hrefs>
+
+Fetch each URL in the list and pass all URLs referenced by B<HREF>s in the page.
+
+=item B<last>
+
+Pass only the last item in the list.
+
+=item B<new_save_dir>
+
+Create a new save directory based on the value of B<{save_dir}>,
+and set B<{save_dir}> to the pathname of the new directory.
+
+=item B<pipe:>I<pipename>[B<:>I<selector>]
+
+Pipe all items through an instance of a pipeline made from the specification named I<pipename>.
+Pass the results of the pipeline.
+If the optional I<selector> is supplied,
+pipe only items matching the selector and pass the rest directly.
+I<selector> may be any "selection" type action
+such as "B<.>I<ext>", "B</>I<regexp>B</>" or "B<same_scheme>".
+
+=item B<per>
+
+Create a new context for each item.
+
+=item B<print>[B<:>I<text>]
+
+Print I<text> after variable substitution, by default the current URL ("B<{url}>").
+
+=item B<query>[B<:>I<field>,...]
+
+The "query" part of the URL;
+the ampersand ("B<&>") separated list of "field=value" pairs after the "?" in a "GET" method query.
+If I<field>s are specified,
+pass the comma separated list of field values correspond to the specified I<field>s.
+Example: from the URL B<http://example.com/foo?x=1&y=2>, B<query> passes "B<x=1&y=2>"
+whereas B<query:x,z,y> passes "B<1,,2>".
+
+=item B<quote>
+
+Pass the URL-encoded form of the current URL.
+
+=item B<s/>I<regexp>B</>I<replacement>B</>[B<g>][B<i>]
+
+Perform a substitution on the current item after the style of sed(1).
+The separator, denoted above by B</>,
+may be any character not occuring in the I<regexp> or I<replacement>.
+I<regexp> is a valid Python regular expression (which broadly means
+Perl compatible, which in turn encompasses "extended regular
+expressions").
+I<replacement> is a piece of text subject to pilfer variable substitution.
+The I<replacement> and terminating separator may be followed by the optional modifiers:
+"B<g>" to do a global replace, changing all matching subtexts
+and "B<i>" to do a case insensitive match.
+
+=item B<same_domain>
+
+Pass items with the same B<{domain}> as the referring URL.
+
+=item B<same_hostname>
+
+Pass items with the same B<{hostname}> as the referring URL.
+
+=item B<same_scheme>
+
+Pass items with the same B<{scheme}> as the referring URL.
+
+=item B<save>[B<:>B<saveas>=I<filename>,B<dir=>I<savedir>]
+
+Save the content of the current URL into the directory specified by B<{save_dir}>
+into a file specified by B<{basename}>.
+The optional parameters B<saveas> and B<dir> may be supplied to override these defaults.
+In particular, passing B<saveas=-> writes the URL content to standard output.
+
+=item B<see>[B<:>I<seenset>,...[B<:>I<value>]]
+
+Perform variable substitution on I<value>, by default "B<{url}>".
+Mark this value as "seen" in the named I<seenset>s, by default "B<_>".
+This will be persistent is the seenset has a backing store file.
+
+=item B<seen>[B<:>I<seenset>,...[B<:>I<value>]]
+
+Perform variable substitution on I<value>, by default "B<{url}>".
+Test if this value is "seen" in any of the named I<seenset>s, by default "B<_>".
+Pass the current item if seen.
+
+=item B<sort>
+
+Sort the list, emitting its members in order.
+
+=item B<srcs>
+
+Fetch each URL in the list and pass all URLs referenced by B<SRC>s in the page.
+
+=item B<title>
+
+Pass the page title of the URL B<{page_title}>.
+
+=item B<type>
+
+Pass the URL's Content-Type B<{content_type}>.
+
+=item B<unique>
+
+Pass only unique members of the list to the output,
+discard members already passed.
+
+=item B<unquote>
+
+Try the current item as URL-encoded and pass the decoded form.
+
+=item B<unseen>[B<:>I<seenset>,...[B<:>I<value>]]
+
+Perform variable substitution on I<value>, by default "B<{url}>".
+Test if this value is "seen" in any of the named I<seenset>s, by default "B<_>".
+Pass the current item if unseen.
+
+=item I<varname>=I<value>
+
+Perform variable substitution on I<value> and store the result as the variable named I<varname>.
+This is done for each item, and is therefore most meaningful when there is only one item in the list,
+as at the start of the pipleline or after "B<per>" or "B<for>".
+
+=item I<varname>==I<value>
+
+Perform variable substitution on I<value> and compare the result
+against the value stored in the variable named I<varname>;
+pass the current item only if the values are equal.
+
+=item B<xml:>I<match>
+
+Parse the URL content as XML and pass all tags found by the XPath I<match>.
+
+=item B<xmlattr:>I<attribute>
+
+Parse the URL content as XM and pass the attribute values named I<attribute>.
+
+=item B<xmltest:>I<match>
+
+Parse the URL content as XML and pass all tag named I<match>.
+
+=back
+
+=head1 EXAMPLE
+
+Print new stories and mark them as seen in the "stories" seen set:
+
+  pifler url http//example.com/stories.html hrefs unseen:stories print see:stories
+
+=head1 SEE ALSO
+
+pilferrc(5cs)
+
+=head1 AUTHOR
+
+Cameron Simpson E<lt>cs@zip.com.auE<gt>
+
