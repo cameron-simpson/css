@@ -50,6 +50,9 @@ The shorthand definition is broken into action string with the python shlex.spli
 
 Example:
 
+  [actions]
+  unquery = 's/\?[^?]*$//'
+  unanchor = 's/#.*//'
   is_archive = '/\.(tar|tgz|tar\.gz|tar\.bz2|cpio|rar|zip|dmg|pkg)$/'
   archives = hrefs is_archive
 
