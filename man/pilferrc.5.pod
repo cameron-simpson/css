@@ -9,7 +9,7 @@ A pilferrc file supplies configuration information for the pilfer(1cs) command.
 
 =head1 SYNTAX
 
-The pilferrc is a WIndows-style .ini file parsed by Python's SafeConfigParser class.
+The pilferrc is a Windows-style .ini file parsed by Python's SafeConfigParser class.
 
 =head2 Sections
 
