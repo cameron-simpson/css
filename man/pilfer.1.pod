@@ -87,6 +87,17 @@ chain of pilferrc(5cs) files,
 named pipeline instances
 and "seen" sets.
 
+=head3 Seen Sets
+
+Pilfer keeps named sets of strings called "seen sets" to track known strings, typically URLs.
+The "see" action and the "seen" and "unseen" selection actions manipulate and consult these sets.
+
+For persistent state,
+it is possible to associate these sets with a backing file in the pilferrc(5cs) configuration,
+a simple flat text file of strings, one per line.
+Seen sets with backing files update the backing file immediately when a string is marked as seen,
+and other instances of pilfer(1cs) monitor their backing files and will see the addition.
+
 =head3 Variable Substitution
 
 Several actions accept arguments which are subject to variable name substitution.
@@ -99,17 +110,6 @@ The field names come from the URL's context variable names.
 Aside from any ad hoc names defined during the pipeline operation,
 several names are predefined, computed from the URL itself.
 These include:
-
-=head3 Seen Sets
-
-Pilfer keeps named sets of strings called "seen sets" to track known strings, typically URLs.
-The "see" action and the "seen" and "unseen" selection actions manipulate and consult these sets.
-
-For persistent state,
-it is possible to associate these sets with a backing file in the pilferrc(5cs) configuration,
-a simple flat text file of strings, one per line.
-Seen sets with backing files update the backing file immediately when a string is marked as seen,
-and other instances of pilfer(1cs) monitor their backing files and will see the addition.
 
 =over 4
 
@@ -163,6 +163,12 @@ context and execute the result via the shell sh(1), supplying the
 current list of items as input.
 Pass each line of output to the next action.
 
+=item I<shorthand>
+
+Any action shorthand defined in the B<[actions]> section of a pilferrc file
+will be replaced by its expansion.
+See pilferrc(5cs).
+
 =item B<delay:>I<seconds>
 
 For each item, sleep for I<seconds> before passing it on.
@@ -203,7 +209,7 @@ The callable should return a mapping of I<varname> to I<value>,
 typically a dict.
 This mapping will be applied to the current context's variables.
 
-=item [B<grokall>:]I<modulename>B<.>I<callname>
+=item B<grokall>:I<modulename>B<.>I<callname>
 
 Grok the fullness of the current list of items;
 call an arbitrary python function for special purpose evaluation of the item list.
