@@ -774,7 +774,7 @@ one_to_one = {
       'unquote':      lambda (P, U): unquote(U),
       'save':         lambda (P, U), *a, **kw: (U, P.save_url(U, *a, **kw))[0],
       's':            substitute,
-      'title':        lambda (P, U): U.title,
+      'title':        lambda (P, U): U.page_title,
       'type':         lambda (P, U): url_io(U.content_type, ""),
       'xmlattr':      lambda (P, U), attr: [ A for A in (ElementTree.XML(U).get(attr),) if A is not None ],
     }
