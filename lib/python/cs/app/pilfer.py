@@ -711,6 +711,34 @@ def grok(module_name, func_name, (P, U), *a, **kw):
           P.set_user_vars(**var_mapping)
     return U
 
+def grokall(module_name, func_name, items, *a, **kw):
+  ''' Grokall performs a user-specified analysis on the items.
+      Import `func_name` from module `module_name`.
+      Call `func_name( items, *a, **kw ).
+      Receive a mapping of variable names to values in return,
+      which is applied to each item[0] via .set_user_vars().
+  '''
+  with Pfx("call %s.%s( items=%r, *a=%r, **kw=%r )...", module_name, func_name, P, U, a, kw):
+    import importlib
+    try:
+      M = importlib.import_module(module_name)
+    except ImportError as e:
+      exception("%s", e)
+    else:
+      try:
+        mfunc = getattr(M, func_name)
+      except AttributeError as e:
+        error("%s: no entry named %r: %s", module_name, func_name, e)
+      else:
+        try:
+          var_mapping = mfunc(items, *a, **kw)
+        except Exception as e:
+          exception("call")
+        else:
+          for item in items:
+            item[0].set_user_vars(**var_mapping)
+            yield item
+
 def _test_grokfunc( (P, U), *a, **kw ):
   v={ 'grok1': 'grok1value',
       'grok2': 'grok2value',
@@ -1153,6 +1181,7 @@ def action_grok(func, action, offset):
   # grokall:a.b.c.d[:args...]
   #
   # Import "d" from the python module "a.b.c".
+  # d() should return a mapping of varname to value.
   #
   # For grok, call d((P, U), kwargs) and apply the
   # returned mapping to P.user_vars.
@@ -1180,8 +1209,8 @@ def action_grok(func, action, offset):
   if is_grokall:
     func_sig = FUNC_MANY_TO_MANY
     def function(items):
-      for P, U in items:
-        yield P, grok(grok_module, grok_funcname, item)
+      for item in grokall(grok_module, grok_funcname, items):
+        yield item
   else:
     func_sig = FUNC_ONE_TO_ONE
     def function( (P, U), *a, **kw):
