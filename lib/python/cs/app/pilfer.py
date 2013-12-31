@@ -634,14 +634,14 @@ def substitute( (P, src), regexp, replacement, replace_all):
 
 def url_delay(U, delay, *a):
   sleep(float(delay))
-  yield U
+  return U
 
 def url_query(U, *a):
   U = URL(U, None)
   if not a:
-    yield U.query
+    return U.query
   qsmap = dict( [ ( qsp.split('=', 1) if '=' in qsp else (qsp, '') ) for qsp in U.query.split('&') ] )
-  yield ','.join( [ unquote(qsmap.get(qparam, '')) for qparam in a ] )
+  return ','.join( [ unquote(qsmap.get(qparam, '')) for qparam in a ] )
 
 def url_io(func, onerror, *a, **kw):
   ''' Call `func` and return its result.
