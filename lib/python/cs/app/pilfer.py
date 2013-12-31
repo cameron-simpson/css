@@ -1349,12 +1349,12 @@ class PilferRC(O):
       raise KeyError("pipe %r already defined" % (pipe_name,))
     specs[pipe_name] = spec
 
-  def loadrc(self, fp):
+  def loadrc(self, filename):
     ''' Read a pilferrc file and load pipeline definitions.
     '''
-    with Pfx(self.filename):
+    with Pfx(filename):
       cfg = ConfigParser()
-      with open(self.filename) as fp:
+      with open(filename) as fp:
         cfg.readfp(fp)
       self.defaults.update(cfg.defaults().iteritems())
       for action in cfg.options('actions'):
