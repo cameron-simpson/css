@@ -507,7 +507,7 @@ class Pilfer(O):
 
     def __init__(self, P, U):
       self.pilfer = P
-      self.url = U
+      self.url = URL(U, None)
 
     def keys(self):
       return set(self._approved) + set(self.pilfer.user_vars.keys())
