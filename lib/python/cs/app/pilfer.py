@@ -192,7 +192,7 @@ def main(argv):
                       if not line or line.startswith('#'):
                         debug("SKIP: %s", line)
                         continue
-                      inQ.put(url)
+                      inQ.put(line)
               # indicate end of input
               inQ.close()
               # await processing of output
