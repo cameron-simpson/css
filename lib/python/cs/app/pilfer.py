@@ -557,17 +557,6 @@ def new_dir(dirpath):
     dirpath = mkdirn(dirpath, '-')
   return dirpath
 
-def make_new_save_dir(Ps, Us):
-  D("make_new_save_dir: Ps is %r, Us is %r", Ps, Us)
-  if Ps:
-    P = Ps[0]
-    sd = P.user_vars.get('save_dir', '.')
-    nsd = new_dir(sd)
-    D("make_new_save_dir: made %r", nsd)
-    P.user_vars['save_dir'] = nsd
-  D("make_new_save_dir: returning %r", Us)
-  return Us
-
 def has_exts(U, suffixes, case_sensitive=False):
   ''' Test if the .path component of a URL ends in one of a list of suffixes.
       Note that the .path component does not include the query_string.
@@ -750,7 +739,6 @@ many_to_many = {
       'unique':       lambda Ps, Us: unique(Us),
       'first':        lambda Ps, Us: Us[:1],
       'last':         lambda Ps, Us: Us[-1:],
-      'new_save_dir': make_new_save_dir,
     }
 
 one_to_many = {
@@ -766,6 +754,7 @@ one_to_one = {
       'delay':        lambda (P, U), delay: (U, sleep(float(delay)))[0],
       'domain':       lambda (P, U): URL(U, None).domain,
       'hostname':     lambda (P, U): URL(U, None).hostname,
+      'new_save_dir': lambda (P, U): (U, P.set_user_vars(save_dir=new_dir(P.user_vars.get('save_dir', '.'))))[0],
       'per':          lambda (P, U): (copy(P), U),
       'print':        lambda (P, U), **kw: (U, P.print_url_string(U, **kw))[0],
       'query':        lambda (P, U), *a: url_query(U, *a),
