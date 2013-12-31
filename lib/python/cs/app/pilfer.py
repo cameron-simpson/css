@@ -1352,14 +1352,17 @@ class PilferRC(O):
   def loadrc(self, filename):
     ''' Read a pilferrc file and load pipeline definitions.
     '''
+    trace("load %s", filename)
     with Pfx(filename):
       cfg = ConfigParser()
       with open(filename) as fp:
         cfg.readfp(fp)
       self.defaults.update(cfg.defaults().iteritems())
-      for action in cfg.options('actions'):
-        with Pfx('[actions].%s', action):
-          self.action_map[action] = shlex.split(cfg.get('actions', action))
+      if cfg.has_section('actions'):
+        for action_name in cfg.options('actions'):
+          with Pfx('[actions].%s', action_name):
+            self.action_map[action_name] = shlex.split(cfg.get('actions', action_name))
+      if cfg.has_section('pipes'):
       for pipe_name in cfg.options('pipes'):
         with Pfx('[pipes].%s', pipe_name):
           pipe_spec = cfg.get('pipes', pipe_name)
@@ -1367,6 +1370,7 @@ class PilferRC(O):
           self.add_pipespec(PipeSpec(pipe_name, shlex.split(pipe_spec)))
       # load [seen] name=>backing_file mapping
       # NB: not yet envsub()ed
+      if cfg.has_section('seen'):
       for setname in cfg.options('seen'):
         backing_file = cfg.get('seen', setname).strip()
         self.seen_backing_files[setname] = backing_file
