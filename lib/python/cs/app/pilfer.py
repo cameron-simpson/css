@@ -87,8 +87,7 @@ def main(argv):
   for opt, val in opts:
     with Pfx("%s", opt):
       if opt == '-c':
-        rc = PilferRC(val)
-        P.rcs.insert(0, rc)
+        P.rcs[0:0] = load_pilferrcs(val)
       elif opt == '-j':
         jobs = int(val)
       elif opt == '-q':
@@ -103,8 +102,7 @@ def main(argv):
     dflt_rc = envsub('$HOME/.pilferrc')
   if dflt_rc:
     with Pfx("$PILFERRC: %s", dflt_rc):
-      rc = PilferRC(dflt_rc)
-      P.rcs.append(rc)
+      P.rcs.extend(load_pilferrcs(dflt_rc))
 
   if not argv:
     error("missing op")
@@ -1325,6 +1323,28 @@ class PipeSpec(O):
       pipe_funcs, errors = argv_pipefuncs(self.argv, action_map)
     return pipe_funcs, errors
 
+def load_pilferrcs(pathname):
+  rcs = []
+  with Pfx(pathname):
+    if os.path.isfile(pathname):
+      # filename: load pilferrc file
+      rcs.append(PilferRC(pathname))
+    elif os.path.isdir(pathname):
+      # directory: load pathname/rc and then pathname/*.rc
+      # recurses if any of these are also directories
+      rcpath = os.path.join(pathname, "rc")
+      if os.path.exists(rcpath):
+        rcs.extend(load_pilferrcs(rcpath))
+      subrcs = sorted( name for name in os.listdir(pathname)
+                       if not name.startswith('.') and name.endswith('.rc')
+                     )
+      for subrc in subrcs:
+        rcpath = os.path.join(pathname, subrc)
+        rcs.extend(load_pilferrcs(rcpath))
+    else:
+      warning("neither a file nor a directory, ignoring")
+  return rcs
+
 class PilferRC(O):
 
   def __init__(self, filename):
@@ -1363,17 +1383,17 @@ class PilferRC(O):
           with Pfx('[actions].%s', action_name):
             self.action_map[action_name] = shlex.split(cfg.get('actions', action_name))
       if cfg.has_section('pipes'):
-      for pipe_name in cfg.options('pipes'):
-        with Pfx('[pipes].%s', pipe_name):
-          pipe_spec = cfg.get('pipes', pipe_name)
-          debug("loadrc: pipe = %s", pipe_spec)
-          self.add_pipespec(PipeSpec(pipe_name, shlex.split(pipe_spec)))
+        for pipe_name in cfg.options('pipes'):
+          with Pfx('[pipes].%s', pipe_name):
+            pipe_spec = cfg.get('pipes', pipe_name)
+            debug("loadrc: pipe = %s", pipe_spec)
+            self.add_pipespec(PipeSpec(pipe_name, shlex.split(pipe_spec)))
       # load [seen] name=>backing_file mapping
       # NB: not yet envsub()ed
       if cfg.has_section('seen'):
-      for setname in cfg.options('seen'):
-        backing_file = cfg.get('seen', setname).strip()
-        self.seen_backing_files[setname] = backing_file
+        for setname in cfg.options('seen'):
+          backing_file = cfg.get('seen', setname).strip()
+          self.seen_backing_files[setname] = backing_file
 
   def __getitem__(self, pipename):
     ''' Fetch PipeSpec by name.
