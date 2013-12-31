@@ -124,6 +124,7 @@ def main(argv):
           url = argv.pop(0)
 
           # load any named pipeline definitions on the command line
+          # these are of the form: pipename:{ action... }
           rc = PilferRC(None)
           P.rcs.insert(0, rc)
           while len(argv) and argv[0].endswith(':{'):
