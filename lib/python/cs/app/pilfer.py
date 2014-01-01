@@ -458,12 +458,16 @@ class Pilfer(O):
       warning("print_url_string: unexpected keyword arguments: %r", kw)
     self._print(print_string, file=file)
 
+  @property
+  def save_dir(self):
+    return self.user_vars.get('save_dir', '.')
+
   def save_url(self, U, saveas=None, dir=None, overwrite=False, **kw):
     ''' Save the contents of the URL `U`.
     '''
     debug("save_url(U=%r, saveas=%r, dir=%s, overwrite=%r, kw=%r)...", U, saveas, dir, overwrite, kw)
     with Pfx("save_url(%s)", U):
-      save_dir = self.user_vars.get('save_dir', '.')
+      save_dir = self.save_dir
       if saveas is None:
         saveas = os.path.join(save_dir, U.basename)
         if saveas.endswith('/'):
@@ -754,7 +758,7 @@ one_to_one = {
       'delay':        lambda (P, U), delay: (U, sleep(float(delay)))[0],
       'domain':       lambda (P, U): URL(U, None).domain,
       'hostname':     lambda (P, U): URL(U, None).hostname,
-      'new_save_dir': lambda (P, U): (U, P.set_user_vars(save_dir=new_dir(P.user_vars.get('save_dir', '.'))))[0],
+      'new_save_dir': lambda (P, U): (U, P.set_user_vars(save_dir=new_dir(P.save_dir)))[0],
       'per':          lambda (P, U): (copy(P), U),
       'print':        lambda (P, U), **kw: (U, P.print_url_string(U, **kw))[0],
       'query':        lambda (P, U), *a: url_query(U, *a),
