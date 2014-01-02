@@ -36,6 +36,7 @@ from cs.lex import get_identifier, get_other_chars
 from cs.logutils import setup_logging, logTo, Pfx, debug, error, warning, exception, trace, pfx_iter, D
 from cs.mappings import MappingChain
 from cs.queues import IterableQueue, NullQueue, NullQ
+from cs.seq import seq
 from cs.tail import tail
 from cs.threads import locked, locked_property
 from cs.urlutils import URL, isURL, NetrcHTTPPasswordMgr
@@ -347,6 +348,7 @@ class Pilfer(O):
   '''
 
   def __init__(self, **kw):
+    self._name = 'Pilfer-%d' % (seq(),)
     self._lock = Lock()
     self.flush_print = False
     self._print_to = None
@@ -357,6 +359,10 @@ class Pilfer(O):
     O.__init__(self, **kw)
     if not hasattr(self, '_shared'):
       self._shared = PilferCommon()                  # common state - seen URLs, etc
+
+  def __str__(self):
+    return self._name
+  __repr__ = __str__
 
   def __copy__(self):
     ''' Copy this Pilfer state item, preserving shared state.
