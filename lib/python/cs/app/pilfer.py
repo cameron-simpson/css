@@ -311,6 +311,7 @@ class PilferCommon(O):
   def __init__(self):
     self._lock = Lock()
     O.__init__(self)
+    self.later = None
     self.seen = defaultdict(set)
     self.rcs = []               # chain of PilferRC libraries
     self.diversions = {}        # global mapping of names to divert: pipelines
@@ -369,6 +370,14 @@ class Pilfer(O):
 
   def see(self, url, seenset='_'):
     self._shared.seenset(seenset).add(url)
+
+  @property
+  def later(self):
+    return self._shared.later
+
+  @later.setter
+  def later(self, L):
+    self._shared.later = L
 
   @property
   def diversions(self):
