@@ -351,7 +351,7 @@ class Pilfer(O):
     self._print_to = None
     self._print_lock = Lock()
     self.user_agent = None
-    self.user_vars = {}
+    self.user_vars = { 'save_dir': '.' }
     self._urlsfile = None
     O.__init__(self, **kw)
     if not hasattr(self, '_shared'):
