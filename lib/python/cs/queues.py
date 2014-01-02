@@ -133,9 +133,9 @@ class QueueIterator(NestingOpenCloseMixin,O):
 ##    return item
 
   def put(self, item, *args, **kw):
-    ''' Put an item on the queue.
+    ''' Put `item` onto the queue.
         Warn if the queue is closed.
-        Reject if the `item` is the sentinel.
+        Reject if `item` is the sentinel.
     '''
     if self.closed:
       with PfxCallInfo():
@@ -145,7 +145,7 @@ class QueueIterator(NestingOpenCloseMixin,O):
     return self._put(item, *args, **kw)
 
   def _put(self, item, *args, **kw):
-    ''' Direct call to self.q.put() with not checks.
+    ''' Direct call to self.q.put() with no checks.
     '''
     return self.q.put(item, *args, **kw)
 
