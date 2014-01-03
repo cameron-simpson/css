@@ -197,7 +197,6 @@ class AdjustableSemaphore(object):
         If `delta` lowers the semaphore capacity then adjust() may block
         until the overcapacity is released.
     '''
-    D("adjust_delta(delta=%r)", delta)
     newvalue = self.__value + delta
     with self.__lock:
       if delta > 0:
