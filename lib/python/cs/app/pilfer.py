@@ -1113,9 +1113,10 @@ def action_divert_pipe(func, action, offset):
           yield item
       if pipe_items:
         P = pipe_items[0][0]
-        outQ = P.pipe_through(pipe_name, pipe_items)
-        for item in outQ:
-          yield item
+        with P.later.more_capacity(1):
+          outQ = P.pipe_through(pipe_name, pipe_items)
+          for item in outQ:
+            yield item
   else:
     raise ValueError("expected \"divert\" or \"pipe\", got func=%r" % (func,))
   return func_sig, function, scoped
