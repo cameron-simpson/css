@@ -622,10 +622,13 @@ class Later(NestingOpenCloseMixin):
       raise TypeError("Later.after(LFs, R, func, ...): expected Asynchron for R, got %r" % (R,))
     LFs = list(LFs)
     count = len(LFs)
+
     def put_func():
       ''' Function to defer: run `func` and pass its return value to R.put().
       '''
       R.call(func, *a, **kw)
+    put_func.__name__ = "%s[func=%s]" % (put_func.__name__, func)
+
     if count == 0:
       # nothing to wait for - queue the function immediately
       debug("Later.after: len(LFs) == 0, func=%s", func.__name__)
