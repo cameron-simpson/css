@@ -131,7 +131,11 @@ class _URL(unicode):
       rq = Request(url, None, hdrs)
       opener = self.opener
       with Pfx("open(%s)", rq):
-        rsp = opener.open(rq)
+        try:
+          rsp = opener.open(rq)
+        except HTTPError as e:
+          warning("open %s: %s", self, e)
+          raise
       H = rsp.info()
       self._info = rsp.info()
       self._content = rsp.read()
