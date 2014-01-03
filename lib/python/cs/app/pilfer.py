@@ -502,7 +502,18 @@ class Pilfer(O):
             except:
               exception("save fails")
 
-  class Variables(object):
+  def format_string(self, s, U):
+    ''' Format a string using the URL `U` as context.
+        `U` will be promoted to an URL if necessary.
+    '''
+    return FormatMapping(self, U).format(s)
+
+  def set_user_var(self, k, value, U, raw=False):
+    if not raw:
+      value = self.format_string(value, U)
+    FormatMapping(self, U)[k] = value
+
+class FormatMapping(object):
     ''' A mapping object to set or fetch user variables or URL attributes.
         Various URL attributes are known, and may not be assigned to.
         This mapping is used with str.format to fill in {value}s.
@@ -554,15 +565,10 @@ class Pilfer(O):
         else:
           P.user_vars[k] = value
 
-  def format_string(self, s, U):
-    ''' Format a string using the URL as context.
+  def format(self, s):
+    ''' Format the string `s` using this mapping.
     '''
-    return Formatter().vformat(s, (), self.Variables(self, U))
-
-  def set_user_var(self, k, value, U, raw=False):
-    if not raw:
-      value = self.format_string(value, U)
-    self.Variables(self, U)[k] = value
+    return Formatter().vformat(s, (), self)
 
 def new_dir(dirpath):
   ''' Create the directory `dirpath` or `dirpath-n` if `dirpath` exists.
