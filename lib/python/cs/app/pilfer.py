@@ -1332,11 +1332,14 @@ def action_compare(var, value):
   '''
   def function(item):
     P, U = item
-    uv = P.user_vars
-    if var not in uv:
-      return False
-    v = U.format(value, U)
-    return uv == v
+    M = FormatMapping(P, U)
+    try:
+      vvalue = M[var]
+    except KeyError:
+      error("unknown variable {%s}", var)
+      raise
+    cvalue = M.format(value)
+    return vvalue == cvalue
   return function, FUNC_SELECTOR
 
 def action_test(var, selector):
