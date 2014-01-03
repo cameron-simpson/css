@@ -556,6 +556,12 @@ class FormatMapping(object):
         else:
           return P.user_vars[k]
 
+  def get(self, k, default):
+    try:
+      return self[k]
+    except KeyError:
+      return default
+
     def __setitem__(self, k, value):
       P = self.pilfer
       url = self.url
