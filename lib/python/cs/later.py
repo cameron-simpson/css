@@ -374,6 +374,12 @@ class Later(NestingOpenCloseMixin):
     default.pop()
     return False
 
+  @contextmanager
+  def more_capacity(self, increment=1):
+    self.capacity.adjust_delta(increment)
+    yield
+    self.capacity.adjust_delta(-increment)
+
   def logTo(self, filename, logger=None, log_level=None):
     ''' Log to the file specified by `filename` using the specified
         logger named `logger` (default the module name, cs.later) at the
