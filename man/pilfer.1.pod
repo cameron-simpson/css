@@ -354,6 +354,11 @@ Perform variable substitution on I<value> and compare the result
 against the value stored in the variable named I<varname>;
 pass the current item only if the values are equal.
 
+=item I<varname>B<~>I<selector_action>
+
+By defaults, any I<selector_action> acts on the current item/URL.
+This syntax applies the I<selector_action> to the value of the specified variable.
+
 =item B<xml:>I<match>
 
 Parse the URL content as XML and pass all tags found by the XPath I<match>.
