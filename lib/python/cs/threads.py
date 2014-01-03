@@ -184,15 +184,22 @@ class AdjustableSemaphore(object):
     return True
 
   def adjust(self, newvalue):
-    ''' The adjust(newvalue) method calls release() or acquire() an
-        appropriate number of times.  If newvalue lowers the semaphore
-        capacity then adjust() may block until the overcapacity is
-        released.
+    ''' Set capacity to `newvalue` by calling release() or acquire() an appropriate number of times.
+	If `newvalue` lowers the semaphore capacity then adjust()
+	may block until the overcapacity is released.
     '''
     if newvalue <= 0:
       raise ValueError("invalid newvalue, should be > 0, got %s" % (newvalue,))
+    self.adjust_delta(newvalue - self.__value)
+
+  def adjust_delta(self, delta):
+    ''' Adjust capacity by `delta` by calling release() or acquire() an appropriate number of times.
+        If `delta` lowers the semaphore capacity then adjust() may block
+        until the overcapacity is released.
+    '''
+    D("adjust_delta(delta=%r)", delta)
+    newvalue = self.__value + delta
     with self.__lock:
-      delta = newvalue-self.__value
       if delta > 0:
         while delta > 0:
           self.__sem.release()
