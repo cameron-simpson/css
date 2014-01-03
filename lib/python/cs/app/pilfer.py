@@ -1336,7 +1336,7 @@ def action_compare(var, value):
     try:
       vvalue = M[var]
     except KeyError:
-      error("unknown variable {%s}", var)
+      error("unknown variable %r", var)
       raise
     cvalue = M.format(value)
     return vvalue == cvalue
@@ -1350,11 +1350,14 @@ def action_test(var, selector):
     raise ValueError("expected selector function but found: %r" % (selector,))
   def function(item):
     P, U = item
-    uv = P.user_vars
-    if var not in uv:
+    M = FormatMapping(P, U)
+    try:
+      vvalue = M[var]
+    except KeyError:
+      error("unknown variable %r", var)
       return False
-    v = U.format(value, U)
-    return sel_func( (P, v) )
+    result = sel_function( (P, vvalue) )
+    return result
   return function, FUNC_SELECTOR
 
 def action_assign(var, value):
