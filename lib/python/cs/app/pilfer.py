@@ -912,24 +912,7 @@ def action_func(action):
                 else:
                   raise ValueError("unrecognised marker %r" % (marker,))
             if not function:
-              if func_sig is not None:
-                raise RuntimeError("func_sig is set (%r) but function is None" % (func_sig,))
-              if func in many_to_many:
-                # many-to-many functions get passed straight in
-                function = many_to_many[func]
-                func_sig = FUNC_MANY_TO_MANY
-              elif func in one_to_many:
-                function = one_to_many[func]
-                func_sig = FUNC_ONE_TO_MANY
-              elif func in one_to_one:
-                function = one_to_one[func]
-                func_sig = FUNC_ONE_TO_ONE
-                scoped = func in one_to_one_scoped
-              elif func in one_test:
-                function = one_test[func]
-                func_sig = FUNC_SELECTOR
-              else:
-                raise ValueError("unknown action")
+                function, func_sig, scoped = function_by_name(func, func_sig)
             else:
               if func_sig is None:
                 raise RuntimeError("function is set (%r) but func_sig is None" % (function,))
@@ -1057,6 +1040,32 @@ def action_func(action):
         return retval
 
     return func_sig, trace_function
+
+def function_by_name(func, func_sig):
+  ''' Look up `func` in mappings of named functions.
+      Return (function, func_sig, scoped).
+  '''
+  scoped = False
+  # look up function by name in mappings
+  if func_sig is not None:
+    raise RuntimeError("func_sig is set (%r) but function is None" % (func_sig,))
+  if func in many_to_many:
+    # many-to-many functions get passed straight in
+    function = many_to_many[func]
+    func_sig = FUNC_MANY_TO_MANY
+  elif func in one_to_many:
+    function = one_to_many[func]
+    func_sig = FUNC_ONE_TO_MANY
+  elif func in one_to_one:
+    function = one_to_one[func]
+    func_sig = FUNC_ONE_TO_ONE
+    scoped = func in one_to_one_scoped
+  elif func in one_test:
+    function = one_test[func]
+    func_sig = FUNC_SELECTOR
+  else:
+    raise ValueError("unknown action")
+  return function, func_sig, scoped
 
 def action_divert_pipe(func, action, offset):
   # divert:pipe_name[:selector]
