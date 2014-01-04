@@ -306,8 +306,12 @@ class PushQueue(NestingOpenCloseMixin, O):
     self.outQ.open()
     if self.is_iterable:
       # add to the outQ opens; defer_iterable will close it
-      items = self.func_push(item)
-      ##items = list(items)
+      try:
+        items = self.func_push(item)
+        ##items = list(items)
+      except Exception as e:
+        exception("PQ.func_push<%s>: %s", self.func_push.__name__, e)
+        items = ()
       L._defer_iterable(items, self.outQ)
     else:
       raise RuntimeError("PUSHQUEUE NOT IS_ITERABLE")
