@@ -525,14 +525,13 @@ class FormatMapping(object):
                 'dirname',
                 'domain',
                 'hrefs',
-                'images',
+                'hostname',
                 'parent',
                 'path',
                 'referer',
                 'srcs',
                 'page_title',
                 'url',
-                'videos',
               )
 
   def __init__(self, P, U):
