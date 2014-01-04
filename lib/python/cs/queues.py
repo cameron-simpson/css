@@ -347,7 +347,7 @@ class PushQueue(NestingOpenCloseMixin, O):
     self.later._after( LFs, None, self.outQ.close )
 
   def _run_func_final(self):
-    items = list(self.func_final())
+    items = self.func_final()
     outQ = self.outQ
     for item in items:
       outQ.put(item)
