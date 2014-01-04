@@ -75,7 +75,7 @@ def noexc_gen(func):
       try:
         item = next(it)
       except StopIteration:
-        return
+        raise
       except Exception as e:
         try:
           exception("exception calling next(%s(%s, **(%s))): %s", func.__name__, args, kwargs, e)
