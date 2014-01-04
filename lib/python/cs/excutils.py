@@ -68,8 +68,16 @@ def noexc_gen(func):
       as in cs.later.Later.pipeline.
   '''
   def noexc_gen_wrapper(*args, **kwargs):
-    it = noexc(func)(*args, **kwargs)
-    if it is None:
+    try:
+      it = func(*args, **kwargs)
+    except Exception as e0:
+      try:
+        exception("exception calling %s(*%s, **(%s)): %s", func.__name__, args, kwargs, e)
+      except Exception as e2:
+        try:
+          D("exception calling %s(*%s, **(%s)): %s", func.__name__, args, kwargs, e)
+        except Exception:
+          pass
       return
     while True:
       try:
@@ -78,12 +86,13 @@ def noexc_gen(func):
         raise
       except Exception as e:
         try:
-          exception("exception calling next(%s(%s, **(%s))): %s", func.__name__, args, kwargs, e)
+          exception("exception calling next(%s(*%s, **(%s))): %s", func.__name__, args, kwargs, e)
         except Exception as e2:
           try:
-            D("exception calling next(%s(%s, **(%s))): %s", func.__name__, args, kwargs, e)
+            D("exception calling next(%s(*%s, **(%s))): %s", func.__name__, args, kwargs, e)
           except Exception:
             pass
+        return
       else:
         yield item
   return noexc_gen_wrapper
