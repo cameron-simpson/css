@@ -59,6 +59,7 @@ def noexc(func):
           D("exception calling %s(%s, **(%s)): %s", func.__name__, args, kwargs, e)
         except Exception:
           pass
+  noexc_wrapper.__name__ = 'noexc(%s)' % (func.__name__,)
   return noexc_wrapper
 
 def noexc_gen(func):
@@ -95,6 +96,7 @@ def noexc_gen(func):
         return
       else:
         yield item
+  noexc_gen_wrapper.__name__ = 'noexc_gen(%s)' % (func.__name__,)
   return noexc_gen_wrapper
 
 def transmute(exc_from, exc_to=None):
