@@ -70,7 +70,7 @@ def noexc_gen(func):
   '''
   def noexc_gen_wrapper(*args, **kwargs):
     try:
-      it = func(*args, **kwargs)
+      it = iter(func(*args, **kwargs))
     except Exception as e0:
       try:
         exception("exception calling %s(*%s, **(%s)): %s", func.__name__, args, kwargs, e)
