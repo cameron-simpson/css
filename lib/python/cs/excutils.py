@@ -35,9 +35,9 @@ def returns_exc_info(func):
       in the case of an exception. `exc_info` is a 3-tuple of
       exc_type, exc_value, exc_traceback as returned by sys.exc_info().
   '''
-  def wrapper(*args, **kwargs):
+  def returns_exc_info_wrapper(*args, **kwargs):
     return return_exc_info(func, *args, **kwargs)
-  return wrapper
+  return returns_exc_info_wrapper
 
 def noexc(func):
   ''' Decorator to wrap a function which should never raise an exception.
@@ -47,7 +47,7 @@ def noexc(func):
       My primary use case is actually to wrap logging functions,
       which I have had abort otherwise sensible code.
   '''
-  def wrapper(*args, **kwargs):
+  def noexc_wrapper(*args, **kwargs):
     from cs.logutils import exception, D
     try:
       return func(*args, **kwargs)
@@ -59,7 +59,7 @@ def noexc(func):
           D("exception calling %s(%s, **(%s)): %s", func.__name__, args, kwargs, e)
         except Exception:
           pass
-  return wrapper
+  return noexc_wrapper
 
 def noexc_gen(func):
   ''' Decorator to wrap a generator which should never raise an exception.
@@ -67,7 +67,7 @@ def noexc_gen(func):
       My primary use case is wrapping generators chained in a pipeline,
       as in cs.later.Later.pipeline.
   '''
-  def wrapper(*args, **kwargs):
+  def noexc_gen_wrapper(*args, **kwargs):
     it = noexc(func)(*args, **kwargs)
     if it is None:
       return
@@ -86,7 +86,7 @@ def noexc_gen(func):
             pass
       else:
         yield item
-  return wrapper
+  return noexc_gen_wrapper
 
 def transmute(exc_from, exc_to=None):
   ''' Decorator to transmute an inner exception to another exception type.
@@ -101,20 +101,20 @@ def transmute(exc_from, exc_to=None):
   if exc_to is None:
     exc_to = RuntimeError
   def transmutor(func):
-    def wrapper(*a, **kw):
+    def transmute_transmutor_wrapper(*a, **kw):
       try:
         return func(*a, **kw)
       except exc_from as e:
         raise exc_to("inner %s transmuted to %s: %s" % (type(e), exc_to, str(e)))
-    return wrapper
+    return transmute_transmutor_wrapper
   return transmutor
 
 def unimplemented(func):
   ''' Decorator for stub methods that must be implemented by a stub class.
   '''
-  def wrapper(self, *a, **kw):
+  def unimplemented_wrapper(self, *a, **kw):
     raise NotImplementedError("%s.%s(*%s, **%s)" % (type(self), func.__name__, a, kw))
-  return wrapper
+  return unimplemented_wrapper
 
 class NoExceptions(object):
   ''' A context manager to catch _all_ exceptions and log them.
