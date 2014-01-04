@@ -29,7 +29,7 @@ except ImportError:
   import xml.etree.ElementTree as ElementTree
 from cs.debug import thread_dump
 from cs.env import envsub
-from cs.excutils import noexc_gen
+from cs.excutils import noexc, noexc_gen
 from cs.fileutils import file_property, mkdirn, lockfile
 from cs.later import Later, FUNC_ONE_TO_ONE, FUNC_ONE_TO_MANY, FUNC_SELECTOR, FUNC_MANY_TO_MANY
 from cs.lex import get_identifier, get_other_chars
@@ -514,47 +514,47 @@ class Pilfer(O):
     FormatMapping(self, U)[k] = value
 
 class FormatMapping(object):
-    ''' A mapping object to set or fetch user variables or URL attributes.
-        Various URL attributes are known, and may not be assigned to.
-        This mapping is used with str.format to fill in {value}s.
-    '''
+  ''' A mapping object to set or fetch user variables or URL attributes.
+      Various URL attributes are known, and may not be assigned to.
+      This mapping is used with str.format to fill in {value}s.
+  '''
 
-    _approved = (
-                  'archives',
-                  'basename',
-                  'dirname',
-                  'domain',
-                  'hrefs',
-                  'images',
-                  'parent',
-                  'path',
-                  'referer',
-                  'srcs',
-                  'page_title',
-                  'url',
-                  'videos',
-                )
+  _approved = (
+                'archives',
+                'basename',
+                'dirname',
+                'domain',
+                'hrefs',
+                'images',
+                'parent',
+                'path',
+                'referer',
+                'srcs',
+                'page_title',
+                'url',
+                'videos',
+              )
 
-    def __init__(self, P, U):
-      self.pilfer = P
-      self.url = URL(U, None)
+  def __init__(self, P, U):
+    self.pilfer = P
+    self.url = URL(U, None)
 
-    def keys(self):
-      return set(self._approved) + set(self.pilfer.user_vars.keys())
+  def keys(self):
+    return set(self._approved) + set(self.pilfer.user_vars.keys())
 
-    def __getitem__(self, k):
-      P = self.pilfer
-      url = self.url
-      with Pfx(url):
-        if k in self._approved:
-          if k == 'url':
-            return url
-          try:
-            return getattr(url, k)
-          except AttributeError as e:
-            raise KeyError("no such attribute: .%s (%s)" % (k, e))
-        else:
-          return P.user_vars[k]
+  def __getitem__(self, k):
+    P = self.pilfer
+    url = self.url
+    with Pfx(url):
+      if k in self._approved:
+        if k == 'url':
+          return url
+        try:
+          return getattr(url, k)
+        except AttributeError as e:
+          raise KeyError("no such attribute: .%s (%s)" % (k, e))
+      else:
+        return P.user_vars[k]
 
   def get(self, k, default):
     try:
@@ -562,14 +562,14 @@ class FormatMapping(object):
     except KeyError:
       return default
 
-    def __setitem__(self, k, value):
-      P = self.pilfer
-      url = self.url
-      with Pfx(url):
-        if k in self._approved:
-          raise KeyError("it is forbidden to assign to attribute .%s" % (k,))
-        else:
-          P.user_vars[k] = value
+  def __setitem__(self, k, value):
+    P = self.pilfer
+    url = self.url
+    with Pfx(url):
+      if k in self._approved:
+        raise KeyError("it is forbidden to assign to attribute .%s" % (k,))
+      else:
+        P.user_vars[k] = value
 
   def format(self, s):
     ''' Format the string `s` using this mapping.
@@ -1047,6 +1047,12 @@ def action_func(action):
     else:
       raise RuntimeError("unhandled func_sig %r" % (func_sig,))
 
+    # wrap functions in exception catchers to report but not reraise
+    if func_sig in (FUNC_ONE_TO_MANY, FUNC_MANY_TO_MANY):
+      funcPU = noexc_gen(funcPU)
+    else:
+      funcPU = noexc(funcPU)
+
     def trace_function(*a, **kw):
       ##D("DO %s(a=(%d args; %r),kw=%r)", action0, len(a), a, kw)
       ##D("   funcPU<%s:%d>=%r %r ...", funcPU.func_code.co_filename, funcPU.func_code.co_firstlineno, funcPU, dir(funcPU))
@@ -1112,7 +1118,6 @@ def action_divert_pipe(func, action, offset):
     # function to divert selected items to a single named pipeline
     func_sig = FUNC_ONE_TO_MANY
     scoped = False
-    @noexc_gen
     def function(item):
       P, U = item
       try:
@@ -1131,7 +1136,6 @@ def action_divert_pipe(func, action, offset):
     # gather all items and feed to an instance of the specified pipeline
     func_sig = FUNC_MANY_TO_MANY
     scoped = True
-    @noexc_gen
     def function(items):
       pipe_items = []
       for item in items:
