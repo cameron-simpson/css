@@ -7,6 +7,7 @@ from threading import Lock, Thread
 from cs.py3 import StringTypes
 import os
 import sys
+from time import sleep
 from cs.lex import isUC_, parseUC_sAttr
 from cs.obj import O
 from cs.seq import the
