@@ -3,7 +3,7 @@
 from __future__ import print_function
 from collections import defaultdict, deque
 from functools import partial
-from threading import Lock
+from threading import Lock, Thread
 from cs.py3 import StringTypes
 import sys
 from cs.lex import isUC_, parseUC_sAttr
