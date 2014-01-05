@@ -1,5 +1,6 @@
 #!/usr/bin/python -tt
 
+from __future__ import print_function
 from collections import defaultdict, deque
 from functools import partial
 from threading import Lock
@@ -8,6 +9,7 @@ import sys
 from cs.lex import isUC_, parseUC_sAttr
 from cs.obj import O
 from cs.seq import the
+from cs.tail import tail
 
 class SeqMapUC_Attrs(object):
   ''' A wrapper for a mapping from keys (matching ^[A-Z][A-Z_0-9]*$)
@@ -105,9 +107,9 @@ class AttributableList(list):
         >>>     self.i = i
         >>> Os = [ O(1), O(2), O(3) ]
         >>> AL = AttributableList( Os )
-        >>> print AL.i
+        >>> print(AL.i)
         [1, 2, 3]
-        >>> print type(AL.i)
+        >>> print(type(AL.i))
         <class 'cs.mappings.AttributableList'>
   '''
 
@@ -152,9 +154,9 @@ class MethodicalList(AttributableList):
         ...
         >>> Os=[ O(), O(), O() ]
         >>> ML = MethodicalList( Os )
-        >>> print ML.x()
+        >>> print(ML.x())
         [4300801872, 4300801936, 4300802000]
-        >>> print type(ML.x())
+        >>> print(type(ML.x()))
         <class 'cs.mappings.MethodicalList'>
   '''
 
@@ -350,3 +352,41 @@ class MappingChain(object):
     for mapping in self.get_mappings():
       ks.update(mapping.keys())
     return ks
+
+class SeenSet(object):
+  ''' A set-like collection with optional backing store file.
+  '''
+
+  def __init__(self, name, backing_file=None):
+    self.name = name
+    self.backing_file = backing_file
+    self.set = set()
+    if backing_file is not None:
+      with open(backing_file, "a"):
+        pass
+      T = Thread(target=self._tailer,
+                 name="SeenSet[%s]._tailer(%s)" % (name, backing_file,),
+                 args=(open(backing_file),))
+      T.daemon = True
+      T.start()
+      sleep(0.1)
+
+  def _tailer(self, fp):
+    for line in tail(fp, seekwhence=os.SEEK_SET):
+      item = line.rstrip()
+      self.add(line.rstrip(), foreign=True)
+
+  def add(self, s, foreign=False):
+    # avoid needlessly extending the backing file
+    if s in self.set:
+      return
+    self.set.add(s)
+    if not foreign:
+      path = self.backing_file
+      if path:
+        with lockfile(path):
+          with open(path, "a") as fp:
+            print(s, file=fp)
+
+  def __contains__(self, item):
+    return item in self.set

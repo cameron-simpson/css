@@ -34,10 +34,9 @@ from cs.fileutils import file_property, mkdirn, lockfile
 from cs.later import Later, FUNC_ONE_TO_ONE, FUNC_ONE_TO_MANY, FUNC_SELECTOR, FUNC_MANY_TO_MANY
 from cs.lex import get_identifier, get_other_chars
 from cs.logutils import setup_logging, logTo, Pfx, debug, error, warning, exception, trace, pfx_iter, D
-from cs.mappings import MappingChain
+from cs.mappings import MappingChain, SeenSet
 from cs.queues import IterableQueue, NullQueue, NullQ
 from cs.seq import seq
-from cs.tail import tail
 from cs.threads import locked, locked_property
 from cs.urlutils import URL, isURL, NetrcHTTPPasswordMgr
 from cs.obj import O
@@ -1466,44 +1465,6 @@ class PilferRC(O):
     if pipename in specs:
       raise KeyError("repeated definition of pipe named %r", pipename)
     specs[pipename] = pipespec
-
-class SeenSet(object):
-  ''' A set-like collection with optional backing store file.
-  '''
-
-  def __init__(self, name, backing_file=None):
-    self.name = name
-    self.backing_file = backing_file
-    self.set = set()
-    if backing_file is not None:
-      with open(backing_file, "a"):
-        pass
-      T = Thread(target=self._tailer,
-                 name="SeenSet[%s]._tailer(%s)" % (name, backing_file,),
-                 args=(open(backing_file),))
-      T.daemon = True
-      T.start()
-      sleep(0.1)
-
-  def _tailer(self, fp):
-    for line in tail(fp, seekwhence=os.SEEK_SET):
-      item = line.rstrip()
-      self.add(line.rstrip(), foreign=True)
-
-  def add(self, s, foreign=False):
-    # avoid needlessly extending the backing file
-    if s in self.set:
-      return
-    self.set.add(s)
-    if not foreign:
-      path = self.backing_file
-      if path:
-        with lockfile(path):
-          with open(path, "a") as fp:
-            print(s, file=fp)
-
-  def __contains__(self, item):
-    return item in self.set
 
 if __name__ == '__main__':
   import sys
