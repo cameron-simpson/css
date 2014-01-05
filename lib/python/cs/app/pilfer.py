@@ -318,6 +318,10 @@ class PilferCommon(O):
     self.opener = build_opener()
     self.opener.add_handler(HTTPBasicAuthHandler(NetrcHTTPPasswordMgr()))
 
+  @property
+  def defaults(self):
+    return MappingChain(mappings=[ rc.defaults for rc in self.rcs ])
+
   @locked
   def seenset(self, name):
     ''' Return the SeenSet implementing the named "seen" set.
@@ -331,7 +335,7 @@ class PilferCommon(O):
          and not backing_file.startswith('./')
          and not backing_file.startswith('../')
            ):
-          backing_basedir = MappingChain(mappings=[ rc.defaults for rc in self.rcs ]).get('seen_dir')
+          backing_basedir = self.defaults.get('seen_dir')
           if backing_basedir is not None:
             backing_basedir = envsub(backing_basedir)
             backing_file = os.path.join(backing_basedir, backing_file)
