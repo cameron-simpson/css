@@ -374,6 +374,10 @@ class Pilfer(O):
                   _shared=self._shared,
                  )
 
+  @property
+  def defaults(self):
+    return self._shared.defaults
+
   def seen(self, url, seenset='_'):
     return url in self._shared.seenset(seenset)
 
