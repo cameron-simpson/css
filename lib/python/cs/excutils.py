@@ -160,6 +160,22 @@ class NoExceptions(object):
         error("IGNORE> "+line[:-1])
     return True
 
+def LogExceptions(conceal=False):
+  ''' Wrapper of NoExceptions which reports exceptions and optionally
+      suppresses them.
+  '''
+  from cs.logutils import exception
+  def handler(exc_type, exc_value, tb):
+    exception("EXCEPTION: %s", exc_value)
+    return conceal
+  return NoExceptions(handler)
+
+def logexc(func):
+  def logexc_wrapper(*a, **kw):
+    with LogExceptions():
+      return func(*a, **kw)
+  return logexc_wrapper
+
 if __name__ == '__main__':
   import cs.excutils_tests
   cs.excutils_tests.selftest(sys.argv)

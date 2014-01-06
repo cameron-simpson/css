@@ -18,6 +18,7 @@ from tempfile import NamedTemporaryFile
 import time
 import unittest
 from cs.env import envsub
+from cs.logutils import error, Pfx
 from cs.timeutils import TimeoutError
 
 def saferename(oldpath, newpath):
@@ -488,53 +489,55 @@ def mkdirn(path, sep=''):
       `path`: the basic directory path.
       `sep`: a separator between `path` and n. Default: ""
   '''
-  if os.sep in sep:
-    raise ValueError(
-            "mkdirn(path=%r, sep=%r): sep contains os.sep (%r)"
-            % (path, sep, os.sep))
-  opath = path
-  if len(path) == 0:
-    path = '.'+os.sep
-
-  if path.endswith(os.sep):
-    if sep:
+  with Pfx("mkdirn(path=%r, sep=%r)", path, sep):
+    if os.sep in sep:
       raise ValueError(
-              "mkdirn(path=%r, sep=%r): using non-empty sep with a trailing %r seems nonsensical"
-              % (path, sep, os.sep))
-    dir = path[:-len(os.sep)]
-    pfx = ''
-  else:
-    dir = os.path.dirname(path)
-    if len(dir) == 0:
-      dir='.'
-    pfx = os.path.basename(path)+sep
+              "sep contains os.sep (%r)"
+              % (os.sep,))
+    opath = path
+    if len(path) == 0:
+      path = '.' + os.sep
 
-  if not os.path.isdir(dir):
-    return None
+    if path.endswith(os.sep):
+      if sep:
+        raise ValueError(
+                "mkdirn(path=%r, sep=%r): using non-empty sep with a trailing %r seems nonsensical"
+                % (path, sep, os.sep))
+      dir = path[:-len(os.sep)]
+      pfx = ''
+    else:
+      dir = os.path.dirname(path)
+      if len(dir) == 0:
+        dir='.'
+      pfx = os.path.basename(path)+sep
 
-  # do a quick scan of the directory to find
-  # if any names of the desired form already exist
-  # in order to start after them
-  maxn = maxFilenameSuffix(dir, pfx)
-  if maxn is None:
-    newn = 0
-  else:
-    newn = maxn
-
-  while True:
-    newn += 1
-    newpath = path + sep + str(newn)
-    try:
-      os.mkdir(newpath)
-    except OSError as e:
-      if sys.exc_value[0] == errno.EEXIST:
-        # taken, try new value
-        continue
-      error("mkdir(%s): %s", newpath, e)
+    if not os.path.isdir(dir):
+      error("parent not a directory: %r", dir)
       return None
-    if len(opath) == 0:
-      newpath = os.path.basename(newpath)
-    return newpath
+
+    # do a quick scan of the directory to find
+    # if any names of the desired form already exist
+    # in order to start after them
+    maxn = maxFilenameSuffix(dir, pfx)
+    if maxn is None:
+      newn = 0
+    else:
+      newn = maxn
+
+    while True:
+      newn += 1
+      newpath = path + sep + str(newn)
+      try:
+        os.mkdir(newpath)
+      except OSError as e:
+        if sys.exc_value[0] == errno.EEXIST:
+          # taken, try new value
+          continue
+        error("mkdir(%s): %s", newpath, e)
+        return None
+      if len(opath) == 0:
+        newpath = os.path.basename(newpath)
+      return newpath
 
 def tmpdir():
   ''' Return the pathname of the default temporary directory for scratch data,

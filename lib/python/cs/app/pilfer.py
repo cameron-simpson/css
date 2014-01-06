@@ -29,8 +29,8 @@ except ImportError:
   import xml.etree.ElementTree as ElementTree
 from cs.debug import thread_dump
 from cs.env import envsub
-from cs.excutils import noexc, noexc_gen
-from cs.fileutils import file_property, mkdirn, lockfile
+from cs.excutils import noexc, noexc_gen, LogExceptions
+from cs.fileutils import file_property, mkdirn
 from cs.later import Later, FUNC_ONE_TO_ONE, FUNC_ONE_TO_MANY, FUNC_SELECTOR, FUNC_MANY_TO_MANY
 from cs.lex import get_identifier, get_other_chars
 from cs.logutils import setup_logging, logTo, Pfx, debug, error, warning, exception, trace, pfx_iter, D
@@ -318,6 +318,10 @@ class PilferCommon(O):
     self.opener = build_opener()
     self.opener.add_handler(HTTPBasicAuthHandler(NetrcHTTPPasswordMgr()))
 
+  @property
+  def defaults(self):
+    return MappingChain(mappings=[ rc.defaults for rc in self.rcs ])
+
   @locked
   def seenset(self, name):
     ''' Return the SeenSet implementing the named "seen" set.
@@ -331,7 +335,7 @@ class PilferCommon(O):
          and not backing_file.startswith('./')
          and not backing_file.startswith('../')
            ):
-          backing_basedir = MappingChain(mappings=[ rc.defaults for rc in self.rcs ]).get('seen_dir')
+          backing_basedir = self.defaults.get('seen_dir')
           if backing_basedir is not None:
             backing_basedir = envsub(backing_basedir)
             backing_file = os.path.join(backing_basedir, backing_file)
@@ -369,6 +373,10 @@ class Pilfer(O):
     return Pilfer(user_vars=dict(self.user_vars),
                   _shared=self._shared,
                  )
+
+  @property
+  def defaults(self):
+    return self._shared.defaults
 
   def seen(self, url, seenset='_'):
     return url in self._shared.seenset(seenset)
@@ -512,6 +520,28 @@ class Pilfer(O):
       value = self.format_string(value, U)
     FormatMapping(self, U)[k] = value
 
+  def import_module_func(self, module_name, func_name):
+    with LogExceptions():
+      import importlib
+      pylib = [ path for path in self.defaults.get('pythonpath', '').split(':') if path ]
+      with self._lock:
+        osyspath = sys.path
+        if pylib:
+          sys.path = [ envsub(path) for path in pylib ] + sys.path
+        try:
+          M = importlib.import_module(module_name)
+        except ImportError as e:
+          exception("%s", e)
+          M = None
+        if pylib:
+          sys.path = osyspath
+      if M is not None:
+        try:
+          return getattr(M, func_name)
+        except AttributeError as e:
+          error("%s: no entry named %r: %s", module_name, func_name, e)
+      return None
+
 class FormatMapping(object):
   ''' A mapping object to set or fetch user variables or URL attributes.
       Various URL attributes are known, and may not be assigned to.
@@ -582,6 +612,7 @@ def new_dir(dirpath):
     os.makedirs(dirpath)
   except OSError as e:
     if e.errno != errno.EEXIST:
+      exception("os.makedirs(%r): %s", dirpath, e)
       raise
     dirpath = mkdirn(dirpath, '-')
   return dirpath
@@ -708,24 +739,17 @@ def grok(module_name, func_name, (P, U), *a, **kw):
       which is applied to P.set_user_vars().
       Returns U, as this is a one-to-one function.
   '''
-  with Pfx("call %s.%s( (P=%r, U=%r), *a=%r, **kw=%r )...", module_name, func_name, P, U, a, kw):
-    import importlib
-    try:
-      M = importlib.import_module(module_name)
-    except ImportError as e:
-      exception("%s", e)
+  with Pfx("grok: call %s.%s( (P=%r, U=%r), *a=%r, **kw=%r )...", module_name, func_name, P, U, a, kw):
+    mfunc = P.import_module_func(module_name, func_name)
+    if mfunc is None:
+      error("import fails")
     else:
       try:
-        mfunc = getattr(M, func_name)
-      except AttributeError as e:
-        error("%s: no entry named %r: %s", module_name, func_name, e)
+        var_mapping = mfunc((P, U), *a, **kw)
+      except Exception as e:
+        exception("call")
       else:
-        try:
-          var_mapping = mfunc((P, U), *a, **kw)
-        except Exception as e:
-          exception("call")
-        else:
-          P.set_user_vars(**var_mapping)
+        P.set_user_vars(**var_mapping)
     return U
 
 def grokall(module_name, func_name, items, *a, **kw):
@@ -735,26 +759,19 @@ def grokall(module_name, func_name, items, *a, **kw):
       Receive a mapping of variable names to values in return,
       which is applied to each item[0] via .set_user_vars().
   '''
-  with Pfx("call %s.%s( items=%r, *a=%r, **kw=%r )...", module_name, func_name, P, U, a, kw):
-    import importlib
-    try:
-      M = importlib.import_module(module_name)
-    except ImportError as e:
-      exception("%s", e)
+  with Pfx("grokall: call %s.%s( items=%r, *a=%r, **kw=%r )...", module_name, func_name, P, U, a, kw):
+    mfunc = P.import_module_func(module_name, func_name)
+    if mfunc is None:
+      error("import fails")
     else:
       try:
-        mfunc = getattr(M, func_name)
-      except AttributeError as e:
-        error("%s: no entry named %r: %s", module_name, func_name, e)
+        var_mapping = mfunc(items, *a, **kw)
+      except Exception as e:
+        exception("call")
       else:
-        try:
-          var_mapping = mfunc(items, *a, **kw)
-        except Exception as e:
-          exception("call")
-        else:
-          for item in items:
-            item[0].set_user_vars(**var_mapping)
-            yield item
+        for item in items:
+          item[0].set_user_vars(**var_mapping)
+          yield item
 
 def _test_grokfunc( (P, U), *a, **kw ):
   v={ 'grok1': 'grok1value',
