@@ -522,26 +522,25 @@ class Pilfer(O):
 
   def import_module_func(self, module_name, func_name):
     with LogExceptions():
-    import importlib
-    pylib = [ path for path in self.defaults.get('pythonpath', '').split(':') if path ]
-    with self._lock:
-      osyspath = sys.path
-      if pylib:
+      import importlib
+      pylib = [ path for path in self.defaults.get('pythonpath', '').split(':') if path ]
+      with self._lock:
+        osyspath = sys.path
+        if pylib:
           sys.path = [ envsub(path) for path in pylib ] + sys.path
-        D("sys.path ==> %r", sys.path)
-      try:
-        M = importlib.import_module(module_name)
-      except ImportError as e:
-        exception("%s", e)
-        M = None
-      if pylib:
-        sys.path = osyspath
-    if M is not None:
-      try:
-        return getattr(M, func_name)
-      except AttributeError as e:
-        error("%s: no entry named %r: %s", module_name, func_name, e)
-    return None
+        try:
+          M = importlib.import_module(module_name)
+        except ImportError as e:
+          exception("%s", e)
+          M = None
+        if pylib:
+          sys.path = osyspath
+      if M is not None:
+        try:
+          return getattr(M, func_name)
+        except AttributeError as e:
+          error("%s: no entry named %r: %s", module_name, func_name, e)
+      return None
 
 class FormatMapping(object):
   ''' A mapping object to set or fetch user variables or URL attributes.
@@ -613,6 +612,7 @@ def new_dir(dirpath):
     os.makedirs(dirpath)
   except OSError as e:
     if e.errno != errno.EEXIST:
+      exception("os.makedirs(%r): %s", dirpath, e)
       raise
     dirpath = mkdirn(dirpath, '-')
   return dirpath
