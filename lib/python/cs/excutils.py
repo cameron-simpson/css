@@ -170,6 +170,12 @@ def LogExceptions(conceal=False):
     return conceal
   return NoExceptions(handler)
 
+def logexc(func):
+  def logexc_wrapper(*a, **kw):
+    with LogExceptions():
+      return func(*a, **kw)
+  return logexc_wrapper
+
 if __name__ == '__main__':
   import cs.excutils_tests
   cs.excutils_tests.selftest(sys.argv)
