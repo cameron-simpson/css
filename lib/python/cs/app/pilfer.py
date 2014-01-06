@@ -29,7 +29,7 @@ except ImportError:
   import xml.etree.ElementTree as ElementTree
 from cs.debug import thread_dump
 from cs.env import envsub
-from cs.excutils import noexc, noexc_gen
+from cs.excutils import noexc, noexc_gen, LogExceptions
 from cs.fileutils import file_property, mkdirn
 from cs.later import Later, FUNC_ONE_TO_ONE, FUNC_ONE_TO_MANY, FUNC_SELECTOR, FUNC_MANY_TO_MANY
 from cs.lex import get_identifier, get_other_chars
@@ -521,12 +521,13 @@ class Pilfer(O):
     FormatMapping(self, U)[k] = value
 
   def import_module_func(self, module_name, func_name):
+    with LogExceptions():
     import importlib
     pylib = [ path for path in self.defaults.get('pythonpath', '').split(':') if path ]
     with self._lock:
       osyspath = sys.path
       if pylib:
-        sys.path = pylib + sys.path
+          sys.path = [ envsub(path) for path in pylib ] + sys.path
         D("sys.path ==> %r", sys.path)
       try:
         M = importlib.import_module(module_name)
