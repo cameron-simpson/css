@@ -278,7 +278,7 @@ class PushQueue(NestingOpenCloseMixin, O):
         Otherwise, submit `func_push` with `item` via L.defer().
     '''
     if name is None:
-      name = "%s%d-%s" % (self.__class__.__name__, seq(), func_push.__name__)
+      name = "%s%d-%s" % (self.__class__.__name__, seq(), func_push)
     self.name = name
     self._lock = Lock()
     O.__init__(self)
