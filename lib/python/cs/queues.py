@@ -289,6 +289,8 @@ class PushQueue(NestingOpenCloseMixin, O):
     self.func_final = func_final
     self.is_iterable = is_iterable
     self.LFs = []
+    if not is_iterable:
+      raise RuntimeError("PUSHQUEUE NOT IS_ITERABLE")
 
   def __str__(self):
     return "<%s>" % (self.name,)
@@ -310,7 +312,7 @@ class PushQueue(NestingOpenCloseMixin, O):
         items = self.func_push(item)
         ##items = list(items)
       except Exception as e:
-        exception("PQ.func_push<%s>: %s", self.func_push.__name__, e)
+        exception("%s.func_push: %s", self, e)
         items = ()
       L._defer_iterable(items, self.outQ)
     else:
