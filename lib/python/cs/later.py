@@ -15,7 +15,8 @@ from cs.excutils import noexc_gen
 from cs.queues import IterableQueue, IterablePriorityQueue, PushQueue, \
                         NestingOpenCloseMixin
 from cs.threads import AdjustableSemaphore, \
-                       WorkerThreadPool, TimerQueue
+                       WorkerThreadPool, TimerQueue, \
+                       locked
 from cs.asynchron import Result, Asynchron, ASYNCH_RUNNING
 from cs.seq import seq
 from cs.logutils import Pfx, PfxCallInfo, error, info, warning, debug, D, OBSOLETE
@@ -264,7 +265,9 @@ class Later(NestingOpenCloseMixin):
     if name is None:
       name = "Later-%d" % (seq(),)
     self._tl = _Later_ThreadLocal()
-    self._lock = Lock()
+    self._lock = RLock()
+    self._finished = threading.Condition(self._lock)
+    self.finished = False
     NestingOpenCloseMixin.__init__(self, open=open)
     if ifdebug():
       import inspect
@@ -314,19 +317,64 @@ class Later(NestingOpenCloseMixin):
     with Pfx("%s.shutdown()" % (self,)):
       if not self.closed:
         raise RuntimeError("not closed!")
-      if self._timerQ:
-        self._timerQ.close()
-        self._timerQ.join()
-      self._LFPQ.close()              # prevent further submissions
-      self._dispatchThread.join()     # wait for all functions to be dispatched
-      self._workers.close()           # wait for all worker threads to complete
+      if self.is_idle():
+        self._finish()
 
-  ## TODO
-  def idle(self):
+  def _finish(self):
+    ''' Called when closed and all activity drained.
+        Closes queues and wakes up waiters for finish.
+    '''
+    ##D("%s._finish...", self)
+    if self._timerQ:
+      self._timerQ.close()
+      self._timerQ.join()
+    self._LFPQ.close()              # prevent further submissions
+    self._dispatchThread.join()     # wait for all functions to be dispatched
+    # NB: we wait for the thread pool inside the _dispatchThread
+    # because _finish may be called from a worker thread,
+    # resulting in that thread joining with itself (forbidden)
+    self.finished = True
+    ##D("%s._finish.acquire...", self)
+    self._finished.acquire()
+    ##D("%s._finish.acquired, notify_all...", self)
+    self._finished.notify_all()
+    ##D("%s._finish.notified, _finish done", self)
+
+  @locked
+  def is_idle(self):
+    return not self.delayed and not self.pending and not self.running
+
+  @locked
+  def is_finished(self):
+    return self.closed and self.is_idle()
+
+  @locked
+  def wait(self):
     ''' Wait for all active and pending jobs to complete, including
         any jobs they may themselves queue.
     '''
-    raise RuntimeError("UNIMPLEMENTED")
+    if self.finished:
+      ##D("%s.wait: already finished - return immediately", self)
+      pass
+    else:
+      ##D("%s.wait...", self)
+      self._finished.acquire()
+      ##D("%s.wait: acquired, waiting...", self)
+      self._finished.wait()
+      ##D("%s.wait FINISHED", self)
+
+  @locked
+  def _track(self, LF, fromset, toset):
+    if not LF:
+      raise ValueError("LF=None")
+    if fromset is None and toset is None:
+      raise ValueError("fromset and toset are None")
+    if fromset is not None:
+      fromset.remove(LF)
+    if toset is not None:
+      toset.add(LF)
+    if self.closed and self.is_idle():
+      self._finish()
 
   def __repr__(self):
     return '<%s "%s" capacity=%s running=%d (%s) pending=%d (%s) delayed=%d closed=%s>' \
@@ -355,7 +403,7 @@ class Later(NestingOpenCloseMixin):
     self.debug("COMPLETE %s: result = %r, exc_info = %r", LF, result, exc_info)
     self.log_status()
     self.capacity.release()
-    self.running.remove(LF)
+    self._track(LF, self.running, None)
 
   def __enter__(self):
     debug("%s: __enter__", self)
@@ -433,10 +481,13 @@ class Later(NestingOpenCloseMixin):
         self.capacity.release() # end of queue, not calling the handler
         break
       LF = pri_entry[-1]
-      self.pending.remove(LF)
-      self.running.add(LF)
+      self._track(LF, self.pending, self.running)
       self.debug("dispatched %s", LF)
       LF._dispatch()
+    # NB: we wait for the thread pool here instead of ._finished
+    # because that may be called from a worker thread,
+    # resulting in that thread joining with itself
+    self._workers.close()           # wait for all worker threads to complete
 
   @property
   def _allow_submit(self):
@@ -477,7 +528,7 @@ class Later(NestingOpenCloseMixin):
     if a or kw:
       func = partial(func, *a, **kw)
     LF = LateFunction(self, func, funcname)
-    self.running.add(LF)
+    self._track(LF, None, self.running)
     LF._dispatch()
     return LF
 
@@ -524,21 +575,20 @@ class Later(NestingOpenCloseMixin):
       when = now + delay
     if when is None or when <= now:
       # queue the request now
-      self.pending.add(LF)
+      self._track(LF, None, self.pending)
       self.debug("queuing %s", LF)
       self._LFPQ.put( pri_entry )
     else:
       # queue the request at a later time
       def queueFunc():
         LF = pri_entry[-1]
-        self.delayed.remove(LF)
-        self.pending.add(LF)
+        self._track(LF, self.delayed, self.running)
         self.debug("queuing %s after delay", LF)
         self._LFPQ.put( pri_entry )
       with self._lock:
         if self._timerQ is None:
           self._timerQ = TimerQueue(name="<TimerQueue %s._timerQ>"%(self.name))
-      self.delayed.add(LF)
+      self._track(LF, None, self.delayed)
       self.debug("delay %s until %s", LF, when)
       self._timerQ.add(when, queueFunc)
 
