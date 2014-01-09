@@ -29,7 +29,7 @@ except ImportError:
   import xml.etree.ElementTree as ElementTree
 from cs.debug import thread_dump
 from cs.env import envsub
-from cs.excutils import noexc, noexc_gen, LogExceptions
+from cs.excutils import noexc, noexc_gen, logexc, LogExceptions
 from cs.fileutils import file_property, mkdirn
 from cs.later import Later, FUNC_ONE_TO_ONE, FUNC_ONE_TO_MANY, FUNC_SELECTOR, FUNC_MANY_TO_MANY
 from cs.lex import get_identifier, get_other_chars
@@ -922,7 +922,8 @@ def action_func(action):
                   # grokall:a.b.c.d[:args...]
                   func_sig, function = action_grok(func, action, offset)
                 elif func == 'for':
-                  # for:var=value
+                  # for:var=value,...
+                  # for:varname:{start}..{stop}
                   # warning: implies 'per'
                   func_sig, function, scoped = action_for(func, action, offset)
                 elif func in ('see', 'seen', 'unseen'):
@@ -1222,16 +1223,32 @@ def action_for(func, action, offset):
   varname, offset = get_identifier(action, offset)
   if not varname:
     raise ValueError("missing varname")
-  if offset == len(action) or action[offset] != '=':
-    raise ValueError("missing =values")
-  values = action[offset+1:]
-  def function( (P, U) ):
-    # expand "values", split on whitespace, iterate with new Pilfer
-    value_list = P.format_string(values, U).split()
-    for value in value_list:
-      P2 = copy(P)
-      P2.set_user_vars(**{varname: value})
-      yield P2, U
+  if offset == len(action):
+    raise ValueError("missing =values or :start..stop")
+  marker = action[offset]
+  if marker == '=':
+    # for:varname=value,...
+    values = action[offset+1:]
+    def function( (P, U) ):
+      # expand "values", split on whitespace, iterate with new Pilfer
+      value_list = P.format_string(values, U).split()
+      for value in value_list:
+        P2 = copy(P)
+        P2.set_user_vars(**{varname: value})
+        yield P2, U
+  elif marker == ':':
+    # for:varname:{start}..{stop}
+    start, stop = action[offset+1:].split('..', 1)
+    def function( (P, U) ):
+      # expand "values", split on whitespace, iterate with new Pilfer
+      istart = int(P.format_string(start, U))
+      istop = int(P.format_string(stop, U))
+      for value in range(istart, istop+1):
+        P2 = copy(P)
+        P2.set_user_vars(**{varname: str(value)})
+        yield P2, U
+  else:
+    raise ValueError("unrecognised marker after varname: %r", marker)
   return func_sig, function, scoped
 
 def action_grok(func, action, offset):
