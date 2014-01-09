@@ -195,7 +195,14 @@ Pass only the first item in the list.
 =item B<for:>I<varname>B<=>I<values>
 
 Perform variable substiution on I<values> and then separate into values on whitespace.
-For each value, copy the current conext, set I<varname> to the value, and pass the context and item.
+For each value, copy the current context,
+set I<varname> to the value, and pass the context and item.
+
+=item B<for:>I<varname>B<:>I<start>B<..>I<stop>
+
+Perform variable substiution on I<start> and I<stop> and then treat as integers.
+For each value from I<start> to I<stop> inclusive, copy the current context,
+set I<varname> to the value, and pass the context and item.
 
 =item [B<grok>:]I<modulename>B<.>I<callname>
 
