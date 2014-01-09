@@ -956,13 +956,23 @@ def action_func(action):
                   raise RuntimeError("function is set (%r) but func_sig is None" % (function,))
             # select URLs matching regexp
             # /regexp/
+            # named groups in the regexp get applied, per URL, to the variables
             elif action.startswith('/'):
               if action.endswith('/'):
                 regexp = action[1:-1]
               else:
                 regexp = action[1:]
               regexp = re.compile(regexp)
-              function = lambda (P, U): regexp.search(U)
+              scoped = True
+              def function( (P, U) ):
+                m = regexp.search(U)
+                if not m:
+                  return (P, False)
+                varmap = m.groupdict()
+                if varmap:
+                  P = copy(P)
+                  P.set_user_vars(**varmap)
+                return (P, True)
               function.__name__ = '/%s/' % (regexp,)
               func_sig = FUNC_SELECTOR
             # select URLs not matching regexp
@@ -1013,12 +1023,19 @@ def action_func(action):
     # FUNC_MANY_TO_MANY functions have their own convoluted wrapper.
     #
     func0 = function
-    if scoped and func_sig not in (FUNC_ONE_TO_ONE, FUNC_ONE_TO_MANY, FUNC_MANY_TO_MANY):
+    if scoped and func_sig not in (FUNC_ONE_TO_ONE, FUNC_SELECTOR, FUNC_ONE_TO_MANY, FUNC_MANY_TO_MANY):
       raise RuntimeError("scoped is true but func_sig == %r" % (func_sig,))
-    if func_sig == FUNC_SELECTOR:
-      def funcPU(item):
-        return func0(item, *args, **kwargs)
-    elif func_sig == FUNC_ONE_TO_ONE:
+    if func_sig == FUNC_SELECTOR and scoped:
+      # convert FUNC_SELECTOR to FUNC_ONE_TO_MANY so that we can pass
+      # through Pilfer contexts
+      func_sig = FUNC_ONE_TO_MANY
+      # func0 returns (P2, Boolean)
+      def func0(item):
+        P, U  = item
+        P2, status = function(item, *args, **kwargs)
+        if status:
+          yield P2, U
+    if func_sig == FUNC_ONE_TO_ONE:
       if scoped:
         def funcPU(item):
           return func0(item, *args, **kwargs)
