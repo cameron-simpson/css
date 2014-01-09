@@ -147,6 +147,7 @@ With a leading "B<->", discard items ending in the file extension "B<.>I<ext>".
 =item [B<->]B</>I<regexp>[B</>]
 
 Pass items matching I<regexp>.
+If there are named subgroups in I<regexp>, save them as the named variables.
 With a leading "B<->", discard items matching I<regexp>.
 
 =item B<!>I<shcmd>

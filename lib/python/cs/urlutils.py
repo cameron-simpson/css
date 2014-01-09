@@ -5,6 +5,7 @@
 #
 
 from __future__ import with_statement, print_function
+import os
 import os.path
 import sys
 from itertools import chain
@@ -126,7 +127,7 @@ class _URL(unicode):
       hdrs = {}
       if self.referer:
         hdrs['Referer'] = self.referer
-      hdrs['User-Agent'] = self.user_agent if self.user_agent else 'css'
+      hdrs['User-Agent'] = self.user_agent if self.user_agent else os.environ.get('USER_AGENT', 'css')
       url = 'file://'+self if self.startswith('/') else self
       rq = Request(url, None, hdrs)
       opener = self.opener
