@@ -588,6 +588,9 @@ class FormatMapping(object):
           return getattr(url, k)
         except AttributeError as e:
           raise KeyError("no such attribute: .%s (%s)" % (k, e))
+        except:
+          ##D("BANG")
+          raise
       else:
         return P.user_vars[k]
 
