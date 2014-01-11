@@ -30,6 +30,7 @@ try:
 except ImportError:
   import xml.etree.ElementTree as ElementTree
 from threading import RLock
+from cs.excutils import logexc
 from cs.lex import parseUC_sAttr
 from cs.logutils import Pfx, pfx_iter, debug, error, warning, exception, D
 from cs.threads import locked_property
@@ -142,6 +143,7 @@ class _URL(unicode):
       self._content = rsp.read()
       self._parsed = None
 
+  @logexc
   def get_content(self, onerror=None):
     ''' Probe URL for content to avoid exceptions later.
         Use, and save as .content, `onerror` in the case of HTTPError.
