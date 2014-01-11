@@ -1087,12 +1087,6 @@ def action_func(action, do_trace):
     else:
       raise RuntimeError("unhandled func_sig %r" % (func_sig,))
 
-    # wrap functions in exception catchers to report but not reraise
-    if func_sig in (FUNC_ONE_TO_MANY, FUNC_MANY_TO_MANY):
-      funcPU = noexc_gen(funcPU)
-    else:
-      funcPU = noexc(funcPU)
-
     def trace_function(*a, **kw):
       if do_trace:
         D("DO %s(a=(%d args; %r),kw=%r)", action0, len(a), a, kw)
