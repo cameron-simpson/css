@@ -1291,7 +1291,7 @@ def action_grok(func, action, offset):
   # For grok, call d((P, U), kwargs) and apply the
   # returned mapping to P.user_vars.
   #
-  # From grokall, call d(Ps, Us, kwargs) and apply
+  # From grokall, call d( ( (P, U), ...), kwargs) and apply
   # the returned mapping to each P.user_vars.
   #
   is_grokall = func == "grokall"
