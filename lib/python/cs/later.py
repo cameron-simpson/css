@@ -10,8 +10,8 @@ import threading
 import traceback
 from cs.py3 import Queue, raise3
 import time
-from cs.debug import ifdebug, Lock, RLock, Thread, trace_caller
-from cs.excutils import noexc_gen
+from cs.debug import ifdebug, Lock, RLock, Thread, trace_caller, thread_dump
+from cs.excutils import noexc_gen, logexc
 from cs.queues import IterableQueue, IterablePriorityQueue, PushQueue, \
                         NestingOpenCloseMixin
 from cs.threads import AdjustableSemaphore, \
@@ -320,6 +320,7 @@ class Later(NestingOpenCloseMixin):
       if self.is_idle():
         self._finish()
 
+  @logexc
   def _finish(self):
     ''' Called when closed and all activity drained.
         Closes queues and wakes up waiters for finish.
