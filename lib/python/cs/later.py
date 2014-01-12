@@ -363,12 +363,12 @@ class Later(NestingOpenCloseMixin):
       self._finished.wait()
       ##D("%s.wait FINISHED", self)
 
-  @locked
   def _track(self, LF, fromset, toset):
     if not LF:
       raise ValueError("LF=None")
     if fromset is None and toset is None:
       raise ValueError("fromset and toset are None")
+    with self._lock:
     if fromset is not None:
       fromset.remove(LF)
     if toset is not None:
