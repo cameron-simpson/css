@@ -209,9 +209,7 @@ def main(argv):
                   with Pfx(str(outQ)):
                     for item in outQ:
                       warning("finalisation collected %r", item)
-            X("L.wait()...")
             L.wait()
-            X("L.wait() COMPLETE")
       else:
         error("unsupported op")
         badopts = True
