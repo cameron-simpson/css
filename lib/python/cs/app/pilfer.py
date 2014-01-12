@@ -769,30 +769,30 @@ def grok(module_name, func_name, (P, U), *a, **kw):
         P.set_user_vars(**var_mapping)
     return U
 
-def grokall(module_name, func_name, items, *a, **kw):
+def grokall(module_name, func_name, Ps, Us, *a, **kw):
   ''' Grokall performs a user-specified analysis on the items.
       Import `func_name` from module `module_name`.
-      Call `func_name( items, *a, **kw ).
+      Call `func_name( Ps, Us, *a, **kw ).
       Receive a mapping of variable names to values in return,
       which is applied to each item[0] via .set_user_vars().
   '''
-  with Pfx("grokall: call %s.%s( items=%r, *a=%r, **kw=%r )...", module_name, func_name, items, a, kw):
-    if not isinstance(items, list):
-      items = list(items)
-    if items:
-      P = items[0][0]
+  with Pfx("grokall: call %s.%s( Ps=%r, Us=%r, *a=%r, **kw=%r )...", module_name, func_name, Ps, Us, a, kw):
+    if not isinstance(Us, list):
+      Us = list(Us)
+    if Us:
+      P = Ps[0]
       mfunc = P.import_module_func(module_name, func_name)
       if mfunc is None:
         error("import fails")
       else:
         try:
-          var_mapping = mfunc(items, *a, **kw)
+          var_mapping = mfunc(Ps, Us, *a, **kw)
         except Exception as e:
           exception("call")
         else:
-          for item in items:
-            item[0].set_user_vars(**var_mapping)
-            yield item
+          for P in Ps:
+            P.set_user_vars(**var_mapping)
+    return Us
 
 def _test_grokfunc( (P, U), *a, **kw ):
   v={ 'grok1': 'grok1value',
