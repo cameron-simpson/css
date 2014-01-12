@@ -849,7 +849,7 @@ re_ASSIGN  = re.compile(r'([a-z]\w*)=')
 re_TEST    = re.compile(r'([a-z]\w*)~')
 re_GROK    = re.compile(r'([a-z]\w*(\.[a-z]\w*)*)\.([_a-z]\w*)', re.I)
 
-def action_func(action, do_trace):
+def action_func(action, do_trace, raw=False):
   ''' Accept a string `action` and return a tuple of:
         func_sig, function
       `func_sig` and `function` are used with Later.pipeline.
@@ -1029,6 +1029,11 @@ def action_func(action, do_trace):
             else:
               raise ValueError("unknown function %r" % (func,))
 
+    # return the raw funtion - a raw caller wants to use it directly,
+    # not in Later.pipeline()
+    if raw:
+      return func_sig, function
+
     # The pipeline itself passes (P, U) item tuples.
     #
     # All functions accept a leading (P, U) tuple argument but most emit only
@@ -1159,7 +1164,7 @@ def action_divert_pipe(func, action, offset, do_trace):
     if marker != action[offset]:
       raise ValueError("expected second marker to match first: expected %r, saw %r"
                        % (marker, action[offset]))
-    sel_func_sig, sel_function = action_func(action[offset+1:], do_trace=do_trace)
+    sel_func_sig, sel_function = action_func(action[offset+1:], do_trace=do_trace, raw=True)
     if sel_func_sig != FUNC_SELECTOR:
       raise ValueError("expected selector function but found: %r" % (action[offset+1:],))
   if func == "divert":
