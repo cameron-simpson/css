@@ -776,19 +776,23 @@ def grokall(module_name, func_name, items, *a, **kw):
       Receive a mapping of variable names to values in return,
       which is applied to each item[0] via .set_user_vars().
   '''
-  with Pfx("grokall: call %s.%s( items=%r, *a=%r, **kw=%r )...", module_name, func_name, P, U, a, kw):
-    mfunc = P.import_module_func(module_name, func_name)
-    if mfunc is None:
-      error("import fails")
-    else:
-      try:
-        var_mapping = mfunc(items, *a, **kw)
-      except Exception as e:
-        exception("call")
+  with Pfx("grokall: call %s.%s( items=%r, *a=%r, **kw=%r )...", module_name, func_name, items, a, kw):
+    if not isinstance(items, list):
+      items = list(items)
+    if items:
+      P = items[0][0]
+      mfunc = P.import_module_func(module_name, func_name)
+      if mfunc is None:
+        error("import fails")
       else:
-        for item in items:
-          item[0].set_user_vars(**var_mapping)
-          yield item
+        try:
+          var_mapping = mfunc(items, *a, **kw)
+        except Exception as e:
+          exception("call")
+        else:
+          for item in items:
+            item[0].set_user_vars(**var_mapping)
+            yield item
 
 def _test_grokfunc( (P, U), *a, **kw ):
   v={ 'grok1': 'grok1value',
@@ -1309,8 +1313,8 @@ def action_grok(func, action, offset):
     raise RuntimeError("arguments to %s not yet implemented" % (func,))
   if is_grokall:
     func_sig = FUNC_MANY_TO_MANY
-    def function(items):
-      for item in grokall(grok_module, grok_funcname, items):
+    def function(items, *a, **kw):
+      for item in grokall(grok_module, grok_funcname, items, *a, **kw):
         yield item
   else:
     func_sig = FUNC_ONE_TO_ONE
