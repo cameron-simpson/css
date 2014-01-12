@@ -329,10 +329,8 @@ class Later(NestingOpenCloseMixin):
       self._timerQ.close()
       self._timerQ.join()
     self._LFPQ.close()              # prevent further submissions
+    self._workers.close()           # wait for all worker threads to complete
     self._dispatchThread.join()     # wait for all functions to be dispatched
-    # NB: we wait for the thread pool inside the _dispatchThread
-    # because _finish may be called from a worker thread,
-    # resulting in that thread joining with itself (forbidden)
     self.finished = True
     self._finished.acquire()
     self._finished.notify_all()
@@ -480,10 +478,6 @@ class Later(NestingOpenCloseMixin):
       self._track(LF, self.pending, self.running)
       self.debug("dispatched %s", LF)
       LF._dispatch()
-    # NB: we wait for the thread pool here instead of ._finished
-    # because that may be called from a worker thread,
-    # resulting in that thread joining with itself
-    self._workers.close()           # wait for all worker threads to complete
 
   @property
   def _allow_submit(self):

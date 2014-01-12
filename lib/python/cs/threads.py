@@ -13,7 +13,7 @@ from itertools import chain
 import sys
 import time
 import threading
-from threading import Semaphore, Timer, Condition
+from threading import Semaphore, Timer, Condition, current_thread
 from collections import deque
 if sys.hexversion < 0x02060000: from sets import Set as set
 from cs.seq import seq
@@ -54,7 +54,8 @@ class WorkerThreadPool(NestingOpenCloseMixin, O):
     for H, HQ in self.all:
       HQ.close()
     for H, HQ in self.all:
-      H.join()
+      if H is not current_thread():
+        H.join()
 
   def dispatch(self, func, retq=None, deliver=None, pfx=None):
     ''' Dispatch the callable `func` in a separate thread.

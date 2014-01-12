@@ -18,8 +18,9 @@ from tempfile import NamedTemporaryFile
 import time
 import unittest
 from cs.env import envsub
-from cs.logutils import error, Pfx
+from cs.logutils import error, Pfx, D
 from cs.timeutils import TimeoutError
+from cs.py3 import ustr
 
 def saferename(oldpath, newpath):
   ''' Rename a path using os.rename(), but raise an exception if the target
@@ -470,12 +471,14 @@ def lockfile(path, ext='.lock', poll_interval=0.1, timeout=None):
       break
 
 def maxFilenameSuffix(dir, pfx):
-  from dircache import listdir
+  pfx=ustr(pfx)
   maxn=None
   pfxlen=len(pfx)
-  for tail in [ e[pfxlen:] for e in listdir(dir)
-                if len(e) > pfxlen and e.startswith(pfx)
-              ]:
+  for e in os.listdir(dir):
+    e = ustr(e)
+    if len(e) <= pfxlen or not e.startswith(pfx):
+      continue
+    tail = e[pfxlen:]
     if tail.isdigit():
       n=int(tail)
       if maxn is None:

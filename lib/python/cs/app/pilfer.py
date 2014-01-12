@@ -547,6 +547,12 @@ class Pilfer(O):
           error("%s: no entry named %r: %s", module_name, func_name, e)
       return None
 
+class FormatArgument(str):
+
+  @property
+  def as_int(self):
+    return int(self)
+  
 class FormatMapping(object):
   ''' A mapping object to set or fetch user variables or URL attributes.
       Various URL attributes are known, and may not be assigned to.
@@ -576,6 +582,9 @@ class FormatMapping(object):
     return set(self._approved) + set(self.pilfer.user_vars.keys())
 
   def __getitem__(self, k):
+    return FormatArgument(self._getitem(k))
+
+  def _getitem(self, k):
     P = self.pilfer
     url = self.url
     with Pfx(url):
@@ -760,26 +769,30 @@ def grok(module_name, func_name, (P, U), *a, **kw):
         P.set_user_vars(**var_mapping)
     return U
 
-def grokall(module_name, func_name, items, *a, **kw):
+def grokall(module_name, func_name, Ps, Us, *a, **kw):
   ''' Grokall performs a user-specified analysis on the items.
       Import `func_name` from module `module_name`.
-      Call `func_name( items, *a, **kw ).
+      Call `func_name( Ps, Us, *a, **kw ).
       Receive a mapping of variable names to values in return,
       which is applied to each item[0] via .set_user_vars().
   '''
-  with Pfx("grokall: call %s.%s( items=%r, *a=%r, **kw=%r )...", module_name, func_name, P, U, a, kw):
-    mfunc = P.import_module_func(module_name, func_name)
-    if mfunc is None:
-      error("import fails")
-    else:
-      try:
-        var_mapping = mfunc(items, *a, **kw)
-      except Exception as e:
-        exception("call")
+  with Pfx("grokall: call %s.%s( Ps=%r, Us=%r, *a=%r, **kw=%r )...", module_name, func_name, Ps, Us, a, kw):
+    if not isinstance(Us, list):
+      Us = list(Us)
+    if Us:
+      P = Ps[0]
+      mfunc = P.import_module_func(module_name, func_name)
+      if mfunc is None:
+        error("import fails")
       else:
-        for item in items:
-          item[0].set_user_vars(**var_mapping)
-          yield item
+        try:
+          var_mapping = mfunc(Ps, Us, *a, **kw)
+        except Exception as e:
+          exception("call")
+        else:
+          for P in Ps:
+            P.set_user_vars(**var_mapping)
+    return Us
 
 def _test_grokfunc( (P, U), *a, **kw ):
   v={ 'grok1': 'grok1value',
@@ -836,11 +849,10 @@ re_ASSIGN  = re.compile(r'([a-z]\w*)=')
 re_TEST    = re.compile(r'([a-z]\w*)~')
 re_GROK    = re.compile(r'([a-z]\w*(\.[a-z]\w*)*)\.([_a-z]\w*)', re.I)
 
-def action_func(action, do_trace):
+def action_func(action, do_trace, raw=False):
   ''' Accept a string `action` and return a tuple of:
         func_sig, function
-      `func_sig` and `function` are used with Later.pipeline
-      and `kwargs` is used as extra parameters for `function`.
+      `func_sig` and `function` are used with Later.pipeline.
   '''
   function = None
   func_sig = None
@@ -1017,6 +1029,11 @@ def action_func(action, do_trace):
             else:
               raise ValueError("unknown function %r" % (func,))
 
+    # return the raw funtion - a raw caller wants to use it directly,
+    # not in Later.pipeline()
+    if raw:
+      return func_sig, function
+
     # The pipeline itself passes (P, U) item tuples.
     #
     # All functions accept a leading (P, U) tuple argument but most emit only
@@ -1030,16 +1047,21 @@ def action_func(action, do_trace):
     func0 = function
     if scoped and func_sig not in (FUNC_ONE_TO_ONE, FUNC_SELECTOR, FUNC_ONE_TO_MANY, FUNC_MANY_TO_MANY):
       raise RuntimeError("scoped is true but func_sig == %r" % (func_sig,))
-    if func_sig == FUNC_SELECTOR and scoped:
+    if func_sig == FUNC_SELECTOR:
       # convert FUNC_SELECTOR to FUNC_ONE_TO_MANY so that we can pass
       # through Pilfer contexts
       func_sig = FUNC_ONE_TO_MANY
-      # func0 returns (P2, Boolean)
-      def func0(item):
-        P, U  = item
-        P2, status = function(item, *args, **kwargs)
-        if status:
-          yield P2, U
+      if scoped:
+        # func0 returns (P2, Boolean)
+        def func0(item):
+          P, U  = item
+          P2, status = function(item, *args, **kwargs)
+          if status:
+            yield P2, U
+      else:
+        def func0( (P, U), *args, **kwargs):
+          if func0( (P, U), *args, **kwargs):
+            yield U
     if func_sig == FUNC_ONE_TO_ONE:
       if scoped:
         def funcPU(item):
@@ -1147,7 +1169,7 @@ def action_divert_pipe(func, action, offset, do_trace):
     if marker != action[offset]:
       raise ValueError("expected second marker to match first: expected %r, saw %r"
                        % (marker, action[offset]))
-    sel_func_sig, sel_function = action_func(action[offset+1:], do_trace=do_trace)
+    sel_func_sig, sel_function = action_func(action[offset+1:], do_trace=do_trace, raw=True)
     if sel_func_sig != FUNC_SELECTOR:
       raise ValueError("expected selector function but found: %r" % (action[offset+1:],))
   if func == "divert":
@@ -1278,7 +1300,7 @@ def action_grok(func, action, offset):
   # For grok, call d((P, U), kwargs) and apply the
   # returned mapping to P.user_vars.
   #
-  # From grokall, call d(Ps, Us, kwargs) and apply
+  # From grokall, call d( ( (P, U), ...), kwargs) and apply
   # the returned mapping to each P.user_vars.
   #
   is_grokall = func == "grokall"
@@ -1300,8 +1322,8 @@ def action_grok(func, action, offset):
     raise RuntimeError("arguments to %s not yet implemented" % (func,))
   if is_grokall:
     func_sig = FUNC_MANY_TO_MANY
-    def function(items):
-      for item in grokall(grok_module, grok_funcname, items):
+    def function(items, *a, **kw):
+      for item in grokall(grok_module, grok_funcname, items, *a, **kw):
         yield item
   else:
     func_sig = FUNC_ONE_TO_ONE
@@ -1421,7 +1443,12 @@ def action_assign(var, value):
   '''
   def function(item):
     P, U = item
-    P.set_user_var(var, value, U)
+    if var == 'url':
+      value2 = P.format_string(value, U)
+      if value2 != U:
+        U = URL(value2, U)
+    else:
+      P.set_user_var(var, value, U)
     return U
   return function, FUNC_ONE_TO_ONE
 

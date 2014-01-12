@@ -121,27 +121,43 @@ class _URL(unicode):
       o.add_handler(HTTPBasicAuthHandler(NetrcHTTPPasswordMgr()))
     return o
 
+  def _request(self, method):
+    class MyRequest(Request):
+      def get_method(self):
+        return method
+    hdrs = {}
+    if self.referer:
+      hdrs['Referer'] = self.referer
+    hdrs['User-Agent'] = self.user_agent if self.user_agent else os.environ.get('USER_AGENT', 'css')
+    url = 'file://'+self if self.startswith('/') else self
+    rq = MyRequest(url, None, hdrs)
+    return rq
+
+  def _response(self, method):
+    rq = self._request(method)
+    opener = self.opener
+    with Pfx("open(%s)", rq):
+      try:
+        rsp = opener.open(rq)
+      except HTTPError as e:
+        warning("open %s: %s", self, e)
+        raise
+    return rsp
+
   def _fetch(self):
     ''' Fetch the URL content.
     '''
     with Pfx("_fetch(%s)", self):
-      hdrs = {}
-      if self.referer:
-        hdrs['Referer'] = self.referer
-      hdrs['User-Agent'] = self.user_agent if self.user_agent else os.environ.get('USER_AGENT', 'css')
-      url = 'file://'+self if self.startswith('/') else self
-      rq = Request(url, None, hdrs)
-      opener = self.opener
-      with Pfx("open(%s)", rq):
-        try:
-          rsp = opener.open(rq)
-        except HTTPError as e:
-          warning("open %s: %s", self, e)
-          raise
+      rsp = self._response('GET')
       H = rsp.info()
       self._info = rsp.info()
       self._content = rsp.read()
       self._parsed = None
+
+  def HEAD(self):
+    rsp = self._response('HEAD')
+    rsp.read()
+    return rsp
 
   @logexc
   def get_content(self, onerror=None):
