@@ -61,7 +61,8 @@ usage = '''Usage: %s [options...] op [args...]
         How many jobs (URL fetches, minor computations) to run at a time.
         Default: %d
     -q  Quiet. Don't recite surviving URLs at the end.
-    -u  Unbuffered. Flush print actions as they occur.'''
+    -u  Unbuffered. Flush print actions as they occur.
+    -x  Trace execution.'''
 
 def main(argv):
   argv = list(argv)
@@ -78,7 +79,7 @@ def main(argv):
   badopts = False
 
   try:
-    opts, argv = getopt(argv, 'c:j:qu')
+    opts, argv = getopt(argv, 'c:j:qux')
   except GetoptError as e:
     warning("%s", e)
     badopts = True
@@ -94,6 +95,8 @@ def main(argv):
         quiet = True
       elif opt == '-u':
         P.flush_print = True
+      elif opt == '-x':
+        P.do_trace = True
       else:
         raise NotImplementedError("unimplemented option")
 
@@ -144,7 +147,7 @@ def main(argv):
                   badopts = True
 
           # gather up the remaining definition as the running pipeline
-          pipe_funcs, errors = argv_pipefuncs(argv, P.action_map)
+          pipe_funcs, errors = argv_pipefuncs(argv, P.action_map, P.do_trace)
 
           # report accumulated errors and set badopts
           if errors:
@@ -220,7 +223,7 @@ def main(argv):
   return xit
 
 # TODO: recursion protection in action_map expansion
-def argv_pipefuncs(argv, action_map):
+def argv_pipefuncs(argv, action_map, do_trace):
   ''' Process command line strings and return a corresponding list
       of functions to construct a Later.pipeline.
   '''
@@ -235,7 +238,7 @@ def argv_pipefuncs(argv, action_map):
       rargv.extend(reversed(expando))
       continue
     try:
-      func_sig, function = action_func(action)
+      func_sig, function = action_func(action, do_trace)
     except ValueError as e:
       errors.append(str(e))
     else:
@@ -357,6 +360,7 @@ class Pilfer(O):
     self._name = 'Pilfer-%d' % (seq(),)
     self._lock = Lock()
     self.flush_print = False
+    self.do_trace = False
     self._print_to = None
     self._print_lock = Lock()
     self.user_agent = None
@@ -411,7 +415,7 @@ class Pilfer(O):
       spec = self.pipes.get(pipe_name)
       if spec is None:
         raise KeyError("no diversion named %r and no pipe specification found" % (pipe_name,))
-      pipe_funcs, errors = spec.pipe_funcs(self.action_map)
+      pipe_funcs, errors = spec.pipe_funcs(self.action_map, self.do_trace)
       if errors:
         for err in errors:
           error(err)
@@ -428,7 +432,7 @@ class Pilfer(O):
     spec = self.pipes.get(pipe_name)
     if spec is None:
       raise KeyError("no pipe specification named %r" % (pipe_name,))
-    pipe_funcs, errors = spec.pipe_funcs(self.action_map)
+    pipe_funcs, errors = spec.pipe_funcs(self.action_map, self.do_trace)
     if errors:
       for err in errors:
         error(err)
@@ -584,6 +588,9 @@ class FormatMapping(object):
           return getattr(url, k)
         except AttributeError as e:
           raise KeyError("no such attribute: .%s (%s)" % (k, e))
+        except:
+          ##D("BANG")
+          raise
       else:
         return P.user_vars[k]
 
@@ -831,7 +838,7 @@ re_ASSIGN  = re.compile(r'([a-z]\w*)=')
 re_TEST    = re.compile(r'([a-z]\w*)~')
 re_GROK    = re.compile(r'([a-z]\w*(\.[a-z]\w*)*)\.([_a-z]\w*)', re.I)
 
-def action_func(action):
+def action_func(action, do_trace):
   ''' Accept a string `action` and return a tuple of:
         func_sig, function
       `func_sig` and `function` are used with Later.pipeline
@@ -869,7 +876,7 @@ def action_func(action):
           # varname~selector
           m = re_TEST.match(action)
           if m:
-            function, func_sig = action_test(m.group(1), action[m.end():])
+            function, func_sig = action_test(m.group(1), action[m.end():], do_trace)
           else:
             # catch "a.b.c" and convert to "grok:a.b.c"
             m = re_GROK.match(action)
@@ -916,7 +923,7 @@ def action_func(action):
                 elif func == "divert" or func == "pipe":
                   # divert:pipe_name[:selector]
                   # pipe:pipe_name[:selector]
-                  func_sig, function, scoped = action_divert_pipe(func, action, offset)
+                  func_sig, function, scoped = action_divert_pipe(func, action, offset, do_trace)
                 elif func == 'grok' or func == 'grokall':
                   # grok:a.b.c.d[:args...]
                   # grokall:a.b.c.d[:args...]
@@ -1083,14 +1090,9 @@ def action_func(action):
     else:
       raise RuntimeError("unhandled func_sig %r" % (func_sig,))
 
-    # wrap functions in exception catchers to report but not reraise
-    if func_sig in (FUNC_ONE_TO_MANY, FUNC_MANY_TO_MANY):
-      funcPU = noexc_gen(funcPU)
-    else:
-      funcPU = noexc(funcPU)
-
     def trace_function(*a, **kw):
-      ##D("DO %s(a=(%d args; %r),kw=%r)", action0, len(a), a, kw)
+      if do_trace:
+        D("DO %s(a=(%d args; %r),kw=%r)", action0, len(a), a, kw)
       ##D("   funcPU<%s:%d>=%r %r ...", funcPU.func_code.co_filename, funcPU.func_code.co_firstlineno, funcPU, dir(funcPU))
       with Pfx(action0):
         try:
@@ -1128,7 +1130,7 @@ def function_by_name(func, func_sig):
     raise ValueError("unknown action")
   return function, func_sig, scoped
 
-def action_divert_pipe(func, action, offset):
+def action_divert_pipe(func, action, offset, do_trace):
   # divert:pipe_name[:selector]
   # pipe:pipe_name[:selector]
   #
@@ -1147,7 +1149,7 @@ def action_divert_pipe(func, action, offset):
     if marker != action[offset]:
       raise ValueError("expected second marker to match first: expected %r, saw %r"
                        % (marker, action[offset]))
-    sel_func_sig, sel_function = action_func(action[offset+1:])
+    sel_func_sig, sel_function = action_func(action[offset+1:], do_trace=do_trace)
     if sel_func_sig != FUNC_SELECTOR:
       raise ValueError("expected selector function but found: %r" % (action[offset+1:],))
   if func == "divert":
@@ -1398,10 +1400,10 @@ def action_compare(var, value):
     return vvalue == cvalue
   return function, FUNC_SELECTOR
 
-def action_test(var, selector):
+def action_test(var, selector, do_trace):
   ''' Return (function, func_sig) for a selector applied to the variable `var`.
   '''
-  sel_func_sig, sel_function = action_func(selector)
+  sel_func_sig, sel_function = action_func(selector, do_trace=do_trace)
   if sel_func_sig != FUNC_SELECTOR:
     raise ValueError("expected selector function but found: %r" % (selector,))
   def function(item):
@@ -1432,9 +1434,10 @@ class PipeSpec(O):
     self.name = name
     self.argv = argv
 
-  def pipe_funcs(self, action_map):
+  @logexc
+  def pipe_funcs(self, action_map, do_trace):
     with Pfx(self.name):
-      pipe_funcs, errors = argv_pipefuncs(self.argv, action_map)
+      pipe_funcs, errors = argv_pipefuncs(self.argv, action_map, do_trace)
     return pipe_funcs, errors
 
 def load_pilferrcs(pathname):
