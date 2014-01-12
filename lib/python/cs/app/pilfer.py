@@ -1433,6 +1433,11 @@ def action_assign(var, value):
   '''
   def function(item):
     P, U = item
+    if var == 'url':
+      value2 = P.format_string(value, U)
+      if value2 != U:
+        U = URL(value2, U)
+    else:
     P.set_user_var(var, value, U)
     return U
   return function, FUNC_ONE_TO_ONE
