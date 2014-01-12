@@ -370,10 +370,10 @@ class Later(NestingOpenCloseMixin):
     if fromset is None and toset is None:
       raise ValueError("fromset and toset are None")
     with self._lock:
-    if fromset is not None:
-      fromset.remove(LF)
-    if toset is not None:
-      toset.add(LF)
+      if fromset is not None:
+        fromset.remove(LF)
+      if toset is not None:
+        toset.add(LF)
     if self.closed and self.is_idle():
       self._finish()
 
