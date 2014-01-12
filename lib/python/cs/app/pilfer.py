@@ -852,8 +852,7 @@ re_GROK    = re.compile(r'([a-z]\w*(\.[a-z]\w*)*)\.([_a-z]\w*)', re.I)
 def action_func(action, do_trace):
   ''' Accept a string `action` and return a tuple of:
         func_sig, function
-      `func_sig` and `function` are used with Later.pipeline
-      and `kwargs` is used as extra parameters for `function`.
+      `func_sig` and `function` are used with Later.pipeline.
   '''
   function = None
   func_sig = None
