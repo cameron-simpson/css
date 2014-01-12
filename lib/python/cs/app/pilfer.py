@@ -1047,16 +1047,21 @@ def action_func(action, do_trace, raw=False):
     func0 = function
     if scoped and func_sig not in (FUNC_ONE_TO_ONE, FUNC_SELECTOR, FUNC_ONE_TO_MANY, FUNC_MANY_TO_MANY):
       raise RuntimeError("scoped is true but func_sig == %r" % (func_sig,))
-    if func_sig == FUNC_SELECTOR and scoped:
+    if func_sig == FUNC_SELECTOR:
       # convert FUNC_SELECTOR to FUNC_ONE_TO_MANY so that we can pass
       # through Pilfer contexts
       func_sig = FUNC_ONE_TO_MANY
-      # func0 returns (P2, Boolean)
-      def func0(item):
-        P, U  = item
-        P2, status = function(item, *args, **kwargs)
-        if status:
-          yield P2, U
+      if scoped:
+        # func0 returns (P2, Boolean)
+        def func0(item):
+          P, U  = item
+          P2, status = function(item, *args, **kwargs)
+          if status:
+            yield P2, U
+      else:
+        def func0( (P, U), *args, **kwargs):
+          if func0( (P, U), *args, **kwargs):
+            yield U
     if func_sig == FUNC_ONE_TO_ONE:
       if scoped:
         def funcPU(item):
@@ -1443,7 +1448,7 @@ def action_assign(var, value):
       if value2 != U:
         U = URL(value2, U)
     else:
-    P.set_user_var(var, value, U)
+      P.set_user_var(var, value, U)
     return U
   return function, FUNC_ONE_TO_ONE
 
