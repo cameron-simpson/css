@@ -547,6 +547,12 @@ class Pilfer(O):
           error("%s: no entry named %r: %s", module_name, func_name, e)
       return None
 
+class FormatArgument(str):
+
+  @property
+  def as_int(self):
+    return int(self)
+  
 class FormatMapping(object):
   ''' A mapping object to set or fetch user variables or URL attributes.
       Various URL attributes are known, and may not be assigned to.
@@ -576,6 +582,9 @@ class FormatMapping(object):
     return set(self._approved) + set(self.pilfer.user_vars.keys())
 
   def __getitem__(self, k):
+    return FormatArgument(self._getitem(k))
+
+  def _getitem(self, k):
     P = self.pilfer
     url = self.url
     with Pfx(url):
