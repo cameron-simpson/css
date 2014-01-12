@@ -325,7 +325,6 @@ class Later(NestingOpenCloseMixin):
     ''' Called when closed and all activity drained.
         Closes queues and wakes up waiters for finish.
     '''
-    ##D("%s._finish...", self)
     if self._timerQ:
       self._timerQ.close()
       self._timerQ.join()
@@ -335,11 +334,8 @@ class Later(NestingOpenCloseMixin):
     # because _finish may be called from a worker thread,
     # resulting in that thread joining with itself (forbidden)
     self.finished = True
-    ##D("%s._finish.acquire...", self)
     self._finished.acquire()
-    ##D("%s._finish.acquired, notify_all...", self)
     self._finished.notify_all()
-    ##D("%s._finish.notified, _finish done", self)
 
   @locked
   def is_idle(self):
@@ -349,7 +345,6 @@ class Later(NestingOpenCloseMixin):
   def is_finished(self):
     return self.closed and self.is_idle()
 
-  @locked
   def wait(self):
     ''' Wait for all active and pending jobs to complete, including
         any jobs they may themselves queue.
