@@ -547,6 +547,10 @@ def locked(func):
       Relies upon a ._lock attribute for locking.
   '''
   def lockfunc(self, *a, **kw):
+    if self._lock.acquire(0):
+      self._lock.release()
+    else:
+      debug("@locked(self._lock=%r <%s>, func=%r)...", self._lock, self._lock.__class__, func)
     with self._lock:
       return func(self, *a, **kw)
   return lockfunc

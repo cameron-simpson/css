@@ -10,8 +10,8 @@ import threading
 import traceback
 from cs.py3 import Queue, raise3
 import time
-from cs.debug import ifdebug, Lock, RLock, Thread, trace_caller
-from cs.excutils import noexc_gen
+from cs.debug import ifdebug, Lock, RLock, Thread, trace_caller, thread_dump
+from cs.excutils import noexc_gen, logexc
 from cs.queues import IterableQueue, IterablePriorityQueue, PushQueue, \
                         NestingOpenCloseMixin
 from cs.threads import AdjustableSemaphore, \
@@ -320,11 +320,11 @@ class Later(NestingOpenCloseMixin):
       if self.is_idle():
         self._finish()
 
+  @logexc
   def _finish(self):
     ''' Called when closed and all activity drained.
         Closes queues and wakes up waiters for finish.
     '''
-    ##D("%s._finish...", self)
     if self._timerQ:
       self._timerQ.close()
       self._timerQ.join()
@@ -334,11 +334,8 @@ class Later(NestingOpenCloseMixin):
     # because _finish may be called from a worker thread,
     # resulting in that thread joining with itself (forbidden)
     self.finished = True
-    ##D("%s._finish.acquire...", self)
     self._finished.acquire()
-    ##D("%s._finish.acquired, notify_all...", self)
     self._finished.notify_all()
-    ##D("%s._finish.notified, _finish done", self)
 
   @locked
   def is_idle(self):
@@ -348,7 +345,6 @@ class Later(NestingOpenCloseMixin):
   def is_finished(self):
     return self.closed and self.is_idle()
 
-  @locked
   def wait(self):
     ''' Wait for all active and pending jobs to complete, including
         any jobs they may themselves queue.
@@ -363,16 +359,16 @@ class Later(NestingOpenCloseMixin):
       self._finished.wait()
       ##D("%s.wait FINISHED", self)
 
-  @locked
   def _track(self, LF, fromset, toset):
     if not LF:
       raise ValueError("LF=None")
     if fromset is None and toset is None:
       raise ValueError("fromset and toset are None")
-    if fromset is not None:
-      fromset.remove(LF)
-    if toset is not None:
-      toset.add(LF)
+    with self._lock:
+      if fromset is not None:
+        fromset.remove(LF)
+      if toset is not None:
+        toset.add(LF)
     if self.closed and self.is_idle():
       self._finish()
 
