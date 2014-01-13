@@ -853,6 +853,9 @@ def action_func(action, do_trace, raw=False):
   ''' Accept a string `action` and return a tuple of:
         func_sig, function
       `func_sig` and `function` are used with Later.pipeline.
+      If `raw`, return a tuple of:
+        func_sig, function, scoped
+      prior to the final step of wrapping scoped functions etc.
   '''
   function = None
   func_sig = None
@@ -1032,7 +1035,7 @@ def action_func(action, do_trace, raw=False):
     # return the raw funtion - a raw caller wants to use it directly,
     # not in Later.pipeline()
     if raw:
-      return func_sig, function
+      return func_sig, function, scoped
 
     # The pipeline itself passes (P, U) item tuples.
     #
@@ -1169,9 +1172,12 @@ def action_divert_pipe(func, action, offset, do_trace):
     if marker != action[offset]:
       raise ValueError("expected second marker to match first: expected %r, saw %r"
                        % (marker, action[offset]))
-    sel_func_sig, sel_function = action_func(action[offset+1:], do_trace=do_trace, raw=True)
+    sel_func_sig, sel_function, sel_scoped = action_func(action[offset+1:], do_trace=do_trace, raw=True)
     if sel_func_sig != FUNC_SELECTOR:
       raise ValueError("expected selector function but found: %r" % (action[offset+1:],))
+    if sel_scoped:
+      sel_function0 = sel_function
+      sel_function = lambda *a, **kw: sel_function0(*a, **kw)[1]
   if func == "divert":
     # function to divert selected items to a single named pipeline
     func_sig = FUNC_ONE_TO_MANY
