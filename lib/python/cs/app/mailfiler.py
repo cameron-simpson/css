@@ -462,6 +462,9 @@ class Filer(O):
     ''' Compute the alert message for the message `M`.
     '''
     hmap = dict( [ (k.lower(), M[k]) for k in M.keys() ] )
+    subj = unrfc2047(M.get('subject', '')).strip()
+    if subj:
+      hmap['subject'] = subj
     for hdr in ('from', 'to', 'cc', 'bcc'):
       hmap['short_'+hdr] = ",".join(self.maildb.header_shortlist(M, (hdr,)))
     hmap['short_recipients'] = ",".join(self.maildb.header_shortlist(M, ('to', 'cc', 'bcc')))
