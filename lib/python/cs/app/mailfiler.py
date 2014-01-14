@@ -468,7 +468,7 @@ class Filer(O):
     for hdr in ('from', 'to', 'cc', 'bcc'):
       hmap['short_'+hdr] = ",".join(self.maildb.header_shortlist(M, (hdr,)))
     hmap['short_recipients'] = ",".join(self.maildb.header_shortlist(M, ('to', 'cc', 'bcc')))
-    return fmt.format(**hmap)
+    return u(fmt).format(**hmap)
 
   def alert(self, alert_message=None):
     ''' Issue an alert with the specified `alert_message`.
