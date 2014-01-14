@@ -447,20 +447,25 @@ class Filer(O):
   def alert_format(self):
     ''' The format string for alert messages from $ALERT_FORMAT.
     '''
-    return self.env('ALERT_FORMAT', 'MAILFILER: {from}: {subject}')
+    return self.env('ALERT_FORMAT', 'MAILFILER: {from}->{short_recipients}: {subject}')
 
   def alert_message(self, M):
-    ''' Compute the alert message for the message `M`.
-    '''
-    fmt = self.alert_format
-    hmap = dict( [ (k.lower(), M[k]) for k in M.keys() ] )
     try:
-      msg = fmt.format(**hmap)
+      msg = self.format_message(M, self.alert_format)
     except KeyError as e:
       error("alert_message: format=%r, message keys=%s: %s",
             fmt, ','.join(sorted(list(M.keys()))), e)
       msg = "MAILFILER: alert! format=%s" % (fmt,)
     return msg
+
+  def format_message(self, M, fmt):
+    ''' Compute the alert message for the message `M`.
+    '''
+    hmap = dict( [ (k.lower(), M[k]) for k in M.keys() ] )
+    for hdr in ('from', 'to', 'cc', 'bcc'):
+      hmap['short_'+hdr] = self.maildb.header_shortlist(M, (hdr,))
+    hmap['short_recipients'] = self.maildb.header_shortlist(M, ('to', 'cc', 'bcc'))
+    return fmt.format(**hmap)
 
   def alert(self, alert_message=None):
     ''' Issue an alert with the specified `alert_message`.
