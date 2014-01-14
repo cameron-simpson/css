@@ -217,7 +217,7 @@ class Filer(O):
     self.log( (u("%s %s") % (time.strftime("%Y-%m-%d %H:%M:%S"),
                                unrfc2047(M.get('subject', '_no_subject'))))
                .replace('\n', ' ') )
-    self.log("  " + unrfc2047(M.get('from', '_no_from')))
+    self.log("  " + self.format_message(M, "{short_from}->{short_recipients}"))
     self.log("  " + M.get('message-id', '<?>'))
     if self.message_path:
       self.log("  " + shortpath(self.message_path))
@@ -463,8 +463,8 @@ class Filer(O):
     '''
     hmap = dict( [ (k.lower(), M[k]) for k in M.keys() ] )
     for hdr in ('from', 'to', 'cc', 'bcc'):
-      hmap['short_'+hdr] = self.maildb.header_shortlist(M, (hdr,))
-    hmap['short_recipients'] = self.maildb.header_shortlist(M, ('to', 'cc', 'bcc'))
+      hmap['short_'+hdr] = ",".join(self.maildb.header_shortlist(M, (hdr,)))
+    hmap['short_recipients'] = ",".join(self.maildb.header_shortlist(M, ('to', 'cc', 'bcc')))
     return fmt.format(**hmap)
 
   def alert(self, alert_message=None):
