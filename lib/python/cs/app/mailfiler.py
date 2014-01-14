@@ -983,17 +983,18 @@ class WatchedMaildir(O):
         for key in mdir.keys():
           with Pfx(key):
             if key in self.lurking:
-              debug("skip processed key")
+              debug("skip lurking key")
               skipped += 1
               continue
-
             nmsgs += 1
+
             with LogTime("key = %s", key, threshold=1.0, level=DEBUG):
               M = mdir[key]
               filer = Filer(self.filter_modes)
 
               ok = filer.file(M, self.rules, mdir.keypath(key))
               if not ok:
+                filer.log("NOT OK, lurking key %s", key)
                 self.lurk(key)
                 continue
 
@@ -1004,8 +1005,8 @@ class WatchedMaildir(O):
                 debug("remove message key %s", key)
                 mdir.remove(key)
                 self.lurking.discard(key)
-            if filer.filter_modes.justone:
-              break
+              if filer.filter_modes.justone:
+                break
 
       if nmsgs or all_keys_time.elapsed >= 0.2:
         info("filtered %d messages (%d skipped) in %5.3fs",
