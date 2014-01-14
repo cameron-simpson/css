@@ -95,6 +95,14 @@ fi
 
 if [ $tnotify ]
 then
+  for var in title subtitle message
+  do  eval "val=\$$var"
+      val=`echo $val`
+      case "$val" in
+        *[\'\\]*)        val=`shqstr "$val"` ;;
+      esac
+      eval "$var=\$val"
+  done
   terminal-notifier -title "$title" -subtitle "$subtitle" -message "$message" >/dev/null
 fi
 
