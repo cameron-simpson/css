@@ -447,7 +447,7 @@ class Filer(O):
   def alert_format(self):
     ''' The format string for alert messages from $ALERT_FORMAT.
     '''
-    return self.env('ALERT_FORMAT', 'MAILFILER: {from}->{short_recipients}: {subject}')
+    return self.env('ALERT_FORMAT', 'MAILFILER: {short_from}->{short_recipients}: {subject}')
 
   def alert_message(self, M):
     try:
