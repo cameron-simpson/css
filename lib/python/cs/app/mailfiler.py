@@ -461,12 +461,12 @@ class Filer(O):
   def format_message(self, M, fmt):
     ''' Compute the alert message for the message `M`.
     '''
-    hmap = dict( [ (k.lower(), M[k]) for k in M.keys() ] )
+    hmap = dict( [ (k.lower().replace('-', '_'), M[k]) for k in M.keys() ] )
     subj = unrfc2047(M.get('subject', '')).strip()
     if subj:
       hmap['subject'] = subj
-    for hdr in ('from', 'to', 'cc', 'bcc'):
-      hmap['short_'+hdr] = ",".join(self.maildb.header_shortlist(M, (hdr,)))
+    for hdr in ('from', 'to', 'cc', 'bcc', 'reply-to'):
+      hmap['short_'+hdr.replace('-', '_')] = ",".join(self.maildb.header_shortlist(M, (hdr,)))
     hmap['short_recipients'] = ",".join(self.maildb.header_shortlist(M, ('to', 'cc', 'bcc')))
     return u(fmt).format(**hmap)
 
