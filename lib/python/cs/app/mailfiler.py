@@ -113,7 +113,9 @@ def main(argv, stdin=None):
                                  delay=delay,
                                  no_remove=no_remove,
                                  maildb_path=os.environ['MAILDB'],
-                                 maildir_cache={})
+                                 maildir_cache={},
+                                 msgiddb_path=os.environ.get('MESSAGEIDDB', envsub('$HOME/var/msgiddb.csv')),
+                                )
       maildirs = [ WatchedMaildir(mdirpath,
                                   filter_modes=filter_modes,
                                   rules_path=envsub(
@@ -162,6 +164,7 @@ class FilterModes(O):
     self._O_omit = ('maildir_cache',)
     self._maildb_path = kw.pop('maildb_path')
     self._maildb_lock = Lock()
+    self._msgiddb_path = kw.pop('msgiddb_path')
     O.__init__(self, **kw)
 
   @file_property
@@ -171,6 +174,10 @@ class FilterModes(O):
 
   def maildir(self, mdirname, environ=None):
     return maildir_from_name(mdirname, environ['MAILDIR'], self.maildir_cache)
+
+  @locked_property
+  def msgiddb(self):
+    return NodeDBFromURL(self._msgiddb_path)
 
 class Filer(O):
   ''' A message filing object, filtering state information used during rule evaluation.
@@ -256,11 +263,16 @@ class Filer(O):
           exception("saving to %r: %s", target, e)
           ok = False
 
+    self.logflush()
     return ok
 
   @property
   def maildb(self):
     return self.filter_modes.maildb
+
+  @property
+  def msgiddb(self):
+    return self.filter_modes.msgiddb
 
   def maildir(self, mdirpath):
     return self.filter_modes.maildir(mdirpath, self.environ)
@@ -282,13 +294,25 @@ class Filer(O):
   def logto(self, logfilepath):
     ''' Direct log messages to the supplied `logfilepath`.
     '''
-    if self._log:
-      self._log.close()
-      self._log = None
+    if self._log and self._log_path == logfilepath:
+      return
+    self.logclose()
     try:
       self._log = io.open(logfilepath, "a", encoding='utf-8')
     except OSError as e:
       self.log("open(%s): %s" % (logfilepath, e))
+    else:
+      self._log_path = logfilepath
+
+  def logflush(self):
+    if self._log:
+      self._log.flush()
+
+  def logclose(self):
+    if self._log:
+      self._log.close()
+      self._log = None
+      self._log_path = None
 
   @property
   def groups(self):
@@ -335,6 +359,11 @@ class Filer(O):
       if target.startswith('|'):
         shcmd = target[1:]
         return self.save_to_pipe(['/bin/sh', '-c', shcmd])
+      elif target.startswith('+'):
+        m = re_ADDHEADER.match(target)
+        hdr = m.group(1)
+        group_names = m.group(2).split(',')
+        return self.save_header(hdr, group_names)
       elif '@' in target:
         return self.sendmail(target)
       else:
@@ -350,6 +379,18 @@ class Filer(O):
           return self.save_to_maildir(mdir,
                                       flags=maildir_flags)
         return self.save_to_mbox(mailpath)
+
+  def save_header(self, hdr, group_names):
+    with Pfx("save_header(%s, %r)", hdr, group_names):
+      if hdr in ('message-id', 'references', 'in-reply-to'):
+        msgids = self.message[hdr].split()
+        for msgid in msgids:
+          debug("%s.GROUPs.update(%r)", msgid, group_names)
+          msgid_node = self.msgiddb.make( ('MESSAGE_ID', msgid) )
+          msgid_node.GROUPs.update(group_names)
+      else:
+        debug("%s.GROUPs.update(%r)", msgid, group_names)
+        raise RuntimeError("need to pull addresses from hdr and add to address groups")
 
   def save_to_maildir(self, mdir, flags=''):
     ''' Save the current message to a Maildir unless we have already saved to
@@ -451,8 +492,16 @@ re_INGROUP_s = r'\(\s*%s(\s*\|\s*%s)*\s*\)' % (re_WORD_or_DOM_s,
 ## print("re_INGROUP = %r" % (re_INGROUP_s), file=sys.stderr)
 re_INGROUP = re.compile( re_INGROUP_s, re.I)
 
+re_HEADERNAME_s = r'[a-z][\-a-z0-9]*'
+
 # header[,header,...].func(
-re_HEADERFUNCTION = re.compile(r'([a-z][\-a-z0-9]*(,[a-z][\-a-z0-9]*)*)\.([a-z][_a-z0-9]*)\(', re.I)
+re_HEADERFUNCTION_s = r'(%s(,%s)*)\.(%s)\(' % (re_HEADERNAME_s, re_HEADERNAME_s, re_WORD_s)
+re_HEADERFUNCTION = re.compile(re_HEADERFUNCTION_s, re.I)
+
+# target syntax: add header values to named groups
+# +header(group|...)
+re_ADDHEADER_s = r'\+(%s)(%s)' % (re_HEADERNAME_s, re_INGROUP_s)
+re_ADDHEADER = re.compile(re_ADDHEADER_s, re.I)
 
 def parserules(fp):
   ''' Read rules from `fp`, yield Rules.
@@ -642,6 +691,14 @@ def get_targets(s, offset):
   while offset < len(s) and not s[offset].isspace():
     if s[offset] == '"':
       target, offset = get_qstr(s, offset)
+    elif s[offset ] == '+':
+      m = re_ADDHEADER.match(s, offset)
+      if m:
+        target = m.group()
+        offset = m.end()
+      else:
+        error("parse failure, expected +header(groups) at %d: %s", offset, s)
+        raise ValueError("syntax error")
     else:
       m = re_UNQWORD.match(s, offset)
       if m:
@@ -707,17 +764,32 @@ class Condition_InGroups(_Condition):
     self.group_names = group_names
 
   def test_value(self, filer, header_name, header_value):
-    for address in filer.addresses(header_name):
-      for group_name in self.group_names:
-        if group_name.startswith('@'):
-          # address ending in @foo
-          if address.endswith(group_name):
-            debug("match %s to %s", address, group_name)
+    if header_name.lower() in ('message-id', 'references', 'in-reply-to'):
+      msgiddb = self.filer.msgiddb
+      msgids = [ v for v in header_value.split() if v ]
+      for msgid in msgids:
+        msgid_node = msgiddb.get( ('MESSAGE_ID', msgid) )
+        for group_name in self.group_names:
+          if group_name.startswith('@'):
+            if msgid.endswith(groupname+'>'):
+              debug("match %s to %s", msgid, group_name)
+              return True
+          elif msgid_node:
+              if group_name in msgid_node.GROUPs:
+                debug("match %s to (%s)", msgid, group_name)
+                return True
+    else:
+      for address in filer.addresses(header_name):
+        for group_name in self.group_names:
+          if group_name.startswith('@'):
+            # address ending in @foo
+            if address.endswith(group_name):
+              debug("match %s to %s", address, group_name)
+              return True
+          elif address.lower() in filer.group(group_name):
+            # address in group "foo"
+            debug("match %s to (%s)", address, group_name)
             return True
-        elif address.lower() in filer.group(group_name):
-          # address in group "foo"
-          debug("match %s to (%s)", address, group_name)
-          return True
     return False
 
 class Condition_HeaderFunction(_Condition):
