@@ -76,6 +76,17 @@ then
     message=`expr "x$message" : 'x[A-Z][A-Z0-9_]*:  *\(.*\)' || :`
   fi
 fi
+
+if [ -z "$subtitle" ]
+then
+  tag=`expr "x$message" : 'x\([^:]*\):  *' || :`
+  if [ -n "$tag" ]
+  then
+    subtitle=$tag
+    message=`expr "x$message" : 'x[^:]*:  *\(.*\)' || :`
+  fi
+fi
+
 set -- "$message"
 [ -n "$subtitle" ] && set -- "$subtitle;" ${1+"$@"}
 [ -n "$title" ] && set -- "$title:" ${1+"$@"}
