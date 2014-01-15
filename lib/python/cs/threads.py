@@ -51,11 +51,11 @@ class WorkerThreadPool(NestingOpenCloseMixin, O):
         Join all the worker threads.
         It is an error to call close() more than once.
     '''
-    for H, HQ in self.all:
+    for HT, HQ in self.all:
       HQ.close()
-    for H, HQ in self.all:
-      if H is not current_thread():
-        H.join()
+    for HT, HQ in self.all:
+      if HT is not current_thread():
+        HT.join()
 
   def dispatch(self, func, retq=None, deliver=None, pfx=None):
     ''' Dispatch the callable `func` in a separate thread.
@@ -83,13 +83,14 @@ class WorkerThreadPool(NestingOpenCloseMixin, O):
         debug("dispatch: need new thread")
         # no available threads - make one
         args = []
-        H = Thread(target=self._handler, args=args)
-        H.daemon = True
-        Hdesc = (H, IterableQueue(name="%s:IQ%d" % (self.name, seq()), open=True))
+        HT = Thread(target=self._handler, args=args, name=("%s:worker" % (self.name,)))
+        ##HT.daemon = True
+        RQ = IterableQueue(name="%s:IQ%d" % (self.name, seq()), open=True)
+        Hdesc = (HT, RQ)
         self.all.append(Hdesc)
         args.append(Hdesc)
         debug("%s: start new worker thread", self)
-        H.start()
+        HT.start()
       Hdesc[1].put( (func, retq, deliver) )
 
   def _handler(self, Hdesc):
@@ -106,9 +107,11 @@ class WorkerThreadPool(NestingOpenCloseMixin, O):
         If both are None and an exception occurred, it gets raised.
     '''
     debug("%s: worker thread starting", self)
-    reqQ = Hdesc[1]
-    for func, retq, deliver in reqQ:
+    HT, RQ = Hdesc
+    for func, retq, deliver in RQ:
       debug("%s: worker thread: received task", self)
+      oname = HT.name
+      HT.name = "%s:RUNNING:%s" % (oname, func)
       try:
         debug("%s: worker thread: running task...", self)
         result = func()
@@ -116,6 +119,7 @@ class WorkerThreadPool(NestingOpenCloseMixin, O):
       except:
         result = None
         exc_info = sys.exc_info()
+        HT.name = oname
         log_func = exception if isinstance(exc_info[1], (TypeError, NameError, AttributeError)) else debug
         log_func("%s: worker thread: ran task: exception! %r", self, sys.exc_info())
         # don't let exceptions go unhandled
@@ -127,6 +131,7 @@ class WorkerThreadPool(NestingOpenCloseMixin, O):
         debug("%s: worker thread: set result = (None, exc_info)", self)
       else:
         exc_info = None
+        HT.name = oname
       func = None     # release func+args
       with self._lock:
         self.idle.append( Hdesc )
