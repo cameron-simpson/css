@@ -743,7 +743,10 @@ class Later(NestingOpenCloseMixin):
         error("defer_iterable: iterate_once: exception during iteration: %s", e)
         outQ.close()
       else:
+        # put the item onto the output queue
+        # this may itself defer various tasks (eg in a pipeline)
         outQ.put(item)
+        # now queue another iteration to run after those defered tasks
         self._defer(iterate_once)
 
     self._defer(iterate_once)
