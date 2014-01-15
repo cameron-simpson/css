@@ -4,11 +4,13 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
-from threading import Condition
+import sys
+from functools import partial
+from threading import Condition, Timer
 import time
 from cs.debug import Lock, RLock, Thread, trace_caller
 from cs.excutils import noexc
-from cs.logutils import exception, warning, D, PfxCallInfo
+from cs.logutils import exception, warning, debug, D, Pfx, PfxCallInfo
 from cs.seq import seq
 from cs.py3 import Queue, PriorityQueue, Queue_Full, Queue_Empty
 from cs.obj import O
@@ -406,3 +408,143 @@ class NullQueue(NestingOpenCloseMixin, O):
       raise StopIteration
 
 NullQ = NullQueue(name='NullQ')
+
+class TimerQueue(object):
+  ''' Class to run a lot of "in the future" jobs without using a bazillion
+      Timer threads.
+  '''
+  def __init__(self, name=None):
+    if name is None:
+      name = 'TimerQueue-%d' % (seq(),)
+    self.name = name
+    self.Q = PriorityQueue()    # queue of waiting jobs
+    self.pending = None         # or (Timer, when, func)
+    self.closed = False
+    self._lock = Lock()
+    self.mainRunning = False
+    self.mainThread = Thread(target=self._main)
+    self.mainThread.start()
+
+  def __str__(self):
+    return self.name
+
+  def close(self, cancel=False):
+    ''' Close the TimerQueue. This forbids further job submissions.
+        If `cancel` is supplied and true, cancel all pending jobs.
+	Note: it is still necessary to call TimerQueue.join() to
+	wait for all pending jobs.
+    '''
+    self.closed = True
+    if self.Q.empty():
+      # dummy entry to wake up the main loop
+      self.Q.put( (None, None, None) )
+    if cancel:
+      self._cancel()
+
+  def _cancel(self):
+    with self._lock:
+      if self.pending:
+        T, Twhen, Tfunc = self.pending
+        self.pending[2] = None
+        self.pending = None
+        T.cancel()
+      else:
+        Twhen, Tfunc = None, None
+    return Twhen, Tfunc
+
+  def add(self, when, func):
+    ''' Queue a new job to be called at 'when'.
+        'func' is the job function, typically made with functools.partial.
+    '''
+    assert not self.closed, "add() on closed TimerQueue"
+    self.Q.put( (when, seq(), func) )
+
+  def join(self):
+    ''' Wait for the main loop thread to finish.
+    '''
+    assert self.mainThread is not None, "no main thread to join"
+    self.mainThread.join()
+
+  def _main(self):
+    ''' Main loop:
+        Pull requests off the queue; they will come off in time order,
+        so we always get the most urgent item.
+        If we're already delayed waiting for a previous request,
+          halt that request's timer and compare it with the new job; push the
+          later request back onto the queue and proceed with the more urgent
+          one.
+        If it should run now, run it.
+        Otherwise start a Timer to run it later.
+        The loop continues processing items until the TimerQueue is closed.
+    '''
+    with Pfx("TimerQueue._main()"):
+      assert not self.mainRunning, "main loop already active"
+      self.mainRunning = True
+      while not self.closed:
+        when, n, func = self.Q.get()
+        debug("got when=%s, n=%s, func=%s", when, n, func)
+        if when is None:
+          # it should be the dummy item
+          assert self.closed
+          assert self.Q.empty()
+          break
+        with self._lock:
+          if self.pending:
+            # Cancel the pending Timer
+            # and choose between the new job and the job the Timer served.
+            # Requeue the lesser job and do or delay-via-Timer the more
+            # urgent one.
+            T, Twhen, Tfunc = self.pending
+            self.pending[2] = None  # prevent the function from running if racy
+            T.cancel()
+            self.pending = None     # nothing pending now
+            T = None                # let go of the cancelled timer
+            if when < Twhen:
+              # push the pending function back onto the queue, but ahead of
+              # later-queued funcs with the same timestamp
+              requeue = (Twhen, 0, Tfunc)
+            else:
+              # push the dequeued function back - we prefer the pending one
+              requeue = (when, n, func)
+              when = Twhen
+              func = Tfunc
+            self.Q.put(requeue)
+          # post: self.pending is None and the Timer is cancelled
+          assert self.pending is None
+
+        now = time.time()
+        delay = when - now
+        if delay <= 0:
+          # function due now - run it
+          try:
+            retval = func()
+          except:
+            exception("func %s threw exception", func)
+          else:
+            debug("func %s returns %s", func, retval)
+        else:
+          # function due later - run it from a Timer
+          def doit(self):
+            # pull off our pending task and untick it
+            Tfunc = None
+            with self._lock:
+              if self.pending:
+                T, Twhen, Tfunc = self.pending
+              self.pending = None
+            # run it if we haven't been told not to
+            if Tfunc:
+              try:
+                retval = Tfunc()
+              except:
+                exception("func %s threw exception", Tfunc)
+              else:
+                debug("func %s returns %s", Tfunc, retval)
+          with self._lock:
+            T = Timer(delay, partial(doit, self))
+            self.pending = [ T, when, func ]
+            T.start()
+      self.mainRunning = False
+
+if __name__ == '__main__':
+  import cs.queues_tests
+  cs.queues_tests.selftest(sys.argv)
