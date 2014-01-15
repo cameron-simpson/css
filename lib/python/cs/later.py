@@ -13,10 +13,9 @@ import time
 from cs.debug import ifdebug, Lock, RLock, Thread, trace_caller, thread_dump
 from cs.excutils import noexc_gen, logexc
 from cs.queues import IterableQueue, IterablePriorityQueue, PushQueue, \
-                        NestingOpenCloseMixin
+                        NestingOpenCloseMixin, TimerQueue
 from cs.threads import AdjustableSemaphore, \
-                       WorkerThreadPool, TimerQueue, \
-                       locked
+                       WorkerThreadPool, locked
 from cs.asynchron import Result, Asynchron, ASYNCH_RUNNING
 from cs.seq import seq
 from cs.logutils import Pfx, PfxCallInfo, error, info, warning, debug, D, OBSOLETE
