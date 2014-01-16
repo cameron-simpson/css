@@ -1,0 +1,144 @@
+#!/bin/sh
+#
+# Generate and possibly apply GRANTs to PostgresQL roles.
+#       - Cameron Simpson <cs@zip.com.au>
+#
+
+set -ue
+
+cmd=`basename "$0"`
+usage="Usage:
+  $cmd [-U pg-user] [-x]
+  $cmd [-U pg-user] [-x] database grant grants,... [on tables,...] to pg-role
+  $cmd [-U pg-user] [-x] database ls
+"
+pg_user=${USER:-`id -un`}
+pg_database=
+doit=
+trace=
+[ -t 2 ] && trace=set-x
+xopt=
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    -U) pg_user=$2; shift ;;
+    -x) xopt=$1 doit=1 trace=set-x ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# -gt 0 ]
+then
+  pg_database=$1
+  shift
+  [ -n "$pg_database" ] || { echo "$cmd: database name may not be empty" >&2
+                             badopts=1
+                           }
+fi
+
+if [ -n "$pg_database" ]
+then
+  if [ $# = 0 ]
+  then
+    echo "$cmd: missing op" >&2
+    badopts=1
+  else
+    op=$1
+    shift
+    case "$op" in
+      grant)
+        if [ $# = 0 ]
+        then
+          echo "$cmd: $op: missing grants" >&2
+          badopts=1
+        else
+          pg_grants=$1
+          shift
+        fi
+
+        if [ $# -gt 0 ] && [ "x$1" = xon ]
+        then
+          pg_tables=$( echo "$2" | tr , ' ' )
+          shift; shift
+        else
+          pg_tables=ALL
+        fi
+
+        if [ $# -gt 0 ] && [ "x$1" = xto ]
+        then
+          pg_role=$2
+          shift; shift
+        else
+          echo "$cmd: $op: missing \"to pg-role\"" >&2
+          badopts=1
+        fi
+
+        if [ $# -gt 0 ]
+        then
+          echo "$cmd: extra arguments: $*" >&2
+          badopts=1
+        fi
+        ;;
+
+      ls)
+        if [ $# -gt 0 ]
+        then
+          echo "$cmd: $op: extra arguments: $*" >&2
+          badopts=1
+        fi
+        ;;
+
+      *)echo "$cmd: unrecognised op \"$op\"" >&2
+        badopts=1
+        ;;
+    esac
+  fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+if [ -z "$pg_database" ]
+then
+  exec sed_fd 1 '/,/!d; s/,.*//' psql -U "$pg_user" -l -F, -A -t
+fi
+
+case "$op" in
+  grant)
+    if [ "x$pg_database" = xALL ]
+    then
+      for db in $( $trace "$0" -U "$pg_user" $xopt | grep -v '^template0$' )
+      do
+        $trace "$0" -U "$pg_user" $xopt -- "$db" grant "$pg_grants" on "$pg_tables" to "$pg_role"
+      done
+      exit $?
+    fi
+    if [ -z "$pg_tables" -o "x$pg_tables" = xALL ]
+    then
+      pg_tables=$( $trace "$0" -U "$pg_user" "$pg_database" ls )
+    fi
+    for table in $pg_tables
+    do
+      echo "GRANT $pg_grants on TABLE $table to $pg_role"
+    done \
+    | if [ $doit ]
+      then
+        $trace psql -U "$pg_user" -- "$pg_database"
+      else
+        cat
+      fi
+    ;;
+  ls)
+    filter_fd 1 "awk -F, '{ print \$2 }'" $trace psql -U "$pg_user" -At -F,  -c '\dt' -- "$pg_database"
+    ;;
+  *)echo "$cmd: $op: unimplemented op" >&2
+    exit 1
+    ;;
+esac
