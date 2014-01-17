@@ -166,6 +166,13 @@ case "$op" in
       ALL)  pg_database=$( recurse | grep -v '^template0$' ) ;;
       *,*)  pg_database=$( echo "$pg_database" | tr , ' ' ) ;;
     esac
+    if [ $doit ]
+    then
+      >>"$dumpdir/roles.txt"
+      pfx roles.txt rewriteif -N -d "$dumpdir/roles.txt" pg_dumpall -r -U "$pg_user"
+    else
+      echo rewriteif -N -d "$dumpdir/roles.txt" pg_dumpall -r -U "$pg_user"
+    fi
     for db in $pg_database
     do  set -- pg_dump -F p "$db"
         dumpfile=$dumpdir/$db.sql.gz
