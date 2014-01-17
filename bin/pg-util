@@ -126,7 +126,7 @@ case "$op" in
     fi
     for table in $pg_tables
     do
-      echo "GRANT $pg_grants on TABLE $table to $pg_role"
+      echo "GRANT $pg_grants on TABLE $table to $pg_role;"
     done \
     | if [ $doit ]
       then
@@ -136,7 +136,7 @@ case "$op" in
       fi
     ;;
   ls)
-    filter_fd 1 "awk -F, '{ print \$2 }'" $trace psql -U "$pg_user" -At -F,  -c '\dt' -- "$pg_database"
+    filter_fd 1 "awk -F, '{ print \$2 }'" $trace psql -U "$pg_user" -At -F,  -c '\d' -- "$pg_database"
     ;;
   *)echo "$cmd: $op: unimplemented op" >&2
     exit 1
