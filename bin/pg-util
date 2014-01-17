@@ -8,9 +8,19 @@ set -ue
 
 cmd=`basename "$0"`
 usage="Usage:
+  -U pg-user    PostgreSQL database user. Default from \$USER or \`id -un\`.
+  -x            Trace execution. With \"grant\", apply the GRANTs instead
+                of reciting them.
   $cmd [-U pg-user] [-x]
-  $cmd [-U pg-user] [-x] database grant grants,... [on tables,...] to pg-role
-  $cmd [-U pg-user] [-x] database ls
+        List database names.
+  $cmd [-U pg-user] [-x] database [ls]
+        List database relations (tables, etc).
+  $cmd [-U pg-user] [-x] databases,... grant grants,... [on tables,...] to pg-role
+        Recite or apply the specified GRANTs.
+        The database name \"ALL\" will recurse over all databases except
+        \"template0\".
+        If \"on tables\" is omitted or tables is \"ALL\" then the GRANTs
+        will be applied to all relations in the database.
 "
 pg_user=${USER:-`id -un`}
 pg_database=
@@ -47,60 +57,57 @@ fi
 if [ -n "$pg_database" ]
 then
   if [ $# = 0 ]
-  then
-    echo "$cmd: missing op" >&2
-    badopts=1
-  else
-    op=$1
-    shift
-    case "$op" in
-      grant)
-        if [ $# = 0 ]
-        then
-          echo "$cmd: $op: missing grants" >&2
-          badopts=1
-        else
-          pg_grants=$1
-          shift
-        fi
-
-        if [ $# -gt 0 ] && [ "x$1" = xon ]
-        then
-          pg_tables=$( echo "$2" | tr , ' ' )
-          shift; shift
-        else
-          pg_tables=ALL
-        fi
-
-        if [ $# -gt 0 ] && [ "x$1" = xto ]
-        then
-          pg_role=$2
-          shift; shift
-        else
-          echo "$cmd: $op: missing \"to pg-role\"" >&2
-          badopts=1
-        fi
-
-        if [ $# -gt 0 ]
-        then
-          echo "$cmd: extra arguments: $*" >&2
-          badopts=1
-        fi
-        ;;
-
-      ls)
-        if [ $# -gt 0 ]
-        then
-          echo "$cmd: $op: extra arguments: $*" >&2
-          badopts=1
-        fi
-        ;;
-
-      *)echo "$cmd: unrecognised op \"$op\"" >&2
-        badopts=1
-        ;;
-    esac
+  then  op=ls
+  else  op=$1; shift
   fi
+  case "$op" in
+
+    grant)
+      if [ $# = 0 ]
+      then
+        echo "$cmd: $op: missing grants" >&2
+        badopts=1
+      else
+        pg_grants=$1
+        shift
+      fi
+
+      if [ $# -gt 0 ] && [ "x$1" = xon ]
+      then
+        pg_tables=$( echo "$2" | tr , ' ' )
+        shift; shift
+      else
+        pg_tables=ALL
+      fi
+
+      if [ $# -gt 0 ] && [ "x$1" = xto ]
+      then
+        pg_role=$2
+        shift; shift
+      else
+        echo "$cmd: $op: missing \"to pg-role\"" >&2
+        badopts=1
+      fi
+
+      if [ $# -gt 0 ]
+      then
+        echo "$cmd: extra arguments: $*" >&2
+        badopts=1
+      fi
+      ;;
+
+    ls)
+      if [ $# -gt 0 ]
+      then
+        echo "$cmd: $op: extra arguments: $*" >&2
+        badopts=1
+      fi
+      ;;
+
+    *)echo "$cmd: unrecognised op \"$op\"" >&2
+      badopts=1
+      ;;
+  esac
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
@@ -118,18 +125,33 @@ recurse()
 case "$op" in
 
   grant)
-    if [ "x$pg_database" = xALL ]
-    then
-      for db in $( recurse | grep -v '^template0$' )
-      do
-        recurse "$db" grant "$pg_grants" on "$pg_tables" to "$pg_role"
-      done
-      exit $?
-    fi
-    if [ -z "$pg_tables" -o "x$pg_tables" = xALL ]
-    then
-      pg_tables=$( recurse "$pg_database" ls )
-    fi
+    case "$pg_database" in
+      ALL)
+        if [ "x$pg_database" = xALL ]
+        then
+          for db in $( recurse | grep -v '^template0$' )
+          do
+            recurse "$db" grant "$pg_grants" on "$pg_tables" to "$pg_role"
+          done
+          exit $?
+        fi
+        ;;
+      *,*)
+        for db in `echo "$pg_database" | tr , ' '`
+        do
+          recurse "$db" grant "$pg_grants" on "$pg_tables" to "$pg_role"
+        done
+        exit $?
+        ;;
+    esac
+    case "$pg_tables" in
+      '' | ALL )
+        pg_tables=$( recurse "$pg_database" ls )
+        ;;
+      *,* )
+        pg_tables=$( echo "$pg_tables" | echo , ' ' )
+        ;;
+    esac
     for table in $pg_tables
     do
       echo "GRANT $pg_grants on TABLE $table to $pg_role;"
