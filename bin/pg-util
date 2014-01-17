@@ -168,18 +168,16 @@ case "$op" in
     esac
     if [ $doit ]
     then
-      >>"$dumpdir/roles.txt"
-      pfx roles.txt rewriteif -N -d "$dumpdir/roles.txt" pg_dumpall -r -U "$pg_user"
+      pfx roles.txt rewriteif -c -N -d "$dumpdir/roles.txt" pg_dumpall -r -U "$pg_user"
     else
-      echo rewriteif -N -d "$dumpdir/roles.txt" pg_dumpall -r -U "$pg_user"
+      echo rewriteif -c -N -d "$dumpdir/roles.txt" pg_dumpall -r -U "$pg_user"
     fi
     for db in $pg_database
     do  set -- pg_dump -F p "$db"
         dumpfile=$dumpdir/$db.sql.gz
         if [ $doit ]
         then
-          >>"$dumpfile"
-          $trace "$@" | $trace gzip -n | $trace rewriteif -N "$dumpfile"
+          $trace "$@" | $trace gzip -n | $trace rewriteif -c -N "$dumpfile"
         else
           echo "$*"
         fi
