@@ -110,19 +110,25 @@ then
   exec sed_fd 1 '/,/!d; s/,.*//' psql -U "$pg_user" -l -F, -A -t
 fi
 
+# call ourself with supplied post-option arguments
+recurse()
+{ $trace "$0" -U "$pg_user" $xopt -- ${1+"$@"}
+}
+
 case "$op" in
+
   grant)
     if [ "x$pg_database" = xALL ]
     then
-      for db in $( $trace "$0" -U "$pg_user" $xopt | grep -v '^template0$' )
+      for db in $( recurse | grep -v '^template0$' )
       do
-        $trace "$0" -U "$pg_user" $xopt -- "$db" grant "$pg_grants" on "$pg_tables" to "$pg_role"
+        recurse "$db" grant "$pg_grants" on "$pg_tables" to "$pg_role"
       done
       exit $?
     fi
     if [ -z "$pg_tables" -o "x$pg_tables" = xALL ]
     then
-      pg_tables=$( $trace "$0" -U "$pg_user" "$pg_database" ls )
+      pg_tables=$( recurse "$pg_database" ls )
     fi
     for table in $pg_tables
     do
@@ -135,10 +141,13 @@ case "$op" in
         cat
       fi
     ;;
+
   ls)
     filter_fd 1 "awk -F, '{ print \$2 }'" $trace psql -U "$pg_user" -At -F,  -c '\d' -- "$pg_database"
     ;;
+
   *)echo "$cmd: $op: unimplemented op" >&2
     exit 1
     ;;
+
 esac
