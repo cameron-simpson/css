@@ -170,8 +170,11 @@ case "$op" in
     do  set -- pg_dump -F p "$db"
         dumpfile=$dumpdir/$db.sql.gz
         if [ $doit ]
-        then  $trace "$@" | $trace gzip -n | $trace rewriteif -N "$dumpfile"
-        else  echo "$*"
+        then
+          >>"$dumpfile"
+          $trace "$@" | $trace gzip -n | $trace rewriteif -N "$dumpfile"
+        else
+          echo "$*"
         fi
     done
     ;;
