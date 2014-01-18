@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+from __future__ import print_function
 from getopt import GetoptError
 import os.path
 import sys
@@ -56,7 +57,7 @@ def main(argv):
           DB.close()
 
     if badopts or xit == 2:
-      print >>sys.stderr, usage % (cmd, cmd, cmd, cmd)
+      print(usage % (cmd, cmd, cmd, cmd), file=sys.stderr)
 
     return xit
 
@@ -85,4 +86,4 @@ def _load(dburl, argv):
   return xit
 
 if __name__ == '__main__':
-  main(sys.argv)
+  sys.exit(main(sys.argv))
