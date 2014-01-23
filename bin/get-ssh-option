@@ -49,7 +49,8 @@ fi
 value=$( sed -n 's/	/ /g
                  s/ /  /
                  s/$/ /
-                 /^[Hh][Oo][Ss][Tt] .*'"$target"' /,/^$/{
+                 /^[Hh][Oo][Ss][Tt] .* '"$target"' /,/^ *$/{
+                   ##w /dev/tty
                    s/^ *'"$option"'  *\(.*[^ ]\) *$/\1/p
                  }' <"$sshcfg" | sed 1q )
 [ -n "$value" ] || value=$*
