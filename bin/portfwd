@@ -183,7 +183,7 @@ pidfile=`sshpidfile "$target"`
 # reload config on every pass
 # default command tails var/log/alert-local and wait for the parent sshd to exit
 cfg_command='pids=
-             [ ! -f var/log/alert-local ] || { tail -F var/log/alert-local & pids="$pids $!"; }
+             [ ! -s var/log/alert-local ] || { tail -F var/log/alert-local & pids="$pids $!"; }
              exec >&2
              while kill -0 "$PPID"
              do
