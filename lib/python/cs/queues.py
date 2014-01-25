@@ -284,7 +284,8 @@ class PushQueue(NestingOpenCloseMixin, O):
       trigger a function on data arrival.
   '''
 
-  def __init__(self, L, func_push, outQ, func_final=None, is_iterable=False, name=None, open=False):
+  def __init__(self, L, func_push, outQ, func_final=None, is_iterable=False, name=None,
+                     open=False, on_open=None, on_close=None, on_shutdown=None):
     ''' Initialise the PushQueue with the Later `L`, the callable `func_push`
         and the output queue `outQ`.
 	`func_push` is a one-to-many function which accepts a single
@@ -302,7 +303,7 @@ class PushQueue(NestingOpenCloseMixin, O):
     self.name = name
     self._lock = Lock()
     O.__init__(self)
-    NestingOpenCloseMixin.__init__(self, open=open)
+    NestingOpenCloseMixin.__init__(self, open=open, on_open=on_open, on_close=on_close, on_shutdown=on_shutdown)
     self.later = L
     self.func_push = func_push
     self.outQ = outQ
