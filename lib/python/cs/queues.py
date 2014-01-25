@@ -291,6 +291,8 @@ class PushQueue(NestingOpenCloseMixin, O):
 	`func_push` is a one-to-many function which accepts a single
 	  item of input and returns an iterable of outputs; it may
 	  be a generator.
+          This iterable is submitted to `L` via defer_iterable to call
+          `outQ.put` with each output.
         `outQ` accepts results from the callable via its .put() method.
         `func_final`, if specified and not None, is called after completion of
           all calls to `func_push`.
