@@ -26,22 +26,34 @@ class NestingOpenCloseMixin(object):
       preexisting attribute _lock for locking.
   '''
 
-  def __init__(self, open=False):
+  def __init__(self, open=False, on_open=None, on_close=None, on_shutdown=None):
     ''' Initialise the NestingOpenCloseMixin state.
 	If the optional parameter `open` is true, return the object in "open"
         state (active opens == 1) otherwise closed (opens == 0).
         The default is "closed" to optimise use as a context manager;
         the __enter__ method will open the object.
+        The following callback parameters may be supplied to aid tracking activity:
+        `on_open`: called on open with the post-increment open count
+        `on_close`: called on close with the pre-decrement open count
+        `on_shutdown`: called after calling self.shutdown()
     '''
     self._opens = 0
+    self.on_open = on_open
+    self.on_close = on_close
+    self.on_shutdown = on_shutdown
     if open:
       self.open()
 
   def open(self):
     ''' Increment the open count.
+	If self.on_open, call self.on_open(self, count) with the
+	post-increment count.
     '''
     with self._lock:
       self._opens += 1
+      count = self._opens
+    if self.on_open:
+      self.on_open(self, count)
 
   def __enter__(self):
     self.open()
@@ -49,14 +61,20 @@ class NestingOpenCloseMixin(object):
 
   def close(self):
     ''' Decrement the open count.
+	If self.on_open, call self.on_open(self, count) with the
+	pre-decrement count.
+        If self.on_shutdown and the count goes to zero, call self.on_shutdown(self).
         If the count goes to zero, call self.shutdown().
     '''
     with self._lock:
+      self._opens -= 1
       count = self._opens
-      count -= 1
-      self._opens = count
+    if self.on_close:
+      self.on_close(self, count)
     if count == 0:
       self.shutdown()
+      if self.on_shutdown:
+        self.on_shutdown(self)
 
   @property
   def closed(self):
