@@ -378,7 +378,14 @@ class Later(NestingOpenCloseMixin):
       self._finished.wait()
       ##D("%s.wait FINISHED", self)
 
-  def _track(self, LF, fromset, toset):
+  def _track(self, tag, LF, fromset, toset):
+    def SN(s):
+      if s is None: return "None"
+      if s is self.delayed: return "delayed"
+      if s is self.pending: return "pending"
+      if s is self.running: return "running"
+      return repr(s)
+    D("_track %s %s from %s => %s", tag, LF.name, SN(fromset), SN(toset))
     if not LF:
       raise ValueError("LF=None")
     if fromset is None and toset is None:
@@ -420,7 +427,7 @@ class Later(NestingOpenCloseMixin):
     self.debug("COMPLETE %s: result = %r, exc_info = %r", LF, result, exc_info)
     self.log_status()
     self.capacity.release()
-    self._track(LF, self.running, None)
+    self._track("_completed(%s)" % (LF.name,), LF, self.running, None)
 
   def __enter__(self):
     debug("%s: __enter__", self)
@@ -498,7 +505,7 @@ class Later(NestingOpenCloseMixin):
         self.capacity.release() # end of queue, not calling the handler
         break
       LF = pri_entry[-1]
-      self._track(LF, self.pending, self.running)
+      self._track("_dispatcher: dispatch", LF, self.pending, self.running)
       self.debug("dispatched %s", LF)
       LF._dispatch()
 
@@ -541,7 +548,7 @@ class Later(NestingOpenCloseMixin):
     if a or kw:
       func = partial(func, *a, **kw)
     LF = LateFunction(self, func, funcname)
-    self._track(LF, None, self.running)
+    self._track("bg: dispatch", LF, None, self.running)
     LF._dispatch()
     return LF
 
@@ -588,21 +595,21 @@ class Later(NestingOpenCloseMixin):
       when = now + delay
     if when is None or when <= now:
       # queue the request now
-      self._track(LF, None, self.pending)
       self.debug("queuing %s", LF)
+      self._track("_submit: _LFPQ.put", LF, None, self.pending)
       self._LFPQ.put( pri_entry )
     else:
       # queue the request at a later time
       def queueFunc():
         LF = pri_entry[-1]
-        self._track(LF, self.delayed, self.running)
         self.debug("queuing %s after delay", LF)
+        self._track("_submit: _LFPQ.put after delay", LF, self.delayed, self.running)
         self._LFPQ.put( pri_entry )
       with self._lock:
         if self._timerQ is None:
           self._timerQ = TimerQueue(name="<TimerQueue %s._timerQ>"%(self.name))
-      self._track(LF, None, self.delayed)
       self.debug("delay %s until %s", LF, when)
+      self._track("_submit: delay", LF, None, self.delayed)
       self._timerQ.add(when, queueFunc)
 
     return LF
