@@ -317,8 +317,21 @@ class Later(NestingOpenCloseMixin):
     with Pfx("%s.shutdown()" % (self,)):
       if not self.closed:
         raise RuntimeError("not closed!")
-      if self.is_idle():
+      self._try_finish()
+
+  def _try_finish(self):
+    D("TRY FINISH...")
+    if self.closed and self.is_idle():
+      D("TRY FINISH: CLOSED AND IDLE")
+      if self.finished:
+        warning("_try_finish: already finished")
+      else:
+        error("_TRACK: IDLE: THREAD STATE:")
+        thread_dump()
+        error("_TRACK: IDLE: PROCEED TO _FINISH...")
         self._finish()
+    else:
+      D("TRY FINISH: not closed and idle")
 
   @logexc
   def _finish(self):
@@ -395,8 +408,8 @@ class Later(NestingOpenCloseMixin):
         fromset.remove(LF)
       if toset is not None:
         toset.add(LF)
-    if self.closed and self.is_idle():
-      self._finish()
+      D("_track: L=%s", self)
+    self._try_finish()
 
   def __repr__(self):
     return '<%s "%s" capacity=%s running=%d (%s) pending=%d (%s) delayed=%d busy=%d closed=%s>' \
