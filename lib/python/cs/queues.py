@@ -382,7 +382,8 @@ class NullQueue(NestingOpenCloseMixin, O):
       Calls to .get() raise Queue_Empty.
   '''
 
-  def __init__(self, blocking=False, name=None, open=False):
+  def __init__(self, blocking=False, name=None,
+               open=False, on_open=None, on_close=None, on_shutdown=None):
     ''' Initialise the NullQueue.
         `blocking`: if true, calls to .get() block until .shutdown().
           Its default is False. 
@@ -394,7 +395,7 @@ class NullQueue(NestingOpenCloseMixin, O):
     self._lock = Lock()
     self._close_cond = Condition(self._lock)
     O.__init__(self)
-    NestingOpenCloseMixin.__init__(self, open=open)
+    NestingOpenCloseMixin.__init__(self, open=open, on_open=on_open, on_close=on_close, on_shutdown=on_shutdown)
     self.blocking = blocking
 
   def put(self, item):
