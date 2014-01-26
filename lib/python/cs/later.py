@@ -11,7 +11,7 @@ import traceback
 from cs.py3 import Queue, raise3
 import time
 from cs.debug import ifdebug, Lock, RLock, Thread, trace_caller, thread_dump
-from cs.excutils import noexc_gen, logexc
+from cs.excutils import noexc, noexc_gen, logexc
 from cs.queues import IterableQueue, IterablePriorityQueue, PushQueue, \
                         NestingOpenCloseMixin, TimerQueue
 from cs.threads import AdjustableSemaphore, \
