@@ -281,6 +281,7 @@ class Later(NestingOpenCloseMixin):
     self.delayed = set()        # unqueued, delayed until specific time
     self.pending = set()        # undispatched LateFunctions
     self.running = set()        # running LateFunctions
+    self._busy = 0              # counter sanity checking is_idle()
     self.logger = None          # reporting; see logTo() method
     self._priority = (0,)
     self._timerQ = None         # queue for delayed requests; instantiated at need
@@ -336,11 +337,32 @@ class Later(NestingOpenCloseMixin):
 
   @locked
   def is_idle(self):
-    return not self.delayed and not self.pending and not self.running
+    with self._lock:
+      status = self._busy == 0 and not self.delayed and not self.pending and not self.running
+    return status
 
   @locked
   def is_finished(self):
     return self.closed and self.is_idle()
+
+  def busy_up(self):
+    D("DO_BUSY UP")
+    with self._lock:
+      self._busy += 1
+
+  def busy_down(self):
+    D("DO_BUSY DOWN")
+    with self._lock:
+      self._busy -= 1
+    self._try_finish()
+
+  @contextmanager
+  def do_busy(self, tag):
+    D("DO_BUSY: START %s", tag)
+    self.busy_up()
+    yield
+    D("DO_BUSY: END %s", tag)
+    self.busy_down()
 
   def wait(self):
     ''' Wait for all active and pending jobs to complete, including
@@ -370,19 +392,21 @@ class Later(NestingOpenCloseMixin):
       self._finish()
 
   def __repr__(self):
-    return '<%s "%s" capacity=%s running=%d (%s) pending=%d (%s) delayed=%d closed=%s>' \
+    return '<%s "%s" capacity=%s running=%d (%s) pending=%d (%s) delayed=%d busy=%d closed=%s>' \
            % ( self.__class__.__name__, self.name,
                self.capacity,
                len(self.running), ','.join( repr(LF.name) for LF in self.running ),
                len(self.pending), ','.join( repr(LF.name) for LF in self.pending ),
                len(self.delayed),
+               self._busy,
                self.closed
              )
 
   def __str__(self):
-    return "<%s[%s] pending=%d running=%d delayed=%d>" \
+    return "<%s[%s] pending=%d running=%d delayed=%d busy=%d>" \
            % (self.name, self.capacity,
-              len(self.pending), len(self.running), len(self.delayed))
+              len(self.pending), len(self.running), len(self.delayed),
+              self._busy)
 
   def log_status(self):
     for LF in list(self.delayed):
