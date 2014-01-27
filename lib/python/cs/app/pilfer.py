@@ -989,7 +989,6 @@ def action_func(action, do_trace, raw=False):
                   P = copy(P)
                   P.set_user_vars(**varmap)
                 return (P, True)
-              function.__name__ = '/%s/' % (regexp,)
               func_sig = FUNC_SELECTOR
             # select URLs not matching regexp
             # -/regexp/
@@ -1000,7 +999,6 @@ def action_func(action, do_trace, raw=False):
                 regexp = action[2:]
               regexp = re.compile(regexp)
               function = lambda (P, U): not regexp.search(U)
-              function.__name__ = '-/%s/' % (regexp,)
               func_sig = FUNC_SELECTOR
             # parent
             # ..
@@ -1028,6 +1026,7 @@ def action_func(action, do_trace, raw=False):
             else:
               raise ValueError("unknown function %r" % (func,))
 
+    function.__name__ = "action(%r)" % (action0,)
     # return the raw funtion - a raw caller wants to use it directly,
     # not in Later.pipeline()
     if raw:
@@ -1121,6 +1120,7 @@ def action_func(action, do_trace, raw=False):
           raise
         return retval
 
+    trace_function.__name__ = "trace_action(%r)" % (action0,)
     return func_sig, trace_function
 
 def function_by_name(func, func_sig):
@@ -1164,6 +1164,7 @@ def action_divert_pipe(func, action, offset, do_trace):
     raise ValueError("no pipe name")
   if offset >= len(action):
     sel_function = lambda (P, U): True
+    sel_function.__name__ = 'True(%r)' % (action,)
   else:
     if marker != action[offset]:
       raise ValueError("expected second marker to match first: expected %r, saw %r"
@@ -1174,6 +1175,7 @@ def action_divert_pipe(func, action, offset, do_trace):
     if sel_scoped:
       sel_function0 = sel_function
       sel_function = lambda *a, **kw: sel_function0(*a, **kw)[1]
+    sel_function.__name__ = "%r.select(%r)" % (action, action[offset+1:])
   if func == "divert":
     # function to divert selected items to a single named pipeline
     func_sig = FUNC_ONE_TO_MANY
@@ -1192,6 +1194,7 @@ def action_divert_pipe(func, action, offset, do_trace):
           yield U
       except Exception as e:
         exception("OUCH")
+    function.__name__ = "divert_func(%r)" % (action,)
   elif func == "pipe":
     # gather all items and feed to an instance of the specified pipeline
     func_sig = FUNC_MANY_TO_MANY
