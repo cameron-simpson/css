@@ -411,7 +411,8 @@ class Pilfer(O):
         for err in errors:
           error(err)
         raise KeyError("invalid pipe specification for diversion named %r" % (pipe_name,))
-      inQ, outQ = self.later.pipeline(pipe_funcs, outQ=NullQueue(blocking=True))
+      name = "DIVERSION:%s" % (pipe_name,)
+      inQ, outQ = self.later.pipeline(pipe_funcs, name=name, outQ=NullQueue(name=name, blocking=True))
       diversions[pipe_name] = O(name=pipe_name, inQ=inQ, outQ=outQ)
     return diversions[pipe_name]
 
