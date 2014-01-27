@@ -357,6 +357,7 @@ class PushQueue(NestingOpenCloseMixin, O):
     ''' Handler to run after completion of `LF`.
         Put the results of `LF` onto `outQ`.
     '''
+    raise RuntimeError("NOTREACHED")
     try:
       for item in LF():
         self.outQ.put(item)
