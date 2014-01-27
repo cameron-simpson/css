@@ -646,8 +646,8 @@ class Later(NestingOpenCloseMixin):
         func = a.pop(0)
     if a or kw:
       func = partial(func, *a, **kw)
-    MLF = self._submit(func, **params)
-    return MLF
+    LF = self._submit(func, **params)
+    return LF
 
   def after(self, LFs, R, func, *a, **kw):
     ''' Queue the function `func` for later dispatch after completion of `LFs`.
