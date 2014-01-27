@@ -403,6 +403,12 @@ class NullQueue(NestingOpenCloseMixin, O):
     NestingOpenCloseMixin.__init__(self, open=open, on_open=on_open, on_close=on_close, on_shutdown=on_shutdown)
     self.blocking = blocking
 
+  def __str__(self):
+    return "NullQueue:%s" % (self.name,)
+
+  def __repr__(self):
+    return "<%s blocking=%s>" % (self, self.blocking)
+
   def put(self, item):
     ''' Put a value onto the Queue; it is discarded.
     '''
