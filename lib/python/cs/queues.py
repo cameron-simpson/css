@@ -75,6 +75,8 @@ class NestingOpenCloseMixin(object):
       self.shutdown()
       if self.on_shutdown:
         self.on_shutdown(self)
+    elif self.closed:
+      raise RuntimeError("%s.close: count=%r, ALREADY CLOSED" % (self, count))
 
   @property
   def closed(self):
