@@ -200,18 +200,9 @@ def main(argv):
                       inQ.put(line)
               # indicate end of input
               inQ.close()
-              # await processing of output
-              with Pfx("main pipeline"):
-                for item in outQ:
-                  warning("finalisation collected %r", item)
-              # await completion of other diversions also
-              for pipe_name, div in P.diversions.items():
-                with Pfx("divert:%s", pipe_name):
-                  outQ = div.outQ
-                  with Pfx(str(outQ)):
-                    for item in outQ:
-                      warning("finalisation collected %r", item)
+            sleep(5)
             L.wait()
+            info("%s done", L)
       else:
         error("unsupported op")
         badopts = True
