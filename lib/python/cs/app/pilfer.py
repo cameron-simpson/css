@@ -1203,16 +1203,25 @@ def action_divert_pipe(func, action, offset, do_trace):
     def function(items):
       pipe_items = []
       for item in items:
-        if sel_function(item):
+        debug("pipe: sel_function=%r, item=%r", sel_function, item)
+        status = sel_function(item)
+        debug("pipe: sel_function=%r, item=%r: status=%r", sel_function, item, status)
+        if status:
+          debug("pipe: pipe_items.append(%r)", item)
           pipe_items.append(item)
         else:
+          D("pipe: not selected, yield straight to output: %r", item)
           yield item
+      debug("pipe: pipe_items=%r", pipe_items)
       if pipe_items:
         P = pipe_items[0][0]
         with P.later.more_capacity(1):
           outQ = P.pipe_through(pipe_name, pipe_items)
+          debug("pipe: pipe_though(%r) => outQ=%r", pipe_name, outQ)
           for item in outQ:
+            debug("pipe: postpipe: yield %r", item)
             yield item
+      debug("pipe: processed pipe_items %r", pipe_items)
   else:
     raise ValueError("expected \"divert\" or \"pipe\", got func=%r" % (func,))
   return func_sig, function, scoped
