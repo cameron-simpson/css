@@ -1180,6 +1180,7 @@ def action_divert_pipe(func, action, offset, do_trace):
     # function to divert selected items to a single named pipeline
     func_sig = FUNC_ONE_TO_MANY
     scoped = False
+    @logexc
     def function(item):
       P, U = item
       try:
