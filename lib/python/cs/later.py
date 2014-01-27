@@ -839,7 +839,13 @@ class Later(NestingOpenCloseMixin):
     while filter_funcs:
       func_iter, func_final = self._pipeline_func(filter_funcs.pop())
       count += 1
-      PQ = PushQueue(self, func_iter, RHQ, is_iterable=True, func_final=func_final, name="pipelinePQ%d"%count, open=True)
+      pq_name = ":".join((name, str(count), str(seq())))
+      def PQend(Q):
+        ##self.busy_down(pq_name)
+        pass
+      ##self.busy_up(pq_name)
+      PQ = PushQueue(self, func_iter, RHQ, is_iterable=True, func_final=func_final,
+                     name=pq_name, open=True, on_shutdown=PQend)
       RHQ = PQ
     if inputs is not None:
       if open:
