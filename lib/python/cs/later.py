@@ -389,9 +389,9 @@ class Later(NestingOpenCloseMixin):
       if s is self.pending: return "pending"
       if s is self.running: return "running"
       return repr(s)
-    D("_track %s %s from %s => %s", tag, LF.name, SN(fromset), SN(toset))
+    debug("_track %s => %s: %s %s", SN(fromset), SN(toset), tag, LF.name)
     if not LF:
-      raise ValueError("LF=None")
+      raise ValueError("LF false! (%r)", LF)
     if fromset is None and toset is None:
       raise ValueError("fromset and toset are None")
     with self._lock:
@@ -399,7 +399,6 @@ class Later(NestingOpenCloseMixin):
         fromset.remove(LF)
       if toset is not None:
         toset.add(LF)
-      D("_track: L=%s", self)
     self._try_finish()
 
   def __repr__(self):
