@@ -321,31 +321,24 @@ class Later(NestingOpenCloseMixin):
       self._try_finish()
 
   def _try_finish(self):
-    D("TRY FINISH...")
     if self.closed and self.is_idle():
-      D("TRY FINISH: CLOSED AND IDLE")
       if self.finished:
         warning("_try_finish: already finished")
       else:
-        error("_TRACK: IDLE: THREAD STATE:")
-        thread_dump()
-        error("_TRACK: IDLE: PROCEED TO _FINISH...")
         self._finish()
-    else:
-      D("TRY FINISH: not closed and idle")
 
   @logexc
   def _finish(self):
     ''' Called when closed and all activity drained.
         Closes queues and wakes up waiters for finish.
     '''
+    self.finished = True
     if self._timerQ:
       self._timerQ.close()
       self._timerQ.join()
     self._LFPQ.close()              # prevent further submissions
     self._workers.close()           # wait for all worker threads to complete
     self._dispatchThread.join()     # wait for all functions to be dispatched
-    self.finished = True
     self._finished.acquire()
     self._finished.notify_all()
 
