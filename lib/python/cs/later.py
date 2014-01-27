@@ -190,7 +190,7 @@ class LateFunction(PendingFunction):
     '''
     PendingFunction.__init__(self, func)
     if name is None:
-      name = "LateFunction-%d[func=%s]" % (seq(),func,)
+      name = "LF-%d[func=%s]" % (seq(),func,)
     self.name = name
     self.later = later
 
