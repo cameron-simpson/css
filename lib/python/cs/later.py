@@ -354,6 +354,8 @@ class Later(NestingOpenCloseMixin):
 
   def busy_up(self, tag):
     with self._lock:
+      if tag in self._busy:
+        raise RuntimeError("busy_up: tag %r already busy" % (tag,))
       self._busy.add(tag)
 
   def busy_down(self, tag):
