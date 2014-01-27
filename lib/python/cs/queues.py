@@ -318,7 +318,10 @@ class PushQueue(NestingOpenCloseMixin, O):
       raise RuntimeError("PUSHQUEUE NOT IS_ITERABLE")
 
   def __str__(self):
-    return "<%s>" % (self.name,)
+    return "PushQueue:%s" % (self.name,)
+
+  def __repr__(self):
+    return "<%s outQ=%s>" % (self, self.outQ)
 
   def put(self, item):
     ''' Receive a new item.
