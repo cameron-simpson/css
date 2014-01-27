@@ -786,7 +786,7 @@ class Later(NestingOpenCloseMixin):
     self._defer(iterate_once)
     return outQ
 
-  def pipeline(self, filter_funcs, inputs=None, outQ=None, open=False):
+  def pipeline(self, filter_funcs, inputs=None, outQ=None, open=False, name=None):
     ''' Construct a function pipeline to be mediated by this Later queue.
         Return:
           input, output
@@ -801,6 +801,7 @@ class Later(NestingOpenCloseMixin):
 	  be supplying input items via `input.put()`.
         `outQ`: the optional output queue; if None, an IterableQueue() will be
           allocated.
+        `name`: name for the PushQueue implementing this pipeline.
 
         If `inputs` is None or `open` is true, the returned `input` requires
         a call to `input.close()` when no further inputs are to be supplied.
@@ -820,14 +821,16 @@ class Later(NestingOpenCloseMixin):
     '''
     if not self.submittable:
       raise RuntimeError("%s.pipeline(...) but not self.submittable" % (self,))
-    return self._pipeline(filter_funcs, inputs, outQ=outQ, open=open)
+    return self._pipeline(filter_funcs, inputs, outQ=outQ, open=open, name=name)
 
-  def _pipeline(self, filter_funcs, inputs=None, outQ=None, open=False):
+  def _pipeline(self, filter_funcs, inputs=None, outQ=None, open=False, name=None):
     filter_funcs = list(filter_funcs)
     if not filter_funcs:
       raise ValueError("no filter_funcs")
     if outQ is None:
       outQ = IterableQueue(name="pipelineIQ", open=True)
+    if name is None:
+      name = "pipelinePQ"
     ##outQ.close = trace_caller(outQ.close)
     RHQ = outQ
     count = 0
