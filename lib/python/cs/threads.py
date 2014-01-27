@@ -41,8 +41,9 @@ class WorkerThreadPool(NestingOpenCloseMixin, O):
     self.idle = deque()
     self.all = []
 
-  def __repr__(self):
-    return '<WorkerThreadPool "%s">' % (self.name,)
+  def __str__(self):
+    return "WorkerThreadPool:%s" % (self.name,)
+  __repr__ = __str__
 
   def shutdown(self):
     ''' Shut down the pool.
