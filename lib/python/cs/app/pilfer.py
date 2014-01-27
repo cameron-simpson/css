@@ -416,6 +416,7 @@ class Pilfer(O):
       diversions[pipe_name] = O(name=pipe_name, inQ=inQ, outQ=outQ)
     return diversions[pipe_name]
 
+  @logexc
   def pipe_through(self, pipe_name, inputs):
     ''' Create a new cs.later.Later.pipeline from the specification named `pipe_name`.
         It will collect items from the iterable `inputs`.
@@ -429,7 +430,8 @@ class Pilfer(O):
       for err in errors:
         error(err)
       raise KeyError("invalid pipe specification for diversion named %r" % (pipe_name,))
-    inQ, outQ = self.later.pipeline(pipe_funcs, inputs=inputs)
+    name = "pipe_through:%s" % (pipe_name,)
+    inQ, outQ = self.later.pipeline(pipe_funcs, name=name, inputs=inputs)
     return outQ
 
   @property
