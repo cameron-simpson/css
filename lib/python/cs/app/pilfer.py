@@ -163,7 +163,9 @@ def main(argv):
                 return P, URL(U, None, scope=P)
               pipe_funcs.insert(0, (FUNC_ONE_TO_ONE, add_scope))
               # construct the pipeline
-              inQ, outQ = L.pipeline(pipe_funcs, outQ=NullQueue(blocking=True, open=True))
+              inQ, outQ = L.pipeline(pipe_funcs, name="MAIN",
+                                     outQ=NullQueue(name="MAIN_PIPELINE_END_NQ",
+                                     blocking=True, open=True))
               if url != '-':
                 # literal URL supplied, deliver to pipeline
                 inQ.put(url)
