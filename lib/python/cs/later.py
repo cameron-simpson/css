@@ -774,13 +774,16 @@ class Later(NestingOpenCloseMixin):
       try:
         item = iterate()
       except StopIteration:
+        debug("L.defer_iterable: StopIteration: CLOSE %s", outQ)
         outQ.close()
       except Exception as e:
-        error("defer_iterable: iterate_once: exception during iteration: %s", e)
+        exception("defer_iterable: iterate_once: exception during iteration: %s", e)
+        debug("L.defer_iterable: other exception: CLOSE %s", outQ)
         outQ.close()
       else:
         # put the item onto the output queue
         # this may itself defer various tasks (eg in a pipeline)
+        debug("L.defer_iterable: iterate_once: %s.put(%r)", outQ, item)
         outQ.put(item)
         # now queue another iteration to run after those defered tasks
         self._defer(iterate_once)
