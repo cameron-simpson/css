@@ -218,6 +218,7 @@ class LateFunction(PendingFunction):
       def run_func():
         with self._allow_submission(L):
           return func()
+      run_func.__name__ = "%s:%s" % (run_func.__name__, func)
       self.state = ASYNCH_RUNNING
       L._workers.dispatch(run_func, deliver=self._worker_complete)
       self.func = None
