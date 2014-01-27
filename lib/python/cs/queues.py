@@ -333,23 +333,26 @@ class PushQueue(NestingOpenCloseMixin, O):
     if self.closed:
       warning("%s.put(%s) when closed" % (self, item))
     L = self.later
-    self.outQ.open()
-    if self.is_iterable:
-      # add to the outQ opens; defer_iterable will close it
-      try:
-        items = self.func_push(item)
-        ##items = list(items)
-      except Exception as e:
-        exception("%s.func_push: %s", self, e)
-        items = ()
-      L._defer_iterable(items, self.outQ)
-    else:
-      raise RuntimeError("PUSHQUEUE NOT IS_ITERABLE")
-      # defer the computation then call _push_items which puts the results
-      # and closes outQ
-      LF = L._defer( self.func_push, item )
-      self.LFs.append(LF)
-      L._after( (LF,), None, self._push_items, LF )
+    with L.do_busy("%s.put(%r)" % (self,item)):
+      if self.is_iterable:
+        # add to the outQ opens; defer_iterable will close it
+        ##D("%s: %s.open()", self, self.outQ)
+        self.outQ.open()
+        try:
+          items = self.func_push(item)
+          ##items = list(items)
+        except Exception as e:
+          exception("%s.func_push: %s", self, e)
+          items = ()
+        ##D("%s: func_push(%r) => items=%r", self, item, items)
+        L._defer_iterable(items, self.outQ)
+      else:
+        raise RuntimeError("PUSHQUEUE NOT IS_ITERABLE")
+        # defer the computation then call _push_items which puts the results
+        # and closes outQ
+        LF = L._defer( self.func_push, item )
+        self.LFs.append(LF)
+        L._after( (LF,), None, self._push_items, LF )
 
   # NB: reports and discards exceptions
   @noexc
@@ -378,10 +381,12 @@ class PushQueue(NestingOpenCloseMixin, O):
     self.later._after( LFs, None, self.outQ.close )
 
   def _run_func_final(self):
-    items = self.func_final()
-    outQ = self.outQ
-    for item in items:
-      outQ.put(item)
+    with self.later.do_busy("%s._run_func_final: func_final=%s" % (self, self.func_final.__name__)):
+      items = self.func_final()
+      items = list(items)
+      outQ = self.outQ
+      for item in items:
+        outQ.put(item)
 
 class NullQueue(NestingOpenCloseMixin, O):
   ''' A queue-like object that discards its inputs.
