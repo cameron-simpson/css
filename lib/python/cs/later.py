@@ -282,7 +282,7 @@ class Later(NestingOpenCloseMixin):
     self.delayed = set()        # unqueued, delayed until specific time
     self.pending = set()        # undispatched LateFunctions
     self.running = set()        # running LateFunctions
-    self._busy = 0              # counter sanity checking is_idle()
+    self._busy = set()              # counter sanity checking is_idle()
     self.logger = None          # reporting; see logTo() method
     self._priority = (0,)
     self._timerQ = None         # queue for delayed requests; instantiated at need
@@ -352,31 +352,28 @@ class Later(NestingOpenCloseMixin):
   @locked
   def is_idle(self):
     with self._lock:
-      status = self._busy == 0 and not self.delayed and not self.pending and not self.running
+      status = not self._busy and not self.delayed and not self.pending and not self.running
     return status
 
   @locked
   def is_finished(self):
     return self.closed and self.is_idle()
 
-  def busy_up(self):
-    D("DO_BUSY UP")
+  def busy_up(self, tag):
     with self._lock:
-      self._busy += 1
+      self._busy.add(tag)
 
-  def busy_down(self):
-    D("DO_BUSY DOWN")
+  def busy_down(self, tag):
     with self._lock:
-      self._busy -= 1
+      if tag in self._busy:
+        self._busy.remove(tag)
     self._try_finish()
 
   @contextmanager
   def do_busy(self, tag):
-    D("DO_BUSY: START %s", tag)
-    self.busy_up()
+    self.busy_up(tag)
     yield
-    D("DO_BUSY: END %s", tag)
-    self.busy_down()
+    self.busy_down(tag)
 
   def wait(self):
     ''' Wait for all active and pending jobs to complete, including
