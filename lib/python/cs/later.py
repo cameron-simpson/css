@@ -18,7 +18,7 @@ from cs.threads import AdjustableSemaphore, \
                        WorkerThreadPool, locked
 from cs.asynchron import Result, Asynchron, ASYNCH_RUNNING
 from cs.seq import seq
-from cs.logutils import Pfx, PfxCallInfo, error, info, warning, debug, D, OBSOLETE
+from cs.logutils import Pfx, PfxCallInfo, error, info, warning, debug, exception, D, OBSOLETE
 
 # function signature designators, used with Later.pipeline()
 FUNC_ONE_TO_MANY = 0
