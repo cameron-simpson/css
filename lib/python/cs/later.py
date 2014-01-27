@@ -837,7 +837,7 @@ class Later(NestingOpenCloseMixin):
     RHQ = outQ
     count = 0
     while filter_funcs:
-      func_sig, func_iter, func_final = self._pipeline_func(filter_funcs.pop())
+      func_iter, func_final = self._pipeline_func(filter_funcs.pop())
       count += 1
       PQ = PushQueue(self, func_iter, RHQ, is_iterable=True, func_final=func_final, name="pipelinePQ%d"%count, open=True)
       RHQ = PQ
@@ -849,11 +849,12 @@ class Later(NestingOpenCloseMixin):
     return RHQ, outQ
 
   def _pipeline_func(self, o):
-    ''' Accept a pipeline element. Return (func_sig, func_iter, func_final).
+    ''' Accept a pipeline element. Return (func_iter, func_final).
         A pipeline element is either a single function, in which case it is
         presumed to be a one-to-many-generator with func_sig FUNC_ONE_TO_MANY,
         or a tuple of (func_sig, func).
-        The returned func_iter and func_final take the following values according to func_sig:
+	The returned func_iter and func_final take the following
+	values according to the supplied func_sig:
 
           func_sig              func_iter, func_final
 
@@ -871,37 +872,33 @@ class Later(NestingOpenCloseMixin):
                                 Example: a sort.
     '''
     if callable(o):
-      func = noexc_gen(o)
+      func = o
       func_sig = FUNC_ONE_TO_MANY
     else:
       # expect a tuple
       func_sig, func = o
     func_final = None
     if func_sig == FUNC_ONE_TO_ONE:
-      @noexc_gen
       def func_iter(item):
         yield func(item)
     elif func_sig == FUNC_ONE_TO_MANY:
-      func_iter = noexc_gen(func)
+      func_iter = func
     elif func_sig == FUNC_SELECTOR:
-      @noexc_gen
       def func_iter(item):
         if func(item):
           yield item
     elif func_sig == FUNC_MANY_TO_MANY:
       gathered = []
-      @noexc_gen
       def func_iter(item):
         gathered.append(item)
         if False:
           yield
-      @noexc_gen
       def func_final():
         for item in func(gathered):
           yield item
     else:
       raise ValueError("unsupported function signature %r" % (func_sig,))
-    return func_sig, func_iter, func_final
+    return func_iter, func_final
 
   @contextmanager
   def priority(self, pri):
