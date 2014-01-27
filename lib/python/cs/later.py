@@ -402,7 +402,7 @@ class Later(NestingOpenCloseMixin):
     self._try_finish()
 
   def __repr__(self):
-    return '<%s "%s" capacity=%s running=%d (%s) pending=%d (%s) delayed=%d busy=%d closed=%s>' \
+    return '<%s "%s" capacity=%s running=%d (%s) pending=%d (%s) delayed=%d busy=%r closed=%s>' \
            % ( self.__class__.__name__, self.name,
                self.capacity,
                len(self.running), ','.join( repr(LF.name) for LF in self.running ),
@@ -413,7 +413,7 @@ class Later(NestingOpenCloseMixin):
              )
 
   def __str__(self):
-    return "<%s[%s] pending=%d running=%d delayed=%d busy=%d>" \
+    return "<%s[%s] pending=%d running=%d delayed=%d busy=%r>" \
            % (self.name, self.capacity,
               len(self.pending), len(self.running), len(self.delayed),
               self._busy)
