@@ -223,6 +223,9 @@ def argv_pipefuncs(argv, action_map, do_trace):
   pipe_funcs = []
   while rargv:
     action = rargv.pop()
+    # support commenting of individual actions
+    if action.startswith('#'):
+      continue
     func, offset = get_identifier(action)
     if func and func in action_map:
       expando = action_map[func]
