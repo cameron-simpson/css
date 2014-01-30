@@ -1061,7 +1061,7 @@ def action_func(action, do_trace, raw=False):
             yield P2, U
       else:
         def func0( (P, U), *args, **kwargs):
-          if func0( (P, U), *args, **kwargs):
+          if function( (P, U), *args, **kwargs):
             yield U
     if func_sig == FUNC_ONE_TO_ONE:
       if scoped:
