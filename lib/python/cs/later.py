@@ -252,15 +252,89 @@ class _Pipeline(object):
   ''' Subclass of cs.queues.PushQueue which counts the number of 
   '''
 
-  def __init__(self, name):
+  def __init__(self, name, L, filter_funcs, outQ):
     self.name = name
+    self.later = L
     self.counter = TrackingCounter(name="%s.counter" % (name,))
-    self.queues = []
+    self.queues = [outQ]
+    RHQ = outQ
+    count = len(filter_funcs)
+    while filter_funcs:
+      func_iter, func_final = self._pipeline_func(filter_funcs.pop())
+      count -= 1
+      pq_name = ":".join((name, str(count), str(seq())))
+      def PQend(tag, Q):
+        L.busy_down(tag)
+      L.busy_up(pq_name)
+      PQ = PushQueue(self, func_iter, RHQ, is_iterable=True, func_final=func_final,
+                     name=pq_name, open=True, on_shutdown=partial(PQend, pq_name))
+      self.queues.insert(PQ, 0)
+      RHQ = PQ
 
   def wait_idle(self):
     D("%s.wait_idle...", self)
     self.counter.wait(0)
     D("%s.wait_idle COMPLETE", self)
+
+  def put(self, item):
+    return self.queues[0].put(item)
+
+  @property
+  def outQ(self):
+    return self.queues[-1]
+
+  def _pipeline_func(self, o):
+    ''' Accept a pipeline element. Return (func_iter, func_final).
+        A pipeline element is either a single function, in which case it is
+        presumed to be a one-to-many-generator with func_sig FUNC_ONE_TO_MANY,
+        or a tuple of (func_sig, func).
+	The returned func_iter and func_final take the following
+	values according to the supplied func_sig:
+
+          func_sig              func_iter, func_final
+
+          FUNC_ONE_TO_MANY      func, None
+                                Example: a directory listing.
+
+          FUNC_SELECTOR         func is presumed to be a Boolean test, and
+                                func_iter is a generator that yields its
+                                argument if the test succeeds.
+                                func_final is None.
+                                Example: a test for inclusion.
+
+          FUNC_MANY_TO_MANY     func_iter is set to save its argument to a list and yield nothing.
+                                func_final applies func to the list and yields the results.
+                                Example: a sort.
+    '''
+    if callable(o):
+      func = o
+      func_sig = FUNC_ONE_TO_MANY
+    else:
+      # expect a tuple
+      func_sig, func = o
+    func_final = None
+    if func_sig == FUNC_ONE_TO_ONE:
+      def func_iter(item):
+        yield func(item)
+    elif func_sig == FUNC_ONE_TO_MANY:
+      func_iter = func
+    elif func_sig == FUNC_SELECTOR:
+      def func_iter(item):
+        if func(item):
+          yield item
+    elif func_sig == FUNC_MANY_TO_MANY:
+      gathered = []
+      def func_iter(item):
+        gathered.append(item)
+        if False:
+          yield
+      def func_final():
+        for item in func(gathered):
+          yield item
+    else:
+      raise ValueError("unsupported function signature %r" % (func_sig,))
+    return func_iter, func_final
+
 
 class Later(NestingOpenCloseMixin):
   ''' A management class to queue function calls for later execution.
@@ -850,78 +924,17 @@ class Later(NestingOpenCloseMixin):
       outQ = IterableQueue(name="pipelineIQ", open=True)
     if name is None:
       name = "pipelinePQ"
-    ##outQ.close = trace_caller(outQ.close)
-    RHQ = outQ
-    count = 0
-    while filter_funcs:
-      func_iter, func_final = self._pipeline_func(filter_funcs.pop())
-      count += 1
-      pq_name = ":".join((name, str(count), str(seq())))
-      def PQend(Q):
-        ##self.busy_down(pq_name)
-        pass
-      ##self.busy_up(pq_name)
-      PQ = PushQueue(self, func_iter, RHQ, is_iterable=True, func_final=func_final,
-                     name=pq_name, open=True, on_shutdown=PQend)
-      RHQ = PQ
+    pipeline = _Pipeline(name, self, filter_funcs, outQ)
     if inputs is not None:
+      inQ = pipeline.queues[0]
       if open:
         # extra open() so that defer_iterable doesn't perform the final close
-        RHQ.open()
-      self._defer_iterable( inputs, RHQ )
-    return RHQ, outQ
-
-  def _pipeline_func(self, o):
-    ''' Accept a pipeline element. Return (func_iter, func_final).
-        A pipeline element is either a single function, in which case it is
-        presumed to be a one-to-many-generator with func_sig FUNC_ONE_TO_MANY,
-        or a tuple of (func_sig, func).
-	The returned func_iter and func_final take the following
-	values according to the supplied func_sig:
-
-          func_sig              func_iter, func_final
-
-          FUNC_ONE_TO_MANY      func, None
-                                Example: a directory listing.
-
-          FUNC_SELECTOR         func is presumed to be a Boolean test, and
-                                func_iter is a generator that yields its
-                                argument if the test succeeds.
-                                func_final is None.
-                                Example: a test for inclusion.
-
-          FUNC_MANY_TO_MANY     func_iter is set to save its argument to a list and yield nothing.
-                                func_final applies func to the list and yields the results.
-                                Example: a sort.
-    '''
-    if callable(o):
-      func = o
-      func_sig = FUNC_ONE_TO_MANY
+        inQ.open()
+      debug("%s._pipeline: call _defer_iterable( inputs=%r, inQ=%r)", self, inputs, inQ)
+      self._defer_iterable( inputs, inQ )
     else:
-      # expect a tuple
-      func_sig, func = o
-    func_final = None
-    if func_sig == FUNC_ONE_TO_ONE:
-      def func_iter(item):
-        yield func(item)
-    elif func_sig == FUNC_ONE_TO_MANY:
-      func_iter = func
-    elif func_sig == FUNC_SELECTOR:
-      def func_iter(item):
-        if func(item):
-          yield item
-    elif func_sig == FUNC_MANY_TO_MANY:
-      gathered = []
-      def func_iter(item):
-        gathered.append(item)
-        if False:
-          yield
-      def func_final():
-        for item in func(gathered):
-          yield item
-    else:
-      raise ValueError("unsupported function signature %r" % (func_sig,))
-    return func_iter, func_final
+      D("%s._pipeline: NOT setting up _defer_iterable( inputs, inQ=%r)", self, inQ)
+    return pipeline
 
   @contextmanager
   def priority(self, pri):
