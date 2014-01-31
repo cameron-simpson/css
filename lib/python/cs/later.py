@@ -248,6 +248,16 @@ class _Later_ThreadLocal(threading.local):
   def __init__(self):
     self.allow_submit = None
 
+class _PipelinePushQueue(PushQueue):
+
+  def __init__(self, pipeline, *a, **kw):
+    self.pipeline = pipeline
+    PushQueue.__init__(self, *a, **kw)
+
+  def put(self, item):
+    self.pipeline.counter.inc()
+    PushQueue.put(self, item)
+
 class _Pipeline(object):
   ''' A _Pipeline encapsultes the chain of PushQueues created by a call to Later.pipeline.
   '''
@@ -268,8 +278,9 @@ class _Pipeline(object):
       def PQend(tag, Q):
         L.busy_down(tag)
       L.busy_up(pq_name)
-      PQ = PushQueue(L, func_iter, RHQ, is_iterable=True, func_final=func_final,
-                     name=pq_name, open=True, on_shutdown=partial(PQend, pq_name))
+      PQ = _PipelinePushQueue(self, L, func_iter, RHQ, is_iterable=True,
+                              func_final=func_final, name=pq_name, open=True,
+                              on_shutdown=partial(PQend, pq_name))
       self.queues.insert(0, PQ)
       RHQ = PQ
 
@@ -354,7 +365,6 @@ class _Pipeline(object):
     # wrap func_iter and func_final to manipulate the item counter
     func_iter0 = func_iter
     def func_iter(item):
-      self.counter.inc()
       for item2 in func_iter0(item):
         if not is_final:
           self.counter.inc()
