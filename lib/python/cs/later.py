@@ -254,9 +254,8 @@ class _PipelinePushQueue(PushQueue):
     self.pipeline = pipeline
     PushQueue.__init__(self, *a, **kw)
 
-  def put(self, item):
-    self.pipeline.counter.inc()
-    PushQueue.put(self, item)
+  def __str__(self):
+    return "%s[%s]" % (PushQueue.__str__(self), self.pipeline)
 
 class _Pipeline(object):
   ''' A _Pipeline encapsultes the chain of PushQueues created by a call to Later.pipeline.
@@ -350,6 +349,7 @@ class _Pipeline(object):
     elif func_sig == FUNC_MANY_TO_MANY:
       gathered = []
       def func_iter(item):
+        # raise counter for each item gathered
         self.counter.inc()
         gathered.append(item)
         if False:
@@ -357,7 +357,7 @@ class _Pipeline(object):
       def func_final():
         for item in func(gathered):
           yield item
-          # NB: decrement after yield to allow increment in wrapper to keep counter > 0
+          # decrement counter after each gathered item is consumed
           self.counter.dec()
     else:
       raise ValueError("unsupported function signature %r" % (func_sig,))
@@ -366,17 +366,22 @@ class _Pipeline(object):
     func_iter0 = func_iter
     def func_iter(item):
       for item2 in func_iter0(item):
-        if not is_final:
+        # raise counter for each item we release
           self.counter.inc()
         yield item2
+        # decrement counter when item consumed
+        self.counter.dec()
+      # decrement counter for consumption of the source item
       self.counter.dec()
 
     func_final0 = func_final
     def func_final():
       for item in func_final0():
-        if not is_final:
+        # raise counter for each item we release
           self.counter.inc()
         yield item
+        # decrement counter when item consumed
+        self.counter.dec()
 
     return func_iter, func_final
 
