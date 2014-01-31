@@ -280,6 +280,10 @@ class _Pipeline(object):
     return self.queues[0].put(item)
 
   @property
+  def inQ(self):
+    return self.queues[0]
+
+  @property
   def outQ(self):
     return self.queues[-1]
 
@@ -926,7 +930,7 @@ class Later(NestingOpenCloseMixin):
       name = "pipelinePQ"
     pipeline = _Pipeline(name, self, filter_funcs, outQ)
     if inputs is not None:
-      inQ = pipeline.queues[0]
+      inQ = pipeline.inQ
       if open:
         # extra open() so that defer_iterable doesn't perform the final close
         inQ.open()
