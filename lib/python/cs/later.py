@@ -283,6 +283,12 @@ class _Pipeline(object):
       self.queues.insert(0, PQ)
       RHQ = PQ
 
+  def __str__(self):
+    return "cs.later._Pipeline:%s:%d" % (self.name, self.counter.value)
+
+  def __repr__(self):
+    return "<%s %d queues, later=%s>" % (self, len(self.queues), self.later)
+
   def wait_idle(self):
     ''' Wait for the counter to become zero.
     '''
