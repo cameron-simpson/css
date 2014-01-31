@@ -307,6 +307,23 @@ class Later(NestingOpenCloseMixin):
     self._dispatchThread = Thread(name=self.name+'._dispatcher', target=self._dispatcher)
     self._dispatchThread.start()
 
+  def __repr__(self):
+    return '<%s "%s" capacity=%s running=%d (%s) pending=%d (%s) delayed=%d busy=%r closed=%s>' \
+           % ( self.__class__.__name__, self.name,
+               self.capacity,
+               len(self.running), ','.join( repr(LF.name) for LF in self.running ),
+               len(self.pending), ','.join( repr(LF.name) for LF in self.pending ),
+               len(self.delayed),
+               self._busy,
+               self.closed
+             )
+
+  def __str__(self):
+    return "<%s[%s] pending=%d running=%d delayed=%d busy=%r>" \
+           % (self.name, self.capacity,
+              len(self.pending), len(self.running), len(self.delayed),
+              self._busy)
+
   def __call__(self, func, *a, **kw):
     ''' A Later object can be called with a function and arguments
 	with the effect of deferring the function and waiting for
@@ -416,23 +433,6 @@ class Later(NestingOpenCloseMixin):
       if toset is not None:
         toset.add(LF)
     self._try_finish()
-
-  def __repr__(self):
-    return '<%s "%s" capacity=%s running=%d (%s) pending=%d (%s) delayed=%d busy=%r closed=%s>' \
-           % ( self.__class__.__name__, self.name,
-               self.capacity,
-               len(self.running), ','.join( repr(LF.name) for LF in self.running ),
-               len(self.pending), ','.join( repr(LF.name) for LF in self.pending ),
-               len(self.delayed),
-               self._busy,
-               self.closed
-             )
-
-  def __str__(self):
-    return "<%s[%s] pending=%d running=%d delayed=%d busy=%r>" \
-           % (self.name, self.capacity,
-              len(self.pending), len(self.running), len(self.delayed),
-              self._busy)
 
   def log_status(self):
     for LF in list(self.delayed):
