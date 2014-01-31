@@ -417,15 +417,13 @@ class Pilfer(O):
           error(err)
         raise KeyError("invalid pipe specification for diversion named %r" % (pipe_name,))
       name = "DIVERSION:%s" % (pipe_name,)
-      inQ, outQ = self.later.pipeline(pipe_funcs, name=name, outQ=NullQueue(name=name, blocking=True))
-      diversions[pipe_name] = O(name=pipe_name, inQ=inQ, outQ=outQ)
+      diversions[pipe_name] = self.later.pipeline(pipe_funcs, name=name, outQ=NullQueue(name=name, blocking=True))
     return diversions[pipe_name]
 
   @logexc
   def pipe_through(self, pipe_name, inputs):
     ''' Create a new cs.later.Later.pipeline from the specification named `pipe_name`.
         It will collect items from the iterable `inputs`.
-        Return the output Queue from which to get results.
     '''
     spec = self.pipes.get(pipe_name)
     if spec is None:
@@ -436,8 +434,7 @@ class Pilfer(O):
         error(err)
       raise KeyError("invalid pipe specification for diversion named %r" % (pipe_name,))
     name = "pipe_through:%s" % (pipe_name,)
-    inQ, outQ = self.later.pipeline(pipe_funcs, name=name, inputs=inputs)
-    return outQ
+    return self.later.pipeline(pipe_funcs, name=name, inputs=inputs)
 
   @property
   def rcs(self):
@@ -1221,9 +1218,9 @@ def action_divert_pipe(func, action, offset, do_trace):
       if pipe_items:
         P = pipe_items[0][0]
         with P.later.more_capacity(1):
-          outQ = P.pipe_through(pipe_name, pipe_items)
-          debug("pipe: pipe_though(%r) => outQ=%r", pipe_name, outQ)
-          for item in outQ:
+          pipeline = P.pipe_through(pipe_name, pipe_items)
+          debug("pipe: pipe_though(%r) => %r", pipe_name, pipeline)
+          for item in pipeline.outQ:
             debug("pipe: postpipe: yield %r", item)
             yield item
       debug("pipe: processed pipe_items %r", pipe_items)
