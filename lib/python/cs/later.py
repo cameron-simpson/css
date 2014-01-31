@@ -716,7 +716,7 @@ class Later(NestingOpenCloseMixin):
       ''' Function to defer: run `func` and pass its return value to R.put().
       '''
       R.call(func, *a, **kw)
-    put_func.__name__ = "%s[func=%s]" % (put_func.__name__, func)
+    put_func.__name__ = "%s._after(%r)[func=%s]" % (self, LFs, func.__name__)
 
     if count == 0:
       # nothing to wait for - queue the function immediately
