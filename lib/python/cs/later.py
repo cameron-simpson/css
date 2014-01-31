@@ -266,9 +266,9 @@ class _Pipeline(object):
       def PQend(tag, Q):
         L.busy_down(tag)
       L.busy_up(pq_name)
-      PQ = PushQueue(self, func_iter, RHQ, is_iterable=True, func_final=func_final,
+      PQ = PushQueue(L, func_iter, RHQ, is_iterable=True, func_final=func_final,
                      name=pq_name, open=True, on_shutdown=partial(PQend, pq_name))
-      self.queues.insert(PQ, 0)
+      self.queues.insert(0, PQ)
       RHQ = PQ
 
   def wait_idle(self):
