@@ -929,8 +929,8 @@ class Later(NestingOpenCloseMixin):
     if name is None:
       name = "pipelinePQ"
     pipeline = _Pipeline(name, self, filter_funcs, outQ)
+    inQ = pipeline.inQ
     if inputs is not None:
-      inQ = pipeline.inQ
       if open:
         # extra open() so that defer_iterable doesn't perform the final close
         inQ.open()
