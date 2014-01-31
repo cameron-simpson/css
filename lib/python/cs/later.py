@@ -248,6 +248,20 @@ class _Later_ThreadLocal(threading.local):
   def __init__(self):
     self.allow_submit = None
 
+class _Pipeline(object):
+  ''' Subclass of cs.queues.PushQueue which counts the number of 
+  '''
+
+  def __init__(self, name):
+    self.name = name
+    self.counter = TrackingCounter(name="%s.counter" % (name,))
+    self.queues = []
+
+  def wait_idle(self):
+    D("%s.wait_idle...", self)
+    self.counter.wait(0)
+    D("%s.wait_idle COMPLETE", self)
+
 class Later(NestingOpenCloseMixin):
   ''' A management class to queue function calls for later execution.
       If `capacity` is an int, it is used to size a Semaphore to constrain
