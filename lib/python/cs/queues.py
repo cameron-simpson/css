@@ -69,6 +69,8 @@ class NestingOpenCloseMixin(object):
         If the count goes to zero, call self.shutdown().
     '''
     with self._lock:
+      if self._opens < 1:
+        raise RuntimeError("%s: EXTRA CLOSE", self)
       self._opens -= 1
       count = self._opens
     if self.on_close:
