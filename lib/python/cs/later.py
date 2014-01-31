@@ -17,7 +17,7 @@ from cs.queues import IterableQueue, IterablePriorityQueue, PushQueue, \
 from cs.threads import AdjustableSemaphore, \
                        WorkerThreadPool, locked
 from cs.asynchron import Result, Asynchron, ASYNCH_RUNNING
-from cs.seq import seq
+from cs.seq import seq, TrackingCounter
 from cs.logutils import Pfx, PfxCallInfo, error, info, warning, debug, exception, D, OBSOLETE
 
 # function signature designators, used with Later.pipeline()
