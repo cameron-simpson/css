@@ -8,7 +8,7 @@ import bisect
 import unittest
 import heapq
 import itertools
-from threading import Lock
+from threading import Lock, Condition
 
 __seq = 0
 __seqLock = Lock()
@@ -200,6 +200,67 @@ def onetomany(func):
   def gather(self, *a, **kw):
     return itertools.chain(*[ func(item) for item in self ])
   return gather
+
+class TrackingCounter(object):
+  ''' A wrapper for a counter which can be incremented and decremented.
+      A facility is provided to wait for the counter to reach a specifi value.
+  '''
+
+  def __init__(self, value=0, name=None):
+    ''' Initialise the counter to `value` (default 0) with the optional `name`.
+    '''
+    if name is None:
+      name = "TrackingCounter-%d" % (seq(),)
+    self.value = value
+    self.name = name
+    self._lock = Lock()
+    self._watched = {}
+
+  def __str__(self):
+    return "%s:%d" % (self.name, self.value)
+
+  def __repr__(self):
+    return "<TrackingCounter %r %r>" % (str(self), self._watched)
+
+  def _notify(self):
+    ''' Notify any waiters on the current counter value.
+        This should be called inside self._lock.
+    '''
+    value = self.value
+    watcher = self._watched.get(value)
+    if watcher:
+      watcher.acquire()
+      watcher.notify_all()
+      watcher.release()
+
+  def inc(self):
+    ''' Increment the counter.
+        Wake up any threads waiting for its new value.
+    '''
+    with self._lock:
+      self.value += 1
+      self._notify()
+
+  def dec(self):
+    ''' Decrement the counter.
+        Wake up any threads waiting for its new value.
+    '''
+    with self._lock:
+      self.value -= 1
+      self._notify()
+
+  def wait(self, value):
+    ''' Wait for the counter to reach the specified `value`.
+    '''
+    with self._lock:
+      if value == self.value:
+        return
+      if value not in self._watched:
+        watcher = self._watched[value] = Condition()
+      else:
+        watcher = self._watched[value]
+      watcher.acquire()
+    watcher.wait()
 
 if __name__ == '__main__':
   import sys
