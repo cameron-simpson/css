@@ -8,6 +8,7 @@ import sys
 from functools import partial
 from threading import Condition, Timer
 import time
+from cs.asynchron import Asynchron
 from cs.debug import Lock, RLock, Thread, trace_caller
 from cs.excutils import noexc
 from cs.logutils import exception, warning, debug, D, Pfx, PfxCallInfo
@@ -41,6 +42,7 @@ class NestingOpenCloseMixin(object):
     self.on_open = on_open
     self.on_close = on_close
     self.on_shutdown = on_shutdown
+    self._asynchron = Asynchron()
     if open:
       self.open()
 
@@ -72,6 +74,7 @@ class NestingOpenCloseMixin(object):
     if self.on_close:
       self.on_close(self, count)
     if count == 0:
+      self._asynchron.put(True)
       self.shutdown()
       if self.on_shutdown:
         self.on_shutdown(self)
@@ -90,6 +93,9 @@ class NestingOpenCloseMixin(object):
   def __exit__(self, exc_type, exc_value, traceback):
     self.close()
     return False
+
+  def join(self):
+    return self._asynchron.join()
 
 class QueueIterator(NestingOpenCloseMixin,O):
   ''' A QueueIterator is a wrapper for a Queue (or ducktype) which
