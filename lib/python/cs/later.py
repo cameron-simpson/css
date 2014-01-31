@@ -249,10 +249,12 @@ class _Later_ThreadLocal(threading.local):
     self.allow_submit = None
 
 class _Pipeline(object):
-  ''' Subclass of cs.queues.PushQueue which counts the number of 
+  ''' A _Pipeline encapsultes the chain of PushQueues created by a call to Later.pipeline.
   '''
 
   def __init__(self, name, L, filter_funcs, outQ):
+    ''' Initialise the _Pipeline from `name`, Later instance `L`, list  of filter functions `filter_funcs` and output queue `outQ`.
+    '''
     self.name = name
     self.later = L
     self.counter = TrackingCounter(name="%s.counter" % (name,))
@@ -272,19 +274,27 @@ class _Pipeline(object):
       RHQ = PQ
 
   def wait_idle(self):
+    ''' Wait for the counter to become zero.
+    '''
     D("%s.wait_idle...", self)
     self.counter.wait(0)
     D("%s.wait_idle COMPLETE", self)
 
   def put(self, item):
+    ''' Put an `item` onto the leftmost queue in the pipeline.
+    '''
     return self.queues[0].put(item)
 
   @property
   def inQ(self):
+    ''' Property returning the leftmost queue in the pipeline, the input queue.
+    '''
     return self.queues[0]
 
   @property
   def outQ(self):
+    ''' Property returning the rightmost queue in the pipeline, the output queue.
+    '''
     return self.queues[-1]
 
   def _pipeline_func(self, o):
