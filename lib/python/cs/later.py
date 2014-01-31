@@ -262,7 +262,7 @@ class _Pipeline(object):
     RHQ = outQ
     count = len(filter_funcs)
     while filter_funcs:
-      func_iter, func_final = self._pipeline_func(filter_funcs.pop())
+      func_iter, func_final = self._pipeline_func(filter_funcs.pop(), is_final=( count == len(filter_funcs) ))
       count -= 1
       pq_name = ":".join((name, str(count), str(seq())))
       def PQend(tag, Q):
@@ -297,7 +297,7 @@ class _Pipeline(object):
     '''
     return self.queues[-1]
 
-  def _pipeline_func(self, o):
+  def _pipeline_func(self, o, is_final):
     ''' Accept a pipeline element. Return (func_iter, func_final).
         A pipeline element is either a single function, in which case it is
         presumed to be a one-to-many-generator with func_sig FUNC_ONE_TO_MANY,
@@ -339,14 +339,35 @@ class _Pipeline(object):
     elif func_sig == FUNC_MANY_TO_MANY:
       gathered = []
       def func_iter(item):
+        self.counter.inc()
         gathered.append(item)
         if False:
           yield
       def func_final():
         for item in func(gathered):
           yield item
+          # NB: decrement after yield to allow increment in wrapper to keep counter > 0
+          self.counter.dec()
     else:
       raise ValueError("unsupported function signature %r" % (func_sig,))
+
+    # wrap func_iter and func_final to manipulate the item counter
+    func_iter0 = func_iter
+    def func_iter(item):
+      self.counter.inc()
+      for item2 in func_iter0(item):
+        if not is_final:
+          self.counter.inc()
+        yield item2
+      self.counter.dec()
+
+    func_final0 = func_final
+    def func_final():
+      for item in func_final0():
+        if not is_final:
+          self.counter.inc()
+        yield item
+
     return func_iter, func_final
 
 
