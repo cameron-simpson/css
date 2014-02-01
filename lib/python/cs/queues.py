@@ -10,7 +10,7 @@ from threading import Condition, Timer
 import time
 from cs.asynchron import Asynchron
 from cs.debug import Lock, RLock, Thread, trace_caller
-from cs.excutils import noexc
+from cs.excutils import noexc, logexc
 from cs.logutils import exception, warning, debug, D, Pfx, PfxCallInfo
 from cs.seq import seq
 from cs.py3 import Queue, PriorityQueue, Queue_Full, Queue_Empty
@@ -61,6 +61,7 @@ class NestingOpenCloseMixin(object):
     self.open()
     return self
 
+  @logexc
   def close(self):
     ''' Decrement the open count.
 	If self.on_open, call self.on_open(self, count) with the
@@ -81,7 +82,7 @@ class NestingOpenCloseMixin(object):
       if self.on_shutdown:
         self.on_shutdown(self)
     elif self.closed:
-      raise RuntimeError("%s.close: count=%r, ALREADY CLOSED" % (self, count))
+      error("%s.close: count=%r, ALREADY CLOSED", self, count)
 
   @property
   def closed(self):
@@ -338,29 +339,29 @@ class PushQueue(NestingOpenCloseMixin, O):
         Otherwise, defer self.func_push(item) and after completion,
         queue its results to outQ.
     '''
+    debug("%s.put(item=%r)", self, item)
     if self.closed:
       warning("%s.put(%s) when closed" % (self, item))
     L = self.later
-    with L.do_busy("%s.put(%r)" % (self,item)):
-      if self.is_iterable:
-        # add to the outQ opens; defer_iterable will close it
-        ##D("%s: %s.open()", self, self.outQ)
-        self.outQ.open()
-        try:
-          items = self.func_push(item)
-          ##items = list(items)
-        except Exception as e:
-          exception("%s.func_push: %s", self, e)
-          items = ()
-        ##D("%s: func_push(%r) => items=%r", self, item, items)
-        L._defer_iterable(items, self.outQ)
-      else:
-        raise RuntimeError("PUSHQUEUE NOT IS_ITERABLE")
-        # defer the computation then call _push_items which puts the results
-        # and closes outQ
-        LF = L._defer( self.func_push, item )
-        self.LFs.append(LF)
-        L._after( (LF,), None, self._push_items, LF )
+    if self.is_iterable:
+      # add to the outQ opens; defer_iterable will close it
+      ##D("%s: %s.open()", self, self.outQ)
+      self.outQ.open()
+      try:
+        items = self.func_push(item)
+        ##items = list(items)
+      except Exception as e:
+        exception("%s.func_push: %s", self, e)
+        items = ()
+      ##D("%s: func_push(%r) => items=%r", self, item, items)
+      L._defer_iterable(items, self.outQ)
+    else:
+      raise RuntimeError("PUSHQUEUE NOT IS_ITERABLE")
+      # defer the computation then call _push_items which puts the results
+      # and closes outQ
+      LF = L._defer( self.func_push, item )
+      self.LFs.append(LF)
+      L._after( (LF,), None, self._push_items, LF )
 
   # NB: reports and discards exceptions
   @noexc
@@ -380,6 +381,7 @@ class PushQueue(NestingOpenCloseMixin, O):
     ''' shutdown() is called by NestingOpenCloseMixin.close() to close
         the outQ for real.
     '''
+    debug("%s.shutdown()", self)
     LFs = self.LFs
     self.LFs = []
     if self.func_final:
@@ -389,12 +391,12 @@ class PushQueue(NestingOpenCloseMixin, O):
     self.later._after( LFs, None, self.outQ.close )
 
   def _run_func_final(self):
-    with self.later.do_busy("%s._run_func_final: func_final=%s" % (self, self.func_final.__name__)):
-      items = self.func_final()
-      items = list(items)
-      outQ = self.outQ
-      for item in items:
-        outQ.put(item)
+    debug("%s._run_func_final()", self)
+    items = self.func_final()
+    items = list(items)
+    outQ = self.outQ
+    for item in items:
+      outQ.put(item)
 
 class NullQueue(NestingOpenCloseMixin, O):
   ''' A queue-like object that discards its inputs.
@@ -426,6 +428,7 @@ class NullQueue(NestingOpenCloseMixin, O):
   def put(self, item):
     ''' Put a value onto the Queue; it is discarded.
     '''
+    debug("%s.put: DISCARD %r", self, item)
     pass
 
   def get(self):
