@@ -6,7 +6,7 @@
 
 import sys
 from cs.debug import Lock
-from cs.logutils import error
+from cs.logutils import error, exception, debug, D
 from cs.obj import O
 from cs.seq import seq
 from cs.py3 import Queue, raise3
@@ -140,16 +140,17 @@ class Asynchron(O):
         if state != ASYNCH_CANCELLED:
           self.state = ASYNCH_READY
       else:
-        raise RuntimeError("<%s>.state is not one of (ASYNCH_CANCELLED, ASYNCH_RUNNING): %r"
+        raise RuntimeError("<%s>.state is not one of (ASYNCH_CANCELLED, ASYNCH_RUNNING, ASYNCH_PENDING): %r"
                            % (self, state))
     self._get_lock.release()
     notifiers = self.notifiers
     del self.notifiers
     for notifier in notifiers:
+      debug("%s._complete: notify via %r", self, notifier)
       try:
         notifier(self)
       except Exception as e:
-        error("%s: calling notifier %s: exc=%s", self, notifier, e)
+        exception("%s._complete: calling notifier %s: exc=%s", self, notifier, e)
 
   def join(self):
     ''' Calling the .join() method waits for the function to run to

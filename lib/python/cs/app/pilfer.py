@@ -33,7 +33,7 @@ from cs.excutils import noexc, noexc_gen, logexc, LogExceptions
 from cs.fileutils import file_property, mkdirn
 from cs.later import Later, FUNC_ONE_TO_ONE, FUNC_ONE_TO_MANY, FUNC_SELECTOR, FUNC_MANY_TO_MANY
 from cs.lex import get_identifier, get_other_chars
-from cs.logutils import setup_logging, logTo, Pfx, debug, error, warning, exception, trace, pfx_iter, D
+from cs.logutils import setup_logging, logTo, Pfx, info, debug, error, warning, exception, trace, pfx_iter, D
 from cs.mappings import MappingChain, SeenSet
 from cs.queues import IterableQueue, NullQueue, NullQ
 from cs.seq import seq
@@ -163,9 +163,14 @@ def main(argv):
                 return P, URL(U, None, scope=P)
               pipe_funcs.insert(0, (FUNC_ONE_TO_ONE, add_scope))
               # construct the pipeline
-              inQ, outQ = L.pipeline(pipe_funcs, outQ=NullQueue(blocking=True, open=True))
+              pipeline = L.pipeline(pipe_funcs, name="MAIN",
+                                    outQ=NullQueue(name="MAIN_PIPELINE_END_NQ",
+                                    blocking=True, open=True))
+              inQ = pipeline.inQ
+              outQ = pipeline.outQ
               if url != '-':
                 # literal URL supplied, deliver to pipeline
+                X("put to main inQ: %s.put(%r)...", inQ, url)
                 inQ.put(url)
               else:
                 # read URLs from stdin
@@ -197,19 +202,30 @@ def main(argv):
                         continue
                       inQ.put(line)
               # indicate end of input
+              X("close main input %s", inQ)
               inQ.close()
-              # await processing of output
-              with Pfx("main pipeline"):
+              X("wait for main output to close")
+              outQ.join()
+              X("wait for diversions to quiesce...")
+              P.quiesce_diversions()
+              X("close diversions...")
+              for div in P.diversions:
+                div.close()
+              X("diversions closed, wait for EOF on diversions")
+              for div in P.diversions:
+                outQ = div.outQ
                 for item in outQ:
-                  warning("finalisation collected %r", item)
-              # await completion of other diversions also
-              for pipe_name, div in P.diversions.items():
-                with Pfx("divert:%s", pipe_name):
-                  outQ = div.outQ
-                  with Pfx(str(outQ)):
-                    for item in outQ:
-                      warning("finalisation collected %r", item)
+                  # diversions are supposed to discard their outputs
+                  error("%s: RECEIVED %r", div, item)
+                X("%s: EOF", div)
+              X("diversions ended")
+            ##D("SLEEP 10")
+            ##sleep(10)
+            ##D("SLEPT, DUMP")
+            ##thread_dump()
+            X("WAIT: L=%r", L)
             L.wait()
+            X("WAIT COMPLETE: L=%r", L)
       else:
         error("unsupported op")
         badopts = True
@@ -230,6 +246,9 @@ def argv_pipefuncs(argv, action_map, do_trace):
   pipe_funcs = []
   while rargv:
     action = rargv.pop()
+    # support commenting of individual actions
+    if action.startswith('#'):
+      continue
     func, offset = get_identifier(action)
     if func and func in action_map:
       expando = action_map[func]
@@ -246,7 +265,7 @@ def argv_pipefuncs(argv, action_map, do_trace):
 def get_pipeline_spec(argv):
   ''' Parse a leading pipeline specification from the list of arguments `argv`.
       A pipeline specification is specified by a leading argument
-      of the form "pipe_name:{", following arguments definition
+      of the form "pipe_name:{", followed by arguments defining
       functions for the pipeline, and a terminating argument of the
       form "}".
 
@@ -257,6 +276,10 @@ def get_pipeline_spec(argv):
 
       If the leading argument does not commence a function specification
       then `spec` will be None and `argv2` will be `argv`.
+
+      Note: this syntax works well with traditional Bourne shells.
+      Zsh users can use 'setopt IGNORE_CLOSE_BRACES' to get
+      sensible behaviour. Bash users may be out of luck.
   '''
   errors = []
   pipe_name = None
@@ -401,6 +424,24 @@ class Pilfer(O):
   def diversions(self):
     return self._shared.diversions
 
+  @logexc
+  def quiesce_diversions(self):
+    X("%s.quiesce_diversions...", self)
+    while True:
+      X("%s.quiesce_diversions: pass over diversions...", self)
+      for div in self.diversions:
+        div.quiesce()
+      X("%s.quiesce_diversions: now check they are all quiet...", self)
+      quiet = True
+      for div in self.diversions:
+        if div.counter:
+          X("%s.quiesce_diversions: NOT QUIET: %s", self, div)
+          quiet = False
+          break
+      if quiet:
+        X("%s.quiesce_diversions: all quiet!", self)
+        return
+
   @locked
   def diversion(self, pipe_name):
     ''' Return the diversion named `pipe_name`.
@@ -418,14 +459,14 @@ class Pilfer(O):
         for err in errors:
           error(err)
         raise KeyError("invalid pipe specification for diversion named %r" % (pipe_name,))
-      inQ, outQ = self.later.pipeline(pipe_funcs, outQ=NullQueue(blocking=True))
-      diversions[pipe_name] = O(name=pipe_name, inQ=inQ, outQ=outQ)
+      name = "DIVERSION:%s" % (pipe_name,)
+      diversions[pipe_name] = self.later.pipeline(pipe_funcs, name=name, outQ=NullQueue(name=name, blocking=True))
     return diversions[pipe_name]
 
+  @logexc
   def pipe_through(self, pipe_name, inputs):
     ''' Create a new cs.later.Later.pipeline from the specification named `pipe_name`.
         It will collect items from the iterable `inputs`.
-        Return the output Queue from which to get results.
     '''
     spec = self.pipes.get(pipe_name)
     if spec is None:
@@ -435,8 +476,8 @@ class Pilfer(O):
       for err in errors:
         error(err)
       raise KeyError("invalid pipe specification for diversion named %r" % (pipe_name,))
-    inQ, outQ = self.later.pipeline(pipe_funcs, inputs=inputs)
-    return outQ
+    name = "pipe_through:%s" % (pipe_name,)
+    return self.later.pipeline(pipe_funcs, name=name, inputs=inputs)
 
   @property
   def rcs(self):
@@ -853,6 +894,9 @@ def action_func(action, do_trace, raw=False):
   ''' Accept a string `action` and return a tuple of:
         func_sig, function
       `func_sig` and `function` are used with Later.pipeline.
+      If `raw`, return a tuple of:
+        func_sig, function, scoped
+      prior to the final step of wrapping scoped functions etc.
   '''
   function = None
   func_sig = None
@@ -990,7 +1034,6 @@ def action_func(action, do_trace, raw=False):
                   P = copy(P)
                   P.set_user_vars(**varmap)
                 return (P, True)
-              function.__name__ = '/%s/' % (regexp,)
               func_sig = FUNC_SELECTOR
             # select URLs not matching regexp
             # -/regexp/
@@ -1001,7 +1044,6 @@ def action_func(action, do_trace, raw=False):
                 regexp = action[2:]
               regexp = re.compile(regexp)
               function = lambda (P, U): not regexp.search(U)
-              function.__name__ = '-/%s/' % (regexp,)
               func_sig = FUNC_SELECTOR
             # parent
             # ..
@@ -1029,10 +1071,11 @@ def action_func(action, do_trace, raw=False):
             else:
               raise ValueError("unknown function %r" % (func,))
 
+    function.__name__ = "action(%r)" % (action0,)
     # return the raw funtion - a raw caller wants to use it directly,
     # not in Later.pipeline()
     if raw:
-      return func_sig, function
+      return func_sig, function, scoped
 
     # The pipeline itself passes (P, U) item tuples.
     #
@@ -1060,7 +1103,7 @@ def action_func(action, do_trace, raw=False):
             yield P2, U
       else:
         def func0( (P, U), *args, **kwargs):
-          if func0( (P, U), *args, **kwargs):
+          if function( (P, U), *args, **kwargs):
             yield U
     if func_sig == FUNC_ONE_TO_ONE:
       if scoped:
@@ -1110,10 +1153,10 @@ def action_func(action, do_trace, raw=False):
     else:
       raise RuntimeError("unhandled func_sig %r" % (func_sig,))
 
+    @logexc
     def trace_function(*a, **kw):
       if do_trace:
-        D("DO %s(a=(%d args; %r),kw=%r)", action0, len(a), a, kw)
-      ##D("   funcPU<%s:%d>=%r %r ...", funcPU.func_code.co_filename, funcPU.func_code.co_firstlineno, funcPU, dir(funcPU))
+        X("DO %s(a=(%d args; %r),kw=%r)", action0, len(a), a, kw)
       with Pfx(action0):
         try:
           retval = funcPU(*a, **kw)
@@ -1122,6 +1165,7 @@ def action_func(action, do_trace, raw=False):
           raise
         return retval
 
+    trace_function.__name__ = "trace_action(%r)" % (action0,)
     return func_sig, trace_function
 
 def function_by_name(func, func_sig):
@@ -1165,17 +1209,23 @@ def action_divert_pipe(func, action, offset, do_trace):
     raise ValueError("no pipe name")
   if offset >= len(action):
     sel_function = lambda (P, U): True
+    sel_function.__name__ = 'True(%r)' % (action,)
   else:
     if marker != action[offset]:
       raise ValueError("expected second marker to match first: expected %r, saw %r"
                        % (marker, action[offset]))
-    sel_func_sig, sel_function = action_func(action[offset+1:], do_trace=do_trace, raw=True)
+    sel_func_sig, sel_function, sel_scoped = action_func(action[offset+1:], do_trace=do_trace, raw=True)
     if sel_func_sig != FUNC_SELECTOR:
       raise ValueError("expected selector function but found: %r" % (action[offset+1:],))
+    if sel_scoped:
+      sel_function0 = sel_function
+      sel_function = lambda *a, **kw: sel_function0(*a, **kw)[1]
+    sel_function.__name__ = "%r.select(%r)" % (action, action[offset+1:])
   if func == "divert":
     # function to divert selected items to a single named pipeline
     func_sig = FUNC_ONE_TO_MANY
     scoped = False
+    @logexc
     def function(item):
       P, U = item
       try:
@@ -1190,6 +1240,7 @@ def action_divert_pipe(func, action, offset, do_trace):
           yield U
       except Exception as e:
         exception("OUCH")
+    function.__name__ = "divert_func(%r)" % (action,)
   elif func == "pipe":
     # gather all items and feed to an instance of the specified pipeline
     func_sig = FUNC_MANY_TO_MANY
@@ -1197,16 +1248,25 @@ def action_divert_pipe(func, action, offset, do_trace):
     def function(items):
       pipe_items = []
       for item in items:
-        if sel_function(item):
+        debug("pipe: sel_function=%r, item=%r", sel_function, item)
+        status = sel_function(item)
+        debug("pipe: sel_function=%r, item=%r: status=%r", sel_function, item, status)
+        if status:
+          debug("pipe: pipe_items.append(%r)", item)
           pipe_items.append(item)
         else:
+          D("pipe: not selected, yield straight to output: %r", item)
           yield item
+      debug("pipe: pipe_items=%r", pipe_items)
       if pipe_items:
         P = pipe_items[0][0]
         with P.later.more_capacity(1):
-          outQ = P.pipe_through(pipe_name, pipe_items)
-          for item in outQ:
+          pipeline = P.pipe_through(pipe_name, pipe_items)
+          debug("pipe: pipe_though(%r) => %r", pipe_name, pipeline)
+          for item in pipeline.outQ:
+            debug("pipe: postpipe: yield %r", item)
             yield item
+      debug("pipe: processed pipe_items %r", pipe_items)
   else:
     raise ValueError("expected \"divert\" or \"pipe\", got func=%r" % (func,))
   return func_sig, function, scoped

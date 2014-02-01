@@ -147,9 +147,7 @@ class DebuggingLock(DebugWrapper):
 
   def __enter__(self):
     ##self.lock.__enter__()
-    D("ENTER0")
     self.acquire()
-    D("ENTER1")
     return self
 
   def __exit__(self, *a):
@@ -163,12 +161,9 @@ class DebuggingLock(DebugWrapper):
     if a:
       blocking = a[0]
       a = a[1:]
-    D("ACQUIRE0")
     filename, lineno = inspect.stack()[1][1:3]
     debug("%s:%d: acquire(blocking=%s)", filename, lineno, blocking)
-    D("ACQUIRE1")
     if blocking:
-      D("ACQUIRE2")
       # blocking
       # try non-blocking first
       # if successful, good
@@ -254,7 +249,7 @@ class DebuggingRLock(DebugWrapper):
 
   def release(self):
     filename, lineno = inspect.stack()[0][1:3]
-    self.debug('%s:%d: release()', filename, lineo)
+    self.debug('%s:%d: release()', filename, lineno)
     self.lock.release()
 
 _debug_threads = set()

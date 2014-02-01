@@ -4,11 +4,14 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
-from threading import Condition
+import sys
+from functools import partial
+from threading import Condition, Timer
 import time
+from cs.asynchron import Asynchron
 from cs.debug import Lock, RLock, Thread, trace_caller
-from cs.excutils import noexc
-from cs.logutils import exception, warning, D, PfxCallInfo
+from cs.excutils import noexc, logexc
+from cs.logutils import exception, warning, debug, D, Pfx, PfxCallInfo
 from cs.seq import seq
 from cs.py3 import Queue, PriorityQueue, Queue_Full, Queue_Empty
 from cs.obj import O
@@ -24,37 +27,62 @@ class NestingOpenCloseMixin(object):
       preexisting attribute _lock for locking.
   '''
 
-  def __init__(self, open=False):
+  def __init__(self, open=False, on_open=None, on_close=None, on_shutdown=None):
     ''' Initialise the NestingOpenCloseMixin state.
 	If the optional parameter `open` is true, return the object in "open"
         state (active opens == 1) otherwise closed (opens == 0).
         The default is "closed" to optimise use as a context manager;
         the __enter__ method will open the object.
+        The following callback parameters may be supplied to aid tracking activity:
+        `on_open`: called on open with the post-increment open count
+        `on_close`: called on close with the pre-decrement open count
+        `on_shutdown`: called after calling self.shutdown()
     '''
     self._opens = 0
+    self.on_open = on_open
+    self.on_close = on_close
+    self.on_shutdown = on_shutdown
+    self._asynchron = Asynchron()
     if open:
       self.open()
 
   def open(self):
     ''' Increment the open count.
+	If self.on_open, call self.on_open(self, count) with the
+	post-increment count.
     '''
     with self._lock:
       self._opens += 1
+      count = self._opens
+    if self.on_open:
+      self.on_open(self, count)
 
   def __enter__(self):
     self.open()
     return self
 
+  @logexc
   def close(self):
     ''' Decrement the open count.
+	If self.on_open, call self.on_open(self, count) with the
+	pre-decrement count.
+        If self.on_shutdown and the count goes to zero, call self.on_shutdown(self).
         If the count goes to zero, call self.shutdown().
     '''
     with self._lock:
+      if self._opens < 1:
+        raise RuntimeError("%s: EXTRA CLOSE", self)
+      self._opens -= 1
       count = self._opens
-      count -= 1
-      self._opens = count
+    if self.on_close:
+      self.on_close(self, count)
     if count == 0:
+      self._asynchron.put(True)
       self.shutdown()
+      if self.on_shutdown:
+        self.on_shutdown(self)
+    elif self.closed:
+      error("%s.close: count=%r, ALREADY CLOSED", self, count)
 
   @property
   def closed(self):
@@ -68,6 +96,9 @@ class NestingOpenCloseMixin(object):
   def __exit__(self, exc_type, exc_value, traceback):
     self.close()
     return False
+
+  def join(self):
+    return self._asynchron.join()
 
 class QueueIterator(NestingOpenCloseMixin,O):
   ''' A QueueIterator is a wrapper for a Queue (or ducktype) which
@@ -264,12 +295,15 @@ class PushQueue(NestingOpenCloseMixin, O):
       trigger a function on data arrival.
   '''
 
-  def __init__(self, L, func_push, outQ, func_final=None, is_iterable=False, name=None, open=False):
+  def __init__(self, L, func_push, outQ, func_final=None, is_iterable=False, name=None,
+                     open=False, on_open=None, on_close=None, on_shutdown=None):
     ''' Initialise the PushQueue with the Later `L`, the callable `func_push`
         and the output queue `outQ`.
 	`func_push` is a one-to-many function which accepts a single
 	  item of input and returns an iterable of outputs; it may
 	  be a generator.
+          This iterable is submitted to `L` via defer_iterable to call
+          `outQ.put` with each output.
         `outQ` accepts results from the callable via its .put() method.
         `func_final`, if specified and not None, is called after completion of
           all calls to `func_push`.
@@ -282,7 +316,7 @@ class PushQueue(NestingOpenCloseMixin, O):
     self.name = name
     self._lock = Lock()
     O.__init__(self)
-    NestingOpenCloseMixin.__init__(self, open=open)
+    NestingOpenCloseMixin.__init__(self, open=open, on_open=on_open, on_close=on_close, on_shutdown=on_shutdown)
     self.later = L
     self.func_push = func_push
     self.outQ = outQ
@@ -293,7 +327,10 @@ class PushQueue(NestingOpenCloseMixin, O):
       raise RuntimeError("PUSHQUEUE NOT IS_ITERABLE")
 
   def __str__(self):
-    return "<%s>" % (self.name,)
+    return "PushQueue:%s" % (self.name,)
+
+  def __repr__(self):
+    return "<%s outQ=%s>" % (self, self.outQ)
 
   def put(self, item):
     ''' Receive a new item.
@@ -302,18 +339,21 @@ class PushQueue(NestingOpenCloseMixin, O):
         Otherwise, defer self.func_push(item) and after completion,
         queue its results to outQ.
     '''
+    debug("%s.put(item=%r)", self, item)
     if self.closed:
       warning("%s.put(%s) when closed" % (self, item))
     L = self.later
-    self.outQ.open()
     if self.is_iterable:
       # add to the outQ opens; defer_iterable will close it
+      ##D("%s: %s.open()", self, self.outQ)
+      self.outQ.open()
       try:
         items = self.func_push(item)
         ##items = list(items)
       except Exception as e:
         exception("%s.func_push: %s", self, e)
         items = ()
+      ##D("%s: func_push(%r) => items=%r", self, item, items)
       L._defer_iterable(items, self.outQ)
     else:
       raise RuntimeError("PUSHQUEUE NOT IS_ITERABLE")
@@ -329,6 +369,7 @@ class PushQueue(NestingOpenCloseMixin, O):
     ''' Handler to run after completion of `LF`.
         Put the results of `LF` onto `outQ`.
     '''
+    raise RuntimeError("NOTREACHED")
     try:
       for item in LF():
         self.outQ.put(item)
@@ -340,6 +381,7 @@ class PushQueue(NestingOpenCloseMixin, O):
     ''' shutdown() is called by NestingOpenCloseMixin.close() to close
         the outQ for real.
     '''
+    debug("%s.shutdown()", self)
     LFs = self.LFs
     self.LFs = []
     if self.func_final:
@@ -349,7 +391,9 @@ class PushQueue(NestingOpenCloseMixin, O):
     self.later._after( LFs, None, self.outQ.close )
 
   def _run_func_final(self):
+    debug("%s._run_func_final()", self)
     items = self.func_final()
+    items = list(items)
     outQ = self.outQ
     for item in items:
       outQ.put(item)
@@ -359,7 +403,8 @@ class NullQueue(NestingOpenCloseMixin, O):
       Calls to .get() raise Queue_Empty.
   '''
 
-  def __init__(self, blocking=False, name=None, open=False):
+  def __init__(self, blocking=False, name=None,
+               open=False, on_open=None, on_close=None, on_shutdown=None):
     ''' Initialise the NullQueue.
         `blocking`: if true, calls to .get() block until .shutdown().
           Its default is False. 
@@ -371,12 +416,19 @@ class NullQueue(NestingOpenCloseMixin, O):
     self._lock = Lock()
     self._close_cond = Condition(self._lock)
     O.__init__(self)
-    NestingOpenCloseMixin.__init__(self, open=open)
+    NestingOpenCloseMixin.__init__(self, open=open, on_open=on_open, on_close=on_close, on_shutdown=on_shutdown)
     self.blocking = blocking
+
+  def __str__(self):
+    return "NullQueue:%s" % (self.name,)
+
+  def __repr__(self):
+    return "<%s blocking=%s>" % (self, self.blocking)
 
   def put(self, item):
     ''' Put a value onto the Queue; it is discarded.
     '''
+    debug("%s.put: DISCARD %r", self, item)
     pass
 
   def get(self):
@@ -406,3 +458,143 @@ class NullQueue(NestingOpenCloseMixin, O):
       raise StopIteration
 
 NullQ = NullQueue(name='NullQ')
+
+class TimerQueue(object):
+  ''' Class to run a lot of "in the future" jobs without using a bazillion
+      Timer threads.
+  '''
+  def __init__(self, name=None):
+    if name is None:
+      name = 'TimerQueue-%d' % (seq(),)
+    self.name = name
+    self.Q = PriorityQueue()    # queue of waiting jobs
+    self.pending = None         # or (Timer, when, func)
+    self.closed = False
+    self._lock = Lock()
+    self.mainRunning = False
+    self.mainThread = Thread(target=self._main)
+    self.mainThread.start()
+
+  def __str__(self):
+    return self.name
+
+  def close(self, cancel=False):
+    ''' Close the TimerQueue. This forbids further job submissions.
+        If `cancel` is supplied and true, cancel all pending jobs.
+	Note: it is still necessary to call TimerQueue.join() to
+	wait for all pending jobs.
+    '''
+    self.closed = True
+    if self.Q.empty():
+      # dummy entry to wake up the main loop
+      self.Q.put( (None, None, None) )
+    if cancel:
+      self._cancel()
+
+  def _cancel(self):
+    with self._lock:
+      if self.pending:
+        T, Twhen, Tfunc = self.pending
+        self.pending[2] = None
+        self.pending = None
+        T.cancel()
+      else:
+        Twhen, Tfunc = None, None
+    return Twhen, Tfunc
+
+  def add(self, when, func):
+    ''' Queue a new job to be called at 'when'.
+        'func' is the job function, typically made with functools.partial.
+    '''
+    assert not self.closed, "add() on closed TimerQueue"
+    self.Q.put( (when, seq(), func) )
+
+  def join(self):
+    ''' Wait for the main loop thread to finish.
+    '''
+    assert self.mainThread is not None, "no main thread to join"
+    self.mainThread.join()
+
+  def _main(self):
+    ''' Main loop:
+        Pull requests off the queue; they will come off in time order,
+        so we always get the most urgent item.
+        If we're already delayed waiting for a previous request,
+          halt that request's timer and compare it with the new job; push the
+          later request back onto the queue and proceed with the more urgent
+          one.
+        If it should run now, run it.
+        Otherwise start a Timer to run it later.
+        The loop continues processing items until the TimerQueue is closed.
+    '''
+    with Pfx("TimerQueue._main()"):
+      assert not self.mainRunning, "main loop already active"
+      self.mainRunning = True
+      while not self.closed:
+        when, n, func = self.Q.get()
+        debug("got when=%s, n=%s, func=%s", when, n, func)
+        if when is None:
+          # it should be the dummy item
+          assert self.closed
+          assert self.Q.empty()
+          break
+        with self._lock:
+          if self.pending:
+            # Cancel the pending Timer
+            # and choose between the new job and the job the Timer served.
+            # Requeue the lesser job and do or delay-via-Timer the more
+            # urgent one.
+            T, Twhen, Tfunc = self.pending
+            self.pending[2] = None  # prevent the function from running if racy
+            T.cancel()
+            self.pending = None     # nothing pending now
+            T = None                # let go of the cancelled timer
+            if when < Twhen:
+              # push the pending function back onto the queue, but ahead of
+              # later-queued funcs with the same timestamp
+              requeue = (Twhen, 0, Tfunc)
+            else:
+              # push the dequeued function back - we prefer the pending one
+              requeue = (when, n, func)
+              when = Twhen
+              func = Tfunc
+            self.Q.put(requeue)
+          # post: self.pending is None and the Timer is cancelled
+          assert self.pending is None
+
+        now = time.time()
+        delay = when - now
+        if delay <= 0:
+          # function due now - run it
+          try:
+            retval = func()
+          except:
+            exception("func %s threw exception", func)
+          else:
+            debug("func %s returns %s", func, retval)
+        else:
+          # function due later - run it from a Timer
+          def doit(self):
+            # pull off our pending task and untick it
+            Tfunc = None
+            with self._lock:
+              if self.pending:
+                T, Twhen, Tfunc = self.pending
+              self.pending = None
+            # run it if we haven't been told not to
+            if Tfunc:
+              try:
+                retval = Tfunc()
+              except:
+                exception("func %s threw exception", Tfunc)
+              else:
+                debug("func %s returns %s", Tfunc, retval)
+          with self._lock:
+            T = Timer(delay, partial(doit, self))
+            self.pending = [ T, when, func ]
+            T.start()
+      self.mainRunning = False
+
+if __name__ == '__main__':
+  import cs.queues_tests
+  cs.queues_tests.selftest(sys.argv)
