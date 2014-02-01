@@ -403,6 +403,24 @@ class Pilfer(O):
   def diversions(self):
     return self._shared.diversions
 
+  @logexc
+  def quiesce_diversions(self):
+    X("%s.quiesce_diversions...", self)
+    while True:
+      X("%s.quiesce_diversions: pass over diversions...", self)
+      for div in self.diversions:
+        div.quiesce()
+      X("%s.quiesce_diversions: now check they are all quiet...", self)
+      quiet = True
+      for div in self.diversions:
+        if div.counter:
+          X("%s.quiesce_diversions: NOT QUIET: %s", self, div)
+          quiet = False
+          break
+      if quiet:
+        X("%s.quiesce_diversions: all quiet!", self)
+        return
+
   @locked
   def diversion(self, pipe_name):
     ''' Return the diversion named `pipe_name`.
