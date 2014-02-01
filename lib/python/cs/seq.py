@@ -233,7 +233,6 @@ class TrackingCounter(object):
     watcher = self._watched.get(value)
     if watcher:
       del self._watched[value]
-      debug("%s.notify_all(value=%d)...", self, value)
       watcher.acquire()
       watcher.notify_all()
       watcher.release()
@@ -257,7 +256,6 @@ class TrackingCounter(object):
   def wait(self, value):
     ''' Wait for the counter to reach the specified `value`.
     '''
-    debug("%s.wait()...", self)
     with self._lock:
       if value == self.value:
         return
@@ -266,7 +264,6 @@ class TrackingCounter(object):
       else:
         watcher = self._watched[value]
       watcher.acquire()
-    debug("%s.wait(): got lock, calling inner wait", self)
     watcher.wait()
 
 if __name__ == '__main__':
