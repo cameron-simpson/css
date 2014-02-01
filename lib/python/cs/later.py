@@ -315,7 +315,11 @@ class _Pipeline(object):
     '''
     D("%s.quiesce...", self)
     self.counter.wait(0)
-    D("%s.quiesce: QUIET", self)
+
+  def close(self):
+    ''' Close the leftmore queue in the pipeline.
+    '''
+    self.inQ.close()
 
   def _pipeline_func(self, o, is_final):
     ''' Accept a pipeline element. Return (func_iter, func_final).
