@@ -313,7 +313,6 @@ class _Pipeline(object):
     '''
     return self.queues[-1]
 
-  @property
   def quiesce(self):
     ''' Wait for there to be no items in play in the pipeline.
     '''
@@ -401,7 +400,6 @@ class _Pipeline(object):
         self.counter.dec()
 
     return func_iter, func_final
-
 
 class Later(NestingOpenCloseMixin):
   ''' A management class to queue function calls for later execution.
