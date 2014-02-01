@@ -244,7 +244,7 @@ def argv_pipefuncs(argv, action_map, do_trace):
 def get_pipeline_spec(argv):
   ''' Parse a leading pipeline specification from the list of arguments `argv`.
       A pipeline specification is specified by a leading argument
-      of the form "pipe_name:{", following arguments definition
+      of the form "pipe_name:{", followed by arguments defining
       functions for the pipeline, and a terminating argument of the
       form "}".
 
@@ -255,6 +255,10 @@ def get_pipeline_spec(argv):
 
       If the leading argument does not commence a function specification
       then `spec` will be None and `argv2` will be `argv`.
+
+      Note: this syntax works well with traditional Bourne shells.
+      Zsh users can use 'setopt IGNORE_CLOSE_BRACES' to get
+      sensible behaviour. Bash users may be out of luck.
   '''
   errors = []
   pipe_name = None
