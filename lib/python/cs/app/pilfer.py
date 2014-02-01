@@ -164,12 +164,13 @@ def main(argv):
               pipe_funcs.insert(0, (FUNC_ONE_TO_ONE, add_scope))
               # construct the pipeline
               pipeline = L.pipeline(pipe_funcs, name="MAIN",
-                                     outQ=NullQueue(name="MAIN_PIPELINE_END_NQ",
-                                     blocking=True, open=True))
+                                    outQ=NullQueue(name="MAIN_PIPELINE_END_NQ",
+                                    blocking=True, open=True))
               inQ = pipeline.inQ
               outQ = pipeline.outQ
               if url != '-':
                 # literal URL supplied, deliver to pipeline
+                X("put to main inQ: %s.put(%r)...", inQ, url)
                 inQ.put(url)
               else:
                 # read URLs from stdin
@@ -201,10 +202,30 @@ def main(argv):
                         continue
                       inQ.put(line)
               # indicate end of input
+              X("close main input %s", inQ)
               inQ.close()
-            sleep(5)
+              X("wait for main output to close")
+              outQ.join()
+              X("wait for diversions to quiesce...")
+              P.quiesce_diversions()
+              X("close diversions...")
+              for div in P.diversions:
+                div.close()
+              X("diversions closed, wait for EOF on diversions")
+              for div in P.diversions:
+                outQ = div.outQ
+                for item in outQ:
+                  # diversions are supposed to discard their outputs
+                  error("%s: RECEIVED %r", div, item)
+                X("%s: EOF", div)
+              X("diversions ended")
+            ##D("SLEEP 10")
+            ##sleep(10)
+            ##D("SLEPT, DUMP")
+            ##thread_dump()
+            X("WAIT: L=%r", L)
             L.wait()
-            info("%s done", L)
+            X("WAIT COMPLETE: L=%r", L)
       else:
         error("unsupported op")
         badopts = True
@@ -1132,10 +1153,10 @@ def action_func(action, do_trace, raw=False):
     else:
       raise RuntimeError("unhandled func_sig %r" % (func_sig,))
 
+    @logexc
     def trace_function(*a, **kw):
       if do_trace:
-        D("DO %s(a=(%d args; %r),kw=%r)", action0, len(a), a, kw)
-      ##D("   funcPU<%s:%d>=%r %r ...", funcPU.func_code.co_filename, funcPU.func_code.co_firstlineno, funcPU, dir(funcPU))
+        X("DO %s(a=(%d args; %r),kw=%r)", action0, len(a), a, kw)
       with Pfx(action0):
         try:
           retval = funcPU(*a, **kw)
