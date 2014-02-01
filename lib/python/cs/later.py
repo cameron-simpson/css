@@ -257,6 +257,10 @@ class _PipelinePushQueue(PushQueue):
   def __str__(self):
     return "%s[%s]" % (PushQueue.__str__(self), self.pipeline)
 
+  def put(self, item):
+    self.pipeline.counter.inc()
+    return PushQueue.put(self, item)
+
 class _Pipeline(object):
   ''' A _Pipeline encapsultes the chain of PushQueues created by a call to Later.pipeline.
   '''
