@@ -274,12 +274,8 @@ class _Pipeline(object):
       func_iter, func_final = self._pipeline_func(filter_funcs.pop(), is_final=( count == len(filter_funcs) ))
       count -= 1
       pq_name = ":".join((name, str(count), str(seq())))
-      def PQend(tag, Q):
-        L.busy_down(tag)
-      L.busy_up(pq_name)
       PQ = _PipelinePushQueue(self, L, func_iter, RHQ, is_iterable=True,
-                              func_final=func_final, name=pq_name, open=True,
-                              on_shutdown=partial(PQend, pq_name))
+                              func_final=func_final, name=pq_name, open=True)
       self.queues.insert(0, PQ)
       RHQ = PQ
 
@@ -446,21 +442,21 @@ class Later(NestingOpenCloseMixin):
     self._dispatchThread.start()
 
   def __repr__(self):
-    return '<%s "%s" capacity=%s running=%d (%s) pending=%d (%s) delayed=%d busy=%r closed=%s>' \
+    return '<%s "%s" capacity=%s running=%d (%s) pending=%d (%s) delayed=%d busy=%d:%r closed=%s>' \
            % ( self.__class__.__name__, self.name,
                self.capacity,
                len(self.running), ','.join( repr(LF.name) for LF in self.running ),
                len(self.pending), ','.join( repr(LF.name) for LF in self.pending ),
                len(self.delayed),
-               self._busy,
+               len(self._busy), self._busy,
                self.closed
              )
 
   def __str__(self):
-    return "<%s[%s] pending=%d running=%d delayed=%d busy=%r>" \
+    return "<%s[%s] pending=%d running=%d delayed=%d busy=%d:%r>" \
            % (self.name, self.capacity,
               len(self.pending), len(self.running), len(self.delayed),
-              self._busy)
+              len(self._busy), self._busy)
 
   def __call__(self, func, *a, **kw):
     ''' A Later object can be called with a function and arguments
@@ -522,19 +518,24 @@ class Later(NestingOpenCloseMixin):
     return self.closed and self.is_idle()
 
   def busy_up(self, tag):
+    with PfxCallInfo():
+      warning("BUSY_UP(%r)", tag)
     with self._lock:
       if tag in self._busy:
-        raise RuntimeError("busy_up: tag %r already busy" % (tag,))
+        raise RuntimeError("BUSY_UP: tag %r already busy" % (tag,))
       self._busy.add(tag)
 
   def busy_down(self, tag):
+    with PfxCallInfo():
+      warning("BUSY_DOWN(%r)", tag)
     with self._lock:
-      if tag in self._busy:
         self._busy.remove(tag)
     self._try_finish()
 
   @contextmanager
   def do_busy(self, tag):
+    with PfxCallInfo():
+      warning("DO_BUSY(%r)", tag)
     self.busy_up(tag)
     yield
     self.busy_down(tag)
