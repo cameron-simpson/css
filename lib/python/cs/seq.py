@@ -230,7 +230,7 @@ class TrackingCounter(object):
         This should be called inside self._lock.
     '''
     value = self.value
-    watcher = self._watched.get(value)
+    watcher = self._watched.pop(value)
     if watcher:
       watcher.acquire()
       watcher.notify_all()
