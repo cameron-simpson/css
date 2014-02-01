@@ -11,7 +11,7 @@ import time
 from cs.asynchron import Asynchron
 from cs.debug import Lock, RLock, Thread, trace_caller
 from cs.excutils import noexc, logexc
-from cs.logutils import exception, warning, debug, D, Pfx, PfxCallInfo
+from cs.logutils import error, exception, warning, debug, D, Pfx, PfxCallInfo
 from cs.seq import seq
 from cs.py3 import Queue, PriorityQueue, Queue_Full, Queue_Empty
 from cs.obj import O
@@ -71,7 +71,7 @@ class NestingOpenCloseMixin(object):
     '''
     with self._lock:
       if self._opens < 1:
-        raise RuntimeError("%s: EXTRA CLOSE", self)
+        error("%s: EXTRA CLOSE", self)
       self._opens -= 1
       count = self._opens
     if self.on_close:
