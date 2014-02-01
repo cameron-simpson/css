@@ -9,6 +9,7 @@ import unittest
 import heapq
 import itertools
 from threading import Lock, Condition
+from cs.logutils import warning, debug, D
 
 __seq = 0
 __seqLock = Lock()
@@ -241,6 +242,7 @@ class TrackingCounter(object):
     ''' Increment the counter.
         Wake up any threads waiting for its new value.
     '''
+    debug("%s.inc", self)
     with self._lock:
       self.value += 1
       self._notify()
@@ -249,8 +251,11 @@ class TrackingCounter(object):
     ''' Decrement the counter.
         Wake up any threads waiting for its new value.
     '''
+    debug("%s.dec", self)
     with self._lock:
       self.value -= 1
+      if self.value < 0:
+        warning("%s.dec: value < 0!", self)
       self._notify()
 
   def wait(self, value):
