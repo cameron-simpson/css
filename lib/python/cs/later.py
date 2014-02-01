@@ -313,6 +313,14 @@ class _Pipeline(object):
     '''
     return self.queues[-1]
 
+  @property
+  def quiesce(self):
+    ''' Wait for there to be no items in play in the pipeline.
+    '''
+    D("%s.quiesce...", self)
+    self.counter.wait(0)
+    D("%s.quiesce: QUIET", self)
+
   def _pipeline_func(self, o, is_final):
     ''' Accept a pipeline element. Return (func_iter, func_final).
         A pipeline element is either a single function, in which case it is
