@@ -1,0 +1,58 @@
+#!/bin/sh
+#
+# Simple ssh config option fetcher.
+#       - Cameron Simpson <cs@zip.com.au> 23jan2014
+#
+
+sshcfg=$HOME/.ssh/config
+
+cmd=$0
+usage="Usage: $cmd [-F config] target option [default]
+  -F config     Specify ssh configuration file. Default: $sshcfg
+  target        Target Host clause name. Only does exact match, no globbing.
+  option        Option name (case-sensitive, regrettably).
+  default       Default value to recite if not found."
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    -F)   sshcfg=$2; shift ;;
+    --)   shift; break ;;
+    -*)   echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    *)    break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing target" >&2
+  badopts=1
+else
+  target=$1
+  shift
+fi
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing option" >&2
+  badopts=1
+else
+  option=$1
+  shift
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+value=$( sed -n 's/	/ /g
+                 s/ /  /
+                 s/$/ /
+                 /^[Hh][Oo][Ss][Tt] .* '"$target"' /,/^ *$/{
+                   ##w /dev/tty
+                   s/^ *'"$option"'  *\(.*[^ ]\) *$/\1/p
+                 }' <"$sshcfg" | sed 1q )
+[ -n "$value" ] || value=$*
+
+printf '%s\n' "$value"

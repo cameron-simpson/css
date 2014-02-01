@@ -1,0 +1,232 @@
+#!/bin/sh
+#
+# Generate and possibly apply GRANTs to PostgresQL roles.
+#       - Cameron Simpson <cs@zip.com.au>
+#
+
+set -ue
+
+cmd=`basename "$0"`
+usage="Usage:
+  -U pg-user    PostgreSQL database user. Default from \$USER or \`id -un\`.
+  -x            Trace execution. With \"grant\", apply the GRANTs instead
+                of reciting them. Implies -y.
+  -y            Perform actions instead of reciting them.
+
+  $cmd [-U pg-user] [-x] [-y]
+        List database names.
+  $cmd [-U pg-user] [-x] [-y] database [ls]
+        List database relations (tables, etc).
+  $cmd [-U pg-user] [-x] [-y] databases,... dump -d dumpdir
+        Call pg_dump on the specified databases, writing compressed
+        \"plain\" dump files into the specified dumpdir using pg_dump,
+        using rewriteif to avoid replacing unchanged dumps, and to make
+        distinct new files when changed.
+        The database name \"ALL\" will recurse over all databases except
+        \"template0\".
+  $cmd [-U pg-user] [-x] [-y] databases,... grant grants,... [on tables,...] to pg-role
+        Recite or apply the specified GRANTs.
+        The database name \"ALL\" will recurse over all databases except
+        \"template0\".
+        If \"on tables\" is omitted or tables is \"ALL\" then the GRANTs
+        will be applied to all relations in the database.
+"
+pg_user=${USER:-`id -un`}
+pg_database=
+doit=
+trace=
+[ -t 2 ] && trace=set-x
+subopts=
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    -U) pg_user=$2; shift ;;
+    -x) subopts="$subopts $1" doit=1 trace=set-x ;;
+    -y) subopts="$subopts $1" doit=1 ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# -gt 0 ]
+then
+  pg_database=$1
+  shift
+  [ -n "$pg_database" ] || { echo "$cmd: database name may not be empty" >&2
+                             badopts=1
+                           }
+fi
+
+if [ -n "$pg_database" ]
+then
+  if [ $# = 0 ]
+  then  op=ls
+  else  op=$1; shift
+  fi
+  case "$op" in
+
+    dump)
+      dumpdir=
+      while [ $# -gt 0 ]
+      do
+        case "$1" in
+          -d)   dumpdir=$2; shift ;;
+          --)   shift; break ;;
+          -?*)  echo "$cmd: $op: unrecognised option: $1" >&2
+                badopts=1
+                ;;
+          *)    break ;;
+        esac
+        shift
+      done
+      if [ -z "$dumpdir" ]
+      then
+        echo "$cmd: $op: missing -d dumpdir option" >&2
+        badopts=1
+      else
+        if [ ! -d "$dumpdir/." ]
+        then
+          echo "$cmd: $op: -d $dumpdir: not a directory" >&2
+          badopts=1
+        fi
+      fi
+      ;;
+
+    grant)
+      if [ $# = 0 ]
+      then
+        echo "$cmd: $op: missing grants" >&2
+        badopts=1
+      else
+        pg_grants=$1
+        shift
+      fi
+
+      if [ $# -gt 0 ] && [ "x$1" = xon ]
+      then
+        pg_tables=$( echo "$2" | tr , ' ' )
+        shift; shift
+      else
+        pg_tables=ALL
+      fi
+
+      if [ $# -gt 0 ] && [ "x$1" = xto ]
+      then
+        pg_role=$2
+        shift; shift
+      else
+        echo "$cmd: $op: missing \"to pg-role\"" >&2
+        badopts=1
+      fi
+
+      if [ $# -gt 0 ]
+      then
+        echo "$cmd: extra arguments: $*" >&2
+        badopts=1
+      fi
+      ;;
+
+    ls)
+      if [ $# -gt 0 ]
+      then
+        echo "$cmd: $op: extra arguments: $*" >&2
+        badopts=1
+      fi
+      ;;
+
+    *)echo "$cmd: unrecognised op \"$op\"" >&2
+      badopts=1
+      ;;
+  esac
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+if [ -z "$pg_database" ]
+then
+  exec sed_fd 1 '/,/!d; s/,.*//' psql -U "$pg_user" -l -F, -A -t
+fi
+
+# call ourself with supplied post-option arguments
+recurse()
+{ $trace "$0" -U "$pg_user" $subopts -- ${1+"$@"}
+}
+
+case "$op" in
+
+  dump)
+    case "$pg_database" in
+      ALL)  pg_database=$( recurse | grep -v '^template0$' ) ;;
+      *,*)  pg_database=$( echo "$pg_database" | tr , ' ' ) ;;
+    esac
+    if [ $doit ]
+    then
+      pfx roles.txt rewriteif -c -N -d "$dumpdir/roles.txt" pg_dumpall -r -U "$pg_user"
+    else
+      echo rewriteif -c -N -d "$dumpdir/roles.txt" pg_dumpall -r -U "$pg_user"
+    fi
+    for db in $pg_database
+    do  set -- pg_dump -F p "$db"
+        dumpfile=$dumpdir/$db.sql.gz
+        if [ $doit ]
+        then
+          $trace "$@" | $trace gzip -n | $trace rewriteif -c -N "$dumpfile"
+        else
+          echo "$*"
+        fi
+    done
+    ;;
+
+  grant)
+    case "$pg_database" in
+      ALL)
+        for db in $( recurse | grep -v '^template0$' )
+        do
+          recurse "$db" grant "$pg_grants" on "$pg_tables" to "$pg_role"
+        done
+        exit $?
+        ;;
+      *,*)
+        for db in `echo "$pg_database" | tr , ' '`
+        do
+          recurse "$db" grant "$pg_grants" on "$pg_tables" to "$pg_role"
+        done
+        exit $?
+        ;;
+    esac
+    case "$pg_tables" in
+      '' | ALL )
+        pg_tables=$( recurse "$pg_database" ls )
+        ;;
+      *,* )
+        pg_tables=$( echo "$pg_tables" | echo , ' ' )
+        ;;
+    esac
+    for table in $pg_tables
+    do
+      echo "GRANT $pg_grants on TABLE $table to $pg_role;"
+    done \
+    | if [ $doit ]
+      then
+        $trace psql -U "$pg_user" -- "$pg_database"
+      else
+        cat
+      fi
+    ;;
+
+  ls)
+    filter_fd 1 "awk -F, '{ print \$2 }'" $trace psql -U "$pg_user" -At -F,  -c '\d' -- "$pg_database"
+    ;;
+
+  *)echo "$cmd: $op: unimplemented op" >&2
+    exit 1
+    ;;
+
+esac

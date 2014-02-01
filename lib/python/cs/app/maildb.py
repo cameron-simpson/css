@@ -436,6 +436,14 @@ class _MailDB(NodeDB):
       return TypeFactory[t](t, name, self)
     return NodeDB._createNode(self, t, name)
 
+  @staticmethod
+  def parsedAddress(addr):
+    if isinstance(addr, StringTypes):
+      realname, coreaddr = parseaddr(addr)
+    else:
+      realname, coreaddr = addr
+    return realname, coreaddr
+
   def getAddressNode(self, addr, noCreate=False):
     ''' Obtain the AddressNode for the specified address `addr`.
         If `addr` is a string, parse it into `realname` and `coreaddr`
@@ -446,10 +454,7 @@ class _MailDB(NodeDB):
         If `noCreate` is True (default False) and the address is not in the
         MailDB, return None and do not create an AddressNode.
     '''
-    if isinstance(addr, StringTypes):
-      realname, coreaddr = parseaddr(addr)
-    else:
-      realname, coreaddr = addr
+    realname, coreaddr = self.parsedAddress(addr)
     coreaddr = coreaddr.lower()
     if  len(coreaddr) == 0:
       raise ValueError("getAddressNode(addr=%r): coreaddr => %r" % (addr, coreaddr))
@@ -460,6 +465,37 @@ class _MailDB(NodeDB):
     if not len(Aname) and len(realname) > 0:
       A.REALNAME = ustr(realname)
     return A
+
+  def shortname(self, addr):
+    ''' Return a short name for an address.
+        Pick the first of: abbreviation from maildb, realname from maildb, coreaddr.
+    '''
+    realname, coreaddr = self.parsedAddress(addr)
+    A = self.getAddressNode( (realname, coreaddr), noCreate=True)
+    if A is None:
+      short = coreaddr
+    else:
+      abbrev = A.abbreviation
+      if abbrev is None:
+        rns = A.get('REALNAME')
+        if rns:
+          rn = rns[0]
+        else:
+          rn = ''
+        short = rn if rn else coreaddr
+      else:
+        short = abbrev
+    return short
+  
+  def header_shortlist(self, M, hdrs):
+    ''' Return a list of the unique shortnames for the addresses in the specified headers.
+    '''
+    L = []
+    for realname, coreaddr in message_addresses(M, hdrs):
+      short = self.shortname( (realname, coreaddr) )
+      if short not in L:
+        L.append(short)
+    return L
 
   def address_group(self, group_name):
     ''' Return the set of addresses in the group `group_name`.

@@ -113,7 +113,9 @@ def main(argv, stdin=None):
                                  delay=delay,
                                  no_remove=no_remove,
                                  maildb_path=os.environ['MAILDB'],
-                                 maildir_cache={})
+                                 maildir_cache={},
+                                 msgiddb_path=os.environ.get('MESSAGEIDDB', envsub('$HOME/var/msgiddb.csv')),
+                                )
       maildirs = [ WatchedMaildir(mdirpath,
                                   filter_modes=filter_modes,
                                   rules_path=envsub(
@@ -162,6 +164,7 @@ class FilterModes(O):
     self._O_omit = ('maildir_cache',)
     self._maildb_path = kw.pop('maildb_path')
     self._maildb_lock = Lock()
+    self._msgiddb_path = kw.pop('msgiddb_path')
     O.__init__(self, **kw)
 
   @file_property
@@ -171,6 +174,10 @@ class FilterModes(O):
 
   def maildir(self, mdirname, environ=None):
     return maildir_from_name(mdirname, environ['MAILDIR'], self.maildir_cache)
+
+  @locked_property
+  def msgiddb(self):
+    return NodeDBFromURL(self._msgiddb_path)
 
 class Filer(O):
   ''' A message filing object, filtering state information used during rule evaluation.
@@ -210,7 +217,7 @@ class Filer(O):
     self.log( (u("%s %s") % (time.strftime("%Y-%m-%d %H:%M:%S"),
                                unrfc2047(M.get('subject', '_no_subject'))))
                .replace('\n', ' ') )
-    self.log("  " + unrfc2047(M.get('from', '_no_from')))
+    self.log("  " + self.format_message(M, "{short_from}->{short_recipients}"))
     self.log("  " + M.get('message-id', '<?>'))
     if self.message_path:
       self.log("  " + shortpath(self.message_path))
@@ -256,11 +263,16 @@ class Filer(O):
           exception("saving to %r: %s", target, e)
           ok = False
 
+    self.logflush()
     return ok
 
   @property
   def maildb(self):
     return self.filter_modes.maildb
+
+  @property
+  def msgiddb(self):
+    return self.filter_modes.msgiddb
 
   def maildir(self, mdirpath):
     return self.filter_modes.maildir(mdirpath, self.environ)
@@ -282,13 +294,25 @@ class Filer(O):
   def logto(self, logfilepath):
     ''' Direct log messages to the supplied `logfilepath`.
     '''
-    if self._log:
-      self._log.close()
-      self._log = None
+    if self._log and self._log_path == logfilepath:
+      return
+    self.logclose()
     try:
       self._log = io.open(logfilepath, "a", encoding='utf-8')
     except OSError as e:
       self.log("open(%s): %s" % (logfilepath, e))
+    else:
+      self._log_path = logfilepath
+
+  def logflush(self):
+    if self._log:
+      self._log.flush()
+
+  def logclose(self):
+    if self._log:
+      self._log.close()
+      self._log = None
+      self._log_path = None
 
   @property
   def groups(self):
@@ -335,6 +359,11 @@ class Filer(O):
       if target.startswith('|'):
         shcmd = target[1:]
         return self.save_to_pipe(['/bin/sh', '-c', shcmd])
+      elif target.startswith('+'):
+        m = re_ADDHEADER.match(target)
+        hdr = m.group(1)
+        group_names = m.group(2).split(',')
+        return self.save_header(hdr, group_names)
       elif '@' in target:
         return self.sendmail(target)
       else:
@@ -350,6 +379,18 @@ class Filer(O):
           return self.save_to_maildir(mdir,
                                       flags=maildir_flags)
         return self.save_to_mbox(mailpath)
+
+  def save_header(self, hdr, group_names):
+    with Pfx("save_header(%s, %r)", hdr, group_names):
+      if hdr in ('message-id', 'references', 'in-reply-to'):
+        msgids = self.message[hdr].split()
+        for msgid in msgids:
+          debug("%s.GROUPs.update(%r)", msgid, group_names)
+          msgid_node = self.msgiddb.make( ('MESSAGE_ID', msgid) )
+          msgid_node.GROUPs.update(group_names)
+      else:
+        debug("%s.GROUPs.update(%r)", msgid, group_names)
+        raise RuntimeError("need to pull addresses from hdr and add to address groups")
 
   def save_to_maildir(self, mdir, flags=''):
     ''' Save the current message to a Maildir unless we have already saved to
@@ -406,20 +447,28 @@ class Filer(O):
   def alert_format(self):
     ''' The format string for alert messages from $ALERT_FORMAT.
     '''
-    return self.env('ALERT_FORMAT', 'MAILFILER: {from}: {subject}')
+    return self.env('ALERT_FORMAT', 'MAILFILER: {short_from}->{short_recipients}: {subject}')
 
   def alert_message(self, M):
-    ''' Compute the alert message for the message `M`.
-    '''
-    fmt = self.alert_format
-    hmap = dict( [ (k.lower(), M[k]) for k in M.keys() ] )
     try:
-      msg = fmt.format(**hmap)
+      msg = self.format_message(M, self.alert_format)
     except KeyError as e:
       error("alert_message: format=%r, message keys=%s: %s",
             fmt, ','.join(sorted(list(M.keys()))), e)
       msg = "MAILFILER: alert! format=%s" % (fmt,)
     return msg
+
+  def format_message(self, M, fmt):
+    ''' Compute the alert message for the message `M`.
+    '''
+    hmap = dict( [ (k.lower().replace('-', '_'), M[k]) for k in M.keys() ] )
+    subj = unrfc2047(M.get('subject', '')).strip()
+    if subj:
+      hmap['subject'] = subj
+    for hdr in ('from', 'to', 'cc', 'bcc', 'reply-to'):
+      hmap['short_'+hdr.replace('-', '_')] = ",".join(self.maildb.header_shortlist(M, (hdr,)))
+    hmap['short_recipients'] = ",".join(self.maildb.header_shortlist(M, ('to', 'cc', 'bcc')))
+    return u(fmt).format(**hmap)
 
   def alert(self, alert_message=None):
     ''' Issue an alert with the specified `alert_message`.
@@ -451,8 +500,16 @@ re_INGROUP_s = r'\(\s*%s(\s*\|\s*%s)*\s*\)' % (re_WORD_or_DOM_s,
 ## print("re_INGROUP = %r" % (re_INGROUP_s), file=sys.stderr)
 re_INGROUP = re.compile( re_INGROUP_s, re.I)
 
+re_HEADERNAME_s = r'[a-z][\-a-z0-9]*'
+
 # header[,header,...].func(
-re_HEADERFUNCTION = re.compile(r'([a-z][\-a-z0-9]*(,[a-z][\-a-z0-9]*)*)\.([a-z][_a-z0-9]*)\(', re.I)
+re_HEADERFUNCTION_s = r'(%s(,%s)*)\.(%s)\(' % (re_HEADERNAME_s, re_HEADERNAME_s, re_WORD_s)
+re_HEADERFUNCTION = re.compile(re_HEADERFUNCTION_s, re.I)
+
+# target syntax: add header values to named groups
+# +header(group|...)
+re_ADDHEADER_s = r'\+(%s)(%s)' % (re_HEADERNAME_s, re_INGROUP_s)
+re_ADDHEADER = re.compile(re_ADDHEADER_s, re.I)
 
 def parserules(fp):
   ''' Read rules from `fp`, yield Rules.
@@ -642,6 +699,14 @@ def get_targets(s, offset):
   while offset < len(s) and not s[offset].isspace():
     if s[offset] == '"':
       target, offset = get_qstr(s, offset)
+    elif s[offset ] == '+':
+      m = re_ADDHEADER.match(s, offset)
+      if m:
+        target = m.group()
+        offset = m.end()
+      else:
+        error("parse failure, expected +header(groups) at %d: %s", offset, s)
+        raise ValueError("syntax error")
     else:
       m = re_UNQWORD.match(s, offset)
       if m:
@@ -707,17 +772,32 @@ class Condition_InGroups(_Condition):
     self.group_names = group_names
 
   def test_value(self, filer, header_name, header_value):
-    for address in filer.addresses(header_name):
-      for group_name in self.group_names:
-        if group_name.startswith('@'):
-          # address ending in @foo
-          if address.endswith(group_name):
-            debug("match %s to %s", address, group_name)
+    if header_name.lower() in ('message-id', 'references', 'in-reply-to'):
+      msgiddb = self.filer.msgiddb
+      msgids = [ v for v in header_value.split() if v ]
+      for msgid in msgids:
+        msgid_node = msgiddb.get( ('MESSAGE_ID', msgid) )
+        for group_name in self.group_names:
+          if group_name.startswith('@'):
+            if msgid.endswith(groupname+'>'):
+              debug("match %s to %s", msgid, group_name)
+              return True
+          elif msgid_node:
+              if group_name in msgid_node.GROUPs:
+                debug("match %s to (%s)", msgid, group_name)
+                return True
+    else:
+      for address in filer.addresses(header_name):
+        for group_name in self.group_names:
+          if group_name.startswith('@'):
+            # address ending in @foo
+            if address.endswith(group_name):
+              debug("match %s to %s", address, group_name)
+              return True
+          elif address.lower() in filer.group(group_name):
+            # address in group "foo"
+            debug("match %s to (%s)", address, group_name)
             return True
-        elif address.lower() in filer.group(group_name):
-          # address in group "foo"
-          debug("match %s to (%s)", address, group_name)
-          return True
     return False
 
 class Condition_HeaderFunction(_Condition):
@@ -903,17 +983,18 @@ class WatchedMaildir(O):
         for key in mdir.keys():
           with Pfx(key):
             if key in self.lurking:
-              debug("skip processed key")
+              debug("skip lurking key")
               skipped += 1
               continue
-
             nmsgs += 1
+
             with LogTime("key = %s", key, threshold=1.0, level=DEBUG):
               M = mdir[key]
               filer = Filer(self.filter_modes)
 
               ok = filer.file(M, self.rules, mdir.keypath(key))
               if not ok:
+                filer.log("NOT OK, lurking key %s", key)
                 self.lurk(key)
                 continue
 
@@ -924,8 +1005,8 @@ class WatchedMaildir(O):
                 debug("remove message key %s", key)
                 mdir.remove(key)
                 self.lurking.discard(key)
-            if filer.filter_modes.justone:
-              break
+              if filer.filter_modes.justone:
+                break
 
       if nmsgs or all_keys_time.elapsed >= 0.2:
         info("filtered %d messages (%d skipped) in %5.3fs",

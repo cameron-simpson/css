@@ -494,7 +494,7 @@ then
          || \
          if [ $linkrepair ] \
          && [ -d "$thisbackup" ] \
-         && $trace dorsync "$lastbackup" "$thisbackup"
+         && dorsync "$lastbackup" "$thisbackup"
          then
            :
          else

@@ -53,8 +53,8 @@ usage="Usage: $cmd [-N] [-q] [-R] -T [-x] src dst [databases...]
   databases...
     Databases to copy. These may take the form db1:db2 to copy tables
     from src.db1 to dst.db2.
-    Default is to copy everything except \"information_schema\"
-    from the db on src to the same named db on dst."
+    Default is to copy everything except \"information_schema\" and
+    \"performance_schema\" from the db on src to the same named db on dst."
 
 badopts=
 
@@ -449,7 +449,8 @@ then
               | sed 1d
               ;;
           esac \
-          | sed '/^information_schema$/d'
+          | sed '/^information_schema$/d
+                 /^performance_schema$/d'
          `
 fi
 

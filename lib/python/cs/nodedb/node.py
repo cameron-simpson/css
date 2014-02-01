@@ -307,11 +307,13 @@ class Node(dict):
       Node["ATTR"] will raise a KeyError.
   '''
 
-  def __init__(self, t, name, nodedb):
+  def __init__(self, t, name, nodedb, initial=None):
     self.type = str1(t) if t is not None else None
     self.name = name
     self.nodedb = nodedb
     self._reverse = {}  # maps (OtherNode, ATTR) => count
+    if initial:
+      self.update(initial)
 
   def __bool__(self):
     ''' bool(Node) returns True, unlike a dict.
@@ -858,9 +860,13 @@ class NodeDB(dict, O):
 
   def __setitem__(self, item, N):
     if not isinstance(N, Node):
-      raise TypeError("tried to store non-Node: %r" % (N,))
-    if N.nodedb is not self:
-      raise ValueError("tried to store foreign Node: %r" % (N,))
+      warning("promote %r to Node", N)
+      N0 = N
+      N = self.make(item)
+      N.update(N0)
+    else:
+      if N.nodedb is not self:
+        raise ValueError("tried to store foreign Node: %r" % (N,))
     key = nodekey(item)
     assert key == (N.type, N.name), \
            "tried to store Node(%s:%s) as key (%s:%s)" \
