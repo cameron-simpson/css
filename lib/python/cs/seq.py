@@ -222,6 +222,9 @@ class TrackingCounter(object):
   def __repr__(self):
     return "<TrackingCounter %r %r>" % (str(self), self._watched)
 
+  def __nonzero__(self):
+    return self.value != 0
+
   def _notify(self):
     ''' Notify any waiters on the current counter value.
         This should be called inside self._lock.
