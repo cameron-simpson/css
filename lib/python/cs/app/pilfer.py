@@ -341,7 +341,7 @@ class PilferCommon(O):
     self.later = None
     self.seen = defaultdict(set)
     self.rcs = []               # chain of PilferRC libraries
-    self.diversions = {}        # global mapping of names to divert: pipelines
+    self.diversions_map = {}        # global mapping of names to divert: pipelines
     self.opener = build_opener()
     self.opener.add_handler(HTTPBasicAuthHandler(NetrcHTTPPasswordMgr()))
 
@@ -422,7 +422,7 @@ class Pilfer(O):
 
   @property
   def diversions(self):
-    return self._shared.diversions
+    return list(self._shared.diversions_map.values())
 
   @logexc
   def quiesce_diversions(self):
@@ -449,7 +449,7 @@ class Pilfer(O):
         There is only one of a given name in the shared state.
         They are instantiated at need.
     '''
-    diversions = self.diversions
+    diversions = self._shared.diversions_map
     if pipe_name not in diversions:
       spec = self.pipes.get(pipe_name)
       if spec is None:
