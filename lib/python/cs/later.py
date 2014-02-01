@@ -313,7 +313,6 @@ class _Pipeline(object):
   def quiesce(self):
     ''' Wait for there to be no items in play in the pipeline.
     '''
-    D("%s.quiesce...", self)
     self.counter.wait(0)
 
   def close(self):
@@ -381,7 +380,7 @@ class _Pipeline(object):
     def func_iter(item):
       for item2 in func_iter0(item):
         # raise counter for each item we release
-          self.counter.inc()
+        self.counter.inc()
         yield item2
         # decrement counter when item consumed
         self.counter.dec()
@@ -392,7 +391,7 @@ class _Pipeline(object):
     def func_final():
       for item in func_final0():
         # raise counter for each item we release
-          self.counter.inc()
+        self.counter.inc()
         yield item
         # decrement counter when item consumed
         self.counter.dec()
@@ -495,6 +494,8 @@ class Later(NestingOpenCloseMixin):
         warning("_try_finish: already finished")
       else:
         self._finish()
+    else:
+      debug("_TRY_FINISH: not ready, self=%s", self)
 
   @logexc
   def _finish(self):
@@ -533,30 +534,30 @@ class Later(NestingOpenCloseMixin):
     with PfxCallInfo():
       warning("BUSY_DOWN(%r)", tag)
     with self._lock:
-        self._busy.remove(tag)
+      self._busy.remove(tag)
     self._try_finish()
 
   @contextmanager
   def do_busy(self, tag):
     with PfxCallInfo():
       warning("DO_BUSY(%r)", tag)
-    self.busy_up(tag)
-    yield
-    self.busy_down(tag)
+      self.busy_up(tag)
+      yield
+      self.busy_down(tag)
 
   def wait(self):
     ''' Wait for all active and pending jobs to complete, including
         any jobs they may themselves queue.
     '''
     if self.finished:
-      ##D("%s.wait: already finished - return immediately", self)
+      debug("%s.wait: already finished - return immediately", self)
       pass
     else:
-      ##D("%s.wait...", self)
+      debug("%s.wait...", self)
       self._finished.acquire()
-      ##D("%s.wait: acquired, waiting...", self)
+      debug("%s.wait: acquired, waiting...", self)
       self._finished.wait()
-      ##D("%s.wait FINISHED", self)
+      debug("%s.wait FINISHED", self)
 
   def _track(self, tag, LF, fromset, toset):
     def SN(s):
@@ -987,6 +988,7 @@ class Later(NestingOpenCloseMixin):
 
   def _pipeline(self, filter_funcs, inputs=None, outQ=None, open=False, name=None):
     filter_funcs = list(filter_funcs)
+    debug("%s._pipeline: filter_funcs=%r", self, filter_funcs)
     if not filter_funcs:
       raise ValueError("no filter_funcs")
     if outQ is None:
@@ -1002,7 +1004,7 @@ class Later(NestingOpenCloseMixin):
       debug("%s._pipeline: call _defer_iterable( inputs=%r, inQ=%r)", self, inputs, inQ)
       self._defer_iterable( inputs, inQ )
     else:
-      D("%s._pipeline: NOT setting up _defer_iterable( inputs, inQ=%r)", self, inQ)
+      debug("%s._pipeline: no inputs, NOT setting up _defer_iterable( inputs, inQ=%r)", self, inQ)
     return pipeline
 
   @contextmanager
