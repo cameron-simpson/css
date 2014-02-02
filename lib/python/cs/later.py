@@ -393,6 +393,7 @@ class _Pipeline(object):
       # decrement counter for consumption of the source item
         self.counter.dec(item)
 
+    if func_final is not None:
     func_final0 = func_final
     def func_final():
       for item in func_final0():
