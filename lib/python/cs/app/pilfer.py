@@ -249,9 +249,9 @@ def argv_pipefuncs(argv, action_map, do_trace):
     # support commenting of individual actions
     if action.startswith('#'):
       continue
-    func, offset = get_identifier(action)
-    if func and func in action_map:
-      expando = action_map[func]
+    func_name, offset = get_identifier(action)
+    if func_name and func_name in action_map:
+      expando = action_map[func_name]
       rargv.extend(reversed(expando))
       continue
     try:
@@ -940,11 +940,11 @@ def action_func(action, do_trace, raw=False):
             if m:
               action = 'grok:' + action
             # operator or s//
-            func, offset = get_identifier(action)
-            if func:
-              with Pfx(func):
+            func_name, offset = get_identifier(action)
+            if func_name:
+              with Pfx(func_name):
                 # an identifier
-                if func == 's':
+                if func_name == 's':
                   # s/this/that/
                   if offset == len(action):
                     raise ValueError("missing delimiter")
@@ -977,31 +977,34 @@ def action_func(action, do_trace, raw=False):
                   kwargs['regexp'] = re.compile(regexp, flags=re_flags)
                   kwargs['replacement'] = repl_format
                   kwargs['replace_all'] = repl_all
-                elif func == "divert" or func == "pipe":
+                elif func_name == "divert" or func_name == "pipe":
                   # divert:pipe_name[:selector]
                   # pipe:pipe_name[:selector]
-                  func_sig, function, scoped = action_divert_pipe(func, action, offset, do_trace)
-                elif func == 'grok' or func == 'grokall':
+                  func_sig, function, scoped = action_divert_pipe(func_name, action, offset, do_trace)
+                elif func_name == 'grok' or func_name == 'grokall':
                   # grok:a.b.c.d[:args...]
                   # grokall:a.b.c.d[:args...]
-                  func_sig, function = action_grok(func, action, offset)
-                elif func == 'for':
+                  func_sig, function = action_grok(func_name, action, offset)
+                elif func_name == 'for':
                   # for:var=value,...
                   # for:varname:{start}..{stop}
                   # warning: implies 'per'
-                  func_sig, function, scoped = action_for(func, action, offset)
-                elif func in ('see', 'seen', 'unseen'):
+                  func_sig, function, scoped = action_for(func_name, action, offset)
+                elif func_name in ('see', 'seen', 'unseen'):
                   # see[:seenset,...[:value]]
                   # seen[:seenset,...[:value]]
                   # unseen[:seenset,...[:value]]
-                  func_sig, function = action_sight(func, action, offset)
+                  func_sig, function = action_sight(func_name, action, offset)
+                elif func_name == "unique":
+                  # unique
+                  func_sig, function = action_unique(func_name, action, offset)
                 # some other function: gather arguments
                 elif offset < len(action):
                   marker = action[offset]
                   if marker == ':':
                     # followed by :kw1=value,kw2=value,...
                     kwtext = action[offset+1:]
-                    if func == "print":
+                    if func_name == "print":
                       # print is special - just a format string relying on current state
                       kwargs['string'] = kwtext
                     else:
@@ -1014,7 +1017,7 @@ def action_func(action, do_trace, raw=False):
                   else:
                     raise ValueError("unrecognised marker %r" % (marker,))
               if not function:
-                function, func_sig, scoped = function_by_name(func, func_sig)
+                function, func_sig, scoped = function_by_name(func_name, func_sig)
               else:
                 if func_sig is None:
                   raise RuntimeError("function is set (%r) but func_sig is None" % (function,))
@@ -1072,7 +1075,7 @@ def action_func(action, do_trace, raw=False):
               function = lambda (P, U): not has_exts( U, exts, case_sensitive=case )
               func_sig = FUNC_SELECTOR
             else:
-              raise ValueError("unknown function %r" % (func,))
+              raise ValueError("unknown function %r" % (func_name,))
 
     function.__name__ = "action(%r)" % (action0,)
     # return the raw funtion - a raw caller wants to use it directly,
@@ -1173,33 +1176,33 @@ def action_func(action, do_trace, raw=False):
     trace_function.__name__ = "trace_action(%r)" % (action0,)
     return func_sig, trace_function
 
-def function_by_name(func, func_sig):
-  ''' Look up `func` in mappings of named functions.
+def function_by_name(func_name, func_sig):
+  ''' Look up `func_name` in mappings of named functions.
       Return (function, func_sig, scoped).
   '''
   scoped = False
   # look up function by name in mappings
   if func_sig is not None:
     raise RuntimeError("func_sig is set (%r) but function is None" % (func_sig,))
-  if func in many_to_many:
+  if func_name in many_to_many:
     # many-to-many functions get passed straight in
-    function = many_to_many[func]
+    function = many_to_many[func_name]
     func_sig = FUNC_MANY_TO_MANY
-  elif func in one_to_many:
-    function = one_to_many[func]
+  elif func_name in one_to_many:
+    function = one_to_many[func_name]
     func_sig = FUNC_ONE_TO_MANY
-  elif func in one_to_one:
-    function = one_to_one[func]
+  elif func_name in one_to_one:
+    function = one_to_one[func_name]
     func_sig = FUNC_ONE_TO_ONE
-    scoped = func in one_to_one_scoped
-  elif func in one_test:
-    function = one_test[func]
+    scoped = func_name in one_to_one_scoped
+  elif func_name in one_test:
+    function = one_test[func_name]
     func_sig = FUNC_SELECTOR
   else:
     raise ValueError("unknown action")
   return function, func_sig, scoped
 
-def action_divert_pipe(func, action, offset, do_trace):
+def action_divert_pipe(func_name, action, offset, do_trace):
   # divert:pipe_name[:selector]
   # pipe:pipe_name[:selector]
   #
@@ -1226,7 +1229,7 @@ def action_divert_pipe(func, action, offset, do_trace):
       sel_function0 = sel_function
       sel_function = lambda *a, **kw: sel_function0(*a, **kw)[1]
     sel_function.__name__ = "%r.select(%r)" % (action, action[offset+1:])
-  if func == "divert":
+  if func_name == "divert":
     # function to divert selected items to a single named pipeline
     func_sig = FUNC_ONE_TO_MANY
     scoped = False
@@ -1246,7 +1249,7 @@ def action_divert_pipe(func, action, offset, do_trace):
       except Exception as e:
         exception("OUCH")
     function.__name__ = "divert_func(%r)" % (action,)
-  elif func == "pipe":
+  elif func_name == "pipe":
     # gather all items and feed to an instance of the specified pipeline
     func_sig = FUNC_MANY_TO_MANY
     scoped = True
@@ -1273,10 +1276,10 @@ def action_divert_pipe(func, action, offset, do_trace):
             yield item
       debug("pipe: processed pipe_items %r", pipe_items)
   else:
-    raise ValueError("expected \"divert\" or \"pipe\", got func=%r" % (func,))
+    raise ValueError("expected \"divert\" or \"pipe\", got func_name=%r" % (func_name,))
   return func_sig, function, scoped
 
-def action_sight(func, action, offset):
+def action_sight(func_name, action, offset):
   # see[:seenset,...[:value]]
   # seen[:seenset,...[:value]]
   # unseen[:seenset,...[:value]]
@@ -1284,7 +1287,7 @@ def action_sight(func, action, offset):
   value = '{url}'
   if offset < len(action):
     if action[offset] != ':':
-      raise ValueError("bad marker after %r, expected ':', found %r", func, action[offset])
+      raise ValueError("bad marker after %r, expected ':', found %r", func_name, action[offset])
     seensets, offset = get_other_chars(action, ':', offset+1)
     seensets = seensets.split(',')
     if not seensets:
@@ -1295,28 +1298,28 @@ def action_sight(func, action, offset):
       value = action[offset+1:]
       if not value:
         value = '{url}'
-  if func == 'see':
+  if func_name == 'see':
     func_sig = FUNC_ONE_TO_ONE
     def function( (P, U) ):
       see_value = P.format_string(value, U)
       for seenset in seensets:
         P.see(see_value, seenset)
       return U
-  elif func == 'seen':
+  elif func_name == 'seen':
     func_sig = FUNC_SELECTOR
     def function( (P, U) ):
       see_value = P.format_string(value, U)
       return any( [ P.seen(see_value, seenset) for seenset in seensets ] )
-  elif func == 'unseen':
+  elif func_name == 'unseen':
     func_sig = FUNC_SELECTOR
     def function( (P, U) ):
       see_value = P.format_string(value, U)
       return not any( [ P.seen(see_value, seenset) for seenset in seensets ] )
   else:
-    raise RuntimeError("action_sight called with unsupported action %r", func)
+    raise RuntimeError("action_sight called with unsupported action %r", func_name)
   return func_sig, function
 
-def action_for(func, action, offset):
+def action_for(func_name, action, offset):
   # for:varname=values
   #
   func_sig = FUNC_ONE_TO_MANY
@@ -1355,7 +1358,7 @@ def action_for(func, action, offset):
     raise ValueError("unrecognised marker after varname: %r", marker)
   return func_sig, function, scoped
 
-def action_grok(func, action, offset):
+def action_grok(func_name, action, offset):
   # grok:a.b.c.d[:args...]
   # grokall:a.b.c.d[:args...]
   #
@@ -1368,7 +1371,7 @@ def action_grok(func, action, offset):
   # From grokall, call d( ( (P, U), ...), kwargs) and apply
   # the returned mapping to each P.user_vars.
   #
-  is_grokall = func == "grokall"
+  is_grokall = func_name == "grokall"
   if offset == len(action):
     raise ValueError("missing marker")
   marker = action[offset]
@@ -1384,7 +1387,7 @@ def action_grok(func, action, offset):
       raise ValueError("expected second marker to match first: expected %r, saw %r"
                        % (marker, action[offset]))
     offset += 1
-    raise RuntimeError("arguments to %s not yet implemented" % (func,))
+    raise RuntimeError("arguments to %s not yet implemented" % (func_name,))
   if is_grokall:
     func_sig = FUNC_MANY_TO_MANY
     def function(items, *a, **kw):
