@@ -1263,6 +1263,7 @@ def action_divert_pipe(func_name, action, offset, do_trace):
             debug("pipe: postpipe: yield %r", item)
             yield item
       debug("pipe: processed pipe_items %r", pipe_items)
+    function.__name__ = "pipe_func(%r)" % (action,)
   else:
     raise ValueError("expected \"divert\" or \"pipe\", got func_name=%r" % (func_name,))
   return func_sig, function, scoped
