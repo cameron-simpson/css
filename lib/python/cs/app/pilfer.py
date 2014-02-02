@@ -319,17 +319,6 @@ def url_xml_find(U, match):
   for found in url_io(URL(U, None).xmlFindall, (), match):
     yield ElementTree.tostring(found, encoding='utf-8')
 
-def unique(items, seen=None):
-  ''' A generator that yields unseen items progressively, as opposed
-      to just stuffing them all into a set and returning the set.
-  '''
-  if seen is None:
-    seen = set()
-  for I in items:
-    if I not in seen:
-      yield I
-      seen.add(I)
-
 class PilferCommon(O):
   ''' Common state associated with all Pilfers.
       Pipeline definitions, seen sets, etc.
@@ -847,7 +836,6 @@ def _test_grokfunc( (P, U), *a, **kw ):
 # actions that work on the whole list of in-play URLs
 many_to_many = {
       'sort':         lambda Ps, Us, *a, **kw: sorted(Us, *a, **kw),
-      'unique':       lambda Ps, Us: unique(Us),
       'first':        lambda Ps, Us: Us[:1],
       'last':         lambda Ps, Us: Us[-1:],
     }
@@ -995,7 +983,7 @@ def action_func(action, do_trace, raw=False):
                   # seen[:seenset,...[:value]]
                   # unseen[:seenset,...[:value]]
                   func_sig, function = action_sight(func_name, action, offset)
-                elif func_name == "unique":
+                elif func_name == 'unique':
                   # unique
                   func_sig, function = action_unique(func_name, action, offset)
                 # some other function: gather arguments
@@ -1318,6 +1306,16 @@ def action_sight(func_name, action, offset):
   else:
     raise RuntimeError("action_sight called with unsupported action %r", func_name)
   return func_sig, function
+
+def action_unique(func_name, action, offset):
+  # unique
+  #
+  seen = set()
+  def function( (P, U) ):
+    if U not in seen:
+      seen.add(U)
+      yield U
+  return FUNC_ONE_TO_MANY, function
 
 def action_for(func_name, action, offset):
   # for:varname=values
