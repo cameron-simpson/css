@@ -463,6 +463,13 @@ class Pilfer(O):
     spec = self.pipes.get(pipe_name)
     if spec is None:
       raise KeyError("no pipe specification named %r" % (pipe_name,))
+    with Pfx("pipe spec %r" % (pipe_name,)):
+      name = "pipe_through:%s" % (pipe_name,)
+      return self.pipe_from_spec(spec, inputs, name=name)
+
+  def pipe_from_spec(self, spec, inputs, name=None):
+    if name is None:
+      name = "pipe_from_spec:%s" % (spec,)
     pipe_funcs, errors = spec.pipe_funcs(self.action_map, self.do_trace)
     if errors:
       for err in errors:
