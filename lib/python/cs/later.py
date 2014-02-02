@@ -275,7 +275,7 @@ class _Pipeline(object):
     RHQ = outQ
     count = len(filter_funcs)
     while filter_funcs:
-      func_iter, func_final = self._pipeline_func(filter_funcs.pop(), is_final=( count == len(filter_funcs) ))
+      func_iter, func_final = self._pipeline_func(filter_funcs.pop())
       count -= 1
       pq_name = ":".join((name, str(count), str(seq())))
       PQ = _PipelinePushQueue(self, L, func_iter, RHQ, is_iterable=True,
@@ -323,7 +323,7 @@ class _Pipeline(object):
     '''
     self.inQ.close()
 
-  def _pipeline_func(self, o, is_final):
+  def _pipeline_func(self, o):
     ''' Accept a pipeline element. Return (func_iter, func_final).
         A pipeline element is either a single function, in which case it is
         presumed to be a one-to-many-generator with func_sig FUNC_ONE_TO_MANY,
