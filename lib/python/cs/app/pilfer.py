@@ -1274,6 +1274,15 @@ def action_divert_pipe(func_name, action, offset, do_trace):
     raise ValueError("expected \"divert\" or \"pipe\", got func_name=%r" % (func_name,))
   return func_sig, function, scoped
 
+def fork_function( (P, U), spec ):
+  P2 = copy(P)
+  with P2.later.more_capacity(1):
+    pipeline = P.pipe_from_spec(spec, ( (P2, U), ))
+    debug("pipe: pipe_though(%r) => %r", pipe_name, pipeline)
+    for item in pipeline.outQ:
+      debug("pipe: postpipe: yield %r", item)
+      yield item
+
 def action_sight(func_name, action, offset):
   # see[:seenset,...[:value]]
   # seen[:seenset,...[:value]]
