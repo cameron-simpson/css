@@ -384,23 +384,26 @@ class _Pipeline(object):
     # wrap func_iter and func_final to manipulate the item counter
     func_iter0 = func_iter
     def func_iter(item):
-      for item2 in func_iter0(item):
-        # raise counter for each item we release
+      with LogExceptions():
+        for item2 in func_iter0(item):
+          # raise counter for each item we release
           self.counter.inc(item2)
-        yield item2
-        # decrement counter when item consumed
+          yield item2
+          # decrement counter when item consumed
           self.counter.dec(item2)
-      # decrement counter for consumption of the source item
+        # decrement counter for consumption of the source item
         self.counter.dec(item)
 
     if func_final is not None:
-    func_final0 = func_final
-    def func_final():
-      for item in func_final0():
-        # raise counter for each item we release
+      func_final0 = func_final
+      def func_final():
+        with LogExceptions():
+          D("%s.func_final::: ...", self)
+          for item in func_final0():
+            # raise counter for each item we release
             self.counter.inc(item)
-        yield item
-        # decrement counter when item consumed
+            yield item
+            # decrement counter when item consumed
             self.counter.dec(item)
 
     return func_iter, func_final
