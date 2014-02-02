@@ -258,7 +258,8 @@ class _PipelinePushQueue(PushQueue):
     return "%s[%s]" % (PushQueue.__str__(self), self.pipeline)
 
   def put(self, item):
-    self.pipeline.counter.inc()
+    D("%s.put(%r)", self, item)
+    self.pipeline.counter.inc(item)
     return PushQueue.put(self, item)
 
 class _Pipeline(object):
@@ -366,7 +367,9 @@ class _Pipeline(object):
       gathered = []
       def func_iter(item):
         # raise counter for each item gathered
-        self.counter.inc()
+          D("%s.func_iter: GATHER %r", self, item)
+          self.counter.inc(item)
+          D("G1")
         gathered.append(item)
         if False:
           yield
@@ -374,7 +377,7 @@ class _Pipeline(object):
         for item in func(gathered):
           yield item
           # decrement counter after each gathered item is consumed
-          self.counter.dec()
+          self.counter.dec(item)
     else:
       raise ValueError("unsupported function signature %r" % (func_sig,))
 
@@ -383,21 +386,21 @@ class _Pipeline(object):
     def func_iter(item):
       for item2 in func_iter0(item):
         # raise counter for each item we release
-        self.counter.inc()
+          self.counter.inc(item2)
         yield item2
         # decrement counter when item consumed
-        self.counter.dec()
+          self.counter.dec(item2)
       # decrement counter for consumption of the source item
-      self.counter.dec()
+        self.counter.dec(item)
 
     func_final0 = func_final
     def func_final():
       for item in func_final0():
         # raise counter for each item we release
-        self.counter.inc()
+            self.counter.inc(item)
         yield item
         # decrement counter when item consumed
-        self.counter.dec()
+            self.counter.dec(item)
 
     return func_iter, func_final
 
