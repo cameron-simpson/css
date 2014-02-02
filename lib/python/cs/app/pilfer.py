@@ -430,8 +430,11 @@ class Pilfer(O):
     while True:
       X("%s.quiesce_diversions: pass over diversions...", self)
       for div in self.diversions:
+        X("%s.quiesce_diversions: check %s ...", self, div)
+        div.counter.check()
+        X("%s.quiesce_diversions: quiesce %s ...", self, div)
         div.quiesce()
-      X("%s.quiesce_diversions: now check they are all quiet...", self)
+      X("%s.quiesce_diversions: now check that they are all quiet...", self)
       quiet = True
       for div in self.diversions:
         if div.counter:
@@ -1163,6 +1166,8 @@ def action_func(action, do_trace, raw=False):
         except Exception as e:
           exception("TRACE: EXCEPTION: %s", e)
           raise
+        if do_trace:
+          X("DONE %s(a=(%d args; %r),kw=%r)", action0, len(a), a, kw)
         return retval
 
     trace_function.__name__ = "trace_action(%r)" % (action0,)
