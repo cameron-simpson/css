@@ -474,8 +474,7 @@ class Pilfer(O):
     if errors:
       for err in errors:
         error(err)
-      raise KeyError("invalid pipe specification for diversion named %r" % (pipe_name,))
-    name = "pipe_through:%s" % (pipe_name,)
+      raise ValueError("invalid pipe specification")
     return self.later.pipeline(pipe_funcs, name=name, inputs=inputs)
 
   @property
