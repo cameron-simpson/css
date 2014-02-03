@@ -247,6 +247,7 @@ def argv_pipefuncs(argv, action_map, do_trace):
   ''' Process command line strings and return a corresponding list
       of functions to construct a Later.pipeline.
   '''
+  # we reverse the list to make action expansion easier
   rargv = list(reversed(argv))
   errors = []
   pipe_funcs = []
@@ -1243,7 +1244,7 @@ def action_divert_pipe(func_name, action, offset, do_trace):
           except KeyError:
             error("no pipe named %r", pipe_name)
           else:
-            pipe.inQ.put(item)
+            pipe.put(item)
         else:
           yield U
       except Exception as e:
@@ -1549,6 +1550,11 @@ class PipeSpec(O):
 
   @logexc
   def pipe_funcs(self, action_map, do_trace):
+    ''' Compute a list of functions to implement a pipeline.
+	It is important that this list is constructed anew for each
+	new pipeline instance because many of the functions rely
+	on closures to track state.
+    '''
     with Pfx(self.name):
       pipe_funcs, errors = argv_pipefuncs(self.argv, action_map, do_trace)
     return pipe_funcs, errors
