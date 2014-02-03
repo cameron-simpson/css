@@ -64,7 +64,9 @@ usage = '''Usage: %s [options...] op [args...]
     -u  Unbuffered. Flush print actions as they occur.
     -x  Trace execution.'''
 
-def main(argv):
+def main(argv, stdin=None):
+  if stdin is None:
+    stdin = sys.stdin
   argv = list(argv)
   xit = 0
   argv0 = argv.pop(0)
@@ -157,55 +159,21 @@ def main(argv):
           if not badopts:
             with Later(jobs) as L:
               P.later = L
-              # commence the main pipeline by converting strings to URL objects
-              # and associating the initial Pilfer object as scope
-              def add_scope(U):
-                return P, URL(U, None, scope=P)
-              pipe_funcs.insert(0, (FUNC_ONE_TO_ONE, add_scope))
               # construct the pipeline
               pipeline = L.pipeline(pipe_funcs, name="MAIN",
                                     outQ=NullQueue(name="MAIN_PIPELINE_END_NQ",
                                     blocking=True, open=True))
-              inQ = pipeline.inQ
-              outQ = pipeline.outQ
-              if url != '-':
-                # literal URL supplied, deliver to pipeline
-                X("put to main inQ: %s.put(%r)...", inQ, url)
-                inQ.put(url)
-              else:
-                # read URLs from stdin
-                try:
-                  do_prompt = sys.stdin.isatty()
-                except AttributeError:
-                  do_prompt = False
-                if do_prompt:
-                  # interactively prompt for URLs, deliver to pipeline
-                  prompt = cmd + ".url> "
-                  while True:
-                    try:
-                      url = input(prompt)
-                    except EOFError:
-                      break
-                    else:
-                      inQ.put(url)
-                else:
-                  # read URLs from non-interactive stdin, deliver to pipeline
-                  lineno = 0
-                  for line in sys.stdin:
-                    lineno += 1
-                    with Pfx("stdin:%d", lineno):
-                      if not line.endswith('\n'):
-                        raise ValueError("unexpected EOF - missing newline")
-                      line = line.strip()
-                      if not line or line.startswith('#'):
-                        debug("SKIP: %s", line)
-                        continue
-                      inQ.put(line)
+              D("GET URLS...")
+              for U in urls(url, stdin=stdin):
+                D("urls => U=%r", U)
+                X("put to main inQ: %s.put(%r)...", pipeline.inQ, U)
+                pipeline.put( (P, URL(U, None, scope=P)) )
+              D("GET URLS DONE")
               # indicate end of input
-              X("close main input %s", inQ)
-              inQ.close()
+              X("close main input %s", pipeline.inQ)
+              pipeline.close()
               X("wait for main output to close")
-              outQ.join()
+              pipeline.join()
               X("wait for diversions to quiesce...")
               P.quiesce_diversions()
               X("close diversions...")
@@ -235,6 +203,44 @@ def main(argv):
     xit = 2
 
   return xit
+
+def urls(url, stdin=None):
+  ''' Generator to yield input URLs.
+  '''
+  if stdin is None:
+    stdin = sys.stdin
+  if url != '-':
+    # literal URL supplied, deliver to pipeline
+    yield url
+  else:
+    # read URLs from stdin
+    try:
+      do_prompt = stdin.isatty()
+    except AttributeError:
+      do_prompt = False
+    if do_prompt:
+      # interactively prompt for URLs, deliver to pipeline
+      prompt = cmd + ".url> "
+      while True:
+        try:
+          url = input(prompt)
+        except EOFError:
+          break
+        else:
+          yield url
+    else:
+      # read URLs from non-interactive stdin, deliver to pipeline
+      lineno = 0
+      for line in stdin:
+        lineno += 1
+        with Pfx("stdin:%d", lineno):
+          if not line.endswith('\n'):
+            raise ValueError("unexpected EOF - missing newline")
+          line = line.strip()
+          if not line or line.startswith('#'):
+            debug("SKIP: %s", line)
+            continue
+          yield url
 
 # TODO: recursion protection in action_map expansion
 def argv_pipefuncs(argv, action_map, do_trace):
