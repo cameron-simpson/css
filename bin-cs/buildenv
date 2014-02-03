@@ -11,8 +11,9 @@ set -ue
 shcmd=`shqstr "$@"`
 
 set -x
-env - sh -c ". /etc/profile
-             PATH=/opt/local/bin:/usr/local/bin:$PATH
-             export PATH
-             set -x
-             $shcmd"
+env - "HOME=$HOME" \
+        sh -c ". /etc/profile
+               PATH=/opt/local/bin:/usr/local/bin:$PATH
+               export PATH
+               set -x
+               $shcmd"
