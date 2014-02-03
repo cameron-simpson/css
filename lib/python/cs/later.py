@@ -300,7 +300,7 @@ class _Pipeline(object):
   def put(self, item):
     ''' Put an `item` onto the leftmost queue in the pipeline.
     '''
-    return self.queues[0].put(item)
+    return self.inQ.put(item)
 
   @property
   def inQ(self):
@@ -323,6 +323,11 @@ class _Pipeline(object):
     ''' Close the leftmore queue in the pipeline.
     '''
     self.inQ.close()
+
+  def join(self):
+    ''' Wait for completion of the output queue.
+    '''
+    self.outQ.join()
 
   def _pipeline_func(self, o):
     ''' Accept a pipeline element. Return (func_iter, func_final).
