@@ -12,8 +12,12 @@ shcmd=`shqstr "$@"`
 
 set -x
 env - "HOME=$HOME" \
-        sh -c ". /etc/profile
-               PATH=/opt/local/bin:/usr/local/bin:$PATH
-               export PATH
+        sh -c '. /etc/profile
+               # example code for ~/rc-local/env/build
+               # PATH=/opt/local/bin:/usr/local/bin:$PATH
+               # export PATH
+               for f in $HOME/rc/env/build $HOME/rc-local/env/build
+               do  [ -s "$f" ] && . "$f"
+               done
                set -x
-               $shcmd"
+               '"$shcmd"
