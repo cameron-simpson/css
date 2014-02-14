@@ -215,7 +215,7 @@ case "$op" in
     done \
     | if [ $doit ]
       then
-        $trace psql -U "$pg_user" -- "$pg_database"
+        $trace psql -e -U "$pg_user" -- "$pg_database"
       else
         cat
       fi
