@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Generate and possibly apply GRANTs to PostgresQL roles.
+# Assorted PostgreSQL utility operations: list, dump, grant etc.
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
