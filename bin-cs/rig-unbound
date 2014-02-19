@@ -20,7 +20,7 @@ wkdir=$HOME/var/unbound
 cf=$wkdir/unbound.conf
 log=$LOGDIR/unbound.log
 localzones="l local"
-localnets="127 192.168 172.16"
+localnets="127 192.168 172.16 10.0"
 cnames=$HOME/rc/dns/cnames
 host_conf=$HOME/rc/dns/unbound.conf-fleet
 
@@ -111,7 +111,6 @@ do
           echo "  local-data: \"${in_addr}in-addr.arpa. 10 IN PTR $host.$lzone.\""
         done
         ;;
-      *) echo "SKIP: zone=$zone, ip=$ip, host=$host" >&2 ;;
     esac
   done
 done
