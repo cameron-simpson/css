@@ -198,6 +198,7 @@ do
 	fi
     else
 	echo "$cmd: $file: edit fails; original unchanged" >&2
+        echo "      sed command was: $sedf" >&2
     fi
 done
 
