@@ -90,6 +90,7 @@ do
 
     file=$1; shift
 
+    # transmute "-" into list of filenames from stdin
     if [ "x$file" = x- ]
     then
 	[ $verbose ] && echo "reading filenames from stdin..."
@@ -97,6 +98,8 @@ do
 	continue
     fi
 
+    # start not ok
+    # we set ok=1 on completion of satisfactory code path
     ok=
 
     if [ ! -f "$file" ]
