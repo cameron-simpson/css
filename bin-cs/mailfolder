@@ -54,9 +54,10 @@ else
                   badopts=1
                 }
 
+  bfoldername=`basename "$foldername"`
   old=OLD/`date "+$MAIL_EXPIRE_FORMAT"`
   maildir=$MAILDIR/$foldername
-  omaildir=$MAILDIR/$old/$foldername
+  omaildir=$MAILDIR/$old/$bfoldername
 
   case "$runlocal" in
     '') # not set - infer from environment
