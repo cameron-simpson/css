@@ -1,8 +1,10 @@
 #!/bin/sh
 #
-# Is a path a maildir folder?
+# Are all specified paths Maildirs?
 #	- Cameron Simpson <cs@zip.com.au> 13jul2004
 #
+
+set -ue
 
 cmd=$0
 usage="Usage: $cmd dirs..."
