@@ -91,7 +91,7 @@ $(py3files): lib/python/$(@ :|lib/python3/||)
 _home:
         @skip=`hg status | sed -n 's:^? \(.*\):--exclude=/\1:p'` \
         binskip=`hg status | sed -n 's:^? bin/\(.*\):--exclude=/\1:p'` \
-        pfx bin $(rsync) -aO --delete \\
+        pfx bin $(rsync) -a --delete \\
                 --include=/CHANGELOG.txt \\
                 $$binskip \\
                 --include=synonyms/ \\
@@ -99,14 +99,14 @@ _home:
                 --exclude=/\*/ \\
                 bin/. $(HOME)/bin/. \
         bosskip=`hg status | sed -n 's:^? bin-bos/\(.*\):--exclude=/\1:p'` \
-        pfx bin-bos $(rsync) -aO $$bosskip bin-bos/. $(HOME)/bin-bos/. \
+        pfx bin-bos $(rsync) -a --delete $$bosskip bin-bos/. $(HOME)/bin-bos/. \
         csskip=`hg status | sed -n 's:^? bin-cs/\(.*\):--exclude=/\1:p'` \
-        pfx bin-cs $(rsync) -aO $$csskip \\
+        pfx bin-cs $(rsync) -a --delete $$csskip \\
                 --exclude=/testzap \\
                 --exclude=/testpageurls \\
                 bin-cs/. $(HOME)/bin-cs/. \
         libskip=`hg status | sed -n 's:^? lib/\(.*\):--exclude=/\1:p'` \
-        pfx lib $(rsync) -aO --delete \\
+        pfx lib $(rsync) -a --delete \\
                 --include=/CHANGELOG.txt \\
                 $$libskip \\
                 --exclude=/venv* \\
