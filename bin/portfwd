@@ -23,10 +23,10 @@ sshopts=-n
 cmd=`basename "$0"`
 usage="Usage:
   $cmd -d [targets...]
-        Disable portfwd for targets, setting DISABLE_TARGET_DISABLE.
+        Disable portfwd for targets, setting PORTFWD_TARGET_DISABLE.
         If no targets are specified, set PORTFWD_DISABLE.
   $cmd -e [targets...]
-        Enable portfwd for targets, clearing DISABLE_TARGET_DISABLE.
+        Enable portfwd for targets, clearing PORTFWD_TARGET_DISABLE.
         If no targets are specified, clear PORTFWD_DISABLE.
   $cmd [-1] [-F ssh_config] targets...
   -1    Once. Do not restart the tunnel if it dies.
