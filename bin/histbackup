@@ -99,7 +99,7 @@ usehbinclude=1
 usehbfiles=1
 linkrepair=
 obackup_options=
-symlink_unchanged=
+symlink_unchanged=1
 rsopts=
 rsdelete=--delete
 verbose=
@@ -130,6 +130,9 @@ usage="Usage:
                 Just symlink the top level date if there are no changes.
                 Requires a prepass \"rsync -n\" but saves a lot of hardlinks
                 and time if the tree is often unchanged.
+                This is the default.
+  --no-symlink-if-unchanged
+                Make a link tree even when there are no changes.
   --rsync-path rrsync Execute the command \"rrsync\" as the remote rsync.
                 Passed to rsync.
   --symlink name Make a symlink named \"name\" pointing at the latest backup.
@@ -196,6 +199,14 @@ do
     #
     --symlink-if-unchanged)
         symlink_unchanged=1
+        ;;
+    # =item --no-symlink-if-unchanged
+    #
+    # Do not symlink the top level date if there are no changes to the tree,
+    # instead always make a hard link tree.
+    #
+    --no-symlink-if-unchanged)
+        symlink_unchanged=
         ;;
     # =item --delete
     #
