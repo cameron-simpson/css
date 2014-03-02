@@ -204,7 +204,7 @@ do
 	echo "$cmd: $file: edit fails; original unchanged" >&2
         if [ $fflag ]
         then
-          echo "      sed script file was $sedscipt"
+          echo "      sed script file was $sedscipt" >&2
         else
           echo "      sed command was: $ecmd" >&2
         fi
