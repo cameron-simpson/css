@@ -202,7 +202,12 @@ do
 	fi
     else
 	echo "$cmd: $file: edit fails; original unchanged" >&2
-        echo "      sed command was: $sedf" >&2
+        if [ $fflag ]
+        then
+          echo "      sed script file was $sedscipt"
+        else
+          echo "      sed command was: $ecmd" >&2
+        fi
     fi
 done
 
