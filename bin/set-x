@@ -1,13 +1,56 @@
 #!/bin/sh
+#
+# Trace execution of a command.
+#       - Cameron Simpson <cs@zip.com.au>
+#
+
+set -ue
+
 : ${DEBUG:=}
-[ $# = 0 ] && { echo "Usage: $0 command [args...]" >&2; exit 2; }
-if [ "x$1" = 'x--no-tag_fd-2' ]
+
+datestamp=
+no_tag_fd=
+subopts=
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    --date)     datestamp=1 subopts="$subopts $1" ;;
+    --no-tag_fd)no_tag_fd=1 ;;
+    --)         shift; break ;;
+    -?*)        echo "$cmd: unrecognised option: $1" >&2
+                badopts=1
+                ;;
+    *)          break ;;
+  esac
+  shift
+done
+
+[ $# -gt 0 ] || { echo "$cmd: missing command" >&2; badopts=1; }
+
+[ $badopts ] && { echo "Usage: $0 [--date] command [args...]" >&2; exit 2; }
+
+if [ $no_tag_fd ]
 then
   shift
 else
   if [ -n "$DEBUG" ]
-  then  exec tag_fd 2 "$1" "$0" --no-tag_fd-2 "$@"
+  then  exec tag_fd 2 "$1" "$0" --no-tag_fd-2 $subopts -- "$@"
   fi
 fi
+
+if [ $datestamp ]
+then
+  date >&2
+  ( set -x
+    exec "$@"
+  )
+  xit=$?
+  date >&2
+  exit $xit
+fi
+
 set -x
 exec "$@"
