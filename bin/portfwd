@@ -13,6 +13,7 @@ set -ue
 : ${USER:=`id -un`}
 
 trace=set-x
+trace_dated='set-x --date'
 setx='set -x'   ## ${DEBUG:-:}${DEBUG:+set -x}
 once=
 sshcfg=$PORTFWD_SSH_CONFIG
@@ -251,8 +252,8 @@ flag -w "$flag_connected" 0
 alert "STARTING: $target"
 rm -f -- "$sh_ctrlpath"
 tag_fd 2 "$target" \
-  $trace \
-    ssh -n $sshopts -F "$sshcfg" \
+  $trace_dated \
+    ssh $sshopts -F "$sshcfg" \
       -o 'PermitLocalCommand=yes' \
       -o "LocalCommand=flag -w '$flag_connected' 1; </dev/null alert CONNECTED: $target &" \
       -o "User=$ssh_user" \
