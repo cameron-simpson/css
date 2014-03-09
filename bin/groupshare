@@ -90,25 +90,25 @@ do
     /bin/pwd
 
     # fix groupness
-    find . ! -type l ! -group "$group" -print \
-    | xxargs $trace chgrp "$group" --
+    $trace find . ! -type l ! -group "$group" -print \
+    | $trace xxargs $trace chgrp "$group" --
 
     # apply setgid bit to directories
-    find . -type d ! -perm 2000 -print \
-    | xxargs $trace chmod g+s --
+    $trace find . -type d ! -perm 2000 -print \
+    | $trace xxargs $trace chmod g+s --
 
     # remove public write
     if [ $ow ]
     then
-      find . ! -type l -perm -2 -print \
-      | xxargs $trace chmod o-w --
+      $trace find . ! -type l -perm -2 -print \
+      | $trace xxargs $trace chmod o-w --
     fi
 
     # set group perms to user perms
     if [ $gu ]
     then
-      find . ! -type l -print \
-      | xxargs $trace chmod g=u --
+      $trace find . ! -type l -print \
+      | $trace xxargs $trace chmod g=u --
     fi
   ) || break
 done
