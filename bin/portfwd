@@ -226,10 +226,10 @@ cfg_outlog=alert-$target
 cfg_errlog=portfwd-$target
 getconfig "$target"
 case $cfg_outlog in
-  /*) ;; *) cfg_outlog=$LOGDIR/$cfg_outlog ;;
+  /*) ;; *) cfg_outlog=$LOGDIR/portfwd/$cfg_outlog ;;
 esac
 case $cfg_errlog in
-  /*) ;; *) cfg_errlog=$LOGDIR/$cfg_errlog ;;
+  /*) ;; *) cfg_errlog=$LOGDIR/portfwd/$cfg_errlog ;;
 esac
 
 [ -n "$cfg_command" ] || sshopts="$sshopts -N"
