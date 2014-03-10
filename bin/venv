@@ -21,6 +21,7 @@ pyver() {
 cmd=`basename "$0"`
 usage="Usage:
     $cmd [options...] init
+    $cmd [options...] exec command [args...]
     $cmd [options...] pip pip-arguments...
   Options:
 "
