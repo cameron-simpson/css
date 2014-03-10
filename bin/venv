@@ -52,6 +52,17 @@ case $op in
     mkdir -- "$VENV_DIR"
     virtualenv -- "$VENV_DIR"
     ;;
+  exec)
+    if [ $# = 0 ]
+    then
+      echo "$cmd: $op: missing command" >&2
+      exit 2
+    fi
+    set -x
+    set +u
+    . "$VENV_DIR/bin/activate"
+    exec "$@"
+    ;;
   pip | python )
     set -x
     exec "$VENV_DIR/bin/$op" ${1+"$@"}
