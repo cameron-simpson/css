@@ -26,6 +26,17 @@ class _NOC_Proxy(Proxy):
     Proxy.__init__(self, other)
     self.closed = False
 
+  def __str__(self):
+    return "open(%s[closed=%r])" % (self.__proxied, self.closed)
+
+  def close(self):
+    ''' Close this open-proxy. Sanity check then call inner close.
+    '''
+    if self.closed:
+      raise RuntimeError("%s: close: already closed" % (self,))
+    self.closed = True
+    self.__proxied.close()
+
 class NestingOpenCloseMixin(object):
   ''' A mixin to count open and closes, and to call .shutdown() when the count goes to zero.
       A count of active open()s is kept, and on the last close()
