@@ -113,8 +113,8 @@ class TestLater(unittest.TestCase):
   def test09pipeline_00noop(self):
     with Later(1) as L:
       items = ['a', 'b', 'c', 'g', 'f', 'e']
-      inQ, outQ = L.pipeline([lambda x:x], items)
-      result = list(outQ)
+      P = L.pipeline([lambda x:x], items)
+      result = list(P.outQ)
       self.assertEquals( items, result )
 
   def test09pipeline_01idenitity(self):
@@ -122,10 +122,10 @@ class TestLater(unittest.TestCase):
     items = ['a', 'b', 'c', 'g', 'f', 'e']
     def func(x):
       yield x
-    inQ, outQ = L.pipeline([ func ], items)
-    self.assertIsNot(outQ, items)
-    self.assertIsInstance(outQ, QueueIterator)
-    result = list(outQ)
+    P = L.pipeline([ func ], items)
+    self.assertIsNot(P.outQ, items)
+    self.assertIsInstance(P.outQ, QueueIterator)
+    result = list(P.outQ)
     self.assertEquals( items, result )
 
   def test09pipeline_02double(self):
@@ -135,10 +135,10 @@ class TestLater(unittest.TestCase):
     def func(x):
       yield x
       yield x
-    inQ, outQ = L.pipeline([ func ], items)
-    self.assertIsNot(outQ, items)
-    self.assertIsInstance(outQ, QueueIterator)
-    result = list(outQ)
+    P = L.pipeline([ func ], items)
+    self.assertIsNot(P.outQ, items)
+    self.assertIsInstance(P.outQ, QueueIterator)
+    result = list(P.outQ)
     # values may be interleaved due to parallelism
     self.assertEquals( len(result), len(expected) )
     self.assertEquals( sorted(result), sorted(expected) )
@@ -149,10 +149,10 @@ class TestLater(unittest.TestCase):
     expected = ['a', 'b', 'c', 'e', 'f', 'g']
     def func(x):
       return sorted(x)
-    inQ, outQ = L.pipeline([ (FUNC_MANY_TO_MANY, func) ], items)
-    self.assertIsNot(outQ, items)
-    self.assertIsInstance(outQ, QueueIterator)
-    result = list(outQ)
+    P = L.pipeline([ (FUNC_MANY_TO_MANY, func) ], items)
+    self.assertIsNot(P.outQ, items)
+    self.assertIsInstance(P.outQ, QueueIterator)
+    result = list(P.outQ)
     self.assertEquals( result, sorted(items) )
 
   def test09pipeline_03b_set(self):
@@ -161,10 +161,10 @@ class TestLater(unittest.TestCase):
     expected = ['a', 'b', 'c', 'e', 'f', 'g']
     def func(x):
       return set(x)
-    inQ, outQ = L.pipeline([ (FUNC_MANY_TO_MANY, func) ], items)
-    self.assertIsNot(outQ, items)
-    self.assertIsInstance(outQ, QueueIterator)
-    result = set(outQ)
+    P = L.pipeline([ (FUNC_MANY_TO_MANY, func) ], items)
+    self.assertIsNot(P.outQ, items)
+    self.assertIsInstance(P.outQ, QueueIterator)
+    result = set(P.outQ)
     self.assertEquals( result, set(items) )
 
   def test09pipeline_04select(self):
@@ -174,10 +174,10 @@ class TestLater(unittest.TestCase):
     expected = ['a', 'c', 'f']
     def wanted(x):
       return x in want
-    inQ, outQ = L.pipeline([ (FUNC_SELECTOR, wanted) ], items)
-    self.assertIsNot(outQ, items)
-    self.assertIsInstance(outQ, QueueIterator)
-    result = list(outQ)
+    P = L.pipeline([ (FUNC_SELECTOR, wanted) ], items)
+    self.assertIsNot(P.outQ, items)
+    self.assertIsInstance(P.outQ, QueueIterator)
+    result = list(P.outQ)
     self.assertEquals( result, expected )
 
   def test09pipeline_05two_by_two_by_sort(self):
@@ -193,10 +193,10 @@ class TestLater(unittest.TestCase):
     def double(x):
       yield x
       yield x
-    inQ, outQ = L.pipeline([ double, double, (FUNC_MANY_TO_MANY, sorted) ], items)
-    self.assertIsNot(outQ, items)
-    self.assertIsInstance(outQ, QueueIterator)
-    result = list(outQ)
+    P = L.pipeline([ double, double, (FUNC_MANY_TO_MANY, sorted) ], items)
+    self.assertIsNot(P.outQ, items)
+    self.assertIsInstance(P.outQ, QueueIterator)
+    result = list(P.outQ)
     self.assertEquals( result, expected )
 
 def selftest(argv):
