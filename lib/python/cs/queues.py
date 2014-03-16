@@ -452,7 +452,9 @@ class NullQueue(NestingOpenCloseMixin, O):
     self._lock = Lock()
     self._close_cond = Condition(self._lock)
     O.__init__(self)
-    NestingOpenCloseMixin.__init__(self, open=open, on_open=on_open, on_close=on_close, on_shutdown=on_shutdown)
+    NestingOpenCloseMixin.__init__(self, open=open,
+                                   on_open=on_open, on_close=on_close, on_shutdown=on_shutdown,
+                                   proxy_type=_Q_Proxy)
     self.blocking = blocking
 
   def __str__(self):
