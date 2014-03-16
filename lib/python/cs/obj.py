@@ -231,7 +231,7 @@ class O(object):
   def __ne__(self, other):
     return not (self == other)
 
-def Proxy(object):
+class Proxy(object):
   ''' An extremely simple proxy object that passes all unmatched attribute accesses to the proxied object.
       Note that setattr and delattr work directly on the proxy, not the proxied object.
   '''
