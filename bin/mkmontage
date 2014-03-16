@@ -4,6 +4,8 @@
 #	- Cameron Simpson <cs@zip.com.au> 25feb2005
 #
 
+set -ue
+
 : ${TMPDIR:=/tmp}
 
 cmd=`basename "$0"`
@@ -13,7 +15,7 @@ geom=
 
 badopts=
 
-while :
+while [ $# -gt 0 ]
 do
   case "$1" in
     -g)	geom=$2; shift ;;
@@ -39,13 +41,13 @@ else
 	  || { echo "$cmd: bad Y value in -g geometry: $geom" >&2
 	       badopts=1
 	     }
-fi
 
-nimages=`expr "$nx" '*' "$ny"` || exit 1
-if [ $# != "$nimages" ]
-then
-  echo "$cmd: number of images doesn't match geometry: expected $nimages, found $# images" >&2
-  badopts=1
+  nimages=`expr "$nx" '*' "$ny"` || exit 1
+  if [ $# != "$nimages" ]
+  then
+    echo "$cmd: number of images doesn't match geometry: expected $nimages, found $# images" >&2
+    badopts=1
+  fi
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
