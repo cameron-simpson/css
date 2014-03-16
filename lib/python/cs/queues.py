@@ -66,10 +66,10 @@ class NestingOpenCloseMixin(object):
       count = self._opens
     if self.on_open:
       self.on_open(self, count)
+    return _NOC_Proxy(self)
 
   def __enter__(self):
-    self.open()
-    return self
+    return self.open()
 
   @logexc
   def close(self):
