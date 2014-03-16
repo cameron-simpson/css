@@ -48,7 +48,7 @@ class NestingOpenCloseMixin(object):
       preexisting attribute _lock for locking.
   '''
 
-  def __init__(self, open=False, on_open=None, on_close=None, on_shutdown=None):
+  def __init__(self, open=False, on_open=None, on_close=None, on_shutdown=None, proxy_type=None):
     ''' Initialise the NestingOpenCloseMixin state.
 	If the optional parameter `open` is true, return the object in "open"
         state (active opens == 1) otherwise closed (opens == 0).
@@ -59,6 +59,9 @@ class NestingOpenCloseMixin(object):
         `on_close`: called on close with the pre-decrement open count
         `on_shutdown`: called after calling self.shutdown()
     '''
+    if proxy_type is None:
+      proxy_type = _NOC_Proxy
+    self._noc_proxy_type = proxy_type
     self._opens = 0
     self.on_open = on_open
     self.on_close = on_close
@@ -78,7 +81,7 @@ class NestingOpenCloseMixin(object):
       count = self._opens
     if self.on_open:
       self.on_open(self, count)
-    return _NOC_Proxy(self)
+    return _noc_proxy_type(self)
 
   def __enter__(self):
     return self.open()
@@ -122,6 +125,13 @@ class NestingOpenCloseMixin(object):
   def join(self):
     return self._asynchron.join()
 
+class _QI_Proxy(_NOC_Proxy):
+
+  def put(self, item, *a, **kw):
+    if self.closed:
+      raise RuntimeError("%s: close: already closed" % (self,))
+    return self.__proxied.put(item, *a, **kw)
+
 class QueueIterator(NestingOpenCloseMixin,O):
   ''' A QueueIterator is a wrapper for a Queue (or ducktype) which
       presents and iterator interface to collect items.
@@ -136,7 +146,7 @@ class QueueIterator(NestingOpenCloseMixin,O):
     self._lock = Lock()
     self.name = name
     O.__init__(self, q=q)
-    NestingOpenCloseMixin.__init__(self, open=open)
+    NestingOpenCloseMixin.__init__(self, open=open, proxy_type=_QI_Proxy)
 
   def __str__(self):
     return "<%s:opens=%d,closed=%s>" % (self.name, self._opens, self.closed)
