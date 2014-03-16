@@ -77,8 +77,9 @@ class NestingOpenCloseMixin(object):
     self.on_close = on_close
     self.on_shutdown = on_shutdown
     self._asynchron = Asynchron()
+    self._open0 = None
     if open:
-      self.open()
+      self._open0 = self.open()
 
   def open(self):
     ''' Increment the open count.
@@ -95,6 +96,9 @@ class NestingOpenCloseMixin(object):
 
   def __enter__(self):
     return self.open()
+
+  def close(self):
+    return self._open0.close()
 
   @logexc
   def _close(self):
