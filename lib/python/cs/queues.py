@@ -421,7 +421,7 @@ class PushQueue(NestingOpenCloseMixin, O):
     self.outQ.close()
 
   def shutdown(self):
-    ''' shutdown() is called by NestingOpenCloseMixin.close() to close
+    ''' shutdown() is called by NestingOpenCloseMixin._close() to close
         the outQ for real.
     '''
     debug("%s.shutdown()", self)
