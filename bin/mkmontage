@@ -71,10 +71,11 @@ do
       && arg=`filecache "$tmpimg"`
       } || ok=
       ;;
-    *)[ -f "$arg" ] || { echo "$cmd: $img: not a file" >&2; ok=; }
+    *)[ -f "$arg" ] || { echo "$cmd: $arg: not a file" >&2; ok=; }
       ;;
   esac
   set -- ${1+"$@"} -geometry "${dx}x${dy}" "$arg"
 done
 
+[ $ok ] || exit 1
 set-x gm montage +label -tile "${nx}x${ny}" "$@" "$tmpimg" && echo "$tmpimg"
