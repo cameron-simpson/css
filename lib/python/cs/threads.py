@@ -21,16 +21,16 @@ import logging
 from cs.debug import Lock, RLock, Thread
 import cs.logutils
 from cs.logutils import Pfx, LogTime, error, warning, debug, exception, OBSOLETE, D
-from cs.obj import O, Proxy
+from cs.obj import O
 from cs.asynchron import report
-from cs.queues import IterableQueue, Channel, NestingOpenCloseMixin, not_closed
+from cs.queues import IterableQueue, Channel, NestingOpenCloseMixin, not_closed, _NOC_Proxy
 from cs.py3 import raise3, Queue, PriorityQueue
 
-class _WTP_Proxy(Proxy):
+class _WTP_Proxy(_NOC_Proxy):
 
   @not_closed
   def dispatch(self, *a, **kw):
-    return self._proxied.dispatch(*a, **kw)
+    return self._proxied._dispatch(*a, **kw)
 
 class WorkerThreadPool(NestingOpenCloseMixin, O):
   ''' A pool of worker threads to run functions.
@@ -63,7 +63,10 @@ class WorkerThreadPool(NestingOpenCloseMixin, O):
       if HT is not current_thread():
         HT.join()
 
-  def dispatch(self, func, retq=None, deliver=None, pfx=None):
+  def dispatch(self, *a, **kw):
+    return self._open0._dispatch(*a, **kw)
+
+  def _dispatch(self, func, retq=None, deliver=None, pfx=None):
     ''' Dispatch the callable `func` in a separate thread.
         On completion the result is the sequence:
           func_result, None, None, None
@@ -74,7 +77,7 @@ class WorkerThreadPool(NestingOpenCloseMixin, O):
         If the parameter `pfx` is not None, submit pfx.func(func);
           see cs.logutils.Pfx's .func method for details.
     '''
-    if self.closed:
+    if self.all_closed:
       raise ValueError("%s: closed, but dispatch() called" % (self,))
     if pfx is not None:
       func = pfx.func(func)
