@@ -125,7 +125,9 @@ class NestingOpenCloseMixin(object):
   def join(self):
     return self._asynchron.join()
 
-class _QI_Proxy(_NOC_Proxy):
+class _Q_Proxy(_NOC_Proxy):
+  ''' A _NOC_Proxy subclass for queues with a sanity check on .put.
+  '''
 
   def put(self, item, *a, **kw):
     if self.closed:
@@ -146,7 +148,7 @@ class QueueIterator(NestingOpenCloseMixin,O):
     self._lock = Lock()
     self.name = name
     O.__init__(self, q=q)
-    NestingOpenCloseMixin.__init__(self, open=open, proxy_type=_QI_Proxy)
+    NestingOpenCloseMixin.__init__(self, open=open, proxy_type=_Q_Proxy)
 
   def __str__(self):
     return "<%s:opens=%d,closed=%s>" % (self.name, self._opens, self.closed)
@@ -348,7 +350,9 @@ class PushQueue(NestingOpenCloseMixin, O):
     self.name = name
     self._lock = Lock()
     O.__init__(self)
-    NestingOpenCloseMixin.__init__(self, open=open, on_open=on_open, on_close=on_close, on_shutdown=on_shutdown)
+    NestingOpenCloseMixin.__init__(self, open=open,
+                                   on_open=on_open, on_close=on_close, on_shutdown=on_shutdown,
+                                   proxy_type=_Q_Proxy)
     self.later = L
     self.func_push = func_push
     self.outQ = outQ
