@@ -14,7 +14,17 @@ from cs.excutils import noexc, logexc
 from cs.logutils import exception, warning, debug, D, Pfx, PfxCallInfo
 from cs.seq import seq
 from cs.py3 import Queue, PriorityQueue, Queue_Full, Queue_Empty
-from cs.obj import O
+from cs.obj import O, Proxy
+
+class _NOC_Proxy(Proxy):
+  ''' A Proxy subclass to return from NestingOpenCloseMixin.open() and __enter__.
+      Note tht this has its own localised .closed attribute which starts False.
+      This lets users indidually track .closed for their use.
+  '''
+
+  def __init__(self, other):
+    Proxy.__init__(self, other)
+    self.closed = False
 
 class NestingOpenCloseMixin(object):
   ''' A mixin to count open and closes, and to call .shutdown() when the count goes to zero.
