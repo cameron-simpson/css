@@ -81,7 +81,7 @@ class NestingOpenCloseMixin(object):
       count = self._opens
     if self.on_open:
       self.on_open(self, count)
-    return _noc_proxy_type(self)
+    return self._noc_proxy_type(self)
 
   def __enter__(self):
     return self.open()
