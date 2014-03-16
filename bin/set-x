@@ -20,7 +20,7 @@ do
     --date)     datestamp=1 subopts="$subopts $1" ;;
     --no-tag_fd)no_tag_fd=1 ;;
     --)         shift; break ;;
-    -?*)        echo "$cmd: unrecognised option: $1" >&2
+    -?*)        echo "$0: unrecognised option: $1" >&2
                 badopts=1
                 ;;
     *)          break ;;
@@ -28,7 +28,7 @@ do
   shift
 done
 
-[ $# -gt 0 ] || { echo "$cmd: missing command" >&2; badopts=1; }
+[ $# -gt 0 ] || { echo "$0: missing command" >&2; badopts=1; }
 
 [ $badopts ] && { echo "Usage: $0 [--date] command [args...]" >&2; exit 2; }
 
