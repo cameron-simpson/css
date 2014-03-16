@@ -16,6 +16,17 @@ from cs.seq import seq
 from cs.py3 import Queue, PriorityQueue, Queue_Full, Queue_Empty
 from cs.obj import O, Proxy
 
+def not_closed(func):
+  ''' Decorator to wrap NestingOpenCloseMixin proxy object methods
+      which hould raise when self.closed.
+  '''
+  def not_closed_wrapper(self, *a, **kw):
+    if self.closed:
+      raise RuntimeError("%s: %s: already closed" % (not_closed_wrapper.__name__, self))
+    return func(self, *a, **kw)
+  not_closed_wrapper.__name__ = "not_closed_wrapper(%s)" % (func.__name__,)
+  return not_closed_wrapper
+
 class _NOC_Proxy(Proxy):
   ''' A Proxy subclass to return from NestingOpenCloseMixin.open() and __enter__.
       Note tht this has its own localised .closed attribute which starts False.
@@ -27,15 +38,14 @@ class _NOC_Proxy(Proxy):
     self.closed = False
 
   def __str__(self):
-    return "open(%s[closed=%r])" % (self.__proxied, self.closed)
+    return "open(%s[closed=%r])" % (self._proxied, self.closed)
 
+  @not_closed
   def close(self):
     ''' Close this open-proxy. Sanity check then call inner close.
     '''
-    if self.closed:
-      raise RuntimeError("%s: close: already closed" % (self,))
     self.closed = True
-    self.__proxied.close()
+    self._proxied.close()
 
 class NestingOpenCloseMixin(object):
   ''' A mixin to count open and closes, and to call .shutdown() when the count goes to zero.
@@ -129,10 +139,9 @@ class _Q_Proxy(_NOC_Proxy):
   ''' A _NOC_Proxy subclass for queues with a sanity check on .put.
   '''
 
+  @not_closed
   def put(self, item, *a, **kw):
-    if self.closed:
-      raise RuntimeError("%s: close: already closed" % (self,))
-    return self.__proxied.put(item, *a, **kw)
+    return self._proxied.put(item, *a, **kw)
 
 class QueueIterator(NestingOpenCloseMixin,O):
   ''' A QueueIterator is a wrapper for a Queue (or ducktype) which
@@ -290,12 +299,11 @@ class Channel(object):
       return self.put(*a)
     return self.get()
 
+  @not_closed
   def get(self):
     ''' Read a value from the Channel.
         Blocks until someone put()s to the Channel.
     '''
-    if self.closed:
-      raise RuntimeError("%s: closed", self)
     # allow a writer to proceed
     self.__writable.release()
     # await a writer
@@ -305,12 +313,11 @@ class Channel(object):
     delattr(self,'_value')
     return value
 
+  @not_closed
   def put(self, value):
     ''' Write a value to the Channel.
         Blocks until a corresponding get() occurs.
     '''
-    if self.closed:
-      raise RuntimeError("%s: closed", self)
     # block until there is a matching .get()
     self.__writable.acquire()
     self._value = value

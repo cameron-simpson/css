@@ -237,7 +237,7 @@ class Proxy(object):
   '''
 
   def __init__(self, other):
-    self.__proxied = other
+    self._proxied = other
 
   def __getattr__(self, attr):
-    return getattr(self.__proxied, attr)
+    return getattr(self._proxied, attr)

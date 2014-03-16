@@ -30,7 +30,7 @@ class _WTP_Proxy(Proxy):
 
   @not_closed
   def dispatch(self, *a, **kw):
-    return self.__proxied.dispatch(*a, **kw)
+    return self._proxied.dispatch(*a, **kw)
 
 class WorkerThreadPool(NestingOpenCloseMixin, O):
   ''' A pool of worker threads to run functions.

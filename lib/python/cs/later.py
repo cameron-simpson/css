@@ -440,7 +440,8 @@ class Later(NestingOpenCloseMixin):
     # inbound requests queue
     self._LFPQ = IterablePriorityQueue(inboundCapacity, name="%s._LFPQ" % (self.name,))
     self._LFPQ.open()
-    self._workers = WorkerThreadPool(name=name+":WorkerThreadPool", open=True)
+    self._worker_pool = WorkerThreadPool(name=name+":WorkerThreadPool")
+    self._workers = self._worker_pool.open()
     self._dispatchThread = Thread(name=self.name+'._dispatcher', target=self._dispatcher)
     self._dispatchThread.start()
 
