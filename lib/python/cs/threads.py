@@ -21,10 +21,16 @@ import logging
 from cs.debug import Lock, RLock, Thread
 import cs.logutils
 from cs.logutils import Pfx, LogTime, error, warning, debug, exception, OBSOLETE, D
-from cs.obj import O
+from cs.obj import O, Proxy
 from cs.asynchron import report
-from cs.queues import IterableQueue, Channel, NestingOpenCloseMixin
+from cs.queues import IterableQueue, Channel, NestingOpenCloseMixin, not_closed
 from cs.py3 import raise3, Queue, PriorityQueue
+
+class _WTP_Proxy(Proxy):
+
+  @not_closed
+  def dispatch(self, *a, **kw):
+    return self.__proxied.dispatch(*a, **kw)
 
 class WorkerThreadPool(NestingOpenCloseMixin, O):
   ''' A pool of worker threads to run functions.
@@ -37,7 +43,7 @@ class WorkerThreadPool(NestingOpenCloseMixin, O):
     self.name = name
     self._lock = Lock()
     O.__init__(self)
-    NestingOpenCloseMixin.__init__(self, open=open)
+    NestingOpenCloseMixin.__init__(self, open=open, proxy_type=_WTP_Proxy)
     self.idle = deque()
     self.all = []
 
