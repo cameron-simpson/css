@@ -71,6 +71,7 @@ class NestingOpenCloseMixin(object):
     ''' Increment the open count.
 	If self.on_open, call self.on_open(self, count) with the
 	post-increment count.
+        Return a Proxy object that tracks this open.
     '''
     with self._lock:
       self._opens += 1
