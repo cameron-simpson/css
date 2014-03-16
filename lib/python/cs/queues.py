@@ -45,7 +45,7 @@ class _NOC_Proxy(Proxy):
     ''' Close this open-proxy. Sanity check then call inner close.
     '''
     self.closed = True
-    self._proxied.close()
+    self._proxied._close()
 
 class NestingOpenCloseMixin(object):
   ''' A mixin to count open and closes, and to call .shutdown() when the count goes to zero.
@@ -97,7 +97,7 @@ class NestingOpenCloseMixin(object):
     return self.open()
 
   @logexc
-  def close(self):
+  def _close(self):
     ''' Decrement the open count.
 	If self.on_open, call self.on_open(self, count) with the
 	pre-decrement count.
@@ -116,11 +116,11 @@ class NestingOpenCloseMixin(object):
       self.shutdown()
       if self.on_shutdown:
         self.on_shutdown(self)
-    elif self.closed:
+    elif self.all_closed:
       error("%s.close: count=%r, ALREADY CLOSED", self, count)
 
   @property
-  def closed(self):
+  def all_closed(self):
     if self._opens > 0:
       return False
     if self._opens < 0:
@@ -160,14 +160,14 @@ class QueueIterator(NestingOpenCloseMixin,O):
     NestingOpenCloseMixin.__init__(self, open=open, proxy_type=_Q_Proxy)
 
   def __str__(self):
-    return "<%s:opens=%d,closed=%s>" % (self.name, self._opens, self.closed)
+    return "<%s:opens=%d,closed=%s>" % (self.name, self._opens, self.all_closed)
 
   def put(self, item, *args, **kw):
     ''' Put `item` onto the queue.
         Warn if the queue is closed.
         Reject if `item` is the sentinel.
     '''
-    if self.closed:
+    if self.all_closed:
       with PfxCallInfo():
         warning("queue closed: item=%s", item)
     if item is self.sentinel:
@@ -195,7 +195,7 @@ class QueueIterator(NestingOpenCloseMixin,O):
         If the queue is closed, raise StopIteration.
     '''
     q = self.q
-    if self.closed and q.empty():
+    if self.all_closed and q.empty():
       raise StopIteration
     try:
       item = q.get()
@@ -383,8 +383,8 @@ class PushQueue(NestingOpenCloseMixin, O):
         queue its results to outQ.
     '''
     debug("%s.put(item=%r)", self, item)
-    if self.closed:
-      warning("%s.put(%s) when closed" % (self, item))
+    if self.all_closed:
+      warning("%s.put(%s) when all closed" % (self, item))
     L = self.later
     if self.is_iterable:
       # add to the outQ opens; defer_iterable will close it
@@ -482,7 +482,7 @@ class NullQueue(NestingOpenCloseMixin, O):
     '''
     if self.blocking:
       with self._lock:
-        if not self.closed:
+        if not self.all_closed:
           self._close_cond.wait()
     raise Queue_Empty
 
