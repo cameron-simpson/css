@@ -66,7 +66,7 @@ class WorkerThreadPool(NestingOpenCloseMixin, O):
   def dispatch(self, *a, **kw):
     return self._open0._dispatch(*a, **kw)
 
-  def _dispatch(self, func, retq=None, deliver=None, pfx=None):
+  def _dispatch(self, func, retq=None, deliver=None, pfx=None, daemon=None):
     ''' Dispatch the callable `func` in a separate thread.
         On completion the result is the sequence:
           func_result, None, None, None
@@ -98,7 +98,10 @@ class WorkerThreadPool(NestingOpenCloseMixin, O):
         Hdesc = (HT, RQ)
         self.all.append(Hdesc)
         args.append(Hdesc)
-        debug("%s: start new worker thread", self)
+        if daemon is not None:
+          debug("%s: new worker thread: set daemon=%s", self, daemon)
+          HT.daemon = daemon
+        debug("%s: start new worker thread (daemon=%s)", self, HT.daemon)
         HT.start()
       Hdesc[1].put( (func, retq, deliver) )
 
