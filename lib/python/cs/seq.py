@@ -10,6 +10,23 @@ import heapq
 import itertools
 from threading import Lock, Condition
 
+class Seq(object):
+  ''' A thread safe wrapper for itertools.count().
+  '''
+
+  __slots__ = ('counter', '_lock')
+
+  def __init__(self, start=0, step=1):
+    self.counter = itertools.count(start, step)
+    self._lock = Lock()
+
+  def __iter__(self):
+    return self
+
+  def next(self):
+    with self._lock:
+      return self.counter.next()
+
 __seq = 0
 __seqLock = Lock()
 
