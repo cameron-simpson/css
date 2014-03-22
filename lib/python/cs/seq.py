@@ -27,20 +27,11 @@ class Seq(object):
     with self._lock:
       return self.counter.next()
 
-__seq = 0
-__seqLock = Lock()
+__seq = Seq()
 
 def seq():
-  ''' Allocate a new sequential number.
-      Useful for creating unique tokens.
-  '''
   global __seq
-  global __seqLock
-  __seqLock.acquire()
-  __seq += 1
-  n = __seq
-  __seqLock.release()
-  return n
+  return __seq.next()
 
 def the(list, context=None):
   ''' Returns the first element of an iterable, but requires there to be
