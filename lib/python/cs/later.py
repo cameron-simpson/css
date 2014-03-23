@@ -427,6 +427,7 @@ class Later(NestingOpenCloseMixin):
     self._LFPQ = IterablePriorityQueue(inboundCapacity, name="%s._LFPQ" % (self.name,)).open()
     self._workers = WorkerThreadPool(name=name+":WorkerThreadPool").open()
     self._dispatchThread = Thread(name=self.name+'._dispatcher', target=self._dispatcher)
+    self._dispatchThread.daemon = True
     self._dispatchThread.start()
 
   def __repr__(self):
