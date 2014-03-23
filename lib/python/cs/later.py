@@ -431,14 +431,14 @@ class Later(NestingOpenCloseMixin):
     self._dispatchThread.start()
 
   def __repr__(self):
-    return '<%s "%s" capacity=%s running=%d (%s) pending=%d (%s) delayed=%d busy=%d:%r closed=%s>' \
+    return '<%s "%s" capacity=%s running=%d (%s) pending=%d (%s) delayed=%d busy=%d:%r all_closed=%s>' \
            % ( self.__class__.__name__, self.name,
                self.capacity,
                len(self.running), ','.join( repr(LF.name) for LF in self.running ),
                len(self.pending), ','.join( repr(LF.name) for LF in self.pending ),
                len(self.delayed),
                len(self._busy), self._busy,
-               self.closed
+               self.all_closed
              )
 
   def __str__(self):
@@ -470,12 +470,12 @@ class Later(NestingOpenCloseMixin):
           outstanding threads to complete
     '''
     with Pfx("%s.shutdown()" % (self,)):
-      if not self.closed:
-        raise RuntimeError("not closed!")
+      if not self.all_closed:
+        warning("NOT ALL_CLOSED")
       self._try_finish()
 
   def _try_finish(self):
-    if self.closed and self.is_idle():
+    if self._opens <= 1 and self.is_idle():
       if self.finished:
         warning("_try_finish: already finished")
       else:
@@ -506,7 +506,7 @@ class Later(NestingOpenCloseMixin):
 
   @locked
   def is_finished(self):
-    return self.closed and self.is_idle()
+    return self.all_closed and self.is_idle()
 
   def busy_up(self, tag):
     with PfxCallInfo():
@@ -638,8 +638,8 @@ class Later(NestingOpenCloseMixin):
       self.logger.debug(*a, **kw)
 
   def __del__(self):
-    if not self.closed:
-      self.close()
+    if not self.all_closed:
+      self._close()
 
   def _dispatcher(self):
     ''' Read LateFunctions from the inbound queue as capacity is available
@@ -661,7 +661,7 @@ class Later(NestingOpenCloseMixin):
   @property
   def submittable(self):
     ''' May new tasks be submitted?
-	This normally tracks "not self.closed", but running tasks
+	This normally tracks "not self.all_closed", but running tasks
 	are wrapped in a thread local override to permit them to
 	submit further related tasks.
     '''
