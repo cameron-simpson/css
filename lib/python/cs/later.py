@@ -724,7 +724,11 @@ class Later(NestingOpenCloseMixin):
       priority = (priority,)
     if pfx is not None:
       func = pfx.func(func)
-    LF = LateFunction(self, func, name=name)
+    L = self.open()
+    def final():
+      D("close after LateFunction(name=%r)", name)
+      L.close()
+    LF = LateFunction(self, func, name=name, final=final)
     pri_entry = list(priority)
     pri_entry.append(seq())     # ensure FIFO servicing of equal priorities
     pri_entry.append(LF)
