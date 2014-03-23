@@ -33,8 +33,16 @@ class _NOC_Proxy(Proxy):
       This lets users indidually track .closed for their use.
   '''
 
-  def __init__(self, other):
+  def __init__(self, other, name=None):
     Proxy.__init__(self, other)
+    if name is None:
+      name = "%s-open%d" % ( getattr(other,
+                                     'name',
+                                     "%s#%d" % (self.__class__.__name__,
+                                                id(self))),
+                             seq()
+                           )
+    self.name = name
     self.closed = False
 
   def __str__(self):
@@ -78,10 +86,11 @@ class NestingOpenCloseMixin(object):
     self.on_shutdown = on_shutdown
     self._asynchron = Asynchron()
 
-  def open(self):
+  def open(self, name=None):
     ''' Increment the open count.
 	If self.on_open, call self.on_open(self, count) with the
 	post-increment count.
+        `name`: optional name for this open object.
         Return a Proxy object that tracks this open.
     '''
     with self._lock:
