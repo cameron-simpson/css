@@ -462,7 +462,6 @@ class Later(NestingOpenCloseMixin):
     '''
     return self.defer(func, *a, **kw)()
 
-  ##@trace_caller
   def shutdown(self):
     ''' Shut down the Later instance:
         - close the TimerQueue, if any, and wait for it to complete
@@ -473,32 +472,28 @@ class Later(NestingOpenCloseMixin):
     '''
     with Pfx("%s.shutdown()" % (self,)):
       if not self.all_closed:
-        warning("NOT ALL_CLOSED")
-      self._try_finish()
-
-  def _try_finish(self):
-    if self._opens <= 1 and self.is_idle():
+        error("NOT ALL_CLOSED")
       if self.finished:
-        warning("_try_finish: already finished")
-      else:
-        self._finish()
-    else:
-      debug("_TRY_FINISH: not ready, self=%s", self)
-
-  @logexc
-  def _finish(self):
-    ''' Called when closed and all activity drained.
-        Closes queues and wakes up waiters for finish.
-    '''
-    self.finished = True
-    if self._timerQ:
-      self._timerQ.close()
-      self._timerQ.join()
-    self._LFPQ.close()              # prevent further submissions
-    self._workers.close()           # wait for all worker threads to complete
-    self._dispatchThread.join()     # wait for all functions to be dispatched
-    self._finished.acquire()
-    self._finished.notify_all()
+        warning("_finish: finished=%r, early return", self.finished)
+        return
+      self.finished = True
+      if self._timerQ:
+        debug("timerQ.close...")
+        self._timerQ.close()
+        debug("timerQ join...")
+        self._timerQ.join()
+        debug("timerQ joined")
+      debug("_LFPQ.close...")
+      self._LFPQ.close()              # prevent further submissions
+      debug("_workers.close...")
+      self._workers.close()           # wait for all worker threads to complete
+      debug("_dispatchThread.join...")
+      self._dispatchThread.join()     # wait for all functions to be dispatched
+      debug("_finished.acquire...")
+      self._finished.acquire()
+      debug("notify_all...")
+      self._finished.notify_all()
+      debug("FINISHED")
 
   @locked
   def is_idle(self):
@@ -509,29 +504,6 @@ class Later(NestingOpenCloseMixin):
   @locked
   def is_finished(self):
     return self.all_closed and self.is_idle()
-
-  def busy_up(self, tag):
-    with PfxCallInfo():
-      warning("BUSY_UP(%r)", tag)
-    with self._lock:
-      if tag in self._busy:
-        raise RuntimeError("BUSY_UP: tag %r already busy" % (tag,))
-      self._busy.add(tag)
-
-  def busy_down(self, tag):
-    with PfxCallInfo():
-      warning("BUSY_DOWN(%r)", tag)
-    with self._lock:
-      self._busy.remove(tag)
-    self._try_finish()
-
-  @contextmanager
-  def do_busy(self, tag):
-    with PfxCallInfo():
-      warning("DO_BUSY(%r)", tag)
-      self.busy_up(tag)
-      yield
-      self.busy_down(tag)
 
   def wait(self):
     ''' Wait for all active and pending jobs to complete, including
@@ -564,7 +536,6 @@ class Later(NestingOpenCloseMixin):
         fromset.remove(LF)
       if toset is not None:
         toset.add(LF)
-    self._try_finish()
 
   def log_status(self):
     for LF in list(self.delayed):
@@ -727,7 +698,7 @@ class Later(NestingOpenCloseMixin):
       func = pfx.func(func)
     L = self.open()
     def final():
-      D("close after LateFunction(name=%r)", name)
+      debug("close after LateFunction(name=%r)", name)
       L.close()
     LF = LateFunction(self, func, name=name, final=final)
     pri_entry = list(priority)
