@@ -442,10 +442,11 @@ class Later(NestingOpenCloseMixin):
              )
 
   def __str__(self):
-    return "<%s[%s] pending=%d running=%d delayed=%d busy=%d:%r>" \
+    return "<%s[%s] pending=%d running=%d delayed=%d busy=%d:%r opens=%d>" \
            % (self.name, self.capacity,
               len(self.pending), len(self.running), len(self.delayed),
-              len(self._busy), self._busy)
+              len(self._busy), self._busy,
+              self._opens)
 
   def __call__(self, func, *a, **kw):
     ''' A Later object can be called with a function and arguments
