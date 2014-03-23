@@ -9,10 +9,11 @@ from functools import partial
 from threading import Condition, Timer
 import threading
 import time
+import traceback
 from cs.asynchron import Asynchron
-from cs.debug import Lock, RLock, Thread, trace_caller
+from cs.debug import Lock, RLock, Thread, trace_caller, stack_dump
 from cs.excutils import noexc, logexc
-from cs.logutils import exception, warning, debug, D, Pfx, PfxCallInfo
+from cs.logutils import exception, error, warning, debug, D, Pfx, PfxCallInfo
 from cs.seq import seq
 from cs.py3 import Queue, PriorityQueue, Queue_Full, Queue_Empty
 from cs.obj import O, Proxy
@@ -23,6 +24,8 @@ def not_closed(func):
   '''
   def not_closed_wrapper(self, *a, **kw):
     if self.closed:
+      error("ALREADY CLOSED: closed set to True from the following:")
+      stack_dump(stack=self.closed_stacklist, log_level=error)
       raise RuntimeError("%s: %s: already closed" % (not_closed_wrapper.__name__, self))
     return func(self, *a, **kw)
   not_closed_wrapper.__name__ = "not_closed_wrapper(%s)" % (func.__name__,)
@@ -53,7 +56,9 @@ class _NOC_Proxy(Proxy):
   def close(self):
     ''' Close this open-proxy. Sanity check then call inner close.
     '''
+    D("<%s>.close()", self.name)
     self.closed = True
+    self.closed_stacklist = traceback.extract_stack()
     self._proxied._close()
 
 class _NOC_ThreadingLocal(threading.local):
