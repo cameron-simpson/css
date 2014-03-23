@@ -6,6 +6,7 @@
 
 import sys
 from functools import partial
+import logging
 from threading import Condition, Timer
 import threading
 import time
@@ -25,7 +26,7 @@ def not_closed(func):
   def not_closed_wrapper(self, *a, **kw):
     if self.closed:
       error("ALREADY CLOSED: closed set to True from the following:")
-      stack_dump(stack=self.closed_stacklist, log_level=error)
+      stack_dump(stack=self.closed_stacklist, log_level=logging.ERROR)
       raise RuntimeError("%s: %s: already closed" % (not_closed_wrapper.__name__, self))
     return func(self, *a, **kw)
   not_closed_wrapper.__name__ = "not_closed_wrapper(%s)" % (func.__name__,)
