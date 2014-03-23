@@ -7,6 +7,7 @@
 import sys
 from functools import partial
 from threading import Condition, Timer
+import threading
 import time
 from cs.asynchron import Asynchron
 from cs.debug import Lock, RLock, Thread, trace_caller
@@ -55,6 +56,11 @@ class _NOC_Proxy(Proxy):
     self.closed = True
     self._proxied._close()
 
+class _NOC_ThreadingLocal(threading.local):
+
+  def __init__(self):
+    self.cmgr_proxies = []
+
 class NestingOpenCloseMixin(object):
   ''' A mixin to count open and closes, and to call .shutdown() when the count goes to zero.
       A count of active open()s is kept, and on the last close()
@@ -80,7 +86,10 @@ class NestingOpenCloseMixin(object):
     if proxy_type is None:
       proxy_type = _NOC_Proxy
     self._noc_proxy_type = proxy_type
+    self._noc_tl = _NOC_ThreadingLocal()
+    self.opened = False
     self._opens = 0
+    ##self.closed = False # final _close() not yet called
     self.on_open = on_open
     self.on_close = on_close
     self.on_shutdown = on_shutdown
@@ -93,18 +102,31 @@ class NestingOpenCloseMixin(object):
         `name`: optional name for this open object.
         Return a Proxy object that tracks this open.
     '''
+    self.opened = True
     with self._lock:
       self._opens += 1
       count = self._opens
     if self.on_open:
       self.on_open(self, count)
-    return self._noc_proxy_type(self)
+    return self._noc_proxy_type(self, name=name)
+
+  @property
+  def cmgr_proxy(self):
+    ''' Property representing the current context manager proxy.
+    '''
+    return self._noc_tl.cmgr_proxies[-1]
 
   def __enter__(self):
-    return self.open()
+    ''' NestingOpenClose context managers return a proxy object.
+    '''
+    proxy = self.open()
+    self._noc_tl.cmgr_proxies.append(proxy)
+    return proxy
 
-  def close(self):
-    return self._open0.close()
+  def __exit__(self, exc_type, exc_value, traceback):
+    proxy = self._noc_tl.cmgr_proxies.pop()
+    proxy.close()
+    return False
 
   @logexc
   def _close(self):
@@ -136,11 +158,14 @@ class NestingOpenCloseMixin(object):
     if self._opens < 0:
       with PfxCallInfo():
         warning("%r._opens < 0: %r", self, self._opens)
+    if not self.opened:
+      # never opened, so not totally closed
+      return False
+    ##if not self.closed:
+    ##  with PfxCallInfo():
+    ##    warning("%r.closed = %r, but want to return all_closed=True", self, self.closed)
+    ##  return False
     return True
-
-  def __exit__(self, exc_type, exc_value, traceback):
-    self.close()
-    return False
 
   def join(self):
     return self._asynchron.join()
