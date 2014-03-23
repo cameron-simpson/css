@@ -241,3 +241,6 @@ class Proxy(object):
 
   def __getattr__(self, attr):
     return getattr(self._proxied, attr)
+
+  def __iter__(self):
+    return iter(self._proxied)
