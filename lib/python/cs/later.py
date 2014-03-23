@@ -262,7 +262,7 @@ class _Pipeline(object):
       count -= 1
       pq_name = ":".join((name, str(count), str(seq())))
       PQ = _PipelinePushQueue(self, L, func_iter, RHQ, is_iterable=True,
-                              func_final=func_final, name=pq_name, open=True)
+                              func_final=func_final, name=pq_name).open()
       self.queues.insert(0, PQ)
       RHQ = PQ
 
@@ -399,13 +399,13 @@ class Later(NestingOpenCloseMixin):
       The `name` parameter may be used to supply an identifying name
       for this instance.
   '''
-  def __init__(self, capacity, inboundCapacity=0, name=None, open=False):
+  def __init__(self, capacity, inboundCapacity=0, name=None):
     if name is None:
       name = "Later-%d" % (seq(),)
     self._lock = RLock()
     self._finished = threading.Condition(self._lock)
     self.finished = False
-    NestingOpenCloseMixin.__init__(self, open=open)
+    NestingOpenCloseMixin.__init__(self)
     if ifdebug():
       import inspect
       filename, lineno = inspect.stack()[1][1:3]
@@ -424,10 +424,8 @@ class Later(NestingOpenCloseMixin):
     self._priority = (0,)
     self._timerQ = None         # queue for delayed requests; instantiated at need
     # inbound requests queue
-    self._LFPQ = IterablePriorityQueue(inboundCapacity, name="%s._LFPQ" % (self.name,))
-    self._LFPQ.open()
-    self._worker_pool = WorkerThreadPool(name=name+":WorkerThreadPool")
-    self._workers = self._worker_pool.open()
+    self._LFPQ = IterablePriorityQueue(inboundCapacity, name="%s._LFPQ" % (self.name,)).open()
+    self._workers = WorkerThreadPool(name=name+":WorkerThreadPool").open()
     self._dispatchThread = Thread(name=self.name+'._dispatcher', target=self._dispatcher)
     self._dispatchThread.start()
 
@@ -897,7 +895,7 @@ class Later(NestingOpenCloseMixin):
 
   def _defer_iterable(self, I, outQ=None):
     if outQ is None:
-      outQ = IterableQueue(name="IQ:defer_iterable:outQ%d" % seq(), open=True)
+      outQ = IterableQueue(name="IQ:defer_iterable:outQ%d" % seq()).open()
     iterate = iter(I).next
 
     def iterate_once():
@@ -925,7 +923,7 @@ class Later(NestingOpenCloseMixin):
     self._defer(iterate_once)
     return outQ
 
-  def pipeline(self, filter_funcs, inputs=None, outQ=None, open=False, name=None):
+  def pipeline(self, filter_funcs, inputs=None, outQ=None, name=None):
     ''' Construct a function pipeline to be mediated by this Later queue.
         Return:
           input, output
@@ -960,15 +958,15 @@ class Later(NestingOpenCloseMixin):
     '''
     if not self.submittable:
       raise RuntimeError("%s.pipeline(...) but not self.submittable" % (self,))
-    return self._pipeline(filter_funcs, inputs, outQ=outQ, open=open, name=name)
+    return self._pipeline(filter_funcs, inputs, outQ=outQ, name=name)
 
-  def _pipeline(self, filter_funcs, inputs=None, outQ=None, open=False, name=None):
+  def _pipeline(self, filter_funcs, inputs=None, outQ=None, name=None):
     filter_funcs = list(filter_funcs)
     debug("%s._pipeline: filter_funcs=%r", self, filter_funcs)
     if not filter_funcs:
       raise ValueError("no filter_funcs")
     if outQ is None:
-      outQ = IterableQueue(name="pipelineIQ", open=True)
+      outQ = IterableQueue(name="pipelineIQ").open()
     if name is None:
       name = "pipelinePQ"
     pipeline = _Pipeline(name, self, filter_funcs, outQ)
