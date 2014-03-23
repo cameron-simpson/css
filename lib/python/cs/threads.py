@@ -36,14 +36,14 @@ class WorkerThreadPool(NestingOpenCloseMixin, O):
   ''' A pool of worker threads to run functions.
   '''
 
-  def __init__(self, name=None, open=False):
+  def __init__(self, name=None):
     if name is None:
       name = "WorkerThreadPool-%d" % (seq(),)
     debug("WorkerThreadPool.__init__(name=%s)", name)
     self.name = name
     self._lock = Lock()
     O.__init__(self)
-    NestingOpenCloseMixin.__init__(self, open=open, proxy_type=_WTP_Proxy)
+    NestingOpenCloseMixin.__init__(self, proxy_type=_WTP_Proxy)
     self.idle = deque()
     self.all = []
 
@@ -94,7 +94,7 @@ class WorkerThreadPool(NestingOpenCloseMixin, O):
         args = []
         HT = Thread(target=self._handler, args=args, name=("%s:worker" % (self.name,)))
         ##HT.daemon = True
-        RQ = IterableQueue(name="%s:IQ%d" % (self.name, seq()), open=True)
+        RQ = IterableQueue(name="%s:IQ%d" % (self.name, seq())).open()
         Hdesc = (HT, RQ)
         self.all.append(Hdesc)
         args.append(Hdesc)
