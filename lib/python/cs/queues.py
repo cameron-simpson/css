@@ -56,7 +56,7 @@ class _NOC_Proxy(Proxy):
   def close(self):
     ''' Close this open-proxy. Sanity check then call inner close.
     '''
-    D("<%s>.close()", self.name)
+    debug("<%s>.close()", self.name)
     self.closed = True
     self.closed_stacklist = traceback.extract_stack()
     self._proxied._close()
