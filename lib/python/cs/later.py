@@ -116,7 +116,8 @@ class _Late_context_manager(object):
 class PendingFunction(Asynchron):
 
   def __init__(self, func, *a, **kw):
-    Asynchron.__init__(self)
+    final = kw.pop('final', None)
+    Asynchron.__init__(self, final=final)
     if a or kw:
       func = partial(func, *a, **kw)
     self.func = func
@@ -182,13 +183,13 @@ class LateFunction(PendingFunction):
             timeout for wait()
   '''
 
-  def __init__(self, later, func, name=None):
+  def __init__(self, later, func, name=None, final=None):
     ''' Initialise a LateFunction.
         `later` is the controlling Later instance.
         `func` is the callable for later execution.
         `name`, if supplied, specifies an identifying name for the LateFunction.
     '''
-    PendingFunction.__init__(self, func)
+    PendingFunction.__init__(self, func, final=final)
     if name is None:
       name = "LF-%d[func=%s]" % (seq(),func,)
     self.name = name
