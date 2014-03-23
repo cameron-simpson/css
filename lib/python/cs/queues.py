@@ -58,12 +58,12 @@ class NestingOpenCloseMixin(object):
       preexisting attribute _lock for locking.
   '''
 
-  def __init__(self, open=False, on_open=None, on_close=None, on_shutdown=None, proxy_type=None):
+  def __init__(self, on_open=None, on_close=None, on_shutdown=None, proxy_type=None):
     ''' Initialise the NestingOpenCloseMixin state.
-	If the optional parameter `open` is true, return the object in "open"
-        state (active opens == 1) otherwise closed (opens == 0).
-        The default is "closed" to optimise use as a context manager;
-        the __enter__ method will open the object.
+	##If the optional parameter `open` is true, return the object in "open"
+        ##state (active opens == 1) otherwise closed (opens == 0).
+        ##The default is "closed" to optimise use as a context manager;
+        ##the __enter__ method will open the object.
         The following callback parameters may be supplied to aid tracking activity:
         `on_open`: called on open with the post-increment open count
         `on_close`: called on close with the pre-decrement open count
@@ -77,9 +77,6 @@ class NestingOpenCloseMixin(object):
     self.on_close = on_close
     self.on_shutdown = on_shutdown
     self._asynchron = Asynchron()
-    self._open0 = None
-    if open:
-      self._open0 = self.open()
 
   def open(self):
     ''' Increment the open count.
@@ -155,13 +152,13 @@ class QueueIterator(NestingOpenCloseMixin,O):
 
   sentinel = object()
 
-  def __init__(self, q, name=None, open=False):
+  def __init__(self, q, name=None):
     if name is None:
       name = "QueueIterator-%d" % (seq(),)
     self._lock = Lock()
     self.name = name
     O.__init__(self, q=q)
-    NestingOpenCloseMixin.__init__(self, open=open, proxy_type=_Q_Proxy)
+    NestingOpenCloseMixin.__init__(self, proxy_type=_Q_Proxy)
 
   def __str__(self):
     return "<%s:opens=%d,closed=%s>" % (self.name, self._opens, self.all_closed)
@@ -257,15 +254,13 @@ class QueueIterator(NestingOpenCloseMixin,O):
 ##      raise Queue_Empty
 ##    return item
 
-def IterableQueue(capacity=0, name=None, open=False, *args, **kw):
+def IterableQueue(capacity=0, name=None, *args, **kw):
   name = kw.pop('name', name)
-  open = kw.pop('open', open)
-  return QueueIterator(Queue(capacity, *args, **kw), name=name, open=open)
+  return QueueIterator(Queue(capacity, *args, **kw), name=name)
 
-def IterablePriorityQueue(capacity=0, name=None, open=False, *args, **kw):
+def IterablePriorityQueue(capacity=0, name=None, *args, **kw):
   name = kw.pop('name', name)
-  open = kw.pop('open', open)
-  return QueueIterator(PriorityQueue(capacity, *args, **kw), name=name, open=open)
+  return QueueIterator(PriorityQueue(capacity, *args, **kw), name=name)
 
 class Channel(object):
   ''' A zero-storage data passage.
@@ -341,7 +336,7 @@ class PushQueue(NestingOpenCloseMixin, O):
   '''
 
   def __init__(self, L, func_push, outQ, func_final=None, is_iterable=False, name=None,
-                     open=False, on_open=None, on_close=None, on_shutdown=None):
+                     on_open=None, on_close=None, on_shutdown=None):
     ''' Initialise the PushQueue with the Later `L`, the callable `func_push`
         and the output queue `outQ`.
 	`func_push` is a one-to-many function which accepts a single
@@ -361,7 +356,7 @@ class PushQueue(NestingOpenCloseMixin, O):
     self.name = name
     self._lock = Lock()
     O.__init__(self)
-    NestingOpenCloseMixin.__init__(self, open=open,
+    NestingOpenCloseMixin.__init__(self,
                                    on_open=on_open, on_close=on_close, on_shutdown=on_shutdown,
                                    proxy_type=_Q_Proxy)
     self.later = L
@@ -451,7 +446,7 @@ class NullQueue(NestingOpenCloseMixin, O):
   '''
 
   def __init__(self, blocking=False, name=None,
-               open=False, on_open=None, on_close=None, on_shutdown=None):
+               on_open=None, on_close=None, on_shutdown=None):
     ''' Initialise the NullQueue.
         `blocking`: if true, calls to .get() block until .shutdown().
           Its default is False. 
@@ -463,7 +458,7 @@ class NullQueue(NestingOpenCloseMixin, O):
     self._lock = Lock()
     self._close_cond = Condition(self._lock)
     O.__init__(self)
-    NestingOpenCloseMixin.__init__(self, open=open,
+    NestingOpenCloseMixin.__init__(self,
                                    on_open=on_open, on_close=on_close, on_shutdown=on_shutdown,
                                    proxy_type=_Q_Proxy)
     self.blocking = blocking
