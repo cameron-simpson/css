@@ -582,9 +582,9 @@ class Later(NestingOpenCloseMixin):
   def __enter__(self):
     debug("%s: __enter__", self)
     global default
-    default.push(self)
-    NestingOpenCloseMixin.__enter__(self)
-    return self
+    L = NestingOpenCloseMixin.__enter__(self)
+    default.push(L)
+    return L
 
   def __exit__(self, exc_type, exc_val, exc_tb):
     ''' Exit handler: release the "complete" lock; the placeholder
