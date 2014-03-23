@@ -197,13 +197,6 @@ class LateFunction(PendingFunction):
   def __str__(self):
     return "<LateFunction %s>" % (self.name,)
 
-  @contextmanager
-  def _allow_submission(self, L):
-    old_allow_submit = L._allow_submit
-    L._allow_submit = True
-    yield
-    L._allow_submit = old_allow_submit
-
   def _dispatch(self):
     ''' ._dispatch() is called by the Later class instance's worker thread.
         It causes the function to be handed to a thread for execution.
@@ -216,7 +209,7 @@ class LateFunction(PendingFunction):
       # wrap the function to permit it to submit more work
       func = self.func
       def run_func():
-        with self._allow_submission(L):
+        with L:
           return func()
       run_func.__name__ = "%s:%s" % (run_func.__name__, func)
       self.state = ASYNCH_RUNNING
@@ -241,12 +234,6 @@ class LateFunction(PendingFunction):
   def _complete(self, result, exc_info):
     PendingFunction._complete(self, result, exc_info)
     self.later._completed(self, result, exc_info)
-
-class _Later_ThreadLocal(threading.local):
-  ''' Thread local state for Later.
-  '''
-  def __init__(self):
-    self.allow_submit = None
 
 class _PipelinePushQueue(PushQueue):
 
@@ -415,7 +402,6 @@ class Later(NestingOpenCloseMixin):
   def __init__(self, capacity, inboundCapacity=0, name=None, open=False):
     if name is None:
       name = "Later-%d" % (seq(),)
-    self._tl = _Later_ThreadLocal()
     self._lock = RLock()
     self._finished = threading.Condition(self._lock)
     self.finished = False
@@ -674,24 +660,13 @@ class Later(NestingOpenCloseMixin):
       LF._dispatch()
 
   @property
-  def _allow_submit(self):
-    return self._tl.allow_submit
-
-  @_allow_submit.setter
-  def _allow_submit(self, value):
-    self._tl.allow_submit = value
-
-  @property
   def submittable(self):
     ''' May new tasks be submitted?
 	This normally tracks "not self.closed", but running tasks
 	are wrapped in a thread local override to permit them to
 	submit further related tasks.
     '''
-    override = self._allow_submit
-    if override is not None:
-      return override
-    return not self.closed
+    return not self.all_closed
 
   def bg(self, func, *a, **kw):
     ''' Queue a function to run right now, ignoring the Later's capacity and
