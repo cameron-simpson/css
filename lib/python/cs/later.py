@@ -950,9 +950,6 @@ class Later(NestingOpenCloseMixin):
     pipeline = _Pipeline(name, self, filter_funcs, outQ)
     inQ = pipeline.inQ
     if inputs is not None:
-      if open:
-        # extra open() so that defer_iterable doesn't perform the final close
-        inQ.open()
       debug("%s._pipeline: call _defer_iterable( inputs=%r, inQ=%r)", self, inputs, inQ)
       self._defer_iterable( inputs, inQ )
     else:
