@@ -428,17 +428,15 @@ class PushQueue(NestingOpenCloseMixin, O):
       warning("%s.put(%s) when all closed" % (self, item))
     L = self.later
     if self.is_iterable:
-      # add to the outQ opens; defer_iterable will close it
-      ##D("%s: %s.open()", self, self.outQ)
-      self.outQ.open()
       try:
         items = self.func_push(item)
         ##items = list(items)
       except Exception as e:
-        exception("%s.func_push: %s", self, e)
+        exception("%s.func_push(item=%r): %s", self, item, e)
         items = ()
       ##D("%s: func_push(%r) => items=%r", self, item, items)
-      L._defer_iterable(items, self.outQ)
+      # pass a new open-proxy to defer_iterable, as it will close it
+      L._defer_iterable(items, self.outQ.open())
     else:
       raise RuntimeError("PUSHQUEUE NOT IS_ITERABLE")
       # defer the computation then call _push_items which puts the results
