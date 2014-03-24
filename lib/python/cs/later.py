@@ -880,11 +880,9 @@ class Later(NestingOpenCloseMixin):
       try:
         item = iterate()
       except StopIteration:
-        debug("L.defer_iterable: StopIteration: CLOSE %s", outQ)
         outQ.close()
       except Exception as e:
         exception("defer_iterable: iterate_once: exception during iteration: %s", e)
-        debug("L.defer_iterable: other exception: CLOSE %s", outQ)
         outQ.close()
       else:
         # put the item onto the output queue
@@ -945,7 +943,6 @@ class Later(NestingOpenCloseMixin):
     pipeline = _Pipeline(name, self, filter_funcs, outQ)
     inQ = pipeline.inQ
     if inputs is not None:
-      debug("%s._pipeline: call _defer_iterable( inputs=%r, inQ=%r)", self, inputs, inQ)
       self._defer_iterable( inputs, inQ )
     else:
       debug("%s._pipeline: no inputs, NOT setting up _defer_iterable( inputs, inQ=%r)", self, inQ)
