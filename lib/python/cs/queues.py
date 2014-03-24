@@ -188,7 +188,7 @@ class _Q_Proxy(_NOC_Proxy):
 
 class QueueIterator(NestingOpenCloseMixin,O):
   ''' A QueueIterator is a wrapper for a Queue (or ducktype) which
-      presents and iterator interface to collect items.
+      presents an iterator interface to collect items.
       It does not offer the .get or .get_nowait methods.
   '''
 
