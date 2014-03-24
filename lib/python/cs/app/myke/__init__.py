@@ -37,8 +37,6 @@ def main(argv):
     ns[macro.name] = macro
     args.pop(0)
 
-  M.prepare()
-
   # defer __enter__ until after option parsing
   M.loadMakefiles(M.makefiles)
   M.loadMakefiles(M.appendfiles)
