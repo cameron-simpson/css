@@ -23,21 +23,27 @@ import cs.logutils
 from cs.logutils import Pfx, LogTime, error, warning, debug, exception, OBSOLETE, D
 from cs.obj import O
 from cs.asynchron import report
-from cs.queues import IterableQueue, Channel, NestingOpenCloseMixin
+from cs.queues import IterableQueue, Channel, NestingOpenCloseMixin, not_closed, _NOC_Proxy
 from cs.py3 import raise3, Queue, PriorityQueue
+
+class _WTP_Proxy(_NOC_Proxy):
+
+  @not_closed
+  def dispatch(self, *a, **kw):
+    return self._proxied._dispatch(*a, **kw)
 
 class WorkerThreadPool(NestingOpenCloseMixin, O):
   ''' A pool of worker threads to run functions.
   '''
 
-  def __init__(self, name=None, open=False):
+  def __init__(self, name=None):
     if name is None:
       name = "WorkerThreadPool-%d" % (seq(),)
     debug("WorkerThreadPool.__init__(name=%s)", name)
     self.name = name
     self._lock = Lock()
     O.__init__(self)
-    NestingOpenCloseMixin.__init__(self, open=open)
+    NestingOpenCloseMixin.__init__(self, proxy_type=_WTP_Proxy)
     self.idle = deque()
     self.all = []
 
@@ -57,7 +63,10 @@ class WorkerThreadPool(NestingOpenCloseMixin, O):
       if HT is not current_thread():
         HT.join()
 
-  def dispatch(self, func, retq=None, deliver=None, pfx=None):
+  def dispatch(self, *a, **kw):
+    return self._open0._dispatch(*a, **kw)
+
+  def _dispatch(self, func, retq=None, deliver=None, pfx=None, daemon=None):
     ''' Dispatch the callable `func` in a separate thread.
         On completion the result is the sequence:
           func_result, None, None, None
@@ -68,7 +77,7 @@ class WorkerThreadPool(NestingOpenCloseMixin, O):
         If the parameter `pfx` is not None, submit pfx.func(func);
           see cs.logutils.Pfx's .func method for details.
     '''
-    if self.closed:
+    if self.all_closed:
       raise ValueError("%s: closed, but dispatch() called" % (self,))
     if pfx is not None:
       func = pfx.func(func)
@@ -85,11 +94,14 @@ class WorkerThreadPool(NestingOpenCloseMixin, O):
         args = []
         HT = Thread(target=self._handler, args=args, name=("%s:worker" % (self.name,)))
         ##HT.daemon = True
-        RQ = IterableQueue(name="%s:IQ%d" % (self.name, seq()), open=True)
+        RQ = IterableQueue(name="%s:IQ%d" % (self.name, seq())).open()
         Hdesc = (HT, RQ)
         self.all.append(Hdesc)
         args.append(Hdesc)
-        debug("%s: start new worker thread", self)
+        if daemon is not None:
+          debug("%s: new worker thread: set daemon=%s", self, daemon)
+          HT.daemon = daemon
+        debug("%s: start new worker thread (daemon=%s)", self, HT.daemon)
         HT.start()
       Hdesc[1].put( (func, retq, deliver) )
 

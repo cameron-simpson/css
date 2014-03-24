@@ -421,9 +421,9 @@ case "$dst" in
           echo "show grants for $sqluser" \
           | mysqlcmd_src -f mysql \
           | \
-          { read grants for who
-            read grant usage on blah to who etc
-            echo "$grant $usage $on $blah $to $who $etc"
+          { read grants for whom
+            read grant usage on blah to whom etc
+            echo "$grant $usage $on $blah $to $whom $etc"
             sed 's/,  */,/g' | sort -k 4
           } \
           | $trace rewriteif $Drwflags "$grantfile"

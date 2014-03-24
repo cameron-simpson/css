@@ -39,19 +39,23 @@ class Maker(NestingOpenCloseMixin, O):
   ''' Main class representing a set of dependencies to make.
   '''
 
-  def __init__(self, makecmd, parallel=1):
+  def __init__(self, makecmd, parallel=1, name=None):
     ''' Initialise a Maker.
         `makecmd`: used to define $(MAKE), typically sys.argv[0].
         `parallel`: the degree of parallelism of shell actions.
     '''
     if parallel < 1:
       raise ValueError("expected positive integer for parallel, got: %s" % (parallel,))
+    if name is None:
+      name = cs.logutils.cmd
     O.__init__(self)
     self._lock = Lock()
     NestingOpenCloseMixin.__init__(self)
     self._O_omit.extend(['macros', 'targets', 'rules', 'namespaces'])
     self.parallel = parallel
-    self._makeQ = None
+    self.name = name
+    self._makeQ = Later(self.parallel, self.name).open()
+    self._makeQ.logTo("myke-later.log")
     self.debug = MakeDebugFlags()
     self.debug.debug = False    # logging.DEBUG noise
     self.debug.flags = False    # watch debug flag settings
@@ -93,33 +97,8 @@ class Maker(NestingOpenCloseMixin, O):
       time.sleep(5)
       self.report()
 
-  def prepare(self):
-    ''' Called after adjusting parameters.
-    '''
-    self._makeQ = Later(self.parallel, name=cs.logutils.cmd)
-    self._makeQ.logTo("myke-later.log")
-
   def shutdown(self):
     self._makeQ.close()
-    self._makeQ = None
-
-  def __enter__(self):
-    ''' Context manager entry.
-        Prepare the _makeQ.
-    '''
-    if self._makeQ is None:
-      self.prepare()
-    self._makeQ.open()
-    NestingOpenCloseMixin.__enter__(self)
-    return self
-
-  def __exit__(self, exc_type, exc_val, exc_tb):
-    ''' Exit handler.
-        Close the _makeQ.
-    '''
-    self.debug_make("%s.close()", self)
-    self._makeQ.close()
-    return False
 
   @property
   def namespaces(self):

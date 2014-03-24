@@ -6,7 +6,7 @@
 
 import sys
 import unittest
-from cs.seq import imerge, onetoone, onetomany
+from cs.seq import imerge, onetoone, onetomany, Seq
 
 class TestSeq(unittest.TestCase):
 
@@ -37,6 +37,13 @@ class TestSeq(unittest.TestCase):
     L = C(['Abc', 'Def'])
     I2 = L.angles()
     self.assertEqual( list(I2), ['<A>', '<b>', '<c>', '<D>', '<e>', '<f>'])
+
+  def test_Seq(self):
+    a = []
+    s = Seq()
+    for i in range(16):
+      a.append(s.next())
+    self.assertEqual( a, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15] )
 
 def selftest(argv):
   unittest.main(__name__, None, argv)

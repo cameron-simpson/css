@@ -11,20 +11,28 @@ import itertools
 from threading import Lock, Condition
 from cs.logutils import warning, debug, D
 
-__seq = 0
-__seqLock = Lock()
+class Seq(object):
+  ''' A thread safe wrapper for itertools.count().
+  '''
+
+  __slots__ = ('counter', '_lock')
+
+  def __init__(self, start=0, step=1):
+    self.counter = itertools.count(start, step)
+    self._lock = Lock()
+
+  def __iter__(self):
+    return self
+
+  def next(self):
+    with self._lock:
+      return self.counter.next()
+
+__seq = Seq()
 
 def seq():
-  ''' Allocate a new sequential number.
-      Useful for creating unique tokens.
-  '''
   global __seq
-  global __seqLock
-  __seqLock.acquire()
-  __seq += 1
-  n = __seq
-  __seqLock.release()
-  return n
+  return __seq.next()
 
 def the(list, context=None):
   ''' Returns the first element of an iterable, but requires there to be

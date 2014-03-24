@@ -13,6 +13,7 @@ set -ue
 : ${USER:=`id -un`}
 
 trace=set-x
+trace_dated='set-x --date'
 setx='set -x'   ## ${DEBUG:-:}${DEBUG:+set -x}
 once=
 sshcfg=$PORTFWD_SSH_CONFIG
@@ -21,21 +22,29 @@ pfnames=
 sshopts=-n
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-1] [-F ssh_config] targets...
+usage="Usage:
+  $cmd -d [targets...]
+        Disable portfwd for targets, setting PORTFWD_TARGET_DISABLE.
+        If no targets are specified, set PORTFWD_DISABLE.
+  $cmd -e [targets...]
+        Enable portfwd for targets, clearing PORTFWD_TARGET_DISABLE.
+        If no targets are specified, clear PORTFWD_DISABLE.
+  $cmd [-1] [-F ssh_config] targets...
   -1    Once. Do not restart the tunnel if it dies.
   -F    Ssh configuration file with clause for target.
         Default from \$PORTFWD_SSH_CONFIG: $sshcfg
   -P pfname
-	Require the named portfwd instance to have its CONNECTED
-	flag true before starting our ssh. For a pfname of \"foo\"
-	the flag \"PORTFWD_FOO_CONNECTED\" is tested. Multiple -P
-	options may be supplied.
+        Require the named portfwd instance to have its CONNECTED
+        flag true before starting our ssh. For a pfname of \"foo\"
+        the flag \"PORTFWD_FOO_CONNECTED\" is tested. Multiple -P
+        options may be supplied.
   -v    Verbose. Passed to ssh.
 
 If a target starts with an upper case letter it is taken to be a group name,
 and the targets are found by finding the first hostname in Host clauses with
 the group name appended. Example: \"Host home ALL\""
 
+setflag=
 opts=
 badopts=
 
@@ -43,6 +52,8 @@ while [ $# -gt 0 ]
 do
   case $1 in
     -1) once=1 ;;
+    -d) setflag=1 flag=PORTFWD_DISABLE flagvalue=1 ;;
+    -e) setflag=1 flag=PORTFWD_DISABLE flagvalue=0 ;;
     -F) sshcfg=$2 opts="$opts $1 $2"; shift ;;
     -P) pfnames="$pfnames $2" opts="$opts $1 $2"; shift ;;
     -v) opts="$opts $1"; sshopts="$sshopts $1" ;;
@@ -55,12 +66,15 @@ do
   shift
 done
 
-if [ $# = 0 ]
+if [ -z "$setflag" ]
 then
-  echo "$cmd: no targets supplied" >&2
-  sed -n 's/^ *[Hh][Oo][Ss][Tt][ 	][ 	]*/  /p' "$sshcfg" >&2
-  echo >&2
-  badopts=1
+  if [ $# = 0 ]
+  then
+    echo "$cmd: no targets supplied" >&2
+    sed -n 's/^ *[Hh][Oo][Ss][Tt][ 	][ 	]*/  /p' "$sshcfg" >&2
+    echo >&2
+    badopts=1
+  fi
 fi
 
 # transmute group names into hosts
@@ -91,6 +105,23 @@ do
 done
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+if [ $setflag ]
+then
+  xit=0
+  if [ $# = 0 ]
+  then
+    $trace flag -w "$flag" "$flagvalue" || xit=1
+  else
+    for target
+    do
+      utarget=`echo "$target" | tr -- '-[a-z]' '_[A-Z]'`
+      tflag=PORTFWD_${utarget}_DISABLE
+      $trace flag -w "$tflag" "$flagvalue" || xit=1
+    done
+  fi
+  exit $xit
+fi
 
 abort() {
   $setx
@@ -195,10 +226,10 @@ cfg_outlog=alert-$target
 cfg_errlog=portfwd-$target
 getconfig "$target"
 case $cfg_outlog in
-  /*) ;; *) cfg_outlog=$LOGDIR/$cfg_outlog ;;
+  /*) ;; *) cfg_outlog=$LOGDIR/portfwd/$cfg_outlog ;;
 esac
 case $cfg_errlog in
-  /*) ;; *) cfg_errlog=$LOGDIR/$cfg_errlog ;;
+  /*) ;; *) cfg_errlog=$LOGDIR/portfwd/$cfg_errlog ;;
 esac
 
 [ -n "$cfg_command" ] || sshopts="$sshopts -N"
@@ -221,8 +252,8 @@ flag -w "$flag_connected" 0
 alert "STARTING: $target"
 rm -f -- "$sh_ctrlpath"
 tag_fd 2 "$target" \
-  $trace \
-    ssh -n $sshopts -F "$sshcfg" \
+  $trace_dated \
+    ssh $sshopts -F "$sshcfg" \
       -o 'PermitLocalCommand=yes' \
       -o "LocalCommand=flag -w '$flag_connected' 1; </dev/null alert CONNECTED: $target &" \
       -o "User=$ssh_user" \

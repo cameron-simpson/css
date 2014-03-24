@@ -1,0 +1,23 @@
+#!/bin/sh
+#
+# Run command with default platform minimal environment, plus a little extra.
+#       - Cameron Simpson <cs@zip.com.au> 03feb2014
+#
+
+set -ue
+
+[ $# -gt 0 ] || set -- env
+
+shcmd=`shqstr "$@"`
+
+set -x
+env - "HOME=$HOME" \
+        sh -c '. /etc/profile
+               # example code for ~/rc-local/env/build
+               # PATH=/opt/local/bin:/usr/local/bin:$PATH
+               # export PATH
+               for f in $HOME/rc/env/build $HOME/rc-local/env/build
+               do  [ -s "$f" ] && . "$f"
+               done
+               set -x
+               '"$shcmd"

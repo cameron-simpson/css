@@ -42,7 +42,7 @@ scriptfromman(manf) = $(manf FP)
 py2files        = $("lib/python/cs/*.py lib/python/cs/*/*.py lib/python/cs/*/*/*.py" G)
 py3files        = $(py2files :|/python/|/python3/|)
 
-rsync = rsync -iO
+rsync = rsync -iO --exclude='.*.swp' --exclude='*.pyc'
 
 _help:
         @echo '_test              - do syntax checks and self tests (may set \$$MYKE_TEST_PYTHON_MODULES if desired)'
@@ -91,29 +91,26 @@ $(py3files): lib/python/$(@ :|lib/python3/||)
 _home:
         @skip=`hg status | sed -n 's:^? \(.*\):--exclude=/\1:p'` \
         binskip=`hg status | sed -n 's:^? bin/\(.*\):--exclude=/\1:p'` \
-        pfx bin $(rsync) -aO --delete \\
+        pfx bin $(rsync) -a --delete \\
                 --include=/CHANGELOG.txt \\
                 $$binskip \\
                 --include=synonyms/ \\
                 --exclude=squid_redirect \\
-                --exclude=.*.swp \\
                 --exclude=/\*/ \\
                 bin/. $(HOME)/bin/. \
         bosskip=`hg status | sed -n 's:^? bin-bos/\(.*\):--exclude=/\1:p'` \
-        pfx bin-bos $(rsync) -aO $$bosskip bin-bos/. $(HOME)/bin-bos/. \
+        pfx bin-bos $(rsync) -a --delete $$bosskip bin-bos/. $(HOME)/bin-bos/. \
         csskip=`hg status | sed -n 's:^? bin-cs/\(.*\):--exclude=/\1:p'` \
-        pfx bin-cs $(rsync) -aO $$csskip \\
+        pfx bin-cs $(rsync) -a --delete $$csskip \\
                 --exclude=/testzap \\
                 --exclude=/testpageurls \\
                 bin-cs/. $(HOME)/bin-cs/. \
         libskip=`hg status | sed -n 's:^? lib/\(.*\):--exclude=/\1:p'` \
-        pfx lib $(rsync) -aO --delete \\
+        pfx lib $(rsync) -a --delete \\
                 --include=/CHANGELOG.txt \\
                 $$libskip \\
                 --exclude=/venv* \\
                 --exclude=testdata/ \\
-                --exclude=*.pyc \\
-                --exclude=*.swp \\
                 lib/. $(HOME)/lib/.
 
 # squid_redirect
