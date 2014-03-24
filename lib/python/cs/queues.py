@@ -51,7 +51,9 @@ class _NOC_Proxy(Proxy):
     self.closed = False
 
   def __str__(self):
-    return "open(%s[closed=%r])" % (self._proxied, self.closed)
+    return "open(%r:%s[closed=%r])" % (self.name, self._proxied, self.closed)
+
+  __repr__ = __str__
 
   @not_closed
   def close(self):
