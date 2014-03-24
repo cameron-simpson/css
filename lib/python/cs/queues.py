@@ -25,7 +25,7 @@ def not_closed(func):
   '''
   def not_closed_wrapper(self, *a, **kw):
     if self.closed:
-      error("ALREADY CLOSED: closed set to True from the following:")
+      error("%r: ALREADY CLOSED: closed set to True from the following:", self)
       stack_dump(stack=self.closed_stacklist, log_level=logging.ERROR)
       raise RuntimeError("%s: %s: already closed" % (not_closed_wrapper.__name__, self))
     return func(self, *a, **kw)
@@ -212,7 +212,7 @@ class QueueIterator(NestingOpenCloseMixin,O):
     '''
     if self.all_closed:
       with PfxCallInfo():
-        warning("queue closed: item=%s", item)
+        warning("%r.put: all closed: item=%s", self, item)
     if item is self.sentinel:
       raise ValueError("put(sentinel)")
     return self._put(item, *args, **kw)
@@ -238,8 +238,6 @@ class QueueIterator(NestingOpenCloseMixin,O):
         If the queue is closed, raise StopIteration.
     '''
     q = self.q
-    if self.all_closed and q.empty():
-      raise StopIteration
     try:
       item = q.get()
     except Queue_Empty:
