@@ -858,22 +858,18 @@ class Later(NestingOpenCloseMixin):
     self.defer(retry)
     return R
 
-  def defer_iterable(self, I, outQ=None):
+  def defer_iterable(self, I, outQ):
     ''' Submit an iterable `I` for asynchronous stepwise iteration
         to return results via the queue `outQ`.
         `outQ` must have a .put method to accept items and a .close method to
         indicate the end of items.
         When the iteration is complete, call outQ.close().
-        If `outQ` is None, instantiate a new IterableQueue.
-        Return `outQ`.
     '''
     if not self.submittable:
       raise RuntimeError("%s.defer_iterable(...) but not self.submittable" % (self,))
     return self._defer_iterable(I, outQ=outQ)
 
-  def _defer_iterable(self, I, outQ=None):
-    if outQ is None:
-      outQ = IterableQueue(name="IQ:defer_iterable:outQ%d" % seq()).open()
+  def _defer_iterable(self, I, outQ):
     iterate = iter(I).next
 
     def iterate_once():
@@ -899,7 +895,6 @@ class Later(NestingOpenCloseMixin):
         self._defer(iterate_once)
 
     self._defer(iterate_once)
-    return outQ
 
   def pipeline(self, filter_funcs, inputs=None, outQ=None, name=None):
     ''' Construct a function pipeline to be mediated by this Later queue.
