@@ -11,7 +11,7 @@ import traceback
 from cs.py3 import Queue, raise3
 import time
 from cs.debug import ifdebug, Lock, RLock, Thread, trace_caller, thread_dump
-from cs.excutils import noexc, noexc_gen, logexc
+from cs.excutils import noexc, noexc_gen, logexc, LogExceptions
 from cs.queues import IterableQueue, IterablePriorityQueue, PushQueue, \
                         NestingOpenCloseMixin, TimerQueue
 from cs.threads import AdjustableSemaphore, \
@@ -245,21 +245,27 @@ class _PipelinePushQueue(PushQueue):
   def __str__(self):
     return "%s[%s]" % (PushQueue.__str__(self), self.pipeline)
 
-class _Pipeline(object):
+  def put(self, item):
+    self.pipeline.counter.inc(item)
+    return PushQueue.put(self, item)
+
+class _Pipeline(NestingOpenCloseMixin):
   ''' A _Pipeline encapsultes the chain of PushQueues created by a call to Later.pipeline.
   '''
 
   def __init__(self, name, L, filter_funcs, outQ):
     ''' Initialise the _Pipeline from `name`, Later instance `L`, list  of filter functions `filter_funcs` and output queue `outQ`.
     '''
+    NestingOpenCloseMixin.__init__(self)
     self.name = name
     self.later = L
     self.counter = TrackingCounter(name="%s.counter" % (name,))
     self.queues = [outQ]
+    self._lock = Lock()
     RHQ = outQ
     count = len(filter_funcs)
     while filter_funcs:
-      func_iter, func_final = self._pipeline_func(filter_funcs.pop(), is_final=( count == len(filter_funcs) ))
+      func_iter, func_final = self._pipeline_func(filter_funcs.pop())
       count -= 1
       pq_name = ":".join((name, str(count), str(seq())))
       PQ = _PipelinePushQueue(self, L, func_iter, RHQ, is_iterable=True,
@@ -283,7 +289,7 @@ class _Pipeline(object):
   def put(self, item):
     ''' Put an `item` onto the leftmost queue in the pipeline.
     '''
-    return self.queues[0].put(item)
+    return self.inQ.put(item)
 
   @property
   def inQ(self):
@@ -297,18 +303,22 @@ class _Pipeline(object):
     '''
     return self.queues[-1]
 
-  @property
   def quiesce(self):
     ''' Wait for there to be no items in play in the pipeline.
     '''
     self.counter.wait(0)
 
-  def close(self):
-    ''' Close the leftmore queue in the pipeline.
+  def shutdown(self):
+    ''' Close the leftmost queue in the pipeline.
     '''
     self.inQ.close()
 
-  def _pipeline_func(self, o, is_final):
+  def join(self):
+    ''' Wait for completion of the output queue.
+    '''
+    self.outQ.join()
+
+  def _pipeline_func(self, o):
     ''' Accept a pipeline element. Return (func_iter, func_final).
         A pipeline element is either a single function, in which case it is
         presumed to be a one-to-many-generator with func_sig FUNC_ONE_TO_MANY,
@@ -351,7 +361,9 @@ class _Pipeline(object):
       gathered = []
       def func_iter(item):
         # raise counter for each item gathered
-        self.counter.inc()
+        D("%s.func_iter: GATHER %r", self, item)
+        self.counter.inc(item)
+        D("G1")
         gathered.append(item)
         if False:
           yield
@@ -359,33 +371,36 @@ class _Pipeline(object):
         for item in func(gathered):
           yield item
           # decrement counter after each gathered item is consumed
-          self.counter.dec()
+          self.counter.dec(item)
     else:
       raise ValueError("unsupported function signature %r" % (func_sig,))
 
     # wrap func_iter and func_final to manipulate the item counter
     func_iter0 = func_iter
     def func_iter(item):
-      for item2 in func_iter0(item):
-        # raise counter for each item we release
-        self.counter.inc()
-        yield item2
-        # decrement counter when item consumed
-        self.counter.dec()
-      # decrement counter for consumption of the source item
-      self.counter.dec()
+      with LogExceptions():
+        for item2 in func_iter0(item):
+          # raise counter for each item we release
+          self.counter.inc(item2)
+          yield item2
+          # decrement counter when item consumed
+          self.counter.dec(item2)
+        # decrement counter for consumption of the source item
+        self.counter.dec(item)
 
-    func_final0 = func_final
-    def func_final():
-      for item in func_final0():
-        # raise counter for each item we release
-        self.counter.inc()
-        yield item
-        # decrement counter when item consumed
-        self.counter.dec()
+    if func_final is not None:
+      func_final0 = func_final
+      def func_final():
+        with LogExceptions():
+          D("%s.func_final::: ...", self)
+          for item in func_final0():
+            # raise counter for each item we release
+            self.counter.inc(item)
+            yield item
+            # decrement counter when item consumed
+            self.counter.dec(item)
 
     return func_iter, func_final
-
 
 class Later(NestingOpenCloseMixin):
   ''' A management class to queue function calls for later execution.
@@ -493,6 +508,7 @@ class Later(NestingOpenCloseMixin):
       self._finished.acquire()
       debug("notify_all...")
       self._finished.notify_all()
+      self._finished.release()
       debug("FINISHED")
 
   @locked
@@ -513,11 +529,8 @@ class Later(NestingOpenCloseMixin):
       debug("%s.wait: already finished - return immediately", self)
       pass
     else:
-      debug("%s.wait...", self)
       self._finished.acquire()
-      debug("%s.wait: acquired, waiting...", self)
       self._finished.wait()
-      debug("%s.wait FINISHED", self)
 
   def _track(self, tag, LF, fromset, toset):
     def SN(s):

@@ -9,6 +9,7 @@ import unittest
 import heapq
 import itertools
 from threading import Lock, Condition
+from cs.logutils import warning, debug, D
 
 class Seq(object):
   ''' A thread safe wrapper for itertools.count().
@@ -223,6 +224,8 @@ class TrackingCounter(object):
     self.name = name
     self._lock = Lock()
     self._watched = {}
+    self._tag_up = {}
+    self._tag_down = {}
 
   def __str__(self):
     return "%s:%d" % (self.name, self.value)
@@ -241,31 +244,51 @@ class TrackingCounter(object):
     watcher = self._watched.get(value)
     if watcher:
       del self._watched[value]
-      debug("%s.notify_all(value=%d)...", self, value)
       watcher.acquire()
       watcher.notify_all()
       watcher.release()
 
-  def inc(self):
+  def inc(self, tag=None):
     ''' Increment the counter.
         Wake up any threads waiting for its new value.
     '''
+    debug("%s.inc", self)
     with self._lock:
       self.value += 1
+      if tag is not None:
+        tag = str(tag)
+        self._tag_up.setdefault(tag, 0)
+        self._tag_up[tag] += 1
       self._notify()
 
-  def dec(self):
+  def dec(self, tag=None):
     ''' Decrement the counter.
         Wake up any threads waiting for its new value.
     '''
+    debug("%s.dec", self)
     with self._lock:
       self.value -= 1
+      if tag is not None:
+        tag = str(tag)
+        self._tag_down.setdefault(tag, 0)
+        self._tag_down[tag] += 1
+        if self._tag_up.get(tag, 0) < self._tag_down[tag]:
+          warning("%s.dec: more .decs than .incs for tag %r", self, tag)
+          raise runtimeError
+      if self.value < 0:
+        warning("%s.dec: value < 0!", self)
       self._notify()
+
+  def check(self):
+    for tag in sorted(self._tag_up.keys()):
+      ups = self._tag_up[tag]
+      downs = self._tag_down.get(tag, 0)
+      if ups != downs:
+        D("%s: ups=%d, downs=%d: tag %r", self, ups, downs, tag)
 
   def wait(self, value):
     ''' Wait for the counter to reach the specified `value`.
     '''
-    debug("%s.wait()...", self)
     with self._lock:
       if value == self.value:
         return
@@ -274,7 +297,6 @@ class TrackingCounter(object):
       else:
         watcher = self._watched[value]
       watcher.acquire()
-    debug("%s.wait(): got lock, calling inner wait", self)
     watcher.wait()
 
 if __name__ == '__main__':

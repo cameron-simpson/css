@@ -10,6 +10,9 @@ A pilferrc file supplies configuration information for the pilfer(1cs) command.
 =head1 SYNTAX
 
 The pilferrc is a Windows-style .ini file parsed by Python's SafeConfigParser class.
+In particular, it supports RFC822 line continuation so that long
+lines may be broken into multiple lines by indenting the second and
+following lines.
 
 =head2 Sections
 
@@ -46,7 +49,7 @@ Example:
 A mapping of action shorthand names to action sequences.
 A shorthand name is translated into the equivalent sequences of action
 when action pipelines are evaluated.
-The shorthand definition is broken into action string with the python shlex.split() function.
+The shorthand definition is broken into action strings with the python shlex.split() function.
 
 Example:
 
@@ -60,6 +63,7 @@ Example:
 
 A mapping of pipe names to pipeline definitions.
 These are used as named pipeline definitions by pilfer(1cs)' "B<pipe:>" and "B<divert:>" actions.
+Pipeline definitions are broken into action strings with the python shlex.split() function.
 
 Example:
 
