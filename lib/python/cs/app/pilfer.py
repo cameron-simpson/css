@@ -163,37 +163,20 @@ def main(argv, stdin=None):
               pipeline = L.pipeline(pipe_funcs, name="MAIN",
                                     outQ=NullQueue(name="MAIN_PIPELINE_END_NQ",
                                                    blocking=True).open())
-              D("GET URLS...")
               for U in urls(url, stdin=stdin):
-                D("urls => U=%r", U)
-                X("put to main inQ: %s.put(%r)...", pipeline.inQ, U)
                 pipeline.put( (P, URL(U, None, scope=P)) )
-              D("GET URLS DONE")
               # indicate end of input
-              X("close main input %s", pipeline.inQ)
               pipeline.close()
-              X("wait for main output to close")
               pipeline.join()
-              X("wait for diversions to quiesce...")
               P.quiesce_diversions()
-              X("close diversions...")
               for div in P.diversions:
                 div.close()
-              X("diversions closed, wait for EOF on diversions")
               for div in P.diversions:
                 outQ = div.outQ
                 for item in outQ:
                   # diversions are supposed to discard their outputs
                   error("%s: RECEIVED %r", div, item)
-                X("%s: EOF", div)
-              X("diversions ended")
-            ##D("SLEEP 10")
-            ##sleep(10)
-            ##D("SLEPT, DUMP")
-            ##thread_dump()
-            X("WAIT: L=%r", L)
             L.wait()
-            X("WAIT COMPLETE: L=%r", L)
       else:
         error("unsupported op")
         badopts = True
