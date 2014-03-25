@@ -27,7 +27,7 @@ try:
   import xml.etree.cElementTree as ElementTree
 except ImportError:
   import xml.etree.ElementTree as ElementTree
-from cs.debug import thread_dump
+from cs.debug import thread_dump, ifdebug
 from cs.env import envsub
 from cs.excutils import noexc, noexc_gen, logexc, LogExceptions
 from cs.fileutils import file_property, mkdirn
@@ -157,17 +157,21 @@ def main(argv, stdin=None):
               error(err)
             badopts = True
           if not badopts:
-            with Later(jobs) as L:
+            LTR = Later(jobs)
+            if ifdebug():
+              # poll the status of the Later regularly
+              ping = Thread(target=pinger, args=(LTR,))
+              ping.daemon = True
+              ping.start()
+            with LTR as L:
               P.later = L
               # construct the pipeline
               pipeline = L.pipeline(pipe_funcs, name="MAIN",
                                     outQ=NullQueue(name="MAIN_PIPELINE_END_NQ",
                                                    blocking=True).open())
-              for U in urls(url, stdin=stdin):
-                pipeline.put( (P, URL(U, None, scope=P)) )
-              # indicate end of input
-              pipeline.close()
-              pipeline.join()
+              with pipeline:
+                for U in urls(url, stdin=stdin):
+                  pipeline.put( (P, URL(U, None, scope=P)) )
               P.quiesce_diversions()
               for div in P.diversions:
                 div.close()
@@ -186,6 +190,11 @@ def main(argv, stdin=None):
     xit = 2
 
   return xit
+
+def pinger(L):
+  while True:
+    D("pinger: L=%r", L)
+    sleep(1)
 
 def urls(url, stdin=None):
   ''' Generator to yield input URLs.
@@ -407,7 +416,7 @@ class Pilfer(O):
   def quiesce_diversions(self):
     X("%s.quiesce_diversions...", self)
     while True:
-      X("%s.quiesce_diversions: pass over diversions...", self)
+      X("%s.quiesce_diversions: LOOP: pass over diversions...", self)
       for div in self.diversions:
         X("%s.quiesce_diversions: check %s ...", self, div)
         div.counter.check()
