@@ -162,7 +162,7 @@ def main(argv, stdin=None):
               # construct the pipeline
               pipeline = L.pipeline(pipe_funcs, name="MAIN",
                                     outQ=NullQueue(name="MAIN_PIPELINE_END_NQ",
-                                    blocking=True, open=True))
+                                                   blocking=True).open())
               D("GET URLS...")
               for U in urls(url, stdin=stdin):
                 D("urls => U=%r", U)
@@ -459,7 +459,7 @@ class Pilfer(O):
           error(err)
         raise KeyError("invalid pipe specification for diversion named %r" % (pipe_name,))
       name = "DIVERSION:%s" % (pipe_name,)
-      diversions[pipe_name] = self.later.pipeline(pipe_funcs, name=name, outQ=NullQueue(name=name, blocking=True, open=True))
+      diversions[pipe_name] = self.later.pipeline(pipe_funcs, name=name, outQ=NullQueue(name=name, blocking=True)).open()
     return diversions[pipe_name]
 
   @logexc
