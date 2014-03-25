@@ -37,7 +37,7 @@ then
   shift
 else
   if [ -n "$DEBUG" ]
-  then  exec tag_fd 2 "$1" "$0" --no-tag_fd-2 $subopts -- "$@"
+  then  exec tag_fd 2 "$1" "$0" --no-tag_fd $subopts -- "$@"
   fi
 fi
 
