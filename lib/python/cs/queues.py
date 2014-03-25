@@ -432,7 +432,6 @@ class PushQueue(NestingOpenCloseMixin, O):
       except Exception as e:
         exception("%s.func_push(item=%r): %s", self, item, e)
         items = ()
-      ##D("%s: func_push(%r) => items=%r", self, item, items)
       # pass a new open-proxy to defer_iterable, as it will close it
       L._defer_iterable(items, self.outQ.open())
     else:
