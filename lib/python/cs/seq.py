@@ -274,7 +274,7 @@ class TrackingCounter(object):
         self._tag_down[tag] += 1
         if self._tag_up.get(tag, 0) < self._tag_down[tag]:
           warning("%s.dec: more .decs than .incs for tag %r", self, tag)
-          raise runtimeError
+          ##raise RuntimeError
       if self.value < 0:
         warning("%s.dec: value < 0!", self)
       self._notify()

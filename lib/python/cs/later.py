@@ -361,9 +361,7 @@ class _Pipeline(NestingOpenCloseMixin):
       gathered = []
       def func_iter(item):
         # raise counter for each item gathered
-        D("%s.func_iter: GATHER %r", self, item)
         self.counter.inc(item)
-        D("G1")
         gathered.append(item)
         if False:
           yield
