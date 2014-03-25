@@ -166,9 +166,11 @@ def main(argv, stdin=None):
             with LTR as L:
               P.later = L
               # construct the pipeline
-              pipeline = L.pipeline(pipe_funcs, name="MAIN",
+              pipeline = L.pipeline(pipe_funcs,
+                                    name="MAIN",
                                     outQ=NullQueue(name="MAIN_PIPELINE_END_NQ",
-                                                   blocking=True).open())
+                                                   blocking=True).open()
+                                   )
               with pipeline:
                 for U in urls(url, stdin=stdin):
                   pipeline.put( (P, URL(U, None, scope=P)) )
