@@ -23,8 +23,9 @@ usage="Usage:
     $cmd [options...] init
     $cmd [options...] exec command [args...]
     $cmd [options...] pip pip-arguments...
-  Options:
-"
+  Options: none yet"
+
+badopts=
 
 while [ $# -gt 0 ]
 do
@@ -37,6 +38,8 @@ do
   esac
   shift
 done
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 if [ $# = 0 ]
 then
