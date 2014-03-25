@@ -246,21 +246,22 @@ class _PipelinePushQueue(PushQueue):
     return "%s[%s]" % (PushQueue.__str__(self), self.pipeline)
 
   def put(self, item):
-    D("%s.put(%r)", self, item)
     self.pipeline.counter.inc(item)
     return PushQueue.put(self, item)
 
-class _Pipeline(object):
+class _Pipeline(NestingOpenCloseMixin):
   ''' A _Pipeline encapsultes the chain of PushQueues created by a call to Later.pipeline.
   '''
 
   def __init__(self, name, L, filter_funcs, outQ):
     ''' Initialise the _Pipeline from `name`, Later instance `L`, list  of filter functions `filter_funcs` and output queue `outQ`.
     '''
+    NestingOpenCloseMixin.__init__(self)
     self.name = name
     self.later = L
     self.counter = TrackingCounter(name="%s.counter" % (name,))
     self.queues = [outQ]
+    self._lock = Lock()
     RHQ = outQ
     count = len(filter_funcs)
     while filter_funcs:
@@ -307,8 +308,8 @@ class _Pipeline(object):
     '''
     self.counter.wait(0)
 
-  def close(self):
-    ''' Close the leftmore queue in the pipeline.
+  def shutdown(self):
+    ''' Close the leftmost queue in the pipeline.
     '''
     self.inQ.close()
 
@@ -507,6 +508,7 @@ class Later(NestingOpenCloseMixin):
       self._finished.acquire()
       debug("notify_all...")
       self._finished.notify_all()
+      self._finished.release()
       debug("FINISHED")
 
   @locked
@@ -527,11 +529,8 @@ class Later(NestingOpenCloseMixin):
       debug("%s.wait: already finished - return immediately", self)
       pass
     else:
-      debug("%s.wait...", self)
       self._finished.acquire()
-      debug("%s.wait: acquired, waiting...", self)
       self._finished.wait()
-      debug("%s.wait FINISHED", self)
 
   def _track(self, tag, LF, fromset, toset):
     def SN(s):
