@@ -300,10 +300,14 @@ class QueueIterator(NestingOpenCloseMixin,O):
 ##    return item
 
 def IterableQueue(capacity=0, name=None, *args, **kw):
+  if not isinstance(capacity, int):
+    raise RuntimeError("capacity: expected int, got: %r" % (capacity,))
   name = kw.pop('name', name)
   return QueueIterator(Queue(capacity, *args, **kw), name=name)
 
 def IterablePriorityQueue(capacity=0, name=None, *args, **kw):
+  if not isinstance(capacity, int):
+    raise RuntimeError("capacity: expected int, got: %r" % (capacity,))
   name = kw.pop('name', name)
   return QueueIterator(PriorityQueue(capacity, *args, **kw), name=name)
 
