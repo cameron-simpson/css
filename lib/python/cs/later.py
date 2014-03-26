@@ -881,7 +881,7 @@ class Later(NestingOpenCloseMixin):
     return self._defer_iterable(I, outQ=outQ)
 
   def _defer_iterable(self, I, outQ):
-    iterate = iter(I).next
+    iterate = partial(next, iter(I))
 
     def iterate_once():
       ''' Call `iterate`. Place the result on outQ.
