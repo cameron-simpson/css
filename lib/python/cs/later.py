@@ -157,7 +157,7 @@ class LateFunction(PendingFunction):
         L = Later(4)
         LF = L.defer()
         x = LF()
-        print x         # prints 3
+        print(x)        # prints 3
 
       Used this way, if the called function raises an exception it is visible:
 

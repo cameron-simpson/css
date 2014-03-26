@@ -12,6 +12,7 @@
 # - Cameron Simpson <cs@zip.com.au>
 #
 
+from __future__ import print_function
 import os.path
 import sys
 import pprint
@@ -31,7 +32,7 @@ def main(argv):
   setup_logging(cmd)
   AB = AddressBookWrapper()
   MDB = MailDB(os.path.abspath('maildb.csv'), readonly=False)
-  ##print "dir(AB.address_book) =",
+  ##print("dir(AB.address_book) =",)
   ##pprint.pprint(dir(AB.address_book))
   for P in AB.people:
     pprint.pprint(P)
