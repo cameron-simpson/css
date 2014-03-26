@@ -1,0 +1,54 @@
+#!/bin/sh
+#
+# Open mutt on the specified message.
+#       - Cameron Simpson <cs@zip.com.au> 27mar2014
+#       
+
+: ${MAILDIR:=$HOME/mail}
+: ${MAILBOX:=$MAILDIR/INBOX}
+
+folder=$MAILBOX
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-f folder] {<message-id>|search}"
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -f) folder=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing message-id or search" >&2
+  badopts=1
+else
+  pattern=$1
+  shift
+  case "$pattern" in
+    *\ *) ;;
+    \<*@*\>)
+        pattern="~i $pattern"
+        ;;
+  esac
+fi
+
+if [ $# -gt 0 ]
+then
+  echo "$cmd: extra arguments: $*" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+set -x
+exec mutt -f "$folder" -e "push '<search>$pattern<enter><display-message>'"
