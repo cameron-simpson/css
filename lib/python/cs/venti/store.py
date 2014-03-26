@@ -70,7 +70,7 @@ class BasicStore(NestingOpenCloseMixin):
       NestingOpenCloseMixin.__init__(self)
       self.name = name
       self.logfp = None
-      self.__funcQ = Later(capacity, name="%s:Later(__funcQ)" % (self.name,))
+      self.__funcQ = Later(capacity, name="%s:Later(__funcQ)" % (self.name,)).open()
       self.hashclass = Hash_SHA1
       self.readonly = False
       self.writeonly = False
@@ -145,15 +145,15 @@ class BasicStore(NestingOpenCloseMixin):
     return block
 
   def __enter__(self):
-    self.open()
     defaults.pushStore(self)
+    return NestingOpenCloseMixin.__enter__(self)
 
   def __exit__(self, exc_type, exc_value, traceback):
     if exc_value:
       import traceback as TB
       TB.print_tb(traceback, file=sys.stderr)
     defaults.popStore()
-    self.close()
+    return NestingOpenCloseMixin.__exit__(self, exc_type, exc_value, traceback)
 
   def __str__(self):
     return "Store(%s)" % self.name

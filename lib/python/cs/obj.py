@@ -244,3 +244,6 @@ class Proxy(object):
 
   def __iter__(self):
     return iter(self._proxied)
+
+  def __len__(self):
+    return len(self._proxied)

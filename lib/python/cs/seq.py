@@ -24,15 +24,17 @@ class Seq(object):
   def __iter__(self):
     return self
 
-  def next(self):
+  def __next__(self):
     with self._lock:
-      return self.counter.next()
+      return next(self.counter)
+
+  next = __next__
 
 __seq = Seq()
 
 def seq():
   global __seq
-  return __seq.next()
+  return next(__seq)
 
 def the(list, context=None):
   ''' Returns the first element of an iterable, but requires there to be
