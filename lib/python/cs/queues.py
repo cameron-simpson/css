@@ -118,6 +118,11 @@ class NestingOpenCloseMixin(object):
       self.on_open(self, count)
     return self._noc_proxy_type(self, name=name)
 
+  def close(self):
+    ''' Placeholder method to warn callers that they should be using the proxy returned from .open().
+    '''
+    raise RuntimeError("%s subclasses do not support .close(): that method is to be called on the _NOC_Proxy returned from .open()" % (self.__class__.__name__,))
+
   @property
   def cmgr_proxy(self):
     ''' Property representing the current context manager proxy.
