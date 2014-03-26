@@ -8,22 +8,31 @@ import bisect
 import unittest
 import heapq
 import itertools
-from threading import Lock
+from threading import Lock, Condition
+from cs.logutils import warning, debug, D
 
-__seq = 0
-__seqLock = Lock()
+class Seq(object):
+  ''' A thread safe wrapper for itertools.count().
+  '''
+
+  __slots__ = ('counter', '_lock')
+
+  def __init__(self, start=0, step=1):
+    self.counter = itertools.count(start, step)
+    self._lock = Lock()
+
+  def __iter__(self):
+    return self
+
+  def next(self):
+    with self._lock:
+      return self.counter.next()
+
+__seq = Seq()
 
 def seq():
-  ''' Allocate a new sequential number.
-      Useful for creating unique tokens.
-  '''
   global __seq
-  global __seqLock
-  __seqLock.acquire()
-  __seq += 1
-  n = __seq
-  __seqLock.release()
-  return n
+  return __seq.next()
 
 def the(list, context=None):
   ''' Returns the first element of an iterable, but requires there to be
@@ -200,6 +209,95 @@ def onetomany(func):
   def gather(self, *a, **kw):
     return itertools.chain(*[ func(item) for item in self ])
   return gather
+
+class TrackingCounter(object):
+  ''' A wrapper for a counter which can be incremented and decremented.
+      A facility is provided to wait for the counter to reach a specifi value.
+  '''
+
+  def __init__(self, value=0, name=None):
+    ''' Initialise the counter to `value` (default 0) with the optional `name`.
+    '''
+    if name is None:
+      name = "TrackingCounter-%d" % (seq(),)
+    self.value = value
+    self.name = name
+    self._lock = Lock()
+    self._watched = {}
+    self._tag_up = {}
+    self._tag_down = {}
+
+  def __str__(self):
+    return "%s:%d" % (self.name, self.value)
+
+  def __repr__(self):
+    return "<TrackingCounter %r %r>" % (str(self), self._watched)
+
+  def __nonzero__(self):
+    return self.value != 0
+
+  def _notify(self):
+    ''' Notify any waiters on the current counter value.
+        This should be called inside self._lock.
+    '''
+    value = self.value
+    watcher = self._watched.get(value)
+    if watcher:
+      del self._watched[value]
+      watcher.acquire()
+      watcher.notify_all()
+      watcher.release()
+
+  def inc(self, tag=None):
+    ''' Increment the counter.
+        Wake up any threads waiting for its new value.
+    '''
+    debug("%s.inc", self)
+    with self._lock:
+      self.value += 1
+      if tag is not None:
+        tag = str(tag)
+        self._tag_up.setdefault(tag, 0)
+        self._tag_up[tag] += 1
+      self._notify()
+
+  def dec(self, tag=None):
+    ''' Decrement the counter.
+        Wake up any threads waiting for its new value.
+    '''
+    debug("%s.dec", self)
+    with self._lock:
+      self.value -= 1
+      if tag is not None:
+        tag = str(tag)
+        self._tag_down.setdefault(tag, 0)
+        self._tag_down[tag] += 1
+        if self._tag_up.get(tag, 0) < self._tag_down[tag]:
+          warning("%s.dec: more .decs than .incs for tag %r", self, tag)
+          ##raise RuntimeError
+      if self.value < 0:
+        warning("%s.dec: value < 0!", self)
+      self._notify()
+
+  def check(self):
+    for tag in sorted(self._tag_up.keys()):
+      ups = self._tag_up[tag]
+      downs = self._tag_down.get(tag, 0)
+      if ups != downs:
+        D("%s: ups=%d, downs=%d: tag %r", self, ups, downs, tag)
+
+  def wait(self, value):
+    ''' Wait for the counter to reach the specified `value`.
+    '''
+    with self._lock:
+      if value == self.value:
+        return
+      if value not in self._watched:
+        watcher = self._watched[value] = Condition()
+      else:
+        watcher = self._watched[value]
+      watcher.acquire()
+    watcher.wait()
 
 if __name__ == '__main__':
   import sys

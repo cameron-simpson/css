@@ -174,6 +174,7 @@ def logexc(func):
   def logexc_wrapper(*a, **kw):
     with LogExceptions():
       return func(*a, **kw)
+  logexc_wrapper.__name__ = 'logexc(%s)' % (func.__name__,)
   return logexc_wrapper
 
 if __name__ == '__main__':

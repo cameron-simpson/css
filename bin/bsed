@@ -83,12 +83,14 @@ trap 'rm -f "$tmp"; exit 1' 1 2 15
 
 xit=0
 ok=1
-while	[ $ok ] || xit=1	# catch exit from previous loop
+
+while	[ $ok ] || xit=1	# catch okness from previous loop pass
 	[ $# -gt 0 ]		# loop condition
 do
 
     file=$1; shift
 
+    # transmute "-" into list of filenames from stdin
     if [ "x$file" = x- ]
     then
 	[ $verbose ] && echo "reading filenames from stdin..."
@@ -96,6 +98,8 @@ do
 	continue
     fi
 
+    # start not ok
+    # we set ok=1 on completion of satisfactory code path
     ok=
 
     if [ ! -f "$file" ]
@@ -198,6 +202,12 @@ do
 	fi
     else
 	echo "$cmd: $file: edit fails; original unchanged" >&2
+        if [ $fflag ]
+        then
+          echo "      sed script file was $sedscipt" >&2
+        else
+          echo "      sed command was: $ecmd" >&2
+        fi
     fi
 done
 

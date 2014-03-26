@@ -60,7 +60,6 @@ do
       else
         echo "$cmd: warning: failed fetch: $url" >&2
       fi
-    echo "ABORTING" >&2; break
     done
 done \
 | fix-mail-dates --mbox \

@@ -215,7 +215,8 @@ class _URL(unicode):
     else:
       parser_names = ('lxml', 'xml')
     try:
-      P = BeautifulSoup(content.decode('utf-8', 'replace'), parser_names)
+      P = BeautifulSoup(content.decode('utf-8', 'replace'), 'lxml')
+      ##P = BeautifulSoup(content.decode('utf-8', 'replace'), list(parser_names))
     except Exception as e:
       exception("%s: .parsed: BeautifulSoup(unicode(content)) fails: %s", self, e)
       with open("cs.urlutils-unparsed.html", "wb") as bs:

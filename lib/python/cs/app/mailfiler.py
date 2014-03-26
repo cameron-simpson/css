@@ -461,12 +461,12 @@ class Filer(O):
   def format_message(self, M, fmt):
     ''' Compute the alert message for the message `M`.
     '''
-    hmap = dict( [ (k.lower(), M[k]) for k in M.keys() ] )
+    hmap = dict( [ (k.lower().replace('-', '_'), M[k]) for k in M.keys() ] )
     subj = unrfc2047(M.get('subject', '')).strip()
     if subj:
       hmap['subject'] = subj
-    for hdr in ('from', 'to', 'cc', 'bcc'):
-      hmap['short_'+hdr] = ",".join(self.maildb.header_shortlist(M, (hdr,)))
+    for hdr in ('from', 'to', 'cc', 'bcc', 'reply-to'):
+      hmap['short_'+hdr.replace('-', '_')] = ",".join(self.maildb.header_shortlist(M, (hdr,)))
     hmap['short_recipients'] = ",".join(self.maildb.header_shortlist(M, ('to', 'cc', 'bcc')))
     return u(fmt).format(**hmap)
 
@@ -983,17 +983,18 @@ class WatchedMaildir(O):
         for key in mdir.keys():
           with Pfx(key):
             if key in self.lurking:
-              debug("skip processed key")
+              debug("skip lurking key")
               skipped += 1
               continue
-
             nmsgs += 1
+
             with LogTime("key = %s", key, threshold=1.0, level=DEBUG):
               M = mdir[key]
               filer = Filer(self.filter_modes)
 
               ok = filer.file(M, self.rules, mdir.keypath(key))
               if not ok:
+                filer.log("NOT OK, lurking key %s", key)
                 self.lurk(key)
                 continue
 
@@ -1004,8 +1005,8 @@ class WatchedMaildir(O):
                 debug("remove message key %s", key)
                 mdir.remove(key)
                 self.lurking.discard(key)
-            if filer.filter_modes.justone:
-              break
+              if filer.filter_modes.justone:
+                break
 
       if nmsgs or all_keys_time.elapsed >= 0.2:
         info("filtered %d messages (%d skipped) in %5.3fs",

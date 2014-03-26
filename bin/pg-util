@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Generate and possibly apply GRANTs to PostgresQL roles.
+# Assorted PostgreSQL utility operations: list, dump, grant etc.
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
@@ -30,6 +30,12 @@ usage="Usage:
         \"template0\".
         If \"on tables\" is omitted or tables is \"ALL\" then the GRANTs
         will be applied to all relations in the database.
+  $cmd [-U pg-user] [-x] [-y] databases,... chown [on tables,...] to pg-role
+        Recite or apply the ownership change.
+        The database name \"ALL\" will recurse over all databases except
+        \"template0\".
+        If \"on tables\" is omitted or tables is \"ALL\" then the owner
+        of all relations in the database will be changed.
 "
 pg_user=${USER:-`id -un`}
 pg_database=
@@ -96,6 +102,31 @@ then
           echo "$cmd: $op: -d $dumpdir: not a directory" >&2
           badopts=1
         fi
+      fi
+      ;;
+
+    chown)
+      if [ $# -gt 0 ] && [ "x$1" = xon ]
+      then
+        pg_tables=$( echo "$2" | tr , ' ' )
+        shift; shift
+      else
+        pg_tables=ALL
+      fi
+
+      if [ $# -gt 0 ] && [ "x$1" = xto ]
+      then
+        pg_role=$2
+        shift; shift
+      else
+        echo "$cmd: $op: missing \"to pg-role\"" >&2
+        badopts=1
+      fi
+
+      if [ $# -gt 0 ]
+      then
+        echo "$cmd: extra arguments: $*" >&2
+        badopts=1
       fi
       ;;
 
@@ -184,6 +215,43 @@ case "$op" in
     done
     ;;
 
+  chown)
+    case "$pg_database" in
+      ALL)
+        for db in $( recurse | grep -v '^template0$' )
+        do
+          recurse "$db" chown on "$pg_tables" to "$pg_role"
+        done
+        exit $?
+        ;;
+      *,*)
+        for db in `echo "$pg_database" | tr , ' '`
+        do
+          recurse "$db" chown on "$pg_tables" to "$pg_role"
+        done
+        exit $?
+        ;;
+    esac
+    case "$pg_tables" in
+      '' | ALL )
+        pg_tables=$( recurse "$pg_database" ls )
+        ;;
+      *,* )
+        pg_tables=$( echo "$pg_tables" | echo , ' ' )
+        ;;
+    esac
+    for table in $pg_tables
+    do
+      echo "ALTER TABLE $table OWNER TO $pg_role;"
+    done \
+    | if [ $doit ]
+      then
+        $trace psql -e -U "$pg_user" -- "$pg_database"
+      else
+        cat
+      fi
+    ;;
+
   grant)
     case "$pg_database" in
       ALL)
@@ -215,7 +283,7 @@ case "$op" in
     done \
     | if [ $doit ]
       then
-        $trace psql -U "$pg_user" -- "$pg_database"
+        $trace psql -e -U "$pg_user" -- "$pg_database"
       else
         cat
       fi

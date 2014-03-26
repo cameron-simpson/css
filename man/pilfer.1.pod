@@ -135,6 +135,11 @@ The current URL.
 
 =over 4
 
+=item B<#>I<text...>
+
+An action commencing with an octothorpe ('B<#>') is ignored.
+This is convenient for commenting out specific actions during debugging.
+
 =item B<..>
 
 Pass the parent of each item in the list, as dirname(1) does for file pathnames.
