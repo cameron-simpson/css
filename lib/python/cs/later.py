@@ -413,7 +413,7 @@ class Later(NestingOpenCloseMixin):
       The `name` parameter may be used to supply an identifying name
       for this instance.
   '''
-  def __init__(self, capacity, inboundCapacity=0, name=None):
+  def __init__(self, capacity, name=None, inboundCapacity=0):
     if name is None:
       name = "Later-%d" % (seq(),)
     self._lock = RLock()
