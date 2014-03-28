@@ -118,6 +118,11 @@ class NestingOpenCloseMixin(object):
       self.on_open(self, count)
     return self._noc_proxy_type(self, name=name)
 
+  def close(self):
+    ''' Placeholder method to warn callers that they should be using the proxy returned from .open().
+    '''
+    raise RuntimeError("%s subclasses do not support .close(): that method is to be called on the _NOC_Proxy returned from .open()" % (self.__class__.__name__,))
+
   @property
   def cmgr_proxy(self):
     ''' Property representing the current context manager proxy.
@@ -295,10 +300,14 @@ class QueueIterator(NestingOpenCloseMixin,O):
 ##    return item
 
 def IterableQueue(capacity=0, name=None, *args, **kw):
+  if not isinstance(capacity, int):
+    raise RuntimeError("capacity: expected int, got: %r" % (capacity,))
   name = kw.pop('name', name)
   return QueueIterator(Queue(capacity, *args, **kw), name=name)
 
 def IterablePriorityQueue(capacity=0, name=None, *args, **kw):
+  if not isinstance(capacity, int):
+    raise RuntimeError("capacity: expected int, got: %r" % (capacity,))
   name = kw.pop('name', name)
   return QueueIterator(PriorityQueue(capacity, *args, **kw), name=name)
 

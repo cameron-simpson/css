@@ -157,7 +157,7 @@ class LateFunction(PendingFunction):
         L = Later(4)
         LF = L.defer()
         x = LF()
-        print x         # prints 3
+        print(x)        # prints 3
 
       Used this way, if the called function raises an exception it is visible:
 
@@ -390,7 +390,6 @@ class _Pipeline(NestingOpenCloseMixin):
       func_final0 = func_final
       def func_final():
         with LogExceptions():
-          D("%s.func_final::: ...", self)
           for item in func_final0():
             # raise counter for each item we release
             self.counter.inc(item)
@@ -413,7 +412,7 @@ class Later(NestingOpenCloseMixin):
       The `name` parameter may be used to supply an identifying name
       for this instance.
   '''
-  def __init__(self, capacity, inboundCapacity=0, name=None):
+  def __init__(self, capacity, name=None, inboundCapacity=0):
     if name is None:
       name = "Later-%d" % (seq(),)
     self._lock = RLock()
@@ -881,7 +880,7 @@ class Later(NestingOpenCloseMixin):
     return self._defer_iterable(I, outQ=outQ)
 
   def _defer_iterable(self, I, outQ):
-    iterate = iter(I).next
+    iterate = partial(next, iter(I))
 
     def iterate_once():
       ''' Call `iterate`. Place the result on outQ.
