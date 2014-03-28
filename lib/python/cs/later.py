@@ -390,7 +390,6 @@ class _Pipeline(NestingOpenCloseMixin):
       func_final0 = func_final
       def func_final():
         with LogExceptions():
-          D("%s.func_final::: ...", self)
           for item in func_final0():
             # raise counter for each item we release
             self.counter.inc(item)
