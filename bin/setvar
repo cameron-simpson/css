@@ -241,12 +241,12 @@ class EnvMapping(dict):
       if '.' in hostname:
         host, hostdomain = hostname.split('.',1)
         return hostdomain
-      raise KeyError
+      raise KeyError("%s: no '.' in $HOSTNAME: %s" % (var, hostname))
     if var == "HOSTNAME":
       val=os.popen('exec hostname').read()
       if val.endswith('\n'):
         return val[:-1]
-      raise KeyError
+      raise KeyError("%s: no result from 'hostname' command" % (var,))
     if var == "OS":
       opsys = os.uname()[0].lower()
       if opsys == "sunos":
@@ -274,8 +274,8 @@ class EnvMapping(dict):
         return "openbsd"
       if opsys == "freebsd":
         return "freebsd"
-      raise KeyError('unknown VENDOR for OS=%s' % (opsys,))
-    raise KeyError
+      raise KeyError('%s: unknown vendor for OS=%s' % (var, opsys))
+    raise KeyError(var)
 
   def _exts(self):
     ''' Generator yielding
@@ -292,14 +292,16 @@ class EnvMapping(dict):
     v_os = dict.get(self, 'OS')
     v_systemid = dict.get(self, 'SYSTEMID')
     if v_hostname:
-      yield '@' + v_hostname
+      yield '.' + v_hostname
     if v_host:
       if v_systemid:
-        yield '@' + v_host + '.' + v_systemid
-      yield '@' + v_host
+        yield '.' + v_host + '@' + v_systemid
+      yield '.' + v_host
     if v_arch:
       yield '.' + v_arch
     if v_os:
       yield '.' + v_os
+    if v_systemid:
+      yield '@' + v_systemid
 
 sys.exit(main(sys.argv))
