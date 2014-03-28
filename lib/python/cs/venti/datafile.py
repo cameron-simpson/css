@@ -46,7 +46,6 @@ class DataFile(O):
   def __init__(self, pathname):
     self.pathname = pathname
     self._fp = None
-    self._size = None
     self._lock = Lock()
 
   @locked_property
@@ -62,12 +61,6 @@ class DataFile(O):
       if self._fp:
         self._fp.close()
         self._fp = None
-
-  @locked_property
-  def size(self):
-    ''' Property returning the size of this file.
-    '''
-    return os.fstat(self.fp.fileno).st_size
 
   def scan(self, uncompress=False):
     ''' Scan the data file and yield (offset, flags, zdata) tuples.
@@ -134,7 +127,6 @@ class DataFile(O):
       fp.write(put_bs(flags))
       fp.write(put_bs(len(data)))
       fp.write(data)
-      self._size = fp.tell()
     return offset
 
   def flush(self):
