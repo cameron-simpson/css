@@ -35,6 +35,10 @@ class DataFlags(int):
     assert flags == 0
     return s
 
+  @property
+  def compressed(self):
+    return self & F_COMPRESSED
+
 class DataFile(O):
   ''' A cs.venti data file, storing data chunks in compressed form.
   '''
