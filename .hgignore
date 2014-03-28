@@ -2,3 +2,4 @@ syntax: regexp
 ^html/manuals/
 \.tar\.gz$
 ^state/
+^state3/

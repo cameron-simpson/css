@@ -47,7 +47,6 @@ class BasicStore(NestingOpenCloseMixin):
       The .writeonly attribute may be set to trap surprises when no blocks
       are expected to be fetched; it relies on asssert statements.
 
-
       The background (*_bg) functions return cs.later.LateFunction instances
       for deferred collection of the operation result.
 
