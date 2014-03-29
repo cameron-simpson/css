@@ -190,26 +190,29 @@ class NestingOpenCloseMixin(object):
   def ping(self):
     ''' Mark this object as "busy"; it will be kept open a little longer in case of more use.
     '''
+    T = None
     with self._lock:
       if self._keep_open is None:
         name = "%s._ping_mainloop" % (self,)
         P = self.open(name=name)
-        T = Thread(name=name, target=self._ping_mainloop, args=(P,))
-        T.start()
         self._keep_open = P
+        T = Thread(name=name, target=self._ping_mainloop, args=(P,))
       else:
         P = self._keep_open
     self._keep_open_until = time.time() + self._keep_open_increment
+    if T:
+      T.start()
 
   def _ping_mainloop(self, proxy):
     ''' Pinger main loop: wait until expiry then close the open proxy.
     '''
+    name = self._keep_open.name
     while self._keep_open_until > time.time():
-      D("%s: pinger: sleep for another %gs", self._keep_open.name, self._keep_open_poll_interval)
+      debug("%s: pinger: sleep for another %gs", name, self._keep_open_poll_interval)
       time.sleep(self._keep_open_poll_interval)
     self._keep_open = None
     self._keep_open_until = None
-    D("%s: pinger: close()", self._keep_open.name)
+    debug("%s: pinger: close()", name)
     proxy.close()
 
 class _Q_Proxy(_NOC_Proxy):
