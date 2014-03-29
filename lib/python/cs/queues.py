@@ -255,50 +255,6 @@ class QueueIterator(NestingOpenCloseMixin,O):
 
   next = __next__
 
-##  def __getattr__(self, attr):
-##    return getattr(self.q, attr)
-##
-##  def get(self, block=True, timeout=None):
-##    if block and timeout is None:
-##      # calling an indefinitiely blocking get if probably an 
-##      raise RuntimeError(".get(block=%r,timeout=%r) on QueueIterator", block, timeout)
-##    if block and timeout is not None:
-##      start = time.time()
-##    q = self.q
-##    item = q.get(block=block, timeout=timeout)
-##    # block must have been True since no exception raised
-##    while item is self.sentinel:
-##      # the sentinel should be ignored
-##      if timeout is None:
-##        if q.empty():
-##          q.put(item)
-##          continue
-##      else:
-##        now = time.time()
-##        elapsed = now - start
-##        timeout -= elapsed
-##        if timeout <= 0:
-##          if q.empty():
-##            raise Queue_Empty
-##      # timeout > 0 or queue not empty
-##      # get the next item, ignoring the sentinel
-##      try:
-##        item = q.get(block=block, timeout=timeout)
-##      except Queue_Empty:
-##        # put the sentinel back to prevent blocking another caller
-##        q._put(self.sentinel)
-##        raise
-##      q._put(self.sentinel)
-##    return item
-##
-##  def get_nowait(self):
-##    q = self.q
-##    item = q.get_nowait()
-##    if item is self.sentinel:
-##      q._put(self.sentinel)
-##      raise Queue_Empty
-##    return item
-
 def IterableQueue(capacity=0, name=None, *args, **kw):
   if not isinstance(capacity, int):
     raise RuntimeError("capacity: expected int, got: %r" % (capacity,))
