@@ -8,10 +8,11 @@ import sys
 from collections import namedtuple
 import os
 import os.path
-from threading import Lock
+from threading import Lock, RLock
 from zlib import compress, decompress
 from cs.logutils import D
 from cs.obj import O
+from cs.queues import NestingOpenCloseMixin
 from cs.serialise import get_bs, put_bs, get_bsfp
 from cs.threads import locked_property
 
@@ -39,14 +40,18 @@ class DataFlags(int):
   def compressed(self):
     return self & F_COMPRESSED
 
-class DataFile(O):
+class DataFile(NestingOpenCloseMixin):
   ''' A cs.venti data file, storing data chunks in compressed form.
   '''
 
   def __init__(self, pathname):
+    NestingOpenCloseMixin.__init__(self)
     self.pathname = pathname
     self._fp = None
-    self._lock = Lock()
+    self._lock = RLock()
+
+  def open(self, name=None):
+    return NestingOpenCloseMixin.open(self, name=name)
 
   @locked_property
   def fp(self):
@@ -54,7 +59,7 @@ class DataFile(O):
     '''
     return open(self.pathname, "a+b")
 
-  def close(self):
+  def shutdown(self):
     ''' Close the current .fp if open.
     '''
     with self._lock:
@@ -127,11 +132,13 @@ class DataFile(O):
       fp.write(put_bs(flags))
       fp.write(put_bs(len(data)))
       fp.write(data)
+    self.ping()
     return offset
 
   def flush(self):
     if self._fp:
       self._fp.flush()
+    self.ping()
 
 class DataDir(O):
   ''' A mapping of hash->Block that manages a directory of DataFiles.
