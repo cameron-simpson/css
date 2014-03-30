@@ -230,9 +230,9 @@ def urls(url, stdin=None):
         with Pfx("stdin:%d", lineno):
           if not line.endswith('\n'):
             raise ValueError("unexpected EOF - missing newline")
-          line = line.strip()
+          url = line.strip()
           if not line or line.startswith('#'):
-            debug("SKIP: %s", line)
+            debug("SKIP: %s", url)
             continue
           yield url
 
