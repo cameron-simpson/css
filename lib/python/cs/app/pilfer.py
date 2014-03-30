@@ -471,10 +471,11 @@ class Pilfer(O):
   def pipe_from_spec(self, spec, inputs, name=None):
     if name is None:
       name = "pipe_from_spec:%s" % (spec,)
-    pipe_funcs, errors = spec.pipe_funcs(self.action_map, self.do_trace)
-    if errors:
-      for err in errors:
-        error(err)
+    with Pfx("%s", spec):
+      pipe_funcs, errors = spec.pipe_funcs(self.action_map, self.do_trace)
+      if errors:
+        for err in errors:
+          error(err)
       raise ValueError("invalid pipe specification")
     return self.later.pipeline(pipe_funcs, name=name, inputs=inputs)
 
@@ -1109,6 +1110,7 @@ def action_func(action, do_trace, raw=False):
       else:
         def func0( PU, *args, **kwargs):
           if function( PU, *args, **kwargs):
+            P, U = PU
             yield U
     if func_sig == FUNC_ONE_TO_ONE:
       if scoped:
