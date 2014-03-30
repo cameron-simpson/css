@@ -258,7 +258,7 @@ def argv_pipefuncs(argv, action_map, do_trace):
     try:
       func_sig, function = action_func(action, do_trace)
     except ValueError as e:
-      errors.append(str(e))
+      errors.append("bad action %r: %s" % (action, e))
     else:
       pipe_funcs.append( (func_sig, function) )
   return pipe_funcs, errors
@@ -476,7 +476,7 @@ class Pilfer(O):
       if errors:
         for err in errors:
           error(err)
-      raise ValueError("invalid pipe specification")
+        raise ValueError("invalid pipe specification")
     return self.later.pipeline(pipe_funcs, name=name, inputs=inputs)
 
   @property
