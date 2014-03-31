@@ -42,13 +42,6 @@ from cs.urlutils import URL, isURL, NetrcHTTPPasswordMgr
 from cs.obj import O
 from cs.py3 import input, ConfigParser
 
-if os.environ.get('DEBUG', ''):
-  def X(tag, *a):
-    D("TRACE: "+tag, *a)
-else:
-  def X(*a):
-    pass
-
 DEFAULT_JOBS = 4
 
 usage = '''Usage: %s [options...] op [args...]
@@ -172,7 +165,7 @@ def main(argv, stdin=None):
                                                    blocking=True).open()
                                    )
               with pipeline:
-                for U in urls(url, stdin=stdin):
+                for U in urls(url, stdin=stdin, cmd=cmd):
                   pipeline.put( (P, URL(U, None, scope=P)) )
               P.quiesce_diversions()
               for div in P.diversions:
@@ -198,11 +191,13 @@ def pinger(L):
     D("pinger: L=%r", L)
     sleep(1)
 
-def urls(url, stdin=None):
+def urls(url, stdin=None, cmd=None):
   ''' Generator to yield input URLs.
   '''
   if stdin is None:
     stdin = sys.stdin
+  if cmd is None:
+    cmd = cs.logutils.cmd
   if url != '-':
     # literal URL supplied, deliver to pipeline
     yield url
@@ -230,9 +225,9 @@ def urls(url, stdin=None):
         with Pfx("stdin:%d", lineno):
           if not line.endswith('\n'):
             raise ValueError("unexpected EOF - missing newline")
-          line = line.strip()
+          url = line.strip()
           if not line or line.startswith('#'):
-            debug("SKIP: %s", line)
+            debug("SKIP: %s", url)
             continue
           yield url
 
@@ -258,7 +253,7 @@ def argv_pipefuncs(argv, action_map, do_trace):
     try:
       func_sig, function = action_func(action, do_trace)
     except ValueError as e:
-      errors.append(str(e))
+      errors.append("bad action %r: %s" % (action, e))
     else:
       pipe_funcs.append( (func_sig, function) )
   return pipe_funcs, errors
@@ -416,23 +411,23 @@ class Pilfer(O):
 
   @logexc
   def quiesce_diversions(self):
-    X("%s.quiesce_diversions...", self)
+    D("%s.quiesce_diversions...", self)
     while True:
-      X("%s.quiesce_diversions: LOOP: pass over diversions...", self)
+      D("%s.quiesce_diversions: LOOP: pass over diversions...", self)
       for div in self.diversions:
-        X("%s.quiesce_diversions: check %s ...", self, div)
+        D("%s.quiesce_diversions: check %s ...", self, div)
         div.counter.check()
-        X("%s.quiesce_diversions: quiesce %s ...", self, div)
+        D("%s.quiesce_diversions: quiesce %s ...", self, div)
         div.quiesce()
-      X("%s.quiesce_diversions: now check that they are all quiet...", self)
+      D("%s.quiesce_diversions: now check that they are all quiet...", self)
       quiet = True
       for div in self.diversions:
         if div.counter:
-          X("%s.quiesce_diversions: NOT QUIET: %s", self, div)
+          D("%s.quiesce_diversions: NOT QUIET: %s", self, div)
           quiet = False
           break
       if quiet:
-        X("%s.quiesce_diversions: all quiet!", self)
+        D("%s.quiesce_diversions: all quiet!", self)
         return
 
   @locked
@@ -471,11 +466,12 @@ class Pilfer(O):
   def pipe_from_spec(self, spec, inputs, name=None):
     if name is None:
       name = "pipe_from_spec:%s" % (spec,)
-    pipe_funcs, errors = spec.pipe_funcs(self.action_map, self.do_trace)
-    if errors:
-      for err in errors:
-        error(err)
-      raise ValueError("invalid pipe specification")
+    with Pfx("%s", spec):
+      pipe_funcs, errors = spec.pipe_funcs(self.action_map, self.do_trace)
+      if errors:
+        for err in errors:
+          error(err)
+        raise ValueError("invalid pipe specification")
     return self.later.pipeline(pipe_funcs, name=name, inputs=inputs)
 
   @property
@@ -1109,6 +1105,7 @@ def action_func(action, do_trace, raw=False):
       else:
         def func0( PU, *args, **kwargs):
           if function( PU, *args, **kwargs):
+            P, U = PU
             yield U
     if func_sig == FUNC_ONE_TO_ONE:
       if scoped:
@@ -1161,7 +1158,7 @@ def action_func(action, do_trace, raw=False):
     @logexc
     def trace_function(*a, **kw):
       if do_trace:
-        X("DO %s(a=(%d args; %r),kw=%r)", action0, len(a), a, kw)
+        D("DO %s(a=(%d args; %r),kw=%r)", action0, len(a), a, kw)
       with Pfx(action0):
         try:
           retval = funcPU(*a, **kw)
@@ -1169,7 +1166,7 @@ def action_func(action, do_trace, raw=False):
           exception("TRACE: EXCEPTION: %s", e)
           raise
         if do_trace:
-          X("DONE %s(a=(%d args; %r),kw=%r)", action0, len(a), a, kw)
+          D("DONE %s(a=(%d args; %r),kw=%r)", action0, len(a), a, kw)
         return retval
 
     trace_function.__name__ = "trace_action(%r)" % (action0,)
