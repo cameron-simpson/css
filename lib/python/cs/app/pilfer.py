@@ -42,13 +42,6 @@ from cs.urlutils import URL, isURL, NetrcHTTPPasswordMgr
 from cs.obj import O
 from cs.py3 import input, ConfigParser
 
-if os.environ.get('DEBUG', ''):
-  def X(tag, *a):
-    D("TRACE: "+tag, *a)
-else:
-  def X(*a):
-    pass
-
 DEFAULT_JOBS = 4
 
 usage = '''Usage: %s [options...] op [args...]
@@ -416,23 +409,23 @@ class Pilfer(O):
 
   @logexc
   def quiesce_diversions(self):
-    X("%s.quiesce_diversions...", self)
+    D("%s.quiesce_diversions...", self)
     while True:
-      X("%s.quiesce_diversions: LOOP: pass over diversions...", self)
+      D("%s.quiesce_diversions: LOOP: pass over diversions...", self)
       for div in self.diversions:
-        X("%s.quiesce_diversions: check %s ...", self, div)
+        D("%s.quiesce_diversions: check %s ...", self, div)
         div.counter.check()
-        X("%s.quiesce_diversions: quiesce %s ...", self, div)
+        D("%s.quiesce_diversions: quiesce %s ...", self, div)
         div.quiesce()
-      X("%s.quiesce_diversions: now check that they are all quiet...", self)
+      D("%s.quiesce_diversions: now check that they are all quiet...", self)
       quiet = True
       for div in self.diversions:
         if div.counter:
-          X("%s.quiesce_diversions: NOT QUIET: %s", self, div)
+          D("%s.quiesce_diversions: NOT QUIET: %s", self, div)
           quiet = False
           break
       if quiet:
-        X("%s.quiesce_diversions: all quiet!", self)
+        D("%s.quiesce_diversions: all quiet!", self)
         return
 
   @locked
@@ -1163,7 +1156,7 @@ def action_func(action, do_trace, raw=False):
     @logexc
     def trace_function(*a, **kw):
       if do_trace:
-        X("DO %s(a=(%d args; %r),kw=%r)", action0, len(a), a, kw)
+        D("DO %s(a=(%d args; %r),kw=%r)", action0, len(a), a, kw)
       with Pfx(action0):
         try:
           retval = funcPU(*a, **kw)
@@ -1171,7 +1164,7 @@ def action_func(action, do_trace, raw=False):
           exception("TRACE: EXCEPTION: %s", e)
           raise
         if do_trace:
-          X("DONE %s(a=(%d args; %r),kw=%r)", action0, len(a), a, kw)
+          D("DONE %s(a=(%d args; %r),kw=%r)", action0, len(a), a, kw)
         return retval
 
     trace_function.__name__ = "trace_action(%r)" % (action0,)
