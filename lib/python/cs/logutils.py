@@ -22,6 +22,11 @@ cmd = __file__
 
 logging_level = logging.INFO
 trace_level = logging.DEBUG
+D_mode = False
+
+def ifdebug():
+  global logging_level
+  return logging_level <= logging.DEBUG
 
 def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=None, upd_mode=None, ansi_mode=None, trace_mode=None):
   ''' Arrange basic logging setup for conventional UNIX command
@@ -49,7 +54,7 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
       it defaults to logging.DEBUG.
       Returns the logging level.
   '''
-  global cmd, logging_level, trace_level
+  global cmd, logging_level, trace_level, D_mode
 
   default_level, default_flags = infer_logging_level()
   if level is None:
@@ -73,6 +78,9 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
 
   if trace_mode is None:
     trace_mode = 'TRACE' in flags
+
+  if 'D' in flags:
+    D_mode = True
 
   if upd_mode is None:
     if 'UPD' in flags:
@@ -149,10 +157,13 @@ def infer_logging_level():
   return level, flags
 
 def D(fmt, *args):
-  ''' Unconditionally print formatted debug string straight to sys.stderr,
+  ''' Print formatted debug string straight to sys.stderr if D_mode is true,
       bypassing the logging modules entirely.
       A quick'n'dirty debug tool.
   '''
+  global D_mode
+  if not D_mode:
+    return
   msg = str(fmt)
   if args:
     msg = msg % args

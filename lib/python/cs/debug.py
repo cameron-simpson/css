@@ -13,13 +13,10 @@ import time
 import traceback
 from cs.py3 import Queue, Queue_Empty
 import cs.logutils
-from cs.logutils import infer_logging_level, debug, error, setup_logging, D, Pfx
+from cs.logutils import infer_logging_level, debug, error, setup_logging, D, Pfx, ifdebug
 from cs.obj import O
 from cs.seq import seq
 from cs.timeutils import sleep
-
-def ifdebug():
-  return cs.logutils.logging_level <= logging.DEBUG
 
 def Lock():
   ''' Factory function: if cs.logutils.logging_level <= logging.DEBUG
