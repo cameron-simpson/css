@@ -354,6 +354,8 @@ class Pilfer(O):
         Treat all keyword arguments as (attribute,value) tuples and
         replace those attributes with the supplied values.
     '''
+    if not a and not kw:
+      raise RuntimeError("%s.copy() with no changes", self)
     P2 = copy(self)
     for attr in a:
       setattr(P2, attr, copy(getattr(P, attr)))
@@ -841,7 +843,7 @@ one_to_one = {
       'domain':       lambda PU: URL(PU[1], None).domain,
       'hostname':     lambda PU: URL(PU[1], None).hostname,
       'new_save_dir': lambda PU: (PU[1], PU[0].set_user_vars(save_dir=new_dir(PU[0].save_dir)))[0],
-      'per':          lambda PU: (copy(PU[0]), PU[1]),
+      'per':          lambda PU: (PU[0].copy('user_vars'), PU[1]),
       'print':        lambda PU, **kw: (PU[1], PU[0].print_url_string(PU[1], **kw))[0],
       'query':        lambda PU, *a: url_query(PU[1], *a),
       'quote':        lambda PU: quote(PU[1]),
@@ -1013,7 +1015,7 @@ def action_func(action, do_trace, raw=False):
                   return (P, False)
                 varmap = m.groupdict()
                 if varmap:
-                  P = copy(P)
+                  P = P.copy('user_vars')
                   P.set_user_vars(**varmap)
                 return (P, True)
               func_sig = FUNC_SELECTOR
@@ -1259,7 +1261,7 @@ def action_divert_pipe(func_name, action, offset, do_trace):
 
 def fork_function( PU, spec ):
   P, U = PU
-  P2 = copy(P)
+  P2 = P.copy()
   with P2.later.more_capacity(1):
     pipeline = P.pipe_from_spec(spec, ( (P2, U), ))
     debug("pipe: pipe_though(%r) => %r", pipe_name, pipeline)
@@ -1343,7 +1345,7 @@ def action_for(func_name, action, offset):
       # expand "values", split on whitespace, iterate with new Pilfer
       value_list = P.format_string(values, U).split()
       for value in value_list:
-        P2 = copy(P)
+        P2 = P.copy('user_vars')
         P2.set_user_vars(**{varname: value})
         yield P2, U
   elif marker == ':':
@@ -1355,7 +1357,7 @@ def action_for(func_name, action, offset):
       istart = int(P.format_string(start, U))
       istop = int(P.format_string(stop, U))
       for value in range(istart, istop+1):
-        P2 = copy(P)
+        P2 = P.copy('user_vars')
         P2.set_user_vars(**{varname: str(value)})
         yield P2, U
   else:
