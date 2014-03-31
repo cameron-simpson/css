@@ -315,20 +315,50 @@ def url_xml_find(U, match):
   for found in url_io(URL(U, None).xmlFindall, (), match):
     yield ElementTree.tostring(found, encoding='utf-8')
 
-class PilferCommon(O):
-  ''' Common state associated with all Pilfers.
-      Pipeline definitions, seen sets, etc.
+class Pilfer(O):
+  ''' State for the pilfer app.
+      Notable attribute include:
+        .flush_print    Flush output after print(), default False.
+        .user_agent     Specify user-agent string, default None.
+        .user_vars      Mapping of user variables for arbitrary use.
   '''
 
-  def __init__(self):
+  def __init__(self, **kw):
+    self._name = 'Pilfer-%d' % (seq(),)
     self._lock = Lock()
-    O.__init__(self)
-    self.later = None
+    self.flush_print = False
+    self.do_trace = False
+    self._print_to = None
+    self._print_lock = Lock()
+    self.user_agent = None
+    self.user_vars = { 'save_dir': '.' }
+    self._urlsfile = None
+    self._lock = Lock()
     self.seen = defaultdict(set)
     self.rcs = []               # chain of PilferRC libraries
     self.diversions_map = {}        # global mapping of names to divert: pipelines
     self.opener = build_opener()
     self.opener.add_handler(HTTPBasicAuthHandler(NetrcHTTPPasswordMgr()))
+    O.__init__(self, **kw)
+
+  def __str__(self):
+    return self._name
+  __repr__ = __str__
+
+  def copy(self, *a, **kw):
+    ''' Copy this Pilfer object with modifications.
+        Performs a shallow copy of `self` using copy.copy.
+	Treat all positional parameters as attribute names, and
+	replace those attributes with shallow copies of the original
+	attribute.
+        Treat all keyword arguments as (attribute,value) tuples and
+        replace those attributes with the supplied values.
+    '''
+    P2 = copy(self)
+    for attr in a:
+      setattr(P2, attr, copy(getattr(P, attr)))
+    for attr, value in itervalues(kw):
+      setattr(P2, attr, value)
 
   @property
   def defaults(self):
@@ -354,60 +384,15 @@ class PilferCommon(O):
       seen[name] = SeenSet(name, backing_file)
     return seen[name]
 
-class Pilfer(O):
-  ''' State for the pilfer app.
-      Notable attribute include:
-        .flush_print    Flush output after print(), default False.
-        .user_agent     Specify user-agent string, default None.
-        .user_vars      Mapping of user variables for arbitrary use.
-  '''
-
-  def __init__(self, **kw):
-    self._name = 'Pilfer-%d' % (seq(),)
-    self._lock = Lock()
-    self.flush_print = False
-    self.do_trace = False
-    self._print_to = None
-    self._print_lock = Lock()
-    self.user_agent = None
-    self.user_vars = { 'save_dir': '.' }
-    self._urlsfile = None
-    O.__init__(self, **kw)
-    if not hasattr(self, '_shared'):
-      self._shared = PilferCommon()                  # common state - seen URLs, etc
-
-  def __str__(self):
-    return self._name
-  __repr__ = __str__
-
-  def __copy__(self):
-    ''' Copy this Pilfer state item, preserving shared state.
-    '''
-    return Pilfer(user_vars=dict(self.user_vars),
-                  _shared=self._shared,
-                 )
-
-  @property
-  def defaults(self):
-    return self._shared.defaults
-
   def seen(self, url, seenset='_'):
-    return url in self._shared.seenset(seenset)
+    return url in self.seenset(seenset)
 
   def see(self, url, seenset='_'):
-    self._shared.seenset(seenset).add(url)
-
-  @property
-  def later(self):
-    return self._shared.later
-
-  @later.setter
-  def later(self, L):
-    self._shared.later = L
+    self.seenset(seenset).add(url)
 
   @property
   def diversions(self):
-    return list(self._shared.diversions_map.values())
+    return list(self.diversions_map.values())
 
   @logexc
   def quiesce_diversions(self):
@@ -437,7 +422,7 @@ class Pilfer(O):
         There is only one of a given name in the shared state.
         They are instantiated at need.
     '''
-    diversions = self._shared.diversions_map
+    diversions = self.diversions_map
     if pipe_name not in diversions:
       spec = self.pipes.get(pipe_name)
       if spec is None:
@@ -473,10 +458,6 @@ class Pilfer(O):
           error(err)
         raise ValueError("invalid pipe specification")
     return self.later.pipeline(pipe_funcs, name=name, inputs=inputs)
-
-  @property
-  def rcs(self):
-    return self._shared.rcs
 
   def _rc_pipespecs(self):
     for rc in self.rcs:
