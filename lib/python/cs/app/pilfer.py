@@ -165,7 +165,7 @@ def main(argv, stdin=None):
                                                    blocking=True).open()
                                    )
               with pipeline:
-                for U in urls(url, stdin=stdin):
+                for U in urls(url, stdin=stdin, cmd=cmd):
                   pipeline.put( (P, URL(U, None, scope=P)) )
               P.quiesce_diversions()
               for div in P.diversions:
@@ -191,11 +191,13 @@ def pinger(L):
     D("pinger: L=%r", L)
     sleep(1)
 
-def urls(url, stdin=None):
+def urls(url, stdin=None, cmd=None):
   ''' Generator to yield input URLs.
   '''
   if stdin is None:
     stdin = sys.stdin
+  if cmd is None:
+    cmd = cs.logutils.cmd
   if url != '-':
     # literal URL supplied, deliver to pipeline
     yield url
