@@ -356,21 +356,9 @@ class Pilfer(O):
   __repr__ = __str__
 
   def copy(self, *a, **kw):
-    ''' Copy this Pilfer object with modifications.
-        Performs a shallow copy of `self` using copy.copy.
-	Treat all positional parameters as attribute names, and
-	replace those attributes with shallow copies of the original
-	attribute.
-        Treat all keyword arguments as (attribute,value) tuples and
-        replace those attributes with the supplied values.
+    ''' Convenience function to shallow copy this Pilfer with modifications.
     '''
-    if not a and not kw:
-      raise RuntimeError("%s.copy() with no changes", self)
-    P2 = copy(self)
-    for attr in a:
-      setattr(P2, attr, copy(getattr(P, attr)))
-    for attr, value in itervalues(kw):
-      setattr(P2, attr, value)
+    return cs.obj.copy(self, *a, **kw)
 
   @property
   def defaults(self):
