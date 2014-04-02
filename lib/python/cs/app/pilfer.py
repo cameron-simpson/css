@@ -237,25 +237,35 @@ def argv_pipefuncs(argv, action_map, do_trace):
       of functions to construct a Later.pipeline.
   '''
   # we reverse the list to make action expansion easier
-  rargv = list(reversed(argv))
+  argv = list(argv)
   errors = []
   pipe_funcs = []
-  while rargv:
-    action = rargv.pop()
+  while argv:
+    action = argv.pop(0)
     # support commenting of individual actions
     if action.startswith('#'):
       continue
+    # macro - prepend new actions
     func_name, offset = get_identifier(action)
     if func_name and func_name in action_map:
       expando = action_map[func_name]
-      rargv.extend(reversed(expando))
+      argv[:0] = expando
       continue
-    try:
-      func_sig, function = action_func(action, do_trace)
-    except ValueError as e:
-      errors.append("bad action %r: %s" % (action, e))
-    else:
+    if action == "per":
+      # fork a new pipeline instance per item
+      # terminate this pipeline with a function to spawn subpipelines
+      # using the tail of the action list from this point
+      func_sig, function = action_per(action, argv)
+      argv = []
       pipe_funcs.append( (func_sig, function) )
+    else:
+      # regular action
+      try:
+        func_sig, function = action_func(action, do_trace)
+      except ValueError as e:
+        errors.append("bad action %r: %s" % (action, e))
+      else:
+        pipe_funcs.append( (func_sig, function) )
   return pipe_funcs, errors
 
 def get_pipeline_spec(argv):
@@ -442,10 +452,15 @@ class Pilfer(O):
   def pipe_through(self, pipe_name, inputs):
     ''' Create a new cs.later.Later.pipeline from the specification named `pipe_name`.
         It will collect items from the iterable `inputs`.
+        `pipe_name` may be a PipeSpec.
     '''
-    spec = self.pipes.get(pipe_name)
-    if spec is None:
-      raise KeyError("no pipe specification named %r" % (pipe_name,))
+    if isinstance(pipe_name, PipeSpec):
+      spec = pipe_name
+      pipe_name = str(spec)
+    else:
+      spec = self.pipes.get(pipe_name)
+      if spec is None:
+        raise KeyError("no pipe specification named %r" % (pipe_name,))
     with Pfx("pipe spec %r" % (pipe_name,)):
       name = "pipe_through:%s" % (pipe_name,)
       return self.pipe_from_spec(spec, inputs, name=name)
@@ -843,7 +858,6 @@ one_to_one = {
       'domain':       lambda PU: URL(PU[1], None).domain,
       'hostname':     lambda PU: URL(PU[1], None).hostname,
       'new_save_dir': lambda PU: (PU[1], PU[0].set_user_vars(save_dir=new_dir(PU[0].save_dir)))[0],
-      'per':          lambda PU: (PU[0].copy('user_vars'), PU[1]),
       'print':        lambda PU, **kw: (PU[1], PU[0].print_url_string(PU[1], **kw))[0],
       'query':        lambda PU, *a: url_query(PU[1], *a),
       'quote':        lambda PU: quote(PU[1]),
@@ -1259,15 +1273,23 @@ def action_divert_pipe(func_name, action, offset, do_trace):
     raise ValueError("expected \"divert\" or \"pipe\", got func_name=%r" % (func_name,))
   return func_sig, function, scoped
 
-def fork_function( PU, spec ):
-  P, U = PU
-  P2 = P.copy()
-  with P2.later.more_capacity(1):
-    pipeline = P.pipe_from_spec(spec, ( (P2, U), ))
-    debug("pipe: pipe_though(%r) => %r", pipe_name, pipeline)
-    for item in pipeline.outQ:
-      debug("pipe: postpipe: yield %r", item)
-      yield item
+def action_per(action, argv):
+  ''' Function to perform a "per": send each item does its own instance of a pipeline.
+  '''
+  debug("action_per: argv=%r", argv)
+  argv = list(argv)
+  pipespec = PipeSpec("per:[%s]" % (','.join(argv)), argv)
+  def function(item):
+    debug("action_per func %r per(%r)", function.__name__, item)
+    P, U = item
+    with P.later.more_capacity(1):
+      pipeline = P.pipe_through(pipespec, (item,))
+      debug("pipe: pipe_though(%s) => %r", pipespec, pipeline)
+      for item in pipeline.outQ:
+        debug("pipe: postpipe: yield %r", item)
+        yield item
+  function.__name__ = "%s(%s)" % (action, '|'.join(argv))
+  return FUNC_ONE_TO_MANY, function
 
 def action_sight(func_name, action, offset):
   # see[:seenset,...[:value]]
