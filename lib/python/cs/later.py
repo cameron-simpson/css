@@ -245,10 +245,6 @@ class _PipelinePushQueue(PushQueue):
   def __str__(self):
     return "%s[%s]" % (PushQueue.__str__(self), self.pipeline)
 
-  def put(self, item):
-    self.pipeline.counter.inc(item)
-    return PushQueue.put(self, item)
-
 class _Pipeline(NestingOpenCloseMixin):
   ''' A _Pipeline encapsultes the chain of PushQueues created by a call to Later.pipeline.
   '''
@@ -259,7 +255,6 @@ class _Pipeline(NestingOpenCloseMixin):
     NestingOpenCloseMixin.__init__(self)
     self.name = name
     self.later = L
-    self.counter = TrackingCounter(name="%s.counter" % (name,))
     self.queues = [outQ]
     self._lock = Lock()
     RHQ = outQ
@@ -274,17 +269,10 @@ class _Pipeline(NestingOpenCloseMixin):
       RHQ = PQ
 
   def __str__(self):
-    return "cs.later._Pipeline:%s:%d" % (self.name, self.counter.value)
+    return "cs.later._Pipeline:%s" % (self.name,)
 
   def __repr__(self):
     return "<%s %d queues, later=%s>" % (self, len(self.queues), self.later)
-
-  def wait_idle(self):
-    ''' Wait for the counter to become zero.
-    '''
-    D("%s.wait_idle...", self)
-    self.counter.wait(0)
-    D("%s.wait_idle COMPLETE", self)
 
   def put(self, item):
     ''' Put an `item` onto the leftmost queue in the pipeline.
@@ -302,11 +290,6 @@ class _Pipeline(NestingOpenCloseMixin):
     ''' Property returning the rightmost queue in the pipeline, the output queue.
     '''
     return self.queues[-1]
-
-  def quiesce(self):
-    ''' Wait for there to be no items in play in the pipeline.
-    '''
-    self.counter.wait(0)
 
   def shutdown(self):
     ''' Close the leftmost queue in the pipeline.
@@ -360,16 +343,13 @@ class _Pipeline(NestingOpenCloseMixin):
     elif func_sig == FUNC_MANY_TO_MANY:
       gathered = []
       def func_iter(item):
-        # raise counter for each item gathered
-        self.counter.inc(item)
+        D("GATHER %r FOR %s", item, func.__name__)
         gathered.append(item)
         if False:
           yield
       def func_final():
         for item in func(gathered):
           yield item
-          # decrement counter after each gathered item is consumed
-          self.counter.dec(item)
     else:
       raise ValueError("unsupported function signature %r" % (func_sig,))
 
@@ -378,24 +358,14 @@ class _Pipeline(NestingOpenCloseMixin):
     def func_iter(item):
       with LogExceptions():
         for item2 in func_iter0(item):
-          # raise counter for each item we release
-          self.counter.inc(item2)
           yield item2
-          # decrement counter when item consumed
-          self.counter.dec(item2)
-        # decrement counter for consumption of the source item
-        self.counter.dec(item)
 
     if func_final is not None:
       func_final0 = func_final
       def func_final():
         with LogExceptions():
           for item in func_final0():
-            # raise counter for each item we release
-            self.counter.inc(item)
             yield item
-            # decrement counter when item consumed
-            self.counter.dec(item)
 
     return func_iter, func_final
 
