@@ -450,6 +450,8 @@ class Filer(O):
     return self.env('ALERT_FORMAT', 'MAILFILER: {short_from}->{short_recipients}: {subject}')
 
   def alert_message(self, M):
+    ''' Return the alert message filled out with parameters from the Message `M`.
+    '''
     try:
       msg = self.format_message(M, self.alert_format)
     except KeyError as e:
