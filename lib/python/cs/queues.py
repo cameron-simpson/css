@@ -51,18 +51,23 @@ class _NOC_Proxy(Proxy):
     self.closed = False
 
   def __str__(self):
-    return "open(%r:%s[closed=%r])" % (self.name, self._proxied, self.closed)
+    return "open(%r:%s[closed=%r,all_closed=%r])" % (self.name, self._proxied, self.closed, self._proxied.all_closed)
 
   __repr__ = __str__
 
   @not_closed
-  def close(self):
+  def close(self, check_final_close=False):
     ''' Close this open-proxy. Sanity check then call inner close.
     '''
-    debug("<%s>.close()", self.name)
+    D("<%s>.close()", self.name)
     self.closed = True
     self.closed_stacklist = traceback.extract_stack()
     self._proxied._close()
+    if check_final_close:
+      if self._proxied.all_closed:
+        D("%s: OK FINAL CLOSE", self)
+      else:
+        raise RuntimeError("%s: expected this to be the final close, but it was not" % (self,))
 
 class _NOC_ThreadingLocal(threading.local):
 
@@ -430,7 +435,7 @@ class PushQueue(NestingOpenCloseMixin, O):
         Otherwise, defer self.func_push(item) and after completion,
         queue its results to outQ.
     '''
-    debug("%s.put(item=%r)", self, item)
+    D("%s.put(item=%r)", self, item)
     if self.all_closed:
       warning("%s.put(%s) when all closed" % (self, item))
     L = self.later
@@ -518,7 +523,7 @@ class NullQueue(NestingOpenCloseMixin, O):
   def put(self, item):
     ''' Put a value onto the Queue; it is discarded.
     '''
-    debug("%s.put: DISCARD %r", self, item)
+    D("%s.put: DISCARD %r", self, item)
     pass
 
   def get(self):
