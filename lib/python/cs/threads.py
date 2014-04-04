@@ -131,19 +131,18 @@ class WorkerThreadPool(NestingOpenCloseMixin, O):
           except:
             result = None
             exc_info = sys.exc_info()
-            HT.name = oname
             log_func = exception if isinstance(exc_info[1], (TypeError, NameError, AttributeError)) else debug
             log_func("%s: worker thread: ran task: exception! %r", self, sys.exc_info())
             # don't let exceptions go unhandled
             # if nobody is watching, raise the exception and don't return
             # this handler to the pool
             if retq is None and deliver is None:
-              debug("%s: worker thread: reraise exception", self)
+              error("%s: worker thread: reraise exception", self)
               raise3(*exc_info)
             debug("%s: worker thread: set result = (None, exc_info)", self)
           else:
             exc_info = None
-            HT.name = oname
+          HT.name = oname
           func = None     # release func+args
           with self._lock:
             self.idle.append( Hdesc )
