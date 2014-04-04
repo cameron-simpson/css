@@ -233,10 +233,13 @@ class TrackingCounter(object):
     return "%s:%d" % (self.name, self.value)
 
   def __repr__(self):
-    return "<TrackingCounter %r %r>" % (str(self), self._watched)
+    return "<TrackingCounter %r:%r>" % (str(self), self._watched)
 
   def __nonzero__(self):
     return self.value != 0
+
+  def __int__(self):
+    return self.value
 
   def _notify(self):
     ''' Notify any waiters on the current counter value.
