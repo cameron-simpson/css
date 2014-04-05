@@ -206,6 +206,7 @@ class O(object):
         This call can be omitted in subclasses if desired.
     '''
     self._O_omit = []
+    self._O_trace = False
     for k in kw:
       setattr(self, k, kw[k])
 
@@ -230,6 +231,13 @@ class O(object):
 
   def __ne__(self, other):
     return not (self == other)
+
+  def D(self, msg, *a):
+    ''' Call cs.logutils.D() if this object is being traced.
+    '''
+    if self._O_trace:
+      from cs.logutils import D as dlog
+      dlog("%s: "+msg, self, *a)
 
 def copy(obj, *a, **kw):
   ''' Convenient function to shallow copy an object with simple modifications.
