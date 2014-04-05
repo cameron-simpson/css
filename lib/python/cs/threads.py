@@ -94,7 +94,7 @@ class WorkerThreadPool(NestingOpenCloseMixin, O):
         args = []
         HT = Thread(target=self._handler, args=args, name=("%s:worker" % (self.name,)))
         ##HT.daemon = True
-        RQ = IterableQueue(name="%s:IQ%d" % (self.name, seq())).open()
+        RQ = IterableQueue(name="%s:IQ%d" % (self.name, seq()))
         Hdesc = (HT, RQ)
         self.all.append(Hdesc)
         args.append(Hdesc)

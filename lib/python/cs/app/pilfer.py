@@ -35,7 +35,7 @@ from cs.later import Later, FUNC_ONE_TO_ONE, FUNC_ONE_TO_MANY, FUNC_SELECTOR, FU
 from cs.lex import get_identifier, get_other_chars
 from cs.logutils import setup_logging, logTo, Pfx, info, debug, error, warning, exception, trace, pfx_iter, D
 from cs.mappings import MappingChain, SeenSet
-from cs.queues import IterableQueue, NullQueue, NullQ
+from cs.queues import NullQueue, NullQ
 from cs.seq import seq
 from cs.threads import locked, locked_property
 from cs.urlutils import URL, isURL, NetrcHTTPPasswordMgr
