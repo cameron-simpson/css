@@ -136,10 +136,7 @@ def O_attrs(o):
       Note: this calls getattr(o, attr) to inspect it in order to
       prune callables.
   '''
-  try:
-    omit = o._O_omit
-  except AttributeError:
-    omit = ()
+  omit = getattr(o, '_O_omit', ())
   for attr in sorted(dir(o)):
     if attr[0].isalpha() and not attr in omit:
       try:
@@ -206,7 +203,6 @@ class O(object):
         This call can be omitted in subclasses if desired.
     '''
     self._O_omit = []
-    self._O_trace = False
     for k in kw:
       setattr(self, k, kw[k])
 
@@ -235,7 +231,7 @@ class O(object):
   def D(self, msg, *a):
     ''' Call cs.logutils.D() if this object is being traced.
     '''
-    if self._O_trace:
+    if getattr(self, '_O_trace', False):
       from cs.logutils import D as dlog
       dlog("%s: "+msg, self, *a)
 
