@@ -236,7 +236,7 @@ class O(object):
       if a:
         dlog("%s: "+msg, self, *a)
       else:
-        dlog(': ',join(str(self), msg))
+        dlog(': '.join( (str(self), msg) ))
 
 def copy(obj, *a, **kw):
   ''' Convenient function to shallow copy an object with simple modifications.
