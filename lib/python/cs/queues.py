@@ -195,7 +195,7 @@ class _Q_Proxy(_NOC_Proxy):
   def put(self, item, *a, **kw):
     return self._proxied.put(item, *a, **kw)
 
-class QueueIterator(NestingOpenCloseMixin,O):
+class QueueIterator(NestingOpenCloseMixin):
   ''' A QueueIterator is a wrapper for a Queue (or ducktype) which
       presents an iterator interface to collect items.
       It does not offer the .get or .get_nowait methods.
@@ -258,50 +258,6 @@ class QueueIterator(NestingOpenCloseMixin,O):
     return item
 
   next = __next__
-
-##  def __getattr__(self, attr):
-##    return getattr(self.q, attr)
-##
-##  def get(self, block=True, timeout=None):
-##    if block and timeout is None:
-##      # calling an indefinitiely blocking get if probably an 
-##      raise RuntimeError(".get(block=%r,timeout=%r) on QueueIterator", block, timeout)
-##    if block and timeout is not None:
-##      start = time.time()
-##    q = self.q
-##    item = q.get(block=block, timeout=timeout)
-##    # block must have been True since no exception raised
-##    while item is self.sentinel:
-##      # the sentinel should be ignored
-##      if timeout is None:
-##        if q.empty():
-##          q.put(item)
-##          continue
-##      else:
-##        now = time.time()
-##        elapsed = now - start
-##        timeout -= elapsed
-##        if timeout <= 0:
-##          if q.empty():
-##            raise Queue_Empty
-##      # timeout > 0 or queue not empty
-##      # get the next item, ignoring the sentinel
-##      try:
-##        item = q.get(block=block, timeout=timeout)
-##      except Queue_Empty:
-##        # put the sentinel back to prevent blocking another caller
-##        q._put(self.sentinel)
-##        raise
-##      q._put(self.sentinel)
-##    return item
-##
-##  def get_nowait(self):
-##    q = self.q
-##    item = q.get_nowait()
-##    if item is self.sentinel:
-##      q._put(self.sentinel)
-##      raise Queue_Empty
-##    return item
 
 def IterableQueue(capacity=0, name=None, *args, **kw):
   if not isinstance(capacity, int):
