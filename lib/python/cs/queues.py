@@ -74,7 +74,7 @@ class _NOC_ThreadingLocal(threading.local):
   def __init__(self):
     self.cmgr_proxies = []
 
-class NestingOpenCloseMixin(object):
+class NestingOpenCloseMixin(O):
   ''' A mixin to count open and closes, and to call .shutdown() when the count goes to zero.
       A count of active open()s is kept, and on the last close()
       the object's .shutdown() method is called.
@@ -383,7 +383,7 @@ class Channel(object):
     else:
       self.closed = True
 
-class PushQueue(NestingOpenCloseMixin, O):
+class PushQueue(NestingOpenCloseMixin):
   ''' A puttable object to look like a Queue.
       Calling .put(item) calls `func_push` supplied at initialisation to
       trigger a function on data arrival.
@@ -491,7 +491,7 @@ class PushQueue(NestingOpenCloseMixin, O):
     for item in items:
       outQ.put(item)
 
-class NullQueue(NestingOpenCloseMixin, O):
+class NullQueue(NestingOpenCloseMixin):
   ''' A queue-like object that discards its inputs.
       Calls to .get() raise Queue_Empty.
   '''
