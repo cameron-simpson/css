@@ -233,7 +233,10 @@ class O(object):
     '''
     if getattr(self, '_O_trace', False):
       from cs.logutils import D as dlog
-      dlog("%s: "+msg, self, *a)
+      if a:
+        dlog("%s: "+msg, self, *a)
+      else:
+        dlog(': ',join(str(self), msg))
 
 def copy(obj, *a, **kw):
   ''' Convenient function to shallow copy an object with simple modifications.
