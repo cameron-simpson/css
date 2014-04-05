@@ -59,13 +59,12 @@ class _NOC_Proxy(Proxy):
   def close(self, check_final_close=False):
     ''' Close this open-proxy. Sanity check then call inner close.
     '''
-    D("<%s>.close()", self.name)
     self.closed = True
     self.closed_stacklist = traceback.extract_stack()
     self._proxied._close()
     if check_final_close:
       if self._proxied.all_closed:
-        D("%s: OK FINAL CLOSE", self)
+        self.D("OK FINAL CLOSE")
       else:
         raise RuntimeError("%s: expected this to be the final close, but it was not" % (self,))
 
@@ -435,7 +434,6 @@ class PushQueue(NestingOpenCloseMixin):
         Otherwise, defer self.func_push(item) and after completion,
         queue its results to outQ.
     '''
-    D("%s.put(item=%r)", self, item)
     if self.all_closed:
       warning("%s.put(%s) when all closed" % (self, item))
     L = self.later
@@ -523,7 +521,6 @@ class NullQueue(NestingOpenCloseMixin):
   def put(self, item):
     ''' Put a value onto the Queue; it is discarded.
     '''
-    D("%s.put: DISCARD %r", self, item)
     pass
 
   def get(self):
