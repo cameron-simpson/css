@@ -262,7 +262,14 @@ class _Pipeline(NestingOpenCloseMixin):
     while filter_funcs:
       func_iter, func_final = self._pipeline_func(filter_funcs.pop())
       count -= 1
-      pq_name = ":".join((name, str(count), str(seq())))
+      pq_name = ":".join( (name,
+                           "%s/%s" % ( (func_iter.__name__ if func_iter else "None"),
+                                       (func_final.__name__ if func_final else "None"),
+                                     ),
+                           str(count),
+                           str(seq()),
+                          )
+                        )
       PQ = _PipelinePushQueue(self, L, func_iter, RHQ, is_iterable=True,
                               func_final=func_final, name=pq_name).open()
       self.queues.insert(0, PQ)
