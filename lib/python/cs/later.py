@@ -301,7 +301,7 @@ class _Pipeline(NestingOpenCloseMixin):
   def shutdown(self):
     ''' Close the leftmost queue in the pipeline.
     '''
-    self.inQ.close()
+    self.inQ.close(check_final_close=True)
 
   def join(self):
     ''' Wait for completion of the output queue.
@@ -409,7 +409,9 @@ class Later(NestingOpenCloseMixin):
     self.delayed = set()        # unqueued, delayed until specific time
     self.pending = set()        # undispatched LateFunctions
     self.running = set()        # running LateFunctions
-    self._busy = set()              # counter sanity checking is_idle()
+    self._busy = TrackingCounter(name="Later<%s>._busy" % (name,)) # counter tracking jobs queued or active
+    self._quiescing = False
+    self._state = ""
     self.logger = None          # reporting; see logTo() method
     self._priority = (0,)
     self._timerQ = None         # queue for delayed requests; instantiated at need
@@ -421,21 +423,21 @@ class Later(NestingOpenCloseMixin):
     self._dispatchThread.start()
 
   def __repr__(self):
-    return '<%s "%s" capacity=%s running=%d (%s) pending=%d (%s) delayed=%d busy=%d:%r all_closed=%s>' \
+    return '<%s "%s" capacity=%s running=%d (%s) pending=%d (%s) delayed=%d busy=%d:%s all_closed=%s>' \
            % ( self.__class__.__name__, self.name,
                self.capacity,
                len(self.running), ','.join( repr(LF.name) for LF in self.running ),
                len(self.pending), ','.join( repr(LF.name) for LF in self.pending ),
                len(self.delayed),
-               len(self._busy), self._busy,
+               int(self._busy), self._busy,
                self.all_closed
              )
 
   def __str__(self):
-    return "<%s[%s] pending=%d running=%d delayed=%d busy=%d:%r opens=%d>" \
+    return "<%s[%s] pending=%d running=%d delayed=%d busy=%d:%s opens=%d>" \
            % (self.name, self.capacity,
               len(self.pending), len(self.running), len(self.delayed),
-              len(self._busy), self._busy,
+              int(self._busy), self._busy,
               self._opens)
 
   def state(self, new_state, *a):
@@ -472,29 +474,27 @@ class Later(NestingOpenCloseMixin):
         return
       self.finished = True
       if self._timerQ:
-        debug("timerQ.close...")
         self._timerQ.close()
-        debug("timerQ join...")
         self._timerQ.join()
-        debug("timerQ joined")
-      debug("_LFPQ.close...")
       self._LFPQ.close()              # prevent further submissions
-      debug("_workers.close...")
       self._workers.close()           # wait for all worker threads to complete
-      debug("_dispatchThread.join...")
       self._dispatchThread.join()     # wait for all functions to be dispatched
-      debug("_finished.acquire...")
       self._finished.acquire()
-      debug("notify_all...")
       self._finished.notify_all()
       self._finished.release()
-      debug("FINISHED")
 
   @locked
   def is_idle(self):
     with self._lock:
       status = not self._busy and not self.delayed and not self.pending and not self.running
     return status
+
+  def quiesce(self):
+    ''' Block until there are no jobs queued or active.
+    '''
+    self._quiescing = True
+    self._busy.wait(0)
+    self._quiescing = False
 
   @locked
   def is_finished(self):
@@ -688,10 +688,12 @@ class Later(NestingOpenCloseMixin):
       priority = (priority,)
     if pfx is not None:
       func = pfx.func(func)
+    self._busy.inc()
     L = self.open()
     def final():
       debug("close after LateFunction(name=%r)", name)
       L.close()
+      self._busy.dec()
     LF = LateFunction(self, func, name=name, final=final)
     pri_entry = list(priority)
     pri_entry.append(seq())     # ensure FIFO servicing of equal priorities
