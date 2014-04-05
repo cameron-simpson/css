@@ -195,7 +195,7 @@ class _Q_Proxy(_NOC_Proxy):
   def put(self, item, *a, **kw):
     return self._proxied.put(item, *a, **kw)
 
-class QueueIterator(NestingOpenCloseMixin):
+class _QueueIterator(NestingOpenCloseMixin):
   ''' A QueueIterator is a wrapper for a Queue (or ducktype) which
       presents an iterator interface to collect items.
       It does not offer the .get or .get_nowait methods.
@@ -263,13 +263,13 @@ def IterableQueue(capacity=0, name=None, *args, **kw):
   if not isinstance(capacity, int):
     raise RuntimeError("capacity: expected int, got: %r" % (capacity,))
   name = kw.pop('name', name)
-  return QueueIterator(Queue(capacity, *args, **kw), name=name)
+  return _QueueIterator(Queue(capacity, *args, **kw), name=name).open()
 
 def IterablePriorityQueue(capacity=0, name=None, *args, **kw):
   if not isinstance(capacity, int):
     raise RuntimeError("capacity: expected int, got: %r" % (capacity,))
   name = kw.pop('name', name)
-  return QueueIterator(PriorityQueue(capacity, *args, **kw), name=name)
+  return _QueueIterator(PriorityQueue(capacity, *args, **kw), name=name).open()
 
 class Channel(object):
   ''' A zero-storage data passage.
