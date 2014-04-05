@@ -438,6 +438,11 @@ class Later(NestingOpenCloseMixin):
               len(self._busy), self._busy,
               self._opens)
 
+  def state(self, new_state, *a):
+    if a:
+      new_state = new_state % a
+    self._state = new_state
+
   def __call__(self, func, *a, **kw):
     ''' A Later object can be called with a function and arguments
 	with the effect of deferring the function and waiting for
