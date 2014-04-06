@@ -366,7 +366,6 @@ class Pilfer(O):
     self.user_vars = { 'save_dir': '.' }
     self._urlsfile = None
     self._lock = Lock()
-    self.seen = defaultdict(set)
     self.rcs = []               # chain of PilferRC libraries
     self.diversions_map = {}        # global mapping of names to divert: pipelines
     self.opener = build_opener()
