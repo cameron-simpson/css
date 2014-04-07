@@ -367,6 +367,7 @@ class Pilfer(O):
     self._urlsfile = None
     self._lock = Lock()
     self.rcs = []               # chain of PilferRC libraries
+    self.seensets = {}
     self.diversions_map = {}        # global mapping of names to divert: pipelines
     self.opener = build_opener()
     self.opener.add_handler(HTTPBasicAuthHandler(NetrcHTTPPasswordMgr()))
@@ -389,7 +390,7 @@ class Pilfer(O):
   def seenset(self, name):
     ''' Return the SeenSet implementing the named "seen" set.
     '''
-    seen = self.seen
+    seen = self.seensets
     if name not in seen:
       backing_file = MappingChain(mappings=[ rc.seen_backing_files for rc in self.rcs ]).get(name)
       if backing_file is not None:
