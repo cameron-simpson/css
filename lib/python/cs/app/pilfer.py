@@ -854,7 +854,6 @@ def _test_grokfunc( PU, *a, **kw ):
 # actions that work on the whole list of in-play URLs
 many_to_many = {
       'sort':         lambda Ps, Us, *a, **kw: sorted(Us, *a, **kw),
-      'first':        lambda Ps, Us: Us[:1],
       'last':         lambda Ps, Us: Us[-1:],
     }
 
@@ -1080,6 +1079,14 @@ def action_func(action, do_trace, raw=False):
                 exts, case = action[2:], True
               exts = exts.split(',')
               function = lambda PU: not has_exts( PU[1], exts, case_sensitive=case )
+              func_sig = FUNC_SELECTOR
+            elif action == 'first':
+              is_first = True
+              def function(item):
+                if is_first:
+                  is_first = False
+                  return True
+                return False
               func_sig = FUNC_SELECTOR
             else:
               raise ValueError("unknown function %r" % (func_name,))
