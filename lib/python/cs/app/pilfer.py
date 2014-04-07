@@ -39,6 +39,7 @@ from cs.queues import NullQueue, NullQ
 from cs.seq import seq
 from cs.threads import locked, locked_property
 from cs.urlutils import URL, isURL, NetrcHTTPPasswordMgr
+import cs.obj
 from cs.obj import O
 from cs.py3 import input, ConfigParser
 
@@ -981,7 +982,8 @@ def action_func(action, do_trace, raw=False):
                   kwargs['regexp'] = re.compile(regexp, flags=re_flags)
                   kwargs['replacement'] = repl_format
                   kwargs['replace_all'] = repl_all
-                elif func_name == "divert" or func_name == "pipe":
+                elif func_name in ("copy", "divert", "pipe"):
+                  # copy:pipe_name[:selector]
                   # divert:pipe_name[:selector]
                   # pipe:pipe_name[:selector]
                   func_sig, function, scoped = action_divert_pipe(func_name, action, offset, do_trace)
@@ -1209,10 +1211,11 @@ def function_by_name(func_name, func_sig):
   return function, func_sig, scoped
 
 def action_divert_pipe(func_name, action, offset, do_trace):
+  # copy:pipe_name[:selector]
   # divert:pipe_name[:selector]
   # pipe:pipe_name[:selector]
   #
-  # Divert selected items to the named pipeline
+  # Divert or copy selected items to the named pipeline
   # or filter selected items through an instance of the named pipeline.
   if offset == len(action):
     raise ValueError("missing marker")
@@ -1242,19 +1245,30 @@ def action_divert_pipe(func_name, action, offset, do_trace):
     @logexc
     def function(item):
       P, U = item
-      try:
-        if sel_function(item):
-          try:
-            pipe = P.diversion(pipe_name)
-          except KeyError:
-            error("no pipe named %r", pipe_name)
-          else:
-            pipe.put(item)
+      if sel_function(item):
+        try:
+          pipe = P.diversion(pipe_name)
+        except KeyError:
+          error("no pipe named %r", pipe_name)
         else:
-          yield U
-      except Exception as e:
-        exception("OUCH")
+          pipe.put(item)
+      else:
+        yield U
     function.__name__ = "divert_func(%r)" % (action,)
+  elif func_name == "copy":
+    func_sig = FUNC_ONE_TO_ONE
+    scoped = True
+    @logexc
+    def function(item):
+      if sel_function(item):
+        try:
+          pipe = P.diversion(pipe_name)
+        except KeyError:
+          error("no pipe named %r", pipe_name)
+        else:
+          pipe.put(item)
+      return item
+    function.__name__ = "copy_func(%r)" % (action,)
   elif func_name == "pipe":
     # gather all items and feed to an instance of the specified pipeline
     func_sig = FUNC_MANY_TO_MANY
