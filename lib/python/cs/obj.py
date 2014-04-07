@@ -3,6 +3,7 @@
 # Random stuff for "objects". - Cameron Simpson <cs@zip.com.au>
 #
 
+from copy import copy as copy0
 from cs.py3 import StringTypes
 
 class slist(list):
@@ -247,11 +248,12 @@ def copy(obj, *a, **kw):
        Treat all keyword arguments as (attribute,value) tuples and
        replace those attributes with the supplied values.
   '''
-  obj2 = copy(obj)
+  obj2 = copy0(obj)
   for attr in a:
     setattr(obj2, attr, copy(getattr(obj, attr)))
   for attr, value in kw.items():
     setattr(obj2, attr, value)
+  return obj2
 
 class Proxy(object):
   ''' An extremely simple proxy object that passes all unmatched attribute accesses to the proxied object.
