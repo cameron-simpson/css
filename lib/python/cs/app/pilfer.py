@@ -35,7 +35,7 @@ from cs.later import Later, FUNC_ONE_TO_ONE, FUNC_ONE_TO_MANY, FUNC_SELECTOR, FU
 from cs.lex import get_identifier, get_other_chars
 from cs.logutils import setup_logging, logTo, Pfx, info, debug, error, warning, exception, trace, pfx_iter, D
 from cs.mappings import MappingChain, SeenSet
-from cs.queues import IterableQueue, NullQueue, NullQ
+from cs.queues import NullQueue, NullQ
 from cs.seq import seq
 from cs.threads import locked, locked_property
 from cs.urlutils import URL, isURL, NetrcHTTPPasswordMgr
@@ -366,8 +366,8 @@ class Pilfer(O):
     self.user_vars = { 'save_dir': '.' }
     self._urlsfile = None
     self._lock = Lock()
-    self.seen = defaultdict(set)
     self.rcs = []               # chain of PilferRC libraries
+    self.seensets = {}
     self.diversions_map = {}        # global mapping of names to divert: pipelines
     self.opener = build_opener()
     self.opener.add_handler(HTTPBasicAuthHandler(NetrcHTTPPasswordMgr()))
@@ -390,7 +390,7 @@ class Pilfer(O):
   def seenset(self, name):
     ''' Return the SeenSet implementing the named "seen" set.
     '''
-    seen = self.seen
+    seen = self.seensets
     if name not in seen:
       backing_file = MappingChain(mappings=[ rc.seen_backing_files for rc in self.rcs ]).get(name)
       if backing_file is not None:

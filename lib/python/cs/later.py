@@ -416,7 +416,7 @@ class Later(NestingOpenCloseMixin):
     self._priority = (0,)
     self._timerQ = None         # queue for delayed requests; instantiated at need
     # inbound requests queue
-    self._LFPQ = IterablePriorityQueue(inboundCapacity, name="%s._LFPQ" % (self.name,)).open()
+    self._LFPQ = IterablePriorityQueue(inboundCapacity, name="%s._LFPQ" % (self.name,))
     self._workers = WorkerThreadPool(name=name+":WorkerThreadPool").open()
     self._dispatchThread = Thread(name=self.name+'._dispatcher', target=self._dispatcher)
     self._dispatchThread.daemon = True
@@ -931,7 +931,7 @@ class Later(NestingOpenCloseMixin):
     if not filter_funcs:
       raise ValueError("no filter_funcs")
     if outQ is None:
-      outQ = IterableQueue(name="pipelineIQ").open()
+      outQ = IterableQueue(name="pipelineIQ")
     if name is None:
       name = "pipelinePQ"
     pipeline = _Pipeline(name, self, filter_funcs, outQ)

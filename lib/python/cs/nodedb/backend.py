@@ -11,7 +11,6 @@ import unittest
 from cs.logutils import D, OBSOLETE, debug, error
 from cs.obj import O
 from cs.threads import locked_property
-from cs.queues import IterableQueue
 from cs.excutils import unimplemented
 from cs.timeutils import sleep
 from cs.debug import Lock, RLock, Thread
