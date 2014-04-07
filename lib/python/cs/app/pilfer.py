@@ -1260,6 +1260,7 @@ def action_divert_pipe(func_name, action, offset, do_trace):
     scoped = True
     @logexc
     def function(item):
+      P, U = item
       if sel_function(item):
         try:
           pipe = P.diversion(pipe_name)
