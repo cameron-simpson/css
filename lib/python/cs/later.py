@@ -350,7 +350,7 @@ class _Pipeline(NestingOpenCloseMixin):
     elif func_sig == FUNC_MANY_TO_MANY:
       gathered = []
       def func_iter(item):
-        D("GATHER %r FOR %s", item, func.__name__)
+        debug("GATHER %r FOR %s", item, func.__name__)
         gathered.append(item)
         if False:
           yield
@@ -815,13 +815,18 @@ class Later(NestingOpenCloseMixin):
     else:
       # create a notification function which submits put_func
       # after sufficient notifications have been received
+      self._busy.inc()
+      L = self.open()
       countery = [count]  # to stop "count" looking like a local var inside the closure
       def submit_func(LF):
         ''' Notification function to submit `func` after sufficient invocations.
         '''
         countery[0] -= 1
-        if countery[0] == 0:
-          self._defer(put_func)
+        if countery[0] != 0:
+          return
+        self._defer(put_func)
+        L.close()
+        self._busy.dec()
       # submit the notifications
       for LF in LFs:
         LF.notify(submit_func)
