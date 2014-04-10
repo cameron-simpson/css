@@ -9,7 +9,7 @@
 set -ue
 
 need_header=1
-header_files=header.tvwiz
+header_file=header.tvwiz
 trace=eecho
 target=
 
