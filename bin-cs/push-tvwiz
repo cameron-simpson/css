@@ -1,0 +1,76 @@
+#!/bin/sh
+#
+# Copy/rsync Beyonwiz .tvwiz recordings into another directory
+# from the current one. Has facilities for skipping corrupt files.
+# Necessity is the mother and all that.
+#       - Cameron Simpson <cs@zip.com.au> 10apr2014
+#
+
+set -ue
+
+need_header=1
+header_files=header.tvwiz
+trace=eecho
+target=
+
+cmd=$0
+usage="Usage: $cmd -d target sources..."
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -d) target=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing sources" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+find "$@" -type d -name \*.tvwiz -print -prune \
+| \
+{
+  set -ue
+  xit=0
+  while read -r src
+  do
+    if [ $need_header ]
+    then
+      hdr=$src/$header_file
+      if [ ! -s "$hdr" ]
+      then
+        echo "$cmd: no $header_file: SKIP: $src" >&2
+        continue
+      fi
+    fi
+
+    dst=$target/$src
+
+    if [ -e "$dst" ]
+    then
+      if [ -d "$dst/." ]
+      then
+        tag_fd 1 "$src" $trace rsync -irt -- "$src/." "$dst/." || xit=1
+      else
+        echo "$cmd: existing non-directory: $dst" >&2
+        xit=1
+      fi
+    else
+      $trace cp -a -i -- "$src" "$dst" || xit=1
+    fi
+  done
+
+  exit $xit
+}
