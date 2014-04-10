@@ -193,7 +193,7 @@ class LateFunction(PendingFunction):
     if name is None:
       name = "LF-%d[func=%s]" % (seq(),func,)
     self.name = name
-    self.later = later
+    self.later = later.open()
 
   def __str__(self):
     return "<LateFunction %s>" % (self.name,)
@@ -207,14 +207,8 @@ class LateFunction(PendingFunction):
     with self._lock:
       if not self.pending:
         raise RuntimeError("should be pending, but state = %s", self.state)
-      # wrap the function to permit it to submit more work
-      func = self.func
-      def run_func():
-        with L:
-          return func()
-      run_func.__name__ = "%s:%s" % (run_func.__name__, func)
       self.state = ASYNCH_RUNNING
-      L._workers.dispatch(run_func, deliver=self._worker_complete, daemon=True)
+      L._workers.dispatch(self.func, deliver=self._worker_complete, daemon=True)
       self.func = None
 
   @OBSOLETE
@@ -235,6 +229,7 @@ class LateFunction(PendingFunction):
   def _complete(self, result, exc_info):
     PendingFunction._complete(self, result, exc_info)
     self.later._completed(self, result, exc_info)
+    self.later.close()
 
 class _PipelinePushQueue(PushQueue):
 
