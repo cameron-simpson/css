@@ -11,7 +11,7 @@ set -ue
 need_header=1
 header_file=header.tvwiz
 doit=1
-trace=set-x
+trace='set-x --date'
 target=
 
 cmd=$0
