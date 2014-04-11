@@ -12,10 +12,15 @@ need_header=1
 header_file=header.tvwiz
 doit=1
 trace='set-x --date'
+docopy=1
 target=
 
 cmd=$0
-usage="Usage: $cmd -d target [-n] [--] sources..."
+usage="Usage: $cmd -d target [-n] [--no-cp] [--] sources...
+    -d target   Specify target directory tree.
+    -n          No action. Recite planned actions.
+    --no-cp     No copy. Rsync existing copies but do not copy new
+                tvwiz directories."
 
 badopts=
 
@@ -24,6 +29,8 @@ do
   case $1 in
     -d) target=$2; shift ;;
     -n) doit= trace=eecho ;;
+    --no-cp)
+        docopy= ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
         badopts=1
@@ -82,7 +89,12 @@ find "$@" -type d -name \*.tvwiz -print -prune \
         xit=1
       fi
     else
-      $trace cp -a -i -- "$src" "$dst" || xit=1
+      if [ $docopy ]
+      then
+        $trace cp -a -i -- "$src" "$dst" || xit=1
+      else
+        echo "$cmd: not copying new dirs, skip: $src" >&2
+      fi
     fi
 
     if [ -e "$dst" ]
