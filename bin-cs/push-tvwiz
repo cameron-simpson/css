@@ -105,7 +105,7 @@ find "$@" -type d -name \*.tvwiz -print -prune \
         name=$(strings "$dsthdr" | sed -n 2p)
         if [ -n "$name" ]
         then
-          name_=$( printf '%s\n' "$name" | tr '\011 ' __ )
+          name_=$( printf '%s\n' "$name" | tr '\011 /' ___ )
           dstdir=$(dirname "$dst")
           dstbase=$(basename "$dst")
           symlink=$dstdir/${name_}_${dstbase}
