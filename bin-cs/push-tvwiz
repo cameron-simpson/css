@@ -84,6 +84,28 @@ find "$@" -type d -name \*.tvwiz -print -prune \
     else
       $trace cp -a -i -- "$src" "$dst" || xit=1
     fi
+
+    if [ -e "$dst" ]
+    then
+      dsthdr=$dst/$header_file
+      if [ -s "$dsthdr" ]
+      then
+        name=$(strings "$dsthdr" | sed -n 2p)
+        if [ -n "$name" ]
+        then
+          name_=$( printf '%s\n' "$name" | tr '\011 ' __ )
+          dstdir=$(dirname "$dst")
+          dstbase=$(basename "$dst")
+          symlink=$dstdir/${name_}_${dstbase}
+          [ ! -e "$symlink" ] || $trace rm -f -- "$symlink"
+          [ ! -e "$symlink" ] && $trace ln -i -s "$dst" "$symlink"
+        else
+          echo "$cmd: warning: no program name from header: $dsthdr" >&2
+        fi
+      else
+        echo "$cmd: warning: no header file: $dsthdr" >&2
+      fi
+    fi
   done
 
   exit $xit
