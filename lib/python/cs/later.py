@@ -361,21 +361,6 @@ class _Pipeline(NestingOpenCloseMixin):
       func_final.__name__ = "func_final_gather(func=%s)" % (func.__name__,)
     else:
       raise ValueError("unsupported function signature %r" % (func_sig,))
-
-    # wrap func_iter and func_final to manipulate the item counter
-    func_iter0 = func_iter
-    def func_iter(item):
-      with LogExceptions():
-        for item2 in func_iter0(item):
-          yield item2
-
-    if func_final is not None:
-      func_final0 = func_final
-      def func_final():
-        with LogExceptions():
-          for item in func_final0():
-            yield item
-
     return func_iter, func_final
 
 class Later(NestingOpenCloseMixin):
