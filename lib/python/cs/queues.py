@@ -163,9 +163,9 @@ class NestingOpenCloseMixin(O):
     if self.on_close:
       self.on_close(self, count)
     if count == 0:
-      self.shutdown()
       if self.on_shutdown:
         self.on_shutdown(self)
+      self.shutdown()
       if not self._finalise_later:
         self.finalise()
     elif self.all_closed:

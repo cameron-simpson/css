@@ -193,10 +193,18 @@ class LateFunction(PendingFunction):
     if name is None:
       name = "LF-%d[func=%s]" % (seq(),func,)
     self.name = name
-    self.later = later
+    self.later = later.open()
 
   def __str__(self):
     return "<LateFunction %s>" % (self.name,)
+
+  def _complete(self, result, exc_info):
+    '''
+    '''
+    D("COMPLETE LATEFUNCTION %s: result=%r, exc_info=%r", self, result, exc_info)
+    PendingFunction._complete(self, result, exc_info)
+    self.later._completed(self, result, exc_info)
+    self.later.close()
 
   def _dispatch(self):
     ''' ._dispatch() is called by the Later class instance's worker thread.
@@ -207,14 +215,8 @@ class LateFunction(PendingFunction):
     with self._lock:
       if not self.pending:
         raise RuntimeError("should be pending, but state = %s", self.state)
-      # wrap the function to permit it to submit more work
-      func = self.func
-      def run_func():
-        with L:
-          return func()
-      run_func.__name__ = "%s:%s" % (run_func.__name__, func)
       self.state = ASYNCH_RUNNING
-      L._workers.dispatch(run_func, deliver=self._worker_complete, daemon=True)
+      L._workers.dispatch(self.func, deliver=self._worker_complete, daemon=True)
       self.func = None
 
   @OBSOLETE
@@ -231,10 +233,6 @@ class LateFunction(PendingFunction):
             for line in formatted.rstrip().split('\n'):
               warning(line)
     self._complete(result, exc_info)
-
-  def _complete(self, result, exc_info):
-    PendingFunction._complete(self, result, exc_info)
-    self.later._completed(self, result, exc_info)
 
 class _PipelinePushQueue(PushQueue):
 
@@ -341,12 +339,14 @@ class _Pipeline(NestingOpenCloseMixin):
     if func_sig == FUNC_ONE_TO_ONE:
       def func_iter(item):
         yield func(item)
+      func_iter.__name__ = "func_iter_1to1(func=%s)" % (func.__name__,)
     elif func_sig == FUNC_ONE_TO_MANY:
       func_iter = func
     elif func_sig == FUNC_SELECTOR:
       def func_iter(item):
         if func(item):
           yield item
+      func_iter.__name__ = "func_iter_1toMany(func=%s)" % (func.__name__,)
     elif func_sig == FUNC_MANY_TO_MANY:
       gathered = []
       def func_iter(item):
@@ -354,26 +354,13 @@ class _Pipeline(NestingOpenCloseMixin):
         gathered.append(item)
         if False:
           yield
+      func_iter.__name__ = "func_iter_gather(func=%s)" % (func.__name__,)
       def func_final():
         for item in func(gathered):
           yield item
+      func_final.__name__ = "func_final_gather(func=%s)" % (func.__name__,)
     else:
       raise ValueError("unsupported function signature %r" % (func_sig,))
-
-    # wrap func_iter and func_final to manipulate the item counter
-    func_iter0 = func_iter
-    def func_iter(item):
-      with LogExceptions():
-        for item2 in func_iter0(item):
-          yield item2
-
-    if func_final is not None:
-      func_final0 = func_final
-      def func_final():
-        with LogExceptions():
-          for item in func_final0():
-            yield item
-
     return func_iter, func_final
 
 class Later(NestingOpenCloseMixin):
@@ -688,13 +675,7 @@ class Later(NestingOpenCloseMixin):
       priority = (priority,)
     if pfx is not None:
       func = pfx.func(func)
-    self._busy.inc()
-    L = self.open()
-    def final():
-      debug("close after LateFunction(name=%r)", name)
-      L.close()
-      self._busy.dec()
-    LF = LateFunction(self, func, name=name, final=final)
+    LF = LateFunction(self, func, name=name)
     pri_entry = list(priority)
     pri_entry.append(seq())     # ensure FIFO servicing of equal priorities
     pri_entry.append(LF)
@@ -891,6 +872,7 @@ class Later(NestingOpenCloseMixin):
         # now queue another iteration to run after those defered tasks
         self._defer(iterate_once)
 
+    iterate_once.__name__ = "%s:next(iter(%s))" % (iterate_once.__name__, I)
     self._defer(iterate_once)
 
   def pipeline(self, filter_funcs, inputs=None, outQ=None, name=None):
