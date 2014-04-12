@@ -164,7 +164,6 @@ class NestingOpenCloseMixin(O):
     if self.on_close:
       self.on_close(self, count)
     if count == 0:
-      self._asynchron.put(True)
       self.shutdown()
       if self.on_shutdown:
         self.on_shutdown(self)
