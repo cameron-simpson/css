@@ -11,7 +11,6 @@ import threading
 from threading import Condition, Timer
 import time
 import traceback
-from cs.asynchron import Asynchron
 from cs.debug import Lock, RLock, Thread, trace_caller, stack_dump
 from cs.excutils import noexc, logexc
 from cs.logutils import exception, error, warning, debug, D, Pfx, PfxCallInfo
