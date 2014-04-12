@@ -198,6 +198,14 @@ class LateFunction(PendingFunction):
   def __str__(self):
     return "<LateFunction %s>" % (self.name,)
 
+  def _complete(self, result, exc_info):
+    '''
+    '''
+    D("COMPLETE LATEFUNCTION %s: result=%r, exc_info=%r", self, result, exc_info)
+    PendingFunction._complete(self, result, exc_info)
+    self.later._completed(self, result, exc_info)
+    self.later.close()
+
   def _dispatch(self):
     ''' ._dispatch() is called by the Later class instance's worker thread.
         It causes the function to be handed to a thread for execution.
@@ -225,11 +233,6 @@ class LateFunction(PendingFunction):
             for line in formatted.rstrip().split('\n'):
               warning(line)
     self._complete(result, exc_info)
-
-  def _complete(self, result, exc_info):
-    PendingFunction._complete(self, result, exc_info)
-    self.later._completed(self, result, exc_info)
-    self.later.close()
 
 class _PipelinePushQueue(PushQueue):
 
