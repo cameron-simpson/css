@@ -339,12 +339,14 @@ class _Pipeline(NestingOpenCloseMixin):
     if func_sig == FUNC_ONE_TO_ONE:
       def func_iter(item):
         yield func(item)
+      func_iter.__name__ = "func_iter_1to1(func=%s)" % (func.__name__,)
     elif func_sig == FUNC_ONE_TO_MANY:
       func_iter = func
     elif func_sig == FUNC_SELECTOR:
       def func_iter(item):
         if func(item):
           yield item
+      func_iter.__name__ = "func_iter_1toMany(func=%s)" % (func.__name__,)
     elif func_sig == FUNC_MANY_TO_MANY:
       gathered = []
       def func_iter(item):
@@ -352,9 +354,11 @@ class _Pipeline(NestingOpenCloseMixin):
         gathered.append(item)
         if False:
           yield
+      func_iter.__name__ = "func_iter_gather(func=%s)" % (func.__name__,)
       def func_final():
         for item in func(gathered):
           yield item
+      func_final.__name__ = "func_final_gather(func=%s)" % (func.__name__,)
     else:
       raise ValueError("unsupported function signature %r" % (func_sig,))
 
@@ -889,6 +893,7 @@ class Later(NestingOpenCloseMixin):
         # now queue another iteration to run after those defered tasks
         self._defer(iterate_once)
 
+    iterate_once.__name__ = "%s:next(iter(%s))" % (iterate_once.__name__, I)
     self._defer(iterate_once)
 
   def pipeline(self, filter_funcs, inputs=None, outQ=None, name=None):
