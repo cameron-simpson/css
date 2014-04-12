@@ -202,7 +202,7 @@ def onetomany(func):
       multiple values back.
       Example:
         class X(list):
-          @onetoone
+          @onetomany
           def chars(self, item):
             return item
         strs = X(['Abc', 'Def'])
@@ -214,7 +214,7 @@ def onetomany(func):
 
 class TrackingCounter(object):
   ''' A wrapper for a counter which can be incremented and decremented.
-      A facility is provided to wait for the counter to reach a specifi value.
+      A facility is provided to wait for the counter to reach a specific value.
   '''
 
   def __init__(self, value=0, name=None):
@@ -233,10 +233,13 @@ class TrackingCounter(object):
     return "%s:%d" % (self.name, self.value)
 
   def __repr__(self):
-    return "<TrackingCounter %r %r>" % (str(self), self._watched)
+    return "<TrackingCounter %r:%r>" % (str(self), self._watched)
 
   def __nonzero__(self):
     return self.value != 0
+
+  def __int__(self):
+    return self.value
 
   def _notify(self):
     ''' Notify any waiters on the current counter value.

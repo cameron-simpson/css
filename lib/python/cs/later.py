@@ -245,10 +245,6 @@ class _PipelinePushQueue(PushQueue):
   def __str__(self):
     return "%s[%s]" % (PushQueue.__str__(self), self.pipeline)
 
-  def put(self, item):
-    self.pipeline.counter.inc(item)
-    return PushQueue.put(self, item)
-
 class _Pipeline(NestingOpenCloseMixin):
   ''' A _Pipeline encapsultes the chain of PushQueues created by a call to Later.pipeline.
   '''
@@ -259,7 +255,6 @@ class _Pipeline(NestingOpenCloseMixin):
     NestingOpenCloseMixin.__init__(self)
     self.name = name
     self.later = L
-    self.counter = TrackingCounter(name="%s.counter" % (name,))
     self.queues = [outQ]
     self._lock = Lock()
     RHQ = outQ
@@ -267,24 +262,24 @@ class _Pipeline(NestingOpenCloseMixin):
     while filter_funcs:
       func_iter, func_final = self._pipeline_func(filter_funcs.pop())
       count -= 1
-      pq_name = ":".join((name, str(count), str(seq())))
+      pq_name = ":".join( (name,
+                           "%s/%s" % ( (func_iter.__name__ if func_iter else "None"),
+                                       (func_final.__name__ if func_final else "None"),
+                                     ),
+                           str(count),
+                           str(seq()),
+                          )
+                        )
       PQ = _PipelinePushQueue(self, L, func_iter, RHQ, is_iterable=True,
                               func_final=func_final, name=pq_name).open()
       self.queues.insert(0, PQ)
       RHQ = PQ
 
   def __str__(self):
-    return "cs.later._Pipeline:%s:%d" % (self.name, self.counter.value)
+    return "cs.later._Pipeline:%s" % (self.name,)
 
   def __repr__(self):
     return "<%s %d queues, later=%s>" % (self, len(self.queues), self.later)
-
-  def wait_idle(self):
-    ''' Wait for the counter to become zero.
-    '''
-    D("%s.wait_idle...", self)
-    self.counter.wait(0)
-    D("%s.wait_idle COMPLETE", self)
 
   def put(self, item):
     ''' Put an `item` onto the leftmost queue in the pipeline.
@@ -303,15 +298,10 @@ class _Pipeline(NestingOpenCloseMixin):
     '''
     return self.queues[-1]
 
-  def quiesce(self):
-    ''' Wait for there to be no items in play in the pipeline.
-    '''
-    self.counter.wait(0)
-
   def shutdown(self):
     ''' Close the leftmost queue in the pipeline.
     '''
-    self.inQ.close()
+    self.inQ.close(check_final_close=True)
 
   def join(self):
     ''' Wait for completion of the output queue.
@@ -360,16 +350,13 @@ class _Pipeline(NestingOpenCloseMixin):
     elif func_sig == FUNC_MANY_TO_MANY:
       gathered = []
       def func_iter(item):
-        # raise counter for each item gathered
-        self.counter.inc(item)
+        debug("GATHER %r FOR %s", item, func.__name__)
         gathered.append(item)
         if False:
           yield
       def func_final():
         for item in func(gathered):
           yield item
-          # decrement counter after each gathered item is consumed
-          self.counter.dec(item)
     else:
       raise ValueError("unsupported function signature %r" % (func_sig,))
 
@@ -378,24 +365,14 @@ class _Pipeline(NestingOpenCloseMixin):
     def func_iter(item):
       with LogExceptions():
         for item2 in func_iter0(item):
-          # raise counter for each item we release
-          self.counter.inc(item2)
           yield item2
-          # decrement counter when item consumed
-          self.counter.dec(item2)
-        # decrement counter for consumption of the source item
-        self.counter.dec(item)
 
     if func_final is not None:
       func_final0 = func_final
       def func_final():
         with LogExceptions():
           for item in func_final0():
-            # raise counter for each item we release
-            self.counter.inc(item)
             yield item
-            # decrement counter when item consumed
-            self.counter.dec(item)
 
     return func_iter, func_final
 
@@ -432,34 +409,41 @@ class Later(NestingOpenCloseMixin):
     self.delayed = set()        # unqueued, delayed until specific time
     self.pending = set()        # undispatched LateFunctions
     self.running = set()        # running LateFunctions
-    self._busy = set()              # counter sanity checking is_idle()
+    self._busy = TrackingCounter(name="Later<%s>._busy" % (name,)) # counter tracking jobs queued or active
+    self._quiescing = False
+    self._state = ""
     self.logger = None          # reporting; see logTo() method
     self._priority = (0,)
     self._timerQ = None         # queue for delayed requests; instantiated at need
     # inbound requests queue
-    self._LFPQ = IterablePriorityQueue(inboundCapacity, name="%s._LFPQ" % (self.name,)).open()
+    self._LFPQ = IterablePriorityQueue(inboundCapacity, name="%s._LFPQ" % (self.name,))
     self._workers = WorkerThreadPool(name=name+":WorkerThreadPool").open()
     self._dispatchThread = Thread(name=self.name+'._dispatcher', target=self._dispatcher)
     self._dispatchThread.daemon = True
     self._dispatchThread.start()
 
   def __repr__(self):
-    return '<%s "%s" capacity=%s running=%d (%s) pending=%d (%s) delayed=%d busy=%d:%r all_closed=%s>' \
+    return '<%s "%s" capacity=%s running=%d (%s) pending=%d (%s) delayed=%d busy=%d:%s all_closed=%s>' \
            % ( self.__class__.__name__, self.name,
                self.capacity,
                len(self.running), ','.join( repr(LF.name) for LF in self.running ),
                len(self.pending), ','.join( repr(LF.name) for LF in self.pending ),
                len(self.delayed),
-               len(self._busy), self._busy,
+               int(self._busy), self._busy,
                self.all_closed
              )
 
   def __str__(self):
-    return "<%s[%s] pending=%d running=%d delayed=%d busy=%d:%r opens=%d>" \
+    return "<%s[%s] pending=%d running=%d delayed=%d busy=%d:%s opens=%d>" \
            % (self.name, self.capacity,
               len(self.pending), len(self.running), len(self.delayed),
-              len(self._busy), self._busy,
+              int(self._busy), self._busy,
               self._opens)
+
+  def state(self, new_state, *a):
+    if a:
+      new_state = new_state % a
+    self._state = new_state
 
   def __call__(self, func, *a, **kw):
     ''' A Later object can be called with a function and arguments
@@ -490,29 +474,27 @@ class Later(NestingOpenCloseMixin):
         return
       self.finished = True
       if self._timerQ:
-        debug("timerQ.close...")
         self._timerQ.close()
-        debug("timerQ join...")
         self._timerQ.join()
-        debug("timerQ joined")
-      debug("_LFPQ.close...")
       self._LFPQ.close()              # prevent further submissions
-      debug("_workers.close...")
       self._workers.close()           # wait for all worker threads to complete
-      debug("_dispatchThread.join...")
       self._dispatchThread.join()     # wait for all functions to be dispatched
-      debug("_finished.acquire...")
       self._finished.acquire()
-      debug("notify_all...")
       self._finished.notify_all()
       self._finished.release()
-      debug("FINISHED")
 
   @locked
   def is_idle(self):
     with self._lock:
       status = not self._busy and not self.delayed and not self.pending and not self.running
     return status
+
+  def quiesce(self):
+    ''' Block until there are no jobs queued or active.
+    '''
+    self._quiescing = True
+    self._busy.wait(0)
+    self._quiescing = False
 
   @locked
   def is_finished(self):
@@ -706,10 +688,12 @@ class Later(NestingOpenCloseMixin):
       priority = (priority,)
     if pfx is not None:
       func = pfx.func(func)
+    self._busy.inc()
     L = self.open()
     def final():
       debug("close after LateFunction(name=%r)", name)
       L.close()
+      self._busy.dec()
     LF = LateFunction(self, func, name=name, final=final)
     pri_entry = list(priority)
     pri_entry.append(seq())     # ensure FIFO servicing of equal priorities
@@ -831,13 +815,18 @@ class Later(NestingOpenCloseMixin):
     else:
       # create a notification function which submits put_func
       # after sufficient notifications have been received
+      self._busy.inc()
+      L = self.open()
       countery = [count]  # to stop "count" looking like a local var inside the closure
       def submit_func(LF):
         ''' Notification function to submit `func` after sufficient invocations.
         '''
         countery[0] -= 1
-        if countery[0] == 0:
-          self._defer(put_func)
+        if countery[0] != 0:
+          return
+        self._defer(put_func)
+        L.close()
+        self._busy.dec()
       # submit the notifications
       for LF in LFs:
         LF.notify(submit_func)
@@ -947,7 +936,7 @@ class Later(NestingOpenCloseMixin):
     if not filter_funcs:
       raise ValueError("no filter_funcs")
     if outQ is None:
-      outQ = IterableQueue(name="pipelineIQ").open()
+      outQ = IterableQueue(name="pipelineIQ")
     if name is None:
       name = "pipelinePQ"
     pipeline = _Pipeline(name, self, filter_funcs, outQ)

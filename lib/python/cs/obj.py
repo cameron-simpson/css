@@ -3,6 +3,7 @@
 # Random stuff for "objects". - Cameron Simpson <cs@zip.com.au>
 #
 
+from copy import copy as copy0
 from cs.py3 import StringTypes
 
 class slist(list):
@@ -136,10 +137,7 @@ def O_attrs(o):
       Note: this calls getattr(o, attr) to inspect it in order to
       prune callables.
   '''
-  try:
-    omit = o._O_omit
-  except AttributeError:
-    omit = ()
+  omit = getattr(o, '_O_omit', ())
   for attr in sorted(dir(o)):
     if attr[0].isalpha() and not attr in omit:
       try:
@@ -230,6 +228,32 @@ class O(object):
 
   def __ne__(self, other):
     return not (self == other)
+
+  def D(self, msg, *a):
+    ''' Call cs.logutils.D() if this object is being traced.
+    '''
+    if getattr(self, '_O_trace', False):
+      from cs.logutils import D as dlog
+      if a:
+        dlog("%s: "+msg, self, *a)
+      else:
+        dlog(': '.join( (str(self), msg) ))
+
+def copy(obj, *a, **kw):
+  ''' Convenient function to shallow copy an object with simple modifications.
+       Performs a shallow copy of `self` using copy.copy.
+       Treat all positional parameters as attribute names, and
+       replace those attributes with shallow copies of the original
+       attribute.
+       Treat all keyword arguments as (attribute,value) tuples and
+       replace those attributes with the supplied values.
+  '''
+  obj2 = copy0(obj)
+  for attr in a:
+    setattr(obj2, attr, copy(getattr(obj, attr)))
+  for attr, value in kw.items():
+    setattr(obj2, attr, value)
+  return obj2
 
 class Proxy(object):
   ''' An extremely simple proxy object that passes all unmatched attribute accesses to the proxied object.
