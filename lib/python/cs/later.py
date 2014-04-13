@@ -250,11 +250,11 @@ class _Pipeline(NestingOpenCloseMixin):
   def __init__(self, name, L, filter_funcs, outQ):
     ''' Initialise the _Pipeline from `name`, Later instance `L`, list  of filter functions `filter_funcs` and output queue `outQ`.
     '''
-    NestingOpenCloseMixin.__init__(self)
     self.name = name
     self.later = L
     self.queues = [outQ]
     self._lock = Lock()
+    NestingOpenCloseMixin.__init__(self)
     RHQ = outQ
     count = len(filter_funcs)
     while filter_funcs:
