@@ -487,7 +487,6 @@ class NullQueue(NestingOpenCloseMixin):
       name = "%s%d" % (self.__class__.__name__, seq())
     self.name = name
     self._lock = Lock()
-    self._close_cond = Condition(self._lock)
     O.__init__(self)
     NestingOpenCloseMixin.__init__(self,
                                    on_open=on_open, on_close=on_close, on_shutdown=on_shutdown,
@@ -510,17 +509,14 @@ class NullQueue(NestingOpenCloseMixin):
         If .blocking, delay until .shutdown().
     '''
     if self.blocking:
-      with self._lock:
-        if not self.all_closed:
-          self._close_cond.wait()
+      self.join()
     raise Queue_Empty
 
   def shutdown(self):
     ''' Shut down the queue. Wakes up anything waiting on ._close_cond, such
         as callers of .get() on a .blocking queue.
     '''
-    with self._lock:
-      self._close_cond.notify_all()
+    pass
 
   def __iter__(self):
     return self
