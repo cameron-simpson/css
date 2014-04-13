@@ -257,7 +257,7 @@ class TrackingCounter(object):
     ''' Increment the counter.
         Wake up any threads waiting for its new value.
     '''
-    debug("%s.inc", self)
+    debug("%s.inc TAG=%r", self, tag)
     with self._lock:
       self.value += 1
       if tag is not None:
@@ -270,7 +270,7 @@ class TrackingCounter(object):
     ''' Decrement the counter.
         Wake up any threads waiting for its new value.
     '''
-    debug("%s.dec", self)
+    debug("%s.dec: TAG=%r", self, tag)
     with self._lock:
       self.value -= 1
       if tag is not None:
