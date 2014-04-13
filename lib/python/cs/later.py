@@ -244,7 +244,7 @@ class _PipelinePushQueue(PushQueue):
     return "%s[%s]" % (PushQueue.__str__(self), self.pipeline)
 
 class _Pipeline(NestingOpenCloseMixin):
-  ''' A _Pipeline encapsultes the chain of PushQueues created by a call to Later.pipeline.
+  ''' A _Pipeline encapsulates the chain of PushQueues created by a call to Later.pipeline.
   '''
 
   def __init__(self, name, L, filter_funcs, outQ):
