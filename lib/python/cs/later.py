@@ -83,7 +83,7 @@ class _Late_context_manager(object):
     '''
 
     def run():
-      ''' This is the placeholder function dispatcher by the Later instance.
+      ''' This is the placeholder function dispatched by the Later instance.
           It releases the "commence" lock for __enter__ to acquire,
           permitting to with-suite to commence.
           It then blocks waiting to acquire the "complete" lock;
