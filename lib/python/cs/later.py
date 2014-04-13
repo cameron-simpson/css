@@ -199,9 +199,8 @@ class LateFunction(PendingFunction):
     return "<LateFunction %s>" % (self.name,)
 
   def _complete(self, result, exc_info):
+    ''' Record the completion result of this LateFunction and update the parent Later.
     '''
-    '''
-    D("COMPLETE LATEFUNCTION %s: result=%r, exc_info=%r", self, result, exc_info)
     PendingFunction._complete(self, result, exc_info)
     self.later._completed(self, result, exc_info)
     self.later.close()
