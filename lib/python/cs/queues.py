@@ -180,6 +180,8 @@ class NestingOpenCloseMixin(O):
       if self._finalise:
         self._finalise.notify_all()
         self._finalise = None
+        return
+    warning("%s: finalised more than once", self)
 
   @property
   def all_closed(self):
