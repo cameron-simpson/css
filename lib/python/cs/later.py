@@ -194,6 +194,7 @@ class LateFunction(PendingFunction):
       name = "LF-%d[func=%s]" % (seq(),func,)
     self.name = name
     self.later = later.open()
+    self.later._busy.inc(name)
 
   def __str__(self):
     return "<LateFunction %s>" % (self.name,)
@@ -203,6 +204,7 @@ class LateFunction(PendingFunction):
     '''
     PendingFunction._complete(self, result, exc_info)
     self.later._completed(self, result, exc_info)
+    self.later._busy.dec(self.name)
     self.later.close()
 
   def _dispatch(self):
@@ -796,7 +798,7 @@ class Later(NestingOpenCloseMixin):
     else:
       # create a notification function which submits put_func
       # after sufficient notifications have been received
-      self._busy.inc()
+      self._busy.inc("Later._after")
       L = self.open()
       countery = [count]  # to stop "count" looking like a local var inside the closure
       def submit_func(LF):
@@ -807,7 +809,7 @@ class Later(NestingOpenCloseMixin):
           return
         self._defer(put_func)
         L.close()
-        self._busy.dec()
+        self._busy.dec("Later._after")
       # submit the notifications
       for LF in LFs:
         LF.notify(submit_func)
