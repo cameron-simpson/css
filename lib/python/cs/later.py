@@ -402,7 +402,7 @@ class Later(NestingOpenCloseMixin):
     self._priority = (0,)
     self._timerQ = None         # queue for delayed requests; instantiated at need
     # inbound requests queue
-    self._LFPQ = IterablePriorityQueue(inboundCapacity, name="%s._LFPQ" % (self.name,))
+    self._pendingq = IterablePriorityQueue(inboundCapacity, name="%s._pendingq" % (self.name,))
     self._workers = WorkerThreadPool(name=name+":WorkerThreadPool").open()
     self._dispatchThread = Thread(name=self.name+'._dispatcher', target=self._dispatcher)
     self._dispatchThread.daemon = True
@@ -463,7 +463,7 @@ class Later(NestingOpenCloseMixin):
       if self._timerQ:
         self._timerQ.close()
         self._timerQ.join()
-      self._LFPQ.close()              # prevent further submissions
+      self._pendingq.close()              # prevent further submissions
       self._workers.close()           # wait for all worker threads to complete
       self._dispatchThread.join()     # wait for all functions to be dispatched
       self._finished.acquire()
@@ -601,7 +601,7 @@ class Later(NestingOpenCloseMixin):
     while True:
       self.capacity.acquire()   # will be released by the LateFunction
       try:
-        pri_entry = self._LFPQ.next()
+        pri_entry = self._pendingq.next()
       except StopIteration:
         self.capacity.release() # end of queue, not calling the handler
         break
@@ -686,15 +686,15 @@ class Later(NestingOpenCloseMixin):
     if when is None or when <= now:
       # queue the request now
       self.debug("queuing %s", LF)
-      self._track("_submit: _LFPQ.put", LF, None, self.pending)
-      self._LFPQ.put( pri_entry )
+      self._track("_submit: _pendingq.put", LF, None, self.pending)
+      self._pendingq.put( pri_entry )
     else:
       # queue the request at a later time
       def queueFunc():
         LF = pri_entry[-1]
         self.debug("queuing %s after delay", LF)
-        self._track("_submit: _LFPQ.put after delay", LF, self.delayed, self.running)
-        self._LFPQ.put( pri_entry )
+        self._track("_submit: _pendingq.put after delay", LF, self.delayed, self.running)
+        self._pendingq.put( pri_entry )
       with self._lock:
         if self._timerQ is None:
           self._timerQ = TimerQueue(name="<TimerQueue %s._timerQ>"%(self.name))
