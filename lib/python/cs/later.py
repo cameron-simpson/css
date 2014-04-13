@@ -430,6 +430,7 @@ class Later(NestingOpenCloseMixin):
   def state(self, new_state, *a):
     if a:
       new_state = new_state % a
+    D("STATE %r [%s]", new_state, self)
     self._state = new_state
 
   def __call__(self, func, *a, **kw):
