@@ -33,6 +33,7 @@ from cs.excutils import noexc, noexc_gen, logexc, LogExceptions
 from cs.fileutils import file_property, mkdirn
 from cs.later import Later, FUNC_ONE_TO_ONE, FUNC_ONE_TO_MANY, FUNC_SELECTOR, FUNC_MANY_TO_MANY
 from cs.lex import get_identifier, get_other_chars
+import cs.logutils
 from cs.logutils import setup_logging, logTo, Pfx, info, debug, error, warning, exception, trace, pfx_iter, D
 from cs.mappings import MappingChain, SeenSet
 from cs.queues import NullQueue, NullQ
@@ -152,7 +153,7 @@ def main(argv, stdin=None):
             badopts = True
           if not badopts:
             LTR = Later(jobs)
-            if ifdebug():
+            if cs.logutils.D_mode or ifdebug():
               # poll the status of the Later regularly
               ping = Thread(target=pinger, args=(LTR,))
               ping.daemon = True
@@ -182,10 +183,10 @@ def main(argv, stdin=None):
               # At this point there should be no actions queued or running in the Later.
               # Close the inputs to the diversions.
               for div in P.diversions:
-                LTR.state("CLOSE %s", div)
+                LTR.state("CLOSE DIV %s", div)
                 div.close(check_final_close=True)
               # Now closed, go to end of output on the diversions.
-              # This should be a null action because everyt deiversion ends
+              # This should be a null action because every diversion ends
 	      # in a NullQueue which discards all received items,
 	      # but we do this for synchronisation.
               for div in P.diversions:
@@ -194,6 +195,9 @@ def main(argv, stdin=None):
                 for item in outQ:
                   # diversions are supposed to discard their outputs
                   error("%s: RECEIVED %r", div, item)
+                LTR.state("DRAINED DIV %s using outQ=%s", div, outQ)
+                ####D("JOIN DIV %s", div)
+                ####div.join()
               # Now the diversions should have completed and closed.
             # out of the context manager, the Later should be shut down
             LTR.state("WAIT...")
@@ -211,7 +215,7 @@ def main(argv, stdin=None):
 
 def pinger(L):
   while True:
-    D("PINGER: L: quiescing=%s, state=%r", L._quiescing, L._state)
+    D("PINGER: L: quiescing=%s, state=%r: %s", L._quiescing, L._state, L)
     sleep(1)
 
 def urls(url, stdin=None, cmd=None):
