@@ -450,6 +450,8 @@ class Filer(O):
     return self.env('ALERT_FORMAT', 'MAILFILER: {short_from}->{short_recipients}: {subject}')
 
   def alert_message(self, M):
+    ''' Return the alert message filled out with parameters from the Message `M`.
+    '''
     try:
       msg = self.format_message(M, self.alert_format)
     except KeyError as e:
@@ -459,7 +461,7 @@ class Filer(O):
     return msg
 
   def format_message(self, M, fmt):
-    ''' Compute the alert message for the message `M`.
+    ''' Compute the alert message for the message `M` using the supplied format string `fmt`.
     '''
     hmap = dict( [ (k.lower().replace('-', '_'), M[k]) for k in M.keys() ] )
     subj = unrfc2047(M.get('subject', '')).strip()
