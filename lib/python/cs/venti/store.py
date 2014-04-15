@@ -66,6 +66,7 @@ class BasicStore(NestingOpenCloseMixin):
     with Pfx("BasicStore(%s,..)", name):
       if capacity is None:
         capacity = 1
+      self._lock = Lock()
       NestingOpenCloseMixin.__init__(self)
       self.name = name
       self.logfp = None
@@ -73,7 +74,6 @@ class BasicStore(NestingOpenCloseMixin):
       self.hashclass = Hash_SHA1
       self.readonly = False
       self.writeonly = False
-      self._lock = Lock()
 
   def add(self, data):
     ''' Add the supplied data bytes to the store.

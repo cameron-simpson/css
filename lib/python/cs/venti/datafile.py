@@ -45,10 +45,10 @@ class DataFile(NestingOpenCloseMixin):
   '''
 
   def __init__(self, pathname):
+    self._lock = RLock()
     NestingOpenCloseMixin.__init__(self)
     self.pathname = pathname
     self._fp = None
-    self._lock = RLock()
 
   def open(self, name=None):
     return NestingOpenCloseMixin.open(self, name=name)
