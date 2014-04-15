@@ -34,7 +34,7 @@ from cs.fileutils import file_property, mkdirn
 from cs.later import Later, FUNC_ONE_TO_ONE, FUNC_ONE_TO_MANY, FUNC_SELECTOR, FUNC_MANY_TO_MANY
 from cs.lex import get_identifier, get_other_chars
 import cs.logutils
-from cs.logutils import setup_logging, logTo, Pfx, info, debug, error, warning, exception, trace, pfx_iter, D
+from cs.logutils import setup_logging, logTo, Pfx, info, debug, error, warning, exception, trace, pfx_iter, D, X
 from cs.mappings import MappingChain, SeenSet
 from cs.queues import NullQueue, NullQ
 from cs.seq import seq
@@ -155,6 +155,10 @@ def main(argv, stdin=None):
             LTR = Later(jobs)
             if cs.logutils.D_mode or ifdebug():
               # poll the status of the Later regularly
+              def pinger(L):
+                while True:
+                  D("PINGER: L: quiescing=%s, state=%r: %s", L._quiescing, L._state, L)
+                  sleep(2)
               ping = Thread(target=pinger, args=(LTR,))
               ping.daemon = True
               ping.start()
@@ -176,28 +180,53 @@ def main(argv, stdin=None):
               # At this point everything has been dispatched from the input queue
               # and the only remaining activity is in actions in the diversions.
               # As long as there are such actions, the Later will be busy.
-              # Wait for all Later activity to cease, then close all the diversions
-              # and wait for end of input on their output queues.
-              LTR.state("quiescing")
-              L.quiesce()
-              # At this point there should be no actions queued or running in the Later.
-              # Close the inputs to the diversions.
-              for div in P.diversions:
+              # In fact, even after the Later first quiesces there may
+              # be stalled diversions waiting for EOF in order to process
+              # their "func_final" actions. Releasing these may pass
+              # tasks to other diversions.
+              # Therefore we iterate:
+              #  - wait for the Later to quiesce
+              #  - [missing] topologically sort the diversions
+              #  - pick the [most-ancestor-like] diversion that is busy
+              #    or exit loop if they are all idle
+              #  - close the div wait for that div to drain
+              #  - repeat
+              while True:
+                D("quiesce LTR")
+                LTR.state("quiescing")
+                L.quiesce()
+                busy_div = None
+                for div in P.diversions:
+                  if div._busy:
+                    busy_div = div
+                    break
+                if busy_div is None:
+                  break
+                D("CLOSE DIV %s", div)
                 LTR.state("CLOSE DIV %s", div)
                 div.close(check_final_close=True)
-              # Now closed, go to end of output on the diversions.
-              # This should be a null action because every diversion ends
-	      # in a NullQueue which discards all received items,
-	      # but we do this for synchronisation.
-              for div in P.diversions:
                 outQ = div.outQ
+                D("DRAIN DIV %s", div)
                 LTR.state("DRAIN DIV %s: outQ=%s", div, outQ)
                 for item in outQ:
                   # diversions are supposed to discard their outputs
                   error("%s: RECEIVED %r", div, item)
                 LTR.state("DRAINED DIV %s using outQ=%s", div, outQ)
-                ####D("JOIN DIV %s", div)
-                ####div.join()
+              D("CLOSE REMAINING DIVS")
+              for div in P.diversions:
+                if not div.closed:
+                  D("CLOSE DIV %s", div)
+                  LTR.state("CLOSE DIV %s", div)
+                  div.close(check_final_close=True)
+                  outQ = div.outQ
+                  D("DRAIN DIV %s", div)
+                  LTR.state("DRAIN DIV %s: outQ=%s", div, outQ)
+                  for item in outQ:
+                    # diversions are supposed to discard their outputs
+                    error("%s: RECEIVED %r", div, item)
+                  LTR.state("DRAINED DIV %s using outQ=%s", div, outQ)
+              LTR.state("quiescing")
+              L.quiesce()
               # Now the diversions should have completed and closed.
             # out of the context manager, the Later should be shut down
             LTR.state("WAIT...")
@@ -212,11 +241,6 @@ def main(argv, stdin=None):
     xit = 2
 
   return xit
-
-def pinger(L):
-  while True:
-    D("PINGER: L: quiescing=%s, state=%r: %s", L._quiescing, L._state, L)
-    sleep(1)
 
 def urls(url, stdin=None, cmd=None):
   ''' Generator to yield input URLs.
