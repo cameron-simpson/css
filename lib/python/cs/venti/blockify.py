@@ -28,7 +28,7 @@ class Blockifier(object):
   def __init__(self):
     self.topBlock = None
     self.S = defaults.S
-    self.Q = IterableQueue().open()
+    self.Q = IterableQueue()
     self.T = Thread(target=self._storeBlocks)
     self.T.start()
 
