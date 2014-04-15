@@ -57,6 +57,7 @@ class KyotoCabinet(object):
       def f(key, value):
         Q.put( (key, value) )
       self.db.iterate(f, writable=False)
+      Q.close()
     T = Thread(target=iterator)
     T.daemon = True
     T.start()

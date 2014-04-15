@@ -9,7 +9,7 @@ import sys
 import time
 import unittest
 from cs.logutils import D, setup_logging
-from cs.queues import QueueIterator, _Q_Proxy
+from cs.queues import _Q_Proxy
 from cs.timeutils import sleep
 from cs.threads import report
 from cs.later import Later, FUNC_MANY_TO_MANY, FUNC_SELECTOR

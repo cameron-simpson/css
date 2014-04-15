@@ -94,7 +94,7 @@ class WorkerThreadPool(NestingOpenCloseMixin, O):
         args = []
         HT = Thread(target=self._handler, args=args, name=("%s:worker" % (self.name,)))
         ##HT.daemon = True
-        RQ = IterableQueue(name="%s:IQ%d" % (self.name, seq())).open()
+        RQ = IterableQueue(name="%s:IQ%d" % (self.name, seq()))
         Hdesc = (HT, RQ)
         self.all.append(Hdesc)
         args.append(Hdesc)
@@ -131,19 +131,18 @@ class WorkerThreadPool(NestingOpenCloseMixin, O):
           except:
             result = None
             exc_info = sys.exc_info()
-            HT.name = oname
             log_func = exception if isinstance(exc_info[1], (TypeError, NameError, AttributeError)) else debug
             log_func("%s: worker thread: ran task: exception! %r", self, sys.exc_info())
             # don't let exceptions go unhandled
             # if nobody is watching, raise the exception and don't return
             # this handler to the pool
             if retq is None and deliver is None:
-              debug("%s: worker thread: reraise exception", self)
+              error("%s: worker thread: reraise exception", self)
               raise3(*exc_info)
             debug("%s: worker thread: set result = (None, exc_info)", self)
           else:
             exc_info = None
-            HT.name = oname
+          HT.name = oname
           func = None     # release func+args
           with self._lock:
             self.idle.append( Hdesc )
@@ -227,71 +226,6 @@ class AdjustableSemaphore(object):
             self.__sem.acquire(True)
           delta += 1
       self.__value = newvalue
-
-class JobCounter:
-  ''' A class to count and wait for outstanding jobs.
-      As jobs are queued, JobCounter.inc() is called.
-      When everything is dispatched, calling JobCounter.whenDone()
-      queues a function to execute on completion of all the jobs.
-  '''
-  def __init__(self,name):
-    self.__name=name
-    self.__lock=Lock()
-    self.__sem=Semaphore(0)
-    self.__n=0
-    self.__onDone=None
-
-  def inc(self):
-    ''' Note that there is another job for which to wait.
-    '''
-    debug("%s: inc()" % self.__name)
-    with self.__lock:
-      self.__n+=1
-
-  def dec(self):
-    ''' Report the completion of a job.
-    '''
-    debug("%s: dec()" % self.__name)
-    self.__sem.release()
-
-  def _wait1(self):
-    ''' Wait for a single job to complete.
-        Return False if no jobs remain.
-        Report True if a job remained and we waited.
-    '''
-    debug("%s: wait1()..." % self.__name)
-    with self.__lock:
-      if self.__n == 0:
-        debug("%s: wait1(): nothing to wait for" % self.__name)
-        return False
-    self.__sem.acquire()
-    with self.__lock:
-      self.__n-=1
-    debug("%s: wait1(): waited" % self.__name)
-    return True
-
-  def _waitAll(self):
-    while self._wait1():
-      pass
-
-  def _waitThenDo(self,*args,**kw):
-    debug("%s: _waitThenDo()..." % self.__name)
-    self._waitAll()
-    debug("%s: _waitThenDo(): waited: calling __onDone()..." % self.__name)
-    return self.__onDone[0](*self.__onDone[1],**self.__onDone[2])
-
-  def doInstead(self,func,*args,**kw):
-    with self.__lock:
-      assert self.__onDone is not None
-      self.__onDone=(func,args,kw)
-
-  def whenDone(self,func,*args,**kw):
-    ''' Queue an action to occur when the jobs are done.
-    '''
-    with self.__lock:
-      assert self.__onDone is None
-      self.__onDone=(func,args,kw)
-      Thread(target=self._waitThenDo,args=args,kwargs=kw).start()
 
 ''' A pool of Channels.
 '''

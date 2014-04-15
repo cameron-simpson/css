@@ -36,7 +36,7 @@ if [ $no_tag_fd ]
 then
   :
 else
-  if [ -n "$DEBUG" ]
+  if [ "x$DEBUG" = x1 ]
   then  exec tag_fd 2 "$1" "$0" --no-tag_fd $subopts -- "$@"
   fi
 fi

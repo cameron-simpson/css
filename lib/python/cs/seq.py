@@ -10,6 +10,7 @@ import heapq
 import itertools
 from threading import Lock, Condition
 from cs.logutils import warning, debug, D
+from cs.py.stack import caller
 
 class Seq(object):
   ''' A thread safe wrapper for itertools.count().
@@ -202,7 +203,7 @@ def onetomany(func):
       multiple values back.
       Example:
         class X(list):
-          @onetoone
+          @onetomany
           def chars(self, item):
             return item
         strs = X(['Abc', 'Def'])
@@ -214,7 +215,11 @@ def onetomany(func):
 
 class TrackingCounter(object):
   ''' A wrapper for a counter which can be incremented and decremented.
-      A facility is provided to wait for the counter to reach a specifi value.
+      A facility is provided to wait for the counter to reach a specific value.
+      The .inc and .dec methods also accept a `tag` argument to keep
+      individual counts based on the tag to aid debugging.
+      TODO: add `strict` option to error and abort if any counter tries
+      to go below zero.
   '''
 
   def __init__(self, value=0, name=None):
@@ -233,10 +238,13 @@ class TrackingCounter(object):
     return "%s:%d" % (self.name, self.value)
 
   def __repr__(self):
-    return "<TrackingCounter %r %r>" % (str(self), self._watched)
+    return "<TrackingCounter %r:%r>" % (str(self), self._watched)
 
   def __nonzero__(self):
     return self.value != 0
+
+  def __int__(self):
+    return self.value
 
   def _notify(self):
     ''' Notify any waiters on the current counter value.
@@ -254,7 +262,8 @@ class TrackingCounter(object):
     ''' Increment the counter.
         Wake up any threads waiting for its new value.
     '''
-    debug("%s.inc", self)
+    if tag:
+      D("INC(%s): %s", tag[:10], caller())
     with self._lock:
       self.value += 1
       if tag is not None:
@@ -267,7 +276,8 @@ class TrackingCounter(object):
     ''' Decrement the counter.
         Wake up any threads waiting for its new value.
     '''
-    debug("%s.dec", self)
+    if tag:
+      D("DEC(%s): %s:", tag[:10], caller())
     with self._lock:
       self.value -= 1
       if tag is not None:
@@ -279,6 +289,11 @@ class TrackingCounter(object):
           ##raise RuntimeError
       if self.value < 0:
         warning("%s.dec: value < 0!", self)
+      elif self.value == 0:
+        D("ZERO HERE")
+        ##from time import sleep
+        ##sleep(3)
+        ##raise RuntimeError("ZERO HERE!")
       self._notify()
 
   def check(self):

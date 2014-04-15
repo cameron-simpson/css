@@ -261,6 +261,12 @@ class _URL(unicode):
     return self.parts.path
 
   @property
+  def path_elements(self):
+    ''' Return the non-empty path components.
+    '''
+    return [ w for w in self.path.strip('/').split('/') if w ]
+
+  @property
   def params(self):
     ''' The URL params as returned by urlparse.urlparse.
     '''

@@ -35,7 +35,7 @@ PRI_PREREQ = 2
 
 MakeDebugFlags = Flags('debug', 'flags', 'make', 'parse')
 
-class Maker(NestingOpenCloseMixin, O):
+class Maker(NestingOpenCloseMixin):
   ''' Main class representing a set of dependencies to make.
   '''
 
@@ -99,6 +99,7 @@ class Maker(NestingOpenCloseMixin, O):
 
   def shutdown(self):
     self._makeQ.close()
+    self._makeQ.wait()
 
   @property
   def namespaces(self):

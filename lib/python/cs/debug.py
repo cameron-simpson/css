@@ -12,14 +12,12 @@ import threading
 import time
 import traceback
 from cs.py3 import Queue, Queue_Empty
+from cs.py.stack import caller
 import cs.logutils
-from cs.logutils import infer_logging_level, debug, error, setup_logging, D, Pfx
+from cs.logutils import infer_logging_level, debug, error, setup_logging, D, Pfx, ifdebug
 from cs.obj import O
 from cs.seq import seq
 from cs.timeutils import sleep
-
-def ifdebug():
-  return cs.logutils.logging_level <= logging.DEBUG
 
 def Lock():
   ''' Factory function: if cs.logutils.logging_level <= logging.DEBUG
@@ -306,12 +304,11 @@ def trace_caller(func):
   ''' Decorator to report the caller of a function when called.
   '''
   def subfunc(*a, **kw):
-    import traceback
-    frame = traceback.extract_stack(None, 2)[0]
+    rame = caller()
     D("CALL %s()<%s:%d> FROM %s()<%s:%d>",
          func.__name__,
          func.__code__.co_filename, func.__code__.co_firstlineno,
-         frame[2], frame[0], frame[1])
+         frame.funcname, frame.filename, frame.lineno)
     return func(*a, **kw)
   subfunc.__name__ = "trace_caller/subfunc/"+func.__name__
   return subfunc

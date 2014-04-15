@@ -67,8 +67,8 @@ echo "show $repl_end status\\G" \
     slave)
         summary="behind=$mys_Seconds_Behind_Master slave_io_running=$mys_Slave_IO_Running slave_sql_running=$mys_Slave_SQL_Running master_log=$mys_Master_Log_File master_log_pos=$mys_Read_Master_Log_Pos"
         case "$mys_Seconds_Behind_Master" in
-          0|1|2)  ;;
-          [3|4]*) status=WARNING ;;
+          0) ;;
+          1|2|3|4) status=WARNING ;;
           *)    status=CRITICAL ;;
         esac
         [ "$mys_Slave_IO_Running" = Yes ] || status=CRITICAL
