@@ -9,6 +9,7 @@ from collections import deque
 import threading
 import traceback
 from cs.py3 import Queue, raise3
+from cs.py.func import funcname
 import time
 from cs.debug import ifdebug, Lock, RLock, Thread, trace_caller, thread_dump
 from cs.excutils import noexc, noexc_gen, logexc, LogExceptions
@@ -302,8 +303,8 @@ class _Pipeline(NestingOpenCloseMixin):
       func_iter, func_final = self._pipeline_func(filter_funcs.pop())
       count -= 1
       pq_name = ":".join( (name,
-                           "%s/%s" % ( (func_iter.__name__ if func_iter else "None"),
-                                       (func_final.__name__ if func_final else "None"),
+                           "%s/%s" % ( (funcname(func_iter) if func_iter else "None"),
+                                       (funcname(func_final) if func_final else "None"),
                                      ),
                            str(count),
                            str(seq()),
@@ -379,26 +380,26 @@ class _Pipeline(NestingOpenCloseMixin):
     if func_sig == FUNC_ONE_TO_ONE:
       def func_iter(item):
         yield func(item)
-      func_iter.__name__ = "func_iter_1to1(func=%s)" % (func.__name__,)
+      func_iter.__name__ = "func_iter_1to1(func=%s)" % (funcname(func),)
     elif func_sig == FUNC_ONE_TO_MANY:
       func_iter = func
     elif func_sig == FUNC_SELECTOR:
       def func_iter(item):
         if func(item):
           yield item
-      func_iter.__name__ = "func_iter_1toMany(func=%s)" % (func.__name__,)
+      func_iter.__name__ = "func_iter_1toMany(func=%s)" % (funcname(func),)
     elif func_sig == FUNC_MANY_TO_MANY:
       gathered = []
       def func_iter(item):
-        debug("GATHER %r FOR %s", item, func.__name__)
+        debug("GATHER %r FOR %s", item, funcname(func))
         gathered.append(item)
         if False:
           yield
-      func_iter.__name__ = "func_iter_gather(func=%s)" % (func.__name__,)
+      func_iter.__name__ = "func_iter_gather(func=%s)" % (funcname(func),)
       def func_final():
         for item in func(gathered):
           yield item
-      func_final.__name__ = "func_final_gather(func=%s)" % (func.__name__,)
+      func_final.__name__ = "func_final_gather(func=%s)" % (funcname(func),)
     else:
       raise ValueError("unsupported function signature %r" % (func_sig,))
     return func_iter, func_final
@@ -828,11 +829,11 @@ class Later(NestingOpenCloseMixin):
       ''' Function to defer: run `func` and pass its return value to R.put().
       '''
       R.call(func, *a, **kw)
-    put_func.__name__ = "%s._after(%r)[func=%s]" % (self, LFs, func.__name__)
+    put_func.__name__ = "%s._after(%r)[func=%s]" % (self, LFs, funcname(func))
 
     if count == 0:
       # nothing to wait for - queue the function immediately
-      debug("Later.after: len(LFs) == 0, func=%s", func.__name__)
+      debug("Later.after: len(LFs) == 0, func=%s", funcname(func))
       self._defer(put_func)
     else:
       # create a notification function which submits put_func
@@ -913,7 +914,7 @@ class Later(NestingOpenCloseMixin):
         # now queue another iteration to run after those defered tasks
         self._defer(iterate_once)
 
-    iterate_once.__name__ = "%s:next(iter(%s))" % (iterate_once.__name__,
+    iterate_once.__name__ = "%s:next(iter(%s))" % (funcname(iterate_once),
                                                    getattr(I, '__name__', repr(I)))
     self._defer(iterate_once)
 
