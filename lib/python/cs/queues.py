@@ -249,6 +249,8 @@ class _Q_Proxy(_NOC_Proxy):
 
   @not_closed
   def put(self, item, *a, **kw):
+    ##D("PUT %r", item)
+    ##D("%s PUT %r", self, item)
     return self._proxied.put(item, *a, **kw)
 
 class _QueueIterator(NestingOpenCloseMixin):
@@ -403,7 +405,7 @@ class PushQueue(NestingOpenCloseMixin):
       queued via a Later for delivery to the output queue.
   '''
 
-  def __init__(self, L, func_push, outQ, func_final=None, is_iterable=False, name=None,
+  def __init__(self, name, L, func_push, outQ, func_final=None,
                      on_open=None, on_close=None, on_shutdown=None):
     ''' Initialise the PushQueue with the Later `L`, the callable `func_push`
         and the output queue `outQ`.
@@ -415,7 +417,7 @@ class PushQueue(NestingOpenCloseMixin):
         `outQ` accepts results from the callable via its .put() method.
         `func_final`, if specified and not None, is called after completion of
           all calls to `func_push`.
-        If `is_iterable``, submit `func_push(item)` via L.defer_iterable() to
+        Submit `func_push(item)` via L.defer_iterable() to
           allow a progressive feed to `outQ`.
         Otherwise, submit `func_push` with `item` via L.defer().
     '''
@@ -431,10 +433,7 @@ class PushQueue(NestingOpenCloseMixin):
     self.func_push = func_push
     self.outQ = outQ
     self.func_final = func_final
-    self.is_iterable = is_iterable
     self.LFs = []
-    if not is_iterable:
-      raise RuntimeError("PUSHQUEUE NOT IS_ITERABLE")
 
   def __str__(self):
     return "PushQueue:%s" % (self.name,)
@@ -452,36 +451,14 @@ class PushQueue(NestingOpenCloseMixin):
     if self.all_closed:
       warning("%s.put(%s) when all closed" % (self, item))
     L = self.later
-    if self.is_iterable:
-      try:
-        items = self.func_push(item)
-        ##items = list(items)
-      except Exception as e:
-        exception("%s.func_push(item=%r): %s", self, item, e)
-        items = ()
-      # pass a new open-proxy to defer_iterable, as it will close it
-      L._defer_iterable(items, self.outQ.open())
-    else:
-      raise RuntimeError("PUSHQUEUE NOT IS_ITERABLE")
-      # defer the computation then call _push_items which puts the results
-      # and closes outQ
-      LF = L._defer( self.func_push, item )
-      self.LFs.append(LF)
-      L._after( (LF,), None, self._push_items, LF )
-
-  # NB: reports and discards exceptions
-  @noexc
-  def _push_items(self, LF):
-    ''' Handler to run after completion of `LF`.
-        Put the results of `LF` onto `outQ`.
-    '''
-    raise RuntimeError("NOTREACHED")
     try:
-      for item in LF():
-        self.outQ.put(item)
+      items = self.func_push(item)
+      ##items = list(items)
     except Exception as e:
-      exception("%s._push_items: exception putting results of LF(): %s", self, e)
-    self.outQ.close()
+      exception("%s.func_push(item=%r): %s", self, item, e)
+      items = ()
+    # pass a new open-proxy to defer_iterable, as it will close it
+    L._defer_iterable(items, self.outQ.open())
 
   def shutdown(self):
     ''' shutdown() is called by NestingOpenCloseMixin._close() to close
@@ -494,13 +471,13 @@ class PushQueue(NestingOpenCloseMixin):
       # run func_final to completion before closing outQ
       LFclose = self.later._after( LFs, None, self._run_func_final )
       LFs = (LFclose,)
+    # schedule final close of output queue
     self.later._after( LFs, None, self.outQ.close )
 
   def _run_func_final(self):
     debug("%s._run_func_final()", self)
-    items = self.func_final()
-    items = list(items)
     outQ = self.outQ
+    items = self.func_final()
     for item in items:
       outQ.put(item)
 

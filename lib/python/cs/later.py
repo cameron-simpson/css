@@ -9,6 +9,7 @@ from collections import deque
 import threading
 import traceback
 from cs.py3 import Queue, raise3
+from cs.py.func import funcname
 import time
 from cs.debug import ifdebug, Lock, RLock, Thread, trace_caller, thread_dump
 from cs.excutils import noexc, noexc_gen, logexc, LogExceptions
@@ -191,10 +192,13 @@ class LateFunction(PendingFunction):
     '''
     PendingFunction.__init__(self, func, final=final)
     if name is None:
-      name = "LF-%d[func=%s]" % (seq(),func,)
+      name = "LF-%d[func=%s]" % (seq(),func.__name__,)
     self.name = name
-    self.later = later.open()
-    self.later._busy.inc(name)
+    self.later = L = later.open()
+    L._busy.inc(name)
+    ##D("NEW LATEFUNCTION %r - busy ==> %d", name, L._busy.value)
+    ##for sn, s in ('running', L.running), ('pending', L.pending):
+    ##  D("    %s=%r", sn, s)
 
   def __str__(self):
     return "<LateFunction %s>" % (self.name,)
@@ -236,10 +240,45 @@ class LateFunction(PendingFunction):
     self._complete(result, exc_info)
 
 class _PipelinePushQueue(PushQueue):
+  ''' A _PipelinePushQueue subclasses cs.queues.PushQueue, adding some item tracking.
+      We raise the pipeline's _busy counter for every item in play,
+      and also raise it while the finalisation function has not run.
+      This lets us inspect a pipeline for business, which we use in the
+      cs.app.pilfer termination process.
+  '''
 
-  def __init__(self, pipeline, *a, **kw):
+  def __init__(self, name, pipeline, func_iter, outQ, func_final=None):
+    ''' Initialise the _PipelinePushQueue, wrapping func_iter and func_final in code to inc/dec the main pipeline _busy counter.
+    '''
     self.pipeline = pipeline
-    PushQueue.__init__(self, *a, **kw)
+
+    # wrap func_iter to raise _busy while processing item
+    def func_push(item):
+      self.pipeline._busy.inc()
+      try:
+        for item2 in func_iter(item):
+          yield item2
+      except Exception:
+        self.pipeline._busy.dec()
+        raise
+      self.pipeline._busy.dec()
+    func_push.__name__ = "busy(%s)" % (func_iter.__name__,)
+
+    # if there is a func_final, raise _busy until func_final completed
+    if func_final is not None:
+      self.pipeline._busy.inc()
+      func_final0 = func_final
+      def func_final():
+        try:
+          result = func_final0()
+        except Exception:
+          self.pipeline._busy.dec()
+          raise
+        self.pipeline._busy.dec()
+        return result
+      func_final.__name__ = "pipeline_dec_busy(%s)" % (func_final0.__name__,)
+
+    PushQueue.__init__(self, name, self.pipeline.later, func_push, outQ, func_final=func_final)
 
   def __str__(self):
     return "%s[%s]" % (PushQueue.__str__(self), self.pipeline)
@@ -256,21 +295,22 @@ class _Pipeline(NestingOpenCloseMixin):
     self.queues = [outQ]
     self._lock = Lock()
     NestingOpenCloseMixin.__init__(self)
+    # counter tracking items in play
+    self._busy = TrackingCounter(name="Pipeline<%s>._items" % (name,))
     RHQ = outQ
     count = len(filter_funcs)
     while filter_funcs:
       func_iter, func_final = self._pipeline_func(filter_funcs.pop())
       count -= 1
       pq_name = ":".join( (name,
-                           "%s/%s" % ( (func_iter.__name__ if func_iter else "None"),
-                                       (func_final.__name__ if func_final else "None"),
+                           "%s/%s" % ( (funcname(func_iter) if func_iter else "None"),
+                                       (funcname(func_final) if func_final else "None"),
                                      ),
                            str(count),
                            str(seq()),
                           )
                         )
-      PQ = _PipelinePushQueue(self, L, func_iter, RHQ, is_iterable=True,
-                              func_final=func_final, name=pq_name).open()
+      PQ = _PipelinePushQueue(pq_name, self, func_iter, RHQ, func_final=func_final).open()
       self.queues.insert(0, PQ)
       RHQ = PQ
 
@@ -340,26 +380,26 @@ class _Pipeline(NestingOpenCloseMixin):
     if func_sig == FUNC_ONE_TO_ONE:
       def func_iter(item):
         yield func(item)
-      func_iter.__name__ = "func_iter_1to1(func=%s)" % (func.__name__,)
+      func_iter.__name__ = "func_iter_1to1(func=%s)" % (funcname(func),)
     elif func_sig == FUNC_ONE_TO_MANY:
       func_iter = func
     elif func_sig == FUNC_SELECTOR:
       def func_iter(item):
         if func(item):
           yield item
-      func_iter.__name__ = "func_iter_1toMany(func=%s)" % (func.__name__,)
+      func_iter.__name__ = "func_iter_1toMany(func=%s)" % (funcname(func),)
     elif func_sig == FUNC_MANY_TO_MANY:
       gathered = []
       def func_iter(item):
-        debug("GATHER %r FOR %s", item, func.__name__)
+        debug("GATHER %r FOR %s", item, funcname(func))
         gathered.append(item)
         if False:
           yield
-      func_iter.__name__ = "func_iter_gather(func=%s)" % (func.__name__,)
+      func_iter.__name__ = "func_iter_gather(func=%s)" % (funcname(func),)
       def func_final():
         for item in func(gathered):
           yield item
-      func_final.__name__ = "func_final_gather(func=%s)" % (func.__name__,)
+      func_final.__name__ = "func_final_gather(func=%s)" % (funcname(func),)
     else:
       raise ValueError("unsupported function signature %r" % (func_sig,))
     return func_iter, func_final
@@ -789,11 +829,11 @@ class Later(NestingOpenCloseMixin):
       ''' Function to defer: run `func` and pass its return value to R.put().
       '''
       R.call(func, *a, **kw)
-    put_func.__name__ = "%s._after(%r)[func=%s]" % (self, LFs, func.__name__)
+    put_func.__name__ = "%s._after(%r)[func=%s]" % (self, LFs, funcname(func))
 
     if count == 0:
       # nothing to wait for - queue the function immediately
-      debug("Later.after: len(LFs) == 0, func=%s", func.__name__)
+      debug("Later.after: len(LFs) == 0, func=%s", funcname(func))
       self._defer(put_func)
     else:
       # create a notification function which submits put_func
@@ -874,7 +914,8 @@ class Later(NestingOpenCloseMixin):
         # now queue another iteration to run after those defered tasks
         self._defer(iterate_once)
 
-    iterate_once.__name__ = "%s:next(iter(%s))" % (iterate_once.__name__, I)
+    iterate_once.__name__ = "%s:next(iter(%s))" % (funcname(iterate_once),
+                                                   getattr(I, '__name__', repr(I)))
     self._defer(iterate_once)
 
   def pipeline(self, filter_funcs, inputs=None, outQ=None, name=None):

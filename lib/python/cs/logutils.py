@@ -162,8 +162,10 @@ def D(fmt, *args):
       A quick'n'dirty debug tool.
   '''
   global D_mode
-  if not D_mode:
-    return
+  if D_mode:
+    X(fmt, *args)
+
+def X(fmt, *args):
   msg = str(fmt)
   if args:
     msg = msg % args
