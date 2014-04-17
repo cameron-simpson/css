@@ -44,9 +44,15 @@ fi
 if [ $datestamp ]
 then
   date >&2
+  pid=
+  for sig in 1 2 3 15
+  do  trap "[ -z \"\$pid\" ] || kill \"-$sig\" \"\$pid\"" "$sig"
+  done
   ( set -x
     exec "$@"
-  )
+  ) &
+  pid=$!
+  wait
   xit=$?
   date >&2
   exit $xit
