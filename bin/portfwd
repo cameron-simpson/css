@@ -123,10 +123,16 @@ then
   exit $xit
 fi
 
+target=
+
 abort() {
   $setx
   : PORTFWD TRAP "subpids=[$subpids]"
-  [ -z "$subpids" ] || killpids $subpids
+  if [ -n "$subpids" ]
+  then
+    killpids -W 5 -- $subpids
+    [ -z "$target" ] || alert "EXITED: $target" </dev/null
+  fi
   [ -n "$pidfile" ] && { >"$pidfile"; rm -f "$pidfile"; }
   [ -n "$flag_connected" ] && flag -w "$flag_connected" 0
   exit 1
