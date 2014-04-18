@@ -40,12 +40,12 @@ exec 3<&0
 
 if [ $dothreads ]
 then
-  notmuch search --limit=10 --output=threads \
+  notmuch search --output=threads \
   | while read -r tid
     do  notmuch search --output=files "id:$tid"
     done
 else
-  notmuch search --limit=10 --output=files -- "$@"
+  notmuch search --output=files -- "$@"
 fi \
 | sort -u \
 | \
