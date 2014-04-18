@@ -51,8 +51,6 @@ do
   fi
 done
 
-set -x
-
 exec 3<&0
 
 mdir=$( mkdirn "$TMPDIR/notmuch-result" )
@@ -69,7 +67,7 @@ else
 fi \
 | egrep '/(new|cur)/[^/]+$' \
 | sort -u \
-| set-x xxargs arg1 -end "$mdir/new" set-x ln -i -s
+| xxargs arg1 -end "$mdir/new" set-x ln -i -s
 
 mutt -f "$mdir" <&3 3<&-
 rm -r "$mdir"
