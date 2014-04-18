@@ -1,0 +1,70 @@
+#!/bin/sh
+#
+# Yet another wrapper for notmuch, to construct a results maildir from a
+# notmuch search.
+#       - Cameron Simpson <cs@zip.com.au> 18apr2014
+#
+
+set -ue
+
+dothreads=
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-t] notmuch-search-terms...
+  -t    Include associated threads."
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -t) dothreads=1 ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing notmuch-search-terms" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+exec 3<&0
+
+if [ $dothreads ]
+then
+  notmuch search --limit=10 --output=threads \
+  | while read -r tid
+    do  notmuch search --output=files "id:$tid"
+    done
+else
+  notmuch search --limit=10 --output=files -- "$@"
+fi \
+| sort -u \
+| \
+{ mdir=
+  while read -r path
+  do
+    if [ -z "$mdir" ]
+    then
+      mdir=$( mkdirn "$TMPDIR/notmuch-result" )
+      maildir "$mdir"
+    fi
+    subd=$(basename $(dirname "$path"))
+    if [ "x$subd" = xnew ]
+    then  nsubd=$subd
+    else  nsubd=cur
+    fi
+    ln -i -s "$path" "$mdir/$nsubd/."
+  done
+  [ -n "$mdir" ] || { echo "$cmd: no matches, quitting" >&2; exit 1; }
+  mutt -f "$mdir" <&3 3<&-
+  rm -r "$mdir"
+}
