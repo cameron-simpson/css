@@ -69,5 +69,5 @@ fi \
 | sort -u \
 | xxargs arg1 -end "$mdir/new" set-x ln -i -s
 
-mutt -f "$mdir" <&3 3<&-
+mutt -e 'unset header_cache' -f "$mdir" <&3 3<&-
 rm -r "$mdir"
