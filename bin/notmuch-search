@@ -36,35 +36,40 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+first=1
+for term
+do
+  [ $first ] && { set --; first=; }
+  case "$term" in
+    all:*)  term=`expr "$term" : 'all:\(.*\)'` ;;
+    *:*)    ;;
+    *)      term=subject:$term ;;
+  esac
+  if [ $first ]
+  then  set -- "$term"; first=
+  else  set -- "$@" "$term"
+  fi
+done
+
+set -x
+
 exec 3<&0
+
+mdir=$( mkdirn "$TMPDIR/notmuch-result" )
+maildir "$mdir"
 
 if [ $dothreads ]
 then
-  notmuch search --output=threads \
+  notmuch search --output=threads -- "$@" \
   | while read -r tid
-    do  notmuch search --output=files "id:$tid"
+    do  notmuch search --output=files -- "$tid"
     done
 else
   notmuch search --output=files -- "$@"
 fi \
+| egrep '/(new|cur)/[^/]+$' \
 | sort -u \
-| \
-{ mdir=
-  while read -r path
-  do
-    if [ -z "$mdir" ]
-    then
-      mdir=$( mkdirn "$TMPDIR/notmuch-result" )
-      maildir "$mdir"
-    fi
-    subd=$(basename $(dirname "$path"))
-    if [ "x$subd" = xnew ]
-    then  nsubd=$subd
-    else  nsubd=cur
-    fi
-    ln -i -s "$path" "$mdir/$nsubd/."
-  done
-  [ -n "$mdir" ] || { echo "$cmd: no matches, quitting" >&2; exit 1; }
-  mutt -f "$mdir" <&3 3<&-
-  rm -r "$mdir"
-}
+| set-x xxargs arg1 -end "$mdir/new" set-x ln -i -s
+
+mutt -f "$mdir" <&3 3<&-
+rm -r "$mdir"
