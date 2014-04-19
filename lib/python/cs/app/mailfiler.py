@@ -138,7 +138,7 @@ def main(argv, stdin=None):
           mdir.close()
         return 1
     else:
-      raise RunTimeError("unimplemented op")
+      raise RuntimeError("unimplemented op")
 
 def maildir_from_name(mdirname, maildir_root, maildir_cache):
     ''' Return the Maildir derived from mdirpath.
@@ -825,7 +825,7 @@ _FilterReport = namedtuple('FilterReport',
 def FilterReport(rule, matched, saved_to, ok_actions, failed_actions):
   if not matched:
     if saved_to:
-      raise RunTimeError("matched(%r) and not saved_to(%r)" % (matched, saved_to))
+      raise RuntimeError("matched(%r) and not saved_to(%r)" % (matched, saved_to))
   return _FilterReport(rule, matched, saved_to, ok_actions, failed_actions)
 
 class Rule(O):

@@ -74,7 +74,7 @@ def monotonic():
     if _global_monotonic is None:
         _global_monotonic = monotonic_clock()
         if _global_monotonic is None:
-            raise RunTimeError("no monotonic clock available")
+            raise RuntimeError("no monotonic clock available")
     return _global_monotonic.now()
 
 _global_hires = None
@@ -86,7 +86,7 @@ def highres():
     if _global_hires is None:
         _global_hires = highres()
         if _global_hires is None:
-            raise RunTimeError("no highres clock available")
+            raise RuntimeError("no highres clock available")
     return _global_hires.now()
 
 _global_steady = None
@@ -98,7 +98,7 @@ def steady():
     if _global_steady is None:
         _global_steady = steady()
         if _global_steady is None:
-            raise RunTimeError("no steady clock available")
+            raise RuntimeError("no steady clock available")
     return _global_steady.now()
 
 class _Clock_Flags(int):
