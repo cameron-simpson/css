@@ -415,6 +415,14 @@ class Pilfer(O):
   def defaults(self):
     return MappingChain(mappings=[ rc.defaults for rc in self.rcs ])
 
+  @property
+  def _(self):
+    return self.user_vars['_']
+
+  @_.setter
+  def _(self, value):
+    self.user_vars['_'] = value
+
   @locked
   def seenset(self, name):
     ''' Return the SeenSet implementing the named "seen" set.
