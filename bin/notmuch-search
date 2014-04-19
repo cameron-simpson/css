@@ -7,10 +7,12 @@
 
 set -ue
 
+doscreen=
 dothreads=
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [-t] notmuch-search-terms...
+  -S    Do search in separate screen session.
   -t    Include associated threads."
 
 badopts=
@@ -18,7 +20,8 @@ badopts=
 while [ $# -gt 0 ]
 do
   case $1 in
-    -t) dothreads=1 ;;
+    -S) doscreen=1 ;;
+    -t) dothreads=1 subopts="$subopts $1" ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
         badopts=1
@@ -35,6 +38,13 @@ then
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+if [ $doscreen ]
+then
+  label=$cmd-`echo "$*" | tr ' ' -`
+  exec screen -m -S "$label" "$0" "$@"
+fi
+ 
 
 first=1
 for term
