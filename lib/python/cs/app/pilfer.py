@@ -53,7 +53,8 @@ usage = '''Usage: %s [options...] op [args...]
     -c config
         Load rc file.
     -j jobs
-        How many jobs (URL fetches, minor computations) to run at a time.
+	How many jobs (actions: URL fetches, minor computations)
+	to run at a time.
         Default: %d
     -q  Quiet. Don't recite surviving URLs at the end.
     -u  Unbuffered. Flush print actions as they occur.
@@ -554,7 +555,7 @@ class Pilfer(O):
     ''' Print a string using approved URL attributes as the format dictionary.
         See Pilfer.format_string.
     '''
-    print_string = kw.pop('string', '{url}')
+    print_string = kw.pop('string', '{_}')
     print_string = self.format_string(print_string, U)
     file = kw.pop('file', self._print_to)
     if kw:
@@ -647,7 +648,7 @@ class FormatMapping(object):
                 'referer',
                 'srcs',
                 'page_title',
-                'url',
+                '_',
               )
 
   def __init__(self, P, U):
@@ -665,7 +666,7 @@ class FormatMapping(object):
     url = self.url
     with Pfx(url):
       if k in self._approved:
-        if k == 'url':
+        if k == '_':
           return url
         try:
           return getattr(url, k)
@@ -920,9 +921,9 @@ one_test = {
       'select_re':    lambda PU, regexp: regexp.search(PU[1]),
     }
 
-re_COMPARE = re.compile(r'([a-z]\w*)==')
-re_ASSIGN  = re.compile(r'([a-z]\w*)=')
-re_TEST    = re.compile(r'([a-z]\w*)~')
+re_COMPARE = re.compile(r'(_|[a-z]\w*)==')
+re_ASSIGN  = re.compile(r'(_|[a-z]\w*)=')
+re_TEST    = re.compile(r'(_|[a-z]\w*)~')
 re_GROK    = re.compile(r'([a-z]\w*(\.[a-z]\w*)*)\.([_a-z]\w*)', re.I)
 
 def action_func(action, do_trace, raw=False):
@@ -1602,7 +1603,7 @@ def action_assign(var, value):
   '''
   def function(item):
     P, U = item
-    if var == 'url':
+    if var == '_':
       value2 = P.format_string(value, U)
       if value2 != U:
         U = URL(value2, U)
