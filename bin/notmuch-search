@@ -41,7 +41,7 @@ for term
 do
   [ $first ] && { set --; first=; }
   case "$term" in
-    all:*)  term=`expr "$term" : 'all:\(.*\)'` ;;
+    :*)  term=`expr "x$term" : 'x:\(.*\)'` ;;
     *:*)    ;;
     *)      term=subject:$term ;;
   esac
