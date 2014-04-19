@@ -4,4 +4,4 @@
 #       - Cameron Simpson <cs@zip.com.au> 19apr2014
 #
 
-exec vim -c 'set formatoptions=wa' ${1+"$@"}
+exec vim -c 'silent !1,/^$/s/  *$//' -c 'set formatoptions=wa' ${1+"$@"}
