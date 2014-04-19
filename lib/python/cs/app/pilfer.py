@@ -910,7 +910,6 @@ one_to_one = {
       'type':         lambda PU: url_io(PU[1].content_type, ""),
       'xmlattr':      lambda PU, attr: [ A for A in (ElementTree.XML(PU[1]).get(attr),) if A is not None ],
     }
-one_to_one_scoped = ('per',)
 
 one_test = {
       'has_title':    lambda PU: PU[1].page_title is not None,
@@ -1238,7 +1237,6 @@ def function_by_name(func_name, func_sig):
   elif func_name in one_to_one:
     function = one_to_one[func_name]
     func_sig = FUNC_ONE_TO_ONE
-    scoped = func_name in one_to_one_scoped
   elif func_name in one_test:
     function = one_test[func_name]
     func_sig = FUNC_SELECTOR
