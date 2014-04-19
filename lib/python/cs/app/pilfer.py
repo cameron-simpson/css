@@ -394,7 +394,6 @@ class Pilfer(O):
     self._print_lock = Lock()
     self.user_agent = None
     self.user_vars = { 'save_dir': '.' }
-    self._urlsfile = None
     self._lock = Lock()
     self.rcs = []               # chain of PilferRC libraries
     self.seensets = {}
