@@ -1051,6 +1051,18 @@ def action_func(action, do_trace, raw=False):
                 elif func_name == 'unique':
                   # unique
                   func_sig, function = action_unique(func_name, action, offset)
+                elif action == 'first':
+                  is_first = [True]
+                  def function(item):
+                    if is_first[0]:
+                      is_first[0] = False
+                      return True
+                    return False
+                  func_sig = FUNC_SELECTOR
+                elif action == 'new_save_dir':
+                  def function(P):
+                    return P.copy_with_vars(save_dir=new_dir(P.save_dir))
+                  func_sig = FUNC_ONE_TO_ONE
                 # some other function: gather arguments
                 elif offset < len(action):
                   marker = action[offset]
@@ -1126,18 +1138,6 @@ def action_func(action, do_trace, raw=False):
               exts = exts.split(',')
               function = lambda P: not has_exts( P._, exts, case_sensitive=case )
               func_sig = FUNC_SELECTOR
-            elif action == 'first':
-              is_first = True
-              def function(item):
-                if is_first:
-                  is_first = False
-                  return True
-                return False
-              func_sig = FUNC_SELECTOR
-            elif action == 'new_save_dir':
-              def function(P):
-                return P.copy_with_vars(save_dir=new_dir(P.save_dir))
-              func_sig = FUNC_ONE_TO_ONE
             else:
               raise ValueError("unknown function %r" % (func_name,))
 
