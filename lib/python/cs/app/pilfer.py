@@ -1244,6 +1244,7 @@ def function_by_name(func_name, func_sig):
     # many-to-many functions get passed straight in
     function = many_to_many[func_name]
     func_sig = FUNC_MANY_TO_MANY
+    scoped = True
   elif func_name in one_to_many:
     function = one_to_many[func_name]
     func_sig = FUNC_ONE_TO_MANY
