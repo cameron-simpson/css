@@ -43,7 +43,7 @@ from cs.urlutils import URL, isURL, NetrcHTTPPasswordMgr
 import cs.obj
 from cs.obj import O
 from cs.py.func import funcname
-from cs.py3 import input, ConfigParser
+from cs.py3 import input, ConfigParser, sorted
 
 DEFAULT_JOBS = 4
 
