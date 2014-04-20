@@ -762,7 +762,7 @@ def with_exts(urls, suffixes, case_sensitive=False):
     else:
       debug("with_exts: discard %s", U)
 
-def substitute( PS, regexp, replacement, replace_all):
+def substitute( P, regexp, replacement, replace_all):
   ''' Perform a regexp substitution on the source string.
       `replacement` is a format string for the replacement text
       using the str.format method.
@@ -771,7 +771,7 @@ def substitute( PS, regexp, replacement, replace_all):
       The keyword arguments consist of '_' for the whole matched string
       and any named groups.
   '''
-  P, src = PS
+  src = P._
   debug("SUBSTITUTE: src=%r, regexp=%r, replacement=%r, replace_all=%s)...",
         src, regexp.pattern, replacement, replace_all)
   strs = []
