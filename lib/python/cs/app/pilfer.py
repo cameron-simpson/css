@@ -1610,7 +1610,7 @@ def action_assign(var, value):
   '''
   def function(P):
     U = P._
-    return P.copy_with_user_vars(**{var: P.format_string(value, U)})
+    return P.copy_with_vars(**{var: P.format_string(value, U)})
   return function, FUNC_ONE_TO_ONE
 
 class PipeSpec(O):
