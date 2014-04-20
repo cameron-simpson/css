@@ -46,7 +46,7 @@ def URL(U, referer, **kw):
   ''' Factory function to return a _URL object from a URL string.
       Handing it a _URL object returns the object.
   '''
-  if not isinstance(U, _URL):
+  if not isURL(U):
     ##D("new U %r (ref=%r)", U, referer)
     U = _URL(ustr(U))
     U._init(referer=referer, **kw)
