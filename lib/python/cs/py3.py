@@ -37,6 +37,12 @@ if sys.hexversion < 0x03000000:
     return o.itervalues()
   input = raw_input
 
+  _sorted = sorted
+  def sorted(iterable, key=None, reversed=False):
+    if key is None:
+      key = lambda x: x
+    return _sorted(iterable, cmp, key, reversed)
+
 else:
 
   unicode = str
@@ -53,6 +59,7 @@ else:
     return o.keys()
   def itervalues(o):
     return o.values()
+  from builtins import sorted
 
 def raise3(exc_type, exc_value, exc_traceback):
   if sys.hexversion >= 0x03000000:
