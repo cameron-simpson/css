@@ -1212,7 +1212,7 @@ def action_func(action, do_trace, raw=False):
           # call the inner function
           Us = func1(Ps, *args, **kwargs)
           # return copies of a suitable original Pilfer
-          return [ (idmap.get(id(U), P0), U).copy_with_vars(_=U) for U in Us ]
+          return [ idmap.get(id(U), P0).copy_with_vars(_=U) for U in Us ]
     else:
       raise RuntimeError("unhandled func_sig %r" % (func_sig,))
 
