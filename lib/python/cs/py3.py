@@ -16,11 +16,11 @@ if sys.hexversion < 0x03000000:
     '''
     if isinstance(s, str):
       try:
-        s = unicode(s, e, 'error')
+        s = s.decode(e, 'strict')
       except UnicodeDecodeError as ude:
         from cs.logutils import warning
         warning("cs.py3.ustr(): %s: s = %s %r", ude, type(s), s)
-        s = unicode(s, e, 'replace')
+        s = s.decode(e, 'replace')
     return s
   try:
     from cStringIO import StringIO as BytesIO
