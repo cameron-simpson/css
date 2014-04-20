@@ -1194,8 +1194,7 @@ def action_func(action, do_trace, raw=False):
         function = lambda Ps: func1(Ps, *args, **kwargs)
       else:
         # Many-to-many functions are different.
-        # We split out the Ps and Us from the input items.
-        # 
+        # We make a mapping from P._ to P for each Ps
         # and re-attach the P components by reverse mapping from the U results;
         # unrecognised Us get associated with Ps[0].
         #
