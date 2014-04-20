@@ -42,6 +42,7 @@ from cs.threads import locked, locked_property
 from cs.urlutils import URL, isURL, NetrcHTTPPasswordMgr
 import cs.obj
 from cs.obj import O
+from cs.py.func import funcname
 from cs.py3 import input, ConfigParser
 
 DEFAULT_JOBS = 4
@@ -173,7 +174,7 @@ def main(argv, stdin=None):
                                    )
               with pipeline:
                 for U in urls(url, stdin=stdin, cmd=cmd):
-                  pipeline.put( (P, URL(U, None, scope=P)) )
+                  pipeline.put( P.copy_with_vars(_=URL(U, None, scope=P)) )
               # wait for main pipeline to drain
               LTR.state("drain main pipeline")
               for item in pipeline.outQ:
@@ -385,15 +386,16 @@ class Pilfer(O):
         .user_vars      Mapping of user variables for arbitrary use.
   '''
 
-  def __init__(self, **kw):
+  def __init__(self, *a, **kw):
     self._name = 'Pilfer-%d' % (seq(),)
     self._lock = Lock()
+    self.user_vars = { 'save_dir': '.' }
+    self._ = None
     self.flush_print = False
     self.do_trace = False
     self._print_to = None
     self._print_lock = Lock()
     self.user_agent = None
-    self.user_vars = { 'save_dir': '.' }
     self._lock = Lock()
     self.rcs = []               # chain of PilferRC libraries
     self.seensets = {}
@@ -403,7 +405,7 @@ class Pilfer(O):
     O.__init__(self, **kw)
 
   def __str__(self):
-    return self._name
+    return "%s[%s]" % (self._name, self._)
   __repr__ = __str__
 
   def copy(self, *a, **kw):
@@ -557,6 +559,13 @@ class Pilfer(O):
     ''' Update self.user_vars from the keyword arguments.
     '''
     self.user_vars.update(kw)
+
+  def copy_with_vars(self, **kw):
+    ''' Make a copy of `self` with copied .user_vars, update the vars and return the copied Pilfer.
+    '''
+    P = self.copy('user_vars')
+    P.set_user_vars(**kw)
+    return P
 
   def print_url_string(self, U, **kw):
     ''' Print a string using approved URL attributes as the format dictionary.
@@ -833,55 +842,59 @@ def url_srcs(U):
   '''
   return url_io_iter(URL(U, None).srcs(absolute=True))
 
-def grok(module_name, func_name, PU, *a, **kw):
-  ''' Grok performs a user-specified analysis on the URL U.
+def grok(module_name, func_name, P, *a, **kw):
+  ''' Grok performs a user-specified analysis on the supplied Pilfer state `P`.
+      (The current value, often an URL, is `P._`.)
       Import `func_name` from module `module_name`.
-      Call `func_name( PU, *a, **kw ).
-      Receive a mapping of variable names to values in return,
-      which is applied to P.set_user_vars().
-      Returns U, as this is a one-to-one function.
+      Call `func_name( P, *a, **kw ).
+      Receive a mapping of variable names to values in return.
+      If not empty, copy P and apply the mapping via which is applied
+      with P.set_user_vars().
+      Returns P (possibly copied), as this is a one-to-one function.
   '''
-  P, U = PU
-  with Pfx("grok: call %s.%s( (P=%r, U=%r), *a=%r, **kw=%r )...", module_name, func_name, P, U, a, kw):
+  with Pfx("grok: call %s.%s( P=%r, *a=%r, **kw=%r )...", module_name, func_name, P, a, kw):
     mfunc = P.import_module_func(module_name, func_name)
     if mfunc is None:
       error("import fails")
     else:
       try:
-        var_mapping = mfunc((P, U), *a, **kw)
+        var_mapping = mfunc(P, *a, **kw)
       except Exception as e:
         exception("call")
       else:
-        P.set_user_vars(**var_mapping)
-    return U
+        if var_mapping:
+          P = P.copy('user_vars')
+          P.set_user_vars(**var_mapping)
+    return P
 
-def grokall(module_name, func_name, Ps, Us, *a, **kw):
+def grokall(module_name, func_name, Ps, *a, **kw):
   ''' Grokall performs a user-specified analysis on the items.
       Import `func_name` from module `module_name`.
-      Call `func_name( Ps, Us, *a, **kw ).
+      Call `func_name( Ps, *a, **kw ).
       Receive a mapping of variable names to values in return,
       which is applied to each item[0] via .set_user_vars().
+      Return the possibly copied Ps.
   '''
-  with Pfx("grokall: call %s.%s( Ps=%r, Us=%r, *a=%r, **kw=%r )...", module_name, func_name, Ps, Us, a, kw):
-    if not isinstance(Us, list):
-      Us = list(Us)
-    if Us:
-      P = Ps[0]
-      mfunc = P.import_module_func(module_name, func_name)
+  with Pfx("grokall: call %s.%s( Ps=%r, *a=%r, **kw=%r )...", module_name, func_name, Ps, a, kw):
+    if not isinstance(Ps, list):
+      Ps = list(Ps)
+    if Ps:
+      mfunc = P[0].import_module_func(module_name, func_name)
       if mfunc is None:
         error("import fails")
       else:
         try:
-          var_mapping = mfunc(Ps, Us, *a, **kw)
+          var_mapping = mfunc(Ps, *a, **kw)
         except Exception as e:
           exception("call")
         else:
+          if var_mapping:
+            Ps = [ P.copy('user_vars') for P in Ps ]
           for P in Ps:
             P.set_user_vars(**var_mapping)
-    return Us
+    return Ps
 
-def _test_grokfunc( PU, *a, **kw ):
-  P, U = PU
+def _test_grokfunc( P, *a, **kw ):
   v={ 'grok1': 'grok1value',
       'grok2': 'grok2value',
     }
@@ -889,42 +902,41 @@ def _test_grokfunc( PU, *a, **kw ):
 
 # actions that work on the whole list of in-play URLs
 many_to_many = {
-      'sort':         lambda Ps, Us, *a, **kw: sorted(Us, *a, **kw),
-      'last':         lambda Ps, Us: Us[-1:],
+      'sort':         lambda Ps, key=lambda P: P._, reversed=False: sorted(Ps, key=key, reversed=reversed),
+      'last':         lambda Ps: Ps[-1:],
     }
 
 one_to_many = {
-      'hrefs':        lambda PU: url_hrefs(PU[1]),
-      'srcs':         lambda PU: url_srcs(PU[1]),
-      'xml':          lambda PU, match: url_xml_find(PU[1], match),
-      'xmltext':      lambda PU, match: XML(PU[1]).findall(match),
+      'hrefs':        lambda P: url_hrefs(P._),
+      'srcs':         lambda P: url_srcs(P._),
+      'xml':          lambda P, match: url_xml_find(P._, match),
+      'xmltext':      lambda P, match: XML(P._).findall(match),
     }
 
 # actions that work on individual URLs
 one_to_one = {
-      '..':           lambda PU: URL(PU[1], None).parent,
-      'delay':        lambda PU, delay: (PU[1], sleep(float(delay)))[0],
-      'domain':       lambda PU: URL(PU[1], None).domain,
-      'hostname':     lambda PU: URL(PU[1], None).hostname,
-      'new_save_dir': lambda PU: (PU[1], PU[0].set_user_vars(save_dir=new_dir(PU[0].save_dir)))[0],
-      'print':        lambda PU, **kw: (PU[1], PU[0].print_url_string(PU[1], **kw))[0],
-      'query':        lambda PU, *a: url_query(PU[1], *a),
-      'quote':        lambda PU: quote(PU[1]),
-      'unquote':      lambda PU: unquote(PU[1]),
-      'save':         lambda PU, *a, **kw: (PU[1], PU[0].save_url(PU[1], *a, **kw))[0],
+      '..':           lambda P: URL(P._, None).parent,
+      'delay':        lambda P, delay: (P._, sleep(float(delay)))[0],
+      'domain':       lambda P: URL(P._, None).domain,
+      'hostname':     lambda P: URL(P._, None).hostname,
+      'print':        lambda P, **kw: (P._, P.print_url_string(P._, **kw))[0],
+      'query':        lambda P, *a: url_query(P._, *a),
+      'quote':        lambda P: quote(P._),
+      'unquote':      lambda P: unquote(P._),
+      'save':         lambda P, *a, **kw: (P._, P.save_url(P._, *a, **kw))[0],
       's':            substitute,
-      'title':        lambda PU: PU[1].page_title,
-      'type':         lambda PU: url_io(PU[1].content_type, ""),
-      'xmlattr':      lambda PU, attr: [ A for A in (ElementTree.XML(PU[1]).get(attr),) if A is not None ],
+      'title':        lambda P: P._.page_title,
+      'type':         lambda P: url_io(P._.content_type, ""),
+      'xmlattr':      lambda P, attr: [ A for A in (ElementTree.XML(P._).get(attr),) if A is not None ],
     }
 
 one_test = {
-      'has_title':    lambda PU: PU[1].page_title is not None,
-      'reject_re':    lambda PU, regexp: not regexp.search(PU[1]),
-      'same_domain':  lambda PU: notNone(PU[1].referer, "%r.referer" % (PU[1],)) and PU[1].domain == PU[1].referer.domain,
-      'same_hostname':lambda PU: notNone(PU[1].referer, "%r.referer" % (PU[1],)) and PU[1].hostname == PU[1].referer.hostname,
-      'same_scheme':  lambda PU: notNone(PU[1].referer, "%r.referer" % (PU[1],)) and PU[1].scheme == PU[1].referer.scheme,
-      'select_re':    lambda PU, regexp: regexp.search(PU[1]),
+      'has_title':    lambda P: P._.page_title is not None,
+      'reject_re':    lambda P, regexp: not regexp.search(P._),
+      'same_domain':  lambda P: notNone(P._.referer, "%r.referer" % (P._,)) and P._.domain == P._.referer.domain,
+      'same_hostname':lambda P: notNone(P._.referer, "%r.referer" % (P._,)) and P._.hostname == P._.referer.hostname,
+      'same_scheme':  lambda P: notNone(P._.referer, "%r.referer" % (P._,)) and P._.scheme == P._.referer.scheme,
+      'select_re':    lambda P, regexp: regexp.search(P._),
     }
 
 re_COMPARE = re.compile(r'(_|[a-z]\w*)==')
@@ -967,6 +979,7 @@ def action_func(action, do_trace, raw=False):
         m = re_ASSIGN.match(action)
         if m:
           function, func_sig = action_assign(m.group(1), action[m.end():])
+          scoped = True
         else:
           # test of variable value
           # varname~selector
@@ -1071,17 +1084,15 @@ def action_func(action, do_trace, raw=False):
                 regexp = action[1:]
               regexp = re.compile(regexp)
               scoped = True
-              def function(PU):
-                P, U = PU
+              def function(P):
+                U = P._
                 m = regexp.search(U)
-                if not m:
-                  return (P, False)
-                varmap = m.groupdict()
-                if varmap:
-                  P = P.copy('user_vars')
-                  P.set_user_vars(**varmap)
-                return (P, True)
-              func_sig = FUNC_SELECTOR
+                if m:
+                  varmap = m.groupdict()
+                  if varmap:
+                    P = P.with_user_vars(**varmap)
+                  yield P
+              func_sig = FUNC_ONE_TO_MANY
             # select URLs not matching regexp
             # -/regexp/
             elif action.startswith('-/'):
@@ -1090,12 +1101,12 @@ def action_func(action, do_trace, raw=False):
               else:
                 regexp = action[2:]
               regexp = re.compile(regexp)
-              function = lambda PU: not regexp.search(PU[1])
+              function = lambda P: not regexp.search(P._)
               func_sig = FUNC_SELECTOR
             # parent
             # ..
             elif action == '..':
-              function = lambda PU: PU[1].parent
+              function = lambda P: P._.parent
               func_sig = FUNC_ONE_TO_ONE
             # select URLs ending in particular extensions
             elif action.startswith('.'):
@@ -1104,7 +1115,7 @@ def action_func(action, do_trace, raw=False):
               else:
                 exts, case = action[1:], True
               exts = exts.split(',')
-              function = lambda PU: has_exts( PU[1], exts, case_sensitive=case )
+              function = lambda P: has_exts( P._, exts, case_sensitive=case )
               func_sig = FUNC_SELECTOR
             # select URLs not ending in particular extensions
             elif action.startswith('-.'):
@@ -1113,7 +1124,7 @@ def action_func(action, do_trace, raw=False):
               else:
                 exts, case = action[2:], True
               exts = exts.split(',')
-              function = lambda PU: not has_exts( PU[1], exts, case_sensitive=case )
+              function = lambda P: not has_exts( P._, exts, case_sensitive=case )
               func_sig = FUNC_SELECTOR
             elif action == 'first':
               is_first = True
@@ -1123,6 +1134,10 @@ def action_func(action, do_trace, raw=False):
                   return True
                 return False
               func_sig = FUNC_SELECTOR
+            elif action == 'new_save_dir':
+              def function(P):
+                return P.copy_with_vars(save_dir=new_dir(P.save_dir))
+              func_sig = FUNC_ONE_TO_ONE
             else:
               raise ValueError("unknown function %r" % (func_name,))
 
@@ -1132,57 +1147,51 @@ def action_func(action, do_trace, raw=False):
     if raw:
       return func_sig, function, scoped
 
-    # The pipeline itself passes (P, U) item tuples.
+    # The pipeline itself passes Pilfer objects, whose ._ attribute is the current value.
     #
-    # All functions accept a leading (P, U) tuple argument but most emit only
-    # a U result (or just a Boolean for selectors).
-    # A few emit a (P, U) because they change the "scope" P argument.
+    # All functions accept a leading Pilfer argument but most emit only
+    # a value result (or just a Boolean for selectors).
+    # A few emit a Pilfer because they change modify it or produce a copy.
     # If "scoped" is true, we expect the latter.
-    # Otherwise we wrap FUNC_ONE_TO_ONE and FUNC_ONE_TO_MANY to emit the
-    # supplied P value with their outputs.
+    # Otherwise we wrap FUNC_ONE_TO_ONE and FUNC_ONE_TO_MANY to
+    # emit a Pilfer with their outputs.
     # FUNC_MANY_TO_MANY functions have their own convoluted wrapper.
     #
     func0 = function
-    if scoped and func_sig not in (FUNC_ONE_TO_ONE, FUNC_SELECTOR, FUNC_ONE_TO_MANY, FUNC_MANY_TO_MANY):
+    if scoped and func_sig not in (FUNC_ONE_TO_ONE, FUNC_ONE_TO_MANY, FUNC_MANY_TO_MANY):
       raise RuntimeError("scoped is true but func_sig == %r" % (func_sig,))
+    # convert FUNC_SELECTOR to FUNC_ONE_TO_MANY
     if func_sig == FUNC_SELECTOR:
-      # convert FUNC_SELECTOR to FUNC_ONE_TO_MANY so that we can pass
-      # through Pilfer contexts
+      func0 = function
+      def function(P):
+        if func0(P, *args, **kwargs):
+          yield P
+      function.__name__ = "one_to_many(%s)" % (funcname(func0),)
       func_sig = FUNC_ONE_TO_MANY
-      if scoped:
-        # func0 returns (P2, Boolean)
-        def func0(item):
-          P, U  = item
-          P2, status = function(item, *args, **kwargs)
-          if status:
-            yield P2, U
-      else:
-        def func0( PU, *args, **kwargs):
-          if function( PU, *args, **kwargs):
-            P, U = PU
-            yield U
+      scoped = True
+    func1 = function
     if func_sig == FUNC_ONE_TO_ONE:
       if scoped:
-        def funcPU(item):
-          return func0(item, *args, **kwargs)
+        function = lambda P: func1(P, *args, **kwargs)
       else:
-        def funcPU(item):
-          P, U = item
-          return P, func0(item, *args, **kwargs)
+        def function(P):
+          U = P._
+          U2 = func1(P, *args, **kwargs)
+          if U2 != U:
+            P = P.copy(_=U2)
+          return P
     elif func_sig == FUNC_ONE_TO_MANY:
       if scoped:
-        def funcPU(item):
-          for P, U in func0(item, *args, **kwargs):
-            yield P, U
+        def function(P):
+          for P2 in func1(P, *args, **kwargs):
+            yield P2
       else:
-        def funcPU(item):
-          P, U = item
-          for i in func0(item, *args, **kwargs):
-            yield P, i
+        def function(P):
+          for U in func1(P, *args, **kwargs):
+            yield P.copy(_=U)
     elif func_sig == FUNC_MANY_TO_MANY:
       if scoped:
-        def funcPU(items):
-          return func0(items)
+        function = lambda Ps: func1(Ps, *args, **kwargs)
       else:
         # Many-to-many functions are different.
         # We split out the Ps and Us from the input items.
@@ -1190,22 +1199,20 @@ def action_func(action, do_trace, raw=False):
         # and re-attach the P components by reverse mapping from the U results;
         # unrecognised Us get associated with Ps[0].
         #
-        def funcPU(items):
-          if not isinstance(items, list):
-            items = list(items)
-          if items:
+        def function(Ps):
+          if not isinstance(Ps, list):
+            Ps = list(Ps)
+          if Ps:
             # preserve the first Pilfer context to attach to unknown items
-            P0 = items[0][0]
-            idmap = dict( [ ( id(item), item ) for item in items ] )
-            Ps = [ item[0] for item in items ]
-            Us = [ item[1] for item in items ]
+            P0 = Ps[0]
+            idmap = dict( [ ( id(P), P ) for P in Ps ] )
           else:
             P0 = None
             idmap = {}
-            Ps = []
-            Us = []
-          Us2 = func0(Ps, Us, *args, **kwargs)
-          return [ (idmap.get(id(U), P0), U) for U in Us2 ]
+          # call the inner function
+          Us = func1(Ps, *args, **kwargs)
+          # return copies of a suitable original Pilfer
+          return [ (idmap.get(id(U), P0), U).copy(_=U) for U in Us ]
     else:
       raise RuntimeError("unhandled func_sig %r" % (func_sig,))
 
@@ -1215,12 +1222,12 @@ def action_func(action, do_trace, raw=False):
         D("DO %s(a=(%d args; %r),kw=%r)", action0, len(a), a, kw)
       with Pfx(action0):
         try:
-          retval = funcPU(*a, **kw)
+          retval = function(*a, **kw)
         except Exception as e:
           exception("TRACE: EXCEPTION: %s", e)
           raise
         if do_trace:
-          D("DONE %s(a=(%d args; %r),kw=%r)", action0, len(a), a, kw)
+          D("DONE %s(a=(%d args; %r),kw=%r) ==> %r", action0, len(a), a, kw, retval)
         return retval
 
     trace_function.__name__ = "trace_action(%r)" % (action0,)
@@ -1266,7 +1273,7 @@ def action_divert_pipe(func_name, action, offset, do_trace):
   if not pipe_name:
     raise ValueError("no pipe name")
   if offset >= len(action):
-    sel_function = lambda PU: True
+    sel_function = lambda P: True
     sel_function.__name__ = 'True(%r)' % (action,)
   else:
     if marker != action[offset]:
@@ -1284,8 +1291,8 @@ def action_divert_pipe(func_name, action, offset, do_trace):
     func_sig = FUNC_ONE_TO_MANY
     scoped = False
     @logexc
-    def function(item):
-      P, U = item
+    def function(P):
+      U = P._
       if sel_function(item):
         try:
           pipe = P.diversion(pipe_name)
@@ -1300,8 +1307,8 @@ def action_divert_pipe(func_name, action, offset, do_trace):
     func_sig = FUNC_ONE_TO_ONE
     scoped = True
     @logexc
-    def function(item):
-      P, U = item
+    def function(P):
+      U = P._
       if sel_function(item):
         try:
           pipe = P.diversion(pipe_name)
@@ -1348,9 +1355,8 @@ def action_per(action, argv):
   debug("action_per: argv=%r", argv)
   argv = list(argv)
   pipespec = PipeSpec("per:[%s]" % (','.join(argv)), argv)
-  def function(item):
+  def function(P):
     debug("action_per func %r per(%r)", function.__name__, item)
-    P, U = item
     with P.later.more_capacity(1):
       pipeline = P.pipe_through(pipespec, (item,))
       debug("pipe: pipe_though(%s) => %r", pipespec, pipeline)
@@ -1381,22 +1387,22 @@ def action_sight(func_name, action, offset):
         value = '{url}'
   if func_name == 'see':
     func_sig = FUNC_ONE_TO_ONE
-    def function(PU):
-      P, U = PU
+    def function(P):
+      U = P._
       see_value = P.format_string(value, U)
       for seenset in seensets:
         P.see(see_value, seenset)
       return U
   elif func_name == 'seen':
     func_sig = FUNC_SELECTOR
-    def function(PU):
-      P, U = PU
+    def function(P):
+      U = P._
       see_value = P.format_string(value, U)
       return any( [ P.seen(see_value, seenset) for seenset in seensets ] )
   elif func_name == 'unseen':
     func_sig = FUNC_SELECTOR
-    def function(PU):
-      P, U = PU
+    def function(P):
+      U = P._
       see_value = P.format_string(value, U)
       return not any( [ P.seen(see_value, seenset) for seenset in seensets ] )
   else:
@@ -1407,8 +1413,8 @@ def action_unique(func_name, action, offset):
   # unique
   #
   seen = set()
-  def function(PU):
-    P, U = PU
+  def function(P):
+    U = P._
     if U not in seen:
       seen.add(U)
       yield U
@@ -1431,26 +1437,22 @@ def action_for(func_name, action, offset):
   if marker == '=':
     # for:varname=value,...
     values = action[offset+1:]
-    def function(PU):
-      P, U = PU
+    def function(P):
+      U = P._
       # expand "values", split on whitespace, iterate with new Pilfer
       value_list = P.format_string(values, U).split()
       for value in value_list:
-        P2 = P.copy('user_vars')
-        P2.set_user_vars(**{varname: value})
-        yield P2, U
+        yield P.with_user_vars(**{varname: value})
   elif marker == ':':
     # for:varname:{start}..{stop}
     start, stop = action[offset+1:].split('..', 1)
-    def function(PU):
-      P, U = PU
+    def function(P):
+      U = P._
       # expand "values", split on whitespace, iterate with new Pilfer
       istart = int(P.format_string(start, U))
       istop = int(P.format_string(stop, U))
       for value in range(istart, istop+1):
-        P2 = P.copy('user_vars')
-        P2.set_user_vars(**{varname: str(value)})
-        yield P2, U
+        yield P.with_user_vars(**{varname: str(value)})
   else:
     raise ValueError("unrecognised marker after varname: %r", marker)
   return func_sig, function, scoped
@@ -1462,10 +1464,10 @@ def action_grok(func_name, action, offset):
   # Import "d" from the python module "a.b.c".
   # d() should return a mapping of varname to value.
   #
-  # For grok, call d((P, U), kwargs) and apply the
+  # For grok, call d(P, kwargs) and apply the
   # returned mapping to P.user_vars.
   #
-  # From grokall, call d( ( (P, U), ...), kwargs) and apply
+  # From grokall, call d( ( P, ...), kwargs) and apply
   # the returned mapping to each P.user_vars.
   #
   is_grokall = func_name == "grokall"
@@ -1492,16 +1494,16 @@ def action_grok(func_name, action, offset):
         yield item
   else:
     func_sig = FUNC_ONE_TO_ONE
-    def function( PU, *a, **kw):
-      return grok(grok_module, grok_funcname, PU, *a, **kw)
+    def function( P, *a, **kw):
+      return grok(grok_module, grok_funcname, P, *a, **kw)
   return func_sig, function
 
 def action_shcmd(shcmd):
   ''' Return (function, func_sig) for a shell command.
   '''
   shcmd = shcmd.strip()
-  def function(item):
-    P, U = item
+  def function(P):
+    U = P._
     uv = P.user_vars
     try:
       v = P.format_string(shcmd, U)
@@ -1536,10 +1538,10 @@ def action_pipecmd(shcmd):
       items = list(items)
     if not items:
       return
-    P, U = items[0]
+    P = items[0]
     uv = P.user_vars
     try:
-      v = P.format_string(shcmd, U)
+      v = P.format_string(shcmd, P._)
     except KeyError as e:
       warning("pipecmd.format(%r): KeyError: %s", uv, e)
     else:
@@ -1552,8 +1554,8 @@ def action_pipecmd(shcmd):
           return
         # spawn a daemon thread to feed items to the pipe
         def feedin():
-          for P, U in items:
-            print(U, file=subp.stdin)
+          for P in items:
+            print(P._, file=subp.stdin)
           subp.stdin.close()
         T = Thread(target=feedin, name='feedin to %r' % (v,))
         T.daemon = True
@@ -1573,8 +1575,8 @@ def action_pipecmd(shcmd):
 def action_compare(var, value):
   ''' Return (function, func_sig) for a variable value comparison.
   '''
-  def function(item):
-    P, U = item
+  def function(P):
+    U = P._
     M = FormatMapping(P, U)
     try:
       vvalue = M[var]
@@ -1591,8 +1593,8 @@ def action_test(var, selector, do_trace):
   sel_func_sig, sel_function = action_func(selector, do_trace=do_trace)
   if sel_func_sig != FUNC_SELECTOR:
     raise ValueError("expected selector function but found: %r" % (selector,))
-  def function(item):
-    P, U = item
+  def function(P):
+    U = P._
     M = FormatMapping(P, U)
     try:
       vvalue = M[var]
@@ -1606,15 +1608,9 @@ def action_test(var, selector, do_trace):
 def action_assign(var, value):
   ''' Return (function, func_sig) for a variable value assignment.
   '''
-  def function(item):
-    P, U = item
-    if var == '_':
-      value2 = P.format_string(value, U)
-      if value2 != U:
-        U = URL(value2, U)
-    else:
-      P.set_user_var(var, value, U)
-    return U
+  def function(P):
+    U = P._
+    return P.copy_with_user_vars(**{var: P.format_string(value, U)})
   return function, FUNC_ONE_TO_ONE
 
 class PipeSpec(O):
