@@ -33,7 +33,7 @@ from cs.mailutils import Maildir, message_addresses, shortpath, ismaildir, make_
 from cs.obj import O, slist
 from cs.threads import locked_property
 from cs.app.maildb import MailDB
-from cs.py3 import unicode as u, StringTypes
+from cs.py3 import unicode as u, StringTypes, ustr
 
 DEFAULT_MAILDIR_RULES = '$HOME/.mailfiler/{maildir.basename}'
 
@@ -470,6 +470,8 @@ class Filer(O):
     for hdr in ('from', 'to', 'cc', 'bcc', 'reply-to'):
       hmap['short_'+hdr.replace('-', '_')] = ",".join(self.maildb.header_shortlist(M, (hdr,)))
     hmap['short_recipients'] = ",".join(self.maildb.header_shortlist(M, ('to', 'cc', 'bcc')))
+    for h, hval in list(hmap.items()):
+      hmap[h] = ustr(hval)
     return u(fmt).format(**hmap)
 
   def alert(self, alert_message=None):
