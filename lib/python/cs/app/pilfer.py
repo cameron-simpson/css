@@ -633,12 +633,12 @@ class Pilfer(O):
     ''' Format a string using the URL `U` as context.
         `U` will be promoted to an URL if necessary.
     '''
-    return FormatMapping(self, U).format(s)
+    return FormatMapping(self).format(s)
 
   def set_user_var(self, k, value, U, raw=False):
     if not raw:
       value = self.format_string(value, U)
-    FormatMapping(self, U)[k] = value
+    FormatMapping(self)[k] = value
 
 class FormatArgument(str):
 
@@ -652,27 +652,39 @@ class FormatMapping(object):
       This mapping is used with str.format to fill in {value}s.
   '''
 
-  _approved = (
-                'archives',
-                'basename',
-                'dirname',
-                'domain',
-                'hrefs',
-                'hostname',
-                'parent',
-                'path',
-                'referer',
-                'srcs',
-                'page_title',
-                '_',
-              )
-
-  def __init__(self, P, U):
+  def __init__(self, P, U=None, factory=None):
+    ''' Initialise this FormatMapping from a Pilfer `P`.
+	The optional paramater `U` (default from `P._`) is the
+	object whose attributes are exposed for format strings,
+	though P.user_vars preempt them.
+	The optional parameter `factory` is used to promote the
+	value `U` to a useful type; it calls URL(U, None) by default.
+    '''
     self.pilfer = P
-    self.url = URL(U, None)
+    if U is None:
+      U = P._
+    if factory is None:
+      factory = lambda x: URL(x, None)
+    self.url = factory(U)
+
+  def _ok_attrkey(self, k):
+    ''' Test for validity of `k` as a public non-callable attribute of self.url.
+    '''
+    if not k[0].isalpha():
+      return False
+    U = self.url
+    try:
+      attr = getattr(U, k)
+    except AttributeError:
+      return False
+    return not callable(attr)
 
   def keys(self):
-    return set(self._approved) + set(self.pilfer.user_vars.keys())
+    ks = ( set( [ k for k in dir(self.url) if self._ok_attrkey(k) ] )
+         + set(self.pilfer.user_vars.keys())
+         )
+    X("FormatMapping: KEYS = %r", ks)
+    return ks
 
   def __getitem__(self, k):
     return FormatArgument(self._getitem(k))
@@ -681,18 +693,15 @@ class FormatMapping(object):
     P = self.pilfer
     url = self.url
     with Pfx(url):
-      if k in self._approved:
-        if k == '_':
-          return url
-        try:
-          return getattr(url, k)
-        except AttributeError as e:
-          raise KeyError("no such attribute: .%s (%s)" % (k, e))
-        except:
-          ##D("BANG")
-          raise
-      else:
+      if k in P.user_vars:
         return P.user_vars[k]
+      if not self._ok_attrkey(k):
+        raise KeyError("unapproved attribute (missing or callable or not public): %r" % (k,))
+      try:
+        attr = getattr(url, k)
+      except AttributeError as e:
+        raise KeyError("no such attribute: .%s: %s" % (k, e))
+      return attr
 
   def get(self, k, default):
     try:
@@ -701,10 +710,11 @@ class FormatMapping(object):
       return default
 
   def __setitem__(self, k, value):
+    X("FormatMapping: __setitem__(k=%r, value=%r)", k, value)
     P = self.pilfer
     url = self.url
     with Pfx(url):
-      if k in self._approved:
+      if self._ok_attrkey(k):
         raise KeyError("it is forbidden to assign to attribute .%s" % (k,))
       else:
         P.user_vars[k] = value
