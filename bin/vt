@@ -26,10 +26,6 @@
 # A store is a content addressed pool of blocks
 # with a filesystem abstraction layered on top of it.
 #
-#
-# Command script for venti-ish implementation.
-#       - Cameron Simpson <cs@zip.com.au> 01may2007
-#
 
 from __future__ import with_statement
 import sys
