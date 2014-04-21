@@ -174,7 +174,7 @@ def main(argv, stdin=None):
                                    )
               with pipeline:
                 for U in urls(url, stdin=stdin, cmd=cmd):
-                  pipeline.put( P.copy_with_vars(_=URL(U, None, scope=P)) )
+                  pipeline.put( P.copy_with_vars(_=U) )
               # wait for main pipeline to drain
               LTR.state("drain main pipeline")
               for item in pipeline.outQ:
