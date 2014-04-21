@@ -64,7 +64,7 @@ class _URL(unicode):
       Subclasses unicode.
   '''
 
-  def _init(self, referer=None, user_agent=None, opener=None, scope=None):
+  def _init(self, referer=None, user_agent=None, opener=None):
     ''' Initialise the _URL.
         `s`: the string defining the URL.
         `referer`: the referring URL.
@@ -72,15 +72,10 @@ class _URL(unicode):
                   "css" if no referer.
         `opener`: urllib2 opener object, inherited from `referer` if unspecified,
                   made at need if no referer.
-        `scope`: an assisting scope object, inherited from `referer` if unspecified,
-                  made at need if no referer. Attributes not found directly on self
-                  are sought on self._scope.
     '''
     self.referer = URL(referer, None) if referer else referer
-    self._scope = scope if scope else self.referer._scope if self.referer else O()
     self.user_agent = user_agent if user_agent else self.referer.user_agent if self.referer else None
-    if opener is not None:
-      self.opener = opener
+    self._opener = opener
     self._parts = None
     self.flush()
     self._lock = RLock()
@@ -91,7 +86,6 @@ class _URL(unicode):
     ''' Ad hoc attributes.
         Upper case attributes named "FOO" parse the text and find the (sole) node named "foo".
         Upper case attributes named "FOOs" parse the text and find all the nodes named "foo".
-        Otherwise, look the attribute up in self._scope.
     '''
     k, plural = parseUC_sAttr(attr)
     if k:
@@ -99,7 +93,7 @@ class _URL(unicode):
       if plural:
         return nodes
       return the(nodes)
-    return getattr(self._scope, attr)
+    raise AttributeError(attr)
 
   def flush(self):
     ''' Forget all cached content.
@@ -114,12 +108,14 @@ class _URL(unicode):
 
   @property
   def opener(self):
-    try:
-      o = self._scope.opener
-    except AttributeError:
-      o = build_opener()
-      o.add_handler(HTTPBasicAuthHandler(NetrcHTTPPasswordMgr()))
-    return o
+    if self._opener is None:
+      if self.referer is not None and self.referer._opener is not None:
+        self._operner = self.referer._opener
+      else:
+        o = build_opener()
+        o.add_handler(HTTPBasicAuthHandler(NetrcHTTPPasswordMgr()))
+        self._opener = o
+    return self._opener
 
   def _request(self, method):
     class MyRequest(Request):
