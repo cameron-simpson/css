@@ -607,17 +607,6 @@ class Pilfer(O):
             except:
               exception("save fails")
 
-  def format_string(self, s, U):
-    ''' Format a string using the URL `U` as context.
-        `U` will be promoted to an URL if necessary.
-    '''
-    return FormatMapping(self, U).format(s)
-
-  def set_user_var(self, k, value, U, raw=False):
-    if not raw:
-      value = self.format_string(value, U)
-    FormatMapping(self, U)[k] = value
-
   def import_module_func(self, module_name, func_name):
     with LogExceptions():
       import importlib
@@ -639,6 +628,17 @@ class Pilfer(O):
         except AttributeError as e:
           error("%s: no entry named %r: %s", module_name, func_name, e)
       return None
+
+  def format_string(self, s, U):
+    ''' Format a string using the URL `U` as context.
+        `U` will be promoted to an URL if necessary.
+    '''
+    return FormatMapping(self, U).format(s)
+
+  def set_user_var(self, k, value, U, raw=False):
+    if not raw:
+      value = self.format_string(value, U)
+    FormatMapping(self, U)[k] = value
 
 class FormatArgument(str):
 
