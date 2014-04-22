@@ -52,13 +52,18 @@ class TestMailFiler(unittest.TestCase):
               Cflags = C.flags
               RCflags = RC.flags
               for flag_name in dir(RC.flags):
+                if flag_name == 'D':
+                  continue
                 if flag_name[0].isalpha():
                   if getattr(RCflags, flag_name):
                     self.assertTrue(flag_name in Cflags, "\"%s\" in Rule but not expected" % (flag_name,))
                   else:
                     self.assertTrue(flag_name not in Cflags, "\"%s\" expected, but not in Rule" % (flag_name,))
             else:
-              self.assertEqual(getattr(C, attr), getattr(RC, attr))
+              av1 = getattr(C, attr)
+              av2 = getattr(RC, attr)
+              if not callable(av1) and not callable(av2):
+                self.assertEqual(getattr(C, attr), getattr(RC, attr))
 
   def testParseRules(self):
     self._testSingleRule( "varname=value", ('ASSIGN', ('varname', 'value')), '', () )
@@ -73,7 +78,7 @@ class TestMailFiler(unittest.TestCase):
     self._testSingleRule( "!target labelstr .",
                           ('TARGET', 'target'), 'labelstr',
                           (), O(alert=True, halt=False) )
-    self._testSingleRule( "!=target labelstr .",
+    self._testSingleRule( "=!target labelstr .",
                           ('TARGET', 'target'), 'labelstr',
                           (), O(alert=True, halt=True) )
     self._testSingleRule( "=!target labelstr .",

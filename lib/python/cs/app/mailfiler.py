@@ -581,18 +581,18 @@ def parserules(fp):
           R = None
           continue
 
-        while True:
-          if line[offset] == '+':
-            R.flags.halt = False
-            offset += 1
-          elif line[offset] == '=':
-            R.flags.halt = True
-            offset += 1
-          if line[offset] == '!':
-            R.flags.alert += 1
-            offset += 1
-          else:
-            break
+        # leading optional '+' (continue, default) or '=' (final)
+        if line[offset] == '+':
+          R.flags.halt = False
+          offset += 1
+        elif line[offset] == '=':
+          R.flags.halt = True
+          offset += 1
+
+        # leading '!' alert
+        if line[offset] == '!':
+          R.flags.alert += 1
+          offset += 1
 
         targets, offset = get_targets(line, offset)
         for target in targets:
