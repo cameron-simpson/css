@@ -375,7 +375,7 @@ class Maildir(mailbox.Maildir):
   __iter__ = itervalues
 
   def values(self):
-    return list(self.iterkeys())
+    return list(self.itervalues())
 
   def iteritems(self):
     for key in self.iterkeys():
