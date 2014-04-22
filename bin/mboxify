@@ -22,7 +22,6 @@ else
     /*) ;; *) mailbox=`pwd`/$mailbox ;;
   esac
   if [ ! -e "$mailbox" ]
-
   then
     echo "$cmd: missing mailbox: $mailbox" >&2
     badopts=1
