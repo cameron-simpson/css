@@ -31,12 +31,12 @@ an environment variable assignment.
 
 Other lines are mail filing rules, of the general form:
 
-  [!][=]targets tag [!]condition
+  [=][!]targets tag [!]condition
 
 A line commencing with whitespace is considered to be an additional
 condition to be ANDed with the preceeding line's rule conditions:
 
-  [!][=]targets tag condition1
+  [=][!]targets tag condition1
                     condition2
                     condition3
 
