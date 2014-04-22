@@ -33,7 +33,7 @@ from cs.mailutils import Maildir, message_addresses, shortpath, ismaildir, make_
 from cs.obj import O, slist
 from cs.threads import locked_property
 from cs.app.maildb import MailDB
-from cs.py3 import unicode as u, StringTypes
+from cs.py3 import unicode as u, StringTypes, ustr
 
 DEFAULT_MAILDIR_RULES = '$HOME/.mailfiler/{maildir.basename}'
 
@@ -138,7 +138,7 @@ def main(argv, stdin=None):
           mdir.close()
         return 1
     else:
-      raise RunTimeError("unimplemented op")
+      raise RuntimeError("unimplemented op")
 
 def maildir_from_name(mdirname, maildir_root, maildir_cache):
     ''' Return the Maildir derived from mdirpath.
@@ -470,6 +470,8 @@ class Filer(O):
     for hdr in ('from', 'to', 'cc', 'bcc', 'reply-to'):
       hmap['short_'+hdr.replace('-', '_')] = ",".join(self.maildb.header_shortlist(M, (hdr,)))
     hmap['short_recipients'] = ",".join(self.maildb.header_shortlist(M, ('to', 'cc', 'bcc')))
+    for h, hval in list(hmap.items()):
+      hmap[h] = ustr(hval)
     return u(fmt).format(**hmap)
 
   def alert(self, alert_message=None):
@@ -825,7 +827,7 @@ _FilterReport = namedtuple('FilterReport',
 def FilterReport(rule, matched, saved_to, ok_actions, failed_actions):
   if not matched:
     if saved_to:
-      raise RunTimeError("matched(%r) and not saved_to(%r)" % (matched, saved_to))
+      raise RuntimeError("matched(%r) and not saved_to(%r)" % (matched, saved_to))
   return _FilterReport(rule, matched, saved_to, ok_actions, failed_actions)
 
 class Rule(O):
