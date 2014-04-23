@@ -203,7 +203,9 @@ class Filer(O):
     self._log = None
     self.targets = set()
     self.labels = set()
-    self.flags = O(alert=False)
+    self.flags = O(alert=False,
+                   flagged=False, passed=False, replied=False,
+                   seen=False, trashed=False, draft=False)
 
   def file(self, M, rules, message_path=None):
     ''' File the specified message `M` according to the supplied `rules`.
@@ -372,13 +374,21 @@ class Filer(O):
           make_maildir(mailpath)
         if ismaildir(mailpath):
           mdir = self.maildir(target)
-          if self.flags.alert:
-            maildir_flags = 'F'
-          else:
-            maildir_flags = ''
+          maildir_flags = ''
+          if self.flags.draft:   maildir_flags += 'D'
+          if self.flags.flagged: maildir_flags += 'F'
+          if self.flags.passed:  maildir_flags += 'P'
+          if self.flags.replied: maildir_flags += 'R'
+          if self.flags.seen:    maildir_flags += 'S'
+          if self.flags.trashed: maildir_flags += 'T'
           return self.save_to_maildir(mdir,
                                       flags=maildir_flags)
-        return self.save_to_mbox(mailpath)
+        status = ''
+        x_status = ''
+        if self.flags.draft:   x_status += 'D'
+        if self.flags.flagged: x_status += 'F'
+        if self.flags.seen:    status += 'R'
+        return self.save_to_mbox(mailpath, status, x_status)
 
   def save_header(self, hdr, group_names):
     with Pfx("save_header(%s, %r)", hdr, group_names):
@@ -409,8 +419,12 @@ class Filer(O):
     self.log("    OK %s" % (shortpath(savepath)))
     return savepath
 
-  def save_to_mbox(self, mboxpath):
+  def save_to_mbox(self, mboxpath, status, x_status):
     M = self.message
+    if len(status) > 0:
+      M['Status'] = status
+    if len(x_status) > 0:
+      M['X-Status'] = x_status
     text = M.as_string(True)
     with open(mboxpath, "a") as mboxfp:
       mboxfp.write(text)
@@ -583,18 +597,18 @@ def parserules(fp):
           R = None
           continue
 
-        while True:
-          if line[offset] == '+':
-            R.flags.halt = False
-            offset += 1
-          elif line[offset] == '=':
-            R.flags.halt = True
-            offset += 1
-          if line[offset] == '!':
-            R.flags.alert += 1
-            offset += 1
-          else:
-            break
+        # leading optional '+' (continue, default) or '=' (final)
+        if line[offset] == '+':
+          R.flags.halt = False
+          offset += 1
+        elif line[offset] == '=':
+          R.flags.halt = True
+          offset += 1
+
+        # leading '!' alert
+        if line[offset] == '!':
+          R.flags.alert += 1
+          offset += 1
 
         targets, offset = get_targets(line, offset)
         for target in targets:
@@ -701,9 +715,11 @@ def get_targets(s, offset):
   '''
   targets = []
   while offset < len(s) and not s[offset].isspace():
+    # "quoted-string"
     if s[offset] == '"':
       target, offset = get_qstr(s, offset)
-    elif s[offset ] == '+':
+    # +header(groups)
+    elif s[offset] == '+':
       m = re_ADDHEADER.match(s, offset)
       if m:
         target = m.group()
@@ -712,6 +728,7 @@ def get_targets(s, offset):
         error("parse failure, expected +header(groups) at %d: %s", offset, s)
         raise ValueError("syntax error")
     else:
+      # unquoted word
       m = re_UNQWORD.match(s, offset)
       if m:
         target = m.group()
@@ -870,7 +887,17 @@ class Rule(O):
         try:
           if action == 'TARGET':
             target = envsub(arg, filer.environ)
-            filer.targets.add(target)
+            if len(target) == 1 and target.isupper():
+              if target == 'D':   filer.flags.draft = True
+              elif target == 'F': filer.flags.flagged = True
+              elif target == 'P': filer.flags.passed = True
+              elif target == 'R': filer.flags.replied = True
+              elif target == 'S': filer.flags.seen = True
+              elif target == 'T': filer.flags.trashed = True
+              else:
+                warning("ignoring unsupported flag \"%s\"" % (target,))
+            else:
+              filer.targets.add(target)
           elif action == 'ASSIGN':
             envvar, s = arg
             value = filer.environ[envvar] = envsub(s, filer.environ)
