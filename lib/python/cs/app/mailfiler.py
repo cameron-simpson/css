@@ -387,7 +387,10 @@ class Filer(O):
         x_status = ''
         if self.flags.draft:   x_status += 'D'
         if self.flags.flagged: x_status += 'F'
-        if self.flags.seen:    status += 'R'
+        if self.flags.replied: status += 'R'
+        if self.flags.passed:  x_status += 'P'
+        if self.flags.seen:    x_status += 'S'
+        if self.flags.trashed: x_status += 'T'
         return self.save_to_mbox(mailpath, status, x_status)
 
   def save_header(self, hdr, group_names):
