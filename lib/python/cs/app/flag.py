@@ -10,7 +10,6 @@ import os
 import os.path
 import errno
 from collections import MutableMapping
-from cs.obj import O
 from cs.env import envsub
 from cs.lex import get_uc_identifier
 
@@ -50,7 +49,7 @@ def main(argv):
         raise ValueError("unexpected values after key value: %s" % (' '.join(argv),))
   return xit
 
-class Flags(O, MutableMapping):
+class Flags(MutableMapping):
 
   def __init__(self, flagdir=None, environ=None):
     if flagdir is None:
