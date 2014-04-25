@@ -5,7 +5,6 @@ from string import printable, whitespace, ascii_letters, digits
 import re
 import sys
 from cs.py3 import unicode
-from cs.logutils import D
 
 unhexify = binascii.unhexlify
 if sys.hexversion >= 0x030000:
