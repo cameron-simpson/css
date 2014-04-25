@@ -25,7 +25,7 @@ def main(argv):
   if len(argv) == 0:
     ks = sorted(F.keys())
     for k in ks:
-      print(k, int(F[k]))
+      print(k, "TRUE" if F[k] else "FALSE")
   else:
     k = argv.pop(0)
     if argv == 0:
