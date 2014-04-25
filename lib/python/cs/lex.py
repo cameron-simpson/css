@@ -1,7 +1,7 @@
 import base64
 import binascii
 import quopri
-from string import printable, whitespace, ascii_letters, digits
+from string import printable, whitespace, ascii_letters, ascii_uppercase, digits
 import re
 import sys
 from cs.py3 import unicode
@@ -318,18 +318,25 @@ def get_nonwhite(s, offset=0):
   '''
   return get_other_chars(s, whitespace, offset=offset)
 
-def get_identifier(s, offset=0):
-  ''' Scan the string `s` for an identifier (ASCII letter or underscore followed by
-      letters, digits or underscores) starting at `offset` (default 0).
+def get_identifier(s, offset=0, alpha=ascii_letters, number=digits, extras='_'):
+  ''' Scan the string `s` for an identifier (by default an ASCII
+      letter or underscore followed by letters, digits or underscores)
+      starting at `offset` (default 0).
       Return (match, new_offset).
       The empty string and an unchanged offset will be returned if
       there is no leading letter/underscore.
   '''
   ch = s[offset]
-  if ch != '_' and ch not in ascii_letters:
+  if ch not in alpha and ch not in extras:
     return '', offset
-  idtail, offset = get_chars(s, ascii_letters + digits + '_', offset+1)
+  idtail, offset = get_chars(s, alpha + number + extras, offset+1)
   return ch + idtail, offset
+
+def get_uc_identifier(s, offset=0, number=digits, extras='_'):
+  ''' Scan the string `s` for an identifier as for get_identifier(),
+      but require the letters to be uppercase.
+  '''
+  return get_identifier(s, offset=offset, alpha=ascii_uppercase, number=number, extras=extras)
 
 def get_other_chars(s, stopchars, offset=0):
   ''' Scan the string `s` for characters not in `stopchars` starting
