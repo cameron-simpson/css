@@ -203,7 +203,7 @@ class Filer(O):
     self._log = None
     self.targets = set()
     self.labels = set()
-    self.flags = O(alert=False,
+    self.flags = O(alert=0,
                    flagged=False, passed=False, replied=False,
                    seen=False, trashed=False, draft=False)
 
@@ -230,8 +230,8 @@ class Filer(O):
       exception("matching rules: %s", e)
       return False
 
-    if self.flags.alert:
-      self.alert()
+    if self.flags.alert > 0:
+      self.alert(self.flags.alert)
 
     if not self.targets:
       if self.default_target:
@@ -491,7 +491,7 @@ class Filer(O):
       hmap[h] = ustr(hval)
     return u(fmt).format(**hmap)
 
-  def alert(self, alert_message=None):
+  def alert(self, alert_level, alert_message=None):
     ''' Issue an alert with the specified `alert_message`.
         If missing or None, use self.alert_message(self.message).
     '''
@@ -608,8 +608,8 @@ def parserules(fp):
           R.flags.halt = True
           offset += 1
 
-        # leading '!' alert
-        if line[offset] == '!':
+        # leading '!' alert: multiple '!' raise the alert level
+        while line[offset] == '!':
           R.flags.alert += 1
           offset += 1
 
@@ -882,8 +882,7 @@ class Rule(O):
     '''
     M = filer.message
     with Pfx(self.context):
-      if self.flags.alert:
-        filer.flags.alert = True
+      filer.flags.alert = max(filer.flags.alert, self.flags.alert)
       if self.label:
         filer.labels.add(self.label)
       for action, arg in self.actions:
