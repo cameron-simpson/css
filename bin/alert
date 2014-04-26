@@ -11,10 +11,11 @@ set -ue
 : ${ALERTLOG:=$LOGDIR/alert-local}
 
 cmd=$0
-usage="Usage: $cmd [-c colour] [-G] [-s subtitle] [-t title] {-|echo-args...]}"
+usage="Usage: $cmd [-c colour] [-G] [-l level] [-s subtitle] [-t title] {-|echo-args...]}"
 
 colour=
 dlog=1
+level=1
 growl=
 tnotify=
 title=
@@ -39,6 +40,7 @@ do
     +D) dlog= ;;
     -G) growl=1 ;;
     +G) growl= ;;
+    -l) level=$2; shift ;;
     -t) title=$2; shift ;;
     -s) subtitle=$2; shift ;;
     --) shift; break ;;
