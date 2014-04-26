@@ -10,17 +10,23 @@ usage="Usage: $cmd command [args...]"
 shcmd=$( shqstr "$@" )
 as_shcmd=\"$( printf '%s\n' "$shcmd" | sed 's/["\\]/\\&/g' )\"
 
-iterm_script='
-    tell application "iTerm"
+set -- `ttysize` || :
+columns=${1:-80}
+rows=${2:-65}
+
+iterm_script="
+    tell application \"iTerm\"
         activate
         set newterm to (make new terminal)
         tell newterm
+            set number of columns to $columns
+            set number of rows to $rows
             set newsession to (make new session at the end of sessions)
             tell newsession
-                exec command '"$as_shcmd"'
+                exec command $as_shcmd
             end tell
         end tell
-    end tell'
+    end tell"
 
 set -x
 exec osascript -e "$iterm_script"
