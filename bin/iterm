@@ -1,0 +1,26 @@
+#!/bin/sh
+#
+# Command wrapper to invoke an arbitrary command in a new iterm window.
+#       - Cameron Simpson <cs@zip.com.au> 26apr2014
+#
+
+cmd=$0
+usage="Usage: $cmd command [args...]"
+
+shcmd=$( shqstr "$@" )
+as_shcmd=\"$( printf '%s\n' "$shcmd" | sed 's/["\\]/\\&/g' )\"
+
+iterm_script='
+    tell application "iTerm"
+        activate
+        set newterm to (make new terminal)
+        tell newterm
+            set newsession to (make new session at the end of sessions)
+            tell newsession
+                exec command '"$as_shcmd"'
+            end tell
+        end tell
+    end tell'
+
+set -x
+exec osascript -e "$iterm_script"
