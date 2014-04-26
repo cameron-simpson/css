@@ -135,7 +135,9 @@ do
 
     # =item B<dlog>
     #
-    # The headline alone is passed to my I<buglog-daily> command.
+    # The headline alone is passed to the I<buglog-daily> command.
+    # If the headline has a leading I<category,...>B<:> prefix,
+    # pass the tail of the headline to I<log-tsline> for each category.
     #
     dlog)
       ##dlog "$headline" || xit=1
