@@ -152,21 +152,26 @@ case "$OS,$TERM,$DISPLAY" in
               exit 2
               ;;
     esac
-    app=iTerm
-    # inherently async, so turn off our own async
-    async=
-    set -- \
-      set-x osascript \
-        -e 'tell app "'"$app"'"
-              set myterm to ('"$itermterm"')
-              tell myterm
-                set mysession to (make new session at the end of sessions)
-                tell mysession
-                  set name to "'"$title"'"
-                  exec command "'"$runme"'"
+    if true
+    then
+      set -- open -a Terminal "$runme"
+    else
+      app=iTerm
+      # inherently async, so turn off our own async
+      async=
+      set -- \
+        set-x osascript \
+          -e 'tell app "'"$app"'"
+                set myterm to ('"$itermterm"')
+                tell myterm
+                  set mysession to (make new session at the end of sessions)
+                  tell mysession
+                    set name to "'"$title"'"
+                    exec command "'"$runme"'"
+                  end tell
                 end tell
-              end tell
-            end tell' 
+              end tell' 
+    fi
     ;;
 
   *,*,?*)
