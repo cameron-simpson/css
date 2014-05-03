@@ -11,7 +11,7 @@ set -ue
 : ${ALERTLOG:=$LOGDIR/alert-local}
 
 cmd=$0
-usage="Usage: $cmd [-c colour] [-G] [-l level] [-s subtitle] [-t title] {-|echo-args...]}"
+usage="Usage: $cmd [-c colour] [-e command [args...] --] [-G] [-l level] [-s subtitle] [-t title] {-|echo-args...]}"
 
 colour=
 dlog=1
@@ -20,6 +20,7 @@ growl=
 tnotify=
 title=
 subtitle=
+execute=
 case "$OS" in
   darwin)
     growl=1
@@ -38,6 +39,41 @@ do
     -c) colour=$2; shift ;;
     -D) dlog=1 ;;
     +D) dlog= ;;
+    -e) shift
+        firstarg=1
+        tailargs=
+        for arg
+        do
+          if [ $tailargs ]
+          then
+            # re-accrue the trailing arguments
+            set -- ${1+"$@"} "$arg"
+          else
+            if [ "x$arg" = x-- ]
+            then
+              if [ $firstarg ]
+              then
+                echo "$cmd: missing command after -e" >&2
+                badopts=1
+              else
+                execute=$( as-script "$@" )
+                tail "$execute"
+              fi
+              set --
+              tailargs=1
+            else
+              [ $firstarg ] && { set --; firstarg=; }
+              set -- ${1+"$@"} "$arg"
+            fi
+          fi
+        done
+        if [ -z "$tailargs" ]
+        then
+          echo "$cmd: -e: missing trailing --" >&2
+          badopts=1
+        fi
+        continue
+        ;;
     -G) growl=1 ;;
     +G) growl= ;;
     -l) level=$2; shift ;;
@@ -116,7 +152,9 @@ then
       esac
       eval "$var=\$val"
   done
-  terminal-notifier -title "$title" -subtitle "$subtitle" -message "$message" >/dev/null
+  set -- terminal-notifier -title "$title" -subtitle "$subtitle" -message "$message"
+  [ -n "$execute" ] && set -- "$@" -execute "$execute"
+  "$@" >/dev/null
 fi
 
 exit $xit
