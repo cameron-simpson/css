@@ -1,4 +1,4 @@
-#!/bin/sh -u
+#!/bin/sh
 #
 # Generic open-a-window.
 #
@@ -7,6 +7,8 @@
 # The -big option is tuned to my X setup on a 1280x1024 screen.
 #	- Cameron Simpson <cs@zip.com.au> December 1991
 #
+
+set -ue
 
 : ${TMPDIR:=/tmp}
 : ${LOGDIR:=$HOME/var/log}
