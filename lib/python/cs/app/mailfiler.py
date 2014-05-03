@@ -206,6 +206,7 @@ class Filer(O):
     self.flags = O(alert=0,
                    flagged=False, passed=False, replied=False,
                    seen=False, trashed=False, draft=False)
+    self.saved_to = []
 
   def file(self, M, rules, message_path=None):
     ''' File the specified message `M` according to the supplied `rules`.
@@ -372,6 +373,8 @@ class Filer(O):
         mailpath = self.resolve(target)
         if not os.path.exists(mailpath):
           make_maildir(mailpath)
+        # record the target folder
+        self.saved_to.append(mailpath)
         if ismaildir(mailpath):
           mdir = self.maildir(target)
           maildir_flags = ''
@@ -502,6 +505,23 @@ class Filer(O):
     subargv = [ self.env('ALERT', 'alert') ]
     if alert_level > 1:
       subargv.extend( ['-l', str(alert_level)] )
+    # tell alert how to open this message
+    # TODO: parameterise so that we can open it with other tools
+    if self.saved_to:
+      try:
+        msg_id = self.message['message-id']
+      except KeyError:
+        warning("no Message-ID !")
+      else:
+        msg_ids = [ msg_id for msg_id in msg_id.split() if len(msg_id) > 0 ]
+        if msg_ids:
+          msg_id = msg_ids[0]
+          subargv.extend( ['-e',
+                            'term',
+                             '-e',
+                              'mutt-open-message',
+                               '-f', self.saved_to[0], msg_id,
+                           '--'] )
     subargv.append(alert_message)
     xit = subprocess.call(subargv)
     if xit != 0:
