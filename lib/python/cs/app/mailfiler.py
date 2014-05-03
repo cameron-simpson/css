@@ -28,7 +28,7 @@ from cs.fileutils import abspath_from_file, file_property, files_property, Pathn
 from cs.lex import get_white, get_nonwhite, get_qstr, unrfc2047
 from cs.logutils import Pfx, setup_logging, \
                         debug, info, warning, error, exception, \
-                        D, LogTime
+                        D, X, LogTime
 from cs.mailutils import Maildir, message_addresses, shortpath, ismaildir, make_maildir
 from cs.obj import O, slist
 from cs.threads import locked_property
@@ -203,9 +203,10 @@ class Filer(O):
     self._log = None
     self.targets = set()
     self.labels = set()
-    self.flags = O(alert=False,
+    self.flags = O(alert=0,
                    flagged=False, passed=False, replied=False,
                    seen=False, trashed=False, draft=False)
+    self.saved_to = []
 
   def file(self, M, rules, message_path=None):
     ''' File the specified message `M` according to the supplied `rules`.
@@ -229,9 +230,6 @@ class Filer(O):
     except Exception as e:
       exception("matching rules: %s", e)
       return False
-
-    if self.flags.alert:
-      self.alert()
 
     if not self.targets:
       if self.default_target:
@@ -264,6 +262,9 @@ class Filer(O):
         except Exception as e:
           exception("saving to %r: %s", target, e)
           ok = False
+
+    if self.flags.alert > 0:
+      self.alert(self.flags.alert)
 
     self.logflush()
     return ok
@@ -372,6 +373,8 @@ class Filer(O):
         mailpath = self.resolve(target)
         if not os.path.exists(mailpath):
           make_maildir(mailpath)
+        # record the target folder
+        self.saved_to.append(mailpath)
         if ismaildir(mailpath):
           mdir = self.maildir(target)
           maildir_flags = ''
@@ -387,7 +390,10 @@ class Filer(O):
         x_status = ''
         if self.flags.draft:   x_status += 'D'
         if self.flags.flagged: x_status += 'F'
-        if self.flags.seen:    status += 'R'
+        if self.flags.replied: status += 'R'
+        if self.flags.passed:  x_status += 'P'
+        if self.flags.seen:    x_status += 'S'
+        if self.flags.trashed: x_status += 'T'
         return self.save_to_mbox(mailpath, status, x_status)
 
   def save_header(self, hdr, group_names):
@@ -488,13 +494,36 @@ class Filer(O):
       hmap[h] = ustr(hval)
     return u(fmt).format(**hmap)
 
-  def alert(self, alert_message=None):
+  def alert(self, alert_level, alert_message=None):
     ''' Issue an alert with the specified `alert_message`.
         If missing or None, use self.alert_message(self.message).
+	If `alert_level` is more than 1, prepend "-l alert_level"
+	to the alert command line arguments.
     '''
     if alert_message is None:
       alert_message = self.alert_message(self.message)
-    xit = subprocess.call([self.env('ALERT', 'alert'), alert_message])
+    subargv = [ self.env('ALERT', 'alert') ]
+    if alert_level > 1:
+      subargv.extend( ['-l', str(alert_level)] )
+    # tell alert how to open this message
+    # TODO: parameterise so that we can open it with other tools
+    if self.saved_to:
+      try:
+        msg_id = self.message['message-id']
+      except KeyError:
+        warning("no Message-ID !")
+      else:
+        msg_ids = [ msg_id for msg_id in msg_id.split() if len(msg_id) > 0 ]
+        if msg_ids:
+          msg_id = msg_ids[0]
+          subargv.extend( ['-e',
+                            'term',
+                             '-e',
+                              'mutt-open-message',
+                               '-f', self.saved_to[0], msg_id,
+                           '--'] )
+    subargv.append(alert_message)
+    xit = subprocess.call(subargv)
     if xit != 0:
       warning("non-zero exit from alert: %d", xit)
     return xit
@@ -605,8 +634,8 @@ def parserules(fp):
           R.flags.halt = True
           offset += 1
 
-        # leading '!' alert
-        if line[offset] == '!':
+        # leading '!' alert: multiple '!' raise the alert level
+        while line[offset] == '!':
           R.flags.alert += 1
           offset += 1
 
@@ -879,8 +908,7 @@ class Rule(O):
     '''
     M = filer.message
     with Pfx(self.context):
-      if self.flags.alert:
-        filer.flags.alert = True
+      filer.flags.alert = max(filer.flags.alert, self.flags.alert)
       if self.label:
         filer.labels.add(self.label)
       for action, arg in self.actions:

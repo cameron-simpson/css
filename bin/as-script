@@ -1,0 +1,31 @@
+#!/bin/sh
+#
+# Transcribe a command along with the current directory and environment
+# to a temporary self removing script. Emit the script name.
+#       - Cameron Simpson <cs@zip.com.au> 27apr2014
+#
+
+set -ue
+
+: ${TMPDIR:=/tmp}
+
+cmd=$( basename "$0" )
+usage="Usage: $cmd command [args...]"
+
+[ $# = 0 ] && { echo "$usage" >&2; exit 2; }
+
+runme=$TMPDIR/$cmd.$$.sh
+qrunme=$( shqstr "$runme" )
+qcommand=$( shqstr "$@" )
+wd=$( /bin/pwd )
+qwd=$( shqstr "$wd" )
+( echo '#!/bin/sh'
+  echo "rm -f -- $qrunme"
+  dumpenv -f -sh
+  printf 'cd %s\n' "$qwd"
+  printf 'exec %s\n' "$qcommand"
+) >"$runme"
+
+chmod a+x "$runme"
+
+printf '%s\n' "$runme"

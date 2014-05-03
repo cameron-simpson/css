@@ -50,7 +50,7 @@ def message_addresses(M, header_names):
     for hdr in hdrs:
       for realname, address in getaddresses( (hdr,) ):
         if len(address) == 0:
-          warning("message_addresses(M, %r): header_name %r: hdr=%r: getaddresses() => (%r, %r): DISCARDED",
+          debug("message_addresses(M, %r): header_name %r: hdr=%r: getaddresses() => (%r, %r): DISCARDED",
                   header_names, header_name, hdr, realname, address)
         else:
           yield realname, address
