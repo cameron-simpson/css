@@ -57,7 +57,6 @@ do
                 badopts=1
               else
                 execute=$( as-script "$@" )
-                tail "$execute"
               fi
               set --
               tailargs=1
