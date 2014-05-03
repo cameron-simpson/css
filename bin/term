@@ -144,13 +144,13 @@ case "$OS,$TERM,$DISPLAY" in
               exit 2
               ;;
     esac
+    # inherently async, so turn off our own async
+    async=
     if true
     then
       set -- open -a Terminal "$runme"
     else
       app=iTerm
-      # inherently async, so turn off our own async
-      async=
       set -- \
         set-x osascript \
           -e 'tell app "'"$app"'"
