@@ -136,17 +136,7 @@ set -- ttysane "$@"
 
 case "$OS,$TERM,$DISPLAY" in
   darwin,*,/?* | darwin,*, )
-    runme=$TMPDIR/$cmd.$$.sh
-    qrunme=`shqstr "$runme"`
-    qcmd=`shqstr "$@"`
-    wd=`/bin/pwd`
-    qwd=`shqstr "$wd"`
-    ( echo '#!/bin/sh'
-      echo "rm -f $qrunme"
-      dumpenv -f -sh
-      printf "%s\n" ": set -x; cd $qwd; exec $qcmd"
-    ) >"$runme"
-    $trace chmod u+rx "$runme"
+    runme=$( as-script "$@" )
     case $windowmode in
       tab)    itermterm='current terminal' ;;
       window) itermterm='make new terminal' ;;
