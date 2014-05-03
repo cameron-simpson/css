@@ -28,7 +28,7 @@ from cs.fileutils import abspath_from_file, file_property, files_property, Pathn
 from cs.lex import get_white, get_nonwhite, get_qstr, unrfc2047
 from cs.logutils import Pfx, setup_logging, \
                         debug, info, warning, error, exception, \
-                        D, LogTime
+                        D, X, LogTime
 from cs.mailutils import Maildir, message_addresses, shortpath, ismaildir, make_maildir
 from cs.obj import O, slist
 from cs.threads import locked_property
@@ -231,9 +231,6 @@ class Filer(O):
       exception("matching rules: %s", e)
       return False
 
-    if self.flags.alert > 0:
-      self.alert(self.flags.alert)
-
     if not self.targets:
       if self.default_target:
         self.targets.add(self.default_target)
@@ -265,6 +262,9 @@ class Filer(O):
         except Exception as e:
           exception("saving to %r: %s", target, e)
           ok = False
+
+    if self.flags.alert > 0:
+      self.alert(self.flags.alert)
 
     self.logflush()
     return ok
