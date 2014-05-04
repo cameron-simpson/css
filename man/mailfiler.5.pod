@@ -31,31 +31,43 @@ an environment variable assignment.
 
 Other lines are mail filing rules, of the general form:
 
-  [!][=]targets tag [!]condition
+  [=][!]targets tag [!]condition
 
 A line commencing with whitespace is considered to be an additional
 condition to be ANDed with the preceeding line's rule conditions:
 
-  [!][=]targets tag condition1
+  [=][!]targets tag condition1
                     condition2
                     condition3
 
 =head3 Delivery Flags
 
-Rules may commences with either or both of the following mode indicators:
-
-  ! An exclaimation symbol ('!') indicates that an alert should be
-    emitted at the end of filing if this rule was matched.
+The following indicators may preceed, in order, the targets:
 
   = An equals symbol ('=') indicates that rule processing should
     cease at this rule if it matches. Normally all matching rules are
     applied.
+
+  ! An exclaimation symbol ('!') indicates that an alert should be
+    emitted at the end of filing if this rule was matched.
 
 =head3 Targets
 
 The "targets" is a comma separated list of mail destinations;
 a target takes the form of a sequence of nonwhitespace non-comma
 characters, or a string value in double quotes.
+
+=head4 Message Flags
+
+A target consististing a single capital letter specifies a flag to be applied 
+to the message. Supported flags are:
+
+  D Draft
+  F Flagged
+  P Passed
+  R Replied
+  S Seen
+  T Trashed
 
 =head4 Deliver to Program
 

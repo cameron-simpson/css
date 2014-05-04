@@ -138,7 +138,6 @@ class DataFile(NestingOpenCloseMixin):
   def flush(self):
     if self._fp:
       self._fp.flush()
-    self.ping()
 
 class DataDir(O):
   ''' A mapping of hash->Block that manages a directory of DataFiles.

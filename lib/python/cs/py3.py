@@ -16,11 +16,11 @@ if sys.hexversion < 0x03000000:
     '''
     if isinstance(s, str):
       try:
-        s = unicode(s, e, 'error')
+        s = s.decode(e, 'strict')
       except UnicodeDecodeError as ude:
         from cs.logutils import warning
         warning("cs.py3.ustr(): %s: s = %s %r", ude, type(s), s)
-        s = unicode(s, e, 'replace')
+        s = s.decode(e, 'replace')
     return s
   try:
     from cStringIO import StringIO as BytesIO
@@ -36,6 +36,12 @@ if sys.hexversion < 0x03000000:
   def itervalues(o):
     return o.itervalues()
   input = raw_input
+
+  _sorted = sorted
+  def sorted(iterable, key=None, reversed=False):
+    if key is None:
+      key = lambda x: x
+    return _sorted(iterable, cmp, key, reversed)
 
 else:
 
@@ -53,6 +59,7 @@ else:
     return o.keys()
   def itervalues(o):
     return o.values()
+  from builtins import sorted
 
 def raise3(exc_type, exc_value, exc_traceback):
   if sys.hexversion >= 0x03000000:

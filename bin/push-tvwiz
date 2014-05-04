@@ -83,7 +83,7 @@ find "$@" -type d -name \*.tvwiz -print -prune \
     then
       if [ -d "$dst/." ]
       then
-        tag_fd 1 "$src" $trace rsync -irt -- "$src/." "$dst/." || xit=1
+        tag_fd 1 "$src" $trace rsync -irt --modify-window=1 -- "$src/." "$dst/." || xit=1
       else
         echo "$cmd: existing non-directory: $dst" >&2
         xit=1

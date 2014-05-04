@@ -250,7 +250,7 @@ def edit_groupness(MDB, addresses):
         xit = os.system("%s %s" % (editor, cs.sh.quotestr(T.name)))
         if xit != 0:
           # TODO: catch SIGINT etc?
-          raise RunTimeError("error editing \"%s\"" % (T.name,))
+          raise RuntimeError("error editing \"%s\"" % (T.name,))
         new_groups = {}
         with codecs.open(T.name, "r", "utf-8") as ifp:
           lineno = 0
