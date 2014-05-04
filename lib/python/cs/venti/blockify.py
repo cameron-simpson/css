@@ -394,13 +394,12 @@ def mp3frames(fp):
     if chunk.startswith("TAG"):
       frame_len = 128
     elif chunk.startswith("ID3"):
-      print >>sys.stderr, "ID3"
+      D("ID3")
       # TODO: suck up a few more bytes and compute length
       return
     else:
       hdr_bytes = map(ord, chunk[:4])
-      ##print >>sys.stderr, hdr_bytes
-
+      ##D("%r", hdr_bytes)
       assert hdr_bytes[0] == 255 and (hdr_bytes[1]&224) == 224, "not a frame header: %s" % (chunk,)
       audio_vid = _mp3_audio_ids[ (hdr_bytes[1]&24) >> 3 ]
       layer = _mp3_layer[ (hdr_bytes[1]&6) >> 1 ]
@@ -451,7 +450,7 @@ def mp3frames(fp):
       if has_crc:
         frame_len += 2
 
-    ##print >>sys.stderr, "vid =", audio_vid, "layer =", layer, "has_crc =", has_crc, "frame_len =", frame_len, "bitrate =", bitrate, "samplingrate =", samplingrate, "padding =", padding
+    ##print("vid =", audio_vid, "layer =", layer, "has_crc =", has_crc, "frame_len =", frame_len, "bitrate =", bitrate, "samplingrate =", samplingrate, "padding =", padding, file=sys.stderr)
     while len(chunk) < frame_len:
       bs = fp.read(frame_len - len(chunk))
       if len(bs) == 0:

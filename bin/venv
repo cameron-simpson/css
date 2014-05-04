@@ -1,0 +1,108 @@
+#!/bin/sh
+#
+# Convenience tool for virtualenv setups.
+#       - Cameron Simpson <cs@zip.com.au> 07mar2014
+#
+
+set -ue
+
+# this was inline, but vim's syntax highlighting broke
+pyver() {
+  # NB: before python 3.4 "python --version" wrote to stderr
+  # http://bugs.python.org/issue18338
+  "$VENV_PYTHON" --version 2>&1 | awk '{print$2}'
+}
+
+pyexe=python
+
+cmd=`basename "$0"`
+usage="Usage:
+    $cmd [options...] init
+    $cmd [options...] exec command [args...]
+    $cmd [options...] pip pip-arguments...
+  Options:
+      -p python-exe
+        Specify python executable.
+        This may also be a python version such as 3.3 or 2."
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -p) pyexe=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+_pyexe=
+case "$pyexe" in
+  [123])
+    majver=$pyexe
+    for minver in `seq 9 -1 0`
+    do
+      _pyexe=`which "python$majver.$minver" 2>/dev/null` || continue
+      break
+    done
+    ;;
+  [123].[0-9])
+    pyver=$pyexe
+    _pyexe=`which "python$pyver" 2>/dev/null` || :
+    ;;
+  *)_pyexe=`which "$pyexe" 2>/dev/null` || :
+    ;;
+esac
+
+if [ -n "$_pyexe" ]
+then
+  VENV_PYTHON=$_pyexe
+else
+  echo "$cmd: no executable found for -p $pyexe" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+: ${VENV_PYVER:=`pyver`}
+: ${VENV_BASE:=$HOME/var/venv}
+: ${VENV_DIR:=$VENV_BASE/$VENV_PYVER}
+
+if [ $# = 0 ]
+then
+  set | grep '^VENV_'
+  exit 0
+fi
+
+op=$1
+shift
+
+case $op in
+  init)
+    set -x
+    mkdir -- "$VENV_DIR"
+    virtualenv -p "$VENV_PYTHON" -- "$VENV_DIR"
+    ;;
+  exec)
+    if [ $# = 0 ]
+    then
+      echo "$cmd: $op: missing command" >&2
+      exit 2
+    fi
+    set -x
+    set +u
+    . "$VENV_DIR/bin/activate"
+    exec "$@"
+    ;;
+  pip | python )
+    set -x
+    exec "$VENV_DIR/bin/$op" ${1+"$@"}
+    ;;
+  *)echo "$cmd: unrecognised operator: $op" >&2
+    exit 2
+    ;;
+esac

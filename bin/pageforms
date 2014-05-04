@@ -9,7 +9,7 @@ htmlopt=
 
 if [ $# = 0 ]
 then
-  [ -t 0 ] && exec withxclip "$0" $htmlopt
+  [ -t 0 ] && exec withclip "$0" $htmlopt
   echo "$0: missing URL" >&2
   exit 2
 fi

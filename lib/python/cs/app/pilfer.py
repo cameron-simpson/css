@@ -27,27 +27,23 @@ try:
   import xml.etree.cElementTree as ElementTree
 except ImportError:
   import xml.etree.ElementTree as ElementTree
-from cs.debug import thread_dump
+from cs.debug import thread_dump, ifdebug
 from cs.env import envsub
 from cs.excutils import noexc, noexc_gen, logexc, LogExceptions
 from cs.fileutils import file_property, mkdirn
 from cs.later import Later, FUNC_ONE_TO_ONE, FUNC_ONE_TO_MANY, FUNC_SELECTOR, FUNC_MANY_TO_MANY
 from cs.lex import get_identifier, get_other_chars
-from cs.logutils import setup_logging, logTo, Pfx, debug, error, warning, exception, trace, pfx_iter, D
+import cs.logutils
+from cs.logutils import setup_logging, logTo, Pfx, info, debug, error, warning, exception, trace, pfx_iter, D, X
 from cs.mappings import MappingChain, SeenSet
-from cs.queues import IterableQueue, NullQueue, NullQ
+from cs.queues import NullQueue, NullQ
 from cs.seq import seq
 from cs.threads import locked, locked_property
 from cs.urlutils import URL, isURL, NetrcHTTPPasswordMgr
+import cs.obj
 from cs.obj import O
-from cs.py3 import input, ConfigParser
-
-if os.environ.get('DEBUG', ''):
-  def X(tag, *a):
-    D("TRACE: "+tag, *a)
-else:
-  def X(*a):
-    pass
+from cs.py.func import funcname
+from cs.py3 import input, ConfigParser, sorted
 
 DEFAULT_JOBS = 4
 
@@ -58,13 +54,16 @@ usage = '''Usage: %s [options...] op [args...]
     -c config
         Load rc file.
     -j jobs
-        How many jobs (URL fetches, minor computations) to run at a time.
+	How many jobs (actions: URL fetches, minor computations)
+	to run at a time.
         Default: %d
     -q  Quiet. Don't recite surviving URLs at the end.
     -u  Unbuffered. Flush print actions as they occur.
     -x  Trace execution.'''
 
-def main(argv):
+def main(argv, stdin=None):
+  if stdin is None:
+    stdin = sys.stdin
   argv = list(argv)
   xit = 0
   argv0 = argv.pop(0)
@@ -155,61 +154,86 @@ def main(argv):
               error(err)
             badopts = True
           if not badopts:
-            with Later(jobs) as L:
+            LTR = Later(jobs)
+            if cs.logutils.D_mode or ifdebug():
+              # poll the status of the Later regularly
+              def pinger(L):
+                while True:
+                  D("PINGER: L: quiescing=%s, state=%r: %s", L._quiescing, L._state, L)
+                  sleep(2)
+              ping = Thread(target=pinger, args=(LTR,))
+              ping.daemon = True
+              ping.start()
+            with LTR as L:
               P.later = L
-              # commence the main pipeline by converting strings to URL objects
-              # and associating the initial Pilfer object as scope
-              def add_scope(U):
-                return P, URL(U, None, scope=P)
-              pipe_funcs.insert(0, (FUNC_ONE_TO_ONE, add_scope))
               # construct the pipeline
-              inQ, outQ = L.pipeline(pipe_funcs, outQ=NullQueue(blocking=True, open=True))
-              if url != '-':
-                # literal URL supplied, deliver to pipeline
-                inQ.put(url)
-              else:
-                # read URLs from stdin
-                try:
-                  do_prompt = sys.stdin.isatty()
-                except AttributeError:
-                  do_prompt = False
-                if do_prompt:
-                  # interactively prompt for URLs, deliver to pipeline
-                  prompt = cmd + ".url> "
-                  while True:
-                    try:
-                      url = input(prompt)
-                    except EOFError:
-                      break
-                    else:
-                      inQ.put(url)
-                else:
-                  # read URLs from non-interactive stdin, deliver to pipeline
-                  lineno = 0
-                  for line in sys.stdin:
-                    lineno += 1
-                    with Pfx("stdin:%d", lineno):
-                      if not line.endswith('\n'):
-                        raise ValueError("unexpected EOF - missing newline")
-                      line = line.strip()
-                      if not line or line.startswith('#'):
-                        debug("SKIP: %s", line)
-                        continue
-                      inQ.put(line)
-              # indicate end of input
-              inQ.close()
-              # await processing of output
-              with Pfx("main pipeline"):
+              pipeline = L.pipeline(pipe_funcs,
+                                    name="MAIN",
+                                    outQ=NullQueue(name="MAIN_PIPELINE_END_NQ",
+                                                   blocking=True).open()
+                                   )
+              with pipeline:
+                for U in urls(url, stdin=stdin, cmd=cmd):
+                  pipeline.put( P.copy_with_vars(_=U) )
+              # wait for main pipeline to drain
+              LTR.state("drain main pipeline")
+              for item in pipeline.outQ:
+                warn("main pipeline output: escaped: %r", item)
+              # At this point everything has been dispatched from the input queue
+              # and the only remaining activity is in actions in the diversions.
+              # As long as there are such actions, the Later will be busy.
+              # In fact, even after the Later first quiesces there may
+              # be stalled diversions waiting for EOF in order to process
+              # their "func_final" actions. Releasing these may pass
+              # tasks to other diversions.
+              # Therefore we iterate:
+              #  - wait for the Later to quiesce
+              #  - [missing] topologically sort the diversions
+              #  - pick the [most-ancestor-like] diversion that is busy
+              #    or exit loop if they are all idle
+              #  - close the div wait for that div to drain
+              #  - repeat
+              while True:
+                D("quiesce LTR")
+                LTR.state("quiescing")
+                L.quiesce()
+                busy_div = None
+                for div in P.diversions:
+                  if div._busy:
+                    busy_div = div
+                    break
+                if busy_div is None:
+                  break
+                D("CLOSE DIV %s", div)
+                LTR.state("CLOSE DIV %s", div)
+                div.close(check_final_close=True)
+                outQ = div.outQ
+                D("DRAIN DIV %s", div)
+                LTR.state("DRAIN DIV %s: outQ=%s", div, outQ)
                 for item in outQ:
-                  warning("finalisation collected %r", item)
-              # await completion of other diversions also
-              for pipe_name, div in P.diversions.items():
-                with Pfx("divert:%s", pipe_name):
+                  # diversions are supposed to discard their outputs
+                  error("%s: RECEIVED %r", div, item)
+                LTR.state("DRAINED DIV %s using outQ=%s", div, outQ)
+              D("CLOSE REMAINING DIVS")
+              for div in P.diversions:
+                if not div.closed:
+                  D("CLOSE DIV %s", div)
+                  LTR.state("CLOSE DIV %s", div)
+                  div.close(check_final_close=True)
                   outQ = div.outQ
-                  with Pfx(str(outQ)):
-                    for item in outQ:
-                      warning("finalisation collected %r", item)
+                  D("DRAIN DIV %s", div)
+                  LTR.state("DRAIN DIV %s: outQ=%s", div, outQ)
+                  for item in outQ:
+                    # diversions are supposed to discard their outputs
+                    error("%s: RECEIVED %r", div, item)
+                  LTR.state("DRAINED DIV %s using outQ=%s", div, outQ)
+              LTR.state("quiescing")
+              L.quiesce()
+              # Now the diversions should have completed and closed.
+            # out of the context manager, the Later should be shut down
+            LTR.state("WAIT...")
             L.wait()
+            LTR.state("WAITED")
       else:
         error("unsupported op")
         badopts = True
@@ -220,33 +244,87 @@ def main(argv):
 
   return xit
 
+def urls(url, stdin=None, cmd=None):
+  ''' Generator to yield input URLs.
+  '''
+  if stdin is None:
+    stdin = sys.stdin
+  if cmd is None:
+    cmd = cs.logutils.cmd
+  if url != '-':
+    # literal URL supplied, deliver to pipeline
+    yield url
+  else:
+    # read URLs from stdin
+    try:
+      do_prompt = stdin.isatty()
+    except AttributeError:
+      do_prompt = False
+    if do_prompt:
+      # interactively prompt for URLs, deliver to pipeline
+      prompt = cmd + ".url> "
+      while True:
+        try:
+          url = input(prompt)
+        except EOFError:
+          break
+        else:
+          yield url
+    else:
+      # read URLs from non-interactive stdin, deliver to pipeline
+      lineno = 0
+      for line in stdin:
+        lineno += 1
+        with Pfx("stdin:%d", lineno):
+          if not line.endswith('\n'):
+            raise ValueError("unexpected EOF - missing newline")
+          url = line.strip()
+          if not line or line.startswith('#'):
+            debug("SKIP: %s", url)
+            continue
+          yield url
+
 # TODO: recursion protection in action_map expansion
 def argv_pipefuncs(argv, action_map, do_trace):
   ''' Process command line strings and return a corresponding list
       of functions to construct a Later.pipeline.
   '''
-  rargv = list(reversed(argv))
+  # we reverse the list to make action expansion easier
+  argv = list(argv)
   errors = []
   pipe_funcs = []
-  while rargv:
-    action = rargv.pop()
-    func, offset = get_identifier(action)
-    if func and func in action_map:
-      expando = action_map[func]
-      rargv.extend(reversed(expando))
+  while argv:
+    action = argv.pop(0)
+    # support commenting of individual actions
+    if action.startswith('#'):
       continue
-    try:
-      func_sig, function = action_func(action, do_trace)
-    except ValueError as e:
-      errors.append(str(e))
-    else:
+    # macro - prepend new actions
+    func_name, offset = get_identifier(action)
+    if func_name and func_name in action_map:
+      expando = action_map[func_name]
+      argv[:0] = expando
+      continue
+    if action == "per":
+      # fork a new pipeline instance per item
+      # terminate this pipeline with a function to spawn subpipelines
+      # using the tail of the action list from this point
+      func_sig, function = action_per(action, argv)
+      argv = []
       pipe_funcs.append( (func_sig, function) )
+    else:
+      # regular action
+      try:
+        func_sig, function = action_func(action, do_trace)
+      except ValueError as e:
+        errors.append("bad action %r: %s" % (action, e))
+      else:
+        pipe_funcs.append( (func_sig, function) )
   return pipe_funcs, errors
 
 def get_pipeline_spec(argv):
   ''' Parse a leading pipeline specification from the list of arguments `argv`.
       A pipeline specification is specified by a leading argument
-      of the form "pipe_name:{", following arguments definition
+      of the form "pipe_name:{", followed by arguments defining
       functions for the pipeline, and a terminating argument of the
       form "}".
 
@@ -257,6 +335,10 @@ def get_pipeline_spec(argv):
 
       If the leading argument does not commence a function specification
       then `spec` will be None and `argv2` will be `argv`.
+
+      Note: this syntax works well with traditional Bourne shells.
+      Zsh users can use 'setopt IGNORE_CLOSE_BRACES' to get
+      sensible behaviour. Bash users may be out of luck.
   '''
   errors = []
   pipe_name = None
@@ -296,41 +378,58 @@ def url_xml_find(U, match):
   for found in url_io(URL(U, None).xmlFindall, (), match):
     yield ElementTree.tostring(found, encoding='utf-8')
 
-def unique(items, seen=None):
-  ''' A generator that yields unseen items progressively, as opposed
-      to just stuffing them all into a set and returning the set.
-  '''
-  if seen is None:
-    seen = set()
-  for I in items:
-    if I not in seen:
-      yield I
-      seen.add(I)
-
-class PilferCommon(O):
-  ''' Common state associated with all Pilfers.
-      Pipeline definitions, seen sets, etc.
+class Pilfer(O):
+  ''' State for the pilfer app.
+      Notable attribute include:
+        .flush_print    Flush output after print(), default False.
+        .user_agent     Specify user-agent string, default None.
+        .user_vars      Mapping of user variables for arbitrary use.
   '''
 
-  def __init__(self):
+  def __init__(self, *a, **kw):
+    self._name = 'Pilfer-%d' % (seq(),)
     self._lock = Lock()
-    O.__init__(self)
-    self.later = None
-    self.seen = defaultdict(set)
+    self.user_vars = { 'save_dir': '.' }
+    self._ = None
+    self.flush_print = False
+    self.do_trace = False
+    self._print_to = None
+    self._print_lock = Lock()
+    self.user_agent = None
+    self._lock = Lock()
     self.rcs = []               # chain of PilferRC libraries
-    self.diversions = {}        # global mapping of names to divert: pipelines
+    self.seensets = {}
+    self.diversions_map = {}        # global mapping of names to divert: pipelines
     self.opener = build_opener()
     self.opener.add_handler(HTTPBasicAuthHandler(NetrcHTTPPasswordMgr()))
+    O.__init__(self, **kw)
+
+  def __str__(self):
+    return "%s[%s]" % (self._name, self._)
+  __repr__ = __str__
+
+  def copy(self, *a, **kw):
+    ''' Convenience function to shallow copy this Pilfer with modifications.
+    '''
+    return cs.obj.copy(self, *a, **kw)
 
   @property
   def defaults(self):
     return MappingChain(mappings=[ rc.defaults for rc in self.rcs ])
 
+  @property
+  def _(self):
+    return self.user_vars['_']
+
+  @_.setter
+  def _(self, value):
+    self.user_vars['_'] = value
+
   @locked
   def seenset(self, name):
     ''' Return the SeenSet implementing the named "seen" set.
     '''
-    seen = self.seen
+    seen = self.seensets
     if name not in seen:
       backing_file = MappingChain(mappings=[ rc.seen_backing_files for rc in self.rcs ]).get(name)
       if backing_file is not None:
@@ -346,60 +445,36 @@ class PilferCommon(O):
       seen[name] = SeenSet(name, backing_file)
     return seen[name]
 
-class Pilfer(O):
-  ''' State for the pilfer app.
-      Notable attribute include:
-        .flush_print    Flush output after print(), default False.
-        .user_agent     Specify user-agent string, default None.
-        .user_vars      Mapping of user variables for arbitrary use.
-  '''
-
-  def __init__(self, **kw):
-    self._name = 'Pilfer-%d' % (seq(),)
-    self._lock = Lock()
-    self.flush_print = False
-    self.do_trace = False
-    self._print_to = None
-    self._print_lock = Lock()
-    self.user_agent = None
-    self.user_vars = { 'save_dir': '.' }
-    self._urlsfile = None
-    O.__init__(self, **kw)
-    if not hasattr(self, '_shared'):
-      self._shared = PilferCommon()                  # common state - seen URLs, etc
-
-  def __str__(self):
-    return self._name
-  __repr__ = __str__
-
-  def __copy__(self):
-    ''' Copy this Pilfer state item, preserving shared state.
-    '''
-    return Pilfer(user_vars=dict(self.user_vars),
-                  _shared=self._shared,
-                 )
-
-  @property
-  def defaults(self):
-    return self._shared.defaults
-
   def seen(self, url, seenset='_'):
-    return url in self._shared.seenset(seenset)
+    return url in self.seenset(seenset)
 
   def see(self, url, seenset='_'):
-    self._shared.seenset(seenset).add(url)
-
-  @property
-  def later(self):
-    return self._shared.later
-
-  @later.setter
-  def later(self, L):
-    self._shared.later = L
+    self.seenset(seenset).add(url)
 
   @property
   def diversions(self):
-    return self._shared.diversions
+    return list(self.diversions_map.values())
+
+  @logexc
+  def quiesce_diversions(self):
+    D("%s.quiesce_diversions...", self)
+    while True:
+      D("%s.quiesce_diversions: LOOP: pass over diversions...", self)
+      for div in self.diversions:
+        D("%s.quiesce_diversions: check %s ...", self, div)
+        div.counter.check()
+        D("%s.quiesce_diversions: quiesce %s ...", self, div)
+        div.quiesce()
+      D("%s.quiesce_diversions: now check that they are all quiet...", self)
+      quiet = True
+      for div in self.diversions:
+        if div.counter:
+          D("%s.quiesce_diversions: NOT QUIET: %s", self, div)
+          quiet = False
+          break
+      if quiet:
+        D("%s.quiesce_diversions: all quiet!", self)
+        return
 
   @locked
   def diversion(self, pipe_name):
@@ -408,7 +483,7 @@ class Pilfer(O):
         There is only one of a given name in the shared state.
         They are instantiated at need.
     '''
-    diversions = self.diversions
+    diversions = self.diversions_map
     if pipe_name not in diversions:
       spec = self.pipes.get(pipe_name)
       if spec is None:
@@ -418,29 +493,40 @@ class Pilfer(O):
         for err in errors:
           error(err)
         raise KeyError("invalid pipe specification for diversion named %r" % (pipe_name,))
-      inQ, outQ = self.later.pipeline(pipe_funcs, outQ=NullQueue(blocking=True))
-      diversions[pipe_name] = O(name=pipe_name, inQ=inQ, outQ=outQ)
+      name = "DIVERSION:%s" % (pipe_name,)
+      diversions[pipe_name] = self.later.pipeline(pipe_funcs,
+                                                  name=name,
+                                                  outQ=NullQueue(name=name,
+                                                                 blocking=True).open()).open()
     return diversions[pipe_name]
 
+  @logexc
   def pipe_through(self, pipe_name, inputs):
     ''' Create a new cs.later.Later.pipeline from the specification named `pipe_name`.
         It will collect items from the iterable `inputs`.
-        Return the output Queue from which to get results.
+        `pipe_name` may be a PipeSpec.
     '''
-    spec = self.pipes.get(pipe_name)
-    if spec is None:
-      raise KeyError("no pipe specification named %r" % (pipe_name,))
-    pipe_funcs, errors = spec.pipe_funcs(self.action_map, self.do_trace)
-    if errors:
-      for err in errors:
-        error(err)
-      raise KeyError("invalid pipe specification for diversion named %r" % (pipe_name,))
-    inQ, outQ = self.later.pipeline(pipe_funcs, inputs=inputs)
-    return outQ
+    if isinstance(pipe_name, PipeSpec):
+      spec = pipe_name
+      pipe_name = str(spec)
+    else:
+      spec = self.pipes.get(pipe_name)
+      if spec is None:
+        raise KeyError("no pipe specification named %r" % (pipe_name,))
+    with Pfx("pipe spec %r" % (pipe_name,)):
+      name = "pipe_through:%s" % (pipe_name,)
+      return self.pipe_from_spec(spec, inputs, name=name)
 
-  @property
-  def rcs(self):
-    return self._shared.rcs
+  def pipe_from_spec(self, spec, inputs, name=None):
+    if name is None:
+      name = "pipe_from_spec:%s" % (spec,)
+    with Pfx("%s", spec):
+      pipe_funcs, errors = spec.pipe_funcs(self.action_map, self.do_trace)
+      if errors:
+        for err in errors:
+          error(err)
+        raise ValueError("invalid pipe specification")
+    return self.later.pipeline(pipe_funcs, name=name, inputs=inputs)
 
   def _rc_pipespecs(self):
     for rc in self.rcs:
@@ -474,11 +560,18 @@ class Pilfer(O):
     '''
     self.user_vars.update(kw)
 
+  def copy_with_vars(self, **kw):
+    ''' Make a copy of `self` with copied .user_vars, update the vars and return the copied Pilfer.
+    '''
+    P = self.copy('user_vars')
+    P.set_user_vars(**kw)
+    return P
+
   def print_url_string(self, U, **kw):
     ''' Print a string using approved URL attributes as the format dictionary.
         See Pilfer.format_string.
     '''
-    print_string = kw.pop('string', '{url}')
+    print_string = kw.pop('string', '{_}')
     print_string = self.format_string(print_string, U)
     file = kw.pop('file', self._print_to)
     if kw:
@@ -514,17 +607,6 @@ class Pilfer(O):
             except:
               exception("save fails")
 
-  def format_string(self, s, U):
-    ''' Format a string using the URL `U` as context.
-        `U` will be promoted to an URL if necessary.
-    '''
-    return FormatMapping(self, U).format(s)
-
-  def set_user_var(self, k, value, U, raw=False):
-    if not raw:
-      value = self.format_string(value, U)
-    FormatMapping(self, U)[k] = value
-
   def import_module_func(self, module_name, func_name):
     with LogExceptions():
       import importlib
@@ -547,6 +629,17 @@ class Pilfer(O):
           error("%s: no entry named %r: %s", module_name, func_name, e)
       return None
 
+  def format_string(self, s, U):
+    ''' Format a string using the URL `U` as context.
+        `U` will be promoted to an URL if necessary.
+    '''
+    return FormatMapping(self).format(s)
+
+  def set_user_var(self, k, value, U, raw=False):
+    if not raw:
+      value = self.format_string(value, U)
+    FormatMapping(self)[k] = value
+
 class FormatArgument(str):
 
   @property
@@ -559,27 +652,39 @@ class FormatMapping(object):
       This mapping is used with str.format to fill in {value}s.
   '''
 
-  _approved = (
-                'archives',
-                'basename',
-                'dirname',
-                'domain',
-                'hrefs',
-                'hostname',
-                'parent',
-                'path',
-                'referer',
-                'srcs',
-                'page_title',
-                'url',
-              )
-
-  def __init__(self, P, U):
+  def __init__(self, P, U=None, factory=None):
+    ''' Initialise this FormatMapping from a Pilfer `P`.
+	The optional paramater `U` (default from `P._`) is the
+	object whose attributes are exposed for format strings,
+	though P.user_vars preempt them.
+	The optional parameter `factory` is used to promote the
+	value `U` to a useful type; it calls URL(U, None) by default.
+    '''
     self.pilfer = P
-    self.url = URL(U, None)
+    if U is None:
+      U = P._
+    if factory is None:
+      factory = lambda x: URL(x, None)
+    self.url = factory(U)
+
+  def _ok_attrkey(self, k):
+    ''' Test for validity of `k` as a public non-callable attribute of self.url.
+    '''
+    if not k[0].isalpha():
+      return False
+    U = self.url
+    try:
+      attr = getattr(U, k)
+    except AttributeError:
+      return False
+    return not callable(attr)
 
   def keys(self):
-    return set(self._approved) + set(self.pilfer.user_vars.keys())
+    ks = ( set( [ k for k in dir(self.url) if self._ok_attrkey(k) ] )
+         + set(self.pilfer.user_vars.keys())
+         )
+    X("FormatMapping: KEYS = %r", ks)
+    return ks
 
   def __getitem__(self, k):
     return FormatArgument(self._getitem(k))
@@ -588,18 +693,15 @@ class FormatMapping(object):
     P = self.pilfer
     url = self.url
     with Pfx(url):
-      if k in self._approved:
-        if k == 'url':
-          return url
-        try:
-          return getattr(url, k)
-        except AttributeError as e:
-          raise KeyError("no such attribute: .%s (%s)" % (k, e))
-        except:
-          ##D("BANG")
-          raise
-      else:
+      if k in P.user_vars:
         return P.user_vars[k]
+      if not self._ok_attrkey(k):
+        raise KeyError("unapproved attribute (missing or callable or not public): %r" % (k,))
+      try:
+        attr = getattr(url, k)
+      except AttributeError as e:
+        raise KeyError("no such attribute: .%s: %s" % (k, e))
+      return attr
 
   def get(self, k, default):
     try:
@@ -608,10 +710,11 @@ class FormatMapping(object):
       return default
 
   def __setitem__(self, k, value):
+    X("FormatMapping: __setitem__(k=%r, value=%r)", k, value)
     P = self.pilfer
     url = self.url
     with Pfx(url):
-      if k in self._approved:
+      if self._ok_attrkey(k):
         raise KeyError("it is forbidden to assign to attribute .%s" % (k,))
       else:
         P.user_vars[k] = value
@@ -669,8 +772,8 @@ def with_exts(urls, suffixes, case_sensitive=False):
     else:
       debug("with_exts: discard %s", U)
 
-def substitute( (P, src), regexp, replacement, replace_all):
-  ''' Perform a regexp substitution on `src`.
+def substitute( P, regexp, replacement, replace_all):
+  ''' Perform a regexp substitution on the source string.
       `replacement` is a format string for the replacement text
       using the str.format method.
       The matched groups from the regexp take the positional arguments 1..n,
@@ -678,6 +781,7 @@ def substitute( (P, src), regexp, replacement, replace_all):
       The keyword arguments consist of '_' for the whole matched string
       and any named groups.
   '''
+  src = P._
   debug("SUBSTITUTE: src=%r, regexp=%r, replacement=%r, replace_all=%s)...",
         src, regexp.pattern, replacement, replace_all)
   strs = []
@@ -748,53 +852,59 @@ def url_srcs(U):
   '''
   return url_io_iter(URL(U, None).srcs(absolute=True))
 
-def grok(module_name, func_name, (P, U), *a, **kw):
-  ''' Grok performs a user-specified analysis on the URL U.
+def grok(module_name, func_name, P, *a, **kw):
+  ''' Grok performs a user-specified analysis on the supplied Pilfer state `P`.
+      (The current value, often an URL, is `P._`.)
       Import `func_name` from module `module_name`.
-      Call `func_name( (P, U), *a, **kw ).
-      Receive a mapping of variable names to values in return,
-      which is applied to P.set_user_vars().
-      Returns U, as this is a one-to-one function.
+      Call `func_name( P, *a, **kw ).
+      Receive a mapping of variable names to values in return.
+      If not empty, copy P and apply the mapping via which is applied
+      with P.set_user_vars().
+      Returns P (possibly copied), as this is a one-to-one function.
   '''
-  with Pfx("grok: call %s.%s( (P=%r, U=%r), *a=%r, **kw=%r )...", module_name, func_name, P, U, a, kw):
+  with Pfx("grok: call %s.%s( P=%r, *a=%r, **kw=%r )...", module_name, func_name, P, a, kw):
     mfunc = P.import_module_func(module_name, func_name)
     if mfunc is None:
       error("import fails")
     else:
       try:
-        var_mapping = mfunc((P, U), *a, **kw)
+        var_mapping = mfunc(P, *a, **kw)
       except Exception as e:
         exception("call")
       else:
-        P.set_user_vars(**var_mapping)
-    return U
+        if var_mapping:
+          P = P.copy('user_vars')
+          P.set_user_vars(**var_mapping)
+    return P
 
-def grokall(module_name, func_name, Ps, Us, *a, **kw):
+def grokall(module_name, func_name, Ps, *a, **kw):
   ''' Grokall performs a user-specified analysis on the items.
       Import `func_name` from module `module_name`.
-      Call `func_name( Ps, Us, *a, **kw ).
+      Call `func_name( Ps, *a, **kw ).
       Receive a mapping of variable names to values in return,
       which is applied to each item[0] via .set_user_vars().
+      Return the possibly copied Ps.
   '''
-  with Pfx("grokall: call %s.%s( Ps=%r, Us=%r, *a=%r, **kw=%r )...", module_name, func_name, Ps, Us, a, kw):
-    if not isinstance(Us, list):
-      Us = list(Us)
-    if Us:
-      P = Ps[0]
-      mfunc = P.import_module_func(module_name, func_name)
+  with Pfx("grokall: call %s.%s( Ps=%r, *a=%r, **kw=%r )...", module_name, func_name, Ps, a, kw):
+    if not isinstance(Ps, list):
+      Ps = list(Ps)
+    if Ps:
+      mfunc = P[0].import_module_func(module_name, func_name)
       if mfunc is None:
         error("import fails")
       else:
         try:
-          var_mapping = mfunc(Ps, Us, *a, **kw)
+          var_mapping = mfunc(Ps, *a, **kw)
         except Exception as e:
           exception("call")
         else:
+          if var_mapping:
+            Ps = [ P.copy('user_vars') for P in Ps ]
           for P in Ps:
             P.set_user_vars(**var_mapping)
-    return Us
+    return Ps
 
-def _test_grokfunc( (P, U), *a, **kw ):
+def _test_grokfunc( P, *a, **kw ):
   v={ 'grok1': 'grok1value',
       'grok2': 'grok2value',
     }
@@ -802,57 +912,55 @@ def _test_grokfunc( (P, U), *a, **kw ):
 
 # actions that work on the whole list of in-play URLs
 many_to_many = {
-      'sort':         lambda Ps, Us, *a, **kw: sorted(Us, *a, **kw),
-      'unique':       lambda Ps, Us: unique(Us),
-      'first':        lambda Ps, Us: Us[:1],
-      'last':         lambda Ps, Us: Us[-1:],
+      'sort':         lambda Ps, key=lambda P: P._, reversed=False: sorted(Ps, key=key, reversed=reversed),
+      'last':         lambda Ps: Ps[-1:],
     }
 
 one_to_many = {
-      'hrefs':        lambda (P, U): url_hrefs(U),
-      'srcs':         lambda (P, U): url_srcs(U),
-      'xml':          lambda (P, U), match: url_xml_find(U, match),
-      'xmltext':      lambda (P, U), match: XML(U).findall(match),
+      'hrefs':        lambda P: url_hrefs(P._),
+      'srcs':         lambda P: url_srcs(P._),
+      'xml':          lambda P, match: url_xml_find(P._, match),
+      'xmltext':      lambda P, match: XML(P._).findall(match),
     }
 
 # actions that work on individual URLs
 one_to_one = {
-      '..':           lambda (P, U): URL(U, None).parent,
-      'delay':        lambda (P, U), delay: (U, sleep(float(delay)))[0],
-      'domain':       lambda (P, U): URL(U, None).domain,
-      'hostname':     lambda (P, U): URL(U, None).hostname,
-      'new_save_dir': lambda (P, U): (U, P.set_user_vars(save_dir=new_dir(P.save_dir)))[0],
-      'per':          lambda (P, U): (copy(P), U),
-      'print':        lambda (P, U), **kw: (U, P.print_url_string(U, **kw))[0],
-      'query':        lambda (P, U), *a: url_query(U, *a),
-      'quote':        lambda (P, U): quote(U),
-      'unquote':      lambda (P, U): unquote(U),
-      'save':         lambda (P, U), *a, **kw: (U, P.save_url(U, *a, **kw))[0],
+      '..':           lambda P: URL(P._, None).parent,
+      'delay':        lambda P, delay: (P._, sleep(float(delay)))[0],
+      'domain':       lambda P: URL(P._, None).domain,
+      'hostname':     lambda P: URL(P._, None).hostname,
+      'print':        lambda P, **kw: (P._, P.print_url_string(P._, **kw))[0],
+      'query':        lambda P, *a: url_query(P._, *a),
+      'quote':        lambda P: quote(P._),
+      'unquote':      lambda P: unquote(P._),
+      'save':         lambda P, *a, **kw: (P._, P.save_url(P._, *a, **kw))[0],
       's':            substitute,
-      'title':        lambda (P, U): U.page_title,
-      'type':         lambda (P, U): url_io(U.content_type, ""),
-      'xmlattr':      lambda (P, U), attr: [ A for A in (ElementTree.XML(U).get(attr),) if A is not None ],
+      'title':        lambda P: P._.page_title,
+      'type':         lambda P: url_io(P._.content_type, ""),
+      'xmlattr':      lambda P, attr: [ A for A in (ElementTree.XML(P._).get(attr),) if A is not None ],
     }
-one_to_one_scoped = ('per',)
 
 one_test = {
-      'has_title':    lambda (P, U): U.page_title is not None,
-      'reject_re':    lambda (P, U), regexp: not regexp.search(U),
-      'same_domain':  lambda (P, U): notNone(U.referer, "%r.referer" % (U,)) and U.domain == U.referer.domain,
-      'same_hostname':lambda (P, U): notNone(U.referer, "%r.referer" % (U,)) and U.hostname == U.referer.hostname,
-      'same_scheme':  lambda (P, U): notNone(U.referer, "%r.referer" % (U,)) and U.scheme == U.referer.scheme,
-      'select_re':    lambda (P, U), regexp: regexp.search(U),
+      'has_title':    lambda P: P._.page_title is not None,
+      'reject_re':    lambda P, regexp: not regexp.search(P._),
+      'same_domain':  lambda P: notNone(P._.referer, "%r.referer" % (P._,)) and P._.domain == P._.referer.domain,
+      'same_hostname':lambda P: notNone(P._.referer, "%r.referer" % (P._,)) and P._.hostname == P._.referer.hostname,
+      'same_scheme':  lambda P: notNone(P._.referer, "%r.referer" % (P._,)) and P._.scheme == P._.referer.scheme,
+      'select_re':    lambda P, regexp: regexp.search(P._),
     }
 
-re_COMPARE = re.compile(r'([a-z]\w*)==')
-re_ASSIGN  = re.compile(r'([a-z]\w*)=')
-re_TEST    = re.compile(r'([a-z]\w*)~')
+re_COMPARE = re.compile(r'(_|[a-z]\w*)==')
+re_ASSIGN  = re.compile(r'(_|[a-z]\w*)=')
+re_TEST    = re.compile(r'(_|[a-z]\w*)~')
 re_GROK    = re.compile(r'([a-z]\w*(\.[a-z]\w*)*)\.([_a-z]\w*)', re.I)
 
 def action_func(action, do_trace, raw=False):
   ''' Accept a string `action` and return a tuple of:
         func_sig, function
       `func_sig` and `function` are used with Later.pipeline.
+      If `raw`, return a tuple of:
+        func_sig, function, scoped
+      prior to the final step of wrapping scoped functions etc.
   '''
   function = None
   func_sig = None
@@ -881,6 +989,7 @@ def action_func(action, do_trace, raw=False):
         m = re_ASSIGN.match(action)
         if m:
           function, func_sig = action_assign(m.group(1), action[m.end():])
+          scoped = True
         else:
           # test of variable value
           # varname~selector
@@ -893,11 +1002,11 @@ def action_func(action, do_trace, raw=False):
             if m:
               action = 'grok:' + action
             # operator or s//
-            func, offset = get_identifier(action)
-            if func:
-              with Pfx(func):
+            func_name, offset = get_identifier(action)
+            if func_name:
+              with Pfx(func_name):
                 # an identifier
-                if func == 's':
+                if func_name == 's':
                   # s/this/that/
                   if offset == len(action):
                     raise ValueError("missing delimiter")
@@ -930,31 +1039,47 @@ def action_func(action, do_trace, raw=False):
                   kwargs['regexp'] = re.compile(regexp, flags=re_flags)
                   kwargs['replacement'] = repl_format
                   kwargs['replace_all'] = repl_all
-                elif func == "divert" or func == "pipe":
+                elif func_name in ("copy", "divert", "pipe"):
+                  # copy:pipe_name[:selector]
                   # divert:pipe_name[:selector]
                   # pipe:pipe_name[:selector]
-                  func_sig, function, scoped = action_divert_pipe(func, action, offset, do_trace)
-                elif func == 'grok' or func == 'grokall':
+                  func_sig, function, scoped = action_divert_pipe(func_name, action, offset, do_trace)
+                elif func_name == 'grok' or func_name == 'grokall':
                   # grok:a.b.c.d[:args...]
                   # grokall:a.b.c.d[:args...]
-                  func_sig, function = action_grok(func, action, offset)
-                elif func == 'for':
+                  func_sig, function = action_grok(func_name, action, offset)
+                elif func_name == 'for':
                   # for:var=value,...
                   # for:varname:{start}..{stop}
                   # warning: implies 'per'
-                  func_sig, function, scoped = action_for(func, action, offset)
-                elif func in ('see', 'seen', 'unseen'):
+                  func_sig, function, scoped = action_for(func_name, action, offset)
+                elif func_name in ('see', 'seen', 'unseen'):
                   # see[:seenset,...[:value]]
                   # seen[:seenset,...[:value]]
                   # unseen[:seenset,...[:value]]
-                  func_sig, function = action_sight(func, action, offset)
+                  func_sig, function = action_sight(func_name, action, offset)
+                elif func_name == 'unique':
+                  # unique
+                  func_sig, function = action_unique(func_name, action, offset)
+                elif action == 'first':
+                  is_first = [True]
+                  def function(item):
+                    if is_first[0]:
+                      is_first[0] = False
+                      return True
+                    return False
+                  func_sig = FUNC_SELECTOR
+                elif action == 'new_save_dir':
+                  def function(P):
+                    return P.copy_with_vars(save_dir=new_dir(P.save_dir))
+                  func_sig = FUNC_ONE_TO_ONE
                 # some other function: gather arguments
                 elif offset < len(action):
                   marker = action[offset]
                   if marker == ':':
                     # followed by :kw1=value,kw2=value,...
                     kwtext = action[offset+1:]
-                    if func == "print":
+                    if func_name == "print":
                       # print is special - just a format string relying on current state
                       kwargs['string'] = kwtext
                     else:
@@ -967,7 +1092,7 @@ def action_func(action, do_trace, raw=False):
                   else:
                     raise ValueError("unrecognised marker %r" % (marker,))
               if not function:
-                function, func_sig, scoped = function_by_name(func, func_sig)
+                function, func_sig, scoped = function_by_name(func_name, func_sig)
               else:
                 if func_sig is None:
                   raise RuntimeError("function is set (%r) but func_sig is None" % (function,))
@@ -981,17 +1106,15 @@ def action_func(action, do_trace, raw=False):
                 regexp = action[1:]
               regexp = re.compile(regexp)
               scoped = True
-              def function( (P, U) ):
+              def function(P):
+                U = P._
                 m = regexp.search(U)
-                if not m:
-                  return (P, False)
-                varmap = m.groupdict()
-                if varmap:
-                  P = copy(P)
-                  P.set_user_vars(**varmap)
-                return (P, True)
-              function.__name__ = '/%s/' % (regexp,)
-              func_sig = FUNC_SELECTOR
+                if m:
+                  varmap = m.groupdict()
+                  if varmap:
+                    P = P.with_user_vars(**varmap)
+                  yield P
+              func_sig = FUNC_ONE_TO_MANY
             # select URLs not matching regexp
             # -/regexp/
             elif action.startswith('-/'):
@@ -1000,13 +1123,12 @@ def action_func(action, do_trace, raw=False):
               else:
                 regexp = action[2:]
               regexp = re.compile(regexp)
-              function = lambda (P, U): not regexp.search(U)
-              function.__name__ = '-/%s/' % (regexp,)
+              function = lambda P: not regexp.search(P._)
               func_sig = FUNC_SELECTOR
             # parent
             # ..
             elif action == '..':
-              function = lambda (P, U): U.parent
+              function = lambda P: P._.parent
               func_sig = FUNC_ONE_TO_ONE
             # select URLs ending in particular extensions
             elif action.startswith('.'):
@@ -1015,7 +1137,7 @@ def action_func(action, do_trace, raw=False):
               else:
                 exts, case = action[1:], True
               exts = exts.split(',')
-              function = lambda (P, U): has_exts( U, exts, case_sensitive=case )
+              function = lambda P: has_exts( P._, exts, case_sensitive=case )
               func_sig = FUNC_SELECTOR
             # select URLs not ending in particular extensions
             elif action.startswith('-.'):
@@ -1024,137 +1146,134 @@ def action_func(action, do_trace, raw=False):
               else:
                 exts, case = action[2:], True
               exts = exts.split(',')
-              function = lambda (P, U): not has_exts( U, exts, case_sensitive=case )
+              function = lambda P: not has_exts( P._, exts, case_sensitive=case )
               func_sig = FUNC_SELECTOR
             else:
-              raise ValueError("unknown function %r" % (func,))
+              raise ValueError("unknown function %r" % (func_name,))
 
+    function.__name__ = "action(%r)" % (action0,)
     # return the raw funtion - a raw caller wants to use it directly,
     # not in Later.pipeline()
     if raw:
-      return func_sig, function
+      return func_sig, function, scoped
 
-    # The pipeline itself passes (P, U) item tuples.
+    # The pipeline itself passes Pilfer objects, whose ._ attribute is the current value.
     #
-    # All functions accept a leading (P, U) tuple argument but most emit only
-    # a U result (or just a Boolean for selectors).
-    # A few, like "per", emit a (P, U) because they change the "scope" P argument.
+    # All functions accept a leading Pilfer argument but most emit only
+    # a value result (or just a Boolean for selectors).
+    # A few emit a Pilfer because they change modify it or produce a copy.
     # If "scoped" is true, we expect the latter.
-    # Otherwise we wrap FUNC_ONE_TO_ONE and FUNC_ONE_TO_MANY to emit the
-    # supplied P value with their outputs.
+    # Otherwise we wrap FUNC_ONE_TO_ONE and FUNC_ONE_TO_MANY to
+    # emit a Pilfer with their outputs.
     # FUNC_MANY_TO_MANY functions have their own convoluted wrapper.
     #
     func0 = function
-    if scoped and func_sig not in (FUNC_ONE_TO_ONE, FUNC_SELECTOR, FUNC_ONE_TO_MANY, FUNC_MANY_TO_MANY):
+    if scoped and func_sig not in (FUNC_ONE_TO_ONE, FUNC_ONE_TO_MANY, FUNC_MANY_TO_MANY):
       raise RuntimeError("scoped is true but func_sig == %r" % (func_sig,))
+    # convert FUNC_SELECTOR to FUNC_ONE_TO_MANY
     if func_sig == FUNC_SELECTOR:
-      # convert FUNC_SELECTOR to FUNC_ONE_TO_MANY so that we can pass
-      # through Pilfer contexts
+      func0 = function
+      def function(P):
+        if func0(P, *args, **kwargs):
+          yield P
+      function.__name__ = "one_to_many(%s)" % (funcname(func0),)
       func_sig = FUNC_ONE_TO_MANY
-      if scoped:
-        # func0 returns (P2, Boolean)
-        def func0(item):
-          P, U  = item
-          P2, status = function(item, *args, **kwargs)
-          if status:
-            yield P2, U
-      else:
-        def func0( (P, U), *args, **kwargs):
-          if func0( (P, U), *args, **kwargs):
-            yield U
+      scoped = True
+    func1 = function
     if func_sig == FUNC_ONE_TO_ONE:
       if scoped:
-        def funcPU(item):
-          return func0(item, *args, **kwargs)
+        function = lambda P: func1(P, *args, **kwargs)
       else:
-        def funcPU(item):
-          P, U = item
-          return P, func0(item, *args, **kwargs)
+        def function(P):
+          U = P._
+          U2 = func1(P, *args, **kwargs)
+          if U2 != U:
+            P = P.copy_with_vars(_=U2)
+          return P
     elif func_sig == FUNC_ONE_TO_MANY:
       if scoped:
-        def funcPU(item):
-          for P, U in func0(item, *args, **kwargs):
-            yield P, U
+        def function(P):
+          for P2 in func1(P, *args, **kwargs):
+            yield P2
       else:
-        def funcPU(item):
-          P, U = item
-          for i in func0(item, *args, **kwargs):
-            yield P, i
+        def function(P):
+          for U in func1(P, *args, **kwargs):
+            yield P.copy_with_vars(_=U)
     elif func_sig == FUNC_MANY_TO_MANY:
       if scoped:
-        def funcPU(items):
-          return func0(items)
+        function = lambda Ps: func1(Ps, *args, **kwargs)
       else:
         # Many-to-many functions are different.
-        # We split out the Ps and Us from the input items.
-        # 
+        # We make a mapping from P._ to P for each Ps
         # and re-attach the P components by reverse mapping from the U results;
         # unrecognised Us get associated with Ps[0].
         #
-        def funcPU(items):
-          if not isinstance(items, list):
-            items = list(items)
-          if items:
+        def function(Ps):
+          if not isinstance(Ps, list):
+            Ps = list(Ps)
+          if Ps:
             # preserve the first Pilfer context to attach to unknown items
-            P0 = items[0][0]
-            idmap = dict( [ ( id(item), item ) for item in items ] )
-            Ps = [ item[0] for item in items ]
-            Us = [ item[1] for item in items ]
+            P0 = Ps[0]
+            idmap = dict( [ ( id(P), P ) for P in Ps ] )
           else:
             P0 = None
             idmap = {}
-            Ps = []
-            Us = []
-          Us2 = func0(Ps, Us, *args, **kwargs)
-          return [ (idmap.get(id(U), P0), U) for U in Us2 ]
+          # call the inner function
+          Us = func1(Ps, *args, **kwargs)
+          # return copies of a suitable original Pilfer
+          return [ idmap.get(id(U), P0).copy_with_vars(_=U) for U in Us ]
     else:
       raise RuntimeError("unhandled func_sig %r" % (func_sig,))
 
+    @logexc
     def trace_function(*a, **kw):
       if do_trace:
         D("DO %s(a=(%d args; %r),kw=%r)", action0, len(a), a, kw)
-      ##D("   funcPU<%s:%d>=%r %r ...", funcPU.func_code.co_filename, funcPU.func_code.co_firstlineno, funcPU, dir(funcPU))
       with Pfx(action0):
         try:
-          retval = funcPU(*a, **kw)
+          retval = function(*a, **kw)
         except Exception as e:
           exception("TRACE: EXCEPTION: %s", e)
           raise
+        if do_trace:
+          D("DONE %s(a=(%d args; %r),kw=%r) ==> %r", action0, len(a), a, kw, retval)
         return retval
 
+    trace_function.__name__ = "trace_action(%r)" % (action0,)
     return func_sig, trace_function
 
-def function_by_name(func, func_sig):
-  ''' Look up `func` in mappings of named functions.
+def function_by_name(func_name, func_sig):
+  ''' Look up `func_name` in mappings of named functions.
       Return (function, func_sig, scoped).
   '''
   scoped = False
   # look up function by name in mappings
   if func_sig is not None:
     raise RuntimeError("func_sig is set (%r) but function is None" % (func_sig,))
-  if func in many_to_many:
+  if func_name in many_to_many:
     # many-to-many functions get passed straight in
-    function = many_to_many[func]
+    function = many_to_many[func_name]
     func_sig = FUNC_MANY_TO_MANY
-  elif func in one_to_many:
-    function = one_to_many[func]
+    scoped = True
+  elif func_name in one_to_many:
+    function = one_to_many[func_name]
     func_sig = FUNC_ONE_TO_MANY
-  elif func in one_to_one:
-    function = one_to_one[func]
+  elif func_name in one_to_one:
+    function = one_to_one[func_name]
     func_sig = FUNC_ONE_TO_ONE
-    scoped = func in one_to_one_scoped
-  elif func in one_test:
-    function = one_test[func]
+  elif func_name in one_test:
+    function = one_test[func_name]
     func_sig = FUNC_SELECTOR
   else:
     raise ValueError("unknown action")
   return function, func_sig, scoped
 
-def action_divert_pipe(func, action, offset, do_trace):
+def action_divert_pipe(func_name, action, offset, do_trace):
+  # copy:pipe_name[:selector]
   # divert:pipe_name[:selector]
   # pipe:pipe_name[:selector]
   #
-  # Divert selected items to the named pipeline
+  # Divert or copy selected items to the named pipeline
   # or filter selected items through an instance of the named pipeline.
   if offset == len(action):
     raise ValueError("missing marker")
@@ -1164,54 +1283,100 @@ def action_divert_pipe(func, action, offset, do_trace):
   if not pipe_name:
     raise ValueError("no pipe name")
   if offset >= len(action):
-    sel_function = lambda (P, U): True
+    sel_function = lambda P: True
+    sel_function.__name__ = 'True(%r)' % (action,)
   else:
     if marker != action[offset]:
       raise ValueError("expected second marker to match first: expected %r, saw %r"
                        % (marker, action[offset]))
-    sel_func_sig, sel_function = action_func(action[offset+1:], do_trace=do_trace, raw=True)
+    sel_func_sig, sel_function, sel_scoped = action_func(action[offset+1:], do_trace=do_trace, raw=True)
     if sel_func_sig != FUNC_SELECTOR:
       raise ValueError("expected selector function but found: %r" % (action[offset+1:],))
-  if func == "divert":
+    if sel_scoped:
+      sel_function0 = sel_function
+      sel_function = lambda *a, **kw: sel_function0(*a, **kw)[1]
+    sel_function.__name__ = "%r.select(%r)" % (action, action[offset+1:])
+  if func_name == "divert":
     # function to divert selected items to a single named pipeline
     func_sig = FUNC_ONE_TO_MANY
     scoped = False
-    def function(item):
-      P, U = item
-      try:
-        if sel_function(item):
-          try:
-            pipe = P.diversion(pipe_name)
-          except KeyError:
-            error("no pipe named %r", pipe_name)
-          else:
-            pipe.inQ.put(item)
+    @logexc
+    def function(P):
+      U = P._
+      if sel_function(item):
+        try:
+          pipe = P.diversion(pipe_name)
+        except KeyError:
+          error("no pipe named %r", pipe_name)
         else:
-          yield U
-      except Exception as e:
-        exception("OUCH")
-  elif func == "pipe":
+          pipe.put(item)
+      else:
+        yield U
+    function.__name__ = "divert_func(%r)" % (action,)
+  elif func_name == "copy":
+    func_sig = FUNC_ONE_TO_ONE
+    scoped = True
+    @logexc
+    def function(P):
+      U = P._
+      if sel_function(item):
+        try:
+          pipe = P.diversion(pipe_name)
+        except KeyError:
+          error("no pipe named %r", pipe_name)
+        else:
+          pipe.put(item)
+      return item
+    function.__name__ = "copy_func(%r)" % (action,)
+  elif func_name == "pipe":
     # gather all items and feed to an instance of the specified pipeline
     func_sig = FUNC_MANY_TO_MANY
     scoped = True
     def function(items):
       pipe_items = []
       for item in items:
-        if sel_function(item):
+        debug("pipe: sel_function=%r, item=%r", sel_function, item)
+        status = sel_function(item)
+        debug("pipe: sel_function=%r, item=%r: status=%r", sel_function, item, status)
+        if status:
+          debug("pipe: pipe_items.append(%r)", item)
           pipe_items.append(item)
         else:
+          D("pipe: not selected, yield straight to output: %r", item)
           yield item
+      debug("pipe: pipe_items=%r", pipe_items)
       if pipe_items:
         P = pipe_items[0][0]
         with P.later.more_capacity(1):
-          outQ = P.pipe_through(pipe_name, pipe_items)
-          for item in outQ:
+          pipeline = P.pipe_through(pipe_name, pipe_items)
+          debug("pipe: pipe_though(%r) => %r", pipe_name, pipeline)
+          for item in pipeline.outQ:
+            debug("pipe: postpipe: yield %r", item)
             yield item
+      debug("pipe: processed pipe_items %r", pipe_items)
+    function.__name__ = "pipe_func(%r)" % (action,)
   else:
-    raise ValueError("expected \"divert\" or \"pipe\", got func=%r" % (func,))
+    raise ValueError("expected \"divert\" or \"pipe\", got func_name=%r" % (func_name,))
   return func_sig, function, scoped
 
-def action_sight(func, action, offset):
+def action_per(action, argv):
+  ''' Function to perform a "per": send each item does its own instance of a pipeline.
+  '''
+  debug("action_per: argv=%r", argv)
+  argv = list(argv)
+  pipespec = PipeSpec("per:[%s]" % (','.join(argv)), argv)
+  def function(P):
+    debug("action_per func %r per(%r)", function.__name__, item)
+    with P.later.more_capacity(1):
+      pipeline = P.pipe_through(pipespec, (item,))
+      debug("pipe: pipe_though(%s) => %r", pipespec, pipeline)
+      for item in pipeline.outQ:
+        debug("pipe: postpipe: yield %r", item)
+        yield item
+  function.__name__ = "%s(%s)" % (action, '|'.join(argv))
+  return FUNC_ONE_TO_MANY, function
+
+def action_sight(func_name, action, offset):
   # see[:seenset,...[:value]]
   # seen[:seenset,...[:value]]
   # unseen[:seenset,...[:value]]
@@ -1219,7 +1384,7 @@ def action_sight(func, action, offset):
   value = '{url}'
   if offset < len(action):
     if action[offset] != ':':
-      raise ValueError("bad marker after %r, expected ':', found %r", func, action[offset])
+      raise ValueError("bad marker after %r, expected ':', found %r", func_name, action[offset])
     seensets, offset = get_other_chars(action, ':', offset+1)
     seensets = seensets.split(',')
     if not seensets:
@@ -1230,28 +1395,42 @@ def action_sight(func, action, offset):
       value = action[offset+1:]
       if not value:
         value = '{url}'
-  if func == 'see':
+  if func_name == 'see':
     func_sig = FUNC_ONE_TO_ONE
-    def function( (P, U) ):
+    def function(P):
+      U = P._
       see_value = P.format_string(value, U)
       for seenset in seensets:
         P.see(see_value, seenset)
       return U
-  elif func == 'seen':
+  elif func_name == 'seen':
     func_sig = FUNC_SELECTOR
-    def function( (P, U) ):
+    def function(P):
+      U = P._
       see_value = P.format_string(value, U)
       return any( [ P.seen(see_value, seenset) for seenset in seensets ] )
-  elif func == 'unseen':
+  elif func_name == 'unseen':
     func_sig = FUNC_SELECTOR
-    def function( (P, U) ):
+    def function(P):
+      U = P._
       see_value = P.format_string(value, U)
       return not any( [ P.seen(see_value, seenset) for seenset in seensets ] )
   else:
-    raise RuntimeError("action_sight called with unsupported action %r", func)
+    raise RuntimeError("action_sight called with unsupported action %r", func_name)
   return func_sig, function
 
-def action_for(func, action, offset):
+def action_unique(func_name, action, offset):
+  # unique
+  #
+  seen = set()
+  def function(P):
+    U = P._
+    if U not in seen:
+      seen.add(U)
+      yield U
+  return FUNC_ONE_TO_MANY, function
+
+def action_for(func_name, action, offset):
   # for:varname=values
   #
   func_sig = FUNC_ONE_TO_MANY
@@ -1268,42 +1447,40 @@ def action_for(func, action, offset):
   if marker == '=':
     # for:varname=value,...
     values = action[offset+1:]
-    def function( (P, U) ):
+    def function(P):
+      U = P._
       # expand "values", split on whitespace, iterate with new Pilfer
       value_list = P.format_string(values, U).split()
       for value in value_list:
-        P2 = copy(P)
-        P2.set_user_vars(**{varname: value})
-        yield P2, U
+        yield P.with_user_vars(**{varname: value})
   elif marker == ':':
     # for:varname:{start}..{stop}
     start, stop = action[offset+1:].split('..', 1)
-    def function( (P, U) ):
+    def function(P):
+      U = P._
       # expand "values", split on whitespace, iterate with new Pilfer
       istart = int(P.format_string(start, U))
       istop = int(P.format_string(stop, U))
       for value in range(istart, istop+1):
-        P2 = copy(P)
-        P2.set_user_vars(**{varname: str(value)})
-        yield P2, U
+        yield P.with_user_vars(**{varname: str(value)})
   else:
     raise ValueError("unrecognised marker after varname: %r", marker)
   return func_sig, function, scoped
 
-def action_grok(func, action, offset):
+def action_grok(func_name, action, offset):
   # grok:a.b.c.d[:args...]
   # grokall:a.b.c.d[:args...]
   #
   # Import "d" from the python module "a.b.c".
   # d() should return a mapping of varname to value.
   #
-  # For grok, call d((P, U), kwargs) and apply the
+  # For grok, call d(P, kwargs) and apply the
   # returned mapping to P.user_vars.
   #
-  # From grokall, call d( ( (P, U), ...), kwargs) and apply
+  # From grokall, call d( ( P, ...), kwargs) and apply
   # the returned mapping to each P.user_vars.
   #
-  is_grokall = func == "grokall"
+  is_grokall = func_name == "grokall"
   if offset == len(action):
     raise ValueError("missing marker")
   marker = action[offset]
@@ -1319,7 +1496,7 @@ def action_grok(func, action, offset):
       raise ValueError("expected second marker to match first: expected %r, saw %r"
                        % (marker, action[offset]))
     offset += 1
-    raise RuntimeError("arguments to %s not yet implemented" % (func,))
+    raise RuntimeError("arguments to %s not yet implemented" % (func_name,))
   if is_grokall:
     func_sig = FUNC_MANY_TO_MANY
     def function(items, *a, **kw):
@@ -1327,16 +1504,16 @@ def action_grok(func, action, offset):
         yield item
   else:
     func_sig = FUNC_ONE_TO_ONE
-    def function( (P, U), *a, **kw):
-      return grok(grok_module, grok_funcname, (P, U), *a, **kw)
+    def function( P, *a, **kw):
+      return grok(grok_module, grok_funcname, P, *a, **kw)
   return func_sig, function
 
 def action_shcmd(shcmd):
   ''' Return (function, func_sig) for a shell command.
   '''
   shcmd = shcmd.strip()
-  def function(item):
-    P, U = item
+  def function(P):
+    U = P._
     uv = P.user_vars
     try:
       v = P.format_string(shcmd, U)
@@ -1371,10 +1548,10 @@ def action_pipecmd(shcmd):
       items = list(items)
     if not items:
       return
-    P, U = items[0]
+    P = items[0]
     uv = P.user_vars
     try:
-      v = P.format_string(shcmd, U)
+      v = P.format_string(shcmd, P._)
     except KeyError as e:
       warning("pipecmd.format(%r): KeyError: %s", uv, e)
     else:
@@ -1387,8 +1564,8 @@ def action_pipecmd(shcmd):
           return
         # spawn a daemon thread to feed items to the pipe
         def feedin():
-          for P, U in items:
-            print(U, file=subp.stdin)
+          for P in items:
+            print(P._, file=subp.stdin)
           subp.stdin.close()
         T = Thread(target=feedin, name='feedin to %r' % (v,))
         T.daemon = True
@@ -1408,8 +1585,8 @@ def action_pipecmd(shcmd):
 def action_compare(var, value):
   ''' Return (function, func_sig) for a variable value comparison.
   '''
-  def function(item):
-    P, U = item
+  def function(P):
+    U = P._
     M = FormatMapping(P, U)
     try:
       vvalue = M[var]
@@ -1426,8 +1603,8 @@ def action_test(var, selector, do_trace):
   sel_func_sig, sel_function = action_func(selector, do_trace=do_trace)
   if sel_func_sig != FUNC_SELECTOR:
     raise ValueError("expected selector function but found: %r" % (selector,))
-  def function(item):
-    P, U = item
+  def function(P):
+    U = P._
     M = FormatMapping(P, U)
     try:
       vvalue = M[var]
@@ -1441,15 +1618,9 @@ def action_test(var, selector, do_trace):
 def action_assign(var, value):
   ''' Return (function, func_sig) for a variable value assignment.
   '''
-  def function(item):
-    P, U = item
-    if var == 'url':
-      value2 = P.format_string(value, U)
-      if value2 != U:
-        U = URL(value2, U)
-    else:
-      P.set_user_var(var, value, U)
-    return U
+  def function(P):
+    U = P._
+    return P.copy_with_vars(**{var: P.format_string(value, U)})
   return function, FUNC_ONE_TO_ONE
 
 class PipeSpec(O):
@@ -1461,6 +1632,11 @@ class PipeSpec(O):
 
   @logexc
   def pipe_funcs(self, action_map, do_trace):
+    ''' Compute a list of functions to implement a pipeline.
+	It is important that this list is constructed anew for each
+	new pipeline instance because many of the functions rely
+	on closures to track state.
+    '''
     with Pfx(self.name):
       pipe_funcs, errors = argv_pipefuncs(self.argv, action_map, do_trace)
     return pipe_funcs, errors

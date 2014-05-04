@@ -51,6 +51,14 @@ class DataFile(O):
     '''
     return open(self.pathname, "a+b")
 
+  def close(self):
+    ''' Close the current .fp if open.
+    '''
+    with self._lock:
+      if self._fp:
+        self._fp.close()
+        self._fp = None
+
   @locked_property
   def size(self):
     ''' Property returning the size of this file.
@@ -128,12 +136,6 @@ class DataFile(O):
   def flush(self):
     if self._fp:
       self._fp.flush()
-
-  def close(self):
-    with self._lock:
-      if self._fp:
-        self._fp.close()
-        self._fp = None
 
 class DataDir(O):
   ''' A mapping of hash->Block that manages a directory of DataFiles.

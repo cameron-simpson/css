@@ -250,7 +250,7 @@ def edit_groupness(MDB, addresses):
         xit = os.system("%s %s" % (editor, cs.sh.quotestr(T.name)))
         if xit != 0:
           # TODO: catch SIGINT etc?
-          raise RunTimeError("error editing \"%s\"" % (T.name,))
+          raise RuntimeError("error editing \"%s\"" % (T.name,))
         new_groups = {}
         with codecs.open(T.name, "r", "utf-8") as ifp:
           lineno = 0
@@ -467,6 +467,9 @@ class _MailDB(NodeDB):
     return A
 
   def shortname(self, addr):
+    ''' Return a short name for an address.
+        Pick the first of: abbreviation from maildb, realname from maildb, coreaddr.
+    '''
     realname, coreaddr = self.parsedAddress(addr)
     A = self.getAddressNode( (realname, coreaddr), noCreate=True)
     if A is None:
@@ -474,12 +477,19 @@ class _MailDB(NodeDB):
     else:
       abbrev = A.abbreviation
       if abbrev is None:
-        short = coreaddr
+        rns = A.get('REALNAME')
+        if rns:
+          rn = rns[0]
+        else:
+          rn = ''
+        short = rn if rn else coreaddr
       else:
         short = abbrev
     return short
   
   def header_shortlist(self, M, hdrs):
+    ''' Return a list of the unique shortnames for the addresses in the specified headers.
+    '''
     L = []
     for realname, coreaddr in message_addresses(M, hdrs):
       short = self.shortname( (realname, coreaddr) )

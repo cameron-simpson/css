@@ -135,6 +135,11 @@ The current URL.
 
 =over 4
 
+=item B<#>I<text...>
+
+An action commencing with an octothorpe ('B<#>') is ignored.
+This is convenient for commenting out specific actions during debugging.
+
 =item B<..>
 
 Pass the parent of each item in the list, as dirname(1) does for file pathnames.
@@ -256,7 +261,11 @@ such as "B<.>I<ext>", "B</>I<regexp>B</>" or "B<same_scheme>".
 
 =item B<per>
 
-Create a new context for each item.
+Create a new pipeline context for each item.
+Normally all items pass through a shared pipeline stage for any action.
+This has relevance for actions which apply to multiple items, such as B<sort>;
+the whole set of items at that stage is sorted.
+After a B<per>, each items commences its own pipeline context.
 
 =item B<print>[B<:>I<text>]
 

@@ -7,6 +7,7 @@
 # TODO: add __getitem__, __getslice__, __delitem__, __delslice__ methods.
 #
 
+from __future__ import print_function
 import sys
 from bisect import bisect_left
 
@@ -327,7 +328,7 @@ class Range(object):
         raise KeyError("[%s:%s] not a subset of %s" % (start, end, self))
       if start == span[0]:
         if end == span[1]:
-          print >>sys.stderr, "remove %s:%s from %s: delete span" % (start,end,span)
+          print("remove %s:%s from %s: delete span" % (start,end,span), file=sys.stderr)
           del _spans[ndx]
         else:
           span[0] = end

@@ -11,7 +11,6 @@ import unittest
 from cs.logutils import D, OBSOLETE, debug, error
 from cs.obj import O
 from cs.threads import locked_property
-from cs.queues import IterableQueue
 from cs.excutils import unimplemented
 from cs.timeutils import sleep
 from cs.debug import Lock, RLock, Thread
@@ -87,14 +86,12 @@ class _BackendMappingMixin(O):
     okeys = set(other.keys())
     if keys != okeys:
       raise Error
-      ##print >>sys.stderr, "1: keys[%s] != okeys[%s]" % (keys, okeys)
-      ##sys.stderr.flush()
+      ##D("1: keys[%s] != okeys[%s]", keys, okeys)
       return False
     for k in keys:
       if self[k] != other[k]:
         raise Error
-        ##print >>sys.stderr, "2: %s != %s" % (self[k], other[k])
-        ##sys.stderr.flush()
+        ##D("2: %s != %s", self[k], other[k])
         return False
     return True
 

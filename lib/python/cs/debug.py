@@ -10,15 +10,14 @@ import logging
 import sys
 import threading
 import time
+import traceback
 from cs.py3 import Queue, Queue_Empty
+from cs.py.stack import caller
 import cs.logutils
-from cs.logutils import infer_logging_level, debug, error, setup_logging, D, Pfx
+from cs.logutils import infer_logging_level, debug, error, setup_logging, D, Pfx, ifdebug
 from cs.obj import O
 from cs.seq import seq
 from cs.timeutils import sleep
-
-def ifdebug():
-  return cs.logutils.logging_level <= logging.DEBUG
 
 def Lock():
   ''' Factory function: if cs.logutils.logging_level <= logging.DEBUG
@@ -65,6 +64,31 @@ def thread_dump(Ts=None, fp=None):
       print("Thread", T.ident, T.name, file=fp)
       traceback.print_stack(frame, None, fp)
       print(file=fp)
+
+def stack_dump(stack=None, limit=None, logger=None, log_level=None):
+  ''' Dump a stack trace to a logger.
+      `stack`: a stack list as returned by traceback.extract_stack.
+               If missing or None, use the result of traceback.extract_stack().
+      `limit`: a limit to the number of stack entries to dump.
+               If missing or None, dump all entries.
+      `logger`: a logger.Logger ducktype or the name of a logger.
+               If missing or None, obtain a logger from logging.getLogger().
+      `log_level`: the logging level for the dump.
+               If missing or None, use cs.logutils.logging_level.
+  '''
+  if stack is None:
+    stack = traceback.extract_stack()
+  if limit is not None:
+    stack = stack[:limit]
+  if logger is None:
+    logger = logging.getLogger()
+  elif isinstance(logger, str):
+    logger = logging.getLogger(logger)
+  if log_level is None:
+    log_level = cs.logutils.logging_level
+  for text in traceback.format_list(stack):
+    for line in text.splitlines():
+      logger.log(log_level, line.rstrip())
 
 def DEBUG(f):
   ''' Decorator to wrap functions in timing and value debuggers.
@@ -147,9 +171,7 @@ class DebuggingLock(DebugWrapper):
 
   def __enter__(self):
     ##self.lock.__enter__()
-    D("ENTER0")
     self.acquire()
-    D("ENTER1")
     return self
 
   def __exit__(self, *a):
@@ -163,12 +185,9 @@ class DebuggingLock(DebugWrapper):
     if a:
       blocking = a[0]
       a = a[1:]
-    D("ACQUIRE0")
     filename, lineno = inspect.stack()[1][1:3]
     debug("%s:%d: acquire(blocking=%s)", filename, lineno, blocking)
-    D("ACQUIRE1")
     if blocking:
-      D("ACQUIRE2")
       # blocking
       # try non-blocking first
       # if successful, good
@@ -254,7 +273,7 @@ class DebuggingRLock(DebugWrapper):
 
   def release(self):
     filename, lineno = inspect.stack()[0][1:3]
-    self.debug('%s:%d: release()', filename, lineo)
+    self.debug('%s:%d: release()', filename, lineno)
     self.lock.release()
 
 _debug_threads = set()
@@ -285,12 +304,11 @@ def trace_caller(func):
   ''' Decorator to report the caller of a function when called.
   '''
   def subfunc(*a, **kw):
-    import traceback
-    frame = traceback.extract_stack(None, 2)[0]
+    rame = caller()
     D("CALL %s()<%s:%d> FROM %s()<%s:%d>",
          func.__name__,
          func.__code__.co_filename, func.__code__.co_firstlineno,
-         frame[2], frame[0], frame[1])
+         frame.funcname, frame.filename, frame.lineno)
     return func(*a, **kw)
   subfunc.__name__ = "trace_caller/subfunc/"+func.__name__
   return subfunc

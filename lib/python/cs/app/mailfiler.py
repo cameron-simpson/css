@@ -28,12 +28,12 @@ from cs.fileutils import abspath_from_file, file_property, files_property, Pathn
 from cs.lex import get_white, get_nonwhite, get_qstr, unrfc2047
 from cs.logutils import Pfx, setup_logging, \
                         debug, info, warning, error, exception, \
-                        D, LogTime
+                        D, X, LogTime
 from cs.mailutils import Maildir, message_addresses, shortpath, ismaildir, make_maildir
 from cs.obj import O, slist
 from cs.threads import locked_property
 from cs.app.maildb import MailDB
-from cs.py3 import unicode as u, StringTypes
+from cs.py3 import unicode as u, StringTypes, ustr
 
 DEFAULT_MAILDIR_RULES = '$HOME/.mailfiler/{maildir.basename}'
 
@@ -138,7 +138,7 @@ def main(argv, stdin=None):
           mdir.close()
         return 1
     else:
-      raise RunTimeError("unimplemented op")
+      raise RuntimeError("unimplemented op")
 
 def maildir_from_name(mdirname, maildir_root, maildir_cache):
     ''' Return the Maildir derived from mdirpath.
@@ -203,7 +203,10 @@ class Filer(O):
     self._log = None
     self.targets = set()
     self.labels = set()
-    self.flags = O(alert=False)
+    self.flags = O(alert=0,
+                   flagged=False, passed=False, replied=False,
+                   seen=False, trashed=False, draft=False)
+    self.saved_to = []
 
   def file(self, M, rules, message_path=None):
     ''' File the specified message `M` according to the supplied `rules`.
@@ -227,9 +230,6 @@ class Filer(O):
     except Exception as e:
       exception("matching rules: %s", e)
       return False
-
-    if self.flags.alert:
-      self.alert()
 
     if not self.targets:
       if self.default_target:
@@ -262,6 +262,9 @@ class Filer(O):
         except Exception as e:
           exception("saving to %r: %s", target, e)
           ok = False
+
+    if self.flags.alert > 0:
+      self.alert(self.flags.alert)
 
     self.logflush()
     return ok
@@ -370,15 +373,28 @@ class Filer(O):
         mailpath = self.resolve(target)
         if not os.path.exists(mailpath):
           make_maildir(mailpath)
+        # record the target folder
+        self.saved_to.append(mailpath)
         if ismaildir(mailpath):
           mdir = self.maildir(target)
-          if self.flags.alert:
-            maildir_flags = 'F'
-          else:
-            maildir_flags = ''
+          maildir_flags = ''
+          if self.flags.draft:   maildir_flags += 'D'
+          if self.flags.flagged: maildir_flags += 'F'
+          if self.flags.passed:  maildir_flags += 'P'
+          if self.flags.replied: maildir_flags += 'R'
+          if self.flags.seen:    maildir_flags += 'S'
+          if self.flags.trashed: maildir_flags += 'T'
           return self.save_to_maildir(mdir,
                                       flags=maildir_flags)
-        return self.save_to_mbox(mailpath)
+        status = ''
+        x_status = ''
+        if self.flags.draft:   x_status += 'D'
+        if self.flags.flagged: x_status += 'F'
+        if self.flags.replied: status += 'R'
+        if self.flags.passed:  x_status += 'P'
+        if self.flags.seen:    x_status += 'S'
+        if self.flags.trashed: x_status += 'T'
+        return self.save_to_mbox(mailpath, status, x_status)
 
   def save_header(self, hdr, group_names):
     with Pfx("save_header(%s, %r)", hdr, group_names):
@@ -409,8 +425,12 @@ class Filer(O):
     self.log("    OK %s" % (shortpath(savepath)))
     return savepath
 
-  def save_to_mbox(self, mboxpath):
+  def save_to_mbox(self, mboxpath, status, x_status):
     M = self.message
+    if len(status) > 0:
+      M['Status'] = status
+    if len(x_status) > 0:
+      M['X-Status'] = x_status
     text = M.as_string(True)
     with open(mboxpath, "a") as mboxfp:
       mboxfp.write(text)
@@ -450,6 +470,8 @@ class Filer(O):
     return self.env('ALERT_FORMAT', 'MAILFILER: {short_from}->{short_recipients}: {subject}')
 
   def alert_message(self, M):
+    ''' Return the alert message filled out with parameters from the Message `M`.
+    '''
     try:
       msg = self.format_message(M, self.alert_format)
     except KeyError as e:
@@ -459,24 +481,49 @@ class Filer(O):
     return msg
 
   def format_message(self, M, fmt):
-    ''' Compute the alert message for the message `M`.
+    ''' Compute the alert message for the message `M` using the supplied format string `fmt`.
     '''
-    hmap = dict( [ (k.lower(), M[k]) for k in M.keys() ] )
+    hmap = dict( [ (k.lower().replace('-', '_'), M[k]) for k in M.keys() ] )
     subj = unrfc2047(M.get('subject', '')).strip()
     if subj:
       hmap['subject'] = subj
-    for hdr in ('from', 'to', 'cc', 'bcc'):
-      hmap['short_'+hdr] = ",".join(self.maildb.header_shortlist(M, (hdr,)))
+    for hdr in ('from', 'to', 'cc', 'bcc', 'reply-to'):
+      hmap['short_'+hdr.replace('-', '_')] = ",".join(self.maildb.header_shortlist(M, (hdr,)))
     hmap['short_recipients'] = ",".join(self.maildb.header_shortlist(M, ('to', 'cc', 'bcc')))
+    for h, hval in list(hmap.items()):
+      hmap[h] = ustr(hval)
     return u(fmt).format(**hmap)
 
-  def alert(self, alert_message=None):
+  def alert(self, alert_level, alert_message=None):
     ''' Issue an alert with the specified `alert_message`.
         If missing or None, use self.alert_message(self.message).
+	If `alert_level` is more than 1, prepend "-l alert_level"
+	to the alert command line arguments.
     '''
     if alert_message is None:
       alert_message = self.alert_message(self.message)
-    xit = subprocess.call([self.env('ALERT', 'alert'), alert_message])
+    subargv = [ self.env('ALERT', 'alert') ]
+    if alert_level > 1:
+      subargv.extend( ['-l', str(alert_level)] )
+    # tell alert how to open this message
+    # TODO: parameterise so that we can open it with other tools
+    if self.saved_to:
+      try:
+        msg_id = self.message['message-id']
+      except KeyError:
+        warning("no Message-ID !")
+      else:
+        msg_ids = [ msg_id for msg_id in msg_id.split() if len(msg_id) > 0 ]
+        if msg_ids:
+          msg_id = msg_ids[0]
+          subargv.extend( ['-e',
+                            'term',
+                             '-e',
+                              'mutt-open-message',
+                               '-f', self.saved_to[0], msg_id,
+                           '--'] )
+    subargv.append(alert_message)
+    xit = subprocess.call(subargv)
     if xit != 0:
       warning("non-zero exit from alert: %d", xit)
     return xit
@@ -579,18 +626,18 @@ def parserules(fp):
           R = None
           continue
 
-        while True:
-          if line[offset] == '+':
-            R.flags.halt = False
-            offset += 1
-          elif line[offset] == '=':
-            R.flags.halt = True
-            offset += 1
-          if line[offset] == '!':
-            R.flags.alert += 1
-            offset += 1
-          else:
-            break
+        # leading optional '+' (continue, default) or '=' (final)
+        if line[offset] == '+':
+          R.flags.halt = False
+          offset += 1
+        elif line[offset] == '=':
+          R.flags.halt = True
+          offset += 1
+
+        # leading '!' alert: multiple '!' raise the alert level
+        while line[offset] == '!':
+          R.flags.alert += 1
+          offset += 1
 
         targets, offset = get_targets(line, offset)
         for target in targets:
@@ -697,9 +744,11 @@ def get_targets(s, offset):
   '''
   targets = []
   while offset < len(s) and not s[offset].isspace():
+    # "quoted-string"
     if s[offset] == '"':
       target, offset = get_qstr(s, offset)
-    elif s[offset ] == '+':
+    # +header(groups)
+    elif s[offset] == '+':
       m = re_ADDHEADER.match(s, offset)
       if m:
         target = m.group()
@@ -708,6 +757,7 @@ def get_targets(s, offset):
         error("parse failure, expected +header(groups) at %d: %s", offset, s)
         raise ValueError("syntax error")
     else:
+      # unquoted word
       m = re_UNQWORD.match(s, offset)
       if m:
         target = m.group()
@@ -823,7 +873,7 @@ _FilterReport = namedtuple('FilterReport',
 def FilterReport(rule, matched, saved_to, ok_actions, failed_actions):
   if not matched:
     if saved_to:
-      raise RunTimeError("matched(%r) and not saved_to(%r)" % (matched, saved_to))
+      raise RuntimeError("matched(%r) and not saved_to(%r)" % (matched, saved_to))
   return _FilterReport(rule, matched, saved_to, ok_actions, failed_actions)
 
 class Rule(O):
@@ -858,15 +908,24 @@ class Rule(O):
     '''
     M = filer.message
     with Pfx(self.context):
-      if self.flags.alert:
-        filer.flags.alert = True
+      filer.flags.alert = max(filer.flags.alert, self.flags.alert)
       if self.label:
         filer.labels.add(self.label)
       for action, arg in self.actions:
         try:
           if action == 'TARGET':
             target = envsub(arg, filer.environ)
-            filer.targets.add(target)
+            if len(target) == 1 and target.isupper():
+              if target == 'D':   filer.flags.draft = True
+              elif target == 'F': filer.flags.flagged = True
+              elif target == 'P': filer.flags.passed = True
+              elif target == 'R': filer.flags.replied = True
+              elif target == 'S': filer.flags.seen = True
+              elif target == 'T': filer.flags.trashed = True
+              else:
+                warning("ignoring unsupported flag \"%s\"" % (target,))
+            else:
+              filer.targets.add(target)
           elif action == 'ASSIGN':
             envvar, s = arg
             value = filer.environ[envvar] = envsub(s, filer.environ)
@@ -983,17 +1042,18 @@ class WatchedMaildir(O):
         for key in mdir.keys():
           with Pfx(key):
             if key in self.lurking:
-              debug("skip processed key")
+              debug("skip lurking key")
               skipped += 1
               continue
-
             nmsgs += 1
+
             with LogTime("key = %s", key, threshold=1.0, level=DEBUG):
               M = mdir[key]
               filer = Filer(self.filter_modes)
 
               ok = filer.file(M, self.rules, mdir.keypath(key))
               if not ok:
+                filer.log("NOT OK, lurking key %s", key)
                 self.lurk(key)
                 continue
 
@@ -1004,8 +1064,8 @@ class WatchedMaildir(O):
                 debug("remove message key %s", key)
                 mdir.remove(key)
                 self.lurking.discard(key)
-            if filer.filter_modes.justone:
-              break
+              if filer.filter_modes.justone:
+                break
 
       if nmsgs or all_keys_time.elapsed >= 0.2:
         info("filtered %d messages (%d skipped) in %5.3fs",

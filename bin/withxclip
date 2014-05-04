@@ -1,5 +1,0 @@
-#!/bin/sh
-[ $# = 0 ] && { echo "Usage: $0 command [args...]" >&2; exit 2; }
-[ -n "$DISPLAY" ] || { echo "$0: no \$DISPLAY!" >&2; exit 1; }
-clip=`xclip -o` || exit 1
-exec "$@" "$clip"

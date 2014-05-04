@@ -4,6 +4,7 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
+from __future__ import print_function
 import sys
 import time
 import unittest
@@ -13,7 +14,7 @@ def D(msg, *a):
   if a:
     msg = msg % a
   with open('/dev/tty', 'a') as tty:
-    print >>tty, msg
+    print(msg, file=tty)
 
 class TestResult(unittest.TestCase):
 

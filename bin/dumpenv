@@ -1,26 +1,55 @@
-#!/usr/bin/perl
-#
-# Emit shell script to reload environment.
-#	- Cameron Simpson 15may93
-#
-# Csh hack.	- cameron, 23sep96
-# Use cs::Shell.- cameron, 01dec98
-# Persist Hack.	- cameron, 02dec98
-#
+#!/usr/bin/python
 
-use cs::Shell;
+import os
+import sys
+import cs.sh
 
-$dumpmode=SH;
-$force=0;
-ARGV:
-while (@ARGV)
-{ if ($ARGV[0] eq '-csh')       { $dumpmode=CSH; shift(@ARGV); }
-  elsif ($ARGV[0] eq '-sh')     { $dumpmode=SH; shift(@ARGV); }
-  elsif ($ARGV[0] eq '-persist'){ $dumpmode=PERSIST; shift(@ARGV); }
-  elsif ($ARGV[0] eq '-f')      { $force=1; shift(@ARGV); }
-  else                          { last ARGV; }
-}
+usage = "Usage: %s [-f] [{-sh|-csh}] [--] [envvars...]"
 
-cs::Shell::putvars($force,$dumpmode);
+def main(argv):
+  syntax = 'sh'
+  force = False
+  argv = list(argv)
+  cmd = argv.pop(0)
+  badopts = False
+  while argv:
+    arg = argv.pop(0)
+    if arg == '-f':
+      force = True
+    elif arg == '-sh':
+      syntax = 'sh'
+    elif arg == '-csh':
+      syntax = 'csh'
+    elif arg == '--':
+      break
+    elif arg.startswith('-'):
+      print >>sys.stderr, "%s: unrecognised option: %s" % (cmd, arg)
+      badopts = True
+    else:
+      argv.insert(0, arg)
+      break
+  if badopts:
+    print >>sys.stderr, usage % (cmd,)
+    return 2
+  if not argv:
+    argv = sorted(os.environ.keys())
+  for envvar in argv:
+    if envvar in os.environ:
+      envval = os.environ[envvar]
+      qenvval = cs.sh.quotestr(envval)
+      if syntax == 'sh':
+        if force:
+          print '%s=%s; export %s' % (envvar, qenvval, envvar)
+        else:
+          print ': ${%s:=%s}; export %s' % (envvar, qenvval, envvar)
+      elif syntax == 'csh':
+        if not force:
+          print 'test -n "$%s" ||' % (envvar,),
+        print 'setenv %s %s' % (envvar, qenvval)
+      else:
+        print >>sys.stderr, "%s: unimplemented synax: %s" % (cmd, syntax)
+        return 1
+  return 0
 
-exit 0;
+if __name__ == '__main__':
+  sys.exit(main(sys.argv))
