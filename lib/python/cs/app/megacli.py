@@ -316,7 +316,7 @@ class MegaRAID(O):
                 info("acceptable drive: %s", DRV.firmware_state)
     if not ok:
       return False
-    return self.docmd('-CfgLdAdd', '-r%d' % (level,), "[" + ",".join(enc_slot) + "]", '-a%d' % (adapter,))
+    return self.docmd('-CfgLdAdd', '-r%d' % (level,), "[" + ",".join(enc_slots) + "]", '-a%d' % (adapter,))
 
   @contextmanager
   def readcmd(self, *args):
