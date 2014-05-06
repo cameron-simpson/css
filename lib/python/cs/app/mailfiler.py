@@ -513,15 +513,18 @@ class Filer(O):
       except KeyError:
         warning("no Message-ID !")
       else:
-        msg_ids = [ msg_id for msg_id in msg_id.split() if len(msg_id) > 0 ]
-        if msg_ids:
-          msg_id = msg_ids[0]
-          subargv.extend( ['-e',
-                            'term',
-                             '-e',
-                              'mutt-open-message',
-                               '-f', self.saved_to[0], msg_id,
-                           '--'] )
+        if msg_id is None:
+          warning("message-id is None!")
+        else:
+          msg_ids = [ msg_id for msg_id in msg_id.split() if len(msg_id) > 0 ]
+          if msg_ids:
+            msg_id = msg_ids[0]
+            subargv.extend( ['-e',
+                              'term',
+                               '-e',
+                                'mutt-open-message',
+                                 '-f', self.saved_to[0], msg_id,
+                             '--'] )
     subargv.append(alert_message)
     xit = subprocess.call(subargv)
     if xit != 0:
