@@ -57,6 +57,7 @@ do
                 badopts=1
               else
                 execute=$( as-script "$@" )
+                execute='>>"$ALERTLOG" 2>&1; '$execute
               fi
               set --
               tailargs=1
