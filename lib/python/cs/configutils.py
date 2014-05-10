@@ -123,13 +123,6 @@ class ConfigSectionWatcher(object):
           value = default
       return value
 
-  def __hasitem__(self, item):
-    try:
-      self[item]
-      return True
-    except KeyError:
-      return False
-
 if __name__ == '__main__':
   import sys
   import cs.configutils_tests
