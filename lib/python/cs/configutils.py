@@ -7,8 +7,8 @@
 import os
 import os.path
 import sys
-from cs.py3 import ConfigParser
 from threading import Lock
+from cs.py3 import ConfigParser
 from cs.fileutils import file_property
 from cs.threads import locked_property
 from cs.logutils import Pfx, info, D
@@ -102,12 +102,12 @@ class ConfigSectionWatcher(object):
     '''
     config = self.config
     section = self.section
-    K = set()
+    ks = set()
     if self.defaults:
-      K.update(self.defaults.keys())
+      ks.update(self.defaults.keys())
     if config.has_section(section):
-      K.update(config.options(section))
-    return K
+      ks.update(config.options(section))
+    return ks
 
   def __getitem__(self, item):
     return self.configwatcher.mapping[item]
