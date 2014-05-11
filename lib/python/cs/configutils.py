@@ -7,11 +7,12 @@
 import os
 import os.path
 import sys
-from cs.py3 import ConfigParser
-from threading import Lock
+from collections import Mapping
+from threading import RLock
+from cs.py3 import ConfigParser, StringTypes
 from cs.fileutils import file_property
-from cs.threads import locked_property
-from cs.logutils import Pfx, info, D
+from cs.threads import locked, locked_property
+from cs.logutils import Pfx, info, D, X
 
 def load_config(config_path, parser=None):
   ''' Load a configuration from the named `config_path`.
@@ -26,17 +27,22 @@ def load_config(config_path, parser=None):
     CP.readfp(fp) 
   return CP
 
-class ConfigWatcher(object):
+class ConfigWatcher(Mapping):
   ''' A monitor for a windows style .ini file.
-      The current SafeConfigParser object is present in the .config attribute.
+      The current SafeConfigParser object is presented as the .config property.
   '''
+
   def __init__(self, config_path):
+    self._lock = RLock()
+    if not os.path.isabs(config_path):
+      config_path = os.path.abspath(config_path)
     self._config_path = config_path
-    self._config_lock = Lock()
-    self._mapping = None
+    self._config_lock = self._lock
+    self._watchers = {}
 
   @file_property
   def config(self, path):
+    self._mapping = None
     return load_config(path)
 
   @property
@@ -49,39 +55,75 @@ class ConfigWatcher(object):
     '''
     d = {}
     config = self.config
-    for section in config.sections():
-      d[section] = dict(config.items(section))
+    if config is not None:
+      # file exists and was read successfully
+      for section in config.sections():
+        d[section] = self[section].as_dict()
     return d
 
-  @locked_property
-  def mapping(self):
-    ''' The current config as a mapping as returned by as_dict().
+  def section_keys(self, section):
+    ''' Return the field names for the specified section.
     '''
-    return self.as_dict()
+    CP = self.config
+    if CP is None or (section != 'DEFAULT' and not CP.has_section(section)):
+      return []
+    return [ name for name, value in CP.items(section) ]
 
+  def section_value(self, section, key):
+    CP = self.config
+    if CP is None or not CP.has_option(section, key):
+      raise KeyError(key)
+    return CP.get(section, key)
+
+  #### Mapping methods.
+  @locked
   def __getitem__(self, section):
-    return self.mapping[section]
+    ''' Return the ConfigWatcher for the specified section.
+    '''
+    watchers = self._watchers
+    if section not in watchers:
+      watchers[section] = ConfigSectionWatcher(self, section)
+    return watchers[section]
 
-class ConfigSectionWatcher(object):
+  def __iter__(self):
+    CP = self.config
+    if CP is None:
+      return iter(())
+    return iter(CP.sections())
+
+  def __len__(self):
+    n = 0
+    for i in self:
+      n += 1
+    return n
+
+class ConfigSectionWatcher(Mapping):
   ''' A class for monitoring a particular clause in a config file.
   '''
 
-  def __init__(self, config_path, section, defaults=None):
+  def __init__(self, config, section, defaults=None):
     ''' Initialise a ConfigSectionWatcher to monitor a particular section
         of a config file.
+        `config`: path of config file, or ConfigWatcher
+        `section`: the section to watch
+        `defaults`: the defaults section to use, default 'DEFAULT'
     '''
-    if not os.path.isabs(config_path):
-      config_path = os.path.abspath(config_path)
+    if isinstance(config, StringTypes):
+      config_path = config
+      config = ConfigWatcher(config_path)
+    if defaults is None:
+      defaults = 'DEFAULT'
+    self.config = config
     self.section = section
     self.defaults = defaults
-    self.configwatcher = ConfigWatcher(config_path)
 
   def __str__(self):
-    return "%s[%s]%r" % (self.path, self.section, self)
+    return "%s[%s]" % (self.path, self.section)
 
   def __repr__(self):
     d = {}
     for k in self.keys():
+      v = self[k]
       d[k] = self[k]
     return repr(d)
 
@@ -89,46 +131,30 @@ class ConfigSectionWatcher(object):
   def path(self):
     ''' The pathname of the config file.
     '''
-    return self.configwatcher.path
+    return self.config.path
 
-  @property
-  def config(self):
-    ''' The current ConfigParser.
-    '''
-    return self.configwatcher.config
+  def as_dict(self):
+    d = {}
+    for k in self:
+      d[k] = self[k]
+    return d
 
   def keys(self):
-    ''' Return the fieldnames in this config section.
-    '''
-    config = self.config
-    section = self.section
-    K = set()
-    if self.defaults:
-      K.update(self.defaults.keys())
-    if config.has_section(section):
-      K.update(config.options(section))
-    return K
+    ks = set(self.config.section_keys(self.section))
+    if self.section != self.defaults:
+      ks.update(set(self.config.section_keys(self.defaults)))
+    return list(ks)
 
-  def __getitem__(self, item):
-    return self.configwatcher.mapping[item]
+  #### Mapping methods.
+  def __getitem__(self, key):
+    v = self.config.section_value(self.section, key)
+    return v
 
-  def get(self, item, default):
-    with Pfx("get(%s)", item):
-      try:
-        value = self[item]
-      except KeyError:
-        value = default
-      else:
-        if value is None:
-          value = default
-      return value
+  def __iter__(self):
+    return iter(self.keys())
 
-  def __hasitem__(self, item):
-    try:
-      self[item]
-      return True
-    except KeyError:
-      return False
+  def __len__(self):
+    return len(self.keys())
 
 if __name__ == '__main__':
   import sys
