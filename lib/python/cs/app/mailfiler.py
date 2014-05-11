@@ -23,6 +23,7 @@ import subprocess
 from tempfile import TemporaryFile
 from threading import Lock
 import time
+from cs.configutils import ConfigWatcher
 from cs.env import envsub
 from cs.fileutils import abspath_from_file, file_property, files_property, Pathname
 from cs.lex import get_white, get_nonwhite, get_qstr, unrfc2047
@@ -36,6 +37,7 @@ from cs.app.maildb import MailDB
 from cs.py3 import unicode as u, StringTypes, ustr
 
 DEFAULT_MAILDIR_RULES = '$HOME/.mailfiler/{maildir.basename}'
+DEFAULT_MAILFILER_RC = '$HOME/.mailfilerrc'
 
 def main(argv, stdin=None):
   if stdin is None:
@@ -106,7 +108,9 @@ def main(argv, stdin=None):
     print(usage, file=sys.stderr)
     return 2
 
+  cfg = ConfigWatcher(longpath(DEFAULT_MAILFILER_RC))
   with Pfx(op):
+    op_cfg = cfg[op]
     if op == 'monitor':
       maildir_cache = {}
       filter_modes = FilterModes(justone=justone,
