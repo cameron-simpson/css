@@ -25,7 +25,8 @@ from threading import Lock
 import time
 from cs.configutils import ConfigWatcher
 from cs.env import envsub
-from cs.fileutils import abspath_from_file, file_property, files_property, Pathname
+from cs.fileutils import abspath_from_file, file_property, files_property, \
+                         longpath, Pathname
 from cs.lex import get_white, get_nonwhite, get_qstr, unrfc2047
 from cs.logutils import Pfx, setup_logging, \
                         debug, info, warning, error, exception, \
@@ -38,6 +39,9 @@ from cs.py3 import unicode as u, StringTypes, ustr
 
 DEFAULT_MAILDIR_RULES = '$HOME/.mailfiler/{maildir.basename}'
 DEFAULT_MAILFILER_RC = '$HOME/.mailfilerrc'
+DEFAULT_MAILDB_PATH = '$HOME/.maildb.csv'
+DEFAULT_MSGIDDB_PATH = '$HOME/var/msgiddb.csv'
+DEFAULT_MAILDIR_PATH = '$MAILDIR'
 
 def main(argv, stdin=None):
   if stdin is None:
@@ -58,6 +62,12 @@ def main(argv, stdin=None):
           )
   badopts = False
 
+  config_path = None
+  maildb_path = None
+  msgiddb_path = None
+  maildir = None
+  rules_pattern = None
+
   if not argv:
     warning("missing op")
     badopts = True
@@ -68,7 +78,6 @@ def main(argv, stdin=None):
         justone = False
         delay = None
         no_remove = False
-        rules_pattern = DEFAULT_MAILDIR_RULES
         try:
           opts, argv = getopt(argv, '1d:nR:')
         except GetoptError as e:
@@ -95,11 +104,7 @@ def main(argv, stdin=None):
             else:
               warning("unimplemented option")
               badopts = True
-        if not argv:
-          warning("missing maildirs")
-          badopts = True
-        else:
-          mdirpaths = [ Pathname(arg) for arg in argv ]
+        mdirpaths = argv
       else:
         warning("unrecognised op: %s", op)
         badopts = True
@@ -108,17 +113,33 @@ def main(argv, stdin=None):
     print(usage, file=sys.stderr)
     return 2
 
-  cfg = ConfigWatcher(longpath(DEFAULT_MAILFILER_RC))
+  if config_path is None:
+    config_path = envsub(DEFAULT_MAILFILER_RC)
+  cfg = ConfigWatcher(config_path)
+
   with Pfx(op):
     op_cfg = cfg[op]
+    if maildb_path is None:
+      maildb_path = longpath(op_cfg.get('maildb', os.environ.get('MAILDB', envsub(DEFAULT_MAILDB_PATH))))
+    if msgiddb_path is None:
+      msgiddb_path = longpath(op_cfg.get('messageiddb', os.environ.get('MESSAGEIDDB', envsub(DEFAULT_MSGIDDB_PATH))))
+    if maildir is None:
+      maildir = longpath(op_cfg.get('maildir', os.environ.get('MAILDIR', envsub(DEFAULT_MAILDIR_PATH))))
+    if rules_pattern is None:
+      rules_pattern = op_cfg.get('rules_pattern', DEFAULT_MAILDIR_RULES)
+
     if op == 'monitor':
+      X("op_cfg = %r", op_cfg)
+      if not mdirpaths:
+        mdirpaths = op_cfg['folders'].split()
+      mdirpaths = [ Pathname(longpath(path, None,  ( (maildir+'/', '+'), ))) for path in mdirpaths ]
       maildir_cache = {}
       filter_modes = FilterModes(justone=justone,
                                  delay=delay,
                                  no_remove=no_remove,
-                                 maildb_path=os.environ['MAILDB'],
+                                 maildb_path=maildb_path,
                                  maildir_cache={},
-                                 msgiddb_path=os.environ.get('MESSAGEIDDB', envsub('$HOME/var/msgiddb.csv')),
+                                 msgiddb_path=msgiddb_path,
                                 )
       maildirs = [ WatchedMaildir(mdirpath,
                                   filter_modes=filter_modes,
