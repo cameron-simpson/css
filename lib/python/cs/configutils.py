@@ -65,14 +65,14 @@ class ConfigWatcher(Mapping):
     ''' Return the field names for the specified section.
     '''
     CP = self.config
-    if CP is None:
+    if CP is None or not CP.has_section(section):
       return []
     return [ name for name, value in CP.items(section) ]
 
   def section_value(self, section, key):
     CP = self.config
-    if CP is None:
-      return None
+    if CP is None or not CP.has_option(section, key):
+      raise KeyError(key)
     return CP.get(section, key)
 
   #### Mapping methods.
