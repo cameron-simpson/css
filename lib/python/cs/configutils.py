@@ -55,17 +55,25 @@ class ConfigWatcher(Mapping):
     '''
     d = {}
     config = self.config
-    for section in config.sections():
-      d[section] = self[section].as_dict()
+    if config is not None:
+      # file exists and was read successfully
+      for section in config.sections():
+        d[section] = self[section].as_dict()
     return d
 
   def section_keys(self, section):
     ''' Return the field names for the specified section.
     '''
-    return [ name for name, value in self.config.items(section) ]
+    CP = self.config
+    if CP is None:
+      return []
+    return [ name for name, value in CP.items(section) ]
 
   def section_value(self, section, key):
-    return self.config.get(section, key)
+    CP = self.config
+    if CP is None:
+      return None
+    return CP.get(section, key)
 
   #### Mapping methods.
   @locked
@@ -78,10 +86,16 @@ class ConfigWatcher(Mapping):
     return watchers[section]
 
   def __iter__(self):
-    return self.config.sections()
+    CP = self.config
+    if CP is None:
+      return iter(())
+    return iter(CP.sections())
 
   def __len__(self):
-    return len(list(self))
+    n = 0
+    for i in self:
+      n += 1
+    return n
 
 class ConfigSectionWatcher(Mapping):
   ''' A class for monitoring a particular clause in a config file.
