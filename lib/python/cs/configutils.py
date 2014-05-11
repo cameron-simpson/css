@@ -65,7 +65,7 @@ class ConfigWatcher(Mapping):
     ''' Return the field names for the specified section.
     '''
     CP = self.config
-    if CP is None or not CP.has_section(section):
+    if CP is None or (section != 'DEFAULT' and not CP.has_section(section)):
       return []
     return [ name for name, value in CP.items(section) ]
 
@@ -141,7 +141,8 @@ class ConfigSectionWatcher(Mapping):
 
   def keys(self):
     ks = set(self.config.section_keys(self.section))
-    ks.update(set(self.config.section_keys(self.defaults)))
+    if self.section != self.defaults:
+      ks.update(set(self.config.section_keys(self.defaults)))
     return list(ks)
 
   #### Mapping methods.
