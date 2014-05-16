@@ -402,6 +402,7 @@ class Pilfer(O):
     self.diversions_map = {}        # global mapping of names to divert: pipelines
     self.opener = build_opener()
     self.opener.add_handler(HTTPBasicAuthHandler(NetrcHTTPPasswordMgr()))
+    self.opener.add_handler(HTTPCookieProcessor())
     O.__init__(self, **kw)
 
   def __str__(self):
