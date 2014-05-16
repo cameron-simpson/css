@@ -867,6 +867,7 @@ def grok(module_name, func_name, P, *a, **kw):
     if mfunc is None:
       error("import fails")
     else:
+      X("grok: calling %s.%s<%s> with P=%r", module_name, func_name, mfunc, P)
       try:
         var_mapping = mfunc(P, *a, **kw)
       except Exception as e:
