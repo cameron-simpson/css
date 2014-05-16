@@ -42,6 +42,8 @@ def write_csv_file(fp, nodedata, noHeaders=False):
   '''
   csvw = csv.writer(fp)
   if not noHeaders:
+    if fp.tell() > 0:
+      raise RuntimeError("writing headers but fp<%r>.tell() = %r" % (fp, fp.tell()))
     csv_writerow( csvw, ('TYPE', 'NAME', 'ATTR', 'VALUE') )
   otype = None
   for t, name, attrmap in nodedata:
@@ -192,6 +194,8 @@ class Backend_CSVFile(Backend):
     csvw = csv.writer(self.csvfp)
     lastrow = None
     for thisrow in csvrows:
+      if tuple(thisrow) == ('TYPE', 'NAME', 'ATTR', 'VALUE'):
+        raise RuntimeError("push_updates: received header row: %r" % (thisrow,))
       t, name, attr, value = thisrow
       if lastrow:
         if t == lastrow.type:

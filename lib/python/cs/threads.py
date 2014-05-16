@@ -24,6 +24,7 @@ from cs.logutils import Pfx, LogTime, error, warning, debug, exception, OBSOLETE
 from cs.obj import O
 from cs.asynchron import report
 from cs.queues import IterableQueue, Channel, NestingOpenCloseMixin, not_closed, _NOC_Proxy
+from cs.py.func import funcname
 from cs.py3 import raise3, Queue, PriorityQueue
 
 class _WTP_Proxy(_NOC_Proxy):
@@ -369,6 +370,7 @@ def locked(func):
       debug("@locked(self._lock=%r <%s>, func=%r)...", self._lock, self._lock.__class__, func)
     with self._lock:
       return func(self, *a, **kw)
+  lockfunc.__name__ = "@locked(%s)" % (funcname(func),)
   return lockfunc
 
 def locked_property(func, lock_name='_lock', prop_name=None, unset_object=None):

@@ -23,6 +23,8 @@ localzones="l local"
 localnets="127 192.168 172.16 10.0"
 cnames=$HOME/rc/dns/cnames
 host_conf=$HOME/rc/dns/unbound.conf-fleet
+outgoing_if=$( netstat -rn | awk '$1 == "default" { print $6 }' )
+outgoing_ip=$( ifconfig "$outgoing_if" | sed -n 'y/	/ /; s/.* inet  *\([1-9][0-9.]*[0-9]\) .*/\1/p' )
 
 # default upstream DNS servers
 [ $# -gt 0 ] || set -- $UNBOUND_DNS_UPSTREAM
@@ -46,6 +48,7 @@ server:
   pidfile: "$pidfile"
   log-queries: yes
   verbosity: 2      # uncomment and increase to get more logging.
+  outgoing-interface: "$outgoing_ip"
   ## # default is "3 2 1 0 0"
   ## target−fetch−policy: "−1 −1 −1 −1 −1"
 X

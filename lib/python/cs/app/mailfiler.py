@@ -23,12 +23,14 @@ import subprocess
 from tempfile import TemporaryFile
 from threading import Lock
 import time
+from cs.configutils import ConfigWatcher
 from cs.env import envsub
-from cs.fileutils import abspath_from_file, file_property, files_property, Pathname
+from cs.fileutils import abspath_from_file, file_property, files_property, \
+                         longpath, Pathname
 from cs.lex import get_white, get_nonwhite, get_qstr, unrfc2047
 from cs.logutils import Pfx, setup_logging, \
                         debug, info, warning, error, exception, \
-                        D, LogTime
+                        D, X, LogTime
 from cs.mailutils import Maildir, message_addresses, shortpath, ismaildir, make_maildir
 from cs.obj import O, slist
 from cs.threads import locked_property
@@ -36,6 +38,10 @@ from cs.app.maildb import MailDB
 from cs.py3 import unicode as u, StringTypes, ustr
 
 DEFAULT_MAILDIR_RULES = '$HOME/.mailfiler/{maildir.basename}'
+DEFAULT_MAILFILER_RC = '$HOME/.mailfilerrc'
+DEFAULT_MAILDB_PATH = '$HOME/.maildb.csv'
+DEFAULT_MSGIDDB_PATH = '$HOME/var/msgiddb.csv'
+DEFAULT_MAILDIR_PATH = '$MAILDIR'
 
 def main(argv, stdin=None):
   if stdin is None:
@@ -56,6 +62,12 @@ def main(argv, stdin=None):
           )
   badopts = False
 
+  config_path = None
+  maildb_path = None
+  msgiddb_path = None
+  maildir = None
+  rules_pattern = None
+
   if not argv:
     warning("missing op")
     badopts = True
@@ -66,7 +78,6 @@ def main(argv, stdin=None):
         justone = False
         delay = None
         no_remove = False
-        rules_pattern = DEFAULT_MAILDIR_RULES
         try:
           opts, argv = getopt(argv, '1d:nR:')
         except GetoptError as e:
@@ -93,11 +104,7 @@ def main(argv, stdin=None):
             else:
               warning("unimplemented option")
               badopts = True
-        if not argv:
-          warning("missing maildirs")
-          badopts = True
-        else:
-          mdirpaths = [ Pathname(arg) for arg in argv ]
+        mdirpaths = argv
       else:
         warning("unrecognised op: %s", op)
         badopts = True
@@ -106,15 +113,33 @@ def main(argv, stdin=None):
     print(usage, file=sys.stderr)
     return 2
 
+  if config_path is None:
+    config_path = envsub(DEFAULT_MAILFILER_RC)
+  cfg = ConfigWatcher(config_path)
+
   with Pfx(op):
+    op_cfg = cfg[op]
+    if maildb_path is None:
+      maildb_path = longpath(op_cfg.get('maildb', os.environ.get('MAILDB', envsub(DEFAULT_MAILDB_PATH))))
+    if msgiddb_path is None:
+      msgiddb_path = longpath(op_cfg.get('messageiddb', os.environ.get('MESSAGEIDDB', envsub(DEFAULT_MSGIDDB_PATH))))
+    if maildir is None:
+      maildir = longpath(op_cfg.get('maildir', os.environ.get('MAILDIR', envsub(DEFAULT_MAILDIR_PATH))))
+    if rules_pattern is None:
+      rules_pattern = op_cfg.get('rules_pattern', DEFAULT_MAILDIR_RULES)
+
     if op == 'monitor':
+      X("op_cfg = %r", op_cfg)
+      if not mdirpaths:
+        mdirpaths = op_cfg['folders'].split()
+      mdirpaths = [ Pathname(longpath(path, None,  ( (maildir+'/', '+'), ))) for path in mdirpaths ]
       maildir_cache = {}
       filter_modes = FilterModes(justone=justone,
                                  delay=delay,
                                  no_remove=no_remove,
-                                 maildb_path=os.environ['MAILDB'],
+                                 maildb_path=maildb_path,
                                  maildir_cache={},
-                                 msgiddb_path=os.environ.get('MESSAGEIDDB', envsub('$HOME/var/msgiddb.csv')),
+                                 msgiddb_path=msgiddb_path,
                                 )
       maildirs = [ WatchedMaildir(mdirpath,
                                   filter_modes=filter_modes,
@@ -203,7 +228,10 @@ class Filer(O):
     self._log = None
     self.targets = set()
     self.labels = set()
-    self.flags = O(alert=False)
+    self.flags = O(alert=0,
+                   flagged=False, passed=False, replied=False,
+                   seen=False, trashed=False, draft=False)
+    self.saved_to = []
 
   def file(self, M, rules, message_path=None):
     ''' File the specified message `M` according to the supplied `rules`.
@@ -227,9 +255,6 @@ class Filer(O):
     except Exception as e:
       exception("matching rules: %s", e)
       return False
-
-    if self.flags.alert:
-      self.alert()
 
     if not self.targets:
       if self.default_target:
@@ -262,6 +287,9 @@ class Filer(O):
         except Exception as e:
           exception("saving to %r: %s", target, e)
           ok = False
+
+    if self.flags.alert > 0:
+      self.alert(self.flags.alert)
 
     self.logflush()
     return ok
@@ -370,15 +398,28 @@ class Filer(O):
         mailpath = self.resolve(target)
         if not os.path.exists(mailpath):
           make_maildir(mailpath)
+        # record the target folder
+        self.saved_to.append(mailpath)
         if ismaildir(mailpath):
           mdir = self.maildir(target)
-          if self.flags.alert:
-            maildir_flags = 'F'
-          else:
-            maildir_flags = ''
+          maildir_flags = ''
+          if self.flags.draft:   maildir_flags += 'D'
+          if self.flags.flagged: maildir_flags += 'F'
+          if self.flags.passed:  maildir_flags += 'P'
+          if self.flags.replied: maildir_flags += 'R'
+          if self.flags.seen:    maildir_flags += 'S'
+          if self.flags.trashed: maildir_flags += 'T'
           return self.save_to_maildir(mdir,
                                       flags=maildir_flags)
-        return self.save_to_mbox(mailpath)
+        status = ''
+        x_status = ''
+        if self.flags.draft:   x_status += 'D'
+        if self.flags.flagged: x_status += 'F'
+        if self.flags.replied: status += 'R'
+        if self.flags.passed:  x_status += 'P'
+        if self.flags.seen:    x_status += 'S'
+        if self.flags.trashed: x_status += 'T'
+        return self.save_to_mbox(mailpath, status, x_status)
 
   def save_header(self, hdr, group_names):
     with Pfx("save_header(%s, %r)", hdr, group_names):
@@ -409,8 +450,12 @@ class Filer(O):
     self.log("    OK %s" % (shortpath(savepath)))
     return savepath
 
-  def save_to_mbox(self, mboxpath):
+  def save_to_mbox(self, mboxpath, status, x_status):
     M = self.message
+    if len(status) > 0:
+      M['Status'] = status
+    if len(x_status) > 0:
+      M['X-Status'] = x_status
     text = M.as_string(True)
     with open(mboxpath, "a") as mboxfp:
       mboxfp.write(text)
@@ -474,13 +519,39 @@ class Filer(O):
       hmap[h] = ustr(hval)
     return u(fmt).format(**hmap)
 
-  def alert(self, alert_message=None):
+  def alert(self, alert_level, alert_message=None):
     ''' Issue an alert with the specified `alert_message`.
         If missing or None, use self.alert_message(self.message).
+	If `alert_level` is more than 1, prepend "-l alert_level"
+	to the alert command line arguments.
     '''
     if alert_message is None:
       alert_message = self.alert_message(self.message)
-    xit = subprocess.call([self.env('ALERT', 'alert'), alert_message])
+    subargv = [ self.env('ALERT', 'alert') ]
+    if alert_level > 1:
+      subargv.extend( ['-l', str(alert_level)] )
+    # tell alert how to open this message
+    # TODO: parameterise so that we can open it with other tools
+    if self.saved_to:
+      try:
+        msg_id = self.message['message-id']
+      except KeyError:
+        warning("no Message-ID !")
+      else:
+        if msg_id is None:
+          warning("message-id is None!")
+        else:
+          msg_ids = [ msg_id for msg_id in msg_id.split() if len(msg_id) > 0 ]
+          if msg_ids:
+            msg_id = msg_ids[0]
+            subargv.extend( ['-e',
+                              'term',
+                               '-e',
+                                'mutt-open-message',
+                                 '-f', self.saved_to[0], msg_id,
+                             '--'] )
+    subargv.append(alert_message)
+    xit = subprocess.call(subargv)
     if xit != 0:
       warning("non-zero exit from alert: %d", xit)
     return xit
@@ -583,18 +654,18 @@ def parserules(fp):
           R = None
           continue
 
-        while True:
-          if line[offset] == '+':
-            R.flags.halt = False
-            offset += 1
-          elif line[offset] == '=':
-            R.flags.halt = True
-            offset += 1
-          if line[offset] == '!':
-            R.flags.alert += 1
-            offset += 1
-          else:
-            break
+        # leading optional '+' (continue, default) or '=' (final)
+        if line[offset] == '+':
+          R.flags.halt = False
+          offset += 1
+        elif line[offset] == '=':
+          R.flags.halt = True
+          offset += 1
+
+        # leading '!' alert: multiple '!' raise the alert level
+        while line[offset] == '!':
+          R.flags.alert += 1
+          offset += 1
 
         targets, offset = get_targets(line, offset)
         for target in targets:
@@ -701,9 +772,11 @@ def get_targets(s, offset):
   '''
   targets = []
   while offset < len(s) and not s[offset].isspace():
+    # "quoted-string"
     if s[offset] == '"':
       target, offset = get_qstr(s, offset)
-    elif s[offset ] == '+':
+    # +header(groups)
+    elif s[offset] == '+':
       m = re_ADDHEADER.match(s, offset)
       if m:
         target = m.group()
@@ -712,6 +785,7 @@ def get_targets(s, offset):
         error("parse failure, expected +header(groups) at %d: %s", offset, s)
         raise ValueError("syntax error")
     else:
+      # unquoted word
       m = re_UNQWORD.match(s, offset)
       if m:
         target = m.group()
@@ -862,15 +936,24 @@ class Rule(O):
     '''
     M = filer.message
     with Pfx(self.context):
-      if self.flags.alert:
-        filer.flags.alert = True
+      filer.flags.alert = max(filer.flags.alert, self.flags.alert)
       if self.label:
         filer.labels.add(self.label)
       for action, arg in self.actions:
         try:
           if action == 'TARGET':
             target = envsub(arg, filer.environ)
-            filer.targets.add(target)
+            if len(target) == 1 and target.isupper():
+              if target == 'D':   filer.flags.draft = True
+              elif target == 'F': filer.flags.flagged = True
+              elif target == 'P': filer.flags.passed = True
+              elif target == 'R': filer.flags.replied = True
+              elif target == 'S': filer.flags.seen = True
+              elif target == 'T': filer.flags.trashed = True
+              else:
+                warning("ignoring unsupported flag \"%s\"" % (target,))
+            else:
+              filer.targets.add(target)
           elif action == 'ASSIGN':
             envvar, s = arg
             value = filer.environ[envvar] = envsub(s, filer.environ)
