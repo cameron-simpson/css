@@ -51,30 +51,25 @@ while [ $# -gt 0 ]
 do
   case $1 in
     --count-regexp)
-      count_re=$2; shift
-      ;;
-    -:)
-      OK=OK
-      FAIL=FAIL
-      ;;
+        count_re=$2; shift
+        ;;
+    -:) OK=OK
+        FAIL=FAIL
+        ;;
     -N|--notify-on-error)
-      notifyaddr=$2; shift ;;
-    -P)
-      dopfx=1 ;;
-    -q)
-      quiet=1 ;;
-    -v)
-      quiet= ;;
+        notifyaddr=$2; shift ;;
+    -P) dopfx=1 ;;
+    -q) quiet=1 ;;
+    -v) quiet= ;;
     --prefix)
-      dopfx=1 pfx=$2; shift ;;
+        dopfx=1 pfx=$2; shift ;;
     --ok)
-      OK=$2; shift ;;
+        OK=$2; shift ;;
     --fail)
-      FAIL=$2; shift ;;
+        FAIL=$2; shift ;;
     --label)
-      words="$words$wordsep$2"; wordsep=' '; shift ;;
-    --)
-      shift; break ;;
+        words="$words$wordsep$2"; wordsep=' '; shift ;;
+    --) shift; break ;;
     -?*)
       echo "$cmd: unrecognised option: $1" >&2
       badopts=1
