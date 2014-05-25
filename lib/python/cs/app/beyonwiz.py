@@ -114,12 +114,19 @@ TruncRecord = namedtuple('TruncRecord', 'wizOffset fileNum flags offset size')
 def parse_trunc(fp):
   ''' An iterator to yield TruncRecord tuples.
   '''
-    while True:
-      buf = fp.read(24)
-      if len(buf) == 0:
-        break
-      assert len(buf) == 24
-      yield TruncRecord(*struct.unpack("<QHHQL", buf))
+  while True:
+    buf = fp.read(24)
+    if len(buf) == 0:
+      break
+    assert len(buf) == 24
+    yield TruncRecord(*struct.unpack("<QHHQL", buf))
+
+def parse_header(data):
+  ''' Decode the data chunk from a TV or radio header chunk.
+  '''
+  main = data[HDR_MAIN_OFF:HDR_MAIN_OFF+HDR_MAIN_SIZE]
+  main_unpacked = struct.unpack('6x 3s 1024s 256s 256s <H 2x <L <H <H 1548s <H <H <H <H')
+  print(main_unpacked)
 
 class TVWiz(O):
   def __init__(self, wizdir):
