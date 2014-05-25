@@ -13,7 +13,11 @@ trace=
 
 cmd=`basename "$0"`
 usage="Usage:
-  $cmd [options...] [op [args...]]
+  $cmd [-a anchor] [op [args...]]
+Operations:
+  $cmd cat table...
+  $cmd export [-d export_base] [table...]
+  $cmd import [-d export_base] [-m {add|replace}] table...
   $cmd [ls]     List tables."
 
 badopts=
@@ -69,7 +73,40 @@ case "$op" in
     [ -d "$export_dir/." ] || $trace mkdir -p -- "$export_dir"
     for t
     do
-      _pft cat "$t" >"$export_dir/$t.txt"
+      tfile=$export_dir/$t.txt
+      _pft cat "$t" >"$tfile"
+    done
+    ;;
+  import)
+    mode=add    # vs "replace"
+    while [ $# -gt 0 ]
+    do
+      case $1 in
+        -d)     PFT_EXPORT=$2; shift ;;
+        -m)     mode=$2; shift
+                case "$mode" in
+                  add|replace) ;;
+                  *)  echo "$cmd: $op: -m: bad mode \"$mode\", expected \"add\" or \"replace\"" >&2
+                      badopts=1
+                      ;;
+                esac
+                ;;
+        --)     shift; break ;;
+        -?*)    echo "$cmd: $op: unrecognised option: $1" >&2
+                badopts=1
+                ;;
+        *)      break ;;
+      esac
+      shift
+    done
+    [ $# = 0 ] && { echo "$cmd: $op: missing table names" >&2; badopts=1; }
+    [ $badopts ] && { echo "$usage" >&2; exit 2; }
+    export_dir=$PFT_EXPORT/$anchor
+    for t
+    do
+      tfile=$export_dir/$t.txt
+      [ -f "$tfile" ] || { echo "$cmd: $op: missing import file: $tfile" >&2; exit 1; }
+      $trace pfctl -a "$anchor" -t "$t" -T add $(grep '^#' "$tfile")
     done
     ;;
   ls)
