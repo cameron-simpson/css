@@ -1,0 +1,55 @@
+#!/bin/sh
+#
+# pft - convenience wrapper for "pfctl(8) -t".
+#       - Cameron Simpson <cs@zip.com.au> 24may2014
+#
+
+set -ue
+
+trace=
+[ -t 2 ] && trace=set-x
+
+cmd=`basename "$0"`
+usage="Usage:
+  $cmd [options...] [op [args...]]
+  $cmd [ls]     List tables."
+
+badopts=
+
+op=
+anchor=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -a) anchor=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+# no op: list tables
+[ $# = 0 ] && exec $trace pfctl -a "$anchor" -sT
+
+op=$1
+shift
+
+case "$op" in
+  ls)
+    if [ $# -gt 0 ]
+    then
+      echo "$cmd: $op: extra arguments: $*" >&2
+      echo "$usage" >&2
+      exit 2
+    fi
+    exec $trace pfctl -a "$anchor" -sT
+    ;;
+  *)echo "$cmd: unrecognised op: $op" >&2
+    echo "$usage" >&2
+    exit 2
+    ;;
+esac
