@@ -81,7 +81,7 @@ def main(argv):
       total = 0
       chunkSize = 0
       chunkOff = 0
-      for wizOffset, fileNum, flags, offset, size in TVWiz(arg).trunc():
+      for wizOffset, fileNum, flags, offset, size in TVWiz(arg).trunc_records():
         print("  wizOffset=%d, fileNum=%d, flags=%02x, offset=%d, size=%d" \
               % ( wizOffset, fileNum, flags, offset, size )
              )
@@ -118,7 +118,8 @@ def parse_trunc(fp):
     buf = fp.read(24)
     if len(buf) == 0:
       break
-    assert len(buf) == 24
+    if len(buf) != 24:
+      raise ValueError("short buffer: %d bytes: %r" % (len(buf), buf))
     yield TruncRecord(*struct.unpack("<QHHQL", buf))
 
 def parse_header(data):
