@@ -106,7 +106,7 @@ case "$op" in
     do
       tfile=$export_dir/$t.txt
       [ -f "$tfile" ] || { echo "$cmd: $op: missing import file: $tfile" >&2; exit 1; }
-      $trace pfctl -a "$anchor" -t "$t" -T add $(grep '^#' "$tfile")
+      $trace pfctl -a "$anchor" -t "$t" -T add $(grep '^ *[^# ]' "$tfile")
     done
     ;;
   ls)
