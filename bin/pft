@@ -6,6 +6,8 @@
 
 set -ue
 
+: ${PFT_EXPORT:=$HOME/var/pf/tables}
+
 trace=
 [ -t 2 ] && trace=set-x
 
@@ -32,13 +34,44 @@ done
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-# no op: list tables
-[ $# = 0 ] && exec $trace pfctl -a "$anchor" -sT
-
+# no op: default to "ls"
+[ $# = 0 ] && set -- ls
 op=$1
 shift
 
+_pft()
+{ $trace env "PFT_EXPORT=$PFT_EXPORT" "$0" -a "$anchor" ${1+"$@"}
+}
+
 case "$op" in
+  cat)
+    for t
+    do
+      $trace pfctl -a "$anchor" -t "$t" -T show
+    done
+    ;;
+  export)
+    while [ $# -gt 0 ]
+    do
+      case $1 in
+        -d)     PFT_EXPORT=$2; shift ;;
+        --)     shift; break ;;
+        -?*)    echo "$cmd: $op: unrecognised option: $1" >&2
+                badopts=1
+                ;;
+        *)      break ;;
+      esac
+      shift
+    done
+    [ $badopts ] && { echo "$usage" >&2; exit 2; }
+    [ $# -gt 0 ] || set -- $( _pft ls )
+    export_dir=$PFT_EXPORT/$anchor
+    [ -d "$export_dir/." ] || $trace mkdir -p -- "$export_dir"
+    for t
+    do
+      _pft cat "$t" >"$export_dir/$t.txt"
+    done
+    ;;
   ls)
     if [ $# -gt 0 ]
     then
