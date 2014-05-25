@@ -17,6 +17,25 @@ from cs.obj import O
 from cs.threads import locked_property
 from cs.urlutils import URL
 
+# constants related to headers
+
+# header filenames
+TVHDR = 'header.tvwiz';
+RADHDR = 'header.radwiz';
+
+# header data offsets and sizes
+HDR_MAIN_OFF = 0
+HDR_MAIN_SIZE = 1564
+HDR_MAX_OFFSETS = 8640
+HDR_OFFSETS_OFF = HDR_MAIN_SIZE
+HDR_OFFSETS_SIZE = 8 * (HDR_MAX_OFFSETS - 1)
+HDR_BOOKMARKS_OFF = 79316
+HDR_BOOKMARKS_SZ = 20 + 64 * 8
+HDR_EPISODE_OFF = 79856
+HDR_EPISODE_SZ = 1 + 255
+HDR_EXTINFO_OFF = 80114
+HDR_EXTINFO_SZ = 2 + 1024
+
 def main(argv):
   args = list(argv)
   cmd = os.path.basename(args.pop(0))
