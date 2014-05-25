@@ -55,10 +55,11 @@ case "$op" in
     done
     ;;
   export)
+    export_dir=$PFT_EXPORT/$anchor
     while [ $# -gt 0 ]
     do
       case $1 in
-        -d)     PFT_EXPORT=$2; shift ;;
+        -d)     export_dir=$2; shift ;;
         --)     shift; break ;;
         -?*)    echo "$cmd: $op: unrecognised option: $1" >&2
                 badopts=1
@@ -69,7 +70,6 @@ case "$op" in
     done
     [ $badopts ] && { echo "$usage" >&2; exit 2; }
     [ $# -gt 0 ] || set -- $( _pft ls )
-    export_dir=$PFT_EXPORT/$anchor
     [ -d "$export_dir/." ] || $trace mkdir -p -- "$export_dir"
     for t
     do
@@ -79,10 +79,11 @@ case "$op" in
     ;;
   import)
     mode=add    # vs "replace"
+    export_dir=$PFT_EXPORT/$anchor
     while [ $# -gt 0 ]
     do
       case $1 in
-        -d)     PFT_EXPORT=$2; shift ;;
+        -d)     export_dir=$2; shift ;;
         -m)     mode=$2; shift
                 case "$mode" in
                   add|replace) ;;
@@ -101,7 +102,6 @@ case "$op" in
     done
     [ $# = 0 ] && { echo "$cmd: $op: missing table names" >&2; badopts=1; }
     [ $badopts ] && { echo "$usage" >&2; exit 2; }
-    export_dir=$PFT_EXPORT/$anchor
     for t
     do
       tfile=$export_dir/$t.txt
