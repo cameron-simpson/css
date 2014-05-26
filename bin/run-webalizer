@@ -9,8 +9,9 @@ set -ue
 : ${TMPDIR:=/tmp}
 
 cmd=`basename "$0"`
-usage="Usage: $cmd -d reportdir [-x] template-webalizer-config Setting=value... /path/to/logfile..."
+usage="Usage: $cmd -d reportdir [-v] [-x] template-webalizer-config Setting=value... /path/to/logfile..."
 
+quiet=1
 trace=
 tplt=/home/webalizer/webalizer.conf.tplt
 wd=`pwd`
@@ -22,6 +23,7 @@ while [ $# -gt 0 ]
 do
   case "$1" in
     -d) reportdir=$2; shift ;;
+    -v) quiet= ;;
     -x) trace=set-x ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
@@ -87,8 +89,8 @@ fi
 conf=$reportdir/webalizer.conf
 imagesdir=$reportdir
 
-[ -d "$reportdir/." ] || $trace mkdir "$reportdir"
-[ -d "$reportdir/hist/." ] || $trace mkdir "$reportdir/hist"
+[ -d "$reportdir/." ] || set-x mkdir "$reportdir"
+[ -d "$reportdir/hist/." ] || set-x mkdir "$reportdir/hist"
 hist=$reportdir/hist/webalizer.hist
 if [ -s "$hist" ]
 then  incr=yes
@@ -100,10 +102,10 @@ echo "IncrementalName $reportdir/hist/webalizer.current" >>"$patchfile"
 echo "Incremental $incr" >>"$patchfile"
 
 >>"$conf"
-cat "$patchfile"
-ls -ld "$conf"
+[ $quiet ] || cat "$patchfile"
+[ $quiet ] || ls -ld "$conf"
 $trace patch-config -I -o "$conf" "$tplt" "$patchfile"
-ls -ld "$conf"
+[ $quiet ] || ls -ld "$conf"
 tmplog=$reportdir/tmp.log.gz
 $trace merge-apache-logs -M "$@" | gzip -v -9 >$tmplog || :
 $trace webalizer -c "$conf" "$tmplog"
