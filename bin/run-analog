@@ -70,21 +70,19 @@ do
   shift
 done
 
-# gather up logfiles or directories
-while [ $# -gt 0 ]
+# remaining arguments are logfiles or directories containing logfiles
+tmplog=$reportdir/tmp.log.gz
+for path
 do
-  case "$1" in
-    /*)
-      path=$1
-      if [ -d "$path/." ]
-      then find "$path/." -type f -exec printf 'LOGFILE "%s"\n' {} ';' >>"$patchfile"
-      else printf 'LOGFILE "%s"\n' "$path" >>"$patchfile"
-      fi
-      ;;
-    *)break ;;
-  esac
-  shift
-done
+  path=$1
+  if [ -d "$path/." ]
+  then find "$path/." -type f
+  else printf '%s\n' "$path"
+  fi
+done \
+| xxargs merge-apache-logs -M \
+| gzip -v -9 >"$tmplog"
+printf 'LOGFILE "%s"\n' "$tmplog" >>"$patchfile"
 
 [ $# = 0 ] || { echo "$cmd: unrecognised arguments: $*" >&2; badopts=1; }
 
@@ -101,6 +99,7 @@ echo "IMAGEDIR $imagesdir" >>"$patchfile"
 cat "$patchfile"
 $trace patch-config -o "$conf" "$tplt" "$patchfile"
 if [ $doit ]
-then  $trace analog "+g$conf"
+then  $trace analog "+g$conf" || xit=1
 else  echo SKIP analog "+g$conf"
 fi
+$trace rm "$tmplog"
