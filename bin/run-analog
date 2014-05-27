@@ -84,8 +84,6 @@ done \
 | gzip -v -9 >"$tmplog"
 printf 'LOGFILE "%s"\n' "$tmplog" >>"$patchfile"
 
-[ $# = 0 ] || { echo "$cmd: unrecognised arguments: $*" >&2; badopts=1; }
-
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 conf=$reportdir/analog.conf
