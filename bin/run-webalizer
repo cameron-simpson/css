@@ -107,6 +107,6 @@ echo "Incremental $incr" >>"$patchfile"
 $trace patch-config -I -o "$conf" "$tplt" "$patchfile"
 [ $quiet ] || ls -ld "$conf"
 tmplog=$reportdir/tmp.log.gz
-$trace merge-apache-logs -M "$@" | gzip -v -9 >"$tmplog" || :
+$trace merge-apache-logs -M "$@" | gzip -9 >"$tmplog" || :
 $trace webalizer -c "$conf" "$tmplog"
 $trace rm "$tmplog"
