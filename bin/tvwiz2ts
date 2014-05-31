@@ -41,7 +41,7 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-outfile=$(dirname "$tvwizdir")/$(basename "$tvwizdir" .tvwiz).mp2ts
+outfile=$(dirname "$tvwizdir")/$(basename "$tvwizdir" .tvwiz).ts
 if [ -e "$outfile" ]
 then
   echo "$cmd: output file already exists: $outfile" >&2
