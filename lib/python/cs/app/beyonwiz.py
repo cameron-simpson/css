@@ -178,6 +178,8 @@ class TVWiz(O):
         output.write(buf)
 
 class WizPnP(O):
+  ''' Class to access a pre-T3 beyonwiz over HTTP.
+  '''
 
   def __init__(self, host, port=None):
     if port is None:
