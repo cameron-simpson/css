@@ -12,9 +12,10 @@ import sys
 import os
 import tempfile
 import unittest
-from cs.logutils import setup_logging, Pfx, info, warning, error, D
+from cs.logutils import setup_logging, Pfx, info, warning, error, D, X
 from cs.mailutils import ismaildir, message_addresses, Message
 from cs.nodedb import NodeDB, Node, NodeDBFromURL
+from cs.lex import get_identifier
 import cs.sh
 from cs.threads import locked_property
 from cs.py3 import StringTypes, ustr
@@ -223,21 +224,34 @@ def edit_group(MDB, group):
       rexp = group[1:]
     R = re.compile(rexp, re.I)
     As = [ A for A in MDB.ADDRESSes if R.search(A.formatted) ]
+    Gs = []
   else:
     As = [ A for A in MDB.ADDRESSes if group in A.GROUPs ]
-  return edit_groupness(MDB, As)
+    Gs = [ G for G in MDB.GROUPs if group in G.GROUPs ]
+  return edit_groupness(MDB, As, Gs)
 
-def edit_groupness(MDB, addresses):
-  ''' Modify the group memberships of the supplied addresses.
-      Removed addresses are not modified.
+def edit_groupness(MDB, addresses, subgroups):
+  ''' Modify the group memberships of the supplied addresses and groups.
+      Removed addresses or groups are not modified.
   '''
   with Pfx("edit_groupness()"):
+    Gs = sorted( set(subgroups),
+                 ( lambda G1, G2: cmp(G1.name, G2.name) )
+               )
     As = sorted( set(addresses),
                  ( lambda A1, A2: cmp(A1.realname.lower(), A2.realname.lower()) ),
                )
     with tempfile.NamedTemporaryFile(suffix='.txt') as T:
       with Pfx(T.name):
         with codecs.open(T.name, "w", encoding="utf-8") as ofp:
+          # present groups first
+          for G in Gs:
+            supergroups = sorted( set(G.GROUPs),
+                                  ( lambda G1, G2: cmp(G1.name, G2.name) )
+                                )
+            line = u'%-15s @%s\n' % (",".join(supergroups), G.name)
+            ofp.write(line)
+          # present addresses next
           for A in As:
             groups = sorted(set(A.GROUPs))
             af = A.formatted
@@ -262,6 +276,15 @@ def edit_groupness(MDB, addresses):
               line = line.rstrip()
               groups, addrtext = line.split(None, 1)
               groups = [ group for group in groups.split(',') if group ]
+              if addrtext.startswith('@'):
+                # presume single group name
+                groupname, offset = get_identifier(addrtext, 1)
+                if offset < len(addrtext):
+                  warning("invalid @groupname: %r", addrtext)
+                else:
+                  MDB.make( ('GROUP', groupname) ).GROUPs = groups
+                continue
+              # otherwise, address list on RHS
               As = set()
               with Pfx(addrtext):
                 for realname, addr in getaddresses((addrtext,)):
