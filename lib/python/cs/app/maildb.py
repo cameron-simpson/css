@@ -132,6 +132,20 @@ def main(argv, stdin=None):
                 else:
                   error("unknown abbreviation")
                   xit = 1
+            # generate other aliases automatically to aid mutt reverse_name behaviour
+            if mutt_aliases:
+              for A in MDB.ADDRESSes:
+                auto_alias = A.realname.strip()
+                if auto_alias:
+                  names = auto_alias.lower().split()
+                  for i in range(len(names)):
+                    name = names[i]
+                    if not name.isalpha():
+                      name = ''.join( [ c for c in name if c.isalpha() ] )
+                      names[i] = name
+                  auto_alias = '.'.join(names)
+                  if auto_alias not in abbrevs:
+                    print('alias', auto_alias, A.formatted)
         elif op == 'list-groups':
           try:
             opts, argv = getopt(argv, 'AG')
@@ -528,7 +542,7 @@ class _MailDB(NodeDB):
 
   @locked_property
   def address_groups(self):
-    ''' Compute the address_group sets, a mapping of GOUP names to a
+    ''' Compute the address_group sets, a mapping of GROUP names to a
         set of A.name.lower().
         Return the mapping.
     '''
