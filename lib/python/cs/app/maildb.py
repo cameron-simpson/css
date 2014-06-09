@@ -134,6 +134,7 @@ def main(argv, stdin=None):
                   xit = 1
             # generate other aliases automatically to aid mutt reverse_name behaviour
             if mutt_aliases:
+              auto_aliases = {}
               for A in MDB.ADDRESSes:
                 auto_alias = A.realname.strip()
                 if auto_alias:
@@ -145,7 +146,9 @@ def main(argv, stdin=None):
                       names[i] = name
                   auto_alias = '.'.join(names)
                   if auto_alias not in abbrevs:
-                    print('alias', auto_alias, A.formatted)
+                    auto_aliases[auto_alias] = A.formatted
+              for auto_alias in sorted(auto_aliases.keys()):
+                print('alias', auto_alias, auto_aliases[auto_alias])
         elif op == 'list-groups':
           try:
             opts, argv = getopt(argv, 'AG')
