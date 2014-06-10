@@ -136,7 +136,8 @@ def main(argv, stdin=None):
             if mutt_aliases:
               alias_names = set(abbrevs.keys())
               auto_aliases = {}
-              for A in MDB.ADDRESSes:
+              As = sorted(MDB.ADDRESSes, key=lambda a: a.name)
+              for A in As:
                 auto_alias = A.realname.strip()
                 if auto_alias:
                   names = auto_alias.lower().split()
