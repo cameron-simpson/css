@@ -132,8 +132,9 @@ def main(argv, stdin=None):
                 else:
                   error("unknown abbreviation")
                   xit = 1
-            # generate other aliases automatically to aid mutt reverse_name behaviour
+            # generate other aliases automatically to aid mutt's reverse_alias=yes behaviour
             if mutt_aliases:
+              alias_names = set(abbrevs.keys())
               auto_aliases = {}
               for A in MDB.ADDRESSes:
                 auto_alias = A.realname.strip()
@@ -144,9 +145,14 @@ def main(argv, stdin=None):
                     if not name.isalpha():
                       name = ''.join( [ c for c in name if c.isalpha() ] )
                       names[i] = name
-                  auto_alias = '.'.join(names)
-                  if auto_alias not in abbrevs:
-                    auto_aliases[auto_alias] = A.formatted
+                  auto_alias_base = '.'.join(names)
+                  auto_alias = auto_alias_base
+                  n = 1
+                  while auto_alias in alias_names:
+                    n += 1
+                    auto_alias = auto_alias_base + str(n)
+                  auto_aliases[auto_alias] = A.formatted
+                  alias_names.add(auto_alias)
               for auto_alias in sorted(auto_aliases.keys()):
                 print('alias', auto_alias, auto_aliases[auto_alias])
         elif op == 'list-groups':
