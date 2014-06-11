@@ -446,6 +446,7 @@ def cmd_mount(args):
   if not os.path.isdir(mountpoint):
     error("%s: mountpoint is not a directory", mountpoint)
     return 1
+  S = defaults.S
   E = S.namei(args[0]+'/')
   if not E.isdir:
     error("%s: dirref - expected directory, not file", dirref)
