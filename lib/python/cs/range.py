@@ -157,14 +157,35 @@ class Range(object):
       return False
     return True
 
+  def slices(self, start=None, end=None):
+    ''' Return an iterable of (inside, [low,high]) covering the gaps and spans in this Range.
+        If `start` is omitted, start at the minimum of 0 and the
+        lowest span in the Range.
+        If `end` is omitted, use the maximum span in the Range.
+        `inside` is true for spans and false for gaps.
+    '''
+    spans = self._spans
+    if start is None:
+      start = min(0, spans[0][0] if spans else 0)
+    if end is None:
+      end = max(start, spans[-1][1] if spans else start)
+    for span in spans:
+      if start < span[0]:
+        yield False, [start, span[0]]
+      yield True, list(span)
+      start = span[1]
+    if start < end:
+      yield False, [start, end]
+
   def dual(self, start=None, end=None):
     ''' Return an iterable of the spans not in this range.
         If `start` is omitted, start at the minimum of 0 and the
         lowest span in the Range.
         If `end` is omitted, use the maximum span in the Range.
     '''
-    # TODO: implement this!
-    raise NotImplementedError
+    for inside, span in self.slices(start=start, end=end):
+      if not inside:
+        yield span
 
   def issubset(self, other):
     ''' Test that self is a subset of other.
