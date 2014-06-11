@@ -26,9 +26,13 @@ def spans(items):
       `items`. Example:
         spans([1,2,3,7,8,11,5]) == [ [1,4], [7:9], [11:12], [5:6] ]
   '''
-  if type(items) is Range:
-    # quick version for a Range
-    for span in items._spans:
+  # see if the object has a .spans() method
+  try:
+    item_spans = items.spans()
+  except AttributeError:
+    pass
+  else:
+    for span in item_spans:
       yield span
     return
 
