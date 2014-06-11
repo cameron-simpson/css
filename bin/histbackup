@@ -567,5 +567,5 @@ exit
 #
 # =head1 SEE ALSO
 #
-# histbackup-prune(1cs), linktree(1cs), rsync(1), ssh(1), cp(1), cpdir(1cs)
+# histbackup-prune(1cs), linktree(1cs), rsync(1), ssh(1), cp(1), cpdir(1cs), crontab(1), crontab(5)
 #

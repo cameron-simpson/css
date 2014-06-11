@@ -1,0 +1,102 @@
+#!/usr/bin/python
+#
+# Keep best instances of lines.
+# Deliberately Python 2.4 compatible because I use this on RedHat RHEL5.
+#       - Cameron Simpson <cs@zip.com.au>
+#
+
+import sys
+import os
+import os.path
+from getopt import getopt, GetoptError
+
+usage = "Usage: %s [-Fsep] {lowest|highest} vcolnum kcolnum[,kcolnum...] [files...]"
+
+def main(argv):
+  cmd = os.path.basename(argv.pop(0))
+  badopts = False
+  sep = None
+  vcol = None
+  kcols = None
+  try:
+    opts, argv = getopt(argv, 'F:')
+  except GetoptError, e:
+    print >>sys.stderr, "%s: %s" % (cmd, e)
+    badopts = True
+  else:
+    for opt, arg in opts:
+      if opt == '-F':
+        sep = arg
+      else:
+        raise RuntimeError("%s: unsupported option: %s" % (cmd, opt))
+  if not argv:
+    print >>sys.stderr, "%s: missing {lowest|highest}" % (cmd,)
+    badopts = True
+  else:
+    mode = argv.pop(0)
+    if mode == 'lowest':
+      def value_func(line):
+        return -int(line.split(sep)[vcol])
+    elif mode == 'highest':
+      def value_func(line):
+        return int(line.split(sep)[vcol])
+    else:
+      print >>sys.stderr, "%s: bad mode, expected lowest or highest" % (cmd,)
+      badopts = True
+  if not argv:
+    print >>sys.stderr, "%s: missing vcol" % (cmd,)
+    badopts = True
+  else:
+    vcol = int(argv.pop(0)) - 1
+  if not argv:
+    print >>sys.stderr, "%s: missing kcols" % (cmd,)
+  else:
+    kcols = [ int(k)-1 for k in argv.pop(0).split(',') ]
+    if len(kcols) == 1:
+      kcol = kcols[0]
+      def key_func(line):
+        return line.split(sep)[kcol]
+    else:
+      def key_func(line):
+        fields = line.split(sep)
+        return tuple( [ fields[k] for k in kcols ] )
+  if badopts:
+    print >>sys.stderr, usage % (cmd,)
+    return 2
+  if not argv:
+    argv = ('-',)
+  def lines_func(files):
+    for filename in files:
+      if filename == '-':
+        for line in sys.stdin:
+          yield line
+      else:
+        fp = open(filename)
+        for line in fp:
+          yield line
+        fp.close()
+  for bestline in best(lines_func(argv), key_func, value_func):
+    print bestline,
+  return 0
+
+def best(lines, key_func, value_func):
+  ''' Process lines, yield the lines with the maximum value for its key.
+  '''
+  keys = []
+  values = {}
+  linemap = {}
+  for line in lines:
+    key = key_func(line)
+    value = value_func(line)
+    if key not in linemap:
+      keys.append(key)
+      linemap[key] = line
+      values[key] = value
+    elif value > values[key]:
+      linemap[key] = line
+      values[key] = value
+  for key in keys:
+    yield linemap[key]
+
+if __name__ == '__main__':
+  sys.exit(main(sys.argv))

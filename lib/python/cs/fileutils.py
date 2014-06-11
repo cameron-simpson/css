@@ -573,6 +573,19 @@ def shortpath(path, environ=None, prefixes=None):
       return subst + path[len(prefix):]
   return path
 
+def longpath(path, environ=None, prefixes=None):
+  ''' Return `path` with prefixes and environment variables substituted.
+      The converse of shortpath().
+  '''
+  if prefixes is None:
+    prefixes = DEFAULT_SHORTEN_PREFIXES
+  for prefix, subst in prefixes:
+    if path.startswith(subst):
+      path = prefix + path[len(subst):]
+      break
+  path = envsub(path, environ)
+  return path
+
 class Pathname(str):
   ''' Subclass of str presenting convenience properties useful for
       format strings related to file paths.

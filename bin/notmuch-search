@@ -9,6 +9,7 @@ set -ue
 
 doscreen=
 dothreads=
+subopts=
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [-t] notmuch-search-terms...
