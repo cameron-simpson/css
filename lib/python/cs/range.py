@@ -89,7 +89,7 @@ class Range(object):
     self._spans = []
 
   def spans(self):
-    ''' Return an interable of (start, end) tuples.
+    ''' Return an interable of [start, end].
     '''
     for span in self._spans:
       yield list(span)
