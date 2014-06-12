@@ -178,7 +178,7 @@ class Range(object):
       yield False, [start, end]
 
   def dual(self, start=None, end=None):
-    ''' Return an iterable of the spans not in this range.
+    ''' Return an iterable of the gaps (spans not in this Range).
         If `start` is omitted, start at the minimum of 0 and the
         lowest span in the Range.
         If `end` is omitted, use the maximum span in the Range.
@@ -190,7 +190,7 @@ class Range(object):
   def issubset(self, other):
     ''' Test that self is a subset of other.
     '''
-    # TODO: handle ranges specially
+    # TODO: handle Ranges specially
     for x in self:
       if x not in other:
         return False
