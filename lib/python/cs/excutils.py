@@ -164,8 +164,9 @@ def LogExceptions(conceal=False):
   ''' Wrapper of NoExceptions which reports exceptions and optionally
       suppresses them.
   '''
-  from cs.logutils import exception
+  from cs.logutils import exception, X
   def handler(exc_type, exc_value, tb):
+    X("LogException: exc_value=%s", exc_value)
     exception("EXCEPTION: %s", exc_value)
     return conceal
   return NoExceptions(handler)
