@@ -22,7 +22,7 @@ from subprocess import Popen, PIPE
 from time import sleep
 from threading import Lock, Thread
 from urllib import quote, unquote
-from urllib2 import HTTPError, URLError, build_opener, HTTPBasicAuthHandler
+from urllib2 import HTTPError, URLError, build_opener, HTTPBasicAuthHandler, HTTPCookieProcessor
 try:
   import xml.etree.cElementTree as ElementTree
 except ImportError:
