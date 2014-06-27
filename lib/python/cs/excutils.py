@@ -48,7 +48,7 @@ def noexc(func):
       which I have had abort otherwise sensible code.
   '''
   def noexc_wrapper(*args, **kwargs):
-    from cs.logutils import exception, D
+    from cs.logutils import exception, X
     try:
       return func(*args, **kwargs)
     except Exception as e:
@@ -56,7 +56,7 @@ def noexc(func):
         exception("exception calling %s(%s, **(%s))", func.__name__, args, kwargs)
       except Exception as e:
         try:
-          D("exception calling %s(%s, **(%s)): %s", func.__name__, args, kwargs, e)
+          X("exception calling %s(%s, **(%s)): %s", func.__name__, args, kwargs, e)
         except Exception:
           pass
   noexc_wrapper.__name__ = 'noexc(%s)' % (func.__name__,)
@@ -68,6 +68,7 @@ def noexc_gen(func):
       My primary use case is wrapping generators chained in a pipeline,
       as in cs.later.Later.pipeline.
   '''
+  from cs.logutils import exception, X
   def noexc_gen_wrapper(*args, **kwargs):
     try:
       it = iter(func(*args, **kwargs))
@@ -76,7 +77,7 @@ def noexc_gen(func):
         exception("exception calling %s(*%s, **(%s)): %s", func.__name__, args, kwargs, e)
       except Exception as e2:
         try:
-          D("exception calling %s(*%s, **(%s)): %s", func.__name__, args, kwargs, e)
+          X("exception calling %s(*%s, **(%s)): %s", func.__name__, args, kwargs, e)
         except Exception:
           pass
       return
@@ -90,7 +91,7 @@ def noexc_gen(func):
           exception("exception calling next(%s(*%s, **(%s))): %s", func.__name__, args, kwargs, e)
         except Exception as e2:
           try:
-            D("exception calling next(%s(*%s, **(%s))): %s", func.__name__, args, kwargs, e)
+            X("exception calling next(%s(*%s, **(%s))): %s", func.__name__, args, kwargs, e)
           except Exception:
             pass
         return
@@ -177,6 +178,19 @@ def logexc(func):
       return func(*a, **kw)
   logexc_wrapper.__name__ = 'logexc(%s)' % (func.__name__,)
   return logexc_wrapper
+
+def logexc_gen(genfunc):
+  def logexc_gen_wrapper(*a, **kw):
+    with LogExceptions():
+      it = genfunc(*a, **kw)
+      while True:
+        try:
+          item = next(it)
+        except StopIteration:
+          return
+        yield item
+  logexc_gen_wrapper.__name__ = 'logexc_gen(%s)' % (genfunc.__name__,)
+  return logexc_gen_wrapper
 
 def try_LogExceptions(e, conceal):
   # optionally fire off an exception, used in testing
