@@ -178,6 +178,20 @@ def logexc(func):
   logexc_wrapper.__name__ = 'logexc(%s)' % (func.__name__,)
   return logexc_wrapper
 
+def try_LogExceptions(e, conceal):
+  # optionally fire off an exception, used in testing
+  with LogExceptions(conceal=conceal):
+    if e:
+      raise e
+
+def try_logexc(e):
+  # optionally fire off an exception, used in testing
+  @logexc
+  def f(e):
+    if e:
+      raise e
+  f(e)
+
 if __name__ == '__main__':
   import cs.excutils_tests
   cs.excutils_tests.selftest(sys.argv)
