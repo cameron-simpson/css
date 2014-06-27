@@ -1336,25 +1336,26 @@ def action_divert_pipe(func_name, action, offset, do_trace):
     scoped = True
     @logexc_gen
     def function(items):
-      P = items[0]
-      pipeline = None
-      first = True
-      with P.later.more_capacity(1):
-        for item in items:
-          debug("pipe: sel_function=%r, item=%r", sel_function, item)
-          status = sel_function(item)
-          debug("pipe: sel_function=%r, item=%r: status=%r", sel_function, item, status)
-          if status:
-            if pipeline is None:
-              pipeQ = IterableQueue()
-              pipeline = item.pipe_through(pipe_name, pipeQ)
-            pipeQ.put(item)
-          else:
-            yield item
-        if pipeline:
-          pipeQ.close()
-          for item in pipeline.outQ:
-            yield item
+      if items:
+        P = items[0]
+        pipeline = None
+        first = True
+        with P.later.more_capacity(1):
+          for item in items:
+            debug("pipe: sel_function=%r, item=%r", sel_function, item)
+            status = sel_function(item)
+            debug("pipe: sel_function=%r, item=%r: status=%r", sel_function, item, status)
+            if status:
+              if pipeline is None:
+                pipeQ = IterableQueue()
+                pipeline = item.pipe_through(pipe_name, pipeQ)
+              pipeQ.put(item)
+            else:
+              yield item
+          if pipeline:
+            pipeQ.close()
+            for item in pipeline.outQ:
+              yield item
 
     function = logexc(function)
     function.__name__ = "pipe_func(%r)" % (action,)
