@@ -29,14 +29,14 @@ except ImportError:
   import xml.etree.ElementTree as ElementTree
 from cs.debug import thread_dump, ifdebug
 from cs.env import envsub
-from cs.excutils import noexc, noexc_gen, logexc, LogExceptions
+from cs.excutils import noexc, noexc_gen, logexc, logexc_gen, LogExceptions
 from cs.fileutils import file_property, mkdirn
 from cs.later import Later, FUNC_ONE_TO_ONE, FUNC_ONE_TO_MANY, FUNC_SELECTOR, FUNC_MANY_TO_MANY
 from cs.lex import get_identifier, get_other_chars
 import cs.logutils
 from cs.logutils import setup_logging, logTo, Pfx, info, debug, error, warning, exception, trace, pfx_iter, D, X
 from cs.mappings import MappingChain, SeenSet
-from cs.queues import NullQueue, NullQ
+from cs.queues import NullQueue, NullQ, IterableQueue
 from cs.seq import seq
 from cs.threads import locked, locked_property
 from cs.urlutils import URL, isURL, NetrcHTTPPasswordMgr
@@ -1334,28 +1334,29 @@ def action_divert_pipe(func_name, action, offset, do_trace):
     # gather all items and feed to an instance of the specified pipeline
     func_sig = FUNC_MANY_TO_MANY
     scoped = True
+    @logexc_gen
     def function(items):
-      pipe_items = []
-      for item in items:
-        debug("pipe: sel_function=%r, item=%r", sel_function, item)
-        status = sel_function(item)
-        debug("pipe: sel_function=%r, item=%r: status=%r", sel_function, item, status)
-        if status:
-          debug("pipe: pipe_items.append(%r)", item)
-          pipe_items.append(item)
-        else:
-          D("pipe: not selected, yield straight to output: %r", item)
-          yield item
-      debug("pipe: pipe_items=%r", pipe_items)
-      if pipe_items:
-        P = pipe_items[0][0]
-        with P.later.more_capacity(1):
-          pipeline = P.pipe_through(pipe_name, pipe_items)
-          debug("pipe: pipe_though(%r) => %r", pipe_name, pipeline)
-          for item in pipeline.outQ:
-            debug("pipe: postpipe: yield %r", item)
+      P = items[0]
+      pipeline = None
+      first = True
+      with P.later.more_capacity(1):
+        for item in items:
+          debug("pipe: sel_function=%r, item=%r", sel_function, item)
+          status = sel_function(item)
+          debug("pipe: sel_function=%r, item=%r: status=%r", sel_function, item, status)
+          if status:
+            if pipeline is None:
+              pipeQ = IterableQueue()
+              pipeline = item.pipe_through(pipe_name, pipeQ)
+            pipeQ.put(item)
+          else:
             yield item
-      debug("pipe: processed pipe_items %r", pipe_items)
+        if pipeline:
+          pipeQ.close()
+          for item in pipeline.outQ:
+            yield item
+
+    function = logexc(function)
     function.__name__ = "pipe_func(%r)" % (action,)
   else:
     raise ValueError("expected \"divert\" or \"pipe\", got func_name=%r" % (func_name,))
