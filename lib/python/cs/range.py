@@ -185,6 +185,7 @@ class Range(object):
     assert(i == 0 or _spans[i-1].end <= start)
     # check current span
     assert(i == len(_spans) or _spans[i].start >= start)
+    raise RuntimeError("INCOMPLETE")
 
   def slices(self, start=None, end=None):
     ''' Return an iterable of (inside, [low,high]) covering the gaps and spans in this Range.
