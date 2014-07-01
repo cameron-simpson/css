@@ -192,17 +192,20 @@ class Range(object):
         lowest span in the Range.
         If `end` is omitted, use the maximum span in the Range.
         `inside` is true for spans and false for gaps.
+        TODO: make this efficient if `start` isn't near the start of the _spans.
     '''
     spans = self._spans
     if start is None:
-      start = min(0, spans[0].start if spans else 0)
+      start = min(0, spans[0].start) if spans else 0
     if end is None:
-      end = max(start, spans[-1].end if spans else start)
+      end = max(start, spans[-1].end) if spans else start
     for span in spans:
       if start < span.start:
         yield False, [start, span.start]
       yield True, span
       start = span.end
+      if start >= end:
+        break
     if start < end:
       yield False, Span(start, end)
 
