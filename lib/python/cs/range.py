@@ -201,7 +201,7 @@ class Range(object):
       end = max(start, spans[-1].end) if spans else start
     for span in spans:
       if start < span.start:
-        yield False, [start, span.start]
+        yield False, Span(start, span.start)
       yield True, span
       start = span.end
       if start >= end:
