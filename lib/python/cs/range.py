@@ -203,6 +203,13 @@ class Range(object):
     for span in spans:
       if start < span.start:
         yield False, Span(start, span.start)
+        start = span.start
+        if start >= end:
+          break
+      if end < span.end:
+        yield True, Span(start, end)
+        start = end
+        break
       yield True, span
       start = span.end
       if start >= end:
