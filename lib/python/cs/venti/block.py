@@ -142,6 +142,49 @@ class _Block(object):
       if start < len(self):
         yield self, start, min(end, len(self))
 
+  def top_slices(self, start=None, end=None):
+    ''' Return an iterator yielding (Block, start, len) tuples representing the uppermost Blocks spanning `start`:`end`.
+	This originating use case is to support providing minimal
+	Block references required to assemble a new indirect Block
+	consisting of data from this Block comingled with updated
+	data without naively layering deeper levels of Block
+	indirection with every update phase.
+        The iterator may end early if the span exceeds the Block data.
+    '''
+    if start is None:
+      start = 0
+    elif start < 0:
+      raise ValueError("start must be >= 0, received: %r" % (start,))
+    if end is None:
+      end = len(self)
+    elif end < start:
+      raise ValueError("end must be >= start(%r), received: %r" % (start,end))
+    if self.indirect:
+      offset = 0        # the absolute index of the left edge of subblock B
+      for B in self.subblocks:
+        sublen = len(B)
+        subend = offset + sublen
+        if start <= offset:
+          if end >= subend:
+            yield B, 0, sublen
+          else:
+            for subslice in B.top_slices(start - offset, end - offset):
+              yield subslice
+        else:
+          # start > offset
+          if subend >= start:
+            # part of this Block overlaps the span
+            for subslice in B.top_slices(start - offset, end - offset):
+              yield subslice
+        # advance the offset to account for this subblock
+        offset = subend
+        if offset >= end:
+          break
+    else:
+      # a leaf Block
+      if start < len(self):
+        yield self, start, min(end, len(self))
+
   def all_data(self):
     ''' The entire data of this Block as a single bytes object.
     '''
