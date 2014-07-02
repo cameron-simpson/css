@@ -42,9 +42,14 @@ class ReadFile(RawIOBase):
 	read system call.
     '''
     if n == -1:
-      return self.readall()
-    for B, start, end in self.block.slices(self._offset, self._offset + n):
-      return B.data[start:end]
+      data = self.readall()
+    else:
+      data = ''
+      for B, start, end in self.block.slices(self._offset, self._offset + n):
+        data = B.data[start:end]
+        break
+    self._offset += len(data)
+    return data
 
   def readinto(self, b):
     nread = 0
@@ -52,6 +57,7 @@ class ReadFile(RawIOBase):
       Blen = end - start
       b[nread:nread+Blen] = B[start:end]
       nread += Blen
+    self._offset += nread
     return nread
 
 class WriteNewFile:
