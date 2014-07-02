@@ -152,6 +152,16 @@ class Range(object):
   def __len__(self):
     return sum( [ end-start for start, end in self._spans ] )
 
+  @property
+  def max(self):
+    ''' Return the maximum Span .end in the Range, or 0 if the Range is empty.
+    '''
+    spans = self._spans
+    if len(spans) > 0:
+      return spans[-1].end
+    else:
+      return 0
+
   def isempty(self):
     ''' Test if the Range is empty; it has no spans.
     '''
@@ -193,7 +203,7 @@ class Range(object):
     raise RuntimeError("INCOMPLETE")
 
   def slices(self, start=None, end=None):
-    ''' Return an iterable of (inside, [low,high]) covering the gaps and spans in this Range.
+    ''' Return an iterable of (inside, Span) covering the gaps and spans in this Range.
         If `start` is omitted, start at the minimum of 0 and the
         lowest span in the Range.
         If `end` is omitted, use the maximum span in the Range.
