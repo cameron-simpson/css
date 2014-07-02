@@ -142,12 +142,6 @@ class _Block(object):
       if start < len(self):
         yield self, start, min(end, len(self))
 
-  def copyto(self, fp):
-    ''' Copy all data to the specified file `fp`.
-    '''
-    for chunk in chunks:
-      fp.write(chunk)
-
   def all_data(self):
     ''' The entire data of this Block as a single bytes object.
     '''
