@@ -153,8 +153,8 @@ class Range(object):
     return sum( [ end-start for start, end in self._spans ] )
 
   @property
-  def max(self):
-    ''' Return the maximum Span .end in the Range, or 0 if the Range is empty.
+  def end(self):
+    ''' Return the end offset of the Range - the maximum Span .end or 0 if the Range is empty.
     '''
     spans = self._spans
     if len(spans) > 0:
