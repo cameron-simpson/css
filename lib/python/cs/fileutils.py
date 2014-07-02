@@ -4,7 +4,8 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
-from __future__ import with_statement, print_function
+from __future__ import with_statement, print_function, absolute_import
+from io import RawIOBase
 import errno
 from functools import partial
 import os
@@ -14,11 +15,14 @@ import sys
 from collections import namedtuple
 from contextlib import contextmanager
 import shutil
-from tempfile import NamedTemporaryFile
+from tempfile import TemporaryFile, NamedTemporaryFile
+from threading import RLock
 import time
 import unittest
 from cs.env import envsub
 from cs.logutils import error, Pfx, D
+from cs.range import Range
+from cs.threads import locked, locked_property
 from cs.timeutils import TimeoutError
 from cs.py3 import ustr
 
@@ -623,6 +627,65 @@ class Pathname(str):
 
   def shorten(self, environ=None, prefixes=None):
     return shortpath(self, environ=environ, prefixes=prefixes)
+
+class BackedFile(RawIOBase):
+  ''' A RawIOBase implementation that uses a backing file for initial data and writes new data to a front file.
+  '''
+
+  def __init__(self, back_file, front_file=None):
+    ''' Initialise the BackedFile using `back_file` for the backing data and `front_file` to the update data.
+    '''
+    self.back_file = back_file
+    self._front_file = front_file
+    self.front_range = Range()
+    self._offset = 0
+    self._lock = RLock()
+
+  @locked_property
+  def front_file(self):
+    return TemporaryFile()
+
+  def tell(self):
+    return self._offset
+
+  @locked
+  def readinto(self, b):
+    start = self._offset
+    end = start + len(b)
+    back_file = self.back_file
+    front_file = self.front_file
+    boff = 0
+    bspace = len(b)
+    for in_front, span in self.front_range.slices(start, end):
+      offset = span.start
+      size = span.size
+      if size > bspace:
+        size = bspace
+      data = bytearray(size)
+      if in_front:
+        front_file.seek(offset)
+        nread = front_file.readinto(data)
+        assert nread <= size
+      else:
+        back_file.seek(offset)
+        nread = back_file.readinto(data)
+        assert nread <= size
+      b[boff:boff+nread] = data[:nread]
+      boff += nread
+      if nread < size:
+        # short read
+        break
+    return boff
+
+  @locked
+  def write(self, b):
+    front_file = self.front_file
+    start = self._offset
+    front_file.seek(start)
+    written = front_file.write(b)
+    if written is not None:
+      self.front_range.add_span(start, start+written)
+    return written
 
 if __name__ == '__main__':
   import cs.fileutils_tests
