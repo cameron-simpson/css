@@ -115,6 +115,33 @@ class _Block(object):
     for leaf in self.leaves:
       yield leaf.data
 
+  def slices(self, start=None, end=None):
+    ''' Return an iterator yielding (Block, start, len) tuples representing the leaf data covering the supplied span `start`:`end`.
+        The iterator may end early if the span exceeds the Block data.
+    '''
+    if start is None:
+      start = 0
+    elif start < 0:
+      raise ValueError("start must be >= 0, received: %r" % (start,))
+    if end is None:
+      end = len(self)
+    elif end < start:
+      raise ValueError("end must be >= start(%r), received: %r" % (start,end))
+    if self.indirect:
+      offset = 0
+      for B in self.subblocks:
+        sublen = len(B)
+        if start < offset + sublen:
+          for subslice in B.slices(start - offset, end - offset):
+            yield subslice
+        offset += sublen
+        if offset >= end:
+          break
+    else:
+      # a leaf Block
+      if start < len(self):
+        yield self, start, min(end, len(self))
+
   def copyto(self, fp):
     ''' Copy all data to the specified file `fp`.
     '''
@@ -140,6 +167,7 @@ class _Block(object):
 class Block(_Block):
   ''' A direct block.
   '''
+
   def __init__(self, **kw):
     ''' Initialise a direct block, supplying data bytes or hashcode,
         but not both.
