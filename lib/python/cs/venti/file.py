@@ -13,9 +13,8 @@ from .meta import Meta
 from .blockify import blockFromFile
 from cs.queues import IterableQueue
 
-class ReadFile(RawIOBase):
-  ''' A read-only file interface supporting seek(), read(), readline(),
-      readlines() and tell() methods.
+class File(RawIOBase):
+  ''' A file interface based on io.RawIOBase.
   '''
   def __init__(self, block):
     self.isdir = False

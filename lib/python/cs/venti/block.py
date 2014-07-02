@@ -161,8 +161,8 @@ class _Block(object):
     '''
     if mode != 'rb':
       raise ValueError("unsupported open mode, require 'rb', got: %s", mode)
-    from cs.ventifile import ReadFile
-    return ReadFile(self)
+    from cs.ventifile import File
+    return File(self)
 
 class Block(_Block):
   ''' A direct block.

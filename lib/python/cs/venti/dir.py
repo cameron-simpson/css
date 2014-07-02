@@ -386,8 +386,8 @@ class Dir(Dirent):
   def open(self, name):
     ''' Open the entry named `name` as a readable file-like object.
     '''
-    from .file import ReadFile
-    return ReadFile(self[name].getBlock())
+    from .file import File
+    return File(self[name].getBlock())
 
   def mkdir(self, name):
     ''' Create a subdirectory named `name`, return the Dirent.
