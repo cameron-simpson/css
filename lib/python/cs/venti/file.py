@@ -11,11 +11,13 @@ from threading import Thread
 from cs.logutils import Pfx, info
 from .meta import Meta
 from .blockify import blockFromFile
+from cs.fileutils import BackedFile
 from cs.queues import IterableQueue
 
-class File(RawIOBase):
-  ''' A file interface based on io.RawIOBase.
+class BlockFile(RawIOBase):
+  ''' A read-only file interface to a Block based on io.RawIOBase.
   '''
+
   def __init__(self, block):
     self.isdir = False
     self.block = block
@@ -58,3 +60,19 @@ class File(RawIOBase):
       nread += Blen
     self._offset += nread
     return nread
+
+class File(BackedFile):
+  ''' A read/write file-like object based on cs.fileutils.BackedFile.
+      An initial Block is supplied for use as the backing data.
+      The .sync and .close methods return a new Block representing the commited data.
+  '''
+
+  def __init__(self, backing_block=None):
+    if backing_block is None:
+      backing_block = Block(data='')
+    self.backing_block = backing_block
+    BackedFile.__init__(BlockFile(backing_block))
+
+  def sync(self):
+    if self.front_range.isempty():
+      return self.backing_block
