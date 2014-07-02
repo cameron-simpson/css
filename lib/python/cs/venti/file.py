@@ -3,7 +3,8 @@
 # File interfaces.      - Cameron Simpson <cs@zip.com.au>
 #
 
-from __future__ import print_function
+from __future__ import print_function, absolute_import
+from io import RawIOBase
 import os
 import sys
 from threading import Thread
@@ -12,102 +13,46 @@ from .meta import Meta
 from .blockify import blockFromFile
 from cs.queues import IterableQueue
 
-class ReadFile(object):
+class ReadFile(RawIOBase):
   ''' A read-only file interface supporting seek(), read(), readline(),
       readlines() and tell() methods.
   '''
   def __init__(self, block):
     self.isdir = False
     self.block = block
-    self.__pos = 0
+    self._offset = 0
 
   def __len__(self):
     return len(self.block)
 
-  def seek(self,offset,whence=0):
+  def seek(self, offset, whence=0):
     if whence == 1:
       offset += self.tell()
     elif whence == 2:
       offset += len(self)
-    self.__pos = offset
+    self._offset = offset
 
   def tell(self):
-    return self.__pos
+    return self._offset
 
-  def readShort(self, maxlen=None):
-    for chunk in self.block.chunks(self.tell()):
-      if maxlen is not None and len(chunk) > maxlen:
-        chunk = chunk[:maxlen]
-      self.seek(len(chunk), 1)
-      return chunk
-    return ''
+  def read(self, n=-1):
+    ''' Read up to `n` bytes in one go.
+	Only bytes from the first subslice are returned, taking the
+	flavour of RawIOBase, which should only make one underlying
+	read system call.
+    '''
+    if n == -1:
+      return self.readall()
+    for B, start, end in self.block.slices(self._offset, self._offset + n):
+      return B.data[start:end]
 
-  def read(self, size=None):
-    opos=self.__pos
-    buf=''
-    while size is None or size > 0:
-      chunk=self.readShort()
-      if len(chunk) == 0:
-        break
-      if size is None:
-        buf+=chunk
-      elif size <= len(chunk):
-        buf+=chunk[:size]
-        size=0
-      else:
-        buf+=chunk
-        size-=len(chunk)
-
-    self.seek(opos+len(buf))
-    return buf
-
-  def readline(self,size=None):
-    opos=self.__pos
-    line=''
-    while size is None or size > 0:
-      chunk=self.readShort()
-      nlndx=chunk.find('\n')
-      if nlndx >= 0:
-        # there is a NL
-        if size is None or nlndx < size:
-          # NL in the available chunk
-          line+=chunk[:nlndx+1]
-        else:
-          # NL not available - ergo size not None and inside chunk
-          line+=chunk[:size]
-        break
-
-      if size is None or size >= len(chunk):
-        # we can suck in the whole chunk
-        line+=chunk
-        if size is not None:
-          size-=len(chunk)
-      else:
-        # take its prefix and quit
-        line+=chunk[:size]
-        break
-
-    self.seek(opos+len(line))
-    return line
-
-  def __iter__(self):
-    while True:
-      line=self.readline()
-      if len(line) == 0:
-        break
-      yield line
-
-  def readlines(self,sizehint=None):
-    lines=[]
-    byteCount=0
-    for line in self:
-      if len(line) == 0:
-        break
-      lines.append(line)
-      byteCount+=len(line)
-      if sizehint is not None and byteCount >= sizehint:
-        break
-    return lines
+  def readinto(self, b):
+    nread = 0
+    for B, start, end in self.block.slices(self._offset, self._offset + len(b)):
+      Blen = end - start
+      b[nread:nread+Blen] = B[start:end]
+      nread += Blen
+    return nread
 
 class WriteNewFile:
   ''' A File-like class that supplies only write, close, flush.
