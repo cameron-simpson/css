@@ -153,10 +153,13 @@ class _Block(object):
   def open(self, mode="rb"):
     ''' Open the block as a file.
     '''
-    if mode != 'rb':
-      raise ValueError("unsupported open mode, require 'rb', got: %s", mode)
-    from cs.ventifile import File
-    return File(self)
+    if mode == 'rb':
+      from .file import BlockFile
+      return BlockFile(self)
+    if mode == 'w+b':
+      from .file import File
+      return File(backing_block=self)
+    raise ValueError("unsupported open mode, expected 'rb' or 'w+b', got: %s", mode)
 
 class Block(_Block):
   ''' A direct block.
