@@ -24,7 +24,19 @@ localnets="127 192.168 172.16 10.0"
 cnames=$HOME/rc/dns/cnames
 host_conf=$HOME/rc/dns/unbound.conf-fleet
 outgoing_if=$( netstat -rn | awk '$1 == "default" { print $6 }' )
+if [ -z "$outgoing_if" ]
+then
+  echo "$cmd: no outbound interface" >&2
+  netstat -rn >&2
+  exit 1
+fi
 outgoing_ip=$( ifconfig "$outgoing_if" | sed -n 'y/	/ /; s/.* inet  *\([1-9][0-9.]*[0-9]\) .*/\1/p' )
+if [ -z "$outgoing_ip" ]
+then
+  echo "$cmd: no inet addr on interface $outgoing_if" >&2
+  ifconfig "$outgoing_if" >&2
+  exit 1
+fi
 
 # default upstream DNS servers
 [ $# -gt 0 ] || set -- $UNBOUND_DNS_UPSTREAM
