@@ -148,10 +148,10 @@ def filedata(fp, rsize=None, start=None, end=None):
     fp.seek(pos)
   while end is None or pos < end:
     if end is None:
-      rsize = 8192
+      toread = rsize
     else:
-      rsize = min(8192, end - pos)
-    data = fp.read(rsize)
+      toread = min(rsize, end - pos)
+    data = fp.read(toread)
     if len(data) == 0:
       break
     pos += len(data)
