@@ -25,9 +25,11 @@ class Blockifier(object):
       stored sequence.
   '''
 
-  def __init__(self):
+  def __init__(self, S=None):
+    if S is None:
+      S = defaults.S
     self.topBlock = None
-    self.S = defaults.S
+    self.S = S
     self.Q = IterableQueue()
     self.T = Thread(target=self._storeBlocks)
     self.T.start()
