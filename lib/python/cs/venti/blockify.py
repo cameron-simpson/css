@@ -134,19 +134,27 @@ def fileBlocks(fp, rsize=None, matchBlocks=None):
   for B in blocksOf(datachunks):
     yield B
 
-def filedata(fp, rsize=None):
+def filedata(fp, rsize=None, start=None, end=None):
   ''' A generator to yield chunks of data from a file.
       These chunks don't need to be preferred-edge aligned;
       blocksOf() does that.
   '''
   if rsize is None:
     rsize = 8192
+  if start is None:
+    pos = fp.tell()
   else:
-    assert rsize > 0
-  while True:
+    pos = start
+    fp.seek(pos)
+  while end is None or pos < end:
+    if end is None:
+      rsize = 8192
+    else:
+      rsize = min(8192, end - pos)
     data = fp.read(rsize)
     if len(data) == 0:
       break
+    pos += len(data)
     yield data
 
 def fullIndirectBlocks(blockSource):
