@@ -129,3 +129,7 @@ def filedata(fp, rsize=8192, start=None, end=None):
       break
     pos += len(data)
     yield data
+
+if __name__ == '__main__':
+  from cs.venti.file_tests import selftest
+  selftest(sys.argv)
