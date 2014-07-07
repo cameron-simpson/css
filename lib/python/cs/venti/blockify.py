@@ -183,7 +183,7 @@ def fullIndirectBlocks(blockSource):
       block = IndirectBlock(subblocks)
     yield block
 
-def blocksOf(dataSource, vocab=None):
+def blockify(dataSource, vocab=None):
   ''' Collect data strings from the iterable dataSource
       and yield data blocks with desirable boundaries.
   '''
