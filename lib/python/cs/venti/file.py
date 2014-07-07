@@ -8,9 +8,10 @@ from io import RawIOBase
 import os
 import sys
 from threading import Thread
+from cs.threads import locked
 from cs.logutils import Pfx, info
 from .meta import Meta
-from .blockify import blockFromFile
+from .blockify import top_block_for
 from cs.fileutils import BackedFile
 from cs.queues import IterableQueue
 
@@ -73,6 +74,58 @@ class File(BackedFile):
     self.backing_block = backing_block
     BackedFile.__init__(BlockFile(backing_block))
 
+  @locked
   def sync(self):
-    if self.front_range.isempty():
-      return self.backing_block
+    ''' Commit the current state to the Store and update the current top block.
+        Returns the new top Block.
+    '''
+    if not self.front_range.isempty():
+      # recompute the top Block from the current high level blocks
+      # discrad the current changes, not saved to the Store
+      self.backing_block = top_block_for(self.high_level_blocks())
+      self._discard_front_file()
+    return self.backing_block
+
+  @locked
+  def high_level_blocks(self):
+    ''' Return an iterator of new high level Blocks covering the current file data.
+    '''
+    for inside, span in self.range.slices(0, self.range.end):
+      if inside:
+        # blockify the new data and yield the top block
+        yield top_block_for(blockify(filedata(front_file,
+                                              start=span.start,
+                                              end=span.end)))
+      else:
+        # yield high level blocks and new partial Blocks
+        # from the old data
+        for B, start, end in backing_block.top_slices(start, end):
+          if start == 0 and end == len(B):
+            # an extant high level block
+            yield B
+          else:
+            # should be a new partial block
+            if B.indirect:
+              raise RuntimeError("got slice for partial Block %s start=%r end=%r but Block is indirect! should be a partial leaf" % (B, start, end))
+            yield Block(data=B[start:end])
+
+def filedata(fp, rsize=8192, start=None, end=None):
+  ''' A generator to yield chunks of data from a file.
+      These chunks don't need to be preferred-edge aligned;
+      blockify() does that.
+  '''
+  if start is None:
+    pos = fp.tell()
+  else:
+    pos = start
+    fp.seek(pos)
+  while end is None or pos < end:
+    if end is None:
+      toread = rsize
+    else:
+      toread = min(rsize, end - pos)
+    data = fp.read(toread)
+    if len(data) == 0:
+      break
+    pos += len(data)
+    yield data
