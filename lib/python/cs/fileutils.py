@@ -641,6 +641,11 @@ class BackedFile(RawIOBase):
     self._offset = 0
     self._lock = RLock()
 
+  @locked
+  def _discard_front_file(self):
+    self._front_file = None
+    self.front_range = Range()
+
   @locked_property
   def front_file(self):
     return TemporaryFile()
