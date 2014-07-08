@@ -24,11 +24,14 @@ class TestAll(unittest.TestCase):
 
   def testFile(self):
     # use this unit test as test data
-    with open(__file__) as testfp:
+    with open(__file__, "rb") as testfp:
       test_text = testfp.read()
     # an empty read-only file
     BF = BlockFile(Block(data=b''))
     self.assertEqual(b'', BF.read())
+    # an empty read/write file
+    F = File()
+    self.assertEqual(F.write(test_text), len(test_text))
 
 def selftest(argv):
   unittest.main(__name__, None, argv, failfast=True)
