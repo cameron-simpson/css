@@ -46,7 +46,7 @@ class BlockFile(RawIOBase):
     if n == -1:
       data = self.readall()
     else:
-      data = ''
+      data = b''
       for B, start, end in self.block.slices(self._offset, self._offset + n):
         data = B.data[start:end]
         break
