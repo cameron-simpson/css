@@ -10,10 +10,11 @@ import sys
 from threading import Thread
 from cs.threads import locked
 from cs.logutils import Pfx, info
-from .meta import Meta
-from .blockify import top_block_for
 from cs.fileutils import BackedFile
 from cs.queues import IterableQueue
+from .meta import Meta
+from .block import Block
+from .blockify import top_block_for
 
 class BlockFile(RawIOBase):
   ''' A read-only file interface to a Block based on io.RawIOBase.
@@ -70,9 +71,9 @@ class File(BackedFile):
 
   def __init__(self, backing_block=None):
     if backing_block is None:
-      backing_block = Block(data='')
+      backing_block = Block(data=b'')
     self.backing_block = backing_block
-    BackedFile.__init__(BlockFile(backing_block))
+    BackedFile.__init__(self, BlockFile(backing_block))
 
   @locked
   def sync(self):
