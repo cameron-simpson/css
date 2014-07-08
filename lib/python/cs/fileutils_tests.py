@@ -351,7 +351,11 @@ class Test(unittest.TestCase):
     bfp.seek(0)
     bfp_text = bfp.read()
     self._eq(backing_text, bfp_text, "backing_text vs bfp_text")
+    bfp.seek(0)
+    bfp_leading_text = bfp.read(512)
+    self._eq(backing_text[:512], bfp_leading_text, "leading 512 bytes of backing_text vs bfp_leading_text")
     bfp.close()
+    backing_fp.close()
 
 
 def selftest(argv):
