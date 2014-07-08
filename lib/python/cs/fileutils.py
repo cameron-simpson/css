@@ -9,6 +9,7 @@ from io import RawIOBase
 import errno
 from functools import partial
 import os
+from os import SEEK_CUR, SEEK_END, SEEK_SET
 import os.path
 import errno
 import sys
@@ -20,7 +21,7 @@ from threading import RLock
 import time
 import unittest
 from cs.env import envsub
-from cs.logutils import error, Pfx, D
+from cs.logutils import error, Pfx, D, X
 from cs.range import Range
 from cs.threads import locked, locked_property
 from cs.timeutils import TimeoutError
@@ -654,6 +655,20 @@ class BackedFile(RawIOBase):
     return self._offset
 
   @locked
+  def seek(self, pos, whence=SEEK_SET):
+    if whence == SEEK_SET:
+      self._offset = pos
+    elif whence == SEEK_CUR:
+      self._offset += pos
+    elif whence == SEEK_END:
+      endpos = self._back_file.seek(0, SEEK_END)
+      if self.front_range is not None:
+        endpos = max(back_end, self.front_range.end())
+      self._offset = endpos
+    else:
+      raise ValueError("unsupported whence value %r" % (whence,))
+
+  @locked
   def readinto(self, b):
     start = self._offset
     end = start + len(b)
@@ -670,13 +685,13 @@ class BackedFile(RawIOBase):
       if in_front:
         front_file.seek(offset)
         nread = front_file.readinto(data)
-        assert nread <= size
       else:
         back_file.seek(offset)
         nread = back_file.readinto(data)
-        assert nread <= size
+      assert nread <= size
       b[boff:boff+nread] = data[:nread]
       boff += nread
+      self._offset = offset + nread
       if nread < size:
         # short read
         break

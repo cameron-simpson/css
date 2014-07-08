@@ -15,7 +15,8 @@ import unittest
 from tempfile import NamedTemporaryFile
 from .fileutils import compare, rewrite, lockfile, Pathname, \
                         file_property, make_file_property, \
-                        make_files_property
+                        make_files_property, \
+                        BackedFile
 from .timeutils import TimeoutError, sleep
 from .logutils import D
 
@@ -342,8 +343,19 @@ class Test(unittest.TestCase):
                           ):
         self._eq(format(P, spec), expected, "format(%r, %r)" % (P, spec))
 
+  def test_BackedFile(self):
+    backing_filename = __file__
+    backing_fp = open(backing_filename, "rb")
+    backing_text = backing_fp.read()
+    bfp = BackedFile(backing_fp)
+    bfp.seek(0)
+    bfp_text = bfp.read()
+    self._eq(backing_text, bfp_text, "backing_text vs bfp_text")
+    bfp.close()
+
+
 def selftest(argv):
-  unittest.main(__name__, None, argv)
+  unittest.main(__name__, None, argv, failfast=True)
 
 if __name__ == '__main__':
   selftest(sys.argv)
