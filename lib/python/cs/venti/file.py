@@ -9,12 +9,12 @@ import os
 import sys
 from threading import Thread
 from cs.threads import locked
-from cs.logutils import Pfx, info
+from cs.logutils import Pfx, info, X
 from cs.fileutils import BackedFile
 from cs.queues import IterableQueue
 from .meta import Meta
 from .block import Block
-from .blockify import top_block_for
+from .blockify import top_block_for, blockify
 
 class BlockFile(RawIOBase):
   ''' A read-only file interface to a Block based on io.RawIOBase.
@@ -82,7 +82,7 @@ class File(BackedFile):
     '''
     if not self.front_range.isempty():
       # recompute the top Block from the current high level blocks
-      # discrad the current changes, not saved to the Store
+      # discard the current changes, not saved to the Store
       self.backing_block = top_block_for(self.high_level_blocks())
       self._discard_front_file()
     return self.backing_block
@@ -91,16 +91,16 @@ class File(BackedFile):
   def high_level_blocks(self):
     ''' Return an iterator of new high level Blocks covering the current file data.
     '''
-    for inside, span in self.range.slices(0, self.range.end):
+    for inside, span in self.front_range.slices(0, self.front_range.end):
       if inside:
         # blockify the new data and yield the top block
-        yield top_block_for(blockify(filedata(front_file,
+        yield top_block_for(blockify(filedata(self.front_file,
                                               start=span.start,
                                               end=span.end)))
       else:
         # yield high level blocks and new partial Blocks
         # from the old data
-        for B, start, end in backing_block.top_slices(start, end):
+        for B, start, end in self.backing_block.top_slices(span.start, span.end):
           if start == 0 and end == len(B):
             # an extant high level block
             yield B
