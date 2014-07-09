@@ -3,147 +3,134 @@
 # File interfaces.      - Cameron Simpson <cs@zip.com.au>
 #
 
-from __future__ import print_function
+from __future__ import print_function, absolute_import
+from io import RawIOBase
 import os
 import sys
 from threading import Thread
-from cs.logutils import Pfx, info
-from .meta import Meta
-from .blockify import blockFromFile
+from cs.threads import locked
+from cs.logutils import Pfx, info, X
+from cs.fileutils import BackedFile
 from cs.queues import IterableQueue
+from .meta import Meta
+from .block import Block
+from .blockify import top_block_for, blockify
 
-class ReadFile(object):
-  ''' A read-only file interface supporting seek(), read(), readline(),
-      readlines() and tell() methods.
+class BlockFile(RawIOBase):
+  ''' A read-only file interface to a Block based on io.RawIOBase.
   '''
+
   def __init__(self, block):
     self.isdir = False
     self.block = block
-    self.__pos = 0
+    self._offset = 0
 
   def __len__(self):
     return len(self.block)
 
-  def seek(self,offset,whence=0):
+  def seek(self, offset, whence=0):
     if whence == 1:
       offset += self.tell()
     elif whence == 2:
       offset += len(self)
-    self.__pos = offset
+    self._offset = offset
 
   def tell(self):
-    return self.__pos
+    return self._offset
 
-  def readShort(self, maxlen=None):
-    for chunk in self.block.chunks(self.tell()):
-      if maxlen is not None and len(chunk) > maxlen:
-        chunk = chunk[:maxlen]
-      self.seek(len(chunk), 1)
-      return chunk
-    return ''
-
-  def read(self, size=None):
-    opos=self.__pos
-    buf=''
-    while size is None or size > 0:
-      chunk=self.readShort()
-      if len(chunk) == 0:
+  def read(self, n=-1):
+    ''' Read up to `n` bytes in one go.
+	Only bytes from the first subslice are returned, taking the
+	flavour of RawIOBase, which should only make one underlying
+	read system call.
+    '''
+    if n == -1:
+      data = self.readall()
+    else:
+      data = b''
+      for B, start, end in self.block.slices(self._offset, self._offset + n):
+        data = B.data[start:end]
         break
-      if size is None:
-        buf+=chunk
-      elif size <= len(chunk):
-        buf+=chunk[:size]
-        size=0
-      else:
-        buf+=chunk
-        size-=len(chunk)
+    self._offset += len(data)
+    return data
 
-    self.seek(opos+len(buf))
-    return buf
+  def readinto(self, b):
+    nread = 0
+    for B, start, end in self.block.slices(self._offset, self._offset + len(b)):
+      Blen = end - start
+      b[nread:nread+Blen] = B[start:end]
+      nread += Blen
+    self._offset += nread
+    return nread
 
-  def readline(self,size=None):
-    opos=self.__pos
-    line=''
-    while size is None or size > 0:
-      chunk=self.readShort()
-      nlndx=chunk.find('\n')
-      if nlndx >= 0:
-        # there is a NL
-        if size is None or nlndx < size:
-          # NL in the available chunk
-          line+=chunk[:nlndx+1]
-        else:
-          # NL not available - ergo size not None and inside chunk
-          line+=chunk[:size]
-        break
-
-      if size is None or size >= len(chunk):
-        # we can suck in the whole chunk
-        line+=chunk
-        if size is not None:
-          size-=len(chunk)
-      else:
-        # take its prefix and quit
-        line+=chunk[:size]
-        break
-
-    self.seek(opos+len(line))
-    return line
-
-  def __iter__(self):
-    while True:
-      line=self.readline()
-      if len(line) == 0:
-        break
-      yield line
-
-  def readlines(self,sizehint=None):
-    lines=[]
-    byteCount=0
-    for line in self:
-      if len(line) == 0:
-        break
-      lines.append(line)
-      byteCount+=len(line)
-      if sizehint is not None and byteCount >= sizehint:
-        break
-    return lines
-
-class WriteNewFile:
-  ''' A File-like class that supplies only write, close, flush.
-      flush() forces any unstored data to the store.
-      close() flushes all data and returns a BlockRef for the whole file.
+class File(BackedFile):
+  ''' A read/write file-like object based on cs.fileutils.BackedFile.
+      An initial Block is supplied for use as the backing data.
+      The .sync and .close methods return a new Block representing the commited data.
   '''
-  def __init__(self):
-    self.__sink=IterableQueue(1)
-    self.__topRef=Q1()
-    self.__closed=False
-    self.__drain=Thread(target=self.__storeBlocks,kwargs={'S':S})
-    self.__drain.start()
-    atexit.register(self.__cleanup)
 
-  def __cleanup(self):
-    if not self.__closed:
-      self.close()
+  def __init__(self, backing_block=None):
+    if backing_block is None:
+      backing_block = Block(data=b'')
+    self.backing_block = backing_block
+    BackedFile.__init__(self, BlockFile(backing_block))
 
-  def write(self,data):
-    self.__sink.put(data)
+  @locked
+  def sync(self):
+    ''' Commit the current state to the Store and update the current top block.
+        Returns the new top Block.
+    '''
+    if not self.front_range.isempty():
+      # recompute the top Block from the current high level blocks
+      # discard the current changes, not saved to the Store
+      self.backing_block = top_block_for(self.high_level_blocks())
+      self._discard_front_file()
+    return self.backing_block
 
-  def flush(self):
-    # TODO: flush unimplemented, should get an intermediate topblockref
-    return None
+  @locked
+  def high_level_blocks(self):
+    ''' Return an iterator of new high level Blocks covering the current file data.
+    '''
+    for inside, span in self.front_range.slices(0, self.front_range.end):
+      if inside:
+        # blockify the new data and yield the top block
+        yield top_block_for(blockify(filedata(self.front_file,
+                                              start=span.start,
+                                              end=span.end)))
+      else:
+        # yield high level blocks and new partial Blocks
+        # from the old data
+        for B, start, end in self.backing_block.top_slices(span.start, span.end):
+          if start == 0 and end == len(B):
+            # an extant high level block
+            yield B
+          else:
+            # should be a new partial block
+            if B.indirect:
+              raise RuntimeError("got slice for partial Block %s start=%r end=%r but Block is indirect! should be a partial leaf" % (B, start, end))
+            yield Block(data=B[start:end])
 
-  def close(self):
-    assert not self.__closed
-    self.__closed=True
-    self.__sink.close()
-    return self.__topRef.get()
-
-  def __storeBlocks(self):
-    self.__topRef.put(topIndirectBlock(blocksOf(self.__sink)))
-
-class WriteOverFile:
-  ''' A File-like class that overwrites an existing
+def filedata(fp, rsize=8192, start=None, end=None):
+  ''' A generator to yield chunks of data from a file.
+      These chunks don't need to be preferred-edge aligned;
+      blockify() does that.
   '''
-  def __init__(self):
-    raise NotImplementedError
+  if start is None:
+    pos = fp.tell()
+  else:
+    pos = start
+    fp.seek(pos)
+  while end is None or pos < end:
+    if end is None:
+      toread = rsize
+    else:
+      toread = min(rsize, end - pos)
+    data = fp.read(toread)
+    if len(data) == 0:
+      break
+    pos += len(data)
+    yield data
+
+if __name__ == '__main__':
+  from cs.venti.file_tests import selftest
+  selftest(sys.argv)

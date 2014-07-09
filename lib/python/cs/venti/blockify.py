@@ -25,16 +25,20 @@ class Blockifier(object):
       stored sequence.
   '''
 
-  def __init__(self):
+  def __init__(self, S=None):
+    if S is None:
+      S = defaults.S
     self.topBlock = None
-    self.S = defaults.S
+    self.S = S
     self.Q = IterableQueue()
     self.T = Thread(target=self._storeBlocks)
     self.T.start()
 
   def _storeBlocks(self):
+    ''' Thread to pull blocks from the queue and gather into a top block.
+    '''
     with self.S:
-      self.topBlock = topIndirectBlock(self.Q)
+      self.topBlock = top_block_for(self.Q)
 
   def add(self, data):
     ''' Add data, return Block hashcode.
@@ -53,101 +57,42 @@ class Blockifier(object):
     self.Q = None
     return self.topBlock
 
-def topIndirectBlock(blockSource):
+def top_block_for(blocks):
   ''' Return a top Block for a stream of Blocks.
   '''
-  blockSource = fullIndirectBlocks(blockSource)
+  blocks = indirect_blocks(blocks)
 
   # Fetch the first two indirect blocks from the generator.
   # If there is none, return a single empty direct block.
   # If there is just one, return it directly.
   # Otherwise there are at least two:
-  # replace the blockSource with another level of fullIndirectBlocks()
+  # replace the blocks with another level of indirect_blocks()
   # reading from the two fetched blocks and the tail of the current
-  # blockSource then lather, rinse, repeat.
+  # blocks then lather, rinse, repeat.
   #
   while True:
     try:
-      topblock = next(blockSource)
+      topblock = next(blocks)
     except StopIteration:
       # no blocks - return the empty block - no data
       return Block(data=b'')
 
     # we have a full IndirectBlock
-    # if there are more, replace our blockSource with
-    #   fullIndirectBlocks(topblock + nexttopblock + blockSource)
+    # if there are more, replace our blocks with
+    #   indirect_blocks(topblock + nexttopblock + blocks)
     try:
-      nexttopblock = next(blockSource)
+      nexttopblock = next(blocks)
     except StopIteration:
       # just one IndirectBlock - we're done
       return topblock
 
     # add a layer of indirection and repeat
-    debug("push new fullIndirectBlocks()")
-    blockSource = fullIndirectBlocks(chain( ( topblock, nexttopblock ),
-                                            blockSource ))
+    debug("push new indirect_blocks()")
+    blocks = indirect_blocks(chain( ( topblock, nexttopblock ), blocks ))
 
   raise RuntimeError("SHOULD NEVER BE REACHED")
 
-def blockFromFile(fp, rsize=None, matchBlocks=None):
-  ''' Return the top block spanning the data from the file `fp`,
-      open in binary mode.
-  '''
-  B = topIndirectBlock(fileBlocks(fp, rsize=rsize, matchBlocks=matchBlocks))
-  if ifdebug():
-    D("blockFromFile: B.span=%d, B.indirect=%s", B.span, B.indirect)
-    dump_block(B)
-  return B
-
-def fileBlocks(fp, rsize=None, matchBlocks=None):
-  ''' Yield Blocks containing the content of this file.
-      If rsize is not None, specifies the preferred read() size.
-      If matchBlocks is not None, specifies a source of Blocks for comparison.
-      This lets us store a file with reference to its previous version
-      without playing the "look for edges" game.
-  '''
-  data = None
-  if matchBlocks:
-    # fetch Blocks from the comparison file until a mismatch
-    for B in matchBlocks:
-      blen = B.span
-      if blen == 0:
-        continue
-      data = fp.read(blen)
-      if len(data) != blen:
-        error("read %d bytes, required %d bytes", len(data), Blen)
-      if len(data) == 0:
-        return
-      # compare hashcodes to avoid fetching data for B if we have its hash
-      if defaults.S.hash(data) == B.hashcode:
-        yield B
-        data = None
-        continue
-      break
-
-  # blockify the remaining data
-  datachunks = filedata(fp, rsize=rsize)
-  if data:
-    datachunks = chain([data], datachunks)
-  for B in blocksOf(datachunks):
-    yield B
-
-def filedata(fp, rsize=None):
-  ''' A generator to yield chunks of data from a file.
-      These chunks don't need to be preferred-edge aligned;
-      blocksOf() does that.
-  '''
-  if rsize is None:
-    rsize = 8192
-  else:
-    assert rsize > 0
-  while True:
-    data = fp.read(rsize)
-    if len(data) == 0:
-      break
-    yield data
-
-def fullIndirectBlocks(blockSource):
+def indirect_blocks(blocks):
   ''' A generator that yields full IndirectBlocks from an iterable
       source of Blocks, except for the last Block which need not
       necessarily be bundled into an IndirectBlock.
@@ -157,7 +102,7 @@ def fullIndirectBlocks(blockSource):
   # how many subblock refs will fit in a block: flags(1)+span(2)+hash
   ## TODO: // ?
   max_subblocks = int(MAX_BLOCKSIZE / (3+S.hashclass.HASHLEN_ENCODED))
-  for block in blockSource:
+  for block in blocks:
     if len(subblocks) >= max_subblocks:
       # overflow
       yield IndirectBlock(subblocks)
@@ -173,8 +118,8 @@ def fullIndirectBlocks(blockSource):
       block = IndirectBlock(subblocks)
     yield block
 
-def blocksOf(dataSource, vocab=None):
-  ''' Collect data strings from the iterable dataSource
+def blockify(data_chunks, vocab=None):
+  ''' Collect data strings from the iterable data_chunks
       and yield data blocks with desirable boundaries.
   '''
   if vocab is None:
@@ -185,7 +130,7 @@ def blocksOf(dataSource, vocab=None):
 
   # invariant: no block edge has been seen in buf based on the vocabulary
   #            the rolling hash has not been used yet
-  for data in dataSource:
+  for data in data_chunks:
     while len(data) > 0:
       # if buflen < MIN_BLOCKSIZE pad with stuff from data
       skip = MIN_BLOCKSIZE - buflen

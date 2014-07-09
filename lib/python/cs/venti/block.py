@@ -115,11 +115,75 @@ class _Block(object):
     for leaf in self.leaves:
       yield leaf.data
 
-  def copyto(self, fp):
-    ''' Copy all data to the specified file `fp`.
+  def slices(self, start=None, end=None):
+    ''' Return an iterator yielding (Block, start, len) tuples representing the leaf data covering the supplied span `start`:`end`.
+        The iterator may end early if the span exceeds the Block data.
     '''
-    for chunk in chunks:
-      fp.write(chunk)
+    if start is None:
+      start = 0
+    elif start < 0:
+      raise ValueError("start must be >= 0, received: %r" % (start,))
+    if end is None:
+      end = len(self)
+    elif end < start:
+      raise ValueError("end must be >= start(%r), received: %r" % (start,end))
+    if self.indirect:
+      offset = 0
+      for B in self.subblocks:
+        sublen = len(B)
+        if start < offset + sublen:
+          for subslice in B.slices(start - offset, end - offset):
+            yield subslice
+        offset += sublen
+        if offset >= end:
+          break
+    else:
+      # a leaf Block
+      if start < len(self):
+        yield self, start, min(end, len(self))
+
+  def top_slices(self, start=None, end=None):
+    ''' Return an iterator yielding (Block, start, len) tuples representing the uppermost Blocks spanning `start`:`end`.
+	This originating use case is to support providing minimal
+	Block references required to assemble a new indirect Block
+	consisting of data from this Block comingled with updated
+	data without naively layering deeper levels of Block
+	indirection with every update phase.
+        The iterator may end early if the span exceeds the Block data.
+    '''
+    if start is None:
+      start = 0
+    elif start < 0:
+      raise ValueError("start must be >= 0, received: %r" % (start,))
+    if end is None:
+      end = len(self)
+    elif end < start:
+      raise ValueError("end must be >= start(%r), received: %r" % (start,end))
+    if self.indirect:
+      offset = 0        # the absolute index of the left edge of subblock B
+      for B in self.subblocks:
+        sublen = len(B)
+        subend = offset + sublen
+        if start <= offset:
+          if end >= subend:
+            yield B, 0, sublen
+          else:
+            for subslice in B.top_slices(start - offset, end - offset):
+              yield subslice
+        else:
+          # start > offset
+          if subend >= start:
+            # part of this Block overlaps the span
+            for subslice in B.top_slices(start - offset, end - offset):
+              yield subslice
+        # advance the offset to account for this subblock
+        offset = subend
+        if offset >= end:
+          break
+    else:
+      # a leaf Block
+      if start < len(self):
+        yield self, start, min(end, len(self))
 
   def all_data(self):
     ''' The entire data of this Block as a single bytes object.
@@ -132,14 +196,18 @@ class _Block(object):
   def open(self, mode="rb"):
     ''' Open the block as a file.
     '''
-    if mode != 'rb':
-      raise ValueError("unsupported open mode, require 'rb', got: %s", mode)
-    from cs.ventifile import ReadFile
-    return ReadFile(self)
+    if mode == 'rb':
+      from .file import BlockFile
+      return BlockFile(self)
+    if mode == 'w+b':
+      from .file import File
+      return File(backing_block=self)
+    raise ValueError("unsupported open mode, expected 'rb' or 'w+b', got: %s", mode)
 
 class Block(_Block):
   ''' A direct block.
   '''
+
   def __init__(self, **kw):
     ''' Initialise a direct block, supplying data bytes or hashcode,
         but not both.
