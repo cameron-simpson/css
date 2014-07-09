@@ -36,6 +36,8 @@ class Test_RWFile(unittest.TestCase, BackedFile_TestMethods):
     bfp = self.backed_fp
     B2 = bfp.sync()
     X("B2 = %s", B2)
+    self.assertEqual(B2, bfp.backing_block)
+    self.assertIsNone(bfp._front_file)
 
 def selftest(argv):
   unittest.main(__name__, None, argv, failfast=True)
