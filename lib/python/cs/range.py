@@ -165,7 +165,7 @@ class Range(object):
   def isempty(self):
     ''' Test if the Range is empty; it has no spans.
     '''
-    return len(self._spans) > 0
+    return len(self._spans) == 0
 
   def __contains__(self, x):
     ''' Test `x` to see if it is wholly contained in this Range.
