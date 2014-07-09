@@ -19,7 +19,7 @@ from .fileutils import compare, rewrite, lockfile, Pathname, \
                         make_files_property, \
                         BackedFile
 from .timeutils import TimeoutError, sleep
-from .logutils import D
+from .logutils import D, X
 
 class TestFileProperty(object):
   def __init__(self):
@@ -348,11 +348,16 @@ class Test_Misc(unittest.TestCase):
 
 class Test_BackedFile(unittest.TestCase):
 
-  def setUp(self):
-    self.backing_filename = __file__
+  def setUp(self, backing_filename=None):
+    if backing_filename is None:
+      backing_filename = __file__
+    self.backing_filename = backing_filename
     self.backing_fp = open(self.backing_filename, "rb")
+    self.backing_text = self.backing_fp.read()
+    self.backed_fp = BackedFile(self.backing_fp)
 
   def tearDown(self):
+    self.backed_fp.close()
     self.backing_fp.close()
 
   def _eq(self, a, b, opdesc):
@@ -363,9 +368,10 @@ class Test_BackedFile(unittest.TestCase):
     self.assertEqual(a, b, "%s: got %r, expected %r" % (opdesc, a, b))
 
   def test_BackedFile(self):
+    X("1")
     backing_fp = self.backing_fp
-    backing_text = backing_fp.read()
-    bfp = BackedFile(backing_fp)
+    backing_text = self.backing_text
+    bfp = self.backed_fp
     # test reading whole file
     bfp.seek(0)
     bfp_text = bfp.read()
