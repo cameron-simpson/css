@@ -12,7 +12,7 @@ from cs.py3 import Queue, raise3
 from cs.py.func import funcname
 import time
 from cs.debug import ifdebug, Lock, RLock, Thread, trace_caller, thread_dump
-from cs.excutils import noexc, noexc_gen, logexc, LogExceptions
+from cs.excutils import noexc, noexc_gen, logexc, logexc_gen, LogExceptions
 from cs.queues import IterableQueue, IterablePriorityQueue, PushQueue, \
                         NestingOpenCloseMixin, TimerQueue
 from cs.threads import AdjustableSemaphore, \
@@ -253,6 +253,7 @@ class _PipelinePushQueue(PushQueue):
     self.pipeline = pipeline
 
     # wrap func_iter to raise _busy while processing item
+    @logexc_gen
     def func_push(item):
       self.pipeline._busy.inc()
       try:
@@ -268,6 +269,7 @@ class _PipelinePushQueue(PushQueue):
     if func_final is not None:
       self.pipeline._busy.inc()
       func_final0 = func_final
+      @logexc
       def func_final():
         try:
           result = func_final0()
@@ -894,6 +896,7 @@ class Later(NestingOpenCloseMixin):
   def _defer_iterable(self, I, outQ):
     iterate = partial(next, iter(I))
 
+    @logexc
     def iterate_once():
       ''' Call `iterate`. Place the result on outQ.
           Close the queue at end of iteration or other exception.
