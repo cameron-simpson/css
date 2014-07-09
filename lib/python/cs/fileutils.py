@@ -707,6 +707,54 @@ class BackedFile(RawIOBase):
       self.front_range.add_span(start, start+written)
     return written
 
+class BackedFile_TestMethods(object):
+  ''' Mixin for testing subclasses of BackedFile.
+  '''
+
+  def _eq(self, a, b, opdesc):
+    ''' Convenience wrapper for assertEqual.
+    '''
+    ##if a == b:
+    ##  print("OK: %s: %r == %r" % (opdesc, a, b), file=sys.stderr)
+    self.assertEqual(a, b, "%s: got %r, expected %r" % (opdesc, a, b))
+
+  def test_BackedFile(self):
+    from random import randint
+    backing_text = self.backing_text
+    bfp = self.backed_fp
+    # test reading whole file
+    bfp.seek(0)
+    bfp_text = bfp.read()
+    self._eq(backing_text, bfp_text, "backing_text vs bfp_text")
+    # test reading first 512 bytes only
+    bfp.seek(0)
+    bfp_leading_text = bfp.read(512)
+    self._eq(backing_text[:512], bfp_leading_text, "leading 512 bytes of backing_text vs bfp_leading_text")
+    # test writing some data and reading it back
+    random_chunk = bytes( randint(0,255) for x in range(256) )
+    bfp.seek(512)
+    bfp.write(random_chunk)
+    # check that the front file has a single span of the right dimensions
+    ffp = bfp._front_file
+    fr = bfp.front_range
+    self.assertIsNotNone(ffp)
+    self.assertIsNotNone(fr)
+    self.assertEqual(len(fr._spans), 1)
+    self.assertEqual(fr._spans[0].start, 512)
+    self.assertEqual(fr._spans[0].end, 768)
+    # read the random data back from the front file
+    ffp.seek(512)
+    front_chunk = ffp.read(256)
+    self.assertEqual(random_chunk, front_chunk)
+    # read the random data back from the BackedFile
+    bfp.seek(512)
+    bfp_chunk = bfp.read(256)
+    self.assertEqual(bfp_chunk, random_chunk)
+    # read a chunk that overlaps the old data and the new data
+    bfp.seek(256)
+    overlap_chunk = bfp.read(512)
+    self.assertEqual(overlap_chunk, backing_text[256:512] + random_chunk)
+
 if __name__ == '__main__':
   import cs.fileutils_tests
   cs.fileutils_tests.selftest(sys.argv)
