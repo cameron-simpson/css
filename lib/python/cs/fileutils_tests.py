@@ -47,6 +47,8 @@ class TestFileProperty(object):
     return data
 
 class TestFilesProperty(object):
+  ''' Tests for watching multiple files.
+  '''
   def __init__(self):
     self._test1_paths = ('testfileprop1',)
     self._test1_lock = Lock()
@@ -71,7 +73,7 @@ class TestFilesProperty(object):
       data = fp.read()
     return (paths[0],), data
 
-class Test(unittest.TestCase):
+class Test_Misc(unittest.TestCase):
 
   def setUp(self):
     self.proppath = 'cs.fileutils_tests_tstprop'
@@ -343,6 +345,21 @@ class Test(unittest.TestCase):
                             ("{.abs}", os.path.abspath(path)),
                           ):
         self._eq(format(P, spec), expected, "format(%r, %r)" % (P, spec))
+
+class Test_BackedFile(unittest.TestCase):
+
+  def setUp(self):
+    pass
+
+  def tearDown(self):
+    pass
+
+  def _eq(self, a, b, opdesc):
+    ''' Convenience wrapper for assertEqual.
+    '''
+    ##if a == b:
+    ##  print("OK: %s: %r == %r" % (opdesc, a, b), file=sys.stderr)
+    self.assertEqual(a, b, "%s: got %r, expected %r" % (opdesc, a, b))
 
   def test_BackedFile(self):
     backing_filename = __file__
