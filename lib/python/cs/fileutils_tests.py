@@ -349,10 +349,11 @@ class Test_Misc(unittest.TestCase):
 class Test_BackedFile(unittest.TestCase):
 
   def setUp(self):
-    pass
+    self.backing_filename = __file__
+    self.backing_fp = open(self.backing_filename, "rb")
 
   def tearDown(self):
-    pass
+    self.backing_fp.close()
 
   def _eq(self, a, b, opdesc):
     ''' Convenience wrapper for assertEqual.
@@ -362,8 +363,7 @@ class Test_BackedFile(unittest.TestCase):
     self.assertEqual(a, b, "%s: got %r, expected %r" % (opdesc, a, b))
 
   def test_BackedFile(self):
-    backing_filename = __file__
-    backing_fp = open(backing_filename, "rb")
+    backing_fp = self.backing_fp
     backing_text = backing_fp.read()
     bfp = BackedFile(backing_fp)
     # test reading whole file
