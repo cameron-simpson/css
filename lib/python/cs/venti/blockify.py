@@ -122,6 +122,8 @@ def blockify(data_chunks, vocab=None):
   ''' Collect data strings from the iterable data_chunks
       and yield data blocks with desirable boundaries.
   '''
+  if isinstance(data_chunks, bytes):
+    data_chunks = (data_chunks,)
   if vocab is None:
     vocab = DFLT_VOCAB
 
