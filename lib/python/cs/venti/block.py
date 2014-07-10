@@ -131,8 +131,10 @@ class _Block(object):
       offset = 0
       for B in self.subblocks:
         sublen = len(B)
-        if start < offset + sublen:
-          for subslice in B.slices(start - offset, end - offset):
+        substart = max(0, start - offset)
+        subend = min(sublen, end - offset)
+        if substart < subend:
+          for subslice in B.slices(substart, subend):
             yield subslice
         offset += sublen
         if offset >= end:
@@ -163,21 +165,16 @@ class _Block(object):
       offset = 0        # the absolute index of the left edge of subblock B
       for B in self.subblocks:
         sublen = len(B)
-        subend = offset + sublen
-        if start <= offset:
-          if end >= subend:
+        substart = max(0, start - offset)
+        subend = min(sublen, end - offset)
+        if substart < subend:
+          if subend - substart == sublen:
             yield B, 0, sublen
           else:
-            for subslice in B.top_slices(start - offset, end - offset):
-              yield subslice
-        else:
-          # start > offset
-          if subend >= start:
-            # part of this Block overlaps the span
-            for subslice in B.top_slices(start - offset, end - offset):
+            for subslice in B.top_slices(substart, subend):
               yield subslice
         # advance the offset to account for this subblock
-        offset = subend
+        offset += sublen
         if offset >= end:
           break
     else:
