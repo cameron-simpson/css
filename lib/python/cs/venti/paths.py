@@ -48,16 +48,28 @@ def get_dirent(direntpath):
 
 def resolve(rootD, subpath, do_mkdir=False):
   ''' Descend from the Dir `rootD` via the path `subpath`.
-      Return the final Dir and the remaining component of subpath
-      (or None if there was no final component).
+      Return the final Dirent, its parent, and any unresolved path components.
   '''
+  if not rootD.isdir:
+    raise ValueError("resolve: not a Dir: %s" % (rootD,))
+  E = rootD
+  P = E.parent
   subpaths = [ s for s in subpath.split('/') if s ]
-  while len(subpaths) > 1:
-    name = subpath.pop(0)
-    rootD = rootD.mkdir(name) if do_mkdir else rootD.chdir1(name)
-  if subpaths:
-    return rootD, subpaths[0]
-  return rootD, None
+  while subpaths:
+    if not E.isdir:
+      raise ValueError("%s: not a Dir, remaining subpaths=%r" % (subpath, subpaths,))
+    name = subpath[0]
+    if name in E:
+      parent = E
+      E = E[name]
+      subpaths.pop(0)
+    elif do_mkdir:
+      parent = E
+      E = E.mkdir(name)
+      subpaths.pop(0)
+    else:
+      break
+  return E, parent, subpaths
 
 def walk(rootD, topdown=True):
   ''' An analogue to os.walk to descend a vt Dir tree.
