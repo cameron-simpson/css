@@ -140,7 +140,8 @@ exec 1>&3 3>&-
   echo
   patch-config -I -i "$dfltrc" <"$directives" \
   | grep '^[^#]' \
-  | sed 's/^ *hierarchy_stoplist/##&/'
+  | sed -e 's/^ *hierarchy_stoplist/##&/' \
+        -e 's/^ *strip_query_terms/##&/'
 ) \
 | $trace rewriteif -d "$rc"
 
