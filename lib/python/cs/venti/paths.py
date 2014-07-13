@@ -7,7 +7,7 @@
 import os
 from cs.inttypes import Flags
 from cs.logutils import Pfx, D, info, warning, error
-from .blockify import blockFromFile
+from .file import file_top_block
 from .dir import decode_Dirent_text, FileDirent
 
 CopyModes = Flags('delete', 'do_mkdir', 'ignore_existing', 'trust_size_mtime')
@@ -53,7 +53,7 @@ def resolve(rootD, subpath, do_mkdir=False):
   if not rootD.isdir:
     raise ValueError("resolve: not a Dir: %s" % (rootD,))
   E = rootD
-  P = E.parent
+  parent = E.parent
   subpaths = [ s for s in subpath.split('/') if s ]
   while subpaths:
     if not E.isdir:
@@ -172,7 +172,7 @@ def copy_in_file(filepath, name=None, rsize=None, matchBlocks=None):
     name = os.path.basename(filepath)
   with Pfx(filepath):
     with open(filepath, "rb") as sfp:
-      B = blockFromFile(sfp, rsize=rsize, matchBlocks=matchBlocks)
+      B = file_top_block(sfp, rsize=rsize, matchBlocks=matchBlocks)
       st = os.fstat(sfp.fileno())
       if B.span != st.st_size:
         error("MISMATCH: %s: B.span=%d, st_size=%d", filepath, B.span, st.st_size)
