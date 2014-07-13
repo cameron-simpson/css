@@ -255,6 +255,24 @@ def copy(obj, *a, **kw):
     setattr(obj2, attr, value)
   return obj2
 
+def obj_as_dict(o, attr_prefix=None, attr_match=None):
+  ''' Return a dictionary with keys mapping to `o` attributes.
+  '''
+  if attr_match is None:
+    if attr_prefix is None:
+      match = lambda attr: len(attr) > 0 and not attr.startswith('_')
+    else:
+      match = lambda attr: attr.startswith(attr_prefix)
+  elif attr_prefix is None:
+    match = attr_match
+  else:
+    raise ValueError("cannot specify both attr_prefix and attr_match")
+  d = {}
+  for attr in dir(o):
+    if match(attr):
+      d[attr] = getattr(o, attr)
+  return d
+
 class Proxy(object):
   ''' An extremely simple proxy object that passes all unmatched attribute accesses to the proxied object.
       Note that setattr and delattr work directly on the proxy, not the proxied object.
