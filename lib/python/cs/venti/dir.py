@@ -17,7 +17,7 @@ from .meta import Meta
 uid_nobody = -1
 gid_nogroup = -1
 
-# Directories (Dir, a subclass of dict) and directory entries (Dirent).
+# Directories (Dir, a subclass of dict) and directory entries (_Dirent).
 
 D_FILE_T = 0
 D_DIR_T = 1
@@ -56,16 +56,16 @@ def decodeDirent(data, offset):
   meta = None
   if flags & F_HASMETA:
     metadata, offset = get_bsdata(data, offset)
-    meta = Meta(metadata.decode())
+    metatext = metadata.decode()
   else:
-    meta = Meta()
+    metatext = None
   block, offset = decodeBlock(data, offset)
   if type_ == D_DIR_T:
-    E = Dir(name, meta=meta, parent=None, dirblock=block)
+    E = Dir(name, metatext=metatext, parent=None, dirblock=block)
   elif type_ == D_FILE_T:
-    E = FileDirent(name, meta=meta, block=block)
+    E = FileDirent(name, metatext=metatext, block=block)
   else:
-    E = _BasicDirent(type_, name, meta, block)
+    E = _Dirent(type_, name, metatext=metatext, block=block)
   return E, offset
 
 def decodeDirents(dirdata, offset=0):
@@ -75,51 +75,46 @@ def decodeDirents(dirdata, offset=0):
     E, offset = decodeDirent(dirdata, offset)
     if E.name is None or len(E.name) == 0:
       # FIXME: skip unnamed dirent
-      warning("skip unnamed Dirent")
+      warning("skip unnamed _Dirent")
       continue
     if E.name == '.' or E.name == '..':
       continue
     yield E
 
-class Dirent(object):
+class _Dirent(object):
   ''' Incomplete base class for Dirent objects.
   '''
 
-  def __init__(self, type_, name, meta=None):
+  def __init__(self, type_, name, metatext=None, block=None):
     if not isinstance(type_, int):
       raise TypeError("type_ is not an int: <%s>%r" % (type(type_), type_))
     if name is not None and not isinstance(name, str):
       raise TypeError("name is neither None nor str: <%s>%r" % (type(name), name))
-    if meta is None:
-      meta = Meta()
-    else:
-      if not isinstance(meta, Meta):
-        raise TypeError("meta is not a Meta: <%s>%r" % (type(meta), meta))
     self.type = type_
     self.name = name
-    self.meta = meta
+    self.meta = Meta(self)
+    if metatext is not None:
+      self.meta.update(metatext)
     self.d_ino = None
+    self._block = None
 
   def __str__(self):
     return self.textencode()
 
   def __repr__(self):
-    return "Dirent(%s, %s, %s)" % (D_type2str, self.name, self.meta)
+    return "_Dirent(%s, %s, %s)" % (D_type2str, self.name, self.meta)
 
   @property
   def isfile(self):
-    ''' Is this a file Dirent?
+    ''' Is this a file _Dirent?
     '''
     return self.type == D_FILE_T
 
   @property
   def isdir(self):
-    ''' Is this a directory Dirent?
+    ''' Is this a directory _Dirent?
     '''
     return self.type == D_DIR_T
-
-  def updateFromStat(self, st):
-    self.meta.updateFromStat(st)
 
   def encode(self, no_name=False):
     ''' Serialise the dirent.
@@ -187,7 +182,7 @@ class Dirent(object):
            + block.textencode()
            )
 
-  # TODO: make size a property?
+  # NB: not a property because it may change
   def size(self):
     return len(self.getBlock())
 
@@ -236,28 +231,16 @@ class Dirent(object):
 
     return (unixmode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime)
 
-class _BasicDirent(Dirent):
-  ''' A _BasicDirent represents a file or directory in the store.
-  '''
-  def __init__(self, type_, name, meta, block):
-    Dirent.__init__(self, type_, name, meta)
-    self.__block = block
-
   def getBlock(self):
     return self.__block
 
-  def __getitem__(self, name):
-    if self.isdir:
-      return self.asdir()[name]
-    raise KeyError("\"%s\" not in %s" % (name, self))
+class FileDirent(_Dirent):
 
-class FileDirent(_BasicDirent):
-
-  def __init__(self, name, meta, block):
-    _BasicDirent.__init__(self, D_FILE_T, name, meta, block)
+  def __init__(self, name, metatext=None, block=None):
+    _Dirent.__init__(self, D_FILE_T, name, metatext=metatext, block=block)
 
   def restore(self, path, makedirs=False, verbosefp=None):
-    ''' Restore this Dirent's file content to the name `path`.
+    ''' Restore this _Dirent's file content to the name `path`.
     '''
     with Pfx("FileDirent.restore(%s)", path):
       if verbosefp is not None:
@@ -292,20 +275,18 @@ class FileDirent(_BasicDirent):
       if self.meta.mtime is not None:
         os.utime(path, (st.st_atime, self.meta.mtime))
 
-class Dir(Dirent):
+class Dir(_Dirent):
   ''' A directory.
   '''
 
-  def __init__(self, name, meta=None, parent=None, dirblock=None):
+  def __init__(self, name, metatext=None, parent=None, dirblock=None):
     ''' Initialise this directory.
-        `meta`: meta information
+        `metatext`: meta information
         `parent`: parent Dir
         `dirblock`: pre-existing Block with initial Dir content
     '''
     self._lock = Lock()
-    if meta is None:
-      meta = Meta()
-    Dirent.__init__(self, D_DIR_T, name, meta)
+    _Dirent.__init__(self, D_DIR_T, name, metatext=metatext)
     self.parent = parent
     self.entries = {}
     if dirblock:
@@ -349,13 +330,13 @@ class Dir(Dirent):
     return self.entries[name]
 
   def __setitem__(self, name, E):
-    ''' Store a Dirent in the specified name slot.
+    ''' Store a _Dirent in the specified name slot.
     '''
     ##debug("<%s>[%s]=%s" % (self.name, name, E))
     if not self._validname(name):
       raise KeyError("invalid name: %s" % (name,))
-    if not isinstance(E, Dirent):
-      raise ValueError("E is not a Dirent: <%s>%r" % (type(E), E))
+    if not isinstance(E, _Dirent):
+      raise ValueError("E is not a _Dirent: <%s>%r" % (type(E), E))
     self.entries[name] = E
 
   def __delitem__(self, name):
@@ -390,7 +371,7 @@ class Dir(Dirent):
     return File(self[name].getBlock())
 
   def mkdir(self, name):
-    ''' Create a subdirectory named `name`, return the Dirent.
+    ''' Create a subdirectory named `name`, return the _Dirent.
     '''
     debug("<%s>.mkdir(%s)..." % (self.name, name))
     D = self[name] = Dir(name, parent=self)
