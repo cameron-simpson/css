@@ -573,6 +573,20 @@ class _MailDB(NodeDB):
       raise ValueError("disaster")
 
   @locked_property
+  def subgroups_map(self):
+    ''' Cached map of groupname to subgroup names.
+    '''
+    subgroups = {}
+    for G in self.GROUPs:
+      for parent_group in G.GROUPs:
+        subgroups.setdefault(parent_group, []).append(G.name)
+
+  def subgroups(self, group_name):
+    ''' Return a list of the subgroup names of the names group.
+    '''
+    return self.subgroups_map.get(group_name, [])
+
+  @locked_property
   def abbreviations(self):
     ''' Compute a mapping of abbreviations to their source address.
     '''
