@@ -322,7 +322,10 @@ def edit_groupness(MDB, addresses, subgroups):
                           ab = None
                     else:
                       ab = None
-                    A.abbreviation = ab
+                    try:
+                      A.abbreviation = ab
+                    except ValueError as e:
+                      error(e)
                     new_groups.setdefault(A, set()).update(groups)
                     realname = ustr(realname.strip())
                     if realname and realname != A.realname:
