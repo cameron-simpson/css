@@ -16,6 +16,7 @@ from cs.excutils import noexc, logexc
 from cs.logutils import exception, error, warning, debug, D, Pfx, PfxCallInfo
 from cs.seq import seq
 from cs.py3 import Queue, PriorityQueue, Queue_Full, Queue_Empty
+from cs.py.func import callmethod_if as ifmethod
 from cs.obj import O, Proxy
 
 def not_closed(func):
@@ -83,12 +84,12 @@ class NestingOpenCloseMixin(O):
       preexisting attribute _lock for locking.
   '''
 
-  def __init__(self, on_open=None, on_close=None, on_shutdown=None, proxy_type=None, finalise_later=False):
+  def __init__(self, proxy_type=None, finalise_later=False):
     ''' Initialise the NestingOpenCloseMixin state.
-        The following callback parameters may be supplied to aid tracking activity:
-        `on_open`: called on open with the post-increment open count
-        `on_close`: called on close with the pre-decrement open count
-        `on_shutdown`: called after calling self.shutdown()
+        Then takes makes use of the following methods if present:
+        `self.on_open(count)`: called on open with the post-increment open count
+        `self.on_close(count)`: called on close with the pre-decrement open count
+        `self.on_shutdown()`: called after calling self.shutdown()
 	`finalise_later`: do not notify the finalisation Condition
 	    on shutdown, require a separate call to .finalise().
 	    This is mode is useful for objects such as queues where
@@ -103,9 +104,6 @@ class NestingOpenCloseMixin(O):
     self.opened = False
     self._opens = 0
     ##self.closed = False # final _close() not yet called
-    self.on_open = on_open
-    self.on_close = on_close
-    self.on_shutdown = on_shutdown
     self._keep_open = None
     self._keep_open_until = None
     self._keep_open_poll_interval = 0.5
@@ -124,8 +122,7 @@ class NestingOpenCloseMixin(O):
     with self._lock:
       self._opens += 1
       count = self._opens
-    if self.on_open:
-      self.on_open(self, count)
+    ifmethod(self, 'on_open', a=(count,))
     return self._noc_proxy_type(self, name=name)
 
   def close(self):
@@ -164,11 +161,9 @@ class NestingOpenCloseMixin(O):
         error("%s: EXTRA CLOSE", self)
       self._opens -= 1
       count = self._opens
-    if self.on_close:
-      self.on_close(self, count)
+    ifmethod(self, 'on_close', a=(count,))
     if count == 0:
-      if self.on_shutdown:
-        self.on_shutdown(self)
+      ifmethod(self, 'on_shutdown')
       self.shutdown()
       if not self._finalise_later:
         self.finalise()
@@ -486,8 +481,7 @@ class NullQueue(NestingOpenCloseMixin):
       Calls to .get() raise Queue_Empty.
   '''
 
-  def __init__(self, blocking=False, name=None,
-               on_open=None, on_close=None, on_shutdown=None):
+  def __init__(self, blocking=False, name=None):
     ''' Initialise the NullQueue.
         `blocking`: if true, calls to .get() block until .shutdown().
           Its default is False. 
@@ -498,9 +492,7 @@ class NullQueue(NestingOpenCloseMixin):
     self.name = name
     self._lock = Lock()
     O.__init__(self)
-    NestingOpenCloseMixin.__init__(self,
-                                   on_open=on_open, on_close=on_close, on_shutdown=on_shutdown,
-                                   proxy_type=_Q_Proxy)
+    NestingOpenCloseMixin.__init__(self, proxy_type=_Q_Proxy)
     self.blocking = blocking
 
   def __str__(self):
