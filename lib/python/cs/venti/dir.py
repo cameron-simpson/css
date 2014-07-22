@@ -7,9 +7,10 @@ import sys
 from threading import Lock
 from cs.logutils import D, Pfx, debug, error, info, warning
 from cs.lex import hexify
+from cs.queues import NestingOpenCloseMixin
 from cs.seq import seq
 from cs.serialise import get_bs, get_bsdata, put_bs, put_bsdata
-from cs.threads import locked_property
+from cs.threads import locked, locked_property
 from . import totext, fromtext
 from .block import Block, decodeBlock
 from .meta import Meta
@@ -85,7 +86,7 @@ class _Dirent(object):
   ''' Incomplete base class for Dirent objects.
   '''
 
-  def __init__(self, type_, name, metatext=None, block=None):
+  def __init__(self, type_, name, metatext=None):
     if not isinstance(type_, int):
       raise TypeError("type_ is not an int: <%s>%r" % (type(type_), type_))
     if name is not None and not isinstance(name, str):
@@ -96,7 +97,6 @@ class _Dirent(object):
     if metatext is not None:
       self.meta.update(metatext)
     self.d_ino = None
-    self._block = None
 
   def __str__(self):
     return self.textencode()
@@ -231,13 +231,50 @@ class _Dirent(object):
 
     return (unixmode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime)
 
-  def getBlock(self):
-    return self.__block
-
-class FileDirent(_Dirent):
+class FileDirent(_Dirent, NestingOpenCloseMixin):
+  ''' A _Dirent subclass referring to a file.
+      If closed, ._block refers to the file content.
+      If open, ._open_file refers to the content.
+  '''
 
   def __init__(self, name, metatext=None, block=None):
-    _Dirent.__init__(self, D_FILE_T, name, metatext=metatext, block=block)
+    NestingOpenCloseMixin.__init__(self)
+    _Dirent.__init__(self, D_FILE_T, name, metatext=metatext)
+    self._open_file = None
+    self._block = block
+
+  @locked
+  def getBlock(self):
+    ''' Obtain the top level Block.
+        If open, sync the file to update ._block.
+    '''
+    if self._open_file is not None:
+      self._block = self._open_file.sync()
+    return self._block
+
+  @locked
+  def on_open(self, count):
+    ''' Set up ._open_file on first open.
+    '''
+    if count < 1:
+      raise ValueError("expected count >= 1, got: %r" % (count,))
+    if count == 1:
+      if self._open_file is None:
+        raise RuntimeError("first open, but ._open_file is not None: %r" % (self._open_file,))
+        self._open_file = File(self[name].getBlock())
+        self._block = None
+
+  @locked
+  def on_close(self, count):
+    ''' On final close, close ._open_file and save result as ._block.
+    '''
+    if count < 1:
+      raise ValueError("expected count >= 1, got: %r" % (count,))
+    if count == 1:
+      if self._block is not None:
+        error("final close, but ._block is not None; replacing with self._open_file.close(), was: %r", self._block)
+      self._block = self._open_file.close()
+      self._open_file = None
 
   def restore(self, path, makedirs=False, verbosefp=None):
     ''' Restore this _Dirent's file content to the name `path`.
@@ -293,7 +330,19 @@ class Dir(_Dirent):
       for E in decodeDirents(dirblock.data):
         E.parent = self
         self[E.name] = E
-    self._lock = Lock()
+    self._lock = RLock()
+
+  @locked
+  def getBlock(self):
+    ''' Return the top Block referring to an encoding of this Dir.
+        TODO: blockify the encoding? Probably desirable for big Dirs.
+    '''
+    names = sorted(self.keys())
+    data = b''.join( self[name].encode()
+                     for name in names
+                     if name != '.' and name != '..'
+                   )
+    return Block(data=data)
 
   def dirs(self):
     return [ name for name in self.keys() if self[name].isdir ]
@@ -345,16 +394,6 @@ class Dir(_Dirent):
     if name == '.' or name == '..':
       raise KeyError("refusing to delete . or ..: name=%s" % (name,))
     del self.entries[name]
-
-  def getBlock(self):
-    ''' Return the top Block referring to an encoding of this Dir.
-    '''
-    names = sorted(self.keys())
-    data = b''.join( self[name].encode()
-                     for name in names
-                     if name != '.' and name != '..'
-                   )
-    return Block(data=data)
 
   def rename(self, oldname, newname):
     ''' Rename entry `oldname` to entry `newname`.
