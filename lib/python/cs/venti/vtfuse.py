@@ -5,20 +5,35 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
-from fuse3 import FUSE, Operations, LoggingMixIn
-from errno import ENOSYS
-import sys
+from fuse import FUSE, FuseOSError, Operations, LoggingMixIn
+from functools import partial
+from collections import namedtuple
+import errno
 import os
-from cs.logutils import D as _D
-from cs.obj import O
+from os import O_CREAT, O_RDONLY, O_WRONLY, O_RDWR, O_APPEND, O_TRUNC
+import sys
+from threading import RLock
+from cs.debug import DummyMap, TracingObject
+from cs.logutils import X
+from cs.obj import O, obj_as_dict
+from cs.seq import Seq
+from cs.threads import locked
+from .block import Block
+from .dir import FileDirent
+from .file import File
+from .paths import resolve
+
+# records associated with an open file
+# TODO: no support for multiple links or path-=open renames
+OpenFile = namedtuple('OpenFile', ('path', 'E', 'fp'))
 
 def mount(mnt, E, S):
-  ''' Run a FUSE filesystem with Dirent and backing Store.
+  ''' Run a FUSE filesystem on `mnt` with Dirent `E` and backing Store `S`.
   '''
   FS = StoreFS(E, S)
-  FS.mount(mnt)
+  FS._mount(mnt)
 
-class StoreFS(LoggingMixIn, Operations, O):
+class StoreFS(Operations):
   ''' Class providing filesystem operations, suitable for passing
       to a FUSE() constructor.
   '''
@@ -29,118 +44,219 @@ class StoreFS(LoggingMixIn, Operations, O):
         dirent: the root directory reference
         S: the Store to hold data
     '''
+    O.__init__(self)
     if not E.isdir:
       raise ValueError("not dir Dir: %s" % (E,))
     self.S =S
     self.E = E
+    E.meta.update('u:rx,g:rx,rx')
+    self._lock = RLock()
+    self._inode_seq = Seq(start=1)
+    self._inode_map = {}
+    self._path_files = {}
+    self._file_handles = []
 
-  def mount(self, root):
+  def __str__(self):
+    return "<StoreFS>"
+
+  def __getattr__(self, attr):
+    # debug aid
+    X("StoreFS.__getattr__: attr=%r", attr)
+    def attrfunc(*a, **kw):
+      X("%s(a=%r,kw=%r)", attr, a, kw)
+      raise RuntimeError(attr)
+    X("%s ==> %s", attr, attrfunc)
+    return attrfunc
+
+  def _mount(self, root):
     ''' Attach this StoreFS to the specified path `root`.
         Return the controlling FUSE object.
     '''
-    return FUSE(self, root, foreground=True, nothreads=True)
+    return TracingObject(FUSE(self, root, foreground=True, nothreads=True, debug=True))
 
-  def resolve(self, path):
-    ''' Return (dirent, basename).
+  def _resolve(self, path):
+    ''' Call cs.venti.paths.resolve and return its result.
     '''
-    return self.E.resolve(path)
+    return resolve(self.E, path)
 
-  def resolve2(self, path):
-    ''' Resolve path to Dirent.
+  def _namei2(self, path):
+    ''' Look up path. Raise FuseOSError(ENOENT) if missing. Return Dirent, parent.
     '''
-    E, basename = self.resolve(path)
-    return E[basename]
+    E, P, tail_path = self._resolve(path)
+    if tail_path:
+      X("_namei2: NOT FOUND: %r", path)
+      raise FuseOSError(errno.ENOENT)
+    return E, P
+
+  def _namei(self, path):
+    ''' Look up path. Raise FuseOSError(ENOENT) if missing. Return Dirent.
+    '''
+    E, P = self._namei2(path)
+    return E
+
+  @locked
+  def _ino(self, path):
+    ''' Return an inode number for a path, allocating one of necessary.
+    '''
+    path = '/'.join( [ word for word in path.split('/') if len(word) ] )
+    if path not in self._inode_map:
+      self._inode_map[path] = self._inode_seq.next()
+    return self._inode_map[path]
+
+  @locked
+  def _new_file_descriptor(self, file_handle):
+    ''' Allocate a new file descriptor for a `file_handle`.
+        TODO: linear allocation cost, may need recode if things get
+          busy; might just need a list of released fds for reuse.
+    '''
+    fhs = self._file_handles
+    for i in range(len(fhs)):
+      if fhs[i] is None:
+        fhs[i] = file_handle
+        return i
+    fhs.append(file_handle)
+    return len(fhs) - 1
 
   ##############
   # FUSE support methods.
 
-  def getattr(self, path):
-    return self.resolve2(path).meta.stat()
-  def readlink(self, path):
-    _D("readlink", path)
-    return os.readlink(self.__abs(path))
-  def readdir(self, path):
-    return ['.', '..'] + self.resolve2(path).keys()
-  def unlink(self, path):
-    dirent, basename = self.resolve(path)
-    if dirent[basename].isdir:
-      raise ValueError("%s: is a directory" % (path,))
-    del dirent[basename]
-  def rmdir(self, path):
-    dirent, basename = self.resolve(path)
-    E = dirent[basename]
+  def access(self, path, amode):
+    X("access(path=%s, mode=%s)", path, amode)
+    E = self._namei(path)
+    if not E.meta.access(amode):
+      X("raise EACCES")
+      raise FuseOSError(errno.EACCES)
+    X("%s.access: return 0", self)
+    return 0
+
+  def create(self, path, mode, fi=None):
+    X("CREATE: path=%r, mode=%o, fi=%r", path, mode, fi)
+    return self._new_file_handle(path, do_create=True, for_read=True, for_write=True, for_append=False)
+
+  def getattr(self, path, fh=None):
+    X("getattr: %s ...", path)
+    try:
+      E = self._namei(path)
+    except FuseOSError as e:
+      X("getattr: FuseOSError: %s", e)
+      raise
+    X("getattr: %s => %s", path, E)
+    if fh is not None:
+      X("fh=%r", fh)
+    d = obj_as_dict(E.meta.stat(), 'st_')
+    d['st_mode'] |= 0o755
+    d['st_dev'] = 16777218
+    d['st_ino'] = self._ino(path)
+    d['st_dev'] = 1701
+    d['st_atime'] = float(d['st_atime'])
+    d['st_ctime'] = float(d['st_ctime'])
+    d['st_mtime'] = float(d['st_mtime'])
+    d['st_nlink'] = 10
+    X("getattr: d=%r", d)
+    return d
+
+  @locked
+  def open(self, path, flags):
+    ''' Obtain a file descriptor open on `path`.
+    '''
+    X("open(path=%r, flags=%r)...", path, flags)
+    do_create = flags & O_CREAT
+    for_read = (flags & O_RDONLY) == O_RDONLY or (flags & O_RDWR) == O_RDWR
+    for_write = (flags & O_WRONLY) == O_WRONLY or (flags & O_RDWR) == O_RDWR
+    for_append = (flags & O_APPEND) == O_APPEND
+    X("open(path=%r,..): do_create=%s for_read=%s, for_write=%s, for_append=%s",
+      do_create, for_read, for_write, for_append)
+    E, P, tail_path = self._resolve(path)
+    if len(tail_path) > 0 and not do_create:
+      X("open(%r): no do_create, raising ENOENT", path)
+      raise FuseOSError(errno.ENOENT)
+    if len(tail_path) > 1:
+      X("open(%r): multiple missing path components: %r", path, tail_path)
+      raise FuseOSError(errno.ENOENT)
+    if len(tail_path) == 1:
+      X("_path_file: new file, basename %r", tail_path)
+      if not E.isdir:
+        X("_path_file: parent (%r) not a directory, raising ENOTDIR", E.name)
+        raise FuseOSError(errno.ENOTDIR)
+      base = tail_path[0]
+      newE = FileDirent(path)
+      E[base] = newE
+      E = newE
+    else:
+      X("_path_file: file exists already")
+    fh = FileHandle(self, path, E, for_read, for_write, for_append)
+    X("open(%r): fh=%s", path, fh)
+    fd = self._new_file_descriptor(fh)
+    X("open(%r): fd=%s", path, fd)
+    return fd
+
+  def opendir(self, path):
+    X("opendir(path=%r)...", path)
+    E = self._namei(path)
+    fd = self._new_file_descriptor(E)
+    X("opendir: return %d", fd)
+    return fd
+
+  def readdir(self, path, *a, **kw):
+    X("READDIR: path=%r, a=%r, kw=%r", path, a, kw)
+    E = self._namei(path)
     if not E.isdir:
-      raise ValueError("%s: not a directory" % (path,))
-    if len(E.entires()) > 0:
-      raise ValueError("%s: not empty" % (path,))
-    del dirent[basename]
-  def symlink(self, path, path1):
-    _D("symlink", path)
-    os.symlink(path, self.__abs(path1))
-  def rename(self, path, path1):
-    _D("rename", path, path1)
-    os.rename(self.__abs(path), self.__abs(path1))
-  def link(self, path, path1):
-    _D("link", path, path1)
-    os.link(self.__abs(path), self.__abs(path1))
-  def chmod(self, path, mode):
-    _D("chmod 0%03o %s" % (mode, path))
-    os.chmod(self.__abs(path), mode)
-  def chown(self, path, user, group):
-    _D("chown %d:%d %s" % (user, group, path))
-    os.chown(self.__abs(path), user, group)
-  def truncate(self, path, len):
-    _D("truncate", path, len)
-    return -ENOSYS
-  def mknod(self, path, mode, dev):
-    _D("mknod", path, mode, dev)
-    os.mknod(self.__abs(path), mode, dev)
-  def mkdir(self, path, mode):
-    _D("mkdir 0%03o %s" % (mode, path))
-    os.mkdir(self.__abs(path), mode)
-  def utime(self, path, times):
-    _D("utime", path)
-    os.utime(self.__abs(path), times)
-  def access(self, path, mode):
-    _D("access", path, mode)
-    if not os.access(self.__abs(path), mode):
-      return -EACCES
-  def statfs(self):
-    _D("statfs")
-    return os.statvfs(self.__basefs)
+      raise FuseOSError(errno.ENOTDIR)
+    return ['.', '..'] + list(E.keys())
 
-  class __File(object):
-    def __init__(self, path, flags, *mode):
-      print("new __File: path =", path, "flags =", repr(flags), "mode =", repr(mode))
-      self.file = os.fdopen(os.open("." + path, flags, *mode),
-                            flag2mode(flags))
-      self.fd = self.file.fileno()
+  def readlink(self, path):
+    E = self._namei(path)
+    # no symlinks yet
+    raise FuseOSError(errno.EINVAL)
 
-    def read(self, length, offset):
-      self.file.seek(offset)
-      return self.file.read(length)
+  def release(self, path, fd):
+    X("release open file path=%r fd=%r...", path, fd)
+    fh = self._file_handles[fd]
+    if fh is None:
+      error("release open file fd=%r: handle is None!", fd)
+    else:
+      fh.close()
+    return 0
 
-    def write(self, buf, offset):
-      self.file.seek(offset)
-      self.file.write(buf)
-      return len(buf)
+  def releasedir(self, path, fd):
+    X("releasedir path=%r fd=%r...", path, fd)
+    fh = self._file_handles[fd]
+    if fh is None:
+      error("releasedir fd=%r: handle is None!", fd)
+    else:
+      X("releasedir fd=%r: OK %s", fd, fh)
+    return 0
 
-    def release(self, flags):
-      self.file.close()
-
-    def fsync(self, isfsyncfile):
-      if isfsyncfile and hasattr(os, 'fdatasync'):
-        os.fdatasync(self.fd)
+  def statfs(self, path):
+    X("statsfs(%s)", path)
+    st = os.statvfs(".")
+    X("statsfs(%s) ==> %r", path, st)
+    d = {}
+    for f in dir(st):
+      if f.startswith('f_'):
+        X("statvfs: .%s = %r", f, getattr(st, f))
+        d[f] = getattr(st, f)
       else:
-        os.fsync(self.fd)
+        X("statvfs: skip %s", f)
+    return d
 
-    def flush(self):
-      self.file.flush()
-      # cf. xmp_flush() in fusexmp_fh.c
-      os.close(os.dup(self.fd))
+class FileHandle(O):
+  ''' Filesystem state for open files.
+  '''
 
-    def fgetattr(self):
-      return os.fstat(self.fd)
+  def __init__(self, fs, path, E, for_read, for_write, for_append):
+    O.__init__(self)
+    self.fs = fs
+    self.path = path
+    self.fp = E.open()
+    self.offset = 0
+    self.for_read = for_read
+    self.for_write = for_write
+    self.for_append = for_append
 
-    def ftruncate(self, len):
-      self.file.truncate(len)
+  def close(self):
+    self.fp.close()
+
+if __name__ == '__main__':
+  from cs.venti.vtfuse_tests import selftest
+  selftest(sys.argv)
