@@ -55,6 +55,7 @@ exec 3>&1 1>"$tmpcf" </dev/null
 cat <<X
 server:
   directory: "$wkdir"
+  do-ip6: no
   username: "$me"
   logfile: "$log"
   pidfile: "$pidfile"
