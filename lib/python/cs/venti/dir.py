@@ -321,27 +321,44 @@ class Dir(_Dirent):
   ''' A directory.
   '''
 
-  def __init__(self, name, metatext=None, parent=None, dirblock=None):
+  def __init__(self, name, metatext=None, parent=None, block=None):
     ''' Initialise this directory.
         `metatext`: meta information
         `parent`: parent Dir
-        `dirblock`: pre-existing Block with initial Dir content
+        `block`: pre-existing Block with initial Dir content
     '''
-    self._lock = Lock()
+    if block is None:
+      self._block = None
+      self._entries = {}
+    else:
+      self._block = block
+      self._entries = None
     _Dirent.__init__(self, D_DIR_T, name, metatext=metatext)
     self.parent = parent
-    self.entries = {}
-    if dirblock:
-      for E in decodeDirents(dirblock.data):
-        E.parent = self
-        self[E.name] = E
     self._lock = RLock()
+
+  @property
+  def entries(self):
+    with self._lock:
+      es = self._entries
+      if self._entries is None:
+        # unpack ._block into ._entries, discard ._block
+        es = self._entries = {}
+        for E in decodeDirents(self._block.data):
+          E.parent = self
+          es[E.name] = E
+        self._block = None
+    return es
 
   @locked
   def getBlock(self):
     ''' Return the top Block referring to an encoding of this Dir.
         TODO: blockify the encoding? Probably desirable for big Dirs.
     '''
+    if self._entries is None:
+      # dir never unpacked: just return the Block
+      return self._block
+    # unpacked; always recompute in case of change
     names = sorted(self.keys())
     data = b''.join( self[name].encode()
                      for name in names
