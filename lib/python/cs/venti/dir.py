@@ -235,6 +235,9 @@ class FileDirent(_Dirent, NestingOpenCloseMixin):
   ''' A _Dirent subclass referring to a file.
       If closed, ._block refers to the file content.
       If open, ._open_file refers to the content.
+      NOTE: multiple opens return the _same_ backing file, with a
+      shared read/write offset. File systems must share this, and
+      keep their own offsets in their file handles.
   '''
 
   def __init__(self, name, metatext=None, block=None):
