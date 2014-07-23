@@ -386,7 +386,7 @@ class Dir(_Dirent):
   def __setitem__(self, name, E):
     ''' Store a _Dirent in the specified name slot.
     '''
-    ##debug("<%s>[%s]=%s" % (self.name, name, E))
+    X("<%s>[%s]=%s" % (self.name, name, E))
     if not self._validname(name):
       raise KeyError("invalid name: %s" % (name,))
     if not isinstance(E, _Dirent):
@@ -407,12 +407,6 @@ class Dir(_Dirent):
     del E[oldname]
     E.name = newname
     self[newname] = E
-
-  def open(self, name):
-    ''' Open the entry named `name` as a readable file-like object.
-    '''
-    from .file import File
-    return File(self[name].getBlock())
 
   def mkdir(self, name):
     ''' Create a subdirectory named `name`, return the _Dirent.
