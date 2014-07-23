@@ -4,8 +4,8 @@ import pwd
 import grp
 import stat
 import sys
-from threading import Lock
-from cs.logutils import D, Pfx, debug, error, info, warning
+from threading import Lock, RLock
+from cs.logutils import D, Pfx, debug, error, info, warning, X
 from cs.lex import hexify
 from cs.queues import NestingOpenCloseMixin
 from cs.seq import seq
