@@ -282,10 +282,13 @@ class Proxy(object):
     self._proxied = other
 
   def __getattr__(self, attr):
-    return getattr(self._proxied, attr)
+    _proxied = object.__getattribute__(self, '_proxied')
+    return getattr(_proxied, attr)
 
   def __iter__(self):
-    return iter(self._proxied)
+    _proxied = object.__getattribute__(self, '_proxied')
+    return iter(_proxied)
 
   def __len__(self):
-    return len(self._proxied)
+    _proxied = object.__getattribute__(self, '_proxied')
+    return len(_proxied)
