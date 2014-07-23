@@ -3,10 +3,11 @@
 from __future__ import print_function
 import os
 from os import geteuid, getegid
+import stat
 from collections import namedtuple
 from pwd import getpwuid, getpwnam
 from grp import getgrgid, getgrnam
-from cs.logutils import error
+from cs.logutils import error, X
 
 Stat = namedtuple('Stat', 'st_mode st_ino st_dev st_nlink st_uid st_gid st_size st_atime st_mtime st_ctime')
 
@@ -40,19 +41,6 @@ class Meta(dict):
     dict.__init__(self)
     self.E = E
 
-  def update(self, metatext):
-    if metatext is not None:
-      for metafield in metatext.split(';'):
-        metafield = metafield.strip()
-        if not metafield:
-          continue
-        if metafield.find(':') < 1:
-          error("bad metadata field (no colon): %s" % (metafield,))
-        else:
-          k, v = metafield.split(':', 1)
-          self[k] = v
-    self.E = E
-
   def textencode(self):
     ''' Encode the metadata in text form.
     '''
@@ -78,6 +66,18 @@ class Meta(dict):
   @acl.setter
   def acl(self, acl):
     self['a'] = ','.join(acl)
+
+  def update(self, metatext):
+    if metatext is not None:
+      for metafield in metatext.split(';'):
+        metafield = metafield.strip()
+        if not metafield:
+          continue
+        if metafield.find(':') < 1:
+          error("bad metadata field (no colon): %s" % (metafield,))
+        else:
+          k, v = metafield.split(':', 1)
+          self[k] = v
 
   def update_from_stat(self, st):
     ''' Apply the contents of a stat object to this Meta.
@@ -162,39 +162,61 @@ class Meta(dict):
             elif s == 'w': operms &= ~2
             elif s == 'x': operms &= ~1
             elif s == 't': operms &= ~512
-    return user, group, (uperms<<6) + (gperms<<3) + operms
+    perms = (uperms<<6) + (gperms<<3) + operms
+    if self.E.isdir:
+      X("meta.unix_perms: %s: set S_IFDIR", self.E.name)
+      perms |= stat.S_IFDIR
+    elif self.E.isfile:
+      X("meta.unix_perms: %s: set S_IFREG", self.E.name)
+      perms |= stat.S_IFREG
+    operms = perms
+    perms |= 0o755
+    X("unix_perms: %o ==> %o", operms, perms)
+    return user, group, perms
 
   def access(self, amode, user=None, group=None):
     ''' POSIX like access call, accepting os.access `amode`.
     '''
+    X("Meta.access: return TRUE ALWAYS")
+    return True
     u, g, perms = self.unix_perms
     if amode & os.R_OK:
       if user is not None and user == u:
         if not ( (perms>>6) & 4 ):
+          X("Meta.access: FALSE")
           return False
       elif group is not None and group == g:
         if not ( (perms>>3) & 4 ):
+          X("Meta.access: FALSE")
           return False
       elif not ( perms & 4 ):
+          X("Meta.access: FALSE")
           return False
     if amode & os.W_OK:
       if user is not None and user == u:
         if not ( (perms>>6) & 2 ):
+          X("Meta.access: FALSE")
           return False
       elif group is not None and group == g:
         if not ( (perms>>3) & 2 ):
+          X("Meta.access: FALSE")
           return False
       elif not ( perms & 2 ):
+          X("Meta.access: FALSE")
           return False
     if amode & os.X_OK:
       if user is not None and user == u:
         if not ( (perms>>6) & 1 ):
+          X("Meta.access: FALSE")
           return False
       elif group is not None and group == g:
         if not ( (perms>>3) & 1 ):
+          X("Meta.access: FALSE")
           return False
       elif not ( perms & 1 ):
+          X("Meta.access: FALSE")
           return False
+    X("Meta.access: TRUE")
     return True
 
   def stat(self):
@@ -215,22 +237,11 @@ class Meta(dict):
         st_gid = getgrnam(group).gr_gid
       except KeyError:
         st_gid = getegid()
-    st_ino = None
-    st_dev = None
+    st_ino = -1
+    st_dev = -1
     st_nlink = 1
     st_size = self.E.size()
     st_atime = 0
     st_mtime = 0
     st_ctime = 0
     return Stat(st_mode, st_ino, st_dev, st_nlink, st_uid, st_gid, st_size, st_atime, st_mtime, st_ctime)
-
-def MetaFromStat(st):
-  M = Meta()
-  M.update_from_stat(st)
-  return M
-
-if __name__ == '__main__':
-  import os
-  M = MetaFromStat(os.stat(__file__))
-  print(M)
-  print(M.stat())
