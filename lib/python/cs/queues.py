@@ -87,15 +87,15 @@ class NestingOpenCloseMixin(O):
   def __init__(self, proxy_type=None, finalise_later=False):
     ''' Initialise the NestingOpenCloseMixin state.
         Then takes makes use of the following methods if present:
-        `self.on_open(count)`: called on open with the post-increment open count
-        `self.on_close(count)`: called on close with the pre-decrement open count
-        `self.on_shutdown()`: called after calling self.shutdown()
-	`finalise_later`: do not notify the finalisation Condition
-	    on shutdown, require a separate call to .finalise().
-	    This is mode is useful for objects such as queues where
-	    the final close prevents further .put calls, but sers
-	    calling .join may need to wait for all the queued items
-	    to be processed.
+          `self.on_open(count)`: called on open with the post-increment open count
+          `self.on_close(count)`: called on close with the pre-decrement open count
+          `self.on_shutdown()`: called after calling self.shutdown()
+        `finalise_later`: do not notify the finalisation Condition on
+          shutdown, require a separate call to .finalise().
+          This is mode is useful for objects such as queues where
+          the final close prevents further .put calls, but users
+          calling .join may need to wait for all the queued items
+          to be processed.
     '''
     if proxy_type is None:
       proxy_type = _NOC_Proxy
@@ -151,8 +151,8 @@ class NestingOpenCloseMixin(O):
   @logexc
   def _close(self):
     ''' Decrement the open count.
-	If self.on_open, call self.on_open(self, count) with the
-	pre-decrement count.
+        If self.on_close, call self.on_close(self, count) with the
+        pre-decrement count.
         If self.on_shutdown and the count goes to zero, call self.on_shutdown(self).
         If the count goes to zero, call self.shutdown().
     '''
