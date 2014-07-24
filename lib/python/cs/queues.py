@@ -161,7 +161,7 @@ class NestingOpenCloseMixin(O):
         error("%s: EXTRA CLOSE", self)
       self._opens -= 1
       count = self._opens
-    ifmethod(self, 'on_close', a=(count,))
+    ifmethod(self, 'on_close', a=(count+1,))
     if count == 0:
       ifmethod(self, 'on_shutdown')
       self.shutdown()
