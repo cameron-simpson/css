@@ -266,8 +266,7 @@ class FileDirent(_Dirent, NestingOpenCloseMixin):
     '''
     self._check()
     if self._open_file is not None:
-      self._block = self._open_file.sync()
-    self._check()
+      return self._open_file.sync()
     return self._block
 
   @locked
