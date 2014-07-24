@@ -89,7 +89,6 @@ class NestingOpenCloseMixin(O):
         Then takes makes use of the following methods if present:
           `self.on_open(count)`: called on open with the post-increment open count
           `self.on_close(count)`: called on close with the pre-decrement open count
-          `self.on_shutdown()`: called after calling self.shutdown()
         `finalise_later`: do not notify the finalisation Condition on
           shutdown, require a separate call to .finalise().
           This is mode is useful for objects such as queues where
@@ -153,7 +152,6 @@ class NestingOpenCloseMixin(O):
     ''' Decrement the open count.
         If self.on_close, call self.on_close(self, count) with the
         pre-decrement count.
-        If self.on_shutdown and the count goes to zero, call self.on_shutdown(self).
         If the count goes to zero, call self.shutdown().
     '''
     with self._lock:
@@ -163,7 +161,6 @@ class NestingOpenCloseMixin(O):
       count = self._opens
     ifmethod(self, 'on_close', a=(count+1,))
     if count == 0:
-      ifmethod(self, 'on_shutdown')
       self.shutdown()
       if not self._finalise_later:
         self.finalise()
