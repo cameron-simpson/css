@@ -84,7 +84,7 @@ class StoreFS(Operations):
     '''
     E, P, tail_path = self._resolve(path)
     if tail_path:
-      X("_namei2: NOT FOUND: %r", path)
+      X("_namei2: NOT FOUND: %r; tail_path=%r", path, tail_path)
       raise FuseOSError(errno.ENOENT)
     return E, P
 
