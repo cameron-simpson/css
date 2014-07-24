@@ -88,6 +88,12 @@ class File(BackedFile):
     return self.backing_block
 
   @locked
+  def close(self):
+    B = self.sync()
+    BackedFile.close(self)
+    return B
+
+  @locked
   def high_level_blocks(self):
     ''' Return an iterator of new high level Blocks covering the current file data.
     '''
