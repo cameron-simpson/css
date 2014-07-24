@@ -55,10 +55,8 @@ def resolve(rootD, subpath, do_mkdir=False):
   E = rootD
   parent = E.parent
   subpaths = [ s for s in subpath.split('/') if s ]
-  while subpaths:
-    if not E.isdir:
-      raise ValueError("%s: not a Dir, remaining subpaths=%r" % (subpath, subpaths,))
-    name = subpath[0]
+  while subpaths and E.isdir:
+    name = subpaths[0]
     if name in E:
       parent = E
       E = E[name]
