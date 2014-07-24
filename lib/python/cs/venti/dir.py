@@ -265,7 +265,7 @@ class FileDirent(_Dirent, NestingOpenCloseMixin):
     if count < 1:
       raise ValueError("expected count >= 1, got: %r" % (count,))
     if count == 1:
-      if self._open_file is None:
+      if self._open_file is not None:
         raise RuntimeError("first open, but ._open_file is not None: %r" % (self._open_file,))
         self._open_file = File(self[name].getBlock())
         self._block = None
