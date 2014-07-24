@@ -168,7 +168,12 @@ def D(fmt, *args):
 def X(fmt, *args):
   msg = str(fmt)
   if args:
-    msg = msg % args
+    omsg = msg
+    try:
+      msg = msg % args
+    except TypeError as e:
+      X("cannot expand msg: %s; msg=%r, args=%r", e, msg, args)
+      msg = "%s[%r]" % (msg, args)
   sys.stderr.write(msg)
   sys.stderr.write("\n")
   sys.stderr.flush()
