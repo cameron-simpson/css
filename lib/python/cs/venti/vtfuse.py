@@ -104,6 +104,10 @@ class StoreFS(Operations):
     return self._inode_map[path]
 
   @locked
+  def _fh(self, fd):
+    return self._file_handles[fd]
+
+  @locked
   def _new_file_descriptor(self, file_handle):
     ''' Allocate a new file descriptor for a `file_handle`.
         TODO: linear allocation cost, may need recode if things get
@@ -131,7 +135,11 @@ class StoreFS(Operations):
 
   def create(self, path, mode, fi=None):
     X("CREATE: path=%r, mode=%o, fi=%r", path, mode, fi)
-    return self._new_file_handle(path, do_create=True, for_read=True, for_write=True, for_append=False)
+    if fi is not None:
+      raise RuntimeError("WHAT TO DO IF FI NOT NONE: fi=%r" % (fi,))
+    fd = self.open(path, O_CREAT|O_TRUNC|O_WRONLY)
+    X("TODO: apply mode to self._fh[%d]", fd)
+    return fd
 
   def getattr(self, path, fh=None):
     X("getattr: %s ...", path)
@@ -165,7 +173,7 @@ class StoreFS(Operations):
     for_write = (flags & O_WRONLY) == O_WRONLY or (flags & O_RDWR) == O_RDWR
     for_append = (flags & O_APPEND) == O_APPEND
     X("open(path=%r,..): do_create=%s for_read=%s, for_write=%s, for_append=%s",
-      do_create, for_read, for_write, for_append)
+      path, do_create, for_read, for_write, for_append)
     E, P, tail_path = self._resolve(path)
     if len(tail_path) > 0 and not do_create:
       X("open(%r): no do_create, raising ENOENT", path)
@@ -211,7 +219,7 @@ class StoreFS(Operations):
 
   def release(self, path, fd):
     X("release open file path=%r fd=%r...", path, fd)
-    fh = self._file_handles[fd]
+    fh = self._fh(fd)
     if fh is None:
       error("release open file fd=%r: handle is None!", fd)
     else:
@@ -220,7 +228,7 @@ class StoreFS(Operations):
 
   def releasedir(self, path, fd):
     X("releasedir path=%r fd=%r...", path, fd)
-    fh = self._file_handles[fd]
+    fh = self._fh(fd)
     if fh is None:
       error("releasedir fd=%r: handle is None!", fd)
     else:
