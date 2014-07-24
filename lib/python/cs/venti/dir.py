@@ -13,6 +13,7 @@ from cs.serialise import get_bs, get_bsdata, put_bs, put_bsdata
 from cs.threads import locked, locked_property
 from . import totext, fromtext
 from .block import Block, decodeBlock
+from .file import File
 from .meta import Meta
 
 uid_nobody = -1
@@ -267,20 +268,19 @@ class FileDirent(_Dirent, NestingOpenCloseMixin):
     if count == 1:
       if self._open_file is not None:
         raise RuntimeError("first open, but ._open_file is not None: %r" % (self._open_file,))
-        self._open_file = File(self[name].getBlock())
-        self._block = None
+      if self._block is None:
+        raise RuntimeError("first open, but ._block is None")
+      self._open_file = File(self._block)
+      self._block = None
 
   @locked
-  def on_close(self, count):
+  def shutdown(self):
     ''' On final close, close ._open_file and save result as ._block.
     '''
-    if count < 1:
-      raise ValueError("expected count >= 1, got: %r" % (count,))
-    if count == 1:
-      if self._block is not None:
-        error("final close, but ._block is not None; replacing with self._open_file.close(), was: %r", self._block)
-      self._block = self._open_file.close()
-      self._open_file = None
+    if self._block is not None:
+      error("final close, but ._block is not None; replacing with self._open_file.close(), was: %r", self._block)
+    self._block = self._open_file.close()
+    self._open_file = None
 
   def restore(self, path, makedirs=False, verbosefp=None):
     ''' Restore this _Dirent's file content to the name `path`.
