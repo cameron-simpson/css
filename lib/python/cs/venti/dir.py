@@ -249,20 +249,32 @@ class FileDirent(_Dirent, NestingOpenCloseMixin):
     _Dirent.__init__(self, D_FILE_T, name, metatext=metatext)
     self._open_file = None
     self._block = block
+    self._check()
+
+  def _check(self):
+    # TODO: check ._block and ._open_file against NOC open count
+    if self._block is None:
+      if self._open_file is None:
+        raise ValueError("both ._block and ._open_file are None")
+    elif self._open_file is not None:
+      raise ValueError("._block is %s and ._open_file is %r" % (self._block, self._open_file))
 
   @locked
   def getBlock(self):
     ''' Obtain the top level Block.
         If open, sync the file to update ._block.
     '''
+    self._check()
     if self._open_file is not None:
       self._block = self._open_file.sync()
+    self._check()
     return self._block
 
   @locked
   def on_open(self, count):
     ''' Set up ._open_file on first open.
     '''
+    self._check()
     if count < 1:
       raise ValueError("expected count >= 1, got: %r" % (count,))
     if count == 1:
@@ -272,15 +284,18 @@ class FileDirent(_Dirent, NestingOpenCloseMixin):
         raise RuntimeError("first open, but ._block is None")
       self._open_file = File(self._block)
       self._block = None
+    self._check()
 
   @locked
   def shutdown(self):
     ''' On final close, close ._open_file and save result as ._block.
     '''
+    self._check()
     if self._block is not None:
       error("final close, but ._block is not None; replacing with self._open_file.close(), was: %r", self._block)
     self._block = self._open_file.close()
     self._open_file = None
+    self._check()
 
   def restore(self, path, makedirs=False, verbosefp=None):
     ''' Restore this _Dirent's file content to the name `path`.
