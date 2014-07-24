@@ -397,8 +397,7 @@ class PushQueue(NestingOpenCloseMixin):
       queued via a Later for delivery to the output queue.
   '''
 
-  def __init__(self, name, L, func_push, outQ, func_final=None,
-                     on_open=None, on_close=None, on_shutdown=None):
+  def __init__(self, name, L, func_push, outQ, func_final=None):
     ''' Initialise the PushQueue with the Later `L`, the callable `func_push`
         and the output queue `outQ`.
 	`func_push` is a one-to-many function which accepts a single
@@ -418,9 +417,7 @@ class PushQueue(NestingOpenCloseMixin):
     self.name = name
     self._lock = Lock()
     O.__init__(self)
-    NestingOpenCloseMixin.__init__(self,
-                                   on_open=on_open, on_close=on_close, on_shutdown=on_shutdown,
-                                   proxy_type=_Q_Proxy)
+    NestingOpenCloseMixin.__init__(self, proxy_type=_Q_Proxy)
     self.later = L
     self.func_push = func_push
     self.outQ = outQ
