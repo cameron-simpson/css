@@ -642,6 +642,14 @@ class BackedFile(RawIOBase):
     self._offset = 0
     self._lock = RLock()
 
+  def __enter__(self):
+    ''' BackedFile instances offer a context manager that take the lock, allowing synchronous use of the file without implementing a suite of special methods like pread/pwrite.
+    '''
+    self._lock.acquire()
+
+  def __exit__(self, *e):
+    self._lock.release()
+
   @locked
   def _discard_front_file(self):
     self._front_file = None
