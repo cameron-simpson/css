@@ -61,9 +61,9 @@ class StoreFS(Operations):
 
   def __getattr__(self, attr):
     # debug aid
-    X("StoreFS.__getattr__: attr=%r", attr)
+    X("UNKNOWN ATTR: StoreFS.__getattr__: attr=%r", attr)
     def attrfunc(*a, **kw):
-      X("%s(a=%r,kw=%r)", attr, a, kw)
+      X("UNKNOWN ATTR: %s(a=%r,kw=%r)", attr, a, kw)
       raise RuntimeError(attr)
     X("%s ==> %s", attr, attrfunc)
     return attrfunc
