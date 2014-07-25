@@ -281,7 +281,8 @@ class FileHandle(O):
     X("FileHandle.write: fp=<%s>%r", fp.__class__, fp)
     with fp:
       fp.seek(offset)
-      fp.write(data)
+      written = fp.write(data)
+    return written
 
   def read(self, offset, size):
     X("FileHandle.read: offset=%r, size=%r", offset, size)
