@@ -248,6 +248,16 @@ class StoreFS(Operations):
         X("statvfs: skip %s", f)
     return d
 
+  def write(self, path, data, offset, fd):
+    X("WRITE: path=%r, data=%r, offset=%d, fd=%r", path, data, offset, fd)
+    return self._fh(fd).write(data, offset)
+
+  def flush(self, path, fh):
+    X("FLUSH: path=%r, fh=%r", path, fh)
+
+  def fsync(self, path, datasync, fh):
+    X("FSYNC: path=%r, datasync=%d, fh=%r", path, datasync, fh)
+
 class FileHandle(O):
   ''' Filesystem state for open files.
   '''
@@ -256,14 +266,21 @@ class FileHandle(O):
     O.__init__(self)
     self.fs = fs
     self.path = path
-    self.fp = E.open()
+    self.Eopen = E.open()
     self.offset = 0
     self.for_read = for_read
     self.for_write = for_write
     self.for_append = for_append
 
+  def write(self, data, offset):
+    fp = self.Eopen._open_file
+    X("FileHandle.write: fp=<%s>%r", fp.__class__, fp)
+    with fp:
+      fp.seek(offset)
+      fp.write(data)
+
   def close(self):
-    self.fp.close()
+    self.Eopen.close()
 
 if __name__ == '__main__':
   from cs.venti.vtfuse_tests import selftest
