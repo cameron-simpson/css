@@ -138,7 +138,7 @@ class StoreFS(Operations):
     if fi is not None:
       raise RuntimeError("WHAT TO DO IF FI NOT NONE: fi=%r" % (fi,))
     fd = self.open(path, O_CREAT|O_TRUNC|O_WRONLY)
-    X("TODO: apply mode to self._fh[%d]", fd)
+    X("TODO: create: apply mode (0o%o) to self._fh[%d]", mode, fd)
     return fd
 
   def getattr(self, path, fh=None):
@@ -167,7 +167,7 @@ class StoreFS(Operations):
   def open(self, path, flags):
     ''' Obtain a file descriptor open on `path`.
     '''
-    X("open(path=%r, flags=%r)...", path, flags)
+    X("open(path=%r, flags=%o)...", path, flags)
     do_create = flags & O_CREAT
     for_read = (flags & O_RDONLY) == O_RDONLY or (flags & O_RDWR) == O_RDWR
     for_write = (flags & O_WRONLY) == O_WRONLY or (flags & O_RDWR) == O_RDWR
