@@ -205,6 +205,10 @@ class StoreFS(Operations):
     X("opendir: return %d", fd)
     return fd
 
+  def read(self, path, size, offset, fd):
+    X("READ: path=%r, size=%d, offset=%d, fd=%r", path, size, offset, fd)
+    return self._fh(fd).read(offset, size)
+
   def readdir(self, path, *a, **kw):
     X("READDIR: path=%r, a=%r, kw=%r", path, a, kw)
     E = self._namei(path)
@@ -278,6 +282,17 @@ class FileHandle(O):
     with fp:
       fp.seek(offset)
       fp.write(data)
+
+  def read(self, offset, size):
+    X("FileHandle.read: offset=%r, size=%r", offset, size)
+    if size < 1:
+      raise ValueError("FileHandle.read: size(%d) < 1" % (size,))
+    fp = self.Eopen._open_file
+    X("FileHandle.read: fp=<%s>%r", fp.__class__, fp)
+    with fp:
+      fp.seek(offset)
+      data = fp.read(size)
+    return data
 
   def close(self):
     self.Eopen.close()
