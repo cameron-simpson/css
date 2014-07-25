@@ -19,7 +19,7 @@ from cs.obj import O, obj_as_dict
 from cs.seq import Seq
 from cs.threads import locked
 from .block import Block
-from .dir import FileDirent
+from .dir import FileDirent, Dir
 from .file import File
 from .paths import resolve
 
@@ -163,6 +163,26 @@ class StoreFS(Operations):
     X("getattr: d=%r", d)
     return d
 
+  def mkdir(self, path, mode):
+    X("mkdir(path=%s, mode=%o)", path, mode)
+    E, P, tail_path = self._resolve(path)
+    if not tail_path:
+      X("mkdir: file exists already")
+      raise FuseOSError(errno.EEXIST)
+    if len(tail_path) > 1:
+      X("mkdir(%r): multiple missing path components: %r", path, tail_path)
+      raise FuseOSError(errno.ENOENT)
+    assert len(tail_path) == 1
+    X("mkdir: new dir, basename %r", tail_path)
+    if not E.isdir:
+      X("mkdir: parent (%r) not a directory, raising ENOTDIR", E.name)
+      raise FuseOSError(errno.ENOTDIR)
+    base = tail_path[0]
+    newE = Dir(path, parent=E)
+    E[base] = newE
+    E = newE
+    # TODO: apply mode to E
+
   @locked
   def open(self, path, flags):
     ''' Obtain a file descriptor open on `path`.
@@ -182,16 +202,16 @@ class StoreFS(Operations):
       X("open(%r): multiple missing path components: %r", path, tail_path)
       raise FuseOSError(errno.ENOENT)
     if len(tail_path) == 1:
-      X("_path_file: new file, basename %r", tail_path)
+      X("open: new file, basename %r", tail_path)
       if not E.isdir:
-        X("_path_file: parent (%r) not a directory, raising ENOTDIR", E.name)
+        X("open: parent (%r) not a directory, raising ENOTDIR", E.name)
         raise FuseOSError(errno.ENOTDIR)
       base = tail_path[0]
       newE = FileDirent(path)
       E[base] = newE
       E = newE
     else:
-      X("_path_file: file exists already")
+      X("open: file exists already")
     fh = FileHandle(self, path, E, for_read, for_write, for_append)
     X("open(%r): fh=%s", path, fh)
     fd = self._new_file_descriptor(fh)
