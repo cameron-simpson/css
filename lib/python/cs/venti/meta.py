@@ -114,7 +114,7 @@ def decodeACL(acl_text):
 def encodeACL(acl):
   ''' Encode a list of AC instances as text.
   '''
-  return ','.join( [ ac.encode() for ac in ac_L ] )
+  return ','.join( [ ac.encode() for ac in acl ] )
 
 class Meta(dict):
   ''' Inode metadata: times, permissions, ownership etc.
@@ -138,7 +138,7 @@ class Meta(dict):
     # update 'a' if necessary
     _acl = self._acl
     if _acl is not None:
-      self['a'] = encodeACL(ac_L)
+      self['a'] = encodeACL(_acl)
     return ";".join("%s:%s" % (k, self[k]) for k in sorted(self.keys()))
 
   def encode(self):
