@@ -7,7 +7,11 @@ import stat
 from collections import namedtuple
 from pwd import getpwuid, getpwnam
 from grp import getgrgid, getgrnam
+from threading import RLock
 from cs.logutils import error, X
+from cs.threads import locked
+
+DEFAULT_ACL = 'u:rw-,g:rw-,*:r-'
 
 Stat = namedtuple('Stat', 'st_mode st_ino st_dev st_nlink st_uid st_gid st_size st_atime st_mtime st_ctime')
 
@@ -24,27 +28,118 @@ def permbits_to_acl(bits):
       sub += c
   return add+'-'+sub
 
+class AC(object):
+  __slots__ = ('prefix', 'allow', 'deny')
+
+  def __init__(self, prefix, allow, deny):
+    ''' Initialise AC with `allow` and `deny` permission strings.
+    '''
+    self.prefix = prefix
+    self.allow = allow
+    self.deny = deny
+
+  def textencode(self):
+    return self.prefix + ':' + self.allow + '-' + self.deny
+
+  def __call__(self, M, accesses):
+    ''' Call the AC with the Meta `M` and the required permissions `accesses`.
+        Returns False if any access is in .deny, otherwise returns True if
+        all accesses are in .allow.
+        Subclasses override this method and check the AC for
+        applicability before deferring to this method to test access;
+        they return None if the AC is not applicable, for example
+        an AC_Owner when the Meta has no owner or the Meta owner
+        does not match the caller owner.
+    '''
+    allow = self.allow
+    deny = self.deny
+    for access in accesses:
+      if access in deny:
+        return False
+      if access not in allow:
+        return False
+    return True
+
+class AC_Owner(AC):
+  def __init__(self, allow, deny):
+    AC.__init__(self, 'o', allow, deny)
+  def __call__(self, M, accesses, owner):
+    Mowner = M.get('u')
+    if Mowner is None or Mowner != owner:
+      return None
+    return AC.__call__(self, M, accesses)
+
+class AC_Group(AC):
+  def __init__(self, allow, deny):
+    AC.__init__(self, 'g', allow, deny)
+  def __call__(self, M, accesses, group):
+    Mgroup = M.get('g')
+    if Mgroup is None or Mgroup != group:
+      return None
+    return AC.__call__(self, M, accesses)
+
+class AC_Other(AC):
+  def __init__(self, allow, deny):
+    AC.__init__(self, '*', allow, deny)
+
+_AC_prefix_map = {
+  'o':  AC_Owner,
+  'g':  AC_Group,
+  '*':  AC_Other,
+}
+
+def decodeAC(ac_text):
+  ''' Factory function to return a new AC from an encoded AC.
+  '''
+  prefix, allow_deny = ac_text.split(':', 1)
+  allow, deny = allow_deny.split('-', 1)
+  try:
+    ac_class = _AC_prefix_map[prefix]
+  except KeyError:
+    raise ValueError("invlaid prefix %r from %r" % (prefix, ac_text))
+  return ac_class(allow, deny)
+
+def decodeACL(acl_text):
+  ''' Return a list of ACs from the encoded list `acl_text`.
+  '''
+  acl = []
+  for ac_text in acl_text.split(','):
+    if ac_text:
+      try:
+        ac = decodeAC(ac_text)
+      except ValueError as e:
+        error("invalid ACL element ignored: %r", ac_text)
+  return acl
+
+def encodeACL(acl):
+  ''' Encode a list of AC instances as text.
+  '''
+  return ','.join( [ ac.encode() for ac in ac_L ] )
+
 class Meta(dict):
-  ''' Metadata:
-        Modification time:
-          m:unix-seconds(int or float)
-        Access Control List:
-          a:ac,...
-            ac:
-              u:user:perms-perms
-              g:group:perms-perms
-              *:perms-perms
-          ? a:blockref of encoded Meta
-          ? a:/path/to/encoded-Meta
+  ''' Inode metadata: times, permissions, ownership etc.
+
+      This is a dictionary with the following keys:
+
+      'u': owner
+      'g': group owner
+      'a': ACL
+      'm': modification time, a float
   '''
   def __init__(self, E):
     dict.__init__(self)
     self.E = E
+    self._acl = None
+    self._lock = RLock()
 
   def textencode(self):
     ''' Encode the metadata in text form.
     '''
-    return "".join("%s:%s;" % (k, self[k]) for k in sorted(self.keys()))
+    # update 'a' if necessary
+    _acl = self._acl
+    if _acl is not None:
+      self['a'] = encodeACL(ac_L)
+    return ";".join("%s:%s" % (k, self[k]) for k in sorted(self.keys()))
 
   def encode(self):
     ''' Encode the metadata in binary form: just text transcribed in UTF-8.
@@ -53,46 +148,59 @@ class Meta(dict):
 
   @property
   def mtime(self):
-    return float(self.get('m', 0))
+    return self.get('m', 0.0)
 
   @mtime.setter
   def mtime(self, when):
-    self['m'] = float(when)
+    self['m'] = when
 
   @property
+  @locked
   def acl(self):
-    return [ ac for ac in self.get('a', '').split(',') if len(ac) ]
+    ''' Return the live list of AC instances, decoded at need.
+    '''
+    _acl = self._acl
+    if _acl is None:
+      _acl = self._acl = decodeACL(self.get('a', DEFAULT_ACL))
+    return _acl
 
   @acl.setter
-  def acl(self, acl):
-    self['a'] = ','.join(acl)
+  @locked
+  def acl(self, ac_L):
+    ''' Rewrite the ACL with a list of AC instances.
+    '''
+    self['a'] = encodeACL(ac_L)
+    self._acl = None
 
   def update(self, metatext):
-    if metatext is not None:
-      for metafield in metatext.split(';'):
-        metafield = metafield.strip()
-        if not metafield:
-          continue
-        if metafield.find(':') < 1:
-          error("bad metadata field (no colon): %s" % (metafield,))
-        else:
-          k, v = metafield.split(':', 1)
-          self[k] = v
+    ''' Update the Meta fields from the supplied metatext.
+    '''
+    for metafield in metatext.split(';'):
+      metafield = metafield.strip()
+      if not metafield:
+        continue
+      try:
+        k, v = metafield.split(':', 1)
+      except ValueError:
+        error("ignoring bad metatext field: %r", metafield)
+        continue
+      self[k] = v
 
   def update_from_stat(self, st):
     ''' Apply the contents of a stat object to this Meta.
     '''
-    self.mtime = st.st_mtime
+    self.mtime = float(st.st_mtime)
     user = getpwuid(st.st_uid)[0]
     group = getgrgid(st.st_gid)[0]
     if ':' in user:
       raise ValueError("invalid username for uid %d, colon forbidden: %s" % (st.st_uid, user))
     if ':' in group:
       raise ValueError("invalid groupname for gid %d, colon forbidden: %s" % (st.st_gid, group))
-    self.acl = ( "u:"+user+":"+permbits_to_acl( (st.st_mode>>6)&7 ),
-                 "g:"+group+":"+permbits_to_acl( (st.st_mode>>3)&7 ),
-                 "*:"+permbits_to_acl( (st.st_mode)&7 ),
-               )
+    self.acl = decodeACL(';'.join( (
+                    "o:"+user+":"+permbits_to_acl( (st.st_mode>>6)&7 ),
+                    "g:"+group+":"+permbits_to_acl( (st.st_mode>>3)&7 ),
+                    "*:"+permbits_to_acl( (st.st_mode)&7 ),
+               ) ) )
 
   @property
   def unix_perms(self):
