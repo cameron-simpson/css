@@ -49,6 +49,7 @@ class StoreFS(Operations):
       raise ValueError("not dir Dir: %s" % (E,))
     self.S =S
     self.E = E
+    self.do_fsync = False
     E.meta.update('u:rx,g:rx,rx')
     self._lock = RLock()
     self._inode_seq = Seq(start=1)
@@ -289,6 +290,8 @@ class StoreFS(Operations):
 
   def fsync(self, path, datasync, fh):
     X("FSYNC: path=%r, datasync=%d, fh=%r", path, datasync, fh)
+    if self.do_fsync:
+      self._fh(fd).sync()
 
 class FileHandle(O):
   ''' Filesystem state for open files.
@@ -322,6 +325,9 @@ class FileHandle(O):
       fp.seek(offset)
       data = fp.read(size)
     return data
+
+  def sync(self):
+    self.Eopen.sync()
 
   def close(self):
     self.Eopen.close()
