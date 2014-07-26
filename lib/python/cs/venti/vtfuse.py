@@ -227,7 +227,15 @@ class StoreFS(Operations):
 
   def read(self, path, size, offset, fd):
     X("READ: path=%r, size=%d, offset=%d, fd=%r", path, size, offset, fd)
-    return self._fh(fd).read(offset, size)
+    chunks = []
+    while size > 0:
+      data = self._fh(fd).read(offset, size)
+      if len(data) == 0:
+        break
+      chunks.append(data)
+      offset += len(data)
+      size -= len(data)
+    return b''.join(chunks)
 
   def readdir(self, path, *a, **kw):
     X("READDIR: path=%r, a=%r, kw=%r", path, a, kw)
