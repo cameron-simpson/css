@@ -11,6 +11,7 @@ from collections import namedtuple
 import errno
 import os
 from os import O_CREAT, O_RDONLY, O_WRONLY, O_RDWR, O_APPEND, O_TRUNC
+from os.path import basename
 import sys
 from threading import RLock
 from cs.debug import DummyMap, TracingObject
@@ -149,7 +150,7 @@ class StoreFS(Operations):
   def create(self, path, mode, fi=None):
     X("CREATE: path=%r, mode=%o, fi=%r", path, mode, fi)
     if fi is not None:
-      raise RuntimeError("WHAT TO DO IF FI NOT NONE: fi=%r" % (fi,))
+      raise RuntimeError("WHAT TO DO IF fi IS NOT NONE: fi=%r" % (fi,))
     fd = self.open(path, O_CREAT|O_TRUNC|O_WRONLY)
     X("TODO: create: apply mode (0o%o) to self._fh[%d]", mode, fd)
     return fd
@@ -291,6 +292,26 @@ class StoreFS(Operations):
       else:
         X("statvfs: skip %s", f)
     return d
+
+  def rename(self, oldpath, newpath):
+    X("rename(%r,%r)...", oldpath, newpath)
+    E1base = basename(oldpath)
+    E1, P1, tail_path = self._resolve(oldpath)
+    if tail_path:
+      raise FuseOSError(errno.ENOENT)
+    if not P1.meta.access(os.X_OK|os.W_OK):
+      raise FuseOSError(errno.EPERM)
+    E2base = basename(newpath)
+    E2, P2, tail_path = self._resolve(newpath)
+    if len(tail_path) > 1:
+      raise FuseOSError(errno.ENOENT)
+    if len(tail_path) == 1:
+      P2 = E2
+      E2 = None
+    if not P2.meta.access(os.X_OK|os.W_OK):
+      raise FuseOSError(errno.EPERM)
+    del P1[E1base]
+    P2[E2base] = E1
 
   def utimens(self, path, times):
     atime, mtime = times
