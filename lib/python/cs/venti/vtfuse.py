@@ -138,6 +138,14 @@ class StoreFS(Operations):
     E = self._namei(path)
     E.meta.chmod(mode)
 
+  def chown(self, path, uid, gid):
+    E = self._namei(path)
+    M = E.meta
+    if uid >= 0:
+      M.uid = uid
+    if gid >= 0:
+      M.gid = gid
+
   def create(self, path, mode, fi=None):
     X("CREATE: path=%r, mode=%o, fi=%r", path, mode, fi)
     if fi is not None:
