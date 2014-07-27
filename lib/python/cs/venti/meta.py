@@ -32,6 +32,8 @@ def username(uid):
     else:
       user = user.pw_name
     user_map[uid] = user
+    if user not in user_map:
+      user_map[user] = uid
   return user
 
 def userid(username):
@@ -49,6 +51,8 @@ def userid(username):
     else:
       uid = user.pw_uid
     user_map[username] = uid
+    if uid not in user_map:
+      user_map[uid] = username
   return uid
 
 def groupname(gid):
@@ -66,6 +70,8 @@ def groupname(gid):
     else:
       group = group.pw_name
     group_map[gid] = group
+    if group not in group_map:
+      group_map[group] = gid
   return group
 
 def groupid(groupname):
@@ -83,6 +89,8 @@ def groupid(groupname):
     else:
       gid = group.pw_uid
     group_map[groupname] = gid
+    if gid not in group_map:
+      group_map[gid] = group
   return gid
 
 Stat = namedtuple('Stat', 'st_mode st_ino st_dev st_nlink st_uid st_gid st_size st_atime st_mtime st_ctime')
