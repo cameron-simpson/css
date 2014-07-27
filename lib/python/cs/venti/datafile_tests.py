@@ -23,7 +23,6 @@ class TestAll(unittest.TestCase):
 
   def tearDown(self):
     import os
-    self.data.close()
     os.remove(self.pathname)
 
   # TODO: tests:
@@ -46,13 +45,14 @@ class TestAll(unittest.TestCase):
   def test00store1(self):
     ''' Save a single block.
     '''
-    self.data.savedata(self._genblock())
+    with self.data:
+      self.data.savedata(self._genblock())
 
   def test01fetch1(self):
     ''' Save and the retrieve a single block.
     '''
-    self.data.savedata(self._genblock())
-    self.data.close()
+    with self.data:
+      self.data.savedata(self._genblock())
     self.data.readdata(0)
 
   def test02randomblocks(self):
@@ -60,16 +60,17 @@ class TestAll(unittest.TestCase):
     '''
     import random
     blocks = {}
-    for _ in range(100):
-      data = self._genblock()
-      offset = self.data.savedata(data)
-      blocks[offset] = data
-    self.data.close()
+    with self.data:
+      for _ in range(100):
+        data = self._genblock()
+        offset = self.data.savedata(data)
+        blocks[offset] = data
     offsets = list(blocks.keys())
     random.shuffle(offsets)
-    for offset in offsets:
-      data = self.data.readdata(offset)
-      self.assertTrue(data == blocks[offset])
+    with self.data:
+      for offset in offsets:
+        data = self.data.readdata(offset)
+        self.assertTrue(data == blocks[offset])
 
 def selftest(argv):
   unittest.main(__name__, None, argv)

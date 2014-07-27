@@ -4,21 +4,26 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
-from __future__ import with_statement, print_function
+from __future__ import with_statement, print_function, absolute_import
+from io import RawIOBase
 import errno
 from functools import partial
 import os
+from os import SEEK_CUR, SEEK_END, SEEK_SET
 import os.path
 import errno
 import sys
 from collections import namedtuple
 from contextlib import contextmanager
 import shutil
-from tempfile import NamedTemporaryFile
+from tempfile import TemporaryFile, NamedTemporaryFile
+from threading import RLock
 import time
 import unittest
 from cs.env import envsub
-from cs.logutils import error, Pfx, D
+from cs.logutils import error, Pfx, D, X
+from cs.range import Range
+from cs.threads import locked, locked_property
 from cs.timeutils import TimeoutError
 from cs.py3 import ustr
 
@@ -623,6 +628,140 @@ class Pathname(str):
 
   def shorten(self, environ=None, prefixes=None):
     return shortpath(self, environ=environ, prefixes=prefixes)
+
+class BackedFile(RawIOBase):
+  ''' A RawIOBase implementation that uses a backing file for initial data and writes new data to a front file.
+  '''
+
+  def __init__(self, back_file, front_file=None):
+    ''' Initialise the BackedFile using `back_file` for the backing data and `front_file` to the update data.
+    '''
+    self.back_file = back_file
+    self._front_file = front_file
+    self.front_range = Range()
+    self._offset = 0
+    self._lock = RLock()
+
+  def __enter__(self):
+    ''' BackedFile instances offer a context manager that take the lock, allowing synchronous use of the file without implementing a suite of special methods like pread/pwrite.
+    '''
+    self._lock.acquire()
+
+  def __exit__(self, *e):
+    self._lock.release()
+
+  @locked
+  def _discard_front_file(self):
+    self._front_file = None
+    self.front_range = Range()
+
+  @locked_property
+  def front_file(self):
+    return TemporaryFile()
+
+  def tell(self):
+    return self._offset
+
+  @locked
+  def seek(self, pos, whence=SEEK_SET):
+    if whence == SEEK_SET:
+      self._offset = pos
+    elif whence == SEEK_CUR:
+      self._offset += pos
+    elif whence == SEEK_END:
+      endpos = self._back_file.seek(0, SEEK_END)
+      if self.front_range is not None:
+        endpos = max(back_end, self.front_range.end())
+      self._offset = endpos
+    else:
+      raise ValueError("unsupported whence value %r" % (whence,))
+
+  @locked
+  def readinto(self, b):
+    start = self._offset
+    end = start + len(b)
+    back_file = self.back_file
+    front_file = self.front_file
+    boff = 0
+    bspace = len(b)
+    for in_front, span in self.front_range.slices(start, end):
+      offset = span.start
+      size = span.size
+      if size > bspace:
+        size = bspace
+      data = bytearray(size)
+      if in_front:
+        front_file.seek(offset)
+        nread = front_file.readinto(data)
+      else:
+        back_file.seek(offset)
+        nread = back_file.readinto(data)
+      assert nread <= size
+      b[boff:boff+nread] = data[:nread]
+      boff += nread
+      self._offset = offset + nread
+      if nread < size:
+        # short read
+        break
+    return boff
+
+  @locked
+  def write(self, b):
+    front_file = self.front_file
+    start = self._offset
+    front_file.seek(start)
+    written = front_file.write(b)
+    if written is not None:
+      self.front_range.add_span(start, start+written)
+    return written
+
+class BackedFile_TestMethods(object):
+  ''' Mixin for testing subclasses of BackedFile.
+  '''
+
+  def _eq(self, a, b, opdesc):
+    ''' Convenience wrapper for assertEqual.
+    '''
+    ##if a == b:
+    ##  print("OK: %s: %r == %r" % (opdesc, a, b), file=sys.stderr)
+    self.assertEqual(a, b, "%s: got %r, expected %r" % (opdesc, a, b))
+
+  def test_BackedFile(self):
+    from random import randint
+    backing_text = self.backing_text
+    bfp = self.backed_fp
+    # test reading whole file
+    bfp.seek(0)
+    bfp_text = bfp.read()
+    self._eq(backing_text, bfp_text, "backing_text vs bfp_text")
+    # test reading first 512 bytes only
+    bfp.seek(0)
+    bfp_leading_text = bfp.read(512)
+    self._eq(backing_text[:512], bfp_leading_text, "leading 512 bytes of backing_text vs bfp_leading_text")
+    # test writing some data and reading it back
+    random_chunk = bytes( randint(0,255) for x in range(256) )
+    bfp.seek(512)
+    bfp.write(random_chunk)
+    # check that the front file has a single span of the right dimensions
+    ffp = bfp._front_file
+    fr = bfp.front_range
+    self.assertIsNotNone(ffp)
+    self.assertIsNotNone(fr)
+    self.assertEqual(len(fr._spans), 1)
+    self.assertEqual(fr._spans[0].start, 512)
+    self.assertEqual(fr._spans[0].end, 768)
+    # read the random data back from the front file
+    ffp.seek(512)
+    front_chunk = ffp.read(256)
+    self.assertEqual(random_chunk, front_chunk)
+    # read the random data back from the BackedFile
+    bfp.seek(512)
+    bfp_chunk = bfp.read(256)
+    self.assertEqual(bfp_chunk, random_chunk)
+    # read a chunk that overlaps the old data and the new data
+    bfp.seek(256)
+    overlap_chunk = bfp.read(512)
+    self.assertEqual(overlap_chunk, backing_text[256:512] + random_chunk)
 
 if __name__ == '__main__':
   import cs.fileutils_tests

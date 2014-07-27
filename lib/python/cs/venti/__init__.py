@@ -55,7 +55,7 @@ def fromtext(s):
 # characters used for metadata.
 # Note: no path separator ("/") because we may accept this as a
 #       path pseudocomponent.
-_texthexify_white_chars = ascii_letters + digits + '_+.,=:;{}*'
+_texthexify_white_chars = ascii_letters + digits + '_+-.,=:;{}*/'
 
 def totext(data):
   ''' Represent a byte sequence as a hex/text string.

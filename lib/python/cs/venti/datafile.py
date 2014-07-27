@@ -8,10 +8,11 @@ import sys
 from collections import namedtuple
 import os
 import os.path
-from threading import Lock
+from threading import Lock, RLock
 from zlib import compress, decompress
 from cs.logutils import D
 from cs.obj import O
+from cs.queues import NestingOpenCloseMixin
 from cs.serialise import get_bs, put_bs, get_bsfp
 from cs.threads import locked_property
 
@@ -35,15 +36,22 @@ class DataFlags(int):
     assert flags == 0
     return s
 
-class DataFile(O):
+  @property
+  def compressed(self):
+    return self & F_COMPRESSED
+
+class DataFile(NestingOpenCloseMixin):
   ''' A cs.venti data file, storing data chunks in compressed form.
   '''
 
   def __init__(self, pathname):
+    self._lock = RLock()
+    NestingOpenCloseMixin.__init__(self)
     self.pathname = pathname
     self._fp = None
-    self._size = None
-    self._lock = Lock()
+
+  def open(self, name=None):
+    return NestingOpenCloseMixin.open(self, name=name)
 
   @locked_property
   def fp(self):
@@ -51,19 +59,13 @@ class DataFile(O):
     '''
     return open(self.pathname, "a+b")
 
-  def close(self):
+  def shutdown(self):
     ''' Close the current .fp if open.
     '''
     with self._lock:
       if self._fp:
         self._fp.close()
         self._fp = None
-
-  @locked_property
-  def size(self):
-    ''' Property returning the size of this file.
-    '''
-    return os.fstat(self.fp.fileno).st_size
 
   def scan(self, uncompress=False):
     ''' Scan the data file and yield (offset, flags, zdata) tuples.
@@ -130,7 +132,7 @@ class DataFile(O):
       fp.write(put_bs(flags))
       fp.write(put_bs(len(data)))
       fp.write(data)
-      self._size = fp.tell()
+    self.ping()
     return offset
 
   def flush(self):
