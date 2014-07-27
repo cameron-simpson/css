@@ -313,6 +313,20 @@ class StoreFS(Operations):
     del P1[E1base]
     P2[E2base] = E1
 
+  def rmdir(self, path):
+    X("rmdir(%r)...", path)
+    Ebase = basename(path)
+    E, P, tail_path = self._resolve(path)
+    if tail_path:
+      raise FuseOSError(errno.ENOENT)
+    if not E.isdir:
+      raise FuseOSError(errno.EDOTDIR)
+    if not P.meta.access(os.W_OK|os.X_OK):
+      raise FuseOSError(errno.EPERM)
+    if E.entries:
+      raise FuseOSError(errno.ENOTEMPTY)
+    del P[Ebase]
+
   def unlink(self, path):
     X("unlink(%r)...", path)
     Ebase = basename(path)
