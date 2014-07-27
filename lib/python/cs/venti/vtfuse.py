@@ -185,7 +185,7 @@ class StoreFS(Operations):
     newE = Dir(path, parent=E)
     E[base] = newE
     E = newE
-    # TODO: apply mode to E
+    E.meta.chmod(mode&0o7777)
 
   @locked
   def open(self, path, flags):
