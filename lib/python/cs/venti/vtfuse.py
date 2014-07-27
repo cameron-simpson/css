@@ -157,7 +157,6 @@ class StoreFS(Operations):
     if fh is not None:
       X("fh=%r", fh)
     d = obj_as_dict(E.meta.stat(), 'st_')
-    d['st_mode'] |= 0o755
     d['st_dev'] = 16777218
     d['st_ino'] = self._ino(path)
     d['st_dev'] = 1701
