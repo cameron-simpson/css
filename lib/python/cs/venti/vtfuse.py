@@ -284,6 +284,13 @@ class StoreFS(Operations):
         X("statvfs: skip %s", f)
     return d
 
+  def utimens(self, path, times):
+    atime, mtime = times
+    E = self._namei(path)
+    M = E.meta
+    ## we do not do atime ## M.atime = atime
+    M.mtime = mtime
+
   def write(self, path, data, offset, fd):
     X("WRITE: path=%r, data=%r, offset=%d, fd=%r", path, data, offset, fd)
     return self._fh(fd).write(data, offset)
