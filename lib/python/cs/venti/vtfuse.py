@@ -50,7 +50,6 @@ class StoreFS(Operations):
     self.S =S
     self.E = E
     self.do_fsync = False
-    E.meta.update('u:rx,g:rx,rx')
     self._lock = RLock()
     self._inode_seq = Seq(start=1)
     self._inode_map = {}
