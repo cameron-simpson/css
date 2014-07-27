@@ -134,6 +134,11 @@ class StoreFS(Operations):
     X("%s.access: return 0", self)
     return 0
 
+  def chmod(self, path, mode):
+    X("chmod(%r, %o)...", path, mode)
+    E = self._namei(path)
+    E.meta.chmod(mode)
+
   def create(self, path, mode, fi=None):
     X("CREATE: path=%r, mode=%o, fi=%r", path, mode, fi)
     if fi is not None:
