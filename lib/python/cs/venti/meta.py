@@ -11,13 +11,85 @@ from threading import RLock
 from cs.logutils import error, X
 from cs.threads import locked
 
-DEFAULT_ACL = 'u:rw-,g:rw-,*:r-'
+DEFAULT_DIR_ACL = 'u:rwx-'
+DEFAULT_FILE_ACL = 'u:rw-x'
+
+user_map = {}
+group_map = {}
+
+def username(uid):
+  ''' Look up the login name associated with the supplied `uid`.
+      Return None if unknown. Caches results, including lookup failure.
+  '''
+  global user_map
+  try:
+    user = user_map[uid]
+  except KeyError:
+    try:
+      user = getpwuid(uid)
+    except KeyError:
+      user = None
+    else:
+      user = user.pw_name
+    user_map[uid] = user
+  return user
+
+def userid(username):
+  ''' Look up the user id associated with the supplied `username`.
+      Return None if unknown. Caches results, including lookup failure.
+  '''
+  global user_map
+  try:
+    uid = user_map[username]
+  except KeyError:
+    try:
+      uid = getpwnam(username)
+    except KeyError:
+      uid = None
+    else:
+      uid = user.pw_uid
+    user_map[username] = uid
+  return uid
+
+def groupname(gid):
+  ''' Look up the group name associated with the supplied `gid`.
+      Return None if unknown. Caches results, including lookup failure.
+  '''
+  global group_map
+  try:
+    group = group_map[gid]
+  except KeyError:
+    try:
+      group = getpwuid(gid)
+    except KeyError:
+      group = None
+    else:
+      group = group.pw_name
+    group_map[gid] = group
+  return group
+
+def groupid(groupname):
+  ''' Look up the group id associated with the supplied `groupname`.
+      Return None if unknown. Caches results, including lookup failure.
+  '''
+  global group_map
+  try:
+    gid = group_map[groupname]
+  except KeyError:
+    try:
+      gid = getpwnam(groupname)
+    except KeyError:
+      gid = None
+    else:
+      gid = group.pw_uid
+    group_map[groupname] = gid
+  return gid
 
 Stat = namedtuple('Stat', 'st_mode st_ino st_dev st_nlink st_uid st_gid st_size st_atime st_mtime st_ctime')
 
-def permbits_to_acl(bits):
-  ''' Take a UNIX 3-bit permission value and return the ACL add-sub string.
-      Example: 6 (110) => "rw-x"
+def permbits_to_allow_deny(bits):
+  ''' Take a UNIX 3-bit permission value and return the ACL allow and deny strings.
+      Example: 6 (110) => 'rw', 'x'
   '''
   add = ''
   sub = ''
@@ -26,7 +98,7 @@ def permbits_to_acl(bits):
       add += c
     else:
       sub += c
-  return add+'-'+sub
+  return add, sub
 
 class AC(object):
   __slots__ = ('prefix', 'allow', 'deny')
@@ -114,7 +186,7 @@ def decodeACL(acl_text):
 def encodeACL(acl):
   ''' Encode a list of AC instances as text.
   '''
-  return ','.join( [ ac.encode() for ac in acl ] )
+  return ','.join( [ ac.textencode() for ac in acl ] )
 
 class Meta(dict):
   ''' Inode metadata: times, permissions, ownership etc.
@@ -147,6 +219,104 @@ class Meta(dict):
     return self.textencode().encode()
 
   @property
+  def user(self):
+    ''' Return the username associated with this Meta's owner.
+    '''
+    u = self.get('u')
+    if u is not None and not isinstance(u, str):
+      u = username(u)
+    return u
+
+  @user.setter
+  def user(self, u):
+    ''' Set the owner (user) of this Meta.
+    '''
+    self['u'] = u
+
+  @user.deleter
+  def user(self):
+    ''' Remove the owner of this Meta.
+    '''
+    if 'u' in self:
+      del self['u']
+
+  @property
+  def uid(self):
+    ''' Return the user id associated with this Meta's owner.
+    '''
+    u = self.get('u')
+    if u is not None and not isinstance(u, int):
+      u = userid(u)
+    return u
+
+  @uid.setter
+  def uid(self, u):
+    ''' Set the owner (user) of this Meta.
+        Saves the user name of the supplied uid, or the uid if the
+        user name cannot be looked up.
+    '''
+    user = username(u)
+    if user is not None:
+      u = user
+    self['u'] = u
+
+  @uid.deleter
+  def uid(self):
+    ''' Remove the owner (user) of this Meta.
+    '''
+    if 'u' in self:
+      del self['u']
+
+  @property
+  def group(self):
+    ''' Return the groupname associated with this Meta's group owner.
+    '''
+    g = self.get('g')
+    if g is not None and not isinstance(g, str):
+      g = username(g)
+    return g
+
+  @group.setter
+  def group(self, g):
+    ''' Set the group owner of this Meta.
+    '''
+    self['g'] = g
+
+  @group.deleter
+  def group(self):
+    ''' Remove the group owner of this Meta.
+    '''
+    if 'g' in self:
+      del self['g']
+
+  @property
+  def gid(self):
+    ''' Return the group id associated with this Meta's group owner.
+    '''
+    g = self.get('g')
+    if g is not None and not isinstance(g, int):
+      g = groupid(g)
+    return g
+
+  @gid.setter
+  def gid(self, g):
+    ''' Set the owner (user) of this Meta.
+        Saves the group name of the supplied gid, or the gid if the
+        group name cannot be looked up.
+    '''
+    group = groupname(g)
+    if group is not None:
+      g = group
+    self['g'] = g
+
+  @gid.deleter
+  def gid(self):
+    ''' Remove the owner (user) of this Meta.
+    '''
+    if 'g' in self:
+      del self['g']
+
+  @property
   def mtime(self):
     return self.get('m', 0.0)
 
@@ -161,7 +331,8 @@ class Meta(dict):
     '''
     _acl = self._acl
     if _acl is None:
-      _acl = self._acl = decodeACL(self.get('a', DEFAULT_ACL))
+      dflt_acl = DEFAULT_DIR_ACL if self.E.isdir else DEFAULT_FILE_ACL
+      _acl = self._acl = decodeACL(self.get('a', dflt_acl))
     return _acl
 
   @acl.setter
@@ -171,6 +342,15 @@ class Meta(dict):
     '''
     self['a'] = encodeACL(ac_L)
     self._acl = None
+    X("META: set ACL to %s", self['a'])
+
+  def chmod(self, mode):
+    ''' Apply UNIX permissions to ACL.
+    '''
+    self.acl = [ AC_Owner( *permbits_to_allow_deny( (mode>>6)&7 ) ),
+                 AC_Group( *permbits_to_allow_deny( (mode>>3)&7 ) ),
+                 AC_Other( *permbits_to_allow_deny( mode&7 ) )
+               ] + [ ac for ac in self.acl if ac.prefix in ('o', 'g', '*') ]
 
   def update(self, metatext):
     ''' Update the Meta fields from the supplied metatext.
@@ -196,11 +376,9 @@ class Meta(dict):
       raise ValueError("invalid username for uid %d, colon forbidden: %s" % (st.st_uid, user))
     if ':' in group:
       raise ValueError("invalid groupname for gid %d, colon forbidden: %s" % (st.st_gid, group))
-    self.acl = decodeACL(';'.join( (
-                    "o:"+user+":"+permbits_to_acl( (st.st_mode>>6)&7 ),
-                    "g:"+group+":"+permbits_to_acl( (st.st_mode>>3)&7 ),
-                    "*:"+permbits_to_acl( (st.st_mode)&7 ),
-               ) ) )
+    self.user = user
+    self.group = group
+    self.chmod(st.st_mode & 0o777)
 
   @property
   def unix_perms(self):
@@ -278,8 +456,8 @@ class Meta(dict):
       X("meta.unix_perms: %s: set S_IFREG", self.E.name)
       perms |= stat.S_IFREG
     operms = perms
-    perms |= 0o755
-    X("unix_perms: %o ==> %o", operms, perms)
+    ##perms |= 0o755
+    ##X("unix_perms: %o ==> %o", operms, perms)
     return user, group, perms
 
   def access(self, amode, user=None, group=None):
