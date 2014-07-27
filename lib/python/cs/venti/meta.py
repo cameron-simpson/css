@@ -405,15 +405,10 @@ class Meta(dict):
     ''' Apply the contents of a stat object to this Meta.
     '''
     self.mtime = float(st.st_mtime)
-    user = getpwuid(st.st_uid)[0]
-    group = getgrgid(st.st_gid)[0]
-    if ':' in user:
-      raise ValueError("invalid username for uid %d, colon forbidden: %s" % (st.st_uid, user))
-    if ':' in group:
-      raise ValueError("invalid groupname for gid %d, colon forbidden: %s" % (st.st_gid, group))
-    self.user = user
-    self.group = group
+    self.uid = st.st_uid
+    self.gid = st.st_gid
     self.chmod(st.st_mode & 0o777)
+    # TODO: setuid, setgid, sticky
 
   @property
   def unix_perms(self):
@@ -439,6 +434,7 @@ class Meta(dict):
         perms |= ac.unixmode
       else:
         warning("Meta.unix_perms: ignoring ACL element %s", ac.extencode)
+    # TODO: setuid, setgid, sticky
     uid = self.uid
     if uid is None:
       uid = NOBODY
