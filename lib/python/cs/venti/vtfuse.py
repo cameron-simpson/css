@@ -313,6 +313,18 @@ class StoreFS(Operations):
     del P1[E1base]
     P2[E2base] = E1
 
+  def unlink(self, path):
+    X("unlink(%r)...", path)
+    Ebase = basename(path)
+    E, P, tail_path = self._resolve(path)
+    if tail_path:
+      raise FuseOSError(errno.ENOENT)
+    if E.isdir:
+      raise FuseOSError(errno.EISDIR)
+    if not P.meta.access(os.W_OK|os.X_OK):
+      raise FuseOSError(errno.EPERM)
+    del P[Ebase]
+
   def utimens(self, path, times):
     atime, mtime = times
     E = self._namei(path)
