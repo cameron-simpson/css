@@ -7,6 +7,7 @@ import stat
 from collections import namedtuple
 from pwd import getpwuid, getpwnam
 from grp import getgrgid, getgrnam
+from stat import S_ISUID, S_ISGID
 from threading import RLock
 from cs.logutils import error, warning, X
 from cs.threads import locked
@@ -121,6 +122,9 @@ class AC(object):
     self.allow = allow
     self.deny = deny
 
+  def __repr__(self):
+    return ':'.join( (self.__class__.__name__, self.textencode()) )
+
   def textencode(self):
     return self.prefix + ':' + self.allow + '-' + self.deny
 
@@ -227,6 +231,8 @@ class Meta(dict):
       'g': group owner
       'a': ACL
       'm': modification time, a float
+      'su': setuid
+      'sg': setgid
   '''
   def __init__(self, E):
     dict.__init__(self)
@@ -378,9 +384,47 @@ class Meta(dict):
     self._acl = None
     X("META: set ACL to %s", self['a'])
 
+  @property
+  def setuid(self):
+    ''' Return whether this Meta is setuid.
+    '''
+    return self.get('su', False)
+
+  @setuid.setter
+  def setuid(self, flag):
+    ''' Set the setuidness of this Meta.
+    '''
+    if flag:
+      self['su'] = flag
+    elif 'su' in self:
+      del self['su']
+
+  @property
+  def setgid(self):
+    ''' Return whether this Meta is setgid.
+    '''
+    return self.get('sg', False)
+
+  @setuid.setter
+  def setgid(self, flag):
+    ''' Set the setgidness of this Meta.
+    '''
+    if flag:
+      self['sg'] = flag
+    elif 'sg' in self:
+      del self['sg']
+
   def chmod(self, mode):
     ''' Apply UNIX permissions to ACL.
     '''
+    if mode&S_ISUID:
+      self.setuid = True
+    else:
+      self.setuid = False
+    if mode&S_ISGID:
+      self.setgid = True
+    else:
+      self.setgid = False
     self.acl = [ AC_Owner( *permbits_to_allow_deny( (mode>>6)&7 ) ),
                  AC_Group( *permbits_to_allow_deny( (mode>>3)&7 ) ),
                  AC_Other( *permbits_to_allow_deny( mode&7 ) )
@@ -435,6 +479,10 @@ class Meta(dict):
       else:
         warning("Meta.unix_perms: ignoring ACL element %s", ac.extencode)
     # TODO: setuid, setgid, sticky
+    if self.setuid:
+      perms |= S_ISUID
+    if self.setgid:
+      perms |= S_ISUID
     uid = self.uid
     if uid is None:
       uid = NOBODY
