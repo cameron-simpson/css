@@ -428,7 +428,7 @@ class Meta(dict):
     self.acl = [ AC_Owner( *permbits_to_allow_deny( (mode>>6)&7 ) ),
                  AC_Group( *permbits_to_allow_deny( (mode>>3)&7 ) ),
                  AC_Other( *permbits_to_allow_deny( mode&7 ) )
-               ] + [ ac for ac in self.acl if ac.prefix in ('o', 'g', '*') ]
+               ] + [ ac for ac in self.acl if ac.prefix not in ('o', 'g', '*') ]
     X("META.chmod: meta=%s", self.textencode())
 
   def update(self, metatext):
