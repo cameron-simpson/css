@@ -8,11 +8,14 @@ from collections import namedtuple
 from pwd import getpwuid, getpwnam
 from grp import getgrgid, getgrnam
 from threading import RLock
-from cs.logutils import error, X
+from cs.logutils import error, warning, X
 from cs.threads import locked
 
-DEFAULT_DIR_ACL = 'u:rwx-'
-DEFAULT_FILE_ACL = 'u:rw-x'
+DEFAULT_DIR_ACL = 'o:rwx-'
+DEFAULT_FILE_ACL = 'o:rw-x'
+
+NOBODY = -1
+NOGROUP = -1
 
 user_map = {}
 group_map = {}
@@ -140,6 +143,23 @@ class AC(object):
         return False
     return True
 
+  @property
+  def unixmode(self):
+    ''' Return the 3-buit UNIX mode for this access.
+    '''
+    mode = 0
+    for a in self.allow:
+      if a == 'r':
+        mode |= 4
+      elif a == 'w':
+        mode |= 2
+      elif a == 'x':
+        mode |= 1
+      else:
+        warning("AC.unixmode: ignoring unsupported permission %r", a)
+    X("unixmode(%r) ==> %o", self.textencode(), mode)
+    return mode
+
 class AC_Owner(AC):
   def __init__(self, allow, deny):
     AC.__init__(self, 'o', allow, deny)
@@ -176,7 +196,7 @@ def decodeAC(ac_text):
   try:
     ac_class = _AC_prefix_map[prefix]
   except KeyError:
-    raise ValueError("invlaid prefix %r from %r" % (prefix, ac_text))
+    raise ValueError("invalid prefix %r from %r" % (prefix, ac_text))
   return ac_class(allow, deny)
 
 def decodeACL(acl_text):
@@ -188,7 +208,9 @@ def decodeACL(acl_text):
       try:
         ac = decodeAC(ac_text)
       except ValueError as e:
-        error("invalid ACL element ignored: %r", ac_text)
+        error("invalid ACL element ignored: %r: %s", ac_text, e)
+      else:
+        acl.append(ac)
   return acl
 
 def encodeACL(acl):
@@ -339,8 +361,12 @@ class Meta(dict):
     '''
     _acl = self._acl
     if _acl is None:
+      X("META.acl: self = %r", self)
       dflt_acl = DEFAULT_DIR_ACL if self.E.isdir else DEFAULT_FILE_ACL
-      _acl = self._acl = decodeACL(self.get('a', dflt_acl))
+      acl_text = self.get('a', dflt_acl)
+      X("META.acl_text: %r", acl_text)
+      _acl = self._acl = decodeACL(acl_text)
+      X("META.acl => %r", _acl)
     return _acl
 
   @acl.setter
@@ -359,6 +385,7 @@ class Meta(dict):
                  AC_Group( *permbits_to_allow_deny( (mode>>3)&7 ) ),
                  AC_Other( *permbits_to_allow_deny( mode&7 ) )
                ] + [ ac for ac in self.acl if ac.prefix in ('o', 'g', '*') ]
+    X("META.chmod: meta=%s", self.textencode())
 
   def update(self, metatext):
     ''' Update the Meta fields from the supplied metatext.
@@ -395,78 +422,31 @@ class Meta(dict):
         For ACLs with more than one user or group this is only an approximation,
         keeping the permissions for the frontmost user and group.
     '''
-    user = None
-    uperms = 0
-    group = None
-    gperms = 0
-    operms = 0
-    for ac in reversed(self.acl):
-      if len(ac) > 0:
-        if ac.startswith('u:'):
-          login, perms = ac[2:].split(':', 1)
-          if login != user:
-            user = login
-            uperms = 0
-          if '-' in perms:
-            add, sub = perms.split('-', 1)
-          else:
-            add, sub = perms, ''
-          for a in add:
-            if a == 'r':   uperms |= 4
-            elif a == 'w': uperms |= 2
-            elif a == 'x': uperms |= 1
-            elif a == 's': uperms |= 32
-          for s in sub:
-            if s == 'r':   uperms &= ~4
-            elif s == 'w': uperms &= ~2
-            elif s == 'x': uperms &= ~1
-            elif s == 's': uperms &= ~32
-        elif ac.startswith('g:'):
-          gname, perms = ac[2:].split(':', 1)
-          if gname != group:
-            group = gname
-            gperms = 0
-          if '-' in perms:
-            add, sub = perms.split('-', 1)
-          else:
-            add, sub = perms, ''
-          for a in add:
-            if a == 'r':   gperms |= 4
-            elif a == 'w': gperms |= 2
-            elif a == 'x': gperms |= 1
-            elif a == 's': gperms |= 128
-          for s in sub:
-            if s == 'r':   gperms &= ~4
-            elif s == 'w': gperms &= ~2
-            elif s == 'x': gperms &= ~1
-            elif s == 's': gperms &= ~128
-        elif ac.startswith('*:'):
-          perms = ac[2:]
-          if '-' in perms:
-            add, sub = perms.split('-', 1)
-          else:
-            add, sub = perms, ''
-          for a in add:
-            if a == 'r':   operms |= 4
-            elif a == 'w': operms |= 2
-            elif a == 'x': operms |= 1
-            elif a == 't': operms |= 512
-          for s in sub:
-            if s == 'r':   operms &= ~4
-            elif s == 'w': operms &= ~2
-            elif s == 'x': operms &= ~1
-            elif s == 't': operms &= ~512
-    perms = (uperms<<6) + (gperms<<3) + operms
     if self.E.isdir:
       X("meta.unix_perms: %s: set S_IFDIR", self.E.name)
-      perms |= stat.S_IFDIR
+      perms = stat.S_IFDIR
     elif self.E.isfile:
       X("meta.unix_perms: %s: set S_IFREG", self.E.name)
-      perms |= stat.S_IFREG
-    operms = perms
-    ##perms |= 0o755
-    ##X("unix_perms: %o ==> %o", operms, perms)
-    return user, group, perms
+      perms = stat.S_IFREG
+    else:
+      warning("Meta.unix_perms: neither a dir nor a file")
+    for ac in self.acl:
+      if ac.prefix == 'o':
+        perms |= ac.unixmode << 6
+      elif ac.prefix == 'g':
+        perms |= ac.unixmode << 3
+      elif ac.prefix == '*':
+        perms |= ac.unixmode
+      else:
+        warning("Meta.unix_perms: ignoring ACL element %s", ac.extencode)
+    uid = self.uid
+    if uid is None:
+      uid = NOBODY
+    gid = self.gid
+    if gid is None:
+      gid = NOGROUP
+    X("META.unix_perms: %d, %d, %o", uid, gid, perms)
+    return uid, gid, perms
 
   def access(self, amode, user=None, group=None):
     ''' POSIX like access call, accepting os.access `amode`.
@@ -516,26 +496,12 @@ class Meta(dict):
   def stat(self):
     ''' Return a stat object computed from this Meta data.
     '''
-    user, group, st_mode = self.unix_perms
-    if user is None:
-      st_uid = os.geteuid()
-    else:
-      try:
-        st_uid = getpwnam(user).pw_uid
-      except KeyError:
-        st_uid = os.geteuid()
-    if group is None:
-      st_gid = getegid()
-    else:
-      try:
-        st_gid = getgrnam(group).gr_gid
-      except KeyError:
-        st_gid = getegid()
+    st_uid, st_gid, st_mode = self.unix_perms
     st_ino = -1
     st_dev = -1
     st_nlink = 1
     st_size = self.E.size()
     st_atime = 0
-    st_mtime = 0
+    st_mtime = self.mtime
     st_ctime = 0
     return Stat(st_mode, st_ino, st_dev, st_nlink, st_uid, st_gid, st_size, st_atime, st_mtime, st_ctime)
