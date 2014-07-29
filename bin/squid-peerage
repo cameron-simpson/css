@@ -77,16 +77,21 @@ re_HAS_SCHEME = re.compile(r'^[a-z]+:')
 def pattern_acl(pattern):
   ''' Return an ACL derived from the supplied pattern.
   '''
-  # /regex
   if pattern == '*':
     return "src all"
+  # /regex
   if pattern.startswith('/'):
     return "url_regex "+pattern
   # scheme:...
   if re_HAS_SCHEME.match(pattern):
     return "url_regex ^"+pattern
+  # .ext ==> url_regex \.ext$
+  if pattern.startswith('.'):
+    return 'url_regex [.]' + pattern[1:] + '$'
+  # *.domain ==> dstdomain .domain
   if pattern.startswith("*."):
     return "dstdomain "+pattern[1:]
+  # specific domain ==> dstdomain domain
   return "dstdomain "+pattern
 
 class Proxies(dict):

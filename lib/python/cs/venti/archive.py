@@ -30,6 +30,7 @@ def archive(arfile, path, modes):
       Store the `path` (updating the Dir).
       Save the new dirref to `arfile`.
   '''
+  ok = True
   # look for existing archive for comparison
   oldtime, oldE = None, None
   if arfile == '-':
@@ -69,7 +70,7 @@ def archive(arfile, path, modes):
       copy_in_dir(path, E, modes)
     elif not os.path.isfile(path):
       error("not a directory or regular file")
-      return
+      return False
     else:
       E = copy_in_file(path)
 
@@ -82,6 +83,7 @@ def archive(arfile, path, modes):
       else:
         with open(arfile, "a") as arfp:
           write_Dirent(arfp, E)
+  return ok
 
 def retrieve(arfile, paths=None):
   ''' Retrieve Dirents for the named file paths, or None if a

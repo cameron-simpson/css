@@ -1,0 +1,52 @@
+#!/bin/sh
+#
+# Make MPEG2 Transport Stream file from TVWiz directory.
+#       - Cameron Simpson <cs@zip.com.au> 25may2014
+#
+
+set -ue
+
+cmd=`basename "$0"`
+usage="Usage: $cmd dir.tvwiz"
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing .tvwiz directory" >&2
+  badoptsd=1
+else
+  tvwizdir=$1
+  shift
+  case $tvwizdir in
+    *.tvwiz)
+      if [ ! -d "$tvwizdir/." ]
+      then
+        echo "$cmd: not a directory: $tvwizdir" >&2
+        badopts=1
+      fi
+      ;;
+    *)
+      echo "$cmd: TVWiz directory expected to end in .tvwiz, rejecting: $tvwizdir" >&2
+      badopts=1
+      ;;
+  esac
+fi
+
+if [ $# -gt 0 ]
+then
+  echo "$cmd: extra arguments: $*" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+outfile=$(dirname "$tvwizdir")/$(basename "$tvwizdir" .tvwiz).mp2ts
+if [ -e "$outfile" ]
+then
+  echo "$cmd: output file already exists: $outfile" >&2
+  exit 1
+fi
+
+set -x
+exec beyonwiz cat "$tvwizdir" >"$outfile"
