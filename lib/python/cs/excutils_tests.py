@@ -45,7 +45,6 @@ class TestExcUtils(unittest.TestCase):
 
   def test_LogExceptions(self):
     from cs.logutils import X, setup_logging
-    X("test_LogException")
     setup_logging("test_LogExceptions")
     bang = RuntimeError("bang! testing LogException")
     try_LogExceptions(None, conceal=True)
@@ -56,7 +55,6 @@ class TestExcUtils(unittest.TestCase):
 
   def test_logexc(self):
     from cs.logutils import X, setup_logging
-    X("test_logexc")
     setup_logging("test_logexc")
     bang = RuntimeError("bang! testing @logexc")
     try_logexc(None)
