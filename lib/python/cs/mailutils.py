@@ -366,7 +366,9 @@ class Maildir(mailbox.Maildir):
   def iterkeys(self):
     return self.msgmap.iterkeys()
 
-  def keys(self):
+  def keys(self, flush=False):
+    if flush:
+      self.flush()
     return self.msgmap.keys()
 
   def itervalues(self):
