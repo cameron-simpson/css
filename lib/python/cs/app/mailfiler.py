@@ -117,10 +117,9 @@ def main(argv, stdin=None):
 
   with Pfx(op):
     if op == 'monitor':
-      folders = argv
-      if not folders:
-        folders = None
-      return MF.monitor(folders, delay=delay, justone=justone, no_remove=no_remove)
+      if not mdirpaths:
+        mdirpaths = None
+      return MF.monitor(mdirpaths, delay=delay, justone=justone, no_remove=no_remove)
     raise RuntimeError("unimplemented op")
 
   return 0
