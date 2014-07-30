@@ -286,7 +286,7 @@ class MailFiler(O):
       with self._lock:
         for wmdir in watchers.values():
           wmdir.close()
-      raise
+      return 1
     return 0
 
   def sweep(self, wmdir, justone=False, no_remove=False):
@@ -1185,6 +1185,10 @@ class WatchedMaildir(O):
            % (self.shortname,
               len(self.rules),
               len(self.lurking))
+
+  def close(self):
+    self.flush()
+    self.mdir.close()
 
   @property
   def shortname(self):
