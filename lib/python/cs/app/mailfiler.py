@@ -116,6 +116,10 @@ def main(argv, stdin=None):
           if argv:
             warning("extra arguments after target: %r", argv)
             badopts = True
+        message_fp = sys.stdin
+        if message_fp.isatty():
+          warning("stdin: will not read from a tty")
+          badopts = True
       else:
         warning("unrecognised op")
         badopts = True
