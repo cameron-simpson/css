@@ -49,16 +49,18 @@ def main(argv, stdin=None):
   argv = list(argv)
   cmd = os.path.basename(argv.pop(0))
   setup_logging(cmd)
-  usage = ( '''Usage: %s monitor [-1] [-d delay] [-n] [-N] [-R rules_pattern] maildirs...
-  -1  File at most 1 message per Maildir.
-  -d delay
-      Delay between runs in seconds.
-      Default is to make only one run over the Maildirs.
-  -n  No remove. Keep filed messages in the origin Maildir.
-  -R rules_pattern
-      Specify the rules file pattern used to specify rules files from Maildir names.
-      Default: %s'''
-            % (cmd, DEFAULT_RULES_PATTERN)
+  usage = ( '''Usage:
+    %s monitor [-1] [-d delay] [-n] [-N] [-R rules_pattern] maildirs...
+      -1  File at most 1 message per Maildir.
+      -d delay
+          Delay between runs in seconds.
+          Default is to make only one run over the Maildirs.
+      -n  No remove. Keep filed messages in the origin Maildir.
+      -R rules_pattern
+          Specify the rules file pattern used to specify rules files from Maildir names.
+          Default: %s
+    %s save target <message'''
+            % (cmd, DEFAULT_RULES_PATTERN, cmd)
           )
   badopts = False
 
@@ -105,8 +107,17 @@ def main(argv, stdin=None):
               warning("unimplemented option")
               badopts = True
         mdirpaths = argv
+      elif op == 'save':
+        if not argv:
+          warning("missing target")
+          badopts = True
+        else:
+          target = argv.pop(0)
+          if argv:
+            warning("extra arguments after target: %r", argv)
+            badopts = True
       else:
-        warning("unrecognised op: %s", op)
+        warning("unrecognised op")
         badopts = True
 
   if badopts:
