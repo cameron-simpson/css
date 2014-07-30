@@ -6,7 +6,7 @@
 
 from __future__ import print_function
 from collections import namedtuple
-from email import message_from_string
+from email import message_from_string, message_from_file
 import email.parser
 from email.utils import getaddresses
 from getopt import getopt, GetoptError
@@ -49,16 +49,18 @@ def main(argv, stdin=None):
   argv = list(argv)
   cmd = os.path.basename(argv.pop(0))
   setup_logging(cmd)
-  usage = ( '''Usage: %s monitor [-1] [-d delay] [-n] [-N] [-R rules_pattern] maildirs...
-  -1  File at most 1 message per Maildir.
-  -d delay
-      Delay between runs in seconds.
-      Default is to make only one run over the Maildirs.
-  -n  No remove. Keep filed messages in the origin Maildir.
-  -R rules_pattern
-      Specify the rules file pattern used to specify rules files from Maildir names.
-      Default: %s'''
-            % (cmd, DEFAULT_RULES_PATTERN)
+  usage = ( '''Usage:
+    %s monitor [-1] [-d delay] [-n] [-N] [-R rules_pattern] maildirs...
+      -1  File at most 1 message per Maildir.
+      -d delay
+          Delay between runs in seconds.
+          Default is to make only one run over the Maildirs.
+      -n  No remove. Keep filed messages in the origin Maildir.
+      -R rules_pattern
+          Specify the rules file pattern used to specify rules files from Maildir names.
+          Default: %s
+    %s save target <message'''
+            % (cmd, DEFAULT_RULES_PATTERN, cmd)
           )
   badopts = False
 
@@ -105,8 +107,21 @@ def main(argv, stdin=None):
               warning("unimplemented option")
               badopts = True
         mdirpaths = argv
+      elif op == 'save':
+        if not argv:
+          warning("missing target")
+          badopts = True
+        else:
+          target = argv.pop(0)
+          if argv:
+            warning("extra arguments after target: %r", argv)
+            badopts = True
+        message_fp = sys.stdin
+        if message_fp.isatty():
+          warning("stdin: will not read from a tty")
+          badopts = True
       else:
-        warning("unrecognised op: %s", op)
+        warning("unrecognised op")
         badopts = True
 
   if badopts:
@@ -117,10 +132,11 @@ def main(argv, stdin=None):
 
   with Pfx(op):
     if op == 'monitor':
-      folders = argv
-      if not folders:
-        folders = None
-      return MF.monitor(folders, delay=delay, justone=justone, no_remove=no_remove)
+      if not mdirpaths:
+        mdirpaths = None
+      return MF.monitor(mdirpaths, delay=delay, justone=justone, no_remove=no_remove)
+    if op == 'save':
+      return MF.save(target, sys.stdin)
     raise RuntimeError("unimplemented op")
 
   return 0
@@ -270,7 +286,7 @@ class MailFiler(O):
       with self._lock:
         for wmdir in watchers.values():
           wmdir.close()
-      raise
+      return 1
     return 0
 
   def sweep(self, wmdir, justone=False, no_remove=False):
@@ -312,6 +328,15 @@ class MailFiler(O):
       if nmsgs or all_keys_time.elapsed >= 0.2:
         info("filtered %d messages (%d skipped) in %5.3fs",
              nmsgs, skipped, all_keys_time.elapsed)
+
+  def save(self, target, msgfp):
+    ''' Implementation for command line "save" function: save file to target.
+    '''
+    filer = MessageFiler(self)
+    filer.message = message_from_file(msgfp)
+    filer.message_path = None
+    filer.save_target(target)
+    return 0
 
   def file_wmdir_key(self, wmdir, key):
     ''' Accept a WatchedMaildir `wmdir` and a message `key`, return success.
@@ -519,7 +544,7 @@ class MessageFiler(O):
     return self.env('MAILDIR', os.path.join(self.env('HOME', None), 'mail'))
 
   def save_target(self, target):
-    with Pfx("save(%s)", target):
+    with Pfx("save_target(%s)", target):
       if target.startswith('|'):
         shcmd = target[1:]
         return self.save_to_pipe(['/bin/sh', '-c', shcmd])
@@ -1160,6 +1185,10 @@ class WatchedMaildir(O):
            % (self.shortname,
               len(self.rules),
               len(self.lurking))
+
+  def close(self):
+    self.flush()
+    self.mdir.close()
 
   @property
   def shortname(self):
