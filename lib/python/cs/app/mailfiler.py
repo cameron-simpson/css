@@ -6,7 +6,7 @@
 
 from __future__ import print_function
 from collections import namedtuple
-from email import message_from_string
+from email import message_from_string, message_from_file
 import email.parser
 from email.utils import getaddresses
 from getopt import getopt, GetoptError
@@ -135,6 +135,8 @@ def main(argv, stdin=None):
       if not mdirpaths:
         mdirpaths = None
       return MF.monitor(mdirpaths, delay=delay, justone=justone, no_remove=no_remove)
+    if op == 'save':
+      return MF.save(target, sys.stdin)
     raise RuntimeError("unimplemented op")
 
   return 0
@@ -326,6 +328,15 @@ class MailFiler(O):
       if nmsgs or all_keys_time.elapsed >= 0.2:
         info("filtered %d messages (%d skipped) in %5.3fs",
              nmsgs, skipped, all_keys_time.elapsed)
+
+  def save(self, target, msgfp):
+    ''' Implementation for command line "save" function: save file to target.
+    '''
+    filer = MessageFiler(self)
+    filer.message = message_from_file(msgfp)
+    filer.message_path = None
+    filer.save_target(target)
+    return 0
 
   def file_wmdir_key(self, wmdir, key):
     ''' Accept a WatchedMaildir `wmdir` and a message `key`, return success.
