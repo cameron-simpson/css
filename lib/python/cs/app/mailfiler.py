@@ -533,7 +533,7 @@ class MessageFiler(O):
     return self.env('MAILDIR', os.path.join(self.env('HOME', None), 'mail'))
 
   def save_target(self, target):
-    with Pfx("save(%s)", target):
+    with Pfx("save_target(%s)", target):
       if target.startswith('|'):
         shcmd = target[1:]
         return self.save_to_pipe(['/bin/sh', '-c', shcmd])
