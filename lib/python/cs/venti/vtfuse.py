@@ -327,6 +327,13 @@ class StoreFS(Operations):
       raise FuseOSError(errno.ENOTEMPTY)
     del P[Ebase]
 
+  def truncate(self, path, length):
+    X("TRUNCATE(%r, %d)...", path, length)
+    E = self._namei(path)
+    if not E.meta.access(os.W_OK):
+      raise FuseOSError(errno.EPERM)
+    E.truncate(length)
+
   def unlink(self, path):
     X("unlink(%r)...", path)
     Ebase = basename(path)
