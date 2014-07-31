@@ -7,7 +7,7 @@
 import sys
 import unittest
 from cs.logutils import D
-from .blockify import blocksOf, Blockifier
+from .blockify import blockify, Blockifier
 
 class TestAll(unittest.TestCase):
 
@@ -21,7 +21,7 @@ class TestAll(unittest.TestCase):
     from .cache import MemCacheStore
     with MemCacheStore():
       data = self.fp.read()
-      blocks = list(blocksOf([data]))
+      blocks = list(blockify([data]))
       data2 = b''.join( b.data for b in blocks )
       self.assertEqual(len(data), len(data2), "data mismatch: len(data)=%d, len(data2)=%d" % (len(data), len(data2)))
       self.assertEqual(data, data2, "data mismatch: data and data2 same length but contents differ")

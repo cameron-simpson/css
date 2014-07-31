@@ -6,21 +6,23 @@
 
 import sys
 import unittest
-from cs.range import Range, overlap, spans
+from random import randint
+from cs.range import Range, overlap, spans, Span
+from cs.logutils import X
 
 class TestAll(unittest.TestCase):
 
   def setUp(self):
     self.items1 = [1,2,3,7,8,11,5]
-    self.spans1 = [ [1,4], [5,6], [7,9], [11,12] ]
+    self.spans1 = [ Span(1,4), Span(5,6), Span(7,9), Span(11,12) ]
     self.items2 = [3,5,6,8,9,10,15,16,19]
-    self.spans2 = [ [3,4], [5,7], [8,11], [15,17], [19,20] ]
+    self.spans2 = [ Span(3,4), Span(5,7), Span(8,11), Span(15,17), Span(19,20) ]
     self.items1plus2 = [1,2,3,5,6,7,8,9,10,11,15,16,19]
-    self.spans1plus2 = [ [1,4], [5,12], [15,17], [19,20] ]
+    self.spans1plus2 = [ Span(1,4), Span(5,12), Span(15,17), Span(19,20) ]
     self.items1minus2 = [1,2,7,11]
-    self.spans1minus2 = [ [1,3], [7,8], [11,12] ]
+    self.spans1minus2 = [ Span(1,3), Span(7,8), Span(11,12) ]
     self.items1xor2 = [1,2,6,7,9,10,11,15,16,19]
-    self.spans1xor2 = [ [1,3], [6,8], [9,12], [15,17], [19,20] ]
+    self.spans1xor2 = [ Span(1,3), Span(6,8), Span(9,12), Span(15,17), Span(19,20) ]
 
   def test00spans(self):
     self.assertNotEqual(list(spans(self.items1)), self.spans1)
@@ -71,7 +73,7 @@ class TestAll(unittest.TestCase):
     R1 = Range(self.items1)
     R1._check()
     for span in self.spans2:
-      R1.update(span[0], span[1])
+      R1.add_span(span[0], span[1])
       R1._check()
     self.assertEqual(list(R1), self.items1plus2)
     self.assertEqual(list(R1.spans()), self.spans1plus2)
@@ -101,8 +103,12 @@ class TestAll(unittest.TestCase):
     R1._check()
     R2 = Range(self.items2)
     R2._check()
+    ##X("R1 = %s", R1)
+    ##X("R2 = %s", R2)
     R1.discard(R2)
     R1._check()
+    ##X("post discard, R1 = %s", R1)
+    ##X("items1minus2 = %s", self.items1minus2)
     self.assertEqual(list(R1), self.items1minus2)
     self.assertEqual(list(list(R1.spans())), self.spans1minus2)
 
@@ -148,8 +154,26 @@ class TestAll(unittest.TestCase):
     self.assertEqual(R4, R3)
     self.assertTrue(R4 is not R3, "R4 is R3")
 
+  def test30random_set_equivalence(self):
+    R1 = Range()
+    S = set()
+    self.assertEqual(S, set(R1))
+    for i in range(100):
+      n = randint(0, 99)
+      if randint(0, 1):
+        ##X("add %d (new=%s)", n, n in S)
+        R1.add(n)
+        S.add(n)
+      else:
+        ##X("discard %d (extant=%s)", n, n in S)
+        R1.discard(n)
+        S.discard(n)
+      ##X("S = %s", S)
+      ##X("R1 = %s", R1)
+      self.assertEqual(S, set(R1)) ## "set:%s vs Range:%s" % (S, R1))
+
 def selftest(argv):
-  unittest.main(__name__, None, argv)
+  unittest.main(__name__, None, argv, failfast=True)
 
 if __name__ == '__main__':
   selftest(sys.argv)

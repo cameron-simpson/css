@@ -154,7 +154,8 @@ then
   done
   set -- terminal-notifier -title "$title" -subtitle "$subtitle" -message "$message"
   [ -n "$execute" ] && set -- "$@" -execute "$execute"
-  "$@" >/dev/null
+  # async because I've seen terminal-notifier hang, stalling my mail filer
+  "$@" >/dev/null &
 fi
 
 exit $xit
