@@ -550,6 +550,9 @@ class MessageFiler(O):
         return self.save_to_pipe(['/bin/sh', '-c', shcmd])
       elif target.startswith('+'):
         m = re_ADDHEADER.match(target)
+        if not m:
+          error("match failure of re_ADDHEADER against %r", target)
+          return None
         hdr = m.group(1)
         group_names = m.group(2).split(',')
         return self.save_header(hdr, group_names)
