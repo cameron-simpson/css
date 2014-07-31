@@ -151,11 +151,11 @@ class _Block(object):
 
   def top_slices(self, start=None, end=None):
     ''' Return an iterator yielding (Block, start, len) tuples representing the uppermost Blocks spanning `start`:`end`.
-	This originating use case is to support providing minimal
-	Block references required to assemble a new indirect Block
-	consisting of data from this Block comingled with updated
-	data without naively layering deeper levels of Block
-	indirection with every update phase.
+        This originating use case is to support providing minimal
+        Block references required to assemble a new indirect Block
+        consisting of data from this Block comingled with updated
+        data without naively layering deeper levels of Block
+        indirection with every update phase.
         The iterator may end early if the span exceeds the Block data.
     '''
     if start is None:
@@ -186,6 +186,19 @@ class _Block(object):
       # a leaf Block
       if start < len(self):
         yield self, start, min(end, len(self))
+
+  def top_blocks(self, start, end):
+    ''' Yield existing high level blocks and new partial Blocks covering a portion of this Block, for constructing a new minimal top block.
+    '''
+    for B, Bstart, Bend in self.top_slices(start, end):
+      if Bstart == 0 and Bend == len(B):
+        # an extant high level block
+        yield B
+      else:
+        # should be a new partial block
+        if B.indirect:
+          raise RuntimeError("got slice for partial Block %s start=%r end=%r but Block is indirect! should be a partial leaf" % (B, Bstart, Bend))
+        yield Block(data=B[Bstart:Bend])
 
   def all_data(self):
     ''' The entire data of this Block as a single bytes object.
