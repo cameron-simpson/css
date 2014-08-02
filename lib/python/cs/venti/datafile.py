@@ -131,8 +131,8 @@ class DataFile(NestingOpenCloseMixin):
     return offset
 
   def flush(self):
-    if self._fp:
-      self._fp.flush()
+    if self.fp:
+      self.fp.flush()
 
 class DataDir(O):
   ''' A mapping of hash->Block that manages a directory of DataFiles.
