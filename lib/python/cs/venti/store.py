@@ -256,7 +256,7 @@ def Store(store_spec):
     if not host:
       host = '127.0.0.1'
     return TCPStore((host, int(port)))
-  if sheme == "ssh":
+  if scheme == "ssh":
     # TODO: path to remote vt command
     # TODO: $VT_SSH envvar
     import cs.sh
