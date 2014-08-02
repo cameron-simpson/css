@@ -14,7 +14,7 @@ from cs.logutils import D
 from cs.obj import O
 from cs.queues import NestingOpenCloseMixin
 from cs.serialise import get_bs, put_bs, get_bsfp
-from cs.threads import locked_property
+from cs.threads import locked, locked_property
 
 F_COMPRESSED = 0x01
 
@@ -50,22 +50,20 @@ class DataFile(NestingOpenCloseMixin):
     self.pathname = pathname
     self._fp = None
 
-  def open(self, name=None):
-    return NestingOpenCloseMixin.open(self, name=name)
-
   @locked_property
   def fp(self):
     ''' Property returning the file object of the current open file.
     '''
     return open(self.pathname, "a+b")
 
+  # This is locked because it interoperates with the .fp property.
+  @locked
   def shutdown(self):
     ''' Close the current .fp if open.
     '''
-    with self._lock:
-      if self._fp:
-        self._fp.close()
-        self._fp = None
+    if self._fp:
+      self._fp.close()
+      self._fp = None
 
   def scan(self, uncompress=False):
     ''' Scan the data file and yield (offset, flags, zdata) tuples.
