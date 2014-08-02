@@ -189,7 +189,7 @@ class DataDir(NestingOpenCloseMixin):
       indices = self._datafileindices()
     with Pfx("scan %d", n):
       for n in indices:
-        D = self.open(n)
+        D = self.datafile(n)
         for offset, flags, data in D.scan():
           I[hashfunc(data)] = self.encodeIndexEntry(n, offset)
 
@@ -217,7 +217,7 @@ class DataDir(NestingOpenCloseMixin):
     ''' Return the uncompressed data associated with the supplied hash.
     '''
     n, offset = self.decodeIndexEntry(self.index[hash])
-    return self.open(n).readdata(offset)
+    return self.datafile(n).readdata(offset)
 
   def __setitem__(self, hash, data):
     ''' Store the supplied `data` indexed by `hash`.
@@ -225,7 +225,7 @@ class DataDir(NestingOpenCloseMixin):
     I = self.index
     if hash not in I:
       n = self.n
-      D = self.open(n)
+      D = self.datafile(n)
       offset = D.savedata(data)
       I[hash] = self.encodeIndexEntry(n, offset)
 
@@ -262,14 +262,14 @@ class DataDir(NestingOpenCloseMixin):
       datafile.flush()
     self.index.flush()
 
-  def open(self, n):
-    ''' Obtain the Datafile indexed `n`.
+  def datafile(self, n):
+    ''' Obtain the Datafile with index `n`.
     '''
-    O = self._open
+    datafiles = self._open
     with self._lock:
-      D = O.get(n)
+      D = datafiles.get(n)
       if D is None:
-        D = O[n] = DataFile(self.pathto(self.datafilename(n)))
+        D = datafiles[n] = DataFile(self.pathto(self.datafilename(n)))
     return D
 
   def datafilename(self, n):
