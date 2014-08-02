@@ -48,33 +48,29 @@ class DataFile(NestingOpenCloseMixin):
     self._lock = RLock()
     NestingOpenCloseMixin.__init__(self)
     self.pathname = pathname
-    self._fp = None
+    self.fp = None
 
-  @locked_property
-  def fp(self):
-    ''' Property returning the file object of the current open file.
-    '''
-    return open(self.pathname, "a+b")
+  def on_open(self, count):
+    if count == 1:
+      self.fp = open(self.pathname, "a+b")
 
-  # This is locked because it interoperates with the .fp property.
-  @locked
   def shutdown(self):
-    ''' Close the current .fp if open.
-    '''
-    if self._fp:
-      self._fp.close()
-      self._fp = None
+    self.fp.close()
+    self.fp = None
 
   def scan(self, uncompress=False):
     ''' Scan the data file and yield (offset, flags, zdata) tuples.
         If `uncompress` is true, decompress the data and strip that flag value.
+        This can be used in parallel with other activity.
     '''
-    fp = self.fp
-    with self._lock:
-      fp.seek(0)
+    with self:
+      fp = self.fp
+      offset = 0
       while True:
-        offset = fp.tell()
-        flags, data = self._readRawDataHere(fp)
+        with self._lock:
+          fp.seek(offset)
+          flags, data = self._readRawDataHere(fp)
+          offset = fp.tell()
         if flags is None:
           break
         if uncompress:
@@ -99,6 +95,7 @@ class DataFile(NestingOpenCloseMixin):
   def _readhere(self, fp):
     ''' Retrieve the data bytes stored at the current file offset.
         The offset points at the flags ahead of the data bytes.
+        Presumes the ._lock is already taken.
     '''
     flags = get_bsfp(fp)
     if flags is None:
