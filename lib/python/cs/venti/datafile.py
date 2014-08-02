@@ -7,6 +7,7 @@
 import sys
 from collections import namedtuple
 import os
+from os import SEEK_SET, SEEK_END
 import os.path
 from threading import Lock, RLock
 from zlib import compress, decompress
@@ -84,7 +85,7 @@ class DataFile(NestingOpenCloseMixin):
     '''
     fp = self.fp
     with self._lock:
-      fp.seek(offset)
+      fp.seek(offset, SEEK_SET)
       flags, data = self._readhere(fp)
     if flags is None:
       raise RuntimeError("no data read from offset %d" % (offset,))
@@ -122,7 +123,7 @@ class DataFile(NestingOpenCloseMixin):
         flags |= F_COMPRESSED
     fp = self.fp
     with self._lock:
-      fp.seek(0, 2)
+      fp.seek(0, SEEK_END)
       offset = fp.tell()
       fp.write(put_bs(flags))
       fp.write(put_bs(len(data)))
@@ -130,6 +131,7 @@ class DataFile(NestingOpenCloseMixin):
     self.ping()
     return offset
 
+  @locked
   def flush(self):
     if self.fp:
       self.fp.flush()
