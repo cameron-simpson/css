@@ -136,7 +136,7 @@ class DataFile(NestingOpenCloseMixin):
     if self.fp:
       self.fp.flush()
 
-class DataDir(O):
+class DataDir(NestingOpenCloseMixin):
   ''' A mapping of hash->Block that manages a directory of DataFiles.
       Subclasses must implement the _openIndex() method, which
       should return a mapping to store and retrieve index information.
@@ -144,10 +144,18 @@ class DataDir(O):
 
   def __init__(self, dir):
     self.dir = dir
-    self._index = None
+    self.index = None
     self._open = {}
     self._n = None
     self._lock = Lock()
+
+  def on_open(self, count):
+    if count == 1:
+      self.index = self._openIndex()
+
+  def shutdown(self):
+    self.index.sync()
+    self.index = None
 
   def _openIndex(self):
     ''' Subclasses must implement the _openIndex method, which returns a
@@ -160,12 +168,6 @@ class DataDir(O):
         relative to the DataDir.
     '''
     return os.path.join(self.dir, rpath)
-
-  @locked_property
-  def index(self):
-    ''' Property returning the index mapping.
-    '''
-    return self._openIndex()
 
   @property
   def indexpath(self):
