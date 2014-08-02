@@ -155,6 +155,11 @@ class StoreFS(Operations):
     X("TODO: create: apply mode (0o%o) to self._fh[%d]", mode, fd)
     return fd
 
+  def ftruncate(self, path, length, fd):
+    X("FTRUNCATE(%r, %d, fd=%d)...", path, length, fd)
+    fh = self._fh(fd)
+    fh.truncate(length)
+
   def getattr(self, path, fh=None):
     X("getattr: %s ...", path)
     try:
@@ -202,6 +207,7 @@ class StoreFS(Operations):
     '''
     X("open(path=%r, flags=%o)...", path, flags)
     do_create = flags & O_CREAT
+    do_trunc = flags & O_TRUNC
     for_read = (flags & O_RDONLY) == O_RDONLY or (flags & O_RDWR) == O_RDWR
     for_write = (flags & O_WRONLY) == O_WRONLY or (flags & O_RDWR) == O_RDWR
     for_append = (flags & O_APPEND) == O_APPEND
@@ -226,6 +232,8 @@ class StoreFS(Operations):
     else:
       X("open: file exists already")
     fh = FileHandle(self, path, E, for_read, for_write, for_append)
+    if do_trunc:
+      fh.truncate(0)
     X("open(%r): fh=%s", path, fh)
     fd = self._new_file_descriptor(fh)
     X("open(%r): fd=%s", path, fd)
@@ -397,6 +405,10 @@ class FileHandle(O):
       fp.seek(offset)
       data = fp.read(size)
     return data
+
+  def truncate(self, length):
+    X("FileHandle.truncate: length=%d", length)
+    self.Eopen._open_file.truncate(length)
 
   def sync(self):
     self.Eopen.sync()
