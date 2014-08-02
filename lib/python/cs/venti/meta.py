@@ -361,6 +361,10 @@ class Meta(dict):
     self['m'] = when
 
   @property
+  def dflt_acl_text(self):
+    return DEFAULT_DIR_ACL if self.E.isdir else DEFAULT_FILE_ACL
+
+  @property
   @locked
   def acl(self):
     ''' Return the live list of AC instances, decoded at need.
