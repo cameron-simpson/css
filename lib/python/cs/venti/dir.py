@@ -162,6 +162,8 @@ class _Dirent(object):
       if not isinstance(meta, Meta):
         raise TypeError("self.meta is not a Meta: <%s>%r" % (type(meta), meta))
       metatxt = meta.textencode()
+      if metatxt == meta.dflt_acl_text:
+        metatxt = ''
       if len(metatxt) > 0:
         metatxt = totext(put_bsdata(metatxt.encode()))
         flags |= F_HASMETA
