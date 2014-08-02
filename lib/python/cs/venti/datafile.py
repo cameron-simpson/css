@@ -231,9 +231,10 @@ class DataDir(NestingOpenCloseMixin):
 
   @locked_property
   def n(self):
-    ''' The index of the currently open data file.
+    ''' Compute save file index on demand.
     '''
-    return self.next_n()
+    indices = self._datafileindices()
+    return max(indices) if indices else self.next_n()
 
   def next_n(self):
     ''' Return a free index not mapping to an existing data file.
