@@ -257,8 +257,9 @@ class DataDir(NestingOpenCloseMixin):
     with self._lock:
       return h in self._index
 
+  @locked
   def flush(self):
-    for datafile in self._open:
+    for datafile in self._open.values():
       datafile.flush()
     self.index.flush()
 
