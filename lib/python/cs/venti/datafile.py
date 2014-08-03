@@ -142,8 +142,13 @@ class DataDir(NestingOpenCloseMixin):
       should return a mapping to store and retrieve index information.
   '''
 
-  def __init__(self, dir):
+  def __init__(self, dir, rollover=None):
+    ''' Initialise this DataDir with the directory path `dir` and the optional DataFIle rollover size `rollover`.
+    '''
+    if rollover is not None and rollover < 1024:
+      raise ValueError("rollover < 1024: %r" % (rollover,))
     self.dir = dir
+    self._rollover = rollver
     self.index = None
     self._open = {}
     self._n = None
@@ -228,6 +233,10 @@ class DataDir(NestingOpenCloseMixin):
       D = self.datafile(n)
       offset = D.savedata(data)
       I[hash] = self.encodeIndexEntry(n, offset)
+      with self._lock:
+        if self.n == n:
+          if self._rollover is not None and offset >= self._rollover:
+            self.set_n(self.next_n())
 
   @locked_property
   def n(self):
