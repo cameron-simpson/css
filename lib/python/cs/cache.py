@@ -1,3 +1,9 @@
+#!/usr/bin/python
+
+from collections import deque
+from threading import Lock
+from cs.threads import locked
+
 _caches=[]
 def overallHitRatio():
   if len(_caches) == 0:
@@ -117,6 +123,112 @@ class LRU(dict):
   def __iter__(self):
     for k in self.keys():
       return k
+
+class LRU_Cache(object):
+  ''' Another simple least recently used cache.
+  '''
+
+  def __init__(self, maxsize, on_add=None, on_remove=None):
+    ''' Initialise the LRU_Cache with maximum size `max`, additon callback `on_add` and removal callback `on_remove`.
+    '''
+    if maxsize < 1:
+      raise ValueError("maxsize must be >= 1, got: %r" % (maxsize,))
+    self.maxsize = maxsize
+    self.on_add = on_add
+    self.on_remove = on_remove
+    self._lock = Lock()
+    self._cache = {}
+    self._seq = 0
+    self._stash = heapq()
+
+  def _prune(self, limit=None):
+    ''' Reduce the cache to the specified limit, by default the cache maxsize.
+    '''
+    if limit is None:
+      limit = self.maxsize
+    cache = self._cache
+    cachesize = len(cache)
+    stash = self._stash
+    while cachesize > limit:
+      qseq, qkey = stash.popleft()
+      if qkey in cache:
+        seq, value = cache[qkey]
+        if seq == qseq:
+          del cache[key]
+          cachesize -= 1
+        elif seq < qseq:
+          raise RuntimeError("_prune: seq error")
+
+  @locked
+  def _winnow(self):
+    ''' Remove all obsolete entries from the stash of keys.
+        This is called if the stash exceeds double the current size of the
+        cache.
+    '''
+    newstash = deque()
+    stash = self._stash
+    cache = self._cache
+    for qseq, qkey in stash:
+      try:
+        seq, value = cache[key]
+      except KeyError:
+        continue
+      if qseq == seq:
+        newstash.append( (qseq, qkey) )
+    self._stash = newstash
+
+  def __getitem__(self, key):
+    return self._cache[key][1]
+
+  def get(self, key, default=None):
+    try:
+      return self._cache[key]
+    except KeyError:
+      return default
+
+  @locked
+  def __setitem__(self, key, value):
+    ''' Store the item in the cache. Prune if necessary.
+    '''
+    cache = self._cache
+    cache[key] = value
+    cachesize = len(cache)
+    if cachesize > self.maxsize:
+      self._prune()
+    elif cachesize*2 < len(self._stash):
+      self._winnow()
+    seq = self._seq
+    self._stash.append( (seq, key) )
+    self._seq = seq + 1
+
+  def __delitem__(self, key):
+    del self._cache[key]
+
+  def __len__(self):
+    return len(self._cache)
+
+  def __contains__(self, key):
+    return key in self._cache
+
+def lru_cache(maxsize=None, cache=None, on_add=None, on_remove=None):
+  ''' Enhanced workalike of @functools.lru_cache.
+  '''
+  if cache is None:
+    if maxsize is None:
+      maxsize = 32
+    cache = LRU_Cache(maxsize=maxsize, on_add=on_add, on_remove=on_remove)
+  elif maxsize is not None:
+    raise ValueError("maxsize must be None if cache is not None: maxsize=%r, cache=%r"
+                     % (maxsize, cache))
+  def caching_func(*a, **kw):
+    key = ( tuple(a), tuple(kw.keys()), tuple(kw.values()) )
+    try:
+      value = cache[key]
+    except KeyError:
+      value = func(*a, **kw)
+      cache[key] = value
+    return value
+  return caching_func
 
 class Cache:
   def __init__(self,backend):
