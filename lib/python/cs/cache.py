@@ -53,9 +53,11 @@ class LRU(dict):
       an array of recent key usage, but updates are O(log max)
       when the cache is full instead of O(max).
   '''
-  def __init__(self,backend,max=None):
-    if max is None: max=1024
-    assert max > 0
+  def __init__(self, backend, max=None):
+    if max is None:
+      max=1024
+    elif max < 1:
+      raise ValueError("max must be >= 1, got: %r" % (max,))
     self.__backend=backend
     self.__max=max
     self.__heap=[]
