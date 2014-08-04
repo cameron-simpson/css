@@ -15,18 +15,25 @@ import unittest
 from .cache import LRU_Cache
 from .logutils import D, X
 
+def check(o):
+  return o._selfcheck()
+
 class Test_LRU_Cache(unittest.TestCase):
 
   def test_setup(self):
     self.assertRaises(ValueError, LRU_Cache, maxsize=0)
     C = LRU_Cache(maxsize=2)
+    check(C)
     self.assertEqual(C, {})
     C[1] = 2
     self.assertEqual(C, {1:2})
+    check(C)
     C[3] = 4
     self.assertEqual(C, {1:2, 3:4})
+    check(C)
     C[5] = 6
     self.assertEqual(C, {3:4, 5:6})
+    check(C)
 
 def selftest(argv):
   unittest.main(__name__, None, argv, failfast=True)
