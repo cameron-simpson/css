@@ -19,9 +19,14 @@ class Test_LRU_Cache(unittest.TestCase):
 
   def test_setup(self):
     self.assertRaises(ValueError, LRU_Cache, maxsize=0)
-    C = LRU_Cache(maxsize=4)
+    C = LRU_Cache(maxsize=2)
+    self.assertEqual(C, {})
     C[1] = 2
     self.assertEqual(C, {1:2})
+    C[3] = 4
+    self.assertEqual(C, {1:2, 3:4})
+    C[5] = 6
+    self.assertEqual(C, {3:4, 5:6})
 
 def selftest(argv):
   unittest.main(__name__, None, argv, failfast=True)
