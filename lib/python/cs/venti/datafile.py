@@ -11,7 +11,8 @@ from os import SEEK_SET, SEEK_END
 import os.path
 from threading import Lock, RLock
 from zlib import compress, decompress
-from cs.logutils import D
+from cs.cache import LRU_Cache
+from cs.logutils import D, X
 from cs.obj import O
 from cs.queues import NestingOpenCloseMixin
 from cs.serialise import get_bs, put_bs, get_bsfp
@@ -51,11 +52,17 @@ class DataFile(NestingOpenCloseMixin):
     self.pathname = pathname
     self.fp = None
 
+  def __str__(self):
+    return "DataFile(%s)" % (self.pathname,)
+
   def on_open(self, count):
+    X("open %s", self)
     if count == 1:
+      X("open %s: first open, open file", self)
       self.fp = open(self.pathname, "a+b")
 
   def shutdown(self):
+    X("shutdown %s: close file", self)
     self.fp.close()
     self.fp = None
 
@@ -150,7 +157,7 @@ class DataDir(NestingOpenCloseMixin):
     self.dir = dir
     self._rollover = rollver
     self.index = None
-    self._open = {}
+    self._open = LRU_Cache(maxsize=4, on_remove=self._remove_open)
     self._n = None
     self._lock = Lock()
 
@@ -280,8 +287,12 @@ class DataDir(NestingOpenCloseMixin):
     with self._lock:
       D = datafiles.get(n)
       if D is None:
-        D = datafiles[n] = DataFile(self.pathto(self.datafilename(n)))
+        D = datafiles[n] = DataFile(self.pathto(self.datafilename(n))).open()
     return D
+
+  def _remove_open(self, key, value):
+    X("close %s")
+    value.close()
 
   def datafilename(self, n):
     ''' Return the file basename for file index `n`.
