@@ -1,8 +1,10 @@
 #!/usr/bin/python
 
+import sys
 from collections import deque
-from threading import Lock
+from threading import Lock, RLock
 from cs.threads import locked
+from cs.logutils import X
 
 _caches=[]
 def overallHitRatio():
@@ -65,10 +67,26 @@ class LRU_Cache(object):
     self.maxsize = maxsize
     self.on_add = on_add
     self.on_remove = on_remove
-    self._lock = Lock()
+    self._lock = RLock()
     self._cache = {}
+    self._cache_seq = {}
     self._seq = 0
-    self._stash = heapq()
+    self._stash = deque()
+
+  def __repr__(self):
+    return "<%s %s>" % (self.__class__.__name__, self._cache)
+
+  def _selfcheck(self):
+    ''' Perform various internal self checks, raise on failure.
+    '''
+    if len(self) > self.maxsize:
+      raise RuntimeError("maxsize=%d, len(self)=%d - self too big" % (self.maxsize, len(self)))
+    if len(self) < len(self._stash):
+      raise RuntimeError("len(self)=%d, len(_stash)=%d - _stash too small" % (len(self), len(self._stash)))
+    cache = self._cache
+    cache_seq = self._cache_seq
+    if len(cache) != len(cache_seq):
+      raise RuntimeError("len(_cache)=%d != len(_cache_seq)=%d" % (len(cache), len(cache_seq)))
 
   def _prune(self, limit=None):
     ''' Reduce the cache to the specified limit, by default the cache maxsize.
@@ -76,30 +94,32 @@ class LRU_Cache(object):
     if limit is None:
       limit = self.maxsize
     cache = self._cache
+    cache_seq = self._cache_seq
     cachesize = len(cache)
     stash = self._stash
     while cachesize > limit:
       qseq, qkey = stash.popleft()
       if qkey in cache:
-        seq, value = cache[qkey]
+        seq = cache_seq[qkey]
         if seq == qseq:
-          del cache[key]
+          # do not del cache[key] directly, we want the callback to fire
+          del self[qkey]
           cachesize -= 1
         elif seq < qseq:
           raise RuntimeError("_prune: seq error")
 
   @locked
   def _winnow(self):
-    ''' Remove all obsolete entries from the stash of keys.
+    ''' Remove all obsolete entries from the stash of (seq, key).
         This is called if the stash exceeds double the current size of the
         cache.
     '''
     newstash = deque()
     stash = self._stash
-    cache = self._cache
+    cache_seq = self._cache_seq
     for qseq, qkey in stash:
       try:
-        seq, value = cache[key]
+        seq = cache_seq[key]
       except KeyError:
         continue
       if qseq == seq:
@@ -107,7 +127,7 @@ class LRU_Cache(object):
     self._stash = newstash
 
   def __getitem__(self, key):
-    return self._cache[key][1]
+    return self._cache[key]
 
   def get(self, key, default=None):
     try:
@@ -120,24 +140,43 @@ class LRU_Cache(object):
     ''' Store the item in the cache. Prune if necessary.
     '''
     cache = self._cache
+    cache_seq = self._cache_seq
+    seq = self._seq
+    self._seq = seq + 1
     cache[key] = value
+    cache_seq[key] = seq
+    callback = self.on_add
+    if callback:
+      callback(key, value)
     cachesize = len(cache)
     if cachesize > self.maxsize:
       self._prune()
     elif cachesize*2 < len(self._stash):
       self._winnow()
-    seq = self._seq
     self._stash.append( (seq, key) )
-    self._seq = seq + 1
 
+  @locked
   def __delitem__(self, key):
+    ''' Delete the specified `key`, calling the on_remove callback.
+    '''
+    value = self._cache[key]
+    callback = self.on_remove
+    if callback:
+      callback(key, value)
     del self._cache[key]
+    del self._cache_seq[key]
 
   def __len__(self):
     return len(self._cache)
 
   def __contains__(self, key):
     return key in self._cache
+
+  def __eq__(self, other):
+    return self._cache == other
+
+  def __ne__(self, other):
+    return not (self == other)
 
 def lru_cache(maxsize=None, cache=None, on_add=None, on_remove=None):
   ''' Enhanced workalike of @functools.lru_cache.
@@ -288,3 +327,7 @@ class CrossReference:
   def store(self,value):
     key=self.key(value)
     self.__index[self.key(value)]=value
+
+if __name__ == '__main__':
+  import cs.cache_tests
+  cs.cache_tests.selftest(sys.argv)
