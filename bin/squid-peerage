@@ -146,13 +146,14 @@ class Proxy(O):
   def peer_access(self):
     ''' For the DIRECT peer, set always_direct.
         For other peers, set cache_peer_access;
-          reject DIRECT patterns
+          deny DIRECT patterns
           allow our patterns except for "*"
           if "*" in our patterns
             reject other non-DIRECT peers' patterns
-            then allow all
+          then
+            allow all
           else
-            reject all
+            deny all
     '''
     name = self.name
     peername = self.peername
