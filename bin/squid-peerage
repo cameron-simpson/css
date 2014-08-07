@@ -55,16 +55,21 @@ def main(argv):
             error("invalid proxname: %s", proxname)
             ok = False
           else:
-            proxies[proxname].patterns.extend(patterns)
+            proxies[proxname].add_patterns(patterns)
 
     if not ok:
       error("invalid specification")
       return 1
 
+  # define accrued ACLs
+  for proxy in proxies.values():
+    proxy.define_acls()
+
   proxnames = sorted(proxies.keys())
   for proxname in proxnames:
-    for acl in proxies[proxname].acls:
-      print(acl)
+    proxy = proxies[proxname]
+    for acl_defn in proxy.acl_definitions():
+      print(acl_defn)
 
   for proxname in proxnames:
     for access in proxies[proxname].peer_access:
@@ -106,35 +111,50 @@ class Proxy(O):
   def __init__(self, name, peername, all_proxies):
     self.name = name
     self.peername = peername
-    self.patterns = []
+    self._patterns = []
     self.all_proxies = all_proxies
+    self.also_unmatched = False
+    self.any_unmatched = False
 
-  @property
-  def acls(self):
-    ''' Define ACLs for our patterns, except "*".
+  def add_patterns(self, patterns):
+    for pattern in patterns:
+      if pattern == '*':
+        self.also_unmatched = True
+      elif pattern == '**':
+        self.any_unmatched = True
+      else:
+        self._patterns.append(pattern)
+
+  def define_acls(self):
+    ''' Define ACLs for our patterns.
     '''
+    self._acls = {}
     n = 0
     oacl_type = None
-    for pattern in self.patterns:
+    for pattern in sorted(self._patterns):
       if pattern != "*":
         acl = pattern_acl(pattern)
         acl_type, acl_text = acl.split(None, 1)
+        # squid 2 just complained about redundancy on ACL definitions
+        # squid 3 aborts, so we'll just make distinct ACLs for each pattern
+        # ghastly, yes
         if oacl_type is None or acl_type != oacl_type:
           oacl_type = acl_type
-          acl_name = "for_%s_%d" % (self.name, n)
+          acl_name = '_'.join( ('for', self.name, str(n)) )
+          self._acls[acl_name] = []
           n += 1
-        yield "acl %s %s %s" % (acl_name, acl_type, acl_text)
+        ##acl_name = '_'.join( (prefix, self.name, str(n)) )
+        ##n += 1
+        self._acls[acl_name].append("acl %s %s %s" % (acl_name, acl_type, acl_text))
 
   @property
   def acl_names(self):
-    ''' Enumerate the ACL names defained by .acls.
-    '''
-    seen = []
-    for acl in self.acls:
-      a, n, t = acl.split(None, 2)
-      if n not in seen:
-        yield n
-        seen.append(n)
+    return sorted(self._acls.keys())
+
+  def acl_definitions(self):
+    for acl_name in self.acl_names:
+      for acl_defn in self._acls[acl_name]:
+        yield acl_defn
 
   @property
   def other_proxies(self):
@@ -146,13 +166,15 @@ class Proxy(O):
   def peer_access(self):
     ''' For the DIRECT peer, set always_direct.
         For other peers, set cache_peer_access;
-          reject DIRECT patterns
-          allow our patterns except for "*"
-          if "*" in our patterns
-            reject other non-DIRECT peers' patterns
-            then allow all
+          deny DIRECT patterns
+          if not any_unmatched:
+            deny all patterns not in our list
+          allow our patterns
+          if also_unmatched or any_unmatched
+          then
+            allow all
           else
-            reject all
+            deny all
     '''
     name = self.name
     peername = self.peername
@@ -164,15 +186,13 @@ class Proxy(O):
     else:
       for acl_name in self.all_proxies['DIRECT'].acl_names:
         yield "cache_peer_access %s deny %s" % (peername, acl_name)
-      # allow our patterns (except "*")
+      if not self.any_unmatched:
+        for oproxy in self.other_proxies:
+          for acl_name in oproxy.acl_names:
+            yield "cache_peer_access %s deny %s" % (peername, acl_name)
       for acl_name in self.acl_names:
         yield "cache_peer_access %s allow %s" % (peername, acl_name)
-      if "*" in self.patterns:
-        # reject other proxies' patterns (except "*")
-        for oproxy in self.other_proxies:
-          if oproxy.name != 'DIRECT':
-            for acl_name in oproxy.acl_names:
-              yield "cache_peer_access %s deny %s" % (peername, acl_name)
+      if self.also_unmatched or self.any_unmatched:
         # allow all others
         yield "cache_peer_access %s allow all" % (peername,)
       else:
