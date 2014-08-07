@@ -322,7 +322,10 @@ def edit_groupness(MDB, addresses, subgroups):
                           ab = None
                     else:
                       ab = None
-                    A.abbreviation = ab
+                    try:
+                      A.abbreviation = ab
+                    except ValueError as e:
+                      error(e)
                     new_groups.setdefault(A, set()).update(groups)
                     realname = ustr(realname.strip())
                     if realname and realname != A.realname:
@@ -386,9 +389,12 @@ class AddressNode(Node):
     if my_abbrev is not None:
       # remove old abbrev from mapping
       del abbrevs[my_abbrev]
-    # new mapping
-    abbrevs[abbrev] = self.name
-    self.ABBREVIATION = abbrev
+    if abbrev is None:
+      self.ABBREVIATIONs = ()
+    else:
+      # new mapping
+      abbrevs[abbrev] = self.name
+      self.ABBREVIATION = abbrev
 
 class MessageNode(Node):
 
@@ -571,6 +577,20 @@ class _MailDB(NodeDB):
     except AttributeError as e:
       D("address_groups(): e = %r", e)
       raise ValueError("disaster")
+
+  @locked_property
+  def subgroups_map(self):
+    ''' Cached map of groupname to subgroup names.
+    '''
+    subgroups = {}
+    for G in self.GROUPs:
+      for parent_group in G.GROUPs:
+        subgroups.setdefault(parent_group, []).append(G.name)
+
+  def subgroups(self, group_name):
+    ''' Return a list of the subgroup names of the names group.
+    '''
+    return self.subgroups_map.get(group_name, [])
 
   @locked_property
   def abbreviations(self):
