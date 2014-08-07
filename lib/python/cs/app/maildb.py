@@ -389,9 +389,12 @@ class AddressNode(Node):
     if my_abbrev is not None:
       # remove old abbrev from mapping
       del abbrevs[my_abbrev]
-    # new mapping
-    abbrevs[abbrev] = self.name
-    self.ABBREVIATION = abbrev
+    if abbrev is None:
+      self.ABBREVIATIONs = ()
+    else:
+      # new mapping
+      abbrevs[abbrev] = self.name
+      self.ABBREVIATION = abbrev
 
 class MessageNode(Node):
 
