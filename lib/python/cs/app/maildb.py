@@ -373,7 +373,11 @@ def update_domain(MDB, old_domain, new_domain, argv):
     warning("no matching addresses")
   else:
     for addr in addrs:
-      MDB.update_domain(addr, old_domain, new_domain)
+      with Pfx(addr):
+        if not addr.endswith(old_domain):
+          warning("does not end in old domain (%s)", old_domain)
+        else:
+          MDB.update_domain(addr, old_domain, new_domain)
 
 PersonNode = Node
 
@@ -563,11 +567,11 @@ class _MailDB(NodeDB):
       A.REALNAME = ustr(realname)
     return A
 
-  def matchAddresses(self, regexp):
-    ''' Return AddressNodes matching the supplied regular expression string `regexp`.
+  def matchAddresses(self, rexp):
+    ''' Return AddressNodes matching the supplied regular expression string `rexp`.
     '''
     R = re.compile(rexp, re.I)
-    As = [ A for A in MDB.ADDRESSes if R.search(A.formatted) ]
+    As = [ A for A in self.ADDRESSes if R.search(A.formatted) ]
     return As
 
   def shortname(self, addr):
