@@ -29,6 +29,12 @@ usage="Usage:
   $cmd -e [targets...]
         Enable portfwd for targets, clearing PORTFWD_TARGET_DISABLE.
         If no targets are specified, clear PORTFWD_DISABLE.
+  $cmd -D [targets...]
+        Disable the override flag for targets, clearing PORTFWD_TARGET_OVERRIDE.
+        If no targets are specified, set PORTFWD_OVERRIDE.
+  $cmd -E [targets...]
+        Enable the override for targets, clearing PORTFWD_TARGET_OVERRIDE.
+        If no targets are specified, clear PORTFWD_OVERRIDE.
   $cmd [-1] [-F ssh_config] targets...
   -1    Once. Do not restart the tunnel if it dies.
   -F    Ssh configuration file with clause for target.
@@ -52,8 +58,10 @@ while [ $# -gt 0 ]
 do
   case $1 in
     -1) once=1 ;;
-    -d) setflag=1 flag=PORTFWD_DISABLE flagvalue=1 ;;
-    -e) setflag=1 flag=PORTFWD_DISABLE flagvalue=0 ;;
+    -d) setflag=1 flagsuffix=DISABLE flagvalue=1 ;;
+    -e) setflag=1 flagsuffix=DISABLE flagvalue=0 ;;
+    -D) setflag=1 flagsuffix=OVERRIDE flagvalue=0 ;;
+    -E) setflag=1 flagsuffix=OVERRIDE flagvalue=1 ;;
     -F) sshcfg=$2 opts="$opts $1 $2"; shift ;;
     -P) pfnames="$pfnames $2" opts="$opts $1 $2"; shift ;;
     -v) opts="$opts $1"; sshopts="$sshopts $1" ;;
@@ -115,13 +123,14 @@ then
   xit=0
   if [ $# = 0 ]
   then
+    flag=PORTFWD_${flagsuffix}
     $trace flag -w "$flag" "$flagvalue" || xit=1
   else
     for target
     do
       utarget=$( uppername "$target" )
-      tflag=PORTFWD_${utarget}_DISABLE
-      $trace flag -w "$tflag" "$flagvalue" || xit=1
+      flag=PORTFWD_${utarget}_${flagsuffix}
+      $trace flag -w "$flag" "$flagvalue" || xit=1
     done
   fi
   exit $xit
