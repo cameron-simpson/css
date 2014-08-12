@@ -13,6 +13,7 @@ set -ue
 logdir=$LOGDIR/svc
 name=
 flag_disable=
+flag_override=
 pidfile=
 trace=${DEBUG:+set-x}
 once=
@@ -30,7 +31,9 @@ usage="Usage: $cmd [-1] [-l] [-L lockname] [-n name] [-t testcmd] [-x] command [
         Use lock \"lockname\" to prevent multiple instances of this svcd.
   -n name
         Specify a name for this svcd.
-        If specified, also create a pid file at $VARRUN/name.pid for the command.
+        If specified, also create a pid file at $VARRUN/name.pid for the
+        command. This also causes svcd to consult the flags {NAME}_OVERRIDE
+        and {NAME}_DISABLE.
   -t testcmd
         Run the test command \"testcmd\" periodically to govern whether the
         command should be active.
@@ -84,14 +87,19 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+uppername()
+{ echo "$1" | tr -- '-[a-z]' '_[A-Z]'
+}
+
 [ $dolock ] \
 && exec $trace lock -1 "$lockname" "$0" $opts -n "$name" -t "$testcmd" -- "$@"
 
 if [ -n "$name" ]
 then
+  uname=$( uppername "$name" )
   [ -z "$pidfile" ] && pidfile=$VARRUN/$name.pid
-  [ -z "$flag_disable" ] \
-  && flag_disable=`echo "$name" | tr -- '-[a-z]' '_[A-Z]'`_DISABLE
+  [ -n "$flag_disable" ] || flag_disable=${uname}_DISABLE
+  [ -n "$flag_override" ] || flag_override=${uname}_OVERRIDE
   pfx="$cmd $name"
 else
   pfx="$cmd $1"
@@ -105,6 +113,7 @@ fi
 
 ok()
 {
+  [ -n "$flag_override" ] && flag -w "$flag_override" && return 0
   [ -z "$flag_disable" ] || not flag -w "$flag_disable" || return 1
   [ -z "$testcmd" ] || sh -c "$testcmd" || return 1
   return 0
