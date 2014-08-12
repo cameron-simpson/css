@@ -106,6 +106,10 @@ done
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+uppername()
+{ echo "$1" | tr -- '-[a-z]' '_[A-Z]'
+}
+
 if [ $setflag ]
 then
   xit=0
@@ -115,7 +119,7 @@ then
   else
     for target
     do
-      utarget=`echo "$target" | tr -- '-[a-z]' '_[A-Z]'`
+      utarget=$( uppername "$target" )
       tflag=PORTFWD_${utarget}_DISABLE
       $trace flag -w "$tflag" "$flagvalue" || xit=1
     done
@@ -166,12 +170,14 @@ sshpidfile()
   echo "$VARRUN/portfwd-ssh.$1.pid"
 }
 
-flag_connected=PORTFWD_`echo "$target" | tr -- '-[a-z]' '_[A-Z]'`_CONNECTED
+utarget=$(uppername "$target")
+flag_connected=PORTFWD_${utarget}_CONNECTED
 pfflags=
 pfpidfiles=
 for pfname in $pfnames
 do
-  pfflags="$pfflags "PORTFWD_`echo "$pfname" | tr -- '-[a-z]' '_[A-Z]'`_CONNECTED
+  upfname=$( uppername "$pfname" )
+  pfflags="$pfflags "PORTFWD_${upfname}_CONNECTED
   pfpidfiles="$pfpidfiles "`sshpidfile "$pfname"`
 done
 
