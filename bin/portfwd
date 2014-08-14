@@ -191,7 +191,7 @@ do
 done
 
 # construct svcd "ok to ssh" test command
-test_shcmd=' flag -w PORTFWD_ANYWAY && exit 0
+test_shcmd=' flag -w PORTFWD_OVERRIDE && exit 0
              flag -w PORTFWD_DISABLE && exit 1'
 for pfpidfile in $pfpidfiles
 do
