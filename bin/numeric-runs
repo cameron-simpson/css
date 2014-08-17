@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env py26+
 #
 # Run intergers from stdin, summarise in ordered list of runs.
 #   - Cameron Simpson <cs@zip.com.au> 17aug2014
