@@ -152,7 +152,7 @@ def write_Dirent(fp, E, when=None):
   fp.write(' ')
   fp.write(str(when))
   fp.write(' ')
-  fp.write(str(E.textencode()))
+  fp.write(E.textencode())
   fp.write(' ')
   fp.write(unctrl(E.name))
   fp.write('\n')
