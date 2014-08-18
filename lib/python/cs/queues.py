@@ -13,7 +13,7 @@ import time
 import traceback
 from cs.debug import Lock, RLock, Thread, trace_caller, stack_dump
 from cs.excutils import noexc, logexc
-from cs.logutils import exception, error, warning, debug, D, Pfx, PfxCallInfo
+from cs.logutils import exception, error, warning, debug, D, X, Pfx, PfxCallInfo
 from cs.seq import seq
 from cs.py3 import Queue, PriorityQueue, Queue_Full, Queue_Empty
 from cs.py.func import callmethod_if as ifmethod
@@ -136,13 +136,15 @@ class NestingOpenCloseMixin(O):
     return self._noc_tl.cmgr_proxies[-1]
 
   def __enter__(self):
-    ''' NestingOpenClose context managers return a proxy object.
+    ''' NestingOpenClose context managers return an open proxy.
     '''
+    # get an open proxy and push it onto the thread-local stack
     proxy = self.open()
     self._noc_tl.cmgr_proxies.append(proxy)
     return proxy
 
   def __exit__(self, exc_type, exc_value, traceback):
+    # retrieve the open proxy
     proxy = self._noc_tl.cmgr_proxies.pop()
     proxy.close()
     return False

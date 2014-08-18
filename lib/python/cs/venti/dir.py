@@ -162,6 +162,8 @@ class _Dirent(object):
       if not isinstance(meta, Meta):
         raise TypeError("self.meta is not a Meta: <%s>%r" % (type(meta), meta))
       metatxt = meta.textencode()
+      if metatxt == meta.dflt_acl_text:
+        metatxt = ''
       if len(metatxt) > 0:
         metatxt = totext(put_bsdata(metatxt.encode()))
         flags |= F_HASMETA
@@ -270,6 +272,17 @@ class FileDirent(_Dirent, NestingOpenCloseMixin):
     return self._block
 
   @locked
+  def size(self):
+    ''' Return the size of this file.
+        If open, use the open file's size.
+        Otherwise get the length of the top Block.
+    '''
+    self._check()
+    if self._open_file is not None:
+      return len(self._open_file)
+    return len(self.getBlock())
+
+  @locked
   def on_open(self, count):
     ''' Set up ._open_file on first open.
     '''
@@ -295,6 +308,14 @@ class FileDirent(_Dirent, NestingOpenCloseMixin):
     self._block = self._open_file.close()
     self._open_file = None
     self._check()
+
+  def truncate(self, length):
+    ''' Truncate this FileDirent to the specified size.
+    '''
+    Esize = self.size()
+    if Esize != length:
+      with self:
+        return self._open_file.truncate(length)
 
   def restore(self, path, makedirs=False, verbosefp=None):
     ''' Restore this _Dirent's file content to the name `path`.

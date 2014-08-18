@@ -7,14 +7,16 @@
 import sys
 from collections import namedtuple
 import os
+from os import SEEK_SET, SEEK_END
 import os.path
 from threading import Lock, RLock
 from zlib import compress, decompress
-from cs.logutils import D
+from cs.cache import LRU_Cache
+from cs.logutils import D, X
 from cs.obj import O
 from cs.queues import NestingOpenCloseMixin
 from cs.serialise import get_bs, put_bs, get_bsfp
-from cs.threads import locked_property
+from cs.threads import locked, locked_property
 
 F_COMPRESSED = 0x01
 
@@ -48,35 +50,35 @@ class DataFile(NestingOpenCloseMixin):
     self._lock = RLock()
     NestingOpenCloseMixin.__init__(self)
     self.pathname = pathname
-    self._fp = None
+    self.fp = None
 
-  def open(self, name=None):
-    return NestingOpenCloseMixin.open(self, name=name)
+  def __str__(self):
+    return "DataFile(%s)" % (self.pathname,)
 
-  @locked_property
-  def fp(self):
-    ''' Property returning the file object of the current open file.
-    '''
-    return open(self.pathname, "a+b")
+  def on_open(self, count):
+    X("open %s", self)
+    if count == 1:
+      X("open %s: first open, open file", self)
+      self.fp = open(self.pathname, "a+b")
 
   def shutdown(self):
-    ''' Close the current .fp if open.
-    '''
-    with self._lock:
-      if self._fp:
-        self._fp.close()
-        self._fp = None
+    X("shutdown %s: close file", self)
+    self.fp.close()
+    self.fp = None
 
   def scan(self, uncompress=False):
     ''' Scan the data file and yield (offset, flags, zdata) tuples.
         If `uncompress` is true, decompress the data and strip that flag value.
+        This can be used in parallel with other activity.
     '''
-    fp = self.fp
-    with self._lock:
-      fp.seek(0)
+    with self:
+      fp = self.fp
+      offset = 0
       while True:
-        offset = fp.tell()
-        flags, data = self._readRawDataHere(fp)
+        with self._lock:
+          fp.seek(offset)
+          flags, data = self._readRawDataHere(fp)
+          offset = fp.tell()
         if flags is None:
           break
         if uncompress:
@@ -90,7 +92,7 @@ class DataFile(NestingOpenCloseMixin):
     '''
     fp = self.fp
     with self._lock:
-      fp.seek(offset)
+      fp.seek(offset, SEEK_SET)
       flags, data = self._readhere(fp)
     if flags is None:
       raise RuntimeError("no data read from offset %d" % (offset,))
@@ -101,6 +103,7 @@ class DataFile(NestingOpenCloseMixin):
   def _readhere(self, fp):
     ''' Retrieve the data bytes stored at the current file offset.
         The offset points at the flags ahead of the data bytes.
+        Presumes the ._lock is already taken.
     '''
     flags = get_bsfp(fp)
     if flags is None:
@@ -127,7 +130,7 @@ class DataFile(NestingOpenCloseMixin):
         flags |= F_COMPRESSED
     fp = self.fp
     with self._lock:
-      fp.seek(0, 2)
+      fp.seek(0, SEEK_END)
       offset = fp.tell()
       fp.write(put_bs(flags))
       fp.write(put_bs(len(data)))
@@ -135,22 +138,36 @@ class DataFile(NestingOpenCloseMixin):
     self.ping()
     return offset
 
+  @locked
   def flush(self):
-    if self._fp:
-      self._fp.flush()
+    if self.fp:
+      self.fp.flush()
 
-class DataDir(O):
+class DataDir(NestingOpenCloseMixin):
   ''' A mapping of hash->Block that manages a directory of DataFiles.
       Subclasses must implement the _openIndex() method, which
       should return a mapping to store and retrieve index information.
   '''
 
-  def __init__(self, dir):
+  def __init__(self, dir, rollover=None):
+    ''' Initialise this DataDir with the directory path `dir` and the optional DataFIle rollover size `rollover`.
+    '''
+    if rollover is not None and rollover < 1024:
+      raise ValueError("rollover < 1024: %r" % (rollover,))
     self.dir = dir
-    self._index = None
-    self._open = {}
+    self._rollover = rollver
+    self.index = None
+    self._open = LRU_Cache(maxsize=4, on_remove=self._remove_open)
     self._n = None
     self._lock = Lock()
+
+  def on_open(self, count):
+    if count == 1:
+      self.index = self._openIndex()
+
+  def shutdown(self):
+    self.index.sync()
+    self.index = None
 
   def _openIndex(self):
     ''' Subclasses must implement the _openIndex method, which returns a
@@ -163,12 +180,6 @@ class DataDir(O):
         relative to the DataDir.
     '''
     return os.path.join(self.dir, rpath)
-
-  @locked_property
-  def index(self):
-    ''' Property returning the index mapping.
-    '''
-    return self._openIndex()
 
   @property
   def indexpath(self):
@@ -190,7 +201,7 @@ class DataDir(O):
       indices = self._datafileindices()
     with Pfx("scan %d", n):
       for n in indices:
-        D = self.open(n)
+        D = self.datafile(n)
         for offset, flags, data in D.scan():
           I[hashfunc(data)] = self.encodeIndexEntry(n, offset)
 
@@ -218,7 +229,7 @@ class DataDir(O):
     ''' Return the uncompressed data associated with the supplied hash.
     '''
     n, offset = self.decodeIndexEntry(self.index[hash])
-    return self.open(n).readdata(offset)
+    return self.datafile(n).readdata(offset)
 
   def __setitem__(self, hash, data):
     ''' Store the supplied `data` indexed by `hash`.
@@ -226,15 +237,20 @@ class DataDir(O):
     I = self.index
     if hash not in I:
       n = self.n
-      D = self.open(n)
+      D = self.datafile(n)
       offset = D.savedata(data)
       I[hash] = self.encodeIndexEntry(n, offset)
+      with self._lock:
+        if self.n == n:
+          if self._rollover is not None and offset >= self._rollover:
+            self.set_n(self.next_n())
 
   @locked_property
   def n(self):
-    ''' The index of the currently open data file.
+    ''' Compute save file index on demand.
     '''
-    return self.next_n()
+    indices = self._datafileindices()
+    return max(indices) if indices else self.next_n()
 
   def next_n(self):
     ''' Return a free index not mapping to an existing data file.
@@ -258,20 +274,25 @@ class DataDir(O):
     with self._lock:
       return h in self._index
 
+  @locked
   def flush(self):
-    for datafile in self._open:
+    for datafile in self._open.values():
       datafile.flush()
     self.index.flush()
 
-  def open(self, n):
-    ''' Obtain the Datafile indexed `n`.
+  def datafile(self, n):
+    ''' Obtain the Datafile with index `n`.
     '''
-    O = self._open
+    datafiles = self._open
     with self._lock:
-      D = O.get(n)
+      D = datafiles.get(n)
       if D is None:
-        D = O[n] = DataFile(self.pathto(self.datafilename(n)))
+        D = datafiles[n] = DataFile(self.pathto(self.datafilename(n))).open()
     return D
+
+  def _remove_open(self, key, value):
+    X("close %s")
+    value.close()
 
   def datafilename(self, n):
     ''' Return the file basename for file index `n`.

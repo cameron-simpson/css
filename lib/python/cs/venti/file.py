@@ -75,6 +75,11 @@ class File(BackedFile):
     self.backing_block = backing_block
     BackedFile.__init__(self, BlockFile(backing_block))
 
+  def __len__(self):
+    ''' Return the current length of the file.
+    '''
+    return max(len(self.backing_block), self.front_range.end)
+
   @locked
   def sync(self):
     ''' Commit the current state to the Store and update the current top block.
@@ -86,6 +91,31 @@ class File(BackedFile):
       self.backing_block = top_block_for(self.high_level_blocks())
       self._discard_front_file()
     return self.backing_block
+
+  @locked
+  def truncate(self, length):
+    if length < 0:
+      raise FuseOSError(errno.EINVAL)
+    cur_len = len(self)
+    front_range = self.front_range
+    backing_block0 = self.backing_block
+    if length < cur_len:
+      # shorten file
+      if front_range.end > length:
+        front_range.discard_span(cur_len, front_range.end)
+        # the front_file should also be too big
+        self.front_file.truncate(length)
+      if len(backing_block0) > length:
+        # new top Block built on previous Block
+        # this might overlap some of the front_range but the only new blocks
+        # should be the partial direct block at the end of the range, and
+        # whatever new indirect blocks get made to span things
+        self.backing_block \
+          = top_block_for(backing_block0.top_blocks(0, length))
+    elif length > cur_len:
+      # extend the front_file and front_range
+      self.front_file.truncate(length)
+      front_range.add_span(front_range.end, length)
 
   @locked
   def close(self):
@@ -122,27 +152,22 @@ class File(BackedFile):
     return b''
 
   @locked
-  def high_level_blocks(self):
-    ''' Return an iterator of new high level Blocks covering the current file data.
+  def high_level_blocks(self, start=None, end=None):
+    ''' Return an iterator of new high level Blocks covering the specified data span, by default the entire current file data.
     '''
-    for inside, span in self.front_range.slices(0, self.front_range.end):
+    if start is None:
+      start = 0
+    if end is None:
+      end = self.front_range.end
+    for inside, span in self.front_range.slices(start, end):
       if inside:
         # blockify the new data and yield the top block
         yield top_block_for(blockify(filedata(self.front_file,
                                               start=span.start,
                                               end=span.end)))
       else:
-        # yield high level blocks and new partial Blocks
-        # from the old data
-        for B, start, end in self.backing_block.top_slices(span.start, span.end):
-          if start == 0 and end == len(B):
-            # an extant high level block
-            yield B
-          else:
-            # should be a new partial block
-            if B.indirect:
-              raise RuntimeError("got slice for partial Block %s start=%r end=%r but Block is indirect! should be a partial leaf" % (B, start, end))
-            yield Block(data=B[start:end])
+        for B in self.backing_block.top_blocks(span.start, span.end):
+          yield B
 
 def filedata(fp, rsize=8192, start=None, end=None):
   ''' A generator to yield chunks of data from a file.
