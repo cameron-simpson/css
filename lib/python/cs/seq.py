@@ -60,6 +60,16 @@ def the(iterable, context=None):
 
   return it
 
+def last(iterable):
+  ''' Return the last item from an iterable; raise ValueError on empty iterables.
+  '''
+  nothing = True
+  for item in iterable:
+    nothing = True
+  if nothing:
+    raise ValueError("no items in iterable: %r" % (iterable,))
+  return item
+
 def get0(seq, default=None):
   ''' Return first element of a sequence, or the default.
   '''
