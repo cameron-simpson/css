@@ -81,8 +81,7 @@ def archive(arfile, path, modes):
       if arfile == '-':
         write_Dirent(sys.stdout, E)
       else:
-        with open(arfile, "a") as arfp:
-          write_Dirent(arfp, E)
+        save_Dirent(arfile, E)
   return ok
 
 def retrieve(arfile, paths=None):
@@ -125,8 +124,15 @@ def toc(arfile, paths=None, verbose=False, fp=None):
     else:
       toc_report(fp, path, E, verbose)
 
+def save_Dirent(path, E, when=None):
+  ''' Save the supplied Dirent `E` to the file `path` with timestamp `when` (default now).
+  '''
+  with lockfile(path):
+    with open(path, "a") as fp:
+      write_Dirent(fp, E, when=when)
+
 def read_Dirents(fp):
-  ''' Generator to yield (unixtime, Dirent) from archive file.
+  ''' Generator to yield (unixtime, Dirent) from an open archive file.
   '''
   lineno = 0
   for line in fp:
@@ -143,7 +149,7 @@ def read_Dirents(fp):
     yield when, E
 
 def write_Dirent(fp, E, when=None):
-  ''' Write a Dirent to an archive file:
+  ''' Write a Dirent to an open archive file:
         isodatetime unixtime totext(dirent) dirent.name
   '''
   if when is None:
