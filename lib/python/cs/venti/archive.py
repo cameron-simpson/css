@@ -24,24 +24,24 @@ from .blockify import blockFromFile
 from .dir import decode_Dirent_text, Dir
 from .paths import copy_in_dir, copy_in_file
 
-def archive(arfile, path, modes):
+def archive(arpath, path, modes):
   ''' Archive the named file path.
-      Get the last dirref from the `arfile`, if any, otherwise make a new Dir.
+      Get the last dirref from the `arpath`, if any, otherwise make a new Dir.
       Store the `path` (updating the Dir).
-      Save the new dirref to `arfile`.
+      Save the new dirref to `arpath`.
   '''
   ok = True
   # look for existing archive for comparison
   oldtime, oldE = None, None
-  if arfile == '-':
+  if arpath == '-':
     arfp = sys.stdin
     # refuse to use terminal as input
     if arfp.isatty():
-      arfp = None
+      raise ValueError("will not read from a tty")
   else:
-    with Pfx(arfile):
+    with Pfx(arpath):
       try:
-        arfp = open(arfile)
+        arfp = open(arpath)
       except OSError as e:
         if e.errno == errno.ENOENT:
           arfp = None
@@ -51,14 +51,14 @@ def archive(arfile, path, modes):
     for unixtime, E in read_Dirents(arfp):
       if E.name == path and (oldtime is None or unixtime >= oldtime):
         oldtime, oldE = unixtime, E
-    if arfile != '-':
+    if arpath != '-':
       arfp.close()
     B = E.getBlock()
     try:
       refdata = B.data
     except KeyError as e:
       warning("%s: %r: can't load data from Store, ignoring",
-              arfile, B.hashcode)
+              arpath, B.hashcode)
       oldtime, oldE = None, None
 
   with Pfx("archive(%s)", path):
@@ -75,13 +75,13 @@ def archive(arfile, path, modes):
       E = copy_in_file(path)
 
     E.name = path
-    if arfile is None:
+    if arpath is None:
       write_Dirent(sys.stdout, E)
     else:
-      if arfile == '-':
+      if arpath == '-':
         write_Dirent(sys.stdout, E)
       else:
-        save_Dirent(arfile, E)
+        save_Dirent(arpath, E)
   return ok
 
 def retrieve(arfile, paths=None):
