@@ -37,7 +37,7 @@ def seq():
   global __seq
   return next(__seq)
 
-def the(list, context=None):
+def the(iterable, context=None):
   ''' Returns the first element of an iterable, but requires there to be
       exactly one.
   '''
@@ -46,7 +46,7 @@ def the(list, context=None):
     icontext=icontext+" for "+context
 
   first=True
-  for elem in list:
+  for elem in iterable:
     if first:
       it=elem
       first=False
