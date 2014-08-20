@@ -230,6 +230,13 @@ class Block(_Block):
     _Block.__init__(self, **kw)
     self.indirect = False
 
+  def matches_data(self, odata):
+    ''' Check supplied bytes `odata` against this Block's hashcode.
+        NB: _not_ defined on indirect Blocks to avoid mistakes.
+    '''
+    hashcode = defaults.S.hash(odata)
+    return hashcode == self.hashcode
+
   @property
   def leaves(self):
     yield self
