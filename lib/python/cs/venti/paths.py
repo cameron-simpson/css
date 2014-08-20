@@ -5,12 +5,9 @@
 #
 
 import os
-from cs.inttypes import Flags
 from cs.logutils import Pfx, D, info, warning, error
 from .file import file_top_block
 from .dir import decode_Dirent_text, FileDirent
-
-CopyModes = Flags('delete', 'do_mkdir', 'ignore_existing', 'trust_size_mtime')
 
 def dirent_dir(direntpath, do_mkdir=False):
   dir, name = dirent_resolve(direntpath, do_mkdir=do_mkdir)
@@ -87,96 +84,6 @@ def walk(rootD, topdown=True):
       else:
         subpath = dir
       pending.push( (subD, subpath) )
-
-def copy_in_dir(rootpath, rootD, modes=None):
-  ''' Copy the os directory tree at `rootpath` over the Dir `rootD`.
-      `modes` is an optional CopyModes value.
-  '''
-  if modes is None:
-    modes = CopyModes(0)
-  with Pfx("copy_in(%s)", rootpath):
-    rootpath_prefix = rootpath + '/'
-    for ospath, dirnames, filenames in os.walk(rootpath):
-      with Pfx(ospath):
-        if ospath == rootpath:
-          dirD = rootD
-        elif ospath.startswith(rootpath_prefix):
-          dirD, name = resolve(rootD, ospath[len(rootpath_prefix):])
-          dirD = dirD.chdir1(name)
-
-        if not os.path.isdir(rootpath):
-          warning("not a directory?")
-
-        if modes.delete:
-          # Remove entries in dirD not present in the real filesystem
-          allnames = set(dirnames)
-          allnames.update(filenames)
-          Dnames = sorted(dirD.keys())
-          for name in Dnames:
-            if name not in allnames:
-              info("delete %s", name)
-              del dirD[name]
-
-        for dirname in sorted(dirnames):
-          with Pfx("%s/", dirname):
-            if dirname not in dirD:
-              dirD.mkdir(dirname)
-            else:
-              E = dirD[dirname]
-              if not E.isdir:
-                # old name is not a dir - toss it and make a dir
-                del dirD[dirname]
-                E = dirD.mkdir(dirname)
-
-        for filename in sorted(filenames):
-          with Pfx(filename):
-            if modes.ignore_existing and filename in dirD:
-              info("skipping, already Stored")
-              continue
-            filepath = os.path.join(ospath, filename)
-            if not os.path.isfile(filepath):
-              warning("not a regular file, skipping")
-              continue
-            matchBlocks = None
-            if filename in dirD:
-              fileE = dirD[filename]
-              B = fileE.getBlock()
-              if modes.trust_size_mtime:
-                M = fileE.meta
-                st = os.stat(filepath)
-                if st.st_mtime == M.mtime and st.st_size == B.span:
-                  info("skipping, same mtime and size")
-                  continue
-                else:
-                  debug("DIFFERING size/mtime: B.span=%d/M.mtime=%s VS st_size=%d/st_mtime=%s",
-                    B.span, M.mtime, st.st_size, st.st_mtime)
-              info("comparing with %s", B)
-              matchBlocks = B.leaves
-            try:
-              E = copy_in_file(filepath, matchBlocks=matchBlocks)
-            except OSError as e:
-              error(str(e))
-              continue
-            except IOError as e:
-              error(str(e))
-              continue
-            dirD[filename] = E
-
-def copy_in_file(filepath, name=None, rsize=None, matchBlocks=None):
-  ''' Store the file named `filepath`.
-      Return the FileDirent.
-  '''
-  if name is None:
-    name = os.path.basename(filepath)
-  with Pfx(filepath):
-    with open(filepath, "rb") as sfp:
-      B = file_top_block(sfp, rsize=rsize, matchBlocks=matchBlocks)
-      st = os.fstat(sfp.fileno())
-      if B.span != st.st_size:
-        error("MISMATCH: %s: B.span=%d, st_size=%d", filepath, B.span, st.st_size)
-    E = FileDirent(name, None, B)
-    E.meta.update_from_stat(st)
-  return E
 
 def copy_out(rootD, rootpath, modes=None):
   ''' Copy the Dir `rootD` onto the os directory `rootpath`.
