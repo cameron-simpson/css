@@ -17,12 +17,16 @@ import sys
 import time
 from datetime import datetime
 import errno
+from itertools import takewhile
+from cs.inttypes import Flags
 from cs.lex import unctrl
-from cs.logutils import D, Pfx, error
+from cs.logutils import D, Pfx, error, X
 from . import totext, fromtext
-from .blockify import blockFromFile
+from .blockify import blockify
 from .dir import decode_Dirent_text, Dir
-from .paths import copy_in_dir, copy_in_file
+from .file import filedata
+
+CopyModes = Flags('delete', 'do_mkdir', 'ignore_existing', 'trust_size_mtime')
 
 def archive(arpath, path, modes):
   ''' Archive the named file path.
@@ -124,6 +128,25 @@ def toc(arfile, paths=None, verbose=False, fp=None):
     else:
       toc_report(fp, path, E, verbose)
 
+def update(arpath, ospath, create_archive=False):
+  when, E = None, None
+  with Pfx("update %r", arpath):
+    try:
+      with open(arfile, "r") as arfp:
+        when, E = last(read_Dirents(arfp))
+    except OSError as e:
+      if e.errno != errno.ENOENT:
+        raise
+  base = os.path.basename(ospath)
+  if os.path.isdir(ospath):
+    if E is None or not E.isdir:
+      E = Dir(base)
+    copy_in_dir(ospath, E, modes)
+  else:
+    if E is None or not E.isfile:
+      E = FileDirent(base)
+    copy_in_file(E, ospath)
+
 def save_Dirent(path, E, when=None):
   ''' Save the supplied Dirent `E` to the file `path` with timestamp `when` (default now).
   '''
@@ -162,3 +185,107 @@ def write_Dirent(fp, E, when=None):
   fp.write(' ')
   fp.write(unctrl(E.name))
   fp.write('\n')
+
+def copy_in_dir(rootD, rootpath, modes):
+  ''' Copy the os directory tree at `rootpath` over the Dir `rootD`.
+      `modes` is an optional CopyModes value.
+  '''
+  with Pfx("copy_in(%s)", rootpath):
+    rootpath_prefix = rootpath + '/'
+    for ospath, dirnames, filenames in os.walk(rootpath):
+      with Pfx(ospath):
+        if ospath == rootpath:
+          dirD = rootD
+        elif ospath.startswith(rootpath_prefix):
+          dirD, name = resolve(rootD, ospath[len(rootpath_prefix):])
+          dirD = dirD.chdir1(name)
+
+        if not os.path.isdir(rootpath):
+          warning("not a directory?")
+
+        if modes.delete:
+          # Remove entries in dirD not present in the real filesystem
+          allnames = set(dirnames)
+          allnames.update(filenames)
+          Dnames = sorted(dirD.keys())
+          for name in Dnames:
+            if name not in allnames:
+              info("delete %s", name)
+              del dirD[name]
+
+        for dirname in sorted(dirnames):
+          with Pfx("%s/", dirname):
+            if dirname not in dirD:
+              dirD.mkdir(dirname)
+            else:
+              E = dirD[dirname]
+              if not E.isdir:
+                # old name is not a dir - toss it and make a dir
+                del dirD[dirname]
+                E = dirD.mkdir(dirname)
+
+        for filename in sorted(filenames):
+          with Pfx(filename):
+            if modes.ignore_existing and filename in dirD:
+              info("skipping, already Stored")
+              continue
+            filepath = os.path.join(ospath, filename)
+            if not os.path.isfile(filepath):
+              warning("not a regular file, skipping")
+              continue
+            matchBlocks = None
+            if filename not in dirD:
+              fileE = FileDirent(filename)
+              dirD[filename] = fileE
+            else:
+              fileE = dirD[filename]
+              if modes.trust_size_mtime:
+                M = fileE.meta
+                st = os.stat(filepath)
+                if st.st_mtime == M.mtime and st.st_size == B.span:
+                  info("skipping, same mtime and size")
+                  continue
+                else:
+                  debug("DIFFERING size/mtime: B.span=%d/M.mtime=%s VS st_size=%d/st_mtime=%s",
+                    B.span, M.mtime, st.st_size, st.st_mtime)
+            try:
+              copy_in_file(fileE, filepath, modes)
+            except OSError as e:
+              error(str(e))
+              continue
+            except IOError as e:
+              error(str(e))
+              continue
+
+def copy_in_file(E, filepath, modes):
+  ''' Store the file named `filepath` over the FileDirent `E`.
+  '''
+  X("copy_in_file(%r)", filepath)
+  with Pfx(filepath):
+    with open(filepath, "rb") as sfp:
+      B = top_block_for(_blockify_file(sfp, E))
+      st = os.fstat(sfp.fileno())
+      if B.span != st.st_size:
+        warning("MISMATCH: B.span=%d, st_size=%d", B.span, st.st_size)
+  E = FileDirent(name, None, B)
+  E.meta.update_from_stat(st)
+
+def _blockify_file(fp, E):
+  ''' Read data from the file `fp` and compare with the FileDirect `E`, yielding leaf Blocks for a new file.
+      This supports update_file().
+  '''
+  # read file data in chunks matching the existing leaves
+  # return the leaves while the data match
+  for B in E.getBlock().leaves:
+    data = sfp.read(len(B))
+    if len(data) == 0:
+      # EOF
+      return
+    if len(data) != len(B):
+      break
+    if not B.matches_data(data):
+      break
+    yield B
+  # blockify the remaining file data
+  for B in blockify(chain( [data], filedata(fp) )):
+    yield B
