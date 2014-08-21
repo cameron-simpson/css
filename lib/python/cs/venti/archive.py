@@ -119,7 +119,7 @@ def toc_report(fp, path, E, verbose):
     for subpath in sorted(E.keys()):
       toc_report(fp, os.path.join(path, subpath), E[subpath], verbose)
 
-def toc(arfile, paths=None, verbose=False, fp=None):
+def toc_archive(arfile, paths=None, verbose=False, fp=None):
   if fp is None:
     fp = sys.stdout
   for path, E in retrieve(arfile, paths):
