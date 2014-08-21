@@ -128,24 +128,43 @@ def toc(arfile, paths=None, verbose=False, fp=None):
     else:
       toc_report(fp, path, E, verbose)
 
-def update(arpath, ospath, create_archive=False):
-  when, E = None, None
+def update_archive(arpath, ospath, modes, create_archive=False):
+  ''' Update the archive file `arpath` from `ospath`.
+     `ospath` is taken to match with the top of the archive.
+  '''
+  last_entry = None
   with Pfx("update %r", arpath):
     try:
       with open(arfile, "r") as arfp:
-        when, E = last(read_Dirents(arfp))
+        try:
+          last_entry = last(read_Dirents(arfp))
+        except IndexError:
+          last_entry = None
     except OSError as e:
       if e.errno != errno.ENOENT:
         raise
-  base = os.path.basename(ospath)
-  if os.path.isdir(ospath):
-    if E is None or not E.isdir:
-      E = Dir(base)
-    copy_in_dir(ospath, E, modes)
-  else:
-    if E is None or not E.isfile:
-      E = FileDirent(base)
-    copy_in_file(E, ospath)
+      if not create_archive:
+        raise ValueError("missing archive (%s), not creating" % (e,))
+    base = os.path.basename(ospath)
+    if os.path.isdir(ospath):
+      if last_entry is None:
+        E = Dir(base)
+      else:
+        when, E = last_entry
+        if not E.isdir:
+          E = Dir(base)
+      copy_in_dir(E, ospath, modes)
+    elif os.path.isfile(ospath):
+      if last_entry is None:
+        E = FileDirent(base)
+      else:
+        when, E = last_entry
+        if not E.isfile:
+          E = FileDirent(base)
+      copy_in_file(E, ospath, modes)
+    else:
+      raise ValueError("unsupported ospath (%r), not directory or file" % (ospath,))
+    save_Dirent(arpath, E)
 
 def save_Dirent(path, E, when=None):
   ''' Save the supplied Dirent `E` to the file `path` with timestamp `when` (default now).
@@ -192,6 +211,7 @@ def copy_in_dir(rootD, rootpath, modes):
   '''
   with Pfx("copy_in(%s)", rootpath):
     rootpath_prefix = rootpath + '/'
+    # TODO: try out scandir sometime
     for ospath, dirnames, filenames in os.walk(rootpath):
       with Pfx(ospath):
         if ospath == rootpath:
