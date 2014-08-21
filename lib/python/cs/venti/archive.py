@@ -28,66 +28,6 @@ from .file import filedata
 
 CopyModes = Flags('delete', 'do_mkdir', 'ignore_existing', 'trust_size_mtime')
 
-def archive(arpath, path, modes):
-  ''' Archive the named file path.
-      Get the last dirref from the `arpath`, if any, otherwise make a new Dir.
-      Store the `path` (updating the Dir).
-      Save the new dirref to `arpath`.
-  '''
-  ok = True
-  # look for existing archive for comparison
-  oldtime, oldE = None, None
-  if arpath == '-':
-    arfp = sys.stdin
-    # refuse to use terminal as input
-    if arfp.isatty():
-      raise ValueError("will not read from a tty")
-  else:
-    with Pfx(arpath):
-      try:
-        arfp = open(arpath)
-      except OSError as e:
-        if e.errno == errno.ENOENT:
-          arfp = None
-        else:
-          raise
-  if arfp:
-    for unixtime, E in read_Dirents(arfp):
-      if E.name == path and (oldtime is None or unixtime >= oldtime):
-        oldtime, oldE = unixtime, E
-    if arpath != '-':
-      arfp.close()
-    B = E.getBlock()
-    try:
-      refdata = B.data
-    except KeyError as e:
-      warning("%s: %r: can't load data from Store, ignoring",
-              arpath, B.hashcode)
-      oldtime, oldE = None, None
-
-  with Pfx("archive(%s)", path):
-    if os.path.isdir(path):
-      if oldE is None or not oldE.isdir:
-        E = Dir(os.path.basename(path))
-      else:
-        E = oldE
-      copy_in_dir(path, E, modes)
-    elif not os.path.isfile(path):
-      error("not a directory or regular file")
-      return False
-    else:
-      E = copy_in_file(path)
-
-    E.name = path
-    if arpath is None:
-      write_Dirent(sys.stdout, E)
-    else:
-      if arpath == '-':
-        write_Dirent(sys.stdout, E)
-      else:
-        save_Dirent(arpath, E)
-  return ok
-
 def retrieve(arfile, paths=None):
   ''' Retrieve Dirents for the named file paths, or None if a
       path does not resolve.
