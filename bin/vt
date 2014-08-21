@@ -42,7 +42,7 @@ from cs.venti.block import Block, IndirectBlock, dump_block
 from cs.venti.store import Store
 from cs.venti.cache import CacheStore, MemCacheStore
 from cs.venti.paths import dirent_dir, dirent_file, dirent_resolve
-from cs.venti.archive import CopyModes, update_archive
+from cs.venti.archive import CopyModes, update_archive, toc_archive
 
 def main(argv):
   setup_logging(upd_mode=False)
@@ -265,8 +265,6 @@ def cmd_ar(args):
     raise GetoptError("bad options")
 
   xit = 0
-
-  import cs.venti.archive
   
   if verbose:
     warning("cmd_ar: verbose specified but not implemented")
@@ -276,7 +274,7 @@ def cmd_ar(args):
     else:
       paths = None
     with Pfx("tf %s" % (arfile,)):
-      cs.venti.archive.toc(arfile, paths)
+      toc_archive(arfile, paths)
   elif mode == 'u':
     for path in args:
       try:
