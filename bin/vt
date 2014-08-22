@@ -244,11 +244,11 @@ def cmd_ar(args):
   verbose = False
   modes = CopyModes()
   modes.trust_size_mtime = True
-  arfile = '-'
+  arpath = '-'
   mode = opts[0]
   for opt in opts[1:]:
     if opt == 'f':
-      arfile = args.pop(0)
+      arpath = args.pop(0)
     elif opt == 'v':
       verbose = True
     elif opt == 'A':
@@ -270,29 +270,25 @@ def cmd_ar(args):
     warning("cmd_ar: verbose specified but not implemented")
   if mode == 't':
     if args:
-      paths = args
+      ospaths = args
     else:
-      paths = None
-    with Pfx("tf %s" % (arfile,)):
-      toc_archive(arfile, paths)
+      ospaths = None
+    with Pfx("tf %s" % (arpath,)):
+      toc_archive(arpath, ospaths)
   elif mode == 'u':
     for path in args:
       try:
-        ok = cs.venti.archive.archive(arfile, path, modes)
+        update_archive(arpath, path, modes, create_archive=True, path)
       except IOError as e:
         error("archive %s: %s" % (path, e))
         xit = 1
-      else:
-        if not ok:
-          error("archive %s: cs.venti.archive.archive: not ok", path)
-          xit = 1
   elif mode == 'x':
     if args:
-      paths = args
+      ospaths = args
     else:
-      paths = None
-    with Pfx("xf %s" % (arfile,)):
-      for path, E in cs.venti.archive.retrieve(arfile, paths, modes):
+      ospaths = None
+    with Pfx("xf %s" % (arpath,)):
+      for path, E in cs.venti.archive.retrieve(arpath, ospaths, modes):
         if E is None:
           error("retrieve %s: not found" % (path,))
           xit = 1
