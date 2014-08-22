@@ -10,12 +10,7 @@ from cs.logutils import D
 from cs.serialise import get_bs, put_bs
 
 # enums for hash types, used in encode/decode
-# TODO: use classes directly?
 HASH_SHA1_T = 0
-HASH_SIZE_SHA1 = 20                               # size of SHA-1 hash
-HASH_SIZE_DEFAULT = 20                            # default size of hash
-                                                # NEVER CHANGE HASH_SIZE!!!
-assert HASH_SIZE_DEFAULT == 20
 
 def decode(bs, offset=0):
   ''' Decode a serialised hash.
