@@ -234,7 +234,7 @@ class Block(_Block):
     ''' Check supplied bytes `odata` against this Block's hashcode.
         NB: _not_ defined on indirect Blocks to avoid mistakes.
     '''
-    return self.hashcode == self.hashcode.fromData(odata)
+    return self.hashcode == self.hashcode.from_data(odata)
 
   @property
   def leaves(self):

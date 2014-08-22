@@ -42,7 +42,7 @@ class Hash_SHA1(bytes):
     return "Hash_SHA1:" + hexify(self)
 
   @classmethod
-  def fromData(cls, data):
+  def from_data(cls, data):
     ''' Factory function returning a Hash_SHA1 object for a data block.
     '''
     hashcode = sha1(data).digest()

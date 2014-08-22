@@ -160,7 +160,7 @@ class BasicStore(NestingOpenCloseMixin):
   def hash(self, data):
     ''' Return a Hash object from data bytes.
     '''
-    return self.hashclass.fromData(data)
+    return self.hashclass.from_data(data)
 
   def keys(self):
     ''' For a big store this is almost certainly unreasonable.
