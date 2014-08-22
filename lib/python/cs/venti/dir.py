@@ -491,21 +491,23 @@ class Dir(_Dirent):
     ''' Like os.makedirs(), create a directory path at need.
         Returns the bottom directory.
     '''
-    D = self
-    for name in path.split('/'):
-      if len(name) == 0:
-        continue
-      if name == '.':
+    E = self
+    if isinstance(path, str):
+      subpaths = path_split(path)
+    else:
+      subpaths = path
+    for name in subpaths:
+      if name == '' or name == '.':
         continue
       if name == '..':
-        D = D.parent
+        E = E.parent
         continue
-      E = D.get(name)
-      if E is None:
-        E = D.mkdir(name)
+      subE = E.get(name)
+      if subE is None:
+        subE = E.mkdir(name)
       else:
-        if not E.isdir:
-          raise ValueError("%s[name=%s] is not a directory" % (D, name))
-      D = E
+        if not subE.isdir:
+          raise ValueError("%s[name=%s] is not a directory" % (subE, name))
+      E = subE
 
     return D
