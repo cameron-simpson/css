@@ -21,15 +21,42 @@ def decode(bs, offset=0):
     hashcls = Hash_SHA1
   else:
     raise ValueError("unsupported hashenum %d", hashenum)
-  hashlen = hashcls.HASHLEN
-  hashdata = bs[offset:offset+hashlen]
-  if len(hashdata) < hashlen:
-    raise ValueError("short hashdata, expected %d bytes, got %d: %r"
-                     % (hashlen, len(hashdata), hashdata))
-  offset += len(hashdata)
-  return hashcls(hashdata), offset
+  return hashcls(decode(bs, offset))
 
-class Hash_SHA1(bytes):
+class _Hash(bytes):
+
+  def encode(self):
+    ''' Return the serialised form of this hash object: hash enum plus hash bytes.
+        If we ever have a variable length hash function, hash bytes with include that information.
+    '''
+    # no hashenum and raw hash
+    return self.HASHENUM_BS + self
+
+  @classmethod
+  def decode(cls, encdata, offset=0):
+    ''' Pull off the encoded hash from the start of the encdata.
+        Return Hash_* object and new offset.
+    '''
+    hashenum = encdata[offset]
+    if hashenum != cls.HASHENUM:
+      raise ValueError("unexpected hashenum; expected 0x%02x, found %r"
+                       % (cls.HASHENUM, hashenum))
+    offset += 1
+    hashbytes = encdata[offset:offset+cls.HASHLEN]
+    if len(hashbytes) != cls.HASHLEN:
+      raise ValueError("short data? got %d bytes, expected %d: %r"
+                       % (len(hashbytes), cls.HASHLEN, encdata[offset:offset+cls.HASHLEN]))
+    return cls.from_hashbytes(hashbytes), offset+len(hashbytes)
+
+  @classmethod
+  def from_hashbytes(cls, hashbytes):
+    ''' Factory function returning a Hash_SHA1 object from the hash bytes.
+    '''
+    if len(hashbytes) != cls.HASHLEN:
+      raise ValueError("expected %d bytes, received %d: %r" % (cls.HASHLEN, len(hashbytes), hashbytes))
+    return cls(hashbytes)
+
+class Hash_SHA1(_Hash):
   HASHLEN = 20
   HASHENUM = HASH_SHA1_T
   HASHENUM_BS = put_bs(HASHENUM)
@@ -46,34 +73,7 @@ class Hash_SHA1(bytes):
     ''' Factory function returning a Hash_SHA1 object for a data block.
     '''
     hashcode = sha1(data).digest()
-    return cls.fromHashcode(hashcode)
-
-  @classmethod
-  def fromHashcode(cls, hashcode):
-    assert len(hashcode) == cls.HASHLEN
-    return cls(hashcode)
-
-  def encode(self):
-    ''' Return the serialised form of this hash object.
-    '''
-    # no hashenum and raw hash
-    return self.HASHENUM_BS + self
-
-  @classmethod
-  def decode(cls, encdata, offset=0):
-    ''' Pull off the encoded hash from the start of the encdata.
-        Return Hash_SHA1 object and tail of encdata.
-    '''
-    hashenum = encdata[offset]
-    if hashenum != cls.HASHENUM:
-      raise ValueError("unexpected hashenum; expected 0x%02x, found %r"
-                       % (cls.HASHENUM, hashenum))
-    offset += 1
-    hashdata = encdata[offset:offset+cls.HASHLEN]
-    if len(hashdata) != cls.HASHLEN:
-      raise ValueError("short data? got %d bytes, expected %d: %r"
-                       % (len(hashdata), cls.HASHLEN, encdata[offset:offset+cls.HASHLEN]))
-    return cls.fromHashcode(hashdata), offset+len(hashdata)
+    return cls.from_hashbytes(hashcode)
 
 if __name__ == '__main__':
   import cs.venti.hash_tests
