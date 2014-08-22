@@ -487,8 +487,9 @@ class Dir(_Dirent):
       D = D.chdir1(name)
     return D
 
-  def makedirs(self, path):
+  def makedirs(self, path, force=False):
     ''' Like os.makedirs(), create a directory path at need.
+        If `force`, replace an non-DIr encountered with an empty Dir.
         Returns the bottom directory.
     '''
     E = self
@@ -507,7 +508,10 @@ class Dir(_Dirent):
         subE = E.mkdir(name)
       else:
         if not subE.isdir:
-          raise ValueError("%s[name=%s] is not a directory" % (subE, name))
+          if force:
+            subE = E.mkdir(name)
+          else:
+            raise ValueError("%s[name=%s] is not a directory" % (subE, name))
       E = subE
 
-    return D
+    return E
