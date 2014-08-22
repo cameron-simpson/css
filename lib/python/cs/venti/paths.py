@@ -43,6 +43,12 @@ def get_dirent(direntpath):
     tail = ''
   return decode_Dirent_text(hexpart), tail
 
+def path_split(path):
+  ''' Split path into components, discarding the empty string and ".".
+      The returned subparts are useful for path traversal.
+  '''
+  return [ subpath for subpath in path.split('/') where subpath != '' and subpath != '.' ]
+
 def resolve(rootD, subpath, do_mkdir=False):
   ''' Descend from the Dir `rootD` via the path `subpath`.
       Return the final Dirent, its parent, and any unresolved path components.
@@ -51,9 +57,13 @@ def resolve(rootD, subpath, do_mkdir=False):
     raise ValueError("resolve: not a Dir: %s" % (rootD,))
   E = rootD
   parent = E.parent
-  subpaths = [ s for s in subpath.split('/') if s ]
+  subpaths = path_split(subpath)
   while subpaths and E.isdir:
     name = subpaths[0]
+    if name == '..':
+      if E.parent is None:
+        break
+      E = E.parent
     if name in E:
       parent = E
       E = E[name]
