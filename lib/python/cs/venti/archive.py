@@ -13,6 +13,7 @@
 
 from __future__ import print_function
 import os
+import stat
 import sys
 import time
 from datetime import datetime
@@ -68,12 +69,23 @@ def toc_archive(arfile, paths=None, verbose=False, fp=None):
     else:
       toc_report(fp, path, E, verbose)
 
-def update_archive(arpath, ospath, modes, create_archive=False):
+def update_archive(arpath, ospath, modes, create_archive=False, arsubpath=None):
   ''' Update the archive file `arpath` from `ospath`.
-     `ospath` is taken to match with the top of the archive.
+     `ospath` is taken to match with the top of the archive plus the `arsubpath` if supplied.
   '''
-  last_entry = None
-  with Pfx("update %r", arpath):
+  with Pfx("update %r <== %r", arpath, ospath):
+    base = os.path.basename(ospath)
+    # stat early once, fail early if necessary
+    st = stat(ospath)
+    if stat.S_ISDIR(st.st_mode):
+      isdir = True
+    elif stat.S_ISREG(st.st_mode):
+      isdir = False
+    else:
+      raise ValueError("unsupported OS file type 0o%o, expected file or directory" % (st.st_mode,))
+
+    # load latest archive root
+    last_entry = None
     try:
       with open(arfile, "r") as arfp:
         try:
@@ -85,26 +97,47 @@ def update_archive(arpath, ospath, modes, create_archive=False):
         raise
       if not create_archive:
         raise ValueError("missing archive (%s), not creating" % (e,))
-    base = os.path.basename(ospath)
-    if os.path.isdir(ospath):
-      if last_entry is None:
-        E = Dir(base)
-      else:
-        when, E = last_entry
-        if not E.isdir:
-          E = Dir(base)
-      copy_in_dir(E, ospath, modes)
-    elif os.path.isfile(ospath):
-      if last_entry is None:
-        E = FileDirent(base)
-      else:
-        when, E = last_entry
-        if not E.isfile:
-          E = FileDirent(base)
-      copy_in_file(E, ospath, modes)
+
+    # prep the subpath components
+    if arsubpath is not None:
+      subpaths = path_split(arsubpath)
     else:
-      raise ValueError("unsupported ospath (%r), not directory or file" % (ospath,))
-    save_Dirent(arpath, E)
+      subpaths = []
+
+    if last_entry is None:
+      when, rootE = last_entry
+    elif subpaths:
+      rootE = Dir()
+    elif isdir:
+      rootE = Dir(base)
+    else:
+      rootE = FileDirent(base)
+
+    # create subdirectories
+    while len(subpaths) > 1:
+      name = subpaths.pop(0)
+      subE = E.get(name)
+      if subE is None or not subE.isdir:
+        subE = E.mkdir(name)
+
+    # create leaf node
+    if subpaths:
+      name, = subpaths
+      subE = E.get(name)
+      if isdir and not subE.isdir:
+        subE = E.mkdir(name)
+      elif not isdir and not subE.isfile:
+        subE = E[name] = FileDirent(name)
+      E = subE
+
+    # update target node
+    if isdir:
+      copy_in_dir(E, ospath, modes)
+    else:
+      copy_in_file(E, ospath, modes)
+
+    # save archive state
+    save_Dirent(arpath, rootE)
 
 def save_Dirent(path, E, when=None):
   ''' Save the supplied Dirent `E` to the file `path` with timestamp `when` (default now).
