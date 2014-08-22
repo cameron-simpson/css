@@ -47,7 +47,7 @@ def path_split(path):
   ''' Split path into components, discarding the empty string and ".".
       The returned subparts are useful for path traversal.
   '''
-  return [ subpath for subpath in path.split('/') where subpath != '' and subpath != '.' ]
+  return [ subpath for subpath in path.split('/') if subpath != '' and subpath != '.' ]
 
 def resolve(rootD, subpath, do_mkdir=False):
   ''' Descend from the Dir `rootD` via the path `subpath`.
