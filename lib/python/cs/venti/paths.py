@@ -51,29 +51,36 @@ def path_split(path):
 
 def resolve(rootD, subpath, do_mkdir=False):
   ''' Descend from the Dir `rootD` via the path `subpath`.
+      `subpath` may be a str or an array of str.
       Return the final Dirent, its parent, and any unresolved path components.
   '''
   if not rootD.isdir:
     raise ValueError("resolve: not a Dir: %s" % (rootD,))
   E = rootD
   parent = E.parent
-  subpaths = path_split(subpath)
+  if isinstance(subpath, str):
+    subpaths = path_split(subpath)
+  else:
+    subpaths = subpath
   while subpaths and E.isdir:
     name = subpaths[0]
-    if name == '..':
+    if name == '' or name == '.':
+      # stay on this Dir
+      pass
+    elif name == '..':
+      # go up a level if available
       if E.parent is None:
         break
       E = E.parent
-    if name in E:
+    elif name in E:
       parent = E
       E = E[name]
-      subpaths.pop(0)
     elif do_mkdir:
       parent = E
       E = E.mkdir(name)
-      subpaths.pop(0)
     else:
       break
+    subpaths.pop(0)
   return E, parent, subpaths
 
 def walk(rootD, topdown=True):
