@@ -56,7 +56,6 @@ class DataFile(NestingOpenCloseMixin):
     return "DataFile(%s)" % (self.pathname,)
 
   def on_open(self, count):
-    X("open %s", self)
     if count == 1:
       X("open %s: first open, open file", self)
       self.fp = open(self.pathname, "a+b")
@@ -149,31 +148,61 @@ class DataDir(NestingOpenCloseMixin):
       should return a mapping to store and retrieve index information.
   '''
 
-  def __init__(self, dirpath, rollover=None):
-    ''' Initialise this DataDir with the directory path `dirpath` and the optional DataFIle rollover size `rollover`.
+  def __init__(self, dirpath, rollover=None, hashclass=None):
+    ''' Initialise this DataDir with the directory path `dirpath` and the optional DataFile rollover size `rollover`.
     '''
     if rollover is not None and rollover < 1024:
-      raise ValueError("rollover < 1024: %r" % (rollover,))
+      raise ValueError("rollover < 1024 (a more normal size would be in megabytes or gigabytes): %r" % (rollover,))
+    if hashclass is None:
+      hashclass = defaults.S.hashclass
     self.dirpath = dirpath
     self._rollover = rollver
-    self.index = None
     self._open = LRU_Cache(maxsize=4, on_remove=self._remove_open)
+    self._indices = {}
     self._n = None
-    self._lock = Lock()
+    self._lock = RLock()
+
+  @property
+  def _hashclass(self):
+    ''' The default hashclass.
+    '''
+    return defaults.S.hashclass
 
   def on_open(self, count):
     if count == 1:
       self.index = self._openIndex()
 
   def shutdown(self):
-    self.index.sync()
-    self.index = None
+    ''' Called on final close of the DataDir.
+        Close and release any open indices.
+        Close any open datafiles.
+    '''
+    with self._lock:
+      for hashname in self._indices:
+        I = self._indices[hashname]
+        I.sync()
+        I.close()
+      self._indices = {}
+      self._open.flush()
 
-  def _openIndex(self):
+  def _openIndex(self, hashname):
     ''' Subclasses must implement the _openIndex method, which returns a
         mapping of hashcode to (datafile_index, datafile_offset).
+        `hashname` is a label to distinguish this index file from
+        others, usually taken from the hashclass.HASHNAME.
     '''
     raise NotImplementedError("%s: no _openIndex() method" % (self.__class__.__name__,))
+
+  def _index(self, hashname):
+    ''' Return the index map for this hash name, opening the index if necessary.
+    '''
+    I = self._index.get(hashname)
+    if I is None:
+      with self._lock:
+        I = self._index.get(hashname)
+        if I is None:
+          I = self._index[hashname] = self._openIndex(self, hashname)
+    return I
 
   def pathto(self, rpath):
     ''' Return a pathname within the DataDir given `rpath`, a path
@@ -223,18 +252,19 @@ class DataDir(NestingOpenCloseMixin):
 
   # without this "in" tries to iterate over the mapping with int indices
   def __contains__(self, hash):
-    return hash in self.index
+    return hash in self._index(hash.HASHNAME)
     
   def __getitem__(self, hash):
     ''' Return the uncompressed data associated with the supplied hash.
     '''
-    n, offset = self.decodeIndexEntry(self.index[hash])
+    entry = self._index(hash.HASHNAME)[hash]
+    n, offset = self.decodeIndexEntry(entry)
     return self.datafile(n).readdata(offset)
 
   def __setitem__(self, hash, data):
     ''' Store the supplied `data` indexed by `hash`.
     '''
-    I = self.index
+    I = self._index(hash.HASHNAME)
     if hash not in I:
       n = self.n
       D = self.datafile(n)
@@ -267,12 +297,6 @@ class DataDir(NestingOpenCloseMixin):
     ''' Set the current file index to `n`.
     '''
     self._n = n
-
-  def contains(self, h):
-    ''' Check if the specified hash is present in the store.
-    '''
-    with self._lock:
-      return h in self._index
 
   @locked
   def flush(self):
@@ -317,23 +341,20 @@ class GDBMDataDir(DataDir):
   ''' A DataDir with a GDBM index.
   '''
 
-  indexname = "index.gdbm"
-
   def __str__(self):
     return "GDBMDataDir(%s)" % (self.dirpath,)
 
-  def _openIndex(self):
+  def _openIndex(self, hashname):
     import dbm.gnu
-    gdbmpath = self.pathto(self.indexname)
-    return dbm.gnu.open(gdbmpath, "c")
+    return dbm.gnu.open(self.pathto("index-%s.gdbm" % (hashname,)))
 
 class KyotoCabinetDataDir(DataDir):
   ''' An DataDir attached to a KyotoCabinet index.
   '''
   indexname = "index.kch"
-  def _getIndex(self):
+  def _openIndex(self, hashname):
     from cs.kyoto import KyotoCabinet
-    return KyotoIndex(os.path.join(self.dirpath, self.indexname))
+    return KyotoCabinaet(self.pathto("index-%s.kch" % (hashname,)))
 
 if __name__ == '__main__':
   import cs.venti.datafile_tests
