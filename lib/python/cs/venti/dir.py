@@ -403,9 +403,13 @@ class Dir(_Dirent):
     return Block(data=data)
 
   def dirs(self):
+    ''' Return a list of the names of subdirectories in this Dir.
+    '''
     return [ name for name in self.keys() if self[name].isdir ]
 
   def files(self):
+    ''' Return a list of the names of files in this Dir.
+    '''
     return [ name for name in self.keys() if self[name].isfile ]
 
   def _validname(self, name):
