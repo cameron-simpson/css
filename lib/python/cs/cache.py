@@ -185,7 +185,7 @@ class LRU_Cache(object):
   def flush(self):
     cache = self._cache
     keys = list(cache.keys())
-    for k in keys:
+    for key in keys:
       del self[key]
     self._reset()
 
