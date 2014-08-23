@@ -85,21 +85,24 @@ def resolve(rootD, subpath, do_mkdir=False):
 
 def walk(rootD, topdown=True):
   ''' An analogue to os.walk to descend a vt Dir tree.
-      Yields Dir, relpath, dirs, files for each directory in the tree.
+      Yields Dir, relpath, dirnames, filenames for each directory in the tree.
       The top directory (`rootD`) has the relpath ''.
   '''
   if not topdown:
-    raise ValueError("cs.venti.paths.walk: topdown must be true, got %r" % (topdown,))
+    raise ValueError("topdown must be true, got %r" % (topdown,))
+  # queue of (Dir, relpath)
   pending = [ (rootD, '') ]
   while pending:
-    thisD, relpath, dirs, files = pending.pop(0)
-    yield thisD, path, thisD.dirs(), thisD.files()
-    for dir in dirs:
-      subD = rootD.chdir1(dir)
+    thisD, relpath = pending.pop(0)
+    dirnames = thisD.dirs()
+    filenames = thisD.files()
+    yield thisD, path, dirnames, filenames
+    for dirname in reversed(dirnames):
+      subD = rootD.chdir1(dirname)
       if relpath:
-        subpath = os.path.join(relpath, dir)
+        subpath = os.path.join(relpath, dirname)
       else:
-        subpath = dir
+        subpath = dirname
       pending.push( (subD, subpath) )
 
 def copy_out(rootD, rootpath, modes=None):
