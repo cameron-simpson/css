@@ -34,6 +34,9 @@ class Test_LRU_Cache(unittest.TestCase):
     C[5] = 6
     self.assertEqual(C, {3:4, 5:6})
     check(C)
+    C.flush()
+    self.assertEqual(C, {})
+    check(C)
 
 def selftest(argv):
   unittest.main(__name__, None, argv, failfast=True)
