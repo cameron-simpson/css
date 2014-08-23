@@ -25,6 +25,12 @@ def decode(bs, offset=0):
 
 class _Hash(bytes):
 
+  def __str__(self):
+    return hexify(self)
+
+  def __repr__(self):
+    return ':'.join( (self.HASHNAME, hexify(self)) )
+
   def encode(self):
     ''' Return the serialised form of this hash object: hash enum plus hash bytes.
         If we ever have a variable length hash function, hash bytes with include that information.
@@ -57,16 +63,11 @@ class _Hash(bytes):
     return cls(hashbytes)
 
 class Hash_SHA1(_Hash):
+  HASHNAME = 'sha1'
   HASHLEN = 20
   HASHENUM = HASH_SHA1_T
   HASHENUM_BS = put_bs(HASHENUM)
   HASHLEN_ENCODED = len(HASHENUM_BS) + HASHLEN
-
-  def __str__(self):
-    return hexify(self)
-
-  def __repr__(self):
-    return "Hash_SHA1:" + hexify(self)
 
   @classmethod
   def from_data(cls, data):
