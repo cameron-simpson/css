@@ -210,18 +210,6 @@ class DataDir(NestingOpenCloseMixin):
     '''
     return os.path.join(self.dirpath, rpath)
 
-  @property
-  def indexpath(self):
-    ''' The file pathname of the index file.
-    '''
-    return self.pathto(self.indexname)
-
-  @property
-  def hasindexfile(self):
-    ''' Property testing whether the index file exists.
-    '''
-    return os.path.exists(self.indexpath)
-
   def scan(self, hashfunc, indices=None):
     ''' Scan the specified datafiles (or all if `indices` is missing or None).
         Record the data locations against the data hashcode in the index.
