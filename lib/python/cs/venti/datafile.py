@@ -149,12 +149,12 @@ class DataDir(NestingOpenCloseMixin):
       should return a mapping to store and retrieve index information.
   '''
 
-  def __init__(self, dir, rollover=None):
-    ''' Initialise this DataDir with the directory path `dir` and the optional DataFIle rollover size `rollover`.
+  def __init__(self, dirpath, rollover=None):
+    ''' Initialise this DataDir with the directory path `dirpath` and the optional DataFIle rollover size `rollover`.
     '''
     if rollover is not None and rollover < 1024:
       raise ValueError("rollover < 1024: %r" % (rollover,))
-    self.dir = dir
+    self.dirpath = dirpath
     self._rollover = rollver
     self.index = None
     self._open = LRU_Cache(maxsize=4, on_remove=self._remove_open)
@@ -179,7 +179,7 @@ class DataDir(NestingOpenCloseMixin):
     ''' Return a pathname within the DataDir given `rpath`, a path
         relative to the DataDir.
     '''
-    return os.path.join(self.dir, rpath)
+    return os.path.join(self.dirpath, rpath)
 
   @property
   def indexpath(self):
@@ -303,7 +303,7 @@ class DataDir(NestingOpenCloseMixin):
     ''' Return the indices of datafiles present.
     '''
     indices = []
-    for name in os.listdir(self.dir):
+    for name in os.listdir(self.dirpath):
       if name.endswith('.vtd'):
         prefix = name[:-4]
         if prefix.isdigit():
@@ -320,7 +320,7 @@ class GDBMDataDir(DataDir):
   indexname = "index.gdbm"
 
   def __str__(self):
-    return "GDBMDataDir(%s)" % (self.dir,)
+    return "GDBMDataDir(%s)" % (self.dirpath,)
 
   def _openIndex(self):
     import dbm.gnu
