@@ -68,6 +68,9 @@ class LRU_Cache(object):
     self.on_add = on_add
     self.on_remove = on_remove
     self._lock = RLock()
+    self._reset()
+
+  def _reset(self):
     self._cache = {}
     self._cache_seq = {}
     self._seq = 0
@@ -177,6 +180,14 @@ class LRU_Cache(object):
 
   def __ne__(self, other):
     return not (self == other)
+
+  @locked
+  def flush(self):
+    cache = self._cache
+    keys = list(cache.keys())
+    for k in keys:
+      del self[key]
+    self._reset()
 
 def lru_cache(maxsize=None, cache=None, on_add=None, on_remove=None):
   ''' Enhanced workalike of @functools.lru_cache.
