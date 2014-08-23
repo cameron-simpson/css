@@ -76,6 +76,8 @@ class Hash_SHA1(_Hash):
     hashcode = sha1(data).digest()
     return cls.from_hashbytes(hashcode)
 
+DEFAULT_HASHCLASS = Hash_SHA1
+
 if __name__ == '__main__':
   import cs.venti.hash_tests
   cs.venti.hash_tests.selftest(sys.argv)
