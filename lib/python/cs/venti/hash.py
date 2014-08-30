@@ -21,7 +21,7 @@ def decode(bs, offset=0):
     hashcls = Hash_SHA1
   else:
     raise ValueError("unsupported hashenum %d", hashenum)
-  return hashcls(decode(bs, offset))
+  return hashcls.decode(bs, offset)
 
 class _Hash(bytes):
 
@@ -43,11 +43,6 @@ class _Hash(bytes):
     ''' Pull off the encoded hash from the start of the encdata.
         Return Hash_* object and new offset.
     '''
-    hashenum = encdata[offset]
-    if hashenum != cls.HASHENUM:
-      raise ValueError("unexpected hashenum; expected 0x%02x, found %r"
-                       % (cls.HASHENUM, hashenum))
-    offset += 1
     hashbytes = encdata[offset:offset+cls.HASHLEN]
     if len(hashbytes) != cls.HASHLEN:
       raise ValueError("short data? got %d bytes, expected %d: %r"
