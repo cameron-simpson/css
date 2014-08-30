@@ -3,16 +3,16 @@
 from __future__ import print_function
 import sys
 from threading import RLock
-from cs.logutils import D, debug, X
+from cs.logutils import D, debug, X, Pfx
 from cs.serialise import get_bs, put_bs
 from cs.threads import locked_property
 from cs.venti import defaults, totext
-from .hash import Hash_SHA1, HASH_SHA1_T, HASH_SIZE_SHA1, decode as hash_decode
+from .hash import decode as hash_decode
 
 F_BLOCK_INDIRECT = 0x01 # indirect block
 
 def decodeBlocks(bs, offset=0):
-  ''' Process a bytes from the supplied `offset` (default 0).
+  ''' Process the bytes `bs` from the supplied `offset` (default 0).
       Yield Blocks.
   '''
   while offset < len(bs):
@@ -25,7 +25,6 @@ def decodeBlock(bs, offset=0):
       Format is:
         BS(flags)
           0x01 indirect blockref
-          0x02 non-SHA1 hashcode
         BS(span)
         hash
   '''
@@ -96,16 +95,14 @@ class _Block(object):
         Format is:
           BS(flags)
             0x01 indirect block
-            0x02 has hash type (False ==> Hash_SHA1_T)
           BS(span)
-          hashcode.encode()     # may include hashlen prefix for some hash types
+          hashcode.encode()     # includes type and conceivably size
     '''
     flags = 0
     if self.indirect:
       flags |= F_BLOCK_INDIRECT
     hashcode = self.hashcode
     enc = put_bs(flags) + put_bs(self.span) + hashcode.encode()
-    assert len(enc) >= 22
     return enc
 
   @property
