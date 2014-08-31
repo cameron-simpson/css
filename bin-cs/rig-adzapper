@@ -105,7 +105,7 @@ do
   echo "http_port $l"
 done
 # zapped
-echo "http_port localhost:8080"
+echo "http_port 127.0.0.1:8080"
 
 cat <<X
 url_rewrite_program $HOME/bin/squid_redirect
