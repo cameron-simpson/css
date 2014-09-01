@@ -82,14 +82,6 @@ def ismbox(path):
   fp.close()
   return from_ == 'From '
 
-def ismaildir(path):
-  ''' Test if 'path' points at a Maildir directory.
-  '''
-  for subdir in ('new','cur','tmp'):
-    if not os.path.isdir(os.path.join(path,subdir)):
-      return False
-  return True
-
 def make_maildir(path):
   ''' Create a new maildir at `path`.
       The path must not already exist.
