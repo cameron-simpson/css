@@ -71,9 +71,11 @@ class TestDataDir(unittest.TestCase):
     random.seed()
     self.pathname = tempfile.mkdtemp(prefix="cs.venti.datafile.testdir", suffix=".dir", dir='.')
     self.datadir = DataDir(self.pathname, rollover=200000)
+    self.datadir_open = self.datadir.open()
     self.datafiles = []
 
   def tearDown(self):
+    self.datadir_open.close()
     os.system("ls -la %s" % self.pathname)
     shutil.rmtree(self.pathname)
 
@@ -88,7 +90,7 @@ class TestDataDir(unittest.TestCase):
       self.assertEqual(rand_offset, offset)
 
   def test001randomblocks(self):
-    ''' Save 100 random blocks, retrieve in random order.
+    ''' Save 1000 random blocks, retrieve in random order.
     '''
     hashclass = DEFAULT_HASHCLASS
     hashfunc = hashclass.from_data
@@ -96,7 +98,7 @@ class TestDataDir(unittest.TestCase):
     by_hash = {}
     by_data = {}
     # store 100 random blocks
-    for _ in range(100):
+    for _ in range(1000):
       data = genblock()
       if data in by_data:
         X("repeated random block, skipping")
