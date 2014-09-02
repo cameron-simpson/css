@@ -6,7 +6,7 @@ else:
 if sys.hexversion < 0x02060000:
   bytes = str
 from cs.lex import hexify
-from cs.logutils import D
+from cs.logutils import D, X
 from cs.serialise import get_bs, put_bs
 
 # enums for hash types, used in encode/decode
@@ -30,6 +30,12 @@ class _Hash(bytes):
 
   def __repr__(self):
     return ':'.join( (self.HASHNAME, hexify(self)) )
+
+  def __eq__(self, other):
+    return self.HASHENUM == other.HASHENUM and bytes.__eq__(self, other)
+
+  def __hash__(self):
+    return bytes.__hash__(self)
 
   def encode(self):
     ''' Return the serialised form of this hash object: hash enum plus hash bytes.
