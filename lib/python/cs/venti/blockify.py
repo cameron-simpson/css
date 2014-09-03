@@ -17,46 +17,6 @@ from .block import Block, IndirectBlock, dump_block
 MIN_BLOCKSIZE = 80      # less than this seems silly
 MAX_BLOCKSIZE = 16383   # fits in 2 octets BS-encoded
 
-class Blockifier(object):
-  ''' A Blockifier accepts data or Blocks and stores them sequentially.
-      Data chunks are presumed to be as desired, and are not reblocked;
-      each is stored directly.
-      The .close() method returns the top Block representing the
-      stored sequence.
-  '''
-
-  def __init__(self, S=None):
-    if S is None:
-      S = defaults.S
-    self.topBlock = None
-    self.S = S
-    self.Q = IterableQueue()
-    self.T = Thread(target=self._storeBlocks)
-    self.T.start()
-
-  def _storeBlocks(self):
-    ''' Thread to pull blocks from the queue and gather into a top block.
-    '''
-    with self.S:
-      self.topBlock = top_block_for(self.Q)
-
-  def add(self, data):
-    ''' Add data, return Block hashcode.
-    '''
-    B = Block(data=data)
-    self.Q.put(B)
-    return B.hashcode
-
-  def addBlock(self, B):
-    self.Q.put(B)
-
-  def close(self):
-    self.Q.close()
-    self.T.join()
-    self.T = None
-    self.Q = None
-    return self.topBlock
-
 def top_block_for(blocks):
   ''' Return a top Block for a stream of Blocks.
   '''
