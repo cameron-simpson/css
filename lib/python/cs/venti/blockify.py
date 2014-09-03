@@ -7,8 +7,7 @@
 
 from itertools import chain
 import sys
-from cs.logutils import debug, D
-from cs.venti import defaults
+from cs.logutils import debug, warning, D
 from .block import Block, IndirectBlock, dump_block
 
 MIN_BLOCKSIZE = 80      # less than this seems silly
@@ -54,17 +53,22 @@ def indirect_blocks(blocks):
       source of Blocks, except for the last Block which need not
       necessarily be bundled into an IndirectBlock.
   '''
-  S = defaults.S
   subblocks = []
-  # how many subblock refs will fit in a block: flags(1)+span(2)+hash
-  ## TODO: // ?
-  max_subblocks = int(MAX_BLOCKSIZE / (3+S.hashclass.HASHLEN_ENCODED))
+  subsize = 0
   for block in blocks:
-    if len(subblocks) >= max_subblocks:
+    enc = block.encode()
+    if subsize + len(enc) > MAX_BLOCKSIZE:
       # overflow
-      yield IndirectBlock(subblocks)
-      subblocks = []
+      if not subblocks:
+        # do not yield empty indirect block, flag logic error instead
+        warning("no pending subblocks at flush, presumably len(block.encode()) %d > MAX_BLOCKSIZE %d",
+                len(enc), MAX_BLOCKSIZE)
+      else:
+        yield IndirectBlock(subblocks)
+        subblocks = []
+        subsize = 0
     subblocks.append(block)
+    subsize += len(enc)
 
   # handle the termination case
   if len(subblocks) > 0:
