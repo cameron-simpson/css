@@ -17,6 +17,7 @@ from cs.obj import O
 from cs.queues import NestingOpenCloseMixin
 from cs.serialise import get_bs, put_bs, get_bsfp
 from cs.threads import locked, locked_property
+from .hash import DEFAULT_HASHCLASS
 
 F_COMPRESSED = 0x01
 
@@ -61,7 +62,6 @@ class DataFile(NestingOpenCloseMixin):
       self.fp = open(self.pathname, "a+b")
 
   def shutdown(self):
-    X("shutdown %s: close file", self)
     self.fp.close()
     self.fp = None
 
@@ -134,6 +134,7 @@ class DataFile(NestingOpenCloseMixin):
       fp.write(put_bs(flags))
       fp.write(put_bs(len(data)))
       fp.write(data)
+      fp.flush()    # surprised this is needed; not needed with C stdio
     self.ping()
     return offset
 
@@ -142,41 +143,31 @@ class DataFile(NestingOpenCloseMixin):
     if self.fp:
       self.fp.flush()
 
-class DataDir(NestingOpenCloseMixin):
+class _DataDir(NestingOpenCloseMixin):
   ''' A mapping of hash->Block that manages a directory of DataFiles.
       Subclasses must implement the _openIndex() method, which
       should return a mapping to store and retrieve index information.
   '''
 
-  def __init__(self, dirpath, rollover=None, hashclass=None):
+  def __init__(self, dirpath, rollover=None):
     ''' Initialise this DataDir with the directory path `dirpath` and the optional DataFile rollover size `rollover`.
     '''
     if rollover is not None and rollover < 1024:
       raise ValueError("rollover < 1024 (a more normal size would be in megabytes or gigabytes): %r" % (rollover,))
-    if hashclass is None:
-      hashclass = defaults.S.hashclass
+    self._lock = RLock()
+    NestingOpenCloseMixin.__init__(self)
     self.dirpath = dirpath
-    self._rollover = rollver
+    self._rollover = rollover
     self._open = LRU_Cache(maxsize=4, on_remove=self._remove_open)
     self._indices = {}
     self._n = None
-    self._lock = RLock()
-
-  @property
-  def _hashclass(self):
-    ''' The default hashclass.
-    '''
-    return defaults.S.hashclass
-
-  def on_open(self, count):
-    if count == 1:
-      self.index = self._openIndex()
 
   def shutdown(self):
     ''' Called on final close of the DataDir.
         Close and release any open indices.
         Close any open datafiles.
     '''
+    X("shutdown(%s)", self)
     with self._lock:
       for hashname in self._indices:
         I = self._indices[hashname]
@@ -196,12 +187,12 @@ class DataDir(NestingOpenCloseMixin):
   def _index(self, hashname):
     ''' Return the index map for this hash name, opening the index if necessary.
     '''
-    I = self._index.get(hashname)
+    I = self._indices.get(hashname)
     if I is None:
       with self._lock:
-        I = self._index.get(hashname)
+        I = self._indices.get(hashname)
         if I is None:
-          I = self._index[hashname] = self._openIndex(self, hashname)
+          I = self._indices[hashname] = self._openIndex(hashname)
     return I
 
   def pathto(self, rpath):
@@ -210,17 +201,18 @@ class DataDir(NestingOpenCloseMixin):
     '''
     return os.path.join(self.dirpath, rpath)
 
-  def scan(self, hashfunc, indices=None):
+  def scan(self, hashclass, indices=None):
     ''' Scan the specified datafiles (or all if `indices` is missing or None).
         Record the data locations against the data hashcode in the index.
     '''
     if indices is None:
-      indices = self._datafileindices()
+      df_indices = self._datafileindices()
+    I = self._index(hashclass.HASHNAME)
     with Pfx("scan %d", n):
-      for n in indices:
-        D = self.datafile(n)
+      for dfn in indices:
+        D = self.datafile(dfn)
         for offset, flags, data in D.scan():
-          I[hashfunc(data)] = self.encodeIndexEntry(n, offset)
+          I[hashclass.from_hashbytes(data)] = self.encodeIndexEntry(n, offset)
 
   @staticmethod
   def decodeIndexEntry(entry):
@@ -242,22 +234,24 @@ class DataDir(NestingOpenCloseMixin):
   def __contains__(self, hash):
     return hash in self._index(hash.HASHNAME)
     
-  def __getitem__(self, hash):
-    ''' Return the uncompressed data associated with the supplied hash.
+  def __getitem__(self, hashcode):
+    ''' Return the uncompressed data associated with the supplied `hashcode`.
     '''
-    entry = self._index(hash.HASHNAME)[hash]
+    entry = self._index(hashcode.HASHNAME)[hashcode]
     n, offset = self.decodeIndexEntry(entry)
     return self.datafile(n).readdata(offset)
 
-  def __setitem__(self, hash, data):
-    ''' Store the supplied `data` indexed by `hash`.
+  def __setitem__(self, hashcode, data):
+    ''' Store the supplied `data` indexed by `hashcode`.
     '''
-    I = self._index(hash.HASHNAME)
-    if hash not in I:
+    I = self._index(hashcode.HASHNAME)
+    if hashcode not in I:
+      # save the data in the current datafile, record the file number and offset
       n = self.n
       D = self.datafile(n)
       offset = D.savedata(data)
-      I[hash] = self.encodeIndexEntry(n, offset)
+      I[hashcode] = self.encodeIndexEntry(n, offset)
+      # roll over to a new file number if the current one has grown too large
       with self._lock:
         if self.n == n:
           if self._rollover is not None and offset >= self._rollover:
@@ -290,7 +284,8 @@ class DataDir(NestingOpenCloseMixin):
   def flush(self):
     for datafile in self._open.values():
       datafile.flush()
-    self.index.flush()
+    for index in self._indices.values():
+      index.flush()
 
   def datafile(self, n):
     ''' Obtain the Datafile with index `n`.
@@ -303,7 +298,6 @@ class DataDir(NestingOpenCloseMixin):
     return D
 
   def _remove_open(self, key, value):
-    X("close %s")
     value.close()
 
   def datafilename(self, n):
@@ -325,24 +319,33 @@ class DataDir(NestingOpenCloseMixin):
               indices.append(n)
     return indices
 
-class GDBMDataDir(DataDir):
+  @property
+  def datafilenames(self):
+    ''' A list of the current datafile pathnames.
+    '''
+    dfnames = [ self.pathto(self.datafilename(n)) for n in self._datafileindices() ]
+    X("datafilenames=%r", dfnames)
+    return dfnames
+
+class GDBMDataDir(_DataDir):
   ''' A DataDir with a GDBM index.
   '''
 
   def __str__(self):
     return "GDBMDataDir(%s)" % (self.dirpath,)
 
+  def flush(self, index):
+    # regrettably, there is only sync, not flush; probably pushes all the way to the disc
+    index.sync()
+
   def _openIndex(self, hashname):
     import dbm.gnu
-    return dbm.gnu.open(self.pathto("index-%s.gdbm" % (hashname,)))
+    gdbm_path = self.pathto("index-%s.gdbm" % (hashname,))
+    X("gdbm_path = %r", gdbm_path)
+    return dbm.gnu.open(gdbm_path, 'c')
 
-class KyotoCabinetDataDir(DataDir):
-  ''' An DataDir attached to a KyotoCabinet index.
-  '''
-  indexname = "index.kch"
-  def _openIndex(self, hashname):
-    from cs.kyoto import KyotoCabinet
-    return KyotoCabinaet(self.pathto("index-%s.kch" % (hashname,)))
+# the default DataDir implementation
+DataDir = GDBMDataDir
 
 if __name__ == '__main__':
   import cs.venti.datafile_tests
