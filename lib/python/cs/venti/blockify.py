@@ -7,10 +7,7 @@
 
 from itertools import chain
 import sys
-from threading import Thread
-from cs.debug import ifdebug
 from cs.logutils import debug, D
-from cs.queues import IterableQueue
 from cs.venti import defaults
 from .block import Block, IndirectBlock, dump_block
 
