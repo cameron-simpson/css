@@ -84,8 +84,19 @@ class File(BackedFile):
     '''
     if backing_block is None:
       backing_block = Block(data=b'')
-    self.backing_block = backing_block
+    self._backing_block = backing_block
     BackedFile.__init__(self, BlockFile(backing_block))
+
+  @property
+  @locked
+  def backing_block(self):
+    return self._backing_block
+
+  @backing_block.setter
+  @locked
+  def backing_block(self, new_block):
+    self._backing_block = new_block
+    self._reset(BlockFile(new_block))
 
   def __len__(self):
     ''' Return the current length of the file.
