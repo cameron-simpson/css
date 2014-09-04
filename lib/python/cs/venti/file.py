@@ -116,6 +116,8 @@ class File(BackedFile):
 
   @locked
   def truncate(self, length):
+    ''' Truncate the File to the specified `length`.
+    '''
     if length < 0:
       raise FuseOSError(errno.EINVAL)
     cur_len = len(self)
@@ -141,6 +143,8 @@ class File(BackedFile):
 
   @locked
   def close(self):
+    ''' Close the File, return the top Block.
+    '''
     B = self.sync()
     BackedFile.close(self)
     return B
