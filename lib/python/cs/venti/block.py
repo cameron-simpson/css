@@ -116,7 +116,7 @@ class _Block(object):
     ''' Return an iterator yielding (Block, start, len) tuples representing the leaf data covering the supplied span `start`:`end`.
         The iterator may end early if the span exceeds the Block data.
     '''
-    X("Block<%s>[len=%d].slices(start=%r, end=%r)...", self, len(self), start, end)
+    ##X("Block<%s>[len=%d].slices(start=%r, end=%r)...", self, len(self), start, end)
     if start is None:
       start = 0
     elif start < 0:
@@ -126,7 +126,7 @@ class _Block(object):
     elif end < start:
       raise ValueError("end must be >= start(%r), received: %r" % (start,end))
     if self.indirect:
-      X("Block.slices: indirect...")
+      ##X("Block.slices: indirect...")
       offset = 0
       for B in self.subblocks:
         sublen = len(B)
@@ -139,12 +139,12 @@ class _Block(object):
         if offset >= end:
           break
     else:
-      X("Block.slices: direct")
+      ##X("Block.slices: direct")
       # a leaf Block
       if start < len(self):
-        X("Block.slices: yield self, %d, %d", start, min(end, len(self)))
+        ##X("Block.slices: yield self, %d, %d", start, min(end, len(self)))
         yield self, start, min(end, len(self))
-    X("Block.slices: COMPLETE")
+    ##X("Block.slices: COMPLETE")
 
   def top_slices(self, start=None, end=None):
     ''' Return an iterator yielding (Block, start, len) tuples representing the uppermost Blocks spanning `start`:`end`.
