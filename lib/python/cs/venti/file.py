@@ -139,6 +139,7 @@ class File(BackedFile):
       if inside:
         # data from the front file; return the first chunk
         for chunk in filedata(self.front_file, start=span.start, end=span.end):
+          self._offset += len(chunk)
           return chunk
       else:
         # data from the backing block: return the first chunk
@@ -147,6 +148,7 @@ class File(BackedFile):
           X("vt.File.read: B=%s[len=%s], Bstart=%r, Bend=%r", B, len(B), Bstart, Bend)
           data = B[Bstart:Bend]
           X("vt.File.read: data=%r", data)
+          self._offset += len(data)
           return data
     X("vt.File.read: no chunks: return empty bytes")
     return b''
