@@ -13,77 +13,21 @@
 
 from __future__ import print_function
 import os
+import stat
 import sys
 import time
 from datetime import datetime
 import errno
+from itertools import takewhile
+from cs.inttypes import Flags
 from cs.lex import unctrl
-from cs.logutils import D, Pfx, error
+from cs.logutils import D, Pfx, error, X
 from . import totext, fromtext
-from .blockify import blockFromFile
+from .blockify import blockify
 from .dir import decode_Dirent_text, Dir
-from .paths import copy_in_dir, copy_in_file
+from .file import filedata
 
-def archive(arfile, path, modes):
-  ''' Archive the named file path.
-      Get the last dirref from the `arfile`, if any, otherwise make a new Dir.
-      Store the `path` (updating the Dir).
-      Save the new dirref to `arfile`.
-  '''
-  ok = True
-  # look for existing archive for comparison
-  oldtime, oldE = None, None
-  if arfile == '-':
-    arfp = sys.stdin
-    # refuse to use terminal as input
-    if arfp.isatty():
-      arfp = None
-  else:
-    with Pfx(arfile):
-      try:
-        arfp = open(arfile)
-      except OSError as e:
-        if e.errno == errno.ENOENT:
-          arfp = None
-        else:
-          raise
-  if arfp:
-    for unixtime, E in read_Dirents(arfp):
-      if E.name == path and (oldtime is None or unixtime >= oldtime):
-        oldtime, oldE = unixtime, E
-    if arfile != '-':
-      arfp.close()
-    B = E.getBlock()
-    try:
-      refdata = B.data
-    except KeyError as e:
-      warning("%s: %r: can't load data from Store, ignoring",
-              arfile, B.hashcode)
-      oldtime, oldE = None, None
-
-  with Pfx("archive(%s)", path):
-    if os.path.isdir(path):
-      if oldE is None or not oldE.isdir:
-        E = Dir(os.path.basename(path))
-      else:
-        E = oldE
-      copy_in_dir(path, E, modes)
-    elif not os.path.isfile(path):
-      error("not a directory or regular file")
-      return False
-    else:
-      E = copy_in_file(path)
-
-    E.name = path
-    if arfile is None:
-      write_Dirent(sys.stdout, E)
-    else:
-      if arfile == '-':
-        write_Dirent(sys.stdout, E)
-      else:
-        with open(arfile, "a") as arfp:
-          write_Dirent(arfp, E)
-  return ok
+CopyModes = Flags('delete', 'do_mkdir', 'ignore_existing', 'trust_size_mtime')
 
 def retrieve(arfile, paths=None):
   ''' Retrieve Dirents for the named file paths, or None if a
@@ -116,7 +60,7 @@ def toc_report(fp, path, E, verbose):
     for subpath in sorted(E.keys()):
       toc_report(fp, os.path.join(path, subpath), E[subpath], verbose)
 
-def toc(arfile, paths=None, verbose=False, fp=None):
+def toc_archive(arfile, paths=None, verbose=False, fp=None):
   if fp is None:
     fp = sys.stdout
   for path, E in retrieve(arfile, paths):
@@ -125,8 +69,85 @@ def toc(arfile, paths=None, verbose=False, fp=None):
     else:
       toc_report(fp, path, E, verbose)
 
+def update_archive(arpath, ospath, modes, create_archive=False, arsubpath=None):
+  ''' Update the archive file `arpath` from `ospath`.
+     `ospath` is taken to match with the top of the archive plus the `arsubpath` if supplied.
+  '''
+  with Pfx("update %r <== %r", arpath, ospath):
+    base = os.path.basename(ospath)
+    # stat early once, fail early if necessary
+    st = stat(ospath)
+    if stat.S_ISDIR(st.st_mode):
+      isdir = True
+    elif stat.S_ISREG(st.st_mode):
+      isdir = False
+    else:
+      raise ValueError("unsupported OS file type 0o%o, expected file or directory" % (st.st_mode,))
+
+    # load latest archive root
+    last_entry = None
+    try:
+      with open(arfile, "r") as arfp:
+        try:
+          last_entry = last(read_Dirents(arfp))
+        except IndexError:
+          last_entry = None
+    except OSError as e:
+      if e.errno != errno.ENOENT:
+        raise
+      if not create_archive:
+        raise ValueError("missing archive (%s), not creating" % (e,))
+
+    # prep the subpath components
+    if arsubpath is not None:
+      subpaths = path_split(arsubpath)
+    else:
+      subpaths = []
+
+    if last_entry is None:
+      when, rootE = last_entry
+    elif subpaths:
+      rootE = Dir()
+    elif isdir:
+      rootE = Dir(base)
+    else:
+      rootE = FileDirent(base)
+
+    # create subdirectories
+    while len(subpaths) > 1:
+      name = subpaths.pop(0)
+      subE = E.get(name)
+      if subE is None or not subE.isdir:
+        subE = E.mkdir(name)
+
+    # create leaf node
+    if subpaths:
+      name, = subpaths
+      subE = E.get(name)
+      if isdir and not subE.isdir:
+        subE = E.mkdir(name)
+      elif not isdir and not subE.isfile:
+        subE = E[name] = FileDirent(name)
+      E = subE
+
+    # update target node
+    if isdir:
+      copy_in_dir(E, ospath, modes)
+    else:
+      copy_in_file(E, ospath, modes)
+
+    # save archive state
+    save_Dirent(arpath, rootE)
+
+def save_Dirent(path, E, when=None):
+  ''' Save the supplied Dirent `E` to the file `path` with timestamp `when` (default now).
+  '''
+  with lockfile(path):
+    with open(path, "a") as fp:
+      write_Dirent(fp, E, when=when)
+
 def read_Dirents(fp):
-  ''' Generator to yield (unixtime, Dirent) from archive file.
+  ''' Generator to yield (unixtime, Dirent) from an open archive file.
   '''
   lineno = 0
   for line in fp:
@@ -143,7 +164,7 @@ def read_Dirents(fp):
     yield when, E
 
 def write_Dirent(fp, E, when=None):
-  ''' Write a Dirent to an archive file:
+  ''' Write a Dirent to an open archive file:
         isodatetime unixtime totext(dirent) dirent.name
   '''
   if when is None:
@@ -152,7 +173,112 @@ def write_Dirent(fp, E, when=None):
   fp.write(' ')
   fp.write(str(when))
   fp.write(' ')
-  fp.write(str(E.textencode()))
+  fp.write(E.textencode())
   fp.write(' ')
   fp.write(unctrl(E.name))
   fp.write('\n')
+
+def copy_in_dir(rootD, rootpath, modes):
+  ''' Copy the os directory tree at `rootpath` over the Dir `rootD`.
+      `modes` is an optional CopyModes value.
+  '''
+  with Pfx("copy_in(%s)", rootpath):
+    rootpath_prefix = rootpath + '/'
+    # TODO: try out scandir sometime
+    for ospath, dirnames, filenames in os.walk(rootpath):
+      with Pfx(ospath):
+        if ospath == rootpath:
+          dirD = rootD
+        elif ospath.startswith(rootpath_prefix):
+          dirD, name = resolve(rootD, ospath[len(rootpath_prefix):])
+          dirD = dirD.chdir1(name)
+
+        if not os.path.isdir(rootpath):
+          warning("not a directory?")
+
+        if modes.delete:
+          # Remove entries in dirD not present in the real filesystem
+          allnames = set(dirnames)
+          allnames.update(filenames)
+          Dnames = sorted(dirD.keys())
+          for name in Dnames:
+            if name not in allnames:
+              info("delete %s", name)
+              del dirD[name]
+
+        for dirname in sorted(dirnames):
+          with Pfx("%s/", dirname):
+            if dirname not in dirD:
+              dirD.mkdir(dirname)
+            else:
+              E = dirD[dirname]
+              if not E.isdir:
+                # old name is not a dir - toss it and make a dir
+                del dirD[dirname]
+                E = dirD.mkdir(dirname)
+
+        for filename in sorted(filenames):
+          with Pfx(filename):
+            if modes.ignore_existing and filename in dirD:
+              info("skipping, already Stored")
+              continue
+            filepath = os.path.join(ospath, filename)
+            if not os.path.isfile(filepath):
+              warning("not a regular file, skipping")
+              continue
+            matchBlocks = None
+            if filename not in dirD:
+              fileE = FileDirent(filename)
+              dirD[filename] = fileE
+            else:
+              fileE = dirD[filename]
+              if modes.trust_size_mtime:
+                M = fileE.meta
+                st = os.stat(filepath)
+                if st.st_mtime == M.mtime and st.st_size == B.span:
+                  info("skipping, same mtime and size")
+                  continue
+                else:
+                  debug("DIFFERING size/mtime: B.span=%d/M.mtime=%s VS st_size=%d/st_mtime=%s",
+                    B.span, M.mtime, st.st_size, st.st_mtime)
+            try:
+              copy_in_file(fileE, filepath, modes)
+            except OSError as e:
+              error(str(e))
+              continue
+            except IOError as e:
+              error(str(e))
+              continue
+
+def copy_in_file(E, filepath, modes):
+  ''' Store the file named `filepath` over the FileDirent `E`.
+  '''
+  X("copy_in_file(%r)", filepath)
+  with Pfx(filepath):
+    with open(filepath, "rb") as sfp:
+      B = top_block_for(_blockify_file(sfp, E))
+      st = os.fstat(sfp.fileno())
+      if B.span != st.st_size:
+        warning("MISMATCH: B.span=%d, st_size=%d", B.span, st.st_size)
+  E = FileDirent(name, None, B)
+  E.meta.update_from_stat(st)
+
+def _blockify_file(fp, E):
+  ''' Read data from the file `fp` and compare with the FileDirect `E`, yielding leaf Blocks for a new file.
+      This supports update_file().
+  '''
+  # read file data in chunks matching the existing leaves
+  # return the leaves while the data match
+  for B in E.getBlock().leaves:
+    data = sfp.read(len(B))
+    if len(data) == 0:
+      # EOF
+      return
+    if len(data) != len(B):
+      break
+    if not B.matches_data(data):
+      break
+    yield B
+  # blockify the remaining file data
+  for B in blockify(chain( [data], filedata(fp) )):
+    yield B

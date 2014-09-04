@@ -155,6 +155,11 @@ class StoreFS(Operations):
     X("TODO: create: apply mode (0o%o) to self._fh[%d]", mode, fd)
     return fd
 
+  def ftruncate(self, path, length, fd):
+    X("FTRUNCATE(%r, %d, fd=%d)...", path, length, fd)
+    fh = self._fh(fd)
+    fh.truncate(length)
+
   def getattr(self, path, fh=None):
     X("getattr: %s ...", path)
     try:
@@ -202,6 +207,7 @@ class StoreFS(Operations):
     '''
     X("open(path=%r, flags=%o)...", path, flags)
     do_create = flags & O_CREAT
+    do_trunc = flags & O_TRUNC
     for_read = (flags & O_RDONLY) == O_RDONLY or (flags & O_RDWR) == O_RDWR
     for_write = (flags & O_WRONLY) == O_WRONLY or (flags & O_RDWR) == O_RDWR
     for_append = (flags & O_APPEND) == O_APPEND
@@ -226,6 +232,8 @@ class StoreFS(Operations):
     else:
       X("open: file exists already")
     fh = FileHandle(self, path, E, for_read, for_write, for_append)
+    if do_trunc:
+      fh.truncate(0)
     X("open(%r): fh=%s", path, fh)
     fd = self._new_file_descriptor(fh)
     X("open(%r): fd=%s", path, fd)
@@ -313,6 +321,39 @@ class StoreFS(Operations):
     del P1[E1base]
     P2[E2base] = E1
 
+  def rmdir(self, path):
+    X("rmdir(%r)...", path)
+    Ebase = basename(path)
+    E, P, tail_path = self._resolve(path)
+    if tail_path:
+      raise FuseOSError(errno.ENOENT)
+    if not E.isdir:
+      raise FuseOSError(errno.EDOTDIR)
+    if not P.meta.access(os.W_OK|os.X_OK):
+      raise FuseOSError(errno.EPERM)
+    if E.entries:
+      raise FuseOSError(errno.ENOTEMPTY)
+    del P[Ebase]
+
+  def truncate(self, path, length):
+    X("TRUNCATE(%r, %d)...", path, length)
+    E = self._namei(path)
+    if not E.meta.access(os.W_OK):
+      raise FuseOSError(errno.EPERM)
+    E.truncate(length)
+
+  def unlink(self, path):
+    X("unlink(%r)...", path)
+    Ebase = basename(path)
+    E, P, tail_path = self._resolve(path)
+    if tail_path:
+      raise FuseOSError(errno.ENOENT)
+    if E.isdir:
+      raise FuseOSError(errno.EISDIR)
+    if not P.meta.access(os.W_OK|os.X_OK):
+      raise FuseOSError(errno.EPERM)
+    del P[Ebase]
+
   def utimens(self, path, times):
     atime, mtime = times
     E = self._namei(path)
@@ -364,6 +405,10 @@ class FileHandle(O):
       fp.seek(offset)
       data = fp.read(size)
     return data
+
+  def truncate(self, length):
+    X("FileHandle.truncate: length=%d", length)
+    self.Eopen._open_file.truncate(length)
 
   def sync(self):
     self.Eopen.sync()

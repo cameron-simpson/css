@@ -162,6 +162,8 @@ class _Dirent(object):
       if not isinstance(meta, Meta):
         raise TypeError("self.meta is not a Meta: <%s>%r" % (type(meta), meta))
       metatxt = meta.textencode()
+      if metatxt == meta.dflt_acl_text:
+        metatxt = ''
       if len(metatxt) > 0:
         metatxt = totext(put_bsdata(metatxt.encode()))
         flags |= F_HASMETA
@@ -270,6 +272,17 @@ class FileDirent(_Dirent, NestingOpenCloseMixin):
     return self._block
 
   @locked
+  def size(self):
+    ''' Return the size of this file.
+        If open, use the open file's size.
+        Otherwise get the length of the top Block.
+    '''
+    self._check()
+    if self._open_file is not None:
+      return len(self._open_file)
+    return len(self.getBlock())
+
+  @locked
   def on_open(self, count):
     ''' Set up ._open_file on first open.
     '''
@@ -295,6 +308,14 @@ class FileDirent(_Dirent, NestingOpenCloseMixin):
     self._block = self._open_file.close()
     self._open_file = None
     self._check()
+
+  def truncate(self, length):
+    ''' Truncate this FileDirent to the specified size.
+    '''
+    Esize = self.size()
+    if Esize != length:
+      with self:
+        return self._open_file.truncate(length)
 
   def restore(self, path, makedirs=False, verbosefp=None):
     ''' Restore this _Dirent's file content to the name `path`.
@@ -382,9 +403,13 @@ class Dir(_Dirent):
     return Block(data=data)
 
   def dirs(self):
+    ''' Return a list of the names of subdirectories in this Dir.
+    '''
     return [ name for name in self.keys() if self[name].isdir ]
 
   def files(self):
+    ''' Return a list of the names of files in this Dir.
+    '''
     return [ name for name in self.keys() if self[name].isfile ]
 
   def _validname(self, name):
@@ -466,25 +491,31 @@ class Dir(_Dirent):
       D = D.chdir1(name)
     return D
 
-  def makedirs(self, path):
+  def makedirs(self, path, force=False):
     ''' Like os.makedirs(), create a directory path at need.
+        If `force`, replace an non-DIr encountered with an empty Dir.
         Returns the bottom directory.
     '''
-    D = self
-    for name in path.split('/'):
-      if len(name) == 0:
-        continue
-      if name == '.':
+    E = self
+    if isinstance(path, str):
+      subpaths = path_split(path)
+    else:
+      subpaths = path
+    for name in subpaths:
+      if name == '' or name == '.':
         continue
       if name == '..':
-        D = D.parent
+        E = E.parent
         continue
-      E = D.get(name)
-      if E is None:
-        E = D.mkdir(name)
+      subE = E.get(name)
+      if subE is None:
+        subE = E.mkdir(name)
       else:
-        if not E.isdir:
-          raise ValueError("%s[name=%s] is not a directory" % (D, name))
-      D = E
+        if not subE.isdir:
+          if force:
+            subE = E.mkdir(name)
+          else:
+            raise ValueError("%s[name=%s] is not a directory" % (subE, name))
+      E = subE
 
-    return D
+    return E

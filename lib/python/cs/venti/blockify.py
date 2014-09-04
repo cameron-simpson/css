@@ -7,55 +7,11 @@
 
 from itertools import chain
 import sys
-from threading import Thread
-from cs.debug import ifdebug
-from cs.logutils import debug, D
-from cs.queues import IterableQueue
-from cs.venti import defaults
+from cs.logutils import debug, warning, D
 from .block import Block, IndirectBlock, dump_block
 
 MIN_BLOCKSIZE = 80      # less than this seems silly
 MAX_BLOCKSIZE = 16383   # fits in 2 octets BS-encoded
-
-class Blockifier(object):
-  ''' A Blockifier accepts data or Blocks and stores them sequentially.
-      Data chunks are presumed to be as desired, and are not reblocked;
-      each is stored directly.
-      The .close() method returns the top Block representing the
-      stored sequence.
-  '''
-
-  def __init__(self, S=None):
-    if S is None:
-      S = defaults.S
-    self.topBlock = None
-    self.S = S
-    self.Q = IterableQueue()
-    self.T = Thread(target=self._storeBlocks)
-    self.T.start()
-
-  def _storeBlocks(self):
-    ''' Thread to pull blocks from the queue and gather into a top block.
-    '''
-    with self.S:
-      self.topBlock = top_block_for(self.Q)
-
-  def add(self, data):
-    ''' Add data, return Block hashcode.
-    '''
-    B = Block(data=data)
-    self.Q.put(B)
-    return B.hashcode
-
-  def addBlock(self, B):
-    self.Q.put(B)
-
-  def close(self):
-    self.Q.close()
-    self.T.join()
-    self.T = None
-    self.Q = None
-    return self.topBlock
 
 def top_block_for(blocks):
   ''' Return a top Block for a stream of Blocks.
@@ -97,17 +53,22 @@ def indirect_blocks(blocks):
       source of Blocks, except for the last Block which need not
       necessarily be bundled into an IndirectBlock.
   '''
-  S = defaults.S
   subblocks = []
-  # how many subblock refs will fit in a block: flags(1)+span(2)+hash
-  ## TODO: // ?
-  max_subblocks = int(MAX_BLOCKSIZE / (3+S.hashclass.HASHLEN_ENCODED))
+  subsize = 0
   for block in blocks:
-    if len(subblocks) >= max_subblocks:
+    enc = block.encode()
+    if subsize + len(enc) > MAX_BLOCKSIZE:
       # overflow
-      yield IndirectBlock(subblocks)
-      subblocks = []
+      if not subblocks:
+        # do not yield empty indirect block, flag logic error instead
+        warning("no pending subblocks at flush, presumably len(block.encode()) %d > MAX_BLOCKSIZE %d",
+                len(enc), MAX_BLOCKSIZE)
+      else:
+        yield IndirectBlock(subblocks)
+        subblocks = []
+        subsize = 0
     subblocks.append(block)
+    subsize += len(enc)
 
   # handle the termination case
   if len(subblocks) > 0:

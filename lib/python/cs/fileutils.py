@@ -636,11 +636,19 @@ class BackedFile(RawIOBase):
   def __init__(self, back_file, front_file=None):
     ''' Initialise the BackedFile using `back_file` for the backing data and `front_file` to the update data.
     '''
-    self.back_file = back_file
-    self._front_file = front_file
-    self.front_range = Range()
     self._offset = 0
     self._lock = RLock()
+    self._reset(back_file, front_file)
+
+  @locked
+  def _reset(self, back_file, front_file=None, front_range=None):
+    ''' Reset the internal state of the BackedFile.
+    '''
+    if front_range is None:
+      front_range = Range()
+    self.back_file = back_file
+    self._front_file = front_file
+    self.front_range = front_range
 
   def __enter__(self):
     ''' BackedFile instances offer a context manager that take the lock, allowing synchronous use of the file without implementing a suite of special methods like pread/pwrite.
@@ -652,8 +660,9 @@ class BackedFile(RawIOBase):
 
   @locked
   def _discard_front_file(self):
-    self._front_file = None
-    self.front_range = Range()
+    ''' Reset the BackedFile, keeping only the backing file.
+    '''
+    self._reset(self.back_file)
 
   @locked_property
   def front_file(self):
@@ -675,6 +684,18 @@ class BackedFile(RawIOBase):
       self._offset = endpos
     else:
       raise ValueError("unsupported whence value %r" % (whence,))
+
+  def read_n(self, n):
+    ''' Read `n` bytes of data and return them.
+        Unlike file.read(), RawIOBase.read() may return short data,
+        thus this workalike, which may only return short data if
+        it hits EOF.
+    '''
+    if n < 1:
+      raise ValueError("n two low, expected >=1, got %r" % (n,))
+    data = bytearray(n)
+    nread = self.readinto(data)
+    return data[:nread]
 
   @locked
   def readinto(self, b):
@@ -736,7 +757,7 @@ class BackedFile_TestMethods(object):
     self._eq(backing_text, bfp_text, "backing_text vs bfp_text")
     # test reading first 512 bytes only
     bfp.seek(0)
-    bfp_leading_text = bfp.read(512)
+    bfp_leading_text = bfp.read_n(512)
     self._eq(backing_text[:512], bfp_leading_text, "leading 512 bytes of backing_text vs bfp_leading_text")
     # test writing some data and reading it back
     random_chunk = bytes( randint(0,255) for x in range(256) )
@@ -756,11 +777,12 @@ class BackedFile_TestMethods(object):
     self.assertEqual(random_chunk, front_chunk)
     # read the random data back from the BackedFile
     bfp.seek(512)
-    bfp_chunk = bfp.read(256)
+    bfp_chunk = bfp.read_n(256)
     self.assertEqual(bfp_chunk, random_chunk)
     # read a chunk that overlaps the old data and the new data
     bfp.seek(256)
-    overlap_chunk = bfp.read(512)
+    overlap_chunk = bfp.read_n(512)
+    self.assertEqual(len(overlap_chunk), 512, "overlap_chunk not 512 bytes: %r" % (overlap_chunk,))
     self.assertEqual(overlap_chunk, backing_text[256:512] + random_chunk)
 
 if __name__ == '__main__':

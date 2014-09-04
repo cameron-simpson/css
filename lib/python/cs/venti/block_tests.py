@@ -6,8 +6,8 @@
 
 import sys
 import unittest
-from cs.logutils import D
-from cs.venti import totext
+from cs.logutils import D, X
+from . import totext
 from .block import Block, IndirectBlock
 
 class TestAll(unittest.TestCase):

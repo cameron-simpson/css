@@ -22,7 +22,7 @@ class TestAll(unittest.TestCase):
     import random
     for _ in range(10):
       rs = bytes( random.randint(0, 255) for _ in range(100) )
-      H = Hash_SHA1.fromData(rs)
+      H = Hash_SHA1.from_data(rs)
       self.assertEqual( sha1(rs).digest(), H )
       Hencode = H.encode()
       H2, offset = Hash_SHA1.decode(Hencode)
