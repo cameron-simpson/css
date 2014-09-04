@@ -207,9 +207,6 @@ def main(argv):
                     error("%s", e)
                     badopts = True
 
-  if S:
-    S.close()
-
   if badopts:
     sys.stderr.write(usage)
     return 2
