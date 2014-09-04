@@ -21,14 +21,20 @@ class BlockFile(RawIOBase):
   '''
 
   def __init__(self, block):
+    ''' Initialise with Block `block`.
+    '''
     self.isdir = False
     self.block = block
     self._offset = 0
 
   def __len__(self):
+    ''' Length of the file, as the length of the backing Block.
+    '''
     return len(self.block)
 
   def seek(self, offset, whence=0):
+    ''' Set the current file offset.
+    '''
     if whence == 1:
       offset += self.tell()
     elif whence == 2:
@@ -36,13 +42,15 @@ class BlockFile(RawIOBase):
     self._offset = offset
 
   def tell(self):
+    ''' Return the current file offset.
+    '''
     return self._offset
 
   def read(self, n=-1):
     ''' Read up to `n` bytes in one go.
-	Only bytes from the first subslice are returned, taking the
-	flavour of RawIOBase, which should only make one underlying
-	read system call.
+        Only bytes from the first subslice are returned, taking the
+        flavour of RawIOBase, which should only make one underlying
+        read system call.
     '''
     if n == -1:
       data = self.readall()
@@ -55,6 +63,8 @@ class BlockFile(RawIOBase):
     return data
 
   def readinto(self, b):
+    ''' Read data into the bytearray `b`.
+    '''
     nread = 0
     for B, start, end in self.block.slices(self._offset, self._offset + len(b)):
       Blen = end - start
@@ -70,6 +80,8 @@ class File(BackedFile):
   '''
 
   def __init__(self, backing_block=None):
+    ''' Initialise File with optional backing Block `backing_block`.
+    '''
     if backing_block is None:
       backing_block = Block(data=b'')
     self.backing_block = backing_block
