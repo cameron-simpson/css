@@ -636,11 +636,19 @@ class BackedFile(RawIOBase):
   def __init__(self, back_file, front_file=None):
     ''' Initialise the BackedFile using `back_file` for the backing data and `front_file` to the update data.
     '''
-    self.back_file = back_file
-    self._front_file = front_file
-    self.front_range = Range()
     self._offset = 0
     self._lock = RLock()
+    self._reset(back_file, front_file)
+
+  @locked
+  def _reset(self, back_file, front_file=None, front_range=None):
+    ''' Reset the internal state of the BackedFile.
+    '''
+    if front_range is None:
+      front_range = Range()
+    self.back_file = back_file
+    self._front_file = front_file
+    self.front_range = front_range
 
   def __enter__(self):
     ''' BackedFile instances offer a context manager that take the lock, allowing synchronous use of the file without implementing a suite of special methods like pread/pwrite.
@@ -652,8 +660,9 @@ class BackedFile(RawIOBase):
 
   @locked
   def _discard_front_file(self):
-    self._front_file = None
-    self.front_range = Range()
+    ''' Reset the BackedFile, keeping only the backing file.
+    '''
+    self._reset(self.back_file)
 
   @locked_property
   def front_file(self):
