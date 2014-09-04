@@ -278,7 +278,7 @@ def cmd_ar(args):
   elif mode == 'u':
     for ospath in args:
       try:
-        update_archive(arpath, ospath, modes, create_archive=True, ospath)
+        update_archive(arpath, ospath, modes, create_archive=True, arsubpath=ospath)
       except IOError as e:
         error("archive %s: %s" % (ospath, e))
         xit = 1
