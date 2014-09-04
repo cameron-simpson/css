@@ -112,7 +112,6 @@ class File(BackedFile):
       # recompute the top Block from the current high level blocks
       # discard the current changes, not saved to the Store
       self.backing_block = top_block_for(self.high_level_blocks())
-      self._discard_front_file()
     return self.backing_block
 
   @locked
