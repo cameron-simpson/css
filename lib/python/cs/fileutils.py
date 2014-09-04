@@ -685,6 +685,18 @@ class BackedFile(RawIOBase):
     else:
       raise ValueError("unsupported whence value %r" % (whence,))
 
+  def read_n(self, n):
+    ''' Read `n` bytes of data and return them.
+        Unlike file.read(), RawIOBase.read() may return short data,
+        thus this workalike, which may only return short data if
+        it hits EOF.
+    '''
+    if n < 1:
+      raise ValueError("n two low, expected >=1, got %r" % (n,))
+    data = bytearray(n)
+    nread = self.readinto(data)
+    return data[:nread]
+
   @locked
   def readinto(self, b):
     start = self._offset
@@ -745,7 +757,7 @@ class BackedFile_TestMethods(object):
     self._eq(backing_text, bfp_text, "backing_text vs bfp_text")
     # test reading first 512 bytes only
     bfp.seek(0)
-    bfp_leading_text = bfp.read(512)
+    bfp_leading_text = bfp.read_n(512)
     self._eq(backing_text[:512], bfp_leading_text, "leading 512 bytes of backing_text vs bfp_leading_text")
     # test writing some data and reading it back
     random_chunk = bytes( randint(0,255) for x in range(256) )
@@ -765,11 +777,12 @@ class BackedFile_TestMethods(object):
     self.assertEqual(random_chunk, front_chunk)
     # read the random data back from the BackedFile
     bfp.seek(512)
-    bfp_chunk = bfp.read(256)
+    bfp_chunk = bfp.read_n(256)
     self.assertEqual(bfp_chunk, random_chunk)
     # read a chunk that overlaps the old data and the new data
     bfp.seek(256)
-    overlap_chunk = bfp.read(512)
+    overlap_chunk = bfp.read_n(512)
+    self.assertEqual(len(overlap_chunk), 512, "overlap_chunk not 512 bytes: %r" % (overlap_chunk,))
     self.assertEqual(overlap_chunk, backing_text[256:512] + random_chunk)
 
 if __name__ == '__main__':
