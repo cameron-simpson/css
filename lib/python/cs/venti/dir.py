@@ -63,7 +63,7 @@ def decodeDirent(data, offset):
     metatext = None
   block, offset = decodeBlock(data, offset)
   if type_ == D_DIR_T:
-    E = Dir(name, metatext=metatext, parent=None, dirblock=block)
+    E = Dir(name, metatext=metatext, parent=None, block=block)
   elif type_ == D_FILE_T:
     E = FileDirent(name, metatext=metatext, block=block)
   else:
