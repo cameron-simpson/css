@@ -96,14 +96,14 @@ def walk(rootD, topdown=True):
     thisD, relpath = pending.pop(0)
     dirnames = thisD.dirs()
     filenames = thisD.files()
-    yield thisD, path, dirnames, filenames
+    yield thisD, relpath, dirnames, filenames
     for dirname in reversed(dirnames):
       subD = rootD.chdir1(dirname)
       if relpath:
         subpath = os.path.join(relpath, dirname)
       else:
         subpath = dirname
-      pending.push( (subD, subpath) )
+      pending.append( (subD, subpath) )
 
 def copy_out(rootD, rootpath, modes=None):
   ''' Copy the Dir `rootD` onto the os directory `rootpath`.
