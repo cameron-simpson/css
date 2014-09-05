@@ -310,17 +310,6 @@ def cmd_cat(args):
     cat(path)
   return 0
 
-# =item B<dump> I<filerefs...>
-#
-# Do a Block dump of the filerefs.
-#
-def cmd_dump(args):
-  if not args:
-    raise GetoptError("missing filerefs")
-  for path in args:
-    dump(path)
-  return 0
-
 # =item B<catblock> [B<-i>] I<hashcodes...>
 #
 # Emit the content of the blocks specified by the supplied I<hashcodes>.
@@ -343,6 +332,17 @@ def cmd_catblock(args):
       B = Block(hashcode)
     for subB in B.leaves:
       sys.stdout.write(subB.data)
+  return 0
+
+# =item B<dump> I<filerefs...>
+#
+# Do a Block dump of the filerefs.
+#
+def cmd_dump(args):
+  if not args:
+    raise GetoptError("missing filerefs")
+  for path in args:
+    dump(path)
   return 0
 
 # =item B<init> <dirpath>
