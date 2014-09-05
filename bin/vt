@@ -55,6 +55,7 @@ def main(argv):
     %s [options...] listen port
     %s [options...] ls [-R] dirrefs...
     %s [options...] mount dirref mountpoint
+    %s [options...] pack paths...
     %s [options...] scan datafile
     %s [options...] pull stores...
     %s [options...] unpack dirrefs...
@@ -66,7 +67,7 @@ def main(argv):
                     /path/to/dir  GDBMStore
                     tcp:[host]:port TCPStore
                     |sh-command   StreamStore via sh-command
-''' % (cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd)
+''' % (cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd)
 
   badopts = False
 
@@ -442,6 +443,36 @@ def cmd_mount(args):
   import cs.venti.vtfuse
   cs.venti.vtfuse.mount(args[1], E, S)
   return 0
+
+# =item B<pack> I<paths>...
+#
+# Replace each I<path> with an archive file I<path>B<.vt> referring
+# to the stored content of I<path>.
+#
+def cmd_pack(args):
+  if not args:
+    raise GetoptError("missing paths")
+  xit = 0
+  for ospath in args:
+    with Pfx(ospath):
+      if not os.path.exists(ospath):
+        error("missing")
+        xit = 1
+        continue
+      arpath = ospath + '.vt'
+      try:
+        update_archive(arpath, ospath, modes, create_archive=True)
+      except IOError as e:
+        error("%s" % (e,))
+        xit = 1
+        continue
+      if os.path.isdir(ospath):
+        X("SKIPPING: rmtree %r", ospath)
+        ##shutils.rmtree(ospath)
+      else:
+        X("SKIPPING: remove %r", ospath)
+        ##os.remove(ospath)
+  return xit
 
 # =item B<pull> I<stores...>
 #
