@@ -19,33 +19,36 @@ import time
 from datetime import datetime
 import errno
 from itertools import takewhile
+from cs.fileutils import lockfile
 from cs.inttypes import Flags
 from cs.lex import unctrl
-from cs.logutils import D, Pfx, error, X
+from cs.logutils import D, Pfx, warning, error, X
+from cs.seq import last
 from . import totext, fromtext
-from .blockify import blockify
-from .dir import decode_Dirent_text, Dir
+from .blockify import blockify, top_block_for
+from .dir import decode_Dirent_text, Dir, FileDirent
 from .file import filedata
+from .paths import resolve, path_split
 
 CopyModes = Flags('delete', 'do_mkdir', 'ignore_existing', 'trust_size_mtime')
 
-def retrieve(arfile, paths=None):
+def retrieve(arpath, paths=None):
   ''' Retrieve Dirents for the named file paths, or None if a
       path does not resolve.
       If `paths` if missing or None, retrieve the latest Dirents
       for all paths named in the archive file.
   '''
-  with Pfx(arfile):
+  with Pfx(arpath):
     found = {}
-    if arfile == '-':
+    if arpath == '-':
       arfp = sys.stdin
       assert not arfp.isatty(), "stdin may not be a tty"
     else:
-      arfp = open(arfile)
+      arfp = open(arpath)
     for unixtime, E in read_Dirents(arfp):
       if paths is None or E.name in paths:
         found[E.name] = E
-    if arfile != '-':
+    if arpath != '-':
       arfp.close()
     if paths is None:
       paths = found.keys()
@@ -60,10 +63,10 @@ def toc_report(fp, path, E, verbose):
     for subpath in sorted(E.keys()):
       toc_report(fp, os.path.join(path, subpath), E[subpath], verbose)
 
-def toc_archive(arfile, paths=None, verbose=False, fp=None):
+def toc_archive(arpath, paths=None, verbose=False, fp=None):
   if fp is None:
     fp = sys.stdout
-  for path, E in retrieve(arfile, paths):
+  for path, E in retrieve(arpath, paths):
     if E is None:
       error("no entry for %s", path)
     else:
@@ -76,7 +79,7 @@ def update_archive(arpath, ospath, modes, create_archive=False, arsubpath=None):
   with Pfx("update %r <== %r", arpath, ospath):
     base = os.path.basename(ospath)
     # stat early once, fail early if necessary
-    st = stat(ospath)
+    st = os.stat(ospath)
     if stat.S_ISDIR(st.st_mode):
       isdir = True
     elif stat.S_ISREG(st.st_mode):
@@ -87,7 +90,7 @@ def update_archive(arpath, ospath, modes, create_archive=False, arsubpath=None):
     # load latest archive root
     last_entry = None
     try:
-      with open(arfile, "r") as arfp:
+      with open(arpath, "r") as arfp:
         try:
           last_entry = last(read_Dirents(arfp))
         except IndexError:
@@ -104,29 +107,37 @@ def update_archive(arpath, ospath, modes, create_archive=False, arsubpath=None):
     else:
       subpaths = []
 
-    if last_entry is None:
+    if last_entry is not None:
+      # attach to entry
       when, rootE = last_entry
     elif subpaths:
-      rootE = Dir()
+      # new archive point: make dir if subpath
+      rootE = Dir('.')
     elif isdir:
+      # new archive point: make dir if source is dir
       rootE = Dir(base)
     else:
+      # new archive point: make file
       rootE = FileDirent(base)
 
     # create subdirectories
+    E = rootE
     while len(subpaths) > 1:
       name = subpaths.pop(0)
       subE = E.get(name)
       if subE is None or not subE.isdir:
         subE = E.mkdir(name)
+      E = subE
 
     # create leaf node
     if subpaths:
       name, = subpaths
       subE = E.get(name)
-      if isdir and not subE.isdir:
+      if isdir and (subE is None or not subE.isdir):
+        if subE is not None:
+          del E[name]
         subE = E.mkdir(name)
-      elif not isdir and not subE.isfile:
+      elif not isdir and (subE is None or not subE.isfile):
         subE = E[name] = FileDirent(name)
       E = subE
 
@@ -183,18 +194,34 @@ def copy_in_dir(rootD, rootpath, modes):
       `modes` is an optional CopyModes value.
   '''
   with Pfx("copy_in(%s)", rootpath):
+    if not os.path.isdir(rootpath):
+      warning("not a directory?")
     rootpath_prefix = rootpath + '/'
     # TODO: try out scandir sometime
     for ospath, dirnames, filenames in os.walk(rootpath):
       with Pfx(ospath):
+        if not os.path.isdir(ospath):
+          warning("not a directory? SKIPPED")
+          continue
+
+        # get matching Dir from store
         if ospath == rootpath:
           dirD = rootD
         elif ospath.startswith(rootpath_prefix):
-          dirD, name = resolve(rootD, ospath[len(rootpath_prefix):])
-          dirD = dirD.chdir1(name)
-
-        if not os.path.isdir(rootpath):
-          warning("not a directory?")
+          dirD, parent, subpaths = resolve(rootD, ospath[len(rootpath_prefix):])
+          for name in subpaths:
+            E = dirD.get(name)
+            if E is None:
+              dirD = dirD.chdir1(name)
+            elif E.isdir:
+              warning("surprise: resolve stopped at a subdir! subpaths=%r", subpaths)
+              dirD = E
+            else:
+              del D[name]
+              dirD = dirD.chdir1(name)
+        else:
+          warning("unexpected ospath, SKIPPED")
+          continue
 
         if modes.delete:
           # Remove entries in dirD not present in the real filesystem
@@ -255,22 +282,23 @@ def copy_in_file(E, filepath, modes):
   '''
   X("copy_in_file(%r)", filepath)
   with Pfx(filepath):
-    with open(filepath, "rb") as sfp:
-      B = top_block_for(_blockify_file(sfp, E))
-      st = os.fstat(sfp.fileno())
+    with open(filepath, "rb") as fp:
+      B = top_block_for(_blockify_file(fp, E))
+      st = os.fstat(fp.fileno())
       if B.span != st.st_size:
         warning("MISMATCH: B.span=%d, st_size=%d", B.span, st.st_size)
+  name = os.path.basename(filepath)
   E = FileDirent(name, None, B)
   E.meta.update_from_stat(st)
 
 def _blockify_file(fp, E):
   ''' Read data from the file `fp` and compare with the FileDirect `E`, yielding leaf Blocks for a new file.
-      This supports update_file().
+      This underpins update_file().
   '''
   # read file data in chunks matching the existing leaves
   # return the leaves while the data match
   for B in E.getBlock().leaves:
-    data = sfp.read(len(B))
+    data = fp.read(len(B))
     if len(data) == 0:
       # EOF
       return
