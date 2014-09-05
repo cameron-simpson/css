@@ -65,7 +65,7 @@ def last(iterable):
   '''
   nothing = True
   for item in iterable:
-    nothing = True
+    nothing = False
   if nothing:
     raise IndexError("no items in iterable: %r" % (iterable,))
   return item
