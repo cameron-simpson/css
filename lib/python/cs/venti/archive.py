@@ -28,49 +28,25 @@ from . import totext, fromtext
 from .blockify import blockify, top_block_for
 from .dir import decode_Dirent_text, Dir, FileDirent
 from .file import filedata
-from .paths import resolve, path_split
+from .paths import resolve, path_split, walk
 
 CopyModes = Flags('delete', 'do_mkdir', 'ignore_existing', 'trust_size_mtime')
-
-def retrieve(arpath, paths=None):
-  ''' Retrieve Dirents for the named file paths, or None if a
-      path does not resolve.
-      If `paths` if missing or None, retrieve the latest Dirents
-      for all paths named in the archive file.
-  '''
-  with Pfx(arpath):
-    found = {}
-    if arpath == '-':
-      arfp = sys.stdin
-      assert not arfp.isatty(), "stdin may not be a tty"
-    else:
-      arfp = open(arpath)
-    for unixtime, E in read_Dirents(arfp):
-      if paths is None or E.name in paths:
-        found[E.name] = E
-    if arpath != '-':
-      arfp.close()
-    if paths is None:
-      paths = found.keys()
-    return [ (path, found.get(path)) for path in paths ]
-
-def toc_report(fp, path, E, verbose):
-  if verbose:
-    print(path, file=fp)
-  else:
-    print(E.meta, path, file=fp)
-  if E.isdir:
-    for subpath in sorted(E.keys()):
-      toc_report(fp, os.path.join(path, subpath), E[subpath], verbose)
 
 def toc_archive(arpath, paths=None, verbose=False, fp=None):
   if fp is None:
     fp = sys.stdout
-  for path, E in retrieve(arpath, paths):
-    if E is None:
-      error("no entry for %s", path)
-    else:
-      toc_report(fp, path, E, verbose)
+  with Pfx(arpath):
+    last_entry = last_Dirent(arpath)
+    if last_entry is None:
+      error("no entries in archive")
+      return 1
+  when, rootD = last_entry
+  for thisD, relpath, dirs, files in walk(rootD, topdown=True):
+    print((relpath if len(relpath) else '.'), thisD.meta)
+    for name in files:
+      E = thisD[name]
+      print(os.path.join(relpath, name), E.meta)
+  return 0
 
 def update_archive(arpath, ospath, modes, create_archive=False, arsubpath=None):
   ''' Update the archive file `arpath` from `ospath`.
@@ -88,18 +64,7 @@ def update_archive(arpath, ospath, modes, create_archive=False, arsubpath=None):
       raise ValueError("unsupported OS file type 0o%o, expected file or directory" % (st.st_mode,))
 
     # load latest archive root
-    last_entry = None
-    try:
-      with open(arpath, "r") as arfp:
-        try:
-          last_entry = last(read_Dirents(arfp))
-        except IndexError:
-          last_entry = None
-    except OSError as e:
-      if e.errno != errno.ENOENT:
-        raise
-      if not create_archive:
-        raise ValueError("missing archive (%s), not creating" % (e,))
+    last_entry = last_Dirent(arpath)
 
     # prep the subpath components
     if arsubpath is not None:
@@ -167,12 +132,28 @@ def read_Dirents(fp):
       if not line.endswith('\n'):
         raise ValueError("incomplete? no trailing newline")
       line = line.rstrip()
+      X("%d: %s", lineno, line)
       # allow optional trailing text, which will be the E.name part normally
       isodate, unixtime, dent = line.split(None, 3)[:3]
       when = float(unixtime)
       E = decode_Dirent_text(dent)
     # note: yield _outside_ Pfx
     yield when, E
+
+def last_Dirent(arpath):
+  ''' Return the latest archive entry.
+  '''
+  try:
+    with open(arpath, "r") as arfp:
+      try:
+        X("opened")
+        return last(read_Dirents(arfp))
+      except IndexError:
+        return None
+  except OSError as e:
+    if e.errno != errno.ENOENT:
+      raise
+  return None
 
 def write_Dirent(fp, E, when=None):
   ''' Write a Dirent to an open archive file:
