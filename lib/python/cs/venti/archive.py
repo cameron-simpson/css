@@ -292,3 +292,89 @@ def _blockify_file(fp, E):
   # blockify the remaining file data
   for B in blockify(chain( [data], filedata(fp) )):
     yield B
+
+def copy_out_dir(rootD, rootpath, modes=None):
+  ''' Copy the Dir `rootD` onto the os directory `rootpath`.
+      `modes` is an optional CopyModes value.
+      Notes: `modes.delete` not implemented.
+  '''
+  if modes is None:
+    modes = CopyModes()
+  X("copy_out_dir(%s,%s,%s)", rootD, rootpath, modes)
+  with Pfx("copy_out(rootpath=%s)", rootpath):
+    for thisD, relpath, dirs, files in walk(rootD, topdown=True):
+      X("walk: relpath=%r: dirs=%r, files=%r", relpath, dirs, files)
+      if relpath:
+        dirpath = os.path.join(rootpath, relpath)
+      else:
+        dirpath = rootpath
+      with Pfx(dirpath):
+        if not os.path.isdir(dirpath):
+          if modes.do_mkdir:
+            try:
+              os.mkdir(dirpath)
+            except OSError as e:
+              error("mkdir: %s", e)
+              dirs[:] = ()
+              files[:] = ()
+              continue
+          else:
+            error("refusing to mkdir, not requested")
+            dirs[:] = ()
+            files[:] = ()
+            continue
+        # apply the metadata now in case of setgid etc
+        thisD.meta.apply_posix(dirpath)
+        X("walk2: files=%r", files)
+        for filename in sorted(files):
+          X("walk3: filename=%r", filename)
+          with Pfx(filename):
+            E = thisD[filename]
+            if not E.isfile:
+              warning("vt source is not a file, skipping")
+              continue
+            filepath = os.path.join(dirpath, filename)
+            copy_out_file(E, filepath, modes)
+        # apply the metadata again
+        thisD.meta.apply_posix(dirpath)
+
+def copy_out_file(E, ospath, modes=None):
+  ''' Update the OS file `ospath` from the FileDirent `E` according to `modes`.
+  '''
+  if modes is None:
+    modes = CopyModes()
+  if not E.isfile:
+    raise ValueError("expected FileDirent, got: %r" % (E,))
+  try:
+    # TODO: should this be os.stat if we don't support symlinks?
+    st = os.lstat(ospath)
+  except OSError as e:
+    st = None
+  else:
+    if modes.ignore_existing:
+      X("already exists, ignoring")
+      return
+  B = E.block
+  M = E.meta
+  if ( modes.trust_size_mtime
+   and st is not None
+   and ( M.mtime is not None and M.mtime == st.st_mtime
+         and B.span == st.st_size
+       )
+     ):
+    X("matching mtime and size, not overwriting")
+    return
+  # create or overwrite the file
+  # TODO: backup mode in case of write errors?
+  with Pfx(ospath):
+    X("rewrite %r", ospath)
+    Blen = len(B)
+    with open(ospath, "wb") as fp:
+      wrote = 0
+      for chunk in B.chunks:
+        X("%s: chunk len %d", ospath, len(chunk))
+        fp.write(chunk)
+        wrote += len(chunk)
+    if Blen != wrote:
+      error("Block len = %d, wrote %d", Blen, wrote)
+    M.apply_posix(ospath)
