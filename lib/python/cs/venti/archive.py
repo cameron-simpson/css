@@ -22,7 +22,7 @@ from itertools import takewhile
 from cs.fileutils import lockfile
 from cs.inttypes import Flags
 from cs.lex import unctrl
-from cs.logutils import D, Pfx, warning, error, X
+from cs.logutils import D, Pfx, info, warning, error, X
 from cs.seq import last
 from . import totext, fromtext
 from .blockify import blockify, top_block_for
