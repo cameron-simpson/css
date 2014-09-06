@@ -372,12 +372,9 @@ class Meta(dict):
     '''
     _acl = self._acl
     if _acl is None:
-      X("META.acl: self = %r", self)
       dflt_acl = DEFAULT_DIR_ACL if self.E.isdir else DEFAULT_FILE_ACL
       acl_text = self.get('a', dflt_acl)
-      X("META.acl_text: %r", acl_text)
       _acl = self._acl = decodeACL(acl_text)
-      X("META.acl => %r", _acl)
     return _acl
 
   @acl.setter
@@ -387,7 +384,6 @@ class Meta(dict):
     '''
     self['a'] = encodeACL(ac_L)
     self._acl = None
-    X("META: set ACL to %s", self['a'])
 
   @property
   def setuid(self):
