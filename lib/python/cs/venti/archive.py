@@ -264,11 +264,10 @@ def copy_in_file(E, filepath, modes):
     with open(filepath, "rb") as fp:
       B = E.block = top_block_for(_blockify_file(fp, E))
       st = os.fstat(fp.fileno())
-      if B.span != st.st_size:
-        warning("MISMATCH: B.span=%d, st_size=%d", B.span, st.st_size)
-  name = os.path.basename(filepath)
-  E = FileDirent(name, None, B)
-  E.meta.update_from_stat(st)
+    if B.span != st.st_size:
+      warning("MISMATCH: B.span=%d, st_size=%d", B.span, st.st_size)
+      raise RuntimeError("ABORT")
+    E.meta.update_from_stat(st)
 
 def _blockify_file(fp, E):
   ''' Read data from the file `fp` and compare with the FileDirect `E`, yielding leaf Blocks for a new file.
