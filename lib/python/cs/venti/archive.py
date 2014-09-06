@@ -271,11 +271,12 @@ def copy_in_file(E, filepath, modes):
 
 def _blockify_file(fp, E):
   ''' Read data from the file `fp` and compare with the FileDirect `E`, yielding leaf Blocks for a new file.
-      This underpins update_file().
+      This underpins copy_in_file().
   '''
   # read file data in chunks matching the existing leaves
   # return the leaves while the data match
-  for B in E.getBlock().leaves:
+  data = None
+  for B in E.block.leaves:
     data = fp.read(len(B))
     if len(data) == 0:
       # EOF
@@ -286,7 +287,10 @@ def _blockify_file(fp, E):
       break
     yield B
   # blockify the remaining file data
-  for B in blockify(chain( [data], filedata(fp) )):
+  chunks = filedata(fp)
+  if data is not None:
+    chunks = chain( [data], chunks )
+  for B in blockify(chunks):
     yield B
 
 def copy_out_dir(rootD, rootpath, modes=None):
