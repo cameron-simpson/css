@@ -30,7 +30,7 @@ from .dir import decode_Dirent_text, Dir, FileDirent
 from .file import filedata
 from .paths import resolve, path_split, walk
 
-CopyModes = Flags('delete', 'do_mkdir', 'ignore_existing', 'trust_size_mtime')
+CopyModes = Flags('delete', 'do_mkdir', 'replace', 'ignore_existing', 'trust_size_mtime')
 
 def toc_archive(arpath, paths=None, verbose=False, fp=None):
   if fp is None:
