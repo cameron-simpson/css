@@ -261,6 +261,7 @@ class FileDirent(_Dirent, NestingOpenCloseMixin):
     elif self._open_file is not None:
       raise ValueError("._block is %s and ._open_file is %r" % (self._block, self._open_file))
 
+  @property
   @locked
   def block(self):
     ''' Obtain the top level Block.
@@ -394,6 +395,7 @@ class Dir(_Dirent):
         self._block = None
     return es
 
+  @property
   @locked
   def block(self):
     ''' Return the top Block referring to an encoding of this Dir.
