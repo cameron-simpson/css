@@ -28,18 +28,18 @@ def username(uid):
   '''
   global user_map
   try:
-    user = user_map[uid]
+    username = user_map[uid]
   except KeyError:
     try:
-      user = getpwuid(uid)
+      pw = getpwuid(uid)
     except KeyError:
-      user = None
+      username = None
     else:
-      user = user.pw_name
-    user_map[uid] = user
-    if user not in user_map:
-      user_map[user] = uid
-  return user
+      username = pw.pw_name
+    user_map[uid] = username
+    if username not in user_map:
+      user_map[username] = uid
+  return username
 
 def userid(username):
   ''' Look up the user id associated with the supplied `username`.
@@ -50,11 +50,11 @@ def userid(username):
     uid = user_map[username]
   except KeyError:
     try:
-      uid = getpwnam(username)
+      pw = getpwnam(username)
     except KeyError:
       uid = None
     else:
-      uid = user.pw_uid
+      uid = pw.pw_uid
     user_map[username] = uid
     if uid not in user_map:
       user_map[uid] = username
@@ -66,18 +66,18 @@ def groupname(gid):
   '''
   global group_map
   try:
-    group = group_map[gid]
+    groupname = group_map[gid]
   except KeyError:
     try:
-      group = getpwuid(gid)
+      gr = getgrgid(gid)
     except KeyError:
-      group = None
+      groupname = None
     else:
-      group = group.pw_name
-    group_map[gid] = group
-    if group not in group_map:
-      group_map[group] = gid
-  return group
+      groupname = gr.gr_name
+    group_map[gid] = groupname
+    if groupname not in group_map:
+      group_map[groupname] = gid
+  return groupname
 
 def groupid(groupname):
   ''' Look up the group id associated with the supplied `groupname`.
@@ -88,14 +88,14 @@ def groupid(groupname):
     gid = group_map[groupname]
   except KeyError:
     try:
-      gid = getpwnam(groupname)
+      gr = getgrnam(groupname)
     except KeyError:
       gid = None
     else:
-      gid = group.pw_uid
+      gid = gr.gr_gid
     group_map[groupname] = gid
     if gid not in group_map:
-      group_map[gid] = group
+      group_map[gid] = groupname
   return gid
 
 Stat = namedtuple('Stat', 'st_mode st_ino st_dev st_nlink st_uid st_gid st_size st_atime st_mtime st_ctime')
