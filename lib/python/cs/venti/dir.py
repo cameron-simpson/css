@@ -269,7 +269,7 @@ class FileDirent(_Dirent, NestingOpenCloseMixin):
     '''
     self._check()
     if self._open_file is not None:
-      return self._open_file.sync()
+      self._block = self._open_file.sync()
     return self._block
 
   @block.setter
