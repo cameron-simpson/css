@@ -132,7 +132,6 @@ def read_Dirents(fp):
       if not line.endswith('\n'):
         raise ValueError("incomplete? no trailing newline")
       line = line.rstrip()
-      X("%d: %s", lineno, line)
       # allow optional trailing text, which will be the E.name part normally
       isodate, unixtime, dent = line.split(None, 3)[:3]
       when = float(unixtime)
@@ -146,7 +145,6 @@ def last_Dirent(arpath):
   try:
     with open(arpath, "r") as arfp:
       try:
-        X("opened")
         return last(read_Dirents(arfp))
       except IndexError:
         return None
@@ -248,7 +246,7 @@ def copy_in_dir(rootD, rootpath, modes):
                   info("skipping, same mtime and size")
                   continue
                 else:
-                  debug("DIFFERING size/mtime: B.span=%d/M.mtime=%s VS st_size=%d/st_mtime=%s",
+                  error("DIFFERING size/mtime: B.span=%d/M.mtime=%s VS st_size=%d/st_mtime=%s",
                     B.span, M.mtime, st.st_size, st.st_mtime)
             try:
               copy_in_file(fileE, filepath, modes)
@@ -262,7 +260,6 @@ def copy_in_dir(rootD, rootpath, modes):
 def copy_in_file(E, filepath, modes):
   ''' Store the file named `filepath` over the FileDirent `E`.
   '''
-  X("copy_in_file(%r)", filepath)
   with Pfx(filepath):
     with open(filepath, "rb") as fp:
       B = E.block = top_block_for(_blockify_file(fp, E))
@@ -300,10 +297,8 @@ def copy_out_dir(rootD, rootpath, modes=None):
   '''
   if modes is None:
     modes = CopyModes()
-  X("copy_out_dir(%s,%s,%s)", rootD, rootpath, modes)
   with Pfx("copy_out(rootpath=%s)", rootpath):
     for thisD, relpath, dirs, files in walk(rootD, topdown=True):
-      X("walk: relpath=%r: dirs=%r, files=%r", relpath, dirs, files)
       if relpath:
         dirpath = os.path.join(rootpath, relpath)
       else:
@@ -325,9 +320,7 @@ def copy_out_dir(rootD, rootpath, modes=None):
             continue
         # apply the metadata now in case of setgid etc
         thisD.meta.apply_posix(dirpath)
-        X("walk2: files=%r", files)
         for filename in sorted(files):
-          X("walk3: filename=%r", filename)
           with Pfx(filename):
             E = thisD[filename]
             if not E.isfile:
