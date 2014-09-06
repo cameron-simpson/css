@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 from __future__ import print_function
+import errno
 import os
 from os import geteuid, getegid
 import stat
@@ -9,7 +10,7 @@ from pwd import getpwuid, getpwnam
 from grp import getgrgid, getgrnam
 from stat import S_ISUID, S_ISGID
 from threading import RLock
-from cs.logutils import error, warning, X
+from cs.logutils import error, warning, X, Pfx
 from cs.threads import locked
 
 DEFAULT_DIR_ACL = 'o:rwx-'
