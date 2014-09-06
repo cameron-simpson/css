@@ -544,7 +544,7 @@ def cmd_unpack(args):
 def lsDirent(fp, E, name):
   ''' Transcribe a Dirent as an ls-style listing.
   '''
-  B = E.getBlock()
+  B = E.block
   st = E.stat()
   st_mode, st_ino, st_dev, st_nlink, st_uid, st_gid, st_size, \
     st_atime, st_mtime, st_ctime = st
@@ -591,7 +591,7 @@ def cat(path, fp=None):
       return cat(path, bfp)
   else:
     F = dirent_file(path)
-    block = F.getBlock()
+    block = F.block
     for B in block.leaves:
       fp.write(B.data)
 
@@ -601,7 +601,7 @@ def dump(path, fp=None):
   E, subname = dirent_resolve(path)
   if subname:
     E = E[subname]
-  dump_block(E.getBlock(), fp)
+  dump_block(E.block, fp)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))

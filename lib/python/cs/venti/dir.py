@@ -144,7 +144,7 @@ class _Dirent(object):
     else:
       metadata = b''
 
-    block = self.getBlock()
+    block = self.block
     return put_bs(self.type) \
          + put_bs(flags) \
          + namedata \
@@ -177,7 +177,7 @@ class _Dirent(object):
       nametxt = totext(put_bsdata(name.encode()))
       flags |= F_HASNAME
 
-    block = self.getBlock()
+    block = self.block
     return ( hexify(put_bs(self.type))
            + hexify(put_bs(flags))
            + metatxt
@@ -187,7 +187,7 @@ class _Dirent(object):
 
   # NB: not a property because it may change
   def size(self):
-    return len(self.getBlock())
+    return len(self.block)
 
   @property
   def mtime(self):
@@ -262,7 +262,7 @@ class FileDirent(_Dirent, NestingOpenCloseMixin):
       raise ValueError("._block is %s and ._open_file is %r" % (self._block, self._open_file))
 
   @locked
-  def getBlock(self):
+  def block(self):
     ''' Obtain the top level Block.
         If open, sync the file to update ._block.
     '''
@@ -271,6 +271,14 @@ class FileDirent(_Dirent, NestingOpenCloseMixin):
       return self._open_file.sync()
     return self._block
 
+  @block.setter
+  @locked
+  def block(self, B):
+    if self._open_file is not None:
+      raise RuntimeError("tried to set .block directly while open")
+    self._block = B
+
+  @property
   @locked
   def size(self):
     ''' Return the size of this file.
@@ -280,7 +288,7 @@ class FileDirent(_Dirent, NestingOpenCloseMixin):
     self._check()
     if self._open_file is not None:
       return len(self._open_file)
-    return len(self.getBlock())
+    return len(self.block)
 
   @locked
   def on_open(self, count):
@@ -329,7 +337,7 @@ class FileDirent(_Dirent, NestingOpenCloseMixin):
         if makedirs:
           os.makedirs(dirpath)
       with open(path, "wb") as ofp:
-        for B in self.getBlock().leaves():
+        for B in self.block.leaves():
           ofp.write(B.blockdata())
         fd = ofp.fileno()
         st = os.fstat(fd)
@@ -387,7 +395,7 @@ class Dir(_Dirent):
     return es
 
   @locked
-  def getBlock(self):
+  def block(self):
     ''' Return the top Block referring to an encoding of this Dir.
         TODO: blockify the encoding? Probably desirable for big Dirs.
     '''

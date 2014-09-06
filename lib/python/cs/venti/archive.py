@@ -241,6 +241,7 @@ def copy_in_dir(rootD, rootpath, modes):
             else:
               fileE = dirD[filename]
               if modes.trust_size_mtime:
+                B = fileE.block
                 M = fileE.meta
                 st = os.stat(filepath)
                 if st.st_mtime == M.mtime and st.st_size == B.span:
@@ -264,7 +265,7 @@ def copy_in_file(E, filepath, modes):
   X("copy_in_file(%r)", filepath)
   with Pfx(filepath):
     with open(filepath, "rb") as fp:
-      B = top_block_for(_blockify_file(fp, E))
+      B = E.block = top_block_for(_blockify_file(fp, E))
       st = os.fstat(fp.fileno())
       if B.span != st.st_size:
         warning("MISMATCH: B.span=%d, st_size=%d", B.span, st.st_size)
