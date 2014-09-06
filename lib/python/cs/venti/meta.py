@@ -551,7 +551,7 @@ class Meta(dict):
     st_ino = -1
     st_dev = -1
     st_nlink = 1
-    st_size = self.E.size()
+    st_size = self.E.size
     st_atime = 0
     st_mtime = self.mtime
     st_ctime = 0
