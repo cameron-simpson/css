@@ -444,6 +444,12 @@ class Meta(dict):
       except ValueError:
         error("ignoring bad metatext field: %r", metafield)
         continue
+      if k in ('m',):
+        try:
+          v = float(v)
+        except ValueError:
+          warning("%s: non-float 'm': %r", self, v)
+          v = 0.0
       self[k] = v
 
   def update_from_stat(self, st):
