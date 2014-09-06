@@ -235,7 +235,8 @@ class Block(_Block):
 
   @property
   def leaves(self):
-    yield self
+    if len(self) > 0:
+      yield self
 
   @locked_property
   def span(self):
@@ -284,7 +285,7 @@ class IndirectBlock(_Block):
       if B.indirect:
         for subB in B.leaves:
           yield subB
-      else:
+      elif len(B) > 0:
         yield B
 
 def chunksOf(B, start, stop=None):
