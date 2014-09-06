@@ -36,12 +36,13 @@ import datetime
 from cs.debug import ifdebug, dump_debug_threads
 from cs.lex import hexify
 import cs.logutils
-from cs.logutils import Pfx, exception, error, warning, debug, setup_logging, logTo, D
+from cs.logutils import Pfx, exception, error, warning, debug, setup_logging, logTo, D, X
 from cs.venti import totext, fromtext, defaults
 from cs.venti.block import Block, IndirectBlock, dump_block
 from cs.venti.store import Store
 from cs.venti.cache import CacheStore, MemCacheStore
-from cs.venti.paths import dirent_dir, dirent_file, dirent_resolve, CopyModes
+from cs.venti.paths import dirent_dir, dirent_file, dirent_resolve
+from cs.venti.archive import CopyModes, update_archive, toc_archive, last_Dirent, copy_out_dir
 
 def main(argv):
   setup_logging(upd_mode=False)
@@ -54,6 +55,7 @@ def main(argv):
     %s [options...] listen port
     %s [options...] ls [-R] dirrefs...
     %s [options...] mount dirref mountpoint
+    %s [options...] pack paths...
     %s [options...] scan datafile
     %s [options...] pull stores...
     %s [options...] unpack dirrefs...
@@ -65,7 +67,7 @@ def main(argv):
                     /path/to/dir  GDBMStore
                     tcp:[host]:port TCPStore
                     |sh-command   StreamStore via sh-command
-''' % (cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd)
+''' % (cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd)
 
   badopts = False
 
@@ -206,9 +208,6 @@ def main(argv):
                     error("%s", e)
                     badopts = True
 
-  if S:
-    S.close()
-
   if badopts:
     sys.stderr.write(usage)
     return 2
@@ -243,11 +242,11 @@ def cmd_ar(args):
   verbose = False
   modes = CopyModes()
   modes.trust_size_mtime = True
-  arfile = '-'
+  arpath = '-'
   mode = opts[0]
   for opt in opts[1:]:
     if opt == 'f':
-      arfile = args.pop(0)
+      arpath = args.pop(0)
     elif opt == 'v':
       verbose = True
     elif opt == 'A':
@@ -264,44 +263,38 @@ def cmd_ar(args):
     raise GetoptError("bad options")
 
   xit = 0
-
-  import cs.venti.archive
   
   if verbose:
     warning("cmd_ar: verbose specified but not implemented")
   if mode == 't':
     if args:
-      paths = args
+      ospaths = args
     else:
-      paths = None
-    with Pfx("tf %s" % (arfile,)):
-      cs.venti.archive.toc(arfile, paths)
+      ospaths = None
+    with Pfx("tf %s" % (arpath,)):
+      toc_archive(arpath, ospaths)
   elif mode == 'u':
-    for path in args:
+    for ospath in args:
       try:
-        ok = cs.venti.archive.archive(arfile, path, modes)
+        update_archive(arpath, ospath, modes, create_archive=True, arsubpath=ospath)
       except IOError as e:
-        error("archive %s: %s" % (path, e))
+        error("archive %s: %s" % (ospath, e))
         xit = 1
-      else:
-        if not ok:
-          error("archive %s: cs.venti.archive.archive: not ok", path)
-          xit = 1
   elif mode == 'x':
     if args:
-      paths = args
+      ospaths = args
     else:
-      paths = None
-    with Pfx("xf %s" % (arfile,)):
-      for path, E in cs.venti.archive.retrieve(arfile, paths, modes):
+      ospaths = None
+    with Pfx("xf %s" % (arpath,)):
+      for ospath, E in cs.venti.archive.retrieve(arpath, ospaths, modes):
         if E is None:
-          error("retrieve %s: not found" % (path,))
+          error("retrieve %s: not found" % (ospath,))
           xit = 1
         else:
           if E.isdir:
-            E.restore(path, makedirs=True, recurse=True)
+            E.restore(ospath, makedirs=True, recurse=True)
           else:
-            E.restore(path, makedirs=True)
+            E.restore(ospath, makedirs=True)
   else:
     raise GetoptError("%s: unsupported mode" % (mode,))
 
@@ -316,17 +309,6 @@ def cmd_cat(args):
     raise GetoptError("missing filerefs")
   for path in args:
     cat(path)
-  return 0
-
-# =item B<dump> I<filerefs...>
-#
-# Do a Block dump of the filerefs.
-#
-def cmd_dump(args):
-  if not args:
-    raise GetoptError("missing filerefs")
-  for path in args:
-    dump(path)
   return 0
 
 # =item B<catblock> [B<-i>] I<hashcodes...>
@@ -351,6 +333,17 @@ def cmd_catblock(args):
       B = Block(hashcode)
     for subB in B.leaves:
       sys.stdout.write(subB.data)
+  return 0
+
+# =item B<dump> I<filerefs...>
+#
+# Do a Block dump of the filerefs.
+#
+def cmd_dump(args):
+  if not args:
+    raise GetoptError("missing filerefs")
+  for path in args:
+    dump(path)
   return 0
 
 # =item B<init> <dirpath>
@@ -451,6 +444,38 @@ def cmd_mount(args):
   cs.venti.vtfuse.mount(args[1], E, S)
   return 0
 
+# =item B<pack> I<paths>...
+#
+# Replace each I<path> with an archive file I<path>B<.vt> referring
+# to the stored content of I<path>.
+#
+def cmd_pack(args):
+  if not args:
+    raise GetoptError("missing paths")
+  xit = 0
+  modes = CopyModes()
+  modes.trust_size_mtime = True
+  for ospath in args:
+    with Pfx(ospath):
+      if not os.path.exists(ospath):
+        error("missing")
+        xit = 1
+        continue
+      arpath = ospath + '.vt'
+      try:
+        update_archive(arpath, ospath, modes, create_archive=True)
+      except IOError as e:
+        error("%s" % (e,))
+        xit = 1
+        continue
+      if os.path.isdir(ospath):
+        X("SKIPPING: rmtree %r", ospath)
+        ##shutils.rmtree(ospath)
+      else:
+        X("SKIPPING: remove %r", ospath)
+        ##os.remove(ospath)
+  return xit
+
 # =item B<pull> I<stores...>
 #
 # Update our store with all the available content from the specified I<stores>.
@@ -483,7 +508,7 @@ def cmd_scan(args):
     dfp.close()
   return 0
 
-# =item B<unpack> I<dirrefs...>
+# =item B<unpack> I<archive>B<.vt>
 #
 # Unpack the directory specified by each I<dirref> into the current
 # working directory.
@@ -494,26 +519,30 @@ def cmd_scan(args):
 #
 def cmd_unpack(args):
   if len(args) < 1:
-    raise GetoptError("missing dirrefs")
-  xit = 0
-  for path in args:
-    with (path):
-      D = dirent_dir(path)
-      for subD, _, files in D.walk(topdown=True):
-        with subD:
-          if len(subD.path) > 0 and not os.path.isdir(subD.path):
-            print("mkdir", subD.path)
-            os.makedirs(subD.path)
-          files.sort()
-          for fname in files:
-            with fname:
-              if len(fname) == 0 or fname == '.' or fname == '..' or '/' in fname:
-                error("illegal filename")
-              fpath = os.path.join(subD.path, fname)
-              with open(fpath, mode='w') as outfp:
-                for b in subD[fname].getBlock().leaves(S):
-                  outfp.write(b)
-  return xit
+    raise GetoptError("missing archive name")
+  arpath = args.pop(0)
+  arbase, arext = os.path.splitext(arpath)
+  X("arbase=%r, arext=%r", arbase, arext)
+  if arext != '.vt':
+    raise GetoptError("archive name does not end in .vt: %r" % (arpath,))
+  if len(args) > 0:
+    raise GetoptError("extra arguments after archive name %r" % (arpath,))
+  if os.path.exists(arbase):
+    error("archive base already exists: %r", arbase)
+    return 1
+  with Pfx(arpath):
+    last_entry = last_Dirent(arpath)
+    if last_entry is None:
+      error("no entries in archive")
+      return 1
+  when, rootE = last_entry
+  with Pfx(arbase):
+    if rootE.isdir:
+      os.mkdir(arbase)
+      copy_out_dir(rootE, arbase, CopyModes(do_mkdir=True))
+    else:
+      copy_out_file(rootE, arbase)
+  return 0
 
 # =back
 #
@@ -521,7 +550,7 @@ def cmd_unpack(args):
 def lsDirent(fp, E, name):
   ''' Transcribe a Dirent as an ls-style listing.
   '''
-  B = E.getBlock()
+  B = E.block
   st = E.stat()
   st_mode, st_ino, st_dev, st_nlink, st_uid, st_gid, st_size, \
     st_atime, st_mtime, st_ctime = st
@@ -568,7 +597,7 @@ def cat(path, fp=None):
       return cat(path, bfp)
   else:
     F = dirent_file(path)
-    block = F.getBlock()
+    block = F.block
     for B in block.leaves:
       fp.write(B.data)
 
@@ -578,7 +607,7 @@ def dump(path, fp=None):
   E, subname = dirent_resolve(path)
   if subname:
     E = E[subname]
-  dump_block(E.getBlock(), fp)
+  dump_block(E.block, fp)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
