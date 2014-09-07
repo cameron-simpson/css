@@ -19,7 +19,7 @@ import stat
 import time
 from datetime import datetime
 import errno
-from itertools import takewhile
+from itertools import takewhile, chain
 from cs.fileutils import lockfile
 from cs.inttypes import Flags
 from cs.lex import unctrl
@@ -289,6 +289,7 @@ def _blockify_file(fp, E):
       break
     if not B.matches_data(data):
       break
+    data = None
     yield B
   # blockify the remaining file data
   chunks = filedata(fp)
