@@ -10,7 +10,7 @@ from pwd import getpwuid, getpwnam
 from grp import getgrgid, getgrnam
 from stat import S_ISUID, S_ISGID
 from threading import RLock
-from cs.logutils import error, warning, X, Pfx
+from cs.logutils import error, warning, debug, X, Pfx
 from cs.threads import locked
 
 DEFAULT_DIR_ACL = 'o:rwx-'
@@ -162,7 +162,6 @@ class AC(object):
         mode |= 1
       else:
         warning("AC.unixmode: ignoring unsupported permission %r", a)
-    X("unixmode(%r) ==> %o", self.textencode(), mode)
     return mode
 
 class AC_Owner(AC):
@@ -469,10 +468,8 @@ class Meta(dict):
         keeping the permissions for the frontmost user and group.
     '''
     if self.E.isdir:
-      X("meta.unix_perms: %s: set S_IFDIR", self.E.name)
       perms = stat.S_IFDIR
     elif self.E.isfile:
-      X("meta.unix_perms: %s: set S_IFREG", self.E.name)
       perms = stat.S_IFREG
     else:
       warning("Meta.unix_perms: neither a dir nor a file")
@@ -496,7 +493,6 @@ class Meta(dict):
     gid = self.gid
     if gid is None:
       gid = NOGROUP
-    X("META.unix_perms: %d, %d, %o", uid, gid, perms)
     return uid, gid, perms
 
   def access(self, amode, user=None, group=None):
@@ -573,7 +569,7 @@ class Meta(dict):
         gid = mst.st_gid
       if uid != -1 or gid != -1:
         with Pfx("chown(uid=%d,gid=%d)", uid, gid):
-          X("chown(%r,%d,%d) from %d:%d", ospath, uid, gid, st.st_uid, st.st_gid)
+          debug("chown(%r,%d,%d) from %d:%d", ospath, uid, gid, st.st_uid, st.st_gid)
           try:
             os.chown(ospath, uid, gid)
           except OSError as e:
@@ -585,13 +581,12 @@ class Meta(dict):
       mst_perms = mst.st_mode & 0o7777
       if st_perms != mst_perms:
         with Pfx("chmod(0o%04o)", mst_perms):
-          X("chmod(%r,0o%04o) from 0o%04o", ospath, mst_perms, st_perms)
+          debug("chmod(%r,0o%04o) from 0o%04o", ospath, mst_perms, st_perms)
           os.chmod(ospath, mst_perms)
       mst_mtime = mst.st_mtime
-      X("mst_mtime = %r", mst_mtime)
       if mst_mtime > 0:
         st_mtime = st.st_mtime
         if mst_mtime != st_mtime:
           with Pfx("chmod(0o%04o)", mst_perms):
-            X("utime(%r,atime=%s,mtime=%s) from mtime=%s", ospath, st.st_atime, mst_mtime, st_mtime)
+            debug("utime(%r,atime=%s,mtime=%s) from mtime=%s", ospath, st.st_atime, mst_mtime, st_mtime)
             os.utime(ospath, (st.st_atime, mst_mtime))
