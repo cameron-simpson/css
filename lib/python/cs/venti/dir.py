@@ -119,7 +119,7 @@ class _Dirent(object):
 
   def encode(self, no_name=False):
     ''' Serialise the dirent.
-        Output format: bs(type)bs(flags)[bsdata(metadata)][bsdata(name)]block
+        Output format: bs(type)bs(flags)[bsdata(name)][bsdata(metadata)]block
     '''
     flags = 0
 
@@ -153,9 +153,16 @@ class _Dirent(object):
 
   def textencode(self):
     ''' Serialise the dirent as text.
-        Output format: bs(type)bs(flags)[bs(metalen)meta][bs(namelen)name]block
+        Output format: bs(type)bs(flags)[bs(namelen)name][bs(metalen)meta]block
     '''
     flags = 0
+
+    name = self.name
+    if name is None or len(name) == 0:
+      nametxt = ""
+    else:
+      nametxt = totext(put_bsdata(name.encode()))
+      flags |= F_HASNAME
 
     meta = self.meta
     if meta:
@@ -170,18 +177,11 @@ class _Dirent(object):
     else:
       metatxt = ""
 
-    name = self.name
-    if name is None or len(name) == 0:
-      nametxt = ""
-    else:
-      nametxt = totext(put_bsdata(name.encode()))
-      flags |= F_HASNAME
-
     block = self.block
     return ( hexify(put_bs(self.type))
            + hexify(put_bs(flags))
-           + metatxt
            + nametxt
+           + metatxt
            + block.textencode()
            )
 
