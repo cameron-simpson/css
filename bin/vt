@@ -33,6 +33,7 @@ import os
 import os.path
 from getopt import getopt, GetoptError
 import datetime
+import shutil
 from cs.debug import ifdebug, dump_debug_threads
 from cs.lex import hexify
 import cs.logutils
@@ -493,12 +494,11 @@ def cmd_pack(args, verbose=None, log=None):
         error("%s" % (e,))
         xit = 1
         continue
+      log("remove %r", ospath)
       if os.path.isdir(ospath):
-        X("SKIPPING: rmtree %r", ospath)
-        ##shutils.rmtree(ospath)
+        shutil.rmtree(ospath)
       else:
-        X("SKIPPING: remove %r", ospath)
-        ##os.remove(ospath)
+        os.remove(ospath)
   return xit
 
 # =item B<pull> I<stores...>
