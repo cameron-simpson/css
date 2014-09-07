@@ -15,6 +15,7 @@ from __future__ import print_function
 import os
 import stat
 import sys
+import stat
 import time
 from datetime import datetime
 import errno
@@ -179,7 +180,8 @@ def copy_in_dir(rootD, rootpath, modes):
     # TODO: try out scandir sometime
     for ospath, dirnames, filenames in os.walk(rootpath):
       with Pfx(ospath):
-        if not os.path.isdir(ospath):
+        dst = os.lstat(ospath)
+        if not stat.S_ISDIR(dst.st_mode):
           warning("not a directory? SKIPPED")
           continue
 
@@ -232,7 +234,6 @@ def copy_in_dir(rootD, rootpath, modes):
             if not os.path.isfile(filepath):
               warning("not a regular file, skipping")
               continue
-            matchBlocks = None
             if filename not in dirD:
               fileE = FileDirent(filename)
               dirD[filename] = fileE
@@ -241,13 +242,13 @@ def copy_in_dir(rootD, rootpath, modes):
               if modes.trust_size_mtime:
                 B = fileE.block
                 M = fileE.meta
-                st = os.stat(filepath)
-                if st.st_mtime == M.mtime and st.st_size == B.span:
+                fst = os.stat(filepath)
+                if fst.st_mtime == M.mtime and fst.st_size == B.span:
                   info("skipping, same mtime and size")
                   continue
                 else:
                   error("DIFFERING size/mtime: B.span=%d/M.mtime=%s VS st_size=%d/st_mtime=%s",
-                    B.span, M.mtime, st.st_size, st.st_mtime)
+                    B.span, M.mtime, fst.st_size, fst.st_mtime)
             try:
               copy_in_file(fileE, filepath, modes)
             except OSError as e:
@@ -256,6 +257,9 @@ def copy_in_dir(rootD, rootpath, modes):
             except IOError as e:
               error(str(e))
               continue
+
+        # finally, update the Dir meta info
+        dirD.meta.update_from_stat(dst)
 
 def copy_in_file(E, filepath, modes):
   ''' Store the file named `filepath` over the FileDirent `E`.
@@ -363,12 +367,10 @@ def copy_out_file(E, ospath, modes=None):
   # create or overwrite the file
   # TODO: backup mode in case of write errors?
   with Pfx(ospath):
-    X("rewrite %r", ospath)
     Blen = len(B)
     with open(ospath, "wb") as fp:
       wrote = 0
       for chunk in B.chunks:
-        X("%s: chunk len %d", ospath, len(chunk))
         fp.write(chunk)
         wrote += len(chunk)
     if Blen != wrote:
