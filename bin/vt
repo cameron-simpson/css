@@ -273,6 +273,8 @@ def cmd_ar(args, verbose=None, log=None):
   for opt in opts[1:]:
     if opt == 'f':
       arpath = args.pop(0)
+    elif opt == 'q':
+      verbose = False
     elif opt == 'v':
       verbose = True
     elif opt == 'A':
@@ -288,10 +290,14 @@ def cmd_ar(args, verbose=None, log=None):
   if badopts:
     raise GetoptError("bad options")
 
+  # log message function(msg, *args)
+  if verbose:
+    log = nl
+  else:
+    log = silent
+
   xit = 0
   
-  if verbose:
-    warning("cmd_ar: verbose specified but not implemented")
   if mode == 't':
     if args:
       ospaths = args
