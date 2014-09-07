@@ -176,6 +176,12 @@ def main(argv):
   if dflt_log is not None:
     logTo(dflt_log, delay=True)
 
+  # log message function(msg, *args)
+  if verbose:
+    log = nl
+  else:
+    log = silent
+
   xit = None
   S = None
 
@@ -223,7 +229,7 @@ def main(argv):
                   S = CacheStore(S, MemCacheStore())
                 with S:
                   try:
-                    xit = op_func(args, verbose=verbose)
+                    xit = op_func(args, verbose=verbose, log=log)
                   except GetoptError as e:
                     error("%s", e)
                     badopts = True
@@ -251,7 +257,7 @@ def main(argv):
 # files, not just ones with new size/mtime, B<f> - specify archive
 # file.
 #
-def cmd_ar(args, verbose=None):
+def cmd_ar(args, verbose=None, log=None):
   if len(args) < 1:
     raise GetoptError("missing options")
   opts = args.pop(0)
@@ -295,7 +301,7 @@ def cmd_ar(args, verbose=None):
   elif mode == 'u':
     for ospath in args:
       try:
-        update_archive(arpath, ospath, modes, create_archive=True, arsubpath=ospath)
+        update_archive(arpath, ospath, modes, create_archive=True, arsubpath=ospath, log=log)
       except IOError as e:
         error("archive %s: %s" % (ospath, e))
         xit = 1
@@ -323,7 +329,7 @@ def cmd_ar(args, verbose=None):
 #
 # Emit the data content of the supplied I<filerefs> on the standard output.
 #
-def cmd_cat(args, verbose=None):
+def cmd_cat(args, verbose=None, log=None):
   if not args:
     raise GetoptError("missing filerefs")
   for path in args:
@@ -337,7 +343,7 @@ def cmd_cat(args, verbose=None):
 # consider the hashcode to specify an indirect block and emit
 # the data content of the leaf blocks.
 #
-def cmd_catblock(args, verbose=None):
+def cmd_catblock(args, verbose=None, log=None):
   indirect = False
   if len(args) > 0 and args[0] == "-i":
     indirect = True
@@ -358,7 +364,7 @@ def cmd_catblock(args, verbose=None):
 #
 # Do a Block dump of the filerefs.
 #
-def cmd_dump(args, verbose=None):
+def cmd_dump(args, verbose=None, log=None):
   if not args:
     raise GetoptError("missing filerefs")
   for path in args:
@@ -369,7 +375,7 @@ def cmd_dump(args, verbose=None):
 #
 # Initialise a directory for use as a store, using the GDBM backend.
 #
-def cmd_init(args, verbose=None):
+def cmd_init(args, verbose=None, log=None):
   if not args:
     raise GetoptError("missing dirpath")
   dirpath = args.pop(0)
@@ -395,7 +401,7 @@ def cmd_init(args, verbose=None):
 # daemon should listen on the specified I<host> address and I<port>
 # for connections.  if I<host> is omitted it defaults to B<127.0.0.1>.
 #
-def cmd_listen(args, verbose=None):
+def cmd_listen(args, verbose=None, log=None):
   if len(args) != 1:
     raise GetoptError("expected a port")
   arg = args[0]
@@ -423,7 +429,7 @@ def cmd_listen(args, verbose=None):
 # Do a directory listing of the specified I<dirrefs>.
 # The B<-R> (recursive) option requests a recurive directory listing.
 #
-def cmd_ls(args, verbose=None):
+def cmd_ls(args, verbose=None, log=None):
   recurse = False
   if args and args[0] == "-R":
     recurse = True
@@ -446,7 +452,7 @@ def cmd_ls(args, verbose=None):
 # Mount the specified I<dirref> as on the specified I<mountpoint> directory.
 # Requires FUSE support.
 #
-def cmd_mount(args, verbose=None):
+def cmd_mount(args, verbose=None, log=None):
   if len(args) != 2:
     raise GetoptError("expected dirref and mountpoint")
   dirref, mountpoint = args
@@ -468,12 +474,12 @@ def cmd_mount(args, verbose=None):
 # Replace each I<path> with an archive file I<path>B<.vt> referring
 # to the stored content of I<path>.
 #
-def cmd_pack(args, verbose=None):
+def cmd_pack(args, verbose=None, log=None):
   if not args:
     raise GetoptError("missing paths")
   xit = 0
-  modes = CopyModes()
-  modes.trust_size_mtime = True
+  modes = CopyModes(trust_size_mtime=True, verbose=verbose)
+  
   for ospath in args:
     with Pfx(ospath):
       if not os.path.exists(ospath):
@@ -482,7 +488,7 @@ def cmd_pack(args, verbose=None):
         continue
       arpath = ospath + '.vt'
       try:
-        update_archive(arpath, ospath, modes, create_archive=True)
+        update_archive(arpath, ospath, modes, create_archive=True, log=log)
       except IOError as e:
         error("%s" % (e,))
         xit = 1
@@ -502,7 +508,7 @@ def cmd_pack(args, verbose=None):
 # This is mostly useful for updating a master store from a store
 # which has been updated offline.
 #
-def cmd_pull(args, verbose=None):
+def cmd_pull(args, verbose=None, log=None):
   if not args:
     raise GetoptError("missing stores")
   raise NotImplementedError
@@ -514,7 +520,7 @@ def cmd_pull(args, verbose=None):
 # Report on standard output
 # the block hashcode, I<datafile> file offset and compressed size.
 #
-def cmd_scan(args, verbose=None):
+def cmd_scan(args, verbose=None, log=None):
   if len(args) != 1:
     raise GetoptError("missing datafile")
   datafile = args[0]
@@ -531,7 +537,7 @@ def cmd_scan(args, verbose=None):
 #
 # Unpack the archive file I<archive>B<.vt> as I<archive>.
 #
-def cmd_unpack(args, verbose=None):
+def cmd_unpack(args, verbose=None, log=None):
   if len(args) < 1:
     raise GetoptError("missing archive name")
   arpath = args.pop(0)
@@ -553,7 +559,7 @@ def cmd_unpack(args, verbose=None):
   with Pfx(arbase):
     if rootE.isdir:
       os.mkdir(arbase)
-      copy_out_dir(rootE, arbase, CopyModes(do_mkdir=True), report=nl)
+      copy_out_dir(rootE, arbase, CopyModes(do_mkdir=True))
     else:
       copy_out_file(rootE, arbase, report=nl)
   return 0
