@@ -12,7 +12,7 @@ import os.path
 from threading import Lock, RLock
 from zlib import compress, decompress
 from cs.cache import LRU_Cache
-from cs.logutils import D, X
+from cs.logutils import D, X, debug
 from cs.obj import O
 from cs.queues import NestingOpenCloseMixin
 from cs.serialise import get_bs, put_bs, get_bsfp
@@ -58,7 +58,7 @@ class DataFile(NestingOpenCloseMixin):
 
   def on_open(self, count):
     if count == 1:
-      X("open %s: first open, open file", self)
+      debug("open %s: first open, open file", self)
       self.fp = open(self.pathname, "a+b")
 
   def shutdown(self):
@@ -341,7 +341,7 @@ class GDBMDataDir(_DataDir):
   def _openIndex(self, hashname):
     import dbm.gnu
     gdbm_path = self.pathto("index-%s.gdbm" % (hashname,))
-    X("gdbm_path = %r", gdbm_path)
+    debug("gdbm_path = %r", gdbm_path)
     return dbm.gnu.open(gdbm_path, 'c')
 
 # the default DataDir implementation

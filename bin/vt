@@ -33,6 +33,7 @@ import os
 import os.path
 from getopt import getopt, GetoptError
 import datetime
+import shutil
 from cs.debug import ifdebug, dump_debug_threads
 from cs.lex import hexify
 import cs.logutils
@@ -272,6 +273,8 @@ def cmd_ar(args, verbose=None, log=None):
   for opt in opts[1:]:
     if opt == 'f':
       arpath = args.pop(0)
+    elif opt == 'q':
+      verbose = False
     elif opt == 'v':
       verbose = True
     elif opt == 'A':
@@ -280,17 +283,21 @@ def cmd_ar(args, verbose=None, log=None):
       error("%s: unsupported option", opt)
       badopts = True
 
-  if mode == 'u' and len(args) < 1:
+  if (mode == 'c' or mode == 'u') and len(args) < 1:
     error("missing pathnames")
     badopts = True
 
   if badopts:
     raise GetoptError("bad options")
 
+  # log message function(msg, *args)
+  if verbose:
+    log = nl
+  else:
+    log = silent
+
   xit = 0
   
-  if verbose:
-    warning("cmd_ar: verbose specified but not implemented")
   if mode == 't':
     if args:
       ospaths = args
@@ -298,7 +305,7 @@ def cmd_ar(args, verbose=None, log=None):
       ospaths = None
     with Pfx("tf %s" % (arpath,)):
       toc_archive(arpath, ospaths)
-  elif mode == 'u':
+  elif mode == 'c' or mode == 'u':
     for ospath in args:
       try:
         update_archive(arpath, ospath, modes, create_archive=True, arsubpath=ospath, log=log)
@@ -493,12 +500,11 @@ def cmd_pack(args, verbose=None, log=None):
         error("%s" % (e,))
         xit = 1
         continue
+      log("remove %r", ospath)
       if os.path.isdir(ospath):
-        X("SKIPPING: rmtree %r", ospath)
-        ##shutils.rmtree(ospath)
+        shutil.rmtree(ospath)
       else:
-        X("SKIPPING: remove %r", ospath)
-        ##os.remove(ospath)
+        os.remove(ospath)
   return xit
 
 # =item B<pull> I<stores...>
@@ -559,9 +565,9 @@ def cmd_unpack(args, verbose=None, log=None):
   with Pfx(arbase):
     if rootE.isdir:
       os.mkdir(arbase)
-      copy_out_dir(rootE, arbase, CopyModes(do_mkdir=True))
+      copy_out_dir(rootE, arbase, CopyModes(do_mkdir=True), log=log)
     else:
-      copy_out_file(rootE, arbase, report=nl)
+      copy_out_file(rootE, arbase, log=log)
   return 0
 
 # =back

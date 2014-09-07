@@ -313,7 +313,7 @@ def _blockify_file(fp, E):
   for B in blockify(chunks):
     yield B
 
-def copy_out_dir(rootD, rootpath, modes=None):
+def copy_out_dir(rootD, rootpath, modes=None, log=None):
   ''' Copy the Dir `rootD` onto the os directory `rootpath`.
       `modes` is an optional CopyModes value.
       Notes: `modes.delete` not implemented.
@@ -329,6 +329,7 @@ def copy_out_dir(rootD, rootpath, modes=None):
       with Pfx(dirpath):
         if not os.path.isdir(dirpath):
           if modes.do_mkdir:
+            log("mkdir   %s", dirpath)
             try:
               os.mkdir(dirpath)
             except OSError as e:
@@ -350,11 +351,11 @@ def copy_out_dir(rootD, rootpath, modes=None):
               warning("vt source is not a file, skipping")
               continue
             filepath = os.path.join(dirpath, filename)
-            copy_out_file(E, filepath, modes)
+            copy_out_file(E, filepath, modes, log=log)
         # apply the metadata again
         thisD.meta.apply_posix(dirpath)
 
-def copy_out_file(E, ospath, modes=None):
+def copy_out_file(E, ospath, modes=None, log=None):
   ''' Update the OS file `ospath` from the FileDirent `E` according to `modes`.
   '''
   if modes is None:
@@ -378,12 +379,13 @@ def copy_out_file(E, ospath, modes=None):
          and B.span == st.st_size
        )
      ):
-    X("matching mtime and size, not overwriting")
+    log("skip  %s (same size/mtime)", ospath)
     return
   # create or overwrite the file
   # TODO: backup mode in case of write errors?
   with Pfx(ospath):
     Blen = len(B)
+    log("rewrite %s", ospath)
     with open(ospath, "wb") as fp:
       wrote = 0
       for chunk in B.chunks:
