@@ -36,7 +36,7 @@ import datetime
 from cs.debug import ifdebug, dump_debug_threads
 from cs.lex import hexify
 import cs.logutils
-from cs.logutils import Pfx, exception, error, warning, debug, setup_logging, logTo, D, X
+from cs.logutils import Pfx, exception, error, warning, debug, setup_logging, logTo, D, X, nl
 from cs.venti import totext, fromtext, defaults
 from cs.venti.block import Block, IndirectBlock, dump_block
 from cs.venti.store import Store
@@ -67,9 +67,17 @@ def main(argv):
                     /path/to/dir  GDBMStore
                     tcp:[host]:port TCPStore
                     |sh-command   StreamStore via sh-command
+      -q          Quiet; not verbose. Default if stdout is not a tty.
+      -v          Verbose; not quiet. Default it stdout is a tty.
 ''' % (cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd)
 
   badopts = False
+
+  # verbose if stdout is a tty
+  try:
+    verbose = sys.stdout.isatty()
+  except:
+    verbose = False
 
   dflt_cache = os.environ.get('VT_STORE_CACHE')
   dflt_vt_store = os.environ.get('VT_STORE')
@@ -77,7 +85,7 @@ def main(argv):
   useMemCache = True
 
   try:
-    opts, args = getopt(argv[1:], 'C:MS:')
+    opts, args = getopt(argv[1:], 'C:MS:qv')
   except GetoptError as e:
     error("unrecognised option: %s: %s"% (e.opt, e.msg))
     badopts = True
@@ -115,6 +123,18 @@ def main(argv):
     #
     elif opt == '-S':
       dflt_vt_store = val
+    # =item B<-q>
+    #
+    # Quiet; not verbose. Default if stdout is not a tty.
+    #
+    elif opt == '-q':
+      verbose = False
+    # =item B<-v>
+    #
+    # Verbose; not quiet. Default it stdout is a tty.
+    #
+    elif opt == '-v':
+      verbose = True
     else:
       raise RuntimeError("unhandled option: %s" % (opt,))
 
@@ -203,7 +223,7 @@ def main(argv):
                   S = CacheStore(S, MemCacheStore())
                 with S:
                   try:
-                    xit = op_func(args)
+                    xit = op_func(args, verbose=verbose)
                   except GetoptError as e:
                     error("%s", e)
                     badopts = True
@@ -231,7 +251,7 @@ def main(argv):
 # files, not just ones with new size/mtime, B<f> - specify archive
 # file.
 #
-def cmd_ar(args):
+def cmd_ar(args, verbose=None):
   if len(args) < 1:
     raise GetoptError("missing options")
   opts = args.pop(0)
@@ -239,7 +259,6 @@ def cmd_ar(args):
     raise GetoptError("empty options")
 
   badopts = False
-  verbose = False
   modes = CopyModes()
   modes.trust_size_mtime = True
   arpath = '-'
@@ -304,7 +323,7 @@ def cmd_ar(args):
 #
 # Emit the data content of the supplied I<filerefs> on the standard output.
 #
-def cmd_cat(args):
+def cmd_cat(args, verbose=None):
   if not args:
     raise GetoptError("missing filerefs")
   for path in args:
@@ -318,7 +337,7 @@ def cmd_cat(args):
 # consider the hashcode to specify an indirect block and emit
 # the data content of the leaf blocks.
 #
-def cmd_catblock(args):
+def cmd_catblock(args, verbose=None):
   indirect = False
   if len(args) > 0 and args[0] == "-i":
     indirect = True
@@ -339,7 +358,7 @@ def cmd_catblock(args):
 #
 # Do a Block dump of the filerefs.
 #
-def cmd_dump(args):
+def cmd_dump(args, verbose=None):
   if not args:
     raise GetoptError("missing filerefs")
   for path in args:
@@ -350,7 +369,7 @@ def cmd_dump(args):
 #
 # Initialise a directory for use as a store, using the GDBM backend.
 #
-def cmd_init(args):
+def cmd_init(args, verbose=None):
   if not args:
     raise GetoptError("missing dirpath")
   dirpath = args.pop(0)
@@ -376,7 +395,7 @@ def cmd_init(args):
 # daemon should listen on the specified I<host> address and I<port>
 # for connections.  if I<host> is omitted it defaults to B<127.0.0.1>.
 #
-def cmd_listen(args):
+def cmd_listen(args, verbose=None):
   if len(args) != 1:
     raise GetoptError("expected a port")
   arg = args[0]
@@ -404,7 +423,7 @@ def cmd_listen(args):
 # Do a directory listing of the specified I<dirrefs>.
 # The B<-R> (recursive) option requests a recurive directory listing.
 #
-def cmd_ls(args):
+def cmd_ls(args, verbose=None):
   recurse = False
   if args and args[0] == "-R":
     recurse = True
@@ -427,7 +446,7 @@ def cmd_ls(args):
 # Mount the specified I<dirref> as on the specified I<mountpoint> directory.
 # Requires FUSE support.
 #
-def cmd_mount(args):
+def cmd_mount(args, verbose=None):
   if len(args) != 2:
     raise GetoptError("expected dirref and mountpoint")
   dirref, mountpoint = args
@@ -449,7 +468,7 @@ def cmd_mount(args):
 # Replace each I<path> with an archive file I<path>B<.vt> referring
 # to the stored content of I<path>.
 #
-def cmd_pack(args):
+def cmd_pack(args, verbose=None):
   if not args:
     raise GetoptError("missing paths")
   xit = 0
@@ -483,7 +502,7 @@ def cmd_pack(args):
 # This is mostly useful for updating a master store from a store
 # which has been updated offline.
 #
-def cmd_pull(args):
+def cmd_pull(args, verbose=None):
   if not args:
     raise GetoptError("missing stores")
   raise NotImplementedError
@@ -495,7 +514,7 @@ def cmd_pull(args):
 # Report on standard output
 # the block hashcode, I<datafile> file offset and compressed size.
 #
-def cmd_scan(args):
+def cmd_scan(args, verbose=None):
   if len(args) != 1:
     raise GetoptError("missing datafile")
   datafile = args[0]
@@ -510,14 +529,9 @@ def cmd_scan(args):
 
 # =item B<unpack> I<archive>B<.vt>
 #
-# Unpack the directory specified by each I<dirref> into the current
-# working directory.
-# This is the inverse of the B<pack> command.
-# Currently, to unpack a B<.vt> file the most succinct command is this:
+# Unpack the archive file I<archive>B<.vt> as I<archive>.
 #
-#   vt unpack `awk '{ dirref=$1 } END { print dirref }' file.vt`
-#
-def cmd_unpack(args):
+def cmd_unpack(args, verbose=None):
   if len(args) < 1:
     raise GetoptError("missing archive name")
   arpath = args.pop(0)
@@ -539,9 +553,9 @@ def cmd_unpack(args):
   with Pfx(arbase):
     if rootE.isdir:
       os.mkdir(arbase)
-      copy_out_dir(rootE, arbase, CopyModes(do_mkdir=True))
+      copy_out_dir(rootE, arbase, CopyModes(do_mkdir=True), report=nl)
     else:
-      copy_out_file(rootE, arbase)
+      copy_out_file(rootE, arbase, report=nl)
   return 0
 
 # =back
@@ -608,6 +622,11 @@ def dump(path, fp=None):
   if subname:
     E = E[subname]
   dump_block(E.block, fp)
+
+def silent(msg, *args, file=None):
+  ''' Dummy function to discard messages.
+  '''
+  pass
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
