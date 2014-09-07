@@ -171,12 +171,16 @@ def X(msg, *args):
   '''
   return nl(msg, *args, file=sys.stderr)
 
-def nl(msg, *args, file=None):
+def nl(msg, *args, **kw):
   ''' Unconditionally write the message `msg` to `file` (default sys.stdout).
       If `args` is not empty, format `msg` using %-expansion with `args`.
   '''
-  if file is None:
+  try:
+    file = kw.pop('file')
+  except KeyError:
     file = sys.stdout
+  if kw:
+    raise ValueError("unexpected keyword arguments: %r" % (kw,))
   msg = str(msg)
   if args:
     omsg = msg
