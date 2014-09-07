@@ -15,22 +15,24 @@ from __future__ import print_function
 import os
 import stat
 import sys
+import stat
 import time
 from datetime import datetime
 import errno
-from itertools import takewhile
+from itertools import takewhile, chain
 from cs.fileutils import lockfile
 from cs.inttypes import Flags
 from cs.lex import unctrl
 from cs.logutils import D, Pfx, info, warning, error, X
 from cs.seq import last
 from . import totext, fromtext
+from .block import dump_block
 from .blockify import blockify, top_block_for
 from .dir import decode_Dirent_text, Dir, FileDirent
 from .file import filedata
 from .paths import resolve, path_split, walk
 
-CopyModes = Flags('delete', 'do_mkdir', 'replace', 'ignore_existing', 'trust_size_mtime')
+CopyModes = Flags('delete', 'do_mkdir', 'ignore_existing', 'replace', 'trust_size_mtime', 'verbose')
 
 def toc_archive(arpath, paths=None, verbose=False, fp=None):
   if fp is None:
@@ -48,7 +50,7 @@ def toc_archive(arpath, paths=None, verbose=False, fp=None):
       print(os.path.join(relpath, name), E.meta)
   return 0
 
-def update_archive(arpath, ospath, modes, create_archive=False, arsubpath=None):
+def update_archive(arpath, ospath, modes, create_archive=False, arsubpath=None, log=None):
   ''' Update the archive file `arpath` from `ospath`.
      `ospath` is taken to match with the top of the archive plus the `arsubpath` if supplied.
   '''
@@ -108,9 +110,9 @@ def update_archive(arpath, ospath, modes, create_archive=False, arsubpath=None):
 
     # update target node
     if isdir:
-      copy_in_dir(E, ospath, modes)
+      copy_in_dir(E, ospath, modes, log=log)
     else:
-      copy_in_file(E, ospath, modes)
+      copy_in_file(E, ospath, modes, log=log)
 
     # save archive state
     save_Dirent(arpath, rootE)
@@ -168,7 +170,7 @@ def write_Dirent(fp, E, when=None):
   fp.write(unctrl(E.name))
   fp.write('\n')
 
-def copy_in_dir(rootD, rootpath, modes):
+def copy_in_dir(rootD, rootpath, modes, log=None):
   ''' Copy the os directory tree at `rootpath` over the Dir `rootD`.
       `modes` is an optional CopyModes value.
   '''
@@ -179,14 +181,17 @@ def copy_in_dir(rootD, rootpath, modes):
     # TODO: try out scandir sometime
     for ospath, dirnames, filenames in os.walk(rootpath):
       with Pfx(ospath):
-        if not os.path.isdir(ospath):
+        dst = os.lstat(ospath)
+        if not stat.S_ISDIR(dst.st_mode):
           warning("not a directory? SKIPPED")
           continue
 
         # get matching Dir from store
         if ospath == rootpath:
+          relpath = '.'
           dirD = rootD
         elif ospath.startswith(rootpath_prefix):
+          relpath = ospath[len(rootpath_prefix):]
           dirD, parent, subpaths = resolve(rootD, ospath[len(rootpath_prefix):])
           for name in subpaths:
             E = dirD.get(name)
@@ -209,30 +214,34 @@ def copy_in_dir(rootD, rootpath, modes):
           Dnames = sorted(dirD.keys())
           for name in Dnames:
             if name not in allnames:
-              info("delete %s", name)
+              relsubname = os.path.join(relpath, name)
+              log("delete %s", relsubname)
               del dirD[name]
 
         for dirname in sorted(dirnames):
           with Pfx("%s/", dirname):
+            reldirname = os.path.join(relpath, dirname)
             if dirname not in dirD:
+              log("mkdir  %s", reldirname)
               dirD.mkdir(dirname)
             else:
               E = dirD[dirname]
               if not E.isdir:
                 # old name is not a dir - toss it and make a dir
+                log("replace/mkdir %s", reldirname)
                 del dirD[dirname]
                 E = dirD.mkdir(dirname)
 
         for filename in sorted(filenames):
           with Pfx(filename):
+            relfilename = os.path.join(relpath, filename)
             if modes.ignore_existing and filename in dirD:
-              info("skipping, already Stored")
+              log("skip     %s (already in archive)", relfilename)
               continue
             filepath = os.path.join(ospath, filename)
             if not os.path.isfile(filepath):
-              warning("not a regular file, skipping")
+              log("skip     %s (not regular file: %s)", relfilename, filepath)
               continue
-            matchBlocks = None
             if filename not in dirD:
               fileE = FileDirent(filename)
               dirD[filename] = fileE
@@ -241,13 +250,14 @@ def copy_in_dir(rootD, rootpath, modes):
               if modes.trust_size_mtime:
                 B = fileE.block
                 M = fileE.meta
-                st = os.stat(filepath)
-                if st.st_mtime == M.mtime and st.st_size == B.span:
-                  info("skipping, same mtime and size")
+                fst = os.stat(filepath)
+                if fst.st_mtime == M.mtime and fst.st_size == B.span:
+                  log("skipfile %s (same mtime/size)", relfilename)
                   continue
                 else:
                   error("DIFFERING size/mtime: B.span=%d/M.mtime=%s VS st_size=%d/st_mtime=%s",
-                    B.span, M.mtime, st.st_size, st.st_mtime)
+                    B.span, M.mtime, fst.st_size, fst.st_mtime)
+            log("file     %s", relfilename)
             try:
               copy_in_file(fileE, filepath, modes)
             except OSError as e:
@@ -257,7 +267,10 @@ def copy_in_dir(rootD, rootpath, modes):
               error(str(e))
               continue
 
-def copy_in_file(E, filepath, modes):
+        # finally, update the Dir meta info
+        dirD.meta.update_from_stat(dst)
+
+def copy_in_file(E, filepath, modes, log=None):
   ''' Store the file named `filepath` over the FileDirent `E`.
   '''
   with Pfx(filepath):
@@ -266,6 +279,12 @@ def copy_in_file(E, filepath, modes):
       st = os.fstat(fp.fileno())
     if B.span != st.st_size:
       warning("MISMATCH: B.span=%d, st_size=%d", B.span, st.st_size)
+      filedata = open(filepath, "rb").read()
+      blockdata = B.all_data()
+      X("len(filedata)=%d", len(filedata))
+      X("len(blockdata)=%d", len(blockdata))
+      open("data1file", "wb").write(filedata)
+      open("data2block", "wb").write(blockdata)
       raise RuntimeError("ABORT")
     E.meta.update_from_stat(st)
 
@@ -285,6 +304,7 @@ def _blockify_file(fp, E):
       break
     if not B.matches_data(data):
       break
+    data = None
     yield B
   # blockify the remaining file data
   chunks = filedata(fp)
@@ -363,12 +383,10 @@ def copy_out_file(E, ospath, modes=None):
   # create or overwrite the file
   # TODO: backup mode in case of write errors?
   with Pfx(ospath):
-    X("rewrite %r", ospath)
     Blen = len(B)
     with open(ospath, "wb") as fp:
       wrote = 0
       for chunk in B.chunks:
-        X("%s: chunk len %d", ospath, len(chunk))
         fp.write(chunk)
         wrote += len(chunk)
     if Blen != wrote:

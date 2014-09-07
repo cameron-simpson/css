@@ -156,27 +156,38 @@ def infer_logging_level():
         level = logging.INFO
   return level, flags
 
-def D(fmt, *args):
+def D(msg, *args):
   ''' Print formatted debug string straight to sys.stderr if D_mode is true,
       bypassing the logging modules entirely.
       A quick'n'dirty debug tool.
   '''
   global D_mode
   if D_mode:
-    X(fmt, *args)
+    X(msg, *args)
 
-def X(fmt, *args):
-  msg = str(fmt)
+def X(msg, *args):
+  ''' Unconditionally write the message `msg` to sys.stderr.
+      If `args` is not empty, format `msg` using %-expansion with `args`.
+  '''
+  return nl(msg, *args, file=sys.stderr)
+
+def nl(msg, *args, file=None):
+  ''' Unconditionally write the message `msg` to `file` (default sys.stdout).
+      If `args` is not empty, format `msg` using %-expansion with `args`.
+  '''
+  if file is None:
+    file = sys.stdout
+  msg = str(msg)
   if args:
     omsg = msg
     try:
       msg = msg % args
     except TypeError as e:
-      X("cannot expand msg: %s; msg=%r, args=%r", e, msg, args)
+      nl("cannot expand msg: %s; msg=%r, args=%r", e, msg, args, file=sys.stderr)
       msg = "%s[%r]" % (msg, args)
-  sys.stderr.write(msg)
-  sys.stderr.write("\n")
-  sys.stderr.flush()
+  file.write(msg)
+  file.write("\n")
+  file.flush()
 
 def logTo(filename, logger=None, mode='a', encoding=None, delay=False, format=None):
   ''' Log to the specified filename.
