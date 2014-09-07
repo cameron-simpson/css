@@ -283,7 +283,7 @@ def cmd_ar(args, verbose=None, log=None):
       error("%s: unsupported option", opt)
       badopts = True
 
-  if mode == 'u' and len(args) < 1:
+  if (mode == 'c' or mode == 'u') and len(args) < 1:
     error("missing pathnames")
     badopts = True
 
@@ -305,7 +305,7 @@ def cmd_ar(args, verbose=None, log=None):
       ospaths = None
     with Pfx("tf %s" % (arpath,)):
       toc_archive(arpath, ospaths)
-  elif mode == 'u':
+  elif mode == 'c' or mode == 'u':
     for ospath in args:
       try:
         update_archive(arpath, ospath, modes, create_archive=True, arsubpath=ospath, log=log)
