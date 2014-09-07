@@ -559,9 +559,9 @@ def cmd_unpack(args, verbose=None, log=None):
   with Pfx(arbase):
     if rootE.isdir:
       os.mkdir(arbase)
-      copy_out_dir(rootE, arbase, CopyModes(do_mkdir=True))
+      copy_out_dir(rootE, arbase, CopyModes(do_mkdir=True), log=log)
     else:
-      copy_out_file(rootE, arbase, report=nl)
+      copy_out_file(rootE, arbase, log=log)
   return 0
 
 # =back
