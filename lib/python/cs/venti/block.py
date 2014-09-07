@@ -334,7 +334,7 @@ def chunksOf(B, start, stop=None):
     # we always start from the start of the next block
     start = 0
 
-def dump_block(B, fp=None, indent=''):
+def dump_block(B, fp=None, indent='', verbose=False):
   if fp is None:
     fp = sys.stderr
   data = B.data
@@ -347,9 +347,14 @@ def dump_block(B, fp=None, indent=''):
     for subB in subblocks:
       dump_block(subB, fp=fp, indent=indent)
   else:
-    print("%sB.datalen=%d, span=%d, hash=%s"
-          % (indent, len(data), B.span, B.hashcode),
-          file=fp)
+    if verbose:
+      print("%sB.datalen=%d, span=%d, hash=%s %r"
+            % (indent, len(data), B.span, B.hashcode, B.data),
+            file=fp)
+    else:
+      print("%sB.datalen=%d, span=%d, hash=%s"
+            % (indent, len(data), B.span, B.hashcode),
+            file=fp)
 
 if __name__ == '__main__':
   import cs.venti.block_tests
