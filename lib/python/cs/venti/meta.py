@@ -429,7 +429,6 @@ class Meta(dict):
                  AC_Group( *permbits_to_allow_deny( (mode>>3)&7 ) ),
                  AC_Other( *permbits_to_allow_deny( mode&7 ) )
                ] + [ ac for ac in self.acl if ac.prefix not in ('o', 'g', '*') ]
-    X("META.chmod: meta=%s", self.textencode())
 
   def update(self, metatext):
     ''' Update the Meta fields from the supplied metatext.
@@ -441,7 +440,7 @@ class Meta(dict):
       try:
         k, v = metafield.split(':', 1)
       except ValueError:
-        error("ignoring bad metatext field: %r", metafield)
+        error("ignoring bad metatext field (no colon): %r", metafield)
         continue
       if k in ('m',):
         try:
