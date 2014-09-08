@@ -42,7 +42,7 @@ from cs.venti import totext, fromtext, defaults
 from cs.venti.block import Block, IndirectBlock, dump_block
 from cs.venti.store import Store
 from cs.venti.cache import CacheStore, MemCacheStore
-from cs.venti.paths import dirent_dir, dirent_file, dirent_resolve
+from cs.venti.paths import dirent_dir, dirent_file, dirent_resolve, resolve
 from cs.venti.archive import CopyModes, update_archive, toc_archive, last_Dirent, copy_out_dir
 
 def main(argv):
@@ -316,17 +316,48 @@ def cmd_ar(args, verbose=None, log=None):
     if args:
       ospaths = args
     else:
-      ospaths = None
+      ospaths = ('.',)
+    xit = 0
+    modes = CopyModes()
     with Pfx("xf %s" % (arpath,)):
-      for ospath, E in cs.venti.archive.retrieve(arpath, ospaths, modes):
-        if E is None:
-          error("retrieve %s: not found" % (ospath,))
-          xit = 1
-        else:
+      with Pfx(arpath):
+        last_entry = last_Dirent(arpath)
+        if last_entry is None:
+          error("no entries in archive")
+          return 1
+      when, rootE = last_entry
+      for ospath in ospaths:
+        with Pfx(ospath):
+          E, Eparent, tail = resolve(rootE, ospath)
+          if tail:
+            error("not in archive")
+            xit = 1
+            continue
+          log("ar x %s", ospath)
           if E.isdir:
-            E.restore(ospath, makedirs=True, recurse=True)
+            with Pfx("makedirs"):
+              try:
+                os.makedirs(ospath, exist_ok=True)
+              except OSError as e:
+                error("%s", e)
+                xit = 1
+                continue
+            copy_out_dir(E, ospath, modes, log=log)
           else:
-            E.restore(ospath, makedirs=True)
+            if os.path.exists(ospath):
+              error("already exists")
+              xit = 1
+              continue
+            osparent = os.path.dirname(ospath)
+            if not os.path.isdir(osparent):
+              with Pfx("makedirs(%s)", osparent):
+                try:
+                  os.makedirs(osparent)
+                except OSError as e:
+                  error("%s", e)
+                  xit = 1
+                  continue
+            copy_out_file(E, ospath, modes, log=log)
   else:
     raise GetoptError("%s: unsupported mode" % (mode,))
 
