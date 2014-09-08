@@ -333,28 +333,30 @@ def cmd_ar(args, verbose=None, log=None):
             error("not in archive")
             xit = 1
             continue
-          if os.path.exists(ospath):
-            error("already exists")
-            xit = 1
-            continue
           log("ar x %s", ospath)
           if E.isdir:
             with Pfx("makedirs"):
               try:
-                os.makedirs(ospath)
+                os.makedirs(ospath, exist_ok=True)
               except OSError as e:
                 error("%s", e)
                 xit = 1
                 continue
             copy_out_dir(E, ospath, modes, log=log)
           else:
-            with Pfx("makedirs"):
-              try:
-                os.makedirs(ospath)
-              except OSError as e:
-                error("%s", e)
-                xit = 1
-                continue
+            if os.path.exists(ospath):
+              error("already exists")
+              xit = 1
+              continue
+            osparent = os.path.dirname(ospath)
+            if not os.path.isdir(osparent):
+              with Pfx("makedirs(%s)", osparent):
+                try:
+                  os.makedirs(osparent)
+                except OSError as e:
+                  error("%s", e)
+                  xit = 1
+                  continue
             copy_out_file(E, ospath, modes, log=log)
   else:
     raise GetoptError("%s: unsupported mode" % (mode,))
