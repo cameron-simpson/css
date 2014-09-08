@@ -266,7 +266,7 @@ def cmd_ar(args, verbose=None, log=None):
     raise GetoptError("empty options")
 
   badopts = False
-  modes = CopyModes()
+  modes = CopyModes(trust_size_mtime=True)
   modes.trust_size_mtime = True
   arpath = '-'
   mode = opts[0]
@@ -318,7 +318,6 @@ def cmd_ar(args, verbose=None, log=None):
     else:
       ospaths = ('.',)
     xit = 0
-    modes = CopyModes()
     with Pfx("xf %s" % (arpath,)):
       with Pfx(arpath):
         last_entry = last_Dirent(arpath)
@@ -516,7 +515,7 @@ def cmd_pack(args, verbose=None, log=None):
   if not args:
     raise GetoptError("missing paths")
   xit = 0
-  modes = CopyModes(trust_size_mtime=True, verbose=verbose)
+  modes = CopyModes(trust_size_mtime=True)
   
   for ospath in args:
     with Pfx(ospath):
