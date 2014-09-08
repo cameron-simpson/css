@@ -32,7 +32,7 @@ from .dir import decode_Dirent_text, Dir, FileDirent
 from .file import filedata
 from .paths import resolve, path_split, walk
 
-CopyModes = Flags('delete', 'do_mkdir', 'ignore_existing', 'replace', 'trust_size_mtime', 'verbose')
+CopyModes = Flags('delete', 'do_mkdir', 'trust_size_mtime')
 
 def toc_archive(arpath, paths=None, verbose=False, fp=None):
   if fp is None:
@@ -235,9 +235,9 @@ def copy_in_dir(rootD, rootpath, modes, log=None):
         for filename in sorted(filenames):
           with Pfx(filename):
             relfilename = os.path.join(relpath, filename)
-            if modes.ignore_existing and filename in dirD:
-              log("skip     %s (already in archive)", relfilename)
-              continue
+            ##if modes.ignore_existing and filename in dirD:
+            ##  log("skip     %s (already in archive)", relfilename)
+            ##  continue
             filepath = os.path.join(ospath, filename)
             if not os.path.isfile(filepath):
               log("skip     %s (not regular file: %s)", relfilename, filepath)
