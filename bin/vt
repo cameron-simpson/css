@@ -42,7 +42,7 @@ from cs.venti import totext, fromtext, defaults
 from cs.venti.block import Block, IndirectBlock, dump_block
 from cs.venti.store import Store
 from cs.venti.cache import CacheStore, MemCacheStore
-from cs.venti.paths import dirent_dir, dirent_file, dirent_resolve
+from cs.venti.paths import dirent_dir, dirent_file, dirent_resolve, resolve
 from cs.venti.archive import CopyModes, update_archive, toc_archive, last_Dirent, copy_out_dir
 
 def main(argv):
