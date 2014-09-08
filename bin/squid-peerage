@@ -93,7 +93,7 @@ def pattern_acl_definition(pattern):
     return "url_regex ^"+pattern
   # .ext ==> url_regex \.ext$
   if pattern.startswith('.'):
-    return 'url_regex [.]' + pattern[1:] + '$'
+    return 'url_regex [.]' + pattern[1:] + '(\?[^?]*)?$'
   # *.domain ==> dstdomain .domain
   if pattern.startswith("*."):
     return "dstdomain "+pattern[1:]
