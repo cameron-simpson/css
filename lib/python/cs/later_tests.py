@@ -112,7 +112,7 @@ class TestLater(unittest.TestCase):
       P = L.pipeline([lambda x:x], items)
       outQ = P.outQ
       result = list(P.outQ)
-      self.assertEquals( items, result )
+      self.assertEqual( items, result )
 
   def test09pipeline_01idenitity(self):
     L = self.L
@@ -123,7 +123,7 @@ class TestLater(unittest.TestCase):
     self.assertIsNot(P.outQ, items)
     self.assertIsInstance(P.outQ, _Q_Proxy)
     result = list(P.outQ)
-    self.assertEquals( items, result )
+    self.assertEqual( items, result )
 
   def test09pipeline_02double(self):
     L = self.L
@@ -137,8 +137,8 @@ class TestLater(unittest.TestCase):
     self.assertIsInstance(P.outQ, _Q_Proxy)
     result = list(P.outQ)
     # values may be interleaved due to parallelism
-    self.assertEquals( len(result), len(expected) )
-    self.assertEquals( sorted(result), sorted(expected) )
+    self.assertEqual( len(result), len(expected) )
+    self.assertEqual( sorted(result), sorted(expected) )
 
   def test09pipeline_03a_sort(self):
     L = self.L
@@ -150,7 +150,7 @@ class TestLater(unittest.TestCase):
     self.assertIsNot(P.outQ, items)
     self.assertIsInstance(P.outQ, _Q_Proxy)
     result = list(P.outQ)
-    self.assertEquals( result, sorted(items) )
+    self.assertEqual( result, sorted(items) )
 
   def test09pipeline_03b_set(self):
     L = self.L
@@ -162,7 +162,7 @@ class TestLater(unittest.TestCase):
     self.assertIsNot(P.outQ, items)
     self.assertIsInstance(P.outQ, _Q_Proxy)
     result = set(P.outQ)
-    self.assertEquals( result, set(items) )
+    self.assertEqual( result, set(items) )
 
   def test09pipeline_04select(self):
     L = self.L
@@ -175,7 +175,7 @@ class TestLater(unittest.TestCase):
     self.assertIsNot(P.outQ, items)
     self.assertIsInstance(P.outQ, _Q_Proxy)
     result = list(P.outQ)
-    self.assertEquals( result, expected )
+    self.assertEqual( result, expected )
 
   def test09pipeline_05two_by_two_by_sort(self):
     L = self.L
@@ -194,7 +194,7 @@ class TestLater(unittest.TestCase):
     self.assertIsNot(P.outQ, items)
     self.assertIsInstance(P.outQ, _Q_Proxy)
     result = list(P.outQ)
-    self.assertEquals( result, expected )
+    self.assertEqual( result, expected )
 
 def selftest(argv):
   setup_logging()
