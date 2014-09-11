@@ -69,7 +69,7 @@ class TestLater(unittest.TestCase):
     y = LF2()
     z = LF3()
     elapsed = time.time() - now
-    self.assertTrue(elapsed >= 4)
+    self.assertTrue(elapsed >= 4, "elapsed (%s) < 4" % (elapsed,))
 
   def test03calltwice(self):
     # compute once, get result twice
