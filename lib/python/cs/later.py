@@ -192,7 +192,7 @@ class LateFunction(PendingFunction):
     '''
     PendingFunction.__init__(self, func, final=final)
     if name is None:
-      name = "LF-%d[func=%s]" % (seq(),func.__name__,)
+      name = "LF-%d[func=%s]" % ( seq(), funcname(func) )
     self.name = name
     self.later = L = later.open()
     L._busy.inc(name)
