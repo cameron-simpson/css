@@ -9,13 +9,11 @@ from functools import partial
 import logging
 from threading import Timer
 import time
-import traceback
 from cs.debug import Lock, RLock, Thread, trace_caller, stack_dump
 from cs.logutils import exception, error, warning, debug, D, X, Pfx, PfxCallInfo
 from cs.resources import NestingOpenCloseMixin, _NOC_Proxy, not_closed
 from cs.seq import seq
 from cs.py3 import Queue, PriorityQueue, Queue_Full, Queue_Empty
-from cs.py.func import callmethod_if as ifmethod
 from cs.obj import O
 
 class _Q_Proxy(_NOC_Proxy):

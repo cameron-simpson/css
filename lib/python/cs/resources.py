@@ -6,8 +6,11 @@
 
 import threading
 from threading import Condition
+import traceback
 from cs.excutils import logexc
 from cs.obj import O, Proxy
+from cs.seq import seq
+from cs.py.func import callmethod_if as ifmethod
 
 def not_closed(func):
   ''' Decorator to wrap NestingOpenCloseMixin proxy object methods
