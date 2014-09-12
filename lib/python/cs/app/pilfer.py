@@ -21,8 +21,18 @@ from string import Formatter
 from subprocess import Popen, PIPE
 from time import sleep
 from threading import Lock, Thread
-from urllib import quote, unquote
-from urllib2 import HTTPError, URLError, build_opener, HTTPBasicAuthHandler, HTTPCookieProcessor
+try:
+  from urllib.parse import quote, unquote
+except ImportError:
+  from urllib import quote, unquote
+try:
+  from urllib.error import HTTPError, URLError
+except ImportError:
+  from urllib2 import HTTPError, URLError
+try:
+  from urllib.request import build_opener, HTTPBasicAuthHandler, HTTPCookieProcessor
+except ImportError:
+  from urllib2 import build_opener, HTTPBasicAuthHandler, HTTPCookieProcessor
 try:
   import xml.etree.cElementTree as ElementTree
 except ImportError:

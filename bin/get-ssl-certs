@@ -1,0 +1,38 @@
+#!/bin/sh
+#
+# Connect to an SSL service and transcribe its certificates based on the recipe at:
+#    http://how2ssl.com/articles/openssl_commands_and_tips/
+# The output may be copied to a .pem file for later use.
+#   - Cameron Simpson <cs@zip.com.au> 09sep2014
+#
+
+cmd=$(basename "$0")
+usage="Usage: $cmd host[:port]"
+
+trace=
+[ -t 2 ] && trace=set-x
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing host[:port]" >&2
+  badopts=1
+else
+  target=$1
+  shift
+  case "$target" in
+    *:*) ;; *) target=$target:https ;;
+  esac
+fi
+
+if [ $# -gt 0 ]
+then
+  echo "$cmd: extra arguments after host[:port]: $*" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+$trace openssl s_client -connect "$target" -showcerts </dev/null \
+| sed -n '/^-----BEGIN CERTIFICATE-----/,/^-----END CERTIFICATE-----/p'
