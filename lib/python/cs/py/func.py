@@ -12,3 +12,24 @@ def funcname(func):
     return func.__name__
   except AttributeError:
     return str(func)
+
+def funccite(func):
+  code = func.__code__
+  return "%s[%s:%d]" % (funcname(func), code.co_filename, code.co_firstlineno)
+
+def callmethod_if(o, method, default=None, a=None, kw=None):
+  ''' Call the named `method` on the object `o` if it exists.
+      If it does not exist, return `default` (which defaults to None).
+      Otherwise call getattr(o, method)(*a, **kw).
+      `a` defaults to ().
+      `kw` defaults to {}.
+  '''
+  try:
+    m = getattr(o, method)
+  except AttributeError:
+    return default
+  if a is None:
+    a = ()
+  if kw is None:
+    kw = {}
+  return m(*a, **kw)

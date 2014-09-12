@@ -13,7 +13,6 @@ cmd=$0
 usage="Usage: $cmd from to [rsync-options...]"
 
 syncset=acc
-exclude='.*.swp *~ *.tmp CVS/ *.pyc'
 
 [ $# -ge 2 ] || { echo "$usage" >&2; exit 2; }
 from=$1 to=$2; shift; shift
@@ -43,6 +42,7 @@ dosync()
   $trace \
     mrsync -rlptOHCi --delete \
         "--files-from=$_ds_files" \
+        '--exclude=.DS_Store' \
         '--exclude=.*.swp' \
         '--exclude=*~' \
         '--exclude=*.tmp' \

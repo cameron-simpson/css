@@ -42,7 +42,8 @@ def main(argv, stdin=None):
       list-groups [-A] [-G] [groups...]
         -A Emit mutt alias lines.
         -G Emit mutt group lines.
-        Using both -A and -G emits mutt aliases lines with the -group option.''' \
+        Using both -A and -G emits mutt aliases lines with the -group option.
+      update-domain @old-domain @new-domain [{/regexp/|address}...]''' \
     % (cmd,)
   setup_logging(cmd)
 
@@ -76,7 +77,7 @@ def main(argv, stdin=None):
     with Pfx(op):
       readonly = op not in ('abbreviate', 'abbrev', 'compact',
                             'edit-group', 'import-addresses',
-                            'learn-addresses',
+                            'learn-addresses', 'update-domain',
                            )
       with MailDB(mdburl, readonly=readonly) as MDB:
         if op == 'import-addresses':
@@ -230,6 +231,26 @@ def main(argv, stdin=None):
             else:
               edit_group(MDB, group)
               MDB.rewrite()
+        elif op == 'update-domain':
+          if not len(argv):
+            error("missing @old-domain")
+            badopts = True
+          else:
+            old_domain = argv.pop(0)
+            if not old_domain.startswith('@'):
+              error('old domain must start with "@": %s' % (old_domain,))
+              badopts = True
+          if not len(argv):
+            error("missing @new-domain")
+            badopts = True
+          else:
+            new_domain = argv.pop(0)
+            if not new_domain.startswith('@'):
+              error('new domain must start with "@": %s' % (new_domain,))
+              badopts = True
+          if not badopts:
+            update_domain(MDB, old_domain, new_domain, argv)
+            MDB.rewrite()
         else:
           error("unsupported op")
           badopts = True
@@ -246,8 +267,7 @@ def edit_group(MDB, group):
       rexp = group[1:-1]
     else:
       rexp = group[1:]
-    R = re.compile(rexp, re.I)
-    As = [ A for A in MDB.ADDRESSes if R.search(A.formatted) ]
+    As = MDB.matchAddresses(rexp)
     Gs = []
   else:
     As = [ A for A in MDB.ADDRESSes if group in A.GROUPs ]
@@ -322,7 +342,10 @@ def edit_groupness(MDB, addresses, subgroups):
                           ab = None
                     else:
                       ab = None
-                    A.abbreviation = ab
+                    try:
+                      A.abbreviation = ab
+                    except ValueError as e:
+                      error(e)
                     new_groups.setdefault(A, set()).update(groups)
                     realname = ustr(realname.strip())
                     if realname and realname != A.realname:
@@ -331,6 +354,30 @@ def edit_groupness(MDB, addresses, subgroups):
     for A, groups in new_groups.items():
       if set(A.GROUPs) != groups:
         A.GROUPs = groups
+
+def update_domain(MDB, old_domain, new_domain, argv):
+  if not argv:
+    addrs = [ A.name for A in MDB.ADDRESSes if A.name.endswith(old_domain) ]
+  else:
+    addrs = []
+    for pattern in argv:
+      if pattern.startswith('/'):
+        if pattern.endswith('/'):
+          rexp = pattern[1:-1]
+        else:
+          rexp = pattern[1:]
+        addrs.extend( [ A.name for A in  MDB.matchAddresses(rexp) ] )
+      else:
+        addrs.append(pattern)
+  if not addrs:
+    warning("no matching addresses")
+  else:
+    for addr in addrs:
+      with Pfx(addr):
+        if not addr.endswith(old_domain):
+          warning("does not end in old domain (%s)", old_domain)
+        else:
+          MDB.update_domain(addr, old_domain, new_domain)
 
 PersonNode = Node
 
@@ -343,6 +390,10 @@ class AddressNode(Node):
   @property
   def realname(self):
     return ustr( getattr(self, 'REALNAME', u'') )
+
+  @realname.setter
+  def realname(self, newname):
+    self.REALNAME = newname
 
   def groups(self):
     return [ address_group for address_group in self.nodedb.address_groups
@@ -386,9 +437,12 @@ class AddressNode(Node):
     if my_abbrev is not None:
       # remove old abbrev from mapping
       del abbrevs[my_abbrev]
-    # new mapping
-    abbrevs[abbrev] = self.name
-    self.ABBREVIATION = abbrev
+    if abbrev is None:
+      self.ABBREVIATIONs = ()
+    else:
+      # new mapping
+      abbrevs[abbrev] = self.name
+      self.ABBREVIATION = abbrev
 
 class MessageNode(Node):
 
@@ -513,6 +567,13 @@ class _MailDB(NodeDB):
       A.REALNAME = ustr(realname)
     return A
 
+  def matchAddresses(self, rexp):
+    ''' Return AddressNodes matching the supplied regular expression string `rexp`.
+    '''
+    R = re.compile(rexp, re.I)
+    As = [ A for A in self.ADDRESSes if R.search(A.formatted) ]
+    return As
+
   def shortname(self, addr):
     ''' Return a short name for an address.
         Pick the first of: abbreviation from maildb, realname from maildb, coreaddr.
@@ -571,6 +632,20 @@ class _MailDB(NodeDB):
     except AttributeError as e:
       D("address_groups(): e = %r", e)
       raise ValueError("disaster")
+
+  @locked_property
+  def subgroups_map(self):
+    ''' Cached map of groupname to subgroup names.
+    '''
+    subgroups = {}
+    for G in self.GROUPs:
+      for parent_group in G.GROUPs:
+        subgroups.setdefault(parent_group, []).append(G.name)
+
+  def subgroups(self, group_name):
+    ''' Return a list of the subgroup names of the names group.
+    '''
+    return self.subgroups_map.get(group_name, [])
 
   @locked_property
   def abbreviations(self):
@@ -694,6 +769,28 @@ class _MailDB(NodeDB):
       A.GROUPs.update(group_names)
       addrs.add(A)
     return addrs
+
+  def update_domain(self, addr, old_domain, new_domain):
+    with Pfx("update_domain(%s, %s, %s)", addr, old_domain, new_domain):
+      if not old_domain.startswith('@'):
+        raise ValueError('old_domain does not start with "@"')
+      if not new_domain.startswith('@'):
+        raise ValueError('new_domain does not start with "@"')
+      if not addr.endswith(old_domain):
+        raise ValueError('addr does not end in old_domain')
+      addr2 = addr[:-len(old_domain)] + new_domain
+      A1 = self.getAddressNode(addr)
+      A2 = self.getAddressNode(addr2)
+      realname = A1.realname
+      if realname and not A2.realname:
+        A2.realname = realname
+      abbrev = A1.abbreviation
+      if abbrev and not A2.abbreviation:
+        del A1.abbreviation
+        A2.abbreviation = abbrev
+      groups = A1.GROUPs
+      if groups and not A2.GROUPs:
+        A2.GROUPs = groups
 
 if __name__ == '__main__':
   sys.exit(main(list(sys.argv)))

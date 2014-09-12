@@ -1,0 +1,70 @@
+#!/usr/bin/python
+#
+# Apply ID3 tags to MP3 files based on their pathname.
+#   - Cameron Simpson <cs@zip.com.au> 24aug2014
+#
+
+from os.path import basename, dirname
+import sys
+from pyid3lib import tag as MP3Tag
+from cs.logutils import setup_logging, Pfx, X
+
+def main(argv):
+  xit = 0
+  cmd = basename(argv[0])
+  setup_logging(cmd)
+  for mp3path in argv[1:]:
+    X(mp3path)
+    info = pathinfo(mp3path)
+    X(repr(info))
+    mp3 = MP3Tag(mp3path)
+    X("mp3 artist = %r, ", mp3.artist)
+    for tagname in ( 'artist', 'album', 'title'):
+      update(mp3, tagname, info[tagname])
+      update_tracknum(mp3, info['tracknum'])
+  return xit
+
+def pathinfo(path):
+  with Pfx(path):
+    info = {}
+    filename = basename(path)
+    left, ext = filename.rsplit('.', 1)
+    if ext != 'mp3':
+      raise ValueError('expected name to end in .mp3')
+    # optional leading disc number with dash
+    if left[0].isdigit() and left[1] == '-':
+      info['disc_num'] = int(left[0])
+      left = left[2:]
+    # leading track number, 2 digits
+    if not left[:2].isdigit():
+      raise ValueError('expected 2 leading digits')
+    info['tracknum'] = int(left[:2])
+    info['title'] = left[2:].strip()
+    albumpath = dirname(path)
+    info['album'] = basename(albumpath)
+    artistpath = dirname(albumpath)
+    info['artist'] = basename(artistpath)
+    return info
+
+def update(mp3, attr, new_value):
+  value = getattr(mp3, attr)
+  if attr == 'artist' and new_value.lower() in ('compilations', 'various', 'various artists'):
+    new_value = value.rstrip('\0').strip()
+  if value != new_value:
+    X(".%s: %r => %r", attr, value, new_value)
+    setattr(mp3, attr, new_value)
+
+def update_tracknum(mp3, new_tracknum):
+  track = mp3.track
+  if track[0] != new_tracknum:
+    new_track = tuple( [new_tracknum] + track[1:] )
+    X(".track: %r => %r", track, new_track)
+    mp3.track = new_track
+
+def norm_artist(artist):
+  if artist[:4].lower() == 'the ' and ',' not in artist:
+    artist = ', '.join( ( artist[4:].lstrip(), artist[:3] ) )
+  return artist
+
+if __name__ == '__main__':
+  sys.exit(main(sys.argv))

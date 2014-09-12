@@ -150,15 +150,19 @@ class NoExceptions(object):
     pass
 
   def __exit__(self, exc_type, exc_value, tb):
+    from cs.logutils import X, warning, D
+    from cs.py.func import funccite
     if exc_type is not None:
       if self.__handler is not None:
         # user supplied handler
+        D("NoExceptions: call %s", funccite(self.__handler))
         return self.__handler(exc_type, exc_value, tb)
+      else:
+        D("__handler is None")
       # report handled exception
-      from cs.logutils import exception, error
-      exception("IGNORE  "+str(exc_type)+": "+str(exc_value))
+      warning("IGNORE  "+str(exc_type)+": "+str(exc_value))
       for line in traceback.format_tb(tb):
-        error("IGNORE> "+line[:-1])
+        warning("IGNORE> "+line[:-1])
     return True
 
 def LogExceptions(conceal=False):
@@ -167,7 +171,6 @@ def LogExceptions(conceal=False):
   '''
   from cs.logutils import exception, X
   def handler(exc_type, exc_value, tb):
-    X("LogException: exc_value=%s", exc_value)
     exception("EXCEPTION: %s", exc_value)
     return conceal
   return NoExceptions(handler)

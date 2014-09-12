@@ -66,6 +66,7 @@ class BasicStore(NestingOpenCloseMixin):
     with Pfx("BasicStore(%s,..)", name):
       if capacity is None:
         capacity = 1
+      self._lock = Lock()
       NestingOpenCloseMixin.__init__(self)
       self.name = name
       self.logfp = None
@@ -73,7 +74,6 @@ class BasicStore(NestingOpenCloseMixin):
       self.hashclass = Hash_SHA1
       self.readonly = False
       self.writeonly = False
-      self._lock = Lock()
 
   def add(self, data):
     ''' Add the supplied data bytes to the store.
@@ -160,7 +160,7 @@ class BasicStore(NestingOpenCloseMixin):
   def hash(self, data):
     ''' Return a Hash object from data bytes.
     '''
-    return self.hashclass.fromData(data)
+    return self.hashclass.from_data(data)
 
   def keys(self):
     ''' For a big store this is almost certainly unreasonable.
@@ -256,7 +256,7 @@ def Store(store_spec):
     if not host:
       host = '127.0.0.1'
     return TCPStore((host, int(port)))
-  if sheme == "ssh":
+  if scheme == "ssh":
     # TODO: path to remote vt command
     # TODO: $VT_SSH envvar
     import cs.sh
