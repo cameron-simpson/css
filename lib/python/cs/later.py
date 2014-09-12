@@ -453,14 +453,14 @@ class Later(NestingOpenCloseMixin):
     self._dispatchThread.start()
 
   def __repr__(self):
-    return '<%s "%s" capacity=%s running=%d (%s) pending=%d (%s) delayed=%d busy=%d:%s all_closed=%s>' \
+    return '<%s "%s" capacity=%s running=%d (%s) pending=%d (%s) delayed=%d busy=%d:%s closed=%s>' \
            % ( self.__class__.__name__, self.name,
                self.capacity,
                len(self.running), ','.join( repr(LF.name) for LF in self.running ),
                len(self.pending), ','.join( repr(LF.name) for LF in self.pending ),
                len(self.delayed),
                int(self._busy), self._busy,
-               self.all_closed
+               self.closed
              )
 
   def __str__(self):
@@ -498,8 +498,8 @@ class Later(NestingOpenCloseMixin):
           outstanding threads to complete
     '''
     with Pfx("%s.shutdown()" % (self,)):
-      if not self.all_closed:
-        error("NOT ALL_CLOSED")
+      if not self.closed:
+        error("NOT CLOSED")
       if self.finished:
         warning("_finish: finished=%r, early return", self.finished)
         return
@@ -529,7 +529,7 @@ class Later(NestingOpenCloseMixin):
 
   @locked
   def is_finished(self):
-    return self.all_closed and self.is_idle()
+    return self.closed and self.is_idle()
 
   def wait(self):
     ''' Wait for all active and pending jobs to complete, including
@@ -634,7 +634,7 @@ class Later(NestingOpenCloseMixin):
       self.logger.debug(*a, **kw)
 
   def __del__(self):
-    if not self.all_closed:
+    if not self.closed:
       self._close()
 
   def _dispatcher(self):
@@ -657,11 +657,11 @@ class Later(NestingOpenCloseMixin):
   @property
   def submittable(self):
     ''' May new tasks be submitted?
-	This normally tracks "not self.all_closed", but running tasks
+	This normally tracks "not self.closed", but running tasks
 	are wrapped in a thread local override to permit them to
 	submit further related tasks.
     '''
-    return not self.all_closed
+    return not self.closed
 
   def bg(self, func, *a, **kw):
     ''' Queue a function to run right now, ignoring the Later's capacity and

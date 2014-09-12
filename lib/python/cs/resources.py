@@ -18,53 +18,11 @@ def not_closed(func):
   '''
   def not_closed_wrapper(self, *a, **kw):
     if self.closed:
-      error("%r: ALREADY CLOSED: closed set to True from the following:", self)
-      stack_dump(stack=self.closed_stacklist, log_level=logging.ERROR)
+      error("%r: ALREADY CLOSED", self)
       raise RuntimeError("%s: %s: already closed" % (not_closed_wrapper.__name__, self))
     return func(self, *a, **kw)
   not_closed_wrapper.__name__ = "not_closed_wrapper(%s)" % (func.__name__,)
   return not_closed_wrapper
-
-class _NOC_Proxy(Proxy):
-  ''' A Proxy subclass to return from NestingOpenCloseMixin.open() and __enter__.
-      Note tht this has its own localised .closed attribute which starts False.
-      This lets users indidually track .closed for their use.
-  '''
-
-  def __init__(self, other, name=None):
-    Proxy.__init__(self, other)
-    if name is None:
-      name = "%s-open%d" % ( getattr(other,
-                                     'name',
-                                     "%s#%d" % (self.__class__.__name__,
-                                                id(self))),
-                             seq()
-                           )
-    self.name = name
-    self.closed = False
-
-  def __str__(self):
-    return "open(%r:%s[closed=%r,all_closed=%r])" % (self.name, self._proxied, self.closed, self._proxied.all_closed)
-
-  __repr__ = __str__
-
-  @not_closed
-  def close(self, check_final_close=False):
-    ''' Close this open-proxy. Sanity check then call inner close.
-    '''
-    self.closed = True
-    self.closed_stacklist = traceback.extract_stack()
-    self._proxied._close()
-    if check_final_close:
-      if self._proxied.all_closed:
-        self.D("OK FINAL CLOSE")
-      else:
-        raise RuntimeError("%s: expected this to be the final close, but it was not" % (self,))
-
-class _NOC_ThreadingLocal(threading.local):
-
-  def __init__(self):
-    self.cmgr_proxies = []
 
 class NestingOpenCloseMixin(O):
   ''' A mixin to count open and closes, and to call .shutdown() when the count goes to zero.
@@ -77,7 +35,7 @@ class NestingOpenCloseMixin(O):
       preexisting attribute _lock for locking.
   '''
 
-  def __init__(self, proxy_type=None, finalise_later=False):
+  def __init__(self, finalise_later=False):
     ''' Initialise the NestingOpenCloseMixin state.
         Then takes makes use of the following methods if present:
           `self.on_open(count)`: called on open with the post-increment open count
@@ -89,10 +47,6 @@ class NestingOpenCloseMixin(O):
           calling .join may need to wait for all the queued items
           to be processed.
     '''
-    if proxy_type is None:
-      proxy_type = _NOC_Proxy
-    self._noc_proxy_type = proxy_type
-    self._noc_tl = _NOC_ThreadingLocal()
     self.opened = False
     self._opens = 0
     ##self.closed = False # final _close() not yet called
@@ -103,47 +57,30 @@ class NestingOpenCloseMixin(O):
     self._finalise_later= finalise_later
     self._finalise = Condition(self._lock)
 
+  def __enter__(self):
+    self.open()
+    return self
+
+  def __exit__(self, exc_type, exc_value, traceback):
+    self.close()
+    return False
+
   def open(self, name=None):
     ''' Increment the open count.
 	If self.on_open, call self.on_open(self, count) with the
 	post-increment count.
         `name`: optional name for this open object.
-        Return a Proxy object that tracks this open.
     '''
     self.opened = True
     with self._lock:
       self._opens += 1
       count = self._opens
     ifmethod(self, 'on_open', a=(count,))
-    return self._noc_proxy_type(self, name=name)
-
-  def close(self):
-    ''' Placeholder method to warn callers that they should be using the proxy returned from .open().
-    '''
-    raise RuntimeError("%s subclasses do not support .close(): that method is to be called on the _NOC_Proxy returned from .open()" % (self.__class__.__name__,))
-
-  @property
-  def cmgr_proxy(self):
-    ''' Property representing the current context manager proxy.
-    '''
-    return self._noc_tl.cmgr_proxies[-1]
-
-  def __enter__(self):
-    ''' NestingOpenClose context managers return an open proxy.
-    '''
-    # get an open proxy and push it onto the thread-local stack
-    proxy = self.open()
-    self._noc_tl.cmgr_proxies.append(proxy)
-    return proxy
-
-  def __exit__(self, exc_type, exc_value, traceback):
-    # retrieve the open proxy
-    proxy = self._noc_tl.cmgr_proxies.pop()
-    proxy.close()
-    return False
+    return self
 
   @logexc
-  def _close(self):
+  @not_closed
+  def close(self, check_final_close=False):
     ''' Decrement the open count.
         If self.on_close, call self.on_close(self, count) with the
         pre-decrement count.
@@ -156,11 +93,14 @@ class NestingOpenCloseMixin(O):
       count = self._opens
     ifmethod(self, 'on_close', a=(count+1,))
     if count == 0:
+      if check_final_close:
+        self.D("OK FINAL CLOSE")
       self.shutdown()
       if not self._finalise_later:
         self.finalise()
-    elif self.all_closed:
-      error("%s.close: count=%r, ALREADY CLOSED", self, count)
+    else:
+      if check_final_close:
+        raise RuntimeError("%s: expected this to be the final close, but it was not" % (self,))
 
   def finalise(self):
     ''' Finalise the object, releasing all callers of .join().
@@ -175,7 +115,7 @@ class NestingOpenCloseMixin(O):
     warning("%s: finalised more than once", self)
 
   @property
-  def all_closed(self):
+  def closed(self):
     if self._opens > 0:
       return False
     if self._opens < 0:
@@ -184,10 +124,6 @@ class NestingOpenCloseMixin(O):
     if not self.opened:
       # never opened, so not totally closed
       return False
-    ##if not self.closed:
-    ##  with PfxCallInfo():
-    ##    warning("%r.closed = %r, but want to return all_closed=True", self, self.closed)
-    ##  return False
     return True
 
   def join(self):
@@ -207,25 +143,22 @@ class NestingOpenCloseMixin(O):
     '''
     T = None
     with self._lock:
-      if self._keep_open is None:
+      if not self._keep_open:
+        self._keep_open = True
         name = "%s._ping_mainloop" % (self,)
-        P = self.open(name=name)
-        self._keep_open = P
-        T = Thread(name=name, target=self._ping_mainloop, args=(P,))
-      else:
-        P = self._keep_open
+        T = Thread(name=name, target=self._ping_mainloop)
     self._keep_open_until = time.time() + self._keep_open_increment
     if T:
       T.start()
 
-  def _ping_mainloop(self, proxy):
+  def _ping_mainloop(self):
     ''' Pinger main loop: wait until expiry then close the open proxy.
     '''
     name = self._keep_open.name
     while self._keep_open_until > time.time():
       debug("%s: pinger: sleep for another %gs", name, self._keep_open_poll_interval)
       time.sleep(self._keep_open_poll_interval)
-    self._keep_open = None
+    self._keep_open = False
     self._keep_open_until = None
     debug("%s: pinger: close()", name)
-    proxy.close()
+    self.close()

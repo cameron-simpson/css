@@ -9,7 +9,6 @@ import sys
 import time
 import unittest
 from cs.logutils import D, setup_logging
-from cs.queues import _Q_Proxy
 from cs.timeutils import sleep
 from cs.threads import report
 from cs.later import Later, FUNC_MANY_TO_MANY, FUNC_SELECTOR
@@ -121,7 +120,6 @@ class TestLater(unittest.TestCase):
       yield x
     P = L.pipeline([ func ], items)
     self.assertIsNot(P.outQ, items)
-    self.assertIsInstance(P.outQ, _Q_Proxy)
     result = list(P.outQ)
     self.assertEqual( items, result )
 
@@ -134,7 +132,6 @@ class TestLater(unittest.TestCase):
       yield x
     P = L.pipeline([ func ], items)
     self.assertIsNot(P.outQ, items)
-    self.assertIsInstance(P.outQ, _Q_Proxy)
     result = list(P.outQ)
     # values may be interleaved due to parallelism
     self.assertEqual( len(result), len(expected) )
@@ -148,7 +145,6 @@ class TestLater(unittest.TestCase):
       return sorted(x)
     P = L.pipeline([ (FUNC_MANY_TO_MANY, func) ], items)
     self.assertIsNot(P.outQ, items)
-    self.assertIsInstance(P.outQ, _Q_Proxy)
     result = list(P.outQ)
     self.assertEqual( result, sorted(items) )
 
@@ -160,7 +156,6 @@ class TestLater(unittest.TestCase):
       return set(x)
     P = L.pipeline([ (FUNC_MANY_TO_MANY, func) ], items)
     self.assertIsNot(P.outQ, items)
-    self.assertIsInstance(P.outQ, _Q_Proxy)
     result = set(P.outQ)
     self.assertEqual( result, set(items) )
 
@@ -173,7 +168,6 @@ class TestLater(unittest.TestCase):
       return x in want
     P = L.pipeline([ (FUNC_SELECTOR, wanted) ], items)
     self.assertIsNot(P.outQ, items)
-    self.assertIsInstance(P.outQ, _Q_Proxy)
     result = list(P.outQ)
     self.assertEqual( result, expected )
 
@@ -192,7 +186,6 @@ class TestLater(unittest.TestCase):
       yield x
     P = L.pipeline([ double, double, (FUNC_MANY_TO_MANY, sorted) ], items)
     self.assertIsNot(P.outQ, items)
-    self.assertIsInstance(P.outQ, _Q_Proxy)
     result = list(P.outQ)
     self.assertEqual( result, expected )
 
