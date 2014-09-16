@@ -143,8 +143,17 @@ badopts=
 
 # have "cp -ral"? otherwise rely on my linktree script
 if [ "x`cp --help 2>&1 | grep ' -[ral][, ]' | wc -l`" = x3 ]
-then  mklinktree(){ $trace cp -ral "$1" "$2"; }
-else  mklinktree(){ $trace linktree "$1" "$2"; }
+then
+  mklinktree(){
+    # make link tree, might fail if hard link limit reached for files
+    $trace cp -ral "$1" "$2" && return 0
+    # failed to make target? fail outright
+    [ -d "$2/." ] || return 1
+    # if we made the target, update from source
+    $trace rsync -iaO "$1/." "$2/."
+  }
+else
+  mklinktree(){ $trace linktree "$1" "$2"; }
 fi
 daycode(){ date '+%Y-%m-%d'; }
 datecode(){ date '+%Y-%m-%d-%H:%M:%S'; }
