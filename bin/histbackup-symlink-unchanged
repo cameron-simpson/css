@@ -8,6 +8,7 @@
 set -ue
 
 trace=  ##set-x     ##eecho
+[ -t 2 ] && trace=set-x
 echo=:
 [ -t 1 ] && echo=echo
 verbose=
