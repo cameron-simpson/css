@@ -97,7 +97,6 @@ linkonly=
 rrsync=rsync
 usehbinclude=1
 usehbfiles=1
-linkrepair=
 obackup_options=
 symlink_unchanged=1
 rsopts=
@@ -124,7 +123,8 @@ usage="Usage:
   --no-hbinclude Do not honour the .hbinclude file in the backup directory.
   --no-rsync    Don't do the rsync pass - just set up the new link tree and
                 report its basename.
-  --link-fail-repair Proceed even if the linktree step fails, presumably due
+  --link-fail-repair (Obsolete; this is always done.)
+                Proceed even if the linktree step fails, presumably due
                 to hard link limit reached.
   --symlink-if-unchanged
                 Just symlink the top level date if there are no changes.
@@ -204,7 +204,7 @@ do
     # from the previous to new backup before proceeding.
     #
     --link-fail-repair)
-      linkrepair=1
+      echo "$cmd: $1: obsolete option; $cmd always tries to cope with hard link failure" >&2
       ;;
     # =item --symlink-if-unchanged
     #
@@ -523,17 +523,11 @@ then
     $vecho "existing backup: linking $lastbackup to $thisbackup ..."
     if ( cd "$dest" || exit 1
          mklinktree "$lastbackup" "$thisbackup" \
-         || \
-         if [ $linkrepair ] \
-         && [ -d "$thisbackup" ] \
-         && dorsync "$lastbackup" "$thisbackup"
-         then
-           :
-         else
+         || {
            dolink=
            $trace rm -rf "$thisbackup"
            false
-         fi
+         }
        )
     then
       ok=1
