@@ -20,6 +20,7 @@ usage="Usage: $cmd [-n] [-q] [-x] [--] srcdir dstdir [dates...]
 trace=
 [ -t 2 ] && trace=set-x
 trace=eecho
+hbopts=
 
 badopts=
 
@@ -28,7 +29,7 @@ do
   case $1 in
     -n) trace=eecho ;;
     -q) trace= ;;
-    -x) trace=set-x ;;
+    -x) trace=set-x hbopts="$hbopts -x -i" ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
         badopts=1
