@@ -101,6 +101,7 @@ obackup_options=
 symlink_unchanged=1
 rsopts=
 rsdelete=--delete
+thisbackup=
 verbose=
 imode=
 ##[ -t 1 ] && verbose=1
@@ -116,6 +117,8 @@ usage="Usage:
   -v, --verbose	Verbose. Note: _not_ passed to rsync.
   -x		Trace execution. Recite linktree and rsync invocations.
   --no-delete   Don't pass --delete to rsync.
+  --date datestring A date string for use as the backup target.
+                The default is the current date or date-time.
   --delete      Pass --delete to rsync.
   --delete-excluded
                 Pass --delete --delete-excluded to rsync.
@@ -222,6 +225,13 @@ do
     #
     --no-symlink-if-unchanged)
         symlink_unchanged=
+        ;;
+    # =item --date datestring
+    #
+    # Specify datestring for this backup. The default is the current date or date-time.
+    #
+    --date)
+        thisbackup=$2; shift
         ;;
     # =item --delete
     #
@@ -471,17 +481,28 @@ lastbackup=$(
         fi
 )
 
-today=`daycode` || exit 1
-thisbackup=$today
-if [ -d "$dest/$thisbackup/." ]
+if [ -n "$thisbackup" ]
 then
+  # check specified backup does not yet exist
+  if [ -d "$dest/$thisbackup/." ]
+  then
+    echo "$cmd: $dest/$thisbackup already exist, aborting" >&2
+    exit 1
+  fi
+else
+  # allocate a backup name
+  today=`daycode` || exit 1
+  thisbackup=$today
+  if [ -d "$dest/$thisbackup/." ]
+  then
     now=`datecode` || exit 1
     thisbackup=$now
     if [ -d "$dest/$thisbackup/." ]
     then
-	echo "$cmd: $dest/$today and $dest/$now already exist, aborting" >&2
-	exit 1
+      echo "$cmd: $dest/$today and $dest/$now already exist, aborting" >&2
+      exit 1
     fi
+  fi
 fi
 
 dorsync()
