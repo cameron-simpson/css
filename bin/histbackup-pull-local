@@ -1,0 +1,105 @@
+#!/bin/sh
+#
+# Pull a histbackup tree from one local file tree to another.
+# Written to aid a NAS migration.
+#   - Cameron Simpson <cs@zip.com.au> 18sep2014
+#
+
+set -ue
+
+cmd=$( basename "$0" )
+usage="Usage: $cmd srcdir dstdir [dates...]
+  srcdir  The source histbackup tree.
+  dstdir  The destination histbackup tree.
+  dates   Optional date strings for the pull; the default is to
+          pull all the dates from srcdir."
+
+trace=
+[ -t 2 ] && trace=set-x
+trace=eecho
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing srcdir" >&2
+  badopts=1
+else
+  srcdir=$1
+  shift
+  [ -d "$srcdir/." ] || { echo "$cmd: srcdir not a directory: $srcdir" >&2
+                          badopts=1
+                        }
+fi
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing dstdir" >&2
+  badopts=1
+else
+  dstdir=$1
+  shift
+  [ -d "$dstdir/." ] || { echo "$cmd: dstdir not a directory: $dstdir" >&2
+                          badopts=1
+                        }
+fi
+
+if [ $# = 0 ]
+then
+  # obtain the dates from 
+  set -- $( cd "$srcdir" && ls -d 19[0-9][0-9]-[01][0-9]-[0-3][0-9]* 2[01][0-9][0-9]-[01][0-9]-[0-3][0-9]* 2>/dev/null )
+fi
+
+xit=0
+
+for date
+do
+  src=$srcdir/$date
+  dst=$dstdir/$date
+  if [ ! -e "$src/." ]
+  then
+    echo "$cmd: missing src: $src" >&2
+    xit=1
+    continue
+  fi
+  if [ -e "$dst" ]
+  then
+    echo "$cmd: skipping existing dst: $dst" >&2
+    continue
+  fi
+  if [ -h "$src" ]
+  then
+    if srclink=$( readlink "$src" )
+    then
+      case "$srclink" in
+        */*)
+          echo "$cmd: src symlink: invalid target format: $src -> $srclink" >&2
+          xit=1
+          continue
+          ;;
+        19[0-9][0-9]-[01][0-9]-[0-3][0-9]* \
+        | 2[01][0-9][0-9]-[01][0-9]-[0-3][0-9]* \
+        )
+          ;;
+        *)
+          echo "$cmd: src symlink: invalid target format: $src -> $srclink" >&2
+          xit=1
+          continue
+          ;;
+      esac
+      if [ ! -e "$dstdir/$srclink" ]
+      then
+        echo "$cmd: warning: src symlink has no matching target: $src -> $srclink" >&2
+      fi
+      $trace ln -i -s "$srclink" "$dst" || xit=1
+    else
+      echo "$cmd: src symlink: readlink fails" >&2
+      xit=1
+      continue
+    fi
+  else
+    $trace histbackup --date "$date" -- "$src" "$dstdir" || xit=1
+  fi
+done
+
+exit $xit
