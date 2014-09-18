@@ -466,21 +466,7 @@ then
   [ -s "$hbinclude" ] && set -- ${1+"$@"} "--include-from=$hbinclude"
 fi
 
-# locate to most recent backup, if any
-lastbackup=$(
-        cd "$dest" || exit 1
-        if [ $symlink_unchanged ]
-        then
-          # most recent actual directory tree
-          ls -drl [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]* 2>/dev/null \
-          | sed '/^d/!d; s/.* //; q'
-        else
-          # most recent directory or symlink
-          ls -dr [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]* 2>/dev/null \
-          | sed 1q
-        fi
-)
-
+# determine name for this backup
 if [ -n "$thisbackup" ]
 then
   # check specified backup does not yet exist
@@ -504,6 +490,26 @@ else
     fi
   fi
 fi
+
+# locate to most recent backup, if any
+lastbackup=$(
+        cd "$dest" || exit 1
+        (
+          if [ $symlink_unchanged ]
+          then
+            # actual directory trees only
+            ls -ld [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]* 2>/dev/null \
+            | sed -n 's/^d.* //p'
+          else
+            # directory or symlink
+            ls -d [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]* 2>/dev/null
+          fi
+          echo "$thisbackup"
+        ) \
+        | sort -u \
+        | sed "/^$thisbackup/,\$d" \
+        | sed -n '$p'
+)
 
 dorsync()
 { [ $# -ge 2 ] || { echo "Usage: dorsync src dst [extra-rsync-opts...]" >&2; exit 2; }
