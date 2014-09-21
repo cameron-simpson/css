@@ -89,11 +89,9 @@ def main(argv):
                                      getattr(DRV, 'virtual_drive', O(number=None)).number,
                                      DRV.firmware_state))
           if adapter_errs:
-            status = ",".join(adapter_errs)
+            print "FAIL A%d %s" % (An, ",".join(adapter_errs))
           else:
-            status = "OK"
-          status_all.append("A%d[%s]" % (An, status))
-        print ", ".join(status_all)
+            print "OK A%d" % (An,)
       else:
         error("unsupported command")
         xit = 1
