@@ -340,12 +340,17 @@ class MegaRAID(O):
     ''' Open a pipe from the megacli command, returning a subprocess.Popen object.
         Yield the stdout attribute.
     '''
-    P = Popen(['set-x', self.megacli] + list(args), stdout=PIPE, close_fds=True)
+    cmdargs = [self.megacli] + list(args)
+    if sys.stderr.isatty():
+      cmdargs.insert(0, 'set-x')
+    P = Popen(cmdargs, stdout=PIPE, close_fds=True)
     yield P.stdout
     P.wait()
 
   def docmd(self, *args):
-    ''' Execute a megacli command as specified.
+    ''' Pretend to execute a megacli command as specified.
+        This currently just echoes commands to stderr; I fear running
+        the "new raid" stuff etc automatically.
         Return True if the exit code is 0, False otherwise.
     '''
     ## if really: trace=set-x else trace=eecho
