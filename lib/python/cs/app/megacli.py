@@ -77,6 +77,23 @@ def main(argv):
           level = int(argv.pop(0))
           if M.new_raid(level, argv, adapter=adapter) != 0:
             xit = 1
+      elif command == "status":
+        status_all = []
+        for An in M.adapters:
+          adapter_errs = []
+          A = M.adapters[An]
+          for DRV in A.physical_disks.values():
+            if DRV.firmware_state != "Online, Spun Up":
+              adapter_errs.append("drive:%s[%s]/VD:%s/%s"
+                                  % (DRV.id, DRV.enc_slot,
+                                     getattr(DRV, 'virtual_drive', O(number=None)).number,
+                                     DRV.firmware_state))
+          if adapter_errs:
+            status = ",".join(adapter_errs)
+          else:
+            status = "OK"
+          status_all.append("A%d[%s]" % (An, status))
+        print ", ".join(status_all)
       else:
         error("unsupported command")
         xit = 1
