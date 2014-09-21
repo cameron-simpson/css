@@ -83,7 +83,8 @@ def main(argv):
           adapter_errs = []
           A = M.adapters[An]
           for DRV in A.physical_disks.values():
-            if DRV.firmware_state != "Online, Spun Up":
+            firmware_state = getattr(DRV, 'firmware_state', 'UNKNOWN')
+            if firmware_state != "Online, Spun Up":
               adapter_errs.append("drive:%s[%s]/VD:%s/%s"
                                   % (DRV.id, DRV.enc_slot,
                                      getattr(DRV, 'virtual_drive', O(number=None)).number,
@@ -388,19 +389,30 @@ class Disk_Group(O):
 class Span(O):
   pass
 class Physical_Disk(O):
+
+  def __init__(self, **kw):
+    self.enclosure_device_id = None
+    self.device_id = None
+    self.slot_number = None
+    self.firmware_state = "UNKNOWN"
+    self.ibm_fru_cru = None
+    self.raw_size = None
+    self.raw_size_units = None
+    O.__init__(self, **kw)
+
   @property
   def id(self):
     ''' Unique identifier for drive, regrettably not what the megacli
         wants to use.
     '''
-    return "enc%d.devid%d" % (self.enclosure_device_id, self.device_id)
+    return "enc%s.devid%s" % (self.enclosure_device_id, self.device_id)
 
   @property
   def enc_slot(self):
     ''' Identifier used by megacli, regretably not unique if enclosure
         misconfigure/misinstalled.
     '''
-    return "%d:%d" % (self.enclosure_device_id, self.slot_number)
+    return "%s:%s" % (self.enclosure_device_id, self.slot_number)
   @property
   def fru(self):
     return self.ibm_fru_cru
