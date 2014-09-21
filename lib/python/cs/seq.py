@@ -18,8 +18,8 @@ class Seq(object):
 
   __slots__ = ('counter', '_lock')
 
-  def __init__(self, start=0, step=1):
-    self.counter = itertools.count(start, step)
+  def __init__(self, start=0):
+    self.counter = itertools.count(start)
     self._lock = Lock()
 
   def __iter__(self):
