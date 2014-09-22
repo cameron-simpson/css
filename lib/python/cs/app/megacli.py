@@ -84,7 +84,7 @@ def main(argv):
           A = M.adapters[An]
           for DRV in A.physical_disks.values():
             firmware_state = getattr(DRV, 'firmware_state', 'UNKNOWN')
-            if firmware_state not in ( "Online, Spun Up", "Unconfigured(good)"):
+            if firmware_state not in ( "Online, Spun Up", "Unconfigured(good), Spun Up"):
               adapter_errs.append("drive:%s[%s]/VD:%s/%s"
                                   % (DRV.id, DRV.enc_slot,
                                      getattr(DRV, 'virtual_drive', O(number=None)).number,
