@@ -271,7 +271,7 @@ class MegaRAID(O):
                 speed, speed_units = m.group(1), m.group(3)
                 setattr(o, attr+'_units', speed_units)
                 info = float(speed)
-              else:
+              elif info != "Unknown":
                 warning("failed to match re_SPEED against: %s", info)
             elif attr in ('default_cache_policy', 'current_cache_policy'):
               info = info.split(', ')
