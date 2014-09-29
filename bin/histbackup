@@ -42,7 +42,7 @@
 #
 # Decide where the backup data will be. Make an empty directory to hold it:
 #
-#	mkdir /path/to/backup/area
+#       mkdir /path/to/backup/area
 #
 # =item Arrange access to the source data
 #
@@ -52,14 +52,14 @@
 # you will need ssh(1) access to the remote host as a user with read access to the data there.
 # Test it:
 #
-#	ssh user@remote ls -l /path/to/source/directory
+#       ssh user@remote ls -l /path/to/source/directory
 #
 # =item Perform a test backup
 #
 # Histbackup does the right thing when the backup area is empty
 # so just:
 #
-#	histbackup -x user@remote:/path/to/source/directory /path/to/backup/area
+#       histbackup -x user@remote:/path/to/source/directory /path/to/backup/area
 #
 # =item Schedule your backups
 #
@@ -68,9 +68,9 @@
 # Use "C<crontab -e>" to make this.
 # Example:
 #
-#	MAILTO=backup-admin@yoursite
-#	PATH=$PATH:/opt/css/bin
-#	0 * * * * histbackup -x user@remote:/path/to/source/directory /path/to/backup/area
+#       MAILTO=backup-admin@yoursite
+#       PATH=$PATH:/opt/css/bin
+#       0 * * * * histbackup -x user@remote:/path/to/source/directory /path/to/backup/area
 #
 # That will run a I<histbackup> every day at midnight,
 # delivering the output of the run by email to B<backup-admin@yoursite>.
@@ -115,8 +115,8 @@ usage="Usage:
 
   -i, --itemize-changes
                 Passed to rsync, result slightly filtered by histbackup.
-  -v, --verbose	Verbose. Note: _not_ passed to rsync.
-  -x		Trace execution. Recite linktree and rsync invocations.
+  -v, --verbose Verbose. Note: _not_ passed to rsync.
+  -x            Trace execution. Recite linktree and rsync invocations.
   --no-delete   Don't pass --delete to rsync.
   --date datestring A date string for use as the backup target.
                 The default is the current date or date-time.
@@ -307,13 +307,13 @@ do
     #
     # Trace execution of important commands (rsync, linktree etc).
     #
-    -x)		trace=set-x ;;
+    -x)         trace=set-x ;;
 
-    --)		shift; break ;;
-    -*)		echo "$cmd: unrecognised option: $1" >&2
-		badopts=1
-		;;
-    *)		break ;;
+    --)         shift; break ;;
+    -*)         echo "$cmd: unrecognised option: $1" >&2
+                badopts=1
+                ;;
+    *)          break ;;
   esac
   shift
 done
@@ -341,11 +341,11 @@ if [ $linkonly ]
 then
     if [ $# -lt 1 ]
     then
-	echo "$cmd: missing parent" >&2
-	badopts=1
+        echo "$cmd: missing parent" >&2
+        badopts=1
     else
-	dest=$1
-	shift
+        dest=$1
+        shift
     fi
 else
     case "$*" in
@@ -402,19 +402,19 @@ then
 fi
 
 [ -d "$dest/." ] || { echo "$cmd: backup dir $dest: not a directory" >&2
-		      badopts=1
-		    }
+                      badopts=1
+                    }
 
 # sanity check $src
 case "$src" in
     '')         [ $linkonly ] || { echo "$cmd: empty src, rejected" >&2; badopts=1; }
                 ;;
-    *:*)	# remote - don't check
-		;;
-    *)		[ -d "$src/."  ] || { echo "$cmd: source dir $src: not a directory" >&2
-				      badopts=1
-				    }
-		;;
+    *:*)        # remote - don't check
+                ;;
+    *)          [ -d "$src/."  ] || { echo "$cmd: source dir $src: not a directory" >&2
+                                      badopts=1
+                                    }
+                ;;
 esac
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
