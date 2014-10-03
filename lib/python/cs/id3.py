@@ -8,7 +8,7 @@
 
 from threading import RLock
 import pyid3lib
-from cs.logutils import X
+from cs.logutils import X, info
 from cs.threads import locked, locked_property
 from cs.obj import O
 
@@ -148,7 +148,7 @@ class ID3(O):
   def _frame(frameid, text, textenc=0):
     ''' Construct a new frame with the specified `frameid`, `text` and optional `textenc` (default 0).
     '''
-    if not self._valid_frameid(frameid):
+    if not ID3._valid_frameid(frameid):
       raise ValueError("invalid frameid, expected UPPER+3*(UPPER|DIGIT), got: %r"
                        % (frameid,))
     return {'text': text, 'textenc': textenc, 'frameid': frameid}
