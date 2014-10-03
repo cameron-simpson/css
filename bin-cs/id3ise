@@ -10,7 +10,10 @@ from cs.id3 import ID3
 from cs.lex import get_identifier
 from cs.logutils import setup_logging, Pfx, X
 
-usage = "Usage: %s [--clean] [tag=value...] [--] mp3-filenames..."
+usage = '''Usage: %s [--clean] [--deduce] [--infer] [tag=value...] [--] filenames...
+    --clean     Strip trailing NULs and leading and trailing whitespace from tags.
+    --deduce    Overwrite tags with values deduced from file pathname.
+    --infer     Update tags (if missing or blank) with values inferred from file pathname.'''
 
 def main(argv):
   xit = 0
@@ -18,6 +21,8 @@ def main(argv):
   setup_logging(cmd)
   args = argv[1:]
   do_clean = False
+  do_deduce = False
+  do_infer = False
   tag_values = {}
   badopts = False
   while args:
@@ -26,6 +31,12 @@ def main(argv):
       break
     if arg == '--clean':
       do_clean = True
+      continue
+    if arg == '--deduce':
+      do_deduce = True
+      continue
+    if arg == '--infer':
+      do_infer = True
       continue
     # tag=value
     tag_name, offset = get_identifier(arg)
@@ -39,8 +50,9 @@ def main(argv):
     error("invalid option: %s", arg)
     badopts = True
 
-  X("args=%r", args)
-  mp3paths = args
+  if do_deduce and do_infer:
+    error("you may not specify both --deduce and --infer")
+    badopts = True
 
   for mp3path in mp3paths:
     X(mp3path)
