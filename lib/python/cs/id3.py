@@ -195,7 +195,6 @@ class ID3(O):
     ''' Fetch the text of the specified frame.
     '''
     if self._valid_frameid(key):
-      X("__getitem__: valid frameid: %r", key)
       frameid = key
       frame = self.get_frame(frameid)
       if frame is None:
