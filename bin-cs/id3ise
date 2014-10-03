@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #
-# Apply ID3 tags to MP3 files based on their pathname.
+# Apply ID3 tags to files based on their pathname.
 #   - Cameron Simpson <cs@zip.com.au> 24aug2014
 #
 
