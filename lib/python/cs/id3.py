@@ -167,6 +167,7 @@ class ID3(O):
     else:
       oldtext = frame['text']
       if oldtext == newtext:
+        info("%s: UNCHANGED %r", frameid, oldtext)
         return
       info("%s: UPDATE %r => %r", frameid, oldtext, newtext)
       frame['text'] = newtext
@@ -207,10 +208,8 @@ class ID3(O):
     return self[frameid]
 
   def __getattr__(self, attr):
-    X("__getattr__: attr=%r", attr)
     if attr.startswith('_'):
       raise AttributeError(".%s missing" % (attr,))
-    X("getattr: .%s => [%r]", attr, attr)
     try:
       return self[attr]
     except KeyError:
@@ -219,6 +218,7 @@ class ID3(O):
   def __setitem__(self, key, value):
     ''' Set a frame text to `value`.
     '''
+    info("%s: SET TO %r", key, value)
     if self._valid_frameid(key):
       self._update_frame(key, value)
     else:
@@ -228,7 +228,6 @@ class ID3(O):
       self[frameid] = value
 
   def __setattr__(self, attr, value):
-    X("__setattr__(attr=%r, value=%r)...", attr, value)
     if attr in self.__dict__ or attr.startswith('_'):
       if ( attr in ID3.frameids_to_names 
         or attr in ID3.names_to_frameids
