@@ -78,15 +78,32 @@ def main(argv):
     break
   return xit
 
-def pathinfo(path):
+def pathinfo(path, sep='/'):
   ''' Deduce metadata from file pathname `path`.
       Expected format:
         .../AlbumArtist/AlbumName/[discnum-]tracknum trackname
   '''
+  X("PATHINFO: sep=%r", sep)
   with Pfx(path):
     info = {}
-    filename = basename(path)
-    left, ext = filename.rsplit('.', 1)
+
+    if sep == '/':
+      # split on path components
+      filepart = basename(path)
+      pathdir = dirname(path)
+      dirpart = basename(pathdir)
+      pathdir2 = dirname(pathdir)
+      dirpart2 = basename(pathdir2)
+      parts = [ dirpart2, dirpart, filepart ]
+    else:
+      # split basename on separator
+      parts = basename(path).rsplit(sep, 2)
+
+    X("PATHINFO: parts = %r", parts)
+    artist, album, trackpart = parts
+    info['album'] = album
+    info['artist'] = artist
+    left, ext = trackpart.rsplit('.', 1)
     if ext != 'mp3':
       raise ValueError('expected name to end in .mp3')
     # optional leading disc number with dash
@@ -96,12 +113,8 @@ def pathinfo(path):
     # leading track number, 2 digits
     if not left[:2].isdigit():
       raise ValueError('expected 2 leading digits')
-    info['tracknum'] = int(left[:2])
+    info['track_number'] = str(int(left[:2]))
     info['title'] = left[2:].strip()
-    albumpath = dirname(path)
-    info['album'] = basename(albumpath)
-    artistpath = dirname(albumpath)
-    info['artist'] = basename(artistpath)
     return info
 
 def update_tracknum(mp3, new_tracknum):
