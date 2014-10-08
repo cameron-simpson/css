@@ -1,9 +1,6 @@
 import os
 import sys
 
-def loadfile(path):
-  return file(path).read()
-
 def contlines(fp):
   ''' Generator that reads continued lines from a file.
       Continued lines have leading whitespace on following lines.
