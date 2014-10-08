@@ -1,13 +1,12 @@
 import os
 import sys
 
-def contlines(fp):
-  ''' Generator that reads continued lines from a file.
-      Continued lines have leading whitespace on following lines.
-      `fp` is an iterable that yields lines, such as an open file.
+def contlines(lines):
+  ''' Generator that reads continued lines the iterable `lines`.
+      "Continued" lines have leading whitespace on following lines.
   '''
   lastline = None
-  for line in fp:
+  for line in lines:
     if len(line) == 0:
       break
     if line.startswith(' ') or line.startswith('\t'):
