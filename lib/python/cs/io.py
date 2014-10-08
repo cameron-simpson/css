@@ -22,8 +22,6 @@ def pread(f,size,pos,whence=0,norestore=False):
   ''' Read a chunk of data from an arbitrary position in a file.
       Restores the file pointer after the read unless norestore is True.
   '''
-  if type(f) is string:
-    f=file(f)
   if not norestore:
     here=f.tell()
   f.seek(pos,whence)
