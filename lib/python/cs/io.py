@@ -1,12 +1,6 @@
 import os
 import sys
 
-def lastline(fp):
-  last=None
-  for line in fp:
-    last=line
-  return last
-
 def loadfile(path):
   return file(path).read()
 
