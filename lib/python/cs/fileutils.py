@@ -17,15 +17,18 @@ from collections import namedtuple
 from contextlib import contextmanager
 import shutil
 from tempfile import TemporaryFile, NamedTemporaryFile
-from threading import RLock
+from threading import RLock, Thread
 import time
 import unittest
 from cs.env import envsub
-from cs.logutils import error, Pfx, D, X
+from cs.lex import as_lines
+from cs.logutils import error, warning, Pfx, D, X
+from cs.queues import IterableQueue
 from cs.range import Range
 from cs.threads import locked, locked_property
 from cs.timeutils import TimeoutError
-from cs.py3 import ustr
+from cs.obj import O
+from cs.py3 import ustr, Queue
 
 def saferename(oldpath, newpath):
   ''' Rename a path using os.rename(), but raise an exception if the target
@@ -784,6 +787,130 @@ class BackedFile_TestMethods(object):
     overlap_chunk = bfp.read_n(512)
     self.assertEqual(len(overlap_chunk), 512, "overlap_chunk not 512 bytes: %r" % (overlap_chunk,))
     self.assertEqual(overlap_chunk, backing_text[256:512] + random_chunk)
+
+class SharedAppendFile(O):
+  ''' A base class to share a modifiable file between multiple users.
+
+      The use case derives from the shared CSV files used by
+      cs.nodedb.csvdb.Backend_CSVFile, where multiple users can
+      read from a common CSV file, and coordinate updates with a
+      lockfile.
+  '''
+
+  DEFAULT_MAX_QUEUE = 128
+  DEFAULT_POLL_INTERVAL = 0.1
+
+  def __init__(self, pathname, readonly=False, writeonly=False,
+                binary=False, max_queue=None,
+                transcribe_update=None, poll_interval=None,
+                lock_ext=None, lock_timeout=None):
+    if max_queue is None:
+      max_queue = self.DEFAULT_MAX_QUEUE
+    if poll_interval is None:
+      poll_interval = self.DEFAULT_POLL_INTERVAL
+    O.__init__(self)
+    self.pathname = pathname
+    self.readonly = readonly
+    self.writeonly = readonly
+    self.binary = binary
+    self.transcribe_update = transcribe_update
+    self.poll_interval = poll_interval
+    self.max_queue = max_queue
+    self.lock_ext = lock_ext
+    self.lock_timeout = lock_timeout
+    self._inQ = Queue(self.max_queue)
+    self._outQ = IterableQueue(self.max_queue, name="%s._outQ" % (self,))
+    self._open()
+
+  def _open(self):
+    ''' Open the file for read or read/write.
+    '''
+    mode = "r" if self.readonly else "r+"
+    if self.binary:
+      mode += "b"
+    self.fp = open(self.pathname, mode)
+    self.running = True
+    self._monitor_thread = Thread(target=self._monitor, name="%s._monitor" % (self,))
+    self._monitor_thread.daemon = True
+    self._monitor_thread.start()
+
+  def _close(self):
+    self.running = False
+    self._monitor_thread.join()
+    self.fp.close()
+    self.fp = None
+
+  def _lockfile(self):
+    ''' Obtain an exclusive lock on the CSV file.
+    '''
+    return lockfile(self.pathname,
+                    ext=self.lock_ext,
+                    poll_interval=self.poll_interval,
+                    timeout=self.lock_timeout)
+
+  def put(self, update_item):
+    ''' Queue an update record for transcription to the shared file.
+    '''
+    self._inQ.put(update_item)
+
+  def _read_to_eof(self):
+    ''' Read update data from the file until EOF, put data chunks onto ._outQ.
+        Return number of reads with data; 0 ==> no new data.
+    '''
+    count = 0
+    for chunk in chunks_of(self.fp):
+      self._outQ.put(chunk)
+      count += 1
+    return count
+
+  def _monitor(self):
+    ''' Monitor the input queue and the data file.
+        Read data from the data file as it appears, copy to the output queue.
+        Read updates from the input queue, append to the data file.
+    '''
+    with Pfx("%s._monitor", self):
+      while self.running:
+        if self._inQ.empty():
+          # look for external updates
+          # sleep briefly if nothing
+          count = self._read_to_eof()
+          if count == 0:
+            time.sleep(self.poll_interval)
+        else:
+          # updates due
+          # read until EOF
+          # obtain lock
+          # read until EOF
+          # append updates
+          # release lock
+          self._read_to_eof()
+          with self._lockfile():
+            self._read_to_eof()
+            pos = self.fp.tell()
+            self.fp.seek(0, SEEK_END)
+            if pos != self.fp.tell():
+              warning("update: pos after catch up=%r, pos after SEEK_END=%r", pos, self.fp.tell())
+            while not self._inQ.empty():
+              item = self._inQ.get()
+              self.transcribe_update(self.fp, item)
+            self.fp.flush()
+
+def chunks_of(fp, rsize=16384):
+  ''' Generator to present text or data from an open file until EOF.
+  '''
+  while True:
+    chunk = fp.read(rsize)
+    if len(chunk) == 0:
+      break
+    yield chunk
+
+def lines_of(fp, partials=None):
+  ''' Generator yielding lines from a file until EOF.
+      Intended for file-like objects that lack a line iteration API.
+  '''
+  if partials is None:
+    partials = []
+  return as_lines(chunks_of(fp, partials))
 
 if __name__ == '__main__':
   import cs.fileutils_tests
