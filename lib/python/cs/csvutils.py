@@ -13,7 +13,8 @@
 
 import csv
 import sys
-from cs.io import CatchupLines
+from cs.fileutils import SharedAppendFile
+from cs.lex import as_lines
 
 if sys.hexversion < 0x03000000:
 
@@ -54,28 +55,25 @@ else:
   def csv_writerow(csvw, row, encoding='utf-8'):
     return csvw.writerow(row)
 
-class CatchUp(object):
-  ''' A CSV layer to cs.io.CatchupLines.
-      It is iterable, yields CSV data rows.
-      At the end of iteration the .partial attribute contains any
-      incomplete line.
-      It is reusable; another iteration will commence with that
-      partial line.
-  '''
+class SharedCSVFile(SharedAppendFile):
 
-  def __init__(self, fp, partial=''):
-    ''' Initialise the CatchUp with an open file `fp` and optional
-        partial line `partial`.
+  def __init__(self, pathname, transcribe_update=None, **kw):
+    if 'binary' in kw:
+      raise ValueError('may not specify binary=')
+    if transcribe_update is None:
+      transcribe_update = self._transcribe_update
+    SharedAppendFile.__init__(self, pathname,
+                              binary=False, transcribe_update=transcribe_update,
+                              **kw)
+
+  def _transcribe_update(self, fp, item):
+    ''' Transcribe an update `item` to the supplied file `fp`.
+        This is called by SharedAppendFile's monitor loop.
     '''
-    self.fp = fp
-    self.partial = partial
+    csv_writerow(fp, item)
 
-  def __iter__(self):
-    self.lines = CatchupLines(self.fp, self.partial)
-    for row in csv_reader(self.lines):
+  def foreign_rows(self):
+    ''' Generator yielding update rows from other writers.
+    '''
+    for row in csv_reader(as_lines(self._outQ)):
       yield row
-    self.partial = self.lines.partial
-
-  def rewind(self):
-    self.fp.seek(0, os.SEEK_SET)
-    self.partial = ''
