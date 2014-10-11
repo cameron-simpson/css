@@ -31,20 +31,20 @@ def resolve_csv_row(row, lastrow):
       attr = lastrow[2]
     return t, name, attr, value
 
-def write_csv_file(fp, nodedata, noHeaders=False):
-  ''' Iterate over the supplied `nodedata`, a sequence of:
-        type, name, attrmap
-      and write to the file-like object `fp` in the vertical" CSV
-      style. `fp` may also be a string in which case the named file
+def write_csv_header(fp):
+  ''' Write CSV header row. Used for exported CSV data.
+  '''
+  csvw = csv.writer(fp)
+  csv_writerow( csvw, ('TYPE', 'NAME', 'ATTR', 'VALUE') )
+
+def write_csv_file(fp, nodedata):
+  ''' Iterate over the supplied `nodedata`, a sequence of (type, name, attrmap) and write to the file-like object `fp` in the vertical" CSV style.
+      `fp` may also be a string in which case the named file
       is truncated and rewritten.
       `attrmap` maps attribute names to sequences of preserialised values as
         computed by NodeDB.totext(value).
   '''
   csvw = csv.writer(fp)
-  if not noHeaders:
-    if fp.tell() > 0:
-      raise RuntimeError("writing headers but fp<%r>.tell() = %r" % (fp, fp.tell()))
-    csv_writerow( csvw, ('TYPE', 'NAME', 'ATTR', 'VALUE') )
   otype = None
   for t, name, attrmap in nodedata:
     attrs = sorted(attrmap.keys())
