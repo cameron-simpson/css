@@ -69,7 +69,7 @@ class SharedCSVFile(SharedAppendFile):
 
   def _transcribe_update(self, fp, item):
     ''' Transcribe an update `item` to the supplied file `fp`.
-        This is called by SharedAppendFile's monitor loop.
+        This the default function passed as SharedAppendFile's transcribe_update parameter.
     '''
     # sanity check: we should only be writing between foreign updates
     # and foreign updates should always be complete lines
