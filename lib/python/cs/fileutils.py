@@ -803,7 +803,20 @@ class SharedAppendFile(O):
   def __init__(self, pathname, readonly=False, writeonly=False,
                 binary=False, max_queue=None,
                 transcribe_update=None, poll_interval=None,
+                eof_markers = False,
                 lock_ext=None, lock_timeout=None):
+    ''' Initialise this SharedAppendFile.
+        `pathname`: the pathname of the file to open.
+        `readonly`: set to true if we will not write updates.
+        `writeonly`: set to true if we will monitor foreign updates.
+        `binary`: if the ile is to be opened in binary mode, otherwise text mode.
+        `max_queue`: maximum input and output Queue length. Default: SharedAppendFile.DEFAULT_MAX_QUEUE.
+        `transcribe_update`: function to transcribe our update objects to the file.
+        `poll_interval`: sleep time between polls after an idle poll. Default: SharedAppendFile.DEFAULT_POLL_INTERVAL.
+        `eof_markers`: set to true to put an empty chunk only to the output Queue when EOF reached.
+        `lock_ext`: lock file extension.
+        `lock_timeout`: maxmimum time to wait for obtaining the lock file.
+    '''
     if max_queue is None:
       max_queue = self.DEFAULT_MAX_QUEUE
     if poll_interval is None:
@@ -814,6 +827,7 @@ class SharedAppendFile(O):
     self.writeonly = readonly
     self.binary = binary
     self.transcribe_update = transcribe_update
+    self.eof_markers = eof_markers
     self.poll_interval = poll_interval
     self.max_queue = max_queue
     self.lock_ext = lock_ext
@@ -859,8 +873,13 @@ class SharedAppendFile(O):
     '''
     count = 0
     for chunk in chunks_of(self.fp):
-      self._outQ.put(chunk)
-      count += 1
+      if len(chunk) == 0:
+        warning("empty chunk received from chunks_of(%s)", self.fp)
+      else:
+        self._outQ.put(chunk)
+        count += 1
+    if self.eof_markers:
+      self._outQ.put(b'' if self.binary else '')
     return count
 
   def _monitor(self):
