@@ -848,7 +848,7 @@ class SharedAppendFile(O):
     self._monitor_thread.daemon = True
     self._monitor_thread.start()
 
-  def _close(self):
+  def close(self):
     self.running = False
     self._monitor_thread.join()
     self.fp.close()
