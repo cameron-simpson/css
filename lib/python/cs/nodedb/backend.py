@@ -289,9 +289,9 @@ class Backend(_BackendMappingMixin, _BackendUpdateQueue):
 
   def _import_nodedata(self):
     ''' Method called by the monitor thread at commencement to load the
-	backend data into the NodeDB. Why in the monitor thread?
-	Because some libraries like SQLite refuse to work in multiple
-	threads.
+        backend data into the NodeDB. Why in the monitor thread?
+        Because some libraries like SQLite refuse to work in multiple
+        threads :-(
     '''
     with self._updates_off():
       self.nodedb.apply_nodedata(self.nodedata(), raw=self.raw)
