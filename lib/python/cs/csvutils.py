@@ -78,8 +78,15 @@ class SharedCSVFile(SharedAppendFile):
               self, self._csv_partials)
     csv_writerow(fp, item)
 
-  def foreign_rows(self):
+  def foreign_rows(self, to_eof=False):
     ''' Generator yielding update rows from other writers.
+        `to_eof`: stop when the EOF marker is seen; requires self.eof_markers to be true.
     '''
-    for row in csv_reader(as_lines(self._outQ, self._csv_partials)):
+    if to_eof:
+      if not self.eof_markers:
+        raise ValueError("to_eof forbidden if not self.eof_markers")
+      chunks = takewhile(lambda x: len(x) > 0, self._outQ)
+    else:
+      chunks = self._outQ
+    for row in csv_reader(as_lines(chunks, self._csv_partials)):
       yield row
