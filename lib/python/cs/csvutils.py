@@ -62,6 +62,7 @@ class SharedCSVFile(SharedAppendFile):
       raise ValueError('may not specify binary=')
     if transcribe_update is None:
       transcribe_update = self._transcribe_update
+    self._csv_partials = []
     SharedAppendFile.__init__(self, pathname,
                               binary=False, transcribe_update=transcribe_update,
                               **kw)
@@ -70,10 +71,15 @@ class SharedCSVFile(SharedAppendFile):
     ''' Transcribe an update `item` to the supplied file `fp`.
         This is called by SharedAppendFile's monitor loop.
     '''
+    # sanity check: we should only be writing between foreign updates
+    # and foreign updates should always be complete lines
+    if len(self._csv_partials):
+      warning("%s._transcribe_update while non-empty partials[]: %r",
+              self, self._csv_partials)
     csv_writerow(fp, item)
 
   def foreign_rows(self):
     ''' Generator yielding update rows from other writers.
     '''
-    for row in csv_reader(as_lines(self._outQ)):
+    for row in csv_reader(as_lines(self._outQ, self._csv_partials)):
       yield row
