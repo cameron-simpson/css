@@ -853,6 +853,11 @@ class SharedAppendFile(O):
     self._monitor_thread.join()
     self.fp.close()
     self.fp = None
+    self.filestate = None
+
+  @property
+  def filestate(self):
+    return FileState(self.fp.fileno())
 
   def _lockfile(self):
     ''' Obtain an exclusive lock on the CSV file.
