@@ -13,6 +13,7 @@
 
 import csv
 import sys
+from itertools import takewhile
 from cs.fileutils import SharedAppendFile
 from cs.lex import as_lines
 
