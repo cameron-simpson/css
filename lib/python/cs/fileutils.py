@@ -113,6 +113,67 @@ def rewrite(filepath, data,
         shutil.copy2(filepath, filepath + backup_ext)
       shutil.copyfile(T.name, filepath)
 
+@contextmanager
+def rewrite_cmgr(pathname,
+            mode='w',
+            backup_ext=None,
+            keep_backup=False,
+            do_rename=False,
+            do_diff=None,
+            empty_ok=False,
+            overwrite_anyway=False):
+  ''' Rewrite a file, presented as a context manager.
+      `mode`: file write mode, defaulting to "w" for text.
+      `backup_ext`: backup extension. None means no backup.
+            An empty string generates an extension based on the current time.
+      `keep_backup`: keep the backup file even if everything works.
+      `do_rename`: rename the temporary file to the original to update.
+      `do_diff`: call do_diff(pathname, tempfile) before commiting.
+      `empty_ok`: do not consider empty output an error.
+      `overwrite_anyway`: do not update the original if the new data are identical.
+  '''
+  X("rewrite_cmgr(%s)...", pathname)
+  if backup_ext is None:
+    backuppath = None
+  else:
+    if len(backup_ext) == 0:
+      backup_ext = '.bak-%s' % (datetime.datetime.now().isoformat(),)
+    backuppath = pathname + backup_ext
+  dirpath = os.path.dirname(pathname)
+
+  T = NamedTemporaryFile(mode=mode, dir=dirpath, delete=False)
+  # hand control to caller
+  try:
+    yield T
+    T.flush()
+    if not empty_ok and os.fstat(T.fileno()).st_size == 0:
+      raise ValueError("empty file")
+  except Exception as e:
+    # failure from caller or flush or sanity check, clean up
+    try:
+      os.unlink(T.name)
+    except OSError as e2:
+      if e2.errno != errno.ENOENT:
+        warning("%s: unlink: %s", T.name, e2)
+    raise e
+
+  # success
+  if not overwrite_anyway and compare(pathname, T.name):
+    # file unchanged, remove temporary
+    os.unlink(T.name)
+    return
+
+  if do_rename:
+    if backuppath is not None:
+      os.rename(pathname, backuppath)
+    os.rename(T.name, pathname)
+  else:
+    if backuppath is not None:
+      shutil.copy2(pathname, backuppath)
+    shutil.copyfile(T.name, pathname)
+  if backuppath and not keep_backup:
+    os.remove(backuppath)
+
 def abspath_from_file(path, from_file):
   ''' Return the absolute path if `path` with respect to `from_file`,
       as one might do for an include file.
