@@ -120,7 +120,7 @@ class _BackendUpdateQueue(O):
       raise RuntimeError("second attempt to start Backend update thread")
     self._update_ready = Lock()
     self._update_ready.acquire()
-    T = Thread(name="%s._update_thread" % (self,),
+    T = Thread(name="%s._update_monitor" % (self,),
                target=self._update_monitor,
                args=(self._updateQ,))
     self._update_thread = T
