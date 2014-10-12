@@ -12,7 +12,7 @@ import cs.sh
 from cs.logutils import Pfx
 
 def export_rows_wide(nodes, attrs=None, all_attrs=False, tokenised=False, all_nodes=False):
-  ''' Yield node data, unescaped, suitable for use as CSV export data
+  ''' Generator to yield node data, unescaped, suitable for use as CSV export data
       in the "wide" format:
         type,name,attr1,attr2...
       with None used for gaps.
