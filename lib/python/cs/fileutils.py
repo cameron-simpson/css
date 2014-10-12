@@ -933,10 +933,13 @@ class SharedAppendFile(O):
     '''
     self._inQ.put(update_item)
 
-  def _read_to_eof(self):
+  def _read_to_eof(self, force_eof_marker=False):
     ''' Read update data from the file until EOF, put data chunks onto ._outQ.
         Return number of reads with data; 0 ==> no new data.
+        `force_eof_marker`: put an EOF marker even if no other chunks were obtained
     '''
+    if force_eof_marker and not self.eof_markers:
+      raise ValueError("force_eof_marker forbidden if not self.eof_markers")
     count = 0
     for chunk in chunks_of(self.fp):
       if len(chunk) == 0:
@@ -944,7 +947,8 @@ class SharedAppendFile(O):
       else:
         self._outQ.put(chunk)
         count += 1
-    if self.eof_markers:
+    if force_eof_marker or (count > 0 and self.eof_markers):
+      # write and EOF marker if we gathered any data (or if force_eof_marker)
       self._outQ.put(b'' if self.binary else '')
     return count
 
@@ -954,21 +958,23 @@ class SharedAppendFile(O):
         Read updates from the input queue, append to the data file.
     '''
     with Pfx("%s._monitor", self):
+      first = True
       while self.running:
+        # catch up
+        # we force an EOF marker the first time
+        # so that external users can read the whole data file initially
+        count = self._read_to_eof(force_eof_marker=(first and self.eof_markers))
+        # check for outgoing updates
         if self._inQ.empty():
-          # look for external updates
           # sleep briefly if nothing
-          count = self._read_to_eof()
           if count == 0:
             time.sleep(self.poll_interval)
         else:
           # updates due
-          # read until EOF
           # obtain lock
-          # read until EOF
-          # append updates
+          #   read until EOF
+          #   append updates
           # release lock
-          self._read_to_eof()
           with self._lockfile():
             self._read_to_eof()
             pos = self.fp.tell()
@@ -979,6 +985,8 @@ class SharedAppendFile(O):
               item = self._inQ.get()
               self.transcribe_update(self.fp, item)
             self.fp.flush()
+        # clear flag for next pass
+        first = False
 
 def chunks_of(fp, rsize=16384):
   ''' Generator to present text or data from an open file until EOF.
