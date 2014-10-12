@@ -13,7 +13,7 @@ from threading import Lock
 import time
 import unittest
 from tempfile import NamedTemporaryFile
-from .fileutils import compare, rewrite, lockfile, Pathname, \
+from .fileutils import compare, rewrite, rewrite_cmgr, lockfile, Pathname, \
                         file_property, make_file_property, \
                         make_files_property, \
                         BackedFile, BackedFile_TestMethods
@@ -124,6 +124,21 @@ class Test_Misc(unittest.TestCase):
         t1data = t1fp.read()
       self.assertEqual( t1data, olddata, "bad old data in %s" % (T1.name,) )
       rewrite(T1.name, StringIO(newdata), mode='w')
+      with open(T1.name) as t1fp:
+        t1data = t1fp.read()
+      self.assertEqual( t1data, newdata, "bad new data in %s" % (T1.name,) )
+
+  def test_rewrite_cmgr(self):
+    olddata = "old data\n"
+    newdata = "new data\n"
+    with NamedTemporaryFile(mode='w') as T1:
+      T1.write(olddata)
+      T1.flush()
+      with open(T1.name) as t1fp:
+        t1data = t1fp.read()
+      self.assertEqual( t1data, olddata, "bad old data in %s" % (T1.name,) )
+      with rewrite_cmgr(T1.name) as tfp:
+        tfp.write(newdata)
       with open(T1.name) as t1fp:
         t1data = t1fp.read()
       self.assertEqual( t1data, newdata, "bad new data in %s" % (T1.name,) )
