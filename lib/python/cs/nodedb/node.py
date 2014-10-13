@@ -763,17 +763,19 @@ class NodeDB(dict, O):
           `fromtext`, a function to compute a value from text
           `tobytes`, a function to render a value in a compact binary form
           `frombytes`, a function to compute a value from the binary form
-        If `tobytes` is None or unspecified, `totext` is used.
-        If `frombytes` is None or unspecified, `fromtext` is used.
+        If `tobytes` is None or unspecified, utf8(`totext`) is used.
+        If `frombytes` is None or unspecified, `fromtext`(decode-utf8) is used.
     '''
     reg = self.__attr_type_registry
     sch = self.__attr_scheme_registry
-    assert t not in reg, "type %s already registered" % (t,)
-    assert scheme not in sch, "scheme '%s' already registered" % (scheme,)
+    if t in reg:
+      raise ValueError("type %s already registered" % (t,))
+    if scheme in sch:
+      raise ValueError("scheme '%s' already registered" % (scheme,))
     if tobytes is None:
-      tobytes = totext
+      tobytes = lambda v: totext(v).encode('utf-8')
     if frombytes is None:
-      frombytes = fromtext
+      frombytes = lambda bs: fromtext(bs.decode('utf-8'))
     R = NodeDB.__AttrTypeRegistration(t, scheme,
                                   totext, fromtext,
                                   tobytes, frombytes)
