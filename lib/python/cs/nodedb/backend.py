@@ -8,12 +8,12 @@ from contextlib import contextmanager
 from threading import Condition
 from collections import namedtuple
 import unittest
-from cs.logutils import D, OBSOLETE, debug, error
-from cs.obj import O
+from cs.logutils import D, OBSOLETE, debug, error, X
 from cs.threads import locked_property
 from cs.excutils import unimplemented
 from cs.timeutils import sleep
 from cs.debug import Lock, RLock, Thread
+from cs.obj import O
 from cs.py3 import Queue, Queue_Full as Full, Queue_Empty as Empty
 
 # delay between update polls
@@ -41,48 +41,34 @@ class Backend(O):
     self.monitor = monitor
     self.raw = raw
     self.closed = False
-    self._lock = Lock()
-    _BackendUpdateQueue.__init__(self)
-    self._ready = Lock()
-    self._ready.acquire()
+    self._lock = Lock()     # general mutex
 
   def __str__(self):
     return "%s(readonly=%s, monitor=%s, raw=%s)" \
            % (self.__class__.__name__, self.readonly, self.monitor, self.raw)
-
-  def nodedata(self):
-    ''' Yield node data in:
-          type, name, attrmap
-        form.
-    '''
-    for k, attrmap in self.iteritems():
-      k1, k2 = k
-      yield k1, k2, attrmap
-
-  def _import_nodedata(self):
-    ''' Method called by the monitor thread at commencement to load the
-        backend data into the NodeDB. Why in the monitor thread?
-        Because some libraries like SQLite refuse to work in multiple
-        threads :-(
-    '''
-    with self._updates_off():
-      self.nodedb.apply_nodedata(self.nodedata(), raw=self.raw)
 
   def init_nodedb(self):
     ''' Apply the nodedata from this backend to the NodeDB.
         This can be overridden by subclasses to provide some backend specific
         efficient implementation.
     '''
-    self._update_start_thread()
-    self._update_ready.acquire()
+    raise NotImplemented("method to do initial db load from Backend")
 
   def close(self):
     ''' Basic close: sync, detach from NodeDB, mark as closed.
     '''
-    self.closed = True
-    self.sync()
-    self._update_close()
-    self.nodedb = None
+    raise NotImplemented("method to shutdown backend, set .nodedb=None, etc")
+
+  def _update(self, csvrow):
+    ''' Update the actual backend with a difference expressed as a CSVRow.
+        The values are as follows:
+          .type, .name  The Node key.
+          .attr         If this commences with a dash ('-') the attribute
+			            values are to be discarded. Otherwise, the value is
+                        to be appended to the attribute.
+          .value        The value to store, already textencoded.
+    '''
+    raise NotImplemented("method to update the backend from a CSVRow with differnece information")
 
   def setAttr(self, t, name, attr, values):
     ''' Save the full contents of this attribute list.
