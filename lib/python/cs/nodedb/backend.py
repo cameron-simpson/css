@@ -52,12 +52,12 @@ class Backend(O):
         This can be overridden by subclasses to provide some backend specific
         efficient implementation.
     '''
-    raise NotImplemented("method to do initial db load from Backend")
+    raise NotImplementedError("method to do initial db load from Backend")
 
   def close(self):
     ''' Basic close: sync, detach from NodeDB, mark as closed.
     '''
-    raise NotImplemented("method to shutdown backend, set .nodedb=None, etc")
+    raise NotImplementedError("method to shutdown backend, set .nodedb=None, etc")
 
   def _update(self, csvrow):
     ''' Update the actual backend with a difference expressed as a CSVRow.
@@ -68,7 +68,7 @@ class Backend(O):
                         to be appended to the attribute.
           .value        The value to store, already textencoded.
     '''
-    raise NotImplemented("method to update the backend from a CSVRow with differnece information")
+    raise NotImplementedError("method to update the backend from a CSVRow with difference information")
 
   def setAttr(self, t, name, attr, values):
     ''' Save the full contents of this attribute list.
