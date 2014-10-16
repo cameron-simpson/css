@@ -65,6 +65,7 @@ class Backend_CSVFile(Backend):
 
   def __init__(self, csvpath, readonly=False, rewrite_inplace=False):
     Backend.__init__(self, readonly=readonly)
+    self.pathname = csvpath
     self.rewrite_inplace = rewrite_inplace
     self.csvpath = csvpath
     self.keep_backups = False
@@ -122,95 +123,12 @@ class Backend_CSVFile(Backend):
   def rewrite(self):
     ''' Force a complete rewrite of the CSV file.
     '''
-    trace("rewrite(%s)", self.csvpath)
+    trace("rewrite(%s)", self.pathname)
     if self.readonly:
       error("%s: readonly: rewrite not done", self)
       return
-
-    with self._update_lock:
-      self._close()
-      with self.lockdata():
-        if self.rewrite_inplace:
-          backup = "%s.bak-%s" % (self.csvpath, datetime.datetime.now().isoformat())
-          copyfile(self.csvpath, backup)
-          with open(self.csvpath, "w") as fp:
-            write_csv_file(fp, self.nodedb.nodedata())
-        else:
-          newfile = "%s.new-%s" % (self.csvpath, datetime.datetime.now().isoformat())
-          with open(newfile, "w") as fp:
-            write_csv_file(fp, self.nodedb.nodedata())
-          backup = "%s.bak-%s" % (self.csvpath, datetime.datetime.now().isoformat())
-          os.rename(self.csvpath, backup)
-          try:
-            os.rename(newfile, self.csvpath)
-          except:
-            error("rename(%s, %s): %s", newfile, self.csvpath, sys.exc_info)
-            os.rename(backup, self.csvpath)
-        self._open()
-        self._fast_forward()
-      if not self.keep_backups:
-        os.remove(backup)
-
-  def iteritems(self):
-    for t, name, attrmap in read_csv_file(self.csvpath):
-      yield (t, name), attrmap
-
-  def iterkeys(self):
-    for item in self.iteritems():
-      yield item[0]
-
-  def itervalues(self):
-    for item in self.iteritems():
-      yield item[1]
-
-  def __setitem__(self, key, N):
-    # CSV DB Nodes only have attributes
-    t = N.type
-    name = N.name
-    for k, v in N.items():
-      self.setAttr(t, name, k, v)
-
-  def _rewind(self):
-    ''' Rewind our access to the CSV file.
-    '''
-    trace("_rewind %r", self.csvpath)
-    self.partial = ''
-    self.csvfp.seek(0, os.SEEK_SET)
-
-  def _fast_forward(self):
-    ''' Advance our access to the CSV file to the end.
-    '''
-    with self._update_lock:
-      trace("_fast_forward %r", self.csvpath)
-      self._rewind()
-      self.csvfp.seek(0, os.SEEK_END)
-
-  def push_updates(self, csvrows):
-    ''' Apply the update rows from the iterable `csvrows` to the data file.
-        This assumes we already have access to the data file.
-    '''
-    trace("push_updates: write our own updates to %s", self.csvfp)
-    totext = self.nodedb.totext
-    csvw = csv.writer(self.csvfp)
-    lastrow = None
-    for thisrow in csvrows:
-      if tuple(thisrow) == ('TYPE', 'NAME', 'ATTR', 'VALUE'):
-        raise RuntimeError("push_updates: received header row: %r" % (thisrow,))
-      t, name, attr, value = thisrow
-      if lastrow:
-        if t == lastrow.type:
-          t = ''
-        if name == lastrow.name:
-          name = ''
-        if attr[0].isalpha() and attr == lastrow.attr:
-          name = ''
-      csvrow = CSVRow(t, name, attr, totext(value))
-      debug("push_updates: csv_writerow(%r)", csvrow)
-      csv_writerow(csvw, csvrow)
-      with self._lock:
-        self._updated_count += 1
-      lastrow = thisrow
-    self.csvfp.flush()
+    with rewrite_cmgr(self.pathname, backup_ext='', do_rename=True) as outfp:
+      write_csv_file(fp, self.nodedb.nodedata())
 
 if __name__ == '__main__':
   from cs.logutils import setup_logging
