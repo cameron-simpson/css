@@ -310,6 +310,7 @@ def trace(func):
       retval = func(*a, **kw)
     except Exception as e:
       X("CALL %s(): RAISES %r", funccite(func), e)
+      raise
     else:
       X("CALL %s(): RETURNS %r", funccite(func), retval)
       return retval
