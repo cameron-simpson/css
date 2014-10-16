@@ -413,13 +413,15 @@ def as_lines(chunks, partials=None):
   '''
   if partials is None:
     partials = []
+  if any( [ '\n' in p for p in partials ] ):
+    raise ValueError("newline in partials: %r", partials)
   for chunk in chunks:
     pos = 0
     nl_pos = chunk.find('\n', pos)
     while nl_pos >= pos:
       partials.append(chunk[pos:nl_pos+1])
       yield ''.join(partials)
-      partials = []
+      partials[:] = ()
       pos = nl_pos + 1
       nl_pos = chunk.find('\n', pos)
     if pos < len(chunk):
