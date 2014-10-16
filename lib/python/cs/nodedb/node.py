@@ -706,6 +706,7 @@ class NodeDB(dict, O):
     self.__attr_type_registry = {}
     self.__attr_scheme_registry = {}
     self.__nodesByType = {}
+    self._lock = RLock()
     # Load data with no backend, then attach backend.
     # - run initially with no backend to avoid accidents
     # - load data from backend
@@ -713,7 +714,6 @@ class NodeDB(dict, O):
     backend.nodedb = self
     backend.init_nodedb()
     self.backend = backend
-    self._lock = RLock()
 
   def __str__(self):
     return "NodeDB(readonly=%s, backend=%s)" % (self.readonly, self.backend)
