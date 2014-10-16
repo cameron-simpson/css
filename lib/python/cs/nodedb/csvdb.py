@@ -11,9 +11,11 @@ import os.path
 import sys
 import datetime
 from shutil import copyfile
-from cs.csvutils import csv_reader, csv_writerow, CatchUp as CSV_CatchUp
-from cs.fileutils import lockfile, FileState
-from cs.logutils import Pfx, error, warning, info, debug, trace, D
+from threading import Thread, Lock
+from cs.debug import trace
+from cs.csvutils import csv_writerow, SharedCSVFile
+from cs.fileutils import FileState, rewrite_cmgr
+from cs.logutils import Pfx, error, warning, info, debug, D, X
 from cs.py3 import StringTypes, Queue_Full as Full, Queue_Empty as Empty
 from . import NodeDB
 from .backend import Backend, CSVRow
@@ -67,58 +69,72 @@ class Backend_CSVFile(Backend):
     Backend.__init__(self, readonly=readonly)
     self.pathname = csvpath
     self.rewrite_inplace = rewrite_inplace
-    self.csvpath = csvpath
+    self.csv = SharedCSVFile(csvpath, eof_markers=True, readonly=readonly)
     self.keep_backups = False
-    self.lastrow = None
+    self._loaded = Lock()
+    self._loaded.acquire()
+
+  def init_nodedb(self):
+    ''' Wait for the first update pass to complete.
+    '''
+    self._open()
+    self.running = True
+    self._monitor_thread = Thread(target=self._monitor, name="%s._monitor" % (self,))
+    self._monitor_thread.daemon = True
+    self._monitor_thread.start()
+    self._loaded.acquire()
+    self._loaded.release()
+    self._loaded = None
 
   def _open(self):
-    mode = "r" if self.readonly else "r+"
-    self.csvfp = open(self.csvpath, mode)
-    self.csvstate = FileState(self.csvfp.fileno())
+    ''' Attach to the shared CSV file.
+    '''
+    self.csv = SharedCSVFile(self.pathname, eof_markers=True, readonly=self.readonly)
 
   def _close(self):
-    self.csvfp.close()
-    self.csvfp = None
-    self.csvstate = None
-
-  def lockdata(self):
-    ''' Obtain an exclusive lock on the CSV file.
+    ''' Detach from the shared CSV file.
     '''
-    return lockfile(self.csvpath)
+    self.csv.close()
+    self.csv = None
 
-  def _import_nodedata(self):
-    with self._updates_off():
-      self._rewind()
-      for row in self.fetch_updates():
-        self.import_csv_row(row)
-
-  def fetch_updates(self, header_row=None):
-    ''' Read CSV update rows from the current file position.
-        Yield resolved rows.
+  def close(self):
+    ''' Final shutdown: stop monitor thread, detach from CSV file.
     '''
-    new_state = FileState(self.csvfp.fileno())
-    if not self.csvstate.samefile(new_state):
-      # CSV file replaced, reload
-      self._close()
-      self.nodedb._scrub()
-      self._open()
-      self._rewind()
-    raw_rows = CSV_CatchUp(self.csvfp, self.partial)
-    if header_row:
-      row = raw_rows.next()
-      if row != header_row:
-        raise RuntimeError(
-              "bad header row, expected %r, got: %r"
-              % (header_row, row))
+    self.running = False
+    self._monitor_thread.join()
+    self._close()
+
+  def _update(self, csvrow):
+    self.csv.put(csvrow)
+
+  def _monitor(self):
+    ''' Monitor loop: collect updates from the backend and apply to the NodeDB.
+    '''
+    first = True
     fromtext = self.nodedb.fromtext
-    lastrow = self.lastrow
-    for row in raw_rows:
-      t, name, attr, value = fullrow = resolve_csv_row(row, lastrow)
-      value = fromtext(value)
-      yield CSVRow(t, name, attr, value)
-      lastrow = fullrow
-    self.partial = raw_rows.partial
-    self.lastrow = lastrow
+    lastrow = None
+    while self.running:
+      X("_monitor: while loop top")
+      new_state = FileState(self.pathname)
+      if not new_state.samefile(self.csv.filestate):
+        X("NEW FILE %r", self.pathname)
+        # a new CSV file is there; assume rewritten entirely
+        # reconnect and reload
+        self._close()
+        self._open()
+        self.nodedb._scrub()
+      X("_monitor: while loop top")
+      for row in self.csv.foreign_rows(to_eof=True):
+        row = resolve_csv_row(row, lastrow)
+        t, name, attr, value = row
+        value = fromtext(value)
+        self.import_csv_row(CSVRow(t, name, attr, value))
+        lastrow = row
+      if first:
+        first = False
+        self._loaded.release()
+      X("_monitor: while loop bottom")
+    X("_monitor: while loop bottom")
 
   def rewrite(self):
     ''' Force a complete rewrite of the CSV file.
@@ -133,5 +149,13 @@ class Backend_CSVFile(Backend):
 if __name__ == '__main__':
   from cs.logutils import setup_logging
   setup_logging()
+  from . import NodeDBFromURL
+  NDB=NodeDBFromURL('file-csv://test.csv', readonly=False)
+  N=NDB.make('T:1')
+  print(N)
+  N.A=1
+  print(N)
+  NDB.close()
+  sys.exit(0)
   import cs.nodedb.csvdb_tests
   cs.nodedb.csvdb_tests.selftest(sys.argv)
