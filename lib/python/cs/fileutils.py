@@ -851,7 +851,7 @@ class BackedFile_TestMethods(object):
     self.assertEqual(len(overlap_chunk), 512, "overlap_chunk not 512 bytes: %r" % (overlap_chunk,))
     self.assertEqual(overlap_chunk, backing_text[256:512] + random_chunk)
 
-class SharedAppendFile(O):
+class SharedAppendFile(object):
   ''' A base class to share a modifiable file between multiple users.
 
       The use case derives from the shared CSV files used by
@@ -884,7 +884,6 @@ class SharedAppendFile(O):
       max_queue = self.DEFAULT_MAX_QUEUE
     if poll_interval is None:
       poll_interval = self.DEFAULT_POLL_INTERVAL
-    O.__init__(self)
     self.pathname = pathname
     self.readonly = readonly
     self.writeonly = readonly
@@ -898,6 +897,9 @@ class SharedAppendFile(O):
     self._inQ = Queue(self.max_queue)
     self._outQ = IterableQueue(self.max_queue, name="%s._outQ" % (self,))
     self._open()
+
+  def __str__(self):
+    return "SharedAppendFile(%r)" % (self.pathname,)
 
   def _open(self):
     ''' Open the file for read or read/write.
