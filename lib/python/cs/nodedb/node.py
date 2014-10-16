@@ -15,11 +15,11 @@ from getopt import GetoptError
 from threading import RLock
 from threading import Thread
 from collections import namedtuple
-from cs.debug import RLock
+from cs.debug import RLock, trace
 from cs.excutils import unimplemented
 from cs.obj import O
 from cs.lex import str1, parseUC_sAttr
-from cs.logutils import Pfx, D, error, warning, info, debug, exception
+from cs.logutils import Pfx, D, error, warning, info, debug, exception, X
 from cs.seq import the, get0
 from cs.threads import locked
 from cs.py3 import StringTypes, unicode
@@ -543,6 +543,7 @@ class Node(dict):
   def __setattr__(self, attr, value):
     ''' Support .ATTR[s] = value[s].
     '''
+    X("Node.__setattr__(%r, %s)", attr, value)
     # forbid .inTYPE attribute setting
     if attr.startswith('in') and len(attr) > 2:
       k, plural = parseUC_sAttr(attr[2:])
@@ -970,8 +971,6 @@ class NodeDB(dict, O):
       if (t, name) in self:
         raise KeyError('newNode(%s, %s): already exists' % (t, name))
       N = self[t, name] = self._createNode(t, name)
-      if self.backend:
-        self.backend[t, name] = N
       self[t, name] = N
     return N
 
