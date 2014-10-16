@@ -89,7 +89,7 @@ class Backend(O):
       self._update(CSVRow(t, name, attr, value))
 
   def import_csv_row(self, row):
-    ''' Apply the values from an individual CSV update row to the NodeDB.
+    ''' Apply the values from an individual CSV update row to the NodeDB without propagating to the backend.
         Each row is expected to be post-resolve_csv_row().
         Honour the incremental notation for data:
         - a NAME commencing with '=' discards any existing (TYPE, NAME)
@@ -108,19 +108,20 @@ class Backend(O):
       if value != "":
         raise ValueError("ATTR = \"%s\" but non-empty VALUE: %r" % (attr, value))
       N = nodedb.make( (t, name) )
-      N[attr] = ()
+      N[attr]._set_values_local( () )
     else:
       # add attribute
       if name.startswith('='):
         # discard node and start anew
         name = name[1:]
-        nodedb[t, name] = {}
+        nodedb[t, name]._scrub_local()
       N = nodedb.make( (t, name) )
       if attr.startswith('='):
         # reset attribute completely before appending value
         attr = attr[1:]
-        N[attr] = ()
-      N.get(attr).append(value)
+        N[attr]._set_values_local( (value,) )
+      else:
+        N.get(attr)._extend_local( (value,) )
 
 class TestAll(unittest.TestCase):
 
