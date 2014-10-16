@@ -143,19 +143,6 @@ class _AttrList(list):
       if hasattr(N, 'name') and hasattr(N, 'type') and hasattr(N, 'nodedb'):
         addref(self.node, self.attr)
 
-  def _save(self):
-    ''' Rewrite our value completely in the backend.
-    '''
-    N = self.node
-    if self.backend:
-      self.backend.setAttr(N.type, N.name, self.attr, self)
-
-  def _extend(self, values):
-    N = self.node
-    backend = self.backend
-    if backend:
-      backend.extendAttr(N.type, N.name, self.attr, values)
-
   def __delitem__(self, index):
     if type(index) is int:
       items = (self[index],)
@@ -199,21 +186,64 @@ class _AttrList(list):
     self.__additemrefs(values)
     self._save()
 
-  def _scrub(self):
+  def _scrub_local(self):
     # remove all elements from this attribute
     self[:] = ()
+  _scrub = _scrub_local
 
-  def append(self, value):
-    self.extend((value,))
+  def _scrub_backend(self):
+    N = self.node
+    self.backend.setAttr(N.type, N.name, self.attr, ())
 
   def extend(self, values):
-    # turn iterator into tuple
+    ''' Extend this attribute, updating both the local and backend data stores.
+    '''
+    self._extend_local(values)
+    self._extend_backend(values)
+
+  def _extend_local(self, values):
+    ''' Record the extension in the local data structure.
+    '''
+    # turn iterable into tuple
     if not isinstance(values, (list, tuple)):
       values = tuple(values)
     if len(values) > 0:
       list.extend(self, values)
       self.__additemrefs(values)
-      self._extend(values)
+      list.extend(self, values)
+
+  def _extend_backend(self, values):
+    ''' Record the extension in the backend.
+    '''
+    backend = self.backend
+    if backend:
+      N = self.node
+      backend.extendAttr(N.type, N.name, self.attr, values)
+
+  def _save(self):
+    ''' Save the entire attribute to the backend.
+    '''
+    self._set_values_backend(self)
+
+  def set_values(self, values):
+    ''' Reset the list of values. Takes shallow copy of the iterable.
+    '''
+    # turn iterable into tuple
+    if not isinstance(values, (list, tuple)):
+      values = tuple(values)
+    self._set_values_local(values)
+    self._set_values_backend(values)
+
+  def _set_values_local(self, values):
+    self._scrub_local()
+    self._extend_local(values)
+
+  def _set_values_backend(self, values):
+    self._scrub_backend()
+    self._extend_backend(values)
+
+  def append(self, value):
+    self.extend((value,))
 
   def insert(self, index, value):
     N = self.node
