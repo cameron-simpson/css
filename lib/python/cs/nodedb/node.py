@@ -215,10 +215,8 @@ class _AttrList(list):
   def _extend_backend(self, values):
     ''' Record the extension in the backend.
     '''
-    backend = self.backend
-    if backend:
-      N = self.node
-      backend.extendAttr(N.type, N.name, self.attr, values)
+    N = self.node
+    backend.extendAttr(N.type, N.name, self.attr, values)
 
   def _save(self):
     ''' Save the entire attribute to the backend.
@@ -255,7 +253,6 @@ class _AttrList(list):
   def pop(self, index=-1):
     value = list.pop(self, index)
     self.__delitemrefs((value,))
-    self.backend.saveAttrs(self)
     self._save()
     return value
 
