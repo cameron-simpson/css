@@ -16,10 +16,8 @@ from cs.debug import Lock, RLock, Thread
 from cs.obj import O
 from cs.py3 import Queue, Queue_Full as Full, Queue_Empty as Empty
 
-# delay between update polls
-POLL_DELAY = 0.1
-
-# convenience tuple of raw values
+# convenience tuple of raw values, actually used to encode updates
+# via Backend.import_csv_row
 CSVRow = namedtuple('CSVRow', 'type name attr value')
 
 class Backend(O):
