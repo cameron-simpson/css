@@ -15,6 +15,7 @@ import csv
 import sys
 from itertools import takewhile
 from cs.fileutils import SharedAppendFile
+from cs.logutils import warning
 from cs.lex import as_lines
 
 if sys.hexversion < 0x03000000:
@@ -77,7 +78,7 @@ class SharedCSVFile(SharedAppendFile):
     if len(self._csv_partials):
       warning("%s._transcribe_update while non-empty partials[]: %r",
               self, self._csv_partials)
-    csv_writerow(fp, item)
+    csv_writerow(csv.writer(fp), item)
 
   def foreign_rows(self, to_eof=False):
     ''' Generator yielding update rows from other writers.
