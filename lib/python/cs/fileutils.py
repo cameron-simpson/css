@@ -483,7 +483,7 @@ def make_files_property(attr_name=None, unset_object=None, poll_rate=1):
   return made_files_property
 
 @contextmanager
-def lockfile(path, ext='.lock', poll_interval=0.1, timeout=None):
+def lockfile(path, ext=None, poll_interval=0.1, timeout=None):
   ''' A context manager which takes and holds a lock file.
       `path`: the base associated with the lock file.
       `ext`: the extension to the base used to construct the lock file name.
@@ -492,6 +492,8 @@ def lockfile(path, ext='.lock', poll_interval=0.1, timeout=None):
                  default None (wait forever).
       `poll_interval`: polling frequency when timeout is not 0.
   '''
+  if ext is None:
+    ext = '.lock'
   if timeout is not None and timeout < 0:
     raise ValueError("timeout should be None or >= 0, not %r" % (timeout,))
   start = None
@@ -1003,7 +1005,7 @@ def lines_of(fp, partials=None):
   '''
   if partials is None:
     partials = []
-  return as_lines(chunks_of(fp, partials))
+  return as_lines(chunks_of(fp), partials)
 
 if __name__ == '__main__':
   import cs.fileutils_tests
