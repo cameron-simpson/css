@@ -304,7 +304,7 @@ def trace_caller(func):
   ''' Decorator to report the caller of a function when called.
   '''
   def subfunc(*a, **kw):
-    rame = caller()
+    frame = caller()
     D("CALL %s()<%s:%d> FROM %s()<%s:%d>",
          func.__name__,
          func.__code__.co_filename, func.__code__.co_firstlineno,
