@@ -77,7 +77,7 @@ class Backend_CSVFile(Backend):
   def init_nodedb(self):
     ''' Wait for the first update pass to complete.
     '''
-    self._open()
+    self._open_csv()
     self.running = True
     self._monitor_thread = Thread(target=self._monitor, name="%s._monitor" % (self,))
     self._monitor_thread.daemon = True
@@ -86,16 +86,20 @@ class Backend_CSVFile(Backend):
     self._loaded.release()
     self._loaded = None
 
-  def _open(self):
+  def _open_csv(self):
     ''' Attach to the shared CSV file.
     '''
     self.csv = SharedCSVFile(self.pathname, eof_markers=True, readonly=self.readonly)
+
+  def _close_csv(self):
+    self.csv.close()
+    self.csv = None
 
   def close(self):
     ''' Final shutdown: stop monitor thread, detach from CSV file.
     '''
     X("%s.close: close SharedCSVFile %s...", self, self.csv)
-    self.csv.close()
+    self._close_csv()
     X("%s.close: set .running=False, join monitor thread", self)
     self.running = False
     self._monitor_thread.join()
@@ -119,16 +123,18 @@ class Backend_CSVFile(Backend):
           X("NEW FILE %r", self.pathname)
           # a new CSV file is there; assume rewritten entirely
           # reconnect and reload
-          self._close()
-          self._open()
+          self._close_csv()
+          self._open_csv()
           self.nodedb._scrub()
       X("_monitor: while loop top")
-      for row in self.csv.foreign_rows(to_eof=True):
-        row = resolve_csv_row(row, lastrow)
-        t, name, attr, value = row
-        value = fromtext(value)
-        self.import_csv_row(CSVRow(t, name, attr, value))
-        lastrow = row
+      csv = self.csv
+      if csv is not None:
+        for row in csv.foreign_rows(to_eof=True):
+          row = resolve_csv_row(row, lastrow)
+          t, name, attr, value = row
+          value = fromtext(value)
+          self.import_csv_row(CSVRow(t, name, attr, value))
+          lastrow = row
       if first:
         first = False
         self._loaded.release()
