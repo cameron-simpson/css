@@ -16,6 +16,7 @@ from cs.debug import trace
 from cs.csvutils import csv_writerow, SharedCSVFile
 from cs.fileutils import FileState, rewrite_cmgr
 from cs.logutils import Pfx, error, warning, info, debug, D, X
+from cs.threads import locked
 from cs.py3 import StringTypes, Queue_Full as Full, Queue_Empty as Empty
 from . import NodeDB
 from .backend import Backend, CSVRow
@@ -78,7 +79,6 @@ class Backend_CSVFile(Backend):
     ''' Wait for the first update pass to complete.
     '''
     self._open_csv()
-    self.running = True
     self._monitor_thread = Thread(target=self._monitor, name="%s._monitor" % (self,))
     self._monitor_thread.daemon = True
     self._monitor_thread.start()
@@ -86,11 +86,13 @@ class Backend_CSVFile(Backend):
     self._loaded.release()
     self._loaded = None
 
+  @locked
   def _open_csv(self):
     ''' Attach to the shared CSV file.
     '''
     self.csv = SharedCSVFile(self.pathname, eof_markers=True, readonly=self.readonly)
 
+  @locked
   def _close_csv(self):
     self.csv.close()
     self.csv = None
@@ -100,8 +102,7 @@ class Backend_CSVFile(Backend):
     '''
     X("%s.close: close SharedCSVFile %s...", self, self.csv)
     self._close_csv()
-    X("%s.close: set .running=False, join monitor thread", self)
-    self.running = False
+    X("%s.close: join monitor thread", self)
     self._monitor_thread.join()
     X("%s.close: COMPLETE", self)
 
@@ -114,7 +115,7 @@ class Backend_CSVFile(Backend):
     first = True
     fromtext = self.nodedb.fromtext
     lastrow = None
-    while self.running:
+    while self.csv is not None:
       X("_monitor: while loop top")
       old_state = self.csv.filestate
       if old_state is not None:
@@ -123,8 +124,9 @@ class Backend_CSVFile(Backend):
           X("NEW FILE %r", self.pathname)
           # a new CSV file is there; assume rewritten entirely
           # reconnect and reload
-          self._close_csv()
-          self._open_csv()
+          with self._lock:
+            self._close_csv()
+            self._open_csv()
           self.nodedb._scrub()
       X("_monitor: while loop top")
       csv = self.csv
