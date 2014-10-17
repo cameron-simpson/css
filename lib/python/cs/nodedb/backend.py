@@ -9,7 +9,7 @@ from threading import Condition
 from collections import namedtuple
 import unittest
 from cs.logutils import D, OBSOLETE, debug, error, X
-from cs.threads import locked_property
+from cs.threads import locked, locked_property
 from cs.excutils import unimplemented
 from cs.timeutils import sleep
 from cs.debug import RLock, Thread
