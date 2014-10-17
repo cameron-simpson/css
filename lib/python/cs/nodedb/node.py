@@ -540,7 +540,6 @@ class Node(dict):
   def __setattr__(self, attr, value):
     ''' Support .ATTR[s] = value[s].
     '''
-    X("Node.__setattr__(%r, %s)", attr, value)
     # forbid .inTYPE attribute setting
     if attr.startswith('in') and len(attr) > 2:
       k, plural = parseUC_sAttr(attr[2:])
