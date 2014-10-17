@@ -908,13 +908,12 @@ class SharedAppendFile(object):
     if self.binary:
       mode += "b"
     self.fp = open(self.pathname, mode)
-    self.running = True
     self._monitor_thread = Thread(target=self._monitor, name="%s._monitor" % (self,))
     self._monitor_thread.daemon = True
     self._monitor_thread.start()
 
   def close(self):
-    self.running = False
+    self._inQ.close()
     self._monitor_thread.join()
     self.fp.close()
     self.fp = None
@@ -965,7 +964,7 @@ class SharedAppendFile(object):
     '''
     with Pfx("%s._monitor", self):
       first = True
-      while self.running:
+      while not self._inQ.closed and not self._inQ.empty():
         # catch up
         # we force an EOF marker the first time
         # so that external users can read the whole data file initially
