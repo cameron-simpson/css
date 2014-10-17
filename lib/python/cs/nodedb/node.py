@@ -100,6 +100,7 @@ class _AttrList(list):
       list.__init__(self)
     self.node = node
     self.attr = attr
+    self._lock = self.node._lock
 
   def __str__(self):
     return str(list(self))
@@ -143,6 +144,7 @@ class _AttrList(list):
       if hasattr(N, 'name') and hasattr(N, 'type') and hasattr(N, 'nodedb'):
         addref(self.node, self.attr)
 
+  @locked
   def __delitem__(self, index):
     if type(index) is int:
       items = (self[index],)
@@ -153,15 +155,11 @@ class _AttrList(list):
     self._save()
     return value
 
+  @locked
   def __delslice__(self, i, j):
     del self[max(0, i):max(0, j):]
 
-  def __iadd__(self, other):
-    self.__additemrefs(other)
-    value = list.__iadd__(self, other)
-    self._save()
-    return value
-
+  @locked
   def __imul__(self, other):
     oitems = list(self)
     value = list.__imul__(self, other)
@@ -170,6 +168,7 @@ class _AttrList(list):
     self._save()
     return value
 
+  @locked
   def __setitem__(self, index, value):
     if isinstance(index, int):
       ovalues = (self[index],)
@@ -200,6 +199,8 @@ class _AttrList(list):
     '''
     self._extend_local(values)
     self._extend_backend(values)
+
+  __iadd__ = extend
 
   def _extend_local(self, values):
     ''' Record the extension in the local data structure.
@@ -338,6 +339,7 @@ class Node(dict):
     self.type = str1(t) if t is not None else None
     self.name = name
     self.nodedb = nodedb
+    self._lock = self.nodedb._lock
     self._reverse = {}  # maps (OtherNode, ATTR) => count
     if initial:
       self.update(initial)
@@ -468,9 +470,11 @@ class Node(dict):
       return False
     return True
 
+  @locked
   def get(self, k, default=None):
     ''' Fetch the item specified.
         Create an empty list if necessary.
+        This is the method that instantiates all entries as _AttrLists.
     '''
     try:
       values = self[k]
@@ -483,6 +487,7 @@ class Node(dict):
 
   # __getitem__ goes directly to the dict implementation
 
+  @locked
   def __setitem__(self, item, new_values):
     ''' Set Node[item] = new_values.
         Unlike a normal dictionary, a shallow copy of new_values is stored,
