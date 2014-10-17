@@ -115,14 +115,16 @@ class Backend_CSVFile(Backend):
     lastrow = None
     while self.running:
       X("_monitor: while loop top")
-      new_state = FileState(self.pathname)
-      if not new_state.samefile(self.csv.filestate):
-        X("NEW FILE %r", self.pathname)
-        # a new CSV file is there; assume rewritten entirely
-        # reconnect and reload
-        self._close()
-        self._open()
-        self.nodedb._scrub()
+      old_state = self.csv.filestate
+      if old_state is not None:
+        new_state = FileState(self.pathname)
+        if not new_state.samefile(old_state):
+          X("NEW FILE %r", self.pathname)
+          # a new CSV file is there; assume rewritten entirely
+          # reconnect and reload
+          self._close()
+          self._open()
+          self.nodedb._scrub()
       X("_monitor: while loop top")
       for row in self.csv.foreign_rows(to_eof=True):
         row = resolve_csv_row(row, lastrow)
