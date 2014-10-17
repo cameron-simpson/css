@@ -216,7 +216,7 @@ class _AttrList(list):
     ''' Record the extension in the backend.
     '''
     N = self.node
-    backend.extendAttr(N.type, N.name, self.attr, values)
+    self.backend.extendAttr(N.type, N.name, self.attr, values)
 
   def _save(self):
     ''' Save the entire attribute to the backend.
