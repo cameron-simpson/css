@@ -70,7 +70,6 @@ class Backend_CSVFile(Backend):
     Backend.__init__(self, readonly=readonly)
     self.pathname = csvpath
     self.rewrite_inplace = rewrite_inplace
-    self.csv = SharedCSVFile(csvpath, eof_markers=True, readonly=readonly)
     self.keep_backups = False
     self._loaded = Lock()
     self._loaded.acquire()
