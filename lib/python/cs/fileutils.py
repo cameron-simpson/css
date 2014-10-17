@@ -993,6 +993,7 @@ class SharedAppendFile(object):
             self.fp.flush()
         # clear flag for next pass
         first = False
+      self._outQ.close()
 
 def chunks_of(fp, rsize=16384):
   ''' Generator to present text or data from an open file until EOF.
