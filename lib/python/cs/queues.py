@@ -83,6 +83,9 @@ class _QueueIterator(NestingOpenCloseMixin):
 
   next = __next__
 
+  def empty(self):
+    return self.q.empty()
+
 def IterableQueue(capacity=0, name=None, *args, **kw):
   if not isinstance(capacity, int):
     raise RuntimeError("capacity: expected int, got: %r" % (capacity,))
