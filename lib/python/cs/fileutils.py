@@ -915,8 +915,9 @@ class SharedAppendFile(object):
   def close(self):
     self._inQ.close()
     self._monitor_thread.join()
-    self.fp.close()
+    fp = self.fp
     self.fp = None
+    fp.close()
 
   @property
   def filestate(self):
