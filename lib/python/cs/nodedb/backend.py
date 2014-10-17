@@ -12,7 +12,7 @@ from cs.logutils import D, OBSOLETE, debug, error, X
 from cs.threads import locked_property
 from cs.excutils import unimplemented
 from cs.timeutils import sleep
-from cs.debug import Lock, RLock, Thread
+from cs.debug import RLock, Thread
 from cs.obj import O
 from cs.py3 import Queue, Queue_Full as Full, Queue_Empty as Empty
 
@@ -39,7 +39,7 @@ class Backend(O):
     self.monitor = monitor
     self.raw = raw
     self.closed = False
-    self._lock = Lock()     # general mutex
+    self._lock = RLock()     # general mutex
 
   def __str__(self):
     return "%s(readonly=%s, monitor=%s, raw=%s)" \
@@ -68,6 +68,7 @@ class Backend(O):
     '''
     raise NotImplementedError("method to update the backend from a CSVRow with difference information")
 
+  @locked
   def setAttr(self, t, name, attr, values):
     ''' Save the full contents of this attribute list.
     '''
@@ -75,11 +76,13 @@ class Backend(O):
     if values:
       self.extendAttr(t, name, attr, values)
 
+  @locked
   def delAttr(self, t, name, attr):
     ''' Delete an attribute.
     '''
     self._update(CSVRow(t, name, '-'+attr, ''))
 
+  @locked
   def extendAttr(self, t, name, attr, values):
     ''' Append values to an attribute.
     '''
