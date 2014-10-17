@@ -28,7 +28,7 @@ from cs.range import Range
 from cs.threads import locked, locked_property
 from cs.timeutils import TimeoutError
 from cs.obj import O
-from cs.py3 import ustr, Queue
+from cs.py3 import ustr
 
 def saferename(oldpath, newpath):
   ''' Rename a path using os.rename(), but raise an exception if the target
@@ -894,7 +894,7 @@ class SharedAppendFile(object):
     self.max_queue = max_queue
     self.lock_ext = lock_ext
     self.lock_timeout = lock_timeout
-    self._inQ = Queue(self.max_queue)
+    self._inQ = IterableQueue(self.max_queue, name="%s._inQ" % (self,))
     self._outQ = IterableQueue(self.max_queue, name="%s._outQ" % (self,))
     self._open()
 
