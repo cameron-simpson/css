@@ -117,18 +117,19 @@ class Backend_CSVFile(Backend):
     lastrow = None
     while self.csv is not None:
       X("_monitor: while loop top")
-      old_state = self.csv.filestate
-      if old_state is not None:
-        new_state = FileState(self.pathname)
-        if not new_state.samefile(old_state):
-          X("NEW FILE %r", self.pathname)
-          # a new CSV file is there; assume rewritten entirely
-          # reconnect and reload
-          with self._lock:
-            self._close_csv()
-            self._open_csv()
-          self.nodedb._scrub()
-      X("_monitor: while loop top")
+      csv = self.csv
+      if csv is not None:
+        old_state = csv.filestate
+        if old_state is not None:
+          new_state = FileState(self.pathname)
+          if not new_state.samefile(old_state):
+            X("NEW FILE %r", self.pathname)
+            # a new CSV file is there; assume rewritten entirely
+            # reconnect and reload
+            with self._lock:
+              self._close_csv()
+              self._open_csv()
+            self.nodedb._scrub()
       csv = self.csv
       if csv is not None:
         for row in csv.foreign_rows(to_eof=True):
@@ -154,6 +155,7 @@ class Backend_CSVFile(Backend):
       write_csv_file(fp, self.nodedb.nodedata())
 
 if __name__ == '__main__':
+  import time
   from cs.logutils import setup_logging
   setup_logging()
   from . import NodeDBFromURL
@@ -162,6 +164,7 @@ if __name__ == '__main__':
   print(N)
   N.A=1
   print(N)
+  time.sleep(2)
   NDB.close()
   sys.exit(0)
   import cs.nodedb.csvdb_tests
