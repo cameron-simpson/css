@@ -91,18 +91,15 @@ class Backend_CSVFile(Backend):
     '''
     self.csv = SharedCSVFile(self.pathname, eof_markers=True, readonly=self.readonly)
 
-  def _close(self):
-    ''' Detach from the shared CSV file.
-    '''
-    self.csv.close()
-    self.csv = None
-
   def close(self):
     ''' Final shutdown: stop monitor thread, detach from CSV file.
     '''
+    X("%s.close: close SharedCSVFile %s...", self, self.csv)
+    self.csv.close()
+    X("%s.close: set .running=False, join monitor thread", self)
     self.running = False
     self._monitor_thread.join()
-    self._close()
+    X("%s.close: COMPLETE", self)
 
   def _update(self, csvrow):
     self.csv.put(csvrow)
