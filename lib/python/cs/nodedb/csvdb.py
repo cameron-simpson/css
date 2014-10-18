@@ -106,6 +106,8 @@ class Backend_CSVFile(Backend):
     X("%s.close: COMPLETE", self)
 
   def _update(self, csvrow):
+    if not isinstance(csvrow, CSVRow):
+      raise TypeError("csvrow=%r" % (csvrow,))
     self.csv.put(csvrow)
 
   def _monitor(self):
