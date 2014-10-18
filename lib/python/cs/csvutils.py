@@ -14,8 +14,9 @@
 import csv
 import sys
 from itertools import takewhile
+from cs.debug import trace
 from cs.fileutils import SharedAppendFile
-from cs.logutils import warning
+from cs.logutils import warning, X
 from cs.lex import as_lines
 
 if sys.hexversion < 0x03000000:
