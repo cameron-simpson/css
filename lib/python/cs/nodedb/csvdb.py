@@ -99,11 +99,8 @@ class Backend_CSVFile(Backend):
   def close(self):
     ''' Final shutdown: stop monitor thread, detach from CSV file.
     '''
-    X("%s.close: close SharedCSVFile %s...", self, self.csv)
     self._close_csv()
-    X("%s.close: join monitor thread", self)
     self._monitor_thread.join()
-    X("%s.close: COMPLETE", self)
 
   def _update(self, csvrow):
     if not isinstance(csvrow, CSVRow):
@@ -148,7 +145,6 @@ class Backend_CSVFile(Backend):
   def rewrite(self):
     ''' Force a complete rewrite of the CSV file.
     '''
-    trace("rewrite(%s)", self.pathname)
     if self.readonly:
       error("%s: readonly: rewrite not done", self)
       return
