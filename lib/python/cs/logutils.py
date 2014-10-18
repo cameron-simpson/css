@@ -191,7 +191,12 @@ def nl(msg, *args, **kw):
       msg = "%s[%r]" % (msg, args)
   file.write(msg)
   file.write("\n")
-  file.flush()
+  try:
+    flush = file.flush
+  except AttributeError:
+    pass
+  else:
+    flush()
 
 def logTo(filename, logger=None, mode='a', encoding=None, delay=False, format=None):
   ''' Log to the specified filename.
