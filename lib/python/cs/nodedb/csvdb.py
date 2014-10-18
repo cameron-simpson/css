@@ -10,6 +10,7 @@ import os
 import os.path
 import sys
 import datetime
+import time
 from shutil import copyfile
 from threading import Thread, Lock
 from cs.debug import trace
@@ -114,14 +115,14 @@ class Backend_CSVFile(Backend):
     fromtext = self.nodedb.fromtext
     lastrow = None
     while self.csv is not None:
-      X("_monitor: while loop top")
       csv = self.csv
-      if csv is not None:
+      if csv is None:
+        pass
+      else:
         old_state = csv.filestate
         if old_state is not None:
           new_state = FileState(self.pathname)
           if not new_state.samefile(old_state):
-            X("NEW FILE %r", self.pathname)
             # a new CSV file is there; assume rewritten entirely
             # reconnect and reload
             with self._lock:
@@ -129,7 +130,9 @@ class Backend_CSVFile(Backend):
               self._open_csv()
             self.nodedb._scrub()
       csv = self.csv
-      if csv is not None:
+      if csv is None:
+        pass
+      else:
         for row in csv.foreign_rows(to_eof=True):
           row = resolve_csv_row(row, lastrow)
           t, name, attr, value = row
@@ -139,8 +142,6 @@ class Backend_CSVFile(Backend):
       if first:
         first = False
         self._loaded.release()
-      X("_monitor: while loop bottom")
-    X("_monitor: while loop bottom")
 
   def rewrite(self):
     ''' Force a complete rewrite of the CSV file.
