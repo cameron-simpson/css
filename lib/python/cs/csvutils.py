@@ -13,7 +13,11 @@
 
 import csv
 import sys
-from cs.io import CatchupLines
+from itertools import takewhile
+from cs.debug import trace
+from cs.fileutils import SharedAppendFile
+from cs.logutils import warning, X
+from cs.lex import as_lines
 
 if sys.hexversion < 0x03000000:
 
@@ -54,28 +58,38 @@ else:
   def csv_writerow(csvw, row, encoding='utf-8'):
     return csvw.writerow(row)
 
-class CatchUp(object):
-  ''' A CSV layer to cs.io.CatchupLines.
-      It is iterable, yields CSV data rows.
-      At the end of iteration the .partial attribute contains any
-      incomplete line.
-      It is reusable; another iteration will commence with that
-      partial line.
-  '''
+class SharedCSVFile(SharedAppendFile):
 
-  def __init__(self, fp, partial=''):
-    ''' Initialise the CatchUp with an open file `fp` and optional
-        partial line `partial`.
+  def __init__(self, pathname, transcribe_update=None, **kw):
+    if 'binary' in kw:
+      raise ValueError('may not specify binary=')
+    if transcribe_update is None:
+      transcribe_update = self._transcribe_update
+    self._csv_partials = []
+    SharedAppendFile.__init__(self, pathname,
+                              binary=False, transcribe_update=transcribe_update,
+                              **kw)
+
+  def _transcribe_update(self, fp, item):
+    ''' Transcribe an update `item` to the supplied file `fp`.
+        This the default function passed as SharedAppendFile's transcribe_update parameter.
     '''
-    self.fp = fp
-    self.partial = partial
+    # sanity check: we should only be writing between foreign updates
+    # and foreign updates should always be complete lines
+    if len(self._csv_partials):
+      warning("%s._transcribe_update while non-empty partials[]: %r",
+              self, self._csv_partials)
+    csv_writerow(csv.writer(fp), item)
 
-  def __iter__(self):
-    self.lines = CatchupLines(self.fp, self.partial)
-    for row in csv_reader(self.lines):
+  def foreign_rows(self, to_eof=False):
+    ''' Generator yielding update rows from other writers.
+        `to_eof`: stop when the EOF marker is seen; requires self.eof_markers to be true.
+    '''
+    if to_eof:
+      if not self.eof_markers:
+        raise ValueError("to_eof forbidden if not self.eof_markers")
+      chunks = takewhile(lambda x: len(x) > 0, self._outQ)
+    else:
+      chunks = self._outQ
+    for row in csv_reader(as_lines(chunks, self._csv_partials)):
       yield row
-    self.partial = self.lines.partial
-
-  def rewind(self):
-    self.fp.seek(0, os.SEEK_SET)
-    self.partial = ''

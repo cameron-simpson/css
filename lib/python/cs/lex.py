@@ -405,6 +405,28 @@ def parseUC_sAttr(attr):
     return attr, False
   return None, False
 
+def as_lines(chunks, partials=None):
+  ''' Generator yielding complete lines from arbitrary pieces text from the iterable `chunks`.
+      After completion, any remaining newline-free chunks remain
+      in the partials list; this will be unavailable to the caller
+      unless the list is presupplied.
+  '''
+  if partials is None:
+    partials = []
+  if any( [ '\n' in p for p in partials ] ):
+    raise ValueError("newline in partials: %r", partials)
+  for chunk in chunks:
+    pos = 0
+    nl_pos = chunk.find('\n', pos)
+    while nl_pos >= pos:
+      partials.append(chunk[pos:nl_pos+1])
+      yield ''.join(partials)
+      partials[:] = ()
+      pos = nl_pos + 1
+      nl_pos = chunk.find('\n', pos)
+    if pos < len(chunk):
+      partials.append(chunk[pos:])
+
 if __name__ == '__main__':
   import cs.lex_tests
   cs.lex_tests.selftest(sys.argv)
