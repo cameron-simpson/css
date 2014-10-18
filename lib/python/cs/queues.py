@@ -89,6 +89,14 @@ class _QueueIterator(NestingOpenCloseMixin):
 
   next = __next__
 
+  def _get(self):
+    ''' Calls the inner queue's .get via .__next__; can break other users' iterators.
+    '''
+    try:
+      return next(self)
+    except StopIteration as e:
+      raise Queue_Empty("got StopIteration from %s" % (self,))
+
   def empty(self):
     return self._item_count == 0
 
