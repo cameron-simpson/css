@@ -230,7 +230,6 @@ def main(argv, stdin=None):
               badopts = True
             else:
               edit_group(MDB, group)
-              MDB.rewrite()
         elif op == 'update-domain':
           if not len(argv):
             error("missing @old-domain")
@@ -250,7 +249,6 @@ def main(argv, stdin=None):
               badopts = True
           if not badopts:
             update_domain(MDB, old_domain, new_domain, argv)
-            MDB.rewrite()
         else:
           error("unsupported op")
           badopts = True
@@ -504,6 +502,7 @@ class _MailDB(NodeDB):
   def rewrite(self):
     ''' Force a complete rewrite of the CSV file.
     '''
+    raise NotImplementedError("needs recode")
     obackend = self.backend
     self.backend = None
     self.scrub()
