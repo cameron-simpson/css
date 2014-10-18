@@ -20,6 +20,7 @@ from tempfile import TemporaryFile, NamedTemporaryFile
 from threading import RLock, Thread
 import time
 import unittest
+from cs.debug import trace
 from cs.env import envsub
 from cs.lex import as_lines
 from cs.logutils import error, warning, Pfx, D, X
@@ -132,7 +133,6 @@ def rewrite_cmgr(pathname,
       `empty_ok`: do not consider empty output an error.
       `overwrite_anyway`: do not update the original if the new data are identical.
   '''
-  X("rewrite_cmgr(%s)...", pathname)
   if backup_ext is None:
     backuppath = None
   else:
@@ -954,7 +954,7 @@ class SharedAppendFile(object):
         self._outQ.put(chunk)
         count += 1
     if force_eof_marker or (count > 0 and self.eof_markers):
-      # write and EOF marker if we gathered any data (or if force_eof_marker)
+      # write an EOF marker if we gathered any data (or if force_eof_marker)
       self._outQ.put(b'' if self.binary else '')
     return count
 
@@ -965,7 +965,7 @@ class SharedAppendFile(object):
     '''
     with Pfx("%s._monitor", self):
       first = True
-      while not self._inQ.closed and not self._inQ.empty():
+      while not self._inQ.closed or not self._inQ.empty():
         # catch up
         # we force an EOF marker the first time
         # so that external users can read the whole data file initially
@@ -988,7 +988,7 @@ class SharedAppendFile(object):
             if pos != self.fp.tell():
               warning("update: pos after catch up=%r, pos after SEEK_END=%r", pos, self.fp.tell())
             while not self._inQ.empty():
-              item = self._inQ.get()
+              item = self._inQ._get()
               self.transcribe_update(self.fp, item)
             self.fp.flush()
         # clear flag for next pass
