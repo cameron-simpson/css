@@ -192,7 +192,7 @@ class _AttrList(list):
 
   def _scrub_backend(self):
     N = self.node
-    self.backend.setAttr(N.type, N.name, self.attr, ())
+    self.backend.delAttr(N.type, N.name, self.attr)
 
   def extend(self, values):
     ''' Extend this attribute, updating both the local and backend data stores.
