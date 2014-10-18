@@ -22,7 +22,10 @@ class _QueueIterator(NestingOpenCloseMixin):
       It does not offer the .get or .get_nowait methods.
   '''
 
-  sentinel = object()
+  class _QueueIterator_Sentinel(object):
+    pass
+
+  sentinel = _QueueIterator_Sentinel()
 
   def __init__(self, q, name=None):
     if name is None:
