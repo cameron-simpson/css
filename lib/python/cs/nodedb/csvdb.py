@@ -106,7 +106,10 @@ class Backend_CSVFile(Backend):
   def _update(self, csvrow):
     if not isinstance(csvrow, CSVRow):
       raise TypeError("csvrow=%r" % (csvrow,))
-    self.csv.put(csvrow)
+    if self.readonly:
+      warning("%s: readonly, discarding: %s", self.pathname, csvrow)
+    else:
+      self.csv.put(csvrow)
 
   def _monitor(self):
     ''' Monitor loop: collect updates from the backend and apply to the NodeDB.
