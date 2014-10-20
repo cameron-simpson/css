@@ -79,7 +79,10 @@ class SharedCSVFile(SharedAppendFile):
     if len(self._csv_partials):
       warning("%s._transcribe_update while non-empty partials[]: %r",
               self, self._csv_partials)
-    csv_writerow(csv.writer(fp), item)
+    try:
+      csv_writerow(csv.writer(fp), item)
+    except IOError as e:
+      warning("%s: IOError %s: discarding %s", sys.argv[0], e, row)
 
   def foreign_rows(self, to_eof=False):
     ''' Generator yielding update rows from other writers.
