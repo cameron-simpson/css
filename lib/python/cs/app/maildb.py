@@ -17,7 +17,7 @@ from cs.mailutils import ismaildir, message_addresses, Message
 from cs.nodedb import NodeDB, Node, NodeDBFromURL
 from cs.lex import get_identifier
 import cs.sh
-from cs.threads import locked_property
+from cs.threads import locked, locked_property
 from cs.py3 import StringTypes, ustr
 
 def main(argv, stdin=None):
@@ -610,27 +610,32 @@ class _MailDB(NodeDB):
     '''
     return self.address_groups.set_default(group_name, set())
 
-  @locked_property
+  @property
+  @locked
   def address_groups(self):
     ''' Compute the address_group sets, a mapping of GROUP names to a
         set of A.name.lower().
         Return the mapping.
     '''
-    try:
-      agroups = { 'all': set() }
-      all = agroups['all']
-      for A in self.ADDRESSes:
-        coreaddr = A.name
-        if coreaddr != coreaddr.lower():
-          warning('ADDRESS %r does not have a lowercase .name attribute: %s', A, A.name)
-        for group_name in A.GROUPs:
-          agroup = agroups.setdefault(group_name, set())
-          agroup.add(coreaddr)
-          all.add(coreaddr)
-      return agroups
-    except AttributeError as e:
-      D("address_groups(): e = %r", e)
-      raise ValueError("disaster")
+    if ( self._address_groups is None
+      or self._address_groups__update_count != self.backend.update_count
+       ):
+      try:
+        agroups = { 'all': set() }
+        all = agroups['all']
+        for A in self.ADDRESSes:
+          coreaddr = A.name
+          if coreaddr != coreaddr.lower():
+            warning('ADDRESS %r does not have a lowercase .name attribute: %s', A, A.name)
+          for group_name in A.GROUPs:
+            agroup = agroups.setdefault(group_name, set())
+            agroup.add(coreaddr)
+            all.add(coreaddr)
+        self._address_groups = agroups
+      except AttributeError as e:
+        D("address_groups(): e = %r", e)
+        raise ValueError("disaster")
+    return self._address_groups
 
   @locked_property
   def subgroups_map(self):
