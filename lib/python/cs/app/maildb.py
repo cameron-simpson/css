@@ -610,32 +610,28 @@ class _MailDB(NodeDB):
     '''
     return self.address_groups.set_default(group_name, set())
 
-  @property
-  @locked
+  @NodeDB.derived_property
   def address_groups(self):
     ''' Compute the address_group sets, a mapping of GROUP names to a
         set of A.name.lower().
         Return the mapping.
     '''
-    if ( self._address_groups is None
-      or self._address_groups__update_count != self.backend.update_count
-       ):
-      try:
-        agroups = { 'all': set() }
-        all = agroups['all']
-        for A in self.ADDRESSes:
-          coreaddr = A.name
-          if coreaddr != coreaddr.lower():
-            warning('ADDRESS %r does not have a lowercase .name attribute: %s', A, A.name)
-          for group_name in A.GROUPs:
-            agroup = agroups.setdefault(group_name, set())
-            agroup.add(coreaddr)
-            all.add(coreaddr)
-        self._address_groups = agroups
-      except AttributeError as e:
-        D("address_groups(): e = %r", e)
-        raise ValueError("disaster")
-    return self._address_groups
+    X("RECOMPUTE ADDRESS_GROUPS")
+    try:
+      agroups = { 'all': set() }
+      all = agroups['all']
+      for A in self.ADDRESSes:
+        coreaddr = A.name
+        if coreaddr != coreaddr.lower():
+          warning('ADDRESS %r does not have a lowercase .name attribute: %s', A, A.name)
+        for group_name in A.GROUPs:
+          agroup = agroups.setdefault(group_name, set())
+          agroup.add(coreaddr)
+          all.add(coreaddr)
+    except AttributeError as e:
+      D("address_groups(): e = %r", e)
+      raise ValueError("disaster")
+    return agroups
 
   @locked_property
   def subgroups_map(self):
