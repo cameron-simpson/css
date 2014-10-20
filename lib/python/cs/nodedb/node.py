@@ -16,7 +16,7 @@ from threading import RLock
 from threading import Thread
 from collections import namedtuple
 from cs.debug import RLock, trace
-from cs.excutils import unimplemented
+from cs.excutils import unimplemented, transmute
 from cs.obj import O
 from cs.lex import str1, parseUC_sAttr
 from cs.logutils import Pfx, D, error, warning, info, debug, exception, X
