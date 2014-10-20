@@ -715,6 +715,37 @@ class NodeDB(dict, O):
   def __str__(self):
     return "NodeDB(readonly=%s, backend=%s)" % (self.readonly, self.backend)
 
+  @staticmethod
+  def derived_property(func, lock_name='_lock', prop_name=None, unset_object=None):
+    if prop_name is None:
+      prop_name = '_' + func.__name__
+    update_prop_name = prop_name + '__update_count'
+    @transmute(AttributeError)
+    def getprop(self):
+      ''' Attempt lockless fetch of property first.
+          Use lock if property is unset and up to date.
+      '''
+      p = getattr(self, prop_name, unset_object)
+      p_count = getattr(self, update_prop_name, 0)
+      if p is unset_object or p_count != self.backend.update_count:
+        with getattr(self, lock_name):
+          # repoll value
+          p = getattr(self, prop_name, unset_object)
+          if p is unset_object or p_count != self.backend.update_count:
+            X("COMPUTE .%s...", prop_name)
+            p_count = self.backend.update_count
+            p = func(self)
+            setattr(self, prop_name, p)
+            setattr(self, update_prop_name, p_count)
+          else:
+            ##debug("inside lock, already computed up to date %s", prop_name)
+            pass
+      else:
+        ##debug("outside lock, already computed up to date %s", prop_name)
+        pass
+      return p
+    return property(getprop)
+
   @locked
   def close(self):
     ''' Close this NodeDB.
