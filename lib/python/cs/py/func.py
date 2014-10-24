@@ -72,3 +72,8 @@ def derived_property(func, original_revision_name='_revision', lock_name='_lock'
       pass
     return p
   return property(property_value)
+
+def derived_from(property_name):
+  ''' A property which must be recomputed if the revision of another property exceeds the snapshot revision.
+  '''
+  return partial(derived_property, original_revision_name=property_name + '__revision')
