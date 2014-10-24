@@ -648,7 +648,7 @@ class _MailDB(NodeDB):
     '''
     return self.subgroups_map.get(group_name, [])
 
-  @locked_property
+  @derived_property
   def abbreviations(self):
     ''' Compute a mapping of abbreviations to their source address.
     '''
