@@ -130,7 +130,6 @@ class Backend(O):
         N[attr]._set_values_local( (value,) )
       else:
         N.get(attr)._extend_local( (value,) )
-    self._update_count += 1
 
 class TestAll(unittest.TestCase):
 
