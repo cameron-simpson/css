@@ -17,7 +17,8 @@ from cs.mailutils import ismaildir, message_addresses, Message
 from cs.nodedb import NodeDB, Node, NodeDBFromURL
 from cs.lex import get_identifier
 import cs.sh
-from cs.threads import locked_property
+from cs.threads import locked, locked_property
+from cs.py.func import derived_property
 from cs.py3 import StringTypes, ustr
 
 def main(argv, stdin=None):
@@ -610,12 +611,13 @@ class _MailDB(NodeDB):
     '''
     return self.address_groups.set_default(group_name, set())
 
-  @locked_property
+  @derived_property
   def address_groups(self):
     ''' Compute the address_group sets, a mapping of GROUP names to a
         set of A.name.lower().
         Return the mapping.
     '''
+    X("RECOMPUTE ADDRESS_GROUPS")
     try:
       agroups = { 'all': set() }
       all = agroups['all']
@@ -627,10 +629,10 @@ class _MailDB(NodeDB):
           agroup = agroups.setdefault(group_name, set())
           agroup.add(coreaddr)
           all.add(coreaddr)
-      return agroups
     except AttributeError as e:
       D("address_groups(): e = %r", e)
       raise ValueError("disaster")
+    return agroups
 
   @locked_property
   def subgroups_map(self):
@@ -646,7 +648,7 @@ class _MailDB(NodeDB):
     '''
     return self.subgroups_map.get(group_name, [])
 
-  @locked_property
+  @derived_property
   def abbreviations(self):
     ''' Compute a mapping of abbreviations to their source address.
     '''

@@ -16,12 +16,13 @@ from threading import RLock
 from threading import Thread
 from collections import namedtuple
 from cs.debug import RLock, trace
-from cs.excutils import unimplemented
+from cs.excutils import unimplemented, transmute
 from cs.obj import O
 from cs.lex import str1, parseUC_sAttr
 from cs.logutils import Pfx, D, error, warning, info, debug, exception, X
 from cs.seq import the, get0
 from cs.threads import locked
+from cs.py.func import derived_property
 from cs.py3 import StringTypes, unicode
 from .export import edit_csv_wide, export_csv_wide
 
@@ -188,6 +189,7 @@ class _AttrList(list):
   def _scrub_local(self):
     # remove all elements from this attribute
     self[:] = ()
+    self.nodedb._revision += 1
   _scrub = _scrub_local
 
   def _scrub_backend(self):
@@ -211,7 +213,7 @@ class _AttrList(list):
     if len(values) > 0:
       list.extend(self, values)
       self.__additemrefs(values)
-      list.extend(self, values)
+      self.nodedb._revision += 1
 
   def _extend_backend(self, values):
     ''' Record the extension in the backend.
@@ -247,29 +249,34 @@ class _AttrList(list):
   def insert(self, index, value):
     N = self.node
     value = list.insert(self, index, value)
+    self.nodedb._revision += 1
     self.__additemrefs((value,))
     self._save()
     return value
 
   def pop(self, index=-1):
     value = list.pop(self, index)
+    self.nodedb._revision += 1
     self.__delitemrefs((value,))
     self._save()
     return value
 
   def remove(self, value):
     list.remove(self, value)
+    self.nodedb._revision += 1
     self._save()
     self.__delitemrefs(value)
 
   def reverse(self):
     if len(self) > 0:
       list.reverse(self, *args)
+      self.nodedb._revision += 1
       self._save()
 
   def sort(self, *args):
     if len(self) > 0:
       list.sort(self, *args)
+      self.nodedb._revision += 1
       self._save()
 
   def __getattr__(self, attr):
@@ -482,7 +489,8 @@ class Node(dict):
       if default is None:
         default = ()
       values = _AttrList(self, k, _items=default)
-      dict.__setitem__(self, k, values) # ensure this gets used later
+      dict.__setitem__(self, k, values) # ensure that this is what gets used later
+      self.nodedb._revision += 1
     return values
 
   # __getitem__ goes directly to the dict implementation
@@ -512,6 +520,7 @@ class Node(dict):
       raise KeyError(repr(item))
     dict.__setitem__(self, k, ())
     dict.__delitem__(self, k)
+    self.nodedb._revision += 1
 
   def __getattr__(self, attr):
     ''' Support .ATTR[s] and .inTYPE.
@@ -707,6 +716,7 @@ class NodeDB(dict, O):
     self.__attr_type_registry = {}
     self.__attr_scheme_registry = {}
     self.__nodesByType = {}
+    self._revision = 0
     self._lock = RLock()
     self.backend = backend
     backend.nodedb = self

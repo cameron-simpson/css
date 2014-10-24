@@ -40,6 +40,7 @@ class Backend(O):
     self.raw = raw
     self.closed = False
     self._lock = RLock()     # general mutex
+    self._update_count = 0
 
   def __str__(self):
     return "%s(readonly=%s, monitor=%s, raw=%s)" \
@@ -67,6 +68,12 @@ class Backend(O):
           .value        The value to store, already textencoded.
     '''
     raise NotImplementedError("method to update the backend from a CSVRow with difference information")
+
+  @property
+  def update_count(self):
+    ''' Return the update count, an monotinoic increasing counter for deciding whether a derived data structure is out of date.
+    '''
+    return self._update_count
 
   @locked
   def setAttr(self, t, name, attr, values):
