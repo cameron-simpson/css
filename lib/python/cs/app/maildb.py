@@ -18,6 +18,7 @@ from cs.nodedb import NodeDB, Node, NodeDBFromURL
 from cs.lex import get_identifier
 import cs.sh
 from cs.threads import locked, locked_property
+from cs.py.func import derived_property
 from cs.py3 import StringTypes, ustr
 
 def main(argv, stdin=None):
@@ -610,7 +611,7 @@ class _MailDB(NodeDB):
     '''
     return self.address_groups.set_default(group_name, set())
 
-  @NodeDB.derived_property
+  @derived_property
   def address_groups(self):
     ''' Compute the address_group sets, a mapping of GROUP names to a
         set of A.name.lower().
