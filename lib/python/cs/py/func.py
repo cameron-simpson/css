@@ -33,3 +33,40 @@ def callmethod_if(o, method, default=None, a=None, kw=None):
   if kw is None:
     kw = {}
   return m(*a, **kw)
+
+def derived_property(func, original_revision_name='_revision', lock_name='_lock', property_name=None, unset_object=None):
+  ''' A property which must be recomputed if the reference revision exceeds the snapshot revision.
+  '''
+  if property_name is None:
+    property_name = '_' + func.__name__
+  # the property used to track the reference revision
+  property_revision_name = property_name + '__revision'
+
+  @transmute(AttributeError)
+  def property_value(self):
+    ''' Attempt lockless fetch of property first.
+        Use lock if property is unset and up to date.
+    '''
+    # poll outside lock
+    p = getattr(self, property_name, unset_object)
+    p_revision = getattr(self, property_revision_name, 0)
+    o_revision = getattr(self, original_revision_name)
+    if p is unset_object or p_revision < o_revision:
+      with getattr(self, lock_name):
+        # repoll value inside lock
+        p = getattr(self, property_name, unset_object)
+        p_revision = getattr(self, property_revision_name, 0)
+        o_revision = getattr(self, original_revision_name)
+        if p is unset_object or p_revision < o_revision:
+          X("COMPUTE .%s...", property_name)
+          p = func(self)
+          setattr(self, property_name, p)
+          setattr(self, property_revision_name, p_revision)
+        else:
+          ##debug("inside lock, already computed up to date %s", property_name)
+          pass
+    else:
+      ##debug("outside lock, already computed up to date %s", property_name)
+      pass
+    return p
+  return property(property_value)
