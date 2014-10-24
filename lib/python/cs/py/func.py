@@ -43,6 +43,7 @@ def derived_property(func, original_revision_name='_revision', lock_name='_lock'
   property_revision_name = property_name + '__revision'
 
   from cs.excutils import transmute
+  from cs.logutils import X
 
   @transmute(AttributeError)
   def property_value(self):
@@ -60,10 +61,11 @@ def derived_property(func, original_revision_name='_revision', lock_name='_lock'
         p_revision = getattr(self, property_revision_name, 0)
         o_revision = getattr(self, original_revision_name)
         if p is unset_object or p_revision < o_revision:
-          X("COMPUTE .%s...", property_name)
+          X("COMPUTE .%s... [p_revision=%s, o_revision=%s]", property_name, p_revision, o_revision)
           p = func(self)
           setattr(self, property_name, p)
-          setattr(self, property_revision_name, p_revision)
+          ##X("COMPUTE .%s: set .%s to %s", self, property_revision_name, o_revision)
+          setattr(self, property_revision_name, o_revision)
         else:
           ##debug("inside lock, already computed up to date %s", property_name)
           pass
