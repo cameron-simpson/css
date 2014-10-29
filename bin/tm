@@ -9,7 +9,9 @@ set -ue
 cmd=$(basename "$0")
 usage="Usage: $cmd [options...] op [args...]
   list-prefix-sessions prefix
-  pick-new-prefix-session prefix"
+    List suffices of sessions startwith with \"prefix\".
+  pick-new-prefix-session prefix
+    Allocate a new session name starting with \"prefix\"."
 
 badopts=
 
