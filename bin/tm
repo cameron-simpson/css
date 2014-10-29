@@ -1,0 +1,102 @@
+#!/bin/sh
+#
+# Tmux convenience script, performing common higher level tasks.
+#   - Cameron Simpson <cs@zip.com.au> 30oct2014
+#
+
+set -ue
+
+cmd=$(basename "$0")
+usage="Usage: $cmd [options...] op [args...]
+  list-prefix-sessions prefix
+  pick-new-prefix-session prefix"
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing op" >&2
+  badopts=1
+else
+  op=$1
+  shift
+  case "$op" in
+    list-prefix-sessions)
+      if [ $# = 0 ]
+      then
+        echo "$cmd: $op: missing prefix" >&2
+        badopts=1
+      else
+        session_prefix=$1
+        shift
+        case "$session_prefix" in
+          *[/*\\\[]*)
+            echo "$cmd: $op: invalid session prefix: $session_prefix" >&2
+            badopts=1
+            ;;
+        esac
+        if [ $# -gt 0 ]
+        then
+          echo "$cmd: $op: extra arguments after prefix: $*" >&2
+          badopts=1
+        fi
+      fi
+      ;;
+    pick-new-prefix-session)
+      if [ $# = 0 ]
+      then
+        echo "$cmd: $op: missing prefix" >&2
+        badopts=1
+      else
+        session_prefix=$1
+        shift
+        case "$session_prefix" in
+          *[/*\\\[]*)
+            echo "$cmd: $op: invalid session prefix: $session_prefix" >&2
+            badopts=1
+            ;;
+        esac
+        if [ $# -gt 0 ]
+        then
+          echo "$cmd: $op: extra arguments after prefix: $*" >&2
+          badopts=1
+        fi
+      fi
+      ;;
+    *)  echo "$cmd: unrecognised op: $op" >&2; badopts=1 ;;
+  esac
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+case "$op" in
+  list-prefix-sessions)
+        tmux list-sessions -F '#{session_name}' \
+        | sed -n "s/^$session_prefix//p"
+        ;;
+  pick-new-prefix-session)
+        curmax=$(
+          ( "$0" list-prefix-sessions "$session_prefix" \
+            | grep "^[1-9][0-9]*$"
+            echo 0
+          ) \
+          | sort -nru \
+          | sed 1q
+        )
+        newmax=$(( curmax + 1 ))
+        echo "$session_prefix$newmax"
+        ;;
+  *)    echo "$cmd: $op: unimplemented" >&2
+        exit 1
+        ;;
+esac
