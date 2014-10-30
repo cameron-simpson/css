@@ -10,11 +10,13 @@ trace=
 [ -t 2 ] && trace=set-x
 
 cmd=$(basename "$0")
-usage="Usage: $cmd [options...] op [args...]
+usage="Usage: $cmd [options...] [op [args...]]
   UPPERCASE_NAME
     Join the session named \"UPPERCASE_NAME\", creating it if necessary.
   list-prefix-sessions prefix
     List suffices of sessions startwith with \"prefix\".
+  ls | list-sessions
+    List sessions. Default if no op supplied.
   pick-new-prefix-session prefix
     Allocate a new session name starting with \"prefix\"."
 
@@ -30,7 +32,7 @@ do
   shift
 done
 
-[ $# -gt 0 ] || exec $trace tmux list-sessions
+[ $# -gt 0 ] || set -- list-sessions
 
 op=$1
 shift
@@ -58,6 +60,8 @@ case "$op" in
         badopts=1
       fi
     fi
+    ;;
+  ls | list-sessions)
     ;;
   pick-new-prefix-session)
     if [ $# = 0 ]
@@ -89,6 +93,9 @@ case "$op" in
   list-prefix-sessions)
         $trace tmux list-sessions -F '#{session_name}' \
         | sed -n "s/^$session_prefix//p"
+        ;;
+  ls | list-sessions)
+        $trace tmux "$op" ${1+"$@"}
         ;;
   pick-new-prefix-session)
         curmax=$(
