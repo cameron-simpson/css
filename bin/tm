@@ -6,8 +6,13 @@
 
 set -ue
 
+trace=
+[ -t 2 ] && trace=set-x
+
 cmd=$(basename "$0")
 usage="Usage: $cmd [options...] op [args...]
+  UPPERCASE_NAME
+    Join the session named \"UPPERCASE_NAME\", creating it if necessary.
   list-prefix-sessions prefix
     List suffices of sessions startwith with \"prefix\".
   pick-new-prefix-session prefix
@@ -25,65 +30,64 @@ do
   shift
 done
 
-if [ $# = 0 ]
-then
-  echo "$cmd: missing op" >&2
-  badopts=1
-else
-  op=$1
-  shift
-  case "$op" in
-    list-prefix-sessions)
-      if [ $# = 0 ]
-      then
-        echo "$cmd: $op: missing prefix" >&2
-        badopts=1
-      else
-        session_prefix=$1
-        shift
-        case "$session_prefix" in
-          *[/*\\\[]*)
-            echo "$cmd: $op: invalid session prefix: $session_prefix" >&2
-            badopts=1
-            ;;
-        esac
-        if [ $# -gt 0 ]
-        then
-          echo "$cmd: $op: extra arguments after prefix: $*" >&2
+[ $# -gt 0 ] || exec $trace tmux list-sessions
+
+op=$1
+shift
+case "$op" in
+  [A-Z]*)
+    $trace tmux new-session -A -s "$op"
+    ;;
+  list-prefix-sessions)
+    if [ $# = 0 ]
+    then
+      echo "$cmd: $op: missing prefix" >&2
+      badopts=1
+    else
+      session_prefix=$1
+      shift
+      case "$session_prefix" in
+        *[/*\\\[]*)
+          echo "$cmd: $op: invalid session prefix: $session_prefix" >&2
           badopts=1
-        fi
-      fi
-      ;;
-    pick-new-prefix-session)
-      if [ $# = 0 ]
+          ;;
+      esac
+      if [ $# -gt 0 ]
       then
-        echo "$cmd: $op: missing prefix" >&2
+        echo "$cmd: $op: extra arguments after prefix: $*" >&2
         badopts=1
-      else
-        session_prefix=$1
-        shift
-        case "$session_prefix" in
-          *[/*\\\[]*)
-            echo "$cmd: $op: invalid session prefix: $session_prefix" >&2
-            badopts=1
-            ;;
-        esac
-        if [ $# -gt 0 ]
-        then
-          echo "$cmd: $op: extra arguments after prefix: $*" >&2
-          badopts=1
-        fi
       fi
-      ;;
-    *)  echo "$cmd: unrecognised op: $op" >&2; badopts=1 ;;
-  esac
-fi
+    fi
+    ;;
+  pick-new-prefix-session)
+    if [ $# = 0 ]
+    then
+      echo "$cmd: $op: missing prefix" >&2
+      badopts=1
+    else
+      session_prefix=$1
+      shift
+      case "$session_prefix" in
+        *[/*\\\[]*)
+          echo "$cmd: $op: invalid session prefix: $session_prefix" >&2
+          badopts=1
+          ;;
+      esac
+      if [ $# -gt 0 ]
+      then
+        echo "$cmd: $op: extra arguments after prefix: $*" >&2
+        badopts=1
+      fi
+    fi
+    ;;
+  *)  echo "$cmd: unrecognised op: $op" >&2; badopts=1 ;;
+esac
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 case "$op" in
   list-prefix-sessions)
-        tmux list-sessions -F '#{session_name}' \
+        $trace tmux list-sessions -F '#{session_name}' \
         | sed -n "s/^$session_prefix//p"
         ;;
   pick-new-prefix-session)
