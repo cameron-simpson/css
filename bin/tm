@@ -6,6 +6,8 @@
 
 set -ue
 
+: ${TMUX:=''}
+
 trace=
 [ -t 2 ] && trace=set-x
 
@@ -38,7 +40,7 @@ op=$1
 shift
 case "$op" in
   [A-Z]*)
-    $trace tmux new-session -A -s "$op"
+    session_name=$op
     ;;
   list-prefix-sessions)
     if [ $# = 0 ]
@@ -90,6 +92,13 @@ esac
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 case "$op" in
+  [A-Z]*)
+    $trace tmux has-session -t "$session_name" || TMUX= $trace tmux new-session -d -s "$session_name"
+    if [ -n "$TMUX" ]
+    then  $trace tmux switch-client -t "$session_name"
+    else  $trace tmux attach-session -t "$session_name"
+    fi
+    ;;
   list-prefix-sessions)
         $trace tmux list-sessions -F '#{session_name}' \
         | sed -n "s/^$session_prefix//p"
