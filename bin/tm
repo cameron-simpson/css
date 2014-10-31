@@ -52,7 +52,7 @@ done
 op=$1
 shift
 case "$op" in
-  [_A-Z]*)
+  [1-9_A-Z]*)
     session_name=$op
     op=use-session
     if [ $# -gt 0 ]
@@ -188,6 +188,14 @@ case "$op" in
   use-session)
     # no tmux? use scr
     have_tmux || exec $trace scr "$session_name"
+    case "$session_name" in
+      [1-9]*)
+        session_name=$(
+          "$0" list-sessions -n -F '#{session_name}'\
+          | awk -v "session_number=$session_name" '$1 == session_number { print $2 }'
+        )
+        ;;
+    esac
     $trace tmux has-session -t "$session_name" || TMUX= $trace tmux new-session -d -s "$session_name"
     if [ -n "$TMUX" ]
     then  $trace tmux switch-client -t "$session_name"
