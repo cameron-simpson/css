@@ -7,6 +7,8 @@
 set -ue
 
 : ${TMUX:=''}
+: ${USER:=`id -ud`}
+: ${HOST:=`hostname`}
 
 trace=
 [ -t 2 ] && trace=set-x
