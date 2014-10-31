@@ -24,8 +24,9 @@ usage="Usage: $cmd [options...] [op [args...]]
     List sessions. Default if no op supplied.
   pick-new-prefix-session prefix
     Allocate a new session name starting with \"prefix\".
-  recite-function-@
-    Print the shell function definition for the \"@\" convenience function.
+  recite-function-remote
+    Print the shell function definition for the \"tm_remote\"
+    convenience function, normally aliased as \"@\".
   use-session session-name
     Join the session named \"session-name\", creating it if necessary."
 
@@ -100,7 +101,7 @@ case "$op" in
       fi
     fi
     ;;
-  recite-function-@)
+  recite-function-remote)
     if [ $# -gt 0 ]
     then
       echo "$cmd: $op: extra arguments: $*" >&2
@@ -149,10 +150,10 @@ case "$op" in
     newmax=$(( curmax + 1 ))
     echo "$session_prefix$newmax"
     ;;
-  recite-function-@)
+  recite-function-remote)
     echo '
-        # Usage: @ [host [session_name [command [args...]]]]
-        @(){
+        # Usage: @ [host [session_name]]
+        tm_remote(){
           : ${_tm_host:=}
           : ${_tm_session:=}
           _tm_src_prefix=_${USER}@${HOST}__
