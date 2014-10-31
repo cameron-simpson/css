@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 from __future__ import print_function
+import errno
 import os
 from os import geteuid, getegid
 import stat
@@ -9,7 +10,7 @@ from pwd import getpwuid, getpwnam
 from grp import getgrgid, getgrnam
 from stat import S_ISUID, S_ISGID
 from threading import RLock
-from cs.logutils import error, warning, X
+from cs.logutils import error, warning, debug, X, Pfx
 from cs.threads import locked
 
 DEFAULT_DIR_ACL = 'o:rwx-'
@@ -27,18 +28,18 @@ def username(uid):
   '''
   global user_map
   try:
-    user = user_map[uid]
+    username = user_map[uid]
   except KeyError:
     try:
-      user = getpwuid(uid)
+      pw = getpwuid(uid)
     except KeyError:
-      user = None
+      username = None
     else:
-      user = user.pw_name
-    user_map[uid] = user
-    if user not in user_map:
-      user_map[user] = uid
-  return user
+      username = pw.pw_name
+    user_map[uid] = username
+    if username not in user_map:
+      user_map[username] = uid
+  return username
 
 def userid(username):
   ''' Look up the user id associated with the supplied `username`.
@@ -49,11 +50,11 @@ def userid(username):
     uid = user_map[username]
   except KeyError:
     try:
-      uid = getpwnam(username)
+      pw = getpwnam(username)
     except KeyError:
       uid = None
     else:
-      uid = user.pw_uid
+      uid = pw.pw_uid
     user_map[username] = uid
     if uid not in user_map:
       user_map[uid] = username
@@ -65,18 +66,18 @@ def groupname(gid):
   '''
   global group_map
   try:
-    group = group_map[gid]
+    groupname = group_map[gid]
   except KeyError:
     try:
-      group = getpwuid(gid)
+      gr = getgrgid(gid)
     except KeyError:
-      group = None
+      groupname = None
     else:
-      group = group.pw_name
-    group_map[gid] = group
-    if group not in group_map:
-      group_map[group] = gid
-  return group
+      groupname = gr.gr_name
+    group_map[gid] = groupname
+    if groupname not in group_map:
+      group_map[groupname] = gid
+  return groupname
 
 def groupid(groupname):
   ''' Look up the group id associated with the supplied `groupname`.
@@ -87,14 +88,14 @@ def groupid(groupname):
     gid = group_map[groupname]
   except KeyError:
     try:
-      gid = getpwnam(groupname)
+      gr = getgrnam(groupname)
     except KeyError:
       gid = None
     else:
-      gid = group.pw_uid
+      gid = gr.gr_gid
     group_map[groupname] = gid
     if gid not in group_map:
-      group_map[gid] = group
+      group_map[gid] = groupname
   return gid
 
 Stat = namedtuple('Stat', 'st_mode st_ino st_dev st_nlink st_uid st_gid st_size st_atime st_mtime st_ctime')
@@ -161,7 +162,6 @@ class AC(object):
         mode |= 1
       else:
         warning("AC.unixmode: ignoring unsupported permission %r", a)
-    X("unixmode(%r) ==> %o", self.textencode(), mode)
     return mode
 
 class AC_Owner(AC):
@@ -361,18 +361,19 @@ class Meta(dict):
     self['m'] = when
 
   @property
+  def dflt_acl_text(self):
+    return DEFAULT_DIR_ACL if self.E.isdir else DEFAULT_FILE_ACL
+
+  @property
   @locked
   def acl(self):
     ''' Return the live list of AC instances, decoded at need.
     '''
     _acl = self._acl
     if _acl is None:
-      X("META.acl: self = %r", self)
       dflt_acl = DEFAULT_DIR_ACL if self.E.isdir else DEFAULT_FILE_ACL
       acl_text = self.get('a', dflt_acl)
-      X("META.acl_text: %r", acl_text)
       _acl = self._acl = decodeACL(acl_text)
-      X("META.acl => %r", _acl)
     return _acl
 
   @acl.setter
@@ -382,7 +383,6 @@ class Meta(dict):
     '''
     self['a'] = encodeACL(ac_L)
     self._acl = None
-    X("META: set ACL to %s", self['a'])
 
   @property
   def setuid(self):
@@ -429,7 +429,6 @@ class Meta(dict):
                  AC_Group( *permbits_to_allow_deny( (mode>>3)&7 ) ),
                  AC_Other( *permbits_to_allow_deny( mode&7 ) )
                ] + [ ac for ac in self.acl if ac.prefix not in ('o', 'g', '*') ]
-    X("META.chmod: meta=%s", self.textencode())
 
   def update(self, metatext):
     ''' Update the Meta fields from the supplied metatext.
@@ -441,8 +440,14 @@ class Meta(dict):
       try:
         k, v = metafield.split(':', 1)
       except ValueError:
-        error("ignoring bad metatext field: %r", metafield)
+        error("ignoring bad metatext field (no colon): %r", metafield)
         continue
+      if k in ('m',):
+        try:
+          v = float(v)
+        except ValueError:
+          warning("%s: non-float 'm': %r", self, v)
+          v = 0.0
       self[k] = v
 
   def update_from_stat(self, st):
@@ -462,10 +467,8 @@ class Meta(dict):
         keeping the permissions for the frontmost user and group.
     '''
     if self.E.isdir:
-      X("meta.unix_perms: %s: set S_IFDIR", self.E.name)
       perms = stat.S_IFDIR
     elif self.E.isfile:
-      X("meta.unix_perms: %s: set S_IFREG", self.E.name)
       perms = stat.S_IFREG
     else:
       warning("Meta.unix_perms: neither a dir nor a file")
@@ -489,7 +492,6 @@ class Meta(dict):
     gid = self.gid
     if gid is None:
       gid = NOGROUP
-    X("META.unix_perms: %d, %d, %o", uid, gid, perms)
     return uid, gid, perms
 
   def access(self, amode, user=None, group=None):
@@ -544,8 +546,46 @@ class Meta(dict):
     st_ino = -1
     st_dev = -1
     st_nlink = 1
-    st_size = self.E.size()
+    st_size = self.E.size
     st_atime = 0
     st_mtime = self.mtime
     st_ctime = 0
     return Stat(st_mode, st_ino, st_dev, st_nlink, st_uid, st_gid, st_size, st_atime, st_mtime, st_ctime)
+
+  def apply_posix(self, ospath):
+    ''' Apply this Meta to the POSIX OS object at `ospath`.
+    '''
+    with Pfx("Meta.apply_os(%r)", ospath):
+      st = os.lstat(ospath)
+      mst = self.stat()
+      if mst.st_uid == NOBODY or mst.st_uid == st.st_uid:
+        uid = -1
+      else:
+        uid = mst.st_uid
+      if mst.st_gid == NOGROUP or mst.st_gid == st.st_gid:
+        gid = -1
+      else:
+        gid = mst.st_gid
+      if uid != -1 or gid != -1:
+        with Pfx("chown(uid=%d,gid=%d)", uid, gid):
+          debug("chown(%r,%d,%d) from %d:%d", ospath, uid, gid, st.st_uid, st.st_gid)
+          try:
+            os.chown(ospath, uid, gid)
+          except OSError as e:
+            if e.errno == errno.EPERM:
+              warning("%s", e)
+            else:
+              raise
+      st_perms = st.st_mode & 0o7777
+      mst_perms = mst.st_mode & 0o7777
+      if st_perms != mst_perms:
+        with Pfx("chmod(0o%04o)", mst_perms):
+          debug("chmod(%r,0o%04o) from 0o%04o", ospath, mst_perms, st_perms)
+          os.chmod(ospath, mst_perms)
+      mst_mtime = mst.st_mtime
+      if mst_mtime > 0:
+        st_mtime = st.st_mtime
+        if mst_mtime != st_mtime:
+          with Pfx("chmod(0o%04o)", mst_perms):
+            debug("utime(%r,atime=%s,mtime=%s) from mtime=%s", ospath, st.st_atime, mst_mtime, st_mtime)
+            os.utime(ospath, (st.st_atime, mst_mtime))

@@ -193,10 +193,13 @@ class MailFiler(O):
     self._maildb_path = path
     self._maildb = None
 
-  @file_property
-  def maildb(self, path):
+  ##@file_property
+  ##def maildb(self, path):
+  @locked_property
+  def maildb(self):
+    path = self.maildb_path
     info("MailFiler: reload maildb %s", shortpath(path))
-    return MailDB(path, readonly=True)
+    return MailDB(path, readonly=False)
 
   @property
   @locked

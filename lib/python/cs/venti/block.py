@@ -3,16 +3,16 @@
 from __future__ import print_function
 import sys
 from threading import RLock
-from cs.logutils import D, debug, X
+from cs.logutils import D, debug, X, Pfx
 from cs.serialise import get_bs, put_bs
 from cs.threads import locked_property
 from cs.venti import defaults, totext
-from .hash import Hash_SHA1, HASH_SHA1_T, HASH_SIZE_SHA1, decode as hash_decode
+from .hash import decode as hash_decode
 
 F_BLOCK_INDIRECT = 0x01 # indirect block
 
 def decodeBlocks(bs, offset=0):
-  ''' Process a bytes from the supplied `offset` (default 0).
+  ''' Process the bytes `bs` from the supplied `offset` (default 0).
       Yield Blocks.
   '''
   while offset < len(bs):
@@ -25,7 +25,6 @@ def decodeBlock(bs, offset=0):
       Format is:
         BS(flags)
           0x01 indirect blockref
-          0x02 non-SHA1 hashcode
         BS(span)
         hash
   '''
@@ -96,16 +95,14 @@ class _Block(object):
         Format is:
           BS(flags)
             0x01 indirect block
-            0x02 has hash type (False ==> Hash_SHA1_T)
           BS(span)
-          hashcode.encode()     # may include hashlen prefix for some hash types
+          hashcode.encode()     # includes type and conceivably size
     '''
     flags = 0
     if self.indirect:
       flags |= F_BLOCK_INDIRECT
     hashcode = self.hashcode
     enc = put_bs(flags) + put_bs(self.span) + hashcode.encode()
-    assert len(enc) >= 22
     return enc
 
   @property
@@ -119,7 +116,7 @@ class _Block(object):
     ''' Return an iterator yielding (Block, start, len) tuples representing the leaf data covering the supplied span `start`:`end`.
         The iterator may end early if the span exceeds the Block data.
     '''
-    X("Block<%s>[len=%d].slices(start=%r, end=%r)...", self, len(self), start, end)
+    ##X("Block<%s>[len=%d].slices(start=%r, end=%r)...", self, len(self), start, end)
     if start is None:
       start = 0
     elif start < 0:
@@ -129,7 +126,7 @@ class _Block(object):
     elif end < start:
       raise ValueError("end must be >= start(%r), received: %r" % (start,end))
     if self.indirect:
-      X("Block.slices: indirect...")
+      ##X("Block.slices: indirect...")
       offset = 0
       for B in self.subblocks:
         sublen = len(B)
@@ -142,20 +139,20 @@ class _Block(object):
         if offset >= end:
           break
     else:
-      X("Block.slices: direct")
+      ##X("Block.slices: direct")
       # a leaf Block
       if start < len(self):
-        X("Block.slices: yield self, %d, %d", start, min(end, len(self)))
+        ##X("Block.slices: yield self, %d, %d", start, min(end, len(self)))
         yield self, start, min(end, len(self))
-    X("Block.slices: COMPLETE")
+    ##X("Block.slices: COMPLETE")
 
   def top_slices(self, start=None, end=None):
     ''' Return an iterator yielding (Block, start, len) tuples representing the uppermost Blocks spanning `start`:`end`.
-	This originating use case is to support providing minimal
-	Block references required to assemble a new indirect Block
-	consisting of data from this Block comingled with updated
-	data without naively layering deeper levels of Block
-	indirection with every update phase.
+        This originating use case is to support providing minimal
+        Block references required to assemble a new indirect Block
+        consisting of data from this Block comingled with updated
+        data without naively layering deeper levels of Block
+        indirection with every update phase.
         The iterator may end early if the span exceeds the Block data.
     '''
     if start is None:
@@ -187,6 +184,19 @@ class _Block(object):
       if start < len(self):
         yield self, start, min(end, len(self))
 
+  def top_blocks(self, start, end):
+    ''' Yield existing high level blocks and new partial Blocks covering a portion of this Block, for constructing a new minimal top block.
+    '''
+    for B, Bstart, Bend in self.top_slices(start, end):
+      if Bstart == 0 and Bend == len(B):
+        # an extant high level block
+        yield B
+      else:
+        # should be a new partial block
+        if B.indirect:
+          raise RuntimeError("got slice for partial Block %s start=%r end=%r but Block is indirect! should be a partial leaf" % (B, Bstart, Bend))
+        yield Block(data=B[Bstart:Bend])
+
   def all_data(self):
     ''' The entire data of this Block as a single bytes object.
     '''
@@ -217,9 +227,16 @@ class Block(_Block):
     _Block.__init__(self, **kw)
     self.indirect = False
 
+  def matches_data(self, odata):
+    ''' Check supplied bytes `odata` against this Block's hashcode.
+        NB: _not_ defined on indirect Blocks to avoid mistakes.
+    '''
+    return self.hashcode == self.hashcode.from_data(odata)
+
   @property
   def leaves(self):
-    yield self
+    if len(self) > 0:
+      yield self
 
   @locked_property
   def span(self):
@@ -268,7 +285,7 @@ class IndirectBlock(_Block):
       if B.indirect:
         for subB in B.leaves:
           yield subB
-      else:
+      elif len(B) > 0:
         yield B
 
 def chunksOf(B, start, stop=None):
@@ -317,7 +334,7 @@ def chunksOf(B, start, stop=None):
     # we always start from the start of the next block
     start = 0
 
-def dump_block(B, fp=None, indent=''):
+def dump_block(B, fp=None, indent='', verbose=False):
   if fp is None:
     fp = sys.stderr
   data = B.data
@@ -330,9 +347,14 @@ def dump_block(B, fp=None, indent=''):
     for subB in subblocks:
       dump_block(subB, fp=fp, indent=indent)
   else:
-    print("%sB.datalen=%d, span=%d, hash=%s"
-          % (indent, len(data), B.span, B.hashcode),
-          file=fp)
+    if verbose:
+      print("%sB.datalen=%d, span=%d, hash=%s %r"
+            % (indent, len(data), B.span, B.hashcode, B.data),
+            file=fp)
+    else:
+      print("%sB.datalen=%d, span=%d, hash=%s"
+            % (indent, len(data), B.span, B.hashcode),
+            file=fp)
 
 if __name__ == '__main__':
   import cs.venti.block_tests

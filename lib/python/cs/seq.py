@@ -18,8 +18,8 @@ class Seq(object):
 
   __slots__ = ('counter', '_lock')
 
-  def __init__(self, start=0, step=1):
-    self.counter = itertools.count(start, step)
+  def __init__(self, start=0):
+    self.counter = itertools.count(start)
     self._lock = Lock()
 
   def __iter__(self):
@@ -37,7 +37,7 @@ def seq():
   global __seq
   return next(__seq)
 
-def the(list, context=None):
+def the(iterable, context=None):
   ''' Returns the first element of an iterable, but requires there to be
       exactly one.
   '''
@@ -46,7 +46,7 @@ def the(list, context=None):
     icontext=icontext+" for "+context
 
   first=True
-  for elem in list:
+  for elem in iterable:
     if first:
       it=elem
       first=False
@@ -59,6 +59,16 @@ def the(list, context=None):
     raise IndexError("%s: got no elements" % (icontext,))
 
   return it
+
+def last(iterable):
+  ''' Return the last item from an iterable; raise IndexError on empty iterables.
+  '''
+  nothing = True
+  for item in iterable:
+    nothing = False
+  if nothing:
+    raise IndexError("no items in iterable: %r" % (iterable,))
+  return item
 
 def get0(seq, default=None):
   ''' Return first element of a sequence, or the default.

@@ -1,35 +1,12 @@
 import os
 import sys
 
-def readn(fp, n):
-  ''' Read exactly n bytes from a file, coping with short reads.
-  '''
-  s=''
-  while n > len(s):
-    s2=fp.read(n-len(s))
-    if len(s2) == 0:
-      error("readn(%s,%d): unexpected EOF after %d bytes"
-             % (fp,n,len(s)))
-      return None
-    s+=s2
-  return s
-
-def lastline(fp):
-  last=None
-  for line in fp:
-    last=line
-  return last
-
-def loadfile(path):
-  return file(path).read()
-
-def contlines(fp):
-  ''' Generator that reads continued lines from a file.
-      Continued lines have leading whitespace on following lines.
-      `fp` is an iterable that yields lines, such as an open file.
+def contlines(lines):
+  ''' Generator that reads continued lines the iterable `lines`.
+      "Continued" lines have leading whitespace on following lines.
   '''
   lastline = None
-  for line in fp:
+  for line in lines:
     if len(line) == 0:
       break
     if line.startswith(' ') or line.startswith('\t'):
@@ -45,8 +22,6 @@ def pread(f,size,pos,whence=0,norestore=False):
   ''' Read a chunk of data from an arbitrary position in a file.
       Restores the file pointer after the read unless norestore is True.
   '''
-  if type(f) is string:
-    f=file(f)
   if not norestore:
     here=f.tell()
   f.seek(pos,whence)

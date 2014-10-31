@@ -63,7 +63,7 @@ def decodeDirent(data, offset):
     metatext = None
   block, offset = decodeBlock(data, offset)
   if type_ == D_DIR_T:
-    E = Dir(name, metatext=metatext, parent=None, dirblock=block)
+    E = Dir(name, metatext=metatext, parent=None, block=block)
   elif type_ == D_FILE_T:
     E = FileDirent(name, metatext=metatext, block=block)
   else:
@@ -119,7 +119,7 @@ class _Dirent(object):
 
   def encode(self, no_name=False):
     ''' Serialise the dirent.
-        Output format: bs(type)bs(flags)[bsdata(metadata)][bsdata(name)]block
+        Output format: bs(type)bs(flags)[bsdata(name)][bsdata(metadata)]block
     '''
     flags = 0
 
@@ -144,7 +144,7 @@ class _Dirent(object):
     else:
       metadata = b''
 
-    block = self.getBlock()
+    block = self.block
     return put_bs(self.type) \
          + put_bs(flags) \
          + namedata \
@@ -153,20 +153,9 @@ class _Dirent(object):
 
   def textencode(self):
     ''' Serialise the dirent as text.
-        Output format: bs(type)bs(flags)[bs(metalen)meta][bs(namelen)name]block
+        Output format: bs(type)bs(flags)[bs(namelen)name][bs(metalen)meta]block
     '''
     flags = 0
-
-    meta = self.meta
-    if meta:
-      if not isinstance(meta, Meta):
-        raise TypeError("self.meta is not a Meta: <%s>%r" % (type(meta), meta))
-      metatxt = meta.textencode()
-      if len(metatxt) > 0:
-        metatxt = totext(put_bsdata(metatxt.encode()))
-        flags |= F_HASMETA
-    else:
-      metatxt = ""
 
     name = self.name
     if name is None or len(name) == 0:
@@ -175,17 +164,30 @@ class _Dirent(object):
       nametxt = totext(put_bsdata(name.encode()))
       flags |= F_HASNAME
 
-    block = self.getBlock()
+    meta = self.meta
+    if meta:
+      if not isinstance(meta, Meta):
+        raise TypeError("self.meta is not a Meta: <%s>%r" % (type(meta), meta))
+      metatxt = meta.textencode()
+      if metatxt == meta.dflt_acl_text:
+        metatxt = ''
+      if len(metatxt) > 0:
+        metatxt = totext(put_bsdata(metatxt.encode()))
+        flags |= F_HASMETA
+    else:
+      metatxt = ""
+
+    block = self.block
     return ( hexify(put_bs(self.type))
            + hexify(put_bs(flags))
-           + metatxt
            + nametxt
+           + metatxt
            + block.textencode()
            )
 
   # NB: not a property because it may change
   def size(self):
-    return len(self.getBlock())
+    return len(self.block)
 
   @property
   def mtime(self):
@@ -259,15 +261,35 @@ class FileDirent(_Dirent, NestingOpenCloseMixin):
     elif self._open_file is not None:
       raise ValueError("._block is %s and ._open_file is %r" % (self._block, self._open_file))
 
+  @property
   @locked
-  def getBlock(self):
+  def block(self):
     ''' Obtain the top level Block.
         If open, sync the file to update ._block.
     '''
     self._check()
     if self._open_file is not None:
-      return self._open_file.sync()
+      self._block = self._open_file.sync()
     return self._block
+
+  @block.setter
+  @locked
+  def block(self, B):
+    if self._open_file is not None:
+      raise RuntimeError("tried to set .block directly while open")
+    self._block = B
+
+  @property
+  @locked
+  def size(self):
+    ''' Return the size of this file.
+        If open, use the open file's size.
+        Otherwise get the length of the top Block.
+    '''
+    self._check()
+    if self._open_file is not None:
+      return len(self._open_file)
+    return len(self.block)
 
   @locked
   def on_open(self, count):
@@ -296,6 +318,14 @@ class FileDirent(_Dirent, NestingOpenCloseMixin):
     self._open_file = None
     self._check()
 
+  def truncate(self, length):
+    ''' Truncate this FileDirent to the specified size.
+    '''
+    Esize = self.size()
+    if Esize != length:
+      with self:
+        return self._open_file.truncate(length)
+
   def restore(self, path, makedirs=False, verbosefp=None):
     ''' Restore this _Dirent's file content to the name `path`.
     '''
@@ -308,7 +338,7 @@ class FileDirent(_Dirent, NestingOpenCloseMixin):
         if makedirs:
           os.makedirs(dirpath)
       with open(path, "wb") as ofp:
-        for B in self.getBlock().leaves():
+        for B in self.block.leaves():
           ofp.write(B.blockdata())
         fd = ofp.fileno()
         st = os.fstat(fd)
@@ -365,8 +395,9 @@ class Dir(_Dirent):
         self._block = None
     return es
 
+  @property
   @locked
-  def getBlock(self):
+  def block(self):
     ''' Return the top Block referring to an encoding of this Dir.
         TODO: blockify the encoding? Probably desirable for big Dirs.
     '''
@@ -382,9 +413,13 @@ class Dir(_Dirent):
     return Block(data=data)
 
   def dirs(self):
+    ''' Return a list of the names of subdirectories in this Dir.
+    '''
     return [ name for name in self.keys() if self[name].isdir ]
 
   def files(self):
+    ''' Return a list of the names of files in this Dir.
+    '''
     return [ name for name in self.keys() if self[name].isfile ]
 
   def _validname(self, name):
@@ -466,25 +501,31 @@ class Dir(_Dirent):
       D = D.chdir1(name)
     return D
 
-  def makedirs(self, path):
+  def makedirs(self, path, force=False):
     ''' Like os.makedirs(), create a directory path at need.
+        If `force`, replace an non-DIr encountered with an empty Dir.
         Returns the bottom directory.
     '''
-    D = self
-    for name in path.split('/'):
-      if len(name) == 0:
-        continue
-      if name == '.':
+    E = self
+    if isinstance(path, str):
+      subpaths = path_split(path)
+    else:
+      subpaths = path
+    for name in subpaths:
+      if name == '' or name == '.':
         continue
       if name == '..':
-        D = D.parent
+        E = E.parent
         continue
-      E = D.get(name)
-      if E is None:
-        E = D.mkdir(name)
+      subE = E.get(name)
+      if subE is None:
+        subE = E.mkdir(name)
       else:
-        if not E.isdir:
-          raise ValueError("%s[name=%s] is not a directory" % (D, name))
-      D = E
+        if not subE.isdir:
+          if force:
+            subE = E.mkdir(name)
+          else:
+            raise ValueError("%s[name=%s] is not a directory" % (subE, name))
+      E = subE
 
-    return D
+    return E

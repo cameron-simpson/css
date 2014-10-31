@@ -93,7 +93,7 @@ def pattern_acl_definition(pattern):
     return "url_regex ^"+pattern
   # .ext ==> url_regex \.ext$
   if pattern.startswith('.'):
-    return 'url_regex [.]' + pattern[1:] + '$'
+    return 'url_regex [.]' + pattern[1:] + '(\?[^?]*)?$'
   # *.domain ==> dstdomain .domain
   if pattern.startswith("*."):
     return "dstdomain "+pattern[1:]
@@ -219,6 +219,8 @@ class Proxy(O):
               % (("allow" if not self._acls_allow[acl_name] else "deny"),
                  acl_name,
                 )
+      if any( P.also_unmatched for P in self.all_proxies.values() ):
+        yield "never_direct allow all"
     else:
       for acl_name in self.acl_names:
         yield "cache_peer_access %s %s %s" \

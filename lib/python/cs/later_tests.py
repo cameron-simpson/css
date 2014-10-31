@@ -9,7 +9,6 @@ import sys
 import time
 import unittest
 from cs.logutils import D, setup_logging
-from cs.queues import _Q_Proxy
 from cs.timeutils import sleep
 from cs.threads import report
 from cs.later import Later, FUNC_MANY_TO_MANY, FUNC_SELECTOR
@@ -69,7 +68,7 @@ class TestLater(unittest.TestCase):
     y = LF2()
     z = LF3()
     elapsed = time.time() - now
-    self.assertTrue(elapsed >= 4)
+    self.assertTrue(elapsed >= 4, "elapsed (%s) < 4" % (elapsed,))
 
   def test03calltwice(self):
     # compute once, get result twice
@@ -112,7 +111,7 @@ class TestLater(unittest.TestCase):
       P = L.pipeline([lambda x:x], items)
       outQ = P.outQ
       result = list(P.outQ)
-      self.assertEquals( items, result )
+      self.assertEqual( items, result )
 
   def test09pipeline_01idenitity(self):
     L = self.L
@@ -121,9 +120,8 @@ class TestLater(unittest.TestCase):
       yield x
     P = L.pipeline([ func ], items)
     self.assertIsNot(P.outQ, items)
-    self.assertIsInstance(P.outQ, _Q_Proxy)
     result = list(P.outQ)
-    self.assertEquals( items, result )
+    self.assertEqual( items, result )
 
   def test09pipeline_02double(self):
     L = self.L
@@ -134,11 +132,10 @@ class TestLater(unittest.TestCase):
       yield x
     P = L.pipeline([ func ], items)
     self.assertIsNot(P.outQ, items)
-    self.assertIsInstance(P.outQ, _Q_Proxy)
     result = list(P.outQ)
     # values may be interleaved due to parallelism
-    self.assertEquals( len(result), len(expected) )
-    self.assertEquals( sorted(result), sorted(expected) )
+    self.assertEqual( len(result), len(expected) )
+    self.assertEqual( sorted(result), sorted(expected) )
 
   def test09pipeline_03a_sort(self):
     L = self.L
@@ -148,9 +145,8 @@ class TestLater(unittest.TestCase):
       return sorted(x)
     P = L.pipeline([ (FUNC_MANY_TO_MANY, func) ], items)
     self.assertIsNot(P.outQ, items)
-    self.assertIsInstance(P.outQ, _Q_Proxy)
     result = list(P.outQ)
-    self.assertEquals( result, sorted(items) )
+    self.assertEqual( result, sorted(items) )
 
   def test09pipeline_03b_set(self):
     L = self.L
@@ -160,9 +156,8 @@ class TestLater(unittest.TestCase):
       return set(x)
     P = L.pipeline([ (FUNC_MANY_TO_MANY, func) ], items)
     self.assertIsNot(P.outQ, items)
-    self.assertIsInstance(P.outQ, _Q_Proxy)
     result = set(P.outQ)
-    self.assertEquals( result, set(items) )
+    self.assertEqual( result, set(items) )
 
   def test09pipeline_04select(self):
     L = self.L
@@ -173,9 +168,8 @@ class TestLater(unittest.TestCase):
       return x in want
     P = L.pipeline([ (FUNC_SELECTOR, wanted) ], items)
     self.assertIsNot(P.outQ, items)
-    self.assertIsInstance(P.outQ, _Q_Proxy)
     result = list(P.outQ)
-    self.assertEquals( result, expected )
+    self.assertEqual( result, expected )
 
   def test09pipeline_05two_by_two_by_sort(self):
     L = self.L
@@ -192,9 +186,8 @@ class TestLater(unittest.TestCase):
       yield x
     P = L.pipeline([ double, double, (FUNC_MANY_TO_MANY, sorted) ], items)
     self.assertIsNot(P.outQ, items)
-    self.assertIsInstance(P.outQ, _Q_Proxy)
     result = list(P.outQ)
-    self.assertEquals( result, expected )
+    self.assertEqual( result, expected )
 
 def selftest(argv):
   setup_logging()
