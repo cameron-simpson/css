@@ -30,6 +30,10 @@ usage="Usage: $cmd [options...] [op [args...]]
   use-session session-name
     Join the session named \"session-name\", creating it if necessary."
 
+have_tmux(){
+  which tmux >/dev/null 2>&1
+}
+
 badopts=
 
 while [ $# -gt 0 ]
@@ -135,7 +139,7 @@ case "$op" in
     ;;
   ls | list-sessions)
     # no tmux? use scr
-    which tmux 2>/dev/null || exec $trace scr
+    have_tmux || exec $trace scr
     $trace tmux list-sessions ${1+"$@"}
     ;;
   pick-new-prefix-session)
@@ -176,7 +180,7 @@ case "$op" in
     ;;
   use-session)
     # no tmux? use scr
-    which tmux 2>/dev/null || exec $trace scr "$session_name"
+    have_tmux || exec $trace scr "$session_name"
     $trace tmux has-session -t "$session_name" || TMUX= $trace tmux new-session -d -s "$session_name"
     if [ -n "$TMUX" ]
     then  $trace tmux switch-client -t "$session_name"
