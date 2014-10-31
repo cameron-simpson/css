@@ -77,6 +77,22 @@ def main(argv):
           level = int(argv.pop(0))
           if M.new_raid(level, argv, adapter=adapter) != 0:
             xit = 1
+      elif command == "status":
+        status_all = []
+        for An in M.adapters:
+          adapter_errs = []
+          A = M.adapters[An]
+          for DRV in A.physical_disks.values():
+            firmware_state = getattr(DRV, 'firmware_state', 'UNKNOWN')
+            if firmware_state not in ( "Online, Spun Up", "Unconfigured(good), Spun Up"):
+              adapter_errs.append("drive:%s[%s]/VD:%s/%s"
+                                  % (DRV.id, DRV.enc_slot,
+                                     getattr(DRV, 'virtual_drive', O(number=None)).number,
+                                     DRV.firmware_state))
+          if adapter_errs:
+            print "FAIL A%d %s" % (An, ",".join(adapter_errs))
+          else:
+            print "OK A%d" % (An,)
       else:
         error("unsupported command")
         xit = 1
@@ -255,7 +271,7 @@ class MegaRAID(O):
                 speed, speed_units = m.group(1), m.group(3)
                 setattr(o, attr+'_units', speed_units)
                 info = float(speed)
-              else:
+              elif info != "Unknown":
                 warning("failed to match re_SPEED against: %s", info)
             elif attr in ('default_cache_policy', 'current_cache_policy'):
               info = info.split(', ')
@@ -323,12 +339,17 @@ class MegaRAID(O):
     ''' Open a pipe from the megacli command, returning a subprocess.Popen object.
         Yield the stdout attribute.
     '''
-    P = Popen(['set-x', self.megacli] + list(args), stdout=PIPE, close_fds=True)
+    cmdargs = [self.megacli] + list(args)
+    if sys.stderr.isatty():
+      cmdargs.insert(0, 'set-x')
+    P = Popen(cmdargs, stdout=PIPE, close_fds=True)
     yield P.stdout
     P.wait()
 
   def docmd(self, *args):
-    ''' Execute a megacli command as specified.
+    ''' Pretend to execute a megacli command as specified.
+        This currently just echoes commands to stderr; I fear running
+        the "new raid" stuff etc automatically.
         Return True if the exit code is 0, False otherwise.
     '''
     ## if really: trace=set-x else trace=eecho
@@ -368,19 +389,30 @@ class Disk_Group(O):
 class Span(O):
   pass
 class Physical_Disk(O):
+
+  def __init__(self, **kw):
+    self.enclosure_device_id = None
+    self.device_id = None
+    self.slot_number = None
+    self.firmware_state = "UNKNOWN"
+    self.ibm_fru_cru = None
+    self.raw_size = None
+    self.raw_size_units = None
+    O.__init__(self, **kw)
+
   @property
   def id(self):
     ''' Unique identifier for drive, regrettably not what the megacli
         wants to use.
     '''
-    return "enc%d.devid%d" % (self.enclosure_device_id, self.device_id)
+    return "enc%s.devid%s" % (self.enclosure_device_id, self.device_id)
 
   @property
   def enc_slot(self):
     ''' Identifier used by megacli, regretably not unique if enclosure
         misconfigure/misinstalled.
     '''
-    return "%d:%d" % (self.enclosure_device_id, self.slot_number)
+    return "%s:%s" % (self.enclosure_device_id, self.slot_number)
   @property
   def fru(self):
     return self.ibm_fru_cru
