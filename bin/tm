@@ -20,7 +20,9 @@ usage="Usage: $cmd [options...] [op [args...]]
   ls | list-sessions
     List sessions. Default if no op supplied.
   pick-new-prefix-session prefix
-    Allocate a new session name starting with \"prefix\"."
+    Allocate a new session name starting with \"prefix\".
+  recite-function-@
+    Print the shell function definition for the \"@\" convenience function."
 
 badopts=
 
@@ -87,6 +89,13 @@ case "$op" in
       fi
     fi
     ;;
+  recite-function-@)
+    if [ $# -gt 0 ]
+    then
+      echo "$cmd: $op: extra arguments: $*" >&2
+      badopts=1
+    fi
+    ;;
   *)  echo "$cmd: unrecognised op: $op" >&2; badopts=1 ;;
 esac
 
@@ -94,6 +103,8 @@ esac
 
 case "$op" in
   [A-Z]*)
+    # no tmux? use scr
+    which tmux 2/dev/null || exec $trace scr "$session_name"
     $trace tmux has-session -t "$session_name" || TMUX= $trace tmux new-session -d -s "$session_name"
     if [ -n "$TMUX" ]
     then  $trace tmux switch-client -t "$session_name"
@@ -101,25 +112,31 @@ case "$op" in
     fi
     ;;
   list-prefix-sessions)
-        $trace tmux list-sessions -F '#{session_name}' \
-        | sed -n "s/^$session_prefix//p"
-        ;;
+    which tmux 2/dev/null || exec $trace scr
+    $trace tmux list-sessions -F '#{session_name}' \
+    | sed -n "s/^$session_prefix//p"
+    ;;
   ls | list-sessions)
-        $trace tmux "$op" ${1+"$@"}
-        ;;
+    $trace tmux "$op" ${1+"$@"}
+    ;;
   pick-new-prefix-session)
-        curmax=$(
-          ( "$0" list-prefix-sessions "$session_prefix" \
-            | grep "^[1-9][0-9]*$"
-            echo 0
-          ) \
-          | sort -nru \
-          | sed 1q
-        )
-        newmax=$(( curmax + 1 ))
-        echo "$session_prefix$newmax"
-        ;;
-  *)    echo "$cmd: $op: unimplemented" >&2
-        exit 1
-        ;;
+    curmax=$(
+      ( "$0" list-prefix-sessions "$session_prefix" \
+        | grep "^[1-9][0-9]*$"
+        echo 0
+      ) \
+      | sort -nru \
+      | sed 1q
+    )
+    newmax=$(( curmax + 1 ))
+    echo "$session_prefix$newmax"
+    ;;
+  recite-function-@)
+    echo '@(){
+      
+    }'
+    ;;
+  *)echo "$cmd: $op: unimplemented" >&2
+    exit 1
+    ;;
 esac
