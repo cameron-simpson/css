@@ -17,7 +17,7 @@ xopt=
 cmd=$(basename "$0")
 usage="Usage: $cmd [options...] [op [args...]]
   UPPERCASE_NAME
-    Shorthand for \"use-session UPPERCASE_NAME\".
+    Shorthand for \"use-session UPPERCASE_NAME\". Includes names starting with an underscore.
   list-prefix-sessions prefix
     List suffices of sessions startwith with \"prefix\".
   ls | list-sessions
@@ -52,7 +52,7 @@ done
 op=$1
 shift
 case "$op" in
-  [A-Z]*)
+  [_A-Z]*)
     session_name=$op
     op=use-session
     if [ $# -gt 0 ]
