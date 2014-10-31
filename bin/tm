@@ -11,7 +11,7 @@ set -ue
 : ${HOST:=`hostname`}
 
 trace=
-[ -t 2 ] && trace=set-x
+##[ -t 2 ] && trace=set-x
 xopt=
 
 cmd=$(basename "$0")
