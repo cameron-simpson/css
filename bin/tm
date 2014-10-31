@@ -50,6 +50,11 @@ case "$op" in
   [A-Z]*)
     session_name=$op
     op=use-session
+    if [ $# -gt 0 ]
+    then
+      echo "$cmd: $op $session_name: extra arguments: $*" >&2
+      badopts=1
+    fi
     ;;
   list-prefix-sessions)
     if [ $# = 0 ]
@@ -102,21 +107,27 @@ case "$op" in
       badopts=1
     fi
     ;;
+  use-session)
+    if [ $# = 0 ]
+    then
+      echo "$cmd: $op: missing session-name" >&2
+      badopts=1
+    else
+      session_name=$1
+      shift
+      if [ $# -gt 0 ]
+      then
+        echo "$cmd: $op $session_name: extra arguments: $*" >&2
+        badopts=1
+      fi
+    fi
+    ;;
   *)  echo "$cmd: unrecognised op: $op" >&2; badopts=1 ;;
 esac
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 case "$op" in
-  [A-Z]*)
-    # no tmux? use scr
-    which tmux 2/dev/null || exec $trace scr "$session_name"
-    $trace tmux has-session -t "$session_name" || TMUX= $trace tmux new-session -d -s "$session_name"
-    if [ -n "$TMUX" ]
-    then  $trace tmux switch-client -t "$session_name"
-    else  $trace tmux attach-session -t "$session_name"
-    fi
-    ;;
   list-prefix-sessions)
     $trace tmux list-sessions -F '#{session_name}' \
     | sed -n "s/^$session_prefix//p"
@@ -139,8 +150,37 @@ case "$op" in
     echo "$session_prefix$newmax"
     ;;
   recite-function-@)
-    echo '@(){
+    echo '
+        # Usage: @ [host [session_name [command [args...]]]]
+        @(){
+          : ${_tm_host:=}
+          : ${_tm_session:=}
+          _tm_src_prefix=_${USER}@${HOST}__
+          if [ $# = 0 ]
+          then
+            if [ -z "$_tm_host" -o -z "$_tm_session" ]
+            then
+              echo "$0: no current default remote session" >&2
+              return 2
+            fi
+            set -- "$_tm_host" "$_tm_session"
+          fi
+          _tm_host=$1; shift
+          if [ $# = 0 ]
+          then  _tm_session=$( $trace sshx "$_tm_host" tm $xopt pick-new-prefix-session "$_tm_src_prefix" ) || return 1
+          else  _tm_session=$1
+          fi
+          $trace sshx "$_tm_host" tm $xopt use-session "$_tm_session"
     }'
+    ;;
+  use-session)
+    # no tmux? use scr
+    which tmux 2>/dev/null || exec $trace scr "$session_name"
+    $trace tmux has-session -t "$session_name" || TMUX= $trace tmux new-session -d -s "$session_name"
+    if [ -n "$TMUX" ]
+    then  $trace tmux switch-client -t "$session_name"
+    else  $trace tmux attach-session -t "$session_name"
+    fi
     ;;
   *)echo "$cmd: $op: unimplemented" >&2
     exit 1
