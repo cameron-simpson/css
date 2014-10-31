@@ -152,7 +152,7 @@ case "$op" in
     ;;
   recite-function-remote)
     echo '
-        # Usage: @ [host [session_name]]
+        # Usage: tm_remote [host [session_name]]
         tm_remote(){
           : ${_tm_host:=}
           : ${_tm_session:=}
