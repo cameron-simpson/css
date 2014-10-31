@@ -1,94 +1,25 @@
-#!/usr/bin/perl
+#!/usr/bin/python
 #
 # Coalesce adjacent blank lines. Detab. Strip trailing whitespace.
 # Nothing that others haven't done before me. Just can't find it.
 #	- Cameron Simpson <cs@zip.com.au> 09may2002
 #
 # Add skipheaders and outputfilter. - cameron 15may2002
+# Python recode, strip a heap of options. - cameron 01sep2014
 #
 
-use strict qw(vars);
+from __future__ import print_function
+import sys
 
-use IO::Handle;
-use Getopt::Std;
-use cs::Misc;
-
-$::Usage="Usage: $::cmd [-{p|P} pipeto] [{-s|-S sigre}] [filename]
-	-p pipeto	Pipe results to the shell command \"pipeto\".
-	-P pipeto	Pipe results to the shell command \"pipeto\", except for the mail headers.
-	-s		Cease pipe on encountering the start of the signature.
-	-S sigregexp	Cease pipe on encountering the start of the signature.
-";
-
-my $pipeto;
-my $skiphdrs=0;
-my $sigre;
-getopts("P:p:sS:") || die $::Usage;
-if ($::opt_p)	{ $pipeto=$::opt_p; }
-if ($::opt_P)	{ $pipeto=$::opt_P; $skiphdrs=1; }
-if ($::opt_s)	{ $sigre='^-- '; }
-if ($::opt_S)	{ $sigre=$::opt_S; }
-
-if (@ARGV == 0)
-{}
-else
-{ my $src = shift(@ARGV);
-  if (@ARGV)
-  { die "$::cmd: extra arguments after filename: @ARGV\n$::Usage";
-  }
-  if ($src ne '-')
-  { open(STDIN,"< $src\0") || die "$::cmd: open($src): $!\n";
-  }
-}
-
-if ($skiphdrs)
-{
-  HDR:
-  while (defined($_=<STDIN>))
-  { print;
-    chomp;
-    last HDR if ! length;
-  }
-}
-
-if (defined $pipeto)
-{ flush(STDOUT);
-  open(PIPE,"| $pipeto\0") || die "$::cmd: can't pipe to: $pipeto: $!\n";
-  select(PIPE);
-}
-
-my $hadblank=0;
-
-BODY:
-while(defined($_=<STDIN>))
-{ if (/$sigre/o && defined $pipeto)
-  { close(PIPE);
-    undef $pipeto;
-    select(STDOUT);
-    print;
-    next BODY;
-  }
-
-  chomp;
-
-  s/\s+$//;
-  $_=detab($_);
-
-  if (length)
-  { print "\n" if $hadblank;
-    $hadblank=0;
-    $_.="\n";
-    print;
-  }
-  elsif ($hadblank)
-  {}
-  else
-  { $hadblank=1;
-  }
-}
-
-if (defined $pipeto)
-{ close(PIPE);
-}
-
-close(STDOUT);
+had_blank = False
+for line in sys.stdin:
+  oline = line
+  line = line.rstrip()
+  line = line.expandtabs()
+  if len(line) == 0:
+    if had_blank:
+      continue
+    had_blank = True
+  else:
+    had_blank = False
+  print(line)

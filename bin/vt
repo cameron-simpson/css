@@ -33,15 +33,17 @@ import os
 import os.path
 from getopt import getopt, GetoptError
 import datetime
+import shutil
 from cs.debug import ifdebug, dump_debug_threads
 from cs.lex import hexify
 import cs.logutils
-from cs.logutils import Pfx, exception, error, warning, debug, setup_logging, logTo, D
+from cs.logutils import Pfx, exception, error, warning, debug, setup_logging, logTo, D, X, nl
 from cs.venti import totext, fromtext, defaults
 from cs.venti.block import Block, IndirectBlock, dump_block
 from cs.venti.store import Store
 from cs.venti.cache import CacheStore, MemCacheStore
-from cs.venti.paths import dirent_dir, dirent_file, dirent_resolve, CopyModes
+from cs.venti.paths import dirent_dir, dirent_file, dirent_resolve, resolve
+from cs.venti.archive import CopyModes, update_archive, toc_archive, last_Dirent, copy_out_dir
 
 def main(argv):
   setup_logging(upd_mode=False)
@@ -54,6 +56,7 @@ def main(argv):
     %s [options...] listen port
     %s [options...] ls [-R] dirrefs...
     %s [options...] mount dirref mountpoint
+    %s [options...] pack paths...
     %s [options...] scan datafile
     %s [options...] pull stores...
     %s [options...] unpack dirrefs...
@@ -65,9 +68,17 @@ def main(argv):
                     /path/to/dir  GDBMStore
                     tcp:[host]:port TCPStore
                     |sh-command   StreamStore via sh-command
-''' % (cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd)
+      -q          Quiet; not verbose. Default if stdout is not a tty.
+      -v          Verbose; not quiet. Default it stdout is a tty.
+''' % (cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd)
 
   badopts = False
+
+  # verbose if stdout is a tty
+  try:
+    verbose = sys.stdout.isatty()
+  except:
+    verbose = False
 
   dflt_cache = os.environ.get('VT_STORE_CACHE')
   dflt_vt_store = os.environ.get('VT_STORE')
@@ -75,7 +86,7 @@ def main(argv):
   useMemCache = True
 
   try:
-    opts, args = getopt(argv[1:], 'C:MS:')
+    opts, args = getopt(argv[1:], 'C:MS:qv')
   except GetoptError as e:
     error("unrecognised option: %s: %s"% (e.opt, e.msg))
     badopts = True
@@ -113,6 +124,18 @@ def main(argv):
     #
     elif opt == '-S':
       dflt_vt_store = val
+    # =item B<-q>
+    #
+    # Quiet; not verbose. Default if stdout is not a tty.
+    #
+    elif opt == '-q':
+      verbose = False
+    # =item B<-v>
+    #
+    # Verbose; not quiet. Default it stdout is a tty.
+    #
+    elif opt == '-v':
+      verbose = True
     else:
       raise RuntimeError("unhandled option: %s" % (opt,))
 
@@ -153,6 +176,12 @@ def main(argv):
 
   if dflt_log is not None:
     logTo(dflt_log, delay=True)
+
+  # log message function(msg, *args)
+  if verbose:
+    log = nl
+  else:
+    log = silent
 
   xit = None
   S = None
@@ -201,13 +230,10 @@ def main(argv):
                   S = CacheStore(S, MemCacheStore())
                 with S:
                   try:
-                    xit = op_func(args)
+                    xit = op_func(args, verbose=verbose, log=log)
                   except GetoptError as e:
                     error("%s", e)
                     badopts = True
-
-  if S:
-    S.close()
 
   if badopts:
     sys.stderr.write(usage)
@@ -232,7 +258,7 @@ def main(argv):
 # files, not just ones with new size/mtime, B<f> - specify archive
 # file.
 #
-def cmd_ar(args):
+def cmd_ar(args, verbose=None, log=None):
   if len(args) < 1:
     raise GetoptError("missing options")
   opts = args.pop(0)
@@ -240,14 +266,15 @@ def cmd_ar(args):
     raise GetoptError("empty options")
 
   badopts = False
-  verbose = False
-  modes = CopyModes()
+  modes = CopyModes(trust_size_mtime=True)
   modes.trust_size_mtime = True
-  arfile = '-'
+  arpath = '-'
   mode = opts[0]
   for opt in opts[1:]:
     if opt == 'f':
-      arfile = args.pop(0)
+      arpath = args.pop(0)
+    elif opt == 'q':
+      verbose = False
     elif opt == 'v':
       verbose = True
     elif opt == 'A':
@@ -256,52 +283,80 @@ def cmd_ar(args):
       error("%s: unsupported option", opt)
       badopts = True
 
-  if mode == 'u' and len(args) < 1:
+  if (mode == 'c' or mode == 'u') and len(args) < 1:
     error("missing pathnames")
     badopts = True
 
   if badopts:
     raise GetoptError("bad options")
 
-  xit = 0
-
-  import cs.venti.archive
-  
+  # log message function(msg, *args)
   if verbose:
-    warning("cmd_ar: verbose specified but not implemented")
+    log = nl
+  else:
+    log = silent
+
+  xit = 0
+  
   if mode == 't':
     if args:
-      paths = args
+      ospaths = args
     else:
-      paths = None
-    with Pfx("tf %s" % (arfile,)):
-      cs.venti.archive.toc(arfile, paths)
-  elif mode == 'u':
-    for path in args:
+      ospaths = None
+    with Pfx("tf %s" % (arpath,)):
+      toc_archive(arpath, ospaths)
+  elif mode == 'c' or mode == 'u':
+    for ospath in args:
       try:
-        ok = cs.venti.archive.archive(arfile, path, modes)
+        update_archive(arpath, ospath, modes, create_archive=True, arsubpath=ospath, log=log)
       except IOError as e:
-        error("archive %s: %s" % (path, e))
+        error("archive %s: %s" % (ospath, e))
         xit = 1
-      else:
-        if not ok:
-          error("archive %s: cs.venti.archive.archive: not ok", path)
-          xit = 1
   elif mode == 'x':
     if args:
-      paths = args
+      ospaths = args
     else:
-      paths = None
-    with Pfx("xf %s" % (arfile,)):
-      for path, E in cs.venti.archive.retrieve(arfile, paths, modes):
-        if E is None:
-          error("retrieve %s: not found" % (path,))
-          xit = 1
-        else:
+      ospaths = ('.',)
+    xit = 0
+    with Pfx("xf %s" % (arpath,)):
+      with Pfx(arpath):
+        last_entry = last_Dirent(arpath)
+        if last_entry is None:
+          error("no entries in archive")
+          return 1
+      when, rootE = last_entry
+      for ospath in ospaths:
+        with Pfx(ospath):
+          E, Eparent, tail = resolve(rootE, ospath)
+          if tail:
+            error("not in archive")
+            xit = 1
+            continue
+          log("ar x %s", ospath)
           if E.isdir:
-            E.restore(path, makedirs=True, recurse=True)
+            with Pfx("makedirs"):
+              try:
+                os.makedirs(ospath, exist_ok=True)
+              except OSError as e:
+                error("%s", e)
+                xit = 1
+                continue
+            copy_out_dir(E, ospath, modes, log=log)
           else:
-            E.restore(path, makedirs=True)
+            if os.path.exists(ospath):
+              error("already exists")
+              xit = 1
+              continue
+            osparent = os.path.dirname(ospath)
+            if not os.path.isdir(osparent):
+              with Pfx("makedirs(%s)", osparent):
+                try:
+                  os.makedirs(osparent)
+                except OSError as e:
+                  error("%s", e)
+                  xit = 1
+                  continue
+            copy_out_file(E, ospath, modes, log=log)
   else:
     raise GetoptError("%s: unsupported mode" % (mode,))
 
@@ -311,22 +366,11 @@ def cmd_ar(args):
 #
 # Emit the data content of the supplied I<filerefs> on the standard output.
 #
-def cmd_cat(args):
+def cmd_cat(args, verbose=None, log=None):
   if not args:
     raise GetoptError("missing filerefs")
   for path in args:
     cat(path)
-  return 0
-
-# =item B<dump> I<filerefs...>
-#
-# Do a Block dump of the filerefs.
-#
-def cmd_dump(args):
-  if not args:
-    raise GetoptError("missing filerefs")
-  for path in args:
-    dump(path)
   return 0
 
 # =item B<catblock> [B<-i>] I<hashcodes...>
@@ -336,7 +380,7 @@ def cmd_dump(args):
 # consider the hashcode to specify an indirect block and emit
 # the data content of the leaf blocks.
 #
-def cmd_catblock(args):
+def cmd_catblock(args, verbose=None, log=None):
   indirect = False
   if len(args) > 0 and args[0] == "-i":
     indirect = True
@@ -353,11 +397,22 @@ def cmd_catblock(args):
       sys.stdout.write(subB.data)
   return 0
 
+# =item B<dump> I<filerefs...>
+#
+# Do a Block dump of the filerefs.
+#
+def cmd_dump(args, verbose=None, log=None):
+  if not args:
+    raise GetoptError("missing filerefs")
+  for path in args:
+    dump(path)
+  return 0
+
 # =item B<init> <dirpath>
 #
 # Initialise a directory for use as a store, using the GDBM backend.
 #
-def cmd_init(args):
+def cmd_init(args, verbose=None, log=None):
   if not args:
     raise GetoptError("missing dirpath")
   dirpath = args.pop(0)
@@ -383,7 +438,7 @@ def cmd_init(args):
 # daemon should listen on the specified I<host> address and I<port>
 # for connections.  if I<host> is omitted it defaults to B<127.0.0.1>.
 #
-def cmd_listen(args):
+def cmd_listen(args, verbose=None, log=None):
   if len(args) != 1:
     raise GetoptError("expected a port")
   arg = args[0]
@@ -411,7 +466,7 @@ def cmd_listen(args):
 # Do a directory listing of the specified I<dirrefs>.
 # The B<-R> (recursive) option requests a recurive directory listing.
 #
-def cmd_ls(args):
+def cmd_ls(args, verbose=None, log=None):
   recurse = False
   if args and args[0] == "-R":
     recurse = True
@@ -434,7 +489,7 @@ def cmd_ls(args):
 # Mount the specified I<dirref> as on the specified I<mountpoint> directory.
 # Requires FUSE support.
 #
-def cmd_mount(args):
+def cmd_mount(args, verbose=None, log=None):
   if len(args) != 2:
     raise GetoptError("expected dirref and mountpoint")
   dirref, mountpoint = args
@@ -451,6 +506,37 @@ def cmd_mount(args):
   cs.venti.vtfuse.mount(args[1], E, S)
   return 0
 
+# =item B<pack> I<paths>...
+#
+# Replace each I<path> with an archive file I<path>B<.vt> referring
+# to the stored content of I<path>.
+#
+def cmd_pack(args, verbose=None, log=None):
+  if not args:
+    raise GetoptError("missing paths")
+  xit = 0
+  modes = CopyModes(trust_size_mtime=True)
+  
+  for ospath in args:
+    with Pfx(ospath):
+      if not os.path.exists(ospath):
+        error("missing")
+        xit = 1
+        continue
+      arpath = ospath + '.vt'
+      try:
+        update_archive(arpath, ospath, modes, create_archive=True, log=log)
+      except IOError as e:
+        error("%s" % (e,))
+        xit = 1
+        continue
+      log("remove %r", ospath)
+      if os.path.isdir(ospath):
+        shutil.rmtree(ospath)
+      else:
+        os.remove(ospath)
+  return xit
+
 # =item B<pull> I<stores...>
 #
 # Update our store with all the available content from the specified I<stores>.
@@ -458,7 +544,7 @@ def cmd_mount(args):
 # This is mostly useful for updating a master store from a store
 # which has been updated offline.
 #
-def cmd_pull(args):
+def cmd_pull(args, verbose=None, log=None):
   if not args:
     raise GetoptError("missing stores")
   raise NotImplementedError
@@ -470,7 +556,7 @@ def cmd_pull(args):
 # Report on standard output
 # the block hashcode, I<datafile> file offset and compressed size.
 #
-def cmd_scan(args):
+def cmd_scan(args, verbose=None, log=None):
   if len(args) != 1:
     raise GetoptError("missing datafile")
   datafile = args[0]
@@ -483,37 +569,36 @@ def cmd_scan(args):
     dfp.close()
   return 0
 
-# =item B<unpack> I<dirrefs...>
+# =item B<unpack> I<archive>B<.vt>
 #
-# Unpack the directory specified by each I<dirref> into the current
-# working directory.
-# This is the inverse of the B<pack> command.
-# Currently, to unpack a B<.vt> file the most succinct command is this:
+# Unpack the archive file I<archive>B<.vt> as I<archive>.
 #
-#   vt unpack `awk '{ dirref=$1 } END { print dirref }' file.vt`
-#
-def cmd_unpack(args):
+def cmd_unpack(args, verbose=None, log=None):
   if len(args) < 1:
-    raise GetoptError("missing dirrefs")
-  xit = 0
-  for path in args:
-    with (path):
-      D = dirent_dir(path)
-      for subD, _, files in D.walk(topdown=True):
-        with subD:
-          if len(subD.path) > 0 and not os.path.isdir(subD.path):
-            print("mkdir", subD.path)
-            os.makedirs(subD.path)
-          files.sort()
-          for fname in files:
-            with fname:
-              if len(fname) == 0 or fname == '.' or fname == '..' or '/' in fname:
-                error("illegal filename")
-              fpath = os.path.join(subD.path, fname)
-              with open(fpath, mode='w') as outfp:
-                for b in subD[fname].getBlock().leaves(S):
-                  outfp.write(b)
-  return xit
+    raise GetoptError("missing archive name")
+  arpath = args.pop(0)
+  arbase, arext = os.path.splitext(arpath)
+  X("arbase=%r, arext=%r", arbase, arext)
+  if arext != '.vt':
+    raise GetoptError("archive name does not end in .vt: %r" % (arpath,))
+  if len(args) > 0:
+    raise GetoptError("extra arguments after archive name %r" % (arpath,))
+  if os.path.exists(arbase):
+    error("archive base already exists: %r", arbase)
+    return 1
+  with Pfx(arpath):
+    last_entry = last_Dirent(arpath)
+    if last_entry is None:
+      error("no entries in archive")
+      return 1
+  when, rootE = last_entry
+  with Pfx(arbase):
+    if rootE.isdir:
+      os.mkdir(arbase)
+      copy_out_dir(rootE, arbase, CopyModes(do_mkdir=True), log=log)
+    else:
+      copy_out_file(rootE, arbase, log=log)
+  return 0
 
 # =back
 #
@@ -521,7 +606,7 @@ def cmd_unpack(args):
 def lsDirent(fp, E, name):
   ''' Transcribe a Dirent as an ls-style listing.
   '''
-  B = E.getBlock()
+  B = E.block
   st = E.stat()
   st_mode, st_ino, st_dev, st_nlink, st_uid, st_gid, st_size, \
     st_atime, st_mtime, st_ctime = st
@@ -568,7 +653,7 @@ def cat(path, fp=None):
       return cat(path, bfp)
   else:
     F = dirent_file(path)
-    block = F.getBlock()
+    block = F.block
     for B in block.leaves:
       fp.write(B.data)
 
@@ -578,7 +663,12 @@ def dump(path, fp=None):
   E, subname = dirent_resolve(path)
   if subname:
     E = E[subname]
-  dump_block(E.getBlock(), fp)
+  dump_block(E.block, fp)
+
+def silent(msg, *args, file=None):
+  ''' Dummy function to discard messages.
+  '''
+  pass
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))

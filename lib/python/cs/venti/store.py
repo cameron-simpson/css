@@ -160,7 +160,7 @@ class BasicStore(NestingOpenCloseMixin):
   def hash(self, data):
     ''' Return a Hash object from data bytes.
     '''
-    return self.hashclass.fromData(data)
+    return self.hashclass.from_data(data)
 
   def keys(self):
     ''' For a big store this is almost certainly unreasonable.
@@ -256,7 +256,7 @@ def Store(store_spec):
     if not host:
       host = '127.0.0.1'
     return TCPStore((host, int(port)))
-  if sheme == "ssh":
+  if scheme == "ssh":
     # TODO: path to remote vt command
     # TODO: $VT_SSH envvar
     import cs.sh
