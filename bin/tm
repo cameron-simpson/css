@@ -112,12 +112,13 @@ case "$op" in
     fi
     ;;
   list-prefix-sessions)
-    which tmux 2/dev/null || exec $trace scr
     $trace tmux list-sessions -F '#{session_name}' \
     | sed -n "s/^$session_prefix//p"
     ;;
   ls | list-sessions)
-    $trace tmux "$op" ${1+"$@"}
+    # no tmux? use scr
+    which tmux 2>/dev/null || exec $trace scr
+    $trace tmux list-sessions ${1+"$@"}
     ;;
   pick-new-prefix-session)
     curmax=$(
@@ -133,7 +134,6 @@ case "$op" in
     ;;
   recite-function-@)
     echo '@(){
-      
     }'
     ;;
   *)echo "$cmd: $op: unimplemented" >&2
