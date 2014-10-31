@@ -14,7 +14,7 @@ trace=
 cmd=$(basename "$0")
 usage="Usage: $cmd [options...] [op [args...]]
   UPPERCASE_NAME
-    Join the session named \"UPPERCASE_NAME\", creating it if necessary.
+    Shorthand for \"use-session UPPERCASE_NAME\".
   list-prefix-sessions prefix
     List suffices of sessions startwith with \"prefix\".
   ls | list-sessions
@@ -22,7 +22,9 @@ usage="Usage: $cmd [options...] [op [args...]]
   pick-new-prefix-session prefix
     Allocate a new session name starting with \"prefix\".
   recite-function-@
-    Print the shell function definition for the \"@\" convenience function."
+    Print the shell function definition for the \"@\" convenience function.
+  use-session session-name
+    Join the session named \"session-name\", creating it if necessary."
 
 badopts=
 
@@ -44,6 +46,7 @@ shift
 case "$op" in
   [A-Z]*)
     session_name=$op
+    op=use-session
     ;;
   list-prefix-sessions)
     if [ $# = 0 ]
