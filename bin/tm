@@ -20,7 +20,7 @@ usage="Usage: $cmd [options...] [op [args...]]
     Shorthand for \"use-session UPPERCASE_NAME\". Includes names starting with an underscore.
   list-prefix-sessions prefix
     List suffices of sessions startwith with \"prefix\".
-  ls | list-sessions
+  ls | list-sessions [-n] [tmux-list-sessions-options...]
     List sessions. Default if no op supplied.
   pick-new-prefix-session prefix
     Allocate a new session name starting with \"prefix\".
@@ -47,7 +47,7 @@ do
   shift
 done
 
-[ $# -gt 0 ] || set -- list-sessions
+[ $# -gt 0 ] || set -- list-sessions -n
 
 op=$1
 shift
@@ -140,7 +140,14 @@ case "$op" in
   ls | list-sessions)
     # no tmux? use scr
     have_tmux || exec $trace scr
-    $trace tmux list-sessions ${1+"$@"}
+    if [ "x$1" = x-n ]
+    then
+      shift
+      $trace tmux list-sessions ${1+"$@"} \
+      | awk '{ printf("%3d %s\n", NR, $0); }'
+    else
+      $trace tmux list-sessions ${1+"$@"}
+    fi
     ;;
   pick-new-prefix-session)
     curmax=$(
