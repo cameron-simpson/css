@@ -385,6 +385,12 @@ class Node(dict):
     for attr in self.keys():
       self[attr]._scrub()
 
+  def _scrub_local(self):
+    ''' Remove all attribute values, but do not pass changes to the backend.
+    '''
+    for attr in self.keys():
+      self[attr]._scrub_local()
+
   def seq(self):
     seqs = self.SEQs
     if seqs:

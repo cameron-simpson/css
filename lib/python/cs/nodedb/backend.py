@@ -122,7 +122,9 @@ class Backend(O):
       if name.startswith('='):
         # discard node and start anew
         name = name[1:]
-        nodedb[t, name]._scrub_local()
+        key = t, name
+        if key in nodedb:
+          nodedb[t, name]._scrub_local()
       N = nodedb.make( (t, name) )
       if attr.startswith('='):
         # reset attribute completely before appending value
