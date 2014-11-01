@@ -207,7 +207,7 @@ case "$op" in
         )
         ;;
     esac
-    $trace tmux has-session -t "$session_name" || TMUX= $trace tmux new-session -d -s "$session_name"
+    $trace tmux has-session -t "$session_name" 2>/dev/null || TMUX= $trace tmux new-session -d -s "$session_name"
     if [ -n "$TMUX" ]
     then  $trace tmux switch-client -t "$session_name"
     else  $trace tmux attach-session -t "$session_name"
