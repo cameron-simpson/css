@@ -163,11 +163,12 @@ case "$op" in
     ;;
   recite-function-remote)
     echo '
-        # Usage: tm_remote [host [session_name]]
+        # Usage: tm_remote [host[:session_name]]
         tm_remote(){
           : ${_tm_host:=}
           : ${_tm_session:=}
           _tm_src_prefix=_${USER}@${HOST}__
+          # no host[:session]? reconnect to the previously used host:session
           if [ $# = 0 ]
           then
             if [ -z "$_tm_host" -o -z "$_tm_session" ]
@@ -175,13 +176,23 @@ case "$op" in
               echo "$0: no current default remote session" >&2
               return 2
             fi
-            set -- "$_tm_host" "$_tm_session"
+            set -- "$_tm_host:$_tm_session"
           fi
-          _tm_host=$1; shift
-          if [ $# = 0 ]
-          then  _tm_session=$( $trace sshx "$_tm_host" tm $xopt pick-new-prefix-session "$_tm_src_prefix" ) || return 1
-          else  _tm_session=$1
-          fi
+          _tm_host_session=$1; shift
+          # parse [user@]host:session ==> [user@host] session
+          case "$_tm_host_session" in
+            *:*)
+              _tm_host=${_tm_host_session%%:*}
+              _tm_session=${_tm_host_session#*:}
+              ;;
+            *)_tm_host=$_tm_host_session
+              _tm_session=
+              ;;
+          esac
+          # allocate new session name if nothing specified
+          [ -n "$_tm_session" ] \
+          || _tm_session=$( $trace sshx "$_tm_host" tm $xopt pick-new-prefix-session "$_tm_src_prefix" ) \
+          || return 1
           $trace sshx "$_tm_host" tm $xopt use-session "$_tm_session"
     }'
     ;;
@@ -196,7 +207,7 @@ case "$op" in
         )
         ;;
     esac
-    $trace tmux has-session -t "$session_name" || TMUX= $trace tmux new-session -d -s "$session_name"
+    $trace tmux has-session -t "$session_name" 2>/dev/null || TMUX= $trace tmux new-session -d -s "$session_name"
     if [ -n "$TMUX" ]
     then  $trace tmux switch-client -t "$session_name"
     else  $trace tmux attach-session -t "$session_name"
