@@ -314,7 +314,7 @@ class MailFiler(O):
             with LogTime("key = %s", key, threshold=1.0, level=DEBUG):
               ok = self.file_wmdir_key(wmdir, key)
               if not ok:
-                filer.log("NOT OK, lurking key %s", key)
+                self.log("NOT OK, lurking key %s", key)
                 wmdir.lurk(key)
                 continue
 
@@ -641,7 +641,7 @@ class MessageFiler(O):
   def process_environ(self):
     ''' Compute the environment for a subprocess.
     '''
-    lc_ = lambda hdr_name: hdr_name.tolower().replace('-', '_')
+    lc_ = lambda hdr_name: hdr_name.lower().replace('-', '_')
     env = dict(self.environ)
     M = self.message
     # add header_foo for every Foo: header
