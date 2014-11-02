@@ -549,9 +549,11 @@ class MessageFiler(O):
   def save_target(self, target):
     with Pfx("save_target(%s)", target):
       if target.startswith('|'):
+        # pipe message to shell command
         shcmd = target[1:]
         return self.save_to_pipe(['/bin/sh', '-c', shcmd])
       elif target.startswith('+'):
+        # add header field values to groups
         m = re_ADDHEADER.match(target)
         if not m:
           error("match failure of re_ADDHEADER against %r", target)
@@ -560,8 +562,10 @@ class MessageFiler(O):
         group_names = m.group(2).split(',')
         return self.save_header(hdr, group_names)
       elif '@' in target:
+        # send message to email address
         return self.sendmail(target)
       else:
+        # save message to Maildir or mbox
         mailpath = self.resolve(target)
         if not os.path.exists(mailpath):
           make_maildir(mailpath)
@@ -589,6 +593,12 @@ class MessageFiler(O):
         return self.save_to_mbox(mailpath, status, x_status)
 
   def save_header(self, hdr, group_names):
+    ''' Update maildb or msgiddb from message header.
+        If a message-id type header, get the msgiddb node for each
+        id and add the `group_names` to its GROUP field.
+        Otherwise, extract all the addresses from the specified
+        header and add to the maildb groups named by `group_names`.
+    '''
     with Pfx("save_header(%s, %r)", hdr, group_names):
       if hdr in ('message-id', 'references', 'in-reply-to'):
         msgids = self.message[hdr].split()
@@ -628,6 +638,23 @@ class MessageFiler(O):
       mboxfp.write(text)
     self.log("    OK >> %s" % (shortpath(mboxpath)))
 
+  def process_environ(self):
+    ''' Compute the environment for a subprocess.
+    '''
+    lc_ = lambda hdr_name: hdr_name.tolower().replace('-', '_')
+    env = dict(self.environ)
+    M = self.message
+    # add header_foo for every Foo: header
+    for hdr_name, hdr_value in M.items():
+      env['header_' + lc_(hdr_name)] = hdr_value
+    # add shortlist_foo for every Foo: address header
+    MDB = self.maildb
+    for hdr_name in 'from', 'to', 'cc', 'bcc', 'reply-to', 'errors_to':
+      env['shortlist_' + lc_(hdr_name)] = ','.join(MDB.header_shortlist(M, ('from',)))
+    # ... and the recipients, combined
+    env['shortlist_to_cc_bcc'] = ','.join(MDB.header_shortlist(M, ('to', 'cc', 'bcc')))
+    return env
+
   def save_to_pipe(self, argv, mfp=None):
     ''' Pipe a message to the command specific by `argv`.
         `mfp` is a file containing the message text.
@@ -644,7 +671,7 @@ class MessageFiler(O):
           mfp.flush()
           mfp.seek(0)
           return self.save_to_pipe(argv, mfp=mfp)
-    retcode = subprocess.call(argv, env=self.environ, stdin=mfp)
+    retcode = subprocess.call(argv, env=self.process_environ(), stdin=mfp)
     self.log("    %s => | %s" % (("OK" if retcode == 0 else "FAIL"), argv))
     return retcode == 0
 
