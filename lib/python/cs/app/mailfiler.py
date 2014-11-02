@@ -641,7 +641,7 @@ class MessageFiler(O):
   def process_environ(self):
     ''' Compute the environment for a subprocess.
     '''
-    lc_ = lambda hdr_name: hdr_name.tolower().replace('-', '_')
+    lc_ = lambda hdr_name: hdr_name.lower().replace('-', '_')
     env = dict(self.environ)
     M = self.message
     # add header_foo for every Foo: header
