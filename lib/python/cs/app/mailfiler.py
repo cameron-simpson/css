@@ -650,7 +650,9 @@ class MessageFiler(O):
     # add shortlist_foo for every Foo: address header
     MDB = self.maildb
     for hdr_name in 'from', 'to', 'cc', 'bcc', 'reply-to', 'errors_to':
-      env['shortlist_' + lc_(hdr_name)] = ','.join(MDB.header_shortlist(M, ('from',)))
+      hdr_value = M.get(hdr_name)
+      if hdr_value:
+        env['shortlist_' + lc_(hdr_name)] = ','.join(MDB.header_shortlist(M, (hdr_name,)))
     # ... and the recipients, combined
     env['shortlist_to_cc_bcc'] = ','.join(MDB.header_shortlist(M, ('to', 'cc', 'bcc')))
     return env
