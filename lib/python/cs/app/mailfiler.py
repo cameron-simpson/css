@@ -823,7 +823,7 @@ def parserules(fp):
         # yield old rule if in progress
         if R:
           yield R
-        R = None
+          R = None
 
         if line[offset] == '<':
           # include another categories file
