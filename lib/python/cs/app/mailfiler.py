@@ -894,9 +894,10 @@ def parserules(fp):
           R = None
           continue
 
-        # leading optional '+' (continue, default) or '=' (final)
+        # leading optional '+' (continue, undelivered) or '=' (final)
         if line[offset] == '+':
           R.flags.halt = False
+          R.flags.undelivered = True
           offset += 1
         elif line[offset] == '=':
           R.flags.halt = True
@@ -1151,7 +1152,7 @@ class Rule(O):
     self.lineno = lineno
     self.conditions = slist()
     self.actions = slist()
-    self.flags = O(alert=0, halt=False)
+    self.flags = O(alert=0, halt=False, undelivered=False)
     self.label = ''
 
   @property
