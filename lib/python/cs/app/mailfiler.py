@@ -391,6 +391,7 @@ class MessageFiler(O):
     self.environ = dict(environ)
     self._log = None
     self.targets = set()
+    self.targets_also = set()
     self.labels = set()
     self.flags = O(alert=0,
                    flagged=False, passed=False, replied=False,
@@ -420,12 +421,17 @@ class MessageFiler(O):
       exception("matching rules: %s", e)
       return False
 
+    ok = True
     if not self.targets:
       if self.default_target:
         self.targets.add(self.default_target)
       else:
         error("no matching targets and no DEFAULT")
-        return False
+        ok = False
+
+    self.targets.update(self.targets_also)
+    if not self.targets:
+      return False
 
     if self.labels:
       xlabels = set()
@@ -443,8 +449,7 @@ class MessageFiler(O):
         M['X-Label'] = ", ".join( sorted(list(self.labels)) )
         self.message = M
 
-    ok = True
-    for target in sorted(list(self.targets)):
+    for target in sorted(list(self.targets+self.targets_also)):
       with Pfx(target):
         try:
           self.save_target(target)
@@ -484,7 +489,10 @@ class MessageFiler(O):
               else:
                 warning("ignoring unsupported flag \"%s\"" % (target,))
             else:
-              self.targets.add(target)
+              if R.flags.undelivered:
+                self.targets_also.add(target)
+              else:
+                self.targets.add(target)
           elif action == 'ASSIGN':
             envvar, s = arg
             value = self.environ[envvar] = envsub(s, self.environ)
