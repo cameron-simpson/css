@@ -391,6 +391,7 @@ class MessageFiler(O):
     self.environ = dict(environ)
     self._log = None
     self.targets = set()
+    self.targets_also = set()
     self.labels = set()
     self.flags = O(alert=0,
                    flagged=False, passed=False, replied=False,
@@ -420,12 +421,17 @@ class MessageFiler(O):
       exception("matching rules: %s", e)
       return False
 
+    ok = True
     if not self.targets:
       if self.default_target:
         self.targets.add(self.default_target)
       else:
         error("no matching targets and no DEFAULT")
-        return False
+        ok = False
+
+    self.targets.update(self.targets_also)
+    if not self.targets:
+      return False
 
     if self.labels:
       xlabels = set()
@@ -443,8 +449,7 @@ class MessageFiler(O):
         M['X-Label'] = ", ".join( sorted(list(self.labels)) )
         self.message = M
 
-    ok = True
-    for target in sorted(list(self.targets)):
+    for target in sorted(list(self.targets+self.targets_also)):
       with Pfx(target):
         try:
           self.save_target(target)
@@ -457,6 +462,53 @@ class MessageFiler(O):
 
     self.logflush()
     return ok
+
+  def apply_rule(self, R):
+    ''' Apply this the rule `R` to this MessageFiler.
+        The rule label, if any, is appended to the .labels attribute.
+        Each action is applied to the state.
+        Assignments update the .environ attribute.
+        Targets accrue in the .targets attribute.
+    '''
+    M = self.message
+    with Pfx(R.context):
+      self.flags.alert = max(self.flags.alert, R.flags.alert)
+      if R.label:
+        self.labels.add(R.label)
+      for action, arg in R.actions:
+        try:
+          if action == 'TARGET':
+            target = envsub(arg, self.environ)
+            if len(target) == 1 and target.isupper():
+              if target == 'D':   self.flags.draft = True
+              elif target == 'F': self.flags.flagged = True
+              elif target == 'P': self.flags.passed = True
+              elif target == 'R': self.flags.replied = True
+              elif target == 'S': self.flags.seen = True
+              elif target == 'T': self.flags.trashed = True
+              else:
+                warning("ignoring unsupported flag \"%s\"" % (target,))
+            else:
+              if R.flags.undelivered:
+                self.targets_also.add(target)
+              else:
+                self.targets.add(target)
+          elif action == 'ASSIGN':
+            envvar, s = arg
+            value = self.environ[envvar] = envsub(s, self.environ)
+            debug("ASSIGN %s=%s", envvar, value)
+            if envvar == 'LOGFILE':
+              self.logto(value)
+            elif envvar == 'DEFAULT':
+              self.default_target = value
+          else:
+            raise RuntimeError("unimplemented action \"%s\"" % action)
+        except (AttributeError, NameError):
+          raise
+        except Exception as e:
+          warning("EXCEPTION %r", e)
+          failed_actions.append( (action, arg, e) )
+          raise
 
   @property
   def maildb(self):
@@ -823,7 +875,7 @@ def parserules(fp):
         # yield old rule if in progress
         if R:
           yield R
-        R = None
+          R = None
 
         if line[offset] == '<':
           # include another categories file
@@ -850,9 +902,10 @@ def parserules(fp):
           R = None
           continue
 
-        # leading optional '+' (continue, default) or '=' (final)
+        # leading optional '+' (continue, undelivered) or '=' (final)
         if line[offset] == '+':
           R.flags.halt = False
+          R.flags.undelivered = True
           offset += 1
         elif line[offset] == '=':
           R.flags.halt = True
@@ -1107,7 +1160,7 @@ class Rule(O):
     self.lineno = lineno
     self.conditions = slist()
     self.actions = slist()
-    self.flags = O(alert=0, halt=False)
+    self.flags = O(alert=0, halt=False, undelivered=False)
     self.label = ''
 
   @property
@@ -1122,50 +1175,6 @@ class Rule(O):
       if not C.match(filer):
         return False
     return True
-
-  def apply(self, filer):
-    ''' Apply this rule to the `filer`.
-        The rule label, if any, is appended to the .labels attribute.
-        Each action is applied to the state.
-        Assignments update the .environ attribute.
-        Targets accrue in the .targets attribute.
-    '''
-    M = filer.message
-    with Pfx(self.context):
-      filer.flags.alert = max(filer.flags.alert, self.flags.alert)
-      if self.label:
-        filer.labels.add(self.label)
-      for action, arg in self.actions:
-        try:
-          if action == 'TARGET':
-            target = envsub(arg, filer.environ)
-            if len(target) == 1 and target.isupper():
-              if target == 'D':   filer.flags.draft = True
-              elif target == 'F': filer.flags.flagged = True
-              elif target == 'P': filer.flags.passed = True
-              elif target == 'R': filer.flags.replied = True
-              elif target == 'S': filer.flags.seen = True
-              elif target == 'T': filer.flags.trashed = True
-              else:
-                warning("ignoring unsupported flag \"%s\"" % (target,))
-            else:
-              filer.targets.add(target)
-          elif action == 'ASSIGN':
-            envvar, s = arg
-            value = filer.environ[envvar] = envsub(s, filer.environ)
-            debug("ASSIGN %s=%s", envvar, value)
-            if envvar == 'LOGFILE':
-              filer.logto(value)
-            elif envvar == 'DEFAULT':
-              filer.default_target = value
-          else:
-            raise RuntimeError("unimplemented action \"%s\"" % action)
-        except (AttributeError, NameError):
-          raise
-        except Exception as e:
-          warning("EXCEPTION %r", e)
-          failed_actions.append( (action, arg, e) )
-          raise
 
 class Rules(list):
   ''' Simple subclass of list storing rules, with methods to load
@@ -1194,7 +1203,7 @@ class Rules(list):
     for R in self:
       with Pfx(R.context):
         if R.match(filer):
-          R.apply(filer)
+          self.apply_rule(R)
           if R.flags.halt:
             done = True
             break
