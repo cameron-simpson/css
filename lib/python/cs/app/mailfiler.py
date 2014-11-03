@@ -458,6 +458,50 @@ class MessageFiler(O):
     self.logflush()
     return ok
 
+  def apply_rule(self, R):
+    ''' Apply this the rule `R` to this MessageFiler.
+        The rule label, if any, is appended to the .labels attribute.
+        Each action is applied to the state.
+        Assignments update the .environ attribute.
+        Targets accrue in the .targets attribute.
+    '''
+    M = self.message
+    with Pfx(R.context):
+      self.flags.alert = max(self.flags.alert, R.flags.alert)
+      if R.label:
+        self.labels.add(R.label)
+      for action, arg in R.actions:
+        try:
+          if action == 'TARGET':
+            target = envsub(arg, self.environ)
+            if len(target) == 1 and target.isupper():
+              if target == 'D':   self.flags.draft = True
+              elif target == 'F': self.flags.flagged = True
+              elif target == 'P': self.flags.passed = True
+              elif target == 'R': self.flags.replied = True
+              elif target == 'S': self.flags.seen = True
+              elif target == 'T': self.flags.trashed = True
+              else:
+                warning("ignoring unsupported flag \"%s\"" % (target,))
+            else:
+              self.targets.add(target)
+          elif action == 'ASSIGN':
+            envvar, s = arg
+            value = self.environ[envvar] = envsub(s, self.environ)
+            debug("ASSIGN %s=%s", envvar, value)
+            if envvar == 'LOGFILE':
+              self.logto(value)
+            elif envvar == 'DEFAULT':
+              self.default_target = value
+          else:
+            raise RuntimeError("unimplemented action \"%s\"" % action)
+        except (AttributeError, NameError):
+          raise
+        except Exception as e:
+          warning("EXCEPTION %r", e)
+          failed_actions.append( (action, arg, e) )
+          raise
+
   @property
   def maildb(self):
     return self.context.maildb
@@ -1123,50 +1167,6 @@ class Rule(O):
         return False
     return True
 
-  def apply(self, filer):
-    ''' Apply this rule to the `filer`.
-        The rule label, if any, is appended to the .labels attribute.
-        Each action is applied to the state.
-        Assignments update the .environ attribute.
-        Targets accrue in the .targets attribute.
-    '''
-    M = filer.message
-    with Pfx(self.context):
-      filer.flags.alert = max(filer.flags.alert, self.flags.alert)
-      if self.label:
-        filer.labels.add(self.label)
-      for action, arg in self.actions:
-        try:
-          if action == 'TARGET':
-            target = envsub(arg, filer.environ)
-            if len(target) == 1 and target.isupper():
-              if target == 'D':   filer.flags.draft = True
-              elif target == 'F': filer.flags.flagged = True
-              elif target == 'P': filer.flags.passed = True
-              elif target == 'R': filer.flags.replied = True
-              elif target == 'S': filer.flags.seen = True
-              elif target == 'T': filer.flags.trashed = True
-              else:
-                warning("ignoring unsupported flag \"%s\"" % (target,))
-            else:
-              filer.targets.add(target)
-          elif action == 'ASSIGN':
-            envvar, s = arg
-            value = filer.environ[envvar] = envsub(s, filer.environ)
-            debug("ASSIGN %s=%s", envvar, value)
-            if envvar == 'LOGFILE':
-              filer.logto(value)
-            elif envvar == 'DEFAULT':
-              filer.default_target = value
-          else:
-            raise RuntimeError("unimplemented action \"%s\"" % action)
-        except (AttributeError, NameError):
-          raise
-        except Exception as e:
-          warning("EXCEPTION %r", e)
-          failed_actions.append( (action, arg, e) )
-          raise
-
 class Rules(list):
   ''' Simple subclass of list storing rules, with methods to load
       rules and filter a message using the rules.
@@ -1194,7 +1194,7 @@ class Rules(list):
     for R in self:
       with Pfx(R.context):
         if R.match(filer):
-          R.apply(filer)
+          self.apply_rule(R)
           if R.flags.halt:
             done = True
             break
