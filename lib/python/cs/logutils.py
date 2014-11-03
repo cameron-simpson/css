@@ -198,8 +198,8 @@ def nl(msg, *args, **kw):
   else:
     flush()
 
-def logTo(filename, logger=None, mode='a', encoding=None, delay=False, format=None):
-  ''' Log to the specified filename.
+def add_log(filename, logger=None, mode='a', encoding=None, delay=False, format=None):
+  ''' Add a FileHandler logging to the specified `filename`; return the chosen logger and the new handler.
       If `logger` is supplied and not None, add the FileHandler to that
       Logger, otherwise to the root Logger. If `logger` is a string, call
       logging.getLogger(logger) to obtain the logger.
@@ -207,7 +207,6 @@ def logTo(filename, logger=None, mode='a', encoding=None, delay=False, format=No
       initialiser.
       `format` is used to set the handler's formatter. It defaults to:
         %(asctime)s %(levelname)s %(message)s
-      Returns the logger and handler.
   '''
   if logger is None:
     logger = logging.getLogger()
@@ -220,6 +219,8 @@ def logTo(filename, logger=None, mode='a', encoding=None, delay=False, format=No
   handler.setFormatter(formatter)
   logger.addHandler(handler)
   return logger, handler
+
+logTo = add_log
 
 class NullHandler(logging.Handler):
   def emit(self, record):
