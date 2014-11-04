@@ -6,6 +6,7 @@
 
 from __future__ import with_statement
 import codecs
+from contextlib import contextmanager
 import logging
 import os
 import os.path
@@ -221,6 +222,12 @@ def add_log(filename, logger=None, mode='a', encoding=None, delay=False, format=
   return logger, handler
 
 logTo = add_log
+
+@contextmanager
+def with_log(filename, logger=None, mode='a', encoding=None, delay=False, format=None):
+  logger, handler = add_log(filename, logger=logger, mode=mode, encoding=encoding, delay=delay, format=format)
+  yield
+  logger.removeHandler(handler)
 
 class NullHandler(logging.Handler):
   def emit(self, record):
