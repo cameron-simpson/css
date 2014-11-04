@@ -28,7 +28,7 @@ from cs.env import envsub
 from cs.fileutils import abspath_from_file, file_property, files_property, \
                          longpath, Pathname
 from cs.lex import get_white, get_nonwhite, get_qstr, unrfc2047
-from cs.logutils import Pfx, setup_logging, \
+from cs.logutils import Pfx, setup_logging, with_log, \
                         debug, info, warning, error, exception, \
                         D, X, LogTime
 from cs.mailutils import Maildir, message_addresses, shortpath, ismaildir, make_maildir
@@ -315,12 +315,12 @@ class MailFiler(O):
             with LogTime("key = %s", key, threshold=1.0, level=DEBUG):
               ok = self.file_wmdir_key(wmdir, key)
               if not ok:
-                self.log("NOT OK, lurking key %s", key)
+                warning("NOT OK, lurking key %s", key)
                 wmdir.lurk(key)
                 continue
 
               if no_remove:
-                filer.log("no_remove: message not removed, lurking key %s", key)
+                info("no_remove: message not removed, lurking key %s", key)
                 wmdir.lurk(key)
               else:
                 debug("remove message key %s", key)
@@ -390,7 +390,6 @@ class MessageFiler(O):
     self.default_target = None
     self.context = context
     self.environ = dict(environ)
-    self._log = None
     self.targets = set()
     self.targets_also = set()
     self.labels = set()
@@ -405,64 +404,63 @@ class MessageFiler(O):
 	specified the filename of the message, supporting hard linking
 	the message into a Maildir.
     '''
-    self.message = M
-    self.message_path = None
-    self.logto(envsub("$HOME/var/log/mailfiler"))
-    self.log( (u("%s %s") % (time.strftime("%Y-%m-%d %H:%M:%S"),
-                               unrfc2047(M.get('subject', '_no_subject'))))
-               .replace('\n', ' ') )
-    self.log("  " + self.format_message(M, "{short_from}->{short_recipients}"))
-    self.log("  " + M.get('message-id', '<?>'))
-    if self.message_path:
-      self.log("  " + shortpath(self.message_path))
+    with with_log(envsub("$HOME/var/log/mailfiler")):
+      self.message = M
+      self.message_path = None
+      info( (u("%s %s") % (time.strftime("%Y-%m-%d %H:%M:%S"),
+                                 unrfc2047(M.get('subject', '_no_subject'))))
+                 .replace('\n', ' ') )
+      info("  " + self.format_message(M, "{short_from}->{short_recipients}"))
+      info("  " + M.get('message-id', '<?>'))
+      if self.message_path:
+        info("  " + shortpath(self.message_path))
 
-    try:
-      rules.match(self)
-    except Exception as e:
-      exception("matching rules: %s", e)
-      return False
+      try:
+        rules.match(self)
+      except Exception as e:
+        exception("matching rules: %s", e)
+        return False
 
-    ok = True
-    if not self.targets:
-      if self.default_target:
-        self.targets.add(self.default_target)
-      else:
-        error("no matching targets and no DEFAULT")
-        ok = False
-
-    self.targets.update(self.targets_also)
-    if not self.targets:
-      return False
-
-    if self.labels:
-      xlabels = set()
-      for labelhdr in M.get_all('X-Label', ()):
-        for label in labelhdr.split(','):
-          label = label.strip()
-          if label:
-            xlabels.add(label)
-      new_labels = self.labels - xlabels
-      if new_labels:
-        # add labels to message
-        self.labels.update(new_labels)
-        self.message_path = None
-        M = message_from_string(M.as_string())
-        M['X-Label'] = ", ".join( sorted(list(self.labels)) )
-        self.message = M
-
-    for target in sorted(list(self.targets+self.targets_also)):
-      with Pfx(target):
-        try:
-          self.save_target(target)
-        except Exception as e:
-          exception("saving to %r: %s", target, e)
+      ok = True
+      if not self.targets:
+        if self.default_target:
+          self.targets.add(self.default_target)
+        else:
+          error("no matching targets and no DEFAULT")
           ok = False
 
-    if self.flags.alert > 0:
-      self.alert(self.flags.alert)
+      self.targets.update(self.targets_also)
+      if not self.targets:
+        return False
 
-    self.logflush()
-    return ok
+      if self.labels:
+        xlabels = set()
+        for labelhdr in M.get_all('X-Label', ()):
+          for label in labelhdr.split(','):
+            label = label.strip()
+            if label:
+              xlabels.add(label)
+        new_labels = self.labels - xlabels
+        if new_labels:
+          # add labels to message
+          self.labels.update(new_labels)
+          self.message_path = None
+          M = message_from_string(M.as_string())
+          M['X-Label'] = ", ".join( sorted(list(self.labels)) )
+          self.message = M
+
+      for target in sorted(list(self.targets)):
+        with Pfx(target):
+          try:
+            self.save_target(target)
+          except Exception as e:
+            exception("saving to %r: %s", target, e)
+            ok = False
+
+      if self.flags.alert > 0:
+        self.alert(self.flags.alert)
+
+      return ok
 
   def apply_rule(self, R):
     ''' Apply this the rule `R` to this MessageFiler.
@@ -499,7 +497,8 @@ class MessageFiler(O):
             value = self.environ[envvar] = envsub(s, self.environ)
             debug("ASSIGN %s=%s", envvar, value)
             if envvar == 'LOGFILE':
-              self.logto(value)
+              warning("LOGFILE= unimplemented at present")
+              ## TODO: self.logto(value)
             elif envvar == 'DEFAULT':
               self.default_target = value
           else:
@@ -524,40 +523,6 @@ class MessageFiler(O):
 
   def resolve(self, foldername):
     return resolve_mail_path(foldername, self.MAILDIR)
-
-  def log(self, *a):
-    ''' Log a message.
-    '''
-    log = self._log
-    if log is None:
-      log = sys.stdout
-    try:
-      print(*[ unicode(s) for s in a], file=log)
-    except UnicodeDecodeError as e:
-      print("MessageFiler.log: %s: a=%r" % (e, a), file=sys.stderr)
-
-  def logto(self, logfilepath):
-    ''' Direct log messages to the supplied `logfilepath`.
-    '''
-    if self._log and self._log_path == logfilepath:
-      return
-    self.logclose()
-    try:
-      self._log = io.open(logfilepath, "a", encoding='utf-8')
-    except OSError as e:
-      self.log("open(%s): %s" % (logfilepath, e))
-    else:
-      self._log_path = logfilepath
-
-  def logflush(self):
-    if self._log:
-      self._log.flush()
-
-  def logclose(self):
-    if self._log:
-      self._log.close()
-      self._log = None
-      self._log_path = None
 
   @property
   def groups(self):
@@ -677,7 +642,7 @@ class MessageFiler(O):
     savepath = mdir.keypath(savekey)
     if not path:
       self.message_path = savepath
-    self.log("    OK %s" % (shortpath(savepath)))
+    info("    OK %s" % (shortpath(savepath)))
     return savepath
 
   def save_to_mbox(self, mboxpath, status, x_status):
@@ -689,7 +654,7 @@ class MessageFiler(O):
     text = M.as_string(True)
     with open(mboxpath, "a") as mboxfp:
       mboxfp.write(text)
-    self.log("    OK >> %s" % (shortpath(mboxpath)))
+    info("    OK >> %s" % (shortpath(mboxpath)))
 
   def process_environ(self):
     ''' Compute the environment for a subprocess.
@@ -727,7 +692,7 @@ class MessageFiler(O):
           mfp.seek(0)
           return self.save_to_pipe(argv, mfp=mfp)
     retcode = subprocess.call(argv, env=self.process_environ(), stdin=mfp)
-    self.log("    %s => | %s" % (("OK" if retcode == 0 else "FAIL"), argv))
+    info("    %s => | %s" % (("OK" if retcode == 0 else "FAIL"), argv))
     return retcode == 0
 
   def sendmail(self, address, mfp=None):
@@ -1204,7 +1169,7 @@ class Rules(list):
     for R in self:
       with Pfx(R.context):
         if R.match(filer):
-          self.apply_rule(R)
+          filer.apply_rule(R)
           if R.flags.halt:
             done = True
             break
