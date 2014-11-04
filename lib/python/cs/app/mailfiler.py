@@ -85,27 +85,28 @@ def main(argv, stdin=None):
         except GetoptError as e:
           warning("%s", e)
           badopts = True
-        for opt, val in opts:
-          with Pfx(opt):
-            if opt == '-1':
-              justone = True
-            elif opt == '-d':
-              try:
-                delay = int(val)
-              except ValueError as e:
-                warning("%s: %s", e, val)
-                badopts = True
-              else:
-                if delay <= 0:
-                  warning("delay must be positive, got: %d", delay)
+        else:
+          for opt, val in opts:
+            with Pfx(opt):
+              if opt == '-1':
+                justone = True
+              elif opt == '-d':
+                try:
+                  delay = int(val)
+                except ValueError as e:
+                  warning("%s: %s", e, val)
                   badopts = True
-            elif opt == '-n':
-              no_remove = True
-            elif opt == '-R':
-              rules_pattern = val
-            else:
-              warning("unimplemented option")
-              badopts = True
+                else:
+                  if delay <= 0:
+                    warning("delay must be positive, got: %d", delay)
+                    badopts = True
+              elif opt == '-n':
+                no_remove = True
+              elif opt == '-R':
+                rules_pattern = val
+              else:
+                warning("unimplemented option")
+                badopts = True
         mdirpaths = argv
       elif op == 'save':
         if not argv:
