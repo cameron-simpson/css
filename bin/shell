@@ -4,13 +4,13 @@
 #   - Cameron Simpson <cs@zip.com.au> 01nov2014
 #
 
-[ $# = 0 ] || { echo "Usage: $0" >&2; exit 2; }
+[ $# = 0 ] || { echo "Usage: $0 [shell-arguments...]" >&2; exit 2; }
 
 : ${SHELL:=/bin/sh}
 : ${BASH_ENV:=$HOME/.bash_env}
 export BASH_ENV
 
-set -- "$SHELL"
+set -- "$SHELL" ${1+"$@"}
 
 if [ -x /opt/local/bin/reattach-to-user-namespace ]
 then  set -- /opt/local/bin/reattach-to-user-namespace "$@"
