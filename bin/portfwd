@@ -157,7 +157,7 @@ flag_connected=
 trap 'abort' 1 2 3 15
 
 # dispatch default route monitor if not already running
-$trace route_default monitor-default-route &
+$trace monitor-default-route &
 
 if [ $# -gt 1 ]
 then
