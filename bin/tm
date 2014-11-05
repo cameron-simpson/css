@@ -202,7 +202,7 @@ case "$op" in
     case "$session_name" in
       [1-9]*)
         session_name=$(
-          "$0" list-sessions -n -F '#{session_name}'\
+          "$0" list-sessions -n -F '#{session_name}' \
           | awk -v "session_number=$session_name" '$1 == session_number { print $2 }'
         )
         ;;
