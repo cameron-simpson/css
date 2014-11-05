@@ -8,6 +8,6 @@ svc_name=route_default
 flag_name=ROUTE_DEFAULT
 
 exec \
-  svcd -n "$svc_name" -x \
+  svcd -l -n "$svc_name" -x \
     flag -w "$flag_name" \
       -c "netstat -rn | egrep '^(default|0\\.0\\.0\\.0) +[1-9]' >/dev/null"
