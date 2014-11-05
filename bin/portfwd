@@ -156,6 +156,9 @@ subpids=
 flag_connected=
 trap 'abort' 1 2 3 15
 
+# dispatch default route monitor if not already running
+$trace route_default monitor-default-route &
+
 if [ $# -gt 1 ]
 then
   # multiple targets - dispatch portfwd for each
@@ -205,7 +208,7 @@ do
 done
 test_shcmd=" $test_shcmd
            "'ssh-add -l >/dev/null || exit 1
-             netstat -rn | egrep '\''^(default|0\.0\.0\.0) +[1-9]'\'' >/dev/null || exit 1
+             flag -w ROUTE_DEFAULT
              [ -x "$HOME/bin-local/do-portfwd" ] || exit 0
              "$HOME/bin-local/do-portfwd"
             '
