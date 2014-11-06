@@ -37,7 +37,7 @@ have_tmux(){
 next_suffix(){
   _ns_prefix=$1
   _ns_max=$(
-    ( sed -n "s/^$_ns_prefix\\([1-9][0-9]*\\)$//p"
+    ( sed -n "s/:.*//; s/^$_ns_prefix\\([1-9][0-9]*\\)$/\\1/p"
       echo 0
     ) \
     | sort -nru \
@@ -89,11 +89,40 @@ case "$op" in
           badopts=1
           ;;
       esac
-      if [ $# -gt 0 ]
-      then
-        echo "$cmd: $op: extra arguments after prefix: $*" >&2
-        badopts=1
-      fi
+    fi
+    if [ $# -gt 0 ]
+    then
+      echo "$cmd: $op: extra arguments after prefix: $*" >&2
+      badopts=1
+    fi
+    ;;
+  pick-new-prefix-session-remote)
+    if [ $# = 0 ]
+    then
+      echo "$cmd: $op: missing prefix" >&2
+      badopts=1
+    else
+      session_prefix=$1
+      shift
+      case "$session_prefix" in
+        *[/*\\\[]*)
+          echo "$cmd: $op: invalid session prefix: $session_prefix" >&2
+          badopts=1
+          ;;
+      esac
+    fi
+    if [ $# = 0 ]
+    then
+      echo "$cmd: $op: missing remote-host" >&2
+      badopts=1
+    else
+      remote_host=$1
+      shift
+    fi
+    if [ $# -gt 0 ]
+    then
+      echo "$cmd: $op: extra arguments after remote-host: $*" >&2
+      badopts=1
     fi
     ;;
   recite-function-remote)
@@ -142,6 +171,10 @@ case "$op" in
     tmux start-server
     echo "$prefix"$(tmux list-sessions | next_suffix "$prefix")
     ;;
+  pick-new-prefix-session-remote)
+    session_name=$session_prefix$( $trace ssh "$remote_host" "tmux start-server && tmux list-sessions" | next_suffix "$session_prefix" )
+    echo "$session_name"
+    ;;
   recite-function-remote)
     echo '
         # Usage: tm_remote [host[:session_name]]
@@ -172,9 +205,9 @@ case "$op" in
           esac
           # allocate new session name if nothing specified
           [ -n "$_tm_session" ] \
-          || _tm_session=$_tm_src_prefix$( $trace ssh "$_tm_host" "tmux start-server && tmux list-sessions" | next_suffix "$_tm_src_prefix" ) \
+          || _tm_session=$( tm pick-new-prefix-session-remote "$_tm_src_prefix" "$_tm_host" ) \
           || return 1
-          $trace ssh -t "$_tm_host" "set -x; tmux has-session -t $_tm_session && tmux-attach-session -t $_tm_session || tmux new-session -s $_tm_session"
+          $trace ssh -t "$_tm_host" "set -x; tmux has-session -t $_tm_session && tmux attach-session -t $_tm_session || tmux new-session -s $_tm_session"
     }'
     ;;
   use-session)
