@@ -30,6 +30,7 @@ usage="Usage: $cmd [options...] [op [args...]]
   use-session session-name
     Join the session named \"session-name\", creating it if necessary."
 
+# Test if this system has tmux in its $PATH.
 have_tmux(){
   which tmux >/dev/null 2>&1
 }
@@ -134,12 +135,14 @@ esac
 
 case "$op" in
   list-prefix-sessions)
+    tmux start-server
     $trace tmux list-sessions -F '#{session_name}' \
     | sed -n "s/^$session_prefix//p"
     ;;
   ls | list-sessions)
     # no tmux? use scr
     have_tmux || exec $trace scr
+    tmux start-server
     if [ "x$1" = x-n ]
     then
       shift
@@ -150,6 +153,7 @@ case "$op" in
     fi
     ;;
   pick-new-prefix-session)
+    tmux start-server
     curmax=$(
       ( "$0" list-prefix-sessions "$session_prefix" \
         | grep "^[1-9][0-9]*$"
@@ -199,10 +203,11 @@ case "$op" in
   use-session)
     # no tmux? use scr
     have_tmux || exec $trace scr "$session_name"
+    tmux start-server
     case "$session_name" in
       [1-9]*)
         session_name=$(
-          "$0" list-sessions -n -F '#{session_name}'\
+          "$0" list-sessions -n -F '#{session_name}' \
           | awk -v "session_number=$session_name" '$1 == session_number { print $2 }'
         )
         ;;
