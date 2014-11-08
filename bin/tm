@@ -18,6 +18,12 @@ cmd=$(basename "$0")
 usage="Usage: $cmd [options...] [op [args...]]
   UPPERCASE_NAME
     Shorthand for \"use-session UPPERCASE_NAME\". Includes names starting with an underscore.
+  =new-session-name
+    Rename the current session name to \"new-session-name\".
+    To be used within a tmux session; relies on \$TMUX_PANE.
+  number=new-session-name
+  UPPERCASE_NAME=new-session-name
+    Rename the specified session to \"new-session-name\".
   ls | list-sessions [-n] [tmux-list-sessions-options...]
     List sessions. Default if no op supplied.
   pick-new-prefix-session prefix
@@ -64,6 +70,28 @@ done
 op=$1
 shift
 case "$op" in
+  =?*)
+    if [ $# -gt 0 ]
+    then
+      echo "$cmd: $op: extra arguments: $*" >&2
+      badopts=1
+    else
+      session_name=$TMUX_PANE
+      session_name_new=$( expr "x$op" : 'x=\(.*\)' )
+      op=rename
+    fi
+    ;;
+  [1-9_A-Z]*=?*)
+    if [ $# -gt 0 ]
+    then
+      echo "$cmd: $op: extra arguments: $*" >&2
+      badopts=1
+    else
+      session_name=$( expr "x$op" : 'x\([^=]*\)=.*' )
+      session_name_new=$( expr "x$op" : 'x[^=]*=\(.*\)' )
+      op=rename
+    fi
+    ;;
   [1-9_A-Z]*)
     session_name=$op
     op=use-session
@@ -132,6 +160,29 @@ case "$op" in
       badopts=1
     fi
     ;;
+  rename)
+    if [ $# = 0 ]
+    then
+      echo "$cmd: $op: missing session-name" >&2
+      badopts=1
+    else
+      session_name=$1
+      shift
+    fi
+    if [ $# = 0 ]
+    then
+      echo "$cmd: $op: missing new-session-name" >&2
+      badopts=1
+    else
+      session_name_new=$2
+      shift
+    fi
+    if [ $# -gt 0 ]
+    then
+      echo "$cmd: $op: extra arguments: $*" >&2
+      badopts=1
+    fi
+    ;;
   use-session)
     if [ $# = 0 ]
     then
@@ -147,7 +198,9 @@ case "$op" in
       fi
     fi
     ;;
-  *)  echo "$cmd: unrecognised op: $op" >&2; badopts=1 ;;
+  *)echo "$cmd: unrecognised op: $op" >&2
+    badopts=1
+    ;;
 esac
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
@@ -207,8 +260,25 @@ case "$op" in
           [ -n "$_tm_session" ] \
           || _tm_session=$( tm pick-new-prefix-session-remote "$_tm_src_prefix" "$_tm_host" ) \
           || return 1
-          $trace ssh -t "$_tm_host" "set -x; tmux has-session -t $_tm_session && tmux attach-session -t $_tm_session || tmux new-session -s $_tm_session"
+          $trace ssh -t "$_tm_host" "set -uex; tmux start-server; tmux has-session -t $_tm_session && tmux attach-session -t $_tm_session || tmux new-session -s $_tm_session"
     }'
+    ;;
+  rename)
+    case "$session_name" in
+      [1-9]*)
+        session_name=$(
+          "$0" list-sessions -n -F '#{session_name}' \
+          | awk -v "session_number=$session_name" '$1 == session_number { print $2 }'
+        )
+        ;;
+    esac
+    if $trace tmux has-session -t "$session_name"
+    then
+      $trace tmux rename-session -t "$session_name" "$session_name_new"
+    else
+      echo "$cmd: $op: no such session: $session_name" >&2
+      exit 1
+    fi
     ;;
   use-session)
     # no tmux? use scr
