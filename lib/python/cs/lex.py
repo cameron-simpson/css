@@ -364,12 +364,18 @@ def get_qstr(s, offset):
   offset = m.end()
 
   # decode the quoted string
+  parts = []
   pos = 0
   spos = qs.find('\\', pos)
   while spos >= 0:
-    qs = qs[:spos] + qs[spos+1:]
-    pos = spos + 1
-  return qs, offset
+    if spos > 0:
+      parts.append(qs[pos:spos])    # part before slosh
+    parts.append(qs[spos+1])        # char after slosh
+    pos = spos + 2
+    spos = qs.find('\\', pos)
+  if pos < len(qs):
+    parts.append(qs[pos:])          # tail of string
+  return ''.join(parts), offset
 
 def isUC_(s):
   ''' Check that a string matches ^[A-Z][A-Z_0-9]*$.
