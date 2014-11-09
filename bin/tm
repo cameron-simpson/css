@@ -50,7 +50,7 @@ have_tmux(){
 next_suffix(){
   _ns_prefix=$1
   _ns_max=$(
-    ( sed -n "s/:.*//; s/^$_ns_prefix\\([1-9][0-9]*\\)$/\\1/p"
+    ( sed -n "s/^$_ns_prefix\\([1-9][0-9]*\\)$/\\1/p"
       echo 0
     ) \
     | sort -nru \
@@ -252,10 +252,10 @@ case "$op" in
   pick-new-prefix-session)
     prefix=$1
     tmux start-server
-    echo "$prefix"$(tmux list-sessions | next_suffix "$prefix")
+    echo "$prefix"$(tmux list-sessions | sed 's/:.*//' | next_suffix "$prefix")
     ;;
   pick-new-prefix-session-remote)
-    session_name=$session_prefix$( $trace ssh "$remote_host" "if which tmux >/dev/null 2>&1; then tmux start-server; tmux list-sessions | sed 's/:.*//'; else screen -ls | sed -n 's/^\\t[1-9][0-9]*\\.\(.*\)/\\1/p'; fi" | next_suffix "$session_prefix" )
+    session_name=$session_prefix$( $trace ssh "$remote_host" "$setx; if which tmux >/dev/null 2>&1; then tmux start-server; tmux list-sessions | sed 's/:.*//'; else screen -ls | sed -n 's/^\\t[1-9][0-9]*\\.\([^\\t]*\)\\t.*/\\1/p'; fi" | next_suffix "$session_prefix" )
     echo "$session_name"
     ;;
   recite-function-remote)
