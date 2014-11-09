@@ -113,35 +113,35 @@ class Backend_CSVFile(Backend):
 
   def _monitor(self):
     ''' Monitor loop: collect updates from the backend and apply to the NodeDB.
+        Terminate when the .csv attribute becomes None.
     '''
     first = True
     fromtext = self.nodedb.fromtext
     lastrow = None
-    while self.csv is not None:
+    while True:
       csv = self.csv
       if csv is None:
-        pass
-      else:
-        old_state = csv.filestate
-        if old_state is not None:
-          new_state = FileState(self.pathname)
-          if not new_state.samefile(old_state):
-            # a new CSV file is there; assume rewritten entirely
-            # reconnect and reload
-            with self._lock:
-              self._close_csv()
-              self._open_csv()
-            self.nodedb._scrub()
+        break
+      # check for file replacement
+      old_state = csv.filestate
+      if old_state is not None:
+        new_state = FileState(self.pathname)
+        if not new_state.samefile(old_state):
+          # a new CSV file is there; assume rewritten entirely
+          # reconnect and reload
+          with self._lock:
+            self._close_csv()
+            self._open_csv()
+          self.nodedb._scrub()
       csv = self.csv
       if csv is None:
-        pass
-      else:
-        for row in csv.foreign_rows(to_eof=True):
-          row = resolve_csv_row(row, lastrow)
-          t, name, attr, value = row
-          value = fromtext(value)
-          self.import_csv_row(CSVRow(t, name, attr, value))
-          lastrow = row
+        break
+      for row in csv.foreign_rows(to_eof=True):
+        row = resolve_csv_row(row, lastrow)
+        t, name, attr, value = row
+        value = fromtext(value)
+        self.import_csv_row(CSVRow(t, name, attr, value))
+        lastrow = row
       if first:
         first = False
         self._loaded.release()
