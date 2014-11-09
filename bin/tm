@@ -40,7 +40,8 @@ usage="Usage: $cmd [options...] [op [args...]]
       Print the shell function definition for the \"tm_remote\"
       convenience function, normally aliased as \"@\".
     rename old-session-name new-session-name
-      Rename the specified session \"old-session-name\" to \"new-session-name\".
+      Rename the specified session \"old-session-name\" to
+      \"new-session-name\".
     use-session session-name
       Join the session named \"session-name\", creating it if necessary.
     use-session-remote session-name remote-host
