@@ -255,7 +255,7 @@ case "$op" in
     echo "$prefix"$(tmux list-sessions | next_suffix "$prefix")
     ;;
   pick-new-prefix-session-remote)
-    session_name=$session_prefix$( $trace ssh "$remote_host" "tmux start-server && tmux list-sessions" | next_suffix "$session_prefix" )
+    session_name=$session_prefix$( $trace ssh "$remote_host" "if which tmux >/dev/null 2>&1; then tmux start-server; tmux list-sessions | sed 's/:.*//'; else screen -ls | sed -n 's/^\\t[1-9][0-9]*\\.\(.*\)/\\1/p'; fi" | next_suffix "$session_prefix" )
     echo "$session_name"
     ;;
   recite-function-remote)
@@ -290,7 +290,7 @@ case "$op" in
           [ -n "$_tm_session" ] \
           || _tm_session=$( tm pick-new-prefix-session-remote "$_tm_src_prefix" "$_tm_host" ) \
           || return 1
-          $trace ssh -t "$_tm_host" "set -uex; tmux start-server; tmux has-session -t $_tm_session && tmux attach-session -t $_tm_session || tmux new-session -s $_tm_session"
+          $trace tm $xopt use-session-remote "$_tm_session" "$_tm_host"
     }'
     ;;
   rename)
@@ -327,6 +327,9 @@ case "$op" in
     then  $trace tmux switch-client -t "$session_name"
     else  $trace tmux attach-session -t "$session_name"
     fi
+    ;;
+  use-session-remote)
+    $trace ssh -t "$remote_host" "$setx; set -ue; if which tmux >/dev/null 2>&1; then tmux start-server; tmux has-session -t $session_name && tmux attach-session -t $session_name || tmux new-session -s $session_name; else screen -x $session_name || screen -S $session_name; fi"
     ;;
   *)echo "$cmd: $op: unimplemented" >&2
     exit 1
