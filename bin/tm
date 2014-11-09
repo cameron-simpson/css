@@ -44,8 +44,8 @@ usage="Usage: $cmd [options...] [op [args...]]
     use-session session-name
       Join the session named \"session-name\", creating it if necessary.
     use-session-remote session-name remote-host
-      Join the session named \"session-name\" on the remote host \"remote-host\",
-      creating it if necessary."
+      Join the session named \"session-name\" on the remote host
+      \"remote-host\", creating it if necessary."
 
 # Test if this system has tmux in its $PATH.
 have_tmux(){
