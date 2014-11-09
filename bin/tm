@@ -29,6 +29,8 @@ usage="Usage: $cmd [options...] [op [args...]]
     List sessions. Default if no op supplied.
   pick-new-prefix-session prefix
     Allocate a new session name starting with \"prefix\".
+  pick-new-prefix-session-remote prefix remote-host
+    Allocate a new session name starting with \"prefix\" on the remote host \"remote-host\".
   recite-function-remote
     Print the shell function definition for the \"tm_remote\"
     convenience function, normally aliased as \"@\".
