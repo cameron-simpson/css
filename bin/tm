@@ -17,32 +17,35 @@ xopt=
 
 cmd=$(basename "$0")
 usage="Usage: $cmd [options...] [op [args...]]
-  UPPERCASE_NAME
-    Shorthand for \"use-session UPPERCASE_NAME\". Includes names starting
-    with an underscore.
-  =new-session-name
-    Rename the current session name to \"new-session-name\".
-    To be used within a tmux session; relies on \$TMUX_PANE.
-  number=new-session-name
-  UPPERCASE_NAME=new-session-name
-    Rename the specified session to \"new-session-name\".
-  ls | list-sessions [-n] [tmux-list-sessions-options...]
-    List sessions. Default if no op supplied.
-  pick-new-prefix-session prefix
-    Allocate a new session name starting with \"prefix\".
-  pick-new-prefix-session-remote prefix remote-host
-    Allocate a new session name starting with \"prefix\" on the remote host
-    \"remote-host\".
-  recite-function-remote
-    Print the shell function definition for the \"tm_remote\"
-    convenience function, normally aliased as \"@\".
-  rename old-session-name new-session-name
-    Rename the specified session \"old-session-name\" to \"new-session-name\".
-  use-session session-name
-    Join the session named \"session-name\", creating it if necessary.
-  use-session-remote session-name remote-host
-    Join the session named \"session-name\" on the remote host \"remote-host\",
-    creating it if necessary."
+  Options:
+    -x  Trace command execution.
+  Operations:
+    UPPERCASE_NAME
+      Shorthand for \"use-session UPPERCASE_NAME\". Includes names starting
+      with an underscore.
+    =new-session-name
+      Rename the current session name to \"new-session-name\".
+      To be used within a tmux session; relies on \$TMUX_PANE.
+    number=new-session-name
+    UPPERCASE_NAME=new-session-name
+      Rename the specified session to \"new-session-name\".
+    ls | list-sessions [-n] [tmux-list-sessions-options...]
+      List sessions. Default if no op supplied.
+    pick-new-prefix-session prefix
+      Allocate a new session name starting with \"prefix\".
+    pick-new-prefix-session-remote prefix remote-host
+      Allocate a new session name starting with \"prefix\" on the remote host
+      \"remote-host\".
+    recite-function-remote
+      Print the shell function definition for the \"tm_remote\"
+      convenience function, normally aliased as \"@\".
+    rename old-session-name new-session-name
+      Rename the specified session \"old-session-name\" to \"new-session-name\".
+    use-session session-name
+      Join the session named \"session-name\", creating it if necessary.
+    use-session-remote session-name remote-host
+      Join the session named \"session-name\" on the remote host \"remote-host\",
+      creating it if necessary."
 
 # Test if this system has tmux in its $PATH.
 have_tmux(){
