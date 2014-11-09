@@ -477,17 +477,18 @@ class MessageFiler(O):
       for action, arg in R.actions:
         try:
           if action == 'TARGET':
-            target = envsub(arg, self.environ)
-            if len(target) == 1 and target.isupper():
-              if target == 'D':   self.flags.draft = True
-              elif target == 'F': self.flags.flagged = True
-              elif target == 'P': self.flags.passed = True
-              elif target == 'R': self.flags.replied = True
-              elif target == 'S': self.flags.seen = True
-              elif target == 'T': self.flags.trashed = True
+            if len(arg) == 1 and arg.isupper():
+              flag_letter = arg
+              if flag_letter == 'D':   self.flags.draft = True
+              elif flag_letter == 'F': self.flags.flagged = True
+              elif flag_letter == 'P': self.flags.passed = True
+              elif flag_letter == 'R': self.flags.replied = True
+              elif flag_letter == 'S': self.flags.seen = True
+              elif flag_letter == 'T': self.flags.trashed = True
               else:
-                warning("ignoring unsupported flag \"%s\"" % (target,))
+                warning("ignoring unsupported flag \"%s\"" % (flag_letter,))
             else:
+              target = arg
               if R.flags.undelivered:
                 self.targets_also.add(target)
               else:
@@ -507,7 +508,7 @@ class MessageFiler(O):
           raise
         except Exception as e:
           warning("EXCEPTION %r", e)
-          failed_actions.append( (action, arg, e) )
+          ##failed_actions.append( (action, arg, e) )
           raise
 
   @property
@@ -568,9 +569,11 @@ class MessageFiler(O):
     with Pfx("save_target(%s)", target):
       if target.startswith('|'):
         # pipe message to shell command
+        # NB: let the shell to the environment substitution, not us
         shcmd = target[1:]
-        return self.save_to_pipe(['/bin/sh', '-c', shcmd])
-      elif target.startswith('+'):
+        return self.save_to_pipe(['/bin/sh', '-xc', shcmd])
+
+      if target.startswith('+'):
         # add header field values to groups
         m = re_ADDHEADER.match(target)
         if not m:
@@ -579,7 +582,9 @@ class MessageFiler(O):
         hdr = m.group(1)
         group_names = m.group(2).split(',')
         return self.save_header(hdr, group_names)
-      elif '@' in target:
+
+      targets = envsub(target, self.process_environ())
+      if '@' in target:
         # send message to email address
         return self.sendmail(target)
       else:
