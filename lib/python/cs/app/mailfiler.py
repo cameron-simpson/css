@@ -24,6 +24,7 @@ from tempfile import TemporaryFile
 from threading import Lock, RLock
 import time
 from cs.configutils import ConfigWatcher
+import cs.env
 from cs.env import envsub
 from cs.fileutils import abspath_from_file, file_property, files_property, \
                          longpath, Pathname
@@ -299,45 +300,61 @@ class MailFiler(O):
       return 1
     return 0
 
-  def sweep(self, wmdir, justone=False, no_remove=False):
+  @property
+  def logdir(self):
+    ''' The pathname of the directory in which log files are written.
+    '''
+    varlog = cs.env.varlog(self.environ)
+    return os.path.join(varlog, 'mailfiler')
+
+  def folder_logfile(self, folder_path):
+    ''' Return path to log file associated with the named folder.
+        TODO: ase on relative path from folder root, not just basename.
+    '''
+    return os.path.join(self.logdir, 'filer-%s.log' % (os.path.basename(folder_path)))
+
+  def sweep(self, wmdir, justone=False, no_remove=False, logfile=None):
     ''' Scan a WatchedMaildir for messages to filter.
         Update the set of lurkers with any keys not removed to prevent
         filtering on subsequent calls.
         If `justone`, return after filing the first message.
     '''
-    debug("sweep %s", wmdir.shortname)
-    with Pfx("sweep %s", wmdir.shortname):
-      nmsgs = 0
-      skipped = 0
-      with LogTime("all keys") as all_keys_time:
-        for key in wmdir.keys(flush=True):
-          with Pfx(key):
-            if key in wmdir.lurking:
-              debug("skip lurking key")
-              skipped += 1
-              continue
-            nmsgs += 1
-
-            with LogTime("key = %s", key, threshold=1.0, level=DEBUG):
-              ok = self.file_wmdir_key(wmdir, key)
-              if not ok:
-                warning("NOT OK, lurking key %s", key)
-                wmdir.lurk(key)
+    if logfile is None:
+      logfile = self.folder_logfile(wmdir)
+    with with_log(logfile):
+      debug("sweep %s", wmdir.shortname)
+      with Pfx("sweep %s", wmdir.shortname):
+        nmsgs = 0
+        skipped = 0
+        with LogTime("all keys") as all_keys_time:
+          for key in wmdir.keys(flush=True):
+            with Pfx(key):
+              if key in wmdir.lurking:
+                debug("skip lurking key")
+                skipped += 1
                 continue
+              nmsgs += 1
 
-              if no_remove:
-                info("no_remove: message not removed, lurking key %s", key)
-                wmdir.lurk(key)
-              else:
-                debug("remove message key %s", key)
-                wmdir.remove(key)
-                wmdir.lurking.discard(key)
-              if justone:
-                break
+              with LogTime("key = %s", key, threshold=1.0, level=DEBUG):
+                ok = self.file_wmdir_key(wmdir, key)
+                if not ok:
+                  warning("NOT OK, lurking key %s", key)
+                  wmdir.lurk(key)
+                  continue
 
-      if nmsgs or all_keys_time.elapsed >= 0.2:
-        info("filtered %d messages (%d skipped) in %5.3fs",
-             nmsgs, skipped, all_keys_time.elapsed)
+                if no_remove:
+                  info("no_remove: message not removed, lurking key %s", key)
+                  wmdir.lurk(key)
+                else:
+                  debug("remove message key %s", key)
+                  wmdir.remove(key)
+                  wmdir.lurking.discard(key)
+                if justone:
+                  break
+
+        if nmsgs or all_keys_time.elapsed >= 0.2:
+          info("filtered %d messages (%d skipped) in %5.3fs",
+               nmsgs, skipped, all_keys_time.elapsed)
 
   def save(self, target, msgfp):
     ''' Implementation for command line "save" function: save file to target.
