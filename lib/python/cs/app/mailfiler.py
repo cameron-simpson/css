@@ -142,7 +142,7 @@ def main(argv, stdin=None):
 
   return 0
 
-def current_value(envvar, cfg, cfg_key, default):
+def current_value(envvar, cfg, cfg_key, default, environ):
   ''' Compute a configurable path value on the fly.
   '''
   value = os.environ.get(envvar)
@@ -156,9 +156,15 @@ def current_value(envvar, cfg, cfg_key, default):
 
 class MailFiler(O):
 
-  def __init__(self, config_path):
+  def __init__(self, config_path, environ=None):
+    ''' Initialise the MailFiler.
+        `config_path`: location of config file, default from DEFAULT_MAILFILER_RC.
+        `environ`: initial environment, default from os.environ.
+    '''
     if config_path is None:
       config_path = envsub(DEFAULT_MAILFILER_RC)
+    if environ is None:
+      environ = dict(os.environ)
     self._lock = RLock()
     self.config_path = config_path
     self._cfg = ConfigWatcher(config_path)
@@ -187,7 +193,7 @@ class MailFiler(O):
   def maildb_path(self):
     ''' Compute maildb path on the fly.
     '''
-    return current_value('MAILDB', self.cfg, 'maildb', DEFAULT_MAILDB_PATH)
+    return current_value('MAILDB', self.cfg, 'maildb', DEFAULT_MAILDB_PATH, self.environ)
   @maildb_path.setter
   @locked
   def maildb_path(self, path):
@@ -209,7 +215,7 @@ class MailFiler(O):
     '''
     path = self._msgiddb_path
     if path is None:
-      path = current_value('MESSAGEIDDB', self.cfg, 'msgiddb', DEFAULT_MSGIDDB_PATH)
+      path = current_value('MESSAGEIDDB', self.cfg, 'msgiddb', DEFAULT_MSGIDDB_PATH, self.environ)
     return path
   @msgiddb_path.setter
   @locked
@@ -226,7 +232,7 @@ class MailFiler(O):
   def maildir_path(self):
     path = self._maildir_path
     if path is None:
-      path = current_value('MAILDIR', self.cfg, 'maildir', DEFAULT_MAILDIR_PATH)
+      path = current_value('MAILDIR', self.cfg, 'maildir', DEFAULT_MAILDIR_PATH, self.environ)
     return path
   @maildir_path.setter
   @locked
@@ -237,7 +243,7 @@ class MailFiler(O):
   def rules_pattern(self):
     pattern \
       = self._rules_pattern \
-      = current_value('MAILFILER_RULES_PATTERN', self.cfg, 'rules_pattern', DEFAULT_RULES_PATTERN)
+      = current_value('MAILFILER_RULES_PATTERN', self.cfg, 'rules_pattern', DEFAULT_RULES_PATTERN, self.environ)
     X(".rules_pattern=%r", pattern)
     return pattern
   @rules_pattern.setter
