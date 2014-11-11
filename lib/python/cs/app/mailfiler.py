@@ -145,7 +145,7 @@ def main(argv, stdin=None):
 def current_value(envvar, cfg, cfg_key, default, environ):
   ''' Compute a configurable path value on the fly.
   '''
-  value = os.environ.get(envvar)
+  value = environ.get(envvar)
   if value is None:
     value = cfg.get(cfg_key)
     if value is None:
