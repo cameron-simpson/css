@@ -38,6 +38,7 @@ from cs.threads import locked, locked_property
 from cs.app.maildb import MailDB
 from cs.py3 import unicode as u, StringTypes, ustr
 
+DEFAULT_MAIN_LOG = 'mailfiler/main.log'
 DEFAULT_RULES_PATTERN = '$HOME/.mailfiler/{maildir.basename}'
 DEFAULT_MAILFILER_RC = '$HOME/.mailfilerrc'
 DEFAULT_MAILDB_PATH = '$HOME/.maildb.csv'
@@ -427,7 +428,7 @@ class MessageFiler(O):
 	specified the filename of the message, supporting hard linking
 	the message into a Maildir.
     '''
-    with with_log(envsub("$HOME/var/log/mailfiler")):
+    with with_log(envsub(DEFAULT_MAIN_LOG)):
       self.message = M
       self.message_path = None
       info( (u("%s %s") % (time.strftime("%Y-%m-%d %H:%M:%S"),
