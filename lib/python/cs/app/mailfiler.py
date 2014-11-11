@@ -408,7 +408,7 @@ class MessageFiler(O):
                    Default from os.environ.
     '''
     if environ is None:
-      environ = os.environ
+      environ = dict(context.environ)
     self.header_addresses = {}
     self.default_target = None
     self.context = context
