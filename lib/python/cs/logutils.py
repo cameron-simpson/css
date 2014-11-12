@@ -229,7 +229,7 @@ logTo = add_log
 @contextmanager
 def with_log(filename, logger=None, mode='a', encoding=None, delay=False, format=None):
   logger, handler = add_log(filename, logger=logger, mode=mode, encoding=encoding, delay=delay, format=format)
-  yield
+  yield logger, handler
   logger.removeHandler(handler)
 
 class NullHandler(logging.Handler):
