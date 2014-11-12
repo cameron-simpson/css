@@ -78,9 +78,6 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
   if main_log.encoding is None:
     main_log = codecs.getwriter("utf-8")(main_log)
 
-  if format is None:
-    format = cmd.replace('%','%%')+': %(levelname)s: %(message)s'
-
   if trace_mode is None:
     trace_mode = 'TRACE' in flags
 
@@ -114,7 +111,7 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
 
   rootLogger = logging.getLogger()
   rootLogger.setLevel(level)
-  main_handler.setFormatter(logging.Formatter(format))
+  main_handler.setFormatter(PfxFormatter(format))
   rootLogger.addHandler(main_handler)
   logging_level = level
   if trace_mode:
@@ -218,24 +215,25 @@ def nl(msg, *args, **kw):
   else:
     flush()
 
-def add_log(filename, logger=None, mode='a', encoding=None, delay=False, format=None):
+def add_log(filename, logger=None, mode='a', encoding=None, delay=False, format=None, no_prefix=False):
   ''' Add a FileHandler logging to the specified `filename`; return the chosen logger and the new handler.
       If `logger` is supplied and not None, add the FileHandler to that
       Logger, otherwise to the root Logger. If `logger` is a string, call
       logging.getLogger(logger) to obtain the logger.
       `mode`, `encoding` and `delay` are passed to the logging.FileHandler
       initialiser.
-      `format` is used to set the handler's formatter. It defaults to:
-        %(asctime)s %(levelname)s %(message)s
+      `format` is used to override the handler's default format.
+      `no_prefix`: do not put the Pfx context onto the front of the message.
   '''
   if logger is None:
     logger = logging.getLogger()
   elif type(logger) is str:
     logger = logging.getLogger(logger)
-  if format is None:
-    format = '%(asctime)s %(levelname)s %(message)s'
   handler = logging.FileHandler(filename, mode, encoding, delay)
-  formatter = logging.Formatter(format)
+  if no_prefix:
+    formatter = Formatter(format)
+  else:
+    formatter = PfxFormatter(format)
   handler.setFormatter(formatter)
   logger.addHandler(handler)
   return logger, handler
