@@ -167,8 +167,9 @@ class MailFiler(O):
       config_path = envsub(DEFAULT_MAILFILER_RC)
     if environ is None:
       environ = dict(os.environ)
-    self._lock = RLock()
     self.config_path = config_path
+    self.environ = environ
+    self._lock = RLock()
     self._cfg = ConfigWatcher(config_path)
     self._maildb_path = None
     self._maildb_lock = self._lock
@@ -321,7 +322,7 @@ class MailFiler(O):
         If `justone`, return after filing the first message.
     '''
     if logfile is None:
-      logfile = self.folder_logfile(wmdir)
+      logfile = self.folder_logfile(wmdir.path)
     with with_log(logfile):
       debug("sweep %s", wmdir.shortname)
       with Pfx("sweep %s", wmdir.shortname):
@@ -428,7 +429,7 @@ class MessageFiler(O):
 	specified the filename of the message, supporting hard linking
 	the message into a Maildir.
     '''
-    with with_log(envsub(DEFAULT_MAIN_LOG)):
+    with with_log(os.path.join(cs.env.varlog(self.environ), envsub(DEFAULT_MAIN_LOG))):
       self.message = M
       self.message_path = None
       info( (u("%s %s") % (time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -1232,6 +1233,10 @@ class WatchedMaildir(O):
   @property
   def shortname(self):
     return self.mdir.shortname
+
+  @property
+  def path(self):
+    return self.mdir.dir
 
   def keys(self, flush=False):
     return self.mdir.keys(flush=flush)
