@@ -323,7 +323,7 @@ class MailFiler(O):
     '''
     if logfile is None:
       logfile = self.folder_logfile(wmdir.path)
-    with with_log(logfile):
+    with with_log(logfile, no_prefix=True):
       debug("sweep %s", wmdir.shortname)
       with Pfx("sweep %s", wmdir.shortname):
         nmsgs = 0
