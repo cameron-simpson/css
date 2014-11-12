@@ -23,7 +23,7 @@ from cs.py3 import unicode, StringTypes, ustr
 cmd = __file__
 
 DEFAULT_BASE_FORMAT = '%(asctime)s %(levelname)s %(message)s'
-DEFAULT_PFX_FORMAT = '%(cmd): %(asctime)s %(levelname)s %(pfx): %(message)s'
+DEFAULT_PFX_FORMAT = '%(cmd)s: %(asctime)s %(levelname)s %(pfx)s: %(message)s'
 
 logging_level = logging.INFO
 trace_level = logging.DEBUG
@@ -127,7 +127,7 @@ class PfxFormatter(Formatter):
       fmt = DEFAULT_PFX_FORMAT
     Formatter.__init__(self, fmt=fmt, datefmt=datefmt)
 
-  def format(record):
+  def format(self, record):
     global cmd
     record.cmd = cmd
     record.pfx = Pfx._state.prefix
