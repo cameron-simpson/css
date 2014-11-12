@@ -318,48 +318,6 @@ def OBSOLETE(func):
     return func(*args, **kwargs)
   return wrapped
 
-if sys.hexversion >= 0x02060000:
-  myLoggerAdapter = logging.LoggerAdapter
-else:
-  class myLoggerAdapter(object):
-    ''' A LoggerAdaptor implementation for pre-2.6 Pythons.
-    '''
-    def __init__(self, L, extra):
-      self.__L = L
-      self.__extra = extra
-    # Logger methods
-    @noexc
-    def exception(self, msg, *args, **kwargs):
-      msg, kwargs = self.process(msg, kwargs)
-      self.__L.exception(msg, *args, **kwargs)
-    @noexc
-    def log(self, level, msg, *args, **kwargs):
-      msg, kwargs = self.process(msg, kwargs)
-      self.__L.log(level, msg, *args, **kwargs)
-    def debug(self, msg, *args, **kwargs):
-      self.log(logging.DEBUG, msg, *args, **kwargs)
-    def info(self, msg, *args, **kwargs):
-      self.log(logging.INFO, msg, *args, **kwargs)
-    def warning(self, msg, *args, **kwargs):
-      self.log(logging.WARNING, msg, *args, **kwargs)
-    @OBSOLETE
-    def warn(self, *args, **kwargs):
-      self.warning(*args, **kwargs)
-    def error(self, msg, *args, **kwargs):
-      self.log(logging.ERROR, msg, *args, **kwargs)
-    def critical(self, msg, *args, **kwargs):
-      self.log(logging.CRITICAL, msg, *args, **kwargs)
-
-class Pfx_LoggerAdapter(myLoggerAdapter):
-  ''' A LoggerAdpater to insert the current prefix onto log messages.
-  '''
-
-  def process(self, msg, kwargs):
-    prefix = Pfx._state.prefix
-    if len(prefix) > 0:
-      msg = prefix.replace('%', '%%') + ": " + msg
-    return msg, kwargs
-
 def pfx_iter(tag, iter):
   ''' Wrapper for iterators to prefix exceptions with `tag`.
   '''
@@ -415,7 +373,6 @@ class Pfx(object):
     self.absolute = absolute
     self._umark = None
     self._loggers = None
-    self._loggerAdapters = None
     if loggers is not None:
       if not hasattr(loggers, '__getitem__'):
         loggers = (loggers, )
@@ -484,7 +441,6 @@ class Pfx(object):
     ''' Define the Loggers anew.
     '''
     self._loggers = newLoggers
-    self._loggerAdapters = None
 
   def partial(self, func, *a, **kw):
     ''' Return a function that will run the supplied function `func`
@@ -500,19 +456,17 @@ class Pfx(object):
 
   @property
   def loggers(self):
-    ''' Return the loggers (actually wrapping LoggerAdapters) to use for this Pfx.
+    ''' Return the loggers to use for this Pfx instance.
     '''
-    if self._loggerAdapters is None:
-      # get the Logger list from an ancestor
-      _loggers = None
+    _loggers = self._loggers
+    if _loggers is None:
       for P in reversed(self._state.stack):
         if P._loggers is not None:
           _loggers = P._loggers
           break
       if _loggers is None:
         _loggers = (logging.getLogger(),)
-      self._loggerAdapters = list( Pfx_LoggerAdapter(L, {}) for L in _loggers )
-    return self._loggerAdapters
+    return _loggers
 
   enter = __enter__
   exit = __exit__
