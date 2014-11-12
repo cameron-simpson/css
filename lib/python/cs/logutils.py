@@ -8,6 +8,7 @@ from __future__ import with_statement
 import codecs
 from contextlib import contextmanager
 import logging
+from logging import Formatter
 import os
 import os.path
 import sys
@@ -119,6 +120,21 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
   if trace_mode:
     trace_level = logging_level
   return level
+
+class PfxFormatter(Formatter):
+  ''' A Formatter subclass that prepends cmd and the current prefix to the log message.
+  '''
+
+  def __init__(self, fmt=None, datefmt=None):
+    if fmt is None:
+      fmt = DEFAULT_PFX_FORMAT
+    Formatter.__init__(self, fmt=fmt, datefmt=datefmt)
+
+  def format(record):
+    global cmd
+    record.cmd = cmd
+    record.pfx = Pfx._state.prefix
+    return Formatter.format(self, record)
 
 def infer_logging_level():
   ''' Infer a logging level from the environment.
