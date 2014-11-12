@@ -486,7 +486,7 @@ class Pfx(object):
     self._loggers = newLoggers
     self._loggerAdapters = None
 
-  def func(self, func, *a, **kw):
+  def partial(self, func, *a, **kw):
     ''' Return a function that will run the supplied function `func`
         within a surrounding Pfx context with the current mark string.
         This is intended for deferred call facilities like

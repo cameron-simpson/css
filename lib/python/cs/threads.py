@@ -67,13 +67,13 @@ class WorkerThreadPool(NestingOpenCloseMixin, O):
           None, exec_type, exc_value, exc_traceback
         If `retq` is not None, the result is .put() on retq.
         If `deliver` is not None, deliver(result) is called.
-        If the parameter `pfx` is not None, submit pfx.func(func);
-          see cs.logutils.Pfx's .func method for details.
+        If the parameter `pfx` is not None, submit pfx.partial(func);
+          see the cs.logutils.Pfx.partial method for details.
     '''
     if self.closed:
       raise ValueError("%s: closed, but dispatch() called" % (self,))
     if pfx is not None:
-      func = pfx.func(func)
+      func = pfx.partial(func)
     idle = self.idle
     with self._lock:
       debug("dispatch: idle = %s", idle)
