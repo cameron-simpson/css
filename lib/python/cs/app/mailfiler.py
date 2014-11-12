@@ -24,6 +24,7 @@ from tempfile import TemporaryFile
 from threading import Lock, RLock
 import time
 from cs.configutils import ConfigWatcher
+import cs.env
 from cs.env import envsub
 from cs.fileutils import abspath_from_file, file_property, files_property, \
                          longpath, Pathname
@@ -37,6 +38,7 @@ from cs.threads import locked, locked_property
 from cs.app.maildb import MailDB
 from cs.py3 import unicode as u, StringTypes, ustr
 
+DEFAULT_MAIN_LOG = 'mailfiler/main.log'
 DEFAULT_RULES_PATTERN = '$HOME/.mailfiler/{maildir.basename}'
 DEFAULT_MAILFILER_RC = '$HOME/.mailfilerrc'
 DEFAULT_MAILDB_PATH = '$HOME/.maildb.csv'
@@ -142,10 +144,10 @@ def main(argv, stdin=None):
 
   return 0
 
-def current_value(envvar, cfg, cfg_key, default):
+def current_value(envvar, cfg, cfg_key, default, environ):
   ''' Compute a configurable path value on the fly.
   '''
-  value = os.environ.get(envvar)
+  value = environ.get(envvar)
   if value is None:
     value = cfg.get(cfg_key)
     if value is None:
@@ -156,11 +158,18 @@ def current_value(envvar, cfg, cfg_key, default):
 
 class MailFiler(O):
 
-  def __init__(self, config_path):
+  def __init__(self, config_path, environ=None):
+    ''' Initialise the MailFiler.
+        `config_path`: location of config file, default from DEFAULT_MAILFILER_RC.
+        `environ`: initial environment, default from os.environ.
+    '''
     if config_path is None:
       config_path = envsub(DEFAULT_MAILFILER_RC)
-    self._lock = RLock()
+    if environ is None:
+      environ = dict(os.environ)
     self.config_path = config_path
+    self.environ = environ
+    self._lock = RLock()
     self._cfg = ConfigWatcher(config_path)
     self._maildb_path = None
     self._maildb_lock = self._lock
@@ -187,7 +196,7 @@ class MailFiler(O):
   def maildb_path(self):
     ''' Compute maildb path on the fly.
     '''
-    return current_value('MAILDB', self.cfg, 'maildb', DEFAULT_MAILDB_PATH)
+    return current_value('MAILDB', self.cfg, 'maildb', DEFAULT_MAILDB_PATH, self.environ)
   @maildb_path.setter
   @locked
   def maildb_path(self, path):
@@ -209,7 +218,7 @@ class MailFiler(O):
     '''
     path = self._msgiddb_path
     if path is None:
-      path = current_value('MESSAGEIDDB', self.cfg, 'msgiddb', DEFAULT_MSGIDDB_PATH)
+      path = current_value('MESSAGEIDDB', self.cfg, 'msgiddb', DEFAULT_MSGIDDB_PATH, self.environ)
     return path
   @msgiddb_path.setter
   @locked
@@ -226,7 +235,7 @@ class MailFiler(O):
   def maildir_path(self):
     path = self._maildir_path
     if path is None:
-      path = current_value('MAILDIR', self.cfg, 'maildir', DEFAULT_MAILDIR_PATH)
+      path = current_value('MAILDIR', self.cfg, 'maildir', DEFAULT_MAILDIR_PATH, self.environ)
     return path
   @maildir_path.setter
   @locked
@@ -237,7 +246,7 @@ class MailFiler(O):
   def rules_pattern(self):
     pattern \
       = self._rules_pattern \
-      = current_value('MAILFILER_RULES_PATTERN', self.cfg, 'rules_pattern', DEFAULT_RULES_PATTERN)
+      = current_value('MAILFILER_RULES_PATTERN', self.cfg, 'rules_pattern', DEFAULT_RULES_PATTERN, self.environ)
     X(".rules_pattern=%r", pattern)
     return pattern
   @rules_pattern.setter
@@ -293,45 +302,61 @@ class MailFiler(O):
       return 1
     return 0
 
-  def sweep(self, wmdir, justone=False, no_remove=False):
+  @property
+  def logdir(self):
+    ''' The pathname of the directory in which log files are written.
+    '''
+    varlog = cs.env.varlog(self.environ)
+    return os.path.join(varlog, 'mailfiler')
+
+  def folder_logfile(self, folder_path):
+    ''' Return path to log file associated with the named folder.
+        TODO: ase on relative path from folder root, not just basename.
+    '''
+    return os.path.join(self.logdir, 'filer-%s.log' % (os.path.basename(folder_path)))
+
+  def sweep(self, wmdir, justone=False, no_remove=False, logfile=None):
     ''' Scan a WatchedMaildir for messages to filter.
         Update the set of lurkers with any keys not removed to prevent
         filtering on subsequent calls.
         If `justone`, return after filing the first message.
     '''
-    debug("sweep %s", wmdir.shortname)
-    with Pfx("sweep %s", wmdir.shortname):
-      nmsgs = 0
-      skipped = 0
-      with LogTime("all keys") as all_keys_time:
-        for key in wmdir.keys(flush=True):
-          with Pfx(key):
-            if key in wmdir.lurking:
-              debug("skip lurking key")
-              skipped += 1
-              continue
-            nmsgs += 1
-
-            with LogTime("key = %s", key, threshold=1.0, level=DEBUG):
-              ok = self.file_wmdir_key(wmdir, key)
-              if not ok:
-                warning("NOT OK, lurking key %s", key)
-                wmdir.lurk(key)
+    if logfile is None:
+      logfile = self.folder_logfile(wmdir.path)
+    with with_log(logfile):
+      debug("sweep %s", wmdir.shortname)
+      with Pfx("sweep %s", wmdir.shortname):
+        nmsgs = 0
+        skipped = 0
+        with LogTime("all keys") as all_keys_time:
+          for key in wmdir.keys(flush=True):
+            with Pfx(key):
+              if key in wmdir.lurking:
+                debug("skip lurking key")
+                skipped += 1
                 continue
+              nmsgs += 1
 
-              if no_remove:
-                info("no_remove: message not removed, lurking key %s", key)
-                wmdir.lurk(key)
-              else:
-                debug("remove message key %s", key)
-                wmdir.remove(key)
-                wmdir.lurking.discard(key)
-              if justone:
-                break
+              with LogTime("key = %s", key, threshold=1.0, level=DEBUG):
+                ok = self.file_wmdir_key(wmdir, key)
+                if not ok:
+                  warning("NOT OK, lurking key %s", key)
+                  wmdir.lurk(key)
+                  continue
 
-      if nmsgs or all_keys_time.elapsed >= 0.2:
-        info("filtered %d messages (%d skipped) in %5.3fs",
-             nmsgs, skipped, all_keys_time.elapsed)
+                if no_remove:
+                  info("no_remove: message not removed, lurking key %s", key)
+                  wmdir.lurk(key)
+                else:
+                  debug("remove message key %s", key)
+                  wmdir.remove(key)
+                  wmdir.lurking.discard(key)
+                if justone:
+                  break
+
+        if nmsgs or all_keys_time.elapsed >= 0.2:
+          info("filtered %d messages (%d skipped) in %5.3fs",
+               nmsgs, skipped, all_keys_time.elapsed)
 
   def save(self, target, msgfp):
     ''' Implementation for command line "save" function: save file to target.
@@ -385,7 +410,7 @@ class MessageFiler(O):
                    Default from os.environ.
     '''
     if environ is None:
-      environ = os.environ
+      environ = dict(context.environ)
     self.header_addresses = {}
     self.default_target = None
     self.context = context
@@ -404,7 +429,7 @@ class MessageFiler(O):
 	specified the filename of the message, supporting hard linking
 	the message into a Maildir.
     '''
-    with with_log(envsub("$HOME/var/log/mailfiler")):
+    with with_log(os.path.join(cs.env.varlog(self.environ), envsub(DEFAULT_MAIN_LOG))):
       self.message = M
       self.message_path = None
       info( (u("%s %s") % (time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -1208,6 +1233,10 @@ class WatchedMaildir(O):
   @property
   def shortname(self):
     return self.mdir.shortname
+
+  @property
+  def path(self):
+    return self.mdir.dir
 
   def keys(self, flush=False):
     return self.mdir.keys(flush=flush)
