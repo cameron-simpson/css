@@ -21,6 +21,9 @@ from cs.py3 import unicode, StringTypes, ustr
 
 cmd = __file__
 
+DEFAULT_BASE_FORMAT = '%(asctime)s %(levelname)s %(message)s'
+DEFAULT_PFX_FORMAT = '%(cmd): %(asctime)s %(levelname)s %(pfx): %(message)s'
+
 logging_level = logging.INFO
 trace_level = logging.DEBUG
 D_mode = False
