@@ -119,15 +119,20 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
   return level
 
 class PfxFormatter(Formatter):
-  ''' A Formatter subclass that prepends cmd and the current prefix to the log message.
+  ''' A Formatter subclass that has access to the program's cmd and Pfx state.
   '''
 
   def __init__(self, fmt=None, datefmt=None):
+    ''' Initialise the PfxFormatter.
+        If `fmt` is None, DEFAULT_PFX_FORMAT is used.
+    '''
     if fmt is None:
       fmt = DEFAULT_PFX_FORMAT
     Formatter.__init__(self, fmt=fmt, datefmt=datefmt)
 
   def format(self, record):
+    ''' Set .cmd and .pfx to the global cmd and Pfx context prefix respectively, then call Formatter.format.
+    '''
     global cmd
     record.cmd = cmd
     record.pfx = Pfx._state.prefix
