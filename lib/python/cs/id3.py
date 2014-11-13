@@ -46,7 +46,7 @@ class ID3(O):
     'SIGN': ('signature',),
     'SYLT': ('sync_lyric_transcription',),
     'SYTC': ('sync_tempo_codes',),
-    'TALB': ('album', 'title'),
+    'TALB': ('album_title', 'album', 'title'),
     'TBPM': ('bpm', 'beats_per_minute'),    # integer
     'TCOM': ('composer',),
     'TCON': ('content_type',),              # integer
@@ -64,7 +64,7 @@ class ID3(O):
     'TIME': ('time',),                      # HHMM
     'TIPL': ('involved_people',),
     'TIT1': ('content_group_description', 'genre'),
-    'TIT2': ('title_content_description',), # eg "adagio"
+    'TIT2': ('song_title', 'songname', 'content_description',), # eg "adagio"
     'TIT3': ('subtitle', 'description_refinement'), # eg "Op. 16"
     'TKEY': ('initial_key',),               # musical key
     'TLAN': ('languages',),
