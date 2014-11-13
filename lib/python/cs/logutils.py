@@ -24,6 +24,7 @@ cmd = __file__
 
 DEFAULT_BASE_FORMAT = '%(asctime)s %(levelname)s %(message)s'
 DEFAULT_PFX_FORMAT = '%(cmd)s: %(asctime)s %(levelname)s %(pfx)s: %(message)s'
+DEFAULT_PFX_FORMAT_TTY = '%(cmd)s: %(pfx)s: %(message)s'
 
 logging_level = logging.INFO
 trace_level = logging.DEBUG
@@ -41,7 +42,6 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
       `main_log` is a string, is it used as a filename to open in append
       mode; otherwise main_log should be a stream suitable for use
       with logging.StreamHandler().
-      If `format` is None, set format to "cmd: levelname: message".
       If `level` is None, infer a level from the environment using
       infer_logging_level().
       If `flags` is None, infer the flags from the environment using
@@ -94,6 +94,12 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
 
   if ansi_mode is None:
     ansi_mode = main_log.isatty()
+
+  if format is None:
+    if main_log.isatty():
+      format = DEFAULT_PFX_FORMAT_TTY
+    else:
+      format = DEFAULT_PFX_FORMAT
 
   if 'TDUMP' in flags:
     # do a thread dump to the main_log on SIGHUP
