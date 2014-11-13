@@ -11,6 +11,7 @@ import logging
 from logging import Formatter
 import os
 import os.path
+import stat
 import sys
 import time
 import threading
@@ -24,6 +25,7 @@ cmd = __file__
 
 DEFAULT_BASE_FORMAT = '%(asctime)s %(levelname)s %(message)s'
 DEFAULT_PFX_FORMAT = '%(cmd)s: %(asctime)s %(levelname)s %(pfx)s: %(message)s'
+DEFAULT_PFX_FORMAT_TTY = '%(cmd)s: %(pfx)s: %(message)s'
 
 logging_level = logging.INFO
 trace_level = logging.DEBUG
@@ -41,7 +43,8 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
       `main_log` is a string, is it used as a filename to open in append
       mode; otherwise main_log should be a stream suitable for use
       with logging.StreamHandler().
-      If `format` is None, set format to "cmd: levelname: message".
+      if `format` is None, use DEFAULT_PFX_FORMAT_TTY when main_log is a tty
+      or FIFO, otherwise DEFAULT_PFX_FORMAT.
       If `level` is None, infer a level from the environment using
       infer_logging_level().
       If `flags` is None, infer the flags from the environment using
@@ -75,6 +78,20 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
     main_log = sys.stderr
   elif type(main_log) is str:
     main_log = open(main_log, "a")
+
+  # determine some attributes of main_log
+  try:
+    fd = main_log.fileno()
+  except (AttributeError, IOError):
+    is_fifo = False
+    is_reg = False
+    is_tty = False
+  else:
+    st = os.fstat(fd)
+    is_fifo = stat.S_ISFIFO(st.st_mode)
+    is_reg = stat.S_ISREG(st.st_mode)
+    is_tty = stat.S_ISCHR(st.st_mode)
+
   if main_log.encoding is None:
     main_log = codecs.getwriter("utf-8")(main_log)
 
@@ -90,10 +107,16 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
     elif 'NOUPD' in flags:
       upd_mode = False
     else:
-      upd_mode = main_log.isatty()
+      upd_mode = is_tty
 
   if ansi_mode is None:
-    ansi_mode = main_log.isatty()
+    ansi_mode = is_tty
+
+  if format is None:
+    if is_tty or is_fifo:
+      format = DEFAULT_PFX_FORMAT_TTY
+    else:
+      format = DEFAULT_PFX_FORMAT
 
   if 'TDUMP' in flags:
     # do a thread dump to the main_log on SIGHUP
