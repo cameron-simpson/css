@@ -300,11 +300,28 @@ class DebuggingThread(threading.Thread, DebugWrapper):
     _debug_threads.discard(self)
     return retval
 
+def trace(func):
+  ''' Decorator to report the call and return of a function.
+  '''
+  from cs.py.func import funccite
+  def subfunc(*a, **kw):
+    X("CALL %s(a=%r,kw=%r)...", funccite(func), a, kw)
+    try:
+      retval = func(*a, **kw)
+    except Exception as e:
+      X("CALL %s(): RAISES %r", funccite(func), e)
+      raise
+    else:
+      X("CALL %s(): RETURNS %r", funccite(func), retval)
+      return retval
+  subfunc.__name__ = "trace/subfunc/"+func.__name__
+  return subfunc
+
 def trace_caller(func):
   ''' Decorator to report the caller of a function when called.
   '''
   def subfunc(*a, **kw):
-    rame = caller()
+    frame = caller()
     D("CALL %s()<%s:%d> FROM %s()<%s:%d>",
          func.__name__,
          func.__code__.co_filename, func.__code__.co_firstlineno,

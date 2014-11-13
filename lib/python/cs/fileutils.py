@@ -17,14 +17,18 @@ from collections import namedtuple
 from contextlib import contextmanager
 import shutil
 from tempfile import TemporaryFile, NamedTemporaryFile
-from threading import RLock
+from threading import RLock, Thread
 import time
 import unittest
+from cs.debug import trace
 from cs.env import envsub
-from cs.logutils import error, Pfx, D, X
+from cs.lex import as_lines
+from cs.logutils import error, warning, Pfx, D, X
+from cs.queues import IterableQueue
 from cs.range import Range
 from cs.threads import locked, locked_property
 from cs.timeutils import TimeoutError
+from cs.obj import O
 from cs.py3 import ustr
 
 def saferename(oldpath, newpath):
@@ -109,6 +113,66 @@ def rewrite(filepath, data,
       if backup_ext:
         shutil.copy2(filepath, filepath + backup_ext)
       shutil.copyfile(T.name, filepath)
+
+@contextmanager
+def rewrite_cmgr(pathname,
+            mode='w',
+            backup_ext=None,
+            keep_backup=False,
+            do_rename=False,
+            do_diff=None,
+            empty_ok=False,
+            overwrite_anyway=False):
+  ''' Rewrite a file, presented as a context manager.
+      `mode`: file write mode, defaulting to "w" for text.
+      `backup_ext`: backup extension. None means no backup.
+            An empty string generates an extension based on the current time.
+      `keep_backup`: keep the backup file even if everything works.
+      `do_rename`: rename the temporary file to the original to update.
+      `do_diff`: call do_diff(pathname, tempfile) before commiting.
+      `empty_ok`: do not consider empty output an error.
+      `overwrite_anyway`: do not update the original if the new data are identical.
+  '''
+  if backup_ext is None:
+    backuppath = None
+  else:
+    if len(backup_ext) == 0:
+      backup_ext = '.bak-%s' % (datetime.datetime.now().isoformat(),)
+    backuppath = pathname + backup_ext
+  dirpath = os.path.dirname(pathname)
+
+  T = NamedTemporaryFile(mode=mode, dir=dirpath, delete=False)
+  # hand control to caller
+  try:
+    yield T
+    T.flush()
+    if not empty_ok and os.fstat(T.fileno()).st_size == 0:
+      raise ValueError("empty file")
+  except Exception as e:
+    # failure from caller or flush or sanity check, clean up
+    try:
+      os.unlink(T.name)
+    except OSError as e2:
+      if e2.errno != errno.ENOENT:
+        warning("%s: unlink: %s", T.name, e2)
+    raise e
+
+  # success
+  if not overwrite_anyway and compare(pathname, T.name):
+    # file unchanged, remove temporary
+    os.unlink(T.name)
+    return
+
+  if do_rename:
+    if backuppath is not None:
+      os.rename(pathname, backuppath)
+    os.rename(T.name, pathname)
+  else:
+    if backuppath is not None:
+      shutil.copy2(pathname, backuppath)
+    shutil.copyfile(T.name, pathname)
+  if backuppath and not keep_backup:
+    os.remove(backuppath)
 
 def abspath_from_file(path, from_file):
   ''' Return the absolute path if `path` with respect to `from_file`,
@@ -419,7 +483,7 @@ def make_files_property(attr_name=None, unset_object=None, poll_rate=1):
   return made_files_property
 
 @contextmanager
-def lockfile(path, ext='.lock', poll_interval=0.1, timeout=None):
+def lockfile(path, ext=None, poll_interval=0.1, timeout=None):
   ''' A context manager which takes and holds a lock file.
       `path`: the base associated with the lock file.
       `ext`: the extension to the base used to construct the lock file name.
@@ -428,6 +492,8 @@ def lockfile(path, ext='.lock', poll_interval=0.1, timeout=None):
                  default None (wait forever).
       `poll_interval`: polling frequency when timeout is not 0.
   '''
+  if ext is None:
+    ext = '.lock'
   if timeout is not None and timeout < 0:
     raise ValueError("timeout should be None or >= 0, not %r" % (timeout,))
   start = None
@@ -784,6 +850,167 @@ class BackedFile_TestMethods(object):
     overlap_chunk = bfp.read_n(512)
     self.assertEqual(len(overlap_chunk), 512, "overlap_chunk not 512 bytes: %r" % (overlap_chunk,))
     self.assertEqual(overlap_chunk, backing_text[256:512] + random_chunk)
+
+class SharedAppendFile(object):
+  ''' A base class to share a modifiable file between multiple users.
+
+      The use case derives from the shared CSV files used by
+      cs.nodedb.csvdb.Backend_CSVFile, where multiple users can
+      read from a common CSV file, and coordinate updates with a
+      lockfile.
+  '''
+
+  DEFAULT_MAX_QUEUE = 128
+  DEFAULT_POLL_INTERVAL = 0.1
+
+  def __init__(self, pathname, readonly=False, writeonly=False,
+                binary=False, max_queue=None,
+                transcribe_update=None, poll_interval=None,
+                eof_markers = False,
+                lock_ext=None, lock_timeout=None):
+    ''' Initialise this SharedAppendFile.
+        `pathname`: the pathname of the file to open.
+        `readonly`: set to true if we will not write updates.
+        `writeonly`: set to true if we will monitor foreign updates.
+        `binary`: if the ile is to be opened in binary mode, otherwise text mode.
+        `max_queue`: maximum input and output Queue length. Default: SharedAppendFile.DEFAULT_MAX_QUEUE.
+        `transcribe_update`: function to transcribe our update objects to the file.
+        `poll_interval`: sleep time between polls after an idle poll. Default: SharedAppendFile.DEFAULT_POLL_INTERVAL.
+        `eof_markers`: set to true to put an empty chunk only to the output Queue when EOF reached.
+        `lock_ext`: lock file extension.
+        `lock_timeout`: maxmimum time to wait for obtaining the lock file.
+    '''
+    if max_queue is None:
+      max_queue = self.DEFAULT_MAX_QUEUE
+    if poll_interval is None:
+      poll_interval = self.DEFAULT_POLL_INTERVAL
+    self.pathname = pathname
+    self.readonly = readonly
+    self.writeonly = readonly
+    self.binary = binary
+    self.transcribe_update = transcribe_update
+    self.eof_markers = eof_markers
+    self.poll_interval = poll_interval
+    self.max_queue = max_queue
+    self.lock_ext = lock_ext
+    self.lock_timeout = lock_timeout
+    self._inQ = IterableQueue(self.max_queue, name="%s._inQ" % (self,))
+    self._outQ = IterableQueue(self.max_queue, name="%s._outQ" % (self,))
+    self._open()
+
+  def __str__(self):
+    return "SharedAppendFile(%r)" % (self.pathname,)
+
+  def _open(self):
+    ''' Open the file for read or read/write.
+    '''
+    mode = "r" if self.readonly else "r+"
+    if self.binary:
+      mode += "b"
+    self.fp = open(self.pathname, mode)
+    self._monitor_thread = Thread(target=self._monitor, name="%s._monitor" % (self,))
+    self._monitor_thread.daemon = True
+    self._monitor_thread.start()
+
+  def close(self):
+    self._inQ.close()
+    self._monitor_thread.join()
+    fp = self.fp
+    self.fp = None
+    fp.close()
+
+  @property
+  def filestate(self):
+    fp = self.fp
+    if fp is None:
+      return None
+    return FileState(fp.fileno())
+
+  def _lockfile(self):
+    ''' Obtain an exclusive lock on the CSV file.
+    '''
+    return lockfile(self.pathname,
+                    ext=self.lock_ext,
+                    poll_interval=self.poll_interval,
+                    timeout=self.lock_timeout)
+
+  def put(self, update_item):
+    ''' Queue an update record for transcription to the shared file.
+    '''
+    self._inQ.put(update_item)
+
+  def _read_to_eof(self, force_eof_marker=False):
+    ''' Read update data from the file until EOF, put data chunks onto ._outQ.
+        Return number of reads with data; 0 ==> no new data.
+        `force_eof_marker`: put an EOF marker even if no other chunks were obtained
+    '''
+    if force_eof_marker and not self.eof_markers:
+      raise ValueError("force_eof_marker forbidden if not self.eof_markers")
+    count = 0
+    for chunk in chunks_of(self.fp):
+      if len(chunk) == 0:
+        warning("empty chunk received from chunks_of(%s)", self.fp)
+      else:
+        self._outQ.put(chunk)
+        count += 1
+    if force_eof_marker or (count > 0 and self.eof_markers):
+      # write an EOF marker if we gathered any data (or if force_eof_marker)
+      self._outQ.put(b'' if self.binary else '')
+    return count
+
+  def _monitor(self):
+    ''' Monitor the input queue and the data file.
+        Read data from the data file as it appears, copy to the output queue.
+        Read updates from the input queue, append to the data file.
+    '''
+    with Pfx("%s._monitor", self):
+      first = True
+      while not self._inQ.closed or not self._inQ.empty():
+        # catch up
+        # we force an EOF marker the first time
+        # so that external users can read the whole data file initially
+        count = self._read_to_eof(force_eof_marker=(first and self.eof_markers))
+        # check for outgoing updates
+        if self._inQ.empty():
+          # sleep briefly if nothing
+          if count == 0:
+            time.sleep(self.poll_interval)
+        else:
+          # updates due
+          # obtain lock
+          #   read until EOF
+          #   append updates
+          # release lock
+          with self._lockfile():
+            self._read_to_eof()
+            pos = self.fp.tell()
+            self.fp.seek(0, SEEK_END)
+            if pos != self.fp.tell():
+              warning("update: pos after catch up=%r, pos after SEEK_END=%r", pos, self.fp.tell())
+            while not self._inQ.empty():
+              item = self._inQ._get()
+              self.transcribe_update(self.fp, item)
+            self.fp.flush()
+        # clear flag for next pass
+        first = False
+      self._outQ.close()
+
+def chunks_of(fp, rsize=16384):
+  ''' Generator to present text or data from an open file until EOF.
+  '''
+  while True:
+    chunk = fp.read(rsize)
+    if len(chunk) == 0:
+      break
+    yield chunk
+
+def lines_of(fp, partials=None):
+  ''' Generator yielding lines from a file until EOF.
+      Intended for file-like objects that lack a line iteration API.
+  '''
+  if partials is None:
+    partials = []
+  return as_lines(chunks_of(fp), partials)
 
 if __name__ == '__main__':
   import cs.fileutils_tests
