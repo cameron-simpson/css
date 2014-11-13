@@ -68,3 +68,10 @@ def envsub(s, environ=None, bare=None, default=None):
         raise ValueError("missing envvar name, offset %d: %s" % (pos, s))
     opos = offset
   return ''.join(strs)
+
+def varlog(environ=None):
+  ''' Return the default base for logs for most cs.* modules.
+  '''
+  if environ is None:
+    environ = os.environ
+  return envsub('$HOME/var/log')

@@ -9,7 +9,7 @@ from functools import partial
 import logging
 from threading import Timer
 import time
-from cs.debug import Lock, RLock, Thread, trace_caller, stack_dump
+from cs.debug import Lock, RLock, Thread, trace, trace_caller, stack_dump
 from cs.logutils import exception, error, warning, debug, D, X, Pfx, PfxCallInfo
 from cs.resources import NestingOpenCloseMixin, not_closed
 from cs.seq import seq
@@ -22,13 +22,17 @@ class _QueueIterator(NestingOpenCloseMixin):
       It does not offer the .get or .get_nowait methods.
   '''
 
-  sentinel = object()
+  class _QueueIterator_Sentinel(object):
+    pass
+
+  sentinel = _QueueIterator_Sentinel()
 
   def __init__(self, q, name=None):
     if name is None:
       name = "QueueIterator-%d" % (seq(),)
     self._lock = Lock()
     self.name = name
+    self._item_count = 0    # count of non-sentinel values on the queue
     O.__init__(self, q=q)
     NestingOpenCloseMixin.__init__(self, finalise_later=True)
 
@@ -46,6 +50,7 @@ class _QueueIterator(NestingOpenCloseMixin):
         warning("%r.put: all closed: item=%s", self, item)
     if item is self.sentinel:
       raise ValueError("put(sentinel)")
+    self._item_count += 1
     return self._put(item, *args, **kw)
 
   def _put(self, item, *args, **kw):
@@ -79,9 +84,21 @@ class _QueueIterator(NestingOpenCloseMixin):
       # put the sentinel back for other iterators
       self._put(item)
       raise StopIteration
+    self._item_count -= 1
     return item
 
   next = __next__
+
+  def _get(self):
+    ''' Calls the inner queue's .get via .__next__; can break other users' iterators.
+    '''
+    try:
+      return next(self)
+    except StopIteration as e:
+      raise Queue_Empty("got StopIteration from %s" % (self,))
+
+  def empty(self):
+    return self._item_count == 0
 
 def IterableQueue(capacity=0, name=None, *args, **kw):
   if not isinstance(capacity, int):

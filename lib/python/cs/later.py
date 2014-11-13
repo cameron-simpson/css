@@ -703,8 +703,8 @@ class Later(NestingOpenCloseMixin):
         this function until the time `when`.
         It is an error to specify both `when` and `delay`.
         If the parameter `name` is not None, use it to name the LateFunction.
-        If the parameter `pfx` is not None, submit pfx.func(func);
-          see cs.logutils.Pfx's .func method for details.
+        If the parameter `pfx` is not None, submit pfx.partial(func);
+          see the cs.logutils.Pfx.partial method for details.
     '''
     if not self.submittable:
       raise RuntimeError("%s.submit(...) but not self.submittable" % (self,))
@@ -718,7 +718,7 @@ class Later(NestingOpenCloseMixin):
     elif type(priority) is int:
       priority = (priority,)
     if pfx is not None:
-      func = pfx.func(func)
+      func = pfx.partial(func)
     LF = LateFunction(self, func, name=name)
     pri_entry = list(priority)
     pri_entry.append(seq())     # ensure FIFO servicing of equal priorities
