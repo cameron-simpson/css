@@ -88,9 +88,9 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
     is_tty = False
   else:
     st = os.fstat(fd)
-    is_fifo = stat.S_ISFIFO(st)
-    is_reg = stat.S_ISREG(st)
-    is_tty = stat.S_ISCHR(st)
+    is_fifo = stat.S_ISFIFO(st.st_mode)
+    is_reg = stat.S_ISREG(st.st_mode)
+    is_tty = stat.S_ISCHR(st.st_mode)
 
   if main_log.encoding is None:
     main_log = codecs.getwriter("utf-8")(main_log)
