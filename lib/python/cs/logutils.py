@@ -231,6 +231,8 @@ def add_log(filename, logger=None, mode='a', encoding=None, delay=False, format=
     logger = logging.getLogger(logger)
   handler = logging.FileHandler(filename, mode, encoding, delay)
   if no_prefix:
+    if format is None:
+      format = DEFAULT_BASE_FORMAT
     formatter = Formatter(format)
   else:
     formatter = PfxFormatter(format)
