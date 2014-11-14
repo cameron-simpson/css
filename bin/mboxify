@@ -7,30 +7,13 @@
 set -ue
 
 cmd=`basename "$0"`
-usage="Usage: $cmd mailbox"
+usage="Usage: $cmd mailboxes..."
 
 badopts=
 
 if [ $# = 0 ]
 then
-  echo "$cmd: missing mailbox" >&2
-  badopts=1
-else
-  mailbox=$1
-  shift
-  case "$mailbox" in
-    /*) ;; *) mailbox=`pwd`/$mailbox ;;
-  esac
-  if [ ! -e "$mailbox" ]
-  then
-    echo "$cmd: missing mailbox: $mailbox" >&2
-    badopts=1
-  fi
-fi
-
-if [ $# -gt 0 ]
-then
-  echo "$cmd: extra arguments: $*" >&2
+  echo "$cmd: missing mailboxes" >&2
   badopts=1
 fi
 
@@ -41,28 +24,47 @@ mailboxold=$mailbox.old$$
 
 set -x
 
-# empty maildir: remove and exit
-ismaildir "$mailbox" && rm0maildir "$mailbox" && [ ! -d "$mailbox" ] && exit 0
+xit=0
 
-# already an mbox? exit
-ismbox "$mailbox" && exit 0
-
-# make stub mbox
->>"$mailboxtmp"
-
-if if ismaildir "$mailbox"
-   then maildir-cat "$mailbox" >"$mailboxtmp"
-   else mutt -n -F /dev/null -f "$mailbox" -e "set sort=mailbox-order; set confirmappend=no; set delete=yes; push '<tag-pattern>.<enter><tag-prefix><save-message>$mailboxtmp<enter><sync-mailbox><exit>'"
-   fi
-then
-  mv "$mailbox" "$mailboxold"
-  mv "$mailboxtmp" "$mailbox"
-  if ismaildir "$mailboxold"
+for mailbox
+do
+  case "$mailbox" in
+    /*) ;; *) mailbox=`pwd`/$mailbox ;;
+  esac
+  if [ ! -e "$mailbox" ]
   then
-    rm -r "$mailboxold"
-  else
-    rmdir "$mailboxold"
+    echo "$cmd: missing mailbox: $mailbox" >&2
+    xit=1
+    continue
   fi
-else
-  rm -f "$mailboxtmp"
-fi
+
+  # empty maildir: remove and continue
+  ismaildir "$mailbox" \
+  && rm0maildir "$mailbox" \
+  && [ ! -d "$mailbox" ] \
+  && continue
+
+  # already an mbox? continue
+  ismbox "$mailbox" && continue
+
+  # make stub mbox
+  >>"$mailboxtmp"
+
+  if if ismaildir "$mailbox"
+     then maildir-cat "$mailbox" >"$mailboxtmp"
+     else mutt -n -F /dev/null -f "$mailbox" -e "set sort=mailbox-order; set confirmappend=no; set delete=yes; push '<tag-pattern>.<enter><tag-prefix><save-message>$mailboxtmp<enter><sync-mailbox><exit>'"
+     fi
+  then
+    mv "$mailbox" "$mailboxold"
+    mv "$mailboxtmp" "$mailbox"
+    if ismaildir "$mailboxold"
+    then rm -r "$mailboxold"
+    else rmdir "$mailboxold"
+    fi
+  else
+    xit=1
+    rm -f "$mailboxtmp"
+  fi
+done
+
+exit $xit
