@@ -19,15 +19,15 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-mailboxtmp=$mailbox.tmp$$
-mailboxold=$mailbox.old$$
-
 set -x
 
 xit=0
 
 for mailbox
 do
+  mailboxtmp=$mailbox.tmp$$
+  mailboxold=$mailbox.old$$
+
   case "$mailbox" in
     /*) ;; *) mailbox=`pwd`/$mailbox ;;
   esac
