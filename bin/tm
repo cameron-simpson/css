@@ -9,10 +9,12 @@ set -ue
 : ${TMUX:=''}
 : ${USER:=`id -ud`}
 : ${HOST:=`hostname`}
+: ${DEBUG:=''}
 
 trace=
 setx=:
 ##[ -t 2 ] && set -- -x ${1+"$@"}
+[ $DEBUG ] && set -- -x ${1+"$@"}
 xopt=
 
 cmd=$(basename "$0")

@@ -8,8 +8,10 @@ from __future__ import with_statement
 import codecs
 from contextlib import contextmanager
 import logging
+from logging import Formatter
 import os
 import os.path
+import stat
 import sys
 import time
 import threading
@@ -20,6 +22,10 @@ from cs.obj import O_str
 from cs.py3 import unicode, StringTypes, ustr
 
 cmd = __file__
+
+DEFAULT_BASE_FORMAT = '%(asctime)s %(levelname)s %(message)s'
+DEFAULT_PFX_FORMAT = '%(cmd)s: %(asctime)s %(levelname)s %(pfx)s: %(message)s'
+DEFAULT_PFX_FORMAT_TTY = '%(cmd)s: %(pfx)s: %(message)s'
 
 logging_level = logging.INFO
 trace_level = logging.DEBUG
@@ -37,7 +43,8 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
       `main_log` is a string, is it used as a filename to open in append
       mode; otherwise main_log should be a stream suitable for use
       with logging.StreamHandler().
-      If `format` is None, set format to "cmd: levelname: message".
+      if `format` is None, use DEFAULT_PFX_FORMAT_TTY when main_log is a tty
+      or FIFO, otherwise DEFAULT_PFX_FORMAT.
       If `level` is None, infer a level from the environment using
       infer_logging_level().
       If `flags` is None, infer the flags from the environment using
@@ -71,11 +78,22 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
     main_log = sys.stderr
   elif type(main_log) is str:
     main_log = open(main_log, "a")
+
+  # determine some attributes of main_log
+  try:
+    fd = main_log.fileno()
+  except (AttributeError, IOError):
+    is_fifo = False
+    is_reg = False
+    is_tty = False
+  else:
+    st = os.fstat(fd)
+    is_fifo = stat.S_ISFIFO(st.st_mode)
+    is_reg = stat.S_ISREG(st.st_mode)
+    is_tty = stat.S_ISCHR(st.st_mode)
+
   if main_log.encoding is None:
     main_log = codecs.getwriter("utf-8")(main_log)
-
-  if format is None:
-    format = cmd.replace('%','%%')+': %(levelname)s: %(message)s'
 
   if trace_mode is None:
     trace_mode = 'TRACE' in flags
@@ -89,10 +107,16 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
     elif 'NOUPD' in flags:
       upd_mode = False
     else:
-      upd_mode = main_log.isatty()
+      upd_mode = is_tty
 
   if ansi_mode is None:
-    ansi_mode = main_log.isatty()
+    ansi_mode = is_tty
+
+  if format is None:
+    if is_tty or is_fifo:
+      format = DEFAULT_PFX_FORMAT_TTY
+    else:
+      format = DEFAULT_PFX_FORMAT
 
   if 'TDUMP' in flags:
     # do a thread dump to the main_log on SIGHUP
@@ -110,12 +134,32 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
 
   rootLogger = logging.getLogger()
   rootLogger.setLevel(level)
-  main_handler.setFormatter(logging.Formatter(format))
+  main_handler.setFormatter(PfxFormatter(format))
   rootLogger.addHandler(main_handler)
   logging_level = level
   if trace_mode:
     trace_level = logging_level
   return level
+
+class PfxFormatter(Formatter):
+  ''' A Formatter subclass that has access to the program's cmd and Pfx state.
+  '''
+
+  def __init__(self, fmt=None, datefmt=None):
+    ''' Initialise the PfxFormatter.
+        If `fmt` is None, DEFAULT_PFX_FORMAT is used.
+    '''
+    if fmt is None:
+      fmt = DEFAULT_PFX_FORMAT
+    Formatter.__init__(self, fmt=fmt, datefmt=datefmt)
+
+  def format(self, record):
+    ''' Set .cmd and .pfx to the global cmd and Pfx context prefix respectively, then call Formatter.format.
+    '''
+    global cmd
+    record.cmd = cmd
+    record.pfx = Pfx._state.prefix
+    return Formatter.format(self, record)
 
 def infer_logging_level():
   ''' Infer a logging level from the environment.
@@ -199,24 +243,27 @@ def nl(msg, *args, **kw):
   else:
     flush()
 
-def add_log(filename, logger=None, mode='a', encoding=None, delay=False, format=None):
+def add_log(filename, logger=None, mode='a', encoding=None, delay=False, format=None, no_prefix=False):
   ''' Add a FileHandler logging to the specified `filename`; return the chosen logger and the new handler.
       If `logger` is supplied and not None, add the FileHandler to that
       Logger, otherwise to the root Logger. If `logger` is a string, call
       logging.getLogger(logger) to obtain the logger.
       `mode`, `encoding` and `delay` are passed to the logging.FileHandler
       initialiser.
-      `format` is used to set the handler's formatter. It defaults to:
-        %(asctime)s %(levelname)s %(message)s
+      `format` is used to override the handler's default format.
+      `no_prefix`: do not put the Pfx context onto the front of the message.
   '''
   if logger is None:
     logger = logging.getLogger()
   elif type(logger) is str:
     logger = logging.getLogger(logger)
-  if format is None:
-    format = '%(asctime)s %(levelname)s %(message)s'
   handler = logging.FileHandler(filename, mode, encoding, delay)
-  formatter = logging.Formatter(format)
+  if no_prefix:
+    if format is None:
+      format = DEFAULT_BASE_FORMAT
+    formatter = Formatter(format)
+  else:
+    formatter = PfxFormatter(format)
   handler.setFormatter(formatter)
   logger.addHandler(handler)
   return logger, handler
@@ -224,9 +271,9 @@ def add_log(filename, logger=None, mode='a', encoding=None, delay=False, format=
 logTo = add_log
 
 @contextmanager
-def with_log(filename, logger=None, mode='a', encoding=None, delay=False, format=None):
-  logger, handler = add_log(filename, logger=logger, mode=mode, encoding=encoding, delay=delay, format=format)
-  yield
+def with_log(filename, **kw):
+  logger, handler = add_log(filename, **kw)
+  yield logger, handler
   logger.removeHandler(handler)
 
 class NullHandler(logging.Handler):
@@ -301,48 +348,6 @@ def OBSOLETE(func):
     return func(*args, **kwargs)
   return wrapped
 
-if sys.hexversion >= 0x02060000:
-  myLoggerAdapter = logging.LoggerAdapter
-else:
-  class myLoggerAdapter(object):
-    ''' A LoggerAdaptor implementation for pre-2.6 Pythons.
-    '''
-    def __init__(self, L, extra):
-      self.__L = L
-      self.__extra = extra
-    # Logger methods
-    @noexc
-    def exception(self, msg, *args, **kwargs):
-      msg, kwargs = self.process(msg, kwargs)
-      self.__L.exception(msg, *args, **kwargs)
-    @noexc
-    def log(self, level, msg, *args, **kwargs):
-      msg, kwargs = self.process(msg, kwargs)
-      self.__L.log(level, msg, *args, **kwargs)
-    def debug(self, msg, *args, **kwargs):
-      self.log(logging.DEBUG, msg, *args, **kwargs)
-    def info(self, msg, *args, **kwargs):
-      self.log(logging.INFO, msg, *args, **kwargs)
-    def warning(self, msg, *args, **kwargs):
-      self.log(logging.WARNING, msg, *args, **kwargs)
-    @OBSOLETE
-    def warn(self, *args, **kwargs):
-      self.warning(*args, **kwargs)
-    def error(self, msg, *args, **kwargs):
-      self.log(logging.ERROR, msg, *args, **kwargs)
-    def critical(self, msg, *args, **kwargs):
-      self.log(logging.CRITICAL, msg, *args, **kwargs)
-
-class Pfx_LoggerAdapter(myLoggerAdapter):
-  ''' A LoggerAdpater to insert the current prefix onto log messages.
-  '''
-
-  def process(self, msg, kwargs):
-    prefix = Pfx._state.prefix
-    if len(prefix) > 0:
-      msg = prefix.replace('%', '%%') + ": " + msg
-    return msg, kwargs
-
 def pfx_iter(tag, iter):
   ''' Wrapper for iterators to prefix exceptions with `tag`.
   '''
@@ -398,7 +403,6 @@ class Pfx(object):
     self.absolute = absolute
     self._umark = None
     self._loggers = None
-    self._loggerAdapters = None
     if loggers is not None:
       if not hasattr(loggers, '__getitem__'):
         loggers = (loggers, )
@@ -467,9 +471,8 @@ class Pfx(object):
     ''' Define the Loggers anew.
     '''
     self._loggers = newLoggers
-    self._loggerAdapters = None
 
-  def func(self, func, *a, **kw):
+  def partial(self, func, *a, **kw):
     ''' Return a function that will run the supplied function `func`
         within a surrounding Pfx context with the current mark string.
         This is intended for deferred call facilities like
@@ -483,19 +486,17 @@ class Pfx(object):
 
   @property
   def loggers(self):
-    ''' Return the loggers (actually wrapping LoggerAdapters) to use for this Pfx.
+    ''' Return the loggers to use for this Pfx instance.
     '''
-    if self._loggerAdapters is None:
-      # get the Logger list from an ancestor
-      _loggers = None
+    _loggers = self._loggers
+    if _loggers is None:
       for P in reversed(self._state.stack):
         if P._loggers is not None:
           _loggers = P._loggers
           break
       if _loggers is None:
         _loggers = (logging.getLogger(),)
-      self._loggerAdapters = list( Pfx_LoggerAdapter(L, {}) for L in _loggers )
-    return self._loggerAdapters
+    return _loggers
 
   enter = __enter__
   exit = __exit__
