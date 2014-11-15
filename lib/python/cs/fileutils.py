@@ -944,6 +944,7 @@ class SharedAppendFile(object):
         Return number of reads with data; 0 ==> no new data.
         `force_eof_marker`: put an EOF marker even if no other chunks were obtained
     '''
+    debug("READ_TO_EOF...")
     if force_eof_marker and not self.eof_markers:
       raise ValueError("force_eof_marker forbidden if not self.eof_markers")
     count = 0
@@ -955,7 +956,10 @@ class SharedAppendFile(object):
         count += 1
     if force_eof_marker or (count > 0 and self.eof_markers):
       # write an EOF marker if we gathered any data (or if force_eof_marker)
+      debug("READ_TO_EOF: PUT EOF MARKER")
       self._outQ.put(b'' if self.binary else '')
+    if count > 0 or force_eof_marker:
+      debug("READ_TO_EOF COMPLETE: CHUNK COUNT=%d", count)
     return count
 
   def _monitor(self):
