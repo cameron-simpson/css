@@ -23,7 +23,7 @@ import unittest
 from cs.debug import trace
 from cs.env import envsub
 from cs.lex import as_lines
-from cs.logutils import error, warning, Pfx, D, X
+from cs.logutils import error, warning, debug, Pfx, D, X
 from cs.queues import IterableQueue
 from cs.range import Range
 from cs.threads import locked, locked_property
