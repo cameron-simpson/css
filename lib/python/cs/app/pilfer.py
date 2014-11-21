@@ -1316,16 +1316,15 @@ def action_divert_pipe(func_name, action, offset, do_trace):
     def function(P):
       ''' Divert selected URLs to the named pipeline.
       '''
-      U = P._
-      if sel_function(U):
+      if sel_function(P):
         try:
           pipe = P.diversion(pipe_name)
         except KeyError:
           error("no pipe named %r", pipe_name)
         else:
-          pipe.put(U)
+          pipe.put(P)
       else:
-        yield U
+        yield P
     function.__name__ = "divert_func(%r)" % (action,)
   elif func_name == "copy":
     func_sig = FUNC_ONE_TO_ONE
@@ -1334,15 +1333,14 @@ def action_divert_pipe(func_name, action, offset, do_trace):
     def function(P):
       ''' Copy selected URLs to the named pipeline.
       '''
-      U = P._
-      if sel_function(U):
+      if sel_function(P):
         try:
           pipe = P.diversion(pipe_name)
         except KeyError:
           error("no pipe named %r", pipe_name)
         else:
-          pipe.put(U)
-      return U
+          pipe.put(P)
+      return P
     function.__name__ = "copy_func(%r)" % (action,)
   elif func_name == "pipe":
     # gather all items and feed to an instance of the specified pipeline
