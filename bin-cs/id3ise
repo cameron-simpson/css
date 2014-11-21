@@ -16,15 +16,16 @@ usage = '''Usage: %s [--clean] [--deduce] [--infer] [tag=value...] [--] filename
     --infer     Update tags (if missing or blank) with values inferred from file pathname.'''
 
 def main(argv):
-  xit = 0
   cmd = basename(argv[0])
   setup_logging(cmd)
   args = argv[1:]
+
   do_clean = False
   do_deduce = False
   do_infer = False
   tag_values = {}
   badopts = False
+
   while args:
     arg = args.pop(0)
     if arg == '--':
@@ -54,27 +55,49 @@ def main(argv):
     error("you may not specify both --deduce and --infer")
     badopts = True
 
-  for mp3path in mp3paths:
-    X(mp3path)
-    mp3 = ID3(mp3path)
-    ##info = pathinfo(mp3path)
-    ##X(repr(info))
-    X("mp3 artist = %r, ", mp3.artist)
-    ##for tag_name in ( 'artist', 'album', 'title'):
-    ##  mp3[tag_name] = info[tag_name]
-    ##update_tracknum(mp3, info['tracknum'])
-    ### SKIP mp3.flush()
-    for frame in mp3.tag:
+  pathnames = args
+
+  if badopts:
+    error(usage, cmd)
+    return 1
+
+  xit = 0
+
+  for pathname in pathnames:
+    X(pathname)
+    id3 = ID3(pathname)
+    for frame in id3.tag:
       frameid = frame['frameid']
       if frameid not in ID3.frameids_to_names:
         print "UNKNOWN frameid %r: %r" % (frameid, frame)
       else:
         frame_name = ID3.frameids_to_names[frameid][0]
         if frame_name == 'attached_picture':
-          frame['data'] = '%d bytes' % (len(frame['data']),)
-        print "%s: %r" % (frame_name, frame)
-      if 'text' not in frame:
-        print "  no 'text' field"
+          print("%s %s: %d bytes" % (frameid, frame_name, len(frame['data'])))
+        elif 'text' in frame:
+          print("%s %s: %s" % (frameid, frame_name, frame['text']))
+        else:
+          print("%s %s: %r" % (frameid, frame_name, frame))
+      if 'text' in frame:
+        if do_clean:
+          id3.clean(frameid)
+    if do_deduce or do_infer:
+      try:
+        info = pathinfo(pathname, sep=' - ')
+      except ValueError as e:
+        try:
+          info = pathinfo(pathname, sep='/')
+        except ValueError as e:
+          info = {}
+        else:
+          pass
+      else:
+        pass
+      for tag_name in sorted(info.keys()):
+        tag_value = getattr(id3, tag_name)
+        if do_deduce or len(tag_value) == 0:
+          id3[tag_name] = info[tag_name]
+      id3.flush()
     break
   return xit
 
@@ -83,7 +106,6 @@ def pathinfo(path, sep='/'):
       Expected format:
         .../AlbumArtist/AlbumName/[discnum-]tracknum trackname
   '''
-  X("PATHINFO: sep=%r", sep)
   with Pfx(path):
     info = {}
 
@@ -99,7 +121,6 @@ def pathinfo(path, sep='/'):
       # split basename on separator
       parts = basename(path).rsplit(sep, 2)
 
-    X("PATHINFO: parts = %r", parts)
     artist, album, trackpart = parts
     info['album'] = album
     info['artist'] = artist
@@ -114,7 +135,7 @@ def pathinfo(path, sep='/'):
     if not left[:2].isdigit():
       raise ValueError('expected 2 leading digits')
     info['track_number'] = str(int(left[:2]))
-    info['title'] = left[2:].strip()
+    info['song_title'] = left[2:].strip()
     return info
 
 def update_tracknum(mp3, new_tracknum):

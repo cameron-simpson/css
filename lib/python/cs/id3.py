@@ -8,7 +8,7 @@
 
 from threading import RLock
 import pyid3lib
-from cs.logutils import X, info
+from cs.logutils import X, info, debug
 from cs.threads import locked, locked_property
 from cs.obj import O
 
@@ -46,7 +46,7 @@ class ID3(O):
     'SIGN': ('signature',),
     'SYLT': ('sync_lyric_transcription',),
     'SYTC': ('sync_tempo_codes',),
-    'TALB': ('album', 'title'),
+    'TALB': ('album_title', 'album', 'title'),
     'TBPM': ('bpm', 'beats_per_minute'),    # integer
     'TCOM': ('composer',),
     'TCON': ('content_type',),              # integer
@@ -64,7 +64,7 @@ class ID3(O):
     'TIME': ('time',),                      # HHMM
     'TIPL': ('involved_people',),
     'TIT1': ('content_group_description', 'genre'),
-    'TIT2': ('title_content_description',), # eg "adagio"
+    'TIT2': ('song_title', 'songname', 'content_description',), # eg "adagio"
     'TIT3': ('subtitle', 'description_refinement'), # eg "Op. 16"
     'TKEY': ('initial_key',),               # musical key
     'TLAN': ('languages',),
@@ -167,7 +167,7 @@ class ID3(O):
     else:
       oldtext = frame['text']
       if oldtext == newtext:
-        info("%s: UNCHANGED %r", frameid, oldtext)
+        debug("%s: UNCHANGED %r", frameid, oldtext)
         return
       info("%s: UPDATE %r => %r", frameid, oldtext, newtext)
       frame['text'] = newtext
@@ -202,7 +202,7 @@ class ID3(O):
         raise KeyError(".%s: no such frame" % (frameid,))
       return frame['text']
     frameid = ID3.names_to_frameids.get(key)
-    X("names_to_frameids.get(%r) ==> %r", key, frameid)
+    debug("names_to_frameids.get(%r) ==> %r", key, frameid)
     if frameid is None:
       raise KeyError(".%s: no mapping to a frameid" % (key,))
     return self[frameid]
@@ -218,7 +218,7 @@ class ID3(O):
   def __setitem__(self, key, value):
     ''' Set a frame text to `value`.
     '''
-    info("%s: SET TO %r", key, value)
+    debug("%s: SET TO %r", key, value)
     if self._valid_frameid(key):
       self._update_frame(key, value)
     else:
