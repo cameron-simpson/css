@@ -1314,14 +1314,16 @@ def action_divert_pipe(func_name, action, offset, do_trace):
     scoped = False
     @logexc
     def function(P):
+      ''' Divert selected URLs to the named pipeline.
+      '''
       U = P._
-      if sel_function(item):
+      if sel_function(U):
         try:
           pipe = P.diversion(pipe_name)
         except KeyError:
           error("no pipe named %r", pipe_name)
         else:
-          pipe.put(item)
+          pipe.put(U)
       else:
         yield U
     function.__name__ = "divert_func(%r)" % (action,)
@@ -1330,15 +1332,17 @@ def action_divert_pipe(func_name, action, offset, do_trace):
     scoped = True
     @logexc
     def function(P):
+      ''' Copy selected URLs to the named pipeline.
+      '''
       U = P._
-      if sel_function(item):
+      if sel_function(U):
         try:
           pipe = P.diversion(pipe_name)
         except KeyError:
           error("no pipe named %r", pipe_name)
         else:
-          pipe.put(item)
-      return item
+          pipe.put(U)
+      return U
     function.__name__ = "copy_func(%r)" % (action,)
   elif func_name == "pipe":
     # gather all items and feed to an instance of the specified pipeline
