@@ -681,13 +681,18 @@ class FormatMapping(object):
   def _ok_attrkey(self, k):
     ''' Test for validity of `k` as a public non-callable attribute of self.url.
     '''
+    X("%r._ok_attrkey(k=%r) ...", self, k)
     if not k[0].isalpha():
+      X(".%s[0]: NOT ISALPHA", k)
       return False
     U = self.url
+    X("U=%r", U)
     try:
       attr = getattr(U, k)
     except AttributeError:
+      X("U: no .%s attr", k)
       return False
+    X("U.%s=%r: checking not callable", k, attr)
     return not callable(attr)
 
   def keys(self):
@@ -971,12 +976,13 @@ def action_func(action, do_trace, raw=False):
         func_sig, function
       `func_sig` and `function` are used with Later.pipeline.
       If `raw`, return a tuple of:
-        func_sig, function, scoped
-      prior to the final step of wrapping scoped functions etc.
+        func_sig, function, result_is_Pilfer
+      prior to the final step of wrapping functions.
   '''
   function = None
   func_sig = None
-  scoped = False        # function output is (P,U), not just U
+  # result_is_Pilfer: the returned function returns a simple result such
+  #   as a Boolean or a string instead of a Pilfer object
   args = []             # collect foo and foo=bar operator arguments
   kwargs = {}
   # parse action into function and kwargs
@@ -985,28 +991,34 @@ def action_func(action, do_trace, raw=False):
 
     if action.startswith('!'):
       # ! shell command to generate items based off current item
+      # receive text lines, stripped
+      result_is_Pilfer = False
       function, func_sig = action_shcmd(action[1:])
     elif action.startswith('|'):
       # | shell command to pipe though
+      # receive text lines, stripped
+      result_is_Pilfer = False
       function, func_sig = action_pipecmd(action[1:])
     else:
       # comparison
       # varname==
       m = re_COMPARE.match(action)
       if m:
+        result_is_Pilfer = False
         function, func_sig = action_compare(m.group(1), action[m.end():])
       else:
         # assignment
         # varname=
         m = re_ASSIGN.match(action)
         if m:
+          result_is_Pilfer = True
           function, func_sig = action_assign(m.group(1), action[m.end():])
-          scoped = True
         else:
           # test of variable value
           # varname~selector
           m = re_TEST.match(action)
           if m:
+            result_is_Pilfer = False
             function, func_sig = action_test(m.group(1), action[m.end():], do_trace)
           else:
             # catch "a.b.c" and convert to "grok:a.b.c"
@@ -1020,6 +1032,7 @@ def action_func(action, do_trace, raw=False):
                 # an identifier
                 if func_name == 's':
                   # s/this/that/
+                  result_is_Pilfer = False
                   if offset == len(action):
                     raise ValueError("missing delimiter")
                   delim = action[offset]
@@ -1055,25 +1068,29 @@ def action_func(action, do_trace, raw=False):
                   # copy:pipe_name[:selector]
                   # divert:pipe_name[:selector]
                   # pipe:pipe_name[:selector]
-                  func_sig, function, scoped = action_divert_pipe(func_name, action, offset, do_trace)
+                  func_sig, function, result_is_Pilfer = action_divert_pipe(func_name, action, offset, do_trace)
                 elif func_name == 'grok' or func_name == 'grokall':
                   # grok:a.b.c.d[:args...]
                   # grokall:a.b.c.d[:args...]
+                  result_is_Pilfer = False
                   func_sig, function = action_grok(func_name, action, offset)
                 elif func_name == 'for':
                   # for:var=value,...
                   # for:varname:{start}..{stop}
                   # warning: implies 'per'
-                  func_sig, function, scoped = action_for(func_name, action, offset)
+                  func_sig, function, result_is_Pilfer = action_for(func_name, action, offset)
                 elif func_name in ('see', 'seen', 'unseen'):
                   # see[:seenset,...[:value]]
                   # seen[:seenset,...[:value]]
                   # unseen[:seenset,...[:value]]
+                  result_is_Pilfer = False
                   func_sig, function = action_sight(func_name, action, offset)
                 elif func_name == 'unique':
                   # unique
+                  result_is_Pilfer = False
                   func_sig, function = action_unique(func_name, action, offset)
                 elif action == 'first':
+                  result_is_Pilfer = False
                   is_first = [True]
                   def function(item):
                     if is_first[0]:
@@ -1082,11 +1099,13 @@ def action_func(action, do_trace, raw=False):
                     return False
                   func_sig = FUNC_SELECTOR
                 elif action == 'new_save_dir':
+                  result_is_Pilfer = True
                   def function(P):
                     return P.copy_with_vars(save_dir=new_dir(P.save_dir))
                   func_sig = FUNC_ONE_TO_ONE
                 # some other function: gather arguments
                 elif offset < len(action):
+                  result_is_Pilfer = False
                   marker = action[offset]
                   if marker == ':':
                     # followed by :kw1=value,kw2=value,...
@@ -1104,7 +1123,7 @@ def action_func(action, do_trace, raw=False):
                   else:
                     raise ValueError("unrecognised marker %r" % (marker,))
               if not function:
-                function, func_sig, scoped = function_by_name(func_name, func_sig)
+                function, func_sig, result_is_Pilfer = function_by_name(func_name, func_sig)
               else:
                 if func_sig is None:
                   raise RuntimeError("function is set (%r) but func_sig is None" % (function,))
@@ -1117,7 +1136,7 @@ def action_func(action, do_trace, raw=False):
               else:
                 regexp = action[1:]
               regexp = re.compile(regexp)
-              scoped = True
+              result_is_Pilfer = True
               def function(P):
                 U = P._
                 m = regexp.search(U)
@@ -1135,11 +1154,13 @@ def action_func(action, do_trace, raw=False):
               else:
                 regexp = action[2:]
               regexp = re.compile(regexp)
+              result_is_Pilfer = False
               function = lambda P: not regexp.search(P._)
               func_sig = FUNC_SELECTOR
             # parent
             # ..
             elif action == '..':
+              result_is_Pilfer = False
               function = lambda P: P._.parent
               func_sig = FUNC_ONE_TO_ONE
             # select URLs ending in particular extensions
@@ -1149,6 +1170,7 @@ def action_func(action, do_trace, raw=False):
               else:
                 exts, case = action[1:], True
               exts = exts.split(',')
+              result_is_Pilfer = False
               function = lambda P: has_exts( P._, exts, case_sensitive=case )
               func_sig = FUNC_SELECTOR
             # select URLs not ending in particular extensions
@@ -1158,6 +1180,7 @@ def action_func(action, do_trace, raw=False):
               else:
                 exts, case = action[2:], True
               exts = exts.split(',')
+              result_is_Pilfer = False
               function = lambda P: not has_exts( P._, exts, case_sensitive=case )
               func_sig = FUNC_SELECTOR
             else:
@@ -1167,21 +1190,21 @@ def action_func(action, do_trace, raw=False):
     # return the raw funtion - a raw caller wants to use it directly,
     # not in Later.pipeline()
     if raw:
-      return func_sig, function, scoped
+      return func_sig, function, result_is_Pilfer
 
     # The pipeline itself passes Pilfer objects, whose ._ attribute is the current value.
     #
     # All functions accept a leading Pilfer argument but most emit only
     # a value result (or just a Boolean for selectors).
-    # A few emit a Pilfer because they change modify it or produce a copy.
-    # If "scoped" is true, we expect the latter.
+    # A few emit a Pilfer because they modify it or produce a copy.
+    # If "result_is_Pilfer" is true, we expect the latter.
     # Otherwise we wrap FUNC_ONE_TO_ONE and FUNC_ONE_TO_MANY to
     # emit a Pilfer with their outputs.
     # FUNC_MANY_TO_MANY functions have their own convoluted wrapper.
     #
     func0 = function
-    if scoped and func_sig not in (FUNC_ONE_TO_ONE, FUNC_ONE_TO_MANY, FUNC_MANY_TO_MANY):
-      raise RuntimeError("scoped is true but func_sig == %r" % (func_sig,))
+    if result_is_Pilfer and func_sig not in (FUNC_ONE_TO_ONE, FUNC_ONE_TO_MANY, FUNC_MANY_TO_MANY):
+      raise RuntimeError("result_is_Pilfer is true but func_sig == %r" % (func_sig,))
     # convert FUNC_SELECTOR to FUNC_ONE_TO_MANY
     if func_sig == FUNC_SELECTOR:
       func0 = function
@@ -1190,10 +1213,10 @@ def action_func(action, do_trace, raw=False):
           yield P
       function.__name__ = "one_to_many(%s)" % (funcname(func0),)
       func_sig = FUNC_ONE_TO_MANY
-      scoped = True
+      result_is_Pilfer = True
     func1 = function
     if func_sig == FUNC_ONE_TO_ONE:
-      if scoped:
+      if result_is_Pilfer:
         function = lambda P: func1(P, *args, **kwargs)
       else:
         def function(P):
@@ -1203,7 +1226,7 @@ def action_func(action, do_trace, raw=False):
             P = P.copy_with_vars(_=U2)
           return P
     elif func_sig == FUNC_ONE_TO_MANY:
-      if scoped:
+      if result_is_Pilfer:
         def function(P):
           for P2 in func1(P, *args, **kwargs):
             yield P2
@@ -1212,7 +1235,7 @@ def action_func(action, do_trace, raw=False):
           for U in func1(P, *args, **kwargs):
             yield P.copy_with_vars(_=U)
     elif func_sig == FUNC_MANY_TO_MANY:
-      if scoped:
+      if result_is_Pilfer:
         function = lambda Ps: func1(Ps, *args, **kwargs)
       else:
         # Many-to-many functions are different.
@@ -1256,29 +1279,31 @@ def action_func(action, do_trace, raw=False):
 
 def function_by_name(func_name, func_sig):
   ''' Look up `func_name` in mappings of named functions.
-      Return (function, func_sig, scoped).
+      Return (function, func_sig, result_is_Pilfer).
   '''
-  scoped = False
   # look up function by name in mappings
   if func_sig is not None:
     raise RuntimeError("func_sig is set (%r) but function is None" % (func_sig,))
   if func_name in many_to_many:
     # many-to-many functions get passed straight in
+    result_is_Pilfer = True
     function = many_to_many[func_name]
     func_sig = FUNC_MANY_TO_MANY
-    scoped = True
   elif func_name in one_to_many:
+    result_is_Pilfer = False
     function = one_to_many[func_name]
     func_sig = FUNC_ONE_TO_MANY
   elif func_name in one_to_one:
+    result_is_Pilfer = False
     function = one_to_one[func_name]
     func_sig = FUNC_ONE_TO_ONE
   elif func_name in one_test:
+    result_is_Pilfer = False
     function = one_test[func_name]
     func_sig = FUNC_SELECTOR
   else:
     raise ValueError("unknown action")
-  return function, func_sig, scoped
+  return function, func_sig, result_is_Pilfer
 
 def action_divert_pipe(func_name, action, offset, do_trace):
   # copy:pipe_name[:selector]
@@ -1311,10 +1336,10 @@ def action_divert_pipe(func_name, action, offset, do_trace):
   if func_name == "divert":
     # function to divert selected items to a single named pipeline
     func_sig = FUNC_ONE_TO_MANY
-    scoped = False
+    result_is_Pilfer = True
     @logexc
     def function(P):
-      ''' Divert selected URLs to the named pipeline.
+      ''' Divert selected Pilfers to the named pipeline.
       '''
       if sel_function(P):
         try:
@@ -1328,10 +1353,10 @@ def action_divert_pipe(func_name, action, offset, do_trace):
     function.__name__ = "divert_func(%r)" % (action,)
   elif func_name == "copy":
     func_sig = FUNC_ONE_TO_ONE
-    scoped = True
+    result_is_Pilfer = True
     @logexc
     def function(P):
-      ''' Copy selected URLs to the named pipeline.
+      ''' Copy selected Pilfers to the named pipeline.
       '''
       if sel_function(P):
         try:
@@ -1345,7 +1370,7 @@ def action_divert_pipe(func_name, action, offset, do_trace):
   elif func_name == "pipe":
     # gather all items and feed to an instance of the specified pipeline
     func_sig = FUNC_MANY_TO_MANY
-    scoped = True
+    result_is_Pilfer = True
     @logexc_gen
     def function(items):
       if items:
@@ -1373,7 +1398,7 @@ def action_divert_pipe(func_name, action, offset, do_trace):
     function.__name__ = "pipe_func(%r)" % (action,)
   else:
     raise ValueError("expected \"divert\" or \"pipe\", got func_name=%r" % (func_name,))
-  return func_sig, function, scoped
+  return func_sig, function, result_is_Pilfer
 
 def action_per(action, argv):
   ''' Function to perform a "per": send each item does its own instance of a pipeline.
@@ -1450,7 +1475,7 @@ def action_for(func_name, action, offset):
   # for:varname=values
   #
   func_sig = FUNC_ONE_TO_MANY
-  scoped = True
+  result_is_Pilfer = True
   if offset == len(action) or action[offset] != ':':
     raise ValueError("missing colon")
   offset += 1
@@ -1481,7 +1506,7 @@ def action_for(func_name, action, offset):
         yield P.with_user_vars(**{varname: str(value)})
   else:
     raise ValueError("unrecognised marker after varname: %r", marker)
-  return func_sig, function, scoped
+  return func_sig, function, result_is_Pilfer
 
 def action_grok(func_name, action, offset):
   # grok:a.b.c.d[:args...]
