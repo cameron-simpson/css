@@ -978,11 +978,11 @@ def action_func(action, do_trace, raw=False):
       If `raw`, return a tuple of:
         func_sig, function, result_is_Pilfer
       prior to the final step of wrapping functions.
+      result_is_Pilfer: the returned function returns a Pilfer object
+        instead of a simple result such as a Boolean or a string.
   '''
   function = None
   func_sig = None
-  # result_is_Pilfer: the returned function returns a simple result such
-  #   as a Boolean or a string instead of a Pilfer object
   args = []             # collect foo and foo=bar operator arguments
   kwargs = {}
   # parse action into function and kwargs
