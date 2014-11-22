@@ -926,6 +926,7 @@ def grok(module_name, func_name, P, *a, **kw):
           P.set_user_vars(**var_mapping)
     return P
 
+@yields_Pilfer
 def grokall(module_name, func_name, Ps, *a, **kw):
   ''' Grokall performs a user-specified analysis on the items.
       Import `func_name` from module `module_name`.
