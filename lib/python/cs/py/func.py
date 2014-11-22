@@ -87,7 +87,10 @@ def yields_type(func, basetype):
   def check_yields_type(*a, **kw):
     for item in func(*a, **kw):
       if not isinstance(item, basetype):
-        raise TypeError("wrong type yielded from func %s: expected subclass of %s, got %s: %r", funcname, basetype, type(item), item)
+        raise TypeError(
+                "wrong type yielded from func %s: expected subclass of %s, got %s: %r"
+                % (funcname, basetype, type(item), item)
+              )
       yield item
   check_yields_type.__name__ = ( 'check_yields_type[%s,basetype=%s]'
                                  % (funcname, basetype)
@@ -101,9 +104,12 @@ def returns_type(func, basetype):
   def check_returns_type(*a, **kw):
     retval = func(*a, **kw)
     if not isinstance(retval, basetype):
-      raise TypeError("wrong type returned from func %s: expected subclass of %s, got %s: %r", funcname, basetype, type(retval), retval)
+      raise TypeError(
+              "wrong type returned from func %s: expected subclass of %s, got %s: %r"
+              % (funcname, basetype, type(retval), retval)
+            )
     return retval
   check_returns_type.__name__ = ( 'check_returns_type[%s,basetype=%s]'
-                                 % (funcname, basetype)
-                               )
+                                  % (funcname, basetype)
+                                )
   return check_returns_type
