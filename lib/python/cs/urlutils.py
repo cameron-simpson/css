@@ -110,7 +110,7 @@ class _URL(unicode):
   def opener(self):
     if self._opener is None:
       if self.referer is not None and self.referer._opener is not None:
-        self._operner = self.referer._opener
+        self._opener = self.referer._opener
       else:
         o = build_opener()
         o.add_handler(HTTPBasicAuthHandler(NetrcHTTPPasswordMgr()))
