@@ -259,6 +259,11 @@ def yields_str(func):
   '''
   return yields_type(func, str)
 
+def returns_bool(func):
+  ''' Decorator for functions which should return Booleans.
+  '''
+  return returns_type(func, bool)
+
 def returns_str(func):
   ''' Decorator for functions which should return strings.
   '''
@@ -1310,19 +1315,31 @@ def function_by_name(func_name, func_sig):
   if func_name in many_to_many:
     # many-to-many functions get passed straight in
     result_is_Pilfer = True
-    function = yields_Pilfer(many_to_many[func_name])
+    function = many_to_many[func_name]
+    if function.__name__ == '<lambda>':
+      function.__name__ = '<lambda %r>' % func_name
+    function = yields_Pilfer(function)
     func_sig = FUNC_MANY_TO_MANY
   elif func_name in one_to_many:
     result_is_Pilfer = False
-    function = yields_str(one_to_many[func_name])
+    function = one_to_many[func_name]
+    if function.__name__ == '<lambda>':
+      function.__name__ = '<lambda %r>' % func_name
+    function = yields_str(function)
     func_sig = FUNC_ONE_TO_MANY
   elif func_name in one_to_one:
     result_is_Pilfer = False
-    function = returns_str(one_to_one[func_name])
+    function = one_to_one[func_name]
+    if function.__name__ == '<lambda>':
+      function.__name__ = '<lambda %r>' % func_name
+    function = returns_str(function)
     func_sig = FUNC_ONE_TO_ONE
   elif func_name in one_test:
     result_is_Pilfer = False
     function = one_test[func_name]
+    if function.__name__ == '<lambda>':
+      function.__name__ = '<lambda %r>' % func_name
+    function = returns_bool(function)
     func_sig = FUNC_SELECTOR
   else:
     raise ValueError("unknown action")
