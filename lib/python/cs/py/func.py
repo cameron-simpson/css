@@ -93,3 +93,17 @@ def yields_type(func, basetype):
                                  % (funcname, basetype)
                                )
   return check_yields_type
+
+def returns_type(func, basetype):
+  ''' Decrator which checks that a function returns values of type `basetype`.
+  '''
+  funcname = funccite(func)
+  def check_returns_type(*a, **kw):
+    retval = func(*a, **kw)
+    if not isinstance(retval, basetype):
+      raise TypeError("wrong type returned from func %s: expected subclass of %s, got %s: %r", funcname, basetype, type(item), item)
+    return retval
+  check_returns_type.__name__ = ( 'check_returns_type[%s,basetype=%s]'
+                                 % (funcname, basetype)
+                               )
+  return check_returns_type
