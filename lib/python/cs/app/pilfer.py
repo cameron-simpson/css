@@ -53,7 +53,7 @@ from cs.urlutils import URL, isURL, NetrcHTTPPasswordMgr
 import cs.obj
 from cs.obj import O
 from cs.py.func import funcname, yields_type
-from cs.py3 import input, ConfigParser, sorted
+from cs.py3 import input, ConfigParser, sorted, ustr
 
 DEFAULT_JOBS = 4
 
@@ -254,6 +254,12 @@ def main(argv, stdin=None):
 
   return xit
 
+def yields_str(func):
+  ''' Decorator for generators which should yield strings.
+  '''
+  return yields_type(func, str)
+
+@yields_str
 def urls(url, stdin=None, cmd=None):
   ''' Generator to yield input URLs.
   '''
@@ -775,6 +781,7 @@ def has_exts(U, suffixes, case_sensitive=False):
         break
   return ok
 
+@yields_str
 def with_exts(urls, suffixes, case_sensitive=False):
   for U in urls:
     ok = False
@@ -861,12 +868,14 @@ def url_io_iter(I):
     else:
       yield item
 
+@yields_str
 def url_hrefs(U):
   ''' Yield the HREFs referenced by a URL.
       Conceals URLError, HTTPError.
   '''
   return url_io_iter(URL(U, None).hrefs(absolute=True))
 
+@yields_str
 def url_srcs(U):
   ''' Yield the SRCs referenced by a URL.
       Conceals URLError, HTTPError.
@@ -1476,6 +1485,7 @@ def action_unique(func_name, action, offset):
   # unique
   #
   seen = set()
+  @yields_str
   def function(P):
     U = P._
     if U not in seen:
@@ -1568,6 +1578,7 @@ def action_shcmd(shcmd):
   ''' Return (function, func_sig) for a shell command.
   '''
   shcmd = shcmd.strip()
+  @yields_str
   def function(P):
     U = P._
     uv = P.user_vars
@@ -1599,6 +1610,7 @@ def action_pipecmd(shcmd):
   ''' Return (function, func_sig) for pipeline through a shell command.
   '''
   shcmd = shcmd.strip()
+  @yields_str
   def function(items):
     if not isinstance(items, list):
       items = list(items)
