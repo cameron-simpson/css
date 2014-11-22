@@ -1448,7 +1448,7 @@ def action_sight(func_name, action, offset):
   # seen[:seenset,...[:value]]
   # unseen[:seenset,...[:value]]
   seensets = ('_',)
-  value = '{url}'
+  value = '{_}'
   if offset < len(action):
     if action[offset] != ':':
       raise ValueError("bad marker after %r, expected ':', found %r", func_name, action[offset])
