@@ -674,6 +674,11 @@ def yields_Pilfer(func):
   '''
   return yields_type(func, Pilfer)
 
+def returns_Pilfer(func):
+  ''' Decorator for functions which should return Pilfers.
+  '''
+  return returns_type(func, Pilfer)
+
 class FormatArgument(str):
 
   @property
@@ -894,6 +899,7 @@ def url_srcs(U):
   '''
   return url_io_iter(URL(U, None).srcs(absolute=True))
 
+@returns_Pilfer
 def grok(module_name, func_name, P, *a, **kw):
   ''' Grok performs a user-specified analysis on the supplied Pilfer state `P`.
       (The current value, often an URL, is `P._`.)
