@@ -1105,7 +1105,7 @@ def action_func(action, do_trace, raw=False):
                 elif func_name == 'grok' or func_name == 'grokall':
                   # grok:a.b.c.d[:args...]
                   # grokall:a.b.c.d[:args...]
-                  result_is_Pilfer = False
+                  result_is_Pilfer = True
                   func_sig, function = action_grok(func_name, action, offset)
                 elif func_name == 'for':
                   # for:var=value,...
