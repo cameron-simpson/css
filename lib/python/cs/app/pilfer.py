@@ -257,7 +257,7 @@ def main(argv, stdin=None):
 def yields_str(func):
   ''' Decorator for generators which should yield strings.
   '''
-  return yields_type(func, str)
+  return yields_type(func, (str, unicode))
 
 def returns_bool(func):
   ''' Decorator for functions which should return Booleans.
@@ -267,7 +267,7 @@ def returns_bool(func):
 def returns_str(func):
   ''' Decorator for functions which should return strings.
   '''
-  return returns_type(func, str)
+  return returns_type(func, (str, unicode))
 
 @yields_str
 def urls(url, stdin=None, cmd=None):
