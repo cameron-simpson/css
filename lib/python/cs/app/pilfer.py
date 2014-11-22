@@ -52,7 +52,7 @@ from cs.threads import locked, locked_property
 from cs.urlutils import URL, isURL, NetrcHTTPPasswordMgr
 import cs.obj
 from cs.obj import O
-from cs.py.func import funcname
+from cs.py.func import funcname, yields_type
 from cs.py3 import input, ConfigParser, sorted
 
 DEFAULT_JOBS = 4
@@ -651,6 +651,11 @@ class Pilfer(O):
       value = self.format_string(value, U)
     FormatMapping(self)[k] = value
 
+def yields_Pilfer(func):
+  ''' Decorator for generators which should yield Pilfers.
+  '''
+  return yields_type(func, Pilfer)
+
 class FormatArgument(str):
 
   @property
@@ -1137,6 +1142,7 @@ def action_func(action, do_trace, raw=False):
                 regexp = action[1:]
               regexp = re.compile(regexp)
               result_is_Pilfer = True
+              @yields_Pilfer
               def function(P):
                 U = P._
                 m = regexp.search(U)
@@ -1208,6 +1214,7 @@ def action_func(action, do_trace, raw=False):
     # convert FUNC_SELECTOR to FUNC_ONE_TO_MANY
     if func_sig == FUNC_SELECTOR:
       func0 = function
+      @yields_Pilfer
       def function(P):
         if func0(P, *args, **kwargs):
           yield P
@@ -1227,10 +1234,12 @@ def action_func(action, do_trace, raw=False):
           return P
     elif func_sig == FUNC_ONE_TO_MANY:
       if result_is_Pilfer:
+        @yields_Pilfer
         def function(P):
           for P2 in func1(P, *args, **kwargs):
             yield P2
       else:
+        @yields_Pilfer
         def function(P):
           for U in func1(P, *args, **kwargs):
             yield P.copy_with_vars(_=U)
@@ -1338,6 +1347,7 @@ def action_divert_pipe(func_name, action, offset, do_trace):
     func_sig = FUNC_ONE_TO_MANY
     result_is_Pilfer = True
     @logexc
+    @yields_Pilfer
     def function(P):
       ''' Divert selected Pilfers to the named pipeline.
       '''
@@ -1372,6 +1382,7 @@ def action_divert_pipe(func_name, action, offset, do_trace):
     func_sig = FUNC_MANY_TO_MANY
     result_is_Pilfer = True
     @logexc_gen
+    @yields_Pilfer
     def function(items):
       if items:
         P = items[0]
@@ -1406,6 +1417,7 @@ def action_per(action, argv):
   debug("action_per: argv=%r", argv)
   argv = list(argv)
   pipespec = PipeSpec("per:[%s]" % (','.join(argv)), argv)
+  @yields_Pilfer
   def function(P):
     debug("action_per func %r per(%r)", function.__name__, item)
     with P.later.more_capacity(1):
@@ -1488,6 +1500,7 @@ def action_for(func_name, action, offset):
   if marker == '=':
     # for:varname=value,...
     values = action[offset+1:]
+    @yields_Pilfer
     def function(P):
       U = P._
       # expand "values", split on whitespace, iterate with new Pilfer
@@ -1497,6 +1510,7 @@ def action_for(func_name, action, offset):
   elif marker == ':':
     # for:varname:{start}..{stop}
     start, stop = action[offset+1:].split('..', 1)
+    @yields_Pilfer
     def function(P):
       U = P._
       # expand "values", split on whitespace, iterate with new Pilfer
@@ -1540,6 +1554,7 @@ def action_grok(func_name, action, offset):
     raise RuntimeError("arguments to %s not yet implemented" % (func_name,))
   if is_grokall:
     func_sig = FUNC_MANY_TO_MANY
+    @yields_Pilfer
     def function(items, *a, **kw):
       for item in grokall(grok_module, grok_funcname, items, *a, **kw):
         yield item
