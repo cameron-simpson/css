@@ -925,6 +925,7 @@ def grok(module_name, func_name, P, *a, **kw):
         exception("call")
       else:
         if var_mapping:
+          debug("grok: var_mapping=%r", var_mapping)
           P = P.copy('user_vars')
           P.set_user_vars(**var_mapping)
     return P
