@@ -1310,7 +1310,7 @@ def function_by_name(func_name, func_sig):
   if func_name in many_to_many:
     # many-to-many functions get passed straight in
     result_is_Pilfer = True
-    function = many_to_many[func_name]
+    function = yields_Pilfer(many_to_many[func_name])
     func_sig = FUNC_MANY_TO_MANY
   elif func_name in one_to_many:
     result_is_Pilfer = False
