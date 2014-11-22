@@ -1256,7 +1256,9 @@ def action_func(action, do_trace, raw=False):
     if func_sig == FUNC_ONE_TO_ONE:
       if result_is_Pilfer:
         function = lambda P: func1(P, *args, **kwargs)
+        function = returns_Pilfer(function)
       else:
+        @returns_Pilfer
         def function(P):
           U = P._
           U2 = func1(P, *args, **kwargs)
@@ -1606,6 +1608,7 @@ def action_grok(func_name, action, offset):
         yield item
   else:
     func_sig = FUNC_ONE_TO_ONE
+    @returns_Pilfer
     def function( P, *a, **kw):
       return grok(grok_module, grok_funcname, P, *a, **kw)
   return func_sig, function
