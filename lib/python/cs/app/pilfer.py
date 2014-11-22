@@ -959,7 +959,7 @@ one_to_many = {
       'xmltext':      lambda P, match: XML(P._).findall(match),
     }
 
-# actions that work on individual URLs
+# actions that work on individual Pilfer instances, returning strings
 one_to_one = {
       '..':           lambda P: URL(P._, None).parent,
       'delay':        lambda P, delay: (P._, sleep(float(delay)))[0],
@@ -1314,11 +1314,11 @@ def function_by_name(func_name, func_sig):
     func_sig = FUNC_MANY_TO_MANY
   elif func_name in one_to_many:
     result_is_Pilfer = False
-    function = one_to_many[func_name]
+    function = yields_str(one_to_many[func_name])
     func_sig = FUNC_ONE_TO_MANY
   elif func_name in one_to_one:
     result_is_Pilfer = False
-    function = one_to_one[func_name]
+    function = returns_str(one_to_one[func_name])
     func_sig = FUNC_ONE_TO_ONE
   elif func_name in one_test:
     result_is_Pilfer = False
