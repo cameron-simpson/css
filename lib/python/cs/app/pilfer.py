@@ -450,6 +450,8 @@ class Pilfer(O):
 
   @_.setter
   def _(self, value):
+    if value is not None and not isinstance(value, str):
+      raise TypeError("Pilfer._: expected string, received: %r" % (value,))
     self.user_vars['_'] = value
 
   @locked
