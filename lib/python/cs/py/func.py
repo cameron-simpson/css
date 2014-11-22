@@ -101,7 +101,7 @@ def returns_type(func, basetype):
   def check_returns_type(*a, **kw):
     retval = func(*a, **kw)
     if not isinstance(retval, basetype):
-      raise TypeError("wrong type returned from func %s: expected subclass of %s, got %s: %r", funcname, basetype, type(item), item)
+      raise TypeError("wrong type returned from func %s: expected subclass of %s, got %s: %r", funcname, basetype, type(retval), retval)
     return retval
   check_returns_type.__name__ = ( 'check_returns_type[%s,basetype=%s]'
                                  % (funcname, basetype)
