@@ -79,3 +79,17 @@ def derived_from(property_name):
   ''' A property which must be recomputed if the revision of another property exceeds the snapshot revision.
   '''
   return partial(derived_property, original_revision_name='_' + property_name + '__revision')
+
+def yields_type(func, basetype):
+  ''' Decrator which checks that a generator yields values of type `basetype`.
+  '''
+  funcname = funccite(func)
+  def check_yields_type(*a, **kw):
+    for item in func(*a, **kw):
+      if not isinstance(item, basetype):
+        raise TypeError("wrong type yielded from func %s: expected subclass of %s, got %s: %r", funcname, basetype, type(item), item)
+      yield item
+  check_yields_type.__name__ = ( 'check_yields_type[%s,basetype=%s]'
+                                 % (funcname, basetype)
+                               )
+  return check_yields_type
