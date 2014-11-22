@@ -52,7 +52,7 @@ from cs.threads import locked, locked_property
 from cs.urlutils import URL, isURL, NetrcHTTPPasswordMgr
 import cs.obj
 from cs.obj import O
-from cs.py.func import funcname, yields_type, returns_type
+from cs.py.func import funcname, funccite, yields_type, returns_type
 from cs.py3 import input, ConfigParser, sorted, ustr
 
 DEFAULT_JOBS = 4
@@ -915,7 +915,7 @@ def grok(module_name, func_name, P, *a, **kw):
     if mfunc is None:
       error("import fails")
     else:
-      X("grok: calling %s.%s<%s> with P=%r", module_name, func_name, mfunc, P)
+      X("grok: calling %s.%s<%s> with P=%r", module_name, func_name, funccite(mfunc), P)
       try:
         var_mapping = mfunc(P, *a, **kw)
       except Exception as e:
@@ -1257,6 +1257,8 @@ def action_func(action, do_trace, raw=False):
         def function(P):
           U = P._
           U2 = func1(P, *args, **kwargs)
+          if isinstance(U2, Pilfer):
+            raise TypeError("unexpected Pilfer from %s: %r" % (funccite(func1), U2))
           if U2 != U:
             P = P.copy_with_vars(_=U2)
           return P
