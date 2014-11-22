@@ -712,25 +712,19 @@ class FormatMapping(object):
   def _ok_attrkey(self, k):
     ''' Test for validity of `k` as a public non-callable attribute of self.url.
     '''
-    X("%r._ok_attrkey(k=%r) ...", self, k)
     if not k[0].isalpha():
-      X(".%s[0]: NOT ISALPHA", k)
       return False
     U = self.url
-    X("U=%r", U)
     try:
       attr = getattr(U, k)
     except AttributeError:
-      X("U: no .%s attr", k)
       return False
-    X("U.%s=%r: checking not callable", k, attr)
     return not callable(attr)
 
   def keys(self):
     ks = ( set( [ k for k in dir(self.url) if self._ok_attrkey(k) ] )
          + set(self.pilfer.user_vars.keys())
          )
-    X("FormatMapping: KEYS = %r", ks)
     return ks
 
   def __getitem__(self, k):
@@ -757,7 +751,6 @@ class FormatMapping(object):
       return default
 
   def __setitem__(self, k, value):
-    X("FormatMapping: __setitem__(k=%r, value=%r)", k, value)
     P = self.pilfer
     url = self.url
     with Pfx(url):
@@ -918,7 +911,6 @@ def grok(module_name, func_name, P, *a, **kw):
     if mfunc is None:
       error("import fails")
     else:
-      X("grok: calling %s.%s<%s> with P=%r", module_name, func_name, funccite(mfunc), P)
       try:
         var_mapping = mfunc(P, *a, **kw)
       except Exception as e:
