@@ -52,7 +52,7 @@ from cs.threads import locked, locked_property
 from cs.urlutils import URL, isURL, NetrcHTTPPasswordMgr
 import cs.obj
 from cs.obj import O
-from cs.py.func import funcname, yields_type
+from cs.py.func import funcname, yields_type, returns_type
 from cs.py3 import input, ConfigParser, sorted, ustr
 
 DEFAULT_JOBS = 4
@@ -258,6 +258,11 @@ def yields_str(func):
   ''' Decorator for generators which should yield strings.
   '''
   return yields_type(func, str)
+
+def returns_str(func):
+  ''' Decorator for functions which should return strings.
+  '''
+  return returns_type(func, str)
 
 @yields_str
 def urls(url, stdin=None, cmd=None):
