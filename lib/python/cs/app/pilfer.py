@@ -454,6 +454,12 @@ class Pilfer(O):
       raise TypeError("Pilfer._: expected string, received: %r" % (value,))
     self.user_vars['_'] = value
 
+  @property
+  def url(self):
+    ''' self._ as a URL object.
+    '''
+    return URL(self._, None)
+
   @locked
   def seenset(self, name):
     ''' Return the SeenSet implementing the named "seen" set.
@@ -587,9 +593,9 @@ class Pilfer(O):
   def set_user_vars(self, **kw):
     ''' Update self.user_vars from the keyword arguments.
     '''
-    for k, v in kw.items():
-      if not isinstance(v, (str, unicode)):
-        raise TypeError("%s.set_user_vars(%r): non-str value for %r: %r" % (self, kw, k, v))
+    ##for k, v in kw.items():
+    ##  if not isinstance(v, (str, unicode)):
+    ##    raise TypeError("%s.set_user_vars(%r): non-str value for %r: %r" % (self, kw, k, v))
     self.user_vars.update(kw)
 
   def copy_with_vars(self, **kw):
@@ -906,21 +912,16 @@ def grok(module_name, func_name, P, *a, **kw):
       with P.set_user_vars().
       Returns P (possibly copied), as this is a one-to-one function.
   '''
-  with Pfx("grok: call %s.%s( P=%r, *a=%r, **kw=%r )...", module_name, func_name, P, a, kw):
-    mfunc = P.import_module_func(module_name, func_name)
-    if mfunc is None:
-      error("import fails")
-    else:
-      try:
-        var_mapping = mfunc(P, *a, **kw)
-      except Exception as e:
-        exception("call")
-      else:
-        if var_mapping:
-          debug("grok: var_mapping=%r", var_mapping)
-          P = P.copy('user_vars')
-          P.set_user_vars(**var_mapping)
-    return P
+  mfunc = P.import_module_func(module_name, func_name)
+  if mfunc is None:
+    error("import fails")
+  else:
+    var_mapping = mfunc(P, *a, **kw)
+    if var_mapping:
+      debug("grok: var_mapping=%r", var_mapping)
+      P = P.copy('user_vars')
+      P.set_user_vars(**var_mapping)
+  return P
 
 @yields_Pilfer
 def grokall(module_name, func_name, Ps, *a, **kw):
@@ -931,24 +932,23 @@ def grokall(module_name, func_name, Ps, *a, **kw):
       which is applied to each item[0] via .set_user_vars().
       Return the possibly copied Ps.
   '''
-  with Pfx("grokall: call %s.%s( Ps=%r, *a=%r, **kw=%r )...", module_name, func_name, Ps, a, kw):
-    if not isinstance(Ps, list):
-      Ps = list(Ps)
-    if Ps:
-      mfunc = P[0].import_module_func(module_name, func_name)
-      if mfunc is None:
-        error("import fails")
+  if not isinstance(Ps, list):
+    Ps = list(Ps)
+  if Ps:
+    mfunc = P[0].import_module_func(module_name, func_name)
+    if mfunc is None:
+      error("import fails")
+    else:
+      try:
+        var_mapping = mfunc(Ps, *a, **kw)
+      except Exception as e:
+        exception("call")
       else:
-        try:
-          var_mapping = mfunc(Ps, *a, **kw)
-        except Exception as e:
-          exception("call")
-        else:
-          if var_mapping:
-            Ps = [ P.copy('user_vars') for P in Ps ]
-          for P in Ps:
-            P.set_user_vars(**var_mapping)
-    return Ps
+        if var_mapping:
+          Ps = [ P.copy('user_vars') for P in Ps ]
+        for P in Ps:
+          P.set_user_vars(**var_mapping)
+  return Ps
 
 def _test_grokfunc( P, *a, **kw ):
   v={ 'grok1': 'grok1value',
@@ -996,9 +996,241 @@ one_test = {
     }
 
 re_COMPARE = re.compile(r'(_|[a-z]\w*)==')
+re_CONTAINS= re.compile(r'(_|[a-z]\w*)\(([^()]*)\)')
 re_ASSIGN  = re.compile(r'(_|[a-z]\w*)=')
 re_TEST    = re.compile(r'(_|[a-z]\w*)~')
 re_GROK    = re.compile(r'([a-z]\w*(\.[a-z]\w*)*)\.([_a-z]\w*)', re.I)
+
+def action_func_raw(action, do_trace):
+  ''' Accept a string `action` and return a tuple of:
+        function, func_sig, result_is_Pilfer
+      This is primarily used by action_func below, but also called
+      by subparses such as selectors applied to the values of named
+      variables.
+      result_is_Pilfer: the returned function returns a Pilfer object
+        instead of a simple result such as a Boolean or a string.
+  '''
+  # save original form of action string
+  action0 = action
+  kwargs = {}
+  if action.startswith('!'):
+    # ! shell command to generate items based off current item
+    # receive text lines, stripped
+    function, func_sig = action_shcmd(action[1:])
+    return function, func_sig, False
+  if action.startswith('|'):
+    # | shell command to pipe though
+    # receive text lines, stripped
+    function, func_sig = action_pipecmd(action[1:])
+    return function, func_sig, False
+  # comparison
+  # varname==
+  m = re_COMPARE.match(action)
+  if m:
+    function, func_sig = action_compare(m.group(1), action[m.end():])
+    return function, func_sig, False
+  # contains
+  # varname(value,value,...)
+  m = re_CONTAINS.match(action)
+  if m:
+    function, func_sig = action_in_list(m.group(1), action[m.end():])
+    return function, func_sig, False
+  # assignment
+  # varname=
+  m = re_ASSIGN.match(action)
+  if m:
+    function, func_sig = action_assign(m.group(1), action[m.end():])
+    return function, func_sig, True
+  # test of variable value
+  # varname~selector
+  m = re_TEST.match(action)
+  if m:
+    function, func_sig = action_test(m.group(1), action[m.end():], do_trace)
+    return function, func_sig, False
+  # catch "a.b.c" and convert to "grok:a.b.c"
+  m = re_GROK.match(action)
+  if m:
+    action = 'grok:' + action
+  # operator name or "s//"
+  function = None
+  func_name, offset = get_identifier(action)
+  if func_name:
+    with Pfx(func_name):
+      # an identifier
+      if func_name == 's':
+        # s/this/that/
+        result_is_Pilfer = False
+        if offset == len(action):
+          raise ValueError("missing delimiter")
+        delim = action[offset]
+        delim2pos = action.find(delim, offset+1)
+        if delim2pos < offset + 1:
+          raise ValueError("missing second delimiter (%r)" % (delim,))
+        regexp = action[offset+1:delim2pos]
+        if not regexp:
+          raise ValueError("empty regexp")
+        delim3pos = action.find(delim, delim2pos+1)
+        if delim3pos < delim2pos+1:
+          raise ValueError("missing third delimiter (%r)" % (delim,))
+        repl_format = action[delim2pos+1:delim3pos]
+        offset = delim3pos + 1
+        repl_all = False
+        repl_icase = False
+        re_flags = 0
+        while offset < len(action):
+          modchar = action[offset]
+          offset += 1
+          if modchar == 'g':
+            repl_all = True
+          elif modchar == 'i':
+            repl_icase = True
+            re_flags != re.IGNORECASE
+          else:
+            raise ValueError("unknown s///x modifier: %r" % (modchar,))
+        debug("s: regexp=%r, replacement=%r, repl_all=%s, repl_icase=%s", regexp, repl_format, repl_all, repl_icase)
+        kwargs['regexp'] = re.compile(regexp, flags=re_flags)
+        kwargs['replacement'] = repl_format
+        kwargs['replace_all'] = repl_all
+      elif func_name in ("copy", "divert", "pipe"):
+        # copy:pipe_name[:selector]
+        # divert:pipe_name[:selector]
+        # pipe:pipe_name[:selector]
+        func_sig, function, result_is_Pilfer = action_divert_pipe(func_name, action, offset, do_trace)
+      elif func_name == 'grok' or func_name == 'grokall':
+        # grok:a.b.c.d[:args...]
+        # grokall:a.b.c.d[:args...]
+        result_is_Pilfer = True
+        func_sig, function = action_grok(func_name, action, offset)
+      elif func_name == 'for':
+        # for:var=value,...
+        # for:varname:{start}..{stop}
+        # warning: implies 'per'
+        func_sig, function, result_is_Pilfer = action_for(func_name, action, offset)
+      elif func_name in ('see', 'seen', 'unseen'):
+        # see[:seenset,...[:value]]
+        # seen[:seenset,...[:value]]
+        # unseen[:seenset,...[:value]]
+        result_is_Pilfer = False
+        func_sig, function = action_sight(func_name, action, offset)
+      elif func_name == 'unique':
+        # unique
+        result_is_Pilfer = False
+        func_sig, function = action_unique(func_name, action, offset)
+      elif action == 'first':
+        result_is_Pilfer = False
+        is_first = [True]
+        @returns_bool
+        def function(item):
+          if is_first[0]:
+            is_first[0] = False
+            return True
+          return False
+        func_sig = FUNC_SELECTOR
+      elif action == 'new_save_dir':
+        # create a new directory based on {save_dir} and update save_dir to match
+        result_is_Pilfer = True
+        @returns_Pilfer
+        def function(P):
+          return P.copy_with_vars(save_dir=new_dir(P.save_dir))
+        func_sig = FUNC_ONE_TO_ONE
+      # some other function: gather arguments
+      elif offset < len(action):
+        result_is_Pilfer = False
+        marker = action[offset]
+        if marker == ':':
+          # followed by :kw1=value,kw2=value,...
+          kwtext = action[offset+1:]
+          if func_name == "print":
+            # print is special - just a format string relying on current state
+            kwargs['string'] = kwtext
+          else:
+            for kw in kwtext.split(','):
+              if '=' in kw:
+                kw, v = kw.split('=', 1)
+                kwargs[kw] = v
+              else:
+                args.append(kw)
+        else:
+          raise ValueError("unrecognised marker %r" % (marker,))
+    if not function:
+      function, func_sig, result_is_Pilfer = function_by_name(func_name)
+    else:
+      if func_sig is None:
+        raise RuntimeError("function is set (%r) but func_sig is None" % (function,))
+  # select URLs matching regexp
+  # /regexp/
+  # named groups in the regexp get applied, per URL, to the variables
+  elif action.startswith('/'):
+    if action.endswith('/'):
+      regexp = action[1:-1]
+    else:
+      regexp = action[1:]
+    regexp = re.compile(regexp)
+    if regexp.groupindex:
+      # a regexp with named groups
+      result_is_Pilfer = True
+      @yields_Pilfer
+      def function(P):
+        U = P._
+        m = regexp.search(U)
+        if m:
+          varmap = m.groupdict()
+          if varmap:
+            P = P.with_user_vars(**varmap)
+          yield P
+      func_sig = FUNC_ONE_TO_MANY
+    else:
+      # regexp with no named groups: a plain selector
+      result_is_Pilfer = False
+      function = lambda P: regexp.search(P._)
+      func_sig = FUNC_SELECTOR
+  # select URLs not matching regexp
+  # -/regexp/
+  elif action.startswith('-/'):
+    if action.endswith('/'):
+      regexp = action[2:-1]
+    else:
+      regexp = action[2:]
+    regexp = re.compile(regexp)
+    if regexp.groupindex:
+      raise ValueError("named groups may not be used in regexp rejection patterns")
+    result_is_Pilfer = False
+    function = lambda P: not regexp.search(P._)
+    func_sig = FUNC_SELECTOR
+  # parent
+  # ..
+  elif action == '..':
+    result_is_Pilfer = False
+    function = lambda P: P._.parent
+    func_sig = FUNC_ONE_TO_ONE
+  # select URLs ending in particular extensions
+  elif action.startswith('.'):
+    if action.endswith('/i'):
+      exts, case = action[1:-2], False
+    else:
+      exts, case = action[1:], True
+    exts = exts.split(',')
+    result_is_Pilfer = False
+    function = lambda P: has_exts( P._, exts, case_sensitive=case )
+    func_sig = FUNC_SELECTOR
+  # select URLs not ending in particular extensions
+  elif action.startswith('-.'):
+    if action.endswith('/i'):
+      exts, case = action[2:-2], False
+    else:
+      exts, case = action[2:], True
+    exts = exts.split(',')
+    result_is_Pilfer = False
+    function = lambda P: not has_exts( P._, exts, case_sensitive=case )
+    func_sig = FUNC_SELECTOR
+  else:
+    raise ValueError("unknown function %r" % (func_name,))
+
+  if kwargs:
+    function = partial(function, **kwargs)
+
+  function.__name__ = "action(%r)" % (action0,)
+  return function, func_sig, result_is_Pilfer
 
 def action_func(action, do_trace, raw=False):
   ''' Accept a string `action` and return a tuple of:
@@ -1010,230 +1242,11 @@ def action_func(action, do_trace, raw=False):
       result_is_Pilfer: the returned function returns a Pilfer object
         instead of a simple result such as a Boolean or a string.
   '''
-  function = None
-  func_sig = None
   args = []             # collect foo and foo=bar operator arguments
   kwargs = {}
   # parse action into function and kwargs
   with Pfx("%s", action):
-    action0 = action
-
-    if action.startswith('!'):
-      # ! shell command to generate items based off current item
-      # receive text lines, stripped
-      result_is_Pilfer = False
-      function, func_sig = action_shcmd(action[1:])
-    elif action.startswith('|'):
-      # | shell command to pipe though
-      # receive text lines, stripped
-      result_is_Pilfer = False
-      function, func_sig = action_pipecmd(action[1:])
-    else:
-      # comparison
-      # varname==
-      m = re_COMPARE.match(action)
-      if m:
-        result_is_Pilfer = False
-        function, func_sig = action_compare(m.group(1), action[m.end():])
-      else:
-        # assignment
-        # varname=
-        m = re_ASSIGN.match(action)
-        if m:
-          result_is_Pilfer = True
-          function, func_sig = action_assign(m.group(1), action[m.end():])
-        else:
-          # test of variable value
-          # varname~selector
-          m = re_TEST.match(action)
-          if m:
-            result_is_Pilfer = False
-            function, func_sig = action_test(m.group(1), action[m.end():], do_trace)
-          else:
-            # catch "a.b.c" and convert to "grok:a.b.c"
-            m = re_GROK.match(action)
-            if m:
-              action = 'grok:' + action
-            # operator or s//
-            func_name, offset = get_identifier(action)
-            if func_name:
-              with Pfx(func_name):
-                # an identifier
-                if func_name == 's':
-                  # s/this/that/
-                  result_is_Pilfer = False
-                  if offset == len(action):
-                    raise ValueError("missing delimiter")
-                  delim = action[offset]
-                  delim2pos = action.find(delim, offset+1)
-                  if delim2pos < offset + 1:
-                    raise ValueError("missing second delimiter (%r)" % (delim,))
-                  regexp = action[offset+1:delim2pos]
-                  if not regexp:
-                    raise ValueError("empty regexp")
-                  delim3pos = action.find(delim, delim2pos+1)
-                  if delim3pos < delim2pos+1:
-                    raise ValueError("missing third delimiter (%r)" % (delim,))
-                  repl_format = action[delim2pos+1:delim3pos]
-                  offset = delim3pos + 1
-                  repl_all = False
-                  repl_icase = False
-                  re_flags = 0
-                  while offset < len(action):
-                    modchar = action[offset]
-                    offset += 1
-                    if modchar == 'g':
-                      repl_all = True
-                    elif modchar == 'i':
-                      repl_icase = True
-                      re_flags != re.IGNORECASE
-                    else:
-                      raise ValueError("unknown s///x modifier: %r" % (modchar,))
-                  debug("s: regexp=%r, replacement=%r, repl_all=%s, repl_icase=%s", regexp, repl_format, repl_all, repl_icase)
-                  kwargs['regexp'] = re.compile(regexp, flags=re_flags)
-                  kwargs['replacement'] = repl_format
-                  kwargs['replace_all'] = repl_all
-                elif func_name in ("copy", "divert", "pipe"):
-                  # copy:pipe_name[:selector]
-                  # divert:pipe_name[:selector]
-                  # pipe:pipe_name[:selector]
-                  func_sig, function, result_is_Pilfer = action_divert_pipe(func_name, action, offset, do_trace)
-                elif func_name == 'grok' or func_name == 'grokall':
-                  # grok:a.b.c.d[:args...]
-                  # grokall:a.b.c.d[:args...]
-                  result_is_Pilfer = True
-                  func_sig, function = action_grok(func_name, action, offset)
-                elif func_name == 'for':
-                  # for:var=value,...
-                  # for:varname:{start}..{stop}
-                  # warning: implies 'per'
-                  func_sig, function, result_is_Pilfer = action_for(func_name, action, offset)
-                elif func_name in ('see', 'seen', 'unseen'):
-                  # see[:seenset,...[:value]]
-                  # seen[:seenset,...[:value]]
-                  # unseen[:seenset,...[:value]]
-                  result_is_Pilfer = False
-                  func_sig, function = action_sight(func_name, action, offset)
-                elif func_name == 'unique':
-                  # unique
-                  result_is_Pilfer = False
-                  func_sig, function = action_unique(func_name, action, offset)
-                elif action == 'first':
-                  result_is_Pilfer = False
-                  is_first = [True]
-                  @returns_bool
-                  def function(item):
-                    if is_first[0]:
-                      is_first[0] = False
-                      return True
-                    return False
-                  func_sig = FUNC_SELECTOR
-                elif action == 'new_save_dir':
-                  # create a new directory based on {save_dir} and update save_dir to match
-                  result_is_Pilfer = True
-                  @returns_Pilfer
-                  def function(P):
-                    return P.copy_with_vars(save_dir=new_dir(P.save_dir))
-                  func_sig = FUNC_ONE_TO_ONE
-                # some other function: gather arguments
-                elif offset < len(action):
-                  result_is_Pilfer = False
-                  marker = action[offset]
-                  if marker == ':':
-                    # followed by :kw1=value,kw2=value,...
-                    kwtext = action[offset+1:]
-                    if func_name == "print":
-                      # print is special - just a format string relying on current state
-                      kwargs['string'] = kwtext
-                    else:
-                      for kw in kwtext.split(','):
-                        if '=' in kw:
-                          kw, v = kw.split('=', 1)
-                          kwargs[kw] = v
-                        else:
-                          args.append(kw)
-                  else:
-                    raise ValueError("unrecognised marker %r" % (marker,))
-              if not function:
-                function, func_sig, result_is_Pilfer = function_by_name(func_name, func_sig)
-              else:
-                if func_sig is None:
-                  raise RuntimeError("function is set (%r) but func_sig is None" % (function,))
-            # select URLs matching regexp
-            # /regexp/
-            # named groups in the regexp get applied, per URL, to the variables
-            elif action.startswith('/'):
-              if action.endswith('/'):
-                regexp = action[1:-1]
-              else:
-                regexp = action[1:]
-              regexp = re.compile(regexp)
-              if regexp.groupindex:
-                # a regexp with named groups
-                result_is_Pilfer = True
-                @yields_Pilfer
-                def function(P):
-                  U = P._
-                  m = regexp.search(U)
-                  if m:
-                    varmap = m.groupdict()
-                    if varmap:
-                      P = P.with_user_vars(**varmap)
-                    yield P
-                func_sig = FUNC_ONE_TO_MANY
-              else:
-                # regexp with no named groups: a plain selector
-                result_is_Pilfer = False
-                function = lambda P: regexp.search(P._)
-                func_sig = FUNC_SELECTOR
-            # select URLs not matching regexp
-            # -/regexp/
-            elif action.startswith('-/'):
-              if action.endswith('/'):
-                regexp = action[2:-1]
-              else:
-                regexp = action[2:]
-              regexp = re.compile(regexp)
-              if regexp.groupindex:
-                raise ValueError("named groups may not be used in regexp rejection patterns")
-              result_is_Pilfer = False
-              function = lambda P: not regexp.search(P._)
-              func_sig = FUNC_SELECTOR
-            # parent
-            # ..
-            elif action == '..':
-              result_is_Pilfer = False
-              function = lambda P: P._.parent
-              func_sig = FUNC_ONE_TO_ONE
-            # select URLs ending in particular extensions
-            elif action.startswith('.'):
-              if action.endswith('/i'):
-                exts, case = action[1:-2], False
-              else:
-                exts, case = action[1:], True
-              exts = exts.split(',')
-              result_is_Pilfer = False
-              function = lambda P: has_exts( P._, exts, case_sensitive=case )
-              func_sig = FUNC_SELECTOR
-            # select URLs not ending in particular extensions
-            elif action.startswith('-.'):
-              if action.endswith('/i'):
-                exts, case = action[2:-2], False
-              else:
-                exts, case = action[2:], True
-              exts = exts.split(',')
-              result_is_Pilfer = False
-              function = lambda P: not has_exts( P._, exts, case_sensitive=case )
-              func_sig = FUNC_SELECTOR
-            else:
-              raise ValueError("unknown function %r" % (func_name,))
-
-    function.__name__ = "action(%r)" % (action0,)
-    # return the raw funtion - a raw caller wants to use it directly,
-    # not in Later.pipeline()
-    if raw:
-      return func_sig, function, result_is_Pilfer
-
+    function, func_sig, result_is_Pilfer = action_func_raw(action, do_trace)
     # The pipeline itself passes Pilfer objects, whose ._ attribute is the current value.
     #
     # All functions accept a leading Pilfer argument but most emit only
@@ -1311,28 +1324,22 @@ def action_func(action, do_trace, raw=False):
 
     @logexc
     def trace_function(*a, **kw):
-      if do_trace:
-        D("DO %s(a=(%d args; %r),kw=%r)", action0, len(a), a, kw)
-      with Pfx(action0):
+      with Pfx(action):
         try:
           retval = function(*a, **kw)
         except Exception as e:
           exception("TRACE: EXCEPTION: %s", e)
           raise
-        if do_trace:
-          D("DONE %s(a=(%d args; %r),kw=%r) ==> %r", action0, len(a), a, kw, retval)
         return retval
 
-    trace_function.__name__ = "trace_action(%r)" % (action0,)
+    trace_function.__name__ = "trace_action(%r)" % (action,)
     return func_sig, trace_function
 
-def function_by_name(func_name, func_sig):
+def function_by_name(func_name):
   ''' Look up `func_name` in mappings of named functions.
       Return (function, func_sig, result_is_Pilfer).
   '''
   # look up function by name in mappings
-  if func_sig is not None:
-    raise RuntimeError("func_sig is set (%r) but function is None" % (func_sig,))
   if func_name in many_to_many:
     # many-to-many functions get passed straight in
     result_is_Pilfer = True
@@ -1387,12 +1394,11 @@ def action_divert_pipe(func_name, action, offset, do_trace):
     if marker != action[offset]:
       raise ValueError("expected second marker to match first: expected %r, saw %r"
                        % (marker, action[offset]))
-    sel_func_sig, sel_function, sel_scoped = action_func(action[offset+1:], do_trace=do_trace, raw=True)
+    sel_function, sel_func_sig, result_is_Pilfer = action_func_raw(action[offset+1:], do_trace=do_trace)
     if sel_func_sig != FUNC_SELECTOR:
-      raise ValueError("expected selector function but found: %r" % (action[offset+1:],))
-    if sel_scoped:
-      sel_function0 = sel_function
-      sel_function = lambda *a, **kw: sel_function0(*a, **kw)[1]
+      raise ValueError("expected selector function but found: func_sig=%s %r func=%r" % (sel_func_sig, action[offset+1:],sel_function))
+    if result_is_Pilfer:
+      raise RuntimeError("result_is_Pilfer should be FALSE!")
     sel_function.__name__ = "%r.select(%r)" % (action, action[offset+1:])
   if func_name == "divert":
     # function to divert selected items to a single named pipeline
@@ -1609,12 +1615,14 @@ def action_grok(func_name, action, offset):
     offset += 1
     raise RuntimeError("arguments to %s not yet implemented" % (func_name,))
   if is_grokall:
+    # grokall: process all the items and yield new items
     func_sig = FUNC_MANY_TO_MANY
     @yields_Pilfer
     def function(items, *a, **kw):
       for item in grokall(grok_module, grok_funcname, items, *a, **kw):
         yield item
   else:
+    # grok: process an item
     func_sig = FUNC_ONE_TO_ONE
     @returns_Pilfer
     def function( P, *a, **kw):
@@ -1697,9 +1705,30 @@ def action_pipecmd(shcmd):
           warning("exit code = %d", xit)
   return function, FUNC_MANY_TO_MANY
 
+def action_in_list(var, listspec):
+  ''' Return (function, func_sig) for a variable value comparison against a list.
+  '''
+  list_values = listspec.split(',')
+  @returns_bool
+  def function(P):
+    U = P._
+    M = FormatMapping(P, U)
+    try:
+      vvalue = M[var]
+    except KeyError:
+      error("unknown variable %r", var)
+      raise
+    for value in list_values:
+      cvalue = M.format(value)
+      if vvalue == cvalue:
+        return True
+    return False
+  return function, FUNC_SELECTOR
+
 def action_compare(var, value):
   ''' Return (function, func_sig) for a variable value comparison.
   '''
+  @returns_bool
   def function(P):
     U = P._
     M = FormatMapping(P, U)
@@ -1726,6 +1755,7 @@ def action_test(var, selector, do_trace):
     except KeyError:
       error("unknown variable %r", var)
       return False
+    ##X("TEST: var=%s, P=%s, vvalue=%s, sel_function=%s", var, P, vvalue, sel_function)
     result = sel_function( (P, vvalue) )
     return result
   return function, FUNC_SELECTOR
