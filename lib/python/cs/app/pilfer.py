@@ -1129,6 +1129,7 @@ def action_func(action, do_trace, raw=False):
                     return False
                   func_sig = FUNC_SELECTOR
                 elif action == 'new_save_dir':
+                  # create a new directory based on {save_dir} and update save_dir to match
                   result_is_Pilfer = True
                   @returns_Pilfer
                   def function(P):
