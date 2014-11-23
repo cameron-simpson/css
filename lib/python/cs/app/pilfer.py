@@ -1499,7 +1499,7 @@ def action_sight(func_name, action, offset):
         raise RuntimeError("parse should have a second colon after %r", action[:offset])
       value = action[offset+1:]
       if not value:
-        value = '{url}'
+        value = '{_}'
   if func_name == 'see':
     func_sig = FUNC_ONE_TO_ONE
     @returns_str
