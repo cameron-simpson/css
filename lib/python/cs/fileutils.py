@@ -1018,7 +1018,7 @@ class SharedAppendLines(SharedAppendFile):
       chunks = takewhile(lambda x: len(x) > 0, self._outQ)
     else:
       chunks = self._outQ
-    return as_lines(chunks, self._partials)
+    return as_lines(chunks)
 
 def chunks_of(fp, rsize=16384):
   ''' Generator to present text or data from an open file until EOF.
