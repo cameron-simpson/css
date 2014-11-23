@@ -271,16 +271,16 @@ class SeenSet(object):
   ''' A set-like collection with optional backing store file.
   '''
 
-  def __init__(self, name, backing_file=None):
+  def __init__(self, name, backing_path=None):
     self.name = name
-    self.backing_file = backing_file
+    self.backing_path = backing_path
     self.set = set()
-    if backing_file is not None:
-      with open(backing_file, "a"):
+    if backing_path is not None:
+      with open(backing_path, "a"):
         pass
       T = Thread(target=self._tailer,
-                 name="SeenSet[%s]._tailer(%s)" % (name, backing_file,),
-                 args=(open(backing_file),))
+                 name="SeenSet[%s]._tailer(%s)" % (name, backing_path,),
+                 args=(open(backing_path),))
       T.daemon = True
       T.start()
       sleep(0.1)
@@ -296,7 +296,7 @@ class SeenSet(object):
       return
     self.set.add(s)
     if not foreign:
-      path = self.backing_file
+      path = self.backing_path
       if path:
         with lockfile(path):
           with open(path, "a") as fp:

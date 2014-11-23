@@ -460,18 +460,18 @@ class Pilfer(O):
     '''
     seen = self.seensets
     if name not in seen:
-      backing_file = MappingChain(mappings=[ rc.seen_backing_files for rc in self.rcs ]).get(name)
-      if backing_file is not None:
-        backing_file = envsub(backing_file)
-        if ( not os.path.isabs(backing_file)
-         and not backing_file.startswith('./')
-         and not backing_file.startswith('../')
+      backing_path = MappingChain(mappings=[ rc.seen_backing_files for rc in self.rcs ]).get(name)
+      if backing_path is not None:
+        backing_path = envsub(backing_path)
+        if ( not os.path.isabs(backing_path)
+         and not backing_path.startswith('./')
+         and not backing_path.startswith('../')
            ):
           backing_basedir = self.defaults.get('seen_dir')
           if backing_basedir is not None:
             backing_basedir = envsub(backing_basedir)
-            backing_file = os.path.join(backing_basedir, backing_file)
-      seen[name] = SeenSet(name, backing_file)
+            backing_path = os.path.join(backing_basedir, backing_path)
+      seen[name] = SeenSet(name, backing_path)
     return seen[name]
 
   def seen(self, url, seenset='_'):
@@ -1821,12 +1821,12 @@ class PilferRC(O):
             pipe_spec = cfg.get('pipes', pipe_name)
             debug("loadrc: pipe = %s", pipe_spec)
             self.add_pipespec(PipeSpec(pipe_name, shlex.split(pipe_spec)))
-      # load [seen] name=>backing_file mapping
+      # load [seen] name=>backing_path mapping
       # NB: not yet envsub()ed
       if cfg.has_section('seen'):
         for setname in cfg.options('seen'):
-          backing_file = cfg.get('seen', setname).strip()
-          self.seen_backing_files[setname] = backing_file
+          backing_path = cfg.get('seen', setname).strip()
+          self.seen_backing_files[setname] = backing_path
 
   def __getitem__(self, pipename):
     ''' Fetch PipeSpec by name.
