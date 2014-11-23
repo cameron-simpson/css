@@ -997,6 +997,29 @@ class SharedAppendFile(object):
         first = False
       self._outQ.close()
 
+class SharedAppendLines(SharedAppendFile):
+
+  def transcribe_update(self, fp, s):
+    '''
+    '''
+    if '\n' in s:
+      raise ValueError("invalid string to transcribe, contains newline: %r" % (s,))
+    fp.write(s)
+    fp.write('\n')
+
+  def foreign_lines(self, to_eof=False):
+    ''' Generator yielding update lines from other writers.
+        `to_eof`: stop when the EOF marker is seen; requires self.eof_markers to be true.
+        Otherwise the generator will run until the SharedAppendLines is closed.
+    '''
+    if to_eof:
+      if not self.eof_markers:
+        raise ValueError("to_eof forbidden if not self.eof_markers")
+      chunks = takewhile(lambda x: len(x) > 0, self._outQ)
+    else:
+      chunks = self._outQ
+    return as_lines(chunks)
+
 def chunks_of(fp, rsize=16384):
   ''' Generator to present text or data from an open file until EOF.
   '''
