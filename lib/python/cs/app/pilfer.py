@@ -454,6 +454,12 @@ class Pilfer(O):
       raise TypeError("Pilfer._: expected string, received: %r" % (value,))
     self.user_vars['_'] = value
 
+  @property
+  def url(self):
+    ''' self._ as a URL object.
+    '''
+    return URL(self._, None)
+
   @locked
   def seenset(self, name):
     ''' Return the SeenSet implementing the named "seen" set.
