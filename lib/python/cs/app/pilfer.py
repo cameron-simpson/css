@@ -1168,17 +1168,24 @@ def action_func(action, do_trace, raw=False):
               else:
                 regexp = action[1:]
               regexp = re.compile(regexp)
-              result_is_Pilfer = True
-              @yields_Pilfer
-              def function(P):
-                U = P._
-                m = regexp.search(U)
-                if m:
-                  varmap = m.groupdict()
-                  if varmap:
-                    P = P.with_user_vars(**varmap)
-                  yield P
-              func_sig = FUNC_ONE_TO_MANY
+              if regexp.groupindex:
+                # a regexp with named groups
+                result_is_Pilfer = True
+                @yields_Pilfer
+                def function(P):
+                  U = P._
+                  m = regexp.search(U)
+                  if m:
+                    varmap = m.groupdict()
+                    if varmap:
+                      P = P.with_user_vars(**varmap)
+                    yield P
+                func_sig = FUNC_ONE_TO_MANY
+              else:
+                # regexp with no named groups: a plain selector
+                result_is_Pilfer = False
+                function = lambda P: regexp.search(P._)
+                func_sig = FUNC_SELECTOR
             # select URLs not matching regexp
             # -/regexp/
             elif action.startswith('-/'):
@@ -1187,6 +1194,8 @@ def action_func(action, do_trace, raw=False):
               else:
                 regexp = action[2:]
               regexp = re.compile(regexp)
+              if regexp.groupindex:
+                raise ValueError("named groups may not be used in regexp rejection patterns")
               result_is_Pilfer = False
               function = lambda P: not regexp.search(P._)
               func_sig = FUNC_SELECTOR
