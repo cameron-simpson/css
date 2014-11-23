@@ -460,7 +460,7 @@ class Pilfer(O):
     '''
     seen = self.seensets
     if name not in seen:
-      backing_path = MappingChain(mappings=[ rc.seen_backing_files for rc in self.rcs ]).get(name)
+      backing_path = MappingChain(mappings=[ rc.seen_backing_paths for rc in self.rcs ]).get(name)
       if backing_path is not None:
         backing_path = envsub(backing_path)
         if ( not os.path.isabs(backing_path)
@@ -1787,7 +1787,7 @@ class PilferRC(O):
     self.defaults = {}
     self.pipe_specs = {}
     self.action_map = {}
-    self.seen_backing_files = {}
+    self.seen_backing_paths = {}
     if filename is not None:
       self.loadrc(filename)
 
@@ -1826,7 +1826,7 @@ class PilferRC(O):
       if cfg.has_section('seen'):
         for setname in cfg.options('seen'):
           backing_path = cfg.get('seen', setname).strip()
-          self.seen_backing_files[setname] = backing_path
+          self.seen_backing_paths[setname] = backing_path
 
   def __getitem__(self, pipename):
     ''' Fetch PipeSpec by name.
