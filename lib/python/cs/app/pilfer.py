@@ -996,6 +996,7 @@ one_test = {
     }
 
 re_COMPARE = re.compile(r'(_|[a-z]\w*)==')
+re_CONTAINS= re.compile(r'(_|[a-z]\w*)\(([^()]*)\)')
 re_ASSIGN  = re.compile(r'(_|[a-z]\w*)=')
 re_TEST    = re.compile(r'(_|[a-z]\w*)~')
 re_GROK    = re.compile(r'([a-z]\w*(\.[a-z]\w*)*)\.([_a-z]\w*)', re.I)
@@ -1027,6 +1028,12 @@ def action_func_raw(action, do_trace):
   m = re_COMPARE.match(action)
   if m:
     function, func_sig = action_compare(m.group(1), action[m.end():])
+    return function, func_sig, False
+  # contains
+  # varname(value,value,...)
+  m = re_CONTAINS.match(action)
+  if m:
+    function, func_sig = action_in_list(m.group(1), action[m.end():])
     return function, func_sig, False
   # assignment
   # varname=
@@ -1695,6 +1702,26 @@ def action_pipecmd(shcmd):
         if xit != 0:
           warning("exit code = %d", xit)
   return function, FUNC_MANY_TO_MANY
+
+def action_in_list(var, listspec):
+  ''' Return (function, func_sig) for a variable value comparison against a list.
+  '''
+  list_values = listspec.split(',')
+  @returns_bool
+  def function(P):
+    U = P._
+    M = FormatMapping(P, U)
+    try:
+      vvalue = M[var]
+    except KeyError:
+      error("unknown variable %r", var)
+      raise
+    for value in list_values:
+      cvalue = M.format(value)
+      if vvalue == cvalue:
+        return True
+    return False
+  return function, FUNC_SELECTOR
 
 def action_compare(var, value):
   ''' Return (function, func_sig) for a variable value comparison.
