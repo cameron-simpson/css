@@ -1615,12 +1615,14 @@ def action_grok(func_name, action, offset):
     offset += 1
     raise RuntimeError("arguments to %s not yet implemented" % (func_name,))
   if is_grokall:
+    # grokall: process all the items and yield new items
     func_sig = FUNC_MANY_TO_MANY
     @yields_Pilfer
     def function(items, *a, **kw):
       for item in grokall(grok_module, grok_funcname, items, *a, **kw):
         yield item
   else:
+    # grok: process an item
     func_sig = FUNC_ONE_TO_ONE
     @returns_Pilfer
     def function( P, *a, **kw):
@@ -1753,6 +1755,7 @@ def action_test(var, selector, do_trace):
     except KeyError:
       error("unknown variable %r", var)
       return False
+    ##X("TEST: var=%s, P=%s, vvalue=%s, sel_function=%s", var, P, vvalue, sel_function)
     result = sel_function( (P, vvalue) )
     return result
   return function, FUNC_SELECTOR
