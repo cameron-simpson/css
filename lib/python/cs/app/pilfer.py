@@ -1012,6 +1012,7 @@ def action_func_raw(action, do_trace):
   '''
   # save original form of action string
   action0 = action
+  args = []
   kwargs = {}
   if action.startswith('!'):
     # ! shell command to generate items based off current item
@@ -1226,8 +1227,8 @@ def action_func_raw(action, do_trace):
   else:
     raise ValueError("unknown function %r" % (func_name,))
 
-  if kwargs:
-    function = partial(function, **kwargs)
+  if args or kwargs:
+    function = partial(function, *args, **kwargs)
 
   function.__name__ = "action(%r)" % (action0,)
   return function, func_sig, result_is_Pilfer
