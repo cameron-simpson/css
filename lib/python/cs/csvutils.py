@@ -60,17 +60,14 @@ else:
 
 class SharedCSVFile(SharedAppendFile):
 
-  def __init__(self, pathname, transcribe_update=None, readonly=False, **kw):
+  def __init__(self, pathname, readonly=False, **kw):
     if 'binary' in kw:
       raise ValueError('may not specify binary=')
-    if transcribe_update is None:
-      transcribe_update = self._transcribe_update
     self._csv_partials = []
     SharedAppendFile.__init__(self, pathname, readonly=readonly,
-                              binary=False, transcribe_update=transcribe_update,
-                              **kw)
+                              binary=False, **kw)
 
-  def _transcribe_update(self, fp, item):
+  def transcribe_update(self, fp, item):
     ''' Transcribe an update `item` to the supplied file `fp`.
         This the default function passed as SharedAppendFile's transcribe_update parameter.
     '''

@@ -865,7 +865,7 @@ class SharedAppendFile(object):
 
   def __init__(self, pathname, readonly=False, writeonly=False,
                 binary=False, max_queue=None,
-                transcribe_update=None, poll_interval=None,
+                poll_interval=None,
                 eof_markers = False,
                 lock_ext=None, lock_timeout=None):
     ''' Initialise this SharedAppendFile.
@@ -874,7 +874,6 @@ class SharedAppendFile(object):
         `writeonly`: set to true if we will monitor foreign updates.
         `binary`: if the ile is to be opened in binary mode, otherwise text mode.
         `max_queue`: maximum input and output Queue length. Default: SharedAppendFile.DEFAULT_MAX_QUEUE.
-        `transcribe_update`: function to transcribe our update objects to the file.
         `poll_interval`: sleep time between polls after an idle poll. Default: SharedAppendFile.DEFAULT_POLL_INTERVAL.
         `eof_markers`: set to true to put an empty chunk only to the output Queue when EOF reached.
         `lock_ext`: lock file extension.
@@ -888,7 +887,6 @@ class SharedAppendFile(object):
     self.readonly = readonly
     self.writeonly = readonly
     self.binary = binary
-    self.transcribe_update = transcribe_update
     self.eof_markers = eof_markers
     self.poll_interval = poll_interval
     self.max_queue = max_queue
