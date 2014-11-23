@@ -682,7 +682,7 @@ def returns_Pilfer(func):
   '''
   return returns_type(func, Pilfer)
 
-class FormatArgument(str):
+class FormatArgument(unicode):
 
   @property
   def as_int(self):
