@@ -1012,41 +1012,42 @@ def action_func_raw(action, do_trace):
   '''
   # save original form of action string
   action0 = action
+  args = []
   kwargs = {}
   if action.startswith('!'):
     # ! shell command to generate items based off current item
     # receive text lines, stripped
     function, func_sig = action_shcmd(action[1:])
-    return function, func_sig, False
+    return function, args, kwargs, func_sig, False
   if action.startswith('|'):
     # | shell command to pipe though
     # receive text lines, stripped
     function, func_sig = action_pipecmd(action[1:])
-    return function, func_sig, False
+    return function, args, kwargs, func_sig, False
   # comparison
   # varname==
   m = re_COMPARE.match(action)
   if m:
     function, func_sig = action_compare(m.group(1), action[m.end():])
-    return function, func_sig, False
+    return function, args, kwargs, func_sig, False
   # contains
   # varname(value,value,...)
   m = re_CONTAINS.match(action)
   if m:
     function, func_sig = action_in_list(m.group(1), action[m.end():])
-    return function, func_sig, False
+    return function, args, kwargs, func_sig, False
   # assignment
   # varname=
   m = re_ASSIGN.match(action)
   if m:
     function, func_sig = action_assign(m.group(1), action[m.end():])
-    return function, func_sig, True
+    return function, args, kwargs, func_sig, True
   # test of variable value
   # varname~selector
   m = re_TEST.match(action)
   if m:
     function, func_sig = action_test(m.group(1), action[m.end():], do_trace)
-    return function, func_sig, False
+    return function, args, kwargs, func_sig, False
   # catch "a.b.c" and convert to "grok:a.b.c"
   m = re_GROK.match(action)
   if m:
@@ -1226,11 +1227,8 @@ def action_func_raw(action, do_trace):
   else:
     raise ValueError("unknown function %r" % (func_name,))
 
-  if kwargs:
-    function = partial(function, **kwargs)
-
   function.__name__ = "action(%r)" % (action0,)
-  return function, func_sig, result_is_Pilfer
+  return function, args, kwargs, func_sig, result_is_Pilfer
 
 def action_func(action, do_trace, raw=False):
   ''' Accept a string `action` and return a tuple of:
@@ -1242,11 +1240,9 @@ def action_func(action, do_trace, raw=False):
       result_is_Pilfer: the returned function returns a Pilfer object
         instead of a simple result such as a Boolean or a string.
   '''
-  args = []             # collect foo and foo=bar operator arguments
-  kwargs = {}
   # parse action into function and kwargs
   with Pfx("%s", action):
-    function, func_sig, result_is_Pilfer = action_func_raw(action, do_trace)
+    function, args, kwargs, func_sig, result_is_Pilfer = action_func_raw(action, do_trace)
     # The pipeline itself passes Pilfer objects, whose ._ attribute is the current value.
     #
     # All functions accept a leading Pilfer argument but most emit only
@@ -1390,11 +1386,13 @@ def action_divert_pipe(func_name, action, offset, do_trace):
   if offset >= len(action):
     sel_function = lambda P: True
     sel_function.__name__ = 'True(%r)' % (action,)
+    sel_args = []
+    sel_kwargs = {}
   else:
     if marker != action[offset]:
       raise ValueError("expected second marker to match first: expected %r, saw %r"
                        % (marker, action[offset]))
-    sel_function, sel_func_sig, result_is_Pilfer = action_func_raw(action[offset+1:], do_trace=do_trace)
+    sel_function, sel_args, sel_kwargs, sel_func_sig, result_is_Pilfer = action_func_raw(action[offset+1:], do_trace=do_trace)
     if sel_func_sig != FUNC_SELECTOR:
       raise ValueError("expected selector function but found: func_sig=%s %r func=%r" % (sel_func_sig, action[offset+1:],sel_function))
     if result_is_Pilfer:
@@ -1409,7 +1407,7 @@ def action_divert_pipe(func_name, action, offset, do_trace):
     def function(P):
       ''' Divert selected Pilfers to the named pipeline.
       '''
-      if sel_function(P):
+      if sel_function(P, *sel_args, **sel_kwargs):
         try:
           pipe = P.diversion(pipe_name)
         except KeyError:
@@ -1426,7 +1424,7 @@ def action_divert_pipe(func_name, action, offset, do_trace):
     def function(P):
       ''' Copy selected Pilfers to the named pipeline.
       '''
-      if sel_function(P):
+      if sel_function(P, *sel_args, **sel_kwargs):
         try:
           pipe = P.diversion(pipe_name)
         except KeyError:
@@ -1449,7 +1447,7 @@ def action_divert_pipe(func_name, action, offset, do_trace):
         with P.later.more_capacity(1):
           for item in items:
             debug("pipe: sel_function=%r, item=%r", sel_function, item)
-            status = sel_function(item)
+            status = sel_function(item, *sel_args, **sel_kwargs)
             debug("pipe: sel_function=%r, item=%r: status=%r", sel_function, item, status)
             if status:
               if pipeline is None:
@@ -1462,7 +1460,6 @@ def action_divert_pipe(func_name, action, offset, do_trace):
             pipeQ.close()
             for item in pipeline.outQ:
               yield item
-
     function = logexc(function)
     function.__name__ = "pipe_func(%r)" % (action,)
   else:
