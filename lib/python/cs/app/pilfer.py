@@ -712,25 +712,19 @@ class FormatMapping(object):
   def _ok_attrkey(self, k):
     ''' Test for validity of `k` as a public non-callable attribute of self.url.
     '''
-    X("%r._ok_attrkey(k=%r) ...", self, k)
     if not k[0].isalpha():
-      X(".%s[0]: NOT ISALPHA", k)
       return False
     U = self.url
-    X("U=%r", U)
     try:
       attr = getattr(U, k)
     except AttributeError:
-      X("U: no .%s attr", k)
       return False
-    X("U.%s=%r: checking not callable", k, attr)
     return not callable(attr)
 
   def keys(self):
     ks = ( set( [ k for k in dir(self.url) if self._ok_attrkey(k) ] )
          + set(self.pilfer.user_vars.keys())
          )
-    X("FormatMapping: KEYS = %r", ks)
     return ks
 
   def __getitem__(self, k):
@@ -757,7 +751,6 @@ class FormatMapping(object):
       return default
 
   def __setitem__(self, k, value):
-    X("FormatMapping: __setitem__(k=%r, value=%r)", k, value)
     P = self.pilfer
     url = self.url
     with Pfx(url):
@@ -918,7 +911,6 @@ def grok(module_name, func_name, P, *a, **kw):
     if mfunc is None:
       error("import fails")
     else:
-      X("grok: calling %s.%s<%s> with P=%r", module_name, func_name, funccite(mfunc), P)
       try:
         var_mapping = mfunc(P, *a, **kw)
       except Exception as e:
@@ -1129,6 +1121,7 @@ def action_func(action, do_trace, raw=False):
                 elif action == 'first':
                   result_is_Pilfer = False
                   is_first = [True]
+                  @returns_bool
                   def function(item):
                     if is_first[0]:
                       is_first[0] = False
@@ -1136,7 +1129,9 @@ def action_func(action, do_trace, raw=False):
                     return False
                   func_sig = FUNC_SELECTOR
                 elif action == 'new_save_dir':
+                  # create a new directory based on {save_dir} and update save_dir to match
                   result_is_Pilfer = True
+                  @returns_Pilfer
                   def function(P):
                     return P.copy_with_vars(save_dir=new_dir(P.save_dir))
                   func_sig = FUNC_ONE_TO_ONE
@@ -1173,17 +1168,24 @@ def action_func(action, do_trace, raw=False):
               else:
                 regexp = action[1:]
               regexp = re.compile(regexp)
-              result_is_Pilfer = True
-              @yields_Pilfer
-              def function(P):
-                U = P._
-                m = regexp.search(U)
-                if m:
-                  varmap = m.groupdict()
-                  if varmap:
-                    P = P.with_user_vars(**varmap)
-                  yield P
-              func_sig = FUNC_ONE_TO_MANY
+              if regexp.groupindex:
+                # a regexp with named groups
+                result_is_Pilfer = True
+                @yields_Pilfer
+                def function(P):
+                  U = P._
+                  m = regexp.search(U)
+                  if m:
+                    varmap = m.groupdict()
+                    if varmap:
+                      P = P.with_user_vars(**varmap)
+                    yield P
+                func_sig = FUNC_ONE_TO_MANY
+              else:
+                # regexp with no named groups: a plain selector
+                result_is_Pilfer = False
+                function = lambda P: regexp.search(P._)
+                func_sig = FUNC_SELECTOR
             # select URLs not matching regexp
             # -/regexp/
             elif action.startswith('-/'):
@@ -1192,6 +1194,8 @@ def action_func(action, do_trace, raw=False):
               else:
                 regexp = action[2:]
               regexp = re.compile(regexp)
+              if regexp.groupindex:
+                raise ValueError("named groups may not be used in regexp rejection patterns")
               result_is_Pilfer = False
               function = lambda P: not regexp.search(P._)
               func_sig = FUNC_SELECTOR
@@ -1495,9 +1499,10 @@ def action_sight(func_name, action, offset):
         raise RuntimeError("parse should have a second colon after %r", action[:offset])
       value = action[offset+1:]
       if not value:
-        value = '{url}'
+        value = '{_}'
   if func_name == 'see':
     func_sig = FUNC_ONE_TO_ONE
+    @returns_str
     def function(P):
       U = P._
       see_value = P.format_string(value, U)
@@ -1506,12 +1511,14 @@ def action_sight(func_name, action, offset):
       return U
   elif func_name == 'seen':
     func_sig = FUNC_SELECTOR
+    @returns_bool
     def function(P):
       U = P._
       see_value = P.format_string(value, U)
       return any( [ P.seen(see_value, seenset) for seenset in seensets ] )
   elif func_name == 'unseen':
     func_sig = FUNC_SELECTOR
+    @returns_bool
     def function(P):
       U = P._
       see_value = P.format_string(value, U)
