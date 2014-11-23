@@ -593,9 +593,9 @@ class Pilfer(O):
   def set_user_vars(self, **kw):
     ''' Update self.user_vars from the keyword arguments.
     '''
-    for k, v in kw.items():
-      if not isinstance(v, (str, unicode)):
-        raise TypeError("%s.set_user_vars(%r): non-str value for %r: %r" % (self, kw, k, v))
+    ##for k, v in kw.items():
+    ##  if not isinstance(v, (str, unicode)):
+    ##    raise TypeError("%s.set_user_vars(%r): non-str value for %r: %r" % (self, kw, k, v))
     self.user_vars.update(kw)
 
   def copy_with_vars(self, **kw):
