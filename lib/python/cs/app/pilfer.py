@@ -912,21 +912,20 @@ def grok(module_name, func_name, P, *a, **kw):
       with P.set_user_vars().
       Returns P (possibly copied), as this is a one-to-one function.
   '''
-  with Pfx("grok: call %s.%s( P=%r, *a=%r, **kw=%r )...", module_name, func_name, P, a, kw):
-    mfunc = P.import_module_func(module_name, func_name)
-    if mfunc is None:
-      error("import fails")
+  mfunc = P.import_module_func(module_name, func_name)
+  if mfunc is None:
+    error("import fails")
+  else:
+    try:
+      var_mapping = mfunc(P, *a, **kw)
+    except Exception as e:
+      exception("call")
     else:
-      try:
-        var_mapping = mfunc(P, *a, **kw)
-      except Exception as e:
-        exception("call")
-      else:
-        if var_mapping:
-          debug("grok: var_mapping=%r", var_mapping)
-          P = P.copy('user_vars')
-          P.set_user_vars(**var_mapping)
-    return P
+      if var_mapping:
+        debug("grok: var_mapping=%r", var_mapping)
+        P = P.copy('user_vars')
+        P.set_user_vars(**var_mapping)
+  return P
 
 @yields_Pilfer
 def grokall(module_name, func_name, Ps, *a, **kw):
@@ -937,24 +936,23 @@ def grokall(module_name, func_name, Ps, *a, **kw):
       which is applied to each item[0] via .set_user_vars().
       Return the possibly copied Ps.
   '''
-  with Pfx("grokall: call %s.%s( Ps=%r, *a=%r, **kw=%r )...", module_name, func_name, Ps, a, kw):
-    if not isinstance(Ps, list):
-      Ps = list(Ps)
-    if Ps:
-      mfunc = P[0].import_module_func(module_name, func_name)
-      if mfunc is None:
-        error("import fails")
+  if not isinstance(Ps, list):
+    Ps = list(Ps)
+  if Ps:
+    mfunc = P[0].import_module_func(module_name, func_name)
+    if mfunc is None:
+      error("import fails")
+    else:
+      try:
+        var_mapping = mfunc(Ps, *a, **kw)
+      except Exception as e:
+        exception("call")
       else:
-        try:
-          var_mapping = mfunc(Ps, *a, **kw)
-        except Exception as e:
-          exception("call")
-        else:
-          if var_mapping:
-            Ps = [ P.copy('user_vars') for P in Ps ]
-          for P in Ps:
-            P.set_user_vars(**var_mapping)
-    return Ps
+        if var_mapping:
+          Ps = [ P.copy('user_vars') for P in Ps ]
+        for P in Ps:
+          P.set_user_vars(**var_mapping)
+  return Ps
 
 def _test_grokfunc( P, *a, **kw ):
   v={ 'grok1': 'grok1value',
