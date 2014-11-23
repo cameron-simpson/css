@@ -1699,6 +1699,7 @@ def action_pipecmd(shcmd):
 def action_compare(var, value):
   ''' Return (function, func_sig) for a variable value comparison.
   '''
+  @returns_bool
   def function(P):
     U = P._
     M = FormatMapping(P, U)
