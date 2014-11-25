@@ -645,6 +645,8 @@ class Pilfer(O):
                 savefp.write(content)
             except:
               exception("save fails")
+            # discard contents, releasing memory
+            U.flush()
 
   def import_module_func(self, module_name, func_name):
     with LogExceptions():
