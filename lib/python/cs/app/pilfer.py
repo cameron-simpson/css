@@ -201,7 +201,8 @@ def main(argv, stdin=None):
               #  - [missing] topologically sort the diversions
               #  - pick the [most-ancestor-like] diversion that is busy
               #    or exit loop if they are all idle
-              #  - close the div wait for that div to drain
+              #  - close the div
+              #  - wait for that div to drain
               #  - repeat
               while True:
                 D("quiesce LTR")
@@ -996,6 +997,7 @@ one_test = {
     }
 
 re_COMPARE = re.compile(r'(_|[a-z]\w*)==')
+re_UNCOMPARE=re.compile(r'(_|[a-z]\w*)!=')
 re_CONTAINS= re.compile(r'(_|[a-z]\w*)\(([^()]*)\)')
 re_ASSIGN  = re.compile(r'(_|[a-z]\w*)=')
 re_TEST    = re.compile(r'(_|[a-z]\w*)~')
@@ -1029,6 +1031,12 @@ def action_func_raw(action, do_trace):
   m = re_COMPARE.match(action)
   if m:
     function, func_sig = action_compare(m.group(1), action[m.end():])
+    return function, args, kwargs, func_sig, False
+  # uncomparison
+  # varname!=
+  m = re_UNCOMPARE.match(action)
+  if m:
+    function, func_sig = action_uncompare(m.group(1), action[m.end():])
     return function, args, kwargs, func_sig, False
   # contains
   # varname(value,value,...)
@@ -1736,6 +1744,22 @@ def action_compare(var, value):
       raise
     cvalue = M.format(value)
     return vvalue == cvalue
+  return function, FUNC_SELECTOR
+
+def action_uncompare(var, value):
+  ''' Return (function, func_sig) for a variable value comparison where not equal.
+  '''
+  @returns_bool
+  def function(P):
+    U = P._
+    M = FormatMapping(P, U)
+    try:
+      vvalue = M[var]
+    except KeyError:
+      error("unknown variable %r", var)
+      raise
+    cvalue = M.format(value)
+    return vvalue != cvalue
   return function, FUNC_SELECTOR
 
 def action_test(var, selector, do_trace):
