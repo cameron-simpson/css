@@ -368,8 +368,9 @@ class _Pipeline(NestingOpenCloseMixin):
                                 func_final is None.
                                 Example: a test for inclusion.
 
-          FUNC_MANY_TO_MANY     func_iter is set to save its argument to a list and yield nothing.
-                                func_final applies func to the list and yields the results.
+          FUNC_MANY_TO_MANY     func_iter is set to save its argument to a
+                                list and yield nothing. func_final applies
+                                func to the list and yields the results.
                                 Example: a sort.
     '''
     if callable(o):
