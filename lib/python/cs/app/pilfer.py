@@ -640,11 +640,14 @@ class Pilfer(O):
             warning("file exists, not saving")
           else:
             content = U.content
-            try:
-              with open(saveas, "wb") as savefp:
-                savefp.write(content)
-            except:
-              exception("save fails")
+            if content is None:
+              error("content unavailable")
+            else:
+              try:
+                with open(saveas, "wb") as savefp:
+                  savefp.write(content)
+              except:
+                exception("save fails")
             # discard contents, releasing memory
             U.flush()
 
