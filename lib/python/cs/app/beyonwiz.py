@@ -17,6 +17,12 @@ from cs.obj import O
 from cs.threads import locked_property
 from cs.urlutils import URL
 
+USAGE = '''Usage:
+    %s  cat tvwizdirs...
+    %s  header tvwizdirs...
+    %s  scan tvwizdirs...
+    %s  test'''
+
 # constants related to headers
 
 # header filenames
@@ -40,9 +46,7 @@ def main(argv):
   args = list(argv)
   cmd = os.path.basename(args.pop(0))
   setup_logging(cmd)
-  usage = '''Usage:
-    %s  cat tvwizdirs...
-    %s  scan tvwizdirs...''' % (cmd, cmd)
+  usage = USAGE % (cmd, cmd, cmd, cmd)
 
   badopts = False
 
