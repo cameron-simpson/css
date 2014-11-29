@@ -139,7 +139,7 @@ def parse_header(data):
   ''' Decode the data chunk from a TV or radio header chunk.
   '''
   main = data[HDR_MAIN_OFF:HDR_MAIN_OFF+HDR_MAIN_SIZE]
-  main_unpacked = struct.unpack('6x 3s 1024s 256s 256s <H 2x <L <H <H 1548s <H <H <H <H')
+  main_unpacked = struct.unpack('6x 3s 1024s 256s 256s <H 2x <L <H <H 1548s <H <H <H <H', data)
   print(main_unpacked)
 
 class TVWiz(O):
