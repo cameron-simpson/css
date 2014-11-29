@@ -146,6 +146,15 @@ class TVWiz(O):
   def __init__(self, wizdir):
     self.dir = wizdir
 
+  @property
+  def header_path(self):
+    return os.path.join(self.dir, TVHDR)
+
+  def header(self):
+    with open(self.header_path, "rb") as hfp:
+      data = hfp.read()
+    return parse_header(data)
+
   def trunc_records(self):
     ''' Generator to yield TruncRecords for this TVWiz directory.
     '''
