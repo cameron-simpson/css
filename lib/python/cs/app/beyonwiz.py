@@ -60,6 +60,10 @@ def main(argv):
         if len(args) < 1:
           error("missing tvwizdirs")
           badopts = True
+      elif op == "header":
+        if len(args) < 1:
+          error("missing tvwizdirs")
+          badopts = True
       elif op == "scan":
         if len(args) < 1:
           error("missing tvwizdirs")
@@ -79,6 +83,11 @@ def main(argv):
   if op == "cat":
     for arg in args:
       TVWiz(arg).copyto(sys.stdout)
+  elif op == "header":
+    for arg in args:
+      print(arg)
+      TV = TVWiz(arg)
+      print(repr(TV.header()))
   elif op == "scan":
     for arg in args:
       print(arg)
