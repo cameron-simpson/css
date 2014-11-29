@@ -105,14 +105,14 @@ class DictAttrs(dict):
 # These are not methods because I don't want to pollute O subclasses
 # with lots of extra method noise.
 #
-def O_merge(o, _conflict=None, **kw):
+def O_merge(o, _conflict=None, _overwrite=False, **kw):
   ''' Merge key:value pairs from a mapping into an O as attributes.
       Ignore keys that do not start with a letter.
       New attributes or attributes whose values compare equal are
       merged in. Unequal values are passed to:
         _conflict(o, attr, old_value, new_value)
       to resolve the conflict. If _conflict is omitted or None
-      a warning if printed and the new value not merged.
+      then the new value overwrites the old if _overwrite is true.
   '''
   for attr, value in kw.iteritems():
     if not len(attr) or not attr[0].isalpha():
@@ -127,8 +127,8 @@ def O_merge(o, _conflict=None, **kw):
     else:
       if ovalue != value:
         if _conflict is None:
-          from cs.logutils import warning
-          warning(".%s: conflicting values: old=%s, new=%s", attr, ovalue, value)
+          if _overwrite:
+            setattr(o, attr, value)
         else:
           _conflict(o, attr, ovalue, value)
 
@@ -255,6 +255,24 @@ def copy(obj, *a, **kw):
     setattr(obj2, attr, value)
   return obj2
 
+def obj_as_dict(o, attr_prefix=None, attr_match=None):
+  ''' Return a dictionary with keys mapping to `o` attributes.
+  '''
+  if attr_match is None:
+    if attr_prefix is None:
+      match = lambda attr: len(attr) > 0 and not attr.startswith('_')
+    else:
+      match = lambda attr: attr.startswith(attr_prefix)
+  elif attr_prefix is None:
+    match = attr_match
+  else:
+    raise ValueError("cannot specify both attr_prefix and attr_match")
+  d = {}
+  for attr in dir(o):
+    if match(attr):
+      d[attr] = getattr(o, attr)
+  return d
+
 class Proxy(object):
   ''' An extremely simple proxy object that passes all unmatched attribute accesses to the proxied object.
       Note that setattr and delattr work directly on the proxy, not the proxied object.
@@ -264,10 +282,13 @@ class Proxy(object):
     self._proxied = other
 
   def __getattr__(self, attr):
-    return getattr(self._proxied, attr)
+    _proxied = object.__getattribute__(self, '_proxied')
+    return getattr(_proxied, attr)
 
   def __iter__(self):
-    return iter(self._proxied)
+    _proxied = object.__getattribute__(self, '_proxied')
+    return iter(_proxied)
 
   def __len__(self):
-    return len(self._proxied)
+    _proxied = object.__getattribute__(self, '_proxied')
+    return len(_proxied)

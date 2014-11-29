@@ -1,0 +1,46 @@
+#!/bin/sh
+#
+# Review the contents of the Beyonwiz drive against the WDlive.
+#   - Cameron Simpson <cs@zip.com.au>
+#
+
+set -ue
+
+header_file=header.tvwiz
+
+bwiz=/mnt/bwiz/Recordings
+wdlive=/mnt/wdlive-public/beyonwiz-scratch2
+
+( cd "$bwiz"
+  find . -type d \( \( -name FSCK0\* -o -name \*.tvwiz \) -prune -o -print \)
+) | \
+{
+  while read -r subdir
+  do
+    bwizdir=$bwiz/$subdir
+    case "$subdir" in
+      .)    wdsubdir=$wdlive/TOP ;;
+      *)    wdsubdir=$wdlive/$subdir ;;
+    esac
+    echo "$bwizdir ==> $wdsubdir"
+
+    ( cd "$bwizdir"
+      ##exec >"$wdsubdir/missing.txt"
+      for tvwiz in *.tvwiz
+      do
+        wdtvwiz=$wdsubdir/$tvwiz
+        [ -f "$tvwiz/header.tvwiz" ] || { echo "$bwizdir/$tvwiz: no header.tvwiz, skipping" >&2; continue; }
+        [ -f "$tvwiz/stat" ] || { echo "$bwizdir/$tvwiz: no stat, skipping" >&2; continue; }
+        [ -f "$tvwiz/trunc" ] || { echo "$bwizdir/$tvwiz: no trunc, skipping" >&2; continue; }
+        name=$(strings "$tvwiz/$header_file" | sed -n 2p)
+        name_=$( printf '%s\n' "$name" | tr '\011 /' ___ )
+        if [ -d "$wdtvwiz/." ]
+        then
+          : echo "existing $wdtvwiz" >&2
+        else
+          echo "MISSING $subdir/$tvwiz ($name)"
+        fi
+      done
+    )
+  done
+}

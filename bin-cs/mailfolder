@@ -12,6 +12,8 @@ set -ue
 : ${MAIL_EXPIRE_FORMAT:='%Y'}           # versus, say, %Y-%m
 : ${MAIL_IMAPSYNC:=}
 : ${MAILBOX:=$MAILDIR/INBOX}
+: ${SENDMESG_FCC:=spool-out}
+export SENDMESG_FCC
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [-f] [-I imapsync] [-q] [foldername]
@@ -68,6 +70,9 @@ bfoldername=`basename "$foldername"`
 old=OLD/`date "+$MAIL_EXPIRE_FORMAT"`
 omaildir=$MAILDIR/$old/$bfoldername
 
+# update where to take copies - presumes sendmail=sendmesg-fcc in muttrc
+SENDMESG_FCC="$maildir $SENDMESG_FCC"
+
 case "$runlocal" in
   '') # not set - infer from environment
       # not at home? run remote, unless local folder present
@@ -100,9 +105,5 @@ fi
 
 [ -n "$MAIL_IMAPSYNC" ] \
 && $trace imap-sync $imapsyncopts "$MAILDIR" "$MAIL_IMAPSYNC" "$foldername" "$old/$foldername" out spool spool-in spool-out
-
-# where to take copies - presumes sendmail=sendmesg-fcc in muttrc
-SENDMESG_FCC="$maildir +spool-out"
-export SENDMESG_FCC
 
 $trace mutt -f "$maildir" -e "fcc-hook . $maildir; save-hook . $omaildir"

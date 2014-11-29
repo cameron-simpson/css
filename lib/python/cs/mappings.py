@@ -8,7 +8,7 @@ from cs.py3 import StringTypes
 import os
 import sys
 from time import sleep
-from cs.fileutils import lockfile
+from cs.fileutils import lockfile, SharedAppendLines
 from cs.lex import isUC_, parseUC_sAttr
 from cs.obj import O
 from cs.seq import the
@@ -206,95 +206,6 @@ class FallbackDict(defaultdict):
       return self.__otherdict[key]
     raise KeyError(key)
 
-class LRUCache(O):
-  ''' A least recently used cache mapping layer for another mapping.
-  '''
-
-  def __init__(self, maxsize, backing):
-    if maxsize < 1:
-      raise ValueError("maxsize needs to be >= 1, received: %s" % (maxsize,))
-    self.maxsize = maxsize
-    self.backing = backing
-    self._cache = {}    # mapping of key => [seq, value]
-    self._seq = 0
-    self._lru = deque()
-    self._lock = Lock()
-
-  def _touch(self, key):
-    s = self._seq
-    s += 1
-    self._cache[key][0] = s
-    self._lru.append( (key, s) )
-    self._seq = s
-
-  def _trim(self):
-    lru = self._lru
-    cache = self._cache
-    while self.size() > self.maxsize and len(lru):
-      k, s = lru.popleft()
-      t = cache.get(k, None)
-      if t is None:
-        D("%s._trim: key %r not in _cache!", self, k)
-      else:
-        if t < s:
-          D("%s._trim: latest touch (%s) < old touch (%s)", self, t, s)
-        elif t == s:
-          # key not touched since placed on the queue, discard it
-          D("discard key %s", key)
-          del cache[k]
-        else:
-          # t > s: key use since this queue item, ignore
-          pass
-
-  def size(self):
-    ''' The default size metric for the cache: number of cached elements.
-    '''
-    return len(self._cache)
-
-  def keys(self):
-    return self.backing.keys()
-
-  def iterkeys(self):
-    return self.backing.iterkeys()
-
-  def iteritems(self):
-    for key in self.iterkeys():
-      yield key, self[key]
-
-  def itervalues(self):
-    for key in self.iterkeys():
-      yield self[key]
-
-  def __len__(self):
-    return len(self.backing)
-
-  def __setitem__(self, key, value):
-    self.backing[key] = value
-    self._cache[key] = [0, value]
-    self._touch(key)
-    self._trim()
-
-  def __getitem__(self, key):
-    sk = self._cache.get(key, None)
-    if sk:
-      self._touch(key)
-      return sk[1]
-    value = self.backing[key]
-    self._cache[key] = [0, value]
-    self._touch(key)
-    return value
-
-  def __contains__(self, key):
-    if key in self._cache:
-      self._touch(key)
-      return True
-    return key in self.backing
-
-  def __delitem__(self, key):
-    del self.backing[key]
-    if key in self._cache:
-      del self._cache[key]
-
 class MappingChain(object):
   ''' A mapping interface to a sequence of mappings.
       It does not support __setitem__ at present; that is expected
@@ -360,36 +271,34 @@ class SeenSet(object):
   ''' A set-like collection with optional backing store file.
   '''
 
-  def __init__(self, name, backing_file=None):
+  def __init__(self, name, backing_path=None):
     self.name = name
-    self.backing_file = backing_file
+    self.backing_path = backing_path
     self.set = set()
-    if backing_file is not None:
-      with open(backing_file, "a"):
+    if backing_path is not None:
+      # create file if missing, also tests access permission
+      with open(backing_path, "a"):
         pass
+      self._backing_file = SharedAppendLines(backing_path)
       T = Thread(target=self._tailer,
-                 name="SeenSet[%s]._tailer(%s)" % (name, backing_file,),
-                 args=(open(backing_file),))
+                 name="SeenSet[%s]._tailer(%s)" % (name, backing_path,)
+                )
       T.daemon = True
       T.start()
       sleep(0.1)
 
-  def _tailer(self, fp):
-    for line in tail(fp, seekwhence=os.SEEK_SET):
+  def _tailer(self):
+    for line in self._backing_file.foreign_lines():
       item = line.rstrip()
-      self.add(line.rstrip(), foreign=True)
+      self.add(item, foreign=True)
 
   def add(self, s, foreign=False):
     # avoid needlessly extending the backing file
     if s in self.set:
       return
     self.set.add(s)
-    if not foreign:
-      path = self.backing_file
-      if path:
-        with lockfile(path):
-          with open(path, "a") as fp:
-            print(s, file=fp)
+    if not foreign and self.backing_path:
+      self._backing_file.put(s)
 
   def __contains__(self, item):
     return item in self.set

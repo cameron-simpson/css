@@ -1,0 +1,20 @@
+#!/usr/bin/env py26+
+#
+# Run intergers from stdin, summarise in ordered list of runs.
+#   - Cameron Simpson <cs@zip.com.au> 17aug2014
+#
+
+import sys
+from cs.range import Range
+
+R = Range()
+for line in sys.stdin:
+  n = int(line.strip())
+  R.add(n)
+
+for start, end in R.spans():
+  if start == end-1:
+    print start
+    ##print start, type(start)
+  else:
+    print "%d..%d" % (start, end-1)
