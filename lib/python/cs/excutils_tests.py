@@ -6,7 +6,8 @@
 
 import sys
 import unittest
-from cs.excutils import return_exc_info, returns_exc_info, noexc
+from cs.excutils import return_exc_info, returns_exc_info, noexc, \
+        try_LogExceptions, try_logexc
 
 class TestExcUtils(unittest.TestCase):
 
@@ -41,6 +42,24 @@ class TestExcUtils(unittest.TestCase):
     f2 = noexc(f)
     self.assertIs(f2(), True)
     self.assertIs(f2(Exception), None)
+
+  def test_LogExceptions(self):
+    from cs.logutils import X, setup_logging
+    setup_logging("test_LogExceptions")
+    bang = RuntimeError("bang! testing LogException")
+    try_LogExceptions(None, conceal=True)
+    try_LogExceptions(None, conceal=False)
+    try_LogExceptions(bang, conceal=True)
+    self.assertRaises(RuntimeError, try_LogExceptions, bang, conceal=False)
+    self.assertRaises(Exception, try_LogExceptions, bang, conceal=False)
+
+  def test_logexc(self):
+    from cs.logutils import X, setup_logging
+    setup_logging("test_logexc")
+    bang = RuntimeError("bang! testing @logexc")
+    try_logexc(None)
+    self.assertRaises(RuntimeError, try_logexc, bang)
+    self.assertRaises(Exception, try_logexc, bang)
 
 def selftest(argv):
   unittest.main(__name__, None, argv)

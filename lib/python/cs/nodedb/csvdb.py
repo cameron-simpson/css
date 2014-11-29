@@ -10,10 +10,14 @@ import os
 import os.path
 import sys
 import datetime
+import time
 from shutil import copyfile
-from cs.csvutils import csv_reader, csv_writerow, CatchUp as CSV_CatchUp
-from cs.fileutils import lockfile, FileState
-from cs.logutils import Pfx, error, warning, info, debug, trace, D
+from threading import Thread, Lock
+from cs.debug import trace
+from cs.csvutils import csv_writerow, SharedCSVFile
+from cs.fileutils import FileState, rewrite_cmgr
+from cs.logutils import Pfx, error, warning, info, debug, D, X
+from cs.threads import locked
 from cs.py3 import StringTypes, Queue_Full as Full, Queue_Empty as Empty
 from . import NodeDB
 from .backend import Backend, CSVRow
@@ -31,20 +35,20 @@ def resolve_csv_row(row, lastrow):
       attr = lastrow[2]
     return t, name, attr, value
 
-def write_csv_file(fp, nodedata, noHeaders=False):
-  ''' Iterate over the supplied `nodedata`, a sequence of:
-        type, name, attrmap
-      and write to the file-like object `fp` in the vertical" CSV
-      style. `fp` may also be a string in which case the named file
+def write_csv_header(fp):
+  ''' Write CSV header row. Used for exported CSV data.
+  '''
+  csvw = csv.writer(fp)
+  csv_writerow( csvw, ('TYPE', 'NAME', 'ATTR', 'VALUE') )
+
+def write_csv_file(fp, nodedata):
+  ''' Iterate over the supplied `nodedata`, a sequence of (type, name, attrmap) and write to the file-like object `fp` in the vertical" CSV style.
+      `fp` may also be a string in which case the named file
       is truncated and rewritten.
       `attrmap` maps attribute names to sequences of preserialised values as
         computed by NodeDB.totext(value).
   '''
   csvw = csv.writer(fp)
-  if not noHeaders:
-    if fp.tell() > 0:
-      raise RuntimeError("writing headers but fp<%r>.tell() = %r" % (fp, fp.tell()))
-    csv_writerow( csvw, ('TYPE', 'NAME', 'ATTR', 'VALUE') )
   otype = None
   for t, name, attrmap in nodedata:
     attrs = sorted(attrmap.keys())
@@ -65,155 +69,106 @@ class Backend_CSVFile(Backend):
 
   def __init__(self, csvpath, readonly=False, rewrite_inplace=False):
     Backend.__init__(self, readonly=readonly)
+    self.pathname = csvpath
     self.rewrite_inplace = rewrite_inplace
-    self.csvpath = csvpath
     self.keep_backups = False
-    self.lastrow = None
+    self._loaded = Lock()
+    self._loaded.acquire()
 
-  def _open(self):
-    mode = "r" if self.readonly else "r+"
-    self.csvfp = open(self.csvpath, mode)
-    self.csvstate = FileState(self.csvfp.fileno())
-
-  def _close(self):
-    self.csvfp.close()
-    self.csvfp = None
-    self.csvstate = None
-
-  def lockdata(self):
-    ''' Obtain an exclusive lock on the CSV file.
+  def init_nodedb(self):
+    ''' Wait for the first update pass to complete.
     '''
-    return lockfile(self.csvpath)
+    self._open_csv()
+    self._monitor_thread = Thread(target=self._monitor, name="%s._monitor" % (self,))
+    self._monitor_thread.daemon = True
+    self._monitor_thread.start()
+    self._loaded.acquire()
+    self._loaded.release()
+    self._loaded = None
 
-  def _import_nodedata(self):
-    with self._updates_off():
-      self._rewind()
-      for row in self.fetch_updates():
-        self.import_csv_row(row)
-
-  def fetch_updates(self, header_row=None):
-    ''' Read CSV update rows from the current file position.
-        Yield resolved rows.
+  @locked
+  def _open_csv(self):
+    ''' Attach to the shared CSV file.
     '''
-    new_state = FileState(self.csvfp.fileno())
-    if not self.csvstate.samefile(new_state):
-      # CSV file replaced, reload
-      self._close()
-      self.nodedb._scrub()
-      self._open()
-      self._rewind()
-    raw_rows = CSV_CatchUp(self.csvfp, self.partial)
-    if header_row:
-      row = raw_rows.next()
-      if row != header_row:
-        raise RuntimeError(
-              "bad header row, expected %r, got: %r"
-              % (header_row, row))
+    self.csv = SharedCSVFile(self.pathname, eof_markers=True, readonly=self.readonly)
+
+  @locked
+  def _close_csv(self):
+    self.csv.close()
+    self.csv = None
+
+  def close(self):
+    ''' Final shutdown: stop monitor thread, detach from CSV file.
+    '''
+    self._close_csv()
+    self._monitor_thread.join()
+
+  def _update(self, csvrow):
+    ''' Update the backing store from an update csvrow.
+    '''
+    if not isinstance(csvrow, CSVRow):
+      raise TypeError("csvrow=%r" % (csvrow,))
+    if self.readonly:
+      warning("%s: readonly, discarding: %s", self.pathname, csvrow)
+    else:
+      self.csv.put(csvrow)
+
+  def _monitor(self):
+    ''' Monitor loop: collect updates from the backend and apply to the NodeDB.
+    '''
+    first = True
     fromtext = self.nodedb.fromtext
-    lastrow = self.lastrow
-    for row in raw_rows:
-      t, name, attr, value = fullrow = resolve_csv_row(row, lastrow)
-      value = fromtext(value)
-      yield CSVRow(t, name, attr, value)
-      lastrow = fullrow
-    self.partial = raw_rows.partial
-    self.lastrow = lastrow
+    lastrow = None
+    while self.csv is not None:
+      csv = self.csv
+      if csv is None:
+        pass
+      else:
+        old_state = csv.filestate
+        if old_state is not None:
+          new_state = FileState(self.pathname)
+          if not new_state.samefile(old_state):
+            # a new CSV file is there; assume rewritten entirely
+            # reconnect and reload
+            with self._lock:
+              self._close_csv()
+              self._open_csv()
+            self.nodedb._scrub()
+      csv = self.csv
+      if csv is None:
+        pass
+      else:
+        for row in csv.foreign_rows(to_eof=True):
+          row = resolve_csv_row(row, lastrow)
+          t, name, attr, value = row
+          value = fromtext(value)
+          self.import_csv_row(CSVRow(t, name, attr, value))
+          lastrow = row
+      if first:
+        first = False
+        self._loaded.release()
 
   def rewrite(self):
     ''' Force a complete rewrite of the CSV file.
     '''
-    trace("rewrite(%s)", self.csvpath)
     if self.readonly:
       error("%s: readonly: rewrite not done", self)
       return
-
-    with self._update_lock:
-      self._close()
-      with self.lockdata():
-        if self.rewrite_inplace:
-          backup = "%s.bak-%s" % (self.csvpath, datetime.datetime.now().isoformat())
-          copyfile(self.csvpath, backup)
-          with open(self.csvpath, "w") as fp:
-            write_csv_file(fp, self.nodedb.nodedata())
-        else:
-          newfile = "%s.new-%s" % (self.csvpath, datetime.datetime.now().isoformat())
-          with open(newfile, "w") as fp:
-            write_csv_file(fp, self.nodedb.nodedata())
-          backup = "%s.bak-%s" % (self.csvpath, datetime.datetime.now().isoformat())
-          os.rename(self.csvpath, backup)
-          try:
-            os.rename(newfile, self.csvpath)
-          except:
-            error("rename(%s, %s): %s", newfile, self.csvpath, sys.exc_info)
-            os.rename(backup, self.csvpath)
-        self._open()
-        self._fast_forward()
-      if not self.keep_backups:
-        os.remove(backup)
-
-  def iteritems(self):
-    for t, name, attrmap in read_csv_file(self.csvpath):
-      yield (t, name), attrmap
-
-  def iterkeys(self):
-    for item in self.iteritems():
-      yield item[0]
-
-  def itervalues(self):
-    for item in self.iteritems():
-      yield item[1]
-
-  def __setitem__(self, key, N):
-    # CSV DB Nodes only have attributes
-    t = N.type
-    name = N.name
-    for k, v in N.items():
-      self.setAttr(t, name, k, v)
-
-  def _rewind(self):
-    ''' Rewind our access to the CSV file.
-    '''
-    trace("_rewind %r", self.csvpath)
-    self.partial = ''
-    self.csvfp.seek(0, os.SEEK_SET)
-
-  def _fast_forward(self):
-    ''' Advance our access to the CSV file to the end.
-    '''
-    with self._update_lock:
-      trace("_fast_forward %r", self.csvpath)
-      self._rewind()
-      self.csvfp.seek(0, os.SEEK_END)
-
-  def push_updates(self, csvrows):
-    ''' Apply the update rows from the iterable `csvrows` to the data file.
-        This assumes we already have access to the data file.
-    '''
-    trace("push_updates: write our own updates to %s", self.csvfp)
-    totext = self.nodedb.totext
-    csvw = csv.writer(self.csvfp)
-    lastrow = None
-    for thisrow in csvrows:
-      if tuple(thisrow) == ('TYPE', 'NAME', 'ATTR', 'VALUE'):
-        raise RuntimeError("push_updates: received header row: %r" % (thisrow,))
-      t, name, attr, value = thisrow
-      if lastrow:
-        if t == lastrow.type:
-          t = ''
-        if name == lastrow.name:
-          name = ''
-        if attr[0].isalpha() and attr == lastrow.attr:
-          name = ''
-      csvrow = CSVRow(t, name, attr, totext(value))
-      debug("push_updates: csv_writerow(%r)", csvrow)
-      csv_writerow(csvw, csvrow)
-      with self._lock:
-        self._updated_count += 1
-      lastrow = thisrow
-    self.csvfp.flush()
+    with rewrite_cmgr(self.pathname, backup_ext='', do_rename=True) as outfp:
+      write_csv_file(fp, self.nodedb.nodedata())
 
 if __name__ == '__main__':
+  import time
   from cs.logutils import setup_logging
   setup_logging()
+  from . import NodeDBFromURL
+  NDB=NodeDBFromURL('file-csv://test.csv', readonly=False)
+  N=NDB.make('T:1')
+  print(N)
+  N.A=1
+  print(N)
+  time.sleep(2)
+  NDB.close()
+  sys.exit(0)
   import cs.nodedb.csvdb_tests
   cs.nodedb.csvdb_tests.selftest(sys.argv)

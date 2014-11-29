@@ -82,14 +82,6 @@ def ismbox(path):
   fp.close()
   return from_ == 'From '
 
-def ismaildir(path):
-  ''' Test if 'path' points at a Maildir directory.
-  '''
-  for subdir in ('new','cur','tmp'):
-    if not os.path.isdir(os.path.join(path,subdir)):
-      return False
-  return True
-
 def make_maildir(path):
   ''' Create a new maildir at `path`.
       The path must not already exist.
@@ -366,7 +358,9 @@ class Maildir(mailbox.Maildir):
   def iterkeys(self):
     return self.msgmap.iterkeys()
 
-  def keys(self):
+  def keys(self, flush=False):
+    if flush:
+      self.flush()
     return self.msgmap.keys()
 
   def itervalues(self):

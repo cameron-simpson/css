@@ -12,7 +12,7 @@ from cs.py3 import Queue, raise3
 from cs.py.func import funcname
 import time
 from cs.debug import ifdebug, Lock, RLock, Thread, trace_caller, thread_dump
-from cs.excutils import noexc, noexc_gen, logexc, LogExceptions
+from cs.excutils import noexc, noexc_gen, logexc, logexc_gen, LogExceptions
 from cs.queues import IterableQueue, IterablePriorityQueue, PushQueue, \
                         NestingOpenCloseMixin, TimerQueue
 from cs.threads import AdjustableSemaphore, \
@@ -192,7 +192,7 @@ class LateFunction(PendingFunction):
     '''
     PendingFunction.__init__(self, func, final=final)
     if name is None:
-      name = "LF-%d[func=%s]" % (seq(),func.__name__,)
+      name = "LF-%d[func=%s]" % ( seq(), funcname(func) )
     self.name = name
     self.later = L = later.open()
     L._busy.inc(name)
@@ -253,6 +253,7 @@ class _PipelinePushQueue(PushQueue):
     self.pipeline = pipeline
 
     # wrap func_iter to raise _busy while processing item
+    @logexc_gen
     def func_push(item):
       self.pipeline._busy.inc()
       try:
@@ -268,6 +269,7 @@ class _PipelinePushQueue(PushQueue):
     if func_final is not None:
       self.pipeline._busy.inc()
       func_final0 = func_final
+      @logexc
       def func_final():
         try:
           result = func_final0()
@@ -352,8 +354,9 @@ class _Pipeline(NestingOpenCloseMixin):
         A pipeline element is either a single function, in which case it is
         presumed to be a one-to-many-generator with func_sig FUNC_ONE_TO_MANY,
         or a tuple of (func_sig, func).
-	The returned func_iter and func_final take the following
-	values according to the supplied func_sig:
+
+        The returned func_iter and func_final take the following
+        values according to the supplied func_sig:
 
           func_sig              func_iter, func_final
 
@@ -366,8 +369,9 @@ class _Pipeline(NestingOpenCloseMixin):
                                 func_final is None.
                                 Example: a test for inclusion.
 
-          FUNC_MANY_TO_MANY     func_iter is set to save its argument to a list and yield nothing.
-                                func_final applies func to the list and yields the results.
+          FUNC_MANY_TO_MANY     func_iter is set to save its argument to a
+                                list and yield nothing. func_final applies
+                                func to the list and yields the results.
                                 Example: a sort.
     '''
     if callable(o):
@@ -451,14 +455,14 @@ class Later(NestingOpenCloseMixin):
     self._dispatchThread.start()
 
   def __repr__(self):
-    return '<%s "%s" capacity=%s running=%d (%s) pending=%d (%s) delayed=%d busy=%d:%s all_closed=%s>' \
+    return '<%s "%s" capacity=%s running=%d (%s) pending=%d (%s) delayed=%d busy=%d:%s closed=%s>' \
            % ( self.__class__.__name__, self.name,
                self.capacity,
                len(self.running), ','.join( repr(LF.name) for LF in self.running ),
                len(self.pending), ','.join( repr(LF.name) for LF in self.pending ),
                len(self.delayed),
                int(self._busy), self._busy,
-               self.all_closed
+               self.closed
              )
 
   def __str__(self):
@@ -496,8 +500,8 @@ class Later(NestingOpenCloseMixin):
           outstanding threads to complete
     '''
     with Pfx("%s.shutdown()" % (self,)):
-      if not self.all_closed:
-        error("NOT ALL_CLOSED")
+      if not self.closed:
+        error("NOT CLOSED")
       if self.finished:
         warning("_finish: finished=%r, early return", self.finished)
         return
@@ -527,7 +531,7 @@ class Later(NestingOpenCloseMixin):
 
   @locked
   def is_finished(self):
-    return self.all_closed and self.is_idle()
+    return self.closed and self.is_idle()
 
   def wait(self):
     ''' Wait for all active and pending jobs to complete, including
@@ -632,7 +636,7 @@ class Later(NestingOpenCloseMixin):
       self.logger.debug(*a, **kw)
 
   def __del__(self):
-    if not self.all_closed:
+    if not self.closed:
       self._close()
 
   def _dispatcher(self):
@@ -655,11 +659,11 @@ class Later(NestingOpenCloseMixin):
   @property
   def submittable(self):
     ''' May new tasks be submitted?
-	This normally tracks "not self.all_closed", but running tasks
+	This normally tracks "not self.closed", but running tasks
 	are wrapped in a thread local override to permit them to
 	submit further related tasks.
     '''
-    return not self.all_closed
+    return not self.closed
 
   def bg(self, func, *a, **kw):
     ''' Queue a function to run right now, ignoring the Later's capacity and
@@ -701,8 +705,8 @@ class Later(NestingOpenCloseMixin):
         this function until the time `when`.
         It is an error to specify both `when` and `delay`.
         If the parameter `name` is not None, use it to name the LateFunction.
-        If the parameter `pfx` is not None, submit pfx.func(func);
-          see cs.logutils.Pfx's .func method for details.
+        If the parameter `pfx` is not None, submit pfx.partial(func);
+          see the cs.logutils.Pfx.partial method for details.
     '''
     if not self.submittable:
       raise RuntimeError("%s.submit(...) but not self.submittable" % (self,))
@@ -716,7 +720,7 @@ class Later(NestingOpenCloseMixin):
     elif type(priority) is int:
       priority = (priority,)
     if pfx is not None:
-      func = pfx.func(func)
+      func = pfx.partial(func)
     LF = LateFunction(self, func, name=name)
     pri_entry = list(priority)
     pri_entry.append(seq())     # ensure FIFO servicing of equal priorities
@@ -894,6 +898,7 @@ class Later(NestingOpenCloseMixin):
   def _defer_iterable(self, I, outQ):
     iterate = partial(next, iter(I))
 
+    @logexc
     def iterate_once():
       ''' Call `iterate`. Place the result on outQ.
           Close the queue at end of iteration or other exception.

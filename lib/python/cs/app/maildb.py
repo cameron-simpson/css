@@ -12,11 +12,13 @@ import sys
 import os
 import tempfile
 import unittest
-from cs.logutils import setup_logging, Pfx, info, warning, error, D
+from cs.logutils import setup_logging, Pfx, info, warning, error, D, X
 from cs.mailutils import ismaildir, message_addresses, Message
 from cs.nodedb import NodeDB, Node, NodeDBFromURL
+from cs.lex import get_identifier
 import cs.sh
-from cs.threads import locked_property
+from cs.threads import locked, locked_property
+from cs.py.func import derived_property
 from cs.py3 import StringTypes, ustr
 
 def main(argv, stdin=None):
@@ -41,7 +43,8 @@ def main(argv, stdin=None):
       list-groups [-A] [-G] [groups...]
         -A Emit mutt alias lines.
         -G Emit mutt group lines.
-        Using both -A and -G emits mutt aliases lines with the -group option.''' \
+        Using both -A and -G emits mutt aliases lines with the -group option.
+      update-domain @old-domain @new-domain [{/regexp/|address}...]''' \
     % (cmd,)
   setup_logging(cmd)
 
@@ -75,7 +78,7 @@ def main(argv, stdin=None):
     with Pfx(op):
       readonly = op not in ('abbreviate', 'abbrev', 'compact',
                             'edit-group', 'import-addresses',
-                            'learn-addresses',
+                            'learn-addresses', 'update-domain',
                            )
       with MailDB(mdburl, readonly=readonly) as MDB:
         if op == 'import-addresses':
@@ -131,6 +134,30 @@ def main(argv, stdin=None):
                 else:
                   error("unknown abbreviation")
                   xit = 1
+            # generate other aliases automatically to aid mutt's reverse_alias=yes behaviour
+            if mutt_aliases:
+              alias_names = set(abbrevs.keys())
+              auto_aliases = {}
+              As = sorted(MDB.ADDRESSes, key=lambda a: a.name)
+              for A in As:
+                auto_alias = A.realname.strip()
+                if auto_alias:
+                  names = auto_alias.lower().split()
+                  for i in range(len(names)):
+                    name = names[i]
+                    if not name.isalpha():
+                      name = ''.join( [ c for c in name if c.isalpha() ] )
+                      names[i] = name
+                  auto_alias_base = '.'.join(names)
+                  auto_alias = auto_alias_base
+                  n = 1
+                  while auto_alias in alias_names:
+                    n += 1
+                    auto_alias = auto_alias_base + str(n)
+                  auto_aliases[auto_alias] = A.formatted
+                  alias_names.add(auto_alias)
+              for auto_alias in sorted(auto_aliases.keys()):
+                print('alias', auto_alias, auto_aliases[auto_alias])
         elif op == 'list-groups':
           try:
             opts, argv = getopt(argv, 'AG')
@@ -204,7 +231,25 @@ def main(argv, stdin=None):
               badopts = True
             else:
               edit_group(MDB, group)
-              MDB.rewrite()
+        elif op == 'update-domain':
+          if not len(argv):
+            error("missing @old-domain")
+            badopts = True
+          else:
+            old_domain = argv.pop(0)
+            if not old_domain.startswith('@'):
+              error('old domain must start with "@": %s' % (old_domain,))
+              badopts = True
+          if not len(argv):
+            error("missing @new-domain")
+            badopts = True
+          else:
+            new_domain = argv.pop(0)
+            if not new_domain.startswith('@'):
+              error('new domain must start with "@": %s' % (new_domain,))
+              badopts = True
+          if not badopts:
+            update_domain(MDB, old_domain, new_domain, argv)
         else:
           error("unsupported op")
           badopts = True
@@ -221,23 +266,35 @@ def edit_group(MDB, group):
       rexp = group[1:-1]
     else:
       rexp = group[1:]
-    R = re.compile(rexp, re.I)
-    As = [ A for A in MDB.ADDRESSes if R.search(A.formatted) ]
+    As = MDB.matchAddresses(rexp)
+    Gs = []
   else:
     As = [ A for A in MDB.ADDRESSes if group in A.GROUPs ]
-  return edit_groupness(MDB, As)
+    Gs = [ G for G in MDB.GROUPs if group in G.GROUPs ]
+  return edit_groupness(MDB, As, Gs)
 
-def edit_groupness(MDB, addresses):
-  ''' Modify the group memberships of the supplied addresses.
-      Removed addresses are not modified.
+def edit_groupness(MDB, addresses, subgroups):
+  ''' Modify the group memberships of the supplied addresses and groups.
+      Removed addresses or groups are not modified.
   '''
   with Pfx("edit_groupness()"):
+    Gs = sorted( set(subgroups),
+                 ( lambda G1, G2: cmp(G1.name, G2.name) )
+               )
     As = sorted( set(addresses),
                  ( lambda A1, A2: cmp(A1.realname.lower(), A2.realname.lower()) ),
                )
     with tempfile.NamedTemporaryFile(suffix='.txt') as T:
       with Pfx(T.name):
         with codecs.open(T.name, "w", encoding="utf-8") as ofp:
+          # present groups first
+          for G in Gs:
+            supergroups = sorted( set(G.GROUPs),
+                                  ( lambda G1, G2: cmp(G1.name, G2.name) )
+                                )
+            line = u'%-15s @%s\n' % (",".join(supergroups), G.name)
+            ofp.write(line)
+          # present addresses next
           for A in As:
             groups = sorted(set(A.GROUPs))
             af = A.formatted
@@ -262,6 +319,15 @@ def edit_groupness(MDB, addresses):
               line = line.rstrip()
               groups, addrtext = line.split(None, 1)
               groups = [ group for group in groups.split(',') if group ]
+              if addrtext.startswith('@'):
+                # presume single group name
+                groupname, offset = get_identifier(addrtext, 1)
+                if offset < len(addrtext):
+                  warning("invalid @groupname: %r", addrtext)
+                else:
+                  MDB.make( ('GROUP', groupname) ).GROUPs = groups
+                continue
+              # otherwise, address list on RHS
               As = set()
               with Pfx(addrtext):
                 for realname, addr in getaddresses((addrtext,)):
@@ -275,7 +341,10 @@ def edit_groupness(MDB, addresses):
                           ab = None
                     else:
                       ab = None
-                    A.abbreviation = ab
+                    try:
+                      A.abbreviation = ab
+                    except ValueError as e:
+                      error(e)
                     new_groups.setdefault(A, set()).update(groups)
                     realname = ustr(realname.strip())
                     if realname and realname != A.realname:
@@ -284,6 +353,30 @@ def edit_groupness(MDB, addresses):
     for A, groups in new_groups.items():
       if set(A.GROUPs) != groups:
         A.GROUPs = groups
+
+def update_domain(MDB, old_domain, new_domain, argv):
+  if not argv:
+    addrs = [ A.name for A in MDB.ADDRESSes if A.name.endswith(old_domain) ]
+  else:
+    addrs = []
+    for pattern in argv:
+      if pattern.startswith('/'):
+        if pattern.endswith('/'):
+          rexp = pattern[1:-1]
+        else:
+          rexp = pattern[1:]
+        addrs.extend( [ A.name for A in  MDB.matchAddresses(rexp) ] )
+      else:
+        addrs.append(pattern)
+  if not addrs:
+    warning("no matching addresses")
+  else:
+    for addr in addrs:
+      with Pfx(addr):
+        if not addr.endswith(old_domain):
+          warning("does not end in old domain (%s)", old_domain)
+        else:
+          MDB.update_domain(addr, old_domain, new_domain)
 
 PersonNode = Node
 
@@ -296,6 +389,10 @@ class AddressNode(Node):
   @property
   def realname(self):
     return ustr( getattr(self, 'REALNAME', u'') )
+
+  @realname.setter
+  def realname(self, newname):
+    self.REALNAME = newname
 
   def groups(self):
     return [ address_group for address_group in self.nodedb.address_groups
@@ -339,9 +436,12 @@ class AddressNode(Node):
     if my_abbrev is not None:
       # remove old abbrev from mapping
       del abbrevs[my_abbrev]
-    # new mapping
-    abbrevs[abbrev] = self.name
-    self.ABBREVIATION = abbrev
+    if abbrev is None:
+      self.ABBREVIATIONs = ()
+    else:
+      # new mapping
+      abbrevs[abbrev] = self.name
+      self.ABBREVIATION = abbrev
 
 class MessageNode(Node):
 
@@ -403,6 +503,7 @@ class _MailDB(NodeDB):
   def rewrite(self):
     ''' Force a complete rewrite of the CSV file.
     '''
+    raise NotImplementedError("needs recode")
     obackend = self.backend
     self.backend = None
     self.scrub()
@@ -466,6 +567,13 @@ class _MailDB(NodeDB):
       A.REALNAME = ustr(realname)
     return A
 
+  def matchAddresses(self, rexp):
+    ''' Return AddressNodes matching the supplied regular expression string `rexp`.
+    '''
+    R = re.compile(rexp, re.I)
+    As = [ A for A in self.ADDRESSes if R.search(A.formatted) ]
+    return As
+
   def shortname(self, addr):
     ''' Return a short name for an address.
         Pick the first of: abbreviation from maildb, realname from maildb, coreaddr.
@@ -503,12 +611,13 @@ class _MailDB(NodeDB):
     '''
     return self.address_groups.set_default(group_name, set())
 
-  @locked_property
+  @derived_property
   def address_groups(self):
-    ''' Compute the address_group sets, a mapping of GOUP names to a
+    ''' Compute the address_group sets, a mapping of GROUP names to a
         set of A.name.lower().
         Return the mapping.
     '''
+    X("RECOMPUTE ADDRESS_GROUPS")
     try:
       agroups = { 'all': set() }
       all = agroups['all']
@@ -520,12 +629,26 @@ class _MailDB(NodeDB):
           agroup = agroups.setdefault(group_name, set())
           agroup.add(coreaddr)
           all.add(coreaddr)
-      return agroups
     except AttributeError as e:
       D("address_groups(): e = %r", e)
       raise ValueError("disaster")
+    return agroups
 
   @locked_property
+  def subgroups_map(self):
+    ''' Cached map of groupname to subgroup names.
+    '''
+    subgroups = {}
+    for G in self.GROUPs:
+      for parent_group in G.GROUPs:
+        subgroups.setdefault(parent_group, []).append(G.name)
+
+  def subgroups(self, group_name):
+    ''' Return a list of the subgroup names of the names group.
+    '''
+    return self.subgroups_map.get(group_name, [])
+
+  @derived_property
   def abbreviations(self):
     ''' Compute a mapping of abbreviations to their source address.
     '''
@@ -647,6 +770,28 @@ class _MailDB(NodeDB):
       A.GROUPs.update(group_names)
       addrs.add(A)
     return addrs
+
+  def update_domain(self, addr, old_domain, new_domain):
+    with Pfx("update_domain(%s, %s, %s)", addr, old_domain, new_domain):
+      if not old_domain.startswith('@'):
+        raise ValueError('old_domain does not start with "@"')
+      if not new_domain.startswith('@'):
+        raise ValueError('new_domain does not start with "@"')
+      if not addr.endswith(old_domain):
+        raise ValueError('addr does not end in old_domain')
+      addr2 = addr[:-len(old_domain)] + new_domain
+      A1 = self.getAddressNode(addr)
+      A2 = self.getAddressNode(addr2)
+      realname = A1.realname
+      if realname and not A2.realname:
+        A2.realname = realname
+      abbrev = A1.abbreviation
+      if abbrev and not A2.abbreviation:
+        del A1.abbreviation
+        A2.abbreviation = abbrev
+      groups = A1.GROUPs
+      if groups and not A2.GROUPs:
+        A2.GROUPs = groups
 
 if __name__ == '__main__':
   sys.exit(main(list(sys.argv)))

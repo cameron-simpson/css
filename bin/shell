@@ -1,0 +1,19 @@
+#!/bin/sh
+#
+# Start a new shell. Muck with the environment a little first.
+#   - Cameron Simpson <cs@zip.com.au> 01nov2014
+#
+
+usage="Usage: $0 [shell-arguments...]"
+
+: ${SHELL:=/bin/sh}
+: ${BASH_ENV:=$HOME/.bash_env}
+export BASH_ENV
+
+set -- "$SHELL" ${1+"$@"}
+
+if [ -x /opt/local/bin/reattach-to-user-namespace ]
+then  set -- /opt/local/bin/reattach-to-user-namespace "$@"
+fi
+
+exec "$@"

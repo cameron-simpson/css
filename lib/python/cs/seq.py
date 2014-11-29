@@ -18,8 +18,8 @@ class Seq(object):
 
   __slots__ = ('counter', '_lock')
 
-  def __init__(self, start=0, step=1):
-    self.counter = itertools.count(start, step)
+  def __init__(self, start=0):
+    self.counter = itertools.count(start)
     self._lock = Lock()
 
   def __iter__(self):
@@ -37,7 +37,7 @@ def seq():
   global __seq
   return next(__seq)
 
-def the(list, context=None):
+def the(iterable, context=None):
   ''' Returns the first element of an iterable, but requires there to be
       exactly one.
   '''
@@ -46,7 +46,7 @@ def the(list, context=None):
     icontext=icontext+" for "+context
 
   first=True
-  for elem in list:
+  for elem in iterable:
     if first:
       it=elem
       first=False
@@ -60,72 +60,22 @@ def the(list, context=None):
 
   return it
 
+def last(iterable):
+  ''' Return the last item from an iterable; raise IndexError on empty iterables.
+  '''
+  nothing = True
+  for item in iterable:
+    nothing = False
+  if nothing:
+    raise IndexError("no items in iterable: %r" % (iterable,))
+  return item
+
 def get0(seq, default=None):
   ''' Return first element of a sequence, or the default.
   '''
   for i in seq:
     return i
   return default
-
-class Range(list):
-  def __init__(self,values=(),step=1):
-    self.__step=step
-    self.__spans=[]
-    for v in values:
-      try:
-        assert len(v) == 2
-      except TypeError:
-        v=(v,v+step)
-      self.add(*v)
-
-  def __str__(self):
-    return ", ".join("%d-%d" % (lo, hi) for lo, hi in self)
-
-  def add(self,lo,hi=None):
-    if hi is None:
-      hi=lo+step
-    else:
-      assert lo < hi
-
-    ndx=bisect.bisect_left(self,(lo,))
-    if ndx > 0 and self[ndx-1][1] >= lo:
-      # incorporate left hand range
-      ndx-=1
-      R=self[ndx]
-      lo=min(R[0],lo)
-      hi=max(R[1],hi)
-      del self[ndx]
-
-    if ndx < len(self):
-      # incorporate overlapping ranges
-      R=self[ndx]
-      while R[0] <= hi:
-        hi=max(R[1],hi)
-        del self[ndx]
-        if ndx == len(self):
-          break
-        R=self[ndx]
-
-    self.insert(ndx,(lo,hi))
-
-  def remove(self,lo,hi=None):
-    if hi is None:
-      hi=lo+step
-    else:
-      assert lo < hi
-
-    ndx=bisect.bisect_left(self,(lo,))
-    if ndx < len(self):
-      R=self[ndx]
-      while R[0] < hi:
-        if R[1] <= hi:
-          del self[ndx]
-          if ndx == len(self):
-            break
-        else:
-          R[0]=max(R[0], hi)
-          break
-        R=self[ndx]
 
 def NamedTupleClassFactory(*fields):
   ''' Construct classes for named tuples a bit like the named tuples

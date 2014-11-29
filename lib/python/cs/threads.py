@@ -23,15 +23,9 @@ import cs.logutils
 from cs.logutils import Pfx, LogTime, error, warning, debug, exception, OBSOLETE, D
 from cs.obj import O
 from cs.asynchron import report
-from cs.queues import IterableQueue, Channel, NestingOpenCloseMixin, not_closed, _NOC_Proxy
+from cs.queues import IterableQueue, Channel, NestingOpenCloseMixin, not_closed
 from cs.py.func import funcname
 from cs.py3 import raise3, Queue, PriorityQueue
-
-class _WTP_Proxy(_NOC_Proxy):
-
-  @not_closed
-  def dispatch(self, *a, **kw):
-    return self._proxied._dispatch(*a, **kw)
 
 class WorkerThreadPool(NestingOpenCloseMixin, O):
   ''' A pool of worker threads to run functions.
@@ -44,7 +38,7 @@ class WorkerThreadPool(NestingOpenCloseMixin, O):
     self.name = name
     self._lock = Lock()
     O.__init__(self)
-    NestingOpenCloseMixin.__init__(self, proxy_type=_WTP_Proxy)
+    NestingOpenCloseMixin.__init__(self)
     self.idle = deque()
     self.all = []
 
@@ -64,10 +58,8 @@ class WorkerThreadPool(NestingOpenCloseMixin, O):
       if HT is not current_thread():
         HT.join()
 
-  def dispatch(self, *a, **kw):
-    return self._open0._dispatch(*a, **kw)
-
-  def _dispatch(self, func, retq=None, deliver=None, pfx=None, daemon=None):
+  @not_closed
+  def dispatch(self, func, retq=None, deliver=None, pfx=None, daemon=None):
     ''' Dispatch the callable `func` in a separate thread.
         On completion the result is the sequence:
           func_result, None, None, None
@@ -75,13 +67,13 @@ class WorkerThreadPool(NestingOpenCloseMixin, O):
           None, exec_type, exc_value, exc_traceback
         If `retq` is not None, the result is .put() on retq.
         If `deliver` is not None, deliver(result) is called.
-        If the parameter `pfx` is not None, submit pfx.func(func);
-          see cs.logutils.Pfx's .func method for details.
+        If the parameter `pfx` is not None, submit pfx.partial(func);
+          see the cs.logutils.Pfx.partial method for details.
     '''
-    if self.all_closed:
+    if self.closed:
       raise ValueError("%s: closed, but dispatch() called" % (self,))
     if pfx is not None:
-      func = pfx.func(func)
+      func = pfx.partial(func)
     idle = self.idle
     with self._lock:
       debug("dispatch: idle = %s", idle)
@@ -120,50 +112,48 @@ class WorkerThreadPool(NestingOpenCloseMixin, O):
         If both are None and an exception occurred, it gets raised.
     '''
     HT, RQ = Hdesc
-    with Pfx(HT.name):
-      for func, retq, deliver in RQ:
-        with Pfx("running:%s", func):
-          oname = HT.name
-          HT.name = "%s:RUNNING:%s" % (oname, func)
-          try:
-            debug("%s: worker thread: running task...", self)
-            result = func()
-            debug("%s: worker thread: ran task: result = %s", self, result)
-          except:
-            result = None
-            exc_info = sys.exc_info()
-            log_func = exception if isinstance(exc_info[1], (TypeError, NameError, AttributeError)) else debug
-            log_func("%s: worker thread: ran task: exception! %r", self, sys.exc_info())
-            # don't let exceptions go unhandled
-            # if nobody is watching, raise the exception and don't return
-            # this handler to the pool
-            if retq is None and deliver is None:
-              error("%s: worker thread: reraise exception", self)
-              raise3(*exc_info)
-            debug("%s: worker thread: set result = (None, exc_info)", self)
-          else:
-            exc_info = None
-          HT.name = oname
-          func = None     # release func+args
-          with self._lock:
-            self.idle.append( Hdesc )
-            ##D("_handler released thread: idle = %s", self.idle)
-          tup = (result, exc_info)
-          if retq is not None:
-            debug("%s: worker thread: %r.put(%s)...", self, retq, tup)
-            retq.put(tup)
-            debug("%s: worker thread: %r.put(%s) done", self, retq, tup)
-            retq = None
-          if deliver is not None:
-            debug("%s: worker thread: deliver %s...", self, tup)
-            deliver(tup)
-            debug("%s: worker thread: delivery done", self)
-            deliver = None
-          # forget stuff
-          result = None
-          exc_info = None
-          tup = None
-          debug("%s: worker thread: proceed to next function...", self)
+    for func, retq, deliver in RQ:
+      oname = HT.name
+      HT.name = "%s:RUNNING:%s" % (oname, func)
+      try:
+        debug("%s: worker thread: running task...", self)
+        result = func()
+        debug("%s: worker thread: ran task: result = %s", self, result)
+      except:
+        result = None
+        exc_info = sys.exc_info()
+        log_func = exception if isinstance(exc_info[1], (TypeError, NameError, AttributeError)) else debug
+        log_func("%s: worker thread: ran task: exception! %r", self, sys.exc_info())
+        # don't let exceptions go unhandled
+        # if nobody is watching, raise the exception and don't return
+        # this handler to the pool
+        if retq is None and deliver is None:
+          error("%s: worker thread: reraise exception", self)
+          raise3(*exc_info)
+        debug("%s: worker thread: set result = (None, exc_info)", self)
+      else:
+        exc_info = None
+      HT.name = oname
+      func = None     # release func+args
+      with self._lock:
+        self.idle.append( Hdesc )
+        ##D("_handler released thread: idle = %s", self.idle)
+      tup = (result, exc_info)
+      if retq is not None:
+        debug("%s: worker thread: %r.put(%s)...", self, retq, tup)
+        retq.put(tup)
+        debug("%s: worker thread: %r.put(%s) done", self, retq, tup)
+        retq = None
+      if deliver is not None:
+        debug("%s: worker thread: deliver %s...", self, tup)
+        deliver(tup)
+        debug("%s: worker thread: delivery done", self)
+        deliver = None
+      # forget stuff
+      result = None
+      exc_info = None
+      tup = None
+      debug("%s: worker thread: proceed to next function...", self)
 
 class AdjustableSemaphore(object):
   ''' A semaphore whose value may be tuned after instantiation.

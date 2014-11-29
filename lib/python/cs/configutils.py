@@ -40,6 +40,9 @@ class ConfigWatcher(Mapping):
     self._config_lock = self._lock
     self._watchers = {}
 
+  def __str__(self):
+    return "ConfigWatcher(%r)" % (self._config_path,)
+
   @file_property
   def config(self, path):
     self._mapping = None
