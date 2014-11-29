@@ -60,6 +60,10 @@ def main(argv):
         if len(args) < 1:
           error("missing tvwizdirs")
           badopts = True
+      elif op == "header":
+        if len(args) < 1:
+          error("missing tvwizdirs")
+          badopts = True
       elif op == "scan":
         if len(args) < 1:
           error("missing tvwizdirs")
@@ -79,6 +83,11 @@ def main(argv):
   if op == "cat":
     for arg in args:
       TVWiz(arg).copyto(sys.stdout)
+  elif op == "header":
+    for arg in args:
+      print(arg)
+      TV = TVWiz(arg)
+      print(repr(TV.header()))
   elif op == "scan":
     for arg in args:
       print(arg)
@@ -130,12 +139,21 @@ def parse_header(data):
   ''' Decode the data chunk from a TV or radio header chunk.
   '''
   main = data[HDR_MAIN_OFF:HDR_MAIN_OFF+HDR_MAIN_SIZE]
-  main_unpacked = struct.unpack('6x 3s 1024s 256s 256s <H 2x <L <H <H 1548s <H <H <H <H')
+  main_unpacked = struct.unpack('6x 3s 1024s 256s 256s <H 2x <L <H <H 1548s <H <H <H <H', data)
   print(main_unpacked)
 
 class TVWiz(O):
   def __init__(self, wizdir):
     self.dir = wizdir
+
+  @property
+  def header_path(self):
+    return os.path.join(self.dir, TVHDR)
+
+  def header(self):
+    with open(self.header_path, "rb") as hfp:
+      data = hfp.read()
+    return parse_header(data)
 
   def trunc_records(self):
     ''' Generator to yield TruncRecords for this TVWiz directory.
