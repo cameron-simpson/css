@@ -129,7 +129,7 @@ _publish_ezos:
         syncezos
 
 _publish_bitbucket:
-        hg push $(hg_bitbucket)
+        hg push --new-branch $(hg_bitbucket)
 
 # mark the tip as a new release
 _release:

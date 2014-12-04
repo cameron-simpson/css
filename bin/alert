@@ -23,7 +23,7 @@ subtitle=
 execute=
 case "$OS" in
   darwin)
-    growl=1
+    ##growl=1
     tnotify=1
     ;;
 esac
@@ -154,7 +154,9 @@ then
   done
   set -- terminal-notifier -title "$title" -subtitle "$subtitle" -message "$message"
   [ -n "$execute" ] && set -- "$@" -execute "$execute"
+  set -- timeout 10 reattach-to-user-namespace "$@"
   # async because I've seen terminal-notifier hang, stalling my mail filer
+  # timeout also to stop hanging processes filling the process table
   "$@" >/dev/null &
 fi
 
