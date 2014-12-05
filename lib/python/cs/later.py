@@ -354,8 +354,9 @@ class _Pipeline(NestingOpenCloseMixin):
         A pipeline element is either a single function, in which case it is
         presumed to be a one-to-many-generator with func_sig FUNC_ONE_TO_MANY,
         or a tuple of (func_sig, func).
-	The returned func_iter and func_final take the following
-	values according to the supplied func_sig:
+
+        The returned func_iter and func_final take the following
+        values according to the supplied func_sig:
 
           func_sig              func_iter, func_final
 
@@ -368,8 +369,9 @@ class _Pipeline(NestingOpenCloseMixin):
                                 func_final is None.
                                 Example: a test for inclusion.
 
-          FUNC_MANY_TO_MANY     func_iter is set to save its argument to a list and yield nothing.
-                                func_final applies func to the list and yields the results.
+          FUNC_MANY_TO_MANY     func_iter is set to save its argument to a
+                                list and yield nothing. func_final applies
+                                func to the list and yields the results.
                                 Example: a sort.
     '''
     if callable(o):

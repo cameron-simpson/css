@@ -208,7 +208,7 @@ do
 done
 test_shcmd=" $test_shcmd
            "'ssh-add -l >/dev/null || exit 1
-             flag -w ROUTE_DEFAULT
+             flag -w ROUTE_DEFAULT || exit 1
              [ -x "$HOME/bin-local/do-portfwd" ] || exit 0
              "$HOME/bin-local/do-portfwd"
             '

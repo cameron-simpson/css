@@ -79,8 +79,7 @@ class _URL(unicode):
     self._parts = None
     self.flush()
     self._lock = RLock()
-    self._content = None
-    self._parsed = None
+    self.flush()
 
   def __getattr__(self, attr):
     ''' Ad hoc attributes.
@@ -105,12 +104,13 @@ class _URL(unicode):
     self._content_type = None
     self._parsed = None
     self._xml = None
+    self._fetch_exception = None
 
   @property
   def opener(self):
     if self._opener is None:
       if self.referer is not None and self.referer._opener is not None:
-        self._operner = self.referer._opener
+        self._opener = self.referer._opener
       else:
         o = build_opener()
         o.add_handler(HTTPBasicAuthHandler(NetrcHTTPPasswordMgr()))
@@ -142,13 +142,22 @@ class _URL(unicode):
 
   def _fetch(self):
     ''' Fetch the URL content.
+        If there is an HTTPError, report the error, flush the
+        content, set self._fetch_exception.
+        This means that that accessing the self.content property
+        will always attempt a fetch, but return None on error.
     '''
     with Pfx("_fetch(%s)", self):
-      rsp = self._response('GET')
-      H = rsp.info()
-      self._info = rsp.info()
-      self._content = rsp.read()
-      self._parsed = None
+      try:
+        rsp = self._response('GET')
+        H = rsp.info()
+        self._info = rsp.info()
+        self._content = rsp.read()
+        self._parsed = None
+      except HTTPError as e:
+        error("error with GET: %s", e)
+        self.flush()
+        self._fetch_exception = e
 
   def HEAD(self):
     rsp = self._response('HEAD')

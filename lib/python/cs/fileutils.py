@@ -23,7 +23,7 @@ import unittest
 from cs.debug import trace
 from cs.env import envsub
 from cs.lex import as_lines
-from cs.logutils import error, warning, Pfx, D, X
+from cs.logutils import error, warning, debug, Pfx, D, X
 from cs.queues import IterableQueue
 from cs.range import Range
 from cs.threads import locked, locked_property
@@ -865,7 +865,7 @@ class SharedAppendFile(object):
 
   def __init__(self, pathname, readonly=False, writeonly=False,
                 binary=False, max_queue=None,
-                transcribe_update=None, poll_interval=None,
+                poll_interval=None,
                 eof_markers = False,
                 lock_ext=None, lock_timeout=None):
     ''' Initialise this SharedAppendFile.
@@ -874,7 +874,6 @@ class SharedAppendFile(object):
         `writeonly`: set to true if we will monitor foreign updates.
         `binary`: if the ile is to be opened in binary mode, otherwise text mode.
         `max_queue`: maximum input and output Queue length. Default: SharedAppendFile.DEFAULT_MAX_QUEUE.
-        `transcribe_update`: function to transcribe our update objects to the file.
         `poll_interval`: sleep time between polls after an idle poll. Default: SharedAppendFile.DEFAULT_POLL_INTERVAL.
         `eof_markers`: set to true to put an empty chunk only to the output Queue when EOF reached.
         `lock_ext`: lock file extension.
@@ -888,7 +887,6 @@ class SharedAppendFile(object):
     self.readonly = readonly
     self.writeonly = readonly
     self.binary = binary
-    self.transcribe_update = transcribe_update
     self.eof_markers = eof_markers
     self.poll_interval = poll_interval
     self.max_queue = max_queue
@@ -944,6 +942,7 @@ class SharedAppendFile(object):
         Return number of reads with data; 0 ==> no new data.
         `force_eof_marker`: put an EOF marker even if no other chunks were obtained
     '''
+    debug("READ_TO_EOF...")
     if force_eof_marker and not self.eof_markers:
       raise ValueError("force_eof_marker forbidden if not self.eof_markers")
     count = 0
@@ -955,7 +954,10 @@ class SharedAppendFile(object):
         count += 1
     if force_eof_marker or (count > 0 and self.eof_markers):
       # write an EOF marker if we gathered any data (or if force_eof_marker)
+      debug("READ_TO_EOF: PUT EOF MARKER")
       self._outQ.put(b'' if self.binary else '')
+    if count > 0 or force_eof_marker:
+      debug("READ_TO_EOF COMPLETE: CHUNK COUNT=%d", count)
     return count
 
   def _monitor(self):
@@ -994,6 +996,29 @@ class SharedAppendFile(object):
         # clear flag for next pass
         first = False
       self._outQ.close()
+
+class SharedAppendLines(SharedAppendFile):
+
+  def transcribe_update(self, fp, s):
+    '''
+    '''
+    if '\n' in s:
+      raise ValueError("invalid string to transcribe, contains newline: %r" % (s,))
+    fp.write(s)
+    fp.write('\n')
+
+  def foreign_lines(self, to_eof=False):
+    ''' Generator yielding update lines from other writers.
+        `to_eof`: stop when the EOF marker is seen; requires self.eof_markers to be true.
+        Otherwise the generator will run until the SharedAppendLines is closed.
+    '''
+    if to_eof:
+      if not self.eof_markers:
+        raise ValueError("to_eof forbidden if not self.eof_markers")
+      chunks = takewhile(lambda x: len(x) > 0, self._outQ)
+    else:
+      chunks = self._outQ
+    return as_lines(chunks)
 
 def chunks_of(fp, rsize=16384):
   ''' Generator to present text or data from an open file until EOF.
