@@ -8,7 +8,7 @@ from __future__ import with_statement
 import codecs
 from contextlib import contextmanager
 import logging
-from logging import Formatter
+from logging import Formatter, StreamHandler
 import os
 import os.path
 import stat
@@ -17,6 +17,7 @@ import time
 import threading
 from threading import Lock
 import traceback
+from cs.ansi_colour import colourise
 from cs.excutils import noexc
 from cs.obj import O_str
 from cs.py3 import unicode, StringTypes, ustr
@@ -144,21 +145,30 @@ class PfxFormatter(Formatter):
   ''' A Formatter subclass that has access to the program's cmd and Pfx state.
   '''
 
-  def __init__(self, fmt=None, datefmt=None):
+  def __init__(self, fmt=None, datefmt=None, cmd=None, context_level=None):
     ''' Initialise the PfxFormatter.
+        `fmt` and `datefmt` are passed to Formatter.
         If `fmt` is None, DEFAULT_PFX_FORMAT is used.
+        If `cmd` is not None, the message is prefixed with the string `cmd`.
+        If `context_level` is None, records with .level < context_level will not have the Pfx state inserted at the front of the message.
     '''
-    if fmt is None:
-      fmt = DEFAULT_PFX_FORMAT
+    self.cmd = cmd
+    self.context_level = context_level
     Formatter.__init__(self, fmt=fmt, datefmt=datefmt)
 
   def format(self, record):
     ''' Set .cmd and .pfx to the global cmd and Pfx context prefix respectively, then call Formatter.format.
     '''
-    global cmd
-    record.cmd = cmd
+    record.cmd = self.cmd if self.cmd else globals()['cmd']
     record.pfx = Pfx._state.prefix
-    return Formatter.format(self, record)
+    fmts = Formatter.format(self, record)
+    message_parts = []
+    if self.context_level is None or record.level >= self.context_level:
+      message_parts.append(self.formatTime(record))
+      message_parts.append(record.pfx)
+    message_parts.append(record.message)
+    record.message = ': '.join(message_parts)
+    return record.message
 
 def infer_logging_level():
   ''' Infer a logging level from the environment.
@@ -605,6 +615,8 @@ class LogTime(object):
     return False
 
 class UpdHandler(StreamHandler):
+  ''' A StreamHandler subclass whose .emit method uses a cs.upd.Upd for transcription.
+  '''
 
   def __init__(self, strm=None, nlLevel=None, ansi_mode=None):
     ''' Initialise the UpdHandler.
