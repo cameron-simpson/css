@@ -402,7 +402,7 @@ def notNone(v, name="value"):
   return True
 
 def url_xml_find(U, match):
-  for found in url_io(URL(U, None).xmlFindall, (), match):
+  for found in url_io(URL(U, None).xml_find_all, (), match):
     yield ElementTree.tostring(found, encoding='utf-8')
 
 class Pilfer(O):
