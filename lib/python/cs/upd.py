@@ -5,7 +5,6 @@ from contextlib import contextmanager
 import atexit
 import logging
 from logging import StreamHandler
-from cs.ansi_colour import colourise
 from cs.lex import unctrl
 from cs.tty import ttysize
 
