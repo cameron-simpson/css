@@ -88,7 +88,7 @@ class _URL(unicode):
     '''
     k, plural = parseUC_sAttr(attr)
     if k:
-      nodes = self.parsed.findAll(k.lower())
+      nodes = self.parsed.find_all(k.lower())
       if plural:
         return nodes
       return the(nodes)
@@ -325,16 +325,16 @@ class _URL(unicode):
   def basename(self):
     return os.path.basename(self.path)
 
-  def findAll(self, *a, **kw):
-    ''' Convenience routine to call BeautifulSoup's .findAll() method.
+  def find_all(self, *a, **kw):
+    ''' Convenience routine to call BeautifulSoup's .find_all() method.
     '''
     parsed = self.parsed
     if not parsed:
       error("%s: parse fails", self)
       return ()
-    return parsed.findAll(*a, **kw)
+    return parsed.find_all(*a, **kw)
 
-  def xmlFindall(self, match):
+  def xml_find_all(self, match):
     ''' Convenience routine to call ElementTree.XML's .findall() method.
     '''
     return self.xml.findall(match)
@@ -378,7 +378,7 @@ class _URL(unicode):
     if 'absolute' in kw:
       absolute = kw['absolute']
       del kw['absolute']
-    for A in self.findAll(*a, **kw):
+    for A in self.find_all(*a, **kw):
       try:
         src = A['src']
       except KeyError:
