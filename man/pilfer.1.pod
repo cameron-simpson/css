@@ -371,6 +371,12 @@ Perform variable substitution on I<value> and compare the result
 against the value stored in the variable named I<varname>;
 pass the current item only if the values are equal.
 
+=item I<varname>!=I<value>
+
+Perform variable substitution on I<value> and compare the result
+against the value stored in the variable named I<varname>;
+pass the current item only if the values are not equal.
+
 =item I<varname>B<~>I<selector_action>
 
 By defaults, any I<selector_action> acts on the current item/URL.

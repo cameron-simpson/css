@@ -104,6 +104,8 @@ class Backend_CSVFile(Backend):
     self._monitor_thread.join()
 
   def _update(self, csvrow):
+    ''' Update the backing store from an update csvrow.
+    '''
     if not isinstance(csvrow, CSVRow):
       raise TypeError("csvrow=%r" % (csvrow,))
     if self.readonly:

@@ -1,2 +1,43 @@
 #!/bin/sh
-exec urlshow https://mail.google.com/
+#
+# Open Gmail composition window with subject and addresses.
+#   - Cameron Simpson <cs@zip.com.au> 03dec2014
+#
+
+set -ue
+
+cmd=$0
+usage="Usage: $cmd [-s subject] addr..."
+
+badopts=
+subj=
+to=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -s) subj=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing addrs" >&2
+  badopts=1
+else
+  to=$1
+  shift
+  while [ $# -gt 0 ]
+  do
+    to="$to,$1"
+    shift
+  done
+fi
+
+exec urlshow "https://mail.google.com/mail/?view=cm&fs=1&to=${to}&su=${subj}&body=&bcc="
