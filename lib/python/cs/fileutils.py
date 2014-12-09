@@ -542,6 +542,9 @@ def lockfile(path, ext=None, poll_interval=0.1, timeout=None):
       break
 
 def maxFilenameSuffix(dir, pfx):
+  ''' Compute the highest existing numeric suffix for names starting with the prefix `pfx`.
+      This is generally used as a starting point for picking a new numeric suffix.
+  '''
   pfx=ustr(pfx)
   maxn=None
   pfxlen=len(pfx)
@@ -623,6 +626,8 @@ def tmpdir():
   return tmpdir
 
 def tmpdirn(tmp=None):
+  ''' Make a new temporary directory with a numeric suffix.
+  '''
   if tmp is None: tmp=tmpdir()
   return mkdirn(os.path.join(tmp, os.path.basename(sys.argv[0])))
 
@@ -911,6 +916,8 @@ class SharedAppendFile(object):
     self._monitor_thread.start()
 
   def close(self):
+    ''' Close the SharedAppendFile: close input queue, wait for monitor to terminate.
+    '''
     self._inQ.close()
     self._monitor_thread.join()
     fp = self.fp
@@ -919,6 +926,8 @@ class SharedAppendFile(object):
 
   @property
   def filestate(self):
+    ''' The current FileState of the backing file.
+    '''
     fp = self.fp
     if fp is None:
       return None
