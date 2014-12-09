@@ -532,7 +532,7 @@ def lockfile(path, ext=None, poll_interval=0.1, timeout=None):
           raise TimeoutError("cs.fileutils.lockfile: pid %d timed out on lockfile \"%s\""
                              % (os.getpid(), lockpath),
                              timeout)
-        time.sleep(poll_interval)
+        time.sleep(sleep_for)
         continue
       raise
     else:
