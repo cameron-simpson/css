@@ -1009,7 +1009,7 @@ class SharedAppendFile(object):
 class SharedAppendLines(SharedAppendFile):
 
   def transcribe_update(self, fp, s):
-    '''
+    ''' Transcribe a string as a line.
     '''
     if '\n' in s:
       raise ValueError("invalid string to transcribe, contains newline: %r" % (s,))
