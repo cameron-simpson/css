@@ -485,7 +485,7 @@ def make_files_property(attr_name=None, unset_object=None, poll_rate=DEFAULT_POL
   return made_files_property
 
 @contextmanager
-def lockfile(path, ext=None, poll_interval=1, timeout=None):
+def lockfile(path, ext=None, poll_interval=None, timeout=None):
   ''' A context manager which takes and holds a lock file.
       `path`: the base associated with the lock file.
       `ext`: the extension to the base used to construct the lock file name.
@@ -494,6 +494,8 @@ def lockfile(path, ext=None, poll_interval=1, timeout=None):
                  default None (wait forever).
       `poll_interval`: polling frequency when timeout is not 0.
   '''
+  if poll_interval is None:
+    poll_interval = DEFAULT_POLL_INTERVAL
   if ext is None:
     ext = '.lock'
   if timeout is not None and timeout < 0:
