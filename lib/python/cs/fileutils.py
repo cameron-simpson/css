@@ -1009,9 +1009,18 @@ class SharedAppendFile(object):
 
 class SharedAppendLines(SharedAppendFile):
 
+  def __init__(self, *a, **kw):
+    SharedAppendFile.__init__(self, *a, **kw)
+    self._line_partials = []
+
   def transcribe_update(self, fp, s):
     ''' Transcribe a string as a line.
     '''
+    # sanity check: we should only be writing between foreign updates
+    # and foreign updates should always be complete lines
+    if len(self._line_partials):
+      warning("%s._transcribe_update while non-empty partials[]: %r",
+              self, self._line_partials)
     if '\n' in s:
       raise ValueError("invalid string to transcribe, contains newline: %r" % (s,))
     fp.write(s)
@@ -1028,7 +1037,7 @@ class SharedAppendLines(SharedAppendFile):
       chunks = takewhile(lambda x: len(x) > 0, self._outQ)
     else:
       chunks = self._outQ
-    return as_lines(chunks)
+    return as_lines(chunks, self._line_partials)
 
 def chunks_of(fp, rsize=16384):
   ''' Generator to present text or data from an open file until EOF.
