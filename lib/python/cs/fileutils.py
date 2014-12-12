@@ -518,7 +518,7 @@ def lockfile(path, ext=None, poll_interval=None, timeout=None):
           # first try - set up counters
           start = now
           complaint_last = start
-          complaint_interval = 1.0
+          complaint_interval = 2 * max(DEFAULT_POLL_INTERVAL, poll_interval)
         else:
           if now - complaint_last >= complaint_interval:
             from cs.logutils import warning
