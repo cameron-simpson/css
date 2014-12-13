@@ -991,7 +991,7 @@ class SharedAppendFile(object):
           # catch up
           # we force an EOF marker the first time
           # so that external users can read the whole data file initially
-          count = self._read_to_eof(force_eof_marker=(first and self.eof_markers))
+          count = self._read_to_eof(force_eof_marker=(first or self.eof_markers))
           if first:
             # indicate first to-EOF read complete, output queue primed
             self.ready.put(True)
