@@ -993,27 +993,28 @@ class SharedAppendFile(object):
           if first:
             # indicate first to-EOF read complete, output queue primed
             self.ready.put(True)
-        # check for outgoing updates
-        if self._inQ.empty():
-          # sleep briefly if nothing
-          if count == 0:
-            time.sleep(self.poll_interval)
-        else:
-          # updates due
-          # obtain lock
-          #   read until EOF
-          #   append updates
-          # release lock
-          with self._lockfile():
-            self._read_to_eof()
-            pos = self.fp.tell()
-            self.fp.seek(0, SEEK_END)
-            if pos != self.fp.tell():
-              warning("update: pos after catch up=%r, pos after SEEK_END=%r", pos, self.fp.tell())
-            while not self._inQ.empty():
-              item = self._inQ._get()
-              self.transcribe_update(self.fp, item)
-            self.fp.flush()
+        if not self.no_update:
+          # check for outgoing updates
+          if self._inQ.empty():
+            # sleep briefly if nothing to write out
+            if count == 0:
+              time.sleep(self.poll_interval)
+          else:
+            # updates due
+            # obtain lock
+            #   read until EOF
+            #   append updates
+            # release lock
+            with self._lockfile():
+              self._read_to_eof()
+              pos = self.fp.tell()
+              self.fp.seek(0, SEEK_END)
+              if pos != self.fp.tell():
+                warning("update: pos after catch up=%r, pos after SEEK_END=%r", pos, self.fp.tell())
+              while not self._inQ.empty():
+                item = self._inQ._get()
+                self.transcribe_update(self.fp, item)
+              self.fp.flush()
         # clear flag for next pass
         first = False
       self._outQ.close()
