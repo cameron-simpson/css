@@ -962,8 +962,6 @@ class SharedAppendFile(object):
         `force_eof_marker`: put an EOF marker even if no other chunks were obtained
     '''
     debug("READ_TO_EOF...")
-    if force_eof_marker and not self.eof_markers:
-      raise ValueError("force_eof_marker forbidden if not self.eof_markers")
     count = 0
     for chunk in chunks_of(self.fp):
       if len(chunk) == 0:
