@@ -1022,7 +1022,9 @@ class SharedAppendFile(object):
 class SharedAppendLines(SharedAppendFile):
 
   def __init__(self, *a, **kw):
-    SharedAppendFile.__init__(self, *a, **kw)
+    if 'binary' in kw:
+      raise ValueError('may not specify binary=')
+    SharedAppendFile.__init__(self, *a, binary=False, **kw)
     self._line_partials = []
 
   def transcribe_update(self, fp, s):
