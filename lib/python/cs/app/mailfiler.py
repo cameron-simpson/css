@@ -487,6 +487,22 @@ class MessageFiler(O):
 
       return ok
 
+  def modify_header(self, hdr, new_value, always=False):
+    ''' Modify the value of the named header `hdr` withe the new value `new_value`.
+        If `new_value` differs from the existing value or if `always`
+        is true, save the old value as X-Old-`hdr`.
+        If the modification changes header, forget self.message_path.
+    '''
+    M = self.message
+    old_value = M.get(hdr, '')
+    if always or old_value != new_value:
+      old_hdr = 'X-Old-' + hdr
+      for old_value in M.get_all(hdr):
+        M.add_header("X-Old-" + hdr, old_value)
+      del M[hdr]
+      M[hdr] = new_value
+      self.message_path = None
+
   def apply_rule(self, R):
     ''' Apply this the rule `R` to this MessageFiler.
         The rule label, if any, is appended to the .labels attribute.
