@@ -288,7 +288,7 @@ class MailFiler(O):
           these_folders = op_cfg.get('folders', '').split()
         for folder in these_folders:
           wmdir = self.maildir_watcher(folder)
-          with LogTime("sweep %s", wmdir.shortname, threshold=1.0):
+          with Pfx("%s", wmdir.shortname):
             self.sweep(wmdir, justone=justone, no_remove=no_remove)
         if delay is None:
           break
@@ -591,7 +591,7 @@ class MessageFiler(O):
     return self.env('MAILDIR', os.path.join(self.env('HOME', None), 'mail'))
 
   def save_target(self, target):
-    with Pfx("save_target(%s)", target):
+    with Pfx("%s", target):
       if target.startswith('|'):
         # pipe message to shell command
         # NB: let the shell to the environment substitution, not us
