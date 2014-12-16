@@ -48,6 +48,7 @@ cachedir=$HOME/var/adzapper/cache
 # reuse previous arguments if none supplied, otherwise update default arguments
 if [ $# = 0 ]
 then  set -- $(lastvalue adzapper)
+      echo "$cmd: using lastvalue adzapper: $*" >&2
 else  lastvalue adzapper "$*"
 fi
 

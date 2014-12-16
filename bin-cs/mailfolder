@@ -66,6 +66,7 @@ case "$foldername" in
   /*) maildir=$foldername ;;
   *)  maildir=$MAILDIR/$foldername ;;
 esac
+_foldername=`printf '%s\n' "$foldername" | tr / _`
 bfoldername=`basename "$foldername"`
 old=OLD/`date "+$MAIL_EXPIRE_FORMAT"`
 omaildir=$MAILDIR/$old/$bfoldername
@@ -106,4 +107,5 @@ fi
 [ -n "$MAIL_IMAPSYNC" ] \
 && $trace imap-sync $imapsyncopts "$MAILDIR" "$MAIL_IMAPSYNC" "$foldername" "$old/$foldername" out spool spool-in spool-out
 
-$trace mutt -f "$maildir" -e "fcc-hook . $maildir; save-hook . $omaildir"
+$trace mutt -f "$maildir" -e "set header_cache='$HOME/var/mutt/header-cache+$_foldername'; fcc-hook . $maildir; save-hook . $omaildir"
+set header_cache=$HOME/var/mutt/header-cache

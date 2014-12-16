@@ -43,6 +43,7 @@ fi
 if [ $# -gt 0 ]
 then  lastvalue unbound "$*"
 else  set -- `lastvalue unbound`
+      echo "$cmd: using lastvalue unbound: $*" >&2
 fi
 
 for d in "$VARRUN" "$wkdir" "$LOGDIR"
