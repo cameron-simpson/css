@@ -425,13 +425,13 @@ class MessageFiler(O):
 
   def file(self, M, rules, message_path=None):
     ''' File the specified message `M` according to the supplied `rules`.
-	If specified and not None, the `message_path` parameter
-	specified the filename of the message, supporting hard linking
-	the message into a Maildir.
+        If specified and not None, the `message_path` parameter
+        specifies the filename of the message, supporting hard linking
+        the message into a Maildir.
     '''
     with with_log(os.path.join(cs.env.varlog(self.environ), envsub(DEFAULT_MAIN_LOG))):
       self.message = M
-      self.message_path = None
+      self.message_path = message_path
       info( (u("%s %s") % (time.strftime("%Y-%m-%d %H:%M:%S"),
                                  unrfc2047(M.get('subject', '_no_subject'))))
                  .replace('\n', ' ') )
