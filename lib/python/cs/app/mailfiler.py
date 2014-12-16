@@ -467,7 +467,7 @@ class MessageFiler(O):
               xlabels.add(label)
         new_labels = self.labels - xlabels
         if new_labels:
-          # add labels to message
+          # add labels to message, forget pathname of original file
           self.labels.update(new_labels)
           self.message_path = None
           M = message_from_string(M.as_string())
