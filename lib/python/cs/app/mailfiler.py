@@ -594,7 +594,7 @@ class MessageFiler(O):
     with Pfx("%s", target):
       if target.startswith('|'):
         # pipe message to shell command
-        # NB: let the shell to the environment substitution, not us
+        # NB: let the shell do the environment substitution, not us
         shcmd = target[1:]
         return self.save_to_pipe(['/bin/sh', '-xc', shcmd])
 
@@ -608,7 +608,7 @@ class MessageFiler(O):
         group_names = m.group(2).split(',')
         return self.save_header(hdr, group_names)
 
-      targets = envsub(target, self.process_environ())
+      target = envsub(target, self.process_environ())
       if '@' in target:
         # send message to email address
         return self.sendmail(target)
