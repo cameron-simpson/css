@@ -71,7 +71,6 @@ def modify_header(M, hdr, new_value, always=False):
       M.add_header("X-Old-" + hdr, old_value)
     del M[hdr]
     M[hdr] = new_value
-    self.message_path = None
   return modified
 
 def ismhdir(path):
