@@ -160,7 +160,7 @@ def dict2js(d):
   return cs.json.json(d)
 
 # characters that may appear in text sections of a texthexify result
-# Notation exclusions:
+# Notable exclusions:
 #  \ - to avoid double in slosh escaped presentation
 #  % - likewise, for percent escaped presentation
 #  [ ] - the delimiters of course
