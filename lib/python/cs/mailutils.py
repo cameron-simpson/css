@@ -56,6 +56,24 @@ def message_addresses(M, header_names):
         else:
           yield realname, address
 
+def modify_header(M, hdr, new_value, always=False):
+  ''' Modify a Message `M` to change the value of the named header `hdr` to the new value `new_value`.
+      If `new_value` differs from the existing value or if `always`
+      is true, save the old value as X-Old-`hdr`.
+      Return a Boolean indicating whether the headers were modified.
+  '''
+  modified = False
+  old_value = M.get(hdr, '')
+  if always or old_value != new_value:
+    modified = True
+    old_hdr = 'X-Old-' + hdr
+    for old_value in M.get_all(hdr):
+      M.add_header("X-Old-" + hdr, old_value)
+    del M[hdr]
+    M[hdr] = new_value
+    self.message_path = None
+  return modified
+
 def ismhdir(path):
   ''' Test if `path` points at an MH directory.
   '''

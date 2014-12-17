@@ -32,7 +32,7 @@ from cs.lex import get_white, get_nonwhite, get_qstr, unrfc2047
 from cs.logutils import Pfx, setup_logging, with_log, \
                         debug, info, warning, error, exception, \
                         D, X, LogTime
-from cs.mailutils import Maildir, message_addresses, shortpath, ismaildir, make_maildir
+from cs.mailutils import Maildir, message_addresses, modify_header, shortpath, ismaildir, make_maildir
 from cs.obj import O, slist
 from cs.threads import locked, locked_property
 from cs.app.maildb import MailDB
@@ -469,7 +469,7 @@ class MessageFiler(O):
         if new_labels:
           # add labels to message, forget pathname of original file
           self.labels.update(new_labels)
-          self.modify_header('X-Label', ', '.join( sorted(list(self.labels)) ))
+          self.modify('X-Label', ', '.join( sorted(list(self.labels)) ))
 
       for target in sorted(list(self.targets)):
         with Pfx(target):
@@ -484,21 +484,11 @@ class MessageFiler(O):
 
       return ok
 
-  def modify_header(self, hdr, new_value, always=False):
-    ''' Modify the value of the named header `hdr` withe the new value `new_value`.
-        If `new_value` differs from the existing value or if `always`
-        is true, save the old value as X-Old-`hdr`.
-        If the modification changes header, forget self.message_path.
+  def modify(self, hdr, new_value, always=False):
+    ''' Modify the value of the named header `hdr` to the new value `new_value` using cs.mailutils.modify_header.
+        If headers were changed, forget self.message_path.
     '''
-    if 
-    M = self.message
-    old_value = M.get(hdr, '')
-    if always or old_value != new_value:
-      old_hdr = 'X-Old-' + hdr
-      for old_value in M.get_all(hdr):
-        M.add_header("X-Old-" + hdr, old_value)
-      del M[hdr]
-      M[hdr] = new_value
+    if modify_header(self.message, hdr, new_value, always=always):
       self.message_path = None
 
   def apply_rule(self, R):
