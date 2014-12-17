@@ -21,7 +21,7 @@ from cs.fileutils import Pathname, shortpath as _shortpath
 from cs.logutils import Pfx, info, warning, debug, D
 from cs.threads import locked_property
 from cs.seq import seq
-from cs.py3 import StringIO
+from cs.py3 import StringIO, StringTypes
 
 SHORTPATH_PREFIXES = ( ('$MAILDIR/', '+'), ('$HOME/', '~/') )
 
@@ -32,7 +32,7 @@ def Message(msgfile, headersonly=False):
   ''' Factory function to accept a file or filename and return an
       email.message.Message.
   '''
-  if isinstance(msgfile, str):
+  if isinstance(msgfile, StringTypes):
     # msgfile presumed to be filename
     pathname = msgfile
     with Pfx(pathname):

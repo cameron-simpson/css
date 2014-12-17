@@ -490,6 +490,7 @@ class MessageFiler(O):
         is true, save the old value as X-Old-`hdr`.
         If the modification changes header, forget self.message_path.
     '''
+    if 
     M = self.message
     old_value = M.get(hdr, '')
     if always or old_value != new_value:
