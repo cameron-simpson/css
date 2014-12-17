@@ -89,16 +89,17 @@ def ismaildir(path):
 def ismbox(path):
   ''' Open path and check that its first line begins with "From ".
   '''
-  fp=None
+  fp = None
   try:
-    fp=open(path)
+    fp = open(path)
     from_ = fp.read(5)
   except IOError:
     if fp is not None:
       fp.close()
     return False
-  fp.close()
-  return from_ == 'From '
+  else:
+    fp.close()
+    return from_ == 'From '
 
 def make_maildir(path):
   ''' Create a new maildir at `path`.
