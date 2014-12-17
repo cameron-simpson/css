@@ -216,6 +216,32 @@ def texthexify(bs, shiftin='[', shiftout=']', whitelist=None):
     chunks.append(chunk)
   return ''.join(chunks)
 
+def untexthexify(s, shiftin='[', shiftout=']'):
+  chunks = []
+  while len(s) > 0:
+    hexlen = s.find(shiftin)
+    if hexlen < 0:
+      break
+    if hexlen > 0:
+      hextext = s[:hexlen]
+      if hexlen % 2 != 0:
+        raise TypeError("uneven hex sequence \"%s\"" % (hextext,))
+      chunks.append(unhexify(s[:hexlen]))
+    s = s[hexlen+len(shiftin):]
+    textlen = s.find(shiftout)
+    if textlen < 0:
+      raise TypeError("missing shift out marker \"%s\"" % (shiftout,))
+    if sys.hexversion < 0x03000000:
+      chunks.append(s[:textlen])
+    else:
+      chunks.append(bytes( ord(c) for c in s[:textlen] ))
+    s = s[textlen+len(shiftout):]
+  if len(s) > 0:
+    if len(s) % 2 != 0:
+      raise TypeError("uneven hex sequence \"%s\"" % (s,))
+    chunks.append(unhexify(s))
+  return b''.join(chunks)
+
 # regexp to match RFC2047 text chunks
 re_RFC2047 = re.compile(r'=\?([^?]+)\?([QB])\?([^?]*)\?=', re.I)
 
@@ -267,32 +293,6 @@ def unrfc2047(s):
   if sofar < len(s):
     chunks.append(s[sofar:])
   return unicode('').join(chunks)
-
-def untexthexify(s, shiftin='[', shiftout=']'):
-  chunks = []
-  while len(s) > 0:
-    hexlen = s.find(shiftin)
-    if hexlen < 0:
-      break
-    if hexlen > 0:
-      hextext = s[:hexlen]
-      if hexlen % 2 != 0:
-        raise TypeError("uneven hex sequence \"%s\"" % (hextext,))
-      chunks.append(unhexify(s[:hexlen]))
-    s = s[hexlen+len(shiftin):]
-    textlen = s.find(shiftout)
-    if textlen < 0:
-      raise TypeError("missing shift out marker \"%s\"" % (shiftout,))
-    if sys.hexversion < 0x03000000:
-      chunks.append(s[:textlen])
-    else:
-      chunks.append(bytes( ord(c) for c in s[:textlen] ))
-    s = s[textlen+len(shiftout):]
-  if len(s) > 0:
-    if len(s) % 2 != 0:
-      raise TypeError("uneven hex sequence \"%s\"" % (s,))
-    chunks.append(unhexify(s))
-  return b''.join(chunks)
 
 def get_chars(s, gochars, offset=0):
   ''' Scan the string `s` for characters in `gochars` starting at `offset`
