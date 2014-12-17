@@ -469,10 +469,7 @@ class MessageFiler(O):
         if new_labels:
           # add labels to message, forget pathname of original file
           self.labels.update(new_labels)
-          self.message_path = None
-          M = message_from_string(M.as_string())
-          M['X-Label'] = ", ".join( sorted(list(self.labels)) )
-          self.message = M
+          self.modify_header('X-Label', ', '.join( sorted(list(self.labels)) ))
 
       for target in sorted(list(self.targets)):
         with Pfx(target):
