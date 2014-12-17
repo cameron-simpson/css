@@ -28,19 +28,20 @@ SHORTPATH_PREFIXES = ( ('$MAILDIR/', '+'), ('$HOME/', '~/') )
 def shortpath(path, environ=None):
   return _shortpath(path, environ=environ, prefixes=SHORTPATH_PREFIXES)
 
-def Message(M, headersonly=False):
+def Message(msgfile, headersonly=False):
   ''' Factory function to accept a file or filename and return an
       email.message.Message.
   '''
-  if isinstance(M, str):
-    pathname = M
+  if isinstance(msgfile, str):
+    # msgfile presumed to be filename
+    pathname = msgfile
     with Pfx(pathname):
       with open(pathname) as mfp:
         M = Message(mfp, headersonly=headersonly)
         M.pathname = pathname
         return M
-  mfp = M
-  return email.parser.Parser().parse(mfp, headersonly=headersonly)
+  # msgfile presumed to be file-like object
+  return email.parser.Parser().parse(msgfile, headersonly=headersonly)
 
 def message_addresses(M, header_names):
   ''' Yield (realname, address) pairs from all the named headers.
