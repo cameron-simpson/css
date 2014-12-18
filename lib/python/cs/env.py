@@ -1,7 +1,7 @@
 import os
 import string
 import types
-from cs.lex import get_identifier
+from cs.lex import get_identifier, get_qstr
 
 def getLogin(uid=None):
   import pwd
@@ -35,39 +35,15 @@ def getenv(var, default=None, environ=None, dosub=False):
       value = envsub(value, environ=environ)
   return value
 
-def envsub(s, environ=None, bare=None, default=None):
-  ''' Replace substring of the form '$var' with the value of 'var' from environ.
+def envsub(s, environ=None, default=None):
+  ''' Replace substrings of the form '$var' with the value of 'var' from environ.
       `environ`: environment mapping, default os.environ.
-      `bare`: string to replace a '$' with no following identifier;
-              a bare '$' raises ValueError if this is not specified.
       `default`: value to substitute for unknown vars;
               if `default` is None a ValueError is raised.
   '''
   if environ is None:
     environ = os.environ
-  strs = []
-  opos = 0
-  while True:
-    pos = s.find('$', opos)
-    if pos < 0:
-      strs.append(s[opos:])
-      break
-    if pos > opos:
-      strs.append(s[opos:pos])
-    identifier, offset = get_identifier(s, pos+1)
-    if identifier:
-      value = environ.get(identifier, default)
-      if value is None:
-        raise ValueError("unknown envvar name $%s, offset %d: %s"
-                         % (identifier, pos, s))
-      strs.append(value)
-    else:
-      if bare is not None:
-        strs.append(bare)
-      else:
-        raise ValueError("missing envvar name, offset %d: %s" % (pos, s))
-    opos = offset
-  return ''.join(strs)
+  return get_qstr(s, 0, q=None, environ=environ, default=default)[0]
 
 def varlog(environ=None):
   ''' Return the default base for logs for most cs.* modules.
