@@ -5,7 +5,7 @@ from string import printable, whitespace, ascii_letters, ascii_uppercase, digits
 import re
 import sys
 import os
-from cs.py3 import unicode, ustr
+from cs.py3 import unicode, ustr, sorted
 ##from cs.logutils import X
 
 unhexify = binascii.unhexlify
@@ -366,7 +366,7 @@ def slosh_mapper(c, charmap=SLOSH_CHARMAP):
   '''
   return charmap.get(c)
 
-def get_sloshed_text(s, delim, offset=0, slosh='\\', mapper=slosh_mapper):
+def get_sloshed_text(s, delim, offset=0, slosh='\\', mapper=slosh_mapper, specials=None):
   ''' Collect slosh escaped text from the string `s` from position `offset` (default 0) and return the decoded unicode string and the offset of the completed parse.
       `delim`: end of string delimiter, such as a single or double quote.
       `offset`: starting offset within `s`, default 0.
@@ -375,18 +375,38 @@ def get_sloshed_text(s, delim, offset=0, slosh='\\', mapper=slosh_mapper):
         and returns a replacement string or None; this is used the
         replace things such as '\\t' or '\\n'. The default is the
         slosh_mapper function, whose default mapping is SLOSH_CHARMAP.
+      `specials`: a mapping of other special character sequences and parse
+        functions for gathering them up. When one of the special
+        character sequences is found in the string, the parse
+        function is called to parse at that point.
+        The parse functions accept
+        `s` and the offset of the special character. They return
+        the decoded string and the offset past the parse.
       The escape character `slosh` introduces an encoding of some
       replacement text whose value depends on the following character.
       If the following character is:
-        - the escape character `slosh`, insert the escape character
-        - the string delimiter `delim`, insert the delimiter
+        - the escape character `slosh`, insert the escape character.
+        - the string delimiter `delim`, insert the delimiter.
         - the character 'x', insert the character with code from
-          the following 2 hexadecimal digits
+          the following 2 hexadecimal digits.
         - the character 'u', insert the character with code from
-          the following 4 hexadecimal digits
+          the following 4 hexadecimal digits.
         - the character 'U', insert the character with code from
-          the following 8 hexadecimal digits
+          the following 8 hexadecimal digits.
+        - a character from the keys of mapper
   '''
+  if specials is not None:
+    # gather up starting character of special keys and a list of
+    # keys in reverse order of length
+    special_starts = set()
+    special_seqs = []
+    for special in specials.keys():
+      if len(special) == 0:
+        raise ValueError('empty strings may not be used as keys for specials: %r' % (specials,))
+      special_starts.add(special[0])
+      special_seqs.append(special)
+    special_starts = u''.join(special_starts)
+    special_seqs = sorted(special_seqs, key=lambda s: -len(s))
   chunks = []
   slen = len(s)
   while True:
@@ -400,14 +420,7 @@ def get_sloshed_text(s, delim, offset=0, slosh='\\', mapper=slosh_mapper):
     if delim is not None and c == delim:
       # delimiter; end text
       break
-    elif c != slosh:
-      # plain text
-      while offset < slen:
-        if s[offset] == slosh or (delim is not None and s[offset] == delim):
-          break
-        offset += 1
-      chunks.append(s[offset0:offset])
-    else:
+    if c == slosh:
       # \something
       if offset >= slen:
         raise ValueError('incomplete slosh escape at offset %d' % (offset0,))
@@ -415,32 +428,56 @@ def get_sloshed_text(s, delim, offset=0, slosh='\\', mapper=slosh_mapper):
       offset += 1
       if c == slosh or (delim is not None and c == delim):
         chunks.append(c)
-      elif c == 'x':
+        continue
+      if c == 'x':
         # \xhh
         if slen - offset < 2:
           raise ValueError('short hexcode for %sxhh at offset %d' % (slosh, offset0))
         hh = s[offset:offset+2]
         offset += 2
         chunks.append(chr(int(hh, 16)))
-      elif c == 'u':
+        continue
+      if c == 'u':
         # \uhhhh
         if slen - offset < 4:
           raise ValueError('short hexcode for %suhhhh at offset %d' % (slosh, offset0))
         hh = s[offset:offset+4]
         offset += 4
         chunks.append(chr(int(hh, 16)))
-      elif c == 'U':
+        continue
+      if c == 'U':
         # \Uhhhhhhhh
         if slen - offset < 8:
           raise ValueError('short hexcode for %sUhhhhhhhh at offset %d' % (slosh, offset0))
         hh = s[offset:offset+8]
         offset += 8
         chunks.append(chr(int(hh, 16)))
-      else:
-        chunk = mapper(c)
-        if chunk is None:
-          raise ValueError('unrecognised %s%s escape at offset %d' % (slosh, c, offset0))
+        continue
+      chunk = mapper(c)
+      if chunk is not None:
+        # supplied \X mapping
         chunks.append(chunk)
+        continue
+      raise ValueError('unrecognised %s%s escape at offset %d' % (slosh, c, offset0))
+    if specials is not None and c in special_starts:
+      # test sequence prefixes from longest to shortest
+      chunk=None
+      for seq in special_seqs:
+        if s.startswith(seq, offset0):
+          # special sequence
+          chunk, offset = specials[seq](s, offset0)
+          if offset < offset0 + 1:
+            raise ValueError("special parser for %r at offset %d moved offset backwards" % (c, offset0))
+          break
+      if chunk is not None:
+        chunks.append(chunk)
+        continue
+    # no special sequence, so plain text
+    while offset < slen:
+      if s[offset] == slosh or (delim is not None and s[offset] == delim):
+        break
+      offset += 1
+    chunks.append(s[offset0:offset])
   return u''.join( ustr(chunk) for chunk in chunks ), offset
 
 def get_envvar(s, offset=0, environ=None):

@@ -5,6 +5,7 @@
 #
 
 import sys
+from functools import partial
 import unittest
 from cs.lex import texthexify, untexthexify, \
                    get_envvar, \
@@ -16,7 +17,7 @@ from cs.py3 import makebytes
 class TestLex(unittest.TestCase):
 
   def setUp(self):
-    pass
+    self.env = { 'A': 'AA', 'B1': 'BB1' }
 
   def tearDown(self):
     pass
@@ -32,13 +33,12 @@ class TestLex(unittest.TestCase):
     self.assertEqual('00', texthexify(makebytes( (0x00,) )))
 
   def test02get_envvar(self):
-    env = { 'A': 'AA', 'B1': 'BB1' }
     self.assertEqual( get_envvar('$$'), ('$', 2) )
-    for envvar in env.keys():
-      envval, offset = get_envvar('$'+envvar, 0, env)
-      self.assertEqual( envval, env[envvar],
+    for envvar in self.env.keys():
+      envval, offset = get_envvar('$'+envvar, 0, self.env)
+      self.assertEqual( envval, self.env[envvar],
                         "get_envvar($%s) ==> %r, expected %r"
-                        % (envvar, envval, env[envvar]) )
+                        % (envvar, envval, self.env[envvar]) )
       self.assertEqual( offset, len(envvar)+1 )
 
   def test03get_sloshed_text(self):
@@ -77,6 +77,12 @@ class TestLex(unittest.TestCase):
         self.assertEqual( offset, offset_expected,
                           "get_sloshed_text(%r): returned offset=%d, expected %d"
                           % (enc, offset, offset_expected) )
+    specials = { '$': get_envvar }
+    special_func = partial(get_envvar, environ=self.env)
+    self.assertEqual(get_sloshed_text('$$', None, specials={ '$': special_func }),
+                     ('$', 2))
+    self.assertEqual(get_sloshed_text('$A', None, specials={ '$': special_func }),
+                     ('AA', 2))
 
   def test04get_qstr(self):
     self.assertRaises(ValueError, get_qstr, '')
