@@ -1,5 +1,6 @@
 import base64
 import binascii
+from functools import partial
 import quopri
 from string import printable, whitespace, ascii_letters, ascii_uppercase, digits
 import re
@@ -522,13 +523,23 @@ def get_envvar(s, offset=0, environ=None, specials=None):
     return specials[c], offset
   raise ValueError("unsupported special variable $%s" % (c,))
 
-def get_qstr(s, offset=0):
+def get_qstr(s, offset=0, q='"', environ=None):
+  ''' Get quoted text with slosh escapes and optional environment substitution.
+      `s`: the string containg the quoted text.
+      `offset`: the starting point, default 0.
+      `q`: the quote character, default '"'.
+      `environ`: if not None, also parse and expand $envvar references.
+  '''
   if len(s) - offset < 1:
     raise ValueError("short string, no opening quote")
   delim = s[offset]
-  if delim != '"':
-    raise ValueError("expected opening double quote, found %r" % (delim,))
-  return get_sloshed_text(s, delim, offset+1)
+  offset += 1
+  if delim != q:
+    raise ValueError("expected opening quote %r, found %r" % (q, delim,))
+  if environ is None:
+    return get_sloshed_text(s, delim, offset)
+  return get_sloshed_text(s, delim, offset,
+                          specials={ '$': partial(get_envvar, environ=environ) })
 
 def isUC_(s):
   ''' Check that a string matches ^[A-Z][A-Z_0-9]*$.

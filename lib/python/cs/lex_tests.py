@@ -98,10 +98,13 @@ class TestLex(unittest.TestCase):
     self.assertRaises(ValueError, get_qstr, 'x')
     self.assertRaises(ValueError, get_qstr, '"x')
     self.assertEqual(get_qstr('""'), ('', 2))
+    self.assertEqual(get_qstr("''", q="'"), ('', 2))
     self.assertEqual(get_qstr('"x"'), ('x', 3))
     self.assertEqual(get_qstr('"\\""'), ('"', 4))
     self.assertEqual(get_qstr('"\\\\"'), ('\\', 4))
     self.assertEqual(get_qstr('"\\t"'), ('\t', 4))
+    self.assertEqual(get_qstr('"$B1"', environ=self.env), ('BB1', 5))
+    self.assertEqual(get_qstr('"\\$B1"', environ=self.env), ('$B1', 6))
 
 def selftest(argv):
   unittest.main(__name__, None, argv)
