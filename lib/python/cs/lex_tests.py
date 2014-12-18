@@ -18,6 +18,7 @@ class TestLex(unittest.TestCase):
 
   def setUp(self):
     self.env = { 'A': 'AA', 'B1': 'BB1' }
+    self.env_specials = { '!': '99' }
 
   def tearDown(self):
     pass
@@ -33,7 +34,7 @@ class TestLex(unittest.TestCase):
     self.assertEqual('00', texthexify(makebytes( (0x00,) )))
 
   def test02get_envvar(self):
-    self.assertEqual( get_envvar('$$'), ('$', 2) )
+    self.assertEqual( get_envvar('$!', specials=self.env_specials), ('99', 2) )
     for envvar in self.env.keys():
       envval, offset = get_envvar('$'+envvar, 0, self.env)
       self.assertEqual( envval, self.env[envvar],
@@ -77,12 +78,20 @@ class TestLex(unittest.TestCase):
         self.assertEqual( offset, offset_expected,
                           "get_sloshed_text(%r): returned offset=%d, expected %d"
                           % (enc, offset, offset_expected) )
-    specials = { '$': get_envvar }
-    special_func = partial(get_envvar, environ=self.env)
-    self.assertEqual(get_sloshed_text('$$', None, specials={ '$': special_func }),
+    special_func = partial(get_envvar, environ=self.env, specials=self.env_specials)
+    specials = { '$': special_func }
+    self.assertEqual(get_sloshed_text('\$', None, specials=specials),
                      ('$', 2))
-    self.assertEqual(get_sloshed_text('$A', None, specials={ '$': special_func }),
+    self.assertEqual(get_sloshed_text('$A', None, specials=specials),
                      ('AA', 2))
+    self.assertEqual(get_sloshed_text('$B1', None, specials=specials),
+                     ('BB1', 3))
+    self.assertEqual(get_sloshed_text('$!', None, specials=specials),
+                     ('99', 2))
+    self.assertEqual(get_sloshed_text('-$A-$B1-$!-', None, specials=specials),
+                     ('-AA-BB1-99-', 11))
+    self.assertEqual(get_sloshed_text('-$A-\\$B1-$!-', None, specials=specials),
+                     ('-AA-$B1-99-', 12))
 
   def test04get_qstr(self):
     self.assertRaises(ValueError, get_qstr, '')

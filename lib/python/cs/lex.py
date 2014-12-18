@@ -424,6 +424,7 @@ def get_sloshed_text(s, delim, offset=0, slosh='\\', mapper=slosh_mapper, specia
       # \something
       if offset >= slen:
         raise ValueError('incomplete slosh escape at offset %d' % (offset0,))
+      offset1 = offset
       c = s[offset]
       offset += 1
       if c == slosh or (delim is not None and c == delim):
@@ -458,6 +459,18 @@ def get_sloshed_text(s, delim, offset=0, slosh='\\', mapper=slosh_mapper, specia
         # supplied \X mapping
         chunks.append(chunk)
         continue
+      # check for escaped special syntax
+      if specials is not None and c in special_starts:
+        # test sequence prefixes from longest to shortest
+        chunk=None
+        for seq in special_seqs:
+          if s.startswith(seq, offset1):
+            # special sequence
+            chunk = c
+            break
+        if chunk is not None:
+          chunks.append(chunk)
+          continue
       raise ValueError('unrecognised %s%s escape at offset %d' % (slosh, c, offset0))
     if specials is not None and c in special_starts:
       # test sequence prefixes from longest to shortest
@@ -472,20 +485,29 @@ def get_sloshed_text(s, delim, offset=0, slosh='\\', mapper=slosh_mapper, specia
       if chunk is not None:
         chunks.append(chunk)
         continue
-    # no special sequence, so plain text
+      chunks.append(c)
+      continue
     while offset < slen:
-      if s[offset] == slosh or (delim is not None and s[offset] == delim):
+      c = s[offset]
+      if ( c == slosh
+        or (delim is not None and c == delim)
+        or (specials is not None and c in special_starts)
+         ):
         break
       offset += 1
     chunks.append(s[offset0:offset])
   return u''.join( ustr(chunk) for chunk in chunks ), offset
 
-def get_envvar(s, offset=0, environ=None):
-  ''' Parse a simple environment variable reference to $$ or $varname.
+def get_envvar(s, offset=0, environ=None, specials=None):
+  ''' Parse a simple environment variable reference to $varname or $x where "x" is a special character.
+      `s`: the string with the variable reference
+      `offset`: the starting point for the reference
+      `environ`: the environment mapping, default os.environ
+      `specials`: the mapping of special single character variables
   '''
   if environ is None:
     environ = os.environ
-  if not s.startswith('$'):
+  if not s.startswith('$', offset):
     raise ValueError("no leading '$' at offset %d" % (offset,))
   offset += 1
   if offset >= len(s):
@@ -496,8 +518,8 @@ def get_envvar(s, offset=0, environ=None):
     return value, offset
   c = s[offset]
   offset += 1
-  if c == '$':
-    return c, offset
+  if specials is not None and c in specials:
+    return specials[c], offset
   raise ValueError("unsupported special variable $%s" % (c,))
 
 def get_qstr(s, offset=0):
