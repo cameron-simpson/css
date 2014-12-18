@@ -809,6 +809,9 @@ re_UNQWORD = re.compile(r'[^,\s]+')
 # header[,header,...]:
 re_HEADERLIST = re.compile(r'([a-z][\-a-z0-9]*(,[a-z][\-a-z0-9]*)*):', re.I)
 
+# header:s/
+re_HEADER_SUBST = re.compile(r'([a-z][\-a-z0-9]*):s([^a-z0-9])', re.I)
+
 # identifier=
 re_ASSIGN = re.compile(r'([a-z]\w+)=', re.I)
 
@@ -1017,12 +1020,33 @@ def parserules(fp):
 
 def get_targets(s, offset):
   ''' Parse list of targets from the string `s` starting at `offset`.
-      Return the list of targets strings and the new offset.
+      Return the list of Targets strings and the new offset.
   '''
   targets = []
   while offset < len(s) and not s[offset].isspace():
+    offset0 = offset
+    # header:s/this/that/
+    m = re_HEADER_SUBST.match(s, offset)
+    if m:
+      subst_header = m.group(1)
+      subst_delim = m.group(2)
+      offset = m.end()
+      subst_delim2pos = s.find(subst_delim, offset)
+      if subst_delim2pos < offset:
+        raise ValueError("missing second delimiter %r at %s"
+                         % (subst_delim, s[offset0:]))
+      subst_re = s[offset:subst_delim2pos]
+      offset = subst_delim2pos+1
+      subst_delim3pos = s.find(subst_delim, offset)
+      if subst_delim3pos < offset:
+        raise ValueError("missing third delimiter %r at %s"
+                         % (subst_delim, s[offset0:]))
+      subst_replacement = s[offset:subst_delim3pos]
+      offset = subst_delim3pos + 1
+      target = (subst_header, subst_re, subst_replacement)
+      X("FOUND %r:s/ %r / %r /", subst_header, subst_re, subst_replacement)
     # "quoted-string"
-    if s[offset] == '"':
+    elif s[offset] == '"':
       target, offset = get_qstr(s, offset)
     # +header(groups)
     elif s[offset] == '+':
