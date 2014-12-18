@@ -527,15 +527,19 @@ def get_qstr(s, offset=0, q='"', environ=None):
   ''' Get quoted text with slosh escapes and optional environment substitution.
       `s`: the string containg the quoted text.
       `offset`: the starting point, default 0.
-      `q`: the quote character, default '"'.
+      `q`: the quote character, default '"'. If `q` is set to None,
+        do not expect the string to be delimited by quote marks.
       `environ`: if not None, also parse and expand $envvar references.
   '''
   if len(s) - offset < 1:
     raise ValueError("short string, no opening quote")
-  delim = s[offset]
-  offset += 1
-  if delim != q:
-    raise ValueError("expected opening quote %r, found %r" % (q, delim,))
+  if q is None:
+    delim = None
+  else:
+    delim = s[offset]
+    offset += 1
+    if delim != q:
+      raise ValueError("expected opening quote %r, found %r" % (q, delim,))
   if environ is None:
     return get_sloshed_text(s, delim, offset)
   return get_sloshed_text(s, delim, offset,

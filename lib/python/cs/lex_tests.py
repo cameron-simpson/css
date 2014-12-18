@@ -100,6 +100,7 @@ class TestLex(unittest.TestCase):
     self.assertEqual(get_qstr('""'), ('', 2))
     self.assertEqual(get_qstr("''", q="'"), ('', 2))
     self.assertEqual(get_qstr('"x"'), ('x', 3))
+    self.assertEqual(get_qstr('x', q=None), ('x', 1))
     self.assertEqual(get_qstr('"\\""'), ('"', 4))
     self.assertEqual(get_qstr('"\\\\"'), ('\\', 4))
     self.assertEqual(get_qstr('"\\t"'), ('\t', 4))
