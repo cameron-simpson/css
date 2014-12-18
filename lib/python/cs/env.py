@@ -54,12 +54,12 @@ def envsub(s, environ=None, bare=None, default=None):
       break
     if pos > opos:
       strs.append(s[opos:pos])
-    id, offset = get_identifier(s, pos+1)
-    if id:
-      value = environ.get(id, default)
+    identifier, offset = get_identifier(s, pos+1)
+    if identifier:
+      value = environ.get(identifier, default)
       if value is None:
         raise ValueError("unknown envvar name $%s, offset %d: %s"
-                         % (id, pos, s))
+                         % (identifier, pos, s))
       strs.append(value)
     else:
       if bare is not None:
