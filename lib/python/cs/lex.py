@@ -4,6 +4,7 @@ import quopri
 from string import printable, whitespace, ascii_letters, ascii_uppercase, digits
 import re
 import sys
+import os
 from cs.py3 import unicode, ustr
 ##from cs.logutils import X
 
@@ -441,6 +442,26 @@ def get_sloshed_text(s, delim, offset=0, slosh='\\', mapper=slosh_mapper):
           raise ValueError('unrecognised %s%s escape at offset %d' % (slosh, c, offset0))
         chunks.append(chunk)
   return u''.join( ustr(chunk) for chunk in chunks ), offset
+
+def get_envvar(s, offset=0, environ=None):
+  ''' Parse a simple environment variable reference to $$ or $varname.
+  '''
+  if environ is None:
+    environ = os.environ
+  if not s.startswith('$'):
+    raise ValueError("no leading '$' at offset %d" % (offset,))
+  offset += 1
+  if offset >= len(s):
+    raise ValueError("short string, nothing after '$' at offset %d" % (offset,))
+  identifier, offset = get_identifier(s, offset)
+  if identifier:
+    value = environ[identifier]
+    return value, offset
+  c = s[offset]
+  offset += 1
+  if c == '$':
+    return c, offset
+  raise ValueError("unsupported special variable $%s" % (c,))
 
 def get_qstr(s, offset=0):
   if len(s) - offset < 1:
