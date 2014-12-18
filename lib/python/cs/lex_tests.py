@@ -7,6 +7,7 @@
 import sys
 import unittest
 from cs.lex import texthexify, untexthexify, \
+                   get_envvar, \
                    get_sloshed_text, SLOSH_CHARMAP, \
                    get_qstr
 from cs.py3 import makebytes
@@ -30,7 +31,17 @@ class TestLex(unittest.TestCase):
     self.assertEqual('', texthexify(b''))
     self.assertEqual('00', texthexify(makebytes( (0x00,) )))
 
-  def test02get_sloshed_text(self):
+  def test02get_envvar(self):
+    env = { 'A': 'AA', 'B1': 'BB1' }
+    self.assertEqual( get_envvar('$$'), ('$', 2) )
+    for envvar in env.keys():
+      envval, offset = get_envvar('$'+envvar, 0, env)
+      self.assertEqual( envval, env[envvar],
+                        "get_envvar($%s) ==> %r, expected %r"
+                        % (envvar, envval, env[envvar]) )
+      self.assertEqual( offset, len(envvar)+1 )
+
+  def test03get_sloshed_text(self):
     self.assertRaises(ValueError, get_sloshed_text, '\\', None)
     self.assertRaises(ValueError, get_sloshed_text, '', '"')
     self.assertRaises(ValueError, get_sloshed_text, '\\', '"')
@@ -67,7 +78,7 @@ class TestLex(unittest.TestCase):
                           "get_sloshed_text(%r): returned offset=%d, expected %d"
                           % (enc, offset, offset_expected) )
 
-  def test03get_qstr(self):
+  def test04get_qstr(self):
     self.assertRaises(ValueError, get_qstr, '')
     self.assertRaises(ValueError, get_qstr, 'x')
     self.assertRaises(ValueError, get_qstr, '"x')
