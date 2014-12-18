@@ -4,7 +4,8 @@ import quopri
 from string import printable, whitespace, ascii_letters, ascii_uppercase, digits
 import re
 import sys
-from cs.py3 import unicode
+from cs.py3 import unicode, ustr
+from cs.logutils import X
 
 unhexify = binascii.unhexlify
 if sys.hexversion >= 0x030000:
@@ -347,6 +348,99 @@ def get_other_chars(s, stopchars, offset=0):
   while offset < len(s) and s[offset] not in stopchars:
     offset += 1
   return s[ooffset:offset], offset
+
+# default character map for \c notation
+SLOSH_CHARMAP = {
+    'a':    '\a',
+    'b':    '\b',
+    'f':    '\f',
+    'n':    '\n',
+    'r':    '\r',
+    't':    '\t',
+    'v':    '\v',
+  }
+
+def slosh_mapper(c, charmap=SLOSH_CHARMAP):
+  ''' Return a string to replace \`c`, or None.
+  '''
+  return charmap.get(c)
+
+def get_sloshed_text(s, delim, offset=0, slosh='\\', mapper=slosh_mapper):
+  ''' Collect slosh escaped text from the string `s` from position `offset` (default 0) and return the decoded unicode string and the offset of the completed parse.
+      `delim`: end of string delimiter, such as a single or double quote.
+      `offset`: starting offset within `s`, default 0.
+      `slosh`: escape character, default a slosh ('\\').
+      `mapper`: a mapping function which accepts a single character
+        and returns a replacement string or None; this is used the
+        replace things such as '\\t' or '\\n'. The default is the
+        slosh_mapper function, whose default mapping is SLOSH_CHARMAP.
+      The escape character `slosh` introduces an encoding of some
+      replacement text whose value depends on the following character.
+      If the following character is:
+        - the escape character `slosh`, insert the escape character
+        - the string delimiter `delim`, insert the delimiter
+        - the character 'x', insert the character with code from
+          the following 2 hexadecimal digits
+        - the character 'u', insert the character with code from
+          the following 4 hexadecimal digits
+        - the character 'U', insert the character with code from
+          the following 8 hexadecimal digits
+  '''
+  chunks = []
+  slen = len(s)
+  while True:
+    if offset >= slen:
+      if delim is not None:
+        raise ValueError("missing delimiter %r at offset %d" % (delim, offset))
+      break
+    offset0 = offset
+    c = s[offset]
+    offset += 1
+    if delim is not None and c == delim:
+      # delimiter; end text
+      break
+    elif c != slosh:
+      # plain text
+      while offset < slen:
+        if s[offset] == slosh or (delim is not None and s[offset] == delim):
+          break
+        offset += 1
+      chunks.append(s[offset0:offset])
+    else:
+      # \something
+      if offset >= slen:
+        raise ValueError('incomplete slosh escape at offset %d' % (offset0,))
+      c = s[offset]
+      offset += 1
+      if c == slosh or (delim is not None and c == delim):
+        chunks.append(c)
+      elif c == 'x':
+        # \xhh
+        if slen - offset < 2:
+          raise ValueError('short hexcode for %sxhh at offset %d' % (slosh, offset0))
+        hh = s[offset:offset+2]
+        offset += 2
+        chunks.append(chr(int(hh, 16)))
+      elif c == 'u':
+        # \uhhhh
+        if slen - offset < 4:
+          raise ValueError('short hexcode for %suhhhh at offset %d' % (slosh, offset0))
+        hh = s[offset:offset+4]
+        offset += 4
+        chunks.append(chr(int(hh, 16)))
+      elif c == 'U':
+        # \Uhhhhhhhh
+        if slen - offset < 8:
+          raise ValueError('short hexcode for %sUhhhhhhhh at offset %d' % (slosh, offset0))
+        hh = s[offset:offset+8]
+        offset += 8
+        chunks.append(chr(int(hh, 16)))
+      else:
+        chunk = mapper(c)
+        if chunk is None:
+          raise ValueError('unrecognised %s%s escape at offset %d' % (slosh, c, offset0))
+        chunks.append(chunk)
+  return u''.join( ustr(chunk) for chunk in chunks ), offset
 
 re_QSTR = re.compile(r'"([^"\\]|\\.)*"')
 

@@ -6,8 +6,9 @@
 
 import sys
 import unittest
-from cs.lex import texthexify, untexthexify
+from cs.lex import texthexify, untexthexify, get_sloshed_text, SLOSH_CHARMAP
 from cs.py3 import makebytes
+##from cs.logutils import X
 
 class TestLex(unittest.TestCase):
 
@@ -26,6 +27,33 @@ class TestLex(unittest.TestCase):
   def test01texthexify(self):
     self.assertEqual('', texthexify(b''))
     self.assertEqual('00', texthexify(makebytes( (0x00,) )))
+
+  def test02get_sloshed_text(self):
+    for delim in None, '"', "'", ']':
+      test_pairs = [
+          ('', ''),
+          ('abc', 'abc'),
+          ('\\\\', '\\'),
+          ('\\x40', '@'),
+          ('\\u0040', '@'),
+          ('\\U00000040', '@'),
+        ]
+      for c, dc in SLOSH_CHARMAP.items():
+        test_pairs.append( ('\\'+c, dc) )
+      if delim is not None:
+        test_pairs.append( ('\\'+delim, delim) )
+      for enc0, dec0 in test_pairs:
+        if delim is None:
+          enc = enc0
+        else:
+          enc = enc0 + delim
+        offset_expected = len(enc)
+        ##X("enc = %r", enc)
+        dec, offset = get_sloshed_text(enc, delim)
+        self.assertEqual( dec, dec0, "%r ==> %r, expected %r" % (enc, dec, dec0) )
+        self.assertEqual( offset, offset_expected,
+                          "get_sloshed_text(%r): returned offset=%d, expected %d"
+                          % (enc, offset, offset_expected) )
 
 def selftest(argv):
   unittest.main(__name__, None, argv)
