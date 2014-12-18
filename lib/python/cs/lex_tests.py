@@ -29,6 +29,16 @@ class TestLex(unittest.TestCase):
     self.assertEqual('00', texthexify(makebytes( (0x00,) )))
 
   def test02get_sloshed_text(self):
+    self.assertRaises(ValueError, get_sloshed_text, '\\', None)
+    self.assertRaises(ValueError, get_sloshed_text, '', '"')
+    self.assertRaises(ValueError, get_sloshed_text, '\\', '"')
+    self.assertRaises(ValueError, get_sloshed_text, '\\"', '"')
+    self.assertRaises(ValueError, get_sloshed_text, '\\x0', '"')
+    self.assertRaises(ValueError, get_sloshed_text, '\\x0zz', '"')
+    self.assertRaises(ValueError, get_sloshed_text, '\\u0', '"')
+    self.assertRaises(ValueError, get_sloshed_text, '\\u000zz', '"')
+    self.assertRaises(ValueError, get_sloshed_text, '\\U0', '"')
+    self.assertRaises(ValueError, get_sloshed_text, '\\U000000zz', '"')
     for delim in None, '"', "'", ']':
       test_pairs = [
           ('', ''),
