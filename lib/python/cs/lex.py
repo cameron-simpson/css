@@ -499,23 +499,29 @@ def get_sloshed_text(s, delim, offset=0, slosh='\\', mapper=slosh_mapper, specia
     chunks.append(s[offset0:offset])
   return u''.join( ustr(chunk) for chunk in chunks ), offset
 
-def get_envvar(s, offset=0, environ=None, specials=None):
+def get_envvar(s, offset=0, environ=None, default=None, specials=None):
   ''' Parse a simple environment variable reference to $varname or $x where "x" is a special character.
       `s`: the string with the variable reference
       `offset`: the starting point for the reference
+      `default`: default value for missing environment variables;
+         if None (the default) a ValueError is raised
       `environ`: the environment mapping, default os.environ
       `specials`: the mapping of special single character variables
   '''
   if environ is None:
     environ = os.environ
+  offset0 = offset
   if not s.startswith('$', offset):
-    raise ValueError("no leading '$' at offset %d" % (offset,))
+    raise ValueError("no leading '$' at offset %d: %r" % (offset,s))
   offset += 1
   if offset >= len(s):
     raise ValueError("short string, nothing after '$' at offset %d" % (offset,))
   identifier, offset = get_identifier(s, offset)
   if identifier:
-    value = environ[identifier]
+    value = environ.get(identifier, default)
+    if value is None:
+      raise ValueError("unknown envvar name $%s, offset %d: %r"
+                       % (identifier, offset0, s))
     return value, offset
   c = s[offset]
   offset += 1

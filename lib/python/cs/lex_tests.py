@@ -41,6 +41,8 @@ class TestLex(unittest.TestCase):
                         "get_envvar($%s) ==> %r, expected %r"
                         % (envvar, envval, self.env[envvar]) )
       self.assertEqual( offset, len(envvar)+1 )
+    self.assertEqual( get_envvar('$x', environ={}, default=''), ('', 2) )
+    self.assertRaises( ValueError, get_envvar, '$x', environ={} )
 
   def test03get_sloshed_text(self):
     self.assertRaises(ValueError, get_sloshed_text, '\\', None)
