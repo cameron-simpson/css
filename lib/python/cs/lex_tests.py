@@ -6,7 +6,9 @@
 
 import sys
 import unittest
-from cs.lex import texthexify, untexthexify, get_sloshed_text, SLOSH_CHARMAP
+from cs.lex import texthexify, untexthexify, \
+                   get_sloshed_text, SLOSH_CHARMAP, \
+                   get_qstr
 from cs.py3 import makebytes
 ##from cs.logutils import X
 
@@ -64,6 +66,16 @@ class TestLex(unittest.TestCase):
         self.assertEqual( offset, offset_expected,
                           "get_sloshed_text(%r): returned offset=%d, expected %d"
                           % (enc, offset, offset_expected) )
+
+  def test03get_qstr(self):
+    self.assertRaises(ValueError, get_qstr, '')
+    self.assertRaises(ValueError, get_qstr, 'x')
+    self.assertRaises(ValueError, get_qstr, '"x')
+    self.assertEqual(get_qstr('""'), ('', 2))
+    self.assertEqual(get_qstr('"x"'), ('x', 3))
+    self.assertEqual(get_qstr('"\\""'), ('"', 4))
+    self.assertEqual(get_qstr('"\\\\"'), ('\\', 4))
+    self.assertEqual(get_qstr('"\\t"'), ('\t', 4))
 
 def selftest(argv):
   unittest.main(__name__, None, argv)

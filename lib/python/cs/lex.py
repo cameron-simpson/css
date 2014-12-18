@@ -5,7 +5,7 @@ from string import printable, whitespace, ascii_letters, ascii_uppercase, digits
 import re
 import sys
 from cs.py3 import unicode, ustr
-from cs.logutils import X
+##from cs.logutils import X
 
 unhexify = binascii.unhexlify
 if sys.hexversion >= 0x030000:
@@ -442,34 +442,13 @@ def get_sloshed_text(s, delim, offset=0, slosh='\\', mapper=slosh_mapper):
         chunks.append(chunk)
   return u''.join( ustr(chunk) for chunk in chunks ), offset
 
-re_QSTR = re.compile(r'"([^"\\]|\\.)*"')
-
-def get_qstr(s, offset):
-  ''' Extract a quoted string from the start of `s`.
-      Return:
-        qs, offset
-      where `qs` is the quoted string after replacing slosh-char with char
-      and `offset` is the offset of the first character after the quoted string.
-  '''
-  m = re_QSTR.match(s, offset)
-  if not m:
-    raise ValueError("no quoted string here: "+s)
-  qs = m.group()[1:-1]
-  offset = m.end()
-
-  # decode the quoted string
-  parts = []
-  pos = 0
-  spos = qs.find('\\', pos)
-  while spos >= 0:
-    if spos > 0:
-      parts.append(qs[pos:spos])    # part before slosh
-    parts.append(qs[spos+1])        # char after slosh
-    pos = spos + 2
-    spos = qs.find('\\', pos)
-  if pos < len(qs):
-    parts.append(qs[pos:])          # tail of string
-  return ''.join(parts), offset
+def get_qstr(s, offset=0):
+  if len(s) - offset < 1:
+    raise ValueError("short string, no opening quote")
+  delim = s[offset]
+  if delim != '"':
+    raise ValueError("expected opening double quote, found %r" % (delim,))
+  return get_sloshed_text(s, delim, offset+1)
 
 def isUC_(s):
   ''' Check that a string matches ^[A-Z][A-Z_0-9]*$.
