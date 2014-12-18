@@ -56,6 +56,8 @@ The following indicators may preceed, in order, the targets:
 The "targets" is a comma separated list of mail destinations;
 a target takes the form of a sequence of nonwhitespace non-comma
 characters, or a string value in double quotes.
+Note that a shell command in quotes will need any backslashes doubled,
+as the quoted string parse strips one level of backslash escaping.
 
 =head4 Message Flags
 
