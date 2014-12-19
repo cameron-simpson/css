@@ -529,7 +529,7 @@ def get_envvar(s, offset=0, environ=None, default=None, specials=None):
     return specials[c], offset
   raise ValueError("unsupported special variable $%s" % (c,))
 
-def get_qstr(s, offset=0, q='"', environ=None, default=None):
+def get_qstr(s, offset=0, q='"', environ=None, default=None, env_specials=None):
   ''' Get quoted text with slosh escapes and optional environment substitution.
       `s`: the string containg the quoted text.
       `offset`: the starting point, default 0.
@@ -551,7 +551,7 @@ def get_qstr(s, offset=0, q='"', environ=None, default=None):
       raise ValueError("expected opening quote %r, found %r" % (q, delim,))
   if environ is None:
     return get_sloshed_text(s, delim, offset)
-  getvar = partial(get_envvar, environ=environ, default=default)
+  getvar = partial(get_envvar, environ=environ, default=default, specials=env_specials)
   return get_sloshed_text(s, delim, offset, specials={ '$': getvar })
 
 def isUC_(s):
