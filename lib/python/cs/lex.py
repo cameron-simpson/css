@@ -554,6 +554,14 @@ def get_qstr(s, offset=0, q='"', environ=None, default=None, env_specials=None):
   getvar = partial(get_envvar, environ=environ, default=default, specials=env_specials)
   return get_sloshed_text(s, delim, offset, specials={ '$': getvar })
 
+def get_delimited(s, offset, delim):
+  ''' Collect text from the string `s` from position `offset` up to the first occurence of delimiter `delim`; return the text excluding the delimiter and the offset after the delimiter.
+  '''
+  pos = s.find(delim, offset)
+  if pos < offset:
+    raise ValueError("delimiter %r not found after offset %d" % (delim, offset))
+  return s[offset:pos], pos+len(delim)
+
 def get_tokens(s, offset, getters):
   ''' Parse the string `s` from position `offset` using the supplied tokenise functions `getters`; return the list of tokens matched and the final offset.
       `s`: the string to parse.
