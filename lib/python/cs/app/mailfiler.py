@@ -1035,7 +1035,7 @@ def get_targets(s, offset):
       if subst_delim2pos < offset:
         raise ValueError("missing second delimiter %r at %s"
                          % (subst_delim, s[offset0:]))
-      subst_re = s[offset:subst_delim2pos]
+      subst_retext = s[offset:subst_delim2pos]
       offset = subst_delim2pos+1
       subst_delim3pos = s.find(subst_delim, offset)
       if subst_delim3pos < offset:
@@ -1043,8 +1043,10 @@ def get_targets(s, offset):
                          % (subst_delim, s[offset0:]))
       subst_replacement = s[offset:subst_delim3pos]
       offset = subst_delim3pos + 1
-      target = (subst_header, subst_re, subst_replacement)
-      X("FOUND %r:s/ %r / %r /", subst_header, subst_re, subst_replacement)
+      target = (subst_header, subst_retext, subst_replacement)
+      X("FOUND %r:s/ %r / %r /", subst_header, subst_retext, subst_replacement)
+      subst_re = re.compile(subst_retext)
+      target = Target_Substitution(header_name, subst_re, subst_replacement)
     # "quoted-string"
     elif s[offset] == '"':
       target, offset = get_qstr(s, offset)
@@ -1071,8 +1073,30 @@ def get_targets(s, offset):
       offset += 1
   return targets, offset
 
+class Target_Substitution(O):
+
+  def __init__(self, header_name, subst_re, subst_replacement):
+    self.header_name = header_name
+    self.subst_re = subst_re
+    self.subst_replacement = subst_replacement
+
+  def save(self, M):
+    old_value = M.get(self.header_name, '')
+    m = self.subst_re.search(old_value)
+    if m:
+      # named substitution values
+      env = m.groupdict()
+      # numbered substitution values
+      env_specials = { '0': m.group(0) }
+      for ndx, grp in enumerate(m.groups()):
+        env_specials[str(ndx+1)] = grp
+      new_value = get_qstr(self.subst_replacement, 0, q=None,
+                           environ=env, env_specials=env_specials)
+      X("%s ==> %s", self.subst_replacement, new_value)
+      modify_header(M, self.header_name, new_value)
+
 class _Condition(O):
-  
+
   def __init__(self, flags, header_names):
     self.flags = flags
     self.header_names = header_names
