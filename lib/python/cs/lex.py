@@ -6,7 +6,7 @@ from string import printable, whitespace, ascii_letters, ascii_uppercase, digits
 import re
 import sys
 import os
-from cs.py3 import unicode, ustr, sorted
+from cs.py3 import unicode, ustr, sorted, StringTypes
 ##from cs.logutils import X
 
 unhexify = binascii.unhexlify
@@ -561,15 +561,21 @@ def get_tokens(s, offset, getters):
       `getters`: an iterable of tokeniser specifications.
       Each tokeniser specification is either:
       - a callable expecting (s, offset) and returning (token, new_offset)
+      - a literal string, to be matched exactly
       - a sequence of (func, args, kwargs); call func(s, offset, *args, **kwargs)
         and receive (token, new_offset)
   '''
   tokens = []
   for getter in getters:
+    args = ()
+    kwargs = {}
     if callable(getter):
       func = getter
-      args = ()
-      kwargs = {}
+    elif isinstance(getter, StringTypes):
+      def func(s, offset):
+        if s.startswith(getter, offset):
+          return getter, offset + len(getter)
+        raise ValueError("string %r not found at offset %d" % (getter, offset))
     else:
       func, args, kwargs = getter
     token, offset = func(s, offset, *args, **kwargs)
