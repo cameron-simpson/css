@@ -554,6 +554,19 @@ def get_qstr(s, offset=0, q='"', environ=None, default=None, env_specials=None):
   getvar = partial(get_envvar, environ=environ, default=default, specials=env_specials)
   return get_sloshed_text(s, delim, offset, specials={ '$': getvar })
 
+def get_tokens(s, offset, getters):
+  ''' Parse the string `s` from position `offset` using the supplied tokenise functions `getters`; return the list of tokens matched and the final offset.
+      `s`: the string to parse.
+      `offset`: the starting position for the parse.
+      `getters`: an iterable of get_* functions which accept
+        (s,offset) as parameters and return (token,offset).
+  '''
+  tokens = []
+  for getter in getters:
+    token, offset = getter(s, offset)
+    tokens.append(token)
+  return tokens
+
 def isUC_(s):
   ''' Check that a string matches ^[A-Z][A-Z_0-9]*$.
   '''
