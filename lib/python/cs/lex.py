@@ -591,7 +591,7 @@ def get_tokens(s, offset, getters):
       raise ValueError("unsupported getter: %r" % (getter,))
     token, offset = func(s, offset, *args, **kwargs)
     tokens.append(token)
-  return tokens
+  return tokens, offset
 
 def isUC_(s):
   ''' Check that a string matches ^[A-Z][A-Z_0-9]*$.
