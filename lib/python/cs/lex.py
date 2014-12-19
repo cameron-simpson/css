@@ -562,8 +562,11 @@ def get_tokens(s, offset, getters):
       Each tokeniser specification is either:
       - a callable expecting (s, offset) and returning (token, new_offset)
       - a literal string, to be matched exactly
-      - a sequence of (func, args, kwargs); call func(s, offset, *args, **kwargs)
-        and receive (token, new_offset)
+      - a tuple or list with values (func, args, kwargs);
+        call func(s, offset, *args, **kwargs)
+      - an object with a .match method such as a regex;
+        call getter.match(s, offset) and return a match object with
+        a .end() method returning the offset of the end of the match
   '''
   tokens = []
   for getter in getters:
@@ -576,8 +579,16 @@ def get_tokens(s, offset, getters):
         if s.startswith(getter, offset):
           return getter, offset + len(getter)
         raise ValueError("string %r not found at offset %d" % (getter, offset))
-    else:
+    elif isinstance(getter, (tuple, list)):
       func, args, kwargs = getter
+    elif hasattr(getter, 'match'):
+      def func(s, offset):
+        m = getter.match(s, offset)
+        if m:
+          return m, m.end()
+        raise ValueError("no match for %s at offset %d" % (getter, offset))
+    else:
+      raise ValueError("unsupported getter: %r" % (getter,))
     token, offset = func(s, offset, *args, **kwargs)
     tokens.append(token)
   return tokens
