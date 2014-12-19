@@ -601,6 +601,16 @@ def get_tokens(s, offset, getters):
     tokens.append(token)
   return tokens, offset
 
+def match_tokens(s, offset, getters):
+  ''' Wrapper for get_tokens which catches ValueError exceptions and returns (None, offset).
+  '''
+  try:
+    tokens, offset2 = get_tokens(s, offset, getters)
+  except ValueError:
+    return None, offset
+  else:
+    return tokens, offset2
+
 def isUC_(s):
   ''' Check that a string matches ^[A-Z][A-Z_0-9]*$.
   '''
