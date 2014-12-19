@@ -558,12 +558,21 @@ def get_tokens(s, offset, getters):
   ''' Parse the string `s` from position `offset` using the supplied tokenise functions `getters`; return the list of tokens matched and the final offset.
       `s`: the string to parse.
       `offset`: the starting position for the parse.
-      `getters`: an iterable of get_* functions which accept
-        (s,offset) as parameters and return (token,offset).
+      `getters`: an iterable of tokeniser specifications.
+      Each tokeniser specification is either:
+      - a callable expecting (s, offset) and returning (token, new_offset)
+      - a sequence of (func, args, kwargs); call func(s, offset, *args, **kwargs)
+        and receive (token, new_offset)
   '''
   tokens = []
   for getter in getters:
-    token, offset = getter(s, offset)
+    if callable(getter):
+      func = getter
+      args = ()
+      kwargs = {}
+    else:
+      func, args, kwargs = getter
+    token, offset = func(s, offset, *args, **kwargs)
     tokens.append(token)
   return tokens
 
