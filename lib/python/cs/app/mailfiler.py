@@ -730,7 +730,8 @@ class MessageFiler(O):
     hmap['short_recipients'] = ",".join(self.maildb.header_shortlist(M, ('to', 'cc', 'bcc')))
     for h, hval in list(hmap.items()):
       hmap[h] = ustr(hval)
-    return u(fmt).format(**hmap)
+    msg = u(fmt).format(**hmap)
+    return msg
 
   def alert(self, alert_level, alert_message=None):
     ''' Issue an alert with the specified `alert_message`.
