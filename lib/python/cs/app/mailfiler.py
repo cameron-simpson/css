@@ -1176,12 +1176,12 @@ class Target_MailFolder(O):
       # save to Maildir
       mdir = Maildir(mailpath)
       maildir_flags = ''
-      if self.flags.draft:   maildir_flags += 'D'
-      if self.flags.flagged: maildir_flags += 'F'
-      if self.flags.passed:  maildir_flags += 'P'
-      if self.flags.replied: maildir_flags += 'R'
-      if self.flags.seen:    maildir_flags += 'S'
-      if self.flags.trashed: maildir_flags += 'T'
+      if filer.flags.draft:   maildir_flags += 'D'
+      if filer.flags.flagged: maildir_flags += 'F'
+      if filer.flags.passed:  maildir_flags += 'P'
+      if filer.flags.replied: maildir_flags += 'R'
+      if filer.flags.seen:    maildir_flags += 'S'
+      if filer.flags.trashed: maildir_flags += 'T'
       mdirpath = mdir.dir
       path = self.message_path
       if path is None:
@@ -1197,12 +1197,12 @@ class Target_MailFolder(O):
       # save to mbox
       status = ''
       x_status = ''
-      if self.flags.draft:   x_status += 'D'
-      if self.flags.flagged: x_status += 'F'
-      if self.flags.replied: status += 'R'
-      if self.flags.passed:  x_status += 'P'
-      if self.flags.seen:    x_status += 'S'
-      if self.flags.trashed: x_status += 'T'
+      if filer.flags.draft:   x_status += 'D'
+      if filer.flags.flagged: x_status += 'F'
+      if filer.flags.replied: status += 'R'
+      if filer.flags.passed:  x_status += 'P'
+      if filer.flags.seen:    x_status += 'S'
+      if filer.flags.trashed: x_status += 'T'
       if len(status) > 0:
         M['Status'] = status
       if len(x_status) > 0:
