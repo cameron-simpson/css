@@ -508,7 +508,7 @@ class MessageFiler(O):
         if '@' in default_save:
           self.save_to_addresses.append(default_save)
         else:
-          self.save_to_folders.append(default_save)
+          self.save_to_folders.append(self.resolve(default_save))
 
       # apply labels
       if self.labels:
