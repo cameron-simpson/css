@@ -1130,9 +1130,10 @@ class Target_Assign(O):
     self.varexpr = varexpr
 
   def save(self, filer):
+    varname = self.varname
     value = envsub(self.varexpr, filer.env)
     X("setenv %s %r", varname, value)
-    filer.env[varname] = value
+    filer.environ[varname] = value
 
 class Target_SetFlag(O):
 
