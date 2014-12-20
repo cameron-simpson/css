@@ -67,7 +67,7 @@ def modify_header(M, hdr, new_value, always=False):
   if always or old_value != new_value:
     modified = True
     old_hdr = 'X-Old-' + hdr
-    for old_value in M.get_all(hdr):
+    for old_value in M.get_all(hdr, ()):
       M.add_header("X-Old-" + hdr, old_value)
     del M[hdr]
     M[hdr] = new_value
