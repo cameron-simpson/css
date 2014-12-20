@@ -521,10 +521,7 @@ class MessageFiler(O):
                 warning("ignoring unsupported flag \"%s\"" % (flag_letter,))
             else:
               target = arg
-              if R.flags.undelivered:
-                self.targets_also.add(target)
-              else:
-                self.targets.add(target)
+              self.targets.add(target)
           elif action == 'ASSIGN':
             envvar, s = arg
             value = self.environ[envvar] = envsub(s, self.environ)
@@ -903,10 +900,9 @@ def parserules(fp):
         # new rule: gather targets and label
         R = Rule(filename=(filename if filename else file_label), lineno=lineno)
 
-        # leading optional '+' (continue, undelivered) or '=' (final)
+        # leading optional '+' (continue) or '=' (final)
         if line[offset] == '+':
           R.flags.halt = False
-          R.flags.undelivered = True
           offset += 1
         elif line[offset] == '=':
           R.flags.halt = True
@@ -1351,7 +1347,7 @@ class Rule(O):
     self.lineno = lineno
     self.conditions = slist()
     self.targets = []
-    self.flags = O(alert=0, halt=False, undelivered=False)
+    self.flags = O(alert=0, halt=False)
     self.label = ''
 
   @property
