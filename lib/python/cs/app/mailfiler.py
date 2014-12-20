@@ -506,33 +506,8 @@ class MessageFiler(O):
       if R.label:
         self.labels.add(R.label)
       for T in R.targets:
-        T.save(self)
         try:
-          if action == 'TARGET':
-            if len(arg) == 1 and arg.isupper():
-              flag_letter = arg
-              if flag_letter == 'D':   self.flags.draft = True
-              elif flag_letter == 'F': self.flags.flagged = True
-              elif flag_letter == 'P': self.flags.passed = True
-              elif flag_letter == 'R': self.flags.replied = True
-              elif flag_letter == 'S': self.flags.seen = True
-              elif flag_letter == 'T': self.flags.trashed = True
-              else:
-                warning("ignoring unsupported flag \"%s\"" % (flag_letter,))
-            else:
-              target = arg
-              self.targets.add(target)
-          elif action == 'ASSIGN':
-            envvar, s = arg
-            value = self.environ[envvar] = envsub(s, self.environ)
-            debug("ASSIGN %s=%s", envvar, value)
-            if envvar == 'LOGFILE':
-              warning("LOGFILE= unimplemented at present")
-              ## TODO: self.logto(value)
-            elif envvar == 'DEFAULT':
-              self.default_target = value
-          else:
-            raise RuntimeError("unimplemented action \"%s\"" % action)
+          T.save(self)
         except (AttributeError, NameError):
           raise
         except Exception as e:
@@ -1130,6 +1105,11 @@ class Target_Assign(O):
     value = envsub(self.varexpr, filer.env)
     X("setenv %s %r", varname, value)
     filer.environ[varname] = value
+    if varname == 'LOGFILE':
+      warning("LOGFILE= unimplemented at present")
+      ## TODO: self.logto(value)
+    elif varname == 'DEFAULT':
+      self.default_target = value
 
 class Target_SetFlag(O):
 
