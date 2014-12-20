@@ -554,7 +554,7 @@ class MessageFiler(O):
         self.labels.add(R.label)
       for T in R.targets:
         try:
-          T.save(self)
+          T.apply(self)
         except (AttributeError, NameError):
           raise
         except Exception as e:
@@ -1147,7 +1147,7 @@ class Target_Assign(O):
     self.varname = varname
     self.varexpr = varexpr
 
-  def save(self, filer):
+  def apply(self, filer):
     varname = self.varname
     value = envsub(self.varexpr, filer.environ)
     X("setenv %s %r", varname, value)
@@ -1155,8 +1155,6 @@ class Target_Assign(O):
     if varname == 'LOGFILE':
       warning("LOGFILE= unimplemented at present")
       ## TODO: self.logto(value)
-    elif varname == 'DEFAULT':
-      self.default_target = value
 
 class Target_SetFlag(O):
 
@@ -1171,7 +1169,7 @@ class Target_SetFlag(O):
       raise ValueError("unsupported flag \"%s\"" % (flag_letter,))
     self.flag_attr = flag_attr
 
-  def save(self, filer):
+  def apply(self, filer):
     setattr(filer.flags, self.flag_attr, True)
 
 class Target_Substitution(O):
@@ -1181,7 +1179,7 @@ class Target_Substitution(O):
     self.subst_re = subst_re
     self.subst_replacement = subst_replacement
 
-  def save(self, filer):
+  def apply(self, filer):
     M = filer.message
     old_value = M.get(self.header_name, '')
     m = self.subst_re.search(old_value)
@@ -1195,71 +1193,24 @@ class Target_Substitution(O):
       new_value = get_qstr(self.subst_replacement, 0, q=None,
                            environ=env, env_specials=env_specials)
       X("%s ==> %s", self.subst_replacement, new_value)
-      modify_header(M, self.header_name, new_value)
-      filer.message_path = None
+      filer.modify(self.header_name, new_value)
 
 class Target_MailAddress(O):
 
   def __init__(self, address):
     self.address = address
 
-  def save(self, filer):
-    # TODO: filer: do not send to same address more than once?
-    filer.sendmail(self.address)
-    filer.saved_to.append(self.address)
+  def apply(self, filer):
+    filer.save_to_addresses.append(self.address)
 
 class Target_MailFolder(O):
 
   def __init__(self, mailfolder):
     self.mailfolder = mailfolder
 
-  def save(self, filer):
-    # save message to Maildir or mbox
-    M = filer.message
+  def apply(self, filer):
     mailpath = filer.resolve(self.mailfolder)
-    if not os.path.exists(mailpath):
-      make_maildir(mailpath)
-    if ismaildir(mailpath):
-      # save to Maildir
-      mdir = Maildir(mailpath)
-      maildir_flags = ''
-      if filer.flags.draft:   maildir_flags += 'D'
-      if filer.flags.flagged: maildir_flags += 'F'
-      if filer.flags.passed:  maildir_flags += 'P'
-      if filer.flags.replied: maildir_flags += 'R'
-      if filer.flags.seen:    maildir_flags += 'S'
-      if filer.flags.trashed: maildir_flags += 'T'
-      mdirpath = mdir.dir
-      path = filer.message_path
-      if path is None:
-        savekey = mdir.save_message(M, flags=maildir_flags)
-      else:
-        savekey = mdir.save_filepath(path, flags=maildir_flags)
-      savepath = mdir.keypath(savekey)
-      if path is None:
-        # update saved message for hard linking
-        filer.message_path = savepath
-      info("    OK %s" % (shortpath(savepath)))
-    else:
-      # save to mbox
-      status = ''
-      x_status = ''
-      if filer.flags.draft:   x_status += 'D'
-      if filer.flags.flagged: x_status += 'F'
-      if filer.flags.replied: status += 'R'
-      if filer.flags.passed:  x_status += 'P'
-      if filer.flags.seen:    x_status += 'S'
-      if filer.flags.trashed: x_status += 'T'
-      if len(status) > 0:
-        M['Status'] = status
-      if len(x_status) > 0:
-        M['X-Status'] = x_status
-      text = M.as_string(True)
-      with open(mboxpath, "a") as mboxfp:
-        mboxfp.write(text)
-      info("    OK >> %s" % (shortpath(mboxpath)))
-    # record the target folder
-    filer.saved_to.append(mailpath)
+    filer.save_to_folders.append(mailpath)
 
 class _Condition(O):
 
