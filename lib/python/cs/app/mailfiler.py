@@ -1104,10 +1104,10 @@ def get_target(s, offset, forbid_quotes=False):
     offset = m.end()
     if '@' in target:
       T = Target_MailAddress(target)
-      X("EMAIL: %r: %s", target, T)
+      ##X("EMAIL: %r: %s", target, T)
     else:
       T = Target_MailFolder(target)
-      X("FOLDER: %r: %s", target, T)
+      ##X("FOLDER: %r: %s", target, T)
     return T, offset
 
   error("parse failure at %d: %s", offset, s)
