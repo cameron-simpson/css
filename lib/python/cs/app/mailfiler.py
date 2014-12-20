@@ -746,7 +746,7 @@ class MessageFiler(O):
       subargv.extend( ['-l', str(alert_level)] )
     # tell alert how to open this message
     # TODO: parameterise so that we can open it with other tools
-    if self.saved_to:
+    if self.save_to_folders:
       try:
         msg_id = self.message['message-id']
       except KeyError:
@@ -762,7 +762,7 @@ class MessageFiler(O):
                               'term',
                                '-e',
                                 'mutt-open-message',
-                                 '-f', self.saved_to[0], msg_id,
+                                 '-f', self.save_to_folders[0], msg_id,
                              '--'] )
     subargv.append(alert_message)
     xit = subprocess.call(subargv)
