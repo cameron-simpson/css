@@ -784,6 +784,8 @@ re_HEADERNAME_LIST_PREFIX_s = re_HEADERNAME_LIST_s + ':'
 re_HEADER_SUBST_s = r'(%s):s([^a-z0-9_])'
 # identifier
 re_IDENTIFIER_s = r'[a-z]\w+'
+# dotted identifier (dots optional)
+re_DOTTED_IDENTIFIER_s = r'%s(\.%s)*' % (re_IDENTIFIER_s, re_IDENTIFIER_s)
 # identifier=
 re_ASSIGN_s = r'(%s)=' % (re_IDENTIFIER_s,)
 
@@ -833,6 +835,7 @@ re_GROUPorDOM_LIST = re.compile(re_GROUPorDOM_LIST_s)
 re_HEADER_SUBST = re.compile(re_HEADER_SUBST_s, re.I)
 re_UNQWORD = re.compile(re_UNQWORD_s)
 re_HEADERNAME = re.compile(re_HEADERNAME_s, re.I)
+re_DOTTED_IDENTIFIER = re.compile(re_DOTTED_IDENTIFIER_s, re.I)
 
 def parserules(fp):
   ''' Read rules from `fp`, yield Rules.
