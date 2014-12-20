@@ -889,7 +889,7 @@ def parserules(fp):
           offset += 1
 
         # targets
-        Ts, offset = get_targets(line, 0)
+        Ts, offset = get_targets(line, offset)
         R.targets.extend(Ts)
         _, offset = get_white(line, offset)
         if offset >= len(line):
