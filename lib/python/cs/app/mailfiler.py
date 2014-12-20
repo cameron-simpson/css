@@ -63,7 +63,7 @@ def main(argv, stdin=None):
       -R rules_pattern
           Specify the rules file pattern used to specify rules files from Maildir names.
           Default: %s
-    %s save target <message'''
+    %s save target[,target...] <message'''
             % (cmd, DEFAULT_RULES_PATTERN, cmd)
           )
   badopts = False
@@ -117,7 +117,7 @@ def main(argv, stdin=None):
           warning("missing target")
           badopts = True
         else:
-          target = argv.pop(0)
+          targets = argv.pop(0)
           if argv:
             warning("extra arguments after target: %r", argv)
             badopts = True
@@ -141,7 +141,7 @@ def main(argv, stdin=None):
         mdirpaths = None
       return MF.monitor(mdirpaths, delay=delay, justone=justone, no_remove=no_remove)
     if op == 'save':
-      return MF.save(target, sys.stdin)
+      return MF.save(targets, sys.stdin)
     raise RuntimeError("unimplemented op")
 
   return 0
@@ -360,13 +360,18 @@ class MailFiler(O):
           info("filtered %d messages (%d skipped) in %5.3fs",
                nmsgs, skipped, all_keys_time.elapsed)
 
-  def save(self, target, msgfp):
+  def save(self, targets, msgfp):
     ''' Implementation for command line "save" function: save file to target.
     '''
+    Ts, offset = get_targets(targets, 0)
+    if offset != len(targets):
+      raise ValueError("invalid target specifications: %r", targets)
     filer = MessageFiler(self)
     filer.message = message_from_file(msgfp)
     filer.message_path = None
-    filer.save_target(target)
+    for T in Ts:
+      T.apply(filer)
+    filer.save_message()
     return 0
 
   def file_wmdir_key(self, wmdir, key):
@@ -519,32 +524,34 @@ class MessageFiler(O):
           self.labels.update(new_labels)
           self.modify('X-Label', ', '.join( sorted(list(self.labels)) ))
 
-      ok = True
+      return self.save_message()
 
-      # save message to folders
-      for folder in self.save_to_folders:
-        with Pfx(folder):
-          try:
-            folderpath = self.resolve(folder)
-            save_to_folderpath(folderpath, self.message, self.message_path, self.flags)
-          except Exception as e:
-            exception("saving to folder %r: %s", folder, e)
-            ok = False
-
-      # forward message
-      for address in self.save_to_addresses:
-        with Pfx(folder):
-          try:
-            self.sendmail(address, self.M, self.message_path)
-          except Exception as e:
-            exception("forwarding to address %r: %s", folder, e)
-            ok = False
-
-      # issue arrival alert
-      if self.flags.alert > 0:
-        self.alert(self.flags.alert)
-
-      return ok
+  def save_message(self):
+    ''' Perform the message save step based on the current filer state.
+        This is separated out to support the command line "save target" operation.
+    '''
+    ok = True
+    # save message to folders
+    for folder in self.save_to_folders:
+      with Pfx(folder):
+        try:
+          folderpath = self.resolve(folder)
+          save_to_folderpath(folderpath, self.message, self.message_path, self.flags)
+        except Exception as e:
+          exception("saving to folder %r: %s", folder, e)
+          ok = False
+    # forward message
+    for address in self.save_to_addresses:
+      with Pfx(folder):
+        try:
+          self.sendmail(address, self.M, self.message_path)
+        except Exception as e:
+          exception("forwarding to address %r: %s", folder, e)
+          ok = False
+    # issue arrival alert
+    if self.flags.alert > 0:
+      self.alert(self.flags.alert)
+    return ok
 
   def modify(self, hdr, new_value, always=False):
     ''' Modify the value of the named header `hdr` to the new value `new_value` using cs.mailutils.modify_header.
