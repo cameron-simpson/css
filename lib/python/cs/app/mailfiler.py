@@ -771,8 +771,12 @@ class MessageFiler(O):
       warning("non-zero exit from alert: %d", xit)
     return xit
 
-# non-whitespace no containing a comma
-re_UNQWORD_s = r'[^,\s]+'
+# quoted string
+re_QSTR_s = r'"([^"]|\\.)*"'
+# non-whitespace not containing a comma or a quote mark
+re_UNQWORD_s = r'[^,"\s]+'
+# non-negative integer
+re_NUMBER_s = r'0|[1-9][0-9]*'
 # non-alphanumeric/non-white
 re_NONALNUMWSP_s = r'[^a-z0-9_\s]'
 # header-name
@@ -821,6 +825,11 @@ re_INGROUPorDOM_s = ( r'\(\s*%s(\s*\|\s*%s)*\s*\)'
 re_INGROUPorDOM = re.compile( re_INGROUPorDOM_s, re.I)
 re_INGROUP = re.compile( re_INGROUP_s, re.I)
 
+# simple argument shorthand (GROUPNAME|@domain|number|"qstr")
+re_ARG_s = r'(%s|%s|%s|%s)' % (re_GROUPNAME_s, re_atDOM_s, re_NUMBER_s, re_QSTR_s)
+# simple commas separated list of ARGs
+re_ARGLIST_s = r'%s(,%s)*' % (re_ARG_s, re_ARG_s)
+
 # header[,header,...].func(
 re_HEADERFUNCTION_s = r'(%s(,%s)*)\.(%s)\(' % (re_HEADERNAME_s, re_HEADERNAME_s, re_WORD_s)
 re_HEADERFUNCTION = re.compile(re_HEADERFUNCTION_s, re.I)
@@ -836,6 +845,7 @@ re_HEADER_SUBST = re.compile(re_HEADER_SUBST_s, re.I)
 re_UNQWORD = re.compile(re_UNQWORD_s)
 re_HEADERNAME = re.compile(re_HEADERNAME_s, re.I)
 re_DOTTED_IDENTIFIER = re.compile(re_DOTTED_IDENTIFIER_s, re.I)
+re_ARGLIST = re.compile(re_ARGLIST_s)
 
 def parserules(fp):
   ''' Read rules from `fp`, yield Rules.
