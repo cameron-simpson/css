@@ -1169,7 +1169,7 @@ class Target_MailFolder(O):
   def save(self, filer):
     # save message to Maildir or mbox
     M = filer.message
-    mailpath = filer.resolve(target)
+    mailpath = filer.resolve(self.mailfolder)
     if not os.path.exists(mailpath):
       make_maildir(mailpath)
     if ismaildir(mailpath):
