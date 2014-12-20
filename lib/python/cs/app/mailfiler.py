@@ -1102,7 +1102,7 @@ class Target_Assign(O):
 
   def save(self, filer):
     varname = self.varname
-    value = envsub(self.varexpr, filer.env)
+    value = envsub(self.varexpr, filer.environ)
     X("setenv %s %r", varname, value)
     filer.environ[varname] = value
     if varname == 'LOGFILE':
