@@ -38,10 +38,8 @@ if sys.hexversion < 0x03000000:
   input = raw_input
 
   _sorted = sorted
-  def sorted(iterable, key=None, reversed=False):
-    if key is None:
-      key = lambda x: x
-    return _sorted(iterable, cmp, key, reversed)
+  def sorted(iterable, key=None, reverse=False):
+    return _sorted(iterable, None, key, reverse)
 
 else:
 

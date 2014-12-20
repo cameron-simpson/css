@@ -114,7 +114,7 @@ def O_merge(o, _conflict=None, _overwrite=False, **kw):
       to resolve the conflict. If _conflict is omitted or None
       then the new value overwrites the old if _overwrite is true.
   '''
-  for attr, value in kw.iteritems():
+  for attr, value in kw.items():
     if not len(attr) or not attr[0].isalpha():
       if not attr.startswith('_O_'):
         warning(".%s: ignoring, does not start with a letter", attr)
@@ -165,7 +165,7 @@ def O_str(o, no_recurse=False, seen=None):
   if t in (tuple,int,float,bool,list):
     return str(o)
   if t is dict:
-    o2 = dict( [ (k, str(v)) for k, v in o.iteritems() ] )
+    o2 = dict( [ (k, str(v)) for k, v in o.items() ] )
     return str(o2)
   if t is set:
     return 'set(%s)' % (','.join(sorted([ str(item) for item in o])))

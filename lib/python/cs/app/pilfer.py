@@ -1506,7 +1506,7 @@ def action_sight(func_name, action, offset):
   if offset < len(action):
     if action[offset] != ':':
       raise ValueError("bad marker after %r, expected ':', found %r", func_name, action[offset])
-    seensets, offset = get_other_chars(action, ':', offset+1)
+    seensets, offset = get_other_chars(action, offset+1, ':')
     seensets = seensets.split(',')
     if not seensets:
       seensets = ('_',)

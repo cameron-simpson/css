@@ -56,6 +56,8 @@ The following indicators may preceed, in order, the targets:
 The "targets" is a comma separated list of mail destinations;
 a target takes the form of a sequence of nonwhitespace non-comma
 characters, or a string value in double quotes.
+Note that a shell command in quotes will need any backslashes doubled,
+as the quoted string parse strips one level of backslash escaping.
 
 =head4 Message Flags
 
@@ -81,7 +83,7 @@ Otherwise, a target containing an "at" symbol ('@') is considered
 an email address to which to send a copy of the message.
 If the mail system accepts the message it is considered to have been dispatched successfully.
 
-=head4 Deliver to Maildir
+=head4 Deliver to Mail Folder
 
 Otherwise, a target is considered to indicate a Maildir or a UNIX mbox
 into which the message should be placed.
