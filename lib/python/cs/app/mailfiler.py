@@ -845,6 +845,7 @@ re_HEADER_SUBST = re.compile(re_HEADER_SUBST_s, re.I)
 re_UNQWORD = re.compile(re_UNQWORD_s)
 re_HEADERNAME = re.compile(re_HEADERNAME_s, re.I)
 re_DOTTED_IDENTIFIER = re.compile(re_DOTTED_IDENTIFIER_s, re.I)
+re_ARG = re.compile(re_ARG_s)
 re_ARGLIST = re.compile(re_ARGLIST_s)
 
 def parserules(fp):
@@ -1096,6 +1097,36 @@ def get_target(s, offset, forbid_quotes=False):
     T = Target_Substitution(header_name, subst_re, replacement)
     X("SUBST: %s ~ s/%s/%s/: %s", header_name, subst_re, replacement, T)
     return T, offset4
+
+  # headers:func([args...])
+  tokens, offset2 = match_tokens(s, offset0,
+                                 ( re_DOTTED_IDENTIFIER,
+                                   '(',
+                                   re_ARGLIST,
+                                   ')'
+                                 ))
+  if tokens:
+    m_funcname, openbr, m_arglist, closebr = tokens
+    funcname = m_funcname.group()
+    arglist = m_arglist.group()
+    args = []
+    arglist_offset = 0
+    while True:
+      m = re_ARG.match(arglist, arglist_offset)
+      if not m:
+        raise ValueError("BUG: arglist %r did not match re_ARG (%s)" % (arglist[arglist_offset:], re_ARG))
+      arglist_offset = m.end()
+      args.append(arg)
+      if arglist_offset >= len(arglist):
+        break
+      if arglist[arglist_offset] != ',':
+        raise ValueError("BUG: expected comma at %r" % (arglist[arglist_offset:],))
+      arglist_offset += 1
+      # allow trailing comma
+      if arglist_offset >= len(arglist):
+        break
+    T = Target_Function(funcname, args)
+    return T, offset2
 
   # +headers(groups)
   tokens, offset2 = match_tokens(s, offset0,
