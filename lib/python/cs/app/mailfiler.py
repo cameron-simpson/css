@@ -1183,7 +1183,7 @@ class Target_MailFolder(O):
       if filer.flags.seen:    maildir_flags += 'S'
       if filer.flags.trashed: maildir_flags += 'T'
       mdirpath = mdir.dir
-      path = self.message_path
+      path = filer.message_path
       if path is None:
         savekey = mdir.save_message(M, flags=flags)
       else:
@@ -1191,7 +1191,7 @@ class Target_MailFolder(O):
       savepath = mdir.keypath(savekey)
       if path is None:
         # update saved message for hard linking
-        self.message_path = savepath
+        filer.message_path = savepath
       info("    OK %s" % (shortpath(savepath)))
     else:
       # save to mbox
