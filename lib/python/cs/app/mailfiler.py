@@ -1185,9 +1185,9 @@ class Target_MailFolder(O):
       mdirpath = mdir.dir
       path = filer.message_path
       if path is None:
-        savekey = mdir.save_message(M, flags=flags)
+        savekey = mdir.save_message(M, flags=maildir_flags)
       else:
-        savekey = mdir.save_filepath(path, flags=flags)
+        savekey = mdir.save_filepath(path, flags=maildir_flags)
       savepath = mdir.keypath(savekey)
       if path is None:
         # update saved message for hard linking
