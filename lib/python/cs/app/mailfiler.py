@@ -725,7 +725,8 @@ class MessageFiler(O):
     if subj:
       hmap['subject'] = subj
     for hdr in ('from', 'to', 'cc', 'bcc', 'reply-to'):
-      hmap['short_'+hdr.replace('-', '_')] = ",".join(self.maildb.header_shortlist(M, (hdr,)))
+      shortnames = self.maildb.header_shortlist(M, (hdr,))
+      hmap['short_'+hdr.replace('-', '_')] = ",".join(shortnames)
     hmap['short_recipients'] = ",".join(self.maildb.header_shortlist(M, ('to', 'cc', 'bcc')))
     for h, hval in list(hmap.items()):
       hmap[h] = ustr(hval)
