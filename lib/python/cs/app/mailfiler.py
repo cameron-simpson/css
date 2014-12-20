@@ -199,6 +199,7 @@ class MailFiler(O):
     ''' Compute maildb path on the fly.
     '''
     return current_value('MAILDB', self.cfg, 'maildb', DEFAULT_MAILDB_PATH, self.environ)
+
   @maildb_path.setter
   @locked
   def maildb_path(self, path):
@@ -1017,7 +1018,6 @@ def get_targets(s, offset):
 def get_target(s, offset, forbid_quotes=False):
   ''' Parse a single target specification from a string; return Target and new offset.
   '''
-  ##X("get_target(%r)...", s[offset:])
   offset0 = offset
   # varname=expr
   m = re_ASSIGN.match(s, offset)
