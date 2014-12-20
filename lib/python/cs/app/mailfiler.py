@@ -396,6 +396,53 @@ def resolve_mail_path(mdirpath, maildir_root):
       mdirpath = os.path.join(maildir_root, mdirpath)
   return mdirpath
 
+def save_to_folderpath(folderpath, M, message_path, flags):
+  ''' Save the Message `M` to the resolved `folderpath`.
+      `message_path`: pathname of existing message file, allowing hardlinking to new maildir if not None
+      `flags`: save flags as from MessageFiler.flags
+  '''
+  if not os.path.exists(folderpath):
+    make_maildir(folderpath)
+  if ismaildir(folderpath):
+    # save to Maildir
+    mdir = Maildir(folderpath)
+    maildir_flags = ''
+    if flags.draft:   maildir_flags += 'D'
+    if flags.flagged: maildir_flags += 'F'
+    if flags.passed:  maildir_flags += 'P'
+    if flags.replied: maildir_flags += 'R'
+    if flags.seen:    maildir_flags += 'S'
+    if flags.trashed: maildir_flags += 'T'
+    mdirpath = mdir.dir
+    if message_path is None:
+      savekey = mdir.save_message(M, flags=maildir_flags)
+    else:
+      savekey = mdir.save_filepath(message_path, flags=maildir_flags)
+    savepath = mdir.keypath(savekey)
+    info("    OK %s" % (shortpath(savepath)))
+    if message_path is None:
+      # update saved message for hard linking
+      message_path = savepath
+  else:
+    # save to mbox
+    status = ''
+    x_status = ''
+    if flags.draft:   x_status += 'D'
+    if flags.flagged: x_status += 'F'
+    if flags.replied: status += 'R'
+    if flags.passed:  x_status += 'P'
+    if flags.seen:    x_status += 'S'
+    if flags.trashed: x_status += 'T'
+    if len(status) > 0:
+      M['Status'] = status
+    if len(x_status) > 0:
+      M['X-Status'] = x_status
+    text = M.as_string(True)
+    with open(folderpath, "a") as mboxfp:
+      mboxfp.write(text)
+    info("    OK >> %s" % (shortpath(folderpath)))
+  return message_path
+
 class MessageFiler(O):
   ''' A message filing object, filtering state information used during rule evaluation.
       .maildb   Current MailDB.
