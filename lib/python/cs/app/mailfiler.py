@@ -28,7 +28,9 @@ import cs.env
 from cs.env import envsub
 from cs.fileutils import abspath_from_file, file_property, files_property, \
                          longpath, Pathname
-from cs.lex import get_white, get_nonwhite, get_qstr, unrfc2047
+import cs.lex
+from cs.lex import get_white, get_nonwhite, get_other_chars, get_qstr, \
+                   unrfc2047, match_tokens, get_delimited
 from cs.logutils import Pfx, setup_logging, with_log, \
                         debug, info, warning, error, exception, \
                         D, X, LogTime
@@ -503,7 +505,8 @@ class MessageFiler(O):
       self.flags.alert = max(self.flags.alert, R.flags.alert)
       if R.label:
         self.labels.add(R.label)
-      for action, arg in R.actions:
+      for T in R.targets:
+        T.save(self)
         try:
           if action == 'TARGET':
             if len(arg) == 1 and arg.isupper():
@@ -662,34 +665,6 @@ class MessageFiler(O):
         debug("%s.GROUPs.update(%r)", msgid, group_names)
         raise RuntimeError("need to pull addresses from hdr and add to address groups")
 
-  def save_to_maildir(self, mdir, flags=''):
-    ''' Save the current message to a Maildir unless we have already saved to
-        this maildir.
-    '''
-    mdirpath = mdir.dir
-    M = self.message
-    path = self.message_path
-    if path is None:
-      savekey = mdir.save_message(M, flags=flags)
-    else:
-      savekey = mdir.save_filepath(path, flags=flags)
-    savepath = mdir.keypath(savekey)
-    if not path:
-      self.message_path = savepath
-    info("    OK %s" % (shortpath(savepath)))
-    return savepath
-
-  def save_to_mbox(self, mboxpath, status, x_status):
-    M = self.message
-    if len(status) > 0:
-      M['Status'] = status
-    if len(x_status) > 0:
-      M['X-Status'] = x_status
-    text = M.as_string(True)
-    with open(mboxpath, "a") as mboxfp:
-      mboxfp.write(text)
-    info("    OK >> %s" % (shortpath(mboxpath)))
-
   def process_environ(self):
     ''' Compute the environment for a subprocess.
     '''
@@ -804,38 +779,68 @@ class MessageFiler(O):
       warning("non-zero exit from alert: %d", xit)
     return xit
 
-re_UNQWORD = re.compile(r'[^,\s]+')
-
+# non-whitespace no containing a comma
+re_UNQWORD_s = r'[^,\s]+'
+# non-alphanumeric/non-white
+re_NONALNUMWSP_s = r'[^a-z0-9_\s]'
+# header-name
+re_HEADERNAME_s = r'[a-z][\-a-z0-9]*'
 # header[,header,...]:
-re_HEADERLIST = re.compile(r'([a-z][\-a-z0-9]*(,[a-z][\-a-z0-9]*)*):', re.I)
-
+re_HEADERNAME_LIST_s = r'(%s(,%s)*)' % (re_HEADERNAME_s, re_HEADERNAME_s)
+re_HEADERNAME_LIST_PREFIX_s = re_HEADERNAME_LIST_s + ':'
 # header:s/
-re_HEADER_SUBST = re.compile(r'([a-z][\-a-z0-9]*):s([^a-z0-9])', re.I)
-
+re_HEADER_SUBST_s = r'(%s):s([^a-z0-9_])'
+# identifier
+re_IDENTIFIER_s = r'[a-z]\w+'
 # identifier=
-re_ASSIGN = re.compile(r'([a-z]\w+)=', re.I)
+re_ASSIGN_s = r'(%s)=' % (re_IDENTIFIER_s,)
 
 # group membership test: (A|B|C|...)
 # where A may be a WORD or @domain
 # indicating an address group name or an address ending in @domain
-re_WORD_s = '[a-z]\w+'
-re_atDOM_s = '@[-\w]+(\.[-\w]+)+'
-re_WORD_or_DOM_s = '(%s|%s)' % (re_WORD_s, re_atDOM_s)
-re_INGROUP_s = r'\(\s*%s(\s*\|\s*%s)*\s*\)' % (re_WORD_or_DOM_s,
-                                               re_WORD_or_DOM_s)
-## print("re_INGROUP = %r" % (re_INGROUP_s), file=sys.stderr)
-re_INGROUP = re.compile( re_INGROUP_s, re.I)
 
-re_HEADERNAME_s = r'[a-z][\-a-z0-9]*'
+# identifier
+re_WORD_s = '[a-z]\w+'
+
+# GROUPNAME
+re_GROUPNAME_s = '[A-Z][A-Z0-9_]+'
+
+# @domain
+re_atDOM_s = '@[-\w]+(\.[-\w]+)+'
+
+# GROUPNAME or @domain
+re_GROUPNAMEorDOM_s = '(%s|%s)' % (re_GROUPNAME_s, re_atDOM_s)
+
+# comma separated list of GROUPNAME or @domain
+re_GROUPorDOM_LIST_s = r'%s(,%s)*' % (re_GROUPNAMEorDOM_s, re_GROUPNAMEorDOM_s)
+
+# (GROUP[|GROUP...])
+re_INGROUP_s = ( r'\(\s*%s(\s*\|\s*%s)*\s*\)'
+                 % (re_GROUPNAME_s, re_GROUPNAME_s)
+               )
+
+# (GROUPorDOM[|GROUPorDOM...])
+re_INGROUPorDOM_s = ( r'\(\s*%s(\s*\|\s*%s)*\s*\)'
+                      % (re_GROUPNAMEorDOM_s, re_GROUPNAMEorDOM_s)
+                    )
+
+re_INGROUPorDOM = re.compile( re_INGROUPorDOM_s, re.I)
+re_INGROUP = re.compile( re_INGROUP_s, re.I)
 
 # header[,header,...].func(
 re_HEADERFUNCTION_s = r'(%s(,%s)*)\.(%s)\(' % (re_HEADERNAME_s, re_HEADERNAME_s, re_WORD_s)
 re_HEADERFUNCTION = re.compile(re_HEADERFUNCTION_s, re.I)
 
-# target syntax: add header values to named groups
-# +header(group|...)
-re_ADDHEADER_s = r'\+(%s)(%s)' % (re_HEADERNAME_s, re_INGROUP_s)
-re_ADDHEADER = re.compile(re_ADDHEADER_s, re.I)
+#############################
+# final regexps directly used
+re_NONALNUMWSP = re.compile(re_NONALNUMWSP_s, re.I)
+re_ASSIGN = re.compile(re_ASSIGN_s, re.I)
+re_HEADERNAME_LIST = re.compile(re_HEADERNAME_LIST_s, re.I)
+re_HEADERNAME_LIST_PREFIX = re.compile(re_HEADERNAME_LIST_PREFIX_s, re.I)
+re_GROUPorDOM_LIST = re.compile(re_GROUPorDOM_LIST_s)
+re_HEADER_SUBST = re.compile(re_HEADER_SUBST_s, re.I)
+re_UNQWORD = re.compile(re_UNQWORD_s)
+re_HEADERNAME = re.compile(re_HEADERNAME_s, re.I)
 
 def parserules(fp):
   ''' Read rules from `fp`, yield Rules.
@@ -872,14 +877,15 @@ def parserules(fp):
       if not line:
         continue
 
+      # check for leading whitespace (continuation line)
       _, offset = get_white(line, 0)
       if not _:
-        # new rule
+        # text at start of line ==> new rule
         # yield old rule if in progress
         if R:
           yield R
           R = None
-
+        # < includes only match at the start of a line
         if line[offset] == '<':
           # include another categories file
           _, offset = get_white(line, offset+1)
@@ -894,16 +900,8 @@ def parserules(fp):
           for R in parserules(subfilename):
             yield R
           continue
-
-        # new rule
+        # new rule: gather targets and label
         R = Rule(filename=(filename if filename else file_label), lineno=lineno)
-
-        m = re_ASSIGN.match(line, offset)
-        if m:
-          R.actions.append( ('ASSIGN', (m.group(1), line[m.end():])) )
-          yield R
-          R = None
-          continue
 
         # leading optional '+' (continue, undelivered) or '=' (final)
         if line[offset] == '+':
@@ -919,30 +917,29 @@ def parserules(fp):
           R.flags.alert += 1
           offset += 1
 
-        targets, offset = get_targets(line, offset)
-        for target in targets:
-          R.actions.append( ('TARGET', target) )
-
-        # gather label
+        # targets
+        Ts, offset = get_targets(line, 0)
+        R.targets.extend(Ts)
         _, offset = get_white(line, offset)
-        if not _ or offset == len(line):
-          R.label = ''
-          warning("no label or condition")
+        if offset >= len(line):
+          # no label; end line parse
           continue
-        if line[offset] == '"':
-          label, offset = get_qstr(line, offset)
-        else:
-          label, offset = get_nonwhite(line, offset)
+
+        # label
+        label, offset = get_nonwhite(line, offset)
         if label == '.':
           label = ''
         R.label = label
         _, offset = get_white(line, offset)
+        if offset >= len(line):
+          # no condition; end line parse
+          continue
 
-      # condition
+      # parse condition and add to current rule
       condition_flags = O(invert=False)
 
-      if not _ or offset == len(line):
-        warning('no condition')
+      if line[offset:] == '.':
+        # placeholder for no condition
         continue
 
       if line[offset] == '!':
@@ -951,10 +948,6 @@ def parserules(fp):
         if offset == len(line):
           warning('no condition after "!"')
           continue
-
-      # . always matches - don't bother storing it as a test
-      if line[offset:] == '.':
-        continue
 
       # leading hdr1,hdr2.func(
       m = re_HEADERFUNCTION.match(line, offset)
@@ -979,7 +972,7 @@ def parserules(fp):
         C = Condition_HeaderFunction(condition_flags, header_names, testfuncname, test_string)
       else:
         # leading hdr1,hdr2,...:
-        m = re_HEADERLIST.match(line, offset)
+        m = re_HEADERNAME_LIST_PREFIX.match(line, offset)
         if m:
           header_names = tuple( H.lower() for H in m.group(1).split(',') if H )
           offset = m.end()
@@ -1025,53 +1018,137 @@ def get_targets(s, offset):
   targets = []
   while offset < len(s) and not s[offset].isspace():
     offset0 = offset
-    # header:s/this/that/
-    m = re_HEADER_SUBST.match(s, offset)
-    if m:
-      subst_header = m.group(1)
-      subst_delim = m.group(2)
-      offset = m.end()
-      subst_delim2pos = s.find(subst_delim, offset)
-      if subst_delim2pos < offset:
-        raise ValueError("missing second delimiter %r at %s"
-                         % (subst_delim, s[offset0:]))
-      subst_retext = s[offset:subst_delim2pos]
-      offset = subst_delim2pos+1
-      subst_delim3pos = s.find(subst_delim, offset)
-      if subst_delim3pos < offset:
-        raise ValueError("missing third delimiter %r at %s"
-                         % (subst_delim, s[offset0:]))
-      subst_replacement = s[offset:subst_delim3pos]
-      offset = subst_delim3pos + 1
-      target = (subst_header, subst_retext, subst_replacement)
-      X("FOUND %r:s/ %r / %r /", subst_header, subst_retext, subst_replacement)
-      subst_re = re.compile(subst_retext)
-      target = Target_Substitution(header_name, subst_re, subst_replacement)
-    # "quoted-string"
-    elif s[offset] == '"':
-      target, offset = get_qstr(s, offset)
-    # +header(groups)
-    elif s[offset] == '+':
-      m = re_ADDHEADER.match(s, offset)
-      if m:
-        target = m.group()
-        offset = m.end()
-      else:
-        error("parse failure, expected +header(groups) at %d: %s", offset, s)
-        raise ValueError("syntax error")
-    else:
-      # unquoted word
-      m = re_UNQWORD.match(s, offset)
-      if m:
-        target = m.group()
-        offset = m.end()
-      else:
-        error("parse failure at %d: %s", offset, s)
-        raise ValueError("syntax error")
-    targets.append(target)
+    T, offset = get_target(s, offset)
+    targets.append(T)
     if offset < len(s) and s[offset] == ',':
       offset += 1
   return targets, offset
+
+def get_target(s, offset, forbid_quotes=False):
+  ''' Parse a single target specification from a string; return Target and new offset.
+  '''
+  ##X("get_target(%r)...", s[offset:])
+  offset0 = offset
+  # varname=expr
+  m = re_ASSIGN.match(s, offset)
+  if m:
+    varname = m.group(1)
+    offset = m.end()
+    if offset >= len(s):
+      varexpr = ''
+    elif s[offset] == '"':
+      varexpr, offset = get_qstr(s, offset)
+    else:
+      varexpr, offset = get_other_chars(s, offset, cs.lex.whitespace + ',')
+    T = Target_Assign(varname, varexpr)
+    X("ASSIGN: %s=%r: %s", varname, varexpr, T)
+    return T, offset
+
+  # F -- flag
+  flag_letter = s[offset]
+  offset1 = offset + 1
+  if ( flag_letter.isupper()
+        and (offset1 == len(s) or s[offset1] == ',' or s[offset1].isspace())
+     ):
+    T = Target_SetFlag(flag_letter)
+    X("SETFLAG: %s ==> %s: %s", flag_letter, T.flag_attr, T)
+    return T, offset1
+
+  # "quoted-target-specification"
+  if not forbid_quotes and s.startswith('"'):
+    s2, offset = get_qstr(s, offset0)
+    # reparse inner string
+    T, offset2 = get_target(s2, 0, forbid_quotes=True)
+    s3 = s2[offset:].lstrip()
+    if s3:
+      qs = s[offset0:offset]
+      raise ValueError("unparsed content from %s: %r" % (qs, s3))
+    X("QUOTED: %s", T)
+    return T, offset2
+
+  # header:s/this/that/
+  tokens, offset2 = match_tokens(s, offset0,
+                                 (re_HEADERNAME, ':s', re_NONALNUMWSP))
+  if tokens:
+    m_header_name, marker, m_delim = tokens
+    header_name = m_header_name.group()
+    delim = m_delim.group()
+    regexp, offset3 = get_delimited(s, offset2, delim)
+    replacement, offset4 = get_delimited(s, offset3, delim)
+    subst_re = re.compile(regexp)
+    T = Target_Substitution(header_name, subst_re, replacement)
+    X("SUBST: %s ~ s/%s/%s/: %s", header_name, subst_re, replacement, T)
+    return T, offset4
+
+  # s/this/that/ -- modify subject:
+  tokens, offset2 = match_tokens(s, offset0,
+                                 ('s', re_NONALNUMWSP))
+  if tokens:
+    header_name = 'subject'
+    marker, m_delim = tokens
+    delim = m_delim.group()
+    regexp, offset3 = get_delimited(s, offset2, delim)
+    replacement, offset4 = get_delimited(s, offset3, delim)
+    subst_re = re.compile(regexp)
+    T = Target_Substitution(header_name, subst_re, replacement)
+    X("SUBST: %s ~ s/%s/%s/: %s", header_name, subst_re, replacement, T)
+    return T, offset4
+
+  # +headers(groups)
+  tokens, offset2 = match_tokens(s, offset0,
+                                 ( '+',
+                                   re_HEADERNAME_LIST,
+                                   re_GROUPorDOM_LIST))
+  if tokens:
+    marker, m_header_names, m_grouplist = tokens
+    header_names = m_header_names.group().split(',')
+    group_names = m_grouplist.group().split('|')
+    T = Target_AddHeaderAddresses(header_names, group_names)
+    X("ADDHDR: +%r(%r): %s", header_names, group_names, T)
+    return T, offset2
+
+  # unquoted word: email address or mail folder
+  m = re_UNQWORD.match(s, offset)
+  if m:
+    target = m.group()
+    offset = m.end()
+    if '@' in target:
+      T = Target_MailAddress(target)
+      X("EMAIL: %r: %s", target, T)
+    else:
+      T = Target_MailFolder(target)
+      X("FOLDER: %r: %s", target, T)
+    return T, offset
+
+  error("parse failure at %d: %s", offset, s)
+  raise ValueError("syntax error")
+
+class Target_Assign(O):
+
+  def __init__(self, varname, varexpr):
+    self.varname = varname
+    self.varexpr = varexpr
+
+  def save(self, filer):
+    value = envsub(self.varexpr, filer.env)
+    X("setenv %s %r", varname, value)
+    filer.env[varname] = value
+
+class Target_SetFlag(O):
+
+  def __init__(self, flag_letter):
+    if flag_letter == 'D':   flag_attr = 'draft'
+    elif flag_letter == 'F': flag_attr = 'flagged'
+    elif flag_letter == 'P': flag_attr = 'passed'
+    elif flag_letter == 'R': flag_attr = 'replied'
+    elif flag_letter == 'S': flag_attr = 'seen'
+    elif flag_letter == 'T': flag_attr = 'trashed'
+    else:
+      raise ValueError("unsupported flag \"%s\"" % (flag_letter,))
+    self.flag_attr = flag_attr
+
+  def save(self, filer):
+    setattr(filer.flags, self.flag_attr, True)
 
 class Target_Substitution(O):
 
@@ -1080,7 +1157,8 @@ class Target_Substitution(O):
     self.subst_re = subst_re
     self.subst_replacement = subst_replacement
 
-  def save(self, M):
+  def save(self, filer):
+    M = filer.message
     old_value = M.get(self.header_name, '')
     m = self.subst_re.search(old_value)
     if m:
@@ -1094,6 +1172,70 @@ class Target_Substitution(O):
                            environ=env, env_specials=env_specials)
       X("%s ==> %s", self.subst_replacement, new_value)
       modify_header(M, self.header_name, new_value)
+      filer.message_path = None
+
+class Target_MailAddress(O):
+
+  def __init__(self, address):
+    self.address = address
+
+  def save(self, filer):
+    # TODO: filer: do not send to same address more than once?
+    filer.sendmail(self.address)
+    filer.saved_to.append(self.address)
+
+class Target_MailFolder(O):
+
+  def __init__(self, mailfolder):
+    self.mailfolder = mailfolder
+
+  def save(self, filer):
+    # save message to Maildir or mbox
+    M = filer.message
+    mailpath = filer.resolve(target)
+    if not os.path.exists(mailpath):
+      make_maildir(mailpath)
+    if ismaildir(mailpath):
+      # save to Maildir
+      mdir = Maildir(mailpath)
+      maildir_flags = ''
+      if self.flags.draft:   maildir_flags += 'D'
+      if self.flags.flagged: maildir_flags += 'F'
+      if self.flags.passed:  maildir_flags += 'P'
+      if self.flags.replied: maildir_flags += 'R'
+      if self.flags.seen:    maildir_flags += 'S'
+      if self.flags.trashed: maildir_flags += 'T'
+      mdirpath = mdir.dir
+      path = self.message_path
+      if path is None:
+        savekey = mdir.save_message(M, flags=flags)
+      else:
+        savekey = mdir.save_filepath(path, flags=flags)
+      savepath = mdir.keypath(savekey)
+      if path is None:
+        # update saved message for hard linking
+        self.message_path = savepath
+      info("    OK %s" % (shortpath(savepath)))
+    else:
+      # save to mbox
+      status = ''
+      x_status = ''
+      if self.flags.draft:   x_status += 'D'
+      if self.flags.flagged: x_status += 'F'
+      if self.flags.replied: status += 'R'
+      if self.flags.passed:  x_status += 'P'
+      if self.flags.seen:    x_status += 'S'
+      if self.flags.trashed: x_status += 'T'
+      if len(status) > 0:
+        M['Status'] = status
+      if len(x_status) > 0:
+        M['X-Status'] = x_status
+      text = M.as_string(True)
+      with open(mboxpath, "a") as mboxfp:
+        mboxfp.write(text)
+      info("    OK >> %s" % (shortpath(mboxpath)))
+    # record the target folder
+    filer.saved_to.append(mailpath)
 
 class _Condition(O):
 
@@ -1207,7 +1349,7 @@ class Rule(O):
     self.filename = filename
     self.lineno = lineno
     self.conditions = slist()
-    self.actions = slist()
+    self.targets = []
     self.flags = O(alert=0, halt=False, undelivered=False)
     self.label = ''
 
