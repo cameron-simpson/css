@@ -199,6 +199,7 @@ class MailFiler(O):
     ''' Compute maildb path on the fly.
     '''
     return current_value('MAILDB', self.cfg, 'maildb', DEFAULT_MAILDB_PATH, self.environ)
+
   @maildb_path.setter
   @locked
   def maildb_path(self, path):
@@ -508,7 +509,7 @@ class MessageFiler(O):
         if '@' in default_save:
           self.save_to_addresses.append(default_save)
         else:
-          self.save_to_folders.append(default_save)
+          self.save_to_folders.append(self.resolve(default_save))
 
       # apply labels
       if self.labels:
@@ -725,11 +726,13 @@ class MessageFiler(O):
     if subj:
       hmap['subject'] = subj
     for hdr in ('from', 'to', 'cc', 'bcc', 'reply-to'):
-      hmap['short_'+hdr.replace('-', '_')] = ",".join(self.maildb.header_shortlist(M, (hdr,)))
+      shortnames = self.maildb.header_shortlist(M, (hdr,))
+      hmap['short_'+hdr.replace('-', '_')] = ",".join(shortnames)
     hmap['short_recipients'] = ",".join(self.maildb.header_shortlist(M, ('to', 'cc', 'bcc')))
     for h, hval in list(hmap.items()):
       hmap[h] = ustr(hval)
-    return u(fmt).format(**hmap)
+    msg = u(fmt).format(**hmap)
+    return msg
 
   def alert(self, alert_level, alert_message=None):
     ''' Issue an alert with the specified `alert_message`.
@@ -744,7 +747,7 @@ class MessageFiler(O):
       subargv.extend( ['-l', str(alert_level)] )
     # tell alert how to open this message
     # TODO: parameterise so that we can open it with other tools
-    if self.saved_to:
+    if self.save_to_folders:
       try:
         msg_id = self.message['message-id']
       except KeyError:
@@ -760,7 +763,7 @@ class MessageFiler(O):
                               'term',
                                '-e',
                                 'mutt-open-message',
-                                 '-f', self.saved_to[0], msg_id,
+                                 '-f', self.save_to_folders[0], msg_id,
                              '--'] )
     subargv.append(alert_message)
     xit = subprocess.call(subargv)
@@ -979,7 +982,7 @@ def parserules(fp):
           C = Condition_Regexp(condition_flags, header_names, atstart, regexp)
         else:
           # headers:(group[|group...])
-          m = re_INGROUP.match(line, offset)
+          m = re_INGROUPorDOM.match(line, offset)
           if m:
             group_names = set( w.strip().lower() for w in m.group()[1:-1].split('|') )
             offset = m.end()
@@ -1015,7 +1018,6 @@ def get_targets(s, offset):
 def get_target(s, offset, forbid_quotes=False):
   ''' Parse a single target specification from a string; return Target and new offset.
   '''
-  ##X("get_target(%r)...", s[offset:])
   offset0 = offset
   # varname=expr
   m = re_ASSIGN.match(s, offset)
