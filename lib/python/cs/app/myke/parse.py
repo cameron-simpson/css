@@ -624,7 +624,7 @@ def parseMacroExpression(context, text=None, offset=0, stopchars=''):
         permutations.append(wh)
     else:
       # non-white, non-macro
-      plain, offset = get_other_chars(text, stopchars+'$'+whitespace, offset)
+      plain, offset = get_other_chars(text, offset, stopchars+'$'+whitespace)
       if plain:
         permutations.append(plain)
       else:
