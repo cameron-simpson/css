@@ -981,7 +981,7 @@ def parserules(fp):
           C = Condition_Regexp(condition_flags, header_names, atstart, regexp)
         else:
           # headers:(group[|group...])
-          m = re_INGROUP.match(line, offset)
+          m = re_INGROUPorDOM.match(line, offset)
           if m:
             group_names = set( w.strip().lower() for w in m.group()[1:-1].split('|') )
             offset = m.end()
