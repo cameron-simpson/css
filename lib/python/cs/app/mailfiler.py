@@ -616,56 +616,6 @@ class MessageFiler(O):
   def MAILDIR(self):
     return self.env('MAILDIR', os.path.join(self.env('HOME', None), 'mail'))
 
-  def save_target(self, target):
-    with Pfx("%s", target):
-      if target.startswith('|'):
-        # pipe message to shell command
-        # NB: let the shell do the environment substitution, not us
-        shcmd = target[1:]
-        return self.save_to_pipe(['/bin/sh', '-xc', shcmd])
-
-      if target.startswith('+'):
-        # add header field values to groups
-        m = re_ADDHEADER.match(target)
-        if not m:
-          error("match failure of re_ADDHEADER against %r", target)
-          return None
-        hdr = m.group(1)
-        group_names = m.group(2).split(',')
-        return self.save_header(hdr, group_names)
-
-      target = envsub(target, self.process_environ())
-      if '@' in target:
-        # send message to email address
-        return self.sendmail(target)
-      else:
-        # save message to Maildir or mbox
-        mailpath = self.resolve(target)
-        if not os.path.exists(mailpath):
-          make_maildir(mailpath)
-        # record the target folder
-        self.saved_to.append(mailpath)
-        if ismaildir(mailpath):
-          mdir = Maildir(mailpath)
-          maildir_flags = ''
-          if self.flags.draft:   maildir_flags += 'D'
-          if self.flags.flagged: maildir_flags += 'F'
-          if self.flags.passed:  maildir_flags += 'P'
-          if self.flags.replied: maildir_flags += 'R'
-          if self.flags.seen:    maildir_flags += 'S'
-          if self.flags.trashed: maildir_flags += 'T'
-          return self.save_to_maildir(mdir,
-                                      flags=maildir_flags)
-        status = ''
-        x_status = ''
-        if self.flags.draft:   x_status += 'D'
-        if self.flags.flagged: x_status += 'F'
-        if self.flags.replied: status += 'R'
-        if self.flags.passed:  x_status += 'P'
-        if self.flags.seen:    x_status += 'S'
-        if self.flags.trashed: x_status += 'T'
-        return self.save_to_mbox(mailpath, status, x_status)
-
   def save_header(self, hdr, group_names):
     ''' Update maildb or msgiddb from message header.
         If a message-id type header, get the msgiddb node for each
