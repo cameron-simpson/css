@@ -461,16 +461,14 @@ class MessageFiler(O):
     if environ is None:
       environ = dict(context.environ)
     self.header_addresses = {}
-    self.default_target = None
     self.context = context
     self.environ = dict(environ)
-    self.targets = set()
-    self.targets_also = set()
     self.labels = set()
     self.flags = O(alert=0,
                    flagged=False, passed=False, replied=False,
                    seen=False, trashed=False, draft=False)
-    self.saved_to = []
+    self.save_to_folders = []
+    self.save_to_addresses = []
 
   def file(self, M, rules, message_path=None):
     ''' File the specified message `M` according to the supplied `rules`.
@@ -489,24 +487,25 @@ class MessageFiler(O):
       if self.message_path:
         info("  " + shortpath(self.message_path))
 
+      # match the rules, gathering labels and save destinations
       try:
         rules.match(self)
       except Exception as e:
         exception("matching rules: %s", e)
         return False
 
-      ok = True
-      if not self.targets:
-        if self.default_target:
-          self.targets.add(self.default_target)
+      # use default destination if no save destinations chosen
+      if not self.save_to_folders and not self.save_to_addresses:
+        default_save = self.env('DEFAULT', '')
+        if not default_save:
+          error("no matching targets and no $DEFAULT")
+          return False
+        if '@' in default_save:
+          self.save_to_addresses.append(default_save)
         else:
-          error("no matching targets and no DEFAULT")
-          ok = False
+          self.save_to_folders.append(default_save)
 
-      self.targets.update(self.targets_also)
-      if not self.targets:
-        return False
-
+      # apply labels
       if self.labels:
         xlabels = set()
         for labelhdr in M.get_all('X-Label', ()):
@@ -520,14 +519,28 @@ class MessageFiler(O):
           self.labels.update(new_labels)
           self.modify('X-Label', ', '.join( sorted(list(self.labels)) ))
 
-      for target in sorted(list(self.targets)):
-        with Pfx(target):
+      ok = True
+
+      # save message to folders
+      for folder in self.save_to_folders:
+        with Pfx(folder):
           try:
-            self.save_target(target)
+            folderpath = self.resolve(folder)
+            save_to_folderpath(folderpath, self.message, self.message_path, self.flags)
           except Exception as e:
-            exception("saving to %r: %s", target, e)
+            exception("saving to folder %r: %s", folder, e)
             ok = False
 
+      # forward message
+      for address in self.save_to_addresses:
+        with Pfx(folder):
+          try:
+            self.sendmail(address, self.M, self.message_path)
+          except Exception as e:
+            exception("forwarding to address %r: %s", folder, e)
+            ok = False
+
+      # issue arrival alert
       if self.flags.alert > 0:
         self.alert(self.flags.alert)
 
