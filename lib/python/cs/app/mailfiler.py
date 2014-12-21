@@ -835,7 +835,7 @@ re_INGROUP = re.compile( re_INGROUP_s, re.I)
 # simple argument shorthand (GROUPNAME|@domain|number|"qstr")
 re_ARG_s = r'(%s|%s|%s|%s)' % (re_GROUPNAME_s, re_atDOM_s, re_NUMBER_s, re_QSTR_s)
 # simple commas separated list of ARGs
-re_ARGLIST_s = r'%s(,%s)*' % (re_ARG_s, re_ARG_s)
+re_ARGLIST_s = r'(%s(,%s)*)?' % (re_ARG_s, re_ARG_s)
 
 # header[,header,...].func(
 re_HEADERFUNCTION_s = r'(%s(,%s)*)\.(%s)\(' % (re_HEADERNAME_s, re_HEADERNAME_s, re_WORD_s)
@@ -1040,8 +1040,9 @@ def get_target(s, offset, forbid_quotes=False):
   ''' Parse a single target specification from a string; return Target and new offset.
   '''
   offset0 = offset
+
   # varname=expr
-  m = re_ASSIGN.match(s, offset)
+  m = re_ASSIGN.match(s, offset0)
   if m:
     varname = m.group(1)
     offset = m.end()
@@ -1052,73 +1053,80 @@ def get_target(s, offset, forbid_quotes=False):
     else:
       varexpr, offset = get_other_chars(s, offset, cs.lex.whitespace + ',')
     T = Target_Assign(varname, varexpr)
-    X("ASSIGN: %s=%r: %s", varname, varexpr, T)
     return T, offset
 
   # F -- flag
-  flag_letter = s[offset]
-  offset1 = offset + 1
+  flag_letter = s[offset0]
+  offset = offset + 1
   if ( flag_letter.isupper()
-        and (offset1 == len(s) or s[offset1] == ',' or s[offset1].isspace())
+        and (offset == len(s) or s[offset] == ',' or s[offset].isspace())
      ):
     T = Target_SetFlag(flag_letter)
-    X("SETFLAG: %s ==> %s: %s", flag_letter, T.flag_attr, T)
-    return T, offset1
+    return T, offset
 
   # "quoted-target-specification"
   if not forbid_quotes and s.startswith('"'):
     s2, offset = get_qstr(s, offset0)
     # reparse inner string
     T, offset2 = get_target(s2, 0, forbid_quotes=True)
-    s3 = s2[offset:].lstrip()
+    # check for complete parse
+    s3 = s2[offset2:].lstrip()
     if s3:
       qs = s[offset0:offset]
       raise ValueError("unparsed content from %s: %r" % (qs, s3))
-    X("QUOTED: %s", T)
-    return T, offset2
+    return T, offset
 
   # header:s/this/that/
-  tokens, offset2 = match_tokens(s, offset0,
-                                 (re_HEADERNAME, ':s', re_NONALNUMWSP))
+  tokens, offset = match_tokens(s, offset0,
+                                (re_HEADERNAME, ':s', re_NONALNUMWSP))
   if tokens:
     m_header_name, marker, m_delim = tokens
     header_name = m_header_name.group()
     delim = m_delim.group()
-    regexp, offset3 = get_delimited(s, offset2, delim)
-    replacement, offset4 = get_delimited(s, offset3, delim)
+    regexp, offset = get_delimited(s, offset, delim)
+    replacement, offset = get_delimited(s, offset, delim)
     subst_re = re.compile(regexp)
     T = Target_Substitution(header_name, subst_re, replacement)
-    X("SUBST: %s ~ s/%s/%s/: %s", header_name, subst_re, replacement, T)
-    return T, offset4
+    return T, offset
 
   # s/this/that/ -- modify subject:
-  tokens, offset2 = match_tokens(s, offset0,
+  tokens, offset = match_tokens(s, offset0,
                                  ('s', re_NONALNUMWSP))
   if tokens:
     header_name = 'subject'
     marker, m_delim = tokens
     delim = m_delim.group()
-    regexp, offset3 = get_delimited(s, offset2, delim)
-    replacement, offset4 = get_delimited(s, offset3, delim)
+    regexp, offset = get_delimited(s, offset, delim)
+    replacement, offset = get_delimited(s, offset, delim)
     subst_re = re.compile(regexp)
     T = Target_Substitution(header_name, subst_re, replacement)
-    X("SUBST: %s ~ s/%s/%s/: %s", header_name, subst_re, replacement, T)
-    return T, offset4
+    return T, offset
 
   # headers:func([args...])
-  tokens, offset2 = match_tokens(s, offset0,
-                                 ( re_DOTTED_IDENTIFIER,
-                                   '(',
-                                   re_ARGLIST,
-                                   ')'
-                                 ))
+  tokens, offset = match_tokens(s, offset0,
+                                ( re_HEADERNAME_LIST,
+                                  ':',
+                                  re_DOTTED_IDENTIFIER,
+                                ))
   if tokens:
-    m_funcname, openbr, m_arglist, closebr = tokens
+    m_headers, colon, m_funcname = tokens
+    # check for optional (arg,...)
+    if offset < len(s) and s[offset] == '(':
+      m_arglist = re_ARGLIST.match(s, offset+1)
+      if not m_arglist:
+        raise ValueError("expected argument list at %r" % (s[offset+1:],))
+      offset = m_arglist.end()
+      if offset >= len(s) or s[offset] != ')':
+        raise ValueError("expected closing parenthesis at %r" % (s[offset:],))
+      offset += 1
+      arglist = m_arglist.group()
+    else:
+      arglist = ()
+    header_names = m_headers.group().split(',')
     funcname = m_funcname.group()
-    arglist = m_arglist.group()
     args = []
     arglist_offset = 0
-    while True:
+    while arglist_offset < len(arglist):
       m = re_ARG.match(arglist, arglist_offset)
       if not m:
         raise ValueError("BUG: arglist %r did not match re_ARG (%s)" % (arglist[arglist_offset:], re_ARG))
@@ -1132,8 +1140,8 @@ def get_target(s, offset, forbid_quotes=False):
       # allow trailing comma
       if arglist_offset >= len(arglist):
         break
-    T = Target_Function(funcname, args)
-    return T, offset2
+    T = Target_Function(header_names, funcname, args)
+    return T, offset
 
   # +headers(groups)
   tokens, offset2 = match_tokens(s, offset0,
@@ -1149,16 +1157,14 @@ def get_target(s, offset, forbid_quotes=False):
     return T, offset2
 
   # unquoted word: email address or mail folder
-  m = re_UNQWORD.match(s, offset)
+  m = re_UNQWORD.match(s, offset0)
   if m:
     target = m.group()
     offset = m.end()
     if '@' in target:
       T = Target_MailAddress(target)
-      ##X("EMAIL: %r: %s", target, T)
     else:
       T = Target_MailFolder(target)
-      ##X("FOLDER: %r: %s", target, T)
     return T, offset
 
   error("parse failure at %d: %s", offset, s)
