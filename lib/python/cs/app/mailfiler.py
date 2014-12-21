@@ -38,6 +38,7 @@ from cs.mailutils import Maildir, message_addresses, modify_header, shortpath, i
 from cs.obj import O, slist
 from cs.threads import locked, locked_property
 from cs.app.maildb import MailDB
+from cs.py.modules import import_module_name
 from cs.py3 import unicode as u, StringTypes, ustr
 
 DEFAULT_MAIN_LOG = 'mailfiler/main.log'
@@ -276,8 +277,8 @@ class MailFiler(O):
 
   def monitor(self, folders, delay=None, justone=False, no_remove=False):
     ''' Monitor the specified `folders`, a list of folder spcifications.
-	If `delay` is not None, poll the folders repeatedly with a
-	delay of `delay` seconds between each pass.
+        If `delay` is not None, poll the folders repeatedly with a
+        delay of `delay` seconds between each pass.
     '''
     X("monitor: self.cfg=%s", self.cfg)
     X("maildb_path=%r", self.maildb_path)
@@ -404,7 +405,8 @@ def resolve_mail_path(mdirpath, maildir_root):
 
 def save_to_folderpath(folderpath, M, message_path, flags):
   ''' Save the Message `M` to the resolved `folderpath`.
-      `message_path`: pathname of existing message file, allowing hardlinking to new maildir if not None
+      `message_path`: pathname of existing message file, allowing
+        hardlinking to new maildir if not None
       `flags`: save flags as from MessageFiler.flags
   '''
   if not os.path.exists(folderpath):
@@ -475,6 +477,7 @@ class MessageFiler(O):
                    seen=False, trashed=False, draft=False)
     self.save_to_folders = []
     self.save_to_addresses = []
+    self.save_to_cmds = []
 
   def file(self, M, rules, message_path=None):
     ''' File the specified message `M` according to the supplied `rules`.
@@ -501,7 +504,9 @@ class MessageFiler(O):
         return False
 
       # use default destination if no save destinations chosen
-      if not self.save_to_folders and not self.save_to_addresses:
+      if not self.save_to_folders \
+      and not self.save_to_addresses \
+      and not self.save_to_cmd:
         default_save = self.env('DEFAULT', '')
         if not default_save:
           error("no matching targets and no $DEFAULT")
@@ -564,9 +569,7 @@ class MessageFiler(O):
   def apply_rule(self, R):
     ''' Apply this the rule `R` to this MessageFiler.
         The rule label, if any, is appended to the .labels attribute.
-        Each action is applied to the state.
-        Assignments update the .environ attribute.
-        Targets accrue in the .targets attribute.
+        Each target is applied to the state.
     '''
     M = self.message
     with Pfx(R.context):
@@ -637,23 +640,29 @@ class MessageFiler(O):
   def MAILDIR(self):
     return self.env('MAILDIR', os.path.join(self.env('HOME', None), 'mail'))
 
-  def save_header(self, hdr, group_names):
-    ''' Update maildb or msgiddb from message header.
-        If a message-id type header, get the msgiddb node for each
-        id and add the `group_names` to its GROUP field.
-        Otherwise, extract all the addresses from the specified
-        header and add to the maildb groups named by `group_names`.
+  def learn_header_addresses(self, header_names, *group_names):
+    ''' Update maildb groups with addresses from message headers.
+        Extract all the addresses from the specified
+        headers and add to the maildb groups named by `group_names`.
     '''
-    with Pfx("save_header(%s, %r)", hdr, group_names):
-      if hdr in ('message-id', 'references', 'in-reply-to'):
-        msgids = self.message[hdr].split()
-        for msgid in msgids:
-          debug("%s.GROUPs.update(%r)", msgid, group_names)
-          msgid_node = self.msgiddb.make( ('MESSAGE_ID', msgid) )
-          msgid_node.GROUPs.update(group_names)
-      else:
+    with Pfx("save_header_addresses(%r, %r)", header_names, group_names):
+      self.maildb.importAddresses_from_message(self.message,
+                                               group_names,
+                                               header_names=header_names)
+
+  def learn_message_ids(self, header_names, *group_names):
+    ''' Update msgiddb groups with message-ids from message headers.
+    '''
+    with Pfx("save_message_ids(%r, %r)", header_names, group_names):
+      M = self.message
+      msgids = set()
+      for header_name in header_names:
+        for hdr_body in M.get-all(header_name, ()):
+          msgids.update(hdr_body.split())
+      for msgid in sorted(msgids):
         debug("%s.GROUPs.update(%r)", msgid, group_names)
-        raise RuntimeError("need to pull addresses from hdr and add to address groups")
+        msgid_node = self.msgiddb.make( ('MESSAGE_ID', msgid) )
+        msgid_node.GROUPs.update(group_names)
 
   def process_environ(self):
     ''' Compute the environment for a subprocess.
@@ -771,8 +780,12 @@ class MessageFiler(O):
       warning("non-zero exit from alert: %d", xit)
     return xit
 
-# non-whitespace no containing a comma
-re_UNQWORD_s = r'[^,\s]+'
+# quoted string
+re_QSTR_s = r'"([^"]|\\.)*"'
+# non-whitespace not containing a comma or a quote mark
+re_UNQWORD_s = r'[^,"\s]+'
+# non-negative integer
+re_NUMBER_s = r'0|[1-9][0-9]*'
 # non-alphanumeric/non-white
 re_NONALNUMWSP_s = r'[^a-z0-9_\s]'
 # header-name
@@ -784,6 +797,8 @@ re_HEADERNAME_LIST_PREFIX_s = re_HEADERNAME_LIST_s + ':'
 re_HEADER_SUBST_s = r'(%s):s([^a-z0-9_])'
 # identifier
 re_IDENTIFIER_s = r'[a-z]\w+'
+# dotted identifier (dots optional)
+re_DOTTED_IDENTIFIER_s = r'%s(\.%s)*' % (re_IDENTIFIER_s, re_IDENTIFIER_s)
 # identifier=
 re_ASSIGN_s = r'(%s)=' % (re_IDENTIFIER_s,)
 
@@ -819,6 +834,11 @@ re_INGROUPorDOM_s = ( r'\(\s*%s(\s*\|\s*%s)*\s*\)'
 re_INGROUPorDOM = re.compile( re_INGROUPorDOM_s, re.I)
 re_INGROUP = re.compile( re_INGROUP_s, re.I)
 
+# simple argument shorthand (GROUPNAME|@domain|number|"qstr")
+re_ARG_s = r'(%s|%s|%s|%s)' % (re_GROUPNAME_s, re_atDOM_s, re_NUMBER_s, re_QSTR_s)
+# simple commas separated list of ARGs
+re_ARGLIST_s = r'(%s(,%s)*)?' % (re_ARG_s, re_ARG_s)
+
 # header[,header,...].func(
 re_HEADERFUNCTION_s = r'(%s(,%s)*)\.(%s)\(' % (re_HEADERNAME_s, re_HEADERNAME_s, re_WORD_s)
 re_HEADERFUNCTION = re.compile(re_HEADERFUNCTION_s, re.I)
@@ -833,6 +853,9 @@ re_GROUPorDOM_LIST = re.compile(re_GROUPorDOM_LIST_s)
 re_HEADER_SUBST = re.compile(re_HEADER_SUBST_s, re.I)
 re_UNQWORD = re.compile(re_UNQWORD_s)
 re_HEADERNAME = re.compile(re_HEADERNAME_s, re.I)
+re_DOTTED_IDENTIFIER = re.compile(re_DOTTED_IDENTIFIER_s, re.I)
+re_ARG = re.compile(re_ARG_s)
+re_ARGLIST = re.compile(re_ARGLIST_s)
 
 def parserules(fp):
   ''' Read rules from `fp`, yield Rules.
@@ -1015,12 +1038,27 @@ def get_targets(s, offset):
       offset += 1
   return targets, offset
 
-def get_target(s, offset, forbid_quotes=False):
+def get_target(s, offset, quoted=False):
   ''' Parse a single target specification from a string; return Target and new offset.
+      `quoted`: already inside quoted: do not expect comma or
+        whitespace to end the target specification
   '''
   offset0 = offset
+
+  # "quoted-target-specification"
+  if not quoted and s.startswith('"', offset0):
+    s2, offset = get_qstr(s, offset0)
+    # reparse inner string
+    T, offset2 = get_target(s2, 0, quoted=True)
+    # check for complete parse
+    s3 = s2[offset2:].lstrip()
+    if s3:
+      qs = s[offset0:offset]
+      raise ValueError("unparsed content from %s: %r" % (qs, s3))
+    return T, offset
+
   # varname=expr
-  m = re_ASSIGN.match(s, offset)
+  m = re_ASSIGN.match(s, offset0)
   if m:
     varname = m.group(1)
     offset = m.end()
@@ -1029,85 +1067,111 @@ def get_target(s, offset, forbid_quotes=False):
     elif s[offset] == '"':
       varexpr, offset = get_qstr(s, offset)
     else:
-      varexpr, offset = get_other_chars(s, offset, cs.lex.whitespace + ',')
+      if quoted:
+        varexpr = s[offset:]
+        offset = len(s)
+      else:
+        varexpr, offset = get_other_chars(s, offset, cs.lex.whitespace+',')
     T = Target_Assign(varname, varexpr)
-    X("ASSIGN: %s=%r: %s", varname, varexpr, T)
     return T, offset
 
   # F -- flag
-  flag_letter = s[offset]
-  offset1 = offset + 1
+  flag_letter = s[offset0]
+  offset = offset + 1
   if ( flag_letter.isupper()
-        and (offset1 == len(s) or s[offset1] == ',' or s[offset1].isspace())
+        and ( offset == len(s)
+           or ( not quoted and ( s[offset] == ',' or s[offset].isspace() ) )
+            )
      ):
     T = Target_SetFlag(flag_letter)
-    X("SETFLAG: %s ==> %s: %s", flag_letter, T.flag_attr, T)
-    return T, offset1
+    return T, offset
 
-  # "quoted-target-specification"
-  if not forbid_quotes and s.startswith('"'):
-    s2, offset = get_qstr(s, offset0)
-    # reparse inner string
-    T, offset2 = get_target(s2, 0, forbid_quotes=True)
-    s3 = s2[offset:].lstrip()
-    if s3:
-      qs = s[offset0:offset]
-      raise ValueError("unparsed content from %s: %r" % (qs, s3))
-    X("QUOTED: %s", T)
-    return T, offset2
+  # |shcmd
+  if s.startswith('|', offset0):
+    if quoted:
+      shcmd = s[offset+1:]
+      offset = len(s)
+    else:
+      shcmd, offset = get_other_chars(s, offset, cs.lex.whitespace+',')
+    T = Target_PipeLine(shcmd)
+    return T, offset
 
   # header:s/this/that/
-  tokens, offset2 = match_tokens(s, offset0,
-                                 (re_HEADERNAME, ':s', re_NONALNUMWSP))
+  tokens, offset = match_tokens(s, offset0,
+                                (re_HEADERNAME, ':s', re_NONALNUMWSP))
   if tokens:
     m_header_name, marker, m_delim = tokens
     header_name = m_header_name.group()
     delim = m_delim.group()
-    regexp, offset3 = get_delimited(s, offset2, delim)
-    replacement, offset4 = get_delimited(s, offset3, delim)
+    regexp, offset = get_delimited(s, offset, delim)
+    replacement, offset = get_delimited(s, offset, delim)
     subst_re = re.compile(regexp)
     T = Target_Substitution(header_name, subst_re, replacement)
-    X("SUBST: %s ~ s/%s/%s/: %s", header_name, subst_re, replacement, T)
-    return T, offset4
+    return T, offset
 
   # s/this/that/ -- modify subject:
-  tokens, offset2 = match_tokens(s, offset0,
+  tokens, offset = match_tokens(s, offset0,
                                  ('s', re_NONALNUMWSP))
   if tokens:
     header_name = 'subject'
     marker, m_delim = tokens
     delim = m_delim.group()
-    regexp, offset3 = get_delimited(s, offset2, delim)
-    replacement, offset4 = get_delimited(s, offset3, delim)
+    regexp, offset = get_delimited(s, offset, delim)
+    replacement, offset = get_delimited(s, offset, delim)
     subst_re = re.compile(regexp)
     T = Target_Substitution(header_name, subst_re, replacement)
-    X("SUBST: %s ~ s/%s/%s/: %s", header_name, subst_re, replacement, T)
-    return T, offset4
+    return T, offset
 
-  # +headers(groups)
-  tokens, offset2 = match_tokens(s, offset0,
-                                 ( '+',
-                                   re_HEADERNAME_LIST,
-                                   re_GROUPorDOM_LIST))
+  # headers:func([args...])
+  tokens, offset = match_tokens(s, offset0,
+                                ( re_HEADERNAME_LIST,
+                                  ':',
+                                  re_DOTTED_IDENTIFIER,
+                                ))
   if tokens:
-    marker, m_header_names, m_grouplist = tokens
-    header_names = m_header_names.group().split(',')
-    group_names = m_grouplist.group().split('|')
-    T = Target_AddHeaderAddresses(header_names, group_names)
-    X("ADDHDR: +%r(%r): %s", header_names, group_names, T)
-    return T, offset2
+    m_headers, colon, m_funcname = tokens
+    # check for optional (arg,...)
+    if offset < len(s) and s[offset] == '(':
+      m_arglist = re_ARGLIST.match(s, offset+1)
+      if not m_arglist:
+        raise ValueError("expected argument list at %r" % (s[offset+1:],))
+      offset = m_arglist.end()
+      if offset >= len(s) or s[offset] != ')':
+        raise ValueError("expected closing parenthesis at %r" % (s[offset:],))
+      offset += 1
+      arglist = m_arglist.group()
+    else:
+      arglist = ()
+    header_names = m_headers.group().split(',')
+    funcname = m_funcname.group()
+    args = []
+    arglist_offset = 0
+    while arglist_offset < len(arglist):
+      m = re_ARG.match(arglist, arglist_offset)
+      if not m:
+        raise ValueError("BUG: arglist %r did not match re_ARG (%s)" % (arglist[arglist_offset:], re_ARG))
+      arglist_offset = m.end()
+      args.append(arg)
+      if arglist_offset >= len(arglist):
+        break
+      if arglist[arglist_offset] != ',':
+        raise ValueError("BUG: expected comma at %r" % (arglist[arglist_offset:],))
+      arglist_offset += 1
+      # allow trailing comma
+      if arglist_offset >= len(arglist):
+        break
+    T = Target_Function(header_names, funcname, args)
+    return T, offset
 
   # unquoted word: email address or mail folder
-  m = re_UNQWORD.match(s, offset)
+  m = re_UNQWORD.match(s, offset0)
   if m:
     target = m.group()
     offset = m.end()
     if '@' in target:
       T = Target_MailAddress(target)
-      X("EMAIL: %r: %s", target, T)
     else:
       T = Target_MailFolder(target)
-      X("FOLDER: %r: %s", target, T)
     return T, offset
 
   error("parse failure at %d: %s", offset, s)
@@ -1166,6 +1230,53 @@ class Target_Substitution(O):
                            environ=env, env_specials=env_specials)
       X("%s ==> %s", self.subst_replacement, new_value)
       filer.modify(self.header_name, new_value)
+
+class Target_Function(O):
+
+  def __init__(self, header_names, funcname, args):
+    self.header_names = header_names
+    self.funcname = funcname
+    self.args = args
+
+  def apply(self, filer):
+    if '.' in self.funcname:
+      module_name, func_name = self.funcname.rsplit('.', 1)
+      func = import_module_name(module_name, func_name)
+      if func is None:
+        raise ValueError("no function %r in module %r" % (func_name, module_name))
+      func = partial(func, filer)
+    elif self.funcname == 'learn_addresses':
+      func = filer.learn_header_addresses
+    elif self.funcname == 'learn_message_ids':
+      func = filer.learn_message_ids
+    else:
+      raise ValueError("no simply named functions defined yet: %r", self.funcname)
+
+    # evaluate the arguments and then call the function
+    func_args = []
+    for arg in self.args:
+      if arg.startswith('"'):
+        value, offset = get_qstr(arg, 0, environ=filer.environ)
+      else:
+        try:
+          value = int(arg)
+        except ValueError:
+          value = arg
+      func_args.append(value)
+    try:
+      func(header_names, *func_args)
+    except Exception as e:
+      error("exception calling %s(filer, *%r): %s", self.funcname, func_args, e)
+      raise
+
+class Target_PipeLine(O):
+
+  def __init__(self, shcmd):
+    self.shcmd = shcmd
+
+  def apply(self, filer):
+    filer.save_to_pipe(['/bin/sh', '-c', shcmd])
+    filer.save_to_cmd.append(shcmd)
 
 class Target_MailAddress(O):
 
