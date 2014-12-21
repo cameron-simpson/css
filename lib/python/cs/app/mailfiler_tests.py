@@ -11,7 +11,7 @@ import unittest
 from cs.app.mailfiler import \
         get_targets, get_target, \
         Target_Assign, Target_Substitution, Target_SetFlag, \
-        Target_MailAddress, Target_MailFolder, \
+        Target_Function, Target_MailAddress, Target_MailFolder, \
         parserules
 from cs.logutils import D, X
 from cs.obj import O, slist
@@ -41,7 +41,10 @@ class TestMailFiler(unittest.TestCase):
         self.assertEqual(offset, offset_expected,
                          "%r[%d:] ==> offset=%d, expected %d"
                          % (target_str, offset0, offset, offset_expected))
-        self.assertIsInstance(T, target_type)
+        self.assertIsInstance(T, target_type,
+                              "wrong type for %r: got %s, expected %s"
+                              % (target_str, type(T), target_type)
+                             )
     return T
 
   def test00parseTargets(self):
@@ -50,6 +53,8 @@ class TestMailFiler(unittest.TestCase):
     self._test_get_target('foo=bar', Target_Assign)
     self._test_get_target('s/this/that/', Target_Substitution)
     self._test_get_target('from:s/this/that/', Target_Substitution)
+    self._test_get_target('from:learn_addresses', Target_Function)
+    self._test_get_target('from:learn_addresses()', Target_Function)
     for flag_letter, flag_attr in (
           ('D', 'draft'),
           ('F', 'flagged'),
@@ -62,7 +67,6 @@ class TestMailFiler(unittest.TestCase):
       self.assertEqual(T.flag_attr, flag_attr)
 
   def _testSingleRule(self, rule_lines, target_types, labelstr, conditions=None, flags=None):
-    X("TEST SINGLE RULE: %r", rule_lines)
     if isinstance(rule_lines, str):
       rule_lines = (rule_lines,)
     if flags is None:
@@ -103,7 +107,6 @@ class TestMailFiler(unittest.TestCase):
 
   def test10parseRules(self):
     targets, offset = get_targets("subject:s/this/that/", 0)
-    X("targets = %r, offset=%r", targets, offset)
     self._testSingleRule( "varname=value", (Target_Assign,), '', () )
     self._testSingleRule( "target . .", (Target_MailFolder,), '', () )
     self._testSingleRule( "target labelstr .", (Target_MailFolder,), 'labelstr', () )
