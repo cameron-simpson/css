@@ -638,23 +638,29 @@ class MessageFiler(O):
   def MAILDIR(self):
     return self.env('MAILDIR', os.path.join(self.env('HOME', None), 'mail'))
 
-  def save_header(self, hdr, group_names):
-    ''' Update maildb or msgiddb from message header.
-        If a message-id type header, get the msgiddb node for each
-        id and add the `group_names` to its GROUP field.
-        Otherwise, extract all the addresses from the specified
-        header and add to the maildb groups named by `group_names`.
+  def save_header_addresses(self, header_names, *group_names):
+    ''' Update maildb groups with addresses from message headers.
+        Extract all the addresses from the specified
+        headers and add to the maildb groups named by `group_names`.
     '''
-    with Pfx("save_header(%s, %r)", hdr, group_names):
-      if hdr in ('message-id', 'references', 'in-reply-to'):
-        msgids = self.message[hdr].split()
-        for msgid in msgids:
-          debug("%s.GROUPs.update(%r)", msgid, group_names)
-          msgid_node = self.msgiddb.make( ('MESSAGE_ID', msgid) )
-          msgid_node.GROUPs.update(group_names)
-      else:
+    with Pfx("save_header_addresses(%r, %r)", header_names, group_names):
+      self.maildb.importAddresses_from_message(self.message,
+                                               group_names,
+                                               header_names=header_names)
+
+  def save_message_ids(self, header_names, *group_names):
+    ''' Update msgiddb groups with message-ids from message headers.
+    '''
+    with Pfx("save_message_ids(%r, %r)", header_names, group_names):
+      M = self.message
+      msgids = set()
+      for header_name in header_names:
+        for hdr_body in M.get-all(header_name, ()):
+          msgids.update(hdr_body.split())
+      for msgid in sorted(msgids):
         debug("%s.GROUPs.update(%r)", msgid, group_names)
-        raise RuntimeError("need to pull addresses from hdr and add to address groups")
+        msgid_node = self.msgiddb.make( ('MESSAGE_ID', msgid) )
+        msgid_node.GROUPs.update(group_names)
 
   def process_environ(self):
     ''' Compute the environment for a subprocess.
