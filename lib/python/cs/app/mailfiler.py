@@ -550,7 +550,15 @@ class MessageFiler(O):
     for address in self.save_to_addresses:
       with Pfx(folder):
         try:
-          self.sendmail(address, self.M, self.message_path)
+          self.sendmail(address)
+        except Exception as e:
+          exception("forwarding to address %r: %s", folder, e)
+          ok = False
+    # pipeline message
+    for shcmd, shenv in self.save_to_cmds:
+      with Pfx(folder):
+        try:
+          self.save_to_pipe(['/bin/sh', '-c', shcmd], shenv)
         except Exception as e:
           exception("forwarding to address %r: %s", folder, e)
           ok = False
@@ -683,11 +691,13 @@ class MessageFiler(O):
     env['shortlist_to_cc_bcc'] = ','.join(MDB.header_shortlist(M, ('to', 'cc', 'bcc')))
     return env
 
-  def save_to_pipe(self, argv, mfp=None):
+  def save_to_pipe(self, argv, environ=None, mfp=None):
     ''' Pipe a message to the command specific by `argv`.
         `mfp` is a file containing the message text.
         If `mfp` is None, use the text of the current message.
     '''
+    if environ is None:
+      environ = self.process_environ()
     if mfp is None:
       message_path = self.message_path
       if message_path:
@@ -699,7 +709,7 @@ class MessageFiler(O):
           mfp.flush()
           mfp.seek(0)
           return self.save_to_pipe(argv, mfp=mfp)
-    retcode = subprocess.call(argv, env=self.process_environ(), stdin=mfp)
+    retcode = subprocess.call(argv, env=environ, stdin=mfp)
     info("    %s => | %s" % (("OK" if retcode == 0 else "FAIL"), argv))
     return retcode == 0
 
@@ -1089,10 +1099,10 @@ def get_target(s, offset, quoted=False):
   # |shcmd
   if s.startswith('|', offset0):
     if quoted:
-      shcmd = s[offset+1:]
+      shcmd = s[offset0+1:]
       offset = len(s)
     else:
-      shcmd, offset = get_other_chars(s, offset, cs.lex.whitespace+',')
+      shcmd, offset = get_other_chars(s, offset0, cs.lex.whitespace+',')
     T = Target_PipeLine(shcmd)
     return T, offset
 
@@ -1275,8 +1285,7 @@ class Target_PipeLine(O):
     self.shcmd = shcmd
 
   def apply(self, filer):
-    filer.save_to_pipe(['/bin/sh', '-c', shcmd])
-    filer.save_to_cmds.append(shcmd)
+    filer.save_to_cmds.append( (self.shcmd, filer.process_environ()) )
 
 class Target_MailAddress(O):
 

@@ -31,7 +31,9 @@ def main(argv):
   setup_logging(cmd)
 
   # load up the environ mapping
-  environ = EnvMapping(os.environ)
+  environ = EnvMapping()
+  for var in 'HOME', 'PATH':
+    environ[var] = os.environ[var]
 
   home = environ['HOME']
   envpath = environ['ENVPATH'] = \
@@ -97,8 +99,11 @@ def setvar(var, value, environ, named_vars):
     try:
       value = environ[var]
     except KeyError:
-      ##error("no definition for $%s, using empty value" % (var,))
+      warning("no definition for $%s, using empty value" % (var,))
       value = ''
+    else:
+      ##warning("choosing existing value for $%s: %r" % (var, value))
+      pass
   environ[var] = value
   named_vars.add(var)
   return value
@@ -206,8 +211,10 @@ def cleanpath(path, sep=':'):
 
 class EnvMapping(object):
 
-  def __init__(self, baseenv):
-    self._defined = dict(baseenv)
+  def __init__(self, baseenv=None):
+    self._defined = {}
+    if baseenv:
+      self._defined.update(baseenv)
     self._definitions = {}
 
   def keys(self):
@@ -226,7 +233,7 @@ class EnvMapping(object):
   def __setitem__(self, var, value):
     ##if var in self._definitions:
     ##  warning("overwrite $%s: %r ==> %r", var, self._definitions[var], value)
-    self._definitions[var] = value
+    self._defined[var] = value
 
   def __getitem__(self, var):
     value = self._defined.get(var)
