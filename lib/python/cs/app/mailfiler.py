@@ -277,8 +277,8 @@ class MailFiler(O):
 
   def monitor(self, folders, delay=None, justone=False, no_remove=False):
     ''' Monitor the specified `folders`, a list of folder spcifications.
-	If `delay` is not None, poll the folders repeatedly with a
-	delay of `delay` seconds between each pass.
+        If `delay` is not None, poll the folders repeatedly with a
+        delay of `delay` seconds between each pass.
     '''
     X("monitor: self.cfg=%s", self.cfg)
     X("maildb_path=%r", self.maildb_path)
@@ -405,7 +405,8 @@ def resolve_mail_path(mdirpath, maildir_root):
 
 def save_to_folderpath(folderpath, M, message_path, flags):
   ''' Save the Message `M` to the resolved `folderpath`.
-      `message_path`: pathname of existing message file, allowing hardlinking to new maildir if not None
+      `message_path`: pathname of existing message file, allowing
+        hardlinking to new maildir if not None
       `flags`: save flags as from MessageFiler.flags
   '''
   if not os.path.exists(folderpath):
@@ -476,6 +477,7 @@ class MessageFiler(O):
                    seen=False, trashed=False, draft=False)
     self.save_to_folders = []
     self.save_to_addresses = []
+    self.save_to_cmds = []
 
   def file(self, M, rules, message_path=None):
     ''' File the specified message `M` according to the supplied `rules`.
@@ -502,7 +504,9 @@ class MessageFiler(O):
         return False
 
       # use default destination if no save destinations chosen
-      if not self.save_to_folders and not self.save_to_addresses:
+      if not self.save_to_folders \
+      and not self.save_to_addresses \
+      and not self.save_to_cmd:
         default_save = self.env('DEFAULT', '')
         if not default_save:
           error("no matching targets and no $DEFAULT")
@@ -565,9 +569,7 @@ class MessageFiler(O):
   def apply_rule(self, R):
     ''' Apply this the rule `R` to this MessageFiler.
         The rule label, if any, is appended to the .labels attribute.
-        Each action is applied to the state.
-        Assignments update the .environ attribute.
-        Targets accrue in the .targets attribute.
+        Each target is applied to the state.
     '''
     M = self.message
     with Pfx(R.context):
@@ -1073,7 +1075,7 @@ def get_target(s, offset, quoted=False):
     return T, offset
 
   # "quoted-target-specification"
-  if not quoted and s.startswith('"'):
+  if not quoted and s.startswith('"', offset0):
     s2, offset = get_qstr(s, offset0)
     # reparse inner string
     T, offset2 = get_target(s2, 0, quoted=True)
@@ -1082,6 +1084,16 @@ def get_target(s, offset, quoted=False):
     if s3:
       qs = s[offset0:offset]
       raise ValueError("unparsed content from %s: %r" % (qs, s3))
+    return T, offset
+
+  # |shcmd
+  if s.startswith('|', offset0):
+    if quoted:
+      shcmd = s[offset+1:]
+      offset = len(s)
+    else:
+      shcmd, offset = get_other_chars(s, offset, cs.lex.whitespace+',')
+    T = Target_PipeLine(shcmd)
     return T, offset
 
   # header:s/this/that/
@@ -1256,6 +1268,15 @@ class Target_Function(O):
     except Exception as e:
       error("exception calling %s(filer, *%r): %s", self.funcname, func_args, e)
       raise
+
+class Target_PipeLine(O):
+
+  def __init__(self, shcmd):
+    self.shcmd = shcmd
+
+  def apply(self, filer):
+    filer.save_to_pipe(['/bin/sh', '-c', shcmd])
+    filer.save_to_cmd.append(shcmd)
 
 class Target_MailAddress(O):
 

@@ -10,7 +10,7 @@ from os.path import basename, dirname, join as joinpath
 import unittest
 from cs.app.mailfiler import \
         get_targets, get_target, \
-        Target_Assign, Target_Substitution, Target_SetFlag, \
+        Target_Assign, Target_PipeLine, Target_Substitution, Target_SetFlag, \
         Target_Function, Target_MailAddress, Target_MailFolder, \
         parserules
 from cs.logutils import D, X
@@ -51,6 +51,7 @@ class TestMailFiler(unittest.TestCase):
     self._test_get_target('foo', Target_MailFolder)
     self._test_get_target('foo@bar', Target_MailAddress)
     self._test_get_target('foo=bar', Target_Assign)
+    self._test_get_target('|shcmd', Target_PipeLine)
     self._test_get_target('s/this/that/', Target_Substitution)
     self._test_get_target('from:s/this/that/', Target_Substitution)
     self._test_get_target('from:learn_addresses', Target_Function)
