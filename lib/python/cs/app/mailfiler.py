@@ -506,7 +506,7 @@ class MessageFiler(O):
       # use default destination if no save destinations chosen
       if not self.save_to_folders \
       and not self.save_to_addresses \
-      and not self.save_to_cmd:
+      and not self.save_to_cmds:
         default_save = self.env('DEFAULT', '')
         if not default_save:
           error("no matching targets and no $DEFAULT")
@@ -1276,7 +1276,7 @@ class Target_PipeLine(O):
 
   def apply(self, filer):
     filer.save_to_pipe(['/bin/sh', '-c', shcmd])
-    filer.save_to_cmd.append(shcmd)
+    filer.save_to_cmds.append(shcmd)
 
 class Target_MailAddress(O):
 
