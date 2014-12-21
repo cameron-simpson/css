@@ -1036,8 +1036,10 @@ def get_targets(s, offset):
       offset += 1
   return targets, offset
 
-def get_target(s, offset, forbid_quotes=False):
+def get_target(s, offset, quoted=False):
   ''' Parse a single target specification from a string; return Target and new offset.
+      `quoted`: already inside quoted: do not expect comma or
+        whitespace to end the target specification
   '''
   offset0 = offset
 
@@ -1051,7 +1053,11 @@ def get_target(s, offset, forbid_quotes=False):
     elif s[offset] == '"':
       varexpr, offset = get_qstr(s, offset)
     else:
-      varexpr, offset = get_other_chars(s, offset, cs.lex.whitespace + ',')
+      if quoted:
+        varexpr = s[offset:]
+        offset = len(s)
+      else:
+        varexpr, offset = get_other_chars(s, offset, cs.lex.whitespace+',')
     T = Target_Assign(varname, varexpr)
     return T, offset
 
@@ -1059,16 +1065,18 @@ def get_target(s, offset, forbid_quotes=False):
   flag_letter = s[offset0]
   offset = offset + 1
   if ( flag_letter.isupper()
-        and (offset == len(s) or s[offset] == ',' or s[offset].isspace())
+        and ( offset == len(s)
+           or ( not quoted and ( s[offset] == ',' or s[offset].isspace() ) )
+            )
      ):
     T = Target_SetFlag(flag_letter)
     return T, offset
 
   # "quoted-target-specification"
-  if not forbid_quotes and s.startswith('"'):
+  if not quoted and s.startswith('"'):
     s2, offset = get_qstr(s, offset0)
     # reparse inner string
-    T, offset2 = get_target(s2, 0, forbid_quotes=True)
+    T, offset2 = get_target(s2, 0, quoted=True)
     # check for complete parse
     s3 = s2[offset2:].lstrip()
     if s3:
