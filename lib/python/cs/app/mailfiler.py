@@ -1045,6 +1045,18 @@ def get_target(s, offset, quoted=False):
   '''
   offset0 = offset
 
+  # "quoted-target-specification"
+  if not quoted and s.startswith('"', offset0):
+    s2, offset = get_qstr(s, offset0)
+    # reparse inner string
+    T, offset2 = get_target(s2, 0, quoted=True)
+    # check for complete parse
+    s3 = s2[offset2:].lstrip()
+    if s3:
+      qs = s[offset0:offset]
+      raise ValueError("unparsed content from %s: %r" % (qs, s3))
+    return T, offset
+
   # varname=expr
   m = re_ASSIGN.match(s, offset0)
   if m:
@@ -1072,18 +1084,6 @@ def get_target(s, offset, quoted=False):
             )
      ):
     T = Target_SetFlag(flag_letter)
-    return T, offset
-
-  # "quoted-target-specification"
-  if not quoted and s.startswith('"', offset0):
-    s2, offset = get_qstr(s, offset0)
-    # reparse inner string
-    T, offset2 = get_target(s2, 0, quoted=True)
-    # check for complete parse
-    s3 = s2[offset2:].lstrip()
-    if s3:
-      qs = s[offset0:offset]
-      raise ValueError("unparsed content from %s: %r" % (qs, s3))
     return T, offset
 
   # |shcmd
