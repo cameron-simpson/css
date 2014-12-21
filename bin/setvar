@@ -31,7 +31,9 @@ def main(argv):
   setup_logging(cmd)
 
   # load up the environ mapping
-  environ = EnvMapping(os.environ)
+  environ = EnvMapping()
+  for var in 'HOME', 'PATH':
+    environ[var] = os.environ[var]
 
   home = environ['HOME']
   envpath = environ['ENVPATH'] = \
@@ -206,8 +208,10 @@ def cleanpath(path, sep=':'):
 
 class EnvMapping(object):
 
-  def __init__(self, baseenv):
-    self._defined = dict(baseenv)
+  def __init__(self, baseenv=None):
+    self._defined = {}
+    if baseenv:
+      self._defined.update(baseenv)
     self._definitions = {}
 
   def keys(self):
