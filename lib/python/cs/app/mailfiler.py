@@ -638,7 +638,7 @@ class MessageFiler(O):
   def MAILDIR(self):
     return self.env('MAILDIR', os.path.join(self.env('HOME', None), 'mail'))
 
-  def save_header_addresses(self, header_names, *group_names):
+  def learn_header_addresses(self, header_names, *group_names):
     ''' Update maildb groups with addresses from message headers.
         Extract all the addresses from the specified
         headers and add to the maildb groups named by `group_names`.
@@ -648,7 +648,7 @@ class MessageFiler(O):
                                                group_names,
                                                header_names=header_names)
 
-  def save_message_ids(self, header_names, *group_names):
+  def learn_message_ids(self, header_names, *group_names):
     ''' Update msgiddb groups with message-ids from message headers.
     '''
     with Pfx("save_message_ids(%r, %r)", header_names, group_names):
@@ -1220,7 +1220,8 @@ class Target_Substitution(O):
 
 class Target_Function(O):
 
-  def __init__(self, funcname, args):
+  def __init__(self, header_names, funcname, args):
+    self.header_names = header_names
     self.funcname = funcname
     self.args = args
 
@@ -1230,6 +1231,11 @@ class Target_Function(O):
       func = import_module_name(module_name, func_name)
       if func is None:
         raise ValueError("no function %r in module %r" % (func_name, module_name))
+      func = partial(func, filer)
+    elif self.funcname == 'learn_addresses':
+      func = filer.learn_header_addresses
+    elif self.funcname == 'learn_message_ids':
+      func = filer.learn_message_ids
     else:
       raise ValueError("no simply named functions defined yet: %r", self.funcname)
 
@@ -1245,7 +1251,7 @@ class Target_Function(O):
           value = arg
       func_args.append(value)
     try:
-      func(filer, *func_args)
+      func(header_names, *func_args)
     except Exception as e:
       error("exception calling %s(filer, *%r): %s", self.funcname, func_args, e)
       raise
