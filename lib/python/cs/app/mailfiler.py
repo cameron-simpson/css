@@ -38,6 +38,7 @@ from cs.mailutils import Maildir, message_addresses, modify_header, shortpath, i
 from cs.obj import O, slist
 from cs.threads import locked, locked_property
 from cs.app.maildb import MailDB
+from cs.py.modules import import_module_name
 from cs.py3 import unicode as u, StringTypes, ustr
 
 DEFAULT_MAIN_LOG = 'mailfiler/main.log'
@@ -1210,6 +1211,37 @@ class Target_Substitution(O):
                            environ=env, env_specials=env_specials)
       X("%s ==> %s", self.subst_replacement, new_value)
       filer.modify(self.header_name, new_value)
+
+class Target_Function(O):
+
+  def __init__(self, funcname, args):
+    self.funcname = funcname
+    self.args = args
+
+  def apply(self, filer):
+    if '.' in self.funcname:
+      module_name, func_name = self.funcname.rsplit('.', 1)
+      func = import_module_name(module_name, func_name)
+      if func is None:
+        raise ValueError("no function %r in module %r" % (func_name, module_name))
+    else:
+      raise ValueError("no simply named functions defined yet: %r", self.funcname)
+
+    # evaluate the arguments and then call the function
+    func_args = []
+    for arg in self.args:
+      if arg.startswith('"'):
+        value, offset = get_qstr(arg, 0, environ=filer.environ)
+      else:
+        try:
+          value = int(arg)
+        except ValueError:
+          value = arg
+      func_args.append(value)
+    try:
+      func(filer, *func_args)
+    except Exception as e:
+      error("exception calling %s(filer, *%r): %s", self.funcname, func_args, e)
 
 class Target_MailAddress(O):
 
