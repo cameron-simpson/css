@@ -7,7 +7,7 @@ import re
 import sys
 import os
 from cs.py3 import unicode, ustr, sorted, StringTypes
-##from cs.logutils import X
+from cs.logutils import X
 
 unhexify = binascii.unhexlify
 if sys.hexversion >= 0x030000:
@@ -397,6 +397,8 @@ def get_sloshed_text(s, delim, offset=0, slosh='\\', mapper=slosh_mapper, specia
           the following 8 hexadecimal digits.
         - a character from the keys of mapper
   '''
+  ##X("get_sloshed_text(%r, delim=%r, offset=%r, slosh=%r, mapper=%r, specials=%r)...",
+  ##   s, delim, offset, slosh, mapper, specials)
   if specials is not None:
     # gather up starting character of special keys and a list of
     # keys in reverse order of length
@@ -541,11 +543,11 @@ def get_qstr(s, offset=0, q='"', environ=None, default=None, env_specials=None):
   '''
   if environ is None and default is not None:
     raise ValueError("environ is None but default is not None (%r)" % (default,))
-  if len(s) - offset < 1:
-    raise ValueError("short string, no opening quote")
   if q is None:
     delim = None
   else:
+    if offset >= len(s):
+      raise ValueError("short string, no opening quote")
     delim = s[offset]
     offset += 1
     if delim != q:
