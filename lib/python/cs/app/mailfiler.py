@@ -1248,6 +1248,7 @@ class Target_Function(O):
       func(filer, *func_args)
     except Exception as e:
       error("exception calling %s(filer, *%r): %s", self.funcname, func_args, e)
+      raise
 
 class Target_MailAddress(O):
 
