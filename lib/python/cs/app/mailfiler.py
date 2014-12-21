@@ -475,8 +475,8 @@ class MessageFiler(O):
     self.flags = O(alert=0,
                    flagged=False, passed=False, replied=False,
                    seen=False, trashed=False, draft=False)
-    self.save_to_folders = []
-    self.save_to_addresses = []
+    self.save_to_folders = set()
+    self.save_to_addresses = set()
     self.save_to_cmds = []
 
   def file(self, M, rules, message_path=None):
@@ -512,9 +512,9 @@ class MessageFiler(O):
           error("no matching targets and no $DEFAULT")
           return False
         if '@' in default_save:
-          self.save_to_addresses.append(default_save)
+          self.save_to_addresses.add(default_save)
         else:
-          self.save_to_folders.append(self.resolve(default_save))
+          self.save_to_folders.add(self.resolve(default_save))
 
       # apply labels
       if self.labels:
@@ -538,7 +538,7 @@ class MessageFiler(O):
     '''
     ok = True
     # save message to folders
-    for folder in self.save_to_folders:
+    for folder in sorted(self.save_to_folders):
       with Pfx(folder):
         try:
           folderpath = self.resolve(folder)
@@ -547,7 +547,7 @@ class MessageFiler(O):
           exception("saving to folder %r: %s", folder, e)
           ok = False
     # forward message
-    for address in self.save_to_addresses:
+    for address in sorted(self.save_to_addresses):
       with Pfx(folder):
         try:
           self.sendmail(address)
@@ -1293,7 +1293,7 @@ class Target_MailAddress(O):
     self.address = address
 
   def apply(self, filer):
-    filer.save_to_addresses.append(self.address)
+    filer.save_to_addresses.add(self.address)
 
 class Target_MailFolder(O):
 
@@ -1302,7 +1302,7 @@ class Target_MailFolder(O):
 
   def apply(self, filer):
     mailpath = filer.resolve(self.mailfolder)
-    filer.save_to_folders.append(mailpath)
+    filer.save_to_folders.add(mailpath)
 
 class _Condition(O):
 
