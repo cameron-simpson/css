@@ -1143,19 +1143,6 @@ def get_target(s, offset, forbid_quotes=False):
     T = Target_Function(header_names, funcname, args)
     return T, offset
 
-  # +headers(groups)
-  tokens, offset2 = match_tokens(s, offset0,
-                                 ( '+',
-                                   re_HEADERNAME_LIST,
-                                   re_GROUPorDOM_LIST))
-  if tokens:
-    marker, m_header_names, m_grouplist = tokens
-    header_names = m_header_names.group().split(',')
-    group_names = m_grouplist.group().split('|')
-    T = Target_AddHeaderAddresses(header_names, group_names)
-    X("ADDHDR: +%r(%r): %s", header_names, group_names, T)
-    return T, offset2
-
   # unquoted word: email address or mail folder
   m = re_UNQWORD.match(s, offset0)
   if m:
