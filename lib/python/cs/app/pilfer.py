@@ -53,6 +53,7 @@ from cs.urlutils import URL, isURL, NetrcHTTPPasswordMgr
 import cs.obj
 from cs.obj import O
 from cs.py.func import funcname, funccite, yields_type, returns_type
+from cs.py.modules import import_module_name
 from cs.py3 import input, ConfigParser, sorted, ustr
 
 DEFAULT_JOBS = 4
@@ -653,25 +654,8 @@ class Pilfer(O):
 
   def import_module_func(self, module_name, func_name):
     with LogExceptions():
-      import importlib
       pylib = [ path for path in self.defaults.get('pythonpath', '').split(':') if path ]
-      with self._lock:
-        osyspath = sys.path
-        if pylib:
-          sys.path = [ envsub(path) for path in pylib ] + sys.path
-        try:
-          M = importlib.import_module(module_name)
-        except ImportError as e:
-          exception("%s", e)
-          M = None
-        if pylib:
-          sys.path = osyspath
-      if M is not None:
-        try:
-          return getattr(M, func_name)
-        except AttributeError as e:
-          error("%s: no entry named %r: %s", module_name, func_name, e)
-      return None
+      return import_module_name(module_name, func_name, pylib, self._lock)
 
   def format_string(self, s, U):
     ''' Format a string using the URL `U` as context.
