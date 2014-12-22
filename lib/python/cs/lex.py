@@ -1,10 +1,13 @@
 import base64
 import binascii
+from functools import partial
 import quopri
 from string import printable, whitespace, ascii_letters, ascii_uppercase, digits
 import re
 import sys
-from cs.py3 import unicode
+import os
+from cs.py3 import unicode, ustr, sorted, StringTypes
+from cs.logutils import X
 
 unhexify = binascii.unhexlify
 if sys.hexversion >= 0x030000:
@@ -92,6 +95,7 @@ def lastlinelen(s):
 DQ_RE=re.compile(r'"(([^\\"]|\\[\\"])*)"')
 nq_re=re.compile(r'\S+')
 
+# REMOVE
 def get_dqstring(s):
   ''' Read a double quoted string from the start of `s`.
       Return the decoded string and the remainder of `s`.
@@ -160,7 +164,7 @@ def dict2js(d):
   return cs.json.json(d)
 
 # characters that may appear in text sections of a texthexify result
-# Notation exclusions:
+# Notable exclusions:
 #  \ - to avoid double in slosh escaped presentation
 #  % - likewise, for percent escaped presentation
 #  [ ] - the delimiters of course
@@ -216,6 +220,32 @@ def texthexify(bs, shiftin='[', shiftout=']', whitelist=None):
     chunks.append(chunk)
   return ''.join(chunks)
 
+def untexthexify(s, shiftin='[', shiftout=']'):
+  chunks = []
+  while len(s) > 0:
+    hexlen = s.find(shiftin)
+    if hexlen < 0:
+      break
+    if hexlen > 0:
+      hextext = s[:hexlen]
+      if hexlen % 2 != 0:
+        raise TypeError("uneven hex sequence \"%s\"" % (hextext,))
+      chunks.append(unhexify(s[:hexlen]))
+    s = s[hexlen+len(shiftin):]
+    textlen = s.find(shiftout)
+    if textlen < 0:
+      raise TypeError("missing shift out marker \"%s\"" % (shiftout,))
+    if sys.hexversion < 0x03000000:
+      chunks.append(s[:textlen])
+    else:
+      chunks.append(bytes( ord(c) for c in s[:textlen] ))
+    s = s[textlen+len(shiftout):]
+  if len(s) > 0:
+    if len(s) % 2 != 0:
+      raise TypeError("uneven hex sequence \"%s\"" % (s,))
+    chunks.append(unhexify(s))
+  return b''.join(chunks)
+
 # regexp to match RFC2047 text chunks
 re_RFC2047 = re.compile(r'=\?([^?]+)\?([QB])\?([^?]*)\?=', re.I)
 
@@ -268,32 +298,6 @@ def unrfc2047(s):
     chunks.append(s[sofar:])
   return unicode('').join(chunks)
 
-def untexthexify(s, shiftin='[', shiftout=']'):
-  chunks = []
-  while len(s) > 0:
-    hexlen = s.find(shiftin)
-    if hexlen < 0:
-      break
-    if hexlen > 0:
-      hextext = s[:hexlen]
-      if hexlen % 2 != 0:
-        raise TypeError("uneven hex sequence \"%s\"" % (hextext,))
-      chunks.append(unhexify(s[:hexlen]))
-    s = s[hexlen+len(shiftin):]
-    textlen = s.find(shiftout)
-    if textlen < 0:
-      raise TypeError("missing shift out marker \"%s\"" % (shiftout,))
-    if sys.hexversion < 0x03000000:
-      chunks.append(s[:textlen])
-    else:
-      chunks.append(bytes( ord(c) for c in s[:textlen] ))
-    s = s[textlen+len(shiftout):]
-  if len(s) > 0:
-    if len(s) % 2 != 0:
-      raise TypeError("uneven hex sequence \"%s\"" % (s,))
-    chunks.append(unhexify(s))
-  return b''.join(chunks)
-
 def get_chars(s, gochars, offset=0):
   ''' Scan the string `s` for characters in `gochars` starting at `offset`
       (default 0).
@@ -316,7 +320,7 @@ def get_nonwhite(s, offset=0):
       `offset` (default 0).
       Return (match, new_offset).
   '''
-  return get_other_chars(s, whitespace, offset=offset)
+  return get_other_chars(s, offset=offset, stopchars=whitespace)
 
 def get_identifier(s, offset=0, alpha=ascii_letters, number=digits, extras='_'):
   ''' Scan the string `s` for an identifier (by default an ASCII
@@ -338,7 +342,7 @@ def get_uc_identifier(s, offset=0, number=digits, extras='_'):
   '''
   return get_identifier(s, offset=offset, alpha=ascii_uppercase, number=number, extras=extras)
 
-def get_other_chars(s, stopchars, offset=0):
+def get_other_chars(s, offset=0, stopchars=None):
   ''' Scan the string `s` for characters not in `stopchars` starting
       at `offset` (default 0).
       Return (match, new_offset).
@@ -348,34 +352,267 @@ def get_other_chars(s, stopchars, offset=0):
     offset += 1
   return s[ooffset:offset], offset
 
-re_QSTR = re.compile(r'"([^"\\]|\\.)*"')
+# default character map for \c notation
+SLOSH_CHARMAP = {
+    'a':    '\a',
+    'b':    '\b',
+    'f':    '\f',
+    'n':    '\n',
+    'r':    '\r',
+    't':    '\t',
+    'v':    '\v',
+  }
 
-def get_qstr(s, offset):
-  ''' Extract a quoted string from the start of `s`.
-      Return:
-        qs, offset
-      where `qs` is the quoted string after replacing slosh-char with char
-      and `offset` is the offset of the first character after the quoted string.
+def slosh_mapper(c, charmap=SLOSH_CHARMAP):
+  ''' Return a string to replace \`c`, or None.
   '''
-  m = re_QSTR.match(s, offset)
-  if not m:
-    raise ValueError("no quoted string here: "+s)
-  qs = m.group()[1:-1]
-  offset = m.end()
+  return charmap.get(c)
 
-  # decode the quoted string
-  parts = []
-  pos = 0
-  spos = qs.find('\\', pos)
-  while spos >= 0:
-    if spos > 0:
-      parts.append(qs[pos:spos])    # part before slosh
-    parts.append(qs[spos+1])        # char after slosh
-    pos = spos + 2
-    spos = qs.find('\\', pos)
-  if pos < len(qs):
-    parts.append(qs[pos:])          # tail of string
-  return ''.join(parts), offset
+def get_sloshed_text(s, delim, offset=0, slosh='\\', mapper=slosh_mapper, specials=None):
+  ''' Collect slosh escaped text from the string `s` from position `offset` (default 0) and return the decoded unicode string and the offset of the completed parse.
+      `delim`: end of string delimiter, such as a single or double quote.
+      `offset`: starting offset within `s`, default 0.
+      `slosh`: escape character, default a slosh ('\\').
+      `mapper`: a mapping function which accepts a single character
+        and returns a replacement string or None; this is used the
+        replace things such as '\\t' or '\\n'. The default is the
+        slosh_mapper function, whose default mapping is SLOSH_CHARMAP.
+      `specials`: a mapping of other special character sequences and parse
+        functions for gathering them up. When one of the special
+        character sequences is found in the string, the parse
+        function is called to parse at that point.
+        The parse functions accept
+        `s` and the offset of the special character. They return
+        the decoded string and the offset past the parse.
+      The escape character `slosh` introduces an encoding of some
+      replacement text whose value depends on the following character.
+      If the following character is:
+        - the escape character `slosh`, insert the escape character.
+        - the string delimiter `delim`, insert the delimiter.
+        - the character 'x', insert the character with code from
+          the following 2 hexadecimal digits.
+        - the character 'u', insert the character with code from
+          the following 4 hexadecimal digits.
+        - the character 'U', insert the character with code from
+          the following 8 hexadecimal digits.
+        - a character from the keys of mapper
+  '''
+  ##X("get_sloshed_text(%r, delim=%r, offset=%r, slosh=%r, mapper=%r, specials=%r)...",
+  ##   s, delim, offset, slosh, mapper, specials)
+  if specials is not None:
+    # gather up starting character of special keys and a list of
+    # keys in reverse order of length
+    special_starts = set()
+    special_seqs = []
+    for special in specials.keys():
+      if len(special) == 0:
+        raise ValueError('empty strings may not be used as keys for specials: %r' % (specials,))
+      special_starts.add(special[0])
+      special_seqs.append(special)
+    special_starts = u''.join(special_starts)
+    special_seqs = sorted(special_seqs, key=lambda s: -len(s))
+  chunks = []
+  slen = len(s)
+  while True:
+    if offset >= slen:
+      if delim is not None:
+        raise ValueError("missing delimiter %r at offset %d" % (delim, offset))
+      break
+    offset0 = offset
+    c = s[offset]
+    offset += 1
+    if delim is not None and c == delim:
+      # delimiter; end text
+      break
+    if c == slosh:
+      # \something
+      if offset >= slen:
+        raise ValueError('incomplete slosh escape at offset %d' % (offset0,))
+      offset1 = offset
+      c = s[offset]
+      offset += 1
+      if c == slosh or (delim is not None and c == delim):
+        chunks.append(c)
+        continue
+      if c == 'x':
+        # \xhh
+        if slen - offset < 2:
+          raise ValueError('short hexcode for %sxhh at offset %d' % (slosh, offset0))
+        hh = s[offset:offset+2]
+        offset += 2
+        chunks.append(chr(int(hh, 16)))
+        continue
+      if c == 'u':
+        # \uhhhh
+        if slen - offset < 4:
+          raise ValueError('short hexcode for %suhhhh at offset %d' % (slosh, offset0))
+        hh = s[offset:offset+4]
+        offset += 4
+        chunks.append(chr(int(hh, 16)))
+        continue
+      if c == 'U':
+        # \Uhhhhhhhh
+        if slen - offset < 8:
+          raise ValueError('short hexcode for %sUhhhhhhhh at offset %d' % (slosh, offset0))
+        hh = s[offset:offset+8]
+        offset += 8
+        chunks.append(chr(int(hh, 16)))
+        continue
+      chunk = mapper(c)
+      if chunk is not None:
+        # supplied \X mapping
+        chunks.append(chunk)
+        continue
+      # check for escaped special syntax
+      if specials is not None and c in special_starts:
+        # test sequence prefixes from longest to shortest
+        chunk=None
+        for seq in special_seqs:
+          if s.startswith(seq, offset1):
+            # special sequence
+            chunk = c
+            break
+        if chunk is not None:
+          chunks.append(chunk)
+          continue
+      raise ValueError('unrecognised %s%s escape at offset %d' % (slosh, c, offset0))
+    if specials is not None and c in special_starts:
+      # test sequence prefixes from longest to shortest
+      chunk=None
+      for seq in special_seqs:
+        if s.startswith(seq, offset0):
+          # special sequence
+          chunk, offset = specials[seq](s, offset0)
+          if offset < offset0 + 1:
+            raise ValueError("special parser for %r at offset %d moved offset backwards" % (c, offset0))
+          break
+      if chunk is not None:
+        chunks.append(chunk)
+        continue
+      chunks.append(c)
+      continue
+    while offset < slen:
+      c = s[offset]
+      if ( c == slosh
+        or (delim is not None and c == delim)
+        or (specials is not None and c in special_starts)
+         ):
+        break
+      offset += 1
+    chunks.append(s[offset0:offset])
+  return u''.join( ustr(chunk) for chunk in chunks ), offset
+
+def get_envvar(s, offset=0, environ=None, default=None, specials=None):
+  ''' Parse a simple environment variable reference to $varname or $x where "x" is a special character.
+      `s`: the string with the variable reference
+      `offset`: the starting point for the reference
+      `default`: default value for missing environment variables;
+         if None (the default) a ValueError is raised
+      `environ`: the environment mapping, default os.environ
+      `specials`: the mapping of special single character variables
+  '''
+  if environ is None:
+    environ = os.environ
+  offset0 = offset
+  if not s.startswith('$', offset):
+    raise ValueError("no leading '$' at offset %d: %r" % (offset,s))
+  offset += 1
+  if offset >= len(s):
+    raise ValueError("short string, nothing after '$' at offset %d" % (offset,))
+  identifier, offset = get_identifier(s, offset)
+  if identifier:
+    value = environ.get(identifier, default)
+    if value is None:
+      raise ValueError("unknown envvar name $%s, offset %d: %r"
+                       % (identifier, offset0, s))
+    return value, offset
+  c = s[offset]
+  offset += 1
+  if specials is not None and c in specials:
+    return specials[c], offset
+  raise ValueError("unsupported special variable $%s" % (c,))
+
+def get_qstr(s, offset=0, q='"', environ=None, default=None, env_specials=None):
+  ''' Get quoted text with slosh escapes and optional environment substitution.
+      `s`: the string containg the quoted text.
+      `offset`: the starting point, default 0.
+      `q`: the quote character, default '"'. If `q` is set to None,
+        do not expect the string to be delimited by quote marks.
+      `environ`: if not None, also parse and expand $envvar references.
+      `default`: passed to get_envvar
+  '''
+  if environ is None and default is not None:
+    raise ValueError("environ is None but default is not None (%r)" % (default,))
+  if q is None:
+    delim = None
+  else:
+    if offset >= len(s):
+      raise ValueError("short string, no opening quote")
+    delim = s[offset]
+    offset += 1
+    if delim != q:
+      raise ValueError("expected opening quote %r, found %r" % (q, delim,))
+  if environ is None:
+    return get_sloshed_text(s, delim, offset)
+  getvar = partial(get_envvar, environ=environ, default=default, specials=env_specials)
+  return get_sloshed_text(s, delim, offset, specials={ '$': getvar })
+
+def get_delimited(s, offset, delim):
+  ''' Collect text from the string `s` from position `offset` up to the first occurence of delimiter `delim`; return the text excluding the delimiter and the offset after the delimiter.
+  '''
+  pos = s.find(delim, offset)
+  if pos < offset:
+    raise ValueError("delimiter %r not found after offset %d" % (delim, offset))
+  return s[offset:pos], pos+len(delim)
+
+def get_tokens(s, offset, getters):
+  ''' Parse the string `s` from position `offset` using the supplied tokenise functions `getters`; return the list of tokens matched and the final offset.
+      `s`: the string to parse.
+      `offset`: the starting position for the parse.
+      `getters`: an iterable of tokeniser specifications.
+      Each tokeniser specification is either:
+      - a callable expecting (s, offset) and returning (token, new_offset)
+      - a literal string, to be matched exactly
+      - a tuple or list with values (func, args, kwargs);
+        call func(s, offset, *args, **kwargs)
+      - an object with a .match method such as a regex;
+        call getter.match(s, offset) and return a match object with
+        a .end() method returning the offset of the end of the match
+  '''
+  tokens = []
+  for getter in getters:
+    args = ()
+    kwargs = {}
+    if callable(getter):
+      func = getter
+    elif isinstance(getter, StringTypes):
+      def func(s, offset):
+        if s.startswith(getter, offset):
+          return getter, offset + len(getter)
+        raise ValueError("string %r not found at offset %d" % (getter, offset))
+    elif isinstance(getter, (tuple, list)):
+      func, args, kwargs = getter
+    elif hasattr(getter, 'match'):
+      def func(s, offset):
+        m = getter.match(s, offset)
+        if m:
+          return m, m.end()
+        raise ValueError("no match for %s at offset %d" % (getter, offset))
+    else:
+      raise ValueError("unsupported getter: %r" % (getter,))
+    token, offset = func(s, offset, *args, **kwargs)
+    tokens.append(token)
+  return tokens, offset
+
+def match_tokens(s, offset, getters):
+  ''' Wrapper for get_tokens which catches ValueError exceptions and returns (None, offset).
+  '''
+  try:
+    tokens, offset2 = get_tokens(s, offset, getters)
+  except ValueError:
+    return None, offset
+  else:
+    return tokens, offset2
 
 def isUC_(s):
   ''' Check that a string matches ^[A-Z][A-Z_0-9]*$.
