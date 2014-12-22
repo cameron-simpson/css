@@ -20,6 +20,7 @@ from tempfile import TemporaryFile, NamedTemporaryFile
 from threading import RLock, Thread
 import time
 import unittest
+from cs.asynchron import Asynchron
 from cs.debug import trace
 from cs.env import envsub
 from cs.lex import as_lines
@@ -546,6 +547,9 @@ def lockfile(path, ext=None, poll_interval=None, timeout=None):
       break
 
 def maxFilenameSuffix(dir, pfx):
+  ''' Compute the highest existing numeric suffix for names starting with the prefix `pfx`.
+      This is generally used as a starting point for picking a new numeric suffix.
+  '''
   pfx=ustr(pfx)
   maxn=None
   pfxlen=len(pfx)
@@ -627,6 +631,8 @@ def tmpdir():
   return tmpdir
 
 def tmpdirn(tmp=None):
+  ''' Make a new temporary directory with a numeric suffix.
+  '''
   if tmp is None: tmp=tmpdir()
   return mkdirn(os.path.join(tmp, os.path.basename(sys.argv[0])))
 
@@ -866,15 +872,16 @@ class SharedAppendFile(object):
 
   DEFAULT_MAX_QUEUE = 128
 
-  def __init__(self, pathname, readonly=False, writeonly=False,
+  def __init__(self, pathname, no_update=False, no_monitor=False,
                 binary=False, max_queue=None,
                 poll_interval=None,
                 eof_markers = False,
                 lock_ext=None, lock_timeout=None):
     ''' Initialise this SharedAppendFile.
         `pathname`: the pathname of the file to open.
-        `readonly`: set to true if we will not write updates.
-        `writeonly`: set to true if we will monitor foreign updates.
+        `no_update`: set to true if we will not write updates.
+        `no_monitor`: set to true if we will not monitor foreign updates.
+            Note: the source file will still be read once to load its contents.
         `binary`: if the ile is to be opened in binary mode, otherwise text mode.
         `max_queue`: maximum input and output Queue length. Default: SharedAppendFile.DEFAULT_MAX_QUEUE.
         `poll_interval`: sleep time between polls after an idle poll. Default: DEFAULT_POLL_INTERVAL.
@@ -882,22 +889,29 @@ class SharedAppendFile(object):
         `lock_ext`: lock file extension.
         `lock_timeout`: maxmimum time to wait for obtaining the lock file.
     '''
-    if max_queue is None:
-      max_queue = self.DEFAULT_MAX_QUEUE
-    if poll_interval is None:
-      poll_interval = DEFAULT_POLL_INTERVAL
-    self.pathname = pathname
-    self.readonly = readonly
-    self.writeonly = readonly
-    self.binary = binary
-    self.eof_markers = eof_markers
-    self.poll_interval = poll_interval
-    self.max_queue = max_queue
-    self.lock_ext = lock_ext
-    self.lock_timeout = lock_timeout
-    self._inQ = IterableQueue(self.max_queue, name="%s._inQ" % (self,))
-    self._outQ = IterableQueue(self.max_queue, name="%s._outQ" % (self,))
-    self._open()
+    with Pfx("SharedAppendFile(%r): __init__", pathname):
+      if max_queue is None:
+        max_queue = self.DEFAULT_MAX_QUEUE
+      if poll_interval is None:
+        poll_interval = DEFAULT_POLL_INTERVAL
+      if no_monitor and eof_markers:
+        raise ValueError("no_monitor and eof_markers may not both be true")
+      self.pathname = pathname
+      self.binary = binary
+      self.no_update = no_update
+      self.no_monitor = no_monitor
+      self.eof_markers = eof_markers
+      self.poll_interval = poll_interval
+      self.max_queue = max_queue
+      self.ready = Asynchron(name="readiness(%s)" % (self,))
+      self.lock_ext = lock_ext
+      self.lock_timeout = lock_timeout
+      if not no_update:
+        # inbound updates to be saved to the file
+        self._inQ = IterableQueue(self.max_queue, name="%s._inQ" % (self,))
+      # outbound outdates by others users of the file
+      self._outQ = IterableQueue(self.max_queue, name="%s._outQ" % (self,))
+      self._open()
 
   def __str__(self):
     return "SharedAppendFile(%r)" % (self.pathname,)
@@ -905,7 +919,7 @@ class SharedAppendFile(object):
   def _open(self):
     ''' Open the file for read or read/write.
     '''
-    mode = "r" if self.readonly else "r+"
+    mode = "r" if self.no_update else "r+"
     if self.binary:
       mode += "b"
     self.fp = open(self.pathname, mode)
@@ -914,6 +928,8 @@ class SharedAppendFile(object):
     self._monitor_thread.start()
 
   def close(self):
+    ''' Close the SharedAppendFile: close input queue, wait for monitor to terminate.
+    '''
     self._inQ.close()
     self._monitor_thread.join()
     fp = self.fp
@@ -922,6 +938,8 @@ class SharedAppendFile(object):
 
   @property
   def filestate(self):
+    ''' The current FileState of the backing file.
+    '''
     fp = self.fp
     if fp is None:
       return None
@@ -946,8 +964,6 @@ class SharedAppendFile(object):
         `force_eof_marker`: put an EOF marker even if no other chunks were obtained
     '''
     debug("READ_TO_EOF...")
-    if force_eof_marker and not self.eof_markers:
-      raise ValueError("force_eof_marker forbidden if not self.eof_markers")
     count = 0
     for chunk in chunks_of(self.fp):
       if len(chunk) == 0:
@@ -971,40 +987,56 @@ class SharedAppendFile(object):
     with Pfx("%s._monitor", self):
       first = True
       while not self._inQ.closed or not self._inQ.empty():
-        # catch up
-        # we force an EOF marker the first time
-        # so that external users can read the whole data file initially
-        count = self._read_to_eof(force_eof_marker=(first and self.eof_markers))
-        # check for outgoing updates
-        if self._inQ.empty():
-          # sleep briefly if nothing
-          if count == 0:
-            time.sleep(self.poll_interval)
-        else:
-          # updates due
-          # obtain lock
-          #   read until EOF
-          #   append updates
-          # release lock
-          with self._lockfile():
-            self._read_to_eof()
-            pos = self.fp.tell()
-            self.fp.seek(0, SEEK_END)
-            if pos != self.fp.tell():
-              warning("update: pos after catch up=%r, pos after SEEK_END=%r", pos, self.fp.tell())
-            while not self._inQ.empty():
-              item = self._inQ._get()
-              self.transcribe_update(self.fp, item)
-            self.fp.flush()
+        if first or not self.no_monitor:
+          # catch up
+          # we force an EOF marker the first time
+          # so that external users can read the whole data file initially
+          count = self._read_to_eof(force_eof_marker=(first or self.eof_markers))
+          if first:
+            # indicate first to-EOF read complete, output queue primed
+            self.ready.put(True)
+        if not self.no_update:
+          # check for outgoing updates
+          if self._inQ.empty():
+            # sleep briefly if nothing to write out
+            if count == 0:
+              time.sleep(self.poll_interval)
+          else:
+            # updates due
+            # obtain lock
+            #   read until EOF
+            #   append updates
+            # release lock
+            with self._lockfile():
+              self._read_to_eof()
+              pos = self.fp.tell()
+              self.fp.seek(0, SEEK_END)
+              if pos != self.fp.tell():
+                warning("update: pos after catch up=%r, pos after SEEK_END=%r", pos, self.fp.tell())
+              while not self._inQ.empty():
+                item = self._inQ._get()
+                self.transcribe_update(self.fp, item)
+              self.fp.flush()
         # clear flag for next pass
         first = False
       self._outQ.close()
 
 class SharedAppendLines(SharedAppendFile):
 
+  def __init__(self, *a, **kw):
+    if 'binary' in kw:
+      raise ValueError('may not specify binary=')
+    SharedAppendFile.__init__(self, *a, binary=False, **kw)
+    self._line_partials = []
+
   def transcribe_update(self, fp, s):
+    ''' Transcribe a string as a line.
     '''
-    '''
+    # sanity check: we should only be writing between foreign updates
+    # and foreign updates should always be complete lines
+    if len(self._line_partials):
+      warning("%s._transcribe_update while non-empty partials[]: %r",
+              self, self._line_partials)
     if '\n' in s:
       raise ValueError("invalid string to transcribe, contains newline: %r" % (s,))
     fp.write(s)
@@ -1021,7 +1053,7 @@ class SharedAppendLines(SharedAppendFile):
       chunks = takewhile(lambda x: len(x) > 0, self._outQ)
     else:
       chunks = self._outQ
-    return as_lines(chunks)
+    return as_lines(chunks, self._line_partials)
 
 def chunks_of(fp, rsize=16384):
   ''' Generator to present text or data from an open file until EOF.
