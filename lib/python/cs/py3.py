@@ -10,7 +10,6 @@ if sys.hexversion >= 0x03000000:
 
   unicode = str
   StringTypes = (str,)
-  makebytes = bytes
   def ustr(s, e='utf-8'):
     return s
   from io import BytesIO, StringIO
@@ -22,14 +21,13 @@ if sys.hexversion >= 0x03000000:
     return o.keys()
   def itervalues(o):
     return o.values()
-  from builtins import sorted, filter
+  from builtins import sorted, filter, bytes
   from itertools import filterfalse
 
 else:
 
   globals()['unicode'] = unicode
   from types import StringTypes
-  makebytes = lambda bytevals: b''.join( chr(bv) for bv in bytevals )
   def ustr(s, e='utf-8'):
     ''' Upgrade str to unicode, if it is a str. Leave other types alone.
     '''
@@ -60,9 +58,36 @@ else:
     return _sorted(iterable, None, key, reverse)
   from itertools import ifilter as filter, ifilterfalse as filterfalse
 
+  class bytes(object):
+    __slots__ = ('_s',)
+    def __init__(self, arg):
+      from cs.logutils import X
+      try:
+        bytevals = iter(arg)
+      except TypeError:
+        bytevals = [ 0 for i in range(arg) ]
+      self._s = ''.join( chr(b) for b in bytevals )
+    def __repr__(self):
+      return 'b' + repr(self._s)
+    def __len__(self):
+      return len(self._s)
+    def __eq__(self, other):
+      if len(self) != len(other):
+        return False
+      return all( self[i] == other[i] for i in range(len(self)) )
+    def __getitem__(self, index):
+      s2 = self._s[index]
+      if isinstance(index, slice):
+        return bytes( ord(ch) for ch in s2 )
+      return ord(s2[0])
+
 def raise3(exc_type, exc_value, exc_traceback):
   if sys.hexversion >= 0x03000000:
     raise exc_type(exc_value).with_traceback(exc_traceback)
   else:
     # subterfuge to let this pass a python3 parser; ugly
     exec('raise exc_type, exc_value, exc_traceback')
+
+if __name__ == '__main__':
+  import cs.py3_tests
+  cs.py3_tests.selftest(sys.argv)
