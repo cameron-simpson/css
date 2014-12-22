@@ -36,10 +36,10 @@ if sys.hexversion < 0x03000000:
   def itervalues(o):
     return o.itervalues()
   input = raw_input
-
   _sorted = sorted
   def sorted(iterable, key=None, reverse=False):
     return _sorted(iterable, None, key, reverse)
+  from itertools import ifilter as filter, ifilterfalse as filterfalse
 
 else:
 
@@ -57,7 +57,8 @@ else:
     return o.keys()
   def itervalues(o):
     return o.values()
-  from builtins import sorted
+  from builtins import sorted, filter
+  from itertools import filterfalse
 
 def raise3(exc_type, exc_value, exc_traceback):
   if sys.hexversion >= 0x03000000:
