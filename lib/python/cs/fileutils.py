@@ -31,6 +31,8 @@ from cs.timeutils import TimeoutError
 from cs.obj import O
 from cs.py3 import ustr
 
+DEFAULT_POLL_INTERVAL = 1.0
+
 def saferename(oldpath, newpath):
   ''' Rename a path using os.rename(), but raise an exception if the target
       path already exists. Slightly racey.
@@ -268,7 +270,7 @@ def file_property(func):
   '''
   return make_file_property()(func)
 
-def make_file_property(attr_name=None, unset_object=None, poll_rate=1):
+def make_file_property(attr_name=None, unset_object=None, poll_rate=DEFAULT_POLL_INTERVAL):
   ''' Construct a decorator that watches an associated file.
       `attr_name`: the underlying attribute, default: '_' + func.__name__
       `unset_object`: the sentinel value for "uninitialised", default: None
@@ -380,7 +382,7 @@ def files_property(func):
   '''
   return make_files_property()(func)
 
-def make_files_property(attr_name=None, unset_object=None, poll_rate=1):
+def make_files_property(attr_name=None, unset_object=None, poll_rate=DEFAULT_POLL_INTERVAL):
   ''' Construct a decorator that watches multiple associated files.
       `attr_name`: the underlying attribute, default: '_' + func.__name__
       `unset_object`: the sentinel value for "uninitialised", default: None
@@ -483,7 +485,7 @@ def make_files_property(attr_name=None, unset_object=None, poll_rate=1):
   return made_files_property
 
 @contextmanager
-def lockfile(path, ext=None, poll_interval=0.1, timeout=None):
+def lockfile(path, ext=None, poll_interval=None, timeout=None):
   ''' A context manager which takes and holds a lock file.
       `path`: the base associated with the lock file.
       `ext`: the extension to the base used to construct the lock file name.
@@ -492,6 +494,8 @@ def lockfile(path, ext=None, poll_interval=0.1, timeout=None):
                  default None (wait forever).
       `poll_interval`: polling frequency when timeout is not 0.
   '''
+  if poll_interval is None:
+    poll_interval = DEFAULT_POLL_INTERVAL
   if ext is None:
     ext = '.lock'
   if timeout is not None and timeout < 0:
@@ -514,7 +518,7 @@ def lockfile(path, ext=None, poll_interval=0.1, timeout=None):
           # first try - set up counters
           start = now
           complaint_last = start
-          complaint_interval = 1.0
+          complaint_interval = 2 * max(DEFAULT_POLL_INTERVAL, poll_interval)
         else:
           if now - complaint_last >= complaint_interval:
             from cs.logutils import warning
@@ -532,7 +536,7 @@ def lockfile(path, ext=None, poll_interval=0.1, timeout=None):
           raise TimeoutError("cs.fileutils.lockfile: pid %d timed out on lockfile \"%s\""
                              % (os.getpid(), lockpath),
                              timeout)
-        time.sleep(poll_interval)
+        time.sleep(sleep_for)
         continue
       raise
     else:
@@ -861,7 +865,6 @@ class SharedAppendFile(object):
   '''
 
   DEFAULT_MAX_QUEUE = 128
-  DEFAULT_POLL_INTERVAL = 0.1
 
   def __init__(self, pathname, readonly=False, writeonly=False,
                 binary=False, max_queue=None,
@@ -874,7 +877,7 @@ class SharedAppendFile(object):
         `writeonly`: set to true if we will monitor foreign updates.
         `binary`: if the ile is to be opened in binary mode, otherwise text mode.
         `max_queue`: maximum input and output Queue length. Default: SharedAppendFile.DEFAULT_MAX_QUEUE.
-        `poll_interval`: sleep time between polls after an idle poll. Default: SharedAppendFile.DEFAULT_POLL_INTERVAL.
+        `poll_interval`: sleep time between polls after an idle poll. Default: DEFAULT_POLL_INTERVAL.
         `eof_markers`: set to true to put an empty chunk only to the output Queue when EOF reached.
         `lock_ext`: lock file extension.
         `lock_timeout`: maxmimum time to wait for obtaining the lock file.
@@ -882,7 +885,7 @@ class SharedAppendFile(object):
     if max_queue is None:
       max_queue = self.DEFAULT_MAX_QUEUE
     if poll_interval is None:
-      poll_interval = self.DEFAULT_POLL_INTERVAL
+      poll_interval = DEFAULT_POLL_INTERVAL
     self.pathname = pathname
     self.readonly = readonly
     self.writeonly = readonly
