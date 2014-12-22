@@ -868,6 +868,14 @@ class SharedAppendFile(object):
       cs.nodedb.csvdb.Backend_CSVFile, where multiple users can
       read from a common CSV file, and coordinate updates with a
       lock file.
+
+      Subclasses need to implement one methods:
+
+      transcribe_update(self, fp, item):
+        fp    the output file
+        item  the output record, to be serialised to the file
+
+      l
   '''
 
   DEFAULT_MAX_QUEUE = 128
@@ -957,6 +965,13 @@ class SharedAppendFile(object):
     ''' Queue an update record for transcription to the shared file.
     '''
     self._inQ.put(update_item)
+
+  def __iter__(self):
+    ''' For iterating over the foreign updates.
+    '''
+    if self.no_monitor:
+      raise RUntimeError("no_monitor is true")
+    return self._outQ
 
   def _read_to_eof(self, force_eof_marker=False):
     ''' Read update data from the file until EOF, put data chunks onto ._outQ.
@@ -1051,9 +1066,9 @@ class SharedAppendLines(SharedAppendFile):
     if to_eof:
       if not self.eof_markers:
         raise ValueError("to_eof forbidden if not self.eof_markers")
-      chunks = takewhile(lambda x: len(x) > 0, self._outQ)
+      chunks = takewhile(lambda x: len(x) > 0, iter(self))
     else:
-      chunks = self._outQ
+      chunks = iter(self)
     return as_lines(chunks, self._line_partials)
 
 def chunks_of(fp, rsize=16384):
