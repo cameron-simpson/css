@@ -867,7 +867,7 @@ class SharedAppendFile(object):
       The use case derives from the shared CSV files used by
       cs.nodedb.csvdb.Backend_CSVFile, where multiple users can
       read from a common CSV file, and coordinate updates with a
-      lockfile.
+      lock file.
   '''
 
   DEFAULT_MAX_QUEUE = 128
@@ -1008,10 +1008,11 @@ class SharedAppendFile(object):
             #   append updates
             # release lock
             with self._lockfile():
-              self._read_to_eof()
-              pos = self.fp.tell()
+              if not self.no_monitor:
+                self._read_to_eof()
+                pos = self.fp.tell()
               self.fp.seek(0, SEEK_END)
-              if pos != self.fp.tell():
+              if not self.no_monitor and pos != self.fp.tell():
                 warning("update: pos after catch up=%r, pos after SEEK_END=%r", pos, self.fp.tell())
               while not self._inQ.empty():
                 item = self._inQ._get()
