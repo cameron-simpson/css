@@ -6,7 +6,26 @@
 
 import sys
 
-if sys.hexversion < 0x03000000:
+if sys.hexversion >= 0x03000000:
+
+  unicode = str
+  StringTypes = (str,)
+  makebytes = bytes
+  def ustr(s, e='utf-8'):
+    return s
+  from io import BytesIO, StringIO
+  from queue import Queue, PriorityQueue, Full as Queue_Full, Empty as Queue_Empty
+  from configparser import ConfigParser
+  def iteritems(o):
+    return o.items()
+  def iterkeys(o):
+    return o.keys()
+  def itervalues(o):
+    return o.values()
+  from builtins import sorted, filter
+  from itertools import filterfalse
+
+else:
 
   globals()['unicode'] = unicode
   from types import StringTypes
@@ -40,25 +59,6 @@ if sys.hexversion < 0x03000000:
   def sorted(iterable, key=None, reverse=False):
     return _sorted(iterable, None, key, reverse)
   from itertools import ifilter as filter, ifilterfalse as filterfalse
-
-else:
-
-  unicode = str
-  StringTypes = (str,)
-  makebytes = bytes
-  def ustr(s, e='utf-8'):
-    return s
-  from io import BytesIO, StringIO
-  from queue import Queue, PriorityQueue, Full as Queue_Full, Empty as Queue_Empty
-  from configparser import ConfigParser
-  def iteritems(o):
-    return o.items()
-  def iterkeys(o):
-    return o.keys()
-  def itervalues(o):
-    return o.values()
-  from builtins import sorted, filter
-  from itertools import filterfalse
 
 def raise3(exc_type, exc_value, exc_traceback):
   if sys.hexversion >= 0x03000000:
