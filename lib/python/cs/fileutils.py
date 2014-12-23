@@ -878,7 +878,10 @@ class SharedAppendFile(object):
         fp    the output file
         item  the output record, to be serialised to the file
 
-      l
+      apply_update(self, item):
+        item  the foreign update record
+
+      item will be None whenever EOF is reached on the file.
   '''
 
   DEFAULT_MAX_QUEUE = 128
