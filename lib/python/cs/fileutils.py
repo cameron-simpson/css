@@ -808,8 +808,10 @@ class BackedFile(RawIOBase):
     start = self._offset
     front_file.seek(start)
     written = front_file.write(b)
-    if written is not None:
-      self.front_range.add_span(start, start+written)
+    if written is None:
+      warning("front_file.write() returned None, assuming %d bytes written, data=%r", len(b), b)
+      written = len(b)
+    self.front_range.add_span(start, start+written)
     return written
 
 class BackedFile_TestMethods(object):
