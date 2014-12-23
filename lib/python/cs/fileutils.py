@@ -847,7 +847,7 @@ class BackedFile_TestMethods(object):
     fr = bfp.front_range
     self.assertIsNotNone(ffp)
     self.assertIsNotNone(fr)
-    self.assertEqual(len(fr._spans), 1)
+    self.assertEqual(len(fr._spans), 1, "fr._spans = %r" % (fr._spans,))
     self.assertEqual(fr._spans[0].start, 512)
     self.assertEqual(fr._spans[0].end, 768)
     # read the random data back from the front file
