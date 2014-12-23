@@ -58,25 +58,20 @@ else:
     return _sorted(iterable, None, key, reverse)
   from itertools import ifilter as filter, ifilterfalse as filterfalse
 
-  class bytes(object):
-    __slots__ = ('_s',)
-    def __init__(self, arg):
+  class bytes(str):
+    def __new__(cls, arg):
       from cs.logutils import X
       try:
         bytevals = iter(arg)
       except TypeError:
         bytevals = [ 0 for i in range(arg) ]
-      self._s = ''.join( chr(b) for b in bytevals )
+      s = ''.join( chr(b) for b in bytevals )
+      self = str.__new__(cls, s)
+      return self
     def __repr__(self):
-      return 'b' + repr(self._s)
-    def __len__(self):
-      return len(self._s)
-    def __eq__(self, other):
-      if len(self) != len(other):
-        return False
-      return all( self[i] == other[i] for i in range(len(self)) )
+      return 'b' + str.__repr__(self)
     def __getitem__(self, index):
-      s2 = self._s[index]
+      s2 = str.__getitem__(self, index)
       if isinstance(index, slice):
         return bytes( ord(ch) for ch in s2 )
       return ord(s2[0])
