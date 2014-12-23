@@ -15,6 +15,7 @@ import errno
 import sys
 from collections import namedtuple
 from contextlib import contextmanager
+from itertools import takewhile
 import shutil
 from tempfile import TemporaryFile, NamedTemporaryFile
 from threading import RLock, Thread
@@ -30,7 +31,7 @@ from cs.range import Range
 from cs.threads import locked, locked_property
 from cs.timeutils import TimeoutError
 from cs.obj import O
-from cs.py3 import ustr
+from cs.py3 import ustr, filter, bytes
 
 DEFAULT_POLL_INTERVAL = 1.0
 
