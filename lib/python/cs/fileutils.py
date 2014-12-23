@@ -896,7 +896,6 @@ class SharedAppendFile(object):
         `binary`: if the ile is to be opened in binary mode, otherwise text mode.
         `max_queue`: maximum input and output Queue length. Default: SharedAppendFile.DEFAULT_MAX_QUEUE.
         `poll_interval`: sleep time between polls after an idle poll. Default: DEFAULT_POLL_INTERVAL.
-        `eof_markers`: set to true to put an empty chunk only to the output Queue when EOF reached.
         `lock_ext`: lock file extension.
         `lock_timeout`: maxmimum time to wait for obtaining the lock file.
     '''
@@ -905,13 +904,10 @@ class SharedAppendFile(object):
         max_queue = self.DEFAULT_MAX_QUEUE
       if poll_interval is None:
         poll_interval = DEFAULT_POLL_INTERVAL
-      if no_monitor and eof_markers:
-        raise ValueError("no_monitor and eof_markers may not both be true")
       self.pathname = pathname
       self.binary = binary
       self.no_update = no_update
       self.no_monitor = no_monitor
-      self.eof_markers = eof_markers
       self.poll_interval = poll_interval
       self.max_queue = max_queue
       self.ready = Asynchron(name="readiness(%s)" % (self,))
@@ -976,10 +972,10 @@ class SharedAppendFile(object):
       raise RUntimeError("no_monitor is true")
     return self._outQ
 
-  def _read_to_eof(self, force_eof_marker=False):
+  def _read_to_eof(self):
     ''' Read update data from the file until EOF, put data chunks onto ._outQ.
+        At EOF put None.
         Return number of reads with data; 0 ==> no new data.
-        `force_eof_marker`: put an EOF marker even if no other chunks were obtained
     '''
     debug("READ_TO_EOF...")
     count = 0
@@ -992,8 +988,8 @@ class SharedAppendFile(object):
     if force_eof_marker or (count > 0 and self.eof_markers):
       # write an EOF marker if we gathered any data (or if force_eof_marker)
       debug("READ_TO_EOF: PUT EOF MARKER")
-      self._outQ.put(b'' if self.binary else '')
-    if count > 0 or force_eof_marker:
+      self._outQ.put(None)
+    if count > 0:
       debug("READ_TO_EOF COMPLETE: CHUNK COUNT=%d", count)
     return count
 
@@ -1007,9 +1003,7 @@ class SharedAppendFile(object):
       while not self._inQ.closed or not self._inQ.empty():
         if first or not self.no_monitor:
           # catch up
-          # we force an EOF marker the first time
-          # so that external users can read the whole data file initially
-          count = self._read_to_eof(force_eof_marker=(first or self.eof_markers))
+          count = self._read_to_eof()
           if first:
             # indicate first to-EOF read complete, output queue primed
             self.ready.put(True)
@@ -1063,15 +1057,15 @@ class SharedAppendLines(SharedAppendFile):
 
   def foreign_lines(self, to_eof=False):
     ''' Generator yielding update lines from other writers.
-        `to_eof`: stop when the EOF marker is seen; requires self.eof_markers to be true.
+        `to_eof`: stop when the EOF marker is seen
         Otherwise the generator will run until the SharedAppendLines is closed.
     '''
     if to_eof:
       if not self.eof_markers:
         raise ValueError("to_eof forbidden if not self.eof_markers")
-      chunks = takewhile(lambda x: len(x) > 0, iter(self))
+      chunks = takewhile(lambda x: x is not None, iter(self))
     else:
-      chunks = iter(self)
+      chunks = filter(lambda x: x is not None, iter(self))
     return as_lines(chunks, self._line_partials)
 
 def chunks_of(fp, rsize=16384):
