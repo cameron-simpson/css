@@ -1070,8 +1070,8 @@ class SharedAppendLines(SharedAppendFile):
     importer = kw.get('importer')
     if importer is not None:
       kw['importer'] = lambda chunk: self._linearise(chunk, importer)
-    SharedAppendFile.__init__(self, *a, binary=False, **kw)
     self._line_partials = []
+    SharedAppendFile.__init__(self, *a, binary=False, **kw)
 
   def _linearise(self, chunk, importer):
     ''' Importer for SharedAppendFile: convert to lines from raw data, pass to real importer.
