@@ -1086,7 +1086,7 @@ class SharedAppendLines(SharedAppendFile):
         if nlpos < 0:
           break
         line = ''.join( partials + [chunk[start:nlpos+1]] )
-        partials = []
+        partials[:] = []
         importer(line)
         start = nlpos + 1
       if start < len(chunk):
