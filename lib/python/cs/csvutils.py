@@ -62,9 +62,21 @@ else:
 class SharedCSVFile(SharedAppendLines):
 
   def __init__(self, pathname, readonly=False, **kw):
+    importer = kw.get('importer')
+    if importer is not None:
+      kw['importer'] = lambda line: self._csvify(line, importer)
     self._csv_partials = []
     SharedAppendLines.__init__(self, pathname, no_update=readonly, **kw)
     self._stringio = StringIO()
+
+  def _csvify(self, line, importer):
+    ''' Importer for SharedAppendLines: convert to row from CSV data, pass to real importer.
+    '''
+    if line is None:
+      importer(None)
+    else:
+      for row in csv_reader([line]):
+        importer(row)
 
   def transcribe_update(self, fp, row):
     ''' Transcribe an update `row` to the supplied file `fp`.
@@ -82,10 +94,3 @@ class SharedCSVFile(SharedAppendLines):
     else:
       fp.write(sfp.getvalue())
     sfp.flush()
-
-  def foreign_rows(self, to_eof=False):
-    ''' Generator yielding update rows from other writers.
-        `to_eof`: stop when the EOF marker is seen; requires self.eof_markers to be true.
-    '''
-    for row in csv_reader(self.foreign_lines(to_eof=to_eof)):
-      yield row
