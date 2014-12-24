@@ -872,16 +872,54 @@ class SharedAppendFile(object):
       read from a common CSV file, and coordinate updates with a
       lock file.
 
-      Subclasses need to implement one methods:
+      Subclasses need to implement one method:
 
       transcribe_update(self, fp, item):
         fp    the output file
         item  the output record, to be serialised to the file
 
-      apply_update(self, item):
-        item  the foreign update record
+      Users of the class or subclass who need to receive foreign
+      updates need to supply the `importer` parameter, a callable
+      which is handed a foreign record from the file to incorporate
+      into their own state. They must be prepared to accept the
+      None singleton, which is a marker for seeing EOF on the backing
+      file; it is sent unconditionally on the first scan of the
+      file and then whenever a scan of the file receives additional
+      data.
 
-      item will be None whenever EOF is reached on the file.
+      Sunclasses which emit higher order records, such as
+      SharedAppendLines below, will need to intercept the `importer`
+      paramater and substitute one of their own which constructs
+      records from the lower order data received from the superclass.
+      For example, here is the for in SharedAppendLines.__init__
+      for this purpose:
+
+        importer = kw.get('importer')
+        if importer is not None:
+          kw['importer'] = lambda chunk: self._linearise(chunk, importer)
+
+      The ._linearise method accepts data chunks from the
+      SharedAppendFile superclass and passes completed text lines
+      to the supplied `importer`, keeping the state of incomplete
+      line data between calls.
+
+      Note that the intercepting importer passes through None calues
+      immediately; they indicate only that more raw data has been
+      gathered from the backing file, not that a complete record
+      has been assembled for import. For example,
+      SharedAppendLines._linearise starts like this:
+
+        if chunk is None:
+          importer(None)
+        else:
+          ... gather chunk into lines ...
+
+      Therefore real imported and intercepting importers must be
+      prepared to accept None at any time; an interceptor passes
+      it through and a real (end user) importer discards it, but
+      may use the receipt of None to update state such as determining
+      that the first scan of the backing file has completed or to
+      update some progress/activity indicator.
   '''
 
   DEFAULT_MAX_QUEUE = 128
