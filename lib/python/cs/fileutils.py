@@ -927,7 +927,6 @@ class SharedAppendFile(object):
   def __init__(self, pathname, no_update=False, no_monitor=False,
                 binary=False, max_queue=None,
                 poll_interval=None,
-                eof_markers = False,
                 lock_ext=None, lock_timeout=None):
     ''' Initialise this SharedAppendFile.
         `pathname`: the pathname of the file to open.
