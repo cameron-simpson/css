@@ -967,6 +967,7 @@ class SharedAppendFile(object):
     if self.binary:
       mode += "b"
     self.fp = open(self.pathname, mode)
+    self.closed = False
     self._monitor_thread = Thread(target=self._monitor, name="%s._monitor" % (self,))
     self._monitor_thread.daemon = True
     self._monitor_thread.start()
@@ -974,7 +975,11 @@ class SharedAppendFile(object):
   def close(self):
     ''' Close the SharedAppendFile: close input queue, wait for monitor to terminate.
     '''
-    self._inQ.close()
+    if self.closed:
+      warning("multiple close of %s", self)
+    self.closed = True
+    if not self.no_update:
+      self._inQ.close()
     self._monitor_thread.join()
     fp = self.fp
     self.fp = None
@@ -1029,7 +1034,12 @@ class SharedAppendFile(object):
     '''
     with Pfx("%s._monitor", self):
       first = True
-      while not self._inQ.closed or not self._inQ.empty():
+      # run until closed and no pending outbound updates
+      while ( not self.closed
+           or ( not self.no_update
+            and (not self._inQ.closed or not self._inQ.empty())
+              )
+            ):
         if self.importer:
           # catch up
           count = self._read_to_eof(force_eof=first)
