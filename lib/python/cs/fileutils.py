@@ -1067,8 +1067,30 @@ class SharedAppendLines(SharedAppendFile):
   def __init__(self, *a, **kw):
     if 'binary' in kw:
       raise ValueError('may not specify binary=')
+    importer = kw.get('importer')
+    if importer is not None:
+      kw['importer'] = lambda chunk: self._linearise(chunk, importer)
     SharedAppendFile.__init__(self, *a, binary=False, **kw)
     self._line_partials = []
+
+  def _linearise(self, chunk, importer):
+    ''' Importer for SharedAppendFile: convert to lines from raw data, pass to real importer.
+    '''
+    if chunk is None:
+      importer(None)
+    else:
+      partials = self._line_partials
+      start = 0
+      while True:
+        nlpos = chunk.find('\n', start)
+        if nlpos < 0:
+          break
+        line = ''.join( partials + [chunk[start:nlpos+1]] )
+        partials = []
+        importer(line)
+        start = nlpos + 1
+      if start < len(chunk):
+        partials.append(chunk[start:])
 
   def transcribe_update(self, fp, s):
     ''' Transcribe a string as a line.
@@ -1082,19 +1104,6 @@ class SharedAppendLines(SharedAppendFile):
       raise ValueError("invalid string to transcribe, contains newline: %r" % (s,))
     fp.write(s)
     fp.write('\n')
-
-  def foreign_lines(self, to_eof=False):
-    ''' Generator yielding update lines from other writers.
-        `to_eof`: stop when the EOF marker is seen
-        Otherwise the generator will run until the SharedAppendLines is closed.
-    '''
-    if to_eof:
-      if not self.eof_markers:
-        raise ValueError("to_eof forbidden if not self.eof_markers")
-      chunks = takewhile(lambda x: x is not None, iter(self))
-    else:
-      chunks = filter(lambda x: x is not None, iter(self))
-    return as_lines(chunks, self._line_partials)
 
 def chunks_of(fp, rsize=16384):
   ''' Generator to present text or data from an open file until EOF.
