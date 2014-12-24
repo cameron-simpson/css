@@ -914,7 +914,7 @@ class SharedAppendFile(object):
         else:
           ... gather chunk into lines ...
 
-      Therefore real imported and intercepting importers must be
+      Therefore real importers and intercepting importers must be
       prepared to accept None at any time; an interceptor passes
       it through and a real (end user) importer discards it, but
       may use the receipt of None to update state such as determining
