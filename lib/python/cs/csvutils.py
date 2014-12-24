@@ -15,10 +15,12 @@ import csv
 import sys
 from itertools import takewhile
 from StringIO import StringIO
+from threading import Thread
 from cs.debug import trace
 from cs.fileutils import SharedAppendLines
 from cs.logutils import warning, X
 from cs.lex import as_lines
+from cs.queues import IterableQueue
 
 if sys.hexversion < 0x03000000:
 
@@ -64,19 +66,29 @@ class SharedCSVFile(SharedAppendLines):
   def __init__(self, pathname, readonly=False, **kw):
     importer = kw.get('importer')
     if importer is not None:
-      kw['importer'] = lambda line: self._csvify(line, importer)
+      kw['importer'] = lambda line: self._queue_csv_text(line, importer)
     self._csv_partials = []
-    SharedAppendLines.__init__(self, pathname, no_update=readonly, **kw)
+    self._importQ = IterableQueue(1, name="SharedCSVFile(%r)._importQ" % (pathname,))
+    self._csvr = csv_reader(self._importQ)
+    self._csv_stream_thread = Thread(target=self._csv_stream,
+                                     name="SharedCSVFile(%r)._csv_stream_thread" % (pathname,),
+                                     args=(importer,))
+    self._csv_stream_thread.daemon = True
+    self._csv_stream_thread.start()
     self._stringio = StringIO()
+    SharedAppendLines.__init__(self, pathname, no_update=readonly, **kw)
 
-  def _csvify(self, line, importer):
+  def _queue_csv_text(self, line, importer):
     ''' Importer for SharedAppendLines: convert to row from CSV data, pass to real importer.
     '''
     if line is None:
       importer(None)
     else:
-      for row in csv_reader([line]):
-        importer(row)
+      self._importQ.put(line)
+
+  def _csv_stream(self, importer):
+    for row in self._csvr:
+      importer(row)
 
   def transcribe_update(self, fp, row):
     ''' Transcribe an update `row` to the supplied file `fp`.
