@@ -34,8 +34,10 @@ from cs.lex import get_white, get_nonwhite, get_other_chars, get_qstr, \
 from cs.logutils import Pfx, setup_logging, with_log, \
                         debug, info, warning, error, exception, \
                         D, X, LogTime
-from cs.mailutils import Maildir, message_addresses, modify_header, shortpath, ismaildir, make_maildir
+from cs.mailutils import Maildir, message_addresses, modify_header, \
+                         shortpath, ismaildir, make_maildir
 from cs.obj import O, slist
+from cs.seq import first
 from cs.threads import locked, locked_property
 from cs.app.maildb import MailDB
 from cs.py.modules import import_module_name
@@ -782,7 +784,7 @@ class MessageFiler(O):
                               'term',
                                '-e',
                                 'mutt-open-message',
-                                 '-f', self.save_to_folders[0], msg_id,
+                                 '-f', first(self.save_to_folders), msg_id,
                              '--'] )
     subargv.append(alert_message)
     xit = subprocess.call(subargv)
