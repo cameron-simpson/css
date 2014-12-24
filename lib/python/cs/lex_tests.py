@@ -11,7 +11,7 @@ from cs.lex import texthexify, untexthexify, \
                    get_envvar, \
                    get_sloshed_text, SLOSH_CHARMAP, \
                    get_qstr
-from cs.py3 import makebytes
+from cs.py3 import bytes
 ##from cs.logutils import X
 
 class TestLex(unittest.TestCase):
@@ -31,7 +31,7 @@ class TestLex(unittest.TestCase):
 
   def test01texthexify(self):
     self.assertEqual('', texthexify(b''))
-    self.assertEqual('00', texthexify(makebytes( (0x00,) )))
+    self.assertEqual('00', texthexify(bytes( (0x00,) )))
 
   def test02get_envvar(self):
     self.assertEqual( get_envvar('$!', specials=self.env_specials), ('99', 2) )
