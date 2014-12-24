@@ -903,7 +903,7 @@ class SharedAppendFile(object):
       to the supplied `importer`, keeping the state of incomplete
       line data between calls.
 
-      Note that the intercepting importer passes through None calues
+      Note that the intercepting importer passes through None values
       immediately; they indicate only that more raw data has been
       gathered from the backing file, not that a complete record
       has been assembled for import. For example,
