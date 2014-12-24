@@ -882,7 +882,7 @@ class SharedAppendFile(object):
       updates need to supply the `importer` parameter, a callable
       which is handed a foreign record from the file to incorporate
       into their own state. They must be prepared to accept the
-      None singleton, which is a marker for seeing EOF on the backing
+      value None, which is a marker for seeing EOF on the backing
       file; it is sent unconditionally on the first scan of the
       file and then whenever a scan of the file receives additional
       data.
@@ -924,17 +924,16 @@ class SharedAppendFile(object):
 
   DEFAULT_MAX_QUEUE = 128
 
-  def __init__(self, pathname, no_update=False, no_monitor=False,
+  def __init__(self, pathname, no_update=False, importer=None,
                 binary=False, max_queue=None,
                 poll_interval=None,
                 lock_ext=None, lock_timeout=None):
     ''' Initialise this SharedAppendFile.
         `pathname`: the pathname of the file to open.
+        `importer`: callable to accept foreign data chunks as their appear
         `no_update`: set to true if we will not write updates.
-        `no_monitor`: set to true if we will not monitor foreign updates.
-            Note: the source file will still be read once to load its contents.
         `binary`: if the ile is to be opened in binary mode, otherwise text mode.
-        `max_queue`: maximum input and output Queue length. Default: SharedAppendFile.DEFAULT_MAX_QUEUE.
+        `max_queue`: maximum input Queue length. Default: SharedAppendFile.DEFAULT_MAX_QUEUE.
         `poll_interval`: sleep time between polls after an idle poll. Default: DEFAULT_POLL_INTERVAL.
         `lock_ext`: lock file extension.
         `lock_timeout`: maxmimum time to wait for obtaining the lock file.
@@ -947,7 +946,7 @@ class SharedAppendFile(object):
       self.pathname = pathname
       self.binary = binary
       self.no_update = no_update
-      self.no_monitor = no_monitor
+      self.importer = importer
       self.poll_interval = poll_interval
       self.max_queue = max_queue
       self.ready = Asynchron(name="readiness(%s)" % (self,))
@@ -956,8 +955,6 @@ class SharedAppendFile(object):
       if not no_update:
         # inbound updates to be saved to the file
         self._inQ = IterableQueue(self.max_queue, name="%s._inQ" % (self,))
-      # outbound outdates by others users of the file
-      self._outQ = IterableQueue(self.max_queue, name="%s._outQ" % (self,))
       self._open()
 
   def __str__(self):
@@ -1005,17 +1002,12 @@ class SharedAppendFile(object):
     '''
     self._inQ.put(update_item)
 
-  def __iter__(self):
-    ''' For iterating over the foreign updates.
-    '''
-    if self.no_monitor:
-      raise RUntimeError("no_monitor is true")
-    return self._outQ
-
-  def _read_to_eof(self):
-    ''' Read update data from the file until EOF, put data chunks onto ._outQ.
-        At EOF put None.
-        Return number of reads with data; 0 ==> no new data.
+  def _read_to_eof(self, force_eof=False):
+    ''' Read update data from the file until EOF, hand data chunks to the importer.
+        At EOF put None if at least one chunk was sent or force_eof
+        is True (set on the first scan so that end users can know
+        when the backing file has completed its initial read).
+        Return the number of reads with data; 0 ==> no new data.
     '''
     debug("READ_TO_EOF...")
     count = 0
@@ -1023,14 +1015,11 @@ class SharedAppendFile(object):
       if len(chunk) == 0:
         warning("empty chunk received from chunks_of(%s)", self.fp)
       else:
-        self._outQ.put(chunk)
+        self.importer(chunk)
         count += 1
-    if force_eof_marker or (count > 0 and self.eof_markers):
-      # write an EOF marker if we gathered any data (or if force_eof_marker)
-      debug("READ_TO_EOF: PUT EOF MARKER")
-      self._outQ.put(None)
-    if count > 0:
+    if force_eof or count > 0:
       debug("READ_TO_EOF COMPLETE: CHUNK COUNT=%d", count)
+      self.importer(None)
     return count
 
   def _monitor(self):
@@ -1041,9 +1030,9 @@ class SharedAppendFile(object):
     with Pfx("%s._monitor", self):
       first = True
       while not self._inQ.closed or not self._inQ.empty():
-        if first or not self.no_monitor:
+        if self.importer:
           # catch up
-          count = self._read_to_eof()
+          count = self._read_to_eof(force_eof=first)
           if first:
             # indicate first to-EOF read complete, output queue primed
             self.ready.put(True)
@@ -1060,7 +1049,7 @@ class SharedAppendFile(object):
             #   append updates
             # release lock
             with self._lockfile():
-              if not self.no_monitor:
+              if self.importer:
                 self._read_to_eof()
                 pos = self.fp.tell()
               self.fp.seek(0, SEEK_END)
@@ -1072,7 +1061,6 @@ class SharedAppendFile(object):
               self.fp.flush()
         # clear flag for next pass
         first = False
-      self._outQ.close()
 
 class SharedAppendLines(SharedAppendFile):
 
