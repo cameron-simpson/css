@@ -1053,7 +1053,7 @@ class SharedAppendFile(object):
                 self._read_to_eof()
                 pos = self.fp.tell()
               self.fp.seek(0, SEEK_END)
-              if not self.no_monitor and pos != self.fp.tell():
+              if self.importer and pos != self.fp.tell():
                 warning("update: pos after catch up=%r, pos after SEEK_END=%r", pos, self.fp.tell())
               while not self._inQ.empty():
                 item = self._inQ._get()
