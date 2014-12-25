@@ -536,29 +536,26 @@ class MessageFiler(O):
     ok = True
     # save message to folders
     for folder in sorted(self.save_to_folders):
-      with Pfx(folder):
-        try:
-          folderpath = self.resolve(folder)
-          save_to_folderpath(folderpath, self.message, self.message_path, self.flags)
-        except Exception as e:
-          exception("saving to folder %r: %s", folder, e)
-          ok = False
+      try:
+        folderpath = self.resolve(folder)
+        save_to_folderpath(folderpath, self.message, self.message_path, self.flags)
+      except Exception as e:
+        exception("saving to folder %r: %s", folder, e)
+        ok = False
     # forward message
     for address in sorted(self.save_to_addresses):
-      with Pfx(folder):
-        try:
-          self.sendmail(address)
-        except Exception as e:
-          exception("forwarding to address %r: %s", folder, e)
-          ok = False
+      try:
+        self.sendmail(address)
+      except Exception as e:
+        exception("forwarding to address %r: %s", folder, e)
+        ok = False
     # pipeline message
     for shcmd, shenv in self.save_to_cmds:
-      with Pfx(folder):
-        try:
-          self.save_to_pipe(['/bin/sh', '-c', shcmd], shenv)
-        except Exception as e:
-          exception("forwarding to address %r: %s", folder, e)
-          ok = False
+      try:
+        self.save_to_pipe(['/bin/sh', '-c', shcmd], shenv)
+      except Exception as e:
+        exception("forwarding to address %r: %s", folder, e)
+        ok = False
     # issue arrival alert
     if self.flags.alert > 0:
       self.alert(self.flags.alert)
