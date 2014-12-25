@@ -331,38 +331,33 @@ class MailFiler(O):
       logfile = self.folder_logfile(wmdir.path)
     with with_log(logfile, no_prefix=True):
       debug("sweep %s", wmdir.shortname)
-      with Pfx("sweep %s", wmdir.shortname):
-        nmsgs = 0
-        skipped = 0
-        with LogTime("all keys") as all_keys_time:
-          for key in wmdir.keys(flush=True):
-            with Pfx(key):
-              if key in wmdir.lurking:
-                debug("skip lurking key")
-                skipped += 1
-                continue
-              nmsgs += 1
-
-              with LogTime("key = %s", key, threshold=1.0, level=DEBUG):
-                ok = self.file_wmdir_key(wmdir, key)
-                if not ok:
-                  warning("NOT OK, lurking key %s", key)
-                  wmdir.lurk(key)
-                  continue
-
-                if no_remove:
-                  info("no_remove: message not removed, lurking key %s", key)
-                  wmdir.lurk(key)
-                else:
-                  debug("remove message key %s", key)
-                  wmdir.remove(key)
-                  wmdir.lurking.discard(key)
-                if justone:
-                  break
-
-        if nmsgs or all_keys_time.elapsed >= 0.2:
-          info("filtered %d messages (%d skipped) in %5.3fs",
-               nmsgs, skipped, all_keys_time.elapsed)
+      nmsgs = 0
+      skipped = 0
+      with LogTime("all keys") as all_keys_time:
+        for key in wmdir.keys(flush=True):
+          if key in wmdir.lurking:
+            debug("skip lurking key")
+            skipped += 1
+            continue
+          nmsgs += 1
+          with LogTime("key = %s", key, threshold=1.0, level=DEBUG):
+            ok = self.file_wmdir_key(wmdir, key)
+            if not ok:
+              warning("NOT OK, lurking key %s", key)
+              wmdir.lurk(key)
+              continue
+            if no_remove:
+              info("no_remove: message not removed, lurking key %s", key)
+              wmdir.lurk(key)
+            else:
+              debug("remove message key %s", key)
+              wmdir.remove(key)
+              wmdir.lurking.discard(key)
+            if justone:
+              break
+      if nmsgs or all_keys_time.elapsed >= 0.2:
+        info("filtered %d messages (%d skipped) in %5.3fs",
+             nmsgs, skipped, all_keys_time.elapsed)
 
   def save(self, targets, msgfp):
     ''' Implementation for command line "save" function: save file to target.
