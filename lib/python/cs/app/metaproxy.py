@@ -67,6 +67,15 @@ def main(argv):
   X("P = %s", P)
   return 0
 
+class MetaProxy(SocketServer.TCPServer):
+
+  def __init__(self, addr, port=DEFAULT_PORT, parallel=DEFAULT_PARALLEL):
+    SocketServer.TCPServer.__init__(
+            self,
+            (addr, port),
+            lambda: MetaProxyHandler(self))
+    self.later = Later(parallel)
+
 class MetaProxyHandler(SocketServer.BaseRequestHandler):
   ''' Request handler class for MetaProxy TCPServers.
   '''
@@ -80,15 +89,6 @@ class MetaProxyHandler(SocketServer.BaseRequestHandler):
   def _handle(self, rqf):
     ''' Handle the request coming in on the TCP socket `rqf`.
     '''
-
-class MetaProxy(SocketServer.TCPServer):
-
-  def __init__(self, addr, port=DEFAULT_PORT, parallel=DEFAULT_PARALLEL):
-    SocketServer.TCPServer.__init__(
-            self,
-            (addr, port),
-            lambda: MetaProxyHandler(self))
-    self.later = Later(parallel)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
