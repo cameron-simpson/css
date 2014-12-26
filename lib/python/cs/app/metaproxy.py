@@ -65,15 +65,18 @@ def main(argv):
     return 2
   P = MetaProxy(addr, port)
   X("P = %s", P)
+  P.serve_forever()
   return 0
 
 class MetaProxy(SocketServer.TCPServer):
 
   def __init__(self, addr, port=DEFAULT_PORT, parallel=DEFAULT_PARALLEL):
+    self.allow_reuse_address = True
     SocketServer.TCPServer.__init__(
             self,
             (addr, port),
-            lambda: MetaProxyHandler(self))
+            MetaProxyHandler
+          )
     self.later = Later(parallel)
     self.name = "MetaProxy(addr=%s,port=%s)" % (addr, port)
 
@@ -84,8 +87,10 @@ class MetaProxyHandler(SocketServer.BaseRequestHandler):
   ''' Request handler class for MetaProxy TCPServers.
   '''
 
-  def __init__(self, proxy):
+  def __init__(self, sockobj, localaddr, proxy):
+    SocketServer.BaseRequestHandler(sockobj, localaddr, proxy)
     self.proxy = proxy
+    X("self = %r %r", self, self.__dict__)
 
   def handle(self):
     rqf = self.request
