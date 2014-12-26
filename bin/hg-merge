@@ -7,12 +7,27 @@
 set -ue
 
 cmd=$( basename "$0" )
-usage="Usage: $cmd other-checkout"
+usage="Usage: $cmd [-m message] other-checkout"
 
 badopts=
 
 trace=
 [ -t 2 ] && trace=set-x
+msg=
+hadmsg=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -m) msg=$2 hadmsg=1; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
 
 if [ $# = 0 ]
 then
@@ -36,6 +51,18 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+if [ -z "$hadmsg" ]
+then
+  if [ -t 0 -a -t 1 ]
+  then
+    necho "merge description> "
+    read -r msg || exit 1
+  else
+    echo "$cmd: merge description is mandatory (may be an empty -m option)" >&2
+    exit 2
+  fi
+fi
+
 branch=$( hg branch )
 obranch=$( incd "$ocheckout" hg branch )
 
@@ -43,5 +70,7 @@ $trace hg fetch "$ocheckout"
 if [ "x$branch" != "x$obranch" ]
 then
   $trace hg merge "$obranch"
-  $trace hg commit -m "merge $obranch ==> $branch"
+  comsg="merge $obranch ==> $branch"
+  [ -z "$msg" ] || comsg="$comsg: $msg"
+  $trace hg commit -m "$comsg"
 fi

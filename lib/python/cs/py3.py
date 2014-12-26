@@ -6,11 +6,28 @@
 
 import sys
 
-if sys.hexversion < 0x03000000:
+if sys.hexversion >= 0x03000000:
+
+  unicode = str
+  StringTypes = (str,)
+  def ustr(s, e='utf-8'):
+    return s
+  from io import BytesIO, StringIO
+  from queue import Queue, PriorityQueue, Full as Queue_Full, Empty as Queue_Empty
+  from configparser import ConfigParser
+  def iteritems(o):
+    return o.items()
+  def iterkeys(o):
+    return o.keys()
+  def itervalues(o):
+    return o.values()
+  from builtins import sorted, filter, bytes
+  from itertools import filterfalse
+
+else:
 
   globals()['unicode'] = unicode
   from types import StringTypes
-  makebytes = lambda bytevals: b''.join( chr(bv) for bv in bytevals )
   def ustr(s, e='utf-8'):
     ''' Upgrade str to unicode, if it is a str. Leave other types alone.
     '''
@@ -36,28 +53,28 @@ if sys.hexversion < 0x03000000:
   def itervalues(o):
     return o.itervalues()
   input = raw_input
-
   _sorted = sorted
   def sorted(iterable, key=None, reverse=False):
     return _sorted(iterable, None, key, reverse)
+  from itertools import ifilter as filter, ifilterfalse as filterfalse
 
-else:
-
-  unicode = str
-  StringTypes = (str,)
-  makebytes = bytes
-  def ustr(s, e='utf-8'):
-    return s
-  from io import BytesIO, StringIO
-  from queue import Queue, PriorityQueue, Full as Queue_Full, Empty as Queue_Empty
-  from configparser import ConfigParser
-  def iteritems(o):
-    return o.items()
-  def iterkeys(o):
-    return o.keys()
-  def itervalues(o):
-    return o.values()
-  from builtins import sorted
+  class bytes(str):
+    def __new__(cls, arg):
+      from cs.logutils import X
+      try:
+        bytevals = iter(arg)
+      except TypeError:
+        bytevals = [ 0 for i in range(arg) ]
+      s = ''.join( chr(b) for b in bytevals )
+      self = str.__new__(cls, s)
+      return self
+    def __repr__(self):
+      return 'b' + str.__repr__(self)
+    def __getitem__(self, index):
+      s2 = str.__getitem__(self, index)
+      if isinstance(index, slice):
+        return bytes( ord(ch) for ch in s2 )
+      return ord(s2[0])
 
 def raise3(exc_type, exc_value, exc_traceback):
   if sys.hexversion >= 0x03000000:
@@ -65,3 +82,7 @@ def raise3(exc_type, exc_value, exc_traceback):
   else:
     # subterfuge to let this pass a python3 parser; ugly
     exec('raise exc_type, exc_value, exc_traceback')
+
+if __name__ == '__main__':
+  import cs.py3_tests
+  cs.py3_tests.selftest(sys.argv)

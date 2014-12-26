@@ -331,38 +331,33 @@ class MailFiler(O):
       logfile = self.folder_logfile(wmdir.path)
     with with_log(logfile, no_prefix=True):
       debug("sweep %s", wmdir.shortname)
-      with Pfx("sweep %s", wmdir.shortname):
-        nmsgs = 0
-        skipped = 0
-        with LogTime("all keys") as all_keys_time:
-          for key in wmdir.keys(flush=True):
-            with Pfx(key):
-              if key in wmdir.lurking:
-                debug("skip lurking key")
-                skipped += 1
-                continue
-              nmsgs += 1
-
-              with LogTime("key = %s", key, threshold=1.0, level=DEBUG):
-                ok = self.file_wmdir_key(wmdir, key)
-                if not ok:
-                  warning("NOT OK, lurking key %s", key)
-                  wmdir.lurk(key)
-                  continue
-
-                if no_remove:
-                  info("no_remove: message not removed, lurking key %s", key)
-                  wmdir.lurk(key)
-                else:
-                  debug("remove message key %s", key)
-                  wmdir.remove(key)
-                  wmdir.lurking.discard(key)
-                if justone:
-                  break
-
-        if nmsgs or all_keys_time.elapsed >= 0.2:
-          info("filtered %d messages (%d skipped) in %5.3fs",
-               nmsgs, skipped, all_keys_time.elapsed)
+      nmsgs = 0
+      skipped = 0
+      with LogTime("all keys") as all_keys_time:
+        for key in wmdir.keys(flush=True):
+          if key in wmdir.lurking:
+            debug("skip lurking key")
+            skipped += 1
+            continue
+          nmsgs += 1
+          with LogTime("key = %s", key, threshold=1.0, level=DEBUG):
+            ok = self.file_wmdir_key(wmdir, key)
+            if not ok:
+              warning("NOT OK, lurking key %s", key)
+              wmdir.lurk(key)
+              continue
+            if no_remove:
+              info("no_remove: message not removed, lurking key %s", key)
+              wmdir.lurk(key)
+            else:
+              debug("remove message key %s", key)
+              wmdir.remove(key)
+              wmdir.lurking.discard(key)
+            if justone:
+              break
+      if nmsgs or all_keys_time.elapsed >= 0.2:
+        info("filtered %d messages (%d skipped) in %5.3fs",
+             nmsgs, skipped, all_keys_time.elapsed)
 
   def save(self, targets, msgfp):
     ''' Implementation for command line "save" function: save file to target.
@@ -541,29 +536,26 @@ class MessageFiler(O):
     ok = True
     # save message to folders
     for folder in sorted(self.save_to_folders):
-      with Pfx(folder):
-        try:
-          folderpath = self.resolve(folder)
-          save_to_folderpath(folderpath, self.message, self.message_path, self.flags)
-        except Exception as e:
-          exception("saving to folder %r: %s", folder, e)
-          ok = False
+      try:
+        folderpath = self.resolve(folder)
+        save_to_folderpath(folderpath, self.message, self.message_path, self.flags)
+      except Exception as e:
+        exception("saving to folder %r: %s", folder, e)
+        ok = False
     # forward message
     for address in sorted(self.save_to_addresses):
-      with Pfx(folder):
-        try:
-          self.sendmail(address)
-        except Exception as e:
-          exception("forwarding to address %r: %s", folder, e)
-          ok = False
+      try:
+        self.sendmail(address)
+      except Exception as e:
+        exception("forwarding to address %r: %s", folder, e)
+        ok = False
     # pipeline message
     for shcmd, shenv in self.save_to_cmds:
-      with Pfx(folder):
-        try:
-          self.save_to_pipe(['/bin/sh', '-c', shcmd], shenv)
-        except Exception as e:
-          exception("forwarding to address %r: %s", folder, e)
-          ok = False
+      try:
+        self.save_to_pipe(['/bin/sh', '-c', shcmd], shenv)
+      except Exception as e:
+        exception("forwarding to address %r: %s", folder, e)
+        ok = False
     # issue arrival alert
     if self.flags.alert > 0:
       self.alert(self.flags.alert)
@@ -1198,7 +1190,6 @@ class Target_Assign(O):
   def apply(self, filer):
     varname = self.varname
     value = envsub(self.varexpr, filer.environ)
-    X("setenv %s %r", varname, value)
     filer.environ[varname] = value
     if varname == 'LOGFILE':
       warning("LOGFILE= unimplemented at present")
