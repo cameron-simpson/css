@@ -75,6 +75,10 @@ class MetaProxy(SocketServer.TCPServer):
             (addr, port),
             lambda: MetaProxyHandler(self))
     self.later = Later(parallel)
+    self.name = "MetaProxy(addr=%s,port=%s)" % (addr, port)
+
+  def __str__(self):
+    return self.name
 
 class MetaProxyHandler(SocketServer.BaseRequestHandler):
   ''' Request handler class for MetaProxy TCPServers.
