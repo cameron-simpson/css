@@ -28,6 +28,7 @@ try:
   import socketserver
 except ImportError:
   import SocketServer
+from cs.excutils import LogExceptions
 from cs.logutils import setup_logging, warning, D, X
 from cs.later import Later
 
@@ -65,6 +66,7 @@ def main(argv):
     return 2
   P = MetaProxy(addr, port)
   X("P = %s", P)
+  #P.handle_request()
   P.serve_forever()
   return 0
 
@@ -78,10 +80,32 @@ class MetaProxy(SocketServer.TCPServer):
             MetaProxyHandler
           )
     self.later = Later(parallel)
+    self.later.open()
     self.name = "MetaProxy(addr=%s,port=%s)" % (addr, port)
 
   def __str__(self):
     return self.name
+
+  def shutdown(self):
+    self.later.close()
+    SocketServer.TCPServer.shutdown(self)
+
+  def process_request(self, rqf, client_addr):
+    X("process_request(...,client_addr=%s", client_addr)
+    handler = self.RequestHandlerClass(rqf, client_addr, self)
+    X("process_request: handler = %s", handler)
+    self.later.defer(self._process_request, handler, rqf, client_addr)
+    X("process_request: self._process_request defered")
+
+  def _process_request(self, handler, rqf, client_addr):
+    X("self._process_request...")
+    with LogExceptions():
+      try:
+        handler.handle(rqf, client_addr)
+        self.shutdown_request(rqf)
+      except:
+        self.handle_error(rqf, client_addr)
+        self.shutdown_request(rqf)
 
 class MetaProxyHandler(SocketServer.BaseRequestHandler):
   ''' Request handler class for MetaProxy TCPServers.
@@ -91,13 +115,10 @@ class MetaProxyHandler(SocketServer.BaseRequestHandler):
     SocketServer.BaseRequestHandler(sockobj, localaddr, proxy)
     self.proxy = proxy
     X("self = %r %r", self, self.__dict__)
+    X("%r", dir(self))
 
-  def handle(self):
-    rqf = self.request
-
-  def _handle(self, rqf):
-    ''' Handle the request coming in on the TCP socket `rqf`.
-    '''
+  def handle(self, rqf, client_addr):
+    X("MetaProxyHandler.handle: rqf = %r", rqf)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
