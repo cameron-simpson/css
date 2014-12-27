@@ -27,7 +27,7 @@ import os.path
 try:
   import socketserver
 except ImportError:
-  import SocketServer
+  import SocketServer as socketserver
 from cs.excutils import LogExceptions
 from cs.logutils import setup_logging, warning, D, X
 from cs.later import Later
@@ -70,11 +70,11 @@ def main(argv):
   P.serve_forever()
   return 0
 
-class MetaProxy(SocketServer.TCPServer):
+class MetaProxy(socketserver.TCPServer):
 
   def __init__(self, addr, port=DEFAULT_PORT, parallel=DEFAULT_PARALLEL):
     self.allow_reuse_address = True
-    SocketServer.TCPServer.__init__(
+    socketserver.TCPServer.__init__(
             self,
             (addr, port),
             MetaProxyHandler
@@ -88,7 +88,7 @@ class MetaProxy(SocketServer.TCPServer):
 
   def shutdown(self):
     self.later.close()
-    SocketServer.TCPServer.shutdown(self)
+    socketserver.TCPServer.shutdown(self)
 
   def process_request(self, rqf, client_addr):
     X("process_request(...,client_addr=%s", client_addr)
@@ -107,12 +107,12 @@ class MetaProxy(SocketServer.TCPServer):
         self.handle_error(rqf, client_addr)
         self.shutdown_request(rqf)
 
-class MetaProxyHandler(SocketServer.BaseRequestHandler):
+class MetaProxyHandler(socketserver.BaseRequestHandler):
   ''' Request handler class for MetaProxy TCPServers.
   '''
 
   def __init__(self, sockobj, localaddr, proxy):
-    SocketServer.BaseRequestHandler(sockobj, localaddr, proxy)
+    socketserver.BaseRequestHandler(sockobj, localaddr, proxy)
     self.proxy = proxy
     X("self = %r %r", self, self.__dict__)
     X("%r", dir(self))
