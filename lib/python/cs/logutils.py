@@ -161,7 +161,13 @@ class PfxFormatter(Formatter):
     '''
     record.cmd = self.cmd if self.cmd else globals()['cmd']
     record.pfx = Pfx._state.prefix
-    fmts = Formatter.format(self, record)
+    try:
+      fmts = Formatter.format(self, record)
+    except TypeError as e:
+      X("cs.logutils.format: record=%r, self=%s: %s", record, self, e)
+      X("record=%s", record.__dict__)
+      X("self=%s", self.__dict__)
+      raise
     message_parts = []
     if self.context_level is None or record.level >= self.context_level:
       message_parts.append(self.formatTime(record))
@@ -439,7 +445,7 @@ class Pfx(object):
               if len(exc_value.args) == 0:
                 args = prefix
               else:
-                args = [ prefixify(unicode(exc_value.args[0]))
+                args = [ prefixify(unicode(exc_value.args[0], errors='replace'))
                        ] + list(exc_value.args[1:])
             exc_value.args = args
         elif hasattr(exc_value, 'message'):
@@ -469,7 +475,7 @@ class Pfx(object):
     if u is None:
       mark = ustr(self.mark)
       if not isinstance(mark, unicode):
-        mark = unicode(mark)
+        mark = unicode(mark, errors='replace')
       u = mark
       if self.mark_args:
         u = u % self.mark_args
