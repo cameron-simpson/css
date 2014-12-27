@@ -24,6 +24,8 @@ from __future__ import print_function
 import sys
 import os
 import os.path
+from email.parser import BytesFeedParser
+from itertools import takewhile
 try:
   import socketserver
 except ImportError:
@@ -119,6 +121,18 @@ class MetaProxyHandler(socketserver.BaseRequestHandler):
 
   def handle(self, rqf, client_addr):
     X("MetaProxyHandler.handle: rqf = %r", rqf)
+    fpin = os.fdopen(rqf.fileno(), "rb")
+    fpout = os.fdopen(rqf.fileno(), "wb")
+    httprq = fpin.readline().decode('iso8859-1')
+    X("httprq = %r", httprq)
+    method, uri, version = httprq.split()
+    X("uri = %r <%s>", uri, type(uri))
+    uri_scheme, uri_tail = uri.split(':', 1)
+    parser = BytesFeedParser()
+    is_header_line = lambda line: line.startswith(b' ') or line.startswith(b'\t') or line.rstrip()
+    parser.feed( b''.join( takewhile( is_header_line, fpin ) ) )
+    M = parser.close()
+    X("M = %r", M)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
