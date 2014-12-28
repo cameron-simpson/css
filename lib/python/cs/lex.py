@@ -95,7 +95,7 @@ def lastlinelen(s):
 DQ_RE=re.compile(r'"(([^\\"]|\\[\\"])*)"')
 nq_re=re.compile(r'\S+')
 
-# REMOVE
+# TODO: REMOVE
 def get_dqstring(s):
   ''' Read a double quoted string from the start of `s`.
       Return the decoded string and the remainder of `s`.
@@ -321,6 +321,12 @@ def get_nonwhite(s, offset=0):
       Return (match, new_offset).
   '''
   return get_other_chars(s, offset=offset, stopchars=whitespace)
+
+def get_hexadecimal(s, offset=0):
+  ''' Scan the string `s` for hexadecimal characters starting at `offset`.
+      Return hex_string, new_offset.
+  '''
+  return get_chars(s, '0123456789abcdefABCDEF', offset)
 
 def get_identifier(s, offset=0, alpha=ascii_letters, number=digits, extras='_'):
   ''' Scan the string `s` for an identifier (by default an ASCII
