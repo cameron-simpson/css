@@ -7,6 +7,7 @@
 import sys
 from string import ascii_letters, ascii_uppercase, ascii_lowercase, digits
 from cs.lex import get_hexadecimal, get_chars, get_other_chars
+from cs.logutils import X
 
 # character classes: see RFC2616 part 2.2
 CR = '\r'
@@ -48,7 +49,7 @@ def get_token(s, offset=0):
       Return token, new_offset.
       See RFC2616 part 2.2.
   '''
-  token, offset = get_other_chars(s, CTL+SEPARATORS, offset)
+  token, offset = get_other_chars(s, offset, CTL+SEPARATORS)
   if not token:
     raise ValueError("expected RFC2616 token at offset=%d" % (offset,))
   return token, offset
@@ -71,35 +72,40 @@ def get_quoted_string(s, offset=0):
       offset += 1
       break
     else:
-      part, offset2 = get_chars(s, '\\"', offset)
-      qs_part.append(part)
+      part, offset2 = get_other_chars(s, offset, '\\"')
+      qs_parts.append(part)
       offset = offset2
   return ''.join(qs_parts), offset
 
 def get_chunk_ext_val(s, offset=0):
-  offset0 = offset
-  if not s.startswith(';', offset):
-    raise ValueError("missing semicolon at offset %d" % (offset,))
-  if s.startswith('"', offset0+1):
-    qstr, offset = get_qstr(s, offset0+1)
+  if s.startswith('"', offset):
+    return get_quoted_string(s, offset)
   else:
-    token, offset = get_token(s, offset0+1)
+    return get_token(s, offset)
 
 def parse_chunk_line1(bline):
   ''' Parse the opening line of a chunked-encoding chunk.
   '''
   line = bline.decode('iso8859-1')
-  if not line.endswith('\n'):
-    raise ValueError("unexpected EOF reading chunk-size")
   # collect chunk-size
-  chunk_size, offset = get_hexadecimal(line_chunk_size)
+  chunk_size, offset = get_hexadecimal(line)
   if not chunk_size:
     raise ValueError("missing chunk-size")
   chunk_size = int(chunk_size, 16)
   chunk_exts = []
   # collect chunk-extensions
-  while offset < len(line) and line.startswith(';'):
-    token, offset = get_token(line, offset+1)
+  while offset < len(line) and line.startswith(';', offset):
+    chunk_ext_name, offset = get_token(line, offset+1)
+    if not line.startswith('=', offset):
+      raise ValueError("missing '=' after chunk-ext-name at offset %d" % (offset,))
+    chunk_ext_val, offset = get_chunk_ext_val(line, offset+1)
+    chunk_exts.append( (chunk_ext_name, chunk_ext_val) )
+  if not line.startswith(CRLF, offset):
+    raise ValueError("missing CRLF at end of opening chunk line at offset %d" % (offset,))
+  offset += 2
+  if offset != len(line):
+    raise ValueError("extra data after CRLF at offset %d: %r" % (offset, line[offset:]))
+  return chunk_size, chunk_exts
 
 if __name__ == '__main__':
   import cs.rfc2616_tests
