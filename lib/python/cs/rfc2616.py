@@ -5,6 +5,7 @@
 #
 
 import sys
+from email.parser import BytesFeedParser
 from itertools import takewhile
 from string import ascii_letters, ascii_uppercase, ascii_lowercase, digits
 from cs.lex import get_hexadecimal, get_chars, get_other_chars
