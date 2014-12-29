@@ -107,6 +107,44 @@ def parse_chunk_line1(bline):
     raise ValueError("extra data after CRLF at offset %d: %r" % (offset, line[offset:]))
   return chunk_size, chunk_exts
 
+def read_headers(fp):
+  ''' Read headers from a binary file such as an HTTP stream, return the Message object.
+  '''
+  def is_header_line(line):
+    return line.startswith(b' ') or line.startswith(b'\t') or line.rstrip()
+  header_lines = list(takewhile(is_header_line, fp))
+  parser = BytesFeedParser()
+  parser.feed(b''.join(header_lines))
+  return b''.join(header_lines), parser.close()
+
+def pass_chunked(fpin, fpout, hdr_trailer):
+  ''' Copy "chunked" data from `fpin` to `fpout`.
+      See RFC2616, part 3.6.1.
+  '''
+  bline = fpin.readline()
+  chunk_size, chunk_exts = parse_chunk_line1(bline)
+  fpout.write(bline)
+  while chunk_size > 0:
+    pass_length(fpin, fpout, chunk_size)
+    crlf = fpin.read(2)
+    if crlf != CRLF:
+      raise ValueError("missing CRLF after chunk data, found: %r" % (crlf,))
+    fpout.write(crlf)
+  if hdr_trailer is not None:
+    trailer_data, trailer_headers = read_headers(fpin)
+    fpout.write(trailer_data)
+
+def pass_length(fpin, fpout, length):
+  ''' Copy a specific amount of data from `fpin` to `fpout`.
+  '''
+  n = length
+  while n > 0:
+    data = fpin.read(n)
+    if not data:
+      raise ValueError("unexpected EOF reading chunk of size %d" % (length,))
+    fpout.write(data)
+    n -= len(data)
+
 if __name__ == '__main__':
   import cs.rfc2616_tests
   cs.rfc2616_tests.selftest(sys.argv)
