@@ -37,6 +37,7 @@ fi
 set -x
 
 "$@"
+hg diff "$file"
 msg=`readline "Log message> "`
 [ -n "$msg" ] || { echo "$cmd: empty message" >&2; exit 1; }
 hg commit -m "$msg" -- "$file"
