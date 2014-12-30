@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #
-# MetaProxy: content rewriting agressive cache web proxy toolkit.
+# MetaProxy: content rewriting aggressive cache web proxy toolkit.
 #   - Cameron Simpson <cs@zip.com.au> 26dec2014
 #
 # Design:
@@ -38,7 +38,7 @@ except ImportError:
 from cs.excutils import LogExceptions
 from cs.logutils import setup_logging, Pfx, debug, info, warning, error, D, X
 from cs.later import Later
-from cs.lex import get_hexadecimal
+from cs.lex import get_hexadecimal, get_other_chars
 from cs.rfc2616 import read_headers, message_has_body, pass_chunked, pass_length, \
                        dec8, enc8, CRLF, CRLFb
 from cs.seq import Seq
@@ -46,7 +46,6 @@ from cs.obj import O
 
 USAGE = '''Usage: %s [-L address:port] [-P upstream_proxy]'''
 
-DEFAULT_PORT = 3128
 DEFAULT_PARALLEL = 4
 
 def main(argv):
@@ -136,16 +135,18 @@ def openpair(fd):
 
 class MetaProxy(socketserver.TCPServer):
 
-  def __init__(self, addr, port=DEFAULT_PORT, parallel=DEFAULT_PARALLEL):
+  def __init__(self, listen_addrport, default_proxy_addrport, parallel=DEFAULT_PARALLEL):
+    self.listen_addrport = listen_addrport
+    self.default_proxy_addrport = default_proxy_addrport
     self.allow_reuse_address = True
     socketserver.TCPServer.__init__(
             self,
-            (addr, port),
+            listen_addrport,
             MetaProxyHandler
           )
     self.later = Later(parallel)
     self.later.open()
-    self.name = "MetaProxy(addr=%s,port=%s)" % (addr, port)
+    self.name = "MetaProxy(%s)" % (listen_addrport,)
     self.tagseq = Seq()
 
   def __str__(self):
@@ -240,17 +241,26 @@ class MetaProxyHandler(socketserver.BaseRequestHandler):
   def choose_proxy(self, RQ):
     ''' Decide where to connect to deliver the request `RQ`.
     '''
-    if True:
+    parts = urlparse(RQ.req_uri)
+    host = parts.netloc
+    port = parts.port
+    if port is None:
+      port = socket.getservbyname(parts.scheme, 'tcp')
+    proxy_addrport = self.proxy.default_proxy_addrport
+    if proxy_addrport is None:
+      # look up $http_proxy or other suitable envvar
+      envvar = parts.scheme + '_proxy'
+      proxyval = os.environ.get(envvar)
+      if proxyval is not None:
+        with Pfx("$%s", envvar):
+          try:
+            proxy_addrport = parse_http_proxy(proxyval)
+          except ValueError as e:
+            warning("invalid value ignored: %s", e)
+    if proxy_addrport is None:
       # direct connection
-      parts = urlparse(RQ.req_uri)
-      host = parts.netloc
-      port = parts.port
-      if port is None:
-        port = socket.getservbyname(parts.scheme, 'tcp')
       proxy_addrport = host, port
-    else:
-      proxy_addrport = '127.0.0.1', 3128
-    info("chose proxy %r", proxy_addrport)
+    info("choose_proxy: %s:%s", *proxy_addrport)
     return proxy_addrport
 
 class URI_Request(O):
@@ -316,6 +326,7 @@ class URI_Request(O):
       if not line.endswith(CRLF):
         raise ValueError("truncated response (no CRLF): %r" % (line,))
       http_version, status_code, reason = line.split(' ', 2)
+      reason = reason.rstrip()
       info("server response: %s %s %s", http_version, status_code, reason)
       self.rsp_http_version = http_version
       self.rsp_status_code = status_code
