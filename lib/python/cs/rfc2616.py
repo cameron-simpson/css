@@ -161,12 +161,22 @@ def pass_length(fpin, fpout, length):
   ''' Copy a specific amount of data from `fpin` to `fpout`.
   '''
   n = length
+  total = 0
   while n > 0:
-    data = fpin.read(n)
+    # limit amount in memory at a time
+    nr = min(n, 102400)
+    data = fpin.read(nr)
     if not data:
       raise ValueError("unexpected EOF reading chunk of size %d" % (length,))
-    fpout.write(data)
     n -= len(data)
+    while data:
+      nout = fpout.write(data)
+      total += nout
+      if nout != len(data):
+        warning("wrote only %d bytes of %d", nout, len(data))
+        data = data[nout:]
+      else:
+        data = None
 
 if __name__ == '__main__':
   import cs.rfc2616_tests
