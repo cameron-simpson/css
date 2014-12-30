@@ -168,7 +168,7 @@ class MetaProxyHandler(socketserver.BaseRequestHandler):
           req_header_data, req_headers = read_headers(fpin)
           RQ.req_header_data = req_header_data
           RQ.req_headers = req_headers
-          proxy_addrport = RQ.choose_proxy()
+          proxy_addrport = self.choose_proxy(RQ)
           upstream = socket.create_connection(proxy_addrport)
           fpup_in, fpup_out = openpair(upstream.fileno())
           Tdownstream = Thread(name="copy from upstream",
@@ -188,6 +188,22 @@ class MetaProxyHandler(socketserver.BaseRequestHandler):
           info("upstream closed")
       info("end proxy requests")
 
+  def choose_proxy(self, RQ):
+    ''' Decide where to connect to deliver the request `RQ`.
+    '''
+    if True:
+      # direct connection
+      parts = urlparse(RQ.req_uri)
+      host = parts.netloc
+      port = parts.port
+      if port is None:
+        port = socket.getservbyname(parts.scheme, 'tcp')
+      proxy_addrport = host, port
+    else:
+      proxy_addrport = '127.0.0.1', 3128
+    info("chose proxy %r", proxy_addrport)
+    return proxy_addrport
+
 class URI_Request(O):
 
   def __init__(self, handler, method, uri, version):
@@ -201,13 +217,6 @@ class URI_Request(O):
 
   def __str__(self):
     return "%s[%s:%s]" % (self.name, self.req_method, self.req_uri)
-
-  def choose_proxy(self):
-    ''' Decide where to connect to deliver this request.
-    '''
-    proxy_addrport = '127.0.0.1', 3128
-    info("chose proxy %r", proxy_addrport)
-    return proxy_addrport
 
   @property
   def req_has_body(self):
