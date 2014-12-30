@@ -23,7 +23,10 @@ import socket
 from urllib2 import urlopen, Request, HTTPError, URLError, \
 		    HTTPPasswordMgrWithDefaultRealm, HTTPBasicAuthHandler, \
 		    build_opener
-from urlparse import urlparse, urljoin
+try:
+  from urllib.parse import urlparse, urljoin
+except ImportError:
+  from urlparse import urlparse, urljoin
 from HTMLParser import HTMLParseError
 try:
   import xml.etree.cElementTree as ElementTree
