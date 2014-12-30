@@ -25,6 +25,7 @@ import sys
 import os
 import os.path
 import socket
+from getopt import getopt, GetoptError
 try:
   import socketserver
 except ImportError:
@@ -43,7 +44,7 @@ from cs.rfc2616 import read_headers, message_has_body, pass_chunked, pass_length
 from cs.seq import Seq
 from cs.obj import O
 
-USAGE = '''Usage: %s address:port'''
+USAGE = '''Usage: %s [-L address:port] [-P upstream_proxy]'''
 
 DEFAULT_PORT = 3128
 DEFAULT_PARALLEL = 4
@@ -52,32 +53,78 @@ def main(argv):
   cmd = os.path.basename(argv.pop(0))
   usage = USAGE % (cmd,)
   setup_logging(cmd)
+
+  listen_addrport = None
+  default_proxy_addrport = None
+
   badopts = False
-  if not argv:
-    warning("missing address:port")
+
+  try:
+    opts, argv = getopt(argv, 'L:P:')
+  except GetoptError as e:
+    error("unrecognised option: %s: %s"% (e.opt, e.msg))
     badopts = True
-  else:
-    addrport = argv.pop(0)
+    opts, argv = [], []
+
+  for opt, val in opts:
+    with Pfx(opt):
+      if opt == '-L':
+        listen_addrport = val
+        try:
+          listen_addrport = parse_addrport(listen_addrport)
+        except ValueError as e:
+          warning("%s", e)
+          badopts = True
+      elif opt == '-P':
+        default_proxy_addrport = val
+        try:
+          default_proxy_addrport = parse_addrport(default_proxy_addrport)
+        except ValueError as e:
+          warning("%s", e)
+          badopts = True
+      else:
+        error("unrecognised option")
+        badopts = True
+
+  if argv:
+    warning("extra arguments after options: %r", argv)
+    badopts = True
+
+  if badopts:
+    print(usage, file=sys.stderr)
+    return 2
+
+  P = MetaProxy(listen_addrport, default_proxy_addrport)
+  P.serve_forever()
+  return 0
+
+def parse_addrport(addrport):
+  ''' Parse addr:port into address string and port number.
+  '''
+  with Pfx("parse_addrport(%s)", addrport):
     try:
       addr, port = addrport.rsplit(':', 1)
     except ValueError:
-      warning("invalid address:port, no colon: %r", addrport)
-      badopts = True
+      raise ValueError("invalid address:port, no colon")
     else:
       try:
         port = int(port)
       except ValueError:
-        warning("invalid address:port, port must be an integer: %r", addrport)
-        badopts = True
-  if argv:
-    warning("extra arguments after address:port: %r", argv)
-    badopts = True
-  if badopts:
-    print(usage, file=sys.stderr)
-    return 2
-  P = MetaProxy(addr, port)
-  P.serve_forever()
-  return 0
+        raise ValueError("invalid address:port, port must be an integer")
+    return addr, port
+
+def parse_http_proxy(envval):
+  ''' Parse the value of $http_proxy or similar; return addr, port.
+  '''
+  with Pfx("parse_http_proxy(%s)", envval):
+    if envval.startswith('http://'):
+      envval_addrport, offset = get_other_chars(envval, 7, '/')
+      if envval.endswith('/', offset):
+        return parse_addrport(envval_addrport)
+      else:
+        raise ValueError("missing trailing slash")
+    else:
+      raise ValueError("does not start with 'http://'")
 
 def openpair(fd):
   ''' Open the supplied file descriptor `fd` for read and open a dup() of it for write.
