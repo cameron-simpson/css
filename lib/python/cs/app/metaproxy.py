@@ -30,6 +30,10 @@ except ImportError:
   import SocketServer as socketserver
 import socket
 from threading import Thread
+try:
+  from urllib.parse import urlparse
+except ImportError:
+  from urlparse import urlparse
 from cs.excutils import LogExceptions
 from cs.logutils import setup_logging, Pfx, debug, info, warning, error, D, X
 from cs.later import Later
