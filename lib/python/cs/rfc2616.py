@@ -31,6 +31,13 @@ TEXT = ''.join( c for c in [ chr(o) for o in range(256) ]
               )
 QDTEXT = TEXT.replace('"', '').replace('\\', '')
 
+# encode and decode bytes<->str for HTTP stream: 8-bit 1-to-1
+enc8 = lambda s: s.encode('iso8859-1')
+dec8 = lambda b: b.decode('iso8859-1')
+
+# CRLF as bytes
+CRLFb = enc8(CRLF)
+
 def get_lws(s, offset=0):
   ''' Gather up an LWS.
   '''
