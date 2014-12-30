@@ -8,7 +8,7 @@ from __future__ import with_statement
 import codecs
 from contextlib import contextmanager
 import logging
-from logging import Formatter
+from logging import Formatter, StreamHandler
 import os
 import os.path
 import stat
@@ -17,6 +17,7 @@ import time
 import threading
 from threading import Lock
 import traceback
+from cs.ansi_colour import colourise
 from cs.excutils import noexc
 from cs.obj import O_str
 from cs.py3 import unicode, StringTypes, ustr
@@ -127,7 +128,6 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
     signal.signal(signal.SIGHUP, handler)
 
   if upd_mode:
-    from cs.upd import UpdHandler
     main_handler = UpdHandler(main_log, level, ansi_mode=ansi_mode)
   else:
     main_handler = logging.StreamHandler(main_log)
@@ -145,21 +145,36 @@ class PfxFormatter(Formatter):
   ''' A Formatter subclass that has access to the program's cmd and Pfx state.
   '''
 
-  def __init__(self, fmt=None, datefmt=None):
+  def __init__(self, fmt=None, datefmt=None, cmd=None, context_level=None):
     ''' Initialise the PfxFormatter.
+        `fmt` and `datefmt` are passed to Formatter.
         If `fmt` is None, DEFAULT_PFX_FORMAT is used.
+        If `cmd` is not None, the message is prefixed with the string `cmd`.
+        If `context_level` is None, records with .level < context_level will not have the Pfx state inserted at the front of the message.
     '''
-    if fmt is None:
-      fmt = DEFAULT_PFX_FORMAT
+    self.cmd = cmd
+    self.context_level = context_level
     Formatter.__init__(self, fmt=fmt, datefmt=datefmt)
 
   def format(self, record):
     ''' Set .cmd and .pfx to the global cmd and Pfx context prefix respectively, then call Formatter.format.
     '''
-    global cmd
-    record.cmd = cmd
+    record.cmd = self.cmd if self.cmd else globals()['cmd']
     record.pfx = Pfx._state.prefix
-    return Formatter.format(self, record)
+    try:
+      fmts = Formatter.format(self, record)
+    except TypeError as e:
+      X("cs.logutils.format: record=%r, self=%s: %s", record, self, e)
+      X("record=%s", record.__dict__)
+      X("self=%s", self.__dict__)
+      raise
+    message_parts = []
+    if self.context_level is None or record.level >= self.context_level:
+      message_parts.append(self.formatTime(record))
+      message_parts.append(record.pfx)
+    message_parts.append(record.message)
+    record.message = ': '.join(message_parts)
+    return record.message
 
 def infer_logging_level():
   ''' Infer a logging level from the environment.
@@ -430,7 +445,7 @@ class Pfx(object):
               if len(exc_value.args) == 0:
                 args = prefix
               else:
-                args = [ prefixify(unicode(exc_value.args[0]))
+                args = [ prefixify(unicode(exc_value.args[0], errors='replace'))
                        ] + list(exc_value.args[1:])
             exc_value.args = args
         elif hasattr(exc_value, 'message'):
@@ -460,7 +475,7 @@ class Pfx(object):
     if u is None:
       mark = ustr(self.mark)
       if not isinstance(mark, unicode):
-        mark = unicode(mark)
+        mark = unicode(mark, errors='replace')
       u = mark
       if self.mark_args:
         u = u % self.mark_args
@@ -604,3 +619,47 @@ class LogTime(object):
       log(level, "%s: ELAPSED %5.3fs" % (tag, elapsed))
     self.elapsed = elapsed
     return False
+
+class UpdHandler(StreamHandler):
+  ''' A StreamHandler subclass whose .emit method uses a cs.upd.Upd for transcription.
+  '''
+
+  def __init__(self, strm=None, nlLevel=None, ansi_mode=None):
+    ''' Initialise the UpdHandler.
+        `strm` is the output stream, default sys.stderr.
+        `nlLevel` is the logging level at which conventional line-of-text
+        output is written; log messages of a lower level go via the
+        update-the-current-line method. Default is logging.WARNING.
+        If `ansi_mode` is None, set if from strm.isatty().
+        A true value causes the handler to colour certain logging levels
+        using ANSI terminal sequences.
+    '''
+    from cs.upd import Upd
+    if strm is None:
+      strm = sys.stderr
+    if nlLevel is None:
+      nlLevel = logging.WARNING
+    if ansi_mode is None:
+      ansi_mode = strm.isatty()
+    StreamHandler.__init__(self, strm)
+    self.__upd = Upd(strm)
+    self.__nlLevel = nlLevel
+    self.__ansi_mode = ansi_mode
+    self.__lock = Lock()
+
+  def emit(self, logrec):
+    with self.__lock:
+      if logrec.levelno >= self.__nlLevel:
+        with self.__upd._withoutContext():
+          if self.__ansi_mode:
+            if logrec.levelno >= logging.ERROR:
+              logrec.msg = colourise(logrec.msg, 'red')
+            elif logrec.levelno >= logging.WARN:
+              logrec.msg = colourise(logrec.msg, 'yellow')
+          StreamHandler.emit(self, logrec)
+      else:
+        self.__upd.out(logrec.getMessage())
+
+  def flush(self):
+    if self.__upd._backend:
+      self.__upd._backend.flush()
