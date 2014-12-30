@@ -148,6 +148,8 @@ class MetaProxyHandler(socketserver.BaseRequestHandler):
     '''
     fpin, fpout = openpair(rqf.fileno())
     self._proxy_requests(fpin, fpout)
+    fpin.close()
+    fpout.close()
 
   def _proxy_requests(self, fpin, fpout):
     ''' Process multiple HTTP proxy requests on the same pair of data streams.
