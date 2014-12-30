@@ -24,11 +24,11 @@ from __future__ import print_function
 import sys
 import os
 import os.path
+import socket
 try:
   import socketserver
 except ImportError:
   import SocketServer as socketserver
-import socket
 from threading import Thread
 try:
   from urllib.parse import urlparse
