@@ -126,6 +126,20 @@ def read_headers(fp):
   parser.feed(b''.join(header_lines))
   return b''.join(header_lines), parser.close()
 
+def message_has_body(headers):
+  ''' Does this message have a message body to forward?
+      See RFC2616, part 4.3 and 4.4.
+      Note that HTTP certain requests preempty this; for example HEAD never has a body.
+      That aspect is not considered here.
+  '''
+  content_length = headers.get('Content-Length')
+  if content_length is not None:
+    return True
+  transfer_encoding = headers.get('Transfer-Encoding')
+  if transfer_encoding is not None:
+    return True
+  return False
+
 def pass_chunked(fpin, fpout, hdr_trailer):
   ''' Copy "chunked" data from `fpin` to `fpout`.
       See RFC2616, part 3.6.1.
