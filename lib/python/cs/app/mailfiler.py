@@ -567,6 +567,7 @@ class MessageFiler(O):
     '''
     if modify_header(self.message, hdr, new_value, always=always):
       self.message_path = None
+      self.header_addresses = {}
 
   def apply_rule(self, R):
     ''' Apply this the rule `R` to this MessageFiler.
