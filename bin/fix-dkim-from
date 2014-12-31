@@ -8,20 +8,29 @@
 # Fortunately, the mangled lines look like this:
 #
 #  From: "full name local@domain [sed-users]" <sed-users@yahoogroups.com>
+# or:
+#  From: "local@domain [sed-users]" <sed-users@yahoogroups.com>
 #
 # This can readily be undone and converted into:
 #
 #  From: "full name" <local@domain>
+# or:
+#  From: <local@domain>
 #
 # leaving the message ready for use.
 #
-# In my mailfiler tool I have this rule:
+# In my mailfiler tool I have these rules:
 #
-#  sh,from:s/"(?P<fullname>.*\S)\s+(?P<coreaddr>\S+@\S+)\s+\[sed-users\]".*<sed-users@yahoogroups.com>/"$fullname" <$coreaddr>/,from:s/"(?P<coreaddr>\S+@\S+)\s+\[sed-users\]".*<sed-users@yahoogroups.com>/<$coreaddr>/ SedUsers
-#        to,cc,sender,x-apparently-to:sed-users@yahoogroups.com
+#   from:s/"(?P<fullname>.*\S)\s+(?P<coreaddr>\S+@\S+)\s+\[sed-users\]".*<sed-users@yahoogroups.com>/"$fullname" <$coreaddr>/
+#                           sender:sed-users@yahoogroups.com
+#                           from:/<sed-users@yahoogroups.com>
+#   from:s/"(?P<coreaddr>\S+@\S+)\s+\[sed-users\]".*<sed-users@yahoogroups.com>/<$coreaddr>/
+#                           sender:sed-users@yahoogroups.com
+#                           from:/<sed-users@yahoogroups.com>
+#   sh      SedUsers        to,cc,sender,x-apparently-to:sed-users@yahoogroups.com
 #
 # Gory, but it rewrites the From: lines on the sed-users list and
-# files the message in my "sh" folder. There are two s/this/that/
+# then files the message in my "sh" folder. There are two s/this/that/
 # rules there, one for "full name local@domain" and one for just
 # "local@domain".
 #
