@@ -15,15 +15,19 @@ usage="Usage: $cmd [upstream-forwards...]"
 
 me=`id -un`
 trace=set-x
+logdir=$LOGDIR/unbound
 pidfile=$VARRUN/unbound.pid
 wkdir=$HOME/var/unbound
 cf=$wkdir/unbound.conf
-log=$LOGDIR/unbound.log
+log=$logdir/unbound.log
 localzones="l local"
 localnets="127 192.168 172.16 10.0"
 cnames=$HOME/rc/dns/cnames
 host_conf=$HOME/rc/dns/unbound.conf-fleet
 outgoing_if=$( netstat -rn | awk '$1 == "default" { print $6 }' )
+
+cd "$logdir" || exit 1
+
 if [ -z "$outgoing_if" ]
 then
   netstat -rn >&2
