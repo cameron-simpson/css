@@ -287,7 +287,7 @@ class SeenSet(object):
     if not line.endswith('\n'):
       warning("%s: adding unterminated line: %s", self, line)
     s = line.rstrip()
-    self.add(s, foreign=true)
+    self.add(s, foreign=True)
 
   def add(self, s, foreign=False):
     # avoid needlessly extending the backing file
