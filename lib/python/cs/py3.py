@@ -4,6 +4,29 @@
 #       - Cameron Simpson <cs@zip.com.au> 28jun2012
 #
 
+distinfo = {
+    'description': "Aids for code sharing between python2 and python3.",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        "Development Status :: 4 - Beta",
+        "Environment :: Other Environment",
+        "Intended Audience :: Developers",
+        "License :: OSI Approved :: GNU Library or Lesser General Public License (LGPL)",
+        "Operating System :: OS Independent",
+        "Topic :: Software Development :: Libraries :: Python Modules",
+        ],
+    'long_description': """\
+Python3 helpers to aid code sharing between python2 and python3.
+----------------------------------------------------------------
+
+Presents various names in python 3 flavour for common use in python
+2 and python 3.
+"""
+}
+
 import sys
 
 if sys.hexversion >= 0x03000000:
