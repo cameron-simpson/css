@@ -4,6 +4,7 @@
 #   - Cameron Simpson <cs@zip.com.au> 21dec2014
 #
 
+import sys
 from cs.logutils import error, exception
 
 def import_module_name(module_name, name, path=None, lock=None):
