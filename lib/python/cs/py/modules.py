@@ -24,13 +24,13 @@ def import_module_name(module_name, name, path=None, lock=None):
   try:
     M = importlib.import_module(module_name)
   except ImportError as e:
-    exception("%s", e)
-    M = None
-  if path:
-    sys.path = osyspath
+    raise NameError("no module named %r: %s: %s" % (module_name, type(e), e))
+  finally:
+    if path:
+      sys.path = osyspath
   if M is not None:
     try:
       return getattr(M, name)
     except AttributeError as e:
-      error("%s: no entry named %r: %s", module_name, name, e)
+      raise NameError("%s: no entry named %r: %s: %s" % (module_name, name, type(e), e))
   return None
