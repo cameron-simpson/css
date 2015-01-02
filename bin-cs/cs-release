@@ -5,9 +5,11 @@
 #
 
 trace=set-x
+relpfx=release
 
 cmd=`basename "$0"`
-usage="Usage: $cmd op [args...]
+usage="Usage: $cmd [-p relpfx] op [args...]
+  -p relpfx Prefix for new release tag names. Default: $relpfx
   op:
     add         Issue a new release.
     last        Report last release issued.
@@ -18,6 +20,23 @@ usage="Usage: $cmd op [args...]
                 Announce last release to freshmeat."
 
 badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -p) relpfx=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+case "$relpfx" in
+  [a-z]*) ;; *) echo "$cmd: -p: invalid relpfx, must start with a lowercase letter, got: $relpfx" >&2
+                badopts=1
+                ;;
+esac
 
 if [ $# = 0 ]
 then
@@ -32,7 +51,7 @@ fi
 
 case $op in
   last)
-    lastrelease=`$trace hg tags | sed -n '/^release-[1-9][01][0-9][0-9][01][0-9][0-3][0-9]/{s/^release-//; s/ .*//; p; q;}'`
+    lastrelease=`$trace hg tags | sed -n "/^$relpfx-[1-9][01][0-9][0-9][01][0-9][0-3][0-9]/{s/^release-//; s/ .*//; p; q;}"`
     [ -n "$lastrelease" ] || exit 1
     printf "%s\n" "$lastrelease"
     exit 0
@@ -71,14 +90,14 @@ case $op in
     ;;
 
   log)
-    lastrelease=release-`$trace "$0" last` || lastrelease=0
+    lastrelease=$relpfx-`$trace "$0" last` || lastrelease=0
     $trace hg log -r "$lastrelease:" \
                   --template '{files}: {desc|firstline}\n' \
-    | $trace sed '/^\.hg/d; /^CHANGELOG/d; /^release-/d'
+    | $trace sed "/^\\.hg/d; /^CHANGELOG/d; /^$relpfx-/d'
     ;;
 
   add)
-    lastrelease=release-`$trace "$0" last` || lastrelease=0
+    lastrelease=$relpfx-`$trace "$0" last` || lastrelease=0
     log=`$trace "$0" log`
     [ -n "$log" ] || exit 1
     uncommited=`$trace hg status | grep -v '^?' || :`
@@ -108,8 +127,8 @@ case $op in
     [ -n "$newrelease" ] || exit 1
     echo
     ask "Ok to mark release as $newrelease" || exit 1
-    newtag=release-$newrelease
-    reldir=release/$newrelease
+    newtag=$relpfx-$newrelease
+    reldir=$relpfx/$newrelease
     $trace mkdir "$reldir"
     printf "%s\n" "$newtag" >"$reldir/release-tag.txt"
     $trace mv "$changefile" "$reldir/SUMMARY.txt"
@@ -148,8 +167,8 @@ $summary_text" "$reldir"
 
     if [ -z "$rev" ]
     then
-      rev=`cs-release last`
-      rev=release-$rev
+      rev=`"$0" last`
+      rev=$relpfx-$rev
     fi
 
     xit=0
