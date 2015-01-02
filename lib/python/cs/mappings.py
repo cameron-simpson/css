@@ -286,7 +286,7 @@ class SeenSet(object):
   def _add_foreign_line(self, line):
     # EOF markers, discard
     if line is None:
-      continue
+      return
     if not line.endswith('\n'):
       warning("%s: adding unterminated line: %s", self, line)
     s = line.rstrip()
