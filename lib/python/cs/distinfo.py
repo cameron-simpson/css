@@ -15,14 +15,16 @@ from cs.logutils import setup_logging, Pfx, info, warning, error
 from cs.py.modules import import_module_name
 
 # published URL
-URL_BASE = 'https://bitbucket.org/cameron_simpson/css/src/tip/lib/python'
+URL_BASE = 'https://bitbucket.org/cameron_simpson/css/src/tip/'
 
 # local directory where the files live
 LIBDIR = 'lib/python'
 
-distinfo = {
+# defaults for packages without their own specifics
+DISTINFO = {
     'author': "Cameron Simpson",
     'author_email': "cs@zip.com.au",
+    'url': 'https://bitbucket.org/cameron_simpson/css/commits/all',
     'classifiers': [
         "Programming Language :: Python",
         "Development Status :: 4 - Beta",
@@ -79,9 +81,24 @@ def main(argv):
   if pypi_package_name is None:
     pypi_package_name = package_name
 
+  libdir = LIBDIR
   distinfo = import_module_name(package_name, 'distinfo')
 
   ok = True
+
+  for kw, value in DISTINFO.items():
+    if value is not None:
+      with Pfx(kw):
+        if kw not in distinfo:
+          distinfo[kw] = value
+
+  ispkg = is_package(package_name, libdir)
+  if ispkg:
+    ## # stash the package in a top level directory of that name
+    ## distinfo['package_dir'] = {package_name: package_name}
+    distinfo['packages'] = [package_name]
+  else:
+    distinfo['py_modules'] = [package_name]
 
   for kw, value in ( ('name', pypi_package_name),
                      ('version', pypi_version),
@@ -103,8 +120,22 @@ def main(argv):
   if not write_setup(setup_py, distinfo):
     ok = False
 
-  pkgsubdir = os.path.join(pkgdir, pypi_package_name)
-  copyin(package_name, LIBDIR, pkgsubdir)
+  manifest_in = os.path.join(pkgdir, 'MANIFEST.in')
+  with open(manifest_in, "w") as mfp:
+    # TODO: support extra files
+    pass
+
+  pkgsubpath = pathify(pypi_package_name)
+  copyin(package_name, libdir, pkgdir)
+  pkgparts = pypi_package_name.split('.')
+  # make missing __init__.py files; something of a hack
+  if len(pkgparts) > 1:
+    for dirpath, dirnames, filenames in os.walk(os.path.join(pkgdir, pkgparts[0])):
+      initpath = os.path.join(dirpath, '__init__.py')
+      if not os.path.exists(initpath):
+        warning("making stub %s", initpath)
+        with open(os.path.join(dirpath, '__init__.py'), "a"):
+          pass
 
   if not ok:
     error("aborting package build")
@@ -122,9 +153,11 @@ def write_setup(setup_path, distinfo):
       out = partial(print, file=setup)
       out("#!/usr/bin/python")
       out("from distutils.core import setup")
-      out("")
       out("setup(")
-      for kw in ( 'description', 'author', 'author_email', 'version',
+      # mandatory fields, in preferred order
+      for kw in ( 'name',
+                  'description', 'author', 'author_email', 'version',
+                  'url',
                   'long_description',
                 ):
         try:
@@ -144,38 +177,56 @@ def pathify(package_name):
   '''
   return package_name.replace('.', os.path.sep)
 
+def is_package(package_name, libdir):
+  ''' Test whether `package_name` is a package (a directory with a __init__.py file).
+      Do some sanity checks and complain loudly.
+  '''
+  package_subpath = pathify(package_name)
+  package_dir = os.path.join(libdir, package_subpath)
+  package_py = package_dir + '.py'
+  package_init_path = os.path.join(package_dir, '__init__.py')
+  is_pkg = os.path.isdir(package_dir)
+  if is_pkg:
+    if os.path.exists(package_py):
+      error("both %s/ and %s exist", package_dir, package_py)
+      is_pkg = False
+    if not os.path.exists(package_init_path):
+      error("%s/ exists, but not %s", package_dir, package_init_path)
+      is_pkg = False
+  else:
+    if not os.path.exists(package_py):
+      error("neither %s/ nor %s exist", package_dir, package_py)
+  return is_pkg
+
 def package_paths(package_name, libdir):
   ''' Generator to yield the file paths from a package relative to the `libdir` subdirectory.
   '''
   package_subpath = pathify(package_name)
-  if os.path.exists(os.path.join(libdir, package_subpath + '.py')):
+  if not is_package(package_name, libdir):
     yield package_subpath + '.py'
-    return
-  if not os.path.exists(os.path.join(libdir, package_subpath, '__init__.py')):
-    raise ValueError("no %r in %r" % (package_name, libdir))
-  libprefix = libdir + os.path.sep
-  for dirpath, dirnames, filenames in os.walk(os.path.join(libdir, package_subpath)):
-    for filename in filenames:
-      if filename.startswith('.'):
-        continue
-      if filename.endswith('.pyc'):
-        continue
-      if filename.endswith('.py'):
-        yield os.path.join(dirpath[len(libprefix):], filename)
-      warning("skipping %s", os.path.join(dirpath, filename))
+  else:
+    libprefix = libdir + os.path.sep
+    for dirpath, dirnames, filenames in os.walk(os.path.join(libdir, package_subpath)):
+      for filename in filenames:
+        if filename.startswith('.'):
+          continue
+        if filename.endswith('.pyc'):
+          continue
+        if filename.endswith('.py'):
+          yield os.path.join(dirpath[len(libprefix):], filename)
+        warning("skipping %s", os.path.join(dirpath, filename))
 
 def needdir(dirpath):
   if not os.path.isdir(dirpath):
-    info("makedirs(%r)", dirpath)
+    warning("makedirs(%r)", dirpath)
     os.makedirs(dirpath)
 
 def copyin(package_name, libdir, dstdir):
   for rpath in package_paths(package_name, libdir):
-    dstsubdir = os.path.join(dstdir, os.path.dirname(rpath))
-    needdir(dstsubdir)
     srcfile = os.path.join(libdir, rpath)
     dstfile = os.path.join(dstdir, rpath)
     info("copy %s ==> %s", srcfile, dstfile)
+    needdir(os.path.dirname(dstfile))
     shutil.copyfile(srcfile, dstfile)
 
 if __name__ == '__main__':
