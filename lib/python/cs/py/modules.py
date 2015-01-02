@@ -10,7 +10,7 @@ from cs.logutils import error, exception
 def import_module_name(module_name, name, path=None, lock=None):
   ''' Import `module_name` and return the value of `name` within it.
       `module_name`: the module name to import
-      `name`: the name within the moudle whose value is returned
+      `name`: the name within the module whose value is returned
       `path`: an array of paths to use as sys.path during the import
       `lock`: a lock to hold during the import (recommended)
   '''
@@ -32,5 +32,5 @@ def import_module_name(module_name, name, path=None, lock=None):
     try:
       return getattr(M, name)
     except AttributeError as e:
-      error("%s: no entry named %r: %s", module_name, func_name, e)
+      error("%s: no entry named %r: %s", module_name, name, e)
   return None
