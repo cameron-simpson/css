@@ -131,8 +131,8 @@ case $op in
     newrelease=$( self next )
     [ -n "$newrelease" ] || exit 1
     echo
-    ask "Ok to mark release as $newrelease" || exit 1
     newtag=$relpfx-$newrelease
+    ask "Ok to mark release as $newtag" || exit 1
     if [ "x$relpfx" = xrelease ]
     then reldir=release/$newrelease
     else reldir=release/$relpfx-$newrelease
