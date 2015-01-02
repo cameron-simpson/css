@@ -133,7 +133,10 @@ case $op in
     echo
     ask "Ok to mark release as $newrelease" || exit 1
     newtag=$relpfx-$newrelease
-    reldir=$relpfx/$newrelease
+    if [ "x$relpfx" = xrelease ]
+    then reldir=release/$newrelease
+    else reldir=release/$relpfx-$newrelease
+    fi
     $trace mkdir "$reldir"
     printf "%s\n" "$newtag" >"$reldir/release-tag.txt"
     $trace mv "$changefile" "$reldir/SUMMARY.txt"
