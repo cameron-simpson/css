@@ -49,6 +49,11 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+# self invoke, passing tunable settings
+self(){
+  $trace "$0" -p "$relpfx" ${1+"$@"}
+}
+
 case $op in
   last)
     lastrelease=`$trace hg tags | sed -n "/^$relpfx-[1-9][01][0-9][0-9][01][0-9][0-3][0-9]/{s/^release-//; s/ .*//; p; q;}"`
@@ -58,7 +63,7 @@ case $op in
     ;;
 
   next)
-    lastrelease=`$trace "$0" last` || lastrelease=
+    lastrelease=`self last` || lastrelease=
     today=`date +%Y%m%d`
     if [ -z "$lastrelease" ]
     then
@@ -90,15 +95,15 @@ case $op in
     ;;
 
   log)
-    lastrelease=$relpfx-`$trace "$0" last` || lastrelease=0
+    lastrelease=$relpfx-`self last` || lastrelease=0
     $trace hg log -r "$lastrelease:" \
                   --template '{files}: {desc|firstline}\n' \
-    | $trace sed "/^\\.hg/d; /^CHANGELOG/d; /^$relpfx-/d'
+    | $trace sed "/^\\.hg/d; /^CHANGELOG/d; /^$relpfx-/d"
     ;;
 
   add)
-    lastrelease=$relpfx-`$trace "$0" last` || lastrelease=0
-    log=`$trace "$0" log`
+    lastrelease=$relpfx-`self last` || lastrelease=0
+    log=`self log`
     [ -n "$log" ] || exit 1
     uncommited=`$trace hg status | grep -v '^?' || :`
     if [ -n "$uncommited" ]
@@ -109,7 +114,7 @@ case $op in
       ask "Proceed anyway" || exit 1
     fi
     echo "Changes since $lastrelease:"
-    "$0" log
+    self log
     echo
     echo "Enter short change summary since $lastrelease."
     changefile=$TMPDIR/$cmd.$$.changes
@@ -123,7 +128,7 @@ case $op in
       "$EDITOR" "$changefile"
     done
     [ -s "$changefile" ] || exit 1
-    newrelease=`$trace "$0" next`
+    newrelease=`self next`
     [ -n "$newrelease" ] || exit 1
     echo
     ask "Ok to mark release as $newrelease" || exit 1
@@ -167,7 +172,7 @@ $summary_text" "$reldir"
 
     if [ -z "$rev" ]
     then
-      rev=`"$0" last`
+      rev=`self last`
       rev=$relpfx-$rev
     fi
 
@@ -197,7 +202,7 @@ $summary_text" "$reldir"
     cf=.freshmeatrc
     [ -s "$cf" ] || { echo "$cmd: missing $cf" >&2; exit 1; }
     eval `winclausevars "$cf" freshmeat fm`
-    lastrelease=`$trace "$0" last`
+    lastrelease=`self last`
     [ -n "$lastrelease" ] || exit 1
     summary=`$trace cat release/$lastrelease/SUMMARY.txt`
     [ -n "$summary" ] || exit 1
