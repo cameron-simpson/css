@@ -9,7 +9,7 @@ relpfx=release
 
 cmd=$( basename "$0" )
 usage="Usage: $cmd [-p relpfx] op [args...]
-  -p relpfx Prefix for new release tag names. Default: $relpfx
+  -P relpfx Prefix for new release tag names. Default: $relpfx
   op:
     add         Issue a new release.
     last        Report last release issued.
@@ -144,7 +144,8 @@ case $op in
     $trace mkdir "$reldir"
     printf "%s\n" "$newtag" >"$reldir/release-tag.txt"
     $trace mv "$changefile" "$reldir/SUMMARY.txt"
-    $trace hg log -r "$lastrelease:tip" >"$reldir/CHANGES.txt"
+    [ "x$lastrelease" = x0 ] \
+    || $trace hg log -r "$lastrelease:tip" >"$reldir/CHANGES.txt"
     $trace hg add "$reldir"
     summary_text=$( cat "$reldir/SUMMARY.txt" )
     $trace hg commit -m "Release information for $newtag.
