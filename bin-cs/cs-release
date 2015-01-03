@@ -76,7 +76,7 @@ self(){
 
 case $op in
   last)
-    lastrelease=$( $trace hg tags | sed -n "/^$relpfx-[1-9][01][0-9][0-9][01][0-9][0-3][0-9]/{s/^release-//; s/ .*//; p; q;}" )
+    lastrelease=$( $trace hg tags | sed -n "/^$relpfx-[1-9][01][0-9][0-9][01][0-9][0-3][0-9]/{s/^$relpfx-//; s/ .*//; p; q;}" )
     if [ -z "$lastrelease" ]
     then
       echo "$cmd: no last release for prefix \"$relpfx\"" >&2
@@ -125,7 +125,7 @@ case $op in
       echo "$cmd: no log because no previous release tag" >&2
       exit 1
     else
-      $trace hg log -r "$lastrelease:" \
+      $trace hg log -r "'$lastrelease':" \
                     --template '{files}: {desc|firstline}\n' \
                     "$subtree" \
       | $trace sed "/^\\.hg/d; /^CHANGELOG/d; /^$relpfx-/d"
@@ -232,9 +232,9 @@ $summary_text" "$reldir"
 
     dstdir=$tmpdir
     echo archive revision $rev ...
-    hg archive -t files -r "$rev" "$dstdir"
+    hg archive -t files -r "'$rev'" "$dstdir"
     echo update file timestamps ...
-    hg-apply-manifest-dates -r "$rev" "$dstdir"
+    hg-apply-manifest-dates -r "'$rev'" "$dstdir"
 
     echo "$dstdir" >&3
     exit $xit
