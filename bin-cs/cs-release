@@ -5,9 +5,11 @@
 #
 
 trace=set-x
+relpfx=release
 
-cmd=`basename "$0"`
-usage="Usage: $cmd op [args...]
+cmd=$( basename "$0" )
+usage="Usage: $cmd [-p relpfx] op [args...]
+  -p relpfx Prefix for new release tag names. Default: $relpfx
   op:
     add         Issue a new release.
     last        Report last release issued.
@@ -18,6 +20,23 @@ usage="Usage: $cmd op [args...]
                 Announce last release to freshmeat."
 
 badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -p) relpfx=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+case "$relpfx" in
+  [a-z]*) ;; *) echo "$cmd: -p: invalid relpfx, must start with a lowercase letter, got: $relpfx" >&2
+                badopts=1
+                ;;
+esac
 
 if [ $# = 0 ]
 then
@@ -30,17 +49,26 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+# self invoke, passing tunable settings
+self(){
+  $trace "$0" -p "$relpfx" ${1+"$@"}
+}
+
 case $op in
   last)
-    lastrelease=`$trace hg tags | sed -n '/^release-[1-9][01][0-9][0-9][01][0-9][0-3][0-9]/{s/^release-//; s/ .*//; p; q;}'`
-    [ -n "$lastrelease" ] || exit 1
+    lastrelease=$( $trace hg tags | sed -n "/^$relpfx-[1-9][01][0-9][0-9][01][0-9][0-3][0-9]/{s/^release-//; s/ .*//; p; q;}" )
+    if [ -z "$lastrelease" ]
+    then
+      echo "$cmd: no last release for prefix \"$relpfx\"" >&2
+      exit 1
+    fi
     printf "%s\n" "$lastrelease"
     exit 0
     ;;
 
   next)
-    lastrelease=`$trace "$0" last` || lastrelease=
-    today=`date +%Y%m%d`
+    lastrelease=$( self last ) || lastrelease=
+    today=$( date +%Y%m%d )
     if [ -z "$lastrelease" ]
     then
       release=$today
@@ -55,8 +83,8 @@ case $op in
         else
           case "$lastrelease" in
             "$today".[1-9] )
-              sfx=`expr "x$lastrelease" : "x$today".'\([1-9][0-9]*\).*'`
-              release=$today.`expr "$sfx" + 1`
+              sfx=$( expr "x$lastrelease" : "x$today".'\([1-9][0-9]*\).*' )
+              release=$today.$( expr "$sfx" + 1 )
               ;;
             *)
               echo "$cmd: can't compute next release from \"$lastrelease\"" >&2
@@ -71,17 +99,17 @@ case $op in
     ;;
 
   log)
-    lastrelease=release-`$trace "$0" last` || lastrelease=0
+    lastrelease=$relpfx-$( self last ) || lastrelease=0
     $trace hg log -r "$lastrelease:" \
                   --template '{files}: {desc|firstline}\n' \
-    | $trace sed '/^\.hg/d; /^CHANGELOG/d; /^release-/d'
+    | $trace sed "/^\\.hg/d; /^CHANGELOG/d; /^$relpfx-/d"
     ;;
 
   add)
-    lastrelease=release-`$trace "$0" last` || lastrelease=0
-    log=`$trace "$0" log`
+    lastrelease=$relpfx-$( self last ) || lastrelease=0
+    log=$( self log )
     [ -n "$log" ] || exit 1
-    uncommited=`$trace hg status | grep -v '^?' || :`
+    uncommited=$( $trace hg status | grep -v '^?' || : )
     if [ -n "$uncommited" ]
     then
       echo "Uncommited changes exist:"
@@ -90,7 +118,7 @@ case $op in
       ask "Proceed anyway" || exit 1
     fi
     echo "Changes since $lastrelease:"
-    "$0" log
+    self log
     echo
     echo "Enter short change summary since $lastrelease."
     changefile=$TMPDIR/$cmd.$$.changes
@@ -104,18 +132,21 @@ case $op in
       "$EDITOR" "$changefile"
     done
     [ -s "$changefile" ] || exit 1
-    newrelease=`$trace "$0" next`
+    newrelease=$( self next )
     [ -n "$newrelease" ] || exit 1
     echo
-    ask "Ok to mark release as $newrelease" || exit 1
-    newtag=release-$newrelease
-    reldir=release/$newrelease
+    newtag=$relpfx-$newrelease
+    ask "Ok to mark release as $newtag" || exit 1
+    if [ "x$relpfx" = xrelease ]
+    then reldir=release/$newrelease
+    else reldir=release/$relpfx-$newrelease
+    fi
     $trace mkdir "$reldir"
     printf "%s\n" "$newtag" >"$reldir/release-tag.txt"
     $trace mv "$changefile" "$reldir/SUMMARY.txt"
     $trace hg log -r "$lastrelease:tip" >"$reldir/CHANGES.txt"
     $trace hg add "$reldir"
-    summary_text=`cat "$reldir/SUMMARY.txt"`
+    summary_text=$( cat "$reldir/SUMMARY.txt" )
     $trace hg commit -m "Release information for $newtag.
 Summary:
 $summary_text" "$reldir"
@@ -148,8 +179,8 @@ $summary_text" "$reldir"
 
     if [ -z "$rev" ]
     then
-      rev=`cs-release last`
-      rev=release-$rev
+      rev=$( self last )
+      rev=$relpfx-$rev
     fi
 
     xit=0
@@ -158,7 +189,7 @@ $summary_text" "$reldir"
 
     unset tmpdir
     trap '[ ! -d "$tmpdir" ] || rm -rf $tmpdir; exit 1' 1 2 13 15
-    tmpdir=`mkdirn "$TMPDIR/$cmd"`
+    tmpdir=$( mkdirn "$TMPDIR/$cmd" )
 
     dstdir=$tmpdir
     echo archive revision $rev ...
@@ -177,10 +208,10 @@ $summary_text" "$reldir"
           fm_url_changelog
     cf=.freshmeatrc
     [ -s "$cf" ] || { echo "$cmd: missing $cf" >&2; exit 1; }
-    eval `winclausevars "$cf" freshmeat fm`
-    lastrelease=`$trace "$0" last`
+    eval $( winclausevars "$cf" freshmeat fm )
+    lastrelease=$( self last )
     [ -n "$lastrelease" ] || exit 1
-    summary=`$trace cat release/$lastrelease/SUMMARY.txt`
+    summary=$( $trace cat release/$lastrelease/SUMMARY.txt )
     [ -n "$summary" ] || exit 1
     printf "%s\n" "$summary"
     ask "Confirm freshmeat-submit of release $lastrelease to project $fm_project"
