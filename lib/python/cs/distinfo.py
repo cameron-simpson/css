@@ -12,7 +12,9 @@ from getopt import getopt, GetoptError
 from subprocess import Popen, PIPE
 import shutil
 from tempfile import mkdtemp
+from threading import RLock
 from cs.logutils import setup_logging, Pfx, info, warning, error, X
+from cs.threads import locked_property
 from cs.py.modules import import_module_name
 from cs.obj import O
 
@@ -113,9 +115,19 @@ def needdir(dirpath):
     warning("makedirs(%r)", dirpath)
     os.makedirs(dirpath)
 
+def runcmd(argv):
+  ''' Run command.
+  '''
+  X("runcmd: argv = %r", argv)
+  P = Popen(argv)
+  xit = P.wait()
+  if xit != 0:
+    raise ValueError("command failed, exit code %d: %r" % (xit, argv))
+
 def cmdstdout(argv):
   ''' Run command, return output in string.
   '''
+  X("cmdstdout: argv = %r", argv)
   P = Popen(argv, stdout=PIPE)
   output = P.stdout.read()
   xit = P.wait()
@@ -155,11 +167,11 @@ class PyPI_Package(O):
       pypi_package_name = package_name
     self.package_name = package_name
     self.pypi_package_name = pypi_package_name
-    self._distinfo = import_module_name(package_name, 'distinfo')
-    X("_distinfo = %r", self._distinfo)
     self.libdir = LIBDIR
+    self._lock = RLock()
+    self._prep_distinfo()
 
-  @property
+  @locked_property
   def version(self):
     return cmdstdout(['cs-release', '-p', self.package_name, 'last']).rstrip()
 
@@ -168,10 +180,16 @@ class PyPI_Package(O):
     return self.version
 
   @property
-  def distinfo(self):
+  def hg_tag(self):
+    return self.package_name + '-' + self.version
+
+  def _prep_distinfo(self):
     ''' Property containing the distutils infor for this package.
     '''
-    info = dict(self._distinfo)
+    info = dict(import_module_name(self.package_name, 'distinfo'))
+
+    info['package_dir'] = {}
+
     for kw, value in DISTINFO.items():
       if value is not None:
         with Pfx(kw):
@@ -196,7 +214,8 @@ class PyPI_Package(O):
               info("publishing %s instead of %s", value, info[kw])
           else:
             info[kw] = value
-    return info
+
+    self.distinfo = info
 
   def make_package(self):
     ''' Create a temporary directory, populate it with the package contents, return the directory name.
@@ -205,8 +224,6 @@ class PyPI_Package(O):
     distinfo = self.distinfo
 
     pkgdir = mkdtemp(prefix='pkg-'+self.pypi_package_name+'-', dir='.')
-
-    self.write_setup(os.path.join(pkgdir, 'setup.py'))
 
     manifest_in = os.path.join(pkgdir, 'MANIFEST.in')
     with open(manifest_in, "w") as mfp:
@@ -223,6 +240,9 @@ class PyPI_Package(O):
           warning("making stub %s", initpath)
           with open(os.path.join(dirpath, '__init__.py'), "a"):
             pass
+
+    # final step: write setup.py with information gathered earlier
+    self.write_setup(os.path.join(pkgdir, 'setup.py'))
 
     return pkgdir
 
@@ -259,7 +279,18 @@ class PyPI_Package(O):
         raise ValueError("could not construct valid setup.py file")
 
   def is_package(self, package_name):
+    ''' Test if the `package_name` is a package or just a file.
+    '''
     return test_is_package(self.libdir, package_name)
+
+  def package_base(self, package_name):
+    ''' Return the base of `package_name`, a relative directory or filename.
+    '''
+    package_subpath = pathify(package_name)
+    base = os.path.join(self.libdir, package_subpath)
+    if not self.is_package(package_name):
+      base += '.py'
+    return base
 
   def package_paths(self, package_name):
     ''' Generator to yield the file paths from a package relative to the `libdir` subdirectory.
@@ -281,13 +312,15 @@ class PyPI_Package(O):
           warning("skipping %s", os.path.join(dirpath, filename))
 
   def copyin(self, package_name, dstdir):
-    libdir = self.libdir
-    for rpath in self.package_paths(package_name):
-      srcfile = os.path.join(libdir, rpath)
-      dstfile = os.path.join(dstdir, rpath)
-      info("copy %s ==> %s", srcfile, dstfile)
-      needdir(os.path.dirname(dstfile))
-      shutil.copyfile(srcfile, dstfile)
+    base = self.package_base(package_name)
+    runcmd([ 'hg',
+               'archive',
+                 '-r', '"%s"' % self.hg_tag,
+                 '-I', base,
+                 dstdir
+           ])
+    X("package_dir[%s]=%s", package_name, base)
+    self.distinfo['package_dir'][package_name] = base
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
