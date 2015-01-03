@@ -182,7 +182,8 @@ case $op in
     $trace mkdir "$reldir"
     printf "%s\n" "$newtag" >"$reldir/release-tag.txt"
     $trace mv "$changefile" "$reldir/SUMMARY.txt"
-    printf '%s\n' "$log" >"$reldir/CHANGES.txt"
+    [ "x$lastrelease" != x0 ] \
+    || printf '%s\n' "$log" >"$reldir/CHANGES.txt"
     $trace hg add "$reldir"
     summary_text=$( cat "$reldir/SUMMARY.txt" )
     $trace hg commit -m "Release information for $newtag.
