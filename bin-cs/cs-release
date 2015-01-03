@@ -57,7 +57,11 @@ self(){
 case $op in
   last)
     lastrelease=$( $trace hg tags | sed -n "/^$relpfx-[1-9][01][0-9][0-9][01][0-9][0-3][0-9]/{s/^release-//; s/ .*//; p; q;}" )
-    [ -n "$lastrelease" ] || exit 1
+    if [ -z "$lastrelease" ]
+    then
+      echo "$cmd: no last release for prefix \"$relpfx\"" >&2
+      exit 1
+    fi
     printf "%s\n" "$lastrelease"
     exit 0
     ;;
