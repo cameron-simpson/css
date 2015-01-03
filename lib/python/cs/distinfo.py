@@ -188,7 +188,7 @@ class PyPI_Package(O):
     '''
     info = dict(import_module_name(self.package_name, 'distinfo'))
 
-    info['package_dir'] = {}
+    info['package_dir'] = {'': self.libdir}
 
     for kw, value in DISTINFO.items():
       if value is not None:
@@ -319,8 +319,6 @@ class PyPI_Package(O):
                  '-I', base,
                  dstdir
            ])
-    X("package_dir[%s]=%s", package_name, base)
-    self.distinfo['package_dir'][package_name] = base
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
