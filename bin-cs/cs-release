@@ -150,9 +150,9 @@ case $op in
         echo "$cmd: no changes since last release tag, aborting" >&2
         exit 1
       fi
+      echo "Changes since $lastrelease:"
+      printf "%s\n" "$log"
     fi
-    echo "Changes since $lastrelease:"
-    printf "%s\n" "$log"
     echo
     echo "Enter short change summary since $lastrelease."
     changefile=$TMPDIR/$cmd.$$.changes
