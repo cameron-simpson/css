@@ -4,6 +4,10 @@
 #       - Cameron Simpson <cs@zip.com.au> 28feb2009
 #
 
+set -ue
+
+: ${TMPDIR:=/tmp}
+
 trace=set-x
 relpfx=release
 
@@ -33,9 +37,25 @@ do
 done
 
 case "$relpfx" in
-  [a-z]*) ;; *) echo "$cmd: -p: invalid relpfx, must start with a lowercase letter, got: $relpfx" >&2
-                badopts=1
-                ;;
+  release)
+    subtree=.
+    ;;
+  [a-z]*)
+    subtree=lib/python/$( echo "$relpfx" | tr . / )
+    if [ ! -d "$subtree" ]
+    then
+      if [ -f "$subtree.py" ]
+      then
+        subtree=$subtree.py
+      else
+        echo "$cmd: neither subdir $subtree nor file $subtree.py" >&2
+        badopts=1
+      fi
+    fi
+    ;;
+  *)echo "$cmd: -p: invalid relpfx, must start with a lowercase letter, got: $relpfx" >&2
+    badopts=1
+    ;;
 esac
 
 if [ $# = 0 ]
@@ -100,15 +120,19 @@ case $op in
 
   log)
     lastrelease=$relpfx-$( self last ) || lastrelease=0
-    $trace hg log -r "$lastrelease:" \
-                  --template '{files}: {desc|firstline}\n' \
-    | $trace sed "/^\\.hg/d; /^CHANGELOG/d; /^$relpfx-/d"
+    if [ "x$lastrelease" = x0 ]
+    then
+      echo "$cmd: no log because no previous release tag" >&2
+      exit 1
+    else
+      $trace hg log -r "$lastrelease:" \
+                    --template '{files}: {desc|firstline}\n' \
+                    "$subtree" \
+      | $trace sed "/^\\.hg/d; /^CHANGELOG/d; /^$relpfx-/d"
+    fi
     ;;
 
   add)
-    lastrelease=$relpfx-$( self last ) || lastrelease=0
-    log=$( self log )
-    [ -n "$log" ] || exit 1
     uncommited=$( $trace hg status | grep -v '^?' || : )
     if [ -n "$uncommited" ]
     then
@@ -117,8 +141,18 @@ case $op in
       echo "These changes will not be included in the release."
       ask "Proceed anyway" || exit 1
     fi
+    lastrelease=$relpfx-$( self last ) || lastrelease=0
+    if [ "x$lastrelease" != x0 ]
+    then
+      log=$( self log )
+      if [ -z "$log" ]
+      then
+        echo "$cmd: no changes since last release tag, aborting" >&2
+        exit 1
+      fi
+    fi
     echo "Changes since $lastrelease:"
-    self log
+    printf "%s\n" "$log"
     echo
     echo "Enter short change summary since $lastrelease."
     changefile=$TMPDIR/$cmd.$$.changes
@@ -131,9 +165,13 @@ case $op in
     do
       "$EDITOR" "$changefile"
     done
-    [ -s "$changefile" ] || exit 1
-    newrelease=$( self next )
-    [ -n "$newrelease" ] || exit 1
+    if [ ! -s "$changefile" ]
+    then
+      echo "$cmd: empty changefile, aborting" >&2
+      exit 1
+    fi
+    newrelease=$( self next ) \
+    || { echo "$cmd: cannot generate next tag" >&2; exit 1; }
     echo
     newtag=$relpfx-$newrelease
     ask "Ok to mark release as $newtag" || exit 1
@@ -144,8 +182,7 @@ case $op in
     $trace mkdir "$reldir"
     printf "%s\n" "$newtag" >"$reldir/release-tag.txt"
     $trace mv "$changefile" "$reldir/SUMMARY.txt"
-    [ "x$lastrelease" = x0 ] \
-    || $trace hg log -r "$lastrelease:tip" >"$reldir/CHANGES.txt"
+    printf '%s\n' "$log" >"$reldir/CHANGES.txt"
     $trace hg add "$reldir"
     summary_text=$( cat "$reldir/SUMMARY.txt" )
     $trace hg commit -m "Release information for $newtag.
