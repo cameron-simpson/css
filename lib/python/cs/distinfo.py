@@ -6,6 +6,7 @@
 #
 from __future__ import print_function
 import sys
+import os
 import os.path
 from functools import partial
 from getopt import getopt, GetoptError
@@ -89,17 +90,8 @@ def main(argv):
 
   xit = 0
 
-  try:
-    pkgdir = PKG.make_package()
-  except NameError as e:
-    X("NameError: %s", e)
-    raise
-  except Exception as e:
-    raise
-    error("failed to make package: %s: %s", type(e), e)
-    xit = 1
-  else:
-    print(pkgdir)
+  with PKG as pkg_dir:
+    os.system("ls -la %s" % (pkg_dir,))
 
   return xit
 
@@ -171,6 +163,21 @@ class PyPI_Package(O):
     self._lock = RLock()
     self._prep_distinfo()
 
+  def __enter__(self):
+    ''' Prep the package in a temporary directory, return the directory.
+    '''
+    if hasattr(self, '_working_dir'):
+      raise RuntimeError("already using ._working_dir = %r" % (self._working_dir,))
+    self._working_dir = self.make_package()
+    return self._working_dir
+
+  def __exit__(self, exc_type, exc_value, traceback):
+    ''' Remove the temporary directory.
+    '''
+    shutil.rmtree(self._working_dir)
+    del self._working_dir
+    return False
+
   @locked_property
   def version(self):
     return cmdstdout(['cs-release', '-p', self.package_name, 'last']).rstrip()
@@ -217,24 +224,25 @@ class PyPI_Package(O):
 
     self.distinfo = info
 
-  def make_package(self):
-    ''' Create a temporary directory, populate it with the package contents, return the directory name.
+  def make_package(self, pkg_dir=None):
+    ''' Prepare package contents in the directory `pkg_dir`, return `pkg_dir`.
+        If `pkg_dir` is not supplied, create a temporary directory.
     '''
-    X("MAKE_PACKAGE...")
+    if pkg_dir is None:
+      pkg_dir = mkdtemp(prefix='pkg-'+self.pypi_package_name+'-', dir='.')
+
     distinfo = self.distinfo
 
-    pkgdir = mkdtemp(prefix='pkg-'+self.pypi_package_name+'-', dir='.')
-
-    manifest_in = os.path.join(pkgdir, 'MANIFEST.in')
+    manifest_in = os.path.join(pkg_dir, 'MANIFEST.in')
     with open(manifest_in, "w") as mfp:
       # TODO: support extra files
       pass
 
-    self.copyin(self.package_name, pkgdir)
+    self.copyin(self.package_name, pkg_dir)
     pkgparts = self.pypi_package_name.split('.')
     # make missing __init__.py files; something of a hack
     if len(pkgparts) > 1:
-      for dirpath, dirnames, filenames in os.walk(os.path.join(pkgdir, pkgparts[0])):
+      for dirpath, dirnames, filenames in os.walk(os.path.join(pkg_dir, pkgparts[0])):
         initpath = os.path.join(dirpath, '__init__.py')
         if not os.path.exists(initpath):
           warning("making stub %s", initpath)
@@ -242,9 +250,9 @@ class PyPI_Package(O):
             pass
 
     # final step: write setup.py with information gathered earlier
-    self.write_setup(os.path.join(pkgdir, 'setup.py'))
+    self.write_setup(os.path.join(pkg_dir, 'setup.py'))
 
-    return pkgdir
+    return pkg_dir
 
   def write_setup(self, setup_path):
     ''' Transcribe a setup.py file.
