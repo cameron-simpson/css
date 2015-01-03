@@ -9,6 +9,7 @@ import sys
 import os.path
 from functools import partial
 from getopt import getopt, GetoptError
+from subprocess import Popen, PIPE
 import shutil
 from tempfile import mkdtemp
 from cs.logutils import setup_logging, Pfx, info, warning, error, X
@@ -95,6 +96,8 @@ def main(argv):
     raise
     error("failed to make package: %s: %s", type(e), e)
     xit = 1
+  else:
+    print(pkgdir)
 
   return xit
 
@@ -109,6 +112,37 @@ def needdir(dirpath):
   if not os.path.isdir(dirpath):
     warning("makedirs(%r)", dirpath)
     os.makedirs(dirpath)
+
+def cmdstdout(argv):
+  ''' Run command, return output in string.
+  '''
+  P = Popen(argv, stdout=PIPE)
+  output = P.stdout.read()
+  xit = P.wait()
+  if xit != 0:
+    raise ValueError("command failed, exit code %d: %r" % (xit, argv))
+  return output
+
+def test_is_package(libdir, package_name):
+  ''' Test whether `package_name` is a package (a directory with a __init__.py file).
+      Do some sanity checks and complain loudly.
+  '''
+  package_subpath = pathify(package_name)
+  package_dir = os.path.join(libdir, package_subpath)
+  package_py = package_dir + '.py'
+  package_init_path = os.path.join(package_dir, '__init__.py')
+  is_pkg = os.path.isdir(package_dir)
+  if is_pkg:
+    if os.path.exists(package_py):
+      error("both %s/ and %s exist", package_dir, package_py)
+      is_pkg = False
+    if not os.path.exists(package_init_path):
+      error("%s/ exists, but not %s", package_dir, package_init_path)
+      is_pkg = False
+  else:
+    if not os.path.exists(package_py):
+      error("neither %s/ nor %s exist", package_dir, package_py)
+  return is_pkg
 
 class PyPI_Package(O):
   ''' Class for creating and administering cs.* packages for PyPI.
@@ -127,22 +161,24 @@ class PyPI_Package(O):
 
   @property
   def version(self):
-    :n bin-cs/cs-rel    
+    return cmdstdout(['cs-release', '-p', self.package_name, 'last']).rstrip()
+
+  @property
+  def pypi_version(self):
+    return self.version
 
   @property
   def distinfo(self):
     ''' Property containing the distutils infor for this package.
     '''
-    X("COMPUTE .distinfo")
     info = dict(self._distinfo)
     for kw, value in DISTINFO.items():
-      X("from DISTINFO: %r ==> %r", kw, value)
       if value is not None:
         with Pfx(kw):
           if kw not in info:
             info[kw] = value
 
-    ispkg = self.is_package
+    ispkg = self.is_package(self.package_name)
     if ispkg:
       ## # stash the package in a top level directory of that name
       ## info['package_dir'] = {package_name: package_name}
@@ -153,7 +189,6 @@ class PyPI_Package(O):
     for kw, value in ( ('name', self.pypi_package_name),
                        ('version', self.pypi_version),
                      ):
-      X("SET %r ==> %r", kw, value)
       if value is not None:
         with Pfx(kw):
           if kw in info:
@@ -161,7 +196,6 @@ class PyPI_Package(O):
               info("publishing %s instead of %s", value, info[kw])
           else:
             info[kw] = value
-    X("COMPUTED .distinfo = %r", info)
     return info
 
   def make_package(self):
@@ -179,8 +213,8 @@ class PyPI_Package(O):
       # TODO: support extra files
       pass
 
-    self.copyin(package_name, libdir, pkgdir)
-    pkgparts = pypi_package_name.split('.')
+    self.copyin(self.package_name, pkgdir)
+    pkgparts = self.pypi_package_name.split('.')
     # make missing __init__.py files; something of a hack
     if len(pkgparts) > 1:
       for dirpath, dirnames, filenames in os.walk(os.path.join(pkgdir, pkgparts[0])):
@@ -224,35 +258,15 @@ class PyPI_Package(O):
       if not ok:
         raise ValueError("could not construct valid setup.py file")
 
-  @property
-  def is_package(self):
-    ''' Test whether `package_name` is a package (a directory with a __init__.py file).
-        Do some sanity checks and complain loudly.
-    '''
-    libdir = self.libdir
-    package_name = self.package_name
-    package_subpath = pathify(package_name)
-    package_dir = os.path.join(libdir, package_subpath)
-    package_py = package_dir + '.py'
-    package_init_path = os.path.join(package_dir, '__init__.py')
-    is_pkg = os.path.isdir(package_dir)
-    if is_pkg:
-      if os.path.exists(package_py):
-        error("both %s/ and %s exist", package_dir, package_py)
-        is_pkg = False
-      if not os.path.exists(package_init_path):
-        error("%s/ exists, but not %s", package_dir, package_init_path)
-        is_pkg = False
-    else:
-      if not os.path.exists(package_py):
-        error("neither %s/ nor %s exist", package_dir, package_py)
-    return is_pkg
+  def is_package(self, package_name):
+    return test_is_package(self.libdir, package_name)
 
-  def package_paths(package_name, libdir):
+  def package_paths(self, package_name):
     ''' Generator to yield the file paths from a package relative to the `libdir` subdirectory.
     '''
+    libdir = self.libdir
     package_subpath = pathify(package_name)
-    if not is_package(package_name, libdir):
+    if not self.is_package(package_name):
       yield package_subpath + '.py'
     else:
       libprefix = libdir + os.path.sep
@@ -266,8 +280,9 @@ class PyPI_Package(O):
             yield os.path.join(dirpath[len(libprefix):], filename)
           warning("skipping %s", os.path.join(dirpath, filename))
 
-  def copyin(package_name, libdir, dstdir):
-    for rpath in package_paths(package_name, libdir):
+  def copyin(self, package_name, dstdir):
+    libdir = self.libdir
+    for rpath in self.package_paths(package_name):
       srcfile = os.path.join(libdir, rpath)
       dstfile = os.path.join(dstdir, rpath)
       info("copy %s ==> %s", srcfile, dstfile)
