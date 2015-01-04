@@ -4,7 +4,7 @@
 #       - Cameron Simpson <cs@zip.com.au> 28jun2012
 #
 
-distinfo = {
+DISTINFO = {
     'description': "Aids for code sharing between python2 and python3.",
     'keywords': ["python2", "python3"],
     'classifiers': [
