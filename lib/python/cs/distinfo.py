@@ -15,9 +15,14 @@ import shutil
 from tempfile import mkdtemp
 from threading import RLock
 from cs.logutils import setup_logging, Pfx, info, warning, error, X
+import cs.sh
 from cs.threads import locked_property
 from cs.py.modules import import_module_name
 from cs.obj import O
+
+PYPI_PROD_URL = 'https://pypi.python.org/pypi'
+PYPI_TEST_URL = 'https://testpypi.python.org/pypi'
+PYPI_DFLT_URL = PYPI_TEST_URL
 
 # published URL
 URL_BASE = 'https://bitbucket.org/cameron_simpson/css/src/tip/'
@@ -53,9 +58,10 @@ def main(argv):
 
   pypi_package_name = None
   pypi_version = None
+  pypi_url = PYPI_DFLT_URL
 
   try:
-    opts, argv = getopt(argv, 'n:v:')
+    opts, argv = getopt(argv, 'n:r:v:')
   except GetoptError as e:
     warning("%s", e)
     badopts = True
@@ -64,6 +70,8 @@ def main(argv):
       with Pfx(opt):
         if opt == '-n':
           pypi_package_name = val
+        elif opt == '-r':
+          pypi_url = val
         elif opt == '-v':
           pypi_version = val
         else:
@@ -91,7 +99,12 @@ def main(argv):
   xit = 0
 
   with PKG as pkg_dir:
-    os.system("ls -la %s" % (pkg_dir,))
+    qpkg_dir = cs.sh.quotestr(pkg_dir)
+    qpypi_url = cs.sh.quotestr(pypi_url)
+    os.system("set -x; cd %s; ls -la" % (qpkg_dir,))
+    os.system("set -x; cd %s; python3 setup.py check" % (qpkg_dir,))
+    os.system("set -x; cd %s; python3 setup.py register -r %s" % (qpkg_dir, qpypi_url))
+    os.system("set -x; cd %s; python3 setup.py sdist upload -r %s" % (qpkg_dir, qpypi_url))
 
   return xit
 
