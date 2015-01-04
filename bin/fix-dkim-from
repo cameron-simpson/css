@@ -70,11 +70,14 @@ x
   y/	/ /
   y/\n/ /
 
-  # replace "full name local@domain [listname]" <listname@blah>
-  s/"\(.*[^ ]\)  *\([^ ][^ ]*@[^ ][^ ]*\)  *\[[^\]*]*\]" *<[^@>]*@[^@>]*>/"\1" <\2>/
+  # trim list name from @yahoogroups.com messages
+  s/  *\[[^\]*]*\]" \(<[^@>]*@yahoogroups\.com>\)/" \1/
+
+  # replace "full name local@domain" <listname@blah>
+  s/"\(.*[^ ]\)  *\([^ ][^ ]*@[^ ][^ ]*\)" *<[^@>]*@[^@>]*>/"\1" <\2>/
   t done
-  # replace "local@domain [listname]" <listname@blah>
-  s/"\([^ ][^ ]*@[^ ][^ ]*\)  *\[[^\]*]*\]" *<[^@>]*@[^@>]*>/<\1>/
+  # replace "local@domain" <listname@blah>
+  s/"\([^ ][^ ]*@[^ ][^ ]*\)" *<[^@>]*@[^@>]*>/<\1>/
   :done
 }
 
