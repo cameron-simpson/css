@@ -193,7 +193,7 @@ class PyPI_Package(O):
   def _prep_distinfo(self):
     ''' Property containing the distutils infor for this package.
     '''
-    info = dict(import_module_name(self.package_name, 'distinfo'))
+    info = dict(import_module_name(self.package_name, 'DISTINFO'))
 
     info['package_dir'] = {'': self.libdir}
 
