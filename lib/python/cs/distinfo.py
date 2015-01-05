@@ -84,9 +84,6 @@ def main(argv):
     badopts = True
   else:
     package_name = argv.pop(0)
-    if argv:
-      warning("extra arguments after pkg-name: %s", ' '.join(argv))
-      badopts = True
 
   if badopts:
     print(usage, file=sys.stderr)
@@ -99,13 +96,11 @@ def main(argv):
 
   xit = 0
 
-  with PKG as pkg_dir:
-    qpkg_dir = cs.sh.quotestr(pkg_dir)
-    qpypi_url = cs.sh.quotestr(pypi_url)
-    os.system("set -x; cd %s; ls -la" % (qpkg_dir,))
-    os.system("set -x; cd %s; python3 setup.py check" % (qpkg_dir,))
-    os.system("set -x; cd %s; python3 setup.py register -r %s" % (qpkg_dir, qpypi_url))
-    os.system("set -x; cd %s; python3 setup.py sdist upload -r %s" % (qpkg_dir, qpypi_url))
+  with PKG.checkout(pypi_url) as pkg_co:
+    pkg_co("ls -la")
+    pkg_co.check()
+    pkg_co.register()
+    pkg_co.upload()
 
   return xit
 
@@ -176,21 +171,6 @@ class PyPI_Package(O):
     self.libdir = LIBDIR
     self._lock = RLock()
     self._prep_distinfo()
-
-  def __enter__(self):
-    ''' Prep the package in a temporary directory, return the directory.
-    '''
-    if hasattr(self, '_working_dir'):
-      raise RuntimeError("already using ._working_dir = %r" % (self._working_dir,))
-    self._working_dir = self.make_package()
-    return self._working_dir
-
-  def __exit__(self, exc_type, exc_value, traceback):
-    ''' Remove the temporary directory.
-    '''
-    shutil.rmtree(self._working_dir)
-    del self._working_dir
-    return False
 
   @locked_property
   def version(self):
@@ -290,6 +270,9 @@ class PyPI_Package(O):
 
     return pkg_dir
 
+  def checkout(self, pypi_url):
+    return PyPI_PackageCheckout(self, pypi_url)
+
   def write_setup(self, setup_path):
     ''' Transcribe a setup.py file.
     '''
@@ -363,6 +346,61 @@ class PyPI_Package(O):
                  '-I', base,
                  dstdir
            ])
+
+class PyPI_PackageCheckout(O):
+  ''' Facilities available with a checkout of a package.
+  '''
+
+  def __init__(self, pkg, pypi_url):
+    ''' Initialise this 
+    '''
+    self.package = pkg
+    self.pypi_url = pypi_url
+
+  def __enter__(self):
+    ''' Prep the package in a temporary directory, return self.
+    '''
+    if hasattr(self, 'pkg_dir'):
+      raise RuntimeError("already using .pkg_dir = %r" % (self.pkg_dir,))
+    self.pkg_dir = self.package.make_package()
+    return self
+
+  def __exit__(self, exc_type, exc_value, traceback):
+    ''' Remove the temporary directory.
+    '''
+    shutil.rmtree(self.pkg_dir)
+    del self.pkg_dir
+    return False
+
+  def inpkg(self, shcmd):
+    ''' Run a command supplied as a sh(1) command string.
+    '''
+    qpkg_dir = cs.sh.quotestr(self.pkg_dir)
+    xit = os.system("set -uex; cd %s; %s" % (qpkg_dir, shcmd))
+    if xit != 0:
+      raise ValueError("command failed, exit status %d: %r" % (xit, shcmd))
+
+  __call__ = inpkg
+
+  def inpkg_argv(self, argv):
+    ''' Run a command supplied as an argument list.
+    '''
+    shcmd = ' '.join(cs.sh.quote(argv))
+    return self.inpkg(shcmd)
+
+  def setup_py(self, *argv):
+    ''' Run a setup.py incantation.
+    '''
+    return self.inpkg_argv([ 'python3', 'setup.py' ] + list(argv))
+
+  def check(self):
+    self.setup_py('check')
+
+  def register(self):
+    self.setup_py('register')
+
+  def upload(self):
+    self.setup_py('sdist', 'upload', '-r', self.pypi_url)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
