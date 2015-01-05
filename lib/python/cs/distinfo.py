@@ -31,20 +31,21 @@ URL_BASE = 'https://bitbucket.org/cameron_simpson/css/src/tip/'
 LIBDIR = 'lib/python'
 
 # defaults for packages without their own specifics
-DISTINFO = {
+DISTINFO_DEFAULTS = {
     'author': "Cameron Simpson",
     'author_email': "cs@zip.com.au",
     'url': 'https://bitbucket.org/cameron_simpson/css/commits/all',
-    'classifiers': [
-        "Programming Language :: Python",
-        "Development Status :: 4 - Beta",
-        "Environment :: Other Environment",
-        "Intended Audience :: Developers",
-        "License :: OSI Approved :: GNU Library or Lesser General Public License (LGPL)",
-        "Operating System :: OS Independent",
-        "Topic :: Software Development :: Libraries :: Python Modules",
-        ],
 }
+
+DISTINFO_CLASSIFICATION = {
+    "Programming Language": "Python",
+    "Development Status": "4 - Beta",
+    "Intended Audience": "Developers",
+    "Operating System": "OS Independent",
+    "Topic": "Software Development :: Libraries :: Python Modules",
+    "License": "OSI Approved :: GNU General Public License v3 (GPLv3)",
+}
+
 
 
 USAGE = '''Usage: %s [-n pypi-pkg-name] [-v pypi_version] pkg-name'''
@@ -206,15 +207,37 @@ class PyPI_Package(O):
   def _prep_distinfo(self):
     ''' Property containing the distutils infor for this package.
     '''
+    global DISTINFO_DEFAULTS
+    global DISTINFO_CLASSIFICATION
+
     info = dict(import_module_name(self.package_name, 'DISTINFO'))
 
     info['package_dir'] = {'': self.libdir}
 
-    for kw, value in DISTINFO.items():
-      if value is not None:
-        with Pfx(kw):
-          if kw not in info:
-            info[kw] = value
+    for kw, value in DISTINFO_DEFAULTS.items():
+      with Pfx(kw):
+        if kw not in info:
+          X("%s = %r", kw, value)
+          info[kw] = value
+
+    ##for kw, value in DISTINFO_APPEND.items():
+    ##  if kw not in info:
+    ##    info[kw] = []
+    ##  X("%s + %r", kw, value)
+    ##  info[kw].extend(value)
+
+    classifiers = info['classifiers']
+    for classifier_topic, classifier_subsection in DISTINFO_CLASSIFICATION.items():
+      classifier_prefix = classifier_topic + " ::"
+      classifier_value = classifier_topic + " :: " + classifier_subsection
+      X("look for %r ...", classifier_prefix)
+      if not any( classifier.startswith(classifier_prefix)
+                  for classifier in classifiers
+                ):
+        X("classifiers + %s", classifier_value)
+        info['classifiers'].append(classifier_value)
+      else:
+        X("already has %r*", classifier_prefix)
 
     ispkg = self.is_package(self.package_name)
     if ispkg:
