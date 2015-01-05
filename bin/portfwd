@@ -92,6 +92,7 @@ do
   [ $first ] && { set --; first=; }
   case "$target" in
     [A-Z]*)
+      # match all targets with the uppercase label
       onargs=$#
       set -- ${1+"$@"} \
              `sed -n 'y/	/ /
@@ -116,6 +117,10 @@ done
 
 uppername()
 { echo "$1" | tr -- '-[a-z]' '_[A-Z]'
+}
+
+lowername()
+{ echo "$1" | tr -- '_[A-Z]' '-[a-z]'
 }
 
 if [ $setflag ]
@@ -184,6 +189,12 @@ sshpidfile()
 
 utarget=$(uppername "$target")
 flag_connected=PORTFWD_${utarget}_CONNECTED
+
+# extract "# F: pfname needs other-pfname"
+for rcpfname in $( sed -n "s/^#  *F:  *${target}  *needs  *\\([a-z][-a-z0-9]*\\) *$/\\1/p" "$sshcfg" )
+do pfnames="$pfnames $rcpfname"
+done
+
 pfflags=
 pfpidfiles=
 for pfname in $pfnames
