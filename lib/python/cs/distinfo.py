@@ -20,6 +20,8 @@ from cs.threads import locked_property
 from cs.py.modules import import_module_name
 from cs.obj import O
 
+X("ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ")
+
 PYPI_PROD_URL = 'https://pypi.python.org/pypi'
 PYPI_TEST_URL = 'https://testpypi.python.org/pypi'
 PYPI_DFLT_URL = PYPI_TEST_URL
@@ -291,14 +293,6 @@ class PyPI_Package(O):
 
     self.copyin(self.package_name, pkg_dir)
     pkgparts = self.pypi_package_name.split('.')
-    # make missing __init__.py files; something of a hack
-    if len(pkgparts) > 1:
-      for dirpath, dirnames, filenames in os.walk(os.path.join(pkg_dir, pkgparts[0])):
-        initpath = os.path.join(dirpath, '__init__.py')
-        if not os.path.exists(initpath):
-          warning("making stub %s", initpath)
-          with open(os.path.join(dirpath, '__init__.py'), "a"):
-            pass
 
     # final step: write setup.py with information gathered earlier
     self.write_setup(os.path.join(pkg_dir, 'setup.py'))
@@ -386,13 +380,23 @@ class PyPI_Package(O):
           warning("skipping %s", os.path.join(dirpath, filename))
 
   def copyin(self, package_name, dstdir):
-    base = self.package_base(package_name)
-    runcmd([ 'hg',
-               'archive',
-                 '-r', '"%s"' % self.hg_tag,
-                 '-I', base,
-                 dstdir
-           ])
+    first = True
+    package_parts = package_name.split('.')
+    while package_parts:
+      superpackage_name = '.'.join(package_parts)
+      base = self.package_base(superpackage_name)
+      if first:
+        include = base
+      else:
+        include = os.path.join(base, '__init__.py')
+      runcmd([ 'hg',
+                 'archive',
+                   '-r', '"%s"' % self.hg_tag,
+                   '-I', include,
+                   dstdir
+             ])
+      package_parts.pop()
+      first = False
 
 class PyPI_PackageCheckout(O):
   ''' Facilities available with a checkout of a package.
@@ -407,7 +411,7 @@ class PyPI_PackageCheckout(O):
     if hasattr(self, 'pkg_dir'):
       raise RuntimeError("already using .pkg_dir = %r" % (self.pkg_dir,))
     self.pkg_dir = self.package.make_package()
-    self.inpkg("ls -la")
+    self.inpkg("ls -laR")
     return self
 
   def __exit__(self, exc_type, exc_value, traceback):
