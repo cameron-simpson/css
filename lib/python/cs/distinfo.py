@@ -54,7 +54,9 @@ USAGE = '''Usage: %s [-n pypi-pkg-name] [-v pypi_version] pkg-name op [op-args..
   -v pypi-version
         Version number for PyPI. Default from last release tag for pkg-name.
   Operations:
-    check   Run setup.py check on the resulting package.'''
+    check   Run setup.py check on the resulting package.
+    register Register/update the package description and version.
+    upload   Upload the package source distribution.'''
 
 def main(argv):
   cmd = os.path.basename(argv.pop(0))
@@ -96,7 +98,7 @@ def main(argv):
     else:
       op = argv.pop(0)
       with Pfx(op):
-        if op == "check":
+        if op in ("check", "register", "upload"):
           if argv:
             warning("extra arguments: %s", ' '.join(argv))
             badopts = True
@@ -121,6 +123,10 @@ def main(argv):
   with Pfx(op):
     if op == 'check':
       PKG.check()
+    elif op == 'register':
+      PKG.register()
+    elif op == 'upload':
+      PKG.upload()
     else:
       raise RuntimeError("unimplemented")
 
@@ -301,6 +307,14 @@ class PyPI_Package(O):
   def check(self):
     with self.checkout() as pkg_co:
       pkg_co.check()
+
+  def register(self):
+    with self.checkout() as pkg_co:
+      pkg_co.register()
+
+  def upload(self):
+    with self.checkout() as pkg_co:
+      pkg_co.upload()
 
   def write_setup(self, setup_path):
     ''' Transcribe a setup.py file.
