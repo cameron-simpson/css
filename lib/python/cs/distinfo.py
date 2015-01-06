@@ -51,6 +51,10 @@ DISTINFO_CLASSIFICATION = {
 USAGE = '''Usage: %s [-n pypi-pkg-name] [-v pypi_version] pkg-name op [op-args...]
   -n pypi-pkg-name
         Name of package in PyPI. Default the same as the local package.
+  -r pypi_repo_url
+        Use the specified PyPI repository URL.
+        Default: %s
+        Official site: %s
   -v pypi-version
         Version number for PyPI. Default from last release tag for pkg-name.
   Operations:
@@ -60,7 +64,7 @@ USAGE = '''Usage: %s [-n pypi-pkg-name] [-v pypi_version] pkg-name op [op-args..
 
 def main(argv):
   cmd = os.path.basename(argv.pop(0))
-  usage = USAGE % (cmd,)
+  usage = USAGE % (cmd, PYPI_DFLT_URL, PYPI_PROD_URL)
   setup_logging(cmd)
 
   badopts = False
@@ -442,7 +446,7 @@ class PyPI_PackageCheckout(O):
     self.setup_py('check')
 
   def register(self):
-    self.setup_py('register')
+    self.setup_py('register', '-r', self.pypi_url)
 
   def upload(self):
     self.setup_py('sdist', 'upload', '-r', self.pypi_url)
