@@ -48,7 +48,11 @@ DISTINFO_CLASSIFICATION = {
 
 
 
-USAGE = '''Usage: %s [-n pypi-pkg-name] [-v pypi_version] pkg-name'''
+USAGE = '''Usage: %s [-n pypi-pkg-name] [-v pypi_version] pkg-name op [op-args...]
+  -n pypi-pkg-name
+        Name of package in PyPI. Default the same as the local package.
+  Operations:
+    check   Run setup.py check on the resulting package.'''
 
 def main(argv):
   cmd = os.path.basename(argv.pop(0))
@@ -84,6 +88,19 @@ def main(argv):
     badopts = True
   else:
     package_name = argv.pop(0)
+    if not argv:
+      warning("missing op")
+      badopts = True
+    else:
+      op = argv.pop(0)
+      with Pfx(op):
+        if op == "check":
+          if argv:
+            warning("extra arguments: %s", ' '.join(argv))
+            badopts = True
+        else:
+          warning("unrecognised op")
+          badopts = True
 
   if badopts:
     print(usage, file=sys.stderr)
@@ -92,15 +109,15 @@ def main(argv):
   if pypi_package_name is None:
     pypi_package_name = package_name
 
-  PKG = PyPI_Package(package_name, pypi_package_name = pypi_package_name)
+  PKG = PyPI_Package(package_name, pypi_package_name=pypi_package_name, pypi_url=pypi_url)
 
   xit = 0
 
-  with PKG.checkout(pypi_url) as pkg_co:
-    pkg_co("ls -la")
-    pkg_co.check()
-    pkg_co.register()
-    pkg_co.upload()
+  with Pfx(op):
+    if op == 'check':
+      PKG.check()
+    else:
+      raise RuntimeError("unimplemented")
 
   return xit
 
@@ -161,13 +178,16 @@ class PyPI_Package(O):
   ''' Class for creating and administering cs.* packages for PyPI.
   '''
 
-  def __init__(self, package_name, pypi_package_name = None):
+  def __init__(self, package_name, pypi_package_name = None, pypi_url=None):
     ''' Iinitialise: save package_name and its name in PyPI.
     '''
     if pypi_package_name is None:
       pypi_package_name = package_name
+    if pypi_url is None:
+      pypi_url = PYPI_DFLT_URL
     self.package_name = package_name
     self.pypi_package_name = pypi_package_name
+    self.pypi_url = pypi_url
     self.libdir = LIBDIR
     self._lock = RLock()
     self._prep_distinfo()
@@ -270,8 +290,12 @@ class PyPI_Package(O):
 
     return pkg_dir
 
-  def checkout(self, pypi_url):
-    return PyPI_PackageCheckout(self, pypi_url)
+  def checkout(self):
+    return PyPI_PackageCheckout(self)
+
+  def check(self):
+    with self.checkout() as pkg_co:
+      pkg_co.check()
 
   def write_setup(self, setup_path):
     ''' Transcribe a setup.py file.
@@ -351,11 +375,8 @@ class PyPI_PackageCheckout(O):
   ''' Facilities available with a checkout of a package.
   '''
 
-  def __init__(self, pkg, pypi_url):
-    ''' Initialise this 
-    '''
+  def __init__(self, pkg):
     self.package = pkg
-    self.pypi_url = pypi_url
 
   def __enter__(self):
     ''' Prep the package in a temporary directory, return self.
@@ -363,6 +384,7 @@ class PyPI_PackageCheckout(O):
     if hasattr(self, 'pkg_dir'):
       raise RuntimeError("already using .pkg_dir = %r" % (self.pkg_dir,))
     self.pkg_dir = self.package.make_package()
+    self.inpkg("ls -la")
     return self
 
   def __exit__(self, exc_type, exc_value, traceback):
@@ -371,6 +393,10 @@ class PyPI_PackageCheckout(O):
     shutil.rmtree(self.pkg_dir)
     del self.pkg_dir
     return False
+
+  @property
+  def pypi_url(self):
+    return self.package.pypi_url
 
   def inpkg(self, shcmd):
     ''' Run a command supplied as a sh(1) command string.
