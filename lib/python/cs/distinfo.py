@@ -51,6 +51,8 @@ DISTINFO_CLASSIFICATION = {
 USAGE = '''Usage: %s [-n pypi-pkg-name] [-v pypi_version] pkg-name op [op-args...]
   -n pypi-pkg-name
         Name of package in PyPI. Default the same as the local package.
+  -v pypi-version
+        Version number for PyPI. Default from last release tag for pkg-name.
   Operations:
     check   Run setup.py check on the resulting package.'''
 
@@ -109,7 +111,10 @@ def main(argv):
   if pypi_package_name is None:
     pypi_package_name = package_name
 
-  PKG = PyPI_Package(package_name, pypi_package_name=pypi_package_name, pypi_url=pypi_url)
+  PKG = PyPI_Package(package_name,
+                     pypi_package_name=pypi_package_name,
+                     pypi_url=pypi_url,
+                     pypi_version=pypi_version)
 
   xit = 0
 
@@ -136,7 +141,6 @@ def needdir(dirpath):
 def runcmd(argv):
   ''' Run command.
   '''
-  X("runcmd: argv = %r", argv)
   P = Popen(argv)
   xit = P.wait()
   if xit != 0:
@@ -145,7 +149,6 @@ def runcmd(argv):
 def cmdstdout(argv):
   ''' Run command, return output in string.
   '''
-  X("cmdstdout: argv = %r", argv)
   P = Popen(argv, stdout=PIPE)
   output = P.stdout.read()
   xit = P.wait()
@@ -178,7 +181,7 @@ class PyPI_Package(O):
   ''' Class for creating and administering cs.* packages for PyPI.
   '''
 
-  def __init__(self, package_name, pypi_package_name = None, pypi_url=None):
+  def __init__(self, package_name, pypi_package_name = None, pypi_url=None, pypi_version=None):
     ''' Iinitialise: save package_name and its name in PyPI.
     '''
     if pypi_package_name is None:
@@ -191,6 +194,8 @@ class PyPI_Package(O):
     self.libdir = LIBDIR
     self._lock = RLock()
     self._prep_distinfo()
+    if pypi_version is not None:
+      self._version = pypi_version
 
   @locked_property
   def version(self):
