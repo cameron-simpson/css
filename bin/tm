@@ -343,6 +343,12 @@ case "$op" in
         )
         ;;
     esac
+    detached=
+    if [ $# -gt 0 ] && [ "x$1" = x-d ]
+    then
+      detached=1
+      shift
+    fi
     if not $trace tmux has-session -t "$session_name" 2>/dev/null
     then
       cr=$( printf '\r' )
@@ -364,9 +370,12 @@ case "$op" in
       TMUX= $trace tmux new-session -d -s "$session_name" "$shcmd"
       [ -z "$keylines" ] || $trace tmux send-keys -l -t "$session_name" -- "$keylines"
     fi
-    if [ -n "$TMUX" ]
-    then  $trace tmux switch-client -t "$session_name"
-    else  $trace tmux attach-session -t "$session_name"
+    if [ -z "$detached" ]
+    then
+      if [ -n "$TMUX" ]
+      then  $trace tmux switch-client -t "$session_name"
+      else  $trace tmux attach-session -t "$session_name"
+      fi
     fi
     ;;
   use-session-remote)

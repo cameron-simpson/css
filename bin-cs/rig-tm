@@ -4,4 +4,4 @@
 #   - Cameron Simpson <cs@zip.com.au> 07jan2015
 #
 
-sed -n 's/^[A-Z].*/tm &/p' "$HOME/.tmrc" | sh -x
+sed -n 's/^\([A-Z][^ ]*\)  */tm \1 -d /p' "$HOME/.tmrc" | sh -x
