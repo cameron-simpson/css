@@ -22,10 +22,11 @@ usage="Usage: $cmd [options...] [op [args...]]
   Options:
     -x  Trace command execution.
   Operations:
-    UPPERCASE_NAME [command [args...]]
+    UPPERCASE_NAME {-c shcmd | [command [args...]]}
       Shorthand for \"use-session UPPERCASE_NAME\". Includes names starting
       with an underscore.
-      If command is supplied, run this command in the session if it does not already exist.
+      If command is supplied, run this command in the session if
+      it does not already exist.
     =new-session-name
       Rename the current session name to \"new-session-name\".
       To be used within a tmux session; relies on \$TMUX_PANE.
@@ -53,9 +54,10 @@ usage="Usage: $cmd [options...] [op [args...]]
       Short for \"tmux select-pane -R\".
     up
       Short for \"tmux select-pane -U\".
-    use-session session-name [command [args...]]
+    use-session session-name {-c shcmd | [command [args...]]}
       Join the session named \"session-name\", creating it if necessary.
-      If command is supplied, run this command in the session if it does not already exist.
+      If command is supplied, run this command in the session if
+      it does not already exist.
     use-session-remote session-name remote-host
       Join the session named \"session-name\" on the remote host
       \"remote-host\", creating it if necessary."
