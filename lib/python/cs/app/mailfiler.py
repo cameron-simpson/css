@@ -36,7 +36,7 @@ from cs.logutils import Pfx, setup_logging, with_log, \
                         D, X, LogTime
 from cs.mailutils import Maildir, message_addresses, modify_header, \
                          shortpath, ismaildir, make_maildir
-from cs.obj import O, slist
+from cs.obj import O
 from cs.seq import first
 from cs.threads import locked, locked_property
 from cs.app.maildb import MailDB
@@ -1415,7 +1415,7 @@ class Rule(O):
   def __init__(self, filename, lineno):
     self.filename = filename
     self.lineno = lineno
-    self.conditions = slist()
+    self.conditions = []
     self.targets = []
     self.flags = O(alert=0, halt=False)
     self.label = ''
