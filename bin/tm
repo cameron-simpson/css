@@ -22,11 +22,9 @@ usage="Usage: $cmd [options...] [op [args...]]
   Options:
     -x  Trace command execution.
   Operations:
-    UPPERCASE_NAME {-c shcmd | [command [args...]]}
+    UPPERCASE_NAME [-K keyline]... {-c shcmd | [command [args...]]}
       Shorthand for \"use-session UPPERCASE_NAME\". Includes names starting
       with an underscore.
-      If command is supplied, run this command in the session if
-      it does not already exist.
     =new-session-name
       Rename the current session name to \"new-session-name\".
       To be used within a tmux session; relies on \$TMUX_PANE.
@@ -54,10 +52,11 @@ usage="Usage: $cmd [options...] [op [args...]]
       Short for \"tmux select-pane -R\".
     up
       Short for \"tmux select-pane -U\".
-    use-session session-name {-c shcmd | [command [args...]]}
+    use-session session-name [-K keyline...] {-c shcmd | [command [args...]]}
       Join the session named \"session-name\", creating it if necessary.
-      If command is supplied, run this command in the session if
-      it does not already exist.
+      If the session does not exist:
+        a) run the supplied command if specified, otherwise \$SHELL.
+        b) pass each keyline with a trailing carriage return.
     use-session-remote session-name remote-host
       Join the session named \"session-name\" on the remote host
       \"remote-host\", creating it if necessary."
@@ -344,16 +343,27 @@ case "$op" in
         )
         ;;
     esac
-    if [ $# = 0 ]
-    then  set -- "$SHELL"
-    else
-      if [ "x$1" = x-c ]
-      then  set -- "$SHELL" "$@"
+    if not $trace tmux has-session -t "$session_name" 2>/dev/null
+    then
+      cr=$( printf '\r' )
+      keylines=
+      while [ $# -gt 0 ] && [ "x$1" = x-K ]
+      do
+        keyline=$2
+        shift; shift
+        keylines=$keylines$keyline$cr
+      done
+      if [ $# = 0 ]
+      then  set -- "$SHELL"
+      else
+        if [ "x$1" = x-c ]
+        then  set -- "$SHELL" "$@"
+        fi
       fi
+      shcmd=$( shqstr "$@" )
+      TMUX= $trace tmux new-session -d -s "$session_name" "$shcmd"
+      [ -z "$keylines" ] || $trace tmux send-keys -l -t "$session_name" -- "$keylines"
     fi
-    shcmd=$( shqstr "$@" )
-    $trace tmux has-session -t "$session_name" 2>/dev/null \
-    || TMUX= $trace tmux new-session -d -s "$session_name" "$shcmd"
     if [ -n "$TMUX" ]
     then  $trace tmux switch-client -t "$session_name"
     else  $trace tmux attach-session -t "$session_name"
