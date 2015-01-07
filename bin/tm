@@ -22,9 +22,10 @@ usage="Usage: $cmd [options...] [op [args...]]
   Options:
     -x  Trace command execution.
   Operations:
-    UPPERCASE_NAME
+    UPPERCASE_NAME [command [args...]]
       Shorthand for \"use-session UPPERCASE_NAME\". Includes names starting
       with an underscore.
+      If command is supplied, run this command in the session if it does not already exist.
     =new-session-name
       Rename the current session name to \"new-session-name\".
       To be used within a tmux session; relies on \$TMUX_PANE.
@@ -52,8 +53,9 @@ usage="Usage: $cmd [options...] [op [args...]]
       Short for \"tmux select-pane -R\".
     up
       Short for \"tmux select-pane -U\".
-    use-session session-name
+    use-session session-name [command [args...]]
       Join the session named \"session-name\", creating it if necessary.
+      If command is supplied, run this command in the session if it does not already exist.
     use-session-remote session-name remote-host
       Join the session named \"session-name\" on the remote host
       \"remote-host\", creating it if necessary."
@@ -119,11 +121,6 @@ case "$op" in
   [1-9_A-Z]*)
     session_name=$op
     op=use-session
-    if [ $# -gt 0 ]
-    then
-      echo "$cmd: $op $session_name: extra arguments: $*" >&2
-      badopts=1
-    fi
     ;;
   up | down | left |right )
     if [ $# -gt 0 ]
@@ -222,11 +219,6 @@ case "$op" in
     else
       session_name=$1
       shift
-    fi
-    if [ $# -gt 0 ]
-    then
-      echo "$cmd: $op: extra arguments: $*" >&2
-      badopts=1
     fi
     ;;
   use-session-remote)
@@ -350,7 +342,16 @@ case "$op" in
         )
         ;;
     esac
-    $trace tmux has-session -t "$session_name" 2>/dev/null || TMUX= $trace tmux new-session -d -s "$session_name"
+    if [ $# = 0 ]
+    then  set -- "$SHELL"
+    else
+      if [ "x$1" = x-c ]
+      then  set -- "$SHELL" "$@"
+      fi
+    fi
+    shcmd=$( shqstr "$@" )
+    $trace tmux has-session -t "$session_name" 2>/dev/null \
+    || TMUX= $trace tmux new-session -d -s "$session_name" "$shcmd"
     if [ -n "$TMUX" ]
     then  $trace tmux switch-client -t "$session_name"
     else  $trace tmux attach-session -t "$session_name"
