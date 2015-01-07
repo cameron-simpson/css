@@ -6,12 +6,6 @@
 from copy import copy as copy0
 from cs.py3 import StringTypes
 
-class slist(list):
-  ''' A list with a shorter str().
-  '''
-  def __str__(self):
-    return str(len(self)) + ":[" + ",".join(str(e) for e in self) + "]"
-
 T_SEQ = 'ARRAY'
 T_MAP = 'HASH'
 T_SCALAR = 'SCALAR'
