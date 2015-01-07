@@ -14,6 +14,10 @@ def objFlavour(obj):
       T_MAP: DictType, DictionaryType, objects with an __keys__ or keys attribute.
       T_SEQ: TupleType, ListType, objects with an __iter__ attribute.
       T_SCALAR: Anything else.
+      Notes: the perlishness of the flavour constants is largely
+      to support the cs.hier class, which in turn supports a very
+      perlish file syntax, for historic reasons supporting existing
+      perl code.
   """
   t = type(obj)
   if isinstance(t, (tuple, list)):
