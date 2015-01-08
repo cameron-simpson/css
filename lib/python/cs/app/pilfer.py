@@ -221,7 +221,7 @@ def main(argv, stdin=None):
                 divnames.remove(busy_name)
                 X("CLOSE DIV %s", busy_div)
                 LTR.state("CLOSE DIV %s", busy_div)
-                busy_div.close(check_final_close=True)
+                busy_div.close(enforce_final_close=True)
                 outQ = busy_div.outQ
                 D("DRAIN DIV %s", busy_div)
                 LTR.state("DRAIN DIV %s: outQ=%s", busy_div, outQ)

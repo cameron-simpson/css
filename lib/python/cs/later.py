@@ -342,7 +342,7 @@ class _Pipeline(NestingOpenCloseMixin):
   def shutdown(self):
     ''' Close the leftmost queue in the pipeline.
     '''
-    self.inQ.close(check_final_close=True)
+    self.inQ.close(enforce_final_close=True)
 
   def join(self):
     ''' Wait for completion of the output queue.

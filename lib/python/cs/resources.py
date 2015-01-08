@@ -8,6 +8,7 @@ import threading
 from threading import Condition
 import traceback
 from cs.excutils import logexc
+from cs.logutils import warning, error
 from cs.obj import O, Proxy
 from cs.seq import seq
 from cs.py.func import callmethod_if as ifmethod
@@ -78,8 +79,8 @@ class NestingOpenCloseMixin(O):
     return self
 
   @logexc
-  @not_closed
-  def close(self, check_final_close=False):
+  ##@not_closed
+  def close(self, enforce_final_close=False):
     ''' Decrement the open count.
         If self.on_close, call self.on_close(self, count) with the
         pre-decrement count.
@@ -92,13 +93,13 @@ class NestingOpenCloseMixin(O):
       count = self._opens
     ifmethod(self, 'on_close', a=(count+1,))
     if count == 0:
-      if check_final_close:
+      if enforce_final_close:
         self.D("OK FINAL CLOSE")
       self.shutdown()
       if not self._finalise_later:
         self.finalise()
     else:
-      if check_final_close:
+      if enforce_final_close:
         raise RuntimeError("%s: expected this to be the final close, but it was not" % (self,))
 
   def finalise(self):
