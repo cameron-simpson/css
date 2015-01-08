@@ -943,7 +943,7 @@ def _test_grokfunc( P, *a, **kw ):
 
 # actions that work on the whole list of in-play URLs
 many_to_many = {
-      'sort':         lambda Ps, key=lambda P: P._, reversed=False: sorted(Ps, key=key, reversed=reversed),
+      'sort':         lambda Ps, key=lambda P: P._, reverse=False: sorted(Ps, key=key, reverse=reverse),
       'last':         lambda Ps: Ps[-1:],
     }
 
