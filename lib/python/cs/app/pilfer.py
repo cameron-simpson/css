@@ -657,7 +657,7 @@ class Pilfer(O):
     ''' Format a string using the URL `U` as context.
         `U` will be promoted to an URL if necessary.
     '''
-    return FormatMapping(self).format(s)
+    return FormatMapping(self, U=U).format(s)
 
   def set_user_var(self, k, value, U, raw=False):
     if not raw:
