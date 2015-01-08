@@ -20,7 +20,12 @@ except ImportError:
     pass
 from netrc import netrc
 import socket
-from urllib2 import urlopen, Request, HTTPError, URLError, \
+try:
+  from urllib.request import urlopen, Request, HTTPError, URLError, \
+            HTTPPasswordMgrWithDefaultRealm, HTTPBasicAuthHandler, \
+            build_opener
+except ImportError:
+  from urllib2 import urlopen, Request, HTTPError, URLError, \
 		    HTTPPasswordMgrWithDefaultRealm, HTTPBasicAuthHandler, \
 		    build_opener
 from urlparse import urlparse, urljoin
