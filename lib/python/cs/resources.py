@@ -18,7 +18,6 @@ def not_closed(func):
   '''
   def not_closed_wrapper(self, *a, **kw):
     if self.closed:
-      error("%r: ALREADY CLOSED", self)
       raise RuntimeError("%s: %s: already closed" % (not_closed_wrapper.__name__, self))
     return func(self, *a, **kw)
   not_closed_wrapper.__name__ = "not_closed_wrapper(%s)" % (func.__name__,)
