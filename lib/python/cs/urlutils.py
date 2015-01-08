@@ -199,7 +199,7 @@ class _URL(unicode):
       self._fetch()
     return self._info.gettype()
 
-  @property
+  @locked_property
   def content_transfer_encoding(self):
     ''' The URL content MIME type.
     '''
