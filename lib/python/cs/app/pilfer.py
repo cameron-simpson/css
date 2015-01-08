@@ -920,7 +920,7 @@ def grokall(module_name, func_name, Ps, *a, **kw):
   if not isinstance(Ps, list):
     Ps = list(Ps)
   if Ps:
-    mfunc = P[0].import_module_func(module_name, func_name)
+    mfunc = Ps[0].import_module_func(module_name, func_name)
     if mfunc is None:
       error("import fails")
     else:
