@@ -279,18 +279,18 @@ class SeenSet(object):
       # create file if missing, also tests access permission
       with open(backing_path, "a"):
         pass
-      self._backing_file = SharedAppendLines(backing_path)
-      T = Thread(target=self._tailer,
-                 name="SeenSet[%s]._tailer(%s)" % (name, backing_path,)
-                )
-      T.daemon = True
-      T.start()
-      sleep(0.1)
+      self._backing_file = SharedAppendLines(backing_path,
+                                             importer=self._add_foreign_line)
+      self._backing_file.ready()
 
-  def _tailer(self):
-    for line in self._backing_file.foreign_lines():
-      item = line.rstrip()
-      self.add(item, foreign=True)
+  def _add_foreign_line(self, line):
+    # EOF markers, discard
+    if line is None:
+      return
+    if not line.endswith('\n'):
+      warning("%s: adding unterminated line: %s", self, line)
+    s = line.rstrip()
+    self.add(s, foreign=True)
 
   def add(self, s, foreign=False):
     # avoid needlessly extending the backing file

@@ -1,0 +1,90 @@
+#!/usr/bin/sed -nf
+#
+# Fix up the From: lines of messages which have passed through a
+# DKIM verifying mailing list such as (gah!) all of Yahoo's ones.
+#
+# They unilaterally decided to introduce this and as fallout they
+# could not leave the From: lines alone like any sane mailing list.
+# Fortunately, the mangled lines look like this:
+#
+#  From: "full name local@domain [sed-users]" <sed-users@yahoogroups.com>
+# or:
+#  From: "local@domain [sed-users]" <sed-users@yahoogroups.com>
+#
+# This can readily be undone and converted into:
+#
+#  From: "full name" <local@domain>
+# or:
+#  From: <local@domain>
+#
+# leaving the message ready for use.
+#
+# In my mailfiler tool I have these rules:
+#
+#   from:s/"(?P<fullname>.*\S)\s+(?P<coreaddr>\S+@\S+)\s+\[sed-users\]".*<sed-users@yahoogroups.com>/"$fullname" <$coreaddr>/
+#                           sender:sed-users@yahoogroups.com
+#                           from:/<sed-users@yahoogroups.com>
+#   from:s/"(?P<coreaddr>\S+@\S+)\s+\[sed-users\]".*<sed-users@yahoogroups.com>/<$coreaddr>/
+#                           sender:sed-users@yahoogroups.com
+#                           from:/<sed-users@yahoogroups.com>
+#   sh      SedUsers        to,cc,sender,x-apparently-to:sed-users@yahoogroups.com
+#
+# Gory, but it rewrites the From: lines on the sed-users list and
+# then files the message in my "sh" folder. There are two s/this/that/
+# rules there, one for "full name local@domain" and one for just
+# "local@domain".
+#
+# The sed script below does the same as an external tool for use
+# with systems like procmail. Note that you need know that the
+# message is suitable to be unmangled, so you will need to phrase the
+# procmail rule along these lines:
+#
+#  :0whf
+#  * from:.*<sed-users@yahoogroups.com>
+#  | fix-dkim-from
+#
+# Hoping this helps,
+#   - Cameron Simpson <cs@zip.com.au> 31dec2014
+#
+
+:top
+
+# save the first line to the hold space
+1{
+  h
+  d
+}
+
+# append continuation lines to the hold space
+/^[ 	]/{
+  H
+  d
+}
+
+# save current line to hold space, pull back saved line
+x
+
+# rewrite the From: line to undo the from-mangling
+/^[Ff][Rr][Oo][Mm]:/{
+
+  y/	/ /
+  y/\n/ /
+
+  # trim list name from @yahoogroups.com messages
+  s/  *\[[^\]*]*\]" \(<[^@>]*@yahoogroups\.com>\)/" \1/
+
+  # replace "full name local@domain" <listname@blah>
+  s/"\(.*[^ ]\)  *\([^ ][^ ]*@[^ ][^ ]*\)" *<[^@>]*@[^@>]*>/"\1" <\2>/
+  t done
+  # replace "local@domain" <listname@blah>
+  s/"\([^ ][^ ]*@[^ ][^ ]*\)" *<[^@>]*@[^@>]*>/<\1>/
+  :done
+}
+
+p
+
+# last line; retrieve saved line and print it
+${
+  x
+  p
+}
