@@ -39,7 +39,7 @@ except ImportError:
 from threading import RLock
 from cs.excutils import logexc
 from cs.lex import parseUC_sAttr
-from cs.logutils import Pfx, pfx_iter, debug, error, warning, exception, D
+from cs.logutils import Pfx, pfx_iter, debug, error, warning, exception, D, X
 from cs.threads import locked_property
 from cs.py3 import StringIO, ustr, unicode
 from cs.obj import O
@@ -95,7 +95,8 @@ class _URL(unicode):
     '''
     k, plural = parseUC_sAttr(attr)
     if k:
-      nodes = self.parsed.find_all(k.lower())
+      P = self.parsed
+      nodes = P.find_all(k.lower())
       if plural:
         return nodes
       return the(nodes)
