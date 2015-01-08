@@ -869,7 +869,7 @@ def url_io_iter(I):
   '''
   while True:
     try:
-      item = I.next()
+      item = next(I)
     except StopIteration:
       break
     except (URLError, HTTPError) as e:
