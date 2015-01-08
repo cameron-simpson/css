@@ -531,10 +531,11 @@ class Pilfer(O):
           error(err)
         raise KeyError("invalid pipe specification for diversion named %r" % (pipe_name,))
       name = "DIVERSION:%s" % (pipe_name,)
-      diversions[pipe_name] = self.later.pipeline(pipe_funcs,
-                                                  name=name,
-                                                  outQ=NullQueue(name=name,
-                                                                 blocking=True).open()).open()
+      outQ=NullQueue(name=name, blocking=True)
+      outQ.open()   # open outQ so it can be closed at the end of the pipeline
+      div = self.later.pipeline(pipe_funcs, name=name, outQ=outQ)
+      div.open()    # will be closed in main program shutdown
+      diversions[pipe_name] = div
     return diversions[pipe_name]
 
   @logexc
