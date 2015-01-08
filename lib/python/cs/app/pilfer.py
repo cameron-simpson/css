@@ -622,6 +622,7 @@ class Pilfer(O):
     '''
     debug("save_url(U=%r, saveas=%r, dir=%s, overwrite=%r, kw=%r)...", U, saveas, dir, overwrite, kw)
     with Pfx("save_url(%s)", U):
+      U = URL(U, None)
       save_dir = self.save_dir
       if saveas is None:
         saveas = os.path.join(save_dir, U.basename)
