@@ -216,16 +216,16 @@ def main(argv, stdin=None):
                     break
                 if busy_div is None:
                   break
-                D("CLOSE DIV %s", div)
-                LTR.state("CLOSE DIV %s", div)
-                div.close(check_final_close=True)
-                outQ = div.outQ
-                D("DRAIN DIV %s", div)
-                LTR.state("DRAIN DIV %s: outQ=%s", div, outQ)
+                D("CLOSE DIV %s", busy_div)
+                LTR.state("CLOSE DIV %s", busy_div)
+                busy_div.close(check_final_close=True)
+                outQ = busy_div.outQ
+                D("DRAIN DIV %s", busy_div)
+                LTR.state("DRAIN DIV %s: outQ=%s", busy_div, outQ)
                 for item in outQ:
                   # diversions are supposed to discard their outputs
-                  error("%s: RECEIVED %r", div, item)
-                LTR.state("DRAINED DIV %s using outQ=%s", div, outQ)
+                  error("%s: RECEIVED %r", busy_div, item)
+                LTR.state("DRAINED DIV %s using outQ=%s", busy_div, outQ)
               D("CLOSE REMAINING DIVS")
               for div in P.diversions:
                 if not div.closed:
