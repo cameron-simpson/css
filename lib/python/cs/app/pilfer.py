@@ -54,7 +54,7 @@ import cs.obj
 from cs.obj import O
 from cs.py.func import funcname, funccite, yields_type, returns_type
 from cs.py.modules import import_module_name
-from cs.py3 import input, ConfigParser, sorted, ustr
+from cs.py3 import input, ConfigParser, sorted, ustr, unicode
 
 DEFAULT_JOBS = 4
 
@@ -1850,7 +1850,7 @@ class PilferRC(O):
       cfg = ConfigParser()
       with open(filename) as fp:
         cfg.readfp(fp)
-      self.defaults.update(cfg.defaults().iteritems())
+      self.defaults.update(cfg.defaults().items())
       if cfg.has_section('actions'):
         for action_name in cfg.options('actions'):
           with Pfx('[actions].%s', action_name):
