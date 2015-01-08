@@ -197,7 +197,7 @@ class _URL(unicode):
     '''
     if self._content is None:
       self._fetch()
-    return self._info.gettype()
+    return self._info.get_content_type()
 
   @locked_property
   def content_transfer_encoding(self):
