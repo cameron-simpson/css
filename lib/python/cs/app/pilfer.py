@@ -1472,9 +1472,9 @@ def action_per(action, argv):
   pipespec = PipeSpec("per:[%s]" % (','.join(argv)), argv)
   @yields_Pilfer
   def function(P):
-    debug("action_per func %r per(%r)", function.__name__, item)
+    debug("action_per func %r per(%r)", function.__name__, P)
     with P.later.more_capacity(1):
-      pipeline = P.pipe_through(pipespec, (item,))
+      pipeline = P.pipe_through(pipespec, (P,))
       debug("pipe: pipe_though(%s) => %r", pipespec, pipeline)
       for item in pipeline.outQ:
         debug("pipe: postpipe: yield %r", item)
