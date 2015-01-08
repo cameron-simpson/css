@@ -1465,7 +1465,7 @@ def action_divert_pipe(func_name, action, offset, do_trace):
   return func_sig, function, result_is_Pilfer
 
 def action_per(action, argv):
-  ''' Function to perform a "per": send each item does its own instance of a pipeline.
+  ''' Function to perform a "per": send each item down its own instance of a pipeline.
   '''
   debug("action_per: argv=%r", argv)
   argv = list(argv)
