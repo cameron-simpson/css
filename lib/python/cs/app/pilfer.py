@@ -205,18 +205,21 @@ def main(argv, stdin=None):
               #  - close the div
               #  - wait for that div to drain
               #  - repeat
-              while True:
-                D("quiesce LTR")
-                LTR.state("quiescing")
-                L.quiesce()
-                busy_div = None
-                for div in P.diversions:
+              # drain all the divserions, choosing the busy ones first
+              divnames = set(P.diversion_names)
+              while divnames:
+                busy_name = None
+                for divname in divnames:
+                  div = P.diversion(divname)
                   if div._busy:
-                    busy_div = div
+                    busy_name = divname
                     break
-                if busy_div is None:
-                  break
-                D("CLOSE DIV %s", busy_div)
+                # nothing busy? pick one arbitrarily
+                if not busy_name:
+                  busy_name = divnames.pop()
+                busy_div = P.diversion(busy_name)
+                divnames.remove(busy_name)
+                X("CLOSE DIV %s", busy_div)
                 LTR.state("CLOSE DIV %s", busy_div)
                 busy_div.close(check_final_close=True)
                 outQ = busy_div.outQ
@@ -226,19 +229,6 @@ def main(argv, stdin=None):
                   # diversions are supposed to discard their outputs
                   error("%s: RECEIVED %r", busy_div, item)
                 LTR.state("DRAINED DIV %s using outQ=%s", busy_div, outQ)
-              D("CLOSE REMAINING DIVS")
-              for div in P.diversions:
-                if not div.closed:
-                  D("CLOSE DIV %s", div)
-                  LTR.state("CLOSE DIV %s", div)
-                  div.close(check_final_close=True)
-                  outQ = div.outQ
-                  D("DRAIN DIV %s", div)
-                  LTR.state("DRAIN DIV %s: outQ=%s", div, outQ)
-                  for item in outQ:
-                    # diversions are supposed to discard their outputs
-                    error("%s: RECEIVED %r", div, item)
-                  LTR.state("DRAINED DIV %s using outQ=%s", div, outQ)
               LTR.state("quiescing")
               L.quiesce()
               # Now the diversions should have completed and closed.
@@ -491,6 +481,10 @@ class Pilfer(O):
   @property
   def diversions(self):
     return list(self.diversions_map.values())
+
+  @property
+  def diversion_names(self):
+    return self.diversions_map.keys()
 
   @logexc
   def quiesce_diversions(self):
