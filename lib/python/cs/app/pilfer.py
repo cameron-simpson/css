@@ -1175,7 +1175,7 @@ def action_func_raw(action, do_trace):
         if m:
           varmap = m.groupdict()
           if varmap:
-            P = P.with_user_vars(**varmap)
+            P = P.copy_with_vars(**varmap)
           yield P
       func_sig = FUNC_ONE_TO_MANY
     else:
@@ -1563,7 +1563,7 @@ def action_for(func_name, action, offset):
       # expand "values", split on whitespace, iterate with new Pilfer
       value_list = P.format_string(values, U).split()
       for value in value_list:
-        yield P.with_user_vars(**{varname: value})
+        yield P.copy_with_vars(**{varname: value})
   elif marker == ':':
     # for:varname:{start}..{stop}
     start, stop = action[offset+1:].split('..', 1)
@@ -1574,7 +1574,7 @@ def action_for(func_name, action, offset):
       istart = int(P.format_string(start, U))
       istop = int(P.format_string(stop, U))
       for value in range(istart, istop+1):
-        yield P.with_user_vars(**{varname: str(value)})
+        yield P.copy_with_vars(**{varname: str(value)})
   else:
     raise ValueError("unrecognised marker after varname: %r", marker)
   return func_sig, function, result_is_Pilfer
