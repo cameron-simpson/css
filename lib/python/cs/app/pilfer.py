@@ -655,7 +655,7 @@ class Pilfer(O):
 
   def import_module_func(self, module_name, func_name):
     with LogExceptions():
-      pylib = [ path for path in self.defaults.get('pythonpath', '').split(':') if path ]
+      pylib = [ path for path in envsub(self.defaults.get('pythonpath', '')).split(':') if path ]
       return import_module_name(module_name, func_name, pylib, self._lock)
 
   def format_string(self, s, U):
