@@ -24,12 +24,14 @@ try:
   from urllib.request import urlopen, Request, HTTPError, URLError, \
             HTTPPasswordMgrWithDefaultRealm, HTTPBasicAuthHandler, \
             build_opener
+  from urllib.parse import urlparse, urljoin
+  from html.parser import HTMLParseError
 except ImportError:
   from urllib2 import urlopen, Request, HTTPError, URLError, \
 		    HTTPPasswordMgrWithDefaultRealm, HTTPBasicAuthHandler, \
 		    build_opener
-from urlparse import urlparse, urljoin
-from HTMLParser import HTMLParseError
+  from urlparse import urlparse, urljoin
+  from HTMLParser import HTMLParseError
 try:
   import xml.etree.cElementTree as ElementTree
 except ImportError:
@@ -39,7 +41,7 @@ from cs.excutils import logexc
 from cs.lex import parseUC_sAttr
 from cs.logutils import Pfx, pfx_iter, debug, error, warning, exception, D
 from cs.threads import locked_property
-from cs.py3 import StringIO, ustr
+from cs.py3 import StringIO, ustr, unicode
 from cs.obj import O
 
 def isURL(U):
