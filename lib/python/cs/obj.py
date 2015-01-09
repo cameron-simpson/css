@@ -6,18 +6,15 @@
 from copy import copy as copy0
 from cs.py3 import StringTypes
 
-T_SEQ = 'ARRAY'
-T_MAP = 'HASH'
+T_SEQ = 'SEQUENCE'
+T_MAP = 'MAPPING'
 T_SCALAR = 'SCALAR'
-def objFlavour(obj):
-  """ Return the ``flavour'' of an object:
+
+def flavour(obj):
+  """ Return constants indicating the ``flavour'' of an object:
       T_MAP: DictType, DictionaryType, objects with an __keys__ or keys attribute.
       T_SEQ: TupleType, ListType, objects with an __iter__ attribute.
       T_SCALAR: Anything else.
-      Notes: the perlishness of the flavour constants is largely
-      to support the cs.hier class, which in turn supports a very
-      perlish file syntax, for historic reasons supporting existing
-      perl code.
   """
   t = type(obj)
   if isinstance(t, (tuple, list)):

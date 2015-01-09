@@ -6,7 +6,7 @@ import os.path
 import sys
 from cs.lex import lastlinelen
 import cs.io
-from cs.obj import DictUC_Attrs, T_SEQ, T_MAP, T_SCALAR, objFlavour as flavour
+from cs.obj import DictUC_Attrs, T_SEQ, T_MAP, T_SCALAR, flavour
 from cs.py3 import StringIO
 
 DEFAULT_OPTS={'dictSep': ' =>',
