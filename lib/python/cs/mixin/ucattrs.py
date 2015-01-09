@@ -36,6 +36,8 @@ class WithUC_Attrs(object):
     return super(WithUC_Attrs, self).__setattr__(attr, value)
 
 class UCdict(WithUC_Attrs, dict):
+  ''' Subclass of dict with .X ==> ['X'] support.
+  '''
   pass
 
 if __name__ == '__main__':
