@@ -11,12 +11,6 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
-        "Development Status :: 4 - Beta",
-        "Environment :: Other Environment",
-        "Intended Audience :: Developers",
-        "License :: OSI Approved :: GNU Library or Lesser General Public License (LGPL)",
-        "Operating System :: OS Independent",
-        "Topic :: Software Development :: Libraries :: Python Modules",
         ],
     'long_description': """\
 Python3 helpers to aid code sharing between python2 and python3.

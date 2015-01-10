@@ -1,9 +1,9 @@
 #!/usr/bin/python
 
 from __future__ import print_function
-from cs.obj import DictUCAttrs
+from cs.mixin.ucattrs import UCdict
 
-class Display(DictUCAttrs):
+class Display(UCdict):
   def __init__(self,display=None):
     dict.__init__(self)
     self.windows={}
@@ -55,9 +55,9 @@ class Display(DictUCAttrs):
       if line.startswith("screen #"):
         screennum=int(line[8:-2])
         assert screennum == len(screens)
-        screen=DictUCAttrs()
+        screen=UCdict()
         screens.append(screen)
-        visuals=DictUCAttrs()
+        visuals=UCdict()
         screen.VISUALS=visuals
         while True:
           if redo:
@@ -83,7 +83,7 @@ class Display(DictUCAttrs):
           elif line.startswith('default visual id:'):
             screen.DEFAULT_VISUAL_ID=eval(line.split()[3])
           elif line.startswith("visual"):
-            visual=DictUCAttrs()
+            visual=UCdict()
             while True:
               line=fp.readline()
               if len(line) == 0:
