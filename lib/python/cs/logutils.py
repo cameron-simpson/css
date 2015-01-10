@@ -14,6 +14,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         ],
+    'requires': ['cs.ansi_colour', 'cs.excutils', 'cs.obj', 'cs.py3'],
     'long_description': """\
 Logging convenience routines.
 -----------------------------
