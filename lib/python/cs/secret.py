@@ -3,7 +3,7 @@ import os.path
 import cs.hier
 import logging
 import cs.logutils
-from cs.obj import DictUC_Attrs
+from cs.mixin.ucattrs import UCdict
 
 def get(secret,path=None):
   return Secret(secret,path=path)
@@ -18,7 +18,7 @@ def dfltpath():
     path=path.split(':')
   return path
 
-class Secret(DictUC_Attrs):
+class Secret(UCdict):
   def __init__(self,secret,path=None):
     ''' Initialise a Secret object from the named secret.
         Raises IOError if no such file can be accessed.
