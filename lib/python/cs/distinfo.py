@@ -163,6 +163,8 @@ def cmdstdout(argv):
   '''
   P = Popen(argv, stdout=PIPE)
   output = P.stdout.read()
+  if sys.version_info[0] >= 3:
+    output = output.decode('utf-8')
   xit = P.wait()
   if xit != 0:
     raise ValueError("command failed, exit code %d: %r" % (xit, argv))
