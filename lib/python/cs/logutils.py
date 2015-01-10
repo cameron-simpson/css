@@ -507,7 +507,7 @@ class Pfx(object):
               if len(exc_value.args) == 0:
                 args = prefix
               else:
-                args = [ prefixify(unicode(exc_value.args[0], errors='replace'))
+                args = [ prefixify(ustr(exc_value.args[0], errors='replace'))
                        ] + list(exc_value.args[1:])
             exc_value.args = args
         elif hasattr(exc_value, 'message'):

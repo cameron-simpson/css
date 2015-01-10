@@ -141,7 +141,7 @@ def transmute(exc_from, exc_to=None):
       try:
         return func(*a, **kw)
       except exc_from as e:
-        raise exc_to("inner %s transmuted to %s: %s" % (type(e), exc_to, str(e)))
+        raise exc_to("inner %s:%s transmuted to %s" % (type(e), e, exc_to))
     return transmute_transmutor_wrapper
   return transmutor
 
