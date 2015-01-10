@@ -27,63 +27,6 @@ def flavour(obj):
     return T_SEQ
   return T_SCALAR
 
-class WithUCAttrs:
-  ''' An object where access to obj.FOO accesses obj['FOO']
-      if FOO is all upper case.
-  '''
-  def __getattr__(self, attr):
-    if attr.isalpha() and attr.isupper():
-      return self[attr]
-    return dict.__getattr__(self, attr)
-  def __setattr__(self, attr, value):
-    if attr.isalpha() and attr.isupper():
-      self[attr]=value
-      return
-    self.__dict__[attr]=value
-
-class DictUCAttrs(dict, WithUCAttrs):
-  ''' A dict where access to obj.FOO accesses obj['FOO']
-      if FOO is all upper case.
-  '''
-  def __init__(self, fill=None):
-    if fill is None:
-      fill=()
-    dict.__init__(self, fill)
-
-class WithUC_Attrs:
-  ''' An object where access to obj.FOO accesses obj['FOO']
-      if FOO matches ^[A-Z][_A-Z0-9]*.
-  '''
-  def __uc_(self, s):
-    if s.isalpha() and s.isupper():
-      return True
-    if len(s) < 1:
-      return False
-    if not s[0].isupper():
-      return False
-    for c in s[1:]:
-      if c != '_' and not (c.isupper() or c.isdigit()):
-        return False
-    return True
-  def __getattr__(self, attr):
-    if self.__uc_(attr):
-      return self[attr]
-    return dict.__getattr__(self, attr)
-  def __setattr__(self, attr, value):
-    if self.__uc_(attr):
-      self[attr]=value
-      return
-    self.__dict__[attr]=value
-
-class DictUC_Attrs(dict, WithUC_Attrs):
-  ''' A dict where access to obj.FOO accesses obj['FOO']
-      if FOO matches ^[A-Z][_A-Z0-9]*.
-  '''
-  def __init__(self, fill=None):
-    if fill is None:
-      fill=()
-    dict.__init__(self, fill)
-
 # Assorted functions for working with O instances.
 # These are not methods because I don't want to pollute O subclasses
 # with lots of extra method noise.
