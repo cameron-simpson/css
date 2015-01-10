@@ -21,7 +21,8 @@ usage="Usage: $cmd [-p relpfx] op [args...]
     log         Changelog from last release to now.
     export      Export release to temporary directory, report directory.
     freshmeat-submit
-                Announce last release to freshmeat."
+                Announce last release to freshmeat.
+    pypi        Release python package to PyPI."
 
 badopts=
 
@@ -267,6 +268,21 @@ $summary_text" "$reldir"
     | $trace freshmeat-submit
     ;;
 
+  pypi)
+    [ $# -gt 0 ] || { echo "$cmd: $op: missing package name" >&2; exit 2; }
+    pkg=$1; shift
+    case "$pkg" in
+      cs.*) ;;
+      *)  echo "$cmd: $op: invalid package name, expected cs.*: $pkg" >&2
+          exit 2
+          ;;
+    esac
+    lastrelease=$( self last )
+    [ -n "$lastrelease" ] || exit 1
+    $trace python -m cs.distinfo "$pkg" check
+    $trace python -m cs.distinfo "$pkg" register
+    $trace python -m cs.distinfo "$pkg" upload
+    ;;
   *)echo "$cmd: unimplemented op \"$op\"" >&2
     exit 2
     ;;
