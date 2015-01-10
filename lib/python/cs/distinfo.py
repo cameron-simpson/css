@@ -20,8 +20,6 @@ from cs.threads import locked_property
 from cs.py.modules import import_module_name
 from cs.obj import O
 
-X("ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ")
-
 PYPI_PROD_URL = 'https://pypi.python.org/pypi'
 PYPI_TEST_URL = 'https://testpypi.python.org/pypi'
 PYPI_DFLT_URL = PYPI_TEST_URL
