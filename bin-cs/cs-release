@@ -8,7 +8,7 @@ set -ue
 
 : ${TMPDIR:=/tmp}
 
-trace=set-x
+trace=  ##set-x
 relpfx=release
 
 cmd=$( basename "$0" )
@@ -304,19 +304,40 @@ $summary_text" "$reldir"
     ;;
 
   pypi)
-    pkg=$relpfx
-    case "$pkg" in
-      cs.*) ;;
-      *)  echo "$cmd: $op: invalid package name, expected cs.*: $pkg" >&2
-          exit 2
-          ;;
-    esac
-    self update-tag
-    lastrelease=$( self last )
-    [ -n "$lastrelease" ] || exit 1
-    $trace python -m cs.distinfo "$pkg" check
-    $trace python -m cs.distinfo "$pkg" register
-    $trace python -m cs.distinfo "$pkg" upload
+    if [ "$relpfx" = ALL ]
+    then
+      for relpfx in $( self ls | grep '^cs\.' )
+      do
+        lastrelease=$( self last ) || exit 1
+        lastpypirelease=$( lastvalue "pypi-css-$relpfx" 2>/dev/null || : )
+        if [ "x$lastrelease" = "x$lastpypirelease" ]
+        then
+          echo "$relpfx: pypi up to date at $lastpypirelease"
+        else
+          if [ -n "$lastpypirelease" ]
+          then
+            echo "$relpfx: $lastrelease, but pypi has $lastpypirelease"
+          else
+            echo "$relpfx: $lastrelease, but pypi has nothing"
+          fi
+        fi
+      done
+    else
+      pkg=$relpfx
+      case "$pkg" in
+        cs.*) ;;
+        *)  echo "$cmd: $op: invalid package name, expected cs.*: $pkg" >&2
+            exit 2
+            ;;
+      esac
+      self update-tag
+      lastrelease=$( self last )
+      [ -n "$lastrelease" ] || exit 1
+      $trace python -m cs.distinfo "$pkg" check
+      $trace python -m cs.distinfo "$pkg" register
+      $trace python -m cs.distinfo "$pkg" upload
+      lastvalue "pypi-css-$relpfx" "$lastrelease"
+    fi
     ;;
 
   *)echo "$cmd: unimplemented op \"$op\"" >&2
