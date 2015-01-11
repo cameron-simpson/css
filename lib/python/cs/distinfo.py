@@ -280,13 +280,37 @@ class PyPI_Package(O):
 
     distinfo = self.distinfo
 
-    manifest_in = os.path.join(pkg_dir, 'MANIFEST.in')
-    with open(manifest_in, "w") as mfp:
+    manifest_path = os.path.join(pkg_dir, 'MANIFEST.in')
+    with open(manifest_path, "w") as mfp:
       # TODO: support extra files
       pass
 
     self.copyin(self.package_name, pkg_dir)
     pkgparts = self.pypi_package_name.split('.')
+
+    readme_rst = 'README.rst'
+    if self.is_package(self.package_name):
+      readme_subpath = os.path.join(self.libdir,
+                                    os.path.join(pkgparts),
+                                    readme_rst)
+    else:
+      readme_subpath = os.path.join(self.libdir,
+                                    os.path.join(*pkgparts[:-1]),
+                                    'README-' + pkgparts[-1] + '.rst')
+    readme_path = os.path.join(pkg_dir, readme_subpath)
+    X("make_package: readme_path = %r", readme_path)
+    if os.path.exists(readme_path):
+      if 'long_description' in distinfo:
+        warning('long_description: already provided, ignoring %s', readme_subpath)
+      else:
+        with open(readme_path) as readmefp:
+          distinfo['long_description'] = readmefp.read().decode('utf-8')
+      shutils.copy2(readme_path, os.path.join(pkg_dir, readme_rst))
+      with open(manifest_path, "a") as mfp:
+        mfp.write(readme_rst)
+        mfp.write('\n')
+    else:
+      warning('no README at %r', readme_subpath)
 
     # final step: write setup.py with information gathered earlier
     self.write_setup(os.path.join(pkg_dir, 'setup.py'))
@@ -314,9 +338,7 @@ class PyPI_Package(O):
     with Pfx("write_setup(%r)", setup_path):
       ok = True
       with open(setup_path, "w") as setup:
-        X("GET .DISTINFO")
         distinfo = self.distinfo
-        X("GOT .DISTINFO: %r", distinfo)
         out = partial(print, file=setup)
         out("#!/usr/bin/python")
         out("from distutils.core import setup")
