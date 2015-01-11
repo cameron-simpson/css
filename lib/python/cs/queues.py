@@ -180,7 +180,7 @@ class Channel(object):
       self.closed = True
 
 class PushQueue(NestingOpenCloseMixin):
-  ''' A puttable object to look like a Queue.
+  ''' A puttable object which looks like a Queue.
       Calling .put(item) calls `func_push` supplied at initialisation
       to trigger a function on data arrival, which returns an iterable
       queued via a Later for delivery to the output queue.
