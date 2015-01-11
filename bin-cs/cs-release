@@ -18,6 +18,7 @@ usage="Usage: $cmd [-p relpfx] op [args...]
     add         Issue a new release.
     last        Report last release issued.
     next        Generate a new release number.
+    update-tag  Update a release tag.
     log         Changelog from last release to now.
     export      Export release to temporary directory, report directory.
     freshmeat-submit
