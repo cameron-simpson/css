@@ -15,6 +15,7 @@ cmd=$( basename "$0" )
 usage="Usage: $cmd [-p relpfx] op [relpfx [args...]]
   relpfx        Prefix for new release tag names. Default: $relpfx
   op:
+    ls          List all release prefixes in use.
     add         Issue a new release.
     last        Report last release issued.
     next        Generate a new release number.
@@ -79,15 +80,30 @@ self(){
 }
 
 case $op in
+  ls)
+    hg tags \
+    | sed -n 's/^\([a-z][^-]*\)-\(2[0-9][0-9][0-9][0-9][0-9][0-9][0-9][^ ]*\) .*/\1/p' \
+    | sort -u
+    ;;
+
   last)
-    lastrelease=$( $trace hg tags | sed -n "/^$relpfx-[1-9][01][0-9][0-9][01][0-9][0-3][0-9]/{s/^$relpfx-//; s/ .*//; p; q;}" )
-    if [ -z "$lastrelease" ]
+    if [ "$relpfx" = ALL ]
     then
-      echo "$cmd: no last release for prefix \"$relpfx\"" >&2
-      exit 1
+      for relpfx in $( self ls )
+      do
+        lastrelease=$( self last )
+        echo "$relpfx $lastrelease"
+      done
+    else
+      lastrelease=$( $trace hg tags | sed -n "/^$relpfx-[1-9][01][0-9][0-9][01][0-9][0-3][0-9]/{s/^$relpfx-//; s/ .*//; p; q;}" )
+      if [ -z "$lastrelease" ]
+      then
+        echo "$cmd: no last release for prefix \"$relpfx\"" >&2
+        exit 1
+      fi
+      printf "%s\n" "$lastrelease"
+      exit 0
     fi
-    printf "%s\n" "$lastrelease"
-    exit 0
     ;;
 
   next)
