@@ -330,12 +330,11 @@ class PyPI_Package(O):
       else:
         with open(readme_path) as readmefp:
           distinfo['long_description'] = readmefp.read().decode('utf-8')
-      shutils.copy2(readme_path, os.path.join(pkg_dir, readme_rst))
+      shutil.copy2(readme_path, os.path.join(pkg_dir, 'README.rst'))
       with open(manifest_path, "a") as mfp:
-        mfp.write(readme_rst)
-        mfp.write('\n')
+        mfp.write('include README.rst\n')
     else:
-      warning('no README at %r', readme_subpath)
+      warning('no README at %r', readme_path)
 
     # final step: write setup.py with information gathered earlier
     self.write_setup(os.path.join(pkg_dir, 'setup.py'))
