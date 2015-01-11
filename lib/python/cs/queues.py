@@ -4,6 +4,32 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
+DISTINFO = {
+    'description': "some Queue subclasses and ducktypes",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'long_description': """\
+Queue subclasses and ducktypes.
+-------------------------------
+
+Presents:
+
+* IterableQueue and IterablePriorityQueue, Queues with the iterator protocol instead of .get().
+
+* Channel, a zero storage message passing object.
+
+* NullQueue, a .puttable object that discards its inputs.
+
+* TimerQueue, a queue for submtting jobs to run at specific times without creating many Timer threads.
+
+* PushQueue, a Queue ducktype which queues a function on .put, whose iterable result is put only an output Queue.
+"""
+}
+
 import sys
 from functools import partial
 import logging
