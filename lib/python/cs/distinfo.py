@@ -20,8 +20,6 @@ from cs.threads import locked_property
 from cs.py.modules import import_module_name
 from cs.obj import O
 
-X("ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ")
-
 PYPI_PROD_URL = 'https://pypi.python.org/pypi'
 PYPI_TEST_URL = 'https://testpypi.python.org/pypi'
 PYPI_DFLT_URL = PYPI_TEST_URL
@@ -163,6 +161,8 @@ def cmdstdout(argv):
   '''
   P = Popen(argv, stdout=PIPE)
   output = P.stdout.read()
+  if sys.version_info[0] >= 3:
+    output = output.decode('utf-8')
   xit = P.wait()
   if xit != 0:
     raise ValueError("command failed, exit code %d: %r" % (xit, argv))
@@ -236,12 +236,6 @@ class PyPI_Package(O):
         if kw not in info:
           X("%s = %r", kw, value)
           info[kw] = value
-
-    ##for kw, value in DISTINFO_APPEND.items():
-    ##  if kw not in info:
-    ##    info[kw] = []
-    ##  X("%s + %r", kw, value)
-    ##  info[kw].extend(value)
 
     classifiers = info['classifiers']
     for classifier_topic, classifier_subsection in DISTINFO_CLASSIFICATION.items():
@@ -363,10 +357,16 @@ class PyPI_Package(O):
   def package_paths(self, package_name):
     ''' Generator to yield the file paths from a package relative to the `libdir` subdirectory.
     '''
+    X("PACKAGE_PATHS...")
     libdir = self.libdir
     package_subpath = pathify(package_name)
     if not self.is_package(package_name):
       yield package_subpath + '.py'
+      test_subpath = package_subpath + '_tests.py'
+      test_path = os.path.join(libdir, test_subpath)
+      X("check for tests at: %r", test_path)
+      if os.path.exists(test_path):
+        yield test_subpath
     else:
       libprefix = libdir + os.path.sep
       for dirpath, dirnames, filenames in os.walk(os.path.join(libdir, package_subpath)):
@@ -380,23 +380,26 @@ class PyPI_Package(O):
           warning("skipping %s", os.path.join(dirpath, filename))
 
   def copyin(self, package_name, dstdir):
+    hgargv = [ 'set-x', 'hg',
+                 'archive',
+                   '-r', '"%s"' % self.hg_tag,
+             ]
     first = True
     package_parts = package_name.split('.')
     while package_parts:
       superpackage_name = '.'.join(package_parts)
       base = self.package_base(superpackage_name)
       if first:
-        include = base
+        # collect entire package contents
+        for subpath in self.package_paths(superpackage_name):
+          hgargv.extend([ '-I', os.path.join(self.libdir, subpath) ])
       else:
-        include = os.path.join(base, '__init__.py')
-      runcmd([ 'hg',
-                 'archive',
-                   '-r', '"%s"' % self.hg_tag,
-                   '-I', include,
-                   dstdir
-             ])
+        # just collecting requires __init__.py files
+        hgargv.extend([ '-I',  os.path.join(base, '__init__.py') ])
       package_parts.pop()
       first = False
+    hgargv.append(dstdir)
+    runcmd(hgargv)
 
 class PyPI_PackageCheckout(O):
   ''' Facilities available with a checkout of a package.
@@ -411,7 +414,7 @@ class PyPI_PackageCheckout(O):
     if hasattr(self, 'pkg_dir'):
       raise RuntimeError("already using .pkg_dir = %r" % (self.pkg_dir,))
     self.pkg_dir = self.package.make_package()
-    self.inpkg("ls -laR")
+    self.inpkg("find . -type f | sort | xxargs ls -ld -- ")
     return self
 
   def __exit__(self, exc_type, exc_value, traceback):

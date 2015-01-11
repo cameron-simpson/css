@@ -1,11 +1,34 @@
 #!/usr/bin/python -tt
 #
-# Stuff to do with sequences and iterables.
+# Stuff to do with counters, sequences and iterables.
 #       - Cameron Simpson <cs@zip.com.au> 20jul2008
 #
 
-import bisect
-import unittest
+DISTINFO = {
+    'description': "Stuff to do with counters, sequences and iterables.",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'requires': ['cs.logutils', 'cs.py.stack'],
+    'long_description': """\
+Stuff to do with counters, sequences and iterables.
+---------------------------------------------------
+
+Presents:
+
+* Seq, a class for thread safe sequential integer generation.
+
+* seq(), a function to return such a number from a default global Seq instance.
+
+* the(), first(), last(), get0(): return the only, first, last or optional-first element of an iterable respectively.
+
+* TrackingCounter, a counting object with facilities for users to wait for it to reach arbitrary values.
+"""
+}
+
 import heapq
 import itertools
 from threading import Lock, Condition

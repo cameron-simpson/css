@@ -4,10 +4,6 @@
 #   - Cameron Simpson <cs@zip.com.au>
 #
 
-import os
-import string
-import sys
-
 DISTINFO = {
     'description': "Convenience functions for constructing shell commands.",
     'keywords': ["python2", "python3"],
@@ -21,8 +17,11 @@ Convenience functions for constructing shell commands
 -----------------------------------------------------
 
 Functions for safely constructing shell command lines from bare strings.
+Somewhat like the inverse of the shlex stdlib module.
 """,
 }
+
+import string
 
 # characters than do not need to be quoted
 SAFECHARS = string.digits + string.ascii_letters + '-+_./'
@@ -71,7 +70,3 @@ def quotestr(s):
     offset += 1
   flush()
   return ''.join(qparts)
-
-def vpopen(argv, mode = 'r', bufsize = -1):
-  quoted = ' '.join(quote(argv))
-  return os.popen(quoted, mode, bufsize)

@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 from __future__ import print_function
+from subprocess import Popen, PIPE
 from cs.mixin.ucattrs import UCdict
 
 class Display(UCdict):
@@ -12,8 +13,8 @@ class Display(UCdict):
       display=os.environ['DISPLAY']
     self['DISPLAY']=display
 
-    import cs.sh
-    fp=cs.sh.vpopen(("xdpyinfo","-display",display))
+    P = Popen(['xdpyinfo', '-display', display], stdout=PIPE)
+    fp = P.stdout
 
     extensions=[]
     screens=[]
@@ -107,6 +108,8 @@ class Display(UCdict):
 
         redo=True
         continue
+
+    P.wait()
 
   def __getattr__(self,attr):
     if attr.isalpha() and attr.isupper():

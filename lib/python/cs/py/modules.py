@@ -24,7 +24,7 @@ def import_module_name(module_name, name, path=None, lock=None):
   try:
     M = importlib.import_module(module_name)
   except ImportError as e:
-    raise NameError("no module named %r: %s: %s" % (module_name, type(e), e))
+    raise ImportError("no module named %r: %s: %s" % (module_name, type(e), e))
   finally:
     if path:
       sys.path = osyspath
@@ -32,5 +32,5 @@ def import_module_name(module_name, name, path=None, lock=None):
     try:
       return getattr(M, name)
     except AttributeError as e:
-      raise NameError("%s: no entry named %r: %s: %s" % (module_name, name, type(e), e))
+      raise ImportError("%s: no entry named %r: %s: %s" % (module_name, name, type(e), e))
   return None

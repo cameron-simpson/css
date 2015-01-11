@@ -249,6 +249,7 @@ $summary_text" "$reldir"
     cf=.freshmeatrc
     [ -s "$cf" ] || { echo "$cmd: missing $cf" >&2; exit 1; }
     eval $( winclausevars "$cf" freshmeat fm )
+    self update-tag
     lastrelease=$( self last )
     [ -n "$lastrelease" ] || exit 1
     summary=$( $trace cat release/$lastrelease/SUMMARY.txt )
@@ -268,21 +269,37 @@ $summary_text" "$reldir"
     | $trace freshmeat-submit
     ;;
 
+  update-tag)
+    if lastrelease=$( self last )
+    then
+      log=$( self log )
+      printf "%s\n" "$log"
+      if [ -n "$log" ] && ask "Issue new tag for $relpfx"
+      then
+        self add || exit 1
+      fi
+    else
+      ask "Issue first tag for $relpfx" || exit 1
+      self add || exit 1
+    fi
+    ;;
+
   pypi)
-    [ $# -gt 0 ] || { echo "$cmd: $op: missing package name" >&2; exit 2; }
-    pkg=$1; shift
+    pkg=$relpfx
     case "$pkg" in
       cs.*) ;;
       *)  echo "$cmd: $op: invalid package name, expected cs.*: $pkg" >&2
           exit 2
           ;;
     esac
+    self update-tag
     lastrelease=$( self last )
     [ -n "$lastrelease" ] || exit 1
     $trace python -m cs.distinfo "$pkg" check
     $trace python -m cs.distinfo "$pkg" register
     $trace python -m cs.distinfo "$pkg" upload
     ;;
+
   *)echo "$cmd: unimplemented op \"$op\"" >&2
     exit 2
     ;;
