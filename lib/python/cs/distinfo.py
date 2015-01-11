@@ -271,6 +271,40 @@ class PyPI_Package(O):
 
     self.distinfo = info
 
+  def pkg_rpath(self, package_name=None, prefix_dir=None, up=False):
+    ''' Return a path based on a `package_name` (default self.package_name).
+        `prefix_dir`: is supplied, prefixed to the returned relative path.
+        `up`: if true, discard the last component of the package name before
+        computing the path.
+    '''
+    if package_name is None:
+      package_name = self.package_name
+    package_paths = package_name.split('.')
+    if up:
+      package_paths = package_paths[:-1]
+    rpath = os.path.join(*package_paths)
+    if prefix_dir:
+      rpath = os.path.join(prefix_dir, rpath)
+    return rpath
+
+  def pkg_readme_rpath(self, package_name=None, prefix_dir=None):
+    if package_name is None:
+      package_name = self.package_name
+    package_paths = package_name.split('.')
+    if self.is_package(package_name):
+      return os.path.join(
+                self.pkg_rpath(
+                    package_name=package_name,
+                    prefix_dir=prefix_dir),
+                'README.rst')
+    else:
+      return os.path.join(
+                self.pkg_rpath(
+                    package_name=package_name,
+                    prefix_dir=prefix_dir,
+                    up=True),
+                'README-' + package_paths[-1] + '.rst')
+
   def make_package(self, pkg_dir=None):
     ''' Prepare package contents in the directory `pkg_dir`, return `pkg_dir`.
         If `pkg_dir` is not supplied, create a temporary directory.
@@ -286,17 +320,8 @@ class PyPI_Package(O):
       pass
 
     self.copyin(self.package_name, pkg_dir)
-    pkgparts = self.pypi_package_name.split('.')
 
-    readme_rst = 'README.rst'
-    if self.is_package(self.package_name):
-      readme_subpath = os.path.join(self.libdir,
-                                    os.path.join(pkgparts),
-                                    readme_rst)
-    else:
-      readme_subpath = os.path.join(self.libdir,
-                                    os.path.join(*pkgparts[:-1]),
-                                    'README-' + pkgparts[-1] + '.rst')
+    readme_subpath = self.pkg_readme_rpath(prefix_dir=self.libdir)
     readme_path = os.path.join(pkg_dir, readme_subpath)
     X("make_package: readme_path = %r", readme_path)
     if os.path.exists(readme_path):
@@ -347,7 +372,6 @@ class PyPI_Package(O):
         for kw in ( 'name',
                     'description', 'author', 'author_email', 'version',
                     'url',
-                    'long_description',
                   ):
           try:
             value = distinfo.pop(kw)
@@ -376,11 +400,10 @@ class PyPI_Package(O):
       base += '.py'
     return base
 
-  def package_paths(self, package_name):
+  def package_paths(self, package_name, libdir):
     ''' Generator to yield the file paths from a package relative to the `libdir` subdirectory.
     '''
     X("PACKAGE_PATHS...")
-    libdir = self.libdir
     package_subpath = pathify(package_name)
     if not self.is_package(package_name):
       yield package_subpath + '.py'
@@ -400,6 +423,11 @@ class PyPI_Package(O):
           if filename.endswith('.py'):
             yield os.path.join(dirpath[len(libprefix):], filename)
           warning("skipping %s", os.path.join(dirpath, filename))
+    readme_subpath = self.pkg_readme_rpath(package_name)
+    readme_path = os.path.join(libdir, readme_subpath)
+    X("PROBE %r", readme_path)
+    if os.path.exists(readme_path):
+      yield readme_subpath
 
   def copyin(self, package_name, dstdir):
     hgargv = [ 'set-x', 'hg',
@@ -413,7 +441,7 @@ class PyPI_Package(O):
       base = self.package_base(superpackage_name)
       if first:
         # collect entire package contents
-        for subpath in self.package_paths(superpackage_name):
+        for subpath in self.package_paths(superpackage_name, self.libdir):
           hgargv.extend([ '-I', os.path.join(self.libdir, subpath) ])
       else:
         # just collecting requires __init__.py files
