@@ -12,13 +12,6 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         ],
-    'long_description': """\
-Convenience functions for constructing shell commands
------------------------------------------------------
-
-Functions for safely constructing shell command lines from bare strings.
-Somewhat like the inverse of the shlex stdlib module.
-""",
 }
 
 import string
