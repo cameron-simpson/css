@@ -12,19 +12,12 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         ],
-    'long_description': """\
-Convenience functions for constructing shell commands
------------------------------------------------------
-
-Functions for safely constructing shell command lines from bare strings.
-Somewhat like the inverse of the shlex stdlib module.
-""",
 }
 
 import string
 
 # characters than do not need to be quoted
-SAFECHARS = string.digits + string.ascii_letters + '-+_./'
+SAFECHARS = string.digits + string.ascii_letters + '-+_./:'
 
 def quote(args):
   ''' Quote the supplied strings, return a list of the quoted strings.
