@@ -44,6 +44,16 @@ do
   shift
 done
 
+if [ $# = 0 ]
+then
+  echo "$cmd: missing op" >&2
+  badopts=1
+else
+  op=$1
+  shift
+  [ $# = 0 ] || { relpfx=$1; shift; }
+fi
+
 case "$relpfx" in
   release)
     subtree=.
@@ -61,20 +71,10 @@ case "$relpfx" in
       fi
     fi
     ;;
-  *)echo "$cmd: -p: invalid relpfx, must start with a lowercase letter, got: $relpfx" >&2
+  *)echo "$cmd: invalid relpfx, must start with a lowercase letter, got: $relpfx" >&2
     badopts=1
     ;;
 esac
-
-if [ $# = 0 ]
-then
-  echo "$cmd: missing op" >&2
-  badopts=1
-else
-  op=$1
-  shift
-  [ $# = 0 ] || { relpfx=$1; shift; }
-fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
