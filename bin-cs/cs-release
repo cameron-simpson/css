@@ -16,7 +16,8 @@ testpypi_url='https://testpypi.python.org/pypi'
 pypi_test_mode=1
 
 cmd=$( basename "$0" )
-usage="Usage: $cmd op [relpfx [args...]]
+usage="Usage: $cmd [-x] op [relpfx [args...]]
+  -x            Trace command execution.
   relpfx        Prefix for new release tag names. Default: $relpfx
   op:
     ls          List all release prefixes in use.
@@ -35,7 +36,7 @@ badopts=
 while [ $# -gt 0 ]
 do
   case $1 in
-    -p) relpfx=$2; shift ;;
+    -x) trace=set-x ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
     *)  break ;;
