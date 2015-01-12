@@ -211,7 +211,7 @@ class PyPI_Package(O):
 
   @locked_property
   def version(self):
-    return cmdstdout(['cs-release', '-p', self.package_name, 'last']).rstrip()
+    return cmdstdout(['cs-release', 'last', self.package_name]).rstrip()
 
   @property
   def pypi_version(self):
