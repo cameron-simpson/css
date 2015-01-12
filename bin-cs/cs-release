@@ -11,8 +11,12 @@ set -ue
 trace=  ##set-x
 relpfx=release
 
+pypi_url='https://pypi.python.org/pypi'
+testpypi_url='https://testpypi.python.org/pypi'
+pypi_test_mode=1
+
 cmd=$( basename "$0" )
-usage="Usage: $cmd [-p relpfx] op [relpfx [args...]]
+usage="Usage: $cmd op [relpfx [args...]]
   relpfx        Prefix for new release tag names. Default: $relpfx
   op:
     ls          List all release prefixes in use.
@@ -24,7 +28,7 @@ usage="Usage: $cmd [-p relpfx] op [relpfx [args...]]
     export      Export release to temporary directory, report directory.
     freshmeat-submit
                 Announce last release to freshmeat.
-    pypi        Release python package to PyPI."
+    pypi [prod] Release python package to PyPI."
 
 badopts=
 
@@ -304,12 +308,23 @@ $summary_text" "$reldir"
     ;;
 
   pypi)
+    if [ $# -gt 0 ] && [ "x$1" = xprod ]
+    then  shift; pypi_test_mode=
+    else  pypi_test_mode=1
+    fi
+    if [ $pypi_test_mode ]
+    then PYPI_URL=$testpypi_url pypipfx=testpypi
+    else PYPI_URL=$pypi_url pypipfx=pypi
+    fi
+    export PYPI_URL
     if [ "$relpfx" = ALL ]
     then
       for relpfx in $( self ls | grep '^cs\.' )
       do
+        pkg=$relpfx
+        lastlabel=$pypipfx-css-$pkg
         lastrelease=$( self last ) || exit 1
-        lastpypirelease=$( lastvalue "pypi-css-$relpfx" 2>/dev/null || : )
+        lastpypirelease=$( $trace lastvalue "$lastlabel" 2>/dev/null || : )
         if [ "x$lastrelease" = "x$lastpypirelease" ]
         then
           echo "$relpfx: pypi up to date at $lastpypirelease"
@@ -324,6 +339,7 @@ $summary_text" "$reldir"
       done
     else
       pkg=$relpfx
+      lastlabel=$pypipfx-css-$pkg
       case "$pkg" in
         cs.*) ;;
         *)  echo "$cmd: $op: invalid package name, expected cs.*: $pkg" >&2
@@ -336,7 +352,7 @@ $summary_text" "$reldir"
       $trace python -m cs.distinfo "$pkg" check
       $trace python -m cs.distinfo "$pkg" register
       $trace python -m cs.distinfo "$pkg" upload
-      lastvalue "pypi-css-$relpfx" "$lastrelease"
+      $trace lastvalue "$lastlabel" "$lastrelease"
     fi
     ;;
 
