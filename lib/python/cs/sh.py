@@ -17,7 +17,7 @@ DISTINFO = {
 import string
 
 # characters than do not need to be quoted
-SAFECHARS = string.digits + string.ascii_letters + '-+_./'
+SAFECHARS = string.digits + string.ascii_letters + '-+_./:'
 
 def quote(args):
   ''' Quote the supplied strings, return a list of the quoted strings.
