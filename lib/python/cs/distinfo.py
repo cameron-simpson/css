@@ -53,7 +53,7 @@ USAGE = '''Usage: %s [-n pypi-pkg-name] [-v pypi_version] pkg-name op [op-args..
         Name of package in PyPI. Default the same as the local package.
   -r pypi_repo_url
         Use the specified PyPI repository URL.
-        Default: %s
+        Default: %s, or from the environment variable $PYPI_URL.
         Official site: %s
   -v pypi-version
         Version number for PyPI. Default from last release tag for pkg-name.
@@ -71,7 +71,7 @@ def main(argv):
 
   pypi_package_name = None
   pypi_version = None
-  pypi_url = PYPI_DFLT_URL
+  pypi_url = os.environ.get('PYPI_URL', PYPI_DFLT_URL)
 
   try:
     opts, argv = getopt(argv, 'n:r:v:')
