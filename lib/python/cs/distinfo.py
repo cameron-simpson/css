@@ -499,7 +499,7 @@ class PyPI_PackageCheckout(O):
     return self.inpkg_argv([ 'python3', 'setup.py' ] + list(argv))
 
   def check(self):
-    self.setup_py('check')
+    self.setup_py('check', '-s', '--restructuredtext')
 
   def register(self):
     self.setup_py('register', '-r', self.pypi_url)
