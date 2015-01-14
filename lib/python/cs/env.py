@@ -1,3 +1,9 @@
+#!/usr/bin/python
+#
+# Environment access and substitution.
+#   - Cameron Simpson <cs@zip.com.au>
+#
+
 import os
 import string
 import types
