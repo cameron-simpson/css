@@ -547,14 +547,14 @@ class MessageFiler(O):
       try:
         self.sendmail(address)
       except Exception as e:
-        exception("forwarding to address %r: %s", folder, e)
+        exception("forwarding to address %r: %s", address, e)
         ok = False
     # pipeline message
     for shcmd, shenv in self.save_to_cmds:
       try:
         self.save_to_pipe(['/bin/sh', '-c', shcmd], shenv)
       except Exception as e:
-        exception("forwarding to address %r: %s", folder, e)
+        exception("piping to %r: %s", shcmd, e)
         ok = False
     # issue arrival alert
     if self.flags.alert > 0:
@@ -1173,7 +1173,9 @@ def get_target(s, offset, quoted=False):
   if m:
     target = m.group()
     offset = m.end()
-    if '@' in target:
+    if '$' in target:
+      T = Target_EnvSub(target)
+    elif '@' in target:
       T = Target_MailAddress(target)
     else:
       T = Target_MailFolder(target)
@@ -1195,6 +1197,22 @@ class Target_Assign(O):
     if varname == 'LOGFILE':
       warning("LOGFILE= unimplemented at present")
       ## TODO: self.logto(value)
+
+class Target_EnvSub(O):
+
+  def __init__(self, target_expr):
+    self.target_expr = target_expr
+
+  def apply(self, filer):
+    ''' Perform environment substituion on target string and then
+        deliver to resulting string.
+    '''
+    target = envsub(self.target_expr, filer.environ)
+    if '@' in target:
+      T = Target_MailAddress(target)
+    else:
+      T = Target_MailFolder(target)
+    T.apply(filer)
 
 class Target_SetFlag(O):
 
