@@ -671,9 +671,9 @@ class Later(NestingOpenCloseMixin):
   @property
   def submittable(self):
     ''' May new tasks be submitted?
-	This normally tracks "not self.closed", but running tasks
-	are wrapped in a thread local override to permit them to
-	submit further related tasks.
+        This normally tracks "not self.closed", but running tasks
+        are wrapped in a thread local override to permit them to
+        submit further related tasks.
     '''
     return not self.closed
 
@@ -681,10 +681,10 @@ class Later(NestingOpenCloseMixin):
     ''' Queue a function to run right now, ignoring the Later's capacity and
         priority system. This is really an easy way to utilise the Later's
         thread pool and get back a handy LateFunction for result collection.
-	It can be useful for transient control functions that
-	themselves queue things through the Later queuing system
-	but do not want to consume capacity themselves, thus avoiding
-	deadlock at the cost of transient overthreading.
+        It can be useful for transient control functions that
+        themselves queue things through the Later queuing system
+        but do not want to consume capacity themselves, thus avoiding
+        deadlock at the cost of transient overthreading.
     '''
     if not self.submittable:
       raise RuntimeError("%s.bg(...) but not self.submittable" % (self,))
@@ -798,36 +798,36 @@ class Later(NestingOpenCloseMixin):
     ''' Queue the function `func` for later dispatch after completion of `LFs`.
         Return a Result for later collection of the function result.
 
-	This function will not be submitted until completion of
-	the supplied LateFunctions `LFs`.
-	If `R` is None a new cs.threads.Result is allocated to
-	accept the function return value.
-        After `func` completes, its return value is passed to R.put().
+        This function will not be submitted until completion of
+        the supplied LateFunctions `LFs`.
+        If `R` is None a new cs.threads.Result is allocated to
+        accept the function return value.
+            After `func` completes, its return value is passed to R.put().
 
-	Typical use case is as follows: suppose you're submitting
-	work via this Later object, and a submitted function itself
-	might submit more LateFunctions for which it must wait.
-	Code like this:
+        Typical use case is as follows: suppose you're submitting
+        work via this Later object, and a submitted function itself
+        might submit more LateFunctions for which it must wait.
+        Code like this:
 
-          def f():
-            LF = L.defer(something)
-            return LF()
+              def f():
+                LF = L.defer(something)
+                return LF()
 
-	may deadlock if the Later is at capacity. The after() method
-	addresses this:
+        may deadlock if the Later is at capacity. The after() method
+        addresses this:
 
-          def f():
-            LF1 = L.defer(something)
-            LF2 = L.defer(somethingelse)
-            R = L.after( [LF1, LF2], None, when_done )
-            return R
+              def f():
+                LF1 = L.defer(something)
+                LF2 = L.defer(somethingelse)
+                R = L.after( [LF1, LF2], None, when_done )
+                return R
 
-	This submits the when_done() function after the LFs have
-	completed without spawning a thread or using the Later's
-	capacity.
+        This submits the when_done() function after the LFs have
+        completed without spawning a thread or using the Later's
+        capacity.
 
-	See the retry method for a convenience method that uses the
-	above pattern in a repeating style.
+        See the retry method for a convenience method that uses the
+        above pattern in a repeating style.
     '''
     if not self.submittable:
       raise RuntimeError("%s.after(...) but not self.submittable" % (self,))
@@ -874,15 +874,15 @@ class Later(NestingOpenCloseMixin):
   def retry(self, R, func, *a, **kw):
     ''' Queue the call `func` for later dispatch and possible
         repetition.
-	If `R` is None a new cs.threads.Result is allocated to
-	accept the function return value.
+        If `R` is None a new cs.threads.Result is allocated to
+        accept the function return value.
         The return value from `func` should be a tuple:
           LFs, result
-	where LFs, if not empty, is a sequence of LateFunctions
-	which should complete. After completion, `func` is queued
-	again.
-	When LFs is empty, result is passed to R.put() and `func`
-	is not requeued.
+        where LFs, if not empty, is a sequence of LateFunctions
+        which should complete. After completion, `func` is queued
+        again.
+        When LFs is empty, result is passed to R.put() and `func`
+        is not requeued.
     '''
     if R is None:
       R = Result()
@@ -945,9 +945,9 @@ class Later(NestingOpenCloseMixin):
         `filter_funcs`: an iterable of filter functions accepting the
           single items from the iterable `inputs`, returning an
           iterable output.
-	`inputs`: the initial iterable inputs; this may be None.
-	  If missing or None, it is expected that the caller will
-	  be supplying input items via `input.put()`.
+        `inputs`: the initial iterable inputs; this may be None.
+          If missing or None, it is expected that the caller will
+          be supplying input items via `input.put()`.
         `outQ`: the optional output queue; if None, an IterableQueue() will be
           allocated.
         `name`: name for the PushQueue implementing this pipeline.
