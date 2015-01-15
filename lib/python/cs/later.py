@@ -2,6 +2,18 @@
 #
 
 from __future__ import print_function
+
+DISTINFO = {
+    'description': "queue functions for execution later",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'requires': ['cs.py3', 'cs.py.func', 'cs.debug', 'cs.excutils', 'cs.queues', 'cs.threads', 'cs.asynchron', 'cs.seq', 'cs.logutils'],
+}
+
 from contextlib import contextmanager
 from functools import partial
 import sys
