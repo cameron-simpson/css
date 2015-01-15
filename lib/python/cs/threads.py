@@ -5,6 +5,18 @@
 #
 
 from __future__ import with_statement
+
+DISTINFO = {
+    'description': "threading and communication/synchronisation conveniences",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'requires': ['cs.seq', 'cs.excutils', 'cs.debug', 'cs.logutils', 'cs.obj', 'cs.queues', 'cs.py.func', 'cs.py3'],
+}
+
 from collections import namedtuple
 from copy import copy
 import inspect
@@ -17,12 +29,9 @@ from collections import deque
 if sys.hexversion < 0x02060000: from sets import Set as set
 from cs.seq import seq
 from cs.excutils import transmute
-import logging
 from cs.debug import Lock, RLock, Thread
-import cs.logutils
-from cs.logutils import Pfx, LogTime, error, warning, debug, exception, OBSOLETE, D
+from cs.logutils import LogTime, error, warning, debug, exception, OBSOLETE, D
 from cs.obj import O
-from cs.asynchron import report
 from cs.queues import IterableQueue, Channel, NestingOpenCloseMixin, not_closed
 from cs.py.func import funcname
 from cs.py3 import raise3, Queue, PriorityQueue
