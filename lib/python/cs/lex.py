@@ -311,9 +311,8 @@ def unrfc2047(s):
     chunks.append(s[sofar:])
   return unicode('').join(chunks)
 
-def get_chars(s, gochars, offset=0):
-  ''' Scan the string `s` for characters in `gochars` starting at `offset`
-      (default 0).
+def get_chars(s, offset, gochars):
+  ''' Scan the string `s` for characters in `gochars` starting at `offset`.
       Return (match, new_offset).
   '''
   ooffset = offset
@@ -326,7 +325,7 @@ def get_white(s, offset=0):
       `offset` (default 0).
       Return (match, new_offset).
   '''
-  return get_chars(s, whitespace, offset=offset)
+  return get_chars(s, offset, whitespace)
 
 def get_nonwhite(s, offset=0):
   ''' Scan the string `s` for characters not in string.whitespace starting at
@@ -346,7 +345,7 @@ def get_identifier(s, offset=0, alpha=ascii_letters, number=digits, extras='_'):
   ch = s[offset]
   if ch not in alpha and ch not in extras:
     return '', offset
-  idtail, offset = get_chars(s, alpha + number + extras, offset+1)
+  idtail, offset = get_chars(s, offset+1, alpha + number + extras)
   return ch + idtail, offset
 
 def get_uc_identifier(s, offset=0, number=digits, extras='_'):
