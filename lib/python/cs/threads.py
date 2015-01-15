@@ -376,7 +376,12 @@ def locked_property(func, lock_name='_lock', prop_name=None, unset_object=None):
     '''
     p = getattr(self, prop_name, unset_object)
     if p is unset_object:
-      with getattr(self, lock_name):
+      try:
+        lock = getattr(self, lock_name)
+      except AttributeError as e:
+        error("no .%s attribute", lock_name)
+        raise
+      with lock:
         p = getattr(self, prop_name, unset_object)
         if p is unset_object:
           ##debug("compute %s...", prop_name)

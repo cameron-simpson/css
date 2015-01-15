@@ -4,13 +4,23 @@
 #       - Cameron Simpson <cs@zip.com.au> 28jun2012
 #
 
+DISTINFO = {
+    'description': "Aids for code sharing between python2 and python3.",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+}
+
 import sys
 
 if sys.hexversion >= 0x03000000:
 
   unicode = str
   StringTypes = (str,)
-  def ustr(s, e='utf-8'):
+  def ustr(s, e='utf-8', errors='strict'):
     return s
   from io import BytesIO, StringIO
   from queue import Queue, PriorityQueue, Full as Queue_Full, Empty as Queue_Empty
@@ -21,19 +31,19 @@ if sys.hexversion >= 0x03000000:
     return o.keys()
   def itervalues(o):
     return o.values()
-  from builtins import sorted, filter, bytes
+  from builtins import sorted, filter, bytes, input
   from itertools import filterfalse
 
 else:
 
   globals()['unicode'] = unicode
   from types import StringTypes
-  def ustr(s, e='utf-8'):
+  def ustr(s, e='utf-8', errors='strict'):
     ''' Upgrade str to unicode, if it is a str. Leave other types alone.
     '''
     if isinstance(s, str):
       try:
-        s = s.decode(e, 'strict')
+        s = s.decode(e, errors=errors)
       except UnicodeDecodeError as ude:
         from cs.logutils import warning
         warning("cs.py3.ustr(): %s: s = %s %r", ude, type(s), s)
@@ -56,6 +66,7 @@ else:
   _sorted = sorted
   def sorted(iterable, key=None, reverse=False):
     return _sorted(iterable, None, key, reverse)
+  input = raw_input
   from itertools import ifilter as filter, ifilterfalse as filterfalse
 
   class bytes(str):

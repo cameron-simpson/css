@@ -5,6 +5,18 @@
 #
 
 from __future__ import with_statement
+
+DISTINFO = {
+    'description': "Logging convenience routines.",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'requires': ['cs.ansi_colour', 'cs.excutils', 'cs.obj', 'cs.py3'],
+}
+
 import codecs
 from contextlib import contextmanager
 import logging
@@ -445,7 +457,7 @@ class Pfx(object):
               if len(exc_value.args) == 0:
                 args = prefix
               else:
-                args = [ prefixify(unicode(exc_value.args[0], errors='replace'))
+                args = [ prefixify(ustr(exc_value.args[0], errors='replace'))
                        ] + list(exc_value.args[1:])
             exc_value.args = args
         elif hasattr(exc_value, 'message'):
