@@ -349,8 +349,7 @@ def get_identifier(s, offset=0, alpha=ascii_letters, number=digits, extras='_'):
   return ch + idtail, offset
 
 def get_uc_identifier(s, offset=0, number=digits, extras='_'):
-  ''' Scan the string `s` for an identifier as for get_identifier(),
-      but require the letters to be uppercase.
+  ''' Scan the string `s` for an identifier as for get_identifier(), but require the letters to be uppercase.
   '''
   return get_identifier(s, offset=offset, alpha=ascii_uppercase, number=number, extras=extras)
 
