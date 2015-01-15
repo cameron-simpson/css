@@ -547,14 +547,14 @@ class MessageFiler(O):
       try:
         self.sendmail(address)
       except Exception as e:
-        exception("forwarding to address %r: %s", folder, e)
+        exception("forwarding to address %r: %s", address, e)
         ok = False
     # pipeline message
     for shcmd, shenv in self.save_to_cmds:
       try:
         self.save_to_pipe(['/bin/sh', '-c', shcmd], shenv)
       except Exception as e:
-        exception("forwarding to address %r: %s", folder, e)
+        exception("piping to %r: %s", shcmd, e)
         ok = False
     # issue arrival alert
     if self.flags.alert > 0:
