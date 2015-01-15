@@ -1,16 +1,6 @@
 #!/usr/bin/python
 #
 
-import base64
-import binascii
-from functools import partial
-import quopri
-from string import printable, whitespace, ascii_letters, ascii_uppercase, digits
-import re
-import sys
-import os
-from cs.py3 import unicode, ustr, sorted, StringTypes
-
 DISTINFO = {
     'description': "lexical analysis, tokenisers",
     'keywords': ["python2", "python3"],
@@ -21,6 +11,16 @@ DISTINFO = {
         ],
     'requires': ['cs.py3'],
 }
+
+import base64
+import binascii
+from functools import partial
+import quopri
+from string import printable, whitespace, ascii_letters, ascii_uppercase, digits
+import re
+import sys
+import os
+from cs.py3 import unicode, ustr, sorted, StringTypes
 
 unhexify = binascii.unhexlify
 if sys.hexversion >= 0x030000:
