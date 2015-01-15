@@ -8,6 +8,18 @@
 #
 
 from __future__ import print_function
+
+DISTINFO = {
+    'description': "a Range class implementing compact integer ranges with a set-like API, and associated functions",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'requires': ['cs.logutils'],
+}
+
 import sys
 from bisect import bisect_left
 from collections import namedtuple
