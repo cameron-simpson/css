@@ -33,7 +33,7 @@ Generally the get_* functions accept a source string and an offset (often option
 
 * isUC_(s): test if a string looks like an upper case identifier
 
-* htmlify(s,nbsp=False): transcribe text in HTML safe form, sing &lt; for < etc
+* htmlify(s,nbsp=False): transcribe text in HTML safe form, using &lt; for "<", etc
 
 * htmlquote(s): transcribe text as HTML quoted string suitable for HTML tag attribute values
 
