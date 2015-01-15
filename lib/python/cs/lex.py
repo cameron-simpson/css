@@ -1,3 +1,6 @@
+#!/usr/bin/python
+#
+
 import base64
 import binascii
 from functools import partial
@@ -7,7 +10,17 @@ import re
 import sys
 import os
 from cs.py3 import unicode, ustr, sorted, StringTypes
-from cs.logutils import X
+
+DISTINFO = {
+    'description': "lexical analysis, tokenisers",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'requires': ['cs.py3'],
+}
 
 unhexify = binascii.unhexlify
 if sys.hexversion >= 0x030000:
@@ -397,8 +410,6 @@ def get_sloshed_text(s, delim, offset=0, slosh='\\', mapper=slosh_mapper, specia
           the following 8 hexadecimal digits.
         - a character from the keys of mapper
   '''
-  ##X("get_sloshed_text(%r, delim=%r, offset=%r, slosh=%r, mapper=%r, specials=%r)...",
-  ##   s, delim, offset, slosh, mapper, specials)
   if specials is not None:
     # gather up starting character of special keys and a list of
     # keys in reverse order of length
