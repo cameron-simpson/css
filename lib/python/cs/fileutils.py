@@ -5,6 +5,18 @@
 #
 
 from __future__ import with_statement, print_function, absolute_import
+
+DISTINFO = {
+    'description': "convenience functions and classes for files and filenames/pathnames",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'requires': ['cs.asynchron', 'cs.debug', 'cs.env', 'cs.logutils', 'cs.queues', 'cs.range', 'cs.threads', 'cs.timeutils', 'cs.obj', 'cs.py3'],
+}
+
 from io import RawIOBase
 import errno
 from functools import partial
