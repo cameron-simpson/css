@@ -36,7 +36,7 @@ from cs.logutils import Pfx, setup_logging, with_log, \
                         D, X, LogTime
 from cs.mailutils import Maildir, message_addresses, modify_header, \
                          shortpath, ismaildir, make_maildir
-from cs.obj import O, slist
+from cs.obj import O
 from cs.seq import first
 from cs.threads import locked, locked_property
 from cs.app.maildb import MailDB
@@ -253,7 +253,7 @@ class MailFiler(O):
     pattern \
       = self._rules_pattern \
       = current_value('MAILFILER_RULES_PATTERN', self.cfg, 'rules_pattern', DEFAULT_RULES_PATTERN, self.environ)
-    X(".rules_pattern=%r", pattern)
+    debug(".rules_pattern=%r", pattern)
     return pattern
   @rules_pattern.setter
   def rules_pattern(self, pattern):
@@ -282,10 +282,10 @@ class MailFiler(O):
         If `delay` is not None, poll the folders repeatedly with a
         delay of `delay` seconds between each pass.
     '''
-    X("monitor: self.cfg=%s", self.cfg)
-    X("maildb_path=%r", self.maildb_path)
-    X("msgiddb_path=%r", self.msgiddb_path)
-    X("rules_pattern=%r", self.rules_pattern)
+    debug("monitor: self.cfg=%s", self.cfg)
+    debug("maildb_path=%r", self.maildb_path)
+    debug("msgiddb_path=%r", self.msgiddb_path)
+    debug("rules_pattern=%r", self.rules_pattern)
     op_cfg = self.subcfg('monitor')
     try:
       while True:
@@ -567,6 +567,7 @@ class MessageFiler(O):
     '''
     if modify_header(self.message, hdr, new_value, always=always):
       self.message_path = None
+      self.header_addresses = {}
 
   def apply_rule(self, R):
     ''' Apply this the rule `R` to this MessageFiler.
@@ -1219,8 +1220,11 @@ class Target_Substitution(O):
     self.subst_replacement = subst_replacement
 
   def apply(self, filer):
+    debug("apply %r : s/%s/%s ...", self.header_name, self.subst_re.pattern, self.subst_replacement)
     M = filer.message
-    old_value = M.get(self.header_name, '')
+    # fetch old value and "unfold" (strip CRLF, see RFC2822 part 2.2.3)
+    old_value = M.get(self.header_name, '').replace('\r','').replace('\n','')
+    debug("  old value = %r", old_value)
     m = self.subst_re.search(old_value)
     if m:
       # named substitution values
@@ -1229,9 +1233,12 @@ class Target_Substitution(O):
       env_specials = { '0': m.group(0) }
       for ndx, grp in enumerate(m.groups()):
         env_specials[str(ndx+1)] = grp
-      new_value = get_qstr(self.subst_replacement, 0, q=None,
+      new_value, offset = get_qstr(self.subst_replacement, 0, q=None,
                            environ=env, env_specials=env_specials)
-      X("%s ==> %s", self.subst_replacement, new_value)
+      if offset != len(self.subst_replacement):
+        warning("after getqstr, offset[%d] != len(subst_replacement)[%d]: %r",
+                offset, len(self.subst_replacement), self.subst_replacement)
+      debug("%s: %s ==> %s", self.header_name, self.subst_replacement, new_value)
       filer.modify(self.header_name, new_value)
 
 class Target_Function(O):
@@ -1408,7 +1415,7 @@ class Rule(O):
   def __init__(self, filename, lineno):
     self.filename = filename
     self.lineno = lineno
-    self.conditions = slist()
+    self.conditions = []
     self.targets = []
     self.flags = O(alert=0, halt=False)
     self.label = ''

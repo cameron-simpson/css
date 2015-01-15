@@ -7,7 +7,7 @@ from cs.hier import flavour, T_SEQ, T_MAP
 from cs.db import dosql, SQLQuery, sqlise, today
 import cs.cache
 from cs.seq import the
-from cs.obj import DictUC_Attrs
+from cs.mixin.ucattrs import UCdict
 
 NodeCoreAttributes=('NAME','TYPE')
 
@@ -197,7 +197,7 @@ class DBDiGraphNode:
   def clone(self,pruneFields=()):
     ''' Returns a shallow clone of a node.
     '''
-    N=DictUC_Attrs()
+    N=UCdict()
     for k in self.keys():
       if k not in pruneFields:
         N[k]=self[k]

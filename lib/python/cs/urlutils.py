@@ -20,14 +20,18 @@ except ImportError:
     pass
 from netrc import netrc
 import socket
-from urllib2 import urlopen, Request, HTTPError, URLError, \
+try:
+  from urllib.request import urlopen, Request, HTTPError, URLError, \
+            HTTPPasswordMgrWithDefaultRealm, HTTPBasicAuthHandler, \
+            build_opener
+  from urllib.parse import urlparse, urljoin
+  from html.parser import HTMLParseError
+except ImportError:
+  from urllib2 import urlopen, Request, HTTPError, URLError, \
 		    HTTPPasswordMgrWithDefaultRealm, HTTPBasicAuthHandler, \
 		    build_opener
-try:
-  from urllib.parse import urlparse, urljoin
-except ImportError:
   from urlparse import urlparse, urljoin
-from HTMLParser import HTMLParseError
+  from HTMLParser import HTMLParseError
 try:
   import xml.etree.cElementTree as ElementTree
 except ImportError:
@@ -35,9 +39,9 @@ except ImportError:
 from threading import RLock
 from cs.excutils import logexc
 from cs.lex import parseUC_sAttr
-from cs.logutils import Pfx, pfx_iter, debug, error, warning, exception, D
+from cs.logutils import Pfx, pfx_iter, debug, error, warning, exception, D, X
 from cs.threads import locked_property
-from cs.py3 import StringIO, ustr
+from cs.py3 import StringIO, ustr, unicode
 from cs.obj import O
 
 def isURL(U):
@@ -91,7 +95,8 @@ class _URL(unicode):
     '''
     k, plural = parseUC_sAttr(attr)
     if k:
-      nodes = self.parsed.find_all(k.lower())
+      P = self.parsed
+      nodes = P.find_all(k.lower())
       if plural:
         return nodes
       return the(nodes)
@@ -193,9 +198,9 @@ class _URL(unicode):
     '''
     if self._content is None:
       self._fetch()
-    return self._info.gettype()
+    return self._info.get_content_type()
 
-  @property
+  @locked_property
   def content_transfer_encoding(self):
     ''' The URL content MIME type.
     '''
