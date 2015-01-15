@@ -105,56 +105,6 @@ def lastlinelen(s):
   '''
   return len(s) - s.rfind('\n') - 1
 
-DQ_RE=re.compile(r'"(([^\\"]|\\[\\"])*)"')
-nq_re=re.compile(r'\S+')
-
-# REMOVE
-def get_dqstring(s):
-  ''' Read a double quoted string from the start of `s`.
-      Return the decoded string and the remainder of `s`.
-      Returns None for the decoded string on no match.
-  '''
-  m = DQ_RE.match(s)
-  if not m:
-    return None, s
-  return undq(m.group(1)), s[m.end():]
-
-# parse a line consisting of words or "quoted strings"
-def parseline(line):
-  words=[]
-  line=line.lstrip()
-  while len(line) > 0:
-    m=DQ_RE.match(line)
-    if m is not None:
-      words.append(undq(m.group(1)))
-      line=line[m.end():]
-    else:
-      m=nq_re.match(line)
-      if m is not None:
-        words.append(m.group(0))
-        line=line[m.end():]
-      else:
-        error("aborting parseline at: %s", line)
-        return None
-
-    line = line.lstrip()
-
-  return words
-
-# strip quotes from a "quoted string"
-dqch_re=re.compile(r'([^\\]|\\.)')
-def undq(s):
-  result=''
-  bs=s.find('\\')
-  while bs >= 0:
-    if bs > 0: result+=s[:bs]
-    result.append(s[bs+1])
-    s=s[bs+2:]
-
-  result+=s
-
-  return result
-
 def htmlify(s,nbsp=False):
   s=s.replace("&","&amp;")
   s=s.replace("<","&lt;")
