@@ -89,13 +89,6 @@ def tabpadding(padlen,tabsize=8,offset=0):
 
   return pad
 
-def skipwhite(s,start=0):
-  ''' Returns the location of next nonwhite in string.
-  '''
-  while start < len(s) and s[start] in whitespace:
-    start+=1
-  return start
-
 def strlist(ary,sep=", "):
   return sep.join([str(a) for a in ary])
 
