@@ -179,7 +179,7 @@ def rewrite_cmgr(pathname,
     os.remove(backuppath)
 
 def abspath_from_file(path, from_file):
-  ''' Return the absolute path if `path` with respect to `from_file`,
+  ''' Return the absolute path of `path` with respect to `from_file`,
       as one might do for an include file.
   '''
   if not os.path.isabs(path):
