@@ -43,7 +43,7 @@ Generally the get_* functions accept a source string and an offset (often option
 
 * slosh_mapper(c, charmap=SLOSH_CHARMAP): return a string to replace \c; the default charmap matches Python slosh escapes
 
-* texthexify(bs, shiftin='[', shiftout=']', whitelist=None): a function like binascii.hexlify but also supporting embedded "printable text" subsequences for compactness and human readbility in the result; initial use case was for transcription of binary data with frequence text, specificly directory entry data
+* texthexify(bs, shiftin='[', shiftout=']', whitelist=None): a function like binascii.hexlify but also supporting embedded "printable text" subsequences for compactness and human readbility in the result; initial use case was for transcription of binary data with frequent text, specificly directory entry data
 
 * untexthexify(s, shiftin='[', shiftout=']'): the inverse of texthexify()
 
