@@ -23,7 +23,7 @@ Generally the get_* functions accept a source string and an offset (often option
 
 * get_sloshed_text(s, delim, offset=0, slosh='\\', mapper=slosh_mapper, specials=None): collect some slosh escaped text with optional special tokens (such as '$' introducing '$foo')
 
-* get_tokens(s, offset, getters): collect a sequence of tokens specicied in `getters`
+* get_tokens(s, offset, getters): collect a sequence of tokens specified in `getters`
 
 * match_tokens(s, offset, getters): wrapper for get_tokens which catches ValueError and returns None instead
 
