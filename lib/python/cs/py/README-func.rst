@@ -19,7 +19,7 @@ Convenience wrapper of derived_property which names the parent property.
 @returns_type(func, basetype)
 -----------------------------
 
-Basis for decorators to do type checking of function return values. Example:
+Basis for decorators to do type checking of function return values. Example::
 
   def returns_bool(func):
     ''' Decorator for functions which should return Booleans.
