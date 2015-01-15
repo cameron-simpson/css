@@ -5,6 +5,18 @@
 #
 
 from __future__ import print_function
+
+DISTINFO = {
+    'description': "assorted debugging facilities",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'requires': ['cs.py3', 'cs.py.stack', 'cs.logutils', 'cs.obj', 'cs.seq', 'cs.timeutils'],
+}
+
 import inspect
 import logging
 import sys
