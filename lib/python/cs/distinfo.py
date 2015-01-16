@@ -424,7 +424,6 @@ class PyPI_Package(O):
           warning("skipping %s", os.path.join(dirpath, filename))
     readme_subpath = self.pkg_readme_rpath(package_name)
     readme_path = os.path.join(libdir, readme_subpath)
-    X("PROBE %r", readme_path)
     if os.path.exists(readme_path):
       yield readme_subpath
 
