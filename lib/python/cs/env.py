@@ -7,7 +7,7 @@
 import os
 import string
 import types
-from cs.lex import get_identifier, get_qstr
+from cs.lex import get_qstr
 
 def getLogin(uid=None):
   import pwd
