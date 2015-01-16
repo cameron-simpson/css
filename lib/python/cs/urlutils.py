@@ -5,6 +5,18 @@
 #
 
 from __future__ import with_statement, print_function
+
+DISTINFO = {
+    'description': "convenience functions for working with URLs",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'requires': ['lxml', 'beautifulsoup4', 'cs.excutils', 'cs.lex', 'cs.logutils', 'cs.threads', 'cs.py3', 'cs.obj'],
+}
+
 import os
 import os.path
 import sys
@@ -202,7 +214,7 @@ class _URL(unicode):
 
   @locked_property
   def content_transfer_encoding(self):
-    ''' The URL content MIME type.
+    ''' The URL content tranfer encoding.
     '''
     if self._content is None:
       self._fetch()
