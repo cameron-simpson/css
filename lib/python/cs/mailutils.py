@@ -4,6 +4,17 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
+DISTINFO = {
+    'description': "functions and classes to work with email",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'requires': ['cs.fileutils', 'cs.logutils', 'cs.threads', 'cs.seq', 'cs.py3'],
+}
+
 import email.message
 import email.parser
 from email.utils import getaddresses
@@ -29,8 +40,7 @@ def shortpath(path, environ=None):
   return _shortpath(path, environ=environ, prefixes=SHORTPATH_PREFIXES)
 
 def Message(msgfile, headersonly=False):
-  ''' Factory function to accept a file or filename and return an
-      email.message.Message.
+  ''' Factory function to accept a file or filename and return an email.message.Message.
   '''
   if isinstance(msgfile, StringTypes):
     # msgfile presumed to be filename

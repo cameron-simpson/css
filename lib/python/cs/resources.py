@@ -4,13 +4,23 @@
 #       - Cameron Simpson <cs@zip.com.au> 11sep2014
 #
 
+DISTINFO = {
+    'description': "resourcing related classes and functions",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'requires': ['cs.excutils', 'cs.logutils', 'cs.obj', 'cs.py.func'],
+}
+
 import threading
 from threading import Condition
 import traceback
 from cs.excutils import logexc
 from cs.logutils import warning, error
-from cs.obj import O, Proxy
-from cs.seq import seq
+from cs.obj import O
 from cs.py.func import callmethod_if as ifmethod
 
 def not_closed(func):

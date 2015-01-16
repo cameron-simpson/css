@@ -11,15 +11,24 @@
 # So we provide csv_reader() generators to yield rows containing unicode.
 #
 
+DISTINFO = {
+    'description': "CSV file related facilities",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'requires': ['cs.fileutils', 'cs.debug', 'cs.logutils', 'cs.queues'],
+}
+
 import csv
 import sys
-from itertools import takewhile
 from StringIO import StringIO
 from threading import Thread
 from cs.debug import trace
 from cs.fileutils import SharedAppendLines
-from cs.logutils import warning, X
-from cs.lex import as_lines
+from cs.logutils import warning
 from cs.queues import IterableQueue
 
 if sys.hexversion < 0x03000000:

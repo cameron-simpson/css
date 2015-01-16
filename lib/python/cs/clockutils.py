@@ -13,6 +13,17 @@
 #
 
 from __future__ import print_function
+
+DISTINFO = {
+    'description': "implementation of PEP0418 with the \"Choosing the clock from a list of constraints\" get_clock() and get_clocks() functions",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+}
+
 from collections import namedtuple
 from time import time
 import os
