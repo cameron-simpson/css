@@ -4,8 +4,17 @@
 #   - Cameron Simpson <cs@zip.com.au> 21dec2014
 #
 
+DISTINFO = {
+    'description': "module/import related stuff",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+}
+
 import sys
-from cs.logutils import error, exception
 
 def import_module_name(module_name, name, path=None, lock=None):
   ''' Import `module_name` and return the value of `name` within it.
