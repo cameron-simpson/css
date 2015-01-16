@@ -56,20 +56,16 @@ fi
 
 case "$relpfx" in
   release)
-    subtree=.
+    logpaths=.
     ;;
   [a-z]*)
-    subtree=lib/python/$( echo "$relpfx" | tr . / )
-    if [ ! -d "$subtree" ]
-    then
-      if [ -f "$subtree.py" ]
-      then
-        subtree=$subtree.py
-      else
-        echo "$cmd: neither subdir $subtree nor file $subtree.py" >&2
-        badopts=1
-      fi
-    fi
+    pfxdir=lib/python/$( echo "$relpfx" | tr . / )
+    logpaths=
+    [ -d "$pfxdir" ] && logpaths="$logpaths $pfxdir"
+    pfxfile=$pfxdir.py
+    [ -f "$pfxfile" ] && logpaths="$logpaths $pfxfile"
+    readmepath=$( dirname "$pfxdir" )/README-$( basename "$pfxdir" ).rst
+    [ -f "$readmepath" ] && logpaths="$logpaths $readmepath"
     ;;
   *)echo "$cmd: invalid relpfx, must start with a lowercase letter, got: $relpfx" >&2
     badopts=1
@@ -152,7 +148,7 @@ case $op in
     else
       $trace hg log -r "'$lastrelease':" \
                     --template '{files}: {desc|firstline}\n' \
-                    "$subtree" \
+                    $logpaths \
       | $trace sed "/^\\.hg/d; /^CHANGELOG/d; /^$relpfx-/d"
     fi
     ;;
