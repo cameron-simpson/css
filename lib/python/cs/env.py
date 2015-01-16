@@ -4,6 +4,17 @@
 #   - Cameron Simpson <cs@zip.com.au>
 #
 
+DISTINFO = {
+    'description': "a few environment related functions",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'requires': ['cs.lex'],
+}
+
 import os
 import string
 import types
