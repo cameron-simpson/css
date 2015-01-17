@@ -1,6 +1,18 @@
 #!/usr/bin/python
 
 from __future__ import print_function
+
+DISTINFO = {
+    'description': "a simple and versatile collection of nodes with attributes, accessed as direct Python objects and automatically transcribed to assorted backing stores (CSV, SQL, GDBM, etc); the CSV backend can be (loosely) shared between multiple clients",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'requires': ['cs.csvutils', 'cs.debug', 'cs.excutils', 'cs.fileutils', 'cs.html', 'cs.lex', 'cs.logutils', 'cs.nodedb', 'cs.obj', 'cs.py.func', 'cs.py3', 'cs.seq', 'cs.sh', 'cs.threads', 'cs.timeutils'],
+}
+
 from getopt import GetoptError
 import os.path
 import sys

@@ -421,6 +421,7 @@ class PyPI_Package(O):
             continue
           if filename.endswith('.py'):
             yield os.path.join(dirpath[len(libprefix):], filename)
+            continue
           warning("skipping %s", os.path.join(dirpath, filename))
     readme_subpath = self.pkg_readme_rpath(package_name)
     readme_path = os.path.join(libdir, readme_subpath)
