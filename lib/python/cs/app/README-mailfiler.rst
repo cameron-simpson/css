@@ -19,7 +19,8 @@ A target can be:
 * an email address, such as the special mail address my phone consults, or that of another person who should always receive copies of specific messages
 
 * a shell command, such as a command to log receipt of a message or to automatically process its contents; many message header details are presented in as shell environment variables for ready use without further header parsing. For example, I pass certain work related messages to this target::
-  "|buglog -n -B dlog \"WORK $shortlist_from->$shortlist_to_cc_bcc: $header_subject\""
+
+  "\|buglog -n -B dlog \"WORK $shortlist_from->$shortlist_to_cc_bcc: $header_subject\""
 
 The "label", if not ".", is added to the X-Label: header.
 
@@ -58,7 +59,7 @@ However, procmail has other problems as well:
 It is sloppy.
   All the matching rules are in fact regular expressions.
   While regular expressions are flexible, they are also error prone and hard to write well and robustly.
-  And for email addresses, they are awful:
+  And for email addresses, regexps are awful:
   * the dots in email address are wildcards in regexps, and must be escaped for robustness
   * email addresses come in multiple forms, notably "Bill <bill@example.com>" and the uglier "(Bill) bill@example.com": to reliably match these you need two expressions with difficult address boundary positions
   By constrast, mailfiler does a proper RFC2822 parse of the address and matches against the "core address", "bill@example.com" in the example, with a direct string comparison. So there is no risk of matching "wildbill@example.com" or "bill@example.com.au", and no requirements on a particular form of the address on arrival.
