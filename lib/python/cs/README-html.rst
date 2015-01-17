@@ -23,7 +23,7 @@ A "token" in this scheme is:
 
 * a sequence: an HTML tag: element 0 is the tag name, element 1 (if a mapping) is the element attributes, any further elements are enclosed tokens
 
-- because a string like "&foo" gets its "&" transcribed into the entity "&amp;", a single element list whose tag begins with "&" encoded an entity, thus: ["&amp;"]
+  - because a string like "&foo" gets its "&" transcribed into the entity "&amp;", a single element list whose tag begins with "&" encodes an entity, example: ["&lt;"]
 
 Example::
 
