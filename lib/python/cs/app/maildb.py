@@ -38,7 +38,9 @@ from cs.threads import locked, locked_property
 from cs.py.func import derived_property
 from cs.py3 import StringTypes, ustr
 
-def main(argv, stdin=None):
+def main(argv=None, stdin=None):
+  if argv is None:
+    argv = sys.argv
   if stdin is None:
     stdin = sys.stdin
   argv = list(argv)
