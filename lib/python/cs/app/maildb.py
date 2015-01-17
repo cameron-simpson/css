@@ -1,6 +1,21 @@
 #!/usr/bin/python -tt
 
 from __future__ import with_statement, print_function
+
+DISTINFO = {
+    'description': "a cs.nodedb NodeDB subclass for storing email address information (groups, addresses, so forth)",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'requires': [ 'cs.logutils', 'cs.mailutils', 'cs.nodedb', 'cs.lex', 'cs.sh', 'cs.threads', 'cs.py.func', 'cs.py3', ],
+    'console_scripts': [
+        'maildb = cs.app.maildb:main',
+        ],
+}
+
 from collections import deque
 from getopt import getopt, GetoptError
 from email.utils import getaddresses, parseaddr, formataddr
