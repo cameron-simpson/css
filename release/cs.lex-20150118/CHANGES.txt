@@ -1,0 +1,4 @@
+lib/python/cs/lex.py: cs.lex: move DISTINFO to top of file
+lib/python/cs/README-lex.rst: cs/README-lex.rst: tpo fix
+lib/python/cs/README-lex.rst: cs.lex: fix typo in README
+lib/python/cs/README-lex.rst: cs/README-lex.rst: spelling fix

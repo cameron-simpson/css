@@ -10,7 +10,7 @@ Callbacks can be registered via an Asychron's .notify method.
 
 An incomplete Asynchron can be told to call a function to compute its value; the function return will be stored as the value unless the function raises an exception, in which case the exception information is recorded instead. If an exception occurred, it will be reraised for any caller of the Asynchron.
 
-Trite example:
+Trite example::
 
   A = Asynchron(name="my demo")
 
@@ -26,3 +26,11 @@ Trite example:
   Thread 3:
     value = A()
     # returns immediately with 3
+
+You can also collect multiple Asynchrons in completion order using the report() function::
+
+  As = [ ... list of Asynchrons or whatever type ... ]
+  ...
+  for A in report(As):
+    x = A()     # collect result, will return immediately
+    print(x)    # print result
