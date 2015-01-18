@@ -39,7 +39,7 @@ some specialty match syntaxes
 
 Multiple conditions may be supplied; all must match.
 
-Notably, the core address syntax also accepts: "@example.com" to match any address from the "example.com" domain, "UPPERCASE_NAME" to match any address in the group "lowercase_name" in the maildb (see maildb_). These can be combined, such as "(@work.example.com|COLLEAGUES|joe-the-consultant@example.com)".
+Notably, the core address syntax also accepts: "@example.com" to match any address from the "example.com" domain, "UPPERCASE_NAME" to match any address in the group "lowercase_name" in the maildb (see cs.app.maildb_). These can be combined, such as "(@work.example.com|COLLEAGUES|joe-the-consultant@example.com)".
 
 My Setup
 --------
@@ -61,17 +61,20 @@ It is sloppy.
   While regular expressions are flexible, they are also error prone and hard to write well and robustly.
   And for email addresses, regexps are awful:
   * the dots in email address are wildcards in regexps, and must be escaped for robustness
-  * email addresses come in multiple forms, notably "Bill <bill@example.com>" and the uglier "(Bill) bill@example.com": to reliably match these you need two expressions with difficult address boundary positions
-  By constrast, mailfiler does a proper RFC2822 parse of the address and matches against the "core address", "bill@example.com" in the example, with a direct string comparison. So there is no risk of matching "wildbill@example.com" or "bill@example.com.au", and no requirements on a particular form of the address on arrival.
+  * email addresses come in multiple forms, notably "Bill <bill@example.com>" and the uglier "(Bill) bill@example.com": to reliably match these you need two expressions with difficult address boundary conditions.
+  By constrast, mailfiler does a proper RFC2822 parse of the address and matches against the "core address", "bill@example.com" in the example, with a direct string comparison.
+  So there is no risk of matching "wildbill@example.com" or "bill@example.com.au", and no requirements on a particular form of the address on arrival.
 
 It is slow:
   Procmail is invoked separately for each message to file, and it must read its rules and compile all its regular expressions every time.
   The expressions are applied as encountered, effectively reparsing each message header every time it is tested for a match.
-  By contrast, mailfiler parses address headers only once, as requested, and keeps the post-parse data (core address) around for direct access in any future match. The match tests are also largely direct string comparisons, much cheaper than a regexp even discounting the regexp compile cost.
+  By contrast, mailfiler parses address headers only once, as requested, and keeps the post-parse data (core address) around for direct access in any future match.
+  The match tests are also largely direct string comparisons, much cheaper than a regexp even discounting the regexp compile cost.
 
 It is hard to use for ad hoc message filing:
   If you can get your message into a separte file, you can test on the command line with "procmail < message". This is not always convenient, especially from inside a mail reader.
-  By contrast, to test a mailfiler ruleset I can just uddate the ruleset, copy a sample message into the spool folder using my mail reader's normal message copy function, and watch the logfile to see the actions taken. Once ocrrect, it is similarly easy to bulk refile many messages by dumping them into the spool directory.
+  By contrast, to test a mailfiler ruleset I can just uddate the ruleset, copy a sample message into the spool folder using my mail reader's normal message copy function, and watch the logfile to see the actions taken.
+  Once correct, it is similarly easy to bulk refile many messages by dumping them into the spool directory.
 
 .. _mailfiler_5_pod: https://bitbucket.org/cameron_simpson/css/src/tip/man/mailfiler.5.pod
-.. _maildb: https://pypi.python.org/pypi/cs.app.maildb
+.. _cs.app.maildb: https://pypi.python.org/pypi/cs.app.maildb
