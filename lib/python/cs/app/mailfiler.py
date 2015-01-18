@@ -5,6 +5,23 @@
 #
 
 from __future__ import print_function
+
+DISTINFO = {
+    'description': "email message filing system which monitors multiple inbound Maildir folders",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'requires': [ 'cs.configutils', 'cs.env', 'cs.fileutils', 'cs.lex', 'cs.logutils', 'cs.mailutils', 'cs.obj', 'cs.seq', 'cs.threads', 'cs.app.maildb', 'cs.py.modules', 'cs.py3' ],
+    'entry_points': {
+      'console_scripts': [
+          'maildb = cs.app.mailfiler:main',
+          ],
+        },
+}
+
 from collections import namedtuple
 from email import message_from_string, message_from_file
 import email.parser
@@ -50,7 +67,9 @@ DEFAULT_MAILDB_PATH = '$HOME/.maildb.csv'
 DEFAULT_MSGIDDB_PATH = '$HOME/var/msgiddb.csv'
 DEFAULT_MAILDIR_PATH = '$MAILDIR'
 
-def main(argv, stdin=None):
+def main(argv=None, stdin=None):
+  if argv is None:
+    argv = sys.argv
   if stdin is None:
     stdin = sys.stdin
   argv = list(argv)
