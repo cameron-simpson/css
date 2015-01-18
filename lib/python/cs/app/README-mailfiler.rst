@@ -18,9 +18,9 @@ A target can be:
 
 * an email address, such as the special mail address my phone consults, or that of another person who should always receive copies of specific messages
 
-* a shell command, such as a command to log receipt of a message or to automatically process its contents; many message header details are presented in as shell environment variables for ready use without further header parsing. For example, I pass certain work related messages to this target::
+* a shell command, such as a command to log receipt of a message or to automatically process its contents; many message header details are presented in as shell environment variables for ready use without further header parsing. For example, I pass certain work related messages to this command::
 
-  "\|buglog -n -B dlog \"WORK $shortlist_from->$shortlist_to_cc_bcc: $header_subject\""
+  buglog -n -B dlog "WORK: $shortlist_from->$shortlist_to_cc_bcc: $header_subject"
 
 The "label", if not ".", is added to the X-Label: header.
 
@@ -29,8 +29,8 @@ The conditions take several forms:
 a bare core email address such as bill@example.com:
   matches a message with this core address in the to/cc/bcc header
 
-a header:address pair such as "from:joe@example.com" or "to,cc:bill@exxample.com"
-  these match "joe@example.com" in the From: header or "bill@exxample.com" in the to/cc headers
+a header:address pair such as "from:joe@example.com" or "to,cc:bill@example.com"
+  these match "joe@example.com" in the From: header or "bill@example.com" in the to/cc headers
 
 a header:/regexp such as "subject:/^FAIL:"
   matches a Subject: header starting with "FAIL:"
