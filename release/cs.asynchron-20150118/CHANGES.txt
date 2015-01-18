@@ -1,0 +1,2 @@
+lib/python/cs/README-asynchron.rst lib/python/cs/asynchron.py: cs.asynchron: move long_description into cs/README-asynchron.rst
+lib/python/cs/README-asynchron.rst lib/python/cs/README-later.rst lib/python/cs/README-logutils.rst lib/python/cs/README-resources.rst lib/python/cs/py/README-func.rst: syntax fixes for .rst files
