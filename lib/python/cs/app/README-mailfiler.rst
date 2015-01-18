@@ -14,11 +14,11 @@ The rule syntax is detailed in mailfiler_5_pod_, but in short::
 
 A target can be:
 
-* a mail folder name, such as "python"
+a mail folder name, such as "python",
 
-* an email address, such as the special mail address my phone consults, or that of another person who should always receive copies of specific messages
+an email address, such as the special mail address my phone consults, or that of another person who should always receive copies of specific messages,
 
-* a shell command, such as a command to log receipt of a message or to automatically process its contents; many message header details are presented in as shell environment variables for ready use without further header parsing. For example, I pass certain work related messages to this command::
+a shell command, such as a command to log receipt of a message or to automatically process its contents; many message header details are presented in as shell environment variables for ready use without further header parsing. For example, I pass certain work related messages to this command::
 
   buglog -n -B dlog "WORK: $shortlist_from->$shortlist_to_cc_bcc: $header_subject"
 
@@ -60,15 +60,15 @@ It is sloppy.
   All the matching rules are in fact regular expressions.
   While regular expressions are flexible, they are also error prone and hard to write well and robustly.
   And for email addresses, regexps are awful:
-  * the dots in email address are wildcards in regexps, and must be escaped for robustness
-  * email addresses come in multiple forms, notably "Bill <bill@example.com>" and the uglier "(Bill) bill@example.com": to reliably match these you need two expressions with difficult address boundary conditions.
+  a) the dots in email address are wildcards in regexps, and must be escaped for robustness
+  b) email addresses come in multiple forms, notably "Bill <bill@example.com>" and the uglier "(Bill) bill@example.com": to reliably match these you need two expressions with difficult address boundary conditions.
   By constrast, mailfiler does a proper RFC2822 parse of the address and matches against the "core address", "bill@example.com" in the example, with a direct string comparison.
   So there is no risk of matching "wildbill@example.com" or "bill@example.com.au", and no requirements on a particular form of the address on arrival.
 
 It is slow:
   Procmail is invoked separately for each message to file, and it must read its rules and compile all its regular expressions every time.
   The expressions are applied as encountered, effectively reparsing each message header every time it is tested for a match.
-  By contrast, mailfiler parses address headers only once, as requested, and keeps the post-parse data (core address) around for direct access in any future match.
+  By contrast, mailfiler parses its rules once at startup (and agani if the rules file is modified); also, during message matching mailfiler parses address headers only once, as requested, and keeps the post-parse data (core address) around for direct access in any future match.
   The match tests are also largely direct string comparisons, much cheaper than a regexp even discounting the regexp compile cost.
 
 It is hard to use for ad hoc message filing:
