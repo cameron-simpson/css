@@ -1,0 +1,5 @@
+lib/python/cs/logutils.py: cs.logutils: distinfo: add "requires"
+lib/python/cs/logutils.py: cs.logutils: use cs.py3.ustr() instead of unicode()
+lib/python/cs/excutils.py lib/python/cs/logutils.py lib/python/cs/py3.py: merge default ==> pypi
+lib/python/cs/README-logutils.rst lib/python/cs/logutils.py: cs.logutils: move long_description into cs/README-logutils.rst
+lib/python/cs/README-asynchron.rst lib/python/cs/README-later.rst lib/python/cs/README-logutils.rst lib/python/cs/README-resources.rst lib/python/cs/py/README-func.rst: syntax fixes for .rst files
