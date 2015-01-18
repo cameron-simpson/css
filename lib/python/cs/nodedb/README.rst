@@ -22,4 +22,4 @@ The Node attributes obey both the sequence API and some of the set API: you can 
 Backing Stores
 --------------
 
-A NodeDB can be backed by a CSV file (beta quality - I use it myself extensively) or SQL or a DBM file (alpha quality, both need some work). The CSV backend allows mutliple clients to share the file; they update by appending to the file and monitor the updates of others.
+A NodeDB can be backed by a CSV file (beta quality - I use it myself extensively) or SQL or a DBM file (alpha quality, both need some work). The CSV backend allows multiple clients to share the file; they update by appending to the file and monitor the updates of others.
