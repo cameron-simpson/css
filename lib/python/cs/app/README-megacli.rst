@@ -10,11 +10,32 @@ For Linux, IBM offer a set of command line tools named MegaCLI_, which are insta
 Unfortunately, their MegaCLI executable is both fiddly to invoke and in its reporting mode, produces a barely human readable report which is quite hostlie to machine parsing.
 I would surmise that someone was told to dump the adapter data in text form, and did so with an ad hoc report; it is pages long and arduous to inspect by eye.
 
-The situation was sufficiently painful that I wrote this module which runs a couple of the report modes and parses their output.
+The situation was sufficiently painful that I wrote this module which runs a couple of the report modes and parses their output. It is deliberately python 2.4 compatible so that it can run on RHEL 5 systems.
 
-The primary "report" mode then dumps a short summary report of relevant information which can be eyeballed immediately; RAID configuration and issues are immediately apparent.
+The primary "report" mode then dumps a short summary report of relevant information which can be eyeballed immediately; RAID configuration and issues are immediately apparent. Here is an example output (the "+" tracing lines are on stderr, and recite the underlying MegaCLI commands used)::
 
-The secondary "status" mode recites the RAID status in a series of terse one line summaries; we use its output in our nagios monitoring.
+  # mcli report
+  + exec py26+ -m cs.app.megacli report
+  + exec /opt/MegaRAID/MegaCli/MegaCli64 -CfgDsply -aAll
+  + exec /opt/MegaRAID/MegaCli/MegaCli64 -PDlist -aAll
+  Adapter 0 IBM ServeRAID-MR10i SAS/SATA Controller serial# P104421610
+    Virtual Drive 0
+      2 drives, size = 278.464GB, raid = Primary-1, Secondary-0, RAID Level Qualifier-0
+        physical drive enc252.devid8 [252:0]
+        physical drive enc252.devid7 [252:1]
+    4 drives:
+      enc252.devid7 [252:1]: VD 0, DG None: 42D0628 279.396 GB, Online, Spun Up
+      enc252.devid8 [252:0]: VD 0, DG None: 81Y9671 279.396 GB, Online, Spun Up
+      enc252.devid2 [252:2]: VD None, DG None: 42D0628 279.396 GB, Unconfigured(good), Spun Up
+      enc252.devid3 [252:3]: VD None, DG None: 42D0628 279.396 GB, Unconfigured(good), Spun Up
+
+The secondary "status" mode recites the RAID status in a series of terse one line summaries; we use its output in our nagios monitoring. here is an example output (the "+" tracing lines are on stderr, and recite the underlying MegaCLI commands used)::
+
+  # mcli status
+  + exec py26+ -m cs.app.megacli status
+  + exec /opt/MegaRAID/MegaCli/MegaCli64 -CfgDsply -aAll
+  + exec /opt/MegaRAID/MegaCli/MegaCli64 -PDlist -aAll
+  OK A0
 
 The other current mode is "new_raid", which will print a MegaCLI command line which will instruct the adapter to assemble a new RAID set.
 
