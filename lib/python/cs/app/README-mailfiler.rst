@@ -46,6 +46,8 @@ My Setup
 
 Like others, I run my personal email faily decoupled: I use one tool (getmail, currently) to collect email and deliver to a spool folder, another tool (this one, mailfiler) to monitor that spool and file to other mail folders, a third tool to read and dispatch email (mutt) and my local machine's mail system to actually queue and send the email.
 
+I start an instance of mailfiler at login, in a tmux session, and an instance of getmail likewise. My email is then collected and filed.
+
 Why not procmail?
 -----------------
 
