@@ -18,7 +18,7 @@ The primary "report" mode then dumps a short summary report of relevant informat
   + exec py26+ -m cs.app.megacli report
   + exec /opt/MegaRAID/MegaCli/MegaCli64 -CfgDsply -aAll
   + exec /opt/MegaRAID/MegaCli/MegaCli64 -PDlist -aAll
-  Adapter 0 IBM ServeRAID-MR10i SAS/SATA Controller serial# P104421610
+  Adapter 0 IBM ServeRAID-MR10i SAS/SATA Controller serial# Pnnnnnnnnn
     Virtual Drive 0
       2 drives, size = 278.464GB, raid = Primary-1, Secondary-0, RAID Level Qualifier-0
         physical drive enc252.devid8 [252:0]
@@ -29,7 +29,7 @@ The primary "report" mode then dumps a short summary report of relevant informat
       enc252.devid2 [252:2]: VD None, DG None: 42D0628 279.396 GB, Unconfigured(good), Spun Up
       enc252.devid3 [252:3]: VD None, DG None: 42D0628 279.396 GB, Unconfigured(good), Spun Up
 
-The secondary "status" mode recites the RAID status in a series of terse one line summaries; we use its output in our nagios monitoring. here is an example output (the "+" tracing lines are on stderr, and recite the underlying MegaCLI commands used)::
+The secondary "status" mode recites the RAID status in a series of terse one line summaries; we use its output in our nagios monitoring. Here is an example output (the "+" tracing lines are on stderr, and recite the underlying MegaCLI commands used)::
 
   # mcli status
   + exec py26+ -m cs.app.megacli status
