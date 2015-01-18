@@ -5,6 +5,21 @@
 #       - Cameron Simpson <cs@zip.com.au> 29jan2013
 #
 
+DISTINFO = {
+    'description': "command line tool to inspect and manipulate LSI MegaRAID adapters (such as used in IBM ServerRAID systems)",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        ],
+    'requires': [ 'cs.logutils', 'cs.threads', 'cs.obj' ],
+    'entry_points': {
+      'console_scripts': [
+          'mcli = cs.app.megacli:main',
+          ],
+        },
+}
+
 import re
 import sys
 from contextlib import contextmanager
@@ -26,7 +41,9 @@ mode_PDLIST = 1         # -PDlist mode
 
 re_SPEED = re.compile('^(\d+(\.\d+)?)\s*(\S+)$')
 
-def main(argv):
+def main(argv=None):
+  if argv is None:
+    argv = sys.argv
   argv = list(argv)
   cmd = argv.pop(0)
   setup_logging(cmd)

@@ -1,3 +1,9 @@
+#!/usr/bin/python
+#
+# Mail related facilities.
+#   - Cameron Simpson <cs@zip.com.au>
+#
+
 import os
 import os.path
 import time
@@ -233,10 +239,3 @@ def openMaildir(path):
     info("open new Maildir", path)
     _maildirs[path]=Maildir(path)
   return _maildirs[path]
-
-re_rfc2407 = re.compile( r'=\?([^?]+)\?([^?]+)\?([^?]*)\?=' )
-
-@OBSOLETE
-def unrfc2047(s):
-  from cs.lex import unrfc2047 as real_unrfc2047
-  return real_unrfc2047(s)

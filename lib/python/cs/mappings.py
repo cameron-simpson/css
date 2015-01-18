@@ -284,10 +284,13 @@ class SeenSet(object):
       self._backing_file.ready()
 
   def _add_foreign_line(self, line):
+    # EOF markers, discard
+    if line is None:
+      return
     if not line.endswith('\n'):
       warning("%s: adding unterminated line: %s", self, line)
     s = line.rstrip()
-    self.add(s, foreign=true)
+    self.add(s, foreign=True)
 
   def add(self, s, foreign=False):
     # avoid needlessly extending the backing file
