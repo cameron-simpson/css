@@ -18,4 +18,10 @@ The secondary "status" mode recites the RAID status in a series of terse one lin
 
 The other current mode is "new_raid", which will print a MegaCLI command line which will instruct the adapter to assemble a new RAID set.
 
+MegaCLI class.
+--------------
+
+The module provides a MegaCLI class which embodies the parsed information from the MegaCLI reporting modes.
+This can be imported and used for special needs.
+
 .. _MegaCLI: http://www-947.ibm.com/support/entry/portal/docdisplay?lndocid=migr-5082327
