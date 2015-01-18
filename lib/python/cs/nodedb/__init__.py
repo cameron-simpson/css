@@ -10,7 +10,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         ],
-    'requires': ['cs.csvutils', 'cs.debug', 'cs.excutils', 'cs.fileutils', 'cs.html', 'cs.lex', 'cs.logutils', 'cs.nodedb', 'cs.obj', 'cs.py.func', 'cs.py3', 'cs.seq', 'cs.sh', 'cs.threads', 'cs.timeutils'],
+    'requires': ['cs.csvutils', 'cs.debug', 'cs.excutils', 'cs.fileutils', 'cs.html', 'cs.lex', 'cs.logutils', 'cs.obj', 'cs.py.func', 'cs.py3', 'cs.seq', 'cs.sh', 'cs.threads', 'cs.timeutils'],
 }
 
 from getopt import GetoptError
