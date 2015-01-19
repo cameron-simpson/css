@@ -1057,7 +1057,8 @@ def get_targets(s, offset):
   while offset < len(s) and not s[offset].isspace():
     offset0 = offset
     T, offset = get_target(s, offset)
-    targets.append(T)
+    if T is not None:
+      targets.append(T)
     if offset < len(s) and s[offset] == ',':
       offset += 1
   return targets, offset
@@ -1129,8 +1130,13 @@ def get_target(s, offset, quoted=False):
     delim = m_delim.group()
     regexp, offset = get_delimited(s, offset, delim)
     replacement, offset = get_delimited(s, offset, delim)
-    subst_re = re.compile(regexp)
-    T = Target_Substitution(header_name, subst_re, replacement)
+    try:
+      subst_re = re.compile(regexp)
+    except Exception as e:
+      error("FAIL: target omitted: re.compile: %s: re = %s", e, regexp)
+      T = None
+    else:
+      T = Target_Substitution(header_name, subst_re, replacement)
     return T, offset
 
   # s/this/that/ -- modify subject:
