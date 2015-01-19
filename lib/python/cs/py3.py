@@ -88,6 +88,8 @@ else:
       if isinstance(index, slice):
         return bytes( ord(ch) for ch in s2 )
       return ord(s2[0])
+    def __contains__(self, b):
+      return str.__contains__(self, chr(b))
 
 def raise3(exc_type, exc_value, exc_traceback):
   if sys.hexversion >= 0x03000000:
