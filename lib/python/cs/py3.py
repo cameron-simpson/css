@@ -21,6 +21,8 @@ if sys.hexversion >= 0x03000000:
   unicode = str
   StringTypes = (str,)
   def ustr(s, e='utf-8', errors='strict'):
+    ''' Upgrade string to unicode: no-op for python 3.
+    '''
     return s
   from io import BytesIO, StringIO
   from queue import Queue, PriorityQueue, Full as Queue_Full, Empty as Queue_Empty
