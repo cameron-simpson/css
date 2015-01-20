@@ -1,13 +1,28 @@
+#!/usr/bin/python
+#
+# Single line status updates.
+#   - Cameron Simpson <cs@zip.com.au>
+#
+
 from __future__ import with_statement
+
+DISTINFO = {
+    'description': "single line status updates with minimal update sequences",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'requires': ['cs.lex', 'cs.tty'],
+}
+
 from threading import Lock
 import threading
 from contextlib import contextmanager
 import atexit
 import logging
 from logging import StreamHandler
-from subprocess import Popen, PIPE
-from cs.ansi_colour import colourise
-from cs.logutils import Pfx
 from cs.lex import unctrl
 from cs.tty import ttysize
 
@@ -20,47 +35,6 @@ def cleanupAtExit():
   instances = ()
 
 atexit.register(cleanupAtExit)
-
-class UpdHandler(StreamHandler):
-
-  def __init__(self, strm=None, nlLevel=None, ansi_mode=None):
-    ''' Initialise the UpdHandler.
-        `strm` is the output stream, default sys.stderr.
-        `nlLevel` is the logging level at which conventional line-of-text
-        output is written; log messages of a lower level go via the
-        update-the-current-line method. Default is logging.WARNING.
-        If `ansi_mode` is None, set if from strm.isatty().
-        A true value causes the handler to colour certain logging levels
-        using ANSI terminal sequences.
-    '''
-    if strm is None:
-      strm = sys.stderr
-    if nlLevel is None:
-      nlLevel = logging.WARNING
-    if ansi_mode is None:
-      ansi_mode = strm.isatty()
-    StreamHandler.__init__(self, strm)
-    self.__upd = Upd(strm)
-    self.__nlLevel = nlLevel
-    self.__ansi_mode = ansi_mode
-    self.__lock = Lock()
-
-  def emit(self, logrec):
-    with self.__lock:
-      if logrec.levelno >= self.__nlLevel:
-        with self.__upd._withoutContext():
-          if self.__ansi_mode:
-            if logrec.levelno >= logging.ERROR:
-              logrec.msg = colourise(logrec.msg, 'red')
-            elif logrec.levelno >= logging.WARN:
-              logrec.msg = colourise(logrec.msg, 'yellow')
-          StreamHandler.emit(self, logrec)
-      else:
-        self.__upd.out(logrec.getMessage())
-
-  def flush(self):
-    if self.__upd._backend:
-      self.__upd._backend.flush()
 
 class Upd(object):
 

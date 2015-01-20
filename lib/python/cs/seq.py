@@ -1,11 +1,20 @@
 #!/usr/bin/python -tt
 #
-# Stuff to do with sequences and iterables.
+# Stuff to do with counters, sequences and iterables.
 #       - Cameron Simpson <cs@zip.com.au> 20jul2008
 #
 
-import bisect
-import unittest
+DISTINFO = {
+    'description': "Stuff to do with counters, sequences and iterables.",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'requires': ['cs.logutils', 'cs.py.stack'],
+}
+
 import heapq
 import itertools
 from threading import Lock, Condition
@@ -60,6 +69,13 @@ def the(iterable, context=None):
 
   return it
 
+def first(iterable):
+  ''' Return the first item from an iterable; raise IndexError on empty iterables.
+  '''
+  for i in iterable:
+    return i
+  raise IndexError("empty iterable %r" % (iterable,))
+
 def last(iterable):
   ''' Return the last item from an iterable; raise IndexError on empty iterables.
   '''
@@ -70,12 +86,15 @@ def last(iterable):
     raise IndexError("no items in iterable: %r" % (iterable,))
   return item
 
-def get0(seq, default=None):
-  ''' Return first element of a sequence, or the default.
+def get0(iterable, default=None):
+  ''' Return first element of an iterable, or the default.
   '''
-  for i in seq:
+  try:
+    i = first(iterable)
+  except IndexError:
+    return default
+  else:
     return i
-  return default
 
 def NamedTupleClassFactory(*fields):
   ''' Construct classes for named tuples a bit like the named tuples

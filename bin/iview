@@ -1,0 +1,50 @@
+#!/bin/sh
+#
+# Trivial convenience wrapper for the essential iview-python tool:
+#  https://github.com/vadmium/python-iview
+# Cameron Simpson <cs@zip.com.au>
+#
+
+trace=
+[ -t 2 ] && trace=set-x
+
+cmd=$( basename "$0" )
+usage="Usage:
+  $cmd {dl|download} files...
+                Download specified files.
+  $cmd [ls]     List available files and descriptions.
+  $cmd /regexp/ Listing selected by regexp."
+
+[ $# -gt 0 ] || set -- ls
+op=$1; shift
+
+case "$op" in
+
+  /*/)
+    regexp=$( expr "x$op" : 'x/\(.*\)/' )
+    $trace "$0" ls | egrep -i -- "$regexp"
+    exit $?
+    ;;
+
+  dl|download)
+    xit=0
+    for url
+    do  $trace iview-cli -d "$url" || xit=1
+    done
+    exit $xit
+    ;;
+
+  ls)
+    $trace iview-cli --programme \
+    | sed -n 's/^\t\(.*[^ ]\)\t*(\([^)]*\)) *$/\2 \1/p'
+    exit $?
+    ;;
+
+  *)
+    echo "$cmd: unrecognised op: $op" >&2
+    badopts=1
+    ;;
+esac
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+exit 1

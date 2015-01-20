@@ -5,6 +5,18 @@
 #
 
 from __future__ import with_statement, print_function
+
+DISTINFO = {
+    'description': "convenience functions for working with URLs",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'requires': ['lxml', 'beautifulsoup4', 'cs.excutils', 'cs.lex', 'cs.logutils', 'cs.threads', 'cs.py3', 'cs.obj'],
+}
+
 import os
 import os.path
 import sys
@@ -20,11 +32,18 @@ except ImportError:
     pass
 from netrc import netrc
 import socket
-from urllib2 import urlopen, Request, HTTPError, URLError, \
+try:
+  from urllib.request import urlopen, Request, HTTPError, URLError, \
+            HTTPPasswordMgrWithDefaultRealm, HTTPBasicAuthHandler, \
+            build_opener
+  from urllib.parse import urlparse, urljoin
+  from html.parser import HTMLParseError
+except ImportError:
+  from urllib2 import urlopen, Request, HTTPError, URLError, \
 		    HTTPPasswordMgrWithDefaultRealm, HTTPBasicAuthHandler, \
 		    build_opener
-from urlparse import urlparse, urljoin
-from HTMLParser import HTMLParseError
+  from urlparse import urlparse, urljoin
+  from HTMLParser import HTMLParseError
 try:
   import xml.etree.cElementTree as ElementTree
 except ImportError:
@@ -32,9 +51,9 @@ except ImportError:
 from threading import RLock
 from cs.excutils import logexc
 from cs.lex import parseUC_sAttr
-from cs.logutils import Pfx, pfx_iter, debug, error, warning, exception, D
+from cs.logutils import Pfx, pfx_iter, debug, error, warning, exception, D, X
 from cs.threads import locked_property
-from cs.py3 import StringIO, ustr
+from cs.py3 import StringIO, ustr, unicode
 from cs.obj import O
 
 def isURL(U):
@@ -79,8 +98,7 @@ class _URL(unicode):
     self._parts = None
     self.flush()
     self._lock = RLock()
-    self._content = None
-    self._parsed = None
+    self.flush()
 
   def __getattr__(self, attr):
     ''' Ad hoc attributes.
@@ -89,7 +107,8 @@ class _URL(unicode):
     '''
     k, plural = parseUC_sAttr(attr)
     if k:
-      nodes = self.parsed.findAll(k.lower())
+      P = self.parsed
+      nodes = P.find_all(k.lower())
       if plural:
         return nodes
       return the(nodes)
@@ -105,12 +124,13 @@ class _URL(unicode):
     self._content_type = None
     self._parsed = None
     self._xml = None
+    self._fetch_exception = None
 
   @property
   def opener(self):
     if self._opener is None:
       if self.referer is not None and self.referer._opener is not None:
-        self._operner = self.referer._opener
+        self._opener = self.referer._opener
       else:
         o = build_opener()
         o.add_handler(HTTPBasicAuthHandler(NetrcHTTPPasswordMgr()))
@@ -142,13 +162,22 @@ class _URL(unicode):
 
   def _fetch(self):
     ''' Fetch the URL content.
+        If there is an HTTPError, report the error, flush the
+        content, set self._fetch_exception.
+        This means that that accessing the self.content property
+        will always attempt a fetch, but return None on error.
     '''
     with Pfx("_fetch(%s)", self):
-      rsp = self._response('GET')
-      H = rsp.info()
-      self._info = rsp.info()
-      self._content = rsp.read()
-      self._parsed = None
+      try:
+        rsp = self._response('GET')
+        H = rsp.info()
+        self._info = rsp.info()
+        self._content = rsp.read()
+        self._parsed = None
+      except HTTPError as e:
+        error("error with GET: %s", e)
+        self.flush()
+        self._fetch_exception = e
 
   def HEAD(self):
     rsp = self._response('HEAD')
@@ -181,11 +210,11 @@ class _URL(unicode):
     '''
     if self._content is None:
       self._fetch()
-    return self._info.gettype()
+    return self._info.get_content_type()
 
-  @property
+  @locked_property
   def content_transfer_encoding(self):
-    ''' The URL content MIME type.
+    ''' The URL content tranfer encoding.
     '''
     if self._content is None:
       self._fetch()
@@ -316,16 +345,16 @@ class _URL(unicode):
   def basename(self):
     return os.path.basename(self.path)
 
-  def findAll(self, *a, **kw):
-    ''' Convenience routine to call BeautifulSoup's .findAll() method.
+  def find_all(self, *a, **kw):
+    ''' Convenience routine to call BeautifulSoup's .find_all() method.
     '''
     parsed = self.parsed
     if not parsed:
       error("%s: parse fails", self)
       return ()
-    return parsed.findAll(*a, **kw)
+    return parsed.find_all(*a, **kw)
 
-  def xmlFindall(self, match):
+  def xml_find_all(self, match):
     ''' Convenience routine to call ElementTree.XML's .findall() method.
     '''
     return self.xml.findall(match)
@@ -369,7 +398,7 @@ class _URL(unicode):
     if 'absolute' in kw:
       absolute = kw['absolute']
       del kw['absolute']
-    for A in self.findAll(*a, **kw):
+    for A in self.find_all(*a, **kw):
       try:
         src = A['src']
       except KeyError:
