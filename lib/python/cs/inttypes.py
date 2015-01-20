@@ -5,7 +5,7 @@
 #
 
 DISTINFO = {
-    'description': "various types associated with integers, such as bitmasks, flags and enums",
+    'description': "various trite types associated with integers, such as bitmasks, flags and enums",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
