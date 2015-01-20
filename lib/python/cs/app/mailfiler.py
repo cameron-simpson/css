@@ -1057,28 +1057,29 @@ def get_targets(s, offset):
   while offset < len(s) and not s[offset].isspace():
     offset0 = offset
     T, offset = get_target(s, offset)
-    targets.append(T)
+    if T is not None:
+      targets.append(T)
     if offset < len(s) and s[offset] == ',':
       offset += 1
   return targets, offset
 
 def get_target(s, offset, quoted=False):
   ''' Parse a single target specification from a string; return Target and new offset.
-      `quoted`: already inside quoted: do not expect comma or
-        whitespace to end the target specification
+      `quoted`: already inside quotes: do not expect comma or whitespace to
+        end the target specification
   '''
   offset0 = offset
 
   # "quoted-target-specification"
   if not quoted and s.startswith('"', offset0):
     s2, offset = get_qstr(s, offset0)
+    s2q = s[offset0:offset]
     # reparse inner string
     T, offset2 = get_target(s2, 0, quoted=True)
-    # check for complete parse
+    # check for complete parse, allow some trailing whitespace
     s3 = s2[offset2:].lstrip()
     if s3:
-      qs = s[offset0:offset]
-      raise ValueError("unparsed content from %s: %r" % (qs, s3))
+      warning("ignoring unparsed content from %s: %r" % (s2q, s3))
     return T, offset
 
   # varname=expr
@@ -1107,7 +1108,11 @@ def get_target(s, offset, quoted=False):
            or ( not quoted and ( s[offset] == ',' or s[offset].isspace() ) )
             )
      ):
-    T = Target_SetFlag(flag_letter)
+    try:
+      T = Target_SetFlag(flag_letter)
+    except ValueError as e:
+      warning("ignoring bad flag %r: %s", flag_letter, e)
+      T = None
     return T, offset
 
   # |shcmd
@@ -1129,8 +1134,13 @@ def get_target(s, offset, quoted=False):
     delim = m_delim.group()
     regexp, offset = get_delimited(s, offset, delim)
     replacement, offset = get_delimited(s, offset, delim)
-    subst_re = re.compile(regexp)
-    T = Target_Substitution(header_name, subst_re, replacement)
+    try:
+      subst_re = re.compile(regexp)
+    except Exception as e:
+      warning("ignoring substitute: re.compile: %s: regexp=%s", e, regexp)
+      T = None
+    else:
+      T = Target_Substitution(header_name, subst_re, replacement)
     return T, offset
 
   # s/this/that/ -- modify subject:
@@ -1143,7 +1153,13 @@ def get_target(s, offset, quoted=False):
     regexp, offset = get_delimited(s, offset, delim)
     replacement, offset = get_delimited(s, offset, delim)
     subst_re = re.compile(regexp)
-    T = Target_Substitution(header_name, subst_re, replacement)
+    try:
+      subst_re = re.compile(regexp)
+    except Exception as e:
+      warning("ignoring substitute: re.compile: %s: regexp=%s", e, regexp)
+      T = None
+    else:
+      T = Target_Substitution(header_name, subst_re, replacement)
     return T, offset
 
   # headers:func([args...])
