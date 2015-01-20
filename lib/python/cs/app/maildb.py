@@ -127,6 +127,7 @@ def main(argv=None, stdin=None):
             if os.path.exists(exportpath):
               error("already exists")
             else:
+              MDB.scrub()
               with open(exportpath, "w") as exfp:
                 MDB.dump(exfp)
         elif op == 'list-abbreviations' or op == 'list-abbrevs':
