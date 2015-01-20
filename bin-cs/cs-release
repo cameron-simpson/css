@@ -335,14 +335,19 @@ $summary_text" "$reldir"
         lastpypirelease=$( $trace lastvalue "$lastlabel" 2>/dev/null || : )
         if [ "x$lastrelease" = "x$lastpypirelease" ]
         then
-          echo "$relpfx: $pypi_pfx up to date at $lastpypirelease"
+          echo "OK $relpfx: $pypi_pfx up to date at $lastpypirelease"
         else
           if [ -n "$lastpypirelease" ]
           then
-            echo "$relpfx: $lastrelease, but $pypi_pfx has $lastpypirelease"
+            echo "NEWER $relpfx: $lastrelease, but $pypi_pfx has $lastpypirelease"
           else
-            echo "$relpfx: $lastrelease, but $pypi_pfx has nothing"
+            echo "NEWER $relpfx: $lastrelease, but $pypi_pfx has nothing"
           fi
+        fi
+        log=$( self log )
+        if [ -n "$log" ]
+        then
+          echo "  has untagged changes"
         fi
       done
     else
