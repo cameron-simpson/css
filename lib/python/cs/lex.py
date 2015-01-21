@@ -128,7 +128,6 @@ def dict2js(d):
 #  / - path separator
 #
 _texthexify_white_chars = ascii_letters + digits + '_-+.,'
-_texthexify_white_octets = bytes(_texthexify_white_chars)
 
 def texthexify(bs, shiftin='[', shiftout=']', whitelist=None):
   ''' Transcribe the bytes `bs` to text.
