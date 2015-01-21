@@ -20,7 +20,8 @@ from string import printable, whitespace, ascii_letters, ascii_uppercase, digits
 import re
 import sys
 import os
-from cs.py3 import unicode, ustr, sorted, StringTypes
+from cs.py3 import bytes, unicode, ustr, sorted, StringTypes
+from cs.logutils import X
 
 unhexify = binascii.unhexlify
 if sys.hexversion >= 0x030000:
@@ -131,6 +132,7 @@ _texthexify_white_octets = bytes(_texthexify_white_chars)
 
 def texthexify(bs, shiftin='[', shiftout=']', whitelist=None):
   ''' Transcribe the bytes `bs` to text.
+      `whitelist`: a bytes or string object indicating byte values which may be represented directly in text; string objects are converted to 
       hexify() and texthexify() output strings may be freely
       concatenated and decoded with untexthexify().
   '''
@@ -140,27 +142,31 @@ def texthexify(bs, shiftin='[', shiftout=']', whitelist=None):
     bschr = lambda bs, ndx: chr(bs[ndx])
   if whitelist is None:
     whitelist = _texthexify_white_chars
+  if isinstance(whitelist, StringTypes) and not isinstance(whitelist, bytes):
+    whitelist = bytes( ord(ch) for ch in whitelist )
   inout_len = len(shiftin) + len(shiftout)
   chunks = []
   offset = 0
   offset0 = offset
   inwhite = False
   while offset < len(bs):
-    c = bschr(bs, offset)
+    b = bs[offset]
     if inwhite:
-      if c not in whitelist:
+      if b not in whitelist:
         inwhite = False
         if offset - offset0 > inout_len:
+          # gather up whitelist span if long enough to bother
           chunk = ( shiftin
-                  + ''.join( bschr(bs, o) for o in range(offset0, offset) )
+                  + ''.join( chr(bs[o]) for o in range(offset0, offset) )
                   + shiftout
                   )
         else:
+          # transcribe as hex anyway - too short
           chunk = hexify(bs[offset0:offset])
         chunks.append(chunk)
         offset0 = offset
     else:
-      if c in whitelist:
+      if b in whitelist:
         inwhite = True
         chunk = hexify(bs[offset0:offset])
         chunks.append(chunk)
@@ -169,7 +175,7 @@ def texthexify(bs, shiftin='[', shiftout=']', whitelist=None):
   if offset > offset0:
     if inwhite and offset - offset0 > inout_len:
       chunk = ( shiftin
-              + ''.join( bschr(bs, o) for o in range(offset0, offset) )
+              + ''.join( chr(bs[o]) for o in range(offset0, offset) )
               + shiftout
               )
     else:
