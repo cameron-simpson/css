@@ -5,6 +5,23 @@
 #
 
 from __future__ import print_function
+
+DISTINFO = {
+    'description': "email message filing system which monitors multiple inbound Maildir folders",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'requires': [ 'cs.configutils', 'cs.env', 'cs.fileutils', 'cs.lex', 'cs.logutils', 'cs.mailutils', 'cs.obj', 'cs.seq', 'cs.threads', 'cs.app.maildb', 'cs.py.modules', 'cs.py3' ],
+    'entry_points': {
+      'console_scripts': [
+          'maildb = cs.app.mailfiler:main',
+          ],
+        },
+}
+
 from collections import namedtuple
 from email import message_from_string, message_from_file
 import email.parser
@@ -50,7 +67,9 @@ DEFAULT_MAILDB_PATH = '$HOME/.maildb.csv'
 DEFAULT_MSGIDDB_PATH = '$HOME/var/msgiddb.csv'
 DEFAULT_MAILDIR_PATH = '$MAILDIR'
 
-def main(argv, stdin=None):
+def main(argv=None, stdin=None):
+  if argv is None:
+    argv = sys.argv
   if stdin is None:
     stdin = sys.stdin
   argv = list(argv)
@@ -547,14 +566,14 @@ class MessageFiler(O):
       try:
         self.sendmail(address)
       except Exception as e:
-        exception("forwarding to address %r: %s", folder, e)
+        exception("forwarding to address %r: %s", address, e)
         ok = False
     # pipeline message
     for shcmd, shenv in self.save_to_cmds:
       try:
         self.save_to_pipe(['/bin/sh', '-c', shcmd], shenv)
       except Exception as e:
-        exception("forwarding to address %r: %s", folder, e)
+        exception("piping to %r: %s", shcmd, e)
         ok = False
     # issue arrival alert
     if self.flags.alert > 0:
@@ -1173,7 +1192,9 @@ def get_target(s, offset, quoted=False):
   if m:
     target = m.group()
     offset = m.end()
-    if '@' in target:
+    if '$' in target:
+      T = Target_EnvSub(target)
+    elif '@' in target:
       T = Target_MailAddress(target)
     else:
       T = Target_MailFolder(target)
@@ -1195,6 +1216,22 @@ class Target_Assign(O):
     if varname == 'LOGFILE':
       warning("LOGFILE= unimplemented at present")
       ## TODO: self.logto(value)
+
+class Target_EnvSub(O):
+
+  def __init__(self, target_expr):
+    self.target_expr = target_expr
+
+  def apply(self, filer):
+    ''' Perform environment substituion on target string and then
+        deliver to resulting string.
+    '''
+    target = envsub(self.target_expr, filer.environ)
+    if '@' in target:
+      T = Target_MailAddress(target)
+    else:
+      T = Target_MailFolder(target)
+    T.apply(filer)
 
 class Target_SetFlag(O):
 

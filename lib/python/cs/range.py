@@ -8,10 +8,22 @@
 #
 
 from __future__ import print_function
+
+DISTINFO = {
+    'description': "a Range class implementing compact integer ranges with a set-like API, and associated functions",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'requires': ['cs.logutils'],
+}
+
 import sys
 from bisect import bisect_left
 from collections import namedtuple
-from cs.logutils import D, X, ifdebug
+from cs.logutils import ifdebug
 
 def overlap(span1, span2):
   ''' Return a list [start, end] denoting the overlap of two spans.
@@ -137,10 +149,8 @@ class Range(object):
         raise ValueError("._spans elements should have low < high, found "+repr(span))
       if ospan is not None:
         if ospan[1] >= start:
-          X("2: ospan=%s, span=%s", ospan, span)
           raise ValueError("._spans elements should be strictly greater than their predecessors, found %s then %s" % (ospan, span))
       ospan = span
-    D("OK full Range: %s", self)
 
   def __iter__(self):
     ''' Yield all the elements.
@@ -274,27 +284,19 @@ class Range(object):
   def add_span(self, start, end):
     ''' Update self with [start,end].
     '''
-    D("ADD_SPAN(%d:%d): Range=%s", start, end, self)
     if start >= end:
       return
     _spans = self._spans
     # locate start index: all affected spans start from here
     S0 = Span(start, start)
     i = bisect_left(_spans, S0)
-    ##X("bisect on %s gives i=%d", S0, i)
     if i > 0 and _spans[i-1].end >= start:
-      ##X("step back to i=%d: %s", i-1, _spans[i-1])
       i -= 1
-    ##if i < len(_spans):
-    ##  X("add_span: start with i=%d => %s", i, _spans[i])
-    ##  if i > 0:
-    ##    X("  prev i-1=%d => %s", i-1, _spans[i-1])
     drop_from = i
     new_start = start
     new_end = end
     while i < len(_spans) and _spans[i].start <= end:
       span = _spans[i]
-      ##X("add_span: absorb %s", span)
       # check that the spans overlap
       assert(span.start <= end and span.end >= start)
       new_start = min(new_start, span.start)
@@ -302,23 +304,19 @@ class Range(object):
       i += 1
     drop_to = i
     new_span = Span(new_start, new_end)
-    ##X("REPLACE spans[%d:%d] (%s) with %s", drop_from, drop_to, _spans[drop_from:drop_to], new_span)
     if self._debug:
       self._check()
     _spans[drop_from:drop_to] = [ new_span ]
-    ##X("REPLACED, rechecking...")
     if self._debug:
       self._check()
 
   def discard_span(self, start, end, remove_mode=False):
     ''' Remove [start,end] from Range if present.
     '''
-    D("DISCARD_SPAN(%d:%d): Range=%s", start, end, self)
     if start >= end:
       # empty range, do nothing
       return
     ospan = Span(start, end)
-    ##X("before discard_span: Range = %s", self)
     _spans = self._spans
     # locate start index: all affected spans start from here
     i = bisect_left(_spans, Span(start, start))
@@ -329,7 +327,6 @@ class Range(object):
     drop_from = None
     # walk spans until span.start >= end
     while i < len(_spans) and _spans[i].start < end:
-      ##X("i = %d", i)
       # span starts below end
       span = _spans[i]
       if remove_mode and start < span.start:
@@ -338,23 +335,18 @@ class Range(object):
         # this span should be considered
         if drop_from is None:
           drop_from = i
-        ##X("consider _span %d:%d versus crop %d:%d", span[0], span[1], start, end)
         # split span on cropping range
         low_span = Span(span.start, start)
         high_span = Span(end, span.end)
         start = max(start, span.end)
         # keep non-empty subspans
         if low_span.start < low_span.end:
-          ##X("  keep low %s", low_span)
           insert_spans.append(low_span)
         else:
-          ##X("  discard low %s", low_span)
           pass
         if high_span.start < high_span.end:
-          ##X("  keep high %s", high_span)
           insert_spans.append(high_span)
         else:
-          ##X("  discard high %s", high_span)
           pass
       i += 1
 
@@ -362,10 +354,8 @@ class Range(object):
       raise KeyError("span %s not entirely in Range" % (ospan,))
 
     drop_to = i
-    ##X("drop_from:to = %s:%s, insert_spans=%s", drop_from, drop_to, insert_spans)
     if (drop_from is not None and drop_from < drop_to) or len(insert_spans) > 0:
       _spans[drop_from:drop_to] = insert_spans
-    ##X("after discard_span: Range = %s", self)
     if self._debug:
       self._check()
 

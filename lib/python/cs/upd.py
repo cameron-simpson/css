@@ -1,4 +1,22 @@
+#!/usr/bin/python
+#
+# Single line status updates.
+#   - Cameron Simpson <cs@zip.com.au>
+#
+
 from __future__ import with_statement
+
+DISTINFO = {
+    'description': "single line status updates with minimal update sequences",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'requires': ['cs.lex', 'cs.tty'],
+}
+
 from threading import Lock
 import threading
 from contextlib import contextmanager

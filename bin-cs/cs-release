@@ -11,7 +11,7 @@ set -ue
 trace=  ##set-x
 relpfx=release
 
-pypi_url='https://pypi.python.org/pypi'
+prodpypi_url='https://pypi.python.org/pypi'
 testpypi_url='https://testpypi.python.org/pypi'
 pypi_test_mode=1
 
@@ -55,21 +55,19 @@ else
 fi
 
 case "$relpfx" in
+  ALL)
+    ;;
   release)
-    subtree=.
+    logpaths=.
     ;;
   [a-z]*)
-    subtree=lib/python/$( echo "$relpfx" | tr . / )
-    if [ ! -d "$subtree" ]
-    then
-      if [ -f "$subtree.py" ]
-      then
-        subtree=$subtree.py
-      else
-        echo "$cmd: neither subdir $subtree nor file $subtree.py" >&2
-        badopts=1
-      fi
-    fi
+    pfxdir=lib/python/$( echo "$relpfx" | tr . / )
+    logpaths=
+    [ -d "$pfxdir" ] && logpaths="$logpaths $pfxdir"
+    pfxfile=$pfxdir.py
+    [ -f "$pfxfile" ] && logpaths="$logpaths $pfxfile"
+    readmepath=$( dirname "$pfxdir" )/README-$( basename "$pfxdir" ).rst
+    [ -f "$readmepath" ] && logpaths="$logpaths $readmepath"
     ;;
   *)echo "$cmd: invalid relpfx, must start with a lowercase letter, got: $relpfx" >&2
     badopts=1
@@ -82,6 +80,19 @@ esac
 self(){
   _self_op=$1; shift
   $trace "$0" "$_self_op" "$relpfx" ${1+"$@"}
+}
+
+pypi_setup(){
+  if [ $pypi_test_mode ]
+  then
+    pypi_url=$testpypi_url
+    pypi_pfx=testpypi
+  else
+    pypi_url=$prodpypi_url
+    pypi_pfx=pypi
+  fi
+  PYPI_URL=$pypi_url
+  export PYPI_URL
 }
 
 case $op in
@@ -152,7 +163,7 @@ case $op in
     else
       $trace hg log -r "'$lastrelease':" \
                     --template '{files}: {desc|firstline}\n' \
-                    "$subtree" \
+                    $logpaths \
       | $trace sed "/^\\.hg/d; /^CHANGELOG/d; /^$relpfx-/d"
     fi
     ;;
@@ -313,34 +324,30 @@ $summary_text" "$reldir"
     then  shift; pypi_test_mode=
     else  pypi_test_mode=1
     fi
-    if [ $pypi_test_mode ]
-    then PYPI_URL=$testpypi_url pypipfx=testpypi
-    else PYPI_URL=$pypi_url pypipfx=pypi
-    fi
-    export PYPI_URL
+    pypi_setup
     if [ "$relpfx" = ALL ]
     then
       for relpfx in $( self ls | grep '^cs\.' )
       do
         pkg=$relpfx
-        lastlabel=$pypipfx-css-$pkg
+        lastlabel=$pypi_pfx-css-$pkg
         lastrelease=$( self last ) || exit 1
         lastpypirelease=$( $trace lastvalue "$lastlabel" 2>/dev/null || : )
         if [ "x$lastrelease" = "x$lastpypirelease" ]
         then
-          echo "$relpfx: pypi up to date at $lastpypirelease"
+          echo "$relpfx: $pypi_pfx up to date at $lastpypirelease"
         else
           if [ -n "$lastpypirelease" ]
           then
-            echo "$relpfx: $lastrelease, but pypi has $lastpypirelease"
+            echo "$relpfx: $lastrelease, but $pypi_pfx has $lastpypirelease"
           else
-            echo "$relpfx: $lastrelease, but pypi has nothing"
+            echo "$relpfx: $lastrelease, but $pypi_pfx has nothing"
           fi
         fi
       done
     else
       pkg=$relpfx
-      lastlabel=$pypipfx-css-$pkg
+      lastlabel=$pypi_pfx-css-$pkg
       case "$pkg" in
         cs.*) ;;
         *)  echo "$cmd: $op: invalid package name, expected cs.*: $pkg" >&2

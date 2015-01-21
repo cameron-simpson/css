@@ -12,6 +12,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         ],
+    'requires': ['cs.debug', 'cs.logutils', 'cs.resources', 'cs.seq', 'cs.py3', 'cs.obj'],
 }
 
 import sys
@@ -19,7 +20,7 @@ from functools import partial
 import logging
 from threading import Timer
 import time
-from cs.debug import Lock, RLock, Thread, trace, trace_caller, stack_dump
+from cs.debug import Lock, Thread, trace, trace_caller, stack_dump
 from cs.logutils import exception, error, warning, debug, D, X, Pfx, PfxCallInfo
 from cs.resources import NestingOpenCloseMixin, not_closed
 from cs.seq import seq

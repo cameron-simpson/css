@@ -4,6 +4,19 @@
 #       - Cameron Simpson <cs@zip.com.au> 15apr2014
 #
 
+DISTINFO = {
+    'description': "convenience facilities related to Python functions",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'requires': ['cs.excutils'],
+}
+
+from cs.excutils import transmute
+
 def funcname(func):
   ''' Return a name for the supplied function `func`.
       Several objects do not have a __name__ attribute, such as partials.
@@ -42,7 +55,6 @@ def derived_property(func, original_revision_name='_revision', lock_name='_lock'
   # the property used to track the reference revision
   property_revision_name = property_name + '__revision'
 
-  from cs.excutils import transmute
   from cs.logutils import X
 
   @transmute(AttributeError)

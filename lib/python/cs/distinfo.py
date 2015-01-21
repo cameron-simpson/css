@@ -421,10 +421,10 @@ class PyPI_Package(O):
             continue
           if filename.endswith('.py'):
             yield os.path.join(dirpath[len(libprefix):], filename)
+            continue
           warning("skipping %s", os.path.join(dirpath, filename))
     readme_subpath = self.pkg_readme_rpath(package_name)
     readme_path = os.path.join(libdir, readme_subpath)
-    X("PROBE %r", readme_path)
     if os.path.exists(readme_path):
       yield readme_subpath
 
@@ -499,7 +499,7 @@ class PyPI_PackageCheckout(O):
     return self.inpkg_argv([ 'python3', 'setup.py' ] + list(argv))
 
   def check(self):
-    self.setup_py('check')
+    self.setup_py('check', '-s', '--restructuredtext')
 
   def register(self):
     self.setup_py('register', '-r', self.pypi_url)

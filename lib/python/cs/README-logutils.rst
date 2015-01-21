@@ -8,7 +8,7 @@ The logging verbosity output format has different defaults based on whether an o
 Some examples:
 --------------
 
-Program initialisation:
+Program initialisation::
 
   from cs.logutils import setup_logging
 
@@ -16,7 +16,7 @@ Program initialisation:
     cmd = os.path.basename(argv.pop(0))
     setup_logging(cmd)
 
-Basic logging from anywhere:
+Basic logging from anywhere::
 
   from cs.logutils import info, warning, error
   [...]
@@ -24,7 +24,7 @@ Basic logging from anywhere:
     [...]
     error("nastiness found! bad value=%r", bad_value)
 
-Context for log messages and exception strings:
+Context for log messages and exception strings::
 
   from cs.logutils import Pfx
   [...]
