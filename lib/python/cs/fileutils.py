@@ -1127,6 +1127,31 @@ class SharedAppendLines(SharedAppendFile):
     fp.write(s)
     fp.write('\n')
 
+class Tee(object):
+  ''' An object with .write, .flsuh and .close methods which copies data to multiple output files.
+  '''
+
+  def __init__(self, *fps):
+    ''' Initialise the Tee; any arguments are taken to be output file objects.
+    '''
+    self._fps = list(fps)
+
+  def add(self, output):
+    self._fps.append(output)
+
+  def write(self, data):
+    for fp in self._fps:
+      fp.write(data)
+
+  def flush(self, data):
+    for fp in self._fps:
+      fp.flush()
+
+  def close(self):
+    for fp in self._fps:
+      fp.close()
+    self._fps = None
+
 def chunks_of(fp, rsize=16384):
   ''' Generator to present text or data from an open file until EOF.
   '''
