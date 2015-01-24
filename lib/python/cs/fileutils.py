@@ -1171,8 +1171,8 @@ def copy_data(fpin, fpout, nbytes, rsize=None):
       break
     fpout.write(data)
     copied += len(data)
+    nbytes -= len(data)
   return copied
-    
 
 def chunks_of(fp, rsize=None):
   ''' Generator to present text or data from an open file until EOF.
