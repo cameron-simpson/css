@@ -46,6 +46,7 @@ from cs.obj import O
 from cs.py3 import ustr, filter, bytes
 
 DEFAULT_POLL_INTERVAL = 1.0
+DEFAULT_READSIZE = 8192
 
 def saferename(oldpath, newpath):
   ''' Rename a path using os.rename(), but raise an exception if the target
@@ -1152,9 +1153,32 @@ class Tee(object):
       fp.close()
     self._fps = None
 
-def chunks_of(fp, rsize=16384):
+def copy_data(fpin, fpout, nbytes, rsize=None):
+  ''' Copy `nbytes` of data from `fpin` to `fpout`.
+      If `nbytes` is None, copy until EOF.
+      `rsize`: read size, default DEFAULT_READSIZE.
+  '''
+  if rsize is None:
+    rsize = DEFAULT_READSIZE
+  copied = 0
+  while nbytes is None or nbytes > 0:
+    to_read = rsize if nbytes is None else min(nbytes, rsize)
+    data = fpin.read(to_read)
+    if not data:
+      if nbytes is not None:
+        warning("early EOF: only %d bytes read, %d still to go",
+                copied, nbytes)
+      break
+    fpout.write(data)
+    copied += len(data)
+  return copied
+    
+
+def chunks_of(fp, rsize=None):
   ''' Generator to present text or data from an open file until EOF.
   '''
+  if rsize is None:
+    rsize = DEFAULT_READSIZE
   while True:
     chunk = fp.read(rsize)
     if len(chunk) == 0:
