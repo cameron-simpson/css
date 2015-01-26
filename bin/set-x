@@ -36,7 +36,7 @@ if [ $no_tag_fd ]
 then
   :
 else
-  if [ -n "$DEBUG" ]
+  if [ "x$DEBUG" = x1 ]
   then  exec tag_fd 2 "$1" "$0" --no-tag_fd $subopts -- "$@"
   fi
 fi
@@ -44,9 +44,15 @@ fi
 if [ $datestamp ]
 then
   date >&2
+  pid=
+  for sig in 1 2 3 15
+  do  trap "[ -z \"\$pid\" ] || kill \"-$sig\" \"\$pid\"" "$sig"
+  done
   ( set -x
     exec "$@"
-  )
+  ) &
+  pid=$!
+  wait
   xit=$?
   date >&2
   exit $xit

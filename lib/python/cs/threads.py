@@ -5,6 +5,18 @@
 #
 
 from __future__ import with_statement
+
+DISTINFO = {
+    'description': "threading and communication/synchronisation conveniences",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'requires': ['cs.seq', 'cs.excutils', 'cs.debug', 'cs.logutils', 'cs.obj', 'cs.queues', 'cs.py.func', 'cs.py3'],
+}
+
 from collections import namedtuple
 from copy import copy
 import inspect
@@ -17,20 +29,12 @@ from collections import deque
 if sys.hexversion < 0x02060000: from sets import Set as set
 from cs.seq import seq
 from cs.excutils import transmute
-import logging
 from cs.debug import Lock, RLock, Thread
-import cs.logutils
-from cs.logutils import Pfx, LogTime, error, warning, debug, exception, OBSOLETE, D
+from cs.logutils import LogTime, error, warning, debug, exception, OBSOLETE, D
 from cs.obj import O
-from cs.asynchron import report
-from cs.queues import IterableQueue, Channel, NestingOpenCloseMixin, not_closed, _NOC_Proxy
+from cs.queues import IterableQueue, Channel, NestingOpenCloseMixin, not_closed
+from cs.py.func import funcname
 from cs.py3 import raise3, Queue, PriorityQueue
-
-class _WTP_Proxy(_NOC_Proxy):
-
-  @not_closed
-  def dispatch(self, *a, **kw):
-    return self._proxied._dispatch(*a, **kw)
 
 class WorkerThreadPool(NestingOpenCloseMixin, O):
   ''' A pool of worker threads to run functions.
@@ -43,7 +47,7 @@ class WorkerThreadPool(NestingOpenCloseMixin, O):
     self.name = name
     self._lock = Lock()
     O.__init__(self)
-    NestingOpenCloseMixin.__init__(self, proxy_type=_WTP_Proxy)
+    NestingOpenCloseMixin.__init__(self)
     self.idle = deque()
     self.all = []
 
@@ -63,10 +67,8 @@ class WorkerThreadPool(NestingOpenCloseMixin, O):
       if HT is not current_thread():
         HT.join()
 
-  def dispatch(self, *a, **kw):
-    return self._open0._dispatch(*a, **kw)
-
-  def _dispatch(self, func, retq=None, deliver=None, pfx=None, daemon=None):
+  @not_closed
+  def dispatch(self, func, retq=None, deliver=None, pfx=None, daemon=None):
     ''' Dispatch the callable `func` in a separate thread.
         On completion the result is the sequence:
           func_result, None, None, None
@@ -74,13 +76,13 @@ class WorkerThreadPool(NestingOpenCloseMixin, O):
           None, exec_type, exc_value, exc_traceback
         If `retq` is not None, the result is .put() on retq.
         If `deliver` is not None, deliver(result) is called.
-        If the parameter `pfx` is not None, submit pfx.func(func);
-          see cs.logutils.Pfx's .func method for details.
+        If the parameter `pfx` is not None, submit pfx.partial(func);
+          see the cs.logutils.Pfx.partial method for details.
     '''
-    if self.all_closed:
+    if self.closed:
       raise ValueError("%s: closed, but dispatch() called" % (self,))
     if pfx is not None:
-      func = pfx.func(func)
+      func = pfx.partial(func)
     idle = self.idle
     with self._lock:
       debug("dispatch: idle = %s", idle)
@@ -94,7 +96,7 @@ class WorkerThreadPool(NestingOpenCloseMixin, O):
         args = []
         HT = Thread(target=self._handler, args=args, name=("%s:worker" % (self.name,)))
         ##HT.daemon = True
-        RQ = IterableQueue(name="%s:IQ%d" % (self.name, seq())).open()
+        RQ = IterableQueue(name="%s:IQ%d" % (self.name, seq()))
         Hdesc = (HT, RQ)
         self.all.append(Hdesc)
         args.append(Hdesc)
@@ -119,51 +121,48 @@ class WorkerThreadPool(NestingOpenCloseMixin, O):
         If both are None and an exception occurred, it gets raised.
     '''
     HT, RQ = Hdesc
-    with Pfx(HT.name):
-      for func, retq, deliver in RQ:
-        with Pfx("running:%s", func):
-          oname = HT.name
-          HT.name = "%s:RUNNING:%s" % (oname, func)
-          try:
-            debug("%s: worker thread: running task...", self)
-            result = func()
-            debug("%s: worker thread: ran task: result = %s", self, result)
-          except:
-            result = None
-            exc_info = sys.exc_info()
-            HT.name = oname
-            log_func = exception if isinstance(exc_info[1], (TypeError, NameError, AttributeError)) else debug
-            log_func("%s: worker thread: ran task: exception! %r", self, sys.exc_info())
-            # don't let exceptions go unhandled
-            # if nobody is watching, raise the exception and don't return
-            # this handler to the pool
-            if retq is None and deliver is None:
-              debug("%s: worker thread: reraise exception", self)
-              raise3(*exc_info)
-            debug("%s: worker thread: set result = (None, exc_info)", self)
-          else:
-            exc_info = None
-            HT.name = oname
-          func = None     # release func+args
-          with self._lock:
-            self.idle.append( Hdesc )
-            ##D("_handler released thread: idle = %s", self.idle)
-          tup = (result, exc_info)
-          if retq is not None:
-            debug("%s: worker thread: %r.put(%s)...", self, retq, tup)
-            retq.put(tup)
-            debug("%s: worker thread: %r.put(%s) done", self, retq, tup)
-            retq = None
-          if deliver is not None:
-            debug("%s: worker thread: deliver %s...", self, tup)
-            deliver(tup)
-            debug("%s: worker thread: delivery done", self)
-            deliver = None
-          # forget stuff
-          result = None
-          exc_info = None
-          tup = None
-          debug("%s: worker thread: proceed to next function...", self)
+    for func, retq, deliver in RQ:
+      oname = HT.name
+      HT.name = "%s:RUNNING:%s" % (oname, func)
+      try:
+        debug("%s: worker thread: running task...", self)
+        result = func()
+        debug("%s: worker thread: ran task: result = %s", self, result)
+      except:
+        result = None
+        exc_info = sys.exc_info()
+        log_func = exception if isinstance(exc_info[1], (TypeError, NameError, AttributeError)) else debug
+        log_func("%s: worker thread: ran task: exception! %r", self, sys.exc_info())
+        # don't let exceptions go unhandled
+        # if nobody is watching, raise the exception and don't return
+        # this handler to the pool
+        if retq is None and deliver is None:
+          error("%s: worker thread: reraise exception", self)
+          raise3(*exc_info)
+        debug("%s: worker thread: set result = (None, exc_info)", self)
+      else:
+        exc_info = None
+      HT.name = oname
+      func = None     # release func+args
+      with self._lock:
+        self.idle.append( Hdesc )
+        ##D("_handler released thread: idle = %s", self.idle)
+      tup = (result, exc_info)
+      if retq is not None:
+        debug("%s: worker thread: %r.put(%s)...", self, retq, tup)
+        retq.put(tup)
+        debug("%s: worker thread: %r.put(%s) done", self, retq, tup)
+        retq = None
+      if deliver is not None:
+        debug("%s: worker thread: deliver %s...", self, tup)
+        deliver(tup)
+        debug("%s: worker thread: delivery done", self)
+        deliver = None
+      # forget stuff
+      result = None
+      exc_info = None
+      tup = None
+      debug("%s: worker thread: proceed to next function...", self)
 
 class AdjustableSemaphore(object):
   ''' A semaphore whose value may be tuned after instantiation.
@@ -227,71 +226,6 @@ class AdjustableSemaphore(object):
             self.__sem.acquire(True)
           delta += 1
       self.__value = newvalue
-
-class JobCounter:
-  ''' A class to count and wait for outstanding jobs.
-      As jobs are queued, JobCounter.inc() is called.
-      When everything is dispatched, calling JobCounter.whenDone()
-      queues a function to execute on completion of all the jobs.
-  '''
-  def __init__(self,name):
-    self.__name=name
-    self.__lock=Lock()
-    self.__sem=Semaphore(0)
-    self.__n=0
-    self.__onDone=None
-
-  def inc(self):
-    ''' Note that there is another job for which to wait.
-    '''
-    debug("%s: inc()" % self.__name)
-    with self.__lock:
-      self.__n+=1
-
-  def dec(self):
-    ''' Report the completion of a job.
-    '''
-    debug("%s: dec()" % self.__name)
-    self.__sem.release()
-
-  def _wait1(self):
-    ''' Wait for a single job to complete.
-        Return False if no jobs remain.
-        Report True if a job remained and we waited.
-    '''
-    debug("%s: wait1()..." % self.__name)
-    with self.__lock:
-      if self.__n == 0:
-        debug("%s: wait1(): nothing to wait for" % self.__name)
-        return False
-    self.__sem.acquire()
-    with self.__lock:
-      self.__n-=1
-    debug("%s: wait1(): waited" % self.__name)
-    return True
-
-  def _waitAll(self):
-    while self._wait1():
-      pass
-
-  def _waitThenDo(self,*args,**kw):
-    debug("%s: _waitThenDo()..." % self.__name)
-    self._waitAll()
-    debug("%s: _waitThenDo(): waited: calling __onDone()..." % self.__name)
-    return self.__onDone[0](*self.__onDone[1],**self.__onDone[2])
-
-  def doInstead(self,func,*args,**kw):
-    with self.__lock:
-      assert self.__onDone is not None
-      self.__onDone=(func,args,kw)
-
-  def whenDone(self,func,*args,**kw):
-    ''' Queue an action to occur when the jobs are done.
-    '''
-    with self.__lock:
-      assert self.__onDone is None
-      self.__onDone=(func,args,kw)
-      Thread(target=self._waitThenDo,args=args,kwargs=kw).start()
 
 ''' A pool of Channels.
 '''
@@ -435,6 +369,7 @@ def locked(func):
       debug("@locked(self._lock=%r <%s>, func=%r)...", self._lock, self._lock.__class__, func)
     with self._lock:
       return func(self, *a, **kw)
+  lockfunc.__name__ = "@locked(%s)" % (funcname(func),)
   return lockfunc
 
 def locked_property(func, lock_name='_lock', prop_name=None, unset_object=None):
@@ -450,7 +385,12 @@ def locked_property(func, lock_name='_lock', prop_name=None, unset_object=None):
     '''
     p = getattr(self, prop_name, unset_object)
     if p is unset_object:
-      with getattr(self, lock_name):
+      try:
+        lock = getattr(self, lock_name)
+      except AttributeError as e:
+        error("no .%s attribute", lock_name)
+        raise
+      with lock:
         p = getattr(self, prop_name, unset_object)
         if p is unset_object:
           ##debug("compute %s...", prop_name)

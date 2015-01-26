@@ -15,17 +15,40 @@ usage="Usage: $cmd [upstream-forwards...]"
 
 me=`id -un`
 trace=set-x
+logdir=$LOGDIR/unbound
 pidfile=$VARRUN/unbound.pid
 wkdir=$HOME/var/unbound
 cf=$wkdir/unbound.conf
-log=$LOGDIR/unbound.log
+log=$logdir/unbound.log
 localzones="l local"
 localnets="127 192.168 172.16 10.0"
 cnames=$HOME/rc/dns/cnames
 host_conf=$HOME/rc/dns/unbound.conf-fleet
+outgoing_if=$( netstat -rn | awk '$1 == "default" { print $6 }' )
+
+cd "$logdir" || exit 1
+
+if [ -z "$outgoing_if" ]
+then
+  netstat -rn >&2
+  echo >&2
+  echo "$cmd: no outbound interface" >&2
+  exit 1
+fi
+outgoing_ip=$( ifconfig "$outgoing_if" | sed -n 'y/	/ /; s/.* inet  *\([1-9][0-9.]*[0-9]\) .*/\1/p' )
+if [ -z "$outgoing_ip" ]
+then
+  echo "$cmd: no inet addr on interface $outgoing_if" >&2
+  ifconfig "$outgoing_if" >&2
+  exit 1
+fi
 
 # default upstream DNS servers
-[ $# -gt 0 ] || set -- $UNBOUND_DNS_UPSTREAM
+if [ $# -gt 0 ]
+then  lastvalue unbound "$*"
+else  set -- `lastvalue unbound`
+      echo "$cmd: using lastvalue unbound: $*" >&2
+fi
 
 for d in "$VARRUN" "$wkdir" "$LOGDIR"
 do  [ -d "$d/." ] || $trace mkdir "$d"
@@ -34,18 +57,23 @@ done
 tmppfx=$TMPDIR/$cmd.$$
 tmpcf=$tmppfx.conf
 tmplocal=$tmppfx.local.txt
-trap 'rm -f "$tmppfx.*"' 0 1 3 15
+tidy(){
+  rm -f -- "$tmppfx".*
+}
+trap tidy 0 1 3 15
 
 exec 3>&1 1>"$tmpcf" </dev/null
 
 cat <<X
 server:
   directory: "$wkdir"
+  do-ip6: no
   username: "$me"
   logfile: "$log"
   pidfile: "$pidfile"
   log-queries: yes
-  verbosity: 3      # uncomment and increase to get more logging.
+  verbosity: 2      # uncomment and increase to get more logging.
+  outgoing-interface: "$outgoing_ip"
   ## # default is "3 2 1 0 0"
   ## target−fetch−policy: "−1 −1 −1 −1 −1"
 X
@@ -159,4 +187,6 @@ set -x
 cd "$wkdir"
 $trace unbound-checkconf "$cf"
 [ ! -f "$pidfile" ] || $trace killpidfile "$pidfile"
+
+tidy
 exec $trace sudo $trace unbound -c "$cf"

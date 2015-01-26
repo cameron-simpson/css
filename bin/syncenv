@@ -43,10 +43,14 @@ isnewfile()
 { [ $# = 1 ] || { echo "$0: Usage: testfile filepath" >&2; exit 2; }
   _inf_file=$1; shift
 
-  [ -f "$_inf_file" ] \
-  && [ -s "$_inf_file" ] \
-  && _inf_mtime=$(mtime "$_inf_file") \
-  && [ "$_inf_mtime" -gt "$lastmtime" ]
+  [ -z "$lastmtime" ] \
+  || [ "x$lastmtime" = x- ] \
+  || {
+    [ -f "$_inf_file" ] \
+    && [ -s "$_inf_file" ] \
+    && _inf_mtime=$(mtime "$_inf_file") \
+    && [ "$_inf_mtime" -gt "$lastmtime" ]
+  }
 }
 
 newness=

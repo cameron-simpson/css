@@ -1,0 +1,4 @@
+lib/python/cs/excutils.py: cs.excutils: fix up the distinfo a bit
+lib/python/cs/excutils.py: cs.excutis: transmute: reword transmuted exception message
+lib/python/cs/excutils.py lib/python/cs/logutils.py lib/python/cs/py3.py: merge default ==> pypi
+lib/python/cs/README-excutils.rst lib/python/cs/excutils.py: excutils: move long_description into cs/README-excutils.rst

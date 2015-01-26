@@ -98,6 +98,11 @@ do
 	continue
     fi
 
+    # modify $file to avoid misinterpretation
+    case "$file" in
+      -*) file=./$file ;;
+    esac
+
     # start not ok
     # we set ok=1 on completion of satisfactory code path
     ok=

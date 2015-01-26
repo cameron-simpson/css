@@ -4,7 +4,15 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
-from cs.logutils import D
+DISTINFO = {
+    'description': "some serialisation functions",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+}
 
 def fromBS(s):
   ''' Read an extensible value from the front of a string.

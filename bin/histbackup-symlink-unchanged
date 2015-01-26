@@ -8,6 +8,7 @@
 set -ue
 
 trace=  ##set-x     ##eecho
+[ -t 2 ] && trace=set-x
 echo=:
 [ -t 1 ] && echo=echo
 verbose=
@@ -92,7 +93,7 @@ do
     continue
   }
 
-  changes=`rsync -niO -aH "./$lastbak/" "./$bakdir/" | sed 1q`
+  changes=`rsync -ni -aOH --delete "./$lastbak/" "./$bakdir/" | sed 1q`
   if [ -n "$changes" ]
   then
     # note as most recent real directory

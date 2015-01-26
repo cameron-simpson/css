@@ -29,6 +29,12 @@ usage="Usage:
   $cmd -e [targets...]
         Enable portfwd for targets, clearing PORTFWD_TARGET_DISABLE.
         If no targets are specified, clear PORTFWD_DISABLE.
+  $cmd -D [targets...]
+        Disable the override flag for targets, clearing PORTFWD_TARGET_OVERRIDE.
+        If no targets are specified, set PORTFWD_OVERRIDE.
+  $cmd -E [targets...]
+        Enable the override for targets, clearing PORTFWD_TARGET_OVERRIDE.
+        If no targets are specified, clear PORTFWD_OVERRIDE.
   $cmd [-1] [-F ssh_config] targets...
   -1    Once. Do not restart the tunnel if it dies.
   -F    Ssh configuration file with clause for target.
@@ -52,8 +58,10 @@ while [ $# -gt 0 ]
 do
   case $1 in
     -1) once=1 ;;
-    -d) setflag=1 flag=PORTFWD_DISABLE flagvalue=1 ;;
-    -e) setflag=1 flag=PORTFWD_DISABLE flagvalue=0 ;;
+    -d) setflag=1 flagsuffix=DISABLE flagvalue=1 ;;
+    -e) setflag=1 flagsuffix=DISABLE flagvalue=0 ;;
+    -D) setflag=1 flagsuffix=OVERRIDE flagvalue=0 ;;
+    -E) setflag=1 flagsuffix=OVERRIDE flagvalue=1 ;;
     -F) sshcfg=$2 opts="$opts $1 $2"; shift ;;
     -P) pfnames="$pfnames $2" opts="$opts $1 $2"; shift ;;
     -v) opts="$opts $1"; sshopts="$sshopts $1" ;;
@@ -84,6 +92,7 @@ do
   [ $first ] && { set --; first=; }
   case "$target" in
     [A-Z]*)
+      # match all targets with the uppercase label
       onargs=$#
       set -- ${1+"$@"} \
              `sed -n 'y/	/ /
@@ -106,27 +115,42 @@ done
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+uppername()
+{ echo "$1" | tr -- '-[a-z]' '_[A-Z]'
+}
+
+lowername()
+{ echo "$1" | tr -- '_[A-Z]' '-[a-z]'
+}
+
 if [ $setflag ]
 then
   xit=0
   if [ $# = 0 ]
   then
+    flag=PORTFWD_${flagsuffix}
     $trace flag -w "$flag" "$flagvalue" || xit=1
   else
     for target
     do
-      utarget=`echo "$target" | tr -- '-[a-z]' '_[A-Z]'`
-      tflag=PORTFWD_${utarget}_DISABLE
-      $trace flag -w "$tflag" "$flagvalue" || xit=1
+      utarget=$( uppername "$target" )
+      flag=PORTFWD_${utarget}_${flagsuffix}
+      $trace flag -w "$flag" "$flagvalue" || xit=1
     done
   fi
   exit $xit
 fi
 
+target=
+
 abort() {
   $setx
   : PORTFWD TRAP "subpids=[$subpids]"
-  [ -z "$subpids" ] || killpids $subpids
+  if [ -n "$subpids" ]
+  then
+    killpids -W 5 -- $subpids
+    [ -z "$target" ] || alert "EXITED: $target" </dev/null
+  fi
   [ -n "$pidfile" ] && { >"$pidfile"; rm -f "$pidfile"; }
   [ -n "$flag_connected" ] && flag -w "$flag_connected" 0
   exit 1
@@ -136,6 +160,9 @@ pidfile=
 subpids=
 flag_connected=
 trap 'abort' 1 2 3 15
+
+# dispatch default route monitor if not already running
+$trace monitor-default-route &
 
 if [ $# -gt 1 ]
 then
@@ -160,17 +187,25 @@ sshpidfile()
   echo "$VARRUN/portfwd-ssh.$1.pid"
 }
 
-flag_connected=PORTFWD_`echo "$target" | tr -- '-[a-z]' '_[A-Z]'`_CONNECTED
+utarget=$(uppername "$target")
+flag_connected=PORTFWD_${utarget}_CONNECTED
+
+# extract "# F: pfname needs other-pfname"
+for rcpfname in $( sed -n "s/^#  *F:  *${target}  *needs  *\\([a-z][-a-z0-9]*\\) *$/\\1/p" "$sshcfg" )
+do pfnames="$pfnames $rcpfname"
+done
+
 pfflags=
 pfpidfiles=
 for pfname in $pfnames
 do
-  pfflags="$pfflags "PORTFWD_`echo "$pfname" | tr -- '-[a-z]' '_[A-Z]'`_CONNECTED
+  upfname=$( uppername "$pfname" )
+  pfflags="$pfflags "PORTFWD_${upfname}_CONNECTED
   pfpidfiles="$pfpidfiles "`sshpidfile "$pfname"`
 done
 
 # construct svcd "ok to ssh" test command
-test_shcmd=' flag -w PORTFWD_ANYWAY && exit 0
+test_shcmd=' flag -w PORTFWD_OVERRIDE && exit 0
              flag -w PORTFWD_DISABLE && exit 1'
 for pfpidfile in $pfpidfiles
 do
@@ -184,7 +219,7 @@ do
 done
 test_shcmd=" $test_shcmd
            "'ssh-add -l >/dev/null || exit 1
-             netstat -rn | egrep '\''^(default|0\.0\.0\.0) +[1-9]'\'' >/dev/null || exit 1
+             flag -w ROUTE_DEFAULT || exit 1
              [ -x "$HOME/bin-local/do-portfwd" ] || exit 0
              "$HOME/bin-local/do-portfwd"
             '

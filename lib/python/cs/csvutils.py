@@ -11,9 +11,25 @@
 # So we provide csv_reader() generators to yield rows containing unicode.
 #
 
+DISTINFO = {
+    'description': "CSV file related facilities",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'requires': ['cs.fileutils', 'cs.debug', 'cs.logutils', 'cs.queues'],
+}
+
 import csv
 import sys
-from cs.io import CatchupLines
+from StringIO import StringIO
+from threading import Thread
+from cs.debug import trace
+from cs.fileutils import SharedAppendLines
+from cs.logutils import warning
+from cs.queues import IterableQueue
 
 if sys.hexversion < 0x03000000:
 
@@ -54,28 +70,48 @@ else:
   def csv_writerow(csvw, row, encoding='utf-8'):
     return csvw.writerow(row)
 
-class CatchUp(object):
-  ''' A CSV layer to cs.io.CatchupLines.
-      It is iterable, yields CSV data rows.
-      At the end of iteration the .partial attribute contains any
-      incomplete line.
-      It is reusable; another iteration will commence with that
-      partial line.
-  '''
+class SharedCSVFile(SharedAppendLines):
 
-  def __init__(self, fp, partial=''):
-    ''' Initialise the CatchUp with an open file `fp` and optional
-        partial line `partial`.
+  def __init__(self, pathname, readonly=False, **kw):
+    importer = kw.get('importer')
+    if importer is not None:
+      kw['importer'] = lambda line: self._queue_csv_text(line, importer)
+    self._csv_partials = []
+    self._importQ = IterableQueue(1, name="SharedCSVFile(%r)._importQ" % (pathname,))
+    self._csvr = csv_reader(self._importQ)
+    self._csv_stream_thread = Thread(target=self._csv_stream,
+                                     name="SharedCSVFile(%r)._csv_stream_thread" % (pathname,),
+                                     args=(importer,))
+    self._csv_stream_thread.daemon = True
+    self._csv_stream_thread.start()
+    self._stringio = StringIO()
+    SharedAppendLines.__init__(self, pathname, no_update=readonly, **kw)
+
+  def _queue_csv_text(self, line, importer):
+    ''' Importer for SharedAppendLines: convert to row from CSV data, pass to real importer.
     '''
-    self.fp = fp
-    self.partial = partial
+    if line is None:
+      importer(None)
+    else:
+      self._importQ.put(line)
 
-  def __iter__(self):
-    self.lines = CatchupLines(self.fp, self.partial)
-    for row in csv_reader(self.lines):
-      yield row
-    self.partial = self.lines.partial
+  def _csv_stream(self, importer):
+    for row in self._csvr:
+      importer(row)
 
-  def rewind(self):
-    self.fp.seek(0, os.SEEK_SET)
-    self.partial = ''
+  def transcribe_update(self, fp, row):
+    ''' Transcribe an update `row` to the supplied file `fp`.
+    '''
+    # sanity check: we should only be writing between foreign updates
+    # and foreign updates should always be complete lines
+    if len(self._csv_partials):
+      warning("%s._transcribe_update while non-empty partials[]: %r",
+              self, self._csv_partials)
+    sfp = self._stringio
+    try:
+      csv_writerow(csv.writer(sfp), row)
+    except IOError as e:
+      warning("%s: IOError %s: discarding %s", sys.argv[0], e, row)
+    else:
+      fp.write(sfp.getvalue())
+    sfp.flush()

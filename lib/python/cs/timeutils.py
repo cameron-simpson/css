@@ -5,6 +5,17 @@
 #
 
 from __future__ import print_function
+
+DISTINFO = {
+    'description': "convenience routines for times and timing",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+}
+
 import datetime
 import time
 
@@ -16,7 +27,7 @@ class TimeoutError(Exception):
       msg = "%s: timeout exceeded (%ss)" % (message, timeout,)
     Exception.__init__(self, msg)
 
-def timeFunc(func, *args, **kw):
+def time_func(func, *args, **kw):
   ''' Run the supplied function and arguments.
       Return a the elapsed time in seconds and the function's own return value.
   '''
@@ -25,17 +36,17 @@ def timeFunc(func, *args, **kw):
     ret = func(*args,**kw)
   return L.elapsed, ret
 
-def tmFromISO(isodate):
+def tm_from_ISO(isodate):
   '''  Parse an ISO8601 date string and return a struct_time.
   '''
   return time.strptime(isodate, "%Y-%m-%dT%H:%M:%S")
 
-def timeFromISO(isodate, islocaltime=False):
+def time_from_ISO(isodate, islocaltime=False):
   '''  Parse an ISO8601 date string and return seconds since the epoch.
        If islocaltime is true convert using localtime(tm) otherwise use
        gmtime(tm).
   '''
-  tm = tmFromISO(isodate)
+  tm = tm_from_ISO(isodate)
   if islocaltime:
     return time.mktime(tm)
   raise NotImplementedError("only localtime supported just now")
@@ -70,7 +81,7 @@ def sleep(delay):
 if __name__ == '__main__':
   iso = '2012-08-24T11:12:13'
   print("iso = %r" % (iso,))
-  tm = tmFromISO(iso)
+  tm = tm_from_ISO(iso)
   print("tm = %r" % (tm,))
-  when = timeFromISO(iso, islocaltime=True)
+  when = time_from_ISO(iso, islocaltime=True)
   print("time = %r" % (when,))

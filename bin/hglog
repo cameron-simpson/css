@@ -4,7 +4,7 @@
 #       - Cameron Simpson <cs@zip.com.au> 15jan2008
 #
 
-template='{date|shortdate} {author|email} {files}\n\t{desc|strip|fill68|tabindent}\n'
+template='{date|shortdate} {author|email} {files} [{branch}]\n\t{desc|strip|fill68|tabindent}\n'
 
 hg log --template "$template" ${1+"$@"} \
 | awk '

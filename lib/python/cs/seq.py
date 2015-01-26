@@ -1,15 +1,25 @@
 #!/usr/bin/python -tt
 #
-# Stuff to do with sequences and iterables.
+# Stuff to do with counters, sequences and iterables.
 #       - Cameron Simpson <cs@zip.com.au> 20jul2008
 #
 
-import bisect
-import unittest
+DISTINFO = {
+    'description': "Stuff to do with counters, sequences and iterables.",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'requires': ['cs.logutils', 'cs.py.stack'],
+}
+
 import heapq
 import itertools
 from threading import Lock, Condition
 from cs.logutils import warning, debug, D
+from cs.py.stack import caller
 
 class Seq(object):
   ''' A thread safe wrapper for itertools.count().
@@ -17,8 +27,8 @@ class Seq(object):
 
   __slots__ = ('counter', '_lock')
 
-  def __init__(self, start=0, step=1):
-    self.counter = itertools.count(start, step)
+  def __init__(self, start=0):
+    self.counter = itertools.count(start)
     self._lock = Lock()
 
   def __iter__(self):
@@ -36,7 +46,7 @@ def seq():
   global __seq
   return next(__seq)
 
-def the(list, context=None):
+def the(iterable, context=None):
   ''' Returns the first element of an iterable, but requires there to be
       exactly one.
   '''
@@ -45,7 +55,7 @@ def the(list, context=None):
     icontext=icontext+" for "+context
 
   first=True
-  for elem in list:
+  for elem in iterable:
     if first:
       it=elem
       first=False
@@ -59,72 +69,32 @@ def the(list, context=None):
 
   return it
 
-def get0(seq, default=None):
-  ''' Return first element of a sequence, or the default.
+def first(iterable):
+  ''' Return the first item from an iterable; raise IndexError on empty iterables.
   '''
-  for i in seq:
+  for i in iterable:
     return i
-  return default
+  raise IndexError("empty iterable %r" % (iterable,))
 
-class Range(list):
-  def __init__(self,values=(),step=1):
-    self.__step=step
-    self.__spans=[]
-    for v in values:
-      try:
-        assert len(v) == 2
-      except TypeError:
-        v=(v,v+step)
-      self.add(*v)
+def last(iterable):
+  ''' Return the last item from an iterable; raise IndexError on empty iterables.
+  '''
+  nothing = True
+  for item in iterable:
+    nothing = False
+  if nothing:
+    raise IndexError("no items in iterable: %r" % (iterable,))
+  return item
 
-  def __str__(self):
-    return ", ".join("%d-%d" % (lo, hi) for lo, hi in self)
-
-  def add(self,lo,hi=None):
-    if hi is None:
-      hi=lo+step
-    else:
-      assert lo < hi
-
-    ndx=bisect.bisect_left(self,(lo,))
-    if ndx > 0 and self[ndx-1][1] >= lo:
-      # incorporate left hand range
-      ndx-=1
-      R=self[ndx]
-      lo=min(R[0],lo)
-      hi=max(R[1],hi)
-      del self[ndx]
-
-    if ndx < len(self):
-      # incorporate overlapping ranges
-      R=self[ndx]
-      while R[0] <= hi:
-        hi=max(R[1],hi)
-        del self[ndx]
-        if ndx == len(self):
-          break
-        R=self[ndx]
-
-    self.insert(ndx,(lo,hi))
-
-  def remove(self,lo,hi=None):
-    if hi is None:
-      hi=lo+step
-    else:
-      assert lo < hi
-
-    ndx=bisect.bisect_left(self,(lo,))
-    if ndx < len(self):
-      R=self[ndx]
-      while R[0] < hi:
-        if R[1] <= hi:
-          del self[ndx]
-          if ndx == len(self):
-            break
-        else:
-          R[0]=max(R[0], hi)
-          break
-        R=self[ndx]
+def get0(iterable, default=None):
+  ''' Return first element of an iterable, or the default.
+  '''
+  try:
+    i = first(iterable)
+  except IndexError:
+    return default
+  else:
+    return i
 
 def NamedTupleClassFactory(*fields):
   ''' Construct classes for named tuples a bit like the named tuples
@@ -202,7 +172,7 @@ def onetomany(func):
       multiple values back.
       Example:
         class X(list):
-          @onetoone
+          @onetomany
           def chars(self, item):
             return item
         strs = X(['Abc', 'Def'])
@@ -214,7 +184,11 @@ def onetomany(func):
 
 class TrackingCounter(object):
   ''' A wrapper for a counter which can be incremented and decremented.
-      A facility is provided to wait for the counter to reach a specifi value.
+      A facility is provided to wait for the counter to reach a specific value.
+      The .inc and .dec methods also accept a `tag` argument to keep
+      individual counts based on the tag to aid debugging.
+      TODO: add `strict` option to error and abort if any counter tries
+      to go below zero.
   '''
 
   def __init__(self, value=0, name=None):
@@ -233,10 +207,13 @@ class TrackingCounter(object):
     return "%s:%d" % (self.name, self.value)
 
   def __repr__(self):
-    return "<TrackingCounter %r %r>" % (str(self), self._watched)
+    return "<TrackingCounter %r:%r>" % (str(self), self._watched)
 
   def __nonzero__(self):
     return self.value != 0
+
+  def __int__(self):
+    return self.value
 
   def _notify(self):
     ''' Notify any waiters on the current counter value.
@@ -254,7 +231,8 @@ class TrackingCounter(object):
     ''' Increment the counter.
         Wake up any threads waiting for its new value.
     '''
-    debug("%s.inc", self)
+    if tag:
+      D("INC(%s): %s", tag[:10], caller())
     with self._lock:
       self.value += 1
       if tag is not None:
@@ -267,7 +245,8 @@ class TrackingCounter(object):
     ''' Decrement the counter.
         Wake up any threads waiting for its new value.
     '''
-    debug("%s.dec", self)
+    if tag:
+      D("DEC(%s): %s:", tag[:10], caller())
     with self._lock:
       self.value -= 1
       if tag is not None:
@@ -279,6 +258,11 @@ class TrackingCounter(object):
           ##raise RuntimeError
       if self.value < 0:
         warning("%s.dec: value < 0!", self)
+      elif self.value == 0:
+        D("ZERO HERE")
+        ##from time import sleep
+        ##sleep(3)
+        ##raise RuntimeError("ZERO HERE!")
       self._notify()
 
   def check(self):

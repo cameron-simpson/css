@@ -22,40 +22,122 @@ appeared at this point in the rules file.
 If the filename is relative, it is resolved with respect to the
 directory part of the filename of the current rules file.
 
-=head2 Variable Assignments
-
-A line commencing with an identifier and an equals symbol ('=') is
-an environment variable assignment.
-
 =head2 Filing Rules
 
 Other lines are mail filing rules, of the general form:
 
-  [!][=]targets tag [!]condition
+  [=][!]targets tag [!]condition
 
 A line commencing with whitespace is considered to be an additional
 condition to be ANDed with the preceeding line's rule conditions:
 
-  [!][=]targets tag condition1
+  [=][!]targets tag condition1
                     condition2
                     condition3
 
 =head3 Delivery Flags
 
-Rules may commences with either or both of the following mode indicators:
-
-  ! An exclaimation symbol ('!') indicates that an alert should be
-    emitted at the end of filing if this rule was matched.
+The following indicators may preceed, in order, the targets:
 
   = An equals symbol ('=') indicates that rule processing should
     cease at this rule if it matches. Normally all matching rules are
     applied.
+
+  ! An exclaimation symbol ('!') indicates that an alert should be
+    emitted at the end of filing if this rule was matched.
 
 =head3 Targets
 
 The "targets" is a comma separated list of mail destinations;
 a target takes the form of a sequence of nonwhitespace non-comma
 characters, or a string value in double quotes.
+Note that a shell command in quotes will need any backslashes doubled,
+as the quoted string parse strips one level of backslash escaping.
+
+=head4 Variable Assignment
+
+A target of the form:
+
+  VARIABLE=value
+
+or
+
+  VARIABLE="quoted-value"
+
+assigns the value to the named environment variable.
+If unquoted, I<value> consists of nonwhitespace characters excluding the comma.
+If quoted, I<quoted-value> is a slosh escaped string.
+Note that the value is subject to paramater substitution and the
+associated slosh escaping and therefore sloshes needed for that
+latter phase will need doubling in the B<">I<quoted-value>B<"> form.
+
+=head4 Header Substitution
+
+A target of the form:
+
+  [header:]s/this/that/
+
+performs a regular expression match on the specified header
+(by default the "Subject:" header)
+and replaces the match with the second string, subject to parameter substitution.
+Named subexpressions in the regular expression are available as parameter names in the replacement.
+
+=head4 Functions on Headers
+
+A target of the form:
+
+  header[,header...]:function[(arg,...)]
+
+applies the named I<function> to each instance of the named headers.
+If there are no I<arg>s then the parentheses may be omitted.
+
+The I<function> may be either a dotted name of the form I<module_name>B<.>I<function_name> or a simple I<function_name>.
+
+With the former form, the Python module named I<module_name> is imported and the name I<function_name> obtained from it.
+
+For convenience, each I<arg> may take the following forms:
+
+=over 6
+
+=item I<NAME>
+
+An uppercase identifier such as a group name, passed in as a string.
+
+=item B<@>I<domain>
+
+An at symbol ("@") followed by a domain name, passed in as a string.
+
+=item I<number>
+
+A nonnegative integer, passed in as an integer.
+
+=item B<">I<quoted-value>B<">
+
+A quoted value subject to parameter substitution.
+The value after substitution is passed in as a string.
+
+=back
+
+The function obtained is called as follows:
+
+  I<function_name>(I<filer>, I<header_names>, *I<args>)
+
+where I<filer> is the internal MessageFiler instance associated with this message,
+I<header_names> and I<args> the list of headers and the I<args> supplied with the target respectively.
+
+The following simple function names are supported:
+
+=head4 Message Flags
+
+A target consististing a single capital letter specifies a flag to be applied 
+to the message. Supported flags are:
+
+  D Draft
+  F Flagged
+  P Passed
+  R Replied
+  S Seen
+  T Trashed
 
 =head4 Deliver to Program
 
@@ -69,7 +151,7 @@ Otherwise, a target containing an "at" symbol ('@') is considered
 an email address to which to send a copy of the message.
 If the mail system accepts the message it is considered to have been dispatched successfully.
 
-=head4 Deliver to Maildir
+=head4 Deliver to Mail Folder
 
 Otherwise, a target is considered to indicate a Maildir or a UNIX mbox
 into which the message should be placed.

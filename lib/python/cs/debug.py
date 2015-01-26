@@ -5,6 +5,18 @@
 #
 
 from __future__ import print_function
+
+DISTINFO = {
+    'description': "assorted debugging facilities",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'requires': ['cs.py3', 'cs.py.stack', 'cs.logutils', 'cs.obj', 'cs.seq', 'cs.timeutils'],
+}
+
 import inspect
 import logging
 import sys
@@ -12,14 +24,12 @@ import threading
 import time
 import traceback
 from cs.py3 import Queue, Queue_Empty
+from cs.py.stack import caller
 import cs.logutils
-from cs.logutils import infer_logging_level, debug, error, setup_logging, D, Pfx
-from cs.obj import O
+from cs.logutils import infer_logging_level, debug, error, setup_logging, D, Pfx, ifdebug, X
+from cs.obj import O, Proxy
 from cs.seq import seq
 from cs.timeutils import sleep
-
-def ifdebug():
-  return cs.logutils.logging_level <= logging.DEBUG
 
 def Lock():
   ''' Factory function: if cs.logutils.logging_level <= logging.DEBUG
@@ -302,19 +312,75 @@ class DebuggingThread(threading.Thread, DebugWrapper):
     _debug_threads.discard(self)
     return retval
 
+def trace(func):
+  ''' Decorator to report the call and return of a function.
+  '''
+  from cs.py.func import funccite
+  def subfunc(*a, **kw):
+    X("CALL %s(a=%r,kw=%r)...", funccite(func), a, kw)
+    try:
+      retval = func(*a, **kw)
+    except Exception as e:
+      X("CALL %s(): RAISES %r", funccite(func), e)
+      raise
+    else:
+      X("CALL %s(): RETURNS %r", funccite(func), retval)
+      return retval
+  subfunc.__name__ = "trace/subfunc/"+func.__name__
+  return subfunc
+
 def trace_caller(func):
   ''' Decorator to report the caller of a function when called.
   '''
   def subfunc(*a, **kw):
-    import traceback
-    frame = traceback.extract_stack(None, 2)[0]
+    frame = caller()
     D("CALL %s()<%s:%d> FROM %s()<%s:%d>",
          func.__name__,
          func.__code__.co_filename, func.__code__.co_firstlineno,
-         frame[2], frame[0], frame[1])
+         frame.funcname, frame.filename, frame.lineno)
     return func(*a, **kw)
   subfunc.__name__ = "trace_caller/subfunc/"+func.__name__
   return subfunc
+
+class TracingObject(Proxy):
+
+  def __init__(self, other):
+    Proxy.__init__(self, other)
+    self.__attr_map = {}
+
+  def __getattribute__(self, attr):
+    X("TracingObject.__getattribute__(attr=%r)", attr)
+    _proxied = Proxy.__getattribute__(self, '_proxied')
+    try:
+      value = object.__getattribute__(_proxied, attr)
+    except AttributeError:
+      X("no .%s attribute", attr)
+      raise
+    else:
+      X("getattr .%s", attr)
+      return TracingObject(value)
+
+  def __call__(self, *a, **kw):
+    _proxied = Proxy.__getattribute__(self, '_proxied')
+    X("call %s(*%r, **%r)", _proxied, a, kw)
+    return _proxied(*a, **kw)
+
+class DummyMap(object):
+  def __init__(self, label, d=None):
+    X("new DummyMap labelled %r, d=%r", label, d)
+    self.__label = label
+    self.__map = {}
+    if d:
+      self.__map.update(d)
+  def __str__(self):
+    return self.__label
+  def items(self):
+    X("%s.items", self)
+    return []
+  def __getitem__(self, key):
+    v = self.__map.get(key)
+    X("%s[%r] => %r", self, key, v)
+    return v
 
 if __name__ == '__main__':
   setup_logging()

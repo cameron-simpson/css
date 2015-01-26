@@ -4,222 +4,64 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
+DISTINFO = {
+    'description': "some Queue subclasses and ducktypes",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'requires': ['cs.debug', 'cs.logutils', 'cs.resources', 'cs.seq', 'cs.py3', 'cs.obj'],
+}
+
 import sys
 from functools import partial
 import logging
-from threading import Condition, Timer
-import threading
+from threading import Timer
 import time
-import traceback
-from cs.asynchron import Asynchron
-from cs.debug import Lock, RLock, Thread, trace_caller, stack_dump
-from cs.excutils import noexc, logexc
-from cs.logutils import exception, error, warning, debug, D, Pfx, PfxCallInfo
+from cs.debug import Lock, Thread, trace, trace_caller, stack_dump
+from cs.logutils import exception, error, warning, debug, D, X, Pfx, PfxCallInfo
+from cs.resources import NestingOpenCloseMixin, not_closed
 from cs.seq import seq
 from cs.py3 import Queue, PriorityQueue, Queue_Full, Queue_Empty
-from cs.obj import O, Proxy
+from cs.obj import O
 
-def not_closed(func):
-  ''' Decorator to wrap NestingOpenCloseMixin proxy object methods
-      which hould raise when self.closed.
-  '''
-  def not_closed_wrapper(self, *a, **kw):
-    if self.closed:
-      error("%r: ALREADY CLOSED: closed set to True from the following:", self)
-      stack_dump(stack=self.closed_stacklist, log_level=logging.ERROR)
-      raise RuntimeError("%s: %s: already closed" % (not_closed_wrapper.__name__, self))
-    return func(self, *a, **kw)
-  not_closed_wrapper.__name__ = "not_closed_wrapper(%s)" % (func.__name__,)
-  return not_closed_wrapper
-
-class _NOC_Proxy(Proxy):
-  ''' A Proxy subclass to return from NestingOpenCloseMixin.open() and __enter__.
-      Note tht this has its own localised .closed attribute which starts False.
-      This lets users indidually track .closed for their use.
-  '''
-
-  def __init__(self, other, name=None):
-    Proxy.__init__(self, other)
-    if name is None:
-      name = "%s-open%d" % ( getattr(other,
-                                     'name',
-                                     "%s#%d" % (self.__class__.__name__,
-                                                id(self))),
-                             seq()
-                           )
-    self.name = name
-    self.closed = False
-
-  def __str__(self):
-    return "open(%r:%s[closed=%r])" % (self.name, self._proxied, self.closed)
-
-  __repr__ = __str__
-
-  @not_closed
-  def close(self):
-    ''' Close this open-proxy. Sanity check then call inner close.
-    '''
-    debug("<%s>.close()", self.name)
-    self.closed = True
-    self.closed_stacklist = traceback.extract_stack()
-    self._proxied._close()
-
-class _NOC_ThreadingLocal(threading.local):
-
-  def __init__(self):
-    self.cmgr_proxies = []
-
-class NestingOpenCloseMixin(object):
-  ''' A mixin to count open and closes, and to call .shutdown() when the count goes to zero.
-      A count of active open()s is kept, and on the last close()
-      the object's .shutdown() method is called.
-      Use via the with-statement calls open()/close() for __enter__()
-      and __exit__().
-      Multithread safe.
-      This mixin uses the internal attribute _opens and relies on a
-      preexisting attribute _lock for locking.
-  '''
-
-  def __init__(self, on_open=None, on_close=None, on_shutdown=None, proxy_type=None):
-    ''' Initialise the NestingOpenCloseMixin state.
-	##If the optional parameter `open` is true, return the object in "open"
-        ##state (active opens == 1) otherwise closed (opens == 0).
-        ##The default is "closed" to optimise use as a context manager;
-        ##the __enter__ method will open the object.
-        The following callback parameters may be supplied to aid tracking activity:
-        `on_open`: called on open with the post-increment open count
-        `on_close`: called on close with the pre-decrement open count
-        `on_shutdown`: called after calling self.shutdown()
-    '''
-    if proxy_type is None:
-      proxy_type = _NOC_Proxy
-    self._noc_proxy_type = proxy_type
-    self._noc_tl = _NOC_ThreadingLocal()
-    self.opened = False
-    self._opens = 0
-    ##self.closed = False # final _close() not yet called
-    self.on_open = on_open
-    self.on_close = on_close
-    self.on_shutdown = on_shutdown
-    self._asynchron = Asynchron()
-
-  def open(self, name=None):
-    ''' Increment the open count.
-	If self.on_open, call self.on_open(self, count) with the
-	post-increment count.
-        `name`: optional name for this open object.
-        Return a Proxy object that tracks this open.
-    '''
-    self.opened = True
-    with self._lock:
-      self._opens += 1
-      count = self._opens
-    if self.on_open:
-      self.on_open(self, count)
-    return self._noc_proxy_type(self, name=name)
-
-  def close(self):
-    ''' Placeholder method to warn callers that they should be using the proxy returned from .open().
-    '''
-    raise RuntimeError("%s subclasses do not support .close(): that method is to be called on the _NOC_Proxy returned from .open()" % (self.__class__.__name__,))
-
-  @property
-  def cmgr_proxy(self):
-    ''' Property representing the current context manager proxy.
-    '''
-    return self._noc_tl.cmgr_proxies[-1]
-
-  def __enter__(self):
-    ''' NestingOpenClose context managers return a proxy object.
-    '''
-    proxy = self.open()
-    self._noc_tl.cmgr_proxies.append(proxy)
-    return proxy
-
-  def __exit__(self, exc_type, exc_value, traceback):
-    proxy = self._noc_tl.cmgr_proxies.pop()
-    proxy.close()
-    return False
-
-  @logexc
-  def _close(self):
-    ''' Decrement the open count.
-	If self.on_open, call self.on_open(self, count) with the
-	pre-decrement count.
-        If self.on_shutdown and the count goes to zero, call self.on_shutdown(self).
-        If the count goes to zero, call self.shutdown().
-    '''
-    with self._lock:
-      if self._opens < 1:
-        error("%s: EXTRA CLOSE", self)
-      self._opens -= 1
-      count = self._opens
-    if self.on_close:
-      self.on_close(self, count)
-    if count == 0:
-      self._asynchron.put(True)
-      self.shutdown()
-      if self.on_shutdown:
-        self.on_shutdown(self)
-    elif self.all_closed:
-      error("%s.close: count=%r, ALREADY CLOSED", self, count)
-
-  @property
-  def all_closed(self):
-    if self._opens > 0:
-      return False
-    if self._opens < 0:
-      with PfxCallInfo():
-        warning("%r._opens < 0: %r", self, self._opens)
-    if not self.opened:
-      # never opened, so not totally closed
-      return False
-    ##if not self.closed:
-    ##  with PfxCallInfo():
-    ##    warning("%r.closed = %r, but want to return all_closed=True", self, self.closed)
-    ##  return False
-    return True
-
-  def join(self):
-    return self._asynchron.join()
-
-class _Q_Proxy(_NOC_Proxy):
-  ''' A _NOC_Proxy subclass for queues with a sanity check on .put.
-  '''
-
-  @not_closed
-  def put(self, item, *a, **kw):
-    return self._proxied.put(item, *a, **kw)
-
-class QueueIterator(NestingOpenCloseMixin,O):
+class _QueueIterator(NestingOpenCloseMixin):
   ''' A QueueIterator is a wrapper for a Queue (or ducktype) which
       presents an iterator interface to collect items.
       It does not offer the .get or .get_nowait methods.
   '''
 
-  sentinel = object()
+  class _QueueIterator_Sentinel(object):
+    pass
+
+  sentinel = _QueueIterator_Sentinel()
 
   def __init__(self, q, name=None):
     if name is None:
       name = "QueueIterator-%d" % (seq(),)
     self._lock = Lock()
     self.name = name
+    self._item_count = 0    # count of non-sentinel values on the queue
     O.__init__(self, q=q)
-    NestingOpenCloseMixin.__init__(self, proxy_type=_Q_Proxy)
+    NestingOpenCloseMixin.__init__(self, finalise_later=True)
 
   def __str__(self):
-    return "<%s:opens=%d,closed=%s>" % (self.name, self._opens, self.all_closed)
+    return "<%s:opens=%d>" % (self.name, self._opens)
 
+  @not_closed
   def put(self, item, *args, **kw):
     ''' Put `item` onto the queue.
         Warn if the queue is closed.
         Reject if `item` is the sentinel.
     '''
-    if self.all_closed:
+    if self.closed:
       with PfxCallInfo():
         warning("%r.put: all closed: item=%s", self, item)
     if item is self.sentinel:
       raise ValueError("put(sentinel)")
+    self._item_count += 1
     return self._put(item, *args, **kw)
 
   def _put(self, item, *args, **kw):
@@ -246,70 +88,40 @@ class QueueIterator(NestingOpenCloseMixin,O):
     try:
       item = q.get()
     except Queue_Empty:
+      D("%s: EMPTY, calling finalise...", self)
+      self.finalise()
       raise StopIteration
     if item is self.sentinel:
       # put the sentinel back for other iterators
       self._put(item)
       raise StopIteration
+    self._item_count -= 1
     return item
 
   next = __next__
 
-##  def __getattr__(self, attr):
-##    return getattr(self.q, attr)
-##
-##  def get(self, block=True, timeout=None):
-##    if block and timeout is None:
-##      # calling an indefinitiely blocking get if probably an 
-##      raise RuntimeError(".get(block=%r,timeout=%r) on QueueIterator", block, timeout)
-##    if block and timeout is not None:
-##      start = time.time()
-##    q = self.q
-##    item = q.get(block=block, timeout=timeout)
-##    # block must have been True since no exception raised
-##    while item is self.sentinel:
-##      # the sentinel should be ignored
-##      if timeout is None:
-##        if q.empty():
-##          q.put(item)
-##          continue
-##      else:
-##        now = time.time()
-##        elapsed = now - start
-##        timeout -= elapsed
-##        if timeout <= 0:
-##          if q.empty():
-##            raise Queue_Empty
-##      # timeout > 0 or queue not empty
-##      # get the next item, ignoring the sentinel
-##      try:
-##        item = q.get(block=block, timeout=timeout)
-##      except Queue_Empty:
-##        # put the sentinel back to prevent blocking another caller
-##        q._put(self.sentinel)
-##        raise
-##      q._put(self.sentinel)
-##    return item
-##
-##  def get_nowait(self):
-##    q = self.q
-##    item = q.get_nowait()
-##    if item is self.sentinel:
-##      q._put(self.sentinel)
-##      raise Queue_Empty
-##    return item
+  def _get(self):
+    ''' Calls the inner queue's .get via .__next__; can break other users' iterators.
+    '''
+    try:
+      return next(self)
+    except StopIteration as e:
+      raise Queue_Empty("got StopIteration from %s" % (self,))
+
+  def empty(self):
+    return self._item_count == 0
 
 def IterableQueue(capacity=0, name=None, *args, **kw):
   if not isinstance(capacity, int):
     raise RuntimeError("capacity: expected int, got: %r" % (capacity,))
   name = kw.pop('name', name)
-  return QueueIterator(Queue(capacity, *args, **kw), name=name)
+  return _QueueIterator(Queue(capacity, *args, **kw), name=name).open()
 
 def IterablePriorityQueue(capacity=0, name=None, *args, **kw):
   if not isinstance(capacity, int):
     raise RuntimeError("capacity: expected int, got: %r" % (capacity,))
   name = kw.pop('name', name)
-  return QueueIterator(PriorityQueue(capacity, *args, **kw), name=name)
+  return _QueueIterator(PriorityQueue(capacity, *args, **kw), name=name).open()
 
 class Channel(object):
   ''' A zero-storage data passage.
@@ -378,14 +190,14 @@ class Channel(object):
     else:
       self.closed = True
 
-class PushQueue(NestingOpenCloseMixin, O):
-  ''' A puttable object to look like a Queue.
-      Calling .put(item) calls `func_push` supplied at initialisation to
-      trigger a function on data arrival.
+class PushQueue(NestingOpenCloseMixin):
+  ''' A puttable object which looks like a Queue.
+      Calling .put(item) calls `func_push` supplied at initialisation
+      to trigger a function on data arrival, which returns an iterable
+      queued via a Later for delivery to the output queue.
   '''
 
-  def __init__(self, L, func_push, outQ, func_final=None, is_iterable=False, name=None,
-                     on_open=None, on_close=None, on_shutdown=None):
+  def __init__(self, name, L, func_push, outQ, func_final=None):
     ''' Initialise the PushQueue with the Later `L`, the callable `func_push`
         and the output queue `outQ`.
 	`func_push` is a one-to-many function which accepts a single
@@ -396,7 +208,7 @@ class PushQueue(NestingOpenCloseMixin, O):
         `outQ` accepts results from the callable via its .put() method.
         `func_final`, if specified and not None, is called after completion of
           all calls to `func_push`.
-        If `is_iterable``, submit `func_push(item)` via L.defer_iterable() to
+        Submit `func_push(item)` via L.defer_iterable() to
           allow a progressive feed to `outQ`.
         Otherwise, submit `func_push` with `item` via L.defer().
     '''
@@ -405,17 +217,12 @@ class PushQueue(NestingOpenCloseMixin, O):
     self.name = name
     self._lock = Lock()
     O.__init__(self)
-    NestingOpenCloseMixin.__init__(self,
-                                   on_open=on_open, on_close=on_close, on_shutdown=on_shutdown,
-                                   proxy_type=_Q_Proxy)
+    NestingOpenCloseMixin.__init__(self)
     self.later = L
     self.func_push = func_push
     self.outQ = outQ
     self.func_final = func_final
-    self.is_iterable = is_iterable
     self.LFs = []
-    if not is_iterable:
-      raise RuntimeError("PUSHQUEUE NOT IS_ITERABLE")
 
   def __str__(self):
     return "PushQueue:%s" % (self.name,)
@@ -430,40 +237,19 @@ class PushQueue(NestingOpenCloseMixin, O):
         Otherwise, defer self.func_push(item) and after completion,
         queue its results to outQ.
     '''
-    debug("%s.put(item=%r)", self, item)
-    if self.all_closed:
+    if self.closed:
       warning("%s.put(%s) when all closed" % (self, item))
     L = self.later
-    if self.is_iterable:
-      try:
-        items = self.func_push(item)
-        ##items = list(items)
-      except Exception as e:
-        exception("%s.func_push(item=%r): %s", self, item, e)
-        items = ()
-      # pass a new open-proxy to defer_iterable, as it will close it
-      L._defer_iterable(items, self.outQ.open())
-    else:
-      raise RuntimeError("PUSHQUEUE NOT IS_ITERABLE")
-      # defer the computation then call _push_items which puts the results
-      # and closes outQ
-      LF = L._defer( self.func_push, item )
-      self.LFs.append(LF)
-      L._after( (LF,), None, self._push_items, LF )
-
-  # NB: reports and discards exceptions
-  @noexc
-  def _push_items(self, LF):
-    ''' Handler to run after completion of `LF`.
-        Put the results of `LF` onto `outQ`.
-    '''
-    raise RuntimeError("NOTREACHED")
     try:
-      for item in LF():
-        self.outQ.put(item)
+      items = self.func_push(item)
+      ##items = list(items)
     except Exception as e:
-      exception("%s._push_items: exception putting results of LF(): %s", self, e)
-    self.outQ.close()
+      exception("%s.func_push(item=%r): %s", self, item, e)
+      items = ()
+    # defer_iterable will close the queue
+    outQ = self.outQ
+    outQ.open()
+    L._defer_iterable(items, outQ)
 
   def shutdown(self):
     ''' shutdown() is called by NestingOpenCloseMixin._close() to close
@@ -476,23 +262,22 @@ class PushQueue(NestingOpenCloseMixin, O):
       # run func_final to completion before closing outQ
       LFclose = self.later._after( LFs, None, self._run_func_final )
       LFs = (LFclose,)
+    # schedule final close of output queue
     self.later._after( LFs, None, self.outQ.close )
 
   def _run_func_final(self):
     debug("%s._run_func_final()", self)
-    items = self.func_final()
-    items = list(items)
     outQ = self.outQ
+    items = self.func_final()
     for item in items:
       outQ.put(item)
 
-class NullQueue(NestingOpenCloseMixin, O):
+class NullQueue(NestingOpenCloseMixin):
   ''' A queue-like object that discards its inputs.
       Calls to .get() raise Queue_Empty.
   '''
 
-  def __init__(self, blocking=False, name=None,
-               on_open=None, on_close=None, on_shutdown=None):
+  def __init__(self, blocking=False, name=None):
     ''' Initialise the NullQueue.
         `blocking`: if true, calls to .get() block until .shutdown().
           Its default is False. 
@@ -502,11 +287,8 @@ class NullQueue(NestingOpenCloseMixin, O):
       name = "%s%d" % (self.__class__.__name__, seq())
     self.name = name
     self._lock = Lock()
-    self._close_cond = Condition(self._lock)
     O.__init__(self)
-    NestingOpenCloseMixin.__init__(self,
-                                   on_open=on_open, on_close=on_close, on_shutdown=on_shutdown,
-                                   proxy_type=_Q_Proxy)
+    NestingOpenCloseMixin.__init__(self)
     self.blocking = blocking
 
   def __str__(self):
@@ -518,7 +300,6 @@ class NullQueue(NestingOpenCloseMixin, O):
   def put(self, item):
     ''' Put a value onto the Queue; it is discarded.
     '''
-    debug("%s.put: DISCARD %r", self, item)
     pass
 
   def get(self):
@@ -526,26 +307,25 @@ class NullQueue(NestingOpenCloseMixin, O):
         If .blocking, delay until .shutdown().
     '''
     if self.blocking:
-      with self._lock:
-        if not self.all_closed:
-          self._close_cond.wait()
+      self.join()
     raise Queue_Empty
 
   def shutdown(self):
     ''' Shut down the queue. Wakes up anything waiting on ._close_cond, such
         as callers of .get() on a .blocking queue.
     '''
-    with self._lock:
-      self._close_cond.notify_all()
+    pass
 
   def __iter__(self):
     return self
 
-  def next(self):
+  def __next__(self):
     try:
       return self.get()
     except Queue_Empty:
       raise StopIteration
+
+  next = __next__
 
 NullQ = NullQueue(name='NullQ')
 
