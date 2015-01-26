@@ -45,7 +45,7 @@ else:
     '''
     if isinstance(s, str):
       try:
-        s = s.decode(e, errors=errors)
+        s = s.decode(e, errors)
       except UnicodeDecodeError as ude:
         from cs.logutils import warning
         warning("cs.py3.ustr(): %s: s = %s %r", ude, type(s), s)
