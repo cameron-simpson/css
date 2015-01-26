@@ -31,34 +31,47 @@ URL_BASE = 'https://bitbucket.org/cameron_simpson/css/src/tip/'
 LIBDIR = 'lib/python'
 
 # defaults for packages without their own specifics
-DISTINFO = {
+DISTINFO_DEFAULTS = {
     'author': "Cameron Simpson",
     'author_email': "cs@zip.com.au",
     'url': 'https://bitbucket.org/cameron_simpson/css/commits/all',
-    'classifiers': [
-        "Programming Language :: Python",
-        "Development Status :: 4 - Beta",
-        "Environment :: Other Environment",
-        "Intended Audience :: Developers",
-        "License :: OSI Approved :: GNU Library or Lesser General Public License (LGPL)",
-        "Operating System :: OS Independent",
-        "Topic :: Software Development :: Libraries :: Python Modules",
-        ],
+}
+
+DISTINFO_CLASSIFICATION = {
+    "Programming Language": "Python",
+    "Development Status": "4 - Beta",
+    "Intended Audience": "Developers",
+    "Operating System": "OS Independent",
+    "Topic": "Software Development :: Libraries :: Python Modules",
+    "License": "OSI Approved :: GNU General Public License v3 (GPLv3)",
 }
 
 
-USAGE = '''Usage: %s [-n pypi-pkg-name] [-v pypi_version] pkg-name'''
+
+USAGE = '''Usage: %s [-n pypi-pkg-name] [-v pypi_version] pkg-name op [op-args...]
+  -n pypi-pkg-name
+        Name of package in PyPI. Default the same as the local package.
+  -r pypi_repo_url
+        Use the specified PyPI repository URL.
+        Default: %s, or from the environment variable $PYPI_URL.
+        Official site: %s
+  -v pypi-version
+        Version number for PyPI. Default from last release tag for pkg-name.
+  Operations:
+    check   Run setup.py check on the resulting package.
+    register Register/update the package description and version.
+    upload   Upload the package source distribution.'''
 
 def main(argv):
   cmd = os.path.basename(argv.pop(0))
-  usage = USAGE % (cmd,)
+  usage = USAGE % (cmd, PYPI_DFLT_URL, PYPI_PROD_URL)
   setup_logging(cmd)
 
   badopts = False
 
   pypi_package_name = None
   pypi_version = None
-  pypi_url = PYPI_DFLT_URL
+  pypi_url = os.environ.get('PYPI_URL', PYPI_DFLT_URL)
 
   try:
     opts, argv = getopt(argv, 'n:r:v:')
@@ -83,9 +96,19 @@ def main(argv):
     badopts = True
   else:
     package_name = argv.pop(0)
-    if argv:
-      warning("extra arguments after pkg-name: %s", ' '.join(argv))
+    if not argv:
+      warning("missing op")
       badopts = True
+    else:
+      op = argv.pop(0)
+      with Pfx(op):
+        if op in ("check", "register", "upload"):
+          if argv:
+            warning("extra arguments: %s", ' '.join(argv))
+            badopts = True
+        else:
+          warning("unrecognised op")
+          badopts = True
 
   if badopts:
     print(usage, file=sys.stderr)
@@ -94,17 +117,22 @@ def main(argv):
   if pypi_package_name is None:
     pypi_package_name = package_name
 
-  PKG = PyPI_Package(package_name, pypi_package_name = pypi_package_name)
+  PKG = PyPI_Package(package_name,
+                     pypi_package_name=pypi_package_name,
+                     pypi_url=pypi_url,
+                     pypi_version=pypi_version)
 
   xit = 0
 
-  with PKG as pkg_dir:
-    qpkg_dir = cs.sh.quotestr(pkg_dir)
-    qpypi_url = cs.sh.quotestr(pypi_url)
-    os.system("set -x; cd %s; ls -la" % (qpkg_dir,))
-    os.system("set -x; cd %s; python3 setup.py check" % (qpkg_dir,))
-    os.system("set -x; cd %s; python3 setup.py register -r %s" % (qpkg_dir, qpypi_url))
-    os.system("set -x; cd %s; python3 setup.py sdist upload -r %s" % (qpkg_dir, qpypi_url))
+  with Pfx(op):
+    if op == 'check':
+      PKG.check()
+    elif op == 'register':
+      PKG.register()
+    elif op == 'upload':
+      PKG.upload()
+    else:
+      raise RuntimeError("unimplemented")
 
   return xit
 
@@ -123,7 +151,6 @@ def needdir(dirpath):
 def runcmd(argv):
   ''' Run command.
   '''
-  X("runcmd: argv = %r", argv)
   P = Popen(argv)
   xit = P.wait()
   if xit != 0:
@@ -132,9 +159,10 @@ def runcmd(argv):
 def cmdstdout(argv):
   ''' Run command, return output in string.
   '''
-  X("cmdstdout: argv = %r", argv)
   P = Popen(argv, stdout=PIPE)
   output = P.stdout.read()
+  if sys.version_info[0] >= 3:
+    output = output.decode('utf-8')
   xit = P.wait()
   if xit != 0:
     raise ValueError("command failed, exit code %d: %r" % (xit, argv))
@@ -165,35 +193,25 @@ class PyPI_Package(O):
   ''' Class for creating and administering cs.* packages for PyPI.
   '''
 
-  def __init__(self, package_name, pypi_package_name = None):
+  def __init__(self, package_name, pypi_package_name = None, pypi_url=None, pypi_version=None):
     ''' Iinitialise: save package_name and its name in PyPI.
     '''
     if pypi_package_name is None:
       pypi_package_name = package_name
+    if pypi_url is None:
+      pypi_url = PYPI_DFLT_URL
     self.package_name = package_name
     self.pypi_package_name = pypi_package_name
+    self.pypi_url = pypi_url
     self.libdir = LIBDIR
     self._lock = RLock()
     self._prep_distinfo()
-
-  def __enter__(self):
-    ''' Prep the package in a temporary directory, return the directory.
-    '''
-    if hasattr(self, '_working_dir'):
-      raise RuntimeError("already using ._working_dir = %r" % (self._working_dir,))
-    self._working_dir = self.make_package()
-    return self._working_dir
-
-  def __exit__(self, exc_type, exc_value, traceback):
-    ''' Remove the temporary directory.
-    '''
-    shutil.rmtree(self._working_dir)
-    del self._working_dir
-    return False
+    if pypi_version is not None:
+      self._version = pypi_version
 
   @locked_property
   def version(self):
-    return cmdstdout(['cs-release', '-p', self.package_name, 'last']).rstrip()
+    return cmdstdout(['cs-release', 'last', self.package_name]).rstrip()
 
   @property
   def pypi_version(self):
@@ -206,15 +224,31 @@ class PyPI_Package(O):
   def _prep_distinfo(self):
     ''' Property containing the distutils infor for this package.
     '''
+    global DISTINFO_DEFAULTS
+    global DISTINFO_CLASSIFICATION
+
     info = dict(import_module_name(self.package_name, 'DISTINFO'))
 
     info['package_dir'] = {'': self.libdir}
 
-    for kw, value in DISTINFO.items():
-      if value is not None:
-        with Pfx(kw):
-          if kw not in info:
-            info[kw] = value
+    for kw, value in DISTINFO_DEFAULTS.items():
+      with Pfx(kw):
+        if kw not in info:
+          X("%s = %r", kw, value)
+          info[kw] = value
+
+    classifiers = info['classifiers']
+    for classifier_topic, classifier_subsection in DISTINFO_CLASSIFICATION.items():
+      classifier_prefix = classifier_topic + " ::"
+      classifier_value = classifier_topic + " :: " + classifier_subsection
+      X("look for %r ...", classifier_prefix)
+      if not any( classifier.startswith(classifier_prefix)
+                  for classifier in classifiers
+                ):
+        X("classifiers + %s", classifier_value)
+        info['classifiers'].append(classifier_value)
+      else:
+        X("already has %r*", classifier_prefix)
 
     ispkg = self.is_package(self.package_name)
     if ispkg:
@@ -237,6 +271,40 @@ class PyPI_Package(O):
 
     self.distinfo = info
 
+  def pkg_rpath(self, package_name=None, prefix_dir=None, up=False):
+    ''' Return a path based on a `package_name` (default self.package_name).
+        `prefix_dir`: is supplied, prefixed to the returned relative path.
+        `up`: if true, discard the last component of the package name before
+        computing the path.
+    '''
+    if package_name is None:
+      package_name = self.package_name
+    package_paths = package_name.split('.')
+    if up:
+      package_paths = package_paths[:-1]
+    rpath = os.path.join(*package_paths)
+    if prefix_dir:
+      rpath = os.path.join(prefix_dir, rpath)
+    return rpath
+
+  def pkg_readme_rpath(self, package_name=None, prefix_dir=None):
+    if package_name is None:
+      package_name = self.package_name
+    package_paths = package_name.split('.')
+    if self.is_package(package_name):
+      return os.path.join(
+                self.pkg_rpath(
+                    package_name=package_name,
+                    prefix_dir=prefix_dir),
+                'README.rst')
+    else:
+      return os.path.join(
+                self.pkg_rpath(
+                    package_name=package_name,
+                    prefix_dir=prefix_dir,
+                    up=True),
+                'README-' + package_paths[-1] + '.rst')
+
   def make_package(self, pkg_dir=None):
     ''' Prepare package contents in the directory `pkg_dir`, return `pkg_dir`.
         If `pkg_dir` is not supplied, create a temporary directory.
@@ -246,26 +314,47 @@ class PyPI_Package(O):
 
     distinfo = self.distinfo
 
-    manifest_in = os.path.join(pkg_dir, 'MANIFEST.in')
-    with open(manifest_in, "w") as mfp:
+    manifest_path = os.path.join(pkg_dir, 'MANIFEST.in')
+    with open(manifest_path, "w") as mfp:
       # TODO: support extra files
       pass
 
     self.copyin(self.package_name, pkg_dir)
-    pkgparts = self.pypi_package_name.split('.')
-    # make missing __init__.py files; something of a hack
-    if len(pkgparts) > 1:
-      for dirpath, dirnames, filenames in os.walk(os.path.join(pkg_dir, pkgparts[0])):
-        initpath = os.path.join(dirpath, '__init__.py')
-        if not os.path.exists(initpath):
-          warning("making stub %s", initpath)
-          with open(os.path.join(dirpath, '__init__.py'), "a"):
-            pass
+
+    readme_subpath = self.pkg_readme_rpath(prefix_dir=self.libdir)
+    readme_path = os.path.join(pkg_dir, readme_subpath)
+    X("make_package: readme_path = %r", readme_path)
+    if os.path.exists(readme_path):
+      if 'long_description' in distinfo:
+        warning('long_description: already provided, ignoring %s', readme_subpath)
+      else:
+        with open(readme_path) as readmefp:
+          distinfo['long_description'] = readmefp.read().decode('utf-8')
+      shutil.copy2(readme_path, os.path.join(pkg_dir, 'README.rst'))
+      with open(manifest_path, "a") as mfp:
+        mfp.write('include README.rst\n')
+    else:
+      warning('no README at %r', readme_path)
 
     # final step: write setup.py with information gathered earlier
     self.write_setup(os.path.join(pkg_dir, 'setup.py'))
 
     return pkg_dir
+
+  def checkout(self):
+    return PyPI_PackageCheckout(self)
+
+  def check(self):
+    with self.checkout() as pkg_co:
+      pkg_co.check()
+
+  def register(self):
+    with self.checkout() as pkg_co:
+      pkg_co.register()
+
+  def upload(self):
+    with self.checkout() as pkg_co:
+      pkg_co.upload()
 
   def write_setup(self, setup_path):
     ''' Transcribe a setup.py file.
@@ -273,9 +362,7 @@ class PyPI_Package(O):
     with Pfx("write_setup(%r)", setup_path):
       ok = True
       with open(setup_path, "w") as setup:
-        X("GET .DISTINFO")
         distinfo = self.distinfo
-        X("GOT .DISTINFO: %r", distinfo)
         out = partial(print, file=setup)
         out("#!/usr/bin/python")
         out("from distutils.core import setup")
@@ -284,7 +371,6 @@ class PyPI_Package(O):
         for kw in ( 'name',
                     'description', 'author', 'author_email', 'version',
                     'url',
-                    'long_description',
                   ):
           try:
             value = distinfo.pop(kw)
@@ -313,13 +399,18 @@ class PyPI_Package(O):
       base += '.py'
     return base
 
-  def package_paths(self, package_name):
+  def package_paths(self, package_name, libdir):
     ''' Generator to yield the file paths from a package relative to the `libdir` subdirectory.
     '''
-    libdir = self.libdir
+    X("PACKAGE_PATHS...")
     package_subpath = pathify(package_name)
     if not self.is_package(package_name):
       yield package_subpath + '.py'
+      test_subpath = package_subpath + '_tests.py'
+      test_path = os.path.join(libdir, test_subpath)
+      X("check for tests at: %r", test_path)
+      if os.path.exists(test_path):
+        yield test_subpath
     else:
       libprefix = libdir + os.path.sep
       for dirpath, dirnames, filenames in os.walk(os.path.join(libdir, package_subpath)):
@@ -330,16 +421,91 @@ class PyPI_Package(O):
             continue
           if filename.endswith('.py'):
             yield os.path.join(dirpath[len(libprefix):], filename)
+            continue
           warning("skipping %s", os.path.join(dirpath, filename))
+    readme_subpath = self.pkg_readme_rpath(package_name)
+    readme_path = os.path.join(libdir, readme_subpath)
+    if os.path.exists(readme_path):
+      yield readme_subpath
 
   def copyin(self, package_name, dstdir):
-    base = self.package_base(package_name)
-    runcmd([ 'hg',
-               'archive',
-                 '-r', '"%s"' % self.hg_tag,
-                 '-I', base,
-                 dstdir
-           ])
+    hgargv = [ 'set-x', 'hg',
+                 'archive',
+                   '-r', '"%s"' % self.hg_tag,
+             ]
+    first = True
+    package_parts = package_name.split('.')
+    while package_parts:
+      superpackage_name = '.'.join(package_parts)
+      base = self.package_base(superpackage_name)
+      if first:
+        # collect entire package contents
+        for subpath in self.package_paths(superpackage_name, self.libdir):
+          hgargv.extend([ '-I', os.path.join(self.libdir, subpath) ])
+      else:
+        # just collecting requires __init__.py files
+        hgargv.extend([ '-I',  os.path.join(base, '__init__.py') ])
+      package_parts.pop()
+      first = False
+    hgargv.append(dstdir)
+    runcmd(hgargv)
+
+class PyPI_PackageCheckout(O):
+  ''' Facilities available with a checkout of a package.
+  '''
+
+  def __init__(self, pkg):
+    self.package = pkg
+
+  def __enter__(self):
+    ''' Prep the package in a temporary directory, return self.
+    '''
+    if hasattr(self, 'pkg_dir'):
+      raise RuntimeError("already using .pkg_dir = %r" % (self.pkg_dir,))
+    self.pkg_dir = self.package.make_package()
+    self.inpkg("find . -type f | sort | xxargs ls -ld -- ")
+    return self
+
+  def __exit__(self, exc_type, exc_value, traceback):
+    ''' Remove the temporary directory.
+    '''
+    shutil.rmtree(self.pkg_dir)
+    del self.pkg_dir
+    return False
+
+  @property
+  def pypi_url(self):
+    return self.package.pypi_url
+
+  def inpkg(self, shcmd):
+    ''' Run a command supplied as a sh(1) command string.
+    '''
+    qpkg_dir = cs.sh.quotestr(self.pkg_dir)
+    xit = os.system("set -uex; cd %s; %s" % (qpkg_dir, shcmd))
+    if xit != 0:
+      raise ValueError("command failed, exit status %d: %r" % (xit, shcmd))
+
+  __call__ = inpkg
+
+  def inpkg_argv(self, argv):
+    ''' Run a command supplied as an argument list.
+    '''
+    shcmd = ' '.join(cs.sh.quote(argv))
+    return self.inpkg(shcmd)
+
+  def setup_py(self, *argv):
+    ''' Run a setup.py incantation.
+    '''
+    return self.inpkg_argv([ 'python3', 'setup.py' ] + list(argv))
+
+  def check(self):
+    self.setup_py('check', '-s', '--restructuredtext')
+
+  def register(self):
+    self.setup_py('register', '-r', self.pypi_url)
+
+  def upload(self):
+    self.setup_py('sdist', 'upload', '-r', self.pypi_url)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))

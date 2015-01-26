@@ -14,7 +14,7 @@ from cs.app.mailfiler import \
         Target_Function, Target_MailAddress, Target_MailFolder, \
         parserules
 from cs.logutils import D, X
-from cs.obj import O, slist
+from cs.obj import O
 
 if not os.environ.get('DEBUG', ''):
   def D(*a):
@@ -148,7 +148,7 @@ class TestMailFiler(unittest.TestCase):
                               test_string='<squid-users.squid-cache.org>'), ) )
 
   def testRulesParseFile(self):
-    rules = slist(parserules(test_rules_file))
+    rules = list(parserules(test_rules_file))
 
 def selftest(argv):
   unittest.main(__name__, None, argv)

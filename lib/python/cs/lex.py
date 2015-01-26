@@ -1,3 +1,17 @@
+#!/usr/bin/python
+#
+
+DISTINFO = {
+    'description': "lexical analysis, tokenisers",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'requires': ['cs.py3'],
+}
+
 import base64
 import binascii
 from functools import partial
@@ -6,7 +20,7 @@ from string import printable, whitespace, ascii_letters, ascii_uppercase, digits
 import re
 import sys
 import os
-from cs.py3 import unicode, ustr, sorted, StringTypes
+from cs.py3 import bytes, unicode, ustr, sorted, StringTypes
 from cs.logutils import X
 
 unhexify = binascii.unhexlify
@@ -76,13 +90,6 @@ def tabpadding(padlen,tabsize=8,offset=0):
 
   return pad
 
-def skipwhite(s,start=0):
-  ''' Returns the location of next nonwhite in string.
-  '''
-  while start < len(s) and s[start] in whitespace:
-    start+=1
-  return start
-
 def strlist(ary,sep=", "):
   return sep.join([str(a) for a in ary])
 
@@ -91,56 +98,6 @@ def lastlinelen(s):
       Initially used by cs.hier to compute effective text width.
   '''
   return len(s) - s.rfind('\n') - 1
-
-DQ_RE=re.compile(r'"(([^\\"]|\\[\\"])*)"')
-nq_re=re.compile(r'\S+')
-
-# REMOVE
-def get_dqstring(s):
-  ''' Read a double quoted string from the start of `s`.
-      Return the decoded string and the remainder of `s`.
-      Returns None for the decoded string on no match.
-  '''
-  m = DQ_RE.match(s)
-  if not m:
-    return None, s
-  return undq(m.group(1)), s[m.end():]
-
-# parse a line consisting of words or "quoted strings"
-def parseline(line):
-  words=[]
-  line=line.lstrip()
-  while len(line) > 0:
-    m=DQ_RE.match(line)
-    if m is not None:
-      words.append(undq(m.group(1)))
-      line=line[m.end():]
-    else:
-      m=nq_re.match(line)
-      if m is not None:
-        words.append(m.group(0))
-        line=line[m.end():]
-      else:
-        error("aborting parseline at: %s", line)
-        return None
-
-    line = line.lstrip()
-
-  return words
-
-# strip quotes from a "quoted string"
-dqch_re=re.compile(r'([^\\]|\\.)')
-def undq(s):
-  result=''
-  bs=s.find('\\')
-  while bs >= 0:
-    if bs > 0: result+=s[:bs]
-    result.append(s[bs+1])
-    s=s[bs+2:]
-
-  result+=s
-
-  return result
 
 def htmlify(s,nbsp=False):
   s=s.replace("&","&amp;")
@@ -174,6 +131,7 @@ _texthexify_white_chars = ascii_letters + digits + '_-+.,'
 
 def texthexify(bs, shiftin='[', shiftout=']', whitelist=None):
   ''' Transcribe the bytes `bs` to text.
+      `whitelist`: a bytes or string object indicating byte values which may be represented directly in text; string objects are converted to 
       hexify() and texthexify() output strings may be freely
       concatenated and decoded with untexthexify().
   '''
@@ -183,27 +141,31 @@ def texthexify(bs, shiftin='[', shiftout=']', whitelist=None):
     bschr = lambda bs, ndx: chr(bs[ndx])
   if whitelist is None:
     whitelist = _texthexify_white_chars
+  if isinstance(whitelist, StringTypes) and not isinstance(whitelist, bytes):
+    whitelist = bytes( ord(ch) for ch in whitelist )
   inout_len = len(shiftin) + len(shiftout)
   chunks = []
   offset = 0
   offset0 = offset
   inwhite = False
   while offset < len(bs):
-    c = bschr(bs, offset)
+    b = bs[offset]
     if inwhite:
-      if c not in whitelist:
+      if b not in whitelist:
         inwhite = False
         if offset - offset0 > inout_len:
+          # gather up whitelist span if long enough to bother
           chunk = ( shiftin
-                  + ''.join( bschr(bs, o) for o in range(offset0, offset) )
+                  + ''.join( chr(bs[o]) for o in range(offset0, offset) )
                   + shiftout
                   )
         else:
+          # transcribe as hex anyway - too short
           chunk = hexify(bs[offset0:offset])
         chunks.append(chunk)
         offset0 = offset
     else:
-      if c in whitelist:
+      if b in whitelist:
         inwhite = True
         chunk = hexify(bs[offset0:offset])
         chunks.append(chunk)
@@ -212,7 +174,7 @@ def texthexify(bs, shiftin='[', shiftout=']', whitelist=None):
   if offset > offset0:
     if inwhite and offset - offset0 > inout_len:
       chunk = ( shiftin
-              + ''.join( bschr(bs, o) for o in range(offset0, offset) )
+              + ''.join( chr(bs[o]) for o in range(offset0, offset) )
               + shiftout
               )
     else:
@@ -298,9 +260,8 @@ def unrfc2047(s):
     chunks.append(s[sofar:])
   return unicode('').join(chunks)
 
-def get_chars(s, gochars, offset=0):
-  ''' Scan the string `s` for characters in `gochars` starting at `offset`
-      (default 0).
+def get_chars(s, offset, gochars):
+  ''' Scan the string `s` for characters in `gochars` starting at `offset`.
       Return (match, new_offset).
   '''
   ooffset = offset
@@ -313,7 +274,7 @@ def get_white(s, offset=0):
       `offset` (default 0).
       Return (match, new_offset).
   '''
-  return get_chars(s, whitespace, offset=offset)
+  return get_chars(s, offset, whitespace)
 
 def get_nonwhite(s, offset=0):
   ''' Scan the string `s` for characters not in string.whitespace starting at
@@ -333,12 +294,11 @@ def get_identifier(s, offset=0, alpha=ascii_letters, number=digits, extras='_'):
   ch = s[offset]
   if ch not in alpha and ch not in extras:
     return '', offset
-  idtail, offset = get_chars(s, alpha + number + extras, offset+1)
+  idtail, offset = get_chars(s, offset+1, alpha + number + extras)
   return ch + idtail, offset
 
 def get_uc_identifier(s, offset=0, number=digits, extras='_'):
-  ''' Scan the string `s` for an identifier as for get_identifier(),
-      but require the letters to be uppercase.
+  ''' Scan the string `s` for an identifier as for get_identifier(), but require the letters to be uppercase.
   '''
   return get_identifier(s, offset=offset, alpha=ascii_uppercase, number=number, extras=extras)
 
@@ -397,8 +357,6 @@ def get_sloshed_text(s, delim, offset=0, slosh='\\', mapper=slosh_mapper, specia
           the following 8 hexadecimal digits.
         - a character from the keys of mapper
   '''
-  ##X("get_sloshed_text(%r, delim=%r, offset=%r, slosh=%r, mapper=%r, specials=%r)...",
-  ##   s, delim, offset, slosh, mapper, specials)
   if specials is not None:
     # gather up starting character of special keys and a list of
     # keys in reverse order of length

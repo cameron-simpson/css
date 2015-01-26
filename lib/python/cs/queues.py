@@ -4,12 +4,23 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
+DISTINFO = {
+    'description': "some Queue subclasses and ducktypes",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'requires': ['cs.debug', 'cs.logutils', 'cs.resources', 'cs.seq', 'cs.py3', 'cs.obj'],
+}
+
 import sys
 from functools import partial
 import logging
 from threading import Timer
 import time
-from cs.debug import Lock, RLock, Thread, trace, trace_caller, stack_dump
+from cs.debug import Lock, Thread, trace, trace_caller, stack_dump
 from cs.logutils import exception, error, warning, debug, D, X, Pfx, PfxCallInfo
 from cs.resources import NestingOpenCloseMixin, not_closed
 from cs.seq import seq
@@ -180,7 +191,7 @@ class Channel(object):
       self.closed = True
 
 class PushQueue(NestingOpenCloseMixin):
-  ''' A puttable object to look like a Queue.
+  ''' A puttable object which looks like a Queue.
       Calling .put(item) calls `func_push` supplied at initialisation
       to trigger a function on data arrival, which returns an iterable
       queued via a Later for delivery to the output queue.

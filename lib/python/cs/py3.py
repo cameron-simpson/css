@@ -11,20 +11,7 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
-        "Development Status :: 4 - Beta",
-        "Environment :: Other Environment",
-        "Intended Audience :: Developers",
-        "License :: OSI Approved :: GNU Library or Lesser General Public License (LGPL)",
-        "Operating System :: OS Independent",
-        "Topic :: Software Development :: Libraries :: Python Modules",
         ],
-    'long_description': """\
-Python3 helpers to aid code sharing between python2 and python3.
-----------------------------------------------------------------
-
-Presents various names in python 3 flavour for common use in python
-2 and python 3.
-"""
 }
 
 import sys
@@ -34,6 +21,8 @@ if sys.hexversion >= 0x03000000:
   unicode = str
   StringTypes = (str,)
   def ustr(s, e='utf-8', errors='strict'):
+    ''' Upgrade string to unicode: no-op for python 3.
+    '''
     return s
   from io import BytesIO, StringIO
   from queue import Queue, PriorityQueue, Full as Queue_Full, Empty as Queue_Empty
@@ -56,7 +45,7 @@ else:
     '''
     if isinstance(s, str):
       try:
-        s = s.decode(e, errors=errors)
+        s = s.decode(e, errors)
       except UnicodeDecodeError as ude:
         from cs.logutils import warning
         warning("cs.py3.ustr(): %s: s = %s %r", ude, type(s), s)
@@ -99,6 +88,8 @@ else:
       if isinstance(index, slice):
         return bytes( ord(ch) for ch in s2 )
       return ord(s2[0])
+    def __contains__(self, b):
+      return str.__contains__(self, chr(b))
 
 def raise3(exc_type, exc_value, exc_traceback):
   if sys.hexversion >= 0x03000000:

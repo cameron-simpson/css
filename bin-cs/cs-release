@@ -8,55 +8,41 @@ set -ue
 
 : ${TMPDIR:=/tmp}
 
-trace=set-x
+trace=  ##set-x
 relpfx=release
 
+prodpypi_url='https://pypi.python.org/pypi'
+testpypi_url='https://testpypi.python.org/pypi'
+pypi_test_mode=1
+
 cmd=$( basename "$0" )
-usage="Usage: $cmd [-p relpfx] op [args...]
-  -p relpfx Prefix for new release tag names. Default: $relpfx
+usage="Usage: $cmd [-x] op [relpfx [args...]]
+  -x            Trace command execution.
+  relpfx        Prefix for new release tag names. Default: $relpfx
   op:
+    ls          List all release prefixes in use.
     add         Issue a new release.
     last        Report last release issued.
     next        Generate a new release number.
+    update-tag  Update a release tag.
     log         Changelog from last release to now.
     export      Export release to temporary directory, report directory.
     freshmeat-submit
-                Announce last release to freshmeat."
+                Announce last release to freshmeat.
+    pypi [prod] Release python package to PyPI."
 
 badopts=
 
 while [ $# -gt 0 ]
 do
   case $1 in
-    -p) relpfx=$2; shift ;;
+    -x) trace=set-x ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
     *)  break ;;
   esac
   shift
 done
-
-case "$relpfx" in
-  release)
-    subtree=.
-    ;;
-  [a-z]*)
-    subtree=lib/python/$( echo "$relpfx" | tr . / )
-    if [ ! -d "$subtree" ]
-    then
-      if [ -f "$subtree.py" ]
-      then
-        subtree=$subtree.py
-      else
-        echo "$cmd: neither subdir $subtree nor file $subtree.py" >&2
-        badopts=1
-      fi
-    fi
-    ;;
-  *)echo "$cmd: -p: invalid relpfx, must start with a lowercase letter, got: $relpfx" >&2
-    badopts=1
-    ;;
-esac
 
 if [ $# = 0 ]
 then
@@ -65,25 +51,75 @@ then
 else
   op=$1
   shift
+  [ $# = 0 ] || { relpfx=$1; shift; }
 fi
+
+case "$relpfx" in
+  ALL)
+    ;;
+  release)
+    logpaths=.
+    ;;
+  [a-z]*)
+    pfxdir=lib/python/$( echo "$relpfx" | tr . / )
+    logpaths=
+    [ -d "$pfxdir" ] && logpaths="$logpaths $pfxdir"
+    pfxfile=$pfxdir.py
+    [ -f "$pfxfile" ] && logpaths="$logpaths $pfxfile"
+    readmepath=$( dirname "$pfxdir" )/README-$( basename "$pfxdir" ).rst
+    [ -f "$readmepath" ] && logpaths="$logpaths $readmepath"
+    ;;
+  *)echo "$cmd: invalid relpfx, must start with a lowercase letter, got: $relpfx" >&2
+    badopts=1
+    ;;
+esac
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 # self invoke, passing tunable settings
 self(){
-  $trace "$0" -p "$relpfx" ${1+"$@"}
+  _self_op=$1; shift
+  $trace "$0" "$_self_op" "$relpfx" ${1+"$@"}
+}
+
+pypi_setup(){
+  if [ $pypi_test_mode ]
+  then
+    pypi_url=$testpypi_url
+    pypi_pfx=testpypi
+  else
+    pypi_url=$prodpypi_url
+    pypi_pfx=pypi
+  fi
+  PYPI_URL=$pypi_url
+  export PYPI_URL
 }
 
 case $op in
+  ls)
+    hg tags \
+    | sed -n 's/^\([a-z][^-]*\)-\(2[0-9][0-9][0-9][0-9][0-9][0-9][0-9][^ ]*\) .*/\1/p' \
+    | sort -u
+    ;;
+
   last)
-    lastrelease=$( $trace hg tags | sed -n "/^$relpfx-[1-9][01][0-9][0-9][01][0-9][0-3][0-9]/{s/^$relpfx-//; s/ .*//; p; q;}" )
-    if [ -z "$lastrelease" ]
+    if [ "$relpfx" = ALL ]
     then
-      echo "$cmd: no last release for prefix \"$relpfx\"" >&2
-      exit 1
+      for relpfx in $( self ls )
+      do
+        lastrelease=$( self last )
+        echo "$relpfx $lastrelease"
+      done
+    else
+      lastrelease=$( $trace hg tags | sed -n "/^$relpfx-[1-9][01][0-9][0-9][01][0-9][0-3][0-9]/{s/^$relpfx-//; s/ .*//; p; q;}" )
+      if [ -z "$lastrelease" ]
+      then
+        echo "$cmd: no last release for prefix \"$relpfx\"" >&2
+        exit 1
+      fi
+      printf "%s\n" "$lastrelease"
+      exit 0
     fi
-    printf "%s\n" "$lastrelease"
-    exit 0
     ;;
 
   next)
@@ -127,7 +163,7 @@ case $op in
     else
       $trace hg log -r "'$lastrelease':" \
                     --template '{files}: {desc|firstline}\n' \
-                    "$subtree" \
+                    $logpaths \
       | $trace sed "/^\\.hg/d; /^CHANGELOG/d; /^$relpfx-/d"
     fi
     ;;
@@ -248,6 +284,7 @@ $summary_text" "$reldir"
     cf=.freshmeatrc
     [ -s "$cf" ] || { echo "$cmd: missing $cf" >&2; exit 1; }
     eval $( winclausevars "$cf" freshmeat fm )
+    self update-tag
     lastrelease=$( self last )
     [ -n "$lastrelease" ] || exit 1
     summary=$( $trace cat release/$lastrelease/SUMMARY.txt )
@@ -265,6 +302,71 @@ $summary_text" "$reldir"
       printf "%s\n" "$summary"
     ) \
     | $trace freshmeat-submit
+    ;;
+
+  update-tag)
+    if lastrelease=$( self last )
+    then
+      log=$( self log )
+      printf "%s\n" "$log"
+      if [ -n "$log" ] && ask "Issue new tag for $relpfx"
+      then
+        self add || exit 1
+      fi
+    else
+      ask "Issue first tag for $relpfx" || exit 1
+      self add || exit 1
+    fi
+    ;;
+
+  pypi)
+    if [ $# -gt 0 ] && [ "x$1" = xprod ]
+    then  shift; pypi_test_mode=
+    else  pypi_test_mode=1
+    fi
+    pypi_setup
+    if [ "$relpfx" = ALL ]
+    then
+      for relpfx in $( self ls | grep '^cs\.' )
+      do
+        pkg=$relpfx
+        lastlabel=$pypi_pfx-css-$pkg
+        lastrelease=$( self last ) || exit 1
+        lastpypirelease=$( $trace lastvalue "$lastlabel" 2>/dev/null || : )
+        if [ "x$lastrelease" = "x$lastpypirelease" ]
+        then
+          echo "OK $relpfx: $pypi_pfx up to date at $lastpypirelease"
+        else
+          if [ -n "$lastpypirelease" ]
+          then
+            echo "NEWER $relpfx: $lastrelease, but $pypi_pfx has $lastpypirelease"
+          else
+            echo "NEWER $relpfx: $lastrelease, but $pypi_pfx has nothing"
+          fi
+        fi
+        log=$( self log )
+        if [ -n "$log" ]
+        then
+          echo "  has untagged changes"
+        fi
+      done
+    else
+      pkg=$relpfx
+      lastlabel=$pypi_pfx-css-$pkg
+      case "$pkg" in
+        cs.*) ;;
+        *)  echo "$cmd: $op: invalid package name, expected cs.*: $pkg" >&2
+            exit 2
+            ;;
+      esac
+      self update-tag
+      lastrelease=$( self last )
+      [ -n "$lastrelease" ] || exit 1
+      $trace python -m cs.distinfo "$pkg" check
+      $trace python -m cs.distinfo "$pkg" register
+      $trace python -m cs.distinfo "$pkg" upload
+      $trace lastvalue "$lastlabel" "$lastrelease"
+    fi
     ;;
 
   *)echo "$cmd: unimplemented op \"$op\"" >&2

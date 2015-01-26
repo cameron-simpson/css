@@ -5,6 +5,18 @@
 #
 
 from __future__ import with_statement
+
+DISTINFO = {
+    'description': "Logging convenience routines.",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'requires': ['cs.ansi_colour', 'cs.excutils', 'cs.obj', 'cs.py3'],
+}
+
 import codecs
 from contextlib import contextmanager
 import logging
