@@ -1,0 +1,1 @@
+lib/python/cs/py3.py: cs.py3: py2 ustr(): fix invocation of str.decode
