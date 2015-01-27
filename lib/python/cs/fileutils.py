@@ -1144,7 +1144,7 @@ class Tee(object):
     for fp in self._fps:
       fp.write(data)
 
-  def flush(self, data):
+  def flush(self):
     for fp in self._fps:
       fp.flush()
 
