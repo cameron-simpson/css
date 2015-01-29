@@ -18,6 +18,7 @@ CHAR = ''.join( chr(o) for o in range(128) )
 LF = '\n'
 SP = ' '
 HT = '\t'
+SP_HT = SP + HT
 CRLF = '\r\n'
 LWS = CR + LF + SP + HT
 DQ = '"'
@@ -48,6 +49,11 @@ def get_lws(s, offset=0):
   if not spacing:
     raise ValueError("missing SP/HT after CRLF at offset %d" % (offset,))
   return CRLF + spacing, offset
+
+def get_space(s, offset=0):
+  ''' Gather up a sequence of SP or HT, possibly empty.
+  '''
+  return get_chars(s, offset, SP_HT)
 
 def get_text(s, offset=0):
   ''' Gather up a sequence of TEXT characters (possibly empty).
