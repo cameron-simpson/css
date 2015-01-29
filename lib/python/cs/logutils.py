@@ -445,7 +445,13 @@ class Pfx(object):
     if exc_value is not None:
       if _state.raise_needs_prefix:
         prefix = self._state.prefix
-        prefixify = lambda text: prefix + ': ' + text.replace('\n', '\n'+prefix)
+        ##prefixify = lambda text: prefix + ': ' + text.replace('\n', '\n'+prefix)
+        def prefixify(text):
+          X("prefixy(text=%r)", text)
+          if not isinstance(text, StringTypes):
+            D("%s: not a string, not prefixing: %r", prefix, text)
+            return text
+          return prefix + ': ' + ustr(text, errors='replace').replace('\n', '\n'+prefix)
         if hasattr(exc_value, 'args'):
           args = exc_value.args
           if args:
@@ -457,8 +463,7 @@ class Pfx(object):
               if len(exc_value.args) == 0:
                 args = prefix
               else:
-                args = [ prefixify(ustr(exc_value.args[0], errors='replace'))
-                       ] + list(exc_value.args[1:])
+                args = [ prefixify(exc_value.args[0]) ] + list(exc_value.args[1:])
             exc_value.args = args
         elif hasattr(exc_value, 'message'):
           exc_value.message = prefixify(str(exc_value.message))
