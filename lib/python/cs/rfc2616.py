@@ -159,7 +159,10 @@ def pass_chunked(fpin, fpout, hdr_trailer):
   while chunk_size > 0:
     pass_length(fpin, fpout, chunk_size)
     crlf = fpin.read(2)
-    if crlf != CRLF:
+    if len(crlf) == 0:
+      warning('pass_chunked: empty data received; no "0" chunk')
+      break
+    if crlf != CRLFb:
       raise ValueError("missing CRLF after chunk data, found: %r" % (crlf,))
     fpout.write(crlf)
   if hdr_trailer is not None:
