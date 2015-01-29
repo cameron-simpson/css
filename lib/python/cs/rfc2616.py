@@ -110,12 +110,14 @@ def parse_chunk_line1(bline):
   chunk_size = int(chunk_size, 16)
   chunk_exts = []
   # collect chunk-extensions
+  _, offset = get_space(line, offset)
   while offset < len(line) and line.startswith(';', offset):
     chunk_ext_name, offset = get_token(line, offset+1)
     if not line.startswith('=', offset):
       raise ValueError("missing '=' after chunk-ext-name at offset %d" % (offset,))
     chunk_ext_val, offset = get_chunk_ext_val(line, offset+1)
     chunk_exts.append( (chunk_ext_name, chunk_ext_val) )
+    _, offset = get_space(line, offset)
   if not line.startswith(CRLF, offset):
     raise ValueError("missing CRLF at end of opening chunk line at offset %d" % (offset,))
   offset += 2
