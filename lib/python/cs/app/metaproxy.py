@@ -10,7 +10,7 @@
 #       divert *.metaproxy directly to trusted remote squid
 #
 #  remote-personal-squid
-#       divert (.metaproxy to local remote-personal-metaproxy
+#       divert *.metaproxy to local remote-personal-metaproxy
 #
 #  remote-personal-metaproxy
 #       rewrite rq URL to target URL, often https:
@@ -24,24 +24,34 @@ from __future__ import print_function
 import sys
 import os
 import os.path
-import socket
+from contextlib import contextmanager
 from getopt import getopt, GetoptError
+import re
+import socket
+from socket import getservbyname
 try:
   import socketserver
 except ImportError:
   import SocketServer as socketserver
-from threading import Thread
+import stat
+from tempfile import mkstemp
+from threading import Thread, RLock
 try:
   from urllib.parse import urlparse
 except ImportError:
   from urlparse import urlparse
+from cs.asynchron import Asynchron
+from cs.env import envsub
 from cs.excutils import LogExceptions
-from cs.logutils import setup_logging, Pfx, debug, info, warning, error, D, X
+from cs.fileutils import copy_data, Tee
+from cs.logutils import setup_logging, Pfx, debug, info, warning, error, exception, D, X
 from cs.later import Later
 from cs.lex import get_hexadecimal, get_other_chars
 from cs.rfc2616 import read_headers, message_has_body, pass_chunked, pass_length, \
                        dec8, enc8, CRLF, CRLFb
 from cs.seq import Seq
+from cs.threads import locked, locked_property
+from cs.timeutils import time_func
 from cs.obj import O
 
 USAGE = '''Usage: %s [-L address:port] [-P upstream_proxy]'''
@@ -93,7 +103,7 @@ def main(argv):
     print(usage, file=sys.stderr)
     return 2
 
-  P = MetaProxy(listen_addrport, default_proxy_addrport)
+  P = MetaProxy(listen_addrport, default_proxy_addrport, parallel=1)
   P.serve_forever()
   return 0
 
@@ -148,6 +158,7 @@ class MetaProxy(socketserver.TCPServer):
     self.later.open()
     self.name = "MetaProxy(%s)" % (listen_addrport,)
     self.tagseq = Seq()
+    self.cache = MetaProxyCache()
 
   def __str__(self):
     return self.name
@@ -175,6 +186,50 @@ class MetaProxy(socketserver.TCPServer):
     '''
     n = next(self.tagseq)
     return "%s-%d" % (prefix, n)
+
+  def should_cache(self, RQ):
+    ''' Test whether a request should be cached.
+    '''
+    uri = RQ.req_uri
+    if ( uri.endswith('/')
+      or uri.endswith('.js')
+      or uri.endswith('.jpg')
+      or uri.endswith('.gif')
+       ):
+      return True
+    return True
+    ##return False
+
+  def probe_cache(self, RQ):
+    ''' Probe the cache for this request. Return (node, fpin, fpout).
+        If the URI is in the cache, return the node and fpin a file
+        object open for read on the cached response.
+        If the URI is new to the cache and this is the first request,
+        fpin will be None and fpout will be open for write on a
+        file which will become the cached response.
+        If the URI is new to the cache but a fetch is already in
+        process, fpin and fpout will be None and a call to the node
+        will return an fpin when the fetch underway is complete.
+    '''
+    cache = self.cache
+    fpin = None
+    fpout = None
+    with cache.lock:
+      N = cache.find_node(RQ)  # may be None if not cached
+      if N and N.ready:
+        # in cache, access the cached response
+        fpin = N.readfrom()
+      else:
+        # not in cache
+        if self.should_cache(RQ):
+          # allocate node and start temp file
+          N = cache.make_node(RQ)
+          fpout = N.writeto()
+        else:
+          # else should not cache, don't bother
+          ##X("... and should not cache")
+          pass
+    return N, fpin, fpout
 
 class MetaProxyHandler(socketserver.BaseRequestHandler):
   ''' Request handler class for MetaProxy TCPServers.
@@ -205,38 +260,78 @@ class MetaProxyHandler(socketserver.BaseRequestHandler):
     client_tag = self.proxy.newtag("client")
     with Pfx(client_tag):
       while True:
-        info("read new request...")
-        httprq = dec8(fpin.readline())
-        if not httprq:
-          info("end of client requests")
+        try:
+          elapsed, bline = time_func(fpin.readline)
+        except ConnectionResetError as e:
+          warning("%s", e)
           break
-        method, uri, version = httprq.split()
-        RQ = URI_Request(self, method, uri, version)
-        info("new request: %s", RQ)
-        with Pfx(str(RQ)):
-          uri_scheme, uri_tail = uri.split(':', 1)
-          req_header_data, req_headers = read_headers(fpin)
-          RQ.req_header_data = req_header_data
-          RQ.req_headers = req_headers
-          proxy_addrport = self.choose_proxy(RQ)
-          upstream = socket.create_connection(proxy_addrport)
-          fpup_in, fpup_out = openpair(upstream.fileno())
-          Tdownstream = Thread(name="copy from upstream",
-                               target=RQ.pass_response,
-                               args=(client_tag, fpup_in, fpout))
-          Tdownstream.daemon = True
-          Tdownstream.start()
-          RQ.pass_request(fpin, fpup_out)
-          fpup_out.flush()
-          Tdownstream.join()
-          fpout.flush()
-          # disconnect from proxy
-          fpup_out.close()
-          fpup_in.close()
-          upstream.close()
-          upstream = None
-          info("upstream closed")
-      info("end proxy requests")
+        httprq = dec8(bline).strip()
+        if not httprq:
+          ##info("end of client requests")
+          break
+        ##info("received rq in %.2fs: %r", elapsed, httprq)
+        with Pfx(httprq):
+          method, uri, version = httprq.split()
+          RQ = URI_Request(self, method, uri, version)
+          with Pfx(str(RQ)):
+            uri_scheme, uri_tail = uri.split(':', 1)
+            req_header_data, req_headers = read_headers(fpin)
+            RQ.req_header_data = req_header_data
+            RQ.req_headers = req_headers
+            rsp_fpout = fpout
+            N, cache_fpin, cache_fpout = self.proxy.probe_cache(RQ)
+            if cache_fpin and cache_fpout:
+              warning("both cache_fpin and cache_fpout !!")
+            if N:
+              if cache_fpin:
+                S = os.fstat(cache_fpin.fileno())
+                if not stat.S_ISREG(S.st_mode):
+                  warning("cache_fpin not attached to a regular file")
+                nbytes = S.st_size
+                copy_data(cache_fpin, fpout, nbytes)
+                cache_fpin.close()
+                cache_fpin = None
+                fpout.flush()
+                info("return CACHED")
+                continue
+            info("NOT CACHED")
+            if cache_fpout:
+              # arrange to copy response to the cache
+              rsp_fpout = Tee(rsp_fpout, cache_fpout)
+            proxy_addrport = self.choose_proxy(RQ)
+            with Pfx("proxy_addrport = %r", proxy_addrport):
+              try:
+                upstream = socket.create_connection(proxy_addrport)
+              except Exception as e:
+                error("%r: socket.create_connection: %s", proxy_addrport, e)
+                RQ.respond(rsp_fpout, '500', 'connect to upstream %r: %s' % (proxy_addrport, e))
+                continue
+              fpup_in, fpup_out = openpair(upstream.fileno())
+              Tdownstream = Thread(name="%s: copy from upstream" % (client_tag,),
+                                   target=RQ.pass_response,
+                                   args=(client_tag, fpup_in, rsp_fpout))
+              Tdownstream.daemon = True
+              Tdownstream.start()
+              RQ.pass_request(fpin, fpup_out)
+              fpup_out.flush()
+              Tdownstream.join()
+              # disconnect from proxy
+              fpup_out.close()
+              fpup_in.close()
+              upstream.close()
+              upstream = None
+              debug("upstream closed")
+            rsp_fpout.flush()
+            if cache_fpout:
+              if RQ.rsp_cache_ok:
+                cache_fpout.close()
+              else:
+                cache_fpout.cancel()
+              cache_fpout = None
+              # forget Tee instance
+              rsp_fpout = None
+
+      ##info("end proxy requests")
 
   def choose_proxy(self, RQ):
     ''' Decide where to connect to deliver the request `RQ`.
@@ -273,6 +368,7 @@ class URI_Request(O):
     self.req_method = method
     self.req_uri = uri
     self.req_http_version = version
+    self.rsp_cache_ok = False
 
   def __str__(self):
     return "%s[%s:%s]" % (self.name, self.req_method, self.req_uri)
@@ -319,9 +415,8 @@ class URI_Request(O):
         debug("no body expected")
 
   def pass_response(self, client_tag,  fpin, fpout):
-    with Pfx("%s: pass_response", client_tag):
-      info("read server response...")
-      bline = fpin.readline()
+    with Pfx("%s: %s: pass_response", client_tag, self):
+      elapsed, bline = time_func(fpin.readline)
       line = dec8(bline)
       if not line.endswith(CRLF):
         raise ValueError("truncated response (no CRLF): %r" % (line,))
@@ -333,7 +428,7 @@ class URI_Request(O):
       self.rsp_reason = reason
       fpout.write(bline)
       rsp_header_data, rsp_headers = read_headers(fpin)
-      debug("response headers:\n%s\n", rsp_headers.as_string())
+      ##info("response headers:\n%s\n", rsp_headers.as_string())
       self.rsp_header_data = rsp_header_data
       self.rsp_headers = rsp_headers
       fpout.write(rsp_header_data)
@@ -364,6 +459,222 @@ class URI_Request(O):
             pass_length(fpin, fpout, length)
           else:
             debug("no body expected")
+      # set self.rsp_cache_ok based on completion of response and status code
+      info("PASS_RESPONSE: body complete, status_code=%r, set self.rsp_cache_ok", status_code)
+      self.rsp_cache_ok =self.req_method == 'GET' and status_code == '200'
+
+  def respond(self, fpout, code, infotext, headers=None, body=None):
+    ''' Send an HTTP response to fpout.
+    '''
+    fpout.write(code.enc8())
+    fpout.write(' '.enc8())
+    fpout.write(infotext.enc8())
+    fpout.write(CRLFb)
+    if headers is not None:
+      fpout.write(headers.as_string().enc8())
+    fpout.write(CRLFb)
+
+class MetaProxyCache(O):
+  ''' Access to a cache directory.
+  '''
+
+  def __init__(self, cache_dir=None):
+    if cache_dir is None:
+      cache_dir = envsub('$HOME/var/metaproxy')
+    self.cache_dir = cache_dir
+    X("cache_dir = %r", self.cache_dir)
+    # create cache dir if missing, but not an arbitrarily deep tree
+    if not os.path.isdir(cache_dir):
+      os.mkdir(cache_dir)
+    self._nodes = {}
+    self._lock = RLock()
+    self.lock = self._lock
+
+  def nodekey(self, RQ):
+    return RQ.req_method, RQ.req_uri
+
+  @locked
+  def find_node(self, RQ):
+    ''' Find and return the CacheNode associated with the URI_Request `RQ`.
+        Return None if there is no existing node for this request.
+    '''
+    key = self.nodekey(RQ)
+    N = self._nodes.get(key)
+    if N is None:
+      N = CacheNode(self, *key)
+      if N.ready:
+        # keep the Node and return it
+        self._nodes[key] = N
+      else:
+        N = None
+    return N
+
+  @locked
+  def make_node(self, RQ):
+    ''' Find and return the CacheNode associated with the URI_Request `RQ`.
+        Create the node if missing.
+        The CacheNode may or may not be .ready.
+    '''
+    key = self.nodekey(RQ)
+    N = self._nodes.get(key)
+    if N is None:
+      N = self._nodes[key] = CacheNode(self, *key)
+      if N.key != key:
+        warning("%s.key=%r but MetaProxyCache key for (%r,%r)=%r",
+                N, N.key, RQ.req_method, RQ.req_uri, key)
+    return N
+
+class CacheNode(O):
+  ''' A node within a MetaProxyCache.
+  '''
+
+  def __init__(self, cache, method, uri):
+    self.cache = cache
+    self.method = method
+    self.uri = uri
+    self._cache_async = None
+    self._cache_path = None
+    path = self.cachepath
+    if os.path.exists(path):
+      self._setpath(path)
+
+  def __str__(self):
+    return "CacheNode<%s:%s>" % (self.method, self.uri)
+
+  def _setpath(self, path):
+    self._cache_path = path
+
+  def __call__(self):
+    ''' Return a file open for read at the start of the response cache.
+    '''
+    async = self._cache_async
+    if async is not None:
+      # caching in progress; block awaiting completion, return result
+      return async()
+    return self.readfrom()
+
+  @property
+  def key(self):
+    return self.method, self.uri
+
+  @property
+  def ready(self):
+    if self._cache_path:
+      return True
+    if not self._cache_async:
+      self._cache_async = Asynchron()
+    return self._cache_async.ready
+
+  @property
+  def cachepath(self):
+    ''' Compute the cache subpath for a URI.
+        - scratch files for foo/bah are made as foo/.tmp*
+        - directories (foo/) are stored as foo/.dir
+        - files names /. are folded back to / (bad idea?)
+        - files named foo/.bah are stored as foo/..bah
+        FIXME: because different (method,uri) pairs may generate
+        equivalent file paths, there is possibility for aliasing.
+
+    '''
+    up = urlparse(self.uri)
+    scheme = up.scheme
+    if scheme == 'http':
+      port = up.port
+      if port is None:
+        port = 80
+    else:
+      raise ValueError("only http:// URIs supported")
+    path = up.path
+    if not path:
+      path = '/'
+    elif path.endswith('/.'):
+      # TODO: bad idea?
+      path = path[:-1]
+    if path.endswith('/'):
+      path = path + '.dir'
+    else:
+      pathdir = os.path.dirname(path)
+      pathbase = os.path.basename(path)
+      if pathbase.startswith('.'):
+        pathbase = '.' + pathbase
+      path = os.path.join(pathdir, pathbase)
+    path = path.strip('/')
+    path = os.path.join(self.cache.cache_dir,
+                        "%s:%s" % (self.method, scheme),
+                        "%s:%d" % (up.hostname, port),
+                        path)
+    if up.params:
+      path += ';' + up.params
+    if up.query:
+      path += '&' + up.query
+    return path
+
+  def start_cache_file(self):
+    return self._cache_fp
+
+  def readfrom(self):
+    ''' Return a file open for read on the cached response.
+    '''
+    return open(self._cache_path, 'rb')
+
+  def writeto(self):
+    ''' Write new content to this cache node, return file.
+    '''
+    wfp = _NewCacheFile(self)
+    if self._cache_async is not None:
+      raise RuntimeError("%s._cache_async already underway" % (self,))
+    self._cache_async = Asynchron()
+    return wfp
+
+class _NewCacheFile(object):
+  ''' A simple file-like object with .write and .close methods used to accrue a cache file.
+  '''
+
+  def __init__(self, node):
+    ''' Instantiaite a new cache file for the supplied CacheNode.
+        Create a temp file in the target directory and rename the final path on .close.
+    '''
+    self.node = node
+    self.finalpath = finalpath = node.cachepath
+    cachesubdir = os.path.dirname(finalpath)
+    if not os.path.isdir(cachesubdir):
+      os.makedirs(cachesubdir)
+    fd, self.tmppath = mkstemp(prefix='.tmp', dir=cachesubdir, text=False)
+    self.fp = os.fdopen(fd, 'wb')
+
+  def write(self, data):
+    ''' Transcribe data to the temp file.
+    '''
+    return self.fp.write(data)
+
+  def flush(self):
+    ''' Flush buffered data to the temp file.
+    '''
+    return self.fp.flush()
+
+  def cancel(self):
+    ''' Cancel the transcription to the temp file and discard.
+    '''
+    info("_NewCacheFile: CANCEL, discard cached response...")
+    self.node._cache_async.cancel()
+    self.fp.close()
+    self.fp = None
+    os.remove(self.tmppath)
+
+  def close(self):
+    ''' Close the output and move the file into place as the cached response.
+    '''
+    info("_NewCacheFile: CLOSE, install cached response...")
+    self.fp.close()
+    self.fp = None
+    finalpath = self.finalpath
+    if os.path.exists(finalpath):
+      warning("replacing existing %r", finalpath)
+    os.rename(self.tmppath, finalpath)
+    X("set %s._cache_path=%r", self.node, finalpath)
+    self.node._setpath(finalpath)
+    self.node._cache_async.result = finalpath
+    self.node._cache_async = None
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
