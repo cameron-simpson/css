@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Pull a specific revisions from a different checkout.
+# Pull specific revisions from a different checkout.
 # Initial use case is to pull bugfixes from an as yet unpublished
 # branch, still lurking in an isolated checkout.
 #   - Cameron Simpson <cs@zip.com.au> 30jan2015
