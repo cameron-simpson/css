@@ -44,6 +44,13 @@ fi
 
 for rev
 do
-  $trace incd "$ocheckout" hg export "$rev" \
-  | $trace hg import --import-branch -
+  case "$rev" in
+    [0-9a-f]*)
+        patch=$( $trace incd "$ocheckout" hg export "$rev" )
+        print '%s\n' "$patch" | $trace hg import --import-branch - 
+        ;;
+    *)  echo "$cmd: unsupported revision specification: $rev" >&2
+        exit 1
+        ;;
+  esac
 done
