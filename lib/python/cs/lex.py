@@ -287,7 +287,7 @@ def get_hexadecimal(s, offset=0):
   ''' Scan the string `s` for hexadecimal characters starting at `offset`.
       Return hex_string, new_offset.
   '''
-  return get_chars(s, '0123456789abcdefABCDEF', offset)
+  return get_chars(s, offset, '0123456789abcdefABCDEF')
 
 def get_identifier(s, offset=0, alpha=ascii_letters, number=digits, extras='_'):
   ''' Scan the string `s` for an identifier (by default an ASCII
