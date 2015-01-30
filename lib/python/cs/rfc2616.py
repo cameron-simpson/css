@@ -10,7 +10,7 @@ from itertools import takewhile
 from string import ascii_letters, ascii_uppercase, ascii_lowercase, digits
 from cs.fileutils import copy_data
 from cs.lex import get_hexadecimal, get_chars, get_other_chars
-from cs.logutils import X
+from cs.logutils import X, warning
 
 # character classes: see RFC2616 part 2.2
 CR = '\r'
