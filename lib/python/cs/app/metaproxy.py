@@ -649,7 +649,12 @@ class _NewCacheFile(object):
     self.finalpath = finalpath = node.cachepath
     cachesubdir = os.path.dirname(finalpath)
     if not os.path.isdir(cachesubdir):
-      os.makedirs(cachesubdir)
+      try:
+        os.makedirs(cachesubdir)
+      except FileExistsError as e:
+        # catch racy directory creation
+        if not os.path.isdir(cachesubdir):
+          raise
     fd, self.tmppath = mkstemp(prefix='.tmp', dir=cachesubdir, text=False)
     self.fp = os.fdopen(fd, 'wb')
 
