@@ -576,12 +576,7 @@ class CacheNode(O):
   @property
   def cachepath(self):
     ''' Compute the cache subpath for a URI.
-        - scratch files for foo/bah are made as foo/.tmp*
-        - directories (foo/) are stored as foo/.dir
-        - files names /. are folded back to / (bad idea?)
-        - files named foo/.bah are stored as foo/..bah
-        FIXME: because different (method,uri) pairs may generate
-        equivalent file paths, there is possibility for aliasing.
+        Scratch files for foo/bah are made as foo/.tmp*
         A dir part with a dot in it gets '.dir' appended.
         A file with no dot or ending in '.file' or '.dir' gets '.file' appended.
     '''
