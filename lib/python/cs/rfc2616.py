@@ -153,15 +153,16 @@ def pass_chunked(fpin, fpout, hdr_trailer):
   ''' Copy "chunked" data from `fpin` to `fpout`.
       See RFC2616, part 3.6.1.
   '''
-  bline = fpin.readline()
-  chunk_size, chunk_exts = parse_chunk_line1(bline)
-  fpout.write(bline)
-  while chunk_size > 0:
+  while True:
+    bline = fpin.readline()
+    chunk_size, chunk_exts = parse_chunk_line1(bline)
+    fpout.write(bline)
+    if chunk_size == 0:
+      break
     pass_length(fpin, fpout, chunk_size)
     crlf = fpin.read(2)
     if len(crlf) == 0:
-      warning('pass_chunked: empty data received; no "0" chunk')
-      break
+      raise ValueError("pass_chunked: empty data received after chunk-data")
     if crlf != CRLFb:
       raise ValueError("missing CRLF after chunk data, found: %r" % (crlf,))
     fpout.write(crlf)
