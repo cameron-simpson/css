@@ -138,11 +138,16 @@ def parse_http_proxy(envval):
 
 def openpair(fd):
   ''' Open the supplied file descriptor `fd` for read and open a dup() of it for write.
+      The file descriptor itself must support read and write.
   '''
-  fd2 = os.dup(fd)
-  fpin = os.fdopen(fd, "rb")
-  fpout = os.fdopen(fd2, "wb")
-  return fpin, fpout
+  with Pfx("openpair(%d)", fd):
+    S = os.fstat(fd)
+    if stat.S_ISREG(S.st_mode):
+      warning("fd (%d) is a regular file; openpair will not make well behaved file objects", fd)
+    fd2 = os.dup(fd)
+    fpin = os.fdopen(fd, "rb")
+    fpout = os.fdopen(fd2, "wb")
+    return fpin, fpout
 
 class MetaProxy(socketserver.TCPServer):
 
