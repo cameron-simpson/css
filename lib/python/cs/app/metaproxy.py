@@ -24,6 +24,7 @@ from __future__ import print_function
 import sys
 import os
 import os.path
+from os.path import basename, dirname
 from contextlib import contextmanager
 from getopt import getopt, GetoptError
 import re
@@ -59,7 +60,7 @@ USAGE = '''Usage: %s [-L address:port] [-P upstream_proxy]'''
 DEFAULT_PARALLEL = 4
 
 def main(argv):
-  cmd = os.path.basename(argv.pop(0))
+  cmd = basename(argv.pop(0))
   usage = USAGE % (cmd,)
   setup_logging(cmd)
 
