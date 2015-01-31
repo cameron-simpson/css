@@ -467,7 +467,9 @@ class URI_Request(O):
             debug("no body expected")
       # set self.rsp_cache_ok based on completion of response and status code
       info("PASS_RESPONSE: body complete, status_code=%r, set self.rsp_cache_ok", status_code)
-      self.rsp_cache_ok =self.req_method == 'GET' and status_code == '200'
+      self.rsp_cache_ok = ( self.req_method == 'GET'
+                        and ( status_code == '200' or status_code == '404' )
+                          )
 
   def respond(self, fpout, code, infotext, headers=None, body=None):
     ''' Send an HTTP response to fpout.
