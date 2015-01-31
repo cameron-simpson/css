@@ -594,19 +594,22 @@ class CacheNode(O):
       raise ValueError("only http:// URIs supported")
     path = up.path
     if not path:
-      path = '/'
-    elif path.endswith('/.'):
-      # TODO: bad idea?
-      path = path[:-1]
-    if path.endswith('/'):
-      path = path + '.dir'
+      warning("empty path from uri %r", uri)
+      pathdir = ''
+      pathbase = ''
+    elif path.endswith('/'):
+      pathdir = path.rstrip('/')
+      pathbase = ''
     else:
-      pathdir = os.path.dirname(path)
-      pathbase = os.path.basename(path)
-      if pathbase.startswith('.'):
-        pathbase = '.' + pathbase
-      path = os.path.join(pathdir, pathbase)
-    path = path.strip('/')
+      pathdir = dirname(path)
+      pathbase = basename(path)
+      if not pathbase:
+        warning('unexpected empty pathbase from uri %r', path)
+    if not pathbase:
+      pathbase = '.dir'
+    elif pathbase.endswith('.dir') or pathbase.endswith('.file'):
+      pathbase += '.file'
+    path = os.path.join(pathdir, pathbase).lstrip('/')
     path = os.path.join(self.cache.cache_dir,
                         "%s:%s" % (self.method, scheme),
                         "%s:%d" % (up.hostname, port),
