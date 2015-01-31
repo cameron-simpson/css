@@ -582,7 +582,8 @@ class CacheNode(O):
         - files named foo/.bah are stored as foo/..bah
         FIXME: because different (method,uri) pairs may generate
         equivalent file paths, there is possibility for aliasing.
-
+        A dir part with a dot in it gets '.dir' appended.
+        A file with no dot or ending in '.file' or '.dir' gets '.file' appended.
     '''
     up = urlparse(self.uri)
     scheme = up.scheme
@@ -593,27 +594,25 @@ class CacheNode(O):
     else:
       raise ValueError("only http:// URIs supported")
     path = up.path
-    if not path:
-      warning("empty path from uri %r", uri)
-      pathdir = ''
-      pathbase = ''
-    elif path.endswith('/'):
-      pathdir = path.rstrip('/')
-      pathbase = ''
+    isdir = not path or path.endswith('/')
+    subpaths = [ subpath for subpath in path.split('/') if subpath ]
+    if not subpaths:
+      path = '.dir'
+      subpaths2 = [ '.dir' ]
     else:
-      pathdir = dirname(path)
-      pathbase = basename(path)
-      if not pathbase:
-        warning('unexpected empty pathbase from uri %r', path)
-    if not pathbase:
-      pathbase = '.dir'
-    elif pathbase.endswith('.dir') or pathbase.endswith('.file'):
-      pathbase += '.file'
-    path = os.path.join(pathdir, pathbase).lstrip('/')
+      lastpath = subpaths.pop(-1)
+      if lastpath.endswith('.file') or '.' not in lastpath:
+        lastpath += '.file'
+      subpaths2 = []
+      for subpath in subpaths:
+        if '.' in subpath:
+          subpath += '.dir'
+        subpaths2.append(subpath)
+      subpaths2.append(lastpath)
     path = os.path.join(self.cache.cache_dir,
                         "%s:%s" % (self.method, scheme),
                         "%s:%d" % (up.hostname, port),
-                        path)
+                        *subpaths2)
     if up.params:
       path += ';' + up.params
     if up.query:
