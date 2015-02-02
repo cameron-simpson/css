@@ -4,6 +4,17 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
+DISTINFO = {
+    'description': "easy HTML transcription",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'requires': ['cs.py3'],
+}
+
 import re
 import sys
 import urllib
@@ -17,7 +28,8 @@ dqAttrValSafeRe = re.compile(r'[-=. \w:@/?~#+&]+')
 BR = ('BR',)
 
 def tok2s(*tokens):
-  ''' Return transcription of token `tok` in HTML form.
+  ''' Transcribe tokens to a string, return the string.
+      This is a trivial wrapper for puttok.
   '''
   fp = StringIO()
   puttok(fp, *tokens)
@@ -48,7 +60,7 @@ def puttok(fp, *tokens):
       tag = tok.tag
       attrs = tok.attrs
     except AttributeError:
-      # not a dict
+      # not a preformed token with .tag and .attrs
       # [ "&ent;" ] is an HTML character entity
       if len(tok) == 1 and tok[0].startswith('&'):
         fp.write(tok[0])

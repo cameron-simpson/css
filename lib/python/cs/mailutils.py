@@ -4,6 +4,17 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
+DISTINFO = {
+    'description': "functions and classes to work with email",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'requires': ['cs.fileutils', 'cs.logutils', 'cs.threads', 'cs.seq', 'cs.py3'],
+}
+
 import email.message
 import email.parser
 from email.utils import getaddresses
@@ -21,26 +32,26 @@ from cs.fileutils import Pathname, shortpath as _shortpath
 from cs.logutils import Pfx, info, warning, debug, D
 from cs.threads import locked_property
 from cs.seq import seq
-from cs.py3 import StringIO
+from cs.py3 import StringIO, StringTypes
 
 SHORTPATH_PREFIXES = ( ('$MAILDIR/', '+'), ('$HOME/', '~/') )
 
 def shortpath(path, environ=None):
   return _shortpath(path, environ=environ, prefixes=SHORTPATH_PREFIXES)
 
-def Message(M, headersonly=False):
-  ''' Factory function to accept a file or filename and return an
-      email.message.Message.
+def Message(msgfile, headersonly=False):
+  ''' Factory function to accept a file or filename and return an email.message.Message.
   '''
-  if isinstance(M, str):
-    pathname = M
+  if isinstance(msgfile, StringTypes):
+    # msgfile presumed to be filename
+    pathname = msgfile
     with Pfx(pathname):
       with open(pathname) as mfp:
         M = Message(mfp, headersonly=headersonly)
         M.pathname = pathname
         return M
-  mfp = M
-  return email.parser.Parser().parse(mfp, headersonly=headersonly)
+  # msgfile presumed to be file-like object
+  return email.parser.Parser().parse(msgfile, headersonly=headersonly)
 
 def message_addresses(M, header_names):
   ''' Yield (realname, address) pairs from all the named headers.
@@ -54,6 +65,23 @@ def message_addresses(M, header_names):
                   header_names, header_name, hdr, realname, address)
         else:
           yield realname, address
+
+def modify_header(M, hdr, new_value, always=False):
+  ''' Modify a Message `M` to change the value of the named header `hdr` to the new value `new_value`.
+      If `new_value` differs from the existing value or if `always`
+      is true, save the old value as X-Old-`hdr`.
+      Return a Boolean indicating whether the headers were modified.
+  '''
+  modified = False
+  old_value = M.get(hdr, '')
+  if always or old_value != new_value:
+    modified = True
+    old_hdr = 'X-Old-' + hdr
+    for old_value in M.get_all(hdr, ()):
+      M.add_header("X-Old-" + hdr, old_value)
+    del M[hdr]
+    M[hdr] = new_value
+  return modified
 
 def ismhdir(path):
   ''' Test if `path` points at an MH directory.
@@ -71,16 +99,17 @@ def ismaildir(path):
 def ismbox(path):
   ''' Open path and check that its first line begins with "From ".
   '''
-  fp=None
+  fp = None
   try:
-    fp=open(path)
+    fp = open(path)
     from_ = fp.read(5)
   except IOError:
     if fp is not None:
       fp.close()
     return False
-  fp.close()
-  return from_ == 'From '
+  else:
+    fp.close()
+    return from_ == 'From '
 
 def make_maildir(path):
   ''' Create a new maildir at `path`.

@@ -1,6 +1,23 @@
 #!/usr/bin/python -tt
 
 from __future__ import with_statement, print_function
+
+DISTINFO = {
+    'description': "a cs.nodedb NodeDB subclass for storing email address information (groups, addresses, so forth)",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'requires': [ 'cs.logutils', 'cs.mailutils', 'cs.nodedb', 'cs.lex', 'cs.seq', 'cs.sh', 'cs.threads', 'cs.py.func', 'cs.py3', ],
+    'entry_points': {
+      'console_scripts': [
+          'maildb = cs.app.maildb:main',
+          ],
+        },
+}
+
 from collections import deque
 from getopt import getopt, GetoptError
 from email.utils import getaddresses, parseaddr, formataddr
@@ -17,11 +34,14 @@ from cs.mailutils import ismaildir, message_addresses, Message
 from cs.nodedb import NodeDB, Node, NodeDBFromURL
 from cs.lex import get_identifier
 import cs.sh
+from cs.seq import get0
 from cs.threads import locked, locked_property
 from cs.py.func import derived_property
 from cs.py3 import StringTypes, ustr
 
-def main(argv, stdin=None):
+def main(argv=None, stdin=None):
+  if argv is None:
+    argv = sys.argv
   if stdin is None:
     stdin = sys.stdin
   argv = list(argv)
@@ -102,6 +122,15 @@ def main(argv, stdin=None):
               xit = 1
         elif op == 'compact':
           MDB.rewrite()
+        elif op == 'export':
+          exportpath = argv.pop(0)
+          with Pfx(exportpath):
+            if os.path.exists(exportpath):
+              error("already exists")
+            else:
+              MDB.scrub()
+              with open(exportpath, "w") as exfp:
+                MDB.dump(exfp)
         elif op == 'list-abbreviations' or op == 'list-abbrevs':
           try:
             opts, argv = getopt(argv, 'A')
@@ -388,7 +417,7 @@ class AddressNode(Node):
 
   @property
   def realname(self):
-    return ustr( getattr(self, 'REALNAME', u'') )
+    return ustr( get0(self.REALNAMEs, u'') )
 
   @realname.setter
   def realname(self, newname):

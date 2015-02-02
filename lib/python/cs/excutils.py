@@ -4,6 +4,16 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
+DISTINFO = {
+    'description': "Convenience facilities for managing exceptions.",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+}
+
 import sys
 import logging
 import traceback
@@ -117,7 +127,7 @@ def transmute(exc_from, exc_to=None):
       try:
         return func(*a, **kw)
       except exc_from as e:
-        raise exc_to("inner %s transmuted to %s: %s" % (type(e), exc_to, str(e)))
+        raise exc_to("inner %s:%s transmuted to %s" % (type(e), e, exc_to))
     return transmute_transmutor_wrapper
   return transmutor
 
