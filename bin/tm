@@ -252,6 +252,11 @@ esac
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+rcmd(){
+  _rcmd_rhost=$1; shift
+  $trace ssh -t "$_rcmd_rhost" "$setx"'; : ${TMPDIR:=}; if [ -z "$TMPDIR" ]; then [ -d "$HOME/tmp/." ] && TMPDIR=$HOME/tmp; fi; export TMPDIR; '"$*"
+}
+
 case "$op" in
   up)    $trace tmux select-pane -U ;;
   down)  $trace tmux select-pane -D ;;
@@ -276,7 +281,7 @@ case "$op" in
     echo "$prefix"$(tmux list-sessions | sed 's/:.*//' | next_suffix "$prefix")
     ;;
   pick-new-prefix-session-remote)
-    session_name=$session_prefix$( $trace ssh "$remote_host" "$setx; if which tmux >/dev/null 2>&1; then tmux start-server; tmux list-sessions | sed 's/:.*//'; else screen -ls | sed -n 's/^\\t[1-9][0-9]*\\.\([^\\t]*\)\\t.*/\\1/p'; fi" | next_suffix "$session_prefix" )
+    session_name=$session_prefix$( rcmd "$remote_host" "if which tmux >/dev/null 2>&1; then tmux start-server; tmux list-sessions | sed 's/:.*//'; else screen -ls | sed -n 's/^\\t[1-9][0-9]*\\.\([^\\t]*\)\\t.*/\\1/p'; fi" | next_suffix "$session_prefix" )
     echo "$session_name"
     ;;
   recite-function-remote)
@@ -379,7 +384,7 @@ case "$op" in
     fi
     ;;
   use-session-remote)
-    $trace ssh -t "$remote_host" "$setx; set -ue; if which tmux >/dev/null 2>&1; then tmux start-server; tmux has-session -t $session_name && exec tmux attach-session -t $session_name || exec tmux new-session -s $session_name; else exec screen -x $session_name || exec screen -S $session_name; fi"
+    rcmd "$remote_host" "set -ue; if which tmux >/dev/null 2>&1; then tmux start-server; tmux has-session -t $session_name && exec tmux attach-session -t $session_name || exec tmux new-session -s $session_name; else exec screen -x $session_name || exec screen -S $session_name; fi"
     ;;
   *)echo "$cmd: $op: unimplemented" >&2
     exit 1
