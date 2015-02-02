@@ -190,28 +190,37 @@ sshpidfile()
 utarget=$(uppername "$target")
 flag_connected=PORTFWD_${utarget}_CONNECTED
 
-# extract "# F: pfname needs other-pfname"
-for rcpfname in $( sed -n "s/^#  *F:  *${target}  *needs  *\\([a-z][-a-z0-9]*\\) *$/\\1/p" "$sshcfg" )
-do pfnames="$pfnames $rcpfname"
-done
-
 pfflags=
 pfpidfiles=
-for pfname in $pfnames
+
+# extract "# F: pfname needs other-pfname"
+# add PORTFWD_OTHER_PFNAME_CONNECTED to flags
+for rc_target in $( sed -n "s/^#  *F:  *${target}  *needs  *\\([a-z][-a-z0-9]*\\) *$/\\1/p" "$sshcfg" )
 do
-  upfname=$( uppername "$pfname" )
-  pfflags="$pfflags "PORTFWD_${upfname}_CONNECTED
-  pfpidfiles="$pfpidfiles "`sshpidfile "$pfname"`
+  rc_utarget=$(uppername "$rc_target")
+  pfflags="$pfflags PORTFWD_${rc_utarget}_CONNECTED"
+done
+
+# extract "# F: pfname needs gw ip-addr"
+# add PORTFWD_GW_IP_ADDR to flags
+for rc_gw in $( sed -n "s/^#  *F:  *${target}  *needs  *gw  *\\([0-9][0-9]*\\.[0-9][0-9]\\.[0-9][0-9]\\.[0-9][0-9]\\) *$/\\1/p" "$sshcfg" )
+do
+  rc_gwname=$( printf '%s\n' "$rc_gw" | tr . _ )
+  rc_ugwname=$(uppername "$rc_gwname")
+  pfflags="$pfflags PORTFWD_GW_$rc_ugwname"
 done
 
 # construct svcd "ok to ssh" test command
 test_shcmd=' flag -w PORTFWD_OVERRIDE && exit 0
              flag -w PORTFWD_DISABLE && exit 1'
+
+# test if fwd already running
 for pfpidfile in $pfpidfiles
 do
   test_shcmd="$test_shcmd
               ifpid -q '$pfpidfile' || exit 1"
 done
+
 for pfflag in $pfflags
 do
   test_shcmd="$test_shcmd
