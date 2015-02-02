@@ -217,7 +217,7 @@ for rc_gw in $( sed -n "s/^#  *F:  *${target}  *needs  *gw  *\\([0-9][0-9]*\\.[0
 do
   rc_gwname=$( printf '%s\n' "$rc_gw" | tr . _ )
   rc_ugwname=$(uppername "$rc_gwname")
-  pfflags="$pfflags PORTFWD_GW_$rc_ugwname"
+  pfflags="$pfflags ROUTE_GW_$rc_ugwname"
 done
 
 # construct svcd "ok to ssh" test command
