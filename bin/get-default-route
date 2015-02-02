@@ -9,7 +9,7 @@ set -ue
 flagpfx=ROUTE_GW_
 
 trace=
-[ -t 2 ] && trace=set-x
+##[ -t 2 ] && trace=set-x
 
 # get gateway IPv4 addresses
 gws=$( netstat -rn | awk '$1 == "default" || $1 == "0.0.0.0" { print $2 }' )
