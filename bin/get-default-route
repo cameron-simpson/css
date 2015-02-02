@@ -15,7 +15,7 @@ trace=
 gws=$( netstat -rn | awk '$1 == "default" || $1 == "0.0.0.0" { print $2 }' )
 
 # generate set of flags that should be set
-set -- $( set -x; for gwaddr in $gws; do echo "$gwaddr"; done | sed -n "y/./_/; s/^/$flagpfx/p" )
+set -- $( for gwaddr in $gws; do echo "$gwaddr"; done | sed -n "y/./_/; s/^/$flagpfx/p" )
 
 # reset existing true flags unless present in route flag list
 for gwflag in $( flag -q | grep "^$flagpfx" )
