@@ -4,6 +4,7 @@
 #       - Cameron Simpson <cs@zip.com.au> 04apr2013
 #
 
+import sys
 import os
 import os.path
 from collections import namedtuple
@@ -14,6 +15,26 @@ from cs.obj import O
 from cs.threads import locked_property
 
 DEFAULT_LIBRARY = '$HOME/Pictures/iPhoto Library.photolibrary'
+
+USAGE = '''Usage: %s [iphoto-library-path]
+'''
+
+def main(argv=None):
+  ''' Main program associate with the cs.app.osx.iphoto module.
+  '''
+  if argv is None:
+    argv = [ 'cs.app.osx.iphoto' ]
+  cmd = os.path.basename(argv.pop(0))
+  if argv:
+    library_path = argv.pop(0)
+  else:
+    library_path = envsub(DEFAULT_LIBRARY)
+  I = iPhoto(library_path)
+  albums = sorted(I.albums, key=lambda A: A.name)
+  for A in albums:
+    print A.name, A
+    ##print 'viewData:', A.viewData
+  return 0
 
 class iPhoto(O):
 
@@ -29,9 +50,13 @@ class iPhoto(O):
     self._lock = RLock()
 
   def apdb_path(self, name):
+    ''' Compute pathname if named database file.
+    '''
     return os.path.join(self.path, 'Database', 'apdb', name+'.apdb')
 
   def _apdb(self, name):
+    ''' Open an SQLite3 connection to the named database.
+    '''
     return sqlite3.connect(self.apdb_path(name))
 
   @locked_property
@@ -101,9 +126,4 @@ class RKAlbum(_DBRow):
     self._row = _RKAlbum(*dbrow)
 
 if __name__ == '__main__':
-  I = iPhoto()
-  for A in I.albums:
-    print A.name
-    if A.name and A.name.startswith('kw-'):
-      print A
-      print A.viewData
+  sys.exit(main(sys.argv))
