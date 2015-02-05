@@ -106,3 +106,4 @@ if __name__ == '__main__':
     print A.name
     if A.name and A.name.startswith('kw-'):
       print A
+      print A.viewData
