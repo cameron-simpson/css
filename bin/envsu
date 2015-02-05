@@ -77,4 +77,4 @@ echo "rm -f '$tmpf'" >>"$tmpf"
 shqstr exec "$@" >>"$tmpf"
 
 set -x
-sux $su_opts -u "$su_user" -- /bin/sh "$tmpf"
+exec sux $su_opts -u "$su_user" -- /bin/sh "$tmpf"

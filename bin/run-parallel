@@ -1,0 +1,57 @@
+#!/bin/sh
+#
+# Read shell commands from standard input, dispatch in parallel up
+# to a limit and keep busy.
+#       - Cameron Simpson <cs@zip.com.au>
+#
+
+set -ue
+
+cmd=`basename "$0"`
+usage="Usage: $cmd n"
+
+: ${TMPDIR:=/tmp}
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing n" >&2
+  badopts=1
+else
+  n=$1
+  shift
+  case "$n" in
+    [1-9]|[1-9][0-9]) ;;
+    *)  echo "$cmd: invalid n ($n)" >&2
+        badopts=1
+        ;;
+  esac
+fi
+
+if [ $# -gt 0 ]
+then
+  echo "$cmd: extra arguments: $*" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+pipe=$TMPDIR/$cmd-pipe$$
+
+mkfifo "$pipe"
+exec 3<>"$pipe"
+rm "$pipe"
+
+# queue up some tokens
+seq 1 "$n" >&3 &
+
+while read -r shcmd
+do
+  read token <&3 || exit 1
+  (
+    ( sh -xc "$shcmd" 3<&-
+      echo "$token" >&3
+    ) &
+  )
+done

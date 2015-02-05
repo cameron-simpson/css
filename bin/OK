@@ -23,6 +23,7 @@ words=
 wordsep=
 notifyaddr=${NOTIFY:-}
 quiet=
+[ -t 1 ] || quiet=1
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [options...] [--] command [args...]
@@ -41,7 +42,8 @@ usage="Usage: $cmd [options...] [--] command [args...]
   -P    Prefix output with the label.
   --prefix pfx
         Prefix output with \"pfx\".
-  -q    Quiet. Only report failures."
+  -q    Quiet. Only report failures.
+  -v    Verbose: not quiet. Report success as well as failure."
 
 badopts=
 
@@ -49,28 +51,25 @@ while [ $# -gt 0 ]
 do
   case $1 in
     --count-regexp)
-      count_re=$2; shift
-      ;;
-    -:)
-      OK=OK
-      FAIL=FAIL
-      ;;
+        count_re=$2; shift
+        ;;
+    -:) OK=OK
+        FAIL=FAIL
+        ;;
     -N|--notify-on-error)
-      notifyaddr=$2; shift ;;
-    -P)
-      dopfx=1 ;;
-    -q)
-      quiet=1 ;;
+        notifyaddr=$2; shift ;;
+    -P) dopfx=1 ;;
+    -q) quiet=1 ;;
+    -v) quiet= ;;
     --prefix)
-      dopfx=1 pfx=$2; shift ;;
+        dopfx=1 pfx=$2; shift ;;
     --ok)
-      OK=$2; shift ;;
+        OK=$2; shift ;;
     --fail)
-      FAIL=$2; shift ;;
+        FAIL=$2; shift ;;
     --label)
-      words="$words$wordsep$2"; wordsep=' '; shift ;;
-    --)
-      shift; break ;;
+        words="$words$wordsep$2"; wordsep=' '; shift ;;
+    --) shift; break ;;
     -?*)
       echo "$cmd: unrecognised option: $1" >&2
       badopts=1
@@ -111,7 +110,9 @@ then
   set -- pfx "$pfx" "$@"
 fi
 
+# progress reporting: announce commencement of task if stderr is a terminal
 [ -t 2 ] && necho "$words" >&2
+
 xit=0
 $trace "$@" || xit=$?
 

@@ -1,17 +1,18 @@
 #!/usr/bin/python
 
+from __future__ import print_function
 import sys
 from threading import RLock
-from cs.logutils import D
+from cs.logutils import D, debug, X, Pfx
 from cs.serialise import get_bs, put_bs
 from cs.threads import locked_property
 from cs.venti import defaults, totext
-from .hash import Hash_SHA1, HASH_SHA1_T, HASH_SIZE_SHA1, decode as hash_decode
+from .hash import decode as hash_decode
 
 F_BLOCK_INDIRECT = 0x01 # indirect block
 
 def decodeBlocks(bs, offset=0):
-  ''' Process a bytes from the supplied `offset` (default 0).
+  ''' Process the bytes `bs` from the supplied `offset` (default 0).
       Yield Blocks.
   '''
   while offset < len(bs):
@@ -24,14 +25,12 @@ def decodeBlock(bs, offset=0):
       Format is:
         BS(flags)
           0x01 indirect blockref
-          0x02 non-SHA1 hashcode
         BS(span)
         hash
   '''
   bs0 = bs
   offset0 = offset
   flags, offset = get_bs(bs, offset)
-  ##D("flags=0x%02x", flags)
   unknown_flags = flags & ~F_BLOCK_INDIRECT
   if unknown_flags:
     raise ValueError("unexpected flags value (0x%02x) with unsupported flags=0x%02x, bs[offset=%d:]=%r"
@@ -58,51 +57,28 @@ def isBlock(o):
 
 class _Block(object):
 
-  def __init__(self, data=None, hashcode=None, span=None, doStore=False, doFlush=False):
+  def __init__(self, data=None, hashcode=None, span=None):
     if data is None and hashcode is None:
       raise ValueError("one of data or hashcode must be not-None")
-    self._lock = RLock()
-    self._data = data
-    self._hashcode = hashcode
+    if data is not None:
+      h = defaults.S.add(data)
+      if hashcode is None:
+        hashcode = h
+      elif h != hashcode:
+        raise ValueError("supplied hashcode %r != saved hash for data (%r : %r)" % (hashcode, h, data))
+    self.hashcode = hashcode
     self._span = span
-    if doStore:
-      self.store(doFlush)
+    self._lock = RLock()
 
   def __str__(self):
-    return self.textEncode()
+    return self.textencode()
 
-  @locked_property
+  @property
   def data(self):
     ''' The direct data of this Block.
         i.e. _not_ the data implied by an indirect Block.
     '''
     return defaults.S[self.hashcode]
-
-  @locked_property
-  def hashcode(self):
-    ''' Return the hashcode for this block.
-        Compute the hashcode if unknown or if it does not match the default
-        store's default hashtype.
-        When the block's current hashcode is the wrong type and this is a
-        "hash only" block, the recompute has an implied fetch from the store
-        using the old/wrong hashcode, so the store must support both.
-    '''
-    data = self._data
-    if data is None:
-      raise RuntimeError("tried to compute hashcode but _data is None")
-    return defaults.S.hash(data)
-
-  @locked_property
-  def span(self):
-    sp = 0
-    for chunk in self.chunks:
-      sp += len(chunk)
-    return sp
-
-  def _flush(self):
-    if self._hashcode is None:
-      self.store()
-    self._data = None
 
   def __getitem__(self, index):
     ''' Return specified direct data.
@@ -110,37 +86,23 @@ class _Block(object):
     return self.data[index]
 
   def __len__(self):
-    return self.span
-
-  def store(self, flush=False):
-    ''' Ensure this block is stored.
-        If `discard` is true, release the block's data.
+    ''' The len(Block) is the length of the encompassed data.
     '''
-    hashcode = defaults.S.add(self.data)
-    if self._hashcode is None:
-      self._hashcode = hashcode
-    elif hashcode != self._hashcode:
-      raise RuntimeError(
-              "store()d hashcode does not match cache: self._hashcode=%r, stored=%r"
-              % (self._hashcode, hashcode))
-    if flush:
-      self._flush()
+    return self.span
 
   def encode(self):
     ''' Encode this Block for storage:
         Format is:
           BS(flags)
             0x01 indirect block
-            0x02 has hash type (False ==> Hash_SHA1_T)
           BS(span)
-          hashcode.encode()     # may include hashlen prefix for some hash types
+          hashcode.encode()     # includes type and conceivably size
     '''
     flags = 0
     if self.indirect:
       flags |= F_BLOCK_INDIRECT
     hashcode = self.hashcode
     enc = put_bs(flags) + put_bs(self.span) + hashcode.encode()
-    assert len(enc) >= 22
     return enc
 
   @property
@@ -150,23 +112,114 @@ class _Block(object):
     for leaf in self.leaves:
       yield leaf.data
 
+  def slices(self, start=None, end=None):
+    ''' Return an iterator yielding (Block, start, len) tuples representing the leaf data covering the supplied span `start`:`end`.
+        The iterator may end early if the span exceeds the Block data.
+    '''
+    ##X("Block<%s>[len=%d].slices(start=%r, end=%r)...", self, len(self), start, end)
+    if start is None:
+      start = 0
+    elif start < 0:
+      raise ValueError("start must be >= 0, received: %r" % (start,))
+    if end is None:
+      end = len(self)
+    elif end < start:
+      raise ValueError("end must be >= start(%r), received: %r" % (start,end))
+    if self.indirect:
+      ##X("Block.slices: indirect...")
+      offset = 0
+      for B in self.subblocks:
+        sublen = len(B)
+        substart = max(0, start - offset)
+        subend = min(sublen, end - offset)
+        if substart < subend:
+          for subslice in B.slices(substart, subend):
+            yield subslice
+        offset += sublen
+        if offset >= end:
+          break
+    else:
+      ##X("Block.slices: direct")
+      # a leaf Block
+      if start < len(self):
+        ##X("Block.slices: yield self, %d, %d", start, min(end, len(self)))
+        yield self, start, min(end, len(self))
+    ##X("Block.slices: COMPLETE")
+
+  def top_slices(self, start=None, end=None):
+    ''' Return an iterator yielding (Block, start, len) tuples representing the uppermost Blocks spanning `start`:`end`.
+        This originating use case is to support providing minimal
+        Block references required to assemble a new indirect Block
+        consisting of data from this Block comingled with updated
+        data without naively layering deeper levels of Block
+        indirection with every update phase.
+        The iterator may end early if the span exceeds the Block data.
+    '''
+    if start is None:
+      start = 0
+    elif start < 0:
+      raise ValueError("start must be >= 0, received: %r" % (start,))
+    if end is None:
+      end = len(self)
+    elif end < start:
+      raise ValueError("end must be >= start(%r), received: %r" % (start,end))
+    if self.indirect:
+      offset = 0        # the absolute index of the left edge of subblock B
+      for B in self.subblocks:
+        sublen = len(B)
+        substart = max(0, start - offset)
+        subend = min(sublen, end - offset)
+        if substart < subend:
+          if subend - substart == sublen:
+            yield B, 0, sublen
+          else:
+            for subslice in B.top_slices(substart, subend):
+              yield subslice
+        # advance the offset to account for this subblock
+        offset += sublen
+        if offset >= end:
+          break
+    else:
+      # a leaf Block
+      if start < len(self):
+        yield self, start, min(end, len(self))
+
+  def top_blocks(self, start, end):
+    ''' Yield existing high level blocks and new partial Blocks covering a portion of this Block, for constructing a new minimal top block.
+    '''
+    for B, Bstart, Bend in self.top_slices(start, end):
+      if Bstart == 0 and Bend == len(B):
+        # an extant high level block
+        yield B
+      else:
+        # should be a new partial block
+        if B.indirect:
+          raise RuntimeError("got slice for partial Block %s start=%r end=%r but Block is indirect! should be a partial leaf" % (B, Bstart, Bend))
+        yield Block(data=B[Bstart:Bend])
+
   def all_data(self):
+    ''' The entire data of this Block as a single bytes object.
+    '''
     return b''.join(self.chunks)
 
-  def textEncode(self):
+  def textencode(self):
     return totext(self.encode())
 
   def open(self, mode="rb"):
     ''' Open the block as a file.
     '''
-    if mode != 'rb':
-      raise ValueError("unsupported open mode, require 'rb', got: %s", mode)
-    from cs.ventifile import ReadFile
-    return ReadFile(self)
+    if mode == 'rb':
+      from .file import BlockFile
+      return BlockFile(self)
+    if mode == 'w+b':
+      from .file import File
+      return File(backing_block=self)
+    raise ValueError("unsupported open mode, expected 'rb' or 'w+b', got: %s", mode)
 
 class Block(_Block):
   ''' A direct block.
   '''
+
   def __init__(self, **kw):
     ''' Initialise a direct block, supplying data bytes or hashcode,
         but not both.
@@ -174,9 +227,20 @@ class Block(_Block):
     _Block.__init__(self, **kw)
     self.indirect = False
 
+  def matches_data(self, odata):
+    ''' Check supplied bytes `odata` against this Block's hashcode.
+        NB: _not_ defined on indirect Blocks to avoid mistakes.
+    '''
+    return self.hashcode == self.hashcode.from_data(odata)
+
   @property
   def leaves(self):
-    yield self
+    if len(self) > 0:
+      yield self
+
+  @locked_property
+  def span(self):
+    return len(self.data)
 
 class IndirectBlock(_Block):
   ''' A preexisting indirect block.
@@ -193,16 +257,25 @@ class IndirectBlock(_Block):
       TODO: allow data= initialisation, to decode raw iblock data
   '''
 
-  def __init__(self, subblocks=None, hashcode=None, span=None, doStore=False, doFlush=False):
+  def __init__(self, subblocks=None, hashcode=None, span=None):
     if subblocks is None:
-      _Block.__init__(self, hashcode=hashcode, span=span, doStore=doStore, doFlush=doFlush)
+      _Block.__init__(self, hashcode=hashcode, span=span)
     else:
-      _Block.__init__(self, data=encodeBlocks(subblocks), doStore=doStore, doFlush=doFlush)
+      _Block.__init__(self, data=encodeBlocks(subblocks))
     self.indirect = True
 
   @locked_property
   def subblocks(self):
     return tuple(decodeBlocks(self.data))
+
+  @locked_property
+  def span(self):
+    ''' The span of an IndirectBlock is the sum of the spans of the subblocks.
+    '''
+    sp = 0
+    for B in self.subblocks:
+      sp += B.span
+    return sp
 
   @property
   def leaves(self):
@@ -212,7 +285,7 @@ class IndirectBlock(_Block):
       if B.indirect:
         for subB in B.leaves:
           yield subB
-      else:
+      elif len(B) > 0:
         yield B
 
 def chunksOf(B, start, stop=None):
@@ -260,6 +333,28 @@ def chunksOf(B, start, stop=None):
       return
     # we always start from the start of the next block
     start = 0
+
+def dump_block(B, fp=None, indent='', verbose=False):
+  if fp is None:
+    fp = sys.stderr
+  data = B.data
+  if B.indirect:
+    subblocks = B.subblocks
+    print("%sIB.datalen=%d, span=%d, %d subblocks, hash=%s"
+          % (indent, len(data), B.span, len(subblocks), B.hashcode),
+          file=fp)
+    indent += '  '
+    for subB in subblocks:
+      dump_block(subB, fp=fp, indent=indent)
+  else:
+    if verbose:
+      print("%sB.datalen=%d, span=%d, hash=%s %r"
+            % (indent, len(data), B.span, B.hashcode, B.data),
+            file=fp)
+    else:
+      print("%sB.datalen=%d, span=%d, hash=%s"
+            % (indent, len(data), B.span, B.hashcode),
+            file=fp)
 
 if __name__ == '__main__':
   import cs.venti.block_tests

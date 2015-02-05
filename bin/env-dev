@@ -1,6 +1,6 @@
 #!/bin/sh -ue
 #
-# Run command in development environment.
+# Run a command in a development environment.
 # This means using the current directory as $prefix,
 # prefixing lots of $fooPATH vars with it approriately,
 # sourcing .env.sh if present, then running command.
@@ -16,7 +16,8 @@ devdir=.
 cmd=`basename "$0"`
 usage="Usage: $cmd [-d develdir] [-x] [command [args...]]
         -d develdir     Development source dir. Default: current directory.
-        -x              Trace invocation of command."
+        -x              Trace invocation of command.
+        +x              Do not trace invocation."
 
 badopts=
 
@@ -24,6 +25,7 @@ while [ $# -gt 0 ]
 do
   case $1 in
     -d) devdir=$2; shift ;;
+    +x) trace= ;;
     -x) trace=set-x ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
@@ -42,8 +44,8 @@ done
 
 case "$devdir" in /*) ;; *) devdir=`cd "$devdir" && pwd` ;; esac
 
-PYTHONPATH=$devdir/lib/python:$devdir/lib:$PYTHONPATH
-PERL5LIB=$devdir/lib/perl5:$devdir/lib:$PERL5LIB
+PYTHONPATH=$devdir/lib/python${PYTHONPATH:+:$PYTHONPATH}
+PERL5LIB=$devdir/lib/perl5${PERL5LIB:+:$PERL5LIB}
 MANPATH=$devdir/man:$MANPATH
 LD_LIBRARY_PATH=$devdir/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
 PATH=$devdir/bin:$PATH
@@ -52,7 +54,11 @@ export PYTHONPATH PERL5LIB MANPATH LD_LIBRARY_PATH PATH
 
 if [ $# = 0 ]
 then
-  env | sort
+  echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
+  echo "MANPATH=$MANPATH"
+  echo "PATH=$PATH"
+  echo "PERL5LIB=$PERL5LIB"
+  echo "PYTHONPATH=$PYTHONPATH"
   exit
 fi
 

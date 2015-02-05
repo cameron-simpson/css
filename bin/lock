@@ -98,6 +98,7 @@ use Getopt::Std;
 $::Usage="Usage: $::cmd [-p pidfile] [-q] [-1] key command [args...]
 	-a	Asynchronous.
 	-p pidfile Pid file. Record child pid in this file.
+        -P      Key may be a pathname. Hack it around avoid having a slash.
 	-q	Query - is lock taken?
 	-s	Silent.
 	-1	Onceonly - bail if lock can't be had immediately.
@@ -112,12 +113,13 @@ $::Query=0;
 $::Silent=(-t STDERR);
 undef $::Pidfile;
 
-my $badopts = ! getopts('ap:qs1');
+my $badopts = ! getopts('ap:Pqs1');
 $::Async=1 if defined $::opt_a;
 $::Pidfile=$::opt_p if defined $::opt_p;
 $::Query=1 if defined $::opt_q;
 $::Onceonly=1 if defined $::opt_1;
 $::Silent=1 if defined $::opt_s;
+$::Pathy=1 if defined $::opt_P;
 
 if (@ARGV < 1)
 { warn "$::cmd: missing key\n";
@@ -125,6 +127,9 @@ if (@ARGV < 1)
 }
 else
 { $::Key=shift @ARGV;
+  if ($::Pathy)
+  { $::Key =~ s:/+:_:g;
+  }
   if ($::Query)
   { if (@ARGV > 0)
     { warn "$::cmd: command not expected with -q option\n";

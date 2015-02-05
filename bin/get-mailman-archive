@@ -43,7 +43,7 @@ do
   pilfer url "$url" hrefs .txt save:-
 
   # some sites hand out .txt.gz decompressed! ouch!
-  pilfer url "$url" hrefs .txt.gz \
+  pilfer url "$url" hrefs .txt.gz print \
   | while read -r url
     do
       if pilfer url "$url" save:- >"$tmpf"

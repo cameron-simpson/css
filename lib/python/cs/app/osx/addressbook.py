@@ -12,6 +12,7 @@
 # - Cameron Simpson <cs@zip.com.au>
 #
 
+from __future__ import print_function
 import os.path
 import sys
 import pprint
@@ -31,7 +32,7 @@ def main(argv):
   setup_logging(cmd)
   AB = AddressBookWrapper()
   MDB = MailDB(os.path.abspath('maildb.csv'), readonly=False)
-  ##print "dir(AB.address_book) =",
+  ##print("dir(AB.address_book) =",)
   ##pprint.pprint(dir(AB.address_book))
   for P in AB.people:
     pprint.pprint(P)
@@ -130,12 +131,16 @@ def updateNodeDB(maildb, people):
     with Pfx('updateNodeDB: %s', cite):
       uid = person['UID']
       C = contactByOSXUID(maildb, uid)
-      if not C:
+      if C:
+        info("EXISTING CONTACT: OSX_AB_UID = %s: %s", uid, cite)
+      else:
+        warning("NEW CONTACT: OSX_AB_UID = %s", uid)
         C = maildb.seqNode('CONTACT')
         C.OSX_AB_UID = str(uid)
+
       lastUpdate = C.get0('OSX_AB_LAST_UPDATE', 0)
       abMTime = mtime(person, 0)
-      D("USER %s: abMTime=%s, lastUpdate=%s", cite, abMTime, lastUpdate)
+      D("USER %s %s: abMTime=%s, lastUpdate=%s", uid, cite, abMTime, lastUpdate)
       if abMTime > lastUpdate:
         print("UPDATE USER %s" % (cite,))
         ## C.OSX_AB_LAST_UPDATE = abMTime
@@ -190,7 +195,7 @@ def updateNodeDB(maildb, people):
             pprint.pprint(person)
             ok = False
         if ok:
-          info("SKIP OSX_AB_LAST_UPDATE uptdate")
+          info("SKIP OSX_AB_LAST_UPDATE update")
           ##C.OSX_AB_LAST_UPDATE = abMTime
       else:
         info("SKIP USER %s", cite)

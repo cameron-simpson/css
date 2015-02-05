@@ -1,0 +1,8 @@
+#!/bin/sh
+#
+# Execute the python from my default virtualenv.
+#       - Cameron Simpson <cs@zip.com.au> 08mar2014
+#
+
+set -x
+exec venv python ${1+"$@"}

@@ -3,16 +3,18 @@
 import os
 from threading import Lock
 import sys
+from contextlib import contextmanager
 import sqlalchemy
 from sqlalchemy import create_engine, \
                        MetaData, Table, Column, Index, Integer, String, \
                        select
+from sqlalchemy.pool import QueuePool
 from sqlalchemy.orm import mapper, sessionmaker
 from sqlalchemy.sql import and_, or_, not_, asc
 from sqlalchemy.sql.expression import distinct
 from cs.py3 import StringTypes
 from cs.excutils import unimplemented
-from cs.logutils import Pfx, error, warning, debug
+from cs.logutils import Pfx, error, warning, debug, trace, D
 from . import NodeDB, Backend
 
 def NODESTable(metadata, name=None):
@@ -41,37 +43,37 @@ def ATTRSTable(metadata, name=None):
 
 class Backend_SQLAlchemy(Backend):
 
-  def __init__(self, engine, nodes=None, attrs=None, readonly=False):
-    self._lock = Lock()
-    self.readonly = readonly
-    if nodes is None:
-      nodes = 'NODES'
-    if attrs is None:
-      attrs = 'ATTRS'
-    if type(engine) in StringTypes:
-      engine = create_engine(engine, echo=len(os.environ.get('DEBUG','')) > 0)
-    metadata=MetaData()
-    metadata.bind = engine
-    if type(nodes) in StringTypes:
-      nodes=NODESTable(metadata, name=nodes)
-    self.nodes=nodes
-    Index('nametype', nodes.c.NAME, nodes.c.TYPE)
-    if type(attrs) is str:
-      attrs=ATTRSTable(metadata, name=attrs)
-    self.attrs=attrs
-    Index('attrvalue', attrs.c.ATTR, attrs.c.VALUE)
-    self.engine=engine
-    metadata.create_all()
+  def __init__(self, engine, nodes_name=None, attrs_name=None, readonly=False):
+    Backend.__init__(self, readonly=readonly)
+    if isinstance(engine, StringTypes):
+      echo = len(os.environ.get('DEBUG','')) > 0
+    if isinstance(engine, StringTypes):
+      engine = create_engine(engine, poolclass=QueuePool, echo=echo)
+    if nodes_name is None:
+      nodes_name = 'NODES'
+    if attrs_name is None:
+      attrs_name = 'ATTRS'
+    self.engine = engine
+    self.nodes_name = nodes_name
+    self.attrs_name = attrs_name
 
     # forward and reverse (type, name) <=> node_id mappings
     self.__nodekeysByID = {}
     self.__IDbyTypeName = {}
 
-  def close(self):
-    Backend.close(self)
+  def _open(self):
+    engine = self.engine
+    metadata=MetaData()
+    metadata.bind = engine
+    nodes = self.nodes = NODESTable(metadata, name=self.nodes_name)
+    Index('nametype', nodes.c.NAME, nodes.c.TYPE)
+    attrs = self.attrs = ATTRSTable(metadata, name=self.attrs_name)
+    Index('attrvalue', attrs.c.ATTR, attrs.c.VALUE)
+    metadata.create_all()
+    self.attrs.select().execute()
 
-  def sync(self):
-    pass
+  def _close(self):
+    raise RuntimeError("how to close .engine?")
 
   def _noteNodeKey(self, t, name, node_id):
     ''' Remember the mapping between db node_id and (type, name).
@@ -86,7 +88,6 @@ class Backend_SQLAlchemy(Backend):
       node_id = self.__IDbyTypeName.get(nodekey)
       if node_id is not None:
         self._forgetNode( t, name, node_id )
-    node_id = self._node_id( t, name )
     for attr in N.keys():
       self.saveAttrs(N[attrs])
 
@@ -94,8 +95,10 @@ class Backend_SQLAlchemy(Backend):
     ''' Return the db node_id for the supplied type and name.
         Create a new node_id if unknown.
     '''
-    if (t, name) not in self.__IDbyTypeName:
-      assert not self.nodedb.readonly
+    node_id = self.__IDbyTypeName.get( (t, name) )
+    if node_id is None:
+      if self.nodedb.readonly:
+        raise RuntimeError("readonly: can't instantiate new NODE_ID for (%s, %s)" % (t, name))
       ins = self.nodes.insert().values(TYPE=t, NAME=name).execute()
       node_id = ins.lastrowid
       self._noteNodeKey(t, name, node_id)
@@ -106,6 +109,17 @@ class Backend_SQLAlchemy(Backend):
     '''
     del self.__nodekeysByID[node_id]
     del self.__IDbyTypeName[t, name]
+
+  @contextmanager
+  def lockdata(self):
+    ''' Obtain an exclusive lock on the database.
+    '''
+    debug("no SQLA lockdata()")
+    yield None
+
+  def fetch_updates(self):
+    debug("no SQLA fetch_updates()")
+    return ()
 
   def __delitem__(self, nodekey):
     assert not self.nodedb.readonly
@@ -163,41 +177,43 @@ class Backend_SQLAlchemy(Backend):
     nodes = self.nodes
     # load node keys
     for node_id, t, name in select( [ nodes.c.TYPE,
-                                      nodes.c.NAME
+                                      nodes.c.NAME,
                                     ] ).execute():
       yield t, name
 
-##  def fromtext(self, text):
-##    if text.startswith(':#'):
-##      warning("deprecated :#node_id serialisation: %s" % (text,))
-##      node_id = int(text[2:])
-##      N = self.__nodekeysByID[int(text[2:])]
-##      warning("  UPDATE %s SET VALUE=\"%s\" WHERE VALUE=\"%s\""
-##           % (self.attrs, ":%s:%s" % (N.type, N.name), text))
-##      return N
-##    return Backend.fromtext(self, text)
-
-  @unimplemented
-  def sync(self):
-    pass
-
-  def close(self):
-    warning("cs.nodedb.sqla.Backend_SQLAlchemy.close() unimplemented")
-
-  def extendAttr(self, t, name, attr, values):
-    assert not self.nodedb.readonly
-    node_id = self.__IDbyTypeName[t, name]
-    ins_values = [ { 'NODE_ID': node_id,
-                     'ATTR':    attr,
-                     'VALUE':   self.totext(value),
-                   } for value in values ]
-    self.attrs.insert().execute(ins_values)
-
-  def delAttr(self, t, name, attr):
-    assert not self.nodedb.readonly
-    node_id = self.__IDbyTypeName[t, name]
-    self.attrs.delete(and_(self.attrs.c.NODE_ID == node_id,
-                           self.attrs.c.ATTR == attr)).execute()
+  def push_updates(self, csvrows):
+    ''' Apply the update rows from the iterable `csvrows` to the database.
+    '''
+    trace("push_updates: write our own updates")
+    totext = self.nodedb.totext
+    lastrow = None
+    for thisrow in csvrows:
+      t, name, attr, value = thisrow
+      node_id = self._node_id(t, name)
+      if attr.startswith('-'):
+        attr = attr[1:]
+        if value != "":
+          raise ValueError("ATTR = \"%s\" but non-empty VALUE: %r" % (attr, value))
+        self.attrs.delete(and_(self.attrs.c.NODE_ID == node_id,
+                               self.attrs.c.ATTR == attr)).execute()
+      else:
+        # add attribute
+        if name.startswith('='):
+          # discard node and start anew
+          name = name[1:]
+          self.attrs.delete(self.attrs.c.NODE_ID == node_id).execute()
+        if attr.startswith('='):
+          # reset attribute completely before appending value
+          attr = attr[1:]
+          self.attrs.delete(and_(self.attrs.c.NODE_ID == node_id,
+                                 self.attrs.c.ATTR == attr)).execute()
+        self.attrs.insert().execute([ { 'NODE_ID': node_id,
+                                        'ATTR':    attr,
+                                        'VALUE':   totext(value),
+                                      } ])
+      with self._lock:
+        self._updated_count += 1
+      lastrow = thisrow
 
 if __name__ == '__main__':
   import cs.nodedb.sqla_tests

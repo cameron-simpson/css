@@ -11,17 +11,19 @@ set -ue
 : ${ALERTLOG:=$LOGDIR/alert-local}
 
 cmd=$0
-usage="Usage: $cmd [-c colour] [-G] [-s subtitle] [-t title] {-|echo-args...]}"
+usage="Usage: $cmd [-c colour] [-e command [args...] --] [-G] [-l level] [-s subtitle] [-t title] {-|echo-args...]}"
 
 colour=
 dlog=1
+level=1
 growl=
 tnotify=
 title=
 subtitle=
+execute=
 case "$OS" in
   darwin)
-    growl=1
+    ##growl=1
     tnotify=1
     ;;
 esac
@@ -37,8 +39,44 @@ do
     -c) colour=$2; shift ;;
     -D) dlog=1 ;;
     +D) dlog= ;;
+    -e) shift
+        firstarg=1
+        tailargs=
+        for arg
+        do
+          if [ $tailargs ]
+          then
+            # re-accrue the trailing arguments
+            set -- ${1+"$@"} "$arg"
+          else
+            if [ "x$arg" = x-- ]
+            then
+              if [ $firstarg ]
+              then
+                echo "$cmd: missing command after -e" >&2
+                badopts=1
+              else
+                execute=$( as-script "$@" )
+                execute='>>"$ALERTLOG" 2>&1; '$execute
+              fi
+              set --
+              tailargs=1
+            else
+              [ $firstarg ] && { set --; firstarg=; }
+              set -- ${1+"$@"} "$arg"
+            fi
+          fi
+        done
+        if [ -z "$tailargs" ]
+        then
+          echo "$cmd: -e: missing trailing --" >&2
+          badopts=1
+        fi
+        continue
+        ;;
     -G) growl=1 ;;
     +G) growl= ;;
+    -l) level=$2; shift ;;
     -t) title=$2; shift ;;
     -s) subtitle=$2; shift ;;
     --) shift; break ;;
@@ -76,6 +114,17 @@ then
     message=`expr "x$message" : 'x[A-Z][A-Z0-9_]*:  *\(.*\)' || :`
   fi
 fi
+
+if [ -z "$subtitle" ]
+then
+  tag=`expr "x$message" : 'x\([^:]*\):  *' || :`
+  if [ -n "$tag" ]
+  then
+    subtitle=$tag
+    message=`expr "x$message" : 'x[^:]*:  *\(.*\)' || :`
+  fi
+fi
+
 set -- "$message"
 [ -n "$subtitle" ] && set -- "$subtitle;" ${1+"$@"}
 [ -n "$title" ] && set -- "$title:" ${1+"$@"}
@@ -95,7 +144,20 @@ fi
 
 if [ $tnotify ]
 then
-  terminal-notifier -title "$title" -subtitle "$subtitle" -message "$message" >/dev/null
+  for var in title subtitle message
+  do  eval "val=\$$var"
+      val=`echo $val`
+      case "$val" in
+        *[\'\\]*)        val=`shqstr "$val"` ;;
+      esac
+      eval "$var=\$val"
+  done
+  set -- terminal-notifier -title "$title" -subtitle "$subtitle" -message "$message"
+  [ -n "$execute" ] && set -- "$@" -execute "$execute"
+  set -- timeout 10 reattach-to-user-namespace "$@"
+  # async because I've seen terminal-notifier hang, stalling my mail filer
+  # timeout also to stop hanging processes filling the process table
+  "$@" >/dev/null &
 fi
 
 exit $xit

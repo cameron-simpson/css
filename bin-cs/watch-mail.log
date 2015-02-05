@@ -1,0 +1,52 @@
+#!/bin/sh
+#
+# Watch the mail log. Run alert(1cs) when something interesting happens.
+#       - Cameron Simpson <cs@zip.com.au>
+#
+
+set -ue
+
+cmd=`basename "$0"`
+usage="Usage: $cmd logfile"
+
+vecho=:
+trace=
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing logfile" >&2
+  badopts=1
+else
+  logfile=$1
+  shift
+  [ -f "$logfile" ] || { echo "$cmd: warning: missing logfile: $logfile" >&2; }
+fi
+
+if [ $# -gt 0 ]
+then
+  echo "$cmd: extra arguments after logfile: $*" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+tail -F -- "$logfile" \
+| while read -r line
+  do
+    case "$line" in
+      *' postfix/smtp['*)
+        #                              Mon           dd            hh:mm:ss   hostname
+        pre_amble=`expr "x$line" : 'x\([A-Z][a-z]*  *[1-9][0-9]*  *..:..:..  *[^ ][^ ]*\)  *postfix/smtp\[.*'`
+        postamble=`expr "x$line" :   'x[A-Z][a-z]*  *[1-9][0-9]*  *..:..:..  *[^ ][^ ]*  *postfix/smtp\[[1-9][0-9]*\]:  *\(.*\)'`
+        status=`   expr "x$line" :   'x[A-Z][a-z]*  *[1-9][0-9]*  *..:..:..  *[^ ][^ ]*  *postfix/smtp\[[1-9][0-9]*\]:  *.*\(status=.*\)'`
+        set -- $pre_amble
+        mon=$1 mday=$2 hms=$3 hostname=$4
+        set -- $postamble
+        id=$1; shift
+        $trace alert -t "POSTFIX @ $hostname" -s "$id $status" -- "$*"
+        ;;
+      *)$vecho "IGNORE: $line" ;;
+    esac
+  done

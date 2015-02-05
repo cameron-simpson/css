@@ -20,14 +20,15 @@ import sys
 from threading import Lock
 from threading import Thread
 from cs.py3 import Queue
-from cs.later import Later, report as reportLFs
+from cs.asynchron import report as reportLFs
+from cs.later import Later
 from cs.logutils import info, debug, warning, Pfx, D
-from cs.serialise import toBS, fromBS
-from cs.threads import Q1, Get1, NestingOpenClose
+from cs.queues import NestingOpenCloseMixin
+from cs.threads import Q1, Get1
 from . import defaults, totext
 from .hash import Hash_SHA1
 
-class BasicStore(NestingOpenClose):
+class BasicStore(NestingOpenCloseMixin):
   ''' Core functions provided by all Stores.
 
       A subclass should provide thread-safe implementations of the following
@@ -45,7 +46,6 @@ class BasicStore(NestingOpenClose):
 
       The .writeonly attribute may be set to trap surprises when no blocks
       are expected to be fetched; it relies on asssert statements.
-
 
       The background (*_bg) functions return cs.later.LateFunction instances
       for deferred collection of the operation result.
@@ -66,17 +66,14 @@ class BasicStore(NestingOpenClose):
     with Pfx("BasicStore(%s,..)", name):
       if capacity is None:
         capacity = 1
-      NestingOpenClose.__init__(self)
+      self._lock = Lock()
+      NestingOpenCloseMixin.__init__(self)
       self.name = name
       self.logfp = None
-      self.__funcQ = Later(capacity)
+      self.__funcQ = Later(capacity, name="%s:Later(__funcQ)" % (self.name,)).open()
       self.hashclass = Hash_SHA1
-      self._lock = Lock()
       self.readonly = False
       self.writeonly = False
-
-  def close(self):
-    self.__funcQ.close()
 
   def add(self, data):
     ''' Add the supplied data bytes to the store.
@@ -143,16 +140,19 @@ class BasicStore(NestingOpenClose):
     '''
     block = self.get(h)
     if block is None:
-      raise KeyError
+      raise KeyError("missing hash %r" % (h,))
     return block
 
   def __enter__(self):
-    NestingOpenClose.__enter__(self)
     defaults.pushStore(self)
+    return NestingOpenCloseMixin.__enter__(self)
 
   def __exit__(self, exc_type, exc_value, traceback):
+    if exc_value:
+      import traceback as TB
+      TB.print_tb(traceback, file=sys.stderr)
     defaults.popStore()
-    return NestingOpenClose.__exit__(self, exc_type, exc_value, traceback)
+    return NestingOpenCloseMixin.__exit__(self, exc_type, exc_value, traceback)
 
   def __str__(self):
     return "Store(%s)" % self.name
@@ -160,7 +160,7 @@ class BasicStore(NestingOpenClose):
   def hash(self, data):
     ''' Return a Hash object from data bytes.
     '''
-    return self.hashclass.fromData(data)
+    return self.hashclass.from_data(data)
 
   def keys(self):
     ''' For a big store this is almost certainly unreasonable.
@@ -168,7 +168,7 @@ class BasicStore(NestingOpenClose):
     raise NotImplementedError
 
   def shutdown(self):
-    ''' Called by final NestingOpenClose.close().
+    ''' Called by final NestingOpenCloseMixin.close().
     '''
     self.__funcQ.close()
 
@@ -256,7 +256,7 @@ def Store(store_spec):
     if not host:
       host = '127.0.0.1'
     return TCPStore((host, int(port)))
-  if sheme == "ssh":
+  if scheme == "ssh":
     # TODO: path to remote vt command
     # TODO: $VT_SSH envvar
     import cs.sh
@@ -290,13 +290,18 @@ class MappingStore(BasicStore):
     BasicStore.__init__(self, name, capacity=capacity)
     self.mapping = mapping
 
-  def add(self, block):
-    h = self.hash(block)
-    self.mapping[h] = block
+  def add(self, data):
+    h = self.hash(data)
+    if h not in self.mapping:
+      self.mapping[h] = data
     return h
 
-  def get(h, default=None):
-    return self.mapping.get(h, default)
+  def get(self, h, default=None):
+    try:
+      data = self.mapping[h]
+    except KeyError:
+      return default
+    return data
 
   def contains(self, h):
     return h in self.mapping

@@ -10,10 +10,8 @@ g=g
 
 [ "x$1" = x-1 ] && { g=; shift; }
 
-[ -n "$USER" ] && sedf="$sedf
-		        s:/u/$USER/:~/:$g"
-
 [ -n "$HOME" ] && sedf="$sedf
-		        s:$HOME/:~/:$g"
+		        s:$HOME/:~/:$g
+		        s:$HOME\$:~:$g"
 
 exec sed "$sedf"

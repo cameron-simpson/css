@@ -4,6 +4,16 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
+DISTINFO = {
+    'description': "Convenience facilities for managing exceptions.",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+}
+
 import sys
 import logging
 import traceback
@@ -35,20 +45,20 @@ def returns_exc_info(func):
       in the case of an exception. `exc_info` is a 3-tuple of
       exc_type, exc_value, exc_traceback as returned by sys.exc_info().
   '''
-  def wrapper(*args, **kwargs):
+  def returns_exc_info_wrapper(*args, **kwargs):
     return return_exc_info(func, *args, **kwargs)
-  return wrapper
+  return returns_exc_info_wrapper
 
 def noexc(func):
   ''' Decorator to wrap a function which should never raise an exception.
       Instead, any raised exception is attempted to be logged.
       A significant side effect is of course that if the function raises an
-      exception it now return None.
+      exception it now returns None.
       My primary use case is actually to wrap logging functions,
       which I have had abort otherwise sensible code.
   '''
-  def wrapper(*args, **kwargs):
-    from cs.logutils import exception, D
+  def noexc_wrapper(*args, **kwargs):
+    from cs.logutils import exception, X
     try:
       return func(*args, **kwargs)
     except Exception as e:
@@ -56,10 +66,49 @@ def noexc(func):
         exception("exception calling %s(%s, **(%s))", func.__name__, args, kwargs)
       except Exception as e:
         try:
-          D("exception calling %s(%s, **(%s)): %s", func.__name__, args, kwargs, e)
+          X("exception calling %s(%s, **(%s)): %s", func.__name__, args, kwargs, e)
         except Exception:
           pass
-  return wrapper
+  noexc_wrapper.__name__ = 'noexc(%s)' % (func.__name__,)
+  return noexc_wrapper
+
+def noexc_gen(func):
+  ''' Decorator to wrap a generator which should never raise an exception.
+      Instead, any raised exception is attempted to be logged and iteration ends.
+      My primary use case is wrapping generators chained in a pipeline,
+      as in cs.later.Later.pipeline.
+  '''
+  from cs.logutils import exception, X
+  def noexc_gen_wrapper(*args, **kwargs):
+    try:
+      it = iter(func(*args, **kwargs))
+    except Exception as e0:
+      try:
+        exception("exception calling %s(*%s, **(%s)): %s", func.__name__, args, kwargs, e)
+      except Exception as e2:
+        try:
+          X("exception calling %s(*%s, **(%s)): %s", func.__name__, args, kwargs, e)
+        except Exception:
+          pass
+      return
+    while True:
+      try:
+        item = next(it)
+      except StopIteration:
+        raise
+      except Exception as e:
+        try:
+          exception("exception calling next(%s(*%s, **(%s))): %s", func.__name__, args, kwargs, e)
+        except Exception as e2:
+          try:
+            X("exception calling next(%s(*%s, **(%s))): %s", func.__name__, args, kwargs, e)
+          except Exception:
+            pass
+        return
+      else:
+        yield item
+  noexc_gen_wrapper.__name__ = 'noexc_gen(%s)' % (func.__name__,)
+  return noexc_gen_wrapper
 
 def transmute(exc_from, exc_to=None):
   ''' Decorator to transmute an inner exception to another exception type.
@@ -74,20 +123,20 @@ def transmute(exc_from, exc_to=None):
   if exc_to is None:
     exc_to = RuntimeError
   def transmutor(func):
-    def wrapper(*a, **kw):
+    def transmute_transmutor_wrapper(*a, **kw):
       try:
         return func(*a, **kw)
       except exc_from as e:
-        raise exc_to("inner %s transmuted to %s: %s" % (type(e), exc_to, str(e)))
-    return wrapper
+        raise exc_to("inner %s:%s transmuted to %s" % (type(e), e, exc_to))
+    return transmute_transmutor_wrapper
   return transmutor
 
 def unimplemented(func):
   ''' Decorator for stub methods that must be implemented by a stub class.
   '''
-  def wrapper(self, *a, **kw):
+  def unimplemented_wrapper(self, *a, **kw):
     raise NotImplementedError("%s.%s(*%s, **%s)" % (type(self), func.__name__, a, kw))
-  return wrapper
+  return unimplemented_wrapper
 
 class NoExceptions(object):
   ''' A context manager to catch _all_ exceptions and log them.
@@ -111,16 +160,64 @@ class NoExceptions(object):
     pass
 
   def __exit__(self, exc_type, exc_value, tb):
+    from cs.logutils import X, warning, D
+    from cs.py.func import funccite
     if exc_type is not None:
       if self.__handler is not None:
         # user supplied handler
+        D("NoExceptions: call %s", funccite(self.__handler))
         return self.__handler(exc_type, exc_value, tb)
+      else:
+        D("__handler is None")
       # report handled exception
-      from cs.logutils import exception, error
-      exception("IGNORE  "+str(exc_type)+": "+str(exc_value))
+      warning("IGNORE  "+str(exc_type)+": "+str(exc_value))
       for line in traceback.format_tb(tb):
-        error("IGNORE> "+line[:-1])
+        warning("IGNORE> "+line[:-1])
     return True
+
+def LogExceptions(conceal=False):
+  ''' Wrapper of NoExceptions which reports exceptions and optionally
+      suppresses them.
+  '''
+  from cs.logutils import exception, X
+  def handler(exc_type, exc_value, tb):
+    exception("EXCEPTION: %s", exc_value)
+    return conceal
+  return NoExceptions(handler)
+
+def logexc(func):
+  def logexc_wrapper(*a, **kw):
+    with LogExceptions():
+      return func(*a, **kw)
+  logexc_wrapper.__name__ = 'logexc(%s)' % (func.__name__,)
+  return logexc_wrapper
+
+def logexc_gen(genfunc):
+  def logexc_gen_wrapper(*a, **kw):
+    with LogExceptions():
+      it = genfunc(*a, **kw)
+      while True:
+        try:
+          item = next(it)
+        except StopIteration:
+          return
+        yield item
+  logexc_gen_wrapper.__name__ = 'logexc_gen(%s)' % (genfunc.__name__,)
+  return logexc_gen_wrapper
+
+def try_LogExceptions(e, conceal):
+  # optionally fire off an exception, used in testing
+  with LogExceptions(conceal=conceal):
+    if e:
+      raise e
+
+def try_logexc(e):
+  # optionally fire off an exception, used in testing
+  @logexc
+  def f(e):
+    if e:
+      raise e
+  f(e)
 
 if __name__ == '__main__':
   import cs.excutils_tests

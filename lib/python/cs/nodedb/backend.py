@@ -4,143 +4,78 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
+from contextlib import contextmanager
+from threading import Condition
+from collections import namedtuple
 import unittest
-from cs.logutils import D, OBSOLETE
-from cs.obj import O
+from cs.logutils import D, OBSOLETE, debug, error, X
+from cs.threads import locked, locked_property
 from cs.excutils import unimplemented
+from cs.timeutils import sleep
+from cs.debug import RLock, Thread
+from cs.obj import O
+from cs.py3 import Queue, Queue_Full as Full, Queue_Empty as Empty
 
-class _BackendMappingMixin(O):
-  ''' A mapping interface to be presented by all Backends.
-  '''
+# convenience tuple of raw values, actually used to encode updates
+# via Backend.import_csv_row
+CSVRow = namedtuple('CSVRow', 'type name attr value')
 
-  def len(self):
-    return len(self.keys())
-
-  @unimplemented
-  def iterkeys(self):
-    ''' Yield (type, name) tuples for all nodes in the backend database.
-    '''
-    pass
-
-  def keys(self):
-    return list(self.iterkeys())
-
-  def iteritems(self):
-    ''' Yield ( (type, name), node_dict ) tuples for all nodes in
-        the backend database.
-    '''
-    for key in self.iterkeys():
-      yield key, self[key]
-
-  def items(self):
-    return list(self.iteritems())
-
-  def itervalues(self):
-    ''' Yield node_dict for all nodes in the backend database.
-    '''
-    for key in self.iterkeys():
-      yield self[key]
-
-  def values(self):
-    return list(self.itervalues())
-
-  @unimplemented
-  def __getitem__(self, key):
-    ''' Return a dict with a mapping of attr => values for the
-        specified node key.
-    '''
-    pass
-
-  def get(self, key, default):
-    try:
-      value = self[key]
-    except KeyError:
-      return default
-    return value
-
-  @unimplemented
-  def __setitem__(self, key, node_dict):
-    pass
-
-  @unimplemented
-  def __delitem__(self, key):
-    pass
-
-  __hash__ = None
-
-  def __eq__(self, other):
-    keys = set(self.keys())
-    okeys = set(other.keys())
-    if keys != okeys:
-      raise Error
-      ##print >>sys.stderr, "1: keys[%s] != okeys[%s]" % (keys, okeys)
-      ##sys.stderr.flush()
-      return False
-    for k in keys:
-      if self[k] != other[k]:
-        raise Error
-        ##print >>sys.stderr, "2: %s != %s" % (self[k], other[k])
-        ##sys.stderr.flush()
-        return False
-    return True
-
-  def __ne__(self, other):
-    return not self == other
-
-class Backend(_BackendMappingMixin):
+class Backend(O):
   ''' Base class for NodeDB backends.
   '''
 
-  def __init__(self, readonly):
+  def __init__(self, readonly, monitor=False, raw=False):
+    ''' Initialise the Backend.
+        `readonly`: this backend is readonly; do not write updates
+        `monitor`:  (default False) this backend watches the backing store
+                    for updates and loads them as found
+        `raw`: if true, this backend does not encode/decode values with
+		totext/fromtext; it must do its own reversible
+		storage of values. This is probably only appropriate
+		for in-memory stores.
+    '''
     self.nodedb = None
     self.readonly = readonly
-    self.changed = False
+    self.monitor = monitor
+    self.raw = raw
+    self.closed = False
+    self._lock = RLock()     # general mutex
+    self._update_count = 0
 
-  def nodedata(self):
-    ''' Yield node data in:
-          type, name, attrmap
-        form.
-    '''
-    for k, attrmap in self.iteritems():
-      k1, k2 = k
-      yield k1, k2, attrmap
+  def __str__(self):
+    return "%s(readonly=%s, monitor=%s, raw=%s)" \
+           % (self.__class__.__name__, self.readonly, self.monitor, self.raw)
 
-  def apply_to(self, nodedb):
-    ''' Apply the nodedata from this backend to a NodeDB.
+  def init_nodedb(self):
+    ''' Apply the nodedata from this backend to the NodeDB.
         This can be overridden by subclasses to provide some backend specific
         efficient implementation.
     '''
-    nodedb.apply_nodedata(self.nodedata())
-
-  @OBSOLETE
-  def totext(self, value):
-    ''' Hook for subclasses that might do special encoding for their backend.
-        Discouraged.
-        Instead, subtypes of NodeDB should register extra types they store
-        using using NodeDB.register_attr_type().
-        See cs/venti/nodedb.py for an example.
-    '''
-    return self.nodedb.totext(value)
-
-  @OBSOLETE
-  def fromtext(self, value):
-    ''' Hook for subclasses that might do special decoding for their backend.
-        Discouraged.
-    '''
-    ##assert False, "OBSOLETE"
-    return self.nodedb.fromtext(value)
+    raise NotImplementedError("method to do initial db load from Backend")
 
   def close(self):
     ''' Basic close: sync, detach from NodeDB, mark as closed.
     '''
-    self.sync()
-    self.nodedb = None
-    self.closed = True
+    raise NotImplementedError("method to shutdown backend, set .nodedb=None, etc")
 
-  @unimplemented
-  def sync(self):
-    pass
+  def _update(self, csvrow):
+    ''' Update the actual backend with a difference expressed as a CSVRow.
+        The values are as follows:
+          .type, .name  The Node key.
+          .attr         If this commences with a dash ('-') the attribute
+			            values are to be discarded. Otherwise, the value is
+                        to be appended to the attribute.
+          .value        The value to store, already textencoded.
+    '''
+    raise NotImplementedError("method to update the backend from a CSVRow with difference information")
 
+  @property
+  def update_count(self):
+    ''' Return the update count, an monotinoic increasing counter for deciding whether a derived data structure is out of date.
+    '''
+    return self._update_count
+
+  @locked
   def setAttr(self, t, name, attr, values):
     ''' Save the full contents of this attribute list.
     '''
@@ -148,50 +83,55 @@ class Backend(_BackendMappingMixin):
     if values:
       self.extendAttr(t, name, attr, values)
 
-  @unimplemented
-  def extendAttr(self, t, name, attr, values):
-    ''' Append values to the named attribute.
-    '''
-    pass
-
-  @unimplemented
+  @locked
   def delAttr(self, t, name, attr):
-    ''' Remove all values from the named attribute.
+    ''' Delete an attribute.
     '''
-    pass
+    self._update(CSVRow(t, name, '-'+attr, ''))
 
-class _QBackend(Backend):
-  ''' A backend to accept updates and queue them for asynchronous
-      completion via another backend.
-  '''
+  @locked
+  def extendAttr(self, t, name, attr, values):
+    ''' Append values to an attribute.
+    '''
+    for value in values:
+      self._update(CSVRow(t, name, attr, value))
 
-  def __init__(self, backend, maxq=None):
-    if maxq is None:
-      maxq = 1024
+  def import_csv_row(self, row):
+    ''' Apply the values from an individual CSV update row to the NodeDB without propagating to the backend.
+        Each row is expected to be post-resolve_csv_row().
+        Honour the incremental notation for data:
+        - a NAME commencing with '=' discards any existing (TYPE, NAME)
+          and begins anew.
+        - an ATTR commencing with '=' discards any existing ATTR and
+          commences the ATTR anew
+        - an ATTR commencing with '-' discards any existing ATTR;
+          VALUE must be empty
+        Otherwise each VALUE is appended to any existing ATTR VALUEs.
+    '''
+    nodedb = self.nodedb
+    t, name, attr, value = row
+    if attr.startswith('-'):
+      # remove attribute
+      attr = attr[1:]
+      if value != "":
+        raise ValueError("ATTR = \"%s\" but non-empty VALUE: %r" % (attr, value))
+      N = nodedb.make( (t, name) )
+      N[attr]._set_values_local( () )
     else:
-      assert maxq > 0
-    self.backend = backend
-    self._Q = IterableQueue(maxq)
-    self._T = Thread(target=self._drain)
-    self._T.start()
-
-  def close(self):
-    self._Q.close()
-    self._T.join()
-    self._T = None
-
-  def _drain(self):
-    for what, args in self._Q:
-      what(*args)
-
-  def newNode(self, t, name):
-    self._Q.put( (self.backend.newNode, (t, name,)) )
-  def delNode(self, t, name):
-    self._Q.put( (self.backend.delNode, (t, name,)) )
-  def extendAttr(self, t, name, attr, values):
-    self._Q.put( (self.backend.extendAttr, (t, name, attr, values)) )
-  def delAttr(self, t, name, attr):
-    self._Q.put( (self.backend.delAttr, (t, name, attr)) )
+      # add attribute
+      if name.startswith('='):
+        # discard node and start anew
+        name = name[1:]
+        key = t, name
+        if key in nodedb:
+          nodedb[t, name]._scrub_local()
+      N = nodedb.make( (t, name) )
+      if attr.startswith('='):
+        # reset attribute completely before appending value
+        attr = attr[1:]
+        N[attr]._set_values_local( (value,) )
+      else:
+        N.get(attr)._extend_local( (value,) )
 
 class TestAll(unittest.TestCase):
 

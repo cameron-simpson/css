@@ -15,12 +15,15 @@ from getopt import GetoptError
 from threading import RLock
 from threading import Thread
 from collections import namedtuple
-from cs.excutils import unimplemented
+from cs.debug import RLock, trace
+from cs.excutils import unimplemented, transmute
 from cs.obj import O
 from cs.lex import str1, parseUC_sAttr
-from cs.logutils import Pfx, D, error, warning, info, debug, exception
+from cs.logutils import Pfx, D, error, warning, info, debug, exception, X
 from cs.seq import the, get0
-from cs.py3 import StringTypes
+from cs.threads import locked
+from cs.py.func import derived_property
+from cs.py3 import StringTypes, unicode
 from .export import edit_csv_wide, export_csv_wide
 
 # regexp to match TYPE:name
@@ -63,11 +66,11 @@ def nodekey(*args):
     else:
       raise ValueError("nodekey() takes (TYPE, NAME) args or a single arg: args=%s" % ( args, ))
 
-    if type(t) not in (str, unicode):
+    if type(t) not in StringTypes:
       raise ValueError("expected TYPE to be a string: %r" % (t,))
     if type(name) is int:
       name = str(name)
-    elif type(name) not in (str, unicode):
+    elif type(name) not in StringTypes:
       raise ValueError("expected NAME to be a string: %r" % (name,))
     if not t.isupper() and t != '_':
       raise ValueError("invalid TYPE, not upper case or _")
@@ -98,8 +101,7 @@ class _AttrList(list):
       list.__init__(self)
     self.node = node
     self.attr = attr
-    if node is not None:
-      self.nodedb = node.nodedb
+    self._lock = self.node._lock
 
   def __str__(self):
     return str(list(self))
@@ -108,6 +110,14 @@ class _AttrList(list):
     if self.node is None:
       return ".%ss[...]" % (self.attr,)
     return "%s.%ss" % (str(self.node), self.attr)
+
+  @property
+  def nodedb(self):
+    return self.node.nodedb
+
+  @property
+  def backend(self):
+    return self.nodedb.backend
 
   def __delitemrefs(self, nodes):
     ''' Remove the reverse references of this attribute.
@@ -135,19 +145,7 @@ class _AttrList(list):
       if hasattr(N, 'name') and hasattr(N, 'type') and hasattr(N, 'nodedb'):
         addref(self.node, self.attr)
 
-  def _save(self):
-    ''' Rewrite our value completely in the backend.
-    '''
-    N = self.node
-    if self.nodedb.backend:
-      self.nodedb.backend.setAttr(N.type, N.name, self.attr, self)
-
-  def _extend(self, values):
-    N = self.node
-    backend = self.nodedb.backend
-    if backend:
-      backend.extendAttr(N.type, N.name, self.attr, values)
-
+  @locked
   def __delitem__(self, index):
     if type(index) is int:
       items = (self[index],)
@@ -158,15 +156,11 @@ class _AttrList(list):
     self._save()
     return value
 
+  @locked
   def __delslice__(self, i, j):
     del self[max(0, i):max(0, j):]
 
-  def __iadd__(self, other):
-    self.__additemrefs(other)
-    value = list.__iadd__(self, other)
-    self._save()
-    return value
-
+  @locked
   def __imul__(self, other):
     oitems = list(self)
     value = list.__imul__(self, other)
@@ -175,62 +169,114 @@ class _AttrList(list):
     self._save()
     return value
 
+  @locked
   def __setitem__(self, index, value):
-    if type(index) is int:
+    if isinstance(index, int):
       ovalues = (self[index],)
       values = (value,)
       index = slice(index, index+1)
-    else:
-      assert type(index) is slice
+    elif isinstance(index, slice):
       ovalues = itertools.islice(self, index.start, index.stop, index.step)
       values = list(value)
+    else:
+      raise TypeError("expected index to be int or slice, got %s: %s[%r] = %s"
+                      % (type(index), self, index, value))
     self.__delitemrefs(ovalues)
     list.__setitem__(self, index, values)
     self.__additemrefs(values)
     self._save()
 
-  def __setslice__(self, i, j, values):
-    self[max(0, i):max(0, j):] = values
+  def _scrub_local(self):
+    # remove all elements from this attribute
+    self[:] = ()
+    self.nodedb._revision += 1
+  _scrub = _scrub_local
 
-  def append(self, value):
-    self.extend((value,))
+  def _scrub_backend(self):
+    N = self.node
+    self.backend.delAttr(N.type, N.name, self.attr)
 
   def extend(self, values):
-    # turn iterator into tuple
+    ''' Extend this attribute, updating both the local and backend data stores.
+    '''
+    self._extend_local(values)
+    self._extend_backend(values)
+
+  __iadd__ = extend
+
+  def _extend_local(self, values):
+    ''' Record the extension in the local data structure.
+    '''
+    # turn iterable into tuple
     if not isinstance(values, (list, tuple)):
       values = tuple(values)
     if len(values) > 0:
       list.extend(self, values)
       self.__additemrefs(values)
-      self._extend(values)
+      self.nodedb._revision += 1
+
+  def _extend_backend(self, values):
+    ''' Record the extension in the backend.
+    '''
+    N = self.node
+    self.backend.extendAttr(N.type, N.name, self.attr, values)
+
+  def _save(self):
+    ''' Save the entire attribute to the backend.
+    '''
+    self._set_values_backend(self)
+
+  def set_values(self, values):
+    ''' Reset the list of values. Takes shallow copy of the iterable.
+    '''
+    # turn iterable into tuple
+    if not isinstance(values, (list, tuple)):
+      values = tuple(values)
+    self._set_values_local(values)
+    self._set_values_backend(values)
+
+  def _set_values_local(self, values):
+    self._scrub_local()
+    self._extend_local(values)
+
+  def _set_values_backend(self, values):
+    self._scrub_backend()
+    self._extend_backend(values)
+
+  def append(self, value):
+    self.extend((value,))
 
   def insert(self, index, value):
     N = self.node
     value = list.insert(self, index, value)
+    self.nodedb._revision += 1
     self.__additemrefs((value,))
     self._save()
     return value
 
   def pop(self, index=-1):
     value = list.pop(self, index)
+    self.nodedb._revision += 1
     self.__delitemrefs((value,))
-    self.nodedb.backend.saveAttrs(self)
     self._save()
     return value
 
   def remove(self, value):
     list.remove(self, value)
+    self.nodedb._revision += 1
     self._save()
     self.__delitemrefs(value)
 
   def reverse(self):
     if len(self) > 0:
       list.reverse(self, *args)
+      self.nodedb._revision += 1
       self._save()
 
   def sort(self, *args):
     if len(self) > 0:
       list.sort(self, *args)
+      self.nodedb._revision += 1
       self._save()
 
   def __getattr__(self, attr):
@@ -296,17 +342,22 @@ class Node(dict):
       Node["ATTR"] will raise a KeyError.
   '''
 
-  def __init__(self, t, name, nodedb):
+  def __init__(self, t, name, nodedb, initial=None):
     self.type = str1(t) if t is not None else None
     self.name = name
     self.nodedb = nodedb
+    self._lock = self.nodedb._lock
     self._reverse = {}  # maps (OtherNode, ATTR) => count
+    if initial:
+      self.update(initial)
 
-  def __nonzero__(self):
+  def __bool__(self):
     ''' bool(Node) returns True, unlike a dict.
         Conversely, the NoNode singleton returns False from bool().
     '''
     return True
+
+  __nonzero__ = __bool__
 
   def __hash__(self):
     ''' Hash function, based on name, type and nodedb id.
@@ -327,6 +378,18 @@ class Node(dict):
         non-_AttrLists etc.
     '''
     pass
+
+  def _scrub(self):
+    ''' Remove all attribute values.
+    '''
+    for attr in self.keys():
+      self[attr]._scrub()
+
+  def _scrub_local(self):
+    ''' Remove all attribute values, but do not pass changes to the backend.
+    '''
+    for attr in self.keys():
+      self[attr]._scrub_local()
 
   def seq(self):
     seqs = self.SEQs
@@ -420,9 +483,11 @@ class Node(dict):
       return False
     return True
 
+  @locked
   def get(self, k, default=None):
     ''' Fetch the item specified.
         Create an empty list if necessary.
+        This is the method that instantiates all entries as _AttrLists.
     '''
     try:
       values = self[k]
@@ -430,11 +495,13 @@ class Node(dict):
       if default is None:
         default = ()
       values = _AttrList(self, k, _items=default)
-      dict.__setitem__(self, k, values) # ensure this gets used later
+      dict.__setitem__(self, k, values) # ensure that this is what gets used later
+      self.nodedb._revision += 1
     return values
 
   # __getitem__ goes directly to the dict implementation
 
+  @locked
   def __setitem__(self, item, new_values):
     ''' Set Node[item] = new_values.
         Unlike a normal dictionary, a shallow copy of new_values is stored,
@@ -459,6 +526,7 @@ class Node(dict):
       raise KeyError(repr(item))
     dict.__setitem__(self, k, ())
     dict.__delitem__(self, k)
+    self.nodedb._revision += 1
 
   def __getattr__(self, attr):
     ''' Support .ATTR[s] and .inTYPE.
@@ -621,11 +689,13 @@ class _NoNode(Node):
   def __init__(self, nodedb):
     Node.__init__(self, '_NoNode', '<_NoNode>', nodedb)
 
-  def __nonzero__(self):
+  def __bool__(self):
     ''' A NodeDB's NoNode returns False from bool().
         Other Nodes return True.
     '''
     return False
+
+  __nonzero__ = __bool__
 
   def __str__(self):
     return "<NoNode>"
@@ -651,26 +721,24 @@ class NodeDB(dict, O):
     self._noNode = None
     self.__attr_type_registry = {}
     self.__attr_scheme_registry = {}
-    # run initially with no backend
-    # load data from backend
-    # attach backend to collect updates
     self.__nodesByType = {}
-    # load data with no backend, then attach backend
-    self.backend = None
-    backend.nodedb = self
-    backend.apply_to(self)
+    self._revision = 0
+    self._lock = RLock()
     self.backend = backend
+    backend.nodedb = self
+    backend.init_nodedb()
 
-  __str__ = O.__str__
+  def __str__(self):
+    return "NodeDB(readonly=%s, backend=%s)" % (self.readonly, self.backend)
 
+  @locked
   def close(self):
     ''' Close this NodeDB.
     '''
-    if self.backend:
-      self.backend.close()
-    self.backend = None
     self.closed = True
+    self.backend.close()
 
+  @locked
   def sync(self):
     ''' Synchronise: update the backend to match the current frontend state.
     '''
@@ -680,15 +748,15 @@ class NodeDB(dict, O):
     return self
 
   def __exit__(self, exc_type, exc_value, traceback):
-    if not self.closed:
-      try:
-        self.close()
-      except Exception as e:
-        if exc_type:
-          error("%s.__exit__: self.close() raised %r", self, e)
-        else:
-          raise
+    self.close()
     return False
+
+  def _scrub(self):
+    ''' Erase all the attribute data from the NodeDB.
+        Supports the backend reload facility.
+    '''
+    for key in list(self.keys()):
+      self[key]._scrub()
 
   def useNoNode(self):
     ''' Enable "no node" mode.
@@ -730,8 +798,8 @@ class NodeDB(dict, O):
                          totext, fromtext,
                          tobytes=None, frombytes=None):
     ''' Register an attribute value type for storage and retrieval in this
-        NodeDB. This permits the storage of values that are not the
-        presupported string, non-negative integer and Node types.
+        NodeDB. This permits the storage of values that are not
+        presupported: strings, non-negative integers and Nodes.
         Parameters:
           `t`, the value type to register
           `scheme`, the scheme label to use for the type
@@ -739,17 +807,19 @@ class NodeDB(dict, O):
           `fromtext`, a function to compute a value from text
           `tobytes`, a function to render a value in a compact binary form
           `frombytes`, a function to compute a value from the binary form
-        If `tobytes` is None or unspecified, `totext` is used.
-        If `frombytes` is None or unspecified, `fromtext` is used.
+        If `tobytes` is None or unspecified, utf8(`totext`) is used.
+        If `frombytes` is None or unspecified, `fromtext`(decode-utf8) is used.
     '''
     reg = self.__attr_type_registry
     sch = self.__attr_scheme_registry
-    assert t not in reg, "type %s already registered" % (t,)
-    assert scheme not in sch, "scheme '%s' already registered" % (scheme,)
+    if t in reg:
+      raise ValueError("type %s already registered" % (t,))
+    if scheme in sch:
+      raise ValueError("scheme '%s' already registered" % (scheme,))
     if tobytes is None:
-      tobytes = totext
+      tobytes = lambda v: totext(v).encode('utf-8')
     if frombytes is None:
-      frombytes = fromtext
+      frombytes = lambda bs: fromtext(bs.decode('utf-8'))
     R = NodeDB.__AttrTypeRegistration(t, scheme,
                                   totext, fromtext,
                                   tobytes, frombytes)
@@ -815,6 +885,9 @@ class NodeDB(dict, O):
     return self.get(item, doCreate=True)
 
   def __getattr__(self, attr):
+    ''' .TYPEs  Iterable if Nodes of the specified TYPE.
+        .TYPE   The meta-Node (TYPE, '_') for the type.
+    '''
     k, plural = parseUC_sAttr(attr)
     if k:
       if plural:
@@ -835,8 +908,14 @@ class NodeDB(dict, O):
     return N
 
   def __setitem__(self, item, N):
-    assert isinstance(N, Node), "tried to store non-Node: %r" % (N,)
-    assert N.nodedb is self, "tried to store foreign Node: %r" % (N,)
+    if not isinstance(N, Node):
+      warning("promote %r to Node", N)
+      N0 = N
+      N = self.make(item)
+      N.update(N0)
+    else:
+      if N.nodedb is not self:
+        raise ValueError("tried to store foreign Node: %r" % (N,))
     key = nodekey(item)
     assert key == (N.type, N.name), \
            "tried to store Node(%s:%s) as key (%s:%s)" \
@@ -872,22 +951,27 @@ class NodeDB(dict, O):
     else:
       raise ValueError("nodekey: expected 1 or 2 args, got: %r" % (args,))
 
-    # FIXME: ghastly hack
-    if type(t) is unicode:
-      t = str(t)
-    else:
-      assert type(t) is str, "t = %s %r" % (type(t), t)
-    if type(name) is unicode:
-      name = str(name)
-    else:
-      assert type(name) is str, "name = %s %r" % (type(name), name)
+    if not isinstance(t, unicode):
+      if type(t) is str:
+        t = unicode(t)
+      else:
+        raise ValueError("TYPE should be unicode: %r" % (t,))
+
+    if not isinstance(name, unicode):
+      if type(name) is str:
+        name = unicode(name)
+      else:
+        raise ValueError("NAME should be unicode: %r" % (name,))
 
     # sanity check type form
     if t != '_':
-      assert t.isupper(), "TYPE should be upper case, got %r" % (t,)
-      assert len(name) > 0
+      if not t.isupper():
+        raise ValueError("TYPE should be upper case: %r" % (t,))
+      if len(name) < 1:
+        raise ValueError("NAME too short: %r" % (name,))
       k, plural = parseUC_sAttr(t)
-      assert k is not None and not plural, "got TYPE == %r" % (t,)
+      if k is None or plural:
+        raise ValueError("TYPE should be singluar upper case: %r" % (t,))
 
     return t, name
 
@@ -900,8 +984,6 @@ class NodeDB(dict, O):
       if (t, name) in self:
         raise KeyError('newNode(%s, %s): already exists' % (t, name))
       N = self[t, name] = self._createNode(t, name)
-      if self.backend:
-        self.backend[t, name] = N
       self[t, name] = N
     return N
 
@@ -920,12 +1002,6 @@ class NodeDB(dict, O):
       return self[key]
     except KeyError:
       return self.newNode(key)
-
-  @property
-  def _s(self):
-    ''' Return Nodes of type _.
-    '''
-    return self.__nodesByType.get('_', ())
 
   def seq(self):
     ''' Obtain a new sequence number for this NodeDB.
@@ -1024,7 +1100,7 @@ class NodeDB(dict, O):
     return cs.nodedb.text.totoken(value)
 
   def totext(self, value):
-    ''' Convert a value for external string storage.
+    ''' Convert a value for external Unicode string storage.
           text        The string "text" for strings not commencing with a colon.
           ::text      The string ":text" for strings commencing with a colon.
           :TYPE:name  Node of specified name and TYPE in local NodeDB.
@@ -1038,25 +1114,26 @@ class NodeDB(dict, O):
       if value.nodedb is self:
         # Node from local NodeDB
         assert value.type[0].isupper(), "non-UPPER type: %s" % (value.type,)
-        return ":%s:%s" % (value.type, value.name)
+        return u':%s:%s' % (value.type, value.name)
       odb, seqnum = self.nodedb.otherDB(value.nodedb.url)
-      return ":+%d:%s:%s" % (seqnum, value.type, value.name)
-    t = type(value)
-    if t in StringTypes:
+      return u':+%d:%s:%s' % (seqnum, value.type, value.name)
+    if isinstance(value, StringTypes):
+      # Python 2 upcode
+      if not isinstance(value, unicode):
+        value = unicode(value, 'iso8859-1')
       if value.startswith(':'):
-        return ':'+value
+        return u':'+value
       return value
+    t = type(value)
     if t is int:
-      s = str(value)
-      assert s[0].isdigit()
-      return ':' + s
+      return u':%d' % (value,)
     R = self.__attr_type_registry.get(t, None)
     if R:
       scheme = R.scheme
       assert scheme[0].islower() and scheme.find(':',1) < 0, \
              "illegal scheme name: \"%s\"" % (scheme,)
-      return ':'+scheme+':'+R.totext(value)
-    raise ValueError("can't totext( <%s> %s )" % (type(value),value))
+      return u':%s:%s' % (scheme, R.totext(value))
+    raise ValueError("can't totext( <%s> %r )" % (type(value), value))
 
   def fromtext(self, text, doCreate=True):
     ''' Convert a stored string into a value.
@@ -1133,7 +1210,7 @@ class NodeDB(dict, O):
     fp.flush()
 
   def nodedata(self, nodes=None):
-    ''' Generator to yield:
+    ''' Generator to yield this NodeDB's data in the form:
           type, name, attrmap
         ready to be written to external storage such as a CSV file
         or to be applied to another NodeDB.
@@ -1146,10 +1223,11 @@ class NodeDB(dict, O):
         attrmap[attr] = [ self.totext(value) for value in values ]
       yield N.type, N.name, attrmap
 
-  def apply_nodedata(self, nodedata, doCreate=True):
-    ''' Load `nodedata`, a sequence of:
+  def apply_nodedata(self, nodedata, doCreate=True, doExtend=False, raw=False):
+    ''' Load `nodedata`, an iterable of:
           type, name, attrmap
         into this NodeDB.
+        attrmap is a mapping from attribute name to a list of totext() values.
     '''
     with Pfx(str(self)):
       debug("apply_nodedata(..,doCreate=%s)...", doCreate)
@@ -1162,7 +1240,12 @@ class NodeDB(dict, O):
         mapping = {}
         for attr, values in attrmap.items():
           ##debug("set %s:%s.%s", t, name, attr)
-          mapping[attr] = [ self.fromtext(value) for value in values ]
+          if not raw:
+            values = [ self.fromtext(value) for value in values ]
+          if doExtend:
+            mapping[attr].extend(values)
+          else:
+            mapping[attr] = values
         N.apply(mapping)
 
   def nodespec(self, spec, doCreate=False):
@@ -1465,7 +1548,7 @@ class NodeDB(dict, O):
 _NodeDBsByURL = {}
 
 def NodeDBFromURL(url, readonly=False, klass=None):
-  ''' Factory method to return singleton NodeDB instances.
+  ''' Factory function to return singleton NodeDB instances.
   '''
   if klass is None:
     klass = NodeDB

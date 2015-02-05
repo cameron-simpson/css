@@ -4,12 +4,18 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
+from __future__ import print_function
 import os
 from os.path import dirname, join as joinpath
 import sys
 import time
 import unittest
 from cs.mailutils import Maildir
+
+def D(msg, *a):
+  if a:
+    msg = msg % a
+  print(msg, file=sys.stderr)
 
 testdatadir = joinpath(dirname(__file__), 'testdata', 'cs.mailutils')
 testmaildir = joinpath(testdatadir, 'maildir')
@@ -20,18 +26,18 @@ class TestMaildir(unittest.TestCase):
     t0 = time.time()
     M = Maildir(testmaildir)
     t1 = time.time()
-    ##print >>sys.stderr, "Maildir(%s): %gs" % (testmaildir, t1-t0,)
-    keys = M.keys()
+    ##D("Maildir(%s): %gs" % (testmaildir, t1-t0,))
+    keys = list(M.keys())
     t2 = time.time()
-    ##print >>sys.stderr, "Maildir(%s).keys(): %gs, %d keys" % (testmaildir, t2-t1, len(keys))
+    ##D("Maildir(%s).keys(): %gs, %d keys" % (testmaildir, t2-t1, len(keys)))
     for key in keys[:100]:
       msg = M[key]
     t3 = time.time()
-    ##print >>sys.stderr, "Maildir(%s): scan 100 msgs %gs" % (testmaildir, t3-t2,)
+    ##D("Maildir(%s): scan 100 msgs %gs" % (testmaildir, t3-t2,))
     for key in keys[100:200]:
       hdr = M.get_headers(key)
     t4 = time.time()
-    ##print >>sys.stderr, "Maildir(%s): scan 100 hdrs %gs" % (testmaildir, t4-t3,)
+    ##D("Maildir(%s): scan 100 hdrs %gs" % (testmaildir, t4-t3,))
 
 def selftest(argv):
   unittest.main(__name__, None, argv)

@@ -13,7 +13,7 @@ class TestAll(unittest.TestCase):
   def setUp(self):
     import random
     random.seed()
-    self.S = MappingStore({})
+    self.S = MappingStore({}).open()
 
   def tearDown(self):
     self.S.close()

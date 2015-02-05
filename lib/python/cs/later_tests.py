@@ -8,7 +8,10 @@ from functools import partial
 import sys
 import time
 import unittest
-from cs.later import Later, report
+from cs.logutils import D, setup_logging
+from cs.timeutils import sleep
+from cs.asynchron import report
+from cs.later import Later, FUNC_MANY_TO_MANY, FUNC_SELECTOR
 
 class TestLater(unittest.TestCase):
 
@@ -17,7 +20,7 @@ class TestLater(unittest.TestCase):
     return x*2
   @staticmethod
   def _delay(n):
-    time.sleep(n)
+    sleep(n)
     return n
   class _Bang(Exception):
     pass
@@ -30,7 +33,7 @@ class TestLater(unittest.TestCase):
     self.L.logTo("/dev/tty")
 
   def tearDown(self):
-    self.L.close()
+    pass
 
   def test00one(self):
     # compute 3*2
@@ -65,7 +68,7 @@ class TestLater(unittest.TestCase):
     y = LF2()
     z = LF3()
     elapsed = time.time() - now
-    self.assertTrue(elapsed >= 4)
+    self.assertTrue(elapsed >= 4, "elapsed (%s) < 4" % (elapsed,))
 
   def test03calltwice(self):
     # compute once, get result twice
@@ -102,12 +105,93 @@ class TestLater(unittest.TestCase):
       results = [ LF() for LF in report( (LF1, LF2, LF3) ) ]
       self.assertEqual(results, [1, 2, 3])
 
-  def test08delay(self):
-    with Later(3) as L3:
-      LF1 = L3
+  def test09pipeline_00noop(self):
+    with Later(1) as L:
+      items = ['a', 'b', 'c', 'g', 'f', 'e']
+      P = L.pipeline([lambda x:x], items)
+      outQ = P.outQ
+      result = list(P.outQ)
+      self.assertEqual( items, result )
+
+  def test09pipeline_01idenitity(self):
+    L = self.L
+    items = ['a', 'b', 'c', 'g', 'f', 'e']
+    def func(x):
+      yield x
+    P = L.pipeline([ func ], items)
+    self.assertIsNot(P.outQ, items)
+    result = list(P.outQ)
+    self.assertEqual( items, result )
+
+  def test09pipeline_02double(self):
+    L = self.L
+    items = ['a', 'b', 'c', 'g', 'f', 'e']
+    expected = ['a', 'a', 'b', 'b', 'c', 'c', 'g', 'g', 'f', 'f', 'e', 'e']
+    def func(x):
+      yield x
+      yield x
+    P = L.pipeline([ func ], items)
+    self.assertIsNot(P.outQ, items)
+    result = list(P.outQ)
+    # values may be interleaved due to parallelism
+    self.assertEqual( len(result), len(expected) )
+    self.assertEqual( sorted(result), sorted(expected) )
+
+  def test09pipeline_03a_sort(self):
+    L = self.L
+    items = ['a', 'b', 'c', 'g', 'f', 'e']
+    expected = ['a', 'b', 'c', 'e', 'f', 'g']
+    def func(x):
+      return sorted(x)
+    P = L.pipeline([ (FUNC_MANY_TO_MANY, func) ], items)
+    self.assertIsNot(P.outQ, items)
+    result = list(P.outQ)
+    self.assertEqual( result, sorted(items) )
+
+  def test09pipeline_03b_set(self):
+    L = self.L
+    items = ['a', 'b', 'c', 'g', 'f', 'e']
+    expected = ['a', 'b', 'c', 'e', 'f', 'g']
+    def func(x):
+      return set(x)
+    P = L.pipeline([ (FUNC_MANY_TO_MANY, func) ], items)
+    self.assertIsNot(P.outQ, items)
+    result = set(P.outQ)
+    self.assertEqual( result, set(items) )
+
+  def test09pipeline_04select(self):
+    L = self.L
+    items = ['a', 'b', 'c', 'g', 'f', 'e']
+    want = ('a', 'f', 'c')
+    expected = ['a', 'c', 'f']
+    def wanted(x):
+      return x in want
+    P = L.pipeline([ (FUNC_SELECTOR, wanted) ], items)
+    self.assertIsNot(P.outQ, items)
+    result = list(P.outQ)
+    self.assertEqual( result, expected )
+
+  def test09pipeline_05two_by_two_by_sort(self):
+    L = self.L
+    items = ['a', 'b', 'c', 'g', 'f', 'e']
+    expected = [ 'a', 'a', 'a', 'a',
+              'b', 'b', 'b', 'b',
+              'c', 'c', 'c', 'c',
+              'e', 'e', 'e', 'e',
+              'f', 'f', 'f', 'f',
+              'g', 'g', 'g', 'g',
+            ]
+    def double(x):
+      yield x
+      yield x
+    P = L.pipeline([ double, double, (FUNC_MANY_TO_MANY, sorted) ], items)
+    self.assertIsNot(P.outQ, items)
+    result = list(P.outQ)
+    self.assertEqual( result, expected )
 
 def selftest(argv):
-  unittest.main(__name__, None, argv)
+  setup_logging()
+  unittest.main(__name__, None, argv, failfast=True)
 
 if __name__ == '__main__':
   selftest(sys.argv)

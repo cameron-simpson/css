@@ -9,10 +9,11 @@ set -ue
 : ${TMPDIR:=/tmp}
 
 cmd=`basename "$0"`
-usage="Usage: $cmd -d reportdir template-analog-config SETTING=value... {/path/to/logfile|/path/to/logdir}..."
+usage="Usage: $cmd -d reportdir [-n] [-x] template-analog-config SETTING=value... {/path/to/logfile|/path/to/logdir}..."
 
-trace=set-x
+trace=
 reportdir=
+doit=1
 
 badopts=
 
@@ -20,6 +21,8 @@ while [ $# -gt 0 ]
 do
   case "$1" in
     -d) reportdir=$2; shift ;;
+    -n) doit= ;;
+    -x) trace=set-x ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
     *)  break ;;
@@ -68,23 +71,19 @@ do
   shift
 done
 
-# gather up logfiles or directories
-while [ $# -gt 0 ]
+# remaining arguments are logfiles or directories containing logfiles
+tmplog=$reportdir/tmp.log.gz
+for path
 do
-  case "$1" in
-    /*)
-      path=$1
-      if [ -d "$path/." ]
-      then find "$path/." -type f -exec printf 'LOGFILE "%s"\n' {} ';' >>"$patchfile"
-      else printf 'LOGFILE "%s"\n' "$path" >>"$patchfile"
-      fi
-      ;;
-    *)break ;;
-  esac
-  shift
-done
-
-[ $# = 0 ] || { echo "$cmd: unrecognised arguments: $*" >&2; badopts=1; }
+  path=$1
+  if [ -d "$path/." ]
+  then find "$path/." -type f
+  else printf '%s\n' "$path"
+  fi
+done \
+| xxargs merge-apache-logs -M \
+| gzip -9 >"$tmplog"
+printf 'LOGFILE "%s"\n' "$tmplog" >>"$patchfile"
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
@@ -96,6 +95,10 @@ echo "OUTFILE $reportdir/index.html" >>"$patchfile"
 [ -d "$imagesdir/." ] || $trace mkdir "$imagesdir"
 echo "IMAGEDIR $imagesdir" >>"$patchfile"
 
-cat "$patchfile"
+##cat "$patchfile"
 $trace patch-config -o "$conf" "$tplt" "$patchfile"
-$trace analog "+g$conf"
+if [ $doit ]
+then  $trace analog "+g$conf" || xit=1
+else  echo SKIP analog "+g$conf"
+fi
+$trace rm "$tmplog"

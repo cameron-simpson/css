@@ -1,0 +1,3 @@
+#!/bin/sh
+set -x
+exec mplayer -nosound -vo png:z=5 -vf framestep=I ${1+"$@"}

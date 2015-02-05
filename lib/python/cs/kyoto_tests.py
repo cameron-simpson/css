@@ -6,10 +6,8 @@
 
 import sys
 import unittest
-from cs.kyoto import KyotoCabinet
 
 class TestLater(unittest.TestCase):
-
   pass
 
 def selftest(argv):

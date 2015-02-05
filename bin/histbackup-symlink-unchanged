@@ -8,15 +8,30 @@
 set -ue
 
 trace=  ##set-x     ##eecho
+[ -t 2 ] && trace=set-x
 echo=:
 [ -t 1 ] && echo=echo
+verbose=
+vecho=:
 
 cmd=`basename "$0"`
-usage="Usage: $cmd histbackup-dir [-x] [dates...]"
+usage="Usage: $cmd [-x] histbackup-dir [dates...]"
 
 badopts=
 
-[ $# -gt 0 ] && [ "x$1" = x-x ] && { trace=set-x; shift; }
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -v) echo=echo verbose=1 vecho=echo ;;
+    -x) trace=set-x ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
 
 if [ $# = 0 ]
 then
@@ -42,7 +57,7 @@ for bakdir in [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]*
 do
   pfx=$hbdir/$bakdir
   # ignore backups that are already symlinks
-  [ -h "$bakdir" ] && continue
+  [ -h "$bakdir" ] && { $vecho "already a symlink, skip: $bakdir"; continue; }
 
   # if specific backups were specified, do not check backups not mentioned
   if [ $# = 0 ]
@@ -65,6 +80,7 @@ do
   if [ -z "$lastbak" ]
   then
     # first actual backup; just remember it for next check
+    $vecho "note latest directory as $bakdir"
     lastbak=$bakdir
     continue
   fi
@@ -72,16 +88,17 @@ do
   # check this one? skip if not
   [ $docheck ] || {
     # note as most recent real directory
+    $vecho "note latest directory as $bakdir"
     lastbak=$bakdir
     continue
   }
 
-  changes=`rsync -niO -aH "./$lastbak/" "./$bakdir/" | sed 1q`
+  changes=`rsync -ni -aOH --delete "./$lastbak/" "./$bakdir/" | sed 1q`
   if [ -n "$changes" ]
   then
     # note as most recent real directory
-    lastbak=$bakdir
     $echo "$pfx: has changes, note as most recent real directory"
+    lastbak=$bakdir
     continue
   fi
   $echo "$pfx: unchanged, linking to $lastbak"

@@ -4,6 +4,17 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
+DISTINFO = {
+    'description': "functions and classes to work with email",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'requires': ['cs.fileutils', 'cs.logutils', 'cs.threads', 'cs.seq', 'cs.py3'],
+}
+
 import email.message
 import email.parser
 from email.utils import getaddresses
@@ -21,26 +32,26 @@ from cs.fileutils import Pathname, shortpath as _shortpath
 from cs.logutils import Pfx, info, warning, debug, D
 from cs.threads import locked_property
 from cs.seq import seq
-from cs.py3 import StringIO
+from cs.py3 import StringIO, StringTypes
 
 SHORTPATH_PREFIXES = ( ('$MAILDIR/', '+'), ('$HOME/', '~/') )
 
 def shortpath(path, environ=None):
   return _shortpath(path, environ=environ, prefixes=SHORTPATH_PREFIXES)
 
-def Message(M, headersonly=False):
-  ''' Factory function to accept a file or filename and return an
-      email.message.Message.
+def Message(msgfile, headersonly=False):
+  ''' Factory function to accept a file or filename and return an email.message.Message.
   '''
-  if isinstance(M, str):
-    pathname = M
+  if isinstance(msgfile, StringTypes):
+    # msgfile presumed to be filename
+    pathname = msgfile
     with Pfx(pathname):
       with open(pathname) as mfp:
         M = Message(mfp, headersonly=headersonly)
         M.pathname = pathname
         return M
-  mfp = M
-  return email.parser.Parser().parse(mfp, headersonly=headersonly)
+  # msgfile presumed to be file-like object
+  return email.parser.Parser().parse(msgfile, headersonly=headersonly)
 
 def message_addresses(M, header_names):
   ''' Yield (realname, address) pairs from all the named headers.
@@ -48,12 +59,29 @@ def message_addresses(M, header_names):
   for header_name in header_names:
     hdrs = M.get_all(header_name, ())
     for hdr in hdrs:
-      if hdr != 'undisclosed-recipients:;':
-        for realname, address in getaddresses( (hdr,) ):
-          if len(address) == 0:
-            warning("message_addresses(M, %r): header_name %r: hdr=%r: getaddresses() => (%r, %r)",
-                    header_names, header_name, hdr, realname, address)
+      for realname, address in getaddresses( (hdr,) ):
+        if len(address) == 0:
+          debug("message_addresses(M, %r): header_name %r: hdr=%r: getaddresses() => (%r, %r): DISCARDED",
+                  header_names, header_name, hdr, realname, address)
+        else:
           yield realname, address
+
+def modify_header(M, hdr, new_value, always=False):
+  ''' Modify a Message `M` to change the value of the named header `hdr` to the new value `new_value`.
+      If `new_value` differs from the existing value or if `always`
+      is true, save the old value as X-Old-`hdr`.
+      Return a Boolean indicating whether the headers were modified.
+  '''
+  modified = False
+  old_value = M.get(hdr, '')
+  if always or old_value != new_value:
+    modified = True
+    old_hdr = 'X-Old-' + hdr
+    for old_value in M.get_all(hdr, ()):
+      M.add_header("X-Old-" + hdr, old_value)
+    del M[hdr]
+    M[hdr] = new_value
+  return modified
 
 def ismhdir(path):
   ''' Test if `path` points at an MH directory.
@@ -71,24 +99,17 @@ def ismaildir(path):
 def ismbox(path):
   ''' Open path and check that its first line begins with "From ".
   '''
-  fp=None
+  fp = None
   try:
-    fp=open(path)
+    fp = open(path)
     from_ = fp.read(5)
   except IOError:
     if fp is not None:
       fp.close()
     return False
-  fp.close()
-  return from_ == 'From '
-
-def ismaildir(path):
-  ''' Test if 'path' points at a Maildir directory.
-  '''
-  for subdir in ('new','cur','tmp'):
-    if not os.path.isdir(os.path.join(path,subdir)):
-      return False
-  return True
+  else:
+    fp.close()
+    return from_ == 'From '
 
 def make_maildir(path):
   ''' Create a new maildir at `path`.
@@ -183,7 +204,7 @@ class Maildir(mailbox.Maildir):
 
   def remove_folder(self, folder):
     F = self.get_folder(folder)
-    for key in F.iterkeys():
+    for key in F.keys():
       raise mailbox.NotEmptyError("not an empty Maildir")
     folderpath = os.path.join(self.dir, folder)
     for subdir in 'tmp', 'new', 'cur':
@@ -206,9 +227,11 @@ class Maildir(mailbox.Maildir):
        and ':' not in key \
        and '/' not in key
 
-  def save_filepath(self, filepath, key=None, nolink=False):
-    ''' Save a file into the Maildir.
+  def save_filepath(self, filepath, key=None, nolink=False, flags=''):
+    ''' Save the file specified by `filepath` into the Maildir.
         By default a hardlink is attempted unless `nolink` is supplied true.
+        The optional `flags` is a string consisting of flag letters listed at:
+          http://cr.yp.to/proto/maildir.html
         Return the key for the saved message.
     '''
     with Pfx("save_filepath(%s)", filepath):
@@ -232,7 +255,10 @@ class Maildir(mailbox.Maildir):
       else:
         debug("copyfile %s => %s", filepath, tmppath)
         shutil.copyfile(filepath, tmppath)
-      newpath = os.path.join(self.dir, 'new', key)
+      newbase = key
+      if flags:
+        newbase += ':2,' + ''.join(sorted(flags))
+      newpath = os.path.join(self.dir, 'new', newbase)
       try:
         debug("rename %s => %s", tmppath, newpath)
         os.rename(tmppath, newpath)
@@ -240,10 +266,10 @@ class Maildir(mailbox.Maildir):
         debug("unlink %s", tmppath)
         os.unlink(tmppath)
         raise
-      self.msgmap[key] = ('new', key)
+      self.msgmap[key] = ('new', newbase)
       return key
 
-  def save_file(self, fp, key=None):
+  def save_file(self, fp, key=None, flags=''):
     ''' Save the contents of the file-like object `fp` into the Maildir.
         Return the key for the saved message.
     '''
@@ -251,13 +277,13 @@ class Maildir(mailbox.Maildir):
       debug("create new file %s for key %s", T.name, key)
       T.write(fp.read())
       T.flush()
-      return self.save_filepath(T.name, key=key)
+      return self.save_filepath(T.name, key=key, flags=flags)
 
-  def save_message(self, M, key=None):
+  def save_message(self, M, key=None, flags=''):
     ''' Save the contents of the Message `M` into the Maildir.
         Return the key for the saved message.
     '''
-    return self.save_file(StringIO(str(M)), key=key)
+    return self.save_file(StringIO(str(M)), key=key, flags=flags)
 
   def keypath(self, key):
     subdir, msgbase = self.msgmap[key]
@@ -319,7 +345,7 @@ class Maildir(mailbox.Maildir):
     return message
 
   def popitem(self):
-    for key in self.iterkeys():
+    for key in self.keys():
       return self.pop(key)
     raise KeyError("empty Maildir")
 
@@ -361,7 +387,9 @@ class Maildir(mailbox.Maildir):
   def iterkeys(self):
     return self.msgmap.iterkeys()
 
-  def keys(self):
+  def keys(self, flush=False):
+    if flush:
+      self.flush()
     return self.msgmap.keys()
 
   def itervalues(self):
@@ -370,7 +398,7 @@ class Maildir(mailbox.Maildir):
   __iter__ = itervalues
 
   def values(self):
-    return list(self.iterkeys())
+    return list(self.itervalues())
 
   def iteritems(self):
     for key in self.iterkeys():

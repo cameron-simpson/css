@@ -4,7 +4,15 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
-from cs.logutils import D
+DISTINFO = {
+    'description': "some serialisation functions",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+}
 
 def fromBS(s):
   ''' Read an extensible value from the front of a string.
@@ -64,6 +72,21 @@ def get_bs(bs, offset=0):
     n = (n<<7) | (o&0x7f)
   return n, offset
 
+def get_bsdata(bs, offset=0):
+  ''' Fetch a length-prefixed data chunk.
+      Decodes an unsigned value from a bytes at the specified `offset`
+      (default 0), and collected that many following bytes.
+      Return those following bytes and the new offset.
+  '''
+  offset0 = offset
+  datalen, offset = get_bs(bs, offset=offset)
+  data = bs[offset:offset+datalen]
+  if len(data) != datalen:
+    raise ValueError("bsdata(bs, offset=%d): unsufficient data: expected %d bytes, got %d bytes"
+                     % (offset0, datalen, len(data)))
+  offset += datalen
+  return data, offset
+
 def put_bs(n):
   ''' Encode an unsigned value as an extensible octet sequence for decode by
       get_bs().
@@ -76,6 +99,11 @@ def put_bs(n):
     bs.append( 0x80 | (n&0x7f) )
     n >>= 7
   return bytes(reversed(bs))
+
+def put_bsdata(data):
+  ''' Encodes `data` as put_bs(len(`data`)) + `data`.
+  '''
+  return put_bs(len(data)) + data
 
 def get_bsfp(fp):
   ''' Read an extensible value from a file.

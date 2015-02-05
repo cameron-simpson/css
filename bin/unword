@@ -1,0 +1,26 @@
+#!/bin/sh
+#
+# Transcribe MS-Word files to text.
+#       - Cameron Simpson <cs@zip.com.au> 27may2013
+#
+
+usage="Usage: $0 filename"
+
+if [ $# = 0 ]
+then
+  set -- -
+else
+  if [ $# -gt 1 ]
+  then
+    echo "$usage" >&2
+    exit 2
+  fi
+fi
+
+file=$1
+shift
+
+if which antiword >/dev/null
+then antiword "$file"
+else catdoc "$file"
+fi
