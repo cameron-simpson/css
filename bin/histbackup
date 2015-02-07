@@ -113,6 +113,7 @@ usage="Usage:
   $cmd [options...] --no-rsync backupdir
   $cmd [options...] [-- [rsyncopts...]]
 
+  -A, --acls    Preserve ACLs. Passed to rsync.
   -i, --itemize-changes
                 Passed to rsync, result slightly filtered by histbackup.
   -v, --verbose Verbose. Note: _not_ passed to rsync.
@@ -284,6 +285,14 @@ do
     #
     --symlink)
       symlink=$2; shift ;;
+
+    # =item -A, --acls
+    #
+    # Preserve ACLs. Passed to rsync.
+    #
+    -A|--acls)
+      rsopts="$rsopts $1"
+      ;;
 
     # =item -i, --itemize-changes
     #
