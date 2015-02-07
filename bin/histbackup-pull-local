@@ -11,6 +11,13 @@ cmd=$( basename "$0" )
 usage="Usage: $cmd [-n] [-q] [-x] [--] srcdir dstdir [dates...]
   -n      No action (default). Recite planned actions.
   -q      Quiet. Act silently.
+  -r      Reverse. Pull dated directories in reverse, useful if the
+          dstdir is partially populated with recent dates, for
+          example as when completing an early small migration which
+          just pulled the latest directory so as to permit use of
+          dstdir as soon as possible.
+          This option is ignored if specific dates are specified;
+          they will be processed as named.
   -x      Trace execution. Display action execution.
   srcdir  The source histbackup tree.
   dstdir  The destination histbackup tree.
@@ -21,6 +28,7 @@ trace=
 [ -t 2 ] && trace=set-x
 trace=eecho
 hbopts=
+reverse=
 
 badopts=
 
@@ -29,6 +37,7 @@ do
   case $1 in
     -n) trace=eecho ;;
     -q) trace= ;;
+    -r) reverse=1 hbopts="$hbopts -r" ;;
     -x) trace=set-x hbopts="$hbopts -x -i" ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
@@ -68,7 +77,17 @@ fi
 if [ $# = 0 ]
 then
   # obtain the dates from $srcdir
-  set -- $( cd "$srcdir" && ls -d 19[0-9][0-9]-[01][0-9]-[0-3][0-9]* 2[01][0-9][0-9]-[01][0-9]-[0-3][0-9]* 2>/dev/null )
+  if [ $reverse ]
+  then
+    set -- $( cd "$srcdir" && ls -d 19[0-9][0-9]-[01][0-9]-[0-3][0-9]* 2[01][0-9][0-9]-[01][0-9]-[0-3][0-9]* 2>/dev/null | reverse )
+  else
+    set -- $( cd "$srcdir" && ls -d 19[0-9][0-9]-[01][0-9]-[0-3][0-9]* 2[01][0-9][0-9]-[01][0-9]-[0-3][0-9]* 2>/dev/null )
+  fi
+else
+  if [ $reverse ]
+  then
+    echo "$cmd: warning: -r (reverse) ignored when specific dates are supplied" >&2
+  fi
 fi
 
 xit=0
@@ -119,7 +138,7 @@ do
       continue
     fi
   else
-    $trace histbackup --date "$date" -- "$src" "$dstdir" || xit=1
+    $trace histbackup $hbopts --date "$date" -- "$src" "$dstdir" || xit=1
   fi
 done
 
