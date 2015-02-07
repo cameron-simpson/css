@@ -103,6 +103,7 @@ symlink_unchanged=1
 rsopts=
 rsdelete=--delete
 thisbackup=
+reverse=
 verbose=
 imode=
 ##[ -t 1 ] && verbose=1
@@ -116,6 +117,8 @@ usage="Usage:
   -A, --acls    Preserve ACLs. Passed to rsync.
   -i, --itemize-changes
                 Passed to rsync, result slightly filtered by histbackup.
+  -r, --reverse Reverse. Consider the youngest older date instead
+                of the oldest younger date as the reference tree.
   -v, --verbose Verbose. Note: _not_ passed to rsync.
   -x            Trace execution. Recite linktree and rsync invocations.
   --no-delete   Don't pass --delete to rsync.
@@ -303,8 +306,16 @@ do
       rsopts="$rsopts -i"
       ;;
 
+    # -item -r, --reverse
+    #
+    # Reverse dates.
+    #
     # =item -v, --verbose
     #
+    -r|--reverse)
+      reverse=1
+      ;;
+
     # Turn on verbose mode.
     #
     -v|--verbose)
