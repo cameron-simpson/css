@@ -501,7 +501,8 @@ else
   fi
 fi
 
-# locate to most recent backup, if any
+# locate to most recent backup younger than this one, if any
+# if $reverse, locate oldest backup later than this one
 lastbackup=$(
         cd "$dest" || exit 1
         (
@@ -516,7 +517,7 @@ lastbackup=$(
           fi
           echo "$thisbackup"
         ) \
-        | sort -u \
+        | if [ $reverse ]; then sort -ur; else sort -u; fi \
         | sed "/^$thisbackup/,\$d" \
         | sed -n '$p'
 )
