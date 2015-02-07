@@ -561,8 +561,11 @@ then
       if [ -z "$changes" ]
       then
         $vecho "no changes, symlinking last tree"
-        ( cd "$dest" || exit 1
-          exec $trace ln -s "$lastbackup" "$thisbackup"
+        ( set -ue
+          cd "$dest" || exit 1
+          $trace ln -s "$lastbackup" "$thisbackup"
+          [ -z "$symlink" ] \
+          || { rm -f "$symlink"; $trace ln -s "$thisbackup" "$symlink"; }
         )
         exit
       else
