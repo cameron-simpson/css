@@ -9,6 +9,8 @@ set -ue
 
 cmd=$( basename "$0" )
 usage="Usage: $cmd [-n] [-q] [-x] [--] srcdir dstdir [dates...]
+  --include=.., --exclude=..
+          Passed to histbackup, thence to rsync.
   -n      No action (default). Recite planned actions.
   -q      Quiet. Act silently.
   -r      Reverse. Pull dated directories in reverse, useful if the
@@ -35,6 +37,8 @@ badopts=
 while [ $# -gt 0 ]
 do
   case $1 in
+    --exclude=* | --include=*)
+        hbopts="$hbopts $1" ;;
     -n) trace=eecho ;;
     -q) trace= ;;
     -r) reverse=1 hbopts="$hbopts -r" ;;
