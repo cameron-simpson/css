@@ -22,7 +22,7 @@ usage="Usage: $cmd [options...] [op [args...]]
   Options:
     -x  Trace command execution.
   Operations:
-    UPPERCASE_NAME [-K keyline]... {-c shcmd | [command [args...]]}
+    UPPERCASE_NAME [-d] [-K keyline]... {-c shcmd | [command [args...]]}
       Shorthand for \"use-session UPPERCASE_NAME\". Includes names starting
       with an underscore.
     =new-session-name
@@ -52,11 +52,13 @@ usage="Usage: $cmd [options...] [op [args...]]
       Short for \"tmux select-pane -R\".
     up
       Short for \"tmux select-pane -U\".
-    use-session session-name [-K keyline...] {-c shcmd | [command [args...]]}
+    use-session session-name [-d] [-K keyline...] {-c shcmd | [command [args...]]}
       Join the session named \"session-name\", creating it if necessary.
       If the session does not exist:
         a) run the supplied command if specified, otherwise \$SHELL.
         b) pass each keyline with a trailing carriage return.
+      If -d (detached) is supplied, to not attach to the session;
+        this is used by my rig-tm script to set up my default sessions.
     use-session-remote session-name remote-host
       Join the session named \"session-name\" on the remote host
       \"remote-host\", creating it if necessary."
