@@ -54,6 +54,7 @@ def main(argv=None, stdin=None):
       compact
       edit-group group
       edit-group /regexp/
+      export exportpath
       import-addresses < addresses.txt
         File format:
           group,... rfc2822-address
@@ -124,13 +125,17 @@ def main(argv=None, stdin=None):
           MDB.rewrite()
         elif op == 'export':
           exportpath = argv.pop(0)
-          with Pfx(exportpath):
-            if os.path.exists(exportpath):
-              error("already exists")
-            else:
-              MDB.scrub()
-              with open(exportpath, "w") as exfp:
-                MDB.dump(exfp)
+          if argv:
+            warning("extra arguments after exportpath: %s", ' '.join(argv))
+            badopts = True
+          else:
+            with Pfx(exportpath):
+              if os.path.exists(exportpath):
+                error("already exists")
+              else:
+                MDB.scrub()
+                with open(exportpath, "w") as exfp:
+                  MDB.dump(exfp)
         elif op == 'list-abbreviations' or op == 'list-abbrevs':
           try:
             opts, argv = getopt(argv, 'A')
