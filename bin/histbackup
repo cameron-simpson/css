@@ -119,6 +119,8 @@ usage="Usage:
                 Passed to rsync, result slightly filtered by histbackup.
   -r, --reverse Reverse. Consider the youngest older date instead
                 of the oldest younger date as the reference tree.
+                Clears any --symlink setting; --symlink must come
+                later than this option is required.
   -v, --verbose Verbose. Note: _not_ passed to rsync.
   -x            Trace execution. Recite linktree and rsync invocations.
   --no-delete   Don't pass --delete to rsync.
@@ -314,6 +316,7 @@ do
     #
     -r|--reverse)
       reverse=1
+      symlink=
       ;;
 
     # Turn on verbose mode.
