@@ -257,7 +257,7 @@ class MetaProxyHandler(socketserver.BaseRequestHandler):
     ''' Handle a connection to the proxy.
     '''
     fpin, fpout = openpair(rqf.fileno())
-    self._proxy_requests(fpin, fpout)
+    self._proxy_requests(_NoCloseFile(fpin), _NoCloseFile(fpout))
     fpin.close()
     fpout.close()
 
@@ -686,6 +686,20 @@ class _NewCacheFile(object):
     self.node._setpath(finalpath)
     self.node._cache_async.result = finalpath
     self.node._cache_async = None
+
+class _NoCloseFile(object):
+
+  def __init__(self, fp):
+    self._fp = fp
+
+  def __getattr__(self, attr):
+    return getattr(self._fp, attr)
+
+  def __iter__(self):
+    return iter(self._fp)
+
+  def close(self):
+    raise RuntimeError("forbidden .close, ._fp=%r" % (self._fp,))
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
