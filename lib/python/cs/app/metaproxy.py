@@ -242,10 +242,11 @@ class MetaProxyHandler(socketserver.BaseRequestHandler):
   '''
 
   def __init__(self, sockobj, localaddr, proxy):
-    socketserver.BaseRequestHandler(sockobj, localaddr, proxy)
-    self.proxy = proxy
-    self.localaddr = localaddr
-    self.remoteaddr = sockobj.getpeername()
+    with Pfx("sockobj=%r", sockobj):
+      socketserver.BaseRequestHandler(sockobj, localaddr, proxy)
+      self.proxy = proxy
+      self.localaddr = localaddr
+      self.remoteaddr = sockobj.getpeername()
 
   def __str__(self):
     return "%s.MetaProxyHandler(%s<==>%s)" % (self.proxy,
