@@ -16,7 +16,7 @@ from threading import Lock
 import cs.secret
 import cs.cache
 from cs.dateutils import isodate
-from cs.obj import WithUC_Attrs
+from cs.mixin.ucattrs import WithUC_Attrs
 from cs.logutils import error, warning
 from cs.seq import the
 
@@ -481,7 +481,7 @@ class DirectKeyedTableView:
            ",".join([row[k] for k in columns]))
     dosql(self.conn,sql)
 
-class DirectTableRow(WithUC_Attrs):
+class DirectTableRow(WithUC_Attrs, object):
   ''' Direct access to a table row.
   '''
   def __init__(self,table,values):
@@ -642,7 +642,7 @@ class NoSuchRowError(IndexError):
   ''' Thrown if the row cannot be found.
   '''
 
-class TableRowWrapper(WithUC_Attrs):
+class TableRowWrapper(WithUC_Attrs, object):
   def __init__(self,tableview,key):
     self.TableView=tableview
     try:

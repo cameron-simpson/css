@@ -8,7 +8,7 @@ from cs.py3 import StringTypes
 import os
 import sys
 from time import sleep
-from cs.fileutils import lockfile
+from cs.fileutils import lockfile, SharedAppendLines
 from cs.lex import isUC_, parseUC_sAttr
 from cs.obj import O
 from cs.seq import the
@@ -271,36 +271,34 @@ class SeenSet(object):
   ''' A set-like collection with optional backing store file.
   '''
 
-  def __init__(self, name, backing_file=None):
+  def __init__(self, name, backing_path=None):
     self.name = name
-    self.backing_file = backing_file
+    self.backing_path = backing_path
     self.set = set()
-    if backing_file is not None:
-      with open(backing_file, "a"):
+    if backing_path is not None:
+      # create file if missing, also tests access permission
+      with open(backing_path, "a"):
         pass
-      T = Thread(target=self._tailer,
-                 name="SeenSet[%s]._tailer(%s)" % (name, backing_file,),
-                 args=(open(backing_file),))
-      T.daemon = True
-      T.start()
-      sleep(0.1)
+      self._backing_file = SharedAppendLines(backing_path,
+                                             importer=self._add_foreign_line)
+      self._backing_file.ready()
 
-  def _tailer(self, fp):
-    for line in tail(fp, seekwhence=os.SEEK_SET):
-      item = line.rstrip()
-      self.add(line.rstrip(), foreign=True)
+  def _add_foreign_line(self, line):
+    # EOF markers, discard
+    if line is None:
+      return
+    if not line.endswith('\n'):
+      warning("%s: adding unterminated line: %s", self, line)
+    s = line.rstrip()
+    self.add(s, foreign=True)
 
   def add(self, s, foreign=False):
     # avoid needlessly extending the backing file
     if s in self.set:
       return
     self.set.add(s)
-    if not foreign:
-      path = self.backing_file
-      if path:
-        with lockfile(path):
-          with open(path, "a") as fp:
-            print(s, file=fp)
+    if not foreign and self.backing_path:
+      self._backing_file.put(s)
 
   def __contains__(self, item):
     return item in self.set

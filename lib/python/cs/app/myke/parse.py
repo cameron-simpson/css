@@ -11,7 +11,7 @@ from os.path import dirname, realpath, isabs
 import re
 from string import whitespace, digits
 import unittest
-from cs.lex import get_chars, get_other_chars, get_white, get_identifier
+from cs.lex import get_other_chars, get_white, get_identifier
 from cs.logutils import Pfx, error, warning, info, debug, exception, D
 
 # mapping of special macro names to evaluation functions
@@ -624,7 +624,7 @@ def parseMacroExpression(context, text=None, offset=0, stopchars=''):
         permutations.append(wh)
     else:
       # non-white, non-macro
-      plain, offset = get_other_chars(text, stopchars+'$'+whitespace, offset)
+      plain, offset = get_other_chars(text, offset, stopchars+'$'+whitespace)
       if plain:
         permutations.append(plain)
       else:

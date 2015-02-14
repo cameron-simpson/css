@@ -4,8 +4,15 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
-import sys
-from cs.logutils import D
+DISTINFO = {
+    'description': "various trite types associated with integers, such as bitmasks, flags and enums",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+}
 
 def _bitvalues(bitnames):
   ''' Compute the association between bit names and values.
@@ -141,5 +148,6 @@ def Enum(*names):
   return E
 
 if __name__ == '__main__':
+  import sys
   import cs.inttypes_tests
   cs.inttypes_tests.selftest(sys.argv)

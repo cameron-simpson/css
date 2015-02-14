@@ -107,10 +107,18 @@ _home:
                 bin-cs/. $(HOME)/bin-cs/. \
         libskip=`hg status | sed -n 's:^? lib/\(.*\):--exclude=/\1:p'` \
         pfx lib $(rsync) -a --delete \\
-                --include=/CHANGELOG.txt \\
+                --include=/js \\
+                --include=/js/cs \\
+                --exclude=/js/* \\
+                --include=/perl \\
+                --include=/perl/cs \\
+                --exclude=/perl/* \\
+                --include=/python \\
+                --include=/python/cs \\
+                --exclude=/python/* \\
                 $$libskip \\
-                --exclude=/venv* \\
-                --exclude=testdata/ \\
+                --exclude=/* \\
+                --exclude=testdata* \\
                 lib/. $(HOME)/lib/.
 
 # squid_redirect
@@ -129,7 +137,7 @@ _publish_ezos:
         syncezos
 
 _publish_bitbucket:
-        hg push $(hg_bitbucket)
+        hg push --new-branch $(hg_bitbucket)
 
 # mark the tip as a new release
 _release:

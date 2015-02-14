@@ -8,9 +8,13 @@ import os
 import sys
 from os.path import basename, dirname, join as joinpath
 import unittest
-from cs.app.mailfiler import parserules
-from cs.logutils import D
-from cs.obj import O, slist
+from cs.app.mailfiler import \
+        get_targets, get_target, \
+        Target_Assign, Target_PipeLine, Target_Substitution, Target_SetFlag, \
+        Target_Function, Target_MailAddress, Target_MailFolder, \
+        parserules
+from cs.logutils import D, X
+from cs.obj import O
 
 if not os.environ.get('DEBUG', ''):
   def D(*a):
@@ -27,15 +31,52 @@ class TestMailFiler(unittest.TestCase):
   def tearDown(self):
     pass
 
-  def _testSingleRule(self, rule_lines, action_tuple, labelstr, conditions=None, flags=None):
+  def _test_get_target(self, target, target_type):
+    for sfx in '', ',', ' ':
+      for pfx in '', ':::':
+        target_str = pfx + target + sfx
+        offset0 = len(pfx)
+        offset_expected = offset0 + len(target)
+        T, offset = get_target(target_str, offset0)
+        self.assertEqual(offset, offset_expected,
+                         "%r[%d:] ==> offset=%d, expected %d"
+                         % (target_str, offset0, offset, offset_expected))
+        self.assertIsInstance(T, target_type,
+                              "wrong type for %r: got %s, expected %s"
+                              % (target_str, type(T), target_type)
+                             )
+    return T
+
+  def test00parseTargets(self):
+    self._test_get_target('foo', Target_MailFolder)
+    self._test_get_target('foo@bar', Target_MailAddress)
+    self._test_get_target('foo=bar', Target_Assign)
+    self._test_get_target('|shcmd', Target_PipeLine)
+    self._test_get_target('s/this/that/', Target_Substitution)
+    self._test_get_target('from:s/this/that/', Target_Substitution)
+    self._test_get_target('from:learn_addresses', Target_Function)
+    self._test_get_target('from:learn_addresses()', Target_Function)
+    for flag_letter, flag_attr in (
+          ('D', 'draft'),
+          ('F', 'flagged'),
+          ('P', 'passed'),
+          ('R', 'replied'),
+          ('S', 'seen'),
+          ('T', 'trashed'),
+        ):
+      T = self._test_get_target(flag_letter, Target_SetFlag)
+      self.assertEqual(T.flag_attr, flag_attr)
+
+  def _testSingleRule(self, rule_lines, target_types, labelstr, conditions=None, flags=None):
     if isinstance(rule_lines, str):
       rule_lines = (rule_lines,)
     if flags is None:
       flags = O(alert=False, halt=False)
     R, = list(parserules(rule_lines))
     D("R = %s", R)
-    self.assertEqual(len(R.actions), 1)
-    self.assertEqual(R.actions[0], action_tuple)
+    self.assertEqual(len(R.targets), len(target_types))
+    for T, Ttype in zip(R.targets, target_types):
+      self.assertIsInstance(T, Ttype)
     self.assertEqual(R.label, labelstr)
     self.assertEqual(R.flags.alert, flags.alert)
     self.assertEqual(R.flags.halt, flags.halt)
@@ -65,48 +106,49 @@ class TestMailFiler(unittest.TestCase):
               if not callable(av1) and not callable(av2):
                 self.assertEqual(getattr(C, attr), getattr(RC, attr))
 
-  def testParseRules(self):
-    self._testSingleRule( "varname=value", ('ASSIGN', ('varname', 'value')), '', () )
-    self._testSingleRule( "target . .", ('TARGET', 'target'), '', () )
-    self._testSingleRule( "target labelstr .", ('TARGET', 'target'), 'labelstr', () )
+  def test10parseRules(self):
+    targets, offset = get_targets("subject:s/this/that/", 0)
+    self._testSingleRule( "varname=value", (Target_Assign,), '', () )
+    self._testSingleRule( "target . .", (Target_MailFolder,), '', () )
+    self._testSingleRule( "target labelstr .", (Target_MailFolder,), 'labelstr', () )
     self._testSingleRule( "=target labelstr .",
-                          ('TARGET', 'target'), 'labelstr',
+                          (Target_MailFolder,), 'labelstr',
                           (), O(alert=False, halt=True) )
     self._testSingleRule( "+target labelstr .",
-                          ('TARGET', 'target'), 'labelstr',
+                          (Target_MailFolder,), 'labelstr',
                           (), O(alert=False, halt=False) )
     self._testSingleRule( "!target labelstr .",
-                          ('TARGET', 'target'), 'labelstr',
+                          (Target_MailFolder,), 'labelstr',
                           (), O(alert=True, halt=False) )
     self._testSingleRule( "=!target labelstr .",
-                          ('TARGET', 'target'), 'labelstr',
+                          (Target_MailFolder,), 'labelstr',
                           (), O(alert=True, halt=True) )
     self._testSingleRule( "=!target labelstr .",
-                          ('TARGET', 'target'), 'labelstr',
+                          (Target_MailFolder,), 'labelstr',
                           (), O(alert=True, halt=True) )
     self._testSingleRule( "target . foo@bar",
-                          ('TARGET', 'target'), '',
+                          (Target_MailFolder,), '',
                           ( O(addrkeys=('foo@bar',), flags=(), header_names=('to', 'cc', 'bcc')), ) )
     self._testSingleRule( "target . ! foo@bar",
-                          ('TARGET', 'target'), '',
+                          (Target_MailFolder,), '',
                           ( O(addrkeys=('foo@bar',), flags=('invert',), header_names=('to', 'cc', 'bcc')), ) )
     self._testSingleRule( "target . from:foo@bar",
-                          ('TARGET', 'target'), '',
+                          (Target_MailFolder,), '',
                           ( O(addrkeys=('foo@bar',), header_names=('from',)), ) )
     self._testSingleRule( "target . to,cc:foo@bar",
-                          ('TARGET', 'target'), '',
+                          (Target_MailFolder,), '',
                           ( O(addrkeys=('foo@bar',), header_names=('to', 'cc')), ) )
     self._testSingleRule( "target . to,cc:joe blogs <joe@bar>",
-                          ('TARGET', 'target'), '',
+                          (Target_MailFolder,), '',
                           ( O(addrkeys=('joe@bar',), header_names=('to', 'cc')), ) )
     self._testSingleRule( "target . list-id.contains(\"<squid-users.squid-cache.org>\")",
-                          ('TARGET', 'target'), '',
+                          (Target_MailFolder,), '',
                           ( O(funcname='contains',
                               header_names=('list-id',),
                               test_string='<squid-users.squid-cache.org>'), ) )
 
   def testRulesParseFile(self):
-    rules = slist(parserules(test_rules_file))
+    rules = list(parserules(test_rules_file))
 
 def selftest(argv):
   unittest.main(__name__, None, argv)

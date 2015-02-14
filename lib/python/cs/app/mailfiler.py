@@ -5,6 +5,23 @@
 #
 
 from __future__ import print_function
+
+DISTINFO = {
+    'description': "email message filing system which monitors multiple inbound Maildir folders",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'requires': [ 'cs.configutils', 'cs.env', 'cs.fileutils', 'cs.lex', 'cs.logutils', 'cs.mailutils', 'cs.obj', 'cs.seq', 'cs.threads', 'cs.app.maildb', 'cs.py.modules', 'cs.py3' ],
+    'entry_points': {
+      'console_scripts': [
+          'maildb = cs.app.mailfiler:main',
+          ],
+        },
+}
+
 from collections import namedtuple
 from email import message_from_string, message_from_file
 import email.parser
@@ -24,26 +41,35 @@ from tempfile import TemporaryFile
 from threading import Lock, RLock
 import time
 from cs.configutils import ConfigWatcher
+import cs.env
 from cs.env import envsub
 from cs.fileutils import abspath_from_file, file_property, files_property, \
                          longpath, Pathname
-from cs.lex import get_white, get_nonwhite, get_qstr, unrfc2047
-from cs.logutils import Pfx, setup_logging, \
+import cs.lex
+from cs.lex import get_white, get_nonwhite, get_other_chars, get_qstr, \
+                   unrfc2047, match_tokens, get_delimited
+from cs.logutils import Pfx, setup_logging, with_log, \
                         debug, info, warning, error, exception, \
                         D, X, LogTime
-from cs.mailutils import Maildir, message_addresses, shortpath, ismaildir, make_maildir
-from cs.obj import O, slist
+from cs.mailutils import Maildir, message_addresses, modify_header, \
+                         shortpath, ismaildir, make_maildir
+from cs.obj import O
+from cs.seq import first
 from cs.threads import locked, locked_property
 from cs.app.maildb import MailDB
+from cs.py.modules import import_module_name
 from cs.py3 import unicode as u, StringTypes, ustr
 
+DEFAULT_MAIN_LOG = 'mailfiler/main.log'
 DEFAULT_RULES_PATTERN = '$HOME/.mailfiler/{maildir.basename}'
 DEFAULT_MAILFILER_RC = '$HOME/.mailfilerrc'
 DEFAULT_MAILDB_PATH = '$HOME/.maildb.csv'
 DEFAULT_MSGIDDB_PATH = '$HOME/var/msgiddb.csv'
 DEFAULT_MAILDIR_PATH = '$MAILDIR'
 
-def main(argv, stdin=None):
+def main(argv=None, stdin=None):
+  if argv is None:
+    argv = sys.argv
   if stdin is None:
     stdin = sys.stdin
   argv = list(argv)
@@ -59,7 +85,7 @@ def main(argv, stdin=None):
       -R rules_pattern
           Specify the rules file pattern used to specify rules files from Maildir names.
           Default: %s
-    %s save target <message'''
+    %s save target[,target...] <message'''
             % (cmd, DEFAULT_RULES_PATTERN, cmd)
           )
   badopts = False
@@ -85,34 +111,35 @@ def main(argv, stdin=None):
         except GetoptError as e:
           warning("%s", e)
           badopts = True
-        for opt, val in opts:
-          with Pfx(opt):
-            if opt == '-1':
-              justone = True
-            elif opt == '-d':
-              try:
-                delay = int(val)
-              except ValueError as e:
-                warning("%s: %s", e, val)
-                badopts = True
-              else:
-                if delay <= 0:
-                  warning("delay must be positive, got: %d", delay)
+        else:
+          for opt, val in opts:
+            with Pfx(opt):
+              if opt == '-1':
+                justone = True
+              elif opt == '-d':
+                try:
+                  delay = int(val)
+                except ValueError as e:
+                  warning("%s: %s", e, val)
                   badopts = True
-            elif opt == '-n':
-              no_remove = True
-            elif opt == '-R':
-              rules_pattern = val
-            else:
-              warning("unimplemented option")
-              badopts = True
+                else:
+                  if delay <= 0:
+                    warning("delay must be positive, got: %d", delay)
+                    badopts = True
+              elif opt == '-n':
+                no_remove = True
+              elif opt == '-R':
+                rules_pattern = val
+              else:
+                warning("unimplemented option")
+                badopts = True
         mdirpaths = argv
       elif op == 'save':
         if not argv:
           warning("missing target")
           badopts = True
         else:
-          target = argv.pop(0)
+          targets = argv.pop(0)
           if argv:
             warning("extra arguments after target: %r", argv)
             badopts = True
@@ -136,15 +163,15 @@ def main(argv, stdin=None):
         mdirpaths = None
       return MF.monitor(mdirpaths, delay=delay, justone=justone, no_remove=no_remove)
     if op == 'save':
-      return MF.save(target, sys.stdin)
+      return MF.save(targets, sys.stdin)
     raise RuntimeError("unimplemented op")
 
   return 0
 
-def current_value(envvar, cfg, cfg_key, default):
+def current_value(envvar, cfg, cfg_key, default, environ):
   ''' Compute a configurable path value on the fly.
   '''
-  value = os.environ.get(envvar)
+  value = environ.get(envvar)
   if value is None:
     value = cfg.get(cfg_key)
     if value is None:
@@ -155,11 +182,18 @@ def current_value(envvar, cfg, cfg_key, default):
 
 class MailFiler(O):
 
-  def __init__(self, config_path):
+  def __init__(self, config_path, environ=None):
+    ''' Initialise the MailFiler.
+        `config_path`: location of config file, default from DEFAULT_MAILFILER_RC.
+        `environ`: initial environment, default from os.environ.
+    '''
     if config_path is None:
       config_path = envsub(DEFAULT_MAILFILER_RC)
-    self._lock = RLock()
+    if environ is None:
+      environ = dict(os.environ)
     self.config_path = config_path
+    self.environ = environ
+    self._lock = RLock()
     self._cfg = ConfigWatcher(config_path)
     self._maildb_path = None
     self._maildb_lock = self._lock
@@ -186,17 +220,21 @@ class MailFiler(O):
   def maildb_path(self):
     ''' Compute maildb path on the fly.
     '''
-    return current_value('MAILDB', self.cfg, 'maildb', DEFAULT_MAILDB_PATH)
+    return current_value('MAILDB', self.cfg, 'maildb', DEFAULT_MAILDB_PATH, self.environ)
+
   @maildb_path.setter
   @locked
   def maildb_path(self, path):
     self._maildb_path = path
     self._maildb = None
 
-  @file_property
-  def maildb(self, path):
+  ##@file_property
+  ##def maildb(self, path):
+  @locked_property
+  def maildb(self):
+    path = self.maildb_path
     info("MailFiler: reload maildb %s", shortpath(path))
-    return MailDB(path, readonly=True)
+    return MailDB(path, readonly=False)
 
   @property
   @locked
@@ -205,7 +243,7 @@ class MailFiler(O):
     '''
     path = self._msgiddb_path
     if path is None:
-      path = current_value('MESSAGEIDDB', self.cfg, 'msgiddb', DEFAULT_MSGIDDB_PATH)
+      path = current_value('MESSAGEIDDB', self.cfg, 'msgiddb', DEFAULT_MSGIDDB_PATH, self.environ)
     return path
   @msgiddb_path.setter
   @locked
@@ -222,7 +260,7 @@ class MailFiler(O):
   def maildir_path(self):
     path = self._maildir_path
     if path is None:
-      path = current_value('MAILDIR', self.cfg, 'maildir', DEFAULT_MAILDIR_PATH)
+      path = current_value('MAILDIR', self.cfg, 'maildir', DEFAULT_MAILDIR_PATH, self.environ)
     return path
   @maildir_path.setter
   @locked
@@ -233,8 +271,8 @@ class MailFiler(O):
   def rules_pattern(self):
     pattern \
       = self._rules_pattern \
-      = current_value('MAILFILER_RULES_PATTERN', self.cfg, 'rules_pattern', DEFAULT_RULES_PATTERN)
-    X(".rules_pattern=%r", pattern)
+      = current_value('MAILFILER_RULES_PATTERN', self.cfg, 'rules_pattern', DEFAULT_RULES_PATTERN, self.environ)
+    debug(".rules_pattern=%r", pattern)
     return pattern
   @rules_pattern.setter
   def rules_pattern(self, pattern):
@@ -260,13 +298,13 @@ class MailFiler(O):
 
   def monitor(self, folders, delay=None, justone=False, no_remove=False):
     ''' Monitor the specified `folders`, a list of folder spcifications.
-	If `delay` is not None, poll the folders repeatedly with a
-	delay of `delay` seconds between each pass.
+        If `delay` is not None, poll the folders repeatedly with a
+        delay of `delay` seconds between each pass.
     '''
-    X("monitor: self.cfg=%s", self.cfg)
-    X("maildb_path=%r", self.maildb_path)
-    X("msgiddb_path=%r", self.msgiddb_path)
-    X("rules_pattern=%r", self.rules_pattern)
+    debug("monitor: self.cfg=%s", self.cfg)
+    debug("maildb_path=%r", self.maildb_path)
+    debug("msgiddb_path=%r", self.msgiddb_path)
+    debug("rules_pattern=%r", self.rules_pattern)
     op_cfg = self.subcfg('monitor')
     try:
       while True:
@@ -275,7 +313,7 @@ class MailFiler(O):
           these_folders = op_cfg.get('folders', '').split()
         for folder in these_folders:
           wmdir = self.maildir_watcher(folder)
-          with LogTime("sweep %s", wmdir.shortname, threshold=1.0):
+          with Pfx("%s", wmdir.shortname):
             self.sweep(wmdir, justone=justone, no_remove=no_remove)
         if delay is None:
           break
@@ -289,53 +327,69 @@ class MailFiler(O):
       return 1
     return 0
 
-  def sweep(self, wmdir, justone=False, no_remove=False):
+  @property
+  def logdir(self):
+    ''' The pathname of the directory in which log files are written.
+    '''
+    varlog = cs.env.varlog(self.environ)
+    return os.path.join(varlog, 'mailfiler')
+
+  def folder_logfile(self, folder_path):
+    ''' Return path to log file associated with the named folder.
+        TODO: ase on relative path from folder root, not just basename.
+    '''
+    return os.path.join(self.logdir, 'filer-%s.log' % (os.path.basename(folder_path)))
+
+  def sweep(self, wmdir, justone=False, no_remove=False, logfile=None):
     ''' Scan a WatchedMaildir for messages to filter.
         Update the set of lurkers with any keys not removed to prevent
         filtering on subsequent calls.
         If `justone`, return after filing the first message.
     '''
-    debug("sweep %s", wmdir.shortname)
-    with Pfx("sweep %s", wmdir.shortname):
+    if logfile is None:
+      logfile = self.folder_logfile(wmdir.path)
+    with with_log(logfile, no_prefix=True):
+      debug("sweep %s", wmdir.shortname)
       nmsgs = 0
       skipped = 0
       with LogTime("all keys") as all_keys_time:
         for key in wmdir.keys(flush=True):
-          with Pfx(key):
-            if key in wmdir.lurking:
-              debug("skip lurking key")
-              skipped += 1
+          if key in wmdir.lurking:
+            debug("skip lurking key")
+            skipped += 1
+            continue
+          nmsgs += 1
+          with LogTime("key = %s", key, threshold=1.0, level=DEBUG):
+            ok = self.file_wmdir_key(wmdir, key)
+            if not ok:
+              warning("NOT OK, lurking key %s", key)
+              wmdir.lurk(key)
               continue
-            nmsgs += 1
-
-            with LogTime("key = %s", key, threshold=1.0, level=DEBUG):
-              ok = self.file_wmdir_key(wmdir, key)
-              if not ok:
-                filer.log("NOT OK, lurking key %s", key)
-                wmdir.lurk(key)
-                continue
-
-              if no_remove:
-                filer.log("no_remove: message not removed, lurking key %s", key)
-                wmdir.lurk(key)
-              else:
-                debug("remove message key %s", key)
-                wmdir.remove(key)
-                wmdir.lurking.discard(key)
-              if justone:
-                break
-
+            if no_remove:
+              info("no_remove: message not removed, lurking key %s", key)
+              wmdir.lurk(key)
+            else:
+              debug("remove message key %s", key)
+              wmdir.remove(key)
+              wmdir.lurking.discard(key)
+            if justone:
+              break
       if nmsgs or all_keys_time.elapsed >= 0.2:
         info("filtered %d messages (%d skipped) in %5.3fs",
              nmsgs, skipped, all_keys_time.elapsed)
 
-  def save(self, target, msgfp):
+  def save(self, targets, msgfp):
     ''' Implementation for command line "save" function: save file to target.
     '''
+    Ts, offset = get_targets(targets, 0)
+    if offset != len(targets):
+      raise ValueError("invalid target specifications: %r", targets)
     filer = MessageFiler(self)
     filer.message = message_from_file(msgfp)
     filer.message_path = None
-    filer.save_target(target)
+    for T in Ts:
+      T.apply(filer)
+    filer.save_message()
     return 0
 
   def file_wmdir_key(self, wmdir, key):
@@ -365,6 +419,54 @@ def resolve_mail_path(mdirpath, maildir_root):
       mdirpath = os.path.join(maildir_root, mdirpath)
   return mdirpath
 
+def save_to_folderpath(folderpath, M, message_path, flags):
+  ''' Save the Message `M` to the resolved `folderpath`.
+      `message_path`: pathname of existing message file, allowing
+        hardlinking to new maildir if not None
+      `flags`: save flags as from MessageFiler.flags
+  '''
+  if not os.path.exists(folderpath):
+    make_maildir(folderpath)
+  if ismaildir(folderpath):
+    # save to Maildir
+    mdir = Maildir(folderpath)
+    maildir_flags = ''
+    if flags.draft:   maildir_flags += 'D'
+    if flags.flagged: maildir_flags += 'F'
+    if flags.passed:  maildir_flags += 'P'
+    if flags.replied: maildir_flags += 'R'
+    if flags.seen:    maildir_flags += 'S'
+    if flags.trashed: maildir_flags += 'T'
+    mdirpath = mdir.dir
+    if message_path is None:
+      savekey = mdir.save_message(M, flags=maildir_flags)
+    else:
+      savekey = mdir.save_filepath(message_path, flags=maildir_flags)
+    savepath = mdir.keypath(savekey)
+    info("    OK %s" % (shortpath(savepath)))
+    if message_path is None:
+      # update saved message for hard linking
+      message_path = savepath
+  else:
+    # save to mbox
+    status = ''
+    x_status = ''
+    if flags.draft:   x_status += 'D'
+    if flags.flagged: x_status += 'F'
+    if flags.replied: status += 'R'
+    if flags.passed:  x_status += 'P'
+    if flags.seen:    x_status += 'S'
+    if flags.trashed: x_status += 'T'
+    if len(status) > 0:
+      M['Status'] = status
+    if len(x_status) > 0:
+      M['X-Status'] = x_status
+    text = M.as_string(True)
+    with open(folderpath, "a") as mboxfp:
+      mboxfp.write(text)
+    info("    OK >> %s" % (shortpath(folderpath)))
+  return message_path
+
 class MessageFiler(O):
   ''' A message filing object, filtering state information used during rule evaluation.
       .maildb   Current MailDB.
@@ -381,79 +483,130 @@ class MessageFiler(O):
                    Default from os.environ.
     '''
     if environ is None:
-      environ = os.environ
+      environ = dict(context.environ)
     self.header_addresses = {}
-    self.default_target = None
     self.context = context
     self.environ = dict(environ)
-    self._log = None
-    self.targets = set()
     self.labels = set()
     self.flags = O(alert=0,
                    flagged=False, passed=False, replied=False,
                    seen=False, trashed=False, draft=False)
-    self.saved_to = []
+    self.save_to_folders = set()
+    self.save_to_addresses = set()
+    self.save_to_cmds = []
 
   def file(self, M, rules, message_path=None):
     ''' File the specified message `M` according to the supplied `rules`.
-	If specified and not None, the `message_path` parameter
-	specified the filename of the message, supporting hard linking
-	the message into a Maildir.
+        If specified and not None, the `message_path` parameter
+        specifies the filename of the message, supporting hard linking
+        the message into a Maildir.
     '''
-    self.message = M
-    self.message_path = None
-    self.logto(envsub("$HOME/var/log/mailfiler"))
-    self.log( (u("%s %s") % (time.strftime("%Y-%m-%d %H:%M:%S"),
-                               unrfc2047(M.get('subject', '_no_subject'))))
-               .replace('\n', ' ') )
-    self.log("  " + self.format_message(M, "{short_from}->{short_recipients}"))
-    self.log("  " + M.get('message-id', '<?>'))
-    if self.message_path:
-      self.log("  " + shortpath(self.message_path))
+    with with_log(os.path.join(cs.env.varlog(self.environ), envsub(DEFAULT_MAIN_LOG))):
+      self.message = M
+      self.message_path = message_path
+      info( (u("%s %s") % (time.strftime("%Y-%m-%d %H:%M:%S"),
+                                 unrfc2047(M.get('subject', '_no_subject'))))
+                 .replace('\n', ' ') )
+      info("  " + self.format_message(M, "{short_from}->{short_recipients}"))
+      info("  " + M.get('message-id', '<?>'))
+      if self.message_path:
+        info("  " + shortpath(self.message_path))
 
-    try:
-      rules.match(self)
-    except Exception as e:
-      exception("matching rules: %s", e)
-      return False
-
-    if not self.targets:
-      if self.default_target:
-        self.targets.add(self.default_target)
-      else:
-        error("no matching targets and no DEFAULT")
+      # match the rules, gathering labels and save destinations
+      try:
+        rules.match(self)
+      except Exception as e:
+        exception("matching rules: %s", e)
         return False
 
-    if self.labels:
-      xlabels = set()
-      for labelhdr in M.get_all('X-Label', ()):
-        for label in labelhdr.split(','):
-          label = label.strip()
-          if label:
-            xlabels.add(label)
-      new_labels = self.labels - xlabels
-      if new_labels:
-        # add labels to message
-        self.labels.update(new_labels)
-        self.message_path = None
-        M = message_from_string(M.as_string())
-        M['X-Label'] = ", ".join( sorted(list(self.labels)) )
-        self.message = M
+      # use default destination if no save destinations chosen
+      if not self.save_to_folders \
+      and not self.save_to_addresses \
+      and not self.save_to_cmds:
+        default_save = self.env('DEFAULT', '')
+        if not default_save:
+          error("no matching targets and no $DEFAULT")
+          return False
+        if '@' in default_save:
+          self.save_to_addresses.add(default_save)
+        else:
+          self.save_to_folders.add(self.resolve(default_save))
 
+      # apply labels
+      if self.labels:
+        xlabels = set()
+        for labelhdr in M.get_all('X-Label', ()):
+          for label in labelhdr.split(','):
+            label = label.strip()
+            if label:
+              xlabels.add(label)
+        new_labels = self.labels - xlabels
+        if new_labels:
+          # add labels to message, forget pathname of original file
+          self.labels.update(new_labels)
+          self.modify('X-Label', ', '.join( sorted(list(self.labels)) ))
+
+      return self.save_message()
+
+  def save_message(self):
+    ''' Perform the message save step based on the current filer state.
+        This is separated out to support the command line "save target" operation.
+    '''
     ok = True
-    for target in sorted(list(self.targets)):
-      with Pfx(target):
-        try:
-          self.save_target(target)
-        except Exception as e:
-          exception("saving to %r: %s", target, e)
-          ok = False
-
+    # save message to folders
+    for folder in sorted(self.save_to_folders):
+      try:
+        folderpath = self.resolve(folder)
+        save_to_folderpath(folderpath, self.message, self.message_path, self.flags)
+      except Exception as e:
+        exception("saving to folder %r: %s", folder, e)
+        ok = False
+    # forward message
+    for address in sorted(self.save_to_addresses):
+      try:
+        self.sendmail(address)
+      except Exception as e:
+        exception("forwarding to address %r: %s", address, e)
+        ok = False
+    # pipeline message
+    for shcmd, shenv in self.save_to_cmds:
+      try:
+        self.save_to_pipe(['/bin/sh', '-c', shcmd], shenv)
+      except Exception as e:
+        exception("piping to %r: %s", shcmd, e)
+        ok = False
+    # issue arrival alert
     if self.flags.alert > 0:
       self.alert(self.flags.alert)
-
-    self.logflush()
     return ok
+
+  def modify(self, hdr, new_value, always=False):
+    ''' Modify the value of the named header `hdr` to the new value `new_value` using cs.mailutils.modify_header.
+        If headers were changed, forget self.message_path.
+    '''
+    if modify_header(self.message, hdr, new_value, always=always):
+      self.message_path = None
+      self.header_addresses = {}
+
+  def apply_rule(self, R):
+    ''' Apply this the rule `R` to this MessageFiler.
+        The rule label, if any, is appended to the .labels attribute.
+        Each target is applied to the state.
+    '''
+    M = self.message
+    with Pfx(R.context):
+      self.flags.alert = max(self.flags.alert, R.flags.alert)
+      if R.label:
+        self.labels.add(R.label)
+      for T in R.targets:
+        try:
+          T.apply(self)
+        except (AttributeError, NameError):
+          raise
+        except Exception as e:
+          warning("EXCEPTION %r", e)
+          ##failed_actions.append( (action, arg, e) )
+          raise
 
   @property
   def maildb(self):
@@ -468,40 +621,6 @@ class MessageFiler(O):
 
   def resolve(self, foldername):
     return resolve_mail_path(foldername, self.MAILDIR)
-
-  def log(self, *a):
-    ''' Log a message.
-    '''
-    log = self._log
-    if log is None:
-      log = sys.stdout
-    try:
-      print(*[ unicode(s) for s in a], file=log)
-    except UnicodeDecodeError as e:
-      print("MessageFiler.log: %s: a=%r" % (e, a), file=sys.stderr)
-
-  def logto(self, logfilepath):
-    ''' Direct log messages to the supplied `logfilepath`.
-    '''
-    if self._log and self._log_path == logfilepath:
-      return
-    self.logclose()
-    try:
-      self._log = io.open(logfilepath, "a", encoding='utf-8')
-    except OSError as e:
-      self.log("open(%s): %s" % (logfilepath, e))
-    else:
-      self._log_path = logfilepath
-
-  def logflush(self):
-    if self._log:
-      self._log.flush()
-
-  def logclose(self):
-    if self._log:
-      self._log.close()
-      self._log = None
-      self._log_path = None
 
   @property
   def groups(self):
@@ -543,93 +662,56 @@ class MessageFiler(O):
   def MAILDIR(self):
     return self.env('MAILDIR', os.path.join(self.env('HOME', None), 'mail'))
 
-  def save_target(self, target):
-    with Pfx("save_target(%s)", target):
-      if target.startswith('|'):
-        shcmd = target[1:]
-        return self.save_to_pipe(['/bin/sh', '-c', shcmd])
-      elif target.startswith('+'):
-        m = re_ADDHEADER.match(target)
-        if not m:
-          error("match failure of re_ADDHEADER against %r", target)
-          return None
-        hdr = m.group(1)
-        group_names = m.group(2).split(',')
-        return self.save_header(hdr, group_names)
-      elif '@' in target:
-        return self.sendmail(target)
-      else:
-        mailpath = self.resolve(target)
-        if not os.path.exists(mailpath):
-          make_maildir(mailpath)
-        # record the target folder
-        self.saved_to.append(mailpath)
-        if ismaildir(mailpath):
-          mdir = Maildir(mailpath)
-          maildir_flags = ''
-          if self.flags.draft:   maildir_flags += 'D'
-          if self.flags.flagged: maildir_flags += 'F'
-          if self.flags.passed:  maildir_flags += 'P'
-          if self.flags.replied: maildir_flags += 'R'
-          if self.flags.seen:    maildir_flags += 'S'
-          if self.flags.trashed: maildir_flags += 'T'
-          return self.save_to_maildir(mdir,
-                                      flags=maildir_flags)
-        status = ''
-        x_status = ''
-        if self.flags.draft:   x_status += 'D'
-        if self.flags.flagged: x_status += 'F'
-        if self.flags.replied: status += 'R'
-        if self.flags.passed:  x_status += 'P'
-        if self.flags.seen:    x_status += 'S'
-        if self.flags.trashed: x_status += 'T'
-        return self.save_to_mbox(mailpath, status, x_status)
-
-  def save_header(self, hdr, group_names):
-    with Pfx("save_header(%s, %r)", hdr, group_names):
-      if hdr in ('message-id', 'references', 'in-reply-to'):
-        msgids = self.message[hdr].split()
-        for msgid in msgids:
-          debug("%s.GROUPs.update(%r)", msgid, group_names)
-          msgid_node = self.msgiddb.make( ('MESSAGE_ID', msgid) )
-          msgid_node.GROUPs.update(group_names)
-      else:
-        debug("%s.GROUPs.update(%r)", msgid, group_names)
-        raise RuntimeError("need to pull addresses from hdr and add to address groups")
-
-  def save_to_maildir(self, mdir, flags=''):
-    ''' Save the current message to a Maildir unless we have already saved to
-        this maildir.
+  def learn_header_addresses(self, header_names, *group_names):
+    ''' Update maildb groups with addresses from message headers.
+        Extract all the addresses from the specified
+        headers and add to the maildb groups named by `group_names`.
     '''
-    mdirpath = mdir.dir
-    M = self.message
-    path = self.message_path
-    if path is None:
-      savekey = mdir.save_message(M, flags=flags)
-    else:
-      savekey = mdir.save_filepath(path, flags=flags)
-    savepath = mdir.keypath(savekey)
-    if not path:
-      self.message_path = savepath
-    self.log("    OK %s" % (shortpath(savepath)))
-    return savepath
+    with Pfx("save_header_addresses(%r, %r)", header_names, group_names):
+      self.maildb.importAddresses_from_message(self.message,
+                                               group_names,
+                                               header_names=header_names)
 
-  def save_to_mbox(self, mboxpath, status, x_status):
-    M = self.message
-    if len(status) > 0:
-      M['Status'] = status
-    if len(x_status) > 0:
-      M['X-Status'] = x_status
-    text = M.as_string(True)
-    with open(mboxpath, "a") as mboxfp:
-      mboxfp.write(text)
-    self.log("    OK >> %s" % (shortpath(mboxpath)))
+  def learn_message_ids(self, header_names, *group_names):
+    ''' Update msgiddb groups with message-ids from message headers.
+    '''
+    with Pfx("save_message_ids(%r, %r)", header_names, group_names):
+      M = self.message
+      msgids = set()
+      for header_name in header_names:
+        for hdr_body in M.get-all(header_name, ()):
+          msgids.update(hdr_body.split())
+      for msgid in sorted(msgids):
+        debug("%s.GROUPs.update(%r)", msgid, group_names)
+        msgid_node = self.msgiddb.make( ('MESSAGE_ID', msgid) )
+        msgid_node.GROUPs.update(group_names)
 
-  def save_to_pipe(self, argv, mfp=None):
+  def process_environ(self):
+    ''' Compute the environment for a subprocess.
+    '''
+    lc_ = lambda hdr_name: hdr_name.lower().replace('-', '_')
+    env = dict(self.environ)
+    M = self.message
+    # add header_foo for every Foo: header
+    for hdr_name, hdr_value in M.items():
+      env['header_' + lc_(hdr_name)] = hdr_value
+    # add shortlist_foo for every Foo: address header
+    MDB = self.maildb
+    for hdr_name in 'from', 'to', 'cc', 'bcc', 'reply-to', 'errors_to':
+      hdr_value = M.get(hdr_name)
+      if hdr_value:
+        env['shortlist_' + lc_(hdr_name)] = ','.join(MDB.header_shortlist(M, (hdr_name,)))
+    # ... and the recipients, combined
+    env['shortlist_to_cc_bcc'] = ','.join(MDB.header_shortlist(M, ('to', 'cc', 'bcc')))
+    return env
+
+  def save_to_pipe(self, argv, environ=None, mfp=None):
     ''' Pipe a message to the command specific by `argv`.
         `mfp` is a file containing the message text.
         If `mfp` is None, use the text of the current message.
     '''
+    if environ is None:
+      environ = self.process_environ()
     if mfp is None:
       message_path = self.message_path
       if message_path:
@@ -641,8 +723,8 @@ class MessageFiler(O):
           mfp.flush()
           mfp.seek(0)
           return self.save_to_pipe(argv, mfp=mfp)
-    retcode = subprocess.call(argv, env=self.environ, stdin=mfp)
-    self.log("    %s => | %s" % (("OK" if retcode == 0 else "FAIL"), argv))
+    retcode = subprocess.call(argv, env=environ, stdin=mfp)
+    info("    %s => | %s" % (("OK" if retcode == 0 else "FAIL"), argv))
     return retcode == 0
 
   def sendmail(self, address, mfp=None):
@@ -677,11 +759,13 @@ class MessageFiler(O):
     if subj:
       hmap['subject'] = subj
     for hdr in ('from', 'to', 'cc', 'bcc', 'reply-to'):
-      hmap['short_'+hdr.replace('-', '_')] = ",".join(self.maildb.header_shortlist(M, (hdr,)))
+      shortnames = self.maildb.header_shortlist(M, (hdr,))
+      hmap['short_'+hdr.replace('-', '_')] = ",".join(shortnames)
     hmap['short_recipients'] = ",".join(self.maildb.header_shortlist(M, ('to', 'cc', 'bcc')))
     for h, hval in list(hmap.items()):
       hmap[h] = ustr(hval)
-    return u(fmt).format(**hmap)
+    msg = u(fmt).format(**hmap)
+    return msg
 
   def alert(self, alert_level, alert_message=None):
     ''' Issue an alert with the specified `alert_message`.
@@ -696,7 +780,7 @@ class MessageFiler(O):
       subargv.extend( ['-l', str(alert_level)] )
     # tell alert how to open this message
     # TODO: parameterise so that we can open it with other tools
-    if self.saved_to:
+    if self.save_to_folders:
       try:
         msg_id = self.message['message-id']
       except KeyError:
@@ -712,7 +796,7 @@ class MessageFiler(O):
                               'term',
                                '-e',
                                 'mutt-open-message',
-                                 '-f', self.saved_to[0], msg_id,
+                                 '-f', first(self.save_to_folders), msg_id,
                              '--'] )
     subargv.append(alert_message)
     xit = subprocess.call(subargv)
@@ -720,35 +804,82 @@ class MessageFiler(O):
       warning("non-zero exit from alert: %d", xit)
     return xit
 
-re_UNQWORD = re.compile(r'[^,\s]+')
-
+# quoted string
+re_QSTR_s = r'"([^"]|\\.)*"'
+# non-whitespace not containing a comma or a quote mark
+re_UNQWORD_s = r'[^,"\s]+'
+# non-negative integer
+re_NUMBER_s = r'0|[1-9][0-9]*'
+# non-alphanumeric/non-white
+re_NONALNUMWSP_s = r'[^a-z0-9_\s]'
+# header-name
+re_HEADERNAME_s = r'[a-z][\-a-z0-9]*'
 # header[,header,...]:
-re_HEADERLIST = re.compile(r'([a-z][\-a-z0-9]*(,[a-z][\-a-z0-9]*)*):', re.I)
-
+re_HEADERNAME_LIST_s = r'(%s(,%s)*)' % (re_HEADERNAME_s, re_HEADERNAME_s)
+re_HEADERNAME_LIST_PREFIX_s = re_HEADERNAME_LIST_s + ':'
+# header:s/
+re_HEADER_SUBST_s = r'(%s):s([^a-z0-9_])'
+# identifier
+re_IDENTIFIER_s = r'[a-z]\w+'
+# dotted identifier (dots optional)
+re_DOTTED_IDENTIFIER_s = r'%s(\.%s)*' % (re_IDENTIFIER_s, re_IDENTIFIER_s)
 # identifier=
-re_ASSIGN = re.compile(r'([a-z]\w+)=', re.I)
+re_ASSIGN_s = r'(%s)=' % (re_IDENTIFIER_s,)
 
 # group membership test: (A|B|C|...)
 # where A may be a WORD or @domain
 # indicating an address group name or an address ending in @domain
+
+# identifier
 re_WORD_s = '[a-z]\w+'
+
+# GROUPNAME
+re_GROUPNAME_s = '[A-Z][A-Z0-9_]+'
+
+# @domain
 re_atDOM_s = '@[-\w]+(\.[-\w]+)+'
-re_WORD_or_DOM_s = '(%s|%s)' % (re_WORD_s, re_atDOM_s)
-re_INGROUP_s = r'\(\s*%s(\s*\|\s*%s)*\s*\)' % (re_WORD_or_DOM_s,
-                                               re_WORD_or_DOM_s)
-## print("re_INGROUP = %r" % (re_INGROUP_s), file=sys.stderr)
+
+# GROUPNAME or @domain
+re_GROUPNAMEorDOM_s = '(%s|%s)' % (re_GROUPNAME_s, re_atDOM_s)
+
+# comma separated list of GROUPNAME or @domain
+re_GROUPorDOM_LIST_s = r'%s(,%s)*' % (re_GROUPNAMEorDOM_s, re_GROUPNAMEorDOM_s)
+
+# (GROUP[|GROUP...])
+re_INGROUP_s = ( r'\(\s*%s(\s*\|\s*%s)*\s*\)'
+                 % (re_GROUPNAME_s, re_GROUPNAME_s)
+               )
+
+# (GROUPorDOM[|GROUPorDOM...])
+re_INGROUPorDOM_s = ( r'\(\s*%s(\s*\|\s*%s)*\s*\)'
+                      % (re_GROUPNAMEorDOM_s, re_GROUPNAMEorDOM_s)
+                    )
+
+re_INGROUPorDOM = re.compile( re_INGROUPorDOM_s, re.I)
 re_INGROUP = re.compile( re_INGROUP_s, re.I)
 
-re_HEADERNAME_s = r'[a-z][\-a-z0-9]*'
+# simple argument shorthand (GROUPNAME|@domain|number|"qstr")
+re_ARG_s = r'(%s|%s|%s|%s)' % (re_GROUPNAME_s, re_atDOM_s, re_NUMBER_s, re_QSTR_s)
+# simple commas separated list of ARGs
+re_ARGLIST_s = r'(%s(,%s)*)?' % (re_ARG_s, re_ARG_s)
 
 # header[,header,...].func(
 re_HEADERFUNCTION_s = r'(%s(,%s)*)\.(%s)\(' % (re_HEADERNAME_s, re_HEADERNAME_s, re_WORD_s)
 re_HEADERFUNCTION = re.compile(re_HEADERFUNCTION_s, re.I)
 
-# target syntax: add header values to named groups
-# +header(group|...)
-re_ADDHEADER_s = r'\+(%s)(%s)' % (re_HEADERNAME_s, re_INGROUP_s)
-re_ADDHEADER = re.compile(re_ADDHEADER_s, re.I)
+#############################
+# final regexps directly used
+re_NONALNUMWSP = re.compile(re_NONALNUMWSP_s, re.I)
+re_ASSIGN = re.compile(re_ASSIGN_s, re.I)
+re_HEADERNAME_LIST = re.compile(re_HEADERNAME_LIST_s, re.I)
+re_HEADERNAME_LIST_PREFIX = re.compile(re_HEADERNAME_LIST_PREFIX_s, re.I)
+re_GROUPorDOM_LIST = re.compile(re_GROUPorDOM_LIST_s)
+re_HEADER_SUBST = re.compile(re_HEADER_SUBST_s, re.I)
+re_UNQWORD = re.compile(re_UNQWORD_s)
+re_HEADERNAME = re.compile(re_HEADERNAME_s, re.I)
+re_DOTTED_IDENTIFIER = re.compile(re_DOTTED_IDENTIFIER_s, re.I)
+re_ARG = re.compile(re_ARG_s)
+re_ARGLIST = re.compile(re_ARGLIST_s)
 
 def parserules(fp):
   ''' Read rules from `fp`, yield Rules.
@@ -785,14 +916,15 @@ def parserules(fp):
       if not line:
         continue
 
+      # check for leading whitespace (continuation line)
       _, offset = get_white(line, 0)
       if not _:
-        # new rule
+        # text at start of line ==> new rule
         # yield old rule if in progress
         if R:
           yield R
-        R = None
-
+          R = None
+        # < includes only match at the start of a line
         if line[offset] == '<':
           # include another categories file
           _, offset = get_white(line, offset+1)
@@ -807,18 +939,10 @@ def parserules(fp):
           for R in parserules(subfilename):
             yield R
           continue
-
-        # new rule
+        # new rule: gather targets and label
         R = Rule(filename=(filename if filename else file_label), lineno=lineno)
 
-        m = re_ASSIGN.match(line, offset)
-        if m:
-          R.actions.append( ('ASSIGN', (m.group(1), line[m.end():])) )
-          yield R
-          R = None
-          continue
-
-        # leading optional '+' (continue, default) or '=' (final)
+        # leading optional '+' (continue) or '=' (final)
         if line[offset] == '+':
           R.flags.halt = False
           offset += 1
@@ -831,30 +955,29 @@ def parserules(fp):
           R.flags.alert += 1
           offset += 1
 
-        targets, offset = get_targets(line, offset)
-        for target in targets:
-          R.actions.append( ('TARGET', target) )
-
-        # gather label
+        # targets
+        Ts, offset = get_targets(line, offset)
+        R.targets.extend(Ts)
         _, offset = get_white(line, offset)
-        if not _ or offset == len(line):
-          R.label = ''
-          warning("no label or condition")
+        if offset >= len(line):
+          # no label; end line parse
           continue
-        if line[offset] == '"':
-          label, offset = get_qstr(line, offset)
-        else:
-          label, offset = get_nonwhite(line, offset)
+
+        # label
+        label, offset = get_nonwhite(line, offset)
         if label == '.':
           label = ''
         R.label = label
         _, offset = get_white(line, offset)
+        if offset >= len(line):
+          # no condition; end line parse
+          continue
 
-      # condition
+      # parse condition and add to current rule
       condition_flags = O(invert=False)
 
-      if not _ or offset == len(line):
-        warning('no condition')
+      if line[offset:] == '.':
+        # placeholder for no condition
         continue
 
       if line[offset] == '!':
@@ -863,10 +986,6 @@ def parserules(fp):
         if offset == len(line):
           warning('no condition after "!"')
           continue
-
-      # . always matches - don't bother storing it as a test
-      if line[offset:] == '.':
-        continue
 
       # leading hdr1,hdr2.func(
       m = re_HEADERFUNCTION.match(line, offset)
@@ -891,7 +1010,7 @@ def parserules(fp):
         C = Condition_HeaderFunction(condition_flags, header_names, testfuncname, test_string)
       else:
         # leading hdr1,hdr2,...:
-        m = re_HEADERLIST.match(line, offset)
+        m = re_HEADERNAME_LIST_PREFIX.match(line, offset)
         if m:
           header_names = tuple( H.lower() for H in m.group(1).split(',') if H )
           offset = m.end()
@@ -910,7 +1029,7 @@ def parserules(fp):
           C = Condition_Regexp(condition_flags, header_names, atstart, regexp)
         else:
           # headers:(group[|group...])
-          m = re_INGROUP.match(line, offset)
+          m = re_INGROUPorDOM.match(line, offset)
           if m:
             group_names = set( w.strip().lower() for w in m.group()[1:-1].split('|') )
             offset = m.end()
@@ -932,38 +1051,314 @@ def parserules(fp):
 
 def get_targets(s, offset):
   ''' Parse list of targets from the string `s` starting at `offset`.
-      Return the list of targets strings and the new offset.
+      Return the list of Targets strings and the new offset.
   '''
   targets = []
   while offset < len(s) and not s[offset].isspace():
-    # "quoted-string"
-    if s[offset] == '"':
-      target, offset = get_qstr(s, offset)
-    # +header(groups)
-    elif s[offset] == '+':
-      m = re_ADDHEADER.match(s, offset)
-      if m:
-        target = m.group()
-        offset = m.end()
-      else:
-        error("parse failure, expected +header(groups) at %d: %s", offset, s)
-        raise ValueError("syntax error")
-    else:
-      # unquoted word
-      m = re_UNQWORD.match(s, offset)
-      if m:
-        target = m.group()
-        offset = m.end()
-      else:
-        error("parse failure at %d: %s", offset, s)
-        raise ValueError("syntax error")
-    targets.append(target)
+    offset0 = offset
+    T, offset = get_target(s, offset)
+    if T is not None:
+      targets.append(T)
     if offset < len(s) and s[offset] == ',':
       offset += 1
   return targets, offset
 
+def get_target(s, offset, quoted=False):
+  ''' Parse a single target specification from a string; return Target and new offset.
+      `quoted`: already inside quotes: do not expect comma or whitespace to
+        end the target specification
+  '''
+  offset0 = offset
+
+  # "quoted-target-specification"
+  if not quoted and s.startswith('"', offset0):
+    s2, offset = get_qstr(s, offset0)
+    s2q = s[offset0:offset]
+    # reparse inner string
+    T, offset2 = get_target(s2, 0, quoted=True)
+    # check for complete parse, allow some trailing whitespace
+    s3 = s2[offset2:].lstrip()
+    if s3:
+      warning("ignoring unparsed content from %s: %r" % (s2q, s3))
+    return T, offset
+
+  # varname=expr
+  m = re_ASSIGN.match(s, offset0)
+  if m:
+    varname = m.group(1)
+    offset = m.end()
+    if offset >= len(s):
+      varexpr = ''
+    elif s[offset] == '"':
+      varexpr, offset = get_qstr(s, offset)
+    else:
+      if quoted:
+        varexpr = s[offset:]
+        offset = len(s)
+      else:
+        varexpr, offset = get_other_chars(s, offset, cs.lex.whitespace+',')
+    T = Target_Assign(varname, varexpr)
+    return T, offset
+
+  # F -- flag
+  flag_letter = s[offset0]
+  offset = offset + 1
+  if ( flag_letter.isupper()
+        and ( offset == len(s)
+           or ( not quoted and ( s[offset] == ',' or s[offset].isspace() ) )
+            )
+     ):
+    try:
+      T = Target_SetFlag(flag_letter)
+    except ValueError as e:
+      warning("ignoring bad flag %r: %s", flag_letter, e)
+      T = None
+    return T, offset
+
+  # |shcmd
+  if s.startswith('|', offset0):
+    if quoted:
+      shcmd = s[offset0+1:]
+      offset = len(s)
+    else:
+      shcmd, offset = get_other_chars(s, offset0, cs.lex.whitespace+',')
+    T = Target_PipeLine(shcmd)
+    return T, offset
+
+  # header:s/this/that/
+  tokens, offset = match_tokens(s, offset0,
+                                (re_HEADERNAME, ':s', re_NONALNUMWSP))
+  if tokens:
+    m_header_name, marker, m_delim = tokens
+    header_name = m_header_name.group()
+    delim = m_delim.group()
+    regexp, offset = get_delimited(s, offset, delim)
+    replacement, offset = get_delimited(s, offset, delim)
+    try:
+      subst_re = re.compile(regexp)
+    except Exception as e:
+      warning("ignoring substitute: re.compile: %s: regexp=%s", e, regexp)
+      T = None
+    else:
+      T = Target_Substitution(header_name, subst_re, replacement)
+    return T, offset
+
+  # s/this/that/ -- modify subject:
+  tokens, offset = match_tokens(s, offset0,
+                                 ('s', re_NONALNUMWSP))
+  if tokens:
+    header_name = 'subject'
+    marker, m_delim = tokens
+    delim = m_delim.group()
+    regexp, offset = get_delimited(s, offset, delim)
+    replacement, offset = get_delimited(s, offset, delim)
+    subst_re = re.compile(regexp)
+    try:
+      subst_re = re.compile(regexp)
+    except Exception as e:
+      warning("ignoring substitute: re.compile: %s: regexp=%s", e, regexp)
+      T = None
+    else:
+      T = Target_Substitution(header_name, subst_re, replacement)
+    return T, offset
+
+  # headers:func([args...])
+  tokens, offset = match_tokens(s, offset0,
+                                ( re_HEADERNAME_LIST,
+                                  ':',
+                                  re_DOTTED_IDENTIFIER,
+                                ))
+  if tokens:
+    m_headers, colon, m_funcname = tokens
+    # check for optional (arg,...)
+    if offset < len(s) and s[offset] == '(':
+      m_arglist = re_ARGLIST.match(s, offset+1)
+      if not m_arglist:
+        raise ValueError("expected argument list at %r" % (s[offset+1:],))
+      offset = m_arglist.end()
+      if offset >= len(s) or s[offset] != ')':
+        raise ValueError("expected closing parenthesis at %r" % (s[offset:],))
+      offset += 1
+      arglist = m_arglist.group()
+    else:
+      arglist = ()
+    header_names = m_headers.group().split(',')
+    funcname = m_funcname.group()
+    args = []
+    arglist_offset = 0
+    while arglist_offset < len(arglist):
+      m = re_ARG.match(arglist, arglist_offset)
+      if not m:
+        raise ValueError("BUG: arglist %r did not match re_ARG (%s)" % (arglist[arglist_offset:], re_ARG))
+      arglist_offset = m.end()
+      args.append(arg)
+      if arglist_offset >= len(arglist):
+        break
+      if arglist[arglist_offset] != ',':
+        raise ValueError("BUG: expected comma at %r" % (arglist[arglist_offset:],))
+      arglist_offset += 1
+      # allow trailing comma
+      if arglist_offset >= len(arglist):
+        break
+    T = Target_Function(header_names, funcname, args)
+    return T, offset
+
+  # unquoted word: email address or mail folder
+  m = re_UNQWORD.match(s, offset0)
+  if m:
+    target = m.group()
+    offset = m.end()
+    if '$' in target:
+      T = Target_EnvSub(target)
+    elif '@' in target:
+      T = Target_MailAddress(target)
+    else:
+      T = Target_MailFolder(target)
+    return T, offset
+
+  error("parse failure at %d: %s", offset, s)
+  raise ValueError("syntax error")
+
+class Target_Assign(O):
+
+  def __init__(self, varname, varexpr):
+    self.varname = varname
+    self.varexpr = varexpr
+
+  def apply(self, filer):
+    varname = self.varname
+    value = envsub(self.varexpr, filer.environ)
+    filer.environ[varname] = value
+    if varname == 'LOGFILE':
+      warning("LOGFILE= unimplemented at present")
+      ## TODO: self.logto(value)
+
+class Target_EnvSub(O):
+
+  def __init__(self, target_expr):
+    self.target_expr = target_expr
+
+  def apply(self, filer):
+    ''' Perform environment substituion on target string and then
+        deliver to resulting string.
+    '''
+    target = envsub(self.target_expr, filer.environ)
+    if '@' in target:
+      T = Target_MailAddress(target)
+    else:
+      T = Target_MailFolder(target)
+    T.apply(filer)
+
+class Target_SetFlag(O):
+
+  def __init__(self, flag_letter):
+    if flag_letter == 'D':   flag_attr = 'draft'
+    elif flag_letter == 'F': flag_attr = 'flagged'
+    elif flag_letter == 'P': flag_attr = 'passed'
+    elif flag_letter == 'R': flag_attr = 'replied'
+    elif flag_letter == 'S': flag_attr = 'seen'
+    elif flag_letter == 'T': flag_attr = 'trashed'
+    else:
+      raise ValueError("unsupported flag \"%s\"" % (flag_letter,))
+    self.flag_attr = flag_attr
+
+  def apply(self, filer):
+    setattr(filer.flags, self.flag_attr, True)
+
+class Target_Substitution(O):
+
+  def __init__(self, header_name, subst_re, subst_replacement):
+    self.header_name = header_name
+    self.subst_re = subst_re
+    self.subst_replacement = subst_replacement
+
+  def apply(self, filer):
+    debug("apply %r : s/%s/%s ...", self.header_name, self.subst_re.pattern, self.subst_replacement)
+    M = filer.message
+    # fetch old value and "unfold" (strip CRLF, see RFC2822 part 2.2.3)
+    old_value = M.get(self.header_name, '').replace('\r','').replace('\n','')
+    debug("  old value = %r", old_value)
+    m = self.subst_re.search(old_value)
+    if m:
+      # named substitution values
+      env = m.groupdict()
+      # numbered substitution values
+      env_specials = { '0': m.group(0) }
+      for ndx, grp in enumerate(m.groups()):
+        env_specials[str(ndx+1)] = grp
+      new_value, offset = get_qstr(self.subst_replacement, 0, q=None,
+                           environ=env, env_specials=env_specials)
+      if offset != len(self.subst_replacement):
+        warning("after getqstr, offset[%d] != len(subst_replacement)[%d]: %r",
+                offset, len(self.subst_replacement), self.subst_replacement)
+      debug("%s: %s ==> %s", self.header_name, self.subst_replacement, new_value)
+      filer.modify(self.header_name, new_value)
+
+class Target_Function(O):
+
+  def __init__(self, header_names, funcname, args):
+    self.header_names = header_names
+    self.funcname = funcname
+    self.args = args
+
+  def apply(self, filer):
+    if '.' in self.funcname:
+      module_name, func_name = self.funcname.rsplit('.', 1)
+      func = import_module_name(module_name, func_name)
+      if func is None:
+        raise ValueError("no function %r in module %r" % (func_name, module_name))
+      func = partial(func, filer)
+    elif self.funcname == 'learn_addresses':
+      func = filer.learn_header_addresses
+    elif self.funcname == 'learn_message_ids':
+      func = filer.learn_message_ids
+    else:
+      raise ValueError("no simply named functions defined yet: %r", self.funcname)
+
+    # evaluate the arguments and then call the function
+    func_args = []
+    for arg in self.args:
+      if arg.startswith('"'):
+        value, offset = get_qstr(arg, 0, environ=filer.environ)
+      else:
+        try:
+          value = int(arg)
+        except ValueError:
+          value = arg
+      func_args.append(value)
+    try:
+      func(header_names, *func_args)
+    except Exception as e:
+      error("exception calling %s(filer, *%r): %s", self.funcname, func_args, e)
+      raise
+
+class Target_PipeLine(O):
+
+  def __init__(self, shcmd):
+    self.shcmd = shcmd
+
+  def apply(self, filer):
+    filer.save_to_cmds.append( (self.shcmd, filer.process_environ()) )
+
+class Target_MailAddress(O):
+
+  def __init__(self, address):
+    self.address = address
+
+  def apply(self, filer):
+    filer.save_to_addresses.add(self.address)
+
+class Target_MailFolder(O):
+
+  def __init__(self, mailfolder):
+    self.mailfolder = mailfolder
+
+  def apply(self, filer):
+    mailpath = filer.resolve(self.mailfolder)
+    filer.save_to_folders.add(mailpath)
+
 class _Condition(O):
-  
+
   def __init__(self, flags, header_names):
     self.flags = flags
     self.header_names = header_names
@@ -1073,8 +1468,8 @@ class Rule(O):
   def __init__(self, filename, lineno):
     self.filename = filename
     self.lineno = lineno
-    self.conditions = slist()
-    self.actions = slist()
+    self.conditions = []
+    self.targets = []
     self.flags = O(alert=0, halt=False)
     self.label = ''
 
@@ -1090,50 +1485,6 @@ class Rule(O):
       if not C.match(filer):
         return False
     return True
-
-  def apply(self, filer):
-    ''' Apply this rule to the `filer`.
-        The rule label, if any, is appended to the .labels attribute.
-        Each action is applied to the state.
-        Assignments update the .environ attribute.
-        Targets accrue in the .targets attribute.
-    '''
-    M = filer.message
-    with Pfx(self.context):
-      filer.flags.alert = max(filer.flags.alert, self.flags.alert)
-      if self.label:
-        filer.labels.add(self.label)
-      for action, arg in self.actions:
-        try:
-          if action == 'TARGET':
-            target = envsub(arg, filer.environ)
-            if len(target) == 1 and target.isupper():
-              if target == 'D':   filer.flags.draft = True
-              elif target == 'F': filer.flags.flagged = True
-              elif target == 'P': filer.flags.passed = True
-              elif target == 'R': filer.flags.replied = True
-              elif target == 'S': filer.flags.seen = True
-              elif target == 'T': filer.flags.trashed = True
-              else:
-                warning("ignoring unsupported flag \"%s\"" % (target,))
-            else:
-              filer.targets.add(target)
-          elif action == 'ASSIGN':
-            envvar, s = arg
-            value = filer.environ[envvar] = envsub(s, filer.environ)
-            debug("ASSIGN %s=%s", envvar, value)
-            if envvar == 'LOGFILE':
-              filer.logto(value)
-            elif envvar == 'DEFAULT':
-              filer.default_target = value
-          else:
-            raise RuntimeError("unimplemented action \"%s\"" % action)
-        except (AttributeError, NameError):
-          raise
-        except Exception as e:
-          warning("EXCEPTION %r", e)
-          failed_actions.append( (action, arg, e) )
-          raise
 
 class Rules(list):
   ''' Simple subclass of list storing rules, with methods to load
@@ -1162,7 +1513,7 @@ class Rules(list):
     for R in self:
       with Pfx(R.context):
         if R.match(filer):
-          R.apply(filer)
+          filer.apply_rule(R)
           if R.flags.halt:
             done = True
             break
@@ -1196,6 +1547,10 @@ class WatchedMaildir(O):
   @property
   def shortname(self):
     return self.mdir.shortname
+
+  @property
+  def path(self):
+    return self.mdir.dir
 
   def keys(self, flush=False):
     return self.mdir.keys(flush=flush)

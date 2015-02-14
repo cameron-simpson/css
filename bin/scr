@@ -6,6 +6,7 @@
 
 set -ue
 
+: ${DISPLAY:=''}
 : ${TMPDIR:=/tmp}
 : ${SHELL:=/bin/sh}
 : ${SCR_PREARGV='ssh-agent'}

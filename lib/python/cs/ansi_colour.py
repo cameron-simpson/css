@@ -4,7 +4,19 @@
 #       - Cameron Simpson <cs@zip.com.au> 16nov2010
 #
 
-colours = {
+DISTINFO = {
+    'description': "Convenience functions for ANSI terminal colour sequences.",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Development Status :: 6 - Mature",
+        "Environment :: Console",
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+}
+
+COLOURS = {
   'normal':     '\033[0m',
   'reverse':    '\033[7m',
   'underline':  '\033[4m',
@@ -20,10 +32,9 @@ colours = {
 }
 
 def colourise(s, colour, uncolour='normal'):
-  ''' Return a string enclosed in colour-on and colour-off ANSI
-      sequences.
+  ''' Return a string enclosed in colour-on and colour-off ANSI sequences.
       `colour` names the desired ANSI colour.
       `uncolour` may be used to specify the colour-off colour;
       the default is 'normal'.
   '''
-  return colours[colour] + s + colours[uncolour]
+  return COLOURS[colour] + s + COLOURS[uncolour]

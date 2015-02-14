@@ -4,20 +4,45 @@
 #       - Cameron Simpson <cs@zip.com.au> 28feb2009
 #
 
-trace=set-x
+set -ue
 
-cmd=`basename "$0"`
-usage="Usage: $cmd op [args...]
+: ${TMPDIR:=/tmp}
+
+trace=  ##set-x
+relpfx=release
+
+prodpypi_url='https://pypi.python.org/pypi'
+testpypi_url='https://testpypi.python.org/pypi'
+pypi_test_mode=1
+
+cmd=$( basename "$0" )
+usage="Usage: $cmd [-x] op [relpfx [args...]]
+  -x            Trace command execution.
+  relpfx        Prefix for new release tag names. Default: $relpfx
   op:
+    ls          List all release prefixes in use.
     add         Issue a new release.
     last        Report last release issued.
     next        Generate a new release number.
+    update-tag  Update a release tag.
     log         Changelog from last release to now.
     export      Export release to temporary directory, report directory.
     freshmeat-submit
-                Announce last release to freshmeat."
+                Announce last release to freshmeat.
+    pypi [prod] Release python package to PyPI."
 
 badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -x) trace=set-x ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    *)  break ;;
+  esac
+  shift
+done
 
 if [ $# = 0 ]
 then
@@ -26,21 +51,80 @@ then
 else
   op=$1
   shift
+  [ $# = 0 ] || { relpfx=$1; shift; }
 fi
+
+case "$relpfx" in
+  ALL)
+    ;;
+  release)
+    logpaths=.
+    ;;
+  [a-z]*)
+    pfxdir=lib/python/$( echo "$relpfx" | tr . / )
+    logpaths=
+    [ -d "$pfxdir" ] && logpaths="$logpaths $pfxdir"
+    pfxfile=$pfxdir.py
+    [ -f "$pfxfile" ] && logpaths="$logpaths $pfxfile"
+    readmepath=$( dirname "$pfxdir" )/README-$( basename "$pfxdir" ).rst
+    [ -f "$readmepath" ] && logpaths="$logpaths $readmepath"
+    ;;
+  *)echo "$cmd: invalid relpfx, must start with a lowercase letter, got: $relpfx" >&2
+    badopts=1
+    ;;
+esac
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+# self invoke, passing tunable settings
+self(){
+  _self_op=$1; shift
+  $trace "$0" "$_self_op" "$relpfx" ${1+"$@"}
+}
+
+pypi_setup(){
+  if [ $pypi_test_mode ]
+  then
+    pypi_url=$testpypi_url
+    pypi_pfx=testpypi
+  else
+    pypi_url=$prodpypi_url
+    pypi_pfx=pypi
+  fi
+  PYPI_URL=$pypi_url
+  export PYPI_URL
+}
+
 case $op in
+  ls)
+    hg tags \
+    | sed -n 's/^\([a-z][^-]*\)-\(2[0-9][0-9][0-9][0-9][0-9][0-9][0-9][^ ]*\) .*/\1/p' \
+    | sort -u
+    ;;
+
   last)
-    lastrelease=`$trace hg tags | sed -n '/^release-[1-9][01][0-9][0-9][01][0-9][0-3][0-9]/{s/^release-//; s/ .*//; p; q;}'`
-    [ -n "$lastrelease" ] || exit 1
-    printf "%s\n" "$lastrelease"
-    exit 0
+    if [ "$relpfx" = ALL ]
+    then
+      for relpfx in $( self ls )
+      do
+        lastrelease=$( self last )
+        echo "$relpfx $lastrelease"
+      done
+    else
+      lastrelease=$( $trace hg tags | sed -n "/^$relpfx-[1-9][01][0-9][0-9][01][0-9][0-3][0-9]/{s/^$relpfx-//; s/ .*//; p; q;}" )
+      if [ -z "$lastrelease" ]
+      then
+        echo "$cmd: no last release for prefix \"$relpfx\"" >&2
+        exit 1
+      fi
+      printf "%s\n" "$lastrelease"
+      exit 0
+    fi
     ;;
 
   next)
-    lastrelease=`$trace "$0" last` || lastrelease=
-    today=`date +%Y%m%d`
+    lastrelease=$( self last ) || lastrelease=
+    today=$( date +%Y%m%d )
     if [ -z "$lastrelease" ]
     then
       release=$today
@@ -55,8 +139,8 @@ case $op in
         else
           case "$lastrelease" in
             "$today".[1-9] )
-              sfx=`expr "x$lastrelease" : "x$today".'\([1-9][0-9]*\).*'`
-              release=$today.`expr "$sfx" + 1`
+              sfx=$( expr "x$lastrelease" : "x$today".'\([1-9][0-9]*\).*' )
+              release=$today.$( expr "$sfx" + 1 )
               ;;
             *)
               echo "$cmd: can't compute next release from \"$lastrelease\"" >&2
@@ -71,17 +155,21 @@ case $op in
     ;;
 
   log)
-    lastrelease=release-`$trace "$0" last` || lastrelease=0
-    $trace hg log -r "$lastrelease:" \
-                  --template '{files}: {desc|firstline}\n' \
-    | $trace sed '/^\.hg/d; /^CHANGELOG/d; /^release-/d'
+    lastrelease=$relpfx-$( self last ) || lastrelease=0
+    if [ "x$lastrelease" = x0 ]
+    then
+      echo "$cmd: no log because no previous release tag" >&2
+      exit 1
+    else
+      $trace hg log -r "'$lastrelease':" \
+                    --template '{files}: {desc|firstline}\n' \
+                    $logpaths \
+      | $trace sed "/^\\.hg/d; /^CHANGELOG/d; /^$relpfx-/d"
+    fi
     ;;
 
   add)
-    lastrelease=release-`$trace "$0" last` || lastrelease=0
-    log=`$trace "$0" log`
-    [ -n "$log" ] || exit 1
-    uncommited=`$trace hg status | grep -v '^?' || :`
+    uncommited=$( $trace hg status | grep -v '^?' || : )
     if [ -n "$uncommited" ]
     then
       echo "Uncommited changes exist:"
@@ -89,8 +177,18 @@ case $op in
       echo "These changes will not be included in the release."
       ask "Proceed anyway" || exit 1
     fi
-    echo "Changes since $lastrelease:"
-    "$0" log
+    lastrelease=$relpfx-$( self last ) || lastrelease=0
+    if [ "x$lastrelease" != x0 ]
+    then
+      log=$( self log )
+      if [ -z "$log" ]
+      then
+        echo "$cmd: no changes since last release tag, aborting" >&2
+        exit 1
+      fi
+      echo "Changes since $lastrelease:"
+      printf "%s\n" "$log"
+    fi
     echo
     echo "Enter short change summary since $lastrelease."
     changefile=$TMPDIR/$cmd.$$.changes
@@ -103,19 +201,27 @@ case $op in
     do
       "$EDITOR" "$changefile"
     done
-    [ -s "$changefile" ] || exit 1
-    newrelease=`$trace "$0" next`
-    [ -n "$newrelease" ] || exit 1
+    if [ ! -s "$changefile" ]
+    then
+      echo "$cmd: empty changefile, aborting" >&2
+      exit 1
+    fi
+    newrelease=$( self next ) \
+    || { echo "$cmd: cannot generate next tag" >&2; exit 1; }
     echo
-    ask "Ok to mark release as $newrelease" || exit 1
-    newtag=release-$newrelease
-    reldir=release/$newrelease
+    newtag=$relpfx-$newrelease
+    ask "Ok to mark release as $newtag" || exit 1
+    if [ "x$relpfx" = xrelease ]
+    then reldir=release/$newrelease
+    else reldir=release/$relpfx-$newrelease
+    fi
     $trace mkdir "$reldir"
     printf "%s\n" "$newtag" >"$reldir/release-tag.txt"
     $trace mv "$changefile" "$reldir/SUMMARY.txt"
-    $trace hg log -r "$lastrelease:tip" >"$reldir/CHANGES.txt"
+    [ "x$lastrelease" == x0 ] \
+    || printf '%s\n' "$log" >"$reldir/CHANGES.txt"
     $trace hg add "$reldir"
-    summary_text=`cat "$reldir/SUMMARY.txt"`
+    summary_text=$( cat "$reldir/SUMMARY.txt" )
     $trace hg commit -m "Release information for $newtag.
 Summary:
 $summary_text" "$reldir"
@@ -148,8 +254,8 @@ $summary_text" "$reldir"
 
     if [ -z "$rev" ]
     then
-      rev=`cs-release last`
-      rev=release-$rev
+      rev=$( self last )
+      rev=$relpfx-$rev
     fi
 
     xit=0
@@ -158,13 +264,13 @@ $summary_text" "$reldir"
 
     unset tmpdir
     trap '[ ! -d "$tmpdir" ] || rm -rf $tmpdir; exit 1' 1 2 13 15
-    tmpdir=`mkdirn "$TMPDIR/$cmd"`
+    tmpdir=$( mkdirn "$TMPDIR/$cmd" )
 
     dstdir=$tmpdir
     echo archive revision $rev ...
-    hg archive -t files -r "$rev" "$dstdir"
+    hg archive -t files -r "'$rev'" "$dstdir"
     echo update file timestamps ...
-    hg-apply-manifest-dates -r "$rev" "$dstdir"
+    hg-apply-manifest-dates -r "'$rev'" "$dstdir"
 
     echo "$dstdir" >&3
     exit $xit
@@ -177,10 +283,11 @@ $summary_text" "$reldir"
           fm_url_changelog
     cf=.freshmeatrc
     [ -s "$cf" ] || { echo "$cmd: missing $cf" >&2; exit 1; }
-    eval `winclausevars "$cf" freshmeat fm`
-    lastrelease=`$trace "$0" last`
+    eval $( winclausevars "$cf" freshmeat fm )
+    self update-tag
+    lastrelease=$( self last )
     [ -n "$lastrelease" ] || exit 1
-    summary=`$trace cat release/$lastrelease/SUMMARY.txt`
+    summary=$( $trace cat release/$lastrelease/SUMMARY.txt )
     [ -n "$summary" ] || exit 1
     printf "%s\n" "$summary"
     ask "Confirm freshmeat-submit of release $lastrelease to project $fm_project"
@@ -195,6 +302,71 @@ $summary_text" "$reldir"
       printf "%s\n" "$summary"
     ) \
     | $trace freshmeat-submit
+    ;;
+
+  update-tag)
+    if lastrelease=$( self last )
+    then
+      log=$( self log )
+      printf "%s\n" "$log"
+      if [ -n "$log" ] && ask "Issue new tag for $relpfx"
+      then
+        self add || exit 1
+      fi
+    else
+      ask "Issue first tag for $relpfx" || exit 1
+      self add || exit 1
+    fi
+    ;;
+
+  pypi)
+    if [ $# -gt 0 ] && [ "x$1" = xprod ]
+    then  shift; pypi_test_mode=
+    else  pypi_test_mode=1
+    fi
+    pypi_setup
+    if [ "$relpfx" = ALL ]
+    then
+      for relpfx in $( self ls | grep '^cs\.' )
+      do
+        pkg=$relpfx
+        lastlabel=$pypi_pfx-css-$pkg
+        lastrelease=$( self last ) || exit 1
+        lastpypirelease=$( $trace lastvalue "$lastlabel" 2>/dev/null || : )
+        if [ "x$lastrelease" = "x$lastpypirelease" ]
+        then
+          echo "OK $relpfx: $pypi_pfx up to date at $lastpypirelease"
+        else
+          if [ -n "$lastpypirelease" ]
+          then
+            echo "NEWER $relpfx: $lastrelease, but $pypi_pfx has $lastpypirelease"
+          else
+            echo "NEWER $relpfx: $lastrelease, but $pypi_pfx has nothing"
+          fi
+        fi
+        log=$( self log )
+        if [ -n "$log" ]
+        then
+          echo "  has untagged changes"
+        fi
+      done
+    else
+      pkg=$relpfx
+      lastlabel=$pypi_pfx-css-$pkg
+      case "$pkg" in
+        cs.*) ;;
+        *)  echo "$cmd: $op: invalid package name, expected cs.*: $pkg" >&2
+            exit 2
+            ;;
+      esac
+      self update-tag
+      lastrelease=$( self last )
+      [ -n "$lastrelease" ] || exit 1
+      $trace python -m cs.distinfo "$pkg" check
+      $trace python -m cs.distinfo "$pkg" register
+      $trace python -m cs.distinfo "$pkg" upload
+      $trace lastvalue "$lastlabel" "$lastrelease"
+    fi
     ;;
 
   *)echo "$cmd: unimplemented op \"$op\"" >&2

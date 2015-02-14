@@ -1,6 +1,6 @@
 #!/bin/sh -ue
 #
-# Run command in development environment.
+# Run a command in a development environment.
 # This means using the current directory as $prefix,
 # prefixing lots of $fooPATH vars with it approriately,
 # sourcing .env.sh if present, then running command.
@@ -54,7 +54,11 @@ export PYTHONPATH PERL5LIB MANPATH LD_LIBRARY_PATH PATH
 
 if [ $# = 0 ]
 then
-  env | sort
+  echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
+  echo "MANPATH=$MANPATH"
+  echo "PATH=$PATH"
+  echo "PERL5LIB=$PERL5LIB"
+  echo "PYTHONPATH=$PYTHONPATH"
   exit
 fi
 

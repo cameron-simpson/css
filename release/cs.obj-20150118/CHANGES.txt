@@ -1,0 +1,2 @@
+lib/python/cs/obj.py: cs.obj: syntax fix for DISTINFO long description
+lib/python/cs/README-obj.rst lib/python/cs/obj.py: cs.obj: move long_description into cs/README-obj.rst

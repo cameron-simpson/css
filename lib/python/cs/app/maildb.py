@@ -1,6 +1,23 @@
 #!/usr/bin/python -tt
 
 from __future__ import with_statement, print_function
+
+DISTINFO = {
+    'description': "a cs.nodedb NodeDB subclass for storing email address information (groups, addresses, so forth)",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'requires': [ 'cs.logutils', 'cs.mailutils', 'cs.nodedb', 'cs.lex', 'cs.seq', 'cs.sh', 'cs.threads', 'cs.py.func', 'cs.py3', ],
+    'entry_points': {
+      'console_scripts': [
+          'maildb = cs.app.maildb:main',
+          ],
+        },
+}
+
 from collections import deque
 from getopt import getopt, GetoptError
 from email.utils import getaddresses, parseaddr, formataddr
@@ -17,10 +34,14 @@ from cs.mailutils import ismaildir, message_addresses, Message
 from cs.nodedb import NodeDB, Node, NodeDBFromURL
 from cs.lex import get_identifier
 import cs.sh
-from cs.threads import locked_property
+from cs.seq import get0
+from cs.threads import locked, locked_property
+from cs.py.func import derived_property
 from cs.py3 import StringTypes, ustr
 
-def main(argv, stdin=None):
+def main(argv=None, stdin=None):
+  if argv is None:
+    argv = sys.argv
   if stdin is None:
     stdin = sys.stdin
   argv = list(argv)
@@ -33,6 +54,7 @@ def main(argv, stdin=None):
       compact
       edit-group group
       edit-group /regexp/
+      export exportpath
       import-addresses < addresses.txt
         File format:
           group,... rfc2822-address
@@ -101,6 +123,19 @@ def main(argv, stdin=None):
               xit = 1
         elif op == 'compact':
           MDB.rewrite()
+        elif op == 'export':
+          exportpath = argv.pop(0)
+          if argv:
+            warning("extra arguments after exportpath: %s", ' '.join(argv))
+            badopts = True
+          else:
+            with Pfx(exportpath):
+              if os.path.exists(exportpath):
+                error("already exists")
+              else:
+                MDB.scrub()
+                with open(exportpath, "w") as exfp:
+                  MDB.dump(exfp)
         elif op == 'list-abbreviations' or op == 'list-abbrevs':
           try:
             opts, argv = getopt(argv, 'A')
@@ -187,15 +222,29 @@ def main(argv, stdin=None):
                   error('no such group')
                   xit = 1
                   continue
-                address_list = ', '.join(sorted(MDB['ADDRESS', address].formatted
-                                                for address in address_group))
                 if mutt_aliases:
                   print('alias', end=' ')
                   if mutt_groups:
                     print('-group', group_name, end=' ')
                 elif mutt_groups:
                   print('group', end=' ')
-                print(group_name, address_list)
+                print(group_name, end=' ')
+                formatted_addresses = sorted(MDB['ADDRESS', address].formatted
+                                             for address in address_group
+                                            )
+                if mutt_aliases or mutt_groups:
+                  # write slosh extended lines
+                  first = True
+                  for formatted_address in formatted_addresses:
+                    if first:
+                      first = False
+                    else:
+                      print(', ', end='')
+                    print('\\\n               ', formatted_address, end='')
+                  print()
+                else:
+                  # write single huge line
+                  print(', '.join(formatted_addresses))
         elif op == 'learn-addresses':
           only_ungrouped = False
           if len(argv) and argv[0] == '--ungrouped':
@@ -230,7 +279,6 @@ def main(argv, stdin=None):
               badopts = True
             else:
               edit_group(MDB, group)
-              MDB.rewrite()
         elif op == 'update-domain':
           if not len(argv):
             error("missing @old-domain")
@@ -250,7 +298,6 @@ def main(argv, stdin=None):
               badopts = True
           if not badopts:
             update_domain(MDB, old_domain, new_domain, argv)
-            MDB.rewrite()
         else:
           error("unsupported op")
           badopts = True
@@ -389,7 +436,7 @@ class AddressNode(Node):
 
   @property
   def realname(self):
-    return ustr( getattr(self, 'REALNAME', u'') )
+    return ustr( get0(self.REALNAMEs, u'') )
 
   @realname.setter
   def realname(self, newname):
@@ -504,6 +551,7 @@ class _MailDB(NodeDB):
   def rewrite(self):
     ''' Force a complete rewrite of the CSV file.
     '''
+    raise NotImplementedError("needs recode")
     obackend = self.backend
     self.backend = None
     self.scrub()
@@ -611,12 +659,13 @@ class _MailDB(NodeDB):
     '''
     return self.address_groups.set_default(group_name, set())
 
-  @locked_property
+  @derived_property
   def address_groups(self):
     ''' Compute the address_group sets, a mapping of GROUP names to a
         set of A.name.lower().
         Return the mapping.
     '''
+    X("RECOMPUTE ADDRESS_GROUPS")
     try:
       agroups = { 'all': set() }
       all = agroups['all']
@@ -628,10 +677,10 @@ class _MailDB(NodeDB):
           agroup = agroups.setdefault(group_name, set())
           agroup.add(coreaddr)
           all.add(coreaddr)
-      return agroups
     except AttributeError as e:
       D("address_groups(): e = %r", e)
       raise ValueError("disaster")
+    return agroups
 
   @locked_property
   def subgroups_map(self):
@@ -647,7 +696,7 @@ class _MailDB(NodeDB):
     '''
     return self.subgroups_map.get(group_name, [])
 
-  @locked_property
+  @derived_property
   def abbreviations(self):
     ''' Compute a mapping of abbreviations to their source address.
     '''

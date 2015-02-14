@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Make MPEG2 Transport Stream file from TVWiz directory.
+# Make an MPEG2 Transport Stream file from a TVWiz directory.
 #       - Cameron Simpson <cs@zip.com.au> 25may2014
 #
 
@@ -41,7 +41,7 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-outfile=$(dirname "$tvwizdir")/$(basename "$tvwizdir" .tvwiz).mp2ts
+outfile=$(basename "$tvwizdir" .tvwiz).ts
 if [ -e "$outfile" ]
 then
   echo "$cmd: output file already exists: $outfile" >&2
