@@ -47,7 +47,7 @@ do
   case "$rev" in
     [0-9a-f]*)
         patch=$( $trace incd "$ocheckout" hg export "$rev" )
-        print '%s\n' "$patch" | $trace hg import - 
+        printf '%s\n' "$patch" | $trace hg import - 
         ;;
     *)  echo "$cmd: unsupported revision specification: $rev" >&2
         exit 1
