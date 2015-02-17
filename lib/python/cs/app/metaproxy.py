@@ -48,6 +48,7 @@ from cs.fileutils import copy_data, Tee
 from cs.logutils import setup_logging, Pfx, debug, info, warning, error, exception, D, X
 from cs.later import Later
 from cs.lex import get_hexadecimal, get_other_chars
+from cs.progress import Progress, ProgressWriter
 from cs.rfc2616 import read_headers, message_has_body, pass_chunked, pass_length, \
                        dec8, enc8, CRLF, CRLFb
 from cs.seq import Seq
@@ -454,19 +455,21 @@ class URI_Request(O):
             length = None
           else:
             length = int(content_length.strip())
+          P = Progress(total=length)
+          profpout = ProxyWriter(fpout)
           if transfer_encoding is not None:
             transfer_encoding = transfer_encoding.strip().lower()
             if transfer_encoding == 'identity':
               debug("transfer_encoding = %r, using pass_identity", transfer_encoding)
-              self.pass_identity(fpin, fpout)
+              self.pass_identity(fpin, profpout)
             else:
               debug("transfer_encoding = %r, using pass_chunked", transfer_encoding)
               hdr_trailer = rsp_headers.get('Trailer')
               debug("trailer = %r", hdr_trailer)
-              pass_chunked(fpin, fpout, hdr_trailer)
+              pass_chunked(fpin, profpout, hdr_trailer)
           elif content_length is not None:
             debug("content_length = %r, using pass_length", content_length)
-            pass_length(fpin, fpout, length)
+            pass_length(fpin, profpout, length)
           else:
             debug("no body expected")
       # set self.rsp_cache_ok based on completion of response and status code
