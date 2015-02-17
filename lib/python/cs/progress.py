@@ -6,6 +6,7 @@
 
 import time
 from cs.logutils import warning
+from cs.obj import Proxy
 
 class Progress(object):
   ''' A progress counter to track task completion with various utility functions.
@@ -154,3 +155,17 @@ class Progress(object):
     if runtime is None:
       return None
     return time.time() + runtime
+
+class ProgressWriter(Proxy):
+  ''' An object with a .write method which updates a Progress and then passes the write through to a file.
+  '''
+
+  def __init__(self, progress, fp):
+    Proxy.__init__(self, fp)
+    self.progress = progress
+    self.fp = fp
+
+  def write(self, data):
+    retval = self.fp.write(data)
+    self.progress.advance(len(data))
+    return retval
