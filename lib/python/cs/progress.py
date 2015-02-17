@@ -56,6 +56,11 @@ class Progress(object):
               self, self.position, position)
     self._positions.append( (update_time, new_position) )
 
+  def advance(self, delta, update_time=None):
+    ''' Record more progress.
+    '''
+    return self.update(self.position + delta, update_time=update_time)
+
   @property
   def throughput(self):
     ''' Compute current overall throughput.
