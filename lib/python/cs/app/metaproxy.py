@@ -450,6 +450,10 @@ class URI_Request(O):
         else:
           transfer_encoding = rsp_headers.get('Transfer-Encoding')
           content_length = rsp_headers.get('Content-Length')
+          if content_length is None:
+            length = None
+          else:
+            length = int(content_length.strip())
           if transfer_encoding is not None:
             transfer_encoding = transfer_encoding.strip().lower()
             if transfer_encoding == 'identity':
@@ -462,7 +466,6 @@ class URI_Request(O):
               pass_chunked(fpin, fpout, hdr_trailer)
           elif content_length is not None:
             debug("content_length = %r, using pass_length", content_length)
-            length = int(content_length.strip())
             pass_length(fpin, fpout, length)
           else:
             debug("no body expected")
