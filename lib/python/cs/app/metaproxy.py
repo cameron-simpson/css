@@ -245,14 +245,23 @@ class MetaProxyHandler(socketserver.BaseRequestHandler):
   def __init__(self, sockobj, localaddr, proxy):
     with Pfx("sockobj=%r", sockobj):
       socketserver.BaseRequestHandler(sockobj, localaddr, proxy)
+      self.sockobj = sockobj
       self.proxy = proxy
       self.localaddr = localaddr
-      self.remoteaddr = sockobj.getpeername()
 
   def __str__(self):
     return "%s.MetaProxyHandler(%s<==>%s)" % (self.proxy,
                                               self.localaddr,
                                               self.remoteaddr)
+
+  @property
+  def remoteaddr(self):
+    sockobj = self.sockobj
+    try:
+      return sockobj.getpeername()
+    except OSError as e:
+      warning(".remoteaadr: getpeername(sockobj=%r): %s", sockobj, e)
+      return None
 
   def handle(self, rqf, client_addr):
     ''' Handle a connection to the proxy.
