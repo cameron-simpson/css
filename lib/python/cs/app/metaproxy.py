@@ -465,7 +465,7 @@ class URI_Request(O):
           else:
             length = int(content_length.strip())
           P = Progress(total=length)
-          profpout = ProxyWriter(fpout)
+          profpout = ProgressWriter(P, fpout)
           if transfer_encoding is not None:
             transfer_encoding = transfer_encoding.strip().lower()
             if transfer_encoding == 'identity':
