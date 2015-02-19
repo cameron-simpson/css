@@ -1230,7 +1230,7 @@ class Target_Assign(O):
     value = envsub(self.varexpr, filer.environ)
     filer.environ[varname] = value
     if varname == 'LOGFILE':
-      warning("LOGFILE= unimplemented at present")
+      debug("LOGFILE= unimplemented at present")
       ## TODO: self.logto(value)
 
 class Target_EnvSub(O):
