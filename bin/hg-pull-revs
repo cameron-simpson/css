@@ -42,15 +42,31 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+branch=$( hg branch )
+obranch=$( incd "$ocheckout" hg branch )
+
 for rev
 do
   case "$rev" in
     [0-9a-f]*)
-        patch=$( $trace incd "$ocheckout" hg export "$rev" )
-        printf '%s\n' "$patch" | $trace hg import - 
+        if patch=$( $trace incd "$ocheckout" hg export "$rev" )
+        then
+          if [ "x$branch" = "x$obranch" ]
+          then  printf '%s\n' "$patch"
+          else  printf '%s\n' "$patch" \
+                | $trace sed '1,/^[^#]/s/^[^#]/[$branch<==$obranch] &/'
+          fi \
+          | $trace hg import - \
+          || xit=1
+        else
+          echo "$cmd: failed to get rev $rev from $ocheckout" >&2
+          xit=1
+        fi
         ;;
     *)  echo "$cmd: unsupported revision specification: $rev" >&2
         exit 1
         ;;
   esac
 done
+
+exit $xit
