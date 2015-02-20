@@ -288,10 +288,14 @@ case "$op" in
     echo "$prefix"$(tmux list-sessions | sed 's/:.*//' | next_suffix "$prefix")
     ;;
   pick-new-prefix-session-remote)
+    # choose a new remote session name
+    # using tmux by choice, screen otherwise
     session_name=$session_prefix$( rcmd "$remote_host" "if which tmux >/dev/null 2>&1; then tmux start-server; tmux list-sessions | sed 's/:.*//'; else screen -ls | sed -n 's/^\\t[1-9][0-9]*\\.\([^\\t]*\)\\t.*/\\1/p'; fi" | next_suffix "$session_prefix" )
     echo "$session_name"
     ;;
   recite-function-remote)
+    # recite a shell function for accessing remote sessions,
+    # typically aliased to "@"
     echo '
         # Usage: tm_remote [host[:session_name]]
         tm_remote(){
@@ -327,6 +331,7 @@ case "$op" in
     }'
     ;;
   rename)
+    # rename session
     case "$session_name" in
       [1-9]*)
         session_name=$(
@@ -344,6 +349,8 @@ case "$op" in
     fi
     ;;
   start)
+    # start initial screen sessions; just the named ones of names specified
+    # obtains definitions from $HOME/.tmrc
     tmrc=$HOME/.tmrc
     if [ ! -f "$tmrc" ]
     then
@@ -428,6 +435,7 @@ case "$op" in
     fi
     ;;
   use-session-remote)
+    # connect to remote session, tmux by choice, screen if no tmux
     rcmd "$remote_host" "set -ue; if which tmux >/dev/null 2>&1; then tmux start-server; tmux has-session -t $session_name && exec tmux attach-session -t $session_name || exec tmux new-session -s $session_name; else exec screen -x $session_name || exec screen -S $session_name; fi"
     ;;
   *)echo "$cmd: $op: unimplemented" >&2
