@@ -56,7 +56,7 @@ do
           if [ "x$branch" = "x$obranch" ]
           then  printf '%s\n' "$patch"
           else  printf '%s\n' "$patch" \
-                | $trace sed "1,/^[^#]/s/^[^#]/[$branch<==$obranch] &/"
+                | $trace sed "1,/^[^#]/s/^[^#]/$obranch ==> $branch: &/"
           fi \
           | $trace hg import - \
           || xit=1
