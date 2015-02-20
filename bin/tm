@@ -1,6 +1,8 @@
 #!/bin/sh
 #
 # Tmux convenience script, performing common higher level tasks.
+# Falls back to using screen if no tmux in some circumstances,
+# primarily when accessing remote sessions.
 #   - Cameron Simpson <cs@zip.com.au> 30oct2014
 #
 
