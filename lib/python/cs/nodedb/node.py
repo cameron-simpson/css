@@ -987,6 +987,21 @@ class NodeDB(dict, O):
       self[t, name] = N
     return N
 
+  @locked
+  def nextNode(self, t):
+    ''' Create the next numbered Node of the type `t`.
+    '''
+    maxn = 0
+    for N in self.type(t):
+      name = N.name
+      try:
+        n = int(name)
+      except ValueError:
+        continue
+      if n > maxn:
+        maxn = n
+    return newNode(self, t, str(maxn + 1))
+
   @property
   def _s(self):
     ''' Nodes of type _.
