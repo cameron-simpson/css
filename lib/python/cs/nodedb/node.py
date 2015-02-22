@@ -885,7 +885,7 @@ class NodeDB(dict, O):
     return self.get(item, doCreate=True)
 
   def __getattr__(self, attr):
-    ''' .TYPEs  Iterable if Nodes of the specified TYPE.
+    ''' .TYPEs  Iterable of Nodes of the specified TYPE.
         .TYPE   The meta-Node (TYPE, '_') for the type.
     '''
     k, plural = parseUC_sAttr(attr)
