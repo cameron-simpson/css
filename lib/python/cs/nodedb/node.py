@@ -713,10 +713,11 @@ class NodeDB(dict, O):
 
   _key = ('_', '_')     # index of metadata node
 
-  def __init__(self, backend, readonly=False):
+  def __init__(self, backend, readonly=False, type_factories=None):
     dict.__init__(self)
     self._lock = RLock()
     self.readonly = readonly
+    self.type_factories = type_factories
     self.closed = False
     self._noNode = None
     self.__attr_type_registry = {}
@@ -831,6 +832,9 @@ class NodeDB(dict, O):
         Subclasses of NodeDB should use this to make Nodes of appropriate
         types.
     '''
+    factories = self.type_factories
+    if factories and t in factories:
+      return factories[t](t, name, self)
     return Node(t, name, self)
 
   def type(self, t):
