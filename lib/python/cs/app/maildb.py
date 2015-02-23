@@ -531,14 +531,17 @@ class MessageNode(Node):
         else:
           msgq.append(M2)
 
-TypeFactory = { 'MESSAGE':      MessageNode,
-                'ADDRESS':      AddressNode,
-              }
-
 def MailDB(mdburl, readonly=True, klass=None):
   if klass is None:
     klass = _MailDB
-  return NodeDBFromURL(mdburl, readonly=readonly, klass=klass)
+  return NodeDBFromURL(mdburl,
+                       readonly=readonly,
+                       klass=klass)
+
+_MailDB_TypeFactories = {
+    'MESSAGE':      MessageNode,
+    'ADDRESS':      AddressNode,
+  }
 
 class _MailDB(NodeDB):
   ''' Extend NodeDB for email.
@@ -546,7 +549,8 @@ class _MailDB(NodeDB):
 
   def __init__(self, backend, readonly=False):
     self._O_omit = ('address_groups',)
-    NodeDB.__init__(self, backend, readonly=readonly)
+    NodeDB.__init__(self, backend, readonly=readonly,
+                    type_factories=_MailDB_TypeFactories)
 
   def rewrite(self):
     ''' Force a complete rewrite of the CSV file.
@@ -577,13 +581,6 @@ class _MailDB(NodeDB):
         absu = set(abs)
         if len(absu) < len(abs):
           N.ABBREVIATIONs = sorted(list(absu))
-
-  def _createNode(self, t, name):
-    ''' Create a new Node of the specified type.
-    '''
-    if t in TypeFactory:
-      return TypeFactory[t](t, name, self)
-    return NodeDB._createNode(self, t, name)
 
   @staticmethod
   def parsedAddress(addr):
