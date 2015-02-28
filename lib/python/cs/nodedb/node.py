@@ -18,7 +18,7 @@ from collections import namedtuple
 from cs.debug import RLock, trace
 from cs.excutils import unimplemented, transmute
 from cs.obj import O
-from cs.lex import str1, parseUC_sAttr
+from cs.lex import parseUC_sAttr
 from cs.logutils import Pfx, D, error, warning, info, debug, exception, X
 from cs.seq import the, get0
 from cs.threads import locked
@@ -409,7 +409,7 @@ class Node(dict):
   def _addReference(self, onode, oattr):
     ''' Add a reference to this Node.
     '''
-    key = (onode, str1(oattr))
+    key = (onode, oattr)
     if key in self._reverse:
       self._reverse[key] += 1
     else:
@@ -418,7 +418,7 @@ class Node(dict):
   def _delReference(self, onode, oattr):
     ''' Remove a reference to this Node.
     '''
-    key = (onode, str1(oattr))
+    key = (onode, oattr)
     if self._reverse[key] == 1:
       del self._reverse[key]
     else:
