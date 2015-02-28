@@ -11,7 +11,6 @@ import sys
 from collections import namedtuple
 from getopt import getopt, GetoptError
 from cs.alg import collate
-from cs.lex import str1
 from cs.logutils import setup_logging, Pfx, warning, error
 from cs.psutils import stop
 
@@ -281,7 +280,7 @@ class BinLogParser(object):
           # use database
           m = BinLogParser.re_USE_DBNAME.match(line)
           if m:
-            dbname = str1(m.group(1))
+            dbname = m.group(1)
             query_info[0] = dbname
             continue
 
