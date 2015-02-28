@@ -18,7 +18,7 @@ from collections import namedtuple
 from cs.debug import RLock, trace
 from cs.excutils import unimplemented, transmute
 from cs.obj import O
-from cs.lex import str1, parseUC_sAttr
+from cs.lex import parseUC_sAttr
 from cs.logutils import Pfx, D, error, warning, info, debug, exception, X
 from cs.seq import the, get0
 from cs.threads import locked
@@ -343,7 +343,7 @@ class Node(dict):
   '''
 
   def __init__(self, t, name, nodedb, initial=None):
-    self.type = str1(t) if t is not None else None
+    self.type = None if t is None else str(t)
     self.name = name
     self.nodedb = nodedb
     self._lock = self.nodedb._lock
@@ -409,7 +409,7 @@ class Node(dict):
   def _addReference(self, onode, oattr):
     ''' Add a reference to this Node.
     '''
-    key = (onode, str1(oattr))
+    key = (onode, oattr)
     if key in self._reverse:
       self._reverse[key] += 1
     else:
@@ -418,7 +418,7 @@ class Node(dict):
   def _delReference(self, onode, oattr):
     ''' Remove a reference to this Node.
     '''
-    key = (onode, str1(oattr))
+    key = (onode, oattr)
     if self._reverse[key] == 1:
       del self._reverse[key]
     else:
@@ -889,7 +889,7 @@ class NodeDB(dict, O):
     return self.get(item, doCreate=True)
 
   def __getattr__(self, attr):
-    ''' .TYPEs  Iterable if Nodes of the specified TYPE.
+    ''' .TYPEs  Iterable of Nodes of the specified TYPE.
         .TYPE   The meta-Node (TYPE, '_') for the type.
     '''
     k, plural = parseUC_sAttr(attr)
@@ -990,6 +990,21 @@ class NodeDB(dict, O):
       N = self[t, name] = self._createNode(t, name)
       self[t, name] = N
     return N
+
+  @locked
+  def nextNode(self, t):
+    ''' Create the next numbered Node of the type `t`.
+    '''
+    maxn = 0
+    for N in self.type(t):
+      name = N.name
+      try:
+        n = int(name)
+      except ValueError:
+        continue
+      if n > maxn:
+        maxn = n
+    return newNode(self, t, str(maxn + 1))
 
   @property
   def _s(self):
