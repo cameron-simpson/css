@@ -625,7 +625,7 @@ def mkdirn(path, sep=''):
       try:
         os.mkdir(newpath)
       except OSError as e:
-        if sys.exc_value[0] == errno.EEXIST:
+        if e.errno == errno.EEXIST:
           # taken, try new value
           continue
         error("mkdir(%s): %s", newpath, e)
