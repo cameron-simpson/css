@@ -344,6 +344,8 @@ class Node(dict):
 
   def __init__(self, t, name, nodedb, initial=None):
     self.type = None if t is None else str(t)
+    if isinstance(name, int):
+      name = str(name)
     self.name = name
     self.nodedb = nodedb
     self._lock = self.nodedb._lock
