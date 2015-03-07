@@ -559,7 +559,7 @@ def lockfile(path, ext=None, poll_interval=None, timeout=None):
       os.remove(lockpath)
       break
 
-def maxFilenameSuffix(dir, pfx):
+def max_suffix(dir, pfx):
   ''' Compute the highest existing numeric suffix for names starting with the prefix `pfx`.
       This is generally used as a starting point for picking a new numeric suffix.
   '''
@@ -613,7 +613,7 @@ def mkdirn(path, sep=''):
     # do a quick scan of the directory to find
     # if any names of the desired form already exist
     # in order to start after them
-    maxn = maxFilenameSuffix(dir, pfx)
+    maxn = max_suffix(dir, pfx)
     if maxn is None:
       newn = 0
     else:
