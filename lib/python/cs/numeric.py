@@ -18,7 +18,7 @@ def primes():
         break
     n += 2
 
-def factorise(n):
+def factors(n):
   ''' Generator yielding the prime factors of `n` in order from lowest to highest.
   '''
   for p in primes():
