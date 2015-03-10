@@ -4,7 +4,7 @@
 #       - Cameron Simpson <cs@zip.com.au> 08mar2014
 #
 
-usage="Usage: $0 [pyver] python-args..." >
+usage="Usage: $0 [pyver] python-args..."
 
 set -ue
 
