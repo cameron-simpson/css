@@ -10,4 +10,4 @@ flag_name=ROUTE_DEFAULT
 exec \
   svcd -l -n "$svc_name" \
     flag -w "$flag_name" \
-      -c "netstat -rn | egrep '^(default|0\\.0\\.0\\.0) +[1-9]' >/dev/null"
+      -c 'gw=$(get-default-route); [ -n "$gw" ]'
