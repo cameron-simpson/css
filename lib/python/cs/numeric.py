@@ -4,6 +4,17 @@
 #   - Cameron Simpson <cs@zip.com.au> 10mar2015
 #
 
+DISTINFO = {
+    'description': "some numeric functions; currently primes() and factors()",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Development Status :: 6 - Mature",
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+}
+
 def primes():
   ''' Generator yielding the primes in order starting at 2.
   '''
