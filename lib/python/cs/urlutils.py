@@ -5,6 +5,18 @@
 #
 
 from __future__ import with_statement, print_function
+
+DISTINFO = {
+    'description': "convenience functions for working with URLs",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'requires': ['lxml', 'beautifulsoup4', 'cs.excutils', 'cs.lex', 'cs.logutils', 'cs.threads', 'cs.py3', 'cs.obj'],
+}
+
 import os
 import os.path
 import sys
@@ -20,11 +32,18 @@ except ImportError:
     pass
 from netrc import netrc
 import socket
-from urllib2 import urlopen, Request, HTTPError, URLError, \
+try:
+  from urllib.request import urlopen, Request, HTTPError, URLError, \
+            HTTPPasswordMgrWithDefaultRealm, HTTPBasicAuthHandler, \
+            build_opener
+  from urllib.parse import urlparse, urljoin
+  from html.parser import HTMLParseError
+except ImportError:
+  from urllib2 import urlopen, Request, HTTPError, URLError, \
 		    HTTPPasswordMgrWithDefaultRealm, HTTPBasicAuthHandler, \
 		    build_opener
-from urlparse import urlparse, urljoin
-from HTMLParser import HTMLParseError
+  from urlparse import urlparse, urljoin
+  from HTMLParser import HTMLParseError
 try:
   import xml.etree.cElementTree as ElementTree
 except ImportError:
@@ -32,9 +51,9 @@ except ImportError:
 from threading import RLock
 from cs.excutils import logexc
 from cs.lex import parseUC_sAttr
-from cs.logutils import Pfx, pfx_iter, debug, error, warning, exception, D
+from cs.logutils import Pfx, pfx_iter, debug, error, warning, exception, D, X
 from cs.threads import locked_property
-from cs.py3 import StringIO, ustr
+from cs.py3 import StringIO, ustr, unicode
 from cs.obj import O
 
 def isURL(U):
@@ -88,7 +107,8 @@ class _URL(unicode):
     '''
     k, plural = parseUC_sAttr(attr)
     if k:
-      nodes = self.parsed.find_all(k.lower())
+      P = self.parsed
+      nodes = P.find_all(k.lower())
       if plural:
         return nodes
       return the(nodes)
@@ -190,11 +210,11 @@ class _URL(unicode):
     '''
     if self._content is None:
       self._fetch()
-    return self._info.gettype()
+    return self._info.get_content_type()
 
-  @property
+  @locked_property
   def content_transfer_encoding(self):
-    ''' The URL content MIME type.
+    ''' The URL content tranfer encoding.
     '''
     if self._content is None:
       self._fetch()

@@ -5,6 +5,18 @@
 #
 
 from __future__ import with_statement, print_function, absolute_import
+
+DISTINFO = {
+    'description': "convenience functions and classes for files and filenames/pathnames",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'requires': ['cs.asynchron', 'cs.debug', 'cs.env', 'cs.logutils', 'cs.queues', 'cs.range', 'cs.threads', 'cs.timeutils', 'cs.obj', 'cs.py3'],
+}
+
 from io import RawIOBase
 import errno
 from functools import partial
@@ -179,7 +191,7 @@ def rewrite_cmgr(pathname,
     os.remove(backuppath)
 
 def abspath_from_file(path, from_file):
-  ''' Return the absolute path if `path` with respect to `from_file`,
+  ''' Return the absolute path of `path` with respect to `from_file`,
       as one might do for an include file.
   '''
   if not os.path.isabs(path):
@@ -547,14 +559,14 @@ def lockfile(path, ext=None, poll_interval=None, timeout=None):
       os.remove(lockpath)
       break
 
-def maxFilenameSuffix(dir, pfx):
+def max_suffix(dirpath, pfx):
   ''' Compute the highest existing numeric suffix for names starting with the prefix `pfx`.
       This is generally used as a starting point for picking a new numeric suffix.
   '''
   pfx=ustr(pfx)
   maxn=None
   pfxlen=len(pfx)
-  for e in os.listdir(dir):
+  for e in os.listdir(dirpath):
     e = ustr(e)
     if len(e) <= pfxlen or not e.startswith(pfx):
       continue
@@ -586,22 +598,22 @@ def mkdirn(path, sep=''):
         raise ValueError(
                 "mkdirn(path=%r, sep=%r): using non-empty sep with a trailing %r seems nonsensical"
                 % (path, sep, os.sep))
-      dir = path[:-len(os.sep)]
+      dirpath = path[:-len(os.sep)]
       pfx = ''
     else:
-      dir = os.path.dirname(path)
-      if len(dir) == 0:
-        dir='.'
+      dirpath = os.path.dirname(path)
+      if len(dirpath) == 0:
+        dirpath='.'
       pfx = os.path.basename(path)+sep
 
-    if not os.path.isdir(dir):
-      error("parent not a directory: %r", dir)
+    if not os.path.isdir(dirpath):
+      error("parent not a directory: %r", dirpath)
       return None
 
     # do a quick scan of the directory to find
     # if any names of the desired form already exist
     # in order to start after them
-    maxn = maxFilenameSuffix(dir, pfx)
+    maxn = max_suffix(dirpath, pfx)
     if maxn is None:
       newn = 0
     else:
@@ -613,7 +625,7 @@ def mkdirn(path, sep=''):
       try:
         os.mkdir(newpath)
       except OSError as e:
-        if sys.exc_value[0] == errno.EEXIST:
+        if e.errno == errno.EEXIST:
           # taken, try new value
           continue
         error("mkdir(%s): %s", newpath, e)

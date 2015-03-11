@@ -1,11 +1,20 @@
 #!/usr/bin/python -tt
 #
-# Stuff to do with sequences and iterables.
+# Stuff to do with counters, sequences and iterables.
 #       - Cameron Simpson <cs@zip.com.au> 20jul2008
 #
 
-import bisect
-import unittest
+DISTINFO = {
+    'description': "Stuff to do with counters, sequences and iterables.",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'requires': ['cs.logutils', 'cs.py.stack'],
+}
+
 import heapq
 import itertools
 from threading import Lock, Condition

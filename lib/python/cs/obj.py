@@ -3,20 +3,26 @@
 # Random stuff for "objects". - Cameron Simpson <cs@zip.com.au>
 #
 
+DISTINFO = {
+    'description': "Convenience facilities for objects.",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'requires': ['cs.py3'],
+}
+
 from copy import copy as copy0
 from cs.py3 import StringTypes
 
-class slist(list):
-  ''' A list with a shorter str().
-  '''
-  def __str__(self):
-    return str(len(self)) + ":[" + ",".join(str(e) for e in self) + "]"
-
-T_SEQ = 'ARRAY'
-T_MAP = 'HASH'
+T_SEQ = 'SEQUENCE'
+T_MAP = 'MAPPING'
 T_SCALAR = 'SCALAR'
-def objFlavour(obj):
-  """ Return the ``flavour'' of an object:
+
+def flavour(obj):
+  """ Return constants indicating the ``flavour'' of an object:
       T_MAP: DictType, DictionaryType, objects with an __keys__ or keys attribute.
       T_SEQ: TupleType, ListType, objects with an __iter__ attribute.
       T_SCALAR: Anything else.
@@ -31,75 +37,6 @@ def objFlavour(obj):
   if hasattr(obj, '__iter__'):
     return T_SEQ
   return T_SCALAR
-
-class WithUCAttrs:
-  ''' An object where access to obj.FOO accesses obj['FOO']
-      if FOO is all upper case.
-  '''
-  def __getattr__(self, attr):
-    if attr.isalpha() and attr.isupper():
-      return self[attr]
-    return dict.__getattr__(self, attr)
-  def __setattr__(self, attr, value):
-    if attr.isalpha() and attr.isupper():
-      self[attr]=value
-      return
-    self.__dict__[attr]=value
-
-class DictUCAttrs(dict, WithUCAttrs):
-  ''' A dict where access to obj.FOO accesses obj['FOO']
-      if FOO is all upper case.
-  '''
-  def __init__(self, fill=None):
-    if fill is None:
-      fill=()
-    dict.__init__(self, fill)
-
-class WithUC_Attrs:
-  ''' An object where access to obj.FOO accesses obj['FOO']
-      if FOO matches ^[A-Z][_A-Z0-9]*.
-  '''
-  def __uc_(self, s):
-    if s.isalpha() and s.isupper():
-      return True
-    if len(s) < 1:
-      return False
-    if not s[0].isupper():
-      return False
-    for c in s[1:]:
-      if c != '_' and not (c.isupper() or c.isdigit()):
-        return False
-    return True
-  def __getattr__(self, attr):
-    if self.__uc_(attr):
-      return self[attr]
-    return dict.__getattr__(self, attr)
-  def __setattr__(self, attr, value):
-    if self.__uc_(attr):
-      self[attr]=value
-      return
-    self.__dict__[attr]=value
-
-class DictUC_Attrs(dict, WithUC_Attrs):
-  ''' A dict where access to obj.FOO accesses obj['FOO']
-      if FOO matches ^[A-Z][_A-Z0-9]*.
-  '''
-  def __init__(self, fill=None):
-    if fill is None:
-      fill=()
-    dict.__init__(self, fill)
-
-class DictAttrs(dict):
-  def __init__(self, d=None):
-    dict.__init__()
-    if d is not None:
-      for k in d.keys():
-        self[k]=d[k]
-
-  def __getattr__(self, attr):
-    return self[attr]
-  def __setattr__(self, attr, value):
-    self[attr]=value
 
 # Assorted functions for working with O instances.
 # These are not methods because I don't want to pollute O subclasses

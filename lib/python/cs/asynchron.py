@@ -4,6 +4,17 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
+DISTINFO = {
+    'description': "Asynchron and friends: callable objects which will receive a value at a later point in time.",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'requires': ['cs.obj', 'cs.seq', 'cs.py3'],
+}
+
 import sys
 from cs.debug import Lock
 from cs.logutils import error, exception, warning, debug, D

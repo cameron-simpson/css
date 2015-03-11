@@ -5,6 +5,23 @@
 #
 
 from __future__ import print_function
+
+DISTINFO = {
+    'description': "email message filing system which monitors multiple inbound Maildir folders",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'requires': [ 'cs.configutils', 'cs.env', 'cs.fileutils', 'cs.lex', 'cs.logutils', 'cs.mailutils', 'cs.obj', 'cs.seq', 'cs.threads', 'cs.app.maildb', 'cs.py.modules', 'cs.py3' ],
+    'entry_points': {
+      'console_scripts': [
+          'maildb = cs.app.mailfiler:main',
+          ],
+        },
+}
+
 from collections import namedtuple
 from email import message_from_string, message_from_file
 import email.parser
@@ -36,7 +53,7 @@ from cs.logutils import Pfx, setup_logging, with_log, \
                         D, X, LogTime
 from cs.mailutils import Maildir, message_addresses, modify_header, \
                          shortpath, ismaildir, make_maildir
-from cs.obj import O, slist
+from cs.obj import O
 from cs.seq import first
 from cs.threads import locked, locked_property
 from cs.app.maildb import MailDB
@@ -50,7 +67,9 @@ DEFAULT_MAILDB_PATH = '$HOME/.maildb.csv'
 DEFAULT_MSGIDDB_PATH = '$HOME/var/msgiddb.csv'
 DEFAULT_MAILDIR_PATH = '$MAILDIR'
 
-def main(argv, stdin=None):
+def main(argv=None, stdin=None):
+  if argv is None:
+    argv = sys.argv
   if stdin is None:
     stdin = sys.stdin
   argv = list(argv)
@@ -253,7 +272,7 @@ class MailFiler(O):
     pattern \
       = self._rules_pattern \
       = current_value('MAILFILER_RULES_PATTERN', self.cfg, 'rules_pattern', DEFAULT_RULES_PATTERN, self.environ)
-    X(".rules_pattern=%r", pattern)
+    debug(".rules_pattern=%r", pattern)
     return pattern
   @rules_pattern.setter
   def rules_pattern(self, pattern):
@@ -282,10 +301,10 @@ class MailFiler(O):
         If `delay` is not None, poll the folders repeatedly with a
         delay of `delay` seconds between each pass.
     '''
-    X("monitor: self.cfg=%s", self.cfg)
-    X("maildb_path=%r", self.maildb_path)
-    X("msgiddb_path=%r", self.msgiddb_path)
-    X("rules_pattern=%r", self.rules_pattern)
+    debug("monitor: self.cfg=%s", self.cfg)
+    debug("maildb_path=%r", self.maildb_path)
+    debug("msgiddb_path=%r", self.msgiddb_path)
+    debug("rules_pattern=%r", self.rules_pattern)
     op_cfg = self.subcfg('monitor')
     try:
       while True:
@@ -547,14 +566,14 @@ class MessageFiler(O):
       try:
         self.sendmail(address)
       except Exception as e:
-        exception("forwarding to address %r: %s", folder, e)
+        exception("forwarding to address %r: %s", address, e)
         ok = False
     # pipeline message
     for shcmd, shenv in self.save_to_cmds:
       try:
         self.save_to_pipe(['/bin/sh', '-c', shcmd], shenv)
       except Exception as e:
-        exception("forwarding to address %r: %s", folder, e)
+        exception("piping to %r: %s", shcmd, e)
         ok = False
     # issue arrival alert
     if self.flags.alert > 0:
@@ -567,6 +586,7 @@ class MessageFiler(O):
     '''
     if modify_header(self.message, hdr, new_value, always=always):
       self.message_path = None
+      self.header_addresses = {}
 
   def apply_rule(self, R):
     ''' Apply this the rule `R` to this MessageFiler.
@@ -1037,28 +1057,29 @@ def get_targets(s, offset):
   while offset < len(s) and not s[offset].isspace():
     offset0 = offset
     T, offset = get_target(s, offset)
-    targets.append(T)
+    if T is not None:
+      targets.append(T)
     if offset < len(s) and s[offset] == ',':
       offset += 1
   return targets, offset
 
 def get_target(s, offset, quoted=False):
   ''' Parse a single target specification from a string; return Target and new offset.
-      `quoted`: already inside quoted: do not expect comma or
-        whitespace to end the target specification
+      `quoted`: already inside quotes: do not expect comma or whitespace to
+        end the target specification
   '''
   offset0 = offset
 
   # "quoted-target-specification"
   if not quoted and s.startswith('"', offset0):
     s2, offset = get_qstr(s, offset0)
+    s2q = s[offset0:offset]
     # reparse inner string
     T, offset2 = get_target(s2, 0, quoted=True)
-    # check for complete parse
+    # check for complete parse, allow some trailing whitespace
     s3 = s2[offset2:].lstrip()
     if s3:
-      qs = s[offset0:offset]
-      raise ValueError("unparsed content from %s: %r" % (qs, s3))
+      warning("ignoring unparsed content from %s: %r" % (s2q, s3))
     return T, offset
 
   # varname=expr
@@ -1087,7 +1108,11 @@ def get_target(s, offset, quoted=False):
            or ( not quoted and ( s[offset] == ',' or s[offset].isspace() ) )
             )
      ):
-    T = Target_SetFlag(flag_letter)
+    try:
+      T = Target_SetFlag(flag_letter)
+    except ValueError as e:
+      warning("ignoring bad flag %r: %s", flag_letter, e)
+      T = None
     return T, offset
 
   # |shcmd
@@ -1109,8 +1134,13 @@ def get_target(s, offset, quoted=False):
     delim = m_delim.group()
     regexp, offset = get_delimited(s, offset, delim)
     replacement, offset = get_delimited(s, offset, delim)
-    subst_re = re.compile(regexp)
-    T = Target_Substitution(header_name, subst_re, replacement)
+    try:
+      subst_re = re.compile(regexp)
+    except Exception as e:
+      warning("ignoring substitute: re.compile: %s: regexp=%s", e, regexp)
+      T = None
+    else:
+      T = Target_Substitution(header_name, subst_re, replacement)
     return T, offset
 
   # s/this/that/ -- modify subject:
@@ -1123,7 +1153,13 @@ def get_target(s, offset, quoted=False):
     regexp, offset = get_delimited(s, offset, delim)
     replacement, offset = get_delimited(s, offset, delim)
     subst_re = re.compile(regexp)
-    T = Target_Substitution(header_name, subst_re, replacement)
+    try:
+      subst_re = re.compile(regexp)
+    except Exception as e:
+      warning("ignoring substitute: re.compile: %s: regexp=%s", e, regexp)
+      T = None
+    else:
+      T = Target_Substitution(header_name, subst_re, replacement)
     return T, offset
 
   # headers:func([args...])
@@ -1172,7 +1208,9 @@ def get_target(s, offset, quoted=False):
   if m:
     target = m.group()
     offset = m.end()
-    if '@' in target:
+    if '$' in target:
+      T = Target_EnvSub(target)
+    elif '@' in target:
       T = Target_MailAddress(target)
     else:
       T = Target_MailFolder(target)
@@ -1192,8 +1230,24 @@ class Target_Assign(O):
     value = envsub(self.varexpr, filer.environ)
     filer.environ[varname] = value
     if varname == 'LOGFILE':
-      warning("LOGFILE= unimplemented at present")
+      debug("LOGFILE= unimplemented at present")
       ## TODO: self.logto(value)
+
+class Target_EnvSub(O):
+
+  def __init__(self, target_expr):
+    self.target_expr = target_expr
+
+  def apply(self, filer):
+    ''' Perform environment substituion on target string and then
+        deliver to resulting string.
+    '''
+    target = envsub(self.target_expr, filer.environ)
+    if '@' in target:
+      T = Target_MailAddress(target)
+    else:
+      T = Target_MailFolder(target)
+    T.apply(filer)
 
 class Target_SetFlag(O):
 
@@ -1219,8 +1273,11 @@ class Target_Substitution(O):
     self.subst_replacement = subst_replacement
 
   def apply(self, filer):
+    debug("apply %r : s/%s/%s ...", self.header_name, self.subst_re.pattern, self.subst_replacement)
     M = filer.message
-    old_value = M.get(self.header_name, '')
+    # fetch old value and "unfold" (strip CRLF, see RFC2822 part 2.2.3)
+    old_value = M.get(self.header_name, '').replace('\r','').replace('\n','')
+    debug("  old value = %r", old_value)
     m = self.subst_re.search(old_value)
     if m:
       # named substitution values
@@ -1229,9 +1286,12 @@ class Target_Substitution(O):
       env_specials = { '0': m.group(0) }
       for ndx, grp in enumerate(m.groups()):
         env_specials[str(ndx+1)] = grp
-      new_value = get_qstr(self.subst_replacement, 0, q=None,
+      new_value, offset = get_qstr(self.subst_replacement, 0, q=None,
                            environ=env, env_specials=env_specials)
-      X("%s ==> %s", self.subst_replacement, new_value)
+      if offset != len(self.subst_replacement):
+        warning("after getqstr, offset[%d] != len(subst_replacement)[%d]: %r",
+                offset, len(self.subst_replacement), self.subst_replacement)
+      debug("%s: %s ==> %s", self.header_name, self.subst_replacement, new_value)
       filer.modify(self.header_name, new_value)
 
 class Target_Function(O):
@@ -1408,7 +1468,7 @@ class Rule(O):
   def __init__(self, filename, lineno):
     self.filename = filename
     self.lineno = lineno
-    self.conditions = slist()
+    self.conditions = []
     self.targets = []
     self.flags = O(alert=0, halt=False)
     self.label = ''
