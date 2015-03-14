@@ -1,0 +1,74 @@
+#!/bin/sh
+#
+# Cherry pick specific revisions from a different checkout.
+# Initial use case is to pull bugfixes from an as yet unpublished
+# branch, still lurking in an isolated checkout.
+#   - Cameron Simpson <cs@zip.com.au> 30jan2015
+#
+
+set -ue
+
+trace=
+[ -t 2 ] && trace=set-x
+
+cmd=$(basename "$0")
+usage="Usage: $cmd other-checkout rev...
+  other-checkout
+    Directory containing the other checkout.
+  rev
+    Revision identifiers from other-checkout."
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing other-checkout" >&2
+  badopts=1
+else
+  ocheckout=$1
+  shift
+  if [ ! -d "$ocheckout/." ]
+  then
+    echo "$cmd: other-checkout not a directory: $ocheckout" >&2
+    badopts=1
+  fi
+fi
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing revs" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+branch=$( hg branch )
+obranch=$( incd "$ocheckout" hg branch )
+
+xit=0
+
+for rev
+do
+  case "$rev" in
+    [0-9a-f]*)
+        if patch=$( $trace incd "$ocheckout" hg export "$rev" )
+        then
+          if [ "x$branch" = "x$obranch" ]
+          then  printf '%s\n' "$patch"
+          else  printf '%s\n' "$patch" \
+                | $trace sed "1,/^[^#]/s/^[^#]/cherrypick $obranch ==> $branch: &/"
+          fi \
+          | $trace hg import - \
+          || xit=1
+        else
+          echo "$cmd: failed to get rev $rev from $ocheckout" >&2
+          xit=1
+        fi
+        ;;
+    *)  echo "$cmd: unsupported revision specification: $rev" >&2
+        exit 1
+        ;;
+  esac
+done
+
+exit $xit

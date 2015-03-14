@@ -54,6 +54,7 @@ def main(argv=None, stdin=None):
       compact
       edit-group group
       edit-group /regexp/
+      export exportpath
       import-addresses < addresses.txt
         File format:
           group,... rfc2822-address
@@ -124,13 +125,17 @@ def main(argv=None, stdin=None):
           MDB.rewrite()
         elif op == 'export':
           exportpath = argv.pop(0)
-          with Pfx(exportpath):
-            if os.path.exists(exportpath):
-              error("already exists")
-            else:
-              MDB.scrub()
-              with open(exportpath, "w") as exfp:
-                MDB.dump(exfp)
+          if argv:
+            warning("extra arguments after exportpath: %s", ' '.join(argv))
+            badopts = True
+          else:
+            with Pfx(exportpath):
+              if os.path.exists(exportpath):
+                error("already exists")
+              else:
+                MDB.scrub()
+                with open(exportpath, "w") as exfp:
+                  MDB.dump(exfp)
         elif op == 'list-abbreviations' or op == 'list-abbrevs':
           try:
             opts, argv = getopt(argv, 'A')
@@ -217,15 +222,29 @@ def main(argv=None, stdin=None):
                   error('no such group')
                   xit = 1
                   continue
-                address_list = ', '.join(sorted(MDB['ADDRESS', address].formatted
-                                                for address in address_group))
                 if mutt_aliases:
                   print('alias', end=' ')
                   if mutt_groups:
                     print('-group', group_name, end=' ')
                 elif mutt_groups:
                   print('group', end=' ')
-                print(group_name, address_list)
+                print(group_name, end=' ')
+                formatted_addresses = sorted(MDB['ADDRESS', address].formatted
+                                             for address in address_group
+                                            )
+                if mutt_aliases or mutt_groups:
+                  # write slosh extended lines
+                  first = True
+                  for formatted_address in formatted_addresses:
+                    if first:
+                      first = False
+                    else:
+                      print(', ', end='')
+                    print('\\\n               ', formatted_address, end='')
+                  print()
+                else:
+                  # write single huge line
+                  print(', '.join(formatted_addresses))
         elif op == 'learn-addresses':
           only_ungrouped = False
           if len(argv) and argv[0] == '--ungrouped':
