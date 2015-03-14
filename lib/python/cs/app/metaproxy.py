@@ -531,6 +531,8 @@ class MetaProxyCache(O):
         self._nodes[key] = N
       else:
         N = None
+    elif not N.exists():
+      N = None
     return N
 
   @locked
@@ -588,6 +590,11 @@ class CacheNode(O):
     if not self._cache_async:
       self._cache_async = Asynchron()
     return self._cache_async.ready
+
+  def exists(self):
+    ''' Test whether the backing file exists.
+    '''
+    return os.path.exists(self.cachepath)
 
   @property
   def cachepath(self):
