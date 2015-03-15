@@ -6,14 +6,15 @@
 #
 # =head1 SYNOPSIS
 #
-# buglog [-B bugsystem] [-n] headline < description
+# buglog [-B bugsystem] [-d datetime] [-n] headline < description
 #
-# buglog [-B bugsystem] [-n] headline command [args...]
+# buglog [-B bugsystem] [-d datetime] [-n] headline command [args...]
 #
 # =head1 DESCRIPTION
 #
-# I<buglog> takes a change I<headline> on the command line and a I<description> on its input
-# and logs it to the bug subsystems enumerated by the environment variable B<$BUGSYSTEMS>.
+# I<buglog> takes a change I<headline> on the command line and a
+# I<description> on its input and logs it to the bug subsystems
+# enumerated by the environment variable B<$BUGSYSTEMS>.
 # B<$BUGSYSTEMS> is a space separated list of subsystems that accept log information.
 #
 
@@ -27,12 +28,14 @@ trace=
 [ -t 2 ] && trace=set-x
 
 readstdin=1
+when=
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [-B bugsystems] [-n] headline < description
   -B bugsystems Space separated list of bugsystems to consider.
                 Default from \$BUGSYSTEMS or \`bugsystems\`:
                 $BUGSYSTEMS
+  -d datetime   Timestamp suitable for passing to \"date -d\".
   -n            No description on input.
   -x            Trace command execution."
 
@@ -50,16 +53,25 @@ do
     # Deliver reports to the specified I<bugsystems> instead of the default.
     #
     -B) BUGSYSTEMS=$2; export BUGSYSTEMS; shift ;;
+
+    # =item B<-d>
+    #
+    # Timestamp suitable for passing to \"date -d\".
+    #
+    -d) when=$2; shift ;;
+
     # =item B<-n>
     #
     # No description.
     #
     -n) readstdin= ;;
+
     # =item B<-x>
     #
     # Trace command execution.
     #
     -x) trace=set-x ;;
+
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
     *)  break ;;
@@ -82,6 +94,12 @@ else
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+# compute ISO8601 timestamp string in local time
+if [ -n "$when" ]
+then  when=`date -d "$when" '+%Y-%m-%d-%H:%M:%S'`
+else  when=`date '+%Y-%m-%d-%H:%M:%S'`
+fi
 
 attachment=$TMPDIR/bugids$$
 trap 'rm -f "$attachment"' 0
@@ -159,7 +177,7 @@ do
         sfx=` expr "x$headline" : 'x[A-Z][A-Z_0-9,]*: *\(.*\)'`
         for category in `printf "%s\n" "$pfx" | tr , ' '`
         do
-          $trace log-tsline -\? -- "$category" "$sfx"
+          $trace log-tsline -\? -d "$when" -- "$category" "$sfx"
         done
       fi
       ;;
