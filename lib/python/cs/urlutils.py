@@ -33,13 +33,13 @@ except ImportError:
 from netrc import netrc
 import socket
 try:
-  from urllib.request import urlopen, Request, HTTPError, URLError, \
+  from urllib.request import Request, HTTPError, URLError, \
             HTTPPasswordMgrWithDefaultRealm, HTTPBasicAuthHandler, \
             build_opener
   from urllib.parse import urlparse, urljoin
   from html.parser import HTMLParseError
 except ImportError:
-  from urllib2 import urlopen, Request, HTTPError, URLError, \
+  from urllib2 import Request, HTTPError, URLError, \
 		    HTTPPasswordMgrWithDefaultRealm, HTTPBasicAuthHandler, \
 		    build_opener
   from urlparse import urlparse, urljoin
