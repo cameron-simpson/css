@@ -210,7 +210,8 @@ do
 
           echo "To: $addr"
           echo "Subject: $subj"
-          echo "X-Buglog-Date: `date`"
+          echo "Date: `date -d "$when" '+%d %b %Y %H:%M:S %z'`"
+          echo "X-Buglog-Date: `when`"
           echo
           cat "$attachment"
         ) | $trace sendmail -oi "$addr"
