@@ -56,8 +56,8 @@ esac
 
 # compute ISO8601 timestamp string
 if [ -n "$when" ]
-then  ts=`date -d "$when" '+%Y-%m-%d-%H:%M:%S'`
-else  ts=`date '+%Y-%m-%d-%H:%M:%S'`
+then  ts=`date -d "$when" '+%Y-%m-%d %H:%M:%S'`
+else  ts=`date '+%Y-%m-%d %H:%M:%S'`
 fi
 
 echo "$ts $*" >>"$logname"

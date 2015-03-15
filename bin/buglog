@@ -97,8 +97,8 @@ fi
 
 # compute ISO8601 timestamp string in local time
 if [ -n "$when" ]
-then  when=`date -d "$when" '+%Y-%m-%d-%H:%M:%S'`
-else  when=`date '+%Y-%m-%d-%H:%M:%S'`
+then  when=`date -d "$when" '+%Y-%m-%d %H:%M:%S'`
+else  when=`date '+%Y-%m-%d %H:%M:%S'`
 fi
 
 attachment=$TMPDIR/bugids$$
