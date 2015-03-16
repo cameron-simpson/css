@@ -420,7 +420,7 @@ def skip_errs(iterable):
   I = iter(iterable)
   while True:
     try:
-      i = I.next()
+      i = next(I)
     except StopIteration:
       break
     except (URLError, HTTPError) as e:
