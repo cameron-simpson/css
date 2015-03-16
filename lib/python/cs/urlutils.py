@@ -20,6 +20,7 @@ DISTINFO = {
 import os
 import os.path
 import sys
+import time
 from itertools import chain
 from bs4 import BeautifulSoup, Tag, BeautifulStoneSoup
 try:
@@ -153,8 +154,13 @@ class _URL(unicode):
     rq = self._request(method)
     opener = self.opener
     with Pfx("open(%s)", rq):
+      now = time.time()
       try:
         rsp = opener.open(rq)
+      except TimeoutError as e:
+        elapsed = time.time() - now
+        warning("open %s: %s; elapsed=%gs", self, e, elapsed)
+        raise
       except HTTPError as e:
         warning("open %s: %s", self, e)
         raise
