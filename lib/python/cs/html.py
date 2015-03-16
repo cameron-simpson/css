@@ -18,7 +18,7 @@ DISTINFO = {
 import re
 import sys
 import urllib
-from cs.py3 import StringTypes, StringIO
+from cs.py3 import StringTypes
 
 # Characters safe to transcribe unescaped.
 re_SAFETEXT = re.compile(r'[^<>&]+')
