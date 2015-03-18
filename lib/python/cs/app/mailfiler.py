@@ -1354,11 +1354,18 @@ class Target_Function(O):
         except ValueError:
           value = arg
       func_args.append(value)
-    try:
-      func(header_names, *func_args)
-    except Exception as e:
-      error("exception calling %s(filer, *%r): %s", self.funcname, func_args, e)
-      raise
+    M = filer.message
+    for header_name in self.header_names:
+      for s in M.get_all(header_name):
+        try:
+          s2 = func(s, *func_args)
+        except Exception as e:
+          exception("exception calling %s(filer, *%r): %s", self.funcname, func_args, e)
+          raise
+        else:
+          if s != s2:
+            info("%s: %r ==> %r", header_name.title(), s, s2)
+            filer.modify(header_name, s2)
 
 class Target_PipeLine(O):
 
