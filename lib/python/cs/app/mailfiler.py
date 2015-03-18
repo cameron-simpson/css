@@ -1335,7 +1335,6 @@ class Target_Function(O):
       func = import_module_name(module_name, func_name)
       if func is None:
         raise ValueError("no function %r in module %r" % (func_name, module_name))
-      func = partial(func, filer)
     elif self.funcname == 'learn_addresses':
       func = filer.learn_header_addresses
     elif self.funcname == 'learn_message_ids':
@@ -1356,16 +1355,17 @@ class Target_Function(O):
       func_args.append(value)
     M = filer.message
     for header_name in self.header_names:
-      for s in M.get_all(header_name):
+      for s in M.get_all(header_name, ()):
         try:
           s2 = func(s, *func_args)
         except Exception as e:
           exception("exception calling %s(filer, *%r): %s", self.funcname, func_args, e)
           raise
         else:
-          if s != s2:
-            info("%s: %r ==> %r", header_name.title(), s, s2)
-            filer.modify(header_name, s2)
+          if s2 is not None:
+            if s != s2:
+              info("%s: %r ==> %r", header_name.title(), s, s2)
+              filer.modify(header_name, s2)
 
 class Target_PipeLine(O):
 
