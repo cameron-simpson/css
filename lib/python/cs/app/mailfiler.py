@@ -1308,11 +1308,9 @@ class Target_Substitution(O):
 
   def apply(self, filer):
     for header_name in self.header_names:
-      X("apply %r : s/%s/%s ...", header_name, self.subst_re.pattern, self.subst_replacement)
       M = filer.message
       # fetch old value and "unfold" (strip CRLF, see RFC2822 part 2.2.3)
       old_value = M.get(header_name, '').replace('\r','').replace('\n','')
-      X("SUBST:   old value = %r", old_value)
       m = self.subst_re.search(old_value)
       if m:
         # record named substitution values
@@ -1327,7 +1325,6 @@ class Target_Substitution(O):
         if offset != len(self.subst_replacement):
           warning("after getqstr, offset[%d] != len(subst_replacement)[%d]: %r",
                   offset, len(self.subst_replacement), self.subst_replacement)
-        debug("SUBST %s: %s ==> %s", header_name, self.subst_replacement, new_value)
         filer.modify(header_name.title(), new_value)
 
 class Target_Function(O):
