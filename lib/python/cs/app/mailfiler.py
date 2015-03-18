@@ -77,6 +77,7 @@ def main(argv=None, stdin=None):
   setup_logging(cmd)
   usage = ( '''Usage:
     %s monitor [-1] [-d delay] [-n] [-N] [-R rules_pattern] maildirs...
+      Monitor Maildirs for new messages and file them.
       -1  File at most 1 message per Maildir.
       -d delay
           Delay between runs in seconds.
@@ -85,8 +86,11 @@ def main(argv=None, stdin=None):
       -R rules_pattern
           Specify the rules file pattern used to specify rules files from Maildir names.
           Default: %s
-    %s save target[,target...] <message'''
-            % (cmd, DEFAULT_RULES_PATTERN, cmd)
+    %s save target[,target...] <message
+      Save a message from standard input to the specified targets.
+    %s report <message
+      Report various things about a message from standard input.'''
+            % (cmd, DEFAULT_RULES_PATTERN, cmd, cmd)
           )
   badopts = False
 
@@ -147,6 +151,10 @@ def main(argv=None, stdin=None):
         if message_fp.isatty():
           warning("stdin: will not read from a tty")
           badopts = True
+      elif op == 'report':
+        if argv:
+          warning("extra arguments: %r", argv)
+          badopts = True
       else:
         warning("unrecognised op")
         badopts = True
@@ -164,6 +172,8 @@ def main(argv=None, stdin=None):
       return MF.monitor(mdirpaths, delay=delay, justone=justone, no_remove=no_remove)
     if op == 'save':
       return MF.save(targets, sys.stdin)
+    if op == 'report':
+      return MF.report(sys.stdin)
     raise RuntimeError("unimplemented op")
 
   return 0
@@ -390,6 +400,23 @@ class MailFiler(O):
     for T in Ts:
       T.apply(filer)
     filer.save_message()
+    return 0
+
+  def report(self, msgfp):
+    ''' Implementation for command line "report" function: report on message.
+    '''
+    message = message_from_file(msgfp)
+    for s in message.get_all('subject', ()):
+      print('Subject:', repr(s))
+      uqs = unrfc2047(s)
+      if s != uqs:
+        print('  ==>', repr(uqs))
+    for hdr in 'from', 'to', 'cc', 'bcc', 'reply-to':
+      for s in message.get_all(hdr, ()):
+        print(hdr.title()+':', repr(s))
+        uqs = unrfc2047(s)
+        if s != uqs:
+          print('  ==>', repr(uqs))
     return 0
 
   def file_wmdir_key(self, wmdir, key):
