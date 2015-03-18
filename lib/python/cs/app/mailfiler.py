@@ -26,6 +26,7 @@ from collections import namedtuple
 from email import message_from_string, message_from_file
 import email.parser
 from email.utils import getaddresses
+from functools import partial
 from getopt import getopt, GetoptError
 import io
 from logging import DEBUG
