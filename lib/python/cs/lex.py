@@ -226,7 +226,7 @@ def unrfc2047(s):
         enctext = m.group()
     elif enctype == 'Q':
       try:
-        enctext = quopri.decodestring(enctext)
+        enctext = quopri.decodestring(enctext.replace('_', ' '))
       except UnicodeEncodeError as e:
         warning("%r: %e", enctext, e)
         ##enctext = enctext.decode('iso8859-1')
@@ -235,14 +235,14 @@ def unrfc2047(s):
     try:
       enctext = enctext.decode(enccset)
     except LookupError as e:
-      warning("%r: %e", enctext, e)
+      warning("decode(%s): %e: %r", enccset, e, enctext)
       enctext = enctext.decode('iso8859-1')
     except UnicodeDecodeError as e:
-      warning("%r: %e", enctext, e)
+      warning("decode(%s): %s: %r", enccset, e, enctext)
       enctext = enctext.decode(enccset, 'replace')
     except UnicodeEncodeError as e:
-      warning("%r: %e", enctext, e)
-      ##enctext = enctext.decode(enccset, 'replace')
+      warning("decode(%s): %e: %r", enccset, e, enctext)
+      enctext = enctext.decode(enccset, 'replace')
     chunks.append(enctext)
     sofar = end
   if sofar < len(s):
