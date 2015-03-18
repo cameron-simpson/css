@@ -21,7 +21,7 @@ import re
 import sys
 import os
 from cs.py3 import bytes, unicode, ustr, sorted, StringTypes
-from cs.logutils import X
+from cs.logutils import X, warning
 
 unhexify = binascii.unhexlify
 if sys.hexversion >= 0x030000:
@@ -216,7 +216,6 @@ def unrfc2047(s):
       littered varieties that come from some low quality mail clients) and
       decode them into flat Unicode.
   '''
-  from cs.logutils import warning
   if not isinstance(s, unicode):
     s = unicode(s, 'iso8859-1')
   chunks = []
