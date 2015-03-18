@@ -1153,29 +1153,35 @@ def get_target(s, offset, quoted=False):
     T = Target_PipeLine(shcmd)
     return T, offset
 
-  # header:s/this/that/
+  # headers:s/this/that/
   tokens, offset = match_tokens(s, offset0,
-                                (re_HEADERNAME, ':s', re_NONALNUMWSP))
+                                ( re_HEADERNAME_LIST,
+                                  ':s',
+                                  re_NONALNUMWSP
+                                ))
   if tokens:
-    m_header_name, marker, m_delim = tokens
-    header_name = m_header_name.group()
+    m_headers, marker, m_delim = tokens
+    header_names = m_headers.group().split(',')
     delim = m_delim.group()
     regexp, offset = get_delimited(s, offset, delim)
     replacement, offset = get_delimited(s, offset, delim)
+    if offset < len(s):
+      warning("UNPARSED TEXT AFTER s/this/that: %r", s[offset:])
+      offset = len(s)
     try:
       subst_re = re.compile(regexp)
     except Exception as e:
       warning("ignoring substitute: re.compile: %s: regexp=%s", e, regexp)
       T = None
     else:
-      T = Target_Substitution(header_name, subst_re, replacement)
+      T = Target_Substitution(header_names, subst_re, replacement)
     return T, offset
 
   # s/this/that/ -- modify subject:
   tokens, offset = match_tokens(s, offset0,
                                  ('s', re_NONALNUMWSP))
   if tokens:
-    header_name = 'subject'
+    header_names = ('subject',)
     marker, m_delim = tokens
     delim = m_delim.group()
     regexp, offset = get_delimited(s, offset, delim)
@@ -1187,7 +1193,7 @@ def get_target(s, offset, quoted=False):
       warning("ignoring substitute: re.compile: %s: regexp=%s", e, regexp)
       T = None
     else:
-      T = Target_Substitution(header_name, subst_re, replacement)
+      T = Target_Substitution(header_names, subst_re, replacement)
     return T, offset
 
   # headers:func([args...])
@@ -1295,32 +1301,34 @@ class Target_SetFlag(O):
 
 class Target_Substitution(O):
 
-  def __init__(self, header_name, subst_re, subst_replacement):
-    self.header_name = header_name
+  def __init__(self, header_names, subst_re, subst_replacement):
+    self.header_names = header_names
     self.subst_re = subst_re
     self.subst_replacement = subst_replacement
 
   def apply(self, filer):
-    debug("apply %r : s/%s/%s ...", self.header_name, self.subst_re.pattern, self.subst_replacement)
-    M = filer.message
-    # fetch old value and "unfold" (strip CRLF, see RFC2822 part 2.2.3)
-    old_value = M.get(self.header_name, '').replace('\r','').replace('\n','')
-    debug("  old value = %r", old_value)
-    m = self.subst_re.search(old_value)
-    if m:
-      # named substitution values
-      env = m.groupdict()
-      # numbered substitution values
-      env_specials = { '0': m.group(0) }
-      for ndx, grp in enumerate(m.groups()):
-        env_specials[str(ndx+1)] = grp
-      new_value, offset = get_qstr(self.subst_replacement, 0, q=None,
-                           environ=env, env_specials=env_specials)
-      if offset != len(self.subst_replacement):
-        warning("after getqstr, offset[%d] != len(subst_replacement)[%d]: %r",
-                offset, len(self.subst_replacement), self.subst_replacement)
-      debug("%s: %s ==> %s", self.header_name, self.subst_replacement, new_value)
-      filer.modify(self.header_name, new_value)
+    for header_name in self.header_names:
+      X("apply %r : s/%s/%s ...", header_name, self.subst_re.pattern, self.subst_replacement)
+      M = filer.message
+      # fetch old value and "unfold" (strip CRLF, see RFC2822 part 2.2.3)
+      old_value = M.get(header_name, '').replace('\r','').replace('\n','')
+      X("SUBST:   old value = %r", old_value)
+      m = self.subst_re.search(old_value)
+      if m:
+        # record named substitution values
+        env = m.groupdict()
+        # record numbered substitution values
+        env_specials = { '0': m.group(0) }
+        for ndx, grp in enumerate(m.groups()):
+          env_specials[str(ndx+1)] = grp
+        repl_value, offset = get_qstr(self.subst_replacement, 0, q=None,
+                             environ=env, env_specials=env_specials)
+        new_value = old_value[:m.start()] + repl_value + old_value[m.end():]
+        if offset != len(self.subst_replacement):
+          warning("after getqstr, offset[%d] != len(subst_replacement)[%d]: %r",
+                  offset, len(self.subst_replacement), self.subst_replacement)
+        debug("SUBST %s: %s ==> %s", header_name, self.subst_replacement, new_value)
+        filer.modify(header_name.title(), new_value)
 
 class Target_Function(O):
 
