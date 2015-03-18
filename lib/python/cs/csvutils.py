@@ -24,11 +24,11 @@ DISTINFO = {
 
 import csv
 import sys
-from StringIO import StringIO
 from threading import Thread
 from cs.debug import trace
 from cs.fileutils import SharedAppendLines
 from cs.logutils import warning
+from cs.py3 import StringIO
 from cs.queues import IterableQueue
 
 if sys.hexversion < 0x03000000:
