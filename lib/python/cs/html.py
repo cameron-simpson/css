@@ -106,7 +106,7 @@ def transcribe(*tokens):
     yield from transcribe(*tok)
     if isSCRIPT:
       yield "\n-->"
-    if tag not in ('BR',):
+    if tag not in ('BR', 'IMG', 'HR'):
       yield '</'
       yield tag
       yield '>'
