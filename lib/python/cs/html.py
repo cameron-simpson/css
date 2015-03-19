@@ -86,7 +86,7 @@ def transcribe(*tokens):
       yield k
       if v is not None:
         yield '="'
-        yield urllib.quote(str(v), '/#:')
+        yield urlquote(str(v), safe=' /#:;')
         yield '"'
     yield '>'
     if isSCRIPT:
