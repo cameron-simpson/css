@@ -103,8 +103,7 @@ def transcribe(*tokens):
     yield '>'
     if isSCRIPT:
       yield "<!--\n"
-    for t in tok:
-      yield fp, t
+    yield from transcribe(*tok)
     if isSCRIPT:
       yield "\n-->"
     if tag not in ('BR',):
