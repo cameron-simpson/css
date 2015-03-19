@@ -17,7 +17,10 @@ DISTINFO = {
 
 import re
 import sys
-import urllib
+try:
+  from urllib.parse import quote as urlquote
+except ImportError:
+  from urllib import quote as urlquote
 from cs.py3 import StringTypes
 
 # Characters safe to transcribe unescaped.
