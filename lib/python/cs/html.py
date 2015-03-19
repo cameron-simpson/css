@@ -124,6 +124,8 @@ def puttext(fp, s, safe_re=None):
     fp.write(chunk)
 
 def transcribe_string(s, safe_re=None):
+  ''' Generator yielding HTML text chunks transcribing the string `s`.
+  '''
   if safe_re is None:
     safe_re = re_SAFETEXT
   while len(s):
