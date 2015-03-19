@@ -28,6 +28,18 @@ re_SAFETEXT = re.compile(r'[^<>&]+')
 # Characters safe to use inside "" in tag attribute values.
 re_SAFETEXT_DQ = re.compile(r'[-=. \w:@/?~#+&]+')
 
+def page_HTML(title, *tokens):
+    ''' Covenience function returning an '<HTML>' token for a page.
+    '''
+    body = ['BODY']
+    body.extend(*tokens)
+    return ['HTML',
+             ['HEAD',
+              ['TITLE', title]
+             ],
+             body,
+           ]
+
 def tok2s(*tokens):
   ''' Transcribe tokens to a string, return the string.
       Trivial wrapper for transcribe().
