@@ -11,34 +11,56 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
-        ],
+    ],
     'requires': ['cs.py3'],
 }
 
 import re
 import sys
-import urllib
-from cs.py3 import StringTypes, StringIO
+try:
+  from urllib.parse import quote as urlquote
+except ImportError:
+  from urllib import quote as urlquote
+from cs.py3 import StringTypes
 
 # Characters safe to transcribe unescaped.
-textSafeRe = re.compile(r'[^<>&]+')
+re_SAFETEXT = re.compile(r'[^<>&]+')
 # Characters safe to use inside "" in tag attribute values.
-dqAttrValSafeRe = re.compile(r'[-=. \w:@/?~#+&]+')
+re_SAFETEXT_DQ = re.compile(r'[-=. \w:@/?~#+&]+')
 
-BR = ('BR',)
+# convenience wrappers
+A = lambda *tok: ['A'] + list(tok)
+B = lambda *tok: ['B'] + list(tok)
+TD = lambda *tok: ['TD'] + list(tok)
+TR = lambda *tok: ['TR'] + list(tok)
+
+def page_HTML(title, *tokens):
+  ''' Covenience function returning an '<HTML>' token for a page.
+  '''
+  body = ['BODY']
+  body.extend(tokens)
+  return ['HTML',
+          ['HEAD',
+           ['TITLE', title]
+           ],
+          body,
+          ]
 
 def tok2s(*tokens):
   ''' Transcribe tokens to a string, return the string.
-      This is a trivial wrapper for puttok.
+      Trivial wrapper for transcribe().
   '''
-  fp = StringIO()
-  puttok(fp, *tokens)
-  s = fp.getvalue()
-  fp.close()
-  return s
+  return ''.join(transcribe(*tokens))
 
 def puttok(fp, *tokens):
-  ''' Transcribe tokens to HTML text.
+  ''' Transcribe tokens as HTML text to the file `fp`.
+      Trivial wrapper for transcribe().
+  '''
+  for s in transcribe(*tokens):
+    fp.write(s)
+
+def transcribe(*tokens):
+  ''' Transcribe tokens as HTML text and yield text portions as generated.
       A token is a string, a sequence or a Tag object.
       A string is safely transcribed as flat text.
       A sequence has:
@@ -48,13 +70,11 @@ def puttok(fp, *tokens):
   '''
   for tok in tokens:
     if isinstance(tok, StringTypes):
-      puttext(fp, tok)
+      yield from transcribe_string(tok)
       continue
-
     if isinstance(tok, (int, float)):
-      puttext(fp, str(tok))
+      yield str(tok)
       continue
-
     # token
     try:
       tag = tok.tag
@@ -63,7 +83,7 @@ def puttok(fp, *tokens):
       # not a preformed token with .tag and .attrs
       # [ "&ent;" ] is an HTML character entity
       if len(tok) == 1 and tok[0].startswith('&'):
-        fp.write(tok[0])
+        yield tok[0]
         continue
       # raw array [ tag[, attrs][, tokens...] ]
       tok = list(tok)
@@ -72,60 +92,61 @@ def puttok(fp, *tokens):
         attrs = tok.pop(0)
       else:
         attrs = {}
-
-    isSCRIPT=(tag.upper() == 'SCRIPT')
+    TAG = tag.upper()
+    isSCRIPT = (TAG == 'SCRIPT')
     if isSCRIPT:
       if 'LANGUAGE' not in [a.upper() for a in attrs.keys()]:
-        attrs['language']='JavaScript'
-
-    fp.write('<')
-    fp.write(tag)
+        attrs['language'] = 'JavaScript'
+    yield '<'
+    yield tag
     for k, v in attrs.items():
-      fp.write(' ')
-      fp.write(k)
+      yield ' '
+      yield k
       if v is not None:
-        fp.write('="')
-        fp.write(urllib.quote(str(v), '/#:'))
-        fp.write('"')
-    fp.write('>')
+        yield '="'
+        yield urlquote(str(v), safe=' /#:;')
+        yield '"'
+    yield '>'
     if isSCRIPT:
-      fp.write("<!--\n")
-    for t in tok:
-      puttok(fp, t)
+      yield "<!--\n"
+    yield from transcribe(*tok)
     if isSCRIPT:
-      fp.write("\n-->")
-    if tag not in ('BR',):
-      fp.write('</')
-      fp.write(tag)
-      fp.write('>')
+      yield "\n-->"
+    if tag not in ('BR', 'IMG', 'HR'):
+      yield '</'
+      yield tag
+      yield '>'
 
-def text2s(s, safeRe=None):
+def quote(s, safe_re=None):
   ''' Return transcription of string in HTML safe form.
   '''
-  fp = StringIO()
-  puttext(fp, s, safeRe=safeRe)
-  s = fp.getvalue()
-  fp.close()
-  return s
+  return ''.join(transcribe_string(s))
 
-def puttext(fp, s, safeRe=None):
-  ''' Transcribe plain text in HTML safe form.
+def puttext(fp, s, safe_re=None):
+  ''' Transcribe plain text in HTML safe form to the file `fp`.
+      Trivial wrapper for transcribe_string().
   '''
-  if safeRe is None: safeRe=textSafeRe
+  for chunk in transcribe_string(s, safe_re=safe_re):
+    fp.write(chunk)
+
+def transcribe_string(s, safe_re=None):
+  ''' Generator yielding HTML text chunks transcribing the string `s`.
+  '''
+  if safe_re is None:
+    safe_re = re_SAFETEXT
   while len(s):
-    m=safeRe.match(s)
+    m = safe_re.match(s)
     if m:
-      safetext=m.group(0)
-      fp.write(safetext)
-      s=s[len(safetext):]
+      safetext = m.group(0)
+      yield safetext
+      s = s[len(safetext):]
     else:
       if s[0] == '<':
-        fp.write('&lt;')
+        yield '&lt;'
       elif s[0] == '>':
-        fp.write('&gt;')
+        yield '&gt;'
       elif s[0] == '&':
-        fp.write('&amp;')
+        yield '&amp;'
       else:
-        fp.write('&#%d;'%ord(s[0]))
-
-      s=s[1:]
+        yield '&#%d;' % ord(s[0])
+      s = s[1:]
