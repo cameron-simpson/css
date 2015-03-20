@@ -26,6 +26,7 @@ from collections import namedtuple
 from email import message_from_string, message_from_file
 import email.parser
 from email.utils import getaddresses
+from functools import partial
 from getopt import getopt, GetoptError
 import io
 from logging import DEBUG
@@ -77,6 +78,7 @@ def main(argv=None, stdin=None):
   setup_logging(cmd)
   usage = ( '''Usage:
     %s monitor [-1] [-d delay] [-n] [-N] [-R rules_pattern] maildirs...
+      Monitor Maildirs for new messages and file them.
       -1  File at most 1 message per Maildir.
       -d delay
           Delay between runs in seconds.
@@ -85,8 +87,11 @@ def main(argv=None, stdin=None):
       -R rules_pattern
           Specify the rules file pattern used to specify rules files from Maildir names.
           Default: %s
-    %s save target[,target...] <message'''
-            % (cmd, DEFAULT_RULES_PATTERN, cmd)
+    %s save target[,target...] <message
+      Save a message from standard input to the specified targets.
+    %s report <message
+      Report various things about a message from standard input.'''
+            % (cmd, DEFAULT_RULES_PATTERN, cmd, cmd)
           )
   badopts = False
 
@@ -147,6 +152,10 @@ def main(argv=None, stdin=None):
         if message_fp.isatty():
           warning("stdin: will not read from a tty")
           badopts = True
+      elif op == 'report':
+        if argv:
+          warning("extra arguments: %r", argv)
+          badopts = True
       else:
         warning("unrecognised op")
         badopts = True
@@ -164,6 +173,8 @@ def main(argv=None, stdin=None):
       return MF.monitor(mdirpaths, delay=delay, justone=justone, no_remove=no_remove)
     if op == 'save':
       return MF.save(targets, sys.stdin)
+    if op == 'report':
+      return MF.report(sys.stdin)
     raise RuntimeError("unimplemented op")
 
   return 0
@@ -390,6 +401,23 @@ class MailFiler(O):
     for T in Ts:
       T.apply(filer)
     filer.save_message()
+    return 0
+
+  def report(self, msgfp):
+    ''' Implementation for command line "report" function: report on message.
+    '''
+    message = message_from_file(msgfp)
+    for s in message.get_all('subject', ()):
+      print('Subject:', repr(s))
+      uqs = unrfc2047(s)
+      if s != uqs:
+        print('  ==>', repr(uqs))
+    for hdr in 'from', 'to', 'cc', 'bcc', 'reply-to':
+      for s in message.get_all(hdr, ()):
+        print(hdr.title()+':', repr(s))
+        uqs = unrfc2047(s)
+        if s != uqs:
+          print('  ==>', repr(uqs))
     return 0
 
   def file_wmdir_key(self, wmdir, key):
@@ -1125,29 +1153,35 @@ def get_target(s, offset, quoted=False):
     T = Target_PipeLine(shcmd)
     return T, offset
 
-  # header:s/this/that/
+  # headers:s/this/that/
   tokens, offset = match_tokens(s, offset0,
-                                (re_HEADERNAME, ':s', re_NONALNUMWSP))
+                                ( re_HEADERNAME_LIST,
+                                  ':s',
+                                  re_NONALNUMWSP
+                                ))
   if tokens:
-    m_header_name, marker, m_delim = tokens
-    header_name = m_header_name.group()
+    m_headers, marker, m_delim = tokens
+    header_names = m_headers.group().split(',')
     delim = m_delim.group()
     regexp, offset = get_delimited(s, offset, delim)
     replacement, offset = get_delimited(s, offset, delim)
+    if offset < len(s):
+      warning("UNPARSED TEXT AFTER s/this/that: %r", s[offset:])
+      offset = len(s)
     try:
       subst_re = re.compile(regexp)
     except Exception as e:
       warning("ignoring substitute: re.compile: %s: regexp=%s", e, regexp)
       T = None
     else:
-      T = Target_Substitution(header_name, subst_re, replacement)
+      T = Target_Substitution(header_names, subst_re, replacement)
     return T, offset
 
   # s/this/that/ -- modify subject:
   tokens, offset = match_tokens(s, offset0,
                                  ('s', re_NONALNUMWSP))
   if tokens:
-    header_name = 'subject'
+    header_names = ('subject',)
     marker, m_delim = tokens
     delim = m_delim.group()
     regexp, offset = get_delimited(s, offset, delim)
@@ -1159,7 +1193,7 @@ def get_target(s, offset, quoted=False):
       warning("ignoring substitute: re.compile: %s: regexp=%s", e, regexp)
       T = None
     else:
-      T = Target_Substitution(header_name, subst_re, replacement)
+      T = Target_Substitution(header_names, subst_re, replacement)
     return T, offset
 
   # headers:func([args...])
@@ -1230,7 +1264,7 @@ class Target_Assign(O):
     value = envsub(self.varexpr, filer.environ)
     filer.environ[varname] = value
     if varname == 'LOGFILE':
-      warning("LOGFILE= unimplemented at present")
+      debug("LOGFILE= unimplemented at present")
       ## TODO: self.logto(value)
 
 class Target_EnvSub(O):
@@ -1267,32 +1301,34 @@ class Target_SetFlag(O):
 
 class Target_Substitution(O):
 
-  def __init__(self, header_name, subst_re, subst_replacement):
-    self.header_name = header_name
+  def __init__(self, header_names, subst_re, subst_replacement):
+    self.header_names = header_names
     self.subst_re = subst_re
     self.subst_replacement = subst_replacement
 
   def apply(self, filer):
-    debug("apply %r : s/%s/%s ...", self.header_name, self.subst_re.pattern, self.subst_replacement)
-    M = filer.message
-    # fetch old value and "unfold" (strip CRLF, see RFC2822 part 2.2.3)
-    old_value = M.get(self.header_name, '').replace('\r','').replace('\n','')
-    debug("  old value = %r", old_value)
-    m = self.subst_re.search(old_value)
-    if m:
-      # named substitution values
-      env = m.groupdict()
-      # numbered substitution values
-      env_specials = { '0': m.group(0) }
-      for ndx, grp in enumerate(m.groups()):
-        env_specials[str(ndx+1)] = grp
-      new_value, offset = get_qstr(self.subst_replacement, 0, q=None,
-                           environ=env, env_specials=env_specials)
-      if offset != len(self.subst_replacement):
-        warning("after getqstr, offset[%d] != len(subst_replacement)[%d]: %r",
-                offset, len(self.subst_replacement), self.subst_replacement)
-      debug("%s: %s ==> %s", self.header_name, self.subst_replacement, new_value)
-      filer.modify(self.header_name, new_value)
+    for header_name in self.header_names:
+      X("apply %r : s/%s/%s ...", header_name, self.subst_re.pattern, self.subst_replacement)
+      M = filer.message
+      # fetch old value and "unfold" (strip CRLF, see RFC2822 part 2.2.3)
+      old_value = M.get(header_name, '').replace('\r','').replace('\n','')
+      X("SUBST:   old value = %r", old_value)
+      m = self.subst_re.search(old_value)
+      if m:
+        # record named substitution values
+        env = m.groupdict()
+        # record numbered substitution values
+        env_specials = { '0': m.group(0) }
+        for ndx, grp in enumerate(m.groups()):
+          env_specials[str(ndx+1)] = grp
+        repl_value, offset = get_qstr(self.subst_replacement, 0, q=None,
+                             environ=env, env_specials=env_specials)
+        new_value = old_value[:m.start()] + repl_value + old_value[m.end():]
+        if offset != len(self.subst_replacement):
+          warning("after getqstr, offset[%d] != len(subst_replacement)[%d]: %r",
+                  offset, len(self.subst_replacement), self.subst_replacement)
+        debug("SUBST %s: %s ==> %s", header_name, self.subst_replacement, new_value)
+        filer.modify(header_name.title(), new_value)
 
 class Target_Function(O):
 
@@ -1307,7 +1343,6 @@ class Target_Function(O):
       func = import_module_name(module_name, func_name)
       if func is None:
         raise ValueError("no function %r in module %r" % (func_name, module_name))
-      func = partial(func, filer)
     elif self.funcname == 'learn_addresses':
       func = filer.learn_header_addresses
     elif self.funcname == 'learn_message_ids':
@@ -1326,11 +1361,19 @@ class Target_Function(O):
         except ValueError:
           value = arg
       func_args.append(value)
-    try:
-      func(header_names, *func_args)
-    except Exception as e:
-      error("exception calling %s(filer, *%r): %s", self.funcname, func_args, e)
-      raise
+    M = filer.message
+    for header_name in self.header_names:
+      for s in M.get_all(header_name, ()):
+        try:
+          s2 = func(s, *func_args)
+        except Exception as e:
+          exception("exception calling %s(filer, *%r): %s", self.funcname, func_args, e)
+          raise
+        else:
+          if s2 is not None:
+            if s != s2:
+              info("%s: %r ==> %r", header_name.title(), s, s2)
+              filer.modify(header_name, s2)
 
 class Target_PipeLine(O):
 
