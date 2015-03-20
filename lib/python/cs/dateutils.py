@@ -5,6 +5,7 @@ from datetime import tzinfo, timedelta, date
 from time import localtime, strftime, strptime
 
 class tzinfoHHMM(tzinfo):
+
   ''' tzinfo class based on +HHMM / -HHMM strings.
   '''
 
@@ -15,14 +16,15 @@ class tzinfoHHMM(tzinfo):
     elif sign == '-':
       sign = -1
     else:
-      raise ValueError("%s: invalid sign '%s', should be '+' or '-'" % (shhmm, sign,))
+      raise ValueError(
+          "%s: invalid sign '%s', should be '+' or '-'" % (shhmm, sign,))
     self._tzname = shhmm
     self.sign = sign
     self.hour = hour
     self.minute = minute
 
   def utcoffset(self, dt):
-    return self.hour*60 + self.minute
+    return self.hour * 60 + self.minute
 
   def dst(self, dt):
     return timedelta(0)
@@ -33,7 +35,8 @@ class tzinfoHHMM(tzinfo):
 def isodate(when=None):
   ''' Return a date in ISO8601 YYYY-MM-DD format.
   '''
-  if when is None: when=localtime()
+  if when is None:
+    when = localtime()
   return strftime("%Y-%m-%d", when)
 
 def a2date(s):

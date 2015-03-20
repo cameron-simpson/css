@@ -18,17 +18,17 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
-        ],
+    ],
     'requires': ['cs.fileutils', 'cs.debug', 'cs.logutils', 'cs.queues'],
 }
 
 import csv
 import sys
-from StringIO import StringIO
 from threading import Thread
 from cs.debug import trace
 from cs.fileutils import SharedAppendLines
 from cs.logutils import warning
+from cs.py3 import StringIO
 from cs.queues import IterableQueue
 
 if sys.hexversion < 0x03000000:
@@ -57,7 +57,7 @@ if sys.hexversion < 0x03000000:
     ''' Write the supplied row as strings encoded with the supplied `encoding`,
         default 'utf-8'.
     '''
-    csvw.writerow([ unicode(value).encode(encoding) for value in row ])
+    csvw.writerow([unicode(value).encode(encoding) for value in row])
 
 else:
 
@@ -77,10 +77,12 @@ class SharedCSVFile(SharedAppendLines):
     if importer is not None:
       kw['importer'] = lambda line: self._queue_csv_text(line, importer)
     self._csv_partials = []
-    self._importQ = IterableQueue(1, name="SharedCSVFile(%r)._importQ" % (pathname,))
+    self._importQ = IterableQueue(
+        1, name="SharedCSVFile(%r)._importQ" % (pathname,))
     self._csvr = csv_reader(self._importQ)
     self._csv_stream_thread = Thread(target=self._csv_stream,
-                                     name="SharedCSVFile(%r)._csv_stream_thread" % (pathname,),
+                                     name="SharedCSVFile(%r)._csv_stream_thread" % (
+                                         pathname,),
                                      args=(importer,))
     self._csv_stream_thread.daemon = True
     self._csv_stream_thread.start()

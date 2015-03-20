@@ -20,7 +20,7 @@ from getopt import getopt, GetoptError
 from string import Formatter
 from subprocess import Popen, PIPE
 from time import sleep
-from threading import Lock, Thread
+from threading import Lock, RLock, Thread
 try:
   from urllib.parse import quote, unquote
 except ImportError:
@@ -206,7 +206,7 @@ def main(argv, stdin=None):
               #  - wait for that div to drain
               #  - repeat
               # drain all the divserions, choosing the busy ones first
-              divnames = set(P.diversion_names)
+              divnames = P.open_diversion_names
               while divnames:
                 busy_name = None
                 for divname in divnames:
@@ -214,12 +214,10 @@ def main(argv, stdin=None):
                   if div._busy:
                     busy_name = divname
                     break
-                # nothing busy? pick one arbitrarily
+                # nothing busy? pick the first one arbitrarily
                 if not busy_name:
-                  busy_name = divnames.pop()
+                  busy_name = divnames[0]
                 busy_div = P.diversion(busy_name)
-                divnames.remove(busy_name)
-                X("CLOSE DIV %s", busy_div)
                 LTR.state("CLOSE DIV %s", busy_div)
                 busy_div.close(enforce_final_close=True)
                 outQ = busy_div.outQ
@@ -229,6 +227,7 @@ def main(argv, stdin=None):
                   # diversions are supposed to discard their outputs
                   error("%s: RECEIVED %r", busy_div, item)
                 LTR.state("DRAINED DIV %s using outQ=%s", busy_div, outQ)
+                divnames = P.open_diversion_names
               LTR.state("quiescing")
               L.quiesce()
               # Now the diversions should have completed and closed.
@@ -414,7 +413,7 @@ class Pilfer(O):
     self._print_to = None
     self._print_lock = Lock()
     self.user_agent = None
-    self._lock = Lock()
+    self._lock = RLock()
     self.rcs = []               # chain of PilferRC libraries
     self.seensets = {}
     self.diversions_map = {}        # global mapping of names to divert: pipelines
@@ -479,12 +478,31 @@ class Pilfer(O):
     self.seenset(seenset).add(url)
 
   @property
+  @locked
   def diversions(self):
+    ''' The current list of named diversions.
+    '''
     return list(self.diversions_map.values())
 
   @property
+  @locked
   def diversion_names(self):
-    return self.diversions_map.keys()
+    ''' The current list of diversion names.
+    '''
+    return list(self.diversions_map.keys())
+
+  @property
+  @locked
+  @logexc
+  def open_diversion_names(self):
+    ''' The current list of open named diversions.
+    '''
+    names = []
+    for divname in self.diversion_names:
+      div = self.diversion(divname)
+      if not div.closed:
+        names.append(divname)
+    return names
 
   @logexc
   def quiesce_diversions(self):
