@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Pull specific revisions from a different checkout.
+# Cherry pick specific revisions from a different checkout.
 # Initial use case is to pull bugfixes from an as yet unpublished
 # branch, still lurking in an isolated checkout.
 #   - Cameron Simpson <cs@zip.com.au> 30jan2015
@@ -42,15 +42,33 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+branch=$( hg branch )
+obranch=$( incd "$ocheckout" hg branch )
+
+xit=0
+
 for rev
 do
   case "$rev" in
     [0-9a-f]*)
-        patch=$( $trace incd "$ocheckout" hg export "$rev" )
-        print '%s\n' "$patch" | $trace hg import - 
+        if patch=$( $trace incd "$ocheckout" hg export "$rev" )
+        then
+          if [ "x$branch" = "x$obranch" ]
+          then  printf '%s\n' "$patch"
+          else  printf '%s\n' "$patch" \
+                | $trace sed "1,/^[^#]/s/^[^#]/cherrypick $obranch ==> $branch: &/"
+          fi \
+          | $trace hg import - \
+          || xit=1
+        else
+          echo "$cmd: failed to get rev $rev from $ocheckout" >&2
+          xit=1
+        fi
         ;;
     *)  echo "$cmd: unsupported revision specification: $rev" >&2
         exit 1
         ;;
   esac
 done
+
+exit $xit
