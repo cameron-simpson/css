@@ -11,7 +11,7 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
-        ],
+    ],
     'requires': ['cs.py3'],
 }
 
@@ -29,16 +29,16 @@ re_SAFETEXT = re.compile(r'[^<>&]+')
 re_SAFETEXT_DQ = re.compile(r'[-=. \w:@/?~#+&]+')
 
 def page_HTML(title, *tokens):
-    ''' Covenience function returning an '<HTML>' token for a page.
-    '''
-    body = ['BODY']
-    body.extend(*tokens)
-    return ['HTML',
-             ['HEAD',
-              ['TITLE', title]
-             ],
-             body,
-           ]
+  ''' Covenience function returning an '<HTML>' token for a page.
+  '''
+  body = ['BODY']
+  body.extend(*tokens)
+  return ['HTML',
+          ['HEAD',
+           ['TITLE', title]
+           ],
+          body,
+          ]
 
 def tok2s(*tokens):
   ''' Transcribe tokens to a string, return the string.
@@ -87,7 +87,7 @@ def transcribe(*tokens):
       else:
         attrs = {}
     TAG = tag.upper()
-    isSCRIPT=( TAG == 'SCRIPT' )
+    isSCRIPT = (TAG == 'SCRIPT')
     if isSCRIPT:
       if 'LANGUAGE' not in [a.upper() for a in attrs.keys()]:
         attrs['language'] = 'JavaScript'
@@ -142,5 +142,5 @@ def transcribe_string(s, safe_re=None):
       elif s[0] == '&':
         yield '&amp;'
       else:
-        yield '&#%d;'%ord(s[0])
-      s=s[1:]
+        yield '&#%d;' % ord(s[0])
+      s = s[1:]
