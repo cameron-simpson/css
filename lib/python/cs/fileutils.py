@@ -559,14 +559,14 @@ def lockfile(path, ext=None, poll_interval=None, timeout=None):
       os.remove(lockpath)
       break
 
-def maxFilenameSuffix(dir, pfx):
+def max_suffix(dirpath, pfx):
   ''' Compute the highest existing numeric suffix for names starting with the prefix `pfx`.
       This is generally used as a starting point for picking a new numeric suffix.
   '''
   pfx=ustr(pfx)
   maxn=None
   pfxlen=len(pfx)
-  for e in os.listdir(dir):
+  for e in os.listdir(dirpath):
     e = ustr(e)
     if len(e) <= pfxlen or not e.startswith(pfx):
       continue
@@ -598,22 +598,22 @@ def mkdirn(path, sep=''):
         raise ValueError(
                 "mkdirn(path=%r, sep=%r): using non-empty sep with a trailing %r seems nonsensical"
                 % (path, sep, os.sep))
-      dir = path[:-len(os.sep)]
+      dirpath = path[:-len(os.sep)]
       pfx = ''
     else:
-      dir = os.path.dirname(path)
-      if len(dir) == 0:
-        dir='.'
+      dirpath = os.path.dirname(path)
+      if len(dirpath) == 0:
+        dirpath='.'
       pfx = os.path.basename(path)+sep
 
-    if not os.path.isdir(dir):
-      error("parent not a directory: %r", dir)
+    if not os.path.isdir(dirpath):
+      error("parent not a directory: %r", dirpath)
       return None
 
     # do a quick scan of the directory to find
     # if any names of the desired form already exist
     # in order to start after them
-    maxn = maxFilenameSuffix(dir, pfx)
+    maxn = max_suffix(dirpath, pfx)
     if maxn is None:
       newn = 0
     else:
