@@ -83,7 +83,7 @@ shift
 
 case $op in
   init)
-    set -x
+    [ -t 2 ] && set -x
     mkdir -- "$VENV_DIR"
     virtualenv -p "$VENV_PYTHON" ${1+"$@"} -- "$VENV_DIR"
     ;;
@@ -93,13 +93,13 @@ case $op in
       echo "$cmd: $op: missing command" >&2
       exit 2
     fi
-    set -x
     set +u
     . "$VENV_DIR/bin/activate"
+    [ -t 2 ] && set -x
     exec "$@"
     ;;
   pip | python )
-    set -x
+    [ -t 2 ] && set -x
     exec "$VENV_DIR/bin/$op" ${1+"$@"}
     ;;
   *)echo "$cmd: unrecognised operator: $op" >&2

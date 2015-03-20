@@ -11,19 +11,40 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
-        ],
+    ],
     'requires': ['cs.py3'],
 }
 
 import re
 import sys
-import urllib
+try:
+  from urllib.parse import quote as urlquote
+except ImportError:
+  from urllib import quote as urlquote
 from cs.py3 import StringTypes
 
 # Characters safe to transcribe unescaped.
 re_SAFETEXT = re.compile(r'[^<>&]+')
 # Characters safe to use inside "" in tag attribute values.
 re_SAFETEXT_DQ = re.compile(r'[-=. \w:@/?~#+&]+')
+
+# convenience wrappers
+A = lambda *tok: ['A'] + list(tok)
+B = lambda *tok: ['B'] + list(tok)
+TD = lambda *tok: ['TD'] + list(tok)
+TR = lambda *tok: ['TR'] + list(tok)
+
+def page_HTML(title, *tokens):
+  ''' Covenience function returning an '<HTML>' token for a page.
+  '''
+  body = ['BODY']
+  body.extend(tokens)
+  return ['HTML',
+          ['HEAD',
+           ['TITLE', title]
+           ],
+          body,
+          ]
 
 def tok2s(*tokens):
   ''' Transcribe tokens to a string, return the string.
@@ -72,7 +93,7 @@ def transcribe(*tokens):
       else:
         attrs = {}
     TAG = tag.upper()
-    isSCRIPT=( TAG == 'SCRIPT' )
+    isSCRIPT = (TAG == 'SCRIPT')
     if isSCRIPT:
       if 'LANGUAGE' not in [a.upper() for a in attrs.keys()]:
         attrs['language'] = 'JavaScript'
@@ -83,16 +104,15 @@ def transcribe(*tokens):
       yield k
       if v is not None:
         yield '="'
-        yield urllib.quote(str(v), '/#:')
+        yield urlquote(str(v), safe=' /#:;')
         yield '"'
     yield '>'
     if isSCRIPT:
       yield "<!--\n"
-    for t in tok:
-      yield fp, t
+    yield from transcribe(*tok)
     if isSCRIPT:
       yield "\n-->"
-    if tag not in ('BR',):
+    if tag not in ('BR', 'IMG', 'HR'):
       yield '</'
       yield tag
       yield '>'
@@ -110,6 +130,8 @@ def puttext(fp, s, safe_re=None):
     fp.write(chunk)
 
 def transcribe_string(s, safe_re=None):
+  ''' Generator yielding HTML text chunks transcribing the string `s`.
+  '''
   if safe_re is None:
     safe_re = re_SAFETEXT
   while len(s):
@@ -126,5 +148,5 @@ def transcribe_string(s, safe_re=None):
       elif s[0] == '&':
         yield '&amp;'
       else:
-        yield '&#%d;'%ord(s[0])
-      s=s[1:]
+        yield '&#%d;' % ord(s[0])
+      s = s[1:]
