@@ -6,7 +6,9 @@
 
 set -uex
 
-mode=--diff
-[ $# -gt 0 ] && [ "x$1" = x-y ] && mode=--in-place
+opts='--indent-size 2 --ignore E302'
 
-venv exec autopep8 "$mode" --indent-size 2 ${1+"$@"}
+mode=--diff
+[ $# -gt 0 ] && [ "x$1" = x-y ] && { shift; mode=--in-place; }
+
+venv exec autopep8 "$mode" $opts ${1+"$@"}
