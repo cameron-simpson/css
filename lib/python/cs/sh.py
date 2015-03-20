@@ -11,7 +11,7 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
-        ],
+    ],
 }
 
 import string
@@ -22,7 +22,7 @@ SAFECHARS = string.digits + string.ascii_letters + '-+_./:'
 def quote(args):
   ''' Quote the supplied strings, return a list of the quoted strings.
   '''
-  return [ quotestr(s) for s in args ]
+  return [quotestr(s) for s in args]
 
 def quotestr(s):
   ''' Quote a string for use on a shell command line.
@@ -32,6 +32,7 @@ def quotestr(s):
   qparts = []
   start = offset = 0
   safemode = True       # not in quotes
+
   def flush():
     if offset > start:
       part = s[start:offset]

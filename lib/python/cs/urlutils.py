@@ -20,6 +20,7 @@ DISTINFO = {
 import os
 import os.path
 import sys
+import time
 from itertools import chain
 from bs4 import BeautifulSoup, Tag, BeautifulStoneSoup
 try:
@@ -33,13 +34,13 @@ except ImportError:
 from netrc import netrc
 import socket
 try:
-  from urllib.request import urlopen, Request, HTTPError, URLError, \
+  from urllib.request import Request, HTTPError, URLError, \
             HTTPPasswordMgrWithDefaultRealm, HTTPBasicAuthHandler, \
             build_opener
   from urllib.parse import urlparse, urljoin
   from html.parser import HTMLParseError
 except ImportError:
-  from urllib2 import urlopen, Request, HTTPError, URLError, \
+  from urllib2 import Request, HTTPError, URLError, \
 		    HTTPPasswordMgrWithDefaultRealm, HTTPBasicAuthHandler, \
 		    build_opener
   from urlparse import urlparse, urljoin
@@ -153,8 +154,13 @@ class _URL(unicode):
     rq = self._request(method)
     opener = self.opener
     with Pfx("open(%s)", rq):
+      now = time.time()
       try:
         rsp = opener.open(rq)
+      except TimeoutError as e:
+        elapsed = time.time() - now
+        warning("open %s: %s; elapsed=%gs", self, e, elapsed)
+        raise
       except HTTPError as e:
         warning("open %s: %s", self, e)
         raise
@@ -414,7 +420,7 @@ def skip_errs(iterable):
   I = iter(iterable)
   while True:
     try:
-      i = I.next()
+      i = next(I)
     except StopIteration:
       break
     except (URLError, HTTPError) as e:

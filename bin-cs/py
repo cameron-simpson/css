@@ -4,5 +4,18 @@
 #       - Cameron Simpson <cs@zip.com.au> 08mar2014
 #
 
+usage="Usage: $0 [pyver] python-args..."
+
+set -ue
+
+pyver=${VENV_PYVER:-3}
+if [ $# -gt 0 ]
+then
+  case "$1" in
+    [23]*)
+      pyver=$1; shift ;;
+  esac
+fi
+
 set -x
-exec venv python ${1+"$@"}
+exec venv -p "$pyver" python ${1+"$@"}
