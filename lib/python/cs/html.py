@@ -38,7 +38,7 @@ def page_HTML(title, *tokens):
   ''' Covenience function returning an '<HTML>' token for a page.
   '''
   body = ['BODY']
-  body.extend(*tokens)
+  body.extend(tokens)
   return ['HTML',
           ['HEAD',
            ['TITLE', title]
