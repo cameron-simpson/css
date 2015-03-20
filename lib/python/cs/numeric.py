@@ -12,7 +12,7 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
-        ],
+    ],
 }
 
 def primes():
@@ -23,7 +23,7 @@ def primes():
   n = 3
   while True:
     for k in known:
-      if k*k > n:
+      if k * k > n:
         yield n
         known.append(n)
         break
@@ -33,7 +33,7 @@ def factors(n):
   ''' Generator yielding the prime factors of `n` in order from lowest to highest.
   '''
   for p in primes():
-    if p*p > n:
+    if p * p > n:
       if n > 1:
         yield n
       break
