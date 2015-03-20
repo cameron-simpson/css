@@ -1,0 +1,3 @@
+#!/bin/sh
+set -uex
+venv exec autopep8 --diff --indent-size 2 ${1+"$@"}
