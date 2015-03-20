@@ -4,11 +4,12 @@
 #   - Cameron Simpson <cs@zip.com.au> 20mar2015
 #
 
-set -uex
+set -ue
 
 opts='--indent-size 2 --ignore E302'
 
 mode=--diff
 [ $# -gt 0 ] && [ "x$1" = x-y ] && { shift; mode=--in-place; }
 
+[ -t 2 ] && set -x
 venv exec autopep8 "$mode" $opts ${1+"$@"}
