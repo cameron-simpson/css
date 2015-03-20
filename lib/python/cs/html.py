@@ -28,6 +28,12 @@ re_SAFETEXT = re.compile(r'[^<>&]+')
 # Characters safe to use inside "" in tag attribute values.
 re_SAFETEXT_DQ = re.compile(r'[-=. \w:@/?~#+&]+')
 
+# convenience wrappers
+A = lambda *tok: ['A'] + list(tok)
+B = lambda *tok: ['B'] + list(tok)
+TD = lambda *tok: ['TD'] + list(tok)
+TR = lambda *tok: ['TR'] + list(tok)
+
 def page_HTML(title, *tokens):
   ''' Covenience function returning an '<HTML>' token for a page.
   '''
