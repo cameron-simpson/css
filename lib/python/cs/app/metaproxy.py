@@ -278,13 +278,17 @@ class MetaProxyHandler(socketserver.BaseRequestHandler):
     with Pfx(client_tag):
       while True:
         try:
-          elapsed, bline = time_func(fpin.readline)
+          rq_fields = read_http_request_line(fpin)
         except ConnectionResetError as e:
           warning("%s", e)
           break
-        httprq = dec8(bline).strip()
-        if not httprq:
-          ##info("end of client requests")
+        rq_method, rq_uri, rq_http_version = rq_fields
+        X("GOT NEXT REQUEST: %r", rq_fields)
+        if rq_method is None:
+          # end of client requests
+          if rq_uri is not None or rq_http_version is not None:
+            warning("rq_method is None but rq_uri, rq_http_version = %r, %r",
+                rq_uri, rq_http_version)
           break
         ##info("received rq in %.2fs: %r", elapsed, httprq)
         with Pfx(httprq):
