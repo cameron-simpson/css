@@ -11,6 +11,7 @@ from string import ascii_letters, ascii_uppercase, ascii_lowercase, digits
 from cs.fileutils import copy_data
 from cs.lex import get_hexadecimal, get_chars, get_other_chars
 from cs.logutils import X, warning
+from cs.timeutils import time_func
 
 # character classes: see RFC2616 part 2.2
 CR = '\r'
@@ -124,6 +125,20 @@ def parse_chunk_line1(bline):
   if offset != len(line):
     raise ValueError("extra data after CRLF at offset %d: %r" % (offset, line[offset:]))
   return chunk_size, chunk_exts
+
+def read_http_request_line(fp):
+  ''' Read HTTP Request-Line from the binary file `fp`, return method, uri, version.
+      See RFC2616 section 5.1.
+      If an empty request line is received return None, None, None.
+  '''
+  elapsed, bline = time_func(fp.readline)
+  X("GOT REQUEST-LINE: %r", bline)
+  httprq = dec8(bline).strip()
+  if not httprq:
+    ##info("end of client requests")
+    return None, None, None
+  method, uri, version = httprq.split()
+  return method, uri, version
 
 def read_headers(fp):
   ''' Read headers from a binary file such as an HTTP stream, return the Message object.
