@@ -49,8 +49,9 @@ from cs.logutils import setup_logging, Pfx, debug, info, warning, error, excepti
 from cs.later import Later
 from cs.lex import get_hexadecimal, get_other_chars
 from cs.progress import Progress, ProgressWriter
-from cs.rfc2616 import read_headers, message_has_body, pass_chunked, pass_length, \
-                       dec8, enc8, CRLF, CRLFb
+from cs.rfc2616 import read_headers, read_http_request_line, message_has_body, \
+                        pass_chunked, pass_length, \
+                        dec8, enc8, CRLF, CRLFb
 from cs.seq import Seq
 from cs.threads import locked, locked_property
 from cs.timeutils import time_func
@@ -290,12 +291,10 @@ class MetaProxyHandler(socketserver.BaseRequestHandler):
             warning("rq_method is None but rq_uri, rq_http_version = %r, %r",
                 rq_uri, rq_http_version)
           break
-        ##info("received rq in %.2fs: %r", elapsed, httprq)
-        with Pfx(httprq):
-          method, uri, version = httprq.split()
-          RQ = URI_Request(self, method, uri, version)
+        with Pfx("%s %s %s", rq_method, rq_uri, rq_http_version):
+          RQ = URI_Request(self, rq_method, rq_uri, rq_http_version)
           with Pfx(str(RQ)):
-            uri_scheme, uri_tail = uri.split(':', 1)
+            uri_scheme, uri_tail = rq_uri.split(':', 1)
             req_header_data, req_headers = read_headers(fpin)
             RQ.req_header_data = req_header_data
             RQ.req_headers = req_headers
