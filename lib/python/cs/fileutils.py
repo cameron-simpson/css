@@ -1129,7 +1129,7 @@ class SharedAppendLines(SharedAppendFile):
     fp.write('\n')
 
 class Tee(object):
-  ''' An object with .write, .flsuh and .close methods which copies data to multiple output files.
+  ''' An object with .write, .flush and .close methods which copies data to multiple output files.
   '''
 
   def __init__(self, *fps):
@@ -1152,6 +1152,24 @@ class Tee(object):
     for fp in self._fps:
       fp.close()
     self._fps = None
+
+@contextmanager
+def tee(fp, fp2):
+  ''' Context manager duplicating .write and .flush from fp to fp2.
+  '''
+  def _write(*a, **kw):
+    fp2.write(*a, **kw)
+    return old_write(*a, **kw)
+  def _flush(*a, **kw):
+    fp2.flush(*a, **kw)
+    return old_flush(*a, **kw)
+  old_write = getattr(fp, 'write')
+  old_flush = getattr(fp, 'flush')
+  fp.write = _write
+  fp.flush = _flush
+  yield
+  fp.write = old_write
+  fp.flush = old_flush
 
 def copy_data(fpin, fpout, nbytes, rsize=None):
   ''' Copy `nbytes` of data from `fpin` to `fpout`.
