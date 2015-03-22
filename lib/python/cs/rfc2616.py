@@ -164,26 +164,33 @@ def message_has_body(headers):
     return True
   return False
 
-def pass_chunked(fpin, fpout, hdr_trailer):
-  ''' Copy "chunked" data from `fpin` to `fpout`.
+def read_chunked(fpin, has_trailer=False):
+  ''' Generator that reads "chunked" data from `fpin`, and an optional trailer section (default False).
       See RFC2616, part 3.6.1.
   '''
   while True:
     bline = fpin.readline()
+    yield bline
     chunk_size, chunk_exts = parse_chunk_line1(bline)
-    fpout.write(bline)
     if chunk_size == 0:
       break
-    pass_length(fpin, fpout, chunk_size)
+    yield read_length(fpin, chunk_size)
     crlf = fpin.read(2)
     if len(crlf) == 0:
       raise ValueError("pass_chunked: empty data received after chunk-data")
     if crlf != CRLFb:
       raise ValueError("missing CRLF after chunk data, found: %r" % (crlf,))
-    fpout.write(crlf)
-  if hdr_trailer is not None:
+    yield crlf
+  if has_trailer:
     trailer_data, trailer_headers = read_headers(fpin)
-    fpout.write(trailer_data)
+    yield trailer_data
+
+def pass_chunked(fpin, fpout, has_trailer):
+  ''' Copy "chunked" data from `fpin` to `fpout`, and an optional trailer section (default False).
+      See RFC2616, part 3.6.1.
+  '''
+  for data in read_chunked(fpin, has_trailer=has_trailer):
+    fpout.write(data)
 
 def pass_length(fpin, fpout, length):
   ''' Copy a specific amount of data from `fpin` to `fpout`.
