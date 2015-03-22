@@ -365,7 +365,7 @@ class MailFiler(O):
       nmsgs = 0
       skipped = 0
       with LogTime("all keys") as all_keys_time:
-        for key in wmdir.keys(flush=True):
+        for key in list(wmdir.keys(flush=True)):
           if key in wmdir.lurking:
             debug("skip lurking key")
             skipped += 1
