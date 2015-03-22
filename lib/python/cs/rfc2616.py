@@ -141,7 +141,7 @@ def read_http_request_line(fp):
   return method, uri, version
 
 def read_headers(fp):
-  ''' Read headers from a binary file such as an HTTP stream, return the Message object.
+  ''' Read headers from a binary file such as an HTTP stream, return the raw binary data and the corresponding Message object.
   '''
   def is_header_line(line):
     return line.startswith(b' ') or line.startswith(b'\t') or line.rstrip()
