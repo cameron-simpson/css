@@ -13,8 +13,8 @@ import email
 from email.parser import HeaderParser, FeedParser
 import email.Parser
 import email.FeedParser
+from io import StringIO
 import string
-import StringIO
 import re
 from contextlib import closing
 from cs.logutils import OBSOLETE
@@ -202,7 +202,7 @@ class Maildir:
       if len(line) == 0 or line == "\n":
         break
 
-    fp=StringIO.StringIO(headertext)
+    fp=StringIO(headertext)
     return self.__parser.parse(fp, headersonly=True)
 
   def importPath(self,path):

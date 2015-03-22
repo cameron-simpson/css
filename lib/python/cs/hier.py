@@ -1,14 +1,14 @@
 #!/usr/bin/python
 
-import re
+from io import StringIO
 import os
 import os.path
+import re
 import sys
 from cs.lex import lastlinelen
 import cs.io
 from cs.obj import T_SEQ, T_MAP, T_SCALAR, flavour
 from cs.mixin.ucattrs import UCdict
-from cs.py3 import StringIO
 
 DEFAULT_OPTS={'dictSep': ' =>',
               'bareWords': True,
