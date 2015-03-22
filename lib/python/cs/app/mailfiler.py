@@ -610,6 +610,7 @@ class MessageFiler(O):
 
   def modify(self, hdr, new_value, always=False):
     ''' Modify the value of the named header `hdr` to the new value `new_value` using cs.mailutils.modify_header.
+        `new_value` may be a string or an iterable of strings.
         If headers were changed, forget self.message_path.
     '''
     if modify_header(self.message, hdr, new_value, always=always):
@@ -1360,17 +1361,21 @@ class Target_Function(O):
       func_args.append(value)
     M = filer.message
     for header_name in self.header_names:
-      for s in M.get_all(header_name, ()):
-        try:
-          s2 = func(s, *func_args)
-        except Exception as e:
-          exception("exception calling %s(filer, *%r): %s", self.funcname, func_args, e)
-          raise
-        else:
-          if s2 is not None:
-            if s != s2:
-              info("%s: %r ==> %r", header_name.title(), s, s2)
-              filer.modify(header_name, s2)
+      header_values = M.get_all(header_name, ())
+      new_header_values = []
+      if header_values:
+        for s in header_values:
+          try:
+            s2 = func(s, *func_args)
+          except Exception as e:
+            exception("exception calling %s(filer, *%r): %s", self.funcname, func_args, e)
+            raise
+          else:
+            if s2 is not None:
+              new_header_values.append(s2)
+        if new_header_values and header_values != new_header_values:
+          info("%s: %r ==> %r", header_name.title(), header_values, new_header_values)
+          filer.modify(header_name, new_header_values)
 
 class Target_PipeLine(O):
 
