@@ -54,7 +54,7 @@ from cs.excutils import logexc
 from cs.lex import parseUC_sAttr
 from cs.logutils import Pfx, pfx_iter, debug, error, warning, exception, D, X
 from cs.threads import locked_property
-from cs.py3 import StringIO, ustr, unicode
+from cs.py3 import ustr, unicode
 from cs.obj import O
 
 def isURL(U):
