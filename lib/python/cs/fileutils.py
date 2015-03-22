@@ -1171,6 +1171,22 @@ def tee(fp, fp2):
   fp.write = old_write
   fp.flush = old_flush
 
+class NullFile(object):
+  ''' Writable file that discards its input.
+      Note that this is _not_ an open of os.devnull; is just discards writes and the is not underlying file descriptor.
+  '''
+
+  def __init__(self):
+    self.offset = 0
+
+  def write(self, data):
+    dlen = len(data)
+    self.offset += dlen
+    return dlen
+
+  def flush(self):
+    pass
+
 def copy_data(fpin, fpout, nbytes, rsize=None):
   ''' Copy `nbytes` of data from `fpin` to `fpout`.
       If `nbytes` is None, copy until EOF.
