@@ -67,21 +67,27 @@ def message_addresses(M, header_names):
         else:
           yield realname, address
 
-def modify_header(M, hdr, new_value, always=False):
-  ''' Modify a Message `M` to change the value of the named header `hdr` to the new value `new_value`.
-      If `new_value` differs from the existing value or if `always`
+def modify_header(M, hdr, new_values, always=False):
+  ''' Modify a Message `M` to change the value of the named header `hdr` to the new value `new_values` (a string or an interable of strings).
+      If `new_values` is a string subclass, convert to a single element list.
+      If `new_values` differs from the existing value or if `always`
       is true, save the old value as X-Old-`hdr`.
       Return a Boolean indicating whether the headers were modified.
   '''
+  if isinstance(new_values, StringTypes):
+    new_values = [new_values]
+  else:
+    new_values = list(new_values)
   modified = False
-  old_value = M.get(hdr, '')
-  if always or old_value != new_value:
+  old_values = M.get_all(hdr, ())
+  if always or old_values != new_values:
     modified = True
     old_hdr = 'X-Old-' + hdr
-    for old_value in M.get_all(hdr, ()):
+    for old_value in old_values:
       M.add_header("X-Old-" + hdr, old_value)
     del M[hdr]
-    M[hdr] = new_value
+    for new_value in new_values:
+      M.add_header(hdr, new_value)
   return modified
 
 def ismhdir(path):

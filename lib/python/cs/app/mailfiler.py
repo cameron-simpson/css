@@ -610,6 +610,7 @@ class MessageFiler(O):
 
   def modify(self, hdr, new_value, always=False):
     ''' Modify the value of the named header `hdr` to the new value `new_value` using cs.mailutils.modify_header.
+        `new_value` may be a string or an iterable of strings.
         If headers were changed, forget self.message_path.
     '''
     if modify_header(self.message, hdr, new_value, always=always):
@@ -1308,11 +1309,9 @@ class Target_Substitution(O):
 
   def apply(self, filer):
     for header_name in self.header_names:
-      X("apply %r : s/%s/%s ...", header_name, self.subst_re.pattern, self.subst_replacement)
       M = filer.message
       # fetch old value and "unfold" (strip CRLF, see RFC2822 part 2.2.3)
       old_value = M.get(header_name, '').replace('\r','').replace('\n','')
-      X("SUBST:   old value = %r", old_value)
       m = self.subst_re.search(old_value)
       if m:
         # record named substitution values
@@ -1327,7 +1326,6 @@ class Target_Substitution(O):
         if offset != len(self.subst_replacement):
           warning("after getqstr, offset[%d] != len(subst_replacement)[%d]: %r",
                   offset, len(self.subst_replacement), self.subst_replacement)
-        debug("SUBST %s: %s ==> %s", header_name, self.subst_replacement, new_value)
         filer.modify(header_name.title(), new_value)
 
 class Target_Function(O):
@@ -1363,17 +1361,21 @@ class Target_Function(O):
       func_args.append(value)
     M = filer.message
     for header_name in self.header_names:
-      for s in M.get_all(header_name, ()):
-        try:
-          s2 = func(s, *func_args)
-        except Exception as e:
-          exception("exception calling %s(filer, *%r): %s", self.funcname, func_args, e)
-          raise
-        else:
-          if s2 is not None:
-            if s != s2:
-              info("%s: %r ==> %r", header_name.title(), s, s2)
-              filer.modify(header_name, s2)
+      header_values = M.get_all(header_name, ())
+      new_header_values = []
+      if header_values:
+        for s in header_values:
+          try:
+            s2 = func(s, *func_args)
+          except Exception as e:
+            exception("exception calling %s(filer, *%r): %s", self.funcname, func_args, e)
+            raise
+          else:
+            if s2 is not None:
+              new_header_values.append(s2)
+        if new_header_values and header_values != new_header_values:
+          info("%s: %r ==> %r", header_name.title(), header_values, new_header_values)
+          filer.modify(header_name, new_header_values)
 
 class Target_PipeLine(O):
 
