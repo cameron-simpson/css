@@ -46,7 +46,7 @@ def get_lws(s, offset=0):
   '''
   if not s.startswith(CRLF, offset):
     raise ValueError("missing CRLF at start of LWS at offset %d" % (offset,))
-  spacing, offset = get_chars(s, SP+HT, offset+2)
+  spacing, offset = get_chars(s, offset+2, SP+HT)
   if not spacing:
     raise ValueError("missing SP/HT after CRLF at offset %d" % (offset,))
   return CRLF + spacing, offset
@@ -59,7 +59,7 @@ def get_space(s, offset=0):
 def get_text(s, offset=0):
   ''' Gather up a sequence of TEXT characters (possibly empty).
   '''
-  return get_chars(s, TEXT, offset)
+  return get_chars(s, offset, TEXT)
 
 def get_token(s, offset=0):
   ''' Get an RFC2616 token from the string `s` starting at `offset`.
