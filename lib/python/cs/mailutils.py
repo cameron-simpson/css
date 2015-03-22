@@ -4,6 +4,8 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
+from __future__ import absolute_import
+
 DISTINFO = {
     'description': "functions and classes to work with email",
     'keywords': ["python2", "python3"],

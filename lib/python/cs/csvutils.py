@@ -11,6 +11,8 @@
 # So we provide csv_reader() generators to yield rows containing unicode.
 #
 
+from __future__ import absolute_import
+
 DISTINFO = {
     'description': "CSV file related facilities",
     'keywords': ["python2", "python3"],
