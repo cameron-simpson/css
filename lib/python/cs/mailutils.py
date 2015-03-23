@@ -49,7 +49,7 @@ def Message(msgfile, headersonly=False):
     # msgfile presumed to be filename
     pathname = msgfile
     with Pfx(pathname):
-      with open(pathname) as mfp:
+      with open(pathname, errors='replace') as mfp:
         M = Message(mfp, headersonly=headersonly)
         M.pathname = pathname
         return M
