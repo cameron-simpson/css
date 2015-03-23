@@ -1173,7 +1173,7 @@ def tee(fp, fp2):
 
 class NullFile(object):
   ''' Writable file that discards its input.
-      Note that this is _not_ an open of os.devnull; is just discards writes and the is not underlying file descriptor.
+      Note that this is _not_ an open of os.devnull; is just discards writes and is not the underlying file descriptor.
   '''
 
   def __init__(self):
