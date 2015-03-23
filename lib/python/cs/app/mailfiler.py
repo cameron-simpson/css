@@ -44,6 +44,7 @@ import time
 from cs.configutils import ConfigWatcher
 import cs.env
 from cs.env import envsub
+from cs.excutils import LogExceptions
 from cs.fileutils import abspath_from_file, file_property, files_property, \
                          longpath, Pathname
 import cs.lex
@@ -364,7 +365,7 @@ class MailFiler(O):
       nmsgs = 0
       skipped = 0
       with LogTime("all keys") as all_keys_time:
-        for key in wmdir.keys(flush=True):
+        for key in list(wmdir.keys(flush=True)):
           if key in wmdir.lurking:
             debug("skip lurking key")
             skipped += 1
@@ -489,7 +490,8 @@ def save_to_folderpath(folderpath, M, message_path, flags):
       M['Status'] = status
     if len(x_status) > 0:
       M['X-Status'] = x_status
-    text = M.as_string(True)
+    with LogExceptions():
+      text = M.as_string(True)
     with open(folderpath, "a") as mboxfp:
       mboxfp.write(text)
     info("    OK >> %s" % (shortpath(folderpath)))
