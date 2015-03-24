@@ -34,14 +34,16 @@ B = lambda *tok: ['B'] + list(tok)
 TD = lambda *tok: ['TD'] + list(tok)
 TR = lambda *tok: ['TR'] + list(tok)
 
-def page_HTML(title, *tokens):
+def page_HTML(title, *tokens, content_type='text/html; charset=UTF-8'):
   ''' Covenience function returning an '<HTML>' token for a page.
+      `content_type`: "http-equiv" Content-Type, default: "text/html; charset=UTF-8".
   '''
   body = ['BODY']
   body.extend(tokens)
   return ['HTML',
           ['HEAD',
-           ['TITLE', title]
+           ['META', {'http-equiv': 'Content-Type', 'content': content_type}], '\n',
+           ['TITLE', title], '\n',
            ],
           body,
           ]
