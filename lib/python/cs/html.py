@@ -34,17 +34,25 @@ B = lambda *tok: ['B'] + list(tok)
 TD = lambda *tok: ['TD'] + list(tok)
 TR = lambda *tok: ['TR'] + list(tok)
 
-def page_HTML(title, *tokens, content_type='text/html; charset=UTF-8'):
-  ''' Covenience function returning an '<HTML>' token for a page.
+def page_HTML(title, *tokens, **kw):
+  ''' Convenience function returning an '<HTML>' token for a page.
+      Keyword parameters:
       `content_type`: "http-equiv" Content-Type, default: "text/html; charset=UTF-8".
+      'head_tokens`: optional extra markup tokens for the HEAD section.
   '''
+  content_type = kw.pop('content_type', 'text/html; charset=UTF-8')
+  head_tokens = kw.pop('head_tokens', ())
+  if kw:
+    raise ValueError("unexpected keywords: %r" % (kw,))
   body = ['BODY']
   body.extend(tokens)
-  return ['HTML',
-          ['HEAD',
+  head = ['HEAD',
            ['META', {'http-equiv': 'Content-Type', 'content': content_type}], '\n',
            ['TITLE', title], '\n',
-           ],
+           ]
+  head.extend(head_tokens)
+  return ['HTML',
+          head,
           body,
           ]
 
