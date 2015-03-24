@@ -34,8 +34,8 @@ B = lambda *tok: ['B'] + list(tok)
 TD = lambda *tok: ['TD'] + list(tok)
 TR = lambda *tok: ['TR'] + list(tok)
 META = lambda name, content: ['META', {'name': name, 'content': content}]
-LINK = lambda rel, href, **kw: ['LINK', dict([('rel', rel), ('href', href)] + kw)]
-SCRIPT_SRC = lambda src, type='text/javascript': ['SCRIPT', {src: src, type: type}]
+LINK = lambda rel, href, **kw: ['LINK', dict([('rel', rel), ('href', href)] + list(kw.items()))]
+SCRIPT_SRC = lambda src, type='text/javascript': ['SCRIPT', {'src': src, 'type': type}]
 
 def page_HTML(title, *tokens, **kw):
   ''' Convenience function returning an '<HTML>' token for a page.
