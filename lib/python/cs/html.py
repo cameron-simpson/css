@@ -21,6 +21,7 @@ try:
   from urllib.parse import quote as urlquote
 except ImportError:
   from urllib import quote as urlquote
+from cs.logutils import warning, X
 from cs.py3 import StringTypes
 
 # Characters safe to transcribe unescaped.
@@ -34,8 +35,9 @@ B = lambda *tok: ['B'] + list(tok)
 TD = lambda *tok: ['TD'] + list(tok)
 TR = lambda *tok: ['TR'] + list(tok)
 META = lambda name, content: ['META', {'name': name, 'content': content}]
-LINK = lambda rel, href, **kw: ['LINK', dict([('rel', rel), ('href', href)] + list(kw.items()))]
-SCRIPT_SRC = lambda src, type='text/javascript': ['SCRIPT', {'src': src, 'type': type}]
+LINK = lambda rel, href, **kw: ['LINK',
+                                dict([('rel', rel), ('href', href)] + list(kw.items()))]
+SCRIPT_SRC = lambda src, ctype='text/javascript': [ 'SCRIPT', {'src': src, 'type': ctype}]
 
 def page_HTML(title, *tokens, **kw):
   ''' Convenience function returning an '<HTML>' token for a page.
@@ -50,9 +52,10 @@ def page_HTML(title, *tokens, **kw):
   body = ['BODY']
   body.extend(tokens)
   head = ['HEAD',
-           ['META', {'http-equiv': 'Content-Type', 'content': content_type}], '\n',
-           ['TITLE', title], '\n',
-           ]
+          ['META', {
+              'http-equiv': 'Content-Type', 'content': content_type}], '\n',
+          ['TITLE', title], '\n',
+          ]
   head.extend(head_tokens)
   return ['HTML',
           head,
@@ -110,6 +113,10 @@ def transcribe(*tokens):
     if isSCRIPT:
       if 'LANGUAGE' not in [a.upper() for a in attrs.keys()]:
         attrs['language'] = 'JavaScript'
+      if 'src' in attrs:
+        if tok:
+          warning("<SCRIPT> with src=, discarding internal tokens: %r", tokens)
+          tok = ()
     yield '<'
     yield tag
     for k, v in attrs.items():
@@ -120,10 +127,11 @@ def transcribe(*tokens):
         yield urlquote(str(v), safe=' /#:;')
         yield '"'
     yield '>'
-    if isSCRIPT:
+    # protect inline SCRIPT source code with HTML comments
+    if isSCRIPT and 'src' not in attrs:
       yield "<!--\n"
     yield from transcribe(*tok)
-    if isSCRIPT:
+    if isSCRIPT and 'src' not in attrs:
       yield "\n-->"
     if tag not in ('BR', 'IMG', 'HR'):
       yield '</'
