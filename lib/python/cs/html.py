@@ -15,6 +15,7 @@ DISTINFO = {
     'requires': ['cs.py3'],
 }
 
+from io import StringIO
 import re
 import sys
 try:
@@ -108,6 +109,20 @@ def transcribe(*tokens):
         attrs = tok.pop(0)
       else:
         attrs = {}
+    if tag == '<!--':
+      yield tag
+      comment = StringIO()
+      for t in tok:
+        if not isinstance(t, StringTypes):
+          raise ValueError("invalid non-string inside \"<!--\" comment: %r" % (t,))
+        comment.write(t)
+      comment_text = comment.getvalue()
+      comment.close()
+      if '-->' in comment_text:
+        raise ValueError("invalid \"-->\" inside \"<!--\" comment: %r" % (comment,))
+      yield comment_text
+      yield '-->'
+      continue
     TAG = tag.upper()
     isSCRIPT = (TAG == 'SCRIPT')
     if isSCRIPT:
