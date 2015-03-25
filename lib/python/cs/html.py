@@ -113,7 +113,7 @@ def transcribe(*tokens):
       else:
         attrs = {}
     if tag == '<!--':
-      yield tag
+      yield '<!-- '
       buf = StringIO()
       for t in tok:
         if not isinstance(t, StringTypes):
@@ -124,7 +124,7 @@ def transcribe(*tokens):
       if '-->' in comment_text:
         raise ValueError("invalid \"-->\" inside \"<!--\" comment: %r" % (comment,))
       yield comment_text
-      yield '-->'
+      yield ' -->'
       continue
     TAG = tag.upper()
     isSCRIPT = (TAG == 'SCRIPT')
