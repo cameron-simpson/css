@@ -40,6 +40,9 @@ LINK = lambda rel, href, **kw: ['LINK',
                                 dict([('rel', rel), ('href', href)] + list(kw.items()))]
 SCRIPT_SRC = lambda src, ctype='text/javascript': [ 'SCRIPT', {'src': src, 'type': ctype}]
 
+comment = lambda *tok: ['<!--'] + list(tok)
+entity = lambda entity_name: [ '&' + entity_name + ';' ]
+
 def page_HTML(title, *tokens, **kw):
   ''' Convenience function returning an '<HTML>' token for a page.
       Keyword parameters:
@@ -111,13 +114,13 @@ def transcribe(*tokens):
         attrs = {}
     if tag == '<!--':
       yield tag
-      comment = StringIO()
+      buf = StringIO()
       for t in tok:
         if not isinstance(t, StringTypes):
           raise ValueError("invalid non-string inside \"<!--\" comment: %r" % (t,))
-        comment.write(t)
-      comment_text = comment.getvalue()
-      comment.close()
+        buf.write(t)
+      comment_text = buf.getvalue()
+      buf.close()
       if '-->' in comment_text:
         raise ValueError("invalid \"-->\" inside \"<!--\" comment: %r" % (comment,))
       yield comment_text
