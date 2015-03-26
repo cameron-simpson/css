@@ -25,7 +25,7 @@ DISTINFO = {
 }
 
 import csv
-from io import StringIO
+from io import BytesIO
 import sys
 from threading import Thread
 from cs.debug import trace
@@ -73,6 +73,8 @@ else:
     return csvw.writerow(row)
 
 class SharedCSVFile(SharedAppendLines):
+  ''' Shared access to a CSV file in UTF-8 encoding.
+  '''
 
   def __init__(self, pathname, readonly=False, **kw):
     importer = kw.get('importer')
@@ -88,7 +90,6 @@ class SharedCSVFile(SharedAppendLines):
                                      args=(importer,))
     self._csv_stream_thread.daemon = True
     self._csv_stream_thread.start()
-    self._stringio = StringIO()
     SharedAppendLines.__init__(self, pathname, no_update=readonly, **kw)
 
   def _queue_csv_text(self, line, importer):
@@ -111,11 +112,8 @@ class SharedCSVFile(SharedAppendLines):
     if len(self._csv_partials):
       warning("%s._transcribe_update while non-empty partials[]: %r",
               self, self._csv_partials)
-    sfp = self._stringio
-    try:
-      csv_writerow(csv.writer(sfp), row)
-    except IOError as e:
-      warning("%s: IOError %s: discarding %s", sys.argv[0], e, row)
-    else:
-      fp.write(sfp.getvalue())
+    sfp = BytesIO()
+    csv_writerow(csv.writer(sfp), row, encoding='utf-8')
+    line = sfp.getvalue().decode('utf-8')
+    fp.write(line)
     sfp.flush()
