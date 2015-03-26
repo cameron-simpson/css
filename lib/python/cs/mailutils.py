@@ -4,6 +4,8 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
+from __future__ import absolute_import
+
 DISTINFO = {
     'description': "functions and classes to work with email",
     'keywords': ["python2", "python3"],
@@ -18,6 +20,7 @@ DISTINFO = {
 import email.message
 import email.parser
 from email.utils import getaddresses
+from io import StringIO
 from itertools import chain
 import mailbox
 import os
@@ -32,7 +35,7 @@ from cs.fileutils import Pathname, shortpath as _shortpath
 from cs.logutils import Pfx, info, warning, debug, D, X
 from cs.threads import locked_property
 from cs.seq import seq
-from cs.py3 import StringIO, StringTypes
+from cs.py3 import StringTypes
 
 SHORTPATH_PREFIXES = ( ('$MAILDIR/', '+'), ('$HOME/', '~/') )
 

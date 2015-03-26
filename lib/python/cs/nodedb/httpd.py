@@ -12,7 +12,7 @@ import socket
 import sys
 from types import StringTypes
 import cherrypy
-from cStringIO import StringIO
+from io import StringIO
 from cs.lex import parseUC_sAttr
 from cs.logutils import info, warning, error, debug, D
 from cs.html import tok2s

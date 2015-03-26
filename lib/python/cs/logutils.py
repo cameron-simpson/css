@@ -448,7 +448,8 @@ class Pfx(object):
         ##prefixify = lambda text: prefix + ': ' + text.replace('\n', '\n'+prefix)
         def prefixify(text):
           if not isinstance(text, StringTypes):
-            X("%s: not a string, not prefixing: %r", prefix, text)
+            X("%s: not a string (class %s), not prefixing: %r",
+              prefix, text.__class__, text)
             return text
           return prefix + ': ' + ustr(text, errors='replace').replace('\n', '\n'+prefix)
         if hasattr(exc_value, 'args'):

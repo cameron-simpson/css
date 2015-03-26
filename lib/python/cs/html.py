@@ -15,12 +15,14 @@ DISTINFO = {
     'requires': ['cs.py3'],
 }
 
+from io import StringIO
 import re
 import sys
 try:
   from urllib.parse import quote as urlquote
 except ImportError:
   from urllib import quote as urlquote
+from cs.logutils import warning, X
 from cs.py3 import StringTypes
 
 # Characters safe to transcribe unescaped.
@@ -33,16 +35,34 @@ A = lambda *tok: ['A'] + list(tok)
 B = lambda *tok: ['B'] + list(tok)
 TD = lambda *tok: ['TD'] + list(tok)
 TR = lambda *tok: ['TR'] + list(tok)
+META = lambda name, content: ['META', {'name': name, 'content': content}]
+LINK = lambda rel, href, **kw: ['LINK',
+                                dict([('rel', rel), ('href', href)] + list(kw.items()))]
+SCRIPT_SRC = lambda src, ctype='text/javascript': [ 'SCRIPT', {'src': src, 'type': ctype}]
 
-def page_HTML(title, *tokens):
-  ''' Covenience function returning an '<HTML>' token for a page.
+comment = lambda *tok: ['<!--'] + list(tok)
+entity = lambda entity_name: [ '&' + entity_name + ';' ]
+
+def page_HTML(title, *tokens, **kw):
+  ''' Convenience function returning an '<HTML>' token for a page.
+      Keyword parameters:
+      `content_type`: "http-equiv" Content-Type, default: "text/html; charset=UTF-8".
+      'head_tokens`: optional extra markup tokens for the HEAD section.
   '''
+  content_type = kw.pop('content_type', 'text/html; charset=UTF-8')
+  head_tokens = kw.pop('head_tokens', ())
+  if kw:
+    raise ValueError("unexpected keywords: %r" % (kw,))
   body = ['BODY']
   body.extend(tokens)
+  head = ['HEAD',
+          ['META', {
+              'http-equiv': 'Content-Type', 'content': content_type}], '\n',
+          ['TITLE', title], '\n',
+          ]
+  head.extend(head_tokens)
   return ['HTML',
-          ['HEAD',
-           ['TITLE', title]
-           ],
+          head,
           body,
           ]
 
@@ -92,11 +112,29 @@ def transcribe(*tokens):
         attrs = tok.pop(0)
       else:
         attrs = {}
+    if tag == '<!--':
+      yield '<!-- '
+      buf = StringIO()
+      for t in tok:
+        if not isinstance(t, StringTypes):
+          raise ValueError("invalid non-string inside \"<!--\" comment: %r" % (t,))
+        buf.write(t)
+      comment_text = buf.getvalue()
+      buf.close()
+      if '-->' in comment_text:
+        raise ValueError("invalid \"-->\" inside \"<!--\" comment: %r" % (comment,))
+      yield comment_text
+      yield ' -->'
+      continue
     TAG = tag.upper()
     isSCRIPT = (TAG == 'SCRIPT')
     if isSCRIPT:
       if 'LANGUAGE' not in [a.upper() for a in attrs.keys()]:
         attrs['language'] = 'JavaScript'
+      if 'src' in attrs:
+        if tok:
+          warning("<SCRIPT> with src=, discarding internal tokens: %r", tokens)
+          tok = ()
     yield '<'
     yield tag
     for k, v in attrs.items():
@@ -107,10 +145,11 @@ def transcribe(*tokens):
         yield urlquote(str(v), safe=' /#:;')
         yield '"'
     yield '>'
-    if isSCRIPT:
+    # protect inline SCRIPT source code with HTML comments
+    if isSCRIPT and 'src' not in attrs:
       yield "<!--\n"
     yield from transcribe(*tok)
-    if isSCRIPT:
+    if isSCRIPT and 'src' not in attrs:
       yield "\n-->"
     if tag not in ('BR', 'IMG', 'HR'):
       yield '</'

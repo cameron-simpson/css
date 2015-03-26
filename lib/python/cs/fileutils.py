@@ -944,7 +944,7 @@ class SharedAppendFile(object):
         `pathname`: the pathname of the file to open.
         `importer`: callable to accept foreign data chunks as their appear
         `no_update`: set to true if we will not write updates.
-        `binary`: if the ile is to be opened in binary mode, otherwise text mode.
+        `binary`: if the file is to be opened in binary mode, otherwise text mode.
         `max_queue`: maximum input Queue length. Default: SharedAppendFile.DEFAULT_MAX_QUEUE.
         `poll_interval`: sleep time between polls after an idle poll. Default: DEFAULT_POLL_INTERVAL.
         `lock_ext`: lock file extension.
