@@ -1227,6 +1227,55 @@ def lines_of(fp, partials=None):
     partials = []
   return as_lines(chunks_of(fp), partials)
 
+class SavingFile(object):
+  ''' A simple file-like object with .write and .close methods used
+      to accrue a file, and a .cancel method to be used instead of
+      .close to discard the file.
+      The originating use case is a cache file for an HTTP response;
+      if the response ends up incomplete the cache file is discarded.
+  '''
+
+  def __init__(self, path, text=False, dir=None):
+    ''' Open the scratch file.
+    '''
+    self.path = path
+    if tmpdir is None:
+      # try to make the temporary file in the same directory as the
+      # target path
+      tmpdir = os.path.dirname(path)
+      if not os.path.isdir(tmpdir):
+        # fall back to the default
+        tmpdir = None
+    self.fd, self.tmppath = mkstemp(prefix='.tmp', dir=dir, text=text)
+    self.fp = os.fdopen(fd, ( 'w' if text else 'wb' ) )
+
+  def write(self, data):
+    ''' Transcribe data to the temp file.
+    '''
+    return self.fp.write(data)
+
+  def flush(self):
+    ''' Flush buffered data to the temp file.
+    '''
+    return self.fp.flush()
+
+  def cancel(self):
+    ''' Cancel the transcription to the temp file and discard.
+    '''
+    self.fp.close()
+    self.fp = None
+    os.remove(self.tmppath)
+
+  def close(self):
+    ''' Close the output and move the file into place as the cached response.
+    '''
+    self.fp.close()
+    self.fp = None
+    path = self.path
+    if os.path.exists(path):
+      warning("replacing existing %r", path)
+    os.rename(self.tmppath, path)
+
 if __name__ == '__main__':
   import cs.fileutils_tests
   cs.fileutils_tests.selftest(sys.argv)
