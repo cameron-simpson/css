@@ -142,7 +142,7 @@ def transcribe(*tokens):
       yield k
       if v is not None:
         yield '="'
-        yield urlquote(str(v), safe=' /#:;')
+        yield urlquote(str(v), safe=' =/#:;')
         yield '"'
     yield '>'
     # protect inline SCRIPT source code with HTML comments
@@ -151,7 +151,7 @@ def transcribe(*tokens):
     yield from transcribe(*tok)
     if isSCRIPT and 'src' not in attrs:
       yield "\n-->"
-    if tag not in ('BR', 'IMG', 'HR'):
+    if tag not in ('BR', 'IMG', 'HR', 'LINK', 'META', 'INPUT'):
       yield '</'
       yield tag
       yield '>'
