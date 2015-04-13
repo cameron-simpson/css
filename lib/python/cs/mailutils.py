@@ -32,7 +32,7 @@ from tempfile import NamedTemporaryFile
 from threading import Lock
 import time
 from cs.fileutils import Pathname, shortpath as _shortpath
-from cs.logutils import Pfx, info, warning, debug, D, X
+from cs.logutils import Pfx, info, warning, exception, debug, D, X
 from cs.threads import locked_property
 from cs.seq import seq
 from cs.py3 import StringTypes
@@ -271,8 +271,8 @@ class Maildir(mailbox.Maildir):
       try:
         debug("rename %s => %s", tmppath, newpath)
         os.rename(tmppath, newpath)
-      except:
-        debug("unlink %s", tmppath)
+      except Exception as e:
+        exception("%s: unlink %s", e, tmppath)
         os.unlink(tmppath)
         raise
       self.msgmap[key] = ('new', newbase)
