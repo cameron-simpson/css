@@ -153,7 +153,7 @@ class OnDemandFunction(PendingFunction):
     result, exc_info = None, None
     try:
       result = self.func()
-    except:
+    except Exception:
       exc_info = sys.exc_info()
       self.exc_info = exc_info
       raise

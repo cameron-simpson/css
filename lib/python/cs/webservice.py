@@ -9,7 +9,7 @@ from __future__ import print_function
 import sys
 from ZSI import SoapWriter, ParsedSoap, TC
 import ZSI.wstools.Utility
-from StringIO import StringIO
+from io import StringIO
 import urllib2
 from cs.obj import flavour, T_MAP, T_SEQ
 import cs.logutils

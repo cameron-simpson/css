@@ -661,7 +661,7 @@ class Pilfer(O):
               try:
                 with open(saveas, "wb") as savefp:
                   savefp.write(content)
-              except:
+              except Exception:
                 exception("save fails")
             # discard contents, releasing memory
             U.flush()

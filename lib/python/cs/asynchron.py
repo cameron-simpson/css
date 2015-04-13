@@ -142,7 +142,7 @@ class Asynchron(O):
     '''
     try:
       r = func(*a, **kw)
-    except:
+    except Exception:
       self.exc_info = sys.exc_info
     else:
       self.result = r
