@@ -81,7 +81,13 @@ def main(argv=None):
                                                                getattr(DRV, 'virtual_drive', O(number=None)).number,
                                                                getattr(DRV, 'disk_group', O(number=None)).number,
                                                                DRV.fru, DRV.raw_size, DRV.raw_size_units,
-                                                               DRV.firmware_state)
+                                                               DRV.firmware_state
+                                                              ),
+           if DRV.media_error_count:
+             print ", media errors %s" % DRV.media_error_count,
+           if DRV.other_error_count:
+             print ", media errors %s" % DRV.other_error_count,
+           print
       elif command == "save":
         save_file, = argv
         if save_raid(save_file) != 0:
