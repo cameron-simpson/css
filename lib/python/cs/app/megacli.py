@@ -84,11 +84,11 @@ def main(argv=None):
                                                                DRV.fru, DRV.raw_size, DRV.raw_size_units,
                                                                DRV.firmware_state
                                                               ),
-          if DRV.media_error_count:
-            print ", media errors %s" % DRV.media_error_count,
-          if DRV.other_error_count:
-            print ", other errors %s" % DRV.other_error_count,
-          print
+            if DRV.media_error_count:
+              print ", media errors %s" % DRV.media_error_count,
+            if DRV.other_error_count:
+              print ", other errors %s" % DRV.other_error_count,
+            print
       elif command == "save":
         save_file, = argv
         if save_raid(save_file) != 0:
