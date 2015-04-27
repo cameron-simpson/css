@@ -84,10 +84,20 @@ def main(argv=None):
                                                                DRV.fru, DRV.raw_size, DRV.raw_size_units,
                                                                DRV.firmware_state
                                                               ),
-            if DRV.media_error_count:
-              print ", media errors %s" % DRV.media_error_count,
-            if DRV.other_error_count:
-              print ", other errors %s" % DRV.other_error_count,
+            try:
+              count = DRV.media_error_count
+            except AttributeError:
+              pass
+            else:
+              if count:
+                print ", media errors %s" % count,
+            try:
+              count = DRV.other_error_count
+            except AttributeError:
+              pass
+            else:
+              if DRV.other_error_count:
+                print ", other errors %s" % DRV.other_error_count,
             print
       elif command == "save":
         save_file, = argv
