@@ -96,8 +96,8 @@ def main(argv=None):
             except AttributeError:
               pass
             else:
-              if DRV.other_error_count:
-                print ", other errors %s" % DRV.other_error_count,
+              if count:
+                print ", other errors %s" % count,
             print
       elif command == "save":
         save_file, = argv
