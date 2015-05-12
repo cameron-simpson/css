@@ -83,7 +83,7 @@ def main(argv):
   return 0
 
 def aptime(logline, zones, defaultZone):
-  ''' Compute a datetime object from the supplied Apache log line.
+  ''' Compute a datetime object from the supplied Apache or Squid log line.
       `defaultZone` is the timezone to use if it cannot be deduced.
   '''
   fields = logline.split()
@@ -133,10 +133,20 @@ def aptime(logline, zones, defaultZone):
         dt = None
 
   if dt is None:
+    # try for leading UNIX time, as from squid
+    if '.' in fields[0]:
+      try:
+        when = float(fields[0])
+      except ValueError, e:
+        dt = None
+      else:
+        dt = datetime.fromtimestamp(when)
+        return dt
+    # no joy, complain
     warning("bad human time in log line: %s", logline)
     return None
 
-  # use defaultZone if tzinfo is not set
+  # we have a human time, use defaultZone if tzinfo is not set
   if tzinfo is None:
     tzinfo = defaultZone
 
