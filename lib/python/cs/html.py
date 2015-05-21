@@ -28,7 +28,7 @@ from cs.py3 import StringTypes
 # Characters safe to transcribe unescaped.
 re_SAFETEXT = re.compile(r'[^<>&]+')
 # Characters safe to use inside "" in tag attribute values.
-re_SAFETEXT_DQ = re.compile(r'[-=. \w:@/?~#+&]+')
+re_SAFETEXT_DQ = re.compile(r'[-=., \w:@/?~#+&()]+')
 
 # convenience wrappers
 A = lambda *tok: ['A'] + list(tok)
@@ -142,7 +142,7 @@ def transcribe(*tokens):
       yield k
       if v is not None:
         yield '="'
-        yield urlquote(str(v), safe=' =/#:;')
+        yield urlquote(str(v), safe="' =/#:;().,")
         yield '"'
     yield '>'
     # protect inline SCRIPT source code with HTML comments

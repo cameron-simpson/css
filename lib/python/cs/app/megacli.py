@@ -31,7 +31,8 @@ from cs.obj import O, O_merge
 
 USAGE = '''Usage:
     %s report
-    %s new_raid raid_level enc:devid...'''
+    %s new_raid raid_level enc:devid...
+    %s status'''
 
 # default location of MegaCLI executable
 MEGACLI = '/opt/MegaRAID/MegaCli/MegaCli64'
@@ -47,7 +48,7 @@ def main(argv=None):
   argv = list(argv)
   cmd = argv.pop(0)
   setup_logging(cmd)
-  usage = USAGE % (cmd, cmd)
+  usage = USAGE % (cmd, cmd, cmd)
 
   badopts = False
 
@@ -81,7 +82,23 @@ def main(argv=None):
                                                                getattr(DRV, 'virtual_drive', O(number=None)).number,
                                                                getattr(DRV, 'disk_group', O(number=None)).number,
                                                                DRV.fru, DRV.raw_size, DRV.raw_size_units,
-                                                               DRV.firmware_state)
+                                                               DRV.firmware_state
+                                                              ),
+            try:
+              count = DRV.media_error_count
+            except AttributeError:
+              pass
+            else:
+              if count:
+                print ", media errors %s" % count,
+            try:
+              count = DRV.other_error_count
+            except AttributeError:
+              pass
+            else:
+              if count:
+                print ", other errors %s" % count,
+            print
       elif command == "save":
         save_file, = argv
         if save_raid(save_file) != 0:
