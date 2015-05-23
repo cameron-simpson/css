@@ -175,21 +175,24 @@ def aptime(logline, zones, defaultZone):
 
   return dt
 
-def apdata(fp, zones, defaultZone, requireOrdering, multiAddrs, fgrep):
+def apdata(fp, zones, defaultZone, requireOrdering, multiAddrs, fgrep, fplabel=None):
   ''' Generator to yield (dt, apline) from Apache log data `fp`.
   '''
+  if fplabel is None:
+    fplabel = str(fp)
+
   if isinstance(fp, str):
     filename = fp
     if filename.endswith('.gz'):
       try:
         with gzip.open(filename) if filename.endswith('.gz') else open(filename) as fp:
-          for dt, apline in apdata(fp, zones, defaultZone, requireOrdering, multiAddrs, fgrep):
+          for dt, apline in apdata(fp, zones, defaultZone, requireOrdering, multiAddrs, fgrep, fplabel=filename):
             yield dt, apline
       except IOError as e:
         error("%s: %s", filename, e)
     return
 
-  with Pfx("%s", fp):
+  with Pfx("%s", fplabel):
     olddt = None
     for lineno, apline in enumerate(fp, 1):
       with Pfx("%d", lineno):
