@@ -319,6 +319,8 @@ class EnvMapping(object):
         return "openbsd"
       if opsys == "freebsd":
         return "freebsd"
+      if opsys == "linux":
+        return "linux"
       raise ValueError('%s: unknown vendor for OS=%s' % (var, opsys))
 
   def _exts(self):

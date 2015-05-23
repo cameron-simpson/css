@@ -4,6 +4,7 @@
 import sys
 import glob
 from collections import namedtuple
+from io import StringIO
 from itertools import chain, product
 import os
 import os.path
@@ -1042,7 +1043,6 @@ class TestAll(unittest.TestCase):
     self.assertEqual(parseMacroExpression('abc  xyz'), (['abc', '  ', 'xyz'], 8))
 
   def test20parseMakeLines(self):
-    from cs.py3 import StringIO
     from .make import Maker
     with Maker("myke") as M:
       parsed = list(parseMakefile(M, StringIO("abc = def\n")))
