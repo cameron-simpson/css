@@ -48,12 +48,14 @@ def page_HTML(title, *tokens, **kw):
       Keyword parameters:
       `content_type`: "http-equiv" Content-Type, default: "text/html; charset=UTF-8".
       'head_tokens`: optional extra markup tokens for the HEAD section.
+      'body_attrs`: optional attributes for the BODY section tag.
   '''
   content_type = kw.pop('content_type', 'text/html; charset=UTF-8')
   head_tokens = kw.pop('head_tokens', ())
+  body_attrs = kw.pop('body_attrs', {})
   if kw:
     raise ValueError("unexpected keywords: %r" % (kw,))
-  body = ['BODY']
+  body = ['BODY', body_attrs]
   body.extend(tokens)
   head = ['HEAD',
           ['META', {
