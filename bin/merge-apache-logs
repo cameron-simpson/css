@@ -147,10 +147,10 @@ def aptime(logline, zones, defaultZone):
       except ValueError, e:
         dt = None
       else:
+        # no timezone needed
         dt = datetime.fromtimestamp(when)
         return dt
-    # no joy, complain
-    warning("bad human time in log line")
+    # still no joy, fail parse
     return None
 
   # we have a human time, use defaultZone if tzinfo is not set
