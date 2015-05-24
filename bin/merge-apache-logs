@@ -208,7 +208,7 @@ def apdata(fp, zones, defaultZone, requireOrdering, multiAddrs, fgrep, fplabel=N
             apline = m.group(3) + ' ' + apline[m.end():]
         dt = aptime(apline, zones, defaultZone)
         if dt is None:
-          warning("cannot compute datetime, discarding")
+          debug("cannot compute datetime, discarding")
           continue
         if requireOrdering:
           if olddt is not None and olddt > dt:
