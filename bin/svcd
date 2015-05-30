@@ -122,6 +122,8 @@ ok()
   return 0
 }
 
+# kill the process specified by $pidfile (if nonempty) otherwise $subpid
+# wait for it to terminate
 killsubproc()
 {
   if [ -n "$pidfile" ]
@@ -159,6 +161,9 @@ do
       ) &
     )
 
+    # wait for the subprocess
+    # or check it isn't there
+    # or kill it (and wait)
     wait "$subpid" || not kill -0 "$subpid" 2>/dev/null || killsubproc
     subpid=
     [ -n "$pidfile" ] && rm -f "$pidfile"
