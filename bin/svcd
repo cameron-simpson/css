@@ -127,7 +127,7 @@ then
   exit 1
 fi
 
-oldsignature=
+oldsignature=$( [ -z "$sigcmd" ] || sh -uec "$sigcmd" )
 
 ok()
 {
