@@ -1,0 +1,51 @@
+#!/bin/sh
+#
+# Construct an unbound.conf(5) file then dispatch unbound(8) via svcd.
+#       - Cameron Simpson <cs@zip.com.au> 26jul2012
+#
+
+set -ue
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [upstream-forwards...]"
+
+: ${VARRUN:=$HOME/var/run}
+: ${LOGDIR:=$HOME/var/log}
+: ${UNBOUND_DNS_UPSTREAM:=}     # server set, eg: opennic
+
+me=`id -un`
+trace=set-x
+logdir=$LOGDIR/unbound
+pidfile=$VARRUN/unbound.pid
+wkdir=$HOME/var/unbound
+cf=$wkdir/unbound.conf
+log=$logdir/unbound.log
+localzones="l local"
+localnets="127 192.168 172.16 10.0"
+cnames=$HOME/rc/dns/cnames
+host_conf=$HOME/rc/dns/unbound.conf-fleet
+outgoing_if=$( netstat -rn | awk '$1 == "default" { print $6 }' )
+
+cd "$logdir" || exit 1
+
+# default upstream DNS servers
+if [ $# -gt 0 ]
+then
+  lastvalue unbound "$*"
+else
+  set -- `lastvalue unbound`
+  echo "$cmd: using lastvalue unbound: $*" >&2
+fi
+
+for d in "$VARRUN" "$wkdir" "$LOGDIR"
+do  [ -d "$d/." ] || $trace mkdir "$d"
+done
+
+$trace rewriteif -d "$cf" gen-unbound.conf ${1+"$@"}
+
+set -x
+cd "$wkdir"
+$trace unbound-checkconf "$cf"
+[ ! -f "$pidfile" ] || $trace killpidfile "$pidfile"
+
+echo SKIP exec $trace sudo $trace svcd -n unbound unbound -c "$cf"
