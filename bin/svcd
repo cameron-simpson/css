@@ -132,11 +132,11 @@ oldsignature=$( [ -z "$sigcmd" ] || sh -uec "$sigcmd" )
 ok()
 {
   # check the signature for change
-  if [ -n "$sigcmd" ]
+  if signature=$( [ -z "$sigcmd" ] || sh -uec "$sigcmd" )
   then
-    signature=$( sh -uec "$setx; $sigcmd" ) || return 1
     if [ "x$oldsignature" != "x$signature" ]
     then
+      alert "SVCD $name: RESTART: signature $oldsignature ==> $signature"
       oldsignature=$signature
       return 1
     fi
