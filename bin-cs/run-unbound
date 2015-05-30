@@ -16,15 +16,10 @@ usage="Usage: $cmd [upstream-forwards...]"
 me=`id -un`
 trace=set-x
 logdir=$LOGDIR/unbound
-pidfile=$VARRUN/unbound.pid
+svcdpidfile=$VARRUN/svcd-unbound.pid
 wkdir=$HOME/var/unbound
 cf=$wkdir/unbound.conf
 log=$logdir/unbound.log
-localzones="l local"
-localnets="127 192.168 172.16 10.0"
-cnames=$HOME/rc/dns/cnames
-host_conf=$HOME/rc/dns/unbound.conf-fleet
-outgoing_if=$( netstat -rn | awk '$1 == "default" { print $6 }' )
 
 cd "$logdir" || exit 1
 
@@ -46,6 +41,5 @@ $trace rewriteif -d "$cf" gen-unbound.conf ${1+"$@"}
 set -x
 cd "$wkdir"
 $trace unbound-checkconf "$cf"
-[ ! -f "$pidfile" ] || $trace killpidfile "$pidfile"
 
-echo SKIP exec $trace sudo $trace svcd -n unbound unbound -c "$cf"
+exec $trace sudo $trace svcd -x -n unbound -p "$svcdpidfile" -s get-default-route set-x unbound -d -c "$cf"
