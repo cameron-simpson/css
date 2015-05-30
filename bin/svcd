@@ -38,6 +38,8 @@ usage="Usage: $cmd [-1] [-l] [-L lockname] [-n name] [-t testcmd] [-x] command [
         If specified, also create a pid file at $VARRUN/name.pid for the
         command. This also causes svcd to consult the flags {NAME}_OVERRIDE
         and {NAME}_DISABLE.
+  -p pidfile
+        Specify pidfile instead of default.
   -s sigcmd
         Run the signature shell command \"sigcmd\" whose output is
         used to check for changed circumstances requiring the service
@@ -60,6 +62,7 @@ do
     -l) dolock=1 ;;
     -L) dolock=1 lockname=$2; shift ;;
     -n) name=$2; shift ;;
+    -p) pidfile=$2; shift ;;
     -s) sigcmd=$2; shift ;;
     -t) testcmd=$2; shift ;;
     -T) testrate=$2; shift ;;
