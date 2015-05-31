@@ -1330,8 +1330,8 @@ class Target_Substitution(O):
         env = m.groupdict()
         # record numbered substitution values
         env_specials = { '0': m.group(0) }
-        for ndx, grp in enumerate(m.groups()):
-          env_specials[str(ndx+1)] = grp
+        for ndx, grp in enumerate(m.groups(), 1):
+          env_specials[str(ndx)] = grp
         repl_value, offset = get_qstr(self.subst_replacement, 0, q=None,
                              environ=env, env_specials=env_specials)
         new_value = old_value[:m.start()] + repl_value + old_value[m.end():]
