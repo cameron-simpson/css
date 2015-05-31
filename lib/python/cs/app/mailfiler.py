@@ -1326,9 +1326,16 @@ class Target_Substitution(O):
       old_value = M.get(header_name, '').replace('\r','').replace('\n','')
       m = self.subst_re.search(old_value)
       if m:
-        # record named substitution values
-        env = m.groupdict()
-        # record numbered substitution values
+        env = {}
+        # Start with the headers as a basic set of available values.
+        # Lowercase header names and replace '-' with '_'.
+        # Strip CRLF per RFC2822 part 2.2.3 as we do for old_value above.
+        for hname, hvalue in M.items():
+          hname = hname.lower().replace('-', '_')
+          env[hname] = hvalue.replace('\r','').replace('\n','')
+        # Override with named substitution values.
+        env.update(m.groupdict())
+        # Add numbered substitution values.
         env_specials = { '0': m.group(0) }
         for ndx, grp in enumerate(m.groups(), 1):
           env_specials[str(ndx)] = grp
