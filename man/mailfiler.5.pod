@@ -75,9 +75,9 @@ latter phase will need doubling in the B<">I<quoted-value>B<"> form.
 
 A target of the form:
 
-  [header:]s/this/that/
+  [header[,header...]:]s/this/that/
 
-performs a regular expression match on the specified header
+performs a regular expression match on the specified headers
 (by default the "Subject:" header)
 and replaces the match with the second string, subject to parameter substitution.
 The available parameter names consist of:
