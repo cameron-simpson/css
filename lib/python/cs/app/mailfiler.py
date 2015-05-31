@@ -24,6 +24,7 @@ DISTINFO = {
 
 from collections import namedtuple
 from email import message_from_string, message_from_file
+from email.header import decode_header, make_header
 import email.parser
 from email.utils import getaddresses
 from functools import partial
@@ -191,6 +192,15 @@ def current_value(envvar, cfg, cfg_key, default, environ):
     else:
       value = longpath(value)
   return value
+
+def scrub_header(value):
+  ''' "Scrub" a header value.
+      Presently this means to undo RFC2047 encoding where possible.
+  '''
+  new_value = unrfc2047(value)
+  if new_value != value:
+    new_value = make_header(decode_header(value))
+  return new_value
 
 class MailFiler(O):
 
@@ -1316,14 +1326,21 @@ class Target_Substitution(O):
       old_value = M.get(header_name, '').replace('\r','').replace('\n','')
       m = self.subst_re.search(old_value)
       if m:
-        # record named substitution values
-        env = m.groupdict()
-        # record numbered substitution values
+        env = {}
+        # Start with the headers as a basic set of available values.
+        # Lowercase header names and replace '-' with '_'.
+        # Strip CRLF per RFC2822 part 2.2.3 as we do for old_value above.
+        for hname, hvalue in M.items():
+          hname = hname.lower().replace('-', '_')
+          env[hname] = hvalue.replace('\r','').replace('\n','')
+        # Override with named substitution values.
+        env.update(m.groupdict())
+        # Add numbered substitution values.
         env_specials = { '0': m.group(0) }
-        for ndx, grp in enumerate(m.groups()):
-          env_specials[str(ndx+1)] = grp
+        for ndx, grp in enumerate(m.groups(), 1):
+          env_specials[str(ndx)] = grp
         repl_value, offset = get_qstr(self.subst_replacement, 0, q=None,
-                             environ=env, env_specials=env_specials)
+                                      environ=env, env_specials=env_specials)
         new_value = old_value[:m.start()] + repl_value + old_value[m.end():]
         if offset != len(self.subst_replacement):
           warning("after getqstr, offset[%d] != len(subst_replacement)[%d]: %r",
@@ -1347,6 +1364,8 @@ class Target_Function(O):
       func = filer.learn_header_addresses
     elif self.funcname == 'learn_message_ids':
       func = filer.learn_message_ids
+    elif self.funcname == 'scrub':
+      func = scrub_header
     else:
       raise ValueError("no simply named functions defined yet: %r", self.funcname)
 
