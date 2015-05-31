@@ -95,7 +95,7 @@ These names and values override any values from the existing header values.
 
 =item numeric subexpressions
 
-B<$0> expands to the whole matched expression, and B<$1> and so on to brackets subexpressions from left to right.
+B<$0> expands to the whole matched expression, and B<$1> and so on to bracketed subexpressions from left to right.
 
 =back
 
