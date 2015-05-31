@@ -146,8 +146,9 @@ The following simple function names are supported:
 
 =head4 Message Flags
 
-A target consististing a single capital letter specifies a flag to be applied 
-to the message. Supported flags are:
+A target consisting a single capital letter specifies a flag to be
+applied to the message.
+Supported flags are:
 
   D Draft
   F Flagged
