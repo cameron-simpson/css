@@ -80,7 +80,24 @@ A target of the form:
 performs a regular expression match on the specified header
 (by default the "Subject:" header)
 and replaces the match with the second string, subject to parameter substitution.
-Named subexpressions in the regular expression are available as parameter names in the replacement.
+The available parameter names consist of:
+
+=over 6
+
+=item the existing header values
+
+The parameter name is the header name in lowercase with dash ('-') replaced by underscore ('_').
+The parameter value is the last header value with CR and LF stripped per RFC2822 part 2.2.3.
+
+=item name subexpressions from the regular expression
+
+These names and values override any values from the existing header values.
+
+=item numeric subexpressions
+
+B<$0> expands to the whole matched expression, and B<$1> and so on to brackets subexpressions from left to right.
+
+=back
 
 =head4 Functions on Headers
 
