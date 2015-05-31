@@ -28,7 +28,7 @@ from cs.py3 import StringTypes
 # Characters safe to transcribe unescaped.
 re_SAFETEXT = re.compile(r'[^<>&]+')
 # Characters safe to use inside "" in tag attribute values.
-re_SAFETEXT_DQ = re.compile(r'[-=. \w:@/?~#+&]+')
+re_SAFETEXT_DQ = re.compile(r'[-=., \w:@/?~#+&()]+')
 
 # convenience wrappers
 A = lambda *tok: ['A'] + list(tok)
@@ -48,12 +48,14 @@ def page_HTML(title, *tokens, **kw):
       Keyword parameters:
       `content_type`: "http-equiv" Content-Type, default: "text/html; charset=UTF-8".
       'head_tokens`: optional extra markup tokens for the HEAD section.
+      'body_attrs`: optional attributes for the BODY section tag.
   '''
   content_type = kw.pop('content_type', 'text/html; charset=UTF-8')
   head_tokens = kw.pop('head_tokens', ())
+  body_attrs = kw.pop('body_attrs', {})
   if kw:
     raise ValueError("unexpected keywords: %r" % (kw,))
-  body = ['BODY']
+  body = ['BODY', body_attrs]
   body.extend(tokens)
   head = ['HEAD',
           ['META', {
@@ -142,7 +144,7 @@ def transcribe(*tokens):
       yield k
       if v is not None:
         yield '="'
-        yield urlquote(str(v), safe=' /#:;')
+        yield urlquote(str(v), safe="' =/#:;().,")
         yield '"'
     yield '>'
     # protect inline SCRIPT source code with HTML comments
@@ -151,7 +153,7 @@ def transcribe(*tokens):
     yield from transcribe(*tok)
     if isSCRIPT and 'src' not in attrs:
       yield "\n-->"
-    if tag not in ('BR', 'IMG', 'HR'):
+    if tag not in ('BR', 'IMG', 'HR', 'LINK', 'META', 'INPUT'):
       yield '</'
       yield tag
       yield '>'

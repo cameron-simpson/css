@@ -31,7 +31,7 @@ def return_exc_info(func, *args, **kwargs):
   '''
   try:
     result = func(*args, **kwargs)
-  except:
+  except Exception:
     return None, tuple(sys.exc_info())
   return result, None
 

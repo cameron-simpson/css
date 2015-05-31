@@ -66,7 +66,7 @@ def trysaferename(oldpath, newpath):
     saferename(oldpath, newpath)
   except OSError:
     return False
-  except:
+  except Exception:
     raise
   return True
 
