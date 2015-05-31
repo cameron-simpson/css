@@ -24,6 +24,7 @@ DISTINFO = {
 
 from collections import namedtuple
 from email import message_from_string, message_from_file
+from email.header import decode_header, make_header
 import email.parser
 from email.utils import getaddresses
 from functools import partial
@@ -191,6 +192,15 @@ def current_value(envvar, cfg, cfg_key, default, environ):
     else:
       value = longpath(value)
   return value
+
+def scrub_header(value):
+  ''' "Scrub" a header value.
+      Presently this means to undo RFC2047 encoding where possible.
+  '''
+  new_value = unrfc2047(value)
+  if new_value != value:
+    new_value = make_header(decode_header(value))
+  return new_value
 
 class MailFiler(O):
 
@@ -1347,6 +1357,8 @@ class Target_Function(O):
       func = filer.learn_header_addresses
     elif self.funcname == 'learn_message_ids':
       func = filer.learn_message_ids
+    elif self.funcname == 'scrub':
+      func = scrub_header
     else:
       raise ValueError("no simply named functions defined yet: %r", self.funcname)
 
