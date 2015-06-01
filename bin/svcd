@@ -136,7 +136,7 @@ ok()
   then
     if [ "x$oldsignature" != "x$signature" ]
     then
-      alert "SVCD $name: RESTART: signature $oldsignature ==> $signature"
+      alert "SVCD $name: RESTART: signature $oldsignature ==> $signature" || :
       oldsignature=$signature
       return 1
     fi
