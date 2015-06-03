@@ -169,6 +169,8 @@ def _transcribe(is_xhtml, *tokens):
     for k, v in attrs.items():
       yield ' '
       yield k
+      if is_xhtml and v is None:
+        v = k
       if v is not None:
         yield '="'
         yield urlquote(str(v), safe="' =/#:;().,")
@@ -186,7 +188,7 @@ def _transcribe(is_xhtml, *tokens):
       yield txt
     if is_SCRIPT and 'src' not in attrs:
       yield "\n-->"
-    if not is_xhtml and not is_single:
+    if not is_single:
       yield '</'
       yield tag
       yield '>'
