@@ -4,6 +4,8 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
+from __future__ import absolute_import
+
 DISTINFO = {
     'description': "easy HTML transcription",
     'keywords': ["python2", "python3"],
@@ -90,9 +92,32 @@ def transcribe(*tokens):
         [1] optionally a mapping of attribute values
         Further elements are tokens contained within this token.
   '''
+  return _transcribe(False, *tokens)
+
+def xtranscribe(*tokens):
+  ''' Transcribe tokens as XHTML text and yield text portions as generated.
+      A token is a string, a sequence or a Tag object.
+      A string is safely transcribed as flat text.
+      A sequence has:
+        [0] the tag name
+        [1] optionally a mapping of attribute values
+        Further elements are tokens contained within this token.
+  '''
+  return _transcribe(True, *tokens)
+
+def _transcribe(is_xhtml, *tokens):
+  ''' Transcribe tokens as HTML or XHTML text and yield text portions as generated.
+      A token is a string, a sequence or a Tag object.
+      A string is safely transcribed as flat text.
+      A sequence has:
+        [0] the tag name
+        [1] optionally a mapping of attribute values
+        Further elements are tokens contained within this token.
+  '''
   for tok in tokens:
     if isinstance(tok, StringTypes):
-      yield from transcribe_string(tok)
+      for txt in transcribe_string(tok):
+        yield txt
       continue
     if isinstance(tok, (int, float)):
       yield str(tok)
@@ -128,14 +153,16 @@ def transcribe(*tokens):
       yield comment_text
       yield ' -->'
       continue
-    TAG = tag.upper()
-    isSCRIPT = (TAG == 'SCRIPT')
-    if isSCRIPT:
-      if 'LANGUAGE' not in [a.upper() for a in attrs.keys()]:
+    # HTML is case insensitive and XHTML has lower case tags
+    tag = tag.lower()
+    is_single = tag in ('br', 'img', 'hr', 'link', 'meta', 'input')
+    is_SCRIPT = (tag.lower() == 'script')
+    if is_SCRIPT:
+      if 'language' not in [a.lower() for a in attrs.keys()]:
         attrs['language'] = 'JavaScript'
       if 'src' in attrs:
         if tok:
-          warning("<SCRIPT> with src=, discarding internal tokens: %r", tokens)
+          warning("<script> with src=, discarding internal tokens: %r", tokens)
           tok = ()
     yield '<'
     yield tag
@@ -146,14 +173,20 @@ def transcribe(*tokens):
         yield '="'
         yield urlquote(str(v), safe="' =/#:;().,")
         yield '"'
+    if is_xhtml and is_single:
+      yield '/'
     yield '>'
     # protect inline SCRIPT source code with HTML comments
-    if isSCRIPT and 'src' not in attrs:
+    if is_SCRIPT and 'src' not in attrs:
       yield "<!--\n"
-    yield from transcribe(*tok)
-    if isSCRIPT and 'src' not in attrs:
+    for txt in _transcribe(is_xhtml, *tok):
+      if is_single:
+        error("content inside singleton tag %r!", tag)
+        break
+      yield txt
+    if is_SCRIPT and 'src' not in attrs:
       yield "\n-->"
-    if tag not in ('BR', 'IMG', 'HR', 'LINK', 'META', 'INPUT'):
+    if not is_xhtml and not is_single:
       yield '</'
       yield tag
       yield '>'
