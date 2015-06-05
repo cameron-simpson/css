@@ -35,6 +35,7 @@ re_SAFETEXT_DQ = re.compile(r'[-=., \w:@/?~#+&()]+')
 # convenience wrappers
 A = lambda *tok: ['A'] + list(tok)
 B = lambda *tok: ['B'] + list(tok)
+TH = lambda *tok: ['TH'] + list(tok)
 TD = lambda *tok: ['TD'] + list(tok)
 TR = lambda *tok: ['TR'] + list(tok)
 META = lambda name, content: ['META', {'name': name, 'content': content}]
