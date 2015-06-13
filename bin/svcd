@@ -111,13 +111,13 @@ fi
 # if command target user is not current user, prefix to commands to run as target
 if [ "x$username" = "x$ousername" ]
 then  command_as=
-else  command_as="sux $username"
+else  command_as="sux -u $username --"
 fi
 
 # if related command target user is not current user, prefix to commands to run as target
 if [ "x$username" = "x$rusername" ]
 then  rel_as=
-else  rel_as="sux $username"
+else  rel_as="sux -u $rusername --"
 fi
 
 uppername()
