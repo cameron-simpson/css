@@ -56,7 +56,7 @@ fi
 # if not once, wrap in svcd
 [ $once ] || \
 { set $trace \
-        svcd -x -n unbound -p "$svcdpidfile" -s get-default-route -- \
+        svcd -x -n unbound -p "$svcdpidfile" -s get-default-route -U "$username" -- \
           "$0" -1 -u "$username" -- ${1+"$@"}
   if [ $dosudo ]
   then  set -- $trace sudo env "HOST=$HOST" "TMPDIR=$TMPDIR" "$@"
