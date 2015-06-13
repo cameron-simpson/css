@@ -9,6 +9,7 @@ set -ue
 : ${VARRUN:=$HOME/var/run}
 : ${LOGDIR:=$HOME/var/log}
 : ${UNBOUND_DNS_UPSTREAM:=}     # server set, eg: opennic
+: ${TMPDIR:=/tmp}
 
 # note current username at startup
 ousername=`id -un`
@@ -50,7 +51,7 @@ done
 # if target user is not current user, prefix to commands to run as target
 if [ "x$username" = "x$ousername" ]
 then  as=
-else  as="sux $username"
+else  as="sux -u $username --"
 fi
 
 # if not once, wrap in svcd
