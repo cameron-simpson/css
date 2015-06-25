@@ -1,0 +1,17 @@
+#!/bin/sh
+#
+# Preload a squid reverse proxy. Expects to be run from the squid host.
+#   - Cameron Simpson <cs@zip.com.au> 25jun2015
+#
+
+set -ue
+
+for domain
+do
+  squid_conf=/app/reverse-proxy/$dom/squid.conf
+  http_port=$( awk '$1 == "http_port" { print $2; exit; }' "$squid_conf" )
+  env \
+    http_proxy=http://$http_port/ \
+    https_proxy=http://$http_port/ \
+    set-x wget -D "$domain" -r -l inf -p -nd --delete-after "http://$domain"
+done
