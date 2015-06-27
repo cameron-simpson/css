@@ -39,9 +39,9 @@ usage="Usage: $cmd [-1] [-l] [-L lockname] [-n name] [-t testcmd] [-x] command [
         Use lock \"lockname\" to prevent multiple instances of this svcd.
   -n name
         Specify a name for this svcd.
-        If specified, also create a pid file at $VARRUN/name.pid for the
-        command. This also causes svcd to consult the flags {NAME}_OVERRIDE
-        and {NAME}_DISABLE.
+        Also create a pid file at $VARRUN/name.pid for the command.
+        This also causes svcd to consult the flags {NAME}_OVERRIDE
+        and {NAME}_DISABLE and {NAME}_RESTART.
   -p pidfile
         Specify pidfile instead of default.
   -s sigcmd
