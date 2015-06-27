@@ -18,6 +18,7 @@ logdir=$LOGDIR/svc
 name=
 flag_disable=
 flag_override=
+flag_restart=
 pidfile=
 trace=
 setx=:
@@ -135,6 +136,7 @@ then
   [ -z "$pidfile" ] && pidfile=$VARRUN/$name.pid
   [ -n "$flag_disable" ] || flag_disable=${uname}_DISABLE
   [ -n "$flag_override" ] || flag_override=${uname}_OVERRIDE
+  [ -n "$flag_restart" ] || flag_restart=${uname}_RESTART
   pfx="$cmd $name"
 else
   # else just compute the prefix from the command
@@ -165,6 +167,12 @@ ok()
   [ -n "$flag_override" ] && $rel_as flag -w "$flag_override" && return 0
   [ -z "$flag_disable" ] || not $rel_as flag -w "$flag_disable" || return 1
   [ -z "$testcmd" ] || $rel_as sh -uec "$setx; $testcmd" || return 1
+  # restart flag returns not-ok and resets the flag
+  if [ -n "$flag_restart" ] && $rel_as flag -w "$flag_restart"
+  then
+    $rel_as flag "$flag_restart" 0
+    return 1
+  fi
   return 0
 }
 
