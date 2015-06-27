@@ -170,6 +170,7 @@ ok()
   # restart flag returns not-ok and resets the flag
   if [ -n "$flag_restart" ] && $rel_as flag -w "$flag_restart"
   then
+    $rel_as alert "SVCD $name: RESTART: flag $flag_restart" || :
     $rel_as flag "$flag_restart" 0
     return 1
   fi
