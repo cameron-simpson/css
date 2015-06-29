@@ -194,7 +194,9 @@ killsubproc()
   then
     if [ -s "$pidfile" ]
     then
-      lert "stop $pidfile"
+      ( short_pidfile=$(printf '%s\n' "$pidfile" | entilde)
+        lert "kill $short_pidfile:" $(cat "$pidfile")
+      ) &
       $trace killpidfile -W "$killtime" -- "$pidfile"
       rm -f "$pidfile"
     fi
@@ -215,9 +217,9 @@ do
   if ok
   then
     # dispatch actual service process
-    lert "start: $*"
     pfx "$pfx" $trace $command_as "$@" &
     subpid=$!
+    lert "spawned pid $subpid: $*"
     [ -n "$pidfile" ] && echo "$subpid" >"$pidfile"
 
     # dispatch monitor to terminate service daemon if no longer ok to run
