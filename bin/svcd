@@ -153,13 +153,13 @@ then
   exit 1
 fi
 
-oldsignature=$( [ -z "$sigcmd" ] || $rel_as sh -uec "$sigcmd" )
-
 # issue an alert message
 lert()
 {
   [ $quiet ] || $rel_as alert "SVCD $name: $*" || :
 }
+
+oldsignature=$( [ -z "$sigcmd" ] || $rel_as sh -uec "$sigcmd" )
 
 ok()
 {
