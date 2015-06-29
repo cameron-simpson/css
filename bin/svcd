@@ -26,6 +26,7 @@ setx=:
 once=
 testrate=7
 killtime=5
+quiet=
 sigcmd=
 testcmd=
 dolock=
@@ -44,6 +45,7 @@ usage="Usage: $cmd [-1] [-l] [-L lockname] [-n name] [-t testcmd] [-x] command [
         and {NAME}_DISABLE and {NAME}_RESTART.
   -p pidfile
         Specify pidfile instead of default.
+  -q    Quiet. Do not issue alerts.
   -s sigcmd
         Run the signature shell command \"sigcmd\" whose output is
         used to check for changed circumstances requiring the service
@@ -71,6 +73,7 @@ do
     -L) dolock=1 lockname=$2; shift ;;
     -n) name=$2; shift ;;
     -p) pidfile=$2; shift ;;
+    -q) quiet=1 ;;
     -s) sigcmd=$2; shift ;;
     -t) testcmd=$2; shift ;;
     -T) testrate=$2; shift ;;
@@ -152,6 +155,12 @@ fi
 
 oldsignature=$( [ -z "$sigcmd" ] || $rel_as sh -uec "$sigcmd" )
 
+# issue an alert message
+lert()
+{
+  [ $quiet ] || $rel_as alert "SVCD $name: $*" || :
+}
+
 ok()
 {
   # check the signature for change
@@ -159,7 +168,7 @@ ok()
   then
     if [ "x$oldsignature" != "x$signature" ]
     then
-      $rel_as alert "SVCD $name: RESTART: signature $oldsignature ==> $signature" || :
+      lert "signature $oldsignature ==> $signature"
       oldsignature=$signature
       return 1
     fi
@@ -170,7 +179,7 @@ ok()
   # restart flag returns not-ok and resets the flag
   if [ -n "$flag_restart" ] && $rel_as flag -w "$flag_restart"
   then
-    $rel_as alert "SVCD $name: RESTART: flag $flag_restart" || :
+    lert "RESTART: flag $flag_restart"
     $rel_as flag "$flag_restart" 0
     return 1
   fi
@@ -185,11 +194,16 @@ killsubproc()
   then
     if [ -s "$pidfile" ]
     then
+      lert "stop $pidfile"
       $trace killpidfile -W "$killtime" -- "$pidfile"
       rm -f "$pidfile"
     fi
   else
-    [ -z "$subpid" ] || $trace killpids -W "$killtime" -- "$subpid"
+    if [ -n "$subpid" ]
+    then
+      lert "stop $subpid"
+      $trace killpids -W "$killtime" -- "$subpid"
+    fi
   fi
 }
 
@@ -201,6 +215,7 @@ do
   if ok
   then
     # dispatch actual service process
+    lert "start: $*"
     pfx "$pfx" $trace $command_as "$@" &
     subpid=$!
     [ -n "$pidfile" ] && echo "$subpid" >"$pidfile"
