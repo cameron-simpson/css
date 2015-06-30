@@ -9,8 +9,11 @@ set -ue
 : ${VARRUN:=$HOME/var/run}
 : ${LOGDIR:=$HOME/var/log}
 : ${UNBOUND_DNS_UPSTREAM:=}     # server set, eg: opennic
+: ${TMPDIR:=/tmp}
 
-username=`id -un`
+# note current username at startup
+ousername=`id -un`
+username=$ousername
 dosudo=
 once=
 trace=set-x
@@ -45,10 +48,16 @@ done
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+# if target user is not current user, prefix to commands to run as target
+if [ "x$username" = "x$ousername" ]
+then  as=
+else  as="sux -u $username --"
+fi
+
 # if not once, wrap in svcd
 [ $once ] || \
 { set $trace \
-        svcd -x -n unbound -p "$svcdpidfile" -s get-default-route -- \
+        svcd -x -n unbound -p "$svcdpidfile" -s get-default-route -U "$username" -- \
           "$0" -1 -u "$username" -- ${1+"$@"}
   if [ $dosudo ]
   then  set -- $trace sudo env "HOST=$HOST" "TMPDIR=$TMPDIR" "$@"
@@ -61,20 +70,20 @@ done
 # default upstream DNS servers
 if [ $# -gt 0 ]
 then
-  lastvalue unbound "$*"
+  $trace $as lastvalue unbound "$*"
 else
-  set -- `lastvalue unbound`
+  set -- `$as lastvalue unbound`
   echo "$cmd: using lastvalue unbound: $*" >&2
 fi
 
 for d in "$VARRUN" "$wkdir" "$LOGDIR"
-do  [ -d "$d/." ] || $trace mkdir "$d"
+do  [ -d "$d/." ] || $trace $as mkdir "$d"
 done
 
-$trace rewriteif -d "$cf" gen-unbound.conf -u "$username" -- ${1+"$@"}
-$trace unbound-checkconf "$cf"
+$trace $as rewriteif -d "$cf" gen-unbound.conf -u "$username" -- ${1+"$@"}
+$trace $as unbound-checkconf "$cf"
 
-set $trace unbound -d -c "$cf"
+set -- $trace unbound -d -c "$cf"
 if [ $dosudo ]
 then  set -- $trace sudo env "HOST=$HOST" "TMPDIR=$TMPDIR" "$@"
 fi
