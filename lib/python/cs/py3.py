@@ -24,7 +24,6 @@ if sys.hexversion >= 0x03000000:
     ''' Upgrade string to unicode: no-op for python 3.
     '''
     return s
-  from io import BytesIO, StringIO
   from queue import Queue, PriorityQueue, Full as Queue_Full, Empty as Queue_Empty
   from configparser import ConfigParser
   def iteritems(o):
@@ -51,11 +50,6 @@ else:
         warning("cs.py3.ustr(): %s: s = %s %r", ude, type(s), s)
         s = s.decode(e, 'replace')
     return s
-  try:
-    from cStringIO import StringIO as BytesIO
-  except ImportError:
-    from StringIO import StringIO as BytesIO
-  StringIO = BytesIO    # horribly wrong, I know
   from Queue import Queue, PriorityQueue, Full as Queue_Full, Empty as Queue_Empty
   from ConfigParser import SafeConfigParser as ConfigParser
   def iteritems(o):

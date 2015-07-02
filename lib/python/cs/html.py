@@ -4,6 +4,8 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
+from __future__ import absolute_import
+
 DISTINFO = {
     'description': "easy HTML transcription",
     'keywords': ["python2", "python3"],
@@ -15,34 +17,57 @@ DISTINFO = {
     'requires': ['cs.py3'],
 }
 
+from io import StringIO
 import re
 import sys
 try:
   from urllib.parse import quote as urlquote
 except ImportError:
   from urllib import quote as urlquote
+from cs.logutils import warning, X
 from cs.py3 import StringTypes
 
 # Characters safe to transcribe unescaped.
 re_SAFETEXT = re.compile(r'[^<>&]+')
 # Characters safe to use inside "" in tag attribute values.
-re_SAFETEXT_DQ = re.compile(r'[-=. \w:@/?~#+&]+')
+re_SAFETEXT_DQ = re.compile(r'[-=., \w:@/?~#+&()]+')
 
 # convenience wrappers
 A = lambda *tok: ['A'] + list(tok)
 B = lambda *tok: ['B'] + list(tok)
+TH = lambda *tok: ['TH'] + list(tok)
 TD = lambda *tok: ['TD'] + list(tok)
 TR = lambda *tok: ['TR'] + list(tok)
+META = lambda name, content: ['META', {'name': name, 'content': content}]
+LINK = lambda rel, href, **kw: ['LINK',
+                                dict([('rel', rel), ('href', href)] + list(kw.items()))]
+SCRIPT_SRC = lambda src, ctype='text/javascript': [ 'SCRIPT', {'src': src, 'type': ctype}]
 
-def page_HTML(title, *tokens):
-  ''' Covenience function returning an '<HTML>' token for a page.
+comment = lambda *tok: ['<!--'] + list(tok)
+entity = lambda entity_name: [ '&' + entity_name + ';' ]
+
+def page_HTML(title, *tokens, **kw):
+  ''' Convenience function returning an '<HTML>' token for a page.
+      Keyword parameters:
+      `content_type`: "http-equiv" Content-Type, default: "text/html; charset=UTF-8".
+      'head_tokens`: optional extra markup tokens for the HEAD section.
+      'body_attrs`: optional attributes for the BODY section tag.
   '''
-  body = ['BODY']
+  content_type = kw.pop('content_type', 'text/html; charset=UTF-8')
+  head_tokens = kw.pop('head_tokens', ())
+  body_attrs = kw.pop('body_attrs', {})
+  if kw:
+    raise ValueError("unexpected keywords: %r" % (kw,))
+  body = ['BODY', body_attrs]
   body.extend(tokens)
+  head = ['HEAD',
+          ['META', {
+              'http-equiv': 'Content-Type', 'content': content_type}], '\n',
+          ['TITLE', title], '\n',
+          ]
+  head.extend(head_tokens)
   return ['HTML',
-          ['HEAD',
-           ['TITLE', title]
-           ],
+          head,
           body,
           ]
 
@@ -68,9 +93,32 @@ def transcribe(*tokens):
         [1] optionally a mapping of attribute values
         Further elements are tokens contained within this token.
   '''
+  return _transcribe(False, *tokens)
+
+def xtranscribe(*tokens):
+  ''' Transcribe tokens as XHTML text and yield text portions as generated.
+      A token is a string, a sequence or a Tag object.
+      A string is safely transcribed as flat text.
+      A sequence has:
+        [0] the tag name
+        [1] optionally a mapping of attribute values
+        Further elements are tokens contained within this token.
+  '''
+  return _transcribe(True, *tokens)
+
+def _transcribe(is_xhtml, *tokens):
+  ''' Transcribe tokens as HTML or XHTML text and yield text portions as generated.
+      A token is a string, a sequence or a Tag object.
+      A string is safely transcribed as flat text.
+      A sequence has:
+        [0] the tag name
+        [1] optionally a mapping of attribute values
+        Further elements are tokens contained within this token.
+  '''
   for tok in tokens:
     if isinstance(tok, StringTypes):
-      yield from transcribe_string(tok)
+      for txt in transcribe_string(tok):
+        yield txt
       continue
     if isinstance(tok, (int, float)):
       yield str(tok)
@@ -92,27 +140,56 @@ def transcribe(*tokens):
         attrs = tok.pop(0)
       else:
         attrs = {}
-    TAG = tag.upper()
-    isSCRIPT = (TAG == 'SCRIPT')
-    if isSCRIPT:
-      if 'LANGUAGE' not in [a.upper() for a in attrs.keys()]:
+    if tag == '<!--':
+      yield '<!-- '
+      buf = StringIO()
+      for t in tok:
+        if not isinstance(t, StringTypes):
+          raise ValueError("invalid non-string inside \"<!--\" comment: %r" % (t,))
+        buf.write(t)
+      comment_text = buf.getvalue()
+      buf.close()
+      if '-->' in comment_text:
+        raise ValueError("invalid \"-->\" inside \"<!--\" comment: %r" % (comment,))
+      yield comment_text
+      yield ' -->'
+      continue
+    # HTML is case insensitive and XHTML has lower case tags
+    tag = tag.lower()
+    is_single = tag in ('br', 'img', 'hr', 'link', 'meta', 'input')
+    is_SCRIPT = (tag.lower() == 'script')
+    if is_SCRIPT:
+      if 'language' not in [a.lower() for a in attrs.keys()]:
         attrs['language'] = 'JavaScript'
+      if 'src' in attrs:
+        if tok:
+          warning("<script> with src=, discarding internal tokens: %r", tokens)
+          tok = ()
     yield '<'
     yield tag
     for k, v in attrs.items():
       yield ' '
       yield k
+      if is_xhtml and v is None:
+        v = k
       if v is not None:
         yield '="'
-        yield urlquote(str(v), safe=' /#:;')
+        yield urlquote(str(v), safe="' =/#:;().,")
         yield '"'
+    if is_xhtml and is_single:
+      yield '/'
     yield '>'
-    if isSCRIPT:
+    # protect inline SCRIPT source code with HTML comments
+    if is_SCRIPT and 'src' not in attrs:
       yield "<!--\n"
-    yield from transcribe(*tok)
-    if isSCRIPT:
+    for txt in _transcribe(is_xhtml, *tok):
+      if is_single:
+        error("content inside singleton tag %r!", tag)
+        break
+      yield txt
+    if is_SCRIPT and 'src' not in attrs:
       yield "\n-->"
-    if tag not in ('BR', 'IMG', 'HR'):
+    if not is_single:
       yield '</'
       yield tag
       yield '>'

@@ -11,10 +11,14 @@ set -ue
 : ${VARRUN:=$HOME/var/run}
 : ${DEBUG:=''}
 
+ousername=`id -un`
+username=$ousername
+rusername=$username
 logdir=$LOGDIR/svc
 name=
 flag_disable=
 flag_override=
+flag_restart=
 pidfile=
 trace=
 setx=:
@@ -22,6 +26,8 @@ setx=:
 once=
 testrate=7
 killtime=5
+quiet=
+sigcmd=
 testcmd=
 dolock=
 lockname=
@@ -34,14 +40,25 @@ usage="Usage: $cmd [-1] [-l] [-L lockname] [-n name] [-t testcmd] [-x] command [
         Use lock \"lockname\" to prevent multiple instances of this svcd.
   -n name
         Specify a name for this svcd.
-        If specified, also create a pid file at $VARRUN/name.pid for the
-        command. This also causes svcd to consult the flags {NAME}_OVERRIDE
-        and {NAME}_DISABLE.
+        Also create a pid file at $VARRUN/name.pid for the command.
+        This also causes svcd to consult the flags {NAME}_OVERRIDE
+        and {NAME}_DISABLE and {NAME}_RESTART.
+  -p pidfile
+        Specify pidfile instead of default.
+  -q    Quiet. Do not issue alerts.
+  -s sigcmd
+        Run the signature shell command \"sigcmd\" whose output is
+        used to check for changed circumstances requiring the service
+        to restart.
   -t testcmd
-        Run the test command \"testcmd\" periodically to govern whether the
-        command should be active.
+        Run the test shell command \"testcmd\" periodically to
+        govern whether the command should be active.
   -T testrate
         Interval between test polls in seconds. Default: $testrate
+  -u username
+        Run command as the specified username.
+  -U username
+        Run test and related commands as the specified username.
   -x    Trace execution."
 
 badopts=
@@ -55,8 +72,13 @@ do
     -l) dolock=1 ;;
     -L) dolock=1 lockname=$2; shift ;;
     -n) name=$2; shift ;;
+    -p) pidfile=$2; shift ;;
+    -q) quiet=1 ;;
+    -s) sigcmd=$2; shift ;;
     -t) testcmd=$2; shift ;;
     -T) testrate=$2; shift ;;
+    -u) username=$2; shift ;;
+    -U) rusername=$2; shift ;;
     -x) trace=set-x setx='set -x' opts="$opts $1" ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
@@ -90,49 +112,100 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+# if command target user is not current user, prefix to commands to run as target
+if [ "x$username" = "x$ousername" ]
+then  command_as=
+else  command_as="sux -u $username --"
+fi
+
+# if related command target user is not current user, prefix to commands to run as target
+if [ "x$username" = "x$rusername" ]
+then  rel_as=
+else  rel_as="sux -u $rusername --"
+fi
+
 uppername()
 { echo "$1" | tr -- '-[a-z]' '_[A-Z]'
 }
 
+# rerun ourself inside a lock if specified
 [ $dolock ] \
-&& exec $trace lock -1 "$lockname" "$0" $opts -n "$name" -t "$testcmd" -- "$@"
+&& exec $trace lock -1 "$lockname" "$0" $opts -n "$name" -t "$testcmd" -u "$username" -U "$rusername" -- "$@"
 
 if [ -n "$name" ]
 then
+  # recompute various things with the service name if specified
   uname=$( uppername "$name" )
   [ -z "$pidfile" ] && pidfile=$VARRUN/$name.pid
   [ -n "$flag_disable" ] || flag_disable=${uname}_DISABLE
   [ -n "$flag_override" ] || flag_override=${uname}_OVERRIDE
+  [ -n "$flag_restart" ] || flag_restart=${uname}_RESTART
   pfx="$cmd $name"
 else
+  # else just compute the prefix from the command
   pfx="$cmd $1"
 fi
 
+# sanity check - is this process already active elsewhere?
 if [ -n "$pidfile" ] && pid=`ifpid -q -v "$pidfile"`
 then
   echo "$cmd: $pidfile: already running, pid $pid:" `ps -o args -p "$pid" 2>/dev/null | sed 1d` >&2
   exit 1
 fi
 
+# issue an alert message
+lert()
+{
+  [ $quiet ] || $rel_as alert "SVCD $name: $*" || :
+}
+
+oldsignature=$( [ -z "$sigcmd" ] || $rel_as sh -uec "$sigcmd" )
+
 ok()
 {
-  [ -n "$flag_override" ] && flag -w "$flag_override" && return 0
-  [ -z "$flag_disable" ] || not flag -w "$flag_disable" || return 1
-  [ -z "$testcmd" ] || sh -uec "$setx; $testcmd" || return 1
+  # check the signature for change
+  if signature=$( [ -z "$sigcmd" ] || $rel_as sh -uec "$sigcmd" )
+  then
+    if [ "x$oldsignature" != "x$signature" ]
+    then
+      lert "signature $oldsignature ==> $signature"
+      oldsignature=$signature
+      return 1
+    fi
+  fi
+  [ -n "$flag_override" ] && $rel_as flag -w "$flag_override" && return 0
+  [ -z "$flag_disable" ] || not $rel_as flag -w "$flag_disable" || return 1
+  [ -z "$testcmd" ] || $rel_as sh -uec "$setx; $testcmd" || return 1
+  # restart flag returns not-ok and resets the flag
+  if [ -n "$flag_restart" ] && $rel_as flag -w "$flag_restart"
+  then
+    lert "RESTART: flag $flag_restart"
+    $rel_as flag "$flag_restart" 0
+    return 1
+  fi
   return 0
 }
 
+# kill the process specified by $pidfile (if nonempty) otherwise $subpid
+# wait for it to terminate
 killsubproc()
 {
   if [ -n "$pidfile" ]
   then
     if [ -s "$pidfile" ]
     then
+      ( short_pidfile=$(printf '%s\n' "$pidfile" | entilde)
+        lert "kill $short_pidfile:" $(cat "$pidfile")
+      ) &
       $trace killpidfile -W "$killtime" -- "$pidfile"
       rm -f "$pidfile"
     fi
   else
-    [ -z "$subpid" ] || $trace killpids -W "$killtime" -- "$subpid"
+    if [ -n "$subpid" ]
+    then
+      lert "stop $subpid"
+      $trace killpids -W "$killtime" -- "$subpid"
+    fi
   fi
 }
 
@@ -144,8 +217,9 @@ do
   if ok
   then
     # dispatch actual service process
-    pfx "$pfx" $trace "$@" &
+    pfx "$pfx" $trace $command_as "$@" &
     subpid=$!
+    lert "spawned pid $subpid: $*"
     [ -n "$pidfile" ] && echo "$subpid" >"$pidfile"
 
     # dispatch monitor to terminate service daemon if no longer ok to run
@@ -159,6 +233,9 @@ do
       ) &
     )
 
+    # wait for the subprocess
+    # or check it isn't there
+    # or kill it (and wait)
     wait "$subpid" || not kill -0 "$subpid" 2>/dev/null || killsubproc
     subpid=
     [ -n "$pidfile" ] && rm -f "$pidfile"

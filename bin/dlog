@@ -19,13 +19,16 @@ when=${DLOG_WHEN:-}
 
 [ -t 0 ] && exec </dev/null
 
-if not flag DLOG_LOCAL && [ "x$HOST" != "x$HOMEHOST" ]
+if [ -n "${HOMEHOST:-}" ]
 then
-  if flag DLOG_REMOTE_DISABLE
+  if not flag DLOG_LOCAL && [ "x$HOST" != "x$HOMEHOST" ]
   then
-    $echo "$cmd: flag DLOG_REMOTE_DISABLE: logging locally"
-  else
-    exec $trace sshx "$HOMEHOST" ./bin/with-login-env dlog ${1+"$@"}
+    if flag DLOG_REMOTE_DISABLE
+    then
+      $echo "$cmd: flag DLOG_REMOTE_DISABLE: logging locally"
+    else
+      exec $trace sshx "$HOMEHOST" ./bin/with-login-env dlog ${1+"$@"}
+    fi
   fi
 fi
 

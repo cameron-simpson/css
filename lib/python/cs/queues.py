@@ -438,7 +438,7 @@ class TimerQueue(object):
           # function due now - run it
           try:
             retval = func()
-          except:
+          except Exception:
             exception("func %s threw exception", func)
           else:
             debug("func %s returns %s", func, retval)
@@ -455,7 +455,7 @@ class TimerQueue(object):
             if Tfunc:
               try:
                 retval = Tfunc()
-              except:
+              except Exception:
                 exception("func %s threw exception", Tfunc)
               else:
                 debug("func %s returns %s", Tfunc, retval)

@@ -4,6 +4,8 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
+from __future__ import absolute_import
+
 DISTINFO = {
     'description': "functions and classes to work with email",
     'keywords': ["python2", "python3"],
@@ -18,6 +20,7 @@ DISTINFO = {
 import email.message
 import email.parser
 from email.utils import getaddresses
+from io import StringIO
 from itertools import chain
 import mailbox
 import os
@@ -29,10 +32,10 @@ from tempfile import NamedTemporaryFile
 from threading import Lock
 import time
 from cs.fileutils import Pathname, shortpath as _shortpath
-from cs.logutils import Pfx, info, warning, debug, D, X
+from cs.logutils import Pfx, info, warning, exception, debug, D, X
 from cs.threads import locked_property
 from cs.seq import seq
-from cs.py3 import StringIO, StringTypes
+from cs.py3 import StringTypes
 
 SHORTPATH_PREFIXES = ( ('$MAILDIR/', '+'), ('$HOME/', '~/') )
 
@@ -46,7 +49,7 @@ def Message(msgfile, headersonly=False):
     # msgfile presumed to be filename
     pathname = msgfile
     with Pfx(pathname):
-      with open(pathname) as mfp:
+      with open(pathname, errors='replace') as mfp:
         M = Message(mfp, headersonly=headersonly)
         M.pathname = pathname
         return M
@@ -66,21 +69,27 @@ def message_addresses(M, header_names):
         else:
           yield realname, address
 
-def modify_header(M, hdr, new_value, always=False):
-  ''' Modify a Message `M` to change the value of the named header `hdr` to the new value `new_value`.
-      If `new_value` differs from the existing value or if `always`
+def modify_header(M, hdr, new_values, always=False):
+  ''' Modify a Message `M` to change the value of the named header `hdr` to the new value `new_values` (a string or an interable of strings).
+      If `new_values` is a string subclass, convert to a single element list.
+      If `new_values` differs from the existing value or if `always`
       is true, save the old value as X-Old-`hdr`.
       Return a Boolean indicating whether the headers were modified.
   '''
+  if isinstance(new_values, StringTypes):
+    new_values = [new_values]
+  else:
+    new_values = list(new_values)
   modified = False
-  old_value = M.get(hdr, '')
-  if always or old_value != new_value:
+  old_values = M.get_all(hdr, ())
+  if always or old_values != new_values:
     modified = True
     old_hdr = 'X-Old-' + hdr
-    for old_value in M.get_all(hdr, ()):
+    for old_value in old_values:
       M.add_header("X-Old-" + hdr, old_value)
     del M[hdr]
-    M[hdr] = new_value
+    for new_value in new_values:
+      M.add_header(hdr, new_value)
   return modified
 
 def ismhdir(path):
@@ -262,8 +271,8 @@ class Maildir(mailbox.Maildir):
       try:
         debug("rename %s => %s", tmppath, newpath)
         os.rename(tmppath, newpath)
-      except:
-        debug("unlink %s", tmppath)
+      except Exception as e:
+        exception("%s: unlink %s", e, tmppath)
         os.unlink(tmppath)
         raise
       self.msgmap[key] = ('new', newbase)

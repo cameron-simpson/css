@@ -12,9 +12,16 @@ import re
 import time
 from getopt import getopt, GetoptError
 from datetime import datetime, timedelta
-from cs.logutils import setup_logging, error, warning, Pfx
+from cs.logutils import setup_logging, error, warning, debug, Pfx
 
-re_MULTIADDRS = re.compile(r'^[^ ,]* *,( |%20)*')
+# an IPv4 address, no numeric range checks
+re_IPV4_ADDR_s = r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}'
+re_IPV4_ADDR = re.compile(re_IPV4_ADDR_s)
+
+# multiple IP addrs from legitimate X-Forwarded-For: headers
+# .group(3) is the final IP address for preservation
+re_MULTIADDRS_s = r'^(%s,( |%%20)+)+(%s) ' % (re_IPV4_ADDR_s,re_IPV4_ADDR_s)
+re_MULTIADDRS = re.compile(re_MULTIADDRS_s)
 
 def main(argv):
   argv = list(argv)
@@ -83,7 +90,7 @@ def main(argv):
   return 0
 
 def aptime(logline, zones, defaultZone):
-  ''' Compute a datetime object from the supplied Apache log line.
+  ''' Compute a datetime object from the supplied Apache or Squid log line.
       `defaultZone` is the timezone to use if it cannot be deduced.
   '''
   fields = logline.split()
@@ -133,10 +140,20 @@ def aptime(logline, zones, defaultZone):
         dt = None
 
   if dt is None:
-    warning("bad human time in log line: %s", logline)
+    # try for leading UNIX time, as from squid
+    if '.' in fields[0]:
+      try:
+        when = float(fields[0])
+      except ValueError, e:
+        dt = None
+      else:
+        # no timezone needed
+        dt = datetime.fromtimestamp(when)
+        return dt
+    # still no joy, fail parse
     return None
 
-  # use defaultZone if tzinfo is not set
+  # we have a human time, use defaultZone if tzinfo is not set
   if tzinfo is None:
     tzinfo = defaultZone
 
@@ -144,7 +161,7 @@ def aptime(logline, zones, defaultZone):
     if len(tzinfo) != 5 \
     or tzinfo[0] not in '+-' \
     or not tzinfo[1:5].isdigit():
-      warning("bad timezone offset (%s) in log line: %s", tzinfo, logline)
+      warning("bad timezone offset (%s)", tzinfo)
       return None
     tzoff = (int(tzinfo[1:3])*60+int(tzinfo[3:5]))*60
     if tzinfo[0] == '+':
@@ -158,44 +175,46 @@ def aptime(logline, zones, defaultZone):
 
   return dt
 
-def apdata(fp, zones, defaultZone, requireOrdering, multiAddrs, fgrep):
+def apdata(fp, zones, defaultZone, requireOrdering, multiAddrs, fgrep, fplabel=None):
   ''' Generator to yield (dt, apline) from Apache log data `fp`.
   '''
+  if fplabel is None:
+    fplabel = str(fp)
+
   if isinstance(fp, str):
     filename = fp
     if filename.endswith('.gz'):
       try:
         with gzip.open(filename) if filename.endswith('.gz') else open(filename) as fp:
-          for dt, apline in apdata(fp, zones, defaultZone, requireOrdering, multiAddrs, fgrep):
+          for dt, apline in apdata(fp, zones, defaultZone, requireOrdering, multiAddrs, fgrep, fplabel=filename):
             yield dt, apline
       except IOError as e:
         error("%s: %s", filename, e)
     return
 
-  olddt = None
-  lineno = 0
-  for apline in fp:
-    lineno += 1
-    if not apline.endswith('\n'):
-      raise ValueError("%s:%d: missing trailing newline" % (fp, lineno))
-    apline = apline[:-1]
-    if fgrep and fgrep not in apline:
-      continue
-    if multiAddrs:
-      m = re_MULTIADDRS.match(apline)
-      while m is not None:
-        apline = apline[m.end():]
-        m = re_MULTIADDRS.match(apline)
-    dt = aptime(apline, zones, defaultZone)
-    if dt is None:
-      warning("%s:%d: cannot compute datetime, discarding line: %s", fp, lineno, apline)
-      continue
-    if requireOrdering:
-      if olddt is not None and olddt > dt:
-        raise ValueError("%s:%d: out of order timestamps: old=%s, new=%s" % (fp, lineno, olddt, dt))
-
-    yield dt, apline
-    olddt = dt
+  with Pfx("%s", fplabel):
+    olddt = None
+    for lineno, apline in enumerate(fp, 1):
+      with Pfx("%d", lineno):
+        if not apline.endswith('\n'):
+          raise ValueError("missing trailing newline")
+        apline = apline[:-1]
+        if fgrep and fgrep not in apline:
+          continue
+        if multiAddrs:
+          # probe for leading "ipaddr, ipaddr, ipaddr" and keep last one
+          m = re_MULTIADDRS.match(apline)
+          if m:
+            apline = m.group(3) + ' ' + apline[m.end():]
+        dt = aptime(apline, zones, defaultZone)
+        if dt is None:
+          debug("cannot compute datetime, discarding")
+          continue
+        if requireOrdering:
+          if olddt is not None and olddt > dt:
+            raise ValueError("out of order timestamps: old=%s, new=%s" % (olddt, dt))
+        yield dt, apline
+        olddt = dt
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
