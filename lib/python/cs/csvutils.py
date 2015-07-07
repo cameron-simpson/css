@@ -107,16 +107,29 @@ class SharedCSVFile(SharedAppendLines):
     for row in self._csvr:
       importer(row)
 
-  def transcribe_update(self, fp, row):
-    ''' Transcribe an update `row` to the supplied file `fp`.
-    '''
-    # sanity check: we should only be writing between foreign updates
-    # and foreign updates should always be complete lines
-    if len(self._csv_partials):
-      warning("%s._transcribe_update while non-empty partials[]: %r",
-              self, self._csv_partials)
-    sfp = BytesIO()
-    csv_writerow(csv.writer(sfp), row, encoding='utf-8')
-    line = sfp.getvalue().decode('utf-8')
-    fp.write(line)
-    sfp.flush()
+  if sys.hexversion >= 0x03000000:
+    # python 3 onwards
+    def transcribe_update(self, fp, row):
+      ''' Transcribe an update `row` to the supplied file `fp`.
+      '''
+      # sanity check: we should only be writing between foreign updates
+      # and foreign updates should always be complete lines
+      if len(self._csv_partials):
+        warning("%s._transcribe_update while non-empty partials[]: %r",
+                self, self._csv_partials)
+      csv_writerow(csv.writer(fp), row, encoding='utf-8')
+  else:
+    # python 2
+    def transcribe_update(self, fp, row):
+      ''' Transcribe an update `row` to the supplied file `fp`.
+      '''
+      # sanity check: we should only be writing between foreign updates
+      # and foreign updates should always be complete lines
+      if len(self._csv_partials):
+        warning("%s._transcribe_update while non-empty partials[]: %r",
+                self, self._csv_partials)
+      sfp = BytesIO()
+      csv_writerow(csv.writer(sfp), row, encoding='utf-8')
+      line = sfp.getvalue().decode('utf-8')
+      fp.write(line)
+      sfp.flush()
