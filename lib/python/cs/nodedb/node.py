@@ -759,6 +759,22 @@ class NodeDB(dict, O):
     for key in list(self.keys()):
       self[key]._scrub()
 
+  def _update_local(self, update):
+    ''' Apply an update to the NodeDB values without updating the backend.
+    '''
+    do_append, t, name, attr, values = update
+    N = self.make( (t, name) )
+    if do_append:
+      # simple append of values
+      N[attr]._extend_local(values)
+    else:
+      if attr is None:
+        # reset whole Node
+        N._scrub_local()
+      else:
+        # reset specified attribute
+        N[attr]._scrub_local()
+
   def useNoNode(self):
     ''' Enable "no node" mode.
         After this call, a reference to a missing .ATTR will return
