@@ -30,7 +30,7 @@ import sys
 from threading import Thread
 from cs.debug import trace
 from cs.fileutils import SharedAppendLines
-from cs.logutils import warning
+from cs.logutils import Pfx, warning
 from cs.queues import IterableQueue
 
 if sys.hexversion < 0x03000000:
@@ -70,7 +70,8 @@ else:
     return csv.reader(fp)
 
   def csv_writerow(csvw, row, encoding='utf-8'):
-    return csvw.writerow(row)
+    with Pfx("csv_writerow(csvw=%s, row=%r, encoding=%r)", csvw, row, encoding):
+      return csvw.writerow(row)
 
 class SharedCSVFile(SharedAppendLines):
   ''' Shared access to a CSV file in UTF-8 encoding.
