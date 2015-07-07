@@ -33,7 +33,21 @@ from cs.fileutils import SharedAppendLines
 from cs.logutils import Pfx, warning
 from cs.queues import IterableQueue
 
-if sys.hexversion < 0x03000000:
+if sys.hexversion >= 0x03000000:
+  # python 3 onwards
+
+  def csv_reader(fp, encoding='utf-8', errors='replace'):
+    ''' Read the file `fp` using csv.reader.
+        Yield the rows.
+    '''
+    return csv.reader(fp)
+
+  def csv_writerow(csvw, row, encoding='utf-8'):
+    with Pfx("csv_writerow(csvw=%s, row=%r, encoding=%r)", csvw, row, encoding):
+      return csvw.writerow(row)
+
+else:
+  # python 2 compatability code
 
   def csv_reader(fp, encoding='utf-8', errors='replace'):
     ''' Read the file `fp` using csv.reader and decode the str
@@ -60,18 +74,6 @@ if sys.hexversion < 0x03000000:
         default 'utf-8'.
     '''
     csvw.writerow([unicode(value).encode(encoding) for value in row])
-
-else:
-
-  def csv_reader(fp, encoding='utf-8', errors='replace'):
-    ''' Read the file `fp` using csv.reader.
-        Yield the rows.
-    '''
-    return csv.reader(fp)
-
-  def csv_writerow(csvw, row, encoding='utf-8'):
-    with Pfx("csv_writerow(csvw=%s, row=%r, encoding=%r)", csvw, row, encoding):
-      return csvw.writerow(row)
 
 class SharedCSVFile(SharedAppendLines):
   ''' Shared access to a CSV file in UTF-8 encoding.
