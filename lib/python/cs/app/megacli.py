@@ -30,8 +30,10 @@ from cs.threads import locked_property
 from cs.obj import O, O_merge
 
 USAGE = '''Usage:
-    %s report
+    %s locate enc_slot [{start|stop}]
     %s new_raid raid_level enc:devid...
+    %s report
+    %s save save_file
     %s status'''
 
 # default location of MegaCLI executable
@@ -48,7 +50,7 @@ def main(argv=None):
   argv = list(argv)
   cmd = argv.pop(0)
   setup_logging(cmd)
-  usage = USAGE % (cmd, cmd, cmd)
+  usage = USAGE % (cmd, cmd, cmd, cmd, cmd)
 
   badopts = False
 
@@ -103,6 +105,24 @@ def main(argv=None):
         save_file, = argv
         if save_raid(save_file) != 0:
           xit = 1
+      elif command == "locate":
+        enc_slot = argv.pop(0)
+        if argv:
+          do_start = argv.pop(0)
+          if do_start == "start":
+            do_start = true
+          elif do_start == "stop":
+            do_start = False
+          else:
+            warning("locate: bad start/stop setting: %r", do_start)
+            badopts = True
+          if argv:
+            warning("locate: extra arguments after start/stop: %s", ' '.join(argv))
+            badopts = True
+        else:
+          do_start = True
+        if not badopts:
+          M.locate(adapter, enc_slot, do_start)
       elif command == "new_raid":
         if len(argv) < 2:
           warning("new_raid: missing raid_level or drives")
@@ -339,6 +359,19 @@ class MegaRAID(O):
                 A.physical_disks[DRV.id] = DRV
 
         return M
+
+  def locate(self, adapter, enc_slot, do_start=True):
+    ''' Start or stop to location light on the specified drive.
+    '''
+    if do_start:
+      start_opt = '-start'
+    else:
+      start_opt = '-stop'
+    return self.docmd('-PdLocate',
+                      start_opt,
+                      '-physdrv[%s]' % (enc_slot,),
+                      '-a%d' % (adapter,),
+                     )
 
   def new_raid(self, level, enc_slots, adapter=0):
     ''' Construct a new RAID device with specified RAID `level` on
