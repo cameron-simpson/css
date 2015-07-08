@@ -32,6 +32,7 @@ from cs.obj import O, O_merge
 USAGE = '''Usage:
     %s locate enc_slot [{start|stop}]
     %s new_raid raid_level enc:devid...
+    %s offline enc_slot
     %s report
     %s save save_file
     %s status'''
@@ -50,7 +51,7 @@ def main(argv=None):
   argv = list(argv)
   cmd = argv.pop(0)
   setup_logging(cmd)
-  usage = USAGE % (cmd, cmd, cmd, cmd, cmd)
+  usage = USAGE % (cmd, cmd, cmd, cmd, cmd, cmd)
 
   badopts = False
 
@@ -123,6 +124,13 @@ def main(argv=None):
           do_start = True
         if not badopts:
           M.locate(adapter, enc_slot, do_start)
+      elif command == "offline":
+        enc_slot = argv.pop(0)
+        if argv:
+          warning("locate: extra arguments after start/stop: %s", ' '.join(argv))
+          badopts = True
+        if not badopts:
+          M.offline(adapter, enc_slot)
       elif command == "new_raid":
         if len(argv) < 2:
           warning("new_raid: missing raid_level or drives")
@@ -369,6 +377,14 @@ class MegaRAID(O):
       start_opt = '-stop'
     return self.docmd('-PdLocate',
                       start_opt,
+                      '-physdrv[%s]' % (enc_slot,),
+                      '-a%d' % (adapter,),
+                     )
+
+  def offline(self, adapter, enc_slot):
+    ''' Take a drive offline (==> failed).
+    '''
+    return self.docmd('-PDOffline',
                       '-physdrv[%s]' % (enc_slot,),
                       '-a%d' % (adapter,),
                      )
