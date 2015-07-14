@@ -136,14 +136,14 @@ if [ -n "$name" ]
 then
   # recompute various things with the service name if specified
   uname=$( uppername "$name" )
-  [ -z "$pidfile" ] && pidfile=$VARRUN/$name.pid
+  [ -z "$pidfile" ] && pidfile=$VARRUN/svcd-$name.pid
   [ -n "$flag_disable" ] || flag_disable=${uname}_DISABLE
   [ -n "$flag_override" ] || flag_override=${uname}_OVERRIDE
   [ -n "$flag_restart" ] || flag_restart=${uname}_RESTART
   pfx="$cmd $name"
 else
   # else just compute the prefix from the command
-  pfx="$cmd $1"
+  pfx="$cmd-$1"
 fi
 
 # sanity check - is this process already active elsewhere?
