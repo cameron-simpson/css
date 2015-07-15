@@ -6,6 +6,8 @@
 
 set -ue
 
+trace=
+[ -t 2 ] && trace=set-x
 from_addr=
 add_addr=add@getpocket.com
 
@@ -20,8 +22,8 @@ add_link() {
     echo "To: $add_addr"
     echo "Subject: add link $1"
     echo
-    echo "$1"
-  ) | sendmail -oi "$add_addr"
+    $trace echo "$1"
+  ) | $trace sendmail -f "$add_addr" -oi "$add_addr"
 }
 
 if [ $# = 0 ]
