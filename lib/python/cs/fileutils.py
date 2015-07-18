@@ -554,10 +554,10 @@ def lockfile(path, ext=None, poll_interval=None, timeout=None):
       time.sleep(sleep_for)
       continue
     else:
-      os.close(lockfd)
-      yield lockpath
-      os.remove(lockpath)
       break
+  os.close(lockfd)
+  yield lockpath
+  os.remove(lockpath)
 
 def max_suffix(dirpath, pfx):
   ''' Compute the highest existing numeric suffix for names starting with the prefix `pfx`.
