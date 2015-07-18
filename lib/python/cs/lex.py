@@ -286,6 +286,12 @@ def get_identifier(s, offset=0, alpha=ascii_letters, number=digits, extras='_'):
   idtail, offset = get_chars(s, offset + 1, alpha + number + extras)
   return ch + idtail, offset
 
+def is_identifier(s, offset=0, alpha=ascii_letters, number=digits, extras='_'):
+  ''' Test if the string `s` is an identifier from position `offset` onward.
+  '''
+  s2, offset2 = get_identifier(s, offset=offset, alpha=alpha, number=number, extras=extras)
+  return s2 and offset2 == len(s)
+
 def get_uc_identifier(s, offset=0, number=digits, extras='_'):
   ''' Scan the string `s` for an identifier as for get_identifier(), but require the letters to be uppercase.
   '''
