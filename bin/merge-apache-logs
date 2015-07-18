@@ -12,7 +12,7 @@ import re
 import time
 from getopt import getopt, GetoptError
 from datetime import datetime, timedelta
-from cs.logutils import setup_logging, error, warning, Pfx
+from cs.logutils import setup_logging, error, warning, debug, Pfx
 
 # an IPv4 address, no numeric range checks
 re_IPV4_ADDR_s = r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}'
@@ -208,7 +208,7 @@ def apdata(fp, zones, defaultZone, requireOrdering, multiAddrs, fgrep, fplabel=N
             apline = m.group(3) + ' ' + apline[m.end():]
         dt = aptime(apline, zones, defaultZone)
         if dt is None:
-          warning("cannot compute datetime, discarding")
+          debug("cannot compute datetime, discarding")
           continue
         if requireOrdering:
           if olddt is not None and olddt > dt:

@@ -43,3 +43,18 @@ def a2date(s):
   ''' Create a date object from an ISO8601 YYYY-MM-DD date string.
   '''
   return date(*strptime(s, "%Y-%m-%d")[0:3])
+
+def parse_date(datestr):
+  ''' Parse a date specifcation and return a datetime.date, or None for empty strings.
+  '''
+  datestr = datestr.strip()
+  if not datestr:
+    return None
+  try:
+    parsed = strptime(datestr, '%Y-%m-%d')
+  except ValueError as e:
+    try:
+      parsed = strptime(datestr, '%d %B %Y')
+    except ValueError as e:
+      parsed = strptime(datestr, '%d/%m/%Y')
+  return date(parsed.tm_year, parsed.tm_mon, parsed.tm_mday)
