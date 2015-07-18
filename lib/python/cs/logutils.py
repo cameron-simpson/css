@@ -188,8 +188,8 @@ class PfxFormatter(Formatter):
     record.message = ': '.join(message_parts)
     return record.message
 
-def infer_logging_level():
-  ''' Infer a logging level from the environment.
+def infer_logging_level(env_debug=None, environ=None):
+  ''' Infer a logging level from the `env_debug`, which by default comes from the environment variable $DEBUG.
       Usually default to logging.WARNING, but if sys.stderr is a terminal,
       default to logging.INFO.
       Parse the environment variable $DEBUG as a comma separated
@@ -204,10 +204,13 @@ def infer_logging_level():
         "ERROR" => logging.ERROR
       Return the inferred logging level and the flags.
   '''
+  if env_debug is None:
+    if environ is None:
+      environ = os.environ
+    env_debug = os.environ.get('DEBUG', '')
   level = logging.WARNING
   if sys.stderr.isatty():
     level = logging.INFO
-  env_debug = os.environ.get('DEBUG', '')
   flags = [ F.upper() for F in env_debug.split(',') if len(F) ]
   for flag in flags:
     if flag == 'DEBUG':
