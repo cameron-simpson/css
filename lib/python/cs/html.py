@@ -95,6 +95,12 @@ def transcribe(*tokens):
   '''
   return _transcribe(False, *tokens)
 
+def transcribe_s(*tokens):
+  ''' Transcribe tokens as HTML text and return the text.
+      Convenience wrapper for transcribe().
+  '''
+  return ''.join(transcribe(*tokens))
+
 def xtranscribe(*tokens):
   ''' Transcribe tokens as XHTML text and yield text portions as generated.
       A token is a string, a sequence or a Tag object.
@@ -105,6 +111,12 @@ def xtranscribe(*tokens):
         Further elements are tokens contained within this token.
   '''
   return _transcribe(True, *tokens)
+
+def xtranscribe_s(*tokens):
+  ''' Transcribe tokens as XHTML text and return the text.
+      Convenience wrapper for xtranscribe().
+  '''
+  return ''.join(xtranscribe(*tokens))
 
 def _transcribe(is_xhtml, *tokens):
   ''' Transcribe tokens as HTML or XHTML text and yield text portions as generated.
