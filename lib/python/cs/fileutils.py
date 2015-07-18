@@ -524,7 +524,7 @@ def lockfile(path, ext=None, poll_interval=None, timeout=None):
         raise
       if timeout is not None and timeout <= 0:
         # immediate failure
-        raise TimeoutError("cs.fileutils.lockfile: pid %d timed out on lockfile \"%s\""
+        raise TimeoutError("cs.fileutils.lockfile: pid %d timed out on lockfile %r"
                            % (os.getpid(), lockpath),
                            timeout)
       now = time.time()
@@ -537,7 +537,7 @@ def lockfile(path, ext=None, poll_interval=None, timeout=None):
       else:
         if now - complaint_last >= complaint_interval:
           from cs.logutils import warning
-          warning("cs.fileutils.lockfile: pid %d waited %ds for \"%s\"",
+          warning("cs.fileutils.lockfile: pid %d waited %ds for %r",
                   os.getpid(), now - start, lockpath)
           complaint_last = now
           complaint_interval *= 2
@@ -548,7 +548,7 @@ def lockfile(path, ext=None, poll_interval=None, timeout=None):
         sleep_for = min(poll_interval, start + timeout - now)
       # test for timeout
       if sleep_for <= 0:
-        raise TimeoutError("cs.fileutils.lockfile: pid %d timed out on lockfile \"%s\""
+        raise TimeoutError("cs.fileutils.lockfile: pid %d timed out on lockfile %r"
                            % (os.getpid(), lockpath),
                            timeout)
       time.sleep(sleep_for)
