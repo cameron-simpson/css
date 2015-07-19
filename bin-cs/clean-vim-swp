@@ -15,7 +15,7 @@ do
   case "$d" in
     -*) d=./$d ;;
   esac
-  ( set -x
+  ( ##set -x
     find "$d" \( -type d -name .hg -prune \) -o \( -type f -name '.*.swp' -ls -exec rm {} ';' \)
   ) || xit=1
 done

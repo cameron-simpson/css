@@ -1,0 +1,7 @@
+#!/bin/sh
+#
+# Connect to pilot21.   - Cameron Simpson <cs@zip.com.au> 11jun2015
+#
+
+set -x
+exec ssh -t dargo21 tip pilot21

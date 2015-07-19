@@ -24,6 +24,7 @@ DISTINFO = {
 
 from collections import namedtuple
 from email import message_from_string, message_from_file
+from email.header import decode_header, make_header
 import email.parser
 from email.utils import getaddresses
 from functools import partial
@@ -44,6 +45,7 @@ import time
 from cs.configutils import ConfigWatcher
 import cs.env
 from cs.env import envsub
+from cs.excutils import LogExceptions
 from cs.fileutils import abspath_from_file, file_property, files_property, \
                          longpath, Pathname
 import cs.lex
@@ -190,6 +192,15 @@ def current_value(envvar, cfg, cfg_key, default, environ):
     else:
       value = longpath(value)
   return value
+
+def scrub_header(value):
+  ''' "Scrub" a header value.
+      Presently this means to undo RFC2047 encoding where possible.
+  '''
+  new_value = unrfc2047(value)
+  if new_value != value:
+    new_value = make_header(decode_header(value))
+  return new_value
 
 class MailFiler(O):
 
@@ -364,7 +375,7 @@ class MailFiler(O):
       nmsgs = 0
       skipped = 0
       with LogTime("all keys") as all_keys_time:
-        for key in wmdir.keys(flush=True):
+        for key in list(wmdir.keys(flush=True)):
           if key in wmdir.lurking:
             debug("skip lurking key")
             skipped += 1
@@ -489,7 +500,8 @@ def save_to_folderpath(folderpath, M, message_path, flags):
       M['Status'] = status
     if len(x_status) > 0:
       M['X-Status'] = x_status
-    text = M.as_string(True)
+    with LogExceptions():
+      text = M.as_string(True)
     with open(folderpath, "a") as mboxfp:
       mboxfp.write(text)
     info("    OK >> %s" % (shortpath(folderpath)))
@@ -610,6 +622,7 @@ class MessageFiler(O):
 
   def modify(self, hdr, new_value, always=False):
     ''' Modify the value of the named header `hdr` to the new value `new_value` using cs.mailutils.modify_header.
+        `new_value` may be a string or an iterable of strings.
         If headers were changed, forget self.message_path.
     '''
     if modify_header(self.message, hdr, new_value, always=always):
@@ -1308,26 +1321,30 @@ class Target_Substitution(O):
 
   def apply(self, filer):
     for header_name in self.header_names:
-      X("apply %r : s/%s/%s ...", header_name, self.subst_re.pattern, self.subst_replacement)
       M = filer.message
       # fetch old value and "unfold" (strip CRLF, see RFC2822 part 2.2.3)
       old_value = M.get(header_name, '').replace('\r','').replace('\n','')
-      X("SUBST:   old value = %r", old_value)
       m = self.subst_re.search(old_value)
       if m:
-        # record named substitution values
-        env = m.groupdict()
-        # record numbered substitution values
+        env = {}
+        # Start with the headers as a basic set of available values.
+        # Lowercase header names and replace '-' with '_'.
+        # Strip CRLF per RFC2822 part 2.2.3 as we do for old_value above.
+        for hname, hvalue in M.items():
+          hname = hname.lower().replace('-', '_')
+          env[hname] = hvalue.replace('\r','').replace('\n','')
+        # Override with named substitution values.
+        env.update(m.groupdict())
+        # Add numbered substitution values.
         env_specials = { '0': m.group(0) }
-        for ndx, grp in enumerate(m.groups()):
-          env_specials[str(ndx+1)] = grp
+        for ndx, grp in enumerate(m.groups(), 1):
+          env_specials[str(ndx)] = grp
         repl_value, offset = get_qstr(self.subst_replacement, 0, q=None,
-                             environ=env, env_specials=env_specials)
+                                      environ=env, env_specials=env_specials)
         new_value = old_value[:m.start()] + repl_value + old_value[m.end():]
         if offset != len(self.subst_replacement):
           warning("after getqstr, offset[%d] != len(subst_replacement)[%d]: %r",
                   offset, len(self.subst_replacement), self.subst_replacement)
-        debug("SUBST %s: %s ==> %s", header_name, self.subst_replacement, new_value)
         filer.modify(header_name.title(), new_value)
 
 class Target_Function(O):
@@ -1347,6 +1364,8 @@ class Target_Function(O):
       func = filer.learn_header_addresses
     elif self.funcname == 'learn_message_ids':
       func = filer.learn_message_ids
+    elif self.funcname == 'scrub':
+      func = scrub_header
     else:
       raise ValueError("no simply named functions defined yet: %r", self.funcname)
 
@@ -1363,17 +1382,21 @@ class Target_Function(O):
       func_args.append(value)
     M = filer.message
     for header_name in self.header_names:
-      for s in M.get_all(header_name, ()):
-        try:
-          s2 = func(s, *func_args)
-        except Exception as e:
-          exception("exception calling %s(filer, *%r): %s", self.funcname, func_args, e)
-          raise
-        else:
-          if s2 is not None:
-            if s != s2:
-              info("%s: %r ==> %r", header_name.title(), s, s2)
-              filer.modify(header_name, s2)
+      header_values = M.get_all(header_name, ())
+      new_header_values = []
+      if header_values:
+        for s in header_values:
+          try:
+            s2 = func(s, *func_args)
+          except Exception as e:
+            exception("exception calling %s(filer, *%r): %s", self.funcname, func_args, e)
+            raise
+          else:
+            if s2 is not None:
+              new_header_values.append(s2)
+        if new_header_values and header_values != new_header_values:
+          info("%s: %r ==> %r", header_name.title(), header_values, new_header_values)
+          filer.modify(header_name, new_header_values)
 
 class Target_PipeLine(O):
 

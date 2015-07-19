@@ -808,7 +808,7 @@ class _MailDB(NodeDB):
       header_names = ( 'from', 'to', 'cc', 'bcc', 'resent-to', 'resent-cc',
                        'reply-to' )
     addrs = set()
-    if isinstance(M, (str, file)):
+    if isinstance(M, StringTypes) or hasattr(M, 'readline'):
       return self.importAddresses_from_message(Message(M), group_names)
     for realname, coreaddr in message_addresses(M, header_names):
       A = self.getAddressNode( (realname, coreaddr) )

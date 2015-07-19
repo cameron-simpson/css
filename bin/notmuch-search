@@ -13,7 +13,7 @@ subopts=
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [-t] notmuch-search-terms...
-  -S    Do search in separate screen session.
+  -S    Do search in separate tmux/screen session.
   -t    Include associated threads."
 
 badopts=
@@ -42,31 +42,16 @@ fi
 
 if [ $doscreen ]
 then
-  label=$cmd-`echo "$*" | tr ' ' -`
-  exec screen -m -S "$label" "$0" "$@"
+  label=NM_$cmd-`echo "$*" | tr ' :' --`
+  exec tm use-session "$label" "$0" "$@"
 fi
  
-
-first=1
-for term
-do
-  [ $first ] && { set --; first=; }
-  case "$term" in
-    :*)  term=`expr "x$term" : 'x:\(.*\)'` ;;
-    *:*)    ;;
-    *)      term=subject:$term ;;
-  esac
-  if [ $first ]
-  then  set -- "$term"; first=
-  else  set -- "$@" "$term"
-  fi
-done
-
 exec 3<&0
 
 mdir=$( mkdirn "$TMPDIR/notmuch-result" )
 maildir "$mdir"
 
+set -x
 if [ $dothreads ]
 then
   notmuch search --output=threads -- "$@" \
@@ -80,5 +65,5 @@ fi \
 | sort -u \
 | xxargs arg1 -end "$mdir/new" set-x ln -i -s
 
-mutt -e 'unset header_cache' -f "$mdir" <&3 3<&-
+mutt -e 'unset header_cache' -e 'push ",D$"' -f "$mdir" <&3 3<&-
 rm -r "$mdir"
