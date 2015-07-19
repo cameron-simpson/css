@@ -396,7 +396,7 @@ def edit_groupness(MDB, addresses, subgroups):
                     new_groups.setdefault(A, set()).update(groups)
                     realname = ustr(realname.strip())
                     if realname and realname != A.realname:
-                      A.REALNAME = realname
+                      A.realname = realname
     # apply groups of whichever addresses survived
     for A, groups in new_groups.items():
       if set(A.GROUPs) != groups:
