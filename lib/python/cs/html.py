@@ -186,7 +186,7 @@ def _transcribe(is_xhtml, *tokens):
         v = k
       if v is not None:
         yield '="'
-        yield urlquote(str(v), safe="' =/#:;().,")
+        yield urlquote(str(v), safe="' =/#:;().,{}")
         yield '"'
     if is_xhtml and is_single:
       yield '/'
