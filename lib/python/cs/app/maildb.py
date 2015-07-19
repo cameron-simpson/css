@@ -34,7 +34,7 @@ from cs.mailutils import ismaildir, message_addresses, Message
 from cs.nodedb import NodeDB, Node, NodeDBFromURL
 from cs.lex import get_identifier
 import cs.sh
-from cs.seq import get0
+from cs.seq import get0, last
 from cs.threads import locked, locked_property
 from cs.py.func import derived_property
 from cs.py3 import StringTypes, ustr
@@ -436,7 +436,13 @@ class AddressNode(Node):
 
   @property
   def realname(self):
-    return ustr( get0(self.REALNAMEs, u'') )
+    ''' Use the last .REALNAME value; presumes latest is best.
+        (Yes, working around junk in the database pending better debugging of another issue.)
+    '''
+    names = list(self.REALNAMEs)
+    if not names:
+      return u''
+    return names[-1]
 
   @realname.setter
   def realname(self, newname):
