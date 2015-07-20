@@ -153,7 +153,7 @@ def _transcribe(is_xhtml, *tokens):
       else:
         attrs = {}
     if tag == '<!--':
-      yield '<!-- '
+      yield '<!--'
       buf = StringIO()
       for t in tok:
         if not isinstance(t, StringTypes):
@@ -164,7 +164,7 @@ def _transcribe(is_xhtml, *tokens):
       if '-->' in comment_text:
         raise ValueError("invalid \"-->\" inside \"<!--\" comment: %r" % (comment,))
       yield comment_text
-      yield ' -->'
+      yield '-->'
       continue
     # HTML is case insensitive and XHTML has lower case tags
     tag = tag.lower()
