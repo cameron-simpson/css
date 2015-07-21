@@ -30,8 +30,12 @@ from cs.threads import locked_property
 from cs.obj import O, O_merge
 
 USAGE = '''Usage:
+    %s locate enc_slot [{start|stop}]
+    %s new_raid raid_level enc:devid...
+    %s offline enc_slot
     %s report
-    %s new_raid raid_level enc:devid...'''
+    %s save save_file
+    %s status'''
 
 # default location of MegaCLI executable
 MEGACLI = '/opt/MegaRAID/MegaCli/MegaCli64'
@@ -47,7 +51,7 @@ def main(argv=None):
   argv = list(argv)
   cmd = argv.pop(0)
   setup_logging(cmd)
-  usage = USAGE % (cmd, cmd)
+  usage = USAGE % (cmd, cmd, cmd, cmd, cmd, cmd)
 
   badopts = False
 
@@ -81,11 +85,52 @@ def main(argv=None):
                                                                getattr(DRV, 'virtual_drive', O(number=None)).number,
                                                                getattr(DRV, 'disk_group', O(number=None)).number,
                                                                DRV.fru, DRV.raw_size, DRV.raw_size_units,
-                                                               DRV.firmware_state)
+                                                               DRV.firmware_state
+                                                              ),
+            try:
+              count = DRV.media_error_count
+            except AttributeError:
+              pass
+            else:
+              if count:
+                print ", media errors %s" % count,
+            try:
+              count = DRV.other_error_count
+            except AttributeError:
+              pass
+            else:
+              if count:
+                print ", other errors %s" % count,
+            print
       elif command == "save":
         save_file, = argv
         if save_raid(save_file) != 0:
           xit = 1
+      elif command == "locate":
+        enc_slot = argv.pop(0)
+        if argv:
+          do_start = argv.pop(0)
+          if do_start == "start":
+            do_start = true
+          elif do_start == "stop":
+            do_start = False
+          else:
+            warning("locate: bad start/stop setting: %r", do_start)
+            badopts = True
+          if argv:
+            warning("locate: extra arguments after start/stop: %s", ' '.join(argv))
+            badopts = True
+        else:
+          do_start = True
+        if not badopts:
+          M.locate(adapter, enc_slot, do_start)
+      elif command == "offline":
+        enc_slot = argv.pop(0)
+        if argv:
+          warning("locate: extra arguments after start/stop: %s", ' '.join(argv))
+          badopts = True
+        if not badopts:
+          M.offline(adapter, enc_slot)
       elif command == "new_raid":
         if len(argv) < 2:
           warning("new_raid: missing raid_level or drives")
@@ -322,6 +367,27 @@ class MegaRAID(O):
                 A.physical_disks[DRV.id] = DRV
 
         return M
+
+  def locate(self, adapter, enc_slot, do_start=True):
+    ''' Start or stop to location light on the specified drive.
+    '''
+    if do_start:
+      start_opt = '-start'
+    else:
+      start_opt = '-stop'
+    return self.docmd('-PdLocate',
+                      start_opt,
+                      '-physdrv[%s]' % (enc_slot,),
+                      '-a%d' % (adapter,),
+                     )
+
+  def offline(self, adapter, enc_slot):
+    ''' Take a drive offline (==> failed).
+    '''
+    return self.docmd('-PDOffline',
+                      '-physdrv[%s]' % (enc_slot,),
+                      '-a%d' % (adapter,),
+                     )
 
   def new_raid(self, level, enc_slots, adapter=0):
     ''' Construct a new RAID device with specified RAID `level` on

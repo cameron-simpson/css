@@ -20,6 +20,8 @@ DISTINFO = {
 import os
 import os.path
 import sys
+import errno
+import time
 from itertools import chain
 from bs4 import BeautifulSoup, Tag, BeautifulStoneSoup
 try:
@@ -33,13 +35,13 @@ except ImportError:
 from netrc import netrc
 import socket
 try:
-  from urllib.request import urlopen, Request, HTTPError, URLError, \
+  from urllib.request import Request, HTTPError, URLError, \
             HTTPPasswordMgrWithDefaultRealm, HTTPBasicAuthHandler, \
             build_opener
   from urllib.parse import urlparse, urljoin
   from html.parser import HTMLParseError
 except ImportError:
-  from urllib2 import urlopen, Request, HTTPError, URLError, \
+  from urllib2 import Request, HTTPError, URLError, \
 		    HTTPPasswordMgrWithDefaultRealm, HTTPBasicAuthHandler, \
 		    build_opener
   from urlparse import urlparse, urljoin
@@ -53,7 +55,7 @@ from cs.excutils import logexc
 from cs.lex import parseUC_sAttr
 from cs.logutils import Pfx, pfx_iter, debug, error, warning, exception, D, X
 from cs.threads import locked_property
-from cs.py3 import StringIO, ustr, unicode
+from cs.py3 import ustr, unicode
 from cs.obj import O
 
 def isURL(U):
@@ -99,6 +101,7 @@ class _URL(unicode):
     self.flush()
     self._lock = RLock()
     self.flush()
+    self.retry_timeout = 3
 
   def __getattr__(self, attr):
     ''' Ad hoc attributes.
@@ -152,12 +155,26 @@ class _URL(unicode):
   def _response(self, method):
     rq = self._request(method)
     opener = self.opener
+    retries = self.retry_timeout
     with Pfx("open(%s)", rq):
-      try:
-        rsp = opener.open(rq)
-      except HTTPError as e:
-        warning("open %s: %s", self, e)
-        raise
+      while retries > 0:
+        now = time.time()
+        try:
+          rsp = opener.open(rq)
+        except OSError as e:
+          if e.errno == errno.ETIMEDOUT:
+            elapsed = time.time() - now
+            warning("open %s: %s; elapsed=%gs", self, e, elapsed)
+            if retries > 0:
+              retries -= 1
+            else:
+              raise
+        except HTTPError as e:
+          warning("open %s: %s", self, e)
+          raise
+        else:
+          # success, exit retry loop
+          break
     return rsp
 
   def _fetch(self):
@@ -210,7 +227,12 @@ class _URL(unicode):
     '''
     if self._content is None:
       self._fetch()
-    return self._info.get_content_type()
+    try:
+      ctype = self._info.get_content_type()
+    except AttributeError as e:
+      warning("%r.content_type: self._info.get_content_type() raises %s", self, e)
+      ctype = None
+    return ctype
 
   @locked_property
   def content_transfer_encoding(self):
@@ -414,7 +436,7 @@ def skip_errs(iterable):
   I = iter(iterable)
   while True:
     try:
-      i = I.next()
+      i = next(I)
     except StopIteration:
       break
     except (URLError, HTTPError) as e:

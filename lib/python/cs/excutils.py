@@ -11,7 +11,7 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
-        ],
+    ],
 }
 
 import sys
@@ -31,7 +31,7 @@ def return_exc_info(func, *args, **kwargs):
   '''
   try:
     result = func(*args, **kwargs)
-  except:
+  except Exception:
     return None, tuple(sys.exc_info())
   return result, None
 
@@ -63,10 +63,12 @@ def noexc(func):
       return func(*args, **kwargs)
     except Exception as e:
       try:
-        exception("exception calling %s(%s, **(%s))", func.__name__, args, kwargs)
+        exception(
+            "exception calling %s(%s, **(%s))", func.__name__, args, kwargs)
       except Exception as e:
         try:
-          X("exception calling %s(%s, **(%s)): %s", func.__name__, args, kwargs, e)
+          X("exception calling %s(%s, **(%s)): %s",
+            func.__name__, args, kwargs, e)
         except Exception:
           pass
   noexc_wrapper.__name__ = 'noexc(%s)' % (func.__name__,)
@@ -79,15 +81,18 @@ def noexc_gen(func):
       as in cs.later.Later.pipeline.
   '''
   from cs.logutils import exception, X
+
   def noexc_gen_wrapper(*args, **kwargs):
     try:
       it = iter(func(*args, **kwargs))
     except Exception as e0:
       try:
-        exception("exception calling %s(*%s, **(%s)): %s", func.__name__, args, kwargs, e)
+        exception(
+            "exception calling %s(*%s, **(%s)): %s", func.__name__, args, kwargs, e)
       except Exception as e2:
         try:
-          X("exception calling %s(*%s, **(%s)): %s", func.__name__, args, kwargs, e)
+          X("exception calling %s(*%s, **(%s)): %s",
+            func.__name__, args, kwargs, e)
         except Exception:
           pass
       return
@@ -98,10 +103,12 @@ def noexc_gen(func):
         raise
       except Exception as e:
         try:
-          exception("exception calling next(%s(*%s, **(%s))): %s", func.__name__, args, kwargs, e)
+          exception("exception calling next(%s(*%s, **(%s))): %s",
+                    func.__name__, args, kwargs, e)
         except Exception as e2:
           try:
-            X("exception calling next(%s(*%s, **(%s))): %s", func.__name__, args, kwargs, e)
+            X("exception calling next(%s(*%s, **(%s))): %s",
+              func.__name__, args, kwargs, e)
           except Exception:
             pass
         return
@@ -122,6 +129,7 @@ def transmute(exc_from, exc_to=None):
   '''
   if exc_to is None:
     exc_to = RuntimeError
+
   def transmutor(func):
     def transmute_transmutor_wrapper(*a, **kw):
       try:
@@ -134,11 +142,14 @@ def transmute(exc_from, exc_to=None):
 def unimplemented(func):
   ''' Decorator for stub methods that must be implemented by a stub class.
   '''
+
   def unimplemented_wrapper(self, *a, **kw):
-    raise NotImplementedError("%s.%s(*%s, **%s)" % (type(self), func.__name__, a, kw))
+    raise NotImplementedError(
+        "%s.%s(*%s, **%s)" % (type(self), func.__name__, a, kw))
   return unimplemented_wrapper
 
 class NoExceptions(object):
+
   ''' A context manager to catch _all_ exceptions and log them.
       Arguably this should be a bare try...except but that's syntacticly
       noisy and separates the catch from the top.
@@ -170,9 +181,9 @@ class NoExceptions(object):
       else:
         D("__handler is None")
       # report handled exception
-      warning("IGNORE  "+str(exc_type)+": "+str(exc_value))
+      warning("IGNORE  " + str(exc_type) + ": " + str(exc_value))
       for line in traceback.format_tb(tb):
-        warning("IGNORE> "+line[:-1])
+        warning("IGNORE> " + line[:-1])
     return True
 
 def LogExceptions(conceal=False):
@@ -180,6 +191,7 @@ def LogExceptions(conceal=False):
       suppresses them.
   '''
   from cs.logutils import exception, X
+
   def handler(exc_type, exc_value, tb):
     exception("EXCEPTION: %s", exc_value)
     return conceal

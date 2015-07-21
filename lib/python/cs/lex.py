@@ -8,7 +8,7 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
-        ],
+    ],
     'requires': ['cs.py3'],
 }
 
@@ -21,7 +21,7 @@ import re
 import sys
 import os
 from cs.py3 import bytes, unicode, ustr, sorted, StringTypes
-from cs.logutils import X
+from cs.logutils import X, warning
 
 unhexify = binascii.unhexlify
 if sys.hexversion >= 0x030000:
@@ -30,57 +30,57 @@ if sys.hexversion >= 0x030000:
 else:
   hexify = binascii.hexlify
 
-ord_space=ord(' ')
+ord_space = ord(' ')
 
-def unctrl(s,tabsize=8):
-  s2=''
-  sofar=0
+def unctrl(s, tabsize=8):
+  s2 = ''
+  sofar = 0
   for i in range(len(s)):
-    ch=s[i]
-    ch2=None
+    ch = s[i]
+    ch2 = None
     if ch == '\t':
       pass
     elif ch == '\f':
-      ch2='\\f'
+      ch2 = '\\f'
     elif ch == '\n':
-      ch2='\\n'
+      ch2 = '\\n'
     elif ch == '\r':
-      ch2='\\r'
+      ch2 = '\\r'
     elif ch == '\v':
-      ch2='\\v'
+      ch2 = '\\v'
     else:
-      o=ord(ch)
+      o = ord(ch)
       if o < ord_space or printable.find(ch) == -1:
         if o >= 256:
-          ch2="\\u%04x"%o
+          ch2 = "\\u%04x" % o
         else:
-          ch2="\\%03o"%o
+          ch2 = "\\%03o" % o
 
     if ch2 is not None:
       if sofar < i:
-        s2+=s[sofar:i]
-      s2+=ch2
-      sofar=i+1
+        s2 += s[sofar:i]
+      s2 += ch2
+      sofar = i + 1
 
   if sofar < len(s):
-    s2+=s[sofar:]
+    s2 += s[sofar:]
 
   return s2.expandtabs(tabsize)
 
-def tabpadding(padlen,tabsize=8,offset=0):
-  pad=''
-  nexttab=tabsize-offset%tabsize
+def tabpadding(padlen, tabsize=8, offset=0):
+  pad = ''
+  nexttab = tabsize - offset % tabsize
   while nexttab <= padlen:
-    pad+='\t'
-    padlen-=nexttab
-    nexttab=tabsize
+    pad += '\t'
+    padlen -= nexttab
+    nexttab = tabsize
 
   if padlen > 0:
-    pad+="%*s"%(padlen,' ')
+    pad += "%*s" % (padlen, ' ')
 
   return pad
 
-def strlist(ary,sep=", "):
+def strlist(ary, sep=", "):
   return sep.join([str(a) for a in ary])
 
 def lastlinelen(s):
@@ -89,22 +89,29 @@ def lastlinelen(s):
   '''
   return len(s) - s.rfind('\n') - 1
 
-def htmlify(s,nbsp=False):
-  s=s.replace("&","&amp;")
-  s=s.replace("<","&lt;")
-  s=s.replace(">","&gt;")
+def htmlify(s, nbsp=False):
+  s = s.replace("&", "&amp;")
+  s = s.replace("<", "&lt;")
+  s = s.replace(">", "&gt;")
   if nbsp:
-    s=s.replace(" ","&nbsp;")
+    s = s.replace(" ", "&nbsp;")
   return s
 
 def htmlquote(s):
-  s=htmlify(s)
-  s=s.replace("\"","&dquot;")
-  return "\""+s+"\""
+  s = htmlify(s)
+  s = s.replace("\"", "&dquot;")
+  return "\"" + s + "\""
 
 def jsquote(s):
-  s=s.replace("\"","&dquot;")
-  return "\""+s+"\""
+  ''' Quote a string for use in JavaScript.
+  '''
+  s = s.replace("\"", "&dquot;")
+  return "\"" + s + "\""
+
+def phpquote(s):
+  ''' Quote a string for use in PHP code.
+  '''
+  return "'" + s.replace('\\', '\\\\').replace("'", "\\'") + "'"
 
 def dict2js(d):
   import cs.json
@@ -132,7 +139,7 @@ def texthexify(bs, shiftin='[', shiftout=']', whitelist=None):
   if whitelist is None:
     whitelist = _texthexify_white_chars
   if isinstance(whitelist, StringTypes) and not isinstance(whitelist, bytes):
-    whitelist = bytes( ord(ch) for ch in whitelist )
+    whitelist = bytes(ord(ch) for ch in whitelist)
   inout_len = len(shiftin) + len(shiftout)
   chunks = []
   offset = 0
@@ -145,10 +152,10 @@ def texthexify(bs, shiftin='[', shiftout=']', whitelist=None):
         inwhite = False
         if offset - offset0 > inout_len:
           # gather up whitelist span if long enough to bother
-          chunk = ( shiftin
-                  + ''.join( chr(bs[o]) for o in range(offset0, offset) )
-                  + shiftout
-                  )
+          chunk = (shiftin
+                   + ''.join(chr(bs[o]) for o in range(offset0, offset))
+                   + shiftout
+                   )
         else:
           # transcribe as hex anyway - too short
           chunk = hexify(bs[offset0:offset])
@@ -163,10 +170,10 @@ def texthexify(bs, shiftin='[', shiftout=']', whitelist=None):
     offset += 1
   if offset > offset0:
     if inwhite and offset - offset0 > inout_len:
-      chunk = ( shiftin
-              + ''.join( chr(bs[o]) for o in range(offset0, offset) )
-              + shiftout
-              )
+      chunk = (shiftin
+               + ''.join(chr(bs[o]) for o in range(offset0, offset))
+               + shiftout
+               )
     else:
       chunk = hexify(bs[offset0:offset])
     chunks.append(chunk)
@@ -183,15 +190,15 @@ def untexthexify(s, shiftin='[', shiftout=']'):
       if hexlen % 2 != 0:
         raise TypeError("uneven hex sequence \"%s\"" % (hextext,))
       chunks.append(unhexify(s[:hexlen]))
-    s = s[hexlen+len(shiftin):]
+    s = s[hexlen + len(shiftin):]
     textlen = s.find(shiftout)
     if textlen < 0:
       raise TypeError("missing shift out marker \"%s\"" % (shiftout,))
     if sys.hexversion < 0x03000000:
       chunks.append(s[:textlen])
     else:
-      chunks.append(bytes( ord(c) for c in s[:textlen] ))
-    s = s[textlen+len(shiftout):]
+      chunks.append(bytes(ord(c) for c in s[:textlen]))
+    s = s[textlen + len(shiftout):]
   if len(s) > 0:
     if len(s) % 2 != 0:
       raise TypeError("uneven hex sequence \"%s\"" % (s,))
@@ -206,7 +213,6 @@ def unrfc2047(s):
       littered varieties that come from some low quality mail clients) and
       decode them into flat Unicode.
   '''
-  from cs.logutils import warning
   if not isinstance(s, unicode):
     s = unicode(s, 'iso8859-1')
   chunks = []
@@ -227,7 +233,7 @@ def unrfc2047(s):
         enctext = m.group()
     elif enctype == 'Q':
       try:
-        enctext = quopri.decodestring(enctext)
+        enctext = quopri.decodestring(enctext.replace('_', ' '))
       except UnicodeEncodeError as e:
         warning("%r: %e", enctext, e)
         ##enctext = enctext.decode('iso8859-1')
@@ -236,14 +242,14 @@ def unrfc2047(s):
     try:
       enctext = enctext.decode(enccset)
     except LookupError as e:
-      warning("%r: %e", enctext, e)
+      warning("decode(%s): %e: %r", enccset, e, enctext)
       enctext = enctext.decode('iso8859-1')
     except UnicodeDecodeError as e:
-      warning("%r: %e", enctext, e)
+      warning("decode(%s): %s: %r", enccset, e, enctext)
       enctext = enctext.decode(enccset, 'replace')
     except UnicodeEncodeError as e:
-      warning("%r: %e", enctext, e)
-      ##enctext = enctext.decode(enccset, 'replace')
+      warning("decode(%s): %e: %r", enccset, e, enctext)
+      enctext = enctext.decode(enccset, 'replace')
     chunks.append(enctext)
     sofar = end
   if sofar < len(s):
@@ -284,7 +290,7 @@ def get_identifier(s, offset=0, alpha=ascii_letters, number=digits, extras='_'):
   ch = s[offset]
   if ch not in alpha and ch not in extras:
     return '', offset
-  idtail, offset = get_chars(s, offset+1, alpha + number + extras)
+  idtail, offset = get_chars(s, offset + 1, alpha + number + extras)
   return ch + idtail, offset
 
 def get_uc_identifier(s, offset=0, number=digits, extras='_'):
@@ -304,14 +310,14 @@ def get_other_chars(s, offset=0, stopchars=None):
 
 # default character map for \c notation
 SLOSH_CHARMAP = {
-    'a':    '\a',
-    'b':    '\b',
-    'f':    '\f',
-    'n':    '\n',
-    'r':    '\r',
-    't':    '\t',
-    'v':    '\v',
-  }
+    'a': '\a',
+    'b': '\b',
+    'f': '\f',
+    'n': '\n',
+    'r': '\r',
+    't': '\t',
+    'v': '\v',
+}
 
 def slosh_mapper(c, charmap=SLOSH_CHARMAP):
   ''' Return a string to replace \`c`, or None.
@@ -354,7 +360,8 @@ def get_sloshed_text(s, delim, offset=0, slosh='\\', mapper=slosh_mapper, specia
     special_seqs = []
     for special in specials.keys():
       if len(special) == 0:
-        raise ValueError('empty strings may not be used as keys for specials: %r' % (specials,))
+        raise ValueError(
+            'empty strings may not be used as keys for specials: %r' % (specials,))
       special_starts.add(special[0])
       special_seqs.append(special)
     special_starts = u''.join(special_starts)
@@ -385,24 +392,27 @@ def get_sloshed_text(s, delim, offset=0, slosh='\\', mapper=slosh_mapper, specia
       if c == 'x':
         # \xhh
         if slen - offset < 2:
-          raise ValueError('short hexcode for %sxhh at offset %d' % (slosh, offset0))
-        hh = s[offset:offset+2]
+          raise ValueError(
+              'short hexcode for %sxhh at offset %d' % (slosh, offset0))
+        hh = s[offset:offset + 2]
         offset += 2
         chunks.append(chr(int(hh, 16)))
         continue
       if c == 'u':
         # \uhhhh
         if slen - offset < 4:
-          raise ValueError('short hexcode for %suhhhh at offset %d' % (slosh, offset0))
-        hh = s[offset:offset+4]
+          raise ValueError(
+              'short hexcode for %suhhhh at offset %d' % (slosh, offset0))
+        hh = s[offset:offset + 4]
         offset += 4
         chunks.append(chr(int(hh, 16)))
         continue
       if c == 'U':
         # \Uhhhhhhhh
         if slen - offset < 8:
-          raise ValueError('short hexcode for %sUhhhhhhhh at offset %d' % (slosh, offset0))
-        hh = s[offset:offset+8]
+          raise ValueError(
+              'short hexcode for %sUhhhhhhhh at offset %d' % (slosh, offset0))
+        hh = s[offset:offset + 8]
         offset += 8
         chunks.append(chr(int(hh, 16)))
         continue
@@ -414,7 +424,7 @@ def get_sloshed_text(s, delim, offset=0, slosh='\\', mapper=slosh_mapper, specia
       # check for escaped special syntax
       if specials is not None and c in special_starts:
         # test sequence prefixes from longest to shortest
-        chunk=None
+        chunk = None
         for seq in special_seqs:
           if s.startswith(seq, offset1):
             # special sequence
@@ -423,16 +433,18 @@ def get_sloshed_text(s, delim, offset=0, slosh='\\', mapper=slosh_mapper, specia
         if chunk is not None:
           chunks.append(chunk)
           continue
-      raise ValueError('unrecognised %s%s escape at offset %d' % (slosh, c, offset0))
+      raise ValueError(
+          'unrecognised %s%s escape at offset %d' % (slosh, c, offset0))
     if specials is not None and c in special_starts:
       # test sequence prefixes from longest to shortest
-      chunk=None
+      chunk = None
       for seq in special_seqs:
         if s.startswith(seq, offset0):
           # special sequence
           chunk, offset = specials[seq](s, offset0)
           if offset < offset0 + 1:
-            raise ValueError("special parser for %r at offset %d moved offset backwards" % (c, offset0))
+            raise ValueError(
+                "special parser for %r at offset %d moved offset backwards" % (c, offset0))
           break
       if chunk is not None:
         chunks.append(chunk)
@@ -441,14 +453,14 @@ def get_sloshed_text(s, delim, offset=0, slosh='\\', mapper=slosh_mapper, specia
       continue
     while offset < slen:
       c = s[offset]
-      if ( c == slosh
-        or (delim is not None and c == delim)
-        or (specials is not None and c in special_starts)
-         ):
+      if (c == slosh
+          or (delim is not None and c == delim)
+          or (specials is not None and c in special_starts)
+          ):
         break
       offset += 1
     chunks.append(s[offset0:offset])
-  return u''.join( ustr(chunk) for chunk in chunks ), offset
+  return u''.join(ustr(chunk) for chunk in chunks), offset
 
 def get_envvar(s, offset=0, environ=None, default=None, specials=None):
   ''' Parse a simple environment variable reference to $varname or $x where "x" is a special character.
@@ -463,10 +475,11 @@ def get_envvar(s, offset=0, environ=None, default=None, specials=None):
     environ = os.environ
   offset0 = offset
   if not s.startswith('$', offset):
-    raise ValueError("no leading '$' at offset %d: %r" % (offset,s))
+    raise ValueError("no leading '$' at offset %d: %r" % (offset, s))
   offset += 1
   if offset >= len(s):
-    raise ValueError("short string, nothing after '$' at offset %d" % (offset,))
+    raise ValueError(
+        "short string, nothing after '$' at offset %d" % (offset,))
   identifier, offset = get_identifier(s, offset)
   if identifier:
     value = environ.get(identifier, default)
@@ -490,7 +503,8 @@ def get_qstr(s, offset=0, q='"', environ=None, default=None, env_specials=None):
       `default`: passed to get_envvar
   '''
   if environ is None and default is not None:
-    raise ValueError("environ is None but default is not None (%r)" % (default,))
+    raise ValueError(
+        "environ is None but default is not None (%r)" % (default,))
   if q is None:
     delim = None
   else:
@@ -502,16 +516,18 @@ def get_qstr(s, offset=0, q='"', environ=None, default=None, env_specials=None):
       raise ValueError("expected opening quote %r, found %r" % (q, delim,))
   if environ is None:
     return get_sloshed_text(s, delim, offset)
-  getvar = partial(get_envvar, environ=environ, default=default, specials=env_specials)
-  return get_sloshed_text(s, delim, offset, specials={ '$': getvar })
+  getvar = partial(
+      get_envvar, environ=environ, default=default, specials=env_specials)
+  return get_sloshed_text(s, delim, offset, specials={'$': getvar})
 
 def get_delimited(s, offset, delim):
   ''' Collect text from the string `s` from position `offset` up to the first occurence of delimiter `delim`; return the text excluding the delimiter and the offset after the delimiter.
   '''
   pos = s.find(delim, offset)
   if pos < offset:
-    raise ValueError("delimiter %r not found after offset %d" % (delim, offset))
-  return s[offset:pos], pos+len(delim)
+    raise ValueError(
+        "delimiter %r not found after offset %d" % (delim, offset))
+  return s[offset:pos], pos + len(delim)
 
 def get_tokens(s, offset, getters):
   ''' Parse the string `s` from position `offset` using the supplied tokenise functions `getters`; return the list of tokens matched and the final offset.
@@ -585,11 +601,11 @@ def parseUC_sAttr(attr):
   if len(attr) > 1:
     if attr[-1] == 's':
       if attr[-2] == 'e':
-        k=attr[:-2]
+        k = attr[:-2]
         if isUC_(k):
           return k, True
       else:
-        k=attr[:-1]
+        k = attr[:-1]
         if isUC_(k):
           return k, True
   if isUC_(attr):
@@ -604,13 +620,13 @@ def as_lines(chunks, partials=None):
   '''
   if partials is None:
     partials = []
-  if any( [ '\n' in p for p in partials ] ):
+  if any(['\n' in p for p in partials]):
     raise ValueError("newline in partials: %r", partials)
   for chunk in chunks:
     pos = 0
     nl_pos = chunk.find('\n', pos)
     while nl_pos >= pos:
-      partials.append(chunk[pos:nl_pos+1])
+      partials.append(chunk[pos:nl_pos + 1])
       yield ''.join(partials)
       partials[:] = ()
       pos = nl_pos + 1

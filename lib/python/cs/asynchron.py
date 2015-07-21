@@ -11,7 +11,7 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
-        ],
+    ],
     'requires': ['cs.obj', 'cs.seq', 'cs.py3'],
 }
 
@@ -28,13 +28,15 @@ ASYNCH_READY = 2         # result computed
 ASYNCH_CANCELLED = 3     # result computation cancelled
 
 class CancellationError(RuntimeError):
+
   ''' Raised when accessing result or exc_info after cancellation.
   '''
-  
+
   def __init__(self, msg="cancelled"):
     RuntimeError.__init__(msg)
 
 class Asynchron(O):
+
   ''' Common functionality for Results, LateFunctions and other
       objects with asynchronous termination.
   '''
@@ -47,7 +49,7 @@ class Asynchron(O):
                  cancellation).
     '''
     O.__init__(self)
-    self._O_omit.extend( ['result', 'exc_info'] )
+    self._O_omit.extend(['result', 'exc_info'])
     if name is None:
       name = "%s-%d" % (self.__class__.__name__, seq(),)
     self.name = name
@@ -95,7 +97,8 @@ class Asynchron(O):
       if state == ASYNCH_RUNNING or state == ASYNCH_PENDING:
         state = ASYNCH_CANCELLED
       else:
-        raise RuntimeError("<%s>.state not one of (ASYNCH_PENDING, ASYNCH_CANCELLED, ASYNCH_RUNNING, ASYNCH_READY): %r", self, state)
+        raise RuntimeError(
+            "<%s>.state not one of (ASYNCH_PENDING, ASYNCH_CANCELLED, ASYNCH_RUNNING, ASYNCH_READY): %r", self, state)
     self._complete(None, None)
     return True
 
@@ -139,7 +142,7 @@ class Asynchron(O):
     '''
     try:
       r = func(*a, **kw)
-    except:
+    except Exception:
       self.exc_info = sys.exc_info
     else:
       self.result = r
@@ -149,7 +152,8 @@ class Asynchron(O):
         Alert people to completion.
     '''
     if result is not None and exc_info is not None:
-      raise ValueError("one of (result, exc_info) must be None, got (%r, %r)" % (result, exc_info))
+      raise ValueError(
+          "one of (result, exc_info) must be None, got (%r, %r)" % (result, exc_info))
     with self._lock:
       state = self.state
       if state == ASYNCH_CANCELLED or state == ASYNCH_RUNNING or state == ASYNCH_PENDING:
@@ -173,7 +177,8 @@ class Asynchron(O):
         exception("%s: exception from .final(): %s", self.name, e)
       else:
         if final_result is not None:
-          warning("%s: discarding non-None result from .final(): %r", self.name, final_result)
+          warning(
+              "%s: discarding non-None result from .final(): %r", self.name, final_result)
     self._get_lock.release()
     notifiers = self.notifiers
     del self.notifiers
@@ -182,7 +187,8 @@ class Asynchron(O):
       try:
         notifier(self)
       except Exception as e:
-        exception("%s._complete: calling notifier %s: exc=%s", self, notifier, e)
+        exception(
+            "%s._complete: calling notifier %s: exc=%s", self, notifier, e)
 
   def join(self):
     ''' Calling the .join() method waits for the function to run to
