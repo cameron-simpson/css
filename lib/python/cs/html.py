@@ -14,7 +14,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'requires': ['cs.py3'],
+    'requires': ['cs.logutils', 'cs.py3'],
 }
 
 from io import StringIO
@@ -84,7 +84,6 @@ def attrquote(s):
     offset = m.end()
   qsv.append(s[offset:])
   qsv.append('"')
-  X("%r ==> %r", s, qsv)
   return ''.join(qsv)
 
 def tok2s(*tokens):
