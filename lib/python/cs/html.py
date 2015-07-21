@@ -20,17 +20,14 @@ DISTINFO = {
 from io import StringIO
 import re
 import sys
-try:
-  from urllib.parse import quote as urlquote
-except ImportError:
-  from urllib import quote as urlquote
 from cs.logutils import warning, X
 from cs.py3 import StringTypes
 
 # Characters safe to transcribe unescaped.
 re_SAFETEXT = re.compile(r'[^<>&]+')
 # Characters safe to use inside "" in tag attribute values.
-re_SAFETEXT_DQ = re.compile(r'[-=., \w:@/?~#+&()]+')
+# See HTML 4.01 section 3.2.2
+re_SAFETEXT_DQ = re.compile(r'[-a-zA-Z0-9._:]+')
 
 # convenience wrappers
 A = lambda *tok: ['A'] + list(tok)
@@ -70,6 +67,25 @@ def page_HTML(title, *tokens, **kw):
           head,
           body,
           ]
+
+def attrquote(s):
+  ''' Quote a string for use as a tag attribute.
+      See HTML 4.01 section 3.2.2.
+  '''
+  qsv = ['"']
+  offset = 0
+  while offset < len(s):
+    m = re_SAFETEXT_DQ.search(s, offset)
+    if not m:
+      break
+    for c in s[offset:m.start()]:
+      qsv.extend( ('&#', str(ord(c)), ';') )
+    qsv.append(m.group())
+    offset = m.end()
+  qsv.append(s[offset:])
+  qsv.append('"')
+  X("%r ==> %r", s, qsv)
+  return ''.join(qsv)
 
 def tok2s(*tokens):
   ''' Transcribe tokens to a string, return the string.
@@ -185,9 +201,8 @@ def _transcribe(is_xhtml, *tokens):
       if is_xhtml and v is None:
         v = k
       if v is not None:
-        yield '="'
-        yield urlquote(str(v), safe="' =/#:;().,{}")
-        yield '"'
+        yield '='
+        yield attrquote(str(v))
     if is_xhtml and is_single:
       yield '/'
     yield '>'
