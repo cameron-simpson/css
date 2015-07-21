@@ -7,7 +7,7 @@
 from __future__ import absolute_import
 
 DISTINFO = {
-    'description': "easy HTML transcription",
+    'description': "easy HTML and XHTML transcription",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
