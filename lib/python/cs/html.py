@@ -32,6 +32,7 @@ re_SAFETEXT_DQ = re.compile(r'[-a-zA-Z0-9._:]+')
 # convenience wrappers
 A = lambda *tok: ['A'] + list(tok)
 B = lambda *tok: ['B'] + list(tok)
+NBSP = ['&nbsp;']
 TH = lambda *tok: ['TH'] + list(tok)
 TD = lambda *tok: ['TD'] + list(tok)
 TR = lambda *tok: ['TR'] + list(tok)
@@ -85,6 +86,23 @@ def attrquote(s):
   qsv.append(s[offset:])
   qsv.append('"')
   return ''.join(qsv)
+
+def nbsp(s):
+  ''' Generator yielding tokens to translate all whitespace in `s` into &nbsp; entitites.
+      Example:
+        list(nobr('a b  cd')) ==> ['a', ['&nbsp;'], 'b', ['&nbsp;'], ['&nbsp;'], 'cd']
+  '''
+  wordchars = []
+  for c in s:
+    if c.isspace():
+      if wordchars:
+        yield ''.join(wordchars)
+        wordchars = []
+      yield NBSP
+    else:
+      wordchars.append(c)
+  if wordchars:
+    yield ''.join(wordchars)
 
 def tok2s(*tokens):
   ''' Transcribe tokens to a string, return the string.
