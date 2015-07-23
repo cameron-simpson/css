@@ -27,7 +27,7 @@ from cs.py3 import StringTypes
 re_SAFETEXT = re.compile(r'[^<>&]+')
 # Characters safe to use inside "" in tag attribute values.
 # See HTML 4.01 section 3.2.2
-re_SAFETEXT_DQ = re.compile(r'[-a-zA-Z0-9._:]+')
+re_SAFETEXT_DQ = re.compile(r'[-a-zA-Z0-9._:\s/;(){}%]+')
 
 # convenience wrappers
 A = lambda *tok: ['A'] + list(tok)
