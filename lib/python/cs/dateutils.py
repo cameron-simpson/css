@@ -32,12 +32,16 @@ class tzinfoHHMM(tzinfo):
   def tzname(self, dt):
     return self._tzname
 
-def isodate(when=None):
-  ''' Return a date in ISO8601 YYYY-MM-DD format.
+def isodate(when=None, dashed=True):
+  ''' Return a date in ISO8601 YYYY-MM-DD format, or YYYYMMDD if not `dashed`.
   '''
   if when is None:
     when = localtime()
-  return strftime("%Y-%m-%d", when)
+  if dashed:
+    format_s = '%Y-%m-%d'
+  else:
+    format_s = '%Y%m%d'
+  return strftime(format_s, when)
 
 def a2date(s):
   ''' Create a date object from an ISO8601 YYYY-MM-DD date string.
