@@ -301,6 +301,16 @@ def main(argv):
 ##      export PYPI_URL
 ##    }
 
+@contextmanager
+def pipefrom(*argv):
+  ''' Context manager returning standard output of command.
+  '''
+  P = Popen(argv, stdout=PIPE)
+  yield P.stdout
+  if P.wait() != 0:
+    pipecmd = ' '.join(argv)
+    raise ValueError("%s: exit status %d" % (pipecmd, P.returncode,))
+
 #                               name        -  YYYYMMDD[.n]
 re_RELEASE_TAG = re.compile(r'([a-z][^-]*)-(2[0-9][0-9][0-9][01][0-9][0-3][0-9](\.[1-9]\d*)?)$')
 
@@ -325,14 +335,8 @@ class VCS(object):
 
 class VCS_Hg(VCS):
 
-  @contextmanager
   def _pipefrom(self, *hgargs):
-    hgargv = ['hg'] + list(hgargs)
-    P = Popen(hgargv, stdout=PIPE)
-    yield P.stdout
-    if P.wait() != 0:
-      hgcmd = ' '.join(hgargv)
-      raise RuntimeError("%s: exit status %d" % (hgcmd, P.returncode,))
+    return pipefrom('hg', *hgargs)
 
   def tags(self):
     ''' Generator yielding the current tags.
