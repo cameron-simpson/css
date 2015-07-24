@@ -347,14 +347,14 @@ class VCS_Hg(VCS):
         tag, _ = tagline.split(None, 1)
         yield tag
 
-  def log_since(self, tag):
-    with hg_pipefrom('log',
+  def log_since(self, tag, paths):
+    with self._pipefrom('log',
                      '-r', tag+':',
                      '--template', '{files}\t{desc|firstline}\n',
                      '--',
                      *paths) as hgfp:
       for hgline in hgfp:
-        files, firstline = hline.split('\t', 1)
+        files, firstline = hgline.split('\t', 1)
         files = files.split()
         firstline = firstline.strip()
         yield files, firstline
@@ -427,18 +427,16 @@ class Name(object):
     prefix = self.prefix
     base = os.path.join(PYLIBTOP, prefix.replace('.', '/'))
     basepy = base + '.py'
-    readme = os.path.join( [ os.path.dirname(base),
-                             'README-' + os.path.basename(base) + '.rst'
-                           ] )
+    readme = os.path.join(os.path.dirname(base), 'README-' + os.path.basename(base) + '.rst')
     return (base, basepy, readme)
 
   def log_since(self):
     ''' Generator yielding (files, line) tuples for log lines since the last release for the supplied `prefix`.
     '''
-    suffix = self.last_release_suffix()
+    suffix = self.last_suffix()
     if suffix is None:
       return
-    return self.vcs.log_since(self.tagname(suffix))
+    return self.vcs.log_since(self.tagname(suffix), self.paths())
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
