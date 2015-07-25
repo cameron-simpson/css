@@ -55,7 +55,7 @@ def main(argv):
       else:
         op = argv.pop(0)
         with Pfx(op):
-          N = Name(name, VCS_Hg())
+          N = ReleaseName(name, VCS_Hg())
           if op == 'last':
             print(N.last_suffix())
           elif op == 'log':
@@ -359,7 +359,7 @@ class VCS_Hg(VCS):
         firstline = firstline.strip()
         yield files, firstline
 
-class Name(object):
+class ReleaseName(object):
   ''' State surrounding a particular release tag prefix.
   '''
 
