@@ -24,12 +24,11 @@ PYLIBTOP = 'lib/python'
 USAGE = '''Usage: %s name [op [args...]]
   name          Prefix for new release tag names.
   op:
-    ls          List all release prefixes in use.
-    add         Issue a new release.
     last        Report last release issued.
-    next        Generate a new release number.
-    update-tag  Update a release tag.
     log         Changelog from last release to now.
+    ls          List all release prefixes in use.
+    next        Generate a new release number.
+    release     Issue a new release.
     export      Export release to temporary directory, report directory.
     freshmeat-submit
                 Announce last release to freshmeat.
