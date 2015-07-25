@@ -11,7 +11,7 @@ from __future__ import print_function
 import sys
 import os.path
 import re
-from subprocess import Popen, PIPE
+from subprocess import Popen, PIPE, check_call
 from contextlib import contextmanager
 from cs.dateutils import isodate
 from cs.logutils import setup_logging, Pfx, warning, X
@@ -66,74 +66,60 @@ def main(argv):
               print(suffix)
           elif op == 'next':
             print(N.next_suffix())
+          elif op == 'release':
+            outstanding = N.uncommitted()
+            if outstanding:
+              print("Uncommited changes exist for these files:")
+              for path in sorted(outstanding):
+                print(' ', path)
+              print("These changes will not be included in the release.")
+              if ask("Proceed with release anyway"):
+                changes = list(N.log_since())
+                if changes:
+                  print("Changes since the last release:")
+                  for files, firstline in changes:
+                    print(" ", ' '.join(files) + ': ' + firstline)
+                  print()
+                  release_message = pipefrom('readdottext').rstrip()
+                  if not release_message:
+                    error("empty release message, aborting")
+                    xit = 1
+                  else:
+                    next_tag = N.next_release_tag()
+                    if ask("Confirm new release for %r as %r" % (name, next_tag)):
+                      rel_dir = os.path.join('release', next_tag)
+                      with Pfx("mkdir(%s)", rel_dir):
+                        os.mkdir(rel_dir)
+                      summary_filename = os.path.join(rel_dir, 'SUMMARY.txt')
+                      with Pfx(summary_filename):
+                        with open(summary_filename, 'w') as sfp:
+                          print(release_message, file=sfp)
+                      changes_filename = os.path.join(rel_dir, 'CHANGES.txt')
+                      with Pfx(changes_filename, 'w') as cfp:
+                        for files, firstline in changes:
+                          print(" ", ' '.join(files) + ': ' + firstline, file=cfp)
+                      VCS = N.vcs
+                      VCS.add_files(summary_filename, changes_filename)
+                      VCS.commit('Release information for %s.\nSummary:\n%s'
+                                 % (next_tag, release_message),
+                                 summary_filename, changes_filename)
+                      VCS.tag(next_tag)
+                    else:
+                      error("release cancelled")
+                      xit = 1
+                else:
+                  error("no changes since last release, aborting")
+                  xit = 1
+              else:
+                xit = 1
+          else:
+            warning("unrecognised op")
+            badopts = True
   if badopts:
     print(usage, file=sys.stderr)
     xit = 2
   return xit
-##  if op == "release":
-##    next_suffix = self.next_release_suffix(prefix)
-##
-##
-##        add)
-##          uncommited=$( $trace hg status | grep -v '^?' || : )
-##          if [ -n "$uncommited" ]
-##          then
-##            echo "Uncommited changes exist:"
-##            printf "%s\n" "$uncommited"
-##            echo "These changes will not be included in the release."
-##            ask "Proceed anyway" || exit 1
-##          fi
-##          lastrelease=$relpfx-$( self last ) || lastrelease=0
-##          if [ "x$lastrelease" != x0 ]
-##          then
-##            log=$( self log )
-##            if [ -z "$log" ]
-##            then
-##              echo "$cmd: no changes since last release tag, aborting" >&2
-##              exit 1
-##            fi
-##            echo "Changes since $lastrelease:"
-##            printf "%s\n" "$log"
-##          fi
-##          echo
-##          echo "Enter short change summary since $lastrelease."
-##          changefile=$TMPDIR/$cmd.$$.changes
-##          readdottext >"$changefile"
-##          [ -s "$changefile" ] || exit 1
-##          while echo
-##                cat "$changefile"
-##                echo
-##                ask "Edit the changes"
-##          do
-##            "$EDITOR" "$changefile"
-##          done
-##          if [ ! -s "$changefile" ]
-##          then
-##            echo "$cmd: empty changefile, aborting" >&2
-##            exit 1
-##          fi
-##          newrelease=$( self next ) \
-##          || { echo "$cmd: cannot generate next tag" >&2; exit 1; }
-##          echo
-##          newtag=$relpfx-$newrelease
-##          ask "Ok to mark release as $newtag" || exit 1
-##          if [ "x$relpfx" = xrelease ]
-##          then reldir=release/$newrelease
-##          else reldir=release/$relpfx-$newrelease
-##          fi
-##          $trace mkdir "$reldir"
-##          printf "%s\n" "$newtag" >"$reldir/release-tag.txt"
-##          $trace mv "$changefile" "$reldir/SUMMARY.txt"
-##          [ "x$lastrelease" == x0 ] \
-##          || printf '%s\n' "$log" >"$reldir/CHANGES.txt"
-##          $trace hg add "$reldir"
-##          summary_text=$( cat "$reldir/SUMMARY.txt" )
-##          $trace hg commit -m "Release information for $newtag.
-##      Summary:
-##      $summary_text" "$reldir"
-##          $trace hg tag "$newtag"
-##          ;;
-##
+
 ##        export)
 ##          exec 3>&1 1>&2
 ##          rev=
@@ -301,6 +287,14 @@ def main(argv):
 ##      export PYPI_URL
 ##    }
 
+def ask(message):
+  ''' Prompt with yes/no question, return true if response is "y" or "yes".
+  '''
+  print(message, end='? ')
+  sys.stdout.flush()
+  response = sys.stdin.readline().rstrip().lower()
+  return response in ('y', 'yes')
+
 @contextmanager
 def pipefrom(*argv):
   ''' Context manager returning standard output of command.
@@ -336,7 +330,13 @@ class VCS(object):
 class VCS_Hg(VCS):
 
   def _pipefrom(self, *hgargs):
+    hgargv = ['hg'] + list(hgargs) + ['|']
+    print(hgargv, file=sys.stderr)
     return pipefrom('hg', *hgargs)
+
+  def _hgcmd(self, *hgargs):
+    print('hg', *hgargs, file=sys.stderr)
+    check_call(['hg'] + list(hgargs))
 
   def tags(self):
     ''' Generator yielding the current tags.
@@ -346,6 +346,13 @@ class VCS_Hg(VCS):
       for tagline in hgfp:
         tag, _ = tagline.split(None, 1)
         yield tag
+
+  def tag(self, tag_name, revision=None):
+    ''' Tag a revision with the supplied `tag`, by default revision "tip".
+    '''
+    if revision is None:
+      revision = 'tip'
+    self._hgcmd('hg', 'tag',  '-r', revision, '--', tag_name)
 
   def log_since(self, tag, paths):
     with self._pipefrom('log',
@@ -358,6 +365,25 @@ class VCS_Hg(VCS):
         files = files.split()
         firstline = firstline.strip()
         yield files, firstline
+
+  def add_files(self, *paths):
+    ''' Add the specified paths to the repository.
+    '''
+    self._hgcmd('add', *paths)
+
+  def commit(self, message, *paths):
+    ''' Commit the specified `paths` with the specified `message`.
+    '''
+    self._hgcmd('commit', '-m', message, '--', *paths)
+
+  def uncommitted(self):
+    ''' Generator yielding uncommited but tracked paths.
+    '''
+    with self._pipefrom('status') as hgfp:
+      for hgline in hgfp:
+        s, path = hgline.rstrip().split(' ', 1)
+        if s != '?':
+          yield path
 
 class ReleaseName(object):
   ''' State surrounding a particular release tag prefix.
@@ -437,6 +463,14 @@ class ReleaseName(object):
     if suffix is None:
       return
     return self.vcs.log_since(self.tagname(suffix), self.paths())
+
+  def uncommitted(self):
+    pathset = set(self.paths())
+    changed = ()
+    for path in self.vcs.uncommitted():
+      if path in pathset:
+        changed.append(path)
+    return changed
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
