@@ -48,8 +48,8 @@ def page_HTML(title, *tokens, **kw):
   ''' Convenience function returning an '<HTML>' token for a page.
       Keyword parameters:
       `content_type`: "http-equiv" Content-Type, default: "text/html; charset=UTF-8".
-      'head_tokens`: optional extra markup tokens for the HEAD section.
-      'body_attrs`: optional attributes for the BODY section tag.
+      `head_tokens`: optional extra markup tokens for the HEAD section.
+      `body_attrs`: optional attributes for the BODY section tag.
   '''
   content_type = kw.pop('content_type', 'text/html; charset=UTF-8')
   head_tokens = kw.pop('head_tokens', ())
