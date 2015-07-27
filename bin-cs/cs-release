@@ -509,7 +509,7 @@ class ReleaseName(object):
     PKG.check()
     PKG.register()
     PKG.upload()
-    lastvalue_label = '-'.join(lastvalue_prefix, 'css', self.prefix)
+    lastvalue_label = '-'.join( [lastvalue_prefix, 'css', self.prefix] )
     lastvalue(lastvalue_label, suffix)
 
 if __name__ == '__main__':
