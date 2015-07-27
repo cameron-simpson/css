@@ -237,21 +237,16 @@ class PyPI_Package(O):
     for kw, value in DISTINFO_DEFAULTS.items():
       with Pfx(kw):
         if kw not in info:
-          X("%s = %r", kw, value)
           info[kw] = value
 
     classifiers = info['classifiers']
     for classifier_topic, classifier_subsection in DISTINFO_CLASSIFICATION.items():
       classifier_prefix = classifier_topic + " ::"
       classifier_value = classifier_topic + " :: " + classifier_subsection
-      X("look for %r ...", classifier_prefix)
       if not any(classifier.startswith(classifier_prefix)
                  for classifier in classifiers
                  ):
-        X("classifiers + %s", classifier_value)
         info['classifiers'].append(classifier_value)
-      else:
-        X("already has %r*", classifier_prefix)
 
     ispkg = self.is_package(self.package_name)
     if ispkg:
@@ -326,7 +321,6 @@ class PyPI_Package(O):
 
     readme_subpath = self.pkg_readme_rpath(prefix_dir=self.libdir)
     readme_path = os.path.join(pkg_dir, readme_subpath)
-    X("make_package: readme_path = %r", readme_path)
     if os.path.exists(readme_path):
       if 'long_description' in distinfo:
         warning(
@@ -407,13 +401,11 @@ class PyPI_Package(O):
   def package_paths(self, package_name, libdir):
     ''' Generator to yield the file paths from a package relative to the `libdir` subdirectory.
     '''
-    X("PACKAGE_PATHS...")
     package_subpath = pathify(package_name)
     if not self.is_package(package_name):
       yield package_subpath + '.py'
       test_subpath = package_subpath + '_tests.py'
       test_path = os.path.join(libdir, test_subpath)
-      X("check for tests at: %r", test_path)
       if os.path.exists(test_path):
         yield test_subpath
     else:
