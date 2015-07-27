@@ -379,6 +379,7 @@ class PyPI_Package(O):
                    ):
           if kw in distinfo:
             out("  %s = %r," % (kw, distinfo[kw]))
+            written.add(kw)
           else:
             warning("missing distinfo[%r]", kw)
             ok = False
