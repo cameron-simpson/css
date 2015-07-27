@@ -369,19 +369,19 @@ class PyPI_Package(O):
         out("from distutils.core import setup")
         out("setup(")
         # mandatory fields, in preferred order
+        written = set()
         for kw in ('name',
                    'description', 'author', 'author_email', 'version',
                    'url',
                    ):
-          try:
-            value = distinfo.pop(kw)
-          except KeyError:
+          if kw in distinfo:
+            out("  %s = %r," % (kw, distinfo[kw]))
+          else:
             warning("missing distinfo[%r]", kw)
             ok = False
-          else:
-            out("  %s = %r," % (kw, value))
         for kw in sorted(distinfo.keys()):
-          out("  %s = %r," % (kw, distinfo[kw]))
+          if kw not in written:
+            out("  %s = %r," % (kw, distinfo[kw]))
         out(")")
       if not ok:
         raise ValueError("could not construct valid setup.py file")
