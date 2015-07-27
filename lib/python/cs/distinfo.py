@@ -215,44 +215,50 @@ class PyPI_Package(O):
     global DISTINFO_DEFAULTS
     global DISTINFO_CLASSIFICATION
 
-    info = dict(import_module_name(self.package_name, 'DISTINFO'))
+    dinfo = dict(import_module_name(self.package_name, 'DISTINFO'))
 
-    info['package_dir'] = {'': self.libdir}
+    dinfo['package_dir'] = {'': self.libdir}
 
     for kw, value in DISTINFO_DEFAULTS.items():
       with Pfx(kw):
-        if kw not in info:
-          info[kw] = value
+        if kw not in dinfo:
+          dinfo[kw] = value
 
-    classifiers = info['classifiers']
+    classifiers = dinfo['classifiers']
     for classifier_topic, classifier_subsection in DISTINFO_CLASSIFICATION.items():
       classifier_prefix = classifier_topic + " ::"
       classifier_value = classifier_topic + " :: " + classifier_subsection
       if not any(classifier.startswith(classifier_prefix)
                  for classifier in classifiers
                  ):
-        info['classifiers'].append(classifier_value)
+        dinfo['classifiers'].append(classifier_value)
 
     ispkg = self.is_package(self.package_name)
     if ispkg:
       # stash the package in a top level directory of that name
-      ## info['package_dir'] = {package_name: package_name}
-      info['packages'] = [self.package_name]
+      ## dinfo['package_dir'] = {package_name: package_name}
+      dinfo['packages'] = [self.package_name]
     else:
-      info['py_modules'] = [self.package_name]
+      dinfo['py_modules'] = [self.package_name]
 
     for kw, value in (('name', self.pypi_package_name),
                       ('version', self.pypi_version),
                       ):
       if value is not None:
         with Pfx(kw):
-          if kw in info:
-            if info[kw] != value:
-              info("publishing %s instead of %s", value, info[kw])
+          if kw in dinfo:
+            if dinfo[kw] != value:
+              info("publishing %s instead of %s", value, dinfo[kw])
           else:
-            info[kw] = value
+            dinfo[kw] = value
 
-    self.distinfo = info
+    self.distinfo = dinfo
+    for kw in ('name',
+               'description', 'author', 'author_email', 'version',
+               'url',
+              ):
+      if kw not in dinfo:
+        error('no %r in distinfo', kw)
 
   def pkg_rpath(self, package_name=None, prefix_dir=None, up=False):
     ''' Return a path based on a `package_name` (default self.package_name).
