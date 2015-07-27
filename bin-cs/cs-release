@@ -507,13 +507,9 @@ class ReleaseName(object):
     if suffix is None:
       suffix = self.last_suffix()
     PKG = PyPI_Package(pypi_url, self.prefix, suffix)
-    X("PKG.distinfo.name = %r", PKG.distinfo['name'])
     PKG.check()
-    X("PKG.distinfo.name = %r", PKG.distinfo['name'])
     PKG.register()
-    X("PKG.distinfo.name = %r", PKG.distinfo['name'])
     PKG.upload()
-    X("PKG.distinfo.name = %r", PKG.distinfo['name'])
     lastvalue_label = '-'.join(lastvalue_prefix, 'css', self.prefix)
     lastvalue(lastvalue_label, suffix)
 

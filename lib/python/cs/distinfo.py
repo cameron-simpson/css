@@ -453,7 +453,7 @@ class PyPI_PackageCheckout(O):
     if hasattr(self, 'pkg_dir'):
       raise RuntimeError("already using .pkg_dir = %r" % (self.pkg_dir,))
     self.pkg_dir = self.package.make_package()
-    self.inpkg("find . -type f | sort | xxargs ls -ld -- ")
+    ##self.inpkg("find . -type f | sort | xxargs ls -ld -- ")
     return self
 
   def __exit__(self, exc_type, exc_value, traceback):
