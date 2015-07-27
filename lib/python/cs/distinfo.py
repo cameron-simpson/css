@@ -118,10 +118,8 @@ def main(argv):
   if pypi_package_name is None:
     pypi_package_name = package_name
 
-  PKG = PyPI_Package(package_name,
-                     pypi_package_name=pypi_package_name,
-                     pypi_url=pypi_url,
-                     pypi_version=pypi_version)
+  PKG = PyPI_Package(pypi_url, package_name, pypi_version,
+                     pypi_package_name=pypi_package_name)
 
   xit = 0
 
@@ -192,12 +190,10 @@ def test_is_package(libdir, package_name):
 
 class PyPI_Package(O):
 
-  ''' Class for creating and administering cs.* packages for PyPI.
-  '''
-
-  def __init__(self, package_name, pypi_package_name=None, pypi_url=None, pypi_version=None):
-    ''' Iinitialise: save package_name and its name in PyPI.
+  def __init__(self, pypi_url, package_name, package_version, pypi_package_name=None, pypi_version=None):
+    ''' Initialise: save package_name and its name in PyPI.
     '''
+    self.pypi_url = pypi_url
     if pypi_package_name is None:
       pypi_package_name = package_name
     if pypi_version is None:
@@ -207,18 +203,7 @@ class PyPI_Package(O):
     self.version = package_version
     self.pypi_version = pypi_version
     self.libdir = LIBDIR
-    self._lock = RLock()
     self._prep_distinfo()
-    if pypi_version is not None:
-      self._version = pypi_version
-
-  @locked_property
-  def version(self):
-    return cmdstdout(['cs-release', 'last', self.package_name]).rstrip()
-
-  @property
-  def pypi_version(self):
-    return self.version
 
   @property
   def hg_tag(self):
