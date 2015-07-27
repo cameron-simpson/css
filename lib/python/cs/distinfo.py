@@ -20,9 +20,8 @@ from cs.threads import locked_property
 from cs.py.modules import import_module_name
 from cs.obj import O
 
-PYPI_PROD_URL = 'https://pypi.python.org/pypi'
-PYPI_TEST_URL = 'https://testpypi.python.org/pypi'
-PYPI_DFLT_URL = PYPI_TEST_URL
+URL_PYPI_PROD = 'https://pypi.python.org/pypi'
+URL_PYPI_TEST = 'https://testpypi.python.org/pypi'
 
 # published URL
 URL_BASE = 'https://bitbucket.org/cameron_simpson/css/src/tip/'
@@ -63,14 +62,14 @@ USAGE = '''Usage: %s [-n pypi-pkg-name] [-v pypi_version] pkg-name op [op-args..
 
 def main(argv):
   cmd = os.path.basename(argv.pop(0))
-  usage = USAGE % (cmd, PYPI_DFLT_URL, PYPI_PROD_URL)
+  usage = USAGE % (cmd, URL_PYPI_TEST, URL_PYPI_PROD)
   setup_logging(cmd)
 
   badopts = False
 
   pypi_package_name = None
   pypi_version = None
-  pypi_url = os.environ.get('PYPI_URL', PYPI_DFLT_URL)
+  pypi_url = None
 
   try:
     opts, argv = getopt(argv, 'n:r:v:')
@@ -112,6 +111,9 @@ def main(argv):
   if badopts:
     print(usage, file=sys.stderr)
     return 2
+
+  if pypi_url is None:
+    pypi_url = os.environ.get('PYPI_URL', URL_PYPI_TEST)
 
   if pypi_package_name is None:
     pypi_package_name = package_name
@@ -198,11 +200,12 @@ class PyPI_Package(O):
     '''
     if pypi_package_name is None:
       pypi_package_name = package_name
-    if pypi_url is None:
-      pypi_url = PYPI_DFLT_URL
+    if pypi_version is None:
+      pypi_version = package_version
     self.package_name = package_name
     self.pypi_package_name = pypi_package_name
-    self.pypi_url = pypi_url
+    self.version = package_version
+    self.pypi_version = pypi_version
     self.libdir = LIBDIR
     self._lock = RLock()
     self._prep_distinfo()
