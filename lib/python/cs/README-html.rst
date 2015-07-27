@@ -1,7 +1,7 @@
 HTML transcription functions.
 =============================
 
-Malformed markup is enraging. Therefore, when I must generate HTML I construct a token structure using natural Python objects (strings, lists, dicts) and use this module to transcribe them to syntacticly correct HTML. This also avoids lots of tediuous and error prone entity escaping.
+Malformed markup is enraging. Therefore, when I must generate HTML I construct a token structure using natural Python objects (strings, lists, dicts) and use this module to transcribe them to syntacticly correct HTML. This also avoids lots of tedious and error prone entity escaping.
 
 A "token" in this scheme is:
 
