@@ -14,10 +14,8 @@ import re
 from subprocess import Popen, PIPE, check_call
 from contextlib import contextmanager
 from cs.dateutils import isodate
+from cs.distinfo import URL_PYPI_PROD, URL_PYPI_TEST, PyPI_Package
 from cs.logutils import setup_logging, Pfx, warning, X
-
-URL_PYPI_PROD = 'https://pypi.python.org/pypi'
-URL_PYPI_TEST = 'https://testpypi.python.org/pypi'
 
 PYLIBTOP = 'lib/python'
 
@@ -66,6 +64,7 @@ def main(argv):
           elif op == 'next':
             print(N.next_suffix())
           elif op == 'release':
+            # issue new release tag
             outstanding = N.uncommitted()
             if outstanding:
               print("Uncommited changes exist for these files:")
@@ -111,6 +110,11 @@ def main(argv):
                   xit = 1
               else:
                 xit = 1
+          elif op in 'testpypi':
+            # upload latest release to testpypi
+            lastvalue_prefix = 'testpypi'
+            pypi_url = URL_PYPI_TEST
+            N.submit_pypi(pypi_url, lastvalue_prefix)
           else:
             warning("unrecognised op")
             badopts = True
@@ -195,21 +199,7 @@ def main(argv):
 ##          | $trace freshmeat-submit
 ##          ;;
 ##
-##        update-tag)
-##          if lastrelease=$( self last )
-##          then
-##            log=$( self log )
-##            printf "%s\n" "$log"
-##            if [ -n "$log" ] && ask "Issue new tag for $relpfx"
-##            then
-##              self add || exit 1
-##            fi
-##          else
-##            ask "Issue first tag for $relpfx" || exit 1
-##            self add || exit 1
-##          fi
-##          ;;
-##
+
 ##        pypi)
 ##          if [ $# -gt 0 ] && [ "x$1" = xprod ]
 ##          then  shift; pypi_test_mode=
@@ -259,32 +249,74 @@ def main(argv):
 ##            $trace lastvalue "$lastlabel" "$lastrelease"
 ##          fi
 ##          ;;
-##
-##        *)echo "$cmd: unimplemented op \"$op\"" >&2
-##          exit 2
-##          ;;
-##
-##      esac
-##          else:
-##            warning("unknown operator")
-##            badopts = True
-##  if badopts:
-##    print(usage, file=sys.stderr)
-##    xit = 2
-##  return xit
-##
-##    pypi_setup(){
-##      if [ $pypi_test_mode ]
-##      then
-##        pypi_url=$testpypi_url
-##        pypi_pfx=testpypi
-##      else
-##        pypi_url=$prodpypi_url
-##        pypi_pfx=pypi
-##      fi
-##      PYPI_URL=$pypi_url
-##      export PYPI_URL
-##    }
+
+def lastvalue(key, value=None):
+  ''' Retrieve or store a lastvalue.
+  '''
+  with pfx('lastvalue(%r)', key):
+    if not key or '/' in key or key.startswith('.'):
+      raise ValueError('invalid key')
+    last_filename = os.path.join(os.environ['HOME'], 'var', 'log', 'lastvalue', key)
+    if value is None:
+      with Pfx(last_filename):
+        with open(last_filename):
+          last = None
+          for lineno, line in enumerate(fp, 1):
+            with Pfx(lineno):
+              if not line.endswith('\n'):
+                raise ValueError('incomplete line')
+              last = line[:-1]
+        return last
+    else:
+      with open(last_filename, 'a') as fp:
+        print(value, file=fp)
+
+##          if [ $# -gt 0 ] && [ "x$1" = xprod ]
+##          then  shift; pypi_test_mode=
+##          else  pypi_test_mode=1
+##          fi
+##          pypi_setup
+##          if [ "$relpfx" = ALL ]
+##          then
+##            for relpfx in $( self ls | grep '^cs\.' )
+##            do
+##              pkg=$relpfx
+##              lastlabel=$pypi_pfx-css-$pkg
+##              lastrelease=$( self last ) || exit 1
+##              lastpypirelease=$( $trace lastvalue "$lastlabel" 2>/dev/null || : )
+##              if [ "x$lastrelease" = "x$lastpypirelease" ]
+##              then
+##                echo "OK $relpfx: $pypi_pfx up to date at $lastpypirelease"
+##              else
+##                if [ -n "$lastpypirelease" ]
+##                then
+##                  echo "NEWER $relpfx: $lastrelease, but $pypi_pfx has $lastpypirelease"
+##                else
+##                  echo "NEWER $relpfx: $lastrelease, but $pypi_pfx has nothing"
+##                fi
+##              fi
+##              log=$( self log )
+##              if [ -n "$log" ]
+##              then
+##                echo "  has untagged changes"
+##              fi
+##            done
+##          else
+##            pkg=$relpfx
+##            lastlabel=$pypi_pfx-css-$pkg
+##            case "$pkg" in
+##              cs.*) ;;
+##              *)  echo "$cmd: $op: invalid package name, expected cs.*: $pkg" >&2
+##                  exit 2
+##                  ;;
+##            esac
+##            self update-tag
+##            lastrelease=$( self last )
+##            [ -n "$lastrelease" ] || exit 1
+##            $trace python -m cs.distinfo "$pkg" check
+##            $trace python -m cs.distinfo "$pkg" register
+##            $trace python -m cs.distinfo "$pkg" upload
+##          fi
 
 def ask(message):
   ''' Prompt with yes/no question, return true if response is "y" or "yes".
@@ -470,6 +502,20 @@ class ReleaseName(object):
       if path in pathset:
         changed.append(path)
     return changed
+
+  def submit_pypi(self, pypi_url, lastvalue_prefix, suffix=None):
+    if suffix is None:
+      suffix = self.last_suffix()
+    PKG = PyPI_Package(pypi_url, self.prefix, suffix)
+    X("PKG.distinfo.name = %r", PKG.distinfo['name'])
+    PKG.check()
+    X("PKG.distinfo.name = %r", PKG.distinfo['name'])
+    PKG.register()
+    X("PKG.distinfo.name = %r", PKG.distinfo['name'])
+    PKG.upload()
+    X("PKG.distinfo.name = %r", PKG.distinfo['name'])
+    lastvalue_label = '-'.join(lastvalue_prefix, 'css', self.prefix)
+    lastvalue(lastvalue_label, suffix)
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
