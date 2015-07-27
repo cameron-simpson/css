@@ -244,7 +244,9 @@ class PyPI_Package(O):
     for kw, value in (('name', self.pypi_package_name),
                       ('version', self.pypi_version),
                       ):
-      if value is not None:
+      if value is None:
+        warning("_prep: no value for %r", name)
+      else:
         with Pfx(kw):
           if kw in dinfo:
             if dinfo[kw] != value:
@@ -314,7 +316,7 @@ class PyPI_Package(O):
     readme_path = os.path.join(pkg_dir, readme_subpath)
     if os.path.exists(readme_path):
       if 'long_description' in distinfo:
-        warning(
+        info(
             'long_description: already provided, ignoring %s', readme_subpath)
       else:
         with open(readme_path) as readmefp:
@@ -439,7 +441,6 @@ class PyPI_Package(O):
     runcmd(hgargv)
 
 class PyPI_PackageCheckout(O):
-
   ''' Facilities available with a checkout of a package.
   '''
 
