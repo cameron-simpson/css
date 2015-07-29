@@ -21,7 +21,6 @@ import re
 import sys
 import os
 from cs.py3 import bytes, unicode, ustr, sorted, StringTypes
-from cs.logutils import X, warning
 
 unhexify = binascii.unhexlify
 if sys.hexversion >= 0x030000:
@@ -201,11 +200,14 @@ def untexthexify(s, shiftin='[', shiftout=']'):
 # regexp to match RFC2047 text chunks
 re_RFC2047 = re.compile(r'=\?([^?]+)\?([QB])\?([^?]*)\?=', re.I)
 
-def unrfc2047(s):
-  ''' Accept a string containing RFC2047 text encodings (or the whitespace
+def unrfc2047(s, warning=None):
+  ''' Accept a string `s` containing RFC2047 text encodings (or the whitespace
       littered varieties that come from some low quality mail clients) and
       decode them into flat Unicode.
+      `warning`: optional parameter specifying function to report warning messages, default cs.logutils.warning
   '''
+  if warning is None:
+    from cs.logutils import warning
   if not isinstance(s, unicode):
     s = unicode(s, 'iso8859-1')
   chunks = []
@@ -217,6 +219,7 @@ def unrfc2047(s):
       chunks.append(s[sofar:start])
     enccset = m.group(1)
     enctype = m.group(2).upper()
+    # default to undecoded text
     enctext = m.group(3)
     if enctype == 'B':
       try:
