@@ -1024,14 +1024,18 @@ class LatePool(object):
           print(result)
   '''
 
-  def __init__(self, L=None, priority=None, delay=None, when=None, name=None, pfx=None, block=False):
+  def __init__(self, L=None, priority=None, delay=None, when=None, pfx=None, block=False):
+    ''' Initialise the LatePool.
+        `L`: Later instance, default from default.current.
+        `priority`, `delay`, `when`, `name`, `pfx`: default values passed to Later.submit.
+        `block`: if true, wait for LateFunction completion before leaving __exit__.
+    '''
     if L is None:
       L = default.current
     self.later = L
     self.parameters = { 'priority': priority,
                         'delay': delay,
                         'when': when,
-                        'name': name,
                         'pfx': pfx,
                       }
     self.block = block
@@ -1045,6 +1049,9 @@ class LatePool(object):
     return self
 
   def __exit__(self, exc_type, exc_val, exc_tb):
+    ''' Exit handler.
+        If .block is true, wait for LateFunction completion before return.
+    '''
     if self.block:
       self.join()
     return False
