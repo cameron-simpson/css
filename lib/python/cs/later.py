@@ -1073,7 +1073,8 @@ class LatePool(object):
   def __iter__(self):
     ''' Report completion of the LateFunctions.
     '''
-    yield from report(self.LFs)
+    for LF in report(self.LFs):
+      yield LF
 
   def join(self):
     ''' Wait for completion of all the LateFunctions.
