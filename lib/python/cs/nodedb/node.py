@@ -490,7 +490,7 @@ class Node(dict):
         This is the method that instantiates all entries as _AttrLists.
     '''
     try:
-      values = self[k]
+      values = dict.__getitem__(self, k)
     except KeyError:
       if default is None:
         default = ()
@@ -499,7 +499,7 @@ class Node(dict):
       self.nodedb._revision += 1
     return values
 
-  # __getitem__ goes directly to the dict implementation
+  __getitem__ = get
 
   @locked
   def __setitem__(self, item, new_values):
