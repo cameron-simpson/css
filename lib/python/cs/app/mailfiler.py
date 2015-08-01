@@ -17,7 +17,7 @@ DISTINFO = {
     'requires': [ 'cs.configutils', 'cs.env', 'cs.fileutils', 'cs.lex', 'cs.logutils', 'cs.mailutils', 'cs.obj', 'cs.seq', 'cs.threads', 'cs.app.maildb', 'cs.py.modules', 'cs.py3' ],
     'entry_points': {
       'console_scripts': [
-          'maildb = cs.app.mailfiler:main',
+          'mailfiler = cs.app.mailfiler:main',
           ],
         },
 }

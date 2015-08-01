@@ -157,7 +157,7 @@ then
   set -- timeout 10 reattach-to-user-namespace "$@"
   # async because I've seen terminal-notifier hang, stalling my mail filer
   # timeout also to stop hanging processes filling the process table
-  "$@" >/dev/null &
+  { "$@" >/dev/null || echo ALERT: "$title $subtitle $message" >&2; } &
 fi
 
 exit $xit

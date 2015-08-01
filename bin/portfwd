@@ -251,7 +251,7 @@ fi
 # run main restart outer control via svcd
 [ $once ] \
 || exec $set_x \
-          svcd -n "PORTFWD_$target" \
+          svcd -n "portfwd-$target" \
                -t "$test_shcmd" \
                -- "$0" -1 $opts -- "$target"
 
