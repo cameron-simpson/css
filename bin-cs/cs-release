@@ -258,7 +258,7 @@ def main(argv):
 def lastvalue(key, value=None):
   ''' Retrieve or store a lastvalue.
   '''
-  with pfx('lastvalue(%r)', key):
+  with Pfx('lastvalue(%r)', key):
     if not key or '/' in key or key.startswith('.'):
       raise ValueError('invalid key')
     last_filename = os.path.join(os.environ['HOME'], 'var', 'log', 'lastvalue', key)
