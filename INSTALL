@@ -10,11 +10,13 @@ The revision control repository is published here:
 
   https://bitbucket.org/cameron_simpson/css/overview
 
+  https://bitbucket.org/cameron_simpson/css/commits/all
+
 Some of the Python modules are availoable from PyPI here:
 
   https://pypi.python.org/pypi?%3Aaction=search&term=cameron+simpson&submit=search
 
-(Because PyPI lacks "author" pages, that is a crude seearch for my name, which happens to get only my packages at present; they all have names starting "cs." should you need to disambigute things.)
+(Because PyPI lacks "author" pages, that is a crude search for my name, which happens to get only my packages at present; they all have names starting "cs." should you need to disambigute things.)
 
 An autoindex of the scripts is in the file 1INDEX.txt.
 
@@ -39,10 +41,15 @@ Installing my scripts:
   It mostly does this:
 
     PATH=$PATH:/opt/css/bin
+
     MANPATH=$MANPATH:/opt/css/man
+
     PYTHONPATH=$PYTHONPATH:/opt/css/lib/python
+
     CLASSPATH=$CLASSPATH:/opt/css/lib/java/au.com.zip.cs.jar
+
     PERL5LIB=$PERL5LIB:/opt/css/lib/perl
+
     export PATH MANPATH PYTHONPATH CLASSPATH PERL5LIB
 
   Several of the scripts expect the following shell environment variables:
