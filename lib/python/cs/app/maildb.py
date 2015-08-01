@@ -308,18 +308,24 @@ def main(argv=None, stdin=None):
 
   return xit
 
-def edit_group(MDB, group):
-  if group.startswith('/'):
-    if group.endswith('/'):
-      rexp = group[1:-1]
+def edit_group(MDB, groupname):
+  ''' Edit the membership of the named `groupname`.
+      If `groupname` starts with a slash then the tail is taken to be
+      a regexp used to select addresses.
+  '''
+  if groupname.startswith('/'):
+    # select by regular expression
+    # regexp as "/re" or "/re/"
+    if groupname.endswith('/'):
+      rexp = groupname[1:-1]
     else:
-      rexp = group[1:]
+      rexp = groupname[1:]
     As = MDB.matchAddresses(rexp)
     Gs = []
   else:
-    groupnames = set(A.GROUPs)
-    As = [ A for A in MDB.ADDRESSes if group in groupnames ]
-    Gs = [ G for G in MDB.GROUPs if group in groupnames ]
+    # select AddressNodes and GroupNodes by groupname
+    As = [ A for A in MDB.ADDRESSes if groupname in A.GROUPs ]
+    Gs = [ G for G in MDB.GROUPs if groupname in G.GROUPs ]
   return edit_groupness(MDB, As, Gs)
 
 def edit_groupness(MDB, addresses, subgroups):
