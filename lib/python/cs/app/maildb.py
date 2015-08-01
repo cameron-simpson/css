@@ -317,8 +317,9 @@ def edit_group(MDB, group):
     As = MDB.matchAddresses(rexp)
     Gs = []
   else:
-    As = [ A for A in MDB.ADDRESSes if group in A.GROUPs ]
-    Gs = [ G for G in MDB.GROUPs if group in G.GROUPs ]
+    groupnames = set(A.GROUPs)
+    As = [ A for A in MDB.ADDRESSes if group in groupnames ]
+    Gs = [ G for G in MDB.GROUPs if group in groupnames ]
   return edit_groupness(MDB, As, Gs)
 
 def edit_groupness(MDB, addresses, subgroups):

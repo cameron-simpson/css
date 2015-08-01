@@ -20,7 +20,7 @@ from cs.logutils import Pfx, error, warning, info, debug, D, X
 from cs.threads import locked
 from cs.py3 import StringTypes, Queue_Full as Full, Queue_Empty as Empty
 from . import NodeDB
-from .backend import Backend, CSVRow
+from .backend import Backend, ResetUpdate, ExtendUpdate
 
 def resolve_csv_row(row, lastrow):
   ''' Transmute a CSV row, resolving omitted TYPE, NAME or ATTR fields.
@@ -80,14 +80,83 @@ class Backend_CSVFile(Backend):
     self._open_csv()
     self.csv.ready()
 
+  def _csv_to_Update(self, row):
+    ''' Decode a CSV row into Backend._Update instances.
+        Yield _Updates.
+        Honour the incremental notation for data:
+        - a NAME commencing with '=' discards any existing (TYPE, NAME)
+          and begins anew.
+        - an ATTR commencing with '=' discards any existing ATTR and
+          commences the ATTR anew
+        - an ATTR commencing with '-' discards any existing ATTR;
+          VALUE must be empty
+        Otherwise each VALUE is appended to any existing ATTR VALUEs.
+    '''
+    t, name, attr, value = row
+    if name.startswith('='):
+      # reset Node, optionally commence attribute
+      yield ResetUpdate(t, name[1:])
+      if attr != "":
+        yield ExtendUpdate(t, name[1:], attr, (value,))
+    elif attr.startswith('='):
+      yield ExtendUpdate(t, name, attr[1:], (value,))
+    elif attr.startswith('-'):
+      if value != "":
+        raise ValueError("reset CVS row: value != '': %r" % (row,))
+      yield ResetUpdate(t, name, attr[1:])
+    else:
+      yield ExtendUpdate(t, name, attr, (value,))
+
+  def _Update_to_csv(self, update):
+    ''' Encode a Backend._Update into CSV rows.
+    '''
+    do_append, t, name, attr, values = update
+    if do_append:
+      # straight value appends
+      for value in values:
+        yield t, name, attr, value
+    else:
+      if attr is None:
+        # reset whole Node
+        if values:
+          raise ValueError("values supplied when attr is None: %r" % (values,))
+        yield t, '=' + name, "", ""
+      else:
+        # reset attr values
+        if values:
+          # reset values
+          first = True
+          for value in values:
+            if first:
+              yield t, name, '=' + attr, value
+              first = False
+            else:
+              yield t, name, attr, value
+        else:
+          # no values - discard whole attr
+          yield t, name, '-' + attr, ""
+
   def import_foreign_row(self, row0):
+    ''' Apply the values from an individual CSV update row to the NodeDB without propagating to the backend.
+        Each row is expected to be post-resolve_csv_row().
+        Honour the incremental notation for data:
+        - a NAME commencing with '=' discards any existing (TYPE, NAME)
+          and begins anew.
+        - an ATTR commencing with '=' discards any existing ATTR and
+          commences the ATTR anew
+        - an ATTR commencing with '-' discards any existing ATTR;
+          VALUE must be empty
+        Otherwise each VALUE is appended to any existing ATTR VALUEs.
+    '''
     if row0 is None:
       return
     row = resolve_csv_row(row0, self._lastrow)
     self._lastrow = row
     t, name, attr, value = row
-    value = self.nodedb.fromtext(value)
-    self.import_csv_row(CSVRow(t, name, attr, value))
+    nodedb = self.nodedb
+    value = nodedb.fromtext(value)
+    for update in self._csv_to_Update( (t, name, attr, value) ):
+      nodedb._update_local(update)
 
   @locked
   def _open_csv(self):
@@ -107,15 +176,14 @@ class Backend_CSVFile(Backend):
     '''
     self._close_csv()
 
-  def _update(self, csvrow):
+  def _update(self, update):
     ''' Update the backing store from an update csvrow.
     '''
-    if not isinstance(csvrow, CSVRow):
-      raise TypeError("csvrow=%r" % (csvrow,))
     if self.readonly:
       warning("%s: readonly, discarding: %s", self.pathname, csvrow)
-    else:
-      self.csv.put(csvrow)
+      return
+    for row in self._Update_to_csv(update):
+      self.csv.put(row)
 
   def rewrite(self):
     ''' Force a complete rewrite of the CSV file.

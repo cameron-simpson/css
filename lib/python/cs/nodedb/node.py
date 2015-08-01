@@ -492,7 +492,7 @@ class Node(dict):
         This is the method that instantiates all entries as _AttrLists.
     '''
     try:
-      values = self[k]
+      values = dict.__getitem__(self, k)
     except KeyError:
       if default is None:
         default = ()
@@ -501,7 +501,7 @@ class Node(dict):
       self.nodedb._revision += 1
     return values
 
-  # __getitem__ goes directly to the dict implementation
+  __getitem__ = get
 
   @locked
   def __setitem__(self, item, new_values):
@@ -760,6 +760,22 @@ class NodeDB(dict, O):
     '''
     for key in list(self.keys()):
       self[key]._scrub()
+
+  def _update_local(self, update):
+    ''' Apply an update to the NodeDB values without updating the backend.
+    '''
+    do_append, t, name, attr, values = update
+    N = self.make( (t, name) )
+    if do_append:
+      # simple append of values
+      N[attr]._extend_local(values)
+    else:
+      if attr is None:
+        # reset whole Node
+        N._scrub_local()
+      else:
+        # reset specified attribute
+        N[attr]._scrub_local()
 
   def useNoNode(self):
     ''' Enable "no node" mode.
