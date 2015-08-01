@@ -153,8 +153,8 @@ class Backend_CSVFile(Backend):
     row = resolve_csv_row(row0, self._lastrow)
     self._lastrow = row
     t, name, attr, value = row
-    value = nodedb.fromtext(value)
     nodedb = self.nodedb
+    value = nodedb.fromtext(value)
     for update in self._csv_to_Update( (t, name, attr, value) ):
       nodedb._update_local(update)
 
