@@ -400,6 +400,7 @@ def edit_groupness(MDB, addresses, subgroups):
                       A.abbreviation = ab
                     except ValueError as e:
                       error(e)
+                    # add named groups to those associated with this address
                     new_groups.setdefault(A, set()).update(groups)
                     realname = ustr(realname.strip())
                     if realname and realname != A.realname:
@@ -407,6 +408,7 @@ def edit_groupness(MDB, addresses, subgroups):
     # apply groups of whichever addresses survived
     for A, groups in new_groups.items():
       if set(A.GROUPs) != groups:
+        # reset .GROUP list if changed
         A.GROUPs = groups
 
 def update_domain(MDB, old_domain, new_domain, argv):
