@@ -102,8 +102,15 @@ def htmlquote(s):
   return "\"" + s + "\""
 
 def jsquote(s):
+  ''' Quote a string for use in JavaScript.
+  '''
   s = s.replace("\"", "&dquot;")
   return "\"" + s + "\""
+
+def phpquote(s):
+  ''' Quote a string for use in PHP code.
+  '''
+  return "'" + s.replace('\\', '\\\\').replace("'", "\\'") + "'"
 
 def dict2js(d):
   import cs.json

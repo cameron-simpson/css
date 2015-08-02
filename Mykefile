@@ -2,6 +2,7 @@ PREFIX          = /opt/css
 weblocal        = $(HOME)/@/ezos/html/cs/css
 ##hg_bitbucket    = https://bitbucket.org/cameron_simpson/css
 hg_bitbucket    = ssh://hg@bitbucket.org/cameron_simpson/css
+www_bitbucket   = https://bitbucket.org/cameron_simpson/css/commits/all
 title           = Cameron Simpson's Scripts
 
 target  = bin
@@ -138,6 +139,7 @@ _publish_ezos:
 
 _publish_bitbucket:
         hg push --new-branch $(hg_bitbucket)
+        @echo 'changes visible at $(www_bitbucket)'
 
 # mark the tip as a new release
 _release:
