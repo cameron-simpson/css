@@ -180,7 +180,7 @@ class Backend_CSVFile(Backend):
     ''' Update the backing store from an update csvrow.
     '''
     if self.readonly:
-      warning("%s: readonly, discarding: %s", self.pathname, csvrow)
+      warning("%s: readonly, discarding: %s", self.pathname, update)
       return
     for row in self._Update_to_csv(update):
       self.csv.put(row)
