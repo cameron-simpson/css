@@ -186,6 +186,12 @@ class _AttrList(list):
     self.__additemrefs(values)
     self._save()
 
+  @locked
+  def __setslice__(self, low, high, values):
+    list.__setslice__(self, low, high, list(values))
+    self._save()
+
+  @locked
   def _scrub_local(self):
     # remove all elements from this attribute
     self[:] = ()
