@@ -51,6 +51,10 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+branch=$( hg branch )
+obranch=$( incd "$ocheckout" hg branch )
+echo "merging $obranch ==> $branch"
+
 if [ -z "$hadmsg" ]
 then
   if [ -t 0 -a -t 1 ]
@@ -62,9 +66,6 @@ then
     exit 2
   fi
 fi
-
-branch=$( hg branch )
-obranch=$( incd "$ocheckout" hg branch )
 
 $trace hg fetch "$ocheckout"
 if [ "x$branch" != "x$obranch" ]
