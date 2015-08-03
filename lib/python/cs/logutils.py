@@ -33,7 +33,7 @@ from threading import Lock
 import traceback
 from cs.ansi_colour import colourise
 from cs.excutils import noexc
-from cs.lex import is_identifier
+from cs.lex import is_identifier, is_dotted_identifier
 from cs.obj import O, O_str
 from cs.py.func import funccite
 from cs.py3 import unicode, StringTypes, ustr
@@ -163,17 +163,31 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
     trace_level = logging_level
 
   for module_name in module_names:
-    M = importlib.import_module(module_name)
-    M.DEBUG = True
-
-  for func_name in function_names:
-    modname, fname = func_name.rsplit('.', 1)
-    M = importlib.import_module(modname)
-    func = M.__dict__.get(fname)
-    if func is None:
-      warning("no %s.%s() found", modname, fname)
+    try:
+      M = importlib.import_module(module_name)
+    except ImportError:
+      warning("setup_logging: cannot import %r", module_name)
     else:
-      M.__dict__[fname] = _ftrace(func)
+      M.DEBUG = True
+
+  for module_name, func_name in function_names:
+    try:
+      M = importlib.import_module(module_name)
+    except ImportError:
+      warning("setup_logging: cannot import %r", module_name)
+      continue
+    F = M
+    for funcpart in func_name.split('.'):
+      M = F
+      try:
+        F = M.getattr(funcpart)
+      except AttributeError:
+        F = None
+        break
+    if F is None:
+      warning("no %s.%s() found", module_name, func_name)
+    else:
+      setattr(M, funcpart, _ftrace(F))
 
   return level
 
@@ -284,10 +298,14 @@ def infer_logging_level(env_debug=None, environ=None):
         level = logging.DEBUG
       else:
         level = logging.INFO
-    elif '.' in flag and all(is_identifier(_) for _ in flag.split('.')):
+    elif flag[0].islower() and is_dotted_identifier(flag):
+      # modulename
       module_names.append(flag)
-    elif '.' in flag and flag.endswith('()') and all(is_identifier(_) for _ in flag[:-2].split('.')):
-      function_names.append(flag[:-2])
+    elif ':' in flag:
+      # module:funcname
+      module_name, func_name = flag.split(':', 1)
+      if is_dotted_identifier(module_name) and is_dotted_identifier(func_name):
+        function_names.append( (module_name, func_name) )
     else:
       uc_flag = flag.upper()
       if uc_flag == 'DEBUG':
