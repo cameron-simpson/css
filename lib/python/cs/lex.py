@@ -290,6 +290,8 @@ def get_identifier(s, offset=0, alpha=ascii_letters, number=digits, extras='_'):
       The empty string and an unchanged offset will be returned if
       there is no leading letter/underscore.
   '''
+  if offset >= len(s):
+    return '', offset
   ch = s[offset]
   if ch not in alpha and ch not in extras:
     return '', offset
