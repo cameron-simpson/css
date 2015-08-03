@@ -73,7 +73,7 @@ do
     -L) dolock=1 lockname=$2; shift ;;
     -n) name=$2; shift ;;
     -p) pidfile=$2; shift ;;
-    -q) quiet=1 ;;
+    -q) quiet=1 opts="$opts $1" ;;
     -s) sigcmd=$2; shift ;;
     -t) testcmd=$2; shift ;;
     -T) testrate=$2; shift ;;
@@ -130,20 +130,20 @@ uppername()
 
 # rerun ourself inside a lock if specified
 [ $dolock ] \
-&& exec $trace lock -1 "$lockname" "$0" $opts -n "$name" -t "$testcmd" -u "$username" -U "$rusername" -- "$@"
+&& exec $trace lock -1 "$lockname" "$0" $opts -n "$name" -p "$pidfile" -s "$sigcmd" -t "$testcmd" -T "$testrate" -u "$username" -U "$rusername" -- "$@"
 
 if [ -n "$name" ]
 then
   # recompute various things with the service name if specified
   uname=$( uppername "$name" )
-  [ -z "$pidfile" ] && pidfile=$VARRUN/$name.pid
+  [ -z "$pidfile" ] && pidfile=$VARRUN/svcd-$name.pid
   [ -n "$flag_disable" ] || flag_disable=${uname}_DISABLE
   [ -n "$flag_override" ] || flag_override=${uname}_OVERRIDE
   [ -n "$flag_restart" ] || flag_restart=${uname}_RESTART
   pfx="$cmd $name"
 else
   # else just compute the prefix from the command
-  pfx="$cmd $1"
+  pfx="$cmd-$1"
 fi
 
 # sanity check - is this process already active elsewhere?
