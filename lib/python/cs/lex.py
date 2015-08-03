@@ -309,6 +309,25 @@ def get_uc_identifier(s, offset=0, number=digits, extras='_'):
   '''
   return get_identifier(s, offset=offset, alpha=ascii_uppercase, number=number, extras=extras)
 
+def get_dotted_identifier(s, offset=0, **kw):
+  ''' Scan the string `s` for a dotted identifier (by default an ASCII
+      letter or underscore followed by letters, digits or underscores)
+      with optional trailing dot and another dotted identifier,
+      starting at `offset` (default 0).
+      Return (match, new_offset).
+      The empty string and an unchanged offset will be returned if
+      there is no leading letter/underscore.
+  '''
+  offset0 = offset
+  _, offset = get_identifier(s, offset=offset, **kw)
+  if _:
+    while offset < len(s)-1 and s[offset] == '.':
+      _, offset2 = get_identifier(s, offset=offset+1, **kw)
+      if not _:
+        break
+      offset = offset2
+  return s[offset0:offset], offset
+
 def get_other_chars(s, offset=0, stopchars=None):
   ''' Scan the string `s` for characters not in `stopchars` starting
       at `offset` (default 0).
