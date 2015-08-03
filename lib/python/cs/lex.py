@@ -298,10 +298,10 @@ def get_identifier(s, offset=0, alpha=ascii_letters, number=digits, extras='_'):
   idtail, offset = get_chars(s, offset + 1, alpha + number + extras)
   return ch + idtail, offset
 
-def is_identifier(s, offset=0, alpha=ascii_letters, number=digits, extras='_'):
+def is_identifier(s, offset=0, **kw):
   ''' Test if the string `s` is an identifier from position `offset` onward.
   '''
-  s2, offset2 = get_identifier(s, offset=offset, alpha=alpha, number=number, extras=extras)
+  s2, offset2 = get_identifier(s, offset=offset, **kw)
   return s2 and offset2 == len(s)
 
 def get_uc_identifier(s, offset=0, number=digits, extras='_'):
@@ -327,6 +327,12 @@ def get_dotted_identifier(s, offset=0, **kw):
         break
       offset = offset2
   return s[offset0:offset], offset
+
+def is_dotted_identifier(s, offset=0, **kw):
+  ''' Test if the string `s` is an identifier from position `offset` onward.
+  '''
+  s2, offset2 = get_dotted_identifier(s, offset=offset, **kw)
+  return s2 and offset2 == len(s)
 
 def get_other_chars(s, offset=0, stopchars=None):
   ''' Scan the string `s` for characters not in `stopchars` starting
