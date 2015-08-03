@@ -752,3 +752,6 @@ class UpdHandler(StreamHandler):
   def flush(self):
     if self.__upd._backend:
       self.__upd._backend.flush()
+
+if __name__ == '__main__':
+  setup_logging(sys.argv[0])
