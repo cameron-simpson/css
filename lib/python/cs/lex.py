@@ -21,7 +21,6 @@ import re
 import sys
 import os
 from cs.py3 import bytes, unicode, ustr, sorted, StringTypes
-from cs.logutils import X, warning
 
 unhexify = binascii.unhexlify
 if sys.hexversion >= 0x030000:
@@ -103,8 +102,15 @@ def htmlquote(s):
   return "\"" + s + "\""
 
 def jsquote(s):
+  ''' Quote a string for use in JavaScript.
+  '''
   s = s.replace("\"", "&dquot;")
   return "\"" + s + "\""
+
+def phpquote(s):
+  ''' Quote a string for use in PHP code.
+  '''
+  return "'" + s.replace('\\', '\\\\').replace("'", "\\'") + "'"
 
 def dict2js(d):
   import cs.json
@@ -201,11 +207,14 @@ def untexthexify(s, shiftin='[', shiftout=']'):
 # regexp to match RFC2047 text chunks
 re_RFC2047 = re.compile(r'=\?([^?]+)\?([QB])\?([^?]*)\?=', re.I)
 
-def unrfc2047(s):
-  ''' Accept a string containing RFC2047 text encodings (or the whitespace
+def unrfc2047(s, warning=None):
+  ''' Accept a string `s` containing RFC2047 text encodings (or the whitespace
       littered varieties that come from some low quality mail clients) and
       decode them into flat Unicode.
+      `warning`: optional parameter specifying function to report warning messages, default cs.logutils.warning
   '''
+  if warning is None:
+    from cs.logutils import warning
   if not isinstance(s, unicode):
     s = unicode(s, 'iso8859-1')
   chunks = []
@@ -217,6 +226,7 @@ def unrfc2047(s):
       chunks.append(s[sofar:start])
     enccset = m.group(1)
     enctype = m.group(2).upper()
+    # default to undecoded text
     enctext = m.group(3)
     if enctype == 'B':
       try:
@@ -285,6 +295,12 @@ def get_identifier(s, offset=0, alpha=ascii_letters, number=digits, extras='_'):
     return '', offset
   idtail, offset = get_chars(s, offset + 1, alpha + number + extras)
   return ch + idtail, offset
+
+def is_identifier(s, offset=0, alpha=ascii_letters, number=digits, extras='_'):
+  ''' Test if the string `s` is an identifier from position `offset` onward.
+  '''
+  s2, offset2 = get_identifier(s, offset=offset, alpha=alpha, number=number, extras=extras)
+  return s2 and offset2 == len(s)
 
 def get_uc_identifier(s, offset=0, number=digits, extras='_'):
   ''' Scan the string `s` for an identifier as for get_identifier(), but require the letters to be uppercase.
