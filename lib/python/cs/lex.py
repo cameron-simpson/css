@@ -290,22 +290,49 @@ def get_identifier(s, offset=0, alpha=ascii_letters, number=digits, extras='_'):
       The empty string and an unchanged offset will be returned if
       there is no leading letter/underscore.
   '''
+  if offset >= len(s):
+    return '', offset
   ch = s[offset]
   if ch not in alpha and ch not in extras:
     return '', offset
   idtail, offset = get_chars(s, offset + 1, alpha + number + extras)
   return ch + idtail, offset
 
-def is_identifier(s, offset=0, alpha=ascii_letters, number=digits, extras='_'):
+def is_identifier(s, offset=0, **kw):
   ''' Test if the string `s` is an identifier from position `offset` onward.
   '''
-  s2, offset2 = get_identifier(s, offset=offset, alpha=alpha, number=number, extras=extras)
+  s2, offset2 = get_identifier(s, offset=offset, **kw)
   return s2 and offset2 == len(s)
 
 def get_uc_identifier(s, offset=0, number=digits, extras='_'):
   ''' Scan the string `s` for an identifier as for get_identifier(), but require the letters to be uppercase.
   '''
   return get_identifier(s, offset=offset, alpha=ascii_uppercase, number=number, extras=extras)
+
+def get_dotted_identifier(s, offset=0, **kw):
+  ''' Scan the string `s` for a dotted identifier (by default an ASCII
+      letter or underscore followed by letters, digits or underscores)
+      with optional trailing dot and another dotted identifier,
+      starting at `offset` (default 0).
+      Return (match, new_offset).
+      The empty string and an unchanged offset will be returned if
+      there is no leading letter/underscore.
+  '''
+  offset0 = offset
+  _, offset = get_identifier(s, offset=offset, **kw)
+  if _:
+    while offset < len(s)-1 and s[offset] == '.':
+      _, offset2 = get_identifier(s, offset=offset+1, **kw)
+      if not _:
+        break
+      offset = offset2
+  return s[offset0:offset], offset
+
+def is_dotted_identifier(s, offset=0, **kw):
+  ''' Test if the string `s` is an identifier from position `offset` onward.
+  '''
+  s2, offset2 = get_dotted_identifier(s, offset=offset, **kw)
+  return s2 and offset2 == len(s)
 
 def get_other_chars(s, offset=0, stopchars=None):
   ''' Scan the string `s` for characters not in `stopchars` starting
