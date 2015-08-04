@@ -194,7 +194,7 @@ class _AttrList(list):
   @locked
   def _scrub_local(self):
     # remove all elements from this attribute
-    self[:] = ()
+    list.clear(self)
     self.nodedb._revision += 1
   _scrub = _scrub_local
 
