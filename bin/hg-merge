@@ -59,8 +59,7 @@ if [ -z "$hadmsg" ]
 then
   if [ -t 0 -a -t 1 ]
   then
-    necho "merge description> "
-    read -r msg || exit 1
+    msg=$( readline "merge description> " ) || exit 1
   else
     echo "$cmd: merge description is mandatory (may be an empty -m option)" >&2
     exit 2

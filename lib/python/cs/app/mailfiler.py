@@ -23,6 +23,7 @@ DISTINFO = {
 }
 
 from collections import namedtuple
+from copy import deepcopy
 from email import message_from_string, message_from_file
 from email.header import decode_header, make_header
 import email.parser
@@ -602,12 +603,31 @@ class MessageFiler(O):
         exception("saving to folder %r: %s", folder, e)
         ok = False
     # forward message
-    for address in sorted(self.save_to_addresses):
-      try:
-        self.sendmail(address)
-      except Exception as e:
-        exception("forwarding to address %r: %s", address, e)
+    if self.save_to_addresses:
+      sender = self.env('EMAIL', None)
+      if sender is None:
+        error("no $EMAIL, required to set Sender-related fields in forwarded messages")
         ok = False
+      else:
+        # change who@where to <who@where> for Return-Path etc
+        if not sender.startswith('<') or not sender.endswith('>'):
+          sender = '<' + sender + '>'
+        # create special message copy with adjusted sender fields
+        fwd_message = deepcopy(self.message)
+        for hdr_name in 'Sender', 'Errors-To', 'Return-Path':
+          modify_header(fwd_message, hdr_name, sender)
+        # remove delivery loop detection headers
+        modify_header(fwd_message, 'Delivered-To', ())
+        with TemporaryFile('w+') as fwd_mfp:
+          fwd_mfp.write(str(fwd_message))
+          fwd_mfp.flush()
+          for address in sorted(self.save_to_addresses):
+            fwd_mfp.seek(0)
+            try:
+              self.sendmail(address, mfp=fwd_mfp, sender=sender)
+            except Exception as e:
+              exception("forwarding to address %r: %s", address, e)
+              ok = False
     # pipeline message
     for shcmd, shenv in self.save_to_cmds:
       try:
@@ -768,12 +788,17 @@ class MessageFiler(O):
     info("    %s => | %s" % (("OK" if retcode == 0 else "FAIL"), argv))
     return retcode == 0
 
-  def sendmail(self, address, mfp=None):
+  def sendmail(self, address, mfp=None, sender=None):
     ''' Dispatch a message to `address`.
         `mfp` is a file containing the message text.
         If `mfp` is None, use the text of the current message.
+        If `sender` is supplied, pass to sendmail with -f option.
     '''
-    return self.save_to_pipe([self.env('SENDMAIL', 'sendmail'), '-oi', address], mfp=mfp)
+    sendmail_argv = [ self.env('SENDMAIL', 'sendmail'), '-oi' ]
+    if sender is not None:
+      sendmail_argv.extend( ('-f', sender) )
+    sendmail_argv.append(address)
+    return self.save_to_pipe(sendmail_argv, mfp=mfp)
 
   @property
   def alert_format(self):
