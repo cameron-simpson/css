@@ -193,6 +193,13 @@ Otherwise, a target containing an "at" symbol ('@') is considered
 an email address to which to send a copy of the message.
 If the mail system accepts the message it is considered to have been dispatched successfully.
 
+To avoid avoid blowback to the original author or source of the message
+the B<Sender:>, B<Return-Path:> and B<Errors-To:> headers are set to the value of the environment variable B<$EMAIL>,
+which is expected to be a bare I<localpart>B<@>I<domain> address.
+If B<$EMAIL> is not set then the message is not sent and delivery is not considered successful.
+
+To avoid spurious delivery loop detection, the B<Delivered-To:> header is cleared.
+
 =head4 Deliver to Mail Folder
 
 Otherwise, a target is considered to indicate a Maildir or a UNIX mbox
