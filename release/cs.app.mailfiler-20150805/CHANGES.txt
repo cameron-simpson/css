@@ -1,0 +1,20 @@
+  lib/python/cs/app/mailfiler.py: merge pypi ==> default: sync after releasing heaps of stuff onto PyPI
+  lib/python/cs/app/mailfiler.py: cs.app.mailfiler: handle invalid targets - error and discard, but proceed with rest of rule; catch and report invalid regexps in substitute
+  lib/python/cs/app/mailfiler.py: cs.app.mailfiler: get_target: handle more semantic errors
+  lib/python/cs/app/mailfiler.py: cs.app.mailfiler: back off LOGFILE= complaint to debug
+  lib/python/cs/app/mailfiler.py: cs.app.mailfiler: add "report" operation, initially reciting a bunch of header values and their unrfc2047 values if different
+  lib/python/cs/app/mailfiler.py: cs.app.mailfiler: add missing import of functools.partial
+  lib/python/cs/app/mailfiler.py: cs.app.mailfiler: hdrs,...:func: correct invocation of function
+  lib/python/cs/app/mailfiler.py: cs.app.mailfiler: hdr,...:func: if func returns non-None, apply as new value for header; do not implicitly prepend Filer to func args
+  lib/python/cs/app/mailfiler.py: cs.app.mailfiler: hdr,...:s/this/that: accept multiple header names
+  lib/python/cs/app/mailfiler.py: cs.app.mailfiler: remove some debugging statements
+  lib/python/cs/app/mailfiler.py: cs.app.mailfiler: Target_Function: apply function to all instances of header more cleanly
+  lib/python/cs/app/mailfiler.py: cs.app.mailfiler: wrap message transcription in LogExceptions; trying to localise transient error
+  lib/python/cs/app/mailfiler.py: cs.app.mailfiler: MailFiler.sweep: py3 fix: .keys is a direct view, snapshot it into a list before processing spool folder
+  lib/python/cs/app/mailfiler.py: cs.app.mailfiler: Target_Function: initial builtin "scrub" - does unrfc2047 to start with
+  lib/python/cs/app/mailfiler.py: cs.app.mailfiler: Target_Substitution: cleaner use of enumerate
+  lib/python/cs/app/mailfiler.py: cs.app.mailfiler: indentation tweak
+  lib/python/cs/app/mailfiler.py: cs.app.mailfiler: Target_Substitution: make header values available as substitution values
+  lib/python/cs/app/README-mailfiler.rst: cs/app/README-mailfiler.rst: better wording
+  lib/python/cs/app/mailfiler.py: cs.app.mailfiler: fix console_script name
+  lib/python/cs/app/mailfiler.py: cs.app.mailfiler: fiddle headers of resend messages to avoid blowback to original authors

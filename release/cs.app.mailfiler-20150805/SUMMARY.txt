@@ -1,0 +1,4 @@
+better handling of configuration errors
+substitution actions accept multiple header names
+initial "scrub" action
+fiddle headers of resent messages to avoid blowback to original authors
