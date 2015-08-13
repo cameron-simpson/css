@@ -129,7 +129,7 @@ cache_dir ufs $cachedir $ZAP_CACHESIZE 16 256
 acl nobannerport myport 8080
 redirector_access allow nobannerport
 collapsed_forwarding on
-refresh_stale_hit 10 seconds
+## obsolete ## refresh_stale_hit 10 seconds
 cache allow GMAP
 ##cache deny QUERY
 cache allow all
@@ -138,7 +138,7 @@ http_access allow all
 shutdown_lifetime 2 seconds
 icp_access allow all
 nonhierarchical_direct off
-maximum_single_addr_tries 4
+## obsolete ## maximum_single_addr_tries 4
 retry_on_error on
 X
 

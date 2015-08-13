@@ -51,20 +51,20 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+branch=$( hg branch )
+obranch=$( incd "$ocheckout" hg branch )
+echo "merging $obranch ==> $branch"
+
 if [ -z "$hadmsg" ]
 then
   if [ -t 0 -a -t 1 ]
   then
-    necho "merge description> "
-    read -r msg || exit 1
+    msg=$( readline "merge description> " ) || exit 1
   else
     echo "$cmd: merge description is mandatory (may be an empty -m option)" >&2
     exit 2
   fi
 fi
-
-branch=$( hg branch )
-obranch=$( incd "$ocheckout" hg branch )
 
 $trace hg fetch "$ocheckout"
 if [ "x$branch" != "x$obranch" ]

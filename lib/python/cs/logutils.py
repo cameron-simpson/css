@@ -19,10 +19,12 @@ DISTINFO = {
 
 import codecs
 from contextlib import contextmanager
+import importlib
 import logging
 from logging import Formatter, StreamHandler
 import os
 import os.path
+from pprint import pformat
 import stat
 import sys
 import time
@@ -31,7 +33,9 @@ from threading import Lock
 import traceback
 from cs.ansi_colour import colourise
 from cs.excutils import noexc
-from cs.obj import O_str
+from cs.lex import is_identifier, is_dotted_identifier
+from cs.obj import O, O_str
+from cs.py.func import funccite
 from cs.py3 import unicode, StringTypes, ustr
 
 cmd = __file__
@@ -48,7 +52,7 @@ def ifdebug():
   global logging_level
   return logging_level <= logging.DEBUG
 
-def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=None, upd_mode=None, ansi_mode=None, trace_mode=None):
+def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=None, upd_mode=None, ansi_mode=None, trace_mode=None, module_names=None, function_names=None):
   ''' Arrange basic logging setup for conventional UNIX command
       line error messaging.
       Sets cs.logging.cmd to `cmd_name`; default from sys.argv[0].
@@ -72,16 +76,21 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
       If `trace_mode` is None, set it according to the presence of
       'TRACE' in flags.
       If trace_mode is true, set the global trace_level to logging_level;
-      it defaults to logging.DEBUG.
+      otherwise it defaults to logging.DEBUG.
       Returns the logging level.
   '''
   global cmd, logging_level, trace_level, D_mode
 
-  default_level, default_flags = infer_logging_level()
+  # infer logging modes, these are the initial defaults
+  linfo = infer_logging_level()
   if level is None:
-    level = default_level
+    level = linfo.level
   if flags is None:
-    flags = default_flags
+    flags = linfo.flags
+  if module_names is None:
+    module_names = linfo.module_names
+  if function_names is None:
+    function_names = linfo.function_names
 
   if cmd_name is None:
     cmd_name = os.path.basename(sys.argv[0])
@@ -148,10 +157,67 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
   rootLogger.setLevel(level)
   main_handler.setFormatter(PfxFormatter(format))
   rootLogger.addHandler(main_handler)
+
   logging_level = level
   if trace_mode:
     trace_level = logging_level
+
+  for module_name in module_names:
+    try:
+      M = importlib.import_module(module_name)
+    except ImportError:
+      warning("setup_logging: cannot import %r", module_name)
+    else:
+      M.DEBUG = True
+
+  for module_name, func_name in function_names:
+    try:
+      M = importlib.import_module(module_name)
+    except ImportError:
+      warning("setup_logging: cannot import %r", module_name)
+      continue
+    F = M
+    for funcpart in func_name.split('.'):
+      M = F
+      try:
+        F = M.getattr(funcpart)
+      except AttributeError:
+        F = None
+        break
+    if F is None:
+      warning("no %s.%s() found", module_name, func_name)
+    else:
+      setattr(M, funcpart, _ftrace(F))
+
   return level
+
+def ftrace(func):
+  ''' Decorator to trace a function if __module__.DEBUG is true.
+  '''
+  M = func.__module__
+  def func_wrap(*a, **kw):
+    do_debug = M.__dict__.get('DEBUG', False)
+    if do_debug:
+      func = _ftrace(func)
+    return func(*a, **kw)
+  return func_wrap
+
+def _ftrace(func):
+  ''' Decorator to trace the call and return of a function.
+  '''
+  fname = '.'.join( (func.__module__, funccite(func)) )
+  def traced_func(*a, **kw):
+    citation = "%s(*%s, **%s)" % (fname, pformat(a, depth=1), pformat(kw, depth=2))
+    X("CALL %s", citation)
+    try:
+      result = func(*a, **kw)
+    except Exception as e:
+      X("EXCEPTION from %s: %s %s", citation, type(e), e)
+      raise
+    else:
+      X("RESULT from %s: %r", citation, result)
+      return result
+  return traced_func
 
 class PfxFormatter(Formatter):
   ''' A Formatter subclass that has access to the program's cmd and Pfx state.
@@ -188,8 +254,8 @@ class PfxFormatter(Formatter):
     record.message = ': '.join(message_parts)
     return record.message
 
-def infer_logging_level():
-  ''' Infer a logging level from the environment.
+def infer_logging_level(env_debug=None, environ=None):
+  ''' Infer a logging level from the `env_debug`, which by default comes from the environment variable $DEBUG.
       Usually default to logging.WARNING, but if sys.stderr is a terminal,
       default to logging.INFO.
       Parse the environment variable $DEBUG as a comma separated
@@ -202,23 +268,29 @@ def infer_logging_level():
         "INFO"  => logging.INFO
         "WARNING" => logging.WARNING
         "ERROR" => logging.ERROR
-      Return the inferred logging level and the flags.
+      Return an object with the following attributes:
+        .level  A logging level.
+        .flags  All the words from $DEBUG as separated by commas and uppercased.
+        .module_names
+                Module names to be debugged.
+        .function_names
+                Functions to be traced in the for "module_name.func_name()".
   '''
+  if env_debug is None:
+    if environ is None:
+      environ = os.environ
+    env_debug = os.environ.get('DEBUG', '')
   level = logging.WARNING
   if sys.stderr.isatty():
     level = logging.INFO
-  env_debug = os.environ.get('DEBUG', '')
   flags = [ F.upper() for F in env_debug.split(',') if len(F) ]
-  for flag in flags:
-    if flag == 'DEBUG':
-      level = logging.DEBUG
-    elif flag == 'INFO':
-      level = logging.INFO
-    elif flag == 'WARN' or flag == 'WARNING':
-      level = logging.WARNING
-    elif flag == 'ERROR':
-      level = logging.ERROR
-    elif flag.isdigit():
+  module_names = []
+  function_names = []
+  for flag in env_debug.split(','):
+    flag = flag.strip()
+    if not flag:
+      continue
+    if flag.isdigit():
       flag_level = int(flag)
       if flag_level < 1:
         level = logging.WARNING
@@ -226,7 +298,25 @@ def infer_logging_level():
         level = logging.DEBUG
       else:
         level = logging.INFO
-  return level, flags
+    elif flag[0].islower() and is_dotted_identifier(flag):
+      # modulename
+      module_names.append(flag)
+    elif ':' in flag:
+      # module:funcname
+      module_name, func_name = flag.split(':', 1)
+      if is_dotted_identifier(module_name) and is_dotted_identifier(func_name):
+        function_names.append( (module_name, func_name) )
+    else:
+      uc_flag = flag.upper()
+      if uc_flag == 'DEBUG':
+        level = logging.DEBUG
+      elif uc_flag == 'INFO':
+        level = logging.INFO
+      elif uc_flag == 'WARN' or uc_flag == 'WARNING':
+        level = logging.WARNING
+      elif uc_flag == 'ERROR':
+        level = logging.ERROR
+  return O(level=level, flags=flags, module_names=module_names, function_names=function_names)
 
 def D(msg, *args):
   ''' Print formatted debug string straight to sys.stderr if D_mode is true,
@@ -680,3 +770,6 @@ class UpdHandler(StreamHandler):
   def flush(self):
     if self.__upd._backend:
       self.__upd._backend.flush()
+
+if __name__ == '__main__':
+  setup_logging(sys.argv[0])

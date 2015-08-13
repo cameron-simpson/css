@@ -1,0 +1,1 @@
+  lib/python/cs/app/README-megacli.rst: cs/app/README-megacli.rst: document new "locate" mode, improve other formatting

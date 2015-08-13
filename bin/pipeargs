@@ -21,10 +21,11 @@ set -ue
 
 : ${TMPDIR:=/tmp}
 
+cmd=$( basename "$0" )
 usage="Usage:
-  $0 [-p prompt] shcmd [args...]
+  $cmd [-p prompt] shcmd [args...]
       \"-\" Insert stdin at this point.
-  $0 [-p prompt] -e cmd [cmd-args...]"
+  $cmd [-p prompt] -e cmd [cmd-args...]"
 
 prompt=
 noargs=
@@ -94,9 +95,15 @@ else
   }
 fi
 
+pipe=$TMPDIR/$cmd.$$
+mkfifo -m 0600 "$pipe"
+
 if [ $noargs ]
 then
-  copystdin | exec "$@"
+  copystdin >"$pipe" &
+  exec <"$pipe"
+  rm "$pipe"
+  exec "$@"
 else
   [ $# -gt 0 ] || set -- -
   for arg
@@ -107,8 +114,10 @@ else
     else
       printf '%s\n' "$arg"
     fi
-  done \
-  | exec sh -c "$shcmd"
+  done >"$pipe" &
+  exec <"$pipe"
+  rm "$pipe"
+  exec sh -c "$shcmd"
 fi
 
 # =head1 BUGS
