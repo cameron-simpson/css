@@ -14,6 +14,8 @@ DISTINFO = {
         ],
 }
 
+from collections import namedtuple
+
 def fromBS(s):
   ''' Read an extensible value from the front of a string.
       Continuation octets have their high bit set.
@@ -87,6 +89,15 @@ def get_bsdata(bs, offset=0):
   offset += datalen
   return data, offset
 
+def read_bsdata(fp):
+  ''' Read a run length encoded data chunk from a file stream.
+  '''
+  length = fromBSfp(fp)
+  data = fp.read(length)
+  if len(data) != length:
+    raise ValueError('short read, expected %d bytes, got %d' % (length, len(data)))
+  return data
+
 def put_bs(n):
   ''' Encode an unsigned value as an extensible octet sequence for decode by
       get_bs().
@@ -124,3 +135,48 @@ def get_bsfp(fp):
   if offset != len(bs):
     raise RuntimeError("failed decode of %r ==> n=%d, offset=%d" % (bs, n, offset))
   return n
+
+_Packet = namedtuple('_Packet', 'channel tag is_request flags payload')
+
+class Packet(_Packet):
+  ''' A general purpose packet to wrap a multiplexable protocol.
+  '''
+
+  def serialise(self):
+    ''' Binary transcription of this packet.
+        Format:
+          bs(total_length)
+          bs(tag)
+          bs(flags)
+          [bs(channel)] # if channel != 0
+          payload       # remainder of packet, size derived from total_length
+        Flags:
+          0             # has_channel
+          1             # is_request
+          remaining flags shifted left and returned
+    '''
+    fl_has_channel = 1 if self.channel else 0
+    fl_is_request  = 1 if self.is_request else 0
+    pkt_flags = (flags << 2) | (fl_is_request << 1) | (fl_has_channel)
+    bs_tag = toBS(tag)
+    bs_flags = toBS(flags)
+    if channel:
+      bs_channel = toBS(channel)
+    else:
+      bs_channel = b''
+    packet = bs_tag + bs_flags + bs_channel + payload
+    return put_bsdata(packet)
+
+def get_bsPacket(fp):
+  packet = read_bsdata(fp)
+  tag, offset = get_bs(packet)
+  flags, offset = get_bs(packet, offset)
+  has_channel = flags & 0x01
+  is_request = flags & 0x02
+  flags >>= 2
+  if has_channel:
+    channel, offset = get_bs(packet, offset)
+  else:
+    channel = 0
+  payload = packet[offset:]
+  return Packet(channel=channel, tag=tag, is_request=is_request, flags=flag, payload=payload)
