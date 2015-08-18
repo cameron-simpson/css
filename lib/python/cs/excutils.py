@@ -171,8 +171,6 @@ class NoExceptions(object):
     pass
 
   def __exit__(self, exc_type, exc_value, tb):
-    from cs.logutils import X
-    X("NoExceptions.__exit__(exc_type=%r, exc_value=%r, tb=%r)...", exc_type, exc_value, tb)
     if exc_type is not None:
       if self.handler is not None:
         return self.handler(exc_type, exc_value, tb)
