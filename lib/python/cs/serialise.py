@@ -16,68 +16,48 @@ DISTINFO = {
 
 from collections import namedtuple
 
-def fromBS(s):
-  ''' Read an extensible value from the front of a string.
+def get_bs(data, offset=0):
+  ''' Read an extensible value from `data` at `offset`.
       Continuation octets have their high bit set.
       The value is big-endian.
+      Return value and new offset.
   '''
-  o=ord(s[0])
-  n=o&0x7f
-  used=1
-  while o & 0x80:
-    o=ord(s[used])
-    used+=1
-    n=(n<<7)|(o&0x7f)
-  return (n, s[used:])
+  n = 0
+  b = 0x80
+  while b & 0x80:
+    b = data[offset]
+    offset += 1
+    n = (n<<7) | (b&0x7f)
+  return n, offset
 
-def fromBSfp(fp):
-  ''' Read an extensible value from a file.
-      Return None at EOF.
+def read_bs(fp):
+  ''' Read an extensible value from the binary stream `fp`.
+      Continuation octets have their high bit set.
+      The value is big-endian.
+      Return value.
   '''
-  ##debug("fromBSfp: reading first BS byte...")
-  s=c=fp.read(1)
-  ##debug("fromBSfp: c=0x%02x" % ord(c))
-  if len(s) == 0:
-    return None
-  while ord(c)&0x80:
-    ##debug("fromBSfp: reading another BS byte...")
-    c=fp.read(1)
-    assert len(c) == 1, "unexpected EOF"
-    ##debug("fromBSfp: c=0x%02x" % ord(c))
-    s+=c
-  n, s = fromBS(s)
-  ##debug("fromBSfp: n==%d" % n)
-  assert len(s) == 0
+  n = 0
+  b = 0x80
+  while b & 0x80:
+    b = fp.read(1)[0]
+    n = (n<<7) | (b&0x7f)
   return n
 
-def toBS(n):
-  ''' Encode a value as an entensible octet sequence for decode by
-      fromBS().
+def put_bs(n):
+  ''' Encode a value as an entensible octet sequence for decode by get_bs().
+      Return the bytes object.
   '''
-  s=chr(n&0x7f)
-  n>>=7
+  bs = [ n&0x7f ]
+  n >>= 7
   while n > 0:
-    s=chr(0x80|(n&0x7f))+s
-    n>>=7
-  return s
-
-def get_bs(bs, offset=0):
-  ''' Decode an unsigned value from a bytes at the specified `offset` (default 0).
-      Return the value and the new offset.
-  '''
-  o = bs[offset]
-  offset += 1
-  n = o & 0x7f
-  while o & 0x80:
-    o = bs[offset]
-    offset += 1
-    n = (n<<7) | (o&0x7f)
-  return n, offset
+    bs.append( 0x80 | (n&0x7f) )
+    n >>= 7
+  return bytes(reversed(bs))
 
 def get_bsdata(bs, offset=0):
   ''' Fetch a length-prefixed data chunk.
       Decodes an unsigned value from a bytes at the specified `offset`
-      (default 0), and collected that many following bytes.
+      (default 0), and collects that many following bytes.
       Return those following bytes and the new offset.
   '''
   offset0 = offset
@@ -92,49 +72,16 @@ def get_bsdata(bs, offset=0):
 def read_bsdata(fp):
   ''' Read a run length encoded data chunk from a file stream.
   '''
-  length = fromBSfp(fp)
+  length = read_bs(fp)
   data = fp.read(length)
   if len(data) != length:
     raise ValueError('short read, expected %d bytes, got %d' % (length, len(data)))
   return data
 
-def put_bs(n):
-  ''' Encode an unsigned value as an extensible octet sequence for decode by
-      get_bs().
-  '''
-  if n < 0:
-    raise ValueError("n < 0 (%r)", n)
-  bs = [ n&0x7f ]
-  n >>= 7
-  while n > 0:
-    bs.append( 0x80 | (n&0x7f) )
-    n >>= 7
-  return bytes(reversed(bs))
-
 def put_bsdata(data):
   ''' Encodes `data` as put_bs(len(`data`)) + `data`.
   '''
   return put_bs(len(data)) + data
-
-def get_bsfp(fp):
-  ''' Read an extensible value from a file.
-      Return None at EOF.
-  '''
-  bs = fp.read(1)
-  if len(bs) == 0:
-    return None
-  bss = [bs]
-  while bs[0] & 0x80:
-    ##debug("fromBSfp: reading another BS byte...")
-    bs = fp.read(1)
-    if len(bs) != 1:
-      raise ValueError("unexpected EOF")
-    bss.append(bs)
-  bs = b''.join(bss)
-  n, offset = get_bs(bs)
-  if offset != len(bs):
-    raise RuntimeError("failed decode of %r ==> n=%d, offset=%d" % (bs, n, offset))
-  return n
 
 _Packet = namedtuple('_Packet', 'channel tag is_request flags payload')
 
@@ -157,26 +104,45 @@ class Packet(_Packet):
     '''
     fl_has_channel = 1 if self.channel else 0
     fl_is_request  = 1 if self.is_request else 0
-    pkt_flags = (flags << 2) | (fl_is_request << 1) | (fl_has_channel)
-    bs_tag = toBS(tag)
-    bs_flags = toBS(flags)
-    if channel:
-      bs_channel = toBS(channel)
+    pkt_flags = (self.flags << 2) | (fl_is_request << 1) | (fl_has_channel)
+    bs_tag = put_bs(self.tag)
+    bs_flags = put_bs(pkt_flags)
+    if self.channel:
+      bs_channel = put_bs(self.channel)
     else:
       bs_channel = b''
-    packet = bs_tag + bs_flags + bs_channel + payload
+    packet = bs_tag + bs_flags + bs_channel + self.payload
     return put_bsdata(packet)
 
-def get_bsPacket(fp):
+def read_Packet(fp):
+  ''' Read a Packet from a binary stream, return the Packet.
+  '''
   packet = read_bsdata(fp)
+  P, offset = get_Packet(packet)
+  if offset < len(packet):
+    raise ValueError("extra data in packet after offset=%d" % (offset,))
+  return P
+
+def get_Packet(data, offset=0):
+  ''' Parse a Packet from the binary data `packet` at position `offset`.
+      Return the Packet and the new offset.
+  '''
+  # collect packet from data chunk
+  packet, offset0 = get_bsdata(data)
+  # now decode packet
   tag, offset = get_bs(packet)
   flags, offset = get_bs(packet, offset)
   has_channel = flags & 0x01
-  is_request = flags & 0x02
+  is_request = (flags & 0x02) != 0
   flags >>= 2
   if has_channel:
     channel, offset = get_bs(packet, offset)
   else:
     channel = 0
   payload = packet[offset:]
-  return Packet(channel=channel, tag=tag, is_request=is_request, flags=flag, payload=payload)
+  return Packet(channel=channel, tag=tag, is_request=is_request, flags=flags, payload=payload), offset0
+
+if __name__ == '__main__':
+  import sys
+  import cs.serialise_tests
+  cs.serialise_tests.selftest(sys.argv)
