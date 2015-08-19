@@ -29,7 +29,7 @@ from cs.queues import IterableQueue, IterablePriorityQueue, PushQueue, \
                         NestingOpenCloseMixin, TimerQueue
 from cs.threads import AdjustableSemaphore, \
                        WorkerThreadPool, locked
-from cs.asynchron import Result, Asynchron, ASYNCH_RUNNING
+from cs.asynchron import Result, Asynchron, ASYNCH_RUNNING, report
 from cs.seq import seq, TrackingCounter
 from cs.logutils import Pfx, PfxCallInfo, error, info, warning, debug, exception, D, OBSOLETE
 
@@ -153,7 +153,7 @@ class OnDemandFunction(PendingFunction):
     result, exc_info = None, None
     try:
       result = self.func()
-    except:
+    except Exception:
       exc_info = sys.exc_info()
       self.exc_info = exc_info
       raise
@@ -679,7 +679,7 @@ class Later(NestingOpenCloseMixin):
 
   def bg(self, func, *a, **kw):
     ''' Queue a function to run right now, ignoring the Later's capacity and
-        priority system. This is really an easy way to utilise the Later's
+        priority system. This is really just an easy way to utilise the Later's
         thread pool and get back a handy LateFunction for result collection.
         It can be useful for transient control functions that
         themselves queue things through the Later queuing system
@@ -1006,6 +1006,81 @@ class Later(NestingOpenCloseMixin):
     self._priority = pri
     yield
     self._priority = oldpri
+
+class LatePool(object):
+  ''' A context manager after the style of subprocess.Pool but with deferred completion.
+      Example usage:
+
+        L = Later(4)    # a 4 thread Later
+        with LatePool(L) as LP:
+          # several calls to LatePool.defer, perhaps looped
+          LP.defer(func, *args, **kwargs)
+          LP.defer(func, *args, **kwargs)
+        # now we can LP.join() to block for all LateFunctions
+        #
+        # or iterate over LP to collect LateFunctions as they complete
+        for LF in LP:
+          result = LF()
+          print(result)
+  '''
+
+  def __init__(self, L=None, priority=None, delay=None, when=None, pfx=None, block=False):
+    ''' Initialise the LatePool.
+        `L`: Later instance, default from default.current.
+        `priority`, `delay`, `when`, `name`, `pfx`: default values passed to Later.submit.
+        `block`: if true, wait for LateFunction completion before leaving __exit__.
+    '''
+    if L is None:
+      L = default.current
+    self.later = L
+    self.parameters = { 'priority': priority,
+                        'delay': delay,
+                        'when': when,
+                        'pfx': pfx,
+                      }
+    self.block = block
+    self.LFs = []
+
+  def __enter__(self):
+    ''' Entry handler: submit a placeholder function to the queue,
+        acquire the "commence" lock, which will be made available
+        when the placeholder gets to run.
+    '''
+    return self
+
+  def __exit__(self, exc_type, exc_val, exc_tb):
+    ''' Exit handler.
+        If .block is true, wait for LateFunction completion before return.
+    '''
+    if self.block:
+      self.join()
+    return False
+
+  def submit(self, func, **params):
+    ''' Submit a function using the LatePool's default paramaters, overridden by `params`.
+    '''
+    submit_params = dict(self.parameters)
+    submit_params.update(kw)
+    return self.L.submit(func, **submit_params)
+
+  def defer(self, func, *a, **kw):
+    ''' Defer a function using the LatePool's default paramaters.
+    '''
+    if a or kw:
+      func = partial(func, *a, **kw)
+    return self.submit(func)
+
+  def __iter__(self):
+    ''' Report completion of the LateFunctions.
+    '''
+    for LF in report(self.LFs):
+      yield LF
+
+  def join(self):
+    ''' Wait for completion of all the LateFunctions.
+    '''
+    for LF in self:
+      pass
 
 if __name__ == '__main__':
   import cs.later_tests

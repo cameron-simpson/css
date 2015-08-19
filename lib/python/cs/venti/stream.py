@@ -14,7 +14,7 @@ from cs.py3 import Queue
 from cs.seq import seq
 from cs.inttypes import Enum
 from cs.logutils import Pfx, info, debug, warning
-from cs.serialise import put_bs, get_bsfp
+from cs.serialise import put_bs, read_bs
 from cs.lex import unctrl
 from cs.queues import IterableQueue
 from cs.threads import Q1
@@ -69,14 +69,14 @@ def decodeRequestStream(fp):
   '''
   with Pfx("decodeRequestStream(%s)", fp):
     while True:
-      rqTag = get_bsfp(fp)
+      rqTag = read_bs(fp)
       if rqTag is None:
         # end of stream
         break
       with Pfx(str(rqTag)):
-        rqType = RqType(get_bsfp(fp))
+        rqType = RqType(read_bs(fp))
         if rqType == T_ADD:
-          size = get_bsfp(fp)
+          size = read_bs(fp)
           if size == 0:
             data = None
           else:
@@ -85,7 +85,7 @@ def decodeRequestStream(fp):
               raise ValueError("expected %d data bytes but got %d: %r", size, len(data), data)
           yield rqTag, rqType, data
         elif rqType == T_GET or rqType == T_CONTAINS:
-          hlen = get_bsfp(fp)
+          hlen = read_bs(fp)
           if hlen < 1:
             raise ValueError("expected hash length >= 1, but was told %d", hlen)
           h = fp.read(hlen)
@@ -100,13 +100,13 @@ def decodeResultStream(self):
   '''
   with Pfx("decodeResultStream(%s)", fp):
     while True:
-      rqTag = get_bsfp(fp)
+      rqTag = read_bs(fp)
       if rqTag is None:
         break
       with Pfx(str(rqTag)):
-        rqType = get_bsfp(fp)
+        rqType = read_bs(fp)
         if rqType == T_ADD:
-          hlen = get_bsfp(fp)
+          hlen = read_bs(fp)
           if hlen < 1:
             raise ValueError("expected hash length >= 1, but was told %d", hlen)
           h = fp.read(hlen)
@@ -114,7 +114,7 @@ def decodeResultStream(self):
             raise ValueError("expected %d hash data bytes but got %d: %r", size, len(h), h)
           yield rqTag, rqType, h
         elif rqType == T_GET:
-          size = get_bsfp(fp)
+          size = read_bs(fp)
           if size == 0:
             data = None
           else:
@@ -123,7 +123,7 @@ def decodeResultStream(self):
               raise ValueError("expected %d data bytes but got %d: %r", size, len(data), data)
           yield rqTag, rqType, data
         elif rqType == T_CONTAINS:
-          yesno = bool(get_bsfp(fp))
+          yesno = bool(read_bs(fp))
           yield rqTag, rqType, yesno
         else:
           raise RuntimeError("unimplemented reply type")
