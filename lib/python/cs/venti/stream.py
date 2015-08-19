@@ -189,12 +189,12 @@ class StreamDaemon(object):
 class StreamStore(BasicStore):
   ''' A Store connected to a StreamDaemon backend.
   '''
-  def __init__(self, name, sendRequestsFP, recvResultsFP):
-    ''' Connect to a StreamDaemon via sendRequestsFP and recvResultsFP.
+  def __init__(self, name, send_fp, recv_fp, local_store=None):
+    ''' Connect to a StreamDaemon via send_fp and recv_fp.
     '''
-    BasicStore.__init__(self, "StreamStore:%s"%name)
-    self.sendRequestsFP = sendRequestsFP
-    self.recvResultsFP = recvResultsFP
+    BasicStore.__init__(self, ':'.join('StreamStore', name))
+    self.send_fp = send_fp
+    self.recv_fp = recv_fp
     self._requestQ = IterableQueue(128)
     self._pendingLock = Lock()
     self._pending = {}
@@ -229,19 +229,19 @@ class StreamStore(BasicStore):
       with self._pendingLock:
         assert tag not in self._pending
         self._pending[tag] = retQ
-      self.sendRequestsFP.write(packet)
+      self.send_fp.write(packet)
       if self._requestQ.empty():
-        self.sendRequestsFP.flush()
+        self.send_fp.flush()
 
   def _process_results_stream(self):
-    for rqTag, rqType, result in decodeRequestStream(self.recvResultsFP):
+    for rqTag, rqType, result in decodeRequestStream(self.recv_fp):
       with self._pendingLock:
         self._pending[tag].put(result)
         del self._pending[tag]
 
   def flush(self):
     with self.__sendLock:
-      self.sendRequestsFP.flush()
+      self.send_fp.flush()
 
   def shutdown(self):
     ''' Close the StreamStore.
@@ -250,12 +250,12 @@ class StreamStore(BasicStore):
     self._requestQ.close()
     self.writer.join()
     self.writer = None
-    self.sendRequestsFP.close()
-    self.sendRequestsFP = None
+    self.send_fp.close()
+    self.send_fp = None
 
     self.reader.join()
     self.reader = None
-    self.recvResultsFP.close()
+    self.recv_fp.close()
     self.recvReqestsFP = None
 
     BasicStore.shutdown(self)
