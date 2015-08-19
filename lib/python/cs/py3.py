@@ -67,7 +67,6 @@ else:
 
   class bytes(str):
     def __new__(cls, arg):
-      from cs.logutils import X
       try:
         bytevals = iter(arg)
       except TypeError:
