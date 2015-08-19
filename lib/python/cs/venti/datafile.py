@@ -15,7 +15,7 @@ from cs.cache import LRU_Cache
 from cs.logutils import D, X, debug
 from cs.obj import O
 from cs.queues import NestingOpenCloseMixin
-from cs.serialise import get_bs, put_bs, get_bsfp
+from cs.serialise import get_bs, put_bs, read_bs
 from cs.threads import locked, locked_property
 from .hash import DEFAULT_HASHCLASS
 
@@ -104,13 +104,13 @@ class DataFile(NestingOpenCloseMixin):
         The offset points at the flags ahead of the data bytes.
         Presumes the ._lock is already taken.
     '''
-    flags = get_bsfp(fp)
+    flags = read_bs(fp)
     if flags is None:
       return None, None
     if (flags & ~F_COMPRESSED) != 0:
       raise ValueError("flags other than F_COMPRESSED: 0x%02x" % ((flags & ~F_COMPRESSED),))
     flags = DataFlags(flags)
-    dsize = get_bsfp(fp)
+    dsize = read_bs(fp)
     if dsize == 0:
       data = b''
     else:
