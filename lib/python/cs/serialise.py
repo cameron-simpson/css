@@ -14,7 +14,44 @@ DISTINFO = {
         ],
 }
 
+import sys
 from collections import namedtuple
+from cs.py3 import bytes
+
+DEBUG = False
+
+if DEBUG:
+  def returns_bytes(f):
+    def wrapped(*a, **kw):
+      value = f(*a, **kw)
+      if type(value) is not bytes:
+        raise RuntimeError("func %s(*%r, **%r) returns type %s: %r"
+                           % (f, a, kw, type(value), value))
+      return value
+    return wrapped
+else:
+  def returns_bytes(f):
+    return f
+
+def is_bytes(value):
+  if type(value) is not bytes:
+    raise RuntimeError("value is not bytes: %s %r"
+                       % (type(value), value))
+
+@returns_bytes
+def _str2bytes(s):
+  ''' Return a bytes object with values from ord(_) for each character.
+  '''
+  return bytes( ord(_) for _ in s )
+
+if sys.hexversion >= 0x03000000:
+  @returns_bytes
+  def readbytes(fp, size=None):
+    return fp.read(size)
+else:
+  @returns_bytes
+  def readbytes(fp, size=None):
+    return _str2bytes(fp.read(size))
 
 def get_bs(data, offset=0):
   ''' Read an extensible value from `data` at `offset`.
@@ -22,6 +59,7 @@ def get_bs(data, offset=0):
       The value is big-endian.
       Return value and new offset.
   '''
+  ##is_bytes(data)
   n = 0
   b = 0x80
   while b & 0x80:
@@ -39,10 +77,11 @@ def read_bs(fp):
   n = 0
   b = 0x80
   while b & 0x80:
-    b = fp.read(1)[0]
+    b = readbytes(fp, 1)[0]
     n = (n<<7) | (b&0x7f)
   return n
 
+@returns_bytes
 def put_bs(n):
   ''' Encode a value as an entensible octet sequence for decode by get_bs().
       Return the bytes object.
@@ -52,36 +91,45 @@ def put_bs(n):
   while n > 0:
     bs.append( 0x80 | (n&0x7f) )
     n >>= 7
-  return bytes(reversed(bs))
+  bs = bytes(reversed(bs))
+  ##is_bytes(bs)
+  return bs
 
-def get_bsdata(bs, offset=0):
+def get_bsdata(chunk, offset=0):
   ''' Fetch a length-prefixed data chunk.
       Decodes an unsigned value from a bytes at the specified `offset`
       (default 0), and collects that many following bytes.
       Return those following bytes and the new offset.
   '''
+  ##is_bytes(chunk)
   offset0 = offset
-  datalen, offset = get_bs(bs, offset=offset)
-  data = bs[offset:offset+datalen]
+  datalen, offset = get_bs(chunk, offset=offset)
+  data = chunk[offset:offset+datalen]
+  ##is_bytes(data)
   if len(data) != datalen:
-    raise ValueError("bsdata(bs, offset=%d): unsufficient data: expected %d bytes, got %d bytes"
+    raise ValueError("bsdata(chunk, offset=%d): insufficient data: expected %d bytes, got %d bytes"
                      % (offset0, datalen, len(data)))
   offset += datalen
   return data, offset
 
+@returns_bytes
 def read_bsdata(fp):
   ''' Read a run length encoded data chunk from a file stream.
   '''
   length = read_bs(fp)
-  data = fp.read(length)
+  data = readbytes(fp, length)
   if len(data) != length:
     raise ValueError('short read, expected %d bytes, got %d' % (length, len(data)))
   return data
 
+@returns_bytes
 def put_bsdata(data):
   ''' Encodes `data` as put_bs(len(`data`)) + `data`.
   '''
-  return put_bs(len(data)) + data
+  ##is_bytes(data)
+  chunk = put_bs(len(data)) + data
+  ##is_bytes(chunk)
+  return chunk
 
 _Packet = namedtuple('_Packet', 'channel tag is_request flags payload')
 
@@ -110,7 +158,7 @@ class Packet(_Packet):
     if self.channel:
       bs_channel = put_bs(self.channel)
     else:
-      bs_channel = b''
+      bs_channel = bytes(())
     packet = bs_tag + bs_flags + bs_channel + self.payload
     return put_bsdata(packet)
 
@@ -127,8 +175,10 @@ def get_Packet(data, offset=0):
   ''' Parse a Packet from the binary data `packet` at position `offset`.
       Return the Packet and the new offset.
   '''
+  ##is_bytes(data)
   # collect packet from data chunk
   packet, offset0 = get_bsdata(data)
+  ##is_bytes(packet)
   # now decode packet
   tag, offset = get_bs(packet)
   flags, offset = get_bs(packet, offset)
