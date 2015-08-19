@@ -26,8 +26,16 @@ class TestSerialise(unittest.TestCase):
   def tearDown(self):
     pass
 
-  def _test_roundtrip_bs(self, n):
+  def _tested_put_bs(self, n):
     data = put_bs(n)
+    for i, b in enumerate(data):
+      self.assertIs(int, type(b))
+      self.assertIs(int, type(data[i]))
+      self.assertEqual(b, data[i])
+    return data
+
+  def _test_roundtrip_bs(self, n):
+    data = self._tested_put_bs(n)
     n2, offset = get_bs(data)
     # check that all encoded bytes consumed
     self.assertEqual(offset, len(data))
@@ -46,7 +54,7 @@ class TestSerialise(unittest.TestCase):
       self._test_roundtrip_bs(n)
 
   def _test_roundtrip_bsdata(self, chunk):
-    data = put_bsdata(chunk)
+    data = self._tested_put_bsdata(chunk)
     chunk2, offset = get_bsdata(data)
     # check that all encoded bytes consumed
     self.assertEqual(offset, len(data))
