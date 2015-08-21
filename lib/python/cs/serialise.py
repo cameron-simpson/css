@@ -77,7 +77,10 @@ def read_bs(fp):
   n = 0
   b = 0x80
   while b & 0x80:
-    b = readbytes(fp, 1)[0]
+    bs = readbytes(fp, 1)
+    if not bs:
+      raise EOFError("%s: end of input" % (fp,))
+    b = bs[0]
     n = (n<<7) | (b&0x7f)
   return n
 
@@ -118,9 +121,13 @@ def read_bsdata(fp):
   '''
   length = read_bs(fp)
   data = readbytes(fp, length)
-  if len(data) != length:
-    raise ValueError('short read, expected %d bytes, got %d' % (length, len(data)))
-  return data
+  if len(data) == length:
+    return data
+  if len(data) < length:
+    raise EOFError('%s: short read, expected %d bytes, got %d'
+                   % (fp, length, len(data)))
+  raise RuntimeError('%s: extra data: asked for %d bytes, received %d bytes!'
+                     % (fp, length, len(data)))
 
 @returns_bytes
 def put_bsdata(data):
