@@ -8,25 +8,17 @@
 
 from __future__ import with_statement
 import sys
-from collections import namedtuple
-from threading import Thread
-from cs.asynchron import Result
-from cs.py3 import bytes
-from cs.seq import Seq
 from cs.inttypes import Enum
 from cs.logutils import Pfx, info, debug, warning
 from cs.serialise import put_bs
 from cs.stream import PacketConnection
-from cs.queues import IterableQueue
 from .store import BasicStore
 from .hash import decode as decode_hash
 
 RqType = Enum('T_ADD', 'T_GET', 'T_CONTAINS')
-T_ADD = RqType(0)       # data->hashcode
-T_GET = RqType(1)       # hashcode->data
-T_CONTAINS = RqType(2)     # hash->boolean
-
-Request_State = namedtuple('RequestState', 'decode_response result')
+T_ADD = RqType(0)           # data->hashcode
+T_GET = RqType(1)           # hashcode->data
+T_CONTAINS = RqType(2)      # hash->boolean
 
 class StreamStore(BasicStore):
   ''' A Store connected to a remote Store via a PacketConnection.
