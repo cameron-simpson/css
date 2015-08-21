@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #
-# Self tests for cs.seq.
+# Self tests for cs.serialise.
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
