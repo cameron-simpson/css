@@ -177,7 +177,7 @@ def get_Packet(data, offset=0):
   '''
   ##is_bytes(data)
   # collect packet from data chunk
-  packet, offset0 = get_bsdata(data)
+  packet, offset0 = get_bsdata(data, offset)
   ##is_bytes(packet)
   # now decode packet
   tag, offset = get_bs(packet)

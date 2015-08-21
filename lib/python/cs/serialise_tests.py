@@ -120,8 +120,21 @@ class TestSerialise(unittest.TestCase):
               P = Packet(channel=channel, tag=tag, is_request=is_request, flags=flags, payload=payload)
               self._test_roundtrip_Packet(P)
     # now test some randomly generated packets
+    random_packets = []
     for _ in range(16):
+      P = randPacket()
       self._test_roundtrip_Packet(randPacket())
+      random_packets.append(P)
+    # now assemble the Packets into a buffer then reextract
+    buffer = bytes()
+    for P in random_packets:
+      buffer += P.serialise()
+    offset = 0
+    for i, P in enumerate(random_packets):
+      offset0 = offset
+      P2, offset = get_Packet(buffer, offset)
+      self.assertEqual(offset-offset0, len(P.serialise()))
+      self.assertEqual(P, P2)
 
 def selftest(argv):
   unittest.main(__name__, None, argv)
