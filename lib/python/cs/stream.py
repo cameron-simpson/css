@@ -4,10 +4,14 @@
 #       - Cameron Simpson <cs@zip.com.au> 21aug2015
 #
 
+from collections import namedtuple
 from cs.asynchron import Result
 from cs.later import Later
 from cs.logutils import Pfx, warning, error
+from cs.seq import Seq
 from cs.serialise import Packet, read_Packet
+
+Request_State = namedtuple('RequestState', 'decode_response result')
 
 class PacketConnection(object):
   ''' A bidirectional binary connection for exchanging requests and responses.
@@ -33,6 +37,9 @@ class PacketConnection(object):
     self._channel_requests = {0: set()}
     # requests we have outstanding against the remote system
     self._pending = {0: {}}
+    # sequence of tag numbers
+    # TODO: later, reuse old tags to prevent montonic growth of tag field
+    self._tags = Seq()
     # work queue for local requests
     self._later = Later(4)
     # dispatch queue for packets to send - bytes objects
@@ -47,6 +54,9 @@ class PacketConnection(object):
     self._send_thread = Thread(target=self._send)
     self._send_thread.daemon = True
     self._send_thread.start()
+
+  def _new_tag(self):
+    return next(self._tag_seq)
 
   def _reject(self, channel, tag):
     ''' Issue a rejection of the specified request.
