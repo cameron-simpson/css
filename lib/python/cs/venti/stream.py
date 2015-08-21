@@ -7,255 +7,79 @@
 #
 
 from __future__ import with_statement
-from threading import Lock
-from threading import Thread
 import sys
-from cs.py3 import Queue
-from cs.seq import seq
+from collections import namedtuple
+from threading import Thread
+from cs.asynchron import Result
+from cs.py3 import bytes
+from cs.seq import Seq
 from cs.inttypes import Enum
 from cs.logutils import Pfx, info, debug, warning
-from cs.serialise import put_bs, read_bs
-from cs.lex import unctrl
+from cs.serialise import put_bs
+from cs.stream import PacketConnection
 from cs.queues import IterableQueue
-from cs.threads import Q1
-from cs.lex import hexify
 from .store import BasicStore
+from .hash import decode as decode_hash
 
 RqType = Enum('T_ADD', 'T_GET', 'T_CONTAINS')
-T_ADD = RqType(0)       # data->hash
-T_GET = RqType(1)       # hash->data
+T_ADD = RqType(0)       # data->hashcode
+T_GET = RqType(1)       # hashcode->data
 T_CONTAINS = RqType(2)     # hash->boolean
 
-# encode tokens once for performance
-enc_STORE = put_bs(T_ADD)
-enc_GET = put_bs(T_GET)
-enc_CONTAINS = put_bs(T_CONTAINS)
-
-def encodeAdd(data):
-  ''' Accept a data block to be added, return the request tag and the request packet.
-  '''
-  if len(data) < 1:
-    raise ValueError("expected non-empty data block")
-  tag = seq()
-  return tag, put_bs(tag) + enc_STORE + put_bs(len(data)) + data
-
-def encodeGet(rqTag, h):
-  ''' Accept a hash to be fetched, return the request tag and the request packet.
-  '''
-  tag = seq()
-  return tag, put_bs(tag) + enc_GET + put_bs(len(h)) + h
-
-def encodeContains(rqTag, h):
-  ''' Accept a hash to check for, return the request tag and the request packet.
-  '''
-  tag = seq()
-  return tag, put_bs(tag) + enc_CONTAINS + put_bs(len(h)) + h
-
-def encodeAddResult(tag, h):
-  return put_bs(tag) + enc_STORE + put_bs(len(h)) + h
-
-def encodeGetResult(tag, data):
-  if len(data) < 1:
-    raise ValueError("expected non-empty data block")
-  if data is None:
-    return put_bs(tag) + enc_GET + put_bs(0)
-  return put_bs(tag) + enc_GET + put_bs(len(data)) + data
-
-def encodeContainsResult(tag, yesno):
-  return put_bs(tag) + enc_CONTAINS + put_bs(1 if yesno else 0)
-
-def decodeRequestStream(fp):
-  ''' Generator that yields (rqTag, rqType, info) from the request stream.
-  '''
-  with Pfx("decodeRequestStream(%s)", fp):
-    while True:
-      rqTag = read_bs(fp)
-      if rqTag is None:
-        # end of stream
-        break
-      with Pfx(str(rqTag)):
-        rqType = RqType(read_bs(fp))
-        if rqType == T_ADD:
-          size = read_bs(fp)
-          if size == 0:
-            data = None
-          else:
-            data = fp.read(size)
-            if len(data) != size:
-              raise ValueError("expected %d data bytes but got %d: %r", size, len(data), data)
-          yield rqTag, rqType, data
-        elif rqType == T_GET or rqType == T_CONTAINS:
-          hlen = read_bs(fp)
-          if hlen < 1:
-            raise ValueError("expected hash length >= 1, but was told %d", hlen)
-          h = fp.read(hlen)
-          if len(h) != heln:
-            raise ValueError("expected %d hash data bytes but got %d: %r", size, len(h), h)
-          yield rqTag, rqType, h
-        else:
-          raise RuntimeError("unimplemented request type")
-
-def decodeResultStream(self):
-  ''' Generator that yields (rqTag, rqType, result) from the result stream.
-  '''
-  with Pfx("decodeResultStream(%s)", fp):
-    while True:
-      rqTag = read_bs(fp)
-      if rqTag is None:
-        break
-      with Pfx(str(rqTag)):
-        rqType = read_bs(fp)
-        if rqType == T_ADD:
-          hlen = read_bs(fp)
-          if hlen < 1:
-            raise ValueError("expected hash length >= 1, but was told %d", hlen)
-          h = fp.read(hlen)
-          if len(h) != heln:
-            raise ValueError("expected %d hash data bytes but got %d: %r", size, len(h), h)
-          yield rqTag, rqType, h
-        elif rqType == T_GET:
-          size = read_bs(fp)
-          if size == 0:
-            data = None
-          else:
-            data = fp.read(size)
-            if len(data) != size:
-              raise ValueError("expected %d data bytes but got %d: %r", size, len(data), data)
-          yield rqTag, rqType, data
-        elif rqType == T_CONTAINS:
-          yesno = bool(read_bs(fp))
-          yield rqTag, rqType, yesno
-        else:
-          raise RuntimeError("unimplemented reply type")
-
-class StreamDaemon(object):
-  ''' A daemon to handle requests from a stream and apply them to a backend
-      store.
-  '''
-  def __init__(self, S, recvRequestFP, sendResultsFP, inBoundCapacity=None):
-    ''' Read Store requests from `recvRequestFP`, apply to the Store `S`,
-        report results upstream via `sendResultsFP`.
-    '''
-    if inBoundCapacity is None:
-      inBoundCapacity = 128
-    self.S = S
-    self._streamQ = Later(128, inboundCapacity=inboundCapacity)
-    self.recvRequestFP = recvRequestFP
-    self.sendResultsFP = sendResultsFP
-    self._resultsQ = IterableQueue(128)
-    self.readerThread = Thread(target=self._process_request_stream,
-                               name="%s._process_request_stream" % (self,))
-    self.resultsThread = Thread(target=self._result_sender,
-                                name="%s._process_results" % (self,))
-    self.readerThread.start()
-    self.resultsThread.start()
-
-  def _process_request_stream(self, fp):
-    SQ = self._streamQ
-    with Pfx("%s._process_requests", self):
-      for rqTag, rqType, rqData in decodeRequestStream(fp):
-        # submit request - will
-        SQ.defer(self._process_request, rqTag, rqType, rqData)
-
-  def _process_request(self, rqTag, rqType, rqData):
-    if rqType == T_ADD:
-      result = S.add(rqData)
-    elif rqType == T_GET:
-      result = S.get(rqData)
-    elif rqType == T_CONTAINS:
-      result = rqData in S
-    self._resultsQ.put(rqTag, rqType, result)
-
-  def _process_results(self, Q):
-    for rqTag, rqType, result in Q:
-      if rqType == T_ADD:
-        packet = encodeAddResult(rqTag, result)
-      elif rqType == T_GET:
-        packet = encodeGetResult(rqTag, result)
-      elif rqType == T_CONTAINS:
-        packet = encodeContainsResult(rqTag, result)
-      else:
-        assert "unimplemented result type %s" % (rqType,)
-      self.sendResultsFP.write(packet)
-      if self.Q.empty():
-        self.sendResultsFP.flush()
-
-  def join(self):
-    ''' Wait for the control threads to terminate.
-    '''
-    self.readerThread.join()    # wait for requests to cease
-    self.resultsThread.join()   # wait for results to drain
+Request_State = namedtuple('RequestState', 'decode_response result')
 
 class StreamStore(BasicStore):
-  ''' A Store connected to a StreamDaemon backend.
+  ''' A Store connected to a remote Store via a PacketConnection.
   '''
+
   def __init__(self, name, send_fp, recv_fp, local_store=None):
-    ''' Connect to a StreamDaemon via send_fp and recv_fp.
-    '''
     BasicStore.__init__(self, ':'.join('StreamStore', name))
-    self.send_fp = send_fp
-    self.recv_fp = recv_fp
-    self._requestQ = IterableQueue(128)
-    self._pendingLock = Lock()
-    self._pending = {}
-    self.writer = Thread(target=self._process_requests)
-    self.writer.start()
-    self.reader = Thread(target=self._process_results_stream)
-    self.reader.start()
-
-  def add(self, data):
-    assert len(data) > 0
-    tag, packet = encodeAdd(data)
-    return self._sendPacket(tag, packet).get()
-
-  def get(self, h, default=None):
-    tag, packet = encodeGet(h)
-    data = self._sendPacket(tag, packet).get()
-    if data is None:
-      return default
-    return data
-
-  def contains(self, h):
-    tag, packet = encodeContains(h)
-    return self._sendPacket(tag, packet).get()
-
-  def _sendPacket(self, tag, packet):
-    retQ = Q1()
-    self._requestQ.put(tag, packet, retQ)
-    return retQ
-
-  def _process_requests(self):
-    for tag, packet, retQ in self._requestQ:
-      with self._pendingLock:
-        assert tag not in self._pending
-        self._pending[tag] = retQ
-      self.send_fp.write(packet)
-      if self._requestQ.empty():
-        self.send_fp.flush()
-
-  def _process_results_stream(self):
-    for rqTag, rqType, result in decodeRequestStream(self.recv_fp):
-      with self._pendingLock:
-        self._pending[tag].put(result)
-        del self._pending[tag]
-
-  def flush(self):
-    with self.__sendLock:
-      self.send_fp.flush()
+    self._conn = PacketConnection(send_fp, recv_fp, self._decode_response)
+    self.local_store = local_store
 
   def shutdown(self):
     ''' Close the StreamStore.
     '''
     debug("%s.shutdown...", self)
-    self._requestQ.close()
-    self.writer.join()
-    self.writer = None
-    self.send_fp.close()
-    self.send_fp = None
-
-    self.reader.join()
-    self.reader = None
-    self.recv_fp.close()
-    self.recvReqestsFP = None
-
+    self._conn.shutdown()
     BasicStore.shutdown(self)
+
+  @staticmethod
+  def _decode_request(payload):
+    ''' Accept a payload and decode into request type and associated data.
+        Return a callable to perform the request, which returns (flags, payload).
+    '''
+    rq_type, offset = get_bs(payload)
+    if rq_type == T_ADD:
+      data = payload[offset:]
+      return lambda data: 0, self.local_store.add(data).encode()
+    if rq_type == T_GET:
+      hashcode, offset = decode_hash(payload, offset)
+      if offset < len(payload):
+        raise ValueError("unparsed data after hashcode at offset %d: %r"
+                         % (offset, payload[offset:]))
+      return lambda hashcode: self.local_store.get(hashcode)
+    if rq_type == T_CONTAINS:
+      hashcode, offset = decode_hash(payload, offset)
+      if offset < len(payload):
+        raise ValueError("unparsed data after hashcode at offset %d: %r"
+                         % (offset, payload[offset:]))
+      return lambda hashcode: 1 if hashcode in self.local_store else 0
+    raise ValueError("unrecognised request code: %d; data=%r"
+                     % (rq_type, payload[offset:]))
+
+  def add_bg(self, data):
+    ''' Dispatch an add request, return a Result for collection.
+    '''
+    return self._conn.request(0, put_bs(T_ADD) + data, self._decode_response_add)
+
+  @staticmethod
+  def _decode_response_add(flags, payload):
+    ''' Decode the reply to an add, should be no flags and a hashcode.
+    '''
+    if flags:
+      raise ValueError("unexpected flags: 0x%02x" % (flags,))
+    hashcode, offset = decode_hash(payload)
+    if offset < len(payload):
+      raise ValueError("unexpected data after hashcode: %r" % (payload[offset:],))
+    return hashcode
