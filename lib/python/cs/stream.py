@@ -12,7 +12,7 @@ from cs.logutils import Pfx, warning, error, X
 from cs.queues import IterableQueue
 from cs.resources import not_closed
 from cs.seq import seq, Seq
-from cs.serialise import Packet, read_Packet, write_Packet
+from cs.serialise import Packet, read_Packet, write_Packet, get_bs
 
 Request_State = namedtuple('RequestState', 'decode_response result')
 
@@ -20,14 +20,13 @@ class PacketConnection(object):
   ''' A bidirectional binary connection for exchanging requests and responses.
   '''
 
-  def __init__(self, recv_fp, send_fp, decode_request=None, name=None):
+  def __init__(self, recv_fp, send_fp, request_handler=None, name=None):
     ''' Initialise the PacketConnection.
         `recv_fp`: inbound binary stream
         `send_fp`: outbound binary stream
-        `decode_request`: if supplied and not None, a callable to
-            decode an inbound request packet into a local callable
-
-        The callable returned from decode_request may itself return one of 4 values:
+        `request_handler`: if supplied and not None, should be a
+            callable accepting (request_type, flags, payload)
+        The request_handler may return one of 4 values:
           None  Respond will be 0 flags and an empty payload.
           int   Flags only. Response will be the flags and an empty payload.
           bytes Payload only. Response with be 0 flags and the payload.
@@ -38,7 +37,7 @@ class PacketConnection(object):
     self.name = name
     self._recv_fp = recv_fp
     self._send_fp = send_fp
-    self.decode_request = decode_request
+    self.request_handler = request_handler
     # requests in play against the local system
     self._channel_requests = {0: set()}
     # requests we have outstanding against the remote system
@@ -90,7 +89,7 @@ class PacketConnection(object):
     self._sendQ.put(P)
 
   @not_closed
-  def request(self, flags, payload, decode_response_payload, channel=0):
+  def request(self, flags, payload, decode_response, channel=0):
     ''' Compose and dispatch a new request.
         Allocates a new tag, a Result to deliver the response, and
         records the response decode function for use when the
@@ -101,7 +100,7 @@ class PacketConnection(object):
     pending = self._pending
     if channel not in pending:
       raise ValueError("invalid channel %d", channel)
-    pending[channel][tag] = Request_State(decode_response_payload, R)
+    pending[channel][tag] = Request_State(decode_response, R)
     self._send_request(channel, tag, flags, payload)
     return R
 
@@ -123,13 +122,14 @@ class PacketConnection(object):
       channel = packet.channel
       tag = packet.tag
       flags = packet.flags
+      payload = packet.payload
       if packet.is_request:
         with Pfx("request[%d:%d]", channel, tag):
           if self.closed:
             error("rejecting request: closed")
             self._reject(channel, tag)
-          elif self.decode_request is None:
-            error("rejecting request: no self.decode_request")
+          elif self.request_handler is None:
+            error("rejecting request: no self.request_handler")
             self._reject(channel, tag)
           else:
             # request from upstream client
@@ -143,19 +143,20 @@ class PacketConnection(object):
                     channel, tag)
               self._reject(channel, tag)
             else:
-              # payload for requests are the request enum and data
+              # payload for requests is the request enum and data
               try:
-                run_rq = self.decode_request(flags, payload)
-              except ValueError as e:
-                error("invalid request received: %s", e)
+                rq_type, offset = get_bs(payload)
+              except IndexError as e:
+                error("invalid request: truncated request type, payload=%r", payload)
                 self._reject(channel, tag)
               else:
                 requests[channel].add(tag)
+                handler = self.request_handler
                 def _run_request():
                   try:
                     result_flags = 0
                     result_payload = bytes(())
-                    result = run_rq()
+                    result = handler(rq_type, flags, payload[offset:])
                     if result is not None:
                       if isinstance(result, int):
                         result_flags = result
@@ -163,14 +164,13 @@ class PacketConnection(object):
                         result_payload = result
                       else:
                         result_flags, result_payload = result
-                    flags, payload = run_rq()
                   except Exception as e:
-                    warning("%s: exception: %s", run, e)
+                    warning("exception: %s", e)
                     self._reject(channel, tag)
                   else:
                     self._respond(channel, tag, result_flags, result_payload)
                   requests[channel].remove(tag)
-                self._later.defer(self._run_request)
+                self._later.defer(_run_request)
       else:
         with Pfx("response[%d:%d]", channel, tag):
           # response: get state of matching pending request, remove from _pending
@@ -185,7 +185,7 @@ class PacketConnection(object):
             flags >>= 1
             payload = packet.payload
             if not ok:
-              R.raise_(ValueError("respond not ok: ok=%s, flags=%s, payload=%r",
+              R.raise_(ValueError("response not ok: ok=%s, flags=%s, payload=%r",
                                   ok, flags, payload))
             else:
               try:
@@ -194,7 +194,8 @@ class PacketConnection(object):
                 R.exc_info = sys.exc_info()
               else:
                 R.result = result
-    self._sendQ.close()
+    if not self._sendQ.closed:
+      self._sendQ.close()
     self._recv_fp.close()
 
   def _send(self):
