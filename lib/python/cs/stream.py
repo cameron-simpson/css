@@ -86,7 +86,10 @@ class PacketConnection(object):
     '''
     tag = self._new_tag()
     R = Result()
-    self._pending[channel][tag] = Request_State(decode_response_payload, R)
+    pending = self._pending
+    if channel not in pending:
+      raise ValueError("invalid channel %d", channel)
+    pending[channel][tag] = Request_State(decode_response_payload, R)
     self._send_request(channel, tag, flags, payload)
     return R
 
