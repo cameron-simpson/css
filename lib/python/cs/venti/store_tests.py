@@ -20,10 +20,7 @@ def randblock(size):
     raise RuntimeError("BANG2")
   return chunk
 
-class TestStore(unittest.TestCase):
-
-  def _open_Store(self):
-    self.S = MappingStore({}).open()
+class _TestStore(unittest.TestCase):
 
   def setUp(self):
     self._open_Store()
@@ -42,6 +39,11 @@ class TestStore(unittest.TestCase):
 
   def test02add(self):
     S = self.S
+
+class TestMappingStore(_TestStore):
+
+  def _open_Store(self):
+    self.S = MappingStore({}).open()
 
 def selftest(argv):
   unittest.main(__name__, None, argv)
