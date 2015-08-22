@@ -28,13 +28,23 @@ class StreamStore(BasicStore):
     BasicStore.__init__(self, ':'.join('StreamStore', name))
     self._conn = PacketConnection(send_fp, recv_fp, self._handle_request)
     self.local_store = local_store
+    self.closed = False
 
   def shutdown(self):
     ''' Close the StreamStore.
     '''
+    self.closed = True
     debug("%s.shutdown...", self)
-    self._conn.shutdown()
+    if not self._conn.closed:
+      self._conn.shutdown()
     BasicStore.shutdown(self)
+
+  def join(self):
+    ''' Wait for the Store to be closed down.
+    '''
+    self._conn.join()
+    if not self.closed:
+      self.shutdown
 
   @staticmethod
   def _handle_request(rq_type, flags, payload):
