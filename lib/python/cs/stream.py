@@ -50,6 +50,7 @@ class PacketConnection(object):
     self._later = Later(4)
     # dispatch queue for packets to send - bytes objects
     self._sendQ = IterableQueue(16)
+    self.closed = False
     # dispatch Thread to process received packets
     self._recv_thread = Thread(target=self._receive)
     self._recv_thread.daemon = True
@@ -60,6 +61,16 @@ class PacketConnection(object):
     self._send_thread = Thread(target=self._send)
     self._send_thread.daemon = True
     self._send_thread.start()
+
+  def __str__(self):
+    return "PacketConnection[%s,closed=%s]" % (self.name, self.closed)
+
+  def shutdown(self):
+    self.closed = True
+    if not self._sendQ.closed:
+      self._sendQ.close()
+    self._send_thread.join()
+    self._recv_thread.join()
 
   def _new_tag(self):
     return next(self._tag_seq)
@@ -78,6 +89,7 @@ class PacketConnection(object):
     P = Packet(channel, tag, False, flags, payload)
     self._sendQ.put(P)
 
+  @not_closed
   def request(self, flags, payload, decode_response_payload, channel=0):
     ''' Compose and dispatch a new request.
         Allocates a new tag, a Result to deliver the response, and
@@ -104,14 +116,20 @@ class PacketConnection(object):
     '''
     fp = self._recv_fp
     while True:
-      packet = read_Packet(fp)
+      try:
+        packet = read_Packet(fp)
+      except EOFError:
+        break
       channel = packet.channel
       tag = packet.tag
       flags = packet.flags
       if packet.is_request:
         with Pfx("request[%d:%d]", channel, tag):
-          if self._decode_request is None:
-            error("rejecting request: no self._decode_request")
+          if self.closed:
+            error("rejecting request: closed")
+            self._reject(channel, tag)
+          elif self.decode_request is None:
+            error("rejecting request: no self.decode_request")
             self._reject(channel, tag)
           else:
             # request from upstream client
@@ -153,7 +171,6 @@ class PacketConnection(object):
                     self._respond(channel, tag, result_flags, result_payload)
                   requests[channel].remove(tag)
                 self._later.defer(self._run_request)
-          raise RuntimeError("NOT REACHED")
       else:
         with Pfx("response[%d:%d]", channel, tag):
           # response: get state of matching pending request, remove from _pending
@@ -166,6 +183,7 @@ class PacketConnection(object):
             # first flag is "ok"
             ok = (flags & 0x01) != 0
             flags >>= 1
+            payload = packet.payload
             if not ok:
               R.raise_(ValueError("respond not ok: ok=%s, flags=%s, payload=%r",
                                   ok, flags, payload))
@@ -176,6 +194,8 @@ class PacketConnection(object):
                 R.exc_info = sys.exc_info()
               else:
                 R.result = result
+    self._sendQ.close()
+    self._recv_fp.close()
 
   def _send(self):
     ''' Send packets upstream.
@@ -188,3 +208,4 @@ class PacketConnection(object):
       write_Packet(fp, P)
       if Q.empty():
         fp.flush()
+    fp.close()
