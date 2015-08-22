@@ -22,6 +22,7 @@ T_CONTAINS = RqType(2)      # hash->boolean
 
 class StreamStore(BasicStore):
   ''' A Store connected to a remote Store via a PacketConnection.
+      Optionally accept a local store to facilitate bidirectional activities.
   '''
 
   def __init__(self, name, send_fp, recv_fp, local_store=None):
