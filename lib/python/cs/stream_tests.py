@@ -32,18 +32,21 @@ class TestStream(unittest.TestCase):
 
   @staticmethod
   def _decode_response(flags, payload):
-    print("RSP: flags=%r, payload=%r" % (flags, payload))
+    return flags, payload
 
   @staticmethod
   def _request_handler(rq_type, flags, payload):
     print("RQ: type=%d, flags=0x%02x, data=%r" % (rq_type, flags, payload))
+    return 0x11, bytes(reversed(payload))
 
   def test00immediate_close(self):
     pass
 
   def test01single_request(self):
-    R = self.local_conn.request(0, bytes((2,3)), self._decode_response, 0)
-    R()
+    R = self.local_conn.request(1, 0x55, bytes((2,3)), self._decode_response, 0)
+    flags, payload = R()
+    self.assertEqual(flags, 0x11)
+    self.assertEqual(payload, bytes((3,2)))
 
 def selftest(argv):
   unittest.main(__name__, None, argv)
