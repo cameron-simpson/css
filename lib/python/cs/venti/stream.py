@@ -26,7 +26,7 @@ class StreamStore(BasicStore):
 
   def __init__(self, name, send_fp, recv_fp, local_store=None):
     BasicStore.__init__(self, ':'.join('StreamStore', name))
-    self._conn = PacketConnection(send_fp, recv_fp, self._decode_response)
+    self._conn = PacketConnection(send_fp, recv_fp, self._handle_request)
     self.local_store = local_store
 
   def shutdown(self):
@@ -37,26 +37,25 @@ class StreamStore(BasicStore):
     BasicStore.shutdown(self)
 
   @staticmethod
-  def _decode_request(payload):
-    ''' Accept a payload and decode into request type and associated data.
-        Return a callable to perform the request, which returns (flags, payload).
+  def _handle_request(rq_type, flags, payload):
+    ''' Perform the action for a request packet.
     '''
-    rq_type, offset = get_bs(payload)
+    if self.local_store is None:
+      raise ValueError("no local_store, request rejected")
     if rq_type == T_ADD:
-      data = payload[offset:]
-      return lambda data: 0, self.local_store.add(data).encode()
+      return self.local_store.add(data).encode()
     if rq_type == T_GET:
       hashcode, offset = decode_hash(payload, offset)
       if offset < len(payload):
         raise ValueError("unparsed data after hashcode at offset %d: %r"
                          % (offset, payload[offset:]))
-      return lambda hashcode: self.local_store.get(hashcode)
+      return self.local_store.get(hashcode)
     if rq_type == T_CONTAINS:
       hashcode, offset = decode_hash(payload, offset)
       if offset < len(payload):
         raise ValueError("unparsed data after hashcode at offset %d: %r"
                          % (offset, payload[offset:]))
-      return lambda hashcode: 1 if hashcode in self.local_store else 0
+      return 1 if hashcode in self.local_store else 0
     raise ValueError("unrecognised request code: %d; data=%r"
                      % (rq_type, payload[offset:]))
 
