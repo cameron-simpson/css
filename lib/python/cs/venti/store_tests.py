@@ -41,14 +41,20 @@ class _TestStore(unittest.TestCase):
     self.assertFalse(S.contains(h))
     self.assertNotIn(h, S)
 
-  def test02add(self):
+  def test02addget(self):
     S = self.S
+    random_chunk_map = {}
     for _ in range(16):
       size = random.randint(127, 16384)
       data = randblock(size)
       h = S.hash(data)
       h2 = S.add(data)
       self.assertEqual(h, h2)
+      random_chunk_map[h] = data
+    for h in random_chunk_map:
+      chunk = S.get(h)
+      self.assertIsNot(chunk, None)
+      self.assertEqual(chunk, random_chunk_map[h])
 
 class TestMappingStore(_TestStore):
 
