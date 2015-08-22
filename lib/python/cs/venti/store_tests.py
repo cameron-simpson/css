@@ -7,19 +7,9 @@
 import random
 import sys
 import unittest
-from .store import MappingStore
 from cs.logutils import X
-
-def rand0(maxn):
-  return random.randint(0, maxn)
-
-def randblock(size):
-  ''' Generate a pseudorandom chunk of bytes of the specified size.
-  '''
-  chunk = bytes( rand0(255) for x in range(size) )
-  if type(chunk) is not bytes:
-    raise RuntimeError("BANG2")
-  return chunk
+from cs.randutils import rand0, randblock
+from .store import MappingStore
 
 class _TestStore(unittest.TestCase):
 
