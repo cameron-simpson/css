@@ -12,7 +12,7 @@ from cs.logutils import Pfx, warning, error, X
 from cs.queues import IterableQueue
 from cs.resources import not_closed
 from cs.seq import seq, Seq
-from cs.serialise import Packet, read_Packet, write_Packet, get_bs
+from cs.serialise import Packet, read_Packet, write_Packet, put_bs, get_bs
 
 Request_State = namedtuple('RequestState', 'decode_response result')
 
@@ -94,7 +94,7 @@ class PacketConnection(object):
     self._sendQ.put(P)
 
   @not_closed
-  def request(self, flags, payload, decode_response, channel=0):
+  def request(self, rq_type, flags, payload, decode_response, channel=0):
     ''' Compose and dispatch a new request.
         Allocates a new tag, a Result to deliver the response, and
         records the response decode function for use when the
@@ -106,13 +106,13 @@ class PacketConnection(object):
     if channel not in pending:
       raise ValueError("invalid channel %d", channel)
     pending[channel][tag] = Request_State(decode_response, R)
-    self._send_request(channel, tag, flags, payload)
+    self._send_request(channel, tag, rq_type, flags, payload)
     return R
 
-  def _send_request(self, channel, tag, flags, payload):
+  def _send_request(self, channel, tag, rq_type, flags, payload):
     ''' Issue a request.
     '''
-    P = Packet(channel, tag, True, flags, payload)
+    P = Packet(channel, tag, True, flags, put_bs(rq_type) + payload)
     self._sendQ.put(P)
 
   def _receive(self):
