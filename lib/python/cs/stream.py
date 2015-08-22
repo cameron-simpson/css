@@ -45,7 +45,7 @@ class PacketConnection(object):
     self._pending = {0: {}}
     # sequence of tag numbers
     # TODO: later, reuse old tags to prevent montonic growth of tag field
-    self._tags = Seq()
+    self._tag_seq = Seq()
     # work queue for local requests
     self._later = Later(4)
     # dispatch queue for packets to send - bytes objects
