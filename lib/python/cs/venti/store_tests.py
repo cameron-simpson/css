@@ -8,6 +8,7 @@ import random
 import sys
 import unittest
 from .store import MappingStore
+from cs.logutils import X
 
 def rand0(maxn):
   return random.randint(0, maxn)
@@ -25,6 +26,9 @@ class _TestStore(unittest.TestCase):
   def setUp(self):
     self._open_Store()
 
+  def _open_Store(self):
+    raise unittest.SkipTest("no Store in base class")
+
   def tearDown(self):
     self.S.close()
 
@@ -39,6 +43,12 @@ class _TestStore(unittest.TestCase):
 
   def test02add(self):
     S = self.S
+    for _ in range(16):
+      size = random.randint(127, 16384)
+      data = randblock(size)
+      h = S.hash(data)
+      h2 = S.add(data)
+      self.assertEqual(h, h2)
 
 class TestMappingStore(_TestStore):
 
