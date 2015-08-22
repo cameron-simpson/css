@@ -4,16 +4,29 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
+import random
 import sys
 import unittest
 from .store import MappingStore
 
-class TestAll(unittest.TestCase):
+def rand0(maxn):
+  return random.randint(0, maxn)
+
+def randblock(size):
+  ''' Generate a pseudorandom chunk of bytes of the specified size.
+  '''
+  chunk = bytes( rand0(255) for x in range(size) )
+  if type(chunk) is not bytes:
+    raise RuntimeError("BANG2")
+  return chunk
+
+class TestStore(unittest.TestCase):
+
+  def _open_Store(self):
+    self.S = MappingStore({}).open()
 
   def setUp(self):
-    import random
-    random.seed()
-    self.S = MappingStore({}).open()
+    self._open_Store()
 
   def tearDown(self):
     self.S.close()
@@ -21,6 +34,14 @@ class TestAll(unittest.TestCase):
   def test01empty(self):
     S = self.S
     self.assertEqual(len(S), 0)
+    size = random.randint(127, 16384)
+    data = randblock(size)
+    h = S.hash(data)
+    self.assertFalse(S.contains(h))
+    self.assertNotIn(h, S)
+
+  def test02add(self):
+    S = self.S
 
 def selftest(argv):
   unittest.main(__name__, None, argv)
