@@ -20,7 +20,7 @@ class PacketConnection(object):
   ''' A bidirectional binary connection for exchanging requests and responses.
   '''
 
-  def __init__(self, recv_fp, send_fp, decode_request=None):
+  def __init__(self, recv_fp, send_fp, decode_request=None, name=None):
     ''' Initialise the PacketConnection.
         `recv_fp`: inbound binary stream
         `send_fp`: outbound binary stream
@@ -33,6 +33,9 @@ class PacketConnection(object):
           bytes Payload only. Response with be 0 flags and the payload.
           (int, bytes) Specify flags and payload for response.
     '''
+    if name is None:
+      name = str(seq())
+    self.name = name
     self._recv_fp = recv_fp
     self._send_fp = send_fp
     self.decode_request = decode_request
