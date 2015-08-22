@@ -71,6 +71,11 @@ class PacketConnection(object):
     self._send_thread.join()
     self._recv_thread.join()
 
+  def join(self):
+    ''' Wait for the receive side of the connection to terminate.
+    '''
+    self._recv_thread.join()
+
   def _new_tag(self):
     return next(self._tag_seq)
 
