@@ -5,11 +5,14 @@
 #
 
 from collections import namedtuple
+from threading import Thread
 from cs.asynchron import Result
 from cs.later import Later
-from cs.logutils import Pfx, warning, error
-from cs.seq import Seq
-from cs.serialise import Packet, read_Packet
+from cs.logutils import Pfx, warning, error, X
+from cs.queues import IterableQueue
+from cs.resources import not_closed
+from cs.seq import seq, Seq
+from cs.serialise import Packet, read_Packet, write_Packet
 
 Request_State = namedtuple('RequestState', 'decode_response result')
 
