@@ -5,25 +5,14 @@
 #
 
 from __future__ import absolute_import
-import random
 import sys
 import unittest
 from io import BytesIO
+from cs.randutils import rand0, randblock
 from cs.serialise import get_bs, read_bs, put_bs, \
                          get_bsdata, read_bsdata, put_bsdata, \
                          Packet, get_Packet
 from cs.py3 import bytes
-
-def rand0(maxn):
-  return random.randint(0, maxn)
-
-def randblock(size):
-  ''' Generate a pseudorandom chunk of bytes of the specified size.
-  '''
-  chunk = bytes( rand0(255) for x in range(size) )
-  if type(chunk) is not bytes:
-    raise RuntimeError("BANG2")
-  return chunk
 
 def randPacket(channel=None, tag=None, is_request=None, flags=None, size=None):
   if channel is None:
