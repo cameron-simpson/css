@@ -209,3 +209,8 @@ class PacketConnection(object):
       if Q.empty():
         fp.flush()
     fp.close()
+
+if __name__ == '__main__':
+  import sys
+  import cs.stream_tests
+  cs.stream_tests.selftest(sys.argv)
