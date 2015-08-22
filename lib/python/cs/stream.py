@@ -68,7 +68,7 @@ class PacketConnection(object):
     ''' Issue a rejection of the specified request.
     '''
     P = Packet(channel, tag, False, 0, bytes(()))
-    self._sendQ.put(P.serialise())
+    self._sendQ.put(P)
 
   def _respond(self, channel, tag, flags, payload):
     ''' Issue a valid response.
@@ -76,7 +76,7 @@ class PacketConnection(object):
     '''
     flags = (flags<<1) | 1
     P = Packet(channel, tag, False, flags, payload)
-    self._sendQ.put(P.serialise())
+    self._sendQ.put(P)
 
   def request(self, flags, payload, decode_response_payload, channel=0):
     ''' Compose and dispatch a new request.
@@ -94,7 +94,7 @@ class PacketConnection(object):
     ''' Issue a request.
     '''
     P = Packet(channel, tag, True, flags, payload)
-    self._sendQ.put(P.serialise())
+    self._sendQ.put(P)
 
   def _receive(self):
     ''' Receive packets from upstream, decode into requests and responses.
@@ -181,7 +181,7 @@ class PacketConnection(object):
     '''
     fp = self._send_fp
     Q = self._sendQ
-    for chunk in Q:
-      fp.write(chunk)
+    for P in Q:
+      write_Packet(fp, P)
       if Q.empty():
         fp.flush()
