@@ -45,33 +45,35 @@ class StreamStore(BasicStoreAsync):
     if not self.closed:
       self.shutdown
 
-  @staticmethod
-  def _handle_request(rq_type, flags, payload):
+  def _handle_request(self, rq_type, flags, payload):
     ''' Perform the action for a request packet.
     '''
     if self.local_store is None:
       raise ValueError("no local_store, request rejected")
     if rq_type == T_ADD:
-      return self.local_store.add(data).encode()
+      return self.local_store.add(payload).encode()
     if rq_type == T_GET:
-      hashcode, offset = decode_hash(payload, offset)
+      hashcode, offset = decode_hash(payload)
       if offset < len(payload):
         raise ValueError("unparsed data after hashcode at offset %d: %r"
                          % (offset, payload[offset:]))
-      return self.local_store.get(hashcode)
+      data = self.local_store.get(hashcode)
+      if data is None:
+        return 0
+      return 1, data
     if rq_type == T_CONTAINS:
-      hashcode, offset = decode_hash(payload, offset)
+      hashcode, offset = decode_hash(payload)
       if offset < len(payload):
         raise ValueError("unparsed data after hashcode at offset %d: %r"
                          % (offset, payload[offset:]))
       return 1 if hashcode in self.local_store else 0
     raise ValueError("unrecognised request code: %d; data=%r"
-                     % (rq_type, payload[offset:]))
+                     % (rq_type, payload))
 
   def add_bg(self, data):
     ''' Dispatch an add request, return a Result for collection.
     '''
-    return self._conn.request(0, put_bs(T_ADD) + data, self._decode_response_add)
+    return self._conn.request(T_ADD, 0, data, self._decode_response_add)
 
   @staticmethod
   def _decode_response_add(flags, payload):
@@ -83,6 +85,44 @@ class StreamStore(BasicStoreAsync):
     if offset < len(payload):
       raise ValueError("unexpected data after hashcode: %r" % (payload[offset:],))
     return hashcode
+
+  def get_bg(self, h):
+    ''' Dispatch a get request, return a Result for collection.
+    '''
+    return self._conn.request(T_GET, 0, h.encode(), self._decode_response_get)
+
+  @staticmethod
+  def _decode_response_get(flags, payload):
+    ''' Decode the reply to a get, should be ok and possible payload.
+    '''
+    ok = flags & 0x01
+    if ok:
+      flags &= ~0x01
+    if flags:
+      raise ValueError("unexpected flags: 0x%02x" % (flags,))
+    if ok:
+      return payload
+    if payload:
+      raise ValueError("not ok, but payload=%r", payload)
+    return None
+
+  def contains_bg(self, h):
+    ''' Dispatch a contains request, return a Result for collection.
+    '''
+    return self._conn.request(T_CONTAINS, 0, h.encode(), self._decode_response_contains)
+
+  @staticmethod
+  def _decode_response_contains(flags, payload):
+    ''' Decode the reply to a contains, should be  a single flag.
+    '''
+    ok = flags & 0x01
+    if ok:
+      flags &= ~0x01
+    if flags:
+      raise ValueError("unexpected flags: 0x%02x" % (flags,))
+    if payload:
+      raise ValueError("non-empty payload: %r" % (payload,))
+    return ok
 
 if __name__ == '__main__':
   import cs.venti.stream_tests
