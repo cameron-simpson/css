@@ -31,7 +31,7 @@ class _TestStore(unittest.TestCase):
     self.assertFalse(S.contains(h))
     self.assertNotIn(h, S)
 
-  def test02addget(self):
+  def test02add_get(self):
     S = self.S
     random_chunk_map = {}
     for _ in range(16):
