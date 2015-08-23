@@ -144,6 +144,12 @@ class Packet(_Packet):
   ''' A general purpose packet to wrap a multiplexable protocol.
   '''
 
+  def __str__(self):
+    return ( "Packet(channel=%s,tag=%s,is_request=%s,flags=0x%02x,payload=[%d]%r)"
+           % ( self.channel, self.tag, self.is_request, self.flags,
+               len(self.payload), self.payload[:16]
+             )
+           )
   def serialise(self):
     ''' Binary transcription of this packet.
         Format:
