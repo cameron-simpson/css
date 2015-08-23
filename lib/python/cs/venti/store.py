@@ -63,7 +63,7 @@ class _BasicStoreCommon(NestingOpenCloseMixin):
       deadlocks may ensue.
   '''
   def __init__(self, name, capacity=None):
-    with Pfx("BasicStore(%s,..)", name):
+    with Pfx("_BasicStoreCommon.__init__(%s,..)", name):
       if capacity is None:
         capacity = 1
       self._lock = Lock()
@@ -203,7 +203,7 @@ class BasicStoreAsync(_BasicStoreCommon):
     return self.sync_bg()()
 
 def Store(store_spec):
-  ''' Factory function to return an appropriate BasicStore subclass
+  ''' Factory function to return an appropriate BasicStore* subclass
       based on its argument:
 
         /path/to/store  A GDBMStore directory (later, tokyocabinet etc)
@@ -280,7 +280,7 @@ class MappingStore(BasicStoreSync):
   def __init__(self, mapping, name=None, capacity=None):
     if name is None:
       name = "MappingStore(%s)" % (mapping,)
-    BasicStore.__init__(self, name, capacity=capacity)
+    BasicStoreSync.__init__(self, name, capacity=capacity)
     self.mapping = mapping
 
   def add(self, data):
