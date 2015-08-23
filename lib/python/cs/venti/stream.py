@@ -26,7 +26,7 @@ class StreamStore(BasicStore):
   '''
 
   def __init__(self, name, send_fp, recv_fp, local_store=None):
-    BasicStore.__init__(self, ':'.join('StreamStore', name))
+    BasicStore.__init__(self, ':'.join( ('StreamStore', name) ))
     self._conn = PacketConnection(send_fp, recv_fp, self._handle_request)
     self.local_store = local_store
     self.closed = False
