@@ -5,7 +5,7 @@
 #
 
 from collections import namedtuple
-from threading import Thread
+from threading import Thread, Lock
 from cs.asynchron import Result
 from cs.later import Later
 from cs.logutils import Pfx, warning, error, X
@@ -13,6 +13,7 @@ from cs.queues import IterableQueue
 from cs.resources import not_closed
 from cs.seq import seq, Seq
 from cs.serialise import Packet, read_Packet, write_Packet, put_bs, get_bs
+from cs.threads import locked
 
 Request_State = namedtuple('RequestState', 'decode_response result')
 
@@ -61,6 +62,9 @@ class PacketConnection(object):
     self._send_thread = Thread(target=self._send)
     self._send_thread.daemon = True
     self._send_thread.start()
+    self._lock = Lock()
+    self.__sent = set()
+    self.__send_queued = set()
 
   def __str__(self):
     return "PacketConnection[%s,closed=%s]" % (self.name, self.closed)
@@ -81,11 +85,40 @@ class PacketConnection(object):
   def _new_tag(self):
     return next(self._tag_seq)
 
+  @locked
+  def _pending_add(self, channel, tag, state):
+    pending = self._pending
+    if channel not in pending:
+      raise ValueError("unknown channel %d" % (channel,))
+    channel_info = pending[channel]
+    if tag in channel_info:
+      raise ValueError("tag %d already pending in channel %d" % (tag, channel))
+    self._pending[channel][tag] = state
+
+  @locked
+  def _pending_pop(self, channel, tag):
+    pending = self._pending
+    if channel not in pending:
+      raise ValueError("unknown channel %d" % (channel,))
+    channel_info = pending[channel]
+    if tag not in channel_info:
+      raise ValueError("tag %d unknown in channel %d" % (tag, channel))
+    if False and tag == 15:
+      raise RuntimeError("BANG")
+    return channel_info.pop(tag)
+
+  def _queue_packet(self, P):
+    sig = (P.channel, P.tag, P.is_request)
+    if sig in self.__send_queued:
+      raise RuntimeError("requeue of %s: %s" % (sig, P))
+    self.__send_queued.add(sig)
+    self._sendQ.put(P)
+
   def _reject(self, channel, tag):
     ''' Issue a rejection of the specified request.
     '''
     P = Packet(channel, tag, False, 0, bytes(()))
-    self._sendQ.put(P)
+    self._queue_packet(P)
 
   def _respond(self, channel, tag, flags, payload):
     ''' Issue a valid response.
@@ -93,7 +126,7 @@ class PacketConnection(object):
     '''
     flags = (flags<<1) | 1
     P = Packet(channel, tag, False, flags, payload)
-    self._sendQ.put(P)
+    self._queue_packet(P)
 
   @not_closed
   def request(self, rq_type, flags, payload, decode_response, channel=0):
@@ -104,10 +137,7 @@ class PacketConnection(object):
     '''
     tag = self._new_tag()
     R = Result()
-    pending = self._pending
-    if channel not in pending:
-      raise ValueError("invalid channel %d", channel)
-    pending[channel][tag] = Request_State(decode_response, R)
+    self._pending_add(channel, tag, Request_State(decode_response, R))
     self._send_request(channel, tag, rq_type, flags, payload)
     return R
 
@@ -115,13 +145,35 @@ class PacketConnection(object):
     ''' Issue a request.
     '''
     P = Packet(channel, tag, True, flags, put_bs(rq_type) + payload)
-    self._sendQ.put(P)
+    self._queue_packet(P)
+
+  def _run_request(self, channel, tag, handler, rq_type, flags, payload):
+    ''' Run a request and queue a response packet.
+    '''
+    try:
+      result_flags = 0
+      result_payload = bytes(())
+      result = handler(rq_type, flags, payload)
+      if result is not None:
+        if isinstance(result, int):
+          result_flags = result
+        elif isinstance(result, bytes):
+          result_payload = result
+        else:
+          result_flags, result_payload = result
+    except Exception as e:
+      warning("exception: %s", e)
+      self._reject(channel, tag)
+    else:
+      self._respond(channel, tag, result_flags, result_payload)
+    self._channel_requests[channel].remove(tag)
 
   def _receive(self):
     ''' Receive packets from upstream, decode into requests and responses.
     '''
     fp = self._recv_fp
     while True:
+      packet = None
       try:
         packet = read_Packet(fp)
       except EOFError:
@@ -158,33 +210,17 @@ class PacketConnection(object):
                 self._reject(channel, tag)
               else:
                 requests[channel].add(tag)
-                handler = self.request_handler
-                def _run_request():
-                  try:
-                    result_flags = 0
-                    result_payload = bytes(())
-                    result = handler(rq_type, flags, payload[offset:])
-                    if result is not None:
-                      if isinstance(result, int):
-                        result_flags = result
-                      elif isinstance(result, bytes):
-                        result_payload = result
-                      else:
-                        result_flags, result_payload = result
-                  except Exception as e:
-                    warning("exception: %s", e)
-                    self._reject(channel, tag)
-                  else:
-                    self._respond(channel, tag, result_flags, result_payload)
-                  requests[channel].remove(tag)
-                self._later.defer(_run_request)
+                self._later.defer(self._run_request,
+                                  channel, tag, self.request_handler,
+                                  rq_type, flags, payload[offset:])
       else:
         with Pfx("response[%d:%d]", channel, tag):
-          # response: get state of matching pending request, remove from _pending
-          rq_state = self._pending.get(channel, {}).pop(tag, None)
-          if rq_state is None:
+          # response: get state of matching pending request, remove state
+          try:
+            rq_state = self._pending_pop(channel, tag)
+          except ValueError as e:
             # no such pending pair - response to unknown request
-            error("%d.%d: response to unknown request", channel, tag)
+            error("%d.%d: response to unknown request: %s", channel, tag, e)
           else:
             decode_response, R = rq_state
             # first flag is "ok"
@@ -213,6 +249,10 @@ class PacketConnection(object):
     fp = self._send_fp
     Q = self._sendQ
     for P in Q:
+      sig = (P.channel, P.tag, P.is_request)
+      if sig in self.__sent:
+        raise RuntimeError("second send of %s" % (P,))
+      self.__sent.add(sig)
       write_Packet(fp, P)
       if Q.empty():
         fp.flush()
