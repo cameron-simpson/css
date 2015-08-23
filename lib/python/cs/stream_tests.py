@@ -8,7 +8,9 @@ from __future__ import absolute_import
 from functools import partial
 import sys
 import os
+import random
 import unittest
+from cs.randutils import rand0, randblock
 from cs.serialise import get_bs
 from cs.stream import PacketConnection
 from cs.logutils import X
@@ -36,17 +38,34 @@ class TestStream(unittest.TestCase):
 
   @staticmethod
   def _request_handler(rq_type, flags, payload):
-    print("RQ: type=%d, flags=0x%02x, data=%r" % (rq_type, flags, payload))
     return 0x11, bytes(reversed(payload))
 
   def test00immediate_close(self):
     pass
 
-  def test01single_request(self):
-    R = self.local_conn.request(1, 0x55, bytes((2,3)), self._decode_response, 0)
-    flags, payload = R()
-    self.assertEqual(flags, 0x11)
-    self.assertEqual(payload, bytes((3,2)))
+  def test01half_duplex(self):
+    # throw the same packet up and back repeatedly
+    for _ in range(16):
+      R = self.local_conn.request(1, 0x55, bytes((2,3)), self._decode_response, 0)
+      flags, payload = R()
+      self.assertEqual(flags, 0x11)
+      self.assertEqual(payload, bytes((3,2)))
+
+  def test02full_duplex_random_payloads(self):
+    # throw 16 packets up, collect responses after requests queued
+    rqs = []
+    for _ in range(16):
+      size = rand0(16384)
+      data = randblock(size)
+      flags = rand0(65536)
+      R = self.local_conn.request(0, flags, data, self._decode_response, 0)
+      rqs.append( (R, flags, data) )
+    random.shuffle(rqs)
+    for rq in rqs:
+      R, flags, data = rq
+      flags, payload = R()
+      self.assertEqual(flags, 0x11)
+      self.assertEqual(payload, bytes(reversed(data)))
 
 def selftest(argv):
   unittest.main(__name__, None, argv)
