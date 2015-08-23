@@ -36,8 +36,8 @@ class OpenSock(object):
     else:
       os.shutdown(self._sock, os.SHUT_RD)
 
-class Server(ThreadingMixIn, TCPServer, NestingOpenCloseMixin):
-  ''' A threading TCPServer that accepts connections by StreamStore clients.
+class TCPStoreServer(ThreadingMixIn, TCPServer, NestingOpenCloseMixin):
+  ''' A threading TCPServer that accepts connections by TCPStoreClients.
   '''
 
   def __init__(self, bind_addr, S):
@@ -63,7 +63,7 @@ class _RequestHandler(StreamRequestHandler):
     RS.join()
     RS.shutdown()
 
-class TCPStore(StreamStore):
+class TCPStoreClient(StreamStore):
   ''' A Store attached to a remote Store at `bind_addr`.
   '''
 
