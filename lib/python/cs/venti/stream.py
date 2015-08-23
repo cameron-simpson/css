@@ -12,7 +12,7 @@ from cs.inttypes import Enum
 from cs.logutils import Pfx, info, debug, warning
 from cs.serialise import put_bs
 from cs.stream import PacketConnection
-from .store import BasicStore
+from .store import BasicStoreAsync
 from .hash import decode as decode_hash
 
 RqType = Enum('T_ADD', 'T_GET', 'T_CONTAINS')
@@ -20,13 +20,13 @@ T_ADD = RqType(0)           # data->hashcode
 T_GET = RqType(1)           # hashcode->data
 T_CONTAINS = RqType(2)      # hash->boolean
 
-class StreamStore(BasicStore):
+class StreamStore(BasicStoreAsync):
   ''' A Store connected to a remote Store via a PacketConnection.
       Optionally accept a local store to facilitate bidirectional activities.
   '''
 
   def __init__(self, name, send_fp, recv_fp, local_store=None):
-    BasicStore.__init__(self, ':'.join( ('StreamStore', name) ))
+    BasicStoreAsync.__init__(self, ':'.join( ('StreamStore', name) ))
     self._conn = PacketConnection(send_fp, recv_fp, self._handle_request)
     self.local_store = local_store
 
@@ -36,7 +36,7 @@ class StreamStore(BasicStore):
     debug("%s.shutdown...", self)
     if not self._conn.closed:
       self._conn.shutdown()
-    BasicStore.shutdown(self)
+    BasicStoreAsync.shutdown(self)
 
   def join(self):
     ''' Wait for the Store to be closed down.
