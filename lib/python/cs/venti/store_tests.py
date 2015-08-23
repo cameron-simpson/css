@@ -24,7 +24,10 @@ class _TestStore(unittest.TestCase):
 
   def test01empty(self):
     S = self.S
-    self.assertEqual(len(S), 0)
+    if hasattr(S, '__len__'):
+      self.assertEqual(len(S), 0)
+    else:
+      X("SKIP test of len(S): no __len__ in %s", type(S))
     size = random.randint(127, 16384)
     data = randblock(size)
     h = S.hash(data)
