@@ -83,3 +83,7 @@ class StreamStore(BasicStore):
     if offset < len(payload):
       raise ValueError("unexpected data after hashcode: %r" % (payload[offset:],))
     return hashcode
+
+if __name__ == '__main__':
+  import cs.venti.stream_tests
+  cs.venti.stream_tests.selftest(sys.argv)
