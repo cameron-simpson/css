@@ -47,6 +47,7 @@ class PacketConnection(object):
     self._tag_seq = Seq()
     # work queue for local requests
     self._later = Later(4)
+    self._later.open()
     # dispatch queue for packets to send - bytes objects
     self._sendQ = IterableQueue(16)
     self.closed = False
@@ -70,6 +71,7 @@ class PacketConnection(object):
       self._sendQ.close()
     self._send_thread.join()
     self._recv_thread.join()
+    self._later.close()
 
   def join(self):
     ''' Wait for the receive side of the connection to terminate.
