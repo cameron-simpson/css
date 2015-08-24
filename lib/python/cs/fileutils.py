@@ -18,7 +18,6 @@ DISTINFO = {
 }
 
 from io import RawIOBase
-import errno
 from functools import partial
 import os
 from os import SEEK_CUR, SEEK_END, SEEK_SET
@@ -29,6 +28,7 @@ from collections import namedtuple
 from contextlib import contextmanager
 from itertools import takewhile
 import shutil
+import socket
 from tempfile import TemporaryFile, NamedTemporaryFile
 from threading import RLock, Thread
 import time
@@ -43,7 +43,7 @@ from cs.range import Range
 from cs.threads import locked, locked_property
 from cs.timeutils import TimeoutError
 from cs.obj import O
-from cs.py3 import ustr, filter, bytes
+from cs.py3 import ustr, bytes
 
 DEFAULT_POLL_INTERVAL = 1.0
 
@@ -1143,6 +1143,39 @@ def lines_of(fp, partials=None):
   if partials is None:
     partials = []
   return as_lines(chunks_of(fp), partials)
+
+class OpenSocket(object):
+  ''' A file-like object for stream sockets, which uses os.shutdown on close.
+  '''
+
+  def __init__(self, sock, for_write):
+    self._for_write = for_write
+    self._sock = sock
+    self._sock_fd = sock.fileno()
+    self._fd = os.dup(self._sock_fd)
+    self._fp = os.fdopen(self._fd, 'wb' if for_write else 'rb')
+
+  def write(self, data):
+    return self._fp.write(data)
+
+  def read(self, size=None):
+    return self._fp.read(size)
+
+  def flush(self):
+    return self._fp.flush()
+
+  def close(self):
+    try:
+      if self._for_write:
+        self._sock.shutdown(socket.SHUT_WR)
+      else:
+        self._sock.shutdown(socket.SHUT_RD)
+    except OSError as e:
+      if e.errno != errno.ENOTCONN:
+        raise
+
+  def _close(self):
+    self._fp.close()
 
 if __name__ == '__main__':
   import cs.fileutils_tests
