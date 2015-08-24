@@ -5,6 +5,7 @@
 #
 
 from __future__ import with_statement
+import sys
 import cs.later
 from cs.lex import hexify
 from .store import BasicStoreSync
@@ -45,17 +46,17 @@ class CacheStore(BasicStoreSync):
       if h not in cache:
         yield h
 
-  def __contains__(self, h):
+  def contains(self, h):
     if h in self.cache:
       return True
     if h in self.backend:
       return True
     return False
 
-  def __getitem__(self, h):
+  def get(self, h):
     if h in self.cache:
       return self.cache[h]
-    return self.backend[h]
+    return self.backend.get(h)
 
   def add(self, data):
     ''' Add the data to the local cache and queue a task to add to the backend.
@@ -130,16 +131,23 @@ class MemoryCacheStore(BasicStoreSync):
     high = (self.low + self.used) % hlen
     hlist[high] = h
 
-  def __contains__(self, h):
+  def contains(self, h):
     with self._lock:
       return h in self.hmap
 
-  def __getitem__(self, h):
+  def get(self, h):
     with self._lock:
-      return self.hmap[h][1]
+      hmap = self.hmap
+      if h in hmap:
+        return hmap[h][1]
+    return None
 
   def add(self, data):
     with self._lock:
       H = self.hash(data)
       self._hit(H, data)
     return H
+
+if __name__ == '__main__':
+  import cs.venti.cache_tests
+  cs.venti.cache_tests.selftest(sys.argv)
