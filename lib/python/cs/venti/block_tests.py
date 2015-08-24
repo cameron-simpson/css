@@ -18,8 +18,8 @@ class TestAll(unittest.TestCase):
 
   def testSHA1(self):
     import random
-    from .cache import MemCacheStore
-    S = MemCacheStore()
+    from .cache import MemoryCacheStore
+    S = MemoryCacheStore()
     with S:
       subblocks = []
       for i in range(10):
