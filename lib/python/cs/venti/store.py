@@ -76,7 +76,7 @@ class _BasicStoreCommon(NestingOpenCloseMixin):
       self.writeonly = False
 
   def _defer(self, func, *args, **kwargs):
-    return self.__funcQ.defer(via(self, func, *args, **kwargs))
+    return self.__funcQ.defer(func, *args, **kwargs)
 
   ###################
   ## Special methods.
