@@ -8,33 +8,9 @@ import os
 from socket import socket, SHUT_WR, SHUT_RD
 from socketserver import TCPServer, ThreadingMixIn, StreamRequestHandler
 from .stream import StreamStore
-from cs.logutils import debug
+from cs.fileutils import OpenSocket
+from cs.logutils import debug, X
 from cs.queues import NestingOpenCloseMixin
-
-class OpenSock(object):
-  ''' A file-like object for stream sockets, which uses os.shutdown on close.
-  '''
-
-  def __init__(self, sock, for_write):
-    self._for_write = for_write
-    self._sock = sock
-    self._fd = os.dup(sock.fileno)
-    self._fp = os.fdopen(self._fd, 'wb' if for_write else 'rb')
-
-  def write(self, data):
-    return self._fp.write(data)
-
-  def read(self, size=None):
-    return self._fp.read(size)
-
-  def flush(self):
-    self._fp.flush()
-
-  def close(self):
-    if self._for_write:
-      os.shutdown(self._sock, os.SHUT_WR)
-    else:
-      os.shutdown(self._sock, os.SHUT_RD)
 
 class TCPStoreServer(ThreadingMixIn, TCPServer, NestingOpenCloseMixin):
   ''' A threading TCPServer that accepts connections by TCPStoreClients.
