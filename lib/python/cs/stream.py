@@ -7,6 +7,7 @@
 from collections import namedtuple
 from threading import Thread, Lock
 from cs.asynchron import Result
+from cs.excutils import logexc
 from cs.later import Later
 from cs.logutils import Pfx, warning, error, X
 from cs.queues import IterableQueue
@@ -168,12 +169,12 @@ class PacketConnection(object):
       self._respond(channel, tag, result_flags, result_payload)
     self._channel_requests[channel].remove(tag)
 
+  @logexc
   def _receive(self):
     ''' Receive packets from upstream, decode into requests and responses.
     '''
     fp = self._recv_fp
     while True:
-      packet = None
       try:
         packet = read_Packet(fp)
       except EOFError:
@@ -241,6 +242,7 @@ class PacketConnection(object):
       self._sendQ.close()
     self._recv_fp.close()
 
+  @logexc
   def _send(self):
     ''' Send packets upstream.
         Write every packet directly to self._send_fp.
