@@ -58,10 +58,14 @@ class CacheStore(BasicStoreSync):
     return self.backend[h]
 
   def add(self, data):
+    ''' Add the data to the local cache and queue a task to add to the backend.
+    '''
     h = self.cache.add(data)
-    h2 = self.backend.add(data)
-    if h != h2:
-      raise RuntimeError("hash mismatch: h=%r, h2=%r, data=%r" % (h, h2, data))
+    def add_backend():
+      h2 = self.backend.add(data)
+      if h != h2:
+        raise RuntimeError("hash mismatch: h=%r, h2=%r, data=%r" % (h, h2, data))
+    self._defer(add_backend)
     return h
 
   def prefetch(self, hs):
