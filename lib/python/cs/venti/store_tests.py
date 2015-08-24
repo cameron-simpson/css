@@ -7,6 +7,7 @@
 import random
 import sys
 import unittest
+from cs.excutils import logexc
 from cs.logutils import X
 from cs.randutils import rand0, randblock
 from .store import MappingStore
@@ -22,16 +23,20 @@ class _TestStore(unittest.TestCase):
   def tearDown(self):
     self.S.close()
 
-  def test01empty(self):
+  def test00empty(self):
     S = self.S
     if hasattr(S, '__len__'):
       self.assertEqual(len(S), 0)
     else:
-      X("SKIP test of len(S): no __len__ in %s", type(S))
+      raise unittest.SkipTest("no __len__ in %s" % (type(S),))
+
+  def test01add_new_block(self):
+    S = self.S
     size = random.randint(127, 16384)
     data = randblock(size)
     h = S.hash(data)
-    self.assertFalse(S.contains(h))
+    ok = S.contains(h)
+    self.assertFalse(ok)
     self.assertNotIn(h, S)
 
   def test02add_get(self):
