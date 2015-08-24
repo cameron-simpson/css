@@ -20,7 +20,7 @@ class CacheStore(BasicStoreSync):
       asynchronously to the backend.
   '''
   def __init__(self, backend, cache):
-    BasicStore.__init__(self, "Cache(cache=%s, backend=%s)" % (cache, backend))
+    BasicStoreSync.__init__(self, "Cache(cache=%s, backend=%s)" % (cache, backend))
     backend.open()
     self.backend = backend
     cache.open()
@@ -87,7 +87,7 @@ class MemoryCacheStore(BasicStoreSync):
       all chunks in memory.
   '''
   def __init__(self, maxchunks=1024):
-    BasicStore.__init__(self, "MemoryCacheStore")
+    BasicStoreSync.__init__(self, "MemoryCacheStore")
     # TODO: fails if maxchunks == 0
     assert maxchunks > 0
     self.hashlist = [None for _ in range(maxchunks)]
