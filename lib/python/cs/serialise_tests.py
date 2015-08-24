@@ -1,26 +1,31 @@
 #!/usr/bin/python
 #
-# Self tests for cs.seq.
+# Self tests for cs.serialise.
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
 from __future__ import absolute_import
-import random
 import sys
 import unittest
 from io import BytesIO
+from cs.randutils import rand0, randblock
 from cs.serialise import get_bs, read_bs, put_bs, \
                          get_bsdata, read_bsdata, put_bsdata, \
                          Packet, get_Packet
 from cs.py3 import bytes
 
-def randblock(size):
-  ''' Generate a pseudorandom chunk of bytes of the specified size.
-  '''
-  chunk = bytes( random.randint(0, 255) for x in range(size) )
-  if type(chunk) is not bytes:
-    raise RuntimeError("BANG2")
-  return chunk
+def randPacket(channel=None, tag=None, is_request=None, flags=None, size=None):
+  if channel is None:
+    channel = rand0(16384)
+  if tag is None:
+    tag = rand0(16384)
+  if is_request is None:
+    is_request = True if rand0(1) else False
+  if flags is None:
+    flags = rand0(65536)
+  if size is None:
+    size = rand0(16384)
+  return Packet(channel, tag, is_request, flags, randblock(size))
 
 if sys.hexversion >= 0x03000000:
   MyBytesIO = BytesIO
@@ -87,6 +92,12 @@ class TestSerialise(unittest.TestCase):
         raise RuntimeError("type(chunk)=%s" % (type(chunk),))
       self._test_roundtrip_bsdata(chunk)
 
+  def _test_roundtrip_Packet(self, P):
+    data = P.serialise()
+    P2, offset = get_Packet(data)
+    self.assertEqual(offset, len(data), "get_Packet(P.serialise(%s)): %d unparsed bytes: %r" % (P, len(data) - offset, data[offset:]))
+    self.assertEqual(P, P2, "get_Packet(P.serialise(%s)) round trip fails" % (P,))
+
   def test02Packet(self):
     ok = True
     for channel in 0, 1, 5, 3021:
@@ -96,10 +107,23 @@ class TestSerialise(unittest.TestCase):
             for payload_length in 0, 1, 255, 127, 131, 1023:
               payload = randblock(payload_length)
               P = Packet(channel=channel, tag=tag, is_request=is_request, flags=flags, payload=payload)
-              data = P.serialise()
-              P2, offset = get_Packet(data)
-              self.assertEqual(offset, len(data), "get_Packet(P.serialise(%s)): %d unparsed bytes: %r" % (P, len(data) - offset, data[offset:]))
-              self.assertEqual(P, P2, "get_Packet(P.serialise(%s)) round trip fails" % (P,))
+              self._test_roundtrip_Packet(P)
+    # now test some randomly generated packets
+    random_packets = []
+    for _ in range(16):
+      P = randPacket()
+      self._test_roundtrip_Packet(randPacket())
+      random_packets.append(P)
+    # now assemble the Packets into a buffer then reextract
+    buffer = bytes()
+    for P in random_packets:
+      buffer += P.serialise()
+    offset = 0
+    for i, P in enumerate(random_packets):
+      offset0 = offset
+      P2, offset = get_Packet(buffer, offset)
+      self.assertEqual(offset-offset0, len(P.serialise()))
+      self.assertEqual(P, P2)
 
 def selftest(argv):
   unittest.main(__name__, None, argv)

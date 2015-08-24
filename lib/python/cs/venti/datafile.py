@@ -21,6 +21,9 @@ from .hash import DEFAULT_HASHCLASS
 
 F_COMPRESSED = 0x01
 
+# 100MiB rollover
+DEFAULT_ROLLOVER = 100 * 1024 * 1024
+
 class DataFlags(int):
   ''' Subclass of int to label stuff nicely.
   '''
@@ -152,7 +155,9 @@ class _DataDir(NestingOpenCloseMixin):
   def __init__(self, dirpath, rollover=None):
     ''' Initialise this DataDir with the directory path `dirpath` and the optional DataFile rollover size `rollover`.
     '''
-    if rollover is not None and rollover < 1024:
+    if rollover is None:
+      rollover = DEFAULT_ROLLOVER
+    elif rollover < 1024:
       raise ValueError("rollover < 1024 (a more normal size would be in megabytes or gigabytes): %r" % (rollover,))
     self._lock = RLock()
     NestingOpenCloseMixin.__init__(self)

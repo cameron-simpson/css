@@ -77,7 +77,10 @@ def read_bs(fp):
   n = 0
   b = 0x80
   while b & 0x80:
-    b = readbytes(fp, 1)[0]
+    bs = readbytes(fp, 1)
+    if not bs:
+      raise EOFError("%s: end of input" % (fp,))
+    b = bs[0]
     n = (n<<7) | (b&0x7f)
   return n
 
@@ -118,9 +121,13 @@ def read_bsdata(fp):
   '''
   length = read_bs(fp)
   data = readbytes(fp, length)
-  if len(data) != length:
-    raise ValueError('short read, expected %d bytes, got %d' % (length, len(data)))
-  return data
+  if len(data) == length:
+    return data
+  if len(data) < length:
+    raise EOFError('%s: short read, expected %d bytes, got %d'
+                   % (fp, length, len(data)))
+  raise RuntimeError('%s: extra data: asked for %d bytes, received %d bytes!'
+                     % (fp, length, len(data)))
 
 @returns_bytes
 def put_bsdata(data):
@@ -137,6 +144,12 @@ class Packet(_Packet):
   ''' A general purpose packet to wrap a multiplexable protocol.
   '''
 
+  def __str__(self):
+    return ( "Packet(channel=%s,tag=%s,is_request=%s,flags=0x%02x,payload=[%d]%r)"
+           % ( self.channel, self.tag, self.is_request, self.flags,
+               len(self.payload), self.payload[:16]
+             )
+           )
   def serialise(self):
     ''' Binary transcription of this packet.
         Format:
@@ -171,13 +184,19 @@ def read_Packet(fp):
     raise ValueError("extra data in packet after offset=%d" % (offset,))
   return P
 
+def write_Packet(fp, P):
+  ''' Write a Packet to a binary stream.
+      Note: does not flush the stream.
+  '''
+  fp.write(put_bsdata(P.serialise()))
+
 def get_Packet(data, offset=0):
   ''' Parse a Packet from the binary data `packet` at position `offset`.
       Return the Packet and the new offset.
   '''
   ##is_bytes(data)
   # collect packet from data chunk
-  packet, offset0 = get_bsdata(data)
+  packet, offset0 = get_bsdata(data, offset)
   ##is_bytes(packet)
   # now decode packet
   tag, offset = get_bs(packet)

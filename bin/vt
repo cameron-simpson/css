@@ -444,8 +444,9 @@ def cmd_listen(args, verbose=None, log=None):
   arg = args[0]
   if arg == '-':
     from cs.venti.stream import StreamDaemon
-    daemon = StreamDaemon(S, sys.stdin, sys.stdout)
-    daemon.join()
+    RS = StreamStore("%s listen -" % (cmd,), sys.stdin, sys.stdout,
+                     local_store=S)
+    RS.join()
   else:
     cpos = arg.rfind(':')
     if cpos >= 0:

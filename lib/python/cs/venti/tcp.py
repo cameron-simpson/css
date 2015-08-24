@@ -7,15 +7,17 @@
 import os
 from socket import socket, SHUT_WR, SHUT_RD
 from socketserver import TCPServer, ThreadingMixIn, StreamRequestHandler
-from .stream import StreamDaemon, StreamStore
-from cs.logutils import debug
+from .stream import StreamStore
+from cs.fileutils import OpenSocket
+from cs.logutils import debug, X
 from cs.queues import NestingOpenCloseMixin
 
-class Server(ThreadingMixIn, TCPServer, NestingOpenCloseMixin):
-  ''' A threading TCPServer that accepts connections by StreamStore clients.
+class TCPStoreServer(ThreadingMixIn, TCPServer, NestingOpenCloseMixin):
+  ''' A threading TCPServer that accepts connections by TCPStoreClients.
   '''
-  def __init__(self, bindaddr, S):
-    ThreadingTCPServer.__init__(self, bindaddr, _RequestHandler)
+
+  def __init__(self, bind_addr, S):
+    TCPServer.__init__(self, bind_addr, _RequestHandler)
     S.open()
     self.S = S
 
@@ -23,29 +25,33 @@ class Server(ThreadingMixIn, TCPServer, NestingOpenCloseMixin):
     self.S.close()
 
 class _RequestHandler(StreamRequestHandler):
+
   def __init__(self, request, client_address, server):
     self.S = server.S
     StreamRequestHandler.__init__(self, request, client_address, server)
 
   def handle(self):
-    SD = StreamDaemon(self.S, self.rfile, self.wfile)
-    SD.start()
-    debug("tcp.handle: waiting for StreamDaemon.resultsThread")
-    SD.join()
-    debug("tcp.handle: waited for StreamDaemon.resultsThread")
-    self.rfile.close()
-    self.wfile.close()
-    debug("tcp.handle: closed connections to client")
+    RS = StreamStore(str(self.S),
+                     OpenSocket(self.request, False),
+                     OpenSocket(self.request, True),
+                     local_store=self.S,
+                    )
+    RS.join()
+    RS.shutdown()
 
-class TCPStore(StreamStore):
-  ''' A Store attached to a StreamDaemon served on the specified 'bindaddr'.
+class TCPStoreClient(StreamStore):
+  ''' A Store attached to a remote Store at `bind_addr`.
   '''
-  def __init__(self, bindaddr):
+
+  def __init__(self, bind_addr):
     self.sock = socket()
-    self.sock.connect(bindaddr)
-    self.fd = self.sock.fileno()
-    self.fd2 = os.dup(self.fd)
+    self.sock.connect(bind_addr)
     StreamStore.__init__(self,
-                         "TCPStore(%s)"%(bindaddr,),
-                         os.fdopen(self.fd, 'wb'),
-                         os.fdopen(self.fd2, 'rb'))
+                         "TCPStore(%s)" % (bind_addr,),
+                         OpenSocket(self.sock, False),
+                         OpenSocket(self.sock, True),
+                        )
+
+  def shutdown(self):
+    StreamStore.shutdown(self)
+    self.sock.close()

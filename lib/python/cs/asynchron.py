@@ -135,6 +135,18 @@ class Asynchron(O):
   def exc_info(self, exc_info):
     self._complete(None, exc_info)
 
+  def raise_(self, exception=None):
+    ''' Convenience wrapper for self.exc_info to store an exception result `exception`.
+        If exception is omitted or None, use sys.exc_info().
+    '''
+    if exception is None:
+      self.exc_info = sys.exc_info()
+    else:
+      try:
+        raise exception
+      except:
+        self.exc_info = sys.exc_info()
+
   def call(self, func, *a, **kw):
     ''' Have the Asynchron call `func(*a,**kw)` and store its values as
         self.result.
@@ -143,7 +155,7 @@ class Asynchron(O):
     try:
       r = func(*a, **kw)
     except Exception:
-      self.exc_info = sys.exc_info
+      self.exc_info = sys.exc_info()
     else:
       self.result = r
 
