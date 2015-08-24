@@ -17,7 +17,7 @@ class TCPStoreServer(ThreadingMixIn, TCPServer, NestingOpenCloseMixin):
   '''
 
   def __init__(self, bind_addr, S):
-    ThreadingTCPServer.__init__(self, bind_addr, _RequestHandler)
+    TCPServer.__init__(self, bind_addr, _RequestHandler)
     S.open()
     self.S = S
 
@@ -32,8 +32,8 @@ class _RequestHandler(StreamRequestHandler):
 
   def handle(self):
     RS = StreamStore(str(self.S),
-                     OpenSock(self.request, False),
-                     OpenSock(self.request, True),
+                     OpenSocket(self.request, False),
+                     OpenSocket(self.request, True),
                      local_store=self.S,
                     )
     RS.join()
@@ -48,8 +48,8 @@ class TCPStoreClient(StreamStore):
     self.sock.connect(bind_addr)
     StreamStore.__init__(self,
                          "TCPStore(%s)" % (bind_addr,),
-                         OpenSock(self.sock, False),
-                         OpenSock(self.sock, True),
+                         OpenSocket(self.sock, False),
+                         OpenSocket(self.sock, True),
                         )
 
   def shutdown(self):
