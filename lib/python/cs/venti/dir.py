@@ -547,3 +547,7 @@ class Dir(_Dirent):
       E = subE
 
     return E
+
+if __name__ == '__main__':
+  import cs.venti.dir_tests
+  cs.venti.dir_tests.selftest(sys.argv)
