@@ -105,6 +105,13 @@ class _Dirent(object):
   def __repr__(self):
     return "_Dirent(%s, %s, %s)" % (D_type2str, self.name, self.meta)
 
+  def __eq__(self, other):
+    return ( self.name == other.name
+         and self.type == other.type
+         and self.meta == other.meta
+         and self.block.hashcode == other.block.hashcode
+           )
+
   @property
   def isfile(self):
     ''' Is this a file _Dirent?
