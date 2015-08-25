@@ -18,11 +18,6 @@ from .hash import DEFAULT_HASHCLASS
 # arbitrary limit
 MAX_BLOCK_SIZE = 16383
 
-def genblock( maxsize=16383):
-  ''' Generate a pseudorandom block of data.
-  '''
-  return os.urandom(random.randint(0, maxsize))
-
 class TestDataFile(unittest.TestCase):
 
   def setUp(self):
