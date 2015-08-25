@@ -16,10 +16,11 @@ DISTINFO = {
 }
 
 import threading
-from threading import Condition
+from threading import Condition, Thread
+import time
 import traceback
 from cs.excutils import logexc
-from cs.logutils import warning, error, PfxCallInfo
+from cs.logutils import debug, warning, error, PfxCallInfo
 from cs.obj import O
 from cs.py.func import callmethod_if as ifmethod
 
@@ -164,11 +165,10 @@ class NestingOpenCloseMixin(O):
   def _ping_mainloop(self):
     ''' Pinger main loop: wait until expiry then close the open proxy.
     '''
-    name = self._keep_open.name
     while self._keep_open_until > time.time():
-      debug("%s: pinger: sleep for another %gs", name, self._keep_open_poll_interval)
+      debug("pinger: sleep for another %gs", self._keep_open_poll_interval)
       time.sleep(self._keep_open_poll_interval)
     self._keep_open = False
     self._keep_open_until = None
-    debug("%s: pinger: close()", name)
+    debug("pinger: close()")
     self.close()
