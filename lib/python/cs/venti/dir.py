@@ -417,6 +417,7 @@ class Dir(_Dirent):
                      for name in names
                      if name != '.' and name != '..'
                    )
+    # TODO: if len(data) >= 16384
     return Block(data=data)
 
   def dirs(self):
@@ -460,12 +461,13 @@ class Dir(_Dirent):
   def __setitem__(self, name, E):
     ''' Store a _Dirent in the specified name slot.
     '''
-    X("<%s>[%s]=%s" % (self.name, name, E))
     if not self._validname(name):
       raise KeyError("invalid name: %s" % (name,))
     if not isinstance(E, _Dirent):
       raise ValueError("E is not a _Dirent: <%s>%r" % (type(E), E))
     self.entries[name] = E
+    if E.isdir and E.parent is None:
+      E.parent = D
 
   def __delitem__(self, name):
     if not self._validname(name):
@@ -473,6 +475,15 @@ class Dir(_Dirent):
     if name == '.' or name == '..':
       raise KeyError("refusing to delete . or ..: name=%s" % (name,))
     del self.entries[name]
+
+  def add(self, E):
+    ''' Add a Dirent to this Dir.
+        If the name is already taken, raise KeyError.
+    '''
+    name = E.name
+    if name in self:
+      raise KeyError("name already exists: %r", name)
+    self[name] = E
 
   def rename(self, oldname, newname):
     ''' Rename entry `oldname` to entry `newname`.
