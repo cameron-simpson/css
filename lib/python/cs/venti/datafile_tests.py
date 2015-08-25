@@ -11,8 +11,12 @@ import shutil
 import tempfile
 import unittest
 from cs.logutils import D, X
+from cs.randutils import rand0, randblock
 from .datafile import DataFile, DataDir
 from .hash import DEFAULT_HASHCLASS
+
+# arbitrary limit
+MAX_BLOCK_SIZE = 16383
 
 def genblock( maxsize=16383):
   ''' Generate a pseudorandom block of data.
@@ -38,12 +42,12 @@ class TestDataFile(unittest.TestCase):
     ''' Save a single block.
     '''
     with self.datafile:
-      self.datafile.savedata(genblock())
+      self.datafile.savedata(randblock(rand0(MAX_BLOCK_SIZE)))
 
   def test01fetch1(self):
     ''' Save and the retrieve a single block.
     '''
-    data = genblock()
+    data = randblock(rand0(MAX_BLOCK_SIZE))
     with self.datafile:
       self.datafile.savedata(data)
     data2 = self.datafile.readdata(0)
@@ -55,7 +59,7 @@ class TestDataFile(unittest.TestCase):
     blocks = {}
     with self.datafile:
       for _ in range(100):
-        data = genblock()
+        data = randblock(rand0(MAX_BLOCK_SIZE))
         offset = self.datafile.savedata(data)
         blocks[offset] = data
     offsets = list(blocks.keys())
@@ -99,7 +103,7 @@ class TestDataDir(unittest.TestCase):
     by_data = {}
     # store 100 random blocks
     for _ in range(1000):
-      data = genblock()
+      data = randblock(rand0(MAX_BLOCK_SIZE))
       if data in by_data:
         X("repeated random block, skipping")
         continue
