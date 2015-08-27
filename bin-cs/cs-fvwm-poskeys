@@ -5,7 +5,7 @@
 #
 
 from cs.logutils import info, setup_logging
-from cs.obj import DictUC_Attrs as UC_
+from cs.mixin.ucattrs import UCdict
 
 setup_logging()
 
@@ -126,12 +126,12 @@ rightmon=[]
 ox=0
 slicenum=0
 for sx in slices:
-  mon=UC_({X: ox, DX: sx})
+  mon=UCdict({X: ox, DX: sx})
   setenv("X11_MONITOR%d_X" % slicenum, ox)
   setenv("X11_MONITOR%d_DX" % slicenum, sx)
   mslots=[]
   for wx, px in slice(sx):
-    geom=UC_({X: ox+px, DX: wx})
+    geom=UCdict({X: ox+px, DX: wx})
     mslots.append(geom)
   mon.SLOTS=mslots
 
