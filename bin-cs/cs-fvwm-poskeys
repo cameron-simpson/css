@@ -4,8 +4,12 @@
 #       - Cameron Simpson <cs@zip.com.au> 20oct2007
 #
 
+import os
+import sys
 from cs.logutils import info, setup_logging
 from cs.mixin.ucattrs import UCdict
+import cs.sh
+import cs.x11
 
 setup_logging()
 
@@ -16,10 +20,6 @@ LEFTSLOTS='LEFTSLOTS'
 RIGHTSLOTS='RIGHTSLOTS'
 LEFTWIDTH='LEFTWIDTH'
 RIGHTWIDTH='RIGHTWIDTH'
-import cs.x11
-import cs.sh
-import os
-import sys
 
 usage="Usage: %s"
 
