@@ -52,7 +52,6 @@ class DataFile(object):
   '''
 
   def __init__(self, pathname):
-    X("DataFile.__init__(pathname=%r)", pathname)
     self._lock = RLock()
     self.pathname = pathname
     self.fp = open(self.pathname, "a+b")
@@ -155,7 +154,6 @@ class _DataDir(NestingOpenCloseMixin):
         Close and release any open indices.
         Close any open datafiles.
     '''
-    X("shutdown(%s)", self)
     with self._lock:
       for hashname in self._indices:
         I = self._indices[hashname]
