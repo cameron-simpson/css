@@ -17,6 +17,7 @@ from .hash import DEFAULT_HASHCLASS
 
 # arbitrary limit
 MAX_BLOCK_SIZE = 16383
+RUN_SIZE = 100  # 1000
 
 class TestDataFile(unittest.TestCase):
 
@@ -36,15 +37,13 @@ class TestDataFile(unittest.TestCase):
   def test00store1(self):
     ''' Save a single block.
     '''
-    with self.datafile:
-      self.datafile.savedata(randblock(rand0(MAX_BLOCK_SIZE)))
+    self.datafile.savedata(randblock(rand0(MAX_BLOCK_SIZE)))
 
   def test01fetch1(self):
     ''' Save and the retrieve a single block.
     '''
     data = randblock(rand0(MAX_BLOCK_SIZE))
-    with self.datafile:
-      self.datafile.savedata(data)
+    self.datafile.savedata(data)
     data2 = self.datafile.readdata(0)
     self.assertEqual(data, data2)
 
@@ -52,17 +51,15 @@ class TestDataFile(unittest.TestCase):
     ''' Save 100 random blocks, close, retrieve in random order.
     '''
     blocks = {}
-    with self.datafile:
-      for _ in range(100):
-        data = randblock(rand0(MAX_BLOCK_SIZE))
-        offset = self.datafile.savedata(data)
-        blocks[offset] = data
+    for _ in range(100):
+      data = randblock(rand0(MAX_BLOCK_SIZE))
+      offset = self.datafile.savedata(data)
+      blocks[offset] = data
     offsets = list(blocks.keys())
     random.shuffle(offsets)
-    with self.datafile:
-      for offset in offsets:
-        data = self.datafile.readdata(offset)
-        self.assertTrue(data == blocks[offset])
+    for offset in offsets:
+      data = self.datafile.readdata(offset)
+      self.assertTrue(data == blocks[offset])
 
 class TestDataDir(unittest.TestCase):
 
@@ -89,7 +86,7 @@ class TestDataDir(unittest.TestCase):
       self.assertEqual(rand_offset, offset)
 
   def test001randomblocks(self):
-    ''' Save 1000 random blocks, retrieve in random order.
+    ''' Save random blocks, retrieve in random order.
     '''
     hashclass = DEFAULT_HASHCLASS
     hashfunc = hashclass.from_data
@@ -97,7 +94,8 @@ class TestDataDir(unittest.TestCase):
     by_hash = {}
     by_data = {}
     # store 100 random blocks
-    for _ in range(1000):
+    for _ in range(RUN_SIZE):
+      X("test001randomblocks: block %d", _)
       data = randblock(rand0(MAX_BLOCK_SIZE))
       if data in by_data:
         X("repeated random block, skipping")
@@ -115,6 +113,7 @@ class TestDataDir(unittest.TestCase):
       self.assertTrue(hashcode in by_hash)
       self.assertTrue(data in by_data)
       self.assertTrue(hashcode in D)
+    X("store complete, now retrieve")
     # now retrieve in random order
     hashcodes = list(by_hash.keys())
     random.shuffle(hashcodes)
