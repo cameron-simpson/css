@@ -125,7 +125,6 @@ class DataFile(object):
       fp.write(put_bs(flags))
       fp.write(put_bsdata(data))
       fp.flush()    # surprised this is needed; not needed with C stdio
-    self.ping()
     return offset
 
   @locked
@@ -286,7 +285,7 @@ class _DataDir(NestingOpenCloseMixin):
     with self._lock:
       D = datafiles.get(n)
       if D is None:
-        D = datafiles[n] = DataFile(self.pathto(self.datafilename(n))).open()
+        D = datafiles[n] = DataFile(self.pathto(self.datafilename(n)))
     return D
 
   def _remove_open(self, key, value):
