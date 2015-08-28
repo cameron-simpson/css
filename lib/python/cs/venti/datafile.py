@@ -15,7 +15,7 @@ from cs.cache import LRU_Cache
 from cs.logutils import D, X, debug
 from cs.obj import O
 from cs.queues import NestingOpenCloseMixin
-from cs.serialise import get_bs, put_bs, read_bs
+from cs.serialise import get_bs, put_bs, read_bs, put_bsdata, read_bsdata
 from cs.threads import locked, locked_property
 from .hash import DEFAULT_HASHCLASS
 
@@ -48,6 +48,7 @@ class DataFlags(int):
 
 class DataFile(NestingOpenCloseMixin):
   ''' A cs.venti data file, storing data chunks in compressed form.
+      This is the usual persistence layer of a local venti Store.
   '''
 
   def __init__(self, pathname):
@@ -113,12 +114,7 @@ class DataFile(NestingOpenCloseMixin):
     if (flags & ~F_COMPRESSED) != 0:
       raise ValueError("flags other than F_COMPRESSED: 0x%02x" % ((flags & ~F_COMPRESSED),))
     flags = DataFlags(flags)
-    dsize = read_bs(fp)
-    if dsize == 0:
-      data = b''
-    else:
-      data = fp.read(dsize)
-    assert len(data) == dsize
+    data = read_bsdata(fp)
     return flags, data
 
   def savedata(self, data, noCompress=False):
@@ -135,8 +131,7 @@ class DataFile(NestingOpenCloseMixin):
       fp.seek(0, SEEK_END)
       offset = fp.tell()
       fp.write(put_bs(flags))
-      fp.write(put_bs(len(data)))
-      fp.write(data)
+      fp.write(put_bsdata(data))
       fp.flush()    # surprised this is needed; not needed with C stdio
     self.ping()
     return offset
