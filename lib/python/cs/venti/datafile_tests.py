@@ -29,6 +29,7 @@ class TestDataFile(unittest.TestCase):
     self.datafile = DataFile(pathname)
 
   def tearDown(self):
+    self.datafile.close()
     os.remove(self.pathname)
 
   # TODO: tests:
@@ -72,7 +73,6 @@ class TestDataDir(unittest.TestCase):
 
   def tearDown(self):
     self.datadir_open.close()
-    os.system("ls -la %s" % self.pathname)
     shutil.rmtree(self.pathname)
 
   def test000IndexEntry(self):
@@ -90,12 +90,11 @@ class TestDataDir(unittest.TestCase):
     '''
     hashclass = DEFAULT_HASHCLASS
     hashfunc = hashclass.from_data
-    D = self.datadir
+    D = self.datadir_open
     by_hash = {}
     by_data = {}
     # store 100 random blocks
     for _ in range(RUN_SIZE):
-      X("test001randomblocks: block %d", _)
       data = randblock(rand0(MAX_BLOCK_SIZE))
       if data in by_data:
         X("repeated random block, skipping")
@@ -113,8 +112,18 @@ class TestDataDir(unittest.TestCase):
       self.assertTrue(hashcode in by_hash)
       self.assertTrue(data in by_data)
       self.assertTrue(hashcode in D)
-    X("store complete, now retrieve")
     # now retrieve in random order
+    hashcodes = list(by_hash.keys())
+    random.shuffle(hashcodes)
+    for hashcode in hashcodes:
+      self.assertTrue(hashcode in by_hash)
+      self.assertTrue(hashcode in D)
+      odata = by_hash[hashcode]
+      data = D[hashcode]
+      self.assertEqual(data, odata)
+    # close datadir, reopen, reretrieve
+    D.close()
+    D = self.datadir_open = DataDir(self.pathname, rollover=200000).open()
     hashcodes = list(by_hash.keys())
     random.shuffle(hashcodes)
     for hashcode in hashcodes:
@@ -125,7 +134,11 @@ class TestDataDir(unittest.TestCase):
       self.assertEqual(data, odata)
 
 def selftest(argv):
-  unittest.main(__name__, None, argv)
+  if False:
+    import cProfile
+    cProfile.runctx('unittest.main(__name__, None, argv)', globals(), locals())
+  else:
+    unittest.main(__name__, None, argv)
 
 if __name__ == '__main__':
   selftest(sys.argv)
