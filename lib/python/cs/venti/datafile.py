@@ -52,6 +52,7 @@ class DataFile(object):
   '''
 
   def __init__(self, pathname):
+    X("DataFile.__init__(pathname=%r)", pathname)
     self._lock = RLock()
     self.pathname = pathname
     self.fp = open(self.pathname, "a+b")
@@ -73,7 +74,9 @@ class DataFile(object):
       offset = 0
       while True:
         with self._lock:
-          fp.seek(offset)
+          if fp.tell() != offset:
+            fp.flush()
+            fp.seek(offset)
           flags, data = self._readhere(fp)
           offset = fp.tell()
         if flags is None:
@@ -124,13 +127,7 @@ class DataFile(object):
       offset = fp.tell()
       fp.write(put_bs(flags))
       fp.write(put_bsdata(data))
-      fp.flush()    # surprised this is needed; not needed with C stdio
     return offset
-
-  @locked
-  def flush(self):
-    if self.fp:
-      self.fp.flush()
 
 class _DataDir(NestingOpenCloseMixin):
   ''' A mapping of hash->Block that manages a directory of DataFiles.
