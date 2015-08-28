@@ -16,7 +16,7 @@ DISTINFO = {
 }
 
 import threading
-from threading import Condition, Thread
+from threading import Condition
 import time
 import traceback
 from cs.excutils import logexc
@@ -61,10 +61,6 @@ class NestingOpenCloseMixin(O):
     self.opened = False
     self._opens = 0
     ##self.closed = False # final _close() not yet called
-    self._keep_open = None
-    self._keep_open_until = None
-    self._keep_open_poll_interval = 0.5
-    self._keep_open_increment = 1.0
     self._finalise_later= finalise_later
     self._finalise = Condition(self._lock)
 
@@ -115,8 +111,8 @@ class NestingOpenCloseMixin(O):
 
   def finalise(self):
     ''' Finalise the object, releasing all callers of .join().
-	Normally this is called automatically after .shutdown unless
-	`finalise_later` was set to true during initialisation.
+        Normally this is called automatically after .shutdown unless
+        `finalise_later` was set to true during initialisation.
     '''
     with self._lock:
       if self._finalise:
@@ -148,27 +144,3 @@ class NestingOpenCloseMixin(O):
       self._finalise.wait()
     else:
       self._lock.release()
-
-  def ping(self):
-    ''' Mark this object as "busy"; it will be kept open a little longer in case of more use.
-    '''
-    T = None
-    with self._lock:
-      if not self._keep_open:
-        self._keep_open = True
-        name = "%s._ping_mainloop" % (self,)
-        T = Thread(name=name, target=self._ping_mainloop)
-    self._keep_open_until = time.time() + self._keep_open_increment
-    if T:
-      T.start()
-
-  def _ping_mainloop(self):
-    ''' Pinger main loop: wait until expiry then close the open proxy.
-    '''
-    while self._keep_open_until > time.time():
-      debug("pinger: sleep for another %gs", self._keep_open_poll_interval)
-      time.sleep(self._keep_open_poll_interval)
-    self._keep_open = False
-    self._keep_open_until = None
-    debug("pinger: close()")
-    self.close()
