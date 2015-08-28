@@ -158,7 +158,7 @@ class _DataDir(NestingOpenCloseMixin):
     NestingOpenCloseMixin.__init__(self)
     self.dirpath = dirpath
     self._rollover = rollover
-    self._open = LRU_Cache(maxsize=4, on_remove=self._remove_open)
+    self._datafile_cache = LRU_Cache(maxsize=4, on_remove=self._remove_open)
     self._indices = {}
     self._n = None
 
@@ -174,7 +174,7 @@ class _DataDir(NestingOpenCloseMixin):
         I.sync()
         I.close()
       self._indices = {}
-      self._open.flush()
+      self._datafile_cache.flush()
 
   def _openIndex(self, hashname):
     ''' Subclasses must implement the _openIndex method, which returns a
@@ -282,7 +282,7 @@ class _DataDir(NestingOpenCloseMixin):
 
   @locked
   def flush(self):
-    for datafile in self._open.values():
+    for datafile in self._datafile_cache.values():
       datafile.flush()
     for index in self._indices.values():
       index.flush()
@@ -290,7 +290,7 @@ class _DataDir(NestingOpenCloseMixin):
   def datafile(self, n):
     ''' Obtain the Datafile with index `n`.
     '''
-    datafiles = self._open
+    datafiles = self._datafile_cache
     with self._lock:
       D = datafiles.get(n)
       if D is None:
