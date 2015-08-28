@@ -46,26 +46,20 @@ class DataFlags(int):
   def compressed(self):
     return self & F_COMPRESSED
 
-class DataFile(NestingOpenCloseMixin):
+class DataFile(object):
   ''' A cs.venti data file, storing data chunks in compressed form.
       This is the usual persistence layer of a local venti Store.
   '''
 
   def __init__(self, pathname):
     self._lock = RLock()
-    NestingOpenCloseMixin.__init__(self)
     self.pathname = pathname
-    self.fp = None
+    self.fp = open(self.pathname, "a+b")
 
   def __str__(self):
     return "DataFile(%s)" % (self.pathname,)
 
-  def on_open(self, count):
-    if count == 1:
-      debug("open %s: first open, open file", self)
-      self.fp = open(self.pathname, "a+b")
-
-  def shutdown(self):
+  def close(self):
     self.fp.close()
     self.fp = None
 
@@ -80,7 +74,7 @@ class DataFile(NestingOpenCloseMixin):
       while True:
         with self._lock:
           fp.seek(offset)
-          flags, data = self._readRawDataHere(fp)
+          flags, data = self._readhere(fp)
           offset = fp.tell()
         if flags is None:
           break
@@ -109,8 +103,6 @@ class DataFile(NestingOpenCloseMixin):
         Presumes the ._lock is already taken.
     '''
     flags = read_bs(fp)
-    if flags is None:
-      return None, None
     if (flags & ~F_COMPRESSED) != 0:
       raise ValueError("flags other than F_COMPRESSED: 0x%02x" % ((flags & ~F_COMPRESSED),))
     flags = DataFlags(flags)
