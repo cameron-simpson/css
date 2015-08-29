@@ -48,7 +48,7 @@ class NestingOpenCloseMixin(O):
 
   def __init__(self, finalise_later=False):
     ''' Initialise the NestingOpenCloseMixin state.
-        Then takes makes use of the following methods if present:
+        This makes use of the following methods if present:
           `self.on_open(count)`: called on open with the post-increment open count
           `self.on_close(count)`: called on close with the pre-decrement open count
         `finalise_later`: do not notify the finalisation Condition on
@@ -144,3 +144,19 @@ class NestingOpenCloseMixin(O):
       self._finalise.wait()
     else:
       self._lock.release()
+
+class MultiOpen(NestingOpenCloseMixin):
+  ''' Context manager class that manages a single open/close object using a NestingOpenCloseMixin.
+  '''
+
+  def __init__(self, openable, finalise_later=False):
+    NestingOpenCloseMixin.__init__(self, finalise_later=finalise_later)
+    self.openable = openable
+
+  def on_open(self, count):
+    if count == 1:
+      self.openable.open()
+
+  def on_close(self, count):
+    if count == 1:
+      self.openable.close()
