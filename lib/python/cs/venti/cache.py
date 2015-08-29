@@ -32,7 +32,7 @@ class CacheStore(BasicStoreSync):
   def shutdown(self):
     self.cache.shutdown()
     self.backend.shutdown()
-    BasicStore.shutdown(self)
+    BasicStoreSync.shutdown(self)
 
   def flush(self):
     self.cache.flush()
