@@ -456,7 +456,7 @@ def cmd_listen(args, verbose=None, log=None):
         host = '127.0.0.1'
       port = int(port)
       import cs.venti.tcp
-      with cs.venti.tcp.Server((host, port), S) as srv:
+      with cs.venti.tcp.TCPStoreServer((host, port), defaults.S) as srv:
         srv.serve_forever()
     else:
       raise GetoptError("invalid listen argument, I expect \"-\" or \"[host]:port\", got \"%s\"" % (arg,))
@@ -565,7 +565,7 @@ def cmd_scan(args, verbose=None, log=None):
   from cs.venti.hash import Hash_SHA1
   with Pfx(datafile):
     dfp = DataFile(datafile)
-    for offset, flags, data in dfp.scanData():
+    for offset, flags, data in dfp.scan():
       print(Hash_SHA1.fromData(data), offset, flags, len(data))
     dfp.close()
   return 0
