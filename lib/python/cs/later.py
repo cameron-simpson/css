@@ -503,6 +503,9 @@ class Later(MultiOpenMixin):
     '''
     return self.defer(func, *a, **kw)()
 
+  def startup(self):
+    pass
+
   def shutdown(self):
     ''' Shut down the Later instance:
         - close the TimerQueue, if any, and wait for it to complete
@@ -649,7 +652,7 @@ class Later(MultiOpenMixin):
 
   def __del__(self):
     if not self.closed:
-      self._close()
+      self.shutdown()
 
   def _dispatcher(self):
     ''' Read LateFunctions from the inbound queue as capacity is available
