@@ -69,6 +69,9 @@ class _QueueIterator(MultiOpenMixin):
     '''
     return self.q.put(item, *args, **kw)
 
+  def startup(self):
+    pass
+
   def shutdown(self):
     ''' Support method for MultiOpenMixin.shutdown.
         Queue the sentinel object so that calls to .get() from .__next__ do not block.
