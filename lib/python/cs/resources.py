@@ -20,7 +20,7 @@ from threading import Condition
 import time
 import traceback
 from cs.excutils import logexc
-from cs.logutils import debug, warning, error, PfxCallInfo
+from cs.logutils import debug, warning, error, PfxCallInfo, X
 from cs.obj import O
 from cs.py.func import callmethod_if as ifmethod
 
