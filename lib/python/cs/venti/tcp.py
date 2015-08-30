@@ -7,6 +7,7 @@
 import os
 from socket import socket, SHUT_WR, SHUT_RD
 from socketserver import TCPServer, ThreadingMixIn, StreamRequestHandler
+from threading import Lock
 from .stream import StreamStore
 from cs.fileutils import OpenSocket
 from cs.logutils import debug, X
@@ -17,9 +18,11 @@ class TCPStoreServer(ThreadingMixIn, TCPServer, NestingOpenCloseMixin):
   '''
 
   def __init__(self, bind_addr, S):
+    self._lock = Lock()
     TCPServer.__init__(self, bind_addr, _RequestHandler)
-    S.open()
+    NestingOpenCloseMixin.__init__(self)
     self.S = S
+    S.open()
 
   def shutdown(self):
     self.S.close()
