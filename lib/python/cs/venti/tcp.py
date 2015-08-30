@@ -22,7 +22,9 @@ class TCPStoreServer(ThreadingMixIn, TCPServer, MultiOpenMixin):
     TCPServer.__init__(self, bind_addr, _RequestHandler)
     MultiOpenMixin.__init__(self)
     self.S = S
-    S.open()
+
+  def startup(self):
+    self.S.open()
 
   def shutdown(self):
     self.S.close()

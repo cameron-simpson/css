@@ -55,6 +55,9 @@ class WorkerThreadPool(MultiOpenMixin, O):
     return "WorkerThreadPool:%s" % (self.name,)
   __repr__ = __str__
 
+  def startup(self):
+    pass
+
   def shutdown(self):
     ''' Shut down the pool.
         Close all the request queues.

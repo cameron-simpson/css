@@ -120,6 +120,9 @@ class _BasicStoreCommon(MultiOpenMixin):
     '''
     raise NotImplementedError
 
+  def startup(self):
+    self.__funcQ.open()
+
   def shutdown(self):
     ''' Called by final MultiOpenMixin.close().
     '''
