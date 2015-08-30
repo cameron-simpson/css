@@ -212,8 +212,8 @@ def main(argv):
           else:
             try:
               S = Store(dflt_vt_store)
-            except:
-              exception("can't open store \"%s\"", dflt_vt_store)
+            except Exception as e:
+              exception("can't open store \"%s\": %s", dflt_vt_store, e)
               badopts = True
             else:
               if dflt_cache is not None:
