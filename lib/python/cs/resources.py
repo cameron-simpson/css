@@ -40,9 +40,8 @@ class MultiOpenMixin(O):
       Use as a context manager calls open()/close() from __enter__() and __exit__().
       Multithread safe.
       This mixin uses the internal attribute _opens and relies on a
-      preexisting attribute _lock for locking.
-      Classes using this mixin need to define .startup and .shutdown,
-      and a mutex of some kind as ._lock (eg Lock or RLock).
+      preexisting attribute _lock for locking, which must be recursive.
+      Classes using this mixin need to define .startup and .shutdown.
   '''
 
   def __init__(self, finalise_later=False):
@@ -57,7 +56,7 @@ class MultiOpenMixin(O):
     self.opened = False
     self._opens = 0
     ##self.closed = False # final _close() not yet called
-    self._finalise_later= finalise_later
+    self._finalise_later = finalise_later
     self._finalise = Condition(self._lock)
 
   def __enter__(self):
