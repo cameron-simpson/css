@@ -31,7 +31,7 @@ from cs.threads import AdjustableSemaphore, \
                        WorkerThreadPool, locked
 from cs.asynchron import Result, Asynchron, ASYNCH_RUNNING, report
 from cs.seq import seq, TrackingCounter
-from cs.logutils import Pfx, PfxCallInfo, error, info, warning, debug, exception, D, OBSOLETE
+from cs.logutils import Pfx, PfxCallInfo, error, info, warning, debug, exception, D, X, OBSOLETE
 
 # function signature designators, used with Later.pipeline()
 FUNC_ONE_TO_MANY = 0
@@ -307,7 +307,7 @@ class _Pipeline(MultiOpenMixin):
     self.name = name
     self.later = L
     self.queues = [outQ]
-    self._lock = Lock()
+    self._lock = RLock()
     MultiOpenMixin.__init__(self)
     # counter tracking items in play
     self._busy = TrackingCounter(name="Pipeline<%s>._items" % (name,))
@@ -524,7 +524,7 @@ class Later(MultiOpenMixin):
       if self._timerQ:
         self._timerQ.close()
         self._timerQ.join()
-      self._pendingq.close()              # prevent further submissions
+      self._pendingq.close()          # prevent further submissions
       self._workers.close()           # wait for all worker threads to complete
       self._dispatchThread.join()     # wait for all functions to be dispatched
       self._finished.acquire()
