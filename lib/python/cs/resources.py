@@ -36,21 +36,17 @@ def not_closed(func):
   return not_closed_wrapper
 
 class MultiOpenMixin(O):
-  ''' A mixin to count open and closes, and to call .shutdown() when the count goes to zero.
-      A count of active open()s is kept, and on the last close()
-      the object's .shutdown() method is called.
-      Use via the with-statement calls open()/close() for __enter__()
-      and __exit__().
+  ''' A mixin to count open and closes, and to call .startup on the first .open and to call .shutdown on the last .close.
+      Use as a context manager calls open()/close() from __enter__() and __exit__().
       Multithread safe.
       This mixin uses the internal attribute _opens and relies on a
       preexisting attribute _lock for locking.
+      Classes using this mixin need to define .startup and .shutdown,
+      and a mutex of some kind as ._lock (eg Lock or RLock).
   '''
 
   def __init__(self, finalise_later=False):
     ''' Initialise the MultiOpenMixin state.
-        This makes use of the following methods if present:
-          `self.on_open(count)`: called on open with the post-increment open count
-          `self.on_close(count)`: called on close with the pre-decrement open count
         `finalise_later`: do not notify the finalisation Condition on
           shutdown, require a separate call to .finalise().
           This is mode is useful for objects such as queues where
@@ -72,25 +68,21 @@ class MultiOpenMixin(O):
     self.close()
     return False
 
-  def open(self, name=None):
+  def open(self):
     ''' Increment the open count.
-	If self.on_open, call self.on_open(self, count) with the
-	post-increment count.
-        `name`: optional name for this open object.
+        On the first .open call self.startup().
     '''
     self.opened = True
     with self._lock:
       self._opens += 1
-      count = self._opens
-    ifmethod(self, 'on_open', a=(count,))
+      if self._opens == 1:
+        self.startup()
     return self
 
   @logexc
   ##@not_closed
   def close(self, enforce_final_close=False):
     ''' Decrement the open count.
-        If self.on_close, call self.on_close(self, count) with the
-        pre-decrement count.
         If the count goes to zero, call self.shutdown().
     '''
     with self._lock:
@@ -98,16 +90,15 @@ class MultiOpenMixin(O):
         error("%s: EXTRA CLOSE", self)
       self._opens -= 1
       count = self._opens
-    ifmethod(self, 'on_close', a=(count+1,))
-    if count == 0:
-      if enforce_final_close:
-        self.D("OK FINAL CLOSE")
-      self.shutdown()
-      if not self._finalise_later:
-        self.finalise()
-    else:
-      if enforce_final_close:
-        raise RuntimeError("%s: expected this to be the final close, but it was not" % (self,))
+      if self._opens == 0:
+        if enforce_final_close:
+          self.D("OK FINAL CLOSE")
+        self.shutdown()
+        if not self._finalise_later:
+          self.finalise()
+      else:
+        if enforce_final_close:
+          raise RuntimeError("%s: expected this to be the final close, but it was not" % (self,))
 
   def finalise(self):
     ''' Finalise the object, releasing all callers of .join().
@@ -153,10 +144,8 @@ class MultiOpen(MultiOpenMixin):
     MultiOpenMixin.__init__(self, finalise_later=finalise_later)
     self.openable = openable
 
-  def on_open(self, count):
-    if count == 1:
-      self.openable.open()
+  def startup(self):
+    self.openable.open()
 
-  def on_close(self, count):
-    if count == 1:
-      self.openable.close()
+  def shutdown(self):
+    self.openable.close()
