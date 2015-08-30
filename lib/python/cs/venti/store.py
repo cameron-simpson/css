@@ -17,12 +17,12 @@ from binascii import hexlify
 import os
 import os.path
 import sys
-from threading import Lock
+from threading import Lock, RLock
 from threading import Thread
 from cs.py3 import Queue
 from cs.asynchron import report as reportLFs
 from cs.later import Later
-from cs.logutils import info, debug, warning, Pfx, D
+from cs.logutils import info, debug, warning, Pfx, D, X
 from cs.queues import MultiOpenMixin
 from cs.threads import Q1, Get1
 from . import defaults, totext
@@ -66,7 +66,7 @@ class _BasicStoreCommon(MultiOpenMixin):
     with Pfx("_BasicStoreCommon.__init__(%s,..)", name):
       if capacity is None:
         capacity = 1
-      self._lock = Lock()
+      self._lock = RLock()
       MultiOpenMixin.__init__(self)
       self.name = name
       self.logfp = None
