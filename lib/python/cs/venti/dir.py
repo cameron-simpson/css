@@ -299,19 +299,16 @@ class FileDirent(_Dirent, MultiOpenMixin):
     return len(self.block)
 
   @locked
-  def on_open(self, count):
+  def startup(self, count):
     ''' Set up ._open_file on first open.
     '''
     self._check()
-    if count < 1:
-      raise ValueError("expected count >= 1, got: %r" % (count,))
-    if count == 1:
-      if self._open_file is not None:
-        raise RuntimeError("first open, but ._open_file is not None: %r" % (self._open_file,))
-      if self._block is None:
-        raise RuntimeError("first open, but ._block is None")
-      self._open_file = File(self._block)
-      self._block = None
+    if self._open_file is not None:
+      raise RuntimeError("first open, but ._open_file is not None: %r" % (self._open_file,))
+    if self._block is None:
+      raise RuntimeError("first open, but ._block is None")
+    self._open_file = File(self._block)
+    self._block = None
     self._check()
 
   @locked
