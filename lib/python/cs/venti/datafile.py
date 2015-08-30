@@ -149,6 +149,9 @@ class _DataDir(MultiOpenMixin):
     self._indices = {}
     self._n = None
 
+  def startup(self):
+    pass
+
   def shutdown(self):
     ''' Called on final close of the DataDir.
         Close and release any open indices.
