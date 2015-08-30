@@ -7,7 +7,7 @@ import sys
 from threading import Lock, RLock
 from cs.logutils import D, Pfx, debug, error, info, warning, X
 from cs.lex import hexify
-from cs.queues import NestingOpenCloseMixin
+from cs.queues import MultiOpenMixin
 from cs.seq import seq
 from cs.serialise import get_bs, get_bsdata, put_bs, put_bsdata
 from cs.threads import locked, locked_property
@@ -241,7 +241,7 @@ class _Dirent(object):
 
     return (unixmode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime)
 
-class FileDirent(_Dirent, NestingOpenCloseMixin):
+class FileDirent(_Dirent, MultiOpenMixin):
   ''' A _Dirent subclass referring to a file.
       If closed, ._block refers to the file content.
       If open, ._open_file refers to the content.
@@ -254,7 +254,7 @@ class FileDirent(_Dirent, NestingOpenCloseMixin):
     if block is None:
       block = Block(data=b'')
     self._lock = RLock()
-    NestingOpenCloseMixin.__init__(self)
+    MultiOpenMixin.__init__(self)
     _Dirent.__init__(self, D_FILE_T, name, metatext=metatext)
     self._open_file = None
     self._block = block

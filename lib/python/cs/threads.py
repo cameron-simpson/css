@@ -32,11 +32,11 @@ from cs.excutils import transmute
 from cs.debug import Lock, RLock, Thread
 from cs.logutils import LogTime, error, warning, debug, exception, OBSOLETE, D
 from cs.obj import O
-from cs.queues import IterableQueue, Channel, NestingOpenCloseMixin, not_closed
+from cs.queues import IterableQueue, Channel, MultiOpenMixin, not_closed
 from cs.py.func import funcname
 from cs.py3 import raise3, Queue, PriorityQueue
 
-class WorkerThreadPool(NestingOpenCloseMixin, O):
+class WorkerThreadPool(MultiOpenMixin, O):
   ''' A pool of worker threads to run functions.
   '''
 
@@ -47,7 +47,7 @@ class WorkerThreadPool(NestingOpenCloseMixin, O):
     self.name = name
     self._lock = Lock()
     O.__init__(self)
-    NestingOpenCloseMixin.__init__(self)
+    MultiOpenMixin.__init__(self)
     self.idle = deque()
     self.all = []
 

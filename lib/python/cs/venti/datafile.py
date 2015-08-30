@@ -14,7 +14,7 @@ from zlib import compress, decompress
 from cs.cache import LRU_Cache
 from cs.logutils import D, X, debug
 from cs.obj import O
-from cs.queues import NestingOpenCloseMixin
+from cs.queues import MultiOpenMixin
 from cs.serialise import get_bs, put_bs, read_bs, put_bsdata, read_bsdata
 from cs.threads import locked, locked_property
 from .hash import DEFAULT_HASHCLASS
@@ -128,7 +128,7 @@ class DataFile(object):
       fp.write(put_bsdata(data))
     return offset
 
-class _DataDir(NestingOpenCloseMixin):
+class _DataDir(MultiOpenMixin):
   ''' A mapping of hash->Block that manages a directory of DataFiles.
       Subclasses must implement the _openIndex() method, which
       should return a mapping to store and retrieve index information.
@@ -142,7 +142,7 @@ class _DataDir(NestingOpenCloseMixin):
     elif rollover < 1024:
       raise ValueError("rollover < 1024 (a more normal size would be in megabytes or gigabytes): %r" % (rollover,))
     self._lock = RLock()
-    NestingOpenCloseMixin.__init__(self)
+    MultiOpenMixin.__init__(self)
     self.dirpath = dirpath
     self._rollover = rollover
     self._datafile_cache = LRU_Cache(maxsize=4, on_remove=self._remove_open)

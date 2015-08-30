@@ -25,7 +25,7 @@ from cs.obj import O
 from cs.py.func import callmethod_if as ifmethod
 
 def not_closed(func):
-  ''' Decorator to wrap NestingOpenCloseMixin proxy object methods
+  ''' Decorator to wrap MultiOpenMixin proxy object methods
       which hould raise when self.closed.
   '''
   def not_closed_wrapper(self, *a, **kw):
@@ -35,7 +35,7 @@ def not_closed(func):
   not_closed_wrapper.__name__ = "not_closed_wrapper(%s)" % (func.__name__,)
   return not_closed_wrapper
 
-class NestingOpenCloseMixin(O):
+class MultiOpenMixin(O):
   ''' A mixin to count open and closes, and to call .shutdown() when the count goes to zero.
       A count of active open()s is kept, and on the last close()
       the object's .shutdown() method is called.
@@ -47,7 +47,7 @@ class NestingOpenCloseMixin(O):
   '''
 
   def __init__(self, finalise_later=False):
-    ''' Initialise the NestingOpenCloseMixin state.
+    ''' Initialise the MultiOpenMixin state.
         This makes use of the following methods if present:
           `self.on_open(count)`: called on open with the post-increment open count
           `self.on_close(count)`: called on close with the pre-decrement open count
@@ -145,12 +145,12 @@ class NestingOpenCloseMixin(O):
     else:
       self._lock.release()
 
-class MultiOpen(NestingOpenCloseMixin):
-  ''' Context manager class that manages a single open/close object using a NestingOpenCloseMixin.
+class MultiOpen(MultiOpenMixin):
+  ''' Context manager class that manages a single open/close object using a MultiOpenMixin.
   '''
 
   def __init__(self, openable, finalise_later=False):
-    NestingOpenCloseMixin.__init__(self, finalise_later=finalise_later)
+    MultiOpenMixin.__init__(self, finalise_later=finalise_later)
     self.openable = openable
 
   def on_open(self, count):

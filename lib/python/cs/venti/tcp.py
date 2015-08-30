@@ -11,16 +11,16 @@ from threading import Lock
 from .stream import StreamStore
 from cs.fileutils import OpenSocket
 from cs.logutils import debug, X
-from cs.queues import NestingOpenCloseMixin
+from cs.queues import MultiOpenMixin
 
-class TCPStoreServer(ThreadingMixIn, TCPServer, NestingOpenCloseMixin):
+class TCPStoreServer(ThreadingMixIn, TCPServer, MultiOpenMixin):
   ''' A threading TCPServer that accepts connections by TCPStoreClients.
   '''
 
   def __init__(self, bind_addr, S):
     self._lock = Lock()
     TCPServer.__init__(self, bind_addr, _RequestHandler)
-    NestingOpenCloseMixin.__init__(self)
+    MultiOpenMixin.__init__(self)
     self.S = S
     S.open()
 

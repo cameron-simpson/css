@@ -16,7 +16,7 @@ from cs.debug import DEBUG
 from cs.inttypes import Flags
 from cs.threads import Lock, RLock, Channel, locked_property
 from cs.later import Later
-from cs.queues import NestingOpenCloseMixin
+from cs.queues import MultiOpenMixin
 from cs.asynchron import Result, report as report_LFs, \
         Asynchron, ASYNCH_PENDING, ASYNCH_RUNNING, ASYNCH_CANCELLED, ASYNCH_READY
 import cs.logutils
@@ -35,7 +35,7 @@ PRI_PREREQ = 2
 
 MakeDebugFlags = Flags('debug', 'flags', 'make', 'parse')
 
-class Maker(NestingOpenCloseMixin):
+class Maker(MultiOpenMixin):
   ''' Main class representing a set of dependencies to make.
   '''
 
@@ -50,7 +50,7 @@ class Maker(NestingOpenCloseMixin):
       name = cs.logutils.cmd
     O.__init__(self)
     self._lock = Lock()
-    NestingOpenCloseMixin.__init__(self)
+    MultiOpenMixin.__init__(self)
     self._O_omit.extend(['macros', 'targets', 'rules', 'namespaces'])
     self.parallel = parallel
     self.name = name
