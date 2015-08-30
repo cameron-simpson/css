@@ -30,7 +30,7 @@ if sys.hexversion < 0x02060000: from sets import Set as set
 from cs.seq import seq
 from cs.excutils import transmute
 from cs.debug import Lock, RLock, Thread
-from cs.logutils import LogTime, error, warning, debug, exception, OBSOLETE, D
+from cs.logutils import LogTime, error, warning, debug, exception, OBSOLETE, D, X
 from cs.obj import O
 from cs.queues import IterableQueue, Channel, MultiOpenMixin, not_closed
 from cs.py.func import funcname
@@ -45,7 +45,7 @@ class WorkerThreadPool(MultiOpenMixin, O):
       name = "WorkerThreadPool-%d" % (seq(),)
     debug("WorkerThreadPool.__init__(name=%s)", name)
     self.name = name
-    self._lock = Lock()
+    self._lock = RLock()
     O.__init__(self)
     MultiOpenMixin.__init__(self)
     self.idle = deque()

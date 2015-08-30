@@ -20,7 +20,7 @@ from functools import partial
 import logging
 from threading import Timer
 import time
-from cs.debug import Lock, Thread, trace, trace_caller, stack_dump
+from cs.debug import Lock, RLock, Thread, trace, trace_caller, stack_dump
 from cs.logutils import exception, error, warning, debug, D, X, Pfx, PfxCallInfo
 from cs.resources import MultiOpenMixin, not_closed
 from cs.seq import seq
@@ -41,7 +41,7 @@ class _QueueIterator(MultiOpenMixin):
   def __init__(self, q, name=None):
     if name is None:
       name = "QueueIterator-%d" % (seq(),)
-    self._lock = Lock()
+    self._lock = RLock()
     self.name = name
     self._item_count = 0    # count of non-sentinel values on the queue
     O.__init__(self, q=q)
@@ -289,7 +289,7 @@ class NullQueue(MultiOpenMixin):
     if name is None:
       name = "%s%d" % (self.__class__.__name__, seq())
     self.name = name
-    self._lock = Lock()
+    self._lock = RLock()
     O.__init__(self)
     MultiOpenMixin.__init__(self)
     self.blocking = blocking
