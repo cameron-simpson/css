@@ -218,7 +218,7 @@ class PushQueue(MultiOpenMixin):
     if name is None:
       name = "%s%d-%s" % (self.__class__.__name__, seq(), func_push)
     self.name = name
-    self._lock = Lock()
+    self._lock = RLock()
     O.__init__(self)
     MultiOpenMixin.__init__(self)
     self.later = L
@@ -253,6 +253,9 @@ class PushQueue(MultiOpenMixin):
     outQ = self.outQ
     outQ.open()
     L._defer_iterable(items, outQ)
+
+  def startup(self):
+    pass
 
   def shutdown(self):
     ''' shutdown() is called by MultiOpenMixin._close() to close
