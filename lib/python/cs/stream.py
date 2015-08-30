@@ -70,6 +70,9 @@ class PacketConnection(object):
   def __str__(self):
     return "PacketConnection[%s,closed=%s]" % (self.name, self.closed)
 
+  def startup(self):
+    pass
+
   def shutdown(self):
     self.closed = True
     if not self._sendQ.closed:
