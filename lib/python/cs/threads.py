@@ -44,10 +44,9 @@ class WorkerThreadPool(MultiOpenMixin, O):
     if name is None:
       name = "WorkerThreadPool-%d" % (seq(),)
     debug("WorkerThreadPool.__init__(name=%s)", name)
-    self.name = name
-    self._lock = RLock()
     O.__init__(self)
     MultiOpenMixin.__init__(self)
+    self.name = name
     self.idle = deque()
     self.all = []
 
