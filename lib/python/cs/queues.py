@@ -315,6 +315,9 @@ class NullQueue(MultiOpenMixin):
       self.join()
     raise Queue_Empty
 
+  def startup(self):
+    pass
+
   def shutdown(self):
     ''' Shut down the queue. Wakes up anything waiting on ._close_cond, such
         as callers of .get() on a .blocking queue.
