@@ -304,11 +304,10 @@ class _Pipeline(MultiOpenMixin):
   def __init__(self, name, L, filter_funcs, outQ):
     ''' Initialise the _Pipeline from `name`, Later instance `L`, list  of filter functions `filter_funcs` and output queue `outQ`.
     '''
+    MultiOpenMixin.__init__(self)
     self.name = name
     self.later = L
     self.queues = [outQ]
-    self._lock = RLock()
-    MultiOpenMixin.__init__(self)
     # counter tracking items in play
     self._busy = TrackingCounter(name="Pipeline<%s>._items" % (name,))
     RHQ = outQ
@@ -436,10 +435,9 @@ class Later(MultiOpenMixin):
   def __init__(self, capacity, name=None, inboundCapacity=0):
     if name is None:
       name = "Later-%d" % (seq(),)
-    self._lock = RLock()
+    MultiOpenMixin.__init__(self)
     self._finished = threading.Condition(self._lock)
     self.finished = False
-    MultiOpenMixin.__init__(self)
     if ifdebug():
       import inspect
       filename, lineno = inspect.stack()[1][1:3]
@@ -592,8 +590,8 @@ class Later(MultiOpenMixin):
     self._track("_completed(%s)" % (LF.name,), LF, self.running, None)
 
   def __enter__(self):
-    debug("%s: __enter__", self)
     global default
+    debug("%s: __enter__", self)
     L = MultiOpenMixin.__enter__(self)
     default.push(L)
     return L
@@ -602,9 +600,9 @@ class Later(MultiOpenMixin):
     ''' Exit handler: release the "complete" lock; the placeholder
         function is blocking on this, and will return on its release.
     '''
+    global default
     debug("%s: __exit__: exc_type=%s", self, exc_type)
     MultiOpenMixin.__exit__(self, exc_type, exc_val, exc_tb)
-    global default
     default.pop()
     return False
 
