@@ -141,7 +141,6 @@ class _DataDir(MultiOpenMixin):
       rollover = DEFAULT_ROLLOVER
     elif rollover < 1024:
       raise ValueError("rollover < 1024 (a more normal size would be in megabytes or gigabytes): %r" % (rollover,))
-    self._lock = RLock()
     MultiOpenMixin.__init__(self)
     self.dirpath = dirpath
     self._rollover = rollover

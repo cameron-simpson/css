@@ -18,7 +18,6 @@ class TCPStoreServer(ThreadingMixIn, TCPServer, MultiOpenMixin):
   '''
 
   def __init__(self, bind_addr, S):
-    self._lock = Lock()
     TCPServer.__init__(self, bind_addr, _RequestHandler)
     MultiOpenMixin.__init__(self)
     self.S = S

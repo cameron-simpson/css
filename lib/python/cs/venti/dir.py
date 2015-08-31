@@ -253,7 +253,6 @@ class FileDirent(_Dirent, MultiOpenMixin):
   def __init__(self, name, metatext=None, block=None):
     if block is None:
       block = Block(data=b'')
-    self._lock = RLock()
     MultiOpenMixin.__init__(self)
     _Dirent.__init__(self, D_FILE_T, name, metatext=metatext)
     self._open_file = None

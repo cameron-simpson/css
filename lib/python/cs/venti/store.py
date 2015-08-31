@@ -62,11 +62,11 @@ class _BasicStoreCommon(MultiOpenMixin):
       ._flush() method, follows any noFlush requests promptly otherwise
       deadlocks may ensue.
   '''
+
   def __init__(self, name, capacity=None):
     with Pfx("_BasicStoreCommon.__init__(%s,..)", name):
       if capacity is None:
         capacity = 1
-      self._lock = RLock()
       MultiOpenMixin.__init__(self)
       self.name = name
       self.logfp = None
