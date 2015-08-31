@@ -41,11 +41,10 @@ class _QueueIterator(MultiOpenMixin):
   def __init__(self, q, name=None):
     if name is None:
       name = "QueueIterator-%d" % (seq(),)
-    self._lock = RLock()
+    MultiOpenMixin.__init__(self, finalise_later=True)
+    self.q = q
     self.name = name
     self._item_count = 0    # count of non-sentinel values on the queue
-    O.__init__(self, q=q)
-    MultiOpenMixin.__init__(self, finalise_later=True)
 
   def __str__(self):
     return "<%s:opens=%d>" % (self.name, self._opens)
