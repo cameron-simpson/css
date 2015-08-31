@@ -8,12 +8,12 @@ import sys
 import unittest
 from random import randint
 from cs.fileutils import BackedFile, BackedFile_TestMethods
+from cs.logutils import X
 from . import defaults
 from .block import Block
 from .blockify import blockify, top_block_for
 from .store import MappingStore
 from .file import BlockFile, File
-from cs.logutils import X
 
 class Test_RWFile(unittest.TestCase, BackedFile_TestMethods):
 

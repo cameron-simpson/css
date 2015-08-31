@@ -75,7 +75,9 @@ class PacketConnection(object):
     if not self._sendQ.closed:
       self._sendQ.close()
     self._send_thread.join()
+    self._send_fp = None
     self._recv_thread.join()
+    self._recv_fp = None
     self._later.close()
 
   def join(self):

@@ -5,11 +5,9 @@
 #
 
 import os
-import random
 import sys
 import unittest
 from cs.logutils import X
-from cs.randutils import rand0, randblock
 from .store import MappingStore
 from .store_tests import _TestStore
 from .stream import StreamStore

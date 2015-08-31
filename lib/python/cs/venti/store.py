@@ -17,18 +17,18 @@ from binascii import hexlify
 import os
 import os.path
 import sys
-from threading import Lock
+from threading import Lock, RLock
 from threading import Thread
 from cs.py3 import Queue
 from cs.asynchron import report as reportLFs
 from cs.later import Later
-from cs.logutils import info, debug, warning, Pfx, D
-from cs.queues import NestingOpenCloseMixin
+from cs.logutils import info, debug, warning, Pfx, D, X
+from cs.queues import MultiOpenMixin
 from cs.threads import Q1, Get1
 from . import defaults, totext
 from .hash import Hash_SHA1
 
-class _BasicStoreCommon(NestingOpenCloseMixin):
+class _BasicStoreCommon(MultiOpenMixin):
   ''' Core functions provided by all Stores.
 
       A subclass should provide thread-safe implementations of the following
@@ -62,12 +62,12 @@ class _BasicStoreCommon(NestingOpenCloseMixin):
       ._flush() method, follows any noFlush requests promptly otherwise
       deadlocks may ensue.
   '''
+
   def __init__(self, name, capacity=None):
     with Pfx("_BasicStoreCommon.__init__(%s,..)", name):
       if capacity is None:
         capacity = 1
-      self._lock = Lock()
-      NestingOpenCloseMixin.__init__(self)
+      MultiOpenMixin.__init__(self)
       self.name = name
       self.logfp = None
       self.__funcQ = Later(capacity, name="%s:Later(__funcQ)" % (self.name,)).open()
@@ -76,7 +76,7 @@ class _BasicStoreCommon(NestingOpenCloseMixin):
       self.writeonly = False
 
   def _defer(self, func, *args, **kwargs):
-    return self.__funcQ.defer(via(self, func, *args, **kwargs))
+    return self.__funcQ.defer(func, *args, **kwargs)
 
   ###################
   ## Special methods.
@@ -98,14 +98,14 @@ class _BasicStoreCommon(NestingOpenCloseMixin):
 
   def __enter__(self):
     defaults.pushStore(self)
-    return NestingOpenCloseMixin.__enter__(self)
+    return MultiOpenMixin.__enter__(self)
 
   def __exit__(self, exc_type, exc_value, traceback):
     if exc_value:
       import traceback as TB
       TB.print_tb(traceback, file=sys.stderr)
     defaults.popStore()
-    return NestingOpenCloseMixin.__exit__(self, exc_type, exc_value, traceback)
+    return MultiOpenMixin.__exit__(self, exc_type, exc_value, traceback)
 
   def __str__(self):
     return "Store(%s)" % self.name
@@ -120,8 +120,11 @@ class _BasicStoreCommon(NestingOpenCloseMixin):
     '''
     raise NotImplementedError
 
+  def startup(self):
+    self.__funcQ.open()
+
   def shutdown(self):
-    ''' Called by final NestingOpenCloseMixin.close().
+    ''' Called by final MultiOpenMixin.close().
     '''
     self.__funcQ.close()
 

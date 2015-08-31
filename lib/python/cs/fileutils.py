@@ -1151,9 +1151,8 @@ class OpenSocket(object):
   def __init__(self, sock, for_write):
     self._for_write = for_write
     self._sock = sock
-    self._sock_fd = sock.fileno()
-    self._fd = os.dup(self._sock_fd)
-    self._fp = os.fdopen(self._fd, 'wb' if for_write else 'rb')
+    self._fp = os.fdopen(os.dup(self._sock.fileno()),
+                         'wb' if for_write else 'rb')
 
   def write(self, data):
     return self._fp.write(data)
@@ -1174,8 +1173,13 @@ class OpenSocket(object):
       if e.errno != errno.ENOTCONN:
         raise
 
+  def __del__(self):
+    self._close()
+
   def _close(self):
     self._fp.close()
+    self._fp = None
+    self._sock = None
 
 if __name__ == '__main__':
   import cs.fileutils_tests

@@ -14,8 +14,8 @@ from zlib import compress, decompress
 from cs.cache import LRU_Cache
 from cs.logutils import D, X, debug
 from cs.obj import O
-from cs.queues import NestingOpenCloseMixin
-from cs.serialise import get_bs, put_bs, read_bs
+from cs.queues import MultiOpenMixin
+from cs.serialise import get_bs, put_bs, read_bs, put_bsdata, read_bsdata
 from cs.threads import locked, locked_property
 from .hash import DEFAULT_HASHCLASS
 
@@ -46,25 +46,20 @@ class DataFlags(int):
   def compressed(self):
     return self & F_COMPRESSED
 
-class DataFile(NestingOpenCloseMixin):
+class DataFile(object):
   ''' A cs.venti data file, storing data chunks in compressed form.
+      This is the usual persistence layer of a local venti Store.
   '''
 
   def __init__(self, pathname):
     self._lock = RLock()
-    NestingOpenCloseMixin.__init__(self)
     self.pathname = pathname
-    self.fp = None
+    self.fp = open(self.pathname, "a+b")
 
   def __str__(self):
     return "DataFile(%s)" % (self.pathname,)
 
-  def on_open(self, count):
-    if count == 1:
-      debug("open %s: first open, open file", self)
-      self.fp = open(self.pathname, "a+b")
-
-  def shutdown(self):
+  def close(self):
     self.fp.close()
     self.fp = None
 
@@ -78,8 +73,10 @@ class DataFile(NestingOpenCloseMixin):
       offset = 0
       while True:
         with self._lock:
-          fp.seek(offset)
-          flags, data = self._readRawDataHere(fp)
+          if fp.tell() != offset:
+            fp.flush()
+            fp.seek(offset)
+          flags, data = self._readhere(fp)
           offset = fp.tell()
         if flags is None:
           break
@@ -108,17 +105,10 @@ class DataFile(NestingOpenCloseMixin):
         Presumes the ._lock is already taken.
     '''
     flags = read_bs(fp)
-    if flags is None:
-      return None, None
     if (flags & ~F_COMPRESSED) != 0:
       raise ValueError("flags other than F_COMPRESSED: 0x%02x" % ((flags & ~F_COMPRESSED),))
     flags = DataFlags(flags)
-    dsize = read_bs(fp)
-    if dsize == 0:
-      data = b''
-    else:
-      data = fp.read(dsize)
-    assert len(data) == dsize
+    data = read_bsdata(fp)
     return flags, data
 
   def savedata(self, data, noCompress=False):
@@ -135,18 +125,10 @@ class DataFile(NestingOpenCloseMixin):
       fp.seek(0, SEEK_END)
       offset = fp.tell()
       fp.write(put_bs(flags))
-      fp.write(put_bs(len(data)))
-      fp.write(data)
-      fp.flush()    # surprised this is needed; not needed with C stdio
-    self.ping()
+      fp.write(put_bsdata(data))
     return offset
 
-  @locked
-  def flush(self):
-    if self.fp:
-      self.fp.flush()
-
-class _DataDir(NestingOpenCloseMixin):
+class _DataDir(MultiOpenMixin):
   ''' A mapping of hash->Block that manages a directory of DataFiles.
       Subclasses must implement the _openIndex() method, which
       should return a mapping to store and retrieve index information.
@@ -159,27 +141,28 @@ class _DataDir(NestingOpenCloseMixin):
       rollover = DEFAULT_ROLLOVER
     elif rollover < 1024:
       raise ValueError("rollover < 1024 (a more normal size would be in megabytes or gigabytes): %r" % (rollover,))
-    self._lock = RLock()
-    NestingOpenCloseMixin.__init__(self)
+    MultiOpenMixin.__init__(self)
     self.dirpath = dirpath
     self._rollover = rollover
-    self._open = LRU_Cache(maxsize=4, on_remove=self._remove_open)
+    self._datafile_cache = LRU_Cache(maxsize=4, on_remove=self._remove_open)
     self._indices = {}
     self._n = None
+
+  def startup(self):
+    pass
 
   def shutdown(self):
     ''' Called on final close of the DataDir.
         Close and release any open indices.
         Close any open datafiles.
     '''
-    X("shutdown(%s)", self)
     with self._lock:
       for hashname in self._indices:
         I = self._indices[hashname]
         I.sync()
         I.close()
       self._indices = {}
-      self._open.flush()
+      self._datafile_cache.flush()
 
   def _openIndex(self, hashname):
     ''' Subclasses must implement the _openIndex method, which returns a
@@ -287,7 +270,7 @@ class _DataDir(NestingOpenCloseMixin):
 
   @locked
   def flush(self):
-    for datafile in self._open.values():
+    for datafile in self._datafile_cache.values():
       datafile.flush()
     for index in self._indices.values():
       index.flush()
@@ -295,11 +278,11 @@ class _DataDir(NestingOpenCloseMixin):
   def datafile(self, n):
     ''' Obtain the Datafile with index `n`.
     '''
-    datafiles = self._open
+    datafiles = self._datafile_cache
     with self._lock:
       D = datafiles.get(n)
       if D is None:
-        D = datafiles[n] = DataFile(self.pathto(self.datafilename(n))).open()
+        D = datafiles[n] = DataFile(self.pathto(self.datafilename(n)))
     return D
 
   def _remove_open(self, key, value):

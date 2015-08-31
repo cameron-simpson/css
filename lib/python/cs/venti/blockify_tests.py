@@ -8,7 +8,7 @@ import sys
 import unittest
 from cs.logutils import D
 from .blockify import blockify
-from .cache import MemCacheStore
+from .cache import MemoryCacheStore
 
 class TestAll(unittest.TestCase):
 
@@ -19,7 +19,7 @@ class TestAll(unittest.TestCase):
     self.fp.close()
 
   def test00blockifyAndRetrieve(self):
-    with MemCacheStore():
+    with MemoryCacheStore():
       data = self.fp.read()
       blocks = list(blockify([data]))
       data2 = b''.join( b.data for b in blocks )

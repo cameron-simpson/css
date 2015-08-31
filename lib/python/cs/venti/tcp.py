@@ -7,19 +7,23 @@
 import os
 from socket import socket, SHUT_WR, SHUT_RD
 from socketserver import TCPServer, ThreadingMixIn, StreamRequestHandler
+from threading import Lock
 from .stream import StreamStore
 from cs.fileutils import OpenSocket
 from cs.logutils import debug, X
-from cs.queues import NestingOpenCloseMixin
+from cs.queues import MultiOpenMixin
 
-class TCPStoreServer(ThreadingMixIn, TCPServer, NestingOpenCloseMixin):
+class TCPStoreServer(ThreadingMixIn, TCPServer, MultiOpenMixin):
   ''' A threading TCPServer that accepts connections by TCPStoreClients.
   '''
 
   def __init__(self, bind_addr, S):
     TCPServer.__init__(self, bind_addr, _RequestHandler)
-    S.open()
+    MultiOpenMixin.__init__(self)
     self.S = S
+
+  def startup(self):
+    self.S.open()
 
   def shutdown(self):
     self.S.close()
