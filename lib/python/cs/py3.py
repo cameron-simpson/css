@@ -65,25 +65,43 @@ else:
   input = raw_input
   from itertools import ifilter as filter, ifilterfalse as filterfalse
 
-  class bytes(str):
-    def __new__(cls, arg):
-      from cs.logutils import X
+  class bytes(list):
+    ''' Trite bytes implementation.
+    '''
+    def __init__(self, arg):
       try:
         bytevals = iter(arg)
       except TypeError:
         bytevals = [ 0 for i in range(arg) ]
-      s = ''.join( chr(b) for b in bytevals )
-      self = str.__new__(cls, s)
-      return self
+      self.__s = ''.join( chr(b) for b in bytevals )
     def __repr__(self):
-      return 'b' + str.__repr__(self)
+      return 'b' + repr(self.__s)
+    def __iter__(self):
+      for _ in self.__s:
+        yield ord(_)
     def __getitem__(self, index):
-      s2 = str.__getitem__(self, index)
-      if isinstance(index, slice):
-        return bytes( ord(ch) for ch in s2 )
-      return ord(s2[0])
+      return ord(self.__s[index])
+    def __getslice__(self, i, j):
+        return bytes( ord(_) for _ in self.__s[i:j] )
     def __contains__(self, b):
-      return str.__contains__(self, chr(b))
+      return chr(b) in self.__s
+    def __eq__(self, other):
+      if type(other) is type(self):
+        return self.__s == other.__s
+      if len(other) != len(self):
+        return False
+      for i, b in enumerate(self):
+        if b != other[i]:
+          return False
+      return True
+    def __len__(self):
+      return len(self.__s)
+    def __add__(self, other):
+      return bytes( list(self) + list(other) )
+    def as_str(self):
+      ''' Back convert to a str, only meaningful for Python 2.
+      '''
+      return ''.join( chr(_) for _ in self )
 
 def raise3(exc_type, exc_value, exc_traceback):
   if sys.hexversion >= 0x03000000:

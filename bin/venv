@@ -85,7 +85,7 @@ case $op in
   init)
     [ -t 2 ] && set -x
     mkdir -- "$VENV_DIR"
-    virtualenv -p "$VENV_PYTHON" ${1+"$@"} -- "$VENV_DIR"
+    virtualenv -p "$VENV_PYTHON" --system-site-packages ${1+"$@"} -- "$VENV_DIR"
     ;;
   exec)
     if [ $# = 0 ]

@@ -16,15 +16,16 @@ DISTINFO = {
 }
 
 import threading
-from threading import Condition
+from threading import Condition, RLock
+import time
 import traceback
 from cs.excutils import logexc
-from cs.logutils import warning, error, PfxCallInfo
+from cs.logutils import debug, warning, error, PfxCallInfo, X
 from cs.obj import O
 from cs.py.func import callmethod_if as ifmethod
 
 def not_closed(func):
-  ''' Decorator to wrap NestingOpenCloseMixin proxy object methods
+  ''' Decorator to wrap MultiOpenMixin proxy object methods
       which hould raise when self.closed.
   '''
   def not_closed_wrapper(self, *a, **kw):
@@ -34,22 +35,16 @@ def not_closed(func):
   not_closed_wrapper.__name__ = "not_closed_wrapper(%s)" % (func.__name__,)
   return not_closed_wrapper
 
-class NestingOpenCloseMixin(O):
-  ''' A mixin to count open and closes, and to call .shutdown() when the count goes to zero.
-      A count of active open()s is kept, and on the last close()
-      the object's .shutdown() method is called.
-      Use via the with-statement calls open()/close() for __enter__()
-      and __exit__().
+class MultiOpenMixin(O):
+  ''' A mixin to count open and closes, and to call .startup on the first .open and to call .shutdown on the last .close.
+      Use as a context manager calls open()/close() from __enter__() and __exit__().
       Multithread safe.
-      This mixin uses the internal attribute _opens and relies on a
-      preexisting attribute _lock for locking.
+      This mixin defines ._lock = RLock(); subclasses need not bother.
+      Classes using this mixin need to define .startup and .shutdown.
   '''
 
   def __init__(self, finalise_later=False):
-    ''' Initialise the NestingOpenCloseMixin state.
-        Then takes makes use of the following methods if present:
-          `self.on_open(count)`: called on open with the post-increment open count
-          `self.on_close(count)`: called on close with the pre-decrement open count
+    ''' Initialise the MultiOpenMixin state.
         `finalise_later`: do not notify the finalisation Condition on
           shutdown, require a separate call to .finalise().
           This is mode is useful for objects such as queues where
@@ -60,11 +55,8 @@ class NestingOpenCloseMixin(O):
     self.opened = False
     self._opens = 0
     ##self.closed = False # final _close() not yet called
-    self._keep_open = None
-    self._keep_open_until = None
-    self._keep_open_poll_interval = 0.5
-    self._keep_open_increment = 1.0
-    self._finalise_later= finalise_later
+    self._lock = RLock()
+    self._finalise_later = finalise_later
     self._finalise = Condition(self._lock)
 
   def __enter__(self):
@@ -75,25 +67,21 @@ class NestingOpenCloseMixin(O):
     self.close()
     return False
 
-  def open(self, name=None):
+  def open(self):
     ''' Increment the open count.
-	If self.on_open, call self.on_open(self, count) with the
-	post-increment count.
-        `name`: optional name for this open object.
+        On the first .open call self.startup().
     '''
     self.opened = True
     with self._lock:
       self._opens += 1
-      count = self._opens
-    ifmethod(self, 'on_open', a=(count,))
+      if self._opens == 1:
+        self.startup()
     return self
 
   @logexc
   ##@not_closed
   def close(self, enforce_final_close=False):
     ''' Decrement the open count.
-        If self.on_close, call self.on_close(self, count) with the
-        pre-decrement count.
         If the count goes to zero, call self.shutdown().
     '''
     with self._lock:
@@ -101,21 +89,20 @@ class NestingOpenCloseMixin(O):
         error("%s: EXTRA CLOSE", self)
       self._opens -= 1
       count = self._opens
-    ifmethod(self, 'on_close', a=(count+1,))
-    if count == 0:
-      if enforce_final_close:
-        self.D("OK FINAL CLOSE")
-      self.shutdown()
-      if not self._finalise_later:
-        self.finalise()
-    else:
-      if enforce_final_close:
-        raise RuntimeError("%s: expected this to be the final close, but it was not" % (self,))
+      if self._opens == 0:
+        if enforce_final_close:
+          self.D("OK FINAL CLOSE")
+        self.shutdown()
+        if not self._finalise_later:
+          self.finalise()
+      else:
+        if enforce_final_close:
+          raise RuntimeError("%s: expected this to be the final close, but it was not" % (self,))
 
   def finalise(self):
     ''' Finalise the object, releasing all callers of .join().
-	Normally this is called automatically after .shutdown unless
-	`finalise_later` was set to true during initialisation.
+        Normally this is called automatically after .shutdown unless
+        `finalise_later` was set to true during initialisation.
     '''
     with self._lock:
       if self._finalise:
@@ -148,27 +135,16 @@ class NestingOpenCloseMixin(O):
     else:
       self._lock.release()
 
-  def ping(self):
-    ''' Mark this object as "busy"; it will be kept open a little longer in case of more use.
-    '''
-    T = None
-    with self._lock:
-      if not self._keep_open:
-        self._keep_open = True
-        name = "%s._ping_mainloop" % (self,)
-        T = Thread(name=name, target=self._ping_mainloop)
-    self._keep_open_until = time.time() + self._keep_open_increment
-    if T:
-      T.start()
+class MultiOpen(MultiOpenMixin):
+  ''' Context manager class that manages a single open/close object using a MultiOpenMixin.
+  '''
 
-  def _ping_mainloop(self):
-    ''' Pinger main loop: wait until expiry then close the open proxy.
-    '''
-    name = self._keep_open.name
-    while self._keep_open_until > time.time():
-      debug("%s: pinger: sleep for another %gs", name, self._keep_open_poll_interval)
-      time.sleep(self._keep_open_poll_interval)
-    self._keep_open = False
-    self._keep_open_until = None
-    debug("%s: pinger: close()", name)
-    self.close()
+  def __init__(self, openable, finalise_later=False):
+    MultiOpenMixin.__init__(self, finalise_later=finalise_later)
+    self.openable = openable
+
+  def startup(self):
+    self.openable.open()
+
+  def shutdown(self):
+    self.openable.close()

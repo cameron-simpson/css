@@ -11,13 +11,13 @@ import shutil
 import tempfile
 import unittest
 from cs.logutils import D, X
+from cs.randutils import rand0, randblock
 from .datafile import DataFile, DataDir
 from .hash import DEFAULT_HASHCLASS
 
-def genblock( maxsize=16383):
-  ''' Generate a pseudorandom block of data.
-  '''
-  return os.urandom(random.randint(0, maxsize))
+# arbitrary limit
+MAX_BLOCK_SIZE = 16383
+RUN_SIZE = 100  # 1000
 
 class TestDataFile(unittest.TestCase):
 
@@ -29,6 +29,7 @@ class TestDataFile(unittest.TestCase):
     self.datafile = DataFile(pathname)
 
   def tearDown(self):
+    self.datafile.close()
     os.remove(self.pathname)
 
   # TODO: tests:
@@ -37,15 +38,13 @@ class TestDataFile(unittest.TestCase):
   def test00store1(self):
     ''' Save a single block.
     '''
-    with self.datafile:
-      self.datafile.savedata(genblock())
+    self.datafile.savedata(randblock(rand0(MAX_BLOCK_SIZE)))
 
   def test01fetch1(self):
     ''' Save and the retrieve a single block.
     '''
-    data = genblock()
-    with self.datafile:
-      self.datafile.savedata(data)
+    data = randblock(rand0(MAX_BLOCK_SIZE))
+    self.datafile.savedata(data)
     data2 = self.datafile.readdata(0)
     self.assertEqual(data, data2)
 
@@ -53,17 +52,15 @@ class TestDataFile(unittest.TestCase):
     ''' Save 100 random blocks, close, retrieve in random order.
     '''
     blocks = {}
-    with self.datafile:
-      for _ in range(100):
-        data = genblock()
-        offset = self.datafile.savedata(data)
-        blocks[offset] = data
+    for _ in range(100):
+      data = randblock(rand0(MAX_BLOCK_SIZE))
+      offset = self.datafile.savedata(data)
+      blocks[offset] = data
     offsets = list(blocks.keys())
     random.shuffle(offsets)
-    with self.datafile:
-      for offset in offsets:
-        data = self.datafile.readdata(offset)
-        self.assertTrue(data == blocks[offset])
+    for offset in offsets:
+      data = self.datafile.readdata(offset)
+      self.assertTrue(data == blocks[offset])
 
 class TestDataDir(unittest.TestCase):
 
@@ -76,7 +73,6 @@ class TestDataDir(unittest.TestCase):
 
   def tearDown(self):
     self.datadir_open.close()
-    os.system("ls -la %s" % self.pathname)
     shutil.rmtree(self.pathname)
 
   def test000IndexEntry(self):
@@ -90,16 +86,16 @@ class TestDataDir(unittest.TestCase):
       self.assertEqual(rand_offset, offset)
 
   def test001randomblocks(self):
-    ''' Save 1000 random blocks, retrieve in random order.
+    ''' Save random blocks, retrieve in random order.
     '''
     hashclass = DEFAULT_HASHCLASS
     hashfunc = hashclass.from_data
-    D = self.datadir
+    D = self.datadir_open
     by_hash = {}
     by_data = {}
     # store 100 random blocks
-    for _ in range(1000):
-      data = genblock()
+    for _ in range(RUN_SIZE):
+      data = randblock(rand0(MAX_BLOCK_SIZE))
       if data in by_data:
         X("repeated random block, skipping")
         continue
@@ -125,9 +121,24 @@ class TestDataDir(unittest.TestCase):
       odata = by_hash[hashcode]
       data = D[hashcode]
       self.assertEqual(data, odata)
+    # close datadir, reopen, reretrieve
+    D.close()
+    D = self.datadir_open = DataDir(self.pathname, rollover=200000).open()
+    hashcodes = list(by_hash.keys())
+    random.shuffle(hashcodes)
+    for hashcode in hashcodes:
+      self.assertTrue(hashcode in by_hash)
+      self.assertTrue(hashcode in D)
+      odata = by_hash[hashcode]
+      data = D[hashcode]
+      self.assertEqual(data, odata)
 
 def selftest(argv):
-  unittest.main(__name__, None, argv)
+  if False:
+    import cProfile
+    cProfile.runctx('unittest.main(__name__, None, argv)', globals(), locals())
+  else:
+    unittest.main(__name__, None, argv)
 
 if __name__ == '__main__':
   selftest(sys.argv)

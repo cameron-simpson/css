@@ -7,7 +7,7 @@ import sys
 from threading import Lock, RLock
 from cs.logutils import D, Pfx, debug, error, info, warning, X
 from cs.lex import hexify
-from cs.queues import NestingOpenCloseMixin
+from cs.queues import MultiOpenMixin
 from cs.seq import seq
 from cs.serialise import get_bs, get_bsdata, put_bs, put_bsdata
 from cs.threads import locked, locked_property
@@ -104,6 +104,13 @@ class _Dirent(object):
 
   def __repr__(self):
     return "_Dirent(%s, %s, %s)" % (D_type2str, self.name, self.meta)
+
+  def __eq__(self, other):
+    return ( self.name == other.name
+         and self.type == other.type
+         and self.meta == other.meta
+         and self.block.hashcode == other.block.hashcode
+           )
 
   @property
   def isfile(self):
@@ -234,7 +241,7 @@ class _Dirent(object):
 
     return (unixmode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime)
 
-class FileDirent(_Dirent, NestingOpenCloseMixin):
+class FileDirent(_Dirent, MultiOpenMixin):
   ''' A _Dirent subclass referring to a file.
       If closed, ._block refers to the file content.
       If open, ._open_file refers to the content.
@@ -246,8 +253,7 @@ class FileDirent(_Dirent, NestingOpenCloseMixin):
   def __init__(self, name, metatext=None, block=None):
     if block is None:
       block = Block(data=b'')
-    self._lock = RLock()
-    NestingOpenCloseMixin.__init__(self)
+    MultiOpenMixin.__init__(self)
     _Dirent.__init__(self, D_FILE_T, name, metatext=metatext)
     self._open_file = None
     self._block = block
@@ -292,19 +298,16 @@ class FileDirent(_Dirent, NestingOpenCloseMixin):
     return len(self.block)
 
   @locked
-  def on_open(self, count):
+  def startup(self, count):
     ''' Set up ._open_file on first open.
     '''
     self._check()
-    if count < 1:
-      raise ValueError("expected count >= 1, got: %r" % (count,))
-    if count == 1:
-      if self._open_file is not None:
-        raise RuntimeError("first open, but ._open_file is not None: %r" % (self._open_file,))
-      if self._block is None:
-        raise RuntimeError("first open, but ._block is None")
-      self._open_file = File(self._block)
-      self._block = None
+    if self._open_file is not None:
+      raise RuntimeError("first open, but ._open_file is not None: %r" % (self._open_file,))
+    if self._block is None:
+      raise RuntimeError("first open, but ._block is None")
+    self._open_file = File(self._block)
+    self._block = None
     self._check()
 
   @locked
@@ -410,6 +413,7 @@ class Dir(_Dirent):
                      for name in names
                      if name != '.' and name != '..'
                    )
+    # TODO: if len(data) >= 16384
     return Block(data=data)
 
   def dirs(self):
@@ -453,12 +457,13 @@ class Dir(_Dirent):
   def __setitem__(self, name, E):
     ''' Store a _Dirent in the specified name slot.
     '''
-    X("<%s>[%s]=%s" % (self.name, name, E))
     if not self._validname(name):
       raise KeyError("invalid name: %s" % (name,))
     if not isinstance(E, _Dirent):
       raise ValueError("E is not a _Dirent: <%s>%r" % (type(E), E))
     self.entries[name] = E
+    if E.isdir and E.parent is None:
+      E.parent = D
 
   def __delitem__(self, name):
     if not self._validname(name):
@@ -466,6 +471,15 @@ class Dir(_Dirent):
     if name == '.' or name == '..':
       raise KeyError("refusing to delete . or ..: name=%s" % (name,))
     del self.entries[name]
+
+  def add(self, E):
+    ''' Add a Dirent to this Dir.
+        If the name is already taken, raise KeyError.
+    '''
+    name = E.name
+    if name in self:
+      raise KeyError("name already exists: %r", name)
+    self[name] = E
 
   def rename(self, oldname, newname):
     ''' Rename entry `oldname` to entry `newname`.
@@ -529,3 +543,7 @@ class Dir(_Dirent):
       E = subE
 
     return E
+
+if __name__ == '__main__':
+  import cs.venti.dir_tests
+  cs.venti.dir_tests.selftest(sys.argv)

@@ -129,7 +129,7 @@ _deploy:
         :make _home
         OPTCSS=$(PREFIX) updcss
 
-_publish:
+_publish _pub:
         :make _publish_bitbucket
         :make _publish_ezos
 

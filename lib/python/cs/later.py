@@ -26,12 +26,12 @@ import time
 from cs.debug import ifdebug, Lock, RLock, Thread, trace_caller, thread_dump
 from cs.excutils import noexc, noexc_gen, logexc, logexc_gen, LogExceptions
 from cs.queues import IterableQueue, IterablePriorityQueue, PushQueue, \
-                        NestingOpenCloseMixin, TimerQueue
+                        MultiOpenMixin, TimerQueue
 from cs.threads import AdjustableSemaphore, \
                        WorkerThreadPool, locked
 from cs.asynchron import Result, Asynchron, ASYNCH_RUNNING, report
 from cs.seq import seq, TrackingCounter
-from cs.logutils import Pfx, PfxCallInfo, error, info, warning, debug, exception, D, OBSOLETE
+from cs.logutils import Pfx, PfxCallInfo, error, info, warning, debug, exception, D, X, OBSOLETE
 
 # function signature designators, used with Later.pipeline()
 FUNC_ONE_TO_MANY = 0
@@ -297,18 +297,17 @@ class _PipelinePushQueue(PushQueue):
   def __str__(self):
     return "%s[%s]" % (PushQueue.__str__(self), self.pipeline)
 
-class _Pipeline(NestingOpenCloseMixin):
+class _Pipeline(MultiOpenMixin):
   ''' A _Pipeline encapsulates the chain of PushQueues created by a call to Later.pipeline.
   '''
 
   def __init__(self, name, L, filter_funcs, outQ):
     ''' Initialise the _Pipeline from `name`, Later instance `L`, list  of filter functions `filter_funcs` and output queue `outQ`.
     '''
+    MultiOpenMixin.__init__(self)
     self.name = name
     self.later = L
     self.queues = [outQ]
-    self._lock = Lock()
-    NestingOpenCloseMixin.__init__(self)
     # counter tracking items in play
     self._busy = TrackingCounter(name="Pipeline<%s>._items" % (name,))
     RHQ = outQ
@@ -420,7 +419,7 @@ class _Pipeline(NestingOpenCloseMixin):
       raise ValueError("unsupported function signature %r" % (func_sig,))
     return func_iter, func_final
 
-class Later(NestingOpenCloseMixin):
+class Later(MultiOpenMixin):
   ''' A management class to queue function calls for later execution.
       If `capacity` is an int, it is used to size a Semaphore to constrain
       the number of dispatched functions which may be in play at a time.
@@ -436,10 +435,9 @@ class Later(NestingOpenCloseMixin):
   def __init__(self, capacity, name=None, inboundCapacity=0):
     if name is None:
       name = "Later-%d" % (seq(),)
-    self._lock = RLock()
+    MultiOpenMixin.__init__(self)
     self._finished = threading.Condition(self._lock)
     self.finished = False
-    NestingOpenCloseMixin.__init__(self)
     if ifdebug():
       import inspect
       filename, lineno = inspect.stack()[1][1:3]
@@ -503,6 +501,9 @@ class Later(NestingOpenCloseMixin):
     '''
     return self.defer(func, *a, **kw)()
 
+  def startup(self):
+    pass
+
   def shutdown(self):
     ''' Shut down the Later instance:
         - close the TimerQueue, if any, and wait for it to complete
@@ -521,7 +522,7 @@ class Later(NestingOpenCloseMixin):
       if self._timerQ:
         self._timerQ.close()
         self._timerQ.join()
-      self._pendingq.close()              # prevent further submissions
+      self._pendingq.close()          # prevent further submissions
       self._workers.close()           # wait for all worker threads to complete
       self._dispatchThread.join()     # wait for all functions to be dispatched
       self._finished.acquire()
@@ -589,9 +590,9 @@ class Later(NestingOpenCloseMixin):
     self._track("_completed(%s)" % (LF.name,), LF, self.running, None)
 
   def __enter__(self):
-    debug("%s: __enter__", self)
     global default
-    L = NestingOpenCloseMixin.__enter__(self)
+    debug("%s: __enter__", self)
+    L = MultiOpenMixin.__enter__(self)
     default.push(L)
     return L
 
@@ -599,9 +600,9 @@ class Later(NestingOpenCloseMixin):
     ''' Exit handler: release the "complete" lock; the placeholder
         function is blocking on this, and will return on its release.
     '''
-    debug("%s: __exit__: exc_type=%s", self, exc_type)
-    NestingOpenCloseMixin.__exit__(self, exc_type, exc_val, exc_tb)
     global default
+    debug("%s: __exit__: exc_type=%s", self, exc_type)
+    MultiOpenMixin.__exit__(self, exc_type, exc_val, exc_tb)
     default.pop()
     return False
 
@@ -649,7 +650,7 @@ class Later(NestingOpenCloseMixin):
 
   def __del__(self):
     if not self.closed:
-      self._close()
+      self.shutdown()
 
   def _dispatcher(self):
     ''' Read LateFunctions from the inbound queue as capacity is available

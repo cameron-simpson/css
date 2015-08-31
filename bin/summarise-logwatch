@@ -26,6 +26,7 @@ s/  *$//
   /^--/d
   /^\*\*Unmatched Entries\*\*/d
   /^network unreachable resolving '/d
+  /^host unreachable resolving '/d
   /^connection refused resolving '/d
   /^client .* query .* denied/d
   /^$/d
