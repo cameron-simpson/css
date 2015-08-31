@@ -16,7 +16,7 @@ DISTINFO = {
 }
 
 import threading
-from threading import Condition
+from threading import Condition, RLock
 import time
 import traceback
 from cs.excutils import logexc
@@ -39,8 +39,7 @@ class MultiOpenMixin(O):
   ''' A mixin to count open and closes, and to call .startup on the first .open and to call .shutdown on the last .close.
       Use as a context manager calls open()/close() from __enter__() and __exit__().
       Multithread safe.
-      This mixin uses the internal attribute _opens and relies on a
-      preexisting attribute _lock for locking, which must be recursive.
+      This mixin defines ._lock = RLock(); subclasses need not bother.
       Classes using this mixin need to define .startup and .shutdown.
   '''
 
@@ -56,6 +55,7 @@ class MultiOpenMixin(O):
     self.opened = False
     self._opens = 0
     ##self.closed = False # final _close() not yet called
+    self._lock = RLock()
     self._finalise_later = finalise_later
     self._finalise = Condition(self._lock)
 
