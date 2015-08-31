@@ -15,7 +15,7 @@ DISTINFO = {
 
 from getopt import GetoptError
 import sys
-from cs.logutils import setup_logging, warning, error, info, D
+from cs.logutils import setup_logging, warning, error, info, D, X
 from .make import Maker
 from .parse import parseMacroAssignment
 
