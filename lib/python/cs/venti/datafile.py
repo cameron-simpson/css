@@ -101,9 +101,9 @@ class DataFile(MultiOpenMixin):
     self.fp.close()
     self.fp = None
 
-  def scan(self, uncompress=False):
+  def scan(self, do_decompress=False):
     ''' Scan the data file and yield (offset, flags, zdata) tuples.
-        If `uncompress` is true, decompress the data and strip that flag value.
+        If `do_decompress` is true, decompress the data and strip that flag value.
         This can be used in parallel with other activity.
     '''
     with self:
@@ -117,8 +117,8 @@ class DataFile(MultiOpenMixin):
             break
         yield offset, flags, data
 
-  def readdata(self, offset):
-    ''' Read data bytes from the supplied offset.
+  def get(self, offset):
+    ''' Fetch data bytes from the supplied offset.
     '''
     fp = self.fp
     with self._lock:
@@ -127,19 +127,7 @@ class DataFile(MultiOpenMixin):
       raise ValueError("unhandled flags: 0x%02x" % (flags,))
     return data
 
-  def _readhere(self, fp):
-    ''' Retrieve the data bytes stored at the current file offset.
-        The offset points at the flags ahead of the data bytes.
-        Presumes the ._lock is already taken.
-    '''
-    flags = read_bs(fp)
-    if (flags & ~F_COMPRESSED) != 0:
-      raise ValueError("flags other than F_COMPRESSED: 0x%02x" % ((flags & ~F_COMPRESSED),))
-    flags = DataFlags(flags)
-    data = read_bsdata(fp)
-    return flags, data
-
-  def savedata(self, data, noCompress=False):
+  def put(self, data, no_compress=False):
     ''' Append a chunk of data to the file, return the store offset.
     '''
     with self._lock:
@@ -240,7 +228,7 @@ class _DataDir(MultiOpenMixin):
     return hash in self._index(hash.HASHNAME)
     
   def __getitem__(self, hashcode):
-    ''' Return the uncompressed data associated with the supplied `hashcode`.
+    ''' Return the decompressed data associated with the supplied `hashcode`.
     '''
     entry = self._index(hashcode.HASHNAME)[hashcode]
     n, offset = self.decodeIndexEntry(entry)
