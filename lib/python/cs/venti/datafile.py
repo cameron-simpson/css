@@ -12,7 +12,7 @@ import os.path
 from threading import Lock, RLock
 from zlib import compress, decompress
 from cs.cache import LRU_Cache
-from cs.logutils import D, X, debug
+from cs.logutils import D, X, debug, warning
 from cs.obj import O
 from cs.queues import MultiOpenMixin
 from cs.serialise import get_bs, put_bs, read_bs, put_bsdata, read_bsdata
