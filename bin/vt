@@ -561,13 +561,16 @@ def cmd_scan(args, verbose=None, log=None):
   if len(args) != 1:
     raise GetoptError("missing datafile")
   datafile = args[0]
-  from cs.venti.datafile import DataFile
+  from cs.venti.datafile import DataFile, F_COMPRESSED, decompress
   from cs.venti.hash import Hash_SHA1
   with Pfx(datafile):
-    dfp = DataFile(datafile)
-    for offset, flags, data in dfp.scan():
-      print(Hash_SHA1.fromData(data), offset, flags, len(data))
-    dfp.close()
+    with DataFile(datafile) as dfp:
+      for offset, flags, data in dfp.scan():
+        if flags & F_COMPRESSED:
+          data2 = decompress(data)
+        else:
+          data2 = data
+        print(Hash_SHA1.from_data(data2), offset, flags, len(data))
   return 0
 
 # =item B<unpack> I<archive>B<.vt>
