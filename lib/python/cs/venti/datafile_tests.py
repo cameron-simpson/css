@@ -18,7 +18,7 @@ from .hash import DEFAULT_HASHCLASS
 
 # arbitrary limit
 MAX_BLOCK_SIZE = 16383
-RUN_SIZE = 100  # 1000
+RUN_SIZE = 100
 
 class TestDataFile(TestCase):
 
@@ -72,11 +72,8 @@ class TestDataDir(TestCase):
     random.seed()
     self.pathname = tempfile.mkdtemp(prefix="cs.venti.datafile.testdir", suffix=".dir", dir='.')
     self.datadir = DataDir(self.pathname, rollover=200000)
-    self.datadir_open = self.datadir.open()
-    self.datafiles = []
 
   def tearDown(self):
-    self.datadir_open.close()
     shutil.rmtree(self.pathname)
 
   def test000IndexEntry(self):
@@ -94,50 +91,50 @@ class TestDataDir(TestCase):
     '''
     hashclass = DEFAULT_HASHCLASS
     hashfunc = hashclass.from_data
-    D = self.datadir_open
-    by_hash = {}
-    by_data = {}
-    # store RUN_SIZE random blocks
-    for n in range(RUN_SIZE):
-      with self.subTest(store_block_n=n):
-        data = randblock(rand0(MAX_BLOCK_SIZE))
-        if data in by_data:
-          X("repeated random block, skipping")
-          continue
-        hashcode = hashfunc(data)
-        # test integrity first
-        self.assertFalse(hashcode in by_hash)
-        self.assertFalse(data in by_data)
-        self.assertFalse(hashcode in D)
-        # store block/hashcode
-        by_hash[hashcode] = data
-        by_data[data] = hashcode
-        D[hashcode] = data
-        # test integrity afterwards
-        self.assertTrue(hashcode in by_hash)
-        self.assertTrue(data in by_data)
-        self.assertTrue(hashcode in D)
-    # now retrieve in random order
-    hashcodes = list(by_hash.keys())
-    random.shuffle(hashcodes)
-    for hashcode in hashcodes:
-      with self.subTest(probe_hashcode=hashcode):
-        self.assertTrue(hashcode in by_hash)
-        self.assertTrue(hashcode in D)
-        odata = by_hash[hashcode]
-        data = D[hashcode]
-        self.assertEqual(data, odata)
-    # close datadir, reopen, reretrieve
-    D = self.datadir_open = DataDir(self.pathname, rollover=200000).open()
-    hashcodes = list(by_hash.keys())
-    random.shuffle(hashcodes)
-    for n, hashcode in enumerate(hashcodes):
-      with self.subTest(n=n, reprobe_hashcode=hashcode):
-        self.assertTrue(hashcode in by_hash)
-        self.assertTrue(hashcode in D)
-        odata = by_hash[hashcode]
-        data = D[hashcode]
-        self.assertEqual(data, odata)
+    with self.datadir as D:
+      D = self.datadir
+      by_hash = {}
+      by_data = {}
+      # store RUN_SIZE random blocks
+      for n in range(RUN_SIZE):
+        with self.subTest(store_block_n=n):
+          data = randblock(rand0(MAX_BLOCK_SIZE))
+          if data in by_data:
+            continue
+          hashcode = hashfunc(data)
+          # test integrity first
+          self.assertFalse(hashcode in by_hash)
+          self.assertFalse(data in by_data)
+          self.assertFalse(hashcode in D)
+          # store block/hashcode
+          by_hash[hashcode] = data
+          by_data[data] = hashcode
+          D[hashcode] = data
+          # test integrity afterwards
+          self.assertTrue(hashcode in by_hash)
+          self.assertTrue(data in by_data)
+          self.assertTrue(hashcode in D)
+      # now retrieve in random order
+      hashcodes = list(by_hash.keys())
+      random.shuffle(hashcodes)
+      for hashcode in hashcodes:
+        with self.subTest(probe_hashcode=hashcode):
+          self.assertTrue(hashcode in by_hash)
+          self.assertTrue(hashcode in D)
+          odata = by_hash[hashcode]
+          data = D[hashcode]
+          self.assertEqual(data, odata)
+    # reopen the DataDir
+    with DataDir(self.pathname, rollover=200000) as D:
+      hashcodes = list(by_hash.keys())
+      random.shuffle(hashcodes)
+      for n, hashcode in enumerate(hashcodes):
+        with self.subTest(n=n, reprobe_hashcode=hashcode):
+          self.assertTrue(hashcode in by_hash)
+          self.assertTrue(hashcode in D)
+          odata = by_hash[hashcode]
+          data = D[hashcode]
+          self.assertEqual(data, odata)
 
 def selftest(argv):
   if False:
