@@ -244,7 +244,11 @@ class _DataDir(MultiOpenMixin):
     '''
     entry = self._index(hashcode.HASHNAME)[hashcode]
     n, offset = self.decodeIndexEntry(entry)
-    return self.datafile(n).readdata(offset)
+    try:
+      data = self.datafile(n).get(offset)
+    except Exception as e:
+      raise KeyError("%s: index said (%d, %d) but fetch fails: %s" % (hashcode, n, offset, e))
+    return data
 
   def __setitem__(self, hashcode, data):
     ''' Store the supplied `data` indexed by `hashcode`.
