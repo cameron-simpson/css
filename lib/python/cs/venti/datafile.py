@@ -88,14 +88,16 @@ class DataFile(MultiOpenMixin):
   '''
 
   def __init__(self, pathname):
-    self._lock = RLock()
+    MultiOpenMixin.__init__(self)
     self.pathname = pathname
-    self.fp = open(self.pathname, "a+b")
 
   def __str__(self):
     return "DataFile(%s)" % (self.pathname,)
 
-  def close(self):
+  def startup(self):
+    self.fp = open(self.pathname, "a+b")
+
+  def shutdown(self):
     self.fp.close()
     self.fp = None
 
@@ -252,7 +254,8 @@ class _DataDir(MultiOpenMixin):
       # save the data in the current datafile, record the file number and offset
       n = self.n
       D = self.datafile(n)
-      offset = D.savedata(data)
+      with D:
+        offset = D.put(data)
       I[hashcode] = self.encodeIndexEntry(n, offset)
       # roll over to a new file number if the current one has grown too large
       with self._lock:
@@ -298,6 +301,7 @@ class _DataDir(MultiOpenMixin):
       D = datafiles.get(n)
       if D is None:
         D = datafiles[n] = DataFile(self.pathto(self.datafilename(n)))
+        D.open()
     return D
 
   def _remove_open(self, key, value):
