@@ -149,7 +149,8 @@ class _DataDir(MultiOpenMixin):
     MultiOpenMixin.__init__(self)
     self.dirpath = dirpath
     self._rollover = rollover
-    self._datafile_cache = LRU_Cache(maxsize=4, on_remove=self._remove_open)
+    self._datafile_cache = LRU_Cache(maxsize=4,
+                                     on_remove=lambda k, datafile: datafile.close())
     self._indices = {}
     self._n = None
 
@@ -162,10 +163,9 @@ class _DataDir(MultiOpenMixin):
         Close any open datafiles.
     '''
     with self._lock:
-      for hashname in self._indices:
-        I = self._indices[hashname]
-        I.sync()
-        I.close()
+      for index in self._indices.values():
+        index.sync()
+        index.close()
       self._indices = {}
       self._datafile_cache.flush()
 
@@ -296,9 +296,6 @@ class _DataDir(MultiOpenMixin):
         D.open()
     return D
 
-  def _remove_open(self, key, value):
-    value.close()
-
   def datafilename(self, n):
     ''' Return the file basename for file index `n`.
     '''
@@ -340,7 +337,6 @@ class GDBMDataDir(_DataDir):
   def _openIndex(self, hashname):
     import dbm.gnu
     gdbm_path = self.pathto("index-%s.gdbm" % (hashname,))
-    debug("gdbm_path = %r", gdbm_path)
     return dbm.gnu.open(gdbm_path, 'c')
 
 # the default DataDir implementation
