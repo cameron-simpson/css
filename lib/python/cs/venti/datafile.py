@@ -46,7 +46,43 @@ class DataFlags(int):
   def compressed(self):
     return self & F_COMPRESSED
 
-class DataFile(object):
+def read_chunk(fp, offset, do_decompress=False):
+  ''' Read a data chunk from the specified offset. Return (flags, chunk, post_offset).
+      If do_decompress is true and flags&F_COMPRESSED, strip that
+      flag and decompress the data before return.
+      Raises EOFError on end of file.
+  '''
+  if fp.tell() != offset:
+    fp.flush()
+    fp.seek(offset)
+  flags = read_bs(fp)
+  if (flags & ~F_COMPRESSED) != 0:
+    raise ValueError("flags other than F_COMPRESSED: 0x%02x" % ((flags & ~F_COMPRESSED),))
+  flags = DataFlags(flags)
+  data = read_bsdata(fp)
+  offset = fp.tell()
+  if do_decompress and (flags & F_COMPRESSED):
+    data = decompress(data)
+    flags &= ~F_COMPRESSED
+  return flags, data, offset
+
+def append_chunk(fp, data, no_compress=False):
+  ''' Append a data chunk to the file, return the store offset.
+      If not no_compress, try to compress the chunk.
+  '''
+  flags = 0
+  if not no_compress:
+    data2 = compress(data)
+    if len(data2) < len(data):
+      data = data2
+      flags |= F_COMPRESSED
+    fp.seek(0, SEEK_END)
+    offset = fp.tell()
+    fp.write(put_bs(flags))
+    fp.write(put_bsdata(data))
+  return offset
+
+class DataFile(MultiOpenMixin):
   ''' A cs.venti data file, storing data chunks in compressed form.
       This is the usual persistence layer of a local venti Store.
   '''
@@ -73,17 +109,10 @@ class DataFile(object):
       offset = 0
       while True:
         with self._lock:
-          if fp.tell() != offset:
-            fp.flush()
-            fp.seek(offset)
-          flags, data = self._readhere(fp)
-          offset = fp.tell()
-        if flags is None:
-          break
-        if uncompress:
-          if flags & F_COMPRESSED:
-            data = decompress(data)
-            flags &= ~F_COMPRESSED
+          try:
+            flags, data, offset = read_chunk(self.fp, offset, do_decompress=do_decompress)
+          except EOFError:
+            break
         yield offset, flags, data
 
   def readdata(self, offset):
@@ -91,12 +120,9 @@ class DataFile(object):
     '''
     fp = self.fp
     with self._lock:
-      fp.seek(offset, SEEK_SET)
-      flags, data = self._readhere(fp)
-    if flags is None:
-      raise RuntimeError("no data read from offset %d" % (offset,))
-    if flags & F_COMPRESSED:
-      data = decompress(data)
+      flags, data, offset = read_chunk(self.fp, offset, do_decompress=True)
+    if flags:
+      raise ValueError("unhandled flags: 0x%02x" % (flags,))
     return data
 
   def _readhere(self, fp):
@@ -114,19 +140,8 @@ class DataFile(object):
   def savedata(self, data, noCompress=False):
     ''' Append a chunk of data to the file, return the store offset.
     '''
-    flags = 0
-    if not noCompress:
-      zdata = compress(data)
-      if len(zdata) < len(data):
-        data = zdata
-        flags |= F_COMPRESSED
-    fp = self.fp
     with self._lock:
-      fp.seek(0, SEEK_END)
-      offset = fp.tell()
-      fp.write(put_bs(flags))
-      fp.write(put_bsdata(data))
-    return offset
+      return append_chunk(self.fp, data, no_compress=no_compress)
 
 class _DataDir(MultiOpenMixin):
   ''' A mapping of hash->Block that manages a directory of DataFiles.
