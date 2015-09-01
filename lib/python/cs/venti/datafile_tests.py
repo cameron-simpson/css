@@ -37,13 +37,11 @@ class TestDataFile(TestCase):
   # TODO: tests:
   #   scan datafile
 
-  @skip
   def test00store1(self):
     ''' Save a single block.
     '''
     self.datafile.put(randblock(rand0(MAX_BLOCK_SIZE)))
 
-  @skip
   def test01fetch1(self):
     ''' Save and the retrieve a single block.
     '''
@@ -53,21 +51,21 @@ class TestDataFile(TestCase):
     self.assertEqual(data, data2)
 
   def test02randomblocks(self):
-    ''' Save 100 random blocks, close, retrieve in random order.
+    ''' Save RUN_SIZE random blocks, close, retrieve in random order.
     '''
     blocks = {}
-    for _ in range(100):
-      data = randblock(rand0(MAX_BLOCK_SIZE))
-      offset = self.datafile.put(data)
-      blocks[offset] = data
+    for n in range(RUN_SIZE):
+      with self.subTest(put_block_n=n):
+        data = randblock(rand0(MAX_BLOCK_SIZE))
+        offset = self.datafile.put(data)
+        blocks[offset] = data
     offsets = list(blocks.keys())
     random.shuffle(offsets)
-    for offset in offsets:
-      with self.subTest(offset=offset):
+    for n, offset in enumerate(offsets):
+      with self.subTest(shuffled_offsets_n=n, offset=offset):
         data = self.datafile.get(offset)
         self.assertTrue(data == blocks[offset])
 
-@skip
 class TestDataDir(TestCase):
 
   def setUp(self):
@@ -84,7 +82,7 @@ class TestDataDir(TestCase):
   def test000IndexEntry(self):
     ''' Test roundtrip of index entry encode/decode.
     '''
-    for count in range(100):
+    for count in range(RUN_SIZE):
       rand_n = random.randint(0, 65536)
       rand_offset = random.randint(0, 65536)
       n, offset = DataDir.decodeIndexEntry(DataDir.encodeIndexEntry(rand_n, rand_offset))
@@ -99,44 +97,47 @@ class TestDataDir(TestCase):
     D = self.datadir_open
     by_hash = {}
     by_data = {}
-    # store 100 random blocks
-    for _ in range(RUN_SIZE):
-      data = randblock(rand0(MAX_BLOCK_SIZE))
-      if data in by_data:
-        X("repeated random block, skipping")
-        continue
-      hashcode = hashfunc(data)
-      # test integrity first
-      self.assertFalse(hashcode in by_hash)
-      self.assertFalse(data in by_data)
-      self.assertFalse(hashcode in D)
-      # store block/hashcode
-      by_hash[hashcode] = data
-      by_data[data] = hashcode
-      D[hashcode] = data
-      # test integrity afterwards
-      self.assertTrue(hashcode in by_hash)
-      self.assertTrue(data in by_data)
-      self.assertTrue(hashcode in D)
+    # store RUN_SIZE random blocks
+    for n in range(RUN_SIZE):
+      with self.subTest(store_block_n=n):
+        data = randblock(rand0(MAX_BLOCK_SIZE))
+        if data in by_data:
+          X("repeated random block, skipping")
+          continue
+        hashcode = hashfunc(data)
+        # test integrity first
+        self.assertFalse(hashcode in by_hash)
+        self.assertFalse(data in by_data)
+        self.assertFalse(hashcode in D)
+        # store block/hashcode
+        by_hash[hashcode] = data
+        by_data[data] = hashcode
+        D[hashcode] = data
+        # test integrity afterwards
+        self.assertTrue(hashcode in by_hash)
+        self.assertTrue(data in by_data)
+        self.assertTrue(hashcode in D)
     # now retrieve in random order
     hashcodes = list(by_hash.keys())
     random.shuffle(hashcodes)
     for hashcode in hashcodes:
-      self.assertTrue(hashcode in by_hash)
-      self.assertTrue(hashcode in D)
-      odata = by_hash[hashcode]
-      data = D[hashcode]
-      self.assertEqual(data, odata)
+      with self.subTest(probe_hashcode=hashcode):
+        self.assertTrue(hashcode in by_hash)
+        self.assertTrue(hashcode in D)
+        odata = by_hash[hashcode]
+        data = D[hashcode]
+        self.assertEqual(data, odata)
     # close datadir, reopen, reretrieve
     D = self.datadir_open = DataDir(self.pathname, rollover=200000).open()
     hashcodes = list(by_hash.keys())
     random.shuffle(hashcodes)
-    for hashcode in hashcodes:
-      self.assertTrue(hashcode in by_hash)
-      self.assertTrue(hashcode in D)
-      odata = by_hash[hashcode]
-      data = D[hashcode]
-      self.assertEqual(data, odata)
+    for n, hashcode in enumerate(hashcodes):
+      with self.subTest(n=n, reprobe_hashcode=hashcode):
+        self.assertTrue(hashcode in by_hash)
+        self.assertTrue(hashcode in D)
+        odata = by_hash[hashcode]
+        data = D[hashcode]
+        self.assertEqual(data, odata)
 
 def selftest(argv):
   if False:
