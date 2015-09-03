@@ -27,6 +27,7 @@ def pipefrom(argv, trace=False, **kw):
       `argv`: the command argument list
       `trace`: Default False. If True, recite invocation to stderr.
         Otherwise presume a stream to which to recite the invocation.
+      The command's stdin is attached to the null device.
       Other keyword arguments are passed to io.TextIOWrapper.
   '''
   if trace:
@@ -35,4 +36,19 @@ def pipefrom(argv, trace=False, **kw):
     print(*pargv, file=tracefp)
   P = subprocess.Popen(argv, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE)
   P.stdout = io.TextIOWrapper(P.stdout, **kw)
+  return P
+
+def pipeto(argv, trace=False, **kw):
+  ''' Pipe text to a command. Optionally trace invocation. Return the Popen object with .stdin encoded as text.
+      `argv`: the command argument list
+      `trace`: Default False. If True, recite invocation to stderr.
+        Otherwise presume a stream to which to recite the invocation.
+      Other keyword arguments are passed to io.TextIOWrapper.
+  '''
+  if trace:
+    tracefp = sys.stderr if trace is True else trace
+    pargv = ['+', '|'] + argv
+    print(*pargv, file=tracefp)
+  P = subprocess.Popen(argv, stdin=subprocess.PIPE)
+  P.stdin = io.TextIOWrapper(P.stdin, **kw)
   return P
