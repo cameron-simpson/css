@@ -45,21 +45,22 @@ class IViewInfo(_IViewInfo):
     if isinstance(R, str):
       R = re.compile(R, re.I)
     return R.search(self.title) or R.search(self.episode)
-  def fetch(self, url, overwrite=False, make_mp4=False):
+  def fetch(self, overwrite=False, make_mp4=False):
+    ''' Fetch video, optionally convert to MP4.
     '''
-    '''
+    url = self.url
     with Pfx('fetch: %s', url):
       base, ext = os.path.splitext(os.path.basename(url))
       if ext != '.mp4':
         warning('expected .mp4 but ext=%r', ext)
       output_flv = base + '.flv'
-      output_mp4 = base + ',mp4'
+      output_mp4 = base + '.mp4'
       with Pfx(output_flv):
         if not overwrite and os.path.exists(output_flv):
           warning('FLV output exists, skipping fetch')
           xit = 0
         else:
-          argv = ['iview-cli', '-d']
+          argv = ['iview-cli', '-d', url]
           xit = run(argv)
           if xit != 0:
             error("nonzero exit from %r: %d", argv, xit)
@@ -67,7 +68,7 @@ class IViewInfo(_IViewInfo):
               try:
                 os.remove(output_flv)
               except OSError as e:
-                if e.error != ENOENT:
+                if e.errno != ENOENT:
                   error('%s', e)
               else:
                 info('removed')
@@ -75,7 +76,7 @@ class IViewInfo(_IViewInfo):
         if make_mp4:
           with Pfx(output_mp4):
             if not overwrite and os.path.exists(output_mp4):
-              warning('MP4 output exists, skipping: %r', output_mp4)
+              warning('MP4 output exists, skipping conversion')
             else:
               argv = ['ffmpeg', '-i', output_flv, '-strict', '-2', '--', output_mp4]
               xit = run(argv)
@@ -85,7 +86,7 @@ class IViewInfo(_IViewInfo):
                   try:
                     os.remove(output_mp4)
                   except OSError as e:
-                    if e.error != ENOENT:
+                    if e.errno != ENOENT:
                       error('%s', e)
                   else:
                     info('removed')
