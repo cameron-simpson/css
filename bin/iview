@@ -8,10 +8,11 @@
 from __future__ import print_function, absolute_import
 import os
 import sys
+import datetime
 import re
+import subprocess
 from io import TextIOWrapper
 from collections import namedtuple
-import subprocess
 from cs.cmdutils import run, pipefrom
 from cs.logutils import setup_logging, error, warning, info, Pfx, X
 
@@ -20,16 +21,73 @@ USAGE = '''Usage:
                 Download specified files.
   %s [ls] [/regexp/]
                 Listing selected by regexp.
+  %s meta [/regexp/]
+                Print metadata about selected programmes.
   %s programme  Return the full output of iview-cli --programme.'''
 
 _IViewInfo = namedtuple('IViewInfo', 'title episode url')
+
 class IViewInfo(_IViewInfo):
+
   def print(self):
+    ''' Print out this object, TAB separated.
+    '''
     print(self.title, self.episode, self.url, sep='\t')
+
   def match_re(self, R):
+    ''' Test whether this object's title or episode is matched by `R`.
+    '''
     if isinstance(R, str):
       R = re.compile(R, re.I)
     return R.search(self.title) or R.search(self.episode)
+
+  @property
+  def series_number(self):
+    ''' Return the series number if it can be inferred.
+    '''
+    parts = os.path.basename(self.url).split('_')
+    if len(parts) >= 4:
+      ss, ep, other = parts[-3:]
+      if len(ss) == 2 and ss.isdigit() and len(ep) == 2 and ep.isdigit():
+        return int(ss)
+    ep_words = self.episode.lower().split()
+    if ( len(ep_words) >= 4
+     and ep_words[0] == 'series'
+     and ep_words[1].isdigit()
+       ):
+      return int(ep_words[1])
+
+  @property
+  def episode_number(self):
+    ''' Return the series number if it can be inferred.
+    '''
+    parts = os.path.basename(self.url).split('_')
+    if len(parts) >= 4:
+      ss, ep, other = parts[-3:]
+      if len(ss) == 2 and ss.isdigit() and len(ep) == 2 and ep.isdigit():
+        return int(ep)
+    ep_words = self.episode.lower().split()
+    if ( len(ep_words) >= 4
+     and ep_words[0] == 'series'
+     and ep_words[1].isdigit()
+     and ep_words[2] == 'episode'
+     and ep_words[3].isdigit()
+       ):
+      return int(ep_words[3])
+
+  @property
+  def date(self):
+    ''' If there are no series or episode numbers the date is often encoded.
+    '''
+    parts = os.path.basename(self.url).split('_')
+    if len(parts) >= 3:
+      ddmm, other = parts[-2:]
+      if len(ddmm) == 4 and ddmm.isdigit():
+        dd, mm = int(ddmm[:2]), int(ddmm[2:])
+        if dd >= 1 and dd <= 31 and mm >= 1 and mm <= 12:
+          yyyy = datetime.date.today().year
+          return datetime.date(yyyy, mm, dd)
+
   def fetch(self, overwrite=False, make_mp4=False):
     ''' Fetch video, optionally convert to MP4.
     '''
@@ -142,7 +200,7 @@ def iview_matches(matches):
 
 def main(argv):
   cmd = argv.pop(0)
-  usage = USAGE % (cmd, cmd, cmd)
+  usage = USAGE % (cmd, cmd, cmd, cmd)
   setup_logging(cmd)
   badopts = False
   if not argv:
@@ -162,6 +220,21 @@ def main(argv):
           matches = iview_info()
         for info in matches:
           info.print()
+      elif op == 'meta':
+        if argv:
+          matches = iview_matches(argv)
+        else:
+          matches = iview_info()
+        for info in matches:
+          meta = {}
+          for attr in 'series_number', 'episode_number', 'date':
+            value = getattr(info, attr)
+            if value is not None:
+              meta[attr] = value
+          print(info.title, info.episode, info.url, sep='\t', end='')
+          for k in sorted(meta.keys()):
+            print('\t'+k+'='+str(meta[k]), end='')
+          print()
       elif op == 'programme':
         if argv:
           warning('extra arguments: %r', argv)
