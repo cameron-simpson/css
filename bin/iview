@@ -11,7 +11,7 @@ import sys
 import re
 from io import TextIOWrapper
 from collections import namedtuple
-from subprocess import Popen, PIPE, DEVNULL
+import subprocess
 from cs.logutils import setup_logging, error, warning, info, Pfx, X
 
 USAGE = '''Usage:
@@ -20,6 +20,22 @@ USAGE = '''Usage:
   %s [ls] [/regexp/]
                 Listing selected by regexp.
   %s programme  Return the full output of iview-cli --programme.'''
+
+def run(argv):
+  ''' Run a command. Trace invocation.
+  '''
+  pargv = ['+'] + argv
+  print(*pargv, file=sys.stderr)
+  return subprocess.call(argv)
+
+def pipefrom(argv):
+  ''' Pipe text from a command. Trace invocation.
+  '''
+  pargv = ['+'] + argv + ['|']
+  print(*pargv, file=sys.stderr)
+  P = subprocess.Popen(argv, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE)
+  P.stdout = TextIOWrapper(P.stdout)
+  return P
 
 _IViewInfo = namedtuple('IViewInfo', 'title episode url')
 class IViewInfo(_IViewInfo):
@@ -44,7 +60,7 @@ class IViewInfo(_IViewInfo):
           xit = 0
         else:
           argv = ['iview-cli', '-d']
-          xit = subprocess.call(argv)
+          xit = run(argv)
           if xit != 0:
             error("nonzero exit from %r: %d", argv, xit)
             with Pfx('remove %r', output_flv):
@@ -62,7 +78,7 @@ class IViewInfo(_IViewInfo):
               warning('MP4 output exists, skipping: %r', output_mp4)
             else:
               argv = ['ffmpeg', '-i', output_flv, '-strict', '-2', '--', output_mp4]
-              xit = subprocess.call(argv)
+              xit = run(argv)
               if xit != 0:
                 error("nonzero exit from %r: %d", argv, xit)
                 with Pfx('remove %r', output_mp4):
@@ -79,9 +95,9 @@ def iview_info():
   ''' Generator yieldinfo IViewInfo objects.
   '''
   argv = ['iview-cli', '--programme']
-  P = Popen(argv, stdin=DEVNULL, stdout=PIPE)
+  P = pipefrom(argv)
   title = None
-  for lineno, line in enumerate(TextIOWrapper(P.stdout), 1):
+  for lineno, line in enumerate(P.stdout, 1):
     with Pfx(lineno):
       if not line.endswith('\n'):
         raise ValueError("mssing newline")
