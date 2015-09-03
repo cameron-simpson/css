@@ -34,8 +34,13 @@ def pipefrom(argv, trace=False, **kw):
     tracefp = sys.stderr if trace is True else trace
     pargv = ['+'] + argv + ['|']
     print(*pargv, file=tracefp)
-  P = subprocess.Popen(argv, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE)
+  sp_devnull = getattr(subprocess, 'DEVNULL')
+  if sp_devnull is None:
+    devnull = open(os.devnull, 'wb')
+  P = subprocess.Popen(argv, stdin=devnull, stdout=subprocess.PIPE)
   P.stdout = io.TextIOWrapper(P.stdout, **kw)
+  if sp_devnull is None:
+    devnull.close()
   return P
 
 def pipeto(argv, trace=False, **kw):
