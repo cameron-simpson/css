@@ -98,6 +98,9 @@ class IViewInfo(_IViewInfo):
         warning('expected .mp4 but ext=%r', ext)
       output_flv = base + '.flv'
       output_mp4 = base + '.mp4'
+      if make_mp4 and os.path.exists(output_mp4):
+        warning('MP4 output exists, skipping fetch of FLV')
+        return 0
       with Pfx(output_flv):
         if not overwrite and os.path.exists(output_flv):
           warning('FLV output exists, skipping fetch')
@@ -131,9 +134,10 @@ class IViewInfo(_IViewInfo):
                   except OSError as e:
                     if e.errno != ENOENT:
                       error('%s', e)
+                      xit = 1
                   else:
                     info('removed')
-        return xit
+      return xit
 
 def iview_info():
   ''' Generator yieldinfo IViewInfo objects.
