@@ -37,6 +37,8 @@ def pipefrom(argv, trace=False, **kw):
   sp_devnull = getattr(subprocess, 'DEVNULL')
   if sp_devnull is None:
     devnull = open(os.devnull, 'wb')
+  else:
+    devnull = sp_devnull
   P = subprocess.Popen(argv, stdin=devnull, stdout=subprocess.PIPE)
   P.stdout = io.TextIOWrapper(P.stdout, **kw)
   if sp_devnull is None:
