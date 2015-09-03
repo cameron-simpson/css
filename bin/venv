@@ -13,7 +13,7 @@ pyver() {
   "$VENV_PYTHON" --version 2>&1 | awk '{print$2}'
 }
 
-pyexe=python
+pyexe=${VENV_PYVER:-python}
 
 cmd=`basename "$0"`
 usage="Usage:
