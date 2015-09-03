@@ -1,50 +1,189 @@
-#!/bin/sh
+#!/usr/bin/env python3
 #
 # Trivial convenience wrapper for the essential iview-python tool:
 #  https://github.com/vadmium/python-iview
 # Cameron Simpson <cs@zip.com.au>
 #
 
-trace=
-[ -t 2 ] && trace=set-x
+from __future__ import print_function, absolute_import
+import os
+import sys
+import re
+from io import TextIOWrapper
+from collections import namedtuple
+from subprocess import Popen, PIPE, DEVNULL
+from cs.logutils import setup_logging, error, warning, info, Pfx, X
 
-cmd=$( basename "$0" )
-usage="Usage:
-  $cmd {dl|download} files...
+USAGE = '''Usage:
+  %s {download|dl} {file|/regexp/}...
                 Download specified files.
-  $cmd [ls]     List available files and descriptions.
-  $cmd /regexp/ Listing selected by regexp."
+  %s [ls] [/regexp/]
+                Listing selected by regexp.
+  %s programme  Return the full output of iview-cli --programme.'''
 
-[ $# -gt 0 ] || set -- ls
-op=$1; shift
+_IViewInfo = namedtuple('IViewInfo', 'title episode url')
+class IViewInfo(_IViewInfo):
+  def print(self):
+    print(self.title, self.episode, self.url, sep='\t')
+  def match_re(self, R):
+    if isinstance(R, str):
+      R = re.compile(R, re.I)
+    return R.search(self.title) or R.search(self.episode)
+  def fetch(self, url, overwrite=False, make_mp4=False):
+    '''
+    '''
+    with Pfx('fetch: %s', url):
+      base, ext = os.path.splitext(os.path.basename(url))
+      if ext != '.mp4':
+        warning('expected .mp4 but ext=%r', ext)
+      output_flv = base + '.flv'
+      output_mp4 = base + ',mp4'
+      with Pfx(output_flv):
+        if not overwrite and os.path.exists(output_flv):
+          warning('FLV output exists, skipping fetch')
+          xit = 0
+        else:
+          argv = ['iview-cli', '-d']
+          xit = subprocess.call(argv)
+          if xit != 0:
+            error("nonzero exit from %r: %d", argv, xit)
+            with Pfx('remove %r', output_flv):
+              try:
+                os.remove(output_flv)
+              except OSError as e:
+                if e.error != ENOENT:
+                  error('%s', e)
+              else:
+                info('removed')
+      if xit == 0:
+        if make_mp4:
+          with Pfx(output_mp4):
+            if not overwrite and os.path.exists(output_mp4):
+              warning('MP4 output exists, skipping: %r', output_mp4)
+            else:
+              argv = ['ffmpeg', '-i', output_flv, '-strict', '-2', '--', output_mp4]
+              xit = subprocess.call(argv)
+              if xit != 0:
+                error("nonzero exit from %r: %d", argv, xit)
+                with Pfx('remove %r', output_mp4):
+                  try:
+                    os.remove(output_mp4)
+                  except OSError as e:
+                    if e.error != ENOENT:
+                      error('%s', e)
+                  else:
+                    info('removed')
+        return xit
 
-case "$op" in
+def iview_info():
+  ''' Generator yieldinfo IViewInfo objects.
+  '''
+  argv = ['iview-cli', '--programme']
+  P = Popen(argv, stdin=DEVNULL, stdout=PIPE)
+  title = None
+  for lineno, line in enumerate(TextIOWrapper(P.stdout), 1):
+    with Pfx(lineno):
+      if not line.endswith('\n'):
+        raise ValueError("mssing newline")
+      if line.startswith('\t'):
+        episode, url = line.strip().split('\t', 1)
+        with Pfx('url: %r', url):
+          if url.startswith('('):
+            url = url[1:]
+          else:
+            warning('expected URL to start with open bracket')
+          if url.endswith(')'):
+            url = url[:-1]
+          else:
+            warning('expected URL to end with closing bracket')
+        if title is None:
+          warning('episode before any title, discarded')
+        else:
+          yield IViewInfo(title, episode, url)
+      else:
+        title = line.strip()
+        if title.endswith(':'):
+          title = title[:-1]
+        else:
+          warning('title line not terminated by colon')
+  xit = P.wait()
+  if xit != 0:
+    warning('nonzero exit %d from: %r', xit, argv)
+  return
 
-  /*/)
-    regexp=$( expr "x$op" : 'x/\(.*\)/' )
-    $trace "$0" ls | egrep -i -- "$regexp"
-    exit $?
-    ;;
+def iview_matches(matches):
+  ''' Generator returning matching IViewInfo objects.
+      `matches` is an iterable or regexp objects or regexp strings.
+  '''
+  Rs = []
+  for regexp_s in matches:
+    if isinstance(regexp_s, str):
+      if regexp_s.startswith('/'):
+        regexp_s = regexp_s[1:]
+      if regexp_s.endswith('/'):
+        regexp_s = regexp_s[:-1]
+      try:
+        R = re.compile(regexp_s, re.I)
+      except Exception as e:
+        warning('bad regexp, ignored: %s', e)
+      else:
+        Rs.append(R)
+    else:
+      Rs.append(regexp_s)
+  if Rs:
+    all_info = list(iview_info())
+    for info in all_info:
+      for R in Rs:
+        if info.match_re(R):
+          yield info
+          break
 
-  dl|download)
-    xit=0
-    for url
-    do  $trace iview-cli -d "$url" || xit=1
-    done
-    exit $xit
-    ;;
+def main(argv):
+  cmd = argv.pop(0)
+  usage = USAGE % (cmd, cmd, cmd)
+  setup_logging(cmd)
+  badopts = False
+  if not argv:
+    op = 'programme'
+  elif argv[0].startswith('/'):
+    op = 'ls'
+  else:
+    op = argv.pop(0)
 
-  ls)
-    $trace iview-cli --programme \
-    | sed -n 's/^\t\(.*[^ ]\)\t*(\([^)]*\)) *$/\2 \1/p'
-    exit $?
-    ;;
+  xit = 0
+  if not badopts:
+    with Pfx(op):
+      if op == 'ls':
+        if argv:
+          matches = iview_matches(argv)
+        else:
+          matches = iview_info()
+        for info in matches:
+          info.print()
+      elif op == 'programme':
+        if argv:
+          warning('extra arguments: %r', argv)
+          badopts = True
+        else:
+          xit = os.system('iview-cli --programme')
+      elif op == 'download' or op == 'dl':
+        if argv:
+          matches = iview_matches(argv)
+        else:
+          matches = iview_info()
+        xit = 0
+        for info in matches:
+          with Pfx(info):
+            if info.fetch(overwrite=False, make_mp4=True) != 0:
+              error('fetch fails')
+              xit = 1
+      else:
+        warning('unrecognised operator')
+        badopts = True
+  if badopts:
+    print(usage, file=sys.stderr)
+    xit = 2
+  return xit
 
-  *)
-    echo "$cmd: unrecognised op: $op" >&2
-    badopts=1
-    ;;
-esac
-
-[ $badopts ] && { echo "$usage" >&2; exit 2; }
-exit 1
+if __name__ == '__main__':
+  sys.exit(main(sys.argv))
