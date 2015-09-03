@@ -9,6 +9,7 @@ from __future__ import print_function, absolute_import
 import os
 import sys
 import datetime
+import json
 import re
 import subprocess
 from io import TextIOWrapper
@@ -231,14 +232,14 @@ def main(argv):
           matches = iview_info()
         for info in matches:
           meta = {}
+          for attr in info._fields:
+            meta[attr] = getattr(info, attr)
           for attr in 'series_number', 'episode_number', 'date':
             value = getattr(info, attr)
             if value is not None:
               meta[attr] = value
-          print(info.title, info.episode, info.url, sep='\t', end='')
-          for k in sorted(meta.keys()):
-            print('\t'+k+'='+str(meta[k]), end='')
-          print()
+          filename = os.path.basename(info.url)
+          print(filename, json.dumps(meta, sort_keys=True))
       elif op == 'programme':
         if argv:
           warning('extra arguments: %r', argv)
