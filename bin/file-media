@@ -90,9 +90,10 @@ def main(argv):
 
   xit = 0
 
-  processed = set()
-  with Pfx('stdin'):
-    for lineno, metadata_line in enumerate(sys.stdin, 1):
+  # filing locations
+  filed = {}
+  for lineno, metadata_line in enumerate(sys.stdin, 1):
+    with Pfx('stdin:%d', lineno):
       if not metadata_line.endswith('\n'):
         raise ValueError('missing trailing newline')
       filename, json_s = metadata_line.rstrip().split(None, 1)
@@ -102,13 +103,12 @@ def main(argv):
         metadata = json.loads(json_s)
         newpath = media_path(filename, metadata, formats, source_tag=source_tag)
         if newpath is None:
-          error('no working formats')
+          error('no working format strings')
           xit = 1
         else:
           newpath = os.path.join(media_dir, newpath)
           if os.path.exists(newpath):
-            warning('already exists: %s', newpath)
-            xit = 1
+            warning('already exists, skipping: %s', newpath)
             continue
           target_dir = os.path.dirname(newpath)
           if not os.path.isdir(target_dir):
@@ -120,20 +120,35 @@ def main(argv):
                 error(e)
                 xit = 1
                 continue
-          info('link to %s', newpath)
-          try:
-            os.link(filename, newpath)
-          except OSError as e:
-            if e.errno == EXDEV:
-              info('copy to %s', newpath)
+          filed = False
+          for srcpath in [filename] + filed.get(filename, []):
+            with Pfx('link(%r, %r)', srcpath, newpath):
+              try:
+                os.link(srcpath, newpath)
+              except OSError as e:
+                if e.errno != EXDEV:
+                  warning(e)
+              else:
+                info('success')
+                filed = True
+                filed.setdefault(filename, []).append(newpath)
+          if not filed:
+            with Pfx('copy(%r, %r)', filename, newpath):
               try:
                 shutil.copy2(filename, newpath)
               except OSError as e:
-                error('copy2 %s: %s', newpath, e)
+                error(e)
                 xit = 1
-            else:
-              error('link %s: %s', newpath, e)
-              xit = 1
+              else:
+                info('success')
+                filed = True
+                filed.setdefault(filename, []).append(newpath)
+  
+  # check for unfiled items
+  for filename in filenames:
+    if filename not in filed:
+      error('not filed: %s', filename)
+      xit = 1
 
   return xit
 
