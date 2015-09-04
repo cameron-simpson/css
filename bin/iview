@@ -236,8 +236,11 @@ def main(argv):
             meta[attr] = getattr(info, attr)
           for attr in 'series_number', 'episode_number', 'date':
             value = getattr(info, attr)
-            if value is not None:
-              meta[attr] = value
+            if value is None:
+              continue
+            if isinstance(value, datetime.date):
+              value = value.strftime('%Y-%m-%d')
+            meta[attr] = value
           filename = os.path.basename(info.url)
           print(filename, json.dumps(meta, sort_keys=True), sep='\t')
       elif op == 'programme':
