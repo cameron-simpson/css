@@ -9,7 +9,9 @@ from __future__ import print_function
 import sys
 import os
 import os.path
+from errno import EXDEV
 import json
+import shutil
 from string import Formatter
 from cs.logutils import setup_logging, error, warning, info, Pfx, X
 
@@ -96,26 +98,62 @@ def main(argv):
       filename, json_s = metadata_line.rstrip().split(None, 1)
       with Pfx(filename):
         if filename not in filenames:
-          info('not on command line, skipping')
           continue
         metadata = json.loads(json_s)
-        F = MetaFormatter(metadata)
-        media_path = None
-        for fmt in formats:
-          with Pfx(fmt):
-            try:
-              formatted = F.format(fmt, source_tag=source_tag)
-            except KeyError as e:
-              info('skip format: %s', e)
-              continue
-          media_path = formatted
-          break
-        if media_path is None:
+        newpath = media_path(filename, metadata, formats, source_tag=source_tag)
+        if newpath is None:
           error('no working formats')
           xit = 1
         else:
-          media_path = os.path.join(media_dir, media_path)
-          print('==>', media_path)
+          newpath = os.path.join(media_dir, newpath)
+          if os.path.exists(newpath):
+            warning('already exists: %s', newpath)
+            xit = 1
+            continue
+          target_dir = os.path.dirname(newpath)
+          if not os.path.isdir(target_dir):
+            info('makedirs(%r)', target_dir)
+            with Pfx('makedirs(%r)', target_dir):
+              try:
+                os.makedirs(target_dir)
+              except OSError as e:
+                error(e)
+                xit = 1
+                continue
+          info('link to %s', newpath)
+          try:
+            os.link(filename, newpath)
+          except OSError as e:
+            if e.errno == EXDEV:
+              info('copy to %s', newpath)
+              try:
+                shutil.copy2(filename, newpath)
+              except OSError as e:
+                error('copy2 %s: %s', newpath, e)
+                xit = 1
+            else:
+              error('link %s: %s', newpath, e)
+              xit = 1
+
+  return xit
+
+def media_path(filename, metadata, formats, **kw):
+  ''' Compute filing name.
+      `filename`: source filename
+  '''
+  filebase, ext = os.path.splitext(filename)
+  F = MetaFormatter(metadata)
+  media_path = None
+  for fmt in formats:
+    with Pfx(fmt):
+      try:
+        formatted = F.format(fmt, **kw)
+      except KeyError as e:
+        info('skip format: %s', e)
+        continue
+    media_path = formatted
+    break
+  return media_path + ext
 
 def trim_episode(name):
   ''' Strip leading series/episode info from episode name.
