@@ -239,7 +239,7 @@ def main(argv):
             if value is not None:
               meta[attr] = value
           filename = os.path.basename(info.url)
-          print(filename, json.dumps(meta, sort_keys=True))
+          print(filename, json.dumps(meta, sort_keys=True), sep='\t')
       elif op == 'programme':
         if argv:
           warning('extra arguments: %r', argv)
