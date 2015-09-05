@@ -582,7 +582,10 @@ class Pfx(object):
     if u is None:
       mark = ustr(self.mark)
       if not isinstance(mark, unicode):
-        mark = unicode(mark, errors='replace')
+        if isinstance(mark, str):
+          mark = unicode(mark, errors='replace')
+        else:
+          mark = unicode(mark)
       u = mark
       if self.mark_args:
         u = u % self.mark_args

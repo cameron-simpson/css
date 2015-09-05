@@ -350,6 +350,9 @@ class _Pipeline(MultiOpenMixin):
     '''
     return self.queues[-1]
 
+  def startup(self):
+    pass
+
   def shutdown(self):
     ''' Close the leftmost queue in the pipeline.
     '''
