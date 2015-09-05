@@ -9,7 +9,7 @@ set -ue
 : ${VARRUN:=$HOME/var/run}
 : ${LOGDIR:=$HOME/var/log}
 : ${PORTFWD_CONFIG:=$HOME/rc/ssh/portfwd}
-: ${PORTFWD_SSH_CONFIG:=$HOME/rc/ssh/config-pf}
+: ${PORTFWD_SSH_CONFIG:=$HOME/.ssh/config-pf}
 : ${USER:=`id -un`}
 
 trace=set-x
