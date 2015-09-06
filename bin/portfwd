@@ -237,7 +237,7 @@ do
               flag -w '$pfflag' || exit 1"
 done
 test_shcmd=" $test_shcmd
-           "'ssh-add -l >/dev/null || exit 1
+           "'flag -w ! PORTFWD_NEED_SSH_AGENT || ssh-add -l >/dev/null || exit 1
              flag -w ROUTE_DEFAULT || exit 1
              [ -x "$HOME/bin-local/do-portfwd" ] || exit 0
              "$HOME/bin-local/do-portfwd"
