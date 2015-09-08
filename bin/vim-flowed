@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Run vim with options suiting format-flowed text.
+# Run vim with options suiting format=flowed text.
 #       - Cameron Simpson <cs@zip.com.au> 19apr2014
 #
 
