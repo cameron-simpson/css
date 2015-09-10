@@ -14,7 +14,7 @@ from cs.logutils import setup_logging, Pfx, X, error, warning, info
 
 USAGE = '''Usage:
     %s haproxy backends frontend_name frontend_listen
-    %s squid acls'''
+    %s squid acls proxy_name'''
 
 Proxy = namedtuple('Proxy', 'name defn_lineno hostname port patterns')
 
@@ -62,9 +62,14 @@ def main(argv):
             subop = argv.pop(0)
             with Pfx(subop):
               if subop == 'acls':
-                if argv:
-                  error('extra arguments: %s', ' '.join(argv))
+                if not argv:
+                  error('missing proxy_name')
                   badopts = True
+                else:
+                  proxy_name = argv.pop(0)
+                  if argv:
+                    error('extra arguments: %s', ' '.join(argv))
+                    badopts = True
               else:
                 error('unrecognised subop')
                 badopts = True
@@ -79,10 +84,14 @@ def main(argv):
     with Pfx('stdin'):
       if not load_proxies(sys.stdin, proxies):
         xit=1
-    direct_proxy = proxies.pop('DIRECT')
     if op == 'haproxy':
+      # haproxy does not handle DIRECT
+      direct_proxy = proxies.pop('DIRECT')
       if subop == 'backends':
         return cmd_haproxy_backends(proxies, frontend_name, frontend_listen)
+    if op == 'squid':
+      if subop == 'acls':
+        return cmd_squid_acls(proxies, proxy_name)
     error('unimplemented op/subop: %s/%s', op, subop)
     return 2
 
@@ -121,7 +130,7 @@ def haproxy_backend_name(proxy_names):
   return '__'.join(sorted(proxy_names))
 
 def haproxy_acl(pattern):
-  with Pfx('acl_haproxy(%r)', pattern):
+  with Pfx('haproxy_acl(%r)', pattern):
     if not pattern:
       raise ValueError('empty pattern')
     # * - wildcard pattern
@@ -155,6 +164,58 @@ def haproxy_acl(pattern):
     if pattern.startswith('.'):
       return r'path_end %s || path_reg %s' \
              % ( haquote(pattern), haquote(escape(pattern + '?')))
+    raise ValueError('unrecognised pattern')
+
+def cmd_squid_acls(proxies, proxy_name):
+  proxy = proxies[proxy_name]
+  patterns = proxy.patterns
+  allow_as_fallback = False
+  for n, pattern in enumerate(patterns):
+    if pattern == '*':
+      allow_as_fallback = True
+    else:
+      print('acl', '_'.join( (proxy_name, str(n)) ), squid_acl(pattern))
+  if proxy_name == 'DIRECT':
+    # first for these ACLs to be direct
+    for n, pattern in enumerate(patterns):
+      acl_name = '_'.join( (proxy_name, str(n)) )
+      print('always_direct allow', acl_name)
+    print('always_direct deny all')
+  else:
+    raise ValueError(proxy_name)
+
+def squid_acl(pattern):
+  with Pfx('squid_acl(%r)', pattern):
+    if not pattern:
+      raise ValueError('empty pattern')
+    # * - wildcard pattern
+    if pattern == '*':
+      return 'true'
+    # *.dom.ain
+    if pattern.startswith('*.') and len(pattern) > 2:
+      return 'dstdomain %s' % (pattern[1:],)
+    # hostname or fqdn
+    if pattern[0].isalpha():
+      return 'dstdomain %s' % (pattern,)
+    # n.n.* - ip-prefix
+    if pattern[0].isdigit() and '.' in pattern:
+      words = pattern.split('.')
+      if words[-1] == '*':
+        words.pop(-1)
+        if ( len(words) > 3
+          or not(all(word.isdigit() and int(word) < 256 for word in words))
+           ):
+          raise ValueError('invalid ip-prefix')
+        padwords = ( words + ['0', '0', '0'] ) [:4]
+        return 'dst -n %s/%d' % ('.'.join(padwords), 8*len(words))
+      if ( len(words) > 4
+        or not(all(word.isdigit() and int(word) < 256 for word in words))
+         ):
+        raise ValueError('invalid IPv4')
+      return 'dstdomain %s' % (pattern,)
+    # .ext - file extension
+    if pattern.startswith('.'):
+      return r'url_regex [.]%s(\?[^?]*)?$' % (escape(pattern),)
     raise ValueError('unrecognised pattern')
 
 def load_proxies(fp, proxies):
