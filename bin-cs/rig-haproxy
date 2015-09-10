@@ -7,7 +7,7 @@
 set -ue
 
 cfg=$HOME/rc-local/haproxy.cfg
-peerage=$HOME/p/squid_peerage
+peerage=$HOME/.peerage
 
 set -x
 
