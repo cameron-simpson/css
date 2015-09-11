@@ -77,9 +77,10 @@ have_tmux(){
 next_suffix(){
   _ns_prefix=$1
   _ns_max=$(
-    ( sed -n "s/^$_ns_prefix\\([1-9][0-9]*\\)$/\\1/p"
-      echo 0
-    ) \
+    tr -d '\015' \
+    | ( sed -n "s/^$_ns_prefix\\([1-9][0-9]*\\)$/\\1/p"
+        echo 0
+      ) \
     | sort -nru \
     | sed 1q
   )
