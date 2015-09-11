@@ -285,9 +285,8 @@ case "$op" in
     fi
     ;;
   pick-new-prefix-session)
-    prefix=$1
     tmux start-server
-    echo "$prefix"$(tmux list-sessions | sed 's/:.*//' | next_suffix "$prefix")
+    echo "$session_prefix"$(tmux list-sessions | sed 's/:.*//' | next_suffix "$session_prefix")
     ;;
   pick-new-prefix-session-remote)
     # choose a new remote session name
