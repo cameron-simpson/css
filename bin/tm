@@ -77,10 +77,9 @@ have_tmux(){
 next_suffix(){
   _ns_prefix=$1
   _ns_max=$(
-    tr -d '\015' \
-    | ( sed -n "s/^$_ns_prefix\\([1-9][0-9]*\\)$/\\1/p"
-        echo 0
-      ) \
+    ( sed -n "s/^$_ns_prefix\\([1-9][0-9]*\\)$/\\1/p"
+      echo 0
+    ) \
     | sort -nru \
     | sed 1q
   )
@@ -293,7 +292,7 @@ case "$op" in
   pick-new-prefix-session-remote)
     # choose a new remote session name
     # using tmux by choice, screen otherwise
-    session_name=$session_prefix$( rcmd "$remote_host" "if which tmux >/dev/null 2>&1; then tmux start-server; tmux list-sessions | sed 's/:.*//'; else screen -ls | sed -n 's/^\\t[1-9][0-9]*\\.\([^\\t]*\)\\t.*/\\1/p'; fi" | next_suffix "$session_prefix" )
+    session_name=$session_prefix$( rcmd "$remote_host" "if which tmux >/dev/null 2>&1; then tmux start-server; tmux list-sessions | sed 's/:.*//'; else screen -ls | sed -n 's/^\\t[1-9][0-9]*\\.\([^\\t]*\)\\t.*/\\1/p'; fi" | tr -d '\015' | next_suffix "$session_prefix" )
     echo "$session_name"
     ;;
   recite-function-remote)
