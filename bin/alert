@@ -13,7 +13,7 @@ set -ue
 : ${ALERT_GROUP:=''}
 
 cmd=$0
-usage="Usage: $cmd [-A alert_to] [-c colour] [-e command [args...] --] [-G] [-l level] [-s subtitle] [-t title] {-|echo-args...]}"
+usage="Usage: $cmd [-A alert_to] [-c colour] [-e command [args...] --] [-l level] [-s subtitle] [-t title] {-|echo-args...]}"
 
 colour=
 level=1
