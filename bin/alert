@@ -10,6 +10,7 @@ set -ue
 : ${LOGDIR:=$HOME/var/log}
 : ${ALERTLOG:=$LOGDIR/alert-local}
 : ${ALERT_TO:='log stderr'}
+: ${ALERT_GROUP:=''}
 
 cmd=$0
 usage="Usage: $cmd [-A alert_to] [-c colour] [-e command [args...] --] [-G] [-l level] [-s subtitle] [-t title] {-|echo-args...]}"
@@ -170,6 +171,9 @@ then
         eval "$var=\$val"
     done
     set -- terminal-notifier -title "$title" -subtitle "$subtitle" -message "$message"
+    # message group - this message updates/replaces last message in this group
+    [ -n "$ALERT_GROUP" ] && set -- "$@" -group "$ALERT_GROUP"
+    # command to run when notifier clicked
     [ -n "$execute" ] && set -- "$@" -execute "$execute"
     set -- timeout 10 reattach-to-user-namespace "$@"
     # async because I've seen terminal-notifier hang, stalling my mail filer
