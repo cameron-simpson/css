@@ -193,6 +193,9 @@ sshpidfile()
 utarget=$(uppername "$target")
 flag_connected=PORTFWD_${utarget}_CONNECTED
 
+ALERT_GROUP=PORTFWD_${utarget}
+export ALERT_GROUP
+
 pfflags=
 pfpidfiles=
 
