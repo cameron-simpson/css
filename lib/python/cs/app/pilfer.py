@@ -433,10 +433,14 @@ class Pilfer(O):
 
   @property
   def defaults(self):
+    ''' Mapping for default values formed by cascading PilferRCs.
+    '''
     return MappingChain(mappings=[ rc.defaults for rc in self.rcs ])
 
   @property
   def _(self):
+    ''' Shortcut to this Pilfer's user_vars['_'] entry - the current item value.
+    '''
     return self.user_vars['_']
 
   @_.setter
@@ -472,9 +476,13 @@ class Pilfer(O):
     return seen[name]
 
   def seen(self, url, seenset='_'):
+    ''' Test if the named `url` has been seen. Default seetset is '_'.
+    '''
     return url in self.seenset(seenset)
 
   def see(self, url, seenset='_'):
+    ''' Mark a `url` as seen. Default seetset is '_'.
+    '''
     self.seenset(seenset).add(url)
 
   @property
@@ -1795,6 +1803,8 @@ def action_assign(var, value):
   return function, FUNC_ONE_TO_ONE
 
 class PipeSpec(O):
+  ''' A pipeline specification: a name and list of actions.
+  '''
 
   def __init__(self, name, argv):
     O.__init__(self)
