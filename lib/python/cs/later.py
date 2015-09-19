@@ -209,13 +209,13 @@ class LateFunction(PendingFunction):
         `func` is the callable for later execution.
         `name`, if supplied, specifies an identifying name for the LateFunction.
         `retry_local`: time delay before retry of this function on RetryError.
-            Default from DEFAULT_RETRY_DELAY.
+            Default from `later.retry_delay`.
     '''
     PendingFunction.__init__(self, func, final=final)
     if name is None:
       name = "LF-%d[func=%s]" % ( seq(), funcname(func) )
     if retry_delay is None:
-      retry_delay = DEFAULT_RETRY_DELAY
+      retry_delay = later.retry_delay
     self.name = name
     self.retry_delay = retry_delay
     self.later = L = later.open()
@@ -446,18 +446,23 @@ class _Pipeline(MultiOpenMixin):
 
 class Later(MultiOpenMixin):
   ''' A management class to queue function calls for later execution.
-      If `capacity` is an int, it is used to size a Semaphore to constrain
-      the number of dispatched functions which may be in play at a time.
-      If `capacity` is not an int it is presumed to be a suitable
-      Semaphore-like object.
-      `inboundCapacity` can be specified to limit the number of undispatched
-      functions that may be queued up; the default is 0 (no limit).
-      Calls to submit functions when the inbound limit is reached block
-      until some functions are dispatched.
-      The `name` parameter may be used to supply an identifying name
-      for this instance.
   '''
-  def __init__(self, capacity, name=None, inboundCapacity=0):
+
+  def __init__(self, capacity, name=None, inboundCapacity=0, retry_delay=None):
+    ''' Initialise the Later instance.
+        If `capacity` is an int, it is used to size a Semaphore to constrain
+        the number of dispatched functions which may be in play at a time.
+        If `capacity` is not an int it is presumed to be a suitable
+        Semaphore-like object.
+        `inboundCapacity` can be specified to limit the number of undispatched
+        functions that may be queued up; the default is 0 (no limit).
+        Calls to submit functions when the inbound limit is reached block
+        until some functions are dispatched.
+        The `name` parameter may be used to supply an identifying name
+        for this instance.
+        `retry_delay`: time delay for requeued functions. Default
+            from DEFAULT_RETRY_DELAY.
+    '''
     if name is None:
       name = "Later-%d" % (seq(),)
     MultiOpenMixin.__init__(self)
@@ -470,8 +475,11 @@ class Later(MultiOpenMixin):
     debug("Later.__init__(capacity=%s, inboundCapacity=%s, name=%s)", capacity, inboundCapacity, name)
     if type(capacity) is int:
       capacity = AdjustableSemaphore(capacity)
+    if retry_delay is None:
+      retry_delay = DEFAULT_RETRY_DELAY
     self.capacity = capacity
     self.inboundCapacity = inboundCapacity
+    self.retry_delay = retry_delay
     self.name = name
     self.delayed = set()        # unqueued, delayed until specific time
     self.pending = set()        # undispatched LateFunctions
