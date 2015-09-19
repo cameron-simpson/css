@@ -1804,9 +1804,9 @@ class PipeSpec(O):
   @logexc
   def pipe_funcs(self, action_map, do_trace):
     ''' Compute a list of functions to implement a pipeline.
-	It is important that this list is constructed anew for each
-	new pipeline instance because many of the functions rely
-	on closures to track state.
+        It is important that this list is constructed anew for each
+        new pipeline instance because many of the functions rely
+        on closures to track state.
     '''
     with Pfx(self.name):
       pipe_funcs, errors = argv_pipefuncs(self.argv, action_map, do_trace)
