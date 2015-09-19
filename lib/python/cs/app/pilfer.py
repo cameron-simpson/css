@@ -43,7 +43,7 @@ from cs.excutils import noexc, noexc_gen, logexc, logexc_gen, LogExceptions
 from cs.fileutils import file_property, mkdirn
 from cs.later import Later, RetryError, \
                     FUNC_ONE_TO_ONE, FUNC_ONE_TO_MANY, FUNC_SELECTOR, FUNC_MANY_TO_MANY
-from cs.lex import get_identifier, get_other_chars
+from cs.lex import get_identifier, is_identifier, get_other_chars
 import cs.logutils
 from cs.logutils import setup_logging, logTo, Pfx, info, debug, error, warning, exception, trace, pfx_iter, D, X
 from cs.mappings import MappingChain, SeenSet
@@ -58,7 +58,14 @@ from cs.py.func import funcname, funccite, yields_type, returns_type
 from cs.py.modules import import_module_name
 from cs.py3 import input, ConfigParser, sorted, ustr, unicode
 
+# parallelism of jobs
 DEFAULT_JOBS = 4
+
+# sleep between flag status polling
+DEFAULT_FLAGS_POLL_INTERVAL = 1.1
+
+# default flag status probe
+DEFAULT_FLAGS_CONJUNCTION = '!PILFER_DISABLE'
 
 usage = '''Usage: %s [options...] op [args...]
   %s url URL actions...
@@ -66,6 +73,8 @@ usage = '''Usage: %s [options...] op [args...]
   Options:
     -c config
         Load rc file.
+    -F flag-conjunction
+        Space separated list of flag or !flag to satisfy as a conjunction.
     -j jobs
 	How many jobs (actions: URL fetches, minor computations)
 	to run at a time.
@@ -87,11 +96,12 @@ def main(argv, stdin=None):
   P = Pilfer()
   quiet = False
   jobs = DEFAULT_JOBS
+  flagnames = DEFAULT_FLAGS_CONJUNCTION
 
   badopts = False
 
   try:
-    opts, argv = getopt(argv, 'c:j:qux')
+    opts, argv = getopt(argv, 'c:F:j:qux')
   except GetoptError as e:
     warning("%s", e)
     badopts = True
@@ -101,6 +111,8 @@ def main(argv, stdin=None):
     with Pfx("%s", opt):
       if opt == '-c':
         P.rcs[0:0] = load_pilferrcs(val)
+      elif opt == '-F':
+        flagnames = val
       elif opt == '-j':
         jobs = int(val)
       elif opt == '-q':
@@ -111,6 +123,17 @@ def main(argv, stdin=None):
         P.do_trace = True
       else:
         raise NotImplementedError("unimplemented option")
+
+  # break the flags into separate words and syntax check
+  flagnames = flagnames.split()
+  for flagname in flagnames:
+    if flagname.startswith('!'):
+      flag_ok = is_identifier(flagname, 1)
+    else:
+      flag_ok = is_identifier(flagname)
+    if not flag_ok:
+      error('invalid flag specifier: %r', flagname)
+      badopts = True
 
   dflt_rc = os.environ.get('PILFERRC')
   if dflt_rc is None:
@@ -140,7 +163,6 @@ def main(argv, stdin=None):
           # these are of the form: pipename:{ action... }
           rc = PilferRC(None)
           P.rcs.insert(0, rc)
-          P._start_monitor_flags()
           while len(argv) and argv[0].endswith(':{'):
             openarg = argv[0]
             with Pfx(openarg):
@@ -169,6 +191,8 @@ def main(argv, stdin=None):
             badopts = True
           if not badopts:
             LTR = Later(jobs)
+            P.flagnames = flagnames
+            P._start_monitor_flags()
             if cs.logutils.D_mode or ifdebug():
               # poll the status of the Later regularly
               def pinger(L):
@@ -458,14 +482,16 @@ class Pilfer(O):
     '''
     return URL(self._, None)
 
-  def _start_monitor_flags(self, flagdir=None):
+  def _start_monitor_flags(self, flagdir=None, poll_interval=None):
     ''' Set up monitoring Thread to maintain a cs.app.flag.Flags status.
         The Pilfer's .flags attribute is what is consulted.
         The ._flags object is the actual cs.app.flag.Flags instance.
     '''
+    if poll_interval is None:
+      poll_interval = DEFAULT_FLAGS_POLL_INTERVAL
     self._flags = Flags(flagdir)
     self.flags = {}
-    T = Thread(target=self._monitor_flags, kwargs={'delay': 1.1})
+    T = Thread(target=self._monitor_flags, kwargs={'delay': poll_interval})
     T.daemon = True
     T.start()
 
@@ -1277,7 +1303,7 @@ def retriable(func, flagnames):
     ''' Call func after testing flags.
     '''
     flags = P.flags
-    for flagname in flagnames:
+    for flagname in P.flagnames:
       if flag.startswith('!'):
         status = not flags.get(flagname[1:], False)
       else:
