@@ -64,6 +64,13 @@ def later(func, *a, **kw):
   '''
   return default.current.defer(func, *a, **kw)
 
+class RetryError(StandardError):
+  ''' Exception raised by functions which should be resubmitted to the queue.
+      The decorator Later.retriable provides a convenience that
+      handles this exception itself.
+  '''
+  pass
+
 class _Late_context_manager(object):
   ''' The _Late_context_manager is a context manager to run a suite via an
       existing Later object. Example usage:
