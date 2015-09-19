@@ -1813,6 +1813,9 @@ class PipeSpec(O):
     return pipe_funcs, errors
 
 def load_pilferrcs(pathname):
+  ''' Load PilferRC instances rom the supplied `pathname`, recursing if this is a directory.
+      Return a list of the PilferRC instances obtained.
+  '''
   rcs = []
   with Pfx(pathname):
     if os.path.isfile(pathname):
@@ -1837,6 +1840,8 @@ def load_pilferrcs(pathname):
 class PilferRC(O):
 
   def __init__(self, filename):
+    ''' Initialise the PilferRC instance. Load values from `filename` if not None.
+    '''
     O.__init__(self)
     self.filename = filename
     self._lock = Lock()
