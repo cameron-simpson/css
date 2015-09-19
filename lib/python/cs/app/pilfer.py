@@ -499,7 +499,14 @@ class Pilfer(O):
     ''' Monitor self._flags regularly, updating self.flags.
     '''
     while True:
-      self.flags = dict(self._flags)
+      old_flags = self.flags
+      new_flags = dict(self._flags)
+      self.flags = new_flags
+      for k in sorted(oldflags.keys):
+        old = bool(old_flags[k])
+        new = bool(new_flags.get(k))
+        if old ^ new:
+          warning("flag %s: %s => %s", k, old, new)
       sleep(delay)
 
   @locked
