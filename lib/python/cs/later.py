@@ -875,31 +875,6 @@ class Later(MultiOpenMixin):
         LF.notify(submit_func)
     return R
 
-  def retry(self, R, func, *a, **kw):
-    ''' Queue the call `func` for later dispatch and possible
-        repetition.
-        If `R` is None a new cs.threads.Result is allocated to
-        accept the function return value.
-        The return value from `func` should be a tuple:
-          LFs, result
-        where LFs, if not empty, is a sequence of LateFunctions
-        which should complete. After completion, `func` is queued
-        again.
-        When LFs is empty, result is passed to R.put() and `func`
-        is not requeued.
-    '''
-    if R is None:
-      R = Result()
-    def retry():
-      LFs = []
-      LFs, result = func(LFs, *a, **kw)
-      if LFs:
-        self.after(LFs, R, retry)
-      else:
-        R.put(result)
-    self.defer(retry)
-    return R
-
   def defer_iterable(self, I, outQ):
     ''' Submit an iterable `I` for asynchronous stepwise iteration
         to return results via the queue `outQ`.
