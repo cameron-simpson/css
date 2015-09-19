@@ -39,6 +39,8 @@ FUNC_ONE_TO_ONE = 1
 FUNC_SELECTOR = 2
 FUNC_MANY_TO_MANY = 3
 
+DEFAULT_RETRY_DELAY = 0.1
+
 class _ThreadLocal(threading.local):
   ''' Thread local state to provide implied context withing Later context managers.
   '''
@@ -66,8 +68,6 @@ def later(func, *a, **kw):
 
 class RetryError(StandardError):
   ''' Exception raised by functions which should be resubmitted to the queue.
-      The decorator Later.retriable provides a convenience that
-      handles this exception itself.
   '''
   pass
 
@@ -203,16 +203,21 @@ class LateFunction(PendingFunction):
             timeout for wait()
   '''
 
-  def __init__(self, later, func, name=None, final=None):
+  def __init__(self, later, func, name=None, final=None, retry_delay=None):
     ''' Initialise a LateFunction.
         `later` is the controlling Later instance.
         `func` is the callable for later execution.
         `name`, if supplied, specifies an identifying name for the LateFunction.
+        `retry_local`: time delay before retry of this function on RetryError.
+            Default from DEFAULT_RETRY_DELAY.
     '''
     PendingFunction.__init__(self, func, final=final)
     if name is None:
       name = "LF-%d[func=%s]" % ( seq(), funcname(func) )
+    if retry_delay is None:
+      retry_delay = DEFAULT_RETRY_DELAY
     self.name = name
+    self.retry_delay = retry_delay
     self.later = L = later.open()
     L._busy.inc(name)
     ##D("NEW LATEFUNCTION %r - busy ==> %d", name, L._busy.value)
@@ -241,7 +246,6 @@ class LateFunction(PendingFunction):
         raise RuntimeError("should be pending, but state = %s", self.state)
       self.state = ASYNCH_RUNNING
       L._workers.dispatch(self.func, deliver=self._worker_complete, daemon=True)
-      self.func = None
 
   @OBSOLETE
   def wait(self):
@@ -250,8 +254,14 @@ class LateFunction(PendingFunction):
   def _worker_complete(self, work_result):
     result, exc_info = work_result
     if exc_info:
-      if isinstance(exc_info[1], (NameError, AttributeError, RuntimeError)):
-        warning("LateFunction<%s>._worker_completed: exc_info=%s", self.name, exc_info[1])
+      e = exc_info[1]
+      if isinstance(e, RetryError):
+        # resubmit this function
+        warning("%s._worker_completed: resubmit after RetryError: %s", e)
+        self.later._submit(self.func, delay=self.retry_delay, name=self.name, LF=self)
+        return
+      if isinstance(e, (NameError, AttributeError, RuntimeError)):
+        warning("%s._worker_completed: exc_info=%s", self.name, exc_info)
         with Pfx('>>'):
           for formatted in traceback.format_exception(*exc_info):
             for line in formatted.rstrip().split('\n'):
@@ -730,12 +740,14 @@ class Later(MultiOpenMixin):
         If the parameter `name` is not None, use it to name the LateFunction.
         If the parameter `pfx` is not None, submit pfx.partial(func);
           see the cs.logutils.Pfx.partial method for details.
+        If the parameter `LF` is not None, construct a new LateFunction to
+          track function completion.
     '''
     if not self.submittable:
       raise RuntimeError("%s.submit(...) but not self.submittable" % (self,))
     return self._submit(func, priority=priority, delay=delay, when=when, name=name, pfx=pfx)
 
-  def _submit(self, func, priority=None, delay=None, when=None, name=None, pfx=None):
+  def _submit(self, func, priority=None, delay=None, when=None, name=None, pfx=None, LF=None, retry_delay=None):
     if delay is not None and when is not None:
       raise ValueError("you can't specify both delay= and when= (%s, %s)" % (delay, when))
     if priority is None:
@@ -744,7 +756,8 @@ class Later(MultiOpenMixin):
       priority = (priority,)
     if pfx is not None:
       func = pfx.partial(func)
-    LF = LateFunction(self, func, name=name)
+    if LF is None:
+      LF = LateFunction(self, func, name=name, retry_delay=retry_delay)
     pri_entry = list(priority)
     pri_entry.append(seq())     # ensure FIFO servicing of equal priorities
     pri_entry.append(LF)
