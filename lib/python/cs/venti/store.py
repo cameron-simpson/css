@@ -17,18 +17,18 @@ from binascii import hexlify
 import os
 import os.path
 import sys
-from threading import Lock
+from threading import Lock, RLock
 from threading import Thread
 from cs.py3 import Queue
 from cs.asynchron import report as reportLFs
 from cs.later import Later
-from cs.logutils import info, debug, warning, Pfx, D
-from cs.queues import NestingOpenCloseMixin
+from cs.logutils import info, debug, warning, Pfx, D, X
+from cs.queues import MultiOpenMixin
 from cs.threads import Q1, Get1
 from . import defaults, totext
 from .hash import Hash_SHA1
 
-class BasicStore(NestingOpenCloseMixin):
+class _BasicStoreCommon(MultiOpenMixin):
   ''' Core functions provided by all Stores.
 
       A subclass should provide thread-safe implementations of the following
@@ -62,12 +62,12 @@ class BasicStore(NestingOpenCloseMixin):
       ._flush() method, follows any noFlush requests promptly otherwise
       deadlocks may ensue.
   '''
+
   def __init__(self, name, capacity=None):
-    with Pfx("BasicStore(%s,..)", name):
+    with Pfx("_BasicStoreCommon.__init__(%s,..)", name):
       if capacity is None:
         capacity = 1
-      self._lock = Lock()
-      NestingOpenCloseMixin.__init__(self)
+      MultiOpenMixin.__init__(self)
       self.name = name
       self.logfp = None
       self.__funcQ = Later(capacity, name="%s:Later(__funcQ)" % (self.name,)).open()
@@ -75,55 +75,8 @@ class BasicStore(NestingOpenCloseMixin):
       self.readonly = False
       self.writeonly = False
 
-  def add(self, data):
-    ''' Add the supplied data bytes to the store.
-    '''
-    raise NotImplementedError
-
-  def get(self, h, default=None):
-    ''' Return the data bytes associated with the supplied hashcode.
-        Return None if the hashcode is not present.
-    '''
-    raise NotImplementedError
-
-  def contains(self, h):
-    raise NotImplementedError
-
-  def flush(self):
-    ''' Flush outstanding I/O operations on the store.
-        This is generally discouraged because it causes less efficient
-        operation but it is sometimes necessary, for example at shutdown or
-        after *_bg() calls with the noFlush=True hint.
-        This does not imply that outstanding transactions have completed,
-        merely that they have been dispatched, for example sent down the
-        stream of a StreamStore.
-        See the sync() call for transaction completion.
-    '''
-    raise NotImplementedError
-
-  def sync(self):
-    ''' Flush outstanding I/O operations on the store and wait for completion.
-    '''
-    raise NotImplementedError
-
-  #####################################
-  ## Background versions of operations.
-  ##
-
-  def add_bg(self, data):
-    return self._defer(self.add, data)
-
-  def get_bg(self, h):
-    return self._defer(self.get, h)
-
-  def contains_bg(self, h):
-    return self._defer(self.contains, h)
-
-  def sync_bg(self):
-    return self._defer(self.sync)
-
   def _defer(self, func, *args, **kwargs):
-    return self.__funcQ.defer(via(self, func, *args, **kwargs))
+    return self.__funcQ.defer(func, *args, **kwargs)
 
   ###################
   ## Special methods.
@@ -145,14 +98,14 @@ class BasicStore(NestingOpenCloseMixin):
 
   def __enter__(self):
     defaults.pushStore(self)
-    return NestingOpenCloseMixin.__enter__(self)
+    return MultiOpenMixin.__enter__(self)
 
   def __exit__(self, exc_type, exc_value, traceback):
     if exc_value:
       import traceback as TB
       TB.print_tb(traceback, file=sys.stderr)
     defaults.popStore()
-    return NestingOpenCloseMixin.__exit__(self, exc_type, exc_value, traceback)
+    return MultiOpenMixin.__exit__(self, exc_type, exc_value, traceback)
 
   def __str__(self):
     return "Store(%s)" % self.name
@@ -167,8 +120,11 @@ class BasicStore(NestingOpenCloseMixin):
     '''
     raise NotImplementedError
 
+  def startup(self):
+    self.__funcQ.open()
+
   def shutdown(self):
-    ''' Called by final NestingOpenCloseMixin.close().
+    ''' Called by final MultiOpenMixin.close().
     '''
     self.__funcQ.close()
 
@@ -209,8 +165,48 @@ class BasicStore(NestingOpenCloseMixin):
       for LF in reportLFs(LF2h.keys()):
         yield LF2h[LF], LF()
 
+class BasicStoreSync(_BasicStoreCommon):
+  ''' Subclass of _BasicStoreCommon expecting synchronous operations and providing asynchronous hooks, dual of BasicStoreAsync.
+  '''
+
+  #####################################
+  ## Background versions of operations.
+  ##
+
+  def add_bg(self, data):
+    return self._defer(self.add, data)
+
+  def get_bg(self, h):
+    return self._defer(self.get, h)
+
+  def contains_bg(self, h):
+    return self._defer(self.contains, h)
+
+  def sync_bg(self):
+    return self._defer(self.sync)
+
+class BasicStoreAsync(_BasicStoreCommon):
+  ''' Subclass of _BasicStoreCommon expecting asynchronous operations and providing synchronous hooks, dual of BasicStoreSync.
+  '''
+
+  #####################################
+  ## Background versions of operations.
+  ##
+
+  def add(self, data):
+    return self.add_bg(data)()
+
+  def get(self, h):
+    return self.get_bg(h)()
+
+  def contains(self, h):
+    return self.contains_bg(h)()
+
+  def sync(self):
+    return self.sync_bg()()
+
 def Store(store_spec):
-  ''' Factory function to return an appropriate BasicStore subclass
+  ''' Factory function to return an appropriate BasicStore* subclass
       based on its argument:
 
         /path/to/store  A GDBMStore directory (later, tokyocabinet etc)
@@ -280,14 +276,14 @@ def pullFromSerial(S1, S2):
     if not S1.contains(h):
       S1.store(S2.fetch(h))
 
-class MappingStore(BasicStore):
+class MappingStore(BasicStoreSync):
   ''' A Store built on an arbitrary mapping object.
   '''
 
   def __init__(self, mapping, name=None, capacity=None):
     if name is None:
       name = "MappingStore(%s)" % (mapping,)
-    BasicStore.__init__(self, name, capacity=capacity)
+    BasicStoreSync.__init__(self, name, capacity=capacity)
     self.mapping = mapping
 
   def add(self, data):

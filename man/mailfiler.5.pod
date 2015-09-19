@@ -55,10 +55,13 @@ Note that a shell command in quotes will need any backslashes doubled,
 as the quoted string parse strips one level of backslash escaping.
 
 Targets come in two flavours, deliverable targets and action targets.
-Deliverable targets are those which deliver a message to some location such as a mail folder, email address or a shell pipeline.
-Action targets affect the filer status or the message itself, such as a variable assignment or a message header modification.
+Deliverable targets are those which deliver a message to some location
+such as a mail folder, email address or a shell pipeline.
+Action targets affect the filer status or the message itself,
+such as a variable assignment or a message header modification.
 
-The action targets are applied as they are encountered in matching rules. The deliverable targets are accrued for delivery at the end of the rules.
+The action targets are applied as they are encountered in matching rules.
+The deliverable targets are accrued for delivery at the end of the rules.
 
 If no deliverable targets have been accrued then the default target,
 specified by the B<$DEFAULT> environment variable, is used.
@@ -88,7 +91,7 @@ or
 assigns the value to the named environment variable.
 If unquoted, I<value> consists of nonwhitespace characters excluding the comma.
 If quoted, I<quoted-value> is a slosh escaped string.
-Note that the value is subject to paramater substitution and the
+Note that the value is subject to parameter substitution and the
 associated slosh escaping and therefore sloshes needed for that
 latter phase will need doubling in the B<">I<quoted-value>B<"> form.
 
@@ -107,7 +110,7 @@ The available parameter names consist of:
 
 =item the existing header values
 
-The parameter name is the header name in lowercase with dash ('-') replaced by underscore ('_').
+The parameter name is the header name in lowercase with dash ('-') replaced by underscore ('_'); example: "message_id".
 The parameter value is the last header value with CR and LF stripped per RFC2822 part 2.2.3.
 
 =item name subexpressions from the regular expression
@@ -190,6 +193,13 @@ Otherwise, a target containing an "at" symbol ('@') is considered
 an email address to which to send a copy of the message.
 If the mail system accepts the message it is considered to have been dispatched successfully.
 
+To avoid avoid blowback to the original author or source of the message
+the B<Sender:>, B<Return-Path:> and B<Errors-To:> headers are set to the value of the environment variable B<$EMAIL>,
+which is expected to be a bare I<localpart>B<@>I<domain> address.
+If B<$EMAIL> is not set then the message is not sent and delivery is not considered successful.
+
+To avoid spurious delivery loop detection, the B<Delivered-To:> header is cleared.
+
 =head4 Deliver to Mail Folder
 
 Otherwise, a target is considered to indicate a Maildir or a UNIX mbox
@@ -219,8 +229,17 @@ Example:
 
 matches a message from "cs@zip.com.au" or addressed to "cs@zip.com.au" in the 'To:' header.
 
-A header may be tested against a regular expression instead of by email address:
-Example:
+A header may be matched against any of multiple addresses by grouping the alternatives in brackets, example:
+
+  to,cc:(python-list@python.org|@example.com|ME|THEM)
+
+which tests all the addresses in the headers 'To:' or 'CC:' against:
+the address B<python-list@python.org>,
+the mail domain B<@example.com>,
+either of the mail address groups B<me> or B<them>.
+The mail address groups come from the maildb(1cs), if any.
+
+A header may be tested against a regular expression instead of by email address by preceding it with a slash ('B</>'), example:
 
   subject:/icewm-Bugs
 

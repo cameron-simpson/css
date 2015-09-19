@@ -16,11 +16,11 @@ from cs.debug import DEBUG
 from cs.inttypes import Flags
 from cs.threads import Lock, RLock, Channel, locked_property
 from cs.later import Later
-from cs.queues import NestingOpenCloseMixin
+from cs.queues import MultiOpenMixin
 from cs.asynchron import Result, report as report_LFs, \
         Asynchron, ASYNCH_PENDING, ASYNCH_RUNNING, ASYNCH_CANCELLED, ASYNCH_READY
 import cs.logutils
-from cs.logutils import Pfx, info, error, debug, D
+from cs.logutils import Pfx, info, error, debug, D, X
 from cs.obj import O
 from .parse import SPECIAL_MACROS, Macro, MacroExpression, \
                    parseMakefile, parseMacroExpression
@@ -35,7 +35,7 @@ PRI_PREREQ = 2
 
 MakeDebugFlags = Flags('debug', 'flags', 'make', 'parse')
 
-class Maker(NestingOpenCloseMixin):
+class Maker(MultiOpenMixin):
   ''' Main class representing a set of dependencies to make.
   '''
 
@@ -49,13 +49,10 @@ class Maker(NestingOpenCloseMixin):
     if name is None:
       name = cs.logutils.cmd
     O.__init__(self)
-    self._lock = Lock()
-    NestingOpenCloseMixin.__init__(self)
+    MultiOpenMixin.__init__(self)
     self._O_omit.extend(['macros', 'targets', 'rules', 'namespaces'])
     self.parallel = parallel
     self.name = name
-    self._makeQ = Later(self.parallel, self.name).open()
-    self._makeQ.logTo("myke-later.log")
     self.debug = MakeDebugFlags()
     self.debug.debug = False    # logging.DEBUG noise
     self.debug.flags = False    # watch debug flag settings
@@ -74,6 +71,7 @@ class Maker(NestingOpenCloseMixin):
     self.active = set()
     self._active_lock = Lock()
     self._namespaces = [{ 'MAKE': makecmd.replace('$', '$$') }]
+    ## DEBUGGING REPORTS FOR HUNG APP
     ##T = Thread(target=self._ticker, args=())
     ##T.daemon = True
     ##D("DISPATCH TICKER")
@@ -81,6 +79,15 @@ class Maker(NestingOpenCloseMixin):
 
   def __str__(self):
     return "<MAKER>"
+
+  def startup(self):
+    self._makeQ = Later(self.parallel, self.name)
+    self._makeQ.open()
+    self._makeQ.logTo("myke-later.log")
+
+  def shutdown(self):
+    self._makeQ.close()
+    self._makeQ.wait()
 
   def report(self, fp=None):
     D("REPORT...")
@@ -96,10 +103,6 @@ class Maker(NestingOpenCloseMixin):
     while True:
       time.sleep(5)
       self.report()
-
-  def shutdown(self):
-    self._makeQ.close()
-    self._makeQ.wait()
 
   @property
   def namespaces(self):

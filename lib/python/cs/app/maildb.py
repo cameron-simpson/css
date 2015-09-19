@@ -308,17 +308,24 @@ def main(argv=None, stdin=None):
 
   return xit
 
-def edit_group(MDB, group):
-  if group.startswith('/'):
-    if group.endswith('/'):
-      rexp = group[1:-1]
+def edit_group(MDB, groupname):
+  ''' Edit the membership of the named `groupname`.
+      If `groupname` starts with a slash then the tail is taken to be
+      a regexp used to select addresses.
+  '''
+  if groupname.startswith('/'):
+    # select by regular expression
+    # regexp as "/re" or "/re/"
+    if groupname.endswith('/'):
+      rexp = groupname[1:-1]
     else:
-      rexp = group[1:]
+      rexp = groupname[1:]
     As = MDB.matchAddresses(rexp)
     Gs = []
   else:
-    As = [ A for A in MDB.ADDRESSes if group in A.GROUPs ]
-    Gs = [ G for G in MDB.GROUPs if group in G.GROUPs ]
+    # select AddressNodes and GroupNodes by groupname
+    As = [ A for A in MDB.ADDRESSes if groupname in A.GROUPs ]
+    Gs = [ G for G in MDB.GROUPs if groupname in G.GROUPs ]
   return edit_groupness(MDB, As, Gs)
 
 def edit_groupness(MDB, addresses, subgroups):
@@ -393,6 +400,7 @@ def edit_groupness(MDB, addresses, subgroups):
                       A.abbreviation = ab
                     except ValueError as e:
                       error(e)
+                    # add named groups to those associated with this address
                     new_groups.setdefault(A, set()).update(groups)
                     realname = ustr(realname.strip())
                     if realname and realname != A.realname:
@@ -400,6 +408,7 @@ def edit_groupness(MDB, addresses, subgroups):
     # apply groups of whichever addresses survived
     for A, groups in new_groups.items():
       if set(A.GROUPs) != groups:
+        # reset .GROUP list if changed
         A.GROUPs = groups
 
 def update_domain(MDB, old_domain, new_domain, argv):
