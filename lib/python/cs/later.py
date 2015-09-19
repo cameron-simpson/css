@@ -900,18 +900,21 @@ class Later(MultiOpenMixin):
         LF.notify(submit_func)
     return R
 
-  def defer_iterable(self, I, outQ):
+  def defer_iterable(self, I, outQ, test_ready=None):
     ''' Submit an iterable `I` for asynchronous stepwise iteration
         to return results via the queue `outQ`.
         `outQ` must have a .put method to accept items and a .close method to
         indicate the end of items.
         When the iteration is complete, call outQ.close().
+        `test_ready`: if not None, a callable to test if iteration
+            is presently permitted; iteration will be deferred until
+            the callable returns a true value
     '''
     if not self.submittable:
       raise RuntimeError("%s.defer_iterable(...) but not self.submittable" % (self,))
-    return self._defer_iterable(I, outQ=outQ)
+    return self._defer_iterable(I, outQ=outQ, test_ready=test_ready)
 
-  def _defer_iterable(self, I, outQ):
+  def _defer_iterable(self, I, outQ, test_ready=None):
     iterate = partial(next, iter(I))
 
     @logexc
@@ -920,6 +923,8 @@ class Later(MultiOpenMixin):
           Close the queue at end of iteration or other exception.
           Otherwise, requeue ourself to collect the next iteration value.
       '''
+      if test_ready is not None and not test_ready():
+        raise RetryError("iterate_once: not ready yet")
       try:
         item = iterate()
       except StopIteration:
