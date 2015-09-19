@@ -41,7 +41,8 @@ from cs.debug import thread_dump, ifdebug
 from cs.env import envsub
 from cs.excutils import noexc, noexc_gen, logexc, logexc_gen, LogExceptions
 from cs.fileutils import file_property, mkdirn
-from cs.later import Later, FUNC_ONE_TO_ONE, FUNC_ONE_TO_MANY, FUNC_SELECTOR, FUNC_MANY_TO_MANY
+from cs.later import Later, RetryError, \
+                    FUNC_ONE_TO_ONE, FUNC_ONE_TO_MANY, FUNC_SELECTOR, FUNC_MANY_TO_MANY
 from cs.lex import get_identifier, get_other_chars
 import cs.logutils
 from cs.logutils import setup_logging, logTo, Pfx, info, debug, error, warning, exception, trace, pfx_iter, D, X
@@ -50,6 +51,7 @@ from cs.queues import NullQueue, NullQ, IterableQueue
 from cs.seq import seq
 from cs.threads import locked, locked_property
 from cs.urlutils import URL, isURL, NetrcHTTPPasswordMgr
+from cs.app.flag import Flags
 import cs.obj
 from cs.obj import O
 from cs.py.func import funcname, funccite, yields_type, returns_type
@@ -138,6 +140,7 @@ def main(argv, stdin=None):
           # these are of the form: pipename:{ action... }
           rc = PilferRC(None)
           P.rcs.insert(0, rc)
+          P._start_monitor_flags()
           while len(argv) and argv[0].endswith(':{'):
             openarg = argv[0]
             with Pfx(openarg):
@@ -454,6 +457,24 @@ class Pilfer(O):
     ''' self._ as a URL object.
     '''
     return URL(self._, None)
+
+  def _start_monitor_flags(self, flagdir=None):
+    ''' Set up monitoring Thread to maintain a cs.app.flag.Flags status.
+        The Pilfer's .flags attribute is what is consulted.
+        The ._flags object is the actual cs.app.flag.Flags instance.
+    '''
+    self._flags = Flags(flagdir)
+    self.flags = {}
+    T = Thread(target=self._monitor_flags, kwargs={'delay': 1.1})
+    T.daemon = True
+    T.start()
+
+  def _monitor_flags(self, delay=1.1):
+    ''' Monitor self._flags regularly, updating self.flags.
+    '''
+    while True:
+      self.flags = dict(self._flags)
+      sleep(delay)
 
   @locked
   def seenset(self, name):
@@ -1248,6 +1269,23 @@ def action_func_raw(action, do_trace):
 
   function.__name__ = "action(%r)" % (action0,)
   return function, args, kwargs, func_sig, result_is_Pilfer
+
+def retriable(func, flagnames):
+  ''' A decorator for a function to probe flags and raise RetryError if unsatisfied.
+  '''
+  def retry_func(P, *a, **kw):
+    ''' Call func after testing flags.
+    '''
+    flags = P.flags
+    for flagname in flagnames:
+      if flag.startswith('!'):
+        status = not flags.get(flagname[1:], False)
+      else:
+        status = flags.get(flagname[1:], False)
+      if not status:
+        raise RetryError('flag stats %r is false' % (flagname,))
+    return func(P, *a, **kw)
+  return retry_func
 
 def action_func(action, do_trace, raw=False):
   ''' Accept a string `action` and return a tuple of:
