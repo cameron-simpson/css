@@ -235,6 +235,11 @@ class LateFunction(PendingFunction):
     self.later._busy.dec(self.name)
     self.later.close()
 
+  def _retry(self):
+    ''' Resubmit this function for later execution.
+    '''
+    self.later._submit(self.func, delay=self.retry_delay, name=self.name, LF=self)
+
   def _dispatch(self):
     ''' ._dispatch() is called by the Later class instance's worker thread.
         It causes the function to be handed to a thread for execution.
@@ -258,7 +263,7 @@ class LateFunction(PendingFunction):
       if isinstance(e, RetryError):
         # resubmit this function
         warning("%s._worker_completed: resubmit after RetryError: %s", e)
-        self.later._submit(self.func, delay=self.retry_delay, name=self.name, LF=self)
+        self._retry()
         return
       if isinstance(e, (NameError, AttributeError, RuntimeError)):
         warning("%s._worker_completed: exc_info=%s", self.name, exc_info)
