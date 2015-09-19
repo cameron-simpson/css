@@ -66,7 +66,7 @@ def later(func, *a, **kw):
   '''
   return default.current.defer(func, *a, **kw)
 
-class RetryError(StandardError):
+class RetryError(Exception):
   ''' Exception raised by functions which should be resubmitted to the queue.
   '''
   pass
