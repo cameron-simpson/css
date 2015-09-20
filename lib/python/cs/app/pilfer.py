@@ -491,6 +491,7 @@ class Pilfer(O):
       poll_interval = DEFAULT_FLAGS_POLL_INTERVAL
     self._flags = Flags(flagdir)
     self.flags = {}
+    self._poll_flags(True)
     T = Thread(target=self._monitor_flags, kwargs={'delay': poll_interval})
     T.daemon = True
     T.start()
@@ -499,15 +500,22 @@ class Pilfer(O):
     ''' Monitor self._flags regularly, updating self.flags.
     '''
     while True:
-      old_flags = self.flags
-      new_flags = dict(self._flags)
-      self.flags = new_flags
-      for k in sorted(old_flags.keys()):
-        old = bool(old_flags[k])
-        new = bool(new_flags.get(k))
-        if old ^ new:
-          warning("flag %s: %s => %s", k, old, new)
       sleep(delay)
+      self._poll_flags()
+
+  def _poll_flags(self, silent=False):
+    ''' Poll the filesystem flags and update the .flags attribute.
+    '''
+    X("_poll_flags...")
+    old_flags = self.flags
+    new_flags = dict(self._flags)
+    self.flags = new_flags
+    for k in sorted(old_flags.keys()):
+      old = bool(old_flags[k])
+      new = bool(new_flags.get(k))
+      if old ^ new:
+        if not silent:
+          warning("flag %s: %s => %s", k, old, new)
 
   def test_flags(self):
     ''' Evaluate the flags conjunction.
@@ -515,10 +523,10 @@ class Pilfer(O):
         Note that it deliberately probes all flags instead of stopping
         at the first false condition.
     '''
-    flags = P.flags
     all_status = True
-    for flagname in P.flagnames:
-      if flag.startswith('!'):
+    flags = self.flags
+    for flagname in self.flagnames:
+      if flagname.startswith('!'):
         status = not flags.setdefault(flagname[1:], False)
       else:
         status = flags.setdefault(flagname[1:], False)
