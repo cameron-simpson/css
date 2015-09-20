@@ -299,17 +299,20 @@ class _PipelinePushQueue(PushQueue):
       cs.app.pilfer termination process.
   '''
 
-  def __init__(self, name, pipeline, func_iter, outQ, func_final=None):
+  def __init__(self, name, pipeline, func_iter, outQ, func_final=None, retry_interval=None):
     ''' Initialise the _PipelinePushQueue, wrapping func_iter and func_final in code to inc/dec the main pipeline _busy counter.
     '''
+    if retry_interval is None:
+      retry_interval = DEFAULT_RETRY_DELAY
     self.pipeline = pipeline
+    self.retry_interval = retry_interval
 
     # wrap func_iter to raise _busy while processing item
     @logexc_gen
     def func_push(item):
       self.pipeline._busy.inc()
       try:
-        for item2 in func_iter(item):
+        for item2 in retry(self.retry_interval, func_iter, item):
           yield item2
       except Exception:
         self.pipeline._busy.dec()
@@ -324,7 +327,7 @@ class _PipelinePushQueue(PushQueue):
       @logexc
       def func_final():
         try:
-          result = func_final0()
+          result = retry(self.retry_interval, func_final0)
         except Exception:
           self.pipeline._busy.dec()
           raise
@@ -443,7 +446,7 @@ class _Pipeline(MultiOpenMixin):
       func_iter = func
     elif func_sig == FUNC_SELECTOR:
       def func_iter(item):
-        if retry(func(item)):
+        if retry(DEFAULT_RETRY_DELAY, func, item):
           yield item
       func_iter.__name__ = "func_iter_1toMany(func=%s)" % (funcname(func),)
     elif func_sig == FUNC_MANY_TO_MANY:
@@ -455,7 +458,7 @@ class _Pipeline(MultiOpenMixin):
           yield
       func_iter.__name__ = "func_iter_gather(func=%s)" % (funcname(func),)
       def func_final():
-        for item in retry(func(gathered)):
+        for item in retry(DEFAULT_RETRY_DELAY, func, gathered):
           yield item
       func_final.__name__ = "func_final_gather(func=%s)" % (funcname(func),)
     else:
