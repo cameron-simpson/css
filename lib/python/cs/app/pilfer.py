@@ -502,12 +502,29 @@ class Pilfer(O):
       old_flags = self.flags
       new_flags = dict(self._flags)
       self.flags = new_flags
-      for k in sorted(oldflags.keys):
+      for k in sorted(old_flags.keys()):
         old = bool(old_flags[k])
         new = bool(new_flags.get(k))
         if old ^ new:
           warning("flag %s: %s => %s", k, old, new)
       sleep(delay)
+
+  def test_flags(self):
+    ''' Evaluate the flags conjunction.
+        Installs the tested names into the status dictionary as side effect.
+        Note that it deliberately probes all flags instead of stopping
+        at the first false condition.
+    '''
+    flags = P.flags
+    all_status = True
+    for flagname in P.flagnames:
+      if flag.startswith('!'):
+        status = not flags.setdefault(flagname[1:], False)
+      else:
+        status = flags.setdefault(flagname[1:], False)
+      if not status:
+        all_status = False
+    return all_status
 
   @locked
   def seenset(self, name):
@@ -1303,20 +1320,14 @@ def action_func_raw(action, do_trace):
   function.__name__ = "action(%r)" % (action0,)
   return function, args, kwargs, func_sig, result_is_Pilfer
 
-def retriable(func, flagnames):
-  ''' A decorator for a function to probe flags and raise RetryError if unsatisfied.
+def retriable(func):
+  ''' A decorator for a function to probe the Pilfer flags and raise RetryError if unsatisfied.
   '''
   def retry_func(P, *a, **kw):
     ''' Call func after testing flags.
     '''
-    flags = P.flags
-    for flagname in P.flagnames:
-      if flag.startswith('!'):
-        status = not flags.get(flagname[1:], False)
-      else:
-        status = flags.get(flagname[1:], False)
-      if not status:
-        raise RetryError('flag stats %r is false' % (flagname,))
+    if not P.test_flags:
+      raise RetryError('flag conjunction fails: %r', P.flagnames)
     return func(P, *a, **kw)
   return retry_func
 
