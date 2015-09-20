@@ -247,7 +247,7 @@ class LateFunction(PendingFunction):
     self.later._busy.dec(self.name)
     self.later.close()
 
-  def _retry(self):
+  def _resubmit(self):
     ''' Resubmit this function for later execution.
     '''
     self.later._submit(self.func, delay=self.retry_delay, name=self.name, LF=self)
@@ -281,7 +281,7 @@ class LateFunction(PendingFunction):
       if isinstance(e, RetryError):
         # resubmit this function
         warning("%s._worker_completed: resubmit after RetryError: %s", e)
-        self._retry()
+        self._resubmit()
         return
       if isinstance(e, (NameError, AttributeError, RuntimeError)):
         warning("%s._worker_completed: exc_info=%s", self.name, exc_info)
