@@ -362,6 +362,9 @@ def argv_pipefuncs(argv, action_map, do_trace):
       except ValueError as e:
         errors.append("bad action %r: %s" % (action, e))
       else:
+        if func_sig != FUNC_MANY_TO_MANY:
+          # other functions are called with each item
+          function = retriable(function)
         pipe_funcs.append( (func_sig, function) )
   return pipe_funcs, errors
 
