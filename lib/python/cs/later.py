@@ -437,13 +437,13 @@ class _Pipeline(MultiOpenMixin):
     func_final = None
     if func_sig == FUNC_ONE_TO_ONE:
       def func_iter(item):
-        yield func(item)
+        yield retry(DEFAULT_RETRY_DELAY, func, item)
       func_iter.__name__ = "func_iter_1to1(func=%s)" % (funcname(func),)
     elif func_sig == FUNC_ONE_TO_MANY:
       func_iter = func
     elif func_sig == FUNC_SELECTOR:
       def func_iter(item):
-        if func(item):
+        if retry(func(item)):
           yield item
       func_iter.__name__ = "func_iter_1toMany(func=%s)" % (funcname(func),)
     elif func_sig == FUNC_MANY_TO_MANY:
@@ -455,7 +455,7 @@ class _Pipeline(MultiOpenMixin):
           yield
       func_iter.__name__ = "func_iter_gather(func=%s)" % (funcname(func),)
       def func_final():
-        for item in func(gathered):
+        for item in retry(func(gathered)):
           yield item
       func_final.__name__ = "func_final_gather(func=%s)" % (funcname(func),)
     else:
