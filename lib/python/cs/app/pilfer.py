@@ -440,6 +440,7 @@ class Pilfer(O):
     self._ = None
     self.flush_print = False
     self.do_trace = False
+    self._flags = None
     self._print_to = None
     self._print_lock = Lock()
     self.user_agent = None
@@ -492,6 +493,8 @@ class Pilfer(O):
     '''
     if poll_interval is None:
       poll_interval = DEFAULT_FLAGS_POLL_INTERVAL
+    if self._flags is not None:
+      raise RuntimeError('self._start_monitor_flags already called')
     self._flags = Flags(flagdir)
     self.flags = {}
     self._poll_flags(True)
@@ -509,16 +512,17 @@ class Pilfer(O):
   def _poll_flags(self, silent=False):
     ''' Poll the filesystem flags and update the .flags attribute.
     '''
-    X("_poll_flags...")
-    old_flags = self.flags
+    flags = self.flags
     new_flags = dict(self._flags)
-    self.flags = new_flags
-    for k in sorted(old_flags.keys()):
-      old = bool(old_flags[k])
+    ks = set(flags.keys())
+    ks.update(new_flags.keys())
+    for k in sorted(ks):
+      old = bool(flags.get(k))
       new = bool(new_flags.get(k))
       if old ^ new:
         if not silent:
           warning("flag %s: %s => %s", k, old, new)
+        flags[k] = new
 
   def test_flags(self):
     ''' Evaluate the flags conjunction.
