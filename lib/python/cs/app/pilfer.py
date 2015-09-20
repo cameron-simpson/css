@@ -1342,9 +1342,10 @@ def retriable(func):
   def retry_func(P, *a, **kw):
     ''' Call func after testing flags.
     '''
-    if not P.test_flags:
-      raise RetryError('flag conjunction fails: %r', P.flagnames)
+    if not P.test_flags():
+      raise RetryError('flag conjunction fails: %s' % (' '.join(P.flagnames)))
     return func(P, *a, **kw)
+  retry_func.__name__ = 'retriable(%s)' % (funcname(func),)
   return retry_func
 
 def action_func(action, do_trace, raw=False):
