@@ -497,7 +497,9 @@ class Pilfer(O):
       raise RuntimeError('self._start_monitor_flags already called')
     self._flags = Flags(flagdir)
     self.flags = {}
-    self._poll_flags(True)
+    self._poll_flags(silent=True)
+    if not self.test_flags():
+      warning('flag conjunction is false: %s' % (' '.join(self.flagnames)))
     T = Thread(target=self._monitor_flags, kwargs={'delay': poll_interval})
     T.daemon = True
     T.start()
