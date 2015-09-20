@@ -80,7 +80,6 @@ def retry(retry_interval, func, *a, **kw):
     try:
       return func(*a, **kw)
     except RetryError as e:
-      warning("%s: %s, retry in %gs ...", funcname(func), e, retry_interval)
       time.sleep(retry_interval)
 
 class _Late_context_manager(object):
@@ -452,7 +451,6 @@ class _Pipeline(MultiOpenMixin):
     elif func_sig == FUNC_MANY_TO_MANY:
       gathered = []
       def func_iter(item):
-        debug("GATHER %r FOR %s", item, funcname(func))
         gathered.append(item)
         if False:
           yield
@@ -1012,7 +1010,6 @@ class Later(MultiOpenMixin):
 
   def _pipeline(self, filter_funcs, inputs=None, outQ=None, name=None):
     filter_funcs = list(filter_funcs)
-    debug("%s._pipeline: filter_funcs=%r", self, filter_funcs)
     if not filter_funcs:
       raise ValueError("no filter_funcs")
     if outQ is None:
