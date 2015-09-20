@@ -71,6 +71,18 @@ class RetryError(Exception):
   '''
   pass
 
+def retry(retry_interval, func, *a, **kw):
+  ''' Call the callable `func` with the supplied arguments.
+      If it raises RetryError, sleep(`retry_interval`) and call
+      again until it does not raise RetryError.
+  '''
+  while True:
+    try:
+      return func(*a, **kw)
+    except RetryError as e:
+      warning("%s: %s, retry in %gs ...", funcname(func), e, retry_interval)
+      time.sleep(retry_interval)
+
 class _Late_context_manager(object):
   ''' The _Late_context_manager is a context manager to run a suite via an
       existing Later object. Example usage:
