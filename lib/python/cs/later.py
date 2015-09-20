@@ -269,6 +269,12 @@ class LateFunction(PendingFunction):
     return self.join()
 
   def _worker_complete(self, work_result):
+    ''' Accept the result of the queued function as returned from the work queue.
+        If the function raised RetryError, requeue the function for later.
+        Otherwise record completion as normal.
+        If the function raised one of NameError, AttributeError, RuntimeError
+        (broadly: "programmer errors"), report the stack trace to aid debugging.
+    '''
     result, exc_info = work_result
     if exc_info:
       e = exc_info[1]
