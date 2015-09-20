@@ -71,6 +71,17 @@ class RetryError(Exception):
   '''
   pass
 
+def retry(retry_interval, func, *a, **kw):
+  ''' Call the callable `func` with the supplied arguments.
+      If it raises RetryError, sleep(`retry_interval`) and call
+      again until it does not raise RetryError.
+  '''
+  while True:
+    try:
+      return func(*a, **kw)
+    except RetryError as e:
+      time.sleep(retry_interval)
+
 class _Late_context_manager(object):
   ''' The _Late_context_manager is a context manager to run a suite via an
       existing Later object. Example usage:
@@ -235,7 +246,7 @@ class LateFunction(PendingFunction):
     self.later._busy.dec(self.name)
     self.later.close()
 
-  def _retry(self):
+  def _resubmit(self):
     ''' Resubmit this function for later execution.
     '''
     self.later._submit(self.func, delay=self.retry_delay, name=self.name, LF=self)
@@ -257,13 +268,19 @@ class LateFunction(PendingFunction):
     return self.join()
 
   def _worker_complete(self, work_result):
+    ''' Accept the result of the queued function as returned from the work queue.
+        If the function raised RetryError, requeue the function for later.
+        Otherwise record completion as normal.
+        If the function raised one of NameError, AttributeError, RuntimeError
+        (broadly: "programmer errors"), report the stack trace to aid debugging.
+    '''
     result, exc_info = work_result
     if exc_info:
       e = exc_info[1]
       if isinstance(e, RetryError):
         # resubmit this function
         warning("%s._worker_completed: resubmit after RetryError: %s", e)
-        self._retry()
+        self._resubmit()
         return
       if isinstance(e, (NameError, AttributeError, RuntimeError)):
         warning("%s._worker_completed: exc_info=%s", self.name, exc_info)
@@ -281,17 +298,20 @@ class _PipelinePushQueue(PushQueue):
       cs.app.pilfer termination process.
   '''
 
-  def __init__(self, name, pipeline, func_iter, outQ, func_final=None):
+  def __init__(self, name, pipeline, func_iter, outQ, func_final=None, retry_interval=None):
     ''' Initialise the _PipelinePushQueue, wrapping func_iter and func_final in code to inc/dec the main pipeline _busy counter.
     '''
+    if retry_interval is None:
+      retry_interval = DEFAULT_RETRY_DELAY
     self.pipeline = pipeline
+    self.retry_interval = retry_interval
 
     # wrap func_iter to raise _busy while processing item
     @logexc_gen
     def func_push(item):
       self.pipeline._busy.inc()
       try:
-        for item2 in func_iter(item):
+        for item2 in retry(self.retry_interval, func_iter, item):
           yield item2
       except Exception:
         self.pipeline._busy.dec()
@@ -306,7 +326,7 @@ class _PipelinePushQueue(PushQueue):
       @logexc
       def func_final():
         try:
-          result = func_final0()
+          result = retry(self.retry_interval, func_final0)
         except Exception:
           self.pipeline._busy.dec()
           raise
@@ -419,25 +439,24 @@ class _Pipeline(MultiOpenMixin):
     func_final = None
     if func_sig == FUNC_ONE_TO_ONE:
       def func_iter(item):
-        yield func(item)
+        yield retry(DEFAULT_RETRY_DELAY, func, item)
       func_iter.__name__ = "func_iter_1to1(func=%s)" % (funcname(func),)
     elif func_sig == FUNC_ONE_TO_MANY:
       func_iter = func
     elif func_sig == FUNC_SELECTOR:
       def func_iter(item):
-        if func(item):
+        if retry(DEFAULT_RETRY_DELAY, func, item):
           yield item
       func_iter.__name__ = "func_iter_1toMany(func=%s)" % (funcname(func),)
     elif func_sig == FUNC_MANY_TO_MANY:
       gathered = []
       def func_iter(item):
-        debug("GATHER %r FOR %s", item, funcname(func))
         gathered.append(item)
         if False:
           yield
       func_iter.__name__ = "func_iter_gather(func=%s)" % (funcname(func),)
       def func_final():
-        for item in func(gathered):
+        for item in retry(DEFAULT_RETRY_DELAY, func, gathered):
           yield item
       func_final.__name__ = "func_final_gather(func=%s)" % (funcname(func),)
     else:
@@ -991,7 +1010,6 @@ class Later(MultiOpenMixin):
 
   def _pipeline(self, filter_funcs, inputs=None, outQ=None, name=None):
     filter_funcs = list(filter_funcs)
-    debug("%s._pipeline: filter_funcs=%r", self, filter_funcs)
     if not filter_funcs:
       raise ValueError("no filter_funcs")
     if outQ is None:
