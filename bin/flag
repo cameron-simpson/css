@@ -61,6 +61,7 @@ then
   cd "$flagdir" || exit 1
   for flag in *
   do
+    [ "x$flag" = 'x*' ] && continue
     if flag "$flag"
     then
       if [ $quiet ]
