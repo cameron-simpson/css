@@ -129,6 +129,8 @@ class Flags(MutableMapping):
 
 class PolledFlags(dict):
   ''' A mapping which maintains a dict of the current state of the flags directory and updates it regularly.
+      This allows an application to consult the flags very frequently
+      without hammering the filesystem.
   '''
 
   # default sleep between flag status polling
