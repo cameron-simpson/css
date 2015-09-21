@@ -10,6 +10,8 @@ import os
 import os.path
 import errno
 from collections import MutableMapping
+from threading import Thread
+from time import sleep
 from cs.env import envsub
 from cs.lex import get_uc_identifier
 
@@ -122,6 +124,40 @@ class Flags(MutableMapping):
   
   def __delitem__(self, k):
     self[k] = False
+
+class PolledFlags(dict):
+
+  # default sleep between flag status polling
+  DEFAULT_POLL_INTERVAL = 1.1
+
+  def __init__(self, flagdir=None, poll_interval=None):
+    dict.__init__(self)
+    if poll_interval is None:
+      poll_interval = PolledFlags.DEFAULT_POLL_INTERVAL
+    self._flags = Flags(flagdir)
+    self._poll_flags(silent=True)
+    T = Thread(target=self._monitor_flags, kwargs={'delay': poll_interval})
+    T.daemon = True
+    T.start()
+
+  def _monitor_flags(self, delay=1.1):
+    ''' Monitor self._flags regularly, updating self.flags.
+    '''
+    while True:
+      sleep(delay)
+      self._poll_flags()
+
+  def _poll_flags(self, silent=False):
+    ''' Poll the filesystem flags and update the .flags attribute.
+    '''
+    new_flags = dict(self._flags)
+    ks = set(self.keys())
+    ks.update(new_flags.keys())
+    for k in sorted(ks):
+      old = bool(self.get(k))
+      new = bool(new_flags.get(k))
+      if old ^ new:
+        self[k] = new
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
