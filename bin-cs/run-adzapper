@@ -193,4 +193,4 @@ do  [ -d "$dir" ] || $trace mkdir -p "$dir"
 done
 
 tidy
-exec $trace squid -f "$rc" ${1+"$@"}
+exec $trace squid -N -f "$rc" ${1+"$@"}
