@@ -52,6 +52,8 @@ def main(argv):
   return xit
 
 class Flags(MutableMapping):
+  ''' A mapping which directly inspects the flags directory.
+  '''
 
   def __init__(self, flagdir=None, environ=None):
     if flagdir is None:
@@ -126,6 +128,8 @@ class Flags(MutableMapping):
     self[k] = False
 
 class PolledFlags(dict):
+  ''' A mapping which maintains a dict of the current state of the flags directory and updates it regularly.
+  '''
 
   # default sleep between flag status polling
   DEFAULT_POLL_INTERVAL = 1.1
