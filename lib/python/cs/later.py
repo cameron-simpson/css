@@ -39,6 +39,8 @@ FUNC_ONE_TO_ONE = 1
 FUNC_SELECTOR = 2
 FUNC_MANY_TO_MANY = 3
 
+DEFAULT_RETRY_DELAY = 0.1
+
 class _ThreadLocal(threading.local):
   ''' Thread local state to provide implied context withing Later context managers.
   '''
@@ -63,6 +65,22 @@ def later(func, *a, **kw):
       Return the LateFunction.
   '''
   return default.current.defer(func, *a, **kw)
+
+class RetryError(Exception):
+  ''' Exception raised by functions which should be resubmitted to the queue.
+  '''
+  pass
+
+def retry(retry_interval, func, *a, **kw):
+  ''' Call the callable `func` with the supplied arguments.
+      If it raises RetryError, sleep(`retry_interval`) and call
+      again until it does not raise RetryError.
+  '''
+  while True:
+    try:
+      return func(*a, **kw)
+    except RetryError as e:
+      time.sleep(retry_interval)
 
 class _Late_context_manager(object):
   ''' The _Late_context_manager is a context manager to run a suite via an
@@ -196,16 +214,21 @@ class LateFunction(PendingFunction):
             timeout for wait()
   '''
 
-  def __init__(self, later, func, name=None, final=None):
+  def __init__(self, later, func, name=None, final=None, retry_delay=None):
     ''' Initialise a LateFunction.
         `later` is the controlling Later instance.
         `func` is the callable for later execution.
         `name`, if supplied, specifies an identifying name for the LateFunction.
+        `retry_local`: time delay before retry of this function on RetryError.
+            Default from `later.retry_delay`.
     '''
     PendingFunction.__init__(self, func, final=final)
     if name is None:
       name = "LF-%d[func=%s]" % ( seq(), funcname(func) )
+    if retry_delay is None:
+      retry_delay = later.retry_delay
     self.name = name
+    self.retry_delay = retry_delay
     self.later = L = later.open()
     L._busy.inc(name)
     ##D("NEW LATEFUNCTION %r - busy ==> %d", name, L._busy.value)
@@ -223,6 +246,11 @@ class LateFunction(PendingFunction):
     self.later._busy.dec(self.name)
     self.later.close()
 
+  def _resubmit(self):
+    ''' Resubmit this function for later execution.
+    '''
+    self.later._submit(self.func, delay=self.retry_delay, name=self.name, LF=self)
+
   def _dispatch(self):
     ''' ._dispatch() is called by the Later class instance's worker thread.
         It causes the function to be handed to a thread for execution.
@@ -234,17 +262,28 @@ class LateFunction(PendingFunction):
         raise RuntimeError("should be pending, but state = %s", self.state)
       self.state = ASYNCH_RUNNING
       L._workers.dispatch(self.func, deliver=self._worker_complete, daemon=True)
-      self.func = None
 
   @OBSOLETE
   def wait(self):
     return self.join()
 
   def _worker_complete(self, work_result):
+    ''' Accept the result of the queued function as returned from the work queue.
+        If the function raised RetryError, requeue the function for later.
+        Otherwise record completion as normal.
+        If the function raised one of NameError, AttributeError, RuntimeError
+        (broadly: "programmer errors"), report the stack trace to aid debugging.
+    '''
     result, exc_info = work_result
     if exc_info:
-      if isinstance(exc_info[1], (NameError, AttributeError, RuntimeError)):
-        warning("LateFunction<%s>._worker_completed: exc_info=%s", self.name, exc_info[1])
+      e = exc_info[1]
+      if isinstance(e, RetryError):
+        # resubmit this function
+        warning("%s._worker_completed: resubmit after RetryError: %s", e)
+        self._resubmit()
+        return
+      if isinstance(e, (NameError, AttributeError, RuntimeError)):
+        warning("%s._worker_completed: exc_info=%s", self.name, exc_info)
         with Pfx('>>'):
           for formatted in traceback.format_exception(*exc_info):
             for line in formatted.rstrip().split('\n'):
@@ -259,17 +298,20 @@ class _PipelinePushQueue(PushQueue):
       cs.app.pilfer termination process.
   '''
 
-  def __init__(self, name, pipeline, func_iter, outQ, func_final=None):
+  def __init__(self, name, pipeline, func_iter, outQ, func_final=None, retry_interval=None):
     ''' Initialise the _PipelinePushQueue, wrapping func_iter and func_final in code to inc/dec the main pipeline _busy counter.
     '''
+    if retry_interval is None:
+      retry_interval = DEFAULT_RETRY_DELAY
     self.pipeline = pipeline
+    self.retry_interval = retry_interval
 
     # wrap func_iter to raise _busy while processing item
     @logexc_gen
     def func_push(item):
       self.pipeline._busy.inc()
       try:
-        for item2 in func_iter(item):
+        for item2 in retry(self.retry_interval, func_iter, item):
           yield item2
       except Exception:
         self.pipeline._busy.dec()
@@ -284,7 +326,7 @@ class _PipelinePushQueue(PushQueue):
       @logexc
       def func_final():
         try:
-          result = func_final0()
+          result = retry(self.retry_interval, func_final0)
         except Exception:
           self.pipeline._busy.dec()
           raise
@@ -350,6 +392,9 @@ class _Pipeline(MultiOpenMixin):
     '''
     return self.queues[-1]
 
+  def startup(self):
+    pass
+
   def shutdown(self):
     ''' Close the leftmost queue in the pipeline.
     '''
@@ -394,25 +439,24 @@ class _Pipeline(MultiOpenMixin):
     func_final = None
     if func_sig == FUNC_ONE_TO_ONE:
       def func_iter(item):
-        yield func(item)
+        yield retry(DEFAULT_RETRY_DELAY, func, item)
       func_iter.__name__ = "func_iter_1to1(func=%s)" % (funcname(func),)
     elif func_sig == FUNC_ONE_TO_MANY:
       func_iter = func
     elif func_sig == FUNC_SELECTOR:
       def func_iter(item):
-        if func(item):
+        if retry(DEFAULT_RETRY_DELAY, func, item):
           yield item
       func_iter.__name__ = "func_iter_1toMany(func=%s)" % (funcname(func),)
     elif func_sig == FUNC_MANY_TO_MANY:
       gathered = []
       def func_iter(item):
-        debug("GATHER %r FOR %s", item, funcname(func))
         gathered.append(item)
         if False:
           yield
       func_iter.__name__ = "func_iter_gather(func=%s)" % (funcname(func),)
       def func_final():
-        for item in func(gathered):
+        for item in retry(DEFAULT_RETRY_DELAY, func, gathered):
           yield item
       func_final.__name__ = "func_final_gather(func=%s)" % (funcname(func),)
     else:
@@ -421,18 +465,23 @@ class _Pipeline(MultiOpenMixin):
 
 class Later(MultiOpenMixin):
   ''' A management class to queue function calls for later execution.
-      If `capacity` is an int, it is used to size a Semaphore to constrain
-      the number of dispatched functions which may be in play at a time.
-      If `capacity` is not an int it is presumed to be a suitable
-      Semaphore-like object.
-      `inboundCapacity` can be specified to limit the number of undispatched
-      functions that may be queued up; the default is 0 (no limit).
-      Calls to submit functions when the inbound limit is reached block
-      until some functions are dispatched.
-      The `name` parameter may be used to supply an identifying name
-      for this instance.
   '''
-  def __init__(self, capacity, name=None, inboundCapacity=0):
+
+  def __init__(self, capacity, name=None, inboundCapacity=0, retry_delay=None):
+    ''' Initialise the Later instance.
+        If `capacity` is an int, it is used to size a Semaphore to constrain
+        the number of dispatched functions which may be in play at a time.
+        If `capacity` is not an int it is presumed to be a suitable
+        Semaphore-like object.
+        `inboundCapacity` can be specified to limit the number of undispatched
+        functions that may be queued up; the default is 0 (no limit).
+        Calls to submit functions when the inbound limit is reached block
+        until some functions are dispatched.
+        The `name` parameter may be used to supply an identifying name
+        for this instance.
+        `retry_delay`: time delay for requeued functions. Default
+            from DEFAULT_RETRY_DELAY.
+    '''
     if name is None:
       name = "Later-%d" % (seq(),)
     MultiOpenMixin.__init__(self)
@@ -445,8 +494,11 @@ class Later(MultiOpenMixin):
     debug("Later.__init__(capacity=%s, inboundCapacity=%s, name=%s)", capacity, inboundCapacity, name)
     if type(capacity) is int:
       capacity = AdjustableSemaphore(capacity)
+    if retry_delay is None:
+      retry_delay = DEFAULT_RETRY_DELAY
     self.capacity = capacity
     self.inboundCapacity = inboundCapacity
+    self.retry_delay = retry_delay
     self.name = name
     self.delayed = set()        # unqueued, delayed until specific time
     self.pending = set()        # undispatched LateFunctions
@@ -720,12 +772,14 @@ class Later(MultiOpenMixin):
         If the parameter `name` is not None, use it to name the LateFunction.
         If the parameter `pfx` is not None, submit pfx.partial(func);
           see the cs.logutils.Pfx.partial method for details.
+        If the parameter `LF` is not None, construct a new LateFunction to
+          track function completion.
     '''
     if not self.submittable:
       raise RuntimeError("%s.submit(...) but not self.submittable" % (self,))
     return self._submit(func, priority=priority, delay=delay, when=when, name=name, pfx=pfx)
 
-  def _submit(self, func, priority=None, delay=None, when=None, name=None, pfx=None):
+  def _submit(self, func, priority=None, delay=None, when=None, name=None, pfx=None, LF=None, retry_delay=None):
     if delay is not None and when is not None:
       raise ValueError("you can't specify both delay= and when= (%s, %s)" % (delay, when))
     if priority is None:
@@ -734,7 +788,8 @@ class Later(MultiOpenMixin):
       priority = (priority,)
     if pfx is not None:
       func = pfx.partial(func)
-    LF = LateFunction(self, func, name=name)
+    if LF is None:
+      LF = LateFunction(self, func, name=name, retry_delay=retry_delay)
     pri_entry = list(priority)
     pri_entry.append(seq())     # ensure FIFO servicing of equal priorities
     pri_entry.append(LF)
@@ -872,43 +927,21 @@ class Later(MultiOpenMixin):
         LF.notify(submit_func)
     return R
 
-  def retry(self, R, func, *a, **kw):
-    ''' Queue the call `func` for later dispatch and possible
-        repetition.
-        If `R` is None a new cs.threads.Result is allocated to
-        accept the function return value.
-        The return value from `func` should be a tuple:
-          LFs, result
-        where LFs, if not empty, is a sequence of LateFunctions
-        which should complete. After completion, `func` is queued
-        again.
-        When LFs is empty, result is passed to R.put() and `func`
-        is not requeued.
-    '''
-    if R is None:
-      R = Result()
-    def retry():
-      LFs = []
-      LFs, result = func(LFs, *a, **kw)
-      if LFs:
-        self.after(LFs, R, retry)
-      else:
-        R.put(result)
-    self.defer(retry)
-    return R
-
-  def defer_iterable(self, I, outQ):
+  def defer_iterable(self, I, outQ, test_ready=None):
     ''' Submit an iterable `I` for asynchronous stepwise iteration
         to return results via the queue `outQ`.
         `outQ` must have a .put method to accept items and a .close method to
         indicate the end of items.
         When the iteration is complete, call outQ.close().
+        `test_ready`: if not None, a callable to test if iteration
+            is presently permitted; iteration will be deferred until
+            the callable returns a true value
     '''
     if not self.submittable:
       raise RuntimeError("%s.defer_iterable(...) but not self.submittable" % (self,))
-    return self._defer_iterable(I, outQ=outQ)
+    return self._defer_iterable(I, outQ=outQ, test_ready=test_ready)
 
-  def _defer_iterable(self, I, outQ):
+  def _defer_iterable(self, I, outQ, test_ready=None):
     iterate = partial(next, iter(I))
 
     @logexc
@@ -917,6 +950,8 @@ class Later(MultiOpenMixin):
           Close the queue at end of iteration or other exception.
           Otherwise, requeue ourself to collect the next iteration value.
       '''
+      if test_ready is not None and not test_ready():
+        raise RetryError("iterate_once: not ready yet")
       try:
         item = iterate()
       except StopIteration:
@@ -975,7 +1010,6 @@ class Later(MultiOpenMixin):
 
   def _pipeline(self, filter_funcs, inputs=None, outQ=None, name=None):
     filter_funcs = list(filter_funcs)
-    debug("%s._pipeline: filter_funcs=%r", self, filter_funcs)
     if not filter_funcs:
       raise ValueError("no filter_funcs")
     if outQ is None:
