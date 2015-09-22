@@ -260,7 +260,7 @@ class FileDirent(_Dirent, MultiOpenMixin):
     self._check()
 
   def _check(self):
-    # TODO: check ._block and ._open_file against NOC open count
+    # TODO: check ._block and ._open_file against MultiOpenMixin open count
     if self._block is None:
       if self._open_file is None:
         raise ValueError("both ._block and ._open_file are None")
@@ -298,7 +298,7 @@ class FileDirent(_Dirent, MultiOpenMixin):
     return len(self.block)
 
   @locked
-  def startup(self, count):
+  def startup(self):
     ''' Set up ._open_file on first open.
     '''
     self._check()
