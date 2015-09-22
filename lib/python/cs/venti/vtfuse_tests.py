@@ -15,7 +15,7 @@ from .vtfuse import mount
 from .store import MappingStore
 from cs.logutils import X
 
-TESTDIR = '/tmp/vtfuse_testdir'
+TESTDIR = 'vtfuse_testdir'
 
 class Test_VTFuse(unittest.TestCase):
 
