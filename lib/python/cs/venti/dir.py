@@ -234,7 +234,7 @@ class _Dirent(object):
 
     dev = 0       # FIXME: we're not hooked to a FS?
     nlink = 1
-    size = self.size()
+    size = self.size
     atime = 0
     mtime = self.mtime
     ctime = 0
@@ -325,7 +325,7 @@ class FileDirent(_Dirent, MultiOpenMixin):
   def truncate(self, length):
     ''' Truncate this FileDirent to the specified size.
     '''
-    Esize = self.size()
+    Esize = self.size
     if Esize != length:
       with self:
         return self._open_file.truncate(length)
