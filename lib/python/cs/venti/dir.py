@@ -192,7 +192,7 @@ class _Dirent(object):
            + block.textencode()
            )
 
-  # NB: not a property because it may change
+  @property
   def size(self):
     return len(self.block)
 
@@ -264,8 +264,9 @@ class FileDirent(_Dirent, MultiOpenMixin):
     if self._block is None:
       if self._open_file is None:
         raise ValueError("both ._block and ._open_file are None")
-    elif self._open_file is not None:
-      raise ValueError("._block is %s and ._open_file is %r" % (self._block, self._open_file))
+    ## both are allowed to be set
+    ##elif self._open_file is not None:
+    ##  raise ValueError("._block is %s and ._open_file is %r" % (self._block, self._open_file))
 
   @property
   @locked
