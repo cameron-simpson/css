@@ -125,7 +125,6 @@ def save_Dirent(fp, E, when=None):
     with lockfile(path):
       with open(path, "a") as fp:
         return save_Dirent(fp, E, when=when)
-  fp = path
   write_Dirent(fp, E, when=when)
 
 def read_Dirents(fp):
