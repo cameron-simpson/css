@@ -15,7 +15,7 @@ from os.path import basename
 import sys
 from threading import RLock
 from cs.debug import DummyMap, TracingObject
-from cs.logutils import X
+from cs.logutils import X, debug, warning, error, Pfx
 from cs.obj import O, obj_as_dict
 from cs.seq import Seq
 from cs.threads import locked
@@ -62,11 +62,10 @@ class StoreFS(Operations):
 
   def __getattr__(self, attr):
     # debug aid
-    X("UNKNOWN ATTR: StoreFS.__getattr__: attr=%r", attr)
+    warning("UNKNOWN ATTR: StoreFS.__getattr__: attr=%r", attr)
     def attrfunc(*a, **kw):
-      X("UNKNOWN ATTR: %s(a=%r,kw=%r)", attr, a, kw)
+      warning("CALL UNKNOWN ATTR: %s(a=%r,kw=%r)", attr, a, kw)
       raise RuntimeError(attr)
-    X("%s ==> %s", attr, attrfunc)
     return attrfunc
 
   def _mount(self, root):
@@ -85,7 +84,7 @@ class StoreFS(Operations):
     '''
     E, P, tail_path = self._resolve(path)
     if tail_path:
-      X("_namei2: NOT FOUND: %r; tail_path=%r", path, tail_path)
+      warning("_namei2: NOT FOUND: %r; tail_path=%r", path, tail_path)
       raise FuseOSError(errno.ENOENT)
     return E, P
 
@@ -126,26 +125,25 @@ class StoreFS(Operations):
   # FUSE support methods.
 
   def access(self, path, amode):
-    X("access(path=%s, mode=%s)", path, amode)
-    E = self._namei(path)
-    if not E.meta.access(amode):
-      X("raise EACCES")
-      raise FuseOSError(errno.EACCES)
-    X("%s.access: return 0", self)
-    return 0
+    with Pfx("access(path=%s, amode=0o%o)", path, amode):
+      E = self._namei(path)
+      if not E.meta.access(amode):
+        raise FuseOSError(errno.EACCES)
+      return 0
 
   def chmod(self, path, mode):
-    X("chmod(%r, %o)...", path, mode)
-    E = self._namei(path)
-    E.meta.chmod(mode)
+    with Pfx("chmod(%r, 0o%04o)...", path, mode):
+      E = self._namei(path)
+      E.meta.chmod(mode)
 
   def chown(self, path, uid, gid):
-    E = self._namei(path)
-    M = E.meta
-    if uid >= 0:
-      M.uid = uid
-    if gid >= 0:
-      M.gid = gid
+    with Pfx("chown(%r, uid=%d, gid=%d)", path, uid, gid):
+      E = self._namei(path)
+      M = E.meta
+      if uid >= 0:
+        M.uid = uid
+      if gid >= 0:
+        M.gid = gid
 
   def create(self, path, mode, fi=None):
     X("CREATE: path=%r, mode=%o, fi=%r", path, mode, fi)
@@ -161,15 +159,14 @@ class StoreFS(Operations):
     fh.truncate(length)
 
   def getattr(self, path, fh=None):
-    X("getattr: %s ...", path)
     try:
       E = self._namei(path)
     except FuseOSError as e:
-      X("getattr: FuseOSError: %s", e)
+      error("getattr: FuseOSError: %s", e)
       raise
-    X("getattr: %s => %s", path, E)
     if fh is not None:
-      X("fh=%r", fh)
+      ##X("fh=%s", fh)
+      pass
     d = obj_as_dict(E.meta.stat(), 'st_')
     d['st_dev'] = 16777218
     d['st_ino'] = self._ino(path)
@@ -178,85 +175,80 @@ class StoreFS(Operations):
     d['st_ctime'] = float(d['st_ctime'])
     d['st_mtime'] = float(d['st_mtime'])
     d['st_nlink'] = 10
-    X("getattr: d=%r", d)
     return d
 
   def mkdir(self, path, mode):
-    X("mkdir(path=%s, mode=%o)", path, mode)
-    E, P, tail_path = self._resolve(path)
-    if not tail_path:
-      X("mkdir: file exists already")
-      raise FuseOSError(errno.EEXIST)
-    if len(tail_path) > 1:
-      X("mkdir(%r): multiple missing path components: %r", path, tail_path)
-      raise FuseOSError(errno.ENOENT)
-    assert len(tail_path) == 1
-    X("mkdir: new dir, basename %r", tail_path)
-    if not E.isdir:
-      X("mkdir: parent (%r) not a directory, raising ENOTDIR", E.name)
-      raise FuseOSError(errno.ENOTDIR)
-    base = tail_path[0]
-    newE = Dir(path, parent=E)
-    E[base] = newE
-    E = newE
-    E.meta.chmod(mode&0o7777)
+    with Pfx("mkdir(path=%r, mode=0o%04o)", path, mode):
+      E, P, tail_path = self._resolve(path)
+      if not tail_path:
+        error("file exists")
+        raise FuseOSError(errno.EEXIST)
+      if len(tail_path) != 1:
+        error("expected exactly 1 missing path component, got: %r", tail_path)
+        raise FuseOSError(errno.ENOENT)
+      if not E.isdir:
+        error("parent (%r) not a directory, raising ENOTDIR", E.name)
+        raise FuseOSError(errno.ENOTDIR)
+      base = tail_path[0]
+      newE = Dir(path, parent=E)
+      E[base] = newE
+      E = newE
+      E.meta.chmod(mode & 0o7777)
 
   @locked
   def open(self, path, flags):
     ''' Obtain a file descriptor open on `path`.
     '''
-    X("open(path=%r, flags=%o)...", path, flags)
-    do_create = flags & O_CREAT
-    do_trunc = flags & O_TRUNC
-    for_read = (flags & O_RDONLY) == O_RDONLY or (flags & O_RDWR) == O_RDWR
-    for_write = (flags & O_WRONLY) == O_WRONLY or (flags & O_RDWR) == O_RDWR
-    for_append = (flags & O_APPEND) == O_APPEND
-    X("open(path=%r,..): do_create=%s for_read=%s, for_write=%s, for_append=%s",
-      path, do_create, for_read, for_write, for_append)
-    E, P, tail_path = self._resolve(path)
-    if len(tail_path) > 0 and not do_create:
-      X("open(%r): no do_create, raising ENOENT", path)
-      raise FuseOSError(errno.ENOENT)
-    if len(tail_path) > 1:
-      X("open(%r): multiple missing path components: %r", path, tail_path)
-      raise FuseOSError(errno.ENOENT)
-    if len(tail_path) == 1:
-      X("open: new file, basename %r", tail_path)
-      if not E.isdir:
-        X("open: parent (%r) not a directory, raising ENOTDIR", E.name)
-        raise FuseOSError(errno.ENOTDIR)
-      base = tail_path[0]
-      newE = FileDirent(path)
-      E[base] = newE
-      E = newE
-    else:
-      X("open: file exists already")
-    fh = FileHandle(self, path, E, for_read, for_write, for_append)
-    if do_trunc:
-      fh.truncate(0)
-    X("open(%r): fh=%s", path, fh)
-    fd = self._new_file_descriptor(fh)
-    X("open(%r): fd=%s", path, fd)
-    return fd
+    with Pfx("open(path=%r, flags=0o%o)...", path, flags):
+      do_create = flags & O_CREAT
+      do_trunc = flags & O_TRUNC
+      for_read = (flags & O_RDONLY) == O_RDONLY or (flags & O_RDWR) == O_RDWR
+      for_write = (flags & O_WRONLY) == O_WRONLY or (flags & O_RDWR) == O_RDWR
+      for_append = (flags & O_APPEND) == O_APPEND
+      debug("do_create=%s for_read=%s, for_write=%s, for_append=%s",
+            do_create, for_read, for_write, for_append)
+      E, P, tail_path = self._resolve(path)
+      if len(tail_path) > 0 and not do_create:
+        error("no do_create, raising ENOENT")
+        raise FuseOSError(errno.ENOENT)
+      if len(tail_path) > 1:
+        error("multiple missing path components: %r", tail_path)
+        raise FuseOSError(errno.ENOENT)
+      if len(tail_path) == 1:
+        debug("open: new file, basename %r", tail_path)
+        if not E.isdir:
+          error("parent (%r) not a directory, raising ENOTDIR", E.name)
+          raise FuseOSError(errno.ENOTDIR)
+        base = tail_path[0]
+        newE = FileDirent(path)
+        E[base] = newE
+        E = newE
+      else:
+        debug("file exists already")
+        pass
+      fh = FileHandle(self, path, E, for_read, for_write, for_append)
+      if do_trunc:
+        fh.truncate(0)
+      fd = self._new_file_descriptor(fh)
+      return fd
 
   def opendir(self, path):
-    X("opendir(path=%r)...", path)
-    E = self._namei(path)
-    fd = self._new_file_descriptor(E)
-    X("opendir: return %d", fd)
-    return fd
+    with Pfx("opendir(%r)", path):
+      E = self._namei(path)
+      fd = self._new_file_descriptor(E)
+      return fd
 
   def read(self, path, size, offset, fd):
-    X("READ: path=%r, size=%d, offset=%d, fd=%r", path, size, offset, fd)
-    chunks = []
-    while size > 0:
-      data = self._fh(fd).read(offset, size)
-      if len(data) == 0:
-        break
-      chunks.append(data)
-      offset += len(data)
-      size -= len(data)
-    return b''.join(chunks)
+    with Pfx("read(path=%r, size=%d, offset=%d, fd=%r", path, size, offset, fd):
+      chunks = []
+      while size > 0:
+        data = self._fh(fd).read(offset, size)
+        if len(data) == 0:
+          break
+        chunks.append(data)
+        offset += len(data)
+        size -= len(data)
+      return b''.join(chunks)
 
   def readdir(self, path, *a, **kw):
     X("READDIR: path=%r, a=%r, kw=%r", path, a, kw)
@@ -298,7 +290,8 @@ class StoreFS(Operations):
         X("statvfs: .%s = %r", f, getattr(st, f))
         d[f] = getattr(st, f)
       else:
-        X("statvfs: skip %s", f)
+        ##X("statvfs: skip %s", f)
+        pass
     return d
 
   def rename(self, oldpath, newpath):
@@ -335,8 +328,7 @@ class StoreFS(Operations):
       raise FuseOSError(errno.ENOTEMPTY)
     del P[Ebase]
 
-  def truncate(self, path, length):
-    X("TRUNCATE(%r, %d)...", path, length)
+  def truncate(self, path, length, fh=None):
     E = self._namei(path)
     if not E.meta.access(os.W_OK):
       raise FuseOSError(errno.EPERM)
