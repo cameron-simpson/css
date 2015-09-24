@@ -117,12 +117,16 @@ def update_archive(arpath, ospath, modes, create_archive=False, arsubpath=None, 
     # save archive state
     save_Dirent(arpath, rootE)
 
-def save_Dirent(path, E, when=None):
-  ''' Save the supplied Dirent `E` to the file `path` with timestamp `when` (default now).
+def save_Dirent(fp, E, when=None):
+  ''' Save the supplied Dirent `E` to the file `path` (open file or pathname) with timestamp `when` (default now).
   '''
-  with lockfile(path):
-    with open(path, "a") as fp:
-      write_Dirent(fp, E, when=when)
+  if isinstance(fp, str):
+    path = fp
+    with lockfile(path):
+      with open(path, "a") as fp:
+        return save_Dirent(fp, E, when=when)
+  fp = path
+  write_Dirent(fp, E, when=when)
 
 def read_Dirents(fp):
   ''' Generator to yield (unixtime, Dirent) from an open archive file.
