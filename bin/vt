@@ -14,7 +14,7 @@
 #   vt [options...] catblock [-i] hashcodes...
 #   vt [options...] listen {-|host:port}
 #   vt [options...] ls [-R] dirrefs...
-#   vt [options...] mount dirref mountpoint
+#   vt [options...] mount dirref mountpoint [logpath]
 #   vt [options...] scan datafile
 #   vt [options...] pull stores...
 #   vt [options...] unpack dirrefs...
@@ -40,6 +40,7 @@ import cs.logutils
 from cs.logutils import Pfx, exception, error, warning, debug, setup_logging, logTo, D, X, nl
 from cs.venti import totext, fromtext, defaults
 from cs.venti.block import Block, IndirectBlock, dump_block
+from cs.venti.dir import Dir
 from cs.venti.store import Store
 from cs.venti.cache import CacheStore, MemoryCacheStore
 from cs.venti.paths import dirent_dir, dirent_file, dirent_resolve, resolve
@@ -491,20 +492,46 @@ def cmd_ls(args, verbose=None, log=None):
 # Requires FUSE support.
 #
 def cmd_mount(args, verbose=None, log=None):
-  if len(args) != 2:
-    raise GetoptError("expected dirref and mountpoint")
-  dirref, mountpoint = args
-  print("mount", args[0], args[1], "...")
+  badopts = False
+  try:
+    dirref = args.pop(0)
+  except IndexError:
+    error("missing dirref")
+    badopts = True
+  try:
+    mountpoint = args.pop(0)
+  except IndexError:
+    error("missing mountpoint")
+    badopts = True
+  if args:
+    sync_log = args.pop(0)
+  else:
+    sync_log = None
+  if args:
+    error("extra arguments: %s", ' '.join(args))
+    badopts = True
+  if badopts:
+    raise GetoptError("bad arguments")
+  from cs.venti.vtfuse import mount
+  X("mount dirref=%r mountpoint=%r sync_log=%r", dirref, mountpoint, sync_log)
   if not os.path.isdir(mountpoint):
     error("%s: mountpoint is not a directory", mountpoint)
     return 1
   S = defaults.S
-  E = S.namei(args[0]+'/')
+  with Pfx("dirref %r", dirref):
+    if dirref == '/':
+      E = Dir('/')
+    else:
+      raise ValueError("need to resolve a dirref")
   if not E.isdir:
-    error("%s: dirref - expected directory, not file", dirref)
+    error("dirref %s: expected directory, not file", dirref)
     return 1
-  import cs.venti.vtfuse
-  cs.venti.vtfuse.mount(args[1], E, S)
+  if sync_log is None:
+    syncfp = None
+  else:
+    with Pfx(sync_log):
+      syncfp = open(sync_log, 'a')
+  mount(mountpoint, E, S, syncfp=syncfp)
   return 0
 
 # =item B<pack> I<paths>...
