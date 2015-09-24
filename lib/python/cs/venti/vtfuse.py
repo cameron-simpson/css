@@ -146,36 +146,37 @@ class StoreFS(Operations):
         M.gid = gid
 
   def create(self, path, mode, fi=None):
-    X("CREATE: path=%r, mode=%o, fi=%r", path, mode, fi)
-    if fi is not None:
-      raise RuntimeError("WHAT TO DO IF fi IS NOT NONE: fi=%r" % (fi,))
-    fd = self.open(path, O_CREAT|O_TRUNC|O_WRONLY)
-    X("TODO: create: apply mode (0o%o) to self._fh[%d]", mode, fd)
-    return fd
+    with Pfx("create(path=%r, mode=0o%04o, fi=%s)", path, mode, fi):
+      if fi is not None:
+        raise RuntimeError("WHAT TO DO IF fi IS NOT NONE? fi=%r" % (fi,))
+      fd = self.open(path, O_CREAT|O_TRUNC|O_WRONLY)
+      warning("TODO: create: apply mode (0o%o) to self._fh[%d]", mode, fd)
+      return fd
 
   def ftruncate(self, path, length, fd):
-    X("FTRUNCATE(%r, %d, fd=%d)...", path, length, fd)
-    fh = self._fh(fd)
-    fh.truncate(length)
+    with Pfx("ftruncate(%r, %d, fd=%d)...", path, length, fd):
+      fh = self._fh(fd)
+      fh.truncate(length)
 
   def getattr(self, path, fh=None):
-    try:
-      E = self._namei(path)
-    except FuseOSError as e:
-      error("getattr: FuseOSError: %s", e)
-      raise
-    if fh is not None:
-      ##X("fh=%s", fh)
-      pass
-    d = obj_as_dict(E.meta.stat(), 'st_')
-    d['st_dev'] = 16777218
-    d['st_ino'] = self._ino(path)
-    d['st_dev'] = 1701
-    d['st_atime'] = float(d['st_atime'])
-    d['st_ctime'] = float(d['st_ctime'])
-    d['st_mtime'] = float(d['st_mtime'])
-    d['st_nlink'] = 10
-    return d
+    with Pfx("getattr(%r, fh=%s)", path, fh):
+      try:
+        E = self._namei(path)
+      except FuseOSError as e:
+        error("FuseOSError: %s", e)
+        raise
+      if fh is not None:
+        ##X("fh=%s", fh)
+        pass
+      d = obj_as_dict(E.meta.stat(), 'st_')
+      d['st_dev'] = 16777218
+      d['st_ino'] = self._ino(path)
+      d['st_dev'] = 1701
+      d['st_atime'] = float(d['st_atime'])
+      d['st_ctime'] = float(d['st_ctime'])
+      d['st_mtime'] = float(d['st_mtime'])
+      d['st_nlink'] = 10
+      return d
 
   def mkdir(self, path, mode):
     with Pfx("mkdir(path=%r, mode=0o%04o)", path, mode):
@@ -251,34 +252,35 @@ class StoreFS(Operations):
       return b''.join(chunks)
 
   def readdir(self, path, *a, **kw):
-    X("READDIR: path=%r, a=%r, kw=%r", path, a, kw)
-    E = self._namei(path)
-    if not E.isdir:
-      raise FuseOSError(errno.ENOTDIR)
-    return ['.', '..'] + list(E.keys())
+    with Pfx("readdir(path=%r, a=%r, kw=%r", path, a, kw):
+      if a or kw:
+        warning("a or kw set!")
+      E = self._namei(path)
+      if not E.isdir:
+        raise FuseOSError(errno.ENOTDIR)
+      return ['.', '..'] + list(E.keys())
 
   def readlink(self, path):
-    E = self._namei(path)
-    # no symlinks yet
-    raise FuseOSError(errno.EINVAL)
+    with Pfx("readlink(%r)", path):
+      E = self._namei(path)
+      # no symlinks yet
+      raise FuseOSError(errno.EINVAL)
 
   def release(self, path, fd):
-    X("release open file path=%r fd=%r...", path, fd)
-    fh = self._fh(fd)
-    if fh is None:
-      error("release open file fd=%r: handle is None!", fd)
-    else:
-      fh.close()
-    return 0
+    with Pfx("release(%r, fd=%d)", path, fd):
+      fh = self._fh(fd)
+      if fh is None:
+        error("handle is None!")
+      else:
+        fh.close()
+      return 0
 
   def releasedir(self, path, fd):
-    X("releasedir path=%r fd=%r...", path, fd)
-    fh = self._fh(fd)
-    if fh is None:
-      error("releasedir fd=%r: handle is None!", fd)
-    else:
-      X("releasedir fd=%r: OK %s", fd, fh)
-    return 0
+    with Pfx("releasedir(path=%r, fd=%d)", path, fd):
+      fh = self._fh(fd)
+      if fh is None:
+        error("handle is None!")
+      return 0
 
   def statfs(self, path):
     X("statsfs(%s)", path)
