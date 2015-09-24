@@ -5,7 +5,7 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
-from fuse import FUSE, FuseOSError, Operations, LoggingMixIn
+from fuse import FUSE, FuseOSError, Operations, LoggingMixIn, fuse_get_context
 from functools import partial
 from collections import namedtuple
 import errno
@@ -28,10 +28,14 @@ from .paths import resolve
 # TODO: no support for multiple links or path-=open renames
 OpenFile = namedtuple('OpenFile', ('path', 'E', 'fp'))
 
-def mount(mnt, E, S):
+def mount(mnt, E, S, syncfp=None):
   ''' Run a FUSE filesystem on `mnt` with Dirent `E` and backing Store `S`.
+      `mnt`: mount point
+      `E`: Dirent of top Store directory
+      `S`: backing Store
+      `syncfp`: if not None, a file to which to write sync lines
   '''
-  FS = StoreFS(E, S)
+  FS = StoreFS(E, S, syncfp=syncfp)
   FS._mount(mnt)
 
 class StoreFS(Operations):
@@ -39,17 +43,19 @@ class StoreFS(Operations):
       to a FUSE() constructor.
   '''
 
-  def __init__(self, E, S):
+  def __init__(self, E, S, syncfp=None):
     ''' Initilaise a new FUSE mountpoint.
         mnt: the mountpoint
         dirent: the root directory reference
         S: the Store to hold data
+        `syncfp`: if not None, a file to which to write sync lines
     '''
     O.__init__(self)
     if not E.isdir:
       raise ValueError("not dir Dir: %s" % (E,))
     self.S =S
     self.E = E
+    self.syncfp = syncfp
     self.do_fsync = False
     self._lock = RLock()
     self._inode_seq = Seq(start=1)
@@ -94,6 +100,18 @@ class StoreFS(Operations):
     E, P = self._namei2(path)
     return E
 
+  def _Estat(self, E):
+    ''' Stat a Dirent, return a dict with useful st_* fields.
+    '''
+    d = obj_as_dict(E.meta.stat(), 'st_')
+    d['st_dev'] = 16777218
+    d['st_dev'] = 1701
+    d['st_atime'] = float(d['st_atime'])
+    d['st_ctime'] = float(d['st_ctime'])
+    d['st_mtime'] = float(d['st_mtime'])
+    d['st_nlink'] = 10
+    return d
+
   @locked
   def _ino(self, path):
     ''' Return an inode number for a path, allocating one of necessary.
@@ -124,6 +142,15 @@ class StoreFS(Operations):
   ##############
   # FUSE support methods.
 
+  def destroy(self, path):
+    X("DESTROY(%r)...", path)
+    with Pfx("destroy(%r)", path):
+      if self.syncfp is not None:
+        save_Dirent(self.syncfp, self.E)
+
+  def sync(self, *a, **kw):
+    X("SYNC: a=%r, kw=%r", a, kw)
+
   def access(self, path, amode):
     with Pfx("access(path=%s, amode=0o%o)", path, amode):
       E = self._namei(path)
@@ -153,6 +180,19 @@ class StoreFS(Operations):
       warning("TODO: create: apply mode (0o%o) to self._fh[%d]", mode, fd)
       return fd
 
+  def fgetattr(self, *a, **kw):
+    X("FGETATTR: a=%r, kw=%r", a, kw)
+    with Pfx("fgetattr(%r, fh=%s)", path, fh):
+      try:
+        E = self._namei(path)
+      except FuseOSError as e:
+        error("FuseOSError: %s", e)
+        raise
+      if fh is not None:
+        ##X("fh=%s", fh)
+        pass
+      return self._Estat(E)
+
   def ftruncate(self, path, length, fd):
     with Pfx("ftruncate(%r, %d, fd=%d)...", path, length, fd):
       fh = self._fh(fd)
@@ -166,17 +206,11 @@ class StoreFS(Operations):
         error("FuseOSError: %s", e)
         raise
       if fh is not None:
-        ##X("fh=%s", fh)
+        X("GETATTR: fh=%s", fh)
         pass
-      d = obj_as_dict(E.meta.stat(), 'st_')
-      d['st_dev'] = 16777218
-      d['st_ino'] = self._ino(path)
-      d['st_dev'] = 1701
-      d['st_atime'] = float(d['st_atime'])
-      d['st_ctime'] = float(d['st_ctime'])
-      d['st_mtime'] = float(d['st_mtime'])
-      d['st_nlink'] = 10
-      return d
+      st = self._Estat(E)
+      st['st_ino'] = self._ino(path)
+      return st
 
   def mkdir(self, path, mode):
     with Pfx("mkdir(path=%r, mode=0o%04o)", path, mode):
@@ -357,10 +391,12 @@ class StoreFS(Operations):
       return self._fh(fd).write(data, offset)
 
   def flush(self, path, fh):
+    X("FLUSH %r fh=%s", path, fh)
     with Pfx("flush(%r, fh=%s)", path, fh):
       info("FLUSH: NOOP?")
 
   def fsync(self, path, datasync, fh):
+    X("FSYNC %r datasync=%r fh=%r", path, datasync, fh)
     with Pfx("fsync(path=%r, datasync=%d, fh=%r)", path, datasync, fh):
       if self.do_fsync:
         self._fh(fd).sync()
