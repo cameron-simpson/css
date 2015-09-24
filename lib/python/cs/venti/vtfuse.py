@@ -15,7 +15,7 @@ from os.path import basename
 import sys
 from threading import RLock
 from cs.debug import DummyMap, TracingObject
-from cs.logutils import X, debug, warning, error, Pfx
+from cs.logutils import X, debug, info, warning, error, Pfx
 from cs.obj import O, obj_as_dict
 from cs.seq import Seq
 from cs.threads import locked
@@ -283,89 +283,87 @@ class StoreFS(Operations):
       return 0
 
   def statfs(self, path):
-    X("statsfs(%s)", path)
-    st = os.statvfs(".")
-    X("statsfs(%s) ==> %r", path, st)
-    d = {}
-    for f in dir(st):
-      if f.startswith('f_'):
-        X("statvfs: .%s = %r", f, getattr(st, f))
-        d[f] = getattr(st, f)
-      else:
-        ##X("statvfs: skip %s", f)
-        pass
-    return d
+    with Pfx("statsfs(%r)", path):
+      st = os.statvfs(".")
+      d = {}
+      for f in dir(st):
+        if f.startswith('f_'):
+          d[f] = getattr(st, f)
+      return d
 
   def rename(self, oldpath, newpath):
-    X("rename(%r,%r)...", oldpath, newpath)
-    E1base = basename(oldpath)
-    E1, P1, tail_path = self._resolve(oldpath)
-    if tail_path:
-      raise FuseOSError(errno.ENOENT)
-    if not P1.meta.access(os.X_OK|os.W_OK):
-      raise FuseOSError(errno.EPERM)
-    E2base = basename(newpath)
-    E2, P2, tail_path = self._resolve(newpath)
-    if len(tail_path) > 1:
-      raise FuseOSError(errno.ENOENT)
-    if len(tail_path) == 1:
-      P2 = E2
-      E2 = None
-    if not P2.meta.access(os.X_OK|os.W_OK):
-      raise FuseOSError(errno.EPERM)
-    del P1[E1base]
-    P2[E2base] = E1
+    with Pfx("rename(%r, %r)...", oldpath, newpath):
+      E1base = basename(oldpath)
+      E1, P1, tail_path = self._resolve(oldpath)
+      if tail_path:
+        raise FuseOSError(errno.ENOENT)
+      if not P1.meta.access(os.X_OK|os.W_OK):
+        raise FuseOSError(errno.EPERM)
+      E2base = basename(newpath)
+      E2, P2, tail_path = self._resolve(newpath)
+      if len(tail_path) > 1:
+        raise FuseOSError(errno.ENOENT)
+      if len(tail_path) == 1:
+        P2 = E2
+        E2 = None
+      if not P2.meta.access(os.X_OK|os.W_OK):
+        raise FuseOSError(errno.EPERM)
+      del P1[E1base]
+      P2[E2base] = E1
 
   def rmdir(self, path):
-    X("rmdir(%r)...", path)
-    Ebase = basename(path)
-    E, P, tail_path = self._resolve(path)
-    if tail_path:
-      raise FuseOSError(errno.ENOENT)
-    if not E.isdir:
-      raise FuseOSError(errno.EDOTDIR)
-    if not P.meta.access(os.W_OK|os.X_OK):
-      raise FuseOSError(errno.EPERM)
-    if E.entries:
-      raise FuseOSError(errno.ENOTEMPTY)
-    del P[Ebase]
+    with Pfx("rmdir(%r)...", path):
+      Ebase = basename(path)
+      E, P, tail_path = self._resolve(path)
+      if tail_path:
+        raise FuseOSError(errno.ENOENT)
+      if not E.isdir:
+        raise FuseOSError(errno.EDOTDIR)
+      if not P.meta.access(os.W_OK|os.X_OK):
+        raise FuseOSError(errno.EPERM)
+      if E.entries:
+        raise FuseOSError(errno.ENOTEMPTY)
+      del P[Ebase]
 
   def truncate(self, path, length, fh=None):
-    E = self._namei(path)
-    if not E.meta.access(os.W_OK):
-      raise FuseOSError(errno.EPERM)
-    E.truncate(length)
+    with Pfx("truncate(%r, length=%d, fh=%s)", path, length, fh):
+      E = self._namei(path)
+      if not E.meta.access(os.W_OK):
+        raise FuseOSError(errno.EPERM)
+      E.truncate(length)
 
   def unlink(self, path):
-    X("unlink(%r)...", path)
-    Ebase = basename(path)
-    E, P, tail_path = self._resolve(path)
-    if tail_path:
-      raise FuseOSError(errno.ENOENT)
-    if E.isdir:
-      raise FuseOSError(errno.EISDIR)
-    if not P.meta.access(os.W_OK|os.X_OK):
-      raise FuseOSError(errno.EPERM)
-    del P[Ebase]
+    with Pfx("unlink(%r)...", path):
+      Ebase = basename(path)
+      E, P, tail_path = self._resolve(path)
+      if tail_path:
+        raise FuseOSError(errno.ENOENT)
+      if E.isdir:
+        raise FuseOSError(errno.EISDIR)
+      if not P.meta.access(os.W_OK|os.X_OK):
+        raise FuseOSError(errno.EPERM)
+      del P[Ebase]
 
   def utimens(self, path, times):
-    atime, mtime = times
-    E = self._namei(path)
-    M = E.meta
-    ## we do not do atime ## M.atime = atime
-    M.mtime = mtime
+    with Pfx("utimens(%r, times=%r", path, times):
+      atime, mtime = times
+      E = self._namei(path)
+      M = E.meta
+      ## we do not do atime ## M.atime = atime
+      M.mtime = mtime
 
   def write(self, path, data, offset, fd):
-    X("WRITE: path=%r, data=%r, offset=%d, fd=%r", path, data, offset, fd)
-    return self._fh(fd).write(data, offset)
+    with Pfx("write(path=%r, data=%d bytes, offset=%d, fd=%r", path, len(data), offset, fd):
+      return self._fh(fd).write(data, offset)
 
   def flush(self, path, fh):
-    X("FLUSH: path=%r, fh=%r", path, fh)
+    with Pfx("flush(%r, fh=%s)", path, fh):
+      info("FLUSH: NOOP?")
 
   def fsync(self, path, datasync, fh):
-    X("FSYNC: path=%r, datasync=%d, fh=%r", path, datasync, fh)
-    if self.do_fsync:
-      self._fh(fd).sync()
+    with Pfx("fsync(path=%r, datasync=%d, fh=%r)", path, datasync, fh):
+      if self.do_fsync:
+        self._fh(fd).sync()
 
 class FileHandle(O):
   ''' Filesystem state for open files.
