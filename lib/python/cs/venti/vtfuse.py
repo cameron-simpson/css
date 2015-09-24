@@ -19,6 +19,7 @@ from cs.logutils import X, debug, info, warning, error, Pfx
 from cs.obj import O, obj_as_dict
 from cs.seq import Seq
 from cs.threads import locked
+from .archive import save_Dirent
 from .block import Block
 from .dir import FileDirent, Dir
 from .file import File
