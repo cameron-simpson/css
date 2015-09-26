@@ -13,8 +13,8 @@ fetchmailclause "$clause" \
 | awk '$1 == "user" { user=$2 }
        $1 == "pass" { pass=$2 }
        $1 == "via"  { via=$2 }
-       END          { print "set imap_user='\''" user "'\''"
-                      print "set imap_pass='\''" pass "'\''"
-                      print "set folder='\''imaps://" user "@" via "/'\''"
+       END          { print "set imap_user='\''" user "'\''; " \
+                            "set imap_pass='\''" pass "'\''; " \
+                            "set folder='\''imaps://" user "@" via "/'\''"
                     }
       '
