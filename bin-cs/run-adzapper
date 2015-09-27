@@ -164,7 +164,6 @@ icp_access allow all
 nonhierarchical_direct off
 prefer_direct off
 always_direct allow alwaysdirect
-always_direct deny all
 ## obsolete ## maximum_single_addr_tries 4
 retry_on_error on
 X
