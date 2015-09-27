@@ -23,19 +23,20 @@ clause=$1; shift
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 exec sed -ne '
-		y/	/ /
-	    '"	/^ *skip  *$clause/b start
-		/^ *poll  *$clause/b start
-		d
-		:start
-		n
-		y/	/ /
-		s/   */ /g
-		s/^ //
-		s/ $//
-		/^#/b start
-		/^$/b start
-		/^skip /d
-		/^poll /d
-		p
-		b start" "$rc"
+        y/	/ /
+        s/$/ /
+        '"	/^ *skip  *$clause /b start
+        /^ *poll  *$clause /b start
+        d
+        :start
+        n
+        y/	/ /
+        s/   */ /g
+        s/^ //
+        s/ $//
+        /^#/b start
+        /^$/b start
+        /^skip /d
+        /^poll /d
+        p
+        b start" "$rc"
