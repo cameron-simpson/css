@@ -34,7 +34,7 @@ do
   first=
 done
 
-set -- svcd -q -T 11 \{ date \; lock -1 GETMAIL time timeout 900 getmail -v "$@" \}
+set -- svcd -n getmail -q -T 11 \{ date \; lock -1 GETMAIL time timeout 900 getmail -v "$@" \}
 
 set -x
 exec "$@"
