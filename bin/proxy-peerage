@@ -113,16 +113,24 @@ def cmd_squid_acls(proxies, proxy_name):
   patterns = proxy.patterns
   allow_as_fallback = False
   for n, pattern in enumerate(patterns):
-    if pattern == '*':
+    defn = pattern.definition
+    if defn == '*':
       allow_as_fallback = True
     else:
-      print('acl', '_'.join( (proxy_name, str(n)) ), squid_acl(pattern))
+      print('acl', '_'.join( (proxy_name, str(n)) ), pattern.squid_acl())
   if proxy_name == 'DIRECT':
-    # first for these ACLs to be direct
+    # force these ACLs to be direct
     for n, pattern in enumerate(patterns):
       acl_name = '_'.join( (proxy_name, str(n)) )
       print('always_direct allow', acl_name)
     print('always_direct deny all')
+    # prevent these ACLs from being never_direct
+    for n, pattern in enumerate(patterns):
+      acl_name = '_'.join( (proxy_name, str(n)) )
+      print('never_direct deny', acl_name)
+    if not allow_as_fallback:
+      # prevent other ACLs from going direct
+      print('never_direct allow all')
   else:
     raise ValueError(proxy_name)
 
@@ -227,9 +235,14 @@ class Proxies(object):
     self._patterns = []  # Patterns in order received
 
   def get(self, proxy_name):
-    ''' Fetch the named Proxy.
+    ''' Fetch the named Proxy or None.
     '''
     return self.by_name.get(proxy_name)
+
+  def __getitem__(self, proxy_name):
+    ''' Fetch the named Proxy.
+    '''
+    return self.by_name[proxy_name]
 
   @property
   def patterns(self):
