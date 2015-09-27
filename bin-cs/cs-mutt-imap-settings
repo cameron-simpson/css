@@ -15,6 +15,6 @@ fetchmailclause "$clause" \
        $1 == "via"  { via=$2 }
        END          { print "set imap_user='\''" user "'\''"
                       print "set imap_pass='\''" pass "'\''"
-                      print "set folder='\''imaps://" user "@" via "/'\''"
+                      print "set my_imap_host='\''" via "'\''"
                     }
       '
