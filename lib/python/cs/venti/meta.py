@@ -16,8 +16,8 @@ from cs.threads import locked
 DEFAULT_DIR_ACL = 'o:rwx-'
 DEFAULT_FILE_ACL = 'o:rw-x'
 
-NOBODY = -1
-NOGROUP = -1
+NOUSERID = -1
+NOGROUPID = -1
 
 user_map = {}
 group_map = {}
@@ -488,10 +488,10 @@ class Meta(dict):
       perms |= S_ISUID
     uid = self.uid
     if uid is None:
-      uid = NOBODY
+      uid = NOUSERID
     gid = self.gid
     if gid is None:
-      gid = NOGROUP
+      gid = NOGROUPID
     return uid, gid, perms
 
   def access(self, amode, user=None, group=None):
@@ -546,11 +546,11 @@ class Meta(dict):
     with Pfx("Meta.apply_os(%r)", ospath):
       st = os.lstat(ospath)
       mst = self.stat()
-      if mst.st_uid == NOBODY or mst.st_uid == st.st_uid:
+      if mst.st_uid == NOUSERID or mst.st_uid == st.st_uid:
         uid = -1
       else:
         uid = mst.st_uid
-      if mst.st_gid == NOGROUP or mst.st_gid == st.st_gid:
+      if mst.st_gid == NOGROUPID or mst.st_gid == st.st_gid:
         gid = -1
       else:
         gid = mst.st_gid
