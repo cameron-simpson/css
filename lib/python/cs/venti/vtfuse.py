@@ -82,7 +82,7 @@ class StoreFS(Operations):
     ''' Attach this StoreFS to the specified path `root`.
         Return the controlling FUSE object.
     '''
-    return TracingObject(FUSE(self, root, foreground=True, nothreads=True, debug=True))
+    return TracingObject(FUSE(self, root, foreground=True, nothreads=True, debug=False))
 
   def _resolve(self, path):
     ''' Call cs.venti.paths.resolve and return its result.
