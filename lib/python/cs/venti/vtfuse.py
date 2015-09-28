@@ -150,19 +150,19 @@ class StoreFS(Operations):
   ##############
   # FUSE support methods.
 
-  def destroy(self, path):
-    X("DESTROY(%r)...", path)
-    with Pfx("destroy(%r)", path):
-      if self.syncfp is not None:
-        save_Dirent(self.syncfp, self.E)
-
-  def sync(self, *a, **kw):
-    X("SYNC: a=%r, kw=%r", a, kw)
+  def _Eaccess(self, E, amode):
+    with Pfx("_Eaccess(E=%r, amode=%s)", E, amode):
+      ctx_uid, ctx_gid, ctx_pid = ctx = fuse_get_context()
+      warning("vtfuse.access: ctx=%r", ctx)
+      # test the access against the caller's uid/gid
+      # pass same in as default file ownership in case there are no metadata
+      return E.meta.access(amode, ctx_uid, ctx_gid,
+                           default_uid=ctx_uid, default_gid=ctx_gid)
 
   def access(self, path, amode):
     with Pfx("access(path=%s, amode=0o%o)", path, amode):
       E = self._namei(path)
-      if not E.meta.access(amode):
+      if not self._Eaccess(E, amode):
         raise FuseOSError(errno.EACCES)
       return 0
 
@@ -188,6 +188,12 @@ class StoreFS(Operations):
       warning("TODO: create: apply mode (0o%o) to self._fh[%d]", mode, fd)
       return fd
 
+  def destroy(self, path):
+    X("DESTROY(%r)...", path)
+    with Pfx("destroy(%r)", path):
+      if self.syncfp is not None:
+        save_Dirent(self.syncfp, self.E)
+
   def fgetattr(self, *a, **kw):
     X("FGETATTR: a=%r, kw=%r", a, kw)
     with Pfx("fgetattr(%r, fh=%s)", path, fh):
@@ -200,6 +206,10 @@ class StoreFS(Operations):
         ##X("fh=%s", fh)
         pass
       return self._Estat(E)
+
+  def flush(self, path, datasync, fd):
+    with Pfx("flush(%r, datasync=%s, fd=%s)", path, datasync, fd):
+      self._fh(fd).sync()
 
   def ftruncate(self, path, length, fd):
     with Pfx("ftruncate(%r, %d, fd=%d)...", path, length, fd):
@@ -339,7 +349,7 @@ class StoreFS(Operations):
       E1, P1, tail_path = self._resolve(oldpath)
       if tail_path:
         raise FuseOSError(errno.ENOENT)
-      if not P1.meta.access(os.X_OK|os.W_OK):
+      if not self._Eaccess(P1, os.X_OK|os.W_OK):
         raise FuseOSError(errno.EPERM)
       E2base = basename(newpath)
       E2, P2, tail_path = self._resolve(newpath)
@@ -348,7 +358,7 @@ class StoreFS(Operations):
       if len(tail_path) == 1:
         P2 = E2
         E2 = None
-      if not P2.meta.access(os.X_OK|os.W_OK):
+      if not self._Eaccess(P2, os.X_OK|os.W_OK):
         raise FuseOSError(errno.EPERM)
       del P1[E1base]
       P2[E2base] = E1
@@ -361,7 +371,7 @@ class StoreFS(Operations):
         raise FuseOSError(errno.ENOENT)
       if not E.isdir:
         raise FuseOSError(errno.EDOTDIR)
-      if not P.meta.access(os.W_OK|os.X_OK):
+      if not self._Eaccess(P, os.W_OK|os.X_OK):
         raise FuseOSError(errno.EPERM)
       if E.entries:
         raise FuseOSError(errno.ENOTEMPTY)
@@ -370,7 +380,7 @@ class StoreFS(Operations):
   def truncate(self, path, length, fh=None):
     with Pfx("truncate(%r, length=%d, fh=%s)", path, length, fh):
       E = self._namei(path)
-      if not E.meta.access(os.W_OK):
+      if not self._Eaccess(E, os.W_OK):
         raise FuseOSError(errno.EPERM)
       E.truncate(length)
 
@@ -382,7 +392,7 @@ class StoreFS(Operations):
         raise FuseOSError(errno.ENOENT)
       if E.isdir:
         raise FuseOSError(errno.EISDIR)
-      if not P.meta.access(os.W_OK|os.X_OK):
+      if not self._Eaccess(P, os.W_OK|os.X_OK):
         raise FuseOSError(errno.EPERM)
       del P[Ebase]
 
