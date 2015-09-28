@@ -177,7 +177,7 @@ class Pattern(_Pattern):
             or not(all(word.isdigit() and int(word) < 256 for word in words))
              ):
             raise ValueError('invalid ip-prefix')
-          return 'hdr.beg(host) %s' % haquote('.'.join(words) + '.')
+          return 'hdr_beg(host) %s' % haquote('.'.join(words) + '.')
         X("words = %r", words)
         if ( len(words) > 4
           or not(all(word.isdigit() and int(word) < 256 for word in words))
@@ -362,8 +362,12 @@ class Proxies(object):
     default_proxies = set()
     for pattern in self.patterns:
       defn = pattern.definition
+      proxy_names = [ _ for _ in pattern.proxy_names if _ != 'DIRECT' ]
+      if not proxy_names:
+        continue
       # catch the wildcard last
       if defn == '*':
+        default_proxies.update(proxy_names)
         continue
       yield ( '  use_backend %s if { %s }' \
               % (haproxy_backend_name(pattern.proxy_names), pattern.haproxy_acl()),
