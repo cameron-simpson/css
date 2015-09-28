@@ -494,10 +494,15 @@ class Meta(dict):
       gid = NOGROUPID
     return uid, gid, perms
 
-  def access(self, amode, user=None, group=None):
+  def access(self, amode, user=None, group=None, default_uid=None, default_gid=None):
     ''' POSIX like access call, accepting os.access `amode`.
     '''
     u, g, perms = self.unix_perms
+    if u == NOUSERID and default_uid is not None:
+      u = default_uid
+    if g == NOGROUPID and default_gid is not None:
+      g = default_gid
+    X("Meta.access: u=%s, g=%s, perms=0o%04o", u, g, perms)
     if amode & os.R_OK:
       if user is not None and user == u:
         if not ( (perms>>6) & 4 ):
