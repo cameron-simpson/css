@@ -23,6 +23,7 @@ from .archive import save_Dirent
 from .block import Block
 from .dir import FileDirent, Dir
 from .file import File
+from .meta import NOUSERID, NOGROUPID
 from .paths import resolve
 
 # records associated with an open file
@@ -58,6 +59,8 @@ class StoreFS(Operations):
     self.E = E
     self.syncfp = syncfp
     self.do_fsync = False
+    self._fs_uid = os.geteuid()
+    self._fs_gid = os.getegid()
     self._lock = RLock()
     self._inode_seq = Seq(start=1)
     self._inode_map = {}
@@ -111,6 +114,10 @@ class StoreFS(Operations):
     d['st_ctime'] = float(d['st_ctime'])
     d['st_mtime'] = float(d['st_mtime'])
     d['st_nlink'] = 10
+    if d['st_uid'] == NOUSERID:
+      d['st_uid'] = self._fs_uid
+    if d['st_gid'] == NOGROUPID:
+      d['st_gid'] = self._fs_gid
     return d
 
   @locked
