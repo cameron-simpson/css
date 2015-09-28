@@ -497,46 +497,34 @@ class Meta(dict):
   def access(self, amode, user=None, group=None):
     ''' POSIX like access call, accepting os.access `amode`.
     '''
-    X("Meta.access: return TRUE ALWAYS")
-    return True
     u, g, perms = self.unix_perms
     if amode & os.R_OK:
       if user is not None and user == u:
         if not ( (perms>>6) & 4 ):
-          X("Meta.access: FALSE")
           return False
       elif group is not None and group == g:
         if not ( (perms>>3) & 4 ):
-          X("Meta.access: FALSE")
           return False
       elif not ( perms & 4 ):
-          X("Meta.access: FALSE")
           return False
     if amode & os.W_OK:
       if user is not None and user == u:
         if not ( (perms>>6) & 2 ):
-          X("Meta.access: FALSE")
           return False
       elif group is not None and group == g:
         if not ( (perms>>3) & 2 ):
-          X("Meta.access: FALSE")
           return False
       elif not ( perms & 2 ):
-          X("Meta.access: FALSE")
           return False
     if amode & os.X_OK:
       if user is not None and user == u:
         if not ( (perms>>6) & 1 ):
-          X("Meta.access: FALSE")
           return False
       elif group is not None and group == g:
         if not ( (perms>>3) & 1 ):
-          X("Meta.access: FALSE")
           return False
       elif not ( perms & 1 ):
-          X("Meta.access: FALSE")
           return False
-    X("Meta.access: TRUE")
     return True
 
   def stat(self):
