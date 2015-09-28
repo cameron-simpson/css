@@ -16,6 +16,7 @@ case "$ARCH" in
 esac
 
 stty sane
+stty eof '^d'
 stty intr '^c' erase '^?' kill '^u'
 stty werase '^w' 2>/dev/null
 stty susp '^z' 2>/dev/null
