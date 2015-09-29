@@ -130,10 +130,8 @@ def save_Dirent(fp, E, when=None):
 def read_Dirents(fp):
   ''' Generator to yield (unixtime, Dirent) from an open archive file.
   '''
-  lineno = 0
-  for line in fp:
+  for lineno, line in enumerate(fp, 1):
     with Pfx("%s:%d", fp, lineno):
-      lineno += 1
       if not line.endswith('\n'):
         raise ValueError("incomplete? no trailing newline")
       line = line.rstrip()
