@@ -7,7 +7,7 @@ from cs.logutils import X
 def dump_Block(block, indent=''):
   X("%s%s %s %d bytes",
     indent,
-    hexify(block.hashcode()),
+    hexify(block.hashcode),
     "indirect" if block.indirect else "direct",
     len(block))
   if block.indirect:
@@ -19,11 +19,11 @@ def dump_Block(block, indent=''):
       dump_Block(B, indent=indent)
 
 def dump_Dirent(E, indent='', recurse=False):
-  X("%s%r %s", indent, hexify(E.block.hashcode()))
+  X("%s%r %s", indent, E.name, hexify(E.block.hashcode))
   if E.isdir:
     indent += '  '
-    for name in sorted(D.keys()):
-      E2 = D[name]
+    for name in sorted(E.keys()):
+      E2 = E[name]
       if recurse:
         dump_Dirent(E2, indent, recurse=True)
       else:
@@ -31,4 +31,4 @@ def dump_Dirent(E, indent='', recurse=False):
           indent,
           'd' if E2.isdir else '-',
           E.name,
-          E.block.hashcode())
+          E.block.hashcode)
