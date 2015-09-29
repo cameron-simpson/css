@@ -230,6 +230,12 @@ class StoreFS(Operations):
       st['st_ino'] = self._ino(path)
       return st
 
+  def listxattr(self, path):
+    X("LISTXATTR...")
+    with Pfx("listxattr(path=%r)", path):
+      warning("listxattr: return empty list")
+      return ''
+
   def mkdir(self, path, mode):
     with Pfx("mkdir(path=%r, mode=0o%04o)", path, mode):
       E, P, tail_path = self._resolve(path)
