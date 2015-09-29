@@ -142,7 +142,7 @@ def read_Dirents(fp):
     # note: yield _outside_ Pfx
     yield when, E
 
-def last_Dirent(arpath):
+def last_Dirent(arpath, missing_ok=False):
   ''' Return the latest archive entry.
   '''
   try:
@@ -150,11 +150,13 @@ def last_Dirent(arpath):
       try:
         return last(read_Dirents(arfp))
       except IndexError:
-        return None
+        return None, None
   except OSError as e:
-    if e.errno != errno.ENOENT:
-      raise
-  return None
+    if e.errno == errno.ENOENT:
+      if missing_ok:
+        return None, None
+    raise
+  raise RuntimeError("NOTREACHED")
 
 def write_Dirent(fp, E, when=None):
   ''' Write a Dirent to an open archive file:
