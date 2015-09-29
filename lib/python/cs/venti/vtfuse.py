@@ -428,7 +428,6 @@ class FileHandle(O):
     self.fs = fs
     self.path = path
     self.Eopen = E.open()
-    self.offset = 0
     self.for_read = for_read
     self.for_write = for_write
     self.for_append = for_append
