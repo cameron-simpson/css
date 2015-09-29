@@ -377,6 +377,9 @@ class StoreFS(Operations):
         raise FuseOSError(errno.ENOTEMPTY)
       del P[Ebase]
 
+  def sync(self, *a, **kw):
+    X("SYNC: a=%r, kw=%r", a, kw)
+
   def truncate(self, path, length, fh=None):
     with Pfx("truncate(%r, length=%d, fh=%s)", path, length, fh):
       E = self._namei(path)
