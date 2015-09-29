@@ -17,3 +17,18 @@ def dump_Block(block, indent=''):
       indent, len(subblocks), len(block))
     for B in subblocks:
       dump_Block(B, indent=indent)
+
+def dump_Dirent(E, indent='', recurse=False):
+  X("%s%r %s", indent, hexify(E.block.hashcode()))
+  if E.isdir:
+    indent += '  '
+    for name in sorted(D.keys()):
+      E2 = D[name]
+      if recurse:
+        dump_Dirent(E2, indent, recurse=True)
+      else:
+        X("%s%s %r %s",
+          indent,
+          'd' if E2.isdir else '-',
+          E.name,
+          E.block.hashcode())
