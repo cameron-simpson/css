@@ -130,20 +130,20 @@ class StoreFS(Operations):
     return self._inode_map[path]
 
   @locked
-  def _fh(self, fd):
-    return self._file_handles[fd]
+  def _fh(self, fhndx):
+    return self._file_handles[fhndx]
 
   @locked
-  def _new_file_descriptor(self, file_handle):
-    ''' Allocate a new file descriptor for a `file_handle`.
+  def _new_file_handle_index(self, file_handle):
+    ''' Allocate a new FileHandle index for a `file_handle`.
         TODO: linear allocation cost, may need recode if things get
           busy; might just need a list of released fds for reuse.
     '''
     fhs = self._file_handles
-    for i in range(len(fhs)):
-      if fhs[i] is None:
-        fhs[i] = file_handle
-        return i
+    for fhndx in range(len(fhs)):
+      if fhs[fhndx] is None:
+        fhs[fhndx] = file_handle
+        return fhndx
     fhs.append(file_handle)
     return len(fhs) - 1
 
@@ -184,9 +184,9 @@ class StoreFS(Operations):
     with Pfx("create(path=%r, mode=0o%04o, fi=%s)", path, mode, fi):
       if fi is not None:
         raise RuntimeError("WHAT TO DO IF fi IS NOT NONE? fi=%r" % (fi,))
-      fd = self.open(path, O_CREAT|O_TRUNC|O_WRONLY)
-      warning("TODO: create: apply mode (0o%o) to self._fh[%d]", mode, fd)
-      return fd
+      fhndx = self.open(path, O_CREAT|O_TRUNC|O_WRONLY)
+      warning("TODO: create: apply mode (0o%o) to self._fh[%d]", mode, fhndx)
+      return fhndx
 
   def destroy(self, path):
     X("DESTROY(%r)...", path)
@@ -207,13 +207,13 @@ class StoreFS(Operations):
         pass
       return self._Estat(E)
 
-  def flush(self, path, datasync, fd):
-    with Pfx("flush(%r, datasync=%s, fd=%s)", path, datasync, fd):
-      self._fh(fd).sync()
+  def flush(self, path, datasync, fhndx):
+    with Pfx("flush(%r, datasync=%s, fhndx=%s)", path, datasync, fhndx):
+      self._fh(fhndx).sync()
 
-  def ftruncate(self, path, length, fd):
-    with Pfx("ftruncate(%r, %d, fd=%d)...", path, length, fd):
-      fh = self._fh(fd)
+  def ftruncate(self, path, length, fhndx):
+    with Pfx("ftruncate(%r, %d, fhndx=%d)...", path, length, fhndx):
+      fh = self._fh(fhndx)
       fh.truncate(length)
 
   def getattr(self, path, fh=None):
@@ -250,7 +250,7 @@ class StoreFS(Operations):
 
   @locked
   def open(self, path, flags):
-    ''' Obtain a file descriptor open on `path`.
+    ''' Obtain a FileHandle open on `path`, return its index.
     '''
     with Pfx("open(path=%r, flags=0o%o)...", path, flags):
       do_create = flags & O_CREAT
@@ -282,20 +282,20 @@ class StoreFS(Operations):
       fh = FileHandle(self, path, E, for_read, for_write, for_append)
       if do_trunc:
         fh.truncate(0)
-      fd = self._new_file_descriptor(fh)
-      return fd
+      fhndx = self._new_file_handle_index(fh)
+      return fhndx
 
   def opendir(self, path):
     with Pfx("opendir(%r)", path):
       E = self._namei(path)
-      fd = self._new_file_descriptor(E)
-      return fd
+      fhndx = self._new_file_handle_index(E)
+      return fhndx
 
-  def read(self, path, size, offset, fd):
-    with Pfx("read(path=%r, size=%d, offset=%d, fd=%r", path, size, offset, fd):
+  def read(self, path, size, offset, fhndx):
+    with Pfx("read(path=%r, size=%d, offset=%d, fhndx=%r", path, size, offset, fhndx):
       chunks = []
       while size > 0:
-        data = self._fh(fd).read(offset, size)
+        data = self._fh(fhndx).read(offset, size)
         if len(data) == 0:
           break
         chunks.append(data)
@@ -318,18 +318,19 @@ class StoreFS(Operations):
       # no symlinks yet
       raise FuseOSError(errno.EINVAL)
 
-  def release(self, path, fd):
-    with Pfx("release(%r, fd=%d)", path, fd):
-      fh = self._fh(fd)
+  def release(self, path, fhndx):
+    X("RELEASE %r fhndx=%s", path, fhndx)
+    with Pfx("release(%r, fhndx=%d)", path, fhndx):
+      fh = self._fh(fhndx)
       if fh is None:
         error("handle is None!")
       else:
         fh.close()
       return 0
 
-  def releasedir(self, path, fd):
-    with Pfx("releasedir(path=%r, fd=%d)", path, fd):
-      fh = self._fh(fd)
+  def releasedir(self, path, fhndx):
+    with Pfx("releasedir(path=%r, fhndx=%d)", path, fhndx):
+      fh = self._fh(fhndx)
       if fh is None:
         error("handle is None!")
       return 0
@@ -407,9 +408,9 @@ class StoreFS(Operations):
       ## we do not do atime ## M.atime = atime
       M.mtime = mtime
 
-  def write(self, path, data, offset, fd):
-    with Pfx("write(path=%r, data=%d bytes, offset=%d, fd=%r", path, len(data), offset, fd):
-      return self._fh(fd).write(data, offset)
+  def write(self, path, data, offset, fhndx):
+    with Pfx("write(path=%r, data=%d bytes, offset=%d, fhndx=%r", path, len(data), offset, fhndx):
+      return self._fh(fhndx).write(data, offset)
 
   def flush(self, path, fh):
     X("FLUSH %r fh=%s", path, fh)
@@ -420,7 +421,7 @@ class StoreFS(Operations):
     X("FSYNC %r datasync=%r fh=%r", path, datasync, fh)
     with Pfx("fsync(path=%r, datasync=%d, fh=%r)", path, datasync, fh):
       if self.do_fsync:
-        self._fh(fd).sync()
+        self._fh(fhndx).sync()
 
 class FileHandle(O):
   ''' Filesystem state for open files.
