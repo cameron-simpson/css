@@ -14,7 +14,7 @@
 #   vt [options...] catblock [-i] hashcodes...
 #   vt [options...] listen {-|host:port}
 #   vt [options...] ls [-R] dirrefs...
-#   vt [options...] mount dirref mountpoint [logpath]
+#   vt [options...] mount special mountpoint
 #   vt [options...] scan datafile
 #   vt [options...] pull stores...
 #   vt [options...] unpack dirrefs...
@@ -485,18 +485,17 @@ def cmd_ls(args, verbose=None, log=None):
     ls(path, D, recurse, sys.stdout)
   return 0
 
-# =item B<mount> I<dirref> I<mountpoint>
+# =item B<mount> I<special> I<mountpoint>
 #
-# B<INCOMPLETE>.
-# Mount the specified I<dirref> as on the specified I<mountpoint> directory.
+# Mount the specified I<special> as on the specified I<mountpoint> directory.
 # Requires FUSE support.
 #
 def cmd_mount(args, verbose=None, log=None):
   badopts = False
   try:
-    dirref = args.pop(0)
+    special = args.pop(0)
   except IndexError:
-    error("missing dirref")
+    error("missing special")
     badopts = True
   try:
     mountpoint = args.pop(0)
@@ -504,33 +503,33 @@ def cmd_mount(args, verbose=None, log=None):
     error("missing mountpoint")
     badopts = True
   if args:
-    sync_log = args.pop(0)
-  else:
-    sync_log = None
-  if args:
     error("extra arguments: %s", ' '.join(args))
     badopts = True
   if badopts:
     raise GetoptError("bad arguments")
   from cs.venti.vtfuse import mount
-  X("mount dirref=%r mountpoint=%r sync_log=%r", dirref, mountpoint, sync_log)
+  X("mount special=%r mountpoint=%r", special, mountpoint)
   if not os.path.isdir(mountpoint):
     error("%s: mountpoint is not a directory", mountpoint)
     return 1
-  S = defaults.S
-  with Pfx("dirref %r", dirref):
-    if dirref == '/':
+  with Pfx(special):
+    try:
+      when, E = last_Dirent(special, missing_ok=True)
+    except Exception as e:
+      error("can't access special: %s", e)
+      return 1
+    # no "last entry" (==> first use) - make an empty directory
+    if E is None:
       E = Dir('/')
     else:
-      raise ValueError("need to resolve a dirref")
-  if not E.isdir:
-    error("dirref %s: expected directory, not file", dirref)
-    return 1
-  if sync_log is None:
-    syncfp = None
-  else:
-    with Pfx(sync_log):
-      syncfp = open(sync_log, 'a')
+      X("last entry: when=%s, E=%s",
+        datetime.datetime.fromtimestamp(when).isoformat(), E)
+      if not E.isdir:
+        error("expected directory, not file: %s", E)
+        return 1
+    with Pfx("open('a')"):
+      syncfp = open(special, 'a')
+  S = defaults.S
   mount(mountpoint, E, S, syncfp=syncfp)
   return 0
 
