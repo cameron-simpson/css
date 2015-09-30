@@ -496,6 +496,11 @@ class Meta(dict):
 
   def access(self, access_mode, access_uid=None, access_group=None, default_uid=None, default_gid=None):
     ''' POSIX like access call, accepting os.access `access_mode`.
+        `access_mode`: a bitmask of os.{R_OK,W_OK,X_OK} as for the os.access function.
+        `access_uid`: the uid of the querying user.
+        `access_gid`: the gid of the querying user.
+        `default_uid`: the reference uid to use if this Meta.uid == NOUSERID.
+        `default_gid`: the reference gid to use if this Meta.gid == NOGROUPID.
     '''
     u, g, perms = self.unix_perms
     if u == NOUSERID and default_uid is not None:
