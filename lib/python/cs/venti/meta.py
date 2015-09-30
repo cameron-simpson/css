@@ -502,7 +502,6 @@ class Meta(dict):
       u = default_uid
     if g == NOGROUPID and default_gid is not None:
       g = default_gid
-    X("Meta.access: u=%s, g=%s, perms=0o%04o", u, g, perms)
     if amode & os.R_OK:
       if user is not None and user == u:
         if not ( (perms>>6) & 4 ):
