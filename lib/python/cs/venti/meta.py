@@ -494,37 +494,37 @@ class Meta(dict):
       gid = NOGROUPID
     return uid, gid, perms
 
-  def access(self, amode, user=None, group=None, default_uid=None, default_gid=None):
-    ''' POSIX like access call, accepting os.access `amode`.
+  def access(self, access_mode, access_uid=None, access_group=None, default_uid=None, default_gid=None):
+    ''' POSIX like access call, accepting os.access `access_mode`.
     '''
     u, g, perms = self.unix_perms
     if u == NOUSERID and default_uid is not None:
       u = default_uid
     if g == NOGROUPID and default_gid is not None:
       g = default_gid
-    if amode & os.R_OK:
-      if user is not None and user == u:
+    if access_mode & os.R_OK:
+      if access_uid is not None and access_uid == u:
         if not ( (perms>>6) & 4 ):
           return False
-      elif group is not None and group == g:
+      elif access_group is not None and access_group == g:
         if not ( (perms>>3) & 4 ):
           return False
       elif not ( perms & 4 ):
           return False
-    if amode & os.W_OK:
-      if user is not None and user == u:
+    if access_mode & os.W_OK:
+      if access_uid is not None and access_uid == u:
         if not ( (perms>>6) & 2 ):
           return False
-      elif group is not None and group == g:
+      elif access_group is not None and access_group == g:
         if not ( (perms>>3) & 2 ):
           return False
       elif not ( perms & 2 ):
           return False
-    if amode & os.X_OK:
-      if user is not None and user == u:
+    if access_mode & os.X_OK:
+      if access_uid is not None and access_uid == u:
         if not ( (perms>>6) & 1 ):
           return False
-      elif group is not None and group == g:
+      elif access_group is not None and access_group == g:
         if not ( (perms>>3) & 1 ):
           return False
       elif not ( perms & 1 ):
