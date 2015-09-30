@@ -279,7 +279,7 @@ class StoreFS(Operations):
           error("parent (%r) not a directory, raising ENOTDIR", E.name)
           raise FuseOSError(errno.ENOTDIR)
         base = tail_path[0]
-        newE = FileDirent(path)
+        newE = FileDirent(base)
         E[base] = newE
         E = newE
       else:
