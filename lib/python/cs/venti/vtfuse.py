@@ -175,9 +175,9 @@ class StoreFS(Operations):
     with Pfx("chown(%r, uid=%d, gid=%d)", path, uid, gid):
       E = self._namei(path)
       M = E.meta
-      if uid >= 0:
+      if uid >= 0 and uid != self._fs_uid:
         M.uid = uid
-      if gid >= 0:
+      if gid >= 0 and gid != self._fs_gid:
         M.gid = gid
 
   def create(self, path, mode, fi=None):
