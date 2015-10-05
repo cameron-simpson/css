@@ -23,9 +23,10 @@ from cs.py3 import Queue
 from cs.asynchron import report as reportLFs
 from cs.later import Later
 from cs.logutils import info, debug, warning, Pfx, D, X
-from cs.queues import MultiOpenMixin
+from cs.resources import MultiOpenMixin
 from cs.threads import Q1, Get1
 from . import defaults, totext
+from .datafile import DataDirMapping
 from .hash import Hash_SHA1
 
 class _BasicStoreCommon(MultiOpenMixin):
@@ -209,7 +210,7 @@ def Store(store_spec):
   ''' Factory function to return an appropriate BasicStore* subclass
       based on its argument:
 
-        /path/to/store  A GDBMStore directory (later, tokyocabinet etc)
+        /path/to/store  A DataDirStore directory.
 
         |command        A subprocess implementing the streaming protocol.
 
@@ -237,9 +238,7 @@ def Store(store_spec):
     # TODO: after tokyocabinet available, probe for index file name
     storepath = os.path.abspath(spec)
     if os.path.isdir(storepath):
-      return GDBMStore(os.path.abspath(spec))
-    if storepath.endswith('.kch'):
-      return KyotoCabinetStore(storepath)
+      return DataDirStore(os.path.abspath(spec))
     raise ValueError("unsupported file store: %s" % (storepath,))
   if scheme == "exec":
     from .stream import StreamStore
@@ -308,13 +307,8 @@ class MappingStore(BasicStoreSync):
   def __len__(self):
     return len(self.mapping)
 
-def GDBMStore(dir):
-  from .datafile import GDBMDataDir
-  return MappingStore(GDBMDataDir(dir))
-
-def KyotoStore(dir):
-  from .datafile import KyotoDataDir
-  return MappingStore(KyotoDataDir(dir))
+def DataDirStore(dirpath, indexclass=None, rollover=None):
+  return MappingStore(DataDirMapping(dirpath, indexclass=indexclass, rollover=rollover))
 
 if __name__ == '__main__':
   import cs.venti.store_tests
