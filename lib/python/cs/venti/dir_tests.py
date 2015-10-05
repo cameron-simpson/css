@@ -18,6 +18,10 @@ class TestAll(unittest.TestCase):
 
   def setUp(self):
     self.S = MappingStore({})
+    self.S.open()
+
+  def tearDown(self):
+    self.S.close()
 
   def _round_trip_Dirent(self, D):
     encoded = D.encode()
