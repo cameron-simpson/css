@@ -43,7 +43,7 @@ class MultiOpenMixin(O):
       Classes using this mixin need to define .startup and .shutdown.
   '''
 
-  def __init__(self, finalise_later=False):
+  def __init__(self, finalise_later=False, lock=None):
     ''' Initialise the MultiOpenMixin state.
         `finalise_later`: do not notify the finalisation Condition on
           shutdown, require a separate call to .finalise().
@@ -51,11 +51,14 @@ class MultiOpenMixin(O):
           the final close prevents further .put calls, but users
           calling .join may need to wait for all the queued items
           to be processed.
+        `lock`: if set and not None, an RLock to use; otherwise one will be allocated
     '''
+    if lock is None:
+      lock = RLock()
     self.opened = False
     self._opens = 0
     ##self.closed = False # final _close() not yet called
-    self._lock = RLock()
+    self._lock = lock
     self._finalise_later = finalise_later
     self._finalise = Condition(self._lock)
 
@@ -139,8 +142,8 @@ class MultiOpen(MultiOpenMixin):
   ''' Context manager class that manages a single open/close object using a MultiOpenMixin.
   '''
 
-  def __init__(self, openable, finalise_later=False):
-    MultiOpenMixin.__init__(self, finalise_later=finalise_later)
+  def __init__(self, openable, finalise_later=False, lock=None):
+    MultiOpenMixin.__init__(self, finalise_later=finalise_later, lock=lock)
     self.openable = openable
 
   def startup(self):
