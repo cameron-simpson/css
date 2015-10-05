@@ -5,6 +5,7 @@
 #
 
 import os
+import sys
 from socket import socket, SHUT_WR, SHUT_RD
 from socketserver import TCPServer, ThreadingMixIn, StreamRequestHandler
 from threading import Lock
@@ -59,3 +60,7 @@ class TCPStoreClient(StreamStore):
   def shutdown(self):
     StreamStore.shutdown(self)
     self.sock.close()
+
+if __name__ == '__main__':
+  import cs.venti.tcp_tests
+  cs.venti.tcp_tests.selftest(sys.argv)
