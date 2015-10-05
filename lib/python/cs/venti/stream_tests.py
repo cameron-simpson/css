@@ -14,7 +14,7 @@ from .stream import StreamStore
 
 class TestStreamStore(_TestStore):
 
-  def _open_Store(self):
+  def _init_Store(self):
     self.upstream_rd, self.upstream_wr = os.pipe()
     self.downstream_rd, self.downstream_wr = os.pipe()
     self.remote_S = StreamStore( "test_remote_Store",
@@ -26,7 +26,6 @@ class TestStreamStore(_TestStore):
                           os.fdopen(self.downstream_rd, 'rb'),
                           os.fdopen(self.upstream_wr, 'wb'),
                         )
-    self.S.open()
 
 def selftest(argv):
   unittest.main(__name__, None, argv)

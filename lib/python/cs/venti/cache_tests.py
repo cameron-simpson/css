@@ -15,14 +15,14 @@ from .cache import CacheStore, MemoryCacheStore
 
 class TestCacheStore(_TestStore):
 
-  def _open_Store(self):
+  def _init_Store(self):
     self.fastS = MappingStore({})
     self.slowS = MappingStore({})
     self.S = CacheStore(self.fastS, self.slowS)
 
 class TestMemoryCacheStore(_TestStore):
 
-  def _open_Store(self):
+  def _init_Store(self):
     self.S = MemoryCacheStore(16)
 
 def selftest(argv):
