@@ -53,15 +53,6 @@ class _BasicStoreCommon(MultiOpenMixin):
 
       The mapping special methods __getitem__ and __contains__ call
       the implementation methods .get() and .contains().
-
-      [ TODO: NO LONGER IMPLEMENTED, BUT IT SHOULD BE ]
-      The hint noFlush, if specified and True, suggests that streaming
-      store connections need not flush the request stream because another
-      request will follow very soon after this request. This allows
-      for more efficient use of streams. Users who set this hint to True
-      must ensure that a "normal" flushing request, or a call of the
-      ._flush() method, follows any noFlush requests promptly otherwise
-      deadlocks may ensue.
   '''
 
   def __init__(self, name, capacity=None):
