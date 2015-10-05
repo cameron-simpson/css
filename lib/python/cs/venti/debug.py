@@ -19,7 +19,11 @@ def dump_Block(block, indent=''):
       dump_Block(B, indent=indent)
 
 def dump_Dirent(E, indent='', recurse=False):
-  X("%s%r %s", indent, E.name, hexify(E.block.hashcode))
+  X("%s%s %r %s",
+    indent,
+    'd' if E.isdir else '-',
+    E.name,
+    hexify(E.block.hashcode))
   if E.isdir:
     indent += '  '
     for name in sorted(E.keys()):
@@ -30,5 +34,5 @@ def dump_Dirent(E, indent='', recurse=False):
         X("%s%s %r %s",
           indent,
           'd' if E2.isdir else '-',
-          E.name,
-          E.block.hashcode)
+          E2.name,
+          hexify(E2.block.hashcode))
