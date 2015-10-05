@@ -40,6 +40,7 @@ import cs.logutils
 from cs.logutils import Pfx, exception, error, warning, debug, setup_logging, logTo, D, X, nl
 from cs.venti import totext, fromtext, defaults
 from cs.venti.block import Block, IndirectBlock, dump_block
+from cs.venti.debug import dump_Dirent
 from cs.venti.dir import Dir
 from cs.venti.store import Store
 from cs.venti.cache import CacheStore, MemoryCacheStore
@@ -508,22 +509,20 @@ def cmd_mount(args, verbose=None, log=None):
   if badopts:
     raise GetoptError("bad arguments")
   from cs.venti.vtfuse import mount
-  X("mount special=%r mountpoint=%r", special, mountpoint)
   if not os.path.isdir(mountpoint):
     error("%s: mountpoint is not a directory", mountpoint)
     return 1
   with Pfx(special):
     try:
       when, E = last_Dirent(special, missing_ok=True)
-    except Exception as e:
+    except OSError as e:
       error("can't access special: %s", e)
       return 1
     # no "last entry" (==> first use) - make an empty directory
     if E is None:
       E = Dir('/')
     else:
-      X("last entry: when=%s, E=%s",
-        datetime.datetime.fromtimestamp(when).isoformat(), E)
+      dump_Dirent(E, recurse=True)
       if not E.isdir:
         error("expected directory, not file: %s", E)
         return 1
