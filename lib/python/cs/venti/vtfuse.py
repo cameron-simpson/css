@@ -21,6 +21,7 @@ from cs.seq import Seq
 from cs.threads import locked
 from .archive import save_Dirent
 from .block import Block
+from .debug import dump_Dirent
 from .dir import FileDirent, Dir
 from .file import File
 from .meta import NOUSERID, NOGROUPID
@@ -94,7 +95,6 @@ class StoreFS(Operations):
     '''
     E, P, tail_path = self._resolve(path)
     if tail_path:
-      warning("_namei2: NOT FOUND: %r; tail_path=%r", path, tail_path)
       raise FuseOSError(errno.ENOENT)
     return E, P
 
@@ -153,7 +153,6 @@ class StoreFS(Operations):
   def _Eaccess(self, E, amode):
     with Pfx("_Eaccess(E=%r, amode=%s)", E, amode):
       ctx_uid, ctx_gid, ctx_pid = ctx = fuse_get_context()
-      warning("vtfuse.access: ctx=%r", ctx)
       # test the access against the caller's uid/gid
       # pass same in as default file ownership in case there are no metadata
       return E.meta.access(amode, ctx_uid, ctx_gid,
@@ -193,6 +192,8 @@ class StoreFS(Operations):
     with Pfx("destroy(%r)", path):
       if self.syncfp is not None:
         save_Dirent(self.syncfp, self.E)
+        dump_Dirent(self.E, recurse=True)
+    X("DESTROY COMPLETE")
 
   def fgetattr(self, *a, **kw):
     X("FGETATTR: a=%r, kw=%r", a, kw)
@@ -221,7 +222,8 @@ class StoreFS(Operations):
       try:
         E = self._namei(path)
       except FuseOSError as e:
-        error("FuseOSError: %s", e)
+        if e.errno != errno.ENOENT:
+          error("FuseOSError: %s", e)
         raise
       if fh is not None:
         X("GETATTR: fh=%s", fh)
