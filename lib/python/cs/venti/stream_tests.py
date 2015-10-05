@@ -26,6 +26,7 @@ class TestStreamStore(_TestStore):
                           os.fdopen(self.downstream_rd, 'rb'),
                           os.fdopen(self.upstream_wr, 'wb'),
                         )
+    self.S.open()
 
 def selftest(argv):
   unittest.main(__name__, None, argv)
