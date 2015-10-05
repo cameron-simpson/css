@@ -13,7 +13,7 @@ import unittest
 from unittest import TestCase, skip
 from cs.logutils import D, X
 from cs.randutils import rand0, randblock
-from .datafile import DataFile, DataDir
+from .datafile import DataFile, DataDirMapping, encode_index_entry, decode_index_entry
 from .hash import DEFAULT_HASHCLASS
 
 # arbitrary limit
@@ -66,12 +66,12 @@ class TestDataFile(TestCase):
         data = self.datafile.get(offset)
         self.assertTrue(data == blocks[offset])
 
-class TestDataDir(TestCase):
+class TestDataDirMapping(TestCase):
 
   def setUp(self):
     random.seed()
     self.pathname = tempfile.mkdtemp(prefix="cs.venti.datafile.testdir", suffix=".dir", dir='.')
-    self.datadir = DataDir(self.pathname, rollover=200000)
+    self.datadir = DataDirMapping(self.pathname, rollover=200000)
 
   def tearDown(self):
     shutil.rmtree(self.pathname)
@@ -82,7 +82,7 @@ class TestDataDir(TestCase):
     for count in range(RUN_SIZE):
       rand_n = random.randint(0, 65536)
       rand_offset = random.randint(0, 65536)
-      n, offset = DataDir.decodeIndexEntry(DataDir.encodeIndexEntry(rand_n, rand_offset))
+      n, offset = decode_index_entry(encode_index_entry(rand_n, rand_offset))
       self.assertEqual(rand_n, n)
       self.assertEqual(rand_offset, offset)
 
@@ -92,7 +92,6 @@ class TestDataDir(TestCase):
     hashclass = DEFAULT_HASHCLASS
     hashfunc = hashclass.from_data
     with self.datadir as D:
-      D = self.datadir
       by_hash = {}
       by_data = {}
       # store RUN_SIZE random blocks
@@ -125,7 +124,7 @@ class TestDataDir(TestCase):
           data = D[hashcode]
           self.assertEqual(data, odata)
     # reopen the DataDir
-    with DataDir(self.pathname, rollover=200000) as D:
+    with DataDirMapping(self.pathname, rollover=200000) as D:
       hashcodes = list(by_hash.keys())
       random.shuffle(hashcodes)
       for n, hashcode in enumerate(hashcodes):
