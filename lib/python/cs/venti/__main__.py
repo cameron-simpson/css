@@ -15,14 +15,14 @@ from cs.debug import ifdebug, dump_debug_threads
 from cs.lex import hexify
 import cs.logutils
 from cs.logutils import Pfx, exception, error, warning, debug, setup_logging, logTo, D, X, nl
-from cs.venti import totext, fromtext, defaults
-from cs.venti.block import Block, IndirectBlock, dump_block
-from cs.venti.debug import dump_Dirent
-from cs.venti.dir import Dir
-from cs.venti.store import Store
-from cs.venti.cache import CacheStore, MemoryCacheStore
-from cs.venti.paths import dirent_dir, dirent_file, dirent_resolve, resolve
-from cs.venti.archive import CopyModes, update_archive, toc_archive, last_Dirent, copy_out_dir
+from . import totext, fromtext, defaults
+from .block import Block, IndirectBlock, dump_block
+from .debug import dump_Dirent
+from .dir import Dir
+from .store import Store
+from .cache import CacheStore, MemoryCacheStore
+from .paths import dirent_dir, dirent_file, dirent_resolve, resolve
+from .archive import CopyModes, update_archive, toc_archive, last_Dirent, copy_out_dir
 
 def main(argv):
   cmd = os.path.basename(argv[0])
