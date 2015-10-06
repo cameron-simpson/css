@@ -25,8 +25,10 @@ from cs.venti.paths import dirent_dir, dirent_file, dirent_resolve, resolve
 from cs.venti.archive import CopyModes, update_archive, toc_archive, last_Dirent, copy_out_dir
 
 def main(argv):
-  setup_logging(upd_mode=False)
-  cmd = cs.logutils.cmd
+  cmd = os.path.basename(argv[0])
+  if cmd.endswith('.py'):
+    cmd = 'vt'
+  setup_logging(cmd_name=cmd, upd_mode=False)
   usage = '''Usage:
     %s [options...] ar tar-options paths..
     %s [options...] cat filerefs...
