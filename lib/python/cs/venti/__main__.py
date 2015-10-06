@@ -3,29 +3,6 @@
 # Command script for venti-ish implementation.
 #       - Cameron Simpson <cs@zip.com.au> 01may2007
 #
-# =head1 NAME
-#
-# vt - access vt stores, a Venti-like content addressed storage pool
-#
-# =head1 SYNOPSIS
-#
-#   vt [options...] ar tar-options paths...
-#   vt [options...] cat filerefs...
-#   vt [options...] catblock [-i] hashcodes...
-#   vt [options...] listen {-|host:port}
-#   vt [options...] ls [-R] dirrefs...
-#   vt [options...] mount special mountpoint
-#   vt [options...] scan datafile
-#   vt [options...] pull stores...
-#   vt [options...] unpack dirrefs...
-#
-# =head1 DESCRIPTION
-#
-# I<vt> is a command accessing vt stores in various ways.
-#
-# A store is a content addressed pool of blocks
-# with a filesystem abstraction layered on top of it.
-#
 
 from __future__ import with_statement
 import sys
@@ -94,87 +71,27 @@ def main(argv):
     badopts = True
     opts, args = [], []
 
-  # =head1 OPTIONS
-  #
-  # =over 4
-  #
   for opt, val in opts:
-    # =item B<-C> I<store>
-    #
-    # Specify a caching store.
-    # The special name "-" means no caching store should be used.
-    # If B<-C> is not used
-    # the environment variable B<VT_STORE_CACHE> may specify the caching store.
-    #
     if opt == '-C':
+      # specify caching Store
       if val == '-':
         dflt_cache = None
       else:
         dflt_cache = val
-    # =item B<-M>
-    #
-    # Do not use the in-memory caching store.
-    # Default is to place an in-memory cache ahead of the other stores.
-    #
     elif opt == '-M':
+      # do not use the in-memory caching store
       useMemoryCacheStore = False
-    # =item B<-S> I<store>
-    #
-    # Use the specified I<store>.
-    # If B<-S> is not used
-    # the environment variable B<VT_STORE> specifies the store.
-    #
     elif opt == '-S':
+      # specify Store
       dflt_vt_store = val
-    # =item B<-q>
-    #
-    # Quiet; not verbose. Default if stdout is not a tty.
-    #
     elif opt == '-q':
+      # quiet: not verbose
       verbose = False
-    # =item B<-v>
-    #
-    # Verbose; not quiet. Default it stdout is a tty.
-    #
     elif opt == '-v':
+      # verbose: not quiet
       verbose = True
     else:
       raise RuntimeError("unhandled option: %s" % (opt,))
-
-  # =back
-  #
-  # =head1 Store Names
-  #
-  # Three of four planned store names are supported at present:
-  #
-  # =over 4
-  #
-  # =item B</>I<pathname>
-  #
-  # A full path to a directory specifies a local filesystem store
-  # in the directory B</>I<pathname>.
-  #
-  # =item B<tcp:>[I<host>]B<:>I<port>
-  #
-  # A name commencing with B<tcp:> specifies a TCP connection to a vt daemon
-  # listening on the specified I<host> and I<port>.
-  # If I<host> is omitted, B<127.0.0.1> is assumed.
-  #
-  # =item B<unix:/>I<pathname>
-  #
-  # B<UNIMPLEMENTED>.
-  # A name commencing with B<unix:> specifies the pathname of a UNIX domain
-  # socket on which a vt daemon is listening.
-  #
-  # =item B<|>I<shell-command>
-  #
-  # A name commencing with shell pipe symbol specifies a proxy command
-  # to connect to a vt daemon. The command string is handed to B</bin/sh>
-  # and should accept vt requests on standard input and write vt responses to
-  # standard output.
-  #
-  # =back
-  #
 
   if dflt_log is not None:
     logTo(dflt_log, delay=True)
@@ -249,18 +166,10 @@ def main(argv):
 
   return xit
 
-# =head1 COMMANDS
-#
-# =over 4
-#
-
-# =item B<ar> tar-like-options I<pathnames...>
-#
-# Archive or retrieve files. Options: B<v> - verbose, B<A> - all
-# files, not just ones with new size/mtime, B<f> - specify archive
-# file.
-#
 def cmd_ar(args, verbose=None, log=None):
+  ''' Archive or retrieve files.
+      Usage: ar tar-like-options pathnames...
+  '''
   if len(args) < 1:
     raise GetoptError("missing options")
   opts = args.pop(0)
@@ -274,12 +183,16 @@ def cmd_ar(args, verbose=None, log=None):
   mode = opts[0]
   for opt in opts[1:]:
     if opt == 'f':
+      # archive filename
       arpath = args.pop(0)
     elif opt == 'q':
+      # quiet: not verbose
       verbose = False
     elif opt == 'v':
+      # verbose: not quiet
       verbose = True
     elif opt == 'A':
+      # archive all files, not just those with differing size or mtime
       modes.trust_size_mtime = False
     else:
       error("%s: unsupported option", opt)
@@ -364,25 +277,18 @@ def cmd_ar(args, verbose=None, log=None):
 
   return xit
 
-# =item B<cat> I<filerefs...>
-#
-# Emit the data content of the supplied I<filerefs> on the standard output.
-#
 def cmd_cat(args, verbose=None, log=None):
+  ''' Concatentate the contents of the supplied filerefs to stdout.
+  '''
   if not args:
     raise GetoptError("missing filerefs")
   for path in args:
     cat(path)
   return 0
 
-# =item B<catblock> [B<-i>] I<hashcodes...>
-#
-# Emit the content of the blocks specified by the supplied I<hashcodes>.
-# If the B<-i> (indirect) option is supplied,
-# consider the hashcode to specify an indirect block and emit
-# the data content of the leaf blocks.
-#
 def cmd_catblock(args, verbose=None, log=None):
+  '''  Emit the content of the blocks specified by the supplied hashcodes.
+  '''
   indirect = False
   if len(args) > 0 and args[0] == "-i":
     indirect = True
@@ -399,22 +305,18 @@ def cmd_catblock(args, verbose=None, log=None):
       sys.stdout.write(subB.data)
   return 0
 
-# =item B<dump> I<filerefs...>
-#
-# Do a Block dump of the filerefs.
-#
 def cmd_dump(args, verbose=None, log=None):
+  ''' Do a Block dump of the filerefs.
+  '''
   if not args:
     raise GetoptError("missing filerefs")
   for path in args:
     dump(path)
   return 0
 
-# =item B<init> <dirpath>
-#
-# Initialise a directory for use as a store, using the GDBM backend.
-#
 def cmd_init(args, verbose=None, log=None):
+  ''' Initialise a directory for use as a store, using the GDBM backend.
+  '''
   if not args:
     raise GetoptError("missing dirpath")
   dirpath = args.pop(0)
@@ -427,20 +329,9 @@ def cmd_init(args, verbose=None, log=None):
       pass
   return 0
 
-# =item B<listen> {B<->|[I<host>]B<:>I<port>}
-#
-# Start a vt daemon.
-#
-# The argument "-" specifies a single use daemon reading vt
-# requests from its standard input and writing replies to its
-# standard output, as it might run from inetd(8) or
-# xinetd(8), or directly from a proxy shell command.
-#
-# An argument of the form I<host>B<:>I<port> specifies that the
-# daemon should listen on the specified I<host> address and I<port>
-# for connections.  if I<host> is omitted it defaults to B<127.0.0.1>.
-#
 def cmd_listen(args, verbose=None, log=None):
+  ''' Start a daemon listening on a TCP port or in stdin/stdout.
+  '''
   if len(args) != 1:
     raise GetoptError("expected a port")
   arg = args[0]
@@ -464,12 +355,9 @@ def cmd_listen(args, verbose=None, log=None):
       raise GetoptError("invalid listen argument, I expect \"-\" or \"[host]:port\", got \"%s\"" % (arg,))
   return 0
 
-# =item B<ls> [B<-R>] I<dirrefs...>
-#
-# Do a directory listing of the specified I<dirrefs>.
-# The B<-R> (recursive) option requests a recurive directory listing.
-#
 def cmd_ls(args, verbose=None, log=None):
+  ''' Do a directory listing of the specified I<dirrefs>.
+  '''
   recurse = False
   if args and args[0] == "-R":
     recurse = True
@@ -486,12 +374,10 @@ def cmd_ls(args, verbose=None, log=None):
     ls(path, D, recurse, sys.stdout)
   return 0
 
-# =item B<mount> I<special> I<mountpoint>
-#
-# Mount the specified I<special> as on the specified I<mountpoint> directory.
-# Requires FUSE support.
-#
 def cmd_mount(args, verbose=None, log=None):
+  ''' Mount the specified special as on the specified mountpoint directory.
+      Requires FUSE support.
+  '''
   badopts = False
   try:
     special = args.pop(0)
@@ -532,12 +418,10 @@ def cmd_mount(args, verbose=None, log=None):
   mount(mountpoint, E, S, syncfp=syncfp)
   return 0
 
-# =item B<pack> I<paths>...
-#
-# Replace each I<path> with an archive file I<path>B<.vt> referring
-# to the stored content of I<path>.
-#
 def cmd_pack(args, verbose=None, log=None):
+  ''' Replace each I<path> with an archive file I<path>B<.vt> referring
+      to the stored content of I<path>.
+  '''
   if not args:
     raise GetoptError("missing paths")
   xit = 0
@@ -563,26 +447,16 @@ def cmd_pack(args, verbose=None, log=None):
         os.remove(ospath)
   return xit
 
-# =item B<pull> I<stores...>
-#
-# Update our store with all the available content from the specified I<stores>.
-# Note that some stores may not list all their content, or any.
-# This is mostly useful for updating a master store from a store
-# which has been updated offline.
-#
 def cmd_pull(args, verbose=None, log=None):
+  ''' Pull missing content from other Stores.
+  '''
   if not args:
     raise GetoptError("missing stores")
   raise NotImplementedError
 
-# =item B<scan> I<datafile>
-#
-# Read the specified I<datafile> as a vt block storage file,
-# a sequence of compressed data blocks.
-# Report on standard output
-# the block hashcode, I<datafile> file offset and compressed size.
-#
 def cmd_scan(args, verbose=None, log=None):
+  ''' Read a datafile and report.
+  '''
   if len(args) != 1:
     raise GetoptError("missing datafile")
   datafile = args[0]
@@ -598,11 +472,9 @@ def cmd_scan(args, verbose=None, log=None):
         print(Hash_SHA1.from_data(data2), offset, flags, len(data))
   return 0
 
-# =item B<unpack> I<archive>B<.vt>
-#
-# Unpack the archive file I<archive>B<.vt> as I<archive>.
-#
 def cmd_unpack(args, verbose=None, log=None):
+  ''' Unpack the archive file I<archive>B<.vt> as I<archive>.
+  '''
   if len(args) < 1:
     raise GetoptError("missing archive name")
   arpath = args.pop(0)
@@ -628,9 +500,6 @@ def cmd_unpack(args, verbose=None, log=None):
     else:
       copy_out_file(rootE, arbase, log=log)
   return 0
-
-# =back
-#
 
 def lsDirent(fp, E, name):
   ''' Transcribe a Dirent as an ls-style listing.
@@ -701,62 +570,3 @@ def silent(msg, *args, file=None):
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
-
-# =head1 EXAMPLES
-#
-# Run a daemon for a master store:
-#
-#  vt -C - -S /var/spool/venti listen :9999
-#
-# Store a directory in that store:
-#
-#  vt -S tcp:127.0.0.1:9999 vt pack directory-name
-#
-# Run a local store on a roaming laptop with internet connectivity,
-# pushing updates back to the master store, keeping a local on-disc cache
-# in B<~/.venti/store>:
-#
-#  vt -C ~/.venti/store -M -S '|exec ssh home-server exec nc 127.0.0.1 9999' listen 9999
-#
-# Use the store on the roaming laptop via the local daemon:
-#
-#  VT_STORE=tcp:127.0.0.1:9999
-#  export VT_STORE
-#  vt command...
-#
-# Use the remote store and local cache without an intermediate daemon:
-#
-#  VT_STORE='|exec ssh home-server exec nc 127.0.0.1 9999'
-#  VT_STORE_CACHE=$HOME/.venti/store
-#  export VT_STORE VT_STORE_CACHE
-#  vt command...
-#
-# This last has more efficient operations at the price of a larger startup
-# latency (the ssh connection) and the downside that only one command can
-# use the cache store at a time because it is not a sharable data structure
-# except via a vt daemon.
-#
-# =head1 BUGS
-#
-# The TODO list is very long, see:
-#
-#  http://csbp.backpackit.com/pub/1356606
-#
-# The command does not cope well with an incomplete store if it traverses
-# into the missing portion;
-# one example is using a cache without the more complete backend master store.
-#
-# =head1 ENVIRONMENT VARIABLES
-#
-# B<VT_STORE>, the default store to use.
-#
-# B<VT_STORE_CACHE>, a default cache store.
-#
-# =head1 SEE ALSO
-#
-# The Venti file storage system: http://en.wikipedia.org/wiki/Venti
-#
-# =head1 AUTHOR
-#
-# Cameron Simpson E<lt>cs@zip.com.auE<gt>
-#
