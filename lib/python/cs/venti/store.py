@@ -306,7 +306,7 @@ class MappingStore(BasicStoreSync):
   def sync(self):
     ''' Call the .flush method of the underlying mapping, if any.
     '''
-    flush = getattr(self.mapping, 'flush')
+    flush = getattr(self.mapping, 'flush', None)
     if flush is not None:
       flush()
 
