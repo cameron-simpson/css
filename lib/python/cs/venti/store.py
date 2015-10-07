@@ -304,7 +304,11 @@ class MappingStore(BasicStoreSync):
     return h in self.mapping
 
   def sync(self):
-    debug("%s: sync() is a no-op", self)
+    ''' Call the .flush method of the underlying mapping, if any.
+    '''
+    flush = getattr(self.mapping, 'flush')
+    if flush is not None:
+      flush()
 
   def __len__(self):
     return len(self.mapping)
