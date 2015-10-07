@@ -29,6 +29,9 @@ class TCPStoreServer(ThreadingMixIn, TCPServer, MultiOpenMixin):
   def shutdown(self):
     self.S.close()
 
+  def sync(self):
+    self.S.sync()
+
 class _RequestHandler(StreamRequestHandler):
 
   def __init__(self, request, client_address, server):
