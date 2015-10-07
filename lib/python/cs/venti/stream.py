@@ -54,6 +54,12 @@ class StreamStore(BasicStoreAsync):
     if not self.closed:
       self.shutdown
 
+  def sync(self):
+    local_store = self.local_store
+    if local_store:
+      local_store.sync()
+    # TODO: pass sync through to the far end
+
   def _handle_request(self, rq_type, flags, payload):
     ''' Perform the action for a request packet.
     '''
