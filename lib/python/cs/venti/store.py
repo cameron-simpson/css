@@ -237,11 +237,11 @@ def Store(store_spec):
     P = Popen(spec, shell=True, stdin=PIPE, stdout=PIPE)
     return StreamStore("exec:"+spec, P.stdin, P.stdout)
   if scheme == "tcp":
-    from .tcp import TCPStore
+    from .tcp import TCPStoreClient
     host, port = spec.rsplit(':', 1)
     if not host:
       host = '127.0.0.1'
-    return TCPStore((host, int(port)))
+    return TCPStoreClient((host, int(port)))
   if scheme == "ssh":
     # TODO: path to remote vt command
     # TODO: $VT_SSH envvar
