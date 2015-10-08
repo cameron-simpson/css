@@ -5,6 +5,7 @@
 
     The Plan 9 Venti system is decribed here:
       http://library.pantek.com/general/plan9.documents/venti/venti.html
+      http://en.wikipedia.org/wiki/Venti
 
     cs.venti implements a similar scheme that supports variable
     sized blocks and arbitrary data sizes, with some domain knowledge

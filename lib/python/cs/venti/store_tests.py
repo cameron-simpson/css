@@ -15,9 +15,10 @@ from .store import MappingStore
 class _TestStore(unittest.TestCase):
 
   def setUp(self):
-    self._open_Store()
+    self._init_Store()
+    self.S.open()
 
-  def _open_Store(self):
+  def _init_Store(self):
     raise unittest.SkipTest("no Store in base class")
 
   def tearDown(self):
@@ -56,7 +57,7 @@ class _TestStore(unittest.TestCase):
 
 class TestMappingStore(_TestStore):
 
-  def _open_Store(self):
+  def _init_Store(self):
     self.S = MappingStore({}).open()
 
 def selftest(argv):

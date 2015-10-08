@@ -30,12 +30,21 @@ class StreamStore(BasicStoreAsync):
     self._conn = PacketConnection(send_fp, recv_fp, self._handle_request)
     self.local_store = local_store
 
+  def startup(self):
+    BasicStoreAsync.startup(self)
+    local_store = self.local_store
+    if local_store:
+      local_store.open()
+
   def shutdown(self):
     ''' Close the StreamStore.
     '''
     debug("%s.shutdown...", self)
     if not self._conn.closed:
       self._conn.shutdown()
+    local_store = self.local_store
+    if local_store:
+      local_store.close()
     BasicStoreAsync.shutdown(self)
 
   def join(self):
@@ -43,7 +52,13 @@ class StreamStore(BasicStoreAsync):
     '''
     self._conn.join()
     if not self.closed:
-      self.shutdown
+      self.shutdown()
+
+  def sync(self):
+    local_store = self.local_store
+    if local_store:
+      local_store.sync()
+    # TODO: pass sync through to the far end
 
   def _handle_request(self, rq_type, flags, payload):
     ''' Perform the action for a request packet.

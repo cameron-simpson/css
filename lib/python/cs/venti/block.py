@@ -86,7 +86,7 @@ class _Block(object):
     return self.data[index]
 
   def __len__(self):
-    ''' The len(Block) is the length of the encompassed data.
+    ''' len(Block) is the length of the encompassed data.
     '''
     return self.span
 
@@ -270,12 +270,10 @@ class IndirectBlock(_Block):
 
   @locked_property
   def span(self):
-    ''' The span of an IndirectBlock is the sum of the spans of the subblocks.
+    ''' The span of an IndirectBlock is the sum of the spans of the immediate subblocks.
+        This is memoised as it is immutable.
     '''
-    sp = 0
-    for B in self.subblocks:
-      sp += B.span
-    return sp
+    return sum(B.span for B in self.subblocks)
 
   @property
   def leaves(self):

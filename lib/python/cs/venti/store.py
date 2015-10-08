@@ -23,9 +23,10 @@ from cs.py3 import Queue
 from cs.asynchron import report as reportLFs
 from cs.later import Later
 from cs.logutils import info, debug, warning, Pfx, D, X
-from cs.queues import MultiOpenMixin
+from cs.resources import MultiOpenMixin
 from cs.threads import Q1, Get1
 from . import defaults, totext
+from .datafile import DataDirMapping
 from .hash import Hash_SHA1
 
 class _BasicStoreCommon(MultiOpenMixin):
@@ -52,15 +53,6 @@ class _BasicStoreCommon(MultiOpenMixin):
 
       The mapping special methods __getitem__ and __contains__ call
       the implementation methods .get() and .contains().
-
-      [ TODO: NO LONGER IMPLEMENTED, BUT IT SHOULD BE ]
-      The hint noFlush, if specified and True, suggests that streaming
-      store connections need not flush the request stream because another
-      request will follow very soon after this request. This allows
-      for more efficient use of streams. Users who set this hint to True
-      must ensure that a "normal" flushing request, or a call of the
-      ._flush() method, follows any noFlush requests promptly otherwise
-      deadlocks may ensue.
   '''
 
   def __init__(self, name, capacity=None):
@@ -209,7 +201,7 @@ def Store(store_spec):
   ''' Factory function to return an appropriate BasicStore* subclass
       based on its argument:
 
-        /path/to/store  A GDBMStore directory (later, tokyocabinet etc)
+        /path/to/store  A DataDirStore directory.
 
         |command        A subprocess implementing the streaming protocol.
 
@@ -237,9 +229,7 @@ def Store(store_spec):
     # TODO: after tokyocabinet available, probe for index file name
     storepath = os.path.abspath(spec)
     if os.path.isdir(storepath):
-      return GDBMStore(os.path.abspath(spec))
-    if storepath.endswith('.kch'):
-      return KyotoCabinetStore(storepath)
+      return DataDirStore(os.path.abspath(spec))
     raise ValueError("unsupported file store: %s" % (storepath,))
   if scheme == "exec":
     from .stream import StreamStore
@@ -247,11 +237,11 @@ def Store(store_spec):
     P = Popen(spec, shell=True, stdin=PIPE, stdout=PIPE)
     return StreamStore("exec:"+spec, P.stdin, P.stdout)
   if scheme == "tcp":
-    from .tcp import TCPStore
+    from .tcp import TCPStoreClient
     host, port = spec.rsplit(':', 1)
     if not host:
       host = '127.0.0.1'
-    return TCPStore((host, int(port)))
+    return TCPStoreClient((host, int(port)))
   if scheme == "ssh":
     # TODO: path to remote vt command
     # TODO: $VT_SSH envvar
@@ -287,10 +277,21 @@ class MappingStore(BasicStoreSync):
     self.mapping = mapping
 
   def add(self, data):
-    h = self.hash(data)
-    if h not in self.mapping:
-      self.mapping[h] = data
-    return h
+    with Pfx("add %d bytes", len(data)):
+      h = self.hash(data)
+      if h not in self.mapping:
+        info("NEW, save with hashcode=%s", h)
+        self.mapping[h] = data
+      else:
+        with Pfx("EXISTING HASH"):
+          try:
+            data2 = self.mapping[h]
+          except Exception as e:
+            error("fetch FAILED: %s", e)
+          else:
+            if data != data2:
+              warning("data mismatch: .add data=%r, Store data=%r", data, data2)
+      return h
 
   def get(self, h, default=None):
     try:
@@ -303,18 +304,17 @@ class MappingStore(BasicStoreSync):
     return h in self.mapping
 
   def sync(self):
-    debug("%s: sync() is a no-op", self)
+    ''' Call the .flush method of the underlying mapping, if any.
+    '''
+    flush = getattr(self.mapping, 'flush', None)
+    if flush is not None:
+      flush()
 
   def __len__(self):
     return len(self.mapping)
 
-def GDBMStore(dir):
-  from .datafile import GDBMDataDir
-  return MappingStore(GDBMDataDir(dir))
-
-def KyotoStore(dir):
-  from .datafile import KyotoDataDir
-  return MappingStore(KyotoDataDir(dir))
+def DataDirStore(dirpath, indexclass=None, rollover=None):
+  return MappingStore(DataDirMapping(dirpath, indexclass=indexclass, rollover=rollover))
 
 if __name__ == '__main__':
   import cs.venti.store_tests
