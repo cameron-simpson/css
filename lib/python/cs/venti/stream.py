@@ -15,10 +15,11 @@ from cs.stream import PacketConnection
 from .store import BasicStoreAsync
 from .hash import decode as decode_hash
 
-RqType = Enum('T_ADD', 'T_GET', 'T_CONTAINS')
+RqType = Enum('T_ADD', 'T_GET', 'T_CONTAINS', 'T_FLUSH')
 T_ADD = RqType(0)           # data->hashcode
 T_GET = RqType(1)           # hashcode->data
 T_CONTAINS = RqType(2)      # hash->boolean
+T_FLUSH = RqType(3)         # flush remote store
 
 class StreamStore(BasicStoreAsync):
   ''' A Store connected to a remote Store via a PacketConnection.
@@ -54,12 +55,6 @@ class StreamStore(BasicStoreAsync):
     if not self.closed:
       self.shutdown()
 
-  def sync(self):
-    local_store = self.local_store
-    if local_store:
-      local_store.sync()
-    # TODO: pass sync through to the far end
-
   def _handle_request(self, rq_type, flags, payload):
     ''' Perform the action for a request packet.
     '''
@@ -82,6 +77,11 @@ class StreamStore(BasicStoreAsync):
         raise ValueError("unparsed data after hashcode at offset %d: %r"
                          % (offset, payload[offset:]))
       return 1 if hashcode in self.local_store else 0
+    if rq_type == T_FLUSH:
+      if payload:
+        raise ValueError("unexpected payload for flush")
+      self.local_store.sync()
+      return 0
     raise ValueError("unrecognised request code: %d; data=%r"
                      % (rq_type, payload))
 
@@ -128,6 +128,29 @@ class StreamStore(BasicStoreAsync):
 
   @staticmethod
   def _decode_response_contains(flags, payload):
+    ''' Decode the reply to a contains, should be a single flag.
+    '''
+    ok = flags & 0x01
+    if ok:
+      flags &= ~0x01
+    if flags:
+      raise ValueError("unexpected flags: 0x%02x" % (flags,))
+    if payload:
+      raise ValueError("non-empty payload: %r" % (payload,))
+    return ok
+
+  def sync_bg(self):
+    ''' Dispatch a sync request, flush the local Store, return a Result for collection.
+    '''
+    R = self._conn.request(T_FLUSH, 0, b'', self._decode_response_sync)
+
+    local_store = self.local_store
+    if local_store:
+      local_store.sync()
+    return R
+
+  @staticmethod
+  def _decode_response_sync(flags, payload):
     ''' Decode the reply to a contains, should be  a single flag.
     '''
     ok = flags & 0x01
