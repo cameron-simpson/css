@@ -52,7 +52,7 @@ class StreamStore(BasicStoreAsync):
     '''
     self._conn.join()
     if not self.closed:
-      self.shutdown
+      self.shutdown()
 
   def sync(self):
     local_store = self.local_store
