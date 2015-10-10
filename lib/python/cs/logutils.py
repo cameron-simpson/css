@@ -333,6 +333,14 @@ def X(msg, *args):
   '''
   return nl(msg, *args, file=sys.stderr)
 
+def XP(msg, *args):
+  ''' Variation on X() which prefixes the message with the currrent Pfx prefix.
+  '''
+  sys.stderr.write(prefix())
+  sys.stderr.write(': ')
+  sys.stderr.flush()
+  return X(msg, *args)
+
 def nl(msg, *args, **kw):
   ''' Unconditionally write the message `msg` to `file` (default sys.stdout).
       If `args` is not empty, format `msg` using %-expansion with `args`.
@@ -645,6 +653,11 @@ class Pfx(object):
     self.log(logging.ERROR, msg, *args, **kwargs)
   def critical(self, msg, *args, **kwargs):
     self.log(logging.CRITICAL, msg, *args, **kwargs)
+
+def prefix():
+  ''' Return the current Pfx prefix.
+  '''
+  return Pfx._state.prefix
 
 class PfxCallInfo(Pfx):
   ''' Subclass of Pfx to insert current function an caller into messages.
