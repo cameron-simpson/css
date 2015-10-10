@@ -108,4 +108,3 @@ fi
 && $trace imap-sync $imapsyncopts "$MAILDIR" "$MAIL_IMAPSYNC" "$foldername" "$old/$foldername" out spool spool-in spool-out
 
 $trace mutt -f "$maildir" -e "set header_cache='$HOME/var/mutt/header-cache+$_foldername'; fcc-hook . $maildir; save-hook . $omaildir"
-set header_cache=$HOME/var/mutt/header-cache

@@ -109,8 +109,9 @@ class File(BackedFile):
         Returns the new top Block.
     '''
     if not self.front_range.isempty():
-      # recompute the top Block from the current high level blocks
-      # discard the current changes, not saved to the Store
+      # Recompute the top Block from the current high level blocks.
+      # As a side-effect of setting .backing_block we discard the
+      # front file data, which are now saved to the Store.
       self.backing_block = top_block_for(self.high_level_blocks())
     return self.backing_block
 

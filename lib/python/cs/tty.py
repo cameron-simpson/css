@@ -19,7 +19,6 @@ DISTINFO = {
         ],
 }
 
-import os
 import re
 from subprocess import Popen, PIPE
 from collections import namedtuple
