@@ -11,6 +11,7 @@ import os.path
 from getopt import getopt, GetoptError
 import datetime
 import shutil
+from signal import signal, SIGINT, SIGHUP
 from cs.debug import ifdebug, dump_debug_threads
 from cs.lex import hexify
 import cs.logutils
@@ -352,7 +353,9 @@ def cmd_listen(args, verbose=None, log=None):
       port = int(port)
       import cs.venti.tcp
       with cs.venti.tcp.TCPStoreServer((host, port), defaults.S) as srv:
-        srv.serve_forever()
+        signal(SIGHUP, lambda signum, frame: srv.cancel())
+        signal(SIGINT, lambda signum, frame: srv.cancel())
+        srv.join()
     else:
       raise GetoptError("invalid listen argument, I expect \"-\" or \"[host]:port\", got \"%s\"" % (arg,))
   return 0
