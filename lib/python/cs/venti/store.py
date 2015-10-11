@@ -38,7 +38,7 @@ class _BasicStoreCommon(MultiOpenMixin):
         .add(block) -> hashcode
         .get(hashcode, [default=None]) -> block (or default)
         .contains(hashcode) -> boolean
-        .sync()
+        .flush()
 
       A convenience .lock attribute is provided for simple mutex use.
 
@@ -174,8 +174,8 @@ class BasicStoreSync(_BasicStoreCommon):
   def contains_bg(self, h):
     return self._defer(self.contains, h)
 
-  def sync_bg(self):
-    return self._defer(self.sync)
+  def flush_bg(self):
+    return self._defer(self.flush)
 
 class BasicStoreAsync(_BasicStoreCommon):
   ''' Subclass of _BasicStoreCommon expecting asynchronous operations and providing synchronous hooks, dual of BasicStoreSync.
@@ -194,8 +194,8 @@ class BasicStoreAsync(_BasicStoreCommon):
   def contains(self, h):
     return self.contains_bg(h)()
 
-  def sync(self):
-    return self.sync_bg()()
+  def flush(self):
+    return self.flush_bg()()
 
 def Store(store_spec):
   ''' Factory function to return an appropriate BasicStore* subclass
@@ -303,7 +303,7 @@ class MappingStore(BasicStoreSync):
   def contains(self, h):
     return h in self.mapping
 
-  def sync(self):
+  def flush(self):
     ''' Call the .flush method of the underlying mapping, if any.
     '''
     flush = getattr(self.mapping, 'flush', None)

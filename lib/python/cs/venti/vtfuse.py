@@ -210,7 +210,7 @@ class StoreFS(Operations):
 
   def flush(self, path, datasync, fhndx):
     with Pfx("flush(%r, datasync=%s, fhndx=%s)", path, datasync, fhndx):
-      self._fh(fhndx).sync()
+      self._fh(fhndx).flush()
 
   def ftruncate(self, path, length, fhndx):
     with Pfx("ftruncate(%r, %d, fhndx=%d)...", path, length, fhndx):
@@ -429,7 +429,7 @@ class StoreFS(Operations):
     X("FSYNC %r datasync=%r fh=%r", path, datasync, fh)
     with Pfx("fsync(path=%r, datasync=%d, fh=%r)", path, datasync, fh):
       if self.do_fsync:
-        self._fh(fhndx).sync()
+        self._fh(fhndx).flush()
 
 class FileHandle(O):
   ''' Filesystem state for open files.
@@ -467,8 +467,8 @@ class FileHandle(O):
     X("FileHandle.truncate: length=%d", length)
     self.Eopen._open_file.truncate(length)
 
-  def sync(self):
-    self.Eopen.sync()
+  def flush(self):
+    self.Eopen.flush()
 
   def close(self):
     self.Eopen.close()

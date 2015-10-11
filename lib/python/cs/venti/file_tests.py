@@ -32,11 +32,10 @@ class Test_RWFile(unittest.TestCase, BackedFile_TestMethods):
     self.backed_fp.close()
     defaults.popStore()
 
-  def test_Sync(self):
+  def test_flush(self):
     self.test_BackedFile()
     bfp = self.backed_fp
-    B2 = bfp.sync()
-    X("B2 = %s", B2)
+    B2 = bfp.flush()
     self.assertEqual(B2, bfp.backing_block)
     self.assertIsNone(bfp._front_file)
 

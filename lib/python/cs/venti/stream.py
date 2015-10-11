@@ -19,7 +19,7 @@ RqType = Enum('T_ADD', 'T_GET', 'T_CONTAINS', 'T_FLUSH')
 T_ADD = RqType(0)           # data->hashcode
 T_GET = RqType(1)           # hashcode->data
 T_CONTAINS = RqType(2)      # hash->boolean
-T_FLUSH = RqType(3)         # flush remote store
+T_FLUSH = RqType(3)         # flush local and remote store
 
 class StreamStore(BasicStoreAsync):
   ''' A Store connected to a remote Store via a PacketConnection.
@@ -80,7 +80,7 @@ class StreamStore(BasicStoreAsync):
     if rq_type == T_FLUSH:
       if payload:
         raise ValueError("unexpected payload for flush")
-      self.local_store.sync()
+      self.local_store.flush()
       return 0
     raise ValueError("unrecognised request code: %d; data=%r"
                      % (rq_type, payload))
@@ -139,18 +139,18 @@ class StreamStore(BasicStoreAsync):
       raise ValueError("non-empty payload: %r" % (payload,))
     return ok
 
-  def sync_bg(self):
+  def flush_bg(self):
     ''' Dispatch a sync request, flush the local Store, return a Result for collection.
     '''
-    R = self._conn.request(T_FLUSH, 0, b'', self._decode_response_sync)
+    R = self._conn.request(T_FLUSH, 0, b'', self._decode_response_flush)
 
     local_store = self.local_store
     if local_store:
-      local_store.sync()
+      local_store.flush()
     return R
 
   @staticmethod
-  def _decode_response_sync(flags, payload):
+  def _decode_response_flush(flags, payload):
     ''' Decode the reply to a contains, should be  a single flag.
     '''
     ok = flags & 0x01

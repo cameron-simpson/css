@@ -76,7 +76,7 @@ class BlockFile(RawIOBase):
 class File(BackedFile):
   ''' A read/write file-like object based on cs.fileutils.BackedFile.
       An initial Block is supplied for use as the backing data.
-      The .sync and .close methods return a new Block representing the commited data.
+      The .flush and .close methods return a new Block representing the commited data.
   '''
 
   def __init__(self, backing_block=None):
@@ -104,8 +104,8 @@ class File(BackedFile):
     return max(len(self.backing_block), self.front_range.end)
 
   @locked
-  def sync(self):
-    ''' Commit the current state to the Store and update the current top block.
+  def flush(self):
+    ''' Push the current state to the Store and update the current top block.
         Returns the new top Block.
     '''
     if not self.front_range.isempty():
@@ -146,7 +146,7 @@ class File(BackedFile):
   def close(self):
     ''' Close the File, return the top Block.
     '''
-    B = self.sync()
+    B = self.flush()
     BackedFile.close(self)
     return B
 
