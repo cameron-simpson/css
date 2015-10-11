@@ -67,6 +67,9 @@ class _BasicStoreCommon(MultiOpenMixin):
       self.readonly = False
       self.writeonly = False
 
+  def __str__(self):
+    return "%s(%s)" % (self.__class__.__name__, self.name)
+
   def _defer(self, func, *args, **kwargs):
     return self.__funcQ.defer(func, *args, **kwargs)
 
@@ -272,7 +275,7 @@ class MappingStore(BasicStoreSync):
 
   def __init__(self, mapping, name=None, capacity=None):
     if name is None:
-      name = "MappingStore(%s)" % (mapping,)
+      name = "MappingStore(%s)" % (type(mapping),)
     BasicStoreSync.__init__(self, name, capacity=capacity)
     self.mapping = mapping
 
@@ -306,9 +309,9 @@ class MappingStore(BasicStoreSync):
   def flush(self):
     ''' Call the .flush method of the underlying mapping, if any.
     '''
-    flush = getattr(self.mapping, 'flush', None)
-    if flush is not None:
-      flush()
+    map_flush = getattr(self.mapping, 'flush', None)
+    if map_flush is not None:
+      map_flush()
 
   def __len__(self):
     return len(self.mapping)
