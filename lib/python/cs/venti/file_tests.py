@@ -28,7 +28,6 @@ class Test_RWFile(unittest.TestCase, BackedFile_TestMethods):
     self.backed_fp = File(self.vt_block)
 
   def tearDown(self):
-    X("tearDown: Store=%r", self.store_dict)
     self.backed_fp.close()
     defaults.popStore()
 
