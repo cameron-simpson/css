@@ -52,6 +52,17 @@ class TCPStoreServer(MultiOpenMixin):
   def flush(self):
     self.S.flush()
 
+  def join(self):
+    ''' Wait for the server thread to exit.
+    '''
+    self.T.join()
+
+  def cancel(self):
+    ''' Shut down the server thread.
+        TODO: shutdown handler threads.
+    '''
+    self.server.shutdown()
+
 class _RequestHandler(StreamRequestHandler):
 
   @logexc
