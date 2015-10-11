@@ -41,7 +41,6 @@ class StreamStore(BasicStoreAsync):
   def shutdown(self):
     ''' Close the StreamStore.
     '''
-    debug("%s.shutdown...", self)
     if not self._conn.closed:
       self._conn.shutdown()
     local_store = self.local_store
