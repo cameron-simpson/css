@@ -8,38 +8,60 @@ import os
 import sys
 from socket import socket, SHUT_WR, SHUT_RD
 from socketserver import TCPServer, ThreadingMixIn, StreamRequestHandler
-from threading import Lock
+from threading import Lock, Thread
 from .stream import StreamStore
+from cs.excutils import logexc
 from cs.fileutils import OpenSocket
 from cs.logutils import debug, X
 from cs.queues import MultiOpenMixin
 
-class TCPStoreServer(ThreadingMixIn, TCPServer, MultiOpenMixin):
+class _Server(ThreadingMixIn, TCPServer):
+
+  def __init__(self, bind_addr, S):
+    TCPServer.__init__(self, bind_addr, _RequestHandler)
+    self.bind_addr = bind_addr
+    self.S = S
+
+  def __str__(self):
+    return "TCPStoreServer:_Server(%s,%s)" % (self.bind_addr, self.S,)
+
+class TCPStoreServer(MultiOpenMixin):
   ''' A threading TCPServer that accepts connections by TCPStoreClients.
   '''
 
   def __init__(self, bind_addr, S):
-    TCPServer.__init__(self, bind_addr, _RequestHandler)
-    MultiOpenMixin.__init__(self)
+    self.bind_addr = bind_addr
     self.S = S
+    self.server = _Server(bind_addr, S)
+    MultiOpenMixin.__init__(self)
+
+  def __str__(self):
+    return "TCPStoreServer(%s,S=%s)" % (self.bind_addr, self.S)
 
   def startup(self):
     self.S.open()
+    self.T = Thread(name="%s[server-thread]", target=self.server.serve_forever)
+    self.T.daemon = True
+    self.T.start()
 
   def shutdown(self):
+    self.server.shutdown()
+    self.T.join()
     self.S.close()
 
-  def sync(self):
-    self.S.sync()
+  def flush(self):
+    self.S.flush()
 
 class _RequestHandler(StreamRequestHandler):
 
+  @logexc
   def __init__(self, request, client_address, server):
     self.S = server.S
     StreamRequestHandler.__init__(self, request, client_address, server)
 
+  @logexc
   def handle(self):
-    RS = StreamStore(str(self.S),
+    RS = StreamStore("server-StreamStore(local=%s)" % self.S,
                      OpenSocket(self.request, False),
                      OpenSocket(self.request, True),
                      local_store=self.S,
@@ -55,7 +77,7 @@ class TCPStoreClient(StreamStore):
     self.sock = socket()
     self.sock.connect(bind_addr)
     StreamStore.__init__(self,
-                         "TCPStore(%s)" % (bind_addr,),
+                         "client-TCPStore(%s)" % (bind_addr,),
                          OpenSocket(self.sock, False),
                          OpenSocket(self.sock, True),
                         )

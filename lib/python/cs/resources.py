@@ -119,8 +119,7 @@ class MultiOpenMixin(O):
     if self._opens > 0:
       return False
     if self._opens < 0:
-      with PfxCallInfo():
-        warning("%r._opens < 0: %r", self, self._opens)
+      XP("%r._opens < 0: %r", self, self._opens)
     if not self.opened:
       # never opened, so not totally closed
       return False

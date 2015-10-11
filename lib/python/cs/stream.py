@@ -9,7 +9,7 @@ from threading import Thread, Lock
 from cs.asynchron import Result
 from cs.excutils import logexc
 from cs.later import Later
-from cs.logutils import Pfx, warning, error, X
+from cs.logutils import Pfx, warning, error, X, XP
 from cs.queues import IterableQueue
 from cs.resources import not_closed
 from cs.seq import seq, Seq
@@ -90,6 +90,8 @@ class PacketConnection(object):
 
   @locked
   def _pending_add(self, channel, tag, state):
+    ''' Record some state against a (channel, tag).
+    '''
     pending = self._pending
     if channel not in pending:
       raise ValueError("unknown channel %d" % (channel,))
@@ -100,6 +102,8 @@ class PacketConnection(object):
 
   @locked
   def _pending_pop(self, channel, tag):
+    ''' Retrieve and remove the state associated with (channel, tag).
+    '''
     pending = self._pending
     if channel not in pending:
       raise ValueError("unknown channel %d" % (channel,))
@@ -175,74 +179,75 @@ class PacketConnection(object):
   def _receive(self):
     ''' Receive packets from upstream, decode into requests and responses.
     '''
-    fp = self._recv_fp
-    while True:
-      try:
-        packet = read_Packet(fp)
-      except EOFError:
-        break
-      channel = packet.channel
-      tag = packet.tag
-      flags = packet.flags
-      payload = packet.payload
-      if packet.is_request:
-        with Pfx("request[%d:%d]", channel, tag):
-          if self.closed:
-            error("rejecting request: closed")
-            self._reject(channel, tag)
-          elif self.request_handler is None:
-            error("rejecting request: no self.request_handler")
-            self._reject(channel, tag)
-          else:
-            # request from upstream client
-            requests = self._channel_requests
-            if channel not in requests:
-              # unknown channel
-              error("rejecting request: unknown channel %d", channel)
+    with Pfx("%s._receive", self):
+      fp = self._recv_fp
+      while True:
+        try:
+          packet = read_Packet(fp)
+        except EOFError:
+          break
+        channel = packet.channel
+        tag = packet.tag
+        flags = packet.flags
+        payload = packet.payload
+        if packet.is_request:
+          with Pfx("request[%d:%d]", channel, tag):
+            if self.closed:
+              error("rejecting request: closed")
               self._reject(channel, tag)
-            elif tag in self._channel_requests[channel]:
-              error("rejecting request: channel %d: tag already in use: %d",
-                    channel, tag)
+            elif self.request_handler is None:
+              error("rejecting request: no self.request_handler")
               self._reject(channel, tag)
             else:
-              # payload for requests is the request enum and data
-              try:
-                rq_type, offset = get_bs(payload)
-              except IndexError as e:
-                error("invalid request: truncated request type, payload=%r", payload)
+              # request from upstream client
+              requests = self._channel_requests
+              if channel not in requests:
+                # unknown channel
+                error("rejecting request: unknown channel %d", channel)
+                self._reject(channel, tag)
+              elif tag in self._channel_requests[channel]:
+                error("rejecting request: channel %d: tag already in use: %d",
+                      channel, tag)
                 self._reject(channel, tag)
               else:
-                requests[channel].add(tag)
-                self._later.defer(self._run_request,
-                                  channel, tag, self.request_handler,
-                                  rq_type, flags, payload[offset:])
-      else:
-        with Pfx("response[%d:%d]", channel, tag):
-          # response: get state of matching pending request, remove state
-          try:
-            rq_state = self._pending_pop(channel, tag)
-          except ValueError as e:
-            # no such pending pair - response to unknown request
-            error("%d.%d: response to unknown request: %s", channel, tag, e)
-          else:
-            decode_response, R = rq_state
-            # first flag is "ok"
-            ok = (flags & 0x01) != 0
-            flags >>= 1
-            payload = packet.payload
-            if not ok:
-              R.raise_(ValueError("response not ok: ok=%s, flags=%s, payload=%r",
-                                  ok, flags, payload))
+                # payload for requests is the request enum and data
+                try:
+                  rq_type, offset = get_bs(payload)
+                except IndexError as e:
+                  error("invalid request: truncated request type, payload=%r", payload)
+                  self._reject(channel, tag)
+                else:
+                  requests[channel].add(tag)
+                  self._later.defer(self._run_request,
+                                    channel, tag, self.request_handler,
+                                    rq_type, flags, payload[offset:])
+        else:
+          with Pfx("response[%d:%d]", channel, tag):
+            # response: get state of matching pending request, remove state
+            try:
+              rq_state = self._pending_pop(channel, tag)
+            except ValueError as e:
+              # no such pending pair - response to unknown request
+              error("%d.%d: response to unknown request: %s", channel, tag, e)
             else:
-              try:
-                result = decode_response(flags, payload)
-              except Exception as e:
-                R.exc_info = sys.exc_info()
+              decode_response, R = rq_state
+              # first flag is "ok"
+              ok = (flags & 0x01) != 0
+              flags >>= 1
+              payload = packet.payload
+              if not ok:
+                R.raise_(ValueError("response not ok: ok=%s, flags=%s, payload=%r"
+                                    % (ok, flags, payload)))
               else:
-                R.result = result
-    if not self._sendQ.closed:
-      self._sendQ.close()
-    self._recv_fp.close()
+                try:
+                  result = decode_response(flags, payload)
+                except Exception as e:
+                  R.exc_info = sys.exc_info()
+                else:
+                  R.result = result
+      if not self._sendQ.closed:
+        self._sendQ.close()
+      self._recv_fp.close()
 
   @logexc
   def _send(self):

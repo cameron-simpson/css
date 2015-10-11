@@ -38,7 +38,7 @@ class _BasicStoreCommon(MultiOpenMixin):
         .add(block) -> hashcode
         .get(hashcode, [default=None]) -> block (or default)
         .contains(hashcode) -> boolean
-        .sync()
+        .flush()
 
       A convenience .lock attribute is provided for simple mutex use.
 
@@ -66,6 +66,9 @@ class _BasicStoreCommon(MultiOpenMixin):
       self.hashclass = Hash_SHA1
       self.readonly = False
       self.writeonly = False
+
+  def __str__(self):
+    return "%s(%s)" % (self.__class__.__name__, self.name)
 
   def _defer(self, func, *args, **kwargs):
     return self.__funcQ.defer(func, *args, **kwargs)
@@ -174,8 +177,8 @@ class BasicStoreSync(_BasicStoreCommon):
   def contains_bg(self, h):
     return self._defer(self.contains, h)
 
-  def sync_bg(self):
-    return self._defer(self.sync)
+  def flush_bg(self):
+    return self._defer(self.flush)
 
 class BasicStoreAsync(_BasicStoreCommon):
   ''' Subclass of _BasicStoreCommon expecting asynchronous operations and providing synchronous hooks, dual of BasicStoreSync.
@@ -194,8 +197,8 @@ class BasicStoreAsync(_BasicStoreCommon):
   def contains(self, h):
     return self.contains_bg(h)()
 
-  def sync(self):
-    return self.sync_bg()()
+  def flush(self):
+    return self.flush_bg()()
 
 def Store(store_spec):
   ''' Factory function to return an appropriate BasicStore* subclass
@@ -272,7 +275,7 @@ class MappingStore(BasicStoreSync):
 
   def __init__(self, mapping, name=None, capacity=None):
     if name is None:
-      name = "MappingStore(%s)" % (mapping,)
+      name = "MappingStore(%s)" % (type(mapping),)
     BasicStoreSync.__init__(self, name, capacity=capacity)
     self.mapping = mapping
 
@@ -303,12 +306,12 @@ class MappingStore(BasicStoreSync):
   def contains(self, h):
     return h in self.mapping
 
-  def sync(self):
+  def flush(self):
     ''' Call the .flush method of the underlying mapping, if any.
     '''
-    flush = getattr(self.mapping, 'flush', None)
-    if flush is not None:
-      flush()
+    map_flush = getattr(self.mapping, 'flush', None)
+    if map_flush is not None:
+      map_flush()
 
   def __len__(self):
     return len(self.mapping)

@@ -76,7 +76,7 @@ class CacheStore(BasicStoreSync):
     self.backend.prefetch(self.missing(hs))
 
   def sync(self):
-    for _ in cs.later.report([ self.cache.sync_bg(), self.backend.sync_bg() ]):
+    for _ in cs.later.report([ self.cache.flush_bg(), self.backend.flush_bg() ]):
       pass
 
 class MemoryCacheStore(BasicStoreSync):

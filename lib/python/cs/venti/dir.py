@@ -277,6 +277,7 @@ class FileDirent(_Dirent, MultiOpenMixin):
     self._check()
     if self._open_file is not None:
       self._block = self._open_file.sync()
+      warning("FileDirent.block: updated to %s", self._block)
     return self._block
 
   @block.setter
@@ -315,10 +316,12 @@ class FileDirent(_Dirent, MultiOpenMixin):
   def shutdown(self):
     ''' On final close, close ._open_file and save result as ._block.
     '''
+    X("CLOSE %s ...", self)
     self._check()
     if self._block is not None:
       error("final close, but ._block is not None; replacing with self._open_file.close(), was: %r", self._block)
     self._block = self._open_file.close()
+    X("CLOSE %s: _block=%s", self, self._block)
     self._open_file = None
     self._check()
 
@@ -415,7 +418,9 @@ class Dir(_Dirent):
                      if name != '.' and name != '..'
                    )
     # TODO: if len(data) >= 16384
-    return Block(data=data)
+    B = Block(data=data)
+    warning("Dir.block: computed Block %s", B)
+    return B
 
   def dirs(self):
     ''' Return a list of the names of subdirectories in this Dir.

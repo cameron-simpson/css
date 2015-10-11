@@ -30,6 +30,7 @@ class _TestStore(unittest.TestCase):
       self.assertEqual(len(S), 0)
     else:
       raise unittest.SkipTest("no __len__ in %s" % (type(S),))
+    S.flush()
 
   def test01add_new_block(self):
     S = self.S
@@ -39,6 +40,7 @@ class _TestStore(unittest.TestCase):
     ok = S.contains(h)
     self.assertFalse(ok)
     self.assertNotIn(h, S)
+    S.flush()
 
   def test02add_get(self):
     S = self.S
@@ -54,6 +56,7 @@ class _TestStore(unittest.TestCase):
       chunk = S.get(h)
       self.assertIsNot(chunk, None)
       self.assertEqual(chunk, random_chunk_map[h])
+    S.flush()
 
 class TestMappingStore(_TestStore):
 

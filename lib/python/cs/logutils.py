@@ -32,7 +32,6 @@ import threading
 from threading import Lock
 import traceback
 from cs.ansi_colour import colourise
-from cs.excutils import noexc
 from cs.lex import is_identifier, is_dotted_identifier
 from cs.obj import O, O_str
 from cs.py.func import funccite
@@ -333,6 +332,14 @@ def X(msg, *args):
   '''
   return nl(msg, *args, file=sys.stderr)
 
+def XP(msg, *args):
+  ''' Variation on X() which prefixes the message with the currrent Pfx prefix.
+  '''
+  sys.stderr.write(prefix())
+  sys.stderr.write(': ')
+  sys.stderr.flush()
+  return X(msg, *args)
+
 def nl(msg, *args, **kw):
   ''' Unconditionally write the message `msg` to `file` (default sys.stdout).
       If `args` is not empty, format `msg` using %-expansion with `args`.
@@ -630,11 +637,13 @@ class Pfx(object):
   def exception(self, msg, *args):
     for L in self.loggers:
       L.exception(msg, *args)
-  @noexc
   def log(self, level, msg, *args, **kwargs):
     ## to debug format errors ## D("msg=%r, args=%r, kwargs=%r", msg, args, kwargs)
     for L in self.loggers:
-      L.log(level, msg, *args, **kwargs)
+      try:
+        L.log(level, msg, *args, **kwargs)
+      except Exception as e:
+        XP("exception logging to %s msg=%r, args=%r, kwargs=%r: %s", L, msg, args, kwargs, e)
   def debug(self, msg, *args, **kwargs):
     self.log(logging.DEBUG, msg, *args, **kwargs)
   def info(self, msg, *args, **kwargs):
@@ -648,6 +657,11 @@ class Pfx(object):
     self.log(logging.ERROR, msg, *args, **kwargs)
   def critical(self, msg, *args, **kwargs):
     self.log(logging.CRITICAL, msg, *args, **kwargs)
+
+def prefix():
+  ''' Return the current Pfx prefix.
+  '''
+  return Pfx._state.prefix
 
 class PfxCallInfo(Pfx):
   ''' Subclass of Pfx to insert current function an caller into messages.
@@ -664,7 +678,6 @@ class PfxCallInfo(Pfx):
 # Logger public functions
 def exception(msg, *args):
   Pfx._state.cur.exception(msg, *args)
-@noexc
 def log(level, msg, *args, **kwargs):
   Pfx._state.cur.log(level, msg, *args, **kwargs)
 def debug(msg, *args, **kwargs):
