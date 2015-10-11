@@ -28,7 +28,8 @@ class StreamStore(BasicStoreAsync):
 
   def __init__(self, name, send_fp, recv_fp, local_store=None):
     BasicStoreAsync.__init__(self, ':'.join( ('StreamStore', name) ))
-    self._conn = PacketConnection(send_fp, recv_fp, self._handle_request)
+    self._conn = PacketConnection(send_fp, recv_fp, self._handle_request,
+                                  name=':'.join( (self.name, 'PacketConnection') ))
     self.local_store = local_store
 
   def startup(self):
@@ -49,11 +50,9 @@ class StreamStore(BasicStoreAsync):
     BasicStoreAsync.shutdown(self)
 
   def join(self):
-    ''' Wait for the Store to be closed down.
+    ''' Wait for the PacketConnection to shut down.
     '''
     self._conn.join()
-    if not self.closed:
-      self.shutdown()
 
   def _handle_request(self, rq_type, flags, payload):
     ''' Perform the action for a request packet.
