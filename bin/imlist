@@ -18,6 +18,7 @@ from cs.logutils import setup_logging, warning, error, Pfx, XP
 
 USAGE = '''Usage:
   %s [-q] [-u] src-paths...
+    -a  Absolute paths in output.
     -q  Quiet. Do not list image data.
     -U  Do not update .imlist files in directories.'''
 
@@ -26,20 +27,23 @@ def main(argv):
   cmd = cs.logutils.cmd
   usage = USAGE % (cmd,)
 
+  absolute = False
   quiet = False
   update_imlist = True
 
   badopts = False
 
   try:
-    opts, argv = getopt(argv[1:], 'qU')
+    opts, argv = getopt(argv[1:], 'aqU')
   except GetoptError as e:
     error("%s", e)
     badopts = True
   else:
     for opt, val in opts:
       with Pfx(opt):
-        if opt == '-q':
+        if opt == '-a':
+          absolute = True
+        elif opt == '-q':
           quiet = True
         elif opt == '-U':
           update_imlist = False
@@ -53,18 +57,21 @@ def main(argv):
   with Pfx(cmd):
     for srcpath in argv:
       if isdir(srcpath):
-        for iminfo in dir_info(srcpath, recurse=True, update_imlist=update_imlist):
+        for iminfo in dir_info(srcpath, recurse=True,
+                               update_imlist=update_imlist):
           if not quiet:
-            write_iminfo(iminfo, sys.stdout)
+            write_iminfo(iminfo, sys.stdout, absolute=absolute)
 
   return 0
 
 ImInfo = namedtuple('ImInfo', 'path width height')
 
-def write_iminfo(iminfo, fp, basename=False):
+def write_iminfo(iminfo, fp, basename=False, absolute=False):
   path = iminfo.path
   if basename:
     path = os.path.basename(path)
+  elif absolute:
+    path=os.path.abspath(path)
   fp.write("%d %d %s\n" % (iminfo.width, iminfo.height, path))
 
 def image_info(impath):
