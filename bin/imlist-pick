@@ -7,16 +7,19 @@
 set -ue
 
 cmd=$(basename "$0")
-usage="Usage: $cmd [-tw] [-n maxn] [-x minx] [-y miny] dirs..."
+usage="Usage: $cmd [-/ regexp] [-tw] [-n maxn] [-x minx] [-y miny] dirs..."
 
 awkcond=1
 maxn=
+regexp=
 
 badopts=
 
 while [ $# -gt 0 ]
 do
   case $1 in
+    -/) regexp=$2; shift ;;
+    -/*)regexp=$( expr "x$1" : 'x..\(.*\)' ) ;;
     -n) maxn=$2; shift ;;
     -t) awkcond="$awkcond && width < height" ;;
     -w) awkcond="$awkcond && width > height" ;;
@@ -42,9 +45,11 @@ fi
 imlist "$@" \
 | awk '{ width=$1; height=$2; pathname=$3 }
       '"$awkcond { print pathname }" \
+| if [ -n "$regexp" ]
+  then  egrep -i -- "$regexp"
+  else  cat
+  fi \
 | if [ -n "$maxn" ]
-  then
-    shuffle | sed "${maxn}q"
-  else
-    cat
+  then  shuffle | sed "${maxn}q"
+  else  cat
   fi
