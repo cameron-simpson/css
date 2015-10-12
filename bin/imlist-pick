@@ -1,0 +1,42 @@
+#!/bin/sh
+#
+# Select images from .imlists.
+#   - Cameron Simpson <cs@zip.com.au> 13oct2015
+#
+
+set -ue
+
+cmd=$(basename "$0")
+usage="Usage: $cmd [-tw] [-n maxn] [-x minx] [-y miny] dirs..."
+
+awkcond=1
+maxn=
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -n) maxn=$2; shift ;;
+    -t) awkcond="$awkcond && width < height" ;;
+    -w) awkcond="$awkcond && width > height" ;;
+    -x) awkcond="$awkcond && width >= $2"; shift ;;
+    -y) awkcond="$awkcond && height >= $2"; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+imlist "$@" \
+| awk '{ width=$1; height=$2; pathname=$3 }
+      '"$awkcond { print pathname }" \
+| if [ -n "$maxn" ]
+  then
+    shuffle | sed "${maxn}q"
+  else
+    cat
+  fi
