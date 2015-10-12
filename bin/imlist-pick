@@ -31,6 +31,14 @@ do
   shift
 done
 
+if [ $# = 0 ]
+then
+  echo "$cmd: missing dirs" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
 imlist "$@" \
 | awk '{ width=$1; height=$2; pathname=$3 }
       '"$awkcond { print pathname }" \
