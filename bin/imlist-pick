@@ -52,7 +52,8 @@ fi
 
 imlist $imlist_opts "$@" \
 | awk '{ width=$1; height=$2; pathname=$3 }
-      '"$awkcond { print pathname }" \
+      '"$awkcond { print }" \
+| sed -n 's/^[1-9][0-9]*  *[1-9][0-9]*  *//p' \
 | if [ -n "$regexp" ]
   then  egrep -i -- "$regexp"
   else  cat
