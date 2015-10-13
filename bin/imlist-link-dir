@@ -22,8 +22,6 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-set -x
-
 imlist-pick -a ${1+"$@"} \
 | \
 ( cd "$target_dir" || exit 1
