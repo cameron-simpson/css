@@ -39,6 +39,6 @@ imlist-pick -a ${1+"$@"} \
       done
       base=$base2
     fi
-    ln -s "$impath" "$base"
+    ln "$impath" "$base"
   done
 )
