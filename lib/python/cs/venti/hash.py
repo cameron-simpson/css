@@ -63,6 +63,12 @@ class _Hash(bytes):
       raise ValueError("expected %d bytes, received %d: %r" % (cls.HASHLEN, len(hashbytes), hashbytes))
     return cls(hashbytes)
 
+  @property
+  def hashfunc(self):
+    ''' Convenient hook to this Hash's class' .from_data method.
+    '''
+    return self.__class__.from_data
+
 class Hash_SHA1(_Hash):
   HASHNAME = 'sha1'
   HASHLEN = 20
