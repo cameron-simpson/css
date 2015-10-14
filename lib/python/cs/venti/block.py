@@ -358,6 +358,26 @@ def dump_block(B, fp=None, indent='', verbose=False):
             % (indent, len(data), B.span, B.hashcode),
             file=fp)
 
+def verify_block(B, recurse=False, S=None):
+  ''' Perform integrity checks on the Block `B`, yield error messages.
+  '''
+  if S is None:
+    S = defaults.S
+  errs = []
+  hashcode = B.hashcode
+  if hashcode not in S:
+    yield B, "hashcode not in %s" % (S,)
+  else:
+    data = B.data
+    # hash the data using the matching hash function
+    data_hashcode = hashcode.hashfunc(data)
+    if hashcode != data_hashcode:
+      yield B, "hashcode(%s) does not match hashfunc of data(%s)" \
+               % (hashcode, data_hashcode)
+  if B.indirect:
+    for subB in B.subblocks:
+      verify_block(subB, recurse=True, S=S)
+
 if __name__ == '__main__':
   import cs.venti.block_tests
   cs.venti.block_tests.selftest(sys.argv)
