@@ -10,7 +10,7 @@ from cs.logutils import D, X
 from cs.randutils import rand0, randblock
 from cs.py3 import bytes
 from . import totext
-from .block import Block, IndirectBlock
+from .block import Block, IndirectBlock, verify_block
 from .cache import MemoryCacheStore
 
 class TestAll(unittest.TestCase):
@@ -18,6 +18,10 @@ class TestAll(unittest.TestCase):
   def setUp(self):
     self.S = MemoryCacheStore()
 
+  def _verify_block(self, B, **kw):
+    errs = list(verify_block(B, **kw))
+    self.assertEqual(errs, [])
+    
   def test00Block(self):
     # make some randbom blocks, check size and content
     with self.S:
@@ -26,6 +30,7 @@ class TestAll(unittest.TestCase):
         rs = randblock(size)
         self.assertEqual(len(rs), size)
         B = Block(data=rs)
+        self._verify_block(B)
         self.assertEqual(len(B), size)
         self.assertEqual(B.span, size)
         self.assertEqual(B.data, rs)
@@ -46,6 +51,7 @@ class TestAll(unittest.TestCase):
           subblocks.append(B)
           fullblock += rs
         IB = IndirectBlock(subblocks=subblocks)
+        self._verify_block(IB, recurse=True)
         IBspan = IB.span
         self.assertEqual(IBspan, total_length)
         IBH = IB.hashcode
@@ -54,6 +60,7 @@ class TestAll(unittest.TestCase):
         self.assertEqual(IBdata, fullblock)
         # refetch block by hashcode
         IB2 = IndirectBlock(hashcode=IBH)
+        self._verify_block(IB2, recurse=True)
         IB2data = IB2.all_data()
         self.assertEqual(IBdata, IB2data, "IB:  %s\nIB2: %s" % (totext(IBdata), totext(IB2data)))
 
