@@ -58,6 +58,10 @@ def isBlock(o):
 class _Block(object):
 
   def __init__(self, data=None, hashcode=None, span=None):
+    ''' Initialise the _Block.
+        A _Block always stores its hashcode and span directly.
+        If `data` is supplied, store it and check the hashcode.
+    '''
     if data is None and hashcode is None:
       raise ValueError("one of data or hashcode must be not-None")
     if data is not None:
