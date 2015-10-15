@@ -13,7 +13,8 @@ import unittest
 from unittest import TestCase, skip
 from cs.logutils import D, X
 from cs.randutils import rand0, randblock
-from .datafile import DataFile, DataDirMapping, encode_index_entry, decode_index_entry
+from .datafile import DataFile, GDBMDataDirMapping, KyotoDataDirMapping, \
+                encode_index_entry, decode_index_entry
 from .hash import DEFAULT_HASHCLASS
 
 # arbitrary limit
@@ -66,14 +67,20 @@ class TestDataFile(TestCase):
         data = self.datafile.get(offset)
         self.assertTrue(data == blocks[offset])
 
-class TestDataDirMapping(TestCase):
+class _TestDataDirMapping(TestCase):
+
+  MAPPING_CLASS = None
 
   def setUp(self):
+    mapping_class = self.__class__.MAPPING_CLASS
+    if mapping_class is None:
+      raise unittest.SkipTest("MAPPING_CLASS is None, skipping TestCase")
     random.seed()
     self.pathname = tempfile.mkdtemp(prefix="cs.venti.datafile.testdir", suffix=".dir", dir='.')
-    self.datadir = DataDirMapping(self.pathname, rollover=200000)
+    self.datadir = mapping_class(self.pathname, rollover=200000)
 
   def tearDown(self):
+    os.system("ls -l "+self.pathname)
     shutil.rmtree(self.pathname)
 
   def test000IndexEntry(self):
@@ -124,7 +131,7 @@ class TestDataDirMapping(TestCase):
           data = D[hashcode]
           self.assertEqual(data, odata)
     # reopen the DataDir
-    with DataDirMapping(self.pathname, rollover=200000) as D:
+    with self.__class__.MAPPING_CLASS(self.pathname, rollover=200000) as D:
       hashcodes = list(by_hash.keys())
       random.shuffle(hashcodes)
       for n, hashcode in enumerate(hashcodes):
@@ -134,6 +141,12 @@ class TestDataDirMapping(TestCase):
           odata = by_hash[hashcode]
           data = D[hashcode]
           self.assertEqual(data, odata)
+
+class TestDataDirMappingGDBM(_TestDataDirMapping):
+  MAPPING_CLASS = GDBMDataDirMapping
+
+class TestDataDirMappingKyoto(_TestDataDirMapping):
+  MAPPING_CLASS = KyotoDataDirMapping
 
 def selftest(argv):
   if False:
