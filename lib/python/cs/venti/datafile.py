@@ -313,9 +313,10 @@ class DataDirMapping(MultiOpenMixin):
     '''
     return self.datadir.pathto('index-' + hashname + '.' + suffix)
 
-  def _index(self, hashname):
-    ''' Obtain the index to which to store/access this hashcode.
+  def _index(self, hashclass):
+    ''' Obtain the index to which to store/access this hashcode class.
     '''
+    hashname = hashclass.HASHNAME
     try:
       # fast path: return already instantiated index
       return self._indices[hashname]
@@ -327,24 +328,25 @@ class DataDirMapping(MultiOpenMixin):
         except KeyError:
           indexclass = self.indexclass
           indexpath = self._indexpath(hashname, indexclass.suffix)
-          index = self._indices[hashname] = indexclass(indexpath, lock=self._lock)
+          index = self._indices[hashname] \
+                = indexclass(indexpath, hashclass, lock=self._lock)
           index.open()
         return index
 
   # without this "in" tries to iterate over the mapping with int indices
   def __contains__(self, hashcode):
-    return hashcode in self._index(hashcode.HASHNAME)
+    return hashcode in self._index(hashcode.__class__)
 
   def __getitem__(self, hashcode):
     ''' Return the decompressed data associated with the supplied `hashcode`.
     '''
-    n, offset = self._index(hashcode.HASHNAME)[hashcode]
+    n, offset = self._index(hashcode.__class__)[hashcode]
     return self.datadir.get(n, offset)
 
   def __setitem__(self, hashcode, data):
     ''' Store the supplied `data` indexed by `hashcode`.
     '''
-    index = self._index(hashcode.HASHNAME)
+    index = self._index(hashcode.__class__)
     if hashcode not in index:
       n, offset = self.datadir.add(data)
       index[hashcode] = n, offset
@@ -363,9 +365,10 @@ class GDBMIndex(MultiOpenMixin):
 
   suffix = 'gdbm'
 
-  def __init__(self, gdbmpath, lock=None):
+  def __init__(self, gdbmpath, hashclass, lock=None):
     import dbm.gnu
     MultiOpenMixin.__init__(self, lock=lock)
+    self._hashclass = hashclass
     self._gdbm_path = gdbmpath
     self._gdbm = None
 
@@ -390,6 +393,87 @@ class GDBMIndex(MultiOpenMixin):
 
 def GDBMDataDirMapping(dirpath, rollover=None):
   return DataDirMapping(dirpath, indexclass=GDBMIndex, rollover=rollover)
+
+class KyotoIndex(MultiOpenMixin):
+  ''' Kyoto Cabinet index for a DataDir.
+      Notably this uses a B+ tree for the index and thus one can
+      traverse from one key forwards and backwards, which supports
+      the coming Store synchronisation processes.
+  '''
+
+  suffix = 'kct'
+
+  def __init__(self, kyotopath, hashclass, lock=None):
+    MultiOpenMixin.__init__(self, lock=lock)
+    self._hashclass = hashclass
+    self._kyoto_path = kyotopath
+    self._kyoto = None
+
+  def startup(self):
+    from kyotocabinet import DB
+    self._kyoto = DB()
+    self._kyoto.open(self._kyoto_path, DB.OWRITER | DB.OCREATE)
+
+  def shutdown(self):
+    self._kyoto.close()
+    self._kyoto = None
+
+  def flush(self):
+    self._kyoto.synchronize(hard=False)
+
+  def __len__(self):
+    return self._kyoto.count()
+
+  def __contains__(self, hashcode):
+    return self._kyoto.check(hashcode) >= 0
+
+  def get(self, hashcode):
+    record = self._kyoto.get(hashcode)
+    if record is None:
+      return None
+    return decode_index_entry(record)
+
+  def __getitem__(self, hashcode):
+    entry = self.get(hashcode)
+    if entry is None:
+      raise IndexError(str(hashcode))
+    return entry
+
+  def __setitem__(self, hashcode, value):
+    self._kyoto[hashcode] = encode_index_entry(*value)
+
+  def first(self):
+    ''' Return the first hashcode in the database or None if empty.
+    '''
+    cursor = self._kyoto.cursor()
+    if not cursor.jump():
+      return None
+    hashcode = self._hashclass.from_hashbytes(cursor.get_key())
+    cursor.disable()
+    return hashcode
+
+    cursor.disable()
+
+  def iter_keys(self, hashcode=None, reverse=False):
+    ''' Generator yielding keys starting with `hashcode`.
+        `hashcode`: the first hashcode; if missing or None, iteration
+                    starts with the first key in the index
+        `reverse`: iterate backwards if true, otherwise forwards
+    '''
+    cursor = self._kyoto.cursor()
+    if cursor.jump(hashcode):
+      while True:
+        yield self._hashclass.from_hashbytes(cursor.get_key())
+        if reverse:
+          if not cursor.step_back():
+            break
+        else:
+          if not cursor.step():
+            break
+    cursor.disable()
+
+def KyotoDataDirMapping(dirpath, rollover=None):
+  return DataDirMapping(dirpath, indexclass=KyotoIndex, rollover=rollover)
 
 if __name__ == '__main__':
   import cs.venti.datafile_tests
