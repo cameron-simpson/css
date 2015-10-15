@@ -24,6 +24,8 @@ def decode(bs, offset=0):
   return hashcls.decode(bs, offset)
 
 class _Hash(bytes):
+  ''' All hashes are bytes subclasses.
+  '''
 
   def __str__(self):
     return hexify(self)
