@@ -368,16 +368,19 @@ class DataDirMapping(MultiOpenMixin):
       hashclass = defaults.S
     return self._index(hashclass).first()
 
-  def iter_keys(self, hashclass=None, hashcode=None, reverse=False):
+  def iter_keys(self, hashclass=None, hashcode=None, reverse=False, after=False):
     ''' Generator yielding keys starting with optional `hashcode`.
         `hashclass`: specify the hashcode type, default from defaults.S
         `hashcode`: the first hashcode; if missing or None, iteration
                     starts with the first key in the index
         `reverse`: iterate backwards if true, otherwise forwards
+        `after`: commence iteration after the first hashcode
     '''
     if hashclass is None:
       hashclass = defaults.S
-    return self._index(hashclass).iter_keys(hashcode=hashcode, reverse=reverse)
+    return self._index(hashclass).iter_keys(hashcode=hashcode,
+                                            reverse=reverse,
+                                            after=after)
 
 class GDBMIndex(MultiOpenMixin):
   ''' GDBM index for a DataDir.
@@ -474,22 +477,25 @@ class KyotoIndex(MultiOpenMixin):
 
     cursor.disable()
 
-  def iter_keys(self, hashcode=None, reverse=False):
+  def iter_keys(self, hashcode=None, reverse=False, after=False):
     ''' Generator yielding keys starting with optional `hashcode`.
         `hashcode`: the first hashcode; if missing or None, iteration
                     starts with the first key in the index
         `reverse`: iterate backwards if true, otherwise forwards
+        `after`: commence iteration after the first hashcode
     '''
     cursor = self._kyoto.cursor()
     if cursor.jump(hashcode):
-      while True:
+      if not after:
         yield self._hashclass.from_hashbytes(cursor.get_key())
+      while True:
         if reverse:
           if not cursor.step_back():
             break
         else:
           if not cursor.step():
             break
+        yield self._hashclass.from_hashbytes(cursor.get_key())
     cursor.disable()
 
 def KyotoDataDirMapping(dirpath, rollover=None):
