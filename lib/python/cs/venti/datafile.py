@@ -18,6 +18,7 @@ from cs.obj import O
 from cs.resources import MultiOpenMixin
 from cs.serialise import get_bs, put_bs, read_bs, put_bsdata, read_bsdata
 from cs.threads import locked, locked_property
+from . import defaults
 from .hash import DEFAULT_HASHCLASS
 
 F_COMPRESSED = 0x01
@@ -359,6 +360,25 @@ class DataDirMapping(MultiOpenMixin):
     for index in indices:
       index.flush()
 
+  def first(self, hashclass=None):
+    ''' Return the first hashcode in the database or None if empty.
+        `hashclass`: specify the hashcode type, default from defaults.S
+    '''
+    if hashclass is None:
+      hashclass = defaults.S
+    return self._index(hashclass).first()
+
+  def iter_keys(self, hashclass=None, hashcode=None, reverse=False):
+    ''' Generator yielding keys starting with optional `hashcode`.
+        `hashclass`: specify the hashcode type, default from defaults.S
+        `hashcode`: the first hashcode; if missing or None, iteration
+                    starts with the first key in the index
+        `reverse`: iterate backwards if true, otherwise forwards
+    '''
+    if hashclass is None:
+      hashclass = defaults.S
+    return self._index(hashclass).iter_keys(hashcode=hashcode, reverse=reverse)
+
 class GDBMIndex(MultiOpenMixin):
   ''' GDBM index for a DataDir.
   '''
@@ -455,7 +475,7 @@ class KyotoIndex(MultiOpenMixin):
     cursor.disable()
 
   def iter_keys(self, hashcode=None, reverse=False):
-    ''' Generator yielding keys starting with `hashcode`.
+    ''' Generator yielding keys starting with optional `hashcode`.
         `hashcode`: the first hashcode; if missing or None, iteration
                     starts with the first key in the index
         `reverse`: iterate backwards if true, otherwise forwards
