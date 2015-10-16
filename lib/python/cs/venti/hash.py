@@ -86,6 +86,19 @@ class Hash_SHA1(_Hash):
     hashcode = sha1(data).digest()
     return cls.from_hashbytes(hashcode)
 
+HASHCLASS_BY_NAME = {}
+
+def register_hashclass(klass):
+  global HASHCLASS_BY_NAME
+  hashname = klass.HASHNAME
+  if hashname in HASHCLASS_BY_NAME:
+    raise ValueError(
+            'cannot register hash class %s: hashname %r already registered to %s'
+            % (klass, hashname, HASHCLASS_BY_NAME[hashname]))
+  HASHCLASS_BY_NAME[hashname] = klass
+
+register_hashclass(Hash_SHA1)
+
 DEFAULT_HASHCLASS = Hash_SHA1
 
 if __name__ == '__main__':
