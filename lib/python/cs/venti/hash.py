@@ -21,7 +21,7 @@ def decode(bs, offset=0):
     hashcls = Hash_SHA1
   else:
     raise ValueError("unsupported hashenum %d", hashenum)
-  return hashcls.decode(bs, offset)
+  return hashcls._decode(bs, offset)
 
 class _Hash(bytes):
   ''' All hashes are bytes subclasses.
@@ -47,9 +47,10 @@ class _Hash(bytes):
     return self.HASHENUM_BS + self
 
   @classmethod
-  def decode(cls, encdata, offset=0):
+  def _decode(cls, encdata, offset=0):
     ''' Pull off the encoded hash from the start of the encdata.
         Return Hash_* object and new offset.
+        NOTE: this happens _after_ the hash type signature prefixed by .encode.
     '''
     hashbytes = encdata[offset:offset+cls.HASHLEN]
     if len(hashbytes) != cls.HASHLEN:
