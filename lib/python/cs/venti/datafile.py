@@ -13,7 +13,7 @@ from threading import Lock, RLock
 from zlib import compress, decompress
 from cs.cache import LRU_Cache
 from cs.excutils import LogExceptions
-from cs.logutils import D, X, debug, warning
+from cs.logutils import D, X, debug, warning, Pfx
 from cs.obj import O
 from cs.resources import MultiOpenMixin
 from cs.serialise import get_bs, put_bs, read_bs, put_bsdata, read_bsdata
@@ -244,11 +244,11 @@ class DataDir(MultiOpenMixin):
     '''
     if indices is None:
       indices = self._datafile_indices()
-    with Pfx("scan %d", n):
-      for dfn in indices:
+    for dfn in indices:
+      with Pfx("scan %d", dfn):
         D = self.datafile(dfn)
         for offset, flags, data in D.scan(do_decompress=True):
-          yield n, offset, data
+          yield dfn, offset, data
 
   def add(self, data):
     ''' Add the supplied data chunk to the current DataFile, return (n, offset).
@@ -515,15 +515,15 @@ class KyotoIndex(MultiOpenMixin):
 def KyotoDataDirMapping(dirpath, rollover=None):
   return DataDirMapping(dirpath, indexclass=KyotoIndex, rollover=rollover)
 
-MAPPING_BY_NAME = {}
+DATADIRMAPPING_BY_NAME = {}
 
 def register_mapping(indexname, klass):
-  global MAPPING_BY_NAME
-  if indexname in MAPPING_BY_NAME:
+  global DATADIRMAPPING_BY_NAME
+  if indexname in DATADIRMAPPING_BY_NAME:
     raise ValueError(
             'cannot register DataDirMapping class %s: indexname %r already registered to %s'
-            % (klass, indexname, MAPPING_BY_NAME[indexname]))
-  MAPPING_BY_NAME[indexname] = klass
+            % (klass, indexname, DATADIRMAPPING_BY_NAME[indexname]))
+  DATADIRMAPPING_BY_NAME[indexname] = klass
 
 register_mapping('gdbm', GDBMDataDirMapping)
 register_mapping('kyoto', KyotoDataDirMapping)
