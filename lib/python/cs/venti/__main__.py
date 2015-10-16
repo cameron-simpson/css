@@ -17,13 +17,15 @@ from cs.lex import hexify
 import cs.logutils
 from cs.logutils import Pfx, exception, error, warning, debug, setup_logging, logTo, D, X, nl
 from . import totext, fromtext, defaults
-from .block import Block, IndirectBlock, dump_block
-from .debug import dump_Dirent
-from .dir import Dir
-from .store import Store
-from .cache import CacheStore, MemoryCacheStore
-from .paths import dirent_dir, dirent_file, dirent_resolve, resolve
 from .archive import CopyModes, update_archive, toc_archive, last_Dirent, copy_out_dir
+from .block import Block, IndirectBlock, dump_block
+from .cache import CacheStore, MemoryCacheStore
+from .debug import dump_Dirent
+from .datafile import DATADIRMAPPING_BY_NAME
+from .dir import Dir
+from .hash import DEFAULT_HASHCLASS, HASHCLASS_BY_NAME
+from .paths import dirent_dir, dirent_file, dirent_resolve, resolve
+from .store import Store
 
 def main(argv):
   cmd = os.path.basename(argv[0])
@@ -35,6 +37,7 @@ def main(argv):
     %s [options...] cat filerefs...
     %s [options...] catblock [-i] hashcodes...
     %s [options...] dump filerefs
+    %s [options...] index datadir indextype[:hashname]
     %s [options...] listen {-|host:port}
     %s [options...] ls [-R] dirrefs...
     %s [options...] mount dirref mountpoint
@@ -52,7 +55,7 @@ def main(argv):
                     |sh-command   StreamStore via sh-command
       -q          Quiet; not verbose. Default if stdout is not a tty.
       -v          Verbose; not quiet. Default it stdout is a tty.
-''' % (cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd)
+''' % (cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd)
 
   badopts = False
 
@@ -120,7 +123,7 @@ def main(argv):
         error("unknown operation \"%s\"", op)
         badopts = True
       else:
-        if op in ("scan", "init"):
+        if op in ("scan", "index", "init"):
           # run without a context store
           try:
             xit = op_func(args)
@@ -315,6 +318,34 @@ def cmd_dump(args, verbose=None, log=None):
     raise GetoptError("missing filerefs")
   for path in args:
     dump(path)
+  return 0
+
+def cmd_index(args, verbose=None, log=None):
+  ''' Update the index of a DataDir.
+  '''
+  if not args:
+    raise GetoptError("missing datadir path")
+  dirpath = args.pop(0)
+  if not args:
+    raise GetoptError("missing index type")
+  indextype = args.pop(0)
+  if ':' in indextype:
+    indextype, hashname = indextype.split(':')
+  else:
+    hashname = DEFAULT_HASHCLASS.HASHNAME
+  if args:
+    raise GetoptError("extra arguments after indextype:hashname: %s"
+                      % (' '.join(args),))
+  try:
+    mappingclass = DATADIRMAPPING_BY_NAME[indextype]
+  except KeyError:
+    raise GetoptError('unknown indextype: %r' % (indextype,))
+  try:
+    hashclass = HASHCLASS_BY_NAME[hashname]
+  except KeyError:
+    raise GetoptError('unknown hashname: %r' % (hashname,))
+  D = mappingclass(dirpath)
+  D.reindex(hashclass=hashclass)
   return 0
 
 def cmd_init(args, verbose=None, log=None):
