@@ -398,6 +398,7 @@ class GDBMIndex(MultiOpenMixin):
   ''' GDBM index for a DataDir.
   '''
 
+  indexname = 'gdbm'
   suffix = 'gdbm'
 
   def __init__(self, gdbmpath, hashclass, lock=None):
@@ -436,6 +437,7 @@ class KyotoIndex(MultiOpenMixin):
       the coming Store synchronisation processes.
   '''
 
+  indexname = 'kyoto'
   suffix = 'kct'
 
   def __init__(self, kyotopath, hashclass, lock=None):
@@ -512,6 +514,19 @@ class KyotoIndex(MultiOpenMixin):
 
 def KyotoDataDirMapping(dirpath, rollover=None):
   return DataDirMapping(dirpath, indexclass=KyotoIndex, rollover=rollover)
+
+MAPPING_BY_NAME = {}
+
+def register_mapping(indexname, klass):
+  global MAPPING_BY_NAME
+  if indexname in MAPPING_BY_NAME:
+    raise ValueError(
+            'cannot register DataDirMapping class %s: indexname %r already registered to %s'
+            % (klass, indexname, MAPPING_BY_NAME[indexname]))
+  MAPPING_BY_NAME[indexname] = klass
+
+register_mapping('gdbm', GDBMDataDirMapping)
+register_mapping('kyoto', KyotoDataDirMapping)
 
 if __name__ == '__main__':
   import cs.venti.datafile_tests
