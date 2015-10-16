@@ -309,6 +309,18 @@ class DataDirMapping(MultiOpenMixin):
       self._indices = {}
     self.datadir.close()
 
+  def reindex(self, hashclass=None):
+    ''' Rescan all the data files, update the index.
+    '''
+    if hashclass is None:
+      hashclass = defaults.S.hashclass
+    I = self._index(hashclass)
+    for n, offset, data in self.datadir.scan():
+      hashcode = hashclass.from_data(data)
+      if hashcode not in I:
+        X("add %s => %d, %d", hashcode, n, offset)
+        I[hashcode] = n, offset
+
   def _indexpath(self, hashname, suffix):
     ''' Return the pathname for a specific type of index.
     '''
