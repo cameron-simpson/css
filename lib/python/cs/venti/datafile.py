@@ -369,7 +369,7 @@ class DataDirMapping(MultiOpenMixin):
     return self._index(hashclass).first()
 
   def iter_keys(self, hashclass=None, hashcode=None, reverse=False, after=False):
-    ''' Generator yielding keys starting with optional `hashcode`.
+    ''' Generator yielding the hashcodes from the database in order starting with optional `hashcode`.
         `hashclass`: specify the hashcode type, default from defaults.S
         `hashcode`: the first hashcode; if missing or None, iteration
                     starts with the first key in the index
@@ -478,7 +478,7 @@ class KyotoIndex(MultiOpenMixin):
     cursor.disable()
 
   def iter_keys(self, hashcode=None, reverse=False, after=False):
-    ''' Generator yielding keys starting with optional `hashcode`.
+    ''' Generator yielding the keys from the index in order starting with optional `hashcode`.
         `hashcode`: the first hashcode; if missing or None, iteration
                     starts with the first key in the index
         `reverse`: iterate backwards if true, otherwise forwards
