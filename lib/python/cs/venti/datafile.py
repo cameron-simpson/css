@@ -275,14 +275,16 @@ class DataDirMapping(MultiOpenMixin):
   ''' Access to a DataDir as a mapping by using a dbm index per hash type.
   '''
 
-  def __init__(self, dirpath, indexclass=None, rollover=None):
+  def __init__(self, dirpath, indexclass=None, rollover=None, hashclass=None):
     ''' Initialise this DataDirMapping.
         `dirpath`: if a str the path to the DataDir, otherwise an existing DataDir
         `indexclass`: class implementing the dbm, initialised with the path
                       to the dbm file; if this is a str it will be looked up
                       in INDEX_BY_NAME
         `rollover`: if `dirpath` is a str, this is passed in to the DataDir constructor
-
+        `hashclass`: the default hashclass for operations needing one if the
+                     default Store does not dictate a hashclass; defaults to
+                     cs.venti.DEFAULT_HASHCLASS
         The indexclass is normally a mapping wrapper for some kind of DBM
         file stored in the DataDir. Importantly, the __getitem__
     '''
@@ -294,6 +296,11 @@ class DataDirMapping(MultiOpenMixin):
       datadir = dirpath
     if indexclass is None:
       indexclass = GDBMIndex
+    elif isinstance(indexclass, str):
+      indexclass = INDEX_BY_NAME[indexclass]
+    if hashclass is None:
+      hashclass = DEFAULT_HASHCLASS
+    self._default_hashclass = hashclass
     # we will use the same lock as the underlying DataDir
     MultiOpenMixin.__init__(self, lock=datadir._lock)
     self.datadir = datadir
@@ -311,11 +318,28 @@ class DataDirMapping(MultiOpenMixin):
       self._indices = {}
     self.datadir.close()
 
+  @property
+  def default_hashclass(self):
+    ''' The default hashclass.
+        If there is a prevailing Store, use its hashclass otherwise
+        self._default_hashclass.
+    '''
+    S = defaults.S
+    if S is None:
+      hashclass = self._default_hashclass
+    else:
+      hashclass = S.hashclass
+    return hashclass
+
+  @property
+  def dirpath(self):
+    return self.datadir.dirpath
+
   def reindex(self, hashclass=None):
     ''' Rescan all the data files, update the index.
     '''
     if hashclass is None:
-      hashclass = defaults.S.hashclass
+      hashclass = self.defaults_hashclass
     I = self._index(hashclass)
     for n, offset, data in self.datadir.scan():
       hashcode = hashclass.from_data(data)
