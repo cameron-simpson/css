@@ -278,7 +278,9 @@ class DataDirMapping(MultiOpenMixin):
   def __init__(self, dirpath, indexclass=None, rollover=None):
     ''' Initialise this DataDirMapping.
         `dirpath`: if a str the path to the DataDir, otherwise an existing DataDir
-        `indexclass`: class implementing the dbm, initialised with the path to the dbm file
+        `indexclass`: class implementing the dbm, initialised with the path
+                      to the dbm file; if this is a str it will be looked up
+                      in INDEX_BY_NAME
         `rollover`: if `dirpath` is a str, this is passed in to the DataDir constructor
 
         The indexclass is normally a mapping wrapper for some kind of DBM
