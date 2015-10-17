@@ -488,6 +488,25 @@ class GDBMIndex(MultiOpenMixin):
   def __setitem__(self, hashcode, value):
     self._gdbm[hashcode] = encode_index_entry(*value)
 
+  def iter_keys(self, hashcode=None, reverse=False, after=False):
+    ''' Generator yielding the keys from the index, unordered
+        `hashcode`: UNSUPPORTED: the first hashcode; if missing or None,
+                    iteration starts with the first key in the index
+        `reverse`: UNSUPPORTED: iterate backwards if true, otherwise forwards
+        `after`: commence iteration after the first hashcode
+    '''
+    if hashcode is not None:
+      raise ValueError("iteration from specific hashcode unsupported")
+    if reverse:
+      raise ValueError("reverse iteration unsupported")
+    if after:
+      raise ValueError("after not supported (meaningless, since no starting hashcode support)")
+    first = True
+    for hashbytes in self._gdbm.keys():
+      if not first or not after:
+        yield self._hashclass.from_hashbytes(hashbytes)
+      fisrt = False
+
 def GDBMDataDirMapping(dirpath, rollover=None):
   return DataDirMapping(dirpath, indexclass=GDBMIndex, rollover=rollover)
 
