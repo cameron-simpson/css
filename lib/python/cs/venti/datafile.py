@@ -357,10 +357,16 @@ class DataDirMapping(MultiOpenMixin):
         X("add %s => %d, %d", hashcode, n, offset)
         I[hashcode] = n, offset
 
+  @staticmethod
+  def _indexfilename(hashname, suffix):
+    ''' Compute the filename part of an indexfile from `hashname` and `suffix`.
+    '''
+    return 'index-' + hashname + '.' + suffix
+
   def _indexpath(self, hashname, suffix):
     ''' Return the pathname for a specific type of index.
     '''
-    return self.datadir.pathto('index-' + hashname + '.' + suffix)
+    return self.datadir.pathto(self._indexfilename(hashname, suffix))
 
   def _index(self, hashclass):
     ''' Obtain the index to which to store/access this hashcode class.
