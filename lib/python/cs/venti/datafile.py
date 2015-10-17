@@ -406,6 +406,9 @@ class DataDirMapping(MultiOpenMixin):
       n, offset = self.datadir.add(data)
       index[hashcode] = n, offset
 
+  def add(self, data):
+    self[self.default_hashclass.from_data(data)] = data
+
   @locked
   def flush(self):
     self.datadir.flush()
