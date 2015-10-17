@@ -15,13 +15,13 @@ from signal import signal, SIGINT, SIGHUP
 from cs.debug import ifdebug, dump_debug_threads
 from cs.lex import hexify
 import cs.logutils
-from cs.logutils import Pfx, exception, error, warning, debug, setup_logging, logTo, D, X, nl
+from cs.logutils import Pfx, exception, error, warning, debug, setup_logging, logTo, X, nl
 from . import totext, fromtext, defaults
 from .archive import CopyModes, update_archive, toc_archive, last_Dirent, copy_out_dir
 from .block import Block, IndirectBlock, dump_block
 from .cache import CacheStore, MemoryCacheStore
 from .debug import dump_Dirent
-from .datafile import DATADIRMAPPING_BY_NAME
+from .datafile import DataDirMapping_from_spec
 from .dir import Dir
 from .hash import DEFAULT_HASHCLASS, HASHCLASS_BY_NAME
 from .paths import dirent_dir, dirent_file, dirent_resolve, resolve
@@ -36,8 +36,10 @@ def main(argv):
     %s [options...] ar tar-options paths..
     %s [options...] cat filerefs...
     %s [options...] catblock [-i] hashcodes...
+    %s [options...] datadir [indextype:[hashname:]]/dirpath index
+    %s [options...] datadir [indextype:[hashname:]]/dirpath pull other-datadirs...
+    %s [options...] datadir [indextype:[hashname:]]/dirpath push other-datadir
     %s [options...] dump filerefs
-    %s [options...] index datadir indextype[:hashname]
     %s [options...] listen {-|host:port}
     %s [options...] ls [-R] dirrefs...
     %s [options...] mount dirref mountpoint
@@ -55,7 +57,7 @@ def main(argv):
                     |sh-command   StreamStore via sh-command
       -q          Quiet; not verbose. Default if stdout is not a tty.
       -v          Verbose; not quiet. Default it stdout is a tty.
-''' % (cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd)
+''' % (cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd)
 
   badopts = False
 
@@ -123,7 +125,7 @@ def main(argv):
         error("unknown operation \"%s\"", op)
         badopts = True
       else:
-        if op in ("scan", "index", "init"):
+        if op in ("scan", "datadir"):
           # run without a context store
           try:
             xit = op_func(args)
@@ -311,6 +313,45 @@ def cmd_catblock(args, verbose=None, log=None):
       sys.stdout.write(subB.data)
   return 0
 
+def cmd_datadir(args, verbose=None, log=None):
+  ''' Perform various operations on DataDirs.
+  '''
+  xit = 1
+  if not args:
+    raise GetoptError("missing datadir spec")
+  datadir_spec = args.pop(0)
+  with Pfx(datadir_spec):
+    D = DataDirMapping_from_spec(datadir_spec)
+    if not args:
+      raise GetoptError("missing subop")
+    subop = args.pop(0)
+    with Pfx(subop):
+      if subop == 'index':
+        if args:
+          raise GetoptError("extra arguments: %s" % (' '.join(args),))
+        D.reindex()
+      elif subop == 'pull':
+        if not args:
+          raise GetoptError("missing other-datadirs")
+        else:
+          for other_spec in args:
+            with Pfx(other_spec):
+              Dother = DataDirMapping_from_spec(other_spec)
+              D.merge_other(Dother)
+      elif subop == 'push':
+        if not args:
+          raise GetoptError("missing other-datadir")
+        else:
+          other_spec = args.pop(0)
+          if args:
+            raise GetoptError("extra arguments after other_spec: %s" % (' '.join(args),))
+          with Pfx(other_spec):
+            Dother = DataDirMapping_from_spec(other_spec)
+            Dother.merge_other(D)
+      else:
+        raise GetoptError('unrecognised subop')
+  return xit
+
 def cmd_dump(args, verbose=None, log=None):
   ''' Do a Block dump of the filerefs.
   '''
@@ -318,34 +359,6 @@ def cmd_dump(args, verbose=None, log=None):
     raise GetoptError("missing filerefs")
   for path in args:
     dump(path)
-  return 0
-
-def cmd_index(args, verbose=None, log=None):
-  ''' Update the index of a DataDir.
-  '''
-  if not args:
-    raise GetoptError("missing datadir path")
-  dirpath = args.pop(0)
-  if not args:
-    raise GetoptError("missing index type")
-  indextype = args.pop(0)
-  if ':' in indextype:
-    indextype, hashname = indextype.split(':')
-  else:
-    hashname = DEFAULT_HASHCLASS.HASHNAME
-  if args:
-    raise GetoptError("extra arguments after indextype:hashname: %s"
-                      % (' '.join(args),))
-  try:
-    mappingclass = DATADIRMAPPING_BY_NAME[indextype]
-  except KeyError:
-    raise GetoptError('unknown indextype: %r' % (indextype,))
-  try:
-    hashclass = HASHCLASS_BY_NAME[hashname]
-  except KeyError:
-    raise GetoptError('unknown hashname: %r' % (hashname,))
-  D = mappingclass(dirpath)
-  D.reindex(hashclass=hashclass)
   return 0
 
 def cmd_init(args, verbose=None, log=None):
