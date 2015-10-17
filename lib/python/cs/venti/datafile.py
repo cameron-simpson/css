@@ -308,6 +308,15 @@ class DataDirMapping(MultiOpenMixin):
     self.indexclass = indexclass
     self._indices = {}  # map hash name to instance of indexclass
 
+  def spec(self):
+    ''' Return a datadir_spec for this DataDirMapping.
+    '''
+    return ':'.join( (self.indexclass.indexname,
+                      self.default_hashclass.HASHNAME,
+                      self.dirpath) )
+
+  __str__ = spec
+
   def startup(self):
     self.datadir.open()
     pass
