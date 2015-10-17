@@ -400,6 +400,7 @@ class DataDirMapping(MultiOpenMixin):
 
   def __setitem__(self, hashcode, data):
     ''' Store the supplied `data` indexed by `hashcode`.
+        If the hashcode is already known, do not both storing the `data`.
     '''
     index = self._index(hashcode.__class__)
     if hashcode not in index:
