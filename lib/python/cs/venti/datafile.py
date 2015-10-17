@@ -349,7 +349,7 @@ class DataDirMapping(MultiOpenMixin):
     ''' Rescan all the data files, update the index.
     '''
     if hashclass is None:
-      hashclass = self.defaults_hashclass
+      hashclass = self.default_hashclass
     I = self._index(hashclass)
     for n, offset, data in self.datadir.scan():
       hashcode = hashclass.from_data(data)
@@ -440,7 +440,7 @@ class DataDirMapping(MultiOpenMixin):
         `after`: commence iteration after the first hashcode
     '''
     if hashclass is None:
-      hashclass = defaults.S
+      hashclass = self.default_hashclass
     return self._index(hashclass).iter_keys(hashcode=hashcode,
                                             reverse=reverse,
                                             after=after)
