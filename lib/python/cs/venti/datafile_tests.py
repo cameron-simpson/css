@@ -5,16 +5,17 @@
 #
 
 import os
+from os.path import abspath
 import sys
 import random
 import shutil
 import tempfile
 import unittest
 from unittest import TestCase, skip
-from cs.logutils import D, X
+from cs.logutils import X
 from cs.randutils import rand0, randblock
 from .datafile import DataFile, GDBMDataDirMapping, KyotoDataDirMapping, \
-                encode_index_entry, decode_index_entry
+                DataDirMapping_from_spec, encode_index_entry, decode_index_entry
 from .hash import DEFAULT_HASHCLASS
 
 # arbitrary limit
@@ -76,7 +77,7 @@ class _TestDataDirMapping(TestCase):
     if mapping_class is None:
       raise unittest.SkipTest("MAPPING_CLASS is None, skipping TestCase")
     random.seed()
-    self.pathname = tempfile.mkdtemp(prefix="cs.venti.datafile.testdir", suffix=".dir", dir='.')
+    self.pathname = abspath(tempfile.mkdtemp(prefix="cs.venti.datafile.testdir", suffix=".dir", dir='.'))
     self.datadir = mapping_class(self.pathname, rollover=200000)
 
   def tearDown(self):
@@ -93,7 +94,21 @@ class _TestDataDirMapping(TestCase):
       self.assertEqual(rand_n, n)
       self.assertEqual(rand_offset, offset)
 
-  def test001randomblocks(self):
+  def test001datadir_spec(self):
+    # force creation of index file
+    with self.datadir:
+      self.datadir.add(b'')
+    datadir_spec = self.datadir.spec()
+    D2 = DataDirMapping_from_spec(datadir_spec)
+    self.assertEqual(datadir_spec, D2.spec())
+    D2 = DataDirMapping_from_spec(self.datadir.dirpath)
+    self.assertEqual(datadir_spec, D2.spec())
+    for indexname in 'gdbm', 'kyoto':
+      for hashname in 'sha1',:
+        spec = '%s:%s:%s' % (indexname, hashname, self.datadir.dirpath)
+        D3 = DataDirMapping_from_spec(spec)
+
+  def test002randomblocks(self):
     ''' Save random blocks, retrieve in random order.
     '''
     hashclass = DEFAULT_HASHCLASS
@@ -130,8 +145,12 @@ class _TestDataDirMapping(TestCase):
           odata = by_hash[hashcode]
           data = D[hashcode]
           self.assertEqual(data, odata)
+      datadir_spec = D.spec()
+    D2 = DataDirMapping_from_spec(datadir_spec)
+    self.assertEqual(datadir_spec, D2.spec())
     # reopen the DataDir
     with self.__class__.MAPPING_CLASS(self.pathname, rollover=200000) as D:
+      self.assertEqual(datadir_spec, D.spec())
       hashcodes = list(by_hash.keys())
       random.shuffle(hashcodes)
       for n, hashcode in enumerate(hashcodes):
