@@ -66,6 +66,13 @@ class _Hash(bytes):
       raise ValueError("expected %d bytes, received %d: %r" % (cls.HASHLEN, len(hashbytes), hashbytes))
     return cls(hashbytes)
 
+  @classmethod
+  def from_data(cls, data):
+    ''' Factory function returning a _Hash object from a data block.
+    '''
+    hashbytes = cls.HASHFUNC(data).digest()
+    return cls.from_hashbytes(hashbytes)
+
   @property
   def hashfunc(self):
     ''' Convenient hook to this Hash's class' .from_data method.
@@ -73,18 +80,12 @@ class _Hash(bytes):
     return self.__class__.from_data
 
 class Hash_SHA1(_Hash):
+  HASHFUNC = sha1
   HASHNAME = 'sha1'
   HASHLEN = 20
   HASHENUM = HASH_SHA1_T
   HASHENUM_BS = put_bs(HASHENUM)
   HASHLEN_ENCODED = len(HASHENUM_BS) + HASHLEN
-
-  @classmethod
-  def from_data(cls, data):
-    ''' Factory function returning a Hash_SHA1 object for a data block.
-    '''
-    hashcode = sha1(data).digest()
-    return cls.from_hashbytes(hashcode)
 
 HASHCLASS_BY_NAME = {}
 
