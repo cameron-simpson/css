@@ -36,8 +36,10 @@ def main(argv):
     %s [options...] ar tar-options paths..
     %s [options...] cat filerefs...
     %s [options...] catblock [-i] hashcodes...
+    %s [options...] datadir [indextype:[hashname:]]/dirpath index
+    %s [options...] datadir [indextype:[hashname:]]/dirpath pull other-datadirs...
+    %s [options...] datadir [indextype:[hashname:]]/dirpath push other-datadir
     %s [options...] dump filerefs
-    %s [options...] index datadir indextype[:hashname]
     %s [options...] listen {-|host:port}
     %s [options...] ls [-R] dirrefs...
     %s [options...] mount dirref mountpoint
@@ -55,7 +57,32 @@ def main(argv):
                     |sh-command   StreamStore via sh-command
       -q          Quiet; not verbose. Default if stdout is not a tty.
       -v          Verbose; not quiet. Default it stdout is a tty.
-''' % (cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd)
+''' % (cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd)
+
+def parse_datadirpath(datadir_spec):
+  ''' 
+  '''
+  indextype = None
+  hashname = None
+  if not datadir_spec.startswith('/'):
+    indextype, datadir_spec = datadir_spec.split(':', 1)
+    if indextype not in DATADIRMAPPING_BY_NAME:
+      raise ValueError("invalid indextype: %r (I know %r)"
+                       % (indextype,), sorted(DATADIRMAPPING_BY_NAME.keys()))
+  if not datadir_spec.startswith('/'):
+    hashname, datadir_spec = datadir_spec.split(':', 1)
+    if hashname not in HASHCLASS_BY_NAME:
+      raise ValueError("invalid hashname: %r (I know %r)"
+                       % (hashname, sorted(HASHCLASS_BY_NAME.keys())))
+  dirpath = datadir_spec
+  if not os.path.isdir(dirpath):
+    raise ValueError("not a directory: %r" % (dirpath,))
+  if indextype is None:
+    for 
+    for name in os.listdir(dirpath
+  if hashname is None:
+    hashname = DEFAULT_HASHCLASS
+  return indextype, hashname, dirpath
 
   badopts = False
 
@@ -123,7 +150,7 @@ def main(argv):
         error("unknown operation \"%s\"", op)
         badopts = True
       else:
-        if op in ("scan", "index", "init"):
+        if op in ("scan", "datadir"):
           # run without a context store
           try:
             xit = op_func(args)
@@ -311,17 +338,8 @@ def cmd_catblock(args, verbose=None, log=None):
       sys.stdout.write(subB.data)
   return 0
 
-def cmd_dump(args, verbose=None, log=None):
-  ''' Do a Block dump of the filerefs.
-  '''
-  if not args:
-    raise GetoptError("missing filerefs")
-  for path in args:
-    dump(path)
-  return 0
-
-def cmd_index(args, verbose=None, log=None):
-  ''' Update the index of a DataDir.
+def cmd_datadir(args, verbose=None, log=None):
+  ''' Perform various operations on DataDirs.
   '''
   if not args:
     raise GetoptError("missing datadir path")
@@ -346,6 +364,15 @@ def cmd_index(args, verbose=None, log=None):
     raise GetoptError('unknown hashname: %r' % (hashname,))
   D = mappingclass(dirpath)
   D.reindex(hashclass=hashclass)
+  return 0
+
+def cmd_dump(args, verbose=None, log=None):
+  ''' Do a Block dump of the filerefs.
+  '''
+  if not args:
+    raise GetoptError("missing filerefs")
+  for path in args:
+    dump(path)
   return 0
 
 def cmd_init(args, verbose=None, log=None):

@@ -326,6 +326,7 @@ class DataDirMapping(MultiOpenMixin):
     '''
     return self.datadir.pathto('index-' + hashname + '.' + suffix)
 
+  def has_index ...
   def _index(self, hashclass):
     ''' Obtain the index to which to store/access this hashcode class.
     '''
@@ -395,6 +396,8 @@ class DataDirMapping(MultiOpenMixin):
                                             after=after)
 
   def merge_other(self, other, hashcodes=None):
+    ''' Iterate over the hashcodes in `other` and fetch anything we don't have.
+    '''
     if hashcodes is None:
       hashcodes = other.iter_keys()
     for hashcode in hashcodes:
