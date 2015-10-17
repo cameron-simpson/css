@@ -395,6 +395,8 @@ class DataDirMapping(MultiOpenMixin):
                                             after=after)
 
   def merge_other(self, other, hashcodes=None):
+    ''' Iterate over the hashcodes in `other` and fetch anything we don't have.
+    '''
     if hashcodes is None:
       hashcodes = other.iter_keys()
     for hashcode in hashcodes:
