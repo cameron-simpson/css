@@ -406,8 +406,13 @@ class DataDirMapping(MultiOpenMixin):
       n, offset = self.datadir.add(data)
       index[hashcode] = n, offset
 
-  def add(self, data):
-    self[self.default_hashclass.from_data(data)] = data
+  def add(self, data, hashclass=None):
+    ''' Add a data chunk using the supplied `hashclass`.
+        If `hashclass` is missing or None, use self.default_hashclass.
+    '''
+    if hashclass is None:
+      hashclass = self.default_hashclass
+    self[hashclass.from_data(data)] = data
 
   @locked
   def flush(self):
