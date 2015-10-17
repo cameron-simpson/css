@@ -280,7 +280,7 @@ class DataDirMapping(MultiOpenMixin):
         `dirpath`: if a str the path to the DataDir, otherwise an existing DataDir
         `indexclass`: class implementing the dbm, initialised with the path
                       to the dbm file; if this is a str it will be looked up
-                      in INDEX_BY_NAME
+                      in INDEXCLASS_BY_NAME
         `rollover`: if `dirpath` is a str, this is passed in to the DataDir constructor
         `hashclass`: the default hashclass for operations needing one if the
                      default Store does not dictate a hashclass; defaults to
@@ -288,6 +288,7 @@ class DataDirMapping(MultiOpenMixin):
         The indexclass is normally a mapping wrapper for some kind of DBM
         file stored in the DataDir. Importantly, the __getitem__
     '''
+    global INDEXCLASS_BY_NAME
     if isinstance(dirpath, str):
       datadir = DataDir(dirpath, rollover=rollover)
     else:
@@ -297,7 +298,7 @@ class DataDirMapping(MultiOpenMixin):
     if indexclass is None:
       indexclass = GDBMIndex
     elif isinstance(indexclass, str):
-      indexclass = INDEX_BY_NAME[indexclass]
+      indexclass = INDEXCLASS_BY_NAME[indexclass]
     if hashclass is None:
       hashclass = DEFAULT_HASHCLASS
     self._default_hashclass = hashclass
@@ -551,18 +552,63 @@ class KyotoIndex(MultiOpenMixin):
 def KyotoDataDirMapping(dirpath, rollover=None):
   return DataDirMapping(dirpath, indexclass=KyotoIndex, rollover=rollover)
 
-DATADIRMAPPING_BY_NAME = {}
+INDEXCLASS_BY_NAME = {}
 
-def register_mapping(indexname, klass):
-  global DATADIRMAPPING_BY_NAME
-  if indexname in DATADIRMAPPING_BY_NAME:
+def register_index(indexname, indexclass):
+  global INDEXCLASS_BY_NAME
+  if indexname in INDEXCLASS_BY_NAME:
     raise ValueError(
-            'cannot register DataDirMapping class %s: indexname %r already registered to %s'
-            % (klass, indexname, DATADIRMAPPING_BY_NAME[indexname]))
-  DATADIRMAPPING_BY_NAME[indexname] = klass
+            'cannot register index class %s: indexname %r already registered to %s'
+            % (indexclass, indexname, INDEXCLASS_BY_NAME[indexname]))
+  INDEXCLASS_BY_NAME[indexname] = indexclass
 
-register_mapping('gdbm', GDBMDataDirMapping)
-register_mapping('kyoto', KyotoDataDirMapping)
+register_index('gdbm', GDBMIndex)
+register_index('kyoto', KyotoIndex)
+
+DEFAULT_INDEXCLASS = GDBMIndex
+
+def DataDirMapping_from_spec(datadir_spec, **kw):
+  ''' Accept `datadir_spec` of the form [indextype:[hashname:]]/dirpath and return a DataDirMapping.
+  '''
+  global INDEXCLASS_BY_NAME, DEFAULT_HASHCLASS, HASHCLASS_BY_NAME
+  with Pfx(datadir_spec):
+    indexclass = None
+    hashname = None
+    # leading indextype
+    if not datadir_spec.startswith('/'):
+      indexname, datadir_spec = datadir_spec.split(':', 1)
+      try:
+        indexclass = INDEXCLASS_BY_NAME[indexname]
+      except KeyError:
+        raise ValueError("invalid indextype: %r (I know %r)"
+                         % (indexname,), sorted(INDEXCLASS_BY_NAME.keys()))
+    if not datadir_spec.startswith('/'):
+      hashname, datadir_spec = datadir_spec.split(':', 1)
+      try:
+        hashclass = HASHCLASS_BY_NAME[hashname]
+      except KeyError:
+        raise ValueError("invalid hashname: %r (I know %r)"
+                         % (hashname, sorted(HASHCLASS_BY_NAME.keys())))
+    else:
+      hashclass = DEFAULT_HASHCLASS
+      hashname = hashclass.HASHNAME
+    dirpath = datadir_spec
+    if not os.path.isdir(dirpath):
+      raise ValueError("not a directory: %r" % (dirpath,))
+    # no indextype yet? look for an index file
+    if indexclass is None:
+      found = False
+      for indexname, indexclass in INDEXCLASS_BY_NAME.items():
+        suffix = indexclass.suffix
+        indexfilename = DataDirMapping._indexfilename(hashname, suffix)
+        entries = list(os.listdir(dirpath))
+        if indexfilename in entries:
+          found = True
+          break
+        if not found:
+          indexclass = DEFAULT_INDEXCLASS
+          warning("no index file found, using %s (EMPTY)", indexclass)
+    return DataDirMapping(dirpath, indexclass=indexclass, **kw)
 
 if __name__ == '__main__':
   import cs.venti.datafile_tests
