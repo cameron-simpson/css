@@ -261,14 +261,6 @@ def Store(store_spec):
       raise ValueError("bad spec ssh:%s, expect ssh://target/remote-spec" % (spec,))
   raise ValueError("unsupported store scheme: %s" % (scheme,))
 
-def pullFromSerial(S1, S2):
-  asked = 0
-  for h in S2.keys():
-    asked += 1
-    info("%d %s" % (asked, totext(h)))
-    if not S1.contains(h):
-      S1.store(S2.fetch(h))
-
 class MappingStore(BasicStoreSync):
   ''' A Store built on an arbitrary mapping object.
   '''
