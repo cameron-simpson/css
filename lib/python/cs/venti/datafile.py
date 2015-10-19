@@ -488,12 +488,13 @@ class GDBMIndex(MultiOpenMixin):
   def __setitem__(self, hashcode, value):
     self._gdbm[hashcode] = encode_index_entry(*value)
 
-  def iter_keys(self, hashcode=None, reverse=None, after=False):
+  def iter_keys(self, hashcode=None, reverse=None, after=False, length=None):
     ''' Generator yielding the keys from the index, unordered
         `hashcode`: must be missing or None; GDBMs cannot iterate
                     from a specific hashcode
         `reverse`: must be missing or None; GDBMs are unordered
         `after`: commence iteration after the first hashcode
+        `length`: if not None, maximum number of hashcodes to yield
     '''
     if hashcode is not None:
       raise ValueError("iteration from specific hashcode unsupported")
@@ -501,11 +502,16 @@ class GDBMIndex(MultiOpenMixin):
       raise ValueError("reverse must be None (unordered)")
     if after:
       raise ValueError("after not supported (meaningless, since no starting hashcode support)")
+    if length is not None and length < 1:
+      raise ValueError("length (%d) must be >= 1" % (length,))
     first = True
     for hashbytes in self._gdbm.keys():
       if not first or not after:
         yield self._hashclass.from_hashbytes(hashbytes)
-      fisrt = False
+        if length <= 1:
+          break
+        length -= 1
+      first = False
 
 def GDBMDataDirMapping(dirpath, rollover=None):
   return DataDirMapping(dirpath, indexclass=GDBMIndex, rollover=rollover)
@@ -571,18 +577,22 @@ class KyotoIndex(MultiOpenMixin):
 
     cursor.disable()
 
-  def iter_keys(self, hashcode=None, reverse=None, after=False):
+  def iter_keys(self, hashcode=None, reverse=None, after=False, length=None):
     ''' Generator yielding the keys from the index in order starting with optional `hashcode`.
         `hashcode`: the first hashcode; if missing or None, iteration
                     starts with the first key in the index
         `reverse`: iterate backwards if true, otherwise forwards
         `after`: commence iteration after the first hashcode
+        `length`: if not None, maximum number of hashcodes to yield
     '''
+    if length is not None and length < 1:
+      raise ValueError("length (%d) must be >= 1" % (length,))
     cursor = self._kyoto.cursor()
     if cursor.jump(hashcode):
       if not after:
         yield self._hashclass.from_hashbytes(cursor.get_key())
-      while True:
+        length -= 1
+      while length >= 1:
         if reverse:
           if not cursor.step_back():
             break
@@ -590,6 +600,9 @@ class KyotoIndex(MultiOpenMixin):
           if not cursor.step():
             break
         yield self._hashclass.from_hashbytes(cursor.get_key())
+        if length <= 1:
+          break
+        length -= 1
     cursor.disable()
 
 def KyotoDataDirMapping(dirpath, rollover=None):
