@@ -431,7 +431,7 @@ class DataDirMapping(MultiOpenMixin):
       hashclass = defaults.S
     return self._index(hashclass).first()
 
-  def iter_keys(self, hashclass=None, hashcode=None, reverse=None, after=False, length=None):
+  def hashcodes(self, hashclass=None, hashcode=None, reverse=None, after=False, length=None):
     ''' Generator yielding the hashcodes from the database in order starting with optional `hashcode`.
         `hashclass`: specify the hashcode type, default from defaults.S
         `hashcode`: the first hashcode; if missing or None, iteration
@@ -442,7 +442,7 @@ class DataDirMapping(MultiOpenMixin):
     '''
     if hashclass is None:
       hashclass = self.default_hashclass
-    return self._index(hashclass).iter_keys(hashcode=hashcode,
+    return self._index(hashclass).hashcodes(hashcode=hashcode,
                                             reverse=reverse,
                                             after=after,
                                             length=length)
@@ -451,7 +451,7 @@ class DataDirMapping(MultiOpenMixin):
     ''' Iterate over the hashcodes in `other` and fetch anything we don't have.
     '''
     if hashcodes is None:
-      hashcodes = other.iter_keys()
+      hashcodes = other.hashcodes()
     for hashcode in hashcodes:
       if hashcode not in self:
         X("pull %s", hashcode)
@@ -490,7 +490,7 @@ class GDBMIndex(MultiOpenMixin):
   def __setitem__(self, hashcode, value):
     self._gdbm[hashcode] = encode_index_entry(*value)
 
-  def iter_keys(self, hashcode=None, reverse=None, after=False, length=None):
+  def hashcodes(self, hashcode=None, reverse=None, after=False, length=None):
     ''' Generator yielding the keys from the index, unordered
         `hashcode`: must be missing or None; GDBMs cannot iterate
                     from a specific hashcode
@@ -579,7 +579,7 @@ class KyotoIndex(MultiOpenMixin):
 
     cursor.disable()
 
-  def iter_keys(self, hashcode=None, reverse=None, after=False, length=None):
+  def hashcodes(self, hashcode=None, reverse=None, after=False, length=None):
     ''' Generator yielding the keys from the index in order starting with optional `hashcode`.
         `hashcode`: the first hashcode; if missing or None, iteration
                     starts with the first key in the index

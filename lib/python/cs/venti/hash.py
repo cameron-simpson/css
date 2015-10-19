@@ -124,8 +124,8 @@ class HashCodeUtilsMixin(object):
     final_hashcode_list = [None]
     def scan_hashcodes():
       # using reverse=False to request ordered hashcodes
-      # should raise an exception if iter_keys cannot return ordered hashcodes
-      for hashcode in self.iter_keys(hashcode=hashcode,
+      # should raise an exception if hashcodes cannot return ordered hashcodes
+      for hashcode in self.hashcodes(hashcode=hashcode,
                                      hashclass=hashclass,
                                      reverse=False,
                                      length=length):
