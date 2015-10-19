@@ -23,7 +23,7 @@ def decode(bs, offset=0):
     raise ValueError("unsupported hashenum %d", hashenum)
   return hashcls._decode(bs, offset)
 
-def hashcodes_checksum(hashcodes):
+def checksum(hashcodes):
   ''' Compute a Hash_SHA1 from the bytes of the supplied `hashcodes`.
       This underlies the mechanism for comparing remote Stores.
   '''
@@ -110,6 +110,29 @@ def register_hashclass(klass):
 register_hashclass(Hash_SHA1)
 
 DEFAULT_HASHCLASS = Hash_SHA1
+
+class HashCodeUtilsMixin(object):
+  ''' Utility methods for classes which use hashcodes as keys.
+  '''
+
+  def hashcodes_checksum(self, hashcode, length, hashclass=None):
+    ''' Collate `length` hashcodes in order from `hashcode` onward, return checksum hashcode and final hashcode covered.
+        This is to be used for scanning remote Stores for differences.
+    '''
+    if length < 1:
+      raise ValueError("length must be >=1 (%d)" % (length,))
+    final_hashcode_list = [None]
+    def scan_hashcodes():
+      # using reverse=False to request ordered hashcodes
+      # should raise an exception if iter_keys cannot return ordered hashcodes
+      for hashcode in self.iter_keys(hashcode=hashcode,
+                                     hashclass=hashclass,
+                                     reverse=False,
+                                     length=length):
+        yield hashcode
+      final_hashcode_list[0] = hashcode
+    H = checksum(scan_hashcodes())
+    return H, final_hashcode_list[0]
 
 if __name__ == '__main__':
   import cs.venti.hash_tests
