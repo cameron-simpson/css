@@ -431,7 +431,7 @@ class DataDirMapping(MultiOpenMixin):
       hashclass = defaults.S
     return self._index(hashclass).first()
 
-  def iter_keys(self, hashclass=None, hashcode=None, reverse=False, after=False):
+  def iter_keys(self, hashclass=None, hashcode=None, reverse=None, after=False):
     ''' Generator yielding the hashcodes from the database in order starting with optional `hashcode`.
         `hashclass`: specify the hashcode type, default from defaults.S
         `hashcode`: the first hashcode; if missing or None, iteration
@@ -488,17 +488,17 @@ class GDBMIndex(MultiOpenMixin):
   def __setitem__(self, hashcode, value):
     self._gdbm[hashcode] = encode_index_entry(*value)
 
-  def iter_keys(self, hashcode=None, reverse=False, after=False):
+  def iter_keys(self, hashcode=None, reverse=None, after=False):
     ''' Generator yielding the keys from the index, unordered
-        `hashcode`: UNSUPPORTED: the first hashcode; if missing or None,
-                    iteration starts with the first key in the index
-        `reverse`: UNSUPPORTED: iterate backwards if true, otherwise forwards
+        `hashcode`: must be missing or None; GDBMs cannot iterate
+                    from a specific hashcode
+        `reverse`: must be missing or None; GDBMs are unordered
         `after`: commence iteration after the first hashcode
     '''
     if hashcode is not None:
       raise ValueError("iteration from specific hashcode unsupported")
-    if reverse:
-      raise ValueError("reverse iteration unsupported")
+    if reverse is not None:
+      raise ValueError("reverse must be None (unordered)")
     if after:
       raise ValueError("after not supported (meaningless, since no starting hashcode support)")
     first = True
@@ -571,7 +571,7 @@ class KyotoIndex(MultiOpenMixin):
 
     cursor.disable()
 
-  def iter_keys(self, hashcode=None, reverse=False, after=False):
+  def iter_keys(self, hashcode=None, reverse=None, after=False):
     ''' Generator yielding the keys from the index in order starting with optional `hashcode`.
         `hashcode`: the first hashcode; if missing or None, iteration
                     starts with the first key in the index
