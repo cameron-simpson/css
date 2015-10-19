@@ -431,19 +431,21 @@ class DataDirMapping(MultiOpenMixin):
       hashclass = defaults.S
     return self._index(hashclass).first()
 
-  def iter_keys(self, hashclass=None, hashcode=None, reverse=None, after=False):
+  def iter_keys(self, hashclass=None, hashcode=None, reverse=None, after=False, length=None):
     ''' Generator yielding the hashcodes from the database in order starting with optional `hashcode`.
         `hashclass`: specify the hashcode type, default from defaults.S
         `hashcode`: the first hashcode; if missing or None, iteration
                     starts with the first key in the index
         `reverse`: iterate backwards if true, otherwise forwards
         `after`: commence iteration after the first hashcode
+        `length`: if not None, the maximum number of hashcodes to yield
     '''
     if hashclass is None:
       hashclass = self.default_hashclass
     return self._index(hashclass).iter_keys(hashcode=hashcode,
                                             reverse=reverse,
-                                            after=after)
+                                            after=after,
+                                            length=length)
 
   def merge_other(self, other, hashcodes=None):
     ''' Iterate over the hashcodes in `other` and fetch anything we don't have.
