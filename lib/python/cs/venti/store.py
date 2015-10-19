@@ -325,7 +325,7 @@ class MappingStore(BasicStoreSync):
     '''
     return self.mapping.first(hashclass=hashclass)
 
-  def iter_keys(self, hashclass=None, hashcode=None, reverse=None, after=False):
+  def iter_keys(self, hashclass=None, hashcode=None, reverse=None, after=False, length=None):
     ''' Generator yielding the Store's in order hashcodes starting with optional `hashcode`.
         `hashclass`: specify the hashcode type, default from defaults.S
         `hashcode`: the first hashcode; if missing or None, iteration
@@ -333,9 +333,10 @@ class MappingStore(BasicStoreSync):
         `reverse`: iterate backwards if true, forwards if false and in no
                    specified order if missing or None
         `after`: commence iteration after the first hashcode
+        `length`: if not None, the maximum number if hashcodes to yield
     '''
     return self.mapping.iter_keys(hashclass=hashclass, hashcode=hashcode,
-                                  reverse=reverse, after=after)
+                                  reverse=reverse, after=after, length=length)
 
 def DataDirStore(dirpath, indexclass=None, rollover=None):
   return MappingStore(DataDirMapping(dirpath, indexclass=indexclass, rollover=rollover))
