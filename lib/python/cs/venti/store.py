@@ -27,7 +27,7 @@ from cs.resources import MultiOpenMixin
 from cs.threads import Q1, Get1
 from . import defaults, totext
 from .datafile import DataDirMapping
-from .hash import Hash_SHA1
+from .hash import Hash_SHA1, hashcodes_checksum as hash_of_hashcodes
 
 class _BasicStoreCommon(MultiOpenMixin):
   ''' Core functions provided by all Stores.
@@ -122,6 +122,17 @@ class _BasicStoreCommon(MultiOpenMixin):
     ''' Called by final MultiOpenMixin.close().
     '''
     self.__funcQ.close()
+
+  def hashcodes_checksum(self, hashcode, length, hashclass=None):
+    ''' Collate `length` hashcodes in order from `hashcode` onward, return checksum hashcode and final hashcode covered.
+        This is to be used for scanning remote Stores for differences.
+    '''
+    if length < 1:
+      raise ValueError("length must be >=1 (%d)" % (length,))
+    return hash_of_hashcodes(
+            takewhile( lambda nh: nh[0] < length,
+                       enumerate(self.iter_keys(hashcode=hashcode,
+                                                hashclass=hashclass))))
 
   def missing(self, hashes):
     ''' Yield hashcodes that are not in the store from an iterable hash
