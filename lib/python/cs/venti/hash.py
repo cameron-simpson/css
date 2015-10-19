@@ -23,6 +23,15 @@ def decode(bs, offset=0):
     raise ValueError("unsupported hashenum %d", hashenum)
   return hashcls._decode(bs, offset)
 
+def hashcodes_checksum(hashcodes):
+  ''' Compute a Hash_SHA1 from the bytes of the supplied `hashcodes`.
+      This underlies the mechanism for comparing remote Stores.
+  '''
+  H = sha1()
+  for hashcode in hashcodes:
+    H.update(hashcode)
+  return Hash_SHA1.from_data(H.digest())
+
 class _Hash(bytes):
   ''' All hashes are bytes subclasses.
   '''
