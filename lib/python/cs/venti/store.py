@@ -314,12 +314,13 @@ class MappingStore(BasicStoreSync):
     '''
     return self.mapping.first(hashclass=hashclass)
 
-  def iter_keys(self, hashclass=None, hashcode=None, reverse=False, after=False):
+  def iter_keys(self, hashclass=None, hashcode=None, reverse=None, after=False):
     ''' Generator yielding the Store's in order hashcodes starting with optional `hashcode`.
         `hashclass`: specify the hashcode type, default from defaults.S
         `hashcode`: the first hashcode; if missing or None, iteration
                     starts with the first key in the index
-        `reverse`: iterate backwards if true, otherwise forwards
+        `reverse`: iterate backwards if true, forwards if false and in no
+                   specified order if missing or None
         `after`: commence iteration after the first hashcode
     '''
     return self.mapping.iter_keys(hashclass=hashclass, hashcode=hashcode,
