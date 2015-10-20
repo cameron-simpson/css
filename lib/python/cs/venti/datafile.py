@@ -19,7 +19,7 @@ from cs.resources import MultiOpenMixin
 from cs.serialise import get_bs, put_bs, read_bs, put_bsdata, read_bsdata
 from cs.threads import locked, locked_property
 from . import defaults
-from .hash import HASHCLASS_BY_NAME, DEFAULT_HASHCLASS
+from .hash import HASHCLASS_BY_NAME, DEFAULT_HASHCLASS, HashCodeUtilsMixin
 
 F_COMPRESSED = 0x01
 
@@ -271,7 +271,7 @@ class DataDir(MultiOpenMixin):
   def get(self, n, offset):
     return self.datafile(n).get(offset)
 
-class DataDirMapping(MultiOpenMixin):
+class DataDirMapping(MultiOpenMixin,HashCodeUtilsMixin):
   ''' Access to a DataDir as a mapping by using a dbm index per hash type.
   '''
 
