@@ -27,7 +27,7 @@ from cs.resources import MultiOpenMixin
 from cs.threads import Q1, Get1
 from . import defaults, totext
 from .datafile import DataDirMapping
-from .hash import Hash_SHA1, HashCodeUtilsMixin
+from .hash import DEFAULT_HASHCLASS, HashCodeUtilsMixin
 
 class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin):
   ''' Core functions provided by all Stores.
@@ -63,7 +63,7 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin):
       self.name = name
       self.logfp = None
       self.__funcQ = Later(capacity, name="%s:Later(__funcQ)" % (self.name,)).open()
-      self.hashclass = Hash_SHA1
+      self.hashclass = DEFAULT_HASHCLASS
       self.readonly = False
       self.writeonly = False
 
