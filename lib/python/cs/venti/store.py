@@ -24,6 +24,7 @@ from cs.asynchron import report as reportLFs
 from cs.later import Later
 from cs.logutils import info, debug, warning, Pfx, D, X
 from cs.resources import MultiOpenMixin
+from cs.seq import Seq
 from cs.threads import Q1, Get1
 from . import defaults, totext
 from .datafile import DataDirMapping
@@ -55,8 +56,12 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin):
       the implementation methods .get() and .contains().
   '''
 
-  def __init__(self, name, capacity=None):
+  _seq = Seq()
+
+  def __init__(self, name=None, capacity=None):
     with Pfx("_BasicStoreCommon.__init__(%s,..)", name):
+      if name is None:
+        name = "%s%d" % (self.__class__.__name__, next(_BasicStoreCommon._seq()))
       if capacity is None:
         capacity = 1
       MultiOpenMixin.__init__(self)
@@ -265,10 +270,11 @@ class MappingStore(BasicStoreSync):
   ''' A Store built on an arbitrary mapping object.
   '''
 
-  def __init__(self, mapping, name=None, capacity=None):
+  def __init__(self, mapping, **kw):
+    name = kw.pop('name', None)
     if name is None:
       name = "MappingStore(%s)" % (type(mapping),)
-    BasicStoreSync.__init__(self, name, capacity=capacity)
+    BasicStoreSync.__init__(self, name=name, **kw)
     self.mapping = mapping
 
   def add(self, data):
@@ -327,8 +333,10 @@ class MappingStore(BasicStoreSync):
     return self.mapping.hashcodes(hashclass=hashclass, hashcode=hashcode,
                                   reverse=reverse, after=after, length=length)
 
-def DataDirStore(dirpath, indexclass=None, rollover=None):
-  return MappingStore(DataDirMapping(dirpath, indexclass=indexclass, rollover=rollover))
+def DataDirStore(dirpath, indexclass=None, rollover=None, **kw):
+  return MappingStore(
+           DataDirMapping(dirpath, indexclass=indexclass, rollover=rollover),
+           **kw)
 
 if __name__ == '__main__':
   import cs.venti.store_tests
