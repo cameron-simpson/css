@@ -441,7 +441,12 @@ class DataDirMapping(MultiOpenMixin,HashCodeUtilsMixin):
     '''
     if hashclass is None:
       hashclass = defaults.S
-    return self._index(hashclass).first()
+    index = self._index(hashclass)
+    try:
+      first_method = index.first
+    except AttributeError:
+      raise NotImplementedError("._index(%s) has no .first" % (hashclass,))
+    return first_method()
 
   def hashcodes(self, hashclass=None, hashcode=None, reverse=None, after=False, length=None):
     ''' Generator yielding the hashcodes from the database in order starting with optional `hashcode`.
