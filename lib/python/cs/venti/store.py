@@ -309,7 +309,7 @@ class MappingStore(BasicStoreSync):
   def __init__(self, mapping, **kw):
     name = kw.pop('name', None)
     if name is None:
-      name = "MappingStore(%s)" % (type(mapping),)
+      name = "MappingStore(%s)" % (type(mapping).__name__,)
     BasicStoreSync.__init__(self, name=name, **kw)
     self.mapping = mapping
 
