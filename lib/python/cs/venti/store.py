@@ -349,9 +349,17 @@ class MappingStore(BasicStoreSync):
 
   def first(self, hashclass=None):
     ''' Return the first hashcode in the Store or None if empty.
-        `hashclass`: specify the hashcode type, default from defaults.S
+        `hashclass`: specify the hashcode type, default from self.hashclass
     '''
-    return self.mapping.first(hashclass=hashclass)
+    if hashclass is None:
+      hashclass = self.hashclass
+    mapping = self.mapping
+    try:
+      first_method = mapping.first
+    except AttributeError:
+      raise NotImplementedError("underlying .mapping has no .first")
+    else:
+      return first_method(hashclass=hashclass)
 
   def hashcodes(self, hashclass=None, hashcode=None, reverse=None, after=False, length=None):
     ''' Generator yielding the Store's in order hashcodes starting with optional `hashcode`.
