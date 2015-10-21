@@ -32,7 +32,7 @@ class _TestStore(unittest.TestCase):
   def test00empty(self):
     S = self.S
     try:
-      len_method = self.__len__
+      len_method = S.__len__
     except AttributeError as e:
       raise unittest.SkipTest("no __len__ in %s: %s" % (type(S), e))
     else:
