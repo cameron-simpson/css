@@ -561,7 +561,10 @@ class KyotoIndex(MultiOpenMixin):
     self._kyoto = None
 
   def flush(self):
-    self._kyoto.synchronize(hard=False)
+    try:
+      self._kyoto.synchronize(hard=False)
+    except TypeError:
+      self._kyoto.synchronize()
 
   def __len__(self):
     return self._kyoto.count()
