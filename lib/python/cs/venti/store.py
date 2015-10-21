@@ -33,6 +33,13 @@ from .hash import DEFAULT_HASHCLASS, HashCodeUtilsMixin
 class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin):
   ''' Core functions provided by all Stores.
 
+      Subclasses should not subclass this class but BasicStoreSync
+      or BasicStoreAsync; these provide the *_bg or non-*_bg sibling
+      methods of those described below so that a subclass need only
+      implement the synchronous or asynchronous forms. Most local
+      Stores will derive from BasicStoreSync and remote Stores
+      derive from BasicStoreAsync.
+
       A subclass should provide thread-safe implementations of the following
       methods:
 
@@ -41,6 +48,15 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin):
         .contains(hashcode) -> boolean
         .flush()
 
+      A subclass _may_ provide thread-safe implementations of the following
+      methods:
+
+        .first() -> hashcode
+        .hashcodes(starting_hashcode, length) -> iterable-of-hashcodes
+
+      The background (*_bg) functions return cs.later.LateFunction instances
+      for deferred collection of the operation result.
+
       A convenience .lock attribute is provided for simple mutex use.
 
       The .readonly attribute may be set to prevent writes and trap
@@ -48,9 +64,6 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin):
 
       The .writeonly attribute may be set to trap surprises when no blocks
       are expected to be fetched; it relies on asssert statements.
-
-      The background (*_bg) functions return cs.later.LateFunction instances
-      for deferred collection of the operation result.
 
       The mapping special methods __getitem__ and __contains__ call
       the implementation methods .get() and .contains().
@@ -187,6 +200,12 @@ class BasicStoreSync(_BasicStoreCommon):
   def flush_bg(self):
     return self._defer(self.flush)
 
+  def first_bg(self):
+    return self._defer(self.first)
+
+  def hashcodes_bg(self, hashcode, length):
+    return self._defer(self.hashcodes, hashcode, length)
+
 class BasicStoreAsync(_BasicStoreCommon):
   ''' Subclass of _BasicStoreCommon expecting asynchronous operations and providing synchronous hooks, dual of BasicStoreSync.
   '''
@@ -206,6 +225,12 @@ class BasicStoreAsync(_BasicStoreCommon):
 
   def flush(self):
     return self.flush_bg()()
+
+  def first(self):
+    return self.first_bg()()
+
+  def hashcodes(self, hashcode, length):
+    return self.hashcodes_bg(self.hashcodes, hashcode, length)()
 
 def Store(store_spec):
   ''' Factory function to return an appropriate BasicStore* subclass
