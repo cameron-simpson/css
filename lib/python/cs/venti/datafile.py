@@ -322,6 +322,9 @@ class DataDirMapping(MultiOpenMixin,HashCodeUtilsMixin):
 
   __str__ = spec
 
+  def __len__(self):
+    return len(self._default_index)
+
   def startup(self):
     self.datadir.open()
     pass
@@ -345,6 +348,10 @@ class DataDirMapping(MultiOpenMixin,HashCodeUtilsMixin):
     else:
       hashclass = S.hashclass
     return hashclass
+
+  @property
+  def _default_index(self):
+    return self._index(self.default_hashclass)
 
   @property
   def dirpath(self):
