@@ -200,6 +200,12 @@ class BasicStoreSync(_BasicStoreCommon):
   def flush_bg(self):
     return self._defer(self.flush)
 
+  def first(self):
+    raise NotImplementedError("no .first")
+
+  def hashcodes(self, hashcode, length):
+    raise NotImplementedError("no .first")
+
   def first_bg(self):
     return self._defer(self.first)
 
