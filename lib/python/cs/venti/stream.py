@@ -20,6 +20,8 @@ T_ADD = RqType(0)           # data->hashcode
 T_GET = RqType(1)           # hashcode->data
 T_CONTAINS = RqType(2)      # hash->boolean
 T_FLUSH = RqType(3)         # flush local and remote store
+T_FIRST = RqType(4)         # ->first hashcode
+T_HASHCODES = RqType(5)     # (hashcode,length)=>hashcodes
 
 class StreamStore(BasicStoreAsync):
   ''' A Store connected to a remote Store via a PacketConnection.
@@ -80,6 +82,21 @@ class StreamStore(BasicStoreAsync):
         raise ValueError("unexpected payload for flush")
       self.local_store.flush()
       return 0
+    if rq_type == T_FIRST:
+      if payload:
+        raise ValueError("unexpected payload")
+      return self.first().encode()
+    if rq_type == T_HASHCODES:
+      if not payload:
+        # no payload ==> return all hashcodes
+        hashcodes = list(self.hashcodes())
+      else:
+        # starting hashcode and length
+        hashcode, offset = decode_hash(payload)
+        if offset >= len(payload):
+          raise ValueError("missing length")
+        return b''.join(h.encode() for h in self.hashcodes(hashcode=hashcode,
+                                                           length=length))
     raise ValueError("unrecognised request code: %d; data=%r"
                      % (rq_type, payload))
 
@@ -159,6 +176,57 @@ class StreamStore(BasicStoreAsync):
     if payload:
       raise ValueError("non-empty payload: %r" % (payload,))
     return ok
+
+  def first_bg(self, h):
+    ''' Dispatch a first-hashcode request, return a Result for collection.
+    '''
+    return self._conn.request(T_FIRST, 0, b'', self._decode_response_first)
+
+  @staticmethod
+  def _decode_response_first(flags, payload):
+    ''' Decode the reply to a first, should be ok and hashcode payload.
+    '''
+    ok = flags & 0x01
+    if ok:
+      flags &= ~0x01
+    if flags:
+      raise ValueError("unexpected flags: 0x%02x" % (flags,))
+    if ok:
+      if not payload:
+        # no hashcodes in remote Store
+        return None
+      hashcode, offset = decode_hash(payload)
+      if offset < len(payload):
+        raise ValueError("unparsed data after hashcode: %d, %r" % (len(payload)-offset, payload[offset:]))
+      return hashcode
+    if payload:
+      raise ValueError("not ok, but payload=%r", payload)
+    return None
+
+  def hashcodes_bg(self, h):
+    ''' Dispatch a hashcodes request, return a Result for collection.
+    '''
+    return self._conn.request(T_FIRST, 0, b'', self._decode_response_first)
+
+  @staticmethod
+  def _decode_hashcodes_first(flags, payload):
+    ''' Decode the reply to a hashcodes, should be ok and hashcodes payload.
+    '''
+    ok = flags & 0x01
+    if ok:
+      flags &= ~0x01
+    if flags:
+      raise ValueError("unexpected flags: 0x%02x" % (flags,))
+    if ok:
+      offset = 0
+      hashary = []
+      while offset < len(payload):
+        hashcode, offset = decode_hash(payload)
+        hashary.append(hashcode)
+      return hashary
+    if payload:
+      raise ValueError("not ok, but payload=%r", payload)
+    return None
 
 if __name__ == '__main__':
   import cs.venti.stream_tests
