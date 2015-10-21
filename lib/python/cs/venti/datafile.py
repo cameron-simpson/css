@@ -185,6 +185,11 @@ class DataDir(MultiOpenMixin):
         Close and release any open indices.
         Close any open datafiles.
     '''
+    self.flush()
+
+  def flush(self):
+    ''' Flush all the open datafiles.
+    '''
     with self._lock:
       self._datafile_cache.flush()
 
