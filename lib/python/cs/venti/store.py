@@ -97,6 +97,9 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin):
   ## Special methods.
   ##
 
+  def __len__(self):
+    raise NotImplementedError("no .__len__")
+
   def __contains__(self, h):
     ''' Test if the supplied hashcode is present in the store.
     '''
@@ -345,7 +348,10 @@ class MappingStore(BasicStoreSync):
       map_flush()
 
   def __len__(self):
-    return len(self.mapping)
+    try:
+      return len(self.mapping)
+    except TypeError as e:
+      raise NotImplementedError("%s: no self.mapping.len(): %s" % (self, e))
 
   def first(self, hashclass=None):
     ''' Return the first hashcode in the Store or None if empty.
