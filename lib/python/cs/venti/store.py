@@ -130,6 +130,7 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin):
 
   def hash(self, data):
     ''' Return a Hash object from data bytes.
+        NB: does _not_ store the data.
     '''
     return self.hashclass.from_data(data)
 
