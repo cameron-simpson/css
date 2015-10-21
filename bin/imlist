@@ -1,0 +1,156 @@
+#!/usr/bin/env python3
+#
+# List or update images.
+#   - Cameron Simpson <cs@zip.com.au> 12oct2015
+#
+
+from __future__ import print_function
+import sys
+from collections import namedtuple
+import errno
+from getopt import getopt, GetoptError
+import os
+from os.path import isdir, splitext
+from PIL import Image
+Image.warnings.simplefilter('error', Image.DecompressionBombWarning)
+import cs.logutils
+from cs.logutils import setup_logging, warning, error, Pfx, XP
+
+USAGE = '''Usage:
+  %s [-q] [-u] src-paths...
+    -a  Absolute paths in output.
+    -q  Quiet. Do not list image data.
+    -U  Do not update .imlist files in directories.'''
+
+def main(argv):
+  setup_logging()
+  cmd = cs.logutils.cmd
+  usage = USAGE % (cmd,)
+
+  absolute = False
+  quiet = False
+  update_imlist = True
+
+  badopts = False
+
+  try:
+    opts, argv = getopt(argv[1:], 'aqU')
+  except GetoptError as e:
+    error("%s", e)
+    badopts = True
+  else:
+    for opt, val in opts:
+      with Pfx(opt):
+        if opt == '-a':
+          absolute = True
+        elif opt == '-q':
+          quiet = True
+        elif opt == '-U':
+          update_imlist = False
+        else:
+          raise RuntimeError('unhandled option')
+
+  if badopts:
+    print(usage, file=sys.stderr)
+    return 2
+
+  with Pfx(cmd):
+    for srcpath in argv:
+      if isdir(srcpath):
+        for iminfo in dir_info(srcpath, recurse=True,
+                               update_imlist=update_imlist):
+          if not quiet:
+            write_iminfo(iminfo, sys.stdout, absolute=absolute)
+
+  return 0
+
+ImInfo = namedtuple('ImInfo', 'path width height')
+
+def write_iminfo(iminfo, fp, basename=False, absolute=False):
+  path = iminfo.path
+  if basename:
+    path = os.path.basename(path)
+  elif absolute:
+    path=os.path.abspath(path)
+  fp.write("%d %d %s\n" % (iminfo.width, iminfo.height, path))
+
+def image_info(impath):
+  ''' Return an ImInfo for the specified image pathname, or None.
+      OSErrors are cuaght and warned, returning None.
+      (PIL also raises OSError if it cannot recognise the file format.)
+  '''
+  with Pfx("image_info(%r)", impath):
+    try:
+      I = Image.open(impath)
+      width, height = I.size
+      I.close()
+    except OSError as e:
+      warning(str(e))
+      return None
+    return ImInfo(impath, width, height)
+
+def dir_info(dirpath, recurse=False, update_imlist=False):
+  if recurse:
+    for subdirpath, dirnames, filenames in os.walk(dirpath, followlinks=False):
+      for iminfo in dir_info(subdirpath, recurse=False,
+                             update_imlist=update_imlist):
+        yield iminfo
+  else:
+    with Pfx(dirpath):
+      imlist = {}
+      imlist_new = []
+      # collect the candidate names in the directory
+      with Pfx("listdir"):
+        try:
+          for name in os.listdir(dirpath):
+            if ( not name.startswith('.')
+             and splitext(name.lower())[1] in ('.jpg', '.png')
+               ):
+              imlist[name] = None
+        except OSError as e:
+          warning(str(e))
+          return
+      # preload .imlist values
+      imlist_path = os.path.join(dirpath, '.imlist')
+      with Pfx("read .imlist"):
+        try:
+          with open(imlist_path) as imlistfp:
+            for lineno, line in enumerate(imlistfp, 1):
+              with Pfx("%d", lineno):
+                try:
+                  words = line.lstrip().split(None, 3)
+                  width, height, name = words[:3]
+                  width = int(width)
+                  height = int(height)
+                except ValueError as e:
+                  warning("%r: %s", line, e)
+                else:
+                  if name not in imlist:
+                    # skip names not current
+                    continue
+                  # note cached image info
+                  pathname = os.path.join(dirpath, name)
+                  iminfo = ImInfo(pathname, width, height)
+                  imlist[name] = iminfo
+        except OSError as e:
+          if e.errno != errno.ENOENT:
+            warning(str(e))
+      # yield image info, fetching uncache data
+      for name in sorted(imlist.keys()):
+        iminfo = imlist[name]
+        if iminfo is None:
+          pathname = os.path.join(dirpath, name)
+          iminfo = image_info(pathname)
+          if iminfo is not None:
+            imlist_new.append(iminfo)
+            yield iminfo
+        else:
+          yield iminfo
+      if update_imlist and imlist_new:
+        with Pfx("update .imlist"):
+          with open(imlist_path, "a") as imlistfp:
+            for iminfo in imlist_new:
+              write_iminfo(iminfo, imlistfp, basename=True)
+
+if __name__ == '__main__':
+  sys.exit(main(sys.argv))
