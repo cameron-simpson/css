@@ -32,16 +32,11 @@ class _TestStore(unittest.TestCase):
   def test00empty(self):
     S = self.S
     try:
-      len_method = S.__len__
-    except AttributeError as e:
-      raise unittest.SkipTest("no __len__ in %s: %s" % (type(S), e))
+      store_len = len(S)
+    except NotImplementedError as e:
+      raise unittest.SkipTest("len(%s) not implemented: %s" % (S, e))
     else:
-      try:
-        store_len = len(S)
-      except TypeError as e:
-        raise unittest.SkipTest(".len not implemented: %s" % (e,))
-      else:
-        self.assertEqual(len(S), 0)
+      self.assertEqual(len(S), 0)
     S.flush()
 
   def test01add_new_block(self):
