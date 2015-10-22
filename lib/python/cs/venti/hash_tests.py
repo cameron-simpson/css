@@ -106,6 +106,24 @@ class TestHashCodeUtilsMixin(unittest.TestCase):
     self.assertEqual(set(M1.hashcodes()), KS1)
     self.assertEqual(M1.first(), min( (h, h2) ))
 
+  def test01hashcodes(self):
+    M1 = self.map1
+    KS1 = self.keys1
+    for n in range(16):
+      data = randblock(rand0(8192))
+      h = M1.add(data)
+      KS1.add(h)
+      self.assertEqual(len(M1), n+1)
+      self.assertEqual(len(KS1), n+1)
+      self.assertEqual(set(M1.hashcodes()), KS1)
+      self.assertEqual(M1.first(), min(M1.keys()))
+      self.assertEqual(M1.first(), min(M1.hashcodes()))
+    with self.assertRaises(ValueError):
+      hs = list(M1.hashcodes(length=0))
+    for n in range(1,16):
+      hs = list(M1.hashcodes(length=n))
+      self.assertEqual(len(hs), n)
+
 def selftest(argv):
   unittest.main(__name__, None, argv)
 
