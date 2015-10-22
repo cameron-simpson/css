@@ -134,6 +134,22 @@ class HashCodeUtilsMixin(object):
     H = checksum(scan_hashcodes())
     return H, final_hashcode_list[0]
 
+  def hashcodes_missing(self, other):
+    ''' Yield hashcodes in `other` which are not present in self.
+    '''
+    # number of hashcodes to request in one go
+    start_hashcode = other.first()
+    if start_hashcode not in self:
+      yield start_hashcode
+    # post: start_hashcode has been checked
+    span_size = 1024
+    while start_hashcode is not None:
+      hashcode = None
+      for hashcode in other.hashcodes(hashcode=start_hashcode, length=span_size, after=True):
+        if hashcode not in self:
+          yield hashcode
+      start_hashcode = hashcode
+
 if __name__ == '__main__':
   import cs.venti.hash_tests
   cs.venti.hash_tests.selftest(sys.argv)
