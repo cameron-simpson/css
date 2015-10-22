@@ -80,8 +80,10 @@ class HashMap(dict, HashCodeUtilsMixin):
 
 class TestHashCodeUtilsMixin(unittest.TestCase):
 
+  MAP_FACTORY = HashMap
+
   def setUp(self):
-    self.map1 = HashMap()
+    self.map1 = self.MAP_FACTORY()
     self.keys1 = set()
 
   def test00first(self):
