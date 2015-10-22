@@ -11,6 +11,7 @@ if sys.hexversion >= 0x02050000:
 else:
   from sha import new as sha1
 import unittest
+from cs.logutils import X
 from cs.randutils import rand0, randblock
 from .hash import Hash_SHA1, decode, HashCodeUtilsMixin
 
@@ -125,6 +126,38 @@ class TestHashCodeUtilsMixin(unittest.TestCase):
     for n in range(1,16):
       hs = list(M1.hashcodes(length=n))
       self.assertEqual(len(hs), n)
+
+  def test02hashcodes_missing(self):
+    M1 = self.map1
+    KS1 = self.keys1
+    for n in range(16):
+      data = randblock(rand0(8192))
+      h = M1.add(data)
+      KS1.add(h)
+    M2 = self.MAP_FACTORY()
+    KS2 = set()
+    # construct M2 as a mix of M1 and random new blocks
+    for n in range(16):
+      if rand0(1) == 0:
+        data = randblock(rand0(8192))
+        h = M2.add(data)
+        KS2.add(h)
+      else:
+        M1ks = list(M1.keys())
+        M1hash = M1ks[rand0(len(M1ks))]
+        data = M1[M1hash]
+        h = M2.add(data)
+        self.assertEqual(h, M1hash)
+        KS2.add(h)
+      # compare differences between M1 and M2
+      # against differences between key sets KS1 and KS2
+      M1missing = set(M1.hashcodes_missing(M2))
+      KS1missing = KS2 - KS1
+      self.assertEqual(M1missing, KS1missing)
+      M2missing = set(M2.hashcodes_missing(M1))
+      KS2missing = KS1 - KS2
+      self.assertEqual(M2missing, KS2missing)
+
 
 def selftest(argv):
   unittest.main(__name__, None, argv)
