@@ -420,12 +420,14 @@ class DataDirMapping(MultiOpenMixin,HashCodeUtilsMixin):
       index[hashcode] = n, offset
 
   def add(self, data, hashclass=None):
-    ''' Add a data chunk using the supplied `hashclass`.
+    ''' Add a data chunk using the supplied `hashclass`. Return the hashcode.
         If `hashclass` is missing or None, use self.default_hashclass.
     '''
     if hashclass is None:
       hashclass = self.default_hashclass
-    self[hashclass.from_data(data)] = data
+    h = hashclass.from_data(data)
+    self[h] = data
+    return h
 
   @locked
   def flush(self):
