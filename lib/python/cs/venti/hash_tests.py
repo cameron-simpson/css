@@ -90,6 +90,7 @@ class TestHashCodeUtilsMixin(unittest.TestCase):
       h = self.map1.first()
     except NotImplementedError as e:
       raise unittest.SkipTest("no .first: %s" % (e,))
+    self.has_keys = hasattr(self.map1, 'keys')
 
   def test00first(self):
     M1 = self.map1
@@ -123,7 +124,8 @@ class TestHashCodeUtilsMixin(unittest.TestCase):
       self.assertEqual(len(M1), n+1)
       self.assertEqual(len(KS1), n+1)
       self.assertEqual(set(M1.hashcodes()), KS1)
-      self.assertEqual(M1.first(), min(M1.keys()))
+      if self.has_keys:
+        self.assertEqual(M1.first(), min(M1.keys()))
       self.assertEqual(M1.first(), min(M1.hashcodes()))
     with self.assertRaises(ValueError):
       hs = list(M1.hashcodes(length=0))
