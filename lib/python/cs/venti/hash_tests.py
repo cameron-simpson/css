@@ -143,8 +143,8 @@ class TestHashCodeUtilsMixin(unittest.TestCase):
         h = M2.add(data)
         KS2.add(h)
       else:
-        M1ks = list(M1.keys())
-        M1hash = M1ks[rand0(len(M1ks))]
+        M1ks = list(M1.hashcodes())
+        M1hash = M1ks[rand0(len(M1ks)-1)]
         data = M1[M1hash]
         h = M2.add(data)
         self.assertEqual(h, M1hash)
