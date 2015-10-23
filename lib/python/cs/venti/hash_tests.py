@@ -88,7 +88,17 @@ class _TestHashCodeUtilsMixin:
       h = self.map1.first()
     except NotImplementedError as e:
       raise unittest.SkipTest("no .first: %s" % (e,))
-    self.has_keys = hasattr(self.map1, 'keys')
+    try:
+      keys_method = self.map1.keys
+    except AttributeError:
+      self.has_keys = False
+    else:
+      try:
+        ks = keys_method()
+      except NotImplementedError:
+        self.has_keys = False
+      else:
+        self.has_keys = True
 
   def test00first(self):
     M1 = self.map1
