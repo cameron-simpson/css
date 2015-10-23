@@ -86,6 +86,10 @@ class TestHashCodeUtilsMixin(unittest.TestCase):
   def setUp(self):
     self.map1 = self.MAP_FACTORY()
     self.keys1 = set()
+    try:
+      h = self.map1.first()
+    except NotImplementedError as e:
+      raise unittest.SkipTest("no .first: %s" % (e,))
 
   def test00first(self):
     M1 = self.map1
