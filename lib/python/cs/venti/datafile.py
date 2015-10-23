@@ -612,8 +612,9 @@ class KyotoIndex(MultiOpenMixin):
     if cursor.jump(hashcode):
       if not after:
         yield self._hashclass.from_hashbytes(cursor.get_key())
-        length -= 1
-      while length >= 1:
+        if length is not None:
+          length -= 1
+      while length is None or length >= 1:
         if reverse:
           if not cursor.step_back():
             break
@@ -621,9 +622,10 @@ class KyotoIndex(MultiOpenMixin):
           if not cursor.step():
             break
         yield self._hashclass.from_hashbytes(cursor.get_key())
-        if length <= 1:
-          break
-        length -= 1
+        if length is not None:
+          if length <= 1:
+            break
+          length -= 1
     cursor.disable()
 
 def KyotoDataDirMapping(dirpath, rollover=None):
