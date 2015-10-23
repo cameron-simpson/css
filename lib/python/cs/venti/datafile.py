@@ -439,7 +439,7 @@ class DataDirMapping(MultiOpenMixin,HashCodeUtilsMixin):
         `hashclass`: specify the hashcode type, default from defaults.S
     '''
     if hashclass is None:
-      hashclass = defaults.S
+      hashclass = self.default_hashclass
     index = self._index(hashclass)
     try:
       first_method = index.first
