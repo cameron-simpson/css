@@ -15,13 +15,15 @@ from cs.excutils import logexc
 from cs.logutils import setup_logging, warning, X
 from cs.randutils import rand0, randblock
 from .datafile import GDBMIndex, KyotoIndex
+from .hash_tests import _TestHashCodeUtilsMixin
 from .store import MappingStore, DataDirStore
 
-class _TestStore(unittest.TestCase):
+class _TestStore(unittest.TestCase, _TestHashCodeUtilsMixin):
 
   def setUp(self):
     self._init_Store()
     self.S.open()
+    _TestHashCodeUtilsMixin.setUp(self)
 
   def _init_Store(self):
     raise unittest.SkipTest("no Store in base class")
@@ -105,19 +107,26 @@ class _TestStore(unittest.TestCase):
 
 class TestMappingStore(_TestStore):
 
+  MAP_FACTORY = lambda self: MappingStore({})
+
   def _init_Store(self):
     self.S = MappingStore({}).open()
 
 class _TestDataDirStore(_TestStore):
 
   INDEX_CLASS = None
+  MAP_FACTORY = lambda self: DataDirStore(self.mktmpdir(), indexclass=self.INDEX_CLASS, rollover=200000)
+
+  @staticmethod
+  def mktmpdir():
+    return abspath(tempfile.mkdtemp(prefix="cs.venti.store.testdatadir", suffix=".dir", dir='.'))
 
   def _init_Store(self):
     indexclass = self.__class__.INDEX_CLASS
     if indexclass is None:
       raise unittest.SkipTest("INDEX_CLASS is None, skipping TestCase")
     random.seed()
-    self.pathname = abspath(tempfile.mkdtemp(prefix="cs.venti.store.testdatadir", suffix=".dir", dir='.'))
+    self.pathname = self.mktmpdir()
     self.S = DataDirStore(self.pathname, indexclass=indexclass, rollover=200000)
 
   def tearDown(self):
