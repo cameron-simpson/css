@@ -318,7 +318,6 @@ class MappingStore(BasicStoreSync):
     with Pfx("add %d bytes", len(data)):
       h = self.hash(data)
       if h not in self.mapping:
-        info("NEW, save with hashcode=%s", h)
         self.mapping[h] = data
       else:
         with Pfx("EXISTING HASH"):
