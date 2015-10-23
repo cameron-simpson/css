@@ -17,10 +17,14 @@ from cs.randutils import rand0, randblock
 from .datafile import DataFile, GDBMDataDirMapping, KyotoDataDirMapping, \
                 DataDirMapping_from_spec, encode_index_entry, decode_index_entry
 from .hash import DEFAULT_HASHCLASS
+from .hash_tests import _TestHashCodeUtilsMixin
 
 # arbitrary limit
 MAX_BLOCK_SIZE = 16383
 RUN_SIZE = 100
+
+def mktmpdir():
+  return abspath(tempfile.mkdtemp(prefix="cs.venti.datafile.testdir", suffix=".dir", dir='.'))
 
 class TestDataFile(TestCase):
 
@@ -68,7 +72,7 @@ class TestDataFile(TestCase):
         data = self.datafile.get(offset)
         self.assertTrue(data == blocks[offset])
 
-class _TestDataDirMapping(TestCase):
+class _TestDataDirMapping(TestCase, _TestHashCodeUtilsMixin):
 
   MAPPING_CLASS = None
 
@@ -77,8 +81,9 @@ class _TestDataDirMapping(TestCase):
     if mapping_class is None:
       raise unittest.SkipTest("MAPPING_CLASS is None, skipping TestCase")
     random.seed()
-    self.pathname = abspath(tempfile.mkdtemp(prefix="cs.venti.datafile.testdir", suffix=".dir", dir='.'))
+    self.pathname = mktmpdir()
     self.datadir = mapping_class(self.pathname, rollover=200000)
+    _TestHashCodeUtilsMixin.setUp(self)
 
   def tearDown(self):
     os.system("ls -l "+self.pathname)
@@ -163,9 +168,11 @@ class _TestDataDirMapping(TestCase):
 
 class TestDataDirMappingGDBM(_TestDataDirMapping):
   MAPPING_CLASS = GDBMDataDirMapping
+  MAP_FACTORY = lambda self: GDBMDataDirMapping(mktmpdir())
 
 class TestDataDirMappingKyoto(_TestDataDirMapping):
   MAPPING_CLASS = KyotoDataDirMapping
+  MAP_FACTORY = lambda self: KyotoDataDirMapping(mktmpdir())
 
 def selftest(argv):
   if False:
