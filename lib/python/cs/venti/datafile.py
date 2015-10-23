@@ -239,9 +239,7 @@ class DataDir(MultiOpenMixin):
   def datafile_paths(self):
     ''' A list of the current datafile pathnames.
     '''
-    dfpaths = [ self.pathto(self.datafilename(n)) for n in self._datafile_indices() ]
-    X("datafile_paths=%r", dfpaths)
-    return dfpaths
+    return [ self.pathto(self.datafilename(n)) for n in self._datafile_indices() ]
 
   def scan(self, indices=None):
     ''' Generator which scans the specified datafiles (or all if `indices` is missing or None).
@@ -366,7 +364,6 @@ class DataDirMapping(MultiOpenMixin,HashCodeUtilsMixin):
     for n, offset, data in self.datadir.scan():
       hashcode = hashclass.from_data(data)
       if hashcode not in I:
-        X("add %s => %d, %d", hashcode, n, offset)
         I[hashcode] = n, offset
 
   @staticmethod
