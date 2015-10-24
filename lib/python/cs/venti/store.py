@@ -210,8 +210,8 @@ class BasicStoreSync(_BasicStoreCommon):
   def hashcodes(self, hashcode, length):
     raise NotImplementedError("no .first")
 
-  def first_bg(self):
-    return self._defer(self.first)
+  def first_bg(self, hashclass=None):
+    return self._defer(self.first, hashclass)
 
   def hashcodes_bg(self, hashcode, length):
     return self._defer(self.hashcodes, hashcode, length)
@@ -236,8 +236,8 @@ class BasicStoreAsync(_BasicStoreCommon):
   def flush(self):
     return self.flush_bg()()
 
-  def first(self):
-    return self.first_bg()()
+  def first(self, hashclass=None):
+    return self.first_bg(hashclass=hashclass)()
 
   def hashcodes(self, hashcode, length):
     return self.hashcodes_bg(self.hashcodes, hashcode, length)()
