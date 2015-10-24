@@ -8,6 +8,7 @@ import os
 import sys
 import unittest
 from cs.logutils import X
+from .hash import HashUtilDict
 from .store import MappingStore
 from .store_tests import _TestStore
 from .stream import StreamStore
@@ -20,7 +21,7 @@ class TestStreamStore(_TestStore, unittest.TestCase):
     self.remote_S = StreamStore( "test_remote_Store",
                                  os.fdopen(self.upstream_rd, 'rb'),
                                  os.fdopen(self.downstream_wr, 'wb'),
-                                 local_store=MappingStore({}).open()
+                                 local_store=MappingStore(HashUtilDict()).open()
                                )
     self.S = StreamStore( "test_local_Store",
                           os.fdopen(self.downstream_rd, 'rb'),
