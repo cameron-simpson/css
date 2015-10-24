@@ -16,6 +16,7 @@ from cs.logutils import setup_logging, warning, X
 from cs.randutils import rand0, randblock
 from .datafile import GDBMIndex, KyotoIndex
 from .store import MappingStore, DataDirStore
+from .hash import HashUtilDict
 from .hash_tests import _TestHashCodeUtils
 
 def mktmpdir():
@@ -113,8 +114,15 @@ class TestMappingStore(_TestStore, unittest.TestCase):
   def _init_Store(self):
     self.S = MappingStore({}).open()
 
-class TestHashCodeUtilsMappingStore(_TestHashCodeUtils, unittest.TestCase):
+class TestHashCodeUtilsMappingStoreDict(_TestHashCodeUtils, unittest.TestCase):
+  ''' Test HashUtils on a MappingStore on a plain dict.
+  '''
   MAP_FACTORY = lambda self: MappingStore({})
+
+class TestHashCodeUtilsMappingStoreHashUtilDict(_TestHashCodeUtils, unittest.TestCase):
+  ''' Test HashUtils on a MappingStore on a HashUtilDict.
+  '''
+  MAP_FACTORY = lambda self: MappingStore(HashUtilDict())
 
 class _TestDataDirStore(_TestStore):
 
