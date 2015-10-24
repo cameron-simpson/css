@@ -85,18 +85,20 @@ class StreamStore(BasicStoreAsync):
     if rq_type == T_FIRST:
       if payload:
         raise ValueError("unexpected payload")
-      return self.first().encode()
+      return self.local_store.first().encode()
     if rq_type == T_HASHCODES:
       if not payload:
         # no payload ==> return all hashcodes
-        hashcodes = list(self.hashcodes())
+        hashcodes = list(self.local_store.hashcodes())
       else:
         # starting hashcode and length
         hashcode, offset = decode_hash(payload)
         if offset >= len(payload):
           raise ValueError("missing length")
-        return b''.join(h.encode() for h in self.hashcodes(hashcode=hashcode,
-                                                           length=length))
+        return b''.join(h.encode()
+                        for h
+                        in self.local_store.hashcodes(hashcode=hashcode,
+                                                      length=length))
     raise ValueError("unrecognised request code: %d; data=%r"
                      % (rq_type, payload))
 
