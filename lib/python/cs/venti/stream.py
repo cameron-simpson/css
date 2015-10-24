@@ -13,7 +13,7 @@ from cs.logutils import setup_logging, Pfx, info, debug, warning, X
 from cs.serialise import put_bss, get_bss
 from cs.stream import PacketConnection
 from .store import BasicStoreAsync
-from .hash import decode as decode_hash, HASHCLASS_BY_NAME
+from .hash import decode as hash_decode, HASHCLASS_BY_NAME
 
 RqType = Enum('T_ADD', 'T_GET', 'T_CONTAINS', 'T_FLUSH')
 T_ADD = RqType(0)           # data->hashcode
@@ -63,7 +63,7 @@ class StreamStore(BasicStoreAsync):
     if rq_type == T_ADD:
       return self.local_store.add(payload).encode()
     if rq_type == T_GET:
-      hashcode, offset = decode_hash(payload)
+      hashcode, offset = hash_decode(payload)
       if offset < len(payload):
         raise ValueError("unparsed data after hashcode at offset %d: %r"
                          % (offset, payload[offset:]))
@@ -72,7 +72,7 @@ class StreamStore(BasicStoreAsync):
         return 0
       return 1, data
     if rq_type == T_CONTAINS:
-      hashcode, offset = decode_hash(payload)
+      hashcode, offset = hash_decode(payload)
       if offset < len(payload):
         raise ValueError("unparsed data after hashcode at offset %d: %r"
                          % (offset, payload[offset:]))
@@ -120,7 +120,7 @@ class StreamStore(BasicStoreAsync):
     '''
     if flags:
       raise ValueError("unexpected flags: 0x%02x" % (flags,))
-    hashcode, offset = decode_hash(payload)
+    hashcode, offset = hash_decode(payload)
     if offset < len(payload):
       raise ValueError("unexpected data after hashcode: %r" % (payload[offset:],))
     return hashcode
@@ -206,7 +206,7 @@ class StreamStore(BasicStoreAsync):
       if not payload:
         # no hashcodes in remote Store
         return None
-      hashcode, offset = decode_hash(payload)
+      hashcode, offset = hash_decode(payload)
       if offset < len(payload):
         raise ValueError("unparsed data after hashcode: %d, %r" % (len(payload)-offset, payload[offset:]))
       return hashcode
@@ -232,7 +232,7 @@ class StreamStore(BasicStoreAsync):
       offset = 0
       hashary = []
       while offset < len(payload):
-        hashcode, offset = decode_hash(payload)
+        hashcode, offset = hash_decode(payload, offset)
         hashary.append(hashcode)
       return hashary
     if payload:
