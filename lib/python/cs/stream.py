@@ -4,6 +4,7 @@
 #       - Cameron Simpson <cs@zip.com.au> 21aug2015
 #
 
+import sys
 from collections import namedtuple
 from threading import Thread, Lock
 from cs.asynchron import Result
