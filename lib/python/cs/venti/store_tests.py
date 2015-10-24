@@ -16,6 +16,10 @@ from cs.logutils import setup_logging, warning, X
 from cs.randutils import rand0, randblock
 from .datafile import GDBMIndex, KyotoIndex
 from .store import MappingStore, DataDirStore
+from .hash_tests import _TestHashCodeUtils
+
+def mktmpdir():
+  return abspath(tempfile.mkdtemp(prefix="cs.venti.store_tests", suffix=".dir", dir='.'))
 
 class _TestStore:
 
@@ -105,26 +109,22 @@ class _TestStore:
 
 class TestMappingStore(_TestStore, unittest.TestCase):
 
-  MAP_FACTORY = lambda self: MappingStore({})
-
   def _init_Store(self):
     self.S = MappingStore({}).open()
+
+class TestHashCodeUtilsMappingStore(_TestHashCodeUtils, unittest.TestCase):
+  MAP_FACTORY = lambda self: MappingStore({})
 
 class _TestDataDirStore(_TestStore, unittest.TestCase):
 
   INDEX_CLASS = None
-  MAP_FACTORY = lambda self: DataDirStore(self.mktmpdir(), indexclass=self.INDEX_CLASS, rollover=200000)
-
-  @staticmethod
-  def mktmpdir():
-    return abspath(tempfile.mkdtemp(prefix="cs.venti.store.testdatadir", suffix=".dir", dir='.'))
 
   def _init_Store(self):
     indexclass = self.__class__.INDEX_CLASS
     if indexclass is None:
       raise unittest.SkipTest("INDEX_CLASS is None, skipping TestCase")
     random.seed()
-    self.pathname = self.mktmpdir()
+    self.pathname = mktmpdir()
     self.S = DataDirStore(self.pathname, indexclass=indexclass, rollover=200000)
 
   def tearDown(self):
@@ -135,8 +135,14 @@ class _TestDataDirStore(_TestStore, unittest.TestCase):
 class TestDataDirStoreGDBM(_TestDataDirStore):
   INDEX_CLASS = GDBMIndex
 
+class TestHashCodeUtilsDataDirStoreGDBMStore(_TestHashCodeUtils, unittest.TestCase):
+  MAP_FACTORY = lambda self: DataDirStore(mktmpdir(), indexclass=GDBMIndex, rollover=200000)
+
 class TestDataDirStoreKyoto(_TestDataDirStore):
   INDEX_CLASS = KyotoIndex
+
+class TestHashCodeUtilsDataDirStoreKyotoStore(_TestHashCodeUtils, unittest.TestCase):
+  MAP_FACTORY = lambda self: DataDirStore(mktmpdir(), indexclass=KyotoIndex, rollover=200000)
 
 def selftest(argv):
   unittest.main(__name__, None, argv)
