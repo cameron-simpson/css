@@ -9,11 +9,11 @@
 from __future__ import with_statement
 import sys
 from cs.inttypes import Enum
-from cs.logutils import Pfx, info, debug, warning, X
-from cs.serialise import put_bs
+from cs.logutils import setup_logging, Pfx, info, debug, warning, X
+from cs.serialise import put_bss, get_bss
 from cs.stream import PacketConnection
 from .store import BasicStoreAsync
-from .hash import decode as decode_hash
+from .hash import decode as decode_hash, HASHCLASS_BY_NAME
 
 RqType = Enum('T_ADD', 'T_GET', 'T_CONTAINS', 'T_FLUSH')
 T_ADD = RqType(0)           # data->hashcode
@@ -83,9 +83,16 @@ class StreamStore(BasicStoreAsync):
       self.local_store.flush()
       return 0
     if rq_type == T_FIRST:
-      if payload:
-        raise ValueError("unexpected payload")
-      return self.local_store.first().encode()
+      hashname, offset = get_bss(payload)
+      if offset < len(payload):
+        raise ValueError("extra payload bytes after hashname %r: %r" % (hashname, payload[offset:]))
+      hashclass = HASHCLASS_BY_NAME[hashname]
+      try:
+        hashcode = self.local_store.first(hashclass)
+      except NotImplementedError as e:
+        hashcode = None
+      payload = hashcode.encode() if hashcode else b''
+      return 1, payload
     if rq_type == T_HASHCODES:
       if not payload:
         # no payload ==> return all hashcodes
@@ -179,10 +186,12 @@ class StreamStore(BasicStoreAsync):
       raise ValueError("non-empty payload: %r" % (payload,))
     return ok
 
-  def first_bg(self):
+  def first_bg(self, hashclass=None):
     ''' Dispatch a first-hashcode request, return a Result for collection.
     '''
-    return self._conn.request(T_FIRST, 0, b'', self._decode_response_first)
+    if hashclass is None:
+      hashclass = self.hashclass
+    return self._conn.request(T_FIRST, 0, put_bss(hashclass.HASHNAME), self._decode_response_first)
 
   @staticmethod
   def _decode_response_first(flags, payload):
