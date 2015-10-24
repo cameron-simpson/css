@@ -15,15 +15,13 @@ from cs.excutils import logexc
 from cs.logutils import setup_logging, warning, X
 from cs.randutils import rand0, randblock
 from .datafile import GDBMIndex, KyotoIndex
-from .hash_tests import _TestHashCodeUtilsMixin
 from .store import MappingStore, DataDirStore
 
-class _TestStore(unittest.TestCase, _TestHashCodeUtilsMixin):
+class _TestStore:
 
   def setUp(self):
     self._init_Store()
     self.S.open()
-    _TestHashCodeUtilsMixin.setUp(self)
 
   def _init_Store(self):
     raise unittest.SkipTest("no Store in base class")
@@ -105,14 +103,14 @@ class _TestStore(unittest.TestCase, _TestHashCodeUtilsMixin):
     self.assertIsNot(first_hashcode, None, ".first of nonempty Store should not be None")
     self.assertEqual(first_hashcode, ordered_hashcodes[0])
 
-class TestMappingStore(_TestStore):
+class TestMappingStore(_TestStore, unittest.TestCase):
 
   MAP_FACTORY = lambda self: MappingStore({})
 
   def _init_Store(self):
     self.S = MappingStore({}).open()
 
-class _TestDataDirStore(_TestStore):
+class _TestDataDirStore(_TestStore, unittest.TestCase):
 
   INDEX_CLASS = None
   MAP_FACTORY = lambda self: DataDirStore(self.mktmpdir(), indexclass=self.INDEX_CLASS, rollover=200000)
