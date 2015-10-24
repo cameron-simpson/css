@@ -79,13 +79,11 @@ class HashMap(dict, HashCodeUtilsMixin):
         ndx += 1
       first = False
 
-class _TestHashCodeUtils(unittest.TestCase):
+class _TestHashCodeUtils:
 
   MAP_FACTORY = None
 
   def setUp(self):
-    if self.MAP_FACTORY is None:
-      raise unittest.SkipTest("MAP_FACTORY is None")
     self.map1 = self.MAP_FACTORY()
     self.keys1 = set()
     try:
@@ -176,7 +174,7 @@ class _TestHashCodeUtils(unittest.TestCase):
       KS2missing = KS1 - KS2
       self.assertEqual(M2missing, KS2missing)
 
-class TestHashCodeUtils(_TestHashCodeUtils):
+class TestHashCodeUtils(_TestHashCodeUtils, unittest.TestCase):
   MAP_FACTORY = HashMap
 
 def selftest(argv):
