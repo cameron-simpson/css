@@ -138,6 +138,24 @@ def put_bsdata(data):
   ##is_bytes(chunk)
   return chunk
 
+@returns_bytes
+def put_bss(s, encoding='utf-8'):
+  ''' Encode the string `s` to bytes using the specified encoding, default 'utf-8'; return the encoding encapsulated with put_bsdata.
+  '''
+  return put_bsdata(s.encode(encoding))
+
+def get_bss(chunk, offset=0, encoding='utf-8'):
+  ''' Fetch an encoded string using get_bsdata and decode with the specified encoding, default 'utf-8'; return the string and the new offset.
+  '''
+  data, offset = get_bsdata(chunk, offset)
+  return data.decode(encoding), offset
+
+def read_bss(fp):
+  ''' Read an encoded string from `fp` using read_bsdata and decode with the specified encoding, default 'utf-8'; return the string.
+  '''
+  data = read_bsdata(fp, encoding='utf-8')
+  return data.decode(encoding)
+
 _Packet = namedtuple('_Packet', 'channel tag is_request flags payload')
 
 class Packet(_Packet):
