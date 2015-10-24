@@ -74,7 +74,7 @@ class _TestHashCodeUtils(_TestAdditionsMixin):
     data2 = randblock(rand0(8192))
     h2 = M1.add(data2)
     KS1.add(h2)
-    self.assertEqual(len(M1), 2)
+    self.assertLen(M1, 2)
     self.assertEqual(set(M1.hashcodes()), KS1)
     self.assertEqual(M1.first(), min( (h, h2) ))
 
