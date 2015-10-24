@@ -9,7 +9,7 @@
 from __future__ import with_statement
 import sys
 from cs.inttypes import Enum
-from cs.logutils import Pfx, info, debug, warning
+from cs.logutils import Pfx, info, debug, warning, X
 from cs.serialise import put_bs
 from cs.stream import PacketConnection
 from .store import BasicStoreAsync
