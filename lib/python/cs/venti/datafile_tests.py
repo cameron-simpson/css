@@ -84,7 +84,7 @@ class _TestDataDirMapping:
     self.datadir = mapping_class(self.pathname, rollover=200000)
 
   def tearDown(self):
-    os.system("ls -l "+self.pathname)
+    ##os.system("ls -l "+self.pathname)
     shutil.rmtree(self.pathname)
 
   def test000IndexEntry(self):
