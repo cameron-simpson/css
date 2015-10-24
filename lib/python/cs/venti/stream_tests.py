@@ -8,25 +8,34 @@ import os
 import sys
 import unittest
 from cs.logutils import X
-from .hash import HashUtilDict
+from .hash_tests import HashUtilDict, _TestHashCodeUtils
 from .store import MappingStore
 from .store_tests import _TestStore
 from .stream import StreamStore
 
+def make_stream_store():
+  upstream_rd, upstream_wr = os.pipe()
+  downstream_rd, downstream_wr = os.pipe()
+  remote_S = StreamStore( "test_remote_Store",
+                          os.fdopen(upstream_rd, 'rb'),
+                          os.fdopen(downstream_wr, 'wb'),
+                          local_store=MappingStore(HashUtilDict()).open()
+                        )
+  S = StreamStore( "test_local_Store",
+                   os.fdopen(downstream_rd, 'rb'),
+                   os.fdopen(upstream_wr, 'wb'),
+                 )
+  return S, remote_S
+
 class TestStreamStore(_TestStore, unittest.TestCase):
 
   def _init_Store(self):
-    self.upstream_rd, self.upstream_wr = os.pipe()
-    self.downstream_rd, self.downstream_wr = os.pipe()
-    self.remote_S = StreamStore( "test_remote_Store",
-                                 os.fdopen(self.upstream_rd, 'rb'),
-                                 os.fdopen(self.downstream_wr, 'wb'),
-                                 local_store=MappingStore(HashUtilDict()).open()
-                               )
-    self.S = StreamStore( "test_local_Store",
-                          os.fdopen(self.downstream_rd, 'rb'),
-                          os.fdopen(self.upstream_wr, 'wb'),
-                        )
+    self.S, self.remote_S = make_stream_store()
+
+class TestHashCodeUtilsStreamStore(_TestHashCodeUtils, unittest.TestCase):
+  ''' Test HashUtils on a MappingStore on a HashUtilDict.
+  '''
+  MAP_FACTORY = lambda self: make_stream_store()[0]
 
 def selftest(argv):
   unittest.main(__name__, None, argv)
