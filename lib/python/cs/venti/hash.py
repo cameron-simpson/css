@@ -150,6 +150,53 @@ class HashCodeUtilsMixin(object):
           yield hashcode
       start_hashcode = hashcode
 
+class HashUtilDict(dict, HashCodeUtilsMixin):
+  ''' Simple dict subclass supporting HashCodeUtilsMixin.
+  '''
+
+  def add(self, data):
+    hashcode = Hash_SHA1.from_data(data)
+    self[hashcode] = data
+    return hashcode
+
+  def sorted_keys(self):
+    return sorted(self.keys())
+
+  def first(self):
+    ks = self.sorted_keys()
+    if ks:
+      return ks[0]
+    return None
+
+  def hashcodes(self, hashclass=None, hashcode=None, reverse=None, after=False, length=None):
+    if length is not None and length < 1:
+      raise ValueError("length < 1: %r" % (length,))
+    if not len(self):
+      return
+    if hashclass is None:
+      first_hashcode = self.first()
+      hashclass = first_hashcode.__class__
+    ks = self.sorted_keys()
+    if hashcode is None:
+      ndx = 0
+    else:
+      ndx = ks.index(hashcode)
+    first = True
+    while length is None or length > 0:
+      try:
+        hashcode = ks[ndx]
+      except IndexError:
+        break
+      if not first or not after:
+        yield hashcode
+        if length is not None:
+          length -= 1
+      if reverse:
+        ndx -= 1
+      else:
+        ndx += 1
+      first = False
+
 if __name__ == '__main__':
   import cs.venti.hash_tests
   cs.venti.hash_tests.selftest(sys.argv)
