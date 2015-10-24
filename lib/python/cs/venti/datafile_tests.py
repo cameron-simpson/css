@@ -11,13 +11,12 @@ import random
 import shutil
 import tempfile
 import unittest
-from unittest import TestCase, skip
 from cs.logutils import X
 from cs.randutils import rand0, randblock
 from .datafile import DataFile, GDBMDataDirMapping, KyotoDataDirMapping, \
                 DataDirMapping_from_spec, encode_index_entry, decode_index_entry
 from .hash import DEFAULT_HASHCLASS
-from .hash_tests import _TestHashCodeUtilsMixin
+from .hash_tests import _TestHashCodeUtils
 
 # arbitrary limit
 MAX_BLOCK_SIZE = 16383
@@ -26,7 +25,7 @@ RUN_SIZE = 100
 def mktmpdir():
   return abspath(tempfile.mkdtemp(prefix="cs.venti.datafile.testdir", suffix=".dir", dir='.'))
 
-class TestDataFile(TestCase):
+class TestDataFile(unittest.TestCase):
 
   def setUp(self):
     random.seed()
@@ -72,7 +71,7 @@ class TestDataFile(TestCase):
         data = self.datafile.get(offset)
         self.assertTrue(data == blocks[offset])
 
-class _TestDataDirMapping(TestCase, _TestHashCodeUtilsMixin):
+class _TestDataDirMapping:
 
   MAPPING_CLASS = None
 
@@ -83,7 +82,6 @@ class _TestDataDirMapping(TestCase, _TestHashCodeUtilsMixin):
     random.seed()
     self.pathname = mktmpdir()
     self.datadir = mapping_class(self.pathname, rollover=200000)
-    _TestHashCodeUtilsMixin.setUp(self)
 
   def tearDown(self):
     os.system("ls -l "+self.pathname)
@@ -166,12 +164,16 @@ class _TestDataDirMapping(TestCase, _TestHashCodeUtilsMixin):
           data = D[hashcode]
           self.assertEqual(data, odata)
 
-class TestDataDirMappingGDBM(_TestDataDirMapping):
+class TestDataDirMappingGDBM(_TestDataDirMapping, unittest.TestCase):
   MAPPING_CLASS = GDBMDataDirMapping
+
+class TestHashCodeUtilsGDBM(_TestHashCodeUtils, unittest.TestCase):
   MAP_FACTORY = lambda self: GDBMDataDirMapping(mktmpdir())
 
-class TestDataDirMappingKyoto(_TestDataDirMapping):
+class TestDataDirMappingKyoto(_TestDataDirMapping, unittest.TestCase):
   MAPPING_CLASS = KyotoDataDirMapping
+
+class TestHashCodeUtilsKyoto(_TestHashCodeUtils, unittest.TestCase):
   MAP_FACTORY = lambda self: KyotoDataDirMapping(mktmpdir())
 
 def selftest(argv):
