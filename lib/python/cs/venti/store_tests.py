@@ -121,8 +121,6 @@ class _TestDataDirStore(_TestStore):
 
   def _init_Store(self):
     indexclass = self.__class__.INDEX_CLASS
-    if indexclass is None:
-      raise unittest.SkipTest("INDEX_CLASS is None, skipping TestCase")
     random.seed()
     self.pathname = mktmpdir()
     self.S = DataDirStore(self.pathname, indexclass=indexclass, rollover=200000)
