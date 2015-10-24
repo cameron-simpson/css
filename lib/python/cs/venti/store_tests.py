@@ -14,15 +14,13 @@ import unittest
 from cs.excutils import logexc
 from cs.logutils import setup_logging, warning, X
 from cs.randutils import rand0, randblock
+from . import _TestAdditionsMixin
 from .datafile import GDBMIndex, KyotoIndex
 from .store import MappingStore, DataDirStore
 from .hash import HashUtilDict
 from .hash_tests import _TestHashCodeUtils
 
-def mktmpdir():
-  return abspath(tempfile.mkdtemp(prefix="cs.venti.store_tests", suffix=".dir", dir='.'))
-
-class _TestStore:
+class _TestStore(_TestAdditionsMixin):
 
   def setUp(self):
     self._init_Store()
@@ -33,15 +31,6 @@ class _TestStore:
 
   def tearDown(self):
     self.S.close()
-
-  def assertLen(self, o, length, *a, **kw):
-    try:
-      olen = len(o)
-    except NotImplementedError as e:
-      ##warning("skip test of len(%s) == %r: %s", o, length, e)
-      pass
-    else:
-      self.assertEqual(olen, length, *a, **kw)
 
   def test00empty(self):
     S = self.S
@@ -131,7 +120,7 @@ class _TestDataDirStore(_TestStore):
   def _init_Store(self):
     indexclass = self.__class__.INDEX_CLASS
     random.seed()
-    self.pathname = mktmpdir()
+    self.pathname = self.mktmpdir()
     self.S = DataDirStore(self.pathname, indexclass=indexclass, rollover=200000)
 
   def tearDown(self):
@@ -143,13 +132,13 @@ class TestDataDirStoreGDBM(_TestDataDirStore, unittest.TestCase):
   INDEX_CLASS = GDBMIndex
 
 class TestHashCodeUtilsDataDirStoreGDBMStore(_TestHashCodeUtils, unittest.TestCase):
-  MAP_FACTORY = lambda self: DataDirStore(mktmpdir(), indexclass=GDBMIndex, rollover=200000)
+  MAP_FACTORY = lambda self: DataDirStore(self.mktmpdir(), indexclass=GDBMIndex, rollover=200000)
 
 class TestDataDirStoreKyoto(_TestDataDirStore, unittest.TestCase):
   INDEX_CLASS = KyotoIndex
 
 class TestHashCodeUtilsDataDirStoreKyotoStore(_TestHashCodeUtils, unittest.TestCase):
-  MAP_FACTORY = lambda self: DataDirStore(mktmpdir(), indexclass=KyotoIndex, rollover=200000)
+  MAP_FACTORY = lambda self: DataDirStore(self.mktmpdir(), indexclass=KyotoIndex, rollover=200000)
 
 def selftest(argv):
   unittest.main(__name__, None, argv)
