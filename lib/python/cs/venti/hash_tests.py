@@ -62,12 +62,12 @@ class _TestHashCodeUtils(_TestAdditionsMixin):
     # test emptiness
     h = M1.first()
     self.assertIs(h, None)
-    self.assertEqual(len(M1), 0)
+    self.assertLen(M1, 0)
     # add one block
     data = randblock(rand0(8192))
     h = M1.add(data)
     KS1.add(h)
-    self.assertEqual(len(M1), 1)
+    self.assertLen(M1, 1)
     self.assertEqual(set(M1.hashcodes()), KS1)
     self.assertEqual(M1.first(), h)
     # add another block
@@ -85,7 +85,7 @@ class _TestHashCodeUtils(_TestAdditionsMixin):
       data = randblock(rand0(8192))
       h = M1.add(data)
       KS1.add(h)
-      self.assertEqual(len(M1), n+1)
+      self.assertLen(M1, n+1)
       self.assertEqual(len(KS1), n+1)
       self.assertEqual(set(M1.hashcodes()), KS1)
       if self.has_keys:
