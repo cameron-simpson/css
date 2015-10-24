@@ -128,7 +128,7 @@ class _TestDataDirStore(_TestStore):
     self.S = DataDirStore(self.pathname, indexclass=indexclass, rollover=200000)
 
   def tearDown(self):
-    os.system("ls -l "+self.pathname)
+    ##os.system("ls -l "+self.pathname)
     shutil.rmtree(self.pathname)
     _TestStore.tearDown(self)
 
