@@ -13,6 +13,7 @@ else:
 import unittest
 from cs.logutils import X
 from cs.randutils import rand0, randblock
+from . import _TestAdditionsMixin
 from .hash import Hash_SHA1, decode, HashCodeUtilsMixin, HashUtilDict
 
 class TestHashing(unittest.TestCase):
@@ -32,7 +33,7 @@ class TestHashing(unittest.TestCase):
       self.assertEqual(offset, len(Hencode))
       self.assertEqual(H, H2)
 
-class _TestHashCodeUtils:
+class _TestHashCodeUtils(_TestAdditionsMixin):
 
   MAP_FACTORY = None
 
