@@ -12,7 +12,7 @@ from .store import MappingStore
 from .store_tests import _TestStore
 from .stream import StreamStore
 
-class TestStreamStore(_TestStore):
+class TestStreamStore(_TestStore, unittest.TestCase):
 
   def _init_Store(self):
     self.upstream_rd, self.upstream_wr = os.pipe()
