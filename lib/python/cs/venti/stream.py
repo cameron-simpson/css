@@ -177,7 +177,7 @@ class StreamStore(BasicStoreAsync):
       raise ValueError("non-empty payload: %r" % (payload,))
     return ok
 
-  def first_bg(self, h):
+  def first_bg(self):
     ''' Dispatch a first-hashcode request, return a Result for collection.
     '''
     return self._conn.request(T_FIRST, 0, b'', self._decode_response_first)
