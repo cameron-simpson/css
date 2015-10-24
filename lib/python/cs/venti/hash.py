@@ -159,11 +159,13 @@ class HashUtilDict(dict, HashCodeUtilsMixin):
     self[hashcode] = data
     return hashcode
 
-  def sorted_keys(self):
-    return sorted(self.keys())
+  def sorted_keys(self, hashclass=None):
+    if hashclass is None:
+      hashclass = DEFAULT_HASHCLASS
+    return sorted(h for h in self.keys() if isinstance(h, hashclass))
 
-  def first(self):
-    ks = self.sorted_keys()
+  def first(self, hashclass=None):
+    ks = self.sorted_keys(hashclass=hashclass)
     if ks:
       return ks[0]
     return None
