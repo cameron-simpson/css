@@ -115,7 +115,7 @@ class TestMappingStore(_TestStore, unittest.TestCase):
 class TestHashCodeUtilsMappingStore(_TestHashCodeUtils, unittest.TestCase):
   MAP_FACTORY = lambda self: MappingStore({})
 
-class _TestDataDirStore(_TestStore, unittest.TestCase):
+class _TestDataDirStore(_TestStore):
 
   INDEX_CLASS = None
 
@@ -132,13 +132,13 @@ class _TestDataDirStore(_TestStore, unittest.TestCase):
     shutil.rmtree(self.pathname)
     _TestStore.tearDown(self)
 
-class TestDataDirStoreGDBM(_TestDataDirStore):
+class TestDataDirStoreGDBM(_TestDataDirStore, unittest.TestCase):
   INDEX_CLASS = GDBMIndex
 
 class TestHashCodeUtilsDataDirStoreGDBMStore(_TestHashCodeUtils, unittest.TestCase):
   MAP_FACTORY = lambda self: DataDirStore(mktmpdir(), indexclass=GDBMIndex, rollover=200000)
 
-class TestDataDirStoreKyoto(_TestDataDirStore):
+class TestDataDirStoreKyoto(_TestDataDirStore, unittest.TestCase):
   INDEX_CLASS = KyotoIndex
 
 class TestHashCodeUtilsDataDirStoreKyotoStore(_TestHashCodeUtils, unittest.TestCase):
