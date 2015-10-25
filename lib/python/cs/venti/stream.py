@@ -244,7 +244,10 @@ class StreamStore(BasicStoreAsync):
       hashclass = HASHCLASS_BY_NAME[hashname]
       hashcode_encoded, offset = get_bsdata(payload, offset)
       if hashcode_encoded:
-        hashcode, offset = hash_decode(hashcode_encoded, offset)
+        hashcode, offset2 = hash_decode(hashcode_encoded)
+        if offset2 != len(hashcode_encoded):
+          raise ValueError("extra data in hashcode_encoded: %r",
+                           hashcode_encoded[offset2:])
       else:
         hashcode = None
       length, offset = get_bs(payload, offset)
