@@ -159,6 +159,16 @@ class HashUtilDict(dict, HashCodeUtilsMixin):
     self[hashcode] = data
     return hashcode
 
+  def open(self):
+    ''' Dummy method to support unit tests with open/close.
+    '''
+    pass
+
+  def close(self):
+    ''' Dummy method to support unit tests with open/close.
+    '''
+    pass
+
   def sorted_keys(self, hashclass=None):
     if hashclass is None:
       hashclass = DEFAULT_HASHCLASS
