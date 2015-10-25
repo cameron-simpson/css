@@ -39,6 +39,7 @@ class _TestHashCodeUtils(_TestAdditionsMixin):
 
   def setUp(self):
     self.map1 = self.MAP_FACTORY()
+    self.map1.open()
     self.keys1 = set()
     try:
       h = self.map1.first()
@@ -55,6 +56,9 @@ class _TestHashCodeUtils(_TestAdditionsMixin):
         self.has_keys = False
       else:
         self.has_keys = True
+
+  def tearDown(self):
+    self.map1.close()
 
   def test00first(self):
     M1 = self.map1
