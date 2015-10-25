@@ -33,9 +33,17 @@ class TestStreamStore(_TestStore, unittest.TestCase):
     self.S, self.remote_S = make_stream_store()
 
 class TestHashCodeUtilsStreamStore(_TestHashCodeUtils, unittest.TestCase):
-  ''' Test HashUtils on a MappingStore on a HashUtilDict.
+  ''' Test HashUtils on a StreamStore on a HashUtilDict.
   '''
-  MAP_FACTORY = lambda self: make_stream_store()[0]
+  def MAP_FACTORY(self):
+    S, remote_S = make_stream_store()
+    remote_S.open()
+    self.remote_S = remote_S
+    return S
+
+  def tearDown(self):
+    self.remote_S.close()
+    _TestHashCodeUtils.tearDown(self)
 
 def selftest(argv):
   unittest.main(__name__, None, argv)
