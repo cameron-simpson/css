@@ -12,21 +12,22 @@ from threading import Lock, Thread
 from .stream import StreamStore
 from cs.excutils import logexc
 from cs.fileutils import OpenSocket
-from cs.logutils import debug, X
+from cs.logutils import debug, X, Pfx
 from cs.queues import MultiOpenMixin
 
 class _Server(ThreadingMixIn, TCPServer):
 
   def __init__(self, bind_addr, S):
-    TCPServer.__init__(self, bind_addr, _RequestHandler)
-    self.bind_addr = bind_addr
-    self.S = S
+    with Pfx("%s.__init__(bind_addr=%r, S=%s)", self.__class__, bind_addr, S):
+      TCPServer.__init__(self, bind_addr, _RequestHandler)
+      self.bind_addr = bind_addr
+      self.S = S
 
   def __str__(self):
     return "TCPStoreServer:_Server(%s,%s)" % (self.bind_addr, self.S,)
 
 class TCPStoreServer(MultiOpenMixin):
-  ''' A threading TCPServer that accepts connections by TCPStoreClients.
+  ''' A threading TCPServer that accepts connections from TCPStoreClients.
   '''
 
   def __init__(self, bind_addr, S):
