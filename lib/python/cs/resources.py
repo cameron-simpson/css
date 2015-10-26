@@ -25,8 +25,7 @@ from cs.obj import O
 from cs.py.func import callmethod_if as ifmethod
 
 def not_closed(func):
-  ''' Decorator to wrap MultiOpenMixin proxy object methods
-      which hould raise when self.closed.
+  ''' Decorator to wrap methods of objects with a .closed property which should raise when self.closed.
   '''
   def not_closed_wrapper(self, *a, **kw):
     if self.closed:
@@ -136,6 +135,19 @@ class MultiOpenMixin(O):
       self._finalise.wait()
     else:
       self._lock.release()
+
+  @staticmethod
+  def is_opened(func):
+    ''' Decorator to wrap MultiOpenMixin proxy object methods which should raise when if the object is not yet open.
+    '''
+    def is_opened_wrapper(self, *a, **kw):
+      if self.closed:
+        raise RuntimeError("%s: %s: already closed" % (is_opened_wrapper.__name__, self))
+      if not self.opened:
+        raise RuntimeError("%s: %s: not yet opened" % (is_opened_wrapper.__name__, self))
+      return func(self, *a, **kw)
+    is_opened_wrapper.__name__ = "is_opened_wrapper(%s)" % (func.__name__,)
+    return is_opened_wrapper
 
 class MultiOpen(MultiOpenMixin):
   ''' Context manager class that manages a single open/close object using a MultiOpenMixin.
