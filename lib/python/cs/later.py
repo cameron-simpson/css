@@ -540,6 +540,7 @@ class Later(MultiOpenMixin):
     D("STATE %r [%s]", new_state, self)
     self._state = new_state
 
+  @MultiOpenMixin.is_opened
   def __call__(self, func, *a, **kw):
     ''' A Later object can be called with a function and arguments
 	with the effect of deferring the function and waiting for
@@ -730,6 +731,7 @@ class Later(MultiOpenMixin):
     '''
     return not self.closed
 
+  @MultiOpenMixin.is_opened
   def bg(self, func, *a, **kw):
     ''' Queue a function to run right now, ignoring the Later's capacity and
         priority system. This is really just an easy way to utilise the Later's
@@ -759,6 +761,7 @@ class Later(MultiOpenMixin):
     '''
     return _Late_context_manager(self, **kwargs)
 
+  @MultiOpenMixin.is_opened
   def submit(self, func, priority=None, delay=None, when=None, name=None, pfx=None):
     ''' Submit the callable `func` for later dispatch.
         Return the corresponding LateFunction for result collection.
@@ -819,6 +822,7 @@ class Later(MultiOpenMixin):
     return LF
 
   ##@trace_caller
+  @MultiOpenMixin.is_opened
   def defer(self, func, *a, **kw):
     ''' Queue the function `func` for later dispatch using the
         default priority with the specified arguments `*a` and `**kw`.
@@ -850,6 +854,7 @@ class Later(MultiOpenMixin):
     LF = self._submit(func, **params)
     return LF
 
+  @MultiOpenMixin.is_opened
   def after(self, LFs, R, func, *a, **kw):
     ''' Queue the function `func` for later dispatch after completion of `LFs`.
         Return a Result for later collection of the function result.
@@ -927,6 +932,7 @@ class Later(MultiOpenMixin):
         LF.notify(submit_func)
     return R
 
+  @MultiOpenMixin.is_opened
   def defer_iterable(self, I, outQ, test_ready=None):
     ''' Submit an iterable `I` for asynchronous stepwise iteration
         to return results via the queue `outQ`.
@@ -971,6 +977,7 @@ class Later(MultiOpenMixin):
                                                    getattr(I, '__name__', repr(I)))
     self._defer(iterate_once)
 
+  @MultiOpenMixin.is_opened
   def pipeline(self, filter_funcs, inputs=None, outQ=None, name=None):
     ''' Construct a function pipeline to be mediated by this Later queue.
         Return:
