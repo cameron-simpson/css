@@ -42,16 +42,22 @@ class WorkerThreadPool(MultiOpenMixin, O):
   ''' A pool of worker threads to run functions.
   '''
 
-  def __init__(self, name=None):
+  def __init__(self, name=None, max_spare=4):
+    ''' Initialise the WorkerThreadPool.
+        `name`: optional name for the pool
+        `max_spare`: maximum size of each idle pool (daemon and non-daemon)
+    '''
     if name is None:
       name = "WorkerThreadPool-%d" % (seq(),)
-    debug("WorkerThreadPool.__init__(name=%s)", name)
+    if max_spare < 1:
+      raise ValueError("max_spare(%s) must be >= 1", max_spare)
     O.__init__(self)
     MultiOpenMixin.__init__(self)
     self.name = name
+    self.max_spare = max_spare
     self.idle_fg = deque()      # nondaemon Threads
     self.idle_daemon = deque()  # daemon Threads
-    self.all = []
+    self.all = set()
 
   def __str__(self):
     return "WorkerThreadPool:%s" % (self.name,)
@@ -66,9 +72,11 @@ class WorkerThreadPool(MultiOpenMixin, O):
         Join all the worker threads.
         It is an error to call close() more than once.
     '''
-    for entry in self.all:
+    with self._lock:
+      all_entries = list(self.all)
+    for entry in all_entries:
       entry.queue.close()
-    for entry in self.all:
+    for entry in all_entries:
       T = entry.thread
       if T is not current_thread():
         T.join()
@@ -103,13 +111,13 @@ class WorkerThreadPool(MultiOpenMixin, O):
       else:
         debug("dispatch: need new thread")
         # no available threads - make one
-        args = []
-        T = Thread(target=self._handler, args=args, name=("%s:worker" % (self.name,)))
+        Targs = []
+        T = Thread(target=self._handler, args=Targs, name=("%s:worker" % (self.name,)))
         T.daemon = daemon
         Q = IterableQueue(name="%s:IQ%d" % (self.name, seq()))
         entry = WTPoolEntry(T, Q)
-        self.all.append(entry)
-        args.append(entry)
+        self.all.add(entry)
+        Targs.append(entry)
         debug("%s: start new worker thread (daemon=%s)", self, T.daemon)
         T.start()
       entry.queue.put( (func, retq, deliver) )
@@ -151,7 +159,11 @@ class WorkerThreadPool(MultiOpenMixin, O):
       T.name = oname
       func = None     # release func+args
       with self._lock:
-        idle.append( entry )
+        if len(idle) < self.max_spare:
+          idle.append(entry)
+        else:
+          self.all.remove(entry)
+          break
         ##D("_handler released thread: idle = %s", idle)
       tup = (result, exc_info)
       if retq is not None:
