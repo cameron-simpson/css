@@ -36,6 +36,8 @@ from cs.queues import IterableQueue, Channel, MultiOpenMixin, not_closed
 from cs.py.func import funcname
 from cs.py3 import raise3, Queue, PriorityQueue
 
+WTPoolEntry = namedtuple('WTPoolEntry', 'thread queue')
+
 class WorkerThreadPool(MultiOpenMixin, O):
   ''' A pool of worker threads to run functions.
   '''
@@ -104,12 +106,12 @@ class WorkerThreadPool(MultiOpenMixin, O):
         HT = Thread(target=self._handler, args=args, name=("%s:worker" % (self.name,)))
         HT.daemon = daemon
         RQ = IterableQueue(name="%s:IQ%d" % (self.name, seq()))
-        Hdesc = (HT, RQ)
+        Hdesc = WTPoolEntry(HT, RQ)
         self.all.append(Hdesc)
         args.append(Hdesc)
         debug("%s: start new worker thread (daemon=%s)", self, HT.daemon)
         HT.start()
-      Hdesc[1].put( (func, retq, deliver) )
+      Hdesc.queue.put( (func, retq, deliver) )
 
   def _handler(self, Hdesc):
     ''' The code run by each handler thread.
