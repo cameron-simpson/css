@@ -47,7 +47,8 @@ class WorkerThreadPool(MultiOpenMixin, O):
     O.__init__(self)
     MultiOpenMixin.__init__(self)
     self.name = name
-    self.idle = deque()
+    self.idle_fg = deque()      # nondaemon Threads
+    self.idle_daemon = deque()  # daemon Threads
     self.all = []
 
   def __str__(self):
@@ -81,14 +82,15 @@ class WorkerThreadPool(MultiOpenMixin, O):
         If the parameter `pfx` is not None, submit pfx.partial(func);
           see the cs.logutils.Pfx.partial method for details.
         If `daemon` is not None, set the .daemon attribute of the Thread to `daemon`.
-        TODO: if `daemon` used, clean up Thread instead of preserving it.
         TODO: high water mark for idle Threads.
     '''
     if self.closed:
       raise ValueError("%s: closed, but dispatch() called" % (self,))
     if pfx is not None:
       func = pfx.partial(func)
-    idle = self.idle
+    if daemon is None:
+      daemon = current_thread().daemon
+    idle = self.idle_daemon if daemon else self.idle_fg
     with self._lock:
       debug("dispatch: idle = %s", idle)
       if len(idle) and daemon is None:
@@ -100,14 +102,11 @@ class WorkerThreadPool(MultiOpenMixin, O):
         # no available threads - make one
         args = []
         HT = Thread(target=self._handler, args=args, name=("%s:worker" % (self.name,)))
-        ##HT.daemon = True
+        HT.daemon = daemon
         RQ = IterableQueue(name="%s:IQ%d" % (self.name, seq()))
         Hdesc = (HT, RQ)
         self.all.append(Hdesc)
         args.append(Hdesc)
-        if daemon is not None:
-          debug("%s: new worker thread: set daemon=%s", self, daemon)
-          HT.daemon = daemon
         debug("%s: start new worker thread (daemon=%s)", self, HT.daemon)
         HT.start()
       Hdesc[1].put( (func, retq, deliver) )
@@ -126,6 +125,7 @@ class WorkerThreadPool(MultiOpenMixin, O):
         If both are None and an exception occurred, it gets raised.
     '''
     HT, RQ = Hdesc
+    idle = self.idle_daemon if HT.daemon else self.idle_fg
     for func, retq, deliver in RQ:
       oname = HT.name
       HT.name = "%s:RUNNING:%s" % (oname, func)
@@ -148,8 +148,8 @@ class WorkerThreadPool(MultiOpenMixin, O):
       HT.name = oname
       func = None     # release func+args
       with self._lock:
-        self.idle.append( Hdesc )
-        ##D("_handler released thread: idle = %s", self.idle)
+        idle.append( Hdesc )
+        ##D("_handler released thread: idle = %s", idle)
       tup = (result, exc_info)
       if retq is not None:
         debug("%s: worker thread: %r.put(%s)...", self, retq, tup)
