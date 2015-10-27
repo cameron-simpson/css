@@ -42,7 +42,7 @@ FUNC_MANY_TO_MANY = 3
 DEFAULT_RETRY_DELAY = 0.1
 
 class _ThreadLocal(threading.local):
-  ''' Thread local state to provide implied context withing Later context managers.
+  ''' Thread local state to provide implied context within Later context managers.
   '''
 
   def __init__(self):
