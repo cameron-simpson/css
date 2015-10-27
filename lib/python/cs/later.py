@@ -503,7 +503,8 @@ class Later(MultiOpenMixin):
     self.delayed = set()        # unqueued, delayed until specific time
     self.pending = set()        # undispatched LateFunctions
     self.running = set()        # running LateFunctions
-    self._busy = TrackingCounter(name="Later<%s>._busy" % (name,)) # counter tracking jobs queued or active
+    # counter tracking jobs queued or active
+    self._busy = TrackingCounter(name="Later<%s>._busy" % (name,), lock=self._lock)
     self._quiescing = False
     self._state = ""
     self.logger = None          # reporting; see logTo() method
