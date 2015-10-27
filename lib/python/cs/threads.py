@@ -80,6 +80,9 @@ class WorkerThreadPool(MultiOpenMixin, O):
         If `deliver` is not None, deliver(result) is called.
         If the parameter `pfx` is not None, submit pfx.partial(func);
           see the cs.logutils.Pfx.partial method for details.
+        If `daemon` is not None, set the .daemon attribute of the Thread to `daemon`.
+        TODO: if `daemon` used, clean up Thread instead of preserving it.
+        TODO: high water mark for idle Threads.
     '''
     if self.closed:
       raise ValueError("%s: closed, but dispatch() called" % (self,))
@@ -88,7 +91,7 @@ class WorkerThreadPool(MultiOpenMixin, O):
     idle = self.idle
     with self._lock:
       debug("dispatch: idle = %s", idle)
-      if len(idle):
+      if len(idle) and daemon is None:
         # use an idle thread
         Hdesc = idle.pop()
         debug("dispatch: reuse %s", Hdesc)
