@@ -66,11 +66,12 @@ class WorkerThreadPool(MultiOpenMixin, O):
         Join all the worker threads.
         It is an error to call close() more than once.
     '''
-    for HT, HQ in self.all:
-      HQ.close()
-    for HT, HQ in self.all:
-      if HT is not current_thread():
-        HT.join()
+    for entry in self.all:
+      entry.queue.close()
+    for entry in self.all:
+      T = entry.thread
+      if T is not current_thread():
+        T.join()
 
   @not_closed
   def dispatch(self, func, retq=None, deliver=None, pfx=None, daemon=None):
@@ -97,23 +98,23 @@ class WorkerThreadPool(MultiOpenMixin, O):
       debug("dispatch: idle = %s", idle)
       if len(idle) and daemon is None:
         # use an idle thread
-        Hdesc = idle.pop()
-        debug("dispatch: reuse %s", Hdesc)
+        entry = idle.pop()
+        debug("dispatch: reuse %s", entry)
       else:
         debug("dispatch: need new thread")
         # no available threads - make one
         args = []
-        HT = Thread(target=self._handler, args=args, name=("%s:worker" % (self.name,)))
-        HT.daemon = daemon
-        RQ = IterableQueue(name="%s:IQ%d" % (self.name, seq()))
-        Hdesc = WTPoolEntry(HT, RQ)
-        self.all.append(Hdesc)
-        args.append(Hdesc)
-        debug("%s: start new worker thread (daemon=%s)", self, HT.daemon)
-        HT.start()
-      Hdesc.queue.put( (func, retq, deliver) )
+        T = Thread(target=self._handler, args=args, name=("%s:worker" % (self.name,)))
+        T.daemon = daemon
+        Q = IterableQueue(name="%s:IQ%d" % (self.name, seq()))
+        entry = WTPoolEntry(T, Q)
+        self.all.append(entry)
+        args.append(entry)
+        debug("%s: start new worker thread (daemon=%s)", self, T.daemon)
+        T.start()
+      entry.queue.put( (func, retq, deliver) )
 
-  def _handler(self, Hdesc):
+  def _handler(self, entry):
     ''' The code run by each handler thread.
         Read a function `func`, return queue `retq` and delivery
         function `deliver` from the function queue.
@@ -126,11 +127,11 @@ class WorkerThreadPool(MultiOpenMixin, O):
         If deliver is not None, deliver(result) is called.
         If both are None and an exception occurred, it gets raised.
     '''
-    HT, RQ = Hdesc
-    idle = self.idle_daemon if HT.daemon else self.idle_fg
-    for func, retq, deliver in RQ:
-      oname = HT.name
-      HT.name = "%s:RUNNING:%s" % (oname, func)
+    T, Q = entry
+    idle = self.idle_daemon if T.daemon else self.idle_fg
+    for func, retq, deliver in Q:
+      oname = T.name
+      T.name = "%s:RUNNING:%s" % (oname, func)
       result, exc_info = None, None
       try:
         debug("%s: worker thread: running task...", self)
@@ -147,10 +148,10 @@ class WorkerThreadPool(MultiOpenMixin, O):
           error("%s: worker thread: reraise exception", self)
           raise3(*exc_info)
         debug("%s: worker thread: set result = (None, exc_info)", self)
-      HT.name = oname
+      T.name = oname
       func = None     # release func+args
       with self._lock:
-        idle.append( Hdesc )
+        idle.append( entry )
         ##D("_handler released thread: idle = %s", idle)
       tup = (result, exc_info)
       if retq is not None:
