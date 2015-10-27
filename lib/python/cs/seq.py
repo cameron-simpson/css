@@ -191,14 +191,16 @@ class TrackingCounter(object):
       to go below zero.
   '''
 
-  def __init__(self, value=0, name=None):
+  def __init__(self, value=0, name=None, lock=None):
     ''' Initialise the counter to `value` (default 0) with the optional `name`.
     '''
     if name is None:
       name = "TrackingCounter-%d" % (seq(),)
+    if lock is None:
+      lock = Lock()
     self.value = value
     self.name = name
-    self._lock = Lock()
+    self._lock = lock
     self._watched = {}
     self._tag_up = {}
     self._tag_down = {}
