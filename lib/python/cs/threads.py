@@ -104,7 +104,7 @@ class WorkerThreadPool(MultiOpenMixin, O):
     idle = self.idle_daemon if daemon else self.idle_fg
     with self._lock:
       debug("dispatch: idle = %s", idle)
-      if len(idle) and daemon is None:
+      if len(idle):
         # use an idle thread
         entry = idle.pop()
         debug("dispatch: reuse %s", entry)
