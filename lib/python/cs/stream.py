@@ -55,13 +55,13 @@ class PacketConnection(object):
     self._sendQ = IterableQueue(16)
     self.closed = False
     # dispatch Thread to process received packets
-    self._recv_thread = Thread(target=self._receive)
+    self._recv_thread = Thread(target=self._receive, name="%s[_receive]" % (self.name,))
     self._recv_thread.daemon = True
     self._recv_thread.start()
     # dispatch Thread to send data
     # primary purpose is to bundle output by deferring flushes
     # otherwise we might just send synchronously
-    self._send_thread = Thread(target=self._send)
+    self._send_thread = Thread(target=self._send, name="%s[_send]" % (self.name,))
     self._send_thread.daemon = True
     self._send_thread.start()
     self._lock = Lock()
