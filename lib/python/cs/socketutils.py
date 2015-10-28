@@ -10,6 +10,21 @@ import errno
 import socket
 from cs.logutils import X
 
+def bind_next_port(sock, host, base_port):
+  ''' Bind a the socket `sock` to the first free (`host`, port); return the port.
+      `base_port`: the first port number to try.
+  '''
+  while True:
+    try:
+      sock.bind( (host, base_port) )
+    except OSError as e:
+      if e.errno == errno.EADDRINUSE:
+        base_port += 1
+      else:
+        raise
+    else:
+      return base_port
+
 class OpenSocket(object):
   ''' A file-like object for stream sockets, which uses os.shutdown on close.
   '''
