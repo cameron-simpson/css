@@ -5,6 +5,7 @@
 #
 
 import os
+import errno
 import random
 import sys
 import unittest
@@ -16,15 +17,23 @@ from .store import MappingStore
 from .store_tests import _TestStore
 from .tcp import TCPStoreServer, TCPStoreClient
 
-BIND_ADDR = '127.0.0.1'
-_start_port = 19999
+BIND_HOST = '127.0.0.1'
+_base_port = 9999
 
 def make_tcp_store():
-  global _start_port
-  bind_addr = (BIND_ADDR, _start_port)
-  _start_port += 1
+  global _base_port
   mapping_S = MappingStore(HashUtilDict())
-  remote_S = TCPStoreServer(bind_addr, mapping_S)
+  while True:
+    bind_addr = (BIND_HOST, _base_port)
+    try:
+      remote_S = TCPStoreServer(bind_addr, mapping_S)
+    except OSError as e:
+      if e.errno == errno.EADDRINUSE:
+        _base_port += 1
+      else:
+        raise
+    else:
+      break
   remote_S.open()
   S = TCPStoreClient(bind_addr)
   return S, remote_S
