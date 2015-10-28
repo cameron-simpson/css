@@ -4,8 +4,11 @@
 #   - Cameron Simpson <cs@zip.com.au> 28oct2015
 #
 
+import os
 import sys
+import errno
 import socket
+from cs.logutils import X
 
 class OpenSocket(object):
   ''' A file-like object for stream sockets, which uses os.shutdown on close.
