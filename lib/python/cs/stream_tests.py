@@ -15,7 +15,7 @@ import unittest
 from cs.logutils import X
 from cs.randutils import rand0, randblock
 from cs.serialise import get_bs
-from cs.socketutils import OpenSocket
+from cs.socketutils import bind_next_port, OpenSocket
 from .stream import PacketConnection
 
 class _TestStream(unittest.TestCase):
@@ -105,13 +105,13 @@ class TestStreamTCP(_TestStream):
 
   def _open_Streams(self):
     self.listen_sock = socket.socket()
-    self.listen_sock.bind( ('127.0.0.1', 9999) )
+    self.listen_port = bind_next_port(self.listen_sock, '127.0.0.1', 9999)
     self.listen_sock.listen(1)
     self.downstream_sock = None
     accept_Thread = Thread(target=self._accept)
     accept_Thread.start()
     self.upstream_sock = socket.socket()
-    self.upstream_sock.connect( ('127.0.0.1', 9999) )
+    self.upstream_sock.connect( ('127.0.0.1', self.listen_port) )
     accept_Thread.join()
     self.assertIsNot(self.downstream_sock, None)
     self.upstream_fp_rd = OpenSocket(self.upstream_sock, False)
