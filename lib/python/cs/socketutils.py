@@ -1,0 +1,49 @@
+#!/usr/bin/python
+#
+# Miscellaneous things to do with sockets.
+#   - Cameron Simpson <cs@zip.com.au> 28oct2015
+#
+
+import sys
+import socket
+
+class OpenSocket(object):
+  ''' A file-like object for stream sockets, which uses os.shutdown on close.
+  '''
+
+  def __init__(self, sock, for_write):
+    self._for_write = for_write
+    self._sock = sock
+    self._fp = os.fdopen(os.dup(self._sock.fileno()),
+                         'wb' if for_write else 'rb')
+
+  def write(self, data):
+    return self._fp.write(data)
+
+  def read(self, size=None):
+    return self._fp.read(size)
+
+  def flush(self):
+    return self._fp.flush()
+
+  def close(self):
+    try:
+      if self._for_write:
+        X("_sock.shutdown(SHUT_WR)")
+        self._sock.shutdown(socket.SHUT_WR)
+      else:
+        X("_sock.shutdown(SHUT_RD)")
+        self._sock.shutdown(socket.SHUT_RD)
+    except OSError as e:
+      if e.errno != errno.ENOTCONN:
+        raise
+    self._close()
+
+  def __del__(self):
+    self._close()
+
+  def _close(self):
+    if self._fp:
+      self._fp.close()
+      self._fp = None
+      self._sock = None
