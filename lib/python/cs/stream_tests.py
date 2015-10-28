@@ -12,11 +12,11 @@ import random
 import socket
 from threading import Thread
 import unittest
-from cs.fileutils import OpenSocket
+from cs.logutils import X
 from cs.randutils import rand0, randblock
 from cs.serialise import get_bs
-from cs.stream import PacketConnection
-from cs.logutils import X
+from cs.socketutils import OpenSocket
+from .stream import PacketConnection
 
 class _TestStream(unittest.TestCase):
 
