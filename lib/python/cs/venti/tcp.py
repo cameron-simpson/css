@@ -11,7 +11,7 @@ from socketserver import TCPServer, ThreadingMixIn, StreamRequestHandler
 from threading import Lock, Thread
 from .stream import StreamStore
 from cs.excutils import logexc
-from cs.fileutils import OpenSocket
+from cs.socketutils import OpenSocket
 from cs.logutils import debug, X, Pfx
 from cs.queues import MultiOpenMixin
 
