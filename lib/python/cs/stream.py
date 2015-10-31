@@ -342,8 +342,6 @@ class PacketConnection(object):
         if OSError.errno == errno.EPIPE:
           warning("remote end closed")
       self._send_fp = None
-      # prevent further Packet submission
-      Q.close()
       XP("return from _send")
 
 if __name__ == '__main__':
