@@ -56,7 +56,6 @@ class PacketConnection(object):
     self._later.open()
     # dispatch queue of Packets to send
     self._sendQ = IterableQueue(16)
-    self._sendQ.open()
     self.closed = False
     # dispatch Thread to process received packets
     self._recv_thread = Thread(target=self._receive, name="%s[_receive]" % (self.name,))
