@@ -140,12 +140,14 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin):
     raise NotImplementedError
 
   def startup(self):
-    self.__funcQ.open()
+    # Later already open
+    pass
 
   def shutdown(self):
     ''' Called by final MultiOpenMixin.close().
     '''
-    self.__funcQ.close()
+    self.__funcQ.close(enforce_final_close=True)
+    self.__funcQ.wait()
 
   def missing(self, hashes):
     ''' Yield hashcodes that are not in the store from an iterable hash
