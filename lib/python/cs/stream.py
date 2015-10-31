@@ -69,6 +69,7 @@ class PacketConnection(object):
     self._send_thread.daemon = True
     self._send_thread.start()
     self._lock = Lock()
+    # debugging: check for reuse of (channel,tag) etc
     self.__sent = set()
     self.__send_queued = set()
 
