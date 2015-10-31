@@ -158,28 +158,31 @@ class WorkerThreadPool(MultiOpenMixin, O):
         debug("%s: worker thread: set result = (None, exc_info)", self)
       T.name = oname
       func = None     # release func+args
-      with self._lock:
-        if len(idle) < self.max_spare:
+      reuse = False and (len(idle) < self.max_spare)
+      if reuse:
+        # make available for another task
+        with self._lock:
           idle.append(entry)
-        else:
-          self.all.remove(entry)
-          break
         ##D("_handler released thread: idle = %s", idle)
-      tup = (result, exc_info)
+      # deliver result
+      result_info = result, exc_info
       if retq is not None:
-        debug("%s: worker thread: %r.put(%s)...", self, retq, tup)
-        retq.put(tup)
-        debug("%s: worker thread: %r.put(%s) done", self, retq, tup)
+        debug("%s: worker thread: %r.put(%s)...", self, retq, result_info)
+        retq.put(result_info)
+        debug("%s: worker thread: %r.put(%s) done", self, retq, result_info)
         retq = None
       if deliver is not None:
-        debug("%s: worker thread: deliver %s...", self, tup)
-        deliver(tup)
+        debug("%s: worker thread: deliver %s...", self, result_info)
+        deliver(result_info)
         debug("%s: worker thread: delivery done", self)
         deliver = None
       # forget stuff
       result = None
       exc_info = None
-      tup = None
+      result_info = None
+      if not reuse:
+        self.all.remove(entry)
+        break
       debug("%s: worker thread: proceed to next function...", self)
 
 class AdjustableSemaphore(object):
