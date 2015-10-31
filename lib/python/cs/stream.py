@@ -315,6 +315,8 @@ class PacketConnection(object):
                 else:
                   R.result = result
       self._recv_fp.close()
+      self._recv_fp = None
+      self.shutdown()
 
   @logexc
   def _send(self):
