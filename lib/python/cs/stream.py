@@ -49,7 +49,7 @@ class PacketConnection(object):
     self._pending = {0: {}}
     # sequence of tag numbers
     # TODO: later, reuse old tags to prevent montonic growth of tag field
-    self._tag_seq = Seq()
+    self._tag_seq = Seq(1)
     # work queue for local requests
     self._later = Later(4, name="%s:Later" % (self,))
     self._later.open()
@@ -149,11 +149,21 @@ class PacketConnection(object):
         records the response decode function for use when the
         response arrives.
     '''
+    if rq_type < 0:
+      raise ValueError("rq_type may not be negative (%s)" % (rq_type,))
+    # reserve type 0 for end-of-requests
+    rq_type += 1
     tag = self._new_tag()
     R = Result()
     self._pending_add(channel, tag, Request_State(decode_response, R))
     self._send_request(channel, tag, rq_type, flags, payload)
     return R
+
+  def _send_EOF(self):
+    ''' Send special end-of-packets request packet. Receiver should quit.
+    '''
+    self._send_request(0, 0, 0, 0, b'')
+    self._sendQ.close()
 
   def _send_request(self, channel, tag, rq_type, flags, payload):
     ''' Issue a request.
@@ -224,10 +234,20 @@ class PacketConnection(object):
                   error("invalid request: truncated request type, payload=%r", payload)
                   self._reject(channel, tag)
                 else:
-                  requests[channel].add(tag)
-                  self._later.defer(self._run_request,
-                                    channel, tag, self.request_handler,
-                                    rq_type, flags, payload[offset:])
+                  if rq_type == 0:
+                    # catch magic EOF request: rq_type 0
+                    XP("RECEIVED EOF, breaking loop...")
+                    break
+                  else:
+                    # hide magic request type 0
+                    rq_type -= 1
+                    requests[channel].add(tag)
+                    # queue the work function and track it
+                    LF = self._later.defer(self._run_request,
+                                           channel, tag, self.request_handler,
+                                           rq_type, flags, payload[offset:])
+                    LF.notify(lambda LF: self._running.remove(LF))
+                    self._running.add(LF)
         else:
           with Pfx("response[%d:%d]", channel, tag):
             # response: get state of matching pending request, remove state
