@@ -314,8 +314,6 @@ class PacketConnection(object):
                   R.exc_info = sys.exc_info()
                 else:
                   R.result = result
-      if not self._sendQ.closed:
-        self._sendQ.close()
       self._recv_fp.close()
 
   @logexc
