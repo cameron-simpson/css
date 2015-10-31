@@ -24,12 +24,15 @@ from cs.logutils import debug, warning, error, PfxCallInfo, X
 from cs.obj import O
 from cs.py.func import callmethod_if as ifmethod
 
+class ClosedError(Exception):
+  pass
+
 def not_closed(func):
   ''' Decorator to wrap methods of objects with a .closed property which should raise when self.closed.
   '''
   def not_closed_wrapper(self, *a, **kw):
     if self.closed:
-      raise RuntimeError("%s: %s: already closed" % (not_closed_wrapper.__name__, self))
+      raise ClosedError("%s: %s: already closed" % (not_closed_wrapper.__name__, self))
     return func(self, *a, **kw)
   not_closed_wrapper.__name__ = "not_closed_wrapper(%s)" % (func.__name__,)
   return not_closed_wrapper
