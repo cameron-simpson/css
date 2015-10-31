@@ -91,9 +91,8 @@ class PacketConnection(object):
         XP("JOIN %s...", LF)
         LF.join()
       XP("ALL RUNNING TASKS JOINED")
-      # shut down remote receiver
-      XP("SEND EOF")
-      self._send_EOF()
+      # shut down sender, should trigger shutdown of remote receiver
+      self._sendQ.close()
       ##XP("_send_thread.join...")
       ##SKIP##self._send_thread.join()
       ##XP("_recv_thread.join...")
@@ -199,12 +198,6 @@ class PacketConnection(object):
     self._pending_add(channel, tag, Request_State(decode_response, R))
     self._send_request(channel, tag, rq_type, flags, payload)
     return R
-
-  def _send_EOF(self):
-    ''' Send special end-of-packets request packet. Receiver should quit.
-    '''
-    self._send_request(0, 0, 0, 0, b'')
-    self._sendQ.close()
 
   def _send_request(self, channel, tag, rq_type, flags, payload):
     ''' Issue a request.
@@ -341,8 +334,10 @@ class PacketConnection(object):
           if OSError.errno == errno.EPIPE:
             warning("remote end closed")
             break
-      XP("_send_fp.close...")
+      eof_packet = Packet(0, 0, True, 0, put_bs(0))
+      XP("send EOF and then _send_fp.close...")
       try:
+        write_Packet(fp, eof_packet)
         self._send_fp.close()
       except OSError as e:
         if OSError.errno == errno.EPIPE:
