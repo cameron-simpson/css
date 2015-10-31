@@ -237,10 +237,9 @@ class PacketConnection(object):
     ''' Receive packets from upstream, decode into requests and responses.
     '''
     with Pfx("%s._receive", self):
-      fp = self._recv_fp
       while True:
         try:
-          packet = read_Packet(fp)
+          packet = read_Packet(self._recv_fp)
         except EOFError:
           break
         channel = packet.channel
