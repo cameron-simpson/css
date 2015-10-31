@@ -265,6 +265,9 @@ class PacketConnection(object):
                 error("rejecting request: channel %d: tag already in use: %d",
                       channel, tag)
                 self._reject(channel, tag)
+              elif self.closed:
+                error("rejecting request: we are closed")
+                self._reject(channel, tag)
               else:
                 # payload for requests is the request enum and data
                 try:
