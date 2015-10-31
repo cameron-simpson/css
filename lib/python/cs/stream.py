@@ -51,7 +51,7 @@ class PacketConnection(object):
     # TODO: later, reuse old tags to prevent montonic growth of tag field
     self._tag_seq = Seq()
     # work queue for local requests
-    self._later = Later(4)
+    self._later = Later(4, name="%s:Later" % (self,))
     self._later.open()
     # dispatch queue for packets to send - bytes objects
     self._sendQ = IterableQueue(16)
