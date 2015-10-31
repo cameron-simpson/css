@@ -149,6 +149,15 @@ class PacketConnection(object):
       raise RuntimeError("BANG")
     return channel_info.pop(tag)
 
+  def _pending_cancel(self):
+    ''' Cancel all the pending requests.
+    '''
+    for chtag, state in self._pending_states():
+      channel, tag = chtag
+      X("%s: cancel pending request %d:%s", self, channel, tag)
+      decode_response, result = self._pending_pop(channel, tag)
+      result.cancel()
+
   def _queue_packet(self, P):
     sig = (P.channel, P.tag, P.is_request)
     if sig in self.__send_queued:
