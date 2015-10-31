@@ -72,7 +72,7 @@ class PacketConnection(object):
     self.__send_queued = set()
 
   def __str__(self):
-    return "PacketConnection[%s,closed=%s]" % (self.name, self.closed)
+    return "PacketConnection[%s]" % (self.name,)
 
   def shutdown(self):
     self.closed = True
