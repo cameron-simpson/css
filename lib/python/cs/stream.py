@@ -53,8 +53,9 @@ class PacketConnection(object):
     # work queue for local requests
     self._later = Later(4, name="%s:Later" % (self,))
     self._later.open()
-    # dispatch queue for packets to send - bytes objects
+    # dispatch queue of Packets to send
     self._sendQ = IterableQueue(16)
+    self._sendQ.open()
     self.closed = False
     # dispatch Thread to process received packets
     self._recv_thread = Thread(target=self._receive, name="%s[_receive]" % (self.name,))
