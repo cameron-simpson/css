@@ -12,7 +12,7 @@ from cs.excutils import logexc
 from cs.later import Later
 from cs.logutils import Pfx, warning, error, X, XP
 from cs.queues import IterableQueue
-from cs.resources import not_closed
+from cs.resources import not_closed, ClosedError
 from cs.seq import seq, Seq
 from cs.serialise import Packet, read_Packet, write_Packet, put_bs, get_bs
 from cs.threads import locked
@@ -122,7 +122,10 @@ class PacketConnection(object):
     if sig in self.__send_queued:
       raise RuntimeError("requeue of %s: %s" % (sig, P))
     self.__send_queued.add(sig)
-    self._sendQ.put(P)
+    try:
+      self._sendQ.put(P)
+    except ClosedError as e:
+      warning("%s: packet not sent: %s", self._sendQ, e)
 
   def _reject(self, channel, tag):
     ''' Issue a rejection of the specified request.
