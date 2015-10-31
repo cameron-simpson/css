@@ -41,8 +41,10 @@ class PacketConnection(object):
     self._recv_fp = recv_fp
     self._send_fp = send_fp
     self.request_handler = request_handler
-    # requests in play against the local system
-    self._channel_requests = {0: set()}
+    # tags of requests in play against the local system
+    self._channel_request_tags = {0: set()}
+    # LateFunctions for the requests we are performing for the remote system
+    self._running = set()
     # requests we have outstanding against the remote system
     self._pending = {0: {}}
     # sequence of tag numbers
@@ -174,7 +176,7 @@ class PacketConnection(object):
       self._reject(channel, tag)
     else:
       self._respond(channel, tag, result_flags, result_payload)
-    self._channel_requests[channel].remove(tag)
+    self._channel_request_tags[channel].remove(tag)
 
   @logexc
   def _receive(self):
@@ -201,12 +203,12 @@ class PacketConnection(object):
               self._reject(channel, tag)
             else:
               # request from upstream client
-              requests = self._channel_requests
+              requests = self._channel_request_tags
               if channel not in requests:
                 # unknown channel
                 error("rejecting request: unknown channel %d", channel)
                 self._reject(channel, tag)
-              elif tag in self._channel_requests[channel]:
+              elif tag in self._channel_request_tags[channel]:
                 error("rejecting request: channel %d: tag already in use: %d",
                       channel, tag)
                 self._reject(channel, tag)
