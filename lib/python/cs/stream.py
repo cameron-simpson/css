@@ -76,14 +76,32 @@ class PacketConnection(object):
     return "PacketConnection[%s]" % (self.name,)
 
   def shutdown(self):
-    self.closed = True
-    if not self._sendQ.closed:
-      self._sendQ.close()
-    self._send_thread.join()
-    self._send_fp = None
-    self._recv_thread.join()
-    self._recv_fp = None
-    self._later.close()
+    with Pfx("SHUTDOWN %s", self):
+      if self.closed:
+        X("SHUTDOWN DONE/IN-PROGRESS; RETURNING")
+        return
+      # prevent further request submission either local or remote
+      self.closed = True
+      ps = self._pending_states()
+      if ps:
+        X("PENDING STATES AT SHUTDOWN: %r", ps)
+      # wait for completion of requests we're performing
+      for LF in list(self._running):
+        XP("JOIN %s...", LF)
+        LF.join()
+      XP("ALL RUNNING TASKS JOINED")
+      # shut down remote receiver
+      XP("SEND EOF")
+      self._send_EOF()
+      ##XP("_send_thread.join...")
+      ##SKIP##self._send_thread.join()
+      ##XP("_recv_thread.join...")
+      ##SKIP##self._recv_thread.join()
+      ##XP("_later.close...")
+      self._later.close()
+      if not self._later.closed:
+        raise RuntimeError("%s: ._later not closed! %r", self, self._later)
+      ##XP("COMPLETE")
 
   def join(self):
     ''' Wait for the receive side of the connection to terminate.
@@ -92,6 +110,18 @@ class PacketConnection(object):
 
   def _new_tag(self):
     return next(self._tag_seq)
+
+  def _pending_states(self):
+    ''' Return a list of ( (channel, tag), Request_State ) for the currently pending requests.
+    '''
+    states = []
+    pending = self._pending
+    for channel in sorted(pending.keys()):
+      channel_states = pending[channel]
+      for tag in sorted(channel_states.keys()):
+        X("%s: cancel pending request %d:%s", self, channel, tag)
+        states.append( (tag, channel_states[tag]) )
+    return states
 
   @locked
   def _pending_add(self, channel, tag, state):
