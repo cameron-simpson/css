@@ -25,7 +25,8 @@ T_HASHCODES = RqType(5)     # (hashcode,length)=>hashcodes
 
 class StreamStore(BasicStoreAsync):
   ''' A Store connected to a remote Store via a PacketConnection.
-      Optionally accept a local store to facilitate bidirectional activities.
+      Optionally accept a local store to facilitate bidirectional activities
+      or simply to implement the server side.
   '''
 
   def __init__(self, name, send_fp, recv_fp, local_store=None):
