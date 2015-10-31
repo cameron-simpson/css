@@ -5,6 +5,7 @@
 #
 
 import sys
+import errno
 from collections import namedtuple
 from threading import Thread, Lock
 from cs.asynchron import Result
@@ -282,17 +283,32 @@ class PacketConnection(object):
         Write every packet directly to self._send_fp.
         Flush whenever the queue is empty.
     '''
-    fp = self._send_fp
-    Q = self._sendQ
-    for P in Q:
-      sig = (P.channel, P.tag, P.is_request)
-      if sig in self.__sent:
-        raise RuntimeError("second send of %s" % (P,))
-      self.__sent.add(sig)
-      write_Packet(fp, P)
-      if Q.empty():
-        fp.flush()
-    fp.close()
+    with Pfx("%s._send", self):
+      fp = self._send_fp
+      Q = self._sendQ
+      for P in Q:
+        sig = (P.channel, P.tag, P.is_request)
+        if sig in self.__sent:
+          raise RuntimeError("second send of %s" % (P,))
+        self.__sent.add(sig)
+        try:
+          write_Packet(fp, P)
+          if Q.empty():
+            fp.flush()
+        except OSError as e:
+          if OSError.errno == errno.EPIPE:
+            warning("remote end closed")
+            break
+      XP("_send_fp.close...")
+      try:
+        self._send_fp.close()
+      except OSError as e:
+        if OSError.errno == errno.EPIPE:
+          warning("remote end closed")
+      self._send_fp = None
+      # prevent further Packet submission
+      Q.close()
+      XP("return from _send")
 
 if __name__ == '__main__':
   import sys
