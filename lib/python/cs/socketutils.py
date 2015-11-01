@@ -47,19 +47,20 @@ class OpenSocket(object):
 
   def close(self):
     with Pfx("OpenSocket.close[fd0=%d,fd=%d]", self._fd0, self._fd):
-      try:
-        if self._for_write:
-          XP("_sock.shutdown(SHUT_WR)")
-          self._sock.shutdown(socket.SHUT_WR)
-        else:
-          XP("_sock.shutdown(SHUT_RD)")
-          self._sock.shutdown(socket.SHUT_RD)
-      except OSError as e:
-        if e.errno == errno.EBADF:
-          warning("socket on fd %d already closed: %s", self._fd, e)
-        elif e.errno != errno.ENOTCONN:
-          raise
-      self._close()
+      if self._sock is not None:
+        try:
+          if self._for_write:
+            XP("_sock.shutdown(SHUT_WR)")
+            self._sock.shutdown(socket.SHUT_WR)
+          else:
+            XP("_sock.shutdown(SHUT_RD)")
+            self._sock.shutdown(socket.SHUT_RD)
+        except OSError as e:
+          if e.errno == errno.EBADF:
+            warning("socket on fd %d already closed: %s", self._fd, e)
+          elif e.errno != errno.ENOTCONN:
+            raise
+        self._close()
 
   def __del__(self):
     self._close()
@@ -69,3 +70,16 @@ class OpenSocket(object):
       self._fp.close()
       self._fp = None
       self._sock = None
+
+  def selfcheck(self):
+    st1 = os.fstat(self._fd)
+    st2 = os.fstat(self._fd0)
+    st3 = os.fstat(self._sock)
+    if s1 != s2:
+      raise ValueError("fstat mismatch s1!=s2 (%s, %s)" % (s1, s2))
+    if s1 != s3:
+      raise ValueError("fstat mismatch s1!=s3 (%s, %s)" % (s1, s3))
+
+if __name__ == '__main__':
+  import cs.socketutils_tests
+  cs.socketutils_tests.selftest(sys.argv)
