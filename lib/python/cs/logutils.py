@@ -426,6 +426,7 @@ class _PfxThreadState(threading.local):
 
   def __init__(self):
     self.raise_needs_prefix = False
+    self._ur_prefix = None
     self.stack = []
 
   @property
@@ -448,7 +449,10 @@ class _PfxThreadState(threading.local):
       marks.append(P.umark)
       if P.absolute:
         break
-    return unicode(': ').join(reversed(marks))
+    if self._ur_prefix is not None:
+      marks.append(self._ur_prefix)
+    marks = reversed(marks)
+    return unicode(': ').join(marks)
 
   def append(self, P):
     ''' Push a new Pfx instance onto the stack.
