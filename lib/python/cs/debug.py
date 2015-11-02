@@ -17,6 +17,7 @@ DISTINFO = {
     'requires': ['cs.py3', 'cs.py.stack', 'cs.logutils', 'cs.obj', 'cs.seq', 'cs.timeutils'],
 }
 
+from contextlib import contextmanager
 import inspect
 import logging
 import sys
@@ -26,7 +27,7 @@ import traceback
 from cs.py3 import Queue, Queue_Empty
 from cs.py.stack import caller
 import cs.logutils
-from cs.logutils import infer_logging_level, debug, error, setup_logging, D, Pfx, ifdebug, X
+from cs.logutils import infer_logging_level, debug, error, setup_logging, D, Pfx, PrePfx, ifdebug, X
 from cs.obj import O, Proxy
 from cs.seq import seq
 from cs.timeutils import sleep
@@ -381,6 +382,23 @@ class DummyMap(object):
     v = self.__map.get(key)
     X("%s[%r] => %r", self, key, v)
     return v
+
+@contextmanager
+def POST(*funcs):
+  ''' Context manager to test a post condition.
+  '''
+  yield None
+  for func in funcs:
+    with PrePfx("POST: %s", func):
+      try:
+        ok = func()
+      except Exception as e:
+        error("exception during post condition func: %s", e)
+        raise
+      else:
+        if not ok:
+          error("post condition false")
+          raise RuntimeError("post condition false")
 
 if __name__ == '__main__':
   setup_logging()
