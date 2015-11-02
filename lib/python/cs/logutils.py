@@ -543,16 +543,18 @@ class Pfx(object):
     _state = self._state
     if exc_value is not None:
       if _state.raise_needs_prefix:
+        # prevent outer Pfx wrappers from hacking stuff as well
+        _state.raise_needs_prefix = False
+        # now hack the exception attributes
         prefix = self._state.prefix
-        ##prefixify = lambda text: prefix + ': ' + text.replace('\n', '\n'+prefix)
         def prefixify(text):
           if not isinstance(text, StringTypes):
             X("%s: not a string (class %s), not prefixing: %r",
               prefix, text.__class__, text)
             return text
           return prefix + ': ' + ustr(text, errors='replace').replace('\n', '\n'+prefix)
-        if hasattr(exc_value, 'args'):
-          args = exc_value.args
+        args = getattr(exc_value, 'args', None)
+        if args is not None:
           if args:
             if isinstance(args, StringTypes):
               D("%s: expected args to be a tuple, got %r", prefix, args)
@@ -560,7 +562,7 @@ class Pfx(object):
             else:
               args = list(args)
               if len(exc_value.args) == 0:
-                args = prefix
+                args = [ prefix ]
               else:
                 args = [ prefixify(exc_value.args[0]) ] + list(exc_value.args[1:])
             exc_value.args = args
@@ -577,8 +579,6 @@ class Pfx(object):
           # we can't modify this exception - at least report the current prefix state
           D("%s: Pfx.__exit__: exc_value = %s", prefix, O_str(exc_value))
           error(prefixify(str(exc_value)))
-        # prevent outer Pfx wrappers from hacking stuff as well
-        _state.raise_needs_prefix = False
     _state.pop()
     return False
 
