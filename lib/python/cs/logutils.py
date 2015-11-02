@@ -326,11 +326,13 @@ def D(msg, *args):
   if D_mode:
     X(msg, *args)
 
-def X(msg, *args):
+def X(msg, *args, file=None):
   ''' Unconditionally write the message `msg` to sys.stderr.
       If `args` is not empty, format `msg` using %-expansion with `args`.
   '''
-  return nl(msg, *args, file=sys.stderr)
+  if file is None:
+    file = sys.stderr
+  return nl(msg, *args, file=file)
 
 def XP(msg, *args):
   ''' Variation on X() which prefixes the message with the currrent Pfx prefix.
