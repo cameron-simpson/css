@@ -330,7 +330,7 @@ class PacketConnection(object):
           if Q.empty():
             fp.flush()
         except OSError as e:
-          if OSError.errno == errno.EPIPE:
+          if e.errno == errno.EPIPE:
             warning("remote end closed")
             break
       eof_packet = Packet(0, 0, True, 0, put_bs(0))
@@ -339,7 +339,7 @@ class PacketConnection(object):
         write_Packet(fp, eof_packet)
         self._send_fp.close()
       except OSError as e:
-        if OSError.errno == errno.EPIPE:
+        if e.errno == errno.EPIPE:
           warning("remote end closed")
       self._send_fp = None
       XP("return from _send")
