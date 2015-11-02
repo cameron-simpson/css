@@ -333,6 +333,7 @@ class PacketConnection(object):
           if e.errno == errno.EPIPE:
             warning("remote end closed")
             break
+          raise
       eof_packet = Packet(0, 0, True, 0, put_bs(0))
       XP("send EOF and then _send_fp.close...")
       try:
@@ -341,6 +342,8 @@ class PacketConnection(object):
       except OSError as e:
         if e.errno == errno.EPIPE:
           warning("remote end closed")
+        else:
+          raise
       self._send_fp = None
       XP("return from _send")
 
