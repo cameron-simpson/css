@@ -670,6 +670,18 @@ def prefix():
   '''
   return Pfx._state.prefix
 
+@contextmanager
+def PrePfx(pfx, *args):
+  ''' Push a temporary value for Pfx._state._ur_prefix to enloundenify messages.
+  '''
+  if args:
+    pfx = pfx % args
+  state = Pfx._state
+  old_ur_prefix = state._ur_prefix
+  state._ur_prefix = pfx
+  yield None
+  state._ur_prefix = old_ur_prefix
+
 class PfxCallInfo(Pfx):
   ''' Subclass of Pfx to insert current function an caller into messages.
   '''
