@@ -326,10 +326,11 @@ def D(msg, *args):
   if D_mode:
     X(msg, *args)
 
-def X(msg, *args, file=None):
+def X(msg, *args, **kwargs):
   ''' Unconditionally write the message `msg` to sys.stderr.
       If `args` is not empty, format `msg` using %-expansion with `args`.
   '''
+  file = kwargs.pop('file', None)
   if file is None:
     file = sys.stderr
   return nl(msg, *args, file=file)
