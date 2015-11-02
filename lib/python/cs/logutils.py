@@ -335,13 +335,25 @@ def X(msg, *args, **kwargs):
     file = sys.stderr
   return nl(msg, *args, file=file)
 
-def XP(msg, *args):
+def XP(msg, *args, **kwargs):
   ''' Variation on X() which prefixes the message with the currrent Pfx prefix.
   '''
-  sys.stderr.write(prefix())
-  sys.stderr.write(': ')
-  sys.stderr.flush()
-  return X(msg, *args)
+  file = kwargs.pop('file', None)
+  if file is None:
+    file = sys.stderr
+  elif file is not None:
+    if isinstance(file, StringTypes):
+      with open(file, "a") as fp:
+        XP(msg, *args, file=fp)
+      return
+  file.write(prefix())
+  file.write(': ')
+  file.flush()
+  return X(msg, *args, file=file)
+
+def XX(prepfx, msg, *args, **kwargs):
+  with PrePfx(prepfx):
+    return XP(msg, *args, **kwargs)
 
 def nl(msg, *args, **kw):
   ''' Unconditionally write the message `msg` to `file` (default sys.stdout).
