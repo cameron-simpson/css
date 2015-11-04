@@ -18,6 +18,7 @@ DISTINFO = {
 }
 
 from contextlib import contextmanager
+from cmd import Cmd
 import inspect
 import logging
 import sys
@@ -399,6 +400,30 @@ def POST(*funcs):
         if not ok:
           error("post condition false")
           raise RuntimeError("post condition false")
+
+class DebugShell(Cmd):
+  ''' An interactive prompt for python statements, attached to /dev/tty by default.
+  '''
+
+  def __init__(self, var_dict, stdin=None, stdout=None):
+    if stdin is None:
+      stdin = open('/dev/tty', 'r')
+    if stdout is None:
+      stdout = open('/dev/tty', 'a')
+    self.stdin = stdin
+    self.stdout = stdout
+    Cmd.__init__(self, stdin=stdin, stdout=stdout)
+    self.vars = var_dict
+
+  def default(self, line):
+    if line == 'EOF':
+      return True
+    try:
+      result = exec(line, globals(), self.vars)
+    except Exception as e:
+      X("Exception: %s", e)
+    self.stdout.flush()
+    return False
 
 if __name__ == '__main__':
   setup_logging()
