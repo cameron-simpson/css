@@ -90,14 +90,16 @@ class _QueueIterator(MultiOpenMixin):
     q = self.q
     try:
       item = q.get()
-    except Queue_Empty:
-      D("%s: EMPTY, calling finalise...", self)
+    except Queue_Empty as e:
+      X("%s: EMPTY, (SHOULD THIS HAPPEN?) calling finalise...", self)
+      self._put(self.sentinel)
       self.finalise()
-      raise StopIteration
+      raise StopIteration("Queue_Empty: %s", e)
     if item is self.sentinel:
+      X("%s: SENTINEL RECEIVED, STOP ITERATION", self)
       # put the sentinel back for other iterators
-      self._put(item)
-      raise StopIteration
+      self._put(self.sentinel)
+      raise StopIteration("SENTINEL")
     self._item_count -= 1
     return item
 
