@@ -21,8 +21,8 @@ import logging
 from threading import Timer
 import time
 from cs.debug import Lock, RLock, Thread, trace, trace_caller, stack_dump
-from cs.logutils import exception, error, warning, debug, D, X, Pfx, PfxCallInfo
-from cs.resources import MultiOpenMixin, not_closed
+from cs.logutils import exception, error, warning, debug, D, X, XP, Pfx, PfxCallInfo
+from cs.resources import MultiOpenMixin, not_closed, ClosedError
 from cs.seq import seq
 from cs.py3 import Queue, PriorityQueue, Queue_Full, Queue_Empty
 from cs.obj import O
@@ -58,6 +58,7 @@ class _QueueIterator(MultiOpenMixin):
     if self.closed:
       with PfxCallInfo():
         warning("%r.put: all closed: item=%s", self, item)
+      raise ClosedError("_QueueIterator closed")
     if item is self.sentinel:
       raise ValueError("put(sentinel)")
     self._item_count += 1
