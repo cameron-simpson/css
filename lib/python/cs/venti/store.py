@@ -22,7 +22,7 @@ from threading import Thread
 from cs.py3 import Queue
 from cs.asynchron import report as reportLFs
 from cs.later import Later
-from cs.logutils import info, debug, warning, Pfx, D, X
+from cs.logutils import info, debug, warning, Pfx, D, X, XP
 from cs.resources import MultiOpenMixin
 from cs.seq import Seq
 from cs.threads import Q1, Get1
