@@ -20,7 +20,7 @@ from threading import Condition, RLock
 import time
 import traceback
 from cs.excutils import logexc
-from cs.logutils import debug, warning, error, PfxCallInfo, X
+from cs.logutils import debug, warning, error, PfxCallInfo, X, XP
 from cs.obj import O
 from cs.py.func import callmethod_if as ifmethod
 
@@ -83,8 +83,6 @@ class MultiOpenMixin(O):
         self.startup()
     return self
 
-  @logexc
-  ##@not_closed
   def close(self, enforce_final_close=False):
     ''' Decrement the open count.
         If the count goes to zero, call self.shutdown().
@@ -92,11 +90,12 @@ class MultiOpenMixin(O):
     with self._lock:
       if self._opens < 1:
         error("%s: EXTRA CLOSE", self)
+        from cs.debug import thread_dump
+        thread_dump([threading.current_thread()])
+        raise RuntimeError("UNDERFLOW CLOSE of %s" % (self,))
       self._opens -= 1
       count = self._opens
       if self._opens == 0:
-        if enforce_final_close:
-          self.D("OK FINAL CLOSE")
         self.shutdown()
         if not self._finalise_later:
           self.finalise()
@@ -121,7 +120,8 @@ class MultiOpenMixin(O):
     if self._opens > 0:
       return False
     if self._opens < 0:
-      XP("%r._opens < 0: %r", self, self._opens)
+      XP("_opens < 0: %r", self._opens)
+      raise RuntimeError("_OPENS UNDERFLOW")
     if not self.opened:
       # never opened, so not totally closed
       return False
