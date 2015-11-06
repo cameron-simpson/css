@@ -97,7 +97,7 @@ class Asynchron(O):
         # completed - "fail" the cancel, no call to ._complete
         return False
       if state == ASYNCH_RUNNING or state == ASYNCH_PENDING:
-        # in progress - change state to cancelled and fall through to ._complete
+        # in progress or not commenced - change state to cancelled and fall through to ._complete
         state = ASYNCH_CANCELLED
       else:
         # state error
