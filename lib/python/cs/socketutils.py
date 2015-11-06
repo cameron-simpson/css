@@ -8,7 +8,7 @@ import os
 import sys
 import errno
 import socket
-from cs.logutils import X, XP, Pfx, warning
+from cs.logutils import X, XP, Pfx, PrePfx, warning, info
 
 def bind_next_port(sock, host, base_port):
   ''' Bind a the socket `sock` to the first free (`host`, port); return the port.
@@ -17,6 +17,11 @@ def bind_next_port(sock, host, base_port):
   while True:
     try:
       sock.bind( (host, base_port) )
+    except socket.error as e:
+      if e.errno == errno.EADDRINUSE:
+        base_port += 1
+      else:
+        raise
     except OSError as e:
       if e.errno == errno.EADDRINUSE:
         base_port += 1
@@ -46,21 +51,31 @@ class OpenSocket(object):
     return self._fp.flush()
 
   def close(self):
-    with Pfx("OpenSocket.close[fd0=%d,fd=%d]", self._fd0, self._fd):
+    with Pfx("OpenSocket.close[fd=%d,fd0=%d]", self._fd, self._fd0):
       if self._sock is not None:
-        try:
-          if self._for_write:
-            XP("_sock.shutdown(SHUT_WR)")
-            self._sock.shutdown(socket.SHUT_WR)
-          else:
-            XP("_sock.shutdown(SHUT_RD)")
-            self._sock.shutdown(socket.SHUT_RD)
-        except OSError as e:
-          if e.errno == errno.EBADF:
-            warning("socket on fd %d already closed: %s", self._fd, e)
-          elif e.errno != errno.ENOTCONN:
-            raise
-        self._close()
+        if self._for_write:
+          shut_mode = socket.SHUT_WR
+          shut_mode_s = 'SHUT_WR'
+        else:
+          shut_mode = socket.SHUT_RD
+          shut_mode_s = 'SHUT_RD'
+        with Pfx("_sock.shutdown(%s)", shut_mode_s):
+          try:
+            self._sock.shutdown(shut_mode)
+          except socket.error as e:
+            if e.errno == errno.ENOTCONN:
+              info("%s", e)
+            else:
+              warning("%s", e)
+              raise
+          except OSError as e:
+            if e.errno == errno.EBADF:
+              warning("already closed: %s", e)
+            elif e.errno == errno.ENOTCONN:
+              warning("not connected: %s", e)
+            else:
+              raise
+          self._close()
 
   def __del__(self):
     self._close()
