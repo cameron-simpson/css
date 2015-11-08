@@ -93,7 +93,7 @@ then
       case $op in
         disable)    flag -w "${uname}_DISABLE" 1 ;;
         enable)     flag -w "${uname}_DISABLE" 0 ;;
-        restart)    flag -w "$uname}_RESTART" 1 ;;
+        restart)    flag -w "${uname}_RESTART" 1 ;;
         *)          echo "$cmd: $op: UNHANDLED!" >&2; exit 1 ;;
       esac
       exit
