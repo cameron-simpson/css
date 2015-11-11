@@ -77,11 +77,12 @@ class PacketConnection(object):
 
   def shutdown(self):
     with Pfx("SHUTDOWN %s", self):
-      if self.closed:
-        X("SHUTDOWN DONE/IN-PROGRESS; RETURNING")
-        return
-      # prevent further request submission either local or remote
-      self.closed = True
+      with self._lock:
+        if self.closed:
+          # shutdown already called from another thread
+          return
+        # prevent further request submission either local or remote
+        self.closed = True
       ps = self._pending_states()
       if ps:
         X("PENDING STATES AT SHUTDOWN: %r", ps)
