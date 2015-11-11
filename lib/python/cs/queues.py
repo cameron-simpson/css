@@ -101,6 +101,8 @@ class _QueueIterator(MultiOpenMixin):
       self._put(self.sentinel)
       raise StopIteration("SENTINEL")
     self._item_count -= 1
+    if self._item_count < 0:
+      raise RuntimeError("_item_count < 0")
     return item
 
   next = __next__
