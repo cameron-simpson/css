@@ -58,6 +58,7 @@ class PacketConnection(object):
     self._later.open()
     # dispatch queue of Packets to send
     self._sendQ = IterableQueue(16)
+    self._lock = Lock()
     self.closed = False
     # dispatch Thread to process received packets
     self._recv_thread = Thread(target=self._receive, name="%s[_receive]" % (self.name,))
@@ -69,7 +70,6 @@ class PacketConnection(object):
     self._send_thread = Thread(target=self._send, name="%s[_send]" % (self.name,))
     self._send_thread.daemon = True
     self._send_thread.start()
-    self._lock = Lock()
     # debugging: check for reuse of (channel,tag) etc
     self.__sent = set()
     self.__send_queued = set()
