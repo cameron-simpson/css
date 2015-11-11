@@ -408,6 +408,18 @@ class DebugShell(Cmd):
     self.stdout.flush()
     return False
 
+def debug_object_shell(o, prompt=None):
+  if prompt is None:
+    prompt = str(o) + '> '
+  v = o.__dict__
+  C = DebugShell(v)
+  intro = '\n\n'
+  for k in sorted(v.keys()):
+    intro += '\n  %s = %r' % (k, v[k])
+  intro += '\n'
+  C.prompt = prompt
+  C.cmdloop(intro)
+
 if __name__ == '__main__':
   setup_logging()
   @DEBUG
