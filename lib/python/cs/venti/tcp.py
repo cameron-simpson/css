@@ -22,6 +22,7 @@ class _Server(ThreadingMixIn, TCPServer):
       TCPServer.__init__(self, bind_addr, _RequestHandler)
       self.bind_addr = bind_addr
       self.S = S
+      self.handlers = set()
 
   def __str__(self):
     return "TCPStoreServer:_Server(%s,%s)" % (self.bind_addr, self.S,)
@@ -68,6 +69,7 @@ class _RequestHandler(StreamRequestHandler):
 
   @logexc
   def __init__(self, request, client_address, server):
+    self.server = server
     self.S = server.S
     StreamRequestHandler.__init__(self, request, client_address, server)
 
@@ -78,8 +80,10 @@ class _RequestHandler(StreamRequestHandler):
                      OpenSocket(self.request, True),
                      local_store=self.S,
                     )
+    self.server.handlers.add(RS)
     RS.join()
     RS.shutdown()
+    self.server.handlers.remove(RS)
 
 class TCPStoreClient(StreamStore):
   ''' A Store attached to a remote Store at `bind_addr`.
