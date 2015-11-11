@@ -44,12 +44,12 @@ class StreamStore(BasicStoreAsync):
   def shutdown(self):
     ''' Close the StreamStore.
     '''
-    if not self._conn.closed:
+    with Pfx("SHUTDOWN %s", self):
       self._conn.shutdown()
-    local_store = self.local_store
-    if local_store:
-      local_store.close()
-    BasicStoreAsync.shutdown(self)
+      local_store = self.local_store
+      if local_store:
+        local_store.close()
+      BasicStoreAsync.shutdown(self)
 
   def join(self):
     ''' Wait for the PacketConnection to shut down.
