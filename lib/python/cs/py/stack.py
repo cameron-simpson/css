@@ -38,6 +38,15 @@ def caller():
   # -3: the calling function of the invoker
   return frames()[-3]
 
+def stack_dump(fp=None):
+  ''' Recite current stack to `fp`, default sys.stderr.
+  '''
+  if fp is None:
+    fp = sys.stderr
+  for F in frames():
+    fp.write(str(F))
+    fp.write('\n')
+
 if __name__ == '__main__':
   import cs.py.stack_tests
   cs.py.stack_tests.selftest(sys.argv)
