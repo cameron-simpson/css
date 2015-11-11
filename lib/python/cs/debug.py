@@ -384,23 +384,6 @@ class DummyMap(object):
     X("%s[%r] => %r", self, key, v)
     return v
 
-@contextmanager
-def POST(*funcs):
-  ''' Context manager to test a post condition.
-  '''
-  yield None
-  for func in funcs:
-    with PrePfx("POST: %s", func):
-      try:
-        ok = func()
-      except Exception as e:
-        error("exception during post condition func: %s", e)
-        raise
-      else:
-        if not ok:
-          error("post condition false")
-          raise RuntimeError("post condition false")
-
 class DebugShell(Cmd):
   ''' An interactive prompt for python statements, attached to /dev/tty by default.
   '''
