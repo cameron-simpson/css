@@ -210,23 +210,25 @@ class PacketConnection(object):
   def _run_request(self, channel, tag, handler, rq_type, flags, payload):
     ''' Run a request and queue a response packet.
     '''
-    try:
-      result_flags = 0
-      result_payload = bytes(())
-      result = handler(rq_type, flags, payload)
-      if result is not None:
-        if isinstance(result, int):
-          result_flags = result
-        elif isinstance(result, bytes):
-          result_payload = result
-        else:
-          result_flags, result_payload = result
-    except Exception as e:
-      warning("exception: %s", e)
-      self._reject(channel, tag)
-    else:
-      self._respond(channel, tag, result_flags, result_payload)
-    self._channel_request_tags[channel].remove(tag)
+    with Pfx("_run_request[ch=%d,tag=%d, rq_type=%d,flags=0x%02x,payload=%r",
+              channel, tag, rq_type, flags, payload):
+      try:
+        result_flags = 0
+        result_payload = bytes(())
+        result = handler(rq_type, flags, payload)
+        if result is not None:
+          if isinstance(result, int):
+            result_flags = result
+          elif isinstance(result, bytes):
+            result_payload = result
+          else:
+            result_flags, result_payload = result
+      except Exception as e:
+        warning("exception: %s", e)
+        self._reject(channel, tag)
+      else:
+        self._respond(channel, tag, result_flags, result_payload)
+      self._channel_request_tags[channel].remove(tag)
 
   @logexc
   def _receive(self):
