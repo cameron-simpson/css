@@ -30,11 +30,13 @@ class PacketConnection(object):
         `send_fp`: outbound binary stream
         `request_handler`: if supplied and not None, should be a
             callable accepting (request_type, flags, payload)
-        The request_handler may return one of 4 values:
+        The request_handler may return one of 4 values on success:
           None  Respond will be 0 flags and an empty payload.
           int   Flags only. Response will be the flags and an empty payload.
-          bytes Payload only. Response with be 0 flags and the payload.
+          bytes Payload only. Response will be 0 flags and the payload.
           (int, bytes) Specify flags and payload for response.
+        An unsuccessful request should raise an exception, which
+        will cause a failure response packet.
     '''
     if name is None:
       name = str(seq())
