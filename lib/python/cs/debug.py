@@ -425,8 +425,9 @@ if __name__ == '__main__':
   @DEBUG
   def testfunc(x):
     debug("into testfunc: x=%r", x)
-    sleep(7)
+    sleep(2)
     debug("leaving testfunc: returning x=%r", x)
     return x
   print("TESTFUNC", testfunc(9))
   thread_dump()
+  ##DebugShell({'x': 1, 'y':2}).cmdloop('Debug> ')
