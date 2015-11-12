@@ -7,8 +7,10 @@
 import os
 import errno
 import random
+import time
 import sys
 import unittest
+from cs.debug import thread_dump, debug_object_shell
 from cs.logutils import X
 from cs.randutils import rand0, randblock
 from .hash import HashUtilDict
@@ -34,6 +36,7 @@ def make_tcp_store():
         raise
     else:
       break
+  X("BIND ADDRESS = %r", bind_addr)
   remote_S.open()
   S = TCPStoreClient(bind_addr)
   return S, remote_S
@@ -64,9 +67,14 @@ class TestHashCodeUtilsTCPStore(_TestHashCodeUtils, unittest.TestCase):
   def tearDown(self):
     self.remote_S.close()
     _TestHashCodeUtils.tearDown(self)
+    debug_object_shell(self, prompt='%s.tearDown> ' % (self._testMethodName,))
 
 def selftest(argv):
   unittest.main(__name__, None, argv)
 
 if __name__ == '__main__':
+  import signal
+  def hup(sig, frame):
+    thread_dump()
+  signal.signal(signal.SIGHUP, hup)
   selftest(sys.argv)
