@@ -41,6 +41,9 @@ class OpenSocket(object):
     self._fd = os.dup(self._fd0)
     self._fp = os.fdopen(self._fd, 'wb' if for_write else 'rb')
 
+  def __str__(self):
+    return "OpenSocket[fd=%d,fd0=%d]" % (self._fd, self._fd0)
+
   def write(self, data):
     return self._fp.write(data)
 
