@@ -91,17 +91,14 @@ class PacketConnection(object):
         X("PENDING STATES AT SHUTDOWN: %r", ps)
       # wait for completion of requests we're performing
       for LF in list(self._running):
-        XP("JOIN %s...", LF)
         LF.join()
-      XP("ALL RUNNING TASKS JOINED")
       # shut down sender, should trigger shutdown of remote receiver
-      self._sendQ.close()
-      ##XP("_send_thread.join...")
-      ##SKIP##self._send_thread.join()
-      ##XP("_recv_thread.join...")
-      ##SKIP##self._recv_thread.join()
-      ##XP("_later.close...")
-      self._later.close()
+      self._sendQ.close(enforce_final_close=True)
+      self._send_thread.join()
+      # we do not wait for the receiver - anyone hanging on outstaning
+      # requests will get them as they come in, and in thoery a network
+      # disconnect might leave the receiver hanging anyway
+      self._later.close(enforce_final_close=True)
       if not self._later.closed:
         raise RuntimeError("%s: ._later not closed! %r", self, self._later)
       ##XP("COMPLETE")
