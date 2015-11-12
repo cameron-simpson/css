@@ -19,11 +19,12 @@ from functools import partial
 import sys
 from collections import deque
 import threading
+import time
 import traceback
 from cs.py3 import Queue, raise3
 from cs.py.func import funcname
-import time
-from cs.debug import ifdebug, Lock, RLock, Thread, trace_caller, thread_dump
+from cs.py.stack import caller
+from cs.debug import ifdebug, Lock, RLock, Thread, trace_caller, thread_dump, stack_dump
 from cs.excutils import noexc, noexc_gen, logexc, logexc_gen, LogExceptions
 from cs.queues import IterableQueue, IterablePriorityQueue, PushQueue, \
                         MultiOpenMixin, TimerQueue
@@ -31,7 +32,7 @@ from cs.threads import AdjustableSemaphore, \
                        WorkerThreadPool, locked
 from cs.asynchron import Result, Asynchron, ASYNCH_RUNNING, report
 from cs.seq import seq, TrackingCounter
-from cs.logutils import Pfx, PfxCallInfo, error, info, warning, debug, exception, D, X, OBSOLETE
+from cs.logutils import Pfx, PrePfx, PfxCallInfo, error, info, warning, debug, exception, D, X, XP, OBSOLETE
 
 # function signature designators, used with Later.pipeline()
 FUNC_ONE_TO_MANY = 0
