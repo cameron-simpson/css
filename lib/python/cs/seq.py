@@ -20,6 +20,7 @@ import itertools
 from threading import Lock, Condition
 from cs.logutils import warning, debug, D
 from cs.py.stack import caller
+from cs.py3 import exec_code
 
 class Seq(object):
   ''' A thread safe wrapper for itertools.count().
@@ -106,9 +107,9 @@ def NamedTupleClassFactory(*fields):
   class NamedTuple(list):
     for i in range(len(fields)):
       f=fields[i]
-      exec('def getx(self): return self[%d]' % i)
-      exec('def setx(self,value): self[%d]=value' % i)
-      exec('%s=property(getx,setx)' % f)
+      exec_code('def getx(self): return self[%d]' % i)
+      exec_code('def setx(self,value): self[%d]=value' % i)
+      exec_code('%s=property(getx,setx)' % f)
   return NamedTuple
 
 def NamedTuple(fields,iter=()):
