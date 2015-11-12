@@ -11,7 +11,8 @@ from threading import Thread, Lock
 from cs.asynchron import Result
 from cs.excutils import logexc
 from cs.later import Later
-from cs.logutils import Pfx, warning, error, X, XP
+from cs.logutils import Pfx, warning, error, X, XP, PrePfx
+from cs.predicate import post_condition
 from cs.queues import IterableQueue
 from cs.resources import not_closed, ClosedError
 from cs.seq import seq, Seq
