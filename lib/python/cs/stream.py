@@ -78,7 +78,10 @@ class PacketConnection(object):
   def __str__(self):
     return "PacketConnection[%s]" % (self.name,)
 
-  def shutdown(self):
+  def shutdown(self, block=False):
+    ''' Shut down the PacketConnection, optionally blocking for outstanding requests.
+        `block`: block for outstanding requests, default False.
+    '''
     with Pfx("SHUTDOWN %s", self):
       with self._lock:
         if self.closed:
@@ -98,9 +101,13 @@ class PacketConnection(object):
       # we do not wait for the receiver - anyone hanging on outstaning
       # requests will get them as they come in, and in thoery a network
       # disconnect might leave the receiver hanging anyway
-      self._later.close(enforce_final_close=True)
-      if not self._later.closed:
-        raise RuntimeError("%s: ._later not closed! %r", self, self._later)
+      if block:
+        self._later.quiesce()
+        self._later.close(enforce_final_close=True)
+        if not self._later.closed:
+          raise RuntimeError("%s: ._later not closed! %r", self, self._later)
+      else:
+        self._later.close()
       ##XP("COMPLETE")
 
   def join(self):
