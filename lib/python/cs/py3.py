@@ -34,7 +34,7 @@ if sys.hexversion >= 0x03000000:
     return o.values()
   from builtins import sorted, filter, bytes, input
   from itertools import filterfalse
-  from .py3_for3 import raise3
+  from .py3_for3 import raise3, exec_code
 
 else:
 
@@ -65,7 +65,7 @@ else:
     return _sorted(iterable, None, key, reverse)
   input = raw_input
   from itertools import ifilter as filter, ifilterfalse as filterfalse
-  from .py3_for2 import raise3
+  from .py3_for2 import raise3, exec_code
 
   class bytes(list):
     ''' Trite bytes implementation.

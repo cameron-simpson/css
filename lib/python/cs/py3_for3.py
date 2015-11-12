@@ -7,3 +7,5 @@
 
 def raise3(exc_type, exc_value, exc_traceback):
   raise exc_type(exc_value).with_traceback(exc_traceback)
+
+exec_code = exec
