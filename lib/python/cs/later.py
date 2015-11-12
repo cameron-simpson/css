@@ -518,6 +518,14 @@ class Later(MultiOpenMixin):
     self._dispatchThread.daemon = True
     self._dispatchThread.start()
 
+  def close(self, *a, **kw):
+    with PrePfx("LATER.CLOSE %s", self):
+      try:
+        MultiOpenMixin.close(self, *a, **kw)
+      except RuntimeError as e:
+        XP("LATER NOT IDLE: %r", self)
+        raise
+
   def __repr__(self):
     return '<%s "%s" capacity=%s running=%d (%s) pending=%d (%s) delayed=%d busy=%d:%r closed=%s>' \
            % ( self.__class__.__name__, self.name,
@@ -567,9 +575,11 @@ class Later(MultiOpenMixin):
 	- close the worker thread pool, which waits for any of its
           outstanding threads to complete
     '''
-    with Pfx("%s.shutdown()" % (self,)):
+    ##with Pfx("%s.shutdown()", self):
+    with PrePfx("LATER.SHUTDOWN [%s]", self):
       if not self.closed:
         error("NOT CLOSED")
+        raise RuntimeError("NOT CLOSED!")
       if self.finished:
         warning("_finish: finished=%r, early return", self.finished)
         return
@@ -605,12 +615,16 @@ class Later(MultiOpenMixin):
     ''' Wait for all active and pending jobs to complete, including
         any jobs they may themselves queue.
     '''
-    if self.finished:
-      debug("%s.wait: already finished - return immediately", self)
-      pass
-    else:
-      self._finished.acquire()
-      self._finished.wait()
+    with Pfx("LATER %s.wait", self):
+      if self.finished:
+        debug("%s.wait: already finished - return immediately", self)
+        pass
+      else:
+        XP("_finished.acquire...")
+        self._finished.acquire()
+        XP("_finished.wait...")
+        self._finished.wait()
+        XP("_finished")
 
   def _track(self, tag, LF, fromset, toset):
     def SN(s):
