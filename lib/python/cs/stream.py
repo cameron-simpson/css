@@ -232,87 +232,99 @@ class PacketConnection(object):
   def _receive(self):
     ''' Receive packets from upstream, decode into requests and responses.
     '''
-    with Pfx("%s._receive", self):
-      while True:
-        try:
-          packet = read_Packet(self._recv_fp)
-        except EOFError:
-          break
-        channel = packet.channel
-        tag = packet.tag
-        flags = packet.flags
-        payload = packet.payload
-        if packet.is_request:
-          with Pfx("request[%d:%d]", channel, tag):
-            if self.closed:
-              error("rejecting request: closed")
-              self._reject(channel, tag)
-            elif self.request_handler is None:
-              error("rejecting request: no self.request_handler")
-              self._reject(channel, tag)
-            else:
-              # request from upstream client
-              requests = self._channel_request_tags
-              if channel not in requests:
-                # unknown channel
-                error("rejecting request: unknown channel %d", channel)
+    ##with Pfx("%s._receive", self):
+    with PrePfx("_RECEIVE [%s]", self):
+      with post_condition( ("_recp_fp is None", lambda: self._recv_fp is None) ):
+        while True:
+          try:
+            packet = read_Packet(self._recv_fp)
+          except EOFError:
+            XP("read_Packet: EOF, breaking loop...")
+            break
+          channel = packet.channel
+          tag = packet.tag
+          flags = packet.flags
+          payload = packet.payload
+          if packet.is_request:
+            with Pfx("request[%d:%d]", channel, tag):
+              if self.closed:
+                error("rejecting request: closed")
                 self._reject(channel, tag)
-              elif tag in self._channel_request_tags[channel]:
-                error("rejecting request: channel %d: tag already in use: %d",
-                      channel, tag)
-                self._reject(channel, tag)
-              elif self.closed:
-                error("rejecting request: we are closed")
+              elif self.request_handler is None:
+                error("rejecting request: no self.request_handler")
                 self._reject(channel, tag)
               else:
-                # payload for requests is the request enum and data
-                try:
-                  rq_type, offset = get_bs(payload)
-                except IndexError as e:
-                  error("invalid request: truncated request type, payload=%r", payload)
+                # request from upstream client
+                requests = self._channel_request_tags
+                if channel not in requests:
+                  # unknown channel
+                  error("rejecting request: unknown channel %d", channel)
+                  self._reject(channel, tag)
+                elif tag in self._channel_request_tags[channel]:
+                  error("rejecting request: channel %d: tag already in use: %d",
+                        channel, tag)
+                  self._reject(channel, tag)
+                elif self.closed:
+                  error("rejecting request: we are closed")
                   self._reject(channel, tag)
                 else:
-                  if rq_type == 0:
-                    # catch magic EOF request: rq_type 0
-                    XP("RECEIVED EOF, breaking loop...")
-                    break
+                  # payload for requests is the request enum and data
+                  try:
+                    rq_type, offset = get_bs(payload)
+                  except IndexError as e:
+                    error("invalid request: truncated request type, payload=%r", payload)
+                    self._reject(channel, tag)
                   else:
-                    # hide magic request type 0
-                    rq_type -= 1
-                    requests[channel].add(tag)
-                    # queue the work function and track it
-                    LF = self._later.defer(self._run_request,
-                                           channel, tag, self.request_handler,
-                                           rq_type, flags, payload[offset:])
-                    LF.notify(lambda LF: self._running.remove(LF))
-                    self._running.add(LF)
-        else:
-          with Pfx("response[%d:%d]", channel, tag):
-            # response: get state of matching pending request, remove state
-            try:
-              rq_state = self._pending_pop(channel, tag)
-            except ValueError as e:
-              # no such pending pair - response to unknown request
-              error("%d.%d: response to unknown request: %s", channel, tag, e)
-            else:
-              decode_response, R = rq_state
-              # first flag is "ok"
-              ok = (flags & 0x01) != 0
-              flags >>= 1
-              payload = packet.payload
-              if not ok:
-                R.raise_(ValueError("response not ok: ok=%s, flags=%s, payload=%r"
-                                    % (ok, flags, payload)))
+                    if rq_type == 0:
+                      # catch magic EOF request: rq_type 0
+                      XP("===== RECEIVED EOF, breaking loop...")
+                      break
+                    else:
+                      # hide magic request type 0
+                      rq_type -= 1
+                      requests[channel].add(tag)
+                      # queue the work function and track it
+                      LF = self._later.defer(self._run_request,
+                                             channel, tag, self.request_handler,
+                                             rq_type, flags, payload[offset:])
+                      LF.notify(lambda LF: self._running.remove(LF))
+                      self._running.add(LF)
+          else:
+            with Pfx("response[%d:%d]", channel, tag):
+              # response: get state of matching pending request, remove state
+              try:
+                rq_state = self._pending_pop(channel, tag)
+              except ValueError as e:
+                # no such pending pair - response to unknown request
+                error("%d.%d: response to unknown request: %s", channel, tag, e)
               else:
-                try:
-                  result = decode_response(flags, payload)
-                except Exception as e:
-                  R.exc_info = sys.exc_info()
+                decode_response, R = rq_state
+                # first flag is "ok"
+                ok = (flags & 0x01) != 0
+                flags >>= 1
+                payload = packet.payload
+                if not ok:
+                  R.raise_(ValueError("response not ok: ok=%s, flags=%s, payload=%r"
+                                      % (ok, flags, payload)))
                 else:
-                  R.result = result
-      self._recv_fp.close()
-      self._recv_fp = None
-      self.shutdown()
+                  try:
+                    result = decode_response(flags, payload)
+                  except Exception as e:
+                    R.exc_info = sys.exc_info()
+                  else:
+                    R.result = result
+        XP("===== EXIT _receive main loop: cancel outstanding requests, _recv_fp.close, self.shutdown...")
+        self._pending_cancel()
+        with Pfx("_recv_fp.close"):
+          try:
+            self._recv_fp.close()
+          except OSError as e:
+            warning("%s.close: %s", self._recv_fp, e)
+          except Exception as e:
+            error("(_RECV) UNEXPECTED EXCEPTION: %s %s", e, e.__class__)
+            raise
+        self._recv_fp = None
+        self.shutdown()
 
   @logexc
   def _send(self):
