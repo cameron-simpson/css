@@ -54,7 +54,7 @@ class OpenSocket(object):
     return self._fp.flush()
 
   def close(self):
-    with Pfx("OpenSocket.close[fd=%d,fd0=%d]", self._fd, self._fd0):
+    with Pfx("%s.close", self):
       if self._sock is not None:
         if self._for_write:
           shut_mode = socket.SHUT_WR
