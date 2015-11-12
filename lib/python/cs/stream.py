@@ -332,35 +332,42 @@ class PacketConnection(object):
         Write every packet directly to self._send_fp.
         Flush whenever the queue is empty.
     '''
-    with Pfx("%s._send", self):
-      fp = self._send_fp
-      Q = self._sendQ
-      for P in Q:
-        sig = (P.channel, P.tag, P.is_request)
-        if sig in self.__sent:
-          raise RuntimeError("second send of %s" % (P,))
-        self.__sent.add(sig)
+    ##with Pfx("%s._send", self):
+    with PrePfx("_SEND [%s]", self):
+      with post_condition( ("_send_fp is None", lambda: self._send_fp is None) ):
+        fp = self._send_fp
+        Q = self._sendQ
+        for P in Q:
+          sig = (P.channel, P.tag, P.is_request)
+          if sig in self.__sent:
+            raise RuntimeError("second send of %s" % (P,))
+          self.__sent.add(sig)
+          try:
+            write_Packet(fp, P)
+            if Q.empty():
+              fp.flush()
+          except OSError as e:
+            if e.errno == errno.EPIPE:
+              warning("remote end closed")
+              break
+            raise
+        eof_packet = Packet(0, 0, True, 0, put_bs(0))
+        XP("send EOF and then _send_fp.close...")
         try:
-          write_Packet(fp, P)
-          if Q.empty():
-            fp.flush()
+          write_Packet(fp, eof_packet)
+          fp.close()
         except OSError as e:
           if e.errno == errno.EPIPE:
-            warning("remote end closed")
-            break
+            warning("remote end closed: %s", e)
+          elif e.errno == errno.EBADF:
+            warning("local end closed: %s", e)
+          else:
+            raise
+        except Exception as e:
+          error("(_SEND) UNEXPECTED EXCEPTION: %s %s", e, e.__class__)
           raise
-      eof_packet = Packet(0, 0, True, 0, put_bs(0))
-      XP("send EOF and then _send_fp.close...")
-      try:
-        write_Packet(fp, eof_packet)
-        self._send_fp.close()
-      except OSError as e:
-        if e.errno == errno.EPIPE:
-          warning("remote end closed")
-        else:
-          raise
-      self._send_fp = None
-      XP("return from _send")
+        self._send_fp = None
+        XP("return from _send")
 
 if __name__ == '__main__':
   import sys
