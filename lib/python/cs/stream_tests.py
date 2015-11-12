@@ -138,4 +138,12 @@ def selftest(argv):
   unittest.main(__name__, None, argv)
 
 if __name__ == '__main__':
+  import signal
+  from cs.debug import thread_dump
+  def hup(sig, frame):
+    thread_dump()
+  signal.signal(signal.SIGHUP, hup)
   selftest(sys.argv)
+  X("THREADS:")
+  thread_dump()
+  X("THREADS DUMPED")
