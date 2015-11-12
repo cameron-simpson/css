@@ -25,7 +25,7 @@ import sys
 import threading
 import time
 import traceback
-from cs.py3 import Queue, Queue_Empty
+from cs.py3 import Queue, Queue_Empty, exec_code
 from cs.py.stack import caller
 import cs.logutils
 from cs.logutils import infer_logging_level, debug, error, setup_logging, D, Pfx, PrePfx, ifdebug, X
@@ -402,10 +402,11 @@ class DebugShell(Cmd):
     if line == 'EOF':
       return True
     try:
-      result = exec(line, globals(), self.vars)
+      exec_code(line, globals(), self.vars)
     except Exception as e:
       X("Exception: %s", e)
     self.stdout.flush()
+    self.stderr.flush()
     return False
 
 def debug_object_shell(o, prompt=None):
