@@ -34,8 +34,7 @@ if sys.hexversion >= 0x03000000:
     return o.values()
   from builtins import sorted, filter, bytes, input
   from itertools import filterfalse
-  def raise3(exc_type, exc_value, exc_traceback):
-    raise exc_type(exc_value).with_traceback(exc_traceback)
+  from .py3_for3 import raise3
 
 else:
 
@@ -66,6 +65,7 @@ else:
     return _sorted(iterable, None, key, reverse)
   input = raw_input
   from itertools import ifilter as filter, ifilterfalse as filterfalse
+  from .py3_for2 import raise3
 
   class bytes(list):
     ''' Trite bytes implementation.
@@ -104,9 +104,6 @@ else:
       ''' Back convert to a str, only meaningful for Python 2.
       '''
       return ''.join( chr(_) for _ in self )
-  def raise3(exc_type, exc_value, exc_traceback):
-    # ugly subterfuge to let this pass a python3 parser
-    exec('raise exc_type, exc_value, exc_traceback')
 
 if __name__ == '__main__':
   import cs.py3_tests
