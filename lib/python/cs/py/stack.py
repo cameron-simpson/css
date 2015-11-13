@@ -19,7 +19,7 @@ import sys
 from collections import namedtuple
 from traceback import extract_stack
 
-_Frame = namedtuple('Frame', 'filename lineno modulename linetext')
+_Frame = namedtuple('Frame', 'filename lineno functionname linetext')
 
 class Frame(_Frame):
   def __str__(self):
