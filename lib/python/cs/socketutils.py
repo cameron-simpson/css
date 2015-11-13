@@ -99,5 +99,5 @@ class OpenSocket(object):
       raise ValueError("fstat mismatch s1!=s3 (%s, %s)" % (s1, s3))
 
 if __name__ == '__main__':
-  import cs.socketutils_tests
-  cs.socketutils_tests.selftest(sys.argv)
+  from cs.debug import selftest
+  selftest('cs.socketutils_tests', sys.argv)
