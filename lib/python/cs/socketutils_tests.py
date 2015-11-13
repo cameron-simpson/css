@@ -98,12 +98,6 @@ class TestOpenSocket_TCP(_TestOpenSocket, unittest.TestCase):
   def accept_once(self):
     self.sock2, peer = self.sock0.accept()
 
-def selftest(argv):
-  unittest.main(__name__, None, argv)
-
 if __name__ == '__main__':
-  import signal
-  def hup(sig, frame):
-    thread_dump()
-  signal.signal(signal.SIGHUP, hup)
-  selftest(sys.argv)
+  from cs.debug import selftest
+  selftest('__main__', sys.argv)
