@@ -421,6 +421,17 @@ def debug_object_shell(o, prompt=None):
   C.prompt = prompt
   C.cmdloop(intro)
 
+def selftest(module_name, argv, defaultTest=None):
+  ''' Called by my unit tests.
+  '''
+  import importlib
+  importlib.import_module(module_name)
+  import signal
+  signal.signal(signal.SIGHUP, lambda sig, frame: thread_dump())
+  signal.signal(signal.SIGINT, lambda sig, frame: sys.exit(thread_dump()))
+  import unittest
+  return unittest.main(module=module_name, defaultTest=defaultTest, argv=argv)
+
 if __name__ == '__main__':
   setup_logging()
   @DEBUG
