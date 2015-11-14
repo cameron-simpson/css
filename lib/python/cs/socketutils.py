@@ -100,4 +100,4 @@ class OpenSocket(object):
 
 if __name__ == '__main__':
   from cs.debug import selftest
-  selftest('cs.socketutils_tests', sys.argv)
+  selftest('cs.socketutils_tests')

@@ -100,4 +100,4 @@ class TestOpenSocket_TCP(_TestOpenSocket, unittest.TestCase):
 
 if __name__ == '__main__':
   from cs.debug import selftest
-  selftest('__main__', sys.argv)
+  selftest('__main__')
