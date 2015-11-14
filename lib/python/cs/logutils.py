@@ -326,6 +326,16 @@ def D(msg, *args):
   if D_mode:
     X(msg, *args)
 
+def DP(msg, *args):
+  ''' Print formatted debug string straight to sys.stderr if D_mode is true,
+      bypassing the logging modules entirely.
+      A quick'n'dirty debug tool.
+      Differs from D() by including the prefix() context.
+  '''
+  global D_mode
+  if D_mode:
+    XP(msg, *args)
+
 def X(msg, *args, **kwargs):
   ''' Unconditionally write the message `msg` to sys.stderr.
       If `args` is not empty, format `msg` using %-expansion with `args`.
