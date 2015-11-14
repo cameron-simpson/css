@@ -737,20 +737,6 @@ def critical(msg, *args, **kwargs):
 def trace(msg, *args, **kwargs):
   log(trace_level, msg, *args, **kwargs)
 
-def listargs(args, kwargs, tostr=None):
-  ''' Take the list 'args' and dict 'kwargs' and return a list of
-      strings representing them for printing.
-  '''
-  if tostr is None:
-    tostr = unicode
-  arglist = [ tostr(A) for A in args ]
-  kw=kwargs.keys()
-  if kw:
-    kw.sort()
-    for k in kw:
-      arglist.append("%s=%s" % (k, tostr(kwargs[k])))
-  return arglist
-
 class LogTime(object):
   ''' LogTime is a content manager that logs the elapsed time of the enclosed
       code. After the run, the field .elapsed contains the elapsed time in
