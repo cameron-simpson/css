@@ -377,6 +377,5 @@ class PacketConnection(object):
         XP("return from _send")
 
 if __name__ == '__main__':
-  import sys
-  import cs.stream_tests
-  cs.stream_tests.selftest(sys.argv)
+  from cs.debug import selftest
+  selftest('cs.stream_tests')
