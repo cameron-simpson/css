@@ -811,8 +811,7 @@ class UpdHandler(StreamHandler):
         self.__upd.out(logrec.getMessage())
 
   def flush(self):
-    if self.__upd._backend:
-      self.__upd._backend.flush()
+    return self.__upd.flush()
 
 if __name__ == '__main__':
   setup_logging(sys.argv[0])
