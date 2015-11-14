@@ -103,7 +103,8 @@ else:
     def as_str(self):
       ''' Back convert to a str, only meaningful for Python 2.
       '''
-      return ''.join( chr(_) for _ in self )
+      return self.__s
+      ##return ''.join( chr(_) for _ in self )
 
 if __name__ == '__main__':
   import cs.py3_tests
