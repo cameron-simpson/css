@@ -105,7 +105,8 @@ class Upd(object):
   def flush(self):
     ''' Flush the output stream.
     '''
-    return self._backend.flush()
+    if self._backend:
+      return self._backend.flush()
 
   def close(self):
     if self._backend is not None:
