@@ -421,9 +421,11 @@ def debug_object_shell(o, prompt=None):
   C.prompt = prompt
   C.cmdloop(intro)
 
-def selftest(module_name, argv, defaultTest=None):
+def selftest(module_name, argv=None, defaultTest=None):
   ''' Called by my unit tests.
   '''
+  if argv is None:
+    argv = sys.argv
   import importlib
   importlib.import_module(module_name)
   import signal
