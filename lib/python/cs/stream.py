@@ -295,8 +295,8 @@ class PacketConnection(object):
                       LF = self._later.defer(self._run_request,
                                              channel, tag, self.request_handler,
                                              rq_type, flags, payload[offset:])
-                      LF.notify(lambda LF: self._running.remove(LF))
                       self._running.add(LF)
+                      LF.notify(lambda LF: self._running.remove(LF))
           else:
             with Pfx("response[%d:%d]", channel, tag):
               # response: get state of matching pending request, remove state
