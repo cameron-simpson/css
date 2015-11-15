@@ -13,6 +13,7 @@ from cs.excutils import logexc
 from cs.later import Later
 from cs.logutils import Pfx, warning, error, X, XP, PrePfx
 from cs.predicate import post_condition
+from cs.py3 import BytesFile
 from cs.queues import IterableQueue
 from cs.resources import not_closed, ClosedError
 from cs.seq import seq, Seq
@@ -42,8 +43,8 @@ class PacketConnection(object):
     if name is None:
       name = str(seq())
     self.name = name
-    self._recv_fp = recv_fp
-    self._send_fp = send_fp
+    self._recv_fp = BytesFile(recv_fp)
+    self._send_fp = BytesFile(send_fp)
     self.request_handler = request_handler
     # tags of requests in play against the local system
     self._channel_request_tags = {0: set()}
