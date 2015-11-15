@@ -34,7 +34,7 @@ if sys.hexversion >= 0x03000000:
     return o.values()
   from builtins import sorted, filter, bytes, input
   from itertools import filterfalse
-  from .py3_for3 import raise3, exec_code
+  from .py3_for3 import raise3, exec_code, bytes, BytesFile
 
 else:
 
@@ -65,46 +65,7 @@ else:
     return _sorted(iterable, None, key, reverse)
   input = raw_input
   from itertools import ifilter as filter, ifilterfalse as filterfalse
-  from .py3_for2 import raise3, exec_code
-
-  class bytes(list):
-    ''' Trite bytes implementation.
-    '''
-    def __init__(self, arg):
-      try:
-        bytevals = iter(arg)
-      except TypeError:
-        bytevals = [ 0 for i in range(arg) ]
-      self.__s = ''.join( chr(b) for b in bytevals )
-    def __repr__(self):
-      return 'b' + repr(self.__s)
-    def __iter__(self):
-      for _ in self.__s:
-        yield ord(_)
-    def __getitem__(self, index):
-      return ord(self.__s[index])
-    def __getslice__(self, i, j):
-        return bytes( ord(_) for _ in self.__s[i:j] )
-    def __contains__(self, b):
-      return chr(b) in self.__s
-    def __eq__(self, other):
-      if type(other) is type(self):
-        return self.__s == other.__s
-      if len(other) != len(self):
-        return False
-      for i, b in enumerate(self):
-        if b != other[i]:
-          return False
-      return True
-    def __len__(self):
-      return len(self.__s)
-    def __add__(self, other):
-      return bytes( list(self) + list(other) )
-    def as_str(self):
-      ''' Back convert to a str, only meaningful for Python 2.
-      '''
-      return self.__s
-      ##return ''.join( chr(_) for _ in self )
+  from .py3_for2 import raise3, exec_code, bytes, BytesFile
 
 if __name__ == '__main__':
   import cs.py3_tests
