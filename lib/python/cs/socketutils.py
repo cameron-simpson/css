@@ -68,6 +68,8 @@ class OpenSocket(object):
           except socket.error as e:
             if e.errno == errno.ENOTCONN:
               info("%s", e)
+            elif e.errno == errno.EBADF:
+              warning("closed: %s", e)
             else:
               warning("%s", e)
               raise
