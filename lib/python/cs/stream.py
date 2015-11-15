@@ -128,7 +128,7 @@ class PacketConnection(object):
       channel_states = pending[channel]
       for tag in sorted(channel_states.keys()):
         X("%s: cancel pending request %d:%s", self, channel, tag)
-        states.append( (tag, channel_states[tag]) )
+        states.append( ( (channel, tag), channel_states[tag]) )
     return states
 
   @locked
