@@ -13,12 +13,13 @@ import socket
 from threading import Thread
 import unittest
 from cs.logutils import X
+from cs.py3 import bytes
 from cs.randutils import rand0, randblock
 from cs.serialise import get_bs
 from cs.socketutils import bind_next_port, OpenSocket
 from .stream import PacketConnection
 
-class _TestStream(unittest.TestCase):
+class _TestStream(object):
 
   def setUp(self):
     self._open_Streams()
@@ -69,7 +70,7 @@ class _TestStream(unittest.TestCase):
       self.assertEqual(flags, 0x11)
       self.assertEqual(payload, bytes(reversed(data)))
 
-class TestStreamPipes(_TestStream):
+class TestStreamPipes(_TestStream, unittest.TestCase):
 
   def _open_Streams(self):
     self.upstream_rd, self.upstream_wr = os.pipe()
@@ -82,7 +83,7 @@ class TestStreamPipes(_TestStream):
                                         request_handler=self._request_handler,
                                         name="remote-pipes")
 
-class TestStreamUNIXSockets(_TestStream):
+class TestStreamUNIXSockets(_TestStream, unittest.TestCase):
 
   def _open_Streams(self):
     self.upstream_rd, self.upstream_wr = socket.socketpair()
@@ -101,7 +102,7 @@ class TestStreamUNIXSockets(_TestStream):
     self.downstream_rd.close()
     self.downstream_wr.close()
 
-class TestStreamTCP(_TestStream):
+class TestStreamTCP(_TestStream, unittest.TestCase):
 
   def _open_Streams(self):
     self.listen_sock = socket.socket()
