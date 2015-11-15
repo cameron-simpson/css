@@ -202,11 +202,18 @@ def read_Packet(fp):
     raise ValueError("extra data in packet after offset=%d" % (offset,))
   return P
 
-def write_Packet(fp, P):
-  ''' Write a Packet to a binary stream.
-      Note: does not flush the stream.
-  '''
-  fp.write(put_bsdata(P.serialise()))
+if sys.hexversion >= 0x03000000:
+  def write_Packet(fp, P):
+    ''' Write a Packet to a binary stream.
+        Note: does not flush the stream.
+    '''
+    fp.write(put_bsdata(P.serialise()))
+else:
+  def write_Packet(fp, P):
+    ''' Write a Packet to a binary stream.
+        Note: does not flush the stream.
+    '''
+    fp.write(put_bsdata(P.serialise()).as_buffer())
 
 def get_Packet(data, offset=0):
   ''' Parse a Packet from the binary data `packet` at position `offset`.
