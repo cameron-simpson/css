@@ -38,21 +38,6 @@ def is_bytes(value):
     raise RuntimeError("value is not bytes: %s %r"
                        % (type(value), value))
 
-@returns_bytes
-def _str2bytes(s):
-  ''' Return a bytes object with values from ord(_) for each character.
-  '''
-  return bytes( ord(_) for _ in s )
-
-if sys.hexversion >= 0x03000000:
-  @returns_bytes
-  def readbytes(fp, size=None):
-    return fp.read(size)
-else:
-  @returns_bytes
-  def readbytes(fp, size=None):
-    return _str2bytes(fp.read(size))
-
 def get_bs(data, offset=0):
   ''' Read an extensible value from `data` at `offset`.
       Continuation octets have their high bit set.
@@ -77,7 +62,7 @@ def read_bs(fp):
   n = 0
   b = 0x80
   while b & 0x80:
-    bs = readbytes(fp, 1)
+    bs = fp.read(1)
     if not bs:
       raise EOFError("%s: end of input" % (fp,))
     b = bs[0]
@@ -120,7 +105,7 @@ def read_bsdata(fp):
   ''' Read a run length encoded data chunk from a file stream.
   '''
   length = read_bs(fp)
-  data = readbytes(fp, length)
+  data = fp.read(length)
   if len(data) == length:
     return data
   if len(data) < length:
