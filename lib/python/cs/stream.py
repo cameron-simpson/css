@@ -364,6 +364,13 @@ class PacketConnection(object):
         try:
           write_Packet(fp, eof_packet)
           fp.close()
+        except IOError as e:
+          if e.errno == errno.EPIPE:
+            warning("remote end closed: %s", e)
+          elif e.errno == errno.EBADF:
+            warning("local end closed: %s", e)
+          else:
+            raise
         except OSError as e:
           if e.errno == errno.EPIPE:
             warning("remote end closed: %s", e)
