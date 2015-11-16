@@ -38,7 +38,7 @@ class StreamStore(BasicStoreAsync):
   def startup(self):
     BasicStoreAsync.startup(self)
     local_store = self.local_store
-    if local_store:
+    if local_store is not None:
       local_store.open()
 
   def shutdown(self):
@@ -47,7 +47,7 @@ class StreamStore(BasicStoreAsync):
     with Pfx("SHUTDOWN %s", self):
       self._conn.shutdown()
       local_store = self.local_store
-      if local_store:
+      if local_store is not None:
         local_store.close()
       BasicStoreAsync.shutdown(self)
 
@@ -166,7 +166,7 @@ class StreamStore(BasicStoreAsync):
     R = self._conn.request(T_FLUSH, 0, b'', self._decode_response_flush)
 
     local_store = self.local_store
-    if local_store:
+    if local_store is not None:
       local_store.flush()
     return R
 
