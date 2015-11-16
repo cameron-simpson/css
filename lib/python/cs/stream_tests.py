@@ -135,9 +135,6 @@ class TestStreamTCP(_TestStream, unittest.TestCase):
     self.upstream_sock.close()
     self.downstream_sock.close()
 
-def selftest(argv):
-  unittest.main(__name__, None, argv)
-
 if __name__ == '__main__':
   from cs.debug import selftest
   selftest('__main__')
