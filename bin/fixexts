@@ -37,10 +37,14 @@ do
                              }
   fi
 
-  prefext=`mime-ext "$type"` || { echo "$cmd: no preferred extension for $type" >&2
+  prefext=`mime-ext "$type"` || { echo "$cmd: cannot look up preferred extension for $type" >&2
                                  xit=1
                                  continue
                                }
+  [ -n "$prefext" ] || { echo "$cmd: no preferred extension for $type" >&2
+                         xit=1
+                         continue
+                       }
 
   # see if ext is ok already
   fbase=`basename "$f"`
