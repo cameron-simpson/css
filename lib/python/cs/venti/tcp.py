@@ -103,5 +103,5 @@ class TCPStoreClient(StreamStore):
     self.sock.close()
 
 if __name__ == '__main__':
-  import cs.venti.tcp_tests
-  cs.venti.tcp_tests.selftest(sys.argv)
+  from cs.debug import selftest
+  selftest('cs.venti.tcp_tests')
