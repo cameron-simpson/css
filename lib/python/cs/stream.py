@@ -92,7 +92,7 @@ class PacketConnection(object):
         self.closed = True
       ps = self._pending_states()
       if ps:
-        X("PENDING STATES AT SHUTDOWN: %r", ps)
+        warning("PENDING STATES AT SHUTDOWN: %r", ps)
       # wait for completion of requests we're performing
       for LF in list(self._running):
         LF.join()
@@ -160,7 +160,7 @@ class PacketConnection(object):
     '''
     for chtag, state in self._pending_states():
       channel, tag = chtag
-      X("%s: cancel pending request %d:%s", self, channel, tag)
+      warning("%s: cancel pending request %d:%s", self, channel, tag)
       decode_response, result = self._pending_pop(channel, tag)
       result.cancel()
 
@@ -172,7 +172,7 @@ class PacketConnection(object):
     try:
       self._sendQ.put(P)
     except ClosedError as e:
-      warning("%s: packet not sent: %s", self._sendQ, e)
+      warning("%s: packet not sent: %s (P=%s)", self._sendQ, e, P)
 
   def _reject(self, channel, tag):
     ''' Issue a rejection of the specified request.
