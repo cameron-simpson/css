@@ -253,8 +253,8 @@ class PacketConnection(object):
           if packet.is_request:
             with Pfx("request[%d:%d]", channel, tag):
               if self.closed:
-                error("rejecting request: closed")
-                self._reject(channel, tag)
+                warning("rejecting request: closed")
+                # NB: no rejection packet sent since sender also closed
               elif self.request_handler is None:
                 error("rejecting request: no self.request_handler")
                 self._reject(channel, tag)
