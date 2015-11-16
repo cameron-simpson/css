@@ -146,7 +146,9 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin):
   def shutdown(self):
     ''' Called by final MultiOpenMixin.close().
     '''
-    self.__funcQ.close(enforce_final_close=True)
+    self.__funcQ.close()
+    if not self.__funcQ.closed:
+      warning("%s.shutdown: __funcQ not closed yet", self)
     self.__funcQ.wait()
 
   def missing(self, hashes):
