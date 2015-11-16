@@ -109,7 +109,6 @@ class PacketConnection(object):
           raise RuntimeError("%s: ._later not closed! %r", self, self._later)
       else:
         self._later.close()
-      ##XP("COMPLETE")
 
   def join(self):
     ''' Wait for the receive side of the connection to terminate.
@@ -127,7 +126,6 @@ class PacketConnection(object):
     for channel in sorted(pending.keys()):
       channel_states = pending[channel]
       for tag in sorted(channel_states.keys()):
-        X("%s: cancel pending request %d:%s", self, channel, tag)
         states.append( ( (channel, tag), channel_states[tag]) )
     return states
 
@@ -247,7 +245,6 @@ class PacketConnection(object):
           try:
             packet = read_Packet(self._recv_fp)
           except EOFError:
-            XP("read_Packet: EOF, breaking loop...")
             break
           channel = packet.channel
           tag = packet.tag
@@ -285,7 +282,6 @@ class PacketConnection(object):
                   else:
                     if rq_type == 0:
                       # catch magic EOF request: rq_type 0
-                      XP("===== RECEIVED EOF, breaking loop...")
                       break
                     else:
                       # hide magic request type 0
@@ -321,7 +317,6 @@ class PacketConnection(object):
                     R.exc_info = sys.exc_info()
                   else:
                     R.result = result
-        XP("===== EXIT _receive main loop: cancel outstanding requests, _recv_fp.close, self.shutdown...")
         self._pending_cancel()
         with Pfx("_recv_fp.close"):
           try:
@@ -360,7 +355,6 @@ class PacketConnection(object):
               break
             raise
         eof_packet = Packet(0, 0, True, 0, put_bs(0))
-        XP("send EOF and then _send_fp.close...")
         try:
           write_Packet(fp, eof_packet)
           fp.close()
@@ -382,7 +376,6 @@ class PacketConnection(object):
           error("(_SEND) UNEXPECTED EXCEPTION: %s %s", e, e.__class__)
           raise
         self._send_fp = None
-        XP("return from _send")
 
 if __name__ == '__main__':
   from cs.debug import selftest
