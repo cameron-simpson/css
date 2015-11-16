@@ -1,0 +1,16 @@
+#!/bin/sh
+#
+# Unpack the MIME message named (or on stdin) in a temp direct and open.
+#   - Cameron Simpson <cs@zip.com.au> 16nov2015
+#
+
+set -ue
+
+: ${TMPDIR:=/tmp}
+
+cmd=$(basename "$0")
+unpackdir=$TMPDIR/$cmd.$$
+
+mkdir "$unpackdir"
+cat ${1+"$@"} | munpack -C "$unpackdir" -t
+open "$unpackdir"
