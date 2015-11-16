@@ -65,7 +65,7 @@ class CacheStore(BasicStoreSync):
     def add_backend():
       h2 = self.backend.add(data)
       if h != h2:
-        raise RuntimeError("hash mismatch: h=%r, h2=%r, data=%r" % (h, h2, data))
+        raise RuntimeError("hash mismatch: h=%r, h2=%r, backend=%s, data=%r" % (h, h2, self.backend.__class__, data))
     self._defer(add_backend)
     return h
 
