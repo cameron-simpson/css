@@ -11,7 +11,7 @@ from threading import Thread, Lock
 from cs.asynchron import Result
 from cs.excutils import logexc
 from cs.later import Later
-from cs.logutils import Pfx, warning, error, X, XP, PrePfx
+from cs.logutils import Pfx, debug, warning, error, X, XP, PrePfx
 from cs.predicate import post_condition
 from cs.py3 import BytesFile
 from cs.queues import IterableQueue
@@ -251,15 +251,15 @@ class PacketConnection(object):
           flags = packet.flags
           payload = packet.payload
           if packet.is_request:
+            # request from upstream client
             with Pfx("request[%d:%d]", channel, tag):
               if self.closed:
-                warning("rejecting request: closed")
+                debug("rejecting request: closed")
                 # NB: no rejection packet sent since sender also closed
               elif self.request_handler is None:
                 error("rejecting request: no self.request_handler")
                 self._reject(channel, tag)
               else:
-                # request from upstream client
                 requests = self._channel_request_tags
                 if channel not in requests:
                   # unknown channel
@@ -268,9 +268,6 @@ class PacketConnection(object):
                 elif tag in self._channel_request_tags[channel]:
                   error("rejecting request: channel %d: tag already in use: %d",
                         channel, tag)
-                  self._reject(channel, tag)
-                elif self.closed:
-                  error("rejecting request: we are closed")
                   self._reject(channel, tag)
                 else:
                   # payload for requests is the request enum and data
@@ -360,14 +357,14 @@ class PacketConnection(object):
           fp.close()
         except IOError as e:
           if e.errno == errno.EPIPE:
-            warning("remote end closed: %s", e)
+            debug("remote end closed: %s", e)
           elif e.errno == errno.EBADF:
             warning("local end closed: %s", e)
           else:
             raise
         except OSError as e:
           if e.errno == errno.EPIPE:
-            warning("remote end closed: %s", e)
+            debug("remote end closed: %s", e)
           elif e.errno == errno.EBADF:
             warning("local end closed: %s", e)
           else:
