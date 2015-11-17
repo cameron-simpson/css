@@ -580,10 +580,11 @@ class Later(MultiOpenMixin):
       if not self.closed:
         error("NOT CLOSED")
         raise RuntimeError("NOT CLOSED!")
-      if self.finished:
-        warning("_finish: finished=%r, early return", self.finished)
-        return
-      self.finished = True
+      with self._lock:
+        if self.finished:
+          warning("_finish: finished=%r, early return", self.finished)
+          return
+        self.finished = True
       if self._timerQ:
         self._timerQ.close()
         self._timerQ.join()
@@ -614,13 +615,12 @@ class Later(MultiOpenMixin):
     with Pfx("LATER %s.wait", self):
       if self.finished:
         debug("%s.wait: already finished - return immediately", self)
-        pass
-      else:
-        XP("_finished.acquire...")
-        self._finished.acquire()
-        XP("_finished.wait...")
-        self._finished.wait()
-        XP("_finished")
+        return
+      XP("_finished.acquire...")
+      self._finished.acquire()
+      XP("_finished.wait...")
+      self._finished.wait()
+      XP("_finished")
 
   def _track(self, tag, LF, fromset, toset):
     def SN(s):
