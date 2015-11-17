@@ -20,9 +20,11 @@ from threading import Condition, RLock
 import time
 import traceback
 from cs.excutils import logexc
+import cs.logutils
 from cs.logutils import debug, warning, error, PfxCallInfo, X, XP
 from cs.obj import O
 from cs.py.func import callmethod_if as ifmethod
+from cs.py.stack import caller
 
 class ClosedError(Exception):
   pass
@@ -59,23 +61,29 @@ class MultiOpenMixin(O):
       lock = RLock()
     self.opened = False
     self._opens = 0
+    self._opened_from = {}
     ##self.closed = False # final _close() not yet called
     self._lock = lock
     self._finalise_later = finalise_later
     self._finalise = Condition(self._lock)
 
   def __enter__(self):
-    self.open()
+    self.open(caller_frame=caller())
     return self
 
   def __exit__(self, exc_type, exc_value, traceback):
     self.close()
     return False
 
-  def open(self):
+  def open(self, caller_frame=None):
     ''' Increment the open count.
         On the first .open call self.startup().
     '''
+    if True:    ## cs.logutils.D_mode:
+      if caller_frame is None:
+        caller_frame = caller()
+      Fkey = caller_frame.filename, caller_frame.lineno
+      self._opened_from[Fkey] = self._opened_from.get(Fkey, 0) + 1
     self.opened = True
     with self._lock:
       self._opens += 1
@@ -89,10 +97,13 @@ class MultiOpenMixin(O):
     '''
     with self._lock:
       if self._opens < 1:
-        error("%s: EXTRA CLOSE", self)
-        from cs.debug import thread_dump
-        thread_dump([threading.current_thread()])
-        raise RuntimeError("UNDERFLOW CLOSE of %s" % (self,))
+        error("%s: UNDERFLOW CLOSE", self)
+        for Fkey in sorted(self._opened_from.keys()):
+          error("  opened from %s %d times", Fkey, self._opened_from[Fkey])
+        ##from cs.debug import thread_dump
+        ##thread_dump([threading.current_thread()])
+        ##raise RuntimeError("UNDERFLOW CLOSE of %s" % (self,))
+        return
       self._opens -= 1
       count = self._opens
       if self._opens == 0:
