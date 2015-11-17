@@ -607,10 +607,6 @@ class Later(MultiOpenMixin):
     self._busy.wait(0)
     self._quiescing = False
 
-  @locked
-  def is_finished(self):
-    return self.closed and self.is_idle()
-
   def wait(self):
     ''' Wait for all active and pending jobs to complete, including
         any jobs they may themselves queue.
