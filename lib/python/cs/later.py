@@ -501,6 +501,7 @@ class Later(MultiOpenMixin):
     self.inboundCapacity = inboundCapacity
     self.retry_delay = retry_delay
     self.name = name
+    self.outstanding = set()    # uncompleted LateFunctions
     self.delayed = set()        # unqueued, delayed until specific time
     self.pending = set()        # undispatched LateFunctions
     self.running = set()        # running LateFunctions
@@ -830,8 +831,28 @@ class Later(MultiOpenMixin):
       self.debug("delay %s until %s", LF, when)
       self._track("_submit: delay", LF, None, self.delayed)
       self._timerQ.add(when, queueFunc)
-
+    # record the function as outstanding and attach a notification
+    # to remove it from the outstanding set on completion
+    self.outstanding.add(LF)
+    LF.notify(lambda LF: self.outstanding.remove(LF))
     return LF
+
+  def complete(self, outstanding=None, until_idle=False):
+    ''' Generator which waits for outstanding functions to complete and yields them.
+        `outstanding`: if not None, an iterable of LateFunctions; default self.outstanding
+        `until_idle`: if outstanding is not None, continue until self.outstanding is empty
+    '''
+    if outstanding is not None:
+      if until_idle:
+        raise ValueError("outstanding is not None and until_idle is not false")
+      for LF in report(outstanding):
+        yield LF
+      return
+    while True:
+      for LF in self.complete(outstanding=list(self.outstanding)):
+        yield LF
+      if not until_idle:
+        break
 
   ##@trace_caller
   @MultiOpenMixin.is_opened
