@@ -507,7 +507,6 @@ class Later(MultiOpenMixin):
     self.running = set()        # running LateFunctions
     # counter tracking jobs queued or active
     self._busy = TrackingCounter(name="Later<%s>._busy" % (name,), lock=self._lock)
-    self._quiescing = False
     self._state = ""
     self.logger = None          # reporting; see logTo() method
     self._priority = (0,)
@@ -601,13 +600,6 @@ class Later(MultiOpenMixin):
     with self._lock:
       status = not self._busy and not self.delayed and not self.pending and not self.running
     return status
-
-  def quiesce(self):
-    ''' Block until there are no jobs queued or active.
-    '''
-    self._quiescing = True
-    self._busy.wait(0)
-    self._quiescing = False
 
   def wait(self):
     ''' Wait for all active and pending jobs to complete, including
