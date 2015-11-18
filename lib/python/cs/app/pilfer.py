@@ -252,7 +252,7 @@ def main(argv, stdin=None):
                 LTR.state("DRAINED DIV %s using outQ=%s", busy_div, outQ)
                 divnames = P.open_diversion_names
               LTR.state("quiescing")
-              L.quiesce()
+              L.complete(until_idle=True)
               # Now the diversions should have completed and closed.
             # out of the context manager, the Later should be shut down
             LTR.state("WAIT...")
