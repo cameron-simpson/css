@@ -29,7 +29,7 @@ from cs.excutils import noexc, noexc_gen, logexc, logexc_gen, LogExceptions
 from cs.queues import IterableQueue, IterablePriorityQueue, PushQueue, \
                         MultiOpenMixin, TimerQueue
 from cs.threads import AdjustableSemaphore, \
-                       WorkerThreadPool, locked
+                       WorkerThreadPool, locked, bg
 from cs.asynchron import Result, Asynchron, ASYNCH_RUNNING, report
 from cs.seq import seq, TrackingCounter
 from cs.logutils import Pfx, PrePfx, PfxCallInfo, error, info, warning, debug, exception, D, X, XP, OBSOLETE
@@ -496,8 +496,7 @@ class Later(MultiOpenMixin):
     if name is None:
       name = "Later-%d" % (seq(),)
     MultiOpenMixin.__init__(self)
-    self._finished = threading.Condition(self._lock)
-    self.finished = False
+    self._finished = threading.Event()
     if ifdebug():
       import inspect
       filename, lineno = inspect.stack()[1][1:3]
@@ -527,6 +526,17 @@ class Later(MultiOpenMixin):
     self._dispatchThread = Thread(name=self.name+'._dispatcher', target=self._dispatcher)
     self._dispatchThread.daemon = True
     self._dispatchThread.start()
+
+  @property
+  def finished(self):
+    ''' Probe the finishedness.
+    '''
+    return self._finished.is_set()
+
+  def wait(self):
+    ''' Wait for the Later to be finished.
+    '''
+    self._finished.wait()
 
   def close(self, *a, **kw):
     with PrePfx("LATER.CLOSE %s", self):
@@ -579,51 +589,32 @@ class Later(MultiOpenMixin):
 
   def shutdown(self):
     ''' Shut down the Later instance:
-        - close the TimerQueue, if any, and wait for it to complete
+        - close the TimerQueue if any
         - close the request queue
-        - wait for the job dispatcher to finish
-	- close the worker thread pool, which waits for any of its
-          outstanding threads to complete
+        - close the worker thread pool
     '''
     ##with Pfx("%s.shutdown()", self):
     with PrePfx("LATER.SHUTDOWN [%s]", self):
       if not self.closed:
         error("NOT CLOSED")
         raise RuntimeError("NOT CLOSED!")
-      with self._lock:
-        if self.finished:
-          warning("_finish: finished=%r, early return", self.finished)
-          return
-        self.finished = True
       if self._timerQ:
         self._timerQ.close()
         self._timerQ.join()
       self._pendingq.close()          # prevent further submissions
-      self._workers.close()           # wait for all worker threads to complete
-      self._dispatchThread.join()     # wait for all functions to be dispatched
-      self._finished.acquire()
-      self._finished.notify_all()
-      self._finished.release()
+      self._workers.close()
+      # queue actions to detect activity completion
+      def finish_up():
+        self._workers.join()                # wait for all worker Threads to complete
+        self._dispatchThread.join()         # wait for all functions to be dispatched
+        self._finished.set()
+      bg(finish_up)
 
   @locked
   def is_idle(self):
     with self._lock:
       status = not self._busy and not self.delayed and not self.pending and not self.running
     return status
-
-  def wait(self):
-    ''' Wait for all active and pending jobs to complete, including
-        any jobs they may themselves queue.
-    '''
-    with Pfx("LATER %s.wait", self):
-      if self.finished:
-        debug("%s.wait: already finished - return immediately", self)
-        return
-      XP("_finished.acquire...")
-      self._finished.acquire()
-      XP("_finished.wait...")
-      self._finished.wait()
-      XP("_finished")
 
   def _track(self, tag, LF, fromset, toset):
     def SN(s):
