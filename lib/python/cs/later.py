@@ -605,16 +605,10 @@ class Later(MultiOpenMixin):
       self._workers.close()
       # queue actions to detect activity completion
       def finish_up():
-        self._workers.join()                # wait for all worker Threads to complete
         self._dispatchThread.join()         # wait for all functions to be dispatched
+        self._workers.join()                # wait for all worker Threads to complete
         self._finished.set()
       bg(finish_up)
-
-  @locked
-  def is_idle(self):
-    with self._lock:
-      status = not self._busy and not self.delayed and not self.pending and not self.running
-    return status
 
   def _track(self, tag, LF, fromset, toset):
     def SN(s):
