@@ -466,6 +466,16 @@ class _Pipeline(MultiOpenMixin):
 
 class Later(MultiOpenMixin):
   ''' A management class to queue function calls for later execution.
+
+      Methods are provided for submitting functions to run ASAP or
+      after a delay or after other pending functions. These methods
+      return LateFunctions, a subclass of cs.asynchron.Asynchon.
+
+      A Later instance' shutdown method closes the Later for further
+      submission (except by functions run by this Later). Shutdown
+      does not imply that all submitted functions have completed
+      or even been dispatched. Callers may wait for completion and
+      optionally cancel functions.
   '''
 
   def __init__(self, capacity, name=None, inboundCapacity=0, retry_delay=None):
