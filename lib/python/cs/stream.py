@@ -103,7 +103,7 @@ class PacketConnection(object):
       # requests will get them as they come in, and in thoery a network
       # disconnect might leave the receiver hanging anyway
       if block:
-        self._later.quiesce()
+        self._later.wait_outstanding(until_idle=True)
         self._later.close(enforce_final_close=True)
         if not self._later.closed:
           raise RuntimeError("%s: ._later not closed! %r", self, self._later)
