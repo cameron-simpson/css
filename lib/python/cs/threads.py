@@ -36,6 +36,17 @@ from cs.queues import IterableQueue, Channel, MultiOpenMixin, not_closed
 from cs.py.func import funcname
 from cs.py3 import raise3, Queue, PriorityQueue
 
+def bg(func, daemon=None, name=None):
+  ''' Dispatch the callable `func` in its own Thread; return the Thread.
+      `daemon`: optional argument specifying the .daemon attribute.
+      `name`: optional argument specifying the Thread name.
+  '''
+  T = Thread(name=name, target=func)
+  if daemon is not None:
+    T.daemon = daemon
+  T.start()
+  return T
+
 WTPoolEntry = namedtuple('WTPoolEntry', 'thread queue')
 
 class WorkerThreadPool(MultiOpenMixin, O):
@@ -69,13 +80,18 @@ class WorkerThreadPool(MultiOpenMixin, O):
   def shutdown(self):
     ''' Shut down the pool.
         Close all the request queues.
-        Join all the worker threads.
-        It is an error to call close() more than once.
+        Note: does not wait for all Threads to complete; call .join after close.
     '''
     with self._lock:
       all_entries = list(self.all)
     for entry in all_entries:
       entry.queue.close()
+
+  def join(self):
+    ''' Wait for all outstanding Threads to complete.
+    '''
+    with self._lock:
+      all_entries = list(self.all)
     for entry in all_entries:
       T = entry.thread
       if T is not current_thread():
