@@ -849,6 +849,12 @@ class Later(MultiOpenMixin):
       if not until_idle:
         break
 
+  def wait_outstanding(self, until_idle=False):
+    ''' Wrapper for complete(), to collect and discard completed LateFunctions.
+    '''
+    for LF in self.complete(until_idle=until_idle):
+      pass
+
   ##@trace_caller
   @MultiOpenMixin.is_opened
   def defer(self, func, *a, **kw):
