@@ -841,7 +841,10 @@ class Later(MultiOpenMixin):
         yield LF
       return
     while True:
-      for LF in self.complete(outstanding=list(self.outstanding)):
+      outstanding = list(self.outstanding)
+      if not outstanding:
+        break
+      for LF in self.complete(outstanding):
         yield LF
       if not until_idle:
         break
