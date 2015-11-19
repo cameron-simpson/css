@@ -105,7 +105,7 @@ class _Late_context_manager(object):
                       }
     self.commence = Lock()
     self.commence.acquire()
-    self.complete = Lock()
+    self.completed = Lock()
     self.commence.acquire()
 
   def __enter__(self):
@@ -118,12 +118,12 @@ class _Late_context_manager(object):
       ''' This is the placeholder function dispatched by the Later instance.
           It releases the "commence" lock for __enter__ to acquire,
           permitting to with-suite to commence.
-          It then blocks waiting to acquire the "complete" lock;
+          It then blocks waiting to acquire the "completed" lock;
           __exit__ releases that lock permitting the placeholder to return
           and release the Later resource.
       '''
       self.commence.release()
-      self.complete.acquire()
+      self.completed.acquire()
       return "run done"
 
     # queue the placeholder function and wait for it to execute
@@ -132,10 +132,10 @@ class _Late_context_manager(object):
     return self
 
   def __exit__(self, exc_type, exc_val, exc_tb):
-    ''' Exit handler: release the "complete" lock; the placeholder
+    ''' Exit handler: release the "completed" lock; the placeholder
         function is blocking on this, and will return on its release.
     '''
-    self.complete.release()
+    self.completed.release()
     if exc_type is not None:
       return False
     W = self.latefunc.wait()
