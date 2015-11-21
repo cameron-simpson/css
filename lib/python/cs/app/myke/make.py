@@ -530,10 +530,10 @@ class Target(Result):
             mdebug("out of date because is_new(T)")
             self.out_of_date = True
           else:
-            LFmtime = getattr(T, 'mtime', None)
-            if LFmtime is not None:
+            Tmtime = getattr(T, 'mtime', None)
+            if Tmtime is not None:
               mtime = self.mtime
-              if mtime is None or LFmtime >= mtime:
+              if mtime is None or Tmtime >= mtime:
                 mdebug("out of date because older than T")
                 self.out_of_date = True
       else:
