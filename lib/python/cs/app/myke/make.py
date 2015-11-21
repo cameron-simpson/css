@@ -601,9 +601,9 @@ class Target(Result):
           mdebug("not out of date (mtime=%r)", self.mtime)
 
       if Ts:
-        self.Ts = LFs
+        self.Ts = Ts
         mdebug("tasks still to do, requeuing")
-        self.maker.after(LFs, None, self._make_partial)
+        self.maker.after(Ts, None, self._make_partial)
       else:
         # all done, record success
         mdebug("SUCCESS")
