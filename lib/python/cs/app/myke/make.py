@@ -504,37 +504,37 @@ class Target(Result):
     with self._lock:
       if self.pending:
         self.state = ASYNCH_RUNNING
-        self.LFs = []   # pending LFs returning True/False
+        self.Ts = []   # pending targets returning True/False
         self.pending_targets = list(self.prereqs)
         self.pending_actions = list(self.actions)
         # queue the first unit of work
         self.maker.defer("%s._make_partial" % (self,), self._make_partial)
 
   @DEBUG
-  def _apply_prereq(self, LF):
-    ''' Apply the consequences of the complete prereq LF.
+  def _apply_prereq(self, T):
+    ''' Apply the consequences of the complete prereq T.
     '''
-    with Pfx("%s._apply_prereqs(LF=%s)", self, LF):
+    with Pfx("%s._apply_prereqs(T=%s)", self, T):
       mdebug = self.maker.debug_make
-      if not LF.ready:
+      if not T.ready:
         raise RuntimeError("not ready")
-      if LF.result:
+      if T.result:
         mdebug("OK")
         try:
-          is_new = LF.is_new
+          is_new = T.is_new
         except AttributeError:
           # presuming not a Target
           pass
         else:
           if is_new:
-            mdebug("out of date because is_new(LF)")
+            mdebug("out of date because is_new(T)")
             self.out_of_date = True
           else:
-            LFmtime = getattr(LF, 'mtime', None)
+            LFmtime = getattr(T, 'mtime', None)
             if LFmtime is not None:
               mtime = self.mtime
               if mtime is None or LFmtime >= mtime:
-                mdebug("out of date because older than LF")
+                mdebug("out of date because older than T")
                 self.out_of_date = True
       else:
         mdebug("FAIL")
@@ -551,18 +551,18 @@ class Target(Result):
       M = self.maker
       mdebug = M.debug_make
 
-      LFs = self.LFs
-      if LFs:
-        mdebug("collect LFs=%s", LFs)
-        self.LFs = []
-        for LF in LFs:
-          with Pfx(LF):
-            self._apply_prereq(LF)
-            if not LF.result:
+      Ts = self.Ts
+      if Ts:
+        mdebug("collect Ts=%s", Ts)
+        self.Ts = []
+        for T in Ts:
+          with Pfx(T):
+            self._apply_prereq(T)
+            if not T.result:
               mdebug("FAILed")
               return
 
-      LFs = []
+      Ts = []
       targets = self.pending_targets
       self.pending_targets = []
       for T in targets:
@@ -580,9 +580,9 @@ class Target(Result):
             # require T and note it for consideration next time
             mdebug("not ready, requiring it...")
             T.require()
-            LFs.append(T)
+            Ts.append(T)
 
-      if not LFs:
+      if not Ts:
         # no pending targets, what about actions?
         # if we're out of date or missing,
         # queue an action and mark ourselves is_new
@@ -594,14 +594,14 @@ class Target(Result):
           if actions:
             A = actions.pop(0)
             mdebug("queue action: %s", A)
-            LFs.append(A.act_later(self))
+            Ts.append(A.act_later(self))
           else:
             mdebug("no actions")
         else:
           mdebug("not out of date (mtime=%r)", self.mtime)
 
-      if LFs:
-        self.LFs = LFs
+      if Ts:
+        self.Ts = LFs
         mdebug("tasks still to do, requeuing")
         self.maker.after(LFs, None, self._make_partial)
       else:
