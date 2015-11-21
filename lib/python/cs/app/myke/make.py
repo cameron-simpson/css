@@ -449,7 +449,8 @@ class Target(Result):
     '''
     prereqs = self._prereqs
     if isinstance(prereqs, MacroExpression):
-      self._prereqs = prereqs(self.context, self.namespaces).split()
+      prereqs_mexpr = prereqs
+      self._prereqs = prereqs_mexpr(self.context, self.namespaces).split()
     return self._prereqs
 
   @property
