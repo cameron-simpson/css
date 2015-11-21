@@ -283,8 +283,8 @@ class Maker(MultiOpenMixin):
         to the namespaces list. In this way later top level Makefiles'
         definitions override ealier ones while still detecting conflicts
         within a particular Makefile.
-	Also, the default_target property is set to the first
-	encountered target if not yet set.
+        Also, the default_target property is set to the first
+        encountered target if not yet set.
     '''
     for makefile in makefiles:
       self.debug_parse("load makefile: %s", makefile)
@@ -376,9 +376,9 @@ class Target(Result):
           `prereqs`: macro expression to produce prereqs.
           `postprereqs`: macro expression to produce post-inference prereqs.
           `actions`: a list of actions to build this Target
-	The same actions list is shared amongst all Targets defined
-	by a common clause in the Mykefile, and extends during the
-	Mykefile parse _after_ defining those Targets. So we do not modify it the class;
+        The same actions list is shared amongst all Targets defined
+        by a common clause in the Mykefile, and extends during the
+        Mykefile parse _after_ defining those Targets. So we do not modify it the class;
         instead we extend .pending_actions when .require() is called the first time,
         just as we for a :make directive.
     '''
@@ -630,8 +630,8 @@ class Action(O):
 
   def act_later(self, target):
     ''' Request that this Action occur on behalf of the Target `target`.
-	Return an Asynchron which returns the success or failure
-	of the action.
+        Return an Asynchron which returns the success or failure
+        of the action.
     '''
     R = Result()
     ALF = target.maker.defer("%s:act[%s]" % (self,target,), self._act, R, target)
