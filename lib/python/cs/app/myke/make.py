@@ -692,8 +692,3 @@ class Action(O):
       retcode = P.wait()
       mdebug("retcode = %d", retcode)
       return retcode == 0
-
-if __name__ == '__main__':
-  from . import main, default_cmd
-  sys.stderr.flush()
-  sys.exit(main([default_cmd] + sys.argv[1:]))
