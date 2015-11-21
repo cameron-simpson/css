@@ -30,13 +30,13 @@ if sys.hexversion < 0x02060000: from sets import Set as set
 from cs.seq import seq
 from cs.excutils import transmute
 from cs.debug import Lock, RLock, Thread
-from cs.logutils import LogTime, error, warning, debug, exception, OBSOLETE, D
+from cs.logutils import LogTime, error, warning, debug, exception, OBSOLETE, D, X
 from cs.obj import O
-from cs.queues import IterableQueue, Channel, NestingOpenCloseMixin, not_closed
+from cs.queues import IterableQueue, Channel, MultiOpenMixin, not_closed
 from cs.py.func import funcname
 from cs.py3 import raise3, Queue, PriorityQueue
 
-class WorkerThreadPool(NestingOpenCloseMixin, O):
+class WorkerThreadPool(MultiOpenMixin, O):
   ''' A pool of worker threads to run functions.
   '''
 
@@ -44,16 +44,18 @@ class WorkerThreadPool(NestingOpenCloseMixin, O):
     if name is None:
       name = "WorkerThreadPool-%d" % (seq(),)
     debug("WorkerThreadPool.__init__(name=%s)", name)
-    self.name = name
-    self._lock = Lock()
     O.__init__(self)
-    NestingOpenCloseMixin.__init__(self)
+    MultiOpenMixin.__init__(self)
+    self.name = name
     self.idle = deque()
     self.all = []
 
   def __str__(self):
     return "WorkerThreadPool:%s" % (self.name,)
   __repr__ = __str__
+
+  def startup(self):
+    pass
 
   def shutdown(self):
     ''' Shut down the pool.
@@ -124,12 +126,12 @@ class WorkerThreadPool(NestingOpenCloseMixin, O):
     for func, retq, deliver in RQ:
       oname = HT.name
       HT.name = "%s:RUNNING:%s" % (oname, func)
+      result, exc_info = None, None
       try:
         debug("%s: worker thread: running task...", self)
         result = func()
         debug("%s: worker thread: ran task: result = %s", self, result)
-      except:
-        result = None
+      except Exception:
         exc_info = sys.exc_info()
         log_func = exception if isinstance(exc_info[1], (TypeError, NameError, AttributeError)) else debug
         log_func("%s: worker thread: ran task: exception! %r", self, sys.exc_info())
@@ -140,8 +142,6 @@ class WorkerThreadPool(NestingOpenCloseMixin, O):
           error("%s: worker thread: reraise exception", self)
           raise3(*exc_info)
         debug("%s: worker thread: set result = (None, exc_info)", self)
-      else:
-        exc_info = None
       HT.name = oname
       func = None     # release func+args
       with self._lock:

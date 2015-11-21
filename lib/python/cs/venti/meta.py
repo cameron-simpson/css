@@ -16,8 +16,8 @@ from cs.threads import locked
 DEFAULT_DIR_ACL = 'o:rwx-'
 DEFAULT_FILE_ACL = 'o:rw-x'
 
-NOBODY = -1
-NOGROUP = -1
+NOUSERID = -1
+NOGROUPID = -1
 
 user_map = {}
 group_map = {}
@@ -488,55 +488,52 @@ class Meta(dict):
       perms |= S_ISUID
     uid = self.uid
     if uid is None:
-      uid = NOBODY
+      uid = NOUSERID
     gid = self.gid
     if gid is None:
-      gid = NOGROUP
+      gid = NOGROUPID
     return uid, gid, perms
 
-  def access(self, amode, user=None, group=None):
-    ''' POSIX like access call, accepting os.access `amode`.
+  def access(self, access_mode, access_uid=None, access_group=None, default_uid=None, default_gid=None):
+    ''' POSIX like access call, accepting os.access `access_mode`.
+        `access_mode`: a bitmask of os.{R_OK,W_OK,X_OK} as for the os.access function.
+        `access_uid`: the uid of the querying user.
+        `access_gid`: the gid of the querying user.
+        `default_uid`: the reference uid to use if this Meta.uid == NOUSERID.
+        `default_gid`: the reference gid to use if this Meta.gid == NOGROUPID.
     '''
-    X("Meta.access: return TRUE ALWAYS")
-    return True
     u, g, perms = self.unix_perms
-    if amode & os.R_OK:
-      if user is not None and user == u:
+    if u == NOUSERID and default_uid is not None:
+      u = default_uid
+    if g == NOGROUPID and default_gid is not None:
+      g = default_gid
+    if access_mode & os.R_OK:
+      if access_uid is not None and access_uid == u:
         if not ( (perms>>6) & 4 ):
-          X("Meta.access: FALSE")
           return False
-      elif group is not None and group == g:
+      elif access_group is not None and access_group == g:
         if not ( (perms>>3) & 4 ):
-          X("Meta.access: FALSE")
           return False
       elif not ( perms & 4 ):
-          X("Meta.access: FALSE")
           return False
-    if amode & os.W_OK:
-      if user is not None and user == u:
+    if access_mode & os.W_OK:
+      if access_uid is not None and access_uid == u:
         if not ( (perms>>6) & 2 ):
-          X("Meta.access: FALSE")
           return False
-      elif group is not None and group == g:
+      elif access_group is not None and access_group == g:
         if not ( (perms>>3) & 2 ):
-          X("Meta.access: FALSE")
           return False
       elif not ( perms & 2 ):
-          X("Meta.access: FALSE")
           return False
-    if amode & os.X_OK:
-      if user is not None and user == u:
+    if access_mode & os.X_OK:
+      if access_uid is not None and access_uid == u:
         if not ( (perms>>6) & 1 ):
-          X("Meta.access: FALSE")
           return False
-      elif group is not None and group == g:
+      elif access_group is not None and access_group == g:
         if not ( (perms>>3) & 1 ):
-          X("Meta.access: FALSE")
           return False
       elif not ( perms & 1 ):
-          X("Meta.access: FALSE")
           return False
-    X("Meta.access: TRUE")
     return True
 
   def stat(self):
@@ -558,11 +555,11 @@ class Meta(dict):
     with Pfx("Meta.apply_os(%r)", ospath):
       st = os.lstat(ospath)
       mst = self.stat()
-      if mst.st_uid == NOBODY or mst.st_uid == st.st_uid:
+      if mst.st_uid == NOUSERID or mst.st_uid == st.st_uid:
         uid = -1
       else:
         uid = mst.st_uid
-      if mst.st_gid == NOGROUP or mst.st_gid == st.st_gid:
+      if mst.st_gid == NOGROUPID or mst.st_gid == st.st_gid:
         gid = -1
       else:
         gid = mst.st_gid

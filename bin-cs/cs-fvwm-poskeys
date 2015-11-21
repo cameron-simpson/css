@@ -4,8 +4,12 @@
 #       - Cameron Simpson <cs@zip.com.au> 20oct2007
 #
 
+import os
+import sys
 from cs.logutils import info, setup_logging
-from cs.obj import DictUC_Attrs as UC_
+from cs.mixin.ucattrs import UCdict
+import cs.sh
+import cs.x11
 
 setup_logging()
 
@@ -16,10 +20,6 @@ LEFTSLOTS='LEFTSLOTS'
 RIGHTSLOTS='RIGHTSLOTS'
 LEFTWIDTH='LEFTWIDTH'
 RIGHTWIDTH='RIGHTWIDTH'
-import cs.x11
-import cs.sh
-import os
-import sys
 
 usage="Usage: %s"
 
@@ -126,12 +126,12 @@ rightmon=[]
 ox=0
 slicenum=0
 for sx in slices:
-  mon=UC_({X: ox, DX: sx})
+  mon=UCdict({X: ox, DX: sx})
   setenv("X11_MONITOR%d_X" % slicenum, ox)
   setenv("X11_MONITOR%d_DX" % slicenum, sx)
   mslots=[]
   for wx, px in slice(sx):
-    geom=UC_({X: ox+px, DX: wx})
+    geom=UCdict({X: ox+px, DX: wx})
     mslots.append(geom)
   mon.SLOTS=mslots
 

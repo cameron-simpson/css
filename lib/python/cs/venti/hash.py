@@ -39,7 +39,7 @@ class _Hash(bytes):
 
   def encode(self):
     ''' Return the serialised form of this hash object: hash enum plus hash bytes.
-        If we ever have a variable length hash function, hash bytes with include that information.
+        If we ever have a variable length hash function, hash bytes will include that information.
     '''
     # no hashenum and raw hash
     return self.HASHENUM_BS + self

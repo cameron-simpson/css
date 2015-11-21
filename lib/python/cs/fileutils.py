@@ -18,7 +18,6 @@ DISTINFO = {
 }
 
 from io import RawIOBase
-import errno
 from functools import partial
 import os
 from os import SEEK_CUR, SEEK_END, SEEK_SET
@@ -29,6 +28,7 @@ from collections import namedtuple
 from contextlib import contextmanager
 from itertools import takewhile
 import shutil
+import socket
 from tempfile import TemporaryFile, NamedTemporaryFile
 from threading import RLock, Thread
 import time
@@ -43,7 +43,7 @@ from cs.range import Range
 from cs.threads import locked, locked_property
 from cs.timeutils import TimeoutError
 from cs.obj import O
-from cs.py3 import ustr, filter, bytes
+from cs.py3 import ustr, bytes
 
 DEFAULT_POLL_INTERVAL = 1.0
 
@@ -66,7 +66,7 @@ def trysaferename(oldpath, newpath):
     saferename(oldpath, newpath)
   except OSError:
     return False
-  except:
+  except Exception:
     raise
   return True
 
@@ -520,44 +520,44 @@ def lockfile(path, ext=None, poll_interval=None, timeout=None):
     try:
       lockfd = os.open(lockpath, os.O_CREAT|os.O_EXCL|os.O_RDWR, 0)
     except OSError as e:
-      if e.errno == errno.EEXIST:
-        if timeout is not None and timeout <= 0:
-          # immediate failure
-          raise TimeoutError("cs.fileutils.lockfile: pid %d timed out on lockfile \"%s\""
-                             % (os.getpid(), lockpath),
-                             timeout)
-        now = time.time()
-        # post: timeout is None or timeout > 0
-        if start is None:
-          # first try - set up counters
-          start = now
-          complaint_last = start
-          complaint_interval = 2 * max(DEFAULT_POLL_INTERVAL, poll_interval)
-        else:
-          if now - complaint_last >= complaint_interval:
-            from cs.logutils import warning
-            warning("cs.fileutils.lockfile: pid %d waited %ds for \"%s\"",
-                    os.getpid(), now - start, lockpath)
-            complaint_last = now
-            complaint_interval *= 2
-        # post: start is set
-        if timeout is None:
-          sleep_for = poll_interval
-        else:
-          sleep_for = min(poll_interval, start + timeout - now)
-        # test for timeout
-        if sleep_for <= 0:
-          raise TimeoutError("cs.fileutils.lockfile: pid %d timed out on lockfile \"%s\""
-                             % (os.getpid(), lockpath),
-                             timeout)
-        time.sleep(sleep_for)
-        continue
-      raise
+      if e.errno != errno.EEXIST:
+        raise
+      if timeout is not None and timeout <= 0:
+        # immediate failure
+        raise TimeoutError("cs.fileutils.lockfile: pid %d timed out on lockfile %r"
+                           % (os.getpid(), lockpath),
+                           timeout)
+      now = time.time()
+      # post: timeout is None or timeout > 0
+      if start is None:
+        # first try - set up counters
+        start = now
+        complaint_last = start
+        complaint_interval = 2 * max(DEFAULT_POLL_INTERVAL, poll_interval)
+      else:
+        if now - complaint_last >= complaint_interval:
+          from cs.logutils import warning
+          warning("cs.fileutils.lockfile: pid %d waited %ds for %r",
+                  os.getpid(), now - start, lockpath)
+          complaint_last = now
+          complaint_interval *= 2
+      # post: start is set
+      if timeout is None:
+        sleep_for = poll_interval
+      else:
+        sleep_for = min(poll_interval, start + timeout - now)
+      # test for timeout
+      if sleep_for <= 0:
+        raise TimeoutError("cs.fileutils.lockfile: pid %d timed out on lockfile %r"
+                           % (os.getpid(), lockpath),
+                           timeout)
+      time.sleep(sleep_for)
+      continue
     else:
-      os.close(lockfd)
-      yield lockpath
-      os.remove(lockpath)
       break
+  os.close(lockfd)
+  yield lockpath
+  os.remove(lockpath)
 
 def max_suffix(dirpath, pfx):
   ''' Compute the highest existing numeric suffix for names starting with the prefix `pfx`.
@@ -944,7 +944,7 @@ class SharedAppendFile(object):
         `pathname`: the pathname of the file to open.
         `importer`: callable to accept foreign data chunks as their appear
         `no_update`: set to true if we will not write updates.
-        `binary`: if the ile is to be opened in binary mode, otherwise text mode.
+        `binary`: if the file is to be opened in binary mode, otherwise text mode.
         `max_queue`: maximum input Queue length. Default: SharedAppendFile.DEFAULT_MAX_QUEUE.
         `poll_interval`: sleep time between polls after an idle poll. Default: DEFAULT_POLL_INTERVAL.
         `lock_ext`: lock file extension.
@@ -1143,6 +1143,43 @@ def lines_of(fp, partials=None):
   if partials is None:
     partials = []
   return as_lines(chunks_of(fp), partials)
+
+class OpenSocket(object):
+  ''' A file-like object for stream sockets, which uses os.shutdown on close.
+  '''
+
+  def __init__(self, sock, for_write):
+    self._for_write = for_write
+    self._sock = sock
+    self._fp = os.fdopen(os.dup(self._sock.fileno()),
+                         'wb' if for_write else 'rb')
+
+  def write(self, data):
+    return self._fp.write(data)
+
+  def read(self, size=None):
+    return self._fp.read(size)
+
+  def flush(self):
+    return self._fp.flush()
+
+  def close(self):
+    try:
+      if self._for_write:
+        self._sock.shutdown(socket.SHUT_WR)
+      else:
+        self._sock.shutdown(socket.SHUT_RD)
+    except OSError as e:
+      if e.errno != errno.ENOTCONN:
+        raise
+
+  def __del__(self):
+    self._close()
+
+  def _close(self):
+    self._fp.close()
+    self._fp = None
+    self._sock = None
 
 if __name__ == '__main__':
   import cs.fileutils_tests

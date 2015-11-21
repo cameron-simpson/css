@@ -1,9 +1,12 @@
 #!/bin/sh -u
 #
-# Spawn a mutt to edit a message and dispatch a reply in screen.
+# Spawn a mutt to edit a message and dispatch a reply in tmux or screen.
 # This lets you detach from an unfinished reply and finish it later.
-# Then just put "set editor=muttedit". Have to unset it for edit-message.
-#	- Cameron Simpson <cs@zip.com.au> 31mar2006
+# My muttrc has this:
+#
+#  macro index g ":set editor=muttedit<enter><group-reply>:set editor=$EDITOR<enter>" "group reply"
+#   
+# - Cameron Simpson <cs@zip.com.au> 31mar2006
 # 
 
 cmd=$0
@@ -13,8 +16,21 @@ usage="Usage: $cmd filename"
 filename=$1; shift
 [ -s "$filename" ] || { echo "$cmd: expected non-empty file, got: $filename" >&2; exit 2; }
 
-now=`date '+%d%b%Y-%H:%M'|tr '[A-Z]' '[a-z]'`
-subj=`sed -n -e '/^$/q; y/	/ /; /^[Ss]ubject:/{ s/^[^:]*: *//; s/[^a-zA-Z0-9:]/_/g; s/___*/_/g; p; q; }' <"$filename" | cut -c1-20`
+now=$( date '+%d%b%Y-%H:%M'|tr '[A-Z]' '[a-z]' )
+subj=$( sed -n -e '/^$/q; y/	/ /; /^[Ss]ubject:/{ s/^[^:]*: *//; s/[^a-zA-Z0-9:]/_/g; s/___*/_/g; p; q; }' <"$filename" | tr : _ )
 
-set -x
-exec screen -m -S "mutt-$now-$subj" mutt -e 'set editor=vim-flowed' -e 'unset signature' -H "$filename"
+session_name=mutt-$now-$subj
+
+set -- mutt -e 'set editor=vim-flowed' -e 'unset signature' -H "$filename"
+
+if tmux start-server
+then
+  session_name=$( printf '%s\n' "$session_name" | tr : _ )
+  shcmd=$( shqstr "$@" )
+  set -x
+  tmux new-session -s "$session_name" "$shcmd"
+else
+  session_name=$( printf '%s\n' "$session_name" | cut -c1-20 )
+  set -x
+  screen -m -S "$session_name" -- "$@"
+fi

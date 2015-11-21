@@ -1,0 +1,2 @@
+New commands "locate" and "offline".
+Report drive error counts.

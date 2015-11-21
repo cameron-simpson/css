@@ -20,14 +20,14 @@ from functools import partial
 import logging
 from threading import Timer
 import time
-from cs.debug import Lock, Thread, trace, trace_caller, stack_dump
+from cs.debug import Lock, RLock, Thread, trace, trace_caller, stack_dump
 from cs.logutils import exception, error, warning, debug, D, X, Pfx, PfxCallInfo
-from cs.resources import NestingOpenCloseMixin, not_closed
+from cs.resources import MultiOpenMixin, not_closed
 from cs.seq import seq
 from cs.py3 import Queue, PriorityQueue, Queue_Full, Queue_Empty
 from cs.obj import O
 
-class _QueueIterator(NestingOpenCloseMixin):
+class _QueueIterator(MultiOpenMixin):
   ''' A QueueIterator is a wrapper for a Queue (or ducktype) which
       presents an iterator interface to collect items.
       It does not offer the .get or .get_nowait methods.
@@ -41,11 +41,10 @@ class _QueueIterator(NestingOpenCloseMixin):
   def __init__(self, q, name=None):
     if name is None:
       name = "QueueIterator-%d" % (seq(),)
-    self._lock = Lock()
+    MultiOpenMixin.__init__(self, finalise_later=True)
+    self.q = q
     self.name = name
     self._item_count = 0    # count of non-sentinel values on the queue
-    O.__init__(self, q=q)
-    NestingOpenCloseMixin.__init__(self, finalise_later=True)
 
   def __str__(self):
     return "<%s:opens=%d>" % (self.name, self._opens)
@@ -69,8 +68,11 @@ class _QueueIterator(NestingOpenCloseMixin):
     '''
     return self.q.put(item, *args, **kw)
 
+  def startup(self):
+    pass
+
   def shutdown(self):
-    ''' Support method for NestingOpenCloseMixin.shutdown.
+    ''' Support method for MultiOpenMixin.shutdown.
         Queue the sentinel object so that calls to .get() from .__next__ do not block.
     '''
     self._put(self.sentinel)
@@ -190,7 +192,7 @@ class Channel(object):
     else:
       self.closed = True
 
-class PushQueue(NestingOpenCloseMixin):
+class PushQueue(MultiOpenMixin):
   ''' A puttable object which looks like a Queue.
       Calling .put(item) calls `func_push` supplied at initialisation
       to trigger a function on data arrival, which returns an iterable
@@ -215,9 +217,9 @@ class PushQueue(NestingOpenCloseMixin):
     if name is None:
       name = "%s%d-%s" % (self.__class__.__name__, seq(), func_push)
     self.name = name
-    self._lock = Lock()
+    self._lock = RLock()
     O.__init__(self)
-    NestingOpenCloseMixin.__init__(self)
+    MultiOpenMixin.__init__(self)
     self.later = L
     self.func_push = func_push
     self.outQ = outQ
@@ -251,8 +253,11 @@ class PushQueue(NestingOpenCloseMixin):
     outQ.open()
     L._defer_iterable(items, outQ)
 
+  def startup(self):
+    pass
+
   def shutdown(self):
-    ''' shutdown() is called by NestingOpenCloseMixin._close() to close
+    ''' shutdown() is called by MultiOpenMixin._close() to close
         the outQ for real.
     '''
     debug("%s.shutdown()", self)
@@ -272,7 +277,7 @@ class PushQueue(NestingOpenCloseMixin):
     for item in items:
       outQ.put(item)
 
-class NullQueue(NestingOpenCloseMixin):
+class NullQueue(MultiOpenMixin):
   ''' A queue-like object that discards its inputs.
       Calls to .get() raise Queue_Empty.
   '''
@@ -286,9 +291,9 @@ class NullQueue(NestingOpenCloseMixin):
     if name is None:
       name = "%s%d" % (self.__class__.__name__, seq())
     self.name = name
-    self._lock = Lock()
+    self._lock = RLock()
     O.__init__(self)
-    NestingOpenCloseMixin.__init__(self)
+    MultiOpenMixin.__init__(self)
     self.blocking = blocking
 
   def __str__(self):
@@ -309,6 +314,9 @@ class NullQueue(NestingOpenCloseMixin):
     if self.blocking:
       self.join()
     raise Queue_Empty
+
+  def startup(self):
+    pass
 
   def shutdown(self):
     ''' Shut down the queue. Wakes up anything waiting on ._close_cond, such
@@ -438,7 +446,7 @@ class TimerQueue(object):
           # function due now - run it
           try:
             retval = func()
-          except:
+          except Exception:
             exception("func %s threw exception", func)
           else:
             debug("func %s returns %s", func, retval)
@@ -455,7 +463,7 @@ class TimerQueue(object):
             if Tfunc:
               try:
                 retval = Tfunc()
-              except:
+              except Exception:
                 exception("func %s threw exception", Tfunc)
               else:
                 debug("func %s returns %s", Tfunc, retval)
