@@ -554,7 +554,7 @@ class Target(Result):
       LFs = self.LFs
       if LFs:
         mdebug("collect LFs=%s", LFs)
-        self.LFS = []
+        self.LFs = []
         for LF in LFs:
           with Pfx(LF):
             self._apply_prereq(LF)
