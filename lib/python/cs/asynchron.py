@@ -48,10 +48,10 @@ class Asynchron(O):
                  regardless of the completion mode (result, exception,
                  cancellation).
     '''
-    if lock is None:
-      lock = Lock()
     O.__init__(self)
     self._O_omit.extend(['result', 'exc_info'])
+    if lock is None:
+      lock = Lock()
     if name is None:
       name = "%s-%d" % (self.__class__.__name__, seq(),)
     self.name = name
