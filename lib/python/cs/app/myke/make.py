@@ -12,7 +12,7 @@ import logging
 from subprocess import Popen
 from threading import Thread
 import time
-from cs.debug import DEBUG
+from cs.excutils import logexc
 from cs.inttypes import Flags
 from cs.threads import Lock, RLock, Channel, locked_property
 from cs.later import Later
@@ -20,7 +20,7 @@ from cs.queues import MultiOpenMixin
 from cs.asynchron import Result, report as report_LFs, \
         Asynchron, ASYNCH_PENDING, ASYNCH_RUNNING, ASYNCH_CANCELLED, ASYNCH_READY
 import cs.logutils
-from cs.logutils import Pfx, info, error, debug, D, X
+from cs.logutils import Pfx, info, error, debug, D, X, XP
 from cs.obj import O
 from .parse import SPECIAL_MACROS, Macro, MacroExpression, \
                    parseMakefile, parseMacroExpression
@@ -71,11 +71,6 @@ class Maker(MultiOpenMixin):
     self.active = set()
     self._active_lock = Lock()
     self._namespaces = [{ 'MAKE': makecmd.replace('$', '$$') }]
-    ## DEBUGGING REPORTS FOR HUNG APP
-    ##T = Thread(target=self._ticker, args=())
-    ##T.daemon = True
-    ##D("DISPATCH TICKER")
-    ##T.start()
 
   def __str__(self):
     return "<MAKER>"
@@ -471,7 +466,6 @@ class Target(Result):
     return Ps
 
   @locked_property
-  @DEBUG
   def mtime(self):
     try:
       s = os.stat(self.name)
@@ -540,9 +534,9 @@ class Target(Result):
         mdebug("FAIL")
         self.result = False
 
-  @DEBUG
-  def _make_partial(self):
-    ''' The inner/recursive/deferred function from _make.
+  @logexc
+  def _make_next(self):
+    ''' The inner/recursive/deferred function from _make; only called if out of date.
         Perform the next unit of work in making this Target.
         If we complete without blocking, put True or False onto self.made.
         Otherwise queue a background function to block and resume.
@@ -637,7 +631,6 @@ class Action(O):
     ALF = target.maker.defer("%s:act[%s]" % (self,target,), self._act, R, target)
     return R
 
-  @DEBUG
   def _act(self, R, target):
     ''' Perform this Action on behalf of the Target `target`.
         Arrange to put the result onto `R`.
