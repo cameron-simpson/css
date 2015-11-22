@@ -379,7 +379,7 @@ class Target(Result):
         just as we for a :make directive.
     '''
 
-    Result.__init__(self)
+    Result.__init__(self, lock=RLock())
     self._O_omit.extend(['actions', 'maker', 'namespaces'])
     self.maker = maker
     self.context = context
