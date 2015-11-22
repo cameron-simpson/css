@@ -400,9 +400,6 @@ class Target(Result):
     #  When all prereqs have been successfully build, if this Target
     #  is out of date then it is marked as new and any actions queued.
     #  
-    self.out_of_date = False
-    self.is_new = False
-    self.was_missing = self.mtime is None
 
   def __str__(self):
     return "{}[{}]".format(self.name, self.madeness())
@@ -512,13 +509,34 @@ class Target(Result):
     with self._lock:
       if self.pending:
         self.state = ASYNCH_RUNNING
-        self.Ts = []   # pending targets returning True/False
-        self.pending_targets = list(self.prereqs)
+        self.was_missing = self.mtime is None
         self.pending_actions = list(self.actions)
+        Ts = []
+        for Pname in self.prereqs:
+          T = self.maker[Pname]
+          Ts.append(T)
+          T.require()
+          # fire fail action immediately
+          T.notify(lambda T: self.fail() if not T.result else None)
         # queue the first unit of work
         self.maker.after(Ts, self._make_after_prereqs, Ts)
 
-  @DEBUG
+  @logexc
+  def _make_after_prereqs(self, Ts):
+    ''' Invoked after the initial prerequisites have been run.
+        Compute out_of_date etc, then run _make_next.
+    '''
+    with Pfx("%s: after prereqs", self.name):
+      self.out_of_date = False
+      for T in Ts:
+        if not T.ready:
+          raise RuntimeError("not ready")
+        self._apply_prereq(T)
+      if not self.failed and (self.was_missing or self.out_of_date):
+        # proceed to normal make process
+        self.Rs = []
+        return self._make_next()
+
   def _apply_prereq(self, T):
     ''' Apply the consequences of the complete prereq T.
     '''
