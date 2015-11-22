@@ -173,10 +173,10 @@ class Maker(MultiOpenMixin):
     return MLF
 
   def after(self, LFs, func, *a, **kw):
-    ''' Submit a function to be run after the supplied LateFunctions `LFs`.
+    ''' Submit a function to be run after the supplied LateFunctions `LFs`, return a Result instance for collection.
     '''
     self.debug_make("after %s call %s(*%r, **%r)" % (LFs, func, a, kw))
-    return self._makeQ.after(LFs, func, *a, **kw)
+    return self._makeQ.after(LFs, None, func, *a, **kw)
 
   def make(self, targets):
     ''' Synchronous call to make targets in series.
@@ -502,7 +502,7 @@ class Target(Result):
         self.pending_targets = list(self.prereqs)
         self.pending_actions = list(self.actions)
         # queue the first unit of work
-        self.maker.defer("%s._make_partial" % (self,), self._make_partial)
+        self.maker.after(Ts, self._make_after_prereqs, Ts)
 
   @DEBUG
   def _apply_prereq(self, T):
@@ -597,7 +597,7 @@ class Target(Result):
       if Ts:
         self.Ts = Ts
         mdebug("tasks still to do, requeuing")
-        self.maker.after(Ts, None, self._make_partial)
+        self.maker.after(Rs, self._make_next)
       else:
         # all done, record success
         mdebug("SUCCESS")
