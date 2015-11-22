@@ -335,10 +335,11 @@ class TargetMap(O):
         if name not in targets:
           T = self._newTarget(self.maker, name, context=None)
           if os.path.exists(name):
-            T.result = True
+            mdebug("%r: exists, now rules - consider made", name)
+            T.succeed()
           else:
-            error("can't infer a Target to make %r" % (name,))
-            T.result = False
+            error("%r: does not exist, no rules (and nothing inferred)", name)
+            T.fail()
           targets[name] = T
     return targets[name]
 
@@ -387,6 +388,7 @@ class Target(Result):
     self._prereqs = prereqs
     self._postprereqs = postprereqs
     self.actions = actions
+    self.failed = False
     # build state:
     #
     # Out Of Date:
@@ -405,6 +407,18 @@ class Target(Result):
   def __str__(self):
     return "{}[{}]".format(self.name, self.madeness())
     ##return "{}[{}]:{}:{}".format(self.name, self.state, self._prereqs, self._postprereqs)
+
+  def succeed(self):
+    ''' Mark target as successfully made.
+    '''
+    self.failed = False
+    self.result = True
+
+  def fail(self):
+    ''' Mark Target as failed.
+    '''
+    self.failed = True
+    self.result = False
 
   def madeness(self):
     ''' Report the status of this target as text.
@@ -512,7 +526,10 @@ class Target(Result):
       mdebug = self.maker.debug_make
       if not T.ready:
         raise RuntimeError("not ready")
-      if T.result:
+      if not T.result:
+        mdebug("FAIL")
+        self.fail()
+      else:
         mdebug("OK")
         try:
           is_new = T.is_new
@@ -530,9 +547,6 @@ class Target(Result):
               if mtime is None or Tmtime >= mtime:
                 mdebug("out of date because older than T")
                 self.out_of_date = True
-      else:
-        mdebug("FAIL")
-        self.result = False
 
   @logexc
   def _make_next(self):
@@ -601,7 +615,7 @@ class Target(Result):
       else:
         # all done, record success
         mdebug("SUCCESS")
-        self.result = True
+        self.succeed()
 
 class Action(O):
 
