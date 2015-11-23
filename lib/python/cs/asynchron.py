@@ -41,7 +41,7 @@ class Asynchron(O):
       objects with asynchronous termination.
   '''
 
-  def __init__(self, name=None, final=None):
+  def __init__(self, name=None, final=None, lock=None):
     ''' Base initialiser for Asynchron objects and subclasses.
         `name`: optional paramater to name this object.
         `final`: a function to run after completion of the asynchron,
@@ -50,6 +50,8 @@ class Asynchron(O):
     '''
     O.__init__(self)
     self._O_omit.extend(['result', 'exc_info'])
+    if lock is None:
+      lock = Lock()
     if name is None:
       name = "%s-%d" % (self.__class__.__name__, seq(),)
     self.name = name
@@ -58,7 +60,7 @@ class Asynchron(O):
     self.notifiers = []
     self._get_lock = Lock()
     self._get_lock.acquire()
-    self._lock = Lock()
+    self._lock = lock
 
   def __repr__(self):
     return str(self)
