@@ -335,7 +335,8 @@ class TargetMap(O):
         if name not in targets:
           T = self._newTarget(self.maker, name, context=None)
           if os.path.exists(name):
-            mdebug("%r: exists, now rules - consider made", name)
+            self.maker.debug_make("%r: exists, no rules - consider made", name)
+            T.out_of_date = False
             T.succeed()
           else:
             error("%r: does not exist, no rules (and nothing inferred)", name)
