@@ -539,6 +539,8 @@ class Target(Result):
         # proceed to normal make process
         self.Rs = []
         return self._make_next()
+      # prereqs ok and up to date: make complete
+      self.succeed()
 
   def _apply_prereq(self, T):
     ''' Apply the consequences of the completed prereq T.
