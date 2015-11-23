@@ -553,22 +553,17 @@ class Target(Result):
         self.fail()
       else:
         mdebug("OK")
-        try:
-          is_new = T.is_new
-        except AttributeError:
-          # presuming not a Target
-          pass
+        X("%s.result=%s", T, T.result)
+        if T.out_of_date:
+          mdebug("out of date because T was out of date")
+          self.out_of_date = True
         else:
-          if is_new:
-            mdebug("out of date because is_new(T)")
-            self.out_of_date = True
-          else:
-            Tmtime = getattr(T, 'mtime', None)
-            if Tmtime is not None:
-              mtime = self.mtime
-              if mtime is None or Tmtime >= mtime:
-                mdebug("out of date because older than T")
-                self.out_of_date = True
+          Tmtime = getattr(T, 'mtime', None)
+          if Tmtime is not None:
+            mtime = self.mtime
+            if mtime is None or Tmtime >= mtime:
+              mdebug("out of date because T is newer")
+              self.out_of_date = True
 
   @logexc
   def _make_next(self):
