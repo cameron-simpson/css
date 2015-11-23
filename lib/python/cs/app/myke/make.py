@@ -465,6 +465,7 @@ class Target(Result):
     ''' Return the new prerequisite target names.
     '''
     if self.was_missing:
+      # target missing: use all prereqs
       return self.prereqs
     Ps = []
     for Pname in self.prereqs:
@@ -473,8 +474,6 @@ class Target(Result):
         raise RuntimeError("%s: prereq %r not ready", self.name, Pname)
       if self.older_than(P):
         Ps.append(Pname)
-      else:
-        D("NOT NEW %r", Pname)
     return Ps
 
   @locked_property
