@@ -577,57 +577,26 @@ class Target(Result):
       M = self.maker
       mdebug = M.debug_make
 
-      Ts = self.Ts
-      if Ts:
-        mdebug("collect Ts=%s", Ts)
-        self.Ts = []
-        for T in Ts:
-          with Pfx(T):
-            self._apply_prereq(T)
-            if not T.result:
-              mdebug("FAILed")
-              return
+      # evaluate the result of Actions or Targets we have just waited for
+      for R in self.Rs:
+        if not R.result:
+          self.fail()
+        elif isinstance(R, Target):
+          self._apply_prereq(R)
+      if self.failed:
+        # failure, cease make
+        return
 
-      Ts = []
-      targets = self.pending_targets
-      self.pending_targets = []
-      for T in targets:
-        with Pfx(str(T)):
-          T = M[T]
-          if T.ready:
-            self._apply_prereq(T)
-            if T.result:
-              mdebug("OK")
-            else:
-              mdebug("FAILed")
-              self.result = False
-              return
-          else:
-            # require T and note it for consideration next time
-            mdebug("not ready, requiring it...")
-            T.require()
-            Ts.append(T)
+      Rs = self.Rs = []
+      actions = self.pending_actions
+      if actions:
+        A = actions.pop(0)
+        mdebug("queue action: %s", A)
+        Rs.append(A.act_later(self))
+      else:
+        mdebug("no actions")
 
-      if not Ts:
-        # no pending targets, what about actions?
-        # if we're out of date or missing,
-        # queue an action and mark ourselves is_new
-        # if so, queue the first one
-        if self.out_of_date or self.mtime is None:
-          mdebug("NEED TO MAKE %s (out_of_date=%r, mtime=%r)", self.name, self.out_of_date, self.mtime)
-          self.is_new = True
-          actions = self.pending_actions
-          if actions:
-            A = actions.pop(0)
-            mdebug("queue action: %s", A)
-            Ts.append(A.act_later(self))
-          else:
-            mdebug("no actions")
-        else:
-          mdebug("not out of date (mtime=%r)", self.mtime)
-
-      if Ts:
-        self.Ts = Ts
+      if Rs:
         mdebug("tasks still to do, requeuing")
         self.maker.after(Rs, self._make_next)
       else:
