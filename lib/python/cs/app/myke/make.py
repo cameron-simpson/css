@@ -489,6 +489,9 @@ class Target(Result):
       return True
     if isinstance(other, str):
       other = self.maker[other]
+    if not other.ready:
+      raise RuntimeError("Target %r not ready, accessed from Target %r",
+                         other, self)
     if other.is_new:
       return True
     m = other.mtime
@@ -538,7 +541,7 @@ class Target(Result):
         return self._make_next()
 
   def _apply_prereq(self, T):
-    ''' Apply the consequences of the complete prereq T.
+    ''' Apply the consequences of the completed prereq T.
     '''
     with Pfx("%s._apply_prereqs(T=%s)", self, T):
       mdebug = self.maker.debug_make
@@ -574,6 +577,8 @@ class Target(Result):
         Otherwise queue a background function to block and resume.
     '''
     with Pfx(self.name):
+      if not self.was_missing and not self.out_of_date:
+        raise RuntimeError("not missing or out of date!")
       M = self.maker
       mdebug = M.debug_make
 
