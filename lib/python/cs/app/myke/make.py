@@ -182,7 +182,6 @@ class Maker(MultiOpenMixin):
     ''' Synchronous call to make targets in series.
     '''
     ok = True
-    mdebug = self.debug_make
     with Pfx("%s.make(%s)", self, " ".join(targets)):
       for target in targets:
         if isinstance(target, str):
@@ -191,15 +190,15 @@ class Maker(MultiOpenMixin):
           T = target
         T.require()
         if T.get():
-          mdebug("MAKE %s: OK", T)
+          self.debug_make("MAKE %s: OK", T)
         else:
-          mdebug("MAKE FAILED for %s", T)
+          self.debug_make("MAKE %s: FAILED", T)
           ok = False
           if self.fail_fast:
-            mdebug("ABORT MAKE")
+            self.debug_make("ABORT MAKE")
             break
-    mdebug("MAKER.MAKE(%s): %s", targets, ok)
-    return ok
+      self.debug_make("%r: %s", targets, ok)
+      return ok
 
   def __getitem__(self, name):
     ''' Return the specified Target.
@@ -406,15 +405,20 @@ class Target(Result):
     return "{}[{}]".format(self.name, self.madeness())
     ##return "{}[{}]:{}:{}".format(self.name, self.state, self._prereqs, self._postprereqs)
 
+  def mdebug(self, msg, *a):
+    return self.maker.debug_make(msg, *a)
+
   def succeed(self):
     ''' Mark target as successfully made.
     '''
+    self.mdebug("OK")
     self.failed = False
     self.result = True
 
   def fail(self):
     ''' Mark Target as failed.
     '''
+    self.mdebug("FAILED")
     self.failed = True
     self.result = False
 
@@ -576,9 +580,6 @@ class Target(Result):
     with Pfx(self.name):
       if not self.was_missing and not self.out_of_date:
         raise RuntimeError("not missing or out of date!")
-      M = self.maker
-      mdebug = M.debug_make
-
       # evaluate the result of Actions or Targets we have just waited for
       for R in self.Rs:
         if not R.result:
@@ -593,17 +594,16 @@ class Target(Result):
       actions = self.pending_actions
       if actions:
         A = actions.pop(0)
-        mdebug("queue action: %s", A)
+        self.mdebug("queue action: %s", A)
         Rs.append(A.act_later(self))
       else:
-        mdebug("no actions")
+        self.mdebug("no actions remaining")
 
       if Rs:
-        mdebug("tasks still to do, requeuing")
+        self.mdebug("tasks still to do, requeuing")
         self.maker.after(Rs, self._make_next)
       else:
         # all done, record success
-        mdebug("SUCCESS")
         self.succeed()
 
 class Action(O):
