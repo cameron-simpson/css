@@ -13,12 +13,13 @@ from threading import Lock, RLock
 from zlib import compress, decompress
 from cs.cache import LRU_Cache
 from cs.excutils import LogExceptions
-from cs.logutils import D, X, debug, warning
+from cs.logutils import D, X, debug, warning, Pfx
 from cs.obj import O
 from cs.resources import MultiOpenMixin
 from cs.serialise import get_bs, put_bs, read_bs, put_bsdata, read_bsdata
 from cs.threads import locked, locked_property
-from .hash import DEFAULT_HASHCLASS
+from . import defaults
+from .hash import HASHCLASS_BY_NAME, DEFAULT_HASHCLASS, HashCodeUtilsMixin
 
 F_COMPRESSED = 0x01
 
@@ -184,6 +185,11 @@ class DataDir(MultiOpenMixin):
         Close and release any open indices.
         Close any open datafiles.
     '''
+    self.flush()
+
+  def flush(self):
+    ''' Flush all the open datafiles.
+    '''
     with self._lock:
       self._datafile_cache.flush()
 
@@ -233,9 +239,7 @@ class DataDir(MultiOpenMixin):
   def datafile_paths(self):
     ''' A list of the current datafile pathnames.
     '''
-    dfpaths = [ self.pathto(self.datafilename(n)) for n in self._datafile_indices() ]
-    X("datafile_paths=%r", dfpaths)
-    return dfpaths
+    return [ self.pathto(self.datafilename(n)) for n in self._datafile_indices() ]
 
   def scan(self, indices=None):
     ''' Generator which scans the specified datafiles (or all if `indices` is missing or None).
@@ -243,11 +247,11 @@ class DataDir(MultiOpenMixin):
     '''
     if indices is None:
       indices = self._datafile_indices()
-    with Pfx("scan %d", n):
-      for dfn in indices:
+    for dfn in indices:
+      with Pfx("scan %d", dfn):
         D = self.datafile(dfn)
         for offset, flags, data in D.scan(do_decompress=True):
-          yield n, offset, data
+          yield dfn, offset, data
 
   def add(self, data):
     ''' Add the supplied data chunk to the current DataFile, return (n, offset).
@@ -270,19 +274,24 @@ class DataDir(MultiOpenMixin):
   def get(self, n, offset):
     return self.datafile(n).get(offset)
 
-class DataDirMapping(MultiOpenMixin):
+class DataDirMapping(MultiOpenMixin,HashCodeUtilsMixin):
   ''' Access to a DataDir as a mapping by using a dbm index per hash type.
   '''
 
-  def __init__(self, dirpath, indexclass=None, rollover=None):
+  def __init__(self, dirpath, indexclass=None, rollover=None, hashclass=None):
     ''' Initialise this DataDirMapping.
         `dirpath`: if a str the path to the DataDir, otherwise an existing DataDir
-        `indexclass`: class implementing the dbm, initialised with the path to the dbm file
+        `indexclass`: class implementing the dbm, initialised with the path
+                      to the dbm file; if this is a str it will be looked up
+                      in INDEXCLASS_BY_NAME
         `rollover`: if `dirpath` is a str, this is passed in to the DataDir constructor
-
+        `hashclass`: the default hashclass for operations needing one if the
+                     default Store does not dictate a hashclass; defaults to
+                     cs.venti.DEFAULT_HASHCLASS
         The indexclass is normally a mapping wrapper for some kind of DBM
         file stored in the DataDir. Importantly, the __getitem__
     '''
+    global INDEXCLASS_BY_NAME
     if isinstance(dirpath, str):
       datadir = DataDir(dirpath, rollover=rollover)
     else:
@@ -291,11 +300,28 @@ class DataDirMapping(MultiOpenMixin):
       datadir = dirpath
     if indexclass is None:
       indexclass = GDBMIndex
+    elif isinstance(indexclass, str):
+      indexclass = INDEXCLASS_BY_NAME[indexclass]
+    if hashclass is None:
+      hashclass = DEFAULT_HASHCLASS
+    self._default_hashclass = hashclass
     # we will use the same lock as the underlying DataDir
     MultiOpenMixin.__init__(self, lock=datadir._lock)
     self.datadir = datadir
     self.indexclass = indexclass
     self._indices = {}  # map hash name to instance of indexclass
+
+  def spec(self):
+    ''' Return a datadir_spec for this DataDirMapping.
+    '''
+    return ':'.join( (self.indexclass.indexname,
+                      self.default_hashclass.HASHNAME,
+                      self.dirpath) )
+
+  __str__ = spec
+
+  def __len__(self):
+    return len(self._default_index)
 
   def startup(self):
     self.datadir.open()
@@ -308,14 +334,53 @@ class DataDirMapping(MultiOpenMixin):
       self._indices = {}
     self.datadir.close()
 
+  @property
+  def default_hashclass(self):
+    ''' The default hashclass.
+        If there is a prevailing Store, use its hashclass otherwise
+        self._default_hashclass.
+    '''
+    S = defaults.S
+    if S is None:
+      hashclass = self._default_hashclass
+    else:
+      hashclass = S.hashclass
+    return hashclass
+
+  @property
+  def _default_index(self):
+    return self._index(self.default_hashclass)
+
+  @property
+  def dirpath(self):
+    return self.datadir.dirpath
+
+  def reindex(self, hashclass=None):
+    ''' Rescan all the data files, update the index.
+    '''
+    if hashclass is None:
+      hashclass = self.default_hashclass
+    I = self._index(hashclass)
+    for n, offset, data in self.datadir.scan():
+      hashcode = hashclass.from_data(data)
+      if hashcode not in I:
+        I[hashcode] = n, offset
+
+  @staticmethod
+  def _indexfilename(hashname, suffix):
+    ''' Compute the filename part of an indexfile from `hashname` and `suffix`.
+    '''
+    return 'index-' + hashname + '.' + suffix
+
   def _indexpath(self, hashname, suffix):
     ''' Return the pathname for a specific type of index.
     '''
-    return self.datadir.pathto('index-' + hashname + '.' + suffix)
+    return self.datadir.pathto(self._indexfilename(hashname, suffix))
 
-  def _index(self, hashname):
-    ''' Obtain the index to which to store/access this hashcode.
+  def _index(self, hashclass):
+    ''' Obtain the index to which to store/access this hashcode class.
     '''
+    hashname = hashclass.HASHNAME
     try:
       # fast path: return already instantiated index
       return self._indices[hashname]
@@ -327,27 +392,39 @@ class DataDirMapping(MultiOpenMixin):
         except KeyError:
           indexclass = self.indexclass
           indexpath = self._indexpath(hashname, indexclass.suffix)
-          index = self._indices[hashname] = indexclass(indexpath, lock=self._lock)
+          index = self._indices[hashname] \
+                = indexclass(indexpath, hashclass, lock=self._lock)
           index.open()
         return index
 
   # without this "in" tries to iterate over the mapping with int indices
   def __contains__(self, hashcode):
-    return hashcode in self._index(hashcode.HASHNAME)
+    return hashcode in self._index(hashcode.__class__)
 
   def __getitem__(self, hashcode):
     ''' Return the decompressed data associated with the supplied `hashcode`.
     '''
-    n, offset = self._index(hashcode.HASHNAME)[hashcode]
+    n, offset = self._index(hashcode.__class__)[hashcode]
     return self.datadir.get(n, offset)
 
   def __setitem__(self, hashcode, data):
     ''' Store the supplied `data` indexed by `hashcode`.
+        If the hashcode is already known, do not both storing the `data`.
     '''
-    index = self._index(hashcode.HASHNAME)
+    index = self._index(hashcode.__class__)
     if hashcode not in index:
       n, offset = self.datadir.add(data)
       index[hashcode] = n, offset
+
+  def add(self, data, hashclass=None):
+    ''' Add a data chunk using the supplied `hashclass`. Return the hashcode.
+        If `hashclass` is missing or None, use self.default_hashclass.
+    '''
+    if hashclass is None:
+      hashclass = self.default_hashclass
+    h = hashclass.from_data(data)
+    self[h] = data
+    return h
 
   @locked
   def flush(self):
@@ -357,15 +434,56 @@ class DataDirMapping(MultiOpenMixin):
     for index in indices:
       index.flush()
 
+  def first(self, hashclass=None):
+    ''' Return the first hashcode in the database or None if empty.
+        `hashclass`: specify the hashcode type, default from defaults.S
+    '''
+    if hashclass is None:
+      hashclass = self.default_hashclass
+    index = self._index(hashclass)
+    try:
+      first_method = index.first
+    except AttributeError:
+      raise NotImplementedError("._index(%s) has no .first" % (hashclass,))
+    return first_method()
+
+  def hashcodes(self, hashclass=None, hashcode=None, reverse=None, after=False, length=None):
+    ''' Generator yielding the hashcodes from the database in order starting with optional `hashcode`.
+        `hashclass`: specify the hashcode type, default from defaults.S
+        `hashcode`: the first hashcode; if missing or None, iteration
+                    starts with the first key in the index
+        `reverse`: iterate backwards if true, otherwise forwards
+        `after`: commence iteration after the first hashcode
+        `length`: if not None, the maximum number of hashcodes to yield
+    '''
+    if hashclass is None:
+      hashclass = self.default_hashclass
+    return self._index(hashclass).hashcodes(hashcode=hashcode,
+                                            reverse=reverse,
+                                            after=after,
+                                            length=length)
+
+  def merge_other(self, other, hashcodes=None):
+    ''' Iterate over the hashcodes in `other` and fetch anything we don't have.
+    '''
+    if hashcodes is None:
+      hashcodes = other.hashcodes()
+    for hashcode in hashcodes:
+      if hashcode not in self:
+        X("pull %s", hashcode)
+        self[hashcode] = other[hashcode]
+
 class GDBMIndex(MultiOpenMixin):
   ''' GDBM index for a DataDir.
   '''
 
+  indexname = 'gdbm'
   suffix = 'gdbm'
 
-  def __init__(self, gdbmpath, lock=None):
+  def __init__(self, gdbmpath, hashclass, lock=None):
     import dbm.gnu
     MultiOpenMixin.__init__(self, lock=lock)
+    self._hashclass = hashclass
     self._gdbm_path = gdbmpath
     self._gdbm = None
 
@@ -388,8 +506,188 @@ class GDBMIndex(MultiOpenMixin):
   def __setitem__(self, hashcode, value):
     self._gdbm[hashcode] = encode_index_entry(*value)
 
+  def hashcodes(self, hashcode=None, reverse=None, after=False, length=None):
+    ''' Generator yielding the keys from the index, unordered
+        `hashcode`: must be missing or None; GDBMs cannot iterate
+                    from a specific hashcode
+        `reverse`: must be missing or None; GDBMs are unordered
+        `after`: commence iteration after the first hashcode
+        `length`: if not None, maximum number of hashcodes to yield
+    '''
+    if hashcode is not None:
+      raise ValueError("iteration from specific hashcode unsupported")
+    if reverse is not None:
+      raise ValueError("reverse must be None (unordered)")
+    if after:
+      raise ValueError("after not supported (meaningless, since no starting hashcode support)")
+    if length is not None and length < 1:
+      raise ValueError("length (%d) must be >= 1" % (length,))
+    first = True
+    for hashbytes in self._gdbm.keys():
+      if not first or not after:
+        yield self._hashclass.from_hashbytes(hashbytes)
+        if length <= 1:
+          break
+        length -= 1
+      first = False
+
 def GDBMDataDirMapping(dirpath, rollover=None):
   return DataDirMapping(dirpath, indexclass=GDBMIndex, rollover=rollover)
+
+class KyotoIndex(MultiOpenMixin):
+  ''' Kyoto Cabinet index for a DataDir.
+      Notably this uses a B+ tree for the index and thus one can
+      traverse from one key forwards and backwards, which supports
+      the coming Store synchronisation processes.
+  '''
+
+  indexname = 'kyoto'
+  suffix = 'kct'
+
+  def __init__(self, kyotopath, hashclass, lock=None):
+    MultiOpenMixin.__init__(self, lock=lock)
+    self._hashclass = hashclass
+    self._kyoto_path = kyotopath
+    self._kyoto = None
+
+  def startup(self):
+    from kyotocabinet import DB
+    self._kyoto = DB()
+    self._kyoto.open(self._kyoto_path, DB.OWRITER | DB.OCREATE)
+
+  def shutdown(self):
+    self._kyoto.close()
+    self._kyoto = None
+
+  def flush(self):
+    try:
+      self._kyoto.synchronize(hard=False)
+    except TypeError:
+      self._kyoto.synchronize()
+
+  def __len__(self):
+    return self._kyoto.count()
+
+  def __contains__(self, hashcode):
+    return self._kyoto.check(hashcode) >= 0
+
+  def get(self, hashcode):
+    record = self._kyoto.get(hashcode)
+    if record is None:
+      return None
+    return decode_index_entry(record)
+
+  def __getitem__(self, hashcode):
+    entry = self.get(hashcode)
+    if entry is None:
+      raise IndexError(str(hashcode))
+    return entry
+
+  def __setitem__(self, hashcode, value):
+    self._kyoto[hashcode] = encode_index_entry(*value)
+
+  def first(self):
+    ''' Return the first hashcode in the database or None if empty.
+    '''
+    cursor = self._kyoto.cursor()
+    if not cursor.jump():
+      return None
+    hashcode = self._hashclass.from_hashbytes(cursor.get_key())
+    cursor.disable()
+    return hashcode
+
+    cursor.disable()
+
+  def hashcodes(self, hashcode=None, reverse=None, after=False, length=None):
+    ''' Generator yielding the keys from the index in order starting with optional `hashcode`.
+        `hashcode`: the first hashcode; if missing or None, iteration
+                    starts with the first key in the index
+        `reverse`: iterate backwards if true, otherwise forwards
+        `after`: commence iteration after the first hashcode
+        `length`: if not None, maximum number of hashcodes to yield
+    '''
+    if length is not None and length < 1:
+      raise ValueError("length (%d) must be >= 1" % (length,))
+    cursor = self._kyoto.cursor()
+    if cursor.jump(hashcode):
+      if not after:
+        yield self._hashclass.from_hashbytes(cursor.get_key())
+        if length is not None:
+          length -= 1
+      while length is None or length >= 1:
+        if reverse:
+          if not cursor.step_back():
+            break
+        else:
+          if not cursor.step():
+            break
+        yield self._hashclass.from_hashbytes(cursor.get_key())
+        if length is not None:
+          if length <= 1:
+            break
+          length -= 1
+    cursor.disable()
+
+def KyotoDataDirMapping(dirpath, rollover=None):
+  return DataDirMapping(dirpath, indexclass=KyotoIndex, rollover=rollover)
+
+INDEXCLASS_BY_NAME = {}
+
+def register_index(indexname, indexclass):
+  global INDEXCLASS_BY_NAME
+  if indexname in INDEXCLASS_BY_NAME:
+    raise ValueError(
+            'cannot register index class %s: indexname %r already registered to %s'
+            % (indexclass, indexname, INDEXCLASS_BY_NAME[indexname]))
+  INDEXCLASS_BY_NAME[indexname] = indexclass
+
+register_index('gdbm', GDBMIndex)
+register_index('kyoto', KyotoIndex)
+
+DEFAULT_INDEXCLASS = GDBMIndex
+
+def DataDirMapping_from_spec(datadir_spec, **kw):
+  ''' Accept `datadir_spec` of the form [indextype:[hashname:]]/dirpath and return a DataDirMapping.
+  '''
+  global INDEXCLASS_BY_NAME, DEFAULT_HASHCLASS, HASHCLASS_BY_NAME
+  with Pfx(datadir_spec):
+    indexclass = None
+    hashname = None
+    # leading indextype
+    if not datadir_spec.startswith('/'):
+      indexname, datadir_spec = datadir_spec.split(':', 1)
+      try:
+        indexclass = INDEXCLASS_BY_NAME[indexname]
+      except KeyError:
+        raise ValueError("invalid indextype: %r (I know %r)"
+                         % (indexname,), sorted(INDEXCLASS_BY_NAME.keys()))
+    if not datadir_spec.startswith('/'):
+      hashname, datadir_spec = datadir_spec.split(':', 1)
+      try:
+        hashclass = HASHCLASS_BY_NAME[hashname]
+      except KeyError:
+        raise ValueError("invalid hashname: %r (I know %r)"
+                         % (hashname, sorted(HASHCLASS_BY_NAME.keys())))
+    else:
+      hashclass = DEFAULT_HASHCLASS
+      hashname = hashclass.HASHNAME
+    dirpath = datadir_spec
+    if not os.path.isdir(dirpath):
+      raise ValueError("not a directory: %r" % (dirpath,))
+    # no indextype yet? look for an index file
+    if indexclass is None:
+      found = False
+      for indexname, indexclass in INDEXCLASS_BY_NAME.items():
+        suffix = indexclass.suffix
+        indexfilename = DataDirMapping._indexfilename(hashname, suffix)
+        entries = list(os.listdir(dirpath))
+        if indexfilename in entries:
+          found = True
+          break
+        if not found:
+          indexclass = DEFAULT_INDEXCLASS
+          warning("no index file found, using %s (EMPTY)", indexclass)
+    return DataDirMapping(dirpath, indexclass=indexclass, **kw)
 
 if __name__ == '__main__':
   import cs.venti.datafile_tests

@@ -276,7 +276,7 @@ class FileDirent(_Dirent, MultiOpenMixin):
     '''
     self._check()
     if self._open_file is not None:
-      self._block = self._open_file.sync()
+      self._block = self._open_file.flush()
       warning("FileDirent.block: updated to %s", self._block)
     return self._block
 

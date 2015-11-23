@@ -20,17 +20,21 @@ from threading import Condition, RLock
 import time
 import traceback
 from cs.excutils import logexc
-from cs.logutils import debug, warning, error, PfxCallInfo, X
+import cs.logutils
+from cs.logutils import debug, warning, error, PfxCallInfo, X, XP
 from cs.obj import O
 from cs.py.func import callmethod_if as ifmethod
+from cs.py.stack import caller
+
+class ClosedError(Exception):
+  pass
 
 def not_closed(func):
-  ''' Decorator to wrap MultiOpenMixin proxy object methods
-      which hould raise when self.closed.
+  ''' Decorator to wrap methods of objects with a .closed property which should raise when self.closed.
   '''
   def not_closed_wrapper(self, *a, **kw):
     if self.closed:
-      raise RuntimeError("%s: %s: already closed" % (not_closed_wrapper.__name__, self))
+      raise ClosedError("%s: %s: already closed" % (not_closed_wrapper.__name__, self))
     return func(self, *a, **kw)
   not_closed_wrapper.__name__ = "not_closed_wrapper(%s)" % (func.__name__,)
   return not_closed_wrapper
@@ -57,23 +61,29 @@ class MultiOpenMixin(O):
       lock = RLock()
     self.opened = False
     self._opens = 0
+    self._opened_from = {}
     ##self.closed = False # final _close() not yet called
     self._lock = lock
     self._finalise_later = finalise_later
     self._finalise = Condition(self._lock)
 
   def __enter__(self):
-    self.open()
+    self.open(caller_frame=caller())
     return self
 
   def __exit__(self, exc_type, exc_value, traceback):
     self.close()
     return False
 
-  def open(self):
+  def open(self, caller_frame=None):
     ''' Increment the open count.
         On the first .open call self.startup().
     '''
+    if True:    ## cs.logutils.D_mode:
+      if caller_frame is None:
+        caller_frame = caller()
+      Fkey = caller_frame.filename, caller_frame.lineno
+      self._opened_from[Fkey] = self._opened_from.get(Fkey, 0) + 1
     self.opened = True
     with self._lock:
       self._opens += 1
@@ -81,20 +91,22 @@ class MultiOpenMixin(O):
         self.startup()
     return self
 
-  @logexc
-  ##@not_closed
   def close(self, enforce_final_close=False):
     ''' Decrement the open count.
         If the count goes to zero, call self.shutdown().
     '''
     with self._lock:
       if self._opens < 1:
-        error("%s: EXTRA CLOSE", self)
+        error("%s: UNDERFLOW CLOSE", self)
+        for Fkey in sorted(self._opened_from.keys()):
+          error("  opened from %s %d times", Fkey, self._opened_from[Fkey])
+        ##from cs.debug import thread_dump
+        ##thread_dump([threading.current_thread()])
+        ##raise RuntimeError("UNDERFLOW CLOSE of %s" % (self,))
+        return
       self._opens -= 1
       count = self._opens
       if self._opens == 0:
-        if enforce_final_close:
-          self.D("OK FINAL CLOSE")
         self.shutdown()
         if not self._finalise_later:
           self.finalise()
@@ -119,7 +131,8 @@ class MultiOpenMixin(O):
     if self._opens > 0:
       return False
     if self._opens < 0:
-      XP("%r._opens < 0: %r", self, self._opens)
+      XP("_opens < 0: %r", self._opens)
+      raise RuntimeError("_OPENS UNDERFLOW")
     if not self.opened:
       # never opened, so not totally closed
       return False
@@ -136,6 +149,19 @@ class MultiOpenMixin(O):
       self._finalise.wait()
     else:
       self._lock.release()
+
+  @staticmethod
+  def is_opened(func):
+    ''' Decorator to wrap MultiOpenMixin proxy object methods which should raise when if the object is not yet open.
+    '''
+    def is_opened_wrapper(self, *a, **kw):
+      if self.closed:
+        raise RuntimeError("%s: %s: already closed" % (is_opened_wrapper.__name__, self))
+      if not self.opened:
+        raise RuntimeError("%s: %s: not yet opened" % (is_opened_wrapper.__name__, self))
+      return func(self, *a, **kw)
+    is_opened_wrapper.__name__ = "is_opened_wrapper(%s)" % (func.__name__,)
+    return is_opened_wrapper
 
 class MultiOpen(MultiOpenMixin):
   ''' Context manager class that manages a single open/close object using a MultiOpenMixin.
