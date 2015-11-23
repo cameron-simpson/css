@@ -496,7 +496,7 @@ class Target(Result):
     if not other.ready:
       raise RuntimeError("Target %r not ready, accessed from Target %r",
                          other, self)
-    if other.is_new:
+    if other.out_of_date:
       return True
     m = other.mtime
     if m is None:
@@ -562,13 +562,9 @@ class Target(Result):
         if T.out_of_date:
           mdebug("out of date because T was out of date")
           self.out_of_date = True
-        else:
-          Tmtime = getattr(T, 'mtime', None)
-          if Tmtime is not None:
-            mtime = self.mtime
-            if mtime is None or Tmtime >= mtime:
-              mdebug("out of date because T is newer")
-              self.out_of_date = True
+        elif self.older_than(T):
+          mdebug("out of date because T is newer")
+          self.out_of_date = True
 
   @logexc
   def _make_next(self):
