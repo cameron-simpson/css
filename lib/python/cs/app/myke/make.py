@@ -554,11 +554,10 @@ class Target(Result):
       if not T.ready:
         raise RuntimeError("not ready")
       if not T.result:
-        mdebug("FAIL")
+        mdebug("FAILED")
         self.fail()
       else:
-        mdebug("OK")
-        X("%s.result=%s", T, T.result)
+        mdebug("MADE OK")
         if T.out_of_date:
           mdebug("out of date because T was out of date")
           self.out_of_date = True
