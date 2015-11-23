@@ -11,22 +11,24 @@ from socketserver import TCPServer, ThreadingMixIn, StreamRequestHandler
 from threading import Lock, Thread
 from .stream import StreamStore
 from cs.excutils import logexc
-from cs.fileutils import OpenSocket
-from cs.logutils import debug, X
+from cs.socketutils import OpenSocket
+from cs.logutils import debug, X, Pfx
 from cs.queues import MultiOpenMixin
 
 class _Server(ThreadingMixIn, TCPServer):
 
   def __init__(self, bind_addr, S):
-    TCPServer.__init__(self, bind_addr, _RequestHandler)
-    self.bind_addr = bind_addr
-    self.S = S
+    with Pfx("%s.__init__(bind_addr=%r, S=%s)", self.__class__, bind_addr, S):
+      TCPServer.__init__(self, bind_addr, _RequestHandler)
+      self.bind_addr = bind_addr
+      self.S = S
+      self.handlers = set()
 
   def __str__(self):
     return "TCPStoreServer:_Server(%s,%s)" % (self.bind_addr, self.S,)
 
 class TCPStoreServer(MultiOpenMixin):
-  ''' A threading TCPServer that accepts connections by TCPStoreClients.
+  ''' A threading TCPServer that accepts connections from TCPStoreClients.
   '''
 
   def __init__(self, bind_addr, S):
@@ -40,7 +42,7 @@ class TCPStoreServer(MultiOpenMixin):
 
   def startup(self):
     self.S.open()
-    self.T = Thread(name="%s[server-thread]", target=self.server.serve_forever)
+    self.T = Thread(name="%s[server-thread]" % (self,), target=self.server.serve_forever, kwargs={'poll_interval': 0.5})
     self.T.daemon = True
     self.T.start()
 
@@ -67,6 +69,7 @@ class _RequestHandler(StreamRequestHandler):
 
   @logexc
   def __init__(self, request, client_address, server):
+    self.server = server
     self.S = server.S
     StreamRequestHandler.__init__(self, request, client_address, server)
 
@@ -77,8 +80,10 @@ class _RequestHandler(StreamRequestHandler):
                      OpenSocket(self.request, True),
                      local_store=self.S,
                     )
+    self.server.handlers.add(RS)
     RS.join()
     RS.shutdown()
+    self.server.handlers.remove(RS)
 
 class TCPStoreClient(StreamStore):
   ''' A Store attached to a remote Store at `bind_addr`.
@@ -98,5 +103,5 @@ class TCPStoreClient(StreamStore):
     self.sock.close()
 
 if __name__ == '__main__':
-  import cs.venti.tcp_tests
-  cs.venti.tcp_tests.selftest(sys.argv)
+  from cs.debug import selftest
+  selftest('cs.venti.tcp_tests')

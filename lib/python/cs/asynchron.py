@@ -93,12 +93,16 @@ class Asynchron(O):
     with self._lock:
       state = self.state
       if state == ASYNCH_CANCELLED:
+        # already cancelled - this is ok, no call to ._complete
         return True
       if state == ASYNCH_READY:
+        # completed - "fail" the cancel, no call to ._complete
         return False
       if state == ASYNCH_RUNNING or state == ASYNCH_PENDING:
+        # in progress or not commenced - change state to cancelled and fall through to ._complete
         state = ASYNCH_CANCELLED
       else:
+        # state error
         raise RuntimeError(
             "<%s>.state not one of (ASYNCH_PENDING, ASYNCH_CANCELLED, ASYNCH_RUNNING, ASYNCH_READY): %r", self, state)
     self._complete(None, None)

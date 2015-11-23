@@ -21,8 +21,8 @@ import logging
 from threading import Timer
 import time
 from cs.debug import Lock, RLock, Thread, trace, trace_caller, stack_dump
-from cs.logutils import exception, error, warning, debug, D, X, Pfx, PfxCallInfo
-from cs.resources import MultiOpenMixin, not_closed
+from cs.logutils import exception, error, warning, debug, D, X, XP, Pfx, PfxCallInfo
+from cs.resources import MultiOpenMixin, not_closed, ClosedError
 from cs.seq import seq
 from cs.py3 import Queue, PriorityQueue, Queue_Full, Queue_Empty
 from cs.obj import O
@@ -58,6 +58,7 @@ class _QueueIterator(MultiOpenMixin):
     if self.closed:
       with PfxCallInfo():
         warning("%r.put: all closed: item=%s", self, item)
+      raise ClosedError("_QueueIterator closed")
     if item is self.sentinel:
       raise ValueError("put(sentinel)")
     self._item_count += 1
@@ -89,15 +90,18 @@ class _QueueIterator(MultiOpenMixin):
     q = self.q
     try:
       item = q.get()
-    except Queue_Empty:
-      D("%s: EMPTY, calling finalise...", self)
+    except Queue_Empty as e:
+      warning("%s: Queue_Empty, (SHOULD THIS HAPPEN?) calling finalise...", self)
+      self._put(self.sentinel)
       self.finalise()
-      raise StopIteration
+      raise StopIteration("Queue_Empty: %s", e)
     if item is self.sentinel:
       # put the sentinel back for other iterators
-      self._put(item)
-      raise StopIteration
+      self._put(self.sentinel)
+      raise StopIteration("SENTINEL")
     self._item_count -= 1
+    if self._item_count < 0:
+      raise RuntimeError("_item_count < 0")
     return item
 
   next = __next__

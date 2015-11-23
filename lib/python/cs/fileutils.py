@@ -1144,43 +1144,6 @@ def lines_of(fp, partials=None):
     partials = []
   return as_lines(chunks_of(fp), partials)
 
-class OpenSocket(object):
-  ''' A file-like object for stream sockets, which uses os.shutdown on close.
-  '''
-
-  def __init__(self, sock, for_write):
-    self._for_write = for_write
-    self._sock = sock
-    self._fp = os.fdopen(os.dup(self._sock.fileno()),
-                         'wb' if for_write else 'rb')
-
-  def write(self, data):
-    return self._fp.write(data)
-
-  def read(self, size=None):
-    return self._fp.read(size)
-
-  def flush(self):
-    return self._fp.flush()
-
-  def close(self):
-    try:
-      if self._for_write:
-        self._sock.shutdown(socket.SHUT_WR)
-      else:
-        self._sock.shutdown(socket.SHUT_RD)
-    except OSError as e:
-      if e.errno != errno.ENOTCONN:
-        raise
-
-  def __del__(self):
-    self._close()
-
-  def _close(self):
-    self._fp.close()
-    self._fp = None
-    self._sock = None
-
 if __name__ == '__main__':
   import cs.fileutils_tests
   cs.fileutils_tests.selftest(sys.argv)

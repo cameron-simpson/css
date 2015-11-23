@@ -22,15 +22,23 @@ from threading import Thread
 from cs.py3 import Queue
 from cs.asynchron import report as reportLFs
 from cs.later import Later
-from cs.logutils import info, debug, warning, Pfx, D, X
+from cs.logutils import info, debug, warning, Pfx, D, X, XP
 from cs.resources import MultiOpenMixin
+from cs.seq import Seq
 from cs.threads import Q1, Get1
 from . import defaults, totext
 from .datafile import DataDirMapping
-from .hash import Hash_SHA1
+from .hash import DEFAULT_HASHCLASS, HashCodeUtilsMixin
 
-class _BasicStoreCommon(MultiOpenMixin):
+class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin):
   ''' Core functions provided by all Stores.
+
+      Subclasses should not subclass this class but BasicStoreSync
+      or BasicStoreAsync; these provide the *_bg or non-*_bg sibling
+      methods of those described below so that a subclass need only
+      implement the synchronous or asynchronous forms. Most local
+      Stores will derive from BasicStoreSync and remote Stores
+      derive from BasicStoreAsync.
 
       A subclass should provide thread-safe implementations of the following
       methods:
@@ -40,6 +48,15 @@ class _BasicStoreCommon(MultiOpenMixin):
         .contains(hashcode) -> boolean
         .flush()
 
+      A subclass _may_ provide thread-safe implementations of the following
+      methods:
+
+        .first() -> hashcode
+        .hashcodes(starting_hashcode, length) -> iterable-of-hashcodes
+
+      The background (*_bg) functions return cs.later.LateFunction instances
+      for deferred collection of the operation result.
+
       A convenience .lock attribute is provided for simple mutex use.
 
       The .readonly attribute may be set to prevent writes and trap
@@ -48,22 +65,25 @@ class _BasicStoreCommon(MultiOpenMixin):
       The .writeonly attribute may be set to trap surprises when no blocks
       are expected to be fetched; it relies on asssert statements.
 
-      The background (*_bg) functions return cs.later.LateFunction instances
-      for deferred collection of the operation result.
-
       The mapping special methods __getitem__ and __contains__ call
       the implementation methods .get() and .contains().
   '''
 
-  def __init__(self, name, capacity=None):
+  _seq = Seq()
+
+  def __init__(self, name=None, capacity=None, hashclass=None):
     with Pfx("_BasicStoreCommon.__init__(%s,..)", name):
+      if name is None:
+        name = "%s%d" % (self.__class__.__name__, next(_BasicStoreCommon._seq()))
       if capacity is None:
         capacity = 1
+      if hashclass is None:
+        hashclass = DEFAULT_HASHCLASS
       MultiOpenMixin.__init__(self)
       self.name = name
+      self.hashclass = hashclass
       self.logfp = None
       self.__funcQ = Later(capacity, name="%s:Later(__funcQ)" % (self.name,)).open()
-      self.hashclass = Hash_SHA1
       self.readonly = False
       self.writeonly = False
 
@@ -76,6 +96,9 @@ class _BasicStoreCommon(MultiOpenMixin):
   ###################
   ## Special methods.
   ##
+
+  def __len__(self):
+    raise NotImplementedError("no .__len__")
 
   def __contains__(self, h):
     ''' Test if the supplied hashcode is present in the store.
@@ -107,6 +130,7 @@ class _BasicStoreCommon(MultiOpenMixin):
 
   def hash(self, data):
     ''' Return a Hash object from data bytes.
+        NB: does _not_ store the data.
     '''
     return self.hashclass.from_data(data)
 
@@ -116,12 +140,16 @@ class _BasicStoreCommon(MultiOpenMixin):
     raise NotImplementedError
 
   def startup(self):
-    self.__funcQ.open()
+    # Later already open
+    pass
 
   def shutdown(self):
     ''' Called by final MultiOpenMixin.close().
     '''
     self.__funcQ.close()
+    if not self.__funcQ.closed:
+      warning("%s.shutdown: __funcQ not closed yet", self)
+    self.__funcQ.wait()
 
   def missing(self, hashes):
     ''' Yield hashcodes that are not in the store from an iterable hash
@@ -180,6 +208,18 @@ class BasicStoreSync(_BasicStoreCommon):
   def flush_bg(self):
     return self._defer(self.flush)
 
+  def first(self):
+    raise NotImplementedError("no .first")
+
+  def hashcodes(self, hashcode, length):
+    raise NotImplementedError("no .first")
+
+  def first_bg(self, hashclass=None):
+    return self._defer(self.first, hashclass)
+
+  def hashcodes_bg(self, hashclass=None, hashcode=None, reverse=None, after=False, length=None):
+    return self._defer(self.hashcodes_bg, hashclass=hashclass, hashcode=hashcode, reverse=reverse, after=after, length=length)
+
 class BasicStoreAsync(_BasicStoreCommon):
   ''' Subclass of _BasicStoreCommon expecting asynchronous operations and providing synchronous hooks, dual of BasicStoreSync.
   '''
@@ -199,6 +239,12 @@ class BasicStoreAsync(_BasicStoreCommon):
 
   def flush(self):
     return self.flush_bg()()
+
+  def first(self, hashclass=None):
+    return self.first_bg(hashclass=hashclass)()
+
+  def hashcodes(self, hashclass=None, hashcode=None, reverse=None, after=False, length=None):
+    return self.hashcodes_bg(hashclass=hashclass, hashcode=hashcode, reverse=reverse, after=after, length=length)()
 
 def Store(store_spec):
   ''' Factory function to return an appropriate BasicStore* subclass
@@ -261,29 +307,21 @@ def Store(store_spec):
       raise ValueError("bad spec ssh:%s, expect ssh://target/remote-spec" % (spec,))
   raise ValueError("unsupported store scheme: %s" % (scheme,))
 
-def pullFromSerial(S1, S2):
-  asked = 0
-  for h in S2.keys():
-    asked += 1
-    info("%d %s" % (asked, totext(h)))
-    if not S1.contains(h):
-      S1.store(S2.fetch(h))
-
 class MappingStore(BasicStoreSync):
   ''' A Store built on an arbitrary mapping object.
   '''
 
-  def __init__(self, mapping, name=None, capacity=None):
+  def __init__(self, mapping, **kw):
+    name = kw.pop('name', None)
     if name is None:
-      name = "MappingStore(%s)" % (type(mapping),)
-    BasicStoreSync.__init__(self, name, capacity=capacity)
+      name = "MappingStore(%s)" % (type(mapping).__name__,)
+    BasicStoreSync.__init__(self, name=name, **kw)
     self.mapping = mapping
 
   def add(self, data):
     with Pfx("add %d bytes", len(data)):
       h = self.hash(data)
       if h not in self.mapping:
-        info("NEW, save with hashcode=%s", h)
         self.mapping[h] = data
       else:
         with Pfx("EXISTING HASH"):
@@ -314,10 +352,42 @@ class MappingStore(BasicStoreSync):
       map_flush()
 
   def __len__(self):
-    return len(self.mapping)
+    try:
+      return len(self.mapping)
+    except TypeError as e:
+      raise NotImplementedError("%s: no self.mapping.len(): %s" % (self, e))
 
-def DataDirStore(dirpath, indexclass=None, rollover=None):
-  return MappingStore(DataDirMapping(dirpath, indexclass=indexclass, rollover=rollover))
+  def first(self, hashclass=None):
+    ''' Return the first hashcode in the Store or None if empty.
+        `hashclass`: specify the hashcode type, default from self.hashclass
+    '''
+    if hashclass is None:
+      hashclass = self.hashclass
+    mapping = self.mapping
+    try:
+      first_method = mapping.first
+    except AttributeError:
+      raise NotImplementedError("underlying .mapping has no .first")
+    else:
+      return first_method(hashclass=hashclass)
+
+  def hashcodes(self, hashclass=None, hashcode=None, reverse=None, after=False, length=None):
+    ''' Generator yielding the Store's in order hashcodes starting with optional `hashcode`.
+        `hashclass`: specify the hashcode type, default from defaults.S
+        `hashcode`: the first hashcode; if missing or None, iteration
+                    starts with the first key in the index
+        `reverse`: iterate backwards if true, forwards if false and in no
+                   specified order if missing or None
+        `after`: commence iteration after the first hashcode
+        `length`: if not None, the maximum number if hashcodes to yield
+    '''
+    return self.mapping.hashcodes(hashclass=hashclass, hashcode=hashcode,
+                                  reverse=reverse, after=after, length=length)
+
+def DataDirStore(dirpath, indexclass=None, rollover=None, **kw):
+  return MappingStore(
+           DataDirMapping(dirpath, indexclass=indexclass, rollover=rollover),
+           **kw)
 
 if __name__ == '__main__':
   import cs.venti.store_tests
