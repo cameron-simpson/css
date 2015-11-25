@@ -81,7 +81,7 @@ def test(argv, I):
   for keyword in I.keywords():
     print('uuid =', keyword.uuid, 'name =', keyword.name)
   for master in I.masters():
-    print('uuid =', master.uuid, 'name =', master.name, 'originalFileName =', master.originalFileName, 'imagePath =', master.imagePath)
+    print('uuid =', master.uuid, 'name =', master.name, 'originalFileName =', master.originalFileName, 'imagePath =', master.imagePath, 'pathname =', master.pathname)
 
 class iPhoto(O):
 
@@ -96,6 +96,11 @@ class iPhoto(O):
     self.path = libpath
     self._lock = RLock()
     self.dbs = iPhotoDBs(self)
+
+  def pathto(self, rpath):
+    if rpath.startswith('/'):
+      raise ValueError('rpath may not start with a slash: %r' % (rpath,))
+    return os.path.join(self.path, rpath)
 
   def dbnames(self):
     return self.dbs.dbnames()
@@ -124,7 +129,7 @@ class iPhotoDBs(object):
 
   @property
   def dbdirpath(self):
-   return os.path.join(self.iphoto.path, 'Database', 'apdb')
+   return self.iphoto.pathto('Database/apdb')
 
   def dbnames(self):
     for basename in os.listdir(self.dbdirpath):
@@ -166,7 +171,7 @@ class iPhotoDB(object):
     self.schema = SCHEMAE[dbname]
     self.table_row_classes = {}
     for table_name, schema in self.schema.items():
-      klass = namedtuple('%s_Row' % (table_name,), schema['columns'])
+      klass = namedtuple('%s_Row' % (table_name,), ['I'] + list(schema['columns']))
       mixin = schema.get('mixin')
       if mixin is not None:
         class Mixed(klass, mixin):
@@ -175,13 +180,22 @@ class iPhotoDB(object):
       self.table_row_classes[table_name] = klass
 
   def table_rows(self, table_name):
+    I = self.iphoto
     row_class = self.table_row_classes.get(table_name, lambda *row: row)
     for row in self.conn.cursor().execute('select * from %s' % (table_name,)):
-      yield row_class(*row)
+      yield row_class(*([I] + list(row)))
+
+class Master_Mixin(object):
+
+  @property
+  def pathname(self):
+    return os.path.join(self.I.pathto('Masters'), self.imagePath)
 
 SCHEMAE = {'Library':
             { 'RKMaster':
-                { 'columns':
+                {
+                  'mixin': Master_Mixin,
+                  'columns':
                     ( 'modelId', 'uuid', 'name', 'projectUuid', 'importGroupUuid',
                       'fileVolumeUuid', 'alternateMasterUuid', 'originalVersionUuid',
                       'originalVersionName', 'fileName', 'type', 'subtype',
