@@ -80,8 +80,12 @@ def test(argv, I):
     print('uuid =', folder.uuid, 'folderType =', folder.folderType, 'name =', folder.name)
   for keyword in I.keywords():
     print('uuid =', keyword.uuid, 'name =', keyword.name)
-  for master in I.masters():
-    print('uuid =', master.uuid, 'name =', master.name, 'originalFileName =', master.originalFileName, 'imagePath =', master.imagePath, 'pathname =', master.pathname)
+  ##for master in I.masters():
+  ##  print('uuid =', master.uuid, 'name =', master.name, 'originalFileName =', master.originalFileName, 'imagePath =', master.imagePath, 'pathname =', master.pathname)
+  for v in I.versions():
+    print('uuid =', v.uuid, 'masterUuid =', v.masterUuid)
+  ##for kwv in I.keywords_to_versions():
+  ##  print('keywordId =', kwv.keywordId, 'versionId =', kwv.versionId)
 
 class iPhoto(O):
 
@@ -119,6 +123,12 @@ class iPhoto(O):
 
   def masters(self):
     return list(self.dbs.Library.table_rows('RKMaster'))
+
+  def versions(self):
+    return list(self.dbs.Library.table_rows('RKVersion'))
+
+  def keywords_to_versions(self):
+    return list(self.dbs.Library.table_rows('RKKeywordForVersion'))
 
 class iPhotoDBs(object):
 
@@ -238,8 +248,34 @@ SCHEMAE = {'Library':
                       'queryData', 'viewData', 'selectedVersionIds',
                     ),
                 },
-              }
+              'RKVersion':
+                { 'columns':
+                    ( 'modelId', 'uuid', 'name', 'fileName',
+                      'versionNumber', 'stackUuid', 'masterUuid',
+                      'masterId', 'rawMasterUuid', 'nonRawMasterUuid',
+                      'projectUuid', 'imageTimeZoneName', 'imageDate',
+                      'mainRating', 'isHidden', 'isFlagged', 'isOriginal',
+                      'isEditable', 'colorLabelIndex', 'masterHeight',
+                      'masterWidth', 'processedHeight', 'processedWidth',
+                      'rotation', 'hasAdjustments', 'hasEnabledAdjustments',
+                      'hasNotes', 'createDate', 'exportImageChangeDate',
+                      'exportMetadataChangeDate', 'isInTrash',
+                      'thumbnailGroup', 'overridePlaceId', 'exifLatitude',
+                      'exifLongitude', 'renderVersion', 'adjSeqNum',
+                      'supportedStatus', 'videoInPoint', 'videoOutPoint',
+                      'videoPosterFramePoint', 'showInLibrary',
+                      'editState', 'contentVersion', 'propertiesVersion',
+                      'rawVersion', 'faceDetectionIsFromPreview',
+                      'faceDetectionRotationFromMaster', 'editListData',
+                      'hasKeywords',
+                    ),
+                },
+              'RKKeywordForVersion':
+                { 'columns':
+                    ( 'modelId', 'versionId', 'keywordId'),
+                },
             }
+          }
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
