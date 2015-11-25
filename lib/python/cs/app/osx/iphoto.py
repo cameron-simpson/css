@@ -76,8 +76,12 @@ def main(argv=None):
 def test(argv, I):
   for album in I.albums():
     print('uuid =', album.uuid, 'albumType =', album.albumType, 'name =', album.name)
-  for master in I.masters():
-    print('uuid =', master.uuid, 'name =', master.name)
+  ##for master in I.masters():
+  ##  print('uuid =', master.uuid, 'name =', master.name)
+  for folder in I.folders():
+    print('uuid =', folder.uuid, 'folderType =', folder.folderType, 'name =', folder.name)
+  for keyword in I.keywords():
+    print('uuid =', keyword.uuid, 'name =', keyword.name)
 
 SCHEMAE = {'Library':
             { 'RKMaster':
@@ -92,6 +96,19 @@ SCHEMAE = {'Library':
                   'importedBy', 'createDate', 'isInTrash', 'faceDetectionState',
                   'colorSpaceName', 'colorSpaceDefinition', 'fileAliasData',
                   'streamAssetId', 'streamSourceUuid', 'burstUuid',
+                ),
+              'RKFolder':
+                ( 'modelId', 'uuid', 'folderType', 'name', 'parentFolderUuid',
+                  'implicitAlbumUuid', 'posterVersionUuid',
+                  'automaticallyGenerateFullSizePreviews', 'versionCount',
+                  'minImageTimeZoneName', 'maxImageTimeZoneName', 'minImageDate',
+                  'maxImageDate', 'folderPath', 'createDate', 'isExpanded',
+                  'isHidden', 'isHiddenWhenEmpty', 'isFavorite', 'isInTrash',
+                  'isMagic', 'colorLabelIndex', 'sortAscending', 'sortKeyPath',
+                ),
+              'RKKeyword':
+                ( 'modelId', 'uuid', 'name', 'searchName', 'parentId',
+                  'hasChildren', 'shortcut',
                 ),
               'RKAlbum':
                 ( 'modelId', 'uuid', 'albumType', 'albumSubclass', 'serviceName',
@@ -187,6 +204,12 @@ class iPhoto(O):
 
   def albums(self):
     return list(self.dbs.Library.table_rows('RKAlbum'))
+
+  def folders(self):
+    return list(self.dbs.Library.table_rows('RKFolder'))
+
+  def keywords(self):
+    return list(self.dbs.Library.table_rows('RKKeyword'))
 
   def masters(self):
     return list(self.dbs.Library.table_rows('RKMaster'))
