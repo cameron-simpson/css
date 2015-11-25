@@ -76,71 +76,44 @@ def main(argv=None):
 def test(argv, I):
   for album in I.albums():
     print('uuid =', album.uuid, 'albumType =', album.albumType, 'name =', album.name)
-  ##for master in I.masters():
-  ##  print('uuid =', master.uuid, 'name =', master.name)
   for folder in I.folders():
     print('uuid =', folder.uuid, 'folderType =', folder.folderType, 'name =', folder.name)
   for keyword in I.keywords():
     print('uuid =', keyword.uuid, 'name =', keyword.name)
+  for master in I.masters():
+    print('uuid =', master.uuid, 'name =', master.name, 'originalFileName =', master.originalFileName, 'imagePath =', master.imagePath)
 
-SCHEMAE = {'Library':
-            { 'RKMaster':
-                ( 'modelId', 'uuid', 'name', 'projectUuid', 'importGroupUuid',
-                  'fileVolumeUuid', 'alternateMasterUuid', 'originalVersionUuid',
-                  'originalVersionName', 'fileName', 'type', 'subtype',
-                  'fileIsReference', 'isExternallyEditable', 'isTrulyRaw',
-                  'isMissing', 'hasAttachments', 'hasNotes', 'hasFocusPoints',
-                  'imagePath', 'fileSize', 'pixelFormat',
-                  'duration', 'imageDate', 'fileCreationDate', 'fileModificationDate',
-                  'imageHash', 'originalFileName', 'originalFileSize', 'imageFormat',
-                  'importedBy', 'createDate', 'isInTrash', 'faceDetectionState',
-                  'colorSpaceName', 'colorSpaceDefinition', 'fileAliasData',
-                  'streamAssetId', 'streamSourceUuid', 'burstUuid',
-                ),
-              'RKFolder':
-                ( 'modelId', 'uuid', 'folderType', 'name', 'parentFolderUuid',
-                  'implicitAlbumUuid', 'posterVersionUuid',
-                  'automaticallyGenerateFullSizePreviews', 'versionCount',
-                  'minImageTimeZoneName', 'maxImageTimeZoneName', 'minImageDate',
-                  'maxImageDate', 'folderPath', 'createDate', 'isExpanded',
-                  'isHidden', 'isHiddenWhenEmpty', 'isFavorite', 'isInTrash',
-                  'isMagic', 'colorLabelIndex', 'sortAscending', 'sortKeyPath',
-                ),
-              'RKKeyword':
-                ( 'modelId', 'uuid', 'name', 'searchName', 'parentId',
-                  'hasChildren', 'shortcut',
-                ),
-              'RKAlbum':
-                ( 'modelId', 'uuid', 'albumType', 'albumSubclass', 'serviceName',
-                  'serviceAccountName', 'serviceFullName', 'name', 'folderUuid',
-                  'queryFolderUuid', 'posterVersionUuid', 'selectedTrackPathUuid',
-                  'sortKeyPath', 'sortAscending', 'customSortAvailable',
-                  'versionCount', 'createDate', 'isFavorite', 'isInTrash', 'isHidden',
-                  'isMagic', 'publishSyncNeeded', 'colorLabelIndex',
-                  'faceSortKeyPath', 'recentUserChangeDate', 'filterData',
-                  'queryData', 'viewData', 'selectedVersionIds',
-                ),
-            },
-          }
+class iPhoto(O):
 
-class iPhotoDB(object):
+  def __init__(self, libpath=None):
+    ''' Open the iPhoto library stored at `libpath`.
+        If `libpath` is not supplied, use DEFAULT_LIBRARY.
+    '''
+    if libpath is None:
+      libpath = envsub(DEFAULT_LIBRARY)
+    if not os.path.isdir(libpath):
+      raise ValueError("not a directory: %r" % (libpath,))
+    self.path = libpath
+    self._lock = RLock()
+    self.dbs = iPhotoDBs(self)
 
-  def __init__(self, iphoto, dbname):
-    global SCHEMAE
-    self.iphoto = iphoto
-    self.name = dbname
-    self.dbpath = iphoto.dbpath(dbname)
-    self.conn = sqlite3.connect(self.dbpath)
-    self.schema = SCHEMAE[dbname]
-    self.table_row_classes = {}
-    for table_name in self.schema.keys():
-      self.table_row_classes[table_name] = namedtuple('%s_Row' % (table_name,),
-                                                      self.schema[table_name])
+  def dbnames(self):
+    return self.dbs.dbnames()
 
-  def table_rows(self, table_name):
-    row_class = self.table_row_classes.get(table_name, lambda *row: row)
-    for row in self.conn.cursor().execute('select * from %s' % (table_name,)):
-      yield row_class(*row)
+  def dbpath(self, dbname):
+    return self.dbs.pathto(dbname)
+
+  def albums(self):
+    return list(self.dbs.Library.table_rows('RKAlbum'))
+
+  def folders(self):
+    return list(self.dbs.Library.table_rows('RKFolder'))
+
+  def keywords(self):
+    return list(self.dbs.Library.table_rows('RKKeyword'))
+
+  def masters(self):
+    return list(self.dbs.Library.table_rows('RKMaster'))
 
 class iPhotoDBs(object):
 
@@ -182,37 +155,77 @@ class iPhotoDBs(object):
       return db
     raise AttributeError(attr)
 
-class iPhoto(O):
+class iPhotoDB(object):
 
-  def __init__(self, libpath=None):
-    ''' Open the iPhoto library stored at `libpath`.
-        If `libpath` is not supplied, use DEFAULT_LIBRARY.
-    '''
-    if libpath is None:
-      libpath = envsub(DEFAULT_LIBRARY)
-    if not os.path.isdir(libpath):
-      raise ValueError("not a directory: %r" % (libpath,))
-    self.path = libpath
-    self._lock = RLock()
-    self.dbs = iPhotoDBs(self)
+  def __init__(self, iphoto, dbname):
+    global SCHEMAE
+    self.iphoto = iphoto
+    self.name = dbname
+    self.dbpath = iphoto.dbpath(dbname)
+    self.conn = sqlite3.connect(self.dbpath)
+    self.schema = SCHEMAE[dbname]
+    self.table_row_classes = {}
+    for table_name, schema in self.schema.items():
+      klass = namedtuple('%s_Row' % (table_name,), schema['columns'])
+      mixin = schema.get('mixin')
+      if mixin is not None:
+        class Mixed(klass, mixin):
+          pass
+        klass = Mixed
+      self.table_row_classes[table_name] = klass
 
-  def dbnames(self):
-    return self.dbs.dbnames()
+  def table_rows(self, table_name):
+    row_class = self.table_row_classes.get(table_name, lambda *row: row)
+    for row in self.conn.cursor().execute('select * from %s' % (table_name,)):
+      yield row_class(*row)
 
-  def dbpath(self, dbname):
-    return self.dbs.pathto(dbname)
-
-  def albums(self):
-    return list(self.dbs.Library.table_rows('RKAlbum'))
-
-  def folders(self):
-    return list(self.dbs.Library.table_rows('RKFolder'))
-
-  def keywords(self):
-    return list(self.dbs.Library.table_rows('RKKeyword'))
-
-  def masters(self):
-    return list(self.dbs.Library.table_rows('RKMaster'))
+SCHEMAE = {'Library':
+            { 'RKMaster':
+                { 'columns':
+                    ( 'modelId', 'uuid', 'name', 'projectUuid', 'importGroupUuid',
+                      'fileVolumeUuid', 'alternateMasterUuid', 'originalVersionUuid',
+                      'originalVersionName', 'fileName', 'type', 'subtype',
+                      'fileIsReference', 'isExternallyEditable', 'isTrulyRaw',
+                      'isMissing', 'hasAttachments', 'hasNotes', 'hasFocusPoints',
+                      'imagePath', 'fileSize', 'pixelFormat',
+                      'duration', 'imageDate', 'fileCreationDate', 'fileModificationDate',
+                      'imageHash', 'originalFileName', 'originalFileSize', 'imageFormat',
+                      'importedBy', 'createDate', 'isInTrash', 'faceDetectionState',
+                      'colorSpaceName', 'colorSpaceDefinition', 'fileAliasData',
+                      'streamAssetId', 'streamSourceUuid', 'burstUuid',
+                    ),
+                },
+              'RKFolder':
+                { 'columns':
+                    ( 'modelId', 'uuid', 'folderType', 'name', 'parentFolderUuid',
+                      'implicitAlbumUuid', 'posterVersionUuid',
+                      'automaticallyGenerateFullSizePreviews', 'versionCount',
+                      'minImageTimeZoneName', 'maxImageTimeZoneName', 'minImageDate',
+                      'maxImageDate', 'folderPath', 'createDate', 'isExpanded',
+                      'isHidden', 'isHiddenWhenEmpty', 'isFavorite', 'isInTrash',
+                      'isMagic', 'colorLabelIndex', 'sortAscending', 'sortKeyPath',
+                    ),
+                },
+              'RKKeyword':
+                { 'columns':
+                    ( 'modelId', 'uuid', 'name', 'searchName', 'parentId',
+                      'hasChildren', 'shortcut',
+                    ),
+                },
+              'RKAlbum':
+                { 'columns':
+                    ( 'modelId', 'uuid', 'albumType', 'albumSubclass', 'serviceName',
+                      'serviceAccountName', 'serviceFullName', 'name', 'folderUuid',
+                      'queryFolderUuid', 'posterVersionUuid', 'selectedTrackPathUuid',
+                      'sortKeyPath', 'sortAscending', 'customSortAvailable',
+                      'versionCount', 'createDate', 'isFavorite', 'isInTrash', 'isHidden',
+                      'isMagic', 'publishSyncNeeded', 'colorLabelIndex',
+                      'faceSortKeyPath', 'recentUserChangeDate', 'filterData',
+                      'queryData', 'viewData', 'selectedVersionIds',
+                    ),
+                },
+              }
+            }
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
