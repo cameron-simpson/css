@@ -3,7 +3,7 @@
 # Examine the named files and attach correct extensions to misnamed ones.
 #	- Cameron Simpson <cs@zip.com.au> 22feb1999
 #
-# Base entirely on file2mime and mimeext now. - cameron 24jul2003
+# Base entirely on file2mime and mime-ext now. - cameron 24jul2003
 # Added "-i type" option to bypass file2mime. - cameron 19apr2005
 #
 
@@ -37,10 +37,14 @@ do
                              }
   fi
 
-  prefext=`mimeext "$type"` || { echo "$cmd: no preferred extension for $type" >&2
+  prefext=`mime-ext "$type"` || { echo "$cmd: cannot look up preferred extension for $type" >&2
                                  xit=1
                                  continue
                                }
+  [ -n "$prefext" ] || { echo "$cmd: no preferred extension for $type" >&2
+                         xit=1
+                         continue
+                       }
 
   # see if ext is ok already
   fbase=`basename "$f"`

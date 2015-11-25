@@ -17,19 +17,28 @@ from binascii import hexlify
 import os
 import os.path
 import sys
-from threading import Lock
+from threading import Lock, RLock
 from threading import Thread
 from cs.py3 import Queue
 from cs.asynchron import report as reportLFs
 from cs.later import Later
-from cs.logutils import info, debug, warning, Pfx, D
-from cs.queues import NestingOpenCloseMixin
+from cs.logutils import info, debug, warning, Pfx, D, X, XP
+from cs.resources import MultiOpenMixin
+from cs.seq import Seq
 from cs.threads import Q1, Get1
 from . import defaults, totext
-from .hash import Hash_SHA1
+from .datafile import DataDirMapping
+from .hash import DEFAULT_HASHCLASS, HashCodeUtilsMixin
 
-class BasicStore(NestingOpenCloseMixin):
+class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin):
   ''' Core functions provided by all Stores.
+
+      Subclasses should not subclass this class but BasicStoreSync
+      or BasicStoreAsync; these provide the *_bg or non-*_bg sibling
+      methods of those described below so that a subclass need only
+      implement the synchronous or asynchronous forms. Most local
+      Stores will derive from BasicStoreSync and remote Stores
+      derive from BasicStoreAsync.
 
       A subclass should provide thread-safe implementations of the following
       methods:
@@ -37,7 +46,16 @@ class BasicStore(NestingOpenCloseMixin):
         .add(block) -> hashcode
         .get(hashcode, [default=None]) -> block (or default)
         .contains(hashcode) -> boolean
-        .sync()
+        .flush()
+
+      A subclass _may_ provide thread-safe implementations of the following
+      methods:
+
+        .first() -> hashcode
+        .hashcodes(starting_hashcode, length) -> iterable-of-hashcodes
+
+      The background (*_bg) functions return cs.later.LateFunction instances
+      for deferred collection of the operation result.
 
       A convenience .lock attribute is provided for simple mutex use.
 
@@ -47,87 +65,40 @@ class BasicStore(NestingOpenCloseMixin):
       The .writeonly attribute may be set to trap surprises when no blocks
       are expected to be fetched; it relies on asssert statements.
 
-      The background (*_bg) functions return cs.later.LateFunction instances
-      for deferred collection of the operation result.
-
       The mapping special methods __getitem__ and __contains__ call
       the implementation methods .get() and .contains().
-
-      [ TODO: NO LONGER IMPLEMENTED, BUT IT SHOULD BE ]
-      The hint noFlush, if specified and True, suggests that streaming
-      store connections need not flush the request stream because another
-      request will follow very soon after this request. This allows
-      for more efficient use of streams. Users who set this hint to True
-      must ensure that a "normal" flushing request, or a call of the
-      ._flush() method, follows any noFlush requests promptly otherwise
-      deadlocks may ensue.
   '''
-  def __init__(self, name, capacity=None):
-    with Pfx("BasicStore(%s,..)", name):
+
+  _seq = Seq()
+
+  def __init__(self, name=None, capacity=None, hashclass=None):
+    with Pfx("_BasicStoreCommon.__init__(%s,..)", name):
+      if name is None:
+        name = "%s%d" % (self.__class__.__name__, next(_BasicStoreCommon._seq()))
       if capacity is None:
         capacity = 1
-      self._lock = Lock()
-      NestingOpenCloseMixin.__init__(self)
+      if hashclass is None:
+        hashclass = DEFAULT_HASHCLASS
+      MultiOpenMixin.__init__(self)
       self.name = name
+      self.hashclass = hashclass
       self.logfp = None
       self.__funcQ = Later(capacity, name="%s:Later(__funcQ)" % (self.name,)).open()
-      self.hashclass = Hash_SHA1
       self.readonly = False
       self.writeonly = False
 
-  def add(self, data):
-    ''' Add the supplied data bytes to the store.
-    '''
-    raise NotImplementedError
-
-  def get(self, h, default=None):
-    ''' Return the data bytes associated with the supplied hashcode.
-        Return None if the hashcode is not present.
-    '''
-    raise NotImplementedError
-
-  def contains(self, h):
-    raise NotImplementedError
-
-  def flush(self):
-    ''' Flush outstanding I/O operations on the store.
-        This is generally discouraged because it causes less efficient
-        operation but it is sometimes necessary, for example at shutdown or
-        after *_bg() calls with the noFlush=True hint.
-        This does not imply that outstanding transactions have completed,
-        merely that they have been dispatched, for example sent down the
-        stream of a StreamStore.
-        See the sync() call for transaction completion.
-    '''
-    raise NotImplementedError
-
-  def sync(self):
-    ''' Flush outstanding I/O operations on the store and wait for completion.
-    '''
-    raise NotImplementedError
-
-  #####################################
-  ## Background versions of operations.
-  ##
-
-  def add_bg(self, data):
-    return self._defer(self.add, data)
-
-  def get_bg(self, h):
-    return self._defer(self.get, h)
-
-  def contains_bg(self, h):
-    return self._defer(self.contains, h)
-
-  def sync_bg(self):
-    return self._defer(self.sync)
+  def __str__(self):
+    return "%s(%s)" % (self.__class__.__name__, self.name)
 
   def _defer(self, func, *args, **kwargs):
-    return self.__funcQ.defer(via(self, func, *args, **kwargs))
+    return self.__funcQ.defer(func, *args, **kwargs)
 
   ###################
   ## Special methods.
   ##
+
+  def __len__(self):
+    raise NotImplementedError("no .__len__")
 
   def __contains__(self, h):
     ''' Test if the supplied hashcode is present in the store.
@@ -145,20 +116,21 @@ class BasicStore(NestingOpenCloseMixin):
 
   def __enter__(self):
     defaults.pushStore(self)
-    return NestingOpenCloseMixin.__enter__(self)
+    return MultiOpenMixin.__enter__(self)
 
   def __exit__(self, exc_type, exc_value, traceback):
     if exc_value:
       import traceback as TB
       TB.print_tb(traceback, file=sys.stderr)
     defaults.popStore()
-    return NestingOpenCloseMixin.__exit__(self, exc_type, exc_value, traceback)
+    return MultiOpenMixin.__exit__(self, exc_type, exc_value, traceback)
 
   def __str__(self):
     return "Store(%s)" % self.name
 
   def hash(self, data):
     ''' Return a Hash object from data bytes.
+        NB: does _not_ store the data.
     '''
     return self.hashclass.from_data(data)
 
@@ -167,10 +139,17 @@ class BasicStore(NestingOpenCloseMixin):
     '''
     raise NotImplementedError
 
+  def startup(self):
+    # Later already open
+    pass
+
   def shutdown(self):
-    ''' Called by final NestingOpenCloseMixin.close().
+    ''' Called by final MultiOpenMixin.close().
     '''
     self.__funcQ.close()
+    if not self.__funcQ.closed:
+      warning("%s.shutdown: __funcQ not closed yet", self)
+    self.__funcQ.wait()
 
   def missing(self, hashes):
     ''' Yield hashcodes that are not in the store from an iterable hash
@@ -209,11 +188,69 @@ class BasicStore(NestingOpenCloseMixin):
       for LF in reportLFs(LF2h.keys()):
         yield LF2h[LF], LF()
 
+class BasicStoreSync(_BasicStoreCommon):
+  ''' Subclass of _BasicStoreCommon expecting synchronous operations and providing asynchronous hooks, dual of BasicStoreAsync.
+  '''
+
+  #####################################
+  ## Background versions of operations.
+  ##
+
+  def add_bg(self, data):
+    return self._defer(self.add, data)
+
+  def get_bg(self, h):
+    return self._defer(self.get, h)
+
+  def contains_bg(self, h):
+    return self._defer(self.contains, h)
+
+  def flush_bg(self):
+    return self._defer(self.flush)
+
+  def first(self):
+    raise NotImplementedError("no .first")
+
+  def hashcodes(self, hashcode, length):
+    raise NotImplementedError("no .first")
+
+  def first_bg(self, hashclass=None):
+    return self._defer(self.first, hashclass)
+
+  def hashcodes_bg(self, hashclass=None, hashcode=None, reverse=None, after=False, length=None):
+    return self._defer(self.hashcodes_bg, hashclass=hashclass, hashcode=hashcode, reverse=reverse, after=after, length=length)
+
+class BasicStoreAsync(_BasicStoreCommon):
+  ''' Subclass of _BasicStoreCommon expecting asynchronous operations and providing synchronous hooks, dual of BasicStoreSync.
+  '''
+
+  #####################################
+  ## Background versions of operations.
+  ##
+
+  def add(self, data):
+    return self.add_bg(data)()
+
+  def get(self, h):
+    return self.get_bg(h)()
+
+  def contains(self, h):
+    return self.contains_bg(h)()
+
+  def flush(self):
+    return self.flush_bg()()
+
+  def first(self, hashclass=None):
+    return self.first_bg(hashclass=hashclass)()
+
+  def hashcodes(self, hashclass=None, hashcode=None, reverse=None, after=False, length=None):
+    return self.hashcodes_bg(hashclass=hashclass, hashcode=hashcode, reverse=reverse, after=after, length=length)()
+
 def Store(store_spec):
-  ''' Factory function to return an appropriate BasicStore subclass
+  ''' Factory function to return an appropriate BasicStore* subclass
       based on its argument:
 
-        /path/to/store  A GDBMStore directory (later, tokyocabinet etc)
+        /path/to/store  A DataDirStore directory.
 
         |command        A subprocess implementing the streaming protocol.
 
@@ -241,9 +278,7 @@ def Store(store_spec):
     # TODO: after tokyocabinet available, probe for index file name
     storepath = os.path.abspath(spec)
     if os.path.isdir(storepath):
-      return GDBMStore(os.path.abspath(spec))
-    if storepath.endswith('.kch'):
-      return KyotoCabinetStore(storepath)
+      return DataDirStore(os.path.abspath(spec))
     raise ValueError("unsupported file store: %s" % (storepath,))
   if scheme == "exec":
     from .stream import StreamStore
@@ -251,11 +286,11 @@ def Store(store_spec):
     P = Popen(spec, shell=True, stdin=PIPE, stdout=PIPE)
     return StreamStore("exec:"+spec, P.stdin, P.stdout)
   if scheme == "tcp":
-    from .tcp import TCPStore
+    from .tcp import TCPStoreClient
     host, port = spec.rsplit(':', 1)
     if not host:
       host = '127.0.0.1'
-    return TCPStore((host, int(port)))
+    return TCPStoreClient((host, int(port)))
   if scheme == "ssh":
     # TODO: path to remote vt command
     # TODO: $VT_SSH envvar
@@ -272,29 +307,32 @@ def Store(store_spec):
       raise ValueError("bad spec ssh:%s, expect ssh://target/remote-spec" % (spec,))
   raise ValueError("unsupported store scheme: %s" % (scheme,))
 
-def pullFromSerial(S1, S2):
-  asked = 0
-  for h in S2.keys():
-    asked += 1
-    info("%d %s" % (asked, totext(h)))
-    if not S1.contains(h):
-      S1.store(S2.fetch(h))
-
-class MappingStore(BasicStore):
+class MappingStore(BasicStoreSync):
   ''' A Store built on an arbitrary mapping object.
   '''
 
-  def __init__(self, mapping, name=None, capacity=None):
+  def __init__(self, mapping, **kw):
+    name = kw.pop('name', None)
     if name is None:
-      name = "MappingStore(%s)" % (mapping,)
-    BasicStore.__init__(self, name, capacity=capacity)
+      name = "MappingStore(%s)" % (type(mapping).__name__,)
+    BasicStoreSync.__init__(self, name=name, **kw)
     self.mapping = mapping
 
   def add(self, data):
-    h = self.hash(data)
-    if h not in self.mapping:
-      self.mapping[h] = data
-    return h
+    with Pfx("add %d bytes", len(data)):
+      h = self.hash(data)
+      if h not in self.mapping:
+        self.mapping[h] = data
+      else:
+        with Pfx("EXISTING HASH"):
+          try:
+            data2 = self.mapping[h]
+          except Exception as e:
+            error("fetch FAILED: %s", e)
+          else:
+            if data != data2:
+              warning("data mismatch: .add data=%r, Store data=%r", data, data2)
+      return h
 
   def get(self, h, default=None):
     try:
@@ -306,19 +344,50 @@ class MappingStore(BasicStore):
   def contains(self, h):
     return h in self.mapping
 
-  def sync(self):
-    debug("%s: sync() is a no-op", self)
+  def flush(self):
+    ''' Call the .flush method of the underlying mapping, if any.
+    '''
+    map_flush = getattr(self.mapping, 'flush', None)
+    if map_flush is not None:
+      map_flush()
 
   def __len__(self):
-    return len(self.mapping)
+    try:
+      return len(self.mapping)
+    except TypeError as e:
+      raise NotImplementedError("%s: no self.mapping.len(): %s" % (self, e))
 
-def GDBMStore(dir):
-  from .datafile import GDBMDataDir
-  return MappingStore(GDBMDataDir(dir))
+  def first(self, hashclass=None):
+    ''' Return the first hashcode in the Store or None if empty.
+        `hashclass`: specify the hashcode type, default from self.hashclass
+    '''
+    if hashclass is None:
+      hashclass = self.hashclass
+    mapping = self.mapping
+    try:
+      first_method = mapping.first
+    except AttributeError:
+      raise NotImplementedError("underlying .mapping has no .first")
+    else:
+      return first_method(hashclass=hashclass)
 
-def KyotoStore(dir):
-  from .datafile import KyotoDataDir
-  return MappingStore(KyotoDataDir(dir))
+  def hashcodes(self, hashclass=None, hashcode=None, reverse=None, after=False, length=None):
+    ''' Generator yielding the Store's in order hashcodes starting with optional `hashcode`.
+        `hashclass`: specify the hashcode type, default from defaults.S
+        `hashcode`: the first hashcode; if missing or None, iteration
+                    starts with the first key in the index
+        `reverse`: iterate backwards if true, forwards if false and in no
+                   specified order if missing or None
+        `after`: commence iteration after the first hashcode
+        `length`: if not None, the maximum number if hashcodes to yield
+    '''
+    return self.mapping.hashcodes(hashclass=hashclass, hashcode=hashcode,
+                                  reverse=reverse, after=after, length=length)
+
+def DataDirStore(dirpath, indexclass=None, rollover=None, **kw):
+  return MappingStore(
+           DataDirMapping(dirpath, indexclass=indexclass, rollover=rollover),
+           **kw)
 
 if __name__ == '__main__':
   import cs.venti.store_tests

@@ -19,10 +19,12 @@ DISTINFO = {
 
 import codecs
 from contextlib import contextmanager
+import importlib
 import logging
 from logging import Formatter, StreamHandler
 import os
 import os.path
+from pprint import pformat
 import stat
 import sys
 import time
@@ -30,8 +32,9 @@ import threading
 from threading import Lock
 import traceback
 from cs.ansi_colour import colourise
-from cs.excutils import noexc
-from cs.obj import O_str
+from cs.lex import is_identifier, is_dotted_identifier
+from cs.obj import O, O_str
+from cs.py.func import funccite
 from cs.py3 import unicode, StringTypes, ustr
 
 cmd = __file__
@@ -48,7 +51,7 @@ def ifdebug():
   global logging_level
   return logging_level <= logging.DEBUG
 
-def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=None, upd_mode=None, ansi_mode=None, trace_mode=None):
+def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=None, upd_mode=None, ansi_mode=None, trace_mode=None, module_names=None, function_names=None):
   ''' Arrange basic logging setup for conventional UNIX command
       line error messaging.
       Sets cs.logging.cmd to `cmd_name`; default from sys.argv[0].
@@ -72,16 +75,21 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
       If `trace_mode` is None, set it according to the presence of
       'TRACE' in flags.
       If trace_mode is true, set the global trace_level to logging_level;
-      it defaults to logging.DEBUG.
+      otherwise it defaults to logging.DEBUG.
       Returns the logging level.
   '''
   global cmd, logging_level, trace_level, D_mode
 
-  default_level, default_flags = infer_logging_level()
+  # infer logging modes, these are the initial defaults
+  linfo = infer_logging_level()
   if level is None:
-    level = default_level
+    level = linfo.level
   if flags is None:
-    flags = default_flags
+    flags = linfo.flags
+  if module_names is None:
+    module_names = linfo.module_names
+  if function_names is None:
+    function_names = linfo.function_names
 
   if cmd_name is None:
     cmd_name = os.path.basename(sys.argv[0])
@@ -148,10 +156,67 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
   rootLogger.setLevel(level)
   main_handler.setFormatter(PfxFormatter(format))
   rootLogger.addHandler(main_handler)
+
   logging_level = level
   if trace_mode:
     trace_level = logging_level
+
+  for module_name in module_names:
+    try:
+      M = importlib.import_module(module_name)
+    except ImportError:
+      warning("setup_logging: cannot import %r", module_name)
+    else:
+      M.DEBUG = True
+
+  for module_name, func_name in function_names:
+    try:
+      M = importlib.import_module(module_name)
+    except ImportError:
+      warning("setup_logging: cannot import %r", module_name)
+      continue
+    F = M
+    for funcpart in func_name.split('.'):
+      M = F
+      try:
+        F = M.getattr(funcpart)
+      except AttributeError:
+        F = None
+        break
+    if F is None:
+      warning("no %s.%s() found", module_name, func_name)
+    else:
+      setattr(M, funcpart, _ftrace(F))
+
   return level
+
+def ftrace(func):
+  ''' Decorator to trace a function if __module__.DEBUG is true.
+  '''
+  M = func.__module__
+  def func_wrap(*a, **kw):
+    do_debug = M.__dict__.get('DEBUG', False)
+    if do_debug:
+      func = _ftrace(func)
+    return func(*a, **kw)
+  return func_wrap
+
+def _ftrace(func):
+  ''' Decorator to trace the call and return of a function.
+  '''
+  fname = '.'.join( (func.__module__, funccite(func)) )
+  def traced_func(*a, **kw):
+    citation = "%s(*%s, **%s)" % (fname, pformat(a, depth=1), pformat(kw, depth=2))
+    X("CALL %s", citation)
+    try:
+      result = func(*a, **kw)
+    except Exception as e:
+      X("EXCEPTION from %s: %s %s", citation, type(e), e)
+      raise
+    else:
+      X("RESULT from %s: %r", citation, result)
+      return result
+  return traced_func
 
 class PfxFormatter(Formatter):
   ''' A Formatter subclass that has access to the program's cmd and Pfx state.
@@ -188,8 +253,8 @@ class PfxFormatter(Formatter):
     record.message = ': '.join(message_parts)
     return record.message
 
-def infer_logging_level():
-  ''' Infer a logging level from the environment.
+def infer_logging_level(env_debug=None, environ=None):
+  ''' Infer a logging level from the `env_debug`, which by default comes from the environment variable $DEBUG.
       Usually default to logging.WARNING, but if sys.stderr is a terminal,
       default to logging.INFO.
       Parse the environment variable $DEBUG as a comma separated
@@ -202,23 +267,29 @@ def infer_logging_level():
         "INFO"  => logging.INFO
         "WARNING" => logging.WARNING
         "ERROR" => logging.ERROR
-      Return the inferred logging level and the flags.
+      Return an object with the following attributes:
+        .level  A logging level.
+        .flags  All the words from $DEBUG as separated by commas and uppercased.
+        .module_names
+                Module names to be debugged.
+        .function_names
+                Functions to be traced in the for "module_name.func_name()".
   '''
+  if env_debug is None:
+    if environ is None:
+      environ = os.environ
+    env_debug = os.environ.get('DEBUG', '')
   level = logging.WARNING
   if sys.stderr.isatty():
     level = logging.INFO
-  env_debug = os.environ.get('DEBUG', '')
   flags = [ F.upper() for F in env_debug.split(',') if len(F) ]
-  for flag in flags:
-    if flag == 'DEBUG':
-      level = logging.DEBUG
-    elif flag == 'INFO':
-      level = logging.INFO
-    elif flag == 'WARN' or flag == 'WARNING':
-      level = logging.WARNING
-    elif flag == 'ERROR':
-      level = logging.ERROR
-    elif flag.isdigit():
+  module_names = []
+  function_names = []
+  for flag in env_debug.split(','):
+    flag = flag.strip()
+    if not flag:
+      continue
+    if flag.isdigit():
       flag_level = int(flag)
       if flag_level < 1:
         level = logging.WARNING
@@ -226,7 +297,25 @@ def infer_logging_level():
         level = logging.DEBUG
       else:
         level = logging.INFO
-  return level, flags
+    elif flag[0].islower() and is_dotted_identifier(flag):
+      # modulename
+      module_names.append(flag)
+    elif ':' in flag:
+      # module:funcname
+      module_name, func_name = flag.split(':', 1)
+      if is_dotted_identifier(module_name) and is_dotted_identifier(func_name):
+        function_names.append( (module_name, func_name) )
+    else:
+      uc_flag = flag.upper()
+      if uc_flag == 'DEBUG':
+        level = logging.DEBUG
+      elif uc_flag == 'INFO':
+        level = logging.INFO
+      elif uc_flag == 'WARN' or uc_flag == 'WARNING':
+        level = logging.WARNING
+      elif uc_flag == 'ERROR':
+        level = logging.ERROR
+  return O(level=level, flags=flags, module_names=module_names, function_names=function_names)
 
 def D(msg, *args):
   ''' Print formatted debug string straight to sys.stderr if D_mode is true,
@@ -237,11 +326,44 @@ def D(msg, *args):
   if D_mode:
     X(msg, *args)
 
-def X(msg, *args):
+def DP(msg, *args):
+  ''' Print formatted debug string straight to sys.stderr if D_mode is true,
+      bypassing the logging modules entirely.
+      A quick'n'dirty debug tool.
+      Differs from D() by including the prefix() context.
+  '''
+  global D_mode
+  if D_mode:
+    XP(msg, *args)
+
+def X(msg, *args, **kwargs):
   ''' Unconditionally write the message `msg` to sys.stderr.
       If `args` is not empty, format `msg` using %-expansion with `args`.
   '''
-  return nl(msg, *args, file=sys.stderr)
+  file = kwargs.pop('file', None)
+  if file is None:
+    file = sys.stderr
+  return nl(msg, *args, file=file)
+
+def XP(msg, *args, **kwargs):
+  ''' Variation on X() which prefixes the message with the currrent Pfx prefix.
+  '''
+  file = kwargs.pop('file', None)
+  if file is None:
+    file = sys.stderr
+  elif file is not None:
+    if isinstance(file, StringTypes):
+      with open(file, "a") as fp:
+        XP(msg, *args, file=fp)
+      return
+  file.write(prefix())
+  file.write(': ')
+  file.flush()
+  return X(msg, *args, file=file)
+
+def XX(prepfx, msg, *args, **kwargs):
+  with PrePfx(prepfx):
+    return XP(msg, *args, **kwargs)
 
 def nl(msg, *args, **kw):
   ''' Unconditionally write the message `msg` to `file` (default sys.stdout).
@@ -326,6 +448,7 @@ class _PfxThreadState(threading.local):
 
   def __init__(self):
     self.raise_needs_prefix = False
+    self._ur_prefix = None
     self.stack = []
 
   @property
@@ -348,7 +471,10 @@ class _PfxThreadState(threading.local):
       marks.append(P.umark)
       if P.absolute:
         break
-    return unicode(': ').join(reversed(marks))
+    if self._ur_prefix is not None:
+      marks.append(self._ur_prefix)
+    marks = reversed(marks)
+    return unicode(': ').join(marks)
 
   def append(self, P):
     ''' Push a new Pfx instance onto the stack.
@@ -444,16 +570,18 @@ class Pfx(object):
     _state = self._state
     if exc_value is not None:
       if _state.raise_needs_prefix:
+        # prevent outer Pfx wrappers from hacking stuff as well
+        _state.raise_needs_prefix = False
+        # now hack the exception attributes
         prefix = self._state.prefix
-        ##prefixify = lambda text: prefix + ': ' + text.replace('\n', '\n'+prefix)
         def prefixify(text):
-          X("prefixy(text=%r)", text)
           if not isinstance(text, StringTypes):
-            D("%s: not a string, not prefixing: %r", prefix, text)
+            DP("%s: not a string (class %s), not prefixing: %r (sys.exc_info=%r)",
+               prefix, text.__class__, text, sys.exc_info())
             return text
           return prefix + ': ' + ustr(text, errors='replace').replace('\n', '\n'+prefix)
-        if hasattr(exc_value, 'args'):
-          args = exc_value.args
+        args = getattr(exc_value, 'args', None)
+        if args is not None:
           if args:
             if isinstance(args, StringTypes):
               D("%s: expected args to be a tuple, got %r", prefix, args)
@@ -461,7 +589,7 @@ class Pfx(object):
             else:
               args = list(args)
               if len(exc_value.args) == 0:
-                args = prefix
+                args = [ prefix ]
               else:
                 args = [ prefixify(exc_value.args[0]) ] + list(exc_value.args[1:])
             exc_value.args = args
@@ -478,8 +606,6 @@ class Pfx(object):
           # we can't modify this exception - at least report the current prefix state
           D("%s: Pfx.__exit__: exc_value = %s", prefix, O_str(exc_value))
           error(prefixify(str(exc_value)))
-        # prevent outer Pfx wrappers from hacking stuff as well
-        _state.raise_needs_prefix = False
     _state.pop()
     return False
 
@@ -492,7 +618,10 @@ class Pfx(object):
     if u is None:
       mark = ustr(self.mark)
       if not isinstance(mark, unicode):
-        mark = unicode(mark, errors='replace')
+        if isinstance(mark, str):
+          mark = unicode(mark, errors='replace')
+        else:
+          mark = unicode(mark)
       u = mark
       if self.mark_args:
         u = u % self.mark_args
@@ -537,11 +666,13 @@ class Pfx(object):
   def exception(self, msg, *args):
     for L in self.loggers:
       L.exception(msg, *args)
-  @noexc
   def log(self, level, msg, *args, **kwargs):
     ## to debug format errors ## D("msg=%r, args=%r, kwargs=%r", msg, args, kwargs)
     for L in self.loggers:
-      L.log(level, msg, *args, **kwargs)
+      try:
+        L.log(level, msg, *args, **kwargs)
+      except Exception as e:
+        XP("exception logging to %s msg=%r, args=%r, kwargs=%r: %s", L, msg, args, kwargs, e)
   def debug(self, msg, *args, **kwargs):
     self.log(logging.DEBUG, msg, *args, **kwargs)
   def info(self, msg, *args, **kwargs):
@@ -555,6 +686,23 @@ class Pfx(object):
     self.log(logging.ERROR, msg, *args, **kwargs)
   def critical(self, msg, *args, **kwargs):
     self.log(logging.CRITICAL, msg, *args, **kwargs)
+
+def prefix():
+  ''' Return the current Pfx prefix.
+  '''
+  return Pfx._state.prefix
+
+@contextmanager
+def PrePfx(pfx, *args):
+  ''' Push a temporary value for Pfx._state._ur_prefix to enloundenify messages.
+  '''
+  if args:
+    pfx = pfx % args
+  state = Pfx._state
+  old_ur_prefix = state._ur_prefix
+  state._ur_prefix = pfx
+  yield None
+  state._ur_prefix = old_ur_prefix
 
 class PfxCallInfo(Pfx):
   ''' Subclass of Pfx to insert current function an caller into messages.
@@ -571,7 +719,6 @@ class PfxCallInfo(Pfx):
 # Logger public functions
 def exception(msg, *args):
   Pfx._state.cur.exception(msg, *args)
-@noexc
 def log(level, msg, *args, **kwargs):
   Pfx._state.cur.log(level, msg, *args, **kwargs)
 def debug(msg, *args, **kwargs):
@@ -589,20 +736,6 @@ def critical(msg, *args, **kwargs):
   log(logging.CRITICAL, msg, *args, **kwargs)
 def trace(msg, *args, **kwargs):
   log(trace_level, msg, *args, **kwargs)
-
-def listargs(args, kwargs, tostr=None):
-  ''' Take the list 'args' and dict 'kwargs' and return a list of
-      strings representing them for printing.
-  '''
-  if tostr is None:
-    tostr = unicode
-  arglist = [ tostr(A) for A in args ]
-  kw=kwargs.keys()
-  if kw:
-    kw.sort()
-    for k in kw:
-      arglist.append("%s=%s" % (k, tostr(kwargs[k])))
-  return arglist
 
 class LogTime(object):
   ''' LogTime is a content manager that logs the elapsed time of the enclosed
@@ -678,5 +811,7 @@ class UpdHandler(StreamHandler):
         self.__upd.out(logrec.getMessage())
 
   def flush(self):
-    if self.__upd._backend:
-      self.__upd._backend.flush()
+    return self.__upd.flush()
+
+if __name__ == '__main__':
+  setup_logging(sys.argv[0])

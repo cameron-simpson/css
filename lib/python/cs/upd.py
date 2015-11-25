@@ -46,7 +46,7 @@ class Upd(object):
         rc = ttysize(backend)
         if rc.columns is not None:
           columns = rc.columns
-    self._backend=backend
+    self._backend = backend
     self.columns = columns
     self._state = ''
     self._lock = threading.RLock()
@@ -101,6 +101,12 @@ class Upd(object):
 
   def nl(self, txt, noStrip=False):
     self.without(self._backend.write, txt+'\n', noStrip=noStrip)
+
+  def flush(self):
+    ''' Flush the output stream.
+    '''
+    if self._backend:
+      return self._backend.flush()
 
   def close(self):
     if self._backend is not None:

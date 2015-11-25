@@ -41,7 +41,7 @@ class Asynchron(O):
       objects with asynchronous termination.
   '''
 
-  def __init__(self, name=None, final=None):
+  def __init__(self, name=None, final=None, lock=None):
     ''' Base initialiser for Asynchron objects and subclasses.
         `name`: optional paramater to name this object.
         `final`: a function to run after completion of the asynchron,
@@ -50,6 +50,8 @@ class Asynchron(O):
     '''
     O.__init__(self)
     self._O_omit.extend(['result', 'exc_info'])
+    if lock is None:
+      lock = Lock()
     if name is None:
       name = "%s-%d" % (self.__class__.__name__, seq(),)
     self.name = name
@@ -58,7 +60,7 @@ class Asynchron(O):
     self.notifiers = []
     self._get_lock = Lock()
     self._get_lock.acquire()
-    self._lock = Lock()
+    self._lock = lock
 
   def __repr__(self):
     return str(self)
@@ -91,12 +93,16 @@ class Asynchron(O):
     with self._lock:
       state = self.state
       if state == ASYNCH_CANCELLED:
+        # already cancelled - this is ok, no call to ._complete
         return True
       if state == ASYNCH_READY:
+        # completed - "fail" the cancel, no call to ._complete
         return False
       if state == ASYNCH_RUNNING or state == ASYNCH_PENDING:
+        # in progress or not commenced - change state to cancelled and fall through to ._complete
         state = ASYNCH_CANCELLED
       else:
+        # state error
         raise RuntimeError(
             "<%s>.state not one of (ASYNCH_PENDING, ASYNCH_CANCELLED, ASYNCH_RUNNING, ASYNCH_READY): %r", self, state)
     self._complete(None, None)
@@ -135,6 +141,18 @@ class Asynchron(O):
   def exc_info(self, exc_info):
     self._complete(None, exc_info)
 
+  def raise_(self, exception=None):
+    ''' Convenience wrapper for self.exc_info to store an exception result `exception`.
+        If exception is omitted or None, use sys.exc_info().
+    '''
+    if exception is None:
+      self.exc_info = sys.exc_info()
+    else:
+      try:
+        raise exception
+      except:
+        self.exc_info = sys.exc_info()
+
   def call(self, func, *a, **kw):
     ''' Have the Asynchron call `func(*a,**kw)` and store its values as
         self.result.
@@ -142,8 +160,8 @@ class Asynchron(O):
     '''
     try:
       r = func(*a, **kw)
-    except:
-      self.exc_info = sys.exc_info
+    except Exception:
+      self.exc_info = sys.exc_info()
     else:
       self.result = r
 
@@ -239,7 +257,7 @@ class Asynchron(O):
       notifier(self)
 
 def report(LFs):
-  ''' Report completed Asynchrons.
+  ''' Generator which yields completed Asynchrons.
       This is a generator that yields Asynchrons as they complete, useful
       for waiting for a sequence of Asynchrons that may complete in an
       arbitrary order.

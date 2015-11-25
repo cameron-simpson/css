@@ -11,6 +11,8 @@
 # So we provide csv_reader() generators to yield rows containing unicode.
 #
 
+from __future__ import absolute_import
+
 DISTINFO = {
     'description': "CSV file related facilities",
     'keywords': ["python2", "python3"],
@@ -23,15 +25,29 @@ DISTINFO = {
 }
 
 import csv
+from io import BytesIO
 import sys
 from threading import Thread
 from cs.debug import trace
 from cs.fileutils import SharedAppendLines
-from cs.logutils import warning
-from cs.py3 import StringIO
+from cs.logutils import Pfx, warning
 from cs.queues import IterableQueue
 
-if sys.hexversion < 0x03000000:
+if sys.hexversion >= 0x03000000:
+  # python 3 onwards
+
+  def csv_reader(fp, encoding='utf-8', errors='replace'):
+    ''' Read the file `fp` using csv.reader.
+        Yield the rows.
+    '''
+    return csv.reader(fp)
+
+  def csv_writerow(csvw, row, encoding='utf-8'):
+    with Pfx("csv_writerow(csvw=%s, row=%r, encoding=%r)", csvw, row, encoding):
+      return csvw.writerow(row)
+
+else:
+  # python 2 compatability code
 
   def csv_reader(fp, encoding='utf-8', errors='replace'):
     ''' Read the file `fp` using csv.reader and decode the str
@@ -59,18 +75,9 @@ if sys.hexversion < 0x03000000:
     '''
     csvw.writerow([unicode(value).encode(encoding) for value in row])
 
-else:
-
-  def csv_reader(fp, encoding='utf-8', errors='replace'):
-    ''' Read the file `fp` using csv.reader.
-        Yield the rows.
-    '''
-    return csv.reader(fp)
-
-  def csv_writerow(csvw, row, encoding='utf-8'):
-    return csvw.writerow(row)
-
 class SharedCSVFile(SharedAppendLines):
+  ''' Shared access to a CSV file in UTF-8 encoding.
+  '''
 
   def __init__(self, pathname, readonly=False, **kw):
     importer = kw.get('importer')
@@ -86,7 +93,6 @@ class SharedCSVFile(SharedAppendLines):
                                      args=(importer,))
     self._csv_stream_thread.daemon = True
     self._csv_stream_thread.start()
-    self._stringio = StringIO()
     SharedAppendLines.__init__(self, pathname, no_update=readonly, **kw)
 
   def _queue_csv_text(self, line, importer):
@@ -101,19 +107,29 @@ class SharedCSVFile(SharedAppendLines):
     for row in self._csvr:
       importer(row)
 
-  def transcribe_update(self, fp, row):
-    ''' Transcribe an update `row` to the supplied file `fp`.
-    '''
-    # sanity check: we should only be writing between foreign updates
-    # and foreign updates should always be complete lines
-    if len(self._csv_partials):
-      warning("%s._transcribe_update while non-empty partials[]: %r",
-              self, self._csv_partials)
-    sfp = self._stringio
-    try:
-      csv_writerow(csv.writer(sfp), row)
-    except IOError as e:
-      warning("%s: IOError %s: discarding %s", sys.argv[0], e, row)
-    else:
-      fp.write(sfp.getvalue())
-    sfp.flush()
+  if sys.hexversion >= 0x03000000:
+    # python 3 onwards
+    def transcribe_update(self, fp, row):
+      ''' Transcribe an update `row` to the supplied file `fp`.
+      '''
+      # sanity check: we should only be writing between foreign updates
+      # and foreign updates should always be complete lines
+      if len(self._csv_partials):
+        warning("%s._transcribe_update while non-empty partials[]: %r",
+                self, self._csv_partials)
+      csv_writerow(csv.writer(fp), row, encoding='utf-8')
+  else:
+    # python 2
+    def transcribe_update(self, fp, row):
+      ''' Transcribe an update `row` to the supplied file `fp`.
+      '''
+      # sanity check: we should only be writing between foreign updates
+      # and foreign updates should always be complete lines
+      if len(self._csv_partials):
+        warning("%s._transcribe_update while non-empty partials[]: %r",
+                self, self._csv_partials)
+      sfp = BytesIO()
+      csv_writerow(csv.writer(sfp), row, encoding='utf-8')
+      line = sfp.getvalue().decode('utf-8')
+      fp.write(line)
+      sfp.flush()

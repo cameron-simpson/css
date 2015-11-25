@@ -53,7 +53,7 @@ fi \
 | LC_ALL=C sed 's|</ *[Aa] *>|&|g' \
 | LC_ALL=C tr '\015' '\012' \
 | if [ $mangle ]
-  then perl -pe 's:<a\s[^>]*\bhref=("[^#"][^"]*"|'\''[^#'\''][^'\'']*'\''|[^#"'\''>\s][^\s>]*)[^>]*>\s*(.*)</a>:$2<blockquote><small>$2<br>&lt;$1&gt;</small></blockquote>:gi'
+  then perl -pe 's;<a\s[^>]*\bhref="((http|https):[^"]*)">[^<]*</a>; $& [$1];gi'
   else cat
   fi \
 | w3m $cols -dump -T text/html \

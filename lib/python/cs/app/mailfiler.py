@@ -17,13 +17,15 @@ DISTINFO = {
     'requires': [ 'cs.configutils', 'cs.env', 'cs.fileutils', 'cs.lex', 'cs.logutils', 'cs.mailutils', 'cs.obj', 'cs.seq', 'cs.threads', 'cs.app.maildb', 'cs.py.modules', 'cs.py3' ],
     'entry_points': {
       'console_scripts': [
-          'maildb = cs.app.mailfiler:main',
+          'mailfiler = cs.app.mailfiler:main',
           ],
         },
 }
 
 from collections import namedtuple
+from copy import deepcopy
 from email import message_from_string, message_from_file
+from email.header import decode_header, make_header
 import email.parser
 from email.utils import getaddresses
 from functools import partial
@@ -44,6 +46,7 @@ import time
 from cs.configutils import ConfigWatcher
 import cs.env
 from cs.env import envsub
+from cs.excutils import LogExceptions
 from cs.fileutils import abspath_from_file, file_property, files_property, \
                          longpath, Pathname
 import cs.lex
@@ -190,6 +193,15 @@ def current_value(envvar, cfg, cfg_key, default, environ):
     else:
       value = longpath(value)
   return value
+
+def scrub_header(value):
+  ''' "Scrub" a header value.
+      Presently this means to undo RFC2047 encoding where possible.
+  '''
+  new_value = unrfc2047(value)
+  if new_value != value:
+    new_value = make_header(decode_header(value))
+  return new_value
 
 class MailFiler(O):
 
@@ -364,7 +376,7 @@ class MailFiler(O):
       nmsgs = 0
       skipped = 0
       with LogTime("all keys") as all_keys_time:
-        for key in wmdir.keys(flush=True):
+        for key in list(wmdir.keys(flush=True)):
           if key in wmdir.lurking:
             debug("skip lurking key")
             skipped += 1
@@ -489,7 +501,8 @@ def save_to_folderpath(folderpath, M, message_path, flags):
       M['Status'] = status
     if len(x_status) > 0:
       M['X-Status'] = x_status
-    text = M.as_string(True)
+    with LogExceptions():
+      text = M.as_string(True)
     with open(folderpath, "a") as mboxfp:
       mboxfp.write(text)
     info("    OK >> %s" % (shortpath(folderpath)))
@@ -590,12 +603,31 @@ class MessageFiler(O):
         exception("saving to folder %r: %s", folder, e)
         ok = False
     # forward message
-    for address in sorted(self.save_to_addresses):
-      try:
-        self.sendmail(address)
-      except Exception as e:
-        exception("forwarding to address %r: %s", address, e)
+    if self.save_to_addresses:
+      sender = self.env('EMAIL', None)
+      if sender is None:
+        error("no $EMAIL, required to set Sender-related fields in forwarded messages")
         ok = False
+      else:
+        # change who@where to <who@where> for Return-Path etc
+        if not sender.startswith('<') or not sender.endswith('>'):
+          sender = '<' + sender + '>'
+        # create special message copy with adjusted sender fields
+        fwd_message = deepcopy(self.message)
+        for hdr_name in 'Sender', 'Errors-To', 'Return-Path':
+          modify_header(fwd_message, hdr_name, sender)
+        # remove delivery loop detection headers
+        modify_header(fwd_message, 'Delivered-To', ())
+        with TemporaryFile('w+') as fwd_mfp:
+          fwd_mfp.write(str(fwd_message))
+          fwd_mfp.flush()
+          for address in sorted(self.save_to_addresses):
+            fwd_mfp.seek(0)
+            try:
+              self.sendmail(address, mfp=fwd_mfp, sender=sender)
+            except Exception as e:
+              exception("forwarding to address %r: %s", address, e)
+              ok = False
     # pipeline message
     for shcmd, shenv in self.save_to_cmds:
       try:
@@ -610,6 +642,7 @@ class MessageFiler(O):
 
   def modify(self, hdr, new_value, always=False):
     ''' Modify the value of the named header `hdr` to the new value `new_value` using cs.mailutils.modify_header.
+        `new_value` may be a string or an iterable of strings.
         If headers were changed, forget self.message_path.
     '''
     if modify_header(self.message, hdr, new_value, always=always):
@@ -755,12 +788,17 @@ class MessageFiler(O):
     info("    %s => | %s" % (("OK" if retcode == 0 else "FAIL"), argv))
     return retcode == 0
 
-  def sendmail(self, address, mfp=None):
+  def sendmail(self, address, mfp=None, sender=None):
     ''' Dispatch a message to `address`.
         `mfp` is a file containing the message text.
         If `mfp` is None, use the text of the current message.
+        If `sender` is supplied, pass to sendmail with -f option.
     '''
-    return self.save_to_pipe([self.env('SENDMAIL', 'sendmail'), '-oi', address], mfp=mfp)
+    sendmail_argv = [ self.env('SENDMAIL', 'sendmail'), '-oi' ]
+    if sender is not None:
+      sendmail_argv.extend( ('-f', sender) )
+    sendmail_argv.append(address)
+    return self.save_to_pipe(sendmail_argv, mfp=mfp)
 
   @property
   def alert_format(self):
@@ -867,24 +905,22 @@ re_GROUPNAME_s = '[A-Z][A-Z0-9_]+'
 # @domain
 re_atDOM_s = '@[-\w]+(\.[-\w]+)+'
 
-# GROUPNAME or @domain
-re_GROUPNAMEorDOM_s = '(%s|%s)' % (re_GROUPNAME_s, re_atDOM_s)
+# local-part@domain
+re_simpleADDRatDOM_s = '[a-z0-9][\-a-z0-9]*' + re_atDOM_s
 
-# comma separated list of GROUPNAME or @domain
-re_GROUPorDOM_LIST_s = r'%s(,%s)*' % (re_GROUPNAMEorDOM_s, re_GROUPNAMEorDOM_s)
+# GROUPNAME or @domain
+re_GROUPNAMEorDOMorADDR_s = \
+    '(%s|%s|%s)' % (re_GROUPNAME_s, re_atDOM_s, re_simpleADDRatDOM_s)
 
 # (GROUP[|GROUP...])
 re_INGROUP_s = ( r'\(\s*%s(\s*\|\s*%s)*\s*\)'
                  % (re_GROUPNAME_s, re_GROUPNAME_s)
                )
 
-# (GROUPorDOM[|GROUPorDOM...])
-re_INGROUPorDOM_s = ( r'\(\s*%s(\s*\|\s*%s)*\s*\)'
-                      % (re_GROUPNAMEorDOM_s, re_GROUPNAMEorDOM_s)
-                    )
-
-re_INGROUPorDOM = re.compile( re_INGROUPorDOM_s, re.I)
-re_INGROUP = re.compile( re_INGROUP_s, re.I)
+# (GROUPorDOMorADDR[|GROUPorDOMorADDR...])
+re_INGROUPorDOMorADDR_s = \
+    r'\(\s*%s(\s*\|\s*%s)*\s*\)' \
+    % (re_GROUPNAMEorDOMorADDR_s, re_GROUPNAMEorDOMorADDR_s)
 
 # simple argument shorthand (GROUPNAME|@domain|number|"qstr")
 re_ARG_s = r'(%s|%s|%s|%s)' % (re_GROUPNAME_s, re_atDOM_s, re_NUMBER_s, re_QSTR_s)
@@ -901,13 +937,13 @@ re_NONALNUMWSP = re.compile(re_NONALNUMWSP_s, re.I)
 re_ASSIGN = re.compile(re_ASSIGN_s, re.I)
 re_HEADERNAME_LIST = re.compile(re_HEADERNAME_LIST_s, re.I)
 re_HEADERNAME_LIST_PREFIX = re.compile(re_HEADERNAME_LIST_PREFIX_s, re.I)
-re_GROUPorDOM_LIST = re.compile(re_GROUPorDOM_LIST_s)
 re_HEADER_SUBST = re.compile(re_HEADER_SUBST_s, re.I)
 re_UNQWORD = re.compile(re_UNQWORD_s)
 re_HEADERNAME = re.compile(re_HEADERNAME_s, re.I)
 re_DOTTED_IDENTIFIER = re.compile(re_DOTTED_IDENTIFIER_s, re.I)
 re_ARG = re.compile(re_ARG_s)
 re_ARGLIST = re.compile(re_ARGLIST_s)
+re_INGROUPorDOMorADDR = re.compile( re_INGROUPorDOMorADDR_s, re.I)
 
 def parserules(fp):
   ''' Read rules from `fp`, yield Rules.
@@ -1057,7 +1093,7 @@ def parserules(fp):
           C = Condition_Regexp(condition_flags, header_names, atstart, regexp)
         else:
           # headers:(group[|group...])
-          m = re_INGROUPorDOM.match(line, offset)
+          m = re_INGROUPorDOMorADDR.match(line, offset)
           if m:
             group_names = set( w.strip().lower() for w in m.group()[1:-1].split('|') )
             offset = m.end()
@@ -1308,26 +1344,30 @@ class Target_Substitution(O):
 
   def apply(self, filer):
     for header_name in self.header_names:
-      X("apply %r : s/%s/%s ...", header_name, self.subst_re.pattern, self.subst_replacement)
       M = filer.message
       # fetch old value and "unfold" (strip CRLF, see RFC2822 part 2.2.3)
       old_value = M.get(header_name, '').replace('\r','').replace('\n','')
-      X("SUBST:   old value = %r", old_value)
       m = self.subst_re.search(old_value)
       if m:
-        # record named substitution values
-        env = m.groupdict()
-        # record numbered substitution values
+        env = {}
+        # Start with the headers as a basic set of available values.
+        # Lowercase header names and replace '-' with '_'.
+        # Strip CRLF per RFC2822 part 2.2.3 as we do for old_value above.
+        for hname, hvalue in M.items():
+          hname = hname.lower().replace('-', '_')
+          env[hname] = hvalue.replace('\r','').replace('\n','')
+        # Override with named substitution values.
+        env.update(m.groupdict())
+        # Add numbered substitution values.
         env_specials = { '0': m.group(0) }
-        for ndx, grp in enumerate(m.groups()):
-          env_specials[str(ndx+1)] = grp
+        for ndx, grp in enumerate(m.groups(), 1):
+          env_specials[str(ndx)] = grp
         repl_value, offset = get_qstr(self.subst_replacement, 0, q=None,
-                             environ=env, env_specials=env_specials)
+                                      environ=env, env_specials=env_specials)
         new_value = old_value[:m.start()] + repl_value + old_value[m.end():]
         if offset != len(self.subst_replacement):
           warning("after getqstr, offset[%d] != len(subst_replacement)[%d]: %r",
                   offset, len(self.subst_replacement), self.subst_replacement)
-        debug("SUBST %s: %s ==> %s", header_name, self.subst_replacement, new_value)
         filer.modify(header_name.title(), new_value)
 
 class Target_Function(O):
@@ -1347,6 +1387,8 @@ class Target_Function(O):
       func = filer.learn_header_addresses
     elif self.funcname == 'learn_message_ids':
       func = filer.learn_message_ids
+    elif self.funcname == 'scrub':
+      func = scrub_header
     else:
       raise ValueError("no simply named functions defined yet: %r", self.funcname)
 
@@ -1363,17 +1405,21 @@ class Target_Function(O):
       func_args.append(value)
     M = filer.message
     for header_name in self.header_names:
-      for s in M.get_all(header_name, ()):
-        try:
-          s2 = func(s, *func_args)
-        except Exception as e:
-          exception("exception calling %s(filer, *%r): %s", self.funcname, func_args, e)
-          raise
-        else:
-          if s2 is not None:
-            if s != s2:
-              info("%s: %r ==> %r", header_name.title(), s, s2)
-              filer.modify(header_name, s2)
+      header_values = M.get_all(header_name, ())
+      new_header_values = []
+      if header_values:
+        for s in header_values:
+          try:
+            s2 = func(s, *func_args)
+          except Exception as e:
+            exception("exception calling %s(filer, *%r): %s", self.funcname, func_args, e)
+            raise
+          else:
+            if s2 is not None:
+              new_header_values.append(s2)
+        if new_header_values and header_values != new_header_values:
+          info("%s: %r ==> %r", header_name.title(), header_values, new_header_values)
+          filer.modify(header_name, new_header_values)
 
 class Target_PipeLine(O):
 
@@ -1456,12 +1502,34 @@ class Condition_InGroups(_Condition):
       msgiddb = self.filer.msgiddb
       msgids = [ v for v in header_value.split() if v ]
       for msgid in msgids:
+        # get the foo@bar part of <foo@bar>
+        # be very lenient
+        if msgid.startswith('<'):
+          if msgid.endswith('>'):
+            # <...>
+            msgid_inner = msgid[1:-1]
+          else:
+            # <...
+            msgid_inner = msgid[1:]
+        elif msgid.endswith('>'):
+          # ...>
+          msgid_inner = msgid[:-1]
+        else:
+          # ...
+          msgid_inner = msgid
         msgid_node = msgiddb.get( ('MESSAGE_ID', msgid) )
         for group_name in self.group_names:
+          # look for <...@domain>
           if group_name.startswith('@'):
-            if msgid.endswith(groupname+'>'):
+            if msgid_inner.lower().endswith(groupname):
               debug("match %s to %s", msgid, group_name)
               return True
+          # look for specific <local@domain>
+          elif '@' in group_name:
+            if msgid_inner.lower() == group_name:
+              debug("match %s to %s", msgid, group_name)
+              return True
+          # look for named group in MESSAGE_ID.GROUPs
           elif msgid_node:
               if group_name in msgid_node.GROUPs:
                 debug("match %s to (%s)", msgid, group_name)
@@ -1472,6 +1540,10 @@ class Condition_InGroups(_Condition):
           if group_name.startswith('@'):
             # address ending in @foo
             if address.endswith(group_name):
+              debug("match %s to %s", address, group_name)
+              return True
+          elif '@' in group_name:
+            if address.lower() == group_name:
               debug("match %s to %s", address, group_name)
               return True
           elif address.lower() in filer.group(group_name):

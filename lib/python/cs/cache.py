@@ -188,6 +188,8 @@ class LRU_Cache(object):
 
   @locked
   def flush(self):
+    ''' Clear the cache.
+    '''
     cache = self._cache
     keys = list(cache.keys())
     for key in keys:

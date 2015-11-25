@@ -285,14 +285,13 @@ case "$op" in
     fi
     ;;
   pick-new-prefix-session)
-    prefix=$1
     tmux start-server
-    echo "$prefix"$(tmux list-sessions | sed 's/:.*//' | next_suffix "$prefix")
+    echo "$session_prefix"$(tmux list-sessions | sed 's/:.*//' | next_suffix "$session_prefix")
     ;;
   pick-new-prefix-session-remote)
     # choose a new remote session name
     # using tmux by choice, screen otherwise
-    session_name=$session_prefix$( rcmd "$remote_host" "if which tmux >/dev/null 2>&1; then tmux start-server; tmux list-sessions | sed 's/:.*//'; else screen -ls | sed -n 's/^\\t[1-9][0-9]*\\.\([^\\t]*\)\\t.*/\\1/p'; fi" | next_suffix "$session_prefix" )
+    session_name=$session_prefix$( rcmd "$remote_host" "if which tmux >/dev/null 2>&1; then tmux start-server; tmux list-sessions | sed 's/:.*//'; else screen -ls | sed -n 's/^\\t[1-9][0-9]*\\.\([^\\t]*\)\\t.*/\\1/p'; fi" | tr -d '\015' | next_suffix "$session_prefix" )
     echo "$session_name"
     ;;
   recite-function-remote)

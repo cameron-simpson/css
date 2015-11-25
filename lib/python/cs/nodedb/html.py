@@ -6,7 +6,7 @@
 
 import sys
 import cherrypy
-from cStringIO import StringIO
+from io import StringIO
 import cs.html
 from cs.py3 import StringTypes
 from cs.nodedb import Node

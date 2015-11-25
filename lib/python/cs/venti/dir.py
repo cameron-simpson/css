@@ -7,7 +7,7 @@ import sys
 from threading import Lock, RLock
 from cs.logutils import D, Pfx, debug, error, info, warning, X
 from cs.lex import hexify
-from cs.queues import NestingOpenCloseMixin
+from cs.queues import MultiOpenMixin
 from cs.seq import seq
 from cs.serialise import get_bs, get_bsdata, put_bs, put_bsdata
 from cs.threads import locked, locked_property
@@ -105,6 +105,13 @@ class _Dirent(object):
   def __repr__(self):
     return "_Dirent(%s, %s, %s)" % (D_type2str, self.name, self.meta)
 
+  def __eq__(self, other):
+    return ( self.name == other.name
+         and self.type == other.type
+         and self.meta == other.meta
+         and self.block.hashcode == other.block.hashcode
+           )
+
   @property
   def isfile(self):
     ''' Is this a file _Dirent?
@@ -185,7 +192,7 @@ class _Dirent(object):
            + block.textencode()
            )
 
-  # NB: not a property because it may change
+  @property
   def size(self):
     return len(self.block)
 
@@ -227,14 +234,14 @@ class _Dirent(object):
 
     dev = 0       # FIXME: we're not hooked to a FS?
     nlink = 1
-    size = self.size()
+    size = self.size
     atime = 0
     mtime = self.mtime
     ctime = 0
 
     return (unixmode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime)
 
-class FileDirent(_Dirent, NestingOpenCloseMixin):
+class FileDirent(_Dirent, MultiOpenMixin):
   ''' A _Dirent subclass referring to a file.
       If closed, ._block refers to the file content.
       If open, ._open_file refers to the content.
@@ -246,20 +253,20 @@ class FileDirent(_Dirent, NestingOpenCloseMixin):
   def __init__(self, name, metatext=None, block=None):
     if block is None:
       block = Block(data=b'')
-    self._lock = RLock()
-    NestingOpenCloseMixin.__init__(self)
+    MultiOpenMixin.__init__(self)
     _Dirent.__init__(self, D_FILE_T, name, metatext=metatext)
     self._open_file = None
     self._block = block
     self._check()
 
   def _check(self):
-    # TODO: check ._block and ._open_file against NOC open count
+    # TODO: check ._block and ._open_file against MultiOpenMixin open count
     if self._block is None:
       if self._open_file is None:
         raise ValueError("both ._block and ._open_file are None")
-    elif self._open_file is not None:
-      raise ValueError("._block is %s and ._open_file is %r" % (self._block, self._open_file))
+    ## both are allowed to be set
+    ##elif self._open_file is not None:
+    ##  raise ValueError("._block is %s and ._open_file is %r" % (self._block, self._open_file))
 
   @property
   @locked
@@ -269,7 +276,8 @@ class FileDirent(_Dirent, NestingOpenCloseMixin):
     '''
     self._check()
     if self._open_file is not None:
-      self._block = self._open_file.sync()
+      self._block = self._open_file.flush()
+      warning("FileDirent.block: updated to %s", self._block)
     return self._block
 
   @block.setter
@@ -292,36 +300,35 @@ class FileDirent(_Dirent, NestingOpenCloseMixin):
     return len(self.block)
 
   @locked
-  def on_open(self, count):
+  def startup(self):
     ''' Set up ._open_file on first open.
     '''
     self._check()
-    if count < 1:
-      raise ValueError("expected count >= 1, got: %r" % (count,))
-    if count == 1:
-      if self._open_file is not None:
-        raise RuntimeError("first open, but ._open_file is not None: %r" % (self._open_file,))
-      if self._block is None:
-        raise RuntimeError("first open, but ._block is None")
-      self._open_file = File(self._block)
-      self._block = None
+    if self._open_file is not None:
+      raise RuntimeError("first open, but ._open_file is not None: %r" % (self._open_file,))
+    if self._block is None:
+      raise RuntimeError("first open, but ._block is None")
+    self._open_file = File(self._block)
+    self._block = None
     self._check()
 
   @locked
   def shutdown(self):
     ''' On final close, close ._open_file and save result as ._block.
     '''
+    X("CLOSE %s ...", self)
     self._check()
     if self._block is not None:
       error("final close, but ._block is not None; replacing with self._open_file.close(), was: %r", self._block)
     self._block = self._open_file.close()
+    X("CLOSE %s: _block=%s", self, self._block)
     self._open_file = None
     self._check()
 
   def truncate(self, length):
     ''' Truncate this FileDirent to the specified size.
     '''
-    Esize = self.size()
+    Esize = self.size
     if Esize != length:
       with self:
         return self._open_file.truncate(length)
@@ -410,7 +417,10 @@ class Dir(_Dirent):
                      for name in names
                      if name != '.' and name != '..'
                    )
-    return Block(data=data)
+    # TODO: if len(data) >= 16384
+    B = Block(data=data)
+    warning("Dir.block: computed Block %s", B)
+    return B
 
   def dirs(self):
     ''' Return a list of the names of subdirectories in this Dir.
@@ -453,12 +463,13 @@ class Dir(_Dirent):
   def __setitem__(self, name, E):
     ''' Store a _Dirent in the specified name slot.
     '''
-    X("<%s>[%s]=%s" % (self.name, name, E))
     if not self._validname(name):
       raise KeyError("invalid name: %s" % (name,))
     if not isinstance(E, _Dirent):
       raise ValueError("E is not a _Dirent: <%s>%r" % (type(E), E))
     self.entries[name] = E
+    if E.isdir and E.parent is None:
+      E.parent = D
 
   def __delitem__(self, name):
     if not self._validname(name):
@@ -466,6 +477,15 @@ class Dir(_Dirent):
     if name == '.' or name == '..':
       raise KeyError("refusing to delete . or ..: name=%s" % (name,))
     del self.entries[name]
+
+  def add(self, E):
+    ''' Add a Dirent to this Dir.
+        If the name is already taken, raise KeyError.
+    '''
+    name = E.name
+    if name in self:
+      raise KeyError("name already exists: %r", name)
+    self[name] = E
 
   def rename(self, oldname, newname):
     ''' Rename entry `oldname` to entry `newname`.
@@ -529,3 +549,7 @@ class Dir(_Dirent):
       E = subE
 
     return E
+
+if __name__ == '__main__':
+  import cs.venti.dir_tests
+  cs.venti.dir_tests.selftest(sys.argv)
