@@ -74,7 +74,7 @@ def main(argv=None):
   return xit
 
 def test(argv, I):
-  for album in I.read_albums():
+  for album in I.albums.read_rows():
     print('uuid =', album.uuid, 'albumType =', album.albumType, 'name =', album.name)
   ##for folder in I.read_folders():
   ##  print('uuid =', folder.uuid, 'folderType =', folder.folderType, 'name =', folder.name)
@@ -115,9 +115,13 @@ class iPhoto(O):
     return self.dbs.pathto(dbname)
 
   def __getattr__(self, attr):
+    # read_*s ==> iterator of rows from table "*"
     if attr.startswith('read_') and attr.endswith('s'):
       nickname = attr[5:-1]
       return self.table_by_nickname[nickname].read_rows
+    # *s ==> table "*"
+    if attr.endswith('s') and attr[:-1] in self.table_by_nickname:
+      return self.table_by_nickname[attr[:-1]]
     raise AttributeError(attr)
 
   def folders(self):
