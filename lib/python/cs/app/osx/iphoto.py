@@ -37,7 +37,7 @@ def main(argv=None):
     library_path = argv.pop(0)
   else:
     library_path = os.environ.get('IPHOTO_LIBRARY_PATH', envsub(DEFAULT_LIBRARY))
-  I = iPhoto(library_path)
+  I = iPhoto(library_path, quick=True)
   xit = 0
   if not argv:
     warning("missing op")
@@ -53,7 +53,11 @@ def main(argv=None):
           obclass = argv.pop(0)
           with Pfx(obclass):
             if obclass == 'albums':
-              names = [ A.name for A in I.album_names() ]
+              I.load_albums()
+              names = I.album_names()
+            elif obclass == 'keywords':
+              I.load_keywords()
+              names = I.keyword_names()
             else:
               warning("unknown class %r", obclass)
               badopts = True
@@ -64,6 +68,7 @@ def main(argv=None):
               for name in sorted(names):
                 print(name)
       elif op == "test":
+        I.load_tables()
         test(argv, I)
       else:
         warning("unrecognised op")
@@ -92,15 +97,17 @@ def test(argv, I):
 
 class iPhoto(O):
 
-  def __init__(self, libpath=None):
+  def __init__(self, libpath=None, quick=False):
     ''' Open the iPhoto library stored at `libpath`.
         If `libpath` is not supplied, use DEFAULT_LIBRARY.
+        `quick`: do not preload all the tables.
     '''
     if libpath is None:
       libpath = envsub(DEFAULT_LIBRARY)
     if not os.path.isdir(libpath):
       raise ValueError("not a directory: %r" % (libpath,))
     self.path = libpath
+    self.quick = quick
     self.table_by_nickname = {}
     self._lock = RLock()
     self.dbs = iPhotoDBs(self)
@@ -108,6 +115,12 @@ class iPhoto(O):
 
   def _load_all(self):
     self.dbs._load_all()
+    if not self.quick:
+      self._load_tables()
+
+  def load_tables(self):
+    ''' Load all the tables into memory.
+    '''
     self.load_albums()
     self.load_masters()
     self.load_keywords()
@@ -151,9 +164,17 @@ class iPhoto(O):
     XP("load_albums...")
     by_id = self.album_by_id = {}
     by_uuid = self.album_by_uuid = {}
+    by_name = self.album_by_name = {}
     for album in self.read_albums():
       by_id[album.modelId] = album
       by_uuid[album.uuid] = album
+      if album.name is None:
+        warning("album has no name: %r", album)
+      else:
+        by_name.setdefault(album.name, set()).add(album)
+
+  def album_names(self):
+    return self.album_by_name.keys()
 
   def load_masters(self):
     ''' Load Library.RKMaster into memory and set up mappings.
