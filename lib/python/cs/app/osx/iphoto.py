@@ -74,16 +74,16 @@ def main(argv=None):
   return xit
 
 def test(argv, I):
-  for album in I.albums():
+  for album in I.read_albums():
     print('uuid =', album.uuid, 'albumType =', album.albumType, 'name =', album.name)
-  for folder in I.folders():
-    print('uuid =', folder.uuid, 'folderType =', folder.folderType, 'name =', folder.name)
-  for keyword in I.keywords():
-    print('uuid =', keyword.uuid, 'name =', keyword.name)
-  ##for master in I.masters():
+  ##for folder in I.read_folders():
+  ##  print('uuid =', folder.uuid, 'folderType =', folder.folderType, 'name =', folder.name)
+  ##for keyword in I.read_keywords():
+  ##  print('uuid =', keyword.uuid, 'name =', keyword.name)
+  ##for master in I.read_masters():
   ##  print('uuid =', master.uuid, 'name =', master.name, 'originalFileName =', master.originalFileName, 'imagePath =', master.imagePath, 'pathname =', master.pathname)
-  for v in I.versions():
-    print('uuid =', v.uuid, 'masterUuid =', v.masterUuid)
+  ##for v in I.read_versions():
+  ##  print('uuid =', v.uuid, 'masterUuid =', v.masterUuid, 'versionNumber =', v.versionNumber)
   ##for kwv in I.keywords_to_versions():
   ##  print('keywordId =', kwv.keywordId, 'versionId =', kwv.versionId)
 
@@ -98,8 +98,10 @@ class iPhoto(O):
     if not os.path.isdir(libpath):
       raise ValueError("not a directory: %r" % (libpath,))
     self.path = libpath
+    self.table_by_nickname = {}
     self._lock = RLock()
     self.dbs = iPhotoDBs(self)
+    self.dbs._load_all()
 
   def pathto(self, rpath):
     if rpath.startswith('/'):
@@ -112,8 +114,11 @@ class iPhoto(O):
   def dbpath(self, dbname):
     return self.dbs.pathto(dbname)
 
-  def albums(self):
-    return list(self.dbs.Library.table_rows('RKAlbum'))
+  def __getattr__(self, attr):
+    if attr.startswith('read_') and attr.endswith('s'):
+      nickname = attr[5:-1]
+      return self.table_by_nickname[nickname].read_rows
+    raise AttributeError(attr)
 
   def folders(self):
     return list(self.dbs.Library.table_rows('RKFolder'))
@@ -135,7 +140,12 @@ class iPhotoDBs(object):
   def __init__(self, iphoto):
     self.iphoto = iphoto
     self.dbmap = {}
+    self.named_tables = {}
     self._lock = iphoto._lock
+
+  def _load_all(self):
+    for dbname in 'Library',:
+      self._load_db(dbname)
 
   @property
   def dbdirpath(self):
@@ -158,17 +168,20 @@ class iPhotoDBs(object):
     XP("connect(%r): isolation_level=%s", dbpath, conn.isolation_level)
     return conn
 
+  def _load_db(self, dbname):
+    db = iPhotoDB(self.iphoto, dbname)
+    self.dbmap[dbname] = db
+    return db
+
   @locked
-  def __getattr__(self, attr):
+  def __getattr__(self, dbname):
     dbmap = self.dbmap
-    if attr in dbmap:
-      return dbmap[attr]
-    dbpath = self.pathto(attr)
+    if dbname in dbmap:
+      return dbmap[dbname]
+    dbpath = self.pathto(dbname)
     if os.path.exists(dbpath):
-      db = iPhotoDB(self.iphoto, attr)
-      dbmap[attr] = db
-      return db
-    raise AttributeError(attr)
+      return self._load_db(dbname)
+    raise AttributeError(dbname)
 
 class iPhotoDB(object):
 
@@ -180,7 +193,9 @@ class iPhotoDB(object):
     self.conn = sqlite3.connect(self.dbpath)
     self.schema = SCHEMAE[dbname]
     self.table_row_classes = {}
-    for table_name, schema in self.schema.items():
+    for nickname, schema in self.schema.items():
+      self.iphoto.table_by_nickname[nickname] = iPhotoTable(self, nickname, schema)
+      table_name = schema['table_name']
       klass = namedtuple('%s_Row' % (table_name,), ['I'] + list(schema['columns']))
       mixin = schema.get('mixin')
       if mixin is not None:
@@ -195,6 +210,39 @@ class iPhotoDB(object):
     for row in self.conn.cursor().execute('select * from %s' % (table_name,)):
       yield row_class(*([I] + list(row)))
 
+class iPhotoTable(object):
+
+  def __init__(self, db, nickname, schema):
+    self.nickname = nickname
+    self.db = db
+    self.schema = schema
+    table_name = schema['table_name']
+    klass = namedtuple('%s_Row' % (table_name,), ['I'] + list(schema['columns']))
+    mixin = schema.get('mixin')
+    if mixin is not None:
+      class Mixed(klass, mixin):
+        pass
+      klass = Mixed
+    self.row_class = klass
+
+  @property
+  def iphoto(self):
+    return self.db.iphoto
+
+  @property
+  def conn(self):
+    return self.db.conn
+
+  @property
+  def table_name(self):
+    return self.schema['table_name']
+
+  def read_rows(self):
+    I = self.iphoto
+    row_class = self.row_class
+    for row in self.conn.cursor().execute('select * from %s' % (self.table_name,)):
+      yield row_class(*([I] + list(row)))
+
 class Master_Mixin(object):
 
   @property
@@ -202,8 +250,8 @@ class Master_Mixin(object):
     return os.path.join(self.I.pathto('Masters'), self.imagePath)
 
 SCHEMAE = {'Library':
-            { 'RKMaster':
-                {
+            { 'master':
+                { 'table_name': 'RKMaster',
                   'mixin': Master_Mixin,
                   'columns':
                     ( 'modelId', 'uuid', 'name', 'projectUuid', 'importGroupUuid',
@@ -219,8 +267,9 @@ SCHEMAE = {'Library':
                       'streamAssetId', 'streamSourceUuid', 'burstUuid',
                     ),
                 },
-              'RKFolder':
-                { 'columns':
+              'folder':
+                { 'table_name': 'RKFolder',
+                  'columns':
                     ( 'modelId', 'uuid', 'folderType', 'name', 'parentFolderUuid',
                       'implicitAlbumUuid', 'posterVersionUuid',
                       'automaticallyGenerateFullSizePreviews', 'versionCount',
@@ -230,14 +279,16 @@ SCHEMAE = {'Library':
                       'isMagic', 'colorLabelIndex', 'sortAscending', 'sortKeyPath',
                     ),
                 },
-              'RKKeyword':
-                { 'columns':
+              'keyword':
+                { 'table_name': 'RKKeyword',
+                  'columns':
                     ( 'modelId', 'uuid', 'name', 'searchName', 'parentId',
                       'hasChildren', 'shortcut',
                     ),
                 },
-              'RKAlbum':
-                { 'columns':
+              'album':
+                { 'table_name': 'RKAlbum',
+                  'columns':
                     ( 'modelId', 'uuid', 'albumType', 'albumSubclass', 'serviceName',
                       'serviceAccountName', 'serviceFullName', 'name', 'folderUuid',
                       'queryFolderUuid', 'posterVersionUuid', 'selectedTrackPathUuid',
@@ -248,8 +299,9 @@ SCHEMAE = {'Library':
                       'queryData', 'viewData', 'selectedVersionIds',
                     ),
                 },
-              'RKVersion':
-                { 'columns':
+              'version':
+                { 'table_name': 'RKVersion',
+                  'columns':
                     ( 'modelId', 'uuid', 'name', 'fileName',
                       'versionNumber', 'stackUuid', 'masterUuid',
                       'masterId', 'rawMasterUuid', 'nonRawMasterUuid',
@@ -270,8 +322,9 @@ SCHEMAE = {'Library':
                       'hasKeywords',
                     ),
                 },
-              'RKKeywordForVersion':
-                { 'columns':
+              'keywordForVersion':
+                { 'table_name': 'RKKeywordForVersion',
+                  'columns':
                     ( 'modelId', 'versionId', 'keywordId'),
                 },
             }
