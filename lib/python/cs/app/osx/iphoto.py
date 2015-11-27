@@ -56,6 +56,9 @@ def main(argv=None):
               if obclass == 'albums':
                 I.load_albums()
                 names = I.album_names()
+              elif obclass == 'masters':
+                I.load_masters()
+                names = I.master_pathnames()
               elif obclass == 'people':
                 I.load_persons()
                 names = I.person_names()
@@ -265,6 +268,10 @@ class iPhoto(O):
     for master in self.read_masters():
       by_id[master.modelId] = master
       by_uuid[master.uuid] = master
+
+  def master_pathnames(self):
+    for master in self.master_by_id.values():
+      yield master.pathname
 
   def _load_table_versions(self):
     ''' Load Library.RKVersion into memory and set up mappings.
