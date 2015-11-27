@@ -186,10 +186,11 @@ class iPhoto(O):
     for album in self.read_albums():
       by_id[album.modelId] = album
       by_uuid[album.uuid] = album
-      if album.name is None:
+      name = album.name
+      if name is None:
         warning("album has no name: %r", album)
       else:
-        by_name.setdefault(album.name, set()).add(album)
+        by_name.setdefault(name, set()).add(album)
 
   def album_names(self):
     return self.album_by_name.keys()
@@ -356,7 +357,6 @@ class iPhotoDBs(object):
     return conn
 
   def _load_db(self, dbname):
-    XP("_load_db(%r)", dbname)
     db = iPhotoDB(self.iphoto, dbname)
     self.dbmap[dbname] = db
     return db
