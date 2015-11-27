@@ -12,7 +12,7 @@ from collections import namedtuple
 import sqlite3
 from threading import RLock
 from cs.env import envsub
-from cs.logutils import Pfx, warning, error, setup_logging, XP
+from cs.logutils import Pfx, warning, error, setup_logging, X, XP
 from cs.obj import O
 from cs.threads import locked, locked_property
 
@@ -32,51 +32,55 @@ def main(argv=None):
   cmd = os.path.basename(argv.pop(0))
   usage = USAGE % (cmd,)
   setup_logging(cmd)
-  badopts = False
-  if argv and argv[0].startswith('/'):
-    library_path = argv.pop(0)
-  else:
-    library_path = os.environ.get('IPHOTO_LIBRARY_PATH', envsub(DEFAULT_LIBRARY))
-  I = iPhoto(library_path, quick=True)
-  xit = 0
-  if not argv:
-    warning("missing op")
-    badopts = True
-  else:
-    op = argv.pop(0)
-    with Pfx(op):
-      if op == 'ls':
-        if not argv:
-          for dbname in sorted(I.dbnames()):
-            print(dbname)
+  with Pfx(cmd):
+    badopts = False
+    if argv and argv[0].startswith('/'):
+      library_path = argv.pop(0)
+    else:
+      library_path = os.environ.get('IPHOTO_LIBRARY_PATH', envsub(DEFAULT_LIBRARY))
+    I = iPhoto(library_path, quick=True)
+    xit = 0
+    if not argv:
+      warning("missing op")
+      badopts = True
+    else:
+      op = argv.pop(0)
+      with Pfx(op):
+        if op == 'ls':
+          if not argv:
+            for dbname in sorted(I.dbnames()):
+              print(dbname)
+          else:
+            obclass = argv.pop(0)
+            with Pfx(obclass):
+              if obclass == 'albums':
+                I.load_albums()
+                names = I.album_names()
+              elif obclass == 'people':
+                I.load_persons()
+                names = I.person_names()
+              elif obclass == 'keywords':
+                I.load_keywords()
+                names = I.keyword_names()
+              else:
+                warning("unknown class %r", obclass)
+                badopts = True
+              if argv:
+                warning("extra arguments: %r", argv)
+                badopts = True
+              if not badopts:
+                for name in sorted(names):
+                  print(name)
+        elif op == "test":
+          I.load_tables()
+          test(argv, I)
         else:
-          obclass = argv.pop(0)
-          with Pfx(obclass):
-            if obclass == 'albums':
-              I.load_albums()
-              names = I.album_names()
-            elif obclass == 'keywords':
-              I.load_keywords()
-              names = I.keyword_names()
-            else:
-              warning("unknown class %r", obclass)
-              badopts = True
-            if argv:
-              warning("extra arguments: %r", argv)
-              badopts = True
-            if not badopts:
-              for name in sorted(names):
-                print(name)
-      elif op == "test":
-        I.load_tables()
-        test(argv, I)
-      else:
-        warning("unrecognised op")
-        badopts = True
-  if badopts:
-    print(usage, file=sys.stderr)
-    return 2
-  return xit
+          warning("unrecognised op")
+          badopts = True
+    if badopts:
+      print(usage, file=sys.stderr)
+      return 2
+    return xit
 
 def test(argv, I):
   ##for folder in I.read_folders():
@@ -126,6 +130,7 @@ class iPhoto(O):
     self.load_keywords()
     self.load_versions()
     self.load_keywordForVersions()
+    self.load_faces()
 
   def pathto(self, rpath):
     if rpath.startswith('/'):
@@ -151,6 +156,19 @@ class iPhoto(O):
         if attr.startswith('read_'):
           nickname = attr[5:-1]
           return self.table_by_nickname[nickname].read_rows
+      if attr.startswith('load_') and attr.endswith('s'):
+        nickname = attr[5:-1]
+        if nickname in self.table_by_nickname:
+          loaded_attr = '_loaded_table_' + nickname
+          loaded = getattr(self, loaded_attr, False)
+          if loaded:
+            return lambda: None
+          else:
+            load_funcname = '_load_table_' + nickname + 's'
+            def loadfunc():
+              getattr(self, load_funcname)()
+              setattr(self, loaded_attr, True)
+            return loadfunc
       elif attr.endswith('_table'):
         # *_table ==> table "*"
         nickname = attr[:-6]
@@ -158,7 +176,7 @@ class iPhoto(O):
           return self.table_by_nickname[nickname]
     raise AttributeError(attr)
 
-  def load_albums(self):
+  def _load_table_albums(self):
     ''' Load Library.RKMaster into memory and set up mappings.
     '''
     XP("load_albums...")
@@ -176,7 +194,68 @@ class iPhoto(O):
   def album_names(self):
     return self.album_by_name.keys()
 
-  def load_masters(self):
+  def _load_table_faces(self):
+    ''' Load Faces.RKDetectedFace into memory and set up mappings.
+    '''
+    XP("load_faces...")
+    self.load_masters()
+    self.load_persons()
+    by_id = self.face_by_id = {}
+    by_uuid = self.face_by_uuid = {}
+    by_masterUuid = self.faces_by_masterUuid = {}
+    master_by_uuid = self.master_by_uuid
+    for face in self.read_faces():
+      by_id[face.modelId] = face
+      by_uuid[face.uuid] = face
+      muuid = face.masterUuid
+      try:
+        master = master_by_uuid[muuid]
+      except KeyError as e:
+        warning("face %r references unknown master %r, ignored: %s",
+                face.modelId, muuid, e)
+      else:
+        master.faces.add(face)
+      faceKey = face.faceKey
+      if faceKey is None:
+        warning("NULL faceKey, not associated with a person: face id %r", face.modelId)
+      else:
+        try:
+          self.person_by_faceKey[faceKey]
+        except KeyError as e:
+          warning("face %r references unknown person key %r, ignored: %s",
+                  face.modelId, faceKey, e)
+
+  def _load_table_persons(self):
+    ''' Load Faces.RKFaceName into memory and set up mappings.
+    '''
+    XP("load_persons...")
+    self.load_masters()
+    by_id = self.person_by_id = {}
+    by_uuid = self.person_by_uuid = {}
+    by_name = self.person_by_name = {}
+    by_fullname = self.person_by_fullname = {}
+    by_faceKey = self.person_by_faceKey = {}
+    for person in self.read_persons():
+      by_id[person.modelId] = person
+      by_uuid[person.uuid] = person
+      by_name[person.name] = person
+      fullname = person.fullName
+      # fullName seems to be to associate with Contacts or something
+      if fullname is not None:
+        by_fullname[fullname] = person
+      faceKey = person.faceKey
+      if faceKey is None:
+        warning("person %r has NULL faceKey", person.modelId)
+      else:
+        by_faceKey[faceKey] = person
+
+  def person_names(self):
+    return self.person_by_name.keys()
+
+  def person_fullnames(self):
+    return self.person_by_fullname.keys()
+
+  def _load_table_masters(self):
     ''' Load Library.RKMaster into memory and set up mappings.
     '''
     XP("load_masters...")
@@ -186,7 +265,7 @@ class iPhoto(O):
       by_id[master.modelId] = master
       by_uuid[master.uuid] = master
 
-  def load_versions(self):
+  def _load_table_versions(self):
     ''' Load Library.RKVersion into memory and set up mappings.
     '''
     XP("load_versions...")
@@ -198,7 +277,7 @@ class iPhoto(O):
       by_uuid[version.uuid] = version
       master_by_id[version.modelId] = self.master_by_id[version.masterId]
 
-  def load_keywords(self):
+  def _load_table_keywords(self):
     ''' Load Library.RKKeyword into memory and set up mappings.
     '''
     XP("load_keywords...")
@@ -216,10 +295,11 @@ class iPhoto(O):
   def keywords(self):
     return self.keyword_by_id.values()
 
-  def load_keywordForVersions(self):
+  def _load_table_keywordForVersions(self):
     ''' Load Library.RKKeywordForVersion into memory and set up mappings.
     '''
     XP("load_keywordForVersions...")
+    self.load_versions()
     by_kwid = self.versions_by_keywordId = {}
     by_vid = self.keywords_by_versionId = {}
     for kw4v in self.read_keywordForVersions():
@@ -249,7 +329,7 @@ class iPhotoDBs(object):
     self._lock = iphoto._lock
 
   def _load_all(self):
-    for dbname in 'Library',:
+    for dbname in 'Library', 'Faces':
       self._load_db(dbname)
 
   @property
@@ -264,6 +344,8 @@ class iPhotoDBs(object):
   def pathto(self, dbname):
     ''' Compute pathname of named database file.
     '''
+    if dbname == 'Faces':
+      return os.path.join(self.dbdirpath, dbname+'.db')
     return os.path.join(self.dbdirpath, dbname+'.apdb')
 
   def _opendb(self, dbpath):
@@ -274,7 +356,7 @@ class iPhotoDBs(object):
     return conn
 
   def _load_db(self, dbname):
-    XP("_load_bd(%r)", dbname)
+    XP("_load_db(%r)", dbname)
     db = iPhotoDB(self.iphoto, dbname)
     self.dbmap[dbname] = db
     return db
@@ -301,20 +383,6 @@ class iPhotoDB(object):
     self.table_row_classes = {}
     for nickname, schema in self.schema.items():
       self.iphoto.table_by_nickname[nickname] = iPhotoTable(self, nickname, schema)
-      table_name = schema['table_name']
-      klass = namedtuple('%s_Row' % (table_name,), ['I'] + list(schema['columns']))
-      mixin = schema.get('mixin')
-      if mixin is not None:
-        class Mixed(klass, mixin):
-          pass
-        klass = Mixed
-      self.table_row_classes[table_name] = klass
-
-  def table_rows(self, table_name):
-    I = self.iphoto
-    row_class = self.table_row_classes.get(table_name, lambda *row: row)
-    for row in self.conn.cursor().execute('select * from %s' % (table_name,)):
-      yield row_class(*([I] + list(row)))
 
 class iPhotoTable(object):
 
@@ -325,10 +393,14 @@ class iPhotoTable(object):
     table_name = schema['table_name']
     klass = namedtuple('%s_Row' % (table_name,), ['I'] + list(schema['columns']))
     mixin = schema.get('mixin')
+    lock = self.iphoto._lock
     if mixin is not None:
       class Mixed(klass, mixin):
         pass
-      klass = Mixed
+      def klass(*a, **kw):
+        o = Mixed(*a, **kw)
+        o._lock = lock
+        return o
     self.row_class = klass
 
   @property
@@ -366,6 +438,10 @@ class Master_Mixin(object):
       return None
     return max(vs, key=lambda v: v.versionNumber)
 
+  @locked_property
+  def faces(self):
+    return set()
+
 class Version_Mixin(object):
 
   @property
@@ -392,7 +468,33 @@ class Keyword_Mixin(object):
     '''
     return set(master.latest_version for master in self.masters())
 
-SCHEMAE = {'Library':
+SCHEMAE = {'Faces':
+            { 'person':
+                { 'table_name': 'RKFaceName',
+                  'columns':
+                    ( 'modelId', 'uuid', 'faceKey', 'keyVersionUuid',
+                      'name', 'fullName', 'email', 'similarFacesCached',
+                      'similarFacesOpen', 'manualOrder', 'lastUsedDate',
+                      'attrs',
+                    ),
+                },
+              'face':
+                { 'table_name': 'RKDetectedFace',
+                  'columns':
+                    ( 'modelId', 'uuid', 'masterUuid', 'altMasterUuid',
+                      'faceKey', 'correlatedFaceKey', 'ownerServiceKey',
+                      'faceIndex', 'width', 'height', 'topLeftX',
+                      'topLeftY', 'topRightX', 'topRightY', 'bottomLeftX',
+                      'bottomLeftY', 'bottomRightX', 'bottomRightY',
+                      'confidence', 'sharpness', 'exposureValue',
+                      'rejected', 'faceCount', 'ignore', 'faceFlags',
+                      'hasFaceTile', 'tileFacePosition', 'faceAngle',
+                      'faceDirectionAngle', 'faceSkinScore',
+                      'skippedInUnnamedFaces',
+                    ),
+                },
+            },
+           'Library':
             { 'master':
                 { 'table_name': 'RKMaster',
                   'mixin': Master_Mixin,
