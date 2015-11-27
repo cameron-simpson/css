@@ -19,9 +19,11 @@ from cs.threads import locked, locked_property
 DEFAULT_LIBRARY = '$HOME/Pictures/iPhoto Library.photolibrary'
 
 USAGE = '''Usage: %s [/path/to/iphoto-library-path] op [op-args...]
-  dump dbname   Dump database rows in CSV format.
   ls            List apdb names.
   ls albums     List album names.
+  ls keywords   List keywords.
+  ls masters    List master pathnames.
+  ls people     List person names.
 '''
 
 def main(argv=None):
