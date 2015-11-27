@@ -56,15 +56,15 @@ def main(argv=None):
               if obclass == 'albums':
                 I.load_albums()
                 names = I.album_names()
+              elif obclass == 'keywords':
+                I.load_keywords()
+                names = I.keyword_names()
               elif obclass == 'masters':
                 I.load_masters()
                 names = I.master_pathnames()
               elif obclass == 'people':
                 I.load_persons()
                 names = I.person_names()
-              elif obclass == 'keywords':
-                I.load_keywords()
-                names = I.keyword_names()
               else:
                 warning("unknown class %r", obclass)
                 badopts = True
