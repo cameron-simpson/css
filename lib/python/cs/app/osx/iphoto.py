@@ -11,6 +11,8 @@ import os.path
 from collections import namedtuple
 import sqlite3
 from threading import RLock
+from PIL import Image
+Image.warnings.simplefilter('error', Image.DecompressionBombWarning)
 from cs.env import envsub
 from cs.logutils import Pfx, warning, error, setup_logging, X, XP
 from cs.obj import O
@@ -19,6 +21,7 @@ from cs.threads import locked, locked_property
 DEFAULT_LIBRARY = '$HOME/Pictures/iPhoto Library.photolibrary'
 
 USAGE = '''Usage: %s [/path/to/iphoto-library-path] op [op-args...]
+  info masters  List info about masters.
   ls            List apdb names.
   ls albums     List album names.
   ls keywords   List keywords.
@@ -48,7 +51,28 @@ def main(argv=None):
     else:
       op = argv.pop(0)
       with Pfx(op):
-        if op == 'ls':
+        if op == 'info':
+          if not argv:
+            warning("missing masters")
+            badopts = True
+          else:
+            obclass = argv.pop(0)
+            with Pfx(obclass):
+              if obclass == 'masters':
+                I.load_all()
+                for master in sorted(I.masters(), key=lambda m: m.pathname):
+                  with Pfx(master.pathname):
+                    iminfo = master.image_info
+                    if iminfo is None:
+                      error("no info")
+                      xit = 1
+                    else:
+                      print(master.pathname, iminfo.dx, iminfo.dy, iminfo.format,
+                            *[ 'kw:'+kw.name for kw in master.keywords() ])
+              else:
+                warning("unknown class %r", obclass)
+                badopts = True
+        elif op == 'ls':
           if not argv:
             for dbname in sorted(I.dbnames()):
               print(dbname)
@@ -77,7 +101,7 @@ def main(argv=None):
                 for name in sorted(names):
                   print(name)
         elif op == "test":
-          I.load_tables()
+          I.load_all_tables()
           test(argv, I)
         else:
           warning("unrecognised op")
@@ -104,6 +128,8 @@ def test(argv, I):
     kw = I.keyword_by_name.get(kwname)
     print(kw.name, [ master.name for master in kw.masters() ])
 
+Image_Info = namedtuple('Image_Info', 'dx dy format')
+
 class iPhoto(O):
 
   def __init__(self, libpath=None, quick=False):
@@ -120,14 +146,14 @@ class iPhoto(O):
     self.table_by_nickname = {}
     self._lock = RLock()
     self.dbs = iPhotoDBs(self)
-    self._load_all()
+    self.load_all(quick=quick)
 
-  def _load_all(self):
-    self.dbs._load_all()
-    if not self.quick:
-      self._load_tables()
+  def load_all(self, quick=False):
+    self.dbs.load_all()
+    if not quick:
+      self.load_all_tables()
 
-  def load_tables(self):
+  def load_all_tables(self):
     ''' Load all the tables into memory.
     '''
     self.load_albums()
@@ -156,7 +182,7 @@ class iPhoto(O):
           nickname = attr[:-1]
           by_id = getattr(self, nickname + '_by_id', None)
           if by_id is not None:
-            return by_id.values()
+            return lambda: by_id.values()
         # read_*s ==> iterator of rows from table "*"
         if attr.startswith('read_'):
           nickname = attr[5:-1]
@@ -279,13 +305,15 @@ class iPhoto(O):
     ''' Load Library.RKVersion into memory and set up mappings.
     '''
     XP("load_versions...")
+    self.load_masters()
     by_id = self.version_by_id = {}
     by_uuid = self.version_by_uuid = {}
     master_by_id = self.master_by_versionId = {}
     for version in self.read_versions():
       by_id[version.modelId] = version
       by_uuid[version.uuid] = version
-      master_by_id[version.modelId] = self.master_by_id[version.masterId]
+      master = master_by_id[version.modelId] = self.master_by_id[version.masterId]
+      master.versions.add(version)
 
   def _load_table_keywords(self):
     ''' Load Library.RKKeyword into memory and set up mappings.
@@ -309,6 +337,7 @@ class iPhoto(O):
     ''' Load Library.RKKeywordForVersion into memory and set up mappings.
     '''
     XP("load_keywordForVersions...")
+    self.load_keywords()
     self.load_versions()
     by_kwid = self.versions_by_keywordId = {}
     by_vid = self.keywords_by_versionId = {}
@@ -338,7 +367,7 @@ class iPhotoDBs(object):
     self.named_tables = {}
     self._lock = iphoto._lock
 
-  def _load_all(self):
+  def load_all(self):
     for dbname in 'Library', 'Faces':
       self._load_db(dbname)
 
@@ -436,13 +465,12 @@ class Master_Mixin(object):
   def pathname(self):
     return os.path.join(self.I.pathto('Masters'), self.imagePath)
 
+  @locked_property
   def versions(self):
-    ''' Iterable of all versions of this master.
-    '''
-    return self.I.versions_by_masterId.get(self.modelId, ())
+    return set()
 
   def latest_version(self):
-    vs = self.versions()
+    vs = self.versions
     if not vs:
       return None
     return max(vs, key=lambda v: v.versionNumber)
@@ -451,11 +479,47 @@ class Master_Mixin(object):
   def faces(self):
     return set()
 
+  def keywords(self):
+    ''' Return the keywords for the latest version of this master.
+    '''
+    return self.I.keywords_by_versionId.get(self.latest_version().modelId, ())
+
+  @locked_property
+  def image_info(self):
+    pathname = self.pathname
+    with Pfx("Image.open(%r)", pathname):
+      try:
+        image = Image.open(pathname)
+      except OSError as e:
+        error("cannot load image: %s", e)
+        return None
+      dx, dy = image.size
+      image_info = Image_Info(dx, dy, image.format)
+      image.close()
+    return image_info
+
+  @property
+  def dx(self):
+    return self.image_info.dx
+
+  @property
+  def dy(self):
+    return self.image_info.dy
+
+  @property
+  def format(self):
+    return self.image_info.format
+
 class Version_Mixin(object):
 
   @property
   def master(self):
     return self.I.master_by_id[self.masterId]
+
+  def keywords(self):
+    ''' Return the keywords for this version.
+    '''
+    return self.I.keywords_by_versionId[self.modelId]
 
 class Keyword_Mixin(object):
 
