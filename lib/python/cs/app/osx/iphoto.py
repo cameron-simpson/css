@@ -252,11 +252,11 @@ class iPhoto(O):
     '''
     XP("load_albums...")
     by_id = self.album_by_id = {}
-    by_uuid = self.album_by_uuid = {}
+    ##by_uuid = self.album_by_uuid = {}
     by_name = self.album_by_name = {}
     for album in self.read_albums():
       by_id[album.modelId] = album
-      by_uuid[album.uuid] = album
+      ##by_uuid[album.uuid] = album
       name = album.name
       if name is None:
         warning("album has no name: %s", album.uuid)
@@ -273,7 +273,7 @@ class iPhoto(O):
     self.load_masters()
     self.load_persons()
     by_id = self.face_by_id = {}
-    by_uuid = self.face_by_uuid = {}
+    ##by_uuid = self.face_by_uuid = {}
     by_masterUuid = self.faces_by_masterUuid = {}
     master_by_uuid = self.master_by_uuid
     n_faces = 0
@@ -282,7 +282,7 @@ class iPhoto(O):
     for face in self.read_faces():
       n_faces += 1
       by_id[face.modelId] = face
-      by_uuid[face.uuid] = face
+      ##by_uuid[face.uuid] = face
       muuid = face.masterUuid
       try:
         master = master_by_uuid[muuid]
