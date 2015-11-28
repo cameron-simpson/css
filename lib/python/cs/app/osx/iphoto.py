@@ -9,6 +9,7 @@ import sys
 import os
 import os.path
 from collections import namedtuple
+from functools import partial
 import sqlite3
 from threading import RLock
 from PIL import Image
@@ -102,16 +103,11 @@ def main(argv=None):
                   info("%s ==> %s", okwname, kwname)
                   kwnames.append(kwname)
             if not badopts:
-              kwname = kwnames.pop(0)
-              masters = I.masters_by_keyword(kwname)
+              masters = None
+              for kwname in kwnames:
+                masters = I.select_by_keyword_name(kwname).select(masters)
               for master in masters:
-                mkwnames = set(master.keyword_names)
-                for kwname in kwnames:
-                  if kwname not in mkwnames:
-                    master = None
-                    break
-                if master is not None:
-                  print(master.pathname)
+                print(master.pathname)
         elif op == 'ls':
           if not argv:
             for dbname in sorted(I.dbnames()):
@@ -240,7 +236,11 @@ class iPhoto(O):
               getattr(self, load_funcname)()
               setattr(self, loaded_attr, True)
             return loadfunc
-      elif attr.endswith('_table'):
+      if attr.startswith('select_by_'):
+        criterion_words = attr[10:].split('_')
+        class_name = 'SelectBy' + '_'.join(word.title() for word in criterion_words)
+        return partial(globals()[class_name], self)
+      if attr.endswith('_table'):
         # *_table ==> table "*"
         nickname = attr[:-6]
         if nickname in self.table_by_nickname:
@@ -262,6 +262,9 @@ class iPhoto(O):
         warning("album has no name: %s", album.uuid)
       else:
         by_name.setdefault(name, set()).add(album)
+
+  def album(self, adbum_id):
+    return self.album_by_id.get(album_id)
 
   def album_names(self):
     return self.album_by_name.keys()
@@ -303,6 +306,9 @@ class iPhoto(O):
           n_unknown += 1
     info("faces: %d loaded, %d null person, %d unknown person", n_faces, n_null, n_unknown)
 
+  def face(self, face_id):
+    return self.face_by_id.get(face_id)
+
   def _load_table_persons(self):
     ''' Load Faces.RKFaceName into memory and set up mappings.
     '''
@@ -326,6 +332,9 @@ class iPhoto(O):
         warning("person %r has NULL faceKey", person.modelId)
       else:
         by_faceKey[faceKey] = person
+
+  def person(self, faceKey):
+    return self.person_by_faceKey.get(faceKey)
 
   def person_names(self):
     return self.person_by_name.keys()
@@ -604,6 +613,23 @@ class Keyword_Mixin(object):
     ''' Return the latest version of all masters with this keyword.
     '''
     return set(master.latest_version for master in self.masters())
+
+class SelectByKeyword_Name(object):
+  ''' Select masters by keyword name.
+  '''
+
+  def __init__(self, iphoto, kwname):
+    self.iphoto = iphoto
+    self.kwname = kwname
+
+  def select(self, masters=None):
+    kwname = self.kwname
+    if masters is None:
+      yield from self.iphoto.masters_by_keyword(kwname)
+    else:
+      for master in masters:
+        if kwname in master.keyword_names:
+          yield master
 
 SCHEMAE = {'Faces':
             { 'person':
