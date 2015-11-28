@@ -14,19 +14,20 @@ from threading import RLock
 from PIL import Image
 Image.warnings.simplefilter('error', Image.DecompressionBombWarning)
 from cs.env import envsub
-from cs.logutils import Pfx, warning, error, setup_logging, X, XP
+from cs.logutils import Pfx, info, warning, error, setup_logging, X, XP
 from cs.obj import O
 from cs.threads import locked, locked_property
 
 DEFAULT_LIBRARY = '$HOME/Pictures/iPhoto Library.photolibrary'
 
 USAGE = '''Usage: %s [/path/to/iphoto-library-path] op [op-args...]
-  info masters  List info about masters.
-  ls            List apdb names.
-  ls albums     List album names.
-  ls keywords   List keywords.
-  ls masters    List master pathnames.
-  ls people     List person names.
+  info masters      List info about masters.
+  kw keywords...    List masters with all specified keywords.
+  ls                List apdb names.
+  ls albums         List album names.
+  ls keywords       List keywords.
+  ls masters        List master pathnames.
+  ls people         List person names.
 '''
 
 def main(argv=None):
@@ -72,6 +73,45 @@ def main(argv=None):
               else:
                 warning("unknown class %r", obclass)
                 badopts = True
+        elif op == 'kw':
+          I.load_all()
+          if not argv:
+            warning("missing keywords")
+            badopts = True
+          else:
+            all_kwnames = set(I.keyword_names())
+            kwnames = []
+            for kwname in argv:
+              if kwname in all_kwnames:
+                kwnames.append(kwname)
+              else:
+                matched = []
+                lc_kwname = kwname.lower()
+                for name in all_kwnames:
+                  if lc_kwname in name.lower():
+                    matched.append(name)
+                if not matched:
+                  warning("%s: unknown keyword", kwname)
+                  badopts = True
+                elif len(matched) > 1:
+                  warning("%s: matches multiple keywords, rejected: %r", kwname, matched)
+                  badopts = True
+                else:
+                  okwname = kwname
+                  kwname = matched[0]
+                  info("%s ==> %s", okwname, kwname)
+                  kwnames.append(kwname)
+            if not badopts:
+              kwname = kwnames.pop(0)
+              masters = I.masters_by_keyword(kwname)
+              for master in masters:
+                mkwnames = set(master.keyword_names())
+                for kwname in kwnames:
+                  if kwname not in mkwnames:
+                    master = None
+                    break
+                if master is not None:
+                  print(master.pathname)
         elif op == 'ls':
           if not argv:
             for dbname in sorted(I.dbnames()):
@@ -219,7 +259,7 @@ class iPhoto(O):
       by_uuid[album.uuid] = album
       name = album.name
       if name is None:
-        warning("album has no name: %r", album)
+        warning("album has no name: %s", album.uuid)
       else:
         by_name.setdefault(name, set()).add(album)
 
@@ -359,6 +399,12 @@ class iPhoto(O):
         kws = by_vid[vid]
       kws.add(kw)
 
+  def versions_by_keyword(self, kwname):
+    return self.keyword_by_name[kwname].versions()
+
+  def masters_by_keyword(self, kwname):
+    return self.keyword_by_name[kwname].masters()
+
 class iPhotoDBs(object):
 
   def __init__(self, iphoto):
@@ -483,6 +529,9 @@ class Master_Mixin(object):
     ''' Return the keywords for the latest version of this master.
     '''
     return self.I.keywords_by_versionId.get(self.latest_version().modelId, ())
+
+  def keyword_names(self):
+    return [ kw.name for kw in self.keywords() ]
 
   @locked_property
   def image_info(self):
