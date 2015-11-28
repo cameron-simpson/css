@@ -276,7 +276,11 @@ class iPhoto(O):
     by_uuid = self.face_by_uuid = {}
     by_masterUuid = self.faces_by_masterUuid = {}
     master_by_uuid = self.master_by_uuid
+    n_faces = 0
+    n_null = 0
+    n_unknown = 0
     for face in self.read_faces():
+      n_faces += 1
       by_id[face.modelId] = face
       by_uuid[face.uuid] = face
       muuid = face.masterUuid
@@ -289,13 +293,15 @@ class iPhoto(O):
         master.faces.add(face)
       faceKey = face.faceKey
       if faceKey is None:
-        warning("NULL faceKey, not associated with a person: face id %r", face.modelId)
+        ## warning("NULL faceKey, not associated with a person: face id %r", face.modelId)
+        n_null += 1
       else:
         try:
           self.person_by_faceKey[faceKey]
         except KeyError as e:
-          warning("face %r references unknown person key %r, ignored: %s",
-                  face.modelId, faceKey, e)
+          ##warning("face %r references unknown person key %r, ignored: %s", face.modelId, faceKey, e)
+          n_unknown += 1
+    info("faces: %d loaded, %d null person, %d unknown person", n_faces, n_null, n_unknown)
 
   def _load_table_persons(self):
     ''' Load Faces.RKFaceName into memory and set up mappings.
