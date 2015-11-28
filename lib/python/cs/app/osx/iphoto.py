@@ -614,7 +614,19 @@ class Keyword_Mixin(object):
     '''
     return set(master.latest_version for master in self.masters())
 
-class SelectByKeyword_Name(object):
+class _SelectMasters(object):
+  ''' Select masters base class.
+  '''
+
+  def default_masters(self):
+    return self.iphoto.masters()
+
+  def select(self, masters=None):
+    if masters is None:
+      return self.default_masters()
+    return self.select_masters(masters)
+
+class SelectByKeyword_Name(_SelectMasters):
   ''' Select masters by keyword name.
   '''
 
@@ -622,14 +634,14 @@ class SelectByKeyword_Name(object):
     self.iphoto = iphoto
     self.kwname = kwname
 
-  def select(self, masters=None):
+  def default_masters(self):
+    return self.iphoto.masters_by_keyword(self.kwname)
+
+  def select_masters(self, masters=None):
     kwname = self.kwname
-    if masters is None:
-      yield from self.iphoto.masters_by_keyword(kwname)
-    else:
-      for master in masters:
-        if kwname in master.keyword_names:
-          yield master
+    for master in masters:
+      if kwname in master.keyword_names:
+        yield master
 
 SCHEMAE = {'Faces':
             { 'person':
