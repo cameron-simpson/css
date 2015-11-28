@@ -69,7 +69,7 @@ def main(argv=None):
                       xit = 1
                     else:
                       print(master.pathname, iminfo.dx, iminfo.dy, iminfo.format,
-                            *[ 'kw:'+kw.name for kw in master.keywords() ])
+                            *[ 'kw:'+kwname for kwname in master.keyword_names ])
               else:
                 warning("unknown class %r", obclass)
                 badopts = True
@@ -79,7 +79,7 @@ def main(argv=None):
             warning("missing keywords")
             badopts = True
           else:
-            all_kwnames = set(I.keyword_names())
+            all_kwnames = set(I.keyword_names)
             kwnames = []
             for kwname in argv:
               if kwname in all_kwnames:
@@ -105,7 +105,7 @@ def main(argv=None):
               kwname = kwnames.pop(0)
               masters = I.masters_by_keyword(kwname)
               for master in masters:
-                mkwnames = set(master.keyword_names())
+                mkwnames = set(master.keyword_names)
                 for kwname in kwnames:
                   if kwname not in mkwnames:
                     master = None
@@ -373,11 +373,13 @@ class iPhoto(O):
       by_uuid[kw.uuid] = kw
       by_name[kw.name] = kw
 
-  def keyword_names(self):
-    return self.keyword_by_name.keys()
-
+  @locked_property
   def keywords(self):
-    return self.keyword_by_id.values()
+    return self.keyword_by_name.values()
+
+  @property
+  def keyword_names(self):
+    return frozenset(kw.name for kw in self.keywords)
 
   def _load_table_keywordForVersions(self):
     ''' Load Library.RKKeywordForVersion into memory and set up mappings.
@@ -531,13 +533,15 @@ class Master_Mixin(object):
   def faces(self):
     return set()
 
+  @property
   def keywords(self):
     ''' Return the keywords for the latest version of this master.
     '''
-    return self.I.keywords_by_versionId.get(self.latest_version().modelId, ())
+    return self.latest_version().keywords
 
+  @property
   def keyword_names(self):
-    return [ kw.name for kw in self.keywords() ]
+    return [ kw.name for kw in self.keywords ]
 
   @locked_property
   def image_info(self):
@@ -571,10 +575,15 @@ class Version_Mixin(object):
   def master(self):
     return self.I.master_by_id[self.masterId]
 
+  @locked_property
   def keywords(self):
     ''' Return the keywords for this version.
     '''
-    return self.I.keywords_by_versionId[self.modelId]
+    return frozenset(self.I.keywords_by_versionId[self.modelId])
+
+  @property
+  def keyword_names(self):
+    return [ kw.name for kw in self.keywords ]
 
 class Keyword_Mixin(object):
 
@@ -588,7 +597,7 @@ class Keyword_Mixin(object):
     '''
     ms = set()
     for version in self.versions():
-      ms.add(self.I.master_by_versionId[version.modelId])
+      ms.add(version.master)
     return ms
 
   def latest_versions(self):
