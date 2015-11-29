@@ -26,6 +26,8 @@ USAGE = '''Usage: %s [/path/to/iphoto-library-path] op [op-args...]
   kw keywords...    List masters with all specified keywords.
   ls                List apdb names.
   ls albums         List album names.
+  ls events         List events names.
+  ls folders        List folder names (includes events).
   ls keywords       List keywords.
   ls masters        List master pathnames.
   ls people         List person names.
@@ -118,6 +120,12 @@ def main(argv=None):
               if obclass == 'albums':
                 I.load_albums()
                 names = I.album_names()
+              elif obclass == 'events':
+                I.load_folders()
+                names = I.event_names()
+              elif obclass == 'folders':
+                I.load_folders()
+                names = I.folder_names()
               elif obclass == 'keywords':
                 I.load_keywords()
                 names = I.keyword_names()
@@ -308,6 +316,41 @@ class iPhoto(O):
 
   def face(self, face_id):
     return self.face_by_id.get(face_id)
+
+  def _load_table_folders(self):
+    ''' Load Library.RKFolder into memory and set up mappings.
+    '''
+    XP("load folders...")
+    by_id = self.folder_by_id = {}
+    ##by_uuid = self.album_by_uuid = {}
+    by_name = self.folder_by_name = {}
+    for folder in self.read_folders():
+      by_id[folder.modelId] = folder
+      ##by_uuid[folder.uuid] = folder
+      name = folder.name
+      if name is None:
+        warning("folder has no name: %s", folder.uuid)
+      else:
+        by_name.setdefault(name, set()).add(folder)
+
+  def folder(self, folder_id):
+    return self.folder_by_id.get(folder_id)
+
+  def folder_names(self):
+    return self.folder_by_name.keys()
+
+  def folders_simple(self):
+    return [ folder for folder in self.folders()
+             if folder.sortKeyPath == 'custom.default'
+           ]
+
+  def events(self):
+    return [ folder for folder in self.folders()
+             if folder.sortKeyPath == 'custom.kind'
+           ]
+
+  def event_names(self):
+    return [ event.name for event in self.events() ]
 
   def _load_table_persons(self):
     ''' Load Faces.RKFaceName into memory and set up mappings.
