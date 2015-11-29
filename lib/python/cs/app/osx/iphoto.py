@@ -183,6 +183,19 @@ def test(argv, I):
   ##  print(kw.name, [ master.name for master in kw.masters() ])
   for vface in I.vfaces():
     print(vface)
+    P = vface.person()
+    print("Person", P)
+    master = vface.master
+    print("Master", master)
+    print(" ", master.pathname)
+    for vface2 in master.vfaces:
+      print("  VFace", vface)
+    FI = vface.Image()
+    filebase, ext = os.path.splitext(os.path.basename(master.pathname))
+    filename = '%s-FACE%s' % (filebase, ext)
+    print("save to %r" % (filename,))
+    FI.save(filename)
+    FI.close()
     break
 
 Image_Info = namedtuple('Image_Info', 'dx dy format')
@@ -645,12 +658,18 @@ class Master_Mixin(object):
   def keyword_names(self):
     return [ kw.name for kw in self.keywords ]
 
+  def Image(self):
+    ''' Obtain an open Image of this master.
+        Caller must close.
+    '''
+    return Image.open(self.pathname)
+
   @locked_property
   def image_info(self):
     pathname = self.pathname
     with Pfx("Image.open(%r)", pathname):
       try:
-        image = Image.open(pathname)
+        image = self.Image()
       except OSError as e:
         error("cannot load image: %s", e)
         return None
@@ -712,6 +731,42 @@ class Person_Mixin(object):
   @locked_property
   def vfaces(self):
     return set()
+
+class VFace_Mixin(object):
+
+  @property
+  def master(self):
+    return self.I.master(self.masterId)
+
+  def person(self):
+    if not self.isNamed:
+      warning("%s: NOT NAMED", self)
+      return None
+    return self.I.person(self.faceKey)
+
+  def Image(self, padfactor=1.0):
+    ''' Return an Image of this face.
+    '''
+    MI = self.master.Image()
+    mdx, mdy = MI.size
+    # convert face box into centre and radii 
+    rx = self.faceRectWidth / 2 * padfactor
+    ry = self.faceRectHeight / 2 * padfactor
+    cx = self.faceRectLeft + rx
+    cy = self.faceRectTop + ry
+    X("RX = %s, RY = %s, CX = %s, CY = %s", rx, ry, cx, cy)
+    # Image y-ordinates are inverse of iPhoto coordinates
+    ##cx = mdx - cx
+    cy = 1.0 - cy
+    face_box = (
+                 int(mdx * (cx - rx)), int(mdy * (cy - ry)),
+                 int(mdx * (cx + rx)), int(mdy * (cy + ry)),
+               )
+    XP("MI.size = %r, face_box = %r", MI.size, face_box)
+    face_Image = MI.crop(face_box)
+    face_Image.load()
+    MI.close()
+    return face_Image
 
 class _SelectMasters(object):
   ''' Select masters base class.
@@ -789,6 +844,7 @@ SCHEMAE = {'Faces':
                 },
               'vface':
                 { 'table_name': 'RKVersionFaceContent',
+                  'mixin': VFace_Mixin,
                   'columns':
                     ( 'modelId', 'versionId', 'masterId', 'isNamed', 'faceKey', 'faceIndex', 'faceRectLeft', 'faceRectTop', 'faceRectWidth', 'faceRectHeight',
                     ),
