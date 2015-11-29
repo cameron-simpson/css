@@ -746,6 +746,12 @@ SCHEMAE = {'Faces':
                       'streamAssetId', 'streamSourceUuid', 'burstUuid',
                     ),
                 },
+              'vface':
+                { 'table_name': 'RKVersionFaceContent',
+                  'columns':
+                    ( 'modelId', 'versionId', 'masterId', 'isNamed', 'faceKey', 'faceIndex', 'faceRectLeft', 'faceRectTop', 'faceRectWidth', 'faceRectHeight',
+                    ),
+                },
               'folder':
                 { 'table_name': 'RKFolder',
                   'columns':
