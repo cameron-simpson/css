@@ -338,35 +338,24 @@ class iPhoto(O):
     self.load_masters()
     self.load_persons()
     by_id = self.vface_by_id = {}
-    ##by_uuid = self.face_by_uuid = {}
-    by_masterUuid = self.faces_by_masterUuid = {}
-    master_by_uuid = self.master_by_uuid
-    n_faces = 0
-    n_null = 0
-    n_unknown = 0
-    for face in self.read_faces():
-      n_faces += 1
-      by_id[face.modelId] = face
-      ##by_uuid[face.uuid] = face
-      muuid = face.masterUuid
-      try:
-        master = master_by_uuid[muuid]
-      except KeyError as e:
-        warning("face %r references unknown master %r, ignored: %s",
-                face.modelId, muuid, e)
+    ##by_uuid = self.vface_by_uuid = {}
+    by_master_id = self.vfaces_by_master_id = {}
+    for vface in self.read_vfaces():
+      by_id[vface.modelId] = vface
+      ##by_uuid[vface.uuid] = vface
+      master_id = vface.masterId
+      master = self.master(master_id)
+      if master is None:
+        warning("vface %d: no master with id %d", vface.modelId, master_id)
       else:
-        master.faces.add(face)
-      faceKey = face.faceKey
-      if faceKey is None:
-        ## warning("NULL faceKey, not associated with a person: face id %r", face.modelId)
-        n_null += 1
-      else:
-        try:
-          self.person_by_faceKey[faceKey]
-        except KeyError as e:
-          ##warning("face %r references unknown person key %r, ignored: %s", face.modelId, faceKey, e)
-          n_unknown += 1
-    info("faces: %d loaded, %d null person, %d unknown person", n_faces, n_null, n_unknown)
+        master.vfaces.add(vface)
+      if vface.isNamed:
+        faceKey = vface.faceKey
+        person = self.person(faceKey)
+        if person is None:
+          warning("vface %d: no person with faceKey %s", vface.modelId, faceKey)
+        else:
+          person.vfaces.add(vface)
 
   def _load_table_folders(self):
     ''' Load Library.RKFolder into memory and set up mappings.
@@ -642,6 +631,10 @@ class Master_Mixin(object):
   def faces(self):
     return set()
 
+  @locked_property
+  def vfaces(self):
+    return set()
+
   @property
   def keywords(self):
     ''' Return the keywords for the latest version of this master.
@@ -714,6 +707,12 @@ class Keyword_Mixin(object):
     '''
     return set(master.latest_version for master in self.masters())
 
+class Person_Mixin(object):
+
+  @locked_property
+  def vfaces(self):
+    return set()
+
 class _SelectMasters(object):
   ''' Select masters base class.
   '''
@@ -746,6 +745,7 @@ class SelectByKeyword_Name(_SelectMasters):
 SCHEMAE = {'Faces':
             { 'person':
                 { 'table_name': 'RKFaceName',
+                  'mixin': Person_Mixin,
                   'columns':
                     ( 'modelId', 'uuid', 'faceKey', 'keyVersionUuid',
                       'name', 'fullName', 'email', 'similarFacesCached',
