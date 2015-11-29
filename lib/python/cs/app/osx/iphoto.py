@@ -35,7 +35,7 @@ USAGE = '''Usage: %s [/path/to/iphoto-library-path] op [op-args...]
 '''
 
 def main(argv=None):
-  ''' Main program associate with the cs.app.osx.iphoto module.
+  ''' Main program associated with the cs.app.osx.iphoto module.
   '''
   if argv is None:
     argv = [ 'cs.app.osx.iphoto' ]
