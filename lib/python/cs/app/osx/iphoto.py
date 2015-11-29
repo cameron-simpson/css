@@ -25,6 +25,7 @@ USAGE = '''Usage: %s [/path/to/iphoto-library-path] op [op-args...]
   info masters      List info about masters.
   kw keywords...    List masters with all specified keywords.
   ls                List apdb names.
+  ls [0-5]          List master pathnames with specific rating.
   ls albums         List album names.
   ls events         List events names.
   ls folders        List folder names (includes events).
@@ -117,7 +118,16 @@ def main(argv=None):
           else:
             obclass = argv.pop(0)
             with Pfx(obclass):
-              if obclass == 'albums':
+              if obclass.isdigit():
+                rating = int(obclass)
+                I.load_versions()
+                names = []
+                for version in I.versions():
+                  if version.mainRating == rating:
+                    pathname = version.master.pathname
+                    if pathname is not None:
+                      names.append(pathname)
+              elif obclass == 'albums':
                 I.load_albums()
                 names = I.album_names()
               elif obclass == 'events':
