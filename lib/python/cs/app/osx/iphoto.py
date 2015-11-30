@@ -271,7 +271,7 @@ class iPhoto(O):
     XP("load albums...")
     by_id = self.album_by_id = {}
     ##by_uuid = self.album_by_uuid = {}
-    by_name = self.album_by_name = {}
+    by_name = self.albums_by_name = {}
     for album in self.read_albums():
       by_id[album.modelId] = album
       ##by_uuid[album.uuid] = album
@@ -279,50 +279,34 @@ class iPhoto(O):
       if name is None:
         warning("album has no name: %s", album.uuid)
       else:
-        by_name.setdefault(name, set()).add(album)
+        try:
+          albums = by_name[name]
+        except KeyError:
+          albums = by_name[name] = set()
+        albums.add(album)
 
   def album(self, album_id):
+    self.load_albums()
     return self.album_by_id.get(album_id)
 
   def album_names(self):
-    return self.album_by_name.keys()
+    self.load_albums()
+    return self.albums_by_name.keys()
 
   def _load_table_faces(self):
     ''' Load Faces.RKDetectedFace into memory and set up mappings.
     '''
     XP("load faces...")
-    self.load_masters()
-    self.load_persons()
     by_id = self.face_by_id = {}
-    ##by_uuid = self.face_by_uuid = {}
-    by_masterUuid = self.faces_by_masterUuid = {}
-    master_by_uuid = self.master_by_uuid
-    n_faces = 0
-    n_null = 0
-    n_unknown = 0
+    by_master_uuid = self.faces_by_master_uuid = {}
     for face in self.read_faces():
-      n_faces += 1
       by_id[face.modelId] = face
-      ##by_uuid[face.uuid] = face
       muuid = face.masterUuid
       try:
-        master = master_by_uuid[muuid]
+        faces = by_master_uuid[muuid]
       except KeyError as e:
-        warning("face %r references unknown master %r, ignored: %s",
-                face.modelId, muuid, e)
-      else:
-        master.faces.add(face)
-      faceKey = face.faceKey
-      if faceKey is None:
-        ## warning("NULL faceKey, not associated with a person: face id %r", face.modelId)
-        n_null += 1
-      else:
-        try:
-          self.person_by_faceKey[faceKey]
-        except KeyError as e:
-          ##warning("face %r references unknown person key %r, ignored: %s", face.modelId, faceKey, e)
-          n_unknown += 1
-    info("faces: %d loaded, %d null person, %d unknown person", n_faces, n_null, n_unknown)
+        faces = by_master_uuid[muuid] = set()
+      faces.add(face)
 
   def face(self, face_id):
     return self.face_by_id.get(face_id)
@@ -331,49 +315,39 @@ class iPhoto(O):
     ''' Load Faces.RKVersionFaceContent into memory and set up mappings.
     '''
     XP("load vfaces...")
-    self.load_masters()
-    self.load_persons()
     by_id = self.vface_by_id = {}
-    ##by_uuid = self.vface_by_uuid = {}
     by_master_id = self.vfaces_by_master_id = {}
     for vface in self.read_vfaces():
       by_id[vface.modelId] = vface
-      ##by_uuid[vface.uuid] = vface
       master_id = vface.masterId
-      master = self.master(master_id)
-      if master is None:
-        warning("vface %d: no master with id %d", vface.modelId, master_id)
-      else:
-        master.vfaces.add(vface)
-      if vface.isNamed:
-        faceKey = vface.faceKey
-        person = self.person(faceKey)
-        if person is None:
-          warning("vface %d: no person with faceKey %s", vface.modelId, faceKey)
-        else:
-          person.vfaces.add(vface)
+      try:
+        vfaces = by_master_id[master_id]
+      except KeyError:
+        vfaces = by_master_id[master_id] = set()
+      vfaces.add(vface)
 
   def _load_table_folders(self):
     ''' Load Library.RKFolder into memory and set up mappings.
     '''
     XP("load folders...")
     by_id = self.folder_by_id = {}
-    ##by_uuid = self.album_by_uuid = {}
-    by_name = self.folder_by_name = {}
+    by_name = self.folders_by_name = {}
     for folder in self.read_folders():
       by_id[folder.modelId] = folder
-      ##by_uuid[folder.uuid] = folder
       name = folder.name
-      if name is None:
-        warning("folder has no name: %s", folder.uuid)
-      else:
-        by_name.setdefault(name, set()).add(folder)
+      try:
+        folders = by_name[name]
+      except KeyError:
+        folders = by_name[name] = set()
+      folders.add(folder)
 
   def folder(self, folder_id):
+    self.load_folders()
     return self.folder_by_id.get(folder_id)
 
   def folder_names(self):
-    return self.folder_by_name.keys()
+    self.load_folders()
+    return self.folders_by_name.keys()
 
   def folders_simple(self):
     return [ folder for folder in self.folders()
@@ -392,30 +366,21 @@ class iPhoto(O):
     ''' Load Faces.RKFaceName into memory and set up mappings.
     '''
     XP("load persons...")
-    self.load_masters()
     by_id = self.person_by_id = {}
-    by_uuid = self.person_by_uuid = {}
     by_name = self.person_by_name = {}
-    by_fullname = self.person_by_fullname = {}
     by_faceKey = self.person_by_faceKey = {}
     for person in self.read_persons():
       by_id[person.modelId] = person
-      by_uuid[person.uuid] = person
       by_name[person.name] = person
-      fullname = person.fullName
-      # fullName seems to be to associate with Contacts or something
-      if fullname is not None:
-        by_fullname[fullname] = person
-      faceKey = person.faceKey
-      if faceKey is None:
-        warning("person %r has NULL faceKey", person.modelId)
-      else:
-        by_faceKey[faceKey] = person
+      by_faceKey[person.faceKey] = person
+      # skip fullName; seems to be to associated with Contacts or something
 
   def person(self, faceKey):
+    self.load_persons()
     return self.person_by_faceKey.get(faceKey)
 
   def person_names(self):
+    self.load_persons()
     return self.person_by_name.keys()
 
   def person_fullnames(self):
@@ -426,15 +391,15 @@ class iPhoto(O):
     '''
     XP("load masters...")
     by_id = self.master_by_id = {}
-    by_uuid = self.master_by_uuid = {}
     for master in self.read_masters():
       by_id[master.modelId] = master
-      by_uuid[master.uuid] = master
 
   def master(self, master_id):
+    self.load_masters()
     return self.master_by_id.get(master_id)
 
   def master_pathnames(self):
+    self.load_masters()
     for master in self.master_by_id.values():
       yield master.pathname
 
@@ -442,33 +407,34 @@ class iPhoto(O):
     ''' Load Library.RKVersion into memory and set up mappings.
     '''
     XP("load versions...")
-    self.load_masters()
     by_id = self.version_by_id = {}
-    by_uuid = self.version_by_uuid = {}
-    master_by_id = self.master_by_versionId = {}
+    by_master_id = self.versions_by_masters_id = {}
     for version in self.read_versions():
       by_id[version.modelId] = version
-      by_uuid[version.uuid] = version
-      master = master_by_id[version.modelId] = self.master_by_id[version.masterId]
-      master.versions.add(version)
+      master_id = version.masterId
+      try:
+        versions = by_master_id[master_id]
+      except KeyError:
+        versions = by_master_id[master_id] = set()
+      versions.add(version)
 
   def _load_table_keywords(self):
     ''' Load Library.RKKeyword into memory and set up mappings.
     '''
     XP("load keywords...")
     by_id = self.keyword_by_id = {}
-    by_uuid = self.keyword_by_uuid = {}
     by_name = self.keyword_by_name = {}
     for kw in self.read_keywords():
       by_id[kw.modelId] = kw
-      by_uuid[kw.uuid] = kw
       by_name[kw.name] = kw
 
   def keyword(self, keyword_id):
+    self.load_keywords()
     return self.keyword_by_id.get(keyword_id)
 
   @locked_property
   def keywords(self):
+    self.load_keywords()
     return self.keyword_by_name.values()
 
   @property
@@ -479,33 +445,21 @@ class iPhoto(O):
     ''' Load Library.RKKeywordForVersion into memory and set up mappings.
     '''
     XP("load keywordForVersions...")
-    self.load_keywords()
-    self.load_versions()
-    by_kwid = self.versions_by_keywordId = {}
-    by_vid = self.keywords_by_versionId = {}
+    by_kwid = self.kw4v_version_ids_by_keyword_id = {}
+    by_vid = self.kw4v_keyword_ids_by_version_id = {}
     for kw4v in self.read_keywordForVersions():
-      vid = kw4v.versionId
-      version = self.version_by_id[vid]
       kwid = kw4v.keywordId
-      kw = self.keyword_by_id[kwid]
-      # mapping from keywordId to versions
-      if kwid not in by_kwid:
-        vs = by_kwid[kwid] = set()
-      else:
-        vs = by_kwid[kwid]
-      vs.add(version)
-      # mapping from version id to keywords
-      if vid not in by_vid:
-        kws = by_vid[vid] = set()
-      else:
-        kws = by_vid[vid]
-      kws.add(kw)
-
-  def versions_by_keyword(self, kwname):
-    return self.keyword_by_name[kwname].versions()
-
-  def masters_by_keyword(self, kwname):
-    return self.keyword_by_name[kwname].masters()
+      try:
+        version_ids = by_kwid[kwid]
+      except KeyError:
+        version_ids = by_kwid[kwid] = set()
+      version_ids.add(kwid)
+      vid = kw4v.versionId
+      try:
+        keyword_ids = by_vid[vid]
+      except KeyError:
+        keyword_ids = by_vid[vid] = set()
+      keyword_ids.add(vid)
 
 class iPhotoDBs(object):
 
@@ -625,11 +579,25 @@ class Master_Mixin(object):
 
   @locked_property
   def faces(self):
-    return set()
+    I = self.I
+    I.load_faces()
+    return I.faces_by_master_id.get(self.modelId, ())
 
   @locked_property
   def vfaces(self):
-    return set()
+    I = self.I
+    I.load_vfaces()
+    return I.vfaces_by_master_id.get(self.modelId, ())
+
+  @locked_property
+  def people(self):
+    them = set()
+    for vface in self.vfaces:
+      who = vface.person()
+      if who is not None:
+        ##X("master %d + %s", self.modelId, who.name)
+        them.add(who)
+    return them
 
   @property
   def keywords(self):
