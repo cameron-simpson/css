@@ -462,6 +462,27 @@ class iPhoto(O):
   def keyword_names(self):
     return frozenset(kw.name for kw in self.keywords)
 
+  def match_keyword(self, kwname):
+    ''' User convenience: match string against all keywords, return matches.
+    '''
+    self.load_keywords()
+    if kwname in self.keyword_by_name:
+      return (kwname,)
+    lc_kwname = kwname.lower()
+    matches = []
+    for name in self.keyword_names():
+      if lc_kwname in name.lower():
+        matches.append(name)
+    return matches
+
+  def versions_by_keyword(self, kwname):
+    self.load_keywords()
+    return self.keywords_by_name[kwname].versions()
+
+  def masters_by_keyword(self, kwname):
+    self.load_keywords()
+    return self.keyword_by_name[kwname].masters()
+
   def _load_table_keywordForVersions(self):
     ''' Load Library.RKKeywordForVersion into memory and set up mappings.
     '''
