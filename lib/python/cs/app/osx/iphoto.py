@@ -251,6 +251,7 @@ class iPhoto(O):
             ##@locked
             def loadfunc():
               if not getattr(self, loaded_attr, False):
+                XP("load %ss (%s)...", nickname, self.table_by_nickname[nickname].qualname)
                 getattr(self, load_funcname)()
                 setattr(self, loaded_attr, True)
             return loadfunc
@@ -268,7 +269,6 @@ class iPhoto(O):
   def _load_table_albums(self):
     ''' Load Library.RKMaster into memory and set up mappings.
     '''
-    XP("load albums...")
     by_id = self.album_by_id = {}
     ##by_uuid = self.album_by_uuid = {}
     by_name = self.albums_by_name = {}
@@ -296,7 +296,6 @@ class iPhoto(O):
   def _load_table_faces(self):
     ''' Load Faces.RKDetectedFace into memory and set up mappings.
     '''
-    XP("load faces...")
     by_id = self.face_by_id = {}
     by_master_uuid = self.faces_by_master_uuid = {}
     for face in self.read_faces():
@@ -314,7 +313,6 @@ class iPhoto(O):
   def _load_table_vfaces(self):
     ''' Load Faces.RKVersionFaceContent into memory and set up mappings.
     '''
-    XP("load vfaces...")
     by_id = self.vface_by_id = {}
     by_master_id = self.vfaces_by_master_id = {}
     for vface in self.read_vfaces():
@@ -329,7 +327,6 @@ class iPhoto(O):
   def _load_table_folders(self):
     ''' Load Library.RKFolder into memory and set up mappings.
     '''
-    XP("load folders...")
     by_id = self.folder_by_id = {}
     by_name = self.folders_by_name = {}
     for folder in self.read_folders():
@@ -365,7 +362,6 @@ class iPhoto(O):
   def _load_table_persons(self):
     ''' Load Faces.RKFaceName into memory and set up mappings.
     '''
-    XP("load persons...")
     by_id = self.person_by_id = {}
     by_name = self.person_by_name = {}
     by_faceKey = self.person_by_faceKey = {}
@@ -414,7 +410,6 @@ class iPhoto(O):
   def _load_table_masters(self):
     ''' Load Library.RKMaster into memory and set up mappings.
     '''
-    XP("load masters...")
     by_id = self.master_by_id = {}
     for master in self.read_masters():
       by_id[master.modelId] = master
@@ -431,7 +426,6 @@ class iPhoto(O):
   def _load_table_versions(self):
     ''' Load Library.RKVersion into memory and set up mappings.
     '''
-    XP("load versions...")
     by_id = self.version_by_id = {}
     by_master_id = self.versions_by_masters_id = {}
     for version in self.read_versions():
@@ -450,7 +444,6 @@ class iPhoto(O):
   def _load_table_keywords(self):
     ''' Load Library.RKKeyword into memory and set up mappings.
     '''
-    XP("load keywords...")
     by_id = self.keyword_by_id = {}
     by_name = self.keyword_by_name = {}
     for kw in self.read_keywords():
@@ -473,7 +466,6 @@ class iPhoto(O):
   def _load_table_keywordForVersions(self):
     ''' Load Library.RKKeywordForVersion into memory and set up mappings.
     '''
-    XP("load keywordForVersions...")
     by_kwid = self.kw4v_version_ids_by_keyword_id = {}
     by_vid = self.kw4v_keyword_ids_by_version_id = {}
     for kw4v in self.read_keywordForVersions():
