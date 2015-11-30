@@ -251,6 +251,7 @@ class iPhoto(O):
           # *s ==> iterable of * (obtained from *_by_id)
           nickname = attr[:-1]
           if nickname in self.table_by_nickname:
+            # require the matching table load
             getattr(self, 'load_%ss' % (nickname,))()
             by_id = getattr(self, nickname + '_by_id')
             return lambda: by_id.values()
@@ -267,9 +268,11 @@ class iPhoto(O):
             return lambda: None
           else:
             load_funcname = '_load_table_' + nickname + 's'
+            ##@locked
             def loadfunc():
-              getattr(self, load_funcname)()
-              setattr(self, loaded_attr, True)
+              if not getattr(self, loaded_attr, False):
+                getattr(self, load_funcname)()
+                setattr(self, loaded_attr, True)
             return loadfunc
       if attr.startswith('select_by_'):
         criterion_words = attr[10:].split('_')
