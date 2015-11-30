@@ -693,7 +693,9 @@ class Version_Mixin(object):
   def keywords(self):
     ''' Return the keywords for this version.
     '''
-    return frozenset(self.I.keywords_by_versionId[self.modelId])
+    I = self.I
+    I.load_keywordForVersions()
+    return frozenset(I.keywords_by_versionId[self.modelId])
 
   @property
   def keyword_names(self):
