@@ -383,8 +383,33 @@ class iPhoto(O):
     self.load_persons()
     return self.person_by_name.keys()
 
-  def person_fullnames(self):
-    return self.person_by_fullname.keys()
+  def match_people(self, person_name):
+    ''' User convenience: match string against all person names, return matches.
+    '''
+    lc_person_name = person_name.lower()
+    all_names = list(self.person_names())
+    matches = set()
+    # try exact match, ignoring case
+    for name in all_names:
+      if lc_person_name == name.lower():
+        matches.add(name)
+    if not matches:
+      # try by word
+      lc_person_words = lc_person_name.split()
+      for name in all_names:
+        lc_words = name.lower().split()
+        match_count = 0
+        for lc_person_word in lc_person_words:
+          if lc_person_word in lc_words:
+            match_count += 1
+        if match_count == len(lc_person_words):
+          matches.add(name)
+    if not matches:
+      # try substrings
+      for name in lc_all_names:
+        if lc_person_name in name.lower():
+          matches.add(name)
+    return matches
 
   def _load_table_masters(self):
     ''' Load Library.RKMaster into memory and set up mappings.
