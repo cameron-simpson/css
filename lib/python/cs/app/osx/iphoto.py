@@ -567,6 +567,8 @@ class iPhotoTable(object):
     self.db = db
     self.schema = schema
     table_name = schema['table_name']
+    self.name = table_name
+    self.qualname = '.'.join( (self.db.name, table_name) )
     klass = namedtuple('%s_Row' % (table_name,), ['I'] + list(schema['columns']))
     mixin = schema.get('mixin')
     lock = self.iphoto._lock
