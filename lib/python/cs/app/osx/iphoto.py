@@ -48,7 +48,7 @@ def main(argv=None):
       library_path = argv.pop(0)
     else:
       library_path = os.environ.get('IPHOTO_LIBRARY_PATH', envsub(DEFAULT_LIBRARY))
-    I = iPhoto(library_path, quick=True)
+    I = iPhoto(library_path)
     xit = 0
     if not argv:
       warning("missing op")
@@ -64,7 +64,6 @@ def main(argv=None):
             obclass = argv.pop(0)
             with Pfx(obclass):
               if obclass == 'masters':
-                I.load_all()
                 for master in sorted(I.masters(), key=lambda m: m.pathname):
                   with Pfx(master.pathname):
                     iminfo = master.image_info
@@ -78,7 +77,6 @@ def main(argv=None):
                 warning("unknown class %r", obclass)
                 badopts = True
         elif op == 'kw':
-          I.load_all()
           if not argv:
             warning("missing keywords")
             badopts = True
@@ -155,7 +153,6 @@ def main(argv=None):
                 for name in sorted(names):
                   print(name)
         elif op == "test":
-          I.load_all_tables()
           test(argv, I)
         else:
           warning("unrecognised op")
@@ -202,36 +199,19 @@ Image_Info = namedtuple('Image_Info', 'dx dy format')
 
 class iPhoto(O):
 
-  def __init__(self, libpath=None, quick=False):
+  def __init__(self, libpath=None):
     ''' Open the iPhoto library stored at `libpath`.
         If `libpath` is not supplied, use DEFAULT_LIBRARY.
-        `quick`: do not preload all the tables.
     '''
     if libpath is None:
       libpath = envsub(DEFAULT_LIBRARY)
     if not os.path.isdir(libpath):
       raise ValueError("not a directory: %r" % (libpath,))
     self.path = libpath
-    self.quick = quick
     self.table_by_nickname = {}
     self._lock = RLock()
     self.dbs = iPhotoDBs(self)
-    self.load_all(quick=quick)
-
-  def load_all(self, quick=False):
     self.dbs.load_all()
-    if not quick:
-      self.load_all_tables()
-
-  def load_all_tables(self):
-    ''' Load all the tables into memory.
-    '''
-    self.load_albums()
-    self.load_masters()
-    self.load_keywords()
-    self.load_versions()
-    self.load_keywordForVersions()
-    self.load_faces()
 
   def pathto(self, rpath):
     if rpath.startswith('/'):
