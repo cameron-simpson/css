@@ -683,7 +683,11 @@ class Version_Mixin(object):
 
   @property
   def master(self):
-    return self.I.master_by_id[self.masterId]
+    master = self.I.master(self.masterId)
+    if master is None:
+      raise ValueError("version %d masterId %d matches no master"
+                       % (self.modelId, self.masterId))
+    return master
 
   @locked_property
   def keywords(self):
