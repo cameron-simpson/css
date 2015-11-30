@@ -755,13 +755,30 @@ class _SelectMasters(object):
   ''' Select masters base class.
   '''
 
-  def default_masters(self):
-    return self.iphoto.masters()
-
   def select(self, masters=None):
     if masters is None:
-      return self.default_masters()
-    return self.select_masters(masters)
+      return self.select_from_all()
+    else:
+      return self.select_masters(masters)
+
+  def select_from_all(self):
+    return self.select_masters(self.iphoto.masters())
+
+class SelectByPerson_Name(_SelectMasters):
+  ''' Select masters by person name.
+  '''
+
+  def __init__(self, iphoto, person_name):
+    self.iphoto = iphoto
+    self.person_name = person_name
+    self.person = iphoto.person_by_name[person_name]
+
+  def select_masters(self, masters):
+    person = self.person
+    for master in masters:
+      if person in master.people:
+        X("found %r in %r", person.name, [ person.name for person in master.people ])
+        yield master
 
 class SelectByKeyword_Name(_SelectMasters):
   ''' Select masters by keyword name.
@@ -771,10 +788,10 @@ class SelectByKeyword_Name(_SelectMasters):
     self.iphoto = iphoto
     self.kwname = kwname
 
-  def default_masters(self):
+  def select_from_all(self):
     return self.iphoto.masters_by_keyword(self.kwname)
 
-  def select_masters(self, masters=None):
+  def select_masters(self, masters):
     kwname = self.kwname
     for master in masters:
       if kwname in master.keyword_names:
