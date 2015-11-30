@@ -81,7 +81,7 @@ def main(argv=None):
             warning("missing keywords")
             badopts = True
           else:
-            all_kwnames = set(I.keyword_names)
+            # resolve keyword names
             kwnames = []
             for kwname in argv:
               matches = I.match_keyword(kwname)
@@ -98,6 +98,7 @@ def main(argv=None):
                   info("%s ==> %s", okwname, kwname)
                 kwnames.append(kwname)
             if not badopts:
+              # select by keywords
               masters = None
               for kwname in kwnames:
                 masters = I.select_by_keyword_name(kwname).select(masters)
