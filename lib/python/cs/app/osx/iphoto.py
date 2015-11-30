@@ -443,6 +443,10 @@ class iPhoto(O):
         versions = by_master_id[master_id] = set()
       versions.add(version)
 
+  def version(self, version_id):
+    self.load_versions()
+    return self.version_by_id.get(version_id)
+
   def _load_table_keywords(self):
     ''' Load Library.RKKeyword into memory and set up mappings.
     '''
