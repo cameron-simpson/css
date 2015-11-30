@@ -484,17 +484,17 @@ class iPhoto(O):
     by_vid = self.kw4v_keyword_ids_by_version_id = {}
     for kw4v in self.read_keywordForVersions():
       kwid = kw4v.keywordId
+      vid = kw4v.versionId
       try:
         version_ids = by_kwid[kwid]
       except KeyError:
         version_ids = by_kwid[kwid] = set()
-      version_ids.add(kwid)
-      vid = kw4v.versionId
+      version_ids.add(vid)
       try:
         keyword_ids = by_vid[vid]
       except KeyError:
         keyword_ids = by_vid[vid] = set()
-      keyword_ids.add(vid)
+      keyword_ids.add(kwid)
 
 class iPhotoDBs(object):
 
