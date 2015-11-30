@@ -84,25 +84,19 @@ def main(argv=None):
             all_kwnames = set(I.keyword_names)
             kwnames = []
             for kwname in argv:
-              if kwname in all_kwnames:
-                kwnames.append(kwname)
+              matches = I.match_keyword(kwname)
+              if not matches:
+                warning("%s: unknown keyword", kwname)
+                badopts = True
+              elif len(matches) > 1:
+                warning("%s: matches multiple keywords, rejected: %r", kwname, matches)
+                badopts = True
               else:
-                matched = []
-                lc_kwname = kwname.lower()
-                for name in all_kwnames:
-                  if lc_kwname in name.lower():
-                    matched.append(name)
-                if not matched:
-                  warning("%s: unknown keyword", kwname)
-                  badopts = True
-                elif len(matched) > 1:
-                  warning("%s: matches multiple keywords, rejected: %r", kwname, matched)
-                  badopts = True
-                else:
-                  okwname = kwname
-                  kwname = matched[0]
+                okwname = kwname
+                kwname = matches[0]
+                if kwname != okwname:
                   info("%s ==> %s", okwname, kwname)
-                  kwnames.append(kwname)
+                kwnames.append(kwname)
             if not badopts:
               masters = None
               for kwname in kwnames:
