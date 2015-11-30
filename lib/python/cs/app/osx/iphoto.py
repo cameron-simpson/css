@@ -459,7 +459,6 @@ class iPhoto(O):
     self.load_keywords()
     return self.keyword_by_name.values()
 
-  @property
   def keyword_names(self):
     return frozenset(kw.name for kw in self.keywords)
 
