@@ -16,6 +16,7 @@ from threading import RLock
 from PIL import Image
 Image.warnings.simplefilter('error', Image.DecompressionBombWarning)
 from cs.env import envsub
+from cs.lex import get_identifier
 from cs.logutils import Pfx, info, warning, error, setup_logging, X, XP
 from cs.obj import O
 from cs.threads import locked, locked_property
@@ -530,6 +531,43 @@ class iPhoto(O):
       except KeyError:
         keyword_ids = by_vid[vid] = set()
       keyword_ids.add(kwid)
+
+  def parse_selector(self, selection):
+    with Pfx(selection):
+      selection0 = selection
+      selector = None
+      invert = False
+      if selection.startswith('!'):
+        invert = True
+        selection = selection[1:]
+      if selection.startswith('/'):
+        re_text = selection[1:]
+        selector = SelectByFilenameRE(self, re_text, invert)
+      else:
+        sel_type, offset = get_identifier(selection)
+        if ( not sel_type
+          or offset >= len(selection)
+          or selection[offset] != ':' ):
+          raise ValueError('invalid selector, not "/regexp" or "type:"')
+        offset += 1
+        if sel_type == 'kw':
+          kwname = selection[offset:]
+          if not kwname:
+            raise ValueError("missing keyword")
+          okwname = kwname
+          try:
+            kwname = self.match_one_keyword(kwname)
+          except ValueError as e:
+            raise ValueError("invalid keyword: %s", e)
+          else:
+            if kwname != okwname:
+              info("%r ==> %r", okwname, kwname)
+            selector = SelectByKeyword_Name(self, kwname, invert)
+        else:
+          raise ValueError("unknown selector type %r" % (sel_type,))
+      if selector is None:
+        raise RuntimeError("parse_selector(%r) did not set selector" % (selection0,))
+      return selector
 
 class iPhotoDBs(object):
 
