@@ -86,19 +86,17 @@ def main(argv=None):
             # resolve keyword names
             kwnames = []
             for kwname in argv:
-              matches = I.match_keyword(kwname)
-              if not matches:
-                warning("%s: unknown keyword", kwname)
-                badopts = True
-              elif len(matches) > 1:
-                warning("%s: matches multiple keywords, rejected: %r", kwname, matches)
-                badopts = True
-              else:
+              with Pfx(kwname):
                 okwname = kwname
-                kwname = matches[0]
-                if kwname != okwname:
-                  info("%s ==> %s", okwname, kwname)
-                kwnames.append(kwname)
+                try:
+                  kwname = I.match_one_keyword(kwname)
+                except ValueError as e:
+                  warning("rejected keyword: %s", e)
+                  badopts = True
+                else:
+                  if kwname != okwname:
+                    info("%s ==> %s", okwname, kwname)
+                  kwnames.append(kwname)
             if not badopts:
               # select by keywords
               masters = None
@@ -497,6 +495,14 @@ class iPhoto(O):
       if lc_kwname in name.lower():
         matches.append(name)
     return matches
+
+  def match_one_keyword(self, kwname):
+    matches = self.match_keyword(kwname)
+    if not matches:
+      raise ValueError("unknown keyword")
+    if len(matches) > 1:
+      raise ValueError("matches multiple keywords, rejected: %r" % (matches,))
+    return matches[0]
 
   def versions_by_keyword(self, kwname):
     self.load_keywords()
