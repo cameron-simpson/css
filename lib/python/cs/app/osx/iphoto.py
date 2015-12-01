@@ -818,7 +818,6 @@ class SelectByPerson_Name(_SelectMasters):
     person = self.person
     for master in masters:
       if person in master.people:
-        X("found %r in %r", person.name, [ person.name for person in master.people ])
         yield master
 
 class SelectByKeyword_Name(_SelectMasters):
