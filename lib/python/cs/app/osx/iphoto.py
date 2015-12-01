@@ -765,7 +765,6 @@ class VFace_Mixin(object):
 
   def person(self):
     if not self.isNamed:
-      warning("%s: NOT NAMED", self)
       return None
     return self.I.person(self.faceKey)
 
