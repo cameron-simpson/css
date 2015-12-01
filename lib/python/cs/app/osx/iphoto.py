@@ -450,7 +450,7 @@ class iPhoto(O):
     ''' Load Library.RKVersion into memory and set up mappings.
     '''
     by_id = self.version_by_id = {}
-    by_master_id = self.versions_by_masters_id = {}
+    by_master_id = self.versions_by_master_id = {}
     for version in self.read_versions():
       by_id[version.modelId] = version
       master_id = version.masterId
@@ -635,12 +635,15 @@ class Master_Mixin(object):
 
   @locked_property
   def versions(self):
-    return set()
+    I = self.I
+    I.load_versions()
+    return I.versions_by_master_id.get(self.modelId, ())
 
   def latest_version(self):
     vs = self.versions
     if not vs:
-      return None
+      raise RuntimeError("no versions for master %d: %r", self.modelId, self.pathname)
+      ##return None
     return max(vs, key=lambda v: v.versionNumber)
 
   @locked_property
