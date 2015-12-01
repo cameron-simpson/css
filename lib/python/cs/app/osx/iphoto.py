@@ -809,33 +809,48 @@ class SelectByPerson_Name(_SelectMasters):
   ''' Select masters by person name.
   '''
 
-  def __init__(self, iphoto, person_name):
+  def __init__(self, iphoto, person_name, invert=False):
     self.iphoto = iphoto
     self.person_name = person_name
     self.person = iphoto.person_by_name[person_name]
+    self.invert = invert
 
   def select_masters(self, masters):
     person = self.person
-    for master in masters:
-      if person in master.people:
-        yield master
+    if self.invert:
+      for master in masters:
+        if person not in master.people:
+          yield master
+    else:
+      for master in masters:
+        if person in master.people:
+          yield master
 
 class SelectByKeyword_Name(_SelectMasters):
   ''' Select masters by keyword name.
   '''
 
-  def __init__(self, iphoto, kwname):
+  def __init__(self, iphoto, kwname, invert=False):
     self.iphoto = iphoto
     self.kwname = kwname
+    self.invert = invert
 
   def select_from_all(self):
-    return self.iphoto.masters_by_keyword(self.kwname)
+    if self.invert:
+      return self.select_masters(self.iphoto.masters())
+    else:
+      return self.iphoto.masters_by_keyword(self.kwname)
 
   def select_masters(self, masters):
     kwname = self.kwname
-    for master in masters:
-      if kwname in master.keyword_names:
-        yield master
+    if self.invert:
+      for master in masters:
+        if kwname not in master.keyword_names:
+          yield master
+    else:
+      for master in masters:
+        if kwname in master.keyword_names:
+          yield master
 
 SCHEMAE = {'Faces':
             { 'person':
