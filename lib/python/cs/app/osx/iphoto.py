@@ -706,7 +706,10 @@ class Keyword_Mixin(object):
   def versions(self):
     ''' Return the versions with this keyword.
     '''
-    return self.I.versions_by_keywordId.get(self.modelId, ())
+    I = self.I
+    I.load_keywordForVersions()
+    for vid in I.kw4v_version_ids_by_keyword_id.get(self.modelId, ()):
+      yield I.version(vid)
 
   def masters(self):
     ''' Return the masters with this keyword.
