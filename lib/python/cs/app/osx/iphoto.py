@@ -10,6 +10,7 @@ import os
 import os.path
 from collections import namedtuple
 from functools import partial
+import re
 import sqlite3
 from threading import RLock
 from PIL import Image
@@ -824,6 +825,27 @@ class SelectByPerson_Name(_SelectMasters):
     else:
       for master in masters:
         if person in master.people:
+          yield master
+
+class SelectByFilenameRE(_SelectMasters):
+  ''' Select masters by regular expression.
+  '''
+
+  def __init__(self, iphoto, re_text, invert=False):
+    self.iphoto = iphoto
+    self.re_text = re_text
+    self.invert = invert
+    self.re = re.compile(re_text)
+
+  def select_masters(self, masters):
+    re = self.re
+    if self.invert:
+      for master in masters:
+        if not re.search(master.latest_version().fileName):
+          yield master
+    else:
+      for master in masters:
+        if re.search(master.latest_version().fileName):
           yield master
 
 class SelectByKeyword_Name(_SelectMasters):
