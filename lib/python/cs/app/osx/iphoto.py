@@ -424,7 +424,7 @@ class iPhoto(O):
           matches.add(name)
     if not matches:
       # try substrings
-      for name in lc_all_names:
+      for name in all_names:
         if lc_person_name in name.lower():
           matches.add(name)
     return matches
