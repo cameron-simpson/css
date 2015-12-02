@@ -45,7 +45,7 @@ subj=$( sed -n -e '/^$/q; y/	/ /; /^[Ss]ubject:/{ s/^[^:]*: *//; s/[^a-zA-Z0-9:]
 
 session_name=mutt-$now-$subj
 
-set -- rmafter "$filename" mutt -e 'set editor=vim-flowed' -e 'unset signature' -H "$filename"
+set -- mutt -e 'set editor=vim-flowed' -e 'unset signature' -H "$filename"
 
 if tmux start-server
 then
