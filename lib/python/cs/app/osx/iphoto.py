@@ -889,6 +889,22 @@ class _SelectMasters(object):
   def select_from_all(self):
     return self.select_masters(self.iphoto.masters())
 
+class SelectByFunction(_SelectMasters):
+  ''' Select by arbitrary function on a master.
+  '''
+  def __init__(self, iphoto, func, invert=False):
+    self.iphoto = iphoto
+    self.func = func
+    self.invert = invert
+
+  def select_masters(self, masters):
+    for master in masters:
+      if func(master):
+        if not invert:
+          yield master
+      elif invert:
+        yield master
+
 class SelectByPerson_Name(_SelectMasters):
   ''' Select masters by person name.
   '''
