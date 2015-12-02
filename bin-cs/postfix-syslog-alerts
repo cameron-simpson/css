@@ -7,13 +7,13 @@
 # OSX mail log
 logfile=/var/log/mail.log
 
-tail -F "logfile" \
+tail -F "$logfile" \
 | while read -r d1 d2 d3 host daemon message
   do
     case "$daemon" in
       'postfix/smtp['*)
         set -- $message
-        alert -t "$daemon@$host" "$2 $3 $7"
+        alert -t "POSTFIX: $daemon@$host" "$2 $3 $7"
         ;;
     esac
   done
