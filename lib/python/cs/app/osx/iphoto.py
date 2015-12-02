@@ -96,7 +96,7 @@ def main(argv=None):
                   badopts = True
                 else:
                   if kwname != okwname:
-                    info("%s ==> %s", okwname, kwname)
+                    info("%r ==> %r", okwname, kwname)
                   kwnames.append(kwname)
             if not badopts:
               # select by keywords
