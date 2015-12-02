@@ -38,7 +38,7 @@ USAGE = '''Usage: %s [/path/to/iphoto-library-path] op [op-args...]
 
 Criteria:
   [!]/regexp            Filename matches regexp.
-  [!]kw:keyword         Latest version has keyword.
+  [!]kw:[keyword]       Latest version has keyword.
                         Empty keyword means "has a keyword".
   [!]face:[person_name] Latest version has named person.
                         Empty person_name means "has a face".
