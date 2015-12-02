@@ -17,10 +17,12 @@ usage="Usage:
     -d  Start session detached.
   $cmd reopen           Open sessions for all mutt editor files sitting about."
 
-if [ "x$*" = xreopen ]
+if [ $# -gt 0 ] && [ "x$1" = xreopen ]
 then
+  shift
   xit=0
-  for msgfile in $HOME/var/mutt/mutt-*[0-9]
+  [ $# -gt 0 ] || set -- "$HOME"/var/mutt/mutt-*[0-9]
+  for msgfile
   do  [ ! -s "$msgfile" ] || ( set -x; "$0" -d "$msgfile" ) || xit=1
   done
   exit $xit
