@@ -35,6 +35,14 @@ USAGE = '''Usage: %s [/path/to/iphoto-library-path] op [op-args...]
   ls keywords       List keywords.
   ls masters        List master pathnames.
   ls people         List person names.
+  select criteria... List masters with all specified criteria.
+
+Criteria:
+  [!]/regexp            Filename matches regexp.
+  [!]kw:keyword         Latest version has keyword.
+                        Empty keyword means "has a keyword".
+  [!]face:person_name   Latest version has named person.
+                        Empty person_name means "has a face".
 '''
 
 def main(argv=None):
@@ -174,6 +182,26 @@ def main(argv=None):
                 masters = I.select_by_person_name(person_name).select(masters)
               for master in masters:
                 print(master.pathname)
+        elif op == 'select':
+          if not argv:
+            warning("missing selectors")
+            badopts = True
+          else:
+            selectors = []
+            for selection in argv:
+              try:
+                selector = I.parse_selector(selection)
+              except ValueError as e:
+                warning("invalid selector: %s", e)
+                badopts = True
+              else:
+                selectors.append(selector)
+          if not badopts:
+            masters = None
+            for selector in selectors:
+              masters = selector.select(masters)
+            for master in masters:
+              print(master.pathname)
         elif op == "test":
           test(argv, I)
         else:
@@ -428,6 +456,14 @@ class iPhoto(O):
         if lc_person_name in name.lower():
           matches.add(name)
     return matches
+
+  def match_one_person(self, person_name):
+    matches = self.match_people(person_name)
+    if not matches:
+      raise ValueError("unknown person")
+    if len(matches) > 1:
+      raise ValueError("matches multiple people, rejected: %r" % (matches,))
+    return matches.pop()
 
   def _load_table_masters(self):
     ''' Load Library.RKMaster into memory and set up mappings.
