@@ -599,6 +599,23 @@ class iPhoto(O):
             if kwname != okwname:
               info("%r ==> %r", okwname, kwname)
             selector = SelectByKeyword_Name(self, kwname, invert)
+        elif sel_type == 'face':
+          person_name = selection[offset:]
+          if not person_name:
+            selector = SelectByFunction(self,
+                                        lambda master: len(master.vfaces) > 0,
+                                        invert)
+          else:
+            operson_name = person_name
+            try:
+              person_name = self.match_one_person(person_name)
+            except ValueError as e:
+              warning("rejected face name: %s", e)
+              badopts = True
+            else:
+              if person_name != operson_name:
+                info("%r ==> %r", operson_name, person_name)
+              selector = SelectByPerson_Name(self, person_name, invert)
         else:
           raise ValueError("unknown selector type %r" % (sel_type,))
       if selector is None:
