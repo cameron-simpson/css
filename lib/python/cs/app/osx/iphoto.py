@@ -286,7 +286,7 @@ class iPhoto(O):
         nickname = attr[:-6]
         if nickname in self.table_by_nickname:
           return self.table_by_nickname[nickname]
-    raise AttributeError(attr)
+    raise AttributeError("iPhoto.__getattr__: nothing named %r" % (attr,))
 
   def _load_table_albums(self):
     ''' Load Library.RKMaster into memory and set up mappings.
