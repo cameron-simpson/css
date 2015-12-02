@@ -25,7 +25,6 @@ DEFAULT_LIBRARY = '$HOME/Pictures/iPhoto Library.photolibrary'
 
 USAGE = '''Usage: %s [/path/to/iphoto-library-path] op [op-args...]
   info masters      List info about masters.
-  kw keywords...    List masters with all specified keywords.
   people names...   List masters with the specified people.
   ls                List apdb names.
   ls [0-5]          List master pathnames with specific rating.
@@ -87,32 +86,6 @@ def main(argv=None):
               else:
                 warning("unknown class %r", obclass)
                 badopts = True
-        elif op == 'kw':
-          if not argv:
-            warning("missing keywords")
-            badopts = True
-          else:
-            # resolve keyword names
-            kwnames = []
-            for kwname in argv:
-              with Pfx(kwname):
-                okwname = kwname
-                try:
-                  kwname = I.match_one_keyword(kwname)
-                except ValueError as e:
-                  warning("rejected keyword: %s", e)
-                  badopts = True
-                else:
-                  if kwname != okwname:
-                    info("%r ==> %r", okwname, kwname)
-                  kwnames.append(kwname)
-            if not badopts:
-              # select by keywords
-              masters = None
-              for kwname in kwnames:
-                masters = I.select_by_keyword_name(kwname).select(masters)
-              for master in masters:
-                print(master.pathname)
         elif op == 'ls':
           if not argv:
             for dbname in sorted(I.dbnames()):
