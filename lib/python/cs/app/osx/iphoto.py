@@ -25,7 +25,6 @@ DEFAULT_LIBRARY = '$HOME/Pictures/iPhoto Library.photolibrary'
 
 USAGE = '''Usage: %s [/path/to/iphoto-library-path] op [op-args...]
   info masters      List info about masters.
-  people names...   List masters with the specified people.
   ls                List apdb names.
   ls [0-5]          List master pathnames with specific rating.
   ls albums         List album names.
@@ -129,32 +128,6 @@ def main(argv=None):
               if not badopts:
                 for name in sorted(names):
                   print(name)
-        elif op == 'people':
-          if not argv:
-            warning("missing person_names")
-            badopts = True
-          else:
-            person_names = []
-            for person_name in argv:
-              matches = I.match_people(person_name)
-              if not matches:
-                warning("%s: unknown person_name", person_name)
-                badopts = True
-              elif len(matches) > 1:
-                warning("%s: matches multiple people, rejected: %r", person_name, matches)
-                badopts = True
-              else:
-                operson_name = person_name
-                person_name = matches.pop()
-                if person_name != operson_name:
-                  info("%s ==> %s", operson_name, person_name)
-                person_names.append(person_name)
-            if not badopts:
-              masters = None
-              for person_name in person_names:
-                masters = I.select_by_person_name(person_name).select(masters)
-              for master in masters:
-                print(master.pathname)
         elif op == 'select':
           if not argv:
             warning("missing selectors")
