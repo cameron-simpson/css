@@ -7,7 +7,9 @@
 set -ue
 
 cmd=$0
-usage="Usage: $cmd target-dir {-|imlist-pick-options...}"
+usage="Usage: $cmd target-dir [_] {-|imlist-pick-options...}"
+
+unsp=
 
 badopts=
 
@@ -18,6 +20,10 @@ then
 else
   target_dir=$1
   shift
+fi
+
+if [ $# -gt 0 ] && [ "x$1" = x_ ]
+then  unsp=1; shift
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
@@ -32,6 +38,14 @@ fi \
   while read -r impath
   do
     base=$(basename "$impath")
+    if [ $unsp ]
+    then
+      case "$base" in
+        *\ * | *\	* )
+          base=$( printf '%s\n' | tr ' \011' __ )
+          ;;
+      esac
+    fi
     if [ -e "$base" ]
     then
       n=1
