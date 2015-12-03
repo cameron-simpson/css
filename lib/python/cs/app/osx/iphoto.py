@@ -584,8 +584,9 @@ class iPhoto(O):
           if selection.startswith('='):
             cmpop += '='
             selection = selection[1:]
-          raise RuntimeError("need implementation for %r %r %r comparisons"
-                             % (sel_type, cmpop, selection))
+          left = sel_type
+          right = selection
+          selector = SelectByComparison(self, left, cmpop, right, invert)
         else:
           raise ValueError("unrecognised delimiter after %r" % (sel_type,))
       if selector is None:
@@ -712,6 +713,14 @@ class Master_Mixin(object):
       raise RuntimeError("no versions for master %d: %r", self.modelId, self.pathname)
       ##return None
     return max(vs, key=lambda v: v.versionNumber)
+
+  @property
+  def width(self):
+    return self.latest_version().processedWidth
+
+  @property
+  def height(self):
+    return self.latest_version().processedheight
 
   @locked_property
   def faces(self):
@@ -891,6 +900,56 @@ class SelectByFunction(_SelectMasters):
           yield master
       elif invert:
         yield master
+
+COMPARATORS = {
+    '<':  lambda left, right: left < right,
+    '<=': lambda left, right: left <= right,
+    '==': lambda left, right: left == right,
+    '!=': lambda left, right: left != right,
+    '=>': lambda left, right: left >= right,
+    '>':  lambda left, right: left > right,
+}
+
+class SelectByComparison(_SelectMasters):
+
+  def __init__(self, iphoto, left, cmpop, right, invert):
+    try:
+      cmpfunc = COMPARATORS[cmpop]
+    except KeyError:
+      raise ValueError('unknown comparison operator %r', cmpop)
+    self.iphoto = iphoto
+    self.left = left
+    self.cmpfunc = cmpfunc
+    self.right = right
+    self.cmpfunc
+    self.invert = invert
+
+  def select_masters(self, masters):
+    invert = self.invert
+    left = self.left
+    right = self.right
+    cmpfunc = self.cmpfunc
+    for master in masters:
+      try:
+        left_val = float(left)
+      except ValueError:
+        try:
+          left_val = int(left)
+        except ValueError:
+          left_val = getattr(master, left)
+      try:
+        right_val = float(right)
+      except ValueError:
+        try:
+          right_val = int(right)
+        except ValueError:
+          right_val = getattr(master, right)
+      if cmpfunc(left_val, right_val):
+        if not invert:
+          yield master
+      else:
+        if invert:
+          yield master
 
 class SelectByPerson_Name(_SelectMasters):
   ''' Select masters by person name.
