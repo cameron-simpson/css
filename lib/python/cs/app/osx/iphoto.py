@@ -536,46 +536,58 @@ class iPhoto(O):
         selector = SelectByFilenameRE(self, re_text, invert)
       else:
         sel_type, offset = get_identifier(selection)
-        if ( not sel_type
-          or offset >= len(selection)
-          or selection[offset] != ':' ):
-          raise ValueError('invalid selector, not "/regexp" or "type:"')
-        offset += 1
-        if sel_type == 'kw':
-          kwname = selection[offset:]
-          if not kwname:
-            selector = SelectByFunction(self,
-                                        lambda master: len(master.keywords) > 0,
-                                        invert)
-          else:
-            okwname = kwname
-            try:
-              kwname = self.match_one_keyword(kwname)
-            except ValueError as e:
-              raise ValueError("invalid keyword: %s", e)
+        if not sel_type:
+          raise ValueError("expected identifier at %r" % (selection,))
+        if offset == len(selection):
+          raise ValueError("expected delimiter after %r" % (sel_type,))
+        selection = selection[offset:]
+        if selection.startswith(':'):
+          selection = selection[1:]
+          if sel_type == 'kw':
+            kwname = selection
+            if not kwname:
+              selector = SelectByFunction(self,
+                                          lambda master: len(master.keywords) > 0,
+                                          invert)
             else:
-              if kwname != okwname:
-                info("%r ==> %r", okwname, kwname)
-              selector = SelectByKeyword_Name(self, kwname, invert)
-        elif sel_type == 'face':
-          person_name = selection[offset:]
-          if not person_name:
-            selector = SelectByFunction(self,
-                                        lambda master: len(master.vfaces) > 0,
-                                        invert)
-          else:
-            operson_name = person_name
-            try:
-              person_name = self.match_one_person(person_name)
-            except ValueError as e:
-              warning("rejected face name: %s", e)
-              badopts = True
+              okwname = kwname
+              try:
+                kwname = self.match_one_keyword(kwname)
+              except ValueError as e:
+                raise ValueError("invalid keyword: %s", e)
+              else:
+                if kwname != okwname:
+                  info("%r ==> %r", okwname, kwname)
+                selector = SelectByKeyword_Name(self, kwname, invert)
+          elif sel_type == 'face':
+            person_name = selection
+            if not person_name:
+              selector = SelectByFunction(self,
+                                          lambda master: len(master.vfaces) > 0,
+                                          invert)
             else:
-              if person_name != operson_name:
-                info("%r ==> %r", operson_name, person_name)
-              selector = SelectByPerson_Name(self, person_name, invert)
+              operson_name = person_name
+              try:
+                person_name = self.match_one_person(person_name)
+              except ValueError as e:
+                warning("rejected face name: %s", e)
+                badopts = True
+              else:
+                if person_name != operson_name:
+                  info("%r ==> %r", operson_name, person_name)
+                selector = SelectByPerson_Name(self, person_name, invert)
+          else:
+            raise ValueError("unknown selector type %r" % (sel_type,))
+        elif selection[0] in '<=>':
+          cmpop = selection[0]
+          selection = selection[1:]
+          if selection.startswith('='):
+            cmpop += '='
+            selection = selection[1:]
+          raise RuntimeError("need implementation for %r %r %r comparisons"
+                             % (sel_type, cmpop, selection))
         else:
-          raise ValueError("unknown selector type %r" % (sel_type,))
+          raise ValueError("unrecognised delimiter after %r" % (sel_type,))
       if selector is None:
         raise RuntimeError("parse_selector(%r) did not set selector" % (selection0,))
       return selector
