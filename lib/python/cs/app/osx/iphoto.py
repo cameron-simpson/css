@@ -720,7 +720,7 @@ class Master_Mixin(object):
 
   @property
   def height(self):
-    return self.latest_version().processedheight
+    return self.latest_version().processedHeight
 
   @locked_property
   def faces(self):
