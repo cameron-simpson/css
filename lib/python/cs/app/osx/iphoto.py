@@ -41,6 +41,8 @@ Criteria:
                         Empty keyword means "has a keyword".
   [!]face:[person_name] Latest version has named person.
                         Empty person_name means "has a face".
+  Because "!" is often used for shell history expansion, a dash "-"
+  is also accepted to invert the selector.
 '''
 
 def main(argv=None):
@@ -526,7 +528,7 @@ class iPhoto(O):
       selection0 = selection
       selector = None
       invert = False
-      if selection.startswith('!'):
+      if selection.startswith('!') or selection.startswith('-'):
         invert = True
         selection = selection[1:]
       if selection.startswith('/'):
