@@ -514,6 +514,13 @@ class iPhoto(O):
         keyword_ids = by_vid[vid] = set()
       keyword_ids.add(kwid)
 
+  def keywords_by_version(self, version_id):
+    ''' Return version
+    '''
+    self.load_keywordForVersions()
+    kwids = self.kw4v_keyword_ids_by_version_id.get(version_id, ())
+    return [ self.keyword(kwid) for kwid in kwids ]
+
   def parse_selector(self, selection):
     with Pfx(selection):
       selection0 = selection
@@ -535,16 +542,19 @@ class iPhoto(O):
         if sel_type == 'kw':
           kwname = selection[offset:]
           if not kwname:
-            raise ValueError("missing keyword")
-          okwname = kwname
-          try:
-            kwname = self.match_one_keyword(kwname)
-          except ValueError as e:
-            raise ValueError("invalid keyword: %s", e)
+            selector = SelectByFunction(self,
+                                        lambda master: len(master.keywords) > 0,
+                                        invert)
           else:
-            if kwname != okwname:
-              info("%r ==> %r", okwname, kwname)
-            selector = SelectByKeyword_Name(self, kwname, invert)
+            okwname = kwname
+            try:
+              kwname = self.match_one_keyword(kwname)
+            except ValueError as e:
+              raise ValueError("invalid keyword: %s", e)
+            else:
+              if kwname != okwname:
+                info("%r ==> %r", okwname, kwname)
+              selector = SelectByKeyword_Name(self, kwname, invert)
         elif sel_type == 'face':
           person_name = selection[offset:]
           if not person_name:
@@ -767,9 +777,7 @@ class Version_Mixin(object):
   def keywords(self):
     ''' Return the keywords for this version.
     '''
-    I = self.I
-    I.load_keywordForVersions()
-    return frozenset(I.keywords_by_versionId[self.modelId])
+    return frozenset(self.I.keywords_by_version(self.modelId))
 
   @property
   def keyword_names(self):
@@ -861,6 +869,8 @@ class SelectByFunction(_SelectMasters):
     self.invert = invert
 
   def select_masters(self, masters):
+    func = self.func
+    invert = self.invert
     for master in masters:
       if func(master):
         if not invert:
