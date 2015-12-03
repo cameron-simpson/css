@@ -1,0 +1,19 @@
+#!/bin/sh
+#
+# Execute a command with the cut buffer contents.
+#       - Cameron Simpson <cs@zip.com.au>
+#
+
+set -ue
+
+: ${OS:=`uname -s | tr '[A-Z]' '[a-z]'`}
+: ${DISPLAY:=}
+
+[ $# = 0 ] && { echo "Usage: $0 command [args...]" >&2; exit 2; }
+
+if [ "x$OS" = xdarwin ]
+then clip=`pbpaste`
+else clip=`xclip -o`
+fi
+
+exec "$@" "$clip"

@@ -45,7 +45,7 @@ else
       ;;
   esac
   set -x
-  fvwmcmd "GotoDesk 0 $desknum" &
+  gotodesk "$desknum"
 fi
 
 [ $incant ] || exit 0

@@ -6,6 +6,7 @@
 
 from __future__ import print_function
 import sys
+from io import StringIO
 import os
 import os.path
 import errno
@@ -13,11 +14,12 @@ from threading import Lock
 import time
 import unittest
 from tempfile import NamedTemporaryFile
-from .fileutils import compare, rewrite, lockfile, Pathname, \
+from .fileutils import compare, rewrite, rewrite_cmgr, lockfile, Pathname, \
                         file_property, make_file_property, \
-                        make_files_property
+                        make_files_property, \
+                        BackedFile, BackedFile_TestMethods
 from .timeutils import TimeoutError, sleep
-from .logutils import D
+from .logutils import D, X
 
 class TestFileProperty(object):
   def __init__(self):
@@ -45,6 +47,8 @@ class TestFileProperty(object):
     return data
 
 class TestFilesProperty(object):
+  ''' Tests for watching multiple files.
+  '''
   def __init__(self):
     self._test1_paths = ('testfileprop1',)
     self._test1_lock = Lock()
@@ -56,18 +60,20 @@ class TestFilesProperty(object):
   def write2(self, data):
     with open(self._test2_paths[0], "w") as fp:
       fp.write(data)
+
   ##@files_property
   ##def test1(self, path0):
   ##  with open(path0) as fp:
   ##    data = fp.read()
   ##  return (path0,), data
+
   @make_files_property(poll_rate=0.3)
   def test2(self, paths):
     with open(paths[0]) as fp:
       data = fp.read()
     return (paths[0],), data
 
-class Test(unittest.TestCase):
+class Test_Misc(unittest.TestCase):
 
   def setUp(self):
     self.proppath = 'cs.fileutils_tests_tstprop'
@@ -94,26 +100,48 @@ class Test(unittest.TestCase):
 
   def test_compare(self):
     data = "here are some data\n"
-    with NamedTemporaryFile() as T1:
+    with NamedTemporaryFile(mode='w') as T1:
       T1.write(data)
       T1.flush()
-      with NamedTemporaryFile() as T2:
+      with NamedTemporaryFile(mode='w') as T2:
         T2.write(data)
         T2.flush()
-        self.assertEqual( open(T1.name).read(), data, "bad data in %s" % (T1.name,) )
-        self.assertEqual( open(T2.name).read(), data, "bad data in %s" % (T2.name,) )
+        with open(T1.name) as t1fp:
+          t1data = t1fp.read()
+        with open(T2.name) as t2fp:
+          t2data = t2fp.read()
+        self.assertEqual( t1data, data, "bad data in %s" % (T1.name,) )
+        self.assertEqual( t2data, data, "bad data in %s" % (T2.name,) )
         self.assertTrue(compare(T1.name, T2.name), "mismatched data in %s and %s" % (T1.name, T2.name))
 
   def test_rewrite(self):
-    from StringIO import StringIO
     olddata = "old data\n"
     newdata = "new data\n"
-    with NamedTemporaryFile() as T1:
+    with NamedTemporaryFile(mode='w') as T1:
       T1.write(olddata)
       T1.flush()
-      self.assertEqual( open(T1.name).read(), olddata, "bad old data in %s" % (T1.name,) )
-      rewrite(T1.name, StringIO(newdata))
-      self.assertEqual( open(T1.name).read(), newdata, "bad new data in %s" % (T1.name,) )
+      with open(T1.name) as t1fp:
+        t1data = t1fp.read()
+      self.assertEqual( t1data, olddata, "bad old data in %s" % (T1.name,) )
+      rewrite(T1.name, StringIO(newdata), mode='w')
+      with open(T1.name) as t1fp:
+        t1data = t1fp.read()
+      self.assertEqual( t1data, newdata, "bad new data in %s" % (T1.name,) )
+
+  def test_rewrite_cmgr(self):
+    olddata = "old data\n"
+    newdata = "new data\n"
+    with NamedTemporaryFile(mode='w') as T1:
+      T1.write(olddata)
+      T1.flush()
+      with open(T1.name) as t1fp:
+        t1data = t1fp.read()
+      self.assertEqual( t1data, olddata, "bad old data in %s" % (T1.name,) )
+      with rewrite_cmgr(T1.name) as tfp:
+        tfp.write(newdata)
+      with open(T1.name) as t1fp:
+        t1data = t1fp.read()
+      self.assertEqual( t1data, newdata, "bad new data in %s" % (T1.name,) )
 
   def test_lockfile_00_basic(self):
     lockbase = self.lockbase
@@ -332,8 +360,22 @@ class Test(unittest.TestCase):
                           ):
         self._eq(format(P, spec), expected, "format(%r, %r)" % (P, spec))
 
+class Test_BackedFile(unittest.TestCase, BackedFile_TestMethods):
+
+  def setUp(self, backing_filename=None):
+    if backing_filename is None:
+      backing_filename = __file__
+    self.backing_filename = backing_filename
+    self.backing_fp = open(self.backing_filename, "rb")
+    self.backing_text = self.backing_fp.read()
+    self.backed_fp = BackedFile(self.backing_fp)
+
+  def tearDown(self):
+    self.backed_fp.close()
+    self.backing_fp.close()
+
 def selftest(argv):
-  unittest.main(__name__, None, argv)
+  unittest.main(__name__, None, argv, failfast=True)
 
 if __name__ == '__main__':
   selftest(sys.argv)

@@ -1,9 +1,11 @@
 #!/usr/bin/python
 
-''' A data store after the style of the Venti scheme.
+''' A data store after the style of the Venti scheme, but not at all binary
+    compatible.
 
     The Plan 9 Venti system is decribed here:
       http://library.pantek.com/general/plan9.documents/venti/venti.html
+      http://en.wikipedia.org/wiki/Venti
 
     cs.venti implements a similar scheme that supports variable
     sized blocks and arbitrary data sizes, with some domain knowledge
@@ -20,6 +22,9 @@
 '''
 
 import re
+from os.path import abspath
+from string import ascii_letters, digits
+import tempfile
 import threading
 from cs.lex import texthexify, untexthexify
 
@@ -48,9 +53,33 @@ def fromtext(s):
   '''
   return untexthexify(s)
 
-_totext_white_re = re.compile(r'[-a-zA-Z0-9_+.,=/:;{}*]+')
+# Characters that may appear in text sections of a texthexify result.
+# Because we transcribe Dir blocks this way it includes some common
+# characters used for metadata.
+# Note: no path separator ("/") because we may accept this as a
+#       path pseudocomponent.
+_texthexify_white_chars = ascii_letters + digits + '_+-.,=:;{}*/'
 
 def totext(data):
   ''' Represent a byte sequence as a hex/text string.
   '''
-  return texthexify(data, whitelist_re = _totext_white_re)
+  return texthexify(data, whitelist=_texthexify_white_chars)
+
+class _TestAdditionsMixin:
+  ''' Some common methods uses in tests.
+  '''
+
+  @staticmethod
+  def mktmpdir():
+    return abspath(tempfile.mkdtemp(prefix="test-cs.venti", suffix=".tmpdir", dir='.'))
+
+  def assertLen(self, o, length, *a, **kw):
+    ''' Test len(o) unless it raises NotImplementedError.
+    '''
+    try:
+      olen = len(o)
+    except NotImplementedError as e:
+      ##warning("skip test of len(%s) == %r: %s", o, length, e)
+      pass
+    else:
+      self.assertEqual(olen, length, *a, **kw)

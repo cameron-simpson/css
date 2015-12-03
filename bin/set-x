@@ -1,10 +1,62 @@
 #!/bin/sh
-[ $# = 0 ] && { echo "Usage: $0 command [args...]" >&2; exit 2; }
-if [ "x$1" = 'x--no-tag_fd-2' ]
-then
+#
+# Trace execution of a command.
+#       - Cameron Simpson <cs@zip.com.au>
+#
+
+set -ue
+
+: ${DEBUG:=}
+
+datestamp=
+no_tag_fd=
+subopts=
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    --date)     datestamp=1 subopts="$subopts $1" ;;
+    --no-tag_fd)no_tag_fd=1 ;;
+    --)         shift; break ;;
+    -?*)        echo "$0: unrecognised option: $1" >&2
+                badopts=1
+                ;;
+    *)          break ;;
+  esac
   shift
+done
+
+[ $# -gt 0 ] || { echo "$0: missing command" >&2; badopts=1; }
+
+[ $badopts ] && { echo "Usage: $0 [--date] command [args...]" >&2; exit 2; }
+
+if [ $no_tag_fd ]
+then
+  :
 else
-  [ ${DEBUG:-} ] && exec tag_fd 2 "$1" "$0" --no-tag_fd-2 "$@"
+  if [ "x$DEBUG" = x1 ]
+  then  exec tag_fd 2 "$1" "$0" --no-tag_fd $subopts -- "$@"
+  fi
 fi
+
+if [ $datestamp ]
+then
+  date >&2
+  pid=
+  for sig in 1 2 3 15
+  do  trap "[ -z \"\$pid\" ] || kill \"-$sig\" \"\$pid\"" "$sig"
+  done
+  ( set -x
+    exec "$@"
+  ) &
+  pid=$!
+  wait
+  xit=$?
+  date >&2
+  exit $xit
+fi
+
 set -x
 exec "$@"

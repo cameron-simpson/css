@@ -5,6 +5,21 @@
 #       - Cameron Simpson <cs@zip.com.au> 29jan2013
 #
 
+DISTINFO = {
+    'description': "command line tool to inspect and manipulate LSI MegaRAID adapters (such as used in IBM ServerRAID systems)",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        ],
+    'requires': [ 'cs.logutils', 'cs.threads', 'cs.obj' ],
+    'entry_points': {
+      'console_scripts': [
+          'mcli = cs.app.megacli:main',
+          ],
+        },
+}
+
 import re
 import sys
 from contextlib import contextmanager
@@ -15,8 +30,12 @@ from cs.threads import locked_property
 from cs.obj import O, O_merge
 
 USAGE = '''Usage:
+    %s locate enc_slot [{start|stop}]
+    %s new_raid raid_level enc:devid...
+    %s offline enc_slot
     %s report
-    %s new_raid raid_level enc:devid...'''
+    %s save save_file
+    %s status'''
 
 # default location of MegaCLI executable
 MEGACLI = '/opt/MegaRAID/MegaCli/MegaCli64'
@@ -26,11 +45,13 @@ mode_PDLIST = 1         # -PDlist mode
 
 re_SPEED = re.compile('^(\d+(\.\d+)?)\s*(\S+)$')
 
-def main(argv):
+def main(argv=None):
+  if argv is None:
+    argv = sys.argv
   argv = list(argv)
   cmd = argv.pop(0)
   setup_logging(cmd)
-  usage = USAGE % (cmd, cmd)
+  usage = USAGE % (cmd, cmd, cmd, cmd, cmd, cmd)
 
   badopts = False
 
@@ -64,11 +85,52 @@ def main(argv):
                                                                getattr(DRV, 'virtual_drive', O(number=None)).number,
                                                                getattr(DRV, 'disk_group', O(number=None)).number,
                                                                DRV.fru, DRV.raw_size, DRV.raw_size_units,
-                                                               DRV.firmware_state)
+                                                               DRV.firmware_state
+                                                              ),
+            try:
+              count = DRV.media_error_count
+            except AttributeError:
+              pass
+            else:
+              if count:
+                print ", media errors %s" % count,
+            try:
+              count = DRV.other_error_count
+            except AttributeError:
+              pass
+            else:
+              if count:
+                print ", other errors %s" % count,
+            print
       elif command == "save":
         save_file, = argv
         if save_raid(save_file) != 0:
           xit = 1
+      elif command == "locate":
+        enc_slot = argv.pop(0)
+        if argv:
+          do_start = argv.pop(0)
+          if do_start == "start":
+            do_start = true
+          elif do_start == "stop":
+            do_start = False
+          else:
+            warning("locate: bad start/stop setting: %r", do_start)
+            badopts = True
+          if argv:
+            warning("locate: extra arguments after start/stop: %s", ' '.join(argv))
+            badopts = True
+        else:
+          do_start = True
+        if not badopts:
+          M.locate(adapter, enc_slot, do_start)
+      elif command == "offline":
+        enc_slot = argv.pop(0)
+        if argv:
+          warning("locate: extra arguments after start/stop: %s", ' '.join(argv))
+          badopts = True
+        if not badopts:
+          M.offline(adapter, enc_slot)
       elif command == "new_raid":
         if len(argv) < 2:
           warning("new_raid: missing raid_level or drives")
@@ -77,6 +139,22 @@ def main(argv):
           level = int(argv.pop(0))
           if M.new_raid(level, argv, adapter=adapter) != 0:
             xit = 1
+      elif command == "status":
+        status_all = []
+        for An in M.adapters:
+          adapter_errs = []
+          A = M.adapters[An]
+          for DRV in A.physical_disks.values():
+            firmware_state = getattr(DRV, 'firmware_state', 'UNKNOWN')
+            if firmware_state not in ( "Online, Spun Up", "Unconfigured(good), Spun Up"):
+              adapter_errs.append("drive:%s[%s]/VD:%s/%s"
+                                  % (DRV.id, DRV.enc_slot,
+                                     getattr(DRV, 'virtual_drive', O(number=None)).number,
+                                     DRV.firmware_state))
+          if adapter_errs:
+            print "FAIL A%d %s" % (An, ",".join(adapter_errs))
+          else:
+            print "OK A%d" % (An,)
       else:
         error("unsupported command")
         xit = 1
@@ -255,7 +333,7 @@ class MegaRAID(O):
                 speed, speed_units = m.group(1), m.group(3)
                 setattr(o, attr+'_units', speed_units)
                 info = float(speed)
-              else:
+              elif info != "Unknown":
                 warning("failed to match re_SPEED against: %s", info)
             elif attr in ('default_cache_policy', 'current_cache_policy'):
               info = info.split(', ')
@@ -271,7 +349,10 @@ class MegaRAID(O):
             elif info == 'No':
               info = False
             ##D("%s.%s = %s", o.__class__.__name__, attr, info)
-            setattr(o, attr, info)
+            if o is None:
+              error("o is None, not setting .%s to %r", attr, info)
+            else:
+              setattr(o, attr, info)
             continue
 
         # catch trailing drive
@@ -286,6 +367,27 @@ class MegaRAID(O):
                 A.physical_disks[DRV.id] = DRV
 
         return M
+
+  def locate(self, adapter, enc_slot, do_start=True):
+    ''' Start or stop to location light on the specified drive.
+    '''
+    if do_start:
+      start_opt = '-start'
+    else:
+      start_opt = '-stop'
+    return self.docmd('-PdLocate',
+                      start_opt,
+                      '-physdrv[%s]' % (enc_slot,),
+                      '-a%d' % (adapter,),
+                     )
+
+  def offline(self, adapter, enc_slot):
+    ''' Take a drive offline (==> failed).
+    '''
+    return self.docmd('-PDOffline',
+                      '-physdrv[%s]' % (enc_slot,),
+                      '-a%d' % (adapter,),
+                     )
 
   def new_raid(self, level, enc_slots, adapter=0):
     ''' Construct a new RAID device with specified RAID `level` on
@@ -313,19 +415,24 @@ class MegaRAID(O):
                 info("acceptable drive: %s", DRV.firmware_state)
     if not ok:
       return False
-    return self.docmd('-CfgLdAdd', '-r%d' % (level,), "[" + ",".join(enc_slot) + "]", '-a%d' % (adapter,))
+    return self.docmd('-CfgLdAdd', '-r%d' % (level,), "[" + ",".join(enc_slots) + "]", '-a%d' % (adapter,))
 
   @contextmanager
   def readcmd(self, *args):
     ''' Open a pipe from the megacli command, returning a subprocess.Popen object.
         Yield the stdout attribute.
     '''
-    P = Popen(['set-x', self.megacli] + list(args), stdout=PIPE, close_fds=True)
+    cmdargs = [self.megacli] + list(args)
+    if sys.stderr.isatty():
+      cmdargs.insert(0, 'set-x')
+    P = Popen(cmdargs, stdout=PIPE, close_fds=True)
     yield P.stdout
     P.wait()
 
   def docmd(self, *args):
-    ''' Execute a megacli command as specified.
+    ''' Pretend to execute a megacli command as specified.
+        This currently just echoes commands to stderr; I fear running
+        the "new raid" stuff etc automatically.
         Return True if the exit code is 0, False otherwise.
     '''
     ## if really: trace=set-x else trace=eecho
@@ -365,19 +472,30 @@ class Disk_Group(O):
 class Span(O):
   pass
 class Physical_Disk(O):
+
+  def __init__(self, **kw):
+    self.enclosure_device_id = None
+    self.device_id = None
+    self.slot_number = None
+    self.firmware_state = "UNKNOWN"
+    self.ibm_fru_cru = None
+    self.raw_size = None
+    self.raw_size_units = None
+    O.__init__(self, **kw)
+
   @property
   def id(self):
     ''' Unique identifier for drive, regrettably not what the megacli
         wants to use.
     '''
-    return "enc%d.devid%d" % (self.enclosure_device_id, self.device_id)
+    return "enc%s.devid%s" % (self.enclosure_device_id, self.device_id)
 
   @property
   def enc_slot(self):
     ''' Identifier used by megacli, regretably not unique if enclosure
         misconfigure/misinstalled.
     '''
-    return "%d:%d" % (self.enclosure_device_id, self.slot_number)
+    return "%s:%s" % (self.enclosure_device_id, self.slot_number)
   @property
   def fru(self):
     return self.ibm_fru_cru

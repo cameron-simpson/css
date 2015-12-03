@@ -9,6 +9,7 @@ set -ue
 recurse=
 users=${BACKUP_USERS:-backup}
 trace=
+[ -t 2 ] && trace=set-x
 
 cmd=$0
 usage="Usage: $cmd [-n] [-r] [-U user,...] pathnames...

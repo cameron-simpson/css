@@ -22,40 +22,164 @@ appeared at this point in the rules file.
 If the filename is relative, it is resolved with respect to the
 directory part of the filename of the current rules file.
 
-=head2 Variable Assignments
-
-A line commencing with an identifier and an equals symbol ('=') is
-an environment variable assignment.
-
 =head2 Filing Rules
 
 Other lines are mail filing rules, of the general form:
 
-  [!][=]targets tag [!]condition
+  [=][!]targets tag [!]condition
 
 A line commencing with whitespace is considered to be an additional
 condition to be ANDed with the preceeding line's rule conditions:
 
-  [!][=]targets tag condition1
+  [=][!]targets tag condition1
                     condition2
                     condition3
 
 =head3 Delivery Flags
 
-Rules may commences with either or both of the following mode indicators:
-
-  ! An exclaimation symbol ('!') indicates that an alert should be
-    emitted at the end of filing if this rule was matched.
+The following indicators may preceed, in order, the targets:
 
   = An equals symbol ('=') indicates that rule processing should
     cease at this rule if it matches. Normally all matching rules are
     applied.
 
+  ! An exclaimation symbol ('!') indicates that an alert should be
+    emitted at the end of filing if this rule was matched.
+
 =head3 Targets
 
-The "targets" is a comma separated list of mail destinations; a
-target takes the form of a sequence of nonwhitespace non-comma
+The "targets" is a comma separated list of actions to perform with a message.
+Syntacticly, a target takes the form of a sequence of nonwhitespace non-comma
 characters, or a string value in double quotes.
+Note that a shell command in quotes will need any backslashes doubled,
+as the quoted string parse strips one level of backslash escaping.
+
+Targets come in two flavours, deliverable targets and action targets.
+Deliverable targets are those which deliver a message to some location
+such as a mail folder, email address or a shell pipeline.
+Action targets affect the filer status or the message itself,
+such as a variable assignment or a message header modification.
+
+The action targets are applied as they are encountered in matching rules.
+The deliverable targets are accrued for delivery at the end of the rules.
+
+If no deliverable targets have been accrued then the default target,
+specified by the B<$DEFAULT> environment variable, is used.
+There is no default for B<$DEFAULT>;
+if it is not specified the message is not considered to be successfully delivered.
+Most rules files commence with a definition of the default delivery target, for example:
+
+  DEFAULT=unmatched
+
+The message must be successfully handed to all targets of all matching
+rules for the filter run to be considered successfully filtered.
+If all delivery attempts succeed, the original message is removed from the Maildir.
+Otherwise the message remains in the Maildir and is ignored on subsequent polls.
+
+The variable target types are listed below in parse order.
+
+=head4 Variable Assignment
+
+A target of the form:
+
+  VARIABLE=value
+
+or
+
+  VARIABLE="quoted-value"
+
+assigns the value to the named environment variable.
+If unquoted, I<value> consists of nonwhitespace characters excluding the comma.
+If quoted, I<quoted-value> is a slosh escaped string.
+Note that the value is subject to parameter substitution and the
+associated slosh escaping and therefore sloshes needed for that
+latter phase will need doubling in the B<">I<quoted-value>B<"> form.
+
+=head4 Header Substitution
+
+A target of the form:
+
+  [header[,header...]:]s/this/that/
+
+performs a regular expression match on the specified headers
+(by default the "Subject:" header)
+and replaces the match with the second string, subject to parameter substitution.
+The available parameter names consist of:
+
+=over 6
+
+=item the existing header values
+
+The parameter name is the header name in lowercase with dash ('-') replaced by underscore ('_'); example: "message_id".
+The parameter value is the last header value with CR and LF stripped per RFC2822 part 2.2.3.
+
+=item name subexpressions from the regular expression
+
+These names and values override any values from the existing header values.
+
+=item numeric subexpressions
+
+B<$0> expands to the whole matched expression, and B<$1> and so on to bracketed subexpressions from left to right.
+
+=back
+
+=head4 Functions on Headers
+
+A target of the form:
+
+  header[,header...]:function[(arg,...)]
+
+applies the named I<function> to each instance of the named headers.
+If there are no I<arg>s then the parentheses may be omitted.
+
+The I<function> may be either a dotted name of the form I<module_name>B<.>I<function_name> or a simple I<function_name>.
+
+With the former form, the Python module named I<module_name> is imported and the name I<function_name> obtained from it.
+
+For convenience, each I<arg> may take the following forms:
+
+=over 6
+
+=item I<NAME>
+
+An uppercase identifier such as a group name, passed in as a string.
+
+=item B<@>I<domain>
+
+An at symbol ("@") followed by a domain name, passed in as a string.
+
+=item I<number>
+
+A nonnegative integer, passed in as an integer.
+
+=item B<">I<quoted-value>B<">
+
+A quoted value subject to parameter substitution.
+The value after substitution is passed in as a string.
+
+=back
+
+The function obtained is called as follows:
+
+  I<function_name>(I<filer>, I<header_names>, *I<args>)
+
+where I<filer> is the internal MessageFiler instance associated with this message,
+I<header_names> and I<args> the list of headers and the I<args> supplied with the target respectively.
+
+The following simple function names are supported:
+
+=head4 Message Flags
+
+A target consisting a single capital letter specifies a flag to be
+applied to the message.
+Supported flags are:
+
+  D Draft
+  F Flagged
+  P Passed
+  R Replied
+  S Seen
+  T Trashed
 
 =head4 Deliver to Program
 
@@ -67,21 +191,19 @@ If the command exits with a zero exit status is it considered to have run succes
 
 Otherwise, a target containing an "at" symbol ('@') is considered
 an email address to which to send a copy of the message.
-It the mail system accepts the message it is considered to have been dispatched successfully.
+If the mail system accepts the message it is considered to have been dispatched successfully.
 
-=head4 Deliver to Maildir
+To avoid avoid blowback to the original author or source of the message
+the B<Sender:>, B<Return-Path:> and B<Errors-To:> headers are set to the value of the environment variable B<$EMAIL>,
+which is expected to be a bare I<localpart>B<@>I<domain> address.
+If B<$EMAIL> is not set then the message is not sent and delivery is not considered successful.
 
-Otherwise, a target is considered to indicate a Maildir into which the message should be placed.
+To avoid spurious delivery loop detection, the B<Delivered-To:> header is cleared.
 
-=head3 Delivery
+=head4 Deliver to Mail Folder
 
-The message must be successfully delivered to all targets of all matching
-rules for the filter run to be considered successfully filtered.
-If the message matched no rules, delivery is attempted to the targets
-specified by the $DEFAULT environment variable.
-
-If all delivery attempt succeeded, the original message is remove from the Maildir.
-Otherwise the message remains in the Maildir and is ignored on subsequent polls.
+Otherwise, a target is considered to indicate a Maildir or a UNIX mbox
+into which the message should be placed.
 
 =head3 Conditions
 
@@ -92,8 +214,8 @@ Example:
 
 matches a message not from "cs@zip.com.au".
 
-Conditions are tested against specific message headers. Unless
-specified, these headers are the 'To:', 'CC:' and 'BCC:' headers.
+Conditions are tested against specific message headers.
+Unless specified, these headers are the 'To:', 'CC:' and 'BCC:' headers.
 Example:
 
   cs@zip.com.au
@@ -107,8 +229,17 @@ Example:
 
 matches a message from "cs@zip.com.au" or addressed to "cs@zip.com.au" in the 'To:' header.
 
-A header may be tested against a regular expression instead of by email address:
-Example:
+A header may be matched against any of multiple addresses by grouping the alternatives in brackets, example:
+
+  to,cc:(python-list@python.org|@example.com|ME|THEM)
+
+which tests all the addresses in the headers 'To:' or 'CC:' against:
+the address B<python-list@python.org>,
+the mail domain B<@example.com>,
+either of the mail address groups B<me> or B<them>.
+The mail address groups come from the maildb(1cs), if any.
+
+A header may be tested against a regular expression instead of by email address by preceding it with a slash ('B</>'), example:
 
   subject:/icewm-Bugs
 

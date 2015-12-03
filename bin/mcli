@@ -4,5 +4,6 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
-set -uex
-exec python -m cs.app.megacli ${1+"$@"}
+set -ue
+[ -t 2 ] && set -x
+exec py26+ -m cs.app.megacli ${1+"$@"}

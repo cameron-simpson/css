@@ -4,103 +4,44 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
+from __future__ import print_function
 import sys
+from functools import partial
 import time
 import unittest
-if sys.hexversion < 0x03000000:
-  from Queue import Queue
-else:
-  from queue import Queue
-from cs.threads import TimerQueue, runTree, RunTreeOp, RUN_TREE_OP_ONE_TO_MANY
-from cs.later import Later
-##from cs.logutils import D
+from cs.debug import thread_dump
+from cs.logutils import X
+from .threads import WorkerThreadPool
 
-def D(msg, *a):
-  if a:
-    msg = msg % a
-  with open('/dev/tty', 'a') as tty:
-    print >>tty, msg
-
-class TestTimerQueue(unittest.TestCase):
+class TestWorkerThreadPool(unittest.TestCase):
 
   def setUp(self):
-    self.TQ = TimerQueue()
-    self.Q = Queue()
+    self.pool = WorkerThreadPool()
 
   def tearDown(self):
-    self.TQ.close()
+    self.pool.shutdown()
 
-  def test00now(self):
-    t0 = time.time()
-    self.TQ.add(time.time(), lambda: self.Q.put(None))
-    self.Q.get()
-    t1 = time.time()
-    self.assertTrue(t1-t0 < 0.1, "took too long to run a function 'now'")
+  def _testfunc(self, *a, **kw):
+    ##X("_testfunc: a=%r, kw=%r", a, kw)
+    return a, kw
 
-  def test01later1(self):
-    t0 = time.time()
-    self.TQ.add(time.time()+1, lambda: self.Q.put(None))
-    self.Q.get()
-    t1 = time.time()
-    self.assertTrue(t1-t0 >= 1, "ran function earlier than now+1")
+  def test00null(self):
+    pass
 
-  def test02timeorder1(self):
-    t0 = time.time()
-    self.TQ.add(time.time()+3, lambda: self.Q.put(3))
-    self.TQ.add(time.time()+2, lambda: self.Q.put(2))
-    self.TQ.add(time.time()+1, lambda: self.Q.put(1))
-    x = self.Q.get()
-    self.assertEqual(x, 1, "expected 1, got x=%s" % (x,))
-    t1 = time.time()
-    self.assertTrue(t1-t0 < 1.1, "took more than 1.1s to get first result")
-    y = self.Q.get()
-    self.assertEqual(y, 2, "expected 2, got y=%s" % (y,))
-    t1 = time.time()
-    self.assertTrue(t1-t0 < 2.1, "took more than 2.1s to get second result")
-    z = self.Q.get()
-    self.assertEqual(z, 3, "expected 3, got z=%s" % (z,))
-    t1 = time.time()
-    self.assertTrue(t1-t0 < 3.1, "took more than 3.1s to get third result")
+  def test01run1(self):
+    f = partial(self._testfunc, 1,2,3, a=4, b=5)
+    def deliver(result):
+      ##X("result = %r", result)
+      pass
+    self.pool.dispatch(f, deliver=deliver)
 
-class TestRuntree(unittest.TestCase):
-
-  def setUp(self):
-    self.TQ = TimerQueue()
-    self.Q = Queue()
-
-  def tearDown(self):
-    self.TQ.close()
-
-  # A many to many identity function.
-  @staticmethod
-  def f_same(input, state):
-    return input
-  # A one to (one,) identity function.
-  @staticmethod
-  def f_same_one2many(input, state):
-    return (input,)
-  @staticmethod
-  def f_incr(items, state):
-    return [ n+1 for n in items ]
-
-  def test_00_helpers(self):
-    self.assertEqual(self.f_same((1,), None), (1,))
-    self.assertEqual(self.f_incr((1,2), None), [2,3])
-
-  def test__01_no_operators(self):
-    L = Later(1)
-    self.assertEqual(runTree( [1,2,3], [], None, L), [1,2,3])
-    L.close()
-
-  def test__01_same(self):
-    L = Later(1)
-    self.assertEqual(list(runTree( [1,2,3], [ RunTreeOp(self.f_same, False, False, None) ], None, L )), [1,2,3])
-    L.close()
-
-  def test__01_same_fork(self):
-    L = Later(1)
-    self.assertEqual(list(runTree( [1,2,3], [ RunTreeOp(self.f_same_one2many, True, True, RUN_TREE_OP_ONE_TO_MANY) ], None, L)), [1,2,3])
-    L.close()
+  def test01run16(self):
+    def deliver(result):
+      ##X("result = %r", result)
+      pass
+    for n in range(16):
+      f = partial(self._testfunc, 1,2,3, a=4, b=5, n=n)
+      self.pool.dispatch(f, deliver=deliver)
 
 def selftest(argv):
   unittest.main(__name__, None, argv)

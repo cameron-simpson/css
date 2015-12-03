@@ -5,46 +5,79 @@
 #
 
 from __future__ import with_statement, print_function
+
+DISTINFO = {
+    'description': "convenience functions for working with URLs",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'requires': ['lxml', 'beautifulsoup4', 'cs.excutils', 'cs.lex', 'cs.logutils', 'cs.threads', 'cs.py3', 'cs.obj'],
+}
+
+import os
 import os.path
 import sys
+import errno
+import time
 from itertools import chain
 from bs4 import BeautifulSoup, Tag, BeautifulStoneSoup
 try:
   import lxml
-  BS4MODE = 'lxml'
 except ImportError:
-  BS4MODE = None
+  try:
+    if sys.stderr.isatty():
+      print("%s: warning: cannot import lxml for use with bs4" % (__file__,), file=sys.stderr)
+  except AttributeError:
+    pass
 from netrc import netrc
 import socket
-from urllib2 import urlopen, Request, HTTPError, URLError, \
+try:
+  from urllib.request import Request, HTTPError, URLError, \
+            HTTPPasswordMgrWithDefaultRealm, HTTPBasicAuthHandler, \
+            build_opener
+  from urllib.parse import urlparse, urljoin
+  from html.parser import HTMLParseError
+except ImportError:
+  from urllib2 import Request, HTTPError, URLError, \
 		    HTTPPasswordMgrWithDefaultRealm, HTTPBasicAuthHandler, \
 		    build_opener
-from urlparse import urlparse, urljoin
-from HTMLParser import HTMLParseError
+  from urlparse import urlparse, urljoin
+  from HTMLParser import HTMLParseError
 try:
   import xml.etree.cElementTree as ElementTree
 except ImportError:
   import xml.etree.ElementTree as ElementTree
 from threading import RLock
+from cs.excutils import logexc
 from cs.lex import parseUC_sAttr
-from cs.logutils import Pfx, pfx_iter, debug, error, warning, exception, D
+from cs.logutils import Pfx, pfx_iter, debug, error, warning, exception, D, X
 from cs.threads import locked_property
-from cs.py3 import StringIO
+from cs.py3 import ustr, unicode
+from cs.obj import O
 
-def URL(U, referer, user_agent=None):
+def isURL(U):
+  ''' Test if an object `U` is an URL instance.
+  '''
+  return isinstance(U, _URL)
+
+def URL(U, referer, **kw):
   ''' Factory function to return a _URL object from a URL string.
       Handing it a _URL object returns the object.
   '''
-  t = type(U)
-  if t is not _URL:
-    U = _URL(U)
-  if user_agent is None:
-    if referer and isinstance(referer, _URL):
-      user_agent = referer.user_agent
-  if user_agent:
-    U.user_agent = user_agent
-  if referer:
-    U.referer = URL(referer, None, user_agent=user_agent)
+  if not isURL(U):
+    ##D("new U %r (ref=%r)", U, referer)
+    U = _URL(ustr(U))
+    U._init(referer=referer, **kw)
+  else:
+    if U.referer is None and referer is not None:
+      ##D("old U %r, updating referer to %r", U, referer)
+      U.referer = referer
+    else:
+      ##D("old U %r (ignoring ref=%r)", U, referer)
+      pass
   return U
 
 class _URL(unicode):
@@ -52,23 +85,37 @@ class _URL(unicode):
       Subclasses unicode.
   '''
 
-  def __init__(self, s, referer=None, user_agent=None):
-    self.referer = URL(referer) if referer else referer
+  def _init(self, referer=None, user_agent=None, opener=None):
+    ''' Initialise the _URL.
+        `s`: the string defining the URL.
+        `referer`: the referring URL.
+        `user_agent`: User-Agent string, inherited from `referer` if unspecified,
+                  "css" if no referer.
+        `opener`: urllib2 opener object, inherited from `referer` if unspecified,
+                  made at need if no referer.
+    '''
+    self.referer = URL(referer, None) if referer else referer
     self.user_agent = user_agent if user_agent else self.referer.user_agent if self.referer else None
+    self._opener = opener
     self._parts = None
     self.flush()
     self._lock = RLock()
-    self._content = None
-    self._parsed = None
+    self.flush()
+    self.retry_timeout = 3
 
   def __getattr__(self, attr):
+    ''' Ad hoc attributes.
+        Upper case attributes named "FOO" parse the text and find the (sole) node named "foo".
+        Upper case attributes named "FOOs" parse the text and find all the nodes named "foo".
+    '''
     k, plural = parseUC_sAttr(attr)
     if k:
-      nodes = self.parsed.findAll(k.lower())
+      P = self.parsed
+      nodes = P.find_all(k.lower())
       if plural:
         return nodes
       return the(nodes)
-    return 
+    raise AttributeError(attr)
 
   def flush(self):
     ''' Forget all cached content.
@@ -80,28 +127,81 @@ class _URL(unicode):
     self._content_type = None
     self._parsed = None
     self._xml = None
-    self._opener = None
+    self._fetch_exception = None
+
+  @property
+  def opener(self):
+    if self._opener is None:
+      if self.referer is not None and self.referer._opener is not None:
+        self._opener = self.referer._opener
+      else:
+        o = build_opener()
+        o.add_handler(HTTPBasicAuthHandler(NetrcHTTPPasswordMgr()))
+        self._opener = o
+    return self._opener
+
+  def _request(self, method):
+    class MyRequest(Request):
+      def get_method(self):
+        return method
+    hdrs = {}
+    if self.referer:
+      hdrs['Referer'] = self.referer
+    hdrs['User-Agent'] = self.user_agent if self.user_agent else os.environ.get('USER_AGENT', 'css')
+    url = 'file://'+self if self.startswith('/') else self
+    rq = MyRequest(url, None, hdrs)
+    return rq
+
+  def _response(self, method):
+    rq = self._request(method)
+    opener = self.opener
+    retries = self.retry_timeout
+    with Pfx("open(%s)", rq):
+      while retries > 0:
+        now = time.time()
+        try:
+          rsp = opener.open(rq)
+        except OSError as e:
+          if e.errno == errno.ETIMEDOUT:
+            elapsed = time.time() - now
+            warning("open %s: %s; elapsed=%gs", self, e, elapsed)
+            if retries > 0:
+              retries -= 1
+            else:
+              raise
+        except HTTPError as e:
+          warning("open %s: %s", self, e)
+          raise
+        else:
+          # success, exit retry loop
+          break
+    return rsp
 
   def _fetch(self):
     ''' Fetch the URL content.
+        If there is an HTTPError, report the error, flush the
+        content, set self._fetch_exception.
+        This means that that accessing the self.content property
+        will always attempt a fetch, but return None on error.
     '''
     with Pfx("_fetch(%s)", self):
-      hdrs = {}
-      if self.referer:
-        hdrs['Referer'] = self.referer
-      hdrs['User-Agent'] = self.user_agent if self.user_agent else 'css'
-      url = 'file://'+self if self.startswith('/') else self
-      rq = Request(url, None, hdrs)
-      auth_handler = HTTPBasicAuthHandler(NetrcHTTPPasswordMgr())
-      opener = build_opener(auth_handler)
-      debug("open URL...")
-      rsp = opener.open(rq)
-      H = rsp.info()
-      self._content_type = H.gettype()
-      self._content = rsp.read()
-      debug("URL: content-type=%s, length=%d", self._content_type, len(self._content))
-      self._parsed = None
+      try:
+        rsp = self._response('GET')
+        H = rsp.info()
+        self._info = rsp.info()
+        self._content = rsp.read()
+        self._parsed = None
+      except HTTPError as e:
+        error("error with GET: %s", e)
+        self.flush()
+        self._fetch_exception = e
 
+  def HEAD(self):
+    rsp = self._response('HEAD')
+    rsp.read()
+    return rsp
+
+  @logexc
   def get_content(self, onerror=None):
     ''' Probe URL for content to avoid exceptions later.
         Use, and save as .content, `onerror` in the case of HTTPError.
@@ -127,7 +227,20 @@ class _URL(unicode):
     '''
     if self._content is None:
       self._fetch()
-    return self._content_type
+    try:
+      ctype = self._info.get_content_type()
+    except AttributeError as e:
+      warning("%r.content_type: self._info.get_content_type() raises %s", self, e)
+      ctype = None
+    return ctype
+
+  @locked_property
+  def content_transfer_encoding(self):
+    ''' The URL content tranfer encoding.
+    '''
+    if self._content is None:
+      self._fetch()
+    return self._info.getencoding()
 
   @property
   def domain(self):
@@ -144,8 +257,13 @@ class _URL(unicode):
     ''' The URL content parsed as HTML by BeautifulSoup.
     '''
     content = self.content
+    if self.content_type == 'text/html':
+      parser_names = ('html5lib', 'html.parser', 'lxml', 'xml')
+    else:
+      parser_names = ('lxml', 'xml')
     try:
-      P = BeautifulSoup(content.decode('utf-8', 'replace'), BS4MODE)
+      P = BeautifulSoup(content.decode('utf-8', 'replace'), 'lxml')
+      ##P = BeautifulSoup(content.decode('utf-8', 'replace'), list(parser_names))
     except Exception as e:
       exception("%s: .parsed: BeautifulSoup(unicode(content)) fails: %s", self, e)
       with open("cs.urlutils-unparsed.html", "wb") as bs:
@@ -153,12 +271,15 @@ class _URL(unicode):
       raise
     return P
 
-  @property
+  def feedparsed(self):
+    ''' A parse of the content via the feedparser module.
+    '''
+    import feedparser
+    return feedparser.parse(self.content)
+
+  @locked_property
   def xml(self):
-    if self._xml is None:
-      content = self.content
-      self._xml = ElementTree.XML(content.decode('utf-8', 'replace'))
-    return self._xml
+    return ElementTree.XML(self.content.decode('utf-8', 'replace'))
 
   @property
   def parts(self):
@@ -185,6 +306,12 @@ class _URL(unicode):
     ''' The URL path as returned by urlparse.urlparse.
     '''
     return self.parts.path
+
+  @property
+  def path_elements(self):
+    ''' Return the non-empty path components.
+    '''
+    return [ w for w in self.path.strip('/').split('/') if w ]
 
   @property
   def params(self):
@@ -240,16 +367,16 @@ class _URL(unicode):
   def basename(self):
     return os.path.basename(self.path)
 
-  def findAll(self, *a, **kw):
-    ''' Convenience routine to call BeautifulSoup's .findAll() method.
+  def find_all(self, *a, **kw):
+    ''' Convenience routine to call BeautifulSoup's .find_all() method.
     '''
     parsed = self.parsed
     if not parsed:
       error("%s: parse fails", self)
       return ()
-    return parsed.findAll(*a, **kw)
+    return parsed.find_all(*a, **kw)
 
-  def xmlFindall(self, match):
+  def xml_find_all(self, match):
     ''' Convenience routine to call ElementTree.XML's .findall() method.
     '''
     return self.xml.findall(match)
@@ -267,8 +394,11 @@ class _URL(unicode):
     return self
 
   @property
-  def title(self):
-    return self.parsed.title.string
+  def page_title(self):
+    t = self.parsed.title
+    if t is None:
+      return ''
+    return t.string
 
   def hrefs(self, absolute=False):
     ''' All 'href=' values from the content HTML 'A' tags.
@@ -290,7 +420,7 @@ class _URL(unicode):
     if 'absolute' in kw:
       absolute = kw['absolute']
       del kw['absolute']
-    for A in self.findAll(*a, **kw):
+    for A in self.find_all(*a, **kw):
       try:
         src = A['src']
       except KeyError:
@@ -306,7 +436,7 @@ def skip_errs(iterable):
   I = iter(iterable)
   while True:
     try:
-      i = I.next()
+      i = next(I)
     except StopIteration:
       break
     except (URLError, HTTPError) as e:

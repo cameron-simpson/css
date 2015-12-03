@@ -4,17 +4,42 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
-import os
-import re
+from __future__ import print_function
 
-def winsize(f):
-  '''   Return a (rows, columns) tuple or None for the specified file object.
+DISTINFO = {
+    'description': "functions related to terminals",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Environment :: Console",
+        "Operating System :: POSIX",
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        "Topic :: Terminals",
+        ],
+}
+
+import re
+from subprocess import Popen, PIPE
+from collections import namedtuple
+
+WinSize = namedtuple('WinSize', 'rows columns')
+
+def ttysize(fd):
+  ''' Return a (rows, columns) tuple for the specified file descriptor.
+      If the window size cannot be determined, None will be returned
+      for either or both of rows and columns.
   '''
-  fd = os.dup(f.fileno()) # obtain fresh fd to pass to the shell
-  sttycmd = "stty -a <&" + str(fd) + " 2>/dev/null"
-  stty = os.popen(sttycmd).read()
-  os.close(fd)
-  m = re.compile(r' rows (\d+); columns (\d+)').search(stty)
-  if not m:
+  if not isinstance(fd, int):
+    fd = fd.fileno()
+  P = Popen(['stty', '-a'], stdin=fd, stdout=PIPE, universal_newlines=True)
+  stty = P.stdout.read()
+  xit = P.wait()
+  if xit != 0:
     return None
-  return (int(m.group(1)), int(m.group(2)))
+  m = re.compile(r' rows (\d+); columns (\d+)').search(stty)
+  if m:
+    rows, columns = int(m.group(1)), int(m.group(2))
+  else:
+    rows, columns = None, None
+  return WinSize( rows, columns )

@@ -6,7 +6,6 @@
 
 import sys
 import cs.mail
-from cs.misc import progress
 
 maildir=cs.mail.Maildir(sys.argv[1])
 fp=None
@@ -15,7 +14,7 @@ for line in sys.stdin:
   if line[:5] == "From ":
     if fp is not None:
       newname=fp.close()
-      progress(newname)
+      print newname
     fp=maildir.newItem()
     fp.write("From_: ")
     fp.write(line[5:])
@@ -24,6 +23,6 @@ for line in sys.stdin:
 
 if fp is not None:
   newname=fp.close()
-  progress(newname)
+  print newname
 
 sys.exit(0)

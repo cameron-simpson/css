@@ -14,7 +14,7 @@ def register_with(nodedb, scheme='cs.venti'):
                             dirent_tobytes, dirent_frombytes)
 
 def dirent_totext(D):
-  return D.textEncode()
+  return D.textencode()
 
 def dirent_fromtext(value):
   D, name = cs.venti.dir.resolve(value)

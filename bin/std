@@ -7,7 +7,14 @@
 @ARGV = time if ! @ARGV;
 
 for (@ARGV)
-	{ next if !/^\d+$/;
+	{ if (!/^(\d+)(\.\d+)?/) {
+            warn "ignoring: \"$_\"";
+            next;
+          }
+          if ($') {
+            warn "discarding: \"$'\"";
+          }
+          $_ = $1;
 
 	  ($sec,$min,$hr,$mday,$mon,$yr,@etc)=gmtime($_);
 	  print "$_:\tgmt: ", &dmyhms2txt($mday,$mon+1,$yr+1900,$hr,$min,$sec);

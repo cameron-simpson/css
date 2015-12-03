@@ -70,11 +70,17 @@ the I<key> supplied.
 
 sub keypath($)
 { local($_)=@_;
-  ##s/_/__/g; # to make au.com.zip.cs.Lockdir a bit simpler
-  s://+:/:g;
-  s:/$::;
-  s:^/::;
-  s:/:_:g;
+  if (1) {
+    if (!length || m:/:) {
+      die "illegal lock name \"$_\"";
+    }
+  } else {
+    ##s/_/__/g; # to make au.com.zip.cs.Lockdir a bit simpler
+    s://+:/:g;
+    s:/$::;
+    s:^/::;
+    s:/:_:g;
+  }
   "$cs::Lock::Lockdir/$_";
 }
 

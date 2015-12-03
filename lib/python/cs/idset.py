@@ -2,7 +2,7 @@ import os
 import os.path
 import re
 from cs.fileutils import mkdirn
-from cs.obj import WithUCAttrs
+from cs.mixin.ucattrs import WithUC_Attrs
 
 numeric_re = re.compile(r'^(0|[1-9][0-9]*)$')
 def is_idnum(s):
@@ -12,7 +12,7 @@ def is_name(s):
 def is_entryKey(key):
   return len(key) > 0 and key[0] != '.' and key.find(os.sep) < 0
 
-class IdSet(WithUCAttrs):
+class IdSet(WithUC_Attrs, object):
   def __init__(self,name,basedir=None):
     if basedir is None:
       basedir=os.path.join(os.environ['HOME'],'var','idsets')
@@ -37,14 +37,14 @@ class IdSet(WithUCAttrs):
   def byName(self,name):
     if is_name(name):
       try:
-        sym=os.readlink(os.path.join(self.path,name))
-        if is_idnum(sym):
-          id=int(sym)
-          E=self[id]
-          if E['name'] == name:
-            return E
-      except:
-        pass
+        sym = os.readlink(os.path.join(self.path,name))
+      except Exception:
+        return None
+      if is_idnum(sym):
+        id = int(sym)
+        E = self[id]
+        if E['name'] == name:
+          return E
     return None
 
   def _newid(self):

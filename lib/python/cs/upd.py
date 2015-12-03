@@ -1,65 +1,40 @@
+#!/usr/bin/python
+#
+# Single line status updates.
+#   - Cameron Simpson <cs@zip.com.au>
+#
+
 from __future__ import with_statement
+
+DISTINFO = {
+    'description': "single line status updates with minimal update sequences",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'requires': ['cs.lex', 'cs.tty'],
+}
+
 from threading import Lock
 import threading
 from contextlib import contextmanager
 import atexit
 import logging
 from logging import StreamHandler
-from subprocess import Popen, PIPE
-from cs.ansi_colour import colourise
-from cs.logutils import Pfx
 from cs.lex import unctrl
+from cs.tty import ttysize
 
-instances=[]
+instances = []
 
 def cleanupAtExit():
   global instances
   for i in instances:
     i.close()
-  instances=()
+  instances = ()
 
 atexit.register(cleanupAtExit)
-
-class UpdHandler(StreamHandler):
-
-  def __init__(self, strm=None, nlLevel=None, ansi_mode=None):
-    ''' Initialise the UpdHandler.
-        `strm` is the output stream, default sys.stderr.
-        `nlLevel` is the logging level at which conventional line-of-text
-        output is written; log messages of a lower level go via the
-        update-the-current-line method. Default is logging.WARNING.
-        If `ansi_mode` is None, set if from strm.isatty().
-        A true value causes the handler to colour certain logging levels
-        using ANSI terminal sequences.
-    '''
-    if strm is None:
-      strm = sys.stderr
-    if nlLevel is None:
-      nlLevel = logging.WARNING
-    if ansi_mode is None:
-      ansi_mode = strm.isatty()
-    StreamHandler.__init__(self, strm)
-    self.__upd = Upd(strm)
-    self.__nlLevel = nlLevel
-    self.__ansi_mode = ansi_mode
-    self.__lock = Lock()
-
-  def emit(self, logrec):
-    with self.__lock:
-      if logrec.levelno >= self.__nlLevel:
-        with self.__upd._withoutContext():
-          if self.__ansi_mode:
-            if logrec.levelno >= logging.ERROR:
-              logrec.msg = colourise(logrec.msg, 'red')
-            elif logrec.levelno >= logging.WARN:
-              logrec.msg = colourise(logrec.msg, 'yellow')
-          StreamHandler.emit(self, logrec)
-      else:
-        self.__upd.out(logrec.getMessage())
-
-  def flush(self):
-    if self.__upd._backend:
-      self.__upd._backend.flush()
 
 class Upd(object):
 
@@ -68,20 +43,13 @@ class Upd(object):
     if columns is None:
       columns = 80
       if backend.isatty():
-        P=Popen(['stty', '-a'], stdin=backend, stdout=PIPE)
-        stty=P.stdout.read()
-        P.wait()
-        P = None
-        fields = [ _.strip() for _ in stty.split('\n')[0].split(';') ]
-        for f in fields:
-          if f.endswith(' columns'):
-            columns = int(f[:-8])
-          elif f.startswith("columns "):
-            columns = int(f[8:])
-    self._backend=backend
+        rc = ttysize(backend)
+        if rc.columns is not None:
+          columns = rc.columns
+    self._backend = backend
     self.columns = columns
-    self._state=''
-    self._lock=threading.RLock()
+    self._state = ''
+    self._lock = threading.RLock()
     global instances
     instances.append(self)
 
@@ -134,10 +102,16 @@ class Upd(object):
   def nl(self, txt, noStrip=False):
     self.without(self._backend.write, txt+'\n', noStrip=noStrip)
 
+  def flush(self):
+    ''' Flush the output stream.
+    '''
+    if self._backend:
+      return self._backend.flush()
+
   def close(self):
     if self._backend is not None:
       self.out('')
-      self._backend=None
+      self._backend = None
 
   def closed(self):
     return self._backend == None
@@ -155,6 +129,6 @@ class Upd(object):
   @contextmanager
   def _withoutContext(self,noStrip=False):
     with self._lock:
-      old=self.out('', noStrip=noStrip)
+      old = self.out('', noStrip=noStrip)
       yield
       self.out(old, noStrip=True)

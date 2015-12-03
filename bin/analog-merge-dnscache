@@ -34,4 +34,4 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-sort -rn -- "$@" | keepfirst -2 | rewriteif "$output" sort -n
+exec rewriteif "$output" keepbest highest 1 2 "$@"

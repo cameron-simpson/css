@@ -1,6 +1,7 @@
 #!/usr/bin/perl -w
 #
 # Recode of Larry Wall's rename script.
+# See also convenience scripts "lc", "__" and "_%".
 #	- Cameron Simpson <cs@zip.com.au> 20aug2003
 #
 

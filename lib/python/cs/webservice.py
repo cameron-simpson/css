@@ -9,9 +9,9 @@ from __future__ import print_function
 import sys
 from ZSI import SoapWriter, ParsedSoap, TC
 import ZSI.wstools.Utility
-from StringIO import StringIO
+from io import StringIO
 import urllib2
-from cs.obj import objFlavour, T_MAP, T_SEQ
+from cs.obj import flavour, T_MAP, T_SEQ
 import cs.logutils
 from cs.logutils import LogTime, Pfx, error
 
@@ -110,7 +110,7 @@ def autoObjectify(O):
   '''
   if isinstance(O,AutoObject):
     return O
-  T=objFlavour(O)
+  T=flavour(O)
   if T is T_MAP:
     return AutoObject(O)
   if T is T_SEQ:

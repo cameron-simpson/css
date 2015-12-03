@@ -15,7 +15,19 @@ tsdir=
 iftsdir=
 
 cmd=`basename "$0"`
-usage="Usage: $cmd [-?] [-c config] [-d when] [-T tsdir] category log-line..."
+usage="Usage: $cmd [-?] [-c config] [-d when] [-T tsdir] category log-line...
+  -?    If the target timesheet directory is missing, just exit with a
+        non-zero status. Normally a usage error is emitted for catgeories
+        with no timesheet directory.
+  -c config
+        Specify the timesheet configuration file.
+        The default is CATEGORY.conf.sh in the timesheet directory.
+  -d when
+        Specify the date for this log message.
+        Default is today.
+  -T tsdir
+        Specify the timesheet directory.
+        Default: $HOME/category/timesheets/$USER"
 
 badopts=
 
@@ -48,8 +60,8 @@ fi
 ##[ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2; badopts=1; }
 [ $# -gt 0 ] || { echo "$cmd: missing log-line" >&2; badopts=1; }
 
-lccat=`printf "%s\n" "$category" | tr '[A-Z]' '[a-z]'`
-uccat=`printf "%s\n" "$category" | tr '[a-z]' '[A-Z]'`
+lccat=$( printf "%s\n" "$category" | tr '[A-Z]' '[a-z]' )
+uccat=$( printf "%s\n" "$category" | tr '[a-z]' '[A-Z]' )
 [ -n "$tsdir" ] || tsdir=$HOME/$lccat/timesheets/$USER
 if [ ! -d "$tsdir/." ]
 then
@@ -79,30 +91,30 @@ fi
 : ${TSDATEFMT_DAYINDENT:='  %H:%M '}
 : ${TSDATEFMT_FOOTER:=''}
 
-day=`monday "$when"`
-tsfile=`date -d "$day" "+$TSDATEFMT_FILENAME"`
+day=$( monday "$when" )
+tsfile=$( date -d "$day" "+$TSDATEFMT_FILENAME" )
 
 if [ ! -s "$tsfile" ]
 then
   {
-    ymd=`date -d "$day" '+%Y-%m-%d'`
-    date2printf=`date -d "$ymd" "+$TSDATEFMT_HEADER"`
+    ymd=$( date -d "$day" '+%Y-%m-%d' )
+    date2printf=$( date -d "$ymd" "+$TSDATEFMT_HEADER" )
     printf "$date2printf"
     for n in 0 1 2 3 4 5 6
     do
-      ymd=`date -d "$day" '+%Y-%m-%d'`
-      wday=`date -d "$day" '+%A'`
-      date2printf=`date -d "$ymd" "+$TSDATEFMT_DAYHEADER"`
+      ymd=$( date -d "$day" '+%Y-%m-%d' )
+      wday=$( date -d "$day" '+%A' )
+      date2printf=$( date -d "$ymd" "+$TSDATEFMT_DAYHEADER" )
       printf "$date2printf"
       [ -z "$TSDATEFMT_DAYFOOTER" ] || {
-        date2printf=`date -d "$ymd" "+$TSDATEFMT_DAYFOOTER"`
+        date2printf=$( date -d "$ymd" "+$TSDATEFMT_DAYFOOTER" )
         printf "$date2printf"
       }
       echo
-      day=`date -d "$ymd tomorrow"`
+      day=$( date -d "$ymd tomorrow" )
     done
-    ymd=`date -d "$day" '+%Y-%m-%d'`
-    date2printf=`date -d "$ymd" "+$TSDATEFMT_FOOTER"`
+    ymd=$( date -d "$day" '+%Y-%m-%d' )
+    date2printf=$( date -d "$ymd" "+$TSDATEFMT_FOOTER" )
     printf "$date2printf"
   } >>"$tsfile"
 fi
@@ -113,10 +125,10 @@ addline()
   _al_tsfile=$1
   _al_when=$2
   shift; shift
-  _al_date2printf=`date -d "$_al_when" "+$TSDATEFMT_DAYHEADER"`
-  _al_dayheader=`printf "$_al_date2printf" | sed -n '/^$/!{p;q;}'`
-  _al_date2printf=`date -d "$_al_when" "+$TSDATEFMT_DAYINDENT"`
-  _al_line=`printf "$_al_date2printf%s" "$*"`
+  _al_date2printf=$( date -d "$_al_when" "+$TSDATEFMT_DAYHEADER" )
+  _al_dayheader=$( printf "$_al_date2printf" | sed -n '/^$/!{p;q;}' )
+  _al_date2printf=$( date -d "$_al_when" "+$TSDATEFMT_DAYINDENT" )
+  _al_line=$( printf "$_al_date2printf%s" "$*" | tr '\012' ';' )
   _al_sedf="/^$_al_dayheader\$/{
   :inday
   /^$/!{

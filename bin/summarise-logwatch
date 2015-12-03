@@ -26,6 +26,8 @@ s/  *$//
   /^--/d
   /^\*\*Unmatched Entries\*\*/d
   /^network unreachable resolving '/d
+  /^host unreachable resolving '/d
+  /^connection refused resolving '/d
   /^client .* query .* denied/d
   /^$/d
   s/^/named: /
@@ -137,6 +139,14 @@ s/  *$//
   /^vsftp: end .* exit=0$/d
   /^$/d
   s/^/secure-log: /
+  p
+  d
+}
+
+/^-*- up2date Begin -*-$/,/^-*- up2date End -*-$/{
+  /^--/d
+  /^updateLoginInfo() login info$/d
+  /^\*\*Unmatched Entries\*\*$/d
   p
   d
 }

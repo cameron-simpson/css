@@ -2,6 +2,8 @@ PREFIX          = /opt/css
 weblocal        = $(HOME)/@/ezos/html/cs/css
 ##hg_bitbucket    = https://bitbucket.org/cameron_simpson/css
 hg_bitbucket    = ssh://hg@bitbucket.org/cameron_simpson/css
+www_bitbucket   = https://bitbucket.org/cameron_simpson/css/commits/all
+title           = Cameron Simpson's Scripts
 
 target  = bin
 
@@ -32,16 +34,16 @@ pmFromHtml(html) = lib/$(html FPP :|::|/|).pm
 podFromMan(manf) = man/$(manf F).pod
 
 subdirs = $('*/.' GD)
-allscripts = $('bin/*' GF !/\./ + "rc.mobile")
+allscripts = $('bin/*' GF !/\./ +"bin/rc.mobile" F)
 
 scriptmandir = $(MANDIR)/man1
 scriptmans = $(scriptmandir)/$((allscripts)).1
 scriptfromman(manf) = $(manf FP)
 
-py2files        = $("lib/python/cs/*.py lib/python/cs/*.py lib/python/cs/*/*/*.py" G)
+py2files        = $("lib/python/cs/*.py lib/python/cs/*/*.py lib/python/cs/*/*/*.py" G)
 py3files        = $(py2files :|/python/|/python3/|)
 
-rsync = rsync -iO
+rsync = rsync -iO --exclude='.*.swp' --exclude='*.pyc'
 
 _help:
         @echo '_test              - do syntax checks and self tests (may set \$$MYKE_TEST_PYTHON_MODULES if desired)'
@@ -54,6 +56,21 @@ _help:
         @echo '_pending           - report unreleased changelog and [M]odified files'
         @echo '_release           - mark tip as new release'
         @echo '_freshmeat         - announce current release to freshmeat'
+        @echo '_updcss            - deploy current tip to /opt/css'
+        @echo '_tarball           - make a tarball of the tip'
+
+_updcss:
+        ./bin-cs/updcss
+
+_tarball:
+        set -uex \
+        rev=tip \
+        today=$$(daycode | tr -d -) \
+        tardir=css-$$rev-$$today \
+        tarball=$$tardir.tar.gz \
+        [ -d "$$tardir/." ] || mkdir "$$tardir" \
+        ./bin-cs/updcss -r "$$rev" "$$tardir" \
+        tar czf "$$tarball" "$$tardir"
 
 _test:
         find lib/python -type f -name '*.py[co]' -exec rm {} \;
@@ -61,7 +78,7 @@ _test:
 
 _test3:
         find lib/python -type f -name '*.py[co]' -exec rm {} \;
-        set -x; ./bin-cs/selftest -x -v --state state3 --pycmd python3 --python lib/python cs $$MYKE_TEST_PYTHON_MODULES
+        set -x; ./bin-cs/selftest -v --state state3 --pycmd python3 --python lib/python cs $$MYKE_TEST_PYTHON_MODULES
 
 _macrotest:
         echo $(py2files)
@@ -75,28 +92,34 @@ $(py3files): lib/python/$(@ :|lib/python3/||)
 _home:
         @skip=`hg status | sed -n 's:^? \(.*\):--exclude=/\1:p'` \
         binskip=`hg status | sed -n 's:^? bin/\(.*\):--exclude=/\1:p'` \
-        pfx bin $(rsync) -aO --delete \\
+        pfx bin $(rsync) -a --delete \\
                 --include=/CHANGELOG.txt \\
                 $$binskip \\
                 --include=synonyms/ \\
                 --exclude=squid_redirect \\
-                --exclude=.*.swp \\
                 --exclude=/\*/ \\
                 bin/. $(HOME)/bin/. \
         bosskip=`hg status | sed -n 's:^? bin-bos/\(.*\):--exclude=/\1:p'` \
-        pfx bin-bos $(rsync) -aO $$bosskip bin-bos/. $(HOME)/bin-bos/. \
+        pfx bin-bos $(rsync) -a --delete $$bosskip bin-bos/. $(HOME)/bin-bos/. \
         csskip=`hg status | sed -n 's:^? bin-cs/\(.*\):--exclude=/\1:p'` \
-        pfx bin-cs $(rsync) -aO $$csskip \\
+        pfx bin-cs $(rsync) -a --delete $$csskip \\
                 --exclude=/testzap \\
                 --exclude=/testpageurls \\
                 bin-cs/. $(HOME)/bin-cs/. \
         libskip=`hg status | sed -n 's:^? lib/\(.*\):--exclude=/\1:p'` \
-        pfx lib $(rsync) -aO --delete \\
-                --include=/CHANGELOG.txt \\
+        pfx lib $(rsync) -a --delete \\
+                --include=/js \\
+                --include=/js/cs \\
+                --exclude=/js/* \\
+                --include=/perl \\
+                --include=/perl/cs \\
+                --exclude=/perl/* \\
+                --include=/python \\
+                --include=/python/cs \\
+                --exclude=/python/* \\
                 $$libskip \\
-                --exclude=testdata/ \\
-                --exclude=*.pyc \\
-                --exclude=*.swp \\
+                --exclude=/* \\
+                --exclude=testdata* \\
                 lib/. $(HOME)/lib/.
 
 # squid_redirect
@@ -106,7 +129,7 @@ _deploy:
         :make _home
         OPTCSS=$(PREFIX) updcss
 
-_publish:
+_publish _pub:
         :make _publish_bitbucket
         :make _publish_ezos
 
@@ -115,7 +138,8 @@ _publish_ezos:
         syncezos
 
 _publish_bitbucket:
-        hg push $(hg_bitbucket)
+        hg push --new-branch $(hg_bitbucket)
+        @echo 'changes visible at $(www_bitbucket)'
 
 # mark the tip as a new release
 _release:
@@ -151,10 +175,10 @@ _podmans: $(podmans)
 
 $(podmans):     $(podFromMan($@))
         :make $(@D)/.
-        >>$@; $(rewrite) $@ pod2man --center="Cameron Simpson Scripts: $?" $?
+        >>$@; $(rewrite) $@ pod2man --center="$(title): $?" $?
         chmod 644 $@
         set -uex; htman=$(htmandir)/$(@F).html \
-        >>$$htman; $(rewrite) $$htman pod2html --title="Cameron Simpson Scripts: $?" $? \
+        >>$$htman; $(rewrite) $$htman pod2html --title="$(title): $?" $? \
         chmod 644 $$htman
 
 _pmmans: $(pmmans)
@@ -163,17 +187,16 @@ $(pmmans):	$(pmFromMan($@))
 	:make $(@D)/.
 	@if grep '^=head1 NAME' <$? >/dev/null \
 	then \
-	    >>$@; $(rewrite) $@ pod2man --center="Cameron Simpson Scripts: $?" $? \
+	    >>$@; $(rewrite) $@ pod2man --center="$(title): $?" $? \
 	    chmod 644 $@ \
 	    htman=$(htmandir)/$(@F).html \
-	    >>$$htman; $(rewrite) $$htman pod2html --title="Cameron Simpson Scripts: $?" $? \
+	    >>$$htman; $(rewrite) $$htman pod2html --title="$(title): $?" $? \
 	    chmod 644 $$htman \
 	else \
 	    : \
 	fi
 
 _scriptmans:
-	@echo make $@ ... \
         ( cd bin; exec egrep -l '^(# *)?=head1 NAME' $(allscripts) ) \\
 	| sed 's|.*|$(scriptmandir)/&.1|' \\
 	| xxargs $(MAKE) MANDIR=$(MANDIR)
@@ -184,15 +207,15 @@ $(scriptmandir)/%.1: bin/%
 	 case "`sed 1q <$?`" in \
 	    '#!/usr/bin/perl'*) \
 		grep '^=head1 NAME' <$? >/dev/null || exit 0 \
-		>>$@; $(rewrite) $@ pod2man --release=CSS --section=1cs --center="Cameron Simpson's Scripts" $? \
-		>>$$htman; $(rewrite) $$htman pod2html --title="Cameron Simpson's Scripts: $?" $? \
+		>>$@; $(rewrite) $@ pod2man --release=CSS --section=1cs --center="$(title)" $? \
+		>>$$htman; $(rewrite) $$htman pod2html --title="$(title): $?" $? \
 		;; \
 	    *) \
 		grep '^# *=head1 NAME' <$? >/dev/null || exit 0 \
 		tmp=$${TMPDIR:-/tmp}/$(@F).$$ \
 		unhashpod <$? >$$tmp \
-		>>$@; $(rewrite) $@ pod2man --section=1cs --center="Cameron Simpson's Scripts" $$tmp \
-		>>$$htman; $(rewrite) $$htman pod2html --title="Cameron Simpson's Scripts: $?" $$tmp \
+		>>$@; $(rewrite) $@ pod2man --section=1cs --center="$(title)" $$tmp \
+		>>$$htman; $(rewrite) $$htman pod2html --title="$(title): $?" $$tmp \
 		rm $$tmp \
 		;; \
 	 esac \

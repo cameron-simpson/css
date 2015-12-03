@@ -1,0 +1,69 @@
+#!/bin/sh
+#
+# Yet another wrapper for notmuch, to construct a results maildir from a
+# notmuch search.
+#       - Cameron Simpson <cs@zip.com.au> 18apr2014
+#
+
+set -ue
+
+doscreen=
+dothreads=
+subopts=
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-t] notmuch-search-terms...
+  -S    Do search in separate tmux/screen session.
+  -t    Include associated threads."
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -S) doscreen=1 ;;
+    -t) dothreads=1 subopts="$subopts $1" ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing notmuch-search-terms" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+if [ $doscreen ]
+then
+  label=NM_$cmd-`echo "$*" | tr ' :' --`
+  exec tm use-session "$label" "$0" "$@"
+fi
+ 
+exec 3<&0
+
+mdir=$( mkdirn "$TMPDIR/notmuch-result" )
+maildir "$mdir"
+
+set -x
+if [ $dothreads ]
+then
+  notmuch search --output=threads -- "$@" \
+  | while read -r tid
+    do  notmuch search --output=files -- "$tid"
+    done
+else
+  notmuch search --output=files -- "$@"
+fi \
+| egrep '/(new|cur)/[^/]+$' \
+| sort -u \
+| xxargs arg1 -end "$mdir/new" set-x ln -i -s
+
+mutt -e 'unset header_cache' -e 'push ",D$"' -f "$mdir" <&3 3<&-
+rm -r "$mdir"

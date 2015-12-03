@@ -33,6 +33,7 @@ case "$type" in
     *': '*'HTML document text'*)	mtype=text/html ;;
     *': '*'PostScript document'*)	mtype=application/postscript ;;
     *': '*'PDF document'*)		mtype=application/pdf ;;
+    *': '*'vCalendar calendar file'*)	mtype=text/calendar ;;
     *': '*'gzip compressed data'*)	mtype=application/x-gzip ;;
     *': '*'bzip2 compressed data'*)	mtype=application/x-bzip ;;
     *': '*'compressed data block compressed') mtype=application/x-compress ;;
@@ -50,6 +51,7 @@ case "$type" in
                                           *)     mtype=application/msword ;;
                                         esac
                                         ;;
+    *': Composite Document File '*)     mtype=application/msword ;;
     *': '*'RIFF (little-endian) data, AVI') mtype=video/avi ;;
     *': uuencoded or xxencoded text'*)	mtype=application/x-uuencode ;;
     *': '*'PGP armored data signed message'*)

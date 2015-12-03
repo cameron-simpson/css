@@ -12,6 +12,7 @@ set -ue
 cmd=`basename "$0"`
 usage="Usage: $cmd [options...] [--] filename [command args...]
 	-0	Rewrite the file even if the input is empty.
+        -c      Create the file if missing.
         -C      Require the file to change; error if the new file is the same.
 	-d	Do a diff of the file changes.
         -D diffto Do a diff of file changes and email to \"diffto\".
@@ -26,7 +27,9 @@ usage="Usage: $cmd [options...] [--] filename [command args...]
 
 trace=${DEBUG:+set-x}
 rw0=
+rw00=
 doit=1
+docreate=
 dodiff=
 diffto=
 diffdecode=
@@ -41,6 +44,7 @@ while [ $# -gt 0 ]
 do
   case "$1" in
     -0)	rw0=1 ;;
+    -c) docreate=1 ;;
     -C) mustchange=1 ;;
     -d)	dodiff=1 ;;
     -D) dodiff=1 diffto=$2; shift ;;
@@ -65,9 +69,9 @@ then
   badopts=1
 else
   file=$1; shift
-  [ -f "$file" ] || { echo "$cmd: $file: not a regular file" >&2
-		      badopts=1
-		    }
+  [ $docreate ] || [ -f "$file" ] || { echo "$cmd: $file: not a regular file" >&2
+                                   badopts=1
+                                 }
   [ $# -gt 0 ] || set -- cat
 fi
 
@@ -89,6 +93,11 @@ trap 'rm -f "$tmp" "$tmp2"' 0 1 2 13 15
 			       $trace rm -f "$tmp"
 			       exit 1
 			     }
+
+if [ $docreate ] && [ ! -e "$file" ]
+then
+  >>"$file"
+fi
 
 if $trace cmp -s "$tmp" "$file"
 then

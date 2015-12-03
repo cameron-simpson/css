@@ -1,31 +1,53 @@
 #!/usr/bin/python -tt
 #
-# Stuff to do with sequences and iterables.
+# Stuff to do with counters, sequences and iterables.
 #       - Cameron Simpson <cs@zip.com.au> 20jul2008
 #
 
-import bisect
-import unittest
+DISTINFO = {
+    'description': "Stuff to do with counters, sequences and iterables.",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'requires': ['cs.logutils', 'cs.py.stack'],
+}
+
 import heapq
 import itertools
-from threading import Lock
+from threading import Lock, Condition
+from cs.logutils import warning, debug, D
+from cs.py.stack import caller
+from cs.py3 import exec_code
 
-__seq = 0
-__seqLock = Lock()
+class Seq(object):
+  ''' A thread safe wrapper for itertools.count().
+  '''
+
+  __slots__ = ('counter', '_lock')
+
+  def __init__(self, start=0):
+    self.counter = itertools.count(start)
+    self._lock = Lock()
+
+  def __iter__(self):
+    return self
+
+  def __next__(self):
+    with self._lock:
+      return next(self.counter)
+
+  next = __next__
+
+__seq = Seq()
 
 def seq():
-  ''' Allocate a new sequential number.
-      Useful for creating unique tokens.
-  '''
   global __seq
-  global __seqLock
-  __seqLock.acquire()
-  __seq += 1
-  n = __seq
-  __seqLock.release()
-  return n
+  return next(__seq)
 
-def the(list, context=None):
+def the(iterable, context=None):
   ''' Returns the first element of an iterable, but requires there to be
       exactly one.
   '''
@@ -34,7 +56,7 @@ def the(list, context=None):
     icontext=icontext+" for "+context
 
   first=True
-  for elem in list:
+  for elem in iterable:
     if first:
       it=elem
       first=False
@@ -48,72 +70,32 @@ def the(list, context=None):
 
   return it
 
-def get0(seq, default=None):
-  ''' Return first element of a sequence, or the default.
+def first(iterable):
+  ''' Return the first item from an iterable; raise IndexError on empty iterables.
   '''
-  for i in seq:
+  for i in iterable:
     return i
-  return default
+  raise IndexError("empty iterable %r" % (iterable,))
 
-class Range(list):
-  def __init__(self,values=(),step=1):
-    self.__step=step
-    self.__spans=[]
-    for v in values:
-      try:
-        assert len(v) == 2
-      except TypeError:
-        v=(v,v+step)
-      self.add(*v)
+def last(iterable):
+  ''' Return the last item from an iterable; raise IndexError on empty iterables.
+  '''
+  nothing = True
+  for item in iterable:
+    nothing = False
+  if nothing:
+    raise IndexError("no items in iterable: %r" % (iterable,))
+  return item
 
-  def __str__(self):
-    return ", ".join("%d-%d" % (lo, hi) for lo, hi in self)
-
-  def add(self,lo,hi=None):
-    if hi is None:
-      hi=lo+step
-    else:
-      assert lo < hi
-
-    ndx=bisect.bisect_left(self,(lo,))
-    if ndx > 0 and self[ndx-1][1] >= lo:
-      # incorporate left hand range
-      ndx-=1
-      R=self[ndx]
-      lo=min(R[0],lo)
-      hi=max(R[1],hi)
-      del self[ndx]
-
-    if ndx < len(self):
-      # incorporate overlapping ranges
-      R=self[ndx]
-      while R[0] <= hi:
-        hi=max(R[1],hi)
-        del self[ndx]
-        if ndx == len(self):
-          break
-        R=self[ndx]
-
-    self.insert(ndx,(lo,hi))
-
-  def remove(self,lo,hi=None):
-    if hi is None:
-      hi=lo+step
-    else:
-      assert lo < hi
-
-    ndx=bisect.bisect_left(self,(lo,))
-    if ndx < len(self):
-      R=self[ndx]
-      while R[0] < hi:
-        if R[1] <= hi:
-          del self[ndx]
-          if ndx == len(self):
-            break
-        else:
-          R[0]=max(R[0], hi)
-          break
-        R=self[ndx]
+def get0(iterable, default=None):
+  ''' Return first element of an iterable, or the default.
+  '''
+  try:
+    i = first(iterable)
+  except IndexError:
+    return default
+  else:
+    return i
 
 def NamedTupleClassFactory(*fields):
   ''' Construct classes for named tuples a bit like the named tuples
@@ -125,9 +107,9 @@ def NamedTupleClassFactory(*fields):
   class NamedTuple(list):
     for i in range(len(fields)):
       f=fields[i]
-      exec('def getx(self): return self[%d]' % i)
-      exec('def setx(self,value): self[%d]=value' % i)
-      exec('%s=property(getx,setx)' % f)
+      exec_code('def getx(self): return self[%d]' % i)
+      exec_code('def setx(self,value): self[%d]=value' % i)
+      exec_code('%s=property(getx,setx)' % f)
   return NamedTuple
 
 def NamedTuple(fields,iter=()):
@@ -135,6 +117,10 @@ def NamedTuple(fields,iter=()):
       Useful for one-off tuples/lists.
   '''
   return NamedTupleClassFactory(*fields)(iter)
+
+class _MergeHeapItem(tuple):
+  def __lt__(self, other):
+    return self[0] < other[0]
 
 def imerge(*iters):
   ''' Merge an iterable of ordered iterables in order.
@@ -149,20 +135,20 @@ def imerge(*iters):
   for I in iters:
     I = iter(I)
     try:
-      head = I.next()
+      head = next(I)
     except StopIteration:
       pass
     else:
-      heapq.heappush(heap, (head, I))
+      heapq.heappush(heap, _MergeHeapItem( (head, I)))
   while heap:
     head, I = heapq.heappop(heap)
     yield head
     try:
-      head = I.next()
+      head = next(I)
     except StopIteration:
       pass
     else:
-      heapq.heappush(heap, (head, I))
+      heapq.heappush(heap, _MergeHeapItem( (head, I)))
 
 def onetoone(func):
   ''' A decorator for a method of a sequence to merge the results of
@@ -187,7 +173,7 @@ def onetomany(func):
       multiple values back.
       Example:
         class X(list):
-          @onetoone
+          @onetomany
           def chars(self, item):
             return item
         strs = X(['Abc', 'Def'])
@@ -196,6 +182,111 @@ def onetomany(func):
   def gather(self, *a, **kw):
     return itertools.chain(*[ func(item) for item in self ])
   return gather
+
+class TrackingCounter(object):
+  ''' A wrapper for a counter which can be incremented and decremented.
+      A facility is provided to wait for the counter to reach a specific value.
+      The .inc and .dec methods also accept a `tag` argument to keep
+      individual counts based on the tag to aid debugging.
+      TODO: add `strict` option to error and abort if any counter tries
+      to go below zero.
+  '''
+
+  def __init__(self, value=0, name=None, lock=None):
+    ''' Initialise the counter to `value` (default 0) with the optional `name`.
+    '''
+    if name is None:
+      name = "TrackingCounter-%d" % (seq(),)
+    if lock is None:
+      lock = Lock()
+    self.value = value
+    self.name = name
+    self._lock = lock
+    self._watched = {}
+    self._tag_up = {}
+    self._tag_down = {}
+
+  def __str__(self):
+    return "%s:%d" % (self.name, self.value)
+
+  def __repr__(self):
+    return "<TrackingCounter %r:%r>" % (str(self), self._watched)
+
+  def __nonzero__(self):
+    return self.value != 0
+
+  def __int__(self):
+    return self.value
+
+  def _notify(self):
+    ''' Notify any waiters on the current counter value.
+        This should be called inside self._lock.
+    '''
+    value = self.value
+    watcher = self._watched.get(value)
+    if watcher:
+      del self._watched[value]
+      watcher.acquire()
+      watcher.notify_all()
+      watcher.release()
+
+  def inc(self, tag=None):
+    ''' Increment the counter.
+        Wake up any threads waiting for its new value.
+    '''
+    if tag:
+      D("INC(%s): %s", tag[:10], caller())
+    with self._lock:
+      self.value += 1
+      if tag is not None:
+        tag = str(tag)
+        self._tag_up.setdefault(tag, 0)
+        self._tag_up[tag] += 1
+      self._notify()
+
+  def dec(self, tag=None):
+    ''' Decrement the counter.
+        Wake up any threads waiting for its new value.
+    '''
+    if tag:
+      D("DEC(%s): %s:", tag[:10], caller())
+    with self._lock:
+      self.value -= 1
+      if tag is not None:
+        tag = str(tag)
+        self._tag_down.setdefault(tag, 0)
+        self._tag_down[tag] += 1
+        if self._tag_up.get(tag, 0) < self._tag_down[tag]:
+          warning("%s.dec: more .decs than .incs for tag %r", self, tag)
+          ##raise RuntimeError
+      if self.value < 0:
+        warning("%s.dec: value < 0!", self)
+      elif self.value == 0:
+        D("ZERO HERE")
+        ##from time import sleep
+        ##sleep(3)
+        ##raise RuntimeError("ZERO HERE!")
+      self._notify()
+
+  def check(self):
+    for tag in sorted(self._tag_up.keys()):
+      ups = self._tag_up[tag]
+      downs = self._tag_down.get(tag, 0)
+      if ups != downs:
+        D("%s: ups=%d, downs=%d: tag %r", self, ups, downs, tag)
+
+  def wait(self, value):
+    ''' Wait for the counter to reach the specified `value`.
+    '''
+    with self._lock:
+      if value == self.value:
+        return
+      if value not in self._watched:
+        watcher = self._watched[value] = Condition()
+      else:
+        watcher = self._watched[value]
+      watcher.acquire()
+    watcher.wait()
 
 if __name__ == '__main__':
   import sys

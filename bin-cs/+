@@ -1,3 +1,0 @@
-#!/bin/sh -ue
-[ $# -gt 0 ] || set -- me
-exec mailfolder ${1+"$@"}

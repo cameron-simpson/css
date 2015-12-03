@@ -4,6 +4,8 @@
 #	- Cameron Simpson <cs@zip.com.au> 25feb2005
 #
 
+set -ue
+
 : ${TMPDIR:=/tmp}
 
 cmd=`basename "$0"`
@@ -13,7 +15,7 @@ geom=
 
 badopts=
 
-while :
+while [ $# -gt 0 ]
 do
   case "$1" in
     -g)	geom=$2; shift ;;
@@ -39,13 +41,13 @@ else
 	  || { echo "$cmd: bad Y value in -g geometry: $geom" >&2
 	       badopts=1
 	     }
-fi
 
-nimages=`expr "$nx" '*' "$ny"` || exit 1
-if [ $# != "$nimages" ]
-then
-  echo "$cmd: number of images doesn't match geometry: expected $nimages, found $# images" >&2
-  badopts=1
+  nimages=`expr "$nx" '*' "$ny"` || exit 1
+  if [ $# != "$nimages" ]
+  then
+    echo "$cmd: number of images doesn't match geometry: expected $nimages, found $# images" >&2
+    badopts=1
+  fi
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
@@ -69,10 +71,11 @@ do
       && arg=`filecache "$tmpimg"`
       } || ok=
       ;;
-    *)[ -f "$arg" ] || { echo "$cmd: $img: not a file" >&2; ok=; }
+    *)[ -f "$arg" ] || { echo "$cmd: $arg: not a file" >&2; ok=; }
       ;;
   esac
   set -- ${1+"$@"} -geometry "${dx}x${dy}" "$arg"
 done
 
+[ $ok ] || exit 1
 set-x gm montage +label -tile "${nx}x${ny}" "$@" "$tmpimg" && echo "$tmpimg"

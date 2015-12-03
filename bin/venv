@@ -1,0 +1,79 @@
+#!/bin/sh
+#
+# Convenience tool for virtualenv setups.
+#       - Cameron Simpson <cs@zip.com.au> 07mar2014
+#
+
+set -ue
+
+: ${VENV_DIR:=$HOME/var/venv}
+
+# this was inline, but vim's syntax highlighting broke
+pyver() {
+  # NB: before python 3.4 "python --version" wrote to stderr
+  # http://bugs.python.org/issue18338
+  "$1" --version 2>&1 | awk '{print$2}'
+}
+
+: ${VENV_DIR:=$HOME/var/venv}
+
+cmd=`basename "$0"`
+usage="Usage:
+    $cmd [version]
+    $cmd [version] init [python]
+    $cmd [version] [exec] command [args...]"
+
+badopts=
+
+case "${1:-''}" in
+  [123]*)   pyver=$1; shift ;;
+  *)        pyver=3 ;;
+esac
+
+if [ $# = 0 ]
+then
+  pyver "$VENV_DIR/$pyver/bin/python"
+  exit $?
+fi
+
+op=$1
+shift
+
+case "$op" in
+  init)
+    if [ $# -gt 0 ]
+    then  pyexe=$1; shift
+    else  pyexe=python$pyver
+    fi
+    if pyver=$( pyver "$pyexe" )
+    then
+      if [ $# -gt 0 ]
+      then  venvdir=$1; shift
+      else  venvdir=$VENV_DIR/$pyver
+      fi
+      [ -t 2 ] && set -x
+      mkdir -- "$venvdir"
+      virtualenv -p "$pyexe" --system-site-packages ${1+"$@"} -- "$venvdir"
+    fi
+    exit $?
+    ;;
+  exec)
+    ;;
+  # put the command back
+  *)set -- "$op" ${1+"$@"}
+    ;;
+esac
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing command" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+venvdir=$VENV_DIR/$pyver
+
+set +u
+. "$venvdir/bin/activate"
+exec "$@"

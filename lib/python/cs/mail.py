@@ -1,3 +1,9 @@
+#!/usr/bin/python
+#
+# Mail related facilities.
+#   - Cameron Simpson <cs@zip.com.au>
+#
+
 import os
 import os.path
 import time
@@ -7,8 +13,8 @@ import email
 from email.parser import HeaderParser, FeedParser
 import email.Parser
 import email.FeedParser
+from io import StringIO
 import string
-import StringIO
 import re
 from contextlib import closing
 from cs.logutils import OBSOLETE
@@ -196,7 +202,7 @@ class Maildir:
       if len(line) == 0 or line == "\n":
         break
 
-    fp=StringIO.StringIO(headertext)
+    fp=StringIO(headertext)
     return self.__parser.parse(fp, headersonly=True)
 
   def importPath(self,path):
@@ -233,10 +239,3 @@ def openMaildir(path):
     info("open new Maildir", path)
     _maildirs[path]=Maildir(path)
   return _maildirs[path]
-
-re_rfc2407 = re.compile( r'=\?([^?]+)\?([^?]+)\?([^?]*)\?=' )
-
-@OBSOLETE
-def unrfc2047(s):
-  from cs.lex import unrfc2047 as real_unrfc2047
-  return real_unrfc2047(s)

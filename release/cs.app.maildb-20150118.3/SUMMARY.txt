@@ -1,0 +1,1 @@
+Cope with setup.py generating a script which does not pass sys.argv.

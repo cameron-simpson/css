@@ -1,6 +1,8 @@
 #!/usr/bin/python -tt
 #
 # Convert my categories file to procmail recipes.
+# Note that these days I use mailfiler(1cs), which operates on these
+# rules directly.
 #       - Cameron Simpson <cs@zip.com.au> 02mar2001
 #
 # Release version: 2011-02-19
@@ -291,9 +293,16 @@
 #
 # CATS2PROCMAILRC_[A-Z]*, macro definitions
 #
+# =head1 NOTES
+#
+# I have supplanted this with mailfiler(1) these days, which accepts
+# an almost idential rule syntax and files messages directly, with a monitor
+# mode where it will watch multiple Maildirs for messages and file them
+# as needed.
+#
 # =head1 SEE ALSO
 #
-# procmail(1), procmailrc(1), procmailex(1), egrep(1)
+# mailfiler(1), mailfiler(5), procmail(1), procmailrc(1), procmailex(1), egrep(1)
 #
 # =head1 AUTHOR
 #

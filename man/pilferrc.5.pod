@@ -1,0 +1,83 @@
+
+=head1 NAME
+
+pilferrc - pilfer(1cs) configuration file format
+
+=head1 DESCRIPTION
+
+A pilferrc file supplies configuration information for the pilfer(1cs) command.
+
+=head1 SYNTAX
+
+The pilferrc is a Windows-style .ini file parsed by Python's SafeConfigParser class.
+In particular, it supports RFC822 line continuation so that long
+lines may be broken into multiple lines by indenting the second and
+following lines.
+
+=head2 Sections
+
+=head3 [DEFAULT]
+
+This contains general global mode configuration:
+
+=over 4
+
+=item seen_dir
+
+The default directory in which to store seen set backing files.
+The value has environment variable substitution performed on it.
+
+Example:
+
+  seen_dir = $HOME/var/pilfer/seen
+
+=back
+
+=head3 [seen]
+
+A mapping of seen set name to backing file name for seen sets with backing files.
+The backing file name has environment variable substitution performed on it.
+If the backing file name does not commence with "/", "./" or "../"
+then the global B<seen_dir> path is prepended to it.
+
+Example:
+
+  stories = stories
+
+=head3 [actions]
+
+A mapping of action shorthand names to action sequences.
+A shorthand name is translated into the equivalent sequences of action
+when action pipelines are evaluated.
+The shorthand definition is broken into action strings with the python shlex.split() function.
+
+Example:
+
+  [actions]
+  unquery = 's/\?[^?]*$//'
+  unanchor = 's/#.*//'
+  is_archive = '/\.(tar|tgz|tar\.gz|tar\.bz2|cpio|rar|zip|dmg|pkg)$/'
+  archives = hrefs is_archive
+
+=head3 [pipes]
+
+A mapping of pipe names to pipeline definitions.
+These are used as named pipeline definitions by pilfer(1cs)' "B<pipe:>" and "B<divert:>" actions.
+Pipeline definitions are broken into action strings with the python shlex.split() function.
+
+Example:
+
+  # select story URLs matching "news" items
+  egsite_stories = /-news// s/#comments$// 's/&reffrom=.*//' unique '/\.s?html$/'
+
+  # select unseen news items from list of hrefs
+  egsite_new_stories = pipe:egsite_stories unseen:egsite_stories
+
+=head1 SEE ALSO
+
+pilfer(1cs)
+
+=head1 AUTHOR
+
+Cameron Simpson E<lt>cs@zip.com.auE<gt>
+

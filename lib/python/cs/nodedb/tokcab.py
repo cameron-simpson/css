@@ -52,10 +52,7 @@ class Backend_TokyoCabinet(Backend):
     ''' Return the attribute record keys for the specified node key.
     '''
     k = nodekey(key)
-    try:
-      t, name = k
-    except:
-      raise
+    t, name = k
     with self.tclock:
       return self.tcdb.fwmkeys(':'.join( (t, name) ))
 

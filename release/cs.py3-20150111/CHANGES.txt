@@ -1,0 +1,5 @@
+lib/python/cs/distinfo.py lib/python/cs/py3.py: cs.distinfo,cs.py3: rename package distinfo to DISTINFO
+lib/python/cs/py3.py: cs.py3: remove several classifiers supplied in cs.distinfo by default
+lib/python/cs/py3.py: cs.py3: ustr: accept errors= parameter, default "strict"
+lib/python/cs/excutils.py lib/python/cs/logutils.py lib/python/cs/py3.py: merge default ==> pypi
+lib/python/cs/README-py3.rst lib/python/cs/py3.py: cs.py3: move long_description into cs/README-py3.rst

@@ -1,13 +1,18 @@
 #!/usr/bin/python -tt
 
+from __future__ import print_function
 from collections import defaultdict, deque
 from functools import partial
-from threading import Lock
+from threading import Lock, Thread
 from cs.py3 import StringTypes
+import os
 import sys
+from time import sleep
+from cs.fileutils import lockfile, SharedAppendLines
 from cs.lex import isUC_, parseUC_sAttr
 from cs.obj import O
 from cs.seq import the
+from cs.tail import tail
 
 class SeqMapUC_Attrs(object):
   ''' A wrapper for a mapping from keys (matching ^[A-Z][A-Z_0-9]*$)
@@ -105,9 +110,9 @@ class AttributableList(list):
         >>>     self.i = i
         >>> Os = [ O(1), O(2), O(3) ]
         >>> AL = AttributableList( Os )
-        >>> print AL.i
+        >>> print(AL.i)
         [1, 2, 3]
-        >>> print type(AL.i)
+        >>> print(type(AL.i))
         <class 'cs.mappings.AttributableList'>
   '''
 
@@ -152,9 +157,9 @@ class MethodicalList(AttributableList):
         ...
         >>> Os=[ O(), O(), O() ]
         >>> ML = MethodicalList( Os )
-        >>> print ML.x()
+        >>> print(ML.x())
         [4300801872, 4300801936, 4300802000]
-        >>> print type(ML.x())
+        >>> print(type(ML.x()))
         <class 'cs.mappings.MethodicalList'>
   '''
 
@@ -201,91 +206,99 @@ class FallbackDict(defaultdict):
       return self.__otherdict[key]
     raise KeyError(key)
 
-class LRUCache(O):
-  ''' A least recently used cache mapping layer for another mapping.
+class MappingChain(object):
+  ''' A mapping interface to a sequence of mappings.
+      It does not support __setitem__ at present; that is expected
+      to be managed via the backing mappings.
   '''
 
-  def __init__(self, maxsize, backing):
-    if maxsize < 1:
-      raise ValueError("maxsize needs to be >= 1, received: %s" % (maxsize,))
-    self.maxsize = maxsize
-    self.backing = backing
-    self._cache = {}    # mapping of key => [seq, value]
-    self._seq = 0
-    self._lru = deque()
-    self._lock = Lock()
-
-  def _touch(self, key):
-    s = self._seq
-    s += 1
-    self._cache[key][0] = s
-    self._lru.append( (key, s) )
-    self._seq = s
-
-  def _trim(self):
-    lru = self._lru
-    cache = self._cache
-    while self.size() > self.maxsize and len(lru):
-      k, s = lru.popleft()
-      t = cache.get(k, None)
-      if t is None:
-        D("%s._trim: key %r not in _cache!", self, k)
-      else:
-        if t < s:
-          D("%s._trim: latest touch (%s) < old touch (%s)", self, t, s)
-        elif t == s:
-          # key not touched since placed on the queue, discard it
-          D("discard key %s", key)
-          del cache[k]
-        else:
-          # t > s: key use since this queue item, ignore
-          pass
-
-  def size(self):
-    ''' The default size metric for the cache: number of cached elements.
+  def __init__(self, mappings=None, get_mappings=None):
+    ''' Initialise the MappingChain.
+        If `mappings` is not None, use it as the sequence of mappings.
+	If `get_mappings` is not None, it is used as a callable to
+	return the sequence of mappings.
+        Exactly one of `mappings` or `get_mappings` must be specified as not
+        None.
     '''
-    return len(self._cache)
-
-  def keys(self):
-    return self.backing.keys()
-
-  def iterkeys(self):
-    return self.backing.iterkeys()
-
-  def iteritems(self):
-    for key in self.iterkeys():
-      yield key, self[key]
-
-  def itervalues(self):
-    for key in self.iterkeys():
-      yield self[key]
-
-  def __len__(self):
-    return len(self.backing)
-
-  def __setitem__(self, key, value):
-    self.backing[key] = value
-    self._cache[key] = [0, value]
-    self._touch(key)
-    self._trim()
+    if mappings is not None:
+      if get_mappings is None:
+        mappings = list(mappings)
+        self.get_mappings = lambda: mappings
+      else:
+        raise ValueError(
+                "cannot supply both mappings (%r) and get_mappings (%r)",
+                mappings, get_mappings)
+    else:
+      if get_mappings is not None:
+        self.get_mappings = get_mappings
+      else:
+        raise ValueError("one of mappings or get_mappings must be specified")
 
   def __getitem__(self, key):
-    sk = self._cache.get(key, None)
-    if sk:
-      self._touch(key)
-      return sk[1]
-    value = self.backing[key]
-    self._cache[key] = [0, value]
-    self._touch(key)
-    return value
+    ''' Return the first value for `key` found in the mappings.
+        Raise KeyError if the key in not found in any mapping.
+    '''
+    for mapping in self.get_mappings():
+      try:
+        value = mapping[key]
+      except KeyError:
+        continue
+      return value
+    raise KeyError(key)
+
+  def get(self, key, default=None):
+    try:
+      return self[key]
+    except KeyError:
+      return default
 
   def __contains__(self, key):
-    if key in self._cache:
-      self._touch(key)
-      return True
-    return key in self.backing
+    try:
+      value = self[key]
+    except KeyError:
+      return False
+    return True
 
-  def __delitem__(self, key):
-    del self.backing[key]
-    if key in self._cache:
-      del self._cache[key]
+  def keys(self):
+    ''' Return the union of the keys in the mappings.
+    '''
+    ks = set()
+    for mapping in self.get_mappings():
+      ks.update(mapping.keys())
+    return ks
+
+class SeenSet(object):
+  ''' A set-like collection with optional backing store file.
+  '''
+
+  def __init__(self, name, backing_path=None):
+    self.name = name
+    self.backing_path = backing_path
+    self.set = set()
+    if backing_path is not None:
+      # create file if missing, also tests access permission
+      with open(backing_path, "a"):
+        pass
+      self._backing_file = SharedAppendLines(backing_path,
+                                             importer=self._add_foreign_line)
+      self._backing_file.ready()
+
+  def _add_foreign_line(self, line):
+    # EOF markers, discard
+    if line is None:
+      return
+    if not line.endswith('\n'):
+      warning("%s: adding unterminated line: %s", self, line)
+    s = line.rstrip()
+    self.add(s, foreign=True)
+
+  def add(self, s, foreign=False):
+    # avoid needlessly extending the backing file
+    if s in self.set:
+      return
+    self.set.add(s)
+    if not foreign and self.backing_path:
+      self._backing_file.put(s)
+
+  def __contains__(self, item):
+    return item in self.set

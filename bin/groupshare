@@ -2,20 +2,45 @@
 #
 # Configure directory trees for group sharing:
 #	- chgrp to named group
-#	- group r/w
 #	- setgid dirs
+#	- optionally, group rights to user rights
+#       - optionally, other rights minus write permission
 # - Cameron Simpson <cs@zip.com.au> 27sep2000
 #
 
+set -ue
+
+gu=
+ow=
+yes=
+trace=
+[ -t 2 ] && trace=set-x
+
 cmd=`basename "$0"`
-usage="Usage: $cmd [-a] [-y] group dirs..."
+usage="Usage: $cmd [-a] [-y] [g=u] [o-w] group dirs...
+  -a    All: implies g=u, o-w.
+  -x    Trace execution.
+  -y    Yes: do not ask before proceeding.
+  g=u   Set group permission to user permission.
+  o-w   Revoke other-write permission."
 
 badopts=
 
-all=
-yes=
-[ $# -gt 0 ] && [ "x$1" = x-a ] && { all=1; shift; }
-[ $# -gt 0 ] && [ "x$1" = x-y ] && { yes=1; shift; }
+while [ $# -gt 0 ]
+do
+  case $1 in
+    g=u)        gu=1 ;;
+    o-w)        ow=1 ;;
+    -a)         gu=1 ow=1 ;;
+    -y)         yes=1 ;;
+    --)         shift; break ;;
+    -?*)        echo "$cmd: unrecognised option: $1" >&2
+                badopts=1
+                ;;
+    *)          break ;;
+  esac
+  shift
+done
 
 if [ $# = 0 ]
 then
@@ -39,7 +64,11 @@ grep "^$group:" /etc/group \
 
 for dir
 do
-  [ -f "$dir" ] && continue
+  if [ ! -d "$dir/." ]
+  then
+    echo "$cmd: not a directory, skipping: $dir" >&2
+    continue
+  fi
   ( cd "$dir" || exit 1
     exec /bin/pwd
   ) || exit 1
@@ -49,27 +78,37 @@ done
 
 for dir
 do
-  [ -f "$dir" ] && { echo "SKIPPING $dir" >&2; continue; }
-  ( cd "$dir" || exit 1
-    /bin/pwd || exit 1
+  if [ ! -d "$dir/." ]
+  then
+    echo "$cmd: not a directory, skipping: $dir" >&2
+    continue
+  fi
 
-    set -x
-    find . ! -type l ! -group "$group" -print \
-    | xxargs set-x chgrp "$group"
+  (
+    set -ue
+    cd "$dir"
+    /bin/pwd
 
-    if [ $all ]
+    # fix groupness
+    $trace find . ! -type l ! -group "$group" -print \
+    | $trace xxargs $trace chgrp "$group" --
+
+    # apply setgid bit to directories
+    $trace find . -type d ! -perm 2000 -print \
+    | $trace xxargs $trace chmod g+s --
+
+    # remove public write
+    if [ $ow ]
     then
-	find . ! -type l -print \
-	| xxargs set-x chmod go=u
-
-	find . ! -type l -print \
-	| xxargs set-x chmod o-w
-    else
-	find . ! -type l -print \
-	| xxargs set-x chmod g=u
+      $trace find . ! -type l -perm -2 -print \
+      | $trace xxargs $trace chmod o-w --
     fi
 
-    find . -type d -print \
-    | xxargs set-x chmod g+s
+    # set group perms to user perms
+    if [ $gu ]
+    then
+      $trace find . ! -type l -print \
+      | $trace xxargs $trace chmod g=u --
+    fi
   ) || break
 done
