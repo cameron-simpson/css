@@ -906,7 +906,7 @@ COMPARATORS = {
     '<=': lambda left, right: left <= right,
     '==': lambda left, right: left == right,
     '!=': lambda left, right: left != right,
-    '=>': lambda left, right: left >= right,
+    '>=': lambda left, right: left >= right,
     '>':  lambda left, right: left > right,
 }
 
