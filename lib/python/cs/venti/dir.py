@@ -192,7 +192,7 @@ class _Dirent(object):
            + block.textencode()
            )
 
-  # NB: not a property because it may change
+  @property
   def size(self):
     return len(self.block)
 
@@ -234,7 +234,7 @@ class _Dirent(object):
 
     dev = 0       # FIXME: we're not hooked to a FS?
     nlink = 1
-    size = self.size()
+    size = self.size
     atime = 0
     mtime = self.mtime
     ctime = 0
@@ -260,12 +260,13 @@ class FileDirent(_Dirent, MultiOpenMixin):
     self._check()
 
   def _check(self):
-    # TODO: check ._block and ._open_file against NOC open count
+    # TODO: check ._block and ._open_file against MultiOpenMixin open count
     if self._block is None:
       if self._open_file is None:
         raise ValueError("both ._block and ._open_file are None")
-    elif self._open_file is not None:
-      raise ValueError("._block is %s and ._open_file is %r" % (self._block, self._open_file))
+    ## both are allowed to be set
+    ##elif self._open_file is not None:
+    ##  raise ValueError("._block is %s and ._open_file is %r" % (self._block, self._open_file))
 
   @property
   @locked
@@ -275,7 +276,8 @@ class FileDirent(_Dirent, MultiOpenMixin):
     '''
     self._check()
     if self._open_file is not None:
-      self._block = self._open_file.sync()
+      self._block = self._open_file.flush()
+      warning("FileDirent.block: updated to %s", self._block)
     return self._block
 
   @block.setter
@@ -298,7 +300,7 @@ class FileDirent(_Dirent, MultiOpenMixin):
     return len(self.block)
 
   @locked
-  def startup(self, count):
+  def startup(self):
     ''' Set up ._open_file on first open.
     '''
     self._check()
@@ -314,17 +316,19 @@ class FileDirent(_Dirent, MultiOpenMixin):
   def shutdown(self):
     ''' On final close, close ._open_file and save result as ._block.
     '''
+    X("CLOSE %s ...", self)
     self._check()
     if self._block is not None:
       error("final close, but ._block is not None; replacing with self._open_file.close(), was: %r", self._block)
     self._block = self._open_file.close()
+    X("CLOSE %s: _block=%s", self, self._block)
     self._open_file = None
     self._check()
 
   def truncate(self, length):
     ''' Truncate this FileDirent to the specified size.
     '''
-    Esize = self.size()
+    Esize = self.size
     if Esize != length:
       with self:
         return self._open_file.truncate(length)
@@ -414,7 +418,9 @@ class Dir(_Dirent):
                      if name != '.' and name != '..'
                    )
     # TODO: if len(data) >= 16384
-    return Block(data=data)
+    B = Block(data=data)
+    warning("Dir.block: computed Block %s", B)
+    return B
 
   def dirs(self):
     ''' Return a list of the names of subdirectories in this Dir.

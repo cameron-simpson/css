@@ -15,7 +15,7 @@ from time import sleep
 from cs.env import envsub
 from cs.lex import get_uc_identifier
 
-DFLT_FLAGDIR = '$HOME/var/flags'
+DFLT_FLAGDIR_SPEC = '$HOME/var/flags'
 
 def main(argv):
   argv = list(argv)
@@ -51,14 +51,27 @@ def main(argv):
         raise ValueError("unexpected values after key value: %s" % (' '.join(argv),))
   return xit
 
+def flagdirpath(path=None, environ=None):
+  ''' Return the pathname of the flags directory.
+  '''
+  if environ is None:
+    environ = os.environ
+  if path is None:
+    flagdir = environ.get('FLAGDIR')
+    if flagdir is None:
+      flagdir = envsub(DFLT_FLAGDIR_SPEC)
+  elif not os.path.isabs(path):
+    flagdir = os.path.join(envsub('$HOME'), path)
+  else:
+    flagdir = path
+  return flagdir
+
 class Flags(MutableMapping):
   ''' A mapping which directly inspects the flags directory.
   '''
 
   def __init__(self, flagdir=None, environ=None):
-    if flagdir is None:
-      flagdir = envsub(DFLT_FLAGDIR)
-    self.dirpath = flagdir
+    self.dirpath = flagdirpath(flagdir, environ)
 
   def init(self):
     ''' Ensure the flag directory exists.
@@ -80,7 +93,13 @@ class Flags(MutableMapping):
   def __iter__(self):
     ''' Iterator returning the flag names in the directory.
     '''
-    for k in os.listdir(self.dirpath):
+    try:
+      listing = os.listdir(self.dirpath)
+    except OSError as e:
+      if e.errno == errno.ENOENT:
+        return
+      raise
+    for k in listing:
       if len(k) > 0:
         name, offset = get_uc_identifier(k)
         if offset == len(k):
