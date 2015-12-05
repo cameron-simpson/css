@@ -1,7 +1,6 @@
 #!/bin/sh
 #
 # Import a static website into an Amazon AWS S3 bucket for static serving.
-# 
 #   - Cameron Simpson <cs@zip.com.au> 05dec2015
 #
 
