@@ -36,7 +36,6 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-set -x
 srcurl=http://$fqdn/
 dsturl=s3://$s3bucket
 vhsubdir=$fqdn
@@ -45,9 +44,15 @@ s3(){
   s3cmd -c "$S3CFG" ${1+"$@"}
 }
 
-wget -nv -mp "$srcurl"
+setx(){
+  ( set -x; "$@" )
+}
+
+xit=0
+
+setx wget -q -mp "$srcurl" || { echo "$cmd: warning: wget had errors, rerun with -nv for details" >&2; xit=1; }
 cd "$vhsubdir"
-s3 -MP sync . "$dsturl"
+setx s3 -MP sync . "$dsturl"
 # repair
 for fixext in text/css:.css
 do
@@ -56,7 +61,9 @@ do
   find * -type f -name "*$suffix" \
   | while read -r fixfile
     do
-      s3 del "$dsturl/$fixfile"
-      s3 -P -m "$mimetype" put "$fixfile" "$dsturl/$fixfile"
+      ##setx s3 del "$dsturl/$fixfile"
+      setx s3 -P -m "$mimetype" put "$fixfile" "$dsturl/$fixfile"
     done
 done
+
+exit $xit
