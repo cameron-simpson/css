@@ -1,0 +1,37 @@
+#!/bin/sh
+
+: ${WPDIR:=$HOME/var/im/wp}
+
+if [ $# -gt 0 ]
+then
+  case "$1" in
+    /*) WPDIR=$1; shift ;;
+  esac
+fi
+
+if [ $# = 0 ]
+then
+  set -x
+  ls -- "$WPDIR/"
+else
+  if [ "x$*" = xOFF ]
+  then
+    set -x
+    rm -f -- "$WPDIR"/*
+  else
+    first=1
+    set -x
+    for arg in ${1+"$@"} 'width>=1024' 'width>height'
+    do  [ $first ] && { set --; first=; }
+      case "$arg" in
+        *:* | *[\<=\>]* ) ;;
+        *)  arg=kw:$arg ;;
+      esac
+      set -- ${1+"$@"} "$arg"
+    done
+    set -x
+    iphoto select ${1+"$@"} | shuffle | sed 64q \
+    | tee /dev/fd/2 \
+    | imlist-link-dir "$WPDIR" _ -
+  fi
+fi
