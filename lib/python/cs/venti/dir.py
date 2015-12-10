@@ -392,7 +392,7 @@ class Dir(_Dirent):
       self._entries = None
     _Dirent.__init__(self, D_DIR_T, name, metatext=metatext)
     self.parent = parent
-    self.changed= False
+    self.changed = False
     self._lock = RLock()
 
   def change(self):
