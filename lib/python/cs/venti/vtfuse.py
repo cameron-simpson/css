@@ -167,12 +167,14 @@ class StoreFS(Operations):
 
   def chmod(self, path, mode):
     with Pfx("chmod(%r, 0o%04o)...", path, mode):
-      E = self._namei(path)
+      E, P = self._namei2(path)
       E.meta.chmod(mode)
+      P.change()
 
   def chown(self, path, uid, gid):
     with Pfx("chown(%r, uid=%d, gid=%d)", path, uid, gid):
-      E = self._namei(path)
+      E, P = self._namei2(path)
+      P.change()
       M = E.meta
       if uid >= 0 and uid != self._fs_uid:
         M.uid = uid
@@ -291,16 +293,19 @@ class StoreFS(Operations):
       if do_trunc:
         fh.truncate(0)
       fhndx = self._new_file_handle_index(fh)
+      P.change()
       return fhndx
 
   def opendir(self, path):
     with Pfx("opendir(%r)", path):
       E = self._namei(path)
+      if not E.isdir:
+        raise FuseOSError(errno.ENOTDIR)
       fhndx = self._new_file_handle_index(E)
       return fhndx
 
   def read(self, path, size, offset, fhndx):
-    with Pfx("read(path=%r, size=%d, offset=%d, fhndx=%r", path, size, offset, fhndx):
+    with Pfx("read(path=%r, size=%d, offset=%d, fhndx=%r)", path, size, offset, fhndx):
       chunks = []
       while size > 0:
         data = self._fh(fhndx).read(offset, size)
@@ -312,7 +317,7 @@ class StoreFS(Operations):
       return b''.join(chunks)
 
   def readdir(self, path, *a, **kw):
-    with Pfx("readdir(path=%r, a=%r, kw=%r", path, a, kw):
+    with Pfx("readdir(path=%r, a=%r, kw=%r)", path, a, kw):
       if a or kw:
         warning("a or kw set!")
       E = self._namei(path)
@@ -391,10 +396,11 @@ class StoreFS(Operations):
 
   def truncate(self, path, length, fh=None):
     with Pfx("truncate(%r, length=%d, fh=%s)", path, length, fh):
-      E = self._namei(path)
+      E, P = self._namei2(path)
       if not self._Eaccess(E, os.W_OK):
         raise FuseOSError(errno.EPERM)
       E.truncate(length)
+      P.change()
 
   def unlink(self, path):
     with Pfx("unlink(%r)...", path):
@@ -411,10 +417,11 @@ class StoreFS(Operations):
   def utimens(self, path, times):
     with Pfx("utimens(%r, times=%r", path, times):
       atime, mtime = times
-      E = self._namei(path)
+      E, P = self._namei2(path)
       M = E.meta
       ## we do not do atime ## M.atime = atime
       M.mtime = mtime
+      P.change()
 
   def write(self, path, data, offset, fhndx):
     with Pfx("write(path=%r, data=%d bytes, offset=%d, fhndx=%r", path, len(data), offset, fhndx):
