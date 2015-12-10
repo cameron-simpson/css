@@ -546,9 +546,8 @@ class Dir(_Dirent):
     return D
 
   def makedirs(self, path, force=False):
-    ''' Like os.makedirs(), create a directory path at need.
-        If `force`, replace an non-DIr encountered with an empty Dir.
-        Returns the bottom directory.
+    ''' Like os.makedirs(), create a directory path at need; return the bottom Dir.
+        If `force`, replace an non-Dir encountered with an empty Dir.
     '''
     E = self
     if isinstance(path, str):
