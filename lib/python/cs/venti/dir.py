@@ -371,6 +371,11 @@ class FileDirent(_Dirent, MultiOpenMixin):
 
 class Dir(_Dirent):
   ''' A directory.
+
+      .changed  Starts False, becomes true if this or any subdirectory
+                gets changed or has a file opened; stays True from then on.
+                This accepts an ongoing compute cost for .block to avoid
+                setting the flag on every file.write etc.
   '''
 
   def __init__(self, name, metatext=None, parent=None, block=None):
@@ -387,7 +392,15 @@ class Dir(_Dirent):
       self._entries = None
     _Dirent.__init__(self, D_DIR_T, name, metatext=metatext)
     self.parent = parent
+    self.changed= False
     self._lock = RLock()
+
+  def change(self):
+    ''' Mark this Dir as changed; propagate to parent Dir if present.
+    '''
+    self.changed = True
+    if self.parent:
+      self.parent.change()
 
   @property
   def entries(self):
@@ -408,18 +421,21 @@ class Dir(_Dirent):
     ''' Return the top Block referring to an encoding of this Dir.
         TODO: blockify the encoding? Probably desirable for big Dirs.
     '''
-    if self._entries is None:
-      # dir never unpacked: just return the Block
-      return self._block
-    # unpacked; always recompute in case of change
-    names = sorted(self.keys())
-    data = b''.join( self[name].encode()
-                     for name in names
-                     if name != '.' and name != '..'
-                   )
-    # TODO: if len(data) >= 16384
-    B = Block(data=data)
-    warning("Dir.block: computed Block %s", B)
+    if self._block is None or self.changed:
+      if self._entries is None:
+        # dir never unpacked: just return the Block
+        return self._block
+      # unpacked; always recompute in case of change
+      names = sorted(self.keys())
+      data = b''.join( self[name].encode()
+                       for name in names
+                       if name != '.' and name != '..'
+                     )
+      # TODO: if len(data) >= 16384
+      B = Block(data=data)
+      warning("Dir.block: computed Block %s", B)
+    else:
+      B = self._block
     return B
 
   def dirs(self):
