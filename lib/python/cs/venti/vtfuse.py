@@ -260,7 +260,7 @@ class StoreFS(Operations):
   def open(self, path, flags):
     ''' Obtain a FileHandle open on `path`, return its index.
     '''
-    with Pfx("open(path=%r, flags=0o%o)...", path, flags):
+    with Pfx("open(path=%r, flags=0o%o)", path, flags):
       do_create = flags & O_CREAT
       do_trunc = flags & O_TRUNC
       for_read = (flags & O_RDONLY) == O_RDONLY or (flags & O_RDWR) == O_RDWR
