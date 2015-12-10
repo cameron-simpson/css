@@ -510,6 +510,7 @@ class Dir(_Dirent):
       raise KeyError("name already exists: %r", name)
     self[name] = E
 
+  @locked
   def rename(self, oldname, newname):
     ''' Rename entry `oldname` to entry `newname`.
     '''
