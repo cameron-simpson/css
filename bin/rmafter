@@ -1,17 +1,27 @@
 #!/bin/sh
 #
-# Run a command and remove a file afterwards.
+# Run a command and remove a file afterwards if successful.
+# With -f (force), remove the file anyway.
 #	- Cameron Simpson <cs@zip.com.au> 18feb2002
 #
 
+set -ue
+
 cmd=$0
-[ $# -gt 1 ] || { echo "Usage: $cmd filename command [args...]" >&2; exit 2; }
+usage="Usage: $cmd [-f] filename command [args...]"
+
+force=
+[ $# -gt 0 ] && [ "x$1" = x-f ] && { force=1; shift; }
+
+[ $# -gt 1 ] || { echo "$usage" >&2; exit 2; }
 
 file=$1; shift
 
-"$@"
-xit=$?
-
-rm "$file" || xit=1
-
-exit $xit
+if "$@"
+then
+  rm -- "$file"
+else
+  xit=$?
+  [ $force ] && rm -- "$file"
+  exit $xit
+fi

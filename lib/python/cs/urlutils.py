@@ -50,6 +50,7 @@ try:
   import xml.etree.cElementTree as ElementTree
 except ImportError:
   import xml.etree.ElementTree as ElementTree
+from string import whitespace
 from threading import RLock
 from cs.excutils import logexc
 from cs.lex import parseUC_sAttr
@@ -385,7 +386,7 @@ class _URL(unicode):
   def baseurl(self):
     for B in self.BASEs:
       try:
-        base = B['href']
+        base = strip_whitespace(B['href'])
       except KeyError:
         pass
       else:
@@ -406,7 +407,7 @@ class _URL(unicode):
     '''
     for A in self.As:
       try:
-        href = A['href']
+        href = strip_whitespace(A['href'])
       except KeyError:
         debug("no href, skip %r", A)
         continue
@@ -422,11 +423,16 @@ class _URL(unicode):
       del kw['absolute']
     for A in self.find_all(*a, **kw):
       try:
-        src = A['src']
+        src = strip_whitespace(A['src'])
       except KeyError:
         debug("no src, skip %r", A)
         continue
       yield URL( (urljoin(self.baseurl, src) if absolute else src), self )
+
+def strip_whitespace(s):
+  ''' Strip whitespace characters from a string, per HTML 4.01 section 1.6 and appendix E.
+  '''
+  return ''.join([ ch for ch in s if ch not in whitespace ])
 
 def skip_errs(iterable):
   ''' Iterate over `iterable` and yield its values.

@@ -1,0 +1,89 @@
+#!/bin/sh
+#
+# Import a static website into an Amazon AWS S3 bucket for static serving.
+#   - Cameron Simpson <cs@zip.com.au> 05dec2015
+#
+
+set -ue
+
+: ${S3CFG:=$HOME/.s3cfg-$AWS_ID}
+
+no_wget=
+no_sync=
+
+cmd=$( basename "$0" )
+usage="Usage: $cmd [--no-wget] [--no-sync] fqdn s3-bucket-name"
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    --no-sync)  no_sync=1 ;;
+    --no-wget)  no_wget=1 ;;
+    --)         shift; break ;;
+    -?*)        echo "$cmd: unrecognised option: $1" >&2
+                badopts=1
+                ;;
+    *)          break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then  echo "$cmd: missing fqdn" >&2
+      badopts=1
+else  fqdn=$1
+      shift
+fi
+
+if [ $# = 0 ]
+then  echo "$cmd: missing s3-bucket-name" >&2
+      badopts=1
+else  s3bucket=$1
+      shift
+fi
+
+if [ $# -gt 0 ]
+then
+  echo "$cmd: extra arguments after s3-bucket-name: $*" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+srcurl=http://$fqdn/
+dsturl=s3://$s3bucket
+vhsubdir=$fqdn
+
+s3(){
+  s3cmd -c "$S3CFG" ${1+"$@"}
+}
+
+setx(){
+  ( set -x; "$@" )
+}
+
+xit=0
+
+[ $no_wget ] || setx wget -q -mp "$srcurl" || { echo "$cmd: warning: wget had errors, rerun with -nv for details" >&2; xit=1; }
+
+if [ -z "$no_sync" ]
+then
+  cd "$vhsubdir"
+  setx s3 -MP sync . "$dsturl"
+  # repair
+  for fixext in text/css:.css
+  do
+    mimetype=$( expr "x$fixext" : 'x\(.*\):.*' )
+    suffix=$(   expr "x$fixext" : 'x.*:\(.*\)' )
+    find * -type f -name "*$suffix" \
+    | while read -r fixfile
+      do
+        ##setx s3 del "$dsturl/$fixfile"
+        setx s3 -P -m "$mimetype" put "$fixfile" "$dsturl/$fixfile"
+      done
+  done
+fi
+
+exit $xit
