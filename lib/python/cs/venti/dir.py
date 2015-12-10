@@ -422,10 +422,7 @@ class Dir(_Dirent):
         TODO: blockify the encoding? Probably desirable for big Dirs.
     '''
     if self._block is None or self.changed:
-      if self._entries is None:
-        # dir never unpacked: just return the Block
-        return self._block
-      # unpacked; always recompute in case of change
+      # recompute in case of change
       names = sorted(self.keys())
       data = b''.join( self[name].encode()
                        for name in names
