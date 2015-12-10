@@ -483,15 +483,22 @@ class Dir(_Dirent):
       raise KeyError("invalid name: %s" % (name,))
     if not isinstance(E, _Dirent):
       raise ValueError("E is not a _Dirent: <%s>%r" % (type(E), E))
+    self.change()
     self.entries[name] = E
-    if E.isdir and E.parent is None:
-      E.parent = D
+    if E.isdir:
+      Eparent = E.parent
+      if Eparent is None:
+        E.parent = D
+      elif Eparent is not self:
+        warning("%s: changing %r.parent to self, was %s", self, name, Eparent)
+        E.parent = self
 
   def __delitem__(self, name):
     if not self._validname(name):
       raise KeyError("invalid name: %s" % (name,))
     if name == '.' or name == '..':
       raise KeyError("refusing to delete . or ..: name=%s" % (name,))
+    self.change()
     del self.entries[name]
 
   def add(self, E):
