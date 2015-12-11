@@ -89,7 +89,7 @@ class StoreFS(Operations):
           if last_text is not None and text == last_text:
             text = None
         if text is not None:
-          write_Dirent_str(self.syncfp, text, etc=E.name)
+          write_Dirent_str(self.syncfp, text, etc=self.E.name)
           self._syncfp_last_dirent_text = text
           dump_Dirent(self.E, recurse=True) # debugging
 
@@ -183,12 +183,14 @@ class StoreFS(Operations):
     with Pfx("chmod(%r, 0o%04o)...", path, mode):
       E, P = self._namei2(path)
       E.meta.chmod(mode)
-      P.change()
+      if P:
+        P.change()
 
   def chown(self, path, uid, gid):
     with Pfx("chown(%r, uid=%d, gid=%d)", path, uid, gid):
       E, P = self._namei2(path)
-      P.change()
+      if P:
+        P.change()
       M = E.meta
       if uid >= 0 and uid != self._fs_uid:
         M.uid = uid
@@ -305,7 +307,8 @@ class StoreFS(Operations):
       if do_trunc:
         fh.truncate(0)
       fhndx = self._new_file_handle_index(fh)
-      P.change()
+      if P:
+        P.change()
       return fhndx
 
   def opendir(self, path):
@@ -433,7 +436,8 @@ class StoreFS(Operations):
       M = E.meta
       ## we do not do atime ## M.atime = atime
       M.mtime = mtime
-      P.change()
+      if P:
+        P.change()
 
   def write(self, path, data, offset, fhndx):
     with Pfx("write(path=%r, data=%d bytes, offset=%d, fhndx=%r", path, len(data), offset, fhndx):
