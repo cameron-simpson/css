@@ -19,7 +19,7 @@ from cs.logutils import X, debug, info, warning, error, Pfx
 from cs.obj import O, obj_as_dict
 from cs.seq import Seq
 from cs.threads import locked
-from .archive import save_Dirent
+from .archive import strfor_Dirent, write_Dirent_str
 from .block import Block
 from .debug import dump_Dirent
 from .dir import FileDirent, Dir
@@ -59,6 +59,7 @@ class StoreFS(Operations):
     self.S =S
     self.E = E
     self.syncfp = syncfp
+    self._syncfp_last_dirent_text = None
     self.do_fsync = False
     self._fs_uid = os.geteuid()
     self._fs_gid = os.getegid()
@@ -78,6 +79,19 @@ class StoreFS(Operations):
       warning("CALL UNKNOWN ATTR: %s(a=%r,kw=%r)", attr, a, kw)
       raise RuntimeError(attr)
     return attrfunc
+
+  def _sync(self):
+    with Pfx("_sync"):
+      if self.syncfp is not None:
+        with self._lock:
+          text = strfor_Dirent(self.E)
+          last_text = self._syncfp_last_dirent_text
+          if last_text is not None and text == last_text:
+            text = None
+        if text is not None:
+          write_Dirent_str(self.syncfp, text, etc=E.name)
+          self._syncfp_last_dirent_text = text
+          dump_Dirent(self.E, recurse=True) # debugging
 
   def _mount(self, root):
     ''' Attach this StoreFS to the specified path `root`.
@@ -192,9 +206,7 @@ class StoreFS(Operations):
   def destroy(self, path):
     X("DESTROY(%r)...", path)
     with Pfx("destroy(%r)", path):
-      if self.syncfp is not None:
-        save_Dirent(self.syncfp, self.E)
-        dump_Dirent(self.E, recurse=True)
+      self._sync()
     X("DESTROY COMPLETE")
 
   def fgetattr(self, *a, **kw):
