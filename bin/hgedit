@@ -6,6 +6,8 @@
 cmd=$0
 usage="Usage: $cmd file [command...]"
 
+dolog=1
+
 badopts=
 
 if [ $# = 0 ]
@@ -38,6 +40,10 @@ set -x
 
 "$@"
 hg diff "$file"
+
+# log the change and diff appropriately
+[ $dolog ] && hg diff "$file" | execif buglog "$cmd $base: $msg"
+
 msg=`readline "Log message> "`
 [ -n "$msg" ] || { echo "$cmd: empty message" >&2; exit 1; }
 hg commit -m "$msg" -- "$file"
