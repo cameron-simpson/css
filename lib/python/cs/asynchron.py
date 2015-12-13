@@ -277,6 +277,42 @@ def report(LFs):
 
 Result = Asynchron
 
+class _PendingFunction(Asynchron):
+  ''' An Asynchron with a callable used to obtain its result.
+      Since nothing triggers the function call this is an abstract class.
+  '''
+
+  def __init__(self, func, *a, **kw):
+    final = kw.pop('final', None)
+    Asynchron.__init__(self, final=final)
+    if a or kw:
+      func = partial(func, *a, **kw)
+    self.func = func
+
+class OnDemandFunction(_PendingFunction):
+  ''' Wrap a callable, run it when required.
+  '''
+
+  def __call__(self):
+    with self._lock:
+      state = self.state
+      if state == ASYNC_CANCELLED:
+        raise CancellationError()
+      if state == ASYNCH_PENDING:
+        self.state = ASYNCH_RUNNING
+      else:
+        raise RuntimeError("state should be ASYNCH_PENDING but is %s" % (self.state))
+    result, exc_info = None, None
+    try:
+      result = self.func()
+    except Exception:
+      exc_info = sys.exc_info()
+      self.exc_info = exc_info
+      raise
+    else:
+      self.result = result
+    return result
+
 if __name__ == '__main__':
   import cs.asynchron_tests
   cs.asynchron_tests.selftest(sys.argv)
