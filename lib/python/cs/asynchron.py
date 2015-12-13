@@ -1,11 +1,11 @@
 #!/usr/bin/python
 #
-# Asynchron and related classes.
+# Result and related classes for asynchronous dispatch and collection.
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
 DISTINFO = {
-    'description': "Asynchron and friends: callable objects which will receive a value at a later point in time.",
+    'description': "Result and friends: callable objects which will receive a value at a later point in time.",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
@@ -35,14 +35,14 @@ class CancellationError(RuntimeError):
   def __init__(self, msg="cancelled"):
     RuntimeError.__init__(msg)
 
-class Asynchron(O):
-
-  ''' Common functionality for Results, LateFunctions and other
+class Result(O):
+  ''' Basic class for asynchronous collection of a result.
+      This is also used to make OnDemandFunctions, LateFunctions and other
       objects with asynchronous termination.
   '''
 
   def __init__(self, name=None, final=None, lock=None, result=None):
-    ''' Base initialiser for Asynchron objects and subclasses.
+    ''' Base initialiser for Result objects and subclasses.
         `name`: optional paramater to name this object.
         `final`: a function to run after completion of the asynchron,
                  regardless of the completion mode (result, exception,
@@ -76,7 +76,7 @@ class Asynchron(O):
 
   @property
   def cancelled(self):
-    ''' Test whether this Asynchron has been cancelled.
+    ''' Test whether this Result has been cancelled.
     '''
     return self.state == ASYNCH_CANCELLED
 
@@ -158,7 +158,7 @@ class Asynchron(O):
         self.exc_info = sys.exc_info()
 
   def call(self, func, *a, **kw):
-    ''' Have the Asynchron call `func(*a,**kw)` and store its values as
+    ''' Have the Result call `func(*a,**kw)` and store its values as
         self.result.
         If `func` raises an exception, store it as self.exc_info.
     '''
@@ -261,9 +261,9 @@ class Asynchron(O):
       notifier(self)
 
 def report(LFs):
-  ''' Generator which yields completed Asynchrons.
-      This is a generator that yields Asynchrons as they complete, useful
-      for waiting for a sequence of Asynchrons that may complete in an
+  ''' Generator which yields completed Results.
+      This is a generator that yields Results as they complete, useful
+      for waiting for a sequence of Results that may complete in an
       arbitrary order.
   '''
   Q = Queue()
@@ -275,16 +275,14 @@ def report(LFs):
   for i in range(n):
     yield Q.get()
 
-Result = Asynchron
-
-class _PendingFunction(Asynchron):
-  ''' An Asynchron with a callable used to obtain its result.
+class _PendingFunction(Result):
+  ''' An Result with a callable used to obtain its result.
       Since nothing triggers the function call this is an abstract class.
   '''
 
   def __init__(self, func, *a, **kw):
     final = kw.pop('final', None)
-    Asynchron.__init__(self, final=final)
+    Result.__init__(self, final=final)
     if a or kw:
       func = partial(func, *a, **kw)
     self.func = func
