@@ -30,7 +30,7 @@ from cs.queues import IterableQueue, IterablePriorityQueue, PushQueue, \
                         MultiOpenMixin, TimerQueue
 from cs.threads import AdjustableSemaphore, \
                        WorkerThreadPool, locked, bg
-from cs.asynchron import Result, Asynchron, _PendingFunction, ASYNCH_RUNNING, report
+from cs.asynchron import Result, _PendingFunction, ASYNCH_RUNNING, report
 from cs.seq import seq, TrackingCounter
 from cs.logutils import Pfx, PrePfx, PfxCallInfo, error, info, warning, debug, exception, D, X, XP, OBSOLETE
 
@@ -891,8 +891,8 @@ class Later(MultiOpenMixin):
   def _after(self, LFs, R, func, *a, **kw):
     if R is None:
       R = Result()
-    elif not isinstance(R, Asynchron):
-      raise TypeError("Later.after(LFs, R, func, ...): expected Asynchron for R, got %r" % (R,))
+    elif not isinstance(R, Result):
+      raise TypeError("Later.after(LFs, R, func, ...): expected Result for R, got %r" % (R,))
     LFs = list(LFs)
     count = len(LFs)
 
