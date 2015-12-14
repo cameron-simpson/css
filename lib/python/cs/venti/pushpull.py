@@ -17,7 +17,7 @@ def pull_hashcode(S1, S2, hashcode):
                      % (S1, S2, hashcode, h1))
   return data
 
-def fetch_hashcodes(S1, S2, hashcodes):
+def pull_hashcodes(S1, S2, hashcodes):
   ''' Generator which fetches the data for the supplied `hashcodes` from `S2` if not in `S1`, updating `S1`.
       The generator yields (hashcode, get_data) where hashcode is
       each hashcode and get_data is a callable with returns the
