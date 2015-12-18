@@ -211,7 +211,7 @@ class BasicStoreSync(_BasicStoreCommon):
   def first(self):
     raise NotImplementedError("no .first")
 
-  def hashcodes(self, hashcode, length):
+  def hashcodes(self, hashclass=None, hashcode=None, reverse=None, after=False, length=None):
     raise NotImplementedError("no .first")
 
   def first_bg(self, hashclass=None):
