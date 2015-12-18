@@ -46,7 +46,6 @@ def missing_hashcodes(S1, S2, window_size=1024):
       `window_size`: number of hashcodes to fetch at a time for comparison,
                      default 1024.
   '''
-  window_size = 1024
   hashcodes1 = None
   hashcodes2 = list(S2.hashcodes(length=window_size))
   while hashcodes2 and (hashcodes1 is None or hashcodes1):
