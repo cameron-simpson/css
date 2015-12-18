@@ -192,7 +192,10 @@ class HashUtilDict(dict, HashCodeUtilsMixin):
     if hashcode is None:
       ndx = 0
     else:
-      ndx = ks.index(hashcode)
+      # locate first hashcode >= requested hashcode
+      for ndx, k in enumerate(ks):
+        if k >= hashcode:
+          break
     first = True
     while length is None or length > 0:
       try:
