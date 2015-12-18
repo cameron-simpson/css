@@ -85,3 +85,7 @@ def missing_hashcodes(S1, S2, window_size=None):
       break
     # fetch next bunch of hashcodes
     hashcodes2 = S2.hashcodes(hashcode=hashcode, length=window_size, after=True)
+
+if __name__ == '__main__':
+  from cs.debug import selftest
+  selftest('cs.venti.pushpull_tests')
