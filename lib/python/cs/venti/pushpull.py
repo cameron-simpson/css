@@ -39,13 +39,15 @@ def pull_hashcodes(S1, S2, hashcodes):
       LF = fetching[hashcode] = S2._defer(pull_hashcode, S1, S2, hashcode)
       yield hashcode, LF
 
-def missing_hashcodes(S1, S2, window_size=1024):
+def missing_hashcodes(S1, S2, window_size=None):
   ''' Scan Stores `S1` and `S2` and yield hashcodes in `S2` but not in `S1`.
       This relies on both Stores supporting the .hashcodes method;
       dumb unordered Stores do not.
       `window_size`: number of hashcodes to fetch at a time for comparison,
                      default 1024.
   '''
+  if window_size is None:
+    window_size = 1024
   hashcodes1 = None
   hashcodes2 = list(S2.hashcodes(length=window_size))
   while hashcodes2 and (hashcodes1 is None or hashcodes1):
