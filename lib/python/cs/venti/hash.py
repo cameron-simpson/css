@@ -8,6 +8,7 @@ if sys.hexversion < 0x02060000:
 from cs.lex import hexify
 from cs.logutils import D, X
 from cs.serialise import get_bs, put_bs
+from .pushpull import missing_hashcodes
 
 # enums for hash types, used in encode/decode
 HASH_SHA1_T = 0
@@ -23,13 +24,13 @@ def decode(bs, offset=0):
     raise ValueError("unsupported hashenum %d", hashenum)
   return hashcls._decode(bs, offset)
 
-def checksum(hashcodes):
+def hash_of_byteses(bss):
   ''' Compute a Hash_SHA1 from the bytes of the supplied `hashcodes`.
       This underlies the mechanism for comparing remote Stores.
   '''
   H = sha1()
-  for hashcode in hashcodes:
-    H.update(hashcode)
+  for bs in bss:
+    H.update(bs)
   return Hash_SHA1.from_data(H.digest())
 
 class _Hash(bytes):
@@ -115,40 +116,15 @@ class HashCodeUtilsMixin(object):
   ''' Utility methods for classes which use hashcodes as keys.
   '''
 
-  def hashcodes_checksum(self, hashcode, length, hashclass=None):
-    ''' Collate `length` hashcodes in order from `hashcode` onward, return checksum hashcode and final hashcode covered.
-        This is to be used for scanning remote Stores for differences.
+  def hash_of_hashcodes(self, hashclass=None, hashcode=None, reverse=None, after=False, length=None):
+    ''' Return a hash of the hashcodes requested; used for comparing remote Stores.
     '''
-    if length < 1:
-      raise ValueError("length must be >=1 (%d)" % (length,))
-    final_hashcode_list = [None]
-    def scan_hashcodes():
-      # using reverse=False to request ordered hashcodes
-      # should raise an exception if hashcodes cannot return ordered hashcodes
-      for hashcode in self.hashcodes(hashcode=hashcode,
-                                     hashclass=hashclass,
-                                     reverse=False,
-                                     length=length):
-        yield hashcode
-      final_hashcode_list[0] = hashcode
-    H = checksum(scan_hashcodes())
-    return H, final_hashcode_list[0]
+    return hash_of_byteses(self.hashcodes(hashclass=hashclass, hashcode=hashcode, reverse=reverse, after=after, length=length))
 
-  def hashcodes_missing(self, other):
-    ''' Yield hashcodes in `other` which are not present in self.
+  def hashcodes_missing(self, other, window_size=None):
+    ''' Generator yielding hashcodes in `other` which are missing in `self`.
     '''
-    # number of hashcodes to request in one go
-    start_hashcode = other.first()
-    if start_hashcode not in self:
-      yield start_hashcode
-    # post: start_hashcode has been checked
-    span_size = 1024
-    while start_hashcode is not None:
-      hashcode = None
-      for hashcode in other.hashcodes(hashcode=start_hashcode, length=span_size, after=True):
-        if hashcode not in self:
-          yield hashcode
-      start_hashcode = hashcode
+    return missing_hashcodes(self, other, window_size=window_size)
 
 class HashUtilDict(dict, HashCodeUtilsMixin):
   ''' Simple dict subclass supporting HashCodeUtilsMixin.
