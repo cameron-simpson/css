@@ -171,7 +171,10 @@ class HashUtilDict(dict, HashCodeUtilsMixin):
       hashclass = first_hashcode.__class__
     ks = self.sorted_keys()
     if hashcode is None:
-      ndx = 0
+      if reverse:
+        ndx = len(ks) - 1
+      else:
+        ndx = 0
     else:
       # locate first hashcode >= requested hashcode
       for ndx, k in enumerate(ks):
