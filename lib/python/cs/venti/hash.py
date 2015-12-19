@@ -117,9 +117,14 @@ class HashCodeUtilsMixin(object):
   '''
 
   def hash_of_hashcodes(self, hashclass=None, hashcode=None, reverse=None, after=False, length=None):
-    ''' Return a hash of the hashcodes requested; used for comparing remote Stores.
+    ''' Return a hash of the hashcodes requested and the last hashcode (or None if no hashcodes matched); used for comparing remote Stores.
     '''
-    return hash_of_byteses(self.hashcodes(hashclass=hashclass, hashcode=hashcode, reverse=reverse, after=after, length=length))
+    hs = list(self.hashcodes(hashclass=hashclass, hashcode=hashcode, reverse=reverse, after=after, length=length))
+    if hs:
+      h_final = hs[-1]
+    else:
+      h_final = None
+    return hash_of_byteses(hs), h_final
 
   def hashcodes_missing(self, other, window_size=None):
     ''' Generator yielding hashcodes in `other` which are missing in `self`.
