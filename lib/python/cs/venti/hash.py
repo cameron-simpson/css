@@ -116,10 +116,10 @@ class HashCodeUtilsMixin(object):
   ''' Utility methods for classes which use hashcodes as keys.
   '''
 
-  def hash_of_hashcodes(self, hashclass=None, hashcode=None, reverse=None, after=False, length=None):
+  def hash_of_hashcodes(self, hashclass=None, start_hashcode=None, reverse=None, after=False, length=None):
     ''' Return a hash of the hashcodes requested and the last hashcode (or None if no hashcodes matched); used for comparing remote Stores.
     '''
-    hs = list(self.hashcodes(hashclass=hashclass, hashcode=hashcode, reverse=reverse, after=after, length=length))
+    hs = list(self.hashcodes(hashclass=hashclass, start_hashcode=start_hashcode, reverse=reverse, after=after, length=length))
     if hs:
       h_final = hs[-1]
     else:
@@ -161,7 +161,7 @@ class HashUtilDict(dict, HashCodeUtilsMixin):
       return ks[0]
     return None
 
-  def hashcodes(self, hashclass=None, hashcode=None, reverse=None, after=False, length=None):
+  def hashcodes(self, hashclass=None, start_hashcode=None, reverse=None, after=False, length=None):
     if length is not None and length < 1:
       raise ValueError("length < 1: %r" % (length,))
     if not len(self):
@@ -170,15 +170,15 @@ class HashUtilDict(dict, HashCodeUtilsMixin):
       first_hashcode = self.first()
       hashclass = first_hashcode.__class__
     ks = self.sorted_keys()
-    if hashcode is None:
+    if start_hashcode is None:
       if reverse:
         ndx = len(ks) - 1
       else:
         ndx = 0
     else:
-      # locate first hashcode >= requested hashcode
+      # locate first hashcode >= start_hashcode
       for ndx, k in enumerate(ks):
-        if k >= hashcode:
+        if k >= start_hashcode:
           break
     first = True
     while length is None or length > 0:
@@ -186,7 +186,18 @@ class HashUtilDict(dict, HashCodeUtilsMixin):
         hashcode = ks[ndx]
       except IndexError:
         break
-      if not first or not after:
+      if start_hashcode is None:
+        yield hashcode
+        if length is not None:
+          length -= 1
+      elif first:
+        if not after or hashcode != start_hashcode:
+          yield hashcode
+          if length is not None:
+            length -= 1
+      elif hashcode == start_hashcode:
+        raise RuntimeError("found start_hashcode but not first in sequence")
+      else:
         yield hashcode
         if length is not None:
           length -= 1
