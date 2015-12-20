@@ -132,10 +132,15 @@ def missing_hashcodes_by_checksum(S1, S2, window_size=None):
     # in case things changed since earlier checksum
     h_final1 = max(hashcodes1)
     for ndx, hashcode in enumerate(hashcodes2):
-      if h_final1 < hashcode:
+      # note that if we fetch more hashcodes then we may get am empty window
+      # just keep running with that if so - do not check h_final1
+      if hashcodes1 and h_final1 < hashcode:
         # hashcodes1 does not cover this point in hashcodes2, fetch more
         hashcodes1 = set(S1.hashcodes(start_hashcode=hashcode, length=len(hashcodes2)-ndx))
-        h_final1 = max(hashcodes1)
+        if hashcodes1:
+          h_final1 = max(hashcodes1)
+        else:
+          h_final = None
       if hashcode not in hashcodes1:
         yield hashcode
     # resume scan from here
