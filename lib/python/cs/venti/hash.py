@@ -5,6 +5,7 @@ else:
   from sha import new as sha1
 if sys.hexversion < 0x02060000:
   bytes = str
+from bisect import bisect_left, bisect_right
 from cs.lex import hexify
 from cs.logutils import D, X
 from cs.serialise import get_bs, put_bs
@@ -131,6 +132,86 @@ class HashCodeUtilsMixin(object):
     '''
     return missing_hashcodes(self, other, window_size=window_size)
 
+  def hashcodes_from(self, hashclass=None, start_hashcode=None, reverse=False):
+    ''' Default generator yielding hashcodes from this object until none remains.
+        This implementation starts by fetching and sorting all the
+        keys, so for large mappings this implementation is memory
+        expensive and also runtime expensive if only a few hashcodes
+        are desired.
+        `hashclass`: hashclass for yielded hashcodes; default from .first().
+        `start_hashcode`: starting hashcode - hashcodes are >=`start_hashcode`;
+                          if None start the sequences from the smallest
+                          hashcode or from the largest if `reverse` is true
+        `reverse`: yield hashcodes in reverse order (counting down instead of up).
+    '''
+    if hashclass is None:
+      first_hashcode = self.first()
+      hashclass = first_hashcode.__class__
+    elif start_hashcode is not None:
+      if not isinstance(start_hashcode, hashclass):
+        raise TypeError("hashclass %s does not match start_hashcode %r"
+                        % (hashclass, start_hashcode))
+    ks = self.sorted_keys(hashclass=hashclass)
+    if start_hashcode is None:
+      if reverse:
+        ndx = len(ks) - 1
+      else:
+        ndx = 0
+    else:
+      if reverse:
+        ndx = bisect_right(ks, start_hashcode)
+        if ndx > 0 and ndx == len(ks):
+          ndx -= 1
+        elif ks[ndx] > start_hashcode:
+          ndx -= 1
+      else:
+        ndx = bisect_left(ks, start_hashcode)
+    # yield keys until we're not wanted
+    while True:
+      try:
+        hashcode = ks[ndx]
+      except IndexError:
+        break
+      yield hashcode
+      if reverse:
+        ndx -= 1
+        if ndx < 0:
+          break
+      else:
+        ndx += 1
+
+  def hashcodes(self, hashclass=None, start_hashcode=None, reverse=False, after=False, length=None):
+    ''' Generator yielding up to `length` hashcodes >=`start_hashcode`.
+        This relies on .hashcodes_from as the source of hashcodes.
+        `hashclass`: hashclass for yielded hashcodes; default from .first().
+        `start_hashcode`: starting hashcode - hashcodes are >=`start_hashcode`;
+                          if None start the sequences from the smallest
+                          hashcode or from the largest if `reverse` is true
+        `reverse`: yield hashcodes in reverse order (counting down instead of up).
+        `after`: skip the first hashcode if it is equal to `start_hashcode`
+        `length`: the maximum number of hashcodes to yield
+    '''
+    if length is not None and length < 1:
+      raise ValueError("length < 1: %r" % (length,))
+    if not len(self):
+      return
+    if hashclass is None:
+      first_hashcode = self.first()
+      hashclass = first_hashcode.__class__
+    first = True
+    for hashcode in self.hashcodes_from(hashclass=hashclass,
+                                        start_hashcode=start_hashcode,
+                                        reverse=reverse):
+      if first:
+        first = False
+        if after and start_hashcode is not None and hashcode == start_hashcode:
+          continue
+      yield hashcode
+      if length is not None:
+        length -= 1
+        if length < 1:
+          break
+
 class HashUtilDict(dict, HashCodeUtilsMixin):
   ''' Simple dict subclass supporting HashCodeUtilsMixin.
   '''
@@ -160,52 +241,6 @@ class HashUtilDict(dict, HashCodeUtilsMixin):
     if ks:
       return ks[0]
     return None
-
-  def hashcodes(self, hashclass=None, start_hashcode=None, reverse=None, after=False, length=None):
-    if length is not None and length < 1:
-      raise ValueError("length < 1: %r" % (length,))
-    if not len(self):
-      return
-    if hashclass is None:
-      first_hashcode = self.first()
-      hashclass = first_hashcode.__class__
-    ks = self.sorted_keys()
-    if start_hashcode is None:
-      if reverse:
-        ndx = len(ks) - 1
-      else:
-        ndx = 0
-    else:
-      # locate first hashcode >= start_hashcode
-      for ndx, k in enumerate(ks):
-        if k >= start_hashcode:
-          break
-    first = True
-    while length is None or length > 0:
-      try:
-        hashcode = ks[ndx]
-      except IndexError:
-        break
-      if start_hashcode is None:
-        yield hashcode
-        if length is not None:
-          length -= 1
-      elif first:
-        if not after or hashcode != start_hashcode:
-          yield hashcode
-          if length is not None:
-            length -= 1
-      elif hashcode == start_hashcode:
-        raise RuntimeError("found start_hashcode but not first in sequence")
-      else:
-        yield hashcode
-        if length is not None:
-          length -= 1
-      if reverse:
-        ndx -= 1
-      else:
-        ndx += 1
-      first = False
 
 if __name__ == '__main__':
   import cs.venti.hash_tests
