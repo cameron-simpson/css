@@ -85,6 +85,7 @@ class _TestHashCodeUtils(_TestAdditionsMixin):
   def test01hashcodes(self):
     M1 = self.map1
     KS1 = self.keys1
+    # add 16 random blocks to the map with some sanity checks along the way
     for n in range(16):
       data = randblock(rand0(8192))
       h = M1.add(data)
@@ -95,11 +96,47 @@ class _TestHashCodeUtils(_TestAdditionsMixin):
       if self.has_keys:
         self.assertEqual(M1.first(), min(M1.keys()))
       self.assertEqual(M1.first(), min(M1.hashcodes()))
+    # asking for 0 hashcodes is forbidden
     with self.assertRaises(ValueError):
       hs = list(M1.hashcodes(length=0))
-    for n in range(1,16):
-      hs = list(M1.hashcodes(length=n))
-      self.assertEqual(len(hs), n)
+    # fetch the leading n hashcodes from the map, with and without `after`
+    for after in False, True:
+      with self.subTest(after=after):
+        for n in range(1,16):
+          hs = list(M1.hashcodes(length=n, after=after))
+          hn = min(n, 15 if after else 16)
+          self.assertEqual(len(hs), hn)
+    # traverse the map in various sized steps, including random
+    ks = sorted(KS1)
+    for step_size in 1, 2, 3, 7, 8, 15, 16, None:
+      with self.subTest(step_size=step_size):
+        start_hashcode = None
+        ksndx = 0
+        seen = set()
+        while ksndx < len(ks):
+          if step_size is None:
+            n = random.randint(1,7)
+          else:
+            n = step_size
+          with self.subTest(start_hashcode=start_hashcode, ksndx=ksndx, n=n):
+            hs = list(M1.hashcodes(start_hashcode=start_hashcode, length=n, after=True))
+            # check ordering between adjacent hashcodes returns and against start_hashcode if not None
+            h0 = None
+            for h in hs:
+              self.assertNotIn(h, seen)
+              seen.add(h)
+              if start_hashcode is not None:
+                self.assertGreater(h, start_hashcode)
+              if h0 is not None:
+                self.assertGreater(h, h0)
+              h0 = h
+            hn = min(len(ks) - ksndx, n)
+            self.assertEqual(len(hs), hn)
+            for i in range(hn):
+              self.assertEqual(ks[ksndx + i], hs[i])
+            ksndx += hn
+            start_hashcode = hs[-1]
+        self.assertEqual(ks, sorted(seen))
 
   def test02hashcodes_missing(self):
     M1 = self.map1
