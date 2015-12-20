@@ -138,7 +138,34 @@ class _TestHashCodeUtils(_TestAdditionsMixin):
             start_hashcode = hs[-1]
         self.assertEqual(ks, sorted(seen))
 
-  def test02hashcodes_missing(self):
+  def test02test_hashcodes_from(self):
+    # fill map1 with 16 random data blocks
+    M1 = self.map1
+    KS1 = self.keys1
+    for n in range(16):
+      data = randblock(rand0(8192))
+      h = M1.add(data)
+      KS1.add(h)
+    # make a block not in the map
+    data2 = randblock(rand0(8192))
+    h2 = Hash_SHA1.from_data(data2)
+    # extract hashes, check results
+    ks = sorted(KS1)
+    for reverse in False, True:
+      for start_hashcode in [None] + ks + [h2]:
+        with self.subTest(reverse=reverse, start_hashcode=start_hashcode):
+          hs = list(M1.hashcodes_from(start_hashcode=start_hashcode,
+                                      reverse=reverse))
+          if reverse:
+            hs2 = list([ h for h
+                         in reversed(ks)
+                         if start_hashcode is None
+                         or h <= start_hashcode ])
+          else:
+            hs2 = [ h for h in ks if start_hashcode is None or h >= start_hashcode ]
+          self.assertEqual(hs, hs2)
+
+  def test03hashcodes_missing(self):
     M1 = self.map1
     KS1 = self.keys1
     for n in range(16):
