@@ -53,7 +53,7 @@ class _TestMissingHashCodes(object):
     missing = list(self.miss_generator(self.map1, self.map2))
     self.assertEqual(len(missing), len(ks2))
 
-  def test03random_mixed(self):
+  def test04random_mixed(self):
     ''' Fill both maps with some overlap.
     '''
     ks1 = set()
