@@ -5,11 +5,12 @@
 
 import unittest
 from random import randint
+from cs.logutils import X
 from cs.randutils import rand0, randblock
 from .hash import HashUtilDict
-from .pushpull import missing_hashcodes
+from .pushpull import missing_hashcodes, missing_hashcodes_by_checksum
 
-class TestMissingHashCodes(unittest.TestCase):
+class _TestMissingHashCodes(object):
 
   def setUp(self):
     self.map1 = HashUtilDict()
@@ -18,7 +19,7 @@ class TestMissingHashCodes(unittest.TestCase):
   def test00empty(self):
     ''' Compare two empty maps.
     '''
-    missing = list(missing_hashcodes(self.map1, self.map2))
+    missing = list(self.miss_generator(self.map1, self.map2))
     self.assertEqual(len(missing), 0)
 
   def test01random_identical(self):
@@ -29,7 +30,7 @@ class TestMissingHashCodes(unittest.TestCase):
       h1 = self.map1.add(data)
       h2 = self.map2.add(data)
       self.assertEqual(h1, h2)
-    missing = list(missing_hashcodes(self.map1, self.map2))
+    missing = list(self.miss_generator(self.map1, self.map2))
     self.assertEqual(len(missing), 0)
 
   def test02random1only(self):
@@ -38,7 +39,7 @@ class TestMissingHashCodes(unittest.TestCase):
     for n in range(32):
       data = randblock(rand0(8192))
       h1 = self.map1.add(data)
-    missing = list(missing_hashcodes(self.map1, self.map2))
+    missing = list(self.miss_generator(self.map1, self.map2))
     self.assertEqual(len(missing), 0)
 
   def test03random2only(self):
@@ -49,7 +50,7 @@ class TestMissingHashCodes(unittest.TestCase):
       data = randblock(rand0(8192))
       h2 = self.map2.add(data)
       ks2.add(h2)
-    missing = list(missing_hashcodes(self.map1, self.map2))
+    missing = list(self.miss_generator(self.map1, self.map2))
     self.assertEqual(len(missing), len(ks2))
 
   def test03random_mixed(self):
@@ -66,14 +67,26 @@ class TestMissingHashCodes(unittest.TestCase):
       if choice >= 1:
         h2 = self.map2.add(data)
         ks2.add(h2)
-    for window_size in 1, 7, 23, 1024:
+    for window_size in 1, 7, 16, 23, 32, 1024:
       with self.subTest(window_size=window_size):
         # items in map1 not in map2
-        missing = set(missing_hashcodes(self.map2, self.map1, window_size=window_size))
+        missing = set(self.miss_generator(self.map2, self.map1, window_size=window_size))
         self.assertEqual(missing, ks1 - ks2)
         # items in map2 not in map1
-        missing = set(missing_hashcodes(self.map1, self.map2, window_size=window_size))
+        missing = set(self.miss_generator(self.map1, self.map2, window_size=window_size))
         self.assertEqual(missing, ks2 - ks1)
+
+class TestMissingHashCodes_Missing_hashcodes(_TestMissingHashCodes, unittest.TestCase):
+
+  def __init__(self, *a, **kw):
+    self.miss_generator = missing_hashcodes
+    unittest.TestCase.__init__(self, *a, **kw)
+
+class TestMissingHashCodes_Missing_hashcodes_checksum(_TestMissingHashCodes, unittest.TestCase):
+
+  def __init__(self, *a, **kw):
+    self.miss_generator = missing_hashcodes_by_checksum
+    unittest.TestCase.__init__(self, *a, **kw)
 
 if __name__ == '__main__':
   from cs.debug import selftest
