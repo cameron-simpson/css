@@ -95,7 +95,6 @@ def missing_hashcodes_by_checksum(S1, S2, window_size=None):
   '''
   if window_size is None:
     window_size = 1024
-  X("missing_hashcodes_by_checksum: window_size=%d", window_size)
   # latest hashcode already compared
   start_hashcode = None
   while True:
@@ -103,60 +102,50 @@ def missing_hashcodes_by_checksum(S1, S2, window_size=None):
     hash1, h_final1 = S1.hash_of_hashcodes(length=window_size, start_hashcode=start_hashcode, after=True)
     if h_final1 is None:
       # end of S1 hashcodes - return all following S2 hashcodes
-      X("end of S1 after hashcode %s; yield all following from S2", start_hashcode)
       break
     hash2, h_final2 = S2.hash_of_hashcodes(length=window_size, start_hashcode=start_hashcode, after=True)
     if h_final2 is None:
       # end of S2 hashcodes - done - return from function
-      X("end of S2 after hashcode %s; nothing more to yield", start_hashcode)
       return
     if hash1 == hash2:
       if h_final1 != h_final2:
         raise RuntimeError('hashes match but h_final1=%s != h_final2=%s'
                            % (h_final1, h_final2))
       # this chunk matches, fetch the next
-      X("chunk after %s matches, advance to chunk after %s", start_hashcode, h_final1)
       start_hashcode = h_final1
       continue
-    X("chunk after %s mismatched", start_hashcode)
     # mismatch, try smaller window
     if window_size >= 32:
       # shrink window until match found or window too small to bother
       owindow_size = window_size
       window_size //= 2
-      X("reduce window size from %d to %d", owindow_size, window_size)
       continue
-    X("chunk after %s mismatched; compare actual hashcodes", start_hashcode)
     # fetch the actual hashcodes
-    hashcodes1 = set(S1.hashcodes(start_hashcode=start_hashcode, length=window_size, after=True))
-    if not hashcodes1:
-      X("end of S1 after hashcode %s; yield all following from S2", start_hashcode)
-      # maybe some entries removed? - anyway, no more S1 so return all following S2 hashcodes
-      break
     hashcodes2 = list(S2.hashcodes(start_hashcode=start_hashcode, length=window_size, after=True))
     if not hashcodes2:
-      X("end of S2 after hashcode %s; nothing more to yield", start_hashcode)
       # maybe some entires removed? - anyway, no more S2 so return
       return
-    for hashcode in hashcodes2:
+    hashcodes1 = set(S1.hashcodes(start_hashcode=start_hashcode, length=window_size, after=True))
+    if not hashcodes1:
+      # maybe some entries removed? - anyway, no more S1 so return all following S2 hashcodes
+      break
+    # in case things changed since earlier checksum
+    h_final1 = max(hashcodes1)
+    for ndx, hashcode in enumerate(hashcodes2):
+      if h_final1 < hashcode:
+        # hashcodes1 does not cover this point in hashcodes2, fetch more
+        hashcodes1 = set(S1.hashcodes(start_hashcode=hashcode, length=len(hashcodes2)-ndx))
+        h_final1 = max(hashcodes1)
       if hashcode not in hashcodes1:
-        X("YIELD %s (not in %r)", hashcode, sorted(hashcodes1))
         yield hashcode
-      else:
-        X("not yield %s", hashcode)
     # resume scan from here
     start_hashcode = hashcodes2[-1]
-    X("advance S2 scan to %s", start_hashcode)
   # collect all following S2 hashcodes
-  X("finished with S1, just scan tail of S2")
   while True:
-    X("tail scan S2 after %s", start_hashcode)
     hashcodes2 = list(S2.hashcodes(start_hashcode=start_hashcode, length=window_size, after=True))
     if not hashcodes2:
-      X("no S2 hashcodes after %s, done", start_hashcode)
       break
     for hashcode in hashcodes2:
-      X("tail scan: yield %s", hashcode)
       yield hashcode
     start_hashcode = hashcodes2[-1]
 
