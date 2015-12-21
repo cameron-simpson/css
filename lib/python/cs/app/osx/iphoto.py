@@ -554,7 +554,7 @@ class iPhoto(O):
               try:
                 kwname = self.match_one_keyword(kwname)
               except ValueError as e:
-                raise ValueError("invalid keyword: %s", e)
+                raise ValueError("invalid keyword: %s" % (e,))
               else:
                 if kwname != okwname:
                   info("%r ==> %r", okwname, kwname)
