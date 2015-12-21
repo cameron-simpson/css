@@ -577,16 +577,16 @@ class KyotoIndex(HashCodeUtilsMixin, MultiOpenMixin):
         `reverse`: iterate backwards if true, otherwise forwards
     '''
     cursor = self._kyoto.cursor()
-    if cursor.jump_back(start_hashcode) if reverse else cursor.jump(start_hashcode):
-      yield self._hashclass.from_hashbytes(cursor.get_key())
-      while True:
-        if reverse:
-          if not cursor.step_back():
-            break
-        else:
-          if not cursor.step():
-            break
+    if reverse:
+      if cursor.jump_back(start_hashcode):
         yield self._hashclass.from_hashbytes(cursor.get_key())
+        while cursor.step_back():
+          yield self._hashclass.from_hashbytes(cursor.get_key())
+    else:
+      if cursor.jump(start_hashcode):
+        yield self._hashclass.from_hashbytes(cursor.get_key())
+        while cursor.step():
+          yield self._hashclass.from_hashbytes(cursor.get_key())
     cursor.disable()
 
 def KyotoDataDirMapping(dirpath, rollover=None):
