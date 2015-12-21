@@ -157,10 +157,7 @@ class _TestHashCodeUtils(_TestAdditionsMixin):
           hs = list(M1.hashcodes_from(start_hashcode=start_hashcode,
                                       reverse=reverse))
           if reverse:
-            hs2 = list([ h for h
-                         in reversed(ks)
-                         if start_hashcode is None
-                         or h <= start_hashcode ])
+            hs2 = [ h for h in reversed(ks) if start_hashcode is None or h <= start_hashcode ]
           else:
             hs2 = [ h for h in ks if start_hashcode is None or h >= start_hashcode ]
           self.assertEqual(hs, hs2)
