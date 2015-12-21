@@ -459,17 +459,6 @@ class DataDirMapping(MultiOpenMixin,HashCodeUtilsMixin):
     return self._index(hashclass).hashcodes_from(start_hashcode=start_hashcode,
                                                  reverse=reverse)
 
-  def merge_other(self, other, hashcodes=None):
-    ''' Iterate over the hashcodes in `other` and fetch anything we don't have.
-        TODO: DISCARD, use functions from pushpull.
-    '''
-    if hashcodes is None:
-      hashcodes = other.hashcodes()
-    for hashcode in hashcodes:
-      if hashcode not in self:
-        X("pull %s", hashcode)
-        self[hashcode] = other[hashcode]
-
 class GDBMIndex(HashCodeUtilsMixin, MultiOpenMixin):
   ''' GDBM index for a DataDir.
   '''
