@@ -4,8 +4,11 @@
 #   - Cameron Simpson <cs@zip.com.au> 15feb2015
 #
 
+from collections import namedtuple
 import time
 from cs.logutils import warning
+
+CheckPoint = namedtuple('CheckPoint', 'time position')
 
 class Progress(object):
   ''' A progress counter to track task completion with various utility functions.
@@ -37,7 +40,7 @@ class Progress(object):
     # history of positions, used to compute throughput
     posns = [ (start_time, start) ]
     if position != start:
-      posns.append( (position, now) )
+      posns.append( CheckPoint(now, position) )
     self._positions = posns
 
   @property
@@ -54,7 +57,7 @@ class Progress(object):
     if new_position < self.position:
       warning("%s.update: .position going backwards from %s to %s",
               self, self.position, position)
-    self._positions.append( (update_time, new_position) )
+    self._positions.append( CheckPoint(update_time, new_position) )
 
   @property
   def throughput(self):
