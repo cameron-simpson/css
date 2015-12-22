@@ -33,7 +33,7 @@ class Progress(object):
       raise ValueError("start_time(%s) > now(%s)", start_time, now)
     if throughput_window is not None and throughput_window <= 0:
       raise ValueError("throughput_window <= 0: %s", throughput_window)
-    self.start = 0
+    self.start = start
     self.total = total
     self.start_time = start_time
     self.throughput_window = throughput_window
@@ -152,3 +152,7 @@ class Progress(object):
     if runtime is None:
       return None
     return time.time() + runtime
+
+if __name__ == '__main__':
+  from cs.debug import selftest
+  selftest('cs.progress_tests')
