@@ -42,6 +42,7 @@ class Progress(object):
     if position != start:
       posns.append( CheckPoint(now, position) )
     self._positions = posns
+    self._flushed = True
 
   @property
   def position(self):
@@ -58,6 +59,21 @@ class Progress(object):
       warning("%s.update: .position going backwards from %s to %s",
               self, self.position, position)
     self._positions.append( CheckPoint(update_time, new_position) )
+    self._flushed = False
+
+  def _flush(self, oldest=None):
+    if oldest is None:
+      window = self.throughput_window
+      if window is None:
+        raise ValueError("oldest may not be None when throughput_window is None")
+      oldest = time.time() - window
+    posns = self._positions
+    while posns:
+      point = posns.pop(0)
+      if point.time >= oldest:
+        posns.appendleft(point)
+        break
+    self._flushed = true
 
   @property
   def throughput(self):
@@ -92,6 +108,8 @@ class Progress(object):
     if time_window <= 0:
       raise ValueError("%s.throughput_recent: invalid time_window <= 0: %s",
                        self, time_window)
+    if not self._flushed:
+      self._flush()
     now = time.time()
     time0 = now - time_window
     if time0 < self.start_time:
