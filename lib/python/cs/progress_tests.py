@@ -5,6 +5,7 @@
 #
 
 from __future__ import absolute_import
+import time
 import unittest
 from cs.logutils import X
 from .progress import Progress
@@ -18,6 +19,14 @@ class TestProgress(unittest.TestCase):
     self.assertEqual(P.start_time, 100)
     self.assertEqual(P.total, 1000)
     self.assertEqual(P.throughput_window, 60)
+
+  def test01defaults(self):
+    P = Progress()
+    self.assertEqual(P.position, 0)
+    self.assertEqual(P.start, 0)
+    self.assertLessEqual(P.start_time, time.time())
+    self.assertIsNone(P.total)
+    self.assertIsNone(P.throughput_window)
 
 if __name__ == '__main__':
   from cs.debug import selftest
