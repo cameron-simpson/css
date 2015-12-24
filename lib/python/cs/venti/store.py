@@ -14,6 +14,7 @@
 
 from __future__ import with_statement
 from binascii import hexlify
+from contextlib import contextmanager
 import os
 import os.path
 import sys
@@ -388,6 +389,55 @@ def DataDirStore(dirpath, indexclass=None, rollover=None, **kw):
   return MappingStore(
            DataDirMapping(dirpath, indexclass=indexclass, rollover=rollover),
            **kw)
+
+class ProgressStore(BasicStoreSync):
+
+  def __init__(self, S):
+    self.S = S
+    Ps = {}
+    for category in 'add', 'get', 'contains', 'requests', 'add_bytes', 'get_bytes':
+      # active actions
+      Ps[category] = Progress(name='-'.join((str(S), category)), throughput_window=10)
+      # cumulative actions
+      Ps[category+'_all'] = Progress(name='-'.join((str(S), category, 'all')), throughput_window=10)
+    self._progress = Ps
+
+  @property
+  def requests(self):
+    return self._progress['requests'].position
+
+  @requests.setter
+  def requests(self, value):
+    return self._progress['requests'].update(value)
+
+  @contextmanager
+  def do_request(self, category):
+    self.requests += 1
+    if category is not None:
+      Pactive = self._progress[category]
+      Pactive.update(P.position + 1)
+      Pall = self._progress[category + '_all']
+      Pall.update(Pall.position + 1)
+    yield
+    if category is not None:
+      Pactive.update(P.position - 1)
+    self.requests -= 1
+
+  def add(self, data):
+    with self.do_request('add'):
+      return self.S.add(data)
+
+  def get(self, hashcode):
+    with self.do_request('get'):
+      return self.S.get(hashcode)
+
+  def contains(self, hashcode):
+    with self.do_request('contains'):
+      return self.S.contains(hashcode)
+
+  def flush(self, hashcode):
+    with self.do_request(None):
+      return self.S.flush()
 
 if __name__ == '__main__':
   import cs.venti.store_tests
