@@ -7,6 +7,7 @@
 from collections import namedtuple
 import time
 from cs.logutils import warning
+from cs.seq import seq
 
 CheckPoint = namedtuple('CheckPoint', 'time position')
 
@@ -14,7 +15,7 @@ class Progress(object):
   ''' A progress counter to track task completion with various utility functions.
   '''
 
-  def __init__(self, total=None, start=0, position=None, start_time=None, throughput_window=None):
+  def __init__(self, total=None, start=0, position=None, start_time=None, throughput_window=None, name=None):
     ''' Initialise the Progesss object.
         `total`: expected completion value, default None.
         `start`: starting position of progress range, default 0.
@@ -22,6 +23,8 @@ class Progress(object):
         `start_time`: start time of the process, default now.
         `throughput_window`: length of throughput time window, default None.
     '''
+    if name is None:
+      name = 'Progress-%d' % (seq(),)
     now = time.time()
     if start is None:
       start = 0
@@ -33,6 +36,7 @@ class Progress(object):
       raise ValueError("start_time(%s) > now(%s)", start_time, now)
     if throughput_window is not None and throughput_window <= 0:
       raise ValueError("throughput_window <= 0: %s", throughput_window)
+    self.name = name
     self.start = start
     self.total = total
     self.start_time = start_time
