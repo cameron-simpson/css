@@ -351,6 +351,11 @@ class DataDirMapping(MultiOpenMixin,HashCodeUtilsMixin):
   def _default_index(self):
     return self._index(self.default_hashclass)
 
+  def sorted_keys(self, hashclass=None):
+    if hashclass is None:
+      hashclass = self.default_hashclass
+    return self._index(hashclass).sorted_keys()
+
   @property
   def dirpath(self):
     return self.datadir.dirpath
