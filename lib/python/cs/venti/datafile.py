@@ -351,10 +351,10 @@ class DataDirMapping(MultiOpenMixin,HashCodeUtilsMixin):
   def _default_index(self):
     return self._index(self.default_hashclass)
 
-  def sorted_keys(self, hashclass=None):
+  def hashcodes_from(self, hashclass=None, start_hashcode=None, reverse=False):
     if hashclass is None:
       hashclass = self.default_hashclass
-    return self._index(hashclass).sorted_keys()
+    return self._index(hashclass).hashcodes_from(hashclass=hashclass, start_hashcode=start_hashcode, reverse=reverse)
 
   @property
   def dirpath(self):
@@ -564,12 +564,15 @@ class KyotoIndex(HashCodeUtilsMixin, MultiOpenMixin):
 
     cursor.disable()
 
-  def hashcodes_from(self, start_hashcode=None, reverse=None):
+  def hashcodes_from(self, hashclass=None, start_hashcode=None, reverse=None):
     ''' Generator yielding the keys from the index in order starting with optional `start_hashcode`.
         `start_hashcode`: the first hashcode; if missing or None, iteration
                     starts with the first key in the index
         `reverse`: iterate backwards if true, otherwise forwards
     '''
+    if hashclass is not None and hashclass is not self._hashclass:
+      raise ValueError("tried to get hashcodes of class %s from %s<_hashclass=%s>"
+                       % (hashclass, self, self._hashclass))
     cursor = self._kyoto.cursor()
     if reverse:
       if cursor.jump_back(start_hashcode):
