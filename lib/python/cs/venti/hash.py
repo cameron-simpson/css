@@ -151,7 +151,7 @@ class HashCodeUtilsMixin(object):
       if not isinstance(start_hashcode, hashclass):
         raise TypeError("hashclass %s does not match start_hashcode %r"
                         % (hashclass, start_hashcode))
-    ks = self.sorted_keys(hashclass=hashclass)
+    ks = self._sorted_keys(hashclass=hashclass)
     if start_hashcode is None:
       if reverse:
         ndx = len(ks) - 1
@@ -231,13 +231,13 @@ class HashUtilDict(dict, HashCodeUtilsMixin):
     '''
     pass
 
-  def sorted_keys(self, hashclass=None):
+  def _sorted_keys(self, hashclass=None):
     if hashclass is None:
       hashclass = DEFAULT_HASHCLASS
     return sorted(h for h in self.keys() if isinstance(h, hashclass))
 
   def first(self, hashclass=None):
-    ks = self.sorted_keys(hashclass=hashclass)
+    ks = self._sorted_keys(hashclass=hashclass)
     if ks:
       return ks[0]
     return None
