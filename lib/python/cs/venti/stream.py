@@ -95,9 +95,9 @@ class StreamStore(BasicStoreAsync):
       payload = hashcode.encode() if hashcode else b''
       return 1, payload
     if rq_type == T_HASHCODES:
-      hashclass, hashcode, reverse, after, length = self._decode_request_hashcodes(flags, payload)
+      hashclass, start_hashcode, reverse, after, length = self._decode_request_hashcodes(flags, payload)
       hcodes = self.local_store.hashcodes(hashclass=hashclass,
-                                          hashcode=hashcode,
+                                          start_hashcode=start_hashcode,
                                           reverse=reverse,
                                           after=after,
                                           length=length)
