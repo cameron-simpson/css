@@ -211,7 +211,7 @@ class StreamStore(BasicStoreAsync):
       raise ValueError("not ok, but payload=%r", payload)
     return None
 
-  def hashcodes_bg(self, hashclass=None, hashcode=None, reverse=None, after=False, length=None):
+  def hashcodes_bg(self, hashclass=None, start_hashcode=None, reverse=None, after=False, length=None):
     ''' Dispatch a hashcodes request, return a Result for collection.
     '''
     if hashclass is None:
@@ -221,7 +221,7 @@ class StreamStore(BasicStoreAsync):
     flags = ( 0x01 if reverse else 0x00 ) \
           | ( 0x02 if after else 0x00 )
     payload = put_bss(hashclass.HASHNAME) \
-            + put_bsdata(b'' if hashcode is None else hashcode.encode()) \
+            + put_bsdata(b'' if start_hashcode is None else start_hashcode.encode()) \
             + put_bs(length if length else 0)
     return self._conn.request(T_HASHCODES, flags, payload, self._decode_response_hashcodes)
 
