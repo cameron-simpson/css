@@ -219,7 +219,7 @@ class BasicStoreSync(_BasicStoreCommon):
     return self._defer(self.first, hashclass)
 
   def hashcodes_bg(self, hashclass=None, start_hashcode=None, reverse=None, after=False, length=None):
-    return self._defer(self.hashcodes_bg, hashclass=hashclass, hashcode=hashcode, reverse=reverse, after=after, length=length)
+    return self._defer(self.hashcodes_bg, hashclass=hashclass, start_hashcode=start_hashcode, reverse=reverse, after=after, length=length)
 
 class BasicStoreAsync(_BasicStoreCommon):
   ''' Subclass of _BasicStoreCommon expecting asynchronous operations and providing synchronous hooks, dual of BasicStoreSync.
@@ -245,7 +245,7 @@ class BasicStoreAsync(_BasicStoreCommon):
     return self.first_bg(hashclass=hashclass)()
 
   def hashcodes(self, hashclass=None, start_hashcode=None, reverse=None, after=False, length=None):
-    return self.hashcodes_bg(hashclass=hashclass, hashcode=hashcode, reverse=reverse, after=after, length=length)()
+    return self.hashcodes_bg(hashclass=hashclass, start_hashcode=start_hashcode, reverse=reverse, after=after, length=length)()
 
 def Store(store_spec):
   ''' Factory function to return an appropriate BasicStore* subclass
