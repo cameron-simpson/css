@@ -385,6 +385,9 @@ class MappingStore(BasicStoreSync):
     return self.mapping.hashcodes(hashclass=hashclass, start_hashcode=start_hashcode,
                                   reverse=reverse, after=after, length=length)
 
+  def sorted_keys(self, hashclass=None):
+    return self.mapping.sorted_keys(hashclass=hashclass)
+
 def DataDirStore(dirpath, indexclass=None, rollover=None, **kw):
   return MappingStore(
            DataDirMapping(dirpath, indexclass=indexclass, rollover=rollover),
