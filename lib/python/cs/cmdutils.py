@@ -5,6 +5,7 @@
 #
 
 from __future__ import print_function, absolute_import
+import os
 import sys
 import io
 import subprocess
@@ -34,7 +35,7 @@ def pipefrom(argv, trace=False, **kw):
     tracefp = sys.stderr if trace is True else trace
     pargv = ['+'] + argv + ['|']
     print(*pargv, file=tracefp)
-  sp_devnull = getattr(subprocess, 'DEVNULL')
+  sp_devnull = getattr(subprocess, 'DEVNULL', None)
   if sp_devnull is None:
     devnull = open(os.devnull, 'wb')
   else:
