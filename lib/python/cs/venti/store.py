@@ -212,13 +212,13 @@ class BasicStoreSync(_BasicStoreCommon):
   def first(self):
     raise NotImplementedError("no .first")
 
-  def hashcodes(self, hashclass=None, hashcode=None, reverse=None, after=False, length=None):
+  def hashcodes(self, hashclass=None, start_hashcode=None, reverse=None, after=False, length=None):
     raise NotImplementedError("no .first")
 
   def first_bg(self, hashclass=None):
     return self._defer(self.first, hashclass)
 
-  def hashcodes_bg(self, hashclass=None, hashcode=None, reverse=None, after=False, length=None):
+  def hashcodes_bg(self, hashclass=None, start_hashcode=None, reverse=None, after=False, length=None):
     return self._defer(self.hashcodes_bg, hashclass=hashclass, hashcode=hashcode, reverse=reverse, after=after, length=length)
 
 class BasicStoreAsync(_BasicStoreCommon):
@@ -244,7 +244,7 @@ class BasicStoreAsync(_BasicStoreCommon):
   def first(self, hashclass=None):
     return self.first_bg(hashclass=hashclass)()
 
-  def hashcodes(self, hashclass=None, hashcode=None, reverse=None, after=False, length=None):
+  def hashcodes(self, hashclass=None, start_hashcode=None, reverse=None, after=False, length=None):
     return self.hashcodes_bg(hashclass=hashclass, hashcode=hashcode, reverse=reverse, after=after, length=length)()
 
 def Store(store_spec):
