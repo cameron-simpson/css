@@ -14,6 +14,7 @@ from cs.serialise import put_bs, get_bs, put_bsdata, get_bsdata, put_bss, get_bs
 from cs.stream import PacketConnection
 from .store import BasicStoreAsync
 from .hash import decode as hash_decode, HASHCLASS_BY_NAME
+from .pushpull import missing_hashcodes_by_checksum
 
 RqType = Enum('T_ADD', 'T_GET', 'T_CONTAINS', 'T_FLUSH')
 T_ADD = RqType(0)           # data->hashcode
@@ -218,6 +219,11 @@ class StreamStore(BasicStoreAsync):
     if payload:
       raise ValueError("not ok, but payload=%r", payload)
     return None
+
+  def hashcodes_missing(self, other, window_size=None):
+    ''' Generator yielding hashcodes in `other` which are missing in `self`.
+    '''
+    return missing_hashcodes_by_checksum(self, other, window_size=window_size)
 
   def hashcodes_bg(self, hashclass=None, start_hashcode=None, reverse=None, after=False, length=None):
     ''' Dispatch a hashcodes request, return a Result for collection.
