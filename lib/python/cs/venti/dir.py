@@ -7,6 +7,7 @@ import sys
 from threading import Lock, RLock
 from cs.logutils import D, Pfx, debug, error, info, warning, X
 from cs.lex import hexify
+from cs.py.stack import stack_dump
 from cs.queues import MultiOpenMixin
 from cs.seq import seq
 from cs.serialise import get_bs, get_bsdata, put_bs, put_bsdata
@@ -278,6 +279,7 @@ class FileDirent(_Dirent, MultiOpenMixin):
     if self._open_file is not None:
       self._block = self._open_file.flush()
       warning("FileDirent.block: updated to %s", self._block)
+      stack_dump()
     return self._block
 
   @block.setter
@@ -430,7 +432,7 @@ class Dir(_Dirent):
                      )
       # TODO: if len(data) >= 16384
       B = Block(data=data)
-      warning("Dir.block: computed Block %s", B)
+      ##warning("Dir.block: computed Block %s", B)
     else:
       B = self._block
     return B
