@@ -4,7 +4,7 @@
 #   - Cameron Simpson <cs@zip.com.au> 15feb2015
 #
 
-from collections import namedtuple, deque
+from collections import namedtuple
 import time
 from cs.logutils import warning, exception, X
 from cs.seq import seq
@@ -42,8 +42,7 @@ class Progress(object):
     self.start_time = start_time
     self.throughput_window = throughput_window
     # history of positions, used to compute throughput
-    posns = deque()
-    posns.append(CheckPoint(start_time, start))
+    posns = [ CheckPoint(start_time, start) ]
     if position != start:
       posns.append(CheckPoint(now, position))
     self._positions = posns
@@ -73,12 +72,16 @@ class Progress(object):
         raise ValueError("oldest may not be None when throughput_window is None")
       oldest = time.time() - window
     posns = self._positions
-    while posns:
-      point = posns.pop()
-      if point.time >= oldest:
-        posns.appendleft(point)
+    # scan for first item still in time window
+    for ndx, posn in enumerate(posns):
+      if posn.time >= oldest:
+        if ndx > 0:
+          del posns[0:ndx]
         break
     self._flushed = True
+
+  def inc(self, amount=1, when=None):
+    self.update(self.position + amount, when)
 
   @property
   def throughput(self):
@@ -124,31 +127,23 @@ class Progress(object):
     # low_pos will be the matching position, probably interpolated
     low_time = None
     low_pos = None
-    # walk backward through the samples, assuming monotonic
-    for t, p in reversed(self._positions):
+    # walk forward through the samples, assumes monotonic
+    for t, p  in self._positions:
       if t >= time0:
         low_time = t
         low_pos = p
-        if low_time == time0:
-          # hit the bottom of the samples, perfectly aligned
-          break
-        continue
-      # post: t < time0
-      if low_time is None:
-        # no samples within the window; caller might infer stall
-        return None
-      # post: low_time > time0
-      # compute new low_position between p and low_position
-      low_pos = p + (low_pos - p) * (time0 - t) / (low_time - t)
-      low_time = time0
-      break
-    t, p = self._positions[-1]
-    if t <= low_time:
-      # return None if negative or zero elapsed time in the span
+        break
+    if low_time is None:
+      # no samples within the window; caller might infer stall
       return None
-    # return average throughput over the span, extending span to now
-    # Note that this will decay until the next update
-    return (p - low_pos) / (now - low_time)
+    if low_time >= now:
+      # in the future? warn and return None
+      warning('low_time=%s >= now=%s', low_time, now)
+      return None
+    rate = (self.position - low_pos) / (now - low_time)
+    if rate < 0:
+      warning('rate < 0 (%s)', rate)
+    return rate
 
   @property
   def projected(self):
