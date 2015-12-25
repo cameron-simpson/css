@@ -22,6 +22,7 @@ T_CONTAINS = RqType(2)      # hash->boolean
 T_FLUSH = RqType(3)         # flush local and remote store
 T_FIRST = RqType(4)         # ->first hashcode
 T_HASHCODES = RqType(5)     # (hashcode,length)=>hashcodes
+T_HASHCODES_HASH = RqType(6)# (hashcode,length)=>hashcode_of_hashes
 
 class StreamStore(BasicStoreAsync):
   ''' A Store connected to a remote Store via a PacketConnection.
@@ -103,6 +104,12 @@ class StreamStore(BasicStoreAsync):
                                           length=length)
       payload = b''.join(h.encode() for h in hcodes)
       return 1, payload
+    if rq_type == T_HASHCODES_HASH:
+      return self.local_store.hash_of_hashcodes(hashclass=hashclass,
+                                                start_hashcode=start_hashcode,
+                                                reverse=reverse,
+                                                after=after,
+                                                length=length)
     raise ValueError("unrecognised request code: %d; data=%r"
                      % (rq_type, payload))
 
