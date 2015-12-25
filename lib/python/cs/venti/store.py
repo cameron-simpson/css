@@ -419,7 +419,10 @@ class ProgressStore(BasicStoreSync):
     name = kw.pop('name', None)
     if name is None:
       name = "ProgressStore(%s)" % (S,)
-    BasicStoreSync.__init__(self, name=name, **kw)
+    lock = kw.pop('lock', None)
+    if lock is None:
+      lock = S._lock
+    BasicStoreSync.__init__(self, name=name, lock=lock, **kw)
     self.S = S
     self.template = template
     self.template_mapping = _ProgressStoreTemplateMapping(self)
@@ -481,7 +484,7 @@ class ProgressStore(BasicStoreSync):
     with self.do_request('contains'):
       return self.S.contains(hashcode)
 
-  def flush(self, hashcode):
+  def flush(self):
     with self.do_request(None):
       return self.S.flush()
 
