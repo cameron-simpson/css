@@ -107,11 +107,17 @@ class StreamStore(BasicStoreAsync):
       return 1, payload
     if rq_type == T_HASHCODES_HASH:
       hashclass, start_hashcode, reverse, after, length = self._decode_request_hash_of_hashcodes(flags, payload)
-      return self.local_store.hash_of_hashcodes(hashclass=hashclass,
-                                                start_hashcode=start_hashcode,
-                                                reverse=reverse,
-                                                after=after,
-                                                length=length)
+      etc = self.local_store.hash_of_hashcodes(hashclass=hashclass,
+                                                             start_hashcode=start_hashcode,
+                                                             reverse=reverse,
+                                                             after=after,
+                                                             length=length)
+      X("self.local_store.hash_of_hashcodes => %r", etc)
+      hashcode, h_final = etc
+      payload = hashcode.encode()
+      if h_final is not None:
+        payload += h_final.encode()
+      return 1, payload
     raise ValueError("unrecognised request code: %d; data=%r"
                      % (rq_type, payload))
 
@@ -346,7 +352,7 @@ class StreamStore(BasicStoreAsync):
 
   @staticmethod
   def _decode_response_hash_of_hashcodes(flags, payload):
-    ''' Decode the reply to a hash_of_hashcodes, should be ok and hashcodes payload.
+    ''' Decode the reply to a hash_of_hashcodes, should be ok, hashcode of hashcodes, and optional h_final hashcode.
     '''
     ok = flags & 0x01
     if ok:
@@ -354,12 +360,15 @@ class StreamStore(BasicStoreAsync):
     if flags:
       raise ValueError("unexpected flags: 0x%02x" % (flags,))
     if ok:
-      offset = 0
-      hashary = []
-      while offset < len(payload):
-        hashcode, offset = hash_decode(payload, offset)
-        hashary.append(hashcode)
-      return hashary
+      hashcode, offset = hash_decode(payload, 0)
+      if offset == len(payload):
+        h_final = None
+      else:
+        h_final, offset = hash_decode(payload, offset)
+        if offset < len(payload):
+          raise ValueError("after hashcode (%s) and h_final (%s), extra bytes: %r"
+                           % (hashcode, h_final, payload[offset:]))
+      return hashcode, h_final
     if payload:
       raise ValueError("not ok, but payload=%r", payload)
     return None
