@@ -402,7 +402,7 @@ class _ProgressStoreTemplateMapping(object):
 
   def __getitem__(self, key):
     try:
-      category, aspect = key.split('_', 1)
+      category, aspect = key.rsplit('_', 1)
     except ValueError:
       category = key
       aspect = 'position'
@@ -415,7 +415,7 @@ class _ProgressStoreTemplateMapping(object):
 
 class ProgressStore(BasicStoreSync):
 
-  def __init__(self, S, template='rq  {requests_position}  {requests_throughput}/s', **kw):
+  def __init__(self, S, template='rq  {requests_all_position}  {requests_all_throughput}/s', **kw):
     name = kw.pop('name', None)
     if name is None:
       name = "ProgressStore(%s)" % (S,)
@@ -461,7 +461,9 @@ class ProgressStore(BasicStoreSync):
 
   @contextmanager
   def do_request(self, category):
+    Ps = self._progress
     self.requests += 1
+    Ps['requests_all'].inc()
     if category is not None:
       Pactive = self._progress[category]
       Pactive.update(Pactive.position + 1)
