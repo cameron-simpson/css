@@ -4,9 +4,9 @@
 #   - Cameron Simpson <cs@zip.com.au> 15feb2015
 #
 
-from collections import namedtuple
+from collections import namedtuple, deque
 import time
-from cs.logutils import warning
+from cs.logutils import warning, exception, X
 from cs.seq import seq
 
 CheckPoint = namedtuple('CheckPoint', 'time position')
@@ -42,9 +42,10 @@ class Progress(object):
     self.start_time = start_time
     self.throughput_window = throughput_window
     # history of positions, used to compute throughput
-    posns = [ (start_time, start) ]
+    posns = deque()
+    posns.append(CheckPoint(start_time, start))
     if position != start:
-      posns.append( CheckPoint(now, position) )
+      posns.append(CheckPoint(now, position))
     self._positions = posns
     self._flushed = True
 
@@ -59,9 +60,9 @@ class Progress(object):
     '''
     if update_time is None:
       update_time = time.time()
-    if new_position < self.position:
-      warning("%s.update: .position going backwards from %s to %s",
-              self, self.position, position)
+    ##if new_position < self.position:
+    ##  warning("%s.update: .position going backwards from %s to %s",
+    ##          self, self.position, new_position)
     self._positions.append( CheckPoint(update_time, new_position) )
     self._flushed = False
 
@@ -73,11 +74,11 @@ class Progress(object):
       oldest = time.time() - window
     posns = self._positions
     while posns:
-      point = posns.pop(0)
+      point = posns.pop()
       if point.time >= oldest:
         posns.appendleft(point)
         break
-    self._flushed = true
+    self._flushed = True
 
   @property
   def throughput(self):
