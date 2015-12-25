@@ -129,6 +129,8 @@ class HashCodeUtilsMixin(object):
 
   def hashcodes_missing(self, other, window_size=None):
     ''' Generator yielding hashcodes in `other` which are missing in `self`.
+        Note that a StreamStore overrides this with a call to
+        missing_hashcodes_by_checksum to reduce bandwidth.
     '''
     return missing_hashcodes(self, other, window_size=window_size)
 
