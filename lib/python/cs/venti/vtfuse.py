@@ -249,9 +249,8 @@ class StoreFS(Operations):
       return st
 
   def listxattr(self, path):
-    X("LISTXATTR...")
     with Pfx("listxattr(path=%r)", path):
-      warning("listxattr: return empty list")
+      debug("listxattr: return empty list")
       return ''
 
   def mkdir(self, path, mode):
