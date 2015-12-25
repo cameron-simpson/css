@@ -19,7 +19,7 @@ from cs.logutils import X, debug, info, warning, error, Pfx
 from cs.obj import O, obj_as_dict
 from cs.seq import Seq
 from cs.threads import locked
-from .archive import save_Dirent
+from .archive import strfor_Dirent, write_Dirent_str
 from .block import Block
 from .debug import dump_Dirent
 from .dir import FileDirent, Dir
@@ -59,6 +59,7 @@ class StoreFS(Operations):
     self.S =S
     self.E = E
     self.syncfp = syncfp
+    self._syncfp_last_dirent_text = None
     self.do_fsync = False
     self._fs_uid = os.geteuid()
     self._fs_gid = os.getegid()
@@ -78,6 +79,19 @@ class StoreFS(Operations):
       warning("CALL UNKNOWN ATTR: %s(a=%r,kw=%r)", attr, a, kw)
       raise RuntimeError(attr)
     return attrfunc
+
+  def _sync(self):
+    with Pfx("_sync"):
+      if self.syncfp is not None:
+        with self._lock:
+          text = strfor_Dirent(self.E)
+          last_text = self._syncfp_last_dirent_text
+          if last_text is not None and text == last_text:
+            text = None
+        if text is not None:
+          write_Dirent_str(self.syncfp, text, etc=self.E.name)
+          self._syncfp_last_dirent_text = text
+          dump_Dirent(self.E, recurse=True) # debugging
 
   def _mount(self, root):
     ''' Attach this StoreFS to the specified path `root`.
@@ -167,12 +181,16 @@ class StoreFS(Operations):
 
   def chmod(self, path, mode):
     with Pfx("chmod(%r, 0o%04o)...", path, mode):
-      E = self._namei(path)
+      E, P = self._namei2(path)
       E.meta.chmod(mode)
+      if P:
+        P.change()
 
   def chown(self, path, uid, gid):
     with Pfx("chown(%r, uid=%d, gid=%d)", path, uid, gid):
-      E = self._namei(path)
+      E, P = self._namei2(path)
+      if P:
+        P.change()
       M = E.meta
       if uid >= 0 and uid != self._fs_uid:
         M.uid = uid
@@ -190,9 +208,7 @@ class StoreFS(Operations):
   def destroy(self, path):
     X("DESTROY(%r)...", path)
     with Pfx("destroy(%r)", path):
-      if self.syncfp is not None:
-        save_Dirent(self.syncfp, self.E)
-        dump_Dirent(self.E, recurse=True)
+      self._sync()
     X("DESTROY COMPLETE")
 
   def fgetattr(self, *a, **kw):
@@ -260,7 +276,7 @@ class StoreFS(Operations):
   def open(self, path, flags):
     ''' Obtain a FileHandle open on `path`, return its index.
     '''
-    with Pfx("open(path=%r, flags=0o%o)...", path, flags):
+    with Pfx("open(path=%r, flags=0o%o)", path, flags):
       do_create = flags & O_CREAT
       do_trunc = flags & O_TRUNC
       for_read = (flags & O_RDONLY) == O_RDONLY or (flags & O_RDWR) == O_RDWR
@@ -291,16 +307,20 @@ class StoreFS(Operations):
       if do_trunc:
         fh.truncate(0)
       fhndx = self._new_file_handle_index(fh)
+      if P:
+        P.change()
       return fhndx
 
   def opendir(self, path):
     with Pfx("opendir(%r)", path):
       E = self._namei(path)
+      if not E.isdir:
+        raise FuseOSError(errno.ENOTDIR)
       fhndx = self._new_file_handle_index(E)
       return fhndx
 
   def read(self, path, size, offset, fhndx):
-    with Pfx("read(path=%r, size=%d, offset=%d, fhndx=%r", path, size, offset, fhndx):
+    with Pfx("read(path=%r, size=%d, offset=%d, fhndx=%r)", path, size, offset, fhndx):
       chunks = []
       while size > 0:
         data = self._fh(fhndx).read(offset, size)
@@ -312,7 +332,7 @@ class StoreFS(Operations):
       return b''.join(chunks)
 
   def readdir(self, path, *a, **kw):
-    with Pfx("readdir(path=%r, a=%r, kw=%r", path, a, kw):
+    with Pfx("readdir(path=%r, a=%r, kw=%r)", path, a, kw):
       if a or kw:
         warning("a or kw set!")
       E = self._namei(path)
@@ -391,10 +411,11 @@ class StoreFS(Operations):
 
   def truncate(self, path, length, fh=None):
     with Pfx("truncate(%r, length=%d, fh=%s)", path, length, fh):
-      E = self._namei(path)
+      E, P = self._namei2(path)
       if not self._Eaccess(E, os.W_OK):
         raise FuseOSError(errno.EPERM)
       E.truncate(length)
+      P.change()
 
   def unlink(self, path):
     with Pfx("unlink(%r)...", path):
@@ -411,10 +432,12 @@ class StoreFS(Operations):
   def utimens(self, path, times):
     with Pfx("utimens(%r, times=%r", path, times):
       atime, mtime = times
-      E = self._namei(path)
+      E, P = self._namei2(path)
       M = E.meta
       ## we do not do atime ## M.atime = atime
       M.mtime = mtime
+      if P:
+        P.change()
 
   def write(self, path, data, offset, fhndx):
     with Pfx("write(path=%r, data=%d bytes, offset=%d, fhndx=%r", path, len(data), offset, fhndx):

@@ -7,6 +7,7 @@ import sys
 from threading import Lock, RLock
 from cs.logutils import D, Pfx, debug, error, info, warning, X
 from cs.lex import hexify
+from cs.py.stack import stack_dump
 from cs.queues import MultiOpenMixin
 from cs.seq import seq
 from cs.serialise import get_bs, get_bsdata, put_bs, put_bsdata
@@ -278,6 +279,7 @@ class FileDirent(_Dirent, MultiOpenMixin):
     if self._open_file is not None:
       self._block = self._open_file.flush()
       warning("FileDirent.block: updated to %s", self._block)
+      stack_dump()
     return self._block
 
   @block.setter
@@ -371,6 +373,11 @@ class FileDirent(_Dirent, MultiOpenMixin):
 
 class Dir(_Dirent):
   ''' A directory.
+
+      .changed  Starts False, becomes true if this or any subdirectory
+                gets changed or has a file opened; stays True from then on.
+                This accepts an ongoing compute cost for .block to avoid
+                setting the flag on every file.write etc.
   '''
 
   def __init__(self, name, metatext=None, parent=None, block=None):
@@ -387,7 +394,15 @@ class Dir(_Dirent):
       self._entries = None
     _Dirent.__init__(self, D_DIR_T, name, metatext=metatext)
     self.parent = parent
+    self.changed = False
     self._lock = RLock()
+
+  def change(self):
+    ''' Mark this Dir as changed; propagate to parent Dir if present.
+    '''
+    self.changed = True
+    if self.parent:
+      self.parent.change()
 
   @property
   def entries(self):
@@ -408,18 +423,18 @@ class Dir(_Dirent):
     ''' Return the top Block referring to an encoding of this Dir.
         TODO: blockify the encoding? Probably desirable for big Dirs.
     '''
-    if self._entries is None:
-      # dir never unpacked: just return the Block
-      return self._block
-    # unpacked; always recompute in case of change
-    names = sorted(self.keys())
-    data = b''.join( self[name].encode()
-                     for name in names
-                     if name != '.' and name != '..'
-                   )
-    # TODO: if len(data) >= 16384
-    B = Block(data=data)
-    warning("Dir.block: computed Block %s", B)
+    if self._block is None or self.changed:
+      # recompute in case of change
+      names = sorted(self.keys())
+      data = b''.join( self[name].encode()
+                       for name in names
+                       if name != '.' and name != '..'
+                     )
+      # TODO: if len(data) >= 16384
+      B = Block(data=data)
+      ##warning("Dir.block: computed Block %s", B)
+    else:
+      B = self._block
     return B
 
   def dirs(self):
@@ -467,15 +482,22 @@ class Dir(_Dirent):
       raise KeyError("invalid name: %s" % (name,))
     if not isinstance(E, _Dirent):
       raise ValueError("E is not a _Dirent: <%s>%r" % (type(E), E))
+    self.change()
     self.entries[name] = E
-    if E.isdir and E.parent is None:
-      E.parent = D
+    if E.isdir:
+      Eparent = E.parent
+      if Eparent is None:
+        E.parent = D
+      elif Eparent is not self:
+        warning("%s: changing %r.parent to self, was %s", self, name, Eparent)
+        E.parent = self
 
   def __delitem__(self, name):
     if not self._validname(name):
       raise KeyError("invalid name: %s" % (name,))
     if name == '.' or name == '..':
       raise KeyError("refusing to delete . or ..: name=%s" % (name,))
+    self.change()
     del self.entries[name]
 
   def add(self, E):
@@ -487,6 +509,7 @@ class Dir(_Dirent):
       raise KeyError("name already exists: %r", name)
     self[name] = E
 
+  @locked
   def rename(self, oldname, newname):
     ''' Rename entry `oldname` to entry `newname`.
     '''
@@ -522,9 +545,8 @@ class Dir(_Dirent):
     return D
 
   def makedirs(self, path, force=False):
-    ''' Like os.makedirs(), create a directory path at need.
-        If `force`, replace an non-DIr encountered with an empty Dir.
-        Returns the bottom directory.
+    ''' Like os.makedirs(), create a directory path at need; return the bottom Dir.
+        If `force`, replace an non-Dir encountered with an empty Dir.
     '''
     E = self
     if isinstance(path, str):

@@ -14,6 +14,7 @@
 
 from __future__ import with_statement
 from binascii import hexlify
+from contextlib import contextmanager
 import os
 import os.path
 import sys
@@ -211,14 +212,14 @@ class BasicStoreSync(_BasicStoreCommon):
   def first(self):
     raise NotImplementedError("no .first")
 
-  def hashcodes(self, hashcode, length):
+  def hashcodes(self, hashclass=None, start_hashcode=None, reverse=None, after=False, length=None):
     raise NotImplementedError("no .first")
 
   def first_bg(self, hashclass=None):
     return self._defer(self.first, hashclass)
 
-  def hashcodes_bg(self, hashclass=None, hashcode=None, reverse=None, after=False, length=None):
-    return self._defer(self.hashcodes_bg, hashclass=hashclass, hashcode=hashcode, reverse=reverse, after=after, length=length)
+  def hashcodes_bg(self, hashclass=None, start_hashcode=None, reverse=None, after=False, length=None):
+    return self._defer(self.hashcodes_bg, hashclass=hashclass, start_hashcode=start_hashcode, reverse=reverse, after=after, length=length)
 
 class BasicStoreAsync(_BasicStoreCommon):
   ''' Subclass of _BasicStoreCommon expecting asynchronous operations and providing synchronous hooks, dual of BasicStoreSync.
@@ -243,8 +244,8 @@ class BasicStoreAsync(_BasicStoreCommon):
   def first(self, hashclass=None):
     return self.first_bg(hashclass=hashclass)()
 
-  def hashcodes(self, hashclass=None, hashcode=None, reverse=None, after=False, length=None):
-    return self.hashcodes_bg(hashclass=hashclass, hashcode=hashcode, reverse=reverse, after=after, length=length)()
+  def hashcodes(self, hashclass=None, start_hashcode=None, reverse=None, after=False, length=None):
+    return self.hashcodes_bg(hashclass=hashclass, start_hashcode=start_hashcode, reverse=reverse, after=after, length=length)()
 
 def Store(store_spec):
   ''' Factory function to return an appropriate BasicStore* subclass
@@ -371,23 +372,75 @@ class MappingStore(BasicStoreSync):
     else:
       return first_method(hashclass=hashclass)
 
-  def hashcodes(self, hashclass=None, hashcode=None, reverse=None, after=False, length=None):
+  def hashcodes(self, hashclass=None, start_hashcode=None, reverse=None, after=False, length=None):
     ''' Generator yielding the Store's in order hashcodes starting with optional `hashcode`.
         `hashclass`: specify the hashcode type, default from defaults.S
-        `hashcode`: the first hashcode; if missing or None, iteration
+        `start_hashcode`: the first hashcode; if missing or None, iteration
                     starts with the first key in the index
         `reverse`: iterate backwards if true, forwards if false and in no
                    specified order if missing or None
         `after`: commence iteration after the first hashcode
-        `length`: if not None, the maximum number if hashcodes to yield
+        `length`: if not None, the maximum number of hashcodes to yield
     '''
-    return self.mapping.hashcodes(hashclass=hashclass, hashcode=hashcode,
+    return self.mapping.hashcodes(hashclass=hashclass, start_hashcode=start_hashcode,
                                   reverse=reverse, after=after, length=length)
+
+  def hashcodes_from(self, hashclass=None, start_hashcode=None, reverse=False):
+    return self.mapping.hashcodes_from(hashclass=hashclass, start_hashcode=start_hashcode, reverse=reverse)
 
 def DataDirStore(dirpath, indexclass=None, rollover=None, **kw):
   return MappingStore(
            DataDirMapping(dirpath, indexclass=indexclass, rollover=rollover),
            **kw)
+
+class ProgressStore(BasicStoreSync):
+
+  def __init__(self, S):
+    self.S = S
+    Ps = {}
+    for category in 'add', 'get', 'contains', 'requests', 'add_bytes', 'get_bytes':
+      # active actions
+      Ps[category] = Progress(name='-'.join((str(S), category)), throughput_window=10)
+      # cumulative actions
+      Ps[category+'_all'] = Progress(name='-'.join((str(S), category, 'all')), throughput_window=10)
+    self._progress = Ps
+
+  @property
+  def requests(self):
+    return self._progress['requests'].position
+
+  @requests.setter
+  def requests(self, value):
+    return self._progress['requests'].update(value)
+
+  @contextmanager
+  def do_request(self, category):
+    self.requests += 1
+    if category is not None:
+      Pactive = self._progress[category]
+      Pactive.update(P.position + 1)
+      Pall = self._progress[category + '_all']
+      Pall.update(Pall.position + 1)
+    yield
+    if category is not None:
+      Pactive.update(P.position - 1)
+    self.requests -= 1
+
+  def add(self, data):
+    with self.do_request('add'):
+      return self.S.add(data)
+
+  def get(self, hashcode):
+    with self.do_request('get'):
+      return self.S.get(hashcode)
+
+  def contains(self, hashcode):
+    with self.do_request('contains'):
+      return self.S.contains(hashcode)
+
+  def flush(self, hashcode):
+    with self.do_request(None):
+      return self.S.flush()
 
 if __name__ == '__main__':
   import cs.venti.store_tests

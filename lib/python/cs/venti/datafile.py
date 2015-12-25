@@ -351,6 +351,11 @@ class DataDirMapping(MultiOpenMixin,HashCodeUtilsMixin):
   def _default_index(self):
     return self._index(self.default_hashclass)
 
+  def hashcodes_from(self, hashclass=None, start_hashcode=None, reverse=False):
+    if hashclass is None:
+      hashclass = self.default_hashclass
+    return self._index(hashclass).hashcodes_from(hashclass=hashclass, start_hashcode=start_hashcode, reverse=reverse)
+
   @property
   def dirpath(self):
     return self.datadir.dirpath
@@ -447,33 +452,19 @@ class DataDirMapping(MultiOpenMixin,HashCodeUtilsMixin):
       raise NotImplementedError("._index(%s) has no .first" % (hashclass,))
     return first_method()
 
-  def hashcodes(self, hashclass=None, hashcode=None, reverse=None, after=False, length=None):
-    ''' Generator yielding the hashcodes from the database in order starting with optional `hashcode`.
+  def hashcodes_from(self, hashclass=None, start_hashcode=None, reverse=False):
+    ''' Generator yielding the hashcodes from the database in order starting with optional `start_hashcode`.
         `hashclass`: specify the hashcode type, default from defaults.S
-        `hashcode`: the first hashcode; if missing or None, iteration
-                    starts with the first key in the index
+        `start_hashcode`: the first hashcode; if missing or None, iteration
+                          starts with the first key in the index
         `reverse`: iterate backwards if true, otherwise forwards
-        `after`: commence iteration after the first hashcode
-        `length`: if not None, the maximum number of hashcodes to yield
     '''
     if hashclass is None:
       hashclass = self.default_hashclass
-    return self._index(hashclass).hashcodes(hashcode=hashcode,
-                                            reverse=reverse,
-                                            after=after,
-                                            length=length)
+    return self._index(hashclass).hashcodes_from(start_hashcode=start_hashcode,
+                                                 reverse=reverse)
 
-  def merge_other(self, other, hashcodes=None):
-    ''' Iterate over the hashcodes in `other` and fetch anything we don't have.
-    '''
-    if hashcodes is None:
-      hashcodes = other.hashcodes()
-    for hashcode in hashcodes:
-      if hashcode not in self:
-        X("pull %s", hashcode)
-        self[hashcode] = other[hashcode]
-
-class GDBMIndex(MultiOpenMixin):
+class GDBMIndex(HashCodeUtilsMixin, MultiOpenMixin):
   ''' GDBM index for a DataDir.
   '''
 
@@ -506,35 +497,10 @@ class GDBMIndex(MultiOpenMixin):
   def __setitem__(self, hashcode, value):
     self._gdbm[hashcode] = encode_index_entry(*value)
 
-  def hashcodes(self, hashcode=None, reverse=None, after=False, length=None):
-    ''' Generator yielding the keys from the index, unordered
-        `hashcode`: must be missing or None; GDBMs cannot iterate
-                    from a specific hashcode
-        `reverse`: must be missing or None; GDBMs are unordered
-        `after`: commence iteration after the first hashcode
-        `length`: if not None, maximum number of hashcodes to yield
-    '''
-    if hashcode is not None:
-      raise ValueError("iteration from specific hashcode unsupported")
-    if reverse is not None:
-      raise ValueError("reverse must be None (unordered)")
-    if after:
-      raise ValueError("after not supported (meaningless, since no starting hashcode support)")
-    if length is not None and length < 1:
-      raise ValueError("length (%d) must be >= 1" % (length,))
-    first = True
-    for hashbytes in self._gdbm.keys():
-      if not first or not after:
-        yield self._hashclass.from_hashbytes(hashbytes)
-        if length <= 1:
-          break
-        length -= 1
-      first = False
-
 def GDBMDataDirMapping(dirpath, rollover=None):
   return DataDirMapping(dirpath, indexclass=GDBMIndex, rollover=rollover)
 
-class KyotoIndex(MultiOpenMixin):
+class KyotoIndex(HashCodeUtilsMixin, MultiOpenMixin):
   ''' Kyoto Cabinet index for a DataDir.
       Notably this uses a B+ tree for the index and thus one can
       traverse from one key forwards and backwards, which supports
@@ -598,34 +564,26 @@ class KyotoIndex(MultiOpenMixin):
 
     cursor.disable()
 
-  def hashcodes(self, hashcode=None, reverse=None, after=False, length=None):
-    ''' Generator yielding the keys from the index in order starting with optional `hashcode`.
-        `hashcode`: the first hashcode; if missing or None, iteration
+  def hashcodes_from(self, hashclass=None, start_hashcode=None, reverse=None):
+    ''' Generator yielding the keys from the index in order starting with optional `start_hashcode`.
+        `start_hashcode`: the first hashcode; if missing or None, iteration
                     starts with the first key in the index
         `reverse`: iterate backwards if true, otherwise forwards
-        `after`: commence iteration after the first hashcode
-        `length`: if not None, maximum number of hashcodes to yield
     '''
-    if length is not None and length < 1:
-      raise ValueError("length (%d) must be >= 1" % (length,))
+    if hashclass is not None and hashclass is not self._hashclass:
+      raise ValueError("tried to get hashcodes of class %s from %s<_hashclass=%s>"
+                       % (hashclass, self, self._hashclass))
     cursor = self._kyoto.cursor()
-    if cursor.jump(hashcode):
-      if not after:
+    if reverse:
+      if cursor.jump_back(start_hashcode):
         yield self._hashclass.from_hashbytes(cursor.get_key())
-        if length is not None:
-          length -= 1
-      while length is None or length >= 1:
-        if reverse:
-          if not cursor.step_back():
-            break
-        else:
-          if not cursor.step():
-            break
+        while cursor.step_back():
+          yield self._hashclass.from_hashbytes(cursor.get_key())
+    else:
+      if cursor.jump(start_hashcode):
         yield self._hashclass.from_hashbytes(cursor.get_key())
-        if length is not None:
-          if length <= 1:
-            break
-          length -= 1
+        while cursor.step():
+          yield self._hashclass.from_hashbytes(cursor.get_key())
     cursor.disable()
 
 def KyotoDataDirMapping(dirpath, rollover=None):

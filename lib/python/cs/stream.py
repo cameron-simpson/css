@@ -11,7 +11,7 @@ from threading import Thread, Lock
 from cs.asynchron import Result
 from cs.excutils import logexc
 from cs.later import Later
-from cs.logutils import Pfx, debug, warning, error, X, XP, PrePfx
+from cs.logutils import Pfx, debug, warning, error, exception, X, XP, PrePfx
 from cs.predicate import post_condition
 from cs.py3 import BytesFile
 from cs.queues import IterableQueue
@@ -228,7 +228,7 @@ class PacketConnection(object):
           else:
             result_flags, result_payload = result
       except Exception as e:
-        warning("exception: %s", e)
+        exception("exception: %s", e)
         self._reject(channel, tag)
       else:
         self._respond(channel, tag, result_flags, result_payload)

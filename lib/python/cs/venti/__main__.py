@@ -25,6 +25,7 @@ from .datafile import DataDirMapping_from_spec
 from .dir import Dir
 from .hash import DEFAULT_HASHCLASS, HASHCLASS_BY_NAME
 from .paths import dirent_dir, dirent_file, dirent_resolve, resolve
+from .pushpull import pull_hashcodes, missing_hashcodes_by_checksum
 from .store import Store
 
 def main(argv):
@@ -341,7 +342,7 @@ def cmd_datadir(args, verbose=None, log=None):
           for other_spec in args:
             with Pfx(other_spec):
               Dother = DataDirMapping_from_spec(other_spec)
-              D.merge_other(Dother)
+              pull_hashcodes(D, Dother, missing_hashcodes_by_checksum(D, Dother))
       elif subop == 'push':
         if not args:
           raise GetoptError("missing other-datadir")
@@ -351,7 +352,7 @@ def cmd_datadir(args, verbose=None, log=None):
             raise GetoptError("extra arguments after other_spec: %s" % (' '.join(args),))
           with Pfx(other_spec):
             Dother = DataDirMapping_from_spec(other_spec)
-            Dother.merge_other(D)
+            pull_hashcodes(Dother, D, missing_hashcodes_by_checksum(Dother, D))
       else:
         raise GetoptError('unrecognised subop')
   return xit

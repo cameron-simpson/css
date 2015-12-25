@@ -4,14 +4,18 @@
 #   - Cameron Simpson <cs@zip.com.au> 15feb2015
 #
 
+from collections import namedtuple
 import time
 from cs.logutils import warning
+from cs.seq import seq
+
+CheckPoint = namedtuple('CheckPoint', 'time position')
 
 class Progress(object):
   ''' A progress counter to track task completion with various utility functions.
   '''
 
-  def __init__(self, total=None, start=0, position=None, start_time=None, throughput_window=None):
+  def __init__(self, total=None, start=0, position=None, start_time=None, throughput_window=None, name=None):
     ''' Initialise the Progesss object.
         `total`: expected completion value, default None.
         `start`: starting position of progress range, default 0.
@@ -19,6 +23,8 @@ class Progress(object):
         `start_time`: start time of the process, default now.
         `throughput_window`: length of throughput time window, default None.
     '''
+    if name is None:
+      name = 'Progress-%d' % (seq(),)
     now = time.time()
     if start is None:
       start = 0
@@ -30,15 +36,17 @@ class Progress(object):
       raise ValueError("start_time(%s) > now(%s)", start_time, now)
     if throughput_window is not None and throughput_window <= 0:
       raise ValueError("throughput_window <= 0: %s", throughput_window)
-    self.start = 0
+    self.name = name
+    self.start = start
     self.total = total
     self.start_time = start_time
     self.throughput_window = throughput_window
     # history of positions, used to compute throughput
     posns = [ (start_time, start) ]
     if position != start:
-      posns.append( (position, now) )
+      posns.append( CheckPoint(now, position) )
     self._positions = posns
+    self._flushed = True
 
   @property
   def position(self):
@@ -54,7 +62,22 @@ class Progress(object):
     if new_position < self.position:
       warning("%s.update: .position going backwards from %s to %s",
               self, self.position, position)
-    self._positions.append( (update_time, new_position) )
+    self._positions.append( CheckPoint(update_time, new_position) )
+    self._flushed = False
+
+  def _flush(self, oldest=None):
+    if oldest is None:
+      window = self.throughput_window
+      if window is None:
+        raise ValueError("oldest may not be None when throughput_window is None")
+      oldest = time.time() - window
+    posns = self._positions
+    while posns:
+      point = posns.pop(0)
+      if point.time >= oldest:
+        posns.appendleft(point)
+        break
+    self._flushed = true
 
   @property
   def throughput(self):
@@ -89,6 +112,8 @@ class Progress(object):
     if time_window <= 0:
       raise ValueError("%s.throughput_recent: invalid time_window <= 0: %s",
                        self, time_window)
+    if not self._flushed:
+      self._flush()
     now = time.time()
     time0 = now - time_window
     if time0 < self.start_time:
@@ -149,3 +174,7 @@ class Progress(object):
     if runtime is None:
       return None
     return time.time() + runtime
+
+if __name__ == '__main__':
+  from cs.debug import selftest
+  selftest('cs.progress_tests')
