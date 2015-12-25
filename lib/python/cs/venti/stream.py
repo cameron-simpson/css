@@ -105,6 +105,7 @@ class StreamStore(BasicStoreAsync):
       payload = b''.join(h.encode() for h in hcodes)
       return 1, payload
     if rq_type == T_HASHCODES_HASH:
+      hashclass, start_hashcode, reverse, after, length = self._decode_request_hash_of_hashcodes(flags, payload)
       return self.local_store.hash_of_hashcodes(hashclass=hashclass,
                                                 start_hashcode=start_hashcode,
                                                 reverse=reverse,
@@ -267,6 +268,79 @@ class StreamStore(BasicStoreAsync):
   @staticmethod
   def _decode_response_hashcodes(flags, payload):
     ''' Decode the reply to a hashcodes, should be ok and hashcodes payload.
+    '''
+    ok = flags & 0x01
+    if ok:
+      flags &= ~0x01
+    if flags:
+      raise ValueError("unexpected flags: 0x%02x" % (flags,))
+    if ok:
+      offset = 0
+      hashary = []
+      while offset < len(payload):
+        hashcode, offset = hash_decode(payload, offset)
+        hashary.append(hashcode)
+      return hashary
+    if payload:
+      raise ValueError("not ok, but payload=%r", payload)
+    return None
+
+  def hash_of_hashcodes_bg(self, hashclass=None, start_hashcode=None, reverse=None, after=False, length=None):
+    ''' Dispatch a hash_of_hashcodes request, return a Result for collection.
+    '''
+    if hashclass is None:
+      hashclass = self.hashclass
+    if length is not None and length < 1:
+      raise ValueError("length should be None or >1, got: %r", length)
+    flags = ( 0x01 if reverse else 0x00 ) \
+          | ( 0x02 if after else 0x00 )
+    payload = put_bss(hashclass.HASHNAME) \
+            + put_bsdata(b'' if start_hashcode is None else start_hashcode.encode()) \
+            + put_bs(length if length else 0)
+    return self._conn.request(T_HASH_OF_HASHCODES, flags, payload, self._decode_response_hash_of_hashcodes)
+
+  def hash_of_hashcodes(self, hashclass=None, start_hashcode=None, reverse=None, after=False, length=None):
+    return self.hash_of_hashcodes_bg(hashclass=hashclass,
+                                     start_hashcode=start_hashcode,
+                                     reverse=reverse,
+                                     after=after,
+                                     length=length)()
+
+  @staticmethod
+  def _decode_request_hash_of_hashcodes(flags, payload):
+    ''' Reverse of the encoding in hash_of_hashcodes_bg.
+    '''
+    with Pfx("_decode_request_hashcodes(flags=0x%02x, payload=%r)", flags, payload):
+      reverse = False
+      after = False
+      if flags & 0x01:
+        reverse = True
+        flags &= ~0x01
+      if flags & 0x02:
+        after = True
+        flags &= ~0x02
+      if flags:
+        raise ValueError("extra flag values: 0x%02x" % (flags,))
+      hashname, offset = get_bss(payload)
+      hashclass = HASHCLASS_BY_NAME[hashname]
+      hashcode_encoded, offset = get_bsdata(payload, offset)
+      if hashcode_encoded:
+        hashcode, offset2 = hash_decode(hashcode_encoded)
+        if offset2 != len(hashcode_encoded):
+          raise ValueError("extra data in hashcode_encoded: %r",
+                           hashcode_encoded[offset2:])
+      else:
+        hashcode = None
+      length, offset = get_bs(payload, offset)
+      if length == 0:
+        length = None
+      if offset != len(payload):
+        raise ValueError("extra data in payload at offset=%d: %r", offset, payload[offset:])
+      return hashclass, hashcode, reverse, after, length
+
+  @staticmethod
+  def _decode_response_hash_of_hashcodes(flags, payload):
+    ''' Decode the reply to a hash_of_hashcodes, should be ok and hashcodes payload.
     '''
     ok = flags & 0x01
     if ok:
