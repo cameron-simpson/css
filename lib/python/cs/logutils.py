@@ -365,6 +365,41 @@ def XX(prepfx, msg, *args, **kwargs):
   with PrePfx(prepfx):
     return XP(msg, *args, **kwargs)
 
+def status(msg, *args, **kwargs):
+  ''' Write a message to the terminal's status line.
+      If there is no status line use the xterm title bar sequence :-(
+  '''
+  file = kwargs.pop('file', None)
+  if file is None:
+    file = sys.stderr
+  try:
+    has_ansi_status = file.has_ansi_status
+  except AttributeError:
+    try:
+      import curses
+    except ImportError:
+      has_ansi_status = None
+    else:
+      curses.setupterm()
+      has_status = curses.tigetflag('hs')
+      if has_status == -1:
+        warning('status: curses.tigetflag(hs): not a Boolean capability, presuming false')
+        has_ansi_status = None
+      elif has_status > 0:
+        has_ansi_status = ( curses.tigetstr('to_status_line'),
+                            curses.gtigetstr('from_status_line')
+                          )
+      else:
+        warning('status: hs=%s, presuming false', has_status)
+        has_ansi_status = None
+    file.has_ansi_status = has_ansi_status
+  if has_ansi_status:
+    msg = has_ansi_status[0] + msg + has_ansi_status[1]
+  else:
+    msg = '\033]0;' + msg + '\007'
+  file.write(msg)
+  file.flush()
+
 def nl(msg, *args, **kw):
   ''' Unconditionally write the message `msg` to `file` (default sys.stdout).
       If `args` is not empty, format `msg` using %-expansion with `args`.
