@@ -303,7 +303,7 @@ class StreamStore(BasicStoreAsync):
     payload = put_bss(hashclass.HASHNAME) \
             + put_bsdata(b'' if start_hashcode is None else start_hashcode.encode()) \
             + put_bs(length if length else 0)
-    return self._conn.request(T_HASH_OF_HASHCODES, flags, payload, self._decode_response_hash_of_hashcodes)
+    return self._conn.request(T_HASHCODES_HASH, flags, payload, self._decode_response_hash_of_hashcodes)
 
   def hash_of_hashcodes(self, hashclass=None, start_hashcode=None, reverse=None, after=False, length=None):
     return self.hash_of_hashcodes_bg(hashclass=hashclass,
