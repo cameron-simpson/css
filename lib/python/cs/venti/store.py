@@ -74,7 +74,7 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin):
 
   _seq = Seq()
 
-  def __init__(self, name=None, capacity=None, hashclass=None):
+  def __init__(self, name=None, capacity=None, hashclass=None, lock=None):
     with Pfx("_BasicStoreCommon.__init__(%s,..)", name):
       if name is None:
         name = "%s%d" % (self.__class__.__name__, next(_BasicStoreCommon._seq()))
@@ -82,7 +82,7 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin):
         capacity = 1
       if hashclass is None:
         hashclass = DEFAULT_HASHCLASS
-      MultiOpenMixin.__init__(self)
+      MultiOpenMixin.__init__(self, lock=lock)
       self.name = name
       self.hashclass = hashclass
       self.logfp = None
