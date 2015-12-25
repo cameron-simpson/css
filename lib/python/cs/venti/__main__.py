@@ -26,7 +26,7 @@ from .dir import Dir
 from .hash import DEFAULT_HASHCLASS, HASHCLASS_BY_NAME
 from .paths import dirent_dir, dirent_file, dirent_resolve, resolve
 from .pushpull import pull_hashcodes, missing_hashcodes_by_checksum
-from .store import Store
+from .store import Store, ProgressStore
 
 def main(argv):
   cmd = os.path.basename(argv[0])
@@ -468,8 +468,8 @@ def cmd_mount(args, verbose=None, log=None):
         return 1
     with Pfx("open('a')"):
       syncfp = open(special, 'a')
-  S = defaults.S
-  mount(mountpoint, E, S, syncfp=syncfp)
+  with ProgressStore(defaults.S) as PS:
+    mount(mountpoint, E, PS, syncfp=syncfp)
   return 0
 
 def cmd_pack(args, verbose=None, log=None):
