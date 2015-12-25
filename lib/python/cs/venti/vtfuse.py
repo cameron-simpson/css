@@ -14,7 +14,6 @@ from os import O_CREAT, O_RDONLY, O_WRONLY, O_RDWR, O_APPEND, O_TRUNC
 from os.path import basename
 import sys
 from threading import RLock
-import time
 from cs.debug import DummyMap, TracingObject
 from cs.logutils import X, debug, info, warning, error, Pfx
 from cs.obj import O, obj_as_dict
@@ -474,7 +473,7 @@ class FileHandle(O):
     with fp:
       fp.seek(offset)
       written = fp.write(data)
-    self.E.mtime = time.time()
+    self.E.touch()
     return written
 
   def read(self, offset, size):
@@ -490,15 +489,15 @@ class FileHandle(O):
 
   def truncate(self, length):
     X("FileHandle.truncate: length=%d", length)
-    self.E.mtime = time.time()
+    self.E.touch()
     self.Eopen._open_file.truncate(length)
 
   def flush(self):
-    self.E.mtime = time.time()
+    self.E.touch()
     self.Eopen.flush()
 
   def close(self):
-    self.E.mtime = time.time()
+    self.E.touch()
     self.Eopen.close()
 
 if __name__ == '__main__':
