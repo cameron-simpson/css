@@ -5,6 +5,7 @@ import grp
 import stat
 import sys
 from threading import Lock, RLock
+import time
 from cs.logutils import D, Pfx, debug, error, info, warning, X
 from cs.lex import hexify
 from cs.py.stack import stack_dump
@@ -200,9 +201,17 @@ class _Dirent(object):
   @property
   def mtime(self):
     return self.meta.mtime
+
   @mtime.setter
   def mtime(self, newtime):
     self.meta.mtime = newtime
+
+  def touch(self, when=None):
+    ''' Set the mtime for this file to `when` (default now: time.time()).
+    '''
+    if when is None:
+      when = time.time()
+    self.mtime = when
 
   def stat(self):
     from pwd import getpwnam

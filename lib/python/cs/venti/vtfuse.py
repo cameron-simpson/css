@@ -249,9 +249,8 @@ class StoreFS(Operations):
       return st
 
   def listxattr(self, path):
-    X("LISTXATTR...")
     with Pfx("listxattr(path=%r)", path):
-      warning("listxattr: return empty list")
+      debug("listxattr: return empty list")
       return ''
 
   def mkdir(self, path, mode):
@@ -462,6 +461,7 @@ class FileHandle(O):
     O.__init__(self)
     self.fs = fs
     self.path = path
+    self.E = E
     self.Eopen = E.open()
     self.for_read = for_read
     self.for_write = for_write
@@ -473,6 +473,7 @@ class FileHandle(O):
     with fp:
       fp.seek(offset)
       written = fp.write(data)
+    self.E.touch()
     return written
 
   def read(self, offset, size):
@@ -488,12 +489,15 @@ class FileHandle(O):
 
   def truncate(self, length):
     X("FileHandle.truncate: length=%d", length)
+    self.E.touch()
     self.Eopen._open_file.truncate(length)
 
   def flush(self):
+    self.E.touch()
     self.Eopen.flush()
 
   def close(self):
+    self.E.touch()
     self.Eopen.close()
 
 if __name__ == '__main__':

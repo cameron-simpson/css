@@ -20,10 +20,12 @@ import os.path
 import sys
 from threading import Lock, RLock
 from threading import Thread
+from time import sleep
 from cs.py3 import Queue
 from cs.asynchron import report as reportLFs
 from cs.later import Later
-from cs.logutils import info, debug, warning, Pfx, D, X, XP
+from cs.logutils import status, info, debug, warning, Pfx, D, X, XP
+from cs.progress import Progress
 from cs.resources import MultiOpenMixin
 from cs.seq import Seq
 from cs.threads import Q1, Get1
@@ -393,17 +395,58 @@ def DataDirStore(dirpath, indexclass=None, rollover=None, **kw):
            DataDirMapping(dirpath, indexclass=indexclass, rollover=rollover),
            **kw)
 
+class _ProgressStoreTemplateMapping(object):
+
+  def __init__(self, PS):
+    self.PS = PS
+
+  def __getitem__(self, key):
+    try:
+      category, aspect = key.split('_', 1)
+    except ValueError:
+      category = key
+      aspect = 'position'
+    P = self.PS._progress[category]
+    try:
+      value = getattr(P, aspect)
+    except AttributeError as e:
+      raise KeyError("%s: aspect=%r" % (key, aspect))
+    return value
+
 class ProgressStore(BasicStoreSync):
 
-  def __init__(self, S):
+  def __init__(self, S, template='rq  {requests_position}  {requests_throughput}/s', **kw):
+    name = kw.pop('name', None)
+    if name is None:
+      name = "ProgressStore(%s)" % (S,)
+    BasicStoreSync.__init__(self, name=name, **kw)
     self.S = S
+    self.template = template
+    self.template_mapping = _ProgressStoreTemplateMapping(self)
     Ps = {}
     for category in 'add', 'get', 'contains', 'requests', 'add_bytes', 'get_bytes':
       # active actions
-      Ps[category] = Progress(name='-'.join((str(S), category)), throughput_window=10)
+      Ps[category] = Progress(name='-'.join((str(S), category)), throughput_window=4)
       # cumulative actions
       Ps[category+'_all'] = Progress(name='-'.join((str(S), category, 'all')), throughput_window=10)
     self._progress = Ps
+    self.run = True
+    self._last_status = ''
+    T = Thread(name='%s-status-line' % (self.S,), target=self._run_status_line)
+    T.daemon = True
+    T.start()
+
+  def __str__(self):
+    return self.status_line()
+
+  def shutdown(self):
+    self.run = False
+    BasicStoreSync.shutdown(self)
+
+  def status_line(self, template=None):
+    if template is None:
+      template = self.template
+    return template.format_map(self.template_mapping)
 
   @property
   def requests(self):
@@ -418,12 +461,12 @@ class ProgressStore(BasicStoreSync):
     self.requests += 1
     if category is not None:
       Pactive = self._progress[category]
-      Pactive.update(P.position + 1)
+      Pactive.update(Pactive.position + 1)
       Pall = self._progress[category + '_all']
       Pall.update(Pall.position + 1)
     yield
     if category is not None:
-      Pactive.update(P.position - 1)
+      Pactive.update(Pactive.position - 1)
     self.requests -= 1
 
   def add(self, data):
@@ -441,6 +484,15 @@ class ProgressStore(BasicStoreSync):
   def flush(self, hashcode):
     with self.do_request(None):
       return self.S.flush()
+
+  def _run_status_line(self):
+    while self.run:
+      text = self.status_line()
+      old_text = self._last_status
+      if text != self._last_status:
+        self._last_status = text
+        status(text)
+      sleep(0.25)
 
 if __name__ == '__main__':
   import cs.venti.store_tests
