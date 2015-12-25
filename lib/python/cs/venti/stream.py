@@ -277,6 +277,24 @@ class StreamStore(BasicStoreAsync):
       raise ValueError("not ok, but payload=%r", payload)
     return None
 
+  def hashcodes_from(self, hashclass=None, start_hashcode=None, reverse=False):
+    ''' Unbounded sequence of hashcodes obtained by successive calls to self.hashcodes.
+    '''
+    length = 64
+    after = False
+    while True:
+      hashcodes = self.hashcodes(hashclass=hashclass,
+                                 start_hashcode=start_hashcode,
+                                 reverse=reverse,
+                                 after=after,
+                                 length=length)
+      if not hashcodes:
+        return
+      for hashcode in hashcodes:
+        yield hashcode
+      start_hashcode = hashcode
+      after = True
+
 if __name__ == '__main__':
   import cs.venti.stream_tests
   cs.venti.stream_tests.selftest(sys.argv)
