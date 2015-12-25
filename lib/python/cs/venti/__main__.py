@@ -32,7 +32,7 @@ def main(argv):
   cmd = os.path.basename(argv[0])
   if cmd.endswith('.py'):
     cmd = 'vt'
-  setup_logging(cmd_name=cmd, upd_mode=False)
+  setup_logging(cmd_name=cmd)
   usage = '''Usage:
     %s [options...] ar tar-options paths..
     %s [options...] cat filerefs...
