@@ -101,11 +101,11 @@ class Progress(object):
     now = time.time()
     elapsed = now - self.start_time
     if elapsed == 0:
-      return None
+      return 0
     if elapsed <= 0:
       warning("%s.throughput: negative elapsed time since start_time=%s: %s",
               self, self.start_time, elapsed)
-      return None
+      return 0
     return consumed / elapsed
 
   def throughput_recent(self, time_window):
@@ -135,11 +135,11 @@ class Progress(object):
         break
     if low_time is None:
       # no samples within the window; caller might infer stall
-      return None
+      return 0
     if low_time >= now:
       # in the future? warn and return None
       warning('low_time=%s >= now=%s', low_time, now)
-      return None
+      return 0
     rate = (self.position - low_pos) / (now - low_time)
     if rate < 0:
       warning('rate < 0 (%s)', rate)
