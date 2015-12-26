@@ -23,8 +23,7 @@ from cs.excutils import logexc
 import cs.logutils
 from cs.logutils import debug, warning, error, PfxCallInfo, X, XP
 from cs.obj import O
-from cs.py.func import callmethod_if as ifmethod
-from cs.py.stack import caller
+from cs.py.stack import caller, stack_dump
 
 class ClosedError(Exception):
   pass
@@ -120,11 +119,14 @@ class MultiOpenMixin(O):
         `finalise_later` was set to true during initialisation.
     '''
     with self._lock:
-      if self._finalise:
-        self._finalise.notify_all()
+      if self._finalise is not None:
+        finalise = self._finalise
         self._finalise = None
+        finalise.notify_all()
         return
     warning("%s: finalised more than once", self)
+    stack_dump()
+    warning("%s: finalised more than once: STACK DUMP COMPLETE", self)
 
   @property
   def closed(self):
