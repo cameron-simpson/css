@@ -8,6 +8,7 @@
 from fuse import FUSE, FuseOSError, Operations, LoggingMixIn, fuse_get_context
 from functools import partial
 from collections import namedtuple
+from logging import getLogger, FileHandler
 import errno
 import os
 from os import O_CREAT, O_RDONLY, O_WRONLY, O_RDWR, O_APPEND, O_TRUNC
@@ -27,6 +28,9 @@ from .file import File
 from .meta import NOUSERID, NOGROUPID
 from .paths import resolve
 
+LOGGER_NAME = 'cs.venti.vtfuse'     # __qualname__ ?
+LOGGER_FILENAME = 'vtfuse.log'
+
 # records associated with an open file
 # TODO: no support for multiple links or path-=open renames
 OpenFile = namedtuple('OpenFile', ('path', 'E', 'fp'))
@@ -38,6 +42,8 @@ def mount(mnt, E, S, syncfp=None):
       `S`: backing Store
       `syncfp`: if not None, a file to which to write sync lines
   '''
+  log = getLogger(LOGGER_NAME)
+  log.addHandler(FileHandler(LOGGER_FILENAME))
   FS = StoreFS(E, S, syncfp=syncfp)
   FS._mount(mnt)
 
@@ -58,6 +64,7 @@ class StoreFS(Operations):
       raise ValueError("not dir Dir: %s" % (E,))
     self.S = S
     self.E = E
+    self.log = getLogger(LOGGER_NAME)
     self.syncfp = syncfp
     self._syncfp_last_dirent_text = None
     self.do_fsync = False
@@ -206,6 +213,7 @@ class StoreFS(Operations):
       return fhndx
 
   def destroy(self, path):
+    self.log.info("destroy path=%r", path)
     X("DESTROY(%r)...", path)
     with Pfx("destroy(%r)", path):
       self._sync()
@@ -335,6 +343,7 @@ class StoreFS(Operations):
       fhndx = self._new_file_handle_index(fh)
       if P:
         P.change()
+      self.log.info("open path=%r flags=0x%02x: fhndx=%d:%s", path, flags, fhndx, fh)
       return fhndx
 
   def opendir(self, path):
@@ -377,8 +386,10 @@ class StoreFS(Operations):
     with Pfx("release(%r, fhndx=%d)", path, fhndx):
       fh = self._fh(fhndx)
       if fh is None:
+        self.log.info("release(%r, %s): no matching FileHandle!", path, fhndx)
         error("handle is None!")
       else:
+        self.log.info("release(%r, %s): fh=%s", path, fhndx, fh)
         fh.close()
       return 0
 
@@ -447,6 +458,7 @@ class StoreFS(Operations):
 
   def sync(self, *a, **kw):
     X("SYNC: a=%r, kw=%r", a, kw)
+    self.log.info("sync *%r **%r", a, kw)
 
   def truncate(self, path, length, fh=None):
     with Pfx("truncate(%r, length=%d, fh=%s)", path, length, fh):
@@ -489,6 +501,7 @@ class FileHandle(O):
   def __init__(self, fs, path, E, for_read, for_write, for_append):
     O.__init__(self)
     self.fs = fs
+    self.log = fs.log
     self.path = path
     self.E = E
     self.Eopen = E.open()
@@ -525,10 +538,13 @@ class FileHandle(O):
     self.Eopen._open_file.truncate(length)
 
   def flush(self):
+    self.log.info('flush')
     self.E.touch()
     self.Eopen.flush()
 
   def close(self):
+    X("VTFUSE.close(%s)...", self.E)
+    self.log.info("close")
     self.E.touch()
     self.Eopen.close()
 
