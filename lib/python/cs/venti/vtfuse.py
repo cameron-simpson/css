@@ -16,6 +16,7 @@ from os.path import basename
 from pprint import pformat
 import sys
 from threading import RLock
+import time
 from cs.debug import DummyMap, TracingObject
 from cs.logutils import X, XP, debug, info, warning, error, Pfx
 from cs.obj import O, obj_as_dict
@@ -59,17 +60,21 @@ def trace_method(method):
       citation += " " + pformat(a, depth=1)
     if kw:
       citation += " " + pformat(kw, depth=2)
-    self.log.info("CALL %s", citation)
+    time0 = time.time()
+    ##self.log.info("CALL %s", citation)
     try:
       result = method(self, *a, **kw)
     except FuseOSError as e:
-      self.log.info("FuseOSError from %s: %s", citation, e)
+      elapsed = time.time() - time0
+      self.log.info("%gs %s: FuseOSError %s", elapsed, citation, e)
       raise
     except Exception as e:
-      self.log.exception("EXCEPTION from %s: %s %s", citation, type(e), e)
+      elapsed = time.time() - time0
+      self.log.exception("%gs %s %s %s", elapsed, citation, type(e), e)
       raise
     else:
-      self.log.info("RETURN %s => %r", citation, result)
+      elapsed = time.time() - time0
+      self.log.info("%gs %s => %r", elapsed, citation, result)
       return result
   traced_method.__name__ = 'trace(%s)' % (fname,)
   return traced_method
