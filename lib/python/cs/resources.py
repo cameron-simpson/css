@@ -124,9 +124,7 @@ class MultiOpenMixin(O):
         self._finalise = None
         finalise.notify_all()
         return
-    warning("%s: finalised more than once", self)
-    stack_dump()
-    warning("%s: finalised more than once: STACK DUMP COMPLETE", self)
+    raise RuntimeError("%s: finalised more than once" % (self,))
 
   @property
   def closed(self):
