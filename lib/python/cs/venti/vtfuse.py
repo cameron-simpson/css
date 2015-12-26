@@ -496,6 +496,9 @@ class FileHandle(O):
     self.for_write = for_write
     self.for_append = for_append
 
+  def __str__(self):
+    return "<FileHandle %r %s>" % (self.path, self.E)
+
   def write(self, data, offset):
     fp = self.Eopen._open_file
     X("FileHandle.write: fp=<%s>%r", fp.__class__, fp)
