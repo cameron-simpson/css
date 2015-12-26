@@ -56,14 +56,14 @@ class StoreFS(Operations):
     O.__init__(self)
     if not E.isdir:
       raise ValueError("not dir Dir: %s" % (E,))
-    self.S =S
+    self.S = S
     self.E = E
     self.syncfp = syncfp
     self._syncfp_last_dirent_text = None
     self.do_fsync = False
     self._fs_uid = os.geteuid()
     self._fs_gid = os.getegid()
-    self._lock = RLock()
+    self._lock = S._lock
     self._inode_seq = Seq(start=1)
     self._inode_map = {}
     self._path_files = {}
