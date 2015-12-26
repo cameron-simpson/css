@@ -13,11 +13,13 @@ import errno
 import os
 from os import O_CREAT, O_RDONLY, O_WRONLY, O_RDWR, O_APPEND, O_TRUNC
 from os.path import basename
+from pprint import pformat
 import sys
 from threading import RLock
 from cs.debug import DummyMap, TracingObject
 from cs.logutils import X, XP, debug, info, warning, error, Pfx
 from cs.obj import O, obj_as_dict
+from cs.py.func import funccite, funcname
 from cs.seq import Seq
 from cs.threads import locked
 from .archive import strfor_Dirent, write_Dirent_str
@@ -43,9 +45,34 @@ def mount(mnt, E, S, syncfp=None):
       `syncfp`: if not None, a file to which to write sync lines
   '''
   log = getLogger(LOGGER_NAME)
+  log.propagate = False
   log.addHandler(FileHandler(LOGGER_FILENAME))
   FS = StoreFS(E, S, syncfp=syncfp)
   FS._mount(mnt)
+
+def trace_method(method):
+  ##fname = '.'.join( (method.__module__, funccite(method)) )
+  fname = '.'.join( (method.__module__, funcname(method)) )
+  def traced_method(self, *a, **kw):
+    citation = fname
+    if a:
+      citation += " " + pformat(a, depth=1)
+    if kw:
+      citation += " " + pformat(kw, depth=2)
+    self.log.info("CALL %s", citation)
+    try:
+      result = method(self, *a, **kw)
+    except FuseOSError as e:
+      self.log.info("FuseOSError from %s: %s", citation, e)
+      raise
+    except Exception as e:
+      self.log.exception("EXCEPTION from %s: %s %s", citation, type(e), e)
+      raise
+    else:
+      self.log.info("RETURN %s => %r", citation, result)
+      return result
+  traced_method.__name__ = 'trace(%s)' % (fname,)
+  return traced_method
 
 class StoreFS(Operations):
   ''' Class providing filesystem operations, suitable for passing
@@ -104,7 +131,8 @@ class StoreFS(Operations):
     ''' Attach this StoreFS to the specified path `root`.
         Return the controlling FUSE object.
     '''
-    return TracingObject(FUSE(self, root, foreground=True, nothreads=True, debug=False))
+    return FUSE(self, root, foreground=True, nothreads=True, debug=False)
+    ##return TracingObject(FUSE(self, root, foreground=True, nothreads=True, debug=False))
 
   def _resolve(self, path):
     ''' Call cs.venti.paths.resolve and return its result.
@@ -179,6 +207,7 @@ class StoreFS(Operations):
       return E.meta.access(amode, ctx_uid, ctx_gid,
                            default_uid=ctx_uid, default_gid=ctx_gid)
 
+  @trace_method
   def access(self, path, amode):
     with Pfx("access(path=%s, amode=0o%o)", path, amode):
       E = self._namei(path)
@@ -186,6 +215,7 @@ class StoreFS(Operations):
         raise FuseOSError(errno.EACCES)
       return 0
 
+  @trace_method
   def chmod(self, path, mode):
     with Pfx("chmod(%r, 0o%04o)...", path, mode):
       E, P = self._namei2(path)
@@ -193,6 +223,7 @@ class StoreFS(Operations):
       if P:
         P.change()
 
+  @trace_method
   def chown(self, path, uid, gid):
     with Pfx("chown(%r, uid=%d, gid=%d)", path, uid, gid):
       E, P = self._namei2(path)
@@ -204,6 +235,7 @@ class StoreFS(Operations):
       if gid >= 0 and gid != self._fs_gid:
         M.gid = gid
 
+  @trace_method
   def create(self, path, mode, fi=None):
     with Pfx("create(path=%r, mode=0o%04o, fi=%s)", path, mode, fi):
       if fi is not None:
@@ -212,15 +244,14 @@ class StoreFS(Operations):
       warning("TODO: create: apply mode (0o%o) to self._fh[%d]", mode, fhndx)
       return fhndx
 
+  @trace_method
   def destroy(self, path):
     self.log.info("destroy path=%r", path)
-    X("DESTROY(%r)...", path)
     with Pfx("destroy(%r)", path):
       self._sync()
-    X("DESTROY COMPLETE")
 
+  @trace_method
   def fgetattr(self, *a, **kw):
-    X("FGETATTR: a=%r, kw=%r", a, kw)
     with Pfx("fgetattr(%r, fh=%s)", path, fh):
       try:
         E = self._namei(path)
@@ -232,30 +263,34 @@ class StoreFS(Operations):
         pass
       return self._Estat(E)
 
+  @trace_method
   def flush(self, path, datasync, fhndx):
     with Pfx("flush(%r, datasync=%s, fhndx=%s)", path, datasync, fhndx):
       self._fh(fhndx).flush()
 
+  @trace_method
   def flush(self, path, fh):
-    X("FLUSH %r fh=%s", path, fh)
     with Pfx("flush(%r, fh=%s)", path, fh):
-      info("FLUSH: NOOP?")
+      ##info("FLUSH: NOOP?")
+      pass
 
+  @trace_method
   def fsync(self, path, datasync, fh):
-    X("FSYNC %r datasync=%r fh=%r", path, datasync, fh)
     with Pfx("fsync(path=%r, datasync=%d, fh=%r)", path, datasync, fh):
       if self.do_fsync:
         self._fh(fhndx).flush()
 
+  @trace_method
   def fsyncdir(self, path, datasync, fh):
-    X("FSYNCDIR(path=%r, datasync=%s, fh=%s)", path, datasync, fh)
     return 0
 
+  @trace_method
   def ftruncate(self, path, length, fhndx):
     with Pfx("ftruncate(%r, %d, fhndx=%d)...", path, length, fhndx):
       fh = self._fh(fhndx)
       fh.truncate(length)
 
+  @trace_method
   def getattr(self, path, fh=None):
     with Pfx("getattr(%r, fh=%s)", path, fh):
       try:
@@ -264,26 +299,26 @@ class StoreFS(Operations):
         if e.errno != errno.ENOENT:
           error("FuseOSError: %s", e)
         raise
-      if fh is not None:
-        X("GETATTR: fh=%s", fh)
-        pass
       st = self._Estat(E)
       st['st_ino'] = self._ino(path)
       return st
 
+  @trace_method
   def getxattr(self, path, name, position=0):
-    X("GETXATTR(path=%r, name=%r, position=%s): raise ENOATTR", path, name, position)
     raise FuseOSError(errno.ENOATTR)
 
+  @trace_method
   def listxattr(self, path):
     with Pfx("listxattr(path=%r)", path):
       XP("return empty list")
       return ''
 
+  @trace_method
   def lock(self, *a, **kw):
     X("lock(*%r, **%r)", a, kw)
     raise FuseOSError(errno.ENOTSUP)
 
+  @trace_method
   def mkdir(self, path, mode):
     with Pfx("mkdir(path=%r, mode=0o%04o)", path, mode):
       E, P, tail_path = self._resolve(path)
@@ -302,10 +337,11 @@ class StoreFS(Operations):
       E = newE
       E.meta.chmod(mode & 0o7777)
 
+  @trace_method
   def mknod(self, path, mode, dev):
-    X("MKNOD(path=%r, mode=%s, dev=%s)", path, mode, dev)
     raise FuseOSError(errno.ENOTSUP)
 
+  @trace_method
   @locked
   def open(self, path, flags):
     ''' Obtain a FileHandle open on `path`, return its index.
@@ -343,9 +379,9 @@ class StoreFS(Operations):
       fhndx = self._new_file_handle_index(fh)
       if P:
         P.change()
-      self.log.info("open path=%r flags=0x%02x: fhndx=%d:%s", path, flags, fhndx, fh)
       return fhndx
 
+  @trace_method
   def opendir(self, path):
     with Pfx("opendir(%r)", path):
       E = self._namei(path)
@@ -354,6 +390,7 @@ class StoreFS(Operations):
       fhndx = self._new_file_handle_index(E)
       return fhndx
 
+  @trace_method
   def read(self, path, size, offset, fhndx):
     with Pfx("read(path=%r, size=%d, offset=%d, fhndx=%r)", path, size, offset, fhndx):
       chunks = []
@@ -366,6 +403,7 @@ class StoreFS(Operations):
         size -= len(data)
       return b''.join(chunks)
 
+  @trace_method
   def readdir(self, path, *a, **kw):
     with Pfx("readdir(path=%r, a=%r, kw=%r)", path, a, kw):
       if a or kw:
@@ -375,14 +413,15 @@ class StoreFS(Operations):
         raise FuseOSError(errno.ENOTDIR)
       return ['.', '..'] + list(E.keys())
 
+  @trace_method
   def readlink(self, path):
     with Pfx("readlink(%r)", path):
       E = self._namei(path)
       # no symlinks yet
       raise FuseOSError(errno.EINVAL)
 
+  @trace_method
   def release(self, path, fhndx):
-    X("RELEASE %r fhndx=%s", path, fhndx)
     with Pfx("release(%r, fhndx=%d)", path, fhndx):
       fh = self._fh(fhndx)
       if fh is None:
@@ -393,6 +432,7 @@ class StoreFS(Operations):
         fh.close()
       return 0
 
+  @trace_method
   def releasedir(self, path, fhndx):
     with Pfx("releasedir(path=%r, fhndx=%d)", path, fhndx):
       fh = self._fh(fhndx)
@@ -400,10 +440,11 @@ class StoreFS(Operations):
         error("handle is None!")
       return 0
 
+  @trace_method
   def removexattr(self, path, name):
-    X("REMOVEXATTR(path=%r, name=%r)", path, name)
     raise FuseOSError(errno.ENOATTR)
 
+  @trace_method
   def rename(self, oldpath, newpath):
     with Pfx("rename(%r, %r)...", oldpath, newpath):
       E1base = basename(oldpath)
@@ -424,6 +465,7 @@ class StoreFS(Operations):
       del P1[E1base]
       P2[E2base] = E1
 
+  @trace_method
   def rmdir(self, path):
     with Pfx("rmdir(%r)...", path):
       Ebase = basename(path)
@@ -438,11 +480,11 @@ class StoreFS(Operations):
         raise FuseOSError(errno.ENOTEMPTY)
       del P[Ebase]
 
+  @trace_method
   def setxattr(self, path, name, value, options, position=0):
-    X("SETXATTR(path=%r, name=%r, value=%r, options=%s, position=%s)",
-      path, name, value, options, position)
     raise FuseOSError(errno.ENOTSUP)
 
+  @trace_method
   def statfs(self, path):
     with Pfx("statsfs(%r)", path):
       st = os.statvfs(".")
@@ -452,14 +494,15 @@ class StoreFS(Operations):
           d[f] = getattr(st, f)
       return d
 
+  @trace_method
   def symlink(self, target, source):
-    X("SYMLINK(%r, %r)", target, source)
     raise FuseOSError(errno.EROFS)
 
+  @trace_method
   def sync(self, *a, **kw):
-    X("SYNC: a=%r, kw=%r", a, kw)
     self.log.info("sync *%r **%r", a, kw)
 
+  @trace_method
   def truncate(self, path, length, fh=None):
     with Pfx("truncate(%r, length=%d, fh=%s)", path, length, fh):
       E, P = self._namei2(path)
@@ -468,6 +511,7 @@ class StoreFS(Operations):
       E.truncate(length)
       P.change()
 
+  @trace_method
   def unlink(self, path):
     with Pfx("unlink(%r)...", path):
       Ebase = basename(path)
@@ -480,6 +524,7 @@ class StoreFS(Operations):
         raise FuseOSError(errno.EPERM)
       del P[Ebase]
 
+  @trace_method
   def utimens(self, path, times):
     with Pfx("utimens(%r, times=%r", path, times):
       atime, mtime = times
@@ -514,7 +559,6 @@ class FileHandle(O):
 
   def write(self, data, offset):
     fp = self.Eopen._open_file
-    X("FileHandle.write: fp=<%s>%r", fp.__class__, fp)
     with fp:
       fp.seek(offset)
       written = fp.write(data)
@@ -522,29 +566,26 @@ class FileHandle(O):
     return written
 
   def read(self, offset, size):
-    X("FileHandle.read: offset=%r, size=%r", offset, size)
     if size < 1:
       raise ValueError("FileHandle.read: size(%d) < 1" % (size,))
     fp = self.Eopen._open_file
-    X("FileHandle.read: fp=<%s>%r", fp.__class__, fp)
     with fp:
       fp.seek(offset)
       data = fp.read(size)
     return data
 
+  @trace_method
   def truncate(self, length):
-    X("FileHandle.truncate: length=%d", length)
     self.E.touch()
     self.Eopen._open_file.truncate(length)
 
+  @trace_method
   def flush(self):
-    self.log.info('flush')
     self.E.touch()
     self.Eopen.flush()
 
+  @trace_method
   def close(self):
-    X("VTFUSE.close(%s)...", self.E)
-    self.log.info("close")
     self.E.touch()
     self.Eopen.close()
 
