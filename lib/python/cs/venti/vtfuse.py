@@ -15,7 +15,7 @@ from os.path import basename
 import sys
 from threading import RLock
 from cs.debug import DummyMap, TracingObject
-from cs.logutils import X, debug, info, warning, error, Pfx
+from cs.logutils import X, XP, debug, info, warning, error, Pfx
 from cs.obj import O, obj_as_dict
 from cs.seq import Seq
 from cs.threads import locked
@@ -233,6 +233,14 @@ class StoreFS(Operations):
       fh = self._fh(fhndx)
       fh.truncate(length)
 
+  def fsync(self, path, datasync, fh):
+    X("FSYNC(path=%r, datasync=%s, fh=%s)", path, datasync, fh)
+    return 0
+
+  def fsyncdir(self, path, datasync, fh):
+    X("FSYNCDIR(path=%r, datasync=%s, fh=%s)", path, datasync, fh)
+    return 0
+
   def getattr(self, path, fh=None):
     with Pfx("getattr(%r, fh=%s)", path, fh):
       try:
@@ -248,10 +256,18 @@ class StoreFS(Operations):
       st['st_ino'] = self._ino(path)
       return st
 
+  def getxattr(self, path, name, position=0):
+    X("GETXATTR(path=%r, name=%r, position=%s): raise ENOATTR", path, name, position)
+    raise FuseOSError(errno.ENOATTR)
+
   def listxattr(self, path):
     with Pfx("listxattr(path=%r)", path):
-      debug("listxattr: return empty list")
+      XP("return empty list")
       return ''
+
+  def lock(self, *a, **kw):
+    X("lock(*%r, **%r)", a, kw)
+    raise FuseOSError(errno.ENOTSUP)
 
   def mkdir(self, path, mode):
     with Pfx("mkdir(path=%r, mode=0o%04o)", path, mode):
@@ -270,6 +286,10 @@ class StoreFS(Operations):
       E[base] = newE
       E = newE
       E.meta.chmod(mode & 0o7777)
+
+  def mknod(self, path, mode, dev):
+    X("MKNOD(path=%r, mode=%s, dev=%s)", path, mode, dev)
+    raise FuseOSError(errno.ENOTSUP)
 
   @locked
   def open(self, path, flags):
@@ -362,14 +382,9 @@ class StoreFS(Operations):
         error("handle is None!")
       return 0
 
-  def statfs(self, path):
-    with Pfx("statsfs(%r)", path):
-      st = os.statvfs(".")
-      d = {}
-      for f in dir(st):
-        if f.startswith('f_'):
-          d[f] = getattr(st, f)
-      return d
+  def removexattr(self, path, name):
+    X("REMOVEXATTR(path=%r, name=%r)", path, name)
+    raise FuseOSError(errno.ENOATTR)
 
   def rename(self, oldpath, newpath):
     with Pfx("rename(%r, %r)...", oldpath, newpath):
@@ -404,6 +419,24 @@ class StoreFS(Operations):
       if E.entries:
         raise FuseOSError(errno.ENOTEMPTY)
       del P[Ebase]
+
+  def setxattr(self, path, name, value, options, position=0):
+    X("SETXATTR(path=%r, name=%r, value=%r, options=%s, position=%s)",
+      path, name, value, options, position)
+    raise FuseOSError(errno.ENOTSUP)
+
+  def statfs(self, path):
+    with Pfx("statsfs(%r)", path):
+      st = os.statvfs(".")
+      d = {}
+      for f in dir(st):
+        if f.startswith('f_'):
+          d[f] = getattr(st, f)
+      return d
+
+  def symlink(self, target, source):
+    X("SYMLINK(%r, %r)", target, source)
+    raise FuseOSError(errno.EROFS)
 
   def sync(self, *a, **kw):
     X("SYNC: a=%r, kw=%r", a, kw)
