@@ -228,18 +228,25 @@ class StoreFS(Operations):
     with Pfx("flush(%r, datasync=%s, fhndx=%s)", path, datasync, fhndx):
       self._fh(fhndx).flush()
 
-  def ftruncate(self, path, length, fhndx):
-    with Pfx("ftruncate(%r, %d, fhndx=%d)...", path, length, fhndx):
-      fh = self._fh(fhndx)
-      fh.truncate(length)
+  def flush(self, path, fh):
+    X("FLUSH %r fh=%s", path, fh)
+    with Pfx("flush(%r, fh=%s)", path, fh):
+      info("FLUSH: NOOP?")
 
   def fsync(self, path, datasync, fh):
-    X("FSYNC(path=%r, datasync=%s, fh=%s)", path, datasync, fh)
-    return 0
+    X("FSYNC %r datasync=%r fh=%r", path, datasync, fh)
+    with Pfx("fsync(path=%r, datasync=%d, fh=%r)", path, datasync, fh):
+      if self.do_fsync:
+        self._fh(fhndx).flush()
 
   def fsyncdir(self, path, datasync, fh):
     X("FSYNCDIR(path=%r, datasync=%s, fh=%s)", path, datasync, fh)
     return 0
+
+  def ftruncate(self, path, length, fhndx):
+    with Pfx("ftruncate(%r, %d, fhndx=%d)...", path, length, fhndx):
+      fh = self._fh(fhndx)
+      fh.truncate(length)
 
   def getattr(self, path, fh=None):
     with Pfx("getattr(%r, fh=%s)", path, fh):
@@ -474,17 +481,6 @@ class StoreFS(Operations):
   def write(self, path, data, offset, fhndx):
     with Pfx("write(path=%r, data=%d bytes, offset=%d, fhndx=%r", path, len(data), offset, fhndx):
       return self._fh(fhndx).write(data, offset)
-
-  def flush(self, path, fh):
-    X("FLUSH %r fh=%s", path, fh)
-    with Pfx("flush(%r, fh=%s)", path, fh):
-      info("FLUSH: NOOP?")
-
-  def fsync(self, path, datasync, fh):
-    X("FSYNC %r datasync=%r fh=%r", path, datasync, fh)
-    with Pfx("fsync(path=%r, datasync=%d, fh=%r)", path, datasync, fh):
-      if self.do_fsync:
-        self._fh(fhndx).flush()
 
 class FileHandle(O):
   ''' Filesystem state for open files.
