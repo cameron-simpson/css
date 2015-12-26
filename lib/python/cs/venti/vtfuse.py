@@ -8,7 +8,7 @@
 from fuse import FUSE, FuseOSError, Operations, LoggingMixIn, fuse_get_context
 from functools import partial
 from collections import namedtuple
-from logging import getLogger, FileHandler
+from logging import getLogger, FileHandler, Formatter
 import errno
 import os
 from os import O_CREAT, O_RDONLY, O_WRONLY, O_RDWR, O_APPEND, O_TRUNC
@@ -18,7 +18,7 @@ import sys
 from threading import RLock
 import time
 from cs.debug import DummyMap, TracingObject
-from cs.logutils import X, XP, debug, info, warning, error, Pfx
+from cs.logutils import X, XP, debug, info, warning, error, Pfx, DEFAULT_BASE_FORMAT
 from cs.obj import O, obj_as_dict
 from cs.py.func import funccite, funcname
 from cs.seq import Seq
@@ -47,7 +47,10 @@ def mount(mnt, E, S, syncfp=None):
   '''
   log = getLogger(LOGGER_NAME)
   log.propagate = False
-  log.addHandler(FileHandler(LOGGER_FILENAME))
+  handler = FileHandler(LOGGER_FILENAME)
+  formatter = Formatter(DEFAULT_BASE_FORMAT)
+  handler.setFormatter(formatter)
+  log.addHandler(handler)
   FS = StoreFS(E, S, syncfp=syncfp)
   FS._mount(mnt)
 
