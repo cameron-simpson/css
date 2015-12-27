@@ -140,18 +140,18 @@ class StoreFS(Operations):
       raise RuntimeError(attr)
     return attrfunc
 
+  @trace_method
   def _sync(self):
-    with Pfx("_sync"):
-      if self.syncfp is not None:
-        with self._lock:
-          text = strfor_Dirent(self.E)
-          last_text = self._syncfp_last_dirent_text
-          if last_text is not None and text == last_text:
-            text = None
-        if text is not None:
-          write_Dirent_str(self.syncfp, text, etc=self.E.name)
-          self._syncfp_last_dirent_text = text
-          dump_Dirent(self.E, recurse=True) # debugging
+    if self.syncfp is not None:
+      with self._lock:
+        text = strfor_Dirent(self.E)
+        last_text = self._syncfp_last_dirent_text
+        if last_text is not None and text == last_text:
+          text = None
+      if text is not None:
+        write_Dirent_str(self.syncfp, text, etc=self.E.name)
+        self._syncfp_last_dirent_text = text
+        dump_Dirent(self.E, recurse=True) # debugging
 
   def _mount(self, root):
     ''' Attach this StoreFS to the specified path `root`.
