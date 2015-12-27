@@ -462,7 +462,7 @@ def cmd_mount(args, verbose=None, log=None):
     if E is None:
       E = Dir('/')
     else:
-      dump_Dirent(E, recurse=True)
+      ##dump_Dirent(E, recurse=True)
       if not E.isdir:
         error("expected directory, not file: %s", E)
         return 1
