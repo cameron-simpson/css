@@ -64,22 +64,23 @@ def trace_method(method):
       citation += " " + pformat(a, depth=1)
     if kw:
       citation += " " + pformat(kw, depth=2)
-    time0 = time.time()
-    ##self.log.info("CALL %s", citation)
-    try:
-      result = method(self, *a, **kw)
-    except FuseOSError as e:
-      elapsed = time.time() - time0
-      self.logQ.put( (self.log.info, citation, elapsed, "FuseOSError %s", e) )
-      raise
-    except Exception as e:
-      elapsed = time.time() - time0
-      self.logQ.put( (self.log.exception, citation, elapsed, "%s %s", type(e), e) )
-      raise
-    else:
-      elapsed = time.time() - time0
-      self.logQ.put( (self.log.info, citation, elapsed, "=> %r", result) )
-      return result
+    with Pfx(citation):
+      time0 = time.time()
+      ##self.log.info("CALL %s", citation)
+      try:
+        result = method(self, *a, **kw)
+      except FuseOSError as e:
+        elapsed = time.time() - time0
+        self.logQ.put( (self.log.info, citation, elapsed, "FuseOSError %s", e) )
+        raise
+      except Exception as e:
+        elapsed = time.time() - time0
+        self.logQ.put( (self.log.exception, citation, elapsed, "%s %s", type(e), e) )
+        raise
+      else:
+        elapsed = time.time() - time0
+        self.logQ.put( (self.log.info, citation, elapsed, "=> %r", result) )
+        return result
   traced_method.__name__ = 'trace(%s)' % (fname,)
   return traced_method
 
