@@ -433,11 +433,9 @@ class StoreFS(Operations):
     with Pfx("release(%r, fhndx=%d)", path, fhndx):
       fh = self._fh(fhndx)
       if fh is None:
-        self.log.info("release(%r, %s): no matching FileHandle!", path, fhndx)
-        error("handle is None!")
-      else:
-        self.log.info("release(%r, %s): fh=%s", path, fhndx, fh)
-        fh.close()
+        error("no matching FileHandle!")
+        raise FuseOSError(errno.EINVAL)
+      fh.close()
       return 0
 
   @trace_method
