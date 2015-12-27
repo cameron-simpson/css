@@ -206,7 +206,13 @@ class StoreFS(Operations):
 
   @locked
   def _fh(self, fhndx):
-    return self._file_handles[fhndx]
+    try:
+      fh = self._file_handles[fhndx]
+    except IndexError:
+      fh = None
+    if fh is None:
+      error("cannot look up FileHandle index %r", fhndx)
+    return fh
 
   @locked
   def _new_file_handle_index(self, file_handle):
