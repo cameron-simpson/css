@@ -476,6 +476,7 @@ class StoreFS(Operations):
     if not self._Eaccess(P2, os.X_OK|os.W_OK):
       raise FuseOSError(errno.EPERM)
     del P1[E1base]
+    E1.name = E2base
     P2[E2base] = E1
 
   @trace_method
