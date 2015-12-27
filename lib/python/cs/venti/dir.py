@@ -37,7 +37,7 @@ F_HASNAME = 0x02
 
 def decode_Dirent_text(text):
   ''' Accept `text`, a text transcription of a Direct, such as from
-      Dirent.textencode(), and return the correspnding Dirent.
+      Dirent.textencode(), and return the corresponding Dirent.
   '''
   data = fromtext(text)
   E, offset = decodeDirent(data, 0)
