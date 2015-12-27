@@ -6,7 +6,7 @@ import stat
 import sys
 from threading import Lock, RLock
 import time
-from cs.logutils import D, Pfx, debug, error, info, warning, X
+from cs.logutils import D, Pfx, debug, error, info, warning, X, XP
 from cs.lex import hexify
 from cs.py.stack import stack_dump
 from cs.queues import MultiOpenMixin
@@ -37,7 +37,7 @@ F_HASNAME = 0x02
 
 def decode_Dirent_text(text):
   ''' Accept `text`, a text transcription of a Direct, such as from
-      Dirent.textencode(), and return the correspnding Dirent.
+      Dirent.textencode(), and return the corresponding Dirent.
   '''
   data = fromtext(text)
   E, offset = decodeDirent(data, 0)
@@ -288,7 +288,7 @@ class FileDirent(_Dirent, MultiOpenMixin):
     if self._open_file is not None:
       self._block = self._open_file.flush()
       warning("FileDirent.block: updated to %s", self._block)
-      stack_dump()
+      ##stack_dump(indent=2)
     return self._block
 
   @block.setter
@@ -409,21 +409,25 @@ class Dir(_Dirent):
   def change(self):
     ''' Mark this Dir as changed; propagate to parent Dir if present.
     '''
+    XP("Dir %r: changed=True", self.name)
+    ##stack_dump(indent=2)
     self.changed = True
     if self.parent:
       self.parent.change()
 
   @property
+  @locked
   def entries(self):
-    with self._lock:
-      es = self._entries
-      if self._entries is None:
-        # unpack ._block into ._entries, discard ._block
-        es = self._entries = {}
-        for E in decodeDirents(self._block.data):
-          E.parent = self
-          es[E.name] = E
-        self._block = None
+    ''' Property containing the live dictionary holding the Dir entries.
+    '''
+    es = self._entries
+    if es is None:
+      # compute the dictionary holding the live Dir entries
+      es = {}
+      for E in decodeDirents(self._block.all_data()):
+        E.parent = self
+        es[E.name] = E
+      self._entries = es
     return es
 
   @property
@@ -442,8 +446,10 @@ class Dir(_Dirent):
       # TODO: if len(data) >= 16384
       B = Block(data=data)
       ##warning("Dir.block: computed Block %s", B)
+      XP("Dir %r: RECOMPUTED BLOCK: %s", self.name, B)
     else:
       B = self._block
+      XP("Dir %r: REUSE ._block: %s", self.name, B)
     return B
 
   def dirs(self):

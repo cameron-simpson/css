@@ -13,7 +13,7 @@ from threading import Lock, RLock
 from zlib import compress, decompress
 from cs.cache import LRU_Cache
 from cs.excutils import LogExceptions
-from cs.logutils import D, X, debug, warning, Pfx
+from cs.logutils import D, X, debug, warning, exception, Pfx
 from cs.obj import O
 from cs.resources import MultiOpenMixin
 from cs.serialise import get_bs, put_bs, read_bs, put_bsdata, read_bsdata
@@ -410,7 +410,11 @@ class DataDirMapping(MultiOpenMixin,HashCodeUtilsMixin):
     ''' Return the decompressed data associated with the supplied `hashcode`.
     '''
     n, offset = self._index(hashcode.__class__)[hashcode]
-    return self.datadir.get(n, offset)
+    try:
+      return self.datadir.get(n, offset)
+    except Exception as e:
+      exception("%s[%s]: not available: %s", self, hashcode, e)
+      raise KeyError(str(hashcode))
 
   def __setitem__(self, hashcode, data):
     ''' Store the supplied `data` indexed by `hashcode`.

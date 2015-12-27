@@ -74,7 +74,7 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin):
 
   _seq = Seq()
 
-  def __init__(self, name=None, capacity=None, hashclass=None):
+  def __init__(self, name=None, capacity=None, hashclass=None, lock=None):
     with Pfx("_BasicStoreCommon.__init__(%s,..)", name):
       if name is None:
         name = "%s%d" % (self.__class__.__name__, next(_BasicStoreCommon._seq()))
@@ -82,7 +82,7 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin):
         capacity = 1
       if hashclass is None:
         hashclass = DEFAULT_HASHCLASS
-      MultiOpenMixin.__init__(self)
+      MultiOpenMixin.__init__(self, lock=lock)
       self.name = name
       self.hashclass = hashclass
       self.logfp = None
@@ -326,7 +326,7 @@ class MappingStore(BasicStoreSync):
       h = self.hash(data)
       if h not in self.mapping:
         self.mapping[h] = data
-      else:
+      elif False:
         with Pfx("EXISTING HASH"):
           try:
             data2 = self.mapping[h]
@@ -402,7 +402,7 @@ class _ProgressStoreTemplateMapping(object):
 
   def __getitem__(self, key):
     try:
-      category, aspect = key.split('_', 1)
+      category, aspect = key.rsplit('_', 1)
     except ValueError:
       category = key
       aspect = 'position'
@@ -415,11 +415,14 @@ class _ProgressStoreTemplateMapping(object):
 
 class ProgressStore(BasicStoreSync):
 
-  def __init__(self, S, template='rq  {requests_position}  {requests_throughput}/s', **kw):
+  def __init__(self, S, template='rq  {requests_all_position}  {requests_all_throughput}/s', **kw):
     name = kw.pop('name', None)
     if name is None:
       name = "ProgressStore(%s)" % (S,)
-    BasicStoreSync.__init__(self, name=name, **kw)
+    lock = kw.pop('lock', None)
+    if lock is None:
+      lock = S._lock
+    BasicStoreSync.__init__(self, name=name, lock=lock, **kw)
     self.S = S
     self.template = template
     self.template_mapping = _ProgressStoreTemplateMapping(self)
@@ -458,7 +461,9 @@ class ProgressStore(BasicStoreSync):
 
   @contextmanager
   def do_request(self, category):
+    Ps = self._progress
     self.requests += 1
+    Ps['requests_all'].inc()
     if category is not None:
       Pactive = self._progress[category]
       Pactive.update(Pactive.position + 1)
@@ -481,7 +486,7 @@ class ProgressStore(BasicStoreSync):
     with self.do_request('contains'):
       return self.S.contains(hashcode)
 
-  def flush(self, hashcode):
+  def flush(self):
     with self.do_request(None):
       return self.S.flush()
 
