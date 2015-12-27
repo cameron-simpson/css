@@ -326,7 +326,7 @@ class MappingStore(BasicStoreSync):
       h = self.hash(data)
       if h not in self.mapping:
         self.mapping[h] = data
-      else:
+      elif False:
         with Pfx("EXISTING HASH"):
           try:
             data2 = self.mapping[h]
