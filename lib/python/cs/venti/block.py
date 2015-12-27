@@ -284,11 +284,8 @@ class IndirectBlock(_Block):
     ''' Return the leaf (direct) blocks.
     '''
     for B in self.subblocks:
-      if B.indirect:
-        for subB in B.leaves:
-          yield subB
-      elif len(B) > 0:
-        yield B
+      for subB in B.leaves:
+        yield subB
 
 def chunksOf(B, start, stop=None):
   ''' Generator that yields the chunks from the subblocks that span
