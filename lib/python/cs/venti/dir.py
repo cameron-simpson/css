@@ -419,9 +419,12 @@ class Dir(_Dirent):
     '''
     # compute the dictionary holding the lives Dir entries
     es = {}
-    for E in decodeDirents(self._block.all_data()):
-      E.parent = self
-      es[E.name] = E
+    try:
+      for E in decodeDirents(self._block.all_data()):
+        E.parent = self
+        es[E.name] = E
+    except IOError as e:
+      error("%s.entries: TRUNCATED, entries lost: IOError: %s", self, e)
     self._block = None
     return es
 
