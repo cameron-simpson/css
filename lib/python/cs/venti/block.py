@@ -3,7 +3,7 @@
 from __future__ import print_function
 import sys
 from threading import RLock
-from cs.logutils import D, debug, X, Pfx
+from cs.logutils import D, error, debug, X, Pfx
 from cs.serialise import get_bs, put_bs
 from cs.threads import locked_property
 from cs.venti import defaults, totext
@@ -82,7 +82,13 @@ class _Block(object):
     ''' The direct data of this Block.
         i.e. _not_ the data implied by an indirect Block.
     '''
-    return defaults.S[self.hashcode]
+    S = defaults.S
+    hashcode = self.hashcode
+    try:
+      return S[hashcode]
+    except KeyError as e:
+      error("%s: data for hashcode %s not available: %s", self, hashcode, e)
+      raise IOError("data for hashcode %s not available: %s" % (hashcode, e)) from e
 
   def __getitem__(self, index):
     ''' Return specified direct data.
