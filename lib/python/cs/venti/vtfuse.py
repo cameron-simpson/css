@@ -15,12 +15,13 @@ from os import O_CREAT, O_RDONLY, O_WRONLY, O_RDWR, O_APPEND, O_TRUNC
 from os.path import basename
 from pprint import pformat
 import sys
-from threading import RLock
+from threading import Thread
 import time
 from cs.debug import DummyMap, TracingObject
 from cs.logutils import X, XP, debug, info, warning, error, Pfx, DEFAULT_BASE_FORMAT
 from cs.obj import O, obj_as_dict
 from cs.py.func import funccite, funcname
+from cs.queues import IterableQueue
 from cs.seq import Seq
 from cs.threads import locked
 from .archive import strfor_Dirent, write_Dirent_str
@@ -69,18 +70,22 @@ def trace_method(method):
       result = method(self, *a, **kw)
     except FuseOSError as e:
       elapsed = time.time() - time0
-      self.log.info("%gs %s: FuseOSError %s", elapsed, citation, e)
+      self.logQ.put( (self.log.info, citation, elapsed, "FuseOSError %s", e) )
       raise
     except Exception as e:
       elapsed = time.time() - time0
-      self.log.exception("%gs %s %s %s", elapsed, citation, type(e), e)
+      self.logQ.put( (self.log.exception, citation, elapsed, "%s %s", type(e), e) )
       raise
     else:
       elapsed = time.time() - time0
-      self.log.info("%gs %s => %r", elapsed, citation, result)
+      self.logQ.put( (self.log.info, citation, elapsed, "=> %r", result) )
       return result
   traced_method.__name__ = 'trace(%s)' % (fname,)
   return traced_method
+
+def log_traces_queued(Q):
+  for logcall, citation, elapsed, msg, *a in Q:
+    logcall("%fs %s " + msg, elapsed, citation ,*a)
 
 class StoreFS(Operations):
   ''' Class providing filesystem operations, suitable for passing
@@ -99,7 +104,16 @@ class StoreFS(Operations):
       raise ValueError("not dir Dir: %s" % (E,))
     self.S = S
     self.E = E
+    # set up a queue to collect logging requests
+    # and a thread to process then asynchronously
     self.log = getLogger(LOGGER_NAME)
+    self.logQ = IterableQueue()
+    X("logQ = %r", self.logQ)
+    T = Thread(name="log-queue(%s)" % (self,),
+               target=log_traces_queued,
+               args=(self.logQ,))
+    T.daemon = True
+    T.start()
     self.syncfp = syncfp
     self._syncfp_last_dirent_text = None
     self.do_fsync = False
@@ -112,7 +126,10 @@ class StoreFS(Operations):
     self._file_handles = []
 
   def __str__(self):
-    return "<StoreFS>"
+    return "<StoreFS S=%s /=%s>" % (self.S, self.E)
+
+  def __del__(self):
+    self.logQ.close()
 
   def __getattr__(self, attr):
     # debug aid
@@ -254,7 +271,6 @@ class StoreFS(Operations):
 
   @trace_method
   def destroy(self, path):
-    self.log.info("destroy path=%r", path)
     with Pfx("destroy(%r)", path):
       self._sync()
 
@@ -553,6 +569,7 @@ class FileHandle(O):
     O.__init__(self)
     self.fs = fs
     self.log = fs.log
+    self.logQ = fs.logQ
     self.path = path
     self.E = E
     self.Eopen = E.open()
