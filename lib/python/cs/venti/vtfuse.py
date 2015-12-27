@@ -235,75 +235,67 @@ class StoreFS(Operations):
 
   @trace_method
   def access(self, path, amode):
-    with Pfx("access(path=%s, amode=0o%o)", path, amode):
-      E = self._namei(path)
-      if not self._Eaccess(E, amode):
-        raise FuseOSError(errno.EACCES)
-      return 0
+    E = self._namei(path)
+    if not self._Eaccess(E, amode):
+      raise FuseOSError(errno.EACCES)
+    return 0
 
   @trace_method
   def chmod(self, path, mode):
-    with Pfx("chmod(%r, 0o%04o)...", path, mode):
-      E, P = self._namei2(path)
-      E.meta.chmod(mode)
-      if P:
-        P.change()
+    E, P = self._namei2(path)
+    E.meta.chmod(mode)
+    if P:
+      P.change()
 
   @trace_method
   def chown(self, path, uid, gid):
-    with Pfx("chown(%r, uid=%d, gid=%d)", path, uid, gid):
-      E, P = self._namei2(path)
-      if P:
-        P.change()
-      M = E.meta
-      if uid >= 0 and uid != self._fs_uid:
-        M.uid = uid
-      if gid >= 0 and gid != self._fs_gid:
-        M.gid = gid
+    E, P = self._namei2(path)
+    if P:
+      P.change()
+    M = E.meta
+    if uid >= 0 and uid != self._fs_uid:
+      M.uid = uid
+    if gid >= 0 and gid != self._fs_gid:
+      M.gid = gid
 
   @trace_method
   def create(self, path, mode, fi=None):
-    with Pfx("create(path=%r, mode=0o%04o, fi=%s)", path, mode, fi):
-      if fi is not None:
-        raise RuntimeError("WHAT TO DO IF fi IS NOT NONE? fi=%r" % (fi,))
-      fhndx = self.open(path, O_CREAT|O_TRUNC|O_WRONLY)
-      warning("TODO: create: apply mode (0o%o) to self._fh[%d]", mode, fhndx)
-      return fhndx
+    if fi is not None:
+      raise RuntimeError("WHAT TO DO IF fi IS NOT NONE? fi=%r" % (fi,))
+    fhndx = self.open(path, O_CREAT|O_TRUNC|O_WRONLY)
+    warning("TODO: create: apply mode (0o%o) to self._fh[%d]", mode, fhndx)
+    return fhndx
 
   @trace_method
   def destroy(self, path):
-    with Pfx("destroy(%r)", path):
-      self._sync()
+    # TODO: catch path == '/', indicates umount?
+    self._sync()
 
   @trace_method
   def fgetattr(self, *a, **kw):
-    with Pfx("fgetattr(%r, fh=%s)", path, fh):
-      try:
-        E = self._namei(path)
-      except FuseOSError as e:
-        error("FuseOSError: %s", e)
-        raise
-      if fh is not None:
-        ##X("fh=%s", fh)
-        pass
-      return self._Estat(E)
+    try:
+      E = self._namei(path)
+    except FuseOSError as e:
+      error("FuseOSError: %s", e)
+      raise
+    if fh is not None:
+      ##X("fh=%s", fh)
+      pass
+    return self._Estat(E)
 
   @trace_method
   def flush(self, path, datasync, fhndx):
-    with Pfx("flush(%r, datasync=%s, fhndx=%s)", path, datasync, fhndx):
-      self._fh(fhndx).flush()
+    self._fh(fhndx).flush()
 
   @trace_method
   def flush(self, path, fh):
-    with Pfx("flush(%r, fh=%s)", path, fh):
-      ##info("FLUSH: NOOP?")
-      pass
+    ##info("FLUSH: NOOP?")
+    pass
 
   @trace_method
   def fsync(self, path, datasync, fh):
-    with Pfx("fsync(path=%r, datasync=%d, fh=%r)", path, datasync, fh):
-      if self.do_fsync:
-        self._fh(fhndx).flush()
+    if self.do_fsync:
+      self._fh(fhndx).flush()
 
   @trace_method
   def fsyncdir(self, path, datasync, fh):
@@ -311,22 +303,20 @@ class StoreFS(Operations):
 
   @trace_method
   def ftruncate(self, path, length, fhndx):
-    with Pfx("ftruncate(%r, %d, fhndx=%d)...", path, length, fhndx):
-      fh = self._fh(fhndx)
-      fh.truncate(length)
+    fh = self._fh(fhndx)
+    fh.truncate(length)
 
   @trace_method
   def getattr(self, path, fh=None):
-    with Pfx("getattr(%r, fh=%s)", path, fh):
-      try:
-        E = self._namei(path)
-      except FuseOSError as e:
-        if e.errno != errno.ENOENT:
-          error("FuseOSError: %s", e)
-        raise
-      st = self._Estat(E)
-      st['st_ino'] = self._ino(path)
-      return st
+    try:
+      E = self._namei(path)
+    except FuseOSError as e:
+      if e.errno != errno.ENOENT:
+        error("FuseOSError: %s", e)
+      raise
+    st = self._Estat(E)
+    st['st_ino'] = self._ino(path)
+    return st
 
   @trace_method
   def getxattr(self, path, name, position=0):
@@ -334,33 +324,30 @@ class StoreFS(Operations):
 
   @trace_method
   def listxattr(self, path):
-    with Pfx("listxattr(path=%r)", path):
-      XP("return empty list")
-      return ''
+    XP("return empty list")
+    return ''
 
   @trace_method
   def lock(self, *a, **kw):
-    X("lock(*%r, **%r)", a, kw)
     raise FuseOSError(errno.ENOTSUP)
 
   @trace_method
   def mkdir(self, path, mode):
-    with Pfx("mkdir(path=%r, mode=0o%04o)", path, mode):
-      E, P, tail_path = self._resolve(path)
-      if not tail_path:
-        error("file exists")
-        raise FuseOSError(errno.EEXIST)
-      if len(tail_path) != 1:
-        error("expected exactly 1 missing path component, got: %r", tail_path)
-        raise FuseOSError(errno.ENOENT)
-      if not E.isdir:
-        error("parent (%r) not a directory, raising ENOTDIR", E.name)
-        raise FuseOSError(errno.ENOTDIR)
-      base = tail_path[0]
-      newE = Dir(base, parent=E)
-      E[base] = newE
-      E = newE
-      E.meta.chmod(mode & 0o7777)
+    E, P, tail_path = self._resolve(path)
+    if not tail_path:
+      error("file exists")
+      raise FuseOSError(errno.EEXIST)
+    if len(tail_path) != 1:
+      error("expected exactly 1 missing path component, got: %r", tail_path)
+      raise FuseOSError(errno.ENOENT)
+    if not E.isdir:
+      error("parent (%r) not a directory, raising ENOTDIR", E.name)
+      raise FuseOSError(errno.ENOTDIR)
+    base = tail_path[0]
+    newE = Dir(base, parent=E)
+    E[base] = newE
+    E = newE
+    E.meta.chmod(mode & 0o7777)
 
   @trace_method
   def mknod(self, path, mode, dev):
@@ -371,97 +358,90 @@ class StoreFS(Operations):
   def open(self, path, flags):
     ''' Obtain a FileHandle open on `path`, return its index.
     '''
-    with Pfx("open(path=%r, flags=0o%o)", path, flags):
-      do_create = flags & O_CREAT
-      do_trunc = flags & O_TRUNC
-      for_read = (flags & O_RDONLY) == O_RDONLY or (flags & O_RDWR) == O_RDWR
-      for_write = (flags & O_WRONLY) == O_WRONLY or (flags & O_RDWR) == O_RDWR
-      for_append = (flags & O_APPEND) == O_APPEND
-      debug("do_create=%s for_read=%s, for_write=%s, for_append=%s",
-            do_create, for_read, for_write, for_append)
-      E, P, tail_path = self._resolve(path)
-      if len(tail_path) > 0 and not do_create:
-        error("no do_create, raising ENOENT")
-        raise FuseOSError(errno.ENOENT)
-      if len(tail_path) > 1:
-        error("multiple missing path components: %r", tail_path)
-        raise FuseOSError(errno.ENOENT)
-      if len(tail_path) == 1:
-        debug("open: new file, basename %r", tail_path)
-        if not E.isdir:
-          error("parent (%r) not a directory, raising ENOTDIR", E.name)
-          raise FuseOSError(errno.ENOTDIR)
-        base = tail_path[0]
-        newE = FileDirent(base)
-        E[base] = newE
-        E = newE
-      else:
-        debug("file exists already")
-        pass
-      fh = FileHandle(self, path, E, for_read, for_write, for_append)
-      if do_trunc:
-        fh.truncate(0)
-      fhndx = self._new_file_handle_index(fh)
-      if P:
-        P.change()
-      return fhndx
+    do_create = flags & O_CREAT
+    do_trunc = flags & O_TRUNC
+    for_read = (flags & O_RDONLY) == O_RDONLY or (flags & O_RDWR) == O_RDWR
+    for_write = (flags & O_WRONLY) == O_WRONLY or (flags & O_RDWR) == O_RDWR
+    for_append = (flags & O_APPEND) == O_APPEND
+    debug("do_create=%s for_read=%s, for_write=%s, for_append=%s",
+          do_create, for_read, for_write, for_append)
+    E, P, tail_path = self._resolve(path)
+    if len(tail_path) > 0 and not do_create:
+      error("no do_create, raising ENOENT")
+      raise FuseOSError(errno.ENOENT)
+    if len(tail_path) > 1:
+      error("multiple missing path components: %r", tail_path)
+      raise FuseOSError(errno.ENOENT)
+    if len(tail_path) == 1:
+      debug("open: new file, basename %r", tail_path)
+      if not E.isdir:
+        error("parent (%r) not a directory, raising ENOTDIR", E.name)
+        raise FuseOSError(errno.ENOTDIR)
+      base = tail_path[0]
+      newE = FileDirent(base)
+      E[base] = newE
+      E = newE
+    else:
+      debug("file exists already")
+      pass
+    fh = FileHandle(self, path, E, for_read, for_write, for_append)
+    if do_trunc:
+      fh.truncate(0)
+    fhndx = self._new_file_handle_index(fh)
+    if P:
+      P.change()
+    return fhndx
 
   @trace_method
   def opendir(self, path):
-    with Pfx("opendir(%r)", path):
-      E = self._namei(path)
-      if not E.isdir:
-        raise FuseOSError(errno.ENOTDIR)
-      fhndx = self._new_file_handle_index(E)
-      return fhndx
+    E = self._namei(path)
+    if not E.isdir:
+      raise FuseOSError(errno.ENOTDIR)
+    fhndx = self._new_file_handle_index(E)
+    return fhndx
 
   @trace_method
   def read(self, path, size, offset, fhndx):
-    with Pfx("read(path=%r, size=%d, offset=%d, fhndx=%r)", path, size, offset, fhndx):
-      chunks = []
-      while size > 0:
-        data = self._fh(fhndx).read(offset, size)
-        if len(data) == 0:
-          break
-        chunks.append(data)
-        offset += len(data)
-        size -= len(data)
-      return b''.join(chunks)
+    chunks = []
+    while size > 0:
+      data = self._fh(fhndx).read(offset, size)
+      if len(data) == 0:
+        break
+      chunks.append(data)
+      offset += len(data)
+      size -= len(data)
+    return b''.join(chunks)
 
   @trace_method
   def readdir(self, path, *a, **kw):
-    with Pfx("readdir(path=%r, a=%r, kw=%r)", path, a, kw):
-      if a or kw:
-        warning("a or kw set!")
-      E = self._namei(path)
-      if not E.isdir:
-        raise FuseOSError(errno.ENOTDIR)
-      return ['.', '..'] + list(E.keys())
+    if a or kw:
+      warning("a or kw set!")
+    E = self._namei(path)
+    if not E.isdir:
+      raise FuseOSError(errno.ENOTDIR)
+    return ['.', '..'] + list(E.keys())
 
   @trace_method
   def readlink(self, path):
-    with Pfx("readlink(%r)", path):
-      E = self._namei(path)
-      # no symlinks yet
-      raise FuseOSError(errno.EINVAL)
+    E = self._namei(path)
+    # no symlinks yet
+    raise FuseOSError(errno.EINVAL)
 
   @trace_method
   def release(self, path, fhndx):
-    with Pfx("release(%r, fhndx=%d)", path, fhndx):
-      fh = self._fh(fhndx)
-      if fh is None:
-        error("no matching FileHandle!")
-        raise FuseOSError(errno.EINVAL)
-      fh.close()
-      return 0
+    fh = self._fh(fhndx)
+    if fh is None:
+      error("no matching FileHandle!")
+      raise FuseOSError(errno.EINVAL)
+    fh.close()
+    return 0
 
   @trace_method
   def releasedir(self, path, fhndx):
-    with Pfx("releasedir(path=%r, fhndx=%d)", path, fhndx):
-      fh = self._fh(fhndx)
-      if fh is None:
-        error("handle is None!")
-      return 0
+    fh = self._fh(fhndx)
+    if fh is None:
+      error("handle is None!")
+    return 0
 
   @trace_method
   def removexattr(self, path, name):
@@ -469,39 +449,37 @@ class StoreFS(Operations):
 
   @trace_method
   def rename(self, oldpath, newpath):
-    with Pfx("rename(%r, %r)...", oldpath, newpath):
-      E1base = basename(oldpath)
-      E1, P1, tail_path = self._resolve(oldpath)
-      if tail_path:
-        raise FuseOSError(errno.ENOENT)
-      if not self._Eaccess(P1, os.X_OK|os.W_OK):
-        raise FuseOSError(errno.EPERM)
-      E2base = basename(newpath)
-      E2, P2, tail_path = self._resolve(newpath)
-      if len(tail_path) > 1:
-        raise FuseOSError(errno.ENOENT)
-      if len(tail_path) == 1:
-        P2 = E2
-        E2 = None
-      if not self._Eaccess(P2, os.X_OK|os.W_OK):
-        raise FuseOSError(errno.EPERM)
-      del P1[E1base]
-      P2[E2base] = E1
+    E1base = basename(oldpath)
+    E1, P1, tail_path = self._resolve(oldpath)
+    if tail_path:
+      raise FuseOSError(errno.ENOENT)
+    if not self._Eaccess(P1, os.X_OK|os.W_OK):
+      raise FuseOSError(errno.EPERM)
+    E2base = basename(newpath)
+    E2, P2, tail_path = self._resolve(newpath)
+    if len(tail_path) > 1:
+      raise FuseOSError(errno.ENOENT)
+    if len(tail_path) == 1:
+      P2 = E2
+      E2 = None
+    if not self._Eaccess(P2, os.X_OK|os.W_OK):
+      raise FuseOSError(errno.EPERM)
+    del P1[E1base]
+    P2[E2base] = E1
 
   @trace_method
   def rmdir(self, path):
-    with Pfx("rmdir(%r)...", path):
-      Ebase = basename(path)
-      E, P, tail_path = self._resolve(path)
-      if tail_path:
-        raise FuseOSError(errno.ENOENT)
-      if not E.isdir:
-        raise FuseOSError(errno.EDOTDIR)
-      if not self._Eaccess(P, os.W_OK|os.X_OK):
-        raise FuseOSError(errno.EPERM)
-      if E.entries:
-        raise FuseOSError(errno.ENOTEMPTY)
-      del P[Ebase]
+    Ebase = basename(path)
+    E, P, tail_path = self._resolve(path)
+    if tail_path:
+      raise FuseOSError(errno.ENOENT)
+    if not E.isdir:
+      raise FuseOSError(errno.EDOTDIR)
+    if not self._Eaccess(P, os.W_OK|os.X_OK):
+      raise FuseOSError(errno.EPERM)
+    if E.entries:
+      raise FuseOSError(errno.ENOTEMPTY)
+    del P[Ebase]
 
   @trace_method
   def setxattr(self, path, name, value, options, position=0):
@@ -509,13 +487,12 @@ class StoreFS(Operations):
 
   @trace_method
   def statfs(self, path):
-    with Pfx("statsfs(%r)", path):
-      st = os.statvfs(".")
-      d = {}
-      for f in dir(st):
-        if f.startswith('f_'):
-          d[f] = getattr(st, f)
-      return d
+    st = os.statvfs(".")
+    d = {}
+    for f in dir(st):
+      if f.startswith('f_'):
+        d[f] = getattr(st, f)
+    return d
 
   @trace_method
   def symlink(self, target, source):
@@ -523,44 +500,40 @@ class StoreFS(Operations):
 
   @trace_method
   def sync(self, *a, **kw):
-    self.log.info("sync *%r **%r", a, kw)
+    pass
 
   @trace_method
   def truncate(self, path, length, fh=None):
-    with Pfx("truncate(%r, length=%d, fh=%s)", path, length, fh):
-      E, P = self._namei2(path)
-      if not self._Eaccess(E, os.W_OK):
-        raise FuseOSError(errno.EPERM)
-      E.truncate(length)
-      P.change()
+    E, P = self._namei2(path)
+    if not self._Eaccess(E, os.W_OK):
+      raise FuseOSError(errno.EPERM)
+    E.truncate(length)
+    P.change()
 
   @trace_method
   def unlink(self, path):
-    with Pfx("unlink(%r)...", path):
-      Ebase = basename(path)
-      E, P, tail_path = self._resolve(path)
-      if tail_path:
-        raise FuseOSError(errno.ENOENT)
-      if E.isdir:
-        raise FuseOSError(errno.EISDIR)
-      if not self._Eaccess(P, os.W_OK|os.X_OK):
-        raise FuseOSError(errno.EPERM)
-      del P[Ebase]
+    Ebase = basename(path)
+    E, P, tail_path = self._resolve(path)
+    if tail_path:
+      raise FuseOSError(errno.ENOENT)
+    if E.isdir:
+      raise FuseOSError(errno.EISDIR)
+    if not self._Eaccess(P, os.W_OK|os.X_OK):
+      raise FuseOSError(errno.EPERM)
+    del P[Ebase]
 
   @trace_method
   def utimens(self, path, times):
-    with Pfx("utimens(%r, times=%r", path, times):
-      atime, mtime = times
-      E, P = self._namei2(path)
-      M = E.meta
-      ## we do not do atime ## M.atime = atime
-      M.mtime = mtime
-      if P:
-        P.change()
+    atime, mtime = times
+    E, P = self._namei2(path)
+    M = E.meta
+    ## we do not do atime ## M.atime = atime
+    M.mtime = mtime
+    if P:
+      P.change()
 
   def write(self, path, data, offset, fhndx):
-    with Pfx("write(path=%r, data=%d bytes, offset=%d, fhndx=%r", path, len(data), offset, fhndx):
-      return self._fh(fhndx).write(data, offset)
+    return self._fh(fhndx).write(data, offset)
 
 class FileHandle(O):
   ''' Filesystem state for open files.
