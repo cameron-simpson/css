@@ -415,18 +415,19 @@ class Dir(_Dirent):
     if self.parent:
       self.parent.change()
 
-  @locked_property
+  @property
+  @locked
   def entries(self):
     ''' Property containing the live dictionary holding the Dir entries.
     '''
-    # compute the dictionary holding the lives Dir entries
-    es = {}
-    try:
+    es = self._entries
+    if es is None:
+      # compute the dictionary holding the live Dir entries
+      es = {}
       for E in decodeDirents(self._block.all_data()):
         E.parent = self
         es[E.name] = E
-    except IOError as e:
-      error("%s.entries: TRUNCATED, entries lost: IOError: %s", self, e)
+      self._entries = es
     return es
 
   @property
