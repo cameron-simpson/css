@@ -33,21 +33,7 @@ def main(argv):
   if cmd.endswith('.py'):
     cmd = 'vt'
   setup_logging(cmd_name=cmd)
-  usage = '''Usage:
-    %s [options...] ar tar-options paths..
-    %s [options...] cat filerefs...
-    %s [options...] catblock [-i] hashcodes...
-    %s [options...] datadir [indextype:[hashname:]]/dirpath index
-    %s [options...] datadir [indextype:[hashname:]]/dirpath pull other-datadirs...
-    %s [options...] datadir [indextype:[hashname:]]/dirpath push other-datadir
-    %s [options...] dump filerefs
-    %s [options...] listen {-|host:port}
-    %s [options...] ls [-R] dirrefs...
-    %s [options...] mount dirref mountpoint
-    %s [options...] pack paths...
-    %s [options...] scan datafile
-    %s [options...] pull stores...
-    %s [options...] unpack dirrefs...
+  usage = '''Usage: %s [options...] operation [args...]
     Options:
       -C store    Use this as a front end cache store.
                   "-" means no front end cache.
@@ -58,7 +44,22 @@ def main(argv):
                     |sh-command   StreamStore via sh-command
       -q          Quiet; not verbose. Default if stdout is not a tty.
       -v          Verbose; not quiet. Default it stdout is a tty.
-''' % (cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd)
+    Operations:
+      ar tar-options paths..
+      cat filerefs...
+      catblock [-i] hashcodes...
+      datadir [indextype:[hashname:]]/dirpath index
+      datadir [indextype:[hashname:]]/dirpath pull other-datadirs...
+      datadir [indextype:[hashname:]]/dirpath push other-datadir
+      dump filerefs
+      listen {-|host:port}
+      ls [-R] dirrefs...
+      mount mountlog.vt mountpoint
+      pack paths...
+      scan datafile
+      pull other-store objects...
+      unpack dirrefs...
+''' % (cmd,)
 
   badopts = False
 
