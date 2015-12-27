@@ -425,7 +425,12 @@ class StoreFS(Operations):
     E = self._namei(path)
     if not E.isdir:
       raise FuseOSError(errno.ENOTDIR)
-    return ['.', '..'] + list(E.keys())
+    try:
+      entries = list(E.keys())
+    except IOError as e:
+      error("IOError: %s", e)
+      raise FuseOSError(errno.EIO)
+    return ['.', '..'] + entries
 
   @trace_method
   def readlink(self, path):
