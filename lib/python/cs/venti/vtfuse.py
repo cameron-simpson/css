@@ -53,7 +53,7 @@ def mount(mnt, E, S, syncfp=None, subpath=None):
   formatter = Formatter(DEFAULT_BASE_FORMAT)
   handler.setFormatter(formatter)
   log.addHandler(handler)
-  FS = StoreFS(E, S, syncfp=syncfp)
+  FS = StoreFS(E, S, syncfp=syncfp, subpath=subpath)
   FS._mount(mnt)
 
 def trace_method(method):
@@ -142,7 +142,7 @@ class StoreFS(Operations):
 
   def __str__(self):
     if self.subpath:
-      return "<StoreFS S=%s /=%s %r=%s>" % (self.S, self.E, self.mntE)
+      return "<StoreFS S=%s /=%s %r=%s>" % (self.S, self.E, self.subpath, self.mntE)
     else:
       return "<StoreFS S=%s /=%s>" % (self.S, self.E)
 
