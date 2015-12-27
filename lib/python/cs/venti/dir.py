@@ -420,7 +420,7 @@ class Dir(_Dirent):
       if self._entries is None:
         # unpack ._block into ._entries, discard ._block
         es = self._entries = {}
-        for E in decodeDirents(self._block.data):
+        for E in decodeDirents(self._block.all_data()):
           E.parent = self
           es[E.name] = E
         self._block = None
