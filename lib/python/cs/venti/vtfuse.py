@@ -65,28 +65,30 @@ def trace_method(method):
     if kw:
       citation += " " + pformat(kw, depth=2)
     with Pfx(citation):
+      ctx = fuse_get_context()
       time0 = time.time()
       ##self.log.info("CALL %s", citation)
       try:
         result = method(self, *a, **kw)
       except FuseOSError as e:
         elapsed = time.time() - time0
-        self.logQ.put( (self.log.info, citation, elapsed, "FuseOSError %s", e) )
+        self.logQ.put( (self.log.info, citation, elapsed, ctx, "FuseOSError %s", e) )
         raise
       except Exception as e:
         elapsed = time.time() - time0
-        self.logQ.put( (self.log.exception, citation, elapsed, "%s %s", type(e), e) )
+        self.logQ.put( (self.log.exception, citation, elapsed, ctx, "%s %s", type(e), e) )
         raise
       else:
         elapsed = time.time() - time0
-        self.logQ.put( (self.log.info, citation, elapsed, "=> %r", result) )
+        self.logQ.put( (self.log.info, citation, elapsed, ctx, "=> %r", result) )
         return result
   traced_method.__name__ = 'trace(%s)' % (fname,)
   return traced_method
 
 def log_traces_queued(Q):
-  for logcall, citation, elapsed, msg, *a in Q:
-    logcall("%fs %s " + msg, elapsed, citation ,*a)
+  for logcall, citation, elapsed, ctx, msg, *a in Q:
+    logcall("%fs uid=%s/gid=%s/pid=%s %s " + msg,
+            elapsed, ctx[0], ctx[1], ctx[2], citation ,*a)
 
 class StoreFS(Operations):
   ''' Class providing filesystem operations, suitable for passing
