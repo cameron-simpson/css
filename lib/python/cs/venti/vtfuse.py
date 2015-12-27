@@ -419,9 +419,9 @@ class StoreFS(Operations):
     return b''.join(chunks)
 
   @trace_method
-  def readdir(self, path, *a, **kw):
-    if a or kw:
-      warning("a or kw set!")
+  def readdir(self, path, fhndx):
+    if self._fh(fhndx) is None:
+      warning("unknown fdndx %r", fhndx)
     E = self._namei(path)
     if not E.isdir:
       raise FuseOSError(errno.ENOTDIR)
