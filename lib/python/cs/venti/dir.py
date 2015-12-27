@@ -6,7 +6,7 @@ import stat
 import sys
 from threading import Lock, RLock
 import time
-from cs.logutils import D, Pfx, debug, error, info, warning, X
+from cs.logutils import D, Pfx, debug, error, info, warning, X, XP
 from cs.lex import hexify
 from cs.py.stack import stack_dump
 from cs.queues import MultiOpenMixin
@@ -409,6 +409,8 @@ class Dir(_Dirent):
   def change(self):
     ''' Mark this Dir as changed; propagate to parent Dir if present.
     '''
+    XP("Dir %r: changed=True", self.name)
+    stack_dump(indent=2)
     self.changed = True
     if self.parent:
       self.parent.change()
@@ -443,8 +445,10 @@ class Dir(_Dirent):
       # TODO: if len(data) >= 16384
       B = Block(data=data)
       ##warning("Dir.block: computed Block %s", B)
+      XP("Dir %r: RECOMPUTED BLOCK: %s", self.name, B)
     else:
       B = self._block
+      XP("Dir %r: REUSE ._block: %s", self.name, B)
     return B
 
   def dirs(self):
