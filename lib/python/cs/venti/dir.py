@@ -425,7 +425,6 @@ class Dir(_Dirent):
         es[E.name] = E
     except IOError as e:
       error("%s.entries: TRUNCATED, entries lost: IOError: %s", self, e)
-    self._block = None
     return es
 
   @property
