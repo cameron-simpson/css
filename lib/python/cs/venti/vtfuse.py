@@ -39,12 +39,13 @@ LOGGER_FILENAME = 'vtfuse.log'
 # TODO: no support for multiple links or path-=open renames
 OpenFile = namedtuple('OpenFile', ('path', 'E', 'fp'))
 
-def mount(mnt, E, S, syncfp=None):
+def mount(mnt, E, S, syncfp=None, subpath=None):
   ''' Run a FUSE filesystem on `mnt` with Dirent `E` and backing Store `S`.
       `mnt`: mount point
-      `E`: Dirent of top Store directory
+      `E`: Dirent of root Store directory
       `S`: backing Store
       `syncfp`: if not None, a file to which to write sync lines
+      `subpath`: relative path from `E` to the directory to attach to the mountpoint
   '''
   log = getLogger(LOGGER_NAME)
   log.propagate = False
@@ -95,18 +96,29 @@ class StoreFS(Operations):
       to a FUSE() constructor.
   '''
 
-  def __init__(self, E, S, syncfp=None):
-    ''' Initilaise a new FUSE mountpoint.
-        mnt: the mountpoint
-        dirent: the root directory reference
-        S: the Store to hold data
+  def __init__(self, E, S, syncfp=None, subpath=None):
+    ''' Initialise a new FUSE mountpoint.
+        `E`: the root directory reference
+        `S`: the backing Store
         `syncfp`: if not None, a file to which to write sync lines
+        `subpath`: relative path to mount Dir
     '''
     O.__init__(self)
     if not E.isdir:
       raise ValueError("not dir Dir: %s" % (E,))
     self.S = S
     self.E = E
+    self.subpath = subpath
+    if subpath:
+      # locate subdirectory to display at mountpoint
+      mntE, P, tail_path = resolve(E, subpath)
+      if tail_path:
+        raise ValueError("subpath %r does not resolve", subpath)
+      if not mntE.isdir:
+        raise ValueError("subpath %r is not a directory", subpath)
+      self.mntE = mntE
+    else:
+      self.mntE = E
     # set up a queue to collect logging requests
     # and a thread to process then asynchronously
     self.log = getLogger(LOGGER_NAME)
@@ -129,7 +141,10 @@ class StoreFS(Operations):
     self._file_handles = []
 
   def __str__(self):
-    return "<StoreFS S=%s /=%s>" % (self.S, self.E)
+    if self.subpath:
+      return "<StoreFS S=%s /=%s %r=%s>" % (self.S, self.E, self.mntE)
+    else:
+      return "<StoreFS S=%s /=%s>" % (self.S, self.E)
 
   def __del__(self):
     self.logQ.close()
@@ -165,7 +180,7 @@ class StoreFS(Operations):
   def _resolve(self, path):
     ''' Call cs.venti.paths.resolve and return its result.
     '''
-    return resolve(self.E, path)
+    return resolve(self.mntE, path)
 
   def _namei2(self, path):
     ''' Look up path. Raise FuseOSError(ENOENT) if missing. Return Dirent, parent.
