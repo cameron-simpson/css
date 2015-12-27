@@ -410,7 +410,7 @@ class Dir(_Dirent):
     ''' Mark this Dir as changed; propagate to parent Dir if present.
     '''
     XP("Dir %r: changed=True", self.name)
-    stack_dump(indent=2)
+    ##stack_dump(indent=2)
     self.changed = True
     if self.parent:
       self.parent.change()
