@@ -54,7 +54,7 @@ def main(argv):
       dump filerefs
       listen {-|host:port}
       ls [-R] dirrefs...
-      mount mountlog.vt mountpoint
+      mount mountlog.vt mountpoint [subpath]
       pack paths...
       scan datafile
       pull other-store objects...
@@ -445,6 +445,10 @@ def cmd_mount(args, verbose=None, log=None):
     error("missing mountpoint")
     badopts = True
   if args:
+    subpath = args.pop(0)
+  else:
+    subpath = None
+  if args:
     error("extra arguments: %s", ' '.join(args))
     badopts = True
   if badopts:
@@ -470,7 +474,7 @@ def cmd_mount(args, verbose=None, log=None):
     with Pfx("open('a')"):
       syncfp = open(special, 'a')
   with ProgressStore(defaults.S) as PS:
-    mount(mountpoint, E, PS, syncfp=syncfp)
+    mount(mountpoint, E, PS, syncfp=syncfp, subpath=subpath)
   return 0
 
 def cmd_pack(args, verbose=None, log=None):
