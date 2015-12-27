@@ -413,17 +413,16 @@ class Dir(_Dirent):
     if self.parent:
       self.parent.change()
 
-  @property
+  @locked_property
   def entries(self):
-    with self._lock:
-      es = self._entries
-      if self._entries is None:
-        # unpack ._block into ._entries, discard ._block
-        es = self._entries = {}
-        for E in decodeDirents(self._block.all_data()):
-          E.parent = self
-          es[E.name] = E
-        self._block = None
+    ''' Property containing the live dictionary holding the Dir entries.
+    '''
+    # compute the dictionary holding the lives Dir entries
+    es = {}
+    for E in decodeDirents(self._block.all_data()):
+      E.parent = self
+      es[E.name] = E
+    self._block = None
     return es
 
   @property
