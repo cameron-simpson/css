@@ -288,7 +288,7 @@ class FileDirent(_Dirent, MultiOpenMixin):
     if self._open_file is not None:
       self._block = self._open_file.flush()
       warning("FileDirent.block: updated to %s", self._block)
-      stack_dump(indent=2)
+      ##stack_dump(indent=2)
     return self._block
 
   @block.setter
