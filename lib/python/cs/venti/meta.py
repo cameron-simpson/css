@@ -209,7 +209,6 @@ def decodeACL(acl_text):
   ''' Return a list of ACs from the encoded list `acl_text`.
   '''
   acl = []
-  X("acl_text = %r", acl_text)
   for ac_text in acl_text.split(','):
     if ac_text:
       try:
@@ -296,7 +295,6 @@ class Meta(dict):
   def update_from_text(self, metatext):
     ''' Update the Meta fields from the supplied metatext.
     '''
-    warning("Meta.update_from_text(%r)...", metatext)
     if metatext.startswith('{'):
       # wordy JSON encoding of metadata
       metadata = json.loads(metatext)
