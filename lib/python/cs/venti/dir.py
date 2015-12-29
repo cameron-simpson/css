@@ -445,10 +445,10 @@ class Dir(_Dirent):
       # TODO: if len(data) >= 16384
       B = Block(data=data)
       ##warning("Dir.block: computed Block %s", B)
-      XP("Dir %r: RECOMPUTED BLOCK: %s", self.name, B)
+      ##XP("Dir %r: RECOMPUTED BLOCK: %s", self.name, B)
     else:
       B = self._block
-      XP("Dir %r: REUSE ._block: %s", self.name, B)
+      ##XP("Dir %r: REUSE ._block: %s", self.name, B)
     return B
 
   def dirs(self):
