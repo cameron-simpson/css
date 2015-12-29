@@ -53,6 +53,8 @@ fi
 
 branch=$( hg branch )
 obranch=$( incd "$ocheckout" hg branch )
+incd "$ocheckout" hg out | grep '^summary'
+echo
 echo "merging $obranch ==> $branch"
 
 if [ -z "$hadmsg" ]
