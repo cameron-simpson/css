@@ -296,11 +296,7 @@ class StoreFS(Operations):
 
   @trace_method
   def fgetattr(self, *a, **kw):
-    try:
-      E = self._namei(path)
-    except FuseOSError as e:
-      error("FuseOSError: %s", e)
-      raise
+    E = self._namei(path)
     if fh is not None:
       ##X("fh=%s", fh)
       pass
@@ -331,24 +327,14 @@ class StoreFS(Operations):
 
   @trace_method
   def getattr(self, path, fh=None):
-    try:
-      E = self._namei(path)
-    except FuseOSError as e:
-      if e.errno != errno.ENOENT:
-        error("FuseOSError: %s", e)
-      raise
+    E = self._namei(path)
     st = self._Estat(E)
     st['st_ino'] = self._ino(path)
     return st
 
   @trace_method
   def getxattr(self, path, name, position=0):
-    try:
-      E = self._namei(path)
-    except FuseOSError as e:
-      if e.errno != errno.ENOENT:
-        error("FuseOSError: %s", e)
-      raise
+    E = self._namei(path)
     meta = E.meta
     try:
       xattr = meta.xattrs[name]
@@ -358,12 +344,7 @@ class StoreFS(Operations):
 
   @trace_method
   def listxattr(self, path):
-    try:
-      E = self._namei(path)
-    except FuseOSError as e:
-      if e.errno != errno.ENOENT:
-        error("FuseOSError: %s", e)
-      raise
+    E = self._namei(path)
     return list(E.meta.xattrs.keys())
 
   @trace_method
