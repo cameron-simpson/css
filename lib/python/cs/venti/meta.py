@@ -327,6 +327,7 @@ class Meta(dict):
           v = 0.0
         self[k] = v
       elif k == 'x':
+        # TODO: should we update the existing xattrs, or replace them all as now?
         self._xattrs = xattrs_from_bytes(untexthexify(v))
       else:
         self[k] = v
@@ -643,3 +644,7 @@ class Meta(dict):
           with Pfx("chmod(0o%04o)", mst_perms):
             debug("utime(%r,atime=%s,mtime=%s) from mtime=%s", ospath, st.st_atime, mst_mtime, st_mtime)
             os.utime(ospath, (st.st_atime, mst_mtime))
+
+  @property
+  def xattrs(self):
+    return self._xattrs
