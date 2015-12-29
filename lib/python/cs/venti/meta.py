@@ -299,13 +299,16 @@ class Meta(dict):
         except ValueError:
           error("ignoring bad metatext field (no colon): %r", metafield)
           continue
-        if k in ('m',):
-          try:
-            v = float(v)
-          except ValueError:
-            warning("%s: non-float 'm': %r", self, v)
-            v = 0.0
-        self[k] = v
+        if k == 'a':
+          self._acl = decodeACL(v)
+        else:
+          if k in ('m',):
+            try:
+              v = float(v)
+            except ValueError:
+              warning("%s: non-float 'm': %r", self, v)
+              v = 0.0
+          self[k] = v
     else:
       # modern JSON encoding of metadata
       metadata = json.loads(metatext)
