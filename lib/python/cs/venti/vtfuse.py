@@ -128,7 +128,6 @@ class StoreFS(Operations):
     # and a thread to process then asynchronously
     self.log = getLogger(LOGGER_NAME)
     self.logQ = IterableQueue()
-    X("logQ = %r", self.logQ)
     T = Thread(name="log-queue(%s)" % (self,),
                target=log_traces_queued,
                args=(self.logQ,))
@@ -353,8 +352,13 @@ class StoreFS(Operations):
     return list(E.meta.xattrs.keys())
 
   @trace_method
-  def lock(self, fip, cmd, lock, *a):
-    XP("fip=%r cmd=%r lock=%r, *a=%r", fip, cmd, lock, a)
+  def lock(self, path, fh, op, thing):
+    # TODO: only seem to see LOCK_UN, never other operations
+    ##bs = []
+    ##while thing > 0:
+    ##  bs.append(thing % 256)
+    ##  thing //= 256
+    ##XP("thing bytes reversed: %r", ' '.join([ "0x%02x" % b for b in bs ]))
     raise FuseOSError(errno.ENOTSUP)
 
   @trace_method
