@@ -328,8 +328,6 @@ class Meta(dict):
         self[k] = v
       elif k == 'x':
         # TODO: should we update the existing xattrs, or replace them all as now?
-        if not isinstance(v, str):
-          warning("update_from_text: {x}=%r", v)
         self._xattrs = dict( (xk, untexthexify(xv)) for xk, xv in v.items() )
       else:
         self[k] = v
