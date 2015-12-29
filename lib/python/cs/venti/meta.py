@@ -262,8 +262,17 @@ class Meta(dict):
     return "Meta:" + self.textencode()
 
   def textencode(self):
+    ''' Return the encoding of this Meta as text.
+    '''
     self._normalise()
-    encoded = json.dumps(dict(self))
+    if all(k in ('u', 'g', 'a', 'm', 'su', 'sg') for k in self.keys()):
+      # these are all "safe" fields - use the compact encoding
+      encoded = ';'.join( ':'.join( (k, str(self[k])) )
+                          for k in sorted(self.keys())
+                        )
+    else:
+      # use the more verbose safe JSON encoding
+      encoded = json.dumps(dict(self))
     X("Meta.textencode=%r", encoded)
     return encoded
 
@@ -288,8 +297,13 @@ class Meta(dict):
     ''' Update the Meta fields from the supplied metatext.
     '''
     warning("Meta.update_from_text(%r)...", metatext)
-    if not metatext.startswith('{'):
-      # old style metadata, no longer transcribed this way
+    if metatext.startswith('{'):
+      # wordy JSON encoding of metadata
+      metadata = json.loads(metatext)
+      kvs = metadata.items()
+    else:
+      # old style compact metadata
+      kvs = []
       for metafield in metatext.split(';'):
         metafield = metafield.strip()
         if not metafield:
@@ -299,29 +313,25 @@ class Meta(dict):
         except ValueError:
           error("ignoring bad metatext field (no colon): %r", metafield)
           continue
-        if k == 'a':
+        else:
+          kvs.append( (k, v) )
+    for k, v in kvs:
+      if k == 'a':
+        if isinstance(v, str):
           self._acl = decodeACL(v)
         else:
-          if k in ('m',):
-            try:
-              v = float(v)
-            except ValueError:
-              warning("%s: non-float 'm': %r", self, v)
-              v = 0.0
-          self[k] = v
-    else:
-      # modern JSON encoding of metadata
-      metadata = json.loads(metatext)
-      for k, v in metadata.items():
-        if k == 'a':
-          if isinstance(v, str):
-            self._acl = decodeACL(v)
-          else:
-            warning("metatext %r: 'a' is not a str: %r", metatext, v)
-        elif k == 'x':
-          self._xattrs = xattrs_from_bytes(untexthexify(v))
-        else:
-          self[k] = v
+          warning("metatext %r: 'a' is not a str: %r", metatext, v)
+      elif k in ('m',):
+        try:
+          v = float(v)
+        except ValueError:
+          warning("%s: non-float 'm': %r", self, v)
+          v = 0.0
+        self[k] = v
+      elif k == 'x':
+        self._xattrs = xattrs_from_bytes(untexthexify(v))
+      else:
+        self[k] = v
 
   @property
   def user(self):
