@@ -351,8 +351,8 @@ class StoreFS(Operations):
     return ''
 
   @trace_method
-  def lock(self, fip, cmd, lock):
-    XP("fip=%r cmd=%r lock=%r", fip, cmd, lock)
+  def lock(self, fip, cmd, lock, *a):
+    XP("fip=%r cmd=%r lock=%r, *a=%r", fip, cmd, lock, a)
     raise FuseOSError(errno.ENOTSUP)
 
   @trace_method
