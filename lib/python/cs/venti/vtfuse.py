@@ -35,6 +35,11 @@ from .paths import resolve
 LOGGER_NAME = 'cs.venti.vtfuse'     # __qualname__ ?
 LOGGER_FILENAME = 'vtfuse.log'
 
+# OSX setxattr option values
+XATTR_NOFOLLOW = 0x0001
+XATTR_CREATE   = 0x0002
+XATTR_REPLACE  = 0x0004
+
 # records associated with an open file
 # TODO: no support for multiple links or path-=open renames
 OpenFile = namedtuple('OpenFile', ('path', 'E', 'fp'))
@@ -510,7 +515,22 @@ class StoreFS(Operations):
 
   @trace_method
   def setxattr(self, path, name, value, options, position=0):
-    raise FuseOSError(errno.ENOTSUP)
+    sane = True
+    if position != 0:
+      warning("position != 0: %r", position)
+      sane = False
+    if options & ~(XATTR_CREATE|XATTR_REPLACE):
+      warning("unsupported options (beyond XATTR_CREATE(0x%02d) and XATTR_REPLACE(0x%02d) in 0x%02x"
+              % (XATTR_CREATE, XATTR_REPLACE, options))
+    if not sane:
+      raise FuseOSError(errno.EINVAL)
+    E = self._namei(path)
+    xattrs = E.meta.xattrs
+    if options & XATTR_CREATE and name in xattrs:
+      raise FuseOSError(errno.EEXIST)
+    if options & XATTR_REPLACE and name not in xattrs:
+      raise FuseOSError(errno.ENOATTR)
+    xattrs[name] = value
 
   @trace_method
   def statfs(self, path):
