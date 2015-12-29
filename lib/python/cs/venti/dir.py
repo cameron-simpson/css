@@ -11,7 +11,7 @@ from cs.lex import hexify
 from cs.py.stack import stack_dump
 from cs.queues import MultiOpenMixin
 from cs.seq import seq
-from cs.serialise import get_bs, get_bsdata, put_bs, put_bsdata
+from cs.serialise import get_bs, get_bsdata, get_bss, put_bs, put_bsdata, put_bss
 from cs.threads import locked, locked_property
 from . import totext, fromtext
 from .block import Block, decodeBlock
@@ -59,8 +59,7 @@ def decodeDirent(data, offset):
     name = ""
   meta = None
   if flags & F_HASMETA:
-    metadata, offset = get_bsdata(data, offset)
-    metatext = metadata.decode()
+    metatext, offset = get_bss(data, offset)
   else:
     metatext = None
   block, offset = decodeBlock(data, offset)
@@ -98,7 +97,7 @@ class _Dirent(object):
     self.name = name
     self.meta = Meta(self)
     if metatext is not None:
-      self.meta.update(metatext)
+      self.meta.update_from_text(metatext)
     self.d_ino = None
 
   def __str__(self):
@@ -147,7 +146,7 @@ class _Dirent(object):
     if meta:
       if not isinstance(meta, Meta):
         raise TypeError("self.meta is not a Meta: <%s>%r" % (type(meta), meta))
-      metadata = put_bsdata(meta.encode())
+      metadata = put_bss(meta.textencode())
       if len(metadata) > 0:
         flags |= F_HASMETA
     else:
