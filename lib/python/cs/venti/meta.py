@@ -11,6 +11,7 @@ from pwd import getpwuid, getpwnam
 from grp import getgrgid, getgrnam
 from stat import S_ISUID, S_ISGID
 from threading import RLock
+from cs.lex import texthexify, untexthexify
 from cs.logutils import error, warning, debug, X, XP, Pfx
 from cs.threads import locked
 from . import totext, fromtext
@@ -328,7 +329,9 @@ class Meta(dict):
         self[k] = v
       elif k == 'x':
         # TODO: should we update the existing xattrs, or replace them all as now?
-        self._xattrs = xattrs_from_bytes(untexthexify(v))
+        if not isinstance(v, str):
+          warning("update_from_text: {x}=%r", v)
+        self._xattrs = dict( (xk, untexthexify(xv)) for xk, xv in v.items() )
       else:
         self[k] = v
 
