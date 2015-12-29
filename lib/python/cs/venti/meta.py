@@ -2,6 +2,7 @@
 
 from __future__ import print_function
 import errno
+import json
 import os
 from os import geteuid, getegid
 import stat
@@ -10,8 +11,9 @@ from pwd import getpwuid, getpwnam
 from grp import getgrgid, getgrnam
 from stat import S_ISUID, S_ISGID
 from threading import RLock
-from cs.logutils import error, warning, debug, X, Pfx
+from cs.logutils import error, warning, debug, X, XP, Pfx
 from cs.threads import locked
+from . import totext, fromtext
 
 DEFAULT_DIR_ACL = 'o:rwx-'
 DEFAULT_FILE_ACL = 'o:rw-x'
@@ -150,7 +152,7 @@ class AC(object):
 
   @property
   def unixmode(self):
-    ''' Return the 3-buit UNIX mode for this access.
+    ''' Return the 3-bit UNIX mode for this access.
     '''
     mode = 0
     for a in self.allow:
@@ -207,6 +209,7 @@ def decodeACL(acl_text):
   ''' Return a list of ACs from the encoded list `acl_text`.
   '''
   acl = []
+  X("acl_text = %r", acl_text)
   for ac_text in acl_text.split(','):
     if ac_text:
       try:
@@ -222,6 +225,19 @@ def encodeACL(acl):
   '''
   return ','.join( [ ac.textencode() for ac in acl ] )
 
+def xattrs_from_bytes(bs, offset=0):
+  ''' Decode an XAttrs from some bytes, return the xattrs dictionary.
+  '''
+  xattrs = {}
+  while offset < len(bs):
+    name, offset = get_bss(bs, offset)
+    data, offset = get_bsdata(bs, offset)
+    if name in xattrs:
+      warning("repeated name, ignored: %r", name)
+    else:
+      xattrs[name] = data
+  return xattrs
+
 class Meta(dict):
   ''' Inode metadata: times, permissions, ownership etc.
 
@@ -233,26 +249,76 @@ class Meta(dict):
       'm': modification time, a float
       'su': setuid
       'sg': setgid
+      'x': xattrs
   '''
   def __init__(self, E):
     dict.__init__(self)
     self.E = E
     self._acl = None
+    self._xattrs = {}
     self._lock = RLock()
 
+  def __str__(self):
+    return "Meta:" + self.textencode()
+
   def textencode(self):
-    ''' Encode the metadata in text form.
+    self._normalise()
+    encoded = json.dumps(dict(self))
+    X("Meta.textencode=%r", encoded)
+    return encoded
+
+  def _normalise(self):
+    ''' Update some entries from their unpacked forms.
     '''
     # update 'a' if necessary
     _acl = self._acl
-    if _acl is not None:
+    if _acl is None:
+      if 'a' in self:
+        del self['a']
+    else:
       self['a'] = encodeACL(_acl)
-    return ";".join("%s:%s" % (k, self[k]) for k in sorted(self.keys()))
+    # update 'x' if necessary
+    _xattrs = self._xattrs
+    if _xattrs:
+      self['x'] = dict( (name, texthexify(data)) for name, data in _xattrs.items() )
+    elif 'x' in self:
+      del self['x']
 
-  def encode(self):
-    ''' Encode the metadata in binary form: just text transcribed in UTF-8.
+  def update_from_text(self, metatext):
+    ''' Update the Meta fields from the supplied metatext.
     '''
-    return self.textencode().encode()
+    warning("Meta.update_from_text(%r)...", metatext)
+    if not metatext.startswith('{'):
+      # old style metadata, no longer transcribed this way
+      for metafield in metatext.split(';'):
+        metafield = metafield.strip()
+        if not metafield:
+          continue
+        try:
+          k, v = metafield.split(':', 1)
+        except ValueError:
+          error("ignoring bad metatext field (no colon): %r", metafield)
+          continue
+        if k in ('m',):
+          try:
+            v = float(v)
+          except ValueError:
+            warning("%s: non-float 'm': %r", self, v)
+            v = 0.0
+        self[k] = v
+    else:
+      # modern JSON encoding of metadata
+      metadata = json.loads(metatext)
+      for k, v in metadata.items():
+        if k == 'a':
+          if isinstance(v, str):
+            self._acl = decodeACL(v)
+          else:
+            warning("metatext %r: 'a' is not a str: %r", metatext, v)
+        elif k == 'x':
+          self._xattrs = xattrs_from_bytes(untexthexify(v))
+        else:
+          self[k] = v
 
   @property
   def user(self):
@@ -429,26 +495,6 @@ class Meta(dict):
                  AC_Group( *permbits_to_allow_deny( (mode>>3)&7 ) ),
                  AC_Other( *permbits_to_allow_deny( mode&7 ) )
                ] + [ ac for ac in self.acl if ac.prefix not in ('o', 'g', '*') ]
-
-  def update(self, metatext):
-    ''' Update the Meta fields from the supplied metatext.
-    '''
-    for metafield in metatext.split(';'):
-      metafield = metafield.strip()
-      if not metafield:
-        continue
-      try:
-        k, v = metafield.split(':', 1)
-      except ValueError:
-        error("ignoring bad metatext field (no colon): %r", metafield)
-        continue
-      if k in ('m',):
-        try:
-          v = float(v)
-        except ValueError:
-          warning("%s: non-float 'm': %r", self, v)
-          v = 0.0
-      self[k] = v
 
   def update_from_stat(self, st):
     ''' Apply the contents of a stat object to this Meta.
