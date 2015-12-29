@@ -273,7 +273,6 @@ class Meta(dict):
     else:
       # use the more verbose safe JSON encoding
       encoded = json.dumps(dict(self))
-    X("Meta.textencode=%r", encoded)
     return encoded
 
   def _normalise(self):
