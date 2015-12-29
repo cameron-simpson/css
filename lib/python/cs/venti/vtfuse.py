@@ -343,7 +343,18 @@ class StoreFS(Operations):
 
   @trace_method
   def getxattr(self, path, name, position=0):
-    raise FuseOSError(errno.ENOATTR)
+    try:
+      E = self._namei(path)
+    except FuseOSError as e:
+      if e.errno != errno.ENOENT:
+        error("FuseOSError: %s", e)
+      raise
+    meta = E.meta
+    try:
+      xattr = meta.xattrs[name]
+    except KeyError:
+      raise FuseOSError(errno.ENOATTR)
+    return xattr
 
   @trace_method
   def listxattr(self, path):
