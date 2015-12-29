@@ -352,13 +352,30 @@ class StoreFS(Operations):
     return list(E.meta.xattrs.keys())
 
   @trace_method
-  def lock(self, path, fh, op, thing):
-    # TODO: only seem to see LOCK_UN, never other operations
-    ##bs = []
-    ##while thing > 0:
-    ##  bs.append(thing % 256)
-    ##  thing //= 256
-    ##XP("thing bytes reversed: %r", ' '.join([ "0x%02x" % b for b in bs ]))
+  def lock(self, path, fh, op, struct_lock):
+    try:
+      ct = struct_lock.contents
+    except AttributeError:
+      # using vanilla fuse.py without "struct lock" patch
+      pass
+    else:
+      XP("dir(struct_lock) = %r", dir(struct_lock))
+      XP("  contents = %r", struct_lock.contents)
+      XP("  dircontents) = %r", dir(struct_lock.contents))
+      ct = struct_lock.contents
+      X("AAAAAAAA")
+      X("  type=%s", ct.type)
+      X("  start=%s", ct.start)
+      X("  end=%s", ct.end)
+      X("  owner=%s", ct.owner)
+      X("  pid=%s", ct.pid)
+      X("BBBBBBBB")
+      # TODO: only seem to see LOCK_UN, never other operations
+      ##bs = []
+      ##while thing > 0:
+      ##  bs.append(thing % 256)
+      ##  thing //= 256
+      ##XP("thing bytes reversed: %r", ' '.join([ "0x%02x" % b for b in bs ]))
     raise FuseOSError(errno.ENOTSUP)
 
   @trace_method
