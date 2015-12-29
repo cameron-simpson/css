@@ -358,8 +358,13 @@ class StoreFS(Operations):
 
   @trace_method
   def listxattr(self, path):
-    XP("return empty list")
-    return ''
+    try:
+      E = self._namei(path)
+    except FuseOSError as e:
+      if e.errno != errno.ENOENT:
+        error("FuseOSError: %s", e)
+      raise
+    return list(E.meta.xattrs.keys())
 
   @trace_method
   def lock(self, fip, cmd, lock, *a):
