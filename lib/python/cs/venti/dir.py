@@ -74,6 +74,8 @@ def decodeDirent(data, offset):
     E = Dir(name, metatext=metatext, parent=None, block=block)
   elif type_ == D_FILE_T:
     E = FileDirent(name, metatext=metatext, block=block)
+  elif type_ == D_SYM_T:
+    E = SymlinkDirent(name, metatext=metatext)
   else:
     E = _Dirent(type_, name, metatext=metatext, block=block)
   return E, offset
@@ -104,7 +106,10 @@ class _Dirent(object):
     self.name = name
     self.meta = Meta(self)
     if metatext is not None:
-      self.meta.update_from_text(metatext)
+      if isinstance(metatext, str):
+        self.meta.update_from_text(metatext)
+      else:
+        self.meta.update_from_items(metatext.items())
     self.d_ino = None
 
   def __str__(self):
@@ -273,7 +278,7 @@ class SymlinkDirent(_Dirent):
     def __init__(self, name, metatext, block=None):
       if block is not None:
         raise ValueError("SymlinkDirent: block must be None, received: %s", block)
-      _Dirent.__init__(self, D_FILE_T, name, metatext=metatext)
+      _Dirent.__init__(self, D_SYM_T, name, metatext=metatext)
       if self.meta.pathref is None:
         raise ValueError("SymlinkDirent: meta.pathref required")
 
