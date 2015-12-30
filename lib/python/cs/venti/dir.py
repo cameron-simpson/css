@@ -25,15 +25,19 @@ gid_nogroup = -1
 
 D_FILE_T = 0
 D_DIR_T = 1
+D_SYM_T = 2
 def D_type2str(type_):
   if type_ == D_FILE_T:
     return "D_FILE_T"
   if type_ == D_DIR_T:
     return "D_DIR_T"
+  if type_ == D_SYM_T:
+    return "D_SYM_T"
   return str(type_)
 
 F_HASMETA = 0x01
 F_HASNAME = 0x02
+F_NOBLOCK = 0x04
 
 def decode_Dirent_text(text):
   ''' Accept `text`, a text transcription of a Direct, such as from
@@ -62,7 +66,10 @@ def decodeDirent(data, offset):
     metatext, offset = get_bss(data, offset)
   else:
     metatext = None
-  block, offset = decodeBlock(data, offset)
+  if flags & F_NOBLOCK:
+    block = None
+  else:
+    block, offset = decodeBlock(data, offset)
   if type_ == D_DIR_T:
     E = Dir(name, metatext=metatext, parent=None, block=block)
   elif type_ == D_FILE_T:
@@ -125,6 +132,12 @@ class _Dirent(object):
     '''
     return self.type == D_DIR_T
 
+  @property
+  def issym(self):
+    ''' Is this a symbolic link _Dirent?
+    '''
+    return self.type == D_SYM_T
+
   def encode(self, no_name=False):
     ''' Serialise the dirent.
         Output format: bs(type)bs(flags)[bsdata(name)][bsdata(metadata)]block
@@ -152,12 +165,17 @@ class _Dirent(object):
     else:
       metadata = b''
 
-    block = self.block
+    if self.issym:
+      flags |= F_NOBLOCK
+      blockref = b''
+    else:
+      blockref = self.block.encode()
+
     return put_bs(self.type) \
          + put_bs(flags) \
          + namedata \
          + metadata \
-         + block.encode()
+         + blockref
 
   def textencode(self):
     ''' Serialise the dirent as text.
@@ -249,6 +267,19 @@ class _Dirent(object):
     ctime = 0
 
     return (unixmode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime)
+
+class SymlinkDirent(_Dirent):
+
+    def __init__(self, name, metatext, block=None):
+      if block is not None:
+        raise ValueError("SymlinkDirent: block must be None, received: %s", block)
+      _Dirent.__init__(self, D_FILE_T, name, metatext=metatext)
+      if self.meta.pathref is None:
+        raise ValueError("SymlinkDirent: meta.pathref required")
+
+    @property
+    def pathref(self):
+      return self.meta.pathref
 
 class FileDirent(_Dirent, MultiOpenMixin):
   ''' A _Dirent subclass referring to a file.
