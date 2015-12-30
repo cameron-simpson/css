@@ -249,6 +249,7 @@ class Meta(dict):
       'm': modification time, a float
       'su': setuid
       'sg': setgid
+      'pathref': pathname component for symlinks (and, later, hard links)
       'x': xattrs
   '''
   def __init__(self, E):
@@ -551,6 +552,10 @@ class Meta(dict):
     if gid is None:
       gid = NOGROUPID
     return uid, gid, perms
+
+  @property
+  def pathref(self):
+    return self['pathref']
 
   def access(self, access_mode, access_uid=None, access_group=None, default_uid=None, default_gid=None):
     ''' POSIX like access call, accepting os.access `access_mode`.
