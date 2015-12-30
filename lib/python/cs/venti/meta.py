@@ -2,6 +2,7 @@
 
 from __future__ import print_function
 import errno
+import json
 import os
 from os import geteuid, getegid
 import stat
@@ -10,8 +11,10 @@ from pwd import getpwuid, getpwnam
 from grp import getgrgid, getgrnam
 from stat import S_ISUID, S_ISGID
 from threading import RLock
-from cs.logutils import error, warning, debug, X, Pfx
+from cs.lex import texthexify, untexthexify
+from cs.logutils import error, warning, debug, X, XP, Pfx
 from cs.threads import locked
+from . import totext, fromtext
 
 DEFAULT_DIR_ACL = 'o:rwx-'
 DEFAULT_FILE_ACL = 'o:rw-x'
@@ -150,7 +153,7 @@ class AC(object):
 
   @property
   def unixmode(self):
-    ''' Return the 3-buit UNIX mode for this access.
+    ''' Return the 3-bit UNIX mode for this access.
     '''
     mode = 0
     for a in self.allow:
@@ -222,6 +225,19 @@ def encodeACL(acl):
   '''
   return ','.join( [ ac.textencode() for ac in acl ] )
 
+def xattrs_from_bytes(bs, offset=0):
+  ''' Decode an XAttrs from some bytes, return the xattrs dictionary.
+  '''
+  xattrs = {}
+  while offset < len(bs):
+    name, offset = get_bss(bs, offset)
+    data, offset = get_bsdata(bs, offset)
+    if name in xattrs:
+      warning("repeated name, ignored: %r", name)
+    else:
+      xattrs[name] = data
+  return xattrs
+
 class Meta(dict):
   ''' Inode metadata: times, permissions, ownership etc.
 
@@ -233,26 +249,92 @@ class Meta(dict):
       'm': modification time, a float
       'su': setuid
       'sg': setgid
+      'pathref': pathname component for symlinks (and, later, hard links)
+      'x': xattrs
   '''
   def __init__(self, E):
     dict.__init__(self)
     self.E = E
     self._acl = None
+    self._xattrs = {}
     self._lock = RLock()
 
+  def __str__(self):
+    return "Meta:" + self.textencode()
+
   def textencode(self):
-    ''' Encode the metadata in text form.
+    ''' Return the encoding of this Meta as text.
+    '''
+    self._normalise()
+    if all(k in ('u', 'g', 'a', 'm', 'su', 'sg') for k in self.keys()):
+      # these are all "safe" fields - use the compact encoding
+      encoded = ';'.join( ':'.join( (k, str(self[k])) )
+                          for k in sorted(self.keys())
+                        )
+    else:
+      # use the more verbose safe JSON encoding
+      encoded = json.dumps(dict(self))
+    return encoded
+
+  def _normalise(self):
+    ''' Update some entries from their unpacked forms.
     '''
     # update 'a' if necessary
     _acl = self._acl
-    if _acl is not None:
+    if _acl is None:
+      if 'a' in self:
+        del self['a']
+    else:
       self['a'] = encodeACL(_acl)
-    return ";".join("%s:%s" % (k, self[k]) for k in sorted(self.keys()))
+    # update 'x' if necessary
+    _xattrs = self._xattrs
+    if _xattrs:
+      self['x'] = dict( (name, texthexify(data)) for name, data in _xattrs.items() )
+    elif 'x' in self:
+      del self['x']
 
-  def encode(self):
-    ''' Encode the metadata in binary form: just text transcribed in UTF-8.
+  def update_from_text(self, metatext):
+    ''' Update the Meta fields from the supplied metatext.
     '''
-    return self.textencode().encode()
+    if metatext.startswith('{'):
+      # wordy JSON encoding of metadata
+      metadata = json.loads(metatext)
+      kvs = metadata.items()
+    else:
+      # old style compact metadata
+      kvs = []
+      for metafield in metatext.split(';'):
+        metafield = metafield.strip()
+        if not metafield:
+          continue
+        try:
+          k, v = metafield.split(':', 1)
+        except ValueError:
+          error("ignoring bad metatext field (no colon): %r", metafield)
+          continue
+        else:
+          kvs.append( (k, v) )
+    self.update_from_items(kvs)
+
+  def update_from_items(self, items):
+    for k, v in items:
+      if k == 'a':
+        if isinstance(v, str):
+          self._acl = decodeACL(v)
+        else:
+          warning("metatext %r: 'a' is not a str: %r", metatext, v)
+      elif k in ('m',):
+        try:
+          v = float(v)
+        except ValueError:
+          warning("%s: non-float 'm': %r", self, v)
+          v = 0.0
+        self[k] = v
+      elif k == 'x':
+        # TODO: should we update the existing xattrs, or replace them all as now?
+        self._xattrs = dict( (xk, untexthexify(xv)) for xk, xv in v.items() )
+      else:
+        self[k] = v
 
   @property
   def user(self):
@@ -430,26 +512,6 @@ class Meta(dict):
                  AC_Other( *permbits_to_allow_deny( mode&7 ) )
                ] + [ ac for ac in self.acl if ac.prefix not in ('o', 'g', '*') ]
 
-  def update(self, metatext):
-    ''' Update the Meta fields from the supplied metatext.
-    '''
-    for metafield in metatext.split(';'):
-      metafield = metafield.strip()
-      if not metafield:
-        continue
-      try:
-        k, v = metafield.split(':', 1)
-      except ValueError:
-        error("ignoring bad metatext field (no colon): %r", metafield)
-        continue
-      if k in ('m',):
-        try:
-          v = float(v)
-        except ValueError:
-          warning("%s: non-float 'm': %r", self, v)
-          v = 0.0
-      self[k] = v
-
   def update_from_stat(self, st):
     ''' Apply the contents of a stat object to this Meta.
     '''
@@ -470,6 +532,8 @@ class Meta(dict):
       perms = stat.S_IFDIR
     elif self.E.isfile:
       perms = stat.S_IFREG
+    elif self.E.issym:
+      perms = stat.S_IFLNK
     else:
       warning("Meta.unix_perms: neither a dir nor a file")
     for ac in self.acl:
@@ -493,6 +557,10 @@ class Meta(dict):
     if gid is None:
       gid = NOGROUPID
     return uid, gid, perms
+
+  @property
+  def pathref(self):
+    return self['pathref']
 
   def access(self, access_mode, access_uid=None, access_group=None, default_uid=None, default_gid=None):
     ''' POSIX like access call, accepting os.access `access_mode`.
@@ -539,11 +607,15 @@ class Meta(dict):
   def stat(self):
     ''' Return a stat object computed from this Meta data.
     '''
+    E = self.E
     st_uid, st_gid, st_mode = self.unix_perms
     st_ino = -1
     st_dev = -1
     st_nlink = 1
-    st_size = self.E.size
+    try:
+      st_size = E.size
+    except AttributeError:
+      st_size = 0
     st_atime = 0
     st_mtime = self.mtime
     st_ctime = 0
@@ -586,3 +658,7 @@ class Meta(dict):
           with Pfx("chmod(0o%04o)", mst_perms):
             debug("utime(%r,atime=%s,mtime=%s) from mtime=%s", ospath, st.st_atime, mst_mtime, st_mtime)
             os.utime(ospath, (st.st_atime, mst_mtime))
+
+  @property
+  def xattrs(self):
+    return self._xattrs

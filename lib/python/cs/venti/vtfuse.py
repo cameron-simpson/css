@@ -27,7 +27,7 @@ from cs.threads import locked
 from .archive import strfor_Dirent, write_Dirent_str
 from .block import Block
 from .debug import dump_Dirent
-from .dir import FileDirent, Dir
+from .dir import Dir, FileDirent, SymlinkDirent
 from .file import File
 from .meta import NOUSERID, NOGROUPID
 from .paths import resolve
@@ -35,16 +35,22 @@ from .paths import resolve
 LOGGER_NAME = 'cs.venti.vtfuse'     # __qualname__ ?
 LOGGER_FILENAME = 'vtfuse.log'
 
+# OSX setxattr option values
+XATTR_NOFOLLOW = 0x0001
+XATTR_CREATE   = 0x0002
+XATTR_REPLACE  = 0x0004
+
 # records associated with an open file
 # TODO: no support for multiple links or path-=open renames
 OpenFile = namedtuple('OpenFile', ('path', 'E', 'fp'))
 
-def mount(mnt, E, S, syncfp=None):
+def mount(mnt, E, S, syncfp=None, subpath=None):
   ''' Run a FUSE filesystem on `mnt` with Dirent `E` and backing Store `S`.
       `mnt`: mount point
-      `E`: Dirent of top Store directory
+      `E`: Dirent of root Store directory
       `S`: backing Store
       `syncfp`: if not None, a file to which to write sync lines
+      `subpath`: relative path from `E` to the directory to attach to the mountpoint
   '''
   log = getLogger(LOGGER_NAME)
   log.propagate = False
@@ -52,7 +58,7 @@ def mount(mnt, E, S, syncfp=None):
   formatter = Formatter(DEFAULT_BASE_FORMAT)
   handler.setFormatter(formatter)
   log.addHandler(handler)
-  FS = StoreFS(E, S, syncfp=syncfp)
+  FS = StoreFS(E, S, syncfp=syncfp, subpath=subpath)
   FS._mount(mnt)
 
 def trace_method(method):
@@ -65,51 +71,63 @@ def trace_method(method):
     if kw:
       citation += " " + pformat(kw, depth=2)
     with Pfx(citation):
+      ctx = fuse_get_context()
       time0 = time.time()
       ##self.log.info("CALL %s", citation)
       try:
         result = method(self, *a, **kw)
       except FuseOSError as e:
         elapsed = time.time() - time0
-        self.logQ.put( (self.log.info, citation, elapsed, "FuseOSError %s", e) )
+        self.logQ.put( (self.log.info, citation, elapsed, ctx, "FuseOSError %s", e) )
         raise
       except Exception as e:
         elapsed = time.time() - time0
-        self.logQ.put( (self.log.exception, citation, elapsed, "%s %s", type(e), e) )
+        self.logQ.put( (self.log.exception, citation, elapsed, ctx, "%s %s", type(e), e) )
         raise
       else:
         elapsed = time.time() - time0
-        self.logQ.put( (self.log.info, citation, elapsed, "=> %r", result) )
+        self.logQ.put( (self.log.info, citation, elapsed, ctx, "=> %r", result) )
         return result
   traced_method.__name__ = 'trace(%s)' % (fname,)
   return traced_method
 
 def log_traces_queued(Q):
-  for logcall, citation, elapsed, msg, *a in Q:
-    logcall("%fs %s " + msg, elapsed, citation ,*a)
+  for logcall, citation, elapsed, ctx, msg, *a in Q:
+    logcall("%fs uid=%s/gid=%s/pid=%s %s " + msg,
+            elapsed, ctx[0], ctx[1], ctx[2], citation ,*a)
 
 class StoreFS(Operations):
   ''' Class providing filesystem operations, suitable for passing
       to a FUSE() constructor.
   '''
 
-  def __init__(self, E, S, syncfp=None):
-    ''' Initilaise a new FUSE mountpoint.
-        mnt: the mountpoint
-        dirent: the root directory reference
-        S: the Store to hold data
+  def __init__(self, E, S, syncfp=None, subpath=None):
+    ''' Initialise a new FUSE mountpoint.
+        `E`: the root directory reference
+        `S`: the backing Store
         `syncfp`: if not None, a file to which to write sync lines
+        `subpath`: relative path to mount Dir
     '''
     O.__init__(self)
     if not E.isdir:
       raise ValueError("not dir Dir: %s" % (E,))
     self.S = S
     self.E = E
+    self.subpath = subpath
+    if subpath:
+      # locate subdirectory to display at mountpoint
+      mntE, P, tail_path = resolve(E, subpath)
+      if tail_path:
+        raise ValueError("subpath %r does not resolve", subpath)
+      if not mntE.isdir:
+        raise ValueError("subpath %r is not a directory", subpath)
+      self.mntE = mntE
+    else:
+      self.mntE = E
     # set up a queue to collect logging requests
     # and a thread to process then asynchronously
     self.log = getLogger(LOGGER_NAME)
     self.logQ = IterableQueue()
-    X("logQ = %r", self.logQ)
     T = Thread(name="log-queue(%s)" % (self,),
                target=log_traces_queued,
                args=(self.logQ,))
@@ -127,7 +145,10 @@ class StoreFS(Operations):
     self._file_handles = []
 
   def __str__(self):
-    return "<StoreFS S=%s /=%s>" % (self.S, self.E)
+    if self.subpath:
+      return "<StoreFS S=%s /=%s %r=%s>" % (self.S, self.E, self.subpath, self.mntE)
+    else:
+      return "<StoreFS S=%s /=%s>" % (self.S, self.E)
 
   def __del__(self):
     self.logQ.close()
@@ -163,7 +184,7 @@ class StoreFS(Operations):
   def _resolve(self, path):
     ''' Call cs.venti.paths.resolve and return its result.
     '''
-    return resolve(self.E, path)
+    return resolve(self.mntE, path)
 
   def _namei2(self, path):
     ''' Look up path. Raise FuseOSError(ENOENT) if missing. Return Dirent, parent.
@@ -279,11 +300,7 @@ class StoreFS(Operations):
 
   @trace_method
   def fgetattr(self, *a, **kw):
-    try:
-      E = self._namei(path)
-    except FuseOSError as e:
-      error("FuseOSError: %s", e)
-      raise
+    E = self._namei(path)
     if fh is not None:
       ##X("fh=%s", fh)
       pass
@@ -314,27 +331,51 @@ class StoreFS(Operations):
 
   @trace_method
   def getattr(self, path, fh=None):
-    try:
-      E = self._namei(path)
-    except FuseOSError as e:
-      if e.errno != errno.ENOENT:
-        error("FuseOSError: %s", e)
-      raise
+    E = self._namei(path)
     st = self._Estat(E)
     st['st_ino'] = self._ino(path)
     return st
 
   @trace_method
   def getxattr(self, path, name, position=0):
-    raise FuseOSError(errno.ENOATTR)
+    E = self._namei(path)
+    meta = E.meta
+    try:
+      xattr = meta.xattrs[name]
+    except KeyError:
+      raise FuseOSError(errno.ENOATTR)
+    return xattr
 
   @trace_method
   def listxattr(self, path):
-    XP("return empty list")
-    return ''
+    E = self._namei(path)
+    return list(E.meta.xattrs.keys())
 
   @trace_method
-  def lock(self, *a, **kw):
+  def lock(self, path, fh, op, struct_lock):
+    try:
+      ct = struct_lock.contents
+    except AttributeError:
+      # using vanilla fuse.py without "struct lock" patch
+      pass
+    else:
+      XP("dir(struct_lock) = %r", dir(struct_lock))
+      XP("  contents = %r", struct_lock.contents)
+      XP("  dircontents) = %r", dir(struct_lock.contents))
+      ct = struct_lock.contents
+      X("AAAAAAAA")
+      X("  type=%s", ct.type)
+      X("  start=%s", ct.start)
+      X("  end=%s", ct.end)
+      X("  owner=%s", ct.owner)
+      X("  pid=%s", ct.pid)
+      X("BBBBBBBB")
+      # TODO: only seem to see LOCK_UN, never other operations
+      ##bs = []
+      ##while thing > 0:
+      ##  bs.append(thing % 256)
+      ##  thing //= 256
+      ##XP("thing bytes reversed: %r", ' '.join([ "0x%02x" % b for b in bs ]))
     raise FuseOSError(errno.ENOTSUP)
 
   @trace_method
@@ -435,8 +476,9 @@ class StoreFS(Operations):
   @trace_method
   def readlink(self, path):
     E = self._namei(path)
-    # no symlinks yet
-    raise FuseOSError(errno.EINVAL)
+    if not E.issym:
+      raise FuseOSError(errno.EINVAL)
+    return E.pathref
 
   @trace_method
   def release(self, path, fhndx):
@@ -495,7 +537,22 @@ class StoreFS(Operations):
 
   @trace_method
   def setxattr(self, path, name, value, options, position=0):
-    raise FuseOSError(errno.ENOTSUP)
+    sane = True
+    if position != 0:
+      warning("position != 0: %r", position)
+      sane = False
+    if options & ~(XATTR_CREATE|XATTR_REPLACE):
+      warning("unsupported options (beyond XATTR_CREATE(0x%02d) and XATTR_REPLACE(0x%02d) in 0x%02x"
+              % (XATTR_CREATE, XATTR_REPLACE, options))
+    if not sane:
+      raise FuseOSError(errno.EINVAL)
+    E = self._namei(path)
+    xattrs = E.meta.xattrs
+    if options & XATTR_CREATE and name in xattrs:
+      raise FuseOSError(errno.EEXIST)
+    if options & XATTR_REPLACE and name not in xattrs:
+      raise FuseOSError(errno.ENOATTR)
+    xattrs[name] = value
 
   @trace_method
   def statfs(self, path):
@@ -508,7 +565,21 @@ class StoreFS(Operations):
 
   @trace_method
   def symlink(self, target, source):
-    raise FuseOSError(errno.EROFS)
+    E, P, tail_path = self._resolve(target)
+    # target must not exist, therefore there should be unresolved path elements
+    if not tail_path:
+      # we expect the path to not fully resole, otherwise the object already exists
+      raise FuseOSError(errno.EEXIST)
+    # if there are more than 1 unresolved components then some
+    # ancestor of target is missing
+    if len(tail_path) > 1:
+      XP("tail_path = %r", tail_path)
+      raise FuseOSError(errno.ENOENT)
+    # the final component must be a directory in order to create the new symlink
+    if not E.isdir:
+      raise FuseOSError(errno.ENOTDIR)
+    name, = tail_path
+    E[name] = SymlinkDirent(name, {'pathref': source})
 
   @trace_method
   def sync(self, *a, **kw):

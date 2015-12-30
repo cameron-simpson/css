@@ -124,7 +124,8 @@ class MultiOpenMixin(O):
         self._finalise = None
         finalise.notify_all()
         return
-    raise RuntimeError("%s: finalised more than once" % (self,))
+    error("%s: finalised more than once" % (self,))
+    ##raise RuntimeError("%s: finalised more than once" % (self,))
 
   @property
   def closed(self):

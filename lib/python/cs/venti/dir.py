@@ -11,7 +11,7 @@ from cs.lex import hexify
 from cs.py.stack import stack_dump
 from cs.queues import MultiOpenMixin
 from cs.seq import seq
-from cs.serialise import get_bs, get_bsdata, put_bs, put_bsdata
+from cs.serialise import get_bs, get_bsdata, get_bss, put_bs, put_bsdata, put_bss
 from cs.threads import locked, locked_property
 from . import totext, fromtext
 from .block import Block, decodeBlock
@@ -25,15 +25,19 @@ gid_nogroup = -1
 
 D_FILE_T = 0
 D_DIR_T = 1
+D_SYM_T = 2
 def D_type2str(type_):
   if type_ == D_FILE_T:
     return "D_FILE_T"
   if type_ == D_DIR_T:
     return "D_DIR_T"
+  if type_ == D_SYM_T:
+    return "D_SYM_T"
   return str(type_)
 
 F_HASMETA = 0x01
 F_HASNAME = 0x02
+F_NOBLOCK = 0x04
 
 def decode_Dirent_text(text):
   ''' Accept `text`, a text transcription of a Direct, such as from
@@ -59,15 +63,19 @@ def decodeDirent(data, offset):
     name = ""
   meta = None
   if flags & F_HASMETA:
-    metadata, offset = get_bsdata(data, offset)
-    metatext = metadata.decode()
+    metatext, offset = get_bss(data, offset)
   else:
     metatext = None
-  block, offset = decodeBlock(data, offset)
+  if flags & F_NOBLOCK:
+    block = None
+  else:
+    block, offset = decodeBlock(data, offset)
   if type_ == D_DIR_T:
     E = Dir(name, metatext=metatext, parent=None, block=block)
   elif type_ == D_FILE_T:
     E = FileDirent(name, metatext=metatext, block=block)
+  elif type_ == D_SYM_T:
+    E = SymlinkDirent(name, metatext=metatext)
   else:
     E = _Dirent(type_, name, metatext=metatext, block=block)
   return E, offset
@@ -98,7 +106,10 @@ class _Dirent(object):
     self.name = name
     self.meta = Meta(self)
     if metatext is not None:
-      self.meta.update(metatext)
+      if isinstance(metatext, str):
+        self.meta.update_from_text(metatext)
+      else:
+        self.meta.update_from_items(metatext.items())
     self.d_ino = None
 
   def __str__(self):
@@ -126,6 +137,12 @@ class _Dirent(object):
     '''
     return self.type == D_DIR_T
 
+  @property
+  def issym(self):
+    ''' Is this a symbolic link _Dirent?
+    '''
+    return self.type == D_SYM_T
+
   def encode(self, no_name=False):
     ''' Serialise the dirent.
         Output format: bs(type)bs(flags)[bsdata(name)][bsdata(metadata)]block
@@ -147,18 +164,23 @@ class _Dirent(object):
     if meta:
       if not isinstance(meta, Meta):
         raise TypeError("self.meta is not a Meta: <%s>%r" % (type(meta), meta))
-      metadata = put_bsdata(meta.encode())
+      metadata = put_bss(meta.textencode())
       if len(metadata) > 0:
         flags |= F_HASMETA
     else:
       metadata = b''
 
-    block = self.block
+    if self.issym:
+      flags |= F_NOBLOCK
+      blockref = b''
+    else:
+      blockref = self.block.encode()
+
     return put_bs(self.type) \
          + put_bs(flags) \
          + namedata \
          + metadata \
-         + block.encode()
+         + blockref
 
   def textencode(self):
     ''' Serialise the dirent as text.
@@ -250,6 +272,19 @@ class _Dirent(object):
     ctime = 0
 
     return (unixmode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime)
+
+class SymlinkDirent(_Dirent):
+
+    def __init__(self, name, metatext, block=None):
+      if block is not None:
+        raise ValueError("SymlinkDirent: block must be None, received: %s", block)
+      _Dirent.__init__(self, D_SYM_T, name, metatext=metatext)
+      if self.meta.pathref is None:
+        raise ValueError("SymlinkDirent: meta.pathref required")
+
+    @property
+    def pathref(self):
+      return self.meta.pathref
 
 class FileDirent(_Dirent, MultiOpenMixin):
   ''' A _Dirent subclass referring to a file.
@@ -446,10 +481,10 @@ class Dir(_Dirent):
       # TODO: if len(data) >= 16384
       B = Block(data=data)
       ##warning("Dir.block: computed Block %s", B)
-      XP("Dir %r: RECOMPUTED BLOCK: %s", self.name, B)
+      ##XP("Dir %r: RECOMPUTED BLOCK: %s", self.name, B)
     else:
       B = self._block
-      XP("Dir %r: REUSE ._block: %s", self.name, B)
+      ##XP("Dir %r: REUSE ._block: %s", self.name, B)
     return B
 
   def dirs(self):

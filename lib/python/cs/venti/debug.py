@@ -23,7 +23,8 @@ def dump_Dirent(E, indent='', recurse=False):
     indent,
     'd' if E.isdir else '-',
     E.name,
-    hexify(E.block.hashcode))
+    '-> '+repr(E.pathref) if E.issym else hexify(E.block.hashcode),
+   )
   if E.isdir:
     indent += '  '
     for name in sorted(E.keys()):
