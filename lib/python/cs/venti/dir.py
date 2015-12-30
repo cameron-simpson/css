@@ -115,7 +115,6 @@ class _Dirent(object):
         self.meta.update_from_text(metatext)
       else:
         self.meta.update_from_items(metatext.items())
-    self.d_ino = None
 
   def __str__(self):
     return self.textencode()
@@ -220,6 +219,14 @@ class _Dirent(object):
            + metatxt
            + block.textencode()
            )
+
+  @property
+  def inum(self):
+    return self.meta.inum
+
+  @inum.setter
+  def inum(self, new_inum):
+    self.meta.inum = new_inum
 
   @property
   def size(self):
