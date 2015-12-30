@@ -578,6 +578,17 @@ class Meta(dict):
   def inum(self):
     return self._inum
 
+  @inum.setter
+  def inum(self, new_inum):
+    ''' Set ._inum (field 'i') with sanity checks.
+    '''
+    if not isinstance(new_inum, int):
+      raise ValueError("expected int, got: %r", new_inum)
+    _inum = self._inum
+    if _inum is not None:
+      warning("replacing ._inum, old value %r => %r", _inum, new_inum)
+    self._inum = new_inum
+
   @property
   def pathref(self):
     return self['pathref']
