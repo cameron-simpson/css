@@ -27,7 +27,7 @@ from cs.threads import locked
 from .archive import strfor_Dirent, write_Dirent_str
 from .block import Block
 from .debug import dump_Dirent
-from .dir import FileDirent, Dir
+from .dir import Dir, FileDirent, SymlinkDirent
 from .file import File
 from .meta import NOUSERID, NOGROUPID
 from .paths import resolve
@@ -476,8 +476,9 @@ class StoreFS(Operations):
   @trace_method
   def readlink(self, path):
     E = self._namei(path)
-    # no symlinks yet
-    raise FuseOSError(errno.EINVAL)
+    if not E.issym:
+      raise FuseOSError(errno.EINVAL)
+    return E.pathref
 
   @trace_method
   def release(self, path, fhndx):
@@ -564,7 +565,21 @@ class StoreFS(Operations):
 
   @trace_method
   def symlink(self, target, source):
-    raise FuseOSError(errno.EROFS)
+    E, P, tail_path = self._resolve(target)
+    # target must not exist, therefore there should be unresolved path elements
+    if not tail_path:
+      # we expect the path to not fully resole, otherwise the object already exists
+      raise FuseOSError(errno.EEXIST)
+    # if there are more than 1 unresolved components then some
+    # ancestor of target is missing
+    if len(tail_path) > 1:
+      XP("tail_path = %r", tail_path)
+      raise FuseOSError(errno.ENOENT)
+    # the final component must be a directory in order to create the new symlink
+    if not E.isdir:
+      raise FuseOSError(errno.ENOTDIR)
+    name, = tail_path
+    E[name] = SymlinkDirent(name, {'pathref': source})
 
   @trace_method
   def sync(self, *a, **kw):
