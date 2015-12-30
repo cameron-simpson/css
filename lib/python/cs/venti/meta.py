@@ -246,6 +246,7 @@ class Meta(dict):
       'u': owner
       'g': group owner
       'a': ACL
+      'i': inode number
       'm': modification time, a float
       'su': setuid
       'sg': setgid
@@ -256,6 +257,7 @@ class Meta(dict):
     dict.__init__(self)
     self.E = E
     self._acl = None
+    self._inum = None
     self._xattrs = {}
     self._lock = RLock()
 
@@ -266,7 +268,7 @@ class Meta(dict):
     ''' Return the encoding of this Meta as text.
     '''
     self._normalise()
-    if all(k in ('u', 'g', 'a', 'm', 'su', 'sg') for k in self.keys()):
+    if all(k in ('u', 'g', 'a', 'i', 'm', 'su', 'sg') for k in self.keys()):
       # these are all "safe" fields - use the compact encoding
       encoded = ';'.join( ':'.join( (k, str(self[k])) )
                           for k in sorted(self.keys())
@@ -286,6 +288,15 @@ class Meta(dict):
         del self['a']
     else:
       self['a'] = encodeACL(_acl)
+    # update 'i' if necessary
+    _inum = self._inum
+    if _inum is None:
+      if 'i' in self:
+        del self['i']
+    else:
+      if not isinstance(_inum, int):
+        raise RuntimeError("self._inum is not an int: %r", _inum)
+      self['i'] = str(_inum)
     # update 'x' if necessary
     _xattrs = self._xattrs
     if _xattrs:
@@ -322,7 +333,12 @@ class Meta(dict):
         if isinstance(v, str):
           self._acl = decodeACL(v)
         else:
-          warning("metatext %r: 'a' is not a str: %r", metatext, v)
+          warning("%s: non-str 'a': %r", self, v)
+      elif k == 'i':
+        try:
+          self._inum = int(v)
+        except ValueError:
+          warning("%s: non-int 'i': %r", self, v)
       elif k in ('m',):
         try:
           v = float(v)
@@ -557,6 +573,10 @@ class Meta(dict):
     if gid is None:
       gid = NOGROUPID
     return uid, gid, perms
+
+  @property
+  def inum(self):
+    return self._inum
 
   @property
   def pathref(self):
