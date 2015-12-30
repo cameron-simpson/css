@@ -26,6 +26,7 @@ gid_nogroup = -1
 D_FILE_T = 0
 D_DIR_T = 1
 D_SYM_T = 2
+D_HARD_T = 2
 def D_type2str(type_):
   if type_ == D_FILE_T:
     return "D_FILE_T"
@@ -33,6 +34,8 @@ def D_type2str(type_):
     return "D_DIR_T"
   if type_ == D_SYM_T:
     return "D_SYM_T"
+  if type_ == D_HARD_T:
+    return "D_HARD_T"
   return str(type_)
 
 F_HASMETA = 0x01
@@ -76,6 +79,8 @@ def decodeDirent(data, offset):
     E = FileDirent(name, metatext=metatext, block=block)
   elif type_ == D_SYM_T:
     E = SymlinkDirent(name, metatext=metatext)
+  elif type_ == D_HARDT:
+    E = HardlinkDirent(name, metatext=metatext)
   else:
     E = _Dirent(type_, name, metatext=metatext, block=block)
   return E, offset
@@ -260,12 +265,9 @@ class _Dirent(object):
     else:
       unixmode |= stat.S_IFREG
 
-    if self.d_ino is None:
-      self.d_ino = seq()
-    ino = self.d_ino
-
     dev = 0       # FIXME: we're not hooked to a FS?
     nlink = 1
+    ino = meta.inum
     size = self.size
     atime = 0
     mtime = self.mtime
@@ -285,6 +287,15 @@ class SymlinkDirent(_Dirent):
     @property
     def pathref(self):
       return self.meta.pathref
+
+class HardlinkDirent(_Dirent):
+
+    def __init__(self, name, metatext, block=None):
+      if block is not None:
+        raise ValueError("HardlinkDirent: block must be None, received: %s", block)
+      _Dirent.__init__(self, D_HARD_T, name, metatext=metatext)
+      if self.meta.inum is None:
+        raise ValueError("HardlinkDirent: meta.inum required")
 
 class FileDirent(_Dirent, MultiOpenMixin):
   ''' A _Dirent subclass referring to a file.
