@@ -314,7 +314,10 @@ class Meta(dict):
           continue
         else:
           kvs.append( (k, v) )
-    for k, v in kvs:
+    self.update_from_items(kvs)
+
+  def update_from_items(self, items):
+    for k, v in items:
       if k == 'a':
         if isinstance(v, str):
           self._acl = decodeACL(v)
@@ -529,6 +532,8 @@ class Meta(dict):
       perms = stat.S_IFDIR
     elif self.E.isfile:
       perms = stat.S_IFREG
+    elif self.E.issym:
+      perms = stat.S_IFLNK
     else:
       warning("Meta.unix_perms: neither a dir nor a file")
     for ac in self.acl:
@@ -602,11 +607,15 @@ class Meta(dict):
   def stat(self):
     ''' Return a stat object computed from this Meta data.
     '''
+    E = self.E
     st_uid, st_gid, st_mode = self.unix_perms
     st_ino = -1
     st_dev = -1
     st_nlink = 1
-    st_size = self.E.size
+    try:
+      st_size = E.size
+    except AttributeError:
+      st_size = 0
     st_atime = 0
     st_mtime = self.mtime
     st_ctime = 0
