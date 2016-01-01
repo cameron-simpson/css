@@ -147,6 +147,12 @@ class _Dirent(object):
     '''
     return self.type == D_SYM_T
 
+  @property
+  def ishardlink(self):
+    ''' Is this a hard link _Dirent?
+    '''
+    return self.type == D_HARD_T
+
   def encode(self, no_name=False):
     ''' Serialise the dirent.
         Output format: bs(type)bs(flags)[bsdata(name)][bsdata(metadata)]block
