@@ -88,6 +88,13 @@ class Range(object):
   '''
 
   def __init__(self, start=None, end=None, debug=None):
+    ''' Initialise the Range.
+        Called with `start` and `end`, these specify the initial
+        span of the Range.
+        If called with just `start`, `start` should instead be an
+        iterable if integer values comprising the values in the
+        Range.
+    '''
     if debug is None:
       debug = ifdebug()
     self._debug = debug
