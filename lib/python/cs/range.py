@@ -239,9 +239,9 @@ class Range(object):
     '''
     spans = self._spans
     if start is None:
-      start = min(0, spans[0].start) if spans else 0
+      start = min(0, self.start) if spans else 0
     if end is None:
-      end = max(start, spans[-1].end) if spans else start
+      end = max(start, self.end) if spans else start
     for span in spans:
       if start < span.start:
         yield False, Span(start, span.start)
