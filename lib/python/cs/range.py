@@ -170,6 +170,16 @@ class Range(object):
     return sum( [ end-start for start, end in self._spans ] )
 
   @property
+  def start(self):
+    ''' Return the start offset of the Range - the minimum Span .start or 0 if the Range is empty.
+    '''
+    spans = self._spans
+    if len(spans) > 0:
+      return spans[0].start
+    else:
+      return 0
+
+  @property
   def end(self):
     ''' Return the end offset of the Range - the maximum Span .end or 0 if the Range is empty.
     '''
