@@ -227,14 +227,6 @@ class _Dirent(object):
            )
 
   @property
-  def inum(self):
-    return self.meta.inum
-
-  @inum.setter
-  def inum(self, new_inum):
-    self.meta.inum = new_inum
-
-  @property
   def size(self):
     return len(self.block)
 
