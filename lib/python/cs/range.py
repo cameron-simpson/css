@@ -23,7 +23,7 @@ DISTINFO = {
 import sys
 from bisect import bisect_left
 from collections import namedtuple
-from cs.logutils import ifdebug
+from cs.logutils import ifdebug, X, XP
 
 def overlap(span1, span2):
   ''' Return a list [start, end] denoting the overlap of two spans.
@@ -206,7 +206,9 @@ class Range(object):
     else:
       start, end = list(x)
     _spans = self._spans
-    ndx = bisect_left(self._spans, Span(start, start))
+    ndx = bisect_left(_spans, Span(start, start))
+    if ndx >= len(_spans):
+      return False
     if ndx > 0 and start < _spans[ndx].start:
       ndx -= 1
     elif ndx >= len(_spans):
