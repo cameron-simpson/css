@@ -19,11 +19,18 @@ def dump_Block(block, indent=''):
       dump_Block(B, indent=indent)
 
 def dump_Dirent(E, indent='', recurse=False):
+  if E.issym:
+    details = '-> ' + repr(E.pathref)
+  elif E.ishardlink:
+    details = 'inode ' + str(E.inum)
+  else:
+    details = hexify(E.block.hashcode)
+  details 
   X("%s%s %r %s",
     indent,
     'd' if E.isdir else '-',
     E.name,
-    '-> '+repr(E.pathref) if E.issym else hexify(E.block.hashcode),
+    details,
    )
   if E.isdir:
     indent += '  '

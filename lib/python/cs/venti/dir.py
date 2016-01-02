@@ -26,7 +26,7 @@ gid_nogroup = -1
 D_FILE_T = 0
 D_DIR_T = 1
 D_SYM_T = 2
-D_HARD_T = 2
+D_HARD_T = 3
 def D_type2str(type_):
   if type_ == D_FILE_T:
     return "D_FILE_T"
@@ -180,7 +180,7 @@ class _Dirent(object):
     else:
       metadata = b''
 
-    if self.issym:
+    if self.issym or self.ishardlink:
       flags |= F_NOBLOCK
       blockref = b''
     else:
@@ -218,12 +218,15 @@ class _Dirent(object):
     else:
       metatxt = ""
 
-    block = self.block
+    if self.issym or self.ishardlink:
+      blocktxt = ''
+    else:
+      blocktxt = self.block.textencode()
     return ( hexify(put_bs(self.type))
            + hexify(put_bs(flags))
            + nametxt
            + metatxt
-           + block.textencode()
+           + blocktxt
            )
 
   @property
@@ -270,9 +273,9 @@ class _Dirent(object):
     else:
       unixmode |= stat.S_IFREG
 
-    dev = 0       # FIXME: we're not hooked to a FS?
+    dev = None          # make it clear that we have to associated filesystem
     nlink = 1
-    ino = meta.inum
+    ino = self.inum
     size = self.size
     atime = 0
     mtime = self.mtime
@@ -282,25 +285,39 @@ class _Dirent(object):
 
 class SymlinkDirent(_Dirent):
 
-    def __init__(self, name, metatext, block=None):
-      if block is not None:
-        raise ValueError("SymlinkDirent: block must be None, received: %s", block)
-      _Dirent.__init__(self, D_SYM_T, name, metatext=metatext)
-      if self.meta.pathref is None:
-        raise ValueError("SymlinkDirent: meta.pathref required")
+  def __init__(self, name, metatext, block=None):
+    if block is not None:
+      raise ValueError("SymlinkDirent: block must be None, received: %s", block)
+    _Dirent.__init__(self, D_SYM_T, name, metatext=metatext)
+    if self.meta.pathref is None:
+      raise ValueError("SymlinkDirent: meta.pathref required")
 
-    @property
-    def pathref(self):
-      return self.meta.pathref
+  @property
+  def pathref(self):
+    return self.meta.pathref
 
 class HardlinkDirent(_Dirent):
+  ''' A hard link.
+      Unlike the regular UNIX filesystem, in a venti filesystem a
+      hard link is a wrapper for an ordinary Dirent which references
+      a persistent inode number and the source Dirent. Most attributes
+      are proxied from the wrapped Dirent.
+      In a normal Dirent .inum is a local attribute and not preserved;
+      in a HardlinkDirent it is a proxy for the local .meta.inum.
+  '''
 
-    def __init__(self, name, metatext, block=None):
-      if block is not None:
-        raise ValueError("HardlinkDirent: block must be None, received: %s", block)
-      _Dirent.__init__(self, D_HARD_T, name, metatext=metatext)
-      if self.meta.inum is None:
-        raise ValueError("HardlinkDirent: meta.inum required")
+  def __init__(self, name, metatext, block=None):
+    if block is not None:
+      raise ValueError("HardlinkDirent: block must be None, received: %s", block)
+    _Dirent.__init__(self, D_HARD_T, name, metatext=metatext)
+    if self.meta.inum is None:
+      raise ValueError("HardlinkDirent: meta.inum required")
+
+  @property
+  def inum(self):
+    ''' On a HardlinkDirent the .inum accesses the meta['i'] field.
+    '''
+    return self.meta.inum
 
 class FileDirent(_Dirent, MultiOpenMixin):
   ''' A _Dirent subclass referring to a file.

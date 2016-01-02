@@ -15,19 +15,21 @@ from os import O_CREAT, O_RDONLY, O_WRONLY, O_RDWR, O_APPEND, O_TRUNC
 from os.path import basename
 from pprint import pformat
 import sys
-from threading import Thread
+from threading import Thread, RLock
 import time
 from cs.debug import DummyMap, TracingObject
+from cs.lex import texthexify, untexthexify
 from cs.logutils import X, XP, debug, info, warning, error, Pfx, DEFAULT_BASE_FORMAT
 from cs.obj import O, obj_as_dict
 from cs.py.func import funccite, funcname
 from cs.queues import IterableQueue
-from cs.seq import Seq
+from cs.range import Range
+from cs.serialise import put_bs, get_bs, put_bsdata, get_bsdata
 from cs.threads import locked
 from .archive import strfor_Dirent, write_Dirent_str
 from .block import Block
 from .debug import dump_Dirent
-from .dir import Dir, FileDirent, SymlinkDirent
+from .dir import Dir, FileDirent, SymlinkDirent, HardlinkDirent, D_FILE_T, decodeDirent
 from .file import File
 from .meta import NOUSERID, NOGROUPID
 from .paths import resolve
@@ -139,10 +141,9 @@ class StoreFS(Operations):
     self._fs_uid = os.geteuid()
     self._fs_gid = os.getegid()
     self._lock = S._lock
-    self._inode_seq = Seq(start=1)
-    self._inode_map = {}
     self._path_files = {}
     self._file_handles = []
+    self._inodes = Inodes(self, E.meta.get('fs_inode_data'))
 
   def __str__(self):
     if self.subpath:
@@ -165,6 +166,8 @@ class StoreFS(Operations):
   def _sync(self):
     if self.syncfp is not None:
       with self._lock:
+        # update the inode table state
+        self.E.meta['fs_inode_data'] = texthexify(self._inodes.encode())
         text = strfor_Dirent(self.E)
         last_text = self._syncfp_last_dirent_text
         if last_text is not None and text == last_text:
@@ -180,6 +183,9 @@ class StoreFS(Operations):
     '''
     return FUSE(self, root, foreground=True, nothreads=True, debug=False)
     ##return TracingObject(FUSE(self, root, foreground=True, nothreads=True, debug=False))
+
+  def allocate_mortal_inum(self):
+    return self._inodes.allocate_mortal_inum()
 
   def _resolve(self, path):
     ''' Call cs.venti.paths.resolve and return its result.
@@ -203,27 +209,30 @@ class StoreFS(Operations):
   def _Estat(self, E):
     ''' Stat a Dirent, return a dict with useful st_* fields.
     '''
-    d = obj_as_dict(E.meta.stat(), 'st_')
+    if E.ishardlink:
+      inum = E.inum
+      E2 = self._inodes.dirent(inum)
+    else:
+      E2 = E
+      try:
+        inum = E2.inum
+      except AttributeError:
+        inum = E2.inum = self.allocate_mortal_inum()
+    d = obj_as_dict(E2.meta.stat(), 'st_')
+    # TODO: what to do about st_dev?
+    # TODO: different nlink for Dir?
     d['st_dev'] = 16777218
     d['st_dev'] = 1701
+    d['st_ino'] = inum
     d['st_atime'] = float(d['st_atime'])
     d['st_ctime'] = float(d['st_ctime'])
     d['st_mtime'] = float(d['st_mtime'])
-    d['st_nlink'] = 10
     if d['st_uid'] == NOUSERID:
       d['st_uid'] = self._fs_uid
     if d['st_gid'] == NOGROUPID:
       d['st_gid'] = self._fs_gid
+    XP("_Estat: d=%r", d)
     return d
-
-  @locked
-  def _ino(self, path):
-    ''' Return an inode number for a path, allocating one of necessary.
-    '''
-    path = '/'.join( [ word for word in path.split('/') if len(word) ] )
-    if path not in self._inode_map:
-      self._inode_map[path] = self._inode_seq.next()
-    return self._inode_map[path]
 
   @locked
   def _fh(self, fhndx):
@@ -254,6 +263,10 @@ class StoreFS(Operations):
 
   def _Eaccess(self, E, amode):
     with Pfx("_Eaccess(E=%r, amode=%s)", E, amode):
+      if E.ishardlink:
+        E0 = E
+        E = self._inodes.dirent(E.inum)
+        warning("map hardlink %s => %s", E0, E)
       ctx_uid, ctx_gid, ctx_pid = ctx = fuse_get_context()
       # test the access against the caller's uid/gid
       # pass same in as default file ownership in case there are no metadata
@@ -333,7 +346,6 @@ class StoreFS(Operations):
   def getattr(self, path, fh=None):
     E = self._namei(path)
     st = self._Estat(E)
-    st['st_ino'] = self._ino(path)
     return st
 
   @trace_method
@@ -345,6 +357,43 @@ class StoreFS(Operations):
     except KeyError:
       raise FuseOSError(errno.ENOATTR)
     return xattr
+
+  @locked
+  @trace_method
+  def link(self, target, source):
+    # TODO: if source is a symlink, follow to find the real thing
+    Esrc, Psrc = self._namei2(source)
+    if not Esrc.isfile and not Esrc.ishardlink:
+      raise FuseOSError(errno.EPERM)
+    # resolve the target - should terminate at the directory to
+    # receive the new hardlink
+    Edst, P, tail_path = self._resolve(target)
+    # target must not exist, therefore there should be unresolved path elements
+    if not tail_path:
+      # we expect the path to not fully resolve, otherwise the object already exists
+      raise FuseOSError(errno.EEXIST)
+    # if there are more than 1 unresolved components then some
+    # ancestor of target is missing
+    if len(tail_path) > 1:
+      XP("tail_path = %r", tail_path)
+      raise FuseOSError(errno.ENOENT)
+    # the final component must be a directory in order to create the new link
+    if not Edst.isdir:
+      raise FuseOSError(errno.ENOTDIR)
+    if Esrc.ishardlink:
+     Esrc = self._inodes.dirent(Esrc.inum)
+    else:
+      # new hardlink, update the source
+      Ename = Esrc.name
+      Esrc2 = self._inodes.make_hardlink(Esrc)
+      Esrc2.name = Ename
+      Psrc[Ename] = Esrc2
+    inum = Esrc.inum
+    name, = tail_path
+    # make hardlink object referencing the inode
+    Edst[name] = HardlinkDirent(name, {'i': inum})
+    # increment link count on underlying Dirent
+    Esrc.meta.nlink += 1
 
   @trace_method
   def listxattr(self, path):
@@ -568,7 +617,7 @@ class StoreFS(Operations):
     E, P, tail_path = self._resolve(target)
     # target must not exist, therefore there should be unresolved path elements
     if not tail_path:
-      # we expect the path to not fully resole, otherwise the object already exists
+      # we expect the path to not fully resolve, otherwise the object already exists
       raise FuseOSError(errno.EEXIST)
     # if there are more than 1 unresolved components then some
     # ancestor of target is missing
@@ -668,6 +717,144 @@ class FileHandle(O):
   def close(self):
     self.E.touch()
     self.Eopen.close()
+
+class Inodes(object):
+  ''' Inode information for a filesystem.
+  '''
+
+  def __init__(self, fs, inodes_datatext=None):
+    self.fs = fs
+    self.max_used = 0
+    # mapping from inode number to Dirent
+    self._inodes = {}
+    # freed inode numbers for reuse
+    self._freed = Range()
+    # alocated inode numbers which are not hard links, and discarded after umount
+    self._mortal = Range()
+    # mapping from inode numbers to Dirents
+    if inodes_datatext is None:
+      self._hardlinked = Range()
+      self._hardlinks_dir = Dir('inodes')
+    else:
+      self._hardlinked, self._hardlinks_dir = self._decode_inode_data(inodes_datatext)
+    # cache of inum->Dirent
+    self._inodes = {}
+    self._lock = RLock()
+
+  def _decode_inode_data(self, idatatext):
+    ''' Decode the permanent inode numbers and the Dirent containing their Dirents.
+    '''
+    XP("decode idatatext: %r", idatatext)
+    idata = untexthexify(idatatext)
+    taken_data, offset1 = get_bsdata(idata)
+    offset = 0
+    _hardlinked = Range()
+    while offset < len(taken_data):
+      start, offset = get_bs(taken_data, offset)
+      end, offset = get_bs(taken_data, offset)
+      _hardlinked.add(start, end)
+    _hardlinked_dir, offset1 = decodeDirent(idata, offset1)
+    if offset1 < len(idata):
+      warning("unparsed idatatext at offset %d: %r", offset1, idata[offset1:])
+    return _hardlinked, _hardlinked_dir
+
+  @locked
+  def encode(self):
+    ''' Transcribe the permanent inode numbers and the Dirent containing their Dirents.
+    '''
+    # record the spans of allocated inodes
+    taken = b''.join( put_bs(S.start) + put_bs(S.end)
+                      for S in self._hardlinked.spans() )
+    # ... and append the Dirent.
+    return put_bsdata(taken) + self._hardlinks_dir.encode()
+
+  @locked
+  def dirent(self, inum):
+    ''' Locate the Dirent for inode `inum`.
+        Raises ValueError if the `inum` is unknown.
+    '''
+    with Pfx("dirent(%d)", inum):
+      E = self._inodes.get(inum)
+      if E is None:
+        ipath = '/'.join( str(b) for b in put_bs(inum) )
+        E, P, tail_path = self._resolve(self._hardlinks_dir, ipath)
+        if tail_path:
+          raise ValueError("not in self._inodes and %r not in self._hardlinks_dir"
+                           % (ipath,))
+        self._inodes[inum] = E
+      return E
+
+  @locked
+  def _allocate_free_inum(self):
+    ''' Allocate an unused inode number and return it.
+        Use the lowest inum from ._freed, otherwise choose one above
+        ._mrtal and ._hardlinked.
+    '''
+    freed = self._freed
+    if freed:
+      inum = freed.start
+      freed -= inum
+    else:
+      inum = max( (1, self._mortal.end, self._hardlinked.end) )
+    if inum in self._inodes:
+      raise RuntimeError("allocated inode number %d, but already in inode table (%s)"
+                         % (inum, Range(self._inodes.keys())))
+    if inum in self._mortal:
+      raise RuntimeError("allocated inode number %d, but already in mortal inode list (%s)"
+                         % (inum, self._mortal))
+    return inum
+
+  @locked
+  def allocate_mortal_inum(self):
+    ''' Allocate an ephemeral inode number to survive only until umount.
+        Record the inum in ._mortal.
+    '''
+    inum = self._allocate_free_inum()
+    self._mortal.add(inum)
+    return inum
+
+  @locked
+  def _allocate_hardlink_inode(self, E):
+    ''' Allocate a new inode to `E`, return the inode number.
+        Stores the Dirent in ._inodes.
+        Stores the Dirent in ._hardlinks_dir.
+        Records the inum in ._hardlinked.
+        Records the inum in the Dirent.
+    '''
+    if E.inum is None:
+      inum = E.inum
+    else:
+      inum = self._allocate_free_inum()
+    inodes = self._inodes
+    self._inodes[inum] = E
+    # file the Dirent away in the _hardlinks_dir
+    D = self._hardlinks_dir
+    path_elem = [ str(b) for b in put_bs(inum) ]
+    for name in path_elem[:-1]:
+      if name not in D:
+        D = D.mkdir(name)
+      else:
+        D = D.chdir1(name)
+    name = path_elem[-1]
+    if name in D:
+      raise RuntimeError("inum %d already allocated: %s", inum, D[name])
+    D[name] = E
+    self._hardlinked.add(inum)
+    E.inum = inum
+    return inum
+
+  @locked
+  def make_hardlink(self, E):
+    ''' Create a new HardlinkDirent wrapping `E` and return the new Dirent.
+    '''
+    if E.type != D_FILE_T:
+      raise ValueError("may not hardlink Dirents of type %s", E.type)
+    inum = self._allocate_hardlink_inode(E)
+    E.meta.nlink = 1
+    E.name = ''
+    self._inodes[inum] = E
+    Edst = HardlinkDirent(E.name, {'i': inum})
+    return Edst
 
 if __name__ == '__main__':
   from cs.venti.vtfuse_tests import selftest

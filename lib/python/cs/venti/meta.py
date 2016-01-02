@@ -248,6 +248,7 @@ class Meta(dict):
       'a': ACL
       'i': inode number
       'm': modification time, a float
+      'n': number of hardlinks
       'su': setuid
       'sg': setgid
       'pathref': pathname component for symlinks (and, later, hard links)
@@ -268,7 +269,7 @@ class Meta(dict):
     ''' Return the encoding of this Meta as text.
     '''
     self._normalise()
-    if all(k in ('u', 'g', 'a', 'i', 'm', 'su', 'sg') for k in self.keys()):
+    if all(k in ('u', 'g', 'a', 'i', 'm', 'n', 'su', 'sg') for k in self.keys()):
       # these are all "safe" fields - use the compact encoding
       encoded = ';'.join( ':'.join( (k, str(self[k])) )
                           for k in sorted(self.keys())
@@ -590,6 +591,18 @@ class Meta(dict):
     self._inum = new_inum
 
   @property
+  def nlink(self):
+    return self.get('n', 1)
+
+  @nlink.setter
+  def nlink(self, new_nlink):
+    self['n'] = new_nlink
+
+  @nlink.deleter
+  def nlink(self):
+    del self['n']
+
+  @property
   def pathref(self):
     return self['pathref']
 
@@ -642,7 +655,7 @@ class Meta(dict):
     st_uid, st_gid, st_mode = self.unix_perms
     st_ino = -1
     st_dev = -1
-    st_nlink = 1
+    st_nlink = self.nlink
     try:
       st_size = E.size
     except AttributeError:
