@@ -783,7 +783,7 @@ class Inodes(object):
       E = self._inodes.get(inum)
       if E is None:
         ipath = '/'.join( str(b) for b in put_bs(inum) )
-        E, P, tail_path = self._resolve(self._hardlinks_dir, ipath)
+        E, P, tail_path = self.fs._resolve(self._hardlinks_dir, ipath)
         if tail_path:
           raise ValueError("not in self._inodes and %r not in self._hardlinks_dir"
                            % (ipath,))
