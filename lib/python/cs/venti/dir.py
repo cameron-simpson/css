@@ -79,7 +79,7 @@ def decodeDirent(data, offset):
     E = FileDirent(name, metatext=metatext, block=block)
   elif type_ == D_SYM_T:
     E = SymlinkDirent(name, metatext=metatext)
-  elif type_ == D_HARDT:
+  elif type_ == D_HARD_T:
     E = HardlinkDirent(name, metatext=metatext)
   else:
     E = _Dirent(type_, name, metatext=metatext, block=block)
@@ -311,7 +311,7 @@ class HardlinkDirent(_Dirent):
       raise ValueError("HardlinkDirent: block must be None, received: %s", block)
     _Dirent.__init__(self, D_HARD_T, name, metatext=metatext)
     if self.meta.inum is None:
-      raise ValueError("HardlinkDirent: meta.inum required")
+      raise ValueError("HardlinkDirent: meta.inum required (metatext=%r)" % (metatext,))
 
   @property
   def inum(self):
