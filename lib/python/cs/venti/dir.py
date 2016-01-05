@@ -1,5 +1,6 @@
 import os
 import os.path
+from collections import namedtuple
 import pwd
 import grp
 import stat
@@ -47,14 +48,16 @@ def decode_Dirent_text(text):
       Dirent.textencode(), and return the corresponding Dirent.
   '''
   data = fromtext(text)
-  E, offset = decodeDirent(data, 0)
+  E, offset = decode_Dirent(data, 0)
   if offset < len(data):
     raise ValueError("%r: not all text decoded: got %r with unparsed data %r"
                      % (text, E, data[offset:]))
   return E
 
-def decodeDirent(data, offset):
-  ''' Unserialise a Dirent, return (dirent, offset).
+DirentComponents = namedtuple('DirentComponents', 'type name metatext block')
+
+def decode_DirentComponents(data, offset):
+  ''' Unserialise a Dirent, return (DirentComponents, offset).
       Input format: bs(type)bs(flags)[bs(namelen)name][bs(metalen)meta]block
   '''
   type_, offset = get_bs(data, offset)
@@ -73,28 +76,42 @@ def decodeDirent(data, offset):
     block = None
   else:
     block, offset = decodeBlock(data, offset)
-  if type_ == D_DIR_T:
-    E = Dir(name, metatext=metatext, parent=None, block=block)
-  elif type_ == D_FILE_T:
-    E = FileDirent(name, metatext=metatext, block=block)
-  elif type_ == D_SYM_T:
-    E = SymlinkDirent(name, metatext=metatext)
-  elif type_ == D_HARD_T:
-    E = HardlinkDirent(name, metatext=metatext)
-  else:
-    E = _Dirent(type_, name, metatext=metatext, block=block)
+  return DirentComponents(type_, name, metatext, block), offset
+
+def decode_Dirent(data, offset):
+  ''' Unserialise a Dirent, return (Dirent, offset).
+      Dirent will be None if the components are invalid.
+  '''
+  components, offset = decode_DirentComponents(data, offset)
+  type_, name, metatext, block = components
+  try:
+    if type_ == D_DIR_T:
+      E = Dir(name, metatext=metatext, parent=None, block=block)
+    elif type_ == D_FILE_T:
+      E = FileDirent(name, metatext=metatext, block=block)
+    elif type_ == D_SYM_T:
+      E = SymlinkDirent(name, metatext=metatext)
+    elif type_ == D_HARD_T:
+      E = HardlinkDirent(name, metatext=metatext)
+    else:
+      E = _Dirent(type_, name, metatext=metatext, block=block)
+  except ValueError as e:
+    warning("%r: invalid DirentComponents, Dirent ignored: %s (components=%s)",
+            name, e, components)
+    E = None
   return E, offset
 
-def decodeDirents(dirdata, offset=0):
+def decode_Dirents(dirdata, offset=0):
   ''' Yield Dirents from the supplied bytes `dirdata`.
   '''
   while offset < len(dirdata):
-    E, offset = decodeDirent(dirdata, offset)
-    if E.name is None or len(E.name) == 0:
-      # FIXME: skip unnamed dirent
-      warning("skip unnamed _Dirent")
+    E, offset = decode_Dirent(dirdata, offset)
+    if E is None:
+      # valid decode but invalid component data - skip
       continue
-    if E.name == '.' or E.name == '..':
+    name = E.name
+    if name is None or name in ('', '.', '..'):
+      warning("skip Dirent named %r", name)
       continue
     yield E
 
@@ -492,7 +509,7 @@ class Dir(_Dirent):
     if es is None:
       # compute the dictionary holding the live Dir entries
       es = {}
-      for E in decodeDirents(self._block.all_data()):
+      for E in decode_Dirents(self._block.all_data()):
         E.parent = self
         es[E.name] = E
       self._entries = es
