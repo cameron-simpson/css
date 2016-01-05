@@ -29,7 +29,7 @@ from cs.threads import locked
 from .archive import strfor_Dirent, write_Dirent_str
 from .block import Block
 from .debug import dump_Dirent
-from .dir import Dir, FileDirent, SymlinkDirent, HardlinkDirent, D_FILE_T, decodeDirent
+from .dir import Dir, FileDirent, SymlinkDirent, HardlinkDirent, D_FILE_T, decode_Dirent
 from .file import File
 from .meta import NOUSERID, NOGROUPID
 from .paths import resolve
@@ -733,13 +733,16 @@ class Inodes(object):
     self._mortal = Range()
     # mapping from inode numbers to Dirents
     if inodes_datatext is None:
-      self._hardlinked = Range()
-      self._hardlinks_dir = Dir('inodes')
+      self._init_empty()
     else:
       self._hardlinked, self._hardlinks_dir = self._decode_inode_data(inodes_datatext)
     # cache of inum->Dirent
     self._inodes = {}
     self._lock = RLock()
+
+  def _init_empty(self):
+    self._hardlinked = Range()
+    self._hardlinks_dir = Dir('inodes')
 
   def _decode_inode_data(self, idatatext):
     ''' Decode the permanent inode numbers and the Dirent containing their Dirents.
@@ -753,7 +756,10 @@ class Inodes(object):
       start, offset = get_bs(taken_data, offset)
       end, offset = get_bs(taken_data, offset)
       _hardlinked.add(start, end)
-    _hardlinked_dir, offset1 = decodeDirent(idata, offset1)
+    _hardlinked_dir, offset1 = decode_Dirent(idata, offset1)
+    if _hardlinked_dir is None:
+      error("invalid Dirent for _hardlinked_dir, inodes LOST")
+      self._init_empty()
     if offset1 < len(idata):
       warning("unparsed idatatext at offset %d: %r", offset1, idata[offset1:])
     return _hardlinked, _hardlinked_dir
