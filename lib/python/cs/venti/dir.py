@@ -182,8 +182,8 @@ class _Dirent(object):
     if name is None:
       name = ""
     if name:
-      namedata = put_bsdata(name.encode())
       flags |= F_HASNAME
+      namedata = put_bsdata(name.encode())
     else:
       namedata = b''
 
@@ -191,9 +191,8 @@ class _Dirent(object):
     if meta:
       if not isinstance(meta, Meta):
         raise TypeError("self.meta is not a Meta: <%s>%r" % (type(meta), meta))
+      flags |= F_HASMETA
       metadata = put_bss(meta.textencode())
-      if len(metadata) > 0:
-        flags |= F_HASMETA
     else:
       metadata = b''
 
