@@ -57,7 +57,7 @@ def decode_Dirent_text(text):
 DirentComponents = namedtuple('DirentComponents', 'type name metatext block')
 
 def decode_DirentComponents(data, offset):
-  ''' Unserialise a Dirent, return (DirentComponents, offset).
+  ''' Unserialise a serialised Dirent, return (DirentComponents, offset).
       Input format: bs(type)bs(flags)[bs(namelen)name][bs(metalen)meta]block
   '''
   type_, offset = get_bs(data, offset)
@@ -102,18 +102,25 @@ def decode_Dirent(data, offset):
   return E, offset
 
 def decode_Dirents(dirdata, offset=0):
-  ''' Yield Dirents from the supplied bytes `dirdata`.
+  ''' Decode all the Dirents from the supplied bytes `dirdata`.
+      Return invalid Dirent data chunks and valid Dirents.
   '''
+  invalid = []  # data chunks with invalid DirentComponents
+  entries = []  # valid Dirents decoded from the data
   while offset < len(dirdata):
+    offset0 = offset
     E, offset = decode_Dirent(dirdata, offset)
     if E is None:
       # valid decode but invalid component data - skip
+      invalid.append(dirdata[offset0:offset])
       continue
     name = E.name
     if name is None or name in ('', '.', '..'):
       warning("skip Dirent named %r", name)
+      invalid.append(dirdata[offset0:offset])
       continue
-    yield E
+    entries.append(E)
+  return invalid, entries
 
 class _Dirent(object):
   ''' Incomplete base class for Dirent objects.
@@ -486,6 +493,7 @@ class Dir(_Dirent):
       self._block = block
       self._entries = None
     _Dirent.__init__(self, D_DIR_T, name, metatext=metatext)
+    self._unhandled_dirent_chunks = None
     self.parent = parent
     self.changed = False
     self._lock = RLock()
@@ -504,15 +512,18 @@ class Dir(_Dirent):
   def entries(self):
     ''' Property containing the live dictionary holding the Dir entries.
     '''
-    es = self._entries
-    if es is None:
+    emap = self._entries
+    if emap is None:
       # compute the dictionary holding the live Dir entries
-      es = {}
-      for E in decode_Dirents(self._block.all_data()):
+      emap = {}
+      invalid, Es = decode_Dirents(self._block.all_data())
+      if invalid:
+        self._unhandled_dirent_chunks = invalid
+      for E in Es:
         E.parent = self
-        es[E.name] = E
-      self._entries = es
-    return es
+        emap[E.name] = E
+      self._entries = emap
+    return emap
 
   @property
   @locked
@@ -522,11 +533,17 @@ class Dir(_Dirent):
     '''
     if self._block is None or self.changed:
       # recompute in case of change
+      # restore the unparsed Dirents from initial load
+      if self._unhandled_dirent_chunks is None:
+        data = b''
+      else:
+        data = b''.join(self._unhandled_dirent_chunks)
+      # append the valid or new Dirents
       names = sorted(self.keys())
-      data = b''.join( self[name].encode()
-                       for name in names
-                       if name != '.' and name != '..'
-                     )
+      data += b''.join( self[name].encode()
+                        for name in names
+                        if name != '.' and name != '..'
+                      )
       # TODO: if len(data) >= 16384
       B = Block(data=data)
       ##warning("Dir.block: computed Block %s", B)
