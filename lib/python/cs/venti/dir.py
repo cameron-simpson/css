@@ -54,35 +54,68 @@ def decode_Dirent_text(text):
                      % (text, E, data[offset:]))
   return E
 
-DirentComponents = namedtuple('DirentComponents', 'type name metatext block')
+class DirentComponents(namedtuple('DirentComponents', 'type name metatext block')):
 
-def decode_DirentComponents(data, offset):
-  ''' Unserialise a serialised Dirent, return (DirentComponents, offset).
-      Input format: bs(type)bs(flags)[bs(namelen)name][bs(metalen)meta]block
-  '''
-  type_, offset = get_bs(data, offset)
-  flags, offset = get_bs(data, offset)
-  if flags & F_HASNAME:
-    namedata, offset = get_bsdata(data, offset)
-    name = namedata.decode()
-  else:
-    name = ""
-  meta = None
-  if flags & F_HASMETA:
-    metatext, offset = get_bss(data, offset)
-  else:
-    metatext = None
-  if flags & F_NOBLOCK:
-    block = None
-  else:
-    block, offset = decodeBlock(data, offset)
-  return DirentComponents(type_, name, metatext, block), offset
+  @classmethod
+  def from_data(cls, data, offset=0):
+    ''' Unserialise a serialised Dirent, return (DirentComponents, offset).
+        Input format: bs(type)bs(flags)[bs(namelen)name][bs(metalen)meta]block
+    '''
+    type_, offset = get_bs(data, offset)
+    flags, offset = get_bs(data, offset)
+    if flags & F_HASNAME:
+      namedata, offset = get_bsdata(data, offset)
+      name = namedata.decode()
+    else:
+      name = ""
+    meta = None
+    if flags & F_HASMETA:
+      metatext, offset = get_bss(data, offset)
+    else:
+      metatext = None
+    if flags & F_NOBLOCK:
+      block = None
+    else:
+      block, offset = decodeBlock(data, offset)
+    return cls(type_, name, metatext, block), offset
+
+  def encode(self):
+    ''' Serialise the components.
+        Output format: bs(type)bs(flags)[bsdata(name)][bsdata(metadata)]block
+    '''
+    flags = 0
+    name = self.name
+    if name:
+      flags |= F_HASNAME
+      namedata = put_bsdata(name.encode())
+    else:
+      namedata = b''
+    meta = self.metatext
+    if meta:
+      flags |= F_HASMETA
+      if isinstance(meta, str):
+        metadata = put_bss(meta)
+      else:
+        metadata = put_bss(meta.textencode())
+    else:
+      metadata = b''
+    block = self.block
+    if block is None:
+      flags |= F_NOBLOCK
+      blockref = b''
+    else:
+      blockref = block.encode()
+    return put_bs(self.type) \
+         + put_bs(flags) \
+         + namedata \
+         + metadata \
+         + blockref
 
 def decode_Dirent(data, offset):
   ''' Unserialise a Dirent, return (Dirent, offset).
-      Dirent will be None if the components are invalid.
   '''
-  components, offset = decode_DirentComponents(data, offset)
+  offset0 = offset
+  components, offset = DirentComponents.from_data(data, offset)
   type_, name, metatext, block = components
   try:
     if type_ == D_DIR_T:
@@ -96,31 +129,18 @@ def decode_Dirent(data, offset):
     else:
       E = _Dirent(type_, name, metatext=metatext, block=block)
   except ValueError as e:
-    warning("%r: invalid DirentComponents, Dirent ignored: %s (components=%s)",
+    warning("%r: invalid DirentComponents, marking Dirent as invalid: %s: %s",
             name, e, components)
-    E = None
+    E = InvalidDirent(components, data[offset0:offset])
   return E, offset
 
 def decode_Dirents(dirdata, offset=0):
-  ''' Decode all the Dirents from the supplied bytes `dirdata`.
+  ''' Decode and yield all the Dirents from the supplied bytes `dirdata`.
       Return invalid Dirent data chunks and valid Dirents.
   '''
-  invalid = []  # data chunks with invalid DirentComponents
-  entries = []  # valid Dirents decoded from the data
   while offset < len(dirdata):
-    offset0 = offset
     E, offset = decode_Dirent(dirdata, offset)
-    if E is None:
-      # valid decode but invalid component data - skip
-      invalid.append(dirdata[offset0:offset])
-      continue
-    name = E.name
-    if name is None or name in ('', '.', '..'):
-      warning("skip Dirent named %r", name)
-      invalid.append(dirdata[offset0:offset])
-      continue
-    entries.append(E)
-  return invalid, entries
+    yield E
 
 class _Dirent(object):
   ''' Incomplete base class for Dirent objects.
@@ -144,7 +164,7 @@ class _Dirent(object):
     return self.textencode()
 
   def __repr__(self):
-    return "_Dirent(%s, %s, %s)" % (D_type2str, self.name, self.meta)
+    return "%s(%s, %s, %s)" % (self.__class__.__name__, D_type2str, self.name, self.meta)
 
   def __eq__(self, other):
     return ( self.name == other.name
@@ -177,43 +197,17 @@ class _Dirent(object):
     '''
     return self.type == D_HARD_T
 
-  def encode(self, no_name=False):
-    ''' Serialise the dirent.
-        Output format: bs(type)bs(flags)[bsdata(name)][bsdata(metadata)]block
+  def encode(self):
+    ''' Serialise this dirent.
     '''
-    flags = 0
-
-    if no_name:
-      name = ""
+    type_ = self.type
     name = self.name
-    if name is None:
-      name = ""
-    if name:
-      flags |= F_HASNAME
-      namedata = put_bsdata(name.encode())
-    else:
-      namedata = b''
-
     meta = self.meta
-    if meta:
-      if not isinstance(meta, Meta):
-        raise TypeError("self.meta is not a Meta: <%s>%r" % (type(meta), meta))
-      flags |= F_HASMETA
-      metadata = put_bss(meta.textencode())
-    else:
-      metadata = b''
-
     if self.issym or self.ishardlink:
-      flags |= F_NOBLOCK
-      blockref = b''
+      block = None
     else:
-      blockref = self.block.encode()
-
-    return put_bs(self.type) \
-         + put_bs(flags) \
-         + namedata \
-         + metadata \
-         + blockref
+      block = self.block
+    return DirentComponents(type_, name, meta, block).encode()
 
   def textencode(self):
     ''' Serialise the dirent as text.
@@ -305,6 +299,34 @@ class _Dirent(object):
     ctime = 0
 
     return (unixmode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime)
+
+class InvalidDirent(_Dirent):
+
+  def __init__(self, components, chunk):
+    ''' An invalid Dirent. Record the original data chunk for regurgitation later.
+    '''
+    self.components = components
+    self.chunk = chunk
+    self.type = components.type
+    self.name = components.name
+    self.metatext = components.metatext
+    self.block = components.block
+    self._meta = None
+
+  def encode(self):
+    ''' Return the original data chunk.
+    '''
+    return chunk
+
+  @property
+  def meta(self):
+    M = self._meta
+    if M is None:
+      M = self.metatext
+      if isinstance(M, str):
+        M = Meta.from_text(meta, self)
+      self._meta = M
+    return M
 
 class SymlinkDirent(_Dirent):
 
@@ -516,10 +538,7 @@ class Dir(_Dirent):
     if emap is None:
       # compute the dictionary holding the live Dir entries
       emap = {}
-      invalid, Es = decode_Dirents(self._block.all_data())
-      if invalid:
-        self._unhandled_dirent_chunks = invalid
-      for E in Es:
+      for E in decode_Dirents(self._block.all_data()):
         E.parent = self
         emap[E.name] = E
       self._entries = emap
