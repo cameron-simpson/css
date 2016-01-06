@@ -1,8 +1,9 @@
 #!/usr/bin/python
 
 import sys
-from cs.lex import hexify
+from cs.lex import hexify, texthexify
 from cs.logutils import X
+from .dir import InvalidDirent
 
 def dump_Block(block, indent=''):
   X("%s%s %s %d bytes",
@@ -19,7 +20,9 @@ def dump_Block(block, indent=''):
       dump_Block(B, indent=indent)
 
 def dump_Dirent(E, indent='', recurse=False):
-  if E.issym:
+  if isinstance(E, InvalidDirent):
+    details = '<INVALID:%s:%s>' % (E.components, texthexify(E.chunk))
+  elif E.issym:
     details = '-> ' + repr(E.pathref)
   elif E.ishardlink:
     details = 'inode ' + str(E.inum)
