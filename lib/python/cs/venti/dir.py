@@ -316,7 +316,7 @@ class InvalidDirent(_Dirent):
   def encode(self):
     ''' Return the original data chunk.
     '''
-    return chunk
+    return self.chunk
 
   @property
   def meta(self):
