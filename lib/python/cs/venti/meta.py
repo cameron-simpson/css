@@ -305,6 +305,14 @@ class Meta(dict):
     elif 'x' in self:
       del self['x']
 
+  @classmethod
+  def from_text(cls, metatext, E=None):
+    ''' Construct a new Meta from `metatext`.
+    '''
+    M = cls(E)
+    M.update_from_text(metatext)
+    return M
+
   def update_from_text(self, metatext):
     ''' Update the Meta fields from the supplied metatext.
     '''
