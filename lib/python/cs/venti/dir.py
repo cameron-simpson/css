@@ -343,7 +343,9 @@ class InvalidDirent(_Dirent):
     M = self._meta
     if M is None:
       M = self.metatext
-      if isinstance(M, str):
+      if M is None:
+        M = Meta(self)
+      elif isinstance(M, str):
         M = Meta.from_text(meta, self)
       self._meta = M
     return M
