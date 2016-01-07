@@ -19,7 +19,7 @@ def dump_Block(block, indent=''):
     for B in subblocks:
       dump_Block(B, indent=indent)
 
-def dump_Dirent(E, indent='', recurse=False):
+def dump_Dirent(E, indent='', recurse=False, not_dir=False):
   if isinstance(E, InvalidDirent):
     details = '<INVALID:%s:%s>' % (E.components, texthexify(E.chunk))
   elif E.issym:
@@ -35,15 +35,8 @@ def dump_Dirent(E, indent='', recurse=False):
     E.name,
     details,
    )
-  if E.isdir:
+  if E.isdir and not not_dir:
     indent += '  '
     for name in sorted(E.keys()):
       E2 = E[name]
-      if recurse:
-        dump_Dirent(E2, indent, recurse=True)
-      else:
-        X("%s%s %r %s",
-          indent,
-          'd' if E2.isdir else '-',
-          E2.name,
-          hexify(E2.block.hashcode))
+      dump_Dirent(E2, indent, recurse=recurse, not_dir=not recurse)
