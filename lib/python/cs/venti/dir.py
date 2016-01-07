@@ -159,6 +159,7 @@ class _Dirent(object):
         self.meta.update_from_text(metatext)
       else:
         self.meta.update_from_items(metatext.items())
+    self._inum = None
 
   def __str__(self):
     return self.textencode()
@@ -196,6 +197,21 @@ class _Dirent(object):
     ''' Is this a hard link _Dirent?
     '''
     return self.type == D_HARD_T
+
+  @property
+  def inum(self):
+    ino = self._inum
+    if ino is None:
+      raise AttributeError("inum (._inum is None)")
+    return ino
+
+  @inum.setter
+  def inum(self, new_inum):
+    ino = self._inum
+    if ino is None:
+      self._inum = new_inum
+    else:
+      raise RuntimeError("%s: cannot set inum to %r (._inum=%r)", self, new_inum, ino)
 
   def encode(self):
     ''' Serialise this dirent.
