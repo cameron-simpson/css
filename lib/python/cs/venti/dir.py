@@ -307,9 +307,9 @@ class _Dirent(object):
     else:
       unixmode |= stat.S_IFREG
 
-    dev = None          # make it clear that we have to associated filesystem
+    dev = None          # make it clear that we have no associated filesystem
     nlink = 1
-    ino = self.inum
+    ino = None          # also needs a filesystem
     size = self.size
     atime = 0
     mtime = self.mtime
