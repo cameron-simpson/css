@@ -223,19 +223,14 @@ class StoreFS(Operations):
   def _Estat(self, E):
     ''' Stat a Dirent, return a dict with useful st_* fields.
     '''
+    inum = self._inum(E)
     if E.ishardlink:
-      inum = E.inum
       E2 = self._inodes.dirent(inum)
     else:
       E2 = E
-      try:
-        inum = E2.inum
-      except AttributeError:
-        inum = E2.inum = self.allocate_mortal_inum()
     d = obj_as_dict(E2.meta.stat(), 'st_')
     # TODO: what to do about st_dev?
     # TODO: different nlink for Dir?
-    d['st_dev'] = 16777218
     d['st_dev'] = 1701
     d['st_ino'] = inum
     d['st_atime'] = float(d['st_atime'])
@@ -278,13 +273,14 @@ class StoreFS(Operations):
   def _Eaccess(self, E, amode):
     with Pfx("_Eaccess(E=%r, amode=%s)", E, amode):
       if E.ishardlink:
-        E0 = E
-        E = self._inodes.dirent(E.inum)
-        warning("map hardlink %s => %s", E0, E)
+        E2 = self._inodes.dirent(E.inum)
+        warning("map hardlink %s => %s", E, E2)
+      else:
+        E2 = E
       ctx_uid, ctx_gid, ctx_pid = ctx = fuse_get_context()
       # test the access against the caller's uid/gid
       # pass same in as default file ownership in case there are no metadata
-      return E.meta.access(amode, ctx_uid, ctx_gid,
+      return E2.meta.access(amode, ctx_uid, ctx_gid,
                            default_uid=ctx_uid, default_gid=ctx_gid)
 
   @trace_method
@@ -395,16 +391,23 @@ class StoreFS(Operations):
     if not Edst.isdir:
       raise FuseOSError(errno.ENOTDIR)
     if Esrc.ishardlink:
-     Esrc = self._inodes.dirent(Esrc.inum)
+     # point Esrc at the master Dirent in ._inodes
+     inum = Esrc.inum
+     Esrc = self._inodes.dirent(inum)
     else:
       # new hardlink, update the source
+      # keep Esrc as the master
+      # obtain Esrc2, the HardlinkDirent wrapper for Esrc
+      # put Esrc2 into the enclosing Dir, replacing Esrc
       Ename = Esrc.name
+      self._inum(Esrc)
       Esrc2 = self._inodes.make_hardlink(Esrc)
       Esrc2.name = Ename
       Psrc[Ename] = Esrc2
-    inum = Esrc.inum
+      inum = Esrc2.inum
+    # make a new hardlink object referencing the inode
+    # and attach it to the target directory
     name, = tail_path
-    # make hardlink object referencing the inode
     Edst[name] = HardlinkDirent(name, {'i': inum})
     # increment link count on underlying Dirent
     Esrc.meta.nlink += 1
