@@ -559,8 +559,11 @@ class Meta(dict):
       perms = stat.S_IFREG
     elif self.E.issym:
       perms = stat.S_IFLNK
+    elif self.E.ishardlink:
+      perms = stat.S_IFREG
     else:
-      warning("Meta.unix_perms: neither a dir nor a file")
+      warning("Meta.unix_perms: neither a dir nor a file, pretending S_IFREG")
+      perms = stat.S_IFREG
     for ac in self.acl:
       if ac.prefix == 'o':
         perms |= ac.unixmode << 6
@@ -668,6 +671,9 @@ class Meta(dict):
       st_size = E.size
     except AttributeError:
       st_size = 0
+    else:
+      if st_size is None:
+        st_size = 0
     st_atime = 0
     st_mtime = self.mtime
     st_ctime = 0
