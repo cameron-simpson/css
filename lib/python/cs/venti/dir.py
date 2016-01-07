@@ -383,6 +383,7 @@ class HardlinkDirent(_Dirent):
   @property
   def inum(self):
     ''' On a HardlinkDirent the .inum accesses the meta['i'] field.
+        It is set at initialisation, so there is no .setter.
     '''
     return self.meta.inum
 
