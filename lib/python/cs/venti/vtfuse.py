@@ -209,6 +209,17 @@ class StoreFS(Operations):
     E, P = self._namei2(path)
     return E
 
+  def _inum(self, E):
+    ''' Compute the inode number for a Dirent.
+        HardlinkDirents have a persistent .inum mapping the the Meta['i'] field.
+        Others do not and keep a private ._inum, not preserved across umount.
+    '''
+    try:
+      inum = E.inum
+    except AttributeError:
+      inum = E.inum = self.allocate_mortal_inum()
+    return inum
+
   def _Estat(self, E):
     ''' Stat a Dirent, return a dict with useful st_* fields.
     '''
