@@ -84,7 +84,7 @@ def trace_method(method):
         raise
       except Exception as e:
         elapsed = time.time() - time0
-        self.logQ.put( (self.log.exception, citation, elapsed, ctx, "%s %s", type(e), e) )
+        dolog(self.log.exception, citation, elapsed, ctx, "%s %s", type(e), e)
         raise
       else:
         elapsed = time.time() - time0
@@ -95,8 +95,11 @@ def trace_method(method):
 
 def log_traces_queued(Q):
   for logcall, citation, elapsed, ctx, msg, *a in Q:
-    logcall("%fs uid=%s/gid=%s/pid=%s %s " + msg,
-            elapsed, ctx[0], ctx[1], ctx[2], citation ,*a)
+    dolog(logcall, citation, elapsed, ctx, msg, *a)
+
+def dolog(logcall, citation, elapsed, ctx, msg, *a):
+  logcall("%fs uid=%s/gid=%s/pid=%s %s " + msg,
+          elapsed, ctx[0], ctx[1], ctx[2], citation ,*a)
 
 class StoreFS(Operations):
   ''' Class providing filesystem operations, suitable for passing
