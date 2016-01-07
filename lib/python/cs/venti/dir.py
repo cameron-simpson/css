@@ -264,7 +264,8 @@ class _Dirent(object):
 
   @property
   def size(self):
-    return len(self.block)
+    block = self.block
+    return None if block is None else len(block)
 
   @property
   def mtime(self):
