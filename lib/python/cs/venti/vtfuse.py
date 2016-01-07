@@ -797,7 +797,7 @@ class Inodes(object):
       E = self._inodes.get(inum)
       if E is None:
         ipath = '/'.join( str(b) for b in put_bs(inum) )
-        E, P, tail_path = self.fs._resolve(self._hardlinks_dir, ipath)
+        E, P, tail_path = resolve(self._hardlinks_dir, ipath)
         if tail_path:
           raise ValueError("not in self._inodes and %r not in self._hardlinks_dir"
                            % (ipath,))
@@ -834,19 +834,19 @@ class Inodes(object):
     return inum
 
   @locked
-  def _allocate_hardlink_inode(self, E):
-    ''' Allocate a new inode to `E`, return the inode number.
-        Stores the Dirent in ._inodes.
-        Stores the Dirent in ._hardlinks_dir.
-        Records the inum in ._hardlinked.
-        Records the inum in the Dirent.
+  def make_hardlink(self, E):
+    ''' Create a new HardlinkDirent wrapping `E` and return the new Dirent.
     '''
-    if E.inum is None:
-      inum = E.inum
-    else:
-      inum = self._allocate_free_inum()
-    inodes = self._inodes
+    if E.type != D_FILE_T:
+      raise ValueError("may not hardlink Dirents of type %s", E.type)
+    # use the inode number of the source Dirent
+    inum = self.fs._inum(E)
+    E.meta.nlink = 1
+    E.name = ''
     self._inodes[inum] = E
+    Edst = HardlinkDirent(E.name, {'i': inum})
+    # note the inum in the _hardlinked Range
+    self._hardlinked.add(inum)
     # file the Dirent away in the _hardlinks_dir
     D = self._hardlinks_dir
     path_elem = [ str(b) for b in put_bs(inum) ]
@@ -859,21 +859,7 @@ class Inodes(object):
     if name in D:
       raise RuntimeError("inum %d already allocated: %s", inum, D[name])
     D[name] = E
-    self._hardlinked.add(inum)
-    E.inum = inum
-    return inum
-
-  @locked
-  def make_hardlink(self, E):
-    ''' Create a new HardlinkDirent wrapping `E` and return the new Dirent.
-    '''
-    if E.type != D_FILE_T:
-      raise ValueError("may not hardlink Dirents of type %s", E.type)
-    inum = self._allocate_hardlink_inode(E)
-    E.meta.nlink = 1
-    E.name = ''
-    self._inodes[inum] = E
-    Edst = HardlinkDirent(E.name, {'i': inum})
+    # return the new HardlinkDirent
     return Edst
 
 if __name__ == '__main__':
