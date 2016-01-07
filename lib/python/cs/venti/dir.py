@@ -8,7 +8,7 @@ import sys
 from threading import Lock, RLock
 import time
 from cs.logutils import D, Pfx, debug, error, info, warning, X, XP
-from cs.lex import hexify
+from cs.lex import hexify, texthexify
 from cs.py.stack import stack_dump
 from cs.queues import MultiOpenMixin
 from cs.seq import seq
@@ -328,6 +328,9 @@ class InvalidDirent(_Dirent):
     self.metatext = components.metatext
     self.block = components.block
     self._meta = None
+
+  def __str__(self):
+    return '<InvalidDirent:%s:%s>' % (self.components, texthexify(self.chunk))
 
   def encode(self):
     ''' Return the original data chunk.
