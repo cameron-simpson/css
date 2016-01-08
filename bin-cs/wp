@@ -37,7 +37,7 @@ else
   else
     first=1
     set -x
-    for arg in ${1+"$@"} 'width>=1024' 'width>height'
+    for arg in wp ${1+"$@"} 'width>=1024' 'width>height'
     do  [ $first ] && { set --; first=; }
       case "$arg" in
         *:* | *[\<=\>]* ) ;;
