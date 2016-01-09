@@ -543,6 +543,7 @@ class Dir(_Dirent):
     self.changed = False
     self._lock = RLock()
 
+  @locked
   def change(self):
     ''' Mark this Dir as changed; propagate to parent Dir if present.
     '''
@@ -587,7 +588,8 @@ class Dir(_Dirent):
                         if name != '.' and name != '..'
                       )
       # TODO: if len(data) >= 16384
-      B = Block(data=data)
+      B = self._block = Block(data=data)
+      self.changed = False
       ##warning("Dir.block: computed Block %s", B)
       ##XP("Dir %r: RECOMPUTED BLOCK: %s", self.name, B)
     else:
