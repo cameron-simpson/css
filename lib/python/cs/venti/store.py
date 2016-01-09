@@ -321,6 +321,26 @@ class MappingStore(BasicStoreSync):
     BasicStoreSync.__init__(self, name=name, **kw)
     self.mapping = mapping
 
+  def startup(self):
+    mapping = self.mapping
+    try:
+      openmap = mapping.open
+    except AttributeError:
+      pass
+    else:
+      openmap()
+    BasicStoreSync.startup(self)
+
+  def shutdown(self):
+    mapping = self.mapping
+    try:
+      closemap = mapping.close
+    except AttributeError:
+      pass
+    else:
+      closemap()
+    BasicStoreSync.shutdown(self)
+
   def add(self, data):
     with Pfx("add %d bytes", len(data)):
       h = self.hash(data)
