@@ -9,12 +9,13 @@ from collections import namedtuple
 import os
 from os import SEEK_SET, SEEK_END
 import os.path
-from threading import Lock, RLock
+from threading import Lock, RLock, Thread
 from zlib import compress, decompress
 from cs.cache import LRU_Cache
 from cs.excutils import LogExceptions
-from cs.logutils import D, X, debug, warning, exception, Pfx
+from cs.logutils import D, X, XP, debug, warning, exception, Pfx
 from cs.obj import O
+from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin
 from cs.serialise import get_bs, put_bs, read_bs, put_bsdata, read_bsdata
 from cs.threads import locked, locked_property
@@ -175,7 +176,7 @@ class DataDir(MultiOpenMixin):
     self.n = current[0] if current else 0
 
   def __str__(self):
-    return "%s(rollover=%s)" % (self.__class__.__name__, self.rollover)
+    return "%s(rollover=%s)" % (self.__class__.__name__, self._rollover)
 
   def startup(self):
     pass
@@ -274,7 +275,7 @@ class DataDir(MultiOpenMixin):
   def get(self, n, offset):
     return self.datafile(n).get(offset)
 
-class DataDirMapping(MultiOpenMixin,HashCodeUtilsMixin):
+class DataDirMapping(MultiOpenMixin, HashCodeUtilsMixin):
   ''' Access to a DataDir as a mapping by using a dbm index per hash type.
   '''
 
@@ -309,7 +310,14 @@ class DataDirMapping(MultiOpenMixin,HashCodeUtilsMixin):
     MultiOpenMixin.__init__(self, lock=datadir._lock)
     self.datadir = datadir
     self.indexclass = indexclass
-    self._indices = {}  # map hash name to instance of indexclass
+    # map hash name to instance of indexclass
+    self._indices = {}
+    # map individual hashcodes to locations before being persistently stored
+    self._unindexed = {}
+    self._indexQ = IterableQueue()
+    T = self._index_Thread = Thread(name="%s-index-thread" % (self,),
+                                    target=self._update_index)
+    T.start()
 
   def spec(self):
     ''' Return a datadir_spec for this DataDirMapping.
@@ -329,6 +337,9 @@ class DataDirMapping(MultiOpenMixin,HashCodeUtilsMixin):
 
   def shutdown(self):
     with self._lock:
+      # shut down new pending index updates and wait for them to be applied
+      self._indexQ.close()
+      self._index_Thread.join()
       for index in self._indices.values():
         index.close()
       self._indices = {}
@@ -420,10 +431,36 @@ class DataDirMapping(MultiOpenMixin,HashCodeUtilsMixin):
     ''' Store the supplied `data` indexed by `hashcode`.
         If the hashcode is already known, do not both storing the `data`.
     '''
-    index = self._index(hashcode.__class__)
-    if hashcode not in index:
-      n, offset = self.datadir.add(data)
-      index[hashcode] = n, offset
+    unindexed = self._unindexed
+    if hashcode in unindexed:
+      # already received
+      pass
+    else:
+      index = self._index(hashcode.__class__)
+      with self._lock:
+        # might have arrived outside the lock
+        if hashcode in unindexed:
+          pass
+        elif hashcode in index:
+          pass
+        else:
+          n, offset = self.datadir.add(data)
+          # cache the location
+          unindexed[hashcode] = n, offset
+          # queue the location for persistent storage
+          self._indexQ.put( (index, hashcode, n, offset) )
+
+  def _update_index(self):
+    ''' Thread body to collect hashcode index data and store it.
+    '''
+    with Pfx("_update_index"):
+      unindexed = self._unindexed
+      X("_update_index: start processing queue...")
+      for index, hashcode, n, offset in self._indexQ:
+        X("_update_index: add n=%d, offset=%d", n, offset)
+        index[hashcode] = n, offset
+        del unindexed[hashcode]
+      X("_update_index: END QUEUE, END THREAD")
 
   def add(self, data, hashclass=None):
     ''' Add a data chunk using the supplied `hashclass`. Return the hashcode.
