@@ -694,8 +694,10 @@ class FileHandle(O):
   ''' Filesystem state for open files.
   '''
 
-  def __init__(self, fs, path, E, for_read, for_write, for_append):
+  def __init__(self, fs, path, E, for_read, for_write, for_append, lock=None):
     O.__init__(self)
+    if lock is None:
+      lock = fs._lock
     self.fs = fs
     self.log = fs.log
     self.logQ = fs.logQ
@@ -705,6 +707,7 @@ class FileHandle(O):
     self.for_read = for_read
     self.for_write = for_write
     self.for_append = for_append
+    self._lock = lock
 
   def __str__(self):
     return "<FileHandle %r %s>" % (self.path, self.E)
@@ -712,8 +715,9 @@ class FileHandle(O):
   def write(self, data, offset):
     fp = self.Eopen._open_file
     with fp:
-      fp.seek(offset)
-      written = fp.write(data)
+      with self._lock:
+        fp.seek(offset)
+        written = fp.write(data)
     self.E.touch()
     return written
 
@@ -722,8 +726,9 @@ class FileHandle(O):
       raise ValueError("FileHandle.read: size(%d) < 1" % (size,))
     fp = self.Eopen._open_file
     with fp:
-      fp.seek(offset)
-      data = fp.read(size)
+      with self._lock:
+        fp.seek(offset)
+        data = fp.read(size)
     return data
 
   @trace_method
