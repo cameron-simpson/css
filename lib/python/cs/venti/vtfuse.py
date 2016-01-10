@@ -178,7 +178,9 @@ class StoreFS(Operations):
       if text is not None:
         write_Dirent_str(self.syncfp, text, etc=self.E.name)
         self._syncfp_last_dirent_text = text
-        dump_Dirent(self.E, recurse=False) # debugging
+        # debugging
+        dump_Dirent(self.E, recurse=False)
+        dump_Dirent(self._inodes._hardlinks_dir, recurse=False)
 
   def _mount(self, root):
     ''' Attach this StoreFS to the specified path `root`.
