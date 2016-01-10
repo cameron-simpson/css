@@ -166,6 +166,7 @@ class _Dirent(object):
   def __repr__(self):
     return "%s(%s, %s, %s)" % (self.__class__.__name__, D_type2str, self.name, self.meta)
 
+  # TODO: support .block=None
   def __eq__(self, other):
     return ( self.name == other.name
          and self.type == other.type
@@ -350,7 +351,7 @@ class SymlinkDirent(_Dirent):
 class HardlinkDirent(_Dirent):
   ''' A hard link.
       Unlike the regular UNIX filesystem, in a venti filesystem a
-      hard link is a wrapper for an ordinary Dirent which references
+      hard link is a wrapper for an ordinary Dirent; this wrapper references
       a persistent inode number and the source Dirent. Most attributes
       are proxied from the wrapped Dirent.
       In a normal Dirent .inum is a local attribute and not preserved;
