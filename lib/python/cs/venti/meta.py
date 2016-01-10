@@ -246,7 +246,7 @@ class Meta(dict):
       'u': owner
       'g': group owner
       'a': ACL
-      'i': inode number
+      'iref': inode number (hard links)
       'm': modification time, a float
       'n': number of hardlinks
       'su': setuid
@@ -258,7 +258,6 @@ class Meta(dict):
     dict.__init__(self)
     self.E = E
     self._acl = None
-    self._inum = None
     self._xattrs = {}
     self._lock = RLock()
 
@@ -269,7 +268,7 @@ class Meta(dict):
     ''' Return the encoding of this Meta as text.
     '''
     self._normalise()
-    if all(k in ('u', 'g', 'a', 'i', 'm', 'n', 'su', 'sg') for k in self.keys()):
+    if all(k in ('u', 'g', 'a', 'iref', 'm', 'n', 'su', 'sg') for k in self.keys()):
       # these are all "safe" fields - use the compact encoding
       encoded = ';'.join( ':'.join( (k, str(self[k])) )
                           for k in sorted(self.keys())
@@ -289,15 +288,6 @@ class Meta(dict):
         del self['a']
     else:
       self['a'] = encodeACL(_acl)
-    # update 'i' if necessary
-    _inum = self._inum
-    if _inum is None:
-      if 'i' in self:
-        del self['i']
-    else:
-      if not isinstance(_inum, int):
-        raise RuntimeError("self._inum is not an int: %r", _inum)
-      self['i'] = str(_inum)
     # update 'x' if necessary
     _xattrs = self._xattrs
     if _xattrs:
@@ -343,11 +333,6 @@ class Meta(dict):
           self._acl = decodeACL(v)
         else:
           warning("%s: non-str 'a': %r", self, v)
-      elif k == 'i':
-        try:
-          self._inum = int(v)
-        except ValueError:
-          warning("%s: non-int 'i': %r", self, v)
       elif k in ('m',):
         try:
           v = float(v)
@@ -588,18 +573,11 @@ class Meta(dict):
 
   @property
   def inum(self):
-    return self._inum
-
-  @inum.setter
-  def inum(self, new_inum):
-    ''' Set ._inum (field 'i') with sanity checks.
-    '''
-    if not isinstance(new_inum, int):
-      raise ValueError("expected int, got: %r", new_inum)
-    _inum = self._inum
-    if _inum is not None:
-      warning("replacing ._inum, old value %r => %r", _inum, new_inum)
-    self._inum = new_inum
+    try:
+      itxt = self['iref']
+    except KeyError:
+      raise AttributeError("inum: no 'iref' key")
+    return int(itxt)
 
   @property
   def nlink(self):
