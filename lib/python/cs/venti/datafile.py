@@ -431,7 +431,7 @@ class DataDirMapping(MultiOpenMixin, HashCodeUtilsMixin):
     try:
       return self.datadir.get(n, offset)
     except Exception as e:
-      exception("%s[%s]: not available: %s", self, hashcode, e)
+      exception("%s[%s]:%d:%d not available: %s", self, hashcode, n, offset, e)
       raise KeyError(str(hashcode))
 
   def __setitem__(self, hashcode, data):
