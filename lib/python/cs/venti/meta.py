@@ -340,6 +340,8 @@ class Meta(dict):
           warning("%s: non-float 'm': %r", self, v)
           v = 0.0
         self[k] = v
+      elif k == 'n':
+        v = int(v)
       elif k == 'x':
         # TODO: should we update the existing xattrs, or replace them all as now?
         self._xattrs = dict( (xk, untexthexify(xv)) for xk, xv in v.items() )
