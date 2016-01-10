@@ -422,12 +422,16 @@ class DataDirMapping(MultiOpenMixin, HashCodeUtilsMixin):
   def __getitem__(self, hashcode):
     ''' Return the decompressed data associated with the supplied `hashcode`.
     '''
-    index = self._index(hashcode.__class__)
+    unindexed = self._unindexed
     try:
-      n, offset = index[hashcode]
+      n, offset = unindexed[hashcode]
     except KeyError:
-      error("%s[%s]: hash not in index", self, hashcode)
-      raise
+      index = self._index(hashcode.__class__)
+      try:
+        n, offset = index[hashcode]
+      except KeyError:
+        error("%s[%s]: hash not in index", self, hashcode)
+        raise
     try:
       return self.datadir.get(n, offset)
     except Exception as e:
