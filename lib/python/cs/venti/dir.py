@@ -159,7 +159,6 @@ class _Dirent(object):
         self.meta.update_from_text(metatext)
       else:
         self.meta.update_from_items(metatext.items())
-    self._inum = None
 
   def __str__(self):
     return self.textencode()
@@ -197,21 +196,6 @@ class _Dirent(object):
     ''' Is this a hard link _Dirent?
     '''
     return self.type == D_HARD_T
-
-  @property
-  def inum(self):
-    ino = self._inum
-    if ino is None:
-      raise AttributeError("inum (._inum is None)")
-    return ino
-
-  @inum.setter
-  def inum(self, new_inum):
-    ino = self._inum
-    if ino is None:
-      self._inum = new_inum
-    else:
-      raise RuntimeError("%s: cannot set inum to %r (._inum=%r)", self, new_inum, ino)
 
   def encode(self):
     ''' Serialise this dirent.
@@ -377,15 +361,19 @@ class HardlinkDirent(_Dirent):
     if block is not None:
       raise ValueError("HardlinkDirent: block must be None, received: %s", block)
     _Dirent.__init__(self, D_HARD_T, name, metatext=metatext)
-    if self.meta.inum is None:
-      raise ValueError("HardlinkDirent: meta.inum required (metatext=%r)" % (metatext,))
+    if not hasattr(self.meta, 'inum'):
+      raise ValueError("HardlinkDirent: meta.inum required (no iref in metatext=%r)" % (metatext,))
 
   @property
   def inum(self):
-    ''' On a HardlinkDirent the .inum accesses the meta['i'] field.
+    ''' On a HardlinkDirent the .inum accesses the meta['iref'] field.
         It is set at initialisation, so there is no .setter.
     '''
     return self.meta.inum
+
+  @classmethod
+  def to_inum(cls, inum, name):
+    return cls(name, {'iref': str(inum)})
 
 class FileDirent(_Dirent, MultiOpenMixin):
   ''' A _Dirent subclass referring to a file.
