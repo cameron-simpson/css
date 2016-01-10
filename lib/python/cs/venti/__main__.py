@@ -75,8 +75,9 @@ def main(argv):
   dflt_log = os.environ.get('VT_LOGFILE')
   useMemoryCacheStore = True
 
+  args = argv[1:]
   try:
-    opts, args = getopt(argv[1:], 'C:MS:qv')
+    opts, args = getopt(args, 'C:MS:qv')
   except GetoptError as e:
     error("unrecognised option: %s: %s"% (e.opt, e.msg))
     badopts = True
