@@ -104,7 +104,6 @@ class MultiOpenMixin(O):
         ##raise RuntimeError("UNDERFLOW CLOSE of %s" % (self,))
         return
       self._opens -= 1
-      count = self._opens
       if self._opens == 0:
         self.shutdown()
         if not self._finalise_later:
