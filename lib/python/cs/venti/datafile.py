@@ -13,7 +13,7 @@ from threading import Lock, RLock, Thread
 from zlib import compress, decompress
 from cs.cache import LRU_Cache
 from cs.excutils import LogExceptions
-from cs.logutils import D, X, XP, debug, warning, exception, Pfx
+from cs.logutils import D, X, XP, debug, warning, error, exception, Pfx
 from cs.obj import O
 from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin
@@ -420,7 +420,12 @@ class DataDirMapping(MultiOpenMixin, HashCodeUtilsMixin):
   def __getitem__(self, hashcode):
     ''' Return the decompressed data associated with the supplied `hashcode`.
     '''
-    n, offset = self._index(hashcode.__class__)[hashcode]
+    index = self._index(hashcode.__class__)
+    try:
+      n, offset = index[hashcode]
+    except KeyError:
+      error("%s[%s]: hash not in index", self, hashcode)
+      raise
     try:
       return self.datadir.get(n, offset)
     except Exception as e:
