@@ -753,8 +753,8 @@ class Inodes(object):
   def __init__(self, fs, inodes_datatext=None):
     self.fs = fs
     self.max_used = 0
-    # mapping from inode number to Dirent
-    self._inodes = {}
+    # cache mapping from inode number to Dirent
+    self._dirents_by_inum = {}
     # freed inode numbers for reuse
     self._freed = Range()
     # alocated inode numbers which are not hard links, and discarded after umount
@@ -764,8 +764,6 @@ class Inodes(object):
       self._init_empty()
     else:
       self._hardlinked, self._hardlinks_dir = self._decode_inode_data(inodes_datatext)
-    # cache of inum->Dirent
-    self._inodes = {}
     self._lock = RLock()
 
   def _init_empty(self):
@@ -808,14 +806,14 @@ class Inodes(object):
         Raises ValueError if the `inum` is unknown.
     '''
     with Pfx("dirent(%d)", inum):
-      E = self._inodes.get(inum)
+      E = self._dirents_by_inum.get(inum)
       if E is None:
         ipath = '/'.join( str(b) for b in put_bs(inum) )
         E, P, tail_path = resolve(self._hardlinks_dir, ipath)
         if tail_path:
-          raise ValueError("not in self._inodes and %r not in self._hardlinks_dir"
+          raise ValueError("not in self._dirents_by_inum and %r not in self._hardlinks_dir"
                            % (ipath,))
-        self._inodes[inum] = E
+        self._dirents_by_inum[inum] = E
       return E
 
   @locked
@@ -830,9 +828,9 @@ class Inodes(object):
       freed -= inum
     else:
       inum = max( (1, self._mortal.end, self._hardlinked.end) )
-    if inum in self._inodes:
+    if inum in self._dirents_by_inum:
       raise RuntimeError("allocated inode number %d, but already in inode table (%s)"
-                         % (inum, Range(self._inodes.keys())))
+                         % (inum, Range(self._dirents_by_inum.keys())))
     if inum in self._mortal:
       raise RuntimeError("allocated inode number %d, but already in mortal inode list (%s)"
                          % (inum, self._mortal))
@@ -857,7 +855,7 @@ class Inodes(object):
     inum = self.fs._inum(E)
     E.meta.nlink = 1
     E.name = ''
-    self._inodes[inum] = E
+    self._dirents_by_inum[inum] = E
     Edst = HardlinkDirent.to_inum(inum, E.name)
     # note the inum in the _hardlinked Range
     self._hardlinked.add(inum)
