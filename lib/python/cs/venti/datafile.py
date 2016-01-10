@@ -340,6 +340,8 @@ class DataDirMapping(MultiOpenMixin, HashCodeUtilsMixin):
       # shut down new pending index updates and wait for them to be applied
       self._indexQ.close()
       self._index_Thread.join()
+      if self._unindexed:
+        error("UNINDEXED BLOCKS: %r", self._unindexed)
       for index in self._indices.values():
         index.close()
       self._indices = {}
