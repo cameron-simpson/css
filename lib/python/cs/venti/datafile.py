@@ -479,12 +479,9 @@ class DataDirMapping(MultiOpenMixin, HashCodeUtilsMixin):
     '''
     with Pfx("_update_index"):
       unindexed = self._unindexed
-      X("_update_index: start processing queue...")
       for index, hashcode, n, offset in self._indexQ:
-        X("_update_index: add n=%d, offset=%d", n, offset)
         index[hashcode] = n, offset
         del unindexed[hashcode]
-      X("_update_index: END QUEUE, END THREAD")
 
   def add(self, data, hashclass=None):
     ''' Add a data chunk using the supplied `hashclass`. Return the hashcode.
@@ -494,6 +491,7 @@ class DataDirMapping(MultiOpenMixin, HashCodeUtilsMixin):
       hashclass = self.default_hashclass
     h = hashclass.from_data(data)
     self[h] = data
+    X("ADD %s to %s", h, self)
     return h
 
   @locked
@@ -560,6 +558,7 @@ class GDBMIndex(HashCodeUtilsMixin, MultiOpenMixin):
                     decode_index_entry(self._gdbm.get(hashcode, default))
 
   def __setitem__(self, hashcode, value):
+    X("GDBMIndex ADD %s (%r)", hashcode, value)
     self._gdbm[hashcode] = encode_index_entry(*value)
 
 def GDBMDataDirMapping(dirpath, rollover=None):
