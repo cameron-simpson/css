@@ -800,6 +800,12 @@ class Inodes(object):
     # ... and append the Dirent.
     return put_bsdata(taken) + self._hardlinks_dir.encode()
 
+  def ipathelems(self, inum):
+    return [ str(b) for b in put_bs(inum) ]
+
+  def ipath(self, inum):
+    return '/'.join(self.ipathelems(inum))
+
   @locked
   def dirent(self, inum):
     ''' Locate the Dirent for inode `inum`.
@@ -808,7 +814,7 @@ class Inodes(object):
     with Pfx("dirent(%d)", inum):
       E = self._dirents_by_inum.get(inum)
       if E is None:
-        ipath = '/'.join( str(b) for b in put_bs(inum) )
+        ipath = self.ipath(inum)
         E, P, tail_path = resolve(self._hardlinks_dir, ipath)
         if tail_path:
           raise ValueError("not in self._dirents_by_inum and %r not in self._hardlinks_dir"
@@ -820,7 +826,7 @@ class Inodes(object):
   def _allocate_free_inum(self):
     ''' Allocate an unused inode number and return it.
         Use the lowest inum from ._freed, otherwise choose one above
-        ._mrtal and ._hardlinked.
+        ._mortal and ._hardlinked.
     '''
     freed = self._freed
     if freed:
@@ -829,8 +835,8 @@ class Inodes(object):
     else:
       inum = max( (1, self._mortal.end, self._hardlinked.end) )
     if inum in self._dirents_by_inum:
-      raise RuntimeError("allocated inode number %d, but already in inode table (%s)"
-                         % (inum, Range(self._dirents_by_inum.keys())))
+      raise RuntimeError("allocated inode number %d, but already in inode cache"
+                         % (inum,))
     if inum in self._mortal:
       raise RuntimeError("allocated inode number %d, but already in mortal inode list (%s)"
                          % (inum, self._mortal))
@@ -854,23 +860,24 @@ class Inodes(object):
     # use the inode number of the source Dirent
     inum = self.fs._inum(E)
     E.meta.nlink = 1
-    E.name = ''
     self._dirents_by_inum[inum] = E
     Edst = HardlinkDirent.to_inum(inum, E.name)
     # note the inum in the _hardlinked Range
     self._hardlinked.add(inum)
     # file the Dirent away in the _hardlinks_dir
     D = self._hardlinks_dir
-    path_elem = [ str(b) for b in put_bs(inum) ]
-    for name in path_elem[:-1]:
+    pathelems = self.ipathelems(inum)
+    for name in pathelems[:-1]:
       if name not in D:
         D = D.mkdir(name)
       else:
         D = D.chdir1(name)
-    name = path_elem[-1]
+    name = pathelems[-1]
+    X("HARDLINKS FINAL NAME %r", name)
     if name in D:
       raise RuntimeError("inum %d already allocated: %s", inum, D[name])
     D[name] = E
+    E.name = name
     # return the new HardlinkDirent
     return Edst
 
