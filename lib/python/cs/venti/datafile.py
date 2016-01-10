@@ -49,40 +49,6 @@ class DataFlags(int):
   def compressed(self):
     return self & F_COMPRESSED
 
-def read_chunk(fp, offset, do_decompress=False):
-  ''' Read a data chunk from the specified offset. Return (flags, chunk, post_offset).
-      If do_decompress is true and flags&F_COMPRESSED, strip that
-      flag and decompress the data before return.
-      Raises EOFError on end of file.
-  '''
-  fp.seek(offset)
-  flags = read_bs(fp)
-  if (flags & ~F_COMPRESSED) != 0:
-    raise ValueError("flags other than F_COMPRESSED: 0x%02x" % ((flags & ~F_COMPRESSED),))
-  flags = DataFlags(flags)
-  data = read_bsdata(fp)
-  offset = fp.tell()
-  if do_decompress and (flags & F_COMPRESSED):
-    data = decompress(data)
-    flags &= ~F_COMPRESSED
-  return flags, data, offset
-
-def append_chunk(fp, data, no_compress=False):
-  ''' Append a data chunk to the file, return the store offset.
-      If not no_compress, try to compress the chunk.
-  '''
-  flags = 0
-  if not no_compress:
-    data2 = compress(data)
-    if len(data2) < len(data):
-      data = data2
-      flags |= F_COMPRESSED
-    fp.seek(0, SEEK_END)
-    offset = fp.tell()
-    fp.write(put_bs(flags))
-    fp.write(put_bsdata(data))
-  return offset
-
 def decode_index_entry(entry):
   ''' Parse a binary index entry, return (n, offset).
   '''
@@ -105,7 +71,7 @@ class DataFile(MultiOpenMixin):
   def __init__(self, pathname):
     MultiOpenMixin.__init__(self)
     self.pathname = pathname
-    self.wrote = False
+    self.appending = False
 
   def __str__(self):
     return "DataFile(%s)" % (self.pathname,)
@@ -114,8 +80,44 @@ class DataFile(MultiOpenMixin):
     self.fp = open(self.pathname, "a+b")
 
   def shutdown(self):
+    if self.appending:
+      self.fp.flush()
     self.fp.close()
     self.fp = None
+
+  def _read_chunk(self, do_decompress=False):
+    ''' Read a data chunk from the current offset. Return (flags, chunk, post_offset).
+        If do_decompress is true and flags&F_COMPRESSED, strip that
+        flag and decompress the data before return.
+        Raises EOFError on end of file.
+    '''
+    fp = self.fp
+    flags = read_bs(fp)
+    if (flags & ~F_COMPRESSED) != 0:
+      raise ValueError("flags other than F_COMPRESSED: 0x%02x" % ((flags & ~F_COMPRESSED),))
+    flags = DataFlags(flags)
+    data = read_bsdata(fp)
+    offset = fp.tell()
+    if do_decompress and (flags & F_COMPRESSED):
+      data = decompress(data)
+      flags &= ~F_COMPRESSED
+    return flags, data, offset
+
+  def _write_chunk(self, data, no_compress=False):
+    ''' Write a data chunk to the file at the current position, return the starting offset.
+        If not no_compress, try to compress the chunk.
+    '''
+    fp = self.fp
+    flags = 0
+    if not no_compress:
+      data2 = compress(data)
+      if len(data2) < len(data):
+        data = data2
+        flags |= F_COMPRESSED
+      offset = fp.tell()
+      fp.write(put_bs(flags))
+      fp.write(put_bsdata(data))
+    return offset
 
   def scan(self, do_decompress=False):
     ''' Scan the data file and yield (offset, flags, zdata) tuples.
@@ -127,11 +129,12 @@ class DataFile(MultiOpenMixin):
       offset = 0
       while True:
         with self._lock:
-          if self.wrote:
+          if self.appending:
             fp.flush()
-            self.wrote = False
+            self.appending = False
+          fp.seek(offset, SEEK_SET)
           try:
-            flags, data, offset = read_chunk(fp, offset, do_decompress=do_decompress)
+            flags, data, offset = self._read_chunk(do_decompress=do_decompress)
           except EOFError:
             break
         yield offset, flags, data
@@ -141,10 +144,11 @@ class DataFile(MultiOpenMixin):
     '''
     fp = self.fp
     with self._lock:
-      if self.wrote:
+      if self.appending:
         fp.flush()
-        self.wrote = False
-      flags, data, offset = read_chunk(fp, offset, do_decompress=True)
+        self.appending = False
+      fp.seek(offset, SEEK_SET)
+      flags, data, offset = self._read_chunk(do_decompress=True)
     if flags:
       raise ValueError("unhandled flags: 0x%02x" % (flags,))
     return data
@@ -154,8 +158,10 @@ class DataFile(MultiOpenMixin):
     '''
     fp = self.fp
     with self._lock:
-      self.wrote = True
-      return append_chunk(fp, data, no_compress=no_compress)
+      if not self.appending:
+        self.appending = True
+        fp.seek(0, SEEK_END)
+      return self._write_chunk(data, no_compress=no_compress)
 
 class DataDir(MultiOpenMixin):
   ''' A class for managing a directory of DataFiles. An instance
