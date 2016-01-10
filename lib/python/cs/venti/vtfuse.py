@@ -213,13 +213,17 @@ class StoreFS(Operations):
 
   def _inum(self, E):
     ''' Compute the inode number for a Dirent.
-        HardlinkDirents have a persistent .inum mapping the the Meta['i'] field.
+        HardlinkDirents have a persistent .inum mapping the the Meta['iref'] field.
         Others do not and keep a private ._inum, not preserved across umount.
     '''
-    try:
+    if E.ishardlink:
       inum = E.inum
-    except AttributeError:
-      inum = E.inum = self.allocate_mortal_inum()
+    else:
+      # allocate transient inum
+      try:
+        inum = E._inum
+      except AttributeError:
+        inum = E._inum = self.allocate_mortal_inum()
     return inum
 
   def _Estat(self, E):
@@ -410,7 +414,7 @@ class StoreFS(Operations):
     # make a new hardlink object referencing the inode
     # and attach it to the target directory
     name, = tail_path
-    Edst[name] = HardlinkDirent(name, {'i': inum})
+    Edst[name] = HardlinkDirent.to_inum(inum, name)
     # increment link count on underlying Dirent
     Esrc.meta.nlink += 1
 
@@ -849,7 +853,7 @@ class Inodes(object):
     E.meta.nlink = 1
     E.name = ''
     self._inodes[inum] = E
-    Edst = HardlinkDirent(E.name, {'i': inum})
+    Edst = HardlinkDirent.to_inum(inum, E.name)
     # note the inum in the _hardlinked Range
     self._hardlinked.add(inum)
     # file the Dirent away in the _hardlinks_dir
