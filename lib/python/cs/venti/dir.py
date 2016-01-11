@@ -633,6 +633,7 @@ class Dir(_Dirent):
       raise ValueError("E is not a _Dirent: <%s>%r" % (type(E), E))
     self.change()
     self.entries[name] = E
+    E.name = name
     if E.isdir:
       Eparent = E.parent
       if Eparent is None:
