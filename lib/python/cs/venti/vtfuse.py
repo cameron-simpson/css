@@ -891,7 +891,6 @@ class Inodes(object):
     if name in D:
       raise RuntimeError("inum %d already allocated: %s", inum, D[name])
     D[name] = E
-    E.name = name
     self._dirents_by_inum[inum] = E, D
     # return the new HardlinkDirent
     return Edst
