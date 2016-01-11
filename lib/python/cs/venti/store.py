@@ -79,7 +79,7 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin):
       if name is None:
         name = "%s%d" % (self.__class__.__name__, next(_BasicStoreCommon._seq()))
       if capacity is None:
-        capacity = 1
+        capacity = 4
       if hashclass is None:
         hashclass = DEFAULT_HASHCLASS
       MultiOpenMixin.__init__(self, lock=lock)
