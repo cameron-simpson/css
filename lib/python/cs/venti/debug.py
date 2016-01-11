@@ -1,8 +1,9 @@
 #!/usr/bin/python
 
 import sys
-from cs.lex import hexify
+from cs.lex import hexify, texthexify
 from cs.logutils import X
+from .dir import InvalidDirent
 
 def dump_Block(block, indent=''):
   X("%s%s %s %d bytes",
@@ -18,22 +19,24 @@ def dump_Block(block, indent=''):
     for B in subblocks:
       dump_Block(B, indent=indent)
 
-def dump_Dirent(E, indent='', recurse=False):
+def dump_Dirent(E, indent='', recurse=False, not_dir=False):
+  if isinstance(E, InvalidDirent):
+    details = '<INVALID:%s:%s>' % (E.components, texthexify(E.chunk))
+  elif E.issym:
+    details = '-> ' + repr(E.pathref)
+  elif E.ishardlink:
+    details = 'inode ' + str(E.inum)
+  else:
+    details = hexify(E.block.hashcode)
+  details 
   X("%s%s %r %s",
     indent,
     'd' if E.isdir else '-',
     E.name,
-    '-> '+repr(E.pathref) if E.issym else hexify(E.block.hashcode),
+    details,
    )
-  if E.isdir:
+  if E.isdir and not not_dir:
     indent += '  '
     for name in sorted(E.keys()):
       E2 = E[name]
-      if recurse:
-        dump_Dirent(E2, indent, recurse=True)
-      else:
-        X("%s%s %r %s",
-          indent,
-          'd' if E2.isdir else '-',
-          E2.name,
-          hexify(E2.block.hashcode))
+      dump_Dirent(E2, indent, recurse=recurse, not_dir=not recurse)

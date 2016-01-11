@@ -21,7 +21,8 @@ from .archive import CopyModes, update_archive, toc_archive, last_Dirent, copy_o
 from .block import Block, IndirectBlock, dump_block
 from .cache import CacheStore, MemoryCacheStore
 from .debug import dump_Dirent
-from .datafile import DataDirMapping_from_spec
+from .datafile import DataFile, DataDir, \
+                      F_COMPRESSED, decompress, DataDirMapping_from_spec
 from .dir import Dir
 from .hash import DEFAULT_HASHCLASS, HASHCLASS_BY_NAME
 from .paths import dirent_dir, dirent_file, dirent_resolve, resolve
@@ -74,8 +75,9 @@ def main(argv):
   dflt_log = os.environ.get('VT_LOGFILE')
   useMemoryCacheStore = True
 
+  args = argv[1:]
   try:
-    opts, args = getopt(argv[1:], 'C:MS:qv')
+    opts, args = getopt(args, 'C:MS:qv')
   except GetoptError as e:
     error("unrecognised option: %s: %s"% (e.opt, e.msg))
     badopts = True
@@ -516,19 +518,24 @@ def cmd_pull(args, verbose=None, log=None):
 def cmd_scan(args, verbose=None, log=None):
   ''' Read a datafile and report.
   '''
-  if len(args) != 1:
-    raise GetoptError("missing datafile")
-  datafile = args[0]
-  from cs.venti.datafile import DataFile, F_COMPRESSED, decompress
-  from cs.venti.hash import Hash_SHA1
-  with Pfx(datafile):
-    with DataFile(datafile) as dfp:
-      for offset, flags, data in dfp.scan():
-        if flags & F_COMPRESSED:
-          data2 = decompress(data)
-        else:
-          data2 = data
-        print(Hash_SHA1.from_data(data2), offset, flags, len(data))
+  if len(args) < 1:
+    raise GetoptError("missing datafile/datadir")
+  hashclass = DEFAULT_HASHCLASS
+  for arg in args:
+    if os.path.isdir(arg):
+      dirpath = arg
+      D = DataDir(dirpath)
+      with D:
+        for n, offset, data in D.scan():
+          print(dirpath, n, offset, "%d:%s" % (len(data), hashclass.from_data(data)))
+    else:
+      filepath = arg
+      F = DataFile(filepath)
+      with F:
+        for offset, flags, data in F.scan():
+          if flags & F_COMPRESSED:
+            data = decompress(data)
+          print(filepath, offset, "%d:%s" % (len(data), hashclass.from_data(data)))
   return 0
 
 def cmd_unpack(args, verbose=None, log=None):

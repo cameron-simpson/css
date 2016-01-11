@@ -9,12 +9,13 @@ from collections import namedtuple
 import os
 from os import SEEK_SET, SEEK_END
 import os.path
-from threading import Lock, RLock
+from threading import Lock, RLock, Thread
 from zlib import compress, decompress
 from cs.cache import LRU_Cache
 from cs.excutils import LogExceptions
-from cs.logutils import D, X, debug, warning, exception, Pfx
+from cs.logutils import D, X, XP, debug, warning, error, exception, Pfx
 from cs.obj import O
+from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin
 from cs.serialise import get_bs, put_bs, read_bs, put_bsdata, read_bsdata
 from cs.threads import locked, locked_property
@@ -48,42 +49,6 @@ class DataFlags(int):
   def compressed(self):
     return self & F_COMPRESSED
 
-def read_chunk(fp, offset, do_decompress=False):
-  ''' Read a data chunk from the specified offset. Return (flags, chunk, post_offset).
-      If do_decompress is true and flags&F_COMPRESSED, strip that
-      flag and decompress the data before return.
-      Raises EOFError on end of file.
-  '''
-  if fp.tell() != offset:
-    fp.flush()
-    fp.seek(offset)
-  flags = read_bs(fp)
-  if (flags & ~F_COMPRESSED) != 0:
-    raise ValueError("flags other than F_COMPRESSED: 0x%02x" % ((flags & ~F_COMPRESSED),))
-  flags = DataFlags(flags)
-  data = read_bsdata(fp)
-  offset = fp.tell()
-  if do_decompress and (flags & F_COMPRESSED):
-    data = decompress(data)
-    flags &= ~F_COMPRESSED
-  return flags, data, offset
-
-def append_chunk(fp, data, no_compress=False):
-  ''' Append a data chunk to the file, return the store offset.
-      If not no_compress, try to compress the chunk.
-  '''
-  flags = 0
-  if not no_compress:
-    data2 = compress(data)
-    if len(data2) < len(data):
-      data = data2
-      flags |= F_COMPRESSED
-    fp.seek(0, SEEK_END)
-    offset = fp.tell()
-    fp.write(put_bs(flags))
-    fp.write(put_bsdata(data))
-  return offset
-
 def decode_index_entry(entry):
   ''' Parse a binary index entry, return (n, offset).
   '''
@@ -106,6 +71,7 @@ class DataFile(MultiOpenMixin):
   def __init__(self, pathname):
     MultiOpenMixin.__init__(self)
     self.pathname = pathname
+    self.appending = False
 
   def __str__(self):
     return "DataFile(%s)" % (self.pathname,)
@@ -114,8 +80,44 @@ class DataFile(MultiOpenMixin):
     self.fp = open(self.pathname, "a+b")
 
   def shutdown(self):
+    if self.appending:
+      self.fp.flush()
     self.fp.close()
     self.fp = None
+
+  def _read_chunk(self, do_decompress=False):
+    ''' Read a data chunk from the current offset. Return (flags, chunk, post_offset).
+        If do_decompress is true and flags&F_COMPRESSED, strip that
+        flag and decompress the data before return.
+        Raises EOFError on end of file.
+    '''
+    fp = self.fp
+    flags = read_bs(fp)
+    if (flags & ~F_COMPRESSED) != 0:
+      raise ValueError("flags other than F_COMPRESSED: 0x%02x" % ((flags & ~F_COMPRESSED),))
+    flags = DataFlags(flags)
+    data = read_bsdata(fp)
+    offset = fp.tell()
+    if do_decompress and (flags & F_COMPRESSED):
+      data = decompress(data)
+      flags &= ~F_COMPRESSED
+    return flags, data, offset
+
+  def _write_chunk(self, data, no_compress=False):
+    ''' Write a data chunk to the file at the current position, return the starting offset.
+        If not no_compress, try to compress the chunk.
+    '''
+    fp = self.fp
+    flags = 0
+    if not no_compress:
+      data2 = compress(data)
+      if len(data2) < len(data):
+        data = data2
+        flags |= F_COMPRESSED
+      offset = fp.tell()
+      fp.write(put_bs(flags))
+      fp.write(put_bsdata(data))
+    return offset
 
   def scan(self, do_decompress=False):
     ''' Scan the data file and yield (offset, flags, zdata) tuples.
@@ -127,8 +129,12 @@ class DataFile(MultiOpenMixin):
       offset = 0
       while True:
         with self._lock:
+          if self.appending:
+            fp.flush()
+            self.appending = False
+          fp.seek(offset, SEEK_SET)
           try:
-            flags, data, offset = read_chunk(self.fp, offset, do_decompress=do_decompress)
+            flags, data, offset = self._read_chunk(do_decompress=do_decompress)
           except EOFError:
             break
         yield offset, flags, data
@@ -138,7 +144,11 @@ class DataFile(MultiOpenMixin):
     '''
     fp = self.fp
     with self._lock:
-      flags, data, offset = read_chunk(self.fp, offset, do_decompress=True)
+      if self.appending:
+        fp.flush()
+        self.appending = False
+      fp.seek(offset, SEEK_SET)
+      flags, data, offset = self._read_chunk(do_decompress=True)
     if flags:
       raise ValueError("unhandled flags: 0x%02x" % (flags,))
     return data
@@ -146,8 +156,12 @@ class DataFile(MultiOpenMixin):
   def put(self, data, no_compress=False):
     ''' Append a chunk of data to the file, return the store offset.
     '''
+    fp = self.fp
     with self._lock:
-      return append_chunk(self.fp, data, no_compress=no_compress)
+      if not self.appending:
+        self.appending = True
+        fp.seek(0, SEEK_END)
+      return self._write_chunk(data, no_compress=no_compress)
 
 class DataDir(MultiOpenMixin):
   ''' A class for managing a directory of DataFiles. An instance
@@ -175,7 +189,7 @@ class DataDir(MultiOpenMixin):
     self.n = current[0] if current else 0
 
   def __str__(self):
-    return "%s(rollover=%s)" % (self.__class__.__name__, self.rollover)
+    return "%s(rollover=%s)" % (self.__class__.__name__, self._rollover)
 
   def startup(self):
     pass
@@ -274,7 +288,7 @@ class DataDir(MultiOpenMixin):
   def get(self, n, offset):
     return self.datafile(n).get(offset)
 
-class DataDirMapping(MultiOpenMixin,HashCodeUtilsMixin):
+class DataDirMapping(MultiOpenMixin, HashCodeUtilsMixin):
   ''' Access to a DataDir as a mapping by using a dbm index per hash type.
   '''
 
@@ -309,7 +323,14 @@ class DataDirMapping(MultiOpenMixin,HashCodeUtilsMixin):
     MultiOpenMixin.__init__(self, lock=datadir._lock)
     self.datadir = datadir
     self.indexclass = indexclass
-    self._indices = {}  # map hash name to instance of indexclass
+    # map hash name to instance of indexclass
+    self._indices = {}
+    # map individual hashcodes to locations before being persistently stored
+    self._unindexed = {}
+    self._indexQ = IterableQueue()
+    T = self._index_Thread = Thread(name="%s-index-thread" % (self,),
+                                    target=self._update_index)
+    T.start()
 
   def spec(self):
     ''' Return a datadir_spec for this DataDirMapping.
@@ -329,6 +350,11 @@ class DataDirMapping(MultiOpenMixin,HashCodeUtilsMixin):
 
   def shutdown(self):
     with self._lock:
+      # shut down new pending index updates and wait for them to be applied
+      self._indexQ.close()
+      self._index_Thread.join()
+      if self._unindexed:
+        error("UNINDEXED BLOCKS: %r", self._unindexed)
       for index in self._indices.values():
         index.close()
       self._indices = {}
@@ -409,21 +435,53 @@ class DataDirMapping(MultiOpenMixin,HashCodeUtilsMixin):
   def __getitem__(self, hashcode):
     ''' Return the decompressed data associated with the supplied `hashcode`.
     '''
-    n, offset = self._index(hashcode.__class__)[hashcode]
+    unindexed = self._unindexed
+    try:
+      n, offset = unindexed[hashcode]
+    except KeyError:
+      index = self._index(hashcode.__class__)
+      try:
+        n, offset = index[hashcode]
+      except KeyError:
+        error("%s[%s]: hash not in index", self, hashcode)
+        raise
     try:
       return self.datadir.get(n, offset)
     except Exception as e:
-      exception("%s[%s]: not available: %s", self, hashcode, e)
+      exception("%s[%s]:%d:%d not available: %s", self, hashcode, n, offset, e)
       raise KeyError(str(hashcode))
 
   def __setitem__(self, hashcode, data):
     ''' Store the supplied `data` indexed by `hashcode`.
         If the hashcode is already known, do not both storing the `data`.
     '''
-    index = self._index(hashcode.__class__)
-    if hashcode not in index:
-      n, offset = self.datadir.add(data)
-      index[hashcode] = n, offset
+    unindexed = self._unindexed
+    if hashcode in unindexed:
+      # already received
+      pass
+    else:
+      index = self._index(hashcode.__class__)
+      with self._lock:
+        # might have arrived outside the lock
+        if hashcode in unindexed:
+          pass
+        elif hashcode in index:
+          pass
+        else:
+          n, offset = self.datadir.add(data)
+          # cache the location
+          unindexed[hashcode] = n, offset
+          # queue the location for persistent storage
+          self._indexQ.put( (index, hashcode, n, offset) )
+
+  def _update_index(self):
+    ''' Thread body to collect hashcode index data and store it.
+    '''
+    with Pfx("_update_index"):
+      unindexed = self._unindexed
+      for index, hashcode, n, offset in self._indexQ:
+        index[hashcode] = n, offset
+        del unindexed[hashcode]
 
   def add(self, data, hashclass=None):
     ''' Add a data chunk using the supplied `hashclass`. Return the hashcode.
@@ -433,6 +491,7 @@ class DataDirMapping(MultiOpenMixin,HashCodeUtilsMixin):
       hashclass = self.default_hashclass
     h = hashclass.from_data(data)
     self[h] = data
+    X("ADD %s to %s", h, self)
     return h
 
   @locked
@@ -499,6 +558,7 @@ class GDBMIndex(HashCodeUtilsMixin, MultiOpenMixin):
                     decode_index_entry(self._gdbm.get(hashcode, default))
 
   def __setitem__(self, hashcode, value):
+    X("GDBMIndex ADD %s (%r)", hashcode, value)
     self._gdbm[hashcode] = encode_index_entry(*value)
 
 def GDBMDataDirMapping(dirpath, rollover=None):

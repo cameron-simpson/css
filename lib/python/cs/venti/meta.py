@@ -246,7 +246,9 @@ class Meta(dict):
       'u': owner
       'g': group owner
       'a': ACL
+      'iref': inode number (hard links)
       'm': modification time, a float
+      'n': number of hardlinks
       'su': setuid
       'sg': setgid
       'pathref': pathname component for symlinks (and, later, hard links)
@@ -266,7 +268,7 @@ class Meta(dict):
     ''' Return the encoding of this Meta as text.
     '''
     self._normalise()
-    if all(k in ('u', 'g', 'a', 'm', 'su', 'sg') for k in self.keys()):
+    if all(k in ('u', 'g', 'a', 'iref', 'm', 'n', 'su', 'sg') for k in self.keys()):
       # these are all "safe" fields - use the compact encoding
       encoded = ';'.join( ':'.join( (k, str(self[k])) )
                           for k in sorted(self.keys())
@@ -292,6 +294,14 @@ class Meta(dict):
       self['x'] = dict( (name, texthexify(data)) for name, data in _xattrs.items() )
     elif 'x' in self:
       del self['x']
+
+  @classmethod
+  def from_text(cls, metatext, E=None):
+    ''' Construct a new Meta from `metatext`.
+    '''
+    M = cls(E)
+    M.update_from_text(metatext)
+    return M
 
   def update_from_text(self, metatext):
     ''' Update the Meta fields from the supplied metatext.
@@ -322,7 +332,7 @@ class Meta(dict):
         if isinstance(v, str):
           self._acl = decodeACL(v)
         else:
-          warning("metatext %r: 'a' is not a str: %r", metatext, v)
+          warning("%s: non-str 'a': %r", self, v)
       elif k in ('m',):
         try:
           v = float(v)
@@ -330,6 +340,8 @@ class Meta(dict):
           warning("%s: non-float 'm': %r", self, v)
           v = 0.0
         self[k] = v
+      elif k == 'n':
+        v = int(v)
       elif k == 'x':
         # TODO: should we update the existing xattrs, or replace them all as now?
         self._xattrs = dict( (xk, untexthexify(xv)) for xk, xv in v.items() )
@@ -534,8 +546,11 @@ class Meta(dict):
       perms = stat.S_IFREG
     elif self.E.issym:
       perms = stat.S_IFLNK
+    elif self.E.ishardlink:
+      perms = stat.S_IFREG
     else:
-      warning("Meta.unix_perms: neither a dir nor a file")
+      warning("Meta.unix_perms: neither a dir nor a file, pretending S_IFREG")
+      perms = stat.S_IFREG
     for ac in self.acl:
       if ac.prefix == 'o':
         perms |= ac.unixmode << 6
@@ -557,6 +572,26 @@ class Meta(dict):
     if gid is None:
       gid = NOGROUPID
     return uid, gid, perms
+
+  @property
+  def inum(self):
+    try:
+      itxt = self['iref']
+    except KeyError:
+      raise AttributeError("inum: no 'iref' key")
+    return int(itxt)
+
+  @property
+  def nlink(self):
+    return self.get('n', 1)
+
+  @nlink.setter
+  def nlink(self, new_nlink):
+    self['n'] = new_nlink
+
+  @nlink.deleter
+  def nlink(self):
+    del self['n']
 
   @property
   def pathref(self):
@@ -611,11 +646,14 @@ class Meta(dict):
     st_uid, st_gid, st_mode = self.unix_perms
     st_ino = -1
     st_dev = -1
-    st_nlink = 1
+    st_nlink = self.nlink
     try:
       st_size = E.size
     except AttributeError:
       st_size = 0
+    else:
+      if st_size is None:
+        st_size = 0
     st_atime = 0
     st_mtime = self.mtime
     st_ctime = 0
