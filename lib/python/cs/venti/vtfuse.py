@@ -502,7 +502,10 @@ class StoreFS(Operations):
       E = newE
     else:
       debug("file exists already")
-      pass
+      if E.ishardlink:
+        # point E at the shared Dirent
+        inum = self._inum(E)
+        E, P = self._inodes.dirent(inum)
     fh = FileHandle(self, path, E, for_read, for_write, for_append)
     if do_trunc:
       fh.truncate(0)
@@ -807,19 +810,31 @@ class Inodes(object):
     return '/'.join(self.ipathelems(inum))
 
   @locked
-  def dirent(self, inum):
-    ''' Locate the Dirent for inode `inum`.
+  def dirent2(self, inum):
+    ''' Locate the Dirent for inode `inum`, return it and its parent.
         Raises ValueError if the `inum` is unknown.
     '''
-    with Pfx("dirent(%d)", inum):
-      E = self._dirents_by_inum.get(inum)
-      if E is None:
+    with Pfx("dirent2(%d)", inum):
+      XP("inum=%r, _dirents_by_inum=%r", inum, self._dirents_by_inum)
+      Einfo = self._dirents_by_inum.get(inum)
+      if Einfo is None:
         ipath = self.ipath(inum)
         E, P, tail_path = resolve(self._hardlinks_dir, ipath)
         if tail_path:
           raise ValueError("not in self._dirents_by_inum and %r not in self._hardlinks_dir"
                            % (ipath,))
-        self._dirents_by_inum[inum] = E
+        self._dirents_by_inum[inum] = E, P
+      else:
+        E, P = Einfo
+      return E, P
+
+  @locked
+  def dirent(self, inum):
+    ''' Locate the Dirent for inode `inum`, return it.
+        Raises ValueError if the `inum` is unknown.
+    '''
+    with Pfx("dirent(%d)", inum):
+      E, P = self.dirent2(inum)
       return E
 
   @locked
@@ -860,7 +875,6 @@ class Inodes(object):
     # use the inode number of the source Dirent
     inum = self.fs._inum(E)
     E.meta.nlink = 1
-    self._dirents_by_inum[inum] = E
     Edst = HardlinkDirent.to_inum(inum, E.name)
     # note the inum in the _hardlinked Range
     self._hardlinked.add(inum)
@@ -878,6 +892,7 @@ class Inodes(object):
       raise RuntimeError("inum %d already allocated: %s", inum, D[name])
     D[name] = E
     E.name = name
+    self._dirents_by_inum[inum] = E, D
     # return the new HardlinkDirent
     return Edst
 
