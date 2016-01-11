@@ -505,7 +505,7 @@ class StoreFS(Operations):
       if E.ishardlink:
         # point E at the shared Dirent
         inum = self._inum(E)
-        E, P = self._inodes.dirent(inum)
+        E, P = self._inodes.dirent2(inum)
     fh = FileHandle(self, path, E, for_read, for_write, for_append)
     if do_trunc:
       fh.truncate(0)
