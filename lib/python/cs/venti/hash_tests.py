@@ -89,7 +89,10 @@ class _TestHashCodeUtils(_TestAdditionsMixin):
     for n in range(16):
       data = randblock(rand0(8192))
       h = M1.add(data)
+      self.assertIn(h, M1)
+      self.assertNotIn(h, KS1)
       KS1.add(h)
+      self.assertIn(h, KS1)
       self.assertLen(M1, n+1)
       self.assertEqual(len(KS1), n+1)
       self.assertEqual(set(M1.hashcodes()), KS1)
