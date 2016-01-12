@@ -1,4 +1,6 @@
-#!/bin/sh -u
+#!/bin/sh
+
+set -uex
 
 : ${SIGNATURE:=$HOME/rc/mail/signature.$SYSTEMID}
 
