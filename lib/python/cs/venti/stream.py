@@ -124,7 +124,6 @@ class StreamStore(BasicStoreAsync):
                                                reverse=reverse,
                                                after=after,
                                                length=length)
-      X("self.local_store.hash_of_hashcodes => %r", etc)
       hashcode, h_final = etc
       payload = hashcode.encode()
       if h_final is not None:
