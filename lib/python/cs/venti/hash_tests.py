@@ -156,11 +156,12 @@ class _TestHashCodeUtils(_TestAdditionsMixin):
     ks = sorted(KS1)
     for reverse in False, True:
       for start_hashcode in [None] + ks + [h2]:
-        with self.subTest(reverse=reverse, start_hashcode=start_hashcode):
+        with self.subTest(M1type=type(M1), reverse=reverse, start_hashcode=start_hashcode):
           hs = list(M1.hashcodes_from(start_hashcode=start_hashcode,
                                       reverse=reverse))
           if reverse:
-            hs2 = [ h for h in reversed(ks) if start_hashcode is None or h <= start_hashcode ]
+            ksrev = reversed(ks)
+            hs2 = [ h for h in ksrev if start_hashcode is None or h <= start_hashcode ]
           else:
             hs2 = [ h for h in ks if start_hashcode is None or h >= start_hashcode ]
           self.assertEqual(hs, hs2)
