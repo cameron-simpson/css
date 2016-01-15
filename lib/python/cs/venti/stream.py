@@ -31,11 +31,22 @@ class StreamStore(BasicStoreAsync):
       or simply to implement the server side.
   '''
 
-  def __init__(self, name, send_fp, recv_fp, local_store=None):
+  def __init__(self, name, send_fp, recv_fp, local_store=None, addif=False):
+    ''' Initialise the Stream Store.
+        `name`: the Store name.
+        `send_fp`: binary stream file for sending data to the peer.
+        `recv_fp`: binary stream file for receiving data from the peer.
+        `local_store`: optional local Store for serving requests from the peer.
+        `addif`: optional mode causing .add to probe the peer for
+            the data chunk's hash and to only submit a T_ADD request
+            if the block is missing; this is a bandwith optimisation
+            at the expense of latency.
+    '''
     BasicStoreAsync.__init__(self, ':'.join( ('StreamStore', name) ))
     self._conn = PacketConnection(send_fp, recv_fp, self._handle_request,
                                   name=':'.join( (self.name, 'PacketConnection') ))
     self.local_store = local_store
+    self.mode_addif = addif
 
   def startup(self):
     BasicStoreAsync.startup(self)
@@ -106,13 +117,13 @@ class StreamStore(BasicStoreAsync):
       payload = b''.join(h.encode() for h in hcodes)
       return 1, payload
     if rq_type == T_HASHCODES_HASH:
-      hashclass, start_hashcode, reverse, after, length = self._decode_request_hash_of_hashcodes(flags, payload)
+      hashclass, start_hashcode, reverse, after, length \
+        = self._decode_request_hash_of_hashcodes(flags, payload)
       etc = self.local_store.hash_of_hashcodes(hashclass=hashclass,
-                                                             start_hashcode=start_hashcode,
-                                                             reverse=reverse,
-                                                             after=after,
-                                                             length=length)
-      X("self.local_store.hash_of_hashcodes => %r", etc)
+                                               start_hashcode=start_hashcode,
+                                               reverse=reverse,
+                                               after=after,
+                                               length=length)
       hashcode, h_final = etc
       payload = hashcode.encode()
       if h_final is not None:
@@ -121,10 +132,26 @@ class StreamStore(BasicStoreAsync):
     raise ValueError("unrecognised request code: %d; data=%r"
                      % (rq_type, payload))
 
+  def _add_direct_bg(self, data):
+    return self._conn.request(T_ADD, 0, data, self._decode_response_add)
+
   def add_bg(self, data):
     ''' Dispatch an add request, return a Result for collection.
     '''
-    return self._conn.request(T_ADD, 0, data, self._decode_response_add)
+    if not self.mode_addif:
+      return self._add_direct_bg(data)
+    hashclass = self.hashclass
+    def add_if_missing():
+      h = hashclass.from_data(data)
+      if self.contains(h):
+        return h
+      h2 = self._add_direct_bg(data)()
+      if h != h2:
+        raise RuntimeError("hashclass=%s: precomputed hash %s != hash from .add %s"
+                           % (hashclass, h, h2))
+      return h
+    LF = self._defer(add_if_missing)
+    return LF
 
   @staticmethod
   def _decode_response_add(flags, payload):
