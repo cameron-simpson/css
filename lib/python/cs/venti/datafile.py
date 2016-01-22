@@ -558,7 +558,7 @@ class GDBMIndex(HashCodeUtilsMixin, MultiOpenMixin):
                     decode_index_entry(self._gdbm.get(hashcode, default))
 
   def __setitem__(self, hashcode, value):
-    X("GDBMIndex ADD %s (%r)", hashcode, value)
+    ##X("GDBMIndex ADD %s (%r)", hashcode, value)
     self._gdbm[hashcode] = encode_index_entry(*value)
 
 def GDBMDataDirMapping(dirpath, rollover=None):
