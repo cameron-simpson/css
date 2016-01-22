@@ -7,7 +7,7 @@
 
 from itertools import chain
 import sys
-from cs.logutils import debug, warning, D
+from cs.logutils import debug, warning, D, X
 from .block import Block, IndirectBlock, dump_block
 
 MIN_BLOCKSIZE = 80      # less than this seems silly
@@ -121,6 +121,7 @@ def blockify(data_chunks, vocab=None):
         else:
           is_edge, edge_offset, subVocab = vocab.test_for_edge(data, offset)
           if is_edge:
+            X("found vocab edge at %r %d", data[offset:offset+10], edge_offset)
             offset += edge_offset
             if offset < start or offset >= len(data):
               raise RuntimeError("bad offset after test_for_vocab_edge")
