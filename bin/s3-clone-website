@@ -57,7 +57,7 @@ dsturl=s3://$s3bucket
 vhsubdir=$fqdn
 
 s3(){
-  s3cmd -c "$S3CFG" ${1+"$@"}
+  s3cmd -c "$S3CFG" -q ${1+"$@"}
 }
 
 setx(){
