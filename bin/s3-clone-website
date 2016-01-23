@@ -10,9 +10,15 @@ set -ue
 
 no_wget=
 no_sync=
+htdocs_dir=
 
 cmd=$( basename "$0" )
-usage="Usage: $cmd [--no-wget] [--no-sync] fqdn s3-bucket-name"
+usage="Usage: $cmd [--no-wget] [--no-sync] [-d htdocs-dir] fqdn s3-bucket-name
+  --no-wget Do not update the htdocs tree from the source website.
+  --no-sync Do not update the S3 bucket from the htdocs tree.
+  -d htdocs-dir
+            Use the specified directory as the htdocs tree; the default is
+            taken from the FQDN."
 
 badopts=
 
@@ -21,6 +27,7 @@ do
   case "$1" in
     --no-sync)  no_sync=1 ;;
     --no-wget)  no_wget=1 ;;
+    -d)         htdocs_dir=$2; shift ;;
     --)         shift; break ;;
     -?*)        echo "$cmd: unrecognised option: $1" >&2
                 badopts=1
@@ -54,10 +61,10 @@ fi
 
 srcurl=http://$fqdn/
 dsturl=s3://$s3bucket
-vhsubdir=$fqdn
+[ -n "$htdocs_dir" ] || htdocs_dir=$fqdn
 
 s3(){
-  s3cmd -c "$S3CFG" -q ${1+"$@"}
+  s3cmd -q -c "$S3CFG" ${1+"$@"}
 }
 
 setx(){
@@ -66,11 +73,16 @@ setx(){
 
 xit=0
 
-[ $no_wget ] || setx wget -q -mp "$srcurl" || { echo "$cmd: warning: wget had errors, rerun with -nv for details" >&2; xit=1; }
+cd "$htdocs_dir"
+
+if [ -z "$no_wget" ]
+then
+  setx wget -q -mp -nH "$srcurl" \
+  || { echo "$cmd: warning: wget had errors, rerun with -nv for details" >&2; xit=1; }
+fi
 
 if [ -z "$no_sync" ]
 then
-  cd "$vhsubdir"
   setx s3 -MP sync . "$dsturl"
   # repair
   for fixext in text/css:.css
