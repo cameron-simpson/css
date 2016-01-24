@@ -121,7 +121,6 @@ def blockify(data_chunks, vocab=None):
         else:
           is_edge, edge_offset, subVocab = vocab.test_for_edge(data, offset)
           if is_edge:
-            X("found vocab edge at %r %d", data[offset:offset+10], edge_offset)
             offset += edge_offset
             if offset < start or offset >= len(data):
               raise RuntimeError("bad offset after test_for_vocab_edge")
