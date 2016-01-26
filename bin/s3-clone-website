@@ -27,7 +27,6 @@ usage="Usage: $cmd [--no-wget] [--no-sync] [-d htdocs-dir] fqdn s3-bucket-name
 
 badopts=
 
-set -x
 while [ $# -gt 0 ]
 do
   case "$1" in
@@ -90,7 +89,6 @@ then
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
-set +x
 
 srcurl=http://$fqdn/
 dsturl=s3://$s3bucket
@@ -119,7 +117,7 @@ then
   fi
   echo "$recite $srcurl" >&2
   "$@" "$srcurl" \
-  || { echo "$cmd: warning: wget had errors, rerun with -nv for details" >&2; xit=1; }
+  || echo "$cmd: warning: wget had errors, rerun with -nv for details" >&2
 fi
 
 [ $no_sync ] || setx s3 -MP sync . "$dsturl"
