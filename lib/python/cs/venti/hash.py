@@ -154,20 +154,31 @@ class HashCodeUtilsMixin(object):
         raise TypeError("hashclass %s does not match start_hashcode %r"
                         % (hashclass, start_hashcode))
     ks = self._sorted_keys(hashclass=hashclass)
+    if not ks:
+      return
     if start_hashcode is None:
       if reverse:
         ndx = len(ks) - 1
       else:
         ndx = 0
     else:
-      if reverse:
-        ndx = bisect_right(ks, start_hashcode)
-        if ndx > 0 and ndx == len(ks):
+      ndx = bisect_left(ks, start_hashcode)
+      if ndx == len(ks):
+        # start_hashcode > max hashcode
+        if reverse:
+          # step back into array
           ndx -= 1
-        elif ks[ndx] > start_hashcode:
-          ndx -= 1
+        else:
+          # nothing to return
+          return
       else:
-        ndx = bisect_left(ks, start_hashcode)
+        # start_hashcode <= max hashcode
+        # ==> ks[ndx] >= start_hashcode
+        if reverse and ks[ndx] > start_hashcode:
+          if ndx > 0:
+            ndx -= 1
+          else:
+            return
     # yield keys until we're not wanted
     while True:
       try:
