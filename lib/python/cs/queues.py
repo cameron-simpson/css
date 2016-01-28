@@ -243,8 +243,8 @@ class PushQueue(MultiOpenMixin):
 
   def put(self, item):
     ''' Receive a new item.
-	If self.is_iterable then presume that self.func_push returns
-	an iterator and submit self.func_push(item) to defer_iterable.
+        If self.is_iterable then presume that self.func_push returns
+        an iterator and submit self.func_push(item) to defer_iterable.
         Otherwise, defer self.func_push(item) and after completion,
         queue its results to outQ.
     '''
