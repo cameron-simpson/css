@@ -39,13 +39,11 @@ try:
             HTTPPasswordMgrWithDefaultRealm, HTTPBasicAuthHandler, \
             build_opener
   from urllib.parse import urlparse, urljoin
-  from html.parser import HTMLParseError
-except ImportError:
+except ImportError as e:
   from urllib2 import Request, HTTPError, URLError, \
 		    HTTPPasswordMgrWithDefaultRealm, HTTPBasicAuthHandler, \
 		    build_opener
   from urlparse import urlparse, urljoin
-  from HTMLParser import HTMLParseError
 try:
   import xml.etree.cElementTree as ElementTree
 except ImportError:

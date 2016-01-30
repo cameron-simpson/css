@@ -23,7 +23,11 @@ cmd=$(basename "$0")
 usage="Usage: $cmd [options...] [op [args...]]
   Options:
     -x  Trace command execution.
+  With no operation, list current sessions.
   Operations:
+    number
+      Join the session numbered \"number\".
+      Shortname for \"use-session number\".
     UPPERCASE_NAME [-d] [-K keyline]... {-c shcmd | [command [args...]]}
       Shorthand for \"use-session UPPERCASE_NAME\". Includes names starting
       with an underscore.

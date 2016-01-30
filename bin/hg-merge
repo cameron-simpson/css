@@ -51,9 +51,10 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+checkout=$( pwd )
 branch=$( hg branch )
 obranch=$( incd "$ocheckout" hg branch )
-incd "$ocheckout" hg out | grep '^summary'
+incd "$ocheckout" hg out "$checkout" | grep '^summary'
 echo
 echo "merging $obranch ==> $branch"
 

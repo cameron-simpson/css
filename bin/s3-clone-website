@@ -10,25 +10,63 @@ set -ue
 
 no_wget=
 no_sync=
+no_fixmime=
+htdocs_dir=
+ht_userarea=
 
 cmd=$( basename "$0" )
-usage="Usage: $cmd [--no-wget] [--no-sync] fqdn s3-bucket-name"
+usage="Usage: $cmd [--no-wget] [--no-sync] [-d htdocs-dir] fqdn s3-bucket-name
+  --no-fixmime  Do not update the MIME types of problem extensions.
+  --no-sync     Do not update the S3 bucket from the htdocs tree.
+  --no-wget     Do not update the htdocs tree from the source website.
+  --password username:areaname
+                Read password for username from .password-areaname.
+  -d htdocs-dir
+            Use the specified directory as the htdocs tree; the default is
+            taken from the FQDN."
 
 badopts=
 
 while [ $# -gt 0 ]
 do
   case "$1" in
-    --no-sync)  no_sync=1 ;;
-    --no-wget)  no_wget=1 ;;
-    --)         shift; break ;;
-    -?*)        echo "$cmd: unrecognised option: $1" >&2
-                badopts=1
-                ;;
-    *)          break ;;
+    --no-fixmime)   no_fixmime=1 ;;
+    --no-sync)      no_sync=1 ;;
+    --no-wget)      no_wget=1 ;;
+    --password)     ht_userarea=$2; shift ;;
+    -d)             htdocs_dir=$2; shift ;;
+    --)             shift; break ;;
+    -?*)            echo "$cmd: unrecognised option: $1" >&2
+                    badopts=1
+                    ;;
+    *)              break ;;
   esac
   shift
 done
+
+# sanity check ht credentials
+if [ -n "$ht_userarea" ]
+then
+    case "$ht_userarea" in
+      ?*:?*)
+        ht_username=$( expr "x$ht_userarea" : 'x\([^:]*\):.*' )
+        ht_areaname=$( expr "x$ht_userarea" : 'x[^:]*:\(.*\)' )
+        ht_password_file=$HOME/.htpassword-$ht_areaname
+        if [ ! -s "$ht_password_file" ]
+        then
+          echo "$cmd: missing credentials file: $ht_password_file" >&2
+          badopts=1
+        else
+          ht_password=$(<$ht_password_file)
+        fi
+        ;;
+      *)echo "$cmd: invalid arguments to --password, expected \"username:areaname\"" >*2
+        badopts=1
+        ;;
+    esac
+else
+  ht_username=
+fi
 
 if [ $# = 0 ]
 then  echo "$cmd: missing fqdn" >&2
@@ -54,10 +92,10 @@ fi
 
 srcurl=http://$fqdn/
 dsturl=s3://$s3bucket
-vhsubdir=$fqdn
+[ -n "$htdocs_dir" ] || htdocs_dir=$fqdn
 
 s3(){
-  s3cmd -c "$S3CFG" ${1+"$@"}
+  s3cmd -q -c "$S3CFG" ${1+"$@"}
 }
 
 setx(){
@@ -66,22 +104,35 @@ setx(){
 
 xit=0
 
-[ $no_wget ] || setx wget -q -mp "$srcurl" || { echo "$cmd: warning: wget had errors, rerun with -nv for details" >&2; xit=1; }
+cd "$htdocs_dir"
 
-if [ -z "$no_sync" ]
+if [ -z "$no_wget" ]
 then
-  cd "$vhsubdir"
-  setx s3 -MP sync . "$dsturl"
-  # repair
-  for fixext in text/css:.css
+  set -- wget -q -mp -nH
+  recite=$*
+  if [ -n "$ht_username" ]
+  then
+    set -- "$@" "--user=$ht_username" "--password=$ht_password"
+    recite="$recite --user=$ht_username --password=******"
+  fi
+  echo "$recite $srcurl" >&2
+  "$@" "$srcurl" \
+  || echo "$cmd: warning: wget had errors, rerun with -nv for details" >&2
+fi
+
+[ $no_sync ] || setx s3 -MP sync . "$dsturl"
+
+if [ -z "$no_fixmime" ]
+then
+  # repair MIME types for various extensions
+  for fixext in text/css:.css video/x-f4v:.f4v application/rdf+xml:.rdf audio/x-ms-wma:.wma
   do
     mimetype=$( expr "x$fixext" : 'x\(.*\):.*' )
     suffix=$(   expr "x$fixext" : 'x.*:\(.*\)' )
     find * -type f -name "*$suffix" \
     | while read -r fixfile
       do
-        ##setx s3 del "$dsturl/$fixfile"
-        setx s3 -P -m "$mimetype" put "$fixfile" "$dsturl/$fixfile"
+        setx s3 -P -m "$mimetype" modify "$dsturl/$fixfile"
       done
   done
 fi
