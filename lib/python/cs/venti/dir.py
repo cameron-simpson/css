@@ -164,7 +164,10 @@ class _Dirent(object):
     return self.textencode()
 
   def __repr__(self):
-    return "%s(%s, %s, %s)" % (self.__class__.__name__, D_type2str, self.name, self.meta)
+    return "%s(%s, %s, %s)" % (self.__class__.__name__,
+                               D_type2str(self.type),
+                               self.name,
+                               self.meta)
 
   # TODO: support .block=None
   def __eq__(self, other):

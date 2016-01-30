@@ -186,7 +186,7 @@ class StoreFS(Operations):
     ''' Attach this StoreFS to the specified path `root`.
         Return the controlling FUSE object.
     '''
-    return FUSE(self, root, foreground=True, nothreads=True, debug=False)
+    return FUSE(self, root, foreground=True, nothreads=True, debug=False, use_ino=True)
     ##return TracingObject(FUSE(self, root, foreground=True, nothreads=True, debug=False))
 
   def allocate_mortal_inum(self):
@@ -383,7 +383,7 @@ class StoreFS(Operations):
       raise FuseOSError(errno.EPERM)
     # resolve the target - should terminate at the directory to
     # receive the new hardlink
-    Edst, P, tail_path = self._resolve(target)
+    Pdst, P, tail_path = self._resolve(target)
     # target must not exist, therefore there should be unresolved path elements
     if not tail_path:
       # we expect the path to not fully resolve, otherwise the object already exists
@@ -394,7 +394,7 @@ class StoreFS(Operations):
       XP("tail_path = %r", tail_path)
       raise FuseOSError(errno.ENOENT)
     # the final component must be a directory in order to create the new link
-    if not Edst.isdir:
+    if not Pdst.isdir:
       raise FuseOSError(errno.ENOTDIR)
     if Esrc.ishardlink:
      # point Esrc at the master Dirent in ._inodes
@@ -403,18 +403,22 @@ class StoreFS(Operations):
     else:
       # new hardlink, update the source
       # keep Esrc as the master
-      # obtain Esrc2, the HardlinkDirent wrapper for Esrc
-      # put Esrc2 into the enclosing Dir, replacing Esrc
-      Ename = Esrc.name
-      self._inum(Esrc)
-      Esrc2 = self._inodes.make_hardlink(Esrc)
-      Esrc2.name = Ename
-      Psrc[Ename] = Esrc2
-      inum = Esrc2.inum
+      # obtain EsrcLink, the HardlinkDirent wrapper for Esrc
+      # put EsrcLink into the enclosing Dir, replacing Esrc
+      src_name = Esrc.name
+      inum0 = self._inum(Esrc)
+      EsrcLink = self._inodes.make_hardlink(Esrc)
+      Psrc[src_name] = EsrcLink
+      inum = EsrcLink.inum
+      if inum != inum0:
+        raise RuntimeError("new hardlink: original inum %d != linked inum %d"
+                           % (inum0, inum))
+    # install the destination hardlink
     # make a new hardlink object referencing the inode
     # and attach it to the target directory
-    name, = tail_path
-    Edst[name] = HardlinkDirent.to_inum(inum, name)
+    dst_name, = tail_path
+    EdstLink = HardlinkDirent.to_inum(inum, dst_name)
+    Pdst[dst_name] = EdstLink
     # increment link count on underlying Dirent
     Esrc.meta.nlink += 1
 
