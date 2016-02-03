@@ -211,9 +211,9 @@ class PushQueue(MultiOpenMixin):
   def __init__(self, name, L, func_push, outQ, func_final=None):
     ''' Initialise the PushQueue with the Later `L`, the callable `func_push`
         and the output queue `outQ`.
-	`func_push` is a one-to-many function which accepts a single
-	  item of input and returns an iterable of outputs; it may
-	  be a generator.
+        `func_push` is a one-to-many function which accepts a single
+          item of input and returns an iterable of outputs; it may
+          be a generator.
           This iterable is submitted to `L` via defer_iterable to call
           `outQ.put` with each output.
         `outQ` accepts results from the callable via its .put() method.
