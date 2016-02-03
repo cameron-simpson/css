@@ -928,11 +928,12 @@ class Later(MultiOpenMixin):
 
   @MultiOpenMixin.is_opened
   def defer_iterable(self, I, outQ, test_ready=None):
-    ''' Submit an iterable `I` for asynchronous stepwise iteration
-        to return results via the queue `outQ`.
+    ''' Submit an iterable `I` for asynchronous stepwise iteration to return results via the queue `outQ`. Return a Result for final synchronisation.
         `outQ` must have a .put method to accept items and a .close method to
         indicate the end of items.
-        When the iteration is complete, call outQ.close().
+        When the iteration is complete, call outQ.close() and complete the Result.
+        The Result will have a true .result if iteration completed
+        and an exception if an iteration raised that exception.
         `test_ready`: if not None, a callable to test if iteration
             is presently permitted; iteration will be deferred until
             the callable returns a true value
@@ -943,6 +944,7 @@ class Later(MultiOpenMixin):
 
   def _defer_iterable(self, I, outQ, test_ready=None):
     iterate = partial(next, iter(I))
+    R = Result()
 
     @logexc
     def iterate_once():
@@ -956,9 +958,11 @@ class Later(MultiOpenMixin):
         item = iterate()
       except StopIteration:
         outQ.close()
+        R.result = True
       except Exception as e:
         exception("defer_iterable: iterate_once: exception during iteration: %s", e)
         outQ.close()
+        R.exc_info = exc_info()
       else:
         # put the item onto the output queue
         # this may itself defer various tasks (eg in a pipeline)
@@ -970,6 +974,7 @@ class Later(MultiOpenMixin):
     iterate_once.__name__ = "%s:next(iter(%s))" % (funcname(iterate_once),
                                                    getattr(I, '__name__', repr(I)))
     self._defer(iterate_once)
+    return R
 
   @MultiOpenMixin.is_opened
   def pipeline(self, filter_funcs, inputs=None, outQ=None, name=None):
