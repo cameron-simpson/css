@@ -932,8 +932,10 @@ class Later(MultiOpenMixin):
         `outQ` must have a .put method to accept items and a .close method to
         indicate the end of items.
         When the iteration is complete, call outQ.close() and complete the Result.
-        The Result will have a true .result if iteration completed
-        and an exception if an iteration raised that exception.
+        If iteration ran to completion then the Result's .result
+        will be the number of iterations, otherwise if an iteration
+        raised an exception the the Result's .exc_info will contain
+        the exception information.
         `test_ready`: if not None, a callable to test if iteration
             is presently permitted; iteration will be deferred until
             the callable returns a true value
@@ -945,6 +947,7 @@ class Later(MultiOpenMixin):
   def _defer_iterable(self, I, outQ, test_ready=None):
     iterate = partial(next, iter(I))
     R = Result()
+    iterations = 0
 
     @logexc
     def iterate_once():
@@ -958,12 +961,13 @@ class Later(MultiOpenMixin):
         item = iterate()
       except StopIteration:
         outQ.close()
-        R.result = True
+        R.result = iterations
       except Exception as e:
         exception("defer_iterable: iterate_once: exception during iteration: %s", e)
         outQ.close()
         R.exc_info = exc_info()
       else:
+        iterations += 1
         # put the item onto the output queue
         # this may itself defer various tasks (eg in a pipeline)
         debug("L.defer_iterable: iterate_once: %s.put(%r)", outQ, item)
