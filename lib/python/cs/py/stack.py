@@ -19,7 +19,7 @@ import sys
 from collections import namedtuple
 from traceback import extract_stack
 
-_Frame = namedtuple('Frame', 'filename lineno functionname linetext')
+_Frame = namedtuple('Frame', 'filename lineno funcname linetext')
 
 class Frame(_Frame):
   def __str__(self):
@@ -36,7 +36,7 @@ def caller():
   # -1: caller, this function
   # -2: invoker, who wants to know the caller
   # -3: the calling function of the invoker
-  return frames()[-3]
+  return Frame(*frames()[-3])
 
 def stack_dump(fp=None, indent=0):
   ''' Recite current stack to `fp`, default sys.stderr.
