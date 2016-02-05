@@ -963,7 +963,7 @@ class Later(MultiOpenMixin):
   def _defer_iterable(self, I, outQ, test_ready=None):
     iterate = partial(next, iter(I))
     R = Result()
-    iterations = 0
+    iterationss = [0]
 
     @logexc
     def iterate_once():
@@ -977,13 +977,13 @@ class Later(MultiOpenMixin):
         item = iterate()
       except StopIteration:
         outQ.close()
-        R.result = iterations
+        R.result = iterationss[0]
       except Exception as e:
         exception("defer_iterable: iterate_once: exception during iteration: %s", e)
         outQ.close()
         R.exc_info = exc_info()
       else:
-        iterations += 1
+        iterationss[0] += 1
         # put the item onto the output queue
         # this may itself defer various tasks (eg in a pipeline)
         debug("L.defer_iterable: iterate_once: %s.put(%r)", outQ, item)
