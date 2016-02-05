@@ -26,6 +26,7 @@ import threading
 import time
 import traceback
 from cs.py3 import Queue, Queue_Empty, exec_code
+from cs.py.func import funccite
 from cs.py.stack import caller
 import cs.logutils
 from cs.logutils import infer_logging_level, debug, error, setup_logging, D, Pfx, PrePfx, ifdebug, X
@@ -336,9 +337,8 @@ def trace_caller(func):
   '''
   def subfunc(*a, **kw):
     frame = caller()
-    D("CALL %s()<%s:%d> FROM %s()<%s:%d>",
-         func.__name__,
-         func.__code__.co_filename, func.__code__.co_firstlineno,
+    X("CALL %s FROM %s()<%s:%d>",
+         funccite(func),
          frame.funcname, frame.filename, frame.lineno)
     return func(*a, **kw)
   subfunc.__name__ = "trace_caller/subfunc/"+func.__name__
