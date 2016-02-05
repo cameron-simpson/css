@@ -17,7 +17,7 @@ DISTINFO = {
 
 import sys
 from cs.debug import Lock
-from cs.logutils import error, exception, warning, debug, D
+from cs.logutils import error, exception, warning, debug, D, Pfx
 from cs.obj import O
 from cs.seq import seq
 from cs.py3 import Queue, raise3
@@ -259,6 +259,22 @@ class Result(O):
         notifier = None
     if notifier is not None:
       notifier(self)
+
+  def with_result(self, submitter, prefix=None):
+    ''' On completion without an exception, call `submitter(self.result)` or report exception.
+    '''
+    def notifier(R):
+      exc_info = R.exc_info
+      if exc_info is None:
+        return submitter(R.result)
+      else:
+        # report error
+        if prefix:
+          with Pfx(prefix):
+            error("exception: %r", exc_info)
+        else:
+          error("exception: %r", exc_info)
+    self.notify(notifier)
 
 def report(LFs):
   ''' Generator which yields completed Results.
