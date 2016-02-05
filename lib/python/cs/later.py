@@ -832,7 +832,6 @@ class Later(MultiOpenMixin):
     for LF in self.complete(until_idle=until_idle):
       pass
 
-  ##@trace_caller
   @MultiOpenMixin.is_opened
   def defer(self, func, *a, **kw):
     ''' Queue the function `func` for later dispatch using the
