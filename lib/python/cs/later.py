@@ -371,8 +371,9 @@ class _Pipeline(MultiOpenMixin):
   ''' A _Pipeline encapsulates the chain of PushQueues created by a call to Later.pipeline.
   '''
 
-  def __init__(self, name, L, filter_funcs, outQ):
-    ''' Initialise the _Pipeline from `name`, Later instance `L`, list  of filter functions `filter_funcs` and output queue `outQ`.
+  def __init__(self, name, L, actions, outQ):
+    ''' Initialise the _Pipeline from `name`, Later instance `L`, list of filter functions `actions` and output queue `outQ`.
+        Each action is either a 2-tuple of (sig, functor) or an object with a .sig attribute and a .functor method returning a callable.
     '''
     MultiOpenMixin.__init__(self)
     self.name = name
@@ -381,12 +382,14 @@ class _Pipeline(MultiOpenMixin):
     # counter tracking items in play
     self._busy = TrackingCounter(name="Pipeline<%s>._items" % (name,))
     RHQ = outQ
-    count = len(filter_funcs)
-    while filter_funcs:
-      func_sig, functor = filter_funcs.pop()
-      count -= 1
+    for index, action in reversed(list(enumerate(actions))):
+      try:
+        func_sig, functor = action
+      except TypeError:
+        func_sig = action.sig
+        functor = action.functor()
       pq_name = ":".join( (name,
-                           str(count),
+                           str(index),
                            str(func_sig),
                            funcname(functor),
                           )
@@ -997,14 +1000,14 @@ class Later(MultiOpenMixin):
     return R
 
   @MultiOpenMixin.is_opened
-  def pipeline(self, filter_funcs, inputs=None, outQ=None, name=None):
+  def pipeline(self, actions, inputs=None, outQ=None, name=None):
     ''' Construct a function pipeline to be mediated by this Later queue.
         Return:
           input, output
         where `input`` is a closeable queue on which more data items can be put
         and `output` is an iterable from which result can be collected.
 
-        `filter_funcs`: an iterable of filter functions accepting the
+        `actions`: an iterable of filter functions accepting
           single items from the iterable `inputs`, returning an
           iterable output.
         `inputs`: the initial iterable inputs; this may be None.
@@ -1032,17 +1035,17 @@ class Later(MultiOpenMixin):
     '''
     if not self.submittable:
       raise RuntimeError("%s.pipeline(...) but not self.submittable" % (self,))
-    return self._pipeline(filter_funcs, inputs, outQ=outQ, name=name)
+    return self._pipeline(actions, inputs, outQ=outQ, name=name)
 
-  def _pipeline(self, filter_funcs, inputs=None, outQ=None, name=None):
-    filter_funcs = list(filter_funcs)
-    if not filter_funcs:
-      raise ValueError("no filter_funcs")
+  def _pipeline(self, actions, inputs=None, outQ=None, name=None):
+    filter_funcs = list(actions)
+    if not actions:
+      raise ValueError("no actions")
     if outQ is None:
       outQ = IterableQueue(name="pipelineIQ")
     if name is None:
       name = "pipelinePQ"
-    pipeline = _Pipeline(name, self, filter_funcs, outQ)
+    pipeline = _Pipeline(name, self, actions, outQ)
     inQ = pipeline.inQ
     if inputs is not None:
       self._defer_iterable( inputs, inQ )
