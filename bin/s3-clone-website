@@ -125,11 +125,11 @@ fi
 if [ -z "$no_fixmime" ]
 then
   # repair MIME types for various extensions
-  for fixext in text/css:.css video/x-f4v:.f4v application/rdf+xml:.rdf audio/x-ms-wma:.wma
+  for fixext in text/css:.css video/x-f4v:.f4v application/rdf+xml:.rdf audio/x-ms-wma:.wma video/quicktime:.mov
   do
     mimetype=$( expr "x$fixext" : 'x\(.*\):.*' )
     suffix=$(   expr "x$fixext" : 'x.*:\(.*\)' )
-    find * -type f -name "*$suffix" \
+    find * -type f -iname "*$suffix" \
     | while read -r fixfile
       do
         setx s3 -P -m "$mimetype" modify "$dsturl/$fixfile"
