@@ -16,6 +16,7 @@ DISTINFO = {
 }
 
 from cs.excutils import transmute
+from cs.py3 import unicode
 
 def funcname(func):
   ''' Return a name for the supplied function `func`.
@@ -125,3 +126,18 @@ def returns_type(func, basetype):
                                   % (funcname, basetype)
                                 )
   return check_returns_type
+
+def yields_str(func):
+  ''' Decorator for generators which should yield strings.
+  '''
+  return yields_type(func, (str, unicode))
+
+def returns_bool(func):
+  ''' Decorator for functions which should return Booleans.
+  '''
+  return returns_type(func, bool)
+
+def returns_str(func):
+  ''' Decorator for functions which should return strings.
+  '''
+  return returns_type(func, (str, unicode))
