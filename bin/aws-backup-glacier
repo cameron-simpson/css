@@ -51,7 +51,7 @@ archive_base=$srcdir_base-$now
 archive_file=$archive_base.tgz
 archive_json=$archive_base.json
 
-$trace tar -cz -f "$archive_file" -C "$srcdir_up" "$srcdir_base"
+$trace tar -cz -f "./$archive_file" -C "$srcdir_up" "$srcdir_base"
 treehash=$( $trace aws-tree-hash "$archive_file" )
 $trace aws glacier upload-archive \
             --account-id - \
