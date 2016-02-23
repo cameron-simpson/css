@@ -14,7 +14,7 @@ no_fixmime=
 no_media=
 htdocs_dir=
 ht_userarea=
-media_exts='flv gif jpg mov mp4 mp3 pdf'
+media_exts='f4v flv gif jpg mov mp4 mp3 ogg pdf'
 
 cmd=$( basename "$0" )
 usage="Usage: $cmd [--no-wget] [--no-sync] [-d htdocs-dir] fqdn s3-bucket-name
