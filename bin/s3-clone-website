@@ -11,11 +11,14 @@ set -ue
 no_wget=
 no_sync=
 no_fixmime=
+no_media=
 htdocs_dir=
 ht_userarea=
+media_exts='flv gif jpg mov mp4 mp3 pdf'
 
 cmd=$( basename "$0" )
 usage="Usage: $cmd [--no-wget] [--no-sync] [-d htdocs-dir] fqdn s3-bucket-name
+  --no-media    Omit media files from the sync: $media_exts
   --no-fixmime  Do not update the MIME types of problem extensions.
   --no-sync     Do not update the S3 bucket from the htdocs tree.
   --no-wget     Do not update the htdocs tree from the source website.
@@ -31,6 +34,7 @@ while [ $# -gt 0 ]
 do
   case "$1" in
     --no-fixmime)   no_fixmime=1 ;;
+    --no-media)     no_media=1 ;;
     --no-sync)      no_sync=1 ;;
     --no-wget)      no_wget=1 ;;
     --password)     ht_userarea=$2; shift ;;
@@ -109,6 +113,12 @@ cd "$htdocs_dir"
 if [ -z "$no_wget" ]
 then
   set -- wget -q -mp -nH
+  if [ $no_media ]
+  then
+    for ext in $media_exts
+    do  set -- "$@" -R "$ext"
+    done
+  fi
   recite=$*
   if [ -n "$ht_username" ]
   then
@@ -120,7 +130,17 @@ then
   || echo "$cmd: warning: wget had errors, rerun with -nv for details" >&2
 fi
 
-[ $no_sync ] || setx s3 -MP sync . "$dsturl"
+[ $no_sync ] || \
+{
+  set -- s3 -MP sync . "$dsturl"
+  if [ $no_media ]
+  then
+    for ext in $media_exts
+    do  set -- "$@" --exclude "*.$ext"
+    done
+  fi
+  setx "$@"
+}
 
 if [ -z "$no_fixmime" ]
 then
@@ -132,7 +152,17 @@ then
     find * -type f -iname "*$suffix" \
     | while read -r fixfile
       do
-        setx s3 -P -m "$mimetype" modify "$dsturl/$fixfile"
+        skip=
+        if [ $no_media ]
+        then
+          for ext in $media_exts
+          do
+            case "$fixfile" in
+              *.$ext) skip=1 ;;
+            esac
+          done
+        fi
+        [ $skip ] || setx s3 -P -m "$mimetype" modify "$dsturl/$fixfile"
       done
   done
 fi
