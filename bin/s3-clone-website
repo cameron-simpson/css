@@ -112,7 +112,7 @@ cd "$htdocs_dir"
 
 if [ -z "$no_wget" ]
 then
-  set -- wget -q -mp -nH
+  set -- wget -q -mp -nH --reject-regex ///
   if [ $no_media ]
   then
     for ext in $media_exts
