@@ -14,5 +14,5 @@ sed -n '
 	d
 	:yes
 	q' \
-"$HOME/.mime.types" "$HOME/rc/mime.types" /etc/mime.types 2>/dev/null
+"$HOME/.mime.types" "$HOME/rc/mime.types" /opt/local/etc/mime.types /usr/local/etc/mime.types /etc/mime.types 2>/dev/null
 exit 0

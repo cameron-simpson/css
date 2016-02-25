@@ -186,15 +186,17 @@ class _AttrList(list):
     self.__additemrefs(values)
     self._save()
 
-  @locked
-  def __setslice__(self, low, high, values):
-    list.__setslice__(self, low, high, list(values))
-    self._save()
+  # the list.clear() method dated from python 3.3
+  try:
+    _list_clear = list.clear
+  except AttributeError:
+    def _list_clear(self):
+      list.__setslice__(self, 0, sys.maxint, ())
 
   @locked
   def _scrub_local(self):
     # remove all elements from this attribute
-    list.clear(self)
+    self._list_clear()
     self.nodedb._revision += 1
   _scrub = _scrub_local
 
