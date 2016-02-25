@@ -175,7 +175,7 @@ class MegaRAID(O):
 
   def __init__(self, megacli=None):
     if megacli is None:
-      megacli = MEGACLI
+      megacli = os.environ.get('MEGACLI', MEGACLI)
     self.megacli = megacli
 
   @property
