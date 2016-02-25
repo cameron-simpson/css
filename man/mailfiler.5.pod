@@ -229,8 +229,17 @@ Example:
 
 matches a message from "cs@zip.com.au" or addressed to "cs@zip.com.au" in the 'To:' header.
 
-A header may be tested against a regular expression instead of by email address:
-Example:
+A header may be matched against any of multiple addresses by grouping the alternatives in brackets, example:
+
+  to,cc:(python-list@python.org|@example.com|ME|THEM)
+
+which tests all the addresses in the headers 'To:' or 'CC:' against:
+the address B<python-list@python.org>,
+the mail domain B<@example.com>,
+either of the mail address groups B<me> or B<them>.
+The mail address groups come from the maildb(1cs), if any.
+
+A header may be tested against a regular expression instead of by email address by preceding it with a slash ('B</>'), example:
 
   subject:/icewm-Bugs
 

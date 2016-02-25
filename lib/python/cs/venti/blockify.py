@@ -7,7 +7,7 @@
 
 from itertools import chain
 import sys
-from cs.logutils import debug, warning, D
+from cs.logutils import debug, warning, D, X
 from .block import Block, IndirectBlock, dump_block
 
 MIN_BLOCKSIZE = 80      # less than this seems silly
@@ -80,115 +80,68 @@ def indirect_blocks(blocks):
     yield block
 
 def blockify(data_chunks, vocab=None):
-  ''' Collect data strings from the iterable data_chunks
-      and yield data blocks with desirable boundaries.
+  ''' Collect data strings from the iterable data_chunks and yield data blocks with desirable boundaries.
   '''
+  # also accept a bare bytes value
   if isinstance(data_chunks, bytes):
     data_chunks = (data_chunks,)
   if vocab is None:
     vocab = DFLT_VOCAB
 
-  buf = []      # list of strings-to-collate-into-a-block
-  buflen = 0    # cumulative length of buf
+  buf = []          # list of data chunks to assemble into a single Block
+  buflen = 0        # cumulative length of buf
+  hash_value = 0    # rolling hash value
+  def bufBlock():
+    # prepare and yield new Block then reset the buffer
+    # closure FTW!
+    B = Block(data=b''.join(buf))
+    buf[:] = []
+    buflen = 0
+    hash_value = 0
+    return B
 
-  # invariant: no block edge has been seen in buf based on the vocabulary
-  #            the rolling hash has not been used yet
   for data in data_chunks:
-    while len(data) > 0:
-      # if buflen < MIN_BLOCKSIZE pad with stuff from data
-      skip = MIN_BLOCKSIZE - buflen
-      if skip > 0:
-        if skip > len(data):
-          skip = len(data)
-        left = data[:skip]
-        data = data[skip:]
-        buf.append(left)
-        buflen += len(left)
-        continue
+    offset = 0
+    # loop to yield Blocks, one Block per iteration
+    while offset < len(data):
+      # note start of this chunk
+      start = offset
+      is_edge = False
+      # phase 1: just compute rolling hash over initial MIN_BLOCKSIZE
+      max_offset = min(len(data), offset + (MIN_BLOCKSIZE - buflen))
+      while offset < max_offset:
+        hash_value, is_edge = test_for_edge(data, offset, hash_value)
+        offset += 1
+      # phase 2: scan for rolling hash edge or vocab edge up to MAX_BLOCKSIZE
+      max_offset = min(len(data), start + (MAX_BLOCKSIZE - buflen))
+      while not is_edge and offset < max_offset:
+        hash_value, is_edge = test_for_edge(data, offset, hash_value)
+        if is_edge:
+          break
+        else:
+          is_edge, edge_offset, subVocab = vocab.test_for_edge(data, offset)
+          if is_edge:
+            offset += edge_offset
+            if offset < start or offset >= len(data):
+              raise RuntimeError("bad offset after test_for_vocab_edge")
+            if subVocab is not None:
+              vocab = subVocab
+            break
+        offset += 1
+      # save this data slice
+      buf.append(data[start:offset])
+      yield bufBlock()
 
-      # we don't like to make blocks bigger than MAX_BLOCKSIZE
-      probe_len = MAX_BLOCKSIZE - buflen
-      assert probe_len > 0, \
-                "probe_len <= 0 (%d), MAX_BLOCKSIZE=%d, len(buf)=%d" \
-                % (probe_len, MAX_BLOCKSIZE, len(buf))
-      # don't try to look beyond the end of the data either
-      probe_len = min(probe_len, len(data))
-
-      # look for a vocabulary word
-      m = vocab.match(data, 0, probe_len)
-      if m:
-        edgepos, _, _, subVocab = m
-        if subVocab:
-          vocab = subVocab
-        buf.append(data[:edgepos])
-        data = data[edgepos:]
-        yield Block(data=b''.join(buf))
-        buf = []
-        buflen = 0
-        continue
-
-      # no vocabulary words seen - append data to buf
-      buf.append(data)
-      buflen += len(data)
-      data = ''
-
-      # if buf gets too big, scan it with the rolling hash
-      # we may have to rescan after finding an edge
-      if buflen >= MAX_BLOCKSIZE:
-        data2 = b''.join(buf)
-        RH = RollingHash()
-        while len(data2) >= MAX_BLOCKSIZE:
-          edgepos = RH.findEdge(data2, len(data2))
-          if edgepos < 0:
-            edgepos = MAX_BLOCKSIZE
-          yield Block(data=data2[:MAX_BLOCKSIZE])
-          data2 = data2[MAX_BLOCKSIZE:]
-          RH.reset()
-        buf = [data2]
-        buflen = len(data2)
-
-  # no more data - yield remaining buffer
-  if buflen > 0:
-    yield Block(data=b''.join(buf))
-
-class RollingHash(object):
-  ''' Compute a rolling hash over 4 bytes of data.
-      TODO: this is a lousy algorithm!
+def test_for_edge(data, offset, hash_value):
+  ''' Add the byte at `data[offset]` to the hash_value and test for the boundary condition; return (new_hash_value, is_boundary).
   '''
-  def __init__(self):
-    self.n = None
-    self.reset()
-
-  def reset(self):
-    self.n = 0
-
-  def value(self):
-    return self.n
-
-  def findEdge(self, data, probe_len):
-    ''' Add bytes from data to the rolling hash until probe_len characters
-        are accumulated or the magic hash code is encountered.
-        Return the offset where the match was found, or -1 if no match.
-        POST: -1: probe_len bytes added to the hash.
-              >=0: offset bytes added to the hash
-    '''
-    assert probe_len > 0
-    probe_len = min(probe_len, len(data))
-    n = self.n
-    for i in range(probe_len):
-      o =data[i]
-      n = ( ( ( n & 0x001fffff ) << 7
-            )
-          | ( ( o & 0x7f )^( (o & 0x80)>>7 )
-            )
-          )
-      if n % 4093 == 1:
-        debug("edge found, returning (hashcode=%d, offset=%d)", self.value(), i+1)
-        self.n = n
-        return i+1
-    self.n = n
-    debug("no edge found, hash now %d, returning (None, %d)", self.value(), probe_len)
-    return -1
+  b = data[offset]
+  hash_value = ( ( ( hash_value & 0x001fffff ) << 7
+                 )
+               | ( ( b & 0x7f )^( (b & 0x80)>>7 )
+                 )
+               )
+  return hash_value, hash_value % 4093 == 1
 
 class Vocabulary(dict):
   ''' A class for representing match vocabuaries.
@@ -208,8 +161,9 @@ class Vocabulary(dict):
         The offset is the position within the match string of the boundary.
         If supplied, Vocaulary is a new Vocabulary to use if this word matches.
     '''
-    assert len(word) > 0
-    if type(info) is int:
+    if len(word) <= 0:
+      raise ValueError("word too short: %r", word)
+    if isinstance(info, int):
       offset = info
       subVocab = None
     else:
@@ -221,8 +175,21 @@ class Vocabulary(dict):
       self[ch1] = []
     self[ch1].append( (word, offset, subVocab) )
 
+  def test_for_edge(self, bs, offset):
+    ''' Probe for a vocabulary word in `bs` at `offset`. Return (is_edge, edge_offset, subVocab).
+    '''
+    is_edge = False
+    b = bs[offset]
+    wordlist = self.get(b)
+    if wordlist is not None:
+      for word, edge_offset, subVocab in wordlist:
+        if bs.startswith(word, offset):
+          return True, edge_offset, subVocab
+    return False, None, None
+
+  # TODO: OBSOLETE
   def match(self, bs, pos, endpos):
-    ''' Locate the earliest occurence in the string 'bs' of a vocabuary word.
+    ''' Locate the earliest occurence in the bytes 'bs' of a vocabuary word.
         Return (edgepos, word, offset, subVocab) for a match or None on no match.
         `edgepos` is the boundary position.
         `word` will be present at edgepos-offset.

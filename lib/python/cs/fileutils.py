@@ -18,7 +18,6 @@ DISTINFO = {
 }
 
 from io import RawIOBase
-import errno
 from functools import partial
 import os
 from os import SEEK_CUR, SEEK_END, SEEK_SET
@@ -29,11 +28,12 @@ from collections import namedtuple
 from contextlib import contextmanager
 from itertools import takewhile
 import shutil
+import socket
 from tempfile import TemporaryFile, NamedTemporaryFile
 from threading import RLock, Thread
 import time
 import unittest
-from cs.asynchron import Asynchron
+from cs.asynchron import Result
 from cs.debug import trace
 from cs.env import envsub
 from cs.lex import as_lines
@@ -43,7 +43,7 @@ from cs.range import Range
 from cs.threads import locked, locked_property
 from cs.timeutils import TimeoutError
 from cs.obj import O
-from cs.py3 import ustr, filter, bytes
+from cs.py3 import ustr, bytes
 
 DEFAULT_POLL_INTERVAL = 1.0
 
@@ -961,7 +961,7 @@ class SharedAppendFile(object):
       self.importer = importer
       self.poll_interval = poll_interval
       self.max_queue = max_queue
-      self.ready = Asynchron(name="readiness(%s)" % (self,))
+      self.ready = Result(name="readiness(%s)" % (self,))
       self.lock_ext = lock_ext
       self.lock_timeout = lock_timeout
       if not no_update:

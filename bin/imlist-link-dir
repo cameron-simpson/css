@@ -1,0 +1,66 @@
+#!/bin/sh
+#
+# Populate a directory with symlinks to images chosen with imlist-pick.
+#   - Cameron Simpson <cs@zip.com.au> 13oct2015
+#
+
+set -ue
+
+cmd=$0
+usage="Usage: $cmd target-dir [_] {-|imlist-pick-options...}"
+
+unsp=
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing target-dir" >&2
+  badopts=1
+else
+  target_dir=$1
+  shift
+fi
+
+if [ $# -gt 0 ] && [ "x$1" = x_ ]
+then  unsp=1; shift
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+if [ "x$*" = x- ]
+then cat
+else imlist-pick -a ${1+"$@"}
+fi \
+| \
+( cd "$target_dir" || exit 1
+  first=1
+  while read -r impath
+  do
+    if [ $first ]
+    then
+      rm -- * 2>/dev/null || :
+      first=
+    fi
+    base=$(basename "$impath")
+    if [ $unsp ]
+    then
+      case "$base" in
+        *\ * | *\	* )
+          base=$( printf '%s\n' "$base" | tr ' \011' __ )
+          ;;
+      esac
+    fi
+    if [ -e "$base" ]
+    then
+      n=1
+      while base2=$n-$base
+            [ -e "$base2" ]
+      do
+        n=$(( n + 1 ))
+      done
+      base=$base2
+    fi
+    ln "$impath" "$base"
+  done
+)

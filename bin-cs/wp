@@ -1,0 +1,53 @@
+#!/bin/sh
+#
+# Select images and link into target directory for later use.
+#   - Cameron Simpson <cs@zip.com.au>
+#
+
+set -ue
+
+cmd=$( basename "$0" )
+usage="Usage: [count] [/output/dir] [OFF|selectors...]"
+
+: ${WPDIR:=$HOME/var/im/wp}
+
+count=24
+
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    [1-9]*)
+        count=$1 ;;
+    /*) WPDIR=$1 ;;
+    --) shift; break ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  set -x
+  ls -- "$WPDIR/"
+else
+  if [ "x$*" = xOFF ]
+  then
+    set -x
+    rm -f -- "$WPDIR"/*
+  else
+    first=1
+    set -x
+    for arg in wp ${1+"$@"} 'width>=1024' 'width>height'
+    do  [ $first ] && { set --; first=; }
+      case "$arg" in
+        *:* | *[\<=\>]* ) ;;
+        *)  arg=kw:$arg ;;
+      esac
+      set -- ${1+"$@"} "$arg"
+    done
+    set -x
+    iphoto select ${1+"$@"} | shuffle | sed "${count}q" \
+    | tee /dev/fd/2 \
+    | imlist-link-dir "$WPDIR" _ -
+  fi
+fi

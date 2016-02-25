@@ -905,24 +905,22 @@ re_GROUPNAME_s = '[A-Z][A-Z0-9_]+'
 # @domain
 re_atDOM_s = '@[-\w]+(\.[-\w]+)+'
 
-# GROUPNAME or @domain
-re_GROUPNAMEorDOM_s = '(%s|%s)' % (re_GROUPNAME_s, re_atDOM_s)
+# local-part@domain
+re_simpleADDRatDOM_s = '[a-z0-9][\-a-z0-9]*' + re_atDOM_s
 
-# comma separated list of GROUPNAME or @domain
-re_GROUPorDOM_LIST_s = r'%s(,%s)*' % (re_GROUPNAMEorDOM_s, re_GROUPNAMEorDOM_s)
+# GROUPNAME or @domain
+re_GROUPNAMEorDOMorADDR_s = \
+    '(%s|%s|%s)' % (re_GROUPNAME_s, re_atDOM_s, re_simpleADDRatDOM_s)
 
 # (GROUP[|GROUP...])
 re_INGROUP_s = ( r'\(\s*%s(\s*\|\s*%s)*\s*\)'
                  % (re_GROUPNAME_s, re_GROUPNAME_s)
                )
 
-# (GROUPorDOM[|GROUPorDOM...])
-re_INGROUPorDOM_s = ( r'\(\s*%s(\s*\|\s*%s)*\s*\)'
-                      % (re_GROUPNAMEorDOM_s, re_GROUPNAMEorDOM_s)
-                    )
-
-re_INGROUPorDOM = re.compile( re_INGROUPorDOM_s, re.I)
-re_INGROUP = re.compile( re_INGROUP_s, re.I)
+# (GROUPorDOMorADDR[|GROUPorDOMorADDR...])
+re_INGROUPorDOMorADDR_s = \
+    r'\(\s*%s(\s*\|\s*%s)*\s*\)' \
+    % (re_GROUPNAMEorDOMorADDR_s, re_GROUPNAMEorDOMorADDR_s)
 
 # simple argument shorthand (GROUPNAME|@domain|number|"qstr")
 re_ARG_s = r'(%s|%s|%s|%s)' % (re_GROUPNAME_s, re_atDOM_s, re_NUMBER_s, re_QSTR_s)
@@ -939,13 +937,13 @@ re_NONALNUMWSP = re.compile(re_NONALNUMWSP_s, re.I)
 re_ASSIGN = re.compile(re_ASSIGN_s, re.I)
 re_HEADERNAME_LIST = re.compile(re_HEADERNAME_LIST_s, re.I)
 re_HEADERNAME_LIST_PREFIX = re.compile(re_HEADERNAME_LIST_PREFIX_s, re.I)
-re_GROUPorDOM_LIST = re.compile(re_GROUPorDOM_LIST_s)
 re_HEADER_SUBST = re.compile(re_HEADER_SUBST_s, re.I)
 re_UNQWORD = re.compile(re_UNQWORD_s)
 re_HEADERNAME = re.compile(re_HEADERNAME_s, re.I)
 re_DOTTED_IDENTIFIER = re.compile(re_DOTTED_IDENTIFIER_s, re.I)
 re_ARG = re.compile(re_ARG_s)
 re_ARGLIST = re.compile(re_ARGLIST_s)
+re_INGROUPorDOMorADDR = re.compile( re_INGROUPorDOMorADDR_s, re.I)
 
 def parserules(fp):
   ''' Read rules from `fp`, yield Rules.
@@ -1095,7 +1093,7 @@ def parserules(fp):
           C = Condition_Regexp(condition_flags, header_names, atstart, regexp)
         else:
           # headers:(group[|group...])
-          m = re_INGROUPorDOM.match(line, offset)
+          m = re_INGROUPorDOMorADDR.match(line, offset)
           if m:
             group_names = set( w.strip().lower() for w in m.group()[1:-1].split('|') )
             offset = m.end()
@@ -1504,12 +1502,34 @@ class Condition_InGroups(_Condition):
       msgiddb = self.filer.msgiddb
       msgids = [ v for v in header_value.split() if v ]
       for msgid in msgids:
+        # get the foo@bar part of <foo@bar>
+        # be very lenient
+        if msgid.startswith('<'):
+          if msgid.endswith('>'):
+            # <...>
+            msgid_inner = msgid[1:-1]
+          else:
+            # <...
+            msgid_inner = msgid[1:]
+        elif msgid.endswith('>'):
+          # ...>
+          msgid_inner = msgid[:-1]
+        else:
+          # ...
+          msgid_inner = msgid
         msgid_node = msgiddb.get( ('MESSAGE_ID', msgid) )
         for group_name in self.group_names:
+          # look for <...@domain>
           if group_name.startswith('@'):
-            if msgid.endswith(groupname+'>'):
+            if msgid_inner.lower().endswith(groupname):
               debug("match %s to %s", msgid, group_name)
               return True
+          # look for specific <local@domain>
+          elif '@' in group_name:
+            if msgid_inner.lower() == group_name:
+              debug("match %s to %s", msgid, group_name)
+              return True
+          # look for named group in MESSAGE_ID.GROUPs
           elif msgid_node:
               if group_name in msgid_node.GROUPs:
                 debug("match %s to (%s)", msgid, group_name)
@@ -1520,6 +1540,10 @@ class Condition_InGroups(_Condition):
           if group_name.startswith('@'):
             # address ending in @foo
             if address.endswith(group_name):
+              debug("match %s to %s", address, group_name)
+              return True
+          elif '@' in group_name:
+            if address.lower() == group_name:
               debug("match %s to %s", address, group_name)
               return True
           elif address.lower() in filer.group(group_name):

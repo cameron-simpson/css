@@ -4,4 +4,4 @@
 #   - Cameron Simpson <cs@zip.com.au> 10mar2015
 #
 
-exec py 2 ${1+"$@"}
+exec venv 2 python ${1+"$@"}
