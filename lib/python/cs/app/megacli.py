@@ -170,6 +170,7 @@ class O(object):
   def __init__(self, **kw):
     for attr, value in kw.items():
       setattr(self, attr, value)
+    self._O_omit = []
 
 class MegaRAID(O):
 
@@ -428,14 +429,14 @@ class MegaRAID(O):
     return self.docmd('-CfgLdAdd', '-r%d' % (level,), "[" + ",".join(enc_slots) + "]", '-a%d' % (adapter,))
 
   def readcmd(self, *args):
-    ''' Open a pipe from the megacli command, returning a subprocess.Popen object.
-        Yield the stdout attribute.
+    ''' Open a pipe from the megacli command and yield lines from its output.
     '''
     cmdargs = [self.megacli] + list(args)
     if sys.stderr.isatty():
       cmdargs.insert(0, 'set-x')
     P = Popen(cmdargs, stdout=PIPE, close_fds=True)
-    yield P.stdout
+    for line in P.stdout:
+      yield line
     P.wait()
 
   def docmd(self, *args):
@@ -525,7 +526,7 @@ def cmd_pop():
 def merge_attrs(o, **kw):
   for attr, value in kw.items():
     if not len(attr) or not attr[0].isalpha():
-      warning(".%s: ignoring, does not start with a letter", attr)
+      D(".%s: ignoring, does not start with a letter", attr)
       continue
     try:
       ovalue = getattr(o, attr)
@@ -534,7 +535,7 @@ def merge_attrs(o, **kw):
       setattr(o, attr, value)
     else:
       if ovalue != value:
-        warning("%s: %s: %r => %r", o, attr, ovalue, value)
+        D("%s: %s: %r => %r", o, attr, ovalue, value)
 
 def D(msg, *a):
   message(msg, sys.stderr, "debug", *a)
