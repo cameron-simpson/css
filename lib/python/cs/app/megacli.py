@@ -12,7 +12,6 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         ],
-    'requires': [ 'cs.logutils', 'cs.threads', 'cs.obj' ],
     'entry_points': {
       'console_scripts': [
           'mcli = cs.app.megacli:main',
