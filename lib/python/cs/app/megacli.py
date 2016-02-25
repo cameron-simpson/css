@@ -175,7 +175,7 @@ class MegaRAID(O):
 
   def __init__(self, megacli=None):
     if megacli is None:
-      megacli = MEGACLI
+      megacli = os.environ.get('MEGACLI', MEGACLI)
     self.megacli = megacli
 
   @property
@@ -431,8 +431,8 @@ class MegaRAID(O):
     ''' Open a pipe from the megacli command and yield lines from its output.
     '''
     cmdargs = [self.megacli] + list(args)
-    if sys.stderr.isatty():
-      cmdargs.insert(0, 'set-x')
+    if sys.stdout.isatty():
+      info("%r", cmdargs)
     P = Popen(cmdargs, stdout=PIPE, close_fds=True)
     for line in P.stdout:
       yield line
@@ -444,8 +444,10 @@ class MegaRAID(O):
         the "new raid" stuff etc automatically.
         Return True if the exit code is 0, False otherwise.
     '''
-    ## if really: trace=set-x else trace=eecho
-    return call(['eecho', self.megacli] + list(args)) == 0
+    cmdargs = [self.megacli] + list(args)
+    info("%r", cmdargs)
+    ## return call(cmdargs) == 0
+    return True
 
   def adapter_save(self, adapter, save_file):
     savepath = "%s-a%d" % (save_file, adapter)
