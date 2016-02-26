@@ -6,7 +6,7 @@
 #
 
 DISTINFO = {
-    'description': "command line tool to inspect and manipulate LSI MegaRAID adapters (such as used in IBM ServerRAID systems)",
+    'description': "command line tool to inspect and manipulate LSI MegaRAID adapters, such as used in IBM ServerRAID systems and Dell PowerEdge RAID Controller (PERC)",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
