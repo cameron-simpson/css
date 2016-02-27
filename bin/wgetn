@@ -6,19 +6,27 @@
 
 set -ue
 
-doit=
-trace=
-
 cmd=$( basename "$0" )
-usage="Usage: $cmd [-x] [-y] [m..]n URL-with-#"
+usage="Usage: $cmd [-q] [-v] [-x] [-y] [m..]n URL-with-#
+  -q, -v    Quiet, verbose. Passed to wget.
+  -n        No action (default): recite generated URLs.
+  -x        Trace invocation of wget.
+  -y        Untraced invocation of wget."
 
 badopts=
+
+doit=
+trace=
+wgopts=
 
 while [ $# -gt 0 ]
 do
   case $1 in
+    -[qv])
+        wgopts="$wgopts $1" ;;
+    -n) doit= ;;
     -x) doit=1 trace=set-x ;;
-    -y) doit=1 ;;
+    -y) doit=1 trace= ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
         badopts=1
@@ -91,6 +99,6 @@ do  printf '%s\n' "$urlleft$i$urlright"
 done \
 | \
 if [ $doit ]
-then  $trace wget -i - -nc
+then  $trace wget -i - -nc $wgopts
 else  cat
 fi
