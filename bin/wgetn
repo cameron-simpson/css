@@ -9,8 +9,8 @@ set -ue
 doit=
 trace=
 
-cmd=$0
-usage="Usage: [-x] [-y] [m..]n URL-with-#"
+cmd=$( basename "$0" )
+usage="Usage: $cmd [-x] [-y] [m..]n URL-with-#"
 
 badopts=
 
@@ -37,12 +37,22 @@ else
   shift
   case $mn in
     [0-9]*..[1-9]*)
-      m=$( expr "x$mn" : 'x\([0-9][0-9]*\).*' )
+      m=$( expr "x$mn" : 'x\([0-9][0-9]*\).*' || : )
       n=$( expr "x$mn" : 'x[0-9][0-9]*\.\.\([1-9][0-9]*\)' )
       ;;
     [1-9]*)
       m=1
       n=$mn
+      # support "m n" as alternative to "m..n"
+      if [ $# -gt 1 ]
+      then
+        case $1 in
+          [1-9]*)
+            m=$n
+            n=$1; shift
+            ;;
+        esac
+      fi
       ;;
     *)echo "$cmd: invalid m..n: $mn" >&2
       badopts=1
@@ -81,6 +91,6 @@ do  printf '%s\n' "$urlleft$i$urlright"
 done \
 | \
 if [ $doit ]
-then  $trace wget -i -
+then  $trace wget -i - -nc
 else  cat
 fi
