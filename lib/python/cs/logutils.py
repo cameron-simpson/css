@@ -32,7 +32,6 @@ import threading
 from threading import Lock
 import traceback
 from cs.ansi_colour import colourise
-from cs.excutils import noexc
 from cs.lex import is_identifier, is_dotted_identifier
 from cs.obj import O, O_str
 from cs.py.func import funccite
@@ -327,11 +326,79 @@ def D(msg, *args):
   if D_mode:
     X(msg, *args)
 
-def X(msg, *args):
+def DP(msg, *args):
+  ''' Print formatted debug string straight to sys.stderr if D_mode is true,
+      bypassing the logging modules entirely.
+      A quick'n'dirty debug tool.
+      Differs from D() by including the prefix() context.
+  '''
+  global D_mode
+  if D_mode:
+    XP(msg, *args)
+
+def X(msg, *args, **kwargs):
   ''' Unconditionally write the message `msg` to sys.stderr.
       If `args` is not empty, format `msg` using %-expansion with `args`.
   '''
-  return nl(msg, *args, file=sys.stderr)
+  file = kwargs.pop('file', None)
+  if file is None:
+    file = sys.stderr
+  return nl(msg, *args, file=file)
+
+def XP(msg, *args, **kwargs):
+  ''' Variation on X() which prefixes the message with the currrent Pfx prefix.
+  '''
+  file = kwargs.pop('file', None)
+  if file is None:
+    file = sys.stderr
+  elif file is not None:
+    if isinstance(file, StringTypes):
+      with open(file, "a") as fp:
+        XP(msg, *args, file=fp)
+      return
+  file.write(prefix())
+  file.write(': ')
+  file.flush()
+  return X(msg, *args, file=file)
+
+def XX(prepfx, msg, *args, **kwargs):
+  with PrePfx(prepfx):
+    return XP(msg, *args, **kwargs)
+
+def status(msg, *args, **kwargs):
+  ''' Write a message to the terminal's status line.
+      If there is no status line use the xterm title bar sequence :-(
+  '''
+  file = kwargs.pop('file', None)
+  if file is None:
+    file = sys.stderr
+  try:
+    has_ansi_status = file.has_ansi_status
+  except AttributeError:
+    try:
+      import curses
+    except ImportError:
+      has_ansi_status = None
+    else:
+      curses.setupterm()
+      has_status = curses.tigetflag('hs')
+      if has_status == -1:
+        warning('status: curses.tigetflag(hs): not a Boolean capability, presuming false')
+        has_ansi_status = None
+      elif has_status > 0:
+        has_ansi_status = ( curses.tigetstr('to_status_line'),
+                            curses.gtigetstr('from_status_line')
+                          )
+      else:
+        warning('status: hs=%s, presuming false', has_status)
+        has_ansi_status = None
+    file.has_ansi_status = has_ansi_status
+  if has_ansi_status:
+    msg = has_ansi_status[0] + msg + has_ansi_status[1]
+  else:
+    msg = '\033]0;' + msg + '\007'
+  file.write(msg)
+  file.flush()
 
 def nl(msg, *args, **kw):
   ''' Unconditionally write the message `msg` to `file` (default sys.stdout).
@@ -416,6 +483,7 @@ class _PfxThreadState(threading.local):
 
   def __init__(self):
     self.raise_needs_prefix = False
+    self._ur_prefix = None
     self.stack = []
 
   @property
@@ -438,7 +506,10 @@ class _PfxThreadState(threading.local):
       marks.append(P.umark)
       if P.absolute:
         break
-    return unicode(': ').join(reversed(marks))
+    if self._ur_prefix is not None:
+      marks.append(self._ur_prefix)
+    marks = reversed(marks)
+    return unicode(': ').join(marks)
 
   def append(self, P):
     ''' Push a new Pfx instance onto the stack.
@@ -534,16 +605,18 @@ class Pfx(object):
     _state = self._state
     if exc_value is not None:
       if _state.raise_needs_prefix:
+        # prevent outer Pfx wrappers from hacking stuff as well
+        _state.raise_needs_prefix = False
+        # now hack the exception attributes
         prefix = self._state.prefix
-        ##prefixify = lambda text: prefix + ': ' + text.replace('\n', '\n'+prefix)
         def prefixify(text):
           if not isinstance(text, StringTypes):
-            X("%s: not a string (class %s), not prefixing: %r",
-              prefix, text.__class__, text)
+            DP("%s: not a string (class %s), not prefixing: %r (sys.exc_info=%r)",
+               prefix, text.__class__, text, sys.exc_info())
             return text
           return prefix + ': ' + ustr(text, errors='replace').replace('\n', '\n'+prefix)
-        if hasattr(exc_value, 'args'):
-          args = exc_value.args
+        args = getattr(exc_value, 'args', None)
+        if args is not None:
           if args:
             if isinstance(args, StringTypes):
               D("%s: expected args to be a tuple, got %r", prefix, args)
@@ -551,7 +624,7 @@ class Pfx(object):
             else:
               args = list(args)
               if len(exc_value.args) == 0:
-                args = prefix
+                args = [ prefix ]
               else:
                 args = [ prefixify(exc_value.args[0]) ] + list(exc_value.args[1:])
             exc_value.args = args
@@ -568,8 +641,6 @@ class Pfx(object):
           # we can't modify this exception - at least report the current prefix state
           D("%s: Pfx.__exit__: exc_value = %s", prefix, O_str(exc_value))
           error(prefixify(str(exc_value)))
-        # prevent outer Pfx wrappers from hacking stuff as well
-        _state.raise_needs_prefix = False
     _state.pop()
     return False
 
@@ -582,7 +653,10 @@ class Pfx(object):
     if u is None:
       mark = ustr(self.mark)
       if not isinstance(mark, unicode):
-        mark = unicode(mark, errors='replace')
+        if isinstance(mark, str):
+          mark = unicode(mark, errors='replace')
+        else:
+          mark = unicode(mark)
       u = mark
       if self.mark_args:
         u = u % self.mark_args
@@ -627,11 +701,13 @@ class Pfx(object):
   def exception(self, msg, *args):
     for L in self.loggers:
       L.exception(msg, *args)
-  @noexc
   def log(self, level, msg, *args, **kwargs):
     ## to debug format errors ## D("msg=%r, args=%r, kwargs=%r", msg, args, kwargs)
     for L in self.loggers:
-      L.log(level, msg, *args, **kwargs)
+      try:
+        L.log(level, msg, *args, **kwargs)
+      except Exception as e:
+        XP("exception logging to %s msg=%r, args=%r, kwargs=%r: %s", L, msg, args, kwargs, e)
   def debug(self, msg, *args, **kwargs):
     self.log(logging.DEBUG, msg, *args, **kwargs)
   def info(self, msg, *args, **kwargs):
@@ -645,6 +721,23 @@ class Pfx(object):
     self.log(logging.ERROR, msg, *args, **kwargs)
   def critical(self, msg, *args, **kwargs):
     self.log(logging.CRITICAL, msg, *args, **kwargs)
+
+def prefix():
+  ''' Return the current Pfx prefix.
+  '''
+  return Pfx._state.prefix
+
+@contextmanager
+def PrePfx(pfx, *args):
+  ''' Push a temporary value for Pfx._state._ur_prefix to enloundenify messages.
+  '''
+  if args:
+    pfx = pfx % args
+  state = Pfx._state
+  old_ur_prefix = state._ur_prefix
+  state._ur_prefix = pfx
+  yield None
+  state._ur_prefix = old_ur_prefix
 
 class PfxCallInfo(Pfx):
   ''' Subclass of Pfx to insert current function an caller into messages.
@@ -661,7 +754,6 @@ class PfxCallInfo(Pfx):
 # Logger public functions
 def exception(msg, *args):
   Pfx._state.cur.exception(msg, *args)
-@noexc
 def log(level, msg, *args, **kwargs):
   Pfx._state.cur.log(level, msg, *args, **kwargs)
 def debug(msg, *args, **kwargs):
@@ -679,20 +771,6 @@ def critical(msg, *args, **kwargs):
   log(logging.CRITICAL, msg, *args, **kwargs)
 def trace(msg, *args, **kwargs):
   log(trace_level, msg, *args, **kwargs)
-
-def listargs(args, kwargs, tostr=None):
-  ''' Take the list 'args' and dict 'kwargs' and return a list of
-      strings representing them for printing.
-  '''
-  if tostr is None:
-    tostr = unicode
-  arglist = [ tostr(A) for A in args ]
-  kw=kwargs.keys()
-  if kw:
-    kw.sort()
-    for k in kw:
-      arglist.append("%s=%s" % (k, tostr(kwargs[k])))
-  return arglist
 
 class LogTime(object):
   ''' LogTime is a content manager that logs the elapsed time of the enclosed
@@ -768,8 +846,7 @@ class UpdHandler(StreamHandler):
         self.__upd.out(logrec.getMessage())
 
   def flush(self):
-    if self.__upd._backend:
-      self.__upd._backend.flush()
+    return self.__upd.flush()
 
 if __name__ == '__main__':
   setup_logging(sys.argv[0])

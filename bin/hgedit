@@ -1,10 +1,17 @@
 #!/bin/sh
 #
+# Update a file by default with EDITOR, commit the file.
+# - Cameron Simpson <cs@zip.com.au>
+#
+
+set -ue
 
 : ${EDITOR:=vi}
 
 cmd=$0
 usage="Usage: $cmd file [command...]"
+
+dolog=1
 
 badopts=
 
@@ -38,6 +45,10 @@ set -x
 
 "$@"
 hg diff "$file"
+
+
 msg=`readline "Log message> "`
 [ -n "$msg" ] || { echo "$cmd: empty message" >&2; exit 1; }
+# log the change and diff appropriately
+[ $dolog ] && hg diff "$file" | execif buglog "$cmd $file: $msg"
 hg commit -m "$msg" -- "$file"

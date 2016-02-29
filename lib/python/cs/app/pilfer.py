@@ -41,8 +41,9 @@ from cs.debug import thread_dump, ifdebug
 from cs.env import envsub
 from cs.excutils import noexc, noexc_gen, logexc, logexc_gen, LogExceptions
 from cs.fileutils import file_property, mkdirn
-from cs.later import Later, FUNC_ONE_TO_ONE, FUNC_ONE_TO_MANY, FUNC_SELECTOR, FUNC_MANY_TO_MANY
-from cs.lex import get_identifier, get_other_chars
+from cs.later import Later, RetryError, \
+                    FUNC_ONE_TO_ONE, FUNC_ONE_TO_MANY, FUNC_SELECTOR, FUNC_MANY_TO_MANY
+from cs.lex import get_identifier, is_identifier, get_other_chars
 import cs.logutils
 from cs.logutils import setup_logging, logTo, Pfx, info, debug, error, warning, exception, trace, pfx_iter, D, X
 from cs.mappings import MappingChain, SeenSet
@@ -50,13 +51,18 @@ from cs.queues import NullQueue, NullQ, IterableQueue
 from cs.seq import seq
 from cs.threads import locked, locked_property
 from cs.urlutils import URL, isURL, NetrcHTTPPasswordMgr
+from cs.app.flag import PolledFlags
 import cs.obj
 from cs.obj import O
 from cs.py.func import funcname, funccite, yields_type, returns_type
 from cs.py.modules import import_module_name
 from cs.py3 import input, ConfigParser, sorted, ustr, unicode
 
+# parallelism of jobs
 DEFAULT_JOBS = 4
+
+# default flag status probe
+DEFAULT_FLAGS_CONJUNCTION = '!PILFER_DISABLE'
 
 usage = '''Usage: %s [options...] op [args...]
   %s url URL actions...
@@ -64,6 +70,8 @@ usage = '''Usage: %s [options...] op [args...]
   Options:
     -c config
         Load rc file.
+    -F flag-conjunction
+        Space separated list of flag or !flag to satisfy as a conjunction.
     -j jobs
 	How many jobs (actions: URL fetches, minor computations)
 	to run at a time.
@@ -85,11 +93,12 @@ def main(argv, stdin=None):
   P = Pilfer()
   quiet = False
   jobs = DEFAULT_JOBS
+  flagnames = DEFAULT_FLAGS_CONJUNCTION
 
   badopts = False
 
   try:
-    opts, argv = getopt(argv, 'c:j:qux')
+    opts, argv = getopt(argv, 'c:F:j:qux')
   except GetoptError as e:
     warning("%s", e)
     badopts = True
@@ -99,6 +108,8 @@ def main(argv, stdin=None):
     with Pfx("%s", opt):
       if opt == '-c':
         P.rcs[0:0] = load_pilferrcs(val)
+      elif opt == '-F':
+        flagnames = val
       elif opt == '-j':
         jobs = int(val)
       elif opt == '-q':
@@ -109,6 +120,17 @@ def main(argv, stdin=None):
         P.do_trace = True
       else:
         raise NotImplementedError("unimplemented option")
+
+  # break the flags into separate words and syntax check
+  flagnames = flagnames.split()
+  for flagname in flagnames:
+    if flagname.startswith('!'):
+      flag_ok = is_identifier(flagname, 1)
+    else:
+      flag_ok = is_identifier(flagname)
+    if not flag_ok:
+      error('invalid flag specifier: %r', flagname)
+      badopts = True
 
   dflt_rc = os.environ.get('PILFERRC')
   if dflt_rc is None:
@@ -166,6 +188,7 @@ def main(argv, stdin=None):
             badopts = True
           if not badopts:
             LTR = Later(jobs)
+            P.flagnames = flagnames
             if cs.logutils.D_mode or ifdebug():
               # poll the status of the Later regularly
               def pinger(L):
@@ -229,7 +252,7 @@ def main(argv, stdin=None):
                 LTR.state("DRAINED DIV %s using outQ=%s", busy_div, outQ)
                 divnames = P.open_diversion_names
               LTR.state("quiescing")
-              L.quiesce()
+              L.wait_outstanding(until_idle=True)
               # Now the diversions should have completed and closed.
             # out of the context manager, the Later should be shut down
             LTR.state("WAIT...")
@@ -335,6 +358,9 @@ def argv_pipefuncs(argv, action_map, do_trace):
       except ValueError as e:
         errors.append("bad action %r: %s" % (action, e))
       else:
+        if func_sig != FUNC_MANY_TO_MANY:
+          # other functions are called with each item
+          function = retriable(function)
         pipe_funcs.append( (func_sig, function) )
   return pipe_funcs, errors
 
@@ -410,6 +436,7 @@ class Pilfer(O):
     self._ = None
     self.flush_print = False
     self.do_trace = False
+    self.flags = PolledFlags()
     self._print_to = None
     self._print_lock = Lock()
     self.user_agent = None
@@ -433,10 +460,14 @@ class Pilfer(O):
 
   @property
   def defaults(self):
+    ''' Mapping for default values formed by cascading PilferRCs.
+    '''
     return MappingChain(mappings=[ rc.defaults for rc in self.rcs ])
 
   @property
   def _(self):
+    ''' Shortcut to this Pilfer's user_vars['_'] entry - the current item value.
+    '''
     return self.user_vars['_']
 
   @_.setter
@@ -450,6 +481,23 @@ class Pilfer(O):
     ''' self._ as a URL object.
     '''
     return URL(self._, None)
+
+  def test_flags(self):
+    ''' Evaluate the flags conjunction.
+        Installs the tested names into the status dictionary as side effect.
+        Note that it deliberately probes all flags instead of stopping
+        at the first false condition.
+    '''
+    all_status = True
+    flags = self.flags
+    for flagname in self.flagnames:
+      if flagname.startswith('!'):
+        status = not flags.setdefault(flagname[1:], False)
+      else:
+        status = flags.setdefault(flagname[1:], False)
+      if not status:
+        all_status = False
+    return all_status
 
   @locked
   def seenset(self, name):
@@ -472,9 +520,13 @@ class Pilfer(O):
     return seen[name]
 
   def seen(self, url, seenset='_'):
+    ''' Test if the named `url` has been seen. Default seetset is '_'.
+    '''
     return url in self.seenset(seenset)
 
   def see(self, url, seenset='_'):
+    ''' Mark a `url` as seen. Default seetset is '_'.
+    '''
     self.seenset(seenset).add(url)
 
   @property
@@ -962,7 +1014,8 @@ def _test_grokfunc( P, *a, **kw ):
 
 # actions that work on the whole list of in-play URLs
 many_to_many = {
-      'sort':         lambda Ps, key=lambda P: P._, reverse=False: sorted(Ps, key=key, reverse=reverse),
+      'sort':         lambda Ps, key=lambda P: P._, reverse=False: \
+                        sorted(Ps, key=key, reverse=reverse),
       'last':         lambda Ps: Ps[-1:],
     }
 
@@ -1240,6 +1293,18 @@ def action_func_raw(action, do_trace):
 
   function.__name__ = "action(%r)" % (action0,)
   return function, args, kwargs, func_sig, result_is_Pilfer
+
+def retriable(func):
+  ''' A decorator for a function to probe the Pilfer flags and raise RetryError if unsatisfied.
+  '''
+  def retry_func(P, *a, **kw):
+    ''' Call func after testing flags.
+    '''
+    if not P.test_flags():
+      raise RetryError('flag conjunction fails: %s' % (' '.join(P.flagnames)))
+    return func(P, *a, **kw)
+  retry_func.__name__ = 'retriable(%s)' % (funcname(func),)
+  return retry_func
 
 def action_func(action, do_trace, raw=False):
   ''' Accept a string `action` and return a tuple of:
@@ -1795,6 +1860,8 @@ def action_assign(var, value):
   return function, FUNC_ONE_TO_ONE
 
 class PipeSpec(O):
+  ''' A pipeline specification: a name and list of actions.
+  '''
 
   def __init__(self, name, argv):
     O.__init__(self)
@@ -1804,15 +1871,18 @@ class PipeSpec(O):
   @logexc
   def pipe_funcs(self, action_map, do_trace):
     ''' Compute a list of functions to implement a pipeline.
-	It is important that this list is constructed anew for each
-	new pipeline instance because many of the functions rely
-	on closures to track state.
+        It is important that this list is constructed anew for each
+        new pipeline instance because many of the functions rely
+        on closures to track state.
     '''
     with Pfx(self.name):
       pipe_funcs, errors = argv_pipefuncs(self.argv, action_map, do_trace)
     return pipe_funcs, errors
 
 def load_pilferrcs(pathname):
+  ''' Load PilferRC instances rom the supplied `pathname`, recursing if this is a directory.
+      Return a list of the PilferRC instances obtained.
+  '''
   rcs = []
   with Pfx(pathname):
     if os.path.isfile(pathname):
@@ -1837,6 +1907,8 @@ def load_pilferrcs(pathname):
 class PilferRC(O):
 
   def __init__(self, filename):
+    ''' Initialise the PilferRC instance. Load values from `filename` if not None.
+    '''
     O.__init__(self)
     self.filename = filename
     self._lock = Lock()

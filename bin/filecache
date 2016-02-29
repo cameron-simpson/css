@@ -18,7 +18,7 @@ file=$1; shift
 || { echo "$cmd: $file: not a file or fetchable object!" >&2; exit 1; }
 
 ext=bin
-mtype=`file2mime "$file"` && { ext=`mimeext "$mtype"` || ext=bin; }
+mtype=`file2mime "$file"` && { ext=`mime-ext "$mtype"` || ext=bin; }
 md5path=`md5path "$file"` || exit 1
 
 cachefile=$FILECACHE_ROOT/$md5path.$ext
