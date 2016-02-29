@@ -895,9 +895,9 @@ class SharedAppendFile(object):
       which is handed a foreign record from the file to incorporate
       into their own state. They must be prepared to accept the
       value None, which is a marker for seeing EOF on the backing
-      file; it is sent unconditionally on the first scan of the
-      file and then whenever a scan of the file receives additional
-      data.
+      file; it is sent unconditionally on completion of the first
+      scan of the file and then whenever a scan of the file receives
+      additional data.
 
       Sunclasses which emit higher order records, such as
       SharedAppendLines below, will need to intercept the `importer`
@@ -955,7 +955,7 @@ class SharedAppendFile(object):
         max_queue = self.DEFAULT_MAX_QUEUE
       if poll_interval is None:
         poll_interval = DEFAULT_POLL_INTERVAL
-      self.pathname = pathname
+      self.pathname = abspath(pathname)
       self.binary = binary
       self.no_update = no_update
       self.importer = importer
