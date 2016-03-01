@@ -1152,8 +1152,8 @@ class SharedAppendLines(SharedAppendFile):
       if start < len(chunk):
         partials.append(chunk[start:])
 
-  def rewrite(self, lines):
-    return SharedAppendFile.rewrite(self, ( line.encode("utf-8") for line in lines ))
+  def rewrite(self, lines, encoding="utf-8"):
+    return SharedAppendFile.rewrite(self, ( line.encode(encoding) for line in lines ))
 
   def transcribe_update(self, fp, s):
     ''' Transcribe a string as a line.
