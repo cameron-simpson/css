@@ -37,7 +37,7 @@ from cs.asynchron import Result
 from cs.debug import trace
 from cs.env import envsub
 from cs.lex import as_lines
-from cs.logutils import error, warning, debug, Pfx, D, X
+from cs.logutils import exception, error, warning, debug, Pfx, D, X
 from cs.queues import IterableQueue
 from cs.range import Range
 from cs.threads import locked, locked_property
@@ -349,8 +349,7 @@ def make_file_property(attr_name=None, unset_object=None, poll_rate=DEFAULT_POLL
             new_value = getattr(self, attr_value, unset_object)
             if new_value is unset_object:
               raise
-            import cs.logutils
-            cs.logutils.exception("exception during poll_file, leaving .%s untouched", attr_value)
+            exception("exception during poll_file, leaving .%s untouched", attr_value)
           else:
             if new_filestate:
               setattr(self, attr_value, new_value)
@@ -479,8 +478,7 @@ def make_files_property(attr_name=None, unset_object=None, poll_rate=DEFAULT_POL
               new_value = getattr(self, attr_value, unset_object)
               if new_value is unset_object:
                 raise
-              import cs.logutils
-              cs.logutils.debug("exception reloading .%s, keeping cached value: %s", attr_value, e)
+              debug("exception reloading .%s, keeping cached value: %s", attr_value, e)
             else:
               # examine new filestates in case they changed during load
               # _if_ we knew about them from the earlier load
@@ -536,7 +534,6 @@ def lockfile(path, ext=None, poll_interval=None, timeout=None):
         complaint_interval = 2 * max(DEFAULT_POLL_INTERVAL, poll_interval)
       else:
         if now - complaint_last >= complaint_interval:
-          from cs.logutils import warning
           warning("cs.fileutils.lockfile: pid %d waited %ds for %r",
                   os.getpid(), now - start, lockpath)
           complaint_last = now
