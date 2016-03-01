@@ -894,7 +894,12 @@ class SharedAppendFile(object):
       value None, which is a marker for seeing EOF on the backing
       file; it is sent unconditionally on completion of the first
       scan of the file and then whenever a scan of the file receives
-      additional data.
+      additional data. They must also be prepared to accept the
+      value SharedAppendFile.SENTINEL_RESTART which is sent when a
+      rewrite/replacement is observed; if the file shrinks or changes
+      inode it is presumed to have been rewritten - SENTINEL_RESTART
+      is sent and the file it reopened and rescanned from the
+      beginning.
 
       Sunclasses which emit higher order records, such as
       SharedAppendLines below, will need to intercept the `importer`
@@ -932,6 +937,7 @@ class SharedAppendFile(object):
   '''
 
   DEFAULT_MAX_QUEUE = 128
+  SENTINEL_RESTART = object()
 
   def __init__(self, pathname, no_update=False, importer=None,
                 binary=False, max_queue=None,
@@ -959,8 +965,11 @@ class SharedAppendFile(object):
       self.poll_interval = poll_interval
       self.max_queue = max_queue
       self.ready = Result(name="readiness(%s)" % (self,))
+      # lock file paramaters
       self.lock_ext = lock_ext
       self.lock_timeout = lock_timeout
+      # mutex on read access
+      self._readlock = RLock()
       if not no_update:
         # inbound updates to be saved to the file
         self._inQ = IterableQueue(self.max_queue, name="%s._inQ" % (self,))
@@ -969,17 +978,40 @@ class SharedAppendFile(object):
   def __str__(self):
     return "SharedAppendFile(%r)" % (self.pathname,)
 
-  def _open(self):
+  def _open(self, skip_to_end=False):
     ''' Open the file for read or read/write.
     '''
     mode = "r" if self.no_update else "r+"
     if self.binary:
       mode += "b"
     self.fp = open(self.pathname, mode)
+    if skip_to_end:
+      self.fp.seek(0, SEEK_END)
+    self.open_state = self.filestate
     self.closed = False
     self._monitor_thread = Thread(target=self._monitor, name="%s._monitor" % (self,))
     self._monitor_thread.daemon = True
     self._monitor_thread.start()
+
+  def _close(self):
+    fp = self.fp
+    self.fp = None
+    fp.close()
+
+  def rewrite(self, chunks):
+    ''' Rewrite the file using content from `chunks`, then switch the new file into place.
+    '''
+    X("%s.rewrite...", self)
+    with self._lockfile():
+      with self._readlock:
+        self._close()
+        tmpfp = mkstemp(dir=dirname(self.pathname))
+        for chunk in chunks:
+          tmpfp.write(chunk)
+        tmpfp.close()
+        os.rename(tmpfp, self.pathname)
+        self._open(skip_to_end=True)
+    X("%s.rewrite DONE", self)
 
   def close(self):
     ''' Close the SharedAppendFile: close input queue, wait for monitor to terminate.
@@ -990,9 +1022,7 @@ class SharedAppendFile(object):
     if not self.no_update:
       self._inQ.close()
     self._monitor_thread.join()
-    fp = self.fp
-    self.fp = None
-    fp.close()
+    self._close()
 
   @property
   def filestate(self):
@@ -1051,7 +1081,8 @@ class SharedAppendFile(object):
             ):
         if self.importer:
           # catch up
-          count = self._read_to_eof(force_eof=first)
+          with self._readlock:
+            count = self._read_to_eof(force_eof=first)
           if first:
             # indicate first to-EOF read complete, output queue primed
             self.ready.put(True)
@@ -1069,8 +1100,9 @@ class SharedAppendFile(object):
             # release lock
             with self._lockfile():
               if self.importer:
-                self._read_to_eof()
-                pos = self.fp.tell()
+                with self._read_lock:
+                  self._read_to_eof()
+                  pos = self.fp.tell()
               self.fp.seek(0, SEEK_END)
               if self.importer and pos != self.fp.tell():
                 warning("update: pos after catch up=%r, pos after SEEK_END=%r", pos, self.fp.tell())
@@ -1078,6 +1110,15 @@ class SharedAppendFile(object):
                 item = self._inQ._get()
                 self.transcribe_update(self.fp, item)
               self.fp.flush()
+        # watch for file being rewritten by other users
+        fstate = FileState(self.pathname)
+        if not fstate.samefile(self.open_state):
+          X("%s: new file, reopen and send SENTINEL_RESTART to client...", self)
+          with self._readlock:
+            self._close()
+            self._open()
+          # alert client to complete new state
+          self.importer(self.SENTINEL_RESTART)
         # clear flag for next pass
         first = False
 
