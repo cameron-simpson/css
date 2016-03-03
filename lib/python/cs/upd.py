@@ -127,7 +127,7 @@ class Upd(object):
     return ret
 
   @contextmanager
-  def _withoutContext(self,noStrip=False):
+  def _withoutContext(self, noStrip=False):
     with self._lock:
       old = self.out('', noStrip=noStrip)
       yield
