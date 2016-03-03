@@ -81,15 +81,15 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
   global cmd, logging_level, trace_level, D_mode
 
   # infer logging modes, these are the initial defaults
-  linfo = infer_logging_level()
+  inferred = infer_logging_level()
   if level is None:
-    level = linfo.level
+    level = inferred.level
   if flags is None:
-    flags = linfo.flags
+    flags = inferred.flags
   if module_names is None:
-    module_names = linfo.module_names
+    module_names = inferred.module_names
   if function_names is None:
-    function_names = linfo.function_names
+    function_names = inferred.function_names
 
   if cmd_name is None:
     cmd_name = os.path.basename(sys.argv[0])
