@@ -398,4 +398,7 @@ class BucketPool(Pool):
     Pool.__init__(self, lambda: boto3.session.Session().resource('s3').Bucket(bucket_name))
 
 if __name__ == '__main__':
+  import signal
+  from cs.debug import thread_dump
+  signal.signal(signal.SIGHUP, lambda sig, frame: thread_dump())
   sys.exit(main(sys.argv))
