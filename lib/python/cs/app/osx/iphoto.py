@@ -41,6 +41,7 @@ Criteria:
                         Empty keyword means "has a keyword".
   [!]face:[person_name] Latest version has named person.
                         Empty person_name means "has a face".
+                        May also be writtens "who:...".
   Because "!" is often used for shell history expansion, a dash "-"
   is also accepted to invert the selector.
 '''
@@ -564,7 +565,7 @@ class iPhoto(O):
                 if kwname != okwname:
                   info("%r ==> %r", okwname, kwname)
                 selector = SelectByKeyword_Name(self, kwname, invert)
-          elif sel_type == 'face':
+          elif sel_type == 'face' or sel_type == 'who':
             person_name = selection
             if not person_name:
               selector = SelectByFunction(self,
