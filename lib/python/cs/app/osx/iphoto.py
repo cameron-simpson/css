@@ -312,7 +312,7 @@ class iPhoto(O):
     ''' Load Faces.RKVersionFaceContent into memory and set up mappings.
     '''
     by_id = self.vface_by_id = {}
-    by_master_id = self.vfaces_by_master_id = {}
+    by_master_id = self.vfaces_by_master_id
     for vface in self.read_vfaces():
       by_id[vface.modelId] = vface
       master_id = vface.masterId
@@ -321,6 +321,11 @@ class iPhoto(O):
       except KeyError:
         vfaces = by_master_id[master_id] = set()
       vfaces.add(vface)
+
+  @locked_property
+  def vfaces_by_master_id(self):
+    self.load_vfaces()
+    return I.vfaces_by_master_id.get(self.modelId, ())
 
   def _load_table_folders(self):
     ''' Load Library.RKFolder into memory and set up mappings.
