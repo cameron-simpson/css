@@ -17,7 +17,7 @@ DISTINFO = {
 
 from contextlib import contextmanager
 import threading
-from threading import Condition, RLock
+from threading import Condition, RLock, Lock
 import time
 import traceback
 from cs.excutils import logexc
@@ -201,6 +201,7 @@ class Pool(O):
     self.new_object = new_object
     self.max_size = max_size
     self.pool = []
+    self._lock = Lock()
 
   def __str__(self):
     return "Pool(max_size=%s, new_object=%s)" % (self.max_size, self.new_object)
@@ -209,10 +210,12 @@ class Pool(O):
   def instance(self):
     ''' Context manager returning an object for use, which is returned to the pool afterwards.
     '''
-    try:
-      o = self.pool.pop()
-    except IndexError:
-      o = self.new_object()
+    with self._lock:
+      try:
+        o = self.pool.pop()
+      except IndexError:
+        o = self.new_object()
     yield o
-    if self.max_size == 0 or len(self.pool) < self.max_size:
-      self.pool.append(o)
+    with self._lock:
+      if self.max_size == 0 or len(self.pool) < self.max_size:
+        self.pool.append(o)
