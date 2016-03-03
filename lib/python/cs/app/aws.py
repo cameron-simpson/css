@@ -12,7 +12,10 @@ import sys
 from collections import namedtuple
 from contextlib import contextmanager
 import hashlib
-from threading import RLock
+import logging
+import magic
+from threading import RLock, Thread
+from time import sleep
 import os
 import os.path
 from os.path import abspath, normpath, join as joinpath
@@ -28,19 +31,29 @@ from cs.later import Later
 from cs.logutils import setup_logging, D, X, XP, error, warning, info, Pfx
 from cs.resources import Pool
 from cs.threads import locked_property
-from cs.obj import O, O_str
+from cs.upd import Upd
 
 USAGE = r'''Usage: %s [-L location (ignored, fixme)] command [args...]
   s3 [bucket_name]'''
 
 S3_MAX_DELETE_OBJECTS = 1000
 
-def main(argv, stderr=None):
+# will be magic.Magic(mime=True)
+MAGIC = None
+
+# will be cs.upd.Upd
+UPD = None
+
+def main(argv, stdout=None, stderr=None):
+  global MAGIC, UPD
+  if stdout is None:
+    stdout = sys.stdout
   if stderr is None:
     stderr = sys.stderr
 
   cmd=os.path.basename(argv.pop(0))
-  setup_logging(cmd)
+  setup_logging(cmd, level=logging.WARNING)
+  UPD = Upd(stdout)
 
   location = None
 
@@ -72,6 +85,7 @@ def main(argv, stderr=None):
     mtpath = os.environ.get('MIME_TYPES')
     if mtpath:
       mimetypes.init((mtpath,))
+    MAGIC = magic.Magic(mime=True)
 
   if not argv:
     error("missing command")
@@ -245,7 +259,7 @@ def s3syncup_file(bucket_pool, srcpath, dstpath, trust_size_mtime=False, doit=Fa
     S = os.stat(srcpath)
     if not stat.S_ISREG(S.st_mode):
       raise ValueError("not a regular file")
-    ctype, cencoding  = mimetypes.guess_type(srcpath)
+    ctype = mimetype(srcpath)
     if ctype is None:
       raise ValueError("cannot deduce content_type")
     with bucket_pool.instance() as B:
@@ -295,8 +309,7 @@ def s3syncup_file(bucket_pool, srcpath, dstpath, trust_size_mtime=False, doit=Fa
         elif trust_size_mtime:
           same_content = same_mtime and same_size
 
-      to_change = action_summary(same_ctype, same_mtime, same_size, same_content)
-      print('>'+to_change, srcpath, ctype)
+      change = '>' + action_summary(same_ctype, same_mtime, same_size, same_content)
       if same_content:
         if same_ctype:
           ##XP("OK")
@@ -362,6 +375,22 @@ def hash_fp(fp, hashname, h=None, rsize=16384):
     with open(filename, 'rb') as fp:
       return hash_fp(fp, hashname, h=h, rsize=rsize)
   return hash_byteses(chunks_of(fp, rsize=rsize), hashname, h=h)
+
+def mimetype(filename):
+  global MAGIC
+  base = basename(filename)
+  try:
+    baseleft, basequery = base.split('?', 1)
+  except ValueError:
+    guesspart = base
+  else:
+    guesspart = baseleft
+  try:
+    ctype, cencoding  = mimetypes.guess_type(guesspart)
+  except ValueError as e:
+    warning("cannot guess MIME type from basename, trying MAGIC: %r: %s", guesspart, e)
+    ctype = MAGIC.from_file(filename).decode()
+  return ctype
 
 class BucketPool(Pool):
 
