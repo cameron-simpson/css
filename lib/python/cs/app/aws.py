@@ -292,7 +292,9 @@ def s3syncup_file(bucket_pool, srcpath, dstpath, trust_size_mtime=False, doit=Fa
       raise ValueError("not a regular file")
     ctype = mimetype(srcpath)
     if ctype is None:
-      raise ValueError("cannot deduce content_type")
+      if default_ctype is None:
+        raise ValueError("cannot deduce content_type")
+      ctype = default_ctype
     with bucket_pool.instance() as B:
       s3obj = B.Object(dstpath)
       try:
