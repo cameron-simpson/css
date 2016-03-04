@@ -299,6 +299,10 @@ def s3syncup_file(bucket_pool, srcpath, dstpath, trust_size_mtime=False, doit=Fa
       s3obj = B.Object(dstpath)
       try:
         s3obj.load()
+      except UnicodeError as e:
+        error("SKIP: cannot handle s3 path %r: %s", dstpath, e)
+        return None, None, srcpath, dstpath, \
+               e, ("SKIP: cannot handle s3 path %r: %s" % (dstpath, e))
       except ClientError as e:
         if e.response['Error']['Code'] == '404':
           missing = True
