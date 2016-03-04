@@ -29,6 +29,8 @@ from cs.excutils import logexc
 from cs.fileutils import chunks_of
 from cs.later import Later
 from cs.logutils import setup_logging, D, X, XP, error, warning, info, Pfx
+from cs.obj import O, O_str
+from cs.queues import IterableQueue
 from cs.resources import Pool
 from cs.threads import locked_property
 from cs.upd import Upd
@@ -111,6 +113,7 @@ def main(argv, stdout=None, stderr=None):
   return xit
 
 def cmd_s3(argv):
+  xit = 0
   s3 = boto3.resource('s3')
   if not argv:
     for bucket in s3.buckets.all():
@@ -157,12 +160,14 @@ def cmd_s3(argv):
               error("extra arguments after srcdir: %r" % (argv,))
               badopts = True
         if not badopts:
-          s3syncup_dir(bucket_pool, srcdir, dstdir, doit=doit, do_delete=do_delete)
+          if not s3syncup_dir(bucket_pool, srcdir, dstdir, doit=doit, do_delete=do_delete, default_ctype='text/html'):
+            xit = 1
       else:
         error("unrecognised s3 op")
         badopts = True
       if badopts:
         raise GetoptError("bad arguments")
+  return xit
 
 def action_summary(same_ctype, same_mtime, same_size, same_content):
   return ( ( 'C' if not same_ctype else '-' )
@@ -171,7 +176,34 @@ def action_summary(same_ctype, same_mtime, same_size, same_content):
          + ( 'd' if not same_content else '-' )
          )
 
-def s3syncup_dir(bucket_pool, srcdir, dstdir, doit=False, do_delete=False):
+def s3syncup_dir(bucket_pool, srcdir, dstdir, doit=False, do_delete=False, default_ctype=None):
+  ''' Sync local directory tree to S3 directory tree.
+  '''
+  global UPD
+  ok = True
+  L = Later(4, name="s3syncup(%r, %r, %r)")
+  Q = IterableQueue()
+  def dispatch():
+    for LF in s3syncup_dir_async(L, bucket_pool, srcdir, dstdir, doit=doit, do_delete=do_delete, default_ctype=default_ctype):
+      Q.put(LF)
+    Q.close()
+  with L:
+    Thread(target=dispatch).start()
+    for LF in Q:
+      change, ctype, srcpath, dstpath, e, error_msg = LF()
+      if e:
+        UPD.without(error, error_msg)
+        ok = False
+      else:
+        line = "%s %-25s %s" % (change, ctype, dstpath)
+        if change == '>----':
+          UPD.out(line)
+        else:
+          UPD.nl(line)
+  L.wait()
+  return ok
+
+def s3syncup_dir_async(L, bucket_pool, srcdir, dstdir, doit=False, do_delete=False, default_ctype=None):
   ''' Sync local directory tree to S3 directory tree.
   '''
   lsep = os.path.sep
@@ -180,82 +212,81 @@ def s3syncup_dir(bucket_pool, srcdir, dstdir, doit=False, do_delete=False):
   srcdir = abspath(srcdir)
   if not os.path.isdir(srcdir):
     raise ValueError("srcdir not a directory: %r", srcdir)
-  L = Later(16, name="s3syncup(%r, %r, %r)")
-  with L:
-    srcdir_slash = srcdir + lsep
-    # compare existing local files with remote
-    for dirpath, dirnames, filenames in os.walk(srcdir):
-      with Pfx(dirpath):
-        # compute the path relative to srcdir
-        if dirpath == srcdir:
-          subdirpath = ''
-        elif dirpath.startswith(srcdir_slash):
-          subdirpath = dirpath[len(srcdir_slash):]
-        else:
-          raise RuntimeError("os.walk(%r) gave surprising dirpath %r" % (srcdir, dirpath))
-        if subdirpath:
-          dstdirpath = rsep.join([dstdir] + subdirpath.split(lsep))
-        else:
-          dstdirpath = dstdir
-        for filename in sorted(filenames):
-          with Pfx(filename):
-            # TODO: dispatch these in parallel
-            srcpath = joinpath(dirpath, filename)
-            if dstdirpath:
-              dstpath = dstdirpath + rsep + filename
+  srcdir_slash = srcdir + lsep
+  # compare existing local files with remote
+  for dirpath, dirnames, filenames in os.walk(srcdir, topdown=True):
+    # arrange lexical order of descent
+    dirnames[:] = sorted(dirnames)
+    with Pfx(dirpath):
+      # compute the path relative to srcdir
+      if dirpath == srcdir:
+        subdirpath = ''
+      elif dirpath.startswith(srcdir_slash):
+        subdirpath = dirpath[len(srcdir_slash):]
+      else:
+        raise RuntimeError("os.walk(%r) gave surprising dirpath %r" % (srcdir, dirpath))
+      if subdirpath:
+        dstdirpath = rsep.join([dstdir] + subdirpath.split(lsep))
+      else:
+        dstdirpath = dstdir
+      for filename in sorted(filenames):
+        with Pfx(filename):
+          # TODO: dispatch these in parallel
+          srcpath = joinpath(dirpath, filename)
+          if dstdirpath:
+            dstpath = dstdirpath + rsep + filename
+          else:
+            dstpath = filename
+          yield L.defer(s3syncup_file, bucket_pool, srcpath, dstpath, doit=True, default_ctype=default_ctype)
+  if do_delete:
+    # now process deletions
+    with bucket_pool.instance() as B:
+      if dstdir:
+        dstdir_prefix = dstdir + rsep
+      else:
+        dstdir_prefix = ''
+      with Pfx("S3.filter(Prefix=%r)", dstdir_prefix):
+        dstdelpaths = []
+        for s3obj in B.objects.filter(Prefix=dstdir_prefix):
+          dstpath = s3obj.key
+          with Pfx(dstpath):
+            if not dstpath.startswith(dstdir_prefix):
+              error("unexpected dstpath, not in subdir")
+              continue
+            dstrpath = dstpath[len(dstdir_prefix):]
+            if dstrpath.startswith(rsep):
+              error("unexpected dstpath, extra %r", rsep)
+              continue
+            srcpath = joinpath(srcdir, lsep.join(dstrpath.split(rsep)))
+            if os.path.exists(srcpath):
+              ##info("src exists, not deleting (src=%r)", srcpath)
+              continue
+            if dstrpath.endswith(rsep):
+              # a folder
+              print("d DEL", dstpath)
             else:
-              dstpath = filename
-            L.defer(s3syncup_file, bucket_pool, srcpath, dstpath, doit=True)
-    if do_delete:
-      # now process deletions
-      with bucket_pool.instance() as B:
-        if dstdir:
-          dstdir_prefix = dstdir + rsep
-        else:
-          dstdir_prefix = ''
-        with Pfx("S3.filter(Prefix=%r)", dstdir_prefix):
-          dstdelpaths = []
-          for s3obj in B.objects.filter(Prefix=dstdir_prefix):
-            dstpath = s3obj.key
-            with Pfx(dstpath):
-              if not dstpath.startswith(dstdir_prefix):
-                error("unexpected dstpath, not in subdir")
-                continue
-              dstrpath = dstpath[len(dstdir_prefix):]
-              if dstrpath.startswith(rsep):
-                error("unexpected dstpath, extra %r", rsep)
-                continue
-              srcpath = joinpath(srcdir, lsep.join(dstrpath.split(rsep)))
-              if os.path.exists(srcpath):
-                ##info("src exists, not deleting (src=%r)", srcpath)
-                continue
-              if dstrpath.endswith(rsep):
-                # a folder
-                print("d DEL", dstpath)
-              else:
-                try:
-                  ctype = s3obj.content_type
-                except AttributeError as e:
-                  ##XP("no .content_type")
-                  ctype = None
-                print("* DEL", dstpath, ctype)
-              dstdelpaths.append(dstpath)
-          if dstdelpaths:
-            dstdelpaths = sorted(dstdelpaths, reverse=True)
-            while dstdelpaths:
-              delpaths = dstdelpaths[:S3_MAX_DELETE_OBJECTS]
-              X("delpaths %r", delpaths)
-              if doit:
-                B.delete_objects(
-                    Delete={
-                      'Objects':
-                        [ {'Key': dstpath} for dstpath in delpaths ]})
-              dstdelpaths[:len(delpaths)] = []
-  L.wait()
+              try:
+                ctype = s3obj.content_type
+              except AttributeError as e:
+                ##XP("no .content_type")
+                ctype = None
+              print("* DEL", dstpath, ctype)
+            dstdelpaths.append(dstpath)
+        if dstdelpaths:
+          dstdelpaths = sorted(dstdelpaths, reverse=True)
+          while dstdelpaths:
+            delpaths = dstdelpaths[:S3_MAX_DELETE_OBJECTS]
+            X("delpaths %r", delpaths)
+            if doit:
+              B.delete_objects(
+                  Delete={
+                    'Objects':
+                      [ {'Key': dstpath} for dstpath in delpaths ]})
+            dstdelpaths[:len(delpaths)] = []
 
 @logexc
-def s3syncup_file(bucket_pool, srcpath, dstpath, trust_size_mtime=False, doit=False):
-  with Pfx(srcpath):
+def s3syncup_file(bucket_pool, srcpath, dstpath, trust_size_mtime=False, doit=False, default_ctype=None):
+  with Pfx('s3syncup_file'):
     S = os.stat(srcpath)
     if not stat.S_ISREG(S.st_mode):
       raise ValueError("not a regular file")
@@ -339,6 +370,7 @@ def s3syncup_file(bucket_pool, srcpath, dstpath, trust_size_mtime=False, doit=Fa
         if doit:
           with Pfx("put(**%r)", kw):
             s3obj.put(**kw)
+    return change, ctype, srcpath, dstpath, None, None
 
 S3Stat = namedtuple('S3Stat', 'st_mtime st_size')
 
