@@ -18,7 +18,7 @@ from threading import RLock, Thread
 from time import sleep
 import os
 import os.path
-from os.path import abspath, normpath, join as joinpath
+from os.path import basename, abspath, normpath, join as joinpath
 import stat
 import mimetypes
 from getopt import getopt, GetoptError
