@@ -349,7 +349,6 @@ def s3syncup_file(bucket_pool, srcpath, dstpath, trust_size_mtime=False, doit=Fa
       change = '>' + action_summary(same_ctype, same_mtime, same_size, same_content)
       if same_content:
         if same_ctype:
-          ##XP("OK")
           pass
         else:
           # update content_type
