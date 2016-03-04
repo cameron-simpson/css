@@ -58,9 +58,11 @@ class Upd(object):
     return self._state
 
   def out(self, txt, noStrip=False):
+    # normalise text
     if not noStrip:
       txt = txt.rstrip()
     txt = unctrl(txt)
+    # crop for terminal width
     if self.columns is not None:
       txt = txt[:self.columns-1]
     txtlen = len(txt)
@@ -68,6 +70,7 @@ class Upd(object):
       old = self._state
       buflen = len(old)
       pfxlen = min(txtlen, buflen)
+      # compute length of common prefix
       for i in range(pfxlen):
         if txt[i] != old[i]:
           pfxlen = i
@@ -88,11 +91,12 @@ class Upd(object):
         # carriage return and complete overwrite
         self._backend.write('\r')
         self._backend.write(txt)
-        extlen = buflen-txtlen
-        if extlen > 0:
-          # old line was longer - write spaces over the old tail
-          self._backend.write( ' ' * extlen )
-          self._backend.write( '\b' * extlen )
+      # trailing text to overwrite with spaces?
+      extlen = buflen-txtlen
+      if extlen > 0:
+        # old line was longer - write spaces over the old tail
+        self._backend.write( ' ' * extlen )
+        self._backend.write( '\b' * extlen )
 
       self._backend.flush()
       self._state = txt
