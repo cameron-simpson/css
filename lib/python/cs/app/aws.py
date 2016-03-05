@@ -200,6 +200,51 @@ def s3syncup_dir(bucket_pool, srcdir, dstdir, doit=False, do_delete=False, defau
           UPD.out(line)
         else:
           UPD.nl(line)
+    if do_delete:
+      # now process deletions
+      with bucket_pool.instance() as B:
+        if dstdir:
+          dstdir_prefix = dstdir + rsep
+        else:
+          dstdir_prefix = ''
+        with Pfx("S3.filter(Prefix=%r)", dstdir_prefix):
+          dstdelpaths = []
+          for s3obj in B.objects.filter(Prefix=dstdir_prefix):
+            dstpath = s3obj.key
+            with Pfx(dstpath):
+              if not dstpath.startswith(dstdir_prefix):
+                error("unexpected dstpath, not in subdir")
+                continue
+              dstrpath = dstpath[len(dstdir_prefix):]
+              if dstrpath.startswith(rsep):
+                error("unexpected dstpath, extra %r", rsep)
+                continue
+              srcpath = joinpath(srcdir, lsep.join(dstrpath.split(rsep)))
+              if os.path.exists(srcpath):
+                ##info("src exists, not deleting (src=%r)", srcpath)
+                continue
+              if dstrpath.endswith(rsep):
+                # a folder
+                nl("d DEL", dstpath)
+              else:
+                try:
+                  ctype = s3obj.content_type
+                except AttributeError as e:
+                  ##XP("no .content_type")
+                  ctype = None
+                nl("* DEL", dstpath, ctype)
+              dstdelpaths.append(dstpath)
+          if dstdelpaths:
+            dstdelpaths = sorted(dstdelpaths, reverse=True)
+            while dstdelpaths:
+              delpaths = dstdelpaths[:S3_MAX_DELETE_OBJECTS]
+              X("delpaths %r", delpaths)
+              if doit:
+                B.delete_objects(
+                    Delete={
+                      'Objects':
+                        [ {'Key': dstpath} for dstpath in delpaths ]})
+              dstdelpaths[:len(delpaths)] = []
   L.wait()
   return ok
 
@@ -238,51 +283,6 @@ def s3syncup_dir_async(L, bucket_pool, srcdir, dstdir, doit=False, do_delete=Fal
           else:
             dstpath = filename
           yield L.defer(s3syncup_file, bucket_pool, srcpath, dstpath, doit=True, default_ctype=default_ctype)
-  if do_delete:
-    # now process deletions
-    with bucket_pool.instance() as B:
-      if dstdir:
-        dstdir_prefix = dstdir + rsep
-      else:
-        dstdir_prefix = ''
-      with Pfx("S3.filter(Prefix=%r)", dstdir_prefix):
-        dstdelpaths = []
-        for s3obj in B.objects.filter(Prefix=dstdir_prefix):
-          dstpath = s3obj.key
-          with Pfx(dstpath):
-            if not dstpath.startswith(dstdir_prefix):
-              error("unexpected dstpath, not in subdir")
-              continue
-            dstrpath = dstpath[len(dstdir_prefix):]
-            if dstrpath.startswith(rsep):
-              error("unexpected dstpath, extra %r", rsep)
-              continue
-            srcpath = joinpath(srcdir, lsep.join(dstrpath.split(rsep)))
-            if os.path.exists(srcpath):
-              ##info("src exists, not deleting (src=%r)", srcpath)
-              continue
-            if dstrpath.endswith(rsep):
-              # a folder
-              print("d DEL", dstpath)
-            else:
-              try:
-                ctype = s3obj.content_type
-              except AttributeError as e:
-                ##XP("no .content_type")
-                ctype = None
-              print("* DEL", dstpath, ctype)
-            dstdelpaths.append(dstpath)
-        if dstdelpaths:
-          dstdelpaths = sorted(dstdelpaths, reverse=True)
-          while dstdelpaths:
-            delpaths = dstdelpaths[:S3_MAX_DELETE_OBJECTS]
-            X("delpaths %r", delpaths)
-            if doit:
-              B.delete_objects(
-                  Delete={
-                    'Objects':
-                      [ {'Key': dstpath} for dstpath in delpaths ]})
-            dstdelpaths[:len(delpaths)] = []
 
 @logexc
 def s3syncup_file(bucket_pool, srcpath, dstpath, trust_size_mtime=False, doit=False, default_ctype=None):
