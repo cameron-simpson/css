@@ -1,13 +1,23 @@
 #!/usr/bin/python
 #
 # Access Amazon AWS services.
-# Uses boto underneath, but boto does not feel awfully pythonic.
-# In any case, this exercise will give me convenient AWS access and
-# an avenue to learn the boto interfaces.
-#       - Cameron Simpson <cs@zip.com.au> 17nov2012
+# - Cameron Simpson <cs@zip.com.au> 2016
 #
 
 from __future__ import print_function
+
+DISTINFO = {
+    'description': "Amazon AWS S3 upload client",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'requires': ['boto3', 'python-magic',
+                ],
+}
+
 import sys
 from collections import namedtuple
 from contextlib import contextmanager
