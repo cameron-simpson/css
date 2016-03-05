@@ -64,8 +64,8 @@ def main(argv, stdout=None, stderr=None):
     stderr = sys.stderr
 
   cmd=os.path.basename(argv.pop(0))
-  setup_logging(cmd, level=logging.WARNING)
-  UPD = Upd(stdout)
+  loginfo = setup_logging(cmd, level=logging.WARNING, upd_mode=True)
+  UPD = loginfo.upd
 
   location = None
 
@@ -179,12 +179,58 @@ def cmd_s3(argv):
         raise GetoptError("bad arguments")
   return xit
 
-def action_summary(same_ctype, same_mtime, same_size, same_content):
-  return ( ( 'C' if not same_ctype else '-' )
-         + ( 'M' if not same_mtime else '-' )
-         + ( 's' if not same_size else '-' )
-         + ( 'd' if not same_content else '-' )
-         )
+class Differences(O):
+
+  def __init__(self, *a, **kw):
+    self.hashcodes = {}
+    O.__init__(self, *a, **kw)
+
+  def summary(self):
+    return ( ( '-' if self.same_content else 'C' )
+           + ( '-' if self.same_mimetype else 'M' )
+           + ( '-' if self.same_size else 's' )
+           + ( '-' if self.same_time else 't' )
+           )
+
+  @property
+  def unchanged(self):
+    return self.same_time and self.same_size and self.same_mimetype and self.same_content
+
+  @property
+  def same_content(self):
+    old = getattr(self, 'sha256_old')
+    new = self.hashcodes['sha256']
+    if new:
+      return old is not None and old == new
+    old = getattr(self, 'md5_old')
+    new = self.hashcodes.get('md5')
+    if new:
+      return old is not None and old == new
+    return False
+
+  @property
+  def same_mimetype(self):
+    old = getattr(self, 'mimetype_old')
+    new = getattr(self, 'mimetype_new')
+    if new:
+      return old is not None and old == new
+    return False
+
+  @property
+  def same_size(self):
+    old = getattr(self, 'size_old')
+    new = getattr(self, 'size_new')
+    if new:
+      return old is not None and old == new
+    return False
+
+  @property
+  def same_time(self):
+    old = getattr(self, 'time_old')
+    new = getattr(self, 'time_new')
+    if new:
+      return old is not None and old == new
+    return False
 
 def s3syncup_dir(bucket_pool, srcdir, dstdir, doit=False, do_delete=False, default_ctype=None):
   ''' Sync local directory tree to S3 directory tree.
@@ -200,16 +246,17 @@ def s3syncup_dir(bucket_pool, srcdir, dstdir, doit=False, do_delete=False, defau
   with L:
     Thread(target=dispatch).start()
     for LF in Q:
-      change, ctype, srcpath, dstpath, e, error_msg = LF()
+      diff, ctype, srcpath, dstpath, e, error_msg = LF()
       if e:
-        UPD.without(error, error_msg)
+        error(error_msg)
         ok = False
       else:
-        line = "%s %-25s %s" % (change, ctype, dstpath)
-        if change == '>----':
+        line = "%s %-25s %s" % (diff.summary(), ctype, dstpath)
+        if diff.unchanged:
           UPD.out(line)
         else:
           UPD.nl(line)
+          ##UPD.nl("  %r", diff.metadata)
     if do_delete:
       # now process deletions
       with bucket_pool.instance() as B:
@@ -297,15 +344,25 @@ def s3syncup_dir_async(L, bucket_pool, srcdir, dstdir, doit=False, do_delete=Fal
 @logexc
 def s3syncup_file(bucket_pool, srcpath, dstpath, trust_size_mtime=False, doit=False, default_ctype=None):
   with Pfx('s3syncup_file'):
+    diff = Differences()
+
+    # fetch size and mtime of local file
     S = os.stat(srcpath)
     if not stat.S_ISREG(S.st_mode):
       raise ValueError("not a regular file")
+    diff.size_new = S.st_size
+    diff.time_new = S.st_mtime
+
+    # compute MIME type for local file
     ctype = mimetype(srcpath)
     if ctype is None:
       if default_ctype is None:
         raise ValueError("cannot deduce content_type")
       ctype = default_ctype
+    diff.mimetype_new = ctype
+
     with bucket_pool.instance() as B:
+      # fetch S3 object attribute
       s3obj = B.Object(dstpath)
       try:
         s3obj.load()
@@ -315,53 +372,57 @@ def s3syncup_file(bucket_pool, srcpath, dstpath, trust_size_mtime=False, doit=Fa
                e, ("SKIP: cannot handle s3 path %r: %s" % (dstpath, e))
       except ClientError as e:
         if e.response['Error']['Code'] == '404':
-          missing = True
+          diff.missing = True
         else:
           raise
       else:
-        missing = False
+        diff.missing = False
+        diff.size_old = s3obj.content_length
+        time_old_s = s3obj.metadata.get('st_mtime')
+        if time_old_s is None:
+          time_old = None
+        else:
+          try:
+            time_old = float(time_old_s)
+          except ValueError:
+            time_old = None
+        diff.time_old = time_old
 
-      hashcode_a_local = None
-      same_ctype = False
-      same_content = False
-      same_mtime = False
-      same_size = False
-      if missing:
+      # look for content hash metadata
+      sha256_local_a = None
+      if diff.missing:
         hashname = 'sha256'
         hashcode_a = None
       else:
-        S3 = s3stat_object(s3obj)
         s3meta = s3obj.metadata
         hashcode_a = s3meta.get('sha256')
         if hashcode_a:
           hashname = 'sha256'
+          diff.sha256_old = hashcode_a
         else:
           hashcode_a = s3meta.get('md5')
           if hashcode_a:
             hashname = 'md5'
+            diff.md5_old = hashcode_a
           else:
             hashname = 'sha256'
+        # compute the local hashcode anyway
+        # it will be the preferred SHA256 code if there was no S3-side hashcode
+        diff.hashcodes[hashname] = hash_fp(srcpath, hashname).hexdigest()
+        # fetch content-type
         try:
           s3ctype = s3obj.content_type
         except AttributeError:
           s3ctype = None
-          same_ctype = False
         else:
-          same_ctype = s3ctype == ctype
-        same_mtime = S3.st_mtime == S.st_mtime
-        same_size = S3.st_size == S.st_size
-        if hashcode_a:
-          hashcode_a_local = hash_fp(srcpath, hashname).hexdigest()
-          same_content = hashcode_a == hashcode_a_local
-        elif trust_size_mtime:
-          same_content = same_mtime and same_size
+          diff.mimetype_old = s3ctype
 
-      change = '>' + action_summary(same_ctype, same_mtime, same_size, same_content)
-      if same_content:
-        if same_ctype:
+      if diff.same_content:
+        if diff.same_mimetype:
           pass
         else:
           # update content_type
+          nl("MIMETYPE: %r => %r %s", diff.mimetype_old, diff.mimetype_new, srcpath)
           kw={ 'ACL': 'public-read',
                'ContentType': ctype,
                'CopySource': dstpath,
@@ -372,11 +433,14 @@ def s3syncup_file(bucket_pool, srcpath, dstpath, trust_size_mtime=False, doit=Fa
               s3obj.copy_from(**kw)
       else:
         # upload new content
-        if hashcode_a_local is None:
-          hashcode_a_local = hash_fp(srcpath, hashname).hexdigest()
-        metadata = { hashname: hashcode_a_local,
-                     'st_mtime': str(S.st_mtime),
+        metadata = { 'st_mtime': str(S.st_mtime),
                    }
+        # ensure we have our preferred hashcode
+        if 'sha256' not in diff.hashcodes:
+          diff.hashcodes['sha256'] = hash_fp(srcpath, 'sha256').hexdigest()
+        for hashname, hashcode_a in diff.hashcodes.items:
+          metadata[hashname] = hashcode_a
+        diff.metadata = metadata
         kw={ 'ACL': 'public-read',
              'ContentType': ctype,
              'Body': open(srcpath, 'rb'),
@@ -385,25 +449,7 @@ def s3syncup_file(bucket_pool, srcpath, dstpath, trust_size_mtime=False, doit=Fa
         if doit:
           with Pfx("put(**%r)", kw):
             s3obj.put(**kw)
-    return change, ctype, srcpath, dstpath, None, None
-
-S3Stat = namedtuple('S3Stat', 'st_mtime st_size')
-
-def s3stat(B, path):
-  s3obj = B.Object(path)
-  return s3stat_object(s3obj)
-
-def s3stat_object(s3obj):
-  st_mtime = None
-  st_mtime_a = s3obj.metadata.get('st_mtime')
-  if st_mtime_a:
-    try:
-      st_mtime = float(st_mtime_a)
-    except ValueError:
-      pass
-  if st_mtime is None:
-    st_mtime=s3obj.last_modified.timestamp()
-  return S3Stat(st_mtime=st_mtime, st_size=s3obj.content_length)
+    return diff, ctype, srcpath, dstpath, None, None
 
 def hash_byteses(bss, hashname, h=None):
   ''' Compute or update the sha256 hashcode for an iterable of bytes objects.
