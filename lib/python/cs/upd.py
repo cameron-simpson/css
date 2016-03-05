@@ -57,7 +57,12 @@ class Upd(object):
   def state(self):
     return self._state
 
-  def out(self, txt, noStrip=False):
+  def out(self, txt, *a, **kw):
+    noStrip = kw.pop('noStrip', False)
+    if kw:
+      raise ValueError("unexpected keyword arguments: %r" % (kw,))
+    if a:
+      txt = txt % a
     # normalise text
     if not noStrip:
       txt = txt.rstrip()
@@ -103,7 +108,12 @@ class Upd(object):
 
     return old
 
-  def nl(self, txt, noStrip=False):
+  def nl(self, txt, *a, **kw):
+    noStrip = kw.pop('noStrip', False)
+    if kw:
+      raise ValueError("unexpected keyword arguments: %r" % (kw,))
+    if a:
+      txt = txt % a
     self.without(self._backend.write, txt+'\n', noStrip=noStrip)
 
   def flush(self):
