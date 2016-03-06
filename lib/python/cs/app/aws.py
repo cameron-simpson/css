@@ -249,12 +249,10 @@ def s3syncup_dir(bucket_pool, srcdir, dstdir, doit=False, do_delete=False, do_up
   ''' Sync local directory tree to S3 directory tree.
   '''
   global UPD
-  UPD.nl("s3syncup_dir: do_delete=%s, do_upload=%s", do_delete, do_upload)
   ok = True
   L = Later(4, name="s3syncup(%r, %r, %r)")
   with L:
     if do_upload:
-      UPD.dl("UPLOAD...")
       Q = IterableQueue()
       def dispatch():
         for LF in s3syncup_dir_async(L, bucket_pool, srcdir, dstdir, doit=doit, do_delete=do_delete, default_ctype=default_ctype):
@@ -274,7 +272,6 @@ def s3syncup_dir(bucket_pool, srcdir, dstdir, doit=False, do_delete=False, do_up
             UPD.nl(line)
             ##UPD.nl("  %r", diff.metadata)
     if do_delete:
-      UPD.nl("DELETE...")
       # now process deletions
       with bucket_pool.instance() as B:
         ##if dstdir:
