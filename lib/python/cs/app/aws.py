@@ -308,7 +308,6 @@ def s3syncup_dir(bucket_pool, srcdir, dstdir, doit=False, do_delete=False, do_up
             dstdelpaths = sorted(dstdelpaths, reverse=True)
             while dstdelpaths:
               delpaths = dstdelpaths[:S3_MAX_DELETE_OBJECTS]
-              X("delpaths %r", delpaths)
               if doit:
                 B.delete_objects(
                     Delete={
