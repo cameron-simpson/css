@@ -462,6 +462,7 @@ def s3syncup_file(bucket_pool, srcpath, dstpath, trust_size_mtime=False, doit=Fa
         kw={ 'ACL': 'public-read',
              'ContentType': ctype,
              'Body': open(srcpath, 'rb'),
+             'Key': dstpath,
              'Metadata': metadata,
            }
         if doit:
