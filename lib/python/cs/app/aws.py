@@ -249,6 +249,7 @@ def s3syncup_dir(bucket_pool, srcdir, dstdir, doit=False, do_delete=False, do_up
   ''' Sync local directory tree to S3 directory tree.
   '''
   global UPD
+  UPD.nl("s3syncup_dir: do_delete=%s, do_upload=%s", do_delete, do_upload)
   ok = True
   L = Later(4, name="s3syncup(%r, %r, %r)")
   with L:
@@ -266,15 +267,21 @@ def s3syncup_dir(bucket_pool, srcdir, dstdir, doit=False, do_delete=False, do_up
           error(error_msg)
           ok = False
         else:
-          UPD.nl(line)
-          ##UPD.nl("  %r", diff.metadata)
+          line = "%s %-25s %s" % (diff.summary(), ctype, dstpath)
+          if diff.unchanged:
+            UPD.out(line)
+          else:
+            UPD.nl(line)
+            ##UPD.nl("  %r", diff.metadata)
     if do_delete:
+      UPD.nl("DELETE...")
       # now process deletions
       with bucket_pool.instance() as B:
-        if dstdir:
-          dstdir_prefix = dstdir + RSEP
-        else:
-          dstdir_prefix = ''
+        ##if dstdir:
+        ##  dstdir_prefix = dstdir + RSEP
+        ##else:
+        ##  dstdir_prefix = ''
+        dstdir_prefix = dstdir + RSEP
         with Pfx("S3.filter(Prefix=%r)", dstdir_prefix):
           dstdelpaths = []
           for s3obj in B.objects.filter(Prefix=dstdir_prefix):
@@ -293,14 +300,9 @@ def s3syncup_dir(bucket_pool, srcdir, dstdir, doit=False, do_delete=False, do_up
                 continue
               if dstrpath.endswith(RSEP):
                 # a folder
-                nl("d DEL", dstpath)
+                UPD.nl("d DEL %s", dstpath)
               else:
-                try:
-                  ctype = s3obj.content_type
-                except AttributeError as e:
-                  ##XP("no .content_type")
-                  ctype = None
-                nl("* DEL", dstpath, ctype)
+                UPD.nl("* DEL %s", dstpath)
               dstdelpaths.append(dstpath)
           if dstdelpaths:
             dstdelpaths = sorted(dstdelpaths, reverse=True)
