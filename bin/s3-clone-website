@@ -134,7 +134,7 @@ fi
 
 [ $no_sync ] || \
 {
-  set -- python3 -m cs.app.aws s3 "$s3bucket" sync-up -n -D .
+  set -- python3 -m cs.app.aws s3 "$s3bucket" sync-up -D .
   ####set -- s3 -MP sync . "$dsturl"
   ###### # skip all the extensions we repair below
   ###### for ext in css f4v rdf wma mov
