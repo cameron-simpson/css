@@ -103,7 +103,7 @@ def main(argv, stdout=None, stderr=None):
       if os.path.exists(filepath):
         mimetypes.init((filepath,))
     mtpath = os.environ.get('MIME_TYPES')
-    if mtpath:
+    if mtpath and os.path.exists(mtpath):
       mimetypes.init((mtpath,))
     MAGIC = magic.Magic(mime=True)
 
