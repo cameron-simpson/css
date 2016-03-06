@@ -428,8 +428,12 @@ def s3syncup_file(bucket_pool, srcpath, dstpath, trust_size_mtime=False, doit=Fa
           nl("MIMETYPE: %r => %r %s", diff.mimetype_old, diff.mimetype_new, srcpath)
           kw={ 'ACL': 'public-read',
                'ContentType': ctype,
-               'CopySource': dstpath,
-               'MetadataDirective': 'COPY',
+               # NB: bucket name plus path
+               'CopySource': B.name + RSEP + dstpath,
+               'Key': dstpath,
+               ##'MetadataDirective': 'COPY',
+               'MetadataDirective': 'REPLACE',
+               'Metadata': metadata,
              }
           if doit:
             with Pfx("copy_from(**%r)", kw):
