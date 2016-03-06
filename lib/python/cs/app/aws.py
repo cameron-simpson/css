@@ -49,6 +49,8 @@ USAGE = r'''Usage: %s [-L location (ignored, fixme)] command [args...]
   s3 [bucket_name]'''
 
 S3_MAX_DELETE_OBJECTS = 1000
+LSEP = os.path.sep
+RSEP = '/'
 
 # will be magic.Magic(mime=True)
 MAGIC = None
@@ -261,7 +263,7 @@ def s3syncup_dir(bucket_pool, srcdir, dstdir, doit=False, do_delete=False, defau
       # now process deletions
       with bucket_pool.instance() as B:
         if dstdir:
-          dstdir_prefix = dstdir + rsep
+          dstdir_prefix = dstdir + RSEP
         else:
           dstdir_prefix = ''
         with Pfx("S3.filter(Prefix=%r)", dstdir_prefix):
@@ -273,14 +275,14 @@ def s3syncup_dir(bucket_pool, srcdir, dstdir, doit=False, do_delete=False, defau
                 error("unexpected dstpath, not in subdir")
                 continue
               dstrpath = dstpath[len(dstdir_prefix):]
-              if dstrpath.startswith(rsep):
-                error("unexpected dstpath, extra %r", rsep)
+              if dstrpath.startswith(RSEP):
+                error("unexpected dstpath, extra %r", RSEP)
                 continue
-              srcpath = joinpath(srcdir, lsep.join(dstrpath.split(rsep)))
+              srcpath = joinpath(srcdir, LSEP.join(dstrpath.split(RSEP)))
               if os.path.exists(srcpath):
                 ##info("src exists, not deleting (src=%r)", srcpath)
                 continue
-              if dstrpath.endswith(rsep):
+              if dstrpath.endswith(RSEP):
                 # a folder
                 nl("d DEL", dstpath)
               else:
@@ -308,13 +310,11 @@ def s3syncup_dir(bucket_pool, srcdir, dstdir, doit=False, do_delete=False, defau
 def s3syncup_dir_async(L, bucket_pool, srcdir, dstdir, doit=False, do_delete=False, default_ctype=None):
   ''' Sync local directory tree to S3 directory tree.
   '''
-  lsep = os.path.sep
-  rsep = '/'
   srcdir0 = srcdir
   srcdir = abspath(srcdir)
   if not os.path.isdir(srcdir):
     raise ValueError("srcdir not a directory: %r", srcdir)
-  srcdir_slash = srcdir + lsep
+  srcdir_slash = srcdir + LSEP
   # compare existing local files with remote
   for dirpath, dirnames, filenames in os.walk(srcdir, topdown=True):
     # arrange lexical order of descent
@@ -328,7 +328,10 @@ def s3syncup_dir_async(L, bucket_pool, srcdir, dstdir, doit=False, do_delete=Fal
       else:
         raise RuntimeError("os.walk(%r) gave surprising dirpath %r" % (srcdir, dirpath))
       if subdirpath:
-        dstdirpath = rsep.join([dstdir] + subdirpath.split(lsep))
+        if dstdir:
+          dstdirpath = RSEP.join([dstdir] + subdirpath.split(LSEP))
+        else:
+          dstdirpath = RSEP.join(subdirpath.split(LSEP))
       else:
         dstdirpath = dstdir
       for filename in sorted(filenames):
