@@ -10,7 +10,6 @@ set -ue
 
 no_wget=
 no_sync=
-no_fixmime=
 no_media=
 htdocs_dir=
 ht_userarea=
@@ -19,7 +18,6 @@ media_exts='f4v flv gif jpg mov mp4 mp3 wma ogg pdf'
 cmd=$( basename "$0" )
 usage="Usage: $cmd [--no-wget] [--no-sync] [-d htdocs-dir] fqdn s3-bucket-name
   --no-media    Omit media files from the sync: $media_exts
-  --no-fixmime  Do not update the MIME types of problem extensions.
   --no-sync     Do not update the S3 bucket from the htdocs tree.
   --no-wget     Do not update the htdocs tree from the source website.
   --password username:areaname
@@ -33,7 +31,6 @@ badopts=
 while [ $# -gt 0 ]
 do
   case "$1" in
-    --no-fixmime)   no_fixmime=1 ;;
     --no-media)     no_media=1 ;;
     --no-sync)      no_sync=1 ;;
     --no-wget)      no_wget=1 ;;
@@ -137,47 +134,20 @@ fi
 
 [ $no_sync ] || \
 {
-  set -- s3 -MP sync . "$dsturl"
-  ## # skip all the extensions we repair below
-  ## for ext in css f4v rdf wma mov
-  ## do  set -- "$@" --exclude "*.$ext"
-  ## done
-  # skip media extensions is requested
-  if [ $no_media ]
-  then
-    for ext in $media_exts
-    do  set -- "$@" --exclude "*.$ext"
-    done
-  fi
+  set -- python3 -m cs.app.aws s3 "$s3bucket" sync-up -n -D .
+  ####set -- s3 -MP sync . "$dsturl"
+  ###### # skip all the extensions we repair below
+  ###### for ext in css f4v rdf wma mov
+  ###### do  set -- "$@" --exclude "*.$ext"
+  ###### done
+  ##### skip media extensions is requested
+  ####if [ $no_media ]
+  ####then
+  ####  for ext in $media_exts
+  ####  do  set -- "$@" --exclude "*.$ext"
+  ####  done
+  ####fi
   setx "$@"
 }
-
-if [ -z "$no_fixmime" ]
-then
-  # repair MIME types for various extensions
-  for fixext in text/css:.css video/x-f4v:.f4v application/rdf+xml:.rdf audio/x-ms-wma:.wma video/quicktime:.mov
-  do
-    mimetype=$( expr "x$fixext" : 'x\(.*\):.*' )
-    suffix=$(   expr "x$fixext" : 'x.*:\(.*\)' )
-    find * -type f -iname "*$suffix" \
-    | while read -r fixfile
-      do
-        skip=
-        if [ $no_media ]
-        then
-          for ext in $media_exts
-          do
-            case "$fixfile" in
-              *.$ext) skip=1 ;;
-            esac
-          done
-        fi
-        [ $skip ] && continue
-        s3mimetype=$( get_s3_mimetype "$dsturl/$fixfile" )
-        [ "x$s3mimetype" = "x$mimetype" ] \
-        || setx s3 -P -m "$mimetype" modify "$dsturl/$fixfile"
-      done
-  done
-fi
 
 exit $xit
