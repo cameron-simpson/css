@@ -376,10 +376,20 @@ def s3syncup_file(bucket_pool, srcpath, dstpath, trust_size_mtime=False, doit=Fa
       except ClientError as e:
         if e.response['Error']['Code'] == '404':
           diff.missing = True
+          diff.s3metadata = None
         else:
           raise
       else:
         diff.missing = False
+        s3m = diff.s3metadata = s3obj.metadata
+        # import some s3cmd-attrs into our own scheme if present
+        if 's3cmd-attrs' in s3m:
+          for s3cmdattr in s3m['s3cmd-attrs'].split('/'):
+            a, v = s3cmdattr.split(':', 1)
+            if a == 'mtime' and 'st_mtime' not in s3m:
+              s3m['st_mtime'] = v
+            elif a == 'md5' and 'md5' not in s3m:
+              s3m['md5'] = v
         diff.size_old = s3obj.content_length
         time_old_s = s3obj.metadata.get('st_mtime')
         if time_old_s is None:
@@ -420,12 +430,16 @@ def s3syncup_file(bucket_pool, srcpath, dstpath, trust_size_mtime=False, doit=Fa
         else:
           diff.mimetype_old = s3ctype
 
+      metadata = { 'st_mtime': str(S.st_mtime),
+                 }
       if diff.same_content:
-        if diff.same_mimetype:
+        for hn in 'sha256', 'md5':
+          if hn in s3obj.metadata:
+            metadata[hn] = s3obj.metadata[hn]
+        if diff.same_mimetype and diff.same_time:
           pass
         else:
           # update content_type
-          nl("MIMETYPE: %r => %r %s", diff.mimetype_old, diff.mimetype_new, srcpath)
           kw={ 'ACL': 'public-read',
                'ContentType': ctype,
                # NB: bucket name plus path
@@ -440,14 +454,11 @@ def s3syncup_file(bucket_pool, srcpath, dstpath, trust_size_mtime=False, doit=Fa
               s3obj.copy_from(**kw)
       else:
         # upload new content
-        metadata = { 'st_mtime': str(S.st_mtime),
-                   }
         # ensure we have our preferred hashcode
         if 'sha256' not in diff.hashcodes:
           diff.hashcodes['sha256'] = hash_fp(srcpath, 'sha256').hexdigest()
-        for hashname, hashcode_a in diff.hashcodes.items:
+        for hashname, hashcode_a in diff.hashcodes.items():
           metadata[hashname] = hashcode_a
-        diff.metadata = metadata
         kw={ 'ACL': 'public-read',
              'ContentType': ctype,
              'Body': open(srcpath, 'rb'),
@@ -456,6 +467,7 @@ def s3syncup_file(bucket_pool, srcpath, dstpath, trust_size_mtime=False, doit=Fa
         if doit:
           with Pfx("put(**%r)", kw):
             s3obj.put(**kw)
+      diff.metadata = metadata
     return diff, ctype, srcpath, dstpath, None, None
 
 def hash_byteses(bss, hashname, h=None):
