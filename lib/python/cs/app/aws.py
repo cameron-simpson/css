@@ -339,7 +339,7 @@ def s3syncup_dir_async(L, bucket_pool, srcdir, dstdir, doit=False, do_delete=Fal
           # TODO: dispatch these in parallel
           srcpath = joinpath(dirpath, filename)
           if dstdirpath:
-            dstpath = dstdirpath + rsep + filename
+            dstpath = dstdirpath + RSEP + filename
           else:
             dstpath = filename
           yield L.defer(s3syncup_file, bucket_pool, srcpath, dstpath, doit=True, default_ctype=default_ctype)
