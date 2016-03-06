@@ -46,7 +46,13 @@ from cs.threads import locked_property
 from cs.upd import Upd
 
 USAGE = r'''Usage: %s [-L location (ignored, fixme)] command [args...]
-  s3 [bucket_name]'''
+  s3
+    List buckets.
+  s3 bucket_name sync-up [-Dn] localdir [bucket_subdir]
+    Synchronise bucket contents from localdir.
+    -D  Delete items in bucket not in localdir.
+    -n  No action. Recite required changes.
+    -U  No upload phase; delete only.'''
 
 S3_MAX_DELETE_OBJECTS = 1000
 LSEP = os.path.sep
@@ -142,9 +148,10 @@ def cmd_s3(argv):
       if s3op == 'sync-up':
         doit = True
         do_delete = False
+        do_upload = True
         badopts = False
         try:
-          opts, argv = getopt(argv, 'Dn')
+          opts, argv = getopt(argv, 'DnU')
         except GetoptError as e:
           error("bad option: %s", e)
           badopts = True
@@ -156,6 +163,8 @@ def cmd_s3(argv):
                 do_delete = True
               elif opt == '-n':
                 doit = False
+              elif opt == '-U':
+                do_upload = False
               else:
                 error("unimplemented option")
                 badopts = True
@@ -172,7 +181,9 @@ def cmd_s3(argv):
               error("extra arguments after srcdir: %r" % (argv,))
               badopts = True
         if not badopts:
-          if not s3syncup_dir(bucket_pool, srcdir, dstdir, doit=doit, do_delete=do_delete, default_ctype='text/html'):
+          if not s3syncup_dir(bucket_pool, srcdir, dstdir,
+                              doit=doit, do_delete=do_delete,
+                              do_upload=do_upload, default_ctype='text/html'):
             xit = 1
       else:
         error("unrecognised s3 op")
@@ -234,28 +245,26 @@ class Differences(O):
       return old is not None and old == new
     return False
 
-def s3syncup_dir(bucket_pool, srcdir, dstdir, doit=False, do_delete=False, default_ctype=None):
+def s3syncup_dir(bucket_pool, srcdir, dstdir, doit=False, do_delete=False, do_upload=False, default_ctype=None):
   ''' Sync local directory tree to S3 directory tree.
   '''
   global UPD
   ok = True
   L = Later(4, name="s3syncup(%r, %r, %r)")
-  Q = IterableQueue()
-  def dispatch():
-    for LF in s3syncup_dir_async(L, bucket_pool, srcdir, dstdir, doit=doit, do_delete=do_delete, default_ctype=default_ctype):
-      Q.put(LF)
-    Q.close()
   with L:
-    Thread(target=dispatch).start()
-    for LF in Q:
-      diff, ctype, srcpath, dstpath, e, error_msg = LF()
-      if e:
-        error(error_msg)
-        ok = False
-      else:
-        line = "%s %-25s %s" % (diff.summary(), ctype, dstpath)
-        if diff.unchanged:
-          UPD.out(line)
+    if do_upload:
+      UPD.dl("UPLOAD...")
+      Q = IterableQueue()
+      def dispatch():
+        for LF in s3syncup_dir_async(L, bucket_pool, srcdir, dstdir, doit=doit, do_delete=do_delete, default_ctype=default_ctype):
+          Q.put(LF)
+        Q.close()
+      Thread(target=dispatch).start()
+      for LF in Q:
+        diff, ctype, srcpath, dstpath, e, error_msg = LF()
+        if e:
+          error(error_msg)
+          ok = False
         else:
           UPD.nl(line)
           ##UPD.nl("  %r", diff.metadata)
