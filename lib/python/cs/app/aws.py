@@ -201,11 +201,11 @@ class Differences(O):
   @property
   def same_content(self):
     old = getattr(self, 'sha256_old', None)
-    if old:
+    if old is not None:
       new = self.hashcodes['sha256']
       return old is not None and old == new
     old = getattr(self, 'md5_old', None)
-    if old:
+    if old is not None:
       new = self.hashcodes['md5']
       return old is not None and old == new
     return False
@@ -214,7 +214,7 @@ class Differences(O):
   def same_mimetype(self):
     old = getattr(self, 'mimetype_old', None)
     new = getattr(self, 'mimetype_new', None)
-    if new:
+    if new is not None:
       return old is not None and old == new
     return False
 
@@ -222,7 +222,7 @@ class Differences(O):
   def same_size(self):
     old = getattr(self, 'size_old', None)
     new = getattr(self, 'size_new', None)
-    if new:
+    if new is not None:
       return old is not None and old == new
     return False
 
@@ -230,7 +230,7 @@ class Differences(O):
   def same_time(self):
     old = getattr(self, 'time_old', None)
     new = getattr(self, 'time_new', None)
-    if new:
+    if new is not None:
       return old is not None and old == new
     return False
 
