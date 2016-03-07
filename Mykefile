@@ -62,6 +62,24 @@ _help:
 _updcss:
         ./bin-cs/updcss
 
+_testhost:
+        set -ue \
+        hosts=$$(hostlist "$$TESTHOST") \
+        for testhost in $$hosts \
+        do \
+          for basedir in . $(PREFIX) \
+          do \
+            target=$$testhost:$$basedir \
+            for subdir in bin lib/python/cs \
+            do \
+              pfx "$$target/$$subdir" \\
+                rsync -iOtr '--include=*/' '--include=*.py' '--exclude=*' \\
+                  "$./$$subdir/" "$$target/$$subdir/" & \
+            done \
+          done \
+        done \
+        wait
+
 _tarball:
         set -uex \
         rev=tip \
