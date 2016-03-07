@@ -70,11 +70,11 @@ _testhost:
           for basedir in . $(PREFIX) \
           do \
             target=$$testhost:$$basedir \
-            for subdir in bin lib/python/cs \
-            do \
-              pfx "$$target/$$subdir" \\
-                rsync -iOtr '--include=*/' '--include=*.py' '--exclude=*' \\
-                  "$./$$subdir/" "$$target/$$subdir/" & \
+            pfx "$$target/bin" set-x \\
+              rsync -iOtr "bin/" "$$target/bin/" & \
+            pfx "$$target/lib/python/cs" set-x \\
+              rsync -iOtr '--include=*/' '--include=*.py' '--exclude=*' \\
+                lib/python/cs/ "$$target/lib/python/cs/" & \
             done \
           done \
         done \
