@@ -1,3 +1,4 @@
 #!/bin/sh
 ##set -x
+set -ue
 exec sshto forwardagent=yes stricthostkeychecking=no forwardx11=no ${1+"$@"}
