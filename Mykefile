@@ -71,9 +71,9 @@ _testhost:
           do \
             target=$$testhost:$$basedir \
             pfx "$$target/bin" set-x \\
-              rsync -iOtr "bin/" "$$target/bin/" & \
+              rsync -iOtrl "bin/" "$$target/bin/" & \
             pfx "$$target/lib/python/cs" set-x \\
-              rsync -iOtr '--include=*/' '--include=*.py' '--exclude=*' \\
+              rsync -iOtrl '--include=*/' '--include=*.py' '--exclude=*' \\
                 lib/python/cs/ "$$target/lib/python/cs/" & \
             done \
           done \
