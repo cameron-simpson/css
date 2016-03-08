@@ -330,10 +330,15 @@ def s3syncup_dir(bucket_pool, srcdir, dstdir, doit=False, do_delete=False, do_up
             while dstdelpaths:
               delpaths = dstdelpaths[:S3_MAX_DELETE_OBJECTS]
               if doit:
-                B.delete_objects(
-                    Delete={
-                      'Objects':
-                        [ {'Key': dstpath} for dstpath in delpaths ]})
+                result = B.delete_objects(
+                          Delete={
+                            'Objects':
+                              [ {'Key': dstpath} for dstpath in delpaths ]})
+                errs = result.get('Errors')
+                if errs:
+                  ok = False
+                  for err in errors:
+                    error("delete: %s: %r", err['Message'], err['Key'])
               dstdelpaths[:len(delpaths)] = []
   L.wait()
   return ok
