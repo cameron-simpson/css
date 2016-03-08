@@ -34,6 +34,7 @@ import mimetypes
 from getopt import getopt, GetoptError
 import boto3
 from botocore.exceptions import ClientError
+from urllib.parse import quote, unquote
 from cs.env import envsub
 from cs.excutils import logexc
 from cs.fileutils import chunks_of
@@ -48,11 +49,12 @@ from cs.upd import Upd
 USAGE = r'''Usage: %s [-L location (ignored, fixme)] command [args...]
   s3
     List buckets.
-  s3 bucket_name sync-up [-Dn] localdir [bucket_subdir]
+  s3 bucket_name sync-up [-DnU%%] localdir [bucket_subdir]
     Synchronise bucket contents from localdir.
     -D  Delete items in bucket not in localdir.
     -n  No action. Recite required changes.
-    -U  No upload phase; delete only.'''
+    -U  No upload phase; delete only.
+    -%%  Decode %%hh sequences in local filenames.'''
 
 S3_MAX_DELETE_OBJECTS = 1000
 LSEP = os.path.sep
@@ -149,9 +151,10 @@ def cmd_s3(argv):
         doit = True
         do_delete = False
         do_upload = True
+        unpercent = False
         badopts = False
         try:
-          opts, argv = getopt(argv, 'DnU')
+          opts, argv = getopt(argv, 'DnU%')
         except GetoptError as e:
           error("bad option: %s", e)
           badopts = True
@@ -165,6 +168,8 @@ def cmd_s3(argv):
                 doit = False
               elif opt == '-U':
                 do_upload = False
+              elif opt == '-%':
+                unpercent = True
               else:
                 error("unimplemented option")
                 badopts = True
@@ -183,7 +188,8 @@ def cmd_s3(argv):
         if not badopts:
           if not s3syncup_dir(bucket_pool, srcdir, dstdir,
                               doit=doit, do_delete=do_delete,
-                              do_upload=do_upload, default_ctype='text/html'):
+                              do_upload=do_upload, unpercent=unpercent,
+                              default_ctype='text/html'):
             xit = 1
       else:
         error("unrecognised s3 op")
@@ -245,7 +251,25 @@ class Differences(O):
       return old is not None and old == new
     return False
 
-def s3syncup_dir(bucket_pool, srcdir, dstdir, doit=False, do_delete=False, do_upload=False, default_ctype=None):
+def path2s3(path, unpercent):
+  ''' Accept a local path and return an S3 path.
+      If `unpercent`, call urllib.parse.unquote on each component.
+  '''
+  components = path.split(LSEP)
+  if unpercent:
+    components = [ unquote(c) for c in components ]
+  return RSEP.join(components)
+
+def s32path(s3path, unpercent):
+  ''' Accept an S3 path and return a local path.
+      If `unpercent`, call urllib.parse.quote on each component.
+  '''
+  components = s3path.split(RSEP)
+  if unpercent:
+    components = [ quote(c, safe="'/ :(),?&=+") for c in components ]
+  return LSEP.join(components)
+
+def s3syncup_dir(bucket_pool, srcdir, dstdir, doit=False, do_delete=False, do_upload=False, unpercent=False, default_ctype=None):
   ''' Sync local directory tree to S3 directory tree.
   '''
   global UPD
@@ -255,7 +279,7 @@ def s3syncup_dir(bucket_pool, srcdir, dstdir, doit=False, do_delete=False, do_up
     if do_upload:
       Q = IterableQueue()
       def dispatch():
-        for LF in s3syncup_dir_async(L, bucket_pool, srcdir, dstdir, doit=doit, do_delete=do_delete, default_ctype=default_ctype):
+        for LF in s3syncup_dir_async(L, bucket_pool, srcdir, dstdir, doit=doit, do_delete=do_delete, unpercent=unpercent, default_ctype=default_ctype):
           Q.put(LF)
         Q.close()
       Thread(target=dispatch).start()
@@ -291,7 +315,7 @@ def s3syncup_dir(bucket_pool, srcdir, dstdir, doit=False, do_delete=False, do_up
               if dstrpath.startswith(RSEP):
                 error("unexpected dstpath, extra %r", RSEP)
                 continue
-              srcpath = joinpath(srcdir, LSEP.join(dstrpath.split(RSEP)))
+              srcpath = joinpath(srcdir, s32path(dstrpath, unpercent))
               if os.path.exists(srcpath):
                 ##info("src exists, not deleting (src=%r)", srcpath)
                 continue
@@ -314,7 +338,7 @@ def s3syncup_dir(bucket_pool, srcdir, dstdir, doit=False, do_delete=False, do_up
   L.wait()
   return ok
 
-def s3syncup_dir_async(L, bucket_pool, srcdir, dstdir, doit=False, do_delete=False, default_ctype=None):
+def s3syncup_dir_async(L, bucket_pool, srcdir, dstdir, doit=False, do_delete=False, unpercent=False, default_ctype=None):
   ''' Sync local directory tree to S3 directory tree.
   '''
   srcdir0 = srcdir
@@ -335,20 +359,22 @@ def s3syncup_dir_async(L, bucket_pool, srcdir, dstdir, doit=False, do_delete=Fal
       else:
         raise RuntimeError("os.walk(%r) gave surprising dirpath %r" % (srcdir, dirpath))
       if subdirpath:
+        s3subdirpath = path2s3(subdirpath, unpercent)
         if dstdir:
-          dstdirpath = RSEP.join([dstdir] + subdirpath.split(LSEP))
+          dstdirpath = dstdir + RSEP + s3subdirpath
         else:
-          dstdirpath = RSEP.join(subdirpath.split(LSEP))
+          dstdirpath = s3subdirpath
       else:
         dstdirpath = dstdir
       for filename in sorted(filenames):
         with Pfx(filename):
           # TODO: dispatch these in parallel
           srcpath = joinpath(dirpath, filename)
+          s3filename = path2s3(filename, unpercent)
           if dstdirpath:
-            dstpath = dstdirpath + RSEP + filename
+            dstpath = dstdirpath + RSEP + s3filename
           else:
-            dstpath = filename
+            dstpath = s3filename
           yield L.defer(s3syncup_file, bucket_pool, srcpath, dstpath, doit=True, default_ctype=default_ctype)
 
 @logexc
