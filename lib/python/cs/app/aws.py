@@ -319,6 +319,8 @@ def s3syncup_dir(bucket_pool, srcdir, dstdir, doit=False, do_delete=False, do_up
               if os.path.exists(srcpath):
                 ##info("src exists, not deleting (src=%r)", srcpath)
                 continue
+              ## uncomment if new %hh omissions surface
+              ##UPD.nl("MISSING local %r", srcpath)
               if dstrpath.endswith(RSEP):
                 # a folder
                 UPD.nl("d DEL %s", dstpath)
