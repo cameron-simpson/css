@@ -42,7 +42,7 @@ def write_csv_header(fp):
   csv_writerow( csvw, ('TYPE', 'NAME', 'ATTR', 'VALUE') )
 
 def write_csv_file(fp, nodedata):
-  ''' Iterate over the supplied `nodedata`, a sequence of (type, name, attrmap) and write to the file-like object `fp` in the vertical" CSV style.
+  ''' Iterate over the supplied `nodedata`, a sequence of (type, name, attrmap) and write to the file-like object `fp` in the "vertical" CSV style.
       `fp` may also be a string in which case the named file
       is truncated and rewritten.
       `attrmap` maps attribute names to sequences of preserialised values as
