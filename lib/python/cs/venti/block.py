@@ -3,7 +3,7 @@
 from __future__ import print_function
 import sys
 from threading import RLock
-from cs.logutils import D, debug, X, Pfx
+from cs.logutils import D, error, debug, X, Pfx
 from cs.serialise import get_bs, put_bs
 from cs.threads import locked_property
 from cs.venti import defaults, totext
@@ -58,6 +58,10 @@ def isBlock(o):
 class _Block(object):
 
   def __init__(self, data=None, hashcode=None, span=None):
+    ''' Initialise the _Block.
+        A _Block always stores its hashcode and span directly.
+        If `data` is supplied, store it and check the hashcode.
+    '''
     if data is None and hashcode is None:
       raise ValueError("one of data or hashcode must be not-None")
     if data is not None:
@@ -78,7 +82,13 @@ class _Block(object):
     ''' The direct data of this Block.
         i.e. _not_ the data implied by an indirect Block.
     '''
-    return defaults.S[self.hashcode]
+    S = defaults.S
+    hashcode = self.hashcode
+    try:
+      return S[hashcode]
+    except KeyError as e:
+      error("%s: data for hashcode %s not available: %s", self, hashcode, e)
+      raise IOError("data for hashcode %s not available: %s" % (hashcode, e)) from e
 
   def __getitem__(self, index):
     ''' Return specified direct data.
@@ -280,11 +290,8 @@ class IndirectBlock(_Block):
     ''' Return the leaf (direct) blocks.
     '''
     for B in self.subblocks:
-      if B.indirect:
-        for subB in B.leaves:
-          yield subB
-      elif len(B) > 0:
-        yield B
+      for subB in B.leaves:
+        yield subB
 
 def chunksOf(B, start, stop=None):
   ''' Generator that yields the chunks from the subblocks that span
@@ -353,6 +360,26 @@ def dump_block(B, fp=None, indent='', verbose=False):
       print("%sB.datalen=%d, span=%d, hash=%s"
             % (indent, len(data), B.span, B.hashcode),
             file=fp)
+
+def verify_block(B, recurse=False, S=None):
+  ''' Perform integrity checks on the Block `B`, yield error messages.
+  '''
+  if S is None:
+    S = defaults.S
+  errs = []
+  hashcode = B.hashcode
+  if hashcode not in S:
+    yield B, "hashcode not in %s" % (S,)
+  else:
+    data = B.data
+    # hash the data using the matching hash function
+    data_hashcode = hashcode.hashfunc(data)
+    if hashcode != data_hashcode:
+      yield B, "hashcode(%s) does not match hashfunc of data(%s)" \
+               % (hashcode, data_hashcode)
+  if B.indirect:
+    for subB in B.subblocks:
+      verify_block(subB, recurse=True, S=S)
 
 if __name__ == '__main__':
   import cs.venti.block_tests

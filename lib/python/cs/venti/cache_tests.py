@@ -13,14 +13,14 @@ from .store import MappingStore
 from .store_tests import _TestStore
 from .cache import CacheStore, MemoryCacheStore
 
-class TestCacheStore(_TestStore):
+class TestCacheStore(_TestStore, unittest.TestCase):
 
   def _init_Store(self):
     self.fastS = MappingStore({})
     self.slowS = MappingStore({})
     self.S = CacheStore(self.fastS, self.slowS)
 
-class TestMemoryCacheStore(_TestStore):
+class TestMemoryCacheStore(_TestStore, unittest.TestCase):
 
   def _init_Store(self):
     self.S = MemoryCacheStore(16)

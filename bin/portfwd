@@ -88,6 +88,25 @@ then
   fi
 fi
 
+# expand target names into host clause names
+# in particular expand [A-Z]* into all host clause names marked with that group
+group_members()
+{ for _gm_target
+  do
+    case "$_gm_target" in
+      [A-Z]*)
+            sed -n 'y/	/ /
+                    s/$/ /
+                    s/^  *//
+                    s/  */  /g
+                    /^[Hh][Oo][Ss][Tt] .*'"$_gm_target"' /s/^[^ ]*  *\([^ A-Z][^ ]*\).*/\1/p' "$sshcfg"
+            ;;
+      *)    printf '%s\n' "$_gm_target"
+            ;;
+    esac
+  done
+}
+
 # transmute group names into hosts
 first=1
 for target
@@ -96,19 +115,15 @@ do
   case "$target" in
     [A-Z]*)
       # match all targets with the uppercase label
-      onargs=$#
-      set -- ${1+"$@"} \
-             `sed -n 'y/	/ /
-                      s/$/ /
-                      s/^  *//
-                      s/  */  /g
-                      /^[Hh][Oo][Ss][Tt] .*'"$target"' /s/^[^ ]*  *\([^ A-Z][^ ]*\).*/\1/p' "$sshcfg"`
-      if [ $# = $onargs ]
+      gtargets=$(group_members "$target")
+      if [ -z "$gtargets" ]
       then
         echo "$cmd: group \"$target\" does not match any Hosts in $sshcfg" >&2
         sed -n 's/^ *[Hh][Oo][Ss][Tt][ 	][ 	]*/  /p' "$sshcfg" >&2
         echo >&2
         badopts=1
+      else
+        set -- ${1+"$@"} $gtargets
       fi
       ;;
     *)set -- ${1+"$@"} "$target"

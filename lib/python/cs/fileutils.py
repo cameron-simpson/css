@@ -33,7 +33,7 @@ from tempfile import TemporaryFile, NamedTemporaryFile
 from threading import RLock, Thread
 import time
 import unittest
-from cs.asynchron import Asynchron
+from cs.asynchron import Result
 from cs.debug import trace
 from cs.env import envsub
 from cs.lex import as_lines
@@ -961,7 +961,7 @@ class SharedAppendFile(object):
       self.importer = importer
       self.poll_interval = poll_interval
       self.max_queue = max_queue
-      self.ready = Asynchron(name="readiness(%s)" % (self,))
+      self.ready = Result(name="readiness(%s)" % (self,))
       self.lock_ext = lock_ext
       self.lock_timeout = lock_timeout
       if not no_update:
@@ -1143,43 +1143,6 @@ def lines_of(fp, partials=None):
   if partials is None:
     partials = []
   return as_lines(chunks_of(fp), partials)
-
-class OpenSocket(object):
-  ''' A file-like object for stream sockets, which uses os.shutdown on close.
-  '''
-
-  def __init__(self, sock, for_write):
-    self._for_write = for_write
-    self._sock = sock
-    self._fp = os.fdopen(os.dup(self._sock.fileno()),
-                         'wb' if for_write else 'rb')
-
-  def write(self, data):
-    return self._fp.write(data)
-
-  def read(self, size=None):
-    return self._fp.read(size)
-
-  def flush(self):
-    return self._fp.flush()
-
-  def close(self):
-    try:
-      if self._for_write:
-        self._sock.shutdown(socket.SHUT_WR)
-      else:
-        self._sock.shutdown(socket.SHUT_RD)
-    except OSError as e:
-      if e.errno != errno.ENOTCONN:
-        raise
-
-  def __del__(self):
-    self._close()
-
-  def _close(self):
-    self._fp.close()
-    self._fp = None
-    self._sock = None
 
 if __name__ == '__main__':
   import cs.fileutils_tests
