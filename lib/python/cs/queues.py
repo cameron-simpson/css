@@ -46,6 +46,7 @@ class _QueueIterator(MultiOpenMixin):
     self.q = q
     self.name = name
     self._item_count = 0    # count of non-sentinel values on the queue
+    self._item_count_previous = 0
 
   def __str__(self):
     return "<%s:opens=%d>" % (self.name, self._opens)
@@ -106,7 +107,9 @@ class _QueueIterator(MultiOpenMixin):
       if cs.logutils.D_mode:
         raise RuntimeError("_item_count < 0")
       else:
-        warning("_item_count < 0 (%d)", self._item_count)
+        if self._item_count_previous != self._item_count:
+          warning("_item_count < 0 (%d)", self._item_count)
+          self._item_count_previous = self._item_count
     return item
 
   next = __next__

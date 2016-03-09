@@ -57,10 +57,17 @@ class Upd(object):
   def state(self):
     return self._state
 
-  def out(self, txt, noStrip=False):
+  def out(self, txt, *a, **kw):
+    noStrip = kw.pop('noStrip', False)
+    if kw:
+      raise ValueError("unexpected keyword arguments: %r" % (kw,))
+    if a:
+      txt = txt % a
+    # normalise text
     if not noStrip:
       txt = txt.rstrip()
     txt = unctrl(txt)
+    # crop for terminal width
     if self.columns is not None:
       txt = txt[:self.columns-1]
     txtlen = len(txt)
@@ -68,6 +75,7 @@ class Upd(object):
       old = self._state
       buflen = len(old)
       pfxlen = min(txtlen, buflen)
+      # compute length of common prefix
       for i in range(pfxlen):
         if txt[i] != old[i]:
           pfxlen = i
@@ -88,18 +96,24 @@ class Upd(object):
         # carriage return and complete overwrite
         self._backend.write('\r')
         self._backend.write(txt)
-        extlen = buflen-txtlen
-        if extlen > 0:
-          # old line was longer - write spaces over the old tail
-          self._backend.write( ' ' * extlen )
-          self._backend.write( '\b' * extlen )
+      # trailing text to overwrite with spaces?
+      extlen = buflen-txtlen
+      if extlen > 0:
+        # old line was longer - write spaces over the old tail
+        self._backend.write( ' ' * extlen )
+        self._backend.write( '\b' * extlen )
 
       self._backend.flush()
       self._state = txt
 
     return old
 
-  def nl(self, txt, noStrip=False):
+  def nl(self, txt, *a, **kw):
+    noStrip = kw.pop('noStrip', False)
+    if kw:
+      raise ValueError("unexpected keyword arguments: %r" % (kw,))
+    if a:
+      txt = txt % a
     self.without(self._backend.write, txt+'\n', noStrip=noStrip)
 
   def flush(self):
@@ -127,7 +141,7 @@ class Upd(object):
     return ret
 
   @contextmanager
-  def _withoutContext(self,noStrip=False):
+  def _withoutContext(self, noStrip=False):
     with self._lock:
       old = self.out('', noStrip=noStrip)
       yield
