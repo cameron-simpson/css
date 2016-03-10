@@ -420,7 +420,7 @@ class MegaRAID(O):
             error("rejecting drive, firmware state not unconfigured good: %s", DRV.firmware_state)
             ok = False
           else:
-            info("acceptable drive: %s", DRV.firmware_state)
+            D("acceptable drive: %s", DRV.firmware_state)
         cmd_pop()
     cmd_pop()
     if not ok:
@@ -431,8 +431,7 @@ class MegaRAID(O):
     ''' Open a pipe from the megacli command and yield lines from its output.
     '''
     cmdargs = [self.megacli] + list(args)
-    if sys.stdout.isatty():
-      info("%r", cmdargs)
+    D("+ %r", cmdargs)
     P = Popen(cmdargs, stdout=PIPE, close_fds=True)
     for line in P.stdout:
       yield line
@@ -445,7 +444,7 @@ class MegaRAID(O):
         Return True if the exit code is 0, False otherwise.
     '''
     cmdargs = [self.megacli] + list(args)
-    info("%r", cmdargs)
+    D("%r", cmdargs)
     ## return call(cmdargs) == 0
     return True
 
@@ -540,9 +539,6 @@ def merge_attrs(o, **kw):
 
 def D(msg, *a):
   message(msg, sys.stderr, "debug", *a)
-
-def info(msg, *a):
-  message(msg, sys.stdout, "info", *a)
 
 def warning(msg, *a):
   message(msg, sys.stderr, "warning", *a)
