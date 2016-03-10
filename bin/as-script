@@ -13,12 +13,18 @@ cmd=$( basename "$0" )
 usage="Usage: $cmd command [args...]"
 
 [ $# = 0 ] && { echo "$usage" >&2; exit 2; }
+subcmd=$1
+subcmdbase=$( basename "$subcmd" )
 
-runme=$TMPDIR/$cmd.$$.sh
+runmedir=$TMPDIR/$cmd
+runme=$runmedir/$subcmdbase.$$.sh
+
 qrunme=$( shqstr "$runme" )
 qcommand=$( shqstr "$@" )
 wd=$( /bin/pwd )
 qwd=$( shqstr "$wd" )
+
+[ -d "$runmedir/." ] || set-x mkdir "$runmedir" || exit 1
 ( echo '#!/bin/sh'
   echo "rm -f -- $qrunme"
   dumpenv -f -sh

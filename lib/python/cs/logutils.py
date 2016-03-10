@@ -52,8 +52,7 @@ def ifdebug():
   return logging_level <= logging.DEBUG
 
 def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=None, upd_mode=None, ansi_mode=None, trace_mode=None, module_names=None, function_names=None):
-  ''' Arrange basic logging setup for conventional UNIX command
-      line error messaging.
+  ''' Arrange basic logging setup for conventional UNIX command line error messaging; return an object with informative attributes.
       Sets cs.logging.cmd to `cmd_name`; default from sys.argv[0].
       If `main_log` is None, the main log will go to sys.stderr; if
       `main_log` is a string, is it used as a filename to open in append
@@ -76,29 +75,36 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
       'TRACE' in flags.
       If trace_mode is true, set the global trace_level to logging_level;
       otherwise it defaults to logging.DEBUG.
-      Returns the logging level.
   '''
   global cmd, logging_level, trace_level, D_mode
 
+  loginfo = O()
+
   # infer logging modes, these are the initial defaults
-  linfo = infer_logging_level()
+  inferred = infer_logging_level()
   if level is None:
-    level = linfo.level
+    level = inferred.level
+  loginfo.level = level
   if flags is None:
-    flags = linfo.flags
+    flags = inferred.flags
+  loginfo.flags = flags
   if module_names is None:
-    module_names = linfo.module_names
+    module_names = inferred.module_names
+  loginfo.module_names = module_names
   if function_names is None:
-    function_names = linfo.function_names
+    function_names = inferred.function_names
+  loginfo.function_names = function_names
 
   if cmd_name is None:
     cmd_name = os.path.basename(sys.argv[0])
   cmd = cmd_name
+  loginfo.cmd = cmd
 
   if main_log is None:
     main_log = sys.stderr
   elif type(main_log) is str:
     main_log = open(main_log, "a")
+  loginfo.main_log_file = main_log
 
   # determine some attributes of main_log
   try:
@@ -129,15 +135,18 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
       upd_mode = False
     else:
       upd_mode = is_tty
+  loginfo.upd_mode = upd_mode
 
   if ansi_mode is None:
     ansi_mode = is_tty
+  loginfo.ansi_mode = ansi_mode
 
   if format is None:
     if is_tty or is_fifo:
       format = DEFAULT_PFX_FORMAT_TTY
     else:
       format = DEFAULT_PFX_FORMAT
+  loginfo.format = format
 
   if 'TDUMP' in flags:
     # do a thread dump to the main_log on SIGHUP
@@ -149,6 +158,7 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
 
   if upd_mode:
     main_handler = UpdHandler(main_log, level, ansi_mode=ansi_mode)
+    loginfo.upd = main_handler.upd
   else:
     main_handler = logging.StreamHandler(main_log)
 
@@ -188,7 +198,7 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
     else:
       setattr(M, funcpart, _ftrace(F))
 
-  return level
+  return loginfo
 
 def ftrace(func):
   ''' Decorator to trace a function if __module__.DEBUG is true.
@@ -827,7 +837,7 @@ class UpdHandler(StreamHandler):
     if ansi_mode is None:
       ansi_mode = strm.isatty()
     StreamHandler.__init__(self, strm)
-    self.__upd = Upd(strm)
+    self.upd = Upd(strm)
     self.__nlLevel = nlLevel
     self.__ansi_mode = ansi_mode
     self.__lock = Lock()
@@ -835,18 +845,18 @@ class UpdHandler(StreamHandler):
   def emit(self, logrec):
     with self.__lock:
       if logrec.levelno >= self.__nlLevel:
-        with self.__upd._withoutContext():
+        with self.upd._withoutContext():
           if self.__ansi_mode:
             if logrec.levelno >= logging.ERROR:
               logrec.msg = colourise(logrec.msg, 'red')
             elif logrec.levelno >= logging.WARN:
               logrec.msg = colourise(logrec.msg, 'yellow')
-          StreamHandler.emit(self, logrec)
+          self.upd.without(StreamHandler.emit, self, logrec)
       else:
-        self.__upd.out(logrec.getMessage())
+        self.upd.out(logrec.getMessage())
 
   def flush(self):
-    return self.__upd.flush()
+    return self.upd.flush()
 
 if __name__ == '__main__':
   setup_logging(sys.argv[0])
