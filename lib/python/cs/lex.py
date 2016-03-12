@@ -283,6 +283,12 @@ def get_nonwhite(s, offset=0):
   '''
   return get_other_chars(s, offset=offset, stopchars=whitespace)
 
+def get_hexadecimal(s, offset=0):
+  ''' Scan the string `s` for hexadecimal characters starting at `offset`.
+      Return hex_string, new_offset.
+  '''
+  return get_chars(s, offset, '0123456789abcdefABCDEF')
+
 def get_identifier(s, offset=0, alpha=ascii_letters, number=digits, extras='_'):
   ''' Scan the string `s` for an identifier (by default an ASCII
       letter or underscore followed by letters, digits or underscores)

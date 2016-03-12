@@ -447,7 +447,7 @@ class Pfx(object):
         prefix = self._state.prefix
         ##prefixify = lambda text: prefix + ': ' + text.replace('\n', '\n'+prefix)
         def prefixify(text):
-          X("prefixy(text=%r)", text)
+          X("prefixify(text=%r)", text)
           if not isinstance(text, StringTypes):
             D("%s: not a string, not prefixing: %r", prefix, text)
             return text

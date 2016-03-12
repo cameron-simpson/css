@@ -17,6 +17,7 @@ from .fileutils import compare, rewrite, rewrite_cmgr, lockfile, Pathname, \
                         file_property, make_file_property, \
                         make_files_property, \
                         BackedFile, BackedFile_TestMethods
+from .py3 import StringIO
 from .timeutils import TimeoutError, sleep
 from .logutils import D, X
 
@@ -114,7 +115,6 @@ class Test_Misc(unittest.TestCase):
         self.assertTrue(compare(T1.name, T2.name), "mismatched data in %s and %s" % (T1.name, T2.name))
 
   def test_rewrite(self):
-    from cs.py3 import StringIO
     olddata = "old data\n"
     newdata = "new data\n"
     with NamedTemporaryFile(mode='w') as T1:

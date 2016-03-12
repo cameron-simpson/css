@@ -46,6 +46,7 @@ from cs.obj import O
 from cs.py3 import ustr, filter, bytes
 
 DEFAULT_POLL_INTERVAL = 1.0
+DEFAULT_READSIZE = 8192
 
 def saferename(oldpath, newpath):
   ''' Rename a path using os.rename(), but raise an exception if the target
@@ -1127,9 +1128,91 @@ class SharedAppendLines(SharedAppendFile):
     fp.write(s)
     fp.write('\n')
 
-def chunks_of(fp, rsize=16384):
+class Tee(object):
+  ''' An object with .write, .flush and .close methods which copies data to multiple output files.
+  '''
+
+  def __init__(self, *fps):
+    ''' Initialise the Tee; any arguments are taken to be output file objects.
+    '''
+    self._fps = list(fps)
+
+  def add(self, output):
+    self._fps.append(output)
+
+  def write(self, data):
+    for fp in self._fps:
+      fp.write(data)
+
+  def flush(self):
+    for fp in self._fps:
+      fp.flush()
+
+  def close(self):
+    for fp in self._fps:
+      fp.close()
+    self._fps = None
+
+@contextmanager
+def tee(fp, fp2):
+  ''' Context manager duplicating .write and .flush from fp to fp2.
+  '''
+  def _write(*a, **kw):
+    fp2.write(*a, **kw)
+    return old_write(*a, **kw)
+  def _flush(*a, **kw):
+    fp2.flush(*a, **kw)
+    return old_flush(*a, **kw)
+  old_write = getattr(fp, 'write')
+  old_flush = getattr(fp, 'flush')
+  fp.write = _write
+  fp.flush = _flush
+  yield
+  fp.write = old_write
+  fp.flush = old_flush
+
+class NullFile(object):
+  ''' Writable file that discards its input.
+      Note that this is _not_ an open of os.devnull; is just discards writes and is not the underlying file descriptor.
+  '''
+
+  def __init__(self):
+    self.offset = 0
+
+  def write(self, data):
+    dlen = len(data)
+    self.offset += dlen
+    return dlen
+
+  def flush(self):
+    pass
+
+def copy_data(fpin, fpout, nbytes, rsize=None):
+  ''' Copy `nbytes` of data from `fpin` to `fpout`.
+      If `nbytes` is None, copy until EOF.
+      `rsize`: read size, default DEFAULT_READSIZE.
+  '''
+  if rsize is None:
+    rsize = DEFAULT_READSIZE
+  copied = 0
+  while nbytes is None or nbytes > 0:
+    to_read = rsize if nbytes is None else min(nbytes, rsize)
+    data = fpin.read(to_read)
+    if not data:
+      if nbytes is not None:
+        warning("early EOF: only %d bytes read, %d still to go",
+                copied, nbytes)
+      break
+    fpout.write(data)
+    copied += len(data)
+    nbytes -= len(data)
+  return copied
+
+def chunks_of(fp, rsize=None):
   ''' Generator to present text or data from an open file until EOF.
   '''
+  if rsize is None:
+    rsize = DEFAULT_READSIZE
   while True:
     chunk = fp.read(rsize)
     if len(chunk) == 0:
@@ -1143,6 +1226,55 @@ def lines_of(fp, partials=None):
   if partials is None:
     partials = []
   return as_lines(chunks_of(fp), partials)
+
+class SavingFile(object):
+  ''' A simple file-like object with .write and .close methods used
+      to accrue a file, and a .cancel method to be used instead of
+      .close to discard the file.
+      The originating use case is a cache file for an HTTP response;
+      if the response ends up incomplete the cache file is discarded.
+  '''
+
+  def __init__(self, path, text=False, dir=None):
+    ''' Open the scratch file.
+    '''
+    self.path = path
+    if tmpdir is None:
+      # try to make the temporary file in the same directory as the
+      # target path
+      tmpdir = os.path.dirname(path)
+      if not os.path.isdir(tmpdir):
+        # fall back to the default
+        tmpdir = None
+    self.fd, self.tmppath = mkstemp(prefix='.tmp', dir=dir, text=text)
+    self.fp = os.fdopen(fd, ( 'w' if text else 'wb' ) )
+
+  def write(self, data):
+    ''' Transcribe data to the temp file.
+    '''
+    return self.fp.write(data)
+
+  def flush(self):
+    ''' Flush buffered data to the temp file.
+    '''
+    return self.fp.flush()
+
+  def cancel(self):
+    ''' Cancel the transcription to the temp file and discard.
+    '''
+    self.fp.close()
+    self.fp = None
+    os.remove(self.tmppath)
+
+  def close(self):
+    ''' Close the output and move the file into place as the cached response.
+    '''
+    self.fp.close()
+    self.fp = None
+    path = self.path
+    if os.path.exists(path):
+      warning("replacing existing %r", path)
+    os.rename(self.tmppath, path)
 
 if __name__ == '__main__':
   import cs.fileutils_tests

@@ -20,7 +20,7 @@ from cs.debug import Lock
 from cs.logutils import error, exception, warning, debug, D
 from cs.obj import O
 from cs.seq import seq
-from cs.py3 import Queue, raise3
+from cs.py3 import Queue, raise3, StringTypes
 
 ASYNCH_PENDING = 0       # result not ready or considered
 ASYNCH_RUNNING = 1       # result function running
@@ -31,7 +31,11 @@ class CancellationError(RuntimeError):
   ''' Raised when accessing result or exc_info after cancellation.
   '''
   
-  def __init__(self, msg="cancelled"):
+  def __init__(self, msg=None):
+    if msg is None:
+      msg = "cancelled"
+    elif not isinstance(msg, StringTypes):
+      msg = "%s: cancelled" % (msg,)
     RuntimeError.__init__(msg)
 
 class Asynchron(O):
@@ -41,7 +45,7 @@ class Asynchron(O):
 
   def __init__(self, name=None, final=None):
     ''' Base initialiser for Asynchron objects and subclasses.
-        `name`: optional paramater to name this object.
+        `name`: optional parameter to name this object.
         `final`: a function to run after completion of the asynchron,
                  regardless of the completion mode (result, exception,
                  cancellation).
@@ -215,7 +219,7 @@ class Asynchron(O):
   def __call__(self):
     result, exc_info = self.join()
     if self.cancelled:
-      raise RuntimeError("%s: cancelled", self)
+      raise CancellationError(self)
     if exc_info:
       raise3(*exc_info)
     return result
