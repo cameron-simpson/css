@@ -133,6 +133,8 @@ def main(argv, stdout=None, stderr=None):
   return xit
 
 def cmd_s3(argv):
+  ''' Work with S3 resources.
+  '''
   xit = 0
   s3 = boto3.resource('s3')
   if not argv:
@@ -186,11 +188,22 @@ def cmd_s3(argv):
               error("extra arguments after srcdir: %r" % (argv,))
               badopts = True
         if not badopts:
-          if not s3syncup_dir(bucket_pool, srcdir, dstdir,
-                              doit=doit, do_delete=do_delete,
-                              do_upload=do_upload, unpercent=unpercent,
-                              default_ctype='text/html'):
-            xit = 1
+          if os.path.isfile(srcdir):
+            diff, ctype, srcpath, dstpath, e, error_msg = \
+                s3syncup_file(bucket_pool, srcdir, dstdir,
+                              doit=doit, default_ctype='text/html')
+            if e:
+              error(error_msg)
+              xit = 1
+            else:
+              line = "%s %-25s %s" % (diff.summary(), ctype, dstpath)
+              UPD.nl(line)
+          else:
+            if not s3syncup_dir(bucket_pool, srcdir, dstdir,
+                                doit=doit, do_delete=do_delete,
+                                do_upload=do_upload, unpercent=unpercent,
+                                default_ctype='text/html'):
+              xit = 1
       else:
         error("unrecognised s3 op")
         badopts = True
