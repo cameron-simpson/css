@@ -1,2 +1,4 @@
 #!/bin/sh
-exec ssh -o 'stricthostkeychecking no' -o 'protocol 1' ${1+"$@"}
+set -ue
+: ${SSH:=ssh}
+exec "$SSH" -o stricthostkeychecking=no -o protocol=1 ${1+"$@"}
