@@ -133,6 +133,8 @@ def main(argv, stdout=None, stderr=None):
   return xit
 
 def cmd_s3(argv):
+  ''' Work with S3 resources.
+  '''
   xit = 0
   s3 = boto3.resource('s3')
   if not argv:
