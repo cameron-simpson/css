@@ -308,7 +308,7 @@ class _URL(unicode):
 
   @property
   def path_elements(self):
-    ''' Return the non-empty path components.
+    ''' Return the non-empty path components; NB: a new list every time.
     '''
     return [ w for w in self.path.strip('/').split('/') if w ]
 
