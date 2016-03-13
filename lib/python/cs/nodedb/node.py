@@ -18,7 +18,7 @@ from collections import namedtuple
 from cs.debug import RLock, trace
 from cs.excutils import unimplemented, transmute
 from cs.obj import O
-from cs.lex import str1, parseUC_sAttr
+from cs.lex import parseUC_sAttr
 from cs.logutils import Pfx, D, error, warning, info, debug, exception, X
 from cs.seq import the, get0
 from cs.threads import locked
@@ -186,9 +186,17 @@ class _AttrList(list):
     self.__additemrefs(values)
     self._save()
 
+  # the list.clear() method dated from python 3.3
+  try:
+    _list_clear = list.clear
+  except AttributeError:
+    def _list_clear(self):
+      list.__setslice__(self, 0, sys.maxint, ())
+
+  @locked
   def _scrub_local(self):
     # remove all elements from this attribute
-    self[:] = ()
+    self._list_clear()
     self.nodedb._revision += 1
   _scrub = _scrub_local
 
@@ -343,7 +351,9 @@ class Node(dict):
   '''
 
   def __init__(self, t, name, nodedb, initial=None):
-    self.type = str1(t) if t is not None else None
+    self.type = None if t is None else str(t)
+    if isinstance(name, int):
+      name = str(name)
     self.name = name
     self.nodedb = nodedb
     self._lock = self.nodedb._lock
@@ -409,7 +419,7 @@ class Node(dict):
   def _addReference(self, onode, oattr):
     ''' Add a reference to this Node.
     '''
-    key = (onode, str1(oattr))
+    key = (onode, oattr)
     if key in self._reverse:
       self._reverse[key] += 1
     else:
@@ -418,7 +428,7 @@ class Node(dict):
   def _delReference(self, onode, oattr):
     ''' Remove a reference to this Node.
     '''
-    key = (onode, str1(oattr))
+    key = (onode, oattr)
     if self._reverse[key] == 1:
       del self._reverse[key]
     else:
@@ -490,7 +500,7 @@ class Node(dict):
         This is the method that instantiates all entries as _AttrLists.
     '''
     try:
-      values = self[k]
+      values = dict.__getitem__(self, k)
     except KeyError:
       if default is None:
         default = ()
@@ -499,7 +509,7 @@ class Node(dict):
       self.nodedb._revision += 1
     return values
 
-  # __getitem__ goes directly to the dict implementation
+  __getitem__ = get
 
   @locked
   def __setitem__(self, item, new_values):
@@ -713,10 +723,11 @@ class NodeDB(dict, O):
 
   _key = ('_', '_')     # index of metadata node
 
-  def __init__(self, backend, readonly=False):
+  def __init__(self, backend, readonly=False, type_factories=None):
     dict.__init__(self)
     self._lock = RLock()
     self.readonly = readonly
+    self.type_factories = type_factories
     self.closed = False
     self._noNode = None
     self.__attr_type_registry = {}
@@ -757,6 +768,22 @@ class NodeDB(dict, O):
     '''
     for key in list(self.keys()):
       self[key]._scrub()
+
+  def _update_local(self, update):
+    ''' Apply an update to the NodeDB values without updating the backend.
+    '''
+    do_append, t, name, attr, values = update
+    N = self.make( (t, name) )
+    if do_append:
+      # simple append of values
+      N[attr]._extend_local(values)
+    else:
+      if attr is None:
+        # reset whole Node
+        N._scrub_local()
+      else:
+        # reset specified attribute
+        N[attr]._scrub_local()
 
   def useNoNode(self):
     ''' Enable "no node" mode.
@@ -831,6 +858,9 @@ class NodeDB(dict, O):
         Subclasses of NodeDB should use this to make Nodes of appropriate
         types.
     '''
+    factories = self.type_factories
+    if factories and t in factories:
+      return factories[t](t, name, self)
     return Node(t, name, self)
 
   def type(self, t):
@@ -885,7 +915,7 @@ class NodeDB(dict, O):
     return self.get(item, doCreate=True)
 
   def __getattr__(self, attr):
-    ''' .TYPEs  Iterable if Nodes of the specified TYPE.
+    ''' .TYPEs  Iterable of Nodes of the specified TYPE.
         .TYPE   The meta-Node (TYPE, '_') for the type.
     '''
     k, plural = parseUC_sAttr(attr)
@@ -986,6 +1016,21 @@ class NodeDB(dict, O):
       N = self[t, name] = self._createNode(t, name)
       self[t, name] = N
     return N
+
+  @locked
+  def nextNode(self, t):
+    ''' Create the next numbered Node of the type `t`.
+    '''
+    maxn = 0
+    for N in self.type(t):
+      name = N.name
+      try:
+        n = int(name)
+      except ValueError:
+        continue
+      if n > maxn:
+        maxn = n
+    return newNode(self, t, str(maxn + 1))
 
   @property
   def _s(self):

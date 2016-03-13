@@ -34,7 +34,7 @@ from cs.mailutils import ismaildir, message_addresses, Message
 from cs.nodedb import NodeDB, Node, NodeDBFromURL
 from cs.lex import get_identifier
 import cs.sh
-from cs.seq import get0
+from cs.seq import get0, last
 from cs.threads import locked, locked_property
 from cs.py.func import derived_property
 from cs.py3 import StringTypes, ustr
@@ -54,6 +54,7 @@ def main(argv=None, stdin=None):
       compact
       edit-group group
       edit-group /regexp/
+      export exportpath
       import-addresses < addresses.txt
         File format:
           group,... rfc2822-address
@@ -124,13 +125,17 @@ def main(argv=None, stdin=None):
           MDB.rewrite()
         elif op == 'export':
           exportpath = argv.pop(0)
-          with Pfx(exportpath):
-            if os.path.exists(exportpath):
-              error("already exists")
-            else:
-              MDB.scrub()
-              with open(exportpath, "w") as exfp:
-                MDB.dump(exfp)
+          if argv:
+            warning("extra arguments after exportpath: %s", ' '.join(argv))
+            badopts = True
+          else:
+            with Pfx(exportpath):
+              if os.path.exists(exportpath):
+                error("already exists")
+              else:
+                MDB.scrub()
+                with open(exportpath, "w") as exfp:
+                  MDB.dump(exfp)
         elif op == 'list-abbreviations' or op == 'list-abbrevs':
           try:
             opts, argv = getopt(argv, 'A')
@@ -217,15 +222,29 @@ def main(argv=None, stdin=None):
                   error('no such group')
                   xit = 1
                   continue
-                address_list = ', '.join(sorted(MDB['ADDRESS', address].formatted
-                                                for address in address_group))
                 if mutt_aliases:
                   print('alias', end=' ')
                   if mutt_groups:
                     print('-group', group_name, end=' ')
                 elif mutt_groups:
                   print('group', end=' ')
-                print(group_name, address_list)
+                print(group_name, end=' ')
+                formatted_addresses = sorted(MDB['ADDRESS', address].formatted
+                                             for address in address_group
+                                            )
+                if mutt_aliases or mutt_groups:
+                  # write slosh extended lines
+                  first = True
+                  for formatted_address in formatted_addresses:
+                    if first:
+                      first = False
+                    else:
+                      print(', ', end='')
+                    print('\\\n               ', formatted_address, end='')
+                  print()
+                else:
+                  # write single huge line
+                  print(', '.join(formatted_addresses))
         elif op == 'learn-addresses':
           only_ungrouped = False
           if len(argv) and argv[0] == '--ungrouped':
@@ -289,17 +308,24 @@ def main(argv=None, stdin=None):
 
   return xit
 
-def edit_group(MDB, group):
-  if group.startswith('/'):
-    if group.endswith('/'):
-      rexp = group[1:-1]
+def edit_group(MDB, groupname):
+  ''' Edit the membership of the named `groupname`.
+      If `groupname` starts with a slash then the tail is taken to be
+      a regexp used to select addresses.
+  '''
+  if groupname.startswith('/'):
+    # select by regular expression
+    # regexp as "/re" or "/re/"
+    if groupname.endswith('/'):
+      rexp = groupname[1:-1]
     else:
-      rexp = group[1:]
+      rexp = groupname[1:]
     As = MDB.matchAddresses(rexp)
     Gs = []
   else:
-    As = [ A for A in MDB.ADDRESSes if group in A.GROUPs ]
-    Gs = [ G for G in MDB.GROUPs if group in G.GROUPs ]
+    # select AddressNodes and GroupNodes by groupname
+    As = [ A for A in MDB.ADDRESSes if groupname in A.GROUPs ]
+    Gs = [ G for G in MDB.GROUPs if groupname in G.GROUPs ]
   return edit_groupness(MDB, As, Gs)
 
 def edit_groupness(MDB, addresses, subgroups):
@@ -374,13 +400,15 @@ def edit_groupness(MDB, addresses, subgroups):
                       A.abbreviation = ab
                     except ValueError as e:
                       error(e)
+                    # add named groups to those associated with this address
                     new_groups.setdefault(A, set()).update(groups)
                     realname = ustr(realname.strip())
                     if realname and realname != A.realname:
-                      A.REALNAME = realname
+                      A.realname = realname
     # apply groups of whichever addresses survived
     for A, groups in new_groups.items():
       if set(A.GROUPs) != groups:
+        # reset .GROUP list if changed
         A.GROUPs = groups
 
 def update_domain(MDB, old_domain, new_domain, argv):
@@ -417,7 +445,13 @@ class AddressNode(Node):
 
   @property
   def realname(self):
-    return ustr( get0(self.REALNAMEs, u'') )
+    ''' Use the last .REALNAME value; presumes latest is best.
+        (Yes, working around junk in the database pending better debugging of another issue.)
+    '''
+    names = list(self.REALNAMEs)
+    if not names:
+      return u''
+    return names[-1]
 
   @realname.setter
   def realname(self, newname):
@@ -512,14 +546,17 @@ class MessageNode(Node):
         else:
           msgq.append(M2)
 
-TypeFactory = { 'MESSAGE':      MessageNode,
-                'ADDRESS':      AddressNode,
-              }
-
 def MailDB(mdburl, readonly=True, klass=None):
   if klass is None:
     klass = _MailDB
-  return NodeDBFromURL(mdburl, readonly=readonly, klass=klass)
+  return NodeDBFromURL(mdburl,
+                       readonly=readonly,
+                       klass=klass)
+
+_MailDB_TypeFactories = {
+    'MESSAGE':      MessageNode,
+    'ADDRESS':      AddressNode,
+  }
 
 class _MailDB(NodeDB):
   ''' Extend NodeDB for email.
@@ -527,7 +564,8 @@ class _MailDB(NodeDB):
 
   def __init__(self, backend, readonly=False):
     self._O_omit = ('address_groups',)
-    NodeDB.__init__(self, backend, readonly=readonly)
+    NodeDB.__init__(self, backend, readonly=readonly,
+                    type_factories=_MailDB_TypeFactories)
 
   def rewrite(self):
     ''' Force a complete rewrite of the CSV file.
@@ -558,13 +596,6 @@ class _MailDB(NodeDB):
         absu = set(abs)
         if len(absu) < len(abs):
           N.ABBREVIATIONs = sorted(list(absu))
-
-  def _createNode(self, t, name):
-    ''' Create a new Node of the specified type.
-    '''
-    if t in TypeFactory:
-      return TypeFactory[t](t, name, self)
-    return NodeDB._createNode(self, t, name)
 
   @staticmethod
   def parsedAddress(addr):
@@ -792,7 +823,7 @@ class _MailDB(NodeDB):
       header_names = ( 'from', 'to', 'cc', 'bcc', 'resent-to', 'resent-cc',
                        'reply-to' )
     addrs = set()
-    if isinstance(M, (str, file)):
+    if isinstance(M, StringTypes) or hasattr(M, 'readline'):
       return self.importAddresses_from_message(Message(M), group_names)
     for realname, coreaddr in message_addresses(M, header_names):
       A = self.getAddressNode( (realname, coreaddr) )

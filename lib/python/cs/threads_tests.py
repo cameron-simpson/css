@@ -6,21 +6,42 @@
 
 from __future__ import print_function
 import sys
+from functools import partial
 import time
 import unittest
-if sys.hexversion < 0x03000000:
-  from Queue import Queue
-else:
-  from queue import Queue
-from cs.queues import TimerQueue
-from cs.later import Later
-##from cs.logutils import D
+from cs.debug import thread_dump
+from cs.logutils import X
+from .threads import WorkerThreadPool
 
-def D(msg, *a):
-  if a:
-    msg = msg % a
-  with open('/dev/tty', 'a') as tty:
-    print(msg, file=tty)
+class TestWorkerThreadPool(unittest.TestCase):
+
+  def setUp(self):
+    self.pool = WorkerThreadPool()
+
+  def tearDown(self):
+    self.pool.shutdown()
+
+  def _testfunc(self, *a, **kw):
+    ##X("_testfunc: a=%r, kw=%r", a, kw)
+    return a, kw
+
+  def test00null(self):
+    pass
+
+  def test01run1(self):
+    f = partial(self._testfunc, 1,2,3, a=4, b=5)
+    def deliver(result):
+      ##X("result = %r", result)
+      pass
+    self.pool.dispatch(f, deliver=deliver)
+
+  def test01run16(self):
+    def deliver(result):
+      ##X("result = %r", result)
+      pass
+    for n in range(16):
+      f = partial(self._testfunc, 1,2,3, a=4, b=5, n=n)
+      self.pool.dispatch(f, deliver=deliver)
 
 def selftest(argv):
   unittest.main(__name__, None, argv)

@@ -5,22 +5,23 @@
 #
 
 from __future__ import with_statement
+import sys
 import cs.later
 from cs.lex import hexify
-from .store import BasicStore
+from .store import BasicStoreSync
 
-class CacheStore(BasicStore):
+class CacheStore(BasicStoreSync):
   ''' A CacheStore is a Store front end to a pair of other Stores, a backend
       store and a cache store. The backend store is the "main" store, perhaps
       remote or slow, while the cache store is normally a faster and possibly
-      lossy store such as a MemCacheStore or a local disc store.
+      lossy store such as a MemoryCacheStore or a local disc store.
 
       A block read is satisfied from the cache if possible, otherwise from
       the backend. A block store is stored to the cache and then
       asynchronously to the backend.
   '''
   def __init__(self, backend, cache):
-    BasicStore.__init__(self, "Cache(cache=%s, backend=%s)" % (cache, backend))
+    BasicStoreSync.__init__(self, "Cache(cache=%s, backend=%s)" % (cache, backend))
     backend.open()
     self.backend = backend
     cache.open()
@@ -31,7 +32,7 @@ class CacheStore(BasicStore):
   def shutdown(self):
     self.cache.shutdown()
     self.backend.shutdown()
-    BasicStore.shutdown(self)
+    BasicStoreSync.shutdown(self)
 
   def flush(self):
     self.cache.flush()
@@ -45,23 +46,27 @@ class CacheStore(BasicStore):
       if h not in cache:
         yield h
 
-  def __contains__(self, h):
+  def contains(self, h):
     if h in self.cache:
       return True
     if h in self.backend:
       return True
     return False
 
-  def __getitem__(self, h):
+  def get(self, h):
     if h in self.cache:
       return self.cache[h]
-    return self.backend[h]
+    return self.backend.get(h)
 
   def add(self, data):
+    ''' Add the data to the local cache and queue a task to add to the backend.
+    '''
     h = self.cache.add(data)
-    h2 = self.backend.add(data)
-    if h != h2:
-      raise RuntimeError("hash mismatch: h=%r, h2=%r, data=%r" % (h, h2, data))
+    def add_backend():
+      h2 = self.backend.add(data)
+      if h != h2:
+        raise RuntimeError("hash mismatch: h=%r, h2=%r, backend=%s, data=%r" % (h, h2, self.backend.__class__, data))
+    self._defer(add_backend)
     return h
 
   def prefetch(self, hs):
@@ -71,10 +76,10 @@ class CacheStore(BasicStore):
     self.backend.prefetch(self.missing(hs))
 
   def sync(self):
-    for _ in cs.later.report([ self.cache.sync_bg(), self.backend.sync_bg() ]):
+    for _ in cs.later.report([ self.cache.flush_bg(), self.backend.flush_bg() ]):
       pass
 
-class MemCacheStore(BasicStore):
+class MemoryCacheStore(BasicStoreSync):
   ''' A lossy store that keeps an in-memory cache of recent chunks.  It may
       discard older chunks if new ones come in when full and would normally
       be used as the cache part of a CacheStore pair.
@@ -83,7 +88,7 @@ class MemCacheStore(BasicStore):
       all chunks in memory.
   '''
   def __init__(self, maxchunks=1024):
-    BasicStore.__init__(self, "MemCacheStore")
+    BasicStoreSync.__init__(self, "MemoryCacheStore")
     # TODO: fails if maxchunks == 0
     assert maxchunks > 0
     self.hashlist = [None for _ in range(maxchunks)]
@@ -126,16 +131,23 @@ class MemCacheStore(BasicStore):
     high = (self.low + self.used) % hlen
     hlist[high] = h
 
-  def __contains__(self, h):
+  def contains(self, h):
     with self._lock:
       return h in self.hmap
 
-  def __getitem__(self, h):
+  def get(self, h):
     with self._lock:
-      return self.hmap[h][1]
+      hmap = self.hmap
+      if h in hmap:
+        return hmap[h][1]
+    return None
 
   def add(self, data):
     with self._lock:
       H = self.hash(data)
       self._hit(H, data)
     return H
+
+if __name__ == '__main__':
+  import cs.venti.cache_tests
+  cs.venti.cache_tests.selftest(sys.argv)

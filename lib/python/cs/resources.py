@@ -15,122 +15,125 @@ DISTINFO = {
     'requires': ['cs.excutils', 'cs.logutils', 'cs.obj', 'cs.py.func'],
 }
 
+from contextlib import contextmanager
 import threading
-from threading import Condition
+from threading import Condition, RLock, Lock
+import time
 import traceback
 from cs.excutils import logexc
-from cs.logutils import warning, error
+import cs.logutils
+from cs.logutils import debug, warning, error, PfxCallInfo, X, XP
 from cs.obj import O
-from cs.py.func import callmethod_if as ifmethod
+from cs.py.stack import caller, stack_dump
+
+class ClosedError(Exception):
+  pass
 
 def not_closed(func):
-  ''' Decorator to wrap NestingOpenCloseMixin proxy object methods
-      which hould raise when self.closed.
+  ''' Decorator to wrap methods of objects with a .closed property which should raise when self.closed.
   '''
   def not_closed_wrapper(self, *a, **kw):
     if self.closed:
-      raise RuntimeError("%s: %s: already closed" % (not_closed_wrapper.__name__, self))
+      raise ClosedError("%s: %s: already closed" % (not_closed_wrapper.__name__, self))
     return func(self, *a, **kw)
   not_closed_wrapper.__name__ = "not_closed_wrapper(%s)" % (func.__name__,)
   return not_closed_wrapper
 
-class NestingOpenCloseMixin(O):
-  ''' A mixin to count open and closes, and to call .shutdown() when the count goes to zero.
-      A count of active open()s is kept, and on the last close()
-      the object's .shutdown() method is called.
-      Use via the with-statement calls open()/close() for __enter__()
-      and __exit__().
+class MultiOpenMixin(O):
+  ''' A mixin to count open and closes, and to call .startup on the first .open and to call .shutdown on the last .close.
+      Use as a context manager calls open()/close() from __enter__() and __exit__().
       Multithread safe.
-      This mixin uses the internal attribute _opens and relies on a
-      preexisting attribute _lock for locking.
+      This mixin defines ._lock = RLock(); subclasses need not bother.
+      Classes using this mixin need to define .startup and .shutdown.
   '''
 
-  def __init__(self, finalise_later=False):
-    ''' Initialise the NestingOpenCloseMixin state.
-        Then takes makes use of the following methods if present:
-          `self.on_open(count)`: called on open with the post-increment open count
-          `self.on_close(count)`: called on close with the pre-decrement open count
+  def __init__(self, finalise_later=False, lock=None):
+    ''' Initialise the MultiOpenMixin state.
         `finalise_later`: do not notify the finalisation Condition on
           shutdown, require a separate call to .finalise().
           This is mode is useful for objects such as queues where
           the final close prevents further .put calls, but users
           calling .join may need to wait for all the queued items
           to be processed.
+        `lock`: if set and not None, an RLock to use; otherwise one will be allocated
     '''
+    if lock is None:
+      lock = RLock()
     self.opened = False
     self._opens = 0
+    self._opened_from = {}
     ##self.closed = False # final _close() not yet called
-    self._keep_open = None
-    self._keep_open_until = None
-    self._keep_open_poll_interval = 0.5
-    self._keep_open_increment = 1.0
-    self._finalise_later= finalise_later
+    self._lock = lock
+    self._finalise_later = finalise_later
     self._finalise = Condition(self._lock)
 
   def __enter__(self):
-    self.open()
+    self.open(caller_frame=caller())
     return self
 
   def __exit__(self, exc_type, exc_value, traceback):
     self.close()
     return False
 
-  def open(self, name=None):
+  def open(self, caller_frame=None):
     ''' Increment the open count.
-	If self.on_open, call self.on_open(self, count) with the
-	post-increment count.
-        `name`: optional name for this open object.
+        On the first .open call self.startup().
     '''
+    if True:    ## cs.logutils.D_mode:
+      if caller_frame is None:
+        caller_frame = caller()
+      Fkey = caller_frame.filename, caller_frame.lineno
+      self._opened_from[Fkey] = self._opened_from.get(Fkey, 0) + 1
     self.opened = True
     with self._lock:
       self._opens += 1
-      count = self._opens
-    ifmethod(self, 'on_open', a=(count,))
+      if self._opens == 1:
+        self.startup()
     return self
 
-  @logexc
-  ##@not_closed
   def close(self, enforce_final_close=False):
     ''' Decrement the open count.
-        If self.on_close, call self.on_close(self, count) with the
-        pre-decrement count.
         If the count goes to zero, call self.shutdown().
     '''
     with self._lock:
       if self._opens < 1:
-        error("%s: EXTRA CLOSE", self)
+        error("%s: UNDERFLOW CLOSE", self)
+        for Fkey in sorted(self._opened_from.keys()):
+          error("  opened from %s %d times", Fkey, self._opened_from[Fkey])
+        ##from cs.debug import thread_dump
+        ##thread_dump([threading.current_thread()])
+        ##raise RuntimeError("UNDERFLOW CLOSE of %s" % (self,))
+        return
       self._opens -= 1
-      count = self._opens
-    ifmethod(self, 'on_close', a=(count+1,))
-    if count == 0:
-      if enforce_final_close:
-        self.D("OK FINAL CLOSE")
-      self.shutdown()
-      if not self._finalise_later:
-        self.finalise()
-    else:
-      if enforce_final_close:
-        raise RuntimeError("%s: expected this to be the final close, but it was not" % (self,))
+      if self._opens == 0:
+        self.shutdown()
+        if not self._finalise_later:
+          self.finalise()
+      else:
+        if enforce_final_close:
+          raise RuntimeError("%s: expected this to be the final close, but it was not" % (self,))
 
   def finalise(self):
     ''' Finalise the object, releasing all callers of .join().
-	Normally this is called automatically after .shutdown unless
-	`finalise_later` was set to true during initialisation.
+        Normally this is called automatically after .shutdown unless
+        `finalise_later` was set to true during initialisation.
     '''
     with self._lock:
-      if self._finalise:
-        self._finalise.notify_all()
+      if self._finalise is not None:
+        finalise = self._finalise
         self._finalise = None
+        finalise.notify_all()
         return
-    warning("%s: finalised more than once", self)
+    error("%s: finalised more than once" % (self,))
+    ##raise RuntimeError("%s: finalised more than once" % (self,))
 
   @property
   def closed(self):
     if self._opens > 0:
       return False
     if self._opens < 0:
-      with PfxCallInfo():
-        warning("%r._opens < 0: %r", self, self._opens)
+      XP("_opens < 0: %r", self._opens)
+      raise RuntimeError("_OPENS UNDERFLOW")
     if not self.opened:
       # never opened, so not totally closed
       return False
@@ -148,27 +151,71 @@ class NestingOpenCloseMixin(O):
     else:
       self._lock.release()
 
-  def ping(self):
-    ''' Mark this object as "busy"; it will be kept open a little longer in case of more use.
+  @staticmethod
+  def is_opened(func):
+    ''' Decorator to wrap MultiOpenMixin proxy object methods which should raise when if the object is not yet open.
     '''
-    T = None
-    with self._lock:
-      if not self._keep_open:
-        self._keep_open = True
-        name = "%s._ping_mainloop" % (self,)
-        T = Thread(name=name, target=self._ping_mainloop)
-    self._keep_open_until = time.time() + self._keep_open_increment
-    if T:
-      T.start()
+    def is_opened_wrapper(self, *a, **kw):
+      if self.closed:
+        raise RuntimeError("%s: %s: already closed" % (is_opened_wrapper.__name__, self))
+      if not self.opened:
+        raise RuntimeError("%s: %s: not yet opened" % (is_opened_wrapper.__name__, self))
+      return func(self, *a, **kw)
+    is_opened_wrapper.__name__ = "is_opened_wrapper(%s)" % (func.__name__,)
+    return is_opened_wrapper
 
-  def _ping_mainloop(self):
-    ''' Pinger main loop: wait until expiry then close the open proxy.
+class MultiOpen(MultiOpenMixin):
+  ''' Context manager class that manages a single open/close object using a MultiOpenMixin.
+  '''
+
+  def __init__(self, openable, finalise_later=False, lock=None):
+    MultiOpenMixin.__init__(self, finalise_later=finalise_later, lock=lock)
+    self.openable = openable
+
+  def startup(self):
+    self.openable.open()
+
+  def shutdown(self):
+    self.openable.close()
+
+class Pool(O):
+  ''' A generic pool of objects on the premise that reuse is cheaper than recreation.
+      All the pool objects must be suitable for use, so the
+      `new_object` callable will typically be a closure. For example,
+      here is the __init__ for a per-thread AWS Bucket using a
+      distinct Session:
+
+      def __init__(self, bucket_name):
+        Pool.__init__(self, lambda: boto3.session.Session().resource('s3').Bucket(bucket_name)
+  '''
+
+  def __init__(self, new_object, max_size=None):
+    ''' Initialise the Pool with creator `new_object` and maximum size `max_size`.
+        `new_object` is a callable which returns a new object for the Pool.
+        `max_size`: The maximum size of the pool of available objects saved for reuse.
+            If omitted or None, defaults to 4.
+            If 0, no upper limit is applied.
     '''
-    name = self._keep_open.name
-    while self._keep_open_until > time.time():
-      debug("%s: pinger: sleep for another %gs", name, self._keep_open_poll_interval)
-      time.sleep(self._keep_open_poll_interval)
-    self._keep_open = False
-    self._keep_open_until = None
-    debug("%s: pinger: close()", name)
-    self.close()
+    if max_size is None:
+      max_size = 4
+    self.new_object = new_object
+    self.max_size = max_size
+    self.pool = []
+    self._lock = Lock()
+
+  def __str__(self):
+    return "Pool(max_size=%s, new_object=%s)" % (self.max_size, self.new_object)
+
+  @contextmanager
+  def instance(self):
+    ''' Context manager returning an object for use, which is returned to the pool afterwards.
+    '''
+    with self._lock:
+      try:
+        o = self.pool.pop()
+      except IndexError:
+        o = self.new_object()
+    yield o
+    with self._lock:
+      if self.max_size == 0 or len(self.pool) < self.max_size:
+        self.pool.append(o)

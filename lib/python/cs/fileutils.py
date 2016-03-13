@@ -18,7 +18,6 @@ DISTINFO = {
 }
 
 from io import RawIOBase
-import errno
 from functools import partial
 import os
 from os import SEEK_CUR, SEEK_END, SEEK_SET
@@ -29,11 +28,12 @@ from collections import namedtuple
 from contextlib import contextmanager
 from itertools import takewhile
 import shutil
+import socket
 from tempfile import TemporaryFile, NamedTemporaryFile
 from threading import RLock, Thread
 import time
 import unittest
-from cs.asynchron import Asynchron
+from cs.asynchron import Result
 from cs.debug import trace
 from cs.env import envsub
 from cs.lex import as_lines
@@ -43,7 +43,7 @@ from cs.range import Range
 from cs.threads import locked, locked_property
 from cs.timeutils import TimeoutError
 from cs.obj import O
-from cs.py3 import ustr, filter, bytes
+from cs.py3 import ustr, bytes
 
 DEFAULT_POLL_INTERVAL = 1.0
 DEFAULT_READSIZE = 8192
@@ -67,7 +67,7 @@ def trysaferename(oldpath, newpath):
     saferename(oldpath, newpath)
   except OSError:
     return False
-  except:
+  except Exception:
     raise
   return True
 
@@ -521,53 +521,53 @@ def lockfile(path, ext=None, poll_interval=None, timeout=None):
     try:
       lockfd = os.open(lockpath, os.O_CREAT|os.O_EXCL|os.O_RDWR, 0)
     except OSError as e:
-      if e.errno == errno.EEXIST:
-        if timeout is not None and timeout <= 0:
-          # immediate failure
-          raise TimeoutError("cs.fileutils.lockfile: pid %d timed out on lockfile \"%s\""
-                             % (os.getpid(), lockpath),
-                             timeout)
-        now = time.time()
-        # post: timeout is None or timeout > 0
-        if start is None:
-          # first try - set up counters
-          start = now
-          complaint_last = start
-          complaint_interval = 2 * max(DEFAULT_POLL_INTERVAL, poll_interval)
-        else:
-          if now - complaint_last >= complaint_interval:
-            from cs.logutils import warning
-            warning("cs.fileutils.lockfile: pid %d waited %ds for \"%s\"",
-                    os.getpid(), now - start, lockpath)
-            complaint_last = now
-            complaint_interval *= 2
-        # post: start is set
-        if timeout is None:
-          sleep_for = poll_interval
-        else:
-          sleep_for = min(poll_interval, start + timeout - now)
-        # test for timeout
-        if sleep_for <= 0:
-          raise TimeoutError("cs.fileutils.lockfile: pid %d timed out on lockfile \"%s\""
-                             % (os.getpid(), lockpath),
-                             timeout)
-        time.sleep(sleep_for)
-        continue
-      raise
+      if e.errno != errno.EEXIST:
+        raise
+      if timeout is not None and timeout <= 0:
+        # immediate failure
+        raise TimeoutError("cs.fileutils.lockfile: pid %d timed out on lockfile %r"
+                           % (os.getpid(), lockpath),
+                           timeout)
+      now = time.time()
+      # post: timeout is None or timeout > 0
+      if start is None:
+        # first try - set up counters
+        start = now
+        complaint_last = start
+        complaint_interval = 2 * max(DEFAULT_POLL_INTERVAL, poll_interval)
+      else:
+        if now - complaint_last >= complaint_interval:
+          from cs.logutils import warning
+          warning("cs.fileutils.lockfile: pid %d waited %ds for %r",
+                  os.getpid(), now - start, lockpath)
+          complaint_last = now
+          complaint_interval *= 2
+      # post: start is set
+      if timeout is None:
+        sleep_for = poll_interval
+      else:
+        sleep_for = min(poll_interval, start + timeout - now)
+      # test for timeout
+      if sleep_for <= 0:
+        raise TimeoutError("cs.fileutils.lockfile: pid %d timed out on lockfile %r"
+                           % (os.getpid(), lockpath),
+                           timeout)
+      time.sleep(sleep_for)
+      continue
     else:
-      os.close(lockfd)
-      yield lockpath
-      os.remove(lockpath)
       break
+  os.close(lockfd)
+  yield lockpath
+  os.remove(lockpath)
 
-def maxFilenameSuffix(dir, pfx):
+def max_suffix(dirpath, pfx):
   ''' Compute the highest existing numeric suffix for names starting with the prefix `pfx`.
       This is generally used as a starting point for picking a new numeric suffix.
   '''
   pfx=ustr(pfx)
   maxn=None
   pfxlen=len(pfx)
-  for e in os.listdir(dir):
+  for e in os.listdir(dirpath):
     e = ustr(e)
     if len(e) <= pfxlen or not e.startswith(pfx):
       continue
@@ -599,22 +599,22 @@ def mkdirn(path, sep=''):
         raise ValueError(
                 "mkdirn(path=%r, sep=%r): using non-empty sep with a trailing %r seems nonsensical"
                 % (path, sep, os.sep))
-      dir = path[:-len(os.sep)]
+      dirpath = path[:-len(os.sep)]
       pfx = ''
     else:
-      dir = os.path.dirname(path)
-      if len(dir) == 0:
-        dir='.'
+      dirpath = os.path.dirname(path)
+      if len(dirpath) == 0:
+        dirpath='.'
       pfx = os.path.basename(path)+sep
 
-    if not os.path.isdir(dir):
-      error("parent not a directory: %r", dir)
+    if not os.path.isdir(dirpath):
+      error("parent not a directory: %r", dirpath)
       return None
 
     # do a quick scan of the directory to find
     # if any names of the desired form already exist
     # in order to start after them
-    maxn = maxFilenameSuffix(dir, pfx)
+    maxn = max_suffix(dirpath, pfx)
     if maxn is None:
       newn = 0
     else:
@@ -945,7 +945,7 @@ class SharedAppendFile(object):
         `pathname`: the pathname of the file to open.
         `importer`: callable to accept foreign data chunks as their appear
         `no_update`: set to true if we will not write updates.
-        `binary`: if the ile is to be opened in binary mode, otherwise text mode.
+        `binary`: if the file is to be opened in binary mode, otherwise text mode.
         `max_queue`: maximum input Queue length. Default: SharedAppendFile.DEFAULT_MAX_QUEUE.
         `poll_interval`: sleep time between polls after an idle poll. Default: DEFAULT_POLL_INTERVAL.
         `lock_ext`: lock file extension.
@@ -962,7 +962,7 @@ class SharedAppendFile(object):
       self.importer = importer
       self.poll_interval = poll_interval
       self.max_queue = max_queue
-      self.ready = Asynchron(name="readiness(%s)" % (self,))
+      self.ready = Result(name="readiness(%s)" % (self,))
       self.lock_ext = lock_ext
       self.lock_timeout = lock_timeout
       if not no_update:

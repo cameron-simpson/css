@@ -24,7 +24,6 @@ if sys.hexversion >= 0x03000000:
     ''' Upgrade string to unicode: no-op for python 3.
     '''
     return s
-  from io import BytesIO, StringIO
   from queue import Queue, PriorityQueue, Full as Queue_Full, Empty as Queue_Empty
   from configparser import ConfigParser
   def iteritems(o):
@@ -35,6 +34,7 @@ if sys.hexversion >= 0x03000000:
     return o.values()
   from builtins import sorted, filter, bytes, input
   from itertools import filterfalse
+  from .py3_for3 import raise3, exec_code, bytes, BytesFile
 
 else:
 
@@ -51,11 +51,6 @@ else:
         warning("cs.py3.ustr(): %s: s = %s %r", ude, type(s), s)
         s = s.decode(e, 'replace')
     return s
-  try:
-    from cStringIO import StringIO as BytesIO
-  except ImportError:
-    from StringIO import StringIO as BytesIO
-  StringIO = BytesIO    # horribly wrong, I know
   from Queue import Queue, PriorityQueue, Full as Queue_Full, Empty as Queue_Empty
   from ConfigParser import SafeConfigParser as ConfigParser
   def iteritems(o):
@@ -70,33 +65,7 @@ else:
     return _sorted(iterable, None, key, reverse)
   input = raw_input
   from itertools import ifilter as filter, ifilterfalse as filterfalse
-
-  class bytes(str):
-    def __new__(cls, arg):
-      from cs.logutils import X
-      try:
-        bytevals = iter(arg)
-      except TypeError:
-        bytevals = [ 0 for i in range(arg) ]
-      s = ''.join( chr(b) for b in bytevals )
-      self = str.__new__(cls, s)
-      return self
-    def __repr__(self):
-      return 'b' + str.__repr__(self)
-    def __getitem__(self, index):
-      s2 = str.__getitem__(self, index)
-      if isinstance(index, slice):
-        return bytes( ord(ch) for ch in s2 )
-      return ord(s2[0])
-    def __contains__(self, b):
-      return str.__contains__(self, chr(b))
-
-def raise3(exc_type, exc_value, exc_traceback):
-  if sys.hexversion >= 0x03000000:
-    raise exc_type(exc_value).with_traceback(exc_traceback)
-  else:
-    # subterfuge to let this pass a python3 parser; ugly
-    exec('raise exc_type, exc_value, exc_traceback')
+  from .py3_for2 import raise3, exec_code, bytes, BytesFile
 
 if __name__ == '__main__':
   import cs.py3_tests

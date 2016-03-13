@@ -1,0 +1,12 @@
+#!/bin/sh
+#
+# Translate CR into NL.
+#   - Cameron Simpson <cs@zip.com.au> 09jun2015
+#
+
+if [ $# -gt 0 ]
+then
+  cat "$@" | "$0"
+else
+  tr '\015' '\012'
+fi

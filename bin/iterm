@@ -1,32 +1,95 @@
 #!/bin/sh
 #
-# Command wrapper to invoke an arbitrary command in a new iterm window.
+# Convenience wrapper for iTerm2 opterations.
 #       - Cameron Simpson <cs@zip.com.au> 26apr2014
 #
 
+set -ue
+
+trace=
+
 cmd=$0
-usage="Usage: $cmd command [args...]"
+usage="Usage: $cmd [-x] op [op-args...]
+  Ops:
+    open command [args...]
+        Open new terminal window runnong command.
+    switch-profile profile name...
+        Change the current tty's profile to 'profile name...'"
 
-shcmd=$( shqstr "$@" )
-as_shcmd=\"$( printf '%s\n' "$shcmd" | sed 's/["\\]/\\&/g' )\"
+badopts=
 
-set -- `ttysize` || :
-columns=${1:-80}
-rows=${2:-65}
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -x) trace=set-x ;;
+    --) shift; break ;;
+    -?)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
 
-iterm_script="
-    tell application \"iTerm\"
-        activate
-        set newterm to (make new terminal)
-        tell newterm
-            set number of columns to $columns
-            set number of rows to $rows
-            set newsession to (make new session at the end of sessions)
-            tell newsession
-                exec command $as_shcmd
+if [ $# = 0 ]
+then
+  echo "$cmd: missing op" >&2
+  badopts=1
+else
+  op=$1
+  shift
+  case $op in
+    open)
+      if [ $# = 0 ]
+      then
+        echo "$cmd: $op: missing command" >&2
+        badopts=1
+      fi
+      ;;
+    switch-profile)
+      if [ $# = 0 ]
+      then
+        echo "$cmd: $op: missing profile name" >&2
+        badopts=1
+      fi
+      ;;
+    *)  echo "$cmd: unrecognised op: $op" >&2
+        badopts=1
+        ;;
+  esac
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+case "$op" in
+  open)
+    shcmd=$( shqstr "$@" )
+    as_shcmd=\"$( printf '%s\n' "$shcmd" | sed 's/["\\]/\\&/g' )\"
+    set -- `ttysize` || :
+    columns=${1:-80}
+    rows=${2:-65}
+    iterm_script="
+        tell application \"iTerm\"
+            activate
+            set newterm to (make new terminal)
+            tell newterm
+                set number of columns to $columns
+                set number of rows to $rows
+                set newsession to (make new session at the end of sessions)
+                tell newsession
+                    exec command $as_shcmd
+                end tell
             end tell
-        end tell
-    end tell"
+        end tell"
+    exec $trace osascript -e "$iterm_script"
+    ;;
 
-set -x
-exec osascript -e "$iterm_script"
+  switch-profile)
+    profilename=$*
+    printf ']50;SetProfile=%s' "$profilename" >/dev/tty
+    ;;
+
+  *)echo "$cmd: $op: unimplemented op" >&2
+    exit 2
+    ;;
+esac

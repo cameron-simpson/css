@@ -10,7 +10,7 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
-        ],
+    ],
     'requires': ['cs.py3'],
 }
 
@@ -59,7 +59,7 @@ def O_merge(o, _conflict=None, _overwrite=False, **kw):
     try:
       ovalue = getattr(o, attr)
     except AttributeError:
-      # new attribute - 
+      # new attribute -
       setattr(o, attr, value)
     else:
       if ovalue != value:
@@ -99,36 +99,35 @@ def O_str(o, no_recurse=False, seen=None):
   t = type(o)
   if t in StringTypes:
     return repr(o)
-  if t in (tuple,int,float,bool,list):
+  if t in (tuple, int, float, bool, list):
     return str(o)
   if t is dict:
-    o2 = dict( [ (k, str(v)) for k, v in o.items() ] )
+    o2 = dict([(k, str(v)) for k, v in o.items()])
     return str(o2)
   if t is set:
-    return 'set(%s)' % (','.join(sorted([ str(item) for item in o])))
+    return 'set(%s)' % (','.join(sorted([str(item) for item in o])))
   seen.add(id(o))
-  s = ( "<%s %s>"
-         % ( o.__class__.__name__,
-             (
-               ",".join([ ( "%s=<%s>" % (pattr, type(pvalue).__name__)
-                            if no_recurse else
-                            "%s=%s" % (pattr,
-                                       O_str(pvalue,
-                                             no_recurse=no_recurse,
-                                             seen=seen)
-                                         if id(pvalue) not in seen
-                                         else "<%s>" % (type(pvalue).__name__,)
-                                      )
-                          )
-                          for pattr, pvalue in O_attritems(o)
-                        ])
-             )
-           )
-     )
+  if no_recurse:
+    attrdesc_strs = [ "%s=<%s>" % (pattr, type(pvalue).__name__)
+                      for pattr, pvalue in O_attritems(o)
+                    ]
+  else:
+    attrdesc_strs = []
+    for pattr, pvalue in O_attritems(o):
+      if id(pvalue) in seen:
+        desc = "<%s>" % (type(pvalue).__name__,)
+      else:
+        desc = "%s=%s" % (pattr,
+                          O_str(pvalue,
+                                no_recurse=no_recurse,
+                                seen=seen))
+      attrdesc_strs.append(desc)
+  s = "<%s %s>" % (o.__class__.__name__, ",".join(attrdesc_strs))
   seen.remove(id(o))
   return s
 
 class O(object):
+
   ''' A bare object subclass to allow storing arbitrary attributes.
       It also has a nicer default str() action.
   '''
@@ -147,7 +146,7 @@ class O(object):
   def __str__(self):
     recurse = self._O_recurse
     self._O_recurse = False
-    s = O_str(self, no_recurse = not recurse)
+    s = O_str(self, no_recurse=not recurse)
     self._O_recurse = recurse
     return s
 
@@ -172,9 +171,9 @@ class O(object):
     if getattr(self, '_O_trace', False):
       from cs.logutils import D as dlog
       if a:
-        dlog("%s: "+msg, self, *a)
+        dlog("%s: " + msg, self, *a)
       else:
-        dlog(': '.join( (str(self), msg) ))
+        dlog(': '.join((str(self), msg)))
 
 def copy(obj, *a, **kw):
   ''' Convenient function to shallow copy an object with simple modifications.
@@ -211,6 +210,7 @@ def obj_as_dict(o, attr_prefix=None, attr_match=None):
   return d
 
 class Proxy(object):
+
   ''' An extremely simple proxy object that passes all unmatched attribute accesses to the proxied object.
       Note that setattr and delattr work directly on the proxy, not the proxied object.
   '''

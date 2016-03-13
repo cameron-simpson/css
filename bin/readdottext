@@ -18,4 +18,4 @@ $line"
     fi
 done
 
-echo "$news"
+printf '%s\n' "$news"

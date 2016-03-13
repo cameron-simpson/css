@@ -1,0 +1,3 @@
+  lib/python/cs/app/megacli.py: cs.app.megacli: backport syntax for Python 2.4 to assist desius@gmail.com
+  lib/python/cs/app/megacli.py: cs.app.megacli: assorted cleanups from previous python 2.4 backport
+  lib/python/cs/app/megacli.py: cs.app.megacli: no longer requires other modules

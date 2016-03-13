@@ -42,18 +42,33 @@ Unbuffered. Flush print actions as they occur.
 
 =back
 
-=head1 URL MODE
+=head1 Command Line Modes
+
+At present there is just one mode, "URL" mode.
+
+=head2 URL MODE
 
 The B<url> operator introduces an URL from which to commence the traversal,
-passing it to the specified action pipeline.
+passing it to the specified action pipeline. This takes the form:
 
-The action pipeline may be preceeded by some named definitions of other pipelines
-for use in the recipe. These are introduced with a word of the form I<name>B<:{>
-and ended with the word B<}>.
+  [url] URL [pipeline-spec...] actions...
+
+The "url" operator is optional if the supplied URL starts with "http://" or "https://".
+
+The starting URL may be followed by operation named pipeline definitions,
+introduced with a word of the form I<name>B<:{> and ended with the word B<}>.
 (Note: zsh(1) users will find the setting "B<setopt IGNORE_CLOSE_BRACES>" useful
 in their shell configuration.)
+Example:
 
-=head2 Operation
+  new_sql_files:{ hrefs .sql unseen:sql_files:save }
+
+This defines a pipeline named "new_sql_files" which performs the operations shown above.
+
+After any pipeline definitions come an explicit piple of actions,
+comprising the main pipeline which processes the supplied URL.
+
+=head1 Operation
 
 Conceptually, the pipeline passes sets of URLs (strings) from one action to the next.
 Each action operates on the list and produces a new list of strings for use by the following action.
