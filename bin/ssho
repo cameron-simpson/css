@@ -1,2 +1,4 @@
 #!/bin/sh
-exec sshto StrictHostKeyChecking=no ${1+"$@"}
+set -ue
+: ${SSH:=ssh}
+exec "$SSH" -o StrictHostKeyChecking=no ${1+"$@"}
