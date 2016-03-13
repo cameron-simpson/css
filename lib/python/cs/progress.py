@@ -65,6 +65,11 @@ class Progress(object):
     self._positions.append( CheckPoint(update_time, new_position) )
     self._flushed = False
 
+  def advance(self, delta, update_time=None):
+    ''' Record more progress.
+    '''
+    return self.update(self.position + delta, update_time=update_time)
+
   def _flush(self, oldest=None):
     if oldest is None:
       window = self.throughput_window
@@ -79,9 +84,6 @@ class Progress(object):
           del posns[0:ndx]
         break
     self._flushed = True
-
-  def inc(self, amount=1, when=None):
-    self.update(self.position + amount, when)
 
   @property
   def throughput(self):
@@ -170,6 +172,20 @@ class Progress(object):
     if runtime is None:
       return None
     return time.time() + runtime
+
+class ProgressWriter(Proxy):
+  ''' An object with a .write method which updates a Progress and then passes the write through to a file.
+  '''
+
+  def __init__(self, progress, fp):
+    Proxy.__init__(self, fp)
+    self.progress = progress
+    self.fp = fp
+
+  def write(self, data):
+    retval = self.fp.write(data)
+    self.progress.advance(len(data))
+    return retval
 
 if __name__ == '__main__':
   from cs.debug import selftest
