@@ -186,7 +186,7 @@ class _URL(unicode):
     with Pfx("_fetch(%s)", self):
       try:
         rsp = self._response('GET')
-        H = rsp.info()
+        self.rsp = rsp
         self._info = rsp.info()
         self._content = rsp.read()
         self._parsed = None
@@ -194,6 +194,9 @@ class _URL(unicode):
         error("error with GET: %s", e)
         self.flush()
         self._fetch_exception = e
+
+  # present GET action publicly
+  GET = _fetch
 
   def HEAD(self):
     rsp = self._response('HEAD')
@@ -398,6 +401,11 @@ class _URL(unicode):
     if t is None:
       return ''
     return t.string
+
+  def resolve(self, base):
+    ''' Resolve this URL with respect to a base URL.
+    '''
+    return URL(urljoin(base, self), base)
 
   def hrefs(self, absolute=False):
     ''' All 'href=' values from the content HTML 'A' tags.
