@@ -22,7 +22,7 @@ from functools import partial
 import os
 from os import SEEK_CUR, SEEK_END, SEEK_SET
 import os.path
-from os.path import basename, dirname, isabs, abspath, join as joinpath
+from os.path import basename, dirname, isabs, isdir, abspath, join as joinpath
 import errno
 import sys
 from collections import namedtuple
@@ -613,7 +613,7 @@ def mkdirn(path, sep=''):
         dirpath='.'
       pfx = basename(path)+sep
 
-    if not os.path.isdir(dirpath):
+    if not isdir(dirpath):
       error("parent not a directory: %r", dirpath)
       return None
 
@@ -1249,7 +1249,7 @@ class SavingFile(object):
       # try to make the temporary file in the same directory as the
       # target path
       tmpdir = dirname(path)
-      if not os.path.isdir(tmpdir):
+      if not isdir(tmpdir):
         # fall back to the default
         tmpdir = None
     self.fd, self.tmppath = mkstemp(prefix='.tmp', dir=dir, text=text)
