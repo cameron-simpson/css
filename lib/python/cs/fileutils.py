@@ -22,6 +22,7 @@ from functools import partial
 import os
 from os import SEEK_CUR, SEEK_END, SEEK_SET
 import os.path
+from os.path import dirname
 import errno
 import sys
 from collections import namedtuple
@@ -161,7 +162,7 @@ def rewrite_cmgr(pathname,
     if len(backup_ext) == 0:
       backup_ext = '.bak-%s' % (datetime.datetime.now().isoformat(),)
     backuppath = pathname + backup_ext
-  dirpath = os.path.dirname(pathname)
+  dirpath = dirname(pathname)
 
   T = NamedTemporaryFile(mode=mode, dir=dirpath, delete=False)
   # hand control to caller
@@ -203,7 +204,7 @@ def abspath_from_file(path, from_file):
   if not os.path.isabs(path):
     if not os.path.isabs(from_file):
       from_file = os.path.abspath(from_file)
-    path = os.path.join(os.path.dirname(from_file), path)
+    path = os.path.join(dirname(from_file), path)
   return path
 
 _FileState = namedtuple('FileState', 'mtime size dev ino')
@@ -607,7 +608,7 @@ def mkdirn(path, sep=''):
       dirpath = path[:-len(os.sep)]
       pfx = ''
     else:
-      dirpath = os.path.dirname(path)
+      dirpath = dirname(path)
       if len(dirpath) == 0:
         dirpath='.'
       pfx = os.path.basename(path)+sep
@@ -703,7 +704,7 @@ class Pathname(str):
 
   @property
   def dirname(self):
-    return Pathname(os.path.dirname(self))
+    return Pathname(dirname(self))
 
   @property
   def basename(self):
@@ -1247,7 +1248,7 @@ class SavingFile(object):
     if tmpdir is None:
       # try to make the temporary file in the same directory as the
       # target path
-      tmpdir = os.path.dirname(path)
+      tmpdir = dirname(path)
       if not os.path.isdir(tmpdir):
         # fall back to the default
         tmpdir = None
