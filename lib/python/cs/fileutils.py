@@ -22,7 +22,7 @@ from functools import partial
 import os
 from os import SEEK_CUR, SEEK_END, SEEK_SET
 import os.path
-from os.path import basename, dirname, isabs, abspath
+from os.path import basename, dirname, isabs, abspath, join as joinpath
 import errno
 import sys
 from collections import namedtuple
@@ -204,7 +204,7 @@ def abspath_from_file(path, from_file):
   if not isabs(path):
     if not isabs(from_file):
       from_file = abspath(from_file)
-    path = os.path.join(dirname(from_file), path)
+    path = joinpath(dirname(from_file), path)
   return path
 
 _FileState = namedtuple('FileState', 'mtime size dev ino')
@@ -654,7 +654,7 @@ def tmpdirn(tmp=None):
   ''' Make a new temporary directory with a numeric suffix.
   '''
   if tmp is None: tmp=tmpdir()
-  return mkdirn(os.path.join(tmp, basename(sys.argv[0])))
+  return mkdirn(joinpath(tmp, basename(sys.argv[0])))
 
 DEFAULT_SHORTEN_PREFIXES = ( ('$HOME/', '~/'), )
 
