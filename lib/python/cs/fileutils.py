@@ -22,7 +22,7 @@ from functools import partial
 import os
 from os import SEEK_CUR, SEEK_END, SEEK_SET
 import os.path
-from os.path import dirname
+from os.path import dirname, isabs
 import errno
 import sys
 from collections import namedtuple
@@ -201,8 +201,8 @@ def abspath_from_file(path, from_file):
   ''' Return the absolute path of `path` with respect to `from_file`,
       as one might do for an include file.
   '''
-  if not os.path.isabs(path):
-    if not os.path.isabs(from_file):
+  if not isabs(path):
+    if not isabs(from_file):
       from_file = os.path.abspath(from_file)
     path = os.path.join(dirname(from_file), path)
   return path
@@ -716,7 +716,7 @@ class Pathname(str):
 
   @property
   def isabs(self):
-    return os.path.isabs(self)
+    return isabs(self)
 
   @property
   def short(self):
