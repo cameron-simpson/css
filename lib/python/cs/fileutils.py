@@ -21,8 +21,8 @@ from io import RawIOBase
 from functools import partial
 import os
 from os import SEEK_CUR, SEEK_END, SEEK_SET
-import os.path
-from os.path import basename, dirname, isabs, isdir, abspath, join as joinpath
+from os.path import basename, dirname, isabs, isdir, \
+                    abspath, join as joinpath, exists as existspath
 import errno
 import sys
 from collections import namedtuple
@@ -1278,7 +1278,7 @@ class SavingFile(object):
     self.fp.close()
     self.fp = None
     path = self.path
-    if os.path.exists(path):
+    if exsistspath(path):
       warning("replacing existing %r", path)
     os.rename(self.tmppath, path)
 
