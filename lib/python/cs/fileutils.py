@@ -109,7 +109,11 @@ def rewrite(filepath, data,
   else:
     tmpdir = None
   with NamedTemporaryFile(mode=mode, dir=tmpdir) as T:
-    for chunk in chunks_of(data):
+    if isinstance(data, list):
+      I = data
+    else:
+      I = chunks_of(data)
+    for chunk in I:
       T.write(chunk)
     T.flush()
     if not empty_ok:
