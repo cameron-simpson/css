@@ -104,7 +104,8 @@ def rewrite(filepath, data,
       Otherwise (default), copy the tempfile to `filepath`.
   '''
   with NamedTemporaryFile(mode=mode) as T:
-    T.write(data.read())
+    for chunk in chunks_of(data):
+      T.write(chunk)
     T.flush()
     if not empty_ok:
       st = os.stat(T.name)
