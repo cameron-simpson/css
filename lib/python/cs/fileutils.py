@@ -103,7 +103,11 @@ def rewrite(filepath, data,
       `filepath` after copying the permission bits.
       Otherwise (default), copy the tempfile to `filepath`.
   '''
-  with NamedTemporaryFile(mode=mode) as T:
+  if do_rename:
+    tmpdir = dirname(filepath)
+  else:
+    tmpdir = None
+  with NamedTemporaryFile(mode=mode, dir=tmpdir) as T:
     for chunk in chunks_of(data):
       T.write(chunk)
     T.flush()
