@@ -159,7 +159,7 @@ class _URL(unicode):
       while retries > 0:
         now = time.time()
         try:
-          rsp = opener.open(rq)
+          opened_url = opener.open(rq)
         except OSError as e:
           if e.errno == errno.ETIMEDOUT:
             elapsed = time.time() - now
@@ -174,7 +174,7 @@ class _URL(unicode):
         else:
           # success, exit retry loop
           break
-    return rsp
+    return opened_url
 
   def _fetch(self):
     ''' Fetch the URL content.
@@ -185,11 +185,14 @@ class _URL(unicode):
     '''
     with Pfx("_fetch(%s)", self):
       try:
-        rsp = self._response('GET')
-        self.rsp = rsp
-        self._info = rsp.info()
-        self._content = rsp.read()
-        self._parsed = None
+        with self._response('GET') as opened_url:
+          opened_url = self._response('GET')
+          self.opened_url = opened_url
+          # URL post redirection
+          self.final_url = URL(opened_url.geturl(), self)
+          self._info = opened_url.info()
+          self._content = opened_url.read()
+          self._parsed = None
       except HTTPError as e:
         error("error with GET: %s", e)
         self.flush()
@@ -199,9 +202,9 @@ class _URL(unicode):
   GET = _fetch
 
   def HEAD(self):
-    rsp = self._response('HEAD')
-    rsp.read()
-    return rsp
+    opened_url = self._response('HEAD')
+    opened_url.read()
+    return opened_url
 
   @logexc
   def get_content(self, onerror=None):
