@@ -20,6 +20,7 @@ DISTINFO = {
 import os
 import os.path
 import sys
+from collections import namedtuple
 import errno
 import time
 from itertools import chain
@@ -159,7 +160,7 @@ class _URL(unicode):
       while retries > 0:
         now = time.time()
         try:
-          rsp = opener.open(rq)
+          opened_url = opener.open(rq)
         except OSError as e:
           if e.errno == errno.ETIMEDOUT:
             elapsed = time.time() - now
@@ -174,7 +175,7 @@ class _URL(unicode):
         else:
           # success, exit retry loop
           break
-    return rsp
+    return opened_url
 
   def _fetch(self):
     ''' Fetch the URL content.
@@ -185,20 +186,31 @@ class _URL(unicode):
     '''
     with Pfx("_fetch(%s)", self):
       try:
-        rsp = self._response('GET')
-        H = rsp.info()
-        self._info = rsp.info()
-        self._content = rsp.read()
-        self._parsed = None
+        with self._response('GET') as opened_url:
+          opened_url = self._response('GET')
+          self.opened_url = opened_url
+          # URL post redirection
+          final_url = opened_url.geturl()
+          if final_url == self:
+            final_url = self
+          else:
+            final_url = URL(final_url, self)
+          self.final_url = final_url
+          self._info = opened_url.info()
+          self._content = opened_url.read()
+          self._parsed = None
       except HTTPError as e:
         error("error with GET: %s", e)
         self.flush()
         self._fetch_exception = e
 
+  # present GET action publicly
+  GET = _fetch
+
   def HEAD(self):
-    rsp = self._response('HEAD')
-    rsp.read()
-    return rsp
+    opened_url = self._response('HEAD')
+    opened_url.read()
+    return opened_url
 
   @logexc
   def get_content(self, onerror=None):
@@ -308,7 +320,7 @@ class _URL(unicode):
 
   @property
   def path_elements(self):
-    ''' Return the non-empty path components.
+    ''' Return the non-empty path components; NB: a new list every time.
     '''
     return [ w for w in self.path.strip('/').split('/') if w ]
 
@@ -399,6 +411,11 @@ class _URL(unicode):
       return ''
     return t.string
 
+  def resolve(self, base):
+    ''' Resolve this URL with respect to a base URL.
+    '''
+    return URL(urljoin(base, self), base)
+
   def hrefs(self, absolute=False):
     ''' All 'href=' values from the content HTML 'A' tags.
         If `absolute`, resolve the sources with respect to our URL.
@@ -426,6 +443,100 @@ class _URL(unicode):
         debug("no src, skip %r", A)
         continue
       yield URL( (urljoin(self.baseurl, src) if absolute else src), self )
+
+  def savepath(self, rootdir):
+    ''' Compute a local filesystem save pathname for this URL.
+        This scheme is designed to accomodate the fact that 'a',
+        'a/' and 'a/b' can all coexist.
+        Extend any component ending in '.' with another '.'.
+        Extend directory components with '.d.'.
+    '''
+    elems = []
+    Uelems = self.path_elements
+    if self.endswith('/'):
+      base = None
+    else:
+      base = Uelems.pop()
+      if base.endswith('.'):
+        base += '.'
+    for elem in Uelems:
+      if elem.endswith('.'):
+        elem += '.'
+      elem += '.d.'
+      elems.append(elem)
+    if base is not None:
+      elems.append(base)
+    path = '/'.join(elems)
+    if not path:
+      path = '.d.'
+    revpath = '/' + self.unsavepath(path)
+    if revpath != self.path:
+      raise RuntimeError("savepath: MISMATCH %r => %r => %r (expected %r)" % (self, path, revpath, self.path))
+      raise RuntimeError("BANG")
+    return path
+
+  @classmethod
+  def unsavepath(cls, savepath):
+    ''' Compute URL path component from a savepath as returned by URL.savepath.
+        This should always round trip with URL.savepath.
+    '''
+    with Pfx("unsavepath(%r)", savepath):
+      elems = [ elem for elem in savepath.split('/') if elem ]
+      base = elems.pop()
+      with Pfx(base):
+        if base == '.d.':
+          base = ''
+        elif base.endswith('.d.'):
+          raise ValueError('basename may not end with ".d."')
+      for i, elem in enumerate(elems):
+        with Pfx(elem):
+          if elem.endswith('.d.'):
+            elem = elem[:-3]
+          else:
+            raise ValueError('dir elements must end in ".d."')
+          elems[i] = elem
+      elems.append(base)
+      for elem in elems:
+        with Pfx(elem):
+          if elem.endswith('.'):
+            elem = elem[:-1]
+            if not elem.endswith('.'):
+              raise ValueError('post "." trimming elem should end in ".", but does not')
+      return '/'.join(elems)
+
+  def walk(self, limit=None, seen=None, follow_redirects=False):
+    ''' Walk a website from this URL yielding this and all descendent URLs.
+        `limit`: an object with a contraint test method "ok".
+                 If not supplied, limit URLs to the same host and port.
+        `seen`: a setlike object with a "__contains__" method and an "add" method.
+                 URLs already in the set will not be yielded or visited.
+        `follow_redirects`: whether to follow URL redirects
+    '''
+    todo = [self]
+    while todo:
+      U = todo.pop()
+      if limit is None:
+        limit = URLLimit(U.hostname, U.port, '/')
+      if seen is None:
+        seen = set()
+      if U in seen:
+        continue
+      seen.add(U)
+      if not limit.ok(U):
+        continue
+      yield U
+      if U.content_type == 'text/html':
+        for subU in sorted(list(U.srcs()) + list(U.hrefs())):
+          todo.append(subU.resolve(U))
+
+class URLLimit(namedtuple('URLLimit', 'hostname port subpath')):
+
+  def ok(self, U):
+    U = URL(U, None)
+    return ( U.hostname == self.hostname
+         and U.port == self.port
+         and U.path.startswith(self.subpath)
+           )
 
 def strip_whitespace(s):
   ''' Strip whitespace characters from a string, per HTML 4.01 section 1.6 and appendix E.

@@ -21,7 +21,8 @@ from io import RawIOBase
 from functools import partial
 import os
 from os import SEEK_CUR, SEEK_END, SEEK_SET
-import os.path
+from os.path import basename, dirname, isabs, isdir, \
+                    abspath, join as joinpath, exists as existspath
 import errno
 import sys
 from collections import namedtuple
@@ -103,8 +104,17 @@ def rewrite(filepath, data,
       `filepath` after copying the permission bits.
       Otherwise (default), copy the tempfile to `filepath`.
   '''
-  with NamedTemporaryFile(mode=mode) as T:
-    T.write(data.read())
+  if do_rename:
+    tmpdir = dirname(filepath)
+  else:
+    tmpdir = None
+  with NamedTemporaryFile(mode=mode, dir=tmpdir) as T:
+    if isinstance(data, list):
+      I = data
+    else:
+      I = chunks_of(data)
+    for chunk in I:
+      T.write(chunk)
     T.flush()
     if not empty_ok:
       st = os.stat(T.name)
@@ -156,7 +166,7 @@ def rewrite_cmgr(pathname,
     if len(backup_ext) == 0:
       backup_ext = '.bak-%s' % (datetime.datetime.now().isoformat(),)
     backuppath = pathname + backup_ext
-  dirpath = os.path.dirname(pathname)
+  dirpath = dirname(pathname)
 
   T = NamedTemporaryFile(mode=mode, dir=dirpath, delete=False)
   # hand control to caller
@@ -195,10 +205,10 @@ def abspath_from_file(path, from_file):
   ''' Return the absolute path of `path` with respect to `from_file`,
       as one might do for an include file.
   '''
-  if not os.path.isabs(path):
-    if not os.path.isabs(from_file):
-      from_file = os.path.abspath(from_file)
-    path = os.path.join(os.path.dirname(from_file), path)
+  if not isabs(path):
+    if not isabs(from_file):
+      from_file = abspath(from_file)
+    path = joinpath(dirname(from_file), path)
   return path
 
 _FileState = namedtuple('FileState', 'mtime size dev ino')
@@ -602,12 +612,12 @@ def mkdirn(path, sep=''):
       dirpath = path[:-len(os.sep)]
       pfx = ''
     else:
-      dirpath = os.path.dirname(path)
+      dirpath = dirname(path)
       if len(dirpath) == 0:
         dirpath='.'
-      pfx = os.path.basename(path)+sep
+      pfx = basename(path)+sep
 
-    if not os.path.isdir(dirpath):
+    if not isdir(dirpath):
       error("parent not a directory: %r", dirpath)
       return None
 
@@ -632,7 +642,7 @@ def mkdirn(path, sep=''):
         error("mkdir(%s): %s", newpath, e)
         return None
       if len(opath) == 0:
-        newpath = os.path.basename(newpath)
+        newpath = basename(newpath)
       return newpath
 
 def tmpdir():
@@ -648,7 +658,7 @@ def tmpdirn(tmp=None):
   ''' Make a new temporary directory with a numeric suffix.
   '''
   if tmp is None: tmp=tmpdir()
-  return mkdirn(os.path.join(tmp, os.path.basename(sys.argv[0])))
+  return mkdirn(joinpath(tmp, basename(sys.argv[0])))
 
 DEFAULT_SHORTEN_PREFIXES = ( ('$HOME/', '~/'), )
 
@@ -698,19 +708,19 @@ class Pathname(str):
 
   @property
   def dirname(self):
-    return Pathname(os.path.dirname(self))
+    return Pathname(dirname(self))
 
   @property
   def basename(self):
-    return Pathname(os.path.basename(self))
+    return Pathname(basename(self))
 
   @property
   def abs(self):
-    return Pathname(os.path.abspath(self))
+    return Pathname(abspath(self))
 
   @property
   def isabs(self):
-    return os.path.isabs(self)
+    return isabs(self)
 
   @property
   def short(self):
@@ -1242,8 +1252,8 @@ class SavingFile(object):
     if tmpdir is None:
       # try to make the temporary file in the same directory as the
       # target path
-      tmpdir = os.path.dirname(path)
-      if not os.path.isdir(tmpdir):
+      tmpdir = dirname(path)
+      if not isdir(tmpdir):
         # fall back to the default
         tmpdir = None
     self.fd, self.tmppath = mkstemp(prefix='.tmp', dir=dir, text=text)
@@ -1272,7 +1282,7 @@ class SavingFile(object):
     self.fp.close()
     self.fp = None
     path = self.path
-    if os.path.exists(path):
+    if exsistspath(path):
       warning("replacing existing %r", path)
     os.rename(self.tmppath, path)
 
