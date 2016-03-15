@@ -20,6 +20,7 @@ DISTINFO = {
 import os
 import os.path
 import sys
+from collections import namedtuple
 import errno
 import time
 from itertools import chain
@@ -502,6 +503,40 @@ class _URL(unicode):
             if not elem.endswith('.'):
               raise ValueError('post "." trimming elem should end in ".", but does not')
       return '/'.join(elems)
+
+  def walk(self, limit=None, seen=None, follow_redirects=False):
+    ''' Walk a website from this URL yielding this and all descendent URLs.
+        `limit`: an object with a contraint test method "ok".
+                 If not supplied, limit URLs to the same host and port.
+        `seen`: a setlike object with a "__contains__" method and an "add" method.
+                 URLs already in the set will not be yielded or visited.
+        `follow_redirects`: whether to follow URL redirects
+    '''
+    todo = [self]
+    while todo:
+      U = todo.pop()
+      if limit is None:
+        limit = URLLimit(U.hostname, U.port, '/')
+      if seen is None:
+        seen = set()
+      if U in seen:
+        continue
+      seen.add(U)
+      if not limit.ok(U):
+        continue
+      yield U
+      if U.content_type == 'text/html':
+        for subU in sorted(list(U.srcs()) + list(U.hrefs())):
+          todo.append(subU.resolve(U))
+
+class URLLimit(namedtuple('URLLimit', 'hostname port subpath')):
+
+  def ok(self, U):
+    U = URL(U, None)
+    return ( U.hostname == self.hostname
+         and U.port == self.port
+         and U.path.startswith(self.subpath)
+           )
 
 def strip_whitespace(s):
   ''' Strip whitespace characters from a string, per HTML 4.01 section 1.6 and appendix E.
