@@ -435,6 +435,66 @@ class _URL(unicode):
         continue
       yield URL( (urljoin(self.baseurl, src) if absolute else src), self )
 
+  def savepath(self, rootdir):
+    ''' Compute a local filesystem save pathname for this URL.
+        This scheme is designed to accomodate the fact that 'a',
+        'a/' and 'a/b' can all coexist.
+        Extend any component ending in '.' with another '.'.
+        Extend directory components with '.d.'.
+    '''
+    elems = []
+    Uelems = self.path_elements
+    if self.endswith('/'):
+      base = None
+    else:
+      base = Uelems.pop()
+      if base.endswith('.'):
+        base += '.'
+    for elem in Uelems:
+      if elem.endswith('.'):
+        elem += '.'
+      elem += '.d.'
+      elems.append(elem)
+    if base is not None:
+      elems.append(base)
+    path = '/'.join(elems)
+    if not path:
+      path = '.d.'
+    revpath = '/' + self.unsavepath(path)
+    if revpath != self.path:
+      raise RuntimeError("savepath: MISMATCH %r => %r => %r (expected %r)" % (self, path, revpath, self.path))
+      raise RuntimeError("BANG")
+    return path
+
+  @classmethod
+  def unsavepath(cls, savepath):
+    ''' Compute URL path component from a savepath as returned by URL.savepath.
+        This should always round trip with URL.savepath.
+    '''
+    with Pfx("unsavepath(%r)", savepath):
+      elems = [ elem for elem in savepath.split('/') if elem ]
+      base = elems.pop()
+      with Pfx(base):
+        if base == '.d.':
+          base = ''
+        elif base.endswith('.d.'):
+          raise ValueError('basename may not end with ".d."')
+      for i, elem in enumerate(elems):
+        with Pfx(elem):
+          if elem.endswith('.d.'):
+            elem = elem[:-3]
+          else:
+            raise ValueError('dir elements must end in ".d."')
+          elems[i] = elem
+      elems.append(base)
+      for elem in elems:
+        with Pfx(elem):
+          if elem.endswith('.'):
+            elem = elem[:-1]
+            if not elem.endswith('.'):
+              raise ValueError('post "." trimming elem should end in ".", but does not')
+      return '/'.join(elems)
+
 def strip_whitespace(s):
   ''' Strip whitespace characters from a string, per HTML 4.01 section 1.6 and appendix E.
   '''
