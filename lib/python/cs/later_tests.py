@@ -31,9 +31,10 @@ class TestLater(unittest.TestCase):
   def setUp(self):
     self.L = Later(2)
     self.L.logTo("/dev/tty")
+    self.L.open()
 
   def tearDown(self):
-    pass
+    self.L.close()
 
   def test00one(self):
     # compute 3*2

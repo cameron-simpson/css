@@ -9,7 +9,7 @@
 optcss=${OPTCSS:-/opt/css}
 cssweb=$HOME/@/ezos/html/cs/css
 adzapweb=$HOME/@/adzapper.sf/html/scripts
-rev=
+rev=tip
 updateweb=1
 force=
 
@@ -45,14 +45,18 @@ fi
                 badopts=1
               }
 
-if [ -n "$rev" ]
-then
-  cssdatedir=css-$rev
-else
-  rev=`cs-release last`
-  cssdatedir=css-$rev
-  rev=release-$rev
-fi
+case "$rev" in
+  RELEASE)
+    rev=`cs-release last`
+    cssdatedir=css-$rev
+    rev=release-$rev
+    ;;
+  tip)
+    cssdatedir=css-$rev-$(datecode)
+    ;;
+  *)cssdatedir=css-$rev
+    ;;
+esac
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 

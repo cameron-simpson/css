@@ -26,4 +26,4 @@ def dirent_tobytes(D):
   return D.encode()
 
 def dirent_frombytes(value):
-  return cs.venti.dir.decodeDirent(value, justone=True)
+  return cs.venti.dir.decode_Dirent(value, justone=True)

@@ -1,0 +1,2 @@
+#!/bin/sh
+exec python3 -m cs.app.osx.iphoto ${1+"$@"}
