@@ -189,7 +189,12 @@ class _URL(unicode):
           opened_url = self._response('GET')
           self.opened_url = opened_url
           # URL post redirection
-          self.final_url = URL(opened_url.geturl(), self)
+          final_url = opened_url.geturl()
+          if final_url == self:
+            final_url = self
+          else:
+            final_url = URL(final_url, self)
+          self.final_url = final_url
           self._info = opened_url.info()
           self._content = opened_url.read()
           self._parsed = None
