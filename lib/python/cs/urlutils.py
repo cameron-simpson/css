@@ -54,6 +54,7 @@ from threading import RLock
 from cs.excutils import logexc, safe_property
 from cs.lex import parseUC_sAttr
 from cs.logutils import Pfx, pfx_iter, debug, error, warning, exception, D, X
+from cs.rfc2616 import datetime_from_http_date
 from cs.threads import locked_property
 from cs.py3 import ustr, unicode
 from cs.obj import O
