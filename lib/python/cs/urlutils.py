@@ -98,6 +98,7 @@ class _URL(unicode):
     self.user_agent = user_agent if user_agent else self.referer.user_agent if self.referer else None
     self._opener = opener
     self._parts = None
+    self._info = None
     self.flush()
     self._lock = RLock()
     self.flush()
@@ -124,7 +125,7 @@ class _URL(unicode):
     #       _parsed is a BeautifulSoup parse of the _content decoded as utf-8.
     #       _xml is an Elementtree parse of the _content decoded as utf-8.
     self._content = None
-    self._content_type = None
+    self._info = None
     self._parsed = None
     self._xml = None
     self._fetch_exception = None
@@ -175,6 +176,7 @@ class _URL(unicode):
         else:
           # success, exit retry loop
           break
+    self._info = opened_url.info()
     return opened_url
 
   def _fetch(self):
@@ -196,7 +198,6 @@ class _URL(unicode):
           else:
             final_url = URL(final_url, self)
           self.final_url = final_url
-          self._info = opened_url.info()
           self._content = opened_url.read()
           self._parsed = None
       except HTTPError as e:
@@ -236,8 +237,8 @@ class _URL(unicode):
   def content_type(self):
     ''' The URL content MIME type.
     '''
-    if self._content is None:
-      self._fetch()
+    if self._info is None:
+      self.HEAD()
     try:
       ctype = self._info.get_content_type()
     except AttributeError as e:
@@ -250,7 +251,7 @@ class _URL(unicode):
     ''' The URL content tranfer encoding.
     '''
     if self._content is None:
-      self._fetch()
+      self.HEAD()
     return self._info.getencoding()
 
   @property
