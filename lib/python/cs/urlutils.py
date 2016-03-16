@@ -522,22 +522,28 @@ class _URL(unicode):
                  URLs already in the set will not be yielded or visited.
         `follow_redirects`: whether to follow URL redirects
     '''
+    if limit is None:
+      limit = self.default_limit()
+    if seen is None:
+      seen = set()
     todo = [self]
     while todo:
       U = todo.pop()
-      if limit is None:
-        limit = URLLimit(U.hostname, U.port, '/')
-      if seen is None:
-        seen = set()
       if U in seen:
         continue
       seen.add(U)
       if not limit.ok(U):
         continue
       yield U
+      # TODO: parse CSS, XML?
       if U.content_type == 'text/html':
         for subU in sorted(list(U.srcs()) + list(U.hrefs())):
           todo.append(subU.resolve(U))
+
+  def default_limit(self):
+    ''' Default URLLimit for this URL: same host:port, any subpath.
+    '''
+    return URLLimit(self.hostname, self.port, '/')
 
 class URLLimit(namedtuple('URLLimit', 'hostname port subpath')):
 
