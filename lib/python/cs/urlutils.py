@@ -51,7 +51,7 @@ except ImportError:
   import xml.etree.ElementTree as ElementTree
 from string import whitespace
 from threading import RLock
-from cs.excutils import logexc
+from cs.excutils import logexc, safe_property
 from cs.lex import parseUC_sAttr
 from cs.logutils import Pfx, pfx_iter, debug, error, warning, exception, D, X
 from cs.threads import locked_property
@@ -130,7 +130,7 @@ class _URL(unicode):
     self._xml = None
     self._fetch_exception = None
 
-  @property
+  @safe_property
   def opener(self):
     if self._opener is None:
       if self.referer is not None and self.referer._opener is not None:
@@ -233,7 +233,7 @@ class _URL(unicode):
     self._fetch()
     return self._content
 
-  @property
+  @safe_property
   def content_type(self):
     ''' The URL content MIME type.
     '''
@@ -246,7 +246,7 @@ class _URL(unicode):
       ctype = None
     return ctype
 
-  @property
+  @safe_property
   def content_length(self):
     ''' The value of the Content-Length: header or None.
     '''
@@ -263,7 +263,7 @@ class _URL(unicode):
       self.HEAD()
     return self._info.getencoding()
 
-  @property
+  @safe_property
   def domain(self):
     ''' The URL domain - the hostname with the first dotted component removed.
     '''
@@ -302,7 +302,7 @@ class _URL(unicode):
   def xml(self):
     return ElementTree.XML(self.content.decode('utf-8', 'replace'))
 
-  @property
+  @safe_property
   def parts(self):
     ''' The URL parsed into parts by urlparse.urlparse.
     '''
@@ -310,81 +310,81 @@ class _URL(unicode):
       self._parts = urlparse(self)
     return self._parts
 
-  @property
+  @safe_property
   def scheme(self):
     ''' The URL scheme as returned by urlparse.urlparse.
     '''
     return self.parts.scheme
 
-  @property
+  @safe_property
   def netloc(self):
     ''' The URL netloc as returned by urlparse.urlparse.
     '''
     return self.parts.netloc
 
-  @property
+  @safe_property
   def path(self):
     ''' The URL path as returned by urlparse.urlparse.
     '''
     return self.parts.path
 
-  @property
+  @safe_property
   def path_elements(self):
     ''' Return the non-empty path components; NB: a new list every time.
     '''
     return [ w for w in self.path.strip('/').split('/') if w ]
 
-  @property
+  @safe_property
   def params(self):
     ''' The URL params as returned by urlparse.urlparse.
     '''
     return self.parts.params
 
-  @property
+  @safe_property
   def query(self):
     ''' The URL query as returned by urlparse.urlparse.
     '''
     return self.parts.query
 
-  @property
+  @safe_property
   def fragment(self):
     ''' The URL fragment as returned by urlparse.urlparse.
     '''
     return self.parts.fragment
 
-  @property
+  @safe_property
   def username(self):
     ''' The URL username as returned by urlparse.urlparse.
     '''
     return self.parts.username
 
-  @property
+  @safe_property
   def password(self):
     ''' The URL password as returned by urlparse.urlparse.
     '''
     return self.parts.password
 
-  @property
+  @safe_property
   def hostname(self):
     ''' The URL hostname as returned by urlparse.urlparse.
     '''
     return self.parts.hostname
 
-  @property
+  @safe_property
   def port(self):
     ''' The URL port as returned by urlparse.urlparse.
     '''
     return self.parts.port
 
-  @property
+  @safe_property
   def dirname(self, absolute=False):
     return os.path.dirname(self.path)
 
-  @property
+  @safe_property
   def parent(self):
     return URL(urljoin(self, self.dirname), self)
 
-  @property
+  @safe_property
   def basename(self):
     return os.path.basename(self.path)
 
@@ -402,7 +402,7 @@ class _URL(unicode):
     '''
     return self.xml.findall(match)
 
-  @property
+  @safe_property
   def baseurl(self):
     for B in self.BASEs:
       try:
@@ -414,7 +414,7 @@ class _URL(unicode):
           return URL(base, self)
     return self
 
-  @property
+  @safe_property
   def page_title(self):
     t = self.parsed.title
     if t is None:
@@ -616,7 +616,7 @@ class URLs(object):
   def __setitem__(self, key, value):
     self.context[key] = value
 
-  @property
+  @safe_property
   def multi(self):
     ''' Prepare this URLs object for reuse by converting its urls
         iterable to a list if not already a list or tuple.
