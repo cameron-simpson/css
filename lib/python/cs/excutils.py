@@ -140,7 +140,7 @@ def transmute(exc_from, exc_to=None):
   return transmutor
 
 def unattributable(func):
-  return transmute(AttributeError, RuntimeError)
+  return transmute(AttributeError, RuntimeError)(func)
 
 def safe_property(func):
   return property(unattributable(func))
