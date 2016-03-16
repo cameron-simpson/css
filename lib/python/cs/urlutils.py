@@ -246,6 +246,15 @@ class _URL(unicode):
       ctype = None
     return ctype
 
+  @property
+  def content_length(self):
+    ''' The value of the Content-Length: header or None.
+    '''
+    value = self._info['Content-Type']
+    if value is not None:
+      value = int(value.strip())
+    return value
+
   @locked_property
   def content_transfer_encoding(self):
     ''' The URL content tranfer encoding.
