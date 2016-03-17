@@ -306,7 +306,7 @@ def s3syncup_dir(bucket_pool, srcdir, dstdir, doit=False, do_delete=False, do_up
   '''
   global UPD
   ok = True
-  L = Later(4, name="s3syncup(%r, %r, %r)")
+  L = Later(4, name="s3syncup(%r, %r, %r)" % (bucket_pool.bucket_name, srcdir, dstdir))
   with L:
     if do_upload:
       Q = IterableQueue()
@@ -585,6 +585,7 @@ class BucketPool(Pool):
 
   def __init__(self, bucket_name):
     Pool.__init__(self, lambda: boto3.session.Session().resource('s3').Bucket(bucket_name))
+    self.bucket_name = bucket_name
 
 if __name__ == '__main__':
   import signal
