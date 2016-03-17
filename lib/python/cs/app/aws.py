@@ -54,7 +54,12 @@ USAGE = r'''Usage: %s [-L location (ignored, fixme)] command [args...]
     -D  Delete items in bucket not in localdir.
     -n  No action. Recite required changes.
     -U  No upload phase; delete only.
-    -%%  Decode %%hh sequences in local filenames.'''
+    -%%  Decode %%hh sequences in local filenames.
+  s3 bucket_name scrape [-DnU] url
+    Synchronise bucket contents with website.
+    -D  Delete items in bucket not in localdir.
+    -n  No action. Recite required changes.
+    -U  No upload phase; delete only.'''
 
 S3_MAX_DELETE_OBJECTS = 1000
 LSEP = os.path.sep
