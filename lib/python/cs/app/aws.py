@@ -325,8 +325,12 @@ def s3syncup_dir(bucket_pool, srcdir, dstdir, doit=False, do_delete=False, do_up
           if diff.unchanged:
             UPD.out(line)
           else:
-            UPD.nl(line)
-            ##UPD.nl("  %r", diff.metadata)
+            if diff.changed_fields() == ['time']:
+              # be quiet about time changes
+              UPD.out(line)
+            else:
+              UPD.nl(line)
+              ##UPD.nl("  %r", diff.metadata)
     if do_delete:
       # now process deletions
       with bucket_pool.instance() as B:
