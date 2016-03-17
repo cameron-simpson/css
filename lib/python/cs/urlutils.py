@@ -184,8 +184,8 @@ class _URL(unicode):
             warning("open %s: %s; elapsed=%gs", self, e, elapsed)
             if retries > 0:
               retries -= 1
-            else:
-              raise
+              continue
+          raise
         except HTTPError as e:
           warning("open %s: %s", self, e)
           raise
