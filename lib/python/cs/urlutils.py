@@ -765,7 +765,7 @@ class NetrcHTTPPasswordMgr(HTTPPasswordMgrWithDefaultRealm):
   def find_user_password(self, realm, authuri):
     user, password = HTTPPasswordMgrWithDefaultRealm.find_user_password(self, realm, authuri)
     if user is None:
-      U = _URL(authuri)
+      U = URL(authuri, None)
       netauth = self._netrc.authenticators(U.hostname)
       if netauth is not None:
         user, account, password = netauth
