@@ -175,8 +175,9 @@ class _URL(unicode):
     with Pfx("open(%s)", rq):
       while retries > 0:
         now = time.time()
+        open = opener.open
         try:
-          opened_url = opener.open(rq)
+          opened_url = open(rq)
         except OSError as e:
           if e.errno == errno.ETIMEDOUT:
             elapsed = time.time() - now
