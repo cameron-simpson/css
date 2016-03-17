@@ -600,23 +600,44 @@ class _URL(unicode):
                  URLs already in the set will not be yielded or visited.
         `follow_redirects`: whether to follow URL redirects
     '''
-    if limit is None:
-      limit = self.default_limit()
-    if seen is None:
-      seen = set()
-    todo = [self]
-    while todo:
-      U = todo.pop()
-      if U in seen:
-        continue
-      seen.add(U)
-      if not limit.ok(U):
-        continue
-      yield U
-      # TODO: parse CSS, XML?
-      if U.content_type == 'text/html':
-        for subU in sorted(list(U.srcs()) + list(U.hrefs())):
-          todo.append(subU.resolve(U))
+    with Pfx("walk(%r)", self):
+      if limit is None:
+        limit = self.default_limit()
+      if seen is None:
+        seen = set()
+      todo = [self]
+      while todo:
+        U = heappop(todo)
+        with Pfx(U):
+          if U in seen:
+            continue
+          seen.add(U)
+          if not limit.ok(U):
+            X("walk: reject %r, does not match limit %s", U, limit)
+            continue
+          yield U
+          subURLs = []
+          try:
+            # TODO: also parse CSS, XML?
+            if U.content_type == 'text/html':
+              subURLs.extend(U.srcs())
+              subURLs.extend(U.hrefs())
+          except HTTPError as e:
+            if e.code != 404:
+              warning("%s", e)
+          for subU in sorted(subURLs):
+            subU0 = subU
+            subU = subU.resolve(U)
+            subU = subU.normalised()
+            if limit.ok(subU):
+              # strip fragment if present - not relevant
+              try:
+                subU, frag = subU.rsplit('#', 1)
+              except ValueError:
+                pass
+              else:
+                subU = URL(subU, U)
+              heappush(todo, subU)
 
   def default_limit(self):
     ''' Default URLLimit for this URL: same host:port, any subpath.
