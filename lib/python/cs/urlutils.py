@@ -81,8 +81,8 @@ def URL(U, referer, **kw):
   '''
   if not isURL(U):
     ##D("new U %r (ref=%r)", U, referer)
-    U = _URL(ustr(U))
-    U._init(referer=referer, **kw)
+    U = _URL(U)
+    U._init(referer, **kw)
   else:
     if U.referer is None and referer is not None:
       ##D("old U %r, updating referer to %r", U, referer)
