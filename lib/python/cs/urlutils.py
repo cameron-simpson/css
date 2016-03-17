@@ -427,6 +427,37 @@ class _URL(unicode):
     '''
     return URL(urljoin(base, self), base)
 
+  def normalised(self):
+    ''' Return a normalised URL where "." and ".." components have been processed.
+    '''
+    slashed = self.path.endswith('/')
+    elems = self.path_elements
+    i = 0
+    while i < len(elems):
+      elem = elems[i]
+      if elem == '' or elem == '.':
+        elems.pop(i)
+      elif elem == '..':
+        elems.pop(i)
+        if i > 0:
+          i -= 1
+          elems.pop(i)
+      else:
+        i += 1
+    normpath = '/' + '/'.join(elems)
+    if slashed and not normpath.endswith('/'):
+      normpath += '/'
+    if normpath == self.path:
+      U = self
+    else:
+      normURL = self.scheme + '://' + self.netloc + normpath
+      if self.params:
+        normURL += ';' + self.paras
+      if self.fragment:
+        normURL += '#' + self.fragment
+      U = URL(normURL, self.referer)
+    return U
+
   def hrefs(self, absolute=False):
     ''' All 'href=' values from the content HTML 'A' tags.
         If `absolute`, resolve the sources with respect to our URL.
