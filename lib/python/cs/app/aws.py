@@ -209,6 +209,41 @@ def cmd_s3(argv):
                                 do_upload=do_upload, unpercent=unpercent,
                                 default_ctype='text/html'):
               xit = 1
+      elif s3op == 'scrape':
+        doit = True
+        do_delete = False
+        do_upload = True
+        badopts = False
+        try:
+          opts, argv = getopt(argv, 'DnU')
+        except GetoptError as e:
+          error("bad option: %s", e)
+          badopts = True
+          opts = ()
+        else:
+          for opt, val in opts:
+            with Pfx(opt):
+              if opt == '-D':
+                do_delete = True
+              elif opt == '-n':
+                doit = False
+              elif opt == '-U':
+                do_upload = False
+              else:
+                error("unimplemented option")
+                badopts = True
+          if not argv:
+            error("missing source URL")
+            badopts = True
+          else:
+            srcurl = URL(argv.pop(0), None)
+            if argv:
+              error("extra arguments after srcdir: %r" % (argv,))
+              badopts = True
+        if not badopts:
+          if not s3scrape(bucket_pool, srcurl,
+                          doit=doit, do_delete=do_delete, do_upload=do_upload):
+              xit = 1
       else:
         error("unrecognised s3 op")
         badopts = True
