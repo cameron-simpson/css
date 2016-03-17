@@ -224,6 +224,20 @@ class _URL(unicode):
   # present GET action publicly
   GET = _fetch
 
+  def exists(self):
+    ''' Test if this URL exists, return Boolean.
+    '''
+    if self._info is not None:
+      return True
+    try:
+      self.HEAD()
+    except HTTPError as e:
+      if e.code == 404:
+        return False
+      raise
+    else:
+      return True
+
   def HEAD(self):
     opened_url = self._response('HEAD')
     opened_url.read()
