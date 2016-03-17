@@ -224,6 +224,25 @@ class Differences(O):
            + ( '-' if self.same_time else 't' )
            )
 
+  def changes(self):
+    ''' Return a dict containing updated field values.
+    '''
+    ch = {}
+    if not self.same_content:
+      ch['content'] = self.hashcodes
+    if not self.same_mimetype:
+      ch['mimetype'] = self.mimetype_new
+    if not self.same_size:
+      ch['size'] = self.size_new
+    if not self.same_time:
+      ch['time'] = self.time_new
+    return ch
+
+  def changed_fields(self):
+    ''' Return a lexically sorted list of the changed fields.
+    '''
+    return sorted(self.changes().keys())
+
   @property
   def unchanged(self):
     return self.same_time and self.same_size and self.same_mimetype and self.same_content
