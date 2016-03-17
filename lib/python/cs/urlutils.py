@@ -642,13 +642,14 @@ class _URL(unicode):
   def default_limit(self):
     ''' Default URLLimit for this URL: same host:port, any subpath.
     '''
-    return URLLimit(self.hostname, self.port, '/')
+    return URLLimit(self.scheme, self.hostname, self.port, '/')
 
-class URLLimit(namedtuple('URLLimit', 'hostname port subpath')):
+class URLLimit(namedtuple('URLLimit', 'scheme hostname port subpath')):
 
   def ok(self, U):
     U = URL(U, None)
-    return ( U.hostname == self.hostname
+    return ( U.scheme == self.scheme
+         and U.hostname == self.hostname
          and U.port == self.port
          and U.path.startswith(self.subpath)
            )
