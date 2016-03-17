@@ -130,7 +130,8 @@ class _URL(unicode):
       if plural:
         return nodes
       return the(nodes)
-    raise AttributeError(attr)
+    # look up method on equivalent Unicode string
+    return getattr(unicode(self), attr)
 
   def flush(self):
     ''' Forget all cached content.
