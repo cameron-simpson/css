@@ -59,6 +59,14 @@ from cs.threads import locked_property
 from cs.py3 import ustr, unicode
 from cs.obj import O
 
+##from http.client import HTTPConnection
+##putheader0 = HTTPConnection.putheader
+##def my_putheader(self, header, *values):
+##  for v in values:
+##    X("HTTPConnection.putheader(%r): value=%r", header, v)
+##  return putheader0(self, header, *values)
+##HTTPConnection.putheader = my_putheader
+
 def isURL(U):
   ''' Test if an object `U` is an URL instance.
   '''
