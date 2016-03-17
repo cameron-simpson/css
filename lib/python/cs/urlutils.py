@@ -22,6 +22,7 @@ import os.path
 import sys
 from collections import namedtuple
 import errno
+from heapq import heappush, heappop
 import time
 from itertools import chain
 from bs4 import BeautifulSoup, Tag, BeautifulStoneSoup
