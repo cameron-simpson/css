@@ -279,9 +279,27 @@ class _URL(unicode):
   def content_length(self):
     ''' The value of the Content-Length: header or None.
     '''
-    value = self._info['Content-Type']
+    try:
+      if self._info is None:
+        self.HEAD()
+      value = self._info['Content-Length']
+      if value is not None:
+        value = int(value.strip())
+      return value
+    except AttributeError as e:
+      raise RuntimeError("%s" % (e,)) from e
+
+  @safe_property
+  def last_modified(self):
+    ''' The value of the Last-Modified: header as a UNIX timestamp, or None.
+    '''
+    if self._info is None:
+      self.HEAD()
+    value = self._info['Last-Modified']
     if value is not None:
-      value = int(value.strip())
+      # parse HTTP-date into datetime object
+      dt_last_modified = datetime_from_http_date(value.strip())
+      value = dt_last_modified.timestamp()
     return value
 
   @locked_property
