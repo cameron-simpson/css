@@ -40,7 +40,7 @@ try:
   from urllib.request import Request, HTTPError, URLError, \
             HTTPPasswordMgrWithDefaultRealm, HTTPBasicAuthHandler, \
             build_opener
-  from urllib.parse import urlparse, urljoin
+  from urllib.parse import urlparse, urljoin, quote as urlquote
 except ImportError as e:
   from urllib2 import Request, HTTPError, URLError, \
 		    HTTPPasswordMgrWithDefaultRealm, HTTPBasicAuthHandler, \
@@ -157,10 +157,10 @@ class _URL(unicode):
         return method
     hdrs = {}
     if self.referer:
-      hdrs['Referer'] = self.referer
+      hdrs['Referer'] = urlquote(self.referer, encoding='utf-8', safe=':/;#')
     hdrs['User-Agent'] = self.user_agent if self.user_agent else os.environ.get('USER_AGENT', 'css')
-    url = 'file://'+self if self.startswith('/') else self
-    rq = MyRequest(url, None, hdrs)
+    rqurl = urlquote(self, encoding='utf-8', safe=':/;#')
+    rq = MyRequest(rqurl, None, hdrs)
     return rq
 
   def _response(self, method):
