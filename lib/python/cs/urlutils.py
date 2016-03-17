@@ -243,7 +243,6 @@ class _URL(unicode):
     opened_url.read()
     return opened_url
 
-  @logexc
   def get_content(self, onerror=None):
     ''' Probe URL for content to avoid exceptions later.
         Use, and save as .content, `onerror` in the case of HTTPError.
