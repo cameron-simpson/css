@@ -1197,26 +1197,45 @@ class NullFile(object):
   def flush(self):
     pass
 
-def copy_data(fpin, fpout, nbytes, rsize=None):
-  ''' Copy `nbytes` of data from `fpin` to `fpout`.
+def file_data(fp, nbytes, rsize=None):
+  ''' Read `nbytes` of data from `fp` and yield the chunks as read.
       If `nbytes` is None, copy until EOF.
       `rsize`: read size, default DEFAULT_READSIZE.
   '''
   if rsize is None:
     rsize = DEFAULT_READSIZE
+  ##prefix = "file_data(fp, nbytes=%d)" % (nbytes,)
   copied = 0
   while nbytes is None or nbytes > 0:
     to_read = rsize if nbytes is None else min(nbytes, rsize)
-    data = fpin.read(to_read)
+    ##X("%s: read %d bytes...", prefix, to_read)
+    data = fp.read(to_read)
     if not data:
       if nbytes is not None:
         warning("early EOF: only %d bytes read, %d still to go",
                 copied, nbytes)
       break
-    fpout.write(data)
+    yield data
     copied += len(data)
     nbytes -= len(data)
+
+def copy_data(fpin, fpout, nbytes, rsize=None):
+  ''' Copy `nbytes` of data from `fpin` to `fpout`, return the number of bytes copied.
+      If `nbytes` is None, copy until EOF.
+      `rsize`: read size, default DEFAULT_READSIZE.
+  '''
+  copied = 0
+  for chunk in file_data(fpin, nbytes, rsize):
+    fpout.write(chunk)
+    copied += len(chunk)
   return copied
+
+def read_data(fp, nbytes, rsize=None):
+  ''' Read `nbytes` of data from `fp`, return the data.
+      If `nbytes` is None, copy until EOF.
+      `rsize`: read size, default DEFAULT_READSIZE.
+  '''
+  return b''.join(file_data(fp, nbytes, rsize))
 
 def chunks_of(fp, rsize=None):
   ''' Generator to present text or data from an open file until EOF.
