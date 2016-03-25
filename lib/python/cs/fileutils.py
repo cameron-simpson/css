@@ -1212,8 +1212,10 @@ def file_data(fp, nbytes, rsize=None):
     data = fp.read(to_read)
     if not data:
       if nbytes is not None:
-        warning("early EOF: only %d bytes read, %d still to go",
-                copied, nbytes)
+        if copied > 0:
+          # no warning of nothing copied - that is immediate end of file - valid
+          warning("early EOF: only %d bytes read, %d still to go",
+                  copied, nbytes)
       break
     yield data
     copied += len(data)
