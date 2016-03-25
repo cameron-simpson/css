@@ -132,7 +132,39 @@ def write_box(fp, box_type, box_tail):
   fp.write(box_tail)
   return length
 
-def boxes(fp):
+class Box(object):
+
+  def __init__(self, box_type, box_data):
+    self.box_type = box_type
+    self.box_data = box_data
+
+  @classmethod
+  def from_file(cls, fp):
+    ''' Read a Box from the file `fp`, return it. Return None at EOF.
+    '''
+    length, box_type, box_data = read_box(fp)
+    if length is None and box_type is None and box_data is None:
+      return None
+    return cls(box_type, box_data)
+
+  @classmethod
+  def from_bytes(cls, bs, offset=0):
+    ''' Decode a Box from a bytes object `bs`, return the Box and the new offset.
+    '''
+    offset0 = offset
+    length, box_type, tail_offset, tail_length = get_box(bs, offset=offset)
+    offset += length
+    if offset > len(bs):
+      raise RuntimeError("box length=%d, but that exceeds the size of bs (%d bytes, offset=%d)"
+                         % (length, len(bs), offset0))
+    box_data = bs[tail_offset:tail_offset+tail_length]
+    if len(box_data) != tail_length:
+      raise RuntimeError("expected %d bytes from bs for tail, got %d"
+                         % (tail_length, len(box_data)))
+    B = Box(box_type, box_data)
+    return B, offset
+
+def file_boxes(fp):
   ''' Generator yielding box (length, name, data) until EOF on `fp`.
   '''
   while True:
@@ -146,11 +178,8 @@ if __name__ == '__main__':
   # parse media stream from stdin as test
   from cs.logutils import setup_logging
   setup_logging(__file__)
-  for al, an, ad in boxes(sys.stdin):
-    print(al, repr(an))
-    if ad is None:
-      print('  no data')
-    elif len(ad) <= 32:
-      print(' ', repr(ad))
-    else:
-      print('  %d bytes: %r...' % (len(ad), ad[:32]))
+  while True:
+    B = Box.from_file(sys.stdin)
+    if B is None:
+      break
+    print(repr(B.box_type), len(B.box_data), 'bytes')
