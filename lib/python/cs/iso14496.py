@@ -132,7 +132,7 @@ def write_box(fp, box_type, box_tail):
   fp.write(box_tail)
   return length
 
-def boxs(fp):
+def boxes(fp):
   ''' Generator yielding box (length, name, data) until EOF on `fp`.
   '''
   while True:
@@ -146,7 +146,7 @@ if __name__ == '__main__':
   # parse media stream from stdin as test
   from cs.logutils import setup_logging
   setup_logging(__file__)
-  for al, an, ad in boxs(sys.stdin):
+  for al, an, ad in boxes(sys.stdin):
     print(al, repr(an))
     if ad is None:
       print('  no data')
