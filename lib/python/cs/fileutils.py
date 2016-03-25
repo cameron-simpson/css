@@ -1237,7 +1237,13 @@ def read_data(fp, nbytes, rsize=None):
       If `nbytes` is None, copy until EOF.
       `rsize`: read size, default DEFAULT_READSIZE.
   '''
-  return b''.join(file_data(fp, nbytes, rsize))
+  bss = list(file_data(fp, nbytes, rsize))
+  if len(bss) == 0:
+    return b''
+  elif len(bss) == 1:
+    return bss[0]
+  else:
+    return b''.join(bss)
 
 def chunks_of(fp, rsize=None):
   ''' Generator to present text or data from an open file until EOF.
