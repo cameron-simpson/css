@@ -99,13 +99,13 @@ def read_box(fp):
     raise ValueError("box tail length %d, expected %d" % (len(tail_bs), tail_len))
   return length, box_type, tail_bs
 
-def write_box(fp, box_type, box_tail):
-  ''' Write an box with name `box_type` (bytes) and data `box_tail` (bytes) to `fp`. Return number of bytes written (should equal the leading box length field).
+def transcribe_box(fp, box_type, box_tail):
+  ''' Generator yielding bytes objects which together comprise a serialisation of this
+   box.
+      `box_tail` may be a bytes object or an iterable of bytes objects.
   '''
   if not isinstance(box_type, bytes):
     raise TypeError("expected box_type to be bytes, received %s" % (type(box_type),))
-  if not isinstance(box_tail, bytes):
-    raise TypeError("expected box_tail to be bytes, received %s" % (type(box_tail),))
   if len(box_type) == 4:
     if box_type == 'uuid':
       raise ValueError("invalid box_type %r: expected 16 byte usertype for uuids" % (box_type,))
@@ -115,7 +115,12 @@ def write_box(fp, box_type, box_tail):
     box_type = 'uuid'
   else:
     raise ValueError("invalid box_type, expect 4 or 16 byte values, got %d bytes" % (len(box_type),))
-  length = 8 + len(usertype) + len(box_tail)
+  if isinstance(box_tail, bytes):
+    box_tail = [box_tail]
+  else:
+    box_tail = list(box_tail)
+  tail_len = sum(len(bs) for bs in box_tail)
+  length = 8 + len(usertype) + tail_len
   if length < (1<<32):
     box_size = length
     largesize_bs = b''
@@ -125,12 +130,21 @@ def write_box(fp, box_type, box_tail):
     largesize_bs = pack('>Q', length)
   else:
     raise ValueError("box too big: size >= 1<<64: %d" % (length,))
-  fp.write(pack('>L', box_size))
-  fp.write(box_type)
-  fp.write(largesize_bs)
-  fp.write(usertype)
-  fp.write(box_tail)
-  return length
+  yield pack('>L', box_size)
+  yield box_type
+  yield largesize_bs
+  yield usertype
+  for bs in box_tail:
+    yield bs
+
+def write_box(fp, box_type, box_tail):
+  ''' Write an box with name `box_type` (bytes) and data `box_tail` (bytes) to `fp`. Return number of bytes written (should equal the leading box length field).
+  '''
+  written = 0
+  for bs in transcribe_box(box_type, box_tail):
+    written += len(bs)
+    fp.write(bs)
+  return written
 
 class Box(object):
 
@@ -163,6 +177,22 @@ class Box(object):
                          % (tail_length, len(box_data)))
     B = Box(box_type, box_data)
     return B, offset
+
+  def transcribe(self):
+    ''' Generator yielding bytes objects which together comprise a serialisation of this box.
+        This method should be overridden by subclasses as required.
+    '''
+    return transcribe_box(self.box_type, self.box_data)
+
+  def write(self, fp):
+    ''' Transcribe this box to a file in serialised form.
+        This method uses transcribe, so it should not need overriding in subclasses.
+    '''
+    written = 0
+    for bs in self.transcribe():
+      written += len(bs)
+      fp.write(bs)
+    return written
 
 def file_boxes(fp):
   ''' Generator yielding box (length, name, data) until EOF on `fp`.
