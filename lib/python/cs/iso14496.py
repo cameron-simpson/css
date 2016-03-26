@@ -150,7 +150,13 @@ class Box(object):
 
   def __init__(self, box_type, box_data):
     self.box_type = box_type
-    self.box_data = box_data
+    self._box_data = box_data
+
+  def __str__(self):
+    return 'Box(box_type=%r,box_data=%d:%r%s)' \
+           % (self.box_type, len(self._box_data),
+              self._box_data[:32],
+              '...' if len(self._box_data) > 32 else '')
 
   @classmethod
   def from_file(cls, fp):
@@ -178,9 +184,15 @@ class Box(object):
     B = Box(box_type, box_data)
     return B, offset
 
+  @property
+  def box_data(self):
+    ''' An iterable of bytes objects comprising the data section of this Box.
+        This property should be overridden by subclasses which decompose data sections.
+    '''
+    yield self._box_data
+
   def transcribe(self):
     ''' Generator yielding bytes objects which together comprise a serialisation of this box.
-        This method should be overridden by subclasses as required.
     '''
     return transcribe_box(self.box_type, self.box_data)
 
@@ -204,6 +216,33 @@ def file_boxes(fp):
       break
     yield box_size, box_type, box_tail
 
+class FTYPBox(Box):
+
+  def __init__(self, box_data):
+    if len(box_data) < 8:
+      raise ValueError("box_data too short, expected at least 8 bytes, got %d"
+                       % (len(box_data),))
+    if len(box_data) % 4 != 0:
+      raise ValueError("box_data not a multiple of 4 bytes: %d"
+                       % (len(box_data),))
+    self.major_brand = box_data[:4]
+    self.minor_version, = unpack('>L', box_data[4:8])
+    self.compatible_brands = [ box_data[offset:offset+4]
+                               for offset in range(8, len(box_data), 4)
+                             ]
+    Box.__init__(self, b'ftyp', b'')
+
+  def __str__(self):
+    return 'FTYPBox(major_brand=%r,minor_version=%d,compatible_brands=%r)' \
+           % (self.major_brand, self.minor_version, self.compatible_brands)
+
+  @property
+  def box_data(self):
+    yield self.major_brand
+    yield pack('>L', self.minor_version)
+    for brand in self.compatible_brands:
+      yield brand
+
 if __name__ == '__main__':
   # parse media stream from stdin as test
   from cs.logutils import setup_logging
@@ -212,4 +251,4 @@ if __name__ == '__main__':
     B = Box.from_file(sys.stdin)
     if B is None:
       break
-    print(repr(B.box_type), len(B.box_data), 'bytes')
+    print(B)
