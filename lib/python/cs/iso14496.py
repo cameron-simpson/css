@@ -103,6 +103,16 @@ def read_box(fp):
     raise ValueError("box tail length %d, expected %d" % (len(tail_bs), tail_len))
   return length, box_type, tail_bs
 
+def file_boxes(fp):
+  ''' Generator yielding box (length, name, data) until EOF on `fp`.
+  '''
+  while True:
+    box_size, box_type, box_tail = read_box(sys.stdin)
+    if box_size is None and box_type is None and box_tail is None:
+      # EOF
+      break
+    yield box_size, box_type, box_tail
+
 def transcribe_box(fp, box_type, box_tail):
   ''' Generator yielding bytes objects which together comprise a serialisation of this
    box.
@@ -285,16 +295,6 @@ class FTYPBox(Box):
       yield brand
 
 KNOWN_BOX_CLASSES[FTYPBox.BOX_TYPE] = FTYPBox
-
-def file_boxes(fp):
-  ''' Generator yielding box (length, name, data) until EOF on `fp`.
-  '''
-  while True:
-    box_size, box_type, box_tail = read_box(sys.stdin)
-    if box_size is None and box_type is None and box_tail is None:
-      # EOF
-      break
-    yield box_size, box_type, box_tail
 
 if __name__ == '__main__':
   # parse media stream from stdin as test
