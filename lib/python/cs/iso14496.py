@@ -158,18 +158,27 @@ class Box(object):
               self._box_data[:32],
               '...' if len(self._box_data) > 32 else '')
 
-  @classmethod
-  def from_file(cls, fp):
-    ''' Read a Box from the file `fp`, return it. Return None at EOF.
+  @staticmethod
+  def from_file(fp, cls=None):
+    ''' Decode a Box subclass from the file `fp`, return it. Return None at EOF.
+        `cls`: if not None, use to construct the instance. Otherwise,
+          look up the box_type in KNOWN_BOX_CLASSES and use that class
+          or Box if not present.
     '''
     length, box_type, box_data = read_box(fp)
     if length is None and box_type is None and box_data is None:
       return None
+    if cls is None:
+      cls = KNOWN_BOX_CLASSES.get(box_type, Box)
     return cls(box_type, box_data)
 
-  @classmethod
-  def from_bytes(cls, bs, offset=0):
+  @staticmethod
+  def from_bytes(bs, offset=0, cls=None):
     ''' Decode a Box from a bytes object `bs`, return the Box and the new offset.
+        `offset`: starting point in `bs` for decode, default 0.
+        `cls`: if not None, use to construct the instance. Otherwise,
+          look up the box_type in KNOWN_BOX_CLASSES and use that class
+          or Box if not present.
     '''
     offset0 = offset
     length, box_type, tail_offset, tail_length = get_box(bs, offset=offset)
@@ -181,6 +190,8 @@ class Box(object):
     if len(box_data) != tail_length:
       raise RuntimeError("expected %d bytes from bs for tail, got %d"
                          % (tail_length, len(box_data)))
+    if cls is None:
+      cls = KNOWN_BOX_CLASSES.get(box_type, Box)
     B = cls(box_type, box_data)
     return B, offset
 
