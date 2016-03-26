@@ -206,17 +206,12 @@ class Box(object):
       fp.write(bs)
     return written
 
-def file_boxes(fp):
-  ''' Generator yielding box (length, name, data) until EOF on `fp`.
-  '''
-  while True:
-    box_size, box_type, box_tail = read_box(sys.stdin)
-    if box_size is None and box_type is None and box_tail is None:
-      # EOF
-      break
-    yield box_size, box_type, box_tail
+# mapping of known box subclasses for use by factories
+KNOWN_BOX_CLASSES = {}
 
 class FTYPBox(Box):
+
+  BOX_TYPE = b'ftyp'
 
   def __init__(self, box_data):
     if len(box_data) < 8:
@@ -230,7 +225,7 @@ class FTYPBox(Box):
     self.compatible_brands = [ box_data[offset:offset+4]
                                for offset in range(8, len(box_data), 4)
                              ]
-    Box.__init__(self, b'ftyp', b'')
+    Box.__init__(self, self.BOX_TYPE, b'')
 
   def __str__(self):
     return 'FTYPBox(major_brand=%r,minor_version=%d,compatible_brands=%r)' \
@@ -242,6 +237,18 @@ class FTYPBox(Box):
     yield pack('>L', self.minor_version)
     for brand in self.compatible_brands:
       yield brand
+
+KNOWN_BOX_CLASSES[FTYPBox.BOX_TYPE] = FTYPBox
+
+def file_boxes(fp):
+  ''' Generator yielding box (length, name, data) until EOF on `fp`.
+  '''
+  while True:
+    box_size, box_type, box_tail = read_box(sys.stdin)
+    if box_size is None and box_type is None and box_tail is None:
+      # EOF
+      break
+    yield box_size, box_type, box_tail
 
 if __name__ == '__main__':
   # parse media stream from stdin as test
