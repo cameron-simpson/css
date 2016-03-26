@@ -181,7 +181,7 @@ class Box(object):
     if len(box_data) != tail_length:
       raise RuntimeError("expected %d bytes from bs for tail, got %d"
                          % (tail_length, len(box_data)))
-    B = Box(box_type, box_data)
+    B = cls(box_type, box_data)
     return B, offset
 
   @property
