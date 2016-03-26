@@ -252,6 +252,7 @@ KNOWN_BOX_CLASSES = {}
 class FREEBox(Box):
 
   BOX_TYPE = b'free'
+  BOX_TYPE2 = b'skip'
 
   def __init__(self, box_type, box_data):
     if box_type != self.BOX_TYPE:
@@ -276,6 +277,7 @@ class FREEBox(Box):
       yield bytes(free_bytes)
 
 KNOWN_BOX_CLASSES[FREEBox.BOX_TYPE] = FREEBox
+KNOWN_BOX_CLASSES[FREEBox.BOX_TYPE2] = FREEBox
 
 class FTYPBox(Box):
 
