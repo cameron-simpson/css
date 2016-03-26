@@ -13,6 +13,10 @@ from __future__ import print_function
 import sys
 from struct import pack, unpack
 from cs.fileutils import read_data
+from cs.py3 import bytes
+
+# a convenience chunk of 256 zero bytes, mostly for use by 'free' blocks
+B0_256 = bytes(256)
 
 def get_box(bs, offset=0):
   ''' Decode an box from the bytes `bs`, starting at `offset` (default 0). Return the box's length, name and data bytes (offset, length), and the new offset.
@@ -219,6 +223,34 @@ class Box(object):
 
 # mapping of known box subclasses for use by factories
 KNOWN_BOX_CLASSES = {}
+
+class FREEBox(Box):
+
+  BOX_TYPE = b'free'
+
+  def __init__(self, box_type, box_data):
+    if box_type != self.BOX_TYPE:
+      raise ValueError("box_type should be %r but got %r"
+                       % (self.BOX_TYPE, box_type))
+    self.free_size = len(box_data)
+    Box.__init__(self, self.BOX_TYPE, b'')
+
+  def __str__(self):
+    return 'FREEBox(free_size=%d)' \
+           % (self.free_size,)
+
+  @property
+  def box_data(self):
+    global B0_256
+    free_bytes = self.free_size
+    len256 = len(B0_256)
+    while free_bytes > len256:
+      yield B0_256
+      free_bytes -= len256
+    if free_bytes > 0:
+      yield bytes(free_bytes)
+
+KNOWN_BOX_CLASSES[FREEBox.BOX_TYPE] = FREEBox
 
 class FTYPBox(Box):
 
