@@ -60,7 +60,7 @@ def get_box(bs, offset=0):
   return length, box_type, tail_offset, tail_length, offset_final
 
 def read_box(fp, offset=None, skip_data=False):
-  ''' Read a raw box from a file, return the box's length, name and data bytes.
+  ''' Read a raw box from a file, return the box's length, type and data bytes.
       No decoding of the data section is performed.
       `offset`: if not None, perform a seek to this offset before
         reading the box.
@@ -119,7 +119,7 @@ def read_box(fp, offset=None, skip_data=False):
   return length, box_type, tail_bs
 
 def file_boxes(fp):
-  ''' Generator yielding box (length, name, data) until EOF on `fp`.
+  ''' Generator yielding box (length, type, data) until EOF on `fp`.
   '''
   while True:
     box_size, box_type, box_tail = read_box(sys.stdin)
@@ -167,7 +167,7 @@ def transcribe_box(fp, box_type, box_tail):
     yield bs
 
 def write_box(fp, box_type, box_tail):
-  ''' Write an box with name `box_type` (bytes) and data `box_tail` (bytes) to `fp`. Return number of bytes written (should equal the leading box length field).
+  ''' Write an box with type `box_type` (bytes) and data `box_tail` (bytes) to `fp`. Return number of bytes written (should equal the leading box length field).
   '''
   written = 0
   for bs in transcribe_box(box_type, box_tail):
