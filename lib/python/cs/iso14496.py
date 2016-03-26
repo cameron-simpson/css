@@ -19,7 +19,7 @@ from cs.py3 import bytes
 B0_256 = bytes(256)
 
 def get_box(bs, offset=0):
-  ''' Decode an box from the bytes `bs`, starting at `offset` (default 0). Return the box's length, name and data bytes (offset, length), and the new offset.
+  ''' Decode an box from the bytes `bs`, starting at `offset` (default 0). Return the box's length, type, data offset, data length and the new offset.
   '''
   usertype = None
   if offset + 8 > len(bs):
@@ -57,11 +57,24 @@ def get_box(bs, offset=0):
                        % (offset_final, offset, offset0, box_size, box_type, length, usertype))
   tail_offset = offset
   tail_length = offset_final - tail_offset
-  return length, box_type, tail_offset, tail_length
+  return length, box_type, tail_offset, tail_length, offset_final
 
-def read_box(fp):
-  ''' Read an box from a file, return the box's length, name and data bytes.
+def read_box(fp, offset=None, skip_data=False):
+  ''' Read a raw box from a file, return the box's length, name and data bytes.
+      No decoding of the data section is performed.
+      `offset`: if not None, perform a seek to this offset before
+        reading the box.
+      `skip_data`: if true (default false), do not read the data
+        section after the box header; instead of returning the data
+        bytes, return their length. NOTE: in this case the file pointer
+        is _not_ advanced to the start of the next box; subsequent
+        callers must do this themselves, for example by doing a
+        relative seek over the data length or an absolute seek to the
+        starting file offset plus the box length, or by supplying such
+        an absolute `offset` on the next call.
   '''
+  if offset is not None:
+    fp.seek(offset)
   header = read_data(fp, 8)
   if not header:
     # indicate end of file
@@ -95,7 +108,9 @@ def read_box(fp):
   tail_len = length - sofar
   if tail_len < 0:
     raise ValueError("negative tail length! (%d) - overrun from header?" % (tail_len,))
-  elif tail_len == 0:
+  if skip_data:
+    return length, box_type, tail_len
+  if tail_len == 0:
     tail_bs = b''
   else:
     tail_bs = read_data(fp, tail_len, rsize=tail_len)
