@@ -213,7 +213,10 @@ class FTYPBox(Box):
 
   BOX_TYPE = b'ftyp'
 
-  def __init__(self, box_data):
+  def __init__(self, box_type, box_data):
+    if box_type != self.BOX_TYPE:
+      raise ValueError("box_type should be %r but got %r"
+                       % (self.BOX_TYPE, box_type))
     if len(box_data) < 8:
       raise ValueError("box_data too short, expected at least 8 bytes, got %d"
                        % (len(box_data),))
