@@ -14,6 +14,8 @@ import sys
 from struct import pack, unpack
 from cs.fileutils import read_data
 from cs.py3 import bytes
+# DEBUG
+from cs.logutils import X
 
 # a convenience chunk of 256 zero bytes, mostly for use by 'free' blocks
 B0_256 = bytes(256)
@@ -59,19 +61,10 @@ def get_box(bs, offset=0):
   tail_length = offset_final - tail_offset
   return length, box_type, tail_offset, tail_length, offset_final
 
-def read_box(fp, offset=None, skip_data=False):
-  ''' Read a raw box from a file, return the box's length, type and data bytes.
-      No decoding of the data section is performed.
+def read_box_header(fp, offset=None):
+  ''' Read a raw box header from a file, return the box's length, type and remaining data length.
       `offset`: if not None, perform a seek to this offset before
         reading the box.
-      `skip_data`: if true (default false), do not read the data
-        section after the box header; instead of returning the data
-        bytes, return their length. NOTE: in this case the file pointer
-        is _not_ advanced to the start of the next box; subsequent
-        callers must do this themselves, for example by doing a
-        relative seek over the data length or an absolute seek to the
-        starting file offset plus the box length, or by supplying such
-        an absolute `offset` on the next call.
   '''
   if offset is not None:
     fp.seek(offset)
@@ -108,6 +101,25 @@ def read_box(fp, offset=None, skip_data=False):
   tail_len = length - sofar
   if tail_len < 0:
     raise ValueError("negative tail length! (%d) - overrun from header?" % (tail_len,))
+  return length, box_type, tail_len
+
+def read_box(fp, offset=None, skip_data=False):
+  ''' Read a raw box from a file, return the box's length, type and data bytes.
+      No decoding of the data section is performed.
+      `offset`: if not None, perform a seek to this offset before
+        reading the box.
+      `skip_data`: if true (default false), do not read the data
+        section after the box header; instead of returning the data
+        bytes, return their length. NOTE: in this case the file pointer
+        is _not_ advanced to the start of the next box; subsequent
+        callers must do this themselves, for example by doing a
+        relative seek over the data length or an absolute seek to the
+        starting file offset plus the box length, or by supplying such
+        an absolute `offset` on the next call.
+  '''
+  length, box_type, tail_len = read_box_header(fp, offset=offset)
+  if length is None and box_type is None and tail_len is None:
+    return None, None, None
   if skip_data:
     return length, box_type, tail_len
   if tail_len == 0:
