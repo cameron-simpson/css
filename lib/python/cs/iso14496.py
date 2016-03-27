@@ -330,6 +330,29 @@ class Box(object):
 # mapping of known box subclasses for use by factories
 KNOWN_BOX_CLASSES = {}
 
+class FullBox(Box):
+  ''' A common extension of a basic Box, with a version and flags field.
+      ISO14496 section 4.2.
+  '''
+
+  def __init__(self, box_type, box_data):
+    Box.__init__(self, box_type, box_data)
+    box_data = self._load_box_data()
+    self.version = box_data[0]
+    self.flags = (box_data[1]<<16) | (box_data[2]<<8) | box_data[3]
+    self._set_box_data(box_data[4:])
+
+  @property
+  def box_vf_data_chunk(self):
+    ''' Return the leading version and 
+        Subclasses need to yield this first from .box_data_chunks().
+    '''
+    return bytes([ self.version,
+                   (self.flags>>16) & 0xff,
+                   (self.flags>>8) & 0xff,
+                   self.flags & 0xff
+                 ])
+
 class FREEBox(Box):
   ''' A 'free' or 'skip' box - ISO14496 section 8.1.2.
       Note the length and discard the data portion.
