@@ -24,12 +24,14 @@ from os import SEEK_CUR, SEEK_END, SEEK_SET
 from os.path import basename, dirname, isabs, isdir, \
                     abspath, join as joinpath, exists as existspath
 import errno
+import os
 import sys
 from collections import namedtuple
 from contextlib import contextmanager
 from itertools import takewhile
 import shutil
 import socket
+import stat
 from tempfile import TemporaryFile, NamedTemporaryFile
 from threading import RLock, Thread
 import time
@@ -51,7 +53,6 @@ try:
 except ImportError:
   # implement our own pread
   # NB: not thread safe!
-  import os
   def pread(fd, offset, size):
     offset0 = os.lseek(fd, 0, SEEK_CUR)
     os.lseek(fd, offset, SEEK_SET)
@@ -65,6 +66,22 @@ except ImportError:
     os.lseek(fd, offset0, SEEK_SET)
     data = b''.join(chunks)
     return data
+
+def seekable(fp):
+  ''' Try to test if a filelike object is seekable.
+      First try the .seekable method from IOBase, otherwise try
+      getting a file descriptor from fp.fileno and stat()ing that,
+      otherwise return False.
+  '''
+  try:
+    test = fp.seekable
+  except AttributeError:
+    try:
+      getfd = fp.fileno
+    except AttributeError:
+      return False
+    test = lambda: stat.S_ISREG(os.fstat(getfd()).st_mode)
+  return test()
 
 DEFAULT_POLL_INTERVAL = 1.0
 DEFAULT_READSIZE = 8192
