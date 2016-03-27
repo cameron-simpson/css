@@ -10,15 +10,19 @@
 #
 
 from __future__ import print_function
+from os import SEEK_CUR
 import sys
 from struct import pack, unpack
-from cs.fileutils import read_data
+from cs.fileutils import read_data, pread, seekable
 from cs.py3 import bytes
 # DEBUG
 from cs.logutils import X
 
 # a convenience chunk of 256 zero bytes, mostly for use by 'free' blocks
 B0_256 = bytes(256)
+
+# an arbitrary maximum read size for fetching the data section
+SIZE_16MB = 1024*1024*16
 
 def get_box(bs, offset=0):
   ''' Decode an box from the bytes `bs`, starting at `offset` (default 0). Return the box's length, type, data offset, data length and the new offset.
@@ -191,9 +195,21 @@ class Box(object):
 
   def __init__(self, box_type, box_data):
     self.box_type = box_type
-    self._box_data = box_data
+    if isinstance(box_data, bytes):
+      # bytes? store directly for use
+      self._box_data = box_data
+    elif isinstance(box_data, str):
+      self._box_data = box_data.decode('iso8859-1')
+    else:
+      # otherwise it should be a callable returning the bytes
+      self._fetch_box_data = box_data
+      self._box_data = None
 
   def __str__(self):
+    if self._box_data is None:
+      # do not load the data just for __str__
+      return 'Box(box_type=%r,box_data=%s())' \
+             % (self.box_type, self._fetch_box_data)
     return 'Box(box_type=%r,box_data=%d:%r%s)' \
            % (self.box_type, len(self._box_data),
               self._box_data[:32],
@@ -206,12 +222,43 @@ class Box(object):
           look up the box_type in KNOWN_BOX_CLASSES and use that class
           or Box if not present.
     '''
-    length, box_type, box_data = read_box(fp)
-    if length is None and box_type is None and box_data is None:
+    ##TODO: use read_box_header and skip things like mdat data block
+    length, box_type, box_data_length = read_box_header(fp)
+    if length is None and box_type is None and box_data_length is None:
       return None
+    if seekable(fp):
+      # create callable to fetch the data section of the box
+      # snapshot the fd and position, make callable, then skip the data section
+      box_data_offset = fp.tell()
+      box_data_fd = fp.fileno()
+      def fetch_data():
+        chunks = []
+        offset = box_data_offset
+        needed = box_data_length
+        if needed > 10*SIZE_16MB:
+          raise RuntimeError("BIG FETCH!")
+        while needed > 0:
+          read_size = min(needed, SIZE_16MB)
+          chunk = pread(box_data_fd, read_size, offset)
+          if len(chunk) != read_size:
+            X("WRONG PREAD: asked for %d bytes, got %d bytes",
+              read_size, len(chunk))
+            if len(chunk) == 0:
+              break
+          chunks.append(chunk)
+          needed -= len(chunk)
+          offset += len(chunk)
+        return b''.join(chunks)
+      fp.seek(box_data_length, SEEK_CUR)
+    else:
+      # not seekable: read all the data now and damn the memory expense
+      fetch_data = read_data(fp, box_data_length)
+      if len(fetch_data) != box_data_length:
+        raise ValueError("expected to read %d box data bytes but got %d"
+                         % (box_data_length, len(fetch_data)))
     if cls is None:
       cls = KNOWN_BOX_CLASSES.get(box_type, Box)
-    return cls(box_type, box_data)
+    return cls(box_type, fetch_data)
 
   @staticmethod
   def from_bytes(bs, offset=0, cls=None):
@@ -221,32 +268,52 @@ class Box(object):
           look up the box_type in KNOWN_BOX_CLASSES and use that class
           or Box if not present.
     '''
+    if offset == len(bs):
+      return None
+    if offset > len(bs):
+      raise ValueError("from_bytes: offset %d is past the end of bs" % (offset,))
     offset0 = offset
     length, box_type, tail_offset, tail_length = get_box(bs, offset=offset)
     offset += length
     if offset > len(bs):
       raise RuntimeError("box length=%d, but that exceeds the size of bs (%d bytes, offset=%d)"
                          % (length, len(bs), offset0))
-    box_data = bs[tail_offset:tail_offset+tail_length]
-    if len(box_data) != tail_length:
-      raise RuntimeError("expected %d bytes from bs for tail, got %d"
-                         % (tail_length, len(box_data)))
+    fetch_box_data = lambda: bs[tail_offset:tail_offset+tail_length]
     if cls is None:
       cls = KNOWN_BOX_CLASSES.get(box_type, Box)
-    B = cls(box_type, box_data)
+    B = cls(box_type, fetch_box_data)
     return B, offset
+
+  def _load_box_data(self):
+    ''' Load the box data into private attribute ._box_data.
+    '''
+    if self._box_data is None:
+      self._box_data = self._fetch_box_data()
+    return self._box_data
+
+  def _set_box_data(self, data):
+    ''' Set the private attribute ._box_data to `data`.
+        This may be used by subclasses to discard loaded data after
+        processing if they override the .box_data_chunks method.
+    '''
+    self._box_data = data
+
+  def box_data_chunks(self):
+    ''' Return an iterable of bytes objects comprising the data section of this Box.
+        This method should be overridden by subclasses which decompose data sections.
+    '''
+    yield self._load_box_data()
 
   @property
   def box_data(self):
-    ''' An iterable of bytes objects comprising the data section of this Box.
-        This property should be overridden by subclasses which decompose data sections.
+    ''' A bytes object containing the data section for this Box.
     '''
-    yield self._box_data
+    return b''.join(self.box_data_chunks())
 
   def transcribe(self):
     ''' Generator yielding bytes objects which together comprise a serialisation of this box.
     '''
-    return transcribe_box(self.box_type, self.box_data)
+    return transcribe_box(self.box_type, self.box_data_chunks())
 
   def write(self, fp):
     ''' Transcribe this box to a file in serialised form.
@@ -270,15 +337,17 @@ class FREEBox(Box):
     if box_type != self.BOX_TYPE:
       raise ValueError("box_type should be %r but got %r"
                        % (self.BOX_TYPE, box_type))
+    Box.__init__(self, self.BOX_TYPE, box_data)
+    box_data = self._load_box_data()
     self.free_size = len(box_data)
-    Box.__init__(self, self.BOX_TYPE, b'')
+    # discard cache of padding data
+    self._set_box_data(b'')
 
   def __str__(self):
     return 'FREEBox(free_size=%d)' \
            % (self.free_size,)
 
-  @property
-  def box_data(self):
+  def box_data_chunks(self):
     global B0_256
     free_bytes = self.free_size
     len256 = len(B0_256)
@@ -299,6 +368,8 @@ class FTYPBox(Box):
     if box_type != self.BOX_TYPE:
       raise ValueError("box_type should be %r but got %r"
                        % (self.BOX_TYPE, box_type))
+    Box.__init__(self, self.BOX_TYPE, box_data)
+    box_data = self._load_box_data()
     if len(box_data) < 8:
       raise ValueError("box_data too short, expected at least 8 bytes, got %d"
                        % (len(box_data),))
@@ -310,14 +381,13 @@ class FTYPBox(Box):
     self.compatible_brands = [ box_data[offset:offset+4]
                                for offset in range(8, len(box_data), 4)
                              ]
-    Box.__init__(self, self.BOX_TYPE, b'')
+    self._set_box_data(b'')
 
   def __str__(self):
     return 'FTYPBox(major_brand=%r,minor_version=%d,compatible_brands=%r)' \
            % (self.major_brand, self.minor_version, self.compatible_brands)
 
-  @property
-  def box_data(self):
+  def box_data_chunks(self):
     yield self.major_brand
     yield pack('>L', self.minor_version)
     for brand in self.compatible_brands:
@@ -327,10 +397,12 @@ KNOWN_BOX_CLASSES[FTYPBox.BOX_TYPE] = FTYPBox
 
 if __name__ == '__main__':
   # parse media stream from stdin as test
+  from os import fdopen
   from cs.logutils import setup_logging
   setup_logging(__file__)
+  stdin = fdopen(sys.stdin.fileno(), 'rb')
   while True:
-    B = Box.from_file(sys.stdin)
+    B = Box.from_file(stdin)
     if B is None:
       break
     print(B)
