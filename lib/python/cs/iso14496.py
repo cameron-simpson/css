@@ -389,7 +389,7 @@ KNOWN_BOX_CLASSES[FREEBox.BOX_TYPE] = FREEBox
 KNOWN_BOX_CLASSES[FREEBox.BOX_TYPE2] = FREEBox
 
 class FTYPBox(Box):
-  ''' An 'ftyp' box - ISO14496 section 4.3.
+  ''' An 'ftyp' File Type box - ISO14496 section 4.3.
       Decode the major_brand, minor_version and compatible_brands.
   '''
 
