@@ -472,6 +472,40 @@ class PDINBox(FullBox):
 
 KNOWN_BOX_CLASSES[PDINBox.BOX_TYPE] = PDINBox
 
+class MOOVBox(Box):
+  ''' An 'moov' Movie box - ISO14496 section 8.2.1.
+      Decode the contained boxes.
+  '''
+
+  BOX_TYPE = b'moov'
+
+  def __init__(self, box_type, box_data):
+    if box_type != self.BOX_TYPE:
+      raise ValueError("box_type should be %r but got %r"
+                       % (self.BOX_TYPE, box_type))
+    Box.__init__(self, box_type, box_data)
+    box_data = self._load_box_data()
+    self.boxes = []
+    offset = 0
+    while True:
+      B, offset = Box.from_bytes(box_data, offset)
+      if B is None:
+        if offset is not None:
+          raise RuntimeError("unexpected offset=%r with B=None" % (offset,))
+        break
+      self.boxes.append(B)
+
+  def __str__(self):
+    return 'MOOVBox(%s)' \
+           % (','.join(str(B) for B in self.boxes))
+
+  def box_data_chunks(self):
+    for B in self.boxes:
+      for chunk in B.box_data_chunks():
+        yield chunk
+
+KNOWN_BOX_CLASSES[MOOVBox.BOX_TYPE] = MOOVBox
+
 if __name__ == '__main__':
   # parse media stream from stdin as test
   from os import fdopen
