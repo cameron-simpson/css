@@ -28,6 +28,7 @@ SIZE_16MB = 1024*1024*16
 def get_box(bs, offset=0):
   ''' Decode an box from the bytes `bs`, starting at `offset` (default 0). Return the box's length, type, data offset, data length and the new offset.
   '''
+  offset0 = offset
   usertype = None
   if offset + 8 > len(bs):
     raise ValueError("not enough bytes at offset %d for box size and type, only %d remaining"
@@ -36,8 +37,10 @@ def get_box(bs, offset=0):
   box_type = bs[offset+4:offset+8]
   offset += 8
   if box_size == 0:
-    raise ValueError("box size 0 (\"to end of file\") not supported")
-  if box_size == 1:
+    # box extends to end of data/file
+    length = len(bs) - offset0
+  elif box_size == 1:
+    # 64 bit length
     if offset + 8 > len(bs):
       raise ValueError("not enough bytes at offset %d for largesize, only %d remaining"
                        % (offset, len(bs) - offset))
@@ -48,16 +51,17 @@ def get_box(bs, offset=0):
                      % (box_size,))
   else:
     length = box_size
-  if offset + length > len(bs):
+  if offset0 + length > len(bs):
     raise ValueError("not enough bytes at offset %d: box length %d but only %d bytes remain"
                      % (offset, length, len(bs) - offset))
   if box_type == 'uuid':
+    # user supplied 16 byte type
     if offset + 16 > len(bs):
       raise ValueError("not enough bytes at offset %d for usertype, only %d remaining"
                        % (offset, len(bs) - offset))
     usertype = bs[offset:offset+16]
-    offset += 16
     box_type = usertype
+    offset += 16
   offset_final = offset0 + length
   if offset_final < offset:
     raise RuntimeError("final offset %d < preamble end offset %d (offset0=%d, box_size=%d, box_type=%r, length=%d, usertype=%r)"
@@ -271,13 +275,16 @@ class Box(object):
           look up the box_type in KNOWN_BOX_CLASSES and use that class
           or Box if not present.
     '''
+    offset0 = offset
     if offset == len(bs):
-      return None
+      return None, None
     if offset > len(bs):
       raise ValueError("from_bytes: offset %d is past the end of bs" % (offset,))
     offset0 = offset
-    length, box_type, tail_offset, tail_length = get_box(bs, offset=offset)
-    offset += length
+    length, box_type, tail_offset, tail_length, offset = get_box(bs, offset=offset)
+    if offset0 + length != offset:
+      raise RuntimeError("get_box(bs,offset=%d) returned length=%d,offset=%d which do not match"
+                         % (offset0, length, offset))
     if offset > len(bs):
       raise RuntimeError("box length=%d, but that exceeds the size of bs (%d bytes, offset=%d)"
                          % (length, len(bs), offset0))
