@@ -362,10 +362,10 @@ class FREEBox(Box):
   BOX_TYPE2 = b'skip'
 
   def __init__(self, box_type, box_data):
-    if box_type != self.BOX_TYPE:
-      raise ValueError("box_type should be %r but got %r"
-                       % (self.BOX_TYPE, box_type))
-    Box.__init__(self, self.BOX_TYPE, box_data)
+    if box_type != self.BOX_TYPE and box_type != self.BOX_TYPE2:
+      raise ValueError("box_type should be %r or %r but got %r"
+                       % (self.BOX_TYPE, self.BOX_TYPE2, box_type))
+    Box.__init__(self, box_type, box_data)
     box_data = self._load_box_data()
     self.free_size = len(box_data)
     # discard cache of padding data
@@ -399,7 +399,7 @@ class FTYPBox(Box):
     if box_type != self.BOX_TYPE:
       raise ValueError("box_type should be %r but got %r"
                        % (self.BOX_TYPE, box_type))
-    Box.__init__(self, self.BOX_TYPE, box_data)
+    Box.__init__(self, box_type, box_data)
     box_data = self._load_box_data()
     if len(box_data) < 8:
       raise ValueError("box_data too short, expected at least 8 bytes, got %d"
