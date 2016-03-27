@@ -192,6 +192,8 @@ def write_box(fp, box_type, box_tail):
   return written
 
 class Box(object):
+  ''' Base class for all boxes - ISO14496 section 4.2.
+  '''
 
   def __init__(self, box_type, box_data):
     self.box_type = box_type
