@@ -53,7 +53,7 @@ try:
 except ImportError:
   # implement our own pread
   # NB: not thread safe!
-  def pread(fd, offset, size):
+  def pread(fd, size, offset):
     offset0 = os.lseek(fd, 0, SEEK_CUR)
     os.lseek(fd, offset, SEEK_SET)
     chunks = []
