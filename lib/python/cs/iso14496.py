@@ -329,6 +329,9 @@ class Box(object):
 KNOWN_BOX_CLASSES = {}
 
 class FREEBox(Box):
+  ''' A 'free' or 'skip' box - ISO14496 section 8.1.2.
+      Note the length and discard the data portion.
+  '''
 
   BOX_TYPE = b'free'
   BOX_TYPE2 = b'skip'
@@ -361,6 +364,9 @@ KNOWN_BOX_CLASSES[FREEBox.BOX_TYPE] = FREEBox
 KNOWN_BOX_CLASSES[FREEBox.BOX_TYPE2] = FREEBox
 
 class FTYPBox(Box):
+  ''' An 'ftyp' box - ISO14496 section 4.3.
+      Decode the major_brand, minor_version and compatible_brands.
+  '''
 
   BOX_TYPE = b'ftyp'
 
