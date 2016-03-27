@@ -10,6 +10,7 @@
 #
 
 from __future__ import print_function
+from collections import namedtuple
 from os import SEEK_CUR
 import sys
 from struct import pack, unpack
@@ -425,6 +426,44 @@ class FTYPBox(Box):
       yield brand
 
 KNOWN_BOX_CLASSES[FTYPBox.BOX_TYPE] = FTYPBox
+
+# field names for the tuples in a PDINBox
+PDInfo = namedtuple('PDInfo', 'rate initial_delay')
+
+class PDINBox(FullBox):
+  ''' An 'pdin' Progressive Download Information box - ISO14496 section 8.1.3.
+      Decode the (rate, initial_delay) pairs of the data section.
+  '''
+
+  BOX_TYPE = b'pdin'
+
+  def __init__(self, box_type, box_data):
+    if box_type != self.BOX_TYPE:
+      raise ValueError("box_type should be %r but got %r"
+                       % (self.BOX_TYPE, box_type))
+    FullBox.__init__(self, box_type, box_data)
+    # obtain box data after version and flags decode
+    box_data = self._box_data
+    if len(box_data) % 8 != 0:
+      raise ValueError("box_data not a multiple of 2x4 bytes: %d"
+                       % (len(box_data),))
+    self.pdinfo = [ PDInfo(unpack('>L>L', box_data[offset:offset+8]))
+                    for offset in range(0, len(box_data), 8)
+                  ]
+    # forget data bytes
+    self._set_box_data(b'')
+
+  def __str__(self):
+    return 'PDINBox(version=%d,flags=0x%02x,pdinfo=%s)' \
+           % (self.version, self.flags,
+              ','.join(str(pdinfo) for pdinfo in self.pdinfo))
+
+  def box_data_chunks(self):
+    yield self.box_vf_data_chunk
+    for pdinfo in self.pdinfo:
+      yield pack('>L>L', pdinfo.rate, pdinfo.initial_delay)
+
+KNOWN_BOX_CLASSES[PDINBox.BOX_TYPE] = PDINBox
 
 if __name__ == '__main__':
   # parse media stream from stdin as test
