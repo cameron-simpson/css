@@ -786,6 +786,7 @@ class TrackGroupTypeBox(FullBox):
     return '%s(type=%r,track_group_id=%d)' % (self.__class__.__name__, self.box_type, self.track_group_id)
 
   def box_data_chunks(self):
+    yield self.box_vf_data_chunk
     yield pack('>L', self.track_group_id)
 
 KNOWN_BOX_CLASSES[TrackGroupTypeBox.BOX_TYPE] = TrackGroupTypeBox
