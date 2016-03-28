@@ -13,9 +13,8 @@ from __future__ import print_function
 from collections import namedtuple
 from os import SEEK_CUR
 import sys
-from struct import pack, unpack
 from cs.fileutils import read_data, pread, seekable
-from cs.py3 import bytes
+from cs.py3 import bytes, pack, unpack
 # DEBUG
 from cs.logutils import X
 
