@@ -613,6 +613,99 @@ class TRAKBox(ContainerBox):
   BOX_TYPE = b'trak'
 KNOWN_BOX_CLASSES[TRAKBox.BOX_TYPE] = TRAKBox
 
+class TKHDBox(FullBox):
+  ''' An 'tkhd' Track Header box - ISO14496 section 8.2.2.
+  '''
+
+  BOX_TYPE = b'tkhd'
+
+  def __init__(self, box_type, box_data):
+    FullBox.__init__(self, box_type, box_data)
+    # obtain box data after version and flags decode
+    box_data = self._box_data
+    if self.version == 0:
+      self.creation_time, \
+      self.modification_time, \
+      self.track_id, \
+      _, \
+      self.duration = unpack('>LLLLL', box_data[:20])
+      offset = 20
+    elif self.version == 1:
+      self.creation_time, \
+      self.modification_time, \
+      self.track_id, \
+      _, \
+      self.duration = unpack('>QQLLQ', box_data[:32])
+      offset = 32
+    else:
+      raise ValueError("TRHD: unsupported version %d" % (self.version,))
+    _, _, \
+    self.layer, \
+    self.alternate_group, \
+    self.volume, \
+    _ = unpack('>LLHHHH', box_data[offset:offset+16])
+    offset += 16
+    self.matrix = unpack('>LLLLLLLLL', box_data[offset:offset+36])
+    offset += 36
+    self.width, self.height = unpack('>LL', box_data[offset:offset+8])
+    offset += 8
+
+  def __str__(self):
+    return 'TRHDBox(version=%d,flags=0x%02x,enabled=%s,in_movie=%s,in_preview=%s,creation_time=%d,modification_time=%s,track_id=%d,duration=%d,laer=%d,alternate_group=%d,volume=0x%04x,matrix=%r,width=%d,height=%d)' \
+           % (self.version, self.flags,
+              self.track_enabled, self.track_in_movie, self.track_in_preview,
+              self.creation_time,
+              self.modification_time,
+              self.track_id,
+              self.duration,
+              self.layer,
+              self.alternate_group,
+              self.volume,
+              self.matrix,
+              self.width,
+              self.height)
+
+  @property
+  def track_enabled(self):
+    return (self.flags&0x4) != 0
+
+  @property
+  def track_in_movie(self):
+    return (self.flags&0x2) != 0
+
+  @property
+  def track_in_preview(self):
+    return (self.flags&0x1) != 0
+
+  def box_data_chunks(self):
+    yield self.box_vf_data_chunk
+    if self.version == 0:
+      yield pack('>LLLLL',
+                 self.creation_time,
+                 self.modification_time,
+                 self.track_id,
+                 0,
+                 self.duration)
+    elif self.version == 1:
+      yield pack('>QQLLQ',
+                 self.creation_time,
+                 self.modification_time,
+                 self.track_id,
+                 0,
+                 self.duration)
+    else:
+      raise RuntimeError("unsupported version %d" % (self.version,))
+    yield pack('>LLHHHH',
+               0, 0,
+               self.layer,
+               self.alternate_group,
+               self.volume,
+               0)
+    yield pack('>LLLLLLLLL', *self.matrix)
+    yield pack('>LL', self.width, self.height)
+
+KNOWN_BOX_CLASSES[TKHDBox.BOX_TYPE] = TKHDBox
+
 if __name__ == '__main__':
   # parse media stream from stdin as test
   from os import fdopen
