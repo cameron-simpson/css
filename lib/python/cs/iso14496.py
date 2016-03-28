@@ -526,13 +526,6 @@ class MOOVBox(ContainerBox):
   BOX_TYPE = b'moov'
 KNOWN_BOX_CLASSES[MOOVBox.BOX_TYPE] = MOOVBox
 
-class TRAKBox(ContainerBox):
-  ''' A 'trak' Track box - ISO14496 section 8.3.1.
-      Decode the contained boxes.
-  '''
-  BOX_TYPE = b'trak'
-KNOWN_BOX_CLASSES[TRAKBox.BOX_TYPE] = TRAKBox
-
 class MVHDBox(FullBox):
   ''' An 'mvhd' Movie Header box - ISO14496 section 8.2.2.
   '''
@@ -598,6 +591,13 @@ class MVHDBox(FullBox):
     yield pack('>L', self.next_track_id)
 
 KNOWN_BOX_CLASSES[MVHDBox.BOX_TYPE] = MVHDBox
+
+class TRAKBox(ContainerBox):
+  ''' A 'trak' Track box - ISO14496 section 8.3.1.
+      Decode the contained boxes.
+  '''
+  BOX_TYPE = b'trak'
+KNOWN_BOX_CLASSES[TRAKBox.BOX_TYPE] = TRAKBox
 
 if __name__ == '__main__':
   # parse media stream from stdin as test
