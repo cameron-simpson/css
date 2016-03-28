@@ -241,6 +241,13 @@ class Box(object):
               self._box_data[:32],
               '...' if len(self._box_data) > 32 else '')
 
+  def dump(self, indent='', fp=None):
+    if fp is None:
+      fp = sys.stdout
+    fp.write(indent)
+    fp.write(str(self))
+    fp.write('\n')
+
   @staticmethod
   def from_file(fp, cls=None):
     ''' Decode a Box subclass from the file `fp`, return it. Return None at EOF.
@@ -514,6 +521,16 @@ class ContainerBox(Box):
     return '%s(%s)' \
            % (self.__class__.__name__, ','.join(str(B) for B in self.boxes))
 
+  def dump(self, indent='', fp=None):
+    if fp is None:
+      fp = sys.stdout
+    fp.write(indent)
+    fp.write(self.__class__.__name__)
+    fp.write('\n')
+    indent += '  '
+    for B in self.boxes:
+      B.dump(indent, fp)
+
   def box_data_chunks(self):
     for B in self.boxes:
       for chunk in B.box_data_chunks():
@@ -721,4 +738,5 @@ if __name__ == '__main__':
     B = Box.from_file(stdin)
     if B is None:
       break
-    print(B)
+    B.dump()
+    ##print(B)
