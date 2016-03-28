@@ -14,7 +14,7 @@ from collections import namedtuple
 from os import SEEK_CUR
 import sys
 from cs.fileutils import read_data, pread, seekable
-from cs.py3 import bytes, pack, unpack
+from cs.py3 import bytes, pack, unpack, iter_unpack
 # DEBUG
 from cs.logutils import X
 
@@ -727,6 +727,34 @@ class TKHDBox(FullBox):
     yield pack('>LL', self.width, self.height)
 
 KNOWN_BOX_CLASSES[TKHDBox.BOX_TYPE] = TKHDBox
+
+class TREFBox(ContainerBox):
+  ''' An 'tref' Track Reference box - ISO14496 section 8.3.3.
+      Decode the contained boxes.
+  '''
+  BOX_TYPE = b'tref'
+KNOWN_BOX_CLASSES[TREFBox.BOX_TYPE] = TREFBox
+
+class TrackReferenceTypeBox(Box):
+  ''' A TrackReferenceTypeBox references to other tracks - ISO14496 section 8.3.3.2.
+  '''
+
+  BOX_TYPES = (b'hint', b'cdsc', b'font', b'hind', b'vdep', b'vplx', b'subt')
+
+  def __init__(self, box_type, box_data):
+    Box.__init__(self, box_type, box_data)
+    box_data = self._load_box_data()
+    track_ids = []
+    for track_id, in iter_unpack('>L', box_data):
+      track_ids.append(track_id)
+    self.track_ids = track_id
+
+  def __str__(self):
+    return '%s(type=%r,track_ids=%r)' % (self.__class__.__name__, self.box_type, self.track_ids)
+
+  def box_data_chunks(self):
+    for track_id in self.track_ids:
+      yield pack('>L', track_id)
 
 if __name__ == '__main__':
   # parse media stream from stdin as test
