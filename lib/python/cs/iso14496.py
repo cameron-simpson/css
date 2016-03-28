@@ -552,9 +552,9 @@ class MVHDBox(FullBox):
     else:
       raise ValueError("MVHD: unsupported version %d" % (self.version,))
     self._rate, \
-    self._volume = unpack('>LH', box_data[offset:offset+6])
+    self._volume = unpack('>lh', box_data[offset:offset+6])
     offset += 6 + 10    # 4 rate, 2 volume, 2-reserved, 2x4 reserved
-    self.matrix = unpack('>LLLLLLLLL', box_data[offset:offset+36])
+    self.matrix = unpack('>lllllllll', box_data[offset:offset+36])
     offset += 36 + 24   # 9x4 matrix, 6x4 predefined
     self.next_track_id, = unpack('>L', box_data[offset:offset+4])
     offset += 4
@@ -597,10 +597,10 @@ class MVHDBox(FullBox):
                  self.duration)
     else:
       raise RuntimeError("unsupported version %d" % (self.version,))
-    yield pack('>L', self._rate)
-    yield pack('>H', self._volume)
+    yield pack('>l', self._rate)
+    yield pack('>h', self._volume)
     yield bytes(10)
-    yield pack('>LLLLLLLLL', *self.matrix)
+    yield pack('>lllllllll', *self.matrix)
     yield bytes(24)
     yield pack('>L', self.next_track_id)
 
