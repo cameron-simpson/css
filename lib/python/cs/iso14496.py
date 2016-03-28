@@ -756,6 +756,10 @@ class TrackReferenceTypeBox(Box):
     for track_id in self.track_ids:
       yield pack('>L', track_id)
 
+for box_type in TrackReferenceTypeBox.BOX_TYPES:
+  KNOWN_BOX_CLASSES[box_type] = TrackReferenceTypeBox
+del box_type
+
 if __name__ == '__main__':
   # parse media stream from stdin as test
   from os import fdopen
