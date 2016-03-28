@@ -526,6 +526,72 @@ class MOOVBox(ContainerBox):
   BOX_TYPE = b'moov'
 KNOWN_BOX_CLASSES[MOOVBox.BOX_TYPE] = MOOVBox
 
+class MVHDBox(FullBox):
+  ''' An 'mvhd' Movie Header box - ISO14496 section 8.2.2.
+  '''
+
+  BOX_TYPE = b'mvhd'
+
+  def __init__(self, box_type, box_data):
+    X("INIT MVHDBox ...")
+    FullBox.__init__(self, box_type, box_data)
+    # obtain box data after version and flags decode
+    box_data = self._box_data
+    if self.version == 0:
+      self.creation_time, \
+      self.modification_time, \
+      self.timescale, \
+      self.duration = unpack('>LLLL', box_data[:16])
+      offset = 16
+    elif self.version == 1:
+      self.creation_time, \
+      self.modification_time, \
+      self.timescale, \
+      self.duration = unpack('>QQLQ', box_data[:28])
+      offset = 28
+    else:
+      raise ValueError("MVHD: unsupported version %d" % (self.version,))
+    self._rate, \
+    self._volume = unpack('>LH', box_data[offset:offset+6])
+    offset += 6 + 10    # 4 rate, 2 volume, 2-reserved, 2x4 reserved
+    self.matrix = unpack('>LLLLLLLLL', box_data[offset:offset+36])
+    offset += 36 + 24   # 9x4 matrix, 6x4 predefined
+    self.next_track_id, = unpack('>L', box_data[offset:offset+4])
+    offset += 4
+    if offset != len(box_data):
+      raise ValueError("MVHD: after decode offset=%d but len(box_data)=%d"
+                       % (offset, len(box_data)))
+
+  def __str__(self):
+    return 'MVHDBox(version=%d,flags=0x%02x,rate=%g,volume=%g,matrix=%r,next_track_id=%d)' \
+           % (self.version, self.flags, self.rate, self.volume,
+              self.matrix, self.next_track_id)
+
+  @property
+  def rate(self):
+    ''' Rate field converted to float: 1.0 represents normal rate.
+    '''
+    _rate = self._rate
+    return (_rate>>16) + (_rate&0xffff)/65536.0
+
+  @property
+  def volume(self):
+    ''' Volume field converted to float: 1.0 represents full volume.
+    '''
+    _volume = self._volume
+    return (_volume>>8) + (_volume&0xff)/256.0
+
+  def box_data_chunks(self):
+    yield self.box_vf_data_chunk
+    yield pack('>L', self._rate)
+    yield pack('>H', self._volume)
+    yield bytes(10)
+    yield pack('>LLLLLLLLL', *self.matrix)
+    yield bytes(24)
+    yield pack('>L', self.next_track_id)
+
+KNOWN_BOX_CLASSES[MVHDBox.BOX_TYPE] = MVHDBox
+
 if __name__ == '__main__':
   # parse media stream from stdin as test
   from os import fdopen
