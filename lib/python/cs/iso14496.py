@@ -16,7 +16,7 @@ import sys
 from cs.fileutils import read_data, pread, seekable
 from cs.py3 import bytes, pack, unpack, iter_unpack
 # DEBUG
-from cs.logutils import X
+from cs.logutils import warning, X
 
 # a convenience chunk of 256 zero bytes, mostly for use by 'free' blocks
 B0_256 = bytes(256)
@@ -797,6 +797,74 @@ class MDIABox(ContainerBox):
   '''
   BOX_TYPE = b'mdia'
 KNOWN_BOX_CLASSES[MDIABox.BOX_TYPE] = MDIABox
+
+class MDHDBox(FullBox):
+  ''' A MDHDBox is a Media Header box - ISO14496 section 8.4.2.
+  '''
+
+  BOX_TYPE = b'mdhd'
+
+  def __init__(self, box_type, box_data):
+    FullBox.__init__(self, box_type, box_data)
+    # obtain box data after version and flags decode
+    box_data = self._box_data
+    if self.version == 0:
+      self.creation_time, \
+      self.modification_time, \
+      self.timescale, \
+      self.duration = unpack('>LLLL', box_data[:16])
+      offset = 16
+    elif self.version == 1:
+      self.creation_time, \
+      self.modification_time, \
+      self.timescale, \
+      self.duration = unpack('>QQLQ', box_data[:28])
+      offset = 28
+    else:
+      raise RuntimeError("unsupported version %d" % (self.version,))
+    X("box_data[%d:] = %r", offset, box_data[offset:])
+    self._language, \
+    self.pre_defined = unpack('>HH', box_data[offset:offset+4])
+    offset += 4
+    if offset != len(box_data):
+      warning("MDHD: %d unparsed bytes after pre_defined: %r",
+              len(box_data)-offset, box_data[offset:])
+
+  def __str__(self):
+    return '%s(type=%r-v%d-0x%02x,creation_time=%d,modification_time=%d,timescale=%d,duration=%d,language=%s)' \
+           % (self.__class__.__name__, self.box_type, self.version, self.flags,
+              self.creation_time, self.modification_time,
+              self.timescale, self.duration,
+              self.language)
+
+  def box_data_chunks(self):
+    yield self.box_vf_data_chunk
+    if self.version == 0:
+      yield pack('>LLLL',
+                 self.creation_time,
+                 self.modification_time,
+                 self.timescale,
+                 self.duration)
+    elif self.version == 1:
+      yield pack('>QQLQ',
+                 self.creation_time,
+                 self.modification_time,
+                 self.timescale,
+                 self.duration)
+    else:
+      raise RuntimeError('unsupported version: %d', self.version)
+    yield self.pack('>HH', self._language, self.pre_defined)
+
+  @property
+  def language(self):
+    _language = self._language
+    return bytes([ x+0x60
+                   for x in (_language>>10)&0x1f,
+                            (_language>>5)&0x1f,
+                            _language&0x1f
+                 ]).decode('ascii')
+
+KNOWN_BOX_CLASSES[MDHDBox.BOX_TYPE] = MDHDBox
 
 if __name__ == '__main__':
   # parse media stream from stdin as test
