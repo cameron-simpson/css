@@ -583,6 +583,20 @@ class MVHDBox(FullBox):
 
   def box_data_chunks(self):
     yield self.box_vf_data_chunk
+    if self.version == 0:
+      yield pack('>LLLL',
+                 self.creation_time,
+                 self.modification_time,
+                 self.timescale,
+                 self.duration)
+    elif self.version == 1:
+      yield pack('>QQLQ',
+                 self.creation_time,
+                 self.modification_time,
+                 self.timescale,
+                 self.duration)
+    else:
+      raise RuntimeError("unsupported version %d" % (self.version,))
     yield pack('>L', self._rate)
     yield pack('>H', self._volume)
     yield bytes(10)
