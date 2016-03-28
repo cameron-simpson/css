@@ -493,9 +493,8 @@ class PDINBox(FullBox):
 
 KNOWN_BOX_CLASSES[PDINBox.BOX_TYPE] = PDINBox
 
-class MOOVBox(Box):
-  ''' An 'moov' Movie box - ISO14496 section 8.2.1.
-      Decode the contained boxes.
+class ContainerBox(Box):
+  ''' A base class for pure container boxes.
   '''
 
   def __init__(self, box_type, box_data):
@@ -512,14 +511,19 @@ class MOOVBox(Box):
       self.boxes.append(B)
 
   def __str__(self):
-    return 'MOOVBox(%s)' \
-           % (','.join(str(B) for B in self.boxes))
+    return '%s(%s)' \
+           % (self.__class__.__name__, ','.join(str(B) for B in self.boxes))
 
   def box_data_chunks(self):
     for B in self.boxes:
       for chunk in B.box_data_chunks():
         yield chunk
 
+class MOOVBox(ContainerBox):
+  ''' An 'moov' Movie box - ISO14496 section 8.2.1.
+      Decode the contained boxes.
+  '''
+  BOX_TYPE = b'moov'
 KNOWN_BOX_CLASSES[MOOVBox.BOX_TYPE] = MOOVBox
 
 if __name__ == '__main__':
