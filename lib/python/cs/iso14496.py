@@ -790,6 +790,13 @@ class TrackGroupTypeBox(FullBox):
 
 KNOWN_BOX_CLASSES[TrackGroupTypeBox.BOX_TYPE] = TrackGroupTypeBox
 
+class MDIABox(ContainerBox):
+  ''' An 'mdia' Media box - ISO14496 section 8.4.1.
+      Decode the contained boxes.
+  '''
+  BOX_TYPE = b'mdia'
+KNOWN_BOX_CLASSES[MDIABox.BOX_TYPE] = MDIABox
+
 if __name__ == '__main__':
   # parse media stream from stdin as test
   from os import fdopen
