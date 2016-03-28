@@ -760,6 +760,36 @@ for box_type in TrackReferenceTypeBox.BOX_TYPES:
   KNOWN_BOX_CLASSES[box_type] = TrackReferenceTypeBox
 del box_type
 
+class TRGRBox(ContainerBox):
+  ''' An 'trgr' Track Group box - ISO14496 section 8.3.4.
+      Decode the contained boxes.
+  '''
+  BOX_TYPE = b'trgr'
+KNOWN_BOX_CLASSES[TRGRBox.BOX_TYPE] = TRGRBox
+
+class TrackGroupTypeBox(FullBox):
+  ''' A TrackGroupTypeBox contains track group id types - ISO14496 section 8.3.3.2.
+  '''
+
+  BOX_TYPE = b'msrc'
+
+  def __init__(self, box_type, box_data):
+    FullBox.__init__(self, box_type, box_data)
+    # obtain box data after version and flags decode
+    box_data = self._box_data
+    self.track_group_id, = unpack('>L', box_data[:4])
+    if len(box_data) > 4:
+      warning('%s: %d bytes of unparsed data after track_group_id: %r',
+              self.__class__.__name__, len(box_data)-4, box_data[4:])
+
+  def __str__(self):
+    return '%s(type=%r,track_group_id=%d)' % (self.__class__.__name__, self.box_type, self.track_group_id)
+
+  def box_data_chunks(self):
+    yield pack('>L', self.track_group_id)
+
+KNOWN_BOX_CLASSES[TrackGroupTypeBox.BOX_TYPE] = TrackGroupTypeBox
+
 if __name__ == '__main__':
   # parse media stream from stdin as test
   from os import fdopen
