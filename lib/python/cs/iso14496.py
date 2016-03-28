@@ -291,7 +291,7 @@ class Box(object):
                          % (box_data_length, len(fetch_data)))
     if cls is None:
       cls = pick_box_class(box_type)
-      X("from_file: KNOWN_BOX_CLASSES.get(%r) => %s", box_type, Box)
+      ##X("from_file: KNOWN_BOX_CLASSES.get(%r) => %s", box_type, Box)
     return cls(box_type, fetch_data)
 
   @staticmethod
@@ -318,7 +318,7 @@ class Box(object):
     fetch_box_data = lambda: bs[tail_offset:tail_offset+tail_length]
     if cls is None:
       cls = pick_box_class(box_type)
-      X("from_bytes: KNOWN_BOX_CLASSES.get(%r) => %s", box_type, Box)
+      ##X("from_bytes: KNOWN_BOX_CLASSES.get(%r) => %s", box_type, Box)
     B = cls(box_type, fetch_box_data)
     return B, offset
 
