@@ -526,6 +526,13 @@ class MOOVBox(ContainerBox):
   BOX_TYPE = b'moov'
 KNOWN_BOX_CLASSES[MOOVBox.BOX_TYPE] = MOOVBox
 
+class TRAKBox(ContainerBox):
+  ''' A 'trak' Track box - ISO14496 section 8.3.1.
+      Decode the contained boxes.
+  '''
+  BOX_TYPE = b'trak'
+KNOWN_BOX_CLASSES[TRAKBox.BOX_TYPE] = TRAKBox
+
 class MVHDBox(FullBox):
   ''' An 'mvhd' Movie Header box - ISO14496 section 8.2.2.
   '''
