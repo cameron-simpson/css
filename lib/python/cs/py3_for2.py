@@ -77,6 +77,8 @@ class bytes(object):
   @staticmethod
   def join(bss):
     return bytes(str.join(bss))
+  def decode(self, encoding='ascii', errors='strict'):
+    return self.__s.decode(encoding, errors)
 
 class BytesFile(object):
   ''' Wrapper class for a file opened in binary mode which uses bytes in its methods instead of str.
