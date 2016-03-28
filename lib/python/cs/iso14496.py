@@ -651,9 +651,10 @@ class TKHDBox(FullBox):
     offset += 8
 
   def __str__(self):
-    return 'TRHDBox(version=%d,flags=0x%02x,enabled=%s,in_movie=%s,in_preview=%s,creation_time=%d,modification_time=%s,track_id=%d,duration=%d,laer=%d,alternate_group=%d,volume=0x%04x,matrix=%r,width=%d,height=%d)' \
+    return 'TRHDBox(version=%d,flags=0x%02x,enabled=%s,in_movie=%s,in_preview=%s,size_is_aspect=%s,creation_time=%d,modification_time=%s,track_id=%d,duration=%d,laer=%d,alternate_group=%d,volume=0x%04x,matrix=%r,width=%d,height=%d)' \
            % (self.version, self.flags,
               self.track_enabled, self.track_in_movie, self.track_in_preview,
+              self.track_size_is_aspect_ratio,
               self.creation_time,
               self.modification_time,
               self.track_id,
@@ -667,7 +668,7 @@ class TKHDBox(FullBox):
 
   @property
   def track_enabled(self):
-    return (self.flags&0x4) != 0
+    return (self.flags&0x1) != 0
 
   @property
   def track_in_movie(self):
@@ -675,7 +676,11 @@ class TKHDBox(FullBox):
 
   @property
   def track_in_preview(self):
-    return (self.flags&0x1) != 0
+    return (self.flags&0x4) != 0
+
+  @property
+  def track_size_is_aspect_ratio(self):
+    return (self.flags&0x8) != 0
 
   def box_data_chunks(self):
     yield self.box_vf_data_chunk
