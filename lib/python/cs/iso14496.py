@@ -736,7 +736,7 @@ class TREFBox(ContainerBox):
 KNOWN_BOX_CLASSES[TREFBox.BOX_TYPE] = TREFBox
 
 class TrackReferenceTypeBox(Box):
-  ''' A TrackReferenceTypeBox references to other tracks - ISO14496 section 8.3.3.2.
+  ''' A TrackReferenceTypeBox continas references to other tracks - ISO14496 section 8.3.3.2.
   '''
 
   BOX_TYPES = (b'hint', b'cdsc', b'font', b'hind', b'vdep', b'vplx', b'subt')
