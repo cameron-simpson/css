@@ -644,23 +644,23 @@ class TKHDBox(FullBox):
       self.creation_time, \
       self.modification_time, \
       self.track_id, \
-      _, \
+      self.reserved1, \
       self.duration = unpack('>LLLLL', box_data[:20])
       offset = 20
     elif self.version == 1:
       self.creation_time, \
       self.modification_time, \
       self.track_id, \
-      _, \
+      self.reserved1, \
       self.duration = unpack('>QQLLQ', box_data[:32])
       offset = 32
     else:
       raise ValueError("TRHD: unsupported version %d" % (self.version,))
-    _, _, \
+    self.reserved2, self.reserved3, \
     self.layer, \
     self.alternate_group, \
     self.volume, \
-    _ = unpack('>LLhhhH', box_data[offset:offset+16])
+    self.reserved4 = unpack('>LLhhhH', box_data[offset:offset+16])
     offset += 16
     self.matrix = unpack('>lllllllll', box_data[offset:offset+36])
     offset += 36
@@ -706,23 +706,23 @@ class TKHDBox(FullBox):
                  self.creation_time,
                  self.modification_time,
                  self.track_id,
-                 0,
+                 self.reserved1,
                  self.duration)
     elif self.version == 1:
       yield pack('>QQLLQ',
                  self.creation_time,
                  self.modification_time,
                  self.track_id,
-                 0,
+                 self.reserved1,
                  self.duration)
     else:
       raise RuntimeError("unsupported version %d" % (self.version,))
     yield pack('>LLhhhH',
-               0, 0,
+               self.reserved2, self.reserved3,
                self.layer,
                self.alternate_group,
                self.volume,
-               0)
+               self.reserved4)
     yield pack('>lllllllll', *self.matrix)
     yield pack('>LL', self.width, self.height)
 
