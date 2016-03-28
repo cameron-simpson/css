@@ -643,9 +643,9 @@ class TKHDBox(FullBox):
     self.layer, \
     self.alternate_group, \
     self.volume, \
-    _ = unpack('>LLHHHH', box_data[offset:offset+16])
+    _ = unpack('>LLhhhH', box_data[offset:offset+16])
     offset += 16
-    self.matrix = unpack('>LLLLLLLLL', box_data[offset:offset+36])
+    self.matrix = unpack('>lllllllll', box_data[offset:offset+36])
     offset += 36
     self.width, self.height = unpack('>LL', box_data[offset:offset+8])
     offset += 8
@@ -700,13 +700,13 @@ class TKHDBox(FullBox):
                  self.duration)
     else:
       raise RuntimeError("unsupported version %d" % (self.version,))
-    yield pack('>LLHHHH',
+    yield pack('>LLhhhH',
                0, 0,
                self.layer,
                self.alternate_group,
                self.volume,
                0)
-    yield pack('>LLLLLLLLL', *self.matrix)
+    yield pack('>lllllllll', *self.matrix)
     yield pack('>LL', self.width, self.height)
 
 KNOWN_BOX_CLASSES[TKHDBox.BOX_TYPE] = TKHDBox
