@@ -200,6 +200,26 @@ class Box(object):
   '''
 
   def __init__(self, box_type, box_data):
+    # sanity check the box_type
+    if sys.hexversion < 0x03000000:
+      if isinstance(box_type, bytes):
+        box_type = box_type._bytes__s
+    try:
+      BOX_TYPE = self.BOX_TYPE
+    except AttributeError:
+      try:
+        BOX_TYPES = self.BOX_TYPES
+      except AttributeError:
+        X("no box_type check in %s, box_type=%r", self.__class__, box_type)
+        pass
+      else:
+        if box_type not in BOX_TYPES:
+          raise ValueError("box_type should be in %r but got %r"
+                           % (BOX_TYPES, box_type))
+    else:
+      if box_type != BOX_TYPE:
+        raise ValueError("box_type should be %r but got %r"
+                         % (BOX_TYPE, box_type))
     self.box_type = box_type
     if isinstance(box_data, bytes):
       # bytes? store directly for use
@@ -365,13 +385,9 @@ class FREEBox(Box):
       Note the length and discard the data portion.
   '''
 
-  BOX_TYPE = b'free'
-  BOX_TYPE2 = b'skip'
+  BOX_TYPES = (b'free', b'skip')
 
   def __init__(self, box_type, box_data):
-    if box_type != self.BOX_TYPE and box_type != self.BOX_TYPE2:
-      raise ValueError("box_type should be %r or %r but got %r"
-                       % (self.BOX_TYPE, self.BOX_TYPE2, box_type))
     Box.__init__(self, box_type, box_data)
     box_data = self._load_box_data()
     self.free_size = len(box_data)
@@ -392,8 +408,9 @@ class FREEBox(Box):
     if free_bytes > 0:
       yield bytes(free_bytes)
 
-KNOWN_BOX_CLASSES[FREEBox.BOX_TYPE] = FREEBox
-KNOWN_BOX_CLASSES[FREEBox.BOX_TYPE2] = FREEBox
+for box_type in FREEBox.BOX_TYPES:
+  KNOWN_BOX_CLASSES[box_type] = FREEBox
+del box_type
 
 class FTYPBox(Box):
   ''' An 'ftyp' File Type box - ISO14496 section 4.3.
@@ -403,9 +420,6 @@ class FTYPBox(Box):
   BOX_TYPE = b'ftyp'
 
   def __init__(self, box_type, box_data):
-    if box_type != self.BOX_TYPE:
-      raise ValueError("box_type should be %r but got %r"
-                       % (self.BOX_TYPE, box_type))
     Box.__init__(self, box_type, box_data)
     box_data = self._load_box_data()
     if len(box_data) < 8:
@@ -444,9 +458,6 @@ class PDINBox(FullBox):
   BOX_TYPE = b'pdin'
 
   def __init__(self, box_type, box_data):
-    if box_type != self.BOX_TYPE:
-      raise ValueError("box_type should be %r but got %r"
-                       % (self.BOX_TYPE, box_type))
     FullBox.__init__(self, box_type, box_data)
     # obtain box data after version and flags decode
     box_data = self._box_data
@@ -476,12 +487,7 @@ class MOOVBox(Box):
       Decode the contained boxes.
   '''
 
-  BOX_TYPE = b'moov'
-
   def __init__(self, box_type, box_data):
-    if box_type != self.BOX_TYPE:
-      raise ValueError("box_type should be %r but got %r"
-                       % (self.BOX_TYPE, box_type))
     Box.__init__(self, box_type, box_data)
     box_data = self._load_box_data()
     self.boxes = []
