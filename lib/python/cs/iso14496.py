@@ -283,7 +283,8 @@ class Box(object):
         raise ValueError("expected to read %d box data bytes but got %d"
                          % (box_data_length, len(fetch_data)))
     if cls is None:
-      cls = KNOWN_BOX_CLASSES.get(box_type, Box)
+      cls = pick_box_class(box_type)
+      X("from_file: KNOWN_BOX_CLASSES.get(%r) => %s", box_type, Box)
     return cls(box_type, fetch_data)
 
   @staticmethod
@@ -309,7 +310,8 @@ class Box(object):
                          % (length, len(bs), offset0))
     fetch_box_data = lambda: bs[tail_offset:tail_offset+tail_length]
     if cls is None:
-      cls = KNOWN_BOX_CLASSES.get(box_type, Box)
+      cls = pick_box_class(box_type)
+      X("from_bytes: KNOWN_BOX_CLASSES.get(%r) => %s", box_type, Box)
     B = cls(box_type, fetch_box_data)
     return B, offset
 
@@ -356,6 +358,15 @@ class Box(object):
 
 # mapping of known box subclasses for use by factories
 KNOWN_BOX_CLASSES = {}
+
+if sys.hexversion >= 0x03000000:
+  def pick_box_class(box_type):
+    return KNOWN_BOX_CLASSES.get(box_type, Box)
+else:
+  def pick_box_class(box_type):
+    if isinstance(box_type, bytes):
+      box_type = box_type._bytes__s
+    return KNOWN_BOX_CLASSES.get(box_type, Box)
 
 class FullBox(Box):
   ''' A common extension of a basic Box, with a version and flags field.
