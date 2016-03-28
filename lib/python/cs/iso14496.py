@@ -475,7 +475,7 @@ class PDINBox(FullBox):
     if len(box_data) % 8 != 0:
       raise ValueError("box_data not a multiple of 2x4 bytes: %d"
                        % (len(box_data),))
-    self.pdinfo = [ PDInfo(unpack('>L>L', box_data[offset:offset+8]))
+    self.pdinfo = [ PDInfo(unpack('>LL', box_data[offset:offset+8]))
                     for offset in range(0, len(box_data), 8)
                   ]
     # forget data bytes
@@ -489,7 +489,7 @@ class PDINBox(FullBox):
   def box_data_chunks(self):
     yield self.box_vf_data_chunk
     for pdinfo in self.pdinfo:
-      yield pack('>L>L', pdinfo.rate, pdinfo.initial_delay)
+      yield pack('>LL', pdinfo.rate, pdinfo.initial_delay)
 
 KNOWN_BOX_CLASSES[PDINBox.BOX_TYPE] = PDINBox
 
