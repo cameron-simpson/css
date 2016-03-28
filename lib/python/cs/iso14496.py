@@ -225,7 +225,7 @@ class Box(object):
       # bytes? store directly for use
       self._box_data = box_data
     elif isinstance(box_data, str):
-      self._box_data = box_data.decode('iso8859-1')
+      self._box_data = bytes(box_data.decode('iso8859-1'))
     else:
       # otherwise it should be a callable returning the bytes
       self._fetch_box_data = box_data
@@ -319,7 +319,7 @@ class Box(object):
     ''' Load the box data into private attribute ._box_data.
     '''
     if self._box_data is None:
-      self._box_data = self._fetch_box_data()
+      self._box_data = bytes(self._fetch_box_data())
     return self._box_data
 
   def _set_box_data(self, data):
