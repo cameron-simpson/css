@@ -857,6 +857,8 @@ class MDHDBox(FullBox):
 
   @property
   def language(self):
+    ''' The ISO 639‐2/T language code as decoded from the packed form.
+    '''
     _language = self._language
     return bytes([ x+0x60
                    for x in (_language>>10)&0x1f,
