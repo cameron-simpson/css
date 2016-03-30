@@ -987,6 +987,50 @@ class STBLBox(ContainerBox):
   BOX_TYPE = b'stbl'
 KNOWN_BOX_CLASSES[STBLBox.BOX_TYPE] = STBLBox
 
+class STSDBox(FullBox):
+  ''' A 'stsd' Sample Description box -= section 8.5.2.
+  '''
+
+  BOX_TYPE = b'stsd'
+  ATTRIBUTES = ()
+
+  def __init__(self, box_type, box_data):
+    FullBox.__init__(self, box_type, box_data)
+    # obtain box data after version and flags decode
+    box_data = self._box_data
+    entry_count, = unpack('>L', box_data[:4])
+    self.boxes = list(get_boxes(box_data, 4))
+    if len(self.boxes) != entry_count:
+      raise ValueError('expected %d SampleEntry Boxes but parsed %d'
+                       % (entry_count, len(self.boxes)))
+
+  def __str__(self):
+    return '%s(%s)' \
+           % (self.__class__.__name__, ','.join(str(B) for B in self.boxes))
+
+  def dump(self, indent='', fp=None):
+    if fp is None:
+      fp = sys.stdout
+    fp.write(indent)
+    fp.write(self.__class__.__name__)
+    fp.write('\n')
+    indent += '  '
+    for B in self.boxes:
+      B.dump(indent, fp)
+
+  def __str__(self):
+    return 'FTYPBox(major_brand=%r,minor_version=%d,compatible_brands=%r)' \
+           % (self.major_brand, self.minor_version, self.compatible_brands)
+
+  def box_data_chunks(self):
+    yield self.box_vf_data_chunk
+    yield pack('>L', len(self.boxes))
+    for B in self.boxes:
+      for chunk in B.box_data_chunks():
+        yield chunk
+
+KNOWN_BOX_CLASSES[STSDBox.BOX_TYPE] = STSDBox
+
 if __name__ == '__main__':
   # parse media stream from stdin as test
   from os import fdopen
