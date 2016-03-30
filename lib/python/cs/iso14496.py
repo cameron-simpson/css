@@ -872,6 +872,44 @@ class MDHDBox(FullBox):
 
 KNOWN_BOX_CLASSES[MDHDBox.BOX_TYPE] = MDHDBox
 
+class HDLRBox(FullBox):
+  ''' A HDLRBox is a Handler Reference box - ISO14496 section 8.4.3.
+  '''
+
+  BOX_TYPE = b'hdlr'
+  ATTRIBUTES = ( ('handler_type', '%r'), 'name' )
+
+  def __init__(self, box_type, box_data):
+    FullBox.__init__(self, box_type, box_data)
+    # obtain box data after version and flags decode
+    box_data = self._box_data
+    X("HDLR: box_data=%r", box_data)
+    self.pre_defined, \
+    self.handler_type, \
+    self.reserved1, \
+    self.reserved2, \
+    self.reserved3 = unpack('>L4sLLL', box_data[:20])
+    offset = 20
+    name_endpos = box_data.find(b'\0', offset)
+    if name_endpos < 0:
+      raise ValueError('HDLR: no NUL in name data: %r' % (box_data[offset:],))
+    if name_endpos != len(box_data) - 1:
+      raise ValueError('HDLR: found NUL not at end of data: %r' % (box_data[offset:],))
+    self.name = box_data[offset:name_endpos].decode('utf-8')
+
+  def box_data_chunks(self):
+    yield self.box_vf_data_chunk
+    yield pack('>LLLLL',
+               self.pre_defined,
+               self.handler_type,
+               self.reserved1,
+               self.reserved2,
+               self.reserved3)
+    yield self.name.encode('utf-8')
+    yield b'\0'
+
+KNOWN_BOX_CLASSES[HDLRBox.BOX_TYPE] = HDLRBox
+
 if __name__ == '__main__':
   # parse media stream from stdin as test
   from os import fdopen
