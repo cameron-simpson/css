@@ -918,6 +918,25 @@ class MINFBox(ContainerBox):
   BOX_TYPE = b'minf'
 KNOWN_BOX_CLASSES[MINFBox.BOX_TYPE] = MINFBox
 
+class NMHDBox(FullBox):
+  ''' A NMHDBox is a Null Media Header box - ISO14496 section 8.4.5.2.
+  '''
+
+  BOX_TYPE = b'nmhd'
+  ATTRIBUTES = ()
+
+  def __init__(self, box_type, box_data):
+    FullBox.__init__(self, box_type, box_data)
+    # obtain box data after version and flags decode
+    box_data = self._box_data
+    if len(box_data) > 0:
+      raise ValueError("NMHD: unexpected data: %r" % (box_data,))
+
+  def box_data_chunks(self):
+    yield self.box_vf_data_chunk
+
+KNOWN_BOX_CLASSES[NMHDBox.BOX_TYPE] = NMHDBox
+
 if __name__ == '__main__':
   # parse media stream from stdin as test
   from os import fdopen
