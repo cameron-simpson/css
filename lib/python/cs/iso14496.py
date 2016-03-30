@@ -565,7 +565,6 @@ class MVHDBox(FullBox):
                  ('next_track_id', '%d') )
 
   def __init__(self, box_type, box_data):
-    X("INIT MVHDBox ...")
     FullBox.__init__(self, box_type, box_data)
     # obtain box data after version and flags decode
     box_data = self._box_data
