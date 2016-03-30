@@ -519,6 +519,23 @@ class PDINBox(FullBox):
 
 KNOWN_BOX_CLASSES[PDINBox.BOX_TYPE] = PDINBox
 
+def get_boxes(bs, offset=0, max_offset=None):
+  ''' Generator collecting Boxes from the supplied data `bs`, starting at `offset` (default: 0) and ending at `max_offset` (default: end of `bs`).
+      Postcondition: all data up to `max_offset` has been collectewd into Boxes.
+  '''
+  if max_offset is None:
+    max_offset = len(bs)
+  while offset < max_offset:
+    B, offset = Box.from_bytes(bs, offset)
+    if B is None:
+      if offset is not None:
+        raise RuntimeError("unexpected offset=%r with B=None" % (offset,))
+      break
+    if offset > max_offset:
+      raise ValueError('final box exceeds limit: finished at %d but limit was %d'
+                       % (offset, max_offset))
+    yield B
+
 class ContainerBox(Box):
   ''' A base class for pure container boxes.
   '''
@@ -526,15 +543,7 @@ class ContainerBox(Box):
   def __init__(self, box_type, box_data):
     Box.__init__(self, box_type, box_data)
     box_data = self._load_box_data()
-    self.boxes = []
-    offset = 0
-    while True:
-      B, offset = Box.from_bytes(box_data, offset)
-      if B is None:
-        if offset is not None:
-          raise RuntimeError("unexpected offset=%r with B=None" % (offset,))
-        break
-      self.boxes.append(B)
+    self.boxes = list(get_boxes(box_data))
 
   def __str__(self):
     return '%s(%s)' \
