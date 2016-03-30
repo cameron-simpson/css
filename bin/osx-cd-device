@@ -1,0 +1,12 @@
+#!/bin/sh
+#
+# Scan the output of diskutil and report the CD devices.
+#   - Cameron Simpson <cs@zip.com.au> 31mar2016
+#
+
+set -ue
+
+diskutil list \
+| awk '/^\// { device=$1 }
+       $1 == "0:" && $2 == "CD_partition_scheme" { print device }
+      '
