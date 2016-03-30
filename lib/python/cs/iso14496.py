@@ -1035,6 +1035,32 @@ class STSDBox(FullBox):
 
 KNOWN_BOX_CLASSES[STSDBox.BOX_TYPE] = STSDBox
 
+class _SampleEntry(Box):
+  ''' Superclass of Sample Entry boxes.
+  '''
+
+  def __init__(self, box_type, box_data):
+    Box.__init__(self, box_type, box_data)
+    box_data = self._load_box_data()
+    self.reserved, self.data_reference_index = unpack('>6sH', box_data[:8])
+    self._set_box_data(box_data[8:])
+
+  def __str__(self):
+    prefix = '%s(%r-%r,data_reference_index=%d' \
+           % (self.__class__.__name__,
+              self.box_type,
+              self.reserved,
+              self.data_reference_index)
+    attr_summary = self.attribute_summary()
+    return prefix + ',' + attr_summary + ')'
+
+  @property
+  def box_se_data_chunk(self):
+    ''' Return the leading reserved bytes and data_reference_index.
+        Subclasses need to yield this first from .box_data_chunks().
+    '''
+    return pack('>6sH', self.reserved, self.data_reference_index)
+
 if __name__ == '__main__':
   # parse media stream from stdin as test
   from os import fdopen
