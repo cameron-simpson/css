@@ -241,6 +241,17 @@ class Box(object):
       self._fetch_box_data = box_data
       self._box_data = None
 
+  def attribute_summary(self):
+    strs = []
+    for attr in self.ATTRIBUTES:
+      if isinstance(attr, str):
+        fmt = '%s'
+      else:
+        # an (attr, fmt) tuple
+        attr, fmt = attr
+      strs.append(attr + '=' + fmt % (getattr(self, attr),))
+    return ','.join(strs)
+
   def __str__(self):
     if self._box_data is None:
       # do not load the data just for __str__
@@ -402,15 +413,8 @@ class FullBox(Box):
                                    self.box_type,
                                    self.version,
                                    self.flags)
-    strs = [prefix]
-    for attr in self.ATTRIBUTES:
-      if isinstance(attr, str):
-        fmt = '%s'
-      else:
-        # an (attr, fmt) tuple
-        attr, fmt = attr
-      strs.append(attr + '=' + fmt % (getattr(self, attr),))
-    return ','.join(strs) + ')'
+    attr_summary = self.attribute_summary()
+    return prefix + ',' + attr_summary + ')'
 
   @property
   def box_vf_data_chunk(self):
