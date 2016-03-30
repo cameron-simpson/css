@@ -1084,7 +1084,7 @@ class BTRTBox(Box):
                self.avgBitrate)
 
 class STDPBox(_SampleTableContainerBox):
-  ''' A 'stdp' Degradation Priority box -= section 8.5.3.
+  ''' A 'stdp' Degradation Priority box - section 8.5.3.
   '''
   BOX_TYPE = b'stsd'
 KNOWN_BOX_CLASSES[STDPBox.BOX_TYPE] = STDPBox
