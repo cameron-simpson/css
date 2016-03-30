@@ -234,9 +234,9 @@ class Box(object):
   def __str__(self):
     if self._box_data is None:
       # do not load the data just for __str__
-      return 'Box(box_type=%r,box_data=%s())' \
+      return 'Box(%r,box_data=%s())' \
              % (self.box_type, self._fetch_box_data)
-    return 'Box(box_type=%r,box_data=%d:%r%s)' \
+    return 'Box(%r,box_data=%d:%r%s)' \
            % (self.box_type, len(self._box_data),
               self._box_data[:32],
               '...' if len(self._box_data) > 32 else '')
