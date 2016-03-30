@@ -79,6 +79,20 @@ class bytes(object):
     return bytes(str.join(bss))
   def decode(self, encoding='ascii', errors='strict'):
     return self.__s.decode(encoding, errors)
+  def find(self, sub, *start_end):
+    start_end = list(start_end)
+    if start_end:
+      start = start_end.pop(0)
+    else:
+      start = 0
+    if start_end:
+      end = start_end.pop(0)
+    else:
+      end = len(self)
+    if start_end:
+      raise TypeError('find() takes 2 to 4 arguments: extra arguments: %r'
+                      % (start_end,))
+    return self.__s.find(sub, start, end)
 
 class BytesFile(object):
   ''' Wrapper class for a file opened in binary mode which uses bytes in its methods instead of str.
