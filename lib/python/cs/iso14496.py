@@ -911,6 +911,13 @@ class HDLRBox(FullBox):
 
 KNOWN_BOX_CLASSES[HDLRBox.BOX_TYPE] = HDLRBox
 
+class MINFBox(ContainerBox):
+  ''' An 'minf' Media Information box - ISO14496 section 8.4.4.
+      Decode the contained boxes.
+  '''
+  BOX_TYPE = b'minf'
+KNOWN_BOX_CLASSES[MINFBox.BOX_TYPE] = MINFBox
+
 if __name__ == '__main__':
   # parse media stream from stdin as test
   from os import fdopen
