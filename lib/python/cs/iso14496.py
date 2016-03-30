@@ -856,7 +856,6 @@ class MDHDBox(FullBox):
       offset = 28
     else:
       raise RuntimeError("unsupported version %d" % (self.version,))
-    X("box_data[%d:] = %r", offset, box_data[offset:])
     self._language, \
     self.pre_defined = unpack('>HH', box_data[offset:offset+4])
     offset += 4
@@ -906,7 +905,6 @@ class HDLRBox(FullBox):
     FullBox.__init__(self, box_type, box_data)
     # obtain box data after version and flags decode
     box_data = self._box_data
-    X("HDLR: box_data=%r", box_data)
     # NB: handler_type is supported to be an unsigned long, but in practice seems to be 4 ASCII bytes, so we load it as a string for readability
     self.pre_defined, \
     self.handler_type, \
