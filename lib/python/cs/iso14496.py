@@ -884,6 +884,7 @@ class HDLRBox(FullBox):
     # obtain box data after version and flags decode
     box_data = self._box_data
     X("HDLR: box_data=%r", box_data)
+    # NB: handler_type is supported to be an unsigned long, but in practice seems to be 4 ASCII bytes, so we load it as a string for readability
     self.pre_defined, \
     self.handler_type, \
     self.reserved1, \
@@ -899,7 +900,7 @@ class HDLRBox(FullBox):
 
   def box_data_chunks(self):
     yield self.box_vf_data_chunk
-    yield pack('>LLLLL',
+    yield pack('>L4sLLL',
                self.pre_defined,
                self.handler_type,
                self.reserved1,
