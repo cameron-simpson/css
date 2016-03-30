@@ -991,11 +991,10 @@ class STBLBox(ContainerBox):
   BOX_TYPE = b'stbl'
 KNOWN_BOX_CLASSES[STBLBox.BOX_TYPE] = STBLBox
 
-class STSDBox(FullBox):
-  ''' A 'stsd' Sample Description box -= section 8.5.2.
+class _SampleTableContainerBox(FullBox):
+  ''' An intermediate FullBox subclass which contains more boxes.
   '''
 
-  BOX_TYPE = b'stsd'
   ATTRIBUTES = ()
 
   def __init__(self, box_type, box_data):
@@ -1005,7 +1004,7 @@ class STSDBox(FullBox):
     entry_count, = unpack('>L', box_data[:4])
     self.boxes = list(get_boxes(box_data, 4))
     if len(self.boxes) != entry_count:
-      raise ValueError('expected %d SampleEntry Boxes but parsed %d'
+      raise ValueError('expected %d contained Boxes but parsed %d'
                        % (entry_count, len(self.boxes)))
 
   def __str__(self):
@@ -1022,10 +1021,6 @@ class STSDBox(FullBox):
     for B in self.boxes:
       B.dump(indent, fp)
 
-  def __str__(self):
-    return 'FTYPBox(major_brand=%r,minor_version=%d,compatible_brands=%r)' \
-           % (self.major_brand, self.minor_version, self.compatible_brands)
-
   def box_data_chunks(self):
     yield self.box_vf_data_chunk
     yield pack('>L', len(self.boxes))
@@ -1033,6 +1028,10 @@ class STSDBox(FullBox):
       for chunk in B.box_data_chunks():
         yield chunk
 
+class STSDBox(_SampleTableContainerBox):
+  ''' A 'stsd' Sample Description box -= section 8.5.2.
+  '''
+  BOX_TYPE = b'stsd'
 KNOWN_BOX_CLASSES[STSDBox.BOX_TYPE] = STSDBox
 
 class _SampleEntry(Box):
@@ -1083,6 +1082,12 @@ class BTRTBox(Box):
                self.bufferSizeDB,
                self.maxBitrate,
                self.avgBitrate)
+
+class STDPBox(_SampleTableContainerBox):
+  ''' A 'stdp' Degradation Priority box -= section 8.5.3.
+  '''
+  BOX_TYPE = b'stsd'
+KNOWN_BOX_CLASSES[STDPBox.BOX_TYPE] = STDPBox
 
 if __name__ == '__main__':
   # parse media stream from stdin as test
