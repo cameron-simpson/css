@@ -965,6 +965,13 @@ class ELNGBox(FullBox):
 
 KNOWN_BOX_CLASSES[ELNGBox.BOX_TYPE] = ELNGBox
 
+class STBLBox(ContainerBox):
+  ''' An 'stbl' Sample Table box - ISO14496 section 8.5.1.
+      Decode the contained boxes.
+  '''
+  BOX_TYPE = b'stbl'
+KNOWN_BOX_CLASSES[STBLBox.BOX_TYPE] = STBLBox
+
 if __name__ == '__main__':
   # parse media stream from stdin as test
   from os import fdopen
