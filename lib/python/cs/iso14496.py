@@ -1061,6 +1061,29 @@ class _SampleEntry(Box):
     '''
     return pack('>6sH', self.reserved, self.data_reference_index)
 
+class BTRTBox(Box):
+  ''' BitRateBox - section 8.5.2.2.
+  '''
+
+  BOX_TYPE = b'btrt'
+  ATTRIBUTES = ( 'bufferSizeDB', 'maxBitrate', 'avgBitrate' )
+
+  def __init__(self, box_type, box_data):
+    box_data = self._load_box_data()
+    self.bufferSizeDB, \
+    self.maxBitrate, \
+    self.avgBitrate = unpack('>LLL', box_data)
+
+  def __str__(self):
+    attr_summary = self.attribute_summary()
+    return self.__class__.__name__ + '(' + attr_summary + ')'
+
+  def box_data_chunks(self):
+    yield pack('>LLL',
+               self.bufferSizeDB,
+               self.maxBitrate,
+               self.avgBitrate)
+
 if __name__ == '__main__':
   # parse media stream from stdin as test
   from os import fdopen
