@@ -418,7 +418,7 @@ class FullBox(Box):
 
   @property
   def box_vf_data_chunk(self):
-    ''' Return the leading version and 
+    ''' Return the leading version and flags.
         Subclasses need to yield this first from .box_data_chunks().
     '''
     return bytes([ self.version,
