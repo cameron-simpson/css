@@ -542,8 +542,14 @@ class ContainerBox(Box):
 
   def __init__(self, box_type, box_data):
     Box.__init__(self, box_type, box_data)
-    box_data = self._load_box_data()
-    self.boxes = list(get_boxes(box_data))
+    self._boxes = None
+
+  @property
+  def boxes(self):
+    if self._boxes is None:
+      box_data = self._load_box_data()
+      self._boxes = list(get_boxes(box_data))
+    return self._boxes
 
   def __str__(self):
     return '%s(%s)' \
