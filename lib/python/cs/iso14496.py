@@ -218,7 +218,9 @@ class Box(object):
       try:
         BOX_TYPES = self.BOX_TYPES
       except AttributeError:
-        X("no box_type check in %s, box_type=%r", self.__class__, box_type)
+        if type(self) is not Box:
+          raise RuntimeError("no box_type check in %s, box_type=%r"
+                             % (self.__class__, box_type))
         pass
       else:
         if box_type not in BOX_TYPES:
