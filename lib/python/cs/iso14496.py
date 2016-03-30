@@ -387,6 +387,21 @@ class FullBox(Box):
     self.flags = (box_data[1]<<16) | (box_data[2]<<8) | box_data[3]
     self._set_box_data(box_data[4:])
 
+  def __str__(self):
+    prefix = '%s(%r-v%d-0x%02x' % (self.__class__.__name__,
+                                   self.box_type,
+                                   self.version,
+                                   self.flags)
+    strs = [prefix]
+    for attr in self.ATTRIBUTES:
+      if isinstance(attr, str):
+        fmt = '%s'
+      else:
+        # an (attr, fmt) tuple
+        attr, fmt = attr
+      strs.append(attr + '=' + fmt % (getattr(self, attr),))
+    return ','.join(strs) + ')'
+
   @property
   def box_vf_data_chunk(self):
     ''' Return the leading version and 
@@ -474,6 +489,7 @@ class PDINBox(FullBox):
   '''
 
   BOX_TYPE = b'pdin'
+  ATTRIBUTES = (('pdinfo', '%r'))
 
   def __init__(self, box_type, box_data):
     FullBox.__init__(self, box_type, box_data)
@@ -487,11 +503,6 @@ class PDINBox(FullBox):
                   ]
     # forget data bytes
     self._set_box_data(b'')
-
-  def __str__(self):
-    return 'PDINBox(version=%d,flags=0x%02x,pdinfo=%s)' \
-           % (self.version, self.flags,
-              ','.join(str(pdinfo) for pdinfo in self.pdinfo))
 
   def box_data_chunks(self):
     yield self.box_vf_data_chunk
@@ -548,6 +559,10 @@ class MVHDBox(FullBox):
   '''
 
   BOX_TYPE = b'mvhd'
+  ATTRIBUTES = ( ('rate', '%g'),
+                 ('volume', '%g'),
+                 ('matrix', '%r'),
+                 ('next_track_id', '%d') )
 
   def __init__(self, box_type, box_data):
     X("INIT MVHDBox ...")
@@ -578,11 +593,6 @@ class MVHDBox(FullBox):
     if offset != len(box_data):
       raise ValueError("MVHD: after decode offset=%d but len(box_data)=%d"
                        % (offset, len(box_data)))
-
-  def __str__(self):
-    return 'MVHDBox(version=%d,flags=0x%02x,rate=%g,volume=%g,matrix=%r,next_track_id=%d)' \
-           % (self.version, self.flags, self.rate, self.volume,
-              self.matrix, self.next_track_id)
 
   @property
   def rate(self):
@@ -635,6 +645,21 @@ class TKHDBox(FullBox):
   '''
 
   BOX_TYPE = b'tkhd'
+  ATTRIBUTES = ( 'track_enabled',
+                 'track_in_movie',
+                 'track_in_preview',
+                 'track_size_is_aspect_ratio',
+                 'creation_time',
+                 'modification_time',
+                 'track_id',
+                 'duration',
+                 'layer',
+                 'alternate_group',
+                 'volume',
+                 ('matrix', '%r'),
+                 'width',
+                 'height',
+               )
 
   def __init__(self, box_type, box_data):
     FullBox.__init__(self, box_type, box_data)
@@ -666,22 +691,6 @@ class TKHDBox(FullBox):
     offset += 36
     self.width, self.height = unpack('>LL', box_data[offset:offset+8])
     offset += 8
-
-  def __str__(self):
-    return 'TRHDBox(version=%d,flags=0x%02x,enabled=%s,in_movie=%s,in_preview=%s,size_is_aspect=%s,creation_time=%d,modification_time=%s,track_id=%d,duration=%d,laer=%d,alternate_group=%d,volume=0x%04x,matrix=%r,width=%d,height=%d)' \
-           % (self.version, self.flags,
-              self.track_enabled, self.track_in_movie, self.track_in_preview,
-              self.track_size_is_aspect_ratio,
-              self.creation_time,
-              self.modification_time,
-              self.track_id,
-              self.duration,
-              self.layer,
-              self.alternate_group,
-              self.volume,
-              self.matrix,
-              self.width,
-              self.height)
 
   @property
   def track_enabled(self):
@@ -772,6 +781,7 @@ class TrackGroupTypeBox(FullBox):
   '''
 
   BOX_TYPE = b'msrc'
+  ATTRIBUTES = ( 'track_group_id', )
 
   def __init__(self, box_type, box_data):
     FullBox.__init__(self, box_type, box_data)
@@ -781,9 +791,6 @@ class TrackGroupTypeBox(FullBox):
     if len(box_data) > 4:
       warning('%s: %d bytes of unparsed data after track_group_id: %r',
               self.__class__.__name__, len(box_data)-4, box_data[4:])
-
-  def __str__(self):
-    return '%s(type=%r,track_group_id=%d)' % (self.__class__.__name__, self.box_type, self.track_group_id)
 
   def box_data_chunks(self):
     yield self.box_vf_data_chunk
@@ -803,6 +810,11 @@ class MDHDBox(FullBox):
   '''
 
   BOX_TYPE = b'mdhd'
+  ATTRIBUTES = ( 'creation_time',
+                 'modification_time',
+                 'timescale',
+                 'duration',
+                 'language' )
 
   def __init__(self, box_type, box_data):
     FullBox.__init__(self, box_type, box_data)
@@ -829,13 +841,6 @@ class MDHDBox(FullBox):
     if offset != len(box_data):
       warning("MDHD: %d unparsed bytes after pre_defined: %r",
               len(box_data)-offset, box_data[offset:])
-
-  def __str__(self):
-    return '%s(type=%r-v%d-0x%02x,creation_time=%d,modification_time=%d,timescale=%d,duration=%d,language=%s)' \
-           % (self.__class__.__name__, self.box_type, self.version, self.flags,
-              self.creation_time, self.modification_time,
-              self.timescale, self.duration,
-              self.language)
 
   def box_data_chunks(self):
     yield self.box_vf_data_chunk
