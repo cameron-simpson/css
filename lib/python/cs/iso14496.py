@@ -942,6 +942,29 @@ class NMHDBox(FullBox):
 
 KNOWN_BOX_CLASSES[NMHDBox.BOX_TYPE] = NMHDBox
 
+class ELNGBox(FullBox):
+  ''' A ELNGBox is a Extended Language Tag box - ISO14496 section 8.4.6.
+  '''
+
+  BOX_TYPE = b'elng'
+  ATTRIBUTES = ( 'extended_language', )
+
+  def __init__(self, box_type, box_data):
+    FullBox.__init__(self, box_type, box_data)
+    # obtain box data after version and flags decode
+    box_data = self._box_data
+    # extended language based on RFC4646
+    self.extended_language, offset = get_utf8_nul(box_data)
+    if offset < len(box_data):
+      raise ValueError("ELNG: unexpected data: %r" % (box_data[offset:],))
+
+  def box_data_chunks(self):
+    yield self.box_vf_data_chunk
+    yield self.extended_language.encode('utf-8')
+    yield b'\0'
+
+KNOWN_BOX_CLASSES[ELNGBox.BOX_TYPE] = ELNGBox
+
 if __name__ == '__main__':
   # parse media stream from stdin as test
   from os import fdopen
