@@ -195,6 +195,14 @@ def write_box(fp, box_type, box_tail):
     fp.write(bs)
   return written
 
+def get_utf8_nul(bs, offset=0):
+  ''' Collect a NUL terminated UTF8 encoded string. Return string and new offset.
+  '''
+  endpos = bs.find(b'\0', offset)
+  if endpos < 0:
+    raise ValueError('no NUL in data: %r' % (bs[offset:],))
+  return bs[offset:endpos].decode('utf-8'), endpos + 1
+
 class Box(object):
   ''' Base class for all boxes - ISO14496 section 4.2.
   '''
@@ -890,13 +898,10 @@ class HDLRBox(FullBox):
     self.reserved1, \
     self.reserved2, \
     self.reserved3 = unpack('>L4sLLL', box_data[:20])
-    offset = 20
-    name_endpos = box_data.find(b'\0', offset)
-    if name_endpos < 0:
-      raise ValueError('HDLR: no NUL in name data: %r' % (box_data[offset:],))
-    if name_endpos != len(box_data) - 1:
-      raise ValueError('HDLR: found NUL not at end of data: %r' % (box_data[offset:],))
-    self.name = box_data[offset:name_endpos].decode('utf-8')
+    offset1 = 20
+    self.name, offset = get_utf8_nul(box_data, offset1)
+    if offset < len(box_data):
+      raise ValueError('HDLR: found NUL not at end of data: %r' % (box_data[offset1:],))
 
   def box_data_chunks(self):
     yield self.box_vf_data_chunk
