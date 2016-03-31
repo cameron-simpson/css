@@ -47,6 +47,7 @@ export CDDBSERVER
 
 anon=
 trace=
+[ -t 2 ] && trace=set-x
 force=
 bps=$CDRIP_BPS
 qual=$CDRIP_QUAL
@@ -237,7 +238,7 @@ byNAME=
 ##[ -n "$NAME" ] && byNAME=" by $NAME"
 
 toc=$TMPDIR/cdtoc.$$
-cdtoc "$CDRIP_DEV" >"$toc" || { rm -f "$toc"; exit 1; }
+$trace cdtoc2 "$CDRIP_DEV" >"$toc" || { rm -f "$toc"; exit 1; }
 
 grep '^[^#]' <"$toc" | grep -v '^[0-9][0-9]* '
 ask "Edit TOC before use" && $EDITOR "$toc"
