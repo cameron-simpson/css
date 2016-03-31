@@ -1,0 +1,106 @@
+#!/bin/sh
+#
+# Retag MP3 files based on their pathname. Requires the id3ed command.
+#   - Cameron Simpson <cs@zip.com.au> 31mar2016
+#
+# This is used to repair mistagged music trees by rearranging the
+# files to their desired names and then running this script to repair
+# the tags. We maintain our music collections outside tools like
+# iTunes etc and manage them independently, then import to proprietry
+# tools later.
+#
+# The default tree layout is:
+#
+#  artist/album/nn songname.mp3
+#
+# where nn is the track number.
+#
+
+cmd=$( basename "$0" )
+usage="Usage: $cmd [-/ {artist{sep}|{sep}artist}] [-T re_artist re_songname] mp3files...
+  -/ artist{sep}
+  -/ {sep}artist
+    Specify that the artist preceeds or follows the supplied separator
+    in the track name. Example:
+      -/ ' - artist'
+    for tracks with filenames like:
+      07 Song Name - Artist Name.mp3
+  -T re_artist re_songname
+    Specify expr-style regexps to extract the artist and songname
+    from the track basename after stripping the leading track number
+    and trailing .mp3."
+
+badopts=
+
+trace=set-x
+track_re_artist=
+track_re_songname=
+sep_style=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -/) sep=$2; shift
+        case $sep in
+          artist?*)
+            track_re_artist='\(.*\)'$( expr "x$sep" : 'xartist\(.*\)' )'.*'
+            track_re_songname='.*'$( expr "x$sep" : 'xartist\(.*\)' )'\(.*\)'
+            ;;
+          *?artist)
+            track_re_artist='.*'$( expr "x$sep" : 'x\(.*\)artist' )'\(.*\)'
+            track_re_songname='\(.*\)'$( expr "x$sep" : 'x\(.*\)artist' )'.*'
+            ;;
+          *)echo "$cmd: -/: invalid artist{sep} or {sep}artist argument: $sep" >&2
+            badopts=1
+            ;;
+        esac
+        ;;
+    -T) track_re_artist=$2 track_re_songname=$3; shift; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+[ $# -gt 0 ] || { echo "$cmd: missing mp3files" >&2; badopts=1; }
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+xit=0
+
+for mp3file
+do
+  case "$mp3file" in
+    */*/*.mp3)
+      basename=$( basename "$mp3file" )
+      basedir=$( dirname "$mp3file" )
+      album=$( basename "$basedir" )
+      upbasedir=$( dirname "$basedir" )
+      artist=$( basename "$upbasedir" )
+      tracknum=$( expr "x$basename" : 'x0*\([1-9][0-9]*\) .*' )
+      trackname=$( expr "x$basename" : 'x0*[1-9][0-9]*  *-* *\(.*\).mp3' )
+      songname=$trackname
+      [ -z "$track_re_artist" ] || artist=$( expr "x$trackname" : "x$track_re_artist" )
+      [ -z "$track_re_songname" ] || songname=$( expr "x$trackname" : "x$track_re_songname" )
+      $trace id3ed -q -q \
+                   -n "$artist" \
+                   -a "$album" \
+                   -k "$tracknum" \
+                   -s "$songname" \
+                   "$mp3file" \
+      || xit=$?
+      ;;
+    *.mp3)
+      echo "$cmd: skipping, not enough path components to retag: $mp3file" >&2
+      xit=1
+      ;;
+    *)echo "$cmd: not an MP3 file: $mp3file" >&2
+      xit=1
+      ;;
+  esac
+done
+
+exit $xit
