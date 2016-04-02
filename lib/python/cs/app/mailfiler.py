@@ -561,9 +561,17 @@ class MessageFiler(O):
         exception("matching rules: %s", e)
         return False
 
-      # add additional targets from alert_rule if any
-      if self.flags.alert and self.alert_rule::
-        self.apply_rule(self.alter_rule)
+      # apply additional targets from $ALERT_TARGETS, if any
+      if self.flags.alert:
+        alert_targets = self.environ.get('ALERT_TARGETS', '')
+        if alert_targets:
+          try:
+            Ts = get_targets(alert_targets, 0)
+          except Exception as e:
+            error('parsing $ALERT_TARGETS: %s', e)
+          else:
+            for T in Ts:
+              T.apply(self)
 
       # use default destination if no save destinations chosen
       if not self.save_to_folders \
