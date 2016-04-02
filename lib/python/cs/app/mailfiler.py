@@ -849,8 +849,8 @@ class MessageFiler(O):
   def alert(self, alert_level, alert_message=None):
     ''' Issue an alert with the specified `alert_message`.
         If missing or None, use self.alert_message(self.message).
-	If `alert_level` is more than 1, prepend "-l alert_level"
-	to the alert command line arguments.
+        If `alert_level` is more than 1, prepend "-l alert_level"
+        to the alert command line arguments.
     '''
     if alert_message is None:
       alert_message = self.alert_message(self.message)
