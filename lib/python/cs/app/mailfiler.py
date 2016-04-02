@@ -532,6 +532,7 @@ class MessageFiler(O):
     self.flags = O(alert=0,
                    flagged=False, passed=False, replied=False,
                    seen=False, trashed=False, draft=False)
+    self.alert_rule = None
     self.save_to_folders = set()
     self.save_to_addresses = set()
     self.save_to_cmds = []
@@ -559,6 +560,10 @@ class MessageFiler(O):
       except Exception as e:
         exception("matching rules: %s", e)
         return False
+
+      # add additional targets from alert_rule if any
+      if self.flags.alert and self.alert_rule::
+        self.apply_rule(self.alter_rule)
 
       # use default destination if no save destinations chosen
       if not self.save_to_folders \
