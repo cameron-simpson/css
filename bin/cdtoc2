@@ -28,7 +28,16 @@ def main(argv):
     if device == '' or device == 'default':
       device = None
   D = discid.read(device)
-  artist, title, tracks = get_disc_info(D.id)
+  try:
+    artist, title, tracks = get_disc_info(D.id)
+  except musicbrainzngs.musicbrainz.ResponseError as e:
+    print('%s: no information obtained for discid %r, making empty TOC: %s'
+          % (cmd, D.id, e), file=sys.stderr)
+    artist = ''
+    title = ''
+    tracks = sorted( [ [track.number, '', track.length]
+                       for track in discid.read(device=device).tracks
+                     ] )
   print(artist)
   print(title)
   for n, trackname, length in tracks:
