@@ -594,6 +594,9 @@ class MessageFiler(O):
         This is separated out to support the command line "save target" operation.
     '''
     ok = True
+    # issue arrival alert
+    if self.flags.alert > 0:
+      self.alert(self.flags.alert)
     # save message to folders
     for folder in sorted(self.save_to_folders):
       try:
@@ -635,9 +638,6 @@ class MessageFiler(O):
       except Exception as e:
         exception("piping to %r: %s", shcmd, e)
         ok = False
-    # issue arrival alert
-    if self.flags.alert > 0:
-      self.alert(self.flags.alert)
     return ok
 
   def modify(self, hdr, new_value, always=False):
