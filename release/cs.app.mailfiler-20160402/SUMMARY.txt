@@ -1,0 +1,6 @@
+Make rule processing more robust in the face of errors in individual targets.
+Add "report" operation for debugging rules against a test message.
+Add "function" targets.
+Make header values available for use in substitution rules.
+Allow local@domain and @domain inside (...|...) group matches.
+Honour new $ALERT_TARGETS variable for addition targets implied by issues an alert for a message.
