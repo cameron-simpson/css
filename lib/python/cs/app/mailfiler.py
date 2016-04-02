@@ -50,8 +50,8 @@ from cs.excutils import LogExceptions
 from cs.fileutils import abspath_from_file, file_property, files_property, \
                          longpath, Pathname
 import cs.lex
-from cs.lex import get_white, get_nonwhite, get_other_chars, get_qstr, \
-                   unrfc2047, match_tokens, get_delimited
+from cs.lex import get_white, get_nonwhite, skipwhite, get_other_chars, \
+                   get_qstr, unrfc2047, match_tokens, get_delimited
 from cs.logutils import Pfx, setup_logging, with_log, \
                         debug, info, warning, error, exception, \
                         D, X, LogTime
@@ -566,7 +566,11 @@ class MessageFiler(O):
         alert_targets = self.environ.get('ALERT_TARGETS', '')
         if alert_targets:
           try:
-            Ts = get_targets(alert_targets, 0)
+            Ts, offset = get_targets(alert_targets, 0)
+            offset = skipwhite(alert_targets, offset)
+            if offset < len(alert_targets):
+              raise ValueError('unparsed $ALERT_TARGETS text: %r'
+                               % alert_targets[offset:])
           except Exception as e:
             error('parsing $ALERT_TARGETS: %s', e)
           else:
