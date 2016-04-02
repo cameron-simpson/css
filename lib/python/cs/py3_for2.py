@@ -74,6 +74,9 @@ class bytes(object):
     ''' For python 2, support buffer protocol.
     '''
     return self.__s
+  @staticmethod
+  def join(bss):
+    return bytes(str.join(bss))
 
 class BytesFile(object):
   ''' Wrapper class for a file opened in binary mode which uses bytes in its methods instead of str.
@@ -104,3 +107,16 @@ class BytesFile(object):
 
   def close(self):
     return self.fp.close()
+
+from struct import pack as _pack, unpack as _unpack
+
+def pack(fmt, *values):
+  return bytes(_pack(fmt, *values))
+
+def unpack(fmt, bs):
+  from cs.logutils import X
+  X("py3_for2.unpack: fmt=%r, bs=%r", fmt, bs)
+  if isinstance(bs, bytes):
+    bs = bs._bytes__s
+    X("py3_for2.unpack: bs => %r", bs)
+  return _unpack(fmt, bs)

@@ -75,7 +75,6 @@ _testhost:
             pfx "$$target/lib/python/cs" set-x \\
               rsync -iOtrl '--include=*/' '--include=*.py' '--exclude=*' \\
                 lib/python/cs/ "$$target/lib/python/cs/" & \
-            done \
           done \
         done \
         wait
