@@ -532,6 +532,7 @@ class MessageFiler(O):
     self.flags = O(alert=0,
                    flagged=False, passed=False, replied=False,
                    seen=False, trashed=False, draft=False)
+    self.alert_rule = None
     self.save_to_folders = set()
     self.save_to_addresses = set()
     self.save_to_cmds = []
@@ -559,6 +560,18 @@ class MessageFiler(O):
       except Exception as e:
         exception("matching rules: %s", e)
         return False
+
+      # apply additional targets from $ALERT_TARGETS, if any
+      if self.flags.alert:
+        alert_targets = self.environ.get('ALERT_TARGETS', '')
+        if alert_targets:
+          try:
+            Ts = get_targets(alert_targets, 0)
+          except Exception as e:
+            error('parsing $ALERT_TARGETS: %s', e)
+          else:
+            for T in Ts:
+              T.apply(self)
 
       # use default destination if no save destinations chosen
       if not self.save_to_folders \
@@ -594,6 +607,9 @@ class MessageFiler(O):
         This is separated out to support the command line "save target" operation.
     '''
     ok = True
+    # issue arrival alert
+    if self.flags.alert > 0:
+      self.alert(self.flags.alert)
     # save message to folders
     for folder in sorted(self.save_to_folders):
       try:
@@ -635,9 +651,6 @@ class MessageFiler(O):
       except Exception as e:
         exception("piping to %r: %s", shcmd, e)
         ok = False
-    # issue arrival alert
-    if self.flags.alert > 0:
-      self.alert(self.flags.alert)
     return ok
 
   def modify(self, hdr, new_value, always=False):
@@ -836,8 +849,8 @@ class MessageFiler(O):
   def alert(self, alert_level, alert_message=None):
     ''' Issue an alert with the specified `alert_message`.
         If missing or None, use self.alert_message(self.message).
-	If `alert_level` is more than 1, prepend "-l alert_level"
-	to the alert command line arguments.
+        If `alert_level` is more than 1, prepend "-l alert_level"
+        to the alert command line arguments.
     '''
     if alert_message is None:
       alert_message = self.alert_message(self.message)

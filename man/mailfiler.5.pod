@@ -95,6 +95,9 @@ Note that the value is subject to parameter substitution and the
 associated slosh escaping and therefore sloshes needed for that
 latter phase will need doubling in the B<">I<quoted-value>B<"> form.
 
+Some environment variables have special meaning
+as described in the ENVIRONMENT section below.
+
 =head4 Header Substitution
 
 A target of the form:
@@ -254,6 +257,55 @@ Example:
 matches a message with the string "<squid-users.squid-cache.org>" in the 'List-ID:' header.
 
 The list of available functions is as follows: B<contains>. (More to come.)
+
+=head1 ENVIRONMENT
+
+B<ALERT>, the executable path of the command to issue alerts, by default "B<alert>".
+
+B<ALERT_FORMAT>, the format of alert strings.
+This is a Python format string, by default: "B<MAILFILER: {short_from}->{short_recipients}: {subject}>".
+
+B<ALERT_TARGETS>, additional implied targets to be used if an alert was issued.
+
+B<DEFAULT>, default delivery target if no rule with a delivery target has been matched.
+See the Targets section above.
+Note that this is considered I<after> any B<$ALERT_TARGETS> have been added.
+
+=head1 CAVEATS
+
+=head2 No Loop Detection
+
+There is no loop detection for folders.
+It is possible to file from folder A to folder B and have a rule for folder B which in turn files to A; this will process the message indefinitely (once per pass).
+
+However, a message which fails to file is noted and never reprocessed.
+This allows the user to fix the rules and then refile the message by hand,
+for example by using mutt to save the offending message to the same folder.
+The refiled message will be seen as new and processed anew.
+
+=head2 Assignments Are Rule Targets
+
+Do not forget that assignments are I<targets>.
+Even the author has been bitten by writing:
+
+  ALERT_TARGETS=F,spool-to-phone
+
+in his environment rules.
+This is I<two> targets: "ALTER_TARGETS=F" and "spool-to-phone".
+As a consequence, all the rule files had an unconditional filing to the "spool-to-phone" folder, including that folder filing to itself.
+The correct incantation is:
+
+  ALERT_TARGETS="F,spool-to-phone"
+
+For completeness the author also added:
+
+  ALERT_TARGETS=""
+
+after the environment load in his "spool-to-phone" folder rules, which now read:
+
+  < env
+  ALERT_TARGETS=""
+  $PHONE . .
 
 =head1 SEE ALSO
 
