@@ -275,6 +275,12 @@ def get_white(s, offset=0):
   '''
   return get_chars(s, offset, whitespace)
 
+def skipwhite(s, offset):
+  ''' Convenience routine for skipping past whitespace; returns offset of next nonwhitespace character.
+  '''
+  _, offset = get_white(s, offset=offset)
+  return offset
+
 def get_nonwhite(s, offset=0):
   ''' Scan the string `s` for characters not in string.whitespace starting at
       `offset` (default 0).
