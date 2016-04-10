@@ -1,4 +1,4 @@
-#!/bin/sed -f
+#!/usr/bin/env sed -f
 #
 # Convert a single file from a directory of single item mail files to
 # something useful for storing in a UNIX format multiitem mail file.

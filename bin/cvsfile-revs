@@ -1,4 +1,4 @@
-#!/bin/sed -nf
+#!/usr/bin/env sed -nf
 #
 # Report revision, date, author, antecedant directly from CVS RCS files.
 # Dates are in ISO format.

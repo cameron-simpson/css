@@ -1,4 +1,4 @@
-#!/bin/sed -nf
+#!/usr/bin/env sed -nf
 #
 # Extract http: URLs from plain text.
 #	- Cameron Simpson <cs@zip.com.au> 24may2000
