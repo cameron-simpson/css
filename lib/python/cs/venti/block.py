@@ -9,7 +9,14 @@ from cs.threads import locked_property
 from cs.venti import defaults, totext
 from .hash import decode as hash_decode
 
-F_BLOCK_INDIRECT = 0x01 # indirect block
+F_BLOCK_INDIRECT = 0x01     # indirect block
+F_BLOCK_SUBBLOCK = 0x02     # subspan of block: offset and subspan follow main spec
+F_BLOCK_TYPED = 0x04        # block type preceeds
+F_BLOCK_TYPE_FLAGS = 0x08   # type-specific flags follow type
+
+BT_HASHREF = 0              # default type: hashref 
+BT_RLE = 1                  # run length encoding: span octet
+BT_LITERAL = 2              # span raw-data
 
 def decodeBlocks(bs, offset=0):
   ''' Process the bytes `bs` from the supplied `offset` (default 0).
@@ -23,26 +30,84 @@ def decodeBlock(bs, offset=0):
   ''' Decode a Block reference.
       Return the Block and the new offset.
       Format is:
+        BS(reflen)  # length of following data
         BS(flags)
           0x01 indirect blockref
+          0x02 subblock of larger Block; subspan follows
+          0x04 typed: type follows
+          0x08 type flags: per type flags follow type
+        [BS(suboffset)BS(subspan)]
+        [BS(type)]
+        [BS(type_flags)]
         BS(span)
-        hash
+        union { type 0: hash
+                type 1: octet-value (repeat span times)
+                type 2: raw-data (span bytes)
+              }
   '''
-  bs0 = bs
-  offset0 = offset
-  flags, offset = get_bs(bs, offset)
-  unknown_flags = flags & ~F_BLOCK_INDIRECT
-  if unknown_flags:
-    raise ValueError("unexpected flags value (0x%02x) with unsupported flags=0x%02x, bs[offset=%d:]=%r"
-                     % (flags, unknown_flags, offset0, bs0[offset0:]))
-  span, offset = get_bs(bs, offset)
-  indirect = bool(flags & F_BLOCK_INDIRECT)
-  hashcode, offset = hash_decode(bs, offset)
-  if indirect:
-    B = IndirectBlock(hashcode=hashcode, span=span)
-  else:
-    B = Block(hashcode=hashcode, span=span)
-  return B, offset
+  with Pfx('decodeBlock(bs, offset=%d)', offset):
+    bs0 = bs
+    offset0 = offset
+    length, offset = get_bs(bs, offset)
+    offset0a = offset
+    # gather flags
+    flags, offset = get_bs(bs, offset)
+    is_indirect = bool(flags & F_BLOCK_INDIRECT)
+    is_subblock = bool(flags & F_BLOCK_SUBBLOCK)
+    is_typed = bool(flags & F_BLOCK_TYPED)
+    has_type_flags = bool(flags & F_BLOCK_TYPE_FLAGS)
+    unknown_flags = flags & ~(F_BLOCK_INDIRECT|F_BLOCK_SUBBLOCK|F_BLOCK_TYPED|F_BLOCK_TYPE_FLAGS)
+    if unknown_flags:
+      raise ValueError("unexpected flags value (0x%02x) with unsupported flags=0x%02x, bs[offset=%d:]=%r"
+                       % (flags, unknown_flags, offset0, bs0[offset0:]))
+    # gather subspan
+    if is_subblock:
+      suboffset, offset = get_bs(bs, offset)
+      subspan, offset = get_bs(bs, offset)
+    if is_typed:
+      block_type, offset = get_bs(bs, offset)
+    else:
+      block_type = BT_HASHREF
+    # gather type flags
+    if has_type_flags:
+      type_flags, offset = get_bs(bs, offset)
+    else:
+      type_flags = 0x00
+    # gather span
+    span, offset = get_bs(bs, offset)
+    # gather type specific block ref
+    if block_type == BT_HASHREF:
+      hashcode, offset = hash_decode(bs, offset)
+      # TODO: merge into basic Block?
+      if is_indirect:
+        B = IndirectBlock(hashcode=hashcode, span=span)
+      else:
+        B = Block(hashcode=hashcode, span=span)
+    elif block_type == BT_RLE:
+      octet = bs[offset]
+      offset += 1
+      B = RLEBlock(octet=octet, span=span)
+    elif block_type == BT_LITERAL:
+      offset1 = offset + span
+      data = bs[offset:offset1]
+      if len(data) != span:
+        raise ValueError("expected %d literal bytes, got %d" % (span, len(data)))
+      offset = offset1
+      B = LiteralBlock(data)
+    else:
+      raise ValueError("unsupported Block type 0x%02x" % (block_type,))
+    # mark Block as indirect or direct
+    # TODO: move indirect/direct leaves etc into _Block
+    B.indirect = is_indirect
+    if is_subblock:
+      # wrap core Block in subspan
+      B = SubBlock(B, suboffset, subspan)
+    # check that we decoded the correct number of bytes
+    if offset - offset0a > length:
+      raise ValueError("overflow decoding Block: length should be %d, but decoded %d bytes" % (length, offset - offset0))
+    elif offset - offset0a < length:
+      raise ValueError("underflow decoding Block: length should be %d, but decoded %d bytes" % (length, offset - offset0))
+    return B, offset
 
 def encodeBlocks(blocks):
   ''' Return data bytes for an IndirectBlock.
