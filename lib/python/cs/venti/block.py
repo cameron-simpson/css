@@ -110,12 +110,13 @@ def decodeBlock(bs, offset=0):
     return B, offset
 
 def encodeBlocks(blocks):
-  ''' Return data bytes for an IndirectBlock.
+  ''' Generator yielding byte chunks encoding Blocks; inverse of decodeBlocks.
   '''
   encs = []
   for B in blocks:
-    encs.append(B.encode())
-  return b''.join(encs)
+    enc = B.encode()
+    yield put_bs(len(enc))
+    yield enc
 
 def isBlock(o):
   return isinstance(o, _Block)
@@ -336,7 +337,7 @@ class IndirectBlock(_Block):
     if subblocks is None:
       _Block.__init__(self, hashcode=hashcode, span=span)
     else:
-      _Block.__init__(self, data=encodeBlocks(subblocks))
+      _Block.__init__(self, data=b''.join(encodeBlocks(subblocks)))
     self.indirect = True
 
   @locked_property
