@@ -261,7 +261,8 @@ done
 for pfflag in $pfflags
 do
   case "$pfflag" in
-    !*) test_shcmd="$test_shcmd
+    !*) pfflag=$( expr "x$pfflag" : 'x!\(.*\)' )
+        test_shcmd="$test_shcmd
                     flag -w '$pfflag' && exit 1"
         ;;
     *)  test_shcmd="$test_shcmd
