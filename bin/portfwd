@@ -251,8 +251,14 @@ done
 
 for pfflag in $pfflags
 do
-  test_shcmd="$test_shcmd
-              flag -w '$pfflag' || exit 1"
+  case "$pfflag" in
+    !*) test_shcmd="$test_shcmd
+                    flag -w '$pfflag' && exit 1"
+        ;;
+    *)  test_shcmd="$test_shcmd
+                    flag -w '$pfflag' || exit 1"
+        ;;
+  esac
 done
 test_shcmd=" $test_shcmd
            "'flag -w ! PORTFWD_NEED_SSH_AGENT || ssh-add -l >/dev/null || exit 1
