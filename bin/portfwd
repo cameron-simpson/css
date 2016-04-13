@@ -238,6 +238,15 @@ do
   pfflags="$pfflags ROUTE_GW_$rc_ugwname"
 done
 
+# extract "# F: pfname needs gw !ip-addr"
+# add PORTFWD_GW_IP_ADDR to flags
+for rc_gw in $( sed -n "s/^#  *F:  *${target}  *needs  *gw  *!\\([0-9][0-9]*\\.[0-9][0-9]*\\.[0-9][0-9]*\\.[0-9][0-9]*\\) *$/\\1/p" "$sshcfg" )
+do
+  rc_gwname=$( printf '%s\n' "$rc_gw" | tr . _ )
+  rc_ugwname=$(uppername "$rc_gwname")
+  pfflags="$pfflags !ROUTE_GW_$rc_ugwname"
+done
+
 # construct svcd "ok to ssh" test command
 test_shcmd=' flag -w PORTFWD_OVERRIDE && exit 0
              flag -w PORTFWD_DISABLE && exit 1'
