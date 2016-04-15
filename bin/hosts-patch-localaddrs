@@ -45,4 +45,4 @@ do
   done
   echo
 done \
-| rlr -f "^## BEGIN LOCAL ADDRS" -t "^## END LOCAL ADDRS" -i "$hosts" -o "$hosts" -
+| rlr -f "^## BEGIN LOCAL ADDRS" -t "^## END LOCAL ADDRS" "$hosts"
