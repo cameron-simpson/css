@@ -7,12 +7,15 @@
 : ${TMPDIR:=/tmp}
 
 cmd=`basename "$0"`
-usage="Usage: $cmd -f from -t to {-i input -o output | target-file} replacement-files...
+usage="Usage: $cmd -f from -t to {-i input -o output | target-file} [replacement-files...]
 	-f from	    Start line marked specified by regexp \"from\".
 	-t to	    Start line marked specified by regexp \"to\".
 	-i input    Take input from \"input\"; \"-\" means standard input.
 	-o output   Write result to \"output\"; \"-\" means standard output.
-    target-file If no -i and no -o, use \"target-file\" for both."
+    target-file If no -i and no -o, use \"target-file\" for both.
+    replacement-files
+                Files providing the replacement text. \"-\" means standard input.
+                Default: standard input."
 
 input=
 output=
@@ -64,7 +67,7 @@ fi
 
 [ -n "$from" ] || { echo "$cmd: missing -f option" >&2; badopts=1; }
 [ -n "$to" ] || { echo "$cmd: missing -t option" >&2; badopts=1; }
-[ $# = 0 ] && { echo "$cmd: missing replacement-files" >&2; badopts=1; }
+[ $# -gt 0 ] || set -- -
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
