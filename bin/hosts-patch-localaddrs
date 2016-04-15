@@ -32,6 +32,11 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+# make sure marker lines are present
+grep '^## BEGIN LOCAL ADDRESSES' "$hosts" >/dev/null \
+|| { echo; echo '## BEGIN LOCAL ADDRESSES'; echo '## END LOCAL ADDRESSES'; } \
+   >>"$hosts"
+
 n=2
 while read names
 do
@@ -48,4 +53,4 @@ do
   done
   echo
 done \
-| rlr -f "^## BEGIN LOCAL ADDRS" -t "^## END LOCAL ADDRS" "$hosts"
+| rlr -f '^## BEGIN LOCAL ADDRESSES' -t '^## END LOCAL ADDRESSES' "$hosts"
