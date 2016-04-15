@@ -27,7 +27,7 @@ usage="Usage: $cmd [options...] [op [args...]]
   Operations:
     number
       Join the session numbered \"number\".
-      Shortname for \"use-session number\".
+      Shorthand for \"use-session number\".
     UPPERCASE_NAME [-d] [-K keyline]... {-c shcmd | [command [args...]]}
       Shorthand for \"use-session UPPERCASE_NAME\". Includes names starting
       with an underscore.
