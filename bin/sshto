@@ -35,10 +35,12 @@ cmd=`basename "$0"` || cmd=$0
 usage="Usage: $cmd [-u dfltuser] [ssh-options...] [sshcfg=value...] [user@]host[![user2@]host2...] [command ...]
   ssh-options...  Passed to all ssh commands.
   sshcfg=value    Transmuted to -o 'sshcfg value' and added to ssh-options.
+  -E              Run login setup at far end.
   -u dfltuser     Default user for each step, default from \$SSHTO_RUSER.
+  -P              Prefix standard error output with hostname for debugging.
   -v              Verbose. Passed to all ssh commands. Turns on additional tracing.
-  -z, +z          Pass -o Compression yes/no to ssh.
-  -E              Run login setup at far end."
+  -V              Verboser, using /opt/css at far end, trace remote shell command.
+  -z, +z          Pass -o Compression yes/no to ssh."
 
 env_presh=': set -vx
            exec 3<&0 4>&1 </dev/null >&2
@@ -235,7 +237,7 @@ split_target()
       fi
       _st_pcmd="${_st_pcmd} -A -T -x -e none -o batchmode=yes -o compression=no $_st_target"
       if [ $needoptcss ]; then _st_pcmd="${_st_pcmd} $SSHTO_OPTCSS/bin/with-opt-css"; fi
-      if [ $pfxstderr ];  then _st_pcmd="${_st_pcmd} tag_fd 2 $1"; fi
+      if [ $pfxstderr ];  then _st_pcmd="${_st_pcmd} tag_fd 2 $_st_target"; fi
       if [ $dotrace ];    then _st_pcmd="${_st_pcmd} $trace"; fi
       shift
     done
