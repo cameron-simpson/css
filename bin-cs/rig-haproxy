@@ -14,4 +14,4 @@ set -x
 proxy-peerage haproxy backends choose_proxy 127.0.0.1:3129 < "$peerage" \
 | rlr -f '^# START CHOOSE PROXY' -t '# END CHOOSE PROXY' "$cfg" -
 
-haproxy -f "$cfg" -D ${1+"$@"}
+svcd -n haproxy haproxy -f "$cfg" ${1+"$@"}
