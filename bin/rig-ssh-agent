@@ -11,6 +11,7 @@ usage="Usage: $cmd [-f] [statefile]
     -f  Force: always start a new agent and overwrite the statefile."
 
 trace=${DEBUG:+set-x}
+force=
 statefile=
 badopts=
 
