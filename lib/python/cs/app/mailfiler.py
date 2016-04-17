@@ -923,7 +923,7 @@ re_GROUPNAME_s = '[A-Z][A-Z0-9_]+'
 re_atDOM_s = '@[-\w]+(\.[-\w]+)+'
 
 # local-part@domain
-re_simpleADDRatDOM_s = '[a-z0-9][\-a-z0-9]*' + re_atDOM_s
+re_simpleADDRatDOM_s = '[a-z0-9][\-\.a-z0-9]*' + re_atDOM_s
 
 # GROUPNAME or @domain
 re_GROUPNAMEorDOMorADDR_s = \
