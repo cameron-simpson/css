@@ -1218,9 +1218,6 @@ def get_target(s, offset, quoted=False):
     delim = m_delim.group()
     regexp, offset = get_delimited(s, offset, delim)
     replacement, offset = get_delimited(s, offset, delim)
-    if offset < len(s):
-      warning("UNPARSED TEXT AFTER s/this/that: %r", s[offset:])
-      offset = len(s)
     try:
       subst_re = re.compile(regexp)
     except Exception as e:
