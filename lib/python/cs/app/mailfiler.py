@@ -1512,7 +1512,9 @@ class Condition_InGroups(_Condition):
     self.group_names = group_names
 
   def test_value(self, filer, header_name, header_value):
+    # choose to test message-ids or addresses
     if header_name.lower() in ('message-id', 'references', 'in-reply-to'):
+      # test is against message-ids
       msgiddb = self.filer.msgiddb
       msgids = [ v for v in header_value.split() if v ]
       for msgid in msgids:
@@ -1549,6 +1551,7 @@ class Condition_InGroups(_Condition):
                 debug("match %s to (%s)", msgid, group_name)
                 return True
     else:
+      # test is against addresses
       for address in filer.addresses(header_name):
         for group_name in self.group_names:
           if group_name.startswith('@'):
@@ -1557,6 +1560,7 @@ class Condition_InGroups(_Condition):
               debug("match %s to %s", address, group_name)
               return True
           elif '@' in group_name:
+            # full address local part
             if address.lower() == group_name:
               debug("match %s to %s", address, group_name)
               return True
