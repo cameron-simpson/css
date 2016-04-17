@@ -1656,7 +1656,6 @@ class Rules(list):
         if R.match(filer):
           filer.apply_rule(R)
           if R.flags.halt:
-            done = True
             break
 
 class WatchedMaildir(O):
