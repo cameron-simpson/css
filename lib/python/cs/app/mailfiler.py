@@ -1606,6 +1606,14 @@ class Rule(O):
     self.flags = O(alert=0, halt=False)
     self.label = ''
 
+  def __str__(self):
+    return "%s:%d: %r %r" % (self.filename, self.lineno, self.targets, self.conditions)
+
+  def __repr__(self):
+    return "Rule(%r:%d,targets=%r,conditions=%r,flags=%s,label=%r)" \
+           % (self.filename, self.lineno, self.targets, self.conditions,
+             self.flags, self.label)
+
   @property
   def context(self):
     return "%s:%d" % (shortpath(self.filename), self.lineno)
