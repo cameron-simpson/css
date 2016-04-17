@@ -1,4 +1,4 @@
-#!/bin/sed -f
+#!/usr/bin/env sed -f
 #
 # Tidy up Subject: lines.
 # Strip multiple Re: stuff and [list] tags.

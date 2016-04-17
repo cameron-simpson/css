@@ -8,6 +8,11 @@
 
 set -ue
 
+: ${TMPDIR:=}
+if [ -z "$TMPDIR" ]
+then [ -d "$HOME/tmp/." ] && TMPDIR=$HOME/tmp
+fi
+export TMPDIR
 : ${TMUX:=''}
 : ${USER:=`id -ud`}
 : ${HOST:=`hostname`}
@@ -27,7 +32,7 @@ usage="Usage: $cmd [options...] [op [args...]]
   Operations:
     number
       Join the session numbered \"number\".
-      Shortname for \"use-session number\".
+      Shorthand for \"use-session number\".
     UPPERCASE_NAME [-d] [-K keyline]... {-c shcmd | [command [args...]]}
       Shorthand for \"use-session UPPERCASE_NAME\". Includes names starting
       with an underscore.
@@ -267,7 +272,7 @@ esac
 
 rcmd(){
   _rcmd_rhost=$1; shift
-  $trace ssh -t "$_rcmd_rhost" "$setx"'; : ${TMPDIR:=}; if [ -z "$TMPDIR" ]; then [ -d "$HOME/tmp/." ] && TMPDIR=$HOME/tmp; fi; export TMPDIR; '"$*"
+  $trace ssh -t "$_rcmd_rhost" "$setx"'; PATH=$HOME/bin:$PATH:/usr/local/bin:/opt/local/bin:$PATH; : ${TMPDIR:=}; if [ -z "$TMPDIR" ]; then [ -d "$HOME/tmp/." ] && TMPDIR=$HOME/tmp; fi; export TMPDIR; '"$*"
 }
 
 case "$op" in

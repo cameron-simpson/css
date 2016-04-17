@@ -1,4 +1,4 @@
-#!/bin/sed -f
+#!/usr/bin/env sed -f
 #
 # Join lines where a tag is split across the line end.
 # Makes subsequent parsing much easier.
