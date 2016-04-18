@@ -80,6 +80,7 @@ dosync var/ "${to}var/" \
     --include=/idsets/ \
     --include=/m4conv/ \
     --include=/run/ \
+    --include=/tmux/ \
     --include=/vagrant/ \
     --include=/venv/ \
     '--exclude=*' &
