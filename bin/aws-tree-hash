@@ -1,0 +1,55 @@
+#!/usr/bin/python
+#
+# Compute an AWS SHA256 tree hash of a file for use with Amazon Glacier.
+#   - Cameron Simpson <cs@zip.com.au> 19feb2016
+#
+
+from __future__ import print_function
+import sys
+from hashlib import sha256
+from binascii import hexlify
+
+USAGE = "Usage: %s filename"
+
+CHUNKSIZE = 1024 * 1024
+
+def main(argv):
+  cmd = argv.pop(0)
+  if len(argv) != 1:
+    print(USAGE % (cmd,), file=sys.stderr)
+  filename = argv.pop(0)
+  digest = treehash(filename)
+  print(hexlify(digest))
+  return 0
+
+def treehash(fp):
+  ''' Compute the tree hash digest of the supplied data file, return the digest.
+  '''
+  if isinstance(fp, str):
+    filename = fp
+    with open(filename, "rb") as fp:
+      return treehash(fp)
+  h = sha256()
+  hs = []
+  while True:
+    bs = fp.read(CHUNKSIZE)
+    if len(bs) == 0:
+      break
+    hs.append(sha256(bs).digest())
+  if not hs:
+    hs.append(sha256(b'').digest())
+  # coalesce adjacent pairs of hash digests until only one remains
+  while len(hs) > 1:
+    hs2 = []
+    for i in range(0, len(hs)-1, 2):
+      h = sha256()
+      h.update(hs[i])
+      h.update(hs[i+1])
+      hs2.append(h.digest())
+    if len(hs) % 2 != 0:
+      hs2.append(hs[-1])
+    hs = hs2
+  return hs[0]
+
+if __name__ == '__main__':
+  sys.exit(main(sys.argv))

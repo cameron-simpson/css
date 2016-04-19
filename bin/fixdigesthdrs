@@ -1,4 +1,4 @@
-#!/bin/sed -f
+#!/usr/bin/env sed -f
 #
 # Take the sad imitation of a digest message that Yahoo makes
 # and unindent the headers.

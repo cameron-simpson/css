@@ -8,6 +8,14 @@
 
 set -ue
 
+if [ -z "${TMUX_TMPDIR:-}" ]
+then
+  if [ -d "$HOME/var/tmux/." ]
+  then
+    TMUX_TMPDIR=$HOME/var/tmux
+    export TMUX_TMPDIR
+  fi
+fi
 : ${TMUX:=''}
 : ${USER:=`id -ud`}
 : ${HOST:=`hostname`}
@@ -23,7 +31,11 @@ cmd=$(basename "$0")
 usage="Usage: $cmd [options...] [op [args...]]
   Options:
     -x  Trace command execution.
+  With no operation, list current sessions.
   Operations:
+    number
+      Join the session numbered \"number\".
+      Shorthand for \"use-session number\".
     UPPERCASE_NAME [-d] [-K keyline]... {-c shcmd | [command [args...]]}
       Shorthand for \"use-session UPPERCASE_NAME\". Includes names starting
       with an underscore.
@@ -263,7 +275,7 @@ esac
 
 rcmd(){
   _rcmd_rhost=$1; shift
-  $trace ssh -t "$_rcmd_rhost" "$setx"'; : ${TMPDIR:=}; if [ -z "$TMPDIR" ]; then [ -d "$HOME/tmp/." ] && TMPDIR=$HOME/tmp; fi; export TMPDIR; '"$*"
+  $trace ssh -t "$_rcmd_rhost" "$setx"'; PATH=$HOME/bin:$PATH:/usr/local/bin:/opt/local/bin:$PATH; : ${TMUX_TMPDIR:=}; if [ -z "$TMUX_TMPDIR" ]; then [ -d "$HOME/var/tmux/." ] && TMUX_TMPDIR=$HOME/var/tmux; export TMUX_TMPDIR; fi; '"$*"
 }
 
 case "$op" in

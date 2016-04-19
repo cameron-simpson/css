@@ -1,4 +1,4 @@
-#!/bin/sed -f
+#!/usr/bin/env sed -f
 #
 # Postprocess POD data, clean-up pass after prepod.
 #	- Cameron Simpson <cs@zip.com.au> 10apr2004

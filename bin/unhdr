@@ -1,4 +1,4 @@
-#!/bin/sed -f
+#!/usr/bin/env sed -f
 #
 # Strip RFC822 headers from input.
 #	- Cameron Simpson 17feb1995

@@ -21,6 +21,7 @@ import logging
 from threading import Timer
 import time
 from cs.debug import Lock, RLock, Thread, trace, trace_caller, stack_dump
+import cs.logutils
 from cs.logutils import exception, error, warning, debug, D, X, XP, Pfx, PfxCallInfo
 from cs.resources import MultiOpenMixin, not_closed, ClosedError
 from cs.seq import seq
@@ -45,6 +46,7 @@ class _QueueIterator(MultiOpenMixin):
     self.q = q
     self.name = name
     self._item_count = 0    # count of non-sentinel values on the queue
+    self._item_count_previous = 0
 
   def __str__(self):
     return "<%s:opens=%d>" % (self.name, self._opens)
@@ -61,12 +63,13 @@ class _QueueIterator(MultiOpenMixin):
       raise ClosedError("_QueueIterator closed")
     if item is self.sentinel:
       raise ValueError("put(sentinel)")
-    self._item_count += 1
     return self._put(item, *args, **kw)
 
   def _put(self, item, *args, **kw):
     ''' Direct call to self.q.put() with no checks.
     '''
+    if item is not self.sentinel:
+      self._item_count += 1
     return self.q.put(item, *args, **kw)
 
   def startup(self):
@@ -101,7 +104,12 @@ class _QueueIterator(MultiOpenMixin):
       raise StopIteration("SENTINEL")
     self._item_count -= 1
     if self._item_count < 0:
-      raise RuntimeError("_item_count < 0")
+      if cs.logutils.D_mode:
+        raise RuntimeError("_item_count < 0")
+      else:
+        if self._item_count_previous != self._item_count:
+          warning("_item_count < 0 (%d)", self._item_count)
+          self._item_count_previous = self._item_count
     return item
 
   next = __next__

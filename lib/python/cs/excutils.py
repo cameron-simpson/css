@@ -139,6 +139,12 @@ def transmute(exc_from, exc_to=None):
     return transmute_transmutor_wrapper
   return transmutor
 
+def unattributable(func):
+  return transmute(AttributeError, RuntimeError)(func)
+
+def safe_property(func):
+  return property(unattributable(func))
+
 def unimplemented(func):
   ''' Decorator for stub methods that must be implemented by a stub class.
   '''

@@ -50,8 +50,8 @@ from cs.excutils import LogExceptions
 from cs.fileutils import abspath_from_file, file_property, files_property, \
                          longpath, Pathname
 import cs.lex
-from cs.lex import get_white, get_nonwhite, get_other_chars, get_qstr, \
-                   unrfc2047, match_tokens, get_delimited
+from cs.lex import get_white, get_nonwhite, skipwhite, get_other_chars, \
+                   get_qstr, unrfc2047, match_tokens, get_delimited
 from cs.logutils import Pfx, setup_logging, with_log, \
                         debug, info, warning, error, exception, \
                         D, X, LogTime
@@ -532,6 +532,7 @@ class MessageFiler(O):
     self.flags = O(alert=0,
                    flagged=False, passed=False, replied=False,
                    seen=False, trashed=False, draft=False)
+    self.alert_rule = None
     self.save_to_folders = set()
     self.save_to_addresses = set()
     self.save_to_cmds = []
@@ -559,6 +560,22 @@ class MessageFiler(O):
       except Exception as e:
         exception("matching rules: %s", e)
         return False
+
+      # apply additional targets from $ALERT_TARGETS, if any
+      if self.flags.alert:
+        alert_targets = self.environ.get('ALERT_TARGETS', '')
+        if alert_targets:
+          try:
+            Ts, offset = get_targets(alert_targets, 0)
+            offset = skipwhite(alert_targets, offset)
+            if offset < len(alert_targets):
+              raise ValueError('unparsed $ALERT_TARGETS text: %r'
+                               % alert_targets[offset:])
+          except Exception as e:
+            error('parsing $ALERT_TARGETS: %s', e)
+          else:
+            for T in Ts:
+              T.apply(self)
 
       # use default destination if no save destinations chosen
       if not self.save_to_folders \
@@ -594,6 +611,9 @@ class MessageFiler(O):
         This is separated out to support the command line "save target" operation.
     '''
     ok = True
+    # issue arrival alert
+    if self.flags.alert > 0:
+      self.alert(self.flags.alert)
     # save message to folders
     for folder in sorted(self.save_to_folders):
       try:
@@ -635,9 +655,6 @@ class MessageFiler(O):
       except Exception as e:
         exception("piping to %r: %s", shcmd, e)
         ok = False
-    # issue arrival alert
-    if self.flags.alert > 0:
-      self.alert(self.flags.alert)
     return ok
 
   def modify(self, hdr, new_value, always=False):
@@ -836,8 +853,8 @@ class MessageFiler(O):
   def alert(self, alert_level, alert_message=None):
     ''' Issue an alert with the specified `alert_message`.
         If missing or None, use self.alert_message(self.message).
-	If `alert_level` is more than 1, prepend "-l alert_level"
-	to the alert command line arguments.
+        If `alert_level` is more than 1, prepend "-l alert_level"
+        to the alert command line arguments.
     '''
     if alert_message is None:
       alert_message = self.alert_message(self.message)
@@ -906,7 +923,7 @@ re_GROUPNAME_s = '[A-Z][A-Z0-9_]+'
 re_atDOM_s = '@[-\w]+(\.[-\w]+)+'
 
 # local-part@domain
-re_simpleADDRatDOM_s = '[a-z0-9][\-a-z0-9]*' + re_atDOM_s
+re_simpleADDRatDOM_s = '[a-z0-9][\-\.a-z0-9]*' + re_atDOM_s
 
 # GROUPNAME or @domain
 re_GROUPNAMEorDOMorADDR_s = \
@@ -1201,9 +1218,6 @@ def get_target(s, offset, quoted=False):
     delim = m_delim.group()
     regexp, offset = get_delimited(s, offset, delim)
     replacement, offset = get_delimited(s, offset, delim)
-    if offset < len(s):
-      warning("UNPARSED TEXT AFTER s/this/that: %r", s[offset:])
-      offset = len(s)
     try:
       subst_re = re.compile(regexp)
     except Exception as e:
@@ -1498,7 +1512,9 @@ class Condition_InGroups(_Condition):
     self.group_names = group_names
 
   def test_value(self, filer, header_name, header_value):
+    # choose to test message-ids or addresses
     if header_name.lower() in ('message-id', 'references', 'in-reply-to'):
+      # test is against message-ids
       msgiddb = self.filer.msgiddb
       msgids = [ v for v in header_value.split() if v ]
       for msgid in msgids:
@@ -1535,6 +1551,7 @@ class Condition_InGroups(_Condition):
                 debug("match %s to (%s)", msgid, group_name)
                 return True
     else:
+      # test is against addresses
       for address in filer.addresses(header_name):
         for group_name in self.group_names:
           if group_name.startswith('@'):
@@ -1543,6 +1560,7 @@ class Condition_InGroups(_Condition):
               debug("match %s to %s", address, group_name)
               return True
           elif '@' in group_name:
+            # full address local part
             if address.lower() == group_name:
               debug("match %s to %s", address, group_name)
               return True
@@ -1588,6 +1606,14 @@ class Rule(O):
     self.flags = O(alert=0, halt=False)
     self.label = ''
 
+  def __str__(self):
+    return "%s:%d: %r %r" % (self.filename, self.lineno, self.targets, self.conditions)
+
+  def __repr__(self):
+    return "Rule(%r:%d,targets=%r,conditions=%r,flags=%s,label=%r)" \
+           % (self.filename, self.lineno, self.targets, self.conditions,
+             self.flags, self.label)
+
   @property
   def context(self):
     return "%s:%d" % (shortpath(self.filename), self.lineno)
@@ -1630,7 +1656,6 @@ class Rules(list):
         if R.match(filer):
           filer.apply_rule(R)
           if R.flags.halt:
-            done = True
             break
 
 class WatchedMaildir(O):

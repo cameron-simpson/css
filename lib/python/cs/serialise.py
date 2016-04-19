@@ -192,6 +192,8 @@ if sys.hexversion >= 0x03000000:
     ''' Write a Packet to a binary stream.
         Note: does not flush the stream.
     '''
+    ##from cs.logutils import X
+    ##X("write_Packet(%s)", P)
     fp.write(put_bsdata(P.serialise()))
 else:
   def write_Packet(fp, P):

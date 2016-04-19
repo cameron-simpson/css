@@ -1,4 +1,4 @@
-#!/bin/sed -f
+#!/usr/bin/env sed -f
 #
 # Transmute leading "From " line on email message, if any.
 #	- Cameron Simpson <cs@zip.com.au> 13jul2002

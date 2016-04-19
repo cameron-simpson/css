@@ -6,12 +6,52 @@
 
 set -ue
 
-[ $# = 1 ] || { echo "Usage: $0 category <message" >&2; exit 2; }
+cmd=$( basename "$0" )
+usage="Usage: $cmd [-tmux] category <message"
+
+: ${TMPDIR:=/tmp}
+
+set -x
+tmuxbg=
+
+badopts=
+
+if [ $# -gt 0 ] && [ "x$1" = x-tmux ]
+then
+  tmuxbg=1
+  shift
+fi
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing category" >&2
+  badopts=1
+else
+  category=$1
+  shift
+fi
+
+if [ $# -gt 0 ]
+then
+  echo "$cmd: extra arguments: $*" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+if [ $tmuxbg ]
+then
+  tmpf=$TMPDIR/$cmd.$$
+  cat >"$tmpf"
+  session_name=$( tm pick-new-prefix-session "$cmd" )
+  exec tmux new-session -s "$session_name" -d "set -x; $0 $category <'$tmpf'; rm '$tmpf'"
+fi
 
 : ${MAILDB:=$HOME/rc/mail/db.csv}
 export MAILDB
 
-maildb -m "$MAILDB" learn-addresses --ungrouped "$1"
+set -x
+maildb -m "$MAILDB" learn-addresses --ungrouped "$category"
 ( maildb -m "$MAILDB" list-groups -AG
   maildb -m "$MAILDB" list-abbreviations -A
-) | rewriteif -d "$HOME/rc/mail/mutt-aliases-auto"
+) | rewriteif -d "$HOME/rc/mutt/aliases-auto"

@@ -1,0 +1,19 @@
+#!/bin/sh
+#
+# Start local haproxy. Normally invoked as:
+#  svcd -n haproxy run-haproxy
+# - Cameron Simpson <cs@zip.com.au> 10sep2015
+# 
+
+set -ue
+
+cfg=$HOME/rc-local/haproxy.cfg
+peerage=$HOME/.peerage
+
+set -x
+
+proxy-peerage haproxy backends choose_proxy 127.0.0.1:3129 < "$peerage" \
+| rlr -f '^# START CHOOSE PROXY' -t '# END CHOOSE PROXY' "$cfg" -
+
+set -x
+exec haproxy -f "$cfg" ${1+"$@"}

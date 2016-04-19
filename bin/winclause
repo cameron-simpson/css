@@ -5,91 +5,118 @@
 #
 
 cmd=$0
-usage="Usage: $cmd file clausename [var=val...]"
+usage="Usage: $cmd file [clausename [var=value...]]"
 
-[ $# -lt 2 ] && { echo "$cmd: missing file or clausename" >&2
-		  echo "$usage" >&2
-		  exit 2
-		}
+badopts=
 
-file=$1; shift
-clause=$1; shift
-
-[ -s "$file" ] || { echo "$cmd: expect nonempty file: $file" >&2; exit 1; }
-
-# no args? just recite clause form file
-[ $# = 0 ] \
-&& exec sed -n 's/^[ 	][ 	]*//
-		/^#/d
-		/^$/d
-		/^\['"$clause"'\]/b begin
-		d
-		:begin
-		n
-		:loop
-		/^\[/q
-		s/^[ 	][ 	]*//
-		/^#/b begin
-		/^$/b begin
-		p
-		n
-		b loop' "$file"
-
-
-badops=
-append=
-prune=
-
-# compute editing commands from "var=val" strings
-for change
-do
-  var=`expr "x$change" : 'x\([a-zA-Z_][a-zA-Z_0-9]*\)=.*'`
-  if [ -z "$var" ]
+if [ $# = 0 ]
+then
+  echo "$cmd: missing file" >&2
+  badopts=1
+else
+  file=$1
+  shift
+  case "$file" in
+    -*) file=./$file ;;
+  esac
+  if [ ! -s "$file" ]
   then
-      echo "$cmd: bad change: $change"
-      badops=1
-  else
-      val=`expr "x$change" : 'x[a-zA-Z_][a-zA-Z_0-9]*=\(.*\)'`
-      append="$append
-	      a\\
-  $change"
-      prune="$prune
-	     /^ *$var *=/{
-	       n
-	       b redo
-	     }"
+    echo "$cmd: expected nonempty file: $file" >&2
+    badopts=1
   fi
-done
+  if [ $# = 0 ]
+  then
+    clause=
+  else
+    clause=$1
+    shift
+    # simple sanity check of var=value arguments
+    for setting
+    do
+      var=$( expr "x$change" : 'x\([a-zA-Z_][a-zA-Z_0-9]*\)=.*' ) || var=
+      if [ -z "$var" ]
+      then
+        echo "$cmd: bad var=value: $setting" >&2
+        badopts=1
+      fi
+    done
+  fi
+fi
 
-[ $badops ] && { echo "$cmd: bad changes, aborting" >&2
-		 echo "$usage" >&2
-		 exit 2
-	       }
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-sedf=':top
-      s/^[ 	][ 	]*//
-      /^#/b next
-      /^$/b next
-      /^\['"$clause"'\]/b begin
-      :next
-      p
-      n
-      b top
-      :begin
-      '"$append"'
-      :loop
-      p
-      n
-      :redo
-      /^\[/b last
-      s/^[ 	][ 	]*//
-      /^#/b loop
-      /^$/b loop
-      '"$prune"'
-      b loop
-      :last
-      p
-      n
-      b top'
+if [ -z "$clause" ]
+then
+  # no clause? recite clause names
+  sed -n 'y/	/ /
+          s/^ *\[ *\([^ ][^ ]*\) *\].*/\1/p
+         ' "$file"
+else
+  if [ $# = 0 ]
+  then
+    # no args? just recite clause from file
+    [ $# = 0 ] \
+    && exec sed -n 's/^[ 	][ 	]*//
+            /^#/d
+            /^$/d
+            /^\['"$clause"'\]/b begin
+            d
+            :begin
+            n
+            :loop
+            /^\[/q
+            s/^[ 	][ 	]*//
+            /^#/b begin
+            /^$/b begin
+            p
+            n
+            b loop' "$file"
+  else
+    # modify the .ini file
+    # compute editing commands from "var=val" strings
+    append=
+    prune=
+    for setting
+    do
+      var=$( expr "x$setting" : 'x\([a-zA-Z_][a-zA-Z_0-9]*\)=.*' )
+      val=$( expr "x$setting" : 'x[a-zA-Z_][a-zA-Z_0-9]*=\(.*\)' )
+      append="$append
+          a\\
+  $setting"
+      prune="$prune
+         /^ *$var *=/{
+           n
+           b redo
+         }"
+    done
 
-exec bsed -n "$sedf" "$file"
+    # apply changes
+    sedf=':top
+          s/^[ 	][ 	]*//
+          /^#/b next
+          /^$/b next
+          /^\['"$clause"'\]/b begin
+          :next
+          p
+          n
+          b top
+          :begin
+          '"$append"'
+          :loop
+          p
+          n
+          :redo
+          /^\[/b last
+          s/^[ 	][ 	]*//
+          /^#/b loop
+          /^$/b loop
+          '"$prune"'
+          b loop
+          :last
+          p
+          n
+          b top'
+
+    exec bsed -n "$sedf" "$file"
+  fi
+fi
