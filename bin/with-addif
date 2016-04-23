@@ -1,0 +1,61 @@
+#!/bin/sh
+#
+# Add an address to an interface, run a command, remove the added address.
+#   - Cameron Simpson <cs@zip.com.au> 23apr2016
+#
+
+set -ue
+
+cmd=$0
+usage="Usage: $cmd ifname addr command [args...]"
+
+badopts=
+
+trace=
+[ -t 2 ] && trace=set-x
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing ifname" >&2
+  badopts=1
+else
+  ifname=$1
+  shift
+fi
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing addr" >&2
+  badopts=1
+else
+  addr=$1
+  shift
+fi
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing command" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+case "$addr" in
+  [1-9]*) ;;
+  *)  ipaddr=$( set -x; host "$addr" | sed -n 's/^[^ ][^ ]* has address \([1-9].*\)/\1/p' )
+      if [ -z "$ipaddr" ]
+      then
+        echo "$cmd: no address for $addr" >&2
+        exit 1
+      fi
+      addr=$ipaddr
+      ;;
+esac
+
+if $trace addif -i "$ifname" -m 255.255.255.255 "$addr"
+then
+  xit=0
+  $trace "$@" || xit=$?
+  $trace delif "$addr"
+  exit $xit
+fi
