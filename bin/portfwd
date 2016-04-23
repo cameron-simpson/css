@@ -287,7 +287,7 @@ fi
 || exec $set_x \
           svcd -n "portfwd-$target" \
                -t "$test_shcmd" \
-               -- "$0" -1 $opts -- "$target"
+               -- pfx "svcd $target" "$0" -1 $opts -- "$target"
 
 # getconfig target
 #
