@@ -6,8 +6,32 @@
 
 set -ue
 
+cmd=$0
+
 : ${FLAGDIR:=$HOME/var/flags}
 cfg=$HOME/rc-local/haproxy-root.cfg
+ifname=$( ifconfig -a | sed -n '1s/[: ].*//p' )
+trace=
+[ -t 2 ] && trace=set-x
 
-set -x
-sudo env "PATH=$PATH" "FLAGDIR=$FLAGDIR" /opt/css/bin/with-opt-css svcd -n haproxy-root haproxy -f "$cfg"
+usage="Usage: $0 [-i ifname] [ipaddrs...]
+  -i ifname Interface name, default: $ifname
+  ipaddrs   Addresses to attach to interface."
+
+if [ $# -gt 0 ] && [ "x$1" = x-i ]
+then
+  ifname=$2
+  shift
+  shift
+fi
+
+first=1
+for ipaddr
+do
+  [ $first ] && { set --; first=; }
+  set -- ${1+"$@"} with-addif "$ifname" "$ipaddr"
+done
+
+set -- ${1+"$@"} svcd -n haproxy-root haproxy -f "$cfg"
+
+$trace sudo env "PATH=$PATH" "FLAGDIR=$FLAGDIR" /opt/css/bin/with-opt-css "$@"
