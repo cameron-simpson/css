@@ -1,0 +1,13 @@
+#!/bin/sh
+#
+# Dispatch haproxy as root via svcd for specific priviledged ports.
+#   - Cameron Simpson <cs@zip.com.au> 23apr2016
+#
+
+set -ue
+
+: ${FLAGDIR:=$HOME/var/flags}
+cfg=$HOME/rc-local/haproxy-root.cfg
+
+set -x
+sudo env "PATH=$PATH" "FLAGDIR=$FLAGDIR" /opt/css/bin/with-opt-css svcd -n haproxy-root haproxy -f "$cfg"
