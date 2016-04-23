@@ -42,7 +42,7 @@ fi
 
 case "$addr" in
   [1-9]*) ;;
-  *)  ipaddr=$( set -x; host "$addr" | sed -n 's/^[^ ][^ ]* has address \([1-9].*\)/\1/p' )
+  *)  ipaddr=$( host "$addr" | sed -n 's/^[^ ][^ ]* has address \([1-9].*\)/\1/p' )
       if [ -z "$ipaddr" ]
       then
         echo "$cmd: no address for $addr" >&2
