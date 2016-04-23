@@ -55,7 +55,11 @@ esac
 if $trace addif -i "$ifname" -m 255.255.255.255 "$addr"
 then
   xit=0
-  $trace "$@" || xit=$?
+  # pass termination signal to child
+  trap '$trace kill $subpid; wait; xit=1' 1 15
+  $trace "$@" &
+  subpid=$!
+  wait || xit=$?
   $trace delif "$addr"
   exit $xit
 fi
