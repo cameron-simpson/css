@@ -438,7 +438,7 @@ class Maildir(mailbox.Maildir):
         The default is to transcribe all messages.
     '''
     if keys is None:
-      keys = self.iterkeys()
+      keys = self.keys()
     for key in keys:
       with Pfx(key):
         message = self[key]
