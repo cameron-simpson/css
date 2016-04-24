@@ -72,16 +72,22 @@ do
 done
 
 # var subtree
-dosync var/ "${to}var/" \
-    --include=/locks/ \
-    --include=/log/ \
-    --include=/flags/ \
-    --include=/haproxy/ \
-    --include=/idsets/ \
-    --include=/m4conv/ \
-    --include=/run/ \
-    --include=/vagrant/ \
-    --include=/venv/ \
+dosync "${from}" "${to}" \
+    --include=/bin-local/ \
+    --include=/tmp/ \
+    --include=/p \
+    --include=/private/ \
+    --include=/var/ \
+    --include=/var/locks/ \
+    --include=/var/log/ \
+    --include=/var/flags/ \
+    --include=/var/haproxy/ \
+    --include=/var/idsets/ \
+    --include=/var/m4conv/ \
+    --include=/var/run/ \
+    --include=/var/tmux/ \
+    --include=/var/vagrant/ \
+    --include=/var/venv/ \
     '--exclude=*' &
 
 wait

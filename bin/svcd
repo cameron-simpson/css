@@ -178,10 +178,6 @@ then
   [ -n "$flag_disable" ] || flag_disable=${uname}_DISABLE
   [ -n "$flag_override" ] || flag_override=${uname}_OVERRIDE
   [ -n "$flag_restart" ] || flag_restart=${uname}_RESTART
-  pfx="$cmd $name"
-else
-  # else just compute the prefix from the command
-  pfx="$cmd-$1"
 fi
 
 # sanity check - is this process already active elsewhere?
@@ -250,18 +246,18 @@ killsubproc()
 subpid=
 trap 'killsubproc; exit 1' 1 2 3 15
 
-while : SVCD MAIN LOOP "$pfx"
+while : SVCD MAIN LOOP
 do
   if ok
   then
     # dispatch actual service process
-    pfx "$pfx" $trace $command_as "$@" &
+    $trace $command_as "$@" &
     subpid=$!
     lert "spawned pid $subpid: $*"
     [ -n "$pidfile" ] && echo "$subpid" >"$pidfile"
 
     # dispatch monitor to terminate service daemon if no longer ok to run
-    ( ( while : SVCD SUBPID MONITOR "$pfx"
+    ( ( while : SVCD SUBPID MONITOR
         do
           sleep "$testrate"
           kill -0 "$subpid" 2>/dev/null || exit 0

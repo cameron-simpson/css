@@ -8,11 +8,14 @@
 
 set -ue
 
-: ${TMPDIR:=}
-if [ -z "$TMPDIR" ]
-then [ -d "$HOME/tmp/." ] && TMPDIR=$HOME/tmp
+if [ -z "${TMUX_TMPDIR:-}" ]
+then
+  if [ -d "$HOME/var/tmux/." ]
+  then
+    TMUX_TMPDIR=$HOME/var/tmux
+    export TMUX_TMPDIR
+  fi
 fi
-export TMPDIR
 : ${TMUX:=''}
 : ${USER:=`id -ud`}
 : ${HOST:=`hostname`}
@@ -272,7 +275,7 @@ esac
 
 rcmd(){
   _rcmd_rhost=$1; shift
-  $trace ssh -t "$_rcmd_rhost" "$setx"'; PATH=$HOME/bin:$PATH:/usr/local/bin:/opt/local/bin:$PATH; : ${TMPDIR:=}; if [ -z "$TMPDIR" ]; then [ -d "$HOME/tmp/." ] && TMPDIR=$HOME/tmp; fi; export TMPDIR; '"$*"
+  $trace ssh -t "$_rcmd_rhost" "$setx"'; PATH=$HOME/bin:$PATH:/usr/local/bin:/opt/local/bin:$PATH; : ${TMUX_TMPDIR:=}; if [ -z "$TMUX_TMPDIR" ]; then [ -d "$HOME/var/tmux/." ] && TMUX_TMPDIR=$HOME/var/tmux; export TMUX_TMPDIR; fi; '"$*"
 }
 
 case "$op" in
@@ -446,7 +449,7 @@ case "$op" in
     ;;
   use-session-remote)
     # connect to remote session, tmux by choice, screen if no tmux
-    rcmd "$remote_host" "set -ue; if which tmux >/dev/null 2>&1; then tmux start-server; tmux has-session -t $session_name && exec tmux attach-session -t $session_name || exec tmux new-session -s $session_name; else exec screen -x $session_name || exec screen -S $session_name; fi"
+    rcmd "$remote_host" "set -ue; if which tmux >/dev/null 2>&1; then tmux start-server; tmux has-session -t $session_name && exec tmux attach-session -t $session_name || exec tmux new-session -s $session_name \${SHELL:-/bin/sh}; else exec screen -x $session_name || exec screen -S $session_name \${SHELL:-/bin/sh}; fi"
     ;;
   *)echo "$cmd: $op: unimplemented" >&2
     exit 1

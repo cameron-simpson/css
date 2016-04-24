@@ -896,7 +896,7 @@ def parseMacro(context, text=None, offset=0):
             else:
               submname, offset = get_identifier(text, offset)
               if not submname:
-                raise ParseError(context, moffset, 'missing macro name or string after "%s" modifier', mod0)
+                raise ParseError(context, offset, 'missing macro name or string after "%s" modifier', mod0)
               modargs = (mod0, submname, False)
           elif mod0 == ':':
             _, offset = get_white(text, offset)

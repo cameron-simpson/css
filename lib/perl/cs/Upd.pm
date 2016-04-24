@@ -76,7 +76,8 @@ use strict qw(vars);
 
 use cs::Misc;
 
-require 'flush.pl';
+##require 'flush.pl';
+use IO::Handle qw();
 
 # hard exported to main
 no warnings 'redefine';
@@ -435,7 +436,7 @@ sub out
 
   if ($cs::Upd::This->{MODE} eq TTY)
   { print $F _diff($cs::Upd::This->{STATE},$_);
-    ::flush($F);
+    $F->flush();
   }
   else
   { ## silent - we only do nl() if going to a log file
@@ -446,11 +447,11 @@ sub out
   $cs::Upd::This->{STATE}=$_;
 }
 
-sub Flush { local($cs::Upd::This)=shift; &flush; }
+sub Flush { shift->flush(); }
 sub flush
 {
   my($F)=$cs::Upd::This->{FILE};
-  ::flush($F);
+  $F->flush();
 }
 
 sub Err	{ local($cs::Upd::This)=shift; &err; }
@@ -467,7 +468,7 @@ sub err	# (@errargs) -> void
     $cs::Upd::This->{ERRSTATE}=$old;
   }
   out('');
-  flush();
+  STDOUT->flush();
   print STDERR $msg;
   out($old);
 }
