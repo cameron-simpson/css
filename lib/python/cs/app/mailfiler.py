@@ -1138,10 +1138,20 @@ def get_targets(s, offset):
   while offset < len(s) and not s[offset].isspace():
     offset0 = offset
     T, offset = get_target(s, offset)
-    if T is not None:
-      targets.append(T)
-    if offset < len(s) and s[offset] == ',':
-      offset += 1
+    targets.append(T)
+    if offset < len(s):
+      # check for end of targets (whitespace) or comma (another target)
+      ch = s[offset]
+      if ch.isspace():
+        continue
+      elif ch == ',':
+        while True:
+          offset += 1
+          if offset >= len(s) or s[offset] != ',':
+            break
+      else:
+        raise ValueError('offset %d: expected comma after target, found: %r'
+                         % (offset, s[offset:]))
   return targets, offset
 
 def get_target(s, offset, quoted=False):
