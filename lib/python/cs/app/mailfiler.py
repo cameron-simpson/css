@@ -359,9 +359,9 @@ class MailFiler(O):
 
   def folder_logfile(self, folder_path):
     ''' Return path to log file associated with the named folder.
-        TODO: ase on relative path from folder root, not just basename.
+        TODO: base on relative path from folder root, not just basename.
     '''
-    return os.path.join(self.logdir, 'filer-%s.log' % (os.path.basename(folder_path)))
+    return os.path.join(self.logdir, '%s.log' % (os.path.basename(folder_path)))
 
   def sweep(self, wmdir, justone=False, no_remove=False, logfile=None):
     ''' Scan a WatchedMaildir for messages to filter.
