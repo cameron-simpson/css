@@ -285,7 +285,7 @@ fi
 # run main restart outer control via svcd
 [ $once ] \
 || exec $set_x \
-          svcd -n "portfwd-$target" \
+          svcd -q -n "portfwd-$target" \
                -t "$test_shcmd" \
                -- pfx "svcd $target" "$0" -1 $opts -- "$target"
 
