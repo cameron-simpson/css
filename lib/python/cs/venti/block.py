@@ -87,7 +87,7 @@ def decodeBlock(bs, offset=0):
     elif block_type == BT_RLE:
       octet = bs[offset]
       offset += 1
-      B = RLEBlock(octet=octet, span=span)
+      B = RLEBlock(span, octet)
     elif block_type == BT_LITERAL:
       offset1 = offset + span
       data = bs[offset:offset1]
@@ -381,6 +381,90 @@ class IndirectBlock(_Block):
     for B in self.subblocks:
       for subB in B.leaves:
         yield subB
+
+class RLEBlock(_Block):
+  ''' An RLEBlock is a Run Length Encoded block of `span` bytes all of a specific value, typically NUL.
+  '''
+
+  def __init__(self, span, octet):
+    if span < 0:
+      raise ValueError("span < 0: %d" % (span,))
+    if isinstance(octet, int):
+      octet = bytes((octet,))
+    elif not isinstance(octet, bytes):
+     raise TypeError("octet should be an int or a bytes instance but is %s: %r" % (type(octet), octet))
+    if len(octet) != 1:
+      raise ValueError("len(octet):%d != 1" % (len(octet),))
+    self.span = span
+    self.octet = octet
+    self.indirect = False
+
+  @property
+  def data(self):
+    return self.octet * self.span
+
+  def encode(self):
+    ''' Encoded form of Block.
+    '''
+    return put_bs(F_BLOCK_TYPED) + put_bs(BT_RLE) + put_bs(self.span) + self.octet
+
+class LiteralBlock(_Block):
+  ''' A LiteralBlock is for data too short to bother hashing and Storing.
+  '''
+
+  def __init__(self, data):
+    self.data = data
+    self.indirect = False
+
+  @property
+  def span(self):
+    return len(self.data)
+
+  def encode(self):
+    return put_bs(F_BLOCK_TYPED) + put_bs(BT_LITERAL) + put_bs(self.span) + self.data
+
+def SubBlock(B, offset, length):
+  ''' Factory for SubBlocks: returns origin Block if offset==0 and length==len(B).
+  '''
+  if offset == 0 and length == len(B):
+    return B
+  return _SubBlock(B, offset, length)
+
+class _SubBlock(_Block):
+  ''' A SubBlock is a view into another block.
+      A SubBlock may not be empty and may not cover the whole of its superblock.
+  '''
+
+  def __init__(self, B, offset, length):
+    if offset <= 0 or offset >= len(B):
+      raise ValueError('offset out of range 1-%d: %d' % (len(B)-1, offset))
+    if length <= 0 or offset+length > len(B):
+      raise ValueError('length must be positive and less than %d (offset=%d, len(superblock)=%d): %d'
+                       % (len(B)-offset, offset, len(B), length))
+    if offset == 0 and length == len(B):
+      raise RuntimeError('tried to make a SubBlock spanning all of of B')
+    self._superblock = B
+    self._offset = offset
+    self.span = length
+
+  def encode(self):
+    ''' Encode this Block for storage:
+        Format is:
+          BS(flags)
+            0x01 indirect block
+          BS(span)
+          hashcode.encode()     # includes type and conceivably size
+    '''
+    flags = 0
+    if self.indirect:
+      flags |= F_BLOCK_INDIRECT
+    hashcode = self.hashcode
+    enc = put_bs(flags) + put_bs(self.span) + hashcode.encode()
+    return enc
+
+  def __getitem__(self, index):
+    # TODO: what about slices?
+    return self._superblock[self._offset+index]
 
 def chunksOf(B, start, stop=None):
   ''' Generator that yields the chunks from the subblocks that span
