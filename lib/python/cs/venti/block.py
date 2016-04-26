@@ -307,6 +307,7 @@ class Block(_Block):
         but not both.
     '''
     _Block.__init__(self, **kw)
+    self.type = BT_HASHREF
     self.indirect = False
 
   @property
@@ -357,6 +358,7 @@ class IndirectBlock(_Block):
       _Block.__init__(self, hashcode=hashcode, span=span)
     else:
       _Block.__init__(self, data=b''.join(encodeBlocks(subblocks)))
+    self.type = BT_HASHREF
     self.indirect = True
 
   @property
@@ -395,6 +397,7 @@ class RLEBlock(_Block):
      raise TypeError("octet should be an int or a bytes instance but is %s: %r" % (type(octet), octet))
     if len(octet) != 1:
       raise ValueError("len(octet):%d != 1" % (len(octet),))
+    self.type = BT_RLE
     self.span = span
     self.octet = octet
     self.indirect = False
@@ -413,6 +416,7 @@ class LiteralBlock(_Block):
   '''
 
   def __init__(self, data):
+    self.type = BT_LITERAL
     self.data = data
     self.indirect = False
 
