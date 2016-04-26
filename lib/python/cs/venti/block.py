@@ -49,6 +49,7 @@ def decodeBlock(bs, offset=0):
     bs0 = bs
     offset0 = offset
     length, offset = get_bs(bs, offset)
+    # note offset after length field, used to sanity check decoding
     offset0a = offset
     # gather flags
     flags, offset = get_bs(bs, offset)
