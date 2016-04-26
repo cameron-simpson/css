@@ -150,8 +150,7 @@ class _Block(object):
   def __str__(self):
     return self.textencode()
 
-  @property
-  def data(self):
+  def stored_data(self):
     ''' The direct data of this Block.
         i.e. _not_ the data implied by an indirect Block.
     '''
@@ -310,6 +309,10 @@ class Block(_Block):
     _Block.__init__(self, **kw)
     self.indirect = False
 
+  @property
+  def data(self):
+    return self.stored_data()
+
   def matches_data(self, odata):
     ''' Check supplied bytes `odata` against this Block's hashcode.
         NB: _not_ defined on indirect Blocks to avoid mistakes.
@@ -346,6 +349,10 @@ class IndirectBlock(_Block):
     else:
       _Block.__init__(self, data=b''.join(encodeBlocks(subblocks)))
     self.indirect = True
+
+  @property
+  def data(self):
+    return self.stored_data()
 
   @locked_property
   def subblocks(self):
