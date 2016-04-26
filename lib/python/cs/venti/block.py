@@ -6,7 +6,7 @@ from threading import RLock
 from cs.logutils import D, error, debug, X, Pfx
 from cs.serialise import get_bs, put_bs
 from cs.threads import locked_property
-from cs.venti import defaults, totext
+from . import defaults, totext
 from .hash import decode as hash_decode
 
 F_BLOCK_INDIRECT = 0x01     # indirect block
