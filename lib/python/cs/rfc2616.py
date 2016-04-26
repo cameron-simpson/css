@@ -5,6 +5,7 @@
 #
 
 import sys
+import datetime
 from email.parser import BytesFeedParser
 from itertools import takewhile
 from string import ascii_letters, ascii_uppercase, ascii_lowercase, digits
@@ -149,6 +150,56 @@ def read_headers(fp):
   parser = BytesFeedParser()
   parser.feed(b''.join(header_lines))
   return b''.join(header_lines), parser.close()
+
+def datetime_from_http_date(s):
+  ''' Parse an HTTP-date from a string, return a datetime object.
+      See RFC2616 section 3.3.1.
+  '''
+  try:
+    return datetime_from_rfc1123_date(s)
+  except ValueError as e:
+    X("datetime_from_rfc1123_date(%r): %s", s, e)
+    try:
+      return datetime_from_rfc850_date(s)
+    except ValueError as e:
+      X("datetime_from_rfc850_date(%r): %s", s, e)
+      return datetime_from_asctime_date(s)
+
+def datetime_from_rfc1123_date(s):
+  ''' Parse an rfc1123-date from a string, return a datetime object.
+      See RFC2616 section 3.3.1.
+      Format: wkday, dd mon yyyy hh:mm:ss GMT
+  '''
+  wkday, etc = s.split(',', 1)
+  if wkday not in ('Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'):
+    raise ValueError("invalid wkday: %r" % (wkday,))
+  dt = datetime.datetime.strptime(etc, " %d %b %Y %H:%M:%S GMT")
+  dt = dt.replace(tzinfo=datetime.timezone(datetime.timedelta()))
+  return dt
+
+def datetime_from_rfc850_date(s):
+  ''' Parse an rfc850-date from a string, return a datetime object.
+      See RFC2616 section 3.3.1.
+      Format: weekday, dd-mon-yy hh:mm:ss GMT
+  '''
+  weekday, etc = s.split(',', 1)
+  if weekday not in ('Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'):
+    raise ValueError("invalid weekday: %r" % (weekday,))
+  dt = datetime.datetime.strptime(etc, " %d-%b-%y %H:%M:%S GMT")
+  dt = dt.replace(tzinfo=datetime.timezone(datetime.timedelta()))
+  return dt
+
+def datetime_from_asctime_date(s):
+  ''' Parse an asctime-date from a string, return a datetime object.
+      See RFC2616 section 3.3.1.
+      Format: wkday, mon d hh:mm:ss yyyy
+  '''
+  wkday, etc = s.split(',', 1)
+  if wkday not in ('Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'):
+    raise ValueError("invalid wkday: %r" % (wkday,))
+  dt = datetime.datetime.strptime(etc + " GMT", " %b %d %H:%M:%S %Y %Z")
+  dt = dt.replace(tzinfo=datetime.timezone(datetime.timedelta()))
+  return dt
 
 def message_has_body(headers):
   ''' Does this message have a message body to forward?

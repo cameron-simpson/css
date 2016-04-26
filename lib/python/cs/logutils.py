@@ -19,7 +19,10 @@ DISTINFO = {
 
 import codecs
 from contextlib import contextmanager
-import importlib
+try:
+  import importlib
+except ImportError:
+  importlib = None
 import logging
 from logging import Formatter, StreamHandler
 import os
@@ -171,32 +174,35 @@ def setup_logging(cmd_name=None, main_log=None, format=None, level=None, flags=N
   if trace_mode:
     trace_level = logging_level
 
-  for module_name in module_names:
-    try:
-      M = importlib.import_module(module_name)
-    except ImportError:
-      warning("setup_logging: cannot import %r", module_name)
+  if module_names or function_names:
+    if importlib is None:
+      warning("setup_logging: no importlib (python<2.7?), ignoring module_names=%r/function_names=%r", module_names, function_names)
     else:
-      M.DEBUG = True
-
-  for module_name, func_name in function_names:
-    try:
-      M = importlib.import_module(module_name)
-    except ImportError:
-      warning("setup_logging: cannot import %r", module_name)
-      continue
-    F = M
-    for funcpart in func_name.split('.'):
-      M = F
-      try:
-        F = M.getattr(funcpart)
-      except AttributeError:
-        F = None
-        break
-    if F is None:
-      warning("no %s.%s() found", module_name, func_name)
-    else:
-      setattr(M, funcpart, _ftrace(F))
+      for module_name in module_names:
+        try:
+          M = importlib.import_module(module_name)
+        except ImportError:
+          warning("setup_logging: cannot import %r", module_name)
+        else:
+          M.DEBUG = True
+      for module_name, func_name in function_names:
+        try:
+          M = importlib.import_module(module_name)
+        except ImportError:
+          warning("setup_logging: cannot import %r", module_name)
+          continue
+        F = M
+        for funcpart in func_name.split('.'):
+          M = F
+          try:
+            F = M.getattr(funcpart)
+          except AttributeError:
+            F = None
+            break
+        if F is None:
+          warning("no %s.%s() found", module_name, func_name)
+        else:
+          setattr(M, funcpart, _ftrace(F))
 
   return loginfo
 

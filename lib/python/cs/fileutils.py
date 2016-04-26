@@ -21,14 +21,17 @@ from io import RawIOBase
 from functools import partial
 import os
 from os import SEEK_CUR, SEEK_END, SEEK_SET
-import os.path
+from os.path import basename, dirname, isabs, isdir, \
+                    abspath, join as joinpath, exists as existspath
 import errno
+import os
 import sys
 from collections import namedtuple
 from contextlib import contextmanager
 from itertools import takewhile
 import shutil
 import socket
+import stat
 from tempfile import TemporaryFile, NamedTemporaryFile
 from threading import RLock, Thread
 import time
@@ -44,6 +47,41 @@ from cs.threads import locked, locked_property
 from cs.timeutils import TimeoutError
 from cs.obj import O
 from cs.py3 import ustr, bytes
+
+try:
+  from os import pread
+except ImportError:
+  # implement our own pread
+  # NB: not thread safe!
+  def pread(fd, size, offset):
+    offset0 = os.lseek(fd, 0, SEEK_CUR)
+    os.lseek(fd, offset, SEEK_SET)
+    chunks = []
+    while size > 0:
+      data = os.read(fd, size)
+      if len(data) == 0:
+        break
+      chunks.append(data)
+      size -= len(data)
+    os.lseek(fd, offset0, SEEK_SET)
+    data = b''.join(chunks)
+    return data
+
+def seekable(fp):
+  ''' Try to test if a filelike object is seekable.
+      First try the .seekable method from IOBase, otherwise try
+      getting a file descriptor from fp.fileno and stat()ing that,
+      otherwise return False.
+  '''
+  try:
+    test = fp.seekable
+  except AttributeError:
+    try:
+      getfd = fp.fileno
+    except AttributeError:
+      return False
+    test = lambda: stat.S_ISREG(os.fstat(getfd()).st_mode)
+  return test()
 
 DEFAULT_POLL_INTERVAL = 1.0
 DEFAULT_READSIZE = 8192
@@ -103,8 +141,17 @@ def rewrite(filepath, data,
       `filepath` after copying the permission bits.
       Otherwise (default), copy the tempfile to `filepath`.
   '''
-  with NamedTemporaryFile(mode=mode) as T:
-    T.write(data.read())
+  if do_rename:
+    tmpdir = dirname(filepath)
+  else:
+    tmpdir = None
+  with NamedTemporaryFile(mode=mode, dir=tmpdir) as T:
+    if isinstance(data, list):
+      I = data
+    else:
+      I = chunks_of(data)
+    for chunk in I:
+      T.write(chunk)
     T.flush()
     if not empty_ok:
       st = os.stat(T.name)
@@ -156,7 +203,7 @@ def rewrite_cmgr(pathname,
     if len(backup_ext) == 0:
       backup_ext = '.bak-%s' % (datetime.datetime.now().isoformat(),)
     backuppath = pathname + backup_ext
-  dirpath = os.path.dirname(pathname)
+  dirpath = dirname(pathname)
 
   T = NamedTemporaryFile(mode=mode, dir=dirpath, delete=False)
   # hand control to caller
@@ -195,10 +242,10 @@ def abspath_from_file(path, from_file):
   ''' Return the absolute path of `path` with respect to `from_file`,
       as one might do for an include file.
   '''
-  if not os.path.isabs(path):
-    if not os.path.isabs(from_file):
-      from_file = os.path.abspath(from_file)
-    path = os.path.join(os.path.dirname(from_file), path)
+  if not isabs(path):
+    if not isabs(from_file):
+      from_file = abspath(from_file)
+    path = joinpath(dirname(from_file), path)
   return path
 
 _FileState = namedtuple('FileState', 'mtime size dev ino')
@@ -602,12 +649,12 @@ def mkdirn(path, sep=''):
       dirpath = path[:-len(os.sep)]
       pfx = ''
     else:
-      dirpath = os.path.dirname(path)
+      dirpath = dirname(path)
       if len(dirpath) == 0:
         dirpath='.'
-      pfx = os.path.basename(path)+sep
+      pfx = basename(path)+sep
 
-    if not os.path.isdir(dirpath):
+    if not isdir(dirpath):
       error("parent not a directory: %r", dirpath)
       return None
 
@@ -632,7 +679,7 @@ def mkdirn(path, sep=''):
         error("mkdir(%s): %s", newpath, e)
         return None
       if len(opath) == 0:
-        newpath = os.path.basename(newpath)
+        newpath = basename(newpath)
       return newpath
 
 def tmpdir():
@@ -648,7 +695,7 @@ def tmpdirn(tmp=None):
   ''' Make a new temporary directory with a numeric suffix.
   '''
   if tmp is None: tmp=tmpdir()
-  return mkdirn(os.path.join(tmp, os.path.basename(sys.argv[0])))
+  return mkdirn(joinpath(tmp, basename(sys.argv[0])))
 
 DEFAULT_SHORTEN_PREFIXES = ( ('$HOME/', '~/'), )
 
@@ -698,19 +745,19 @@ class Pathname(str):
 
   @property
   def dirname(self):
-    return Pathname(os.path.dirname(self))
+    return Pathname(dirname(self))
 
   @property
   def basename(self):
-    return Pathname(os.path.basename(self))
+    return Pathname(basename(self))
 
   @property
   def abs(self):
-    return Pathname(os.path.abspath(self))
+    return Pathname(abspath(self))
 
   @property
   def isabs(self):
-    return os.path.isabs(self)
+    return isabs(self)
 
   @property
   def short(self):
@@ -1187,26 +1234,53 @@ class NullFile(object):
   def flush(self):
     pass
 
-def copy_data(fpin, fpout, nbytes, rsize=None):
-  ''' Copy `nbytes` of data from `fpin` to `fpout`.
+def file_data(fp, nbytes, rsize=None):
+  ''' Read `nbytes` of data from `fp` and yield the chunks as read.
       If `nbytes` is None, copy until EOF.
       `rsize`: read size, default DEFAULT_READSIZE.
   '''
   if rsize is None:
     rsize = DEFAULT_READSIZE
+  ##prefix = "file_data(fp, nbytes=%d)" % (nbytes,)
   copied = 0
   while nbytes is None or nbytes > 0:
     to_read = rsize if nbytes is None else min(nbytes, rsize)
-    data = fpin.read(to_read)
+    ##X("%s: read %d bytes...", prefix, to_read)
+    data = fp.read(to_read)
     if not data:
       if nbytes is not None:
-        warning("early EOF: only %d bytes read, %d still to go",
-                copied, nbytes)
+        if copied > 0:
+          # no warning of nothing copied - that is immediate end of file - valid
+          warning("early EOF: only %d bytes read, %d still to go",
+                  copied, nbytes)
       break
-    fpout.write(data)
+    yield data
     copied += len(data)
     nbytes -= len(data)
+
+def copy_data(fpin, fpout, nbytes, rsize=None):
+  ''' Copy `nbytes` of data from `fpin` to `fpout`, return the number of bytes copied.
+      If `nbytes` is None, copy until EOF.
+      `rsize`: read size, default DEFAULT_READSIZE.
+  '''
+  copied = 0
+  for chunk in file_data(fpin, nbytes, rsize):
+    fpout.write(chunk)
+    copied += len(chunk)
   return copied
+
+def read_data(fp, nbytes, rsize=None):
+  ''' Read `nbytes` of data from `fp`, return the data.
+      If `nbytes` is None, copy until EOF.
+      `rsize`: read size, default DEFAULT_READSIZE.
+  '''
+  bss = list(file_data(fp, nbytes, rsize))
+  if len(bss) == 0:
+    return b''
+  elif len(bss) == 1:
+    return bss[0]
+  else:
+    return b''.join(bss)
 
 def chunks_of(fp, rsize=None):
   ''' Generator to present text or data from an open file until EOF.
@@ -1242,8 +1316,8 @@ class SavingFile(object):
     if tmpdir is None:
       # try to make the temporary file in the same directory as the
       # target path
-      tmpdir = os.path.dirname(path)
-      if not os.path.isdir(tmpdir):
+      tmpdir = dirname(path)
+      if not isdir(tmpdir):
         # fall back to the default
         tmpdir = None
     self.fd, self.tmppath = mkstemp(prefix='.tmp', dir=dir, text=text)
@@ -1272,7 +1346,7 @@ class SavingFile(object):
     self.fp.close()
     self.fp = None
     path = self.path
-    if os.path.exists(path):
+    if exsistspath(path):
       warning("replacing existing %r", path)
     os.rename(self.tmppath, path)
 

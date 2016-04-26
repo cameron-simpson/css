@@ -75,7 +75,6 @@ _testhost:
             pfx "$$target/lib/python/cs" set-x \\
               rsync -iOtrl '--include=*/' '--include=*.py' '--exclude=*' \\
                 lib/python/cs/ "$$target/lib/python/cs/" & \
-            done \
           done \
         done \
         wait
@@ -118,7 +117,7 @@ _home:
                 --exclude=/\*/ \\
                 bin/. $(HOME)/bin/. \
         bosskip=`hg status | sed -n 's:^? bin-bos/\(.*\):--exclude=/\1:p'` \
-        pfx bin-bos $(rsync) -a --delete $$bosskip bin-bos/. $(HOME)/bin-bos/. \
+        pfx bin-bos $(rsync) -a --delete $$bosskip bin-bos/. $(HOME)/bos/bin/. \
         csskip=`hg status | sed -n 's:^? bin-cs/\(.*\):--exclude=/\1:p'` \
         pfx bin-cs $(rsync) -a --delete $$csskip \\
                 --exclude=/testzap \\

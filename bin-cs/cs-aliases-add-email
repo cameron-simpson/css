@@ -54,4 +54,4 @@ set -x
 maildb -m "$MAILDB" learn-addresses --ungrouped "$category"
 ( maildb -m "$MAILDB" list-groups -AG
   maildb -m "$MAILDB" list-abbreviations -A
-) | rewriteif -d "$HOME/rc/mail/mutt-aliases-auto"
+) | rewriteif -d "$HOME/rc/mutt/aliases-auto"

@@ -3,7 +3,8 @@
 # Minimalist curses accompished by piping to vdis.
 #
 
-require 'flush.pl';
+##require 'flush.pl';
+use IO::Handle qw();
 
 package vdis;
 
@@ -25,10 +26,10 @@ sub size{ { package main; require 'cs/stty.pl'; }
 sub move{ print $VDIS "\033p$_[0],$_[1].";
 	}
 
-sub sync{ print $VDIS ''; &'flush("vdis'$VDIS"); }
+sub sync{ print $VDIS ''; $VDIS->flush(); }
 
 sub newpage
-	{ print $VDIS "\f"; &'flush("vdis'$VDIS"); }
+	{ print $VDIS "\f"; $VDIS->flush(); }
 
 sub bold{ print $VDIS "\033m+B"; }
 sub nobold{ print $VDIS "\033m-B"; }
@@ -38,7 +39,6 @@ sub nounder{print $VDIS "\033m-_"; }
 
 sub normal{print $VDIS "\033m0"; }
 
-sub end	{ close($VDIS);
-	}
+sub end	{ close($VDIS); }
 
 1;
