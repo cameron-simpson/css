@@ -119,6 +119,12 @@ def encodeBlocks(blocks):
     yield put_bs(len(enc))
     yield enc
 
+def encodeBlock(B):
+  ''' Return a bytes object containing the run length encoding from a Block.
+      put_bs(len(B.encode())) + B.encode()
+  '''
+  return b''.join(encodeBlocks((B,)))
+
 def isBlock(o):
   return isinstance(o, _Block)
 
