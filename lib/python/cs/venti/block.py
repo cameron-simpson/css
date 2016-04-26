@@ -299,7 +299,7 @@ class _Block(object):
     raise ValueError("unsupported open mode, expected 'rb' or 'w+b', got: %s", mode)
 
 class Block(_Block):
-  ''' A direct block.
+  ''' A direct block; data Stored and hashed.
   '''
 
   def __init__(self, **kw):
@@ -332,15 +332,24 @@ class IndirectBlock(_Block):
   ''' A preexisting indirect block.
       Indirect blocks come in two states, reflecting how how they are
       initialised.
-      The other way to initialise an IndirectBlock is with a hashcode and a
-      span indicating the length of the data encompassed by the block; this is
-      how a block is made from a directory entry or another indirect block.
+
+      The first state is specified by supplying the `subblocks`
+      paramater, an iterable of Blocks to be referenced by this
+      IndirectBlock. The referenced Blocks are encoded and assembled
+      into the data for this Block.
+
+      The second state is specified by supplying the `hashcode` and
+      `span` for an existing Stored block, whose content to initialise
+      an IndirectBlock is with a hashcode and a span indicating the
+      length of the data encompassed by the block speified by the
+      hashcode; the data of that Block can be decoded to obtain the
+      reference Blocks for this IndirectBlock.
 
       An indirect block can be extended with more block hashes, even one
       initialised from a hashcode. It is necessary to call the .store()
       method on a block that has been extended.
 
-      TODO: allow data= initialisation, to decode raw iblock data
+      TODO: allow data= initialisation, to decode raw iblock data.
   '''
 
   def __init__(self, subblocks=None, hashcode=None, span=None):
