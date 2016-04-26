@@ -540,19 +540,29 @@ def verify_block(B, recurse=False, S=None):
   if S is None:
     S = defaults.S
   errs = []
-  hashcode = B.hashcode
-  if hashcode not in S:
-    yield B, "hashcode not in %s" % (S,)
+  try:
+    hashcode = B.hashcode
+  except AttributeError:
+    pass
   else:
-    data = B.data
-    # hash the data using the matching hash function
-    data_hashcode = hashcode.hashfunc(data)
-    if hashcode != data_hashcode:
-      yield B, "hashcode(%s) does not match hashfunc of data(%s)" \
-               % (hashcode, data_hashcode)
+    if hashcode not in S:
+      yield B, "hashcode not in %s" % (S,)
+    else:
+      data = B.data
+      # hash the data using the matching hash function
+      data_hashcode = hashcode.hashfunc(data)
+      if hashcode != data_hashcode:
+        yield B, "hashcode(%s) does not match hashfunc of data(%s)" \
+                 % (hashcode, data_hashcode)
   if B.indirect:
     for subB in B.subblocks:
       verify_block(subB, recurse=True, S=S)
+  else:
+    # direct block: verify data length
+    data = B.data
+    if B.span != len(data):
+      yield B, "span(%d) != len(data:%d)" \
+               (B.span, len(data))
 
 if __name__ == '__main__':
   import cs.venti.block_tests
