@@ -2,6 +2,7 @@
 
 from __future__ import print_function
 import sys
+from enum import IntEnum
 from threading import RLock
 from cs.logutils import D, error, debug, X, Pfx
 from cs.serialise import get_bs, put_bs
@@ -14,9 +15,10 @@ F_BLOCK_SUBBLOCK = 0x02     # subspan of block: offset and subspan follow main s
 F_BLOCK_TYPED = 0x04        # block type preceeds
 F_BLOCK_TYPE_FLAGS = 0x08   # type-specific flags follow type
 
-BT_HASHREF = 0              # default type: hashref 
-BT_RLE = 1                  # run length encoding: span octet
-BT_LITERAL = 2              # span raw-data
+class BlockType(IntEnum):
+  BT_HASHREF = 0              # default type: hashref 
+  BT_RLE = 1                  # run length encoding: span octet
+  BT_LITERAL = 2              # span raw-data
 
 def decodeBlocks(bs, offset=0):
   ''' Process the bytes `bs` from the supplied `offset` (default 0).
@@ -68,7 +70,7 @@ def decodeBlock(bs, offset=0):
     if is_typed:
       block_type, offset = get_bs(bs, offset)
     else:
-      block_type = BT_HASHREF
+      block_type = BlockType.BT_HASHREF
     # gather type flags
     if has_type_flags:
       type_flags, offset = get_bs(bs, offset)
@@ -77,18 +79,18 @@ def decodeBlock(bs, offset=0):
     # gather span
     span, offset = get_bs(bs, offset)
     # gather type specific block ref
-    if block_type == BT_HASHREF:
+    if block_type == BlockType.BT_HASHREF:
       hashcode, offset = hash_decode(bs, offset)
       # TODO: merge into basic Block?
       if is_indirect:
         B = IndirectBlock(hashcode=hashcode, span=span)
       else:
         B = Block(hashcode=hashcode, span=span)
-    elif block_type == BT_RLE:
+    elif block_type == BlockType.BT_RLE:
       octet = bs[offset]
       offset += 1
       B = RLEBlock(span, octet)
-    elif block_type == BT_LITERAL:
+    elif block_type == BlockType.BT_LITERAL:
       offset1 = offset + span
       data = bs[offset:offset1]
       if len(data) != span:
@@ -307,7 +309,7 @@ class Block(_Block):
         but not both.
     '''
     _Block.__init__(self, **kw)
-    self.type = BT_HASHREF
+    self.type = BlockType.BT_HASHREF
     self.indirect = False
 
   @property
@@ -358,7 +360,7 @@ class IndirectBlock(_Block):
       _Block.__init__(self, hashcode=hashcode, span=span)
     else:
       _Block.__init__(self, data=b''.join(encodeBlocks(subblocks)))
-    self.type = BT_HASHREF
+    self.type = BlockType.BT_HASHREF
     self.indirect = True
 
   @property
@@ -397,7 +399,7 @@ class RLEBlock(_Block):
      raise TypeError("octet should be an int or a bytes instance but is %s: %r" % (type(octet), octet))
     if len(octet) != 1:
       raise ValueError("len(octet):%d != 1" % (len(octet),))
-    self.type = BT_RLE
+    self.type = BlockType.BT_RLE
     self.span = span
     self.octet = octet
     self.indirect = False
@@ -409,14 +411,14 @@ class RLEBlock(_Block):
   def encode(self):
     ''' Encoded form of Block.
     '''
-    return put_bs(F_BLOCK_TYPED) + put_bs(BT_RLE) + put_bs(self.span) + self.octet
+    return put_bs(F_BLOCK_TYPED) + put_bs(BlockType.BT_RLE) + put_bs(self.span) + self.octet
 
 class LiteralBlock(_Block):
   ''' A LiteralBlock is for data too short to bother hashing and Storing.
   '''
 
   def __init__(self, data):
-    self.type = BT_LITERAL
+    self.type = BlockType.BT_LITERAL
     self.data = data
     self.indirect = False
 
@@ -425,7 +427,7 @@ class LiteralBlock(_Block):
     return len(self.data)
 
   def encode(self):
-    return put_bs(F_BLOCK_TYPED) + put_bs(BT_LITERAL) + put_bs(self.span) + self.data
+    return put_bs(F_BLOCK_TYPED) + put_bs(BlockType.BT_LITERAL) + put_bs(self.span) + self.data
 
 def SubBlock(B, offset, length):
   ''' Factory for SubBlocks: returns origin Block if offset==0 and length==len(B).

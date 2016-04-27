@@ -12,7 +12,7 @@ from cs.py3 import bytes
 from . import totext
 from .block import Block, IndirectBlock, RLEBlock, LiteralBlock, \
                 verify_block, \
-                BT_HASHREF, BT_RLE, BT_LITERAL, \
+                BlockType, \
                 encodeBlock, decodeBlock
 from .cache import MemoryCacheStore
 
@@ -71,16 +71,16 @@ class TestAll(unittest.TestCase):
     # TODO: round trip indirect blocks?
     S = self.S
     with S:
-      for block_type in BT_HASHREF, BT_RLE, BT_LITERAL:
+      for block_type in BlockType.BT_HASHREF, BlockType.BT_RLE, BlockType.BT_LITERAL:
         size = rand0(16384)
         with self.subTest(type=block_type, size=size):
-          if block_type == BT_HASHREF:
+          if block_type == BlockType.BT_HASHREF:
             rs = randblock(size)
             B = Block(data=rs)
-          elif block_type == BT_RLE:
+          elif block_type == BlockType.BT_RLE:
             rb = bytes((rand0(256),))
             B = RLEBlock(size, rb)
-          elif block_type == BT_LITERAL:
+          elif block_type == BlockType.BT_LITERAL:
             rs = randblock(size)
             B = LiteralBlock(data=rs)
           else:
@@ -96,12 +96,12 @@ class TestAll(unittest.TestCase):
           self.assertEqual(B.indirect, B2.indirect, "block indirects differ")
           self.assertEqual(B.span, B2.span, "span lengths differ")
           self.assertEqual(B.data, B2.data, "spanned data differ")
-          if block_type == BT_HASHREF:
+          if block_type == BlockType.BT_HASHREF:
             self.assertEqual(B.hashcode, B2.hashcode)
-          elif block_type == BT_RLE:
+          elif block_type == BlockType.BT_RLE:
             self.assertFalse(B2.indirect)
             self.assertEqual(B2.data, B2.octet * B2.span)
-          elif block_type == BT_LITERAL:
+          elif block_type == BlockType.BT_LITERAL:
             self.assertFalse(B2.indirect)
           else:
             raise RuntimeError("no type specific tests for Block type %r" % (block_type,))
