@@ -5,6 +5,7 @@
 #
 
 import sys
+from random import choice
 import unittest
 from cs.logutils import D, X
 from cs.randutils import rand0, randblock
