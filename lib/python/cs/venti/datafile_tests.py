@@ -45,12 +45,12 @@ class TestDataFile(unittest.TestCase):
   def test00store1(self):
     ''' Save a single block.
     '''
-    self.datafile.put(randblock(rand0(MAX_BLOCK_SIZE)))
+    self.datafile.put(randblock(rand0(MAX_BLOCK_SIZE+1)))
 
   def test01fetch1(self):
     ''' Save and the retrieve a single block.
     '''
-    data = randblock(rand0(MAX_BLOCK_SIZE))
+    data = randblock(rand0(MAX_BLOCK_SIZE+1))
     self.datafile.put(data)
     data2 = self.datafile.get(0)
     self.assertEqual(data, data2)
@@ -61,7 +61,7 @@ class TestDataFile(unittest.TestCase):
     blocks = {}
     for n in range(RUN_SIZE):
       with self.subTest(put_block_n=n):
-        data = randblock(rand0(MAX_BLOCK_SIZE))
+        data = randblock(rand0(MAX_BLOCK_SIZE+1))
         offset = self.datafile.put(data)
         blocks[offset] = data
     offsets = list(blocks.keys())
@@ -122,7 +122,7 @@ class _TestDataDirMapping:
       # store RUN_SIZE random blocks
       for n in range(RUN_SIZE):
         with self.subTest(store_block_n=n):
-          data = randblock(rand0(MAX_BLOCK_SIZE))
+          data = randblock(rand0(MAX_BLOCK_SIZE+1))
           if data in by_data:
             continue
           hashcode = hashfunc(data)
