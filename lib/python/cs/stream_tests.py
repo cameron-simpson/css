@@ -58,9 +58,9 @@ class _TestStream(object):
     # throw 16 packets up, collect responses after requests queued
     rqs = []
     for _ in range(16):
-      size = rand0(16384)
+      size = rand0(16385)
       data = randblock(size)
-      flags = rand0(65536)
+      flags = rand0(65537)
       R = self.local_conn.request(0, flags, data, self._decode_response, 0)
       rqs.append( (R, flags, data) )
     random.shuffle(rqs)
