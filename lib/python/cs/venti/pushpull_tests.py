@@ -26,7 +26,7 @@ class _TestMissingHashCodes(object):
     ''' Fill map1 and map2 with the same fandom blocks.
     '''
     for n in range(32):
-      data = randblock(rand0(8192))
+      data = randblock(rand0(8193))
       h1 = self.map1.add(data)
       h2 = self.map2.add(data)
       self.assertEqual(h1, h2)
@@ -37,7 +37,7 @@ class _TestMissingHashCodes(object):
     ''' Fill map1 with random blocks, nothing in map2.
     '''
     for n in range(32):
-      data = randblock(rand0(8192))
+      data = randblock(rand0(8193))
       h1 = self.map1.add(data)
     missing = list(self.miss_generator(self.map1, self.map2))
     self.assertEqual(len(missing), 0)
@@ -47,7 +47,7 @@ class _TestMissingHashCodes(object):
     '''
     ks2 = set()
     for n in range(32):
-      data = randblock(rand0(8192))
+      data = randblock(rand0(8193))
       h2 = self.map2.add(data)
       ks2.add(h2)
     missing = list(self.miss_generator(self.map1, self.map2))
@@ -59,7 +59,7 @@ class _TestMissingHashCodes(object):
     ks1 = set()
     ks2 = set()
     for n in range(32):
-      data = randblock(rand0(8192))
+      data = randblock(rand0(8193))
       choice = randint(0, 2)
       if choice <= 1:
         h1 = self.map1.add(data)
