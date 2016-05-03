@@ -15,7 +15,7 @@ from cs.seq import seq
 from cs.serialise import get_bs, get_bsdata, get_bss, put_bs, put_bsdata, put_bss
 from cs.threads import locked, locked_property
 from . import totext, fromtext
-from .block import Block, decodeBlock
+from .block import Block, decodeBlock, encodeBlock
 from .file import File
 from .meta import Meta
 
@@ -44,7 +44,7 @@ F_HASNAME = 0x02
 F_NOBLOCK = 0x04
 
 def decode_Dirent_text(text):
-  ''' Accept `text`, a text transcription of a Direct, such as from
+  ''' Accept `text`, a text transcription of a Dirent, such as from
       Dirent.textencode(), and return the corresponding Dirent.
   '''
   data = fromtext(text)
@@ -59,7 +59,7 @@ class DirentComponents(namedtuple('DirentComponents', 'type name metatext block'
   @classmethod
   def from_data(cls, data, offset=0):
     ''' Unserialise a serialised Dirent, return (DirentComponents, offset).
-        Input format: bs(type)bs(flags)[bs(namelen)name][bs(metalen)meta]block
+        Input format: bs(type)bs(flags)[bs(namelen)name][bs(metalen)meta]blockref
     '''
     type_, offset = get_bs(data, offset)
     flags, offset = get_bs(data, offset)
@@ -104,7 +104,7 @@ class DirentComponents(namedtuple('DirentComponents', 'type name metatext block'
       flags |= F_NOBLOCK
       blockref = b''
     else:
-      blockref = block.encode()
+      blockref = encodeBlock(block)
     return put_bs(self.type) \
          + put_bs(flags) \
          + namedata \
@@ -217,38 +217,7 @@ class _Dirent(object):
     ''' Serialise the dirent as text.
         Output format: bs(type)bs(flags)[bs(namelen)name][bs(metalen)meta]block
     '''
-    flags = 0
-
-    name = self.name
-    if name is None or len(name) == 0:
-      nametxt = ""
-    else:
-      nametxt = totext(put_bsdata(name.encode()))
-      flags |= F_HASNAME
-
-    meta = self.meta
-    if meta:
-      if not isinstance(meta, Meta):
-        raise TypeError("self.meta is not a Meta: <%s>%r" % (type(meta), meta))
-      metatxt = meta.textencode()
-      if metatxt == meta.dflt_acl_text:
-        metatxt = ''
-      if len(metatxt) > 0:
-        metatxt = totext(put_bsdata(metatxt.encode()))
-        flags |= F_HASMETA
-    else:
-      metatxt = ""
-
-    if self.issym or self.ishardlink:
-      blocktxt = ''
-    else:
-      blocktxt = self.block.textencode()
-    return ( hexify(put_bs(self.type))
-           + hexify(put_bs(flags))
-           + nametxt
-           + metatxt
-           + blocktxt
-           )
+    return totext(self.encode())
 
   @property
   def size(self):
@@ -539,7 +508,7 @@ class Dir(_Dirent):
   def change(self):
     ''' Mark this Dir as changed; propagate to parent Dir if present.
     '''
-    XP("Dir %r: changed=True", self.name)
+    ##XP("Dir %r: changed=True", self.name)
     ##stack_dump(indent=2)
     self.changed = True
     if self.parent:
