@@ -174,7 +174,7 @@ class _Dirent(object):
     return ( self.name == other.name
          and self.type == other.type
          and self.meta == other.meta
-         and self.block.hashcode == other.block.hashcode
+         and self.block == other.block
            )
 
   @property
