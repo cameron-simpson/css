@@ -279,7 +279,7 @@ class _Block(object):
   @locked_property
   def subblocks(self):
     if not self.indirect:
-      raise TypeError("Block is not direct, no .subblocks")
+      raise TypeError("Block is direct, no .subblocks")
     return tuple(decodeBlocks(self.data))
 
   @property
