@@ -170,6 +170,87 @@ class _Block(object):
   def __str__(self):
     return self.textencode()
 
+  def __eq__(self, oblock):
+    if self is oblock:
+      return True
+    if self.span != oblock.span:
+      # different lengths, no match
+      return False
+    # see if both blocks are direct blocks
+    if not self.indirect and not oblock.indirect:
+      # directly compare hashcodes if available
+      try:
+        h1 = self.hashcode
+      except AttributeError:
+        pass
+      else:
+        try:
+          h2 = oblock.hashcode
+        except AttributeError:
+          pass
+        else:
+          return h1 == h2
+      # directly compare data otherwise
+      return self.data == oblock.data
+    # indirect: walk both blocks comparing leaves
+    leaves1 = self.leaves
+    leaves2 = oblock.leaves
+    offset = 0  # amount already compared
+    offset1 = 0 # offset of start of leaf1
+    offset2 = 0 # offset of start of leaf2
+    leaf2 = None
+    for leaf1 in leaves1:
+      end1 = offset1 + len(data1)
+      while offset < end1:
+        # still more bytes in leaf1 needing comparison
+        # fetch leaf2 if required
+        while leaf2 is None:
+          try:
+            leaf2 = next(leaves2)
+          except StopIteration:
+            # oblock is short
+            return False
+          if len(leaf2) == 0:
+            leaf2 = None
+        # compare leaves if aligned
+        # this will sidestep any data fetch if they both have hashcodes
+        if offset == offset1 and offset == offset2 and len(leaf1) == len(leaf2):
+          if leaf1 != leaf2:
+            return False
+          # identical, advance to end of block
+          offset = end1
+          leaf2 = None
+          continue
+        end2 = offset2 + len(data2)
+        cmplen = min(offset1, offset2) - offset
+        if cmplen < 0:
+          raise RuntimeError("cmplen(%d) < 0: offset=%d, offset1=%d, offset2=%d"
+                             % (cmplen, offset, offset1, offset2))
+        # we can defer fetching the data until now
+        data1 = leaf1.data
+        data2 = leaf2.data
+        if ( data1[offset-offset1:offset-offset1+cmplen]
+             != data2[offset-offset2:offset-offset2+cmplen] 
+           ):
+          return False
+        offset += cmplen
+        if offset > end1 or offset > end2:
+          raise RuntimeError("offset advanced beyond end of leaf1 or leaf2: offset=%d, end(leaf1)=%d, end(leaf2)= %d" % ( offset, end1, end2))
+        if offset >= end2:
+          # leaf2 consumed, discard
+          leaf2 = None
+    # check that there are no more nonempty leaves in leaves2
+    while leaf2 is None:
+      try:
+        leaf2 = next(leaves2)
+      except StopIteration:
+        pass
+      else:
+        if len(leaf2) == 0:
+          leaf2 = None
+    # data are identical if we have consumed all of leaves1 an all of leaves2
+    return leaf2 is None
+
   def _encode(self, flags, span, block_type, block_type_flags, chunks):
     ''' Return the bytes encoding for this Block, sans run length.
     '''
