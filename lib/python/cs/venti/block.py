@@ -546,10 +546,7 @@ class LiteralBlock(_Block):
     _Block.__init__(self, BlockType.BT_LITERAL)
     self.data = data
     self.indirect = False
-
-  @property
-  def span(self):
-    return len(self.data)
+    self.span = len(data)
 
   def encode(self):
     return self._encode(0, self.span, BlockType.BT_LITERAL, 0,
