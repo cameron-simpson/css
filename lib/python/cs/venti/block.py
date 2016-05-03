@@ -34,7 +34,7 @@ def encoded_Block_fields(flags, span, block_type, type_flags=0, chunks=()):
   '''
   if flags & ~(F_BLOCK_INDIRECT|F_BLOCK_TYPED|F_BLOCK_TYPE_FLAGS):
     raise ValueError("unexpected flags: 0x%02x" % (flags,))
-  if span < 1:
+  if span < 0:
     raise ValueError("expected span >= 1, got: %s" % (span,))
   if not isinstance(block_type, BlockType):
     block_type = BlockType(block_type)
