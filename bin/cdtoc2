@@ -1,0 +1,106 @@
+#!/usr/bin/env python3
+#
+# Extract discid and track info from a CD as a preliminary to
+# constructing a FreeDB CDDB entry. Used by cdsubmit.
+# Rework of cddiscinfo in Python, since the Perl libraries aren't
+# working any more; update to work on OSX and use MusicBrainz.
+#	- Cameron Simpson <cs@zip.com.au> 31mar2016
+#
+
+from __future__ import print_function
+import os
+from os.path import basename
+import sys
+from pprint import pprint
+import discid
+import musicbrainzngs
+
+USAGE = 'Usage: %s [device]'
+APP_VERSION = '2.0a'
+
+def main(argv):
+  cmd = basename(argv.pop(0))
+  usage = USAGE % (cmd,)
+  musicbrainzngs.set_useragent(cmd, APP_VERSION, os.environ['EMAIL'])
+  device = None
+  if argv:
+    device = argv.pop(0)
+    if device == '' or device == 'default':
+      device = None
+  D = discid.read(device)
+  try:
+    artist, title, tracks = get_disc_info(D.id)
+  except musicbrainzngs.musicbrainz.ResponseError as e:
+    print('%s: no information obtained for discid %r, making empty TOC: %s'
+          % (cmd, D.id, e), file=sys.stderr)
+    artist = ''
+    title = ''
+    tracks = sorted( [ [track.number, '', track.length]
+                       for track in discid.read(device=device).tracks
+                     ] )
+  print(artist)
+  print(title)
+  for n, trackname, length in tracks:
+    print(n, length)
+    print(trackname)
+    print()
+
+def print_toc(artist, title, track_list):
+    print(artist)
+    print(title)
+    offset = 0
+    for n, track in enumerate(track_list, 1):
+      track_length = int(track['length'])
+      print(n, track_length, offset)
+      offset += track_length
+      print(track['title'])
+      print()
+
+def get_disc_info(disc_id):
+  X('musicbrainzngs.get_releases_by_discid(%r)...', disc_id)
+  info = musicbrainzngs.get_releases_by_discid(disc_id, includes=['recordings'])
+  pprint(info, sys.stderr, indent=2, width=16)
+  X("process...")
+  if 'disc' in info:
+    matches = list(disc_info_from_mbdisc(info['disc'], disc_id))
+    if not matches:
+      raise ValueError('no disc_id %r matches: %r' % (disc_id, disc_info_from_mbdisc))
+    if len(matches) > 1:
+      print("using first of multiple matches for disc_id %r: %r" % (disc_id, matches), file=sys.stderr)
+    return matches[0]
+  if 'cdstub' in info:
+    return disc_info_from_mbcdstub['cdstubs']
+  pprint(info, sys.stderr, indent=2)
+  raise ValueError('cannot get album track info: get_releases_by_discid(%r) gave: %r'
+                   % (disc_id, info))
+
+def disc_info_from_mbcdstub(cdstub):
+  artist = cdstub['artist']
+  title = cdstub['title']
+  tracks = []
+  for n, track in enumerate(cdstub['track-list'], 1):
+    tracks.append( (n, track['title'], track['length']) )
+  return artist, title, track
+
+def disc_info_from_mbdisc(disc, disc_id):
+  artist = None
+  for release in disc['release-list']:
+    for medium in release['medium-list']:
+      for disc in medium['disc-list']:
+        if disc['id'] == disc_id:
+          # matched disc: yield info
+          title = release['title']
+          tracks = []
+          for track in medium['track-list']:
+            tracks.append( (int(track['number']),
+                            track['recording']['title'],
+                            int(track['recording']['length'])) )
+          yield artist, title, tracks
+
+def X(msg, *a):
+  if a:
+    msg = msg % a
+  print(msg, file=sys.stderr)
+
+if __name__ == '__main__':
+  sys.exit(main(sys.argv))

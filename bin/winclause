@@ -16,6 +16,9 @@ then
 else
   file=$1
   shift
+  case "$file" in
+    -*) file=./$file ;;
+  esac
   if [ ! -s "$file" ]
   then
     echo "$cmd: expected nonempty file: $file" >&2
@@ -47,7 +50,7 @@ then
   # no clause? recite clause names
   sed -n 'y/	/ /
           s/^ *\[ *\([^ ][^ ]*\) *\].*/\1/p
-         ' -- "$file"
+         ' "$file"
 else
   if [ $# = 0 ]
   then
@@ -67,7 +70,7 @@ else
             /^$/b begin
             p
             n
-            b loop' -- "$file"
+            b loop' "$file"
   else
     # modify the .ini file
     # compute editing commands from "var=val" strings
