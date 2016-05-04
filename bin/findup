@@ -45,7 +45,7 @@ dir=$( pwd )
 while [ -z "$odir" ] || [ "x$odir" != "x$dir" ]
 do
   path=$dir/$relpath
-  if "$@" "$relpath"
+  if "$@" "$path"
   then
     xit=0
     printf '%s\n' "$path"
