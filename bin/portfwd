@@ -297,8 +297,6 @@ test_shcmd=" $test_shcmd
              [ -x "$HOME/bin-local/do-portfwd" ] || exit 0
              "$HOME/bin-local/do-portfwd"
             '
-exit 1
-
 if [ $doit ]
 then set_x=set-x
 else set_x=echo
