@@ -247,6 +247,26 @@ do
   pfflags="$pfflags !ROUTE_GW_$rc_ugwname"
 done
 
+# extract probe "# F: probe probe-shell-cmannd"
+pfprobes=$( sed -n "s/^#  *F:  *${target}  *probe  *\\([^ ].*\\)/\1/p" "$sshcfg" )
+
+for rc_ping in $( sed -n "s/^#  *F:  *${target}  *ping  *\\([^ ].*\\)/\1/p" "$sshcfg" )
+do
+  case "$rc_ping" in
+    !?*)rc_ping=$( expr "x$rc_ping" : 'x.\(.*\)' )
+        rc_ping="not ping -c 1 -t 3 $rc_ping >/dev/null"
+        ;;
+    ?*) rc_ping="ping -c 1 -t 3 $rc_ping >/dev/null"
+        ;;
+    *)  echo "$cmd: $target: $sshcfg: invalid \"# F: ping\" target: $rc_ping" >&2
+        badopts=1
+        continue
+        ;;
+  esac
+  pfprobes="$pfprobes
+            $rc_ping"
+done
+        
 # construct svcd "ok to ssh" test command
 test_shcmd=' flag -w PORTFWD_OVERRIDE && exit 0
              flag -w PORTFWD_DISABLE && exit 1'
@@ -273,9 +293,11 @@ done
 test_shcmd=" $test_shcmd
            "'flag -w ! PORTFWD_NEED_SSH_AGENT || ssh-add -l >/dev/null || exit 1
              flag -w ROUTE_DEFAULT || exit 1
+            '$( printf '%s\n' "$pfprobes" | sed -n 's/ *\([^ ].*\)/{ \1; } || exit 1/p' )'
              [ -x "$HOME/bin-local/do-portfwd" ] || exit 0
              "$HOME/bin-local/do-portfwd"
             '
+exit 1
 
 if [ $doit ]
 then set_x=set-x
