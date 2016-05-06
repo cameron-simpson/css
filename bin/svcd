@@ -44,6 +44,8 @@ usage="Usage:
   $cmd restart name
           Set the flag {NAME}_RESTART, causing the matching svcd to shut down
           and then restart its daemon process.
+  $cmd stop name
+          Kill the svcd running the named daemon process and the daemon process.
   $cmd [-1] [-l] [-L lockname] [-n name] [-t testcmd] [-x] command [args...]
     -1    Run command only once.
     -l    Use lock \"svcd-<name>\" to prevent multiple instances of this svcd.
@@ -78,32 +80,37 @@ uppername()
 { echo "$1" | tr -- '-[a-z]' '_[A-Z]'
 }
 
-# process {disable|enable|restart} specially if present
-if [ $# -gt 0 ] && [ "x$1" = xdisable -o "x$1" = xenable -o "x$1" = xrestart ]
+# process {disable|enable|restart|stop} specially if present
+if [ $# -gt 0 ]
 then
-  op=$1; shift
-  if [ $# = 0 ]
-  then
-    echo "$cmd: $op: missing name" >&2
-  else
-    name=$1; shift
-    if [ $# -gt 0 ]
-    then
-      echo "$cmd: $op: extra arguments after name: $*" >&2
-    else
-      # usage correct, act on the operation
-      uname=$( uppername "$name" )
-      case $op in
-        disable)    flag -w "${uname}_DISABLE" 1 ;;
-        enable)     flag -w "${uname}_DISABLE" 0 ;;
-        restart)    flag -w "${uname}_RESTART" 1 ;;
-        *)          echo "$cmd: $op: UNHANDLED!" >&2; exit 1 ;;
-      esac
-      exit
-    fi
-  fi
-  echo "$usage" >&2
-  exit 2
+  case "$1" in
+    disable|enable|restart|stop)
+      op=$1; shift
+      if [ $# = 0 ]
+      then
+        echo "$cmd: $op: missing name" >&2
+      else
+        name=$1; shift
+        if [ $# -gt 0 ]
+        then
+          echo "$cmd: $op: extra arguments after name: $*" >&2
+        else
+          # usage correct, act on the operation
+          uname=$( uppername "$name" )
+          case $op in
+            disable)    $race flag -w "${uname}_DISABLE" 1 ;;
+            enable)     $race flag -w "${uname}_DISABLE" 0 ;;
+            restart)    $race flag -w "${uname}_RESTART" 1 ;;
+            stop)       $trace killpidfile -W "$killtime" -- "$VARRUN/svcd-$name.pid" ;;
+            *)          echo "$cmd: $op: UNHANDLED!" >&2; exit 1 ;;
+          esac
+          exit
+        fi
+      fi
+      echo "$usage" >&2
+      exit 2
+      ;;
+  esac
 fi
 
 badopts=
