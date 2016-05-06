@@ -250,13 +250,14 @@ done
 # extract probe "# F: probe probe-shell-cmannd"
 pfprobes=$( sed -n "s/^#  *F:  *${target}  *probe  *\\([^ ].*\\)/\1/p" "$sshcfg" )
 
+# extract ping probes "# F: ping [!]host..."
 for rc_ping in $( sed -n "s/^#  *F:  *${target}  *ping  *\\([^ ].*\\)/\1/p" "$sshcfg" )
 do
   case "$rc_ping" in
     !?*)rc_ping=$( expr "x$rc_ping" : 'x.\(.*\)' )
-        rc_ping="not ping -c 1 -t 3 $rc_ping >/dev/null"
+        rc_ping="not ping -c 1 -t 3 $rc_ping >/dev/null 2>&1"
         ;;
-    ?*) rc_ping="ping -c 1 -t 3 $rc_ping >/dev/null"
+    ?*) rc_ping="ping -c 1 -t 3 $rc_ping >/dev/null 2>&1"
         ;;
     *)  echo "$cmd: $target: $sshcfg: invalid \"# F: ping\" target: $rc_ping" >&2
         badopts=1
