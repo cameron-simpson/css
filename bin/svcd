@@ -19,7 +19,8 @@ name=
 flag_disable=
 flag_override=
 flag_restart=
-pidfile=
+svcd_pidfile=
+subp_pidfile=
 trace=
 setx=:
 [ -z "$DEBUG" ] || { trace=set-x; setx='set -x'; }
@@ -50,11 +51,13 @@ usage="Usage:
           Use lock \"lockname\" to prevent multiple instances of this svcd.
     -n name
           Specify a name for this svcd.
-          Also create a pid file at $VARRUN/name.pid for the command.
+          Also create a subprocess pid file at $VARRUN/name.pid for the command.
           This also causes svcd to consult the flags {NAME}_OVERRIDE
           and {NAME}_DISABLE and {NAME}_RESTART.
-    -p pidfile
-          Specify pidfile instead of default.
+    -p svcd-pidfile
+          Specify $cmd pid file instead of default.
+    -P subp-pidfile
+          Specify $cmd subprocess pid file instead of default.
     -q    Quiet. Do not issue alerts.
     -s sigcmd
           Run the signature shell command \"sigcmd\" whose output is
@@ -114,7 +117,7 @@ do
     -l) dolock=1 ;;
     -L) dolock=1 lockname=$2; shift ;;
     -n) name=$2; shift ;;
-    -p) pidfile=$2; shift ;;
+    -p) svcd_pidfile=$2; shift ;;
     -q) quiet=1 opts="$opts $1" ;;
     -s) sigcmd=$2; shift ;;
     -t) testcmd=$2; shift ;;
@@ -168,22 +171,23 @@ fi
 
 # rerun ourself inside a lock if specified
 [ $dolock ] \
-&& exec $trace lock -1 "$lockname" "$0" $opts -n "$name" -p "$pidfile" -s "$sigcmd" -t "$testcmd" -T "$testrate" -u "$username" -U "$rusername" -- "$@"
+&& exec $trace lock -1 "$lockname" "$0" $opts -n "$name" -p "$subp_pidfile" -P "$svcd_pidfile" -s "$sigcmd" -t "$testcmd" -T "$testrate" -u "$username" -U "$rusername" -- "$@"
 
 if [ -n "$name" ]
 then
   # recompute various things with the service name if specified
   uname=$( uppername "$name" )
-  [ -z "$pidfile" ] && pidfile=$VARRUN/svcd-$name.pid
-  [ -n "$flag_disable" ] || flag_disable=${uname}_DISABLE
-  [ -n "$flag_override" ] || flag_override=${uname}_OVERRIDE
-  [ -n "$flag_restart" ] || flag_restart=${uname}_RESTART
+  : ${subp_pidfile:=$VARRUN/$name.pid}
+  : ${svcd_pidfile:=$VARRUN/svcd-$name.pid}
+  : ${flag_disable:-${uname}_DISABLE}
+  : ${flag_override:=${uname}_OVERRIDE}
+  : ${flag_restart:=${uname}_RESTART}
 fi
 
 # sanity check - is this process already active elsewhere?
-if [ -n "$pidfile" ] && pid=`ifpid -q -v "$pidfile"`
+if [ -n "$svcd_pidfile" ] && pid=`ifpid -q -v "$svcd_pidfile"`
 then
-  echo "$cmd: $pidfile: already running, pid $pid:" `ps -o args -p "$pid" 2>/dev/null | sed 1d` >&2
+  echo "$cmd: $svcd_pidfile: already running, pid $pid:" `ps -o args -p "$pid" 2>/dev/null | sed 1d` >&2
   exit 1
 fi
 
@@ -220,19 +224,19 @@ ok()
   return 0
 }
 
-# kill the process specified by $pidfile (if nonempty) otherwise $subpid
+# kill the process specified by $subp_pidfile (if nonempty) otherwise $subpid
 # wait for it to terminate
 killsubproc()
 {
-  if [ -n "$pidfile" ]
+  if [ -n "$subp_pidfile" ]
   then
-    if [ -s "$pidfile" ]
+    if [ -s "$subp_pidfile" ]
     then
-      ( short_pidfile=$(printf '%s\n' "$pidfile" | entilde)
-        lert "kill $short_pidfile:" $(cat "$pidfile")
+      ( short_pidfile=$(printf '%s\n' "$subp_pidfile" | entilde)
+        lert "kill $short_pidfile:" $(cat "$subp_pidfile")
       ) &
-      $trace killpidfile -W "$killtime" -- "$pidfile"
-      rm -f "$pidfile"
+      $trace killpidfile -W "$killtime" -- "$subp_pidfile"
+      rm -f "$subp_pidfile"
     fi
   else
     if [ -n "$subpid" ]
@@ -243,8 +247,16 @@ killsubproc()
   fi
 }
 
+tidy()
+{
+  [ -n "$subp_pidfile" ] && rm -f "$subp_pidfile"
+  [ -n "$svcd_pidfile" ] && rm -f "$svcd_pidfile"
+}
+
+[ -n "$svcd_pidfile" ] && echo $$ >"$svcd_pidfile"
+
 subpid=
-trap 'killsubproc; exit 1' 1 2 3 15
+trap 'killsubproc; tidy; exit 1' 1 2 3 15
 
 while : SVCD MAIN LOOP
 do
@@ -254,7 +266,7 @@ do
     $trace $command_as "$@" &
     subpid=$!
     lert "spawned pid $subpid: $*"
-    [ -n "$pidfile" ] && echo "$subpid" >"$pidfile"
+    [ -n "$subp_pidfile" ] && echo "$subpid" >"$subp_pidfile"
 
     # dispatch monitor to terminate service daemon if no longer ok to run
     ( ( while : SVCD SUBPID MONITOR
@@ -272,13 +284,13 @@ do
     # or kill it (and wait)
     wait "$subpid" || not kill -0 "$subpid" 2>/dev/null || killsubproc
     subpid=
-    [ -n "$pidfile" ] && rm -f "$pidfile"
+    [ -n "$subp_pidfile" ] && rm -f "$subp_pidfile"
 
     [ $once ] && break
   fi
   $trace sleep "$testrate"
 done
 
-[ -n "$pidfile" ] && rm -f "$pidfile"
+tidy
 
 exit 0
