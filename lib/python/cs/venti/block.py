@@ -383,7 +383,7 @@ class _Block(object):
         # should be a new partial block
         if B.indirect:
           raise RuntimeError("got slice for partial Block %s start=%r end=%r but Block is indirect! should be a partial leaf" % (B, Bstart, Bend))
-        yield Block(data=B[Bstart:Bend])
+        yield SubBlock(B, Bstart, Bend - Bstart)
 
   def all_data(self):
     ''' The entire data of this Block as a single bytes object.
