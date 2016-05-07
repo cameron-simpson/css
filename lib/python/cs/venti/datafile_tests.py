@@ -11,6 +11,10 @@ import random
 import shutil
 import tempfile
 import unittest
+try:
+  import kyotocabinet
+except ImportError:
+  kyotocabinet = None
 from cs.logutils import X
 from cs.randutils import rand0, randblock
 from .datafile import DataFile, GDBMDataDirMapping, KyotoDataDirMapping, \
@@ -107,9 +111,13 @@ class _TestDataDirMapping:
     D2 = DataDirMapping_from_spec(self.datadir.dirpath)
     self.assertEqual(datadir_spec, D2.spec())
     for indexname in 'gdbm', 'kyoto':
-      for hashname in 'sha1',:
-        spec = '%s:%s:%s' % (indexname, hashname, self.datadir.dirpath)
-        D3 = DataDirMapping_from_spec(spec)
+      with self.subTest(indexname=indexname):
+        if indexname == 'kyoto' and kyotocabinet is None:
+            raise unittest.SkipTest('could not import kyotocabinet')
+        for hashname in 'sha1',:
+          with self.subTest(hashname=hashname):
+            spec = '%s:%s:%s' % (indexname, hashname, self.datadir.dirpath)
+            D3 = DataDirMapping_from_spec(spec)
 
   def test002randomblocks(self):
     ''' Save random blocks, retrieve in random order.
@@ -137,6 +145,7 @@ class _TestDataDirMapping:
           # test integrity afterwards
           self.assertTrue(hashcode in by_hash)
           self.assertTrue(data in by_data)
+          ##X("D[]=%r", list(D.keys()))
           self.assertTrue(hashcode in D)
       # now retrieve in random order
       hashcodes = list(by_hash.keys())
@@ -170,9 +179,11 @@ class TestDataDirMappingGDBM(_TestDataDirMapping, unittest.TestCase):
 class TestHashCodeUtilsGDBM(_TestHashCodeUtils, unittest.TestCase):
   MAP_FACTORY = lambda self: GDBMDataDirMapping(mktmpdir())
 
+@unittest.skipIf(kyotocabinet is None, "could not import kyotocabinet")
 class TestDataDirMappingKyoto(_TestDataDirMapping, unittest.TestCase):
   MAPPING_CLASS = KyotoDataDirMapping
 
+@unittest.skipIf(kyotocabinet is None, "could not import kyotocabinet")
 class TestHashCodeUtilsKyoto(_TestHashCodeUtils, unittest.TestCase):
   MAP_FACTORY = lambda self: KyotoDataDirMapping(mktmpdir())
 
