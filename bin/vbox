@@ -9,10 +9,10 @@ set -ue
 cmd=$( basename "$0" )
 usage="Usage: $cmd op [arguments...]
   Operations:
-    pause vm-name [VBoxManage pause options...]
-    resume vm-name [VBoxManage resume options...]
+    pause vm-name [VBoxManage controlvm vm-name pause options...]
+    resume vm-name [VBoxManage controlvm vm-name resume options...]
     start vm-name [VBoxManage startvm options...]
-    suspend vm-name [VBoxManage savestate options...]"
+    suspend vm-name [VBoxManage controlvm vm-name savestate options...]"
 
 badopts=
 
@@ -25,6 +25,14 @@ else
   shift
   case "$op" in
     pause|resume|start|suspend)
+        if [ $# = 0 ]
+        then
+          echo "$cmd: $op: missing vm-name" >&2
+          badopts=1
+        else
+          vmname=$1
+          shift
+        fi
         ;;
     *)  echo "$cmd: unrecognised op: $op" >&2
         badopts=1
@@ -35,10 +43,10 @@ fi
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 case "$op" in
-  pause)    VBoxManage pause ${1+"$@"} ;;
-  resume)   VBoxManage resume ${1+"$@"} ;;
-  start)    VBoxManage startvm ${1+"$@"} ;;
-  suspend)  VBoxManage savestate ${1+"$@"} ;;
+  pause)    VBoxManage controlvm "$vmname" pause ${1+"$@"} ;;
+  resume)   VBoxManage controlvm "$vmname" resume ${1+"$@"} ;;
+  start)    VBoxManage startvm "$vmname" ${1+"$@"} ;;
+  suspend)  VBoxManage controlvm "$vmname" savestate ${1+"$@"} ;;
   *)        echo "$cmd: unimplemented op: $op" >&2
             exit 1
             ;;
