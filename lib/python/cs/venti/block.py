@@ -568,8 +568,8 @@ class _SubBlock(_Block):
     _Block.__init__(self, BlockType.BT_SUBBLOCK)
     with Pfx("_SubBlock(suboffset=%d, span=%d)[len(SuperB)=%d]",
              suboffset, span, len(SuperB)):
-      if suboffset <= 0 or suboffset >= len(SuperB):
-        raise ValueError('suboffset out of range 1-%d: %d' % (len(SuperB)-1, suboffset))
+      if suboffset < 0 or suboffset >= len(SuperB):
+        raise ValueError('suboffset out of range 0-%d: %d' % (len(SuperB)-1, suboffset))
       if span < 0 or suboffset+span > len(SuperB):
         raise ValueError('span must be nonnegative and less than %d (suboffset=%d, len(superblock)=%d): %d'
                          % (len(SuperB)-suboffset, suboffset, len(SuperB), span))
