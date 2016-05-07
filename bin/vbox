@@ -6,6 +6,9 @@
 
 set -ue
 
+trace=
+[ -t 2 ] && trace=set-x
+
 cmd=$( basename "$0" )
 usage="Usage: $cmd op [arguments...]
   Operations:
@@ -43,10 +46,10 @@ fi
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 case "$op" in
-  pause)    VBoxManage controlvm "$vmname" pause ${1+"$@"} ;;
-  resume)   VBoxManage controlvm "$vmname" resume ${1+"$@"} ;;
-  start)    VBoxManage startvm "$vmname" ${1+"$@"} ;;
-  suspend)  VBoxManage controlvm "$vmname" savestate ${1+"$@"} ;;
+  pause)    $trace VBoxManage controlvm "$vmname" pause ${1+"$@"} ;;
+  resume)   $trace VBoxManage controlvm "$vmname" resume ${1+"$@"} ;;
+  start)    $trace VBoxManage startvm "$vmname" ${1+"$@"} ;;
+  suspend)  $trace VBoxManage controlvm "$vmname" savestate ${1+"$@"} ;;
   *)        echo "$cmd: unimplemented op: $op" >&2
             exit 1
             ;;
