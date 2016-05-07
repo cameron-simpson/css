@@ -89,4 +89,7 @@ then
   exit 1
 fi
 
+SVC_OP=$op
+SVC_NAME=$name
+export SVC_OP SVC_NAME
 exec sh -c "$setx; $shcmd"
