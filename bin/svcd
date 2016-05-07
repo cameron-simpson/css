@@ -98,9 +98,9 @@ then
           # usage correct, act on the operation
           uname=$( uppername "$name" )
           case $op in
-            disable)    $race flag -w "${uname}_DISABLE" 1 ;;
-            enable)     $race flag -w "${uname}_DISABLE" 0 ;;
-            restart)    $race flag -w "${uname}_RESTART" 1 ;;
+            disable)    $trace flag -w "${uname}_DISABLE" 1 ;;
+            enable)     $trace flag -w "${uname}_DISABLE" 0 ;;
+            restart)    $trace flag -w "${uname}_RESTART" 1 ;;
             stop)       $trace killpidfile -W "$killtime" -- "$VARRUN/svcd-$name.pid" ;;
             *)          echo "$cmd: $op: UNHANDLED!" >&2; exit 1 ;;
           esac
@@ -187,7 +187,7 @@ then
   uname=$( uppername "$name" )
   : ${subp_pidfile:=$VARRUN/$name.pid}
   : ${svcd_pidfile:=$VARRUN/svcd-$name.pid}
-  : ${flag_disable:-${uname}_DISABLE}
+  : ${flag_disable:=${uname}_DISABLE}
   : ${flag_override:=${uname}_OVERRIDE}
   : ${flag_restart:=${uname}_RESTART}
 fi
