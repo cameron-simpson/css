@@ -1,0 +1,92 @@
+#!/bin/sh
+#
+# Convenience command to start disparate services based on name.
+# The configuration is in $HOME/rc/svc.
+# For further convenience I define the following shell aliases:
+#
+#   alias disable='svc disable'
+#   alias disabled='flag -q | grep "_DISABLE\$"'
+#   alias enable='svc enable'
+#   alias restart='svc restart'
+#   alias start='svc start'
+#   alias stop='svc stop'
+#
+# This makes managing my personal service processes far more convenient.
+#   - Cameron Simpson <cs@zip.com.au> 07may2016
+#
+
+set -ue
+
+: ${SVC_CONFIG:=$HOME/.svcrc}
+
+cmd=$( basename "$0" )
+usage="Usage: $cmd {disable|enable|restart|start|stop} name"
+
+badopts=
+
+# tracing
+setx=:
+trace=
+[ -t 2 ] && { setx='set -x'; trace=set-x; }
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing op" >&2
+  badopts=1
+else
+  op=$1
+  shift
+  case "$op" in
+    disable|enable|restart|start|stop)
+        ;;
+    *)  echo "$cmd: unrecognised op: $op" >&2
+        badopts=1
+        ;;
+  esac
+  if [ $# = 0 ]
+  then
+    echo "$cmd: $op: missing name" >&2
+    badopts=1
+  else
+    name=$1
+    shift
+  fi
+fi
+
+if [ $# -gt 0 ]
+then
+  echo "$cmd: extra arguments: $*" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+# process config file
+shcmd=
+while read -r rc_op rc_ptn rc_shcmd
+do
+  # skip comments, blank lines and config for other ops
+  case "$rc_op" in
+    \#* | '')
+      continue
+      ;;
+    "$op")
+      ;;
+    *)continue
+      ;;
+  esac
+  # check for a match on the name
+  case "$name" in
+    $rc_ptn)
+      shcmd=$rc_shcmd
+      ;;
+  esac
+done <"$SVC_CONFIG"
+
+if [ -z "$shcmd" ]
+then
+  echo "$cmd: $SVC_CONFIG: no rules for: $op $name" >&2
+  exit 1
+fi
+
+exec $trace sh -c "$setx; $shcmd"
