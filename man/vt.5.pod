@@ -23,12 +23,16 @@ if it is 0 then it is the final byte in the sequence.
 The 7 lower order bits contribute to the value.
 The value starts at zero
 and as each byte is gathered from the sequence
-the value is right shifted 7 places (a multiplication of 128)
+the value is left shifted 7 places (a multiplication of 128)
 and the 7 low order bits of the new byte are added to the value.
 
-=head2 Hex/Text Encoding
+Facilites to read and write and encode and decode these
+come from the cs.serialise Python module.
 
-Raw byte sequences are sometimes encoded as mix of text and hexadecimal
+=head2 Textual Hex/Text Encoding
+
+Text transcriptions of raw byte sequences
+are sometimes encoded as mix of text and hexadecimal
 sequences where textual representation is required,
 such as on the command line or in B<.vt> archive files.
 These sequences represent each byte as a pair of hexadecimal characters
@@ -41,9 +45,14 @@ This enhances the readablity of several transcriptions
 that contain text portions,
 notably directory entries.
 
+Functions to encode and decode this format
+are available from the cs.venti package as toext and fromtext respectively;
+these are wrappers for the cs.lex Python module's
+texthexify and untexthexify respectively.
+
 =head1 DATA STORAGE FORMATS
 
-=head2 On Disc Block Store
+=head2 Local Filesystem Block Store
 
 The on disc content is stored in flat files consisting of a sequence
 of I<size>/I<zblock> chunks.
@@ -52,7 +61,7 @@ zblock segment.
 The I<zblock> segment is a ZLib compressed version of the raw data block as
 returned from Python's zlib.compress() function.
 
-A data store managed by the cs.venti.gdbmstore.GDBStore class
+A data store managed by the cs.venti.gdbmstore.GDBMStore class
 consists of a directory holding several of the flat files
 described above, named B<I<n>.vtd> where I<n> is a number counting from 0.
 The contents of the store are indexed by a GDBM file named B<index>

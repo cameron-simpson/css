@@ -848,6 +848,14 @@ class Later(MultiOpenMixin):
     LF = self._submit(func, **params)
     return LF
 
+  def with_result_of(self, callable1, func, *a, **kw):
+    ''' Defer `callable1`, then add its result to the arguments for `func` and defer that. Return the LateFunction for `func`.
+    '''
+    def then():
+      LF1 = self.defer(callable1)
+      return self.defer(func, *[a + [LF1.result]])
+    return then()
+
   @MultiOpenMixin.is_opened
   def after(self, LFs, R, func, *a, **kw):
     ''' Queue the function `func` for later dispatch after completion of `LFs`.
@@ -1043,6 +1051,11 @@ class Later(MultiOpenMixin):
     yield
     self._priority = oldpri
 
+  def pool(self, *a, **kw):
+    ''' Return a LatePool to manage some tasks run with this Later.
+    '''
+    return LatePool(L=self, *a, **kw)
+
 class LatePool(object):
   ''' A context manager after the style of subprocess.Pool but with deferred completion.
       Example usage:
@@ -1092,12 +1105,19 @@ class LatePool(object):
       self.join()
     return False
 
+  def add(self, LF):
+    ''' Add a LateFunction to those to be tracked by this LatePool.
+    '''
+    self.LFs.append(LF)
+
   def submit(self, func, **params):
     ''' Submit a function using the LatePool's default paramaters, overridden by `params`.
     '''
     submit_params = dict(self.parameters)
     submit_params.update(kw)
-    return self.L.submit(func, **submit_params)
+    LF = self.L.submit(func, **submit_params)
+    self.add(LF)
+    return LF
 
   def defer(self, func, *a, **kw):
     ''' Defer a function using the LatePool's default paramaters.

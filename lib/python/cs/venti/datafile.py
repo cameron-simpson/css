@@ -430,7 +430,7 @@ class DataDirMapping(MultiOpenMixin, HashCodeUtilsMixin):
 
   # without this "in" tries to iterate over the mapping with int indices
   def __contains__(self, hashcode):
-    return hashcode in self._index(hashcode.__class__)
+    return hashcode in self._unindexed or hashcode in self._index(hashcode.__class__)
 
   def __getitem__(self, hashcode):
     ''' Return the decompressed data associated with the supplied `hashcode`.
@@ -491,7 +491,6 @@ class DataDirMapping(MultiOpenMixin, HashCodeUtilsMixin):
       hashclass = self.default_hashclass
     h = hashclass.from_data(data)
     self[h] = data
-    X("ADD %s to %s", h, self)
     return h
 
   @locked
