@@ -154,13 +154,6 @@ def missing_hashcodes_by_checksum(S1, S2, window_size=None):
       yield hashcode
     start_hashcode = hashcodes2[-1]
 
-def pull_Dirent(S1, S2, E, recurse=False):
-  E.block.complete(S2)
-  if E.isdir:
-    for name, entry in E.entries.items():
-      if name != '.' and name != '..':
-        pull_Dirent(S1, S2, entry)
-
 if __name__ == '__main__':
   from cs.debug import selftest
   selftest('cs.venti.pushpull_tests')

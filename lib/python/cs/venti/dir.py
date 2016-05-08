@@ -274,6 +274,16 @@ class _Dirent(object):
 
     return (unixmode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime)
 
+  def complete(self, S2, recurse=False):
+    ''' Complete this Dirent from alternative Store `S2`.
+        TODO: paralellise like _Block.complete.
+    '''
+    self.block.complete(S2)
+    if self.isdir:
+      for name, entry in self.entries.items():
+        if name != '.' and name != '..':
+          entry.complete(S2, True)
+
 class InvalidDirent(_Dirent):
 
   def __init__(self, components, chunk):
