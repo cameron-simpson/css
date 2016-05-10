@@ -5,6 +5,7 @@
 # For further convenience I define the following shell aliases:
 #
 #   alias disable='svc disable'
+#   alias connected='flag -q | grep "_CONNECTED\$"'
 #   alias disabled='flag -q | grep "_DISABLE\$"'
 #   alias enable='svc enable'
 #   alias restart='svc restart'
