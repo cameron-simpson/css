@@ -217,6 +217,43 @@ class MegaRAID(O):
 
     return Mconfigured
 
+  def _preparse(fp, start=1):
+    ''' Generator yielding (lineno, line, heading, info, attr).
+        Skips blank lines etc.
+    '''
+    for mlineno, line in enumerate(fp, start=start):
+      if not line.endswith('\n'):
+        raise ValueError("%d: missing newline" % (mlineno,))
+      line = line.rstrip()
+      if not line:
+        continue
+      if line.startswith('======='):
+        continue
+      line = line.rstrip()
+      heading = line
+      info = None
+      attr = None
+      if ': ' in line:
+        heading, info = line.split(': ', 1)
+      elif ' :' in line:
+        heading, info = line.split(' :', 1)
+      elif line.endswith(':'):
+        heading = line[:-1]
+        info = ''
+      else:
+        warning("%d: unparsed line: %s", mlineno, line)
+        continue
+      heading = heading.rstrip()
+      info = info.lstrip()
+      attr = heading.lower().replace(' ', '_').replace('.','').replace("'",'').replace('/','_')
+      try:
+        n = int(info)
+      except ValueError:
+        pass
+      else:
+        info = n
+      yield mlineno, line, heading, info, attr
+
   def _parse(self, megacli_args, mode):
     ''' Generic parser for megacli output.
         Update 
@@ -230,16 +267,8 @@ class MegaRAID(O):
     DG = None
     DRV = None
     o = None
-    mlineno = 0
-    for line in self.readcmd(*megacli_args):
-      mlineno += 1
-      if not line.endswith('\n'):
-        raise ValueError("%d: missing newline" % (mlineno,))
-      line = line.rstrip()
-      if not line:
-        continue
-      if line.startswith('======='):
-        continue
+    for mlineno, line, heading, info, attr \
+        in self._preparse(self.readcmd(*megacli_args)):
       if ( line == 'Virtual Drive Information:'
         or line == 'Physical Disk Information:'
          ):
@@ -251,25 +280,6 @@ class MegaRAID(O):
         M.adapters[An] = A
         o = A
         continue
-      if ': ' in line:
-        heading, info = line.split(': ', 1)
-      elif ' :' in line:
-        heading, info = line.split(' :', 1)
-      elif line.endswith(':'):
-        heading = line[:-1]
-        info = ''
-      else:
-        warning("unparsed line: %s", line)
-        continue
-      heading = heading.rstrip()
-      info = info.lstrip()
-      attr = heading.lower().replace(' ', '_').replace('.','').replace("'",'').replace('/','_')
-      try:
-        n = int(info)
-      except ValueError:
-        pass
-      else:
-        info = n
       if mode == mode_CFGDSPLY:
         if heading == 'Adapter':
           An = info
