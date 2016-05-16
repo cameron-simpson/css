@@ -190,8 +190,8 @@ class MegaRAID(O):
         data structure with the adpater information.
     '''
     cmd_append("megacli -CfgDsply -aAll")
-    Mconfigured = self._parse(self.readcmd(['-CfgDsply', '-aAll']), mode_CFGDSPLY)
-    cmd_pop()
+    ##Mconfigured = self._parse(self.readcmd(['-CfgDsply', '-aAll']), mode_CFGDSPLY)
+    Mconfigured = self._parse(open('CfgDsply.txt'), mode_CFGDSPLY)
     # record physical drives by id (NB: _not_ enclosure/slot)
     for A in Mconfigured.adapters.values():
       for V in A.virtual_drives.values():
@@ -200,10 +200,11 @@ class MegaRAID(O):
             error("VD drive %d: %s already in A.physical_disks", VDRVn)
           else:
             A.physical_disks[DRV.id] = DRV
+    cmd_pop()
 
     cmd_append("megacli -PDlist -aAll")
-    Mphysical = self._parse(self.readmcd(['-PDlist', '-aAll']), mode_PDLIST)
-    cmd_pop()
+    ##Mphysical = self._parse(self.readmcd(['-PDlist', '-aAll']), mode_PDLIST)
+    Mphysical = self._parse(open('PDList.txt'), mode_PDLIST)
     for A in Mphysical.adapters.values():
       disks = Mconfigured.adapters[A.number].physical_disks
       for DRVid, DRV in A.physical_disks.items():
