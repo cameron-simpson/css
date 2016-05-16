@@ -221,7 +221,7 @@ class MegaRAID(O):
 
     return Mconfigured
 
-  def _preparse(fp, start=1):
+  def _preparse(self, fp, start=1):
     ''' Generator yielding (lineno, line, heading, info, attr).
         Skips blank lines etc.
     '''
@@ -245,8 +245,8 @@ class MegaRAID(O):
         heading = line[:-1]
         info = ''
       else:
-        warning("%d: unparsed line: %s", mlineno, line)
-        continue
+        heading = line
+        info = ''
       heading = heading.rstrip()
       info = info.lstrip()
       attr = heading.lower().replace(' ', '_').replace('.','').replace("'",'').replace('/','_')
