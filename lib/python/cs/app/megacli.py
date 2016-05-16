@@ -189,8 +189,10 @@ class MegaRAID(O):
     ''' Read various megacli query command outputs and construct a
         data structure with the adpater information.
     '''
-    Mconfigured = self._parse(['-CfgDsply', '-aAll'], mode_CFGDSPLY)
-    # record physical drives by id (_NB: _not_ enclosure/slot)
+    cmd_append("megacli -CfgDsply -aAll")
+    Mconfigured = self._parse(self.readcmd(['-CfgDsply', '-aAll']), mode_CFGDSPLY)
+    cmd_pop()
+    # record physical drives by id (NB: _not_ enclosure/slot)
     for A in Mconfigured.adapters.values():
       for V in A.virtual_drives.values():
         for VDRVn, DRV in V.physical_disks.items():
@@ -199,8 +201,9 @@ class MegaRAID(O):
           else:
             A.physical_disks[DRV.id] = DRV
 
-    cmd_append("merge CfgDsply/PDlist")
-    Mphysical = self._parse(['-PDlist', '-aAll'], mode_PDLIST)
+    cmd_append("megacli -PDlist -aAll")
+    Mphysical = self._parse(self.readmcd(['-PDlist', '-aAll']), mode_PDLIST)
+    cmd_pop()
     for A in Mphysical.adapters.values():
       disks = Mconfigured.adapters[A.number].physical_disks
       for DRVid, DRV in A.physical_disks.items():
@@ -254,11 +257,10 @@ class MegaRAID(O):
         info = n
       yield mlineno, line, heading, info, attr
 
-  def _parse(self, megacli_args, mode):
+  def _parse(self, fp, mode):
     ''' Generic parser for megacli output.
         Update 
     '''
-    cmd_append("megacli " + " ".join(megacli_args))
     M = O(adapters={})
     o = None
     A = None
@@ -267,8 +269,7 @@ class MegaRAID(O):
     DG = None
     DRV = None
     o = None
-    for mlineno, line, heading, info, attr \
-        in self._preparse(self.readcmd(*megacli_args)):
+    for mlineno, line, heading, info, attr  in self._preparse(fp):
       if ( line == 'Virtual Drive Information:'
         or line == 'Physical Disk Information:'
          ):
@@ -383,7 +384,6 @@ class MegaRAID(O):
             A.physical_disks[DRV.id] = DRV
           cmd_pop()
 
-    cmd_pop()
     return M
 
   def locate(self, adapter, enc_slot, do_start=True):
