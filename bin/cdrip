@@ -32,6 +32,7 @@
 #
 
 : ${TMPDIR:=$HOME/tmp}
+: ${OS:=`uname -s | tr '[A-Z]' '[a-z]'`}
 : ${EDITOR:=vi}
 : ${NAME:=''}
 : ${CDRIP_TRACKFMT:='%02d - %s'}        # track number then title
@@ -397,7 +398,16 @@ sed -e 's;//*; -- ;g' -e 's/   */ /g' \
 
 xit=$?
 
-eject "$CDRIP_DEV"
+case "$OS" in
+  darwin)   case "$CDRIP_DEV" in
+              default)  dev=$(osx-cd-device) ;;
+              *)        dev=$CDRIP_DEV ;;
+            esac
+            diskutil eject "$dev"
+            ;;
+  *)        eject "$CDRIP_DEV" ;;
+esac
+
 necho ''
 
 exit $xit

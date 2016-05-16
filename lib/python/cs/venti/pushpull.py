@@ -154,24 +154,6 @@ def missing_hashcodes_by_checksum(S1, S2, window_size=None):
       yield hashcode
     start_hashcode = hashcodes2[-1]
 
-def pull_indirect(S1, S2, block):
-  ''' Pull `block` and any indirect children from `S2` if not in `S1`.
-      TODO: asynchronous prefetch of subblocks to reduce latency.
-  '''
-  h = block.hashcode
-  if h not in S1:
-    S1.add(S2.get(h))
-  if block.indirect:
-    for subB in block.subblocks:
-      pull_indirect(S1, S2, subB)
-
-def pull_Dirent(S1, S2, E):
-  pull_indirect(E.block)
-  if E.isdir:
-    for name, entry in E.entries.items():
-      if name != '.' and name != '..':
-        pull_Dirent(S1, S2, entry)
-
 if __name__ == '__main__':
   from cs.debug import selftest
   selftest('cs.venti.pushpull_tests')

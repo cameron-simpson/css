@@ -8,7 +8,7 @@ from __future__ import absolute_import
 import sys
 import unittest
 from io import BytesIO
-from cs.randutils import rand0, randblock
+from cs.randutils import rand0, randbool, randblock
 from cs.serialise import get_bs, read_bs, put_bs, \
                          get_bsdata, read_bsdata, put_bsdata, \
                          get_bss, put_bss, \
@@ -17,15 +17,15 @@ from cs.py3 import bytes
 
 def randPacket(channel=None, tag=None, is_request=None, flags=None, size=None):
   if channel is None:
-    channel = rand0(16384)
+    channel = rand0(16385)
   if tag is None:
-    tag = rand0(16384)
+    tag = rand0(16385)
   if is_request is None:
-    is_request = True if rand0(1) else False
+    is_request = randbool()
   if flags is None:
-    flags = rand0(65536)
+    flags = rand0(65537)
   if size is None:
-    size = rand0(16384)
+    size = rand0(16385)
   return Packet(channel, tag, is_request, flags, randblock(size))
 
 if sys.hexversion >= 0x03000000:

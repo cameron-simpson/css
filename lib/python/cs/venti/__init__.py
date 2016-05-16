@@ -56,14 +56,12 @@ def fromtext(s):
 # Characters that may appear in text sections of a texthexify result.
 # Because we transcribe Dir blocks this way it includes some common
 # characters used for metadata.
-# Note: no path separator ("/") because we may accept this as a
-#       path pseudocomponent.
-_texthexify_white_chars = ascii_letters + digits + '_+-.,=:;{}*/'
+_TEXTHEXIFY_WHITE_CHARS = ascii_letters + digits + '_+-.,=:;{}*/'
 
 def totext(data):
   ''' Represent a byte sequence as a hex/text string.
   '''
-  return texthexify(data, whitelist=_texthexify_white_chars)
+  return texthexify(data, whitelist=_TEXTHEXIFY_WHITE_CHARS)
 
 class _TestAdditionsMixin:
   ''' Some common methods uses in tests.
