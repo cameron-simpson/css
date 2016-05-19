@@ -38,23 +38,10 @@ def main(argv):
     tracks = sorted( [ [track.number, '', track.length]
                        for track in discid.read(device=device).tracks
                      ] )
-  print(artist)
-  print(title)
+  print(artist if artist else 'ARTIST')
+  print(title if title else 'TITLE')
   for n, trackname, length in tracks:
-    print(n, length)
-    print(trackname)
-    print()
-
-def print_toc(artist, title, track_list):
-    print(artist)
-    print(title)
-    offset = 0
-    for n, track in enumerate(track_list, 1):
-      track_length = int(track['length'])
-      print(n, track_length, offset)
-      offset += track_length
-      print(track['title'])
-      print()
+    print(n, trackname)
 
 def get_disc_info(disc_id):
   X('musicbrainzngs.get_releases_by_discid(%r)...', disc_id)
