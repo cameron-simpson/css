@@ -256,9 +256,7 @@ sed -e 's;//*; -- ;g' -e 's/   */ /g' \
     encpid=
     xit=0
     nextjob=1
-    while read track secs offset \
-       && read title \
-       && read xtra
+    while read track title
     do
       dir=$artist/$album
       case $track in
