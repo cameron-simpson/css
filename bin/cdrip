@@ -2,11 +2,11 @@
 #
 # Yet another audio CD ripper. Easiest way to learn the tools :-)
 # Like mkcd and mkiso, this is meant to be a no brainer command line.
-#	- Cameron Simpson <cs@zip.com.au> 12mar2001
+#       - Cameron Simpson <cs@zip.com.au> 12mar2001
 #
-# Add MP3 mode, basicly for my brother.	 -cameron 25aug2001
+# Add MP3 mode, basicly for my brother.  -cameron 25aug2001
 # Support multiple encodings, add -k option, switch to WAV as
-# intermediate file format.		- cameron 16mar2003
+# intermediate file format.             - cameron 16mar2003
 # Log completed tracks to the INDEX file if present. - cameron 27oct2005
 #
 # =head1 NAME
@@ -23,7 +23,7 @@
 # Normally it is sufficient to cd to your audio archive directory,
 # insert your audio CD in the CDROM drive and say:
 #
-#	cdrip
+#       cdrip
 #
 # I<cdrip> will consult the FreeDB database for track and album titles,
 # and extract and encode the tracks.
@@ -32,12 +32,13 @@
 #
 
 : ${TMPDIR:=$HOME/tmp}
+: ${OS:=`uname -s | tr '[A-Z]' '[a-z]'`}
 : ${EDITOR:=vi}
 : ${NAME:=''}
-: ${CDRIP_TRACKFMT:='%02d - %s'}	# track number then title
+: ${CDRIP_TRACKFMT:='%02d - %s'}        # track number then title
 : ${CDRIP_DEV:=/dev/cdrom}
 : ${CDRIP_DIR:=.}
-: ${CDRIP_ENC:=mp3}			# comma separated list of ogg,mp3,flac
+: ${CDRIP_ENC:=mp3}                     # comma separated list of ogg,mp3,flac
 : ${CDRIP_BPS:=192}
 : ${CDRIP_QUAL=6}
 : ${CDRIP_LOCK:=''}
@@ -47,6 +48,7 @@ export CDDBSERVER
 
 anon=
 trace=
+[ -t 2 ] && trace=set-x
 force=
 bps=$CDRIP_BPS
 qual=$CDRIP_QUAL
@@ -64,23 +66,23 @@ cmd=`basename "$0"` || exit 1
 usage="Usage: $cmd [-A] [-q qual] [-b bps] [-d device] [-e enclist] [-l lock] [-j jobs] [-K]
         -A              Anonymous; don't consult CDDB. Useful for personal
                         discs with unpublished content.
-	-b kbps		Fixed bitrate kilobits per second for the encoding.
-			Default: variable bit rate using quality.
-	-d device	Device holding the CD. Default: $CDRIP_DEV
+        -b kbps         Fixed bitrate kilobits per second for the encoding.
+                        Default: variable bit rate using quality.
+        -d device       Device holding the CD. Default: $CDRIP_DEV
         -D dir          Change working directory.
-	-e enclist	Select encoding(s), comma separated.
-			Supported: ogg,mp3,flac. Default: $CDRIP_ENC
+        -e enclist      Select encoding(s), comma separated.
+                        Supported: ogg,mp3,flac. Default: $CDRIP_ENC
         -f              Force; rip audio even if the desired file already
                         exists.
-	-j jobs		Use this many CPUs for the encoding phase.
-			(jobs > 1) implies \"-l $cmd\".
-	-K		Keep the WAV file around.
-	-l lock		Do encoding completely asynchronously, using \"lock\"
-			as the lock name basis.
-	-n nice		Extra niceness for the encoder. Default: $nice
-	-q qual		Variable bitrate quality rating.
-			Default: $qual
-	-v		Verbose.
+        -j jobs         Use this many CPUs for the encoding phase.
+                        (jobs > 1) implies \"-l $cmd\".
+        -K              Keep the WAV file around.
+        -l lock         Do encoding completely asynchronously, using \"lock\"
+                        as the lock name basis.
+        -n nice         Extra niceness for the encoder. Default: $nice
+        -q qual         Variable bitrate quality rating.
+                        Default: $qual
+        -v              Verbose.
         -x              Trace execution."
 
 set -- -b "$bps" -q "$qual" $CDRIP_OPTS ${1+"$@"}
@@ -94,106 +96,106 @@ badopts=
 while [ $# -gt 0 ]
 do
     case $1 in
-	#
-	# =item B<-A>
-	#
-	# Anonymous. Do not expect or obtain a table of contents for this disc.
+        #
+        # =item B<-A>
+        #
+        # Anonymous. Do not expect or obtain a table of contents for this disc.
         #
         -A)     anon=1 ;;
-	#
-	# =item B<-b> I<kbps>
-	#
-	# Fixed bitrate kilobits per second for the encoding.
-	# Default: variable bit rate using quality (B<-q> below).
-	#
-	-b)	[ -n "$2" ] && { oggencqual="-b $2" lamequal="-b $2"; }
-		shift ;;
-	# =item B<-d> I<device>
-	#
-	# The device from which to read the audio CD.
-	# Default: B</dev/cdrom> or the value of B<$CDRIP_DEV>.
-	#
-	-d)	CDRIP_DEV=$2 ;shift ;;
-	# =item B<-D> I<dir>
-	#
-	# Change working directory to I<dir> before ripping.
-	# Default: B<.> or the value of B<$CDRIP_DIR>.
-	#
-	-D)	CDRIP_DIR=$2 ;shift ;;
-	# =item B<-e> I<encodings>
-	#
-	# Comma separated list of encoding formats to produce.
-	# Supported: ogg, mp3, flac.
-	# Default: B<ogg>, or the value of B<$CDRIP_ENC>.
-	#
-	-e)	CDRIP_ENC=$2; shift ;;
-	# =item B<-j> I<jobs>
-	#
-	# Run I<jobs> encoders at once.
-	# This implies use of a set of locks.
-	# Useful on multi-CPU machines.
-	#
-	-j)	jobs=$2; shift ;;
-	# =item B<-K>
-	#
-	# Keep the WAV files of the raw audio from the CD around after encoding.
-	#
-	-K)	keep=1 ;;
-	# =item B<-l> I<lock>
-	#
-	# Base name of the lock to use for asynchronous background decoding.
-	# You can use this if you can pull the audio data from the CD faster than
-	# your machine can encode the data to the desired format
-	# (eg a fast CDROM in a slow machine).
-	# This will background every encoder, each of which will obtain the named lock
-	# with the lock(1cs) command before running, thus not thrashing your machine
-	# to death.
-	# Use of this option may allow you to queue up many CDs by pulling the data in
-	# ahead of completion of the encoding.
-	# Default: synchronous encoding - the encoding will still run in parallel
-	# with pulling data from the CD, but encoding of each track will
-	# still wait for the previous encoding to finish, and ripping of the
-	# track after will in turn be delayed under encoding of this track can be dispatched.
-	#
-	-l)	lock=$2; shift ;;
-	# =item B<-q> I<quality>
-	#
-	# Variable bitrate quality level.
-	# Default: B<6> or the value of B<$CDRIP_QUAL>.
-	# Note: this is the oggenc(1) quality numbering (1 is bad, 9 is good).
-	# Lame(1)'s quality numbering goes the other way.
-	# The script converts as appropriate, but this should be bourne in mind if encoding to MP3.
-	# Flac(1) encoding uses this to control the compression level.
-	#
-	-q)	if [ -n "$2" ]
-		then
-		  oggencqual="-q $2"
-		  lamequal="-v -V `expr 9 - $2`"
-		  case "$2" in
-		    9)		flacenc=-8 ;; # we do not go to 11
-		    [0-8])	flacenc=-$2 ;;
-		    *)		echo "$cmd: unsupported quality: $1 $2" >&2
-				badopts=1
-				;;
-		  esac
-		fi
-		shift ;;
-	# =item B<-v>
-	#
-	# Verbose.
-	# Make rippers more noisy.
-	#
-	-v)	cdpara_noise=-e ;;
-	# =item B<-x>
-	#
-	# Trace execution.
-	#
-	-x)	trace=set-x ;;
-	--)	shift; break ;;
-	-?*)	echo "$cmd: unrecognised option: $1" >&2
-		badopts=1
-		;;
-	*)	break ;;
+        #
+        # =item B<-b> I<kbps>
+        #
+        # Fixed bitrate kilobits per second for the encoding.
+        # Default: variable bit rate using quality (B<-q> below).
+        #
+        -b)     [ -n "$2" ] && { oggencqual="-b $2" lamequal="-b $2"; }
+                shift ;;
+        # =item B<-d> I<device>
+        #
+        # The device from which to read the audio CD.
+        # Default: B</dev/cdrom> or the value of B<$CDRIP_DEV>.
+        #
+        -d)     CDRIP_DEV=$2 ;shift ;;
+        # =item B<-D> I<dir>
+        #
+        # Change working directory to I<dir> before ripping.
+        # Default: B<.> or the value of B<$CDRIP_DIR>.
+        #
+        -D)     CDRIP_DIR=$2 ;shift ;;
+        # =item B<-e> I<encodings>
+        #
+        # Comma separated list of encoding formats to produce.
+        # Supported: ogg, mp3, flac.
+        # Default: B<ogg>, or the value of B<$CDRIP_ENC>.
+        #
+        -e)     CDRIP_ENC=$2; shift ;;
+        # =item B<-j> I<jobs>
+        #
+        # Run I<jobs> encoders at once.
+        # This implies use of a set of locks.
+        # Useful on multi-CPU machines.
+        #
+        -j)     jobs=$2; shift ;;
+        # =item B<-K>
+        #
+        # Keep the WAV files of the raw audio from the CD around after encoding.
+        #
+        -K)     keep=1 ;;
+        # =item B<-l> I<lock>
+        #
+        # Base name of the lock to use for asynchronous background decoding.
+        # You can use this if you can pull the audio data from the CD faster than
+        # your machine can encode the data to the desired format
+        # (eg a fast CDROM in a slow machine).
+        # This will background every encoder, each of which will obtain the named lock
+        # with the lock(1cs) command before running, thus not thrashing your machine
+        # to death.
+        # Use of this option may allow you to queue up many CDs by pulling the data in
+        # ahead of completion of the encoding.
+        # Default: synchronous encoding - the encoding will still run in parallel
+        # with pulling data from the CD, but encoding of each track will
+        # still wait for the previous encoding to finish, and ripping of the
+        # track after will in turn be delayed under encoding of this track can be dispatched.
+        #
+        -l)     lock=$2; shift ;;
+        # =item B<-q> I<quality>
+        #
+        # Variable bitrate quality level.
+        # Default: B<6> or the value of B<$CDRIP_QUAL>.
+        # Note: this is the oggenc(1) quality numbering (1 is bad, 9 is good).
+        # Lame(1)'s quality numbering goes the other way.
+        # The script converts as appropriate, but this should be bourne in mind if encoding to MP3.
+        # Flac(1) encoding uses this to control the compression level.
+        #
+        -q)     if [ -n "$2" ]
+                then
+                  oggencqual="-q $2"
+                  lamequal="-v -V `expr 9 - $2`"
+                  case "$2" in
+                    9)          flacenc=-8 ;; # we do not go to 11
+                    [0-8])      flacenc=-$2 ;;
+                    *)          echo "$cmd: unsupported quality: $1 $2" >&2
+                                badopts=1
+                                ;;
+                  esac
+                fi
+                shift ;;
+        # =item B<-v>
+        #
+        # Verbose.
+        # Make rippers more noisy.
+        #
+        -v)     cdpara_noise=-e ;;
+        # =item B<-x>
+        #
+        # Trace execution.
+        #
+        -x)     trace=set-x ;;
+        --)     shift; break ;;
+        -?*)    echo "$cmd: unrecognised option: $1" >&2
+                badopts=1
+                ;;
+        *)      break ;;
     esac
     shift
 done
@@ -202,14 +204,14 @@ done
 #
 
 case "$lock" in
-  *[\ \	]*)	echo "$cmd: no whitespace in lock names! (\"$lock\")" >&2
-		badopts=1
-		;;
+  *[\ \ ]*)     echo "$cmd: no whitespace in lock names! (\"$lock\")" >&2
+                badopts=1
+                ;;
 esac
 
 [ $# = 0 ] || { echo "$cmd: extra arguments: $* ">&2
-		badopts=1
-	      }
+                badopts=1
+              }
 
 enclist=
 for e in `echo "$CDRIP_ENC" | tr , ' '`
@@ -217,8 +219,8 @@ do
   case $e in
     mp3|ogg|flac)
         enclist="$enclist $e" ;;
-    *)	echo "$cmd: unrecognised encoding: $e" >&2
-        echo "	I known ogg, mp3 and flac" >&2
+    *)  echo "$cmd: unrecognised encoding: $e" >&2
+        echo "  I known ogg, mp3 and flac" >&2
         badopts=1
         ;;
   esac
@@ -237,29 +239,29 @@ byNAME=
 ##[ -n "$NAME" ] && byNAME=" by $NAME"
 
 toc=$TMPDIR/cdtoc.$$
-cdtoc "$CDRIP_DEV" >"$toc" || { rm -f "$toc"; exit 1; }
+$trace cdtoc2 "$CDRIP_DEV" >"$toc" || { rm -f "$toc"; exit 1; }
 
-grep '^[^#]' <"$toc" | grep -v '^[0-9][0-9]* '
+echo "TOC:"
+cat "$toc"
+echo
 ask "Edit TOC before use" && $EDITOR "$toc"
 
 exec <"$toc"
 rm "$toc"
 
 sed -e 's;//*; -- ;g' -e 's/   */ /g' \
-| ( read artist	|| exit 1
-    read album	|| exit 1
+| ( read artist || exit 1
+    read album  || exit 1
 
     encpid=
     xit=0
     nextjob=1
-    while read track secs offset \
-       && read title \
-       && read xtra
+    while read track title
     do
       dir=$artist/$album
       case $track in
-	  [0-9])	wtrack=0$track ;;
-	  *)		wtrack=$track ;;
+          [0-9])        wtrack=0$track ;;
+          *)            wtrack=$track ;;
       esac
       ftitle=`printf "$trackfmt" "$track" "$title"`
 
@@ -301,9 +303,9 @@ sed -e 's;//*; -- ;g' -e 's/   */ /g' \
 
       for enc in $needenc
       do
-	out=$dir/$ftitle.$enc
-	link=$raw-4$enc
-	in=$link
+        out=$dir/$ftitle.$enc
+        link=$raw-4$enc
+        in=$link
 
         $trace ln "$raw" "$link" || { xit=1; continue; }
 
@@ -315,62 +317,62 @@ sed -e 's;//*; -- ;g' -e 's/   */ /g' \
             encpid=
         fi
 
-	case $enc in
-	  flac)
-	    set -- flac $flacenc -o "$out" "$in"
-	    ;;
-	  ogg)
-	    set -- oggenc $oggencqual -a "$artist" -N "$track" -t "$title" -l "$album"
+        case $enc in
+          flac)
+            set -- flac $flacenc -o "$out" "$in"
+            ;;
+          ogg)
+            set -- oggenc $oggencqual -a "$artist" -N "$track" -t "$title" -l "$album"
 
-	    # This fiddling is because oggenc blows up with long comments.
-	    commentf=.tmp$$c
-	    { [ -n "$xtra" ] && echo "$xtra"
-	      echo "Encoded$byNAME with `oggenc -v` [$oggencqual]"
-	    } >"$commentf"
+            # This fiddling is because oggenc blows up with long comments.
+            commentf=.tmp$$c
+            { [ -n "$xtra" ] && echo "$xtra"
+              echo "Encoded$byNAME with `oggenc -v` [$oggencqual]"
+            } >"$commentf"
 
-	    while read -r comment
-	    do  [ -n "$comment" ] && set "$@" -c "COMMENT=$comment"
-	    done <"$commentf"
-	    rm "$commentf"
+            while read -r comment
+            do  [ -n "$comment" ] && set "$@" -c "COMMENT=$comment"
+            done <"$commentf"
+            rm "$commentf"
 
-	    set -- "$@" -o "$out" "$in"
-	    ;;
-	  mp3)
-	    set -- lame -h $lamequal -p "$in" "$out"
+            set -- "$@" -o "$out" "$in"
+            ;;
+          mp3)
+            set -- lame -h $lamequal -p "$in" "$out"
 
-	    # dispatch job to id3 tag the file after encoding
+            # dispatch job to id3 tag the file after encoding
             (
               # wait for the input link to disappear
-	      while [ -s "$link" ]
-	      do  sleep 1
-	      done
-	      if [ -s "$out" ]
-	      then
+              while [ -s "$link" ]
+              do  sleep 1
+              done
+              if [ -s "$out" ]
+              then
                 : ${lamev:=`lame -v 2>&1 | sed 1q`}
-		$trace id3ed -q -q \
-		             -s "$title" -n "$artist" -a "$album" \
-		             -c "Encoded$byNAME with $lamev [$lamequal] on `date`" \
-		             -k "$track" "$out" </dev/null >/dev/null
-	      fi
-	    ) &
-	    ;;
-	  *)
-	    echo "$cmd: unimplemented encoding \"$enc\"!" >&2
-	    xit=1
-	    continue
-	    ;;
-	esac
+                $trace id3ed -q -q \
+                             -s "$title" -n "$artist" -a "$album" \
+                             -c "Encoded$byNAME with $lamev [$lamequal] on `date`" \
+                             -k "$track" "$out" </dev/null >/dev/null
+              fi
+            ) &
+            ;;
+          *)
+            echo "$cmd: unimplemented encoding \"$enc\"!" >&2
+            xit=1
+            continue
+            ;;
+        esac
 
         # remove source file after encode
-	set -- rmafter "$link" "$@"
+        set -- rmafter "$link" "$@"
 
-	if [ -n "$lock" ]
+        if [ -n "$lock" ]
         then
           set -- alog cdrip lock "$lock@$HOST-$nextjob" "$@"
           nextjob=`expr \( $nextjob \) \% $jobs + 1`
         fi
 
-	set -- nice -n "$nice" "$@"
+        set -- nice -n "$nice" "$@"
 
         if $trace "$@"
         then
@@ -394,7 +396,16 @@ sed -e 's;//*; -- ;g' -e 's/   */ /g' \
 
 xit=$?
 
-eject "$CDRIP_DEV"
+case "$OS" in
+  darwin)   case "$CDRIP_DEV" in
+              default)  dev=$(osx-cd-device) ;;
+              *)        dev=$CDRIP_DEV ;;
+            esac
+            diskutil eject "$dev"
+            ;;
+  *)        eject "$CDRIP_DEV" ;;
+esac
+
 necho ''
 
 exit $xit
@@ -412,19 +423,19 @@ exit $xit
 #
 # The program used to pull the audio data from the CD, available here:
 #
-#	http://freshmeat.net/projects/cdparanoia/?topic_id=118%2C113
+#       http://freshmeat.net/projects/cdparanoia/?topic_id=118%2C113
 #
 # =item B<oggenc>
 #
 # The program used to encode CD audio to Ogg Vorbis files, available here:
 #
-#	http://freshmeat.net/projects/oggenc/?topic_id=113
+#       http://freshmeat.net/projects/oggenc/?topic_id=113
 #
 # =item B<lame>
 #
 # The program used to encode CD audio to MP3 files, available here:
 #
-#	http://freshmeat.net/projects/lame/?topic_id=113%2C123
+#       http://freshmeat.net/projects/lame/?topic_id=113%2C123
 #
 # =item B<css>
 #
@@ -433,7 +444,7 @@ exit $xit
 # so the easiest thing is just to grab it and put its B<bin> directory at the end of your B<$PATH>.
 # It is available here:
 #
-#	http://freshmeat.net/projects/css-cameronsimpsonsscripts/?topic_id=45%2C137%2C253%2C861
+#       http://freshmeat.net/projects/css-cameronsimpsonsscripts/?topic_id=45%2C137%2C253%2C861
 #
 # =back
 #

@@ -134,6 +134,8 @@ do
 done
 # zapped
 echo "http_port 127.0.0.1:8080"
+# always direct
+echo "http_port 127.0.0.1:3127"
 
 cat <<X
 url_rewrite_program $HOME/bin/squid_redirect
@@ -148,6 +150,7 @@ cache_store_log /dev/null
 coredump_dir $zapdir
 cache_dir ufs $cachedir $ZAP_CACHESIZE 16 256
 acl nobannerport myport 8080
+acl alwaysdirect myport 3127
 redirector_access allow nobannerport
 collapsed_forwarding on
 ## obsolete ## refresh_stale_hit 10 seconds
@@ -160,6 +163,7 @@ shutdown_lifetime 2 seconds
 icp_access allow all
 nonhierarchical_direct off
 prefer_direct off
+always_direct allow alwaysdirect
 ## obsolete ## maximum_single_addr_tries 4
 retry_on_error on
 X
@@ -193,4 +197,4 @@ do  [ -d "$dir" ] || $trace mkdir -p "$dir"
 done
 
 tidy
-exec $trace squid -f "$rc" ${1+"$@"}
+exec $trace squid -N -f "$rc" ${1+"$@"}

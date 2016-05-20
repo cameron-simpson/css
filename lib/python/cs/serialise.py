@@ -38,23 +38,8 @@ def is_bytes(value):
     raise RuntimeError("value is not bytes: %s %r"
                        % (type(value), value))
 
-@returns_bytes
-def _str2bytes(s):
-  ''' Return a bytes object with values from ord(_) for each character.
-  '''
-  return bytes( ord(_) for _ in s )
-
-if sys.hexversion >= 0x03000000:
-  @returns_bytes
-  def readbytes(fp, size=None):
-    return fp.read(size)
-else:
-  @returns_bytes
-  def readbytes(fp, size=None):
-    return _str2bytes(fp.read(size))
-
 def get_bs(data, offset=0):
-  ''' Read an extensible value from `data` at `offset`.
+  ''' Read an extensible byte serialised value from `data` at `offset`.
       Continuation octets have their high bit set.
       The value is big-endian.
       Return value and new offset.
@@ -69,7 +54,7 @@ def get_bs(data, offset=0):
   return n, offset
 
 def read_bs(fp):
-  ''' Read an extensible value from the binary stream `fp`.
+  ''' Read an extensible byte serialised value from the binary stream `fp`.
       Continuation octets have their high bit set.
       The value is big-endian.
       Return value.
@@ -77,7 +62,7 @@ def read_bs(fp):
   n = 0
   b = 0x80
   while b & 0x80:
-    bs = readbytes(fp, 1)
+    bs = fp.read(1)
     if not bs:
       raise EOFError("%s: end of input" % (fp,))
     b = bs[0]
@@ -86,7 +71,7 @@ def read_bs(fp):
 
 @returns_bytes
 def put_bs(n):
-  ''' Encode a value as an entensible octet sequence for decode by get_bs().
+  ''' Encode a value as an entensible byte serialised octet sequence for decode by get_bs().
       Return the bytes object.
   '''
   bs = [ n&0x7f ]
@@ -120,7 +105,7 @@ def read_bsdata(fp):
   ''' Read a run length encoded data chunk from a file stream.
   '''
   length = read_bs(fp)
-  data = readbytes(fp, length)
+  data = fp.read(length)
   if len(data) == length:
     return data
   if len(data) < length:
@@ -137,6 +122,24 @@ def put_bsdata(data):
   chunk = put_bs(len(data)) + data
   ##is_bytes(chunk)
   return chunk
+
+@returns_bytes
+def put_bss(s, encoding='utf-8'):
+  ''' Encode the string `s` to bytes using the specified encoding, default 'utf-8'; return the encoding encapsulated with put_bsdata.
+  '''
+  return put_bsdata(s.encode(encoding))
+
+def get_bss(chunk, offset=0, encoding='utf-8'):
+  ''' Fetch an encoded string using get_bsdata and decode with the specified encoding, default 'utf-8'; return the string and the new offset.
+  '''
+  data, offset = get_bsdata(chunk, offset)
+  return data.decode(encoding), offset
+
+def read_bss(fp):
+  ''' Read an encoded string from `fp` using read_bsdata and decode with the specified encoding, default 'utf-8'; return the string.
+  '''
+  data = read_bsdata(fp, encoding='utf-8')
+  return data.decode(encoding)
 
 _Packet = namedtuple('_Packet', 'channel tag is_request flags payload')
 
@@ -184,11 +187,20 @@ def read_Packet(fp):
     raise ValueError("extra data in packet after offset=%d" % (offset,))
   return P
 
-def write_Packet(fp, P):
-  ''' Write a Packet to a binary stream.
-      Note: does not flush the stream.
-  '''
-  fp.write(put_bsdata(P.serialise()))
+if sys.hexversion >= 0x03000000:
+  def write_Packet(fp, P):
+    ''' Write a Packet to a binary stream.
+        Note: does not flush the stream.
+    '''
+    ##from cs.logutils import X
+    ##X("write_Packet(%s)", P)
+    fp.write(put_bsdata(P.serialise()))
+else:
+  def write_Packet(fp, P):
+    ''' Write a Packet to a binary stream.
+        Note: does not flush the stream.
+    '''
+    fp.write(put_bsdata(P.serialise()).as_buffer())
 
 def get_Packet(data, offset=0):
   ''' Parse a Packet from the binary data `packet` at position `offset`.

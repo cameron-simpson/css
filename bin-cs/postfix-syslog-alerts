@@ -1,0 +1,19 @@
+#!/bin/sh
+#
+# Tail the system postfix mail log and issue alerts.
+#   - Cameron Simpson <cs@zip.com.au> 03dec2015
+#
+
+# OSX mail log
+logfile=/var/log/mail.log
+
+tail -F "$logfile" \
+| while read -r d1 d2 d3 host daemon message
+  do
+    case "$daemon" in
+      'postfix/smtp['*)
+        set -- $message
+        alert -t "POSTFIX: $daemon@$host" "$2 $3 $7"
+        ;;
+    esac
+  done

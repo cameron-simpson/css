@@ -1,0 +1,159 @@
+#!/bin/sh
+#
+# Import a static website into an Amazon AWS S3 bucket for static serving.
+#   - Cameron Simpson <cs@zip.com.au> 05dec2015
+#
+
+set -ue
+
+##: ${S3CFG:=$HOME/.s3cfg-$AWS_ID}
+: ${TMPDIR:=/tmp}
+
+no_wget=
+no_sync=
+no_media=
+htdocs_dir=
+ht_userarea=
+media_exts='f4v flv gif jpg mov mp4 mp3 wma ogg pdf'
+
+cmd=$( basename "$0" )
+usage="Usage: $cmd [--no-wget] [--no-sync] [-d htdocs-dir] fqdn s3-bucket-name
+  --no-media    Omit media files from the sync: $media_exts
+  --no-sync     Do not update the S3 bucket from the htdocs tree.
+  --no-wget     Do not update the htdocs tree from the source website.
+  --password username:areaname
+                Read password for username from .password-areaname.
+  -d htdocs-dir
+            Use the specified directory as the htdocs tree; the default is
+            taken from the FQDN."
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    --no-media)     no_media=1 ;;
+    --no-sync)      no_sync=1 ;;
+    --no-wget)      no_wget=1 ;;
+    --password)     ht_userarea=$2; shift ;;
+    -d)             htdocs_dir=$2; shift ;;
+    --)             shift; break ;;
+    -?*)            echo "$cmd: unrecognised option: $1" >&2
+                    badopts=1
+                    ;;
+    *)              break ;;
+  esac
+  shift
+done
+
+# sanity check ht credentials
+if [ -n "$ht_userarea" ]
+then
+    case "$ht_userarea" in
+      ?*:?*)
+        ht_username=$( expr "x$ht_userarea" : 'x\([^:]*\):.*' )
+        ht_areaname=$( expr "x$ht_userarea" : 'x[^:]*:\(.*\)' )
+        ht_password_file=$HOME/.htpassword-$ht_areaname
+        if [ ! -s "$ht_password_file" ]
+        then
+          echo "$cmd: missing credentials file: $ht_password_file" >&2
+          badopts=1
+        else
+          ht_password=$(<$ht_password_file)
+        fi
+        ;;
+      *)echo "$cmd: invalid arguments to --password, expected \"username:areaname\"" >*2
+        badopts=1
+        ;;
+    esac
+else
+  ht_username=
+fi
+
+if [ $# = 0 ]
+then  echo "$cmd: missing fqdn" >&2
+      badopts=1
+else  fqdn=$1
+      shift
+fi
+
+if [ $# = 0 ]
+then  echo "$cmd: missing s3-bucket-name" >&2
+      badopts=1
+else  s3bucket=$1
+      shift
+fi
+
+if [ $# -gt 0 ]
+then
+  echo "$cmd: extra arguments after s3-bucket-name: $*" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+tmppfx=$TMPDIR/$cmd.$$
+trap 'rm -f "$tmppfx".*' 0 1 3 15
+
+srcurl=http://$fqdn/
+dsturl=s3://$s3bucket
+[ -n "$htdocs_dir" ] || htdocs_dir=$fqdn
+
+s3(){
+  s3cmd -q -c "$S3CFG" ${1+"$@"}
+}
+
+setx(){
+  ( set -x; "$@" )
+}
+
+# fetch HEAD of URL, echo Content-Type
+get_s3_mimetype(){
+  s3cmd -c "$S3CFG" info "$1" | sed -n 's/^ *MIME type: *//p'
+}
+
+xit=0
+
+cd "$htdocs_dir"
+
+if [ -z "$no_wget" ]
+then
+  wgetlog=$tmppfx-wget.log
+  set -- wget -nv -o "$wgetlog" -mp -nH --restrict-file-names=ascii --reject-regex '////'
+  if [ $no_media ]
+  then
+    for ext in $media_exts
+    do  set -- "$@" -R "$ext"
+    done
+  fi
+  recite=$*
+  if [ -n "$ht_username" ]
+  then
+    set -- "$@" "--user=$ht_username" "--password=$ht_password"
+    recite="$recite --user=$ht_username --password=******"
+  fi
+  echo "$recite $srcurl" >&2
+  "$@" "$srcurl" \
+  || echo "$cmd: warning: wget had errors, rerun with -nv for details" >&2
+  echo "WGET LOG: $wgetlog"
+fi
+
+[ $no_sync ] || \
+{
+  set -- python3 -m cs.app.aws s3 "$s3bucket" sync-up -D -% .
+  ####set -- s3 -MP sync . "$dsturl"
+  ###### # skip all the extensions we repair below
+  ###### for ext in css f4v rdf wma mov
+  ###### do  set -- "$@" --exclude "*.$ext"
+  ###### done
+  ##### skip media extensions is requested
+  ####if [ $no_media ]
+  ####then
+  ####  for ext in $media_exts
+  ####  do  set -- "$@" --exclude "*.$ext"
+  ####  done
+  ####fi
+  setx "$@"
+}
+
+exit $xit

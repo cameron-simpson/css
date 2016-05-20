@@ -212,7 +212,8 @@ def _transcribe(is_xhtml, *tokens):
           tok = ()
     yield '<'
     yield tag
-    for k, v in attrs.items():
+    for k in sorted(attrs.keys()):
+      v = attrs[k]
       yield ' '
       yield k
       if is_xhtml and v is None:

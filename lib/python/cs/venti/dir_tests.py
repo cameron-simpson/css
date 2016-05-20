@@ -8,20 +8,24 @@ from random import shuffle
 import sys
 import unittest
 from cs.logutils import D, X
-from cs.randutils import rand0, randblock
+from cs.randutils import randbool, randblock
 from cs.py3 import bytes
 from . import totext
 from .store import MappingStore
-from .dir import FileDirent, Dir, decodeDirent, decode_Dirent_text, decodeDirents
+from .dir import FileDirent, Dir, decode_Dirent, decode_Dirent_text, decode_Dirents
 
 class TestAll(unittest.TestCase):
 
   def setUp(self):
     self.S = MappingStore({})
+    self.S.open()
+
+  def tearDown(self):
+    self.S.close()
 
   def _round_trip_Dirent(self, D):
     encoded = D.encode()
-    D2, offset = decodeDirent(encoded, 0)
+    D2, offset = decode_Dirent(encoded, 0)
     self.assertEqual(D, D2)
     text_encoded = D.textencode()
     D2 = decode_Dirent_text(text_encoded)
@@ -49,7 +53,7 @@ class TestAll(unittest.TestCase):
         ordinals = list(range(16))
         shuffle(ordinals)
         for n in ordinals:
-          dofile = True if rand0(1) == 0 else False
+          dofile = randbool()
           if dofile:
             name = 'file' + str(n)
             E = FileDirent(name)

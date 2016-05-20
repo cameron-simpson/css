@@ -5,30 +5,69 @@
 #
 
 import os
+import errno
 import random
+import time
 import sys
 import unittest
+from cs.debug import thread_dump, debug_object_shell
 from cs.logutils import X
-from cs.randutils import rand0, randblock
+from .hash import HashUtilDict
+from .hash_tests import _TestHashCodeUtils
 from .store import MappingStore
 from .store_tests import _TestStore
 from .tcp import TCPStoreServer, TCPStoreClient
 
-BIND_ADDR = ('127.0.0.1', 9999)
+BIND_HOST = '127.0.0.1'
+_base_port = 9999
 
-class TestTCPStore(_TestStore):
+def make_tcp_store():
+  global _base_port
+  mapping_S = MappingStore(HashUtilDict())
+  while True:
+    bind_addr = (BIND_HOST, _base_port)
+    try:
+      remote_S = TCPStoreServer(bind_addr, mapping_S)
+    except OSError as e:
+      if e.errno == errno.EADDRINUSE:
+        _base_port += 1
+      else:
+        raise
+    else:
+      break
+  ##X("BIND ADDRESS = %r", bind_addr)
+  remote_S.open()
+  S = TCPStoreClient(bind_addr)
+  return S, remote_S
 
-  def _open_Store(self):
-    X("OPENSTORE: make MappingStore...")
-    self.mapping_S = MappingStore({})
-    X("OPENSTORE: setup TCPStoreServer...")
-    self.remote_S = TCPStoreServer(BIND_ADDR, self.mapping_S)
-    X("OPENSTORE: set up TCPSToreClient...")
-    self.S = TCPStoreClient(BIND_ADDR)
-    X("OPENSTIORE COMPLETE")
+class TestTCPStore(_TestStore, unittest.TestCase):
 
-def selftest(argv):
-  unittest.main(__name__, None, argv)
+  def _init_Store(self):
+    self.S, self.remote_S = make_tcp_store()
+
+  def setUp(self):
+    _TestStore.setUp(self)
+    self.remote_S.open()
+
+  def tearDown(self):
+    self.remote_S.close()
+    _TestStore.tearDown(self)
+
+class TestHashCodeUtilsTCPStore(_TestHashCodeUtils, unittest.TestCase):
+  ''' Test HashUtils on a TCPStore on a HashUtilDict.
+  '''
+
+  def MAP_FACTORY(self):
+    S, remote_S = make_tcp_store()
+    remote_S.open()
+    self.remote_S = remote_S
+    return S
+
+  def tearDown(self):
+    self.remote_S.close()
+    _TestHashCodeUtils.tearDown(self)
+    ##debug_object_shell(self, prompt='%s.tearDown> ' % (self._testMethodName,))
 
 if __name__ == '__main__':
-  selftest(sys.argv)
+  from cs.debug import selftest
+  selftest('__main__')

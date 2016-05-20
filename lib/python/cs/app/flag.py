@@ -10,10 +10,12 @@ import os
 import os.path
 import errno
 from collections import MutableMapping
+from threading import Thread
+from time import sleep
 from cs.env import envsub
 from cs.lex import get_uc_identifier
 
-DFLT_FLAGDIR = '$HOME/var/flags'
+DFLT_FLAGDIR_SPEC = '$HOME/var/flags'
 
 def main(argv):
   argv = list(argv)
@@ -49,12 +51,27 @@ def main(argv):
         raise ValueError("unexpected values after key value: %s" % (' '.join(argv),))
   return xit
 
+def flagdirpath(path=None, environ=None):
+  ''' Return the pathname of the flags directory.
+  '''
+  if environ is None:
+    environ = os.environ
+  if path is None:
+    flagdir = environ.get('FLAGDIR')
+    if flagdir is None:
+      flagdir = envsub(DFLT_FLAGDIR_SPEC)
+  elif not os.path.isabs(path):
+    flagdir = os.path.join(envsub('$HOME'), path)
+  else:
+    flagdir = path
+  return flagdir
+
 class Flags(MutableMapping):
+  ''' A mapping which directly inspects the flags directory.
+  '''
 
   def __init__(self, flagdir=None, environ=None):
-    if flagdir is None:
-      flagdir = envsub(DFLT_FLAGDIR)
-    self.dirpath = flagdir
+    self.dirpath = flagdirpath(flagdir, environ)
 
   def init(self):
     ''' Ensure the flag directory exists.
@@ -76,7 +93,13 @@ class Flags(MutableMapping):
   def __iter__(self):
     ''' Iterator returning the flag names in the directory.
     '''
-    for k in os.listdir(self.dirpath):
+    try:
+      listing = os.listdir(self.dirpath)
+    except OSError as e:
+      if e.errno == errno.ENOENT:
+        return
+      raise
+    for k in listing:
       if len(k) > 0:
         name, offset = get_uc_identifier(k)
         if offset == len(k):
@@ -122,6 +145,44 @@ class Flags(MutableMapping):
   
   def __delitem__(self, k):
     self[k] = False
+
+class PolledFlags(dict):
+  ''' A mapping which maintains a dict of the current state of the flags directory and updates it regularly.
+      This allows an application to consult the flags very frequently
+      without hammering the filesystem.
+  '''
+
+  # default sleep between flag status polling
+  DEFAULT_POLL_INTERVAL = 1.1
+
+  def __init__(self, flagdir=None, poll_interval=None):
+    dict.__init__(self)
+    if poll_interval is None:
+      poll_interval = PolledFlags.DEFAULT_POLL_INTERVAL
+    self._flags = Flags(flagdir)
+    self._poll_flags(silent=True)
+    T = Thread(target=self._monitor_flags, kwargs={'delay': poll_interval})
+    T.daemon = True
+    T.start()
+
+  def _monitor_flags(self, delay=1.1):
+    ''' Monitor self._flags regularly, updating self.flags.
+    '''
+    while True:
+      sleep(delay)
+      self._poll_flags()
+
+  def _poll_flags(self, silent=False):
+    ''' Poll the filesystem flags and update the .flags attribute.
+    '''
+    new_flags = dict(self._flags)
+    ks = set(self.keys())
+    ks.update(new_flags.keys())
+    for k in sorted(ks):
+      old = bool(self.get(k))
+      new = bool(new_flags.get(k))
+      if old ^ new:
+        self[k] = new
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))

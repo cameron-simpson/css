@@ -11,6 +11,8 @@ Convenience functions and classes for files and filenames/pathnames.
 
 * FileState: a signature object for a file state derived from os.stat or os.lstat or os.fstat; has .mtime, .size, .dev and .ino attributes
 
+* Tee: an output file-like object for copying data to multiple output files
+
 * abspath_from_file: restore relative path with respect to another path, as for an include filename
 
 * chunks_of: generator yielding text or data from an open file until EOF

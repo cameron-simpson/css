@@ -1,0 +1,20 @@
+#!/bin/sh
+#
+# Read clause form .fetchmailrc, recite mutt IMAP settings.
+#   - Cameron Simpson <cs@zip.com.au> 26sep2015
+#
+
+set -ue
+
+clause=$1
+shift
+
+fetchmailclause "$clause" \
+| awk '$1 == "user" { user=$2 }
+       $1 == "pass" { pass=$2 }
+       $1 == "via"  { via=$2 }
+       END          { print "set imap_user='\''" user "'\''"
+                      print "set imap_pass='\''" pass "'\''"
+                      print "set my_imap_host='\''" via "'\''"
+                    }
+      '

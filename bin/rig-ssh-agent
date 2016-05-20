@@ -7,15 +7,18 @@
 set -ue
 
 cmd=$0
-usage="Usage: $cmd [statefile]"
+usage="Usage: $cmd [-f] [statefile]
+    -f  Force: always start a new agent and overwrite the statefile."
 
 trace=${DEBUG:+set-x}
+force=
 statefile=
 badopts=
 
 while [ $# -gt 0 ]
 do
   case $1 in
+    -f) force=1 ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
         badopts=1
@@ -31,16 +34,20 @@ done
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 [ -n "$statefile" ] || statefile=`$trace ssh-agent-statefile` || exit 1
-eval `$trace get-ssh-agent "$statefile" || echo false` && exit 0
 
-# some machines don't have an ssh-agent:-(
-agent=`$trace which ssh-agent` || exit 1
-[ -x "$agent" ] || exit 1
-
-export statefile
-exec $trace bgproc \
-  rmthen -f "$statefile" \
-  $trace no-ssh-agent \
-  $trace ssh-agent \
-  $trace sh -c 'stash-ssh-agent "$statefile"; exec pause' \
-  </dev/null
+if [ $force ] || not $trace get-ssh-agent "$statefile"
+then
+  # some machines don't have an ssh-agent:-(
+  if agent=`$trace which ssh-agent` && [ -x "$agent" ]
+  then
+    $trace rm -f -- "$statefile"
+    export statefile
+    $trace no-ssh-agent \
+      $trace ssh-agent \
+      $trace sh -c 'stash-ssh-agent "$statefile"; exec pause' \
+      </dev/null &
+  else
+    echo "$cmd: no ssh-agent command, aborting" >&2
+    exit 1
+  fi
+fi

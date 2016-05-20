@@ -21,19 +21,22 @@ from io import RawIOBase
 from functools import partial
 import os
 from os import SEEK_CUR, SEEK_END, SEEK_SET
-import os.path
+from os.path import basename, dirname, isabs, isdir, \
+                    abspath, join as joinpath, exists as existspath
 import errno
+import os
 import sys
 from collections import namedtuple
 from contextlib import contextmanager
 from itertools import takewhile
 import shutil
 import socket
+import stat
 from tempfile import TemporaryFile, NamedTemporaryFile
 from threading import RLock, Thread
 import time
 import unittest
-from cs.asynchron import Asynchron
+from cs.asynchron import Result
 from cs.debug import trace
 from cs.env import envsub
 from cs.lex import as_lines
@@ -45,7 +48,43 @@ from cs.timeutils import TimeoutError
 from cs.obj import O
 from cs.py3 import ustr, bytes
 
+try:
+  from os import pread
+except ImportError:
+  # implement our own pread
+  # NB: not thread safe!
+  def pread(fd, size, offset):
+    offset0 = os.lseek(fd, 0, SEEK_CUR)
+    os.lseek(fd, offset, SEEK_SET)
+    chunks = []
+    while size > 0:
+      data = os.read(fd, size)
+      if len(data) == 0:
+        break
+      chunks.append(data)
+      size -= len(data)
+    os.lseek(fd, offset0, SEEK_SET)
+    data = b''.join(chunks)
+    return data
+
+def seekable(fp):
+  ''' Try to test if a filelike object is seekable.
+      First try the .seekable method from IOBase, otherwise try
+      getting a file descriptor from fp.fileno and stat()ing that,
+      otherwise return False.
+  '''
+  try:
+    test = fp.seekable
+  except AttributeError:
+    try:
+      getfd = fp.fileno
+    except AttributeError:
+      return False
+    test = lambda: stat.S_ISREG(os.fstat(getfd()).st_mode)
+  return test()
+
 DEFAULT_POLL_INTERVAL = 1.0
+DEFAULT_READSIZE = 8192
 
 def saferename(oldpath, newpath):
   ''' Rename a path using os.rename(), but raise an exception if the target
@@ -102,8 +141,17 @@ def rewrite(filepath, data,
       `filepath` after copying the permission bits.
       Otherwise (default), copy the tempfile to `filepath`.
   '''
-  with NamedTemporaryFile(mode=mode) as T:
-    T.write(data.read())
+  if do_rename:
+    tmpdir = dirname(filepath)
+  else:
+    tmpdir = None
+  with NamedTemporaryFile(mode=mode, dir=tmpdir) as T:
+    if isinstance(data, list):
+      I = data
+    else:
+      I = chunks_of(data)
+    for chunk in I:
+      T.write(chunk)
     T.flush()
     if not empty_ok:
       st = os.stat(T.name)
@@ -155,7 +203,7 @@ def rewrite_cmgr(pathname,
     if len(backup_ext) == 0:
       backup_ext = '.bak-%s' % (datetime.datetime.now().isoformat(),)
     backuppath = pathname + backup_ext
-  dirpath = os.path.dirname(pathname)
+  dirpath = dirname(pathname)
 
   T = NamedTemporaryFile(mode=mode, dir=dirpath, delete=False)
   # hand control to caller
@@ -194,10 +242,10 @@ def abspath_from_file(path, from_file):
   ''' Return the absolute path of `path` with respect to `from_file`,
       as one might do for an include file.
   '''
-  if not os.path.isabs(path):
-    if not os.path.isabs(from_file):
-      from_file = os.path.abspath(from_file)
-    path = os.path.join(os.path.dirname(from_file), path)
+  if not isabs(path):
+    if not isabs(from_file):
+      from_file = abspath(from_file)
+    path = joinpath(dirname(from_file), path)
   return path
 
 _FileState = namedtuple('FileState', 'mtime size dev ino')
@@ -601,12 +649,12 @@ def mkdirn(path, sep=''):
       dirpath = path[:-len(os.sep)]
       pfx = ''
     else:
-      dirpath = os.path.dirname(path)
+      dirpath = dirname(path)
       if len(dirpath) == 0:
         dirpath='.'
-      pfx = os.path.basename(path)+sep
+      pfx = basename(path)+sep
 
-    if not os.path.isdir(dirpath):
+    if not isdir(dirpath):
       error("parent not a directory: %r", dirpath)
       return None
 
@@ -631,7 +679,7 @@ def mkdirn(path, sep=''):
         error("mkdir(%s): %s", newpath, e)
         return None
       if len(opath) == 0:
-        newpath = os.path.basename(newpath)
+        newpath = basename(newpath)
       return newpath
 
 def tmpdir():
@@ -647,7 +695,7 @@ def tmpdirn(tmp=None):
   ''' Make a new temporary directory with a numeric suffix.
   '''
   if tmp is None: tmp=tmpdir()
-  return mkdirn(os.path.join(tmp, os.path.basename(sys.argv[0])))
+  return mkdirn(joinpath(tmp, basename(sys.argv[0])))
 
 DEFAULT_SHORTEN_PREFIXES = ( ('$HOME/', '~/'), )
 
@@ -697,19 +745,19 @@ class Pathname(str):
 
   @property
   def dirname(self):
-    return Pathname(os.path.dirname(self))
+    return Pathname(dirname(self))
 
   @property
   def basename(self):
-    return Pathname(os.path.basename(self))
+    return Pathname(basename(self))
 
   @property
   def abs(self):
-    return Pathname(os.path.abspath(self))
+    return Pathname(abspath(self))
 
   @property
   def isabs(self):
-    return os.path.isabs(self)
+    return isabs(self)
 
   @property
   def short(self):
@@ -961,7 +1009,7 @@ class SharedAppendFile(object):
       self.importer = importer
       self.poll_interval = poll_interval
       self.max_queue = max_queue
-      self.ready = Asynchron(name="readiness(%s)" % (self,))
+      self.ready = Result(name="readiness(%s)" % (self,))
       self.lock_ext = lock_ext
       self.lock_timeout = lock_timeout
       if not no_update:
@@ -1127,9 +1175,118 @@ class SharedAppendLines(SharedAppendFile):
     fp.write(s)
     fp.write('\n')
 
-def chunks_of(fp, rsize=16384):
+class Tee(object):
+  ''' An object with .write, .flush and .close methods which copies data to multiple output files.
+  '''
+
+  def __init__(self, *fps):
+    ''' Initialise the Tee; any arguments are taken to be output file objects.
+    '''
+    self._fps = list(fps)
+
+  def add(self, output):
+    self._fps.append(output)
+
+  def write(self, data):
+    for fp in self._fps:
+      fp.write(data)
+
+  def flush(self):
+    for fp in self._fps:
+      fp.flush()
+
+  def close(self):
+    for fp in self._fps:
+      fp.close()
+    self._fps = None
+
+@contextmanager
+def tee(fp, fp2):
+  ''' Context manager duplicating .write and .flush from fp to fp2.
+  '''
+  def _write(*a, **kw):
+    fp2.write(*a, **kw)
+    return old_write(*a, **kw)
+  def _flush(*a, **kw):
+    fp2.flush(*a, **kw)
+    return old_flush(*a, **kw)
+  old_write = getattr(fp, 'write')
+  old_flush = getattr(fp, 'flush')
+  fp.write = _write
+  fp.flush = _flush
+  yield
+  fp.write = old_write
+  fp.flush = old_flush
+
+class NullFile(object):
+  ''' Writable file that discards its input.
+      Note that this is _not_ an open of os.devnull; is just discards writes and is not the underlying file descriptor.
+  '''
+
+  def __init__(self):
+    self.offset = 0
+
+  def write(self, data):
+    dlen = len(data)
+    self.offset += dlen
+    return dlen
+
+  def flush(self):
+    pass
+
+def file_data(fp, nbytes, rsize=None):
+  ''' Read `nbytes` of data from `fp` and yield the chunks as read.
+      If `nbytes` is None, copy until EOF.
+      `rsize`: read size, default DEFAULT_READSIZE.
+  '''
+  if rsize is None:
+    rsize = DEFAULT_READSIZE
+  ##prefix = "file_data(fp, nbytes=%d)" % (nbytes,)
+  copied = 0
+  while nbytes is None or nbytes > 0:
+    to_read = rsize if nbytes is None else min(nbytes, rsize)
+    ##X("%s: read %d bytes...", prefix, to_read)
+    data = fp.read(to_read)
+    if not data:
+      if nbytes is not None:
+        if copied > 0:
+          # no warning of nothing copied - that is immediate end of file - valid
+          warning("early EOF: only %d bytes read, %d still to go",
+                  copied, nbytes)
+      break
+    yield data
+    copied += len(data)
+    nbytes -= len(data)
+
+def copy_data(fpin, fpout, nbytes, rsize=None):
+  ''' Copy `nbytes` of data from `fpin` to `fpout`, return the number of bytes copied.
+      If `nbytes` is None, copy until EOF.
+      `rsize`: read size, default DEFAULT_READSIZE.
+  '''
+  copied = 0
+  for chunk in file_data(fpin, nbytes, rsize):
+    fpout.write(chunk)
+    copied += len(chunk)
+  return copied
+
+def read_data(fp, nbytes, rsize=None):
+  ''' Read `nbytes` of data from `fp`, return the data.
+      If `nbytes` is None, copy until EOF.
+      `rsize`: read size, default DEFAULT_READSIZE.
+  '''
+  bss = list(file_data(fp, nbytes, rsize))
+  if len(bss) == 0:
+    return b''
+  elif len(bss) == 1:
+    return bss[0]
+  else:
+    return b''.join(bss)
+
+def chunks_of(fp, rsize=None):
   ''' Generator to present text or data from an open file until EOF.
   '''
+  if rsize is None:
+    rsize = DEFAULT_READSIZE
   while True:
     chunk = fp.read(rsize)
     if len(chunk) == 0:
@@ -1144,42 +1301,54 @@ def lines_of(fp, partials=None):
     partials = []
   return as_lines(chunks_of(fp), partials)
 
-class OpenSocket(object):
-  ''' A file-like object for stream sockets, which uses os.shutdown on close.
+class SavingFile(object):
+  ''' A simple file-like object with .write and .close methods used
+      to accrue a file, and a .cancel method to be used instead of
+      .close to discard the file.
+      The originating use case is a cache file for an HTTP response;
+      if the response ends up incomplete the cache file is discarded.
   '''
 
-  def __init__(self, sock, for_write):
-    self._for_write = for_write
-    self._sock = sock
-    self._fp = os.fdopen(os.dup(self._sock.fileno()),
-                         'wb' if for_write else 'rb')
+  def __init__(self, path, text=False, dir=None):
+    ''' Open the scratch file.
+    '''
+    self.path = path
+    if tmpdir is None:
+      # try to make the temporary file in the same directory as the
+      # target path
+      tmpdir = dirname(path)
+      if not isdir(tmpdir):
+        # fall back to the default
+        tmpdir = None
+    self.fd, self.tmppath = mkstemp(prefix='.tmp', dir=dir, text=text)
+    self.fp = os.fdopen(fd, ( 'w' if text else 'wb' ) )
 
   def write(self, data):
-    return self._fp.write(data)
-
-  def read(self, size=None):
-    return self._fp.read(size)
+    ''' Transcribe data to the temp file.
+    '''
+    return self.fp.write(data)
 
   def flush(self):
-    return self._fp.flush()
+    ''' Flush buffered data to the temp file.
+    '''
+    return self.fp.flush()
+
+  def cancel(self):
+    ''' Cancel the transcription to the temp file and discard.
+    '''
+    self.fp.close()
+    self.fp = None
+    os.remove(self.tmppath)
 
   def close(self):
-    try:
-      if self._for_write:
-        self._sock.shutdown(socket.SHUT_WR)
-      else:
-        self._sock.shutdown(socket.SHUT_RD)
-    except OSError as e:
-      if e.errno != errno.ENOTCONN:
-        raise
-
-  def __del__(self):
-    self._close()
-
-  def _close(self):
-    self._fp.close()
-    self._fp = None
-    self._sock = None
+    ''' Close the output and move the file into place as the cached response.
+    '''
+    self.fp.close()
+    self.fp = None
+    path = self.path
+    if exsistspath(path):
+      warning("replacing existing %r", path)
+    os.rename(self.tmppath, path)
 
 if __name__ == '__main__':
   import cs.fileutils_tests

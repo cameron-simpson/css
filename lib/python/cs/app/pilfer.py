@@ -51,7 +51,7 @@ from cs.queues import NullQueue, NullQ, IterableQueue
 from cs.seq import seq
 from cs.threads import locked, locked_property
 from cs.urlutils import URL, isURL, NetrcHTTPPasswordMgr
-from cs.app.flag import Flags
+from cs.app.flag import PolledFlags
 import cs.obj
 from cs.obj import O
 from cs.py.func import funcname, funccite, yields_type, returns_type
@@ -60,9 +60,6 @@ from cs.py3 import input, ConfigParser, sorted, ustr, unicode
 
 # parallelism of jobs
 DEFAULT_JOBS = 4
-
-# sleep between flag status polling
-DEFAULT_FLAGS_POLL_INTERVAL = 1.1
 
 # default flag status probe
 DEFAULT_FLAGS_CONJUNCTION = '!PILFER_DISABLE'
@@ -192,7 +189,6 @@ def main(argv, stdin=None):
           if not badopts:
             LTR = Later(jobs)
             P.flagnames = flagnames
-            P._start_monitor_flags()
             if cs.logutils.D_mode or ifdebug():
               # poll the status of the Later regularly
               def pinger(L):
@@ -256,7 +252,7 @@ def main(argv, stdin=None):
                 LTR.state("DRAINED DIV %s using outQ=%s", busy_div, outQ)
                 divnames = P.open_diversion_names
               LTR.state("quiescing")
-              L.quiesce()
+              L.wait_outstanding(until_idle=True)
               # Now the diversions should have completed and closed.
             # out of the context manager, the Later should be shut down
             LTR.state("WAIT...")
@@ -440,7 +436,7 @@ class Pilfer(O):
     self._ = None
     self.flush_print = False
     self.do_trace = False
-    self._flags = None
+    self.flags = PolledFlags()
     self._print_to = None
     self._print_lock = Lock()
     self.user_agent = None
@@ -485,44 +481,6 @@ class Pilfer(O):
     ''' self._ as a URL object.
     '''
     return URL(self._, None)
-
-  def _start_monitor_flags(self, flagdir=None, poll_interval=None):
-    ''' Set up monitoring Thread to maintain a cs.app.flag.Flags status.
-        The Pilfer's .flags attribute is what is consulted.
-        The ._flags object is the actual cs.app.flag.Flags instance.
-    '''
-    if poll_interval is None:
-      poll_interval = DEFAULT_FLAGS_POLL_INTERVAL
-    if self._flags is not None:
-      raise RuntimeError('self._start_monitor_flags already called')
-    self._flags = Flags(flagdir)
-    self.flags = {}
-    self._poll_flags(True)
-    T = Thread(target=self._monitor_flags, kwargs={'delay': poll_interval})
-    T.daemon = True
-    T.start()
-
-  def _monitor_flags(self, delay=1.1):
-    ''' Monitor self._flags regularly, updating self.flags.
-    '''
-    while True:
-      sleep(delay)
-      self._poll_flags()
-
-  def _poll_flags(self, silent=False):
-    ''' Poll the filesystem flags and update the .flags attribute.
-    '''
-    flags = self.flags
-    new_flags = dict(self._flags)
-    ks = set(flags.keys())
-    ks.update(new_flags.keys())
-    for k in sorted(ks):
-      old = bool(flags.get(k))
-      new = bool(new_flags.get(k))
-      if old ^ new:
-        if not silent:
-          warning("flag %s: %s => %s", k, old, new)
-        flags[k] = new
 
   def test_flags(self):
     ''' Evaluate the flags conjunction.

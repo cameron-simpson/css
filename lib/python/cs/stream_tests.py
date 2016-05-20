@@ -12,13 +12,14 @@ import random
 import socket
 from threading import Thread
 import unittest
-from cs.fileutils import OpenSocket
+from cs.logutils import X
+from cs.py3 import bytes
 from cs.randutils import rand0, randblock
 from cs.serialise import get_bs
-from cs.stream import PacketConnection
-from cs.logutils import X
+from cs.socketutils import bind_next_port, OpenSocket
+from .stream import PacketConnection
 
-class _TestStream(unittest.TestCase):
+class _TestStream(object):
 
   def setUp(self):
     self._open_Streams()
@@ -57,9 +58,9 @@ class _TestStream(unittest.TestCase):
     # throw 16 packets up, collect responses after requests queued
     rqs = []
     for _ in range(16):
-      size = rand0(16384)
+      size = rand0(16385)
       data = randblock(size)
-      flags = rand0(65536)
+      flags = rand0(65537)
       R = self.local_conn.request(0, flags, data, self._decode_response, 0)
       rqs.append( (R, flags, data) )
     random.shuffle(rqs)
@@ -69,7 +70,7 @@ class _TestStream(unittest.TestCase):
       self.assertEqual(flags, 0x11)
       self.assertEqual(payload, bytes(reversed(data)))
 
-class TestStreamPipes(_TestStream):
+class TestStreamPipes(_TestStream, unittest.TestCase):
 
   def _open_Streams(self):
     self.upstream_rd, self.upstream_wr = os.pipe()
@@ -82,7 +83,7 @@ class TestStreamPipes(_TestStream):
                                         request_handler=self._request_handler,
                                         name="remote-pipes")
 
-class TestStreamUNIXSockets(_TestStream):
+class TestStreamUNIXSockets(_TestStream, unittest.TestCase):
 
   def _open_Streams(self):
     self.upstream_rd, self.upstream_wr = socket.socketpair()
@@ -101,17 +102,17 @@ class TestStreamUNIXSockets(_TestStream):
     self.downstream_rd.close()
     self.downstream_wr.close()
 
-class TestStreamTCP(_TestStream):
+class TestStreamTCP(_TestStream, unittest.TestCase):
 
   def _open_Streams(self):
     self.listen_sock = socket.socket()
-    self.listen_sock.bind( ('127.0.0.1', 9999) )
+    self.listen_port = bind_next_port(self.listen_sock, '127.0.0.1', 9999)
     self.listen_sock.listen(1)
     self.downstream_sock = None
     accept_Thread = Thread(target=self._accept)
     accept_Thread.start()
     self.upstream_sock = socket.socket()
-    self.upstream_sock.connect( ('127.0.0.1', 9999) )
+    self.upstream_sock.connect( ('127.0.0.1', self.listen_port) )
     accept_Thread.join()
     self.assertIsNot(self.downstream_sock, None)
     self.upstream_fp_rd = OpenSocket(self.upstream_sock, False)
@@ -134,8 +135,6 @@ class TestStreamTCP(_TestStream):
     self.upstream_sock.close()
     self.downstream_sock.close()
 
-def selftest(argv):
-  unittest.main(__name__, None, argv)
-
 if __name__ == '__main__':
-  selftest(sys.argv)
+  from cs.debug import selftest
+  selftest('__main__')

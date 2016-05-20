@@ -8,23 +8,24 @@ from __future__ import absolute_import
 import sys
 import unittest
 from io import BytesIO
-from cs.randutils import rand0, randblock
+from cs.randutils import rand0, randbool, randblock
 from cs.serialise import get_bs, read_bs, put_bs, \
                          get_bsdata, read_bsdata, put_bsdata, \
+                         get_bss, put_bss, \
                          Packet, get_Packet
 from cs.py3 import bytes
 
 def randPacket(channel=None, tag=None, is_request=None, flags=None, size=None):
   if channel is None:
-    channel = rand0(16384)
+    channel = rand0(16385)
   if tag is None:
-    tag = rand0(16384)
+    tag = rand0(16385)
   if is_request is None:
-    is_request = True if rand0(1) else False
+    is_request = randbool()
   if flags is None:
-    flags = rand0(65536)
+    flags = rand0(65537)
   if size is None:
-    size = rand0(16384)
+    size = rand0(16385)
   return Packet(channel, tag, is_request, flags, randblock(size))
 
 if sys.hexversion >= 0x03000000:
@@ -66,7 +67,8 @@ class TestSerialise(unittest.TestCase):
     self.assertRaises(IndexError, get_bs, bytes(()))
     self.assertEqual(get_bs(bytes((0,))), (0, 1))
     for n in 1, 3, 7, 127, 128, 255, 256, 16383, 16384:
-      self._test_roundtrip_bs(n)
+      with self.subTest(n=n):
+        self._test_roundtrip_bs(n)
 
   def _test_roundtrip_bsdata(self, chunk):
     data = put_bsdata(chunk)
@@ -88,9 +90,22 @@ class TestSerialise(unittest.TestCase):
     self.assertEqual(get_bsdata(bytes( (2, 0, 0) )), (bytes((0, 0)), 3))
     for n in 1, 3, 7, 127, 128, 255, 256, 16383, 16384:
       chunk = randblock(n)
-      if type(chunk) is not bytes:
-        raise RuntimeError("type(chunk)=%s" % (type(chunk),))
-      self._test_roundtrip_bsdata(chunk)
+      with self.subTest(n=n, chunk=chunk):
+        if type(chunk) is not bytes:
+          raise RuntimeError("type(chunk)=%s" % (type(chunk),))
+        self._test_roundtrip_bsdata(chunk)
+
+  def _test_roundtrip_bss(self, s, encoding):
+    data = put_bss(s, encoding)
+    s2, offset = get_bss(data, 0)
+    self.assertEqual(offset, len(data), "get_bss(put_bss(%r)): %d unparsed bytes: %r" % (s, len(data) - offset, data[offset:]))
+    self.assertEqual(s, s2, "get_bss(put_bss(%r)): round trip fails" % (s,))
+
+  def test02bss(self):
+    for s in '', 'a', 'qwerty':
+      for encoding in 'utf-8', 'ascii':
+        with self.subTest(s=s, encoding=encoding):
+          self._test_roundtrip_bss(s, encoding)
 
   def _test_roundtrip_Packet(self, P):
     data = P.serialise()
@@ -105,9 +120,11 @@ class TestSerialise(unittest.TestCase):
         for is_request in False, True:
           for flags in 0, 1, 5, 911:
             for payload_length in 0, 1, 255, 127, 131, 1023:
-              payload = randblock(payload_length)
-              P = Packet(channel=channel, tag=tag, is_request=is_request, flags=flags, payload=payload)
-              self._test_roundtrip_Packet(P)
+              with self.subTest(channel=channel, tag=tag, is_request=is_request, flags=flags, payload_length=payload_length):
+                payload = randblock(payload_length)
+                P = Packet(channel=channel, tag=tag, is_request=is_request,
+                           flags=flags, payload=payload)
+                self._test_roundtrip_Packet(P)
     # now test some randomly generated packets
     random_packets = []
     for _ in range(16):

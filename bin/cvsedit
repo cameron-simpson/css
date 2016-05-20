@@ -116,7 +116,7 @@ editxit=$?
    }
 
 # log the change and diff appropriately
-[ $dolog ] && cvs diff "$file" | grep "$cvsdiffgrep" | execif buglog "cvsedit $base: $msg"
+[ $dolog ] && cvs diff "$file" | grep "$cvsdiffgrep" | execif buglog "$cmd $base: $msg"
 
 ( cd "$dir" || exit 1
   exec cvs commit -m "$msg" "$base"
