@@ -1138,6 +1138,24 @@ class LatePool(object):
     for LF in self:
       pass
 
+def capacity(func):
+  ''' Decorator for functions which wish to manage concurrent requests.
+      The caller must provide a `capacity` keyword arguments which
+      is either a Later instance or an int; if an int a Later with
+      that capacity will be made.
+      The Later will be passed into the inner function as the
+      `capacity` keyword argument.
+  '''
+  def with_capacity(*a, **kw):
+    ''' Wrapper function 
+    '''
+    L = kw.pop('capacity')
+    if isinstance(L, int):
+      L = Later(L)
+    kw['capacity'] = L
+    return func(*a, **kw)
+  return with_capacity
+
 if __name__ == '__main__':
   import cs.later_tests
   cs.later_tests.selftest(sys.argv)
