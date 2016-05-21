@@ -72,6 +72,7 @@ def main(argv=None):
                 print(B,
                       ' '.join(str(T) for T in B.tags),
                       str(B.rating),
+                      str(B.series),
                      )
             elif obclass in ('authors', 'tags'):
               for obj in CL.table(obclass).instances():
@@ -134,7 +135,7 @@ class Calibre_Library(O):
       try:
         meta = self._table_meta[table_name]
       except KeyError:
-        raise AttributeError('%s: no entry in ._table_meta for %r' % (attr, table_name))
+        raise AttributeError('%s: no entry in ._table_meta' % (table_name,))
       T = CalibreTable(meta.klass, self, self.metadb, table_name, meta.columns, meta.name)
       self._tables[table_name] = T
     return T
@@ -188,8 +189,10 @@ class CalibreTableRowNS(NS):
   def library(self):
     return self.table.library
 
-  def related_entities(self, link_table_name, our_column_name, other_column_name):
-    T = self.library.table(other_column_name+'s')
+  def related_entities(self, link_table_name, our_column_name, other_column_name, other_table_name=None):
+    if other_table_name is None:
+     other_table_name = other_column_name + 's'
+    T = self.library.table(other_table_name)
     return set( T[row[0]] for row
                 in T.db.execute( 'SELECT %s as %s_id from %s where %s = %d'
                                  % (other_column_name, other_column_name,
@@ -210,7 +213,10 @@ class Book(CalibreTableRowNS):
 
   @property
   def series(self):
-    return self.related_entities('books_series_link', 'book', 'series')
+    Ss = self.related_entities('books_series_link', 'book', 'series', 'series')
+    if Ss:
+      return the(Ss)
+    return None
 
   @property
   def tags(self):
