@@ -66,7 +66,10 @@ def main(argv=None):
           else:
             obclass = argv.pop(0)
           with Pfx(obclass):
-            if obclass in ('authors', 'books', 'tags'):
+            if obclass == 'books':
+              for B in CL.table_books.instances():
+                print(B, ' '.join(str(T) for T in B.tags))
+            elif obclass in ('authors', 'tags'):
               for obj in CL.table(obclass).instances():
                 print(obj)
             else:
@@ -142,6 +145,10 @@ class CalibreTableRowNS(NS):
   def __str__(self):
     return getattr(self, self.table.name_column)
 
+  def __hash__(self):
+    return self.id
+
+  @property
   def library(self):
     return self.table.library
 
@@ -168,11 +175,19 @@ class CalibreTable(object):
       o = self.row_class(self, dict(zip(self.columns, row)))
       self.by_id[o.id] = o
 
+  def __getitem__(self, row_id):
+    return self.by_id[row_id]
+
 class Author(CalibreTableRowNS):
   pass
 
 class Book(CalibreTableRowNS):
-  pass
+
+  @property
+  def tags(self):
+    T = self.library.table_tags
+    return set( T[row[0]] for row
+                in T.db.execute('SELECT tag as tag_id from books_tags_link where book = %d' % (self.id,)) )
 
 class Tag(CalibreTableRowNS):
   pass
