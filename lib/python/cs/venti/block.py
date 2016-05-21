@@ -4,6 +4,7 @@ from __future__ import print_function
 import sys
 from enum import IntEnum, unique as uniqueEnum
 from threading import RLock
+from cs.later import capacity
 from cs.logutils import D, error, debug, X, Pfx
 from cs.serialise import get_bs, put_bs
 from cs.threads import locked_property
@@ -404,6 +405,7 @@ class _Block(object):
       return File(backing_block=self)
     raise ValueError("unsupported open mode, expected 'rb' or 'w+b', got: %s", mode)
 
+  @capacity
   def complete(self, S2, capacity=None):
     ''' Complete this Block from alternative Store `S2`.
         If the current Store does not contain us, fetch data from `S2`.
@@ -413,11 +415,6 @@ class _Block(object):
         If an int, construct a Later instance with that capacity.
         Otherwise presume `capacity` is already a Later instance and use that.
     '''
-    if capacity is None:
-      capacity = self.capacity
-    if isinstance(capacity, int):
-      with Later(capacity) as L:
-        return self.complete(S2, L)
     # capacity should be a Later instance
     L = capacity
     with L.pool() as LP:
@@ -435,7 +432,7 @@ class _Block(object):
       if self.indirect:
         for subB in self.subbblocks():
           X("complete: complete subblock %s...", subB)
-          LP.defer(subB.complete, S2, L)
+          LP.defer(subB.complete, S2, capacity=L)
     X("complete: join...")
     LP.join()
     X("complete: completed")
