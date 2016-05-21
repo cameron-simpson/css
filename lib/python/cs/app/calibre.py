@@ -67,7 +67,7 @@ def main(argv=None):
           with Pfx(obclass):
             if obclass == 'books':
               for B in CL.books:
-                print(B.title)
+                print(B.title, B.author_sort)
             elif obclass == 'tags':
               I.load_folders()
               names = I.event_names()
@@ -100,6 +100,11 @@ class Calibre_Library(O):
     self.metadb = sqlite3.connect(self.metadbpath)
     self._books = None
     self._book_table = None
+    self._tables = {}
+    self._table_meta = \
+      {
+        'books': (Book, 'id title sort timestamp pubdate series_index author_sort isbn lccn path flags uuid has_cover last_modified'),
+      }
 
   def pathto(self, rpath):
     if rpath.startswith('/'):
@@ -108,52 +113,55 @@ class Calibre_Library(O):
 
   @property
   def books(self):
-    Bs = self._books
-    if Bs is None:
-      Bs = []
-      for row in self._book_dbrows():
-        Bs.append(Book(self, row))
-      self._books = Bs
-    return Bs
-
-  @property
-  def book_table(self):
-    T = self._book_table
-    if T is None:
-      T = CalibreTable(self.metadb, 'books',
-                       'id title sort timestamp pubdate series_index author_sort isbn lccn path flags uuid has_cover last_modified')
-      self._book_table = T
-    return T
-
-  def _book_dbrows(self):
-    return self.book_table.read_rows()
-
-class Book(object):
-
-  def __init__(self, CL, row):
-    self.library = CL
-    self.row = row
+    return self.table_books.instances()
 
   def __getattr__(self, attr):
-    try:
-      value = getattr(self.row, attr)
-    except AttributeError:
-      raise
-    return value
+    if attr.startswith('table_'):
+      table_name = attr[6:]
+      T = self._tables.get(table_name)
+      if T is None:
+        try:
+          meta = self._table_meta[table_name]
+        except KeyError:
+          raise AttributeError('%s: no entry in ._table_meta for %r' % (attr, table_name))
+        T = CalibreTable(meta[0], self, self.metadb, table_name, meta[1])
+        self._tables[table_name] = T
+      return T
+    raise AttributeError(attr)
+
+class CalibreTableRowNS(NS):
+
+  def __init__(self, table, rowmap):
+    self.table = table
+    NS.__init__(self, **rowmap)
+
+  def library(self):
+    return self.table.library
 
 class CalibreTable(object):
 
-  def __init__(self, db, name, columns):
+  def __init__(self, row_class, CL, db, name, columns):
+    self.row_class = row_class
+    self.library = CL
     self.db = db
     self.name = name
     self.columns = columns.split()
     X("columns = %r", self.columns)
     self._select_all = 'SELECT %s from %s' % (','.join(self.columns), name)
     X("select = %r", self._select_all)
+    self.by_id = {}
+    self._load()
 
-  def read_rows(self):
+  def instances(self):
+    return self.by_id.values()
+
+  def _load(self):
     for row in self.db.execute(self._select_all):
-      yield NS(**dict(zip(self.columns, row)))
+      o = self.row_class(self, dict(zip(self.columns, row)))
+      self.by_id[o.id] = o
+
+class Book(CalibreTableRowNS):
+  pass
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
