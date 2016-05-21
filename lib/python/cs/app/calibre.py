@@ -20,6 +20,7 @@ from cs.env import envsub
 from cs.lex import get_identifier
 from cs.logutils import Pfx, info, warning, error, setup_logging, X, XP
 from cs.obj import O
+from cs.seq import the
 from cs.threads import locked, locked_property
 
 DEFAULT_LIBRARY = '$HOME/Calibre_Library'
@@ -68,7 +69,10 @@ def main(argv=None):
           with Pfx(obclass):
             if obclass == 'books':
               for B in CL.table_books.instances():
-                print(B, ' '.join(str(T) for T in B.tags))
+                print(B,
+                      ' '.join(str(T) for T in B.tags),
+                      str(B.rating),
+                     )
             elif obclass in ('authors', 'tags'):
               for obj in CL.table(obclass).instances():
                 print(obj)
@@ -108,6 +112,12 @@ class Calibre_Library(O):
         'books': NS(klass=Book,
                     columns='id title sort timestamp pubdate series_index author_sort isbn lccn path flags uuid has_cover last_modified',
                     name='title'),
+        'ratings': NS(klass=Rating,
+                      columns='id rating',
+                      name='rating'),
+        'series': NS(klass=Series,
+                     columns='id name sort',
+                     name='name'),
         'tags': NS(klass=Tag,
                    columns='id name',
                    name='name'),
@@ -192,8 +202,27 @@ class Author(CalibreTableRowNS):
 class Book(CalibreTableRowNS):
 
   @property
+  def rating(self):
+    Rs = self.related_entities('books_ratings_link', 'book', 'rating')
+    if Rs:
+      return the(Rs).rating
+    return None
+
+  @property
+  def series(self):
+    return self.related_entities('books_series_link', 'book', 'series')
+
+  @property
   def tags(self):
     return self.related_entities('books_tags_link', 'book', 'tag')
+
+class Rating(CalibreTableRowNS):
+
+  def __str__(self):
+    return ('*' * self.rating) if self.rating else '-'
+
+class Series(CalibreTableRowNS):
+  pass
 
 class Tag(CalibreTableRowNS):
   pass
