@@ -27,6 +27,7 @@ METADB_NAME = 'metadata.db'
 
 USAGE = '''Usage: %s [/path/to/iphoto-library-path] op [op-args...]
   ls [books]        List books.
+  ls authors        List authors.
   ls tags           List tags.
   select criteria... List books with all specified criteria.
 
@@ -65,12 +66,9 @@ def main(argv=None):
           else:
             obclass = argv.pop(0)
           with Pfx(obclass):
-            if obclass in ('authors', 'books'):
+            if obclass in ('authors', 'books', 'tags'):
               for obj in CL.table(obclass).instances():
                 print(obj)
-            elif obclass == 'tags':
-              I.load_folders()
-              names = I.event_names()
             else:
               warning("unknown class %r", obclass)
               badopts = True
@@ -98,8 +96,6 @@ class Calibre_Library(O):
     self.path = libpath
     self.metadbpath = self.pathto(METADB_NAME)
     self.metadb = sqlite3.connect(self.metadbpath)
-    self._books = None
-    self._book_table = None
     self._tables = {}
     self._table_meta = \
       {
@@ -109,6 +105,9 @@ class Calibre_Library(O):
         'books': NS(klass=Book,
                     columns='id title sort timestamp pubdate series_index author_sort isbn lccn path flags uuid has_cover last_modified',
                     name='title'),
+        'tags': NS(klass=Tag,
+                   columns='id name',
+                   name='name'),
       }
 
   def pathto(self, rpath):
@@ -173,6 +172,9 @@ class Author(CalibreTableRowNS):
   pass
 
 class Book(CalibreTableRowNS):
+  pass
+
+class Tag(CalibreTableRowNS):
   pass
 
 if __name__ == '__main__':
