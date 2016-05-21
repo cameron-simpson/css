@@ -134,9 +134,12 @@ class Book(object):
     self.library = CL
     self.row = row
 
-  @property
-  def title(self):
-    return self.row.title
+  def __getattr__(self, attr):
+    try:
+      value = getattr(self.row, attr)
+    except AttributeError:
+      raise
+    return value
 
 class CalibreTable(object):
 
