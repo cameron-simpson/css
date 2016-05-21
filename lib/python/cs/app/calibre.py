@@ -74,6 +74,11 @@ def main(argv=None):
                       str(B.rating),
                       str(B.series),
                      )
+                S = B.series
+                if S:
+                  for B2 in S.books:
+                    if B2 is not B:
+                      print('  also', B2)
             elif obclass in ('authors', 'tags'):
               for obj in CL.table(obclass).instances():
                 print(obj)
@@ -228,7 +233,10 @@ class Rating(CalibreTableRowNS):
     return ('*' * self.rating) if self.rating else '-'
 
 class Series(CalibreTableRowNS):
-  pass
+
+  @property
+  def books(self):
+    return self.related_entities('books_series_link', 'series', 'book')
 
 class Tag(CalibreTableRowNS):
   pass
