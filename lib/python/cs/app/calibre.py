@@ -31,6 +31,7 @@ USAGE = '''Usage: %s [/path/to/iphoto-library-path] op [op-args...]
   ls authors        List authors.
   ls tags           List tags.
   select criteria... List books with all specified criteria.
+  tag book-title +tag...
 
 Criteria:
   [!]/regexp            Regexp found in text fields.
@@ -91,6 +92,25 @@ def main(argv=None):
             if argv:
               warning("extra arguments: %r", argv)
               badopts = True
+        elif op == 'tag':
+          if not argv:
+            warning('missing book-title')
+            badopts = True
+          else:
+            book_title = argv.pop(0)
+          if not badopts:
+            with Pfx(book_title):
+              for B in CL.books_by_title(book_title):
+                for tag_op in argv:
+                  if tag_op.startswith('+'):
+                    tag_name = tag_op[1:]
+                    B.add_tag(tag_name)
+                  elif tag_op.startswith('-'):
+                    tag_name = tag_op[1:]
+                    B.remove_tag(tag_name)
+                  else:
+                    warning('unsupported tag op %r', tag_op)
+                    badopts = True
         else:
           warning("unrecognised op")
           badopts = True
@@ -132,6 +152,15 @@ class Calibre_Library(O):
                    name='name'),
       }
 
+  def dosql_ro(self, sql, *params):
+    return self.metadb.execute(sql, params)
+
+  def dosql_rw(self, sql, *params):
+    c = self.metadb.cursor()
+    results = c.execute(sql, params)
+    self.metadb.commit()
+    return results
+
   def pathto(self, rpath):
     if rpath.startswith('/'):
       raise ValueError('rpath may not start with a slash: %r' % (rpath,))
@@ -148,6 +177,15 @@ class Calibre_Library(O):
       self._tables[table_name] = T
     return T
 
+  def books_by_title(self, book_title):
+    return [ B for B in self.books if B.title == book_title ]
+
+  def book_by_title(self, book_title):
+    return the(self.books_by_title(book_title))
+
+  def tag_by_name(self, tag_name):
+    return the( T for T in self.tags if T.name == tag_name )
+
   def __getattr__(self, attr):
     if attr.startswith('table_'):
       return self.table(attr[6:])
@@ -160,7 +198,8 @@ class CalibreTable(object):
   def __init__(self, row_class, CL, db, name, columns, name_column):
     self.row_class = row_class
     self.library = CL
-    self.db = db
+    self.dosql_ro = CL.dosql_ro
+    self.dosql_rw = CL.dosql_rw
     self.name = name
     self.columns = columns.split()
     self.name_column = name_column
@@ -174,7 +213,7 @@ class CalibreTable(object):
     return self.by_id.values()
 
   def _load(self):
-    for row in self.db.execute(self._select_all):
+    for row in self.dosql_ro(self._select_all):
       o = self.row_class(self, dict(zip(self.columns, row)))
       self.by_id[o.id] = o
 
@@ -187,6 +226,14 @@ class CalibreTableRowNS(NS):
     self.table = table
     NS.__init__(self, **rowmap)
 
+  @property
+  def dosql_ro(self):
+    return self.table.dosql_ro
+
+  @property
+  def dosql_rw(self):
+    return self.table.dosql_rw
+
   def __str__(self):
     return getattr(self, self.table.name_column)
 
@@ -197,15 +244,19 @@ class CalibreTableRowNS(NS):
   def library(self):
     return self.table.library
 
+  @property
+  def db(self):
+    return self.library.metadb
+
   def related_entities(self, link_table_name, our_column_name, other_column_name, other_table_name=None):
     if other_table_name is None:
      other_table_name = other_column_name + 's'
     T = self.library.table(other_table_name)
     return set( T[row[0]] for row
-                in T.db.execute( 'SELECT %s as %s_id from %s where %s = %d'
-                                 % (other_column_name, other_column_name,
-                                    link_table_name,
-                                    our_column_name, self.id)) )
+                in T.dosql_ro( 'SELECT %s as %s_id from %s where %s = %d'
+                               % (other_column_name, other_column_name,
+                                  link_table_name,
+                                  our_column_name, self.id)) )
 
 class Author(CalibreTableRowNS):
 
@@ -236,6 +287,24 @@ class Book(CalibreTableRowNS):
   @property
   def tags(self):
     return self.related_entities('books_tags_link', 'book', 'tag')
+
+  def add_tag(self, tag_name):
+    if tag_name not in [ str(T) for T in self.tags ]:
+      T = self.library.make_tag(tag_name)
+      sql = 'INSERT INTO books_tags_link(book, tag) VALUES (%d, %d)' \
+            % (self.id, T.id)
+      X("SQL %r", sql)
+      self.dosql_rw(sql)
+
+  def remove_tag(self, tag_name):
+    CL = self.library
+    if tag_name in [ str(T) for T in self.tags ]:
+      T = CL.tag_by_name(tag_name)
+      sql = 'DELETE FROM books_tags_link WHERE book = %d and tag = %d' \
+            % (self.id, T.id)
+      X("SQL %r", sql)
+      results = CL.dosql_rw(sql)
+      X("results = %r", results)
 
 class Rating(CalibreTableRowNS):
 
