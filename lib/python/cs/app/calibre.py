@@ -178,6 +178,14 @@ class CalibreTableRowNS(NS):
   def library(self):
     return self.table.library
 
+  def related_entities(self, link_table_name, our_column_name, other_column_name):
+    T = self.library.table(other_column_name+'s')
+    return set( T[row[0]] for row
+                in T.db.execute( 'SELECT %s as %s_id from %s where %s = %d'
+                                 % (other_column_name, other_column_name,
+                                    link_table_name,
+                                    our_column_name, self.id)) )
+
 class Author(CalibreTableRowNS):
   pass
 
@@ -185,9 +193,7 @@ class Book(CalibreTableRowNS):
 
   @property
   def tags(self):
-    T = self.library.table_tags
-    return set( T[row[0]] for row
-                in T.db.execute('SELECT tag as tag_id from books_tags_link where book = %d' % (self.id,)) )
+    return self.related_entities('books_tags_link', 'book', 'tag')
 
 class Tag(CalibreTableRowNS):
   pass
