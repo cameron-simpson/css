@@ -136,22 +136,6 @@ class Calibre_Library(O):
       return self.table(attr).instances()
     raise AttributeError(attr)
 
-class CalibreTableRowNS(NS):
-
-  def __init__(self, table, rowmap):
-    self.table = table
-    NS.__init__(self, **rowmap)
-
-  def __str__(self):
-    return getattr(self, self.table.name_column)
-
-  def __hash__(self):
-    return self.id
-
-  @property
-  def library(self):
-    return self.table.library
-
 class CalibreTable(object):
 
   def __init__(self, row_class, CL, db, name, columns, name_column):
@@ -177,6 +161,22 @@ class CalibreTable(object):
 
   def __getitem__(self, row_id):
     return self.by_id[row_id]
+
+class CalibreTableRowNS(NS):
+
+  def __init__(self, table, rowmap):
+    self.table = table
+    NS.__init__(self, **rowmap)
+
+  def __str__(self):
+    return getattr(self, self.table.name_column)
+
+  def __hash__(self):
+    return self.id
+
+  @property
+  def library(self):
+    return self.table.library
 
 class Author(CalibreTableRowNS):
   pass
