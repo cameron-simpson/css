@@ -129,7 +129,7 @@ class Calibre_Library(O):
   def __getattr__(self, attr):
     if attr.startswith('table_'):
       return self.table(attr[6:])
-    if attr in ('books', 'authors'):
+    if attr in ('books', 'authors', 'tags'):
       return self.table(attr).instances()
     raise AttributeError(attr)
 
