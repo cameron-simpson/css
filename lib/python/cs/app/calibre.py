@@ -83,6 +83,8 @@ def main(argv=None):
             elif obclass in ('authors', 'tags'):
               for obj in CL.table(obclass).instances():
                 print(obj)
+                for B in obj.books:
+                  print(' ', B)
             else:
               warning("unknown class %r", obclass)
               badopts = True
@@ -206,7 +208,10 @@ class CalibreTableRowNS(NS):
                                     our_column_name, self.id)) )
 
 class Author(CalibreTableRowNS):
-  pass
+
+  @property
+  def books(self):
+    return self.related_entities('books_authors_link', 'author', 'book')
 
 class Book(CalibreTableRowNS):
 
@@ -244,7 +249,10 @@ class Series(CalibreTableRowNS):
     return self.related_entities('books_series_link', 'series', 'book')
 
 class Tag(CalibreTableRowNS):
-  pass
+
+  @property
+  def books(self):
+    return self.related_entities('books_tags_link', 'tag', 'book')
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
