@@ -102,7 +102,7 @@ class Calibre_Library(O):
     self._tables = {}
     self._table_meta = \
       {
-        'authors': NS(klass=Book,
+        'authors': NS(klass=Author,
                       columns='id name sort link',
                       name='name'),
         'books': NS(klass=Book,
