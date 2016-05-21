@@ -74,6 +74,7 @@ def main(argv=None):
                       str(B.rating),
                       str(B.series),
                      )
+                print(' ', '+'.join(str(A) for A in B.authors))
                 S = B.series
                 if S:
                   for B2 in S.books:
@@ -208,6 +209,10 @@ class Author(CalibreTableRowNS):
   pass
 
 class Book(CalibreTableRowNS):
+
+  @property
+  def authors(self):
+    return self.related_entities('books_authors_link', 'book', 'author')
 
   @property
   def rating(self):
