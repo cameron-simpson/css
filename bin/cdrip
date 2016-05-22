@@ -241,10 +241,14 @@ byNAME=
 toc=$TMPDIR/cdtoc.$$
 $trace cdtoc2 "$CDRIP_DEV" >"$toc" || { rm -f "$toc"; exit 1; }
 
-echo "TOC:"
-cat "$toc"
-echo
-ask "Edit TOC before use" && $EDITOR "$toc"
+while :
+do
+  $EDITOR "$toc"
+  echo
+  cat "$toc"
+  echo
+  ask "Proceed with rip" && break
+done
 
 exec <"$toc"
 rm "$toc"
