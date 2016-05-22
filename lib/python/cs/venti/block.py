@@ -4,7 +4,6 @@ from __future__ import print_function
 import sys
 from enum import IntEnum, unique as uniqueEnum
 from threading import RLock
-from cs.later import capacity
 from cs.logutils import D, error, debug, X, Pfx
 from cs.serialise import get_bs, put_bs
 from cs.threads import locked_property
@@ -404,38 +403,6 @@ class _Block(object):
       from .file import File
       return File(backing_block=self)
     raise ValueError("unsupported open mode, expected 'rb' or 'w+b', got: %s", mode)
-
-  @capacity
-  def complete(self, S2, capacity=None):
-    ''' Complete this Block from alternative Store `S2`.
-        If the current Store does not contain us, fetch data from `S2`.
-        If indirect, repeat for all children.
-        `capacity` controls the parallelism of the completion.
-        If None, use the self.capacity.
-        If an int, construct a Later instance with that capacity.
-        Otherwise presume `capacity` is already a Later instance and use that.
-    '''
-    # capacity should be a Later instance
-    L = capacity
-    with L.pool() as LP:
-      LFs = []
-      try:
-        h = self.hashcode
-      except AttributeError:
-        pass
-      else:
-        S = defaults.S
-        if h not in S:
-          # dispatch fetch for missing data
-          X("complete: fetch S2[%s]...", h)
-          LP.add(L.with_result_of(partial(S2.get, h), S.add))
-      if self.indirect:
-        for subB in self.subbblocks():
-          X("complete: complete subblock %s...", subB)
-          LP.defer(subB.complete, S2, capacity=L)
-    X("complete: join...")
-    LP.join()
-    X("complete: completed")
 
 class HashCodeBlock(_Block):
 

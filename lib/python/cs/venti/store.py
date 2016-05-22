@@ -162,6 +162,31 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin):
       if h not in self:
         yield h
 
+  def complete_Block(self, B, S2):
+    ''' Complete storage of this Block from alternative Store `S2`.
+        If this STore does not contain the Block, fetch data from `S2`.
+        If indirect, repeat for all children.
+    '''
+    L = self.later
+    with L.pool() as LP:
+      LFs = []
+      try:
+        h = self.hashcode
+      except AttributeError:
+        pass
+      else:
+        if h not in self:
+          # dispatch fetch for missing data
+          X("complete: fetch S2[%s]...", h)
+          LP.add(L.with_result_of(partial(S2.get, h), self.add))
+      if self.indirect:
+        for subB in self.subbblocks():
+          X("complete: complete subblock %s...", subB)
+          LP.defer(subB.complete, S2, capacity=L)
+    X("complete: join...")
+    LP.join()
+    X("complete: completed")
+
   def prefetch(self, hashes):
     ''' Prefetch the blocks associated with hs, an iterable returning hashes.
         This is intended to hint that these blocks will be wanted soon,
