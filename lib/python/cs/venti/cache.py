@@ -74,16 +74,6 @@ class CacheStore(BasicStoreSync):
     self._defer(add_backend)
     return h
 
-  def prefetch(self, hs):
-    ''' Request from the backend those hashes from 'hs'
-        which do not occur in the cache.
-    '''
-    self.backend.prefetch(self.missing(hs))
-
-  def sync(self):
-    for _ in cs.later.report([ self.cache.flush_bg(), self.backend.flush_bg() ]):
-      pass
-
 class MemoryCacheStore(BasicStoreSync):
   ''' A lossy store that keeps an in-memory cache of recent chunks.  It may
       discard older chunks if new ones come in when full and would normally

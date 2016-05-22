@@ -187,35 +187,6 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin):
     LP.join()
     X("complete: completed")
 
-  def prefetch(self, hashes):
-    ''' Prefetch the blocks associated with hs, an iterable returning hashes.
-        This is intended to hint that these blocks will be wanted soon,
-        and so implementors might queue the fetches on an "idle" queue so as
-        not to penalise other store users.
-        This default implementation does nothing, which may be perfectly
-        legitimate for some stores.
-    '''
-    pass
-
-  def multifetch(self, hs, ordered=False):
-    ''' Generator yielding:
-          hash, data
-        for each hash in `hs`.
-        If `ordered` is true, yield data in the order of `hs`
-        otherwise yield data as it arrives from the Store.
-    '''
-    LFs = []
-    for h in hs:
-      LF = self.fetch_bg(h)
-      h2LF[h] = self.fetch_bg(h)
-      LF2h[LF] = h
-    if ordered:
-      for h in hs:
-        yield h, h2LF[h]()
-    else:
-      for LF in reportLFs(LF2h.keys()):
-        yield LF2h[LF], LF()
-
 class BasicStoreSync(_BasicStoreCommon):
   ''' Subclass of _BasicStoreCommon expecting synchronous operations and providing asynchronous hooks, dual of BasicStoreAsync.
   '''
