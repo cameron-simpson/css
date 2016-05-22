@@ -35,8 +35,13 @@ class CacheStore(BasicStoreSync):
     BasicStoreSync.shutdown(self)
 
   def flush(self):
-    self.cache.flush()
-    self.backend.flush()
+    # dispatch flushes in parallel
+    LFs = [ self.cache.flush_bg(),
+            self.backend.flush_bg()
+          ]
+    # wait for the cache flush and then the backend flush
+    for LF in LFs:
+      LF()
 
   def keys(self):
     cache = self.cache
