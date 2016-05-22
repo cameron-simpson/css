@@ -162,31 +162,6 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin):
       if h not in self:
         yield h
 
-  def complete_Block(self, B, S2):
-    ''' Complete storage of this Block from alternative Store `S2`.
-        If this STore does not contain the Block, fetch data from `S2`.
-        If indirect, repeat for all children.
-    '''
-    L = self.later
-    with L.pool() as LP:
-      LFs = []
-      try:
-        h = self.hashcode
-      except AttributeError:
-        pass
-      else:
-        if h not in self:
-          # dispatch fetch for missing data
-          X("complete: fetch S2[%s]...", h)
-          LP.add(L.with_result_of(partial(S2.get, h), self.add))
-      if self.indirect:
-        for subB in self.subbblocks():
-          X("complete: complete subblock %s...", subB)
-          LP.defer(subB.complete, S2, capacity=L)
-    X("complete: join...")
-    LP.join()
-    X("complete: completed")
-
 class BasicStoreSync(_BasicStoreCommon):
   ''' Subclass of _BasicStoreCommon expecting synchronous operations and providing asynchronous hooks, dual of BasicStoreAsync.
   '''
