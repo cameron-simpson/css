@@ -159,7 +159,7 @@ def complete_Block(B, S, S2):
       If `S` does not contain the Block, fetch data from `S2`.
       If indirect, repeat for all children.
   '''
-  L = self.later
+  L = S.later
   with L.pool() as LP:
     LFs = []
     try:
