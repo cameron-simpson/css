@@ -45,6 +45,7 @@ set -ue
 : ${CDRIP_QUAL=6}
 : ${CDRIP_LOCK:=''}
 : ${CDRIP_OPTS:=''}
+: ${CDRIP_TOCDIR:=$HOME/var/cdrip/toc}
 : ${CDDBSERVER:=au.freedb.org:8880}
 export CDDBSERVER
 
@@ -240,8 +241,7 @@ fi
 byNAME=
 ##[ -n "$NAME" ] && byNAME=" by $NAME"
 
-toc=$TMPDIR/cdtoc.$$
-$trace cdtoc2 "$CDRIP_DEV" >"$toc" || { rm -f "$toc"; exit 1; }
+toc=$( $trace cdtoc2 -d "$CDRIP_TOCDIR" "$CDRIP_DEV" ) || exit 1
 
 while :
 do
@@ -253,7 +253,6 @@ do
 done
 
 exec <"$toc"
-rm "$toc"
 
 sed -e 's;//*; -- ;g' -e 's/   */ /g' \
 | ( read artist || exit 1
