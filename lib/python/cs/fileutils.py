@@ -1015,13 +1015,13 @@ class SharedAppendFile(object):
       if not no_update:
         # inbound updates to be saved to the file
         self._inQ = IterableQueue(self.max_queue, name="%s._inQ" % (self,))
-      self._open()
+      self._open_fp()
 
   def __str__(self):
     return "SharedAppendFile(%r)" % (self.pathname,)
 
-  def _open(self):
-    ''' Open the file for read or read/write.
+  def _open_fp(self):
+    ''' Open the file for read or read/write, save open file as .fp.
     '''
     mode = "r" if self.no_update else "r+"
     if self.binary:
@@ -1061,6 +1061,25 @@ class SharedAppendFile(object):
                     ext=self.lock_ext,
                     poll_interval=self.poll_interval,
                     timeout=self.lock_timeout)
+
+  @contextmanager
+  def open(self, mode=None):
+    ''' Context manager to obtain the lockfile, open the file with the specified mode (default: append), return the open file.
+    '''
+    if mode is None:
+      mode = "ab" if self.binary else "a"
+    with self._lockfile():
+      self.fp.flush()
+      self.fp.close()
+      try:
+        fp = open(self.pathname, mode)
+      except OSError:
+        raise
+      else:
+        yield fp
+        fp.close()
+      finally:
+        self._open_fp()
 
   def put(self, update_item):
     ''' Queue an update record for transcription to the shared file.
