@@ -66,6 +66,8 @@ def write_csv_file(fp, nodedata):
         name = ''
 
 class Backend_CSVFile(Backend):
+  ''' An interface to a cs.csvutils.SharedCSVFile to store nodedb state.
+  '''
 
   def __init__(self, csvpath, readonly=False, rewrite_inplace=False):
     Backend.__init__(self, readonly=readonly)
