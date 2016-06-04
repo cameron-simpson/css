@@ -433,6 +433,7 @@ def readMakefileLines(M, fp, parent_context=None, start_lineno=1):
                 raise ParseError(context, 0, ":else inside :else")
               else:
                 ifStack[-1][1] = False
+              continue
             if word == "endif":
               # extra text permitted
               if not ifStack:
