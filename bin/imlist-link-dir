@@ -34,15 +34,20 @@ else imlist-pick -a ${1+"$@"}
 fi \
 | \
 ( cd "$target_dir" || exit 1
-  rm -- * 2>/dev/null || :
+  first=1
   while read -r impath
   do
+    if [ $first ]
+    then
+      rm -- * 2>/dev/null || :
+      first=
+    fi
     base=$(basename "$impath")
     if [ $unsp ]
     then
       case "$base" in
         *\ * | *\	* )
-          base=$( printf '%s\n' | tr ' \011' __ )
+          base=$( printf '%s\n' "$base" | tr ' \011' __ )
           ;;
       esac
     fi

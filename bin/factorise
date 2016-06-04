@@ -1,0 +1,22 @@
+#!/usr/bin/python
+#
+# Recite values and their prime factors.
+#   - Cameron Simpson <cs@zip.com.au> 30dec2015
+# 
+
+from __future__ import print_function
+import sys
+from cs.numeric import factors
+
+def main(argv):
+  cmd = argv.pop(0)
+  for arg in argv:
+    value = int(arg)
+    print(value, end='')
+    for factor in factors(value):
+      print('', factor, end='')
+    print()
+  return 0
+
+if __name__ == '__main__':
+  sys.exit(main(sys.argv))

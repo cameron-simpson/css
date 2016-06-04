@@ -6,10 +6,10 @@
 
 set -uex
 
-: ${TMPDIR:=/tmp}
+outdir=$HOME/var/mail-attachments
 
 cmd=$(basename "$0")
-unpackdir=$TMPDIR/$cmd.$$
+unpackdir=$outdir/$(datecode)-$$
 
 mkdir "$unpackdir"
 cat ${1+"$@"} | munpack -C "$unpackdir" -t

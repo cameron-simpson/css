@@ -15,16 +15,16 @@ DISTINFO = {
     'requires': ['cs.excutils', 'cs.logutils', 'cs.obj', 'cs.py.func'],
 }
 
+from contextlib import contextmanager
 import threading
-from threading import Condition, RLock
+from threading import Condition, RLock, Lock
 import time
 import traceback
 from cs.excutils import logexc
 import cs.logutils
 from cs.logutils import debug, warning, error, PfxCallInfo, X, XP
 from cs.obj import O
-from cs.py.func import callmethod_if as ifmethod
-from cs.py.stack import caller
+from cs.py.stack import caller, stack_dump
 
 class ClosedError(Exception):
   pass
@@ -105,7 +105,6 @@ class MultiOpenMixin(O):
         ##raise RuntimeError("UNDERFLOW CLOSE of %s" % (self,))
         return
       self._opens -= 1
-      count = self._opens
       if self._opens == 0:
         self.shutdown()
         if not self._finalise_later:
@@ -120,11 +119,13 @@ class MultiOpenMixin(O):
         `finalise_later` was set to true during initialisation.
     '''
     with self._lock:
-      if self._finalise:
-        self._finalise.notify_all()
+      if self._finalise is not None:
+        finalise = self._finalise
         self._finalise = None
+        finalise.notify_all()
         return
-    warning("%s: finalised more than once", self)
+    error("%s: finalised more than once" % (self,))
+    ##raise RuntimeError("%s: finalised more than once" % (self,))
 
   @property
   def closed(self):
@@ -176,3 +177,45 @@ class MultiOpen(MultiOpenMixin):
 
   def shutdown(self):
     self.openable.close()
+
+class Pool(O):
+  ''' A generic pool of objects on the premise that reuse is cheaper than recreation.
+      All the pool objects must be suitable for use, so the
+      `new_object` callable will typically be a closure. For example,
+      here is the __init__ for a per-thread AWS Bucket using a
+      distinct Session:
+
+      def __init__(self, bucket_name):
+        Pool.__init__(self, lambda: boto3.session.Session().resource('s3').Bucket(bucket_name)
+  '''
+
+  def __init__(self, new_object, max_size=None):
+    ''' Initialise the Pool with creator `new_object` and maximum size `max_size`.
+        `new_object` is a callable which returns a new object for the Pool.
+        `max_size`: The maximum size of the pool of available objects saved for reuse.
+            If omitted or None, defaults to 4.
+            If 0, no upper limit is applied.
+    '''
+    if max_size is None:
+      max_size = 4
+    self.new_object = new_object
+    self.max_size = max_size
+    self.pool = []
+    self._lock = Lock()
+
+  def __str__(self):
+    return "Pool(max_size=%s, new_object=%s)" % (self.max_size, self.new_object)
+
+  @contextmanager
+  def instance(self):
+    ''' Context manager returning an object for use, which is returned to the pool afterwards.
+    '''
+    with self._lock:
+      try:
+        o = self.pool.pop()
+      except IndexError:
+        o = self.new_object()
+    yield o
+    with self._lock:
+      if self.max_size == 0 or len(self.pool) < self.max_size:
+        self.pool.append(o)

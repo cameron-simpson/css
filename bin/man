@@ -4,7 +4,8 @@
 #	- Cameron Simpson <cs@zip.com.au> 11may1997
 #
 
-require 'flush.pl';
+##require 'flush.pl';
+use IO::Handle qw();
 use Getopt::Std;
 use cs::Pathname;
 use cs::Shell;
@@ -273,7 +274,8 @@ PROMPT:
 exit $?;
 
 sub necho
-{ printflush(STDOUT,@_);
+{ print(@_);
+  STDOUT->flush();
 }
 
 sub basename

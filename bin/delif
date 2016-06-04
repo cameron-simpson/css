@@ -5,12 +5,14 @@
 #
 
 : ${TMPDIR:=/tmp}
-trace=set-x
 
 cmd=`basename "$0"` || cmd=$0
 usage="Usage: $cmd [-n] ip-addrs..."
 
 badopts=
+
+trace=
+[ -t 2 ] && trace=set-x
 
 [ $# -gt 0 ] && [ "x$1" = x-n ] && { trace=echo; shift; }
 

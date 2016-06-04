@@ -38,12 +38,14 @@ def caller():
   # -3: the calling function of the invoker
   return frames()[-3]
 
-def stack_dump(fp=None):
+def stack_dump(fp=None, indent=0):
   ''' Recite current stack to `fp`, default sys.stderr.
   '''
   if fp is None:
     fp = sys.stderr
   for F in frames():
+    if indent > 0:
+      fp.write(' ' * indent)
     fp.write(str(F))
     fp.write('\n')
 

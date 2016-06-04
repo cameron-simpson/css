@@ -1,18 +1,21 @@
 import os
 import os.path
+from collections import namedtuple
 import pwd
 import grp
 import stat
 import sys
 from threading import Lock, RLock
-from cs.logutils import D, Pfx, debug, error, info, warning, X
-from cs.lex import hexify
+import time
+from cs.logutils import D, Pfx, debug, error, info, warning, X, XP
+from cs.lex import hexify, texthexify
+from cs.py.stack import stack_dump
 from cs.queues import MultiOpenMixin
 from cs.seq import seq
-from cs.serialise import get_bs, get_bsdata, put_bs, put_bsdata
+from cs.serialise import get_bs, get_bsdata, get_bss, put_bs, put_bsdata, put_bss
 from cs.threads import locked, locked_property
 from . import totext, fromtext
-from .block import Block, decodeBlock
+from .block import Block, decodeBlock, encodeBlock
 from .file import File
 from .meta import Meta
 
@@ -23,64 +26,120 @@ gid_nogroup = -1
 
 D_FILE_T = 0
 D_DIR_T = 1
+D_SYM_T = 2
+D_HARD_T = 3
 def D_type2str(type_):
   if type_ == D_FILE_T:
     return "D_FILE_T"
   if type_ == D_DIR_T:
     return "D_DIR_T"
+  if type_ == D_SYM_T:
+    return "D_SYM_T"
+  if type_ == D_HARD_T:
+    return "D_HARD_T"
   return str(type_)
 
 F_HASMETA = 0x01
 F_HASNAME = 0x02
+F_NOBLOCK = 0x04
 
 def decode_Dirent_text(text):
-  ''' Accept `text`, a text transcription of a Direct, such as from
-      Dirent.textencode(), and return the correspnding Dirent.
+  ''' Accept `text`, a text transcription of a Dirent, such as from
+      Dirent.textencode(), and return the corresponding Dirent.
   '''
   data = fromtext(text)
-  E, offset = decodeDirent(data, 0)
+  E, offset = decode_Dirent(data, 0)
   if offset < len(data):
     raise ValueError("%r: not all text decoded: got %r with unparsed data %r"
                      % (text, E, data[offset:]))
   return E
 
-def decodeDirent(data, offset):
-  ''' Unserialise a Dirent, return (dirent, offset).
-      Input format: bs(type)bs(flags)[bs(namelen)name][bs(metalen)meta]block
+class DirentComponents(namedtuple('DirentComponents', 'type name metatext block')):
+
+  @classmethod
+  def from_data(cls, data, offset=0):
+    ''' Unserialise a serialised Dirent, return (DirentComponents, offset).
+        Input format: bs(type)bs(flags)[bs(namelen)name][bs(metalen)meta]blockref
+    '''
+    type_, offset = get_bs(data, offset)
+    flags, offset = get_bs(data, offset)
+    if flags & F_HASNAME:
+      namedata, offset = get_bsdata(data, offset)
+      name = namedata.decode()
+    else:
+      name = ""
+    meta = None
+    if flags & F_HASMETA:
+      metatext, offset = get_bss(data, offset)
+    else:
+      metatext = None
+    if flags & F_NOBLOCK:
+      block = None
+    else:
+      block, offset = decodeBlock(data, offset)
+    return cls(type_, name, metatext, block), offset
+
+  def encode(self):
+    ''' Serialise the components.
+        Output format: bs(type)bs(flags)[bsdata(name)][bsdata(metadata)]block
+    '''
+    flags = 0
+    name = self.name
+    if name:
+      flags |= F_HASNAME
+      namedata = put_bsdata(name.encode())
+    else:
+      namedata = b''
+    meta = self.metatext
+    if meta:
+      flags |= F_HASMETA
+      if isinstance(meta, str):
+        metadata = put_bss(meta)
+      else:
+        metadata = put_bss(meta.textencode())
+    else:
+      metadata = b''
+    block = self.block
+    if block is None:
+      flags |= F_NOBLOCK
+      blockref = b''
+    else:
+      blockref = encodeBlock(block)
+    return put_bs(self.type) \
+         + put_bs(flags) \
+         + namedata \
+         + metadata \
+         + blockref
+
+def decode_Dirent(data, offset):
+  ''' Unserialise a Dirent, return (Dirent, offset).
   '''
-  type_, offset = get_bs(data, offset)
-  flags, offset = get_bs(data, offset)
-  if flags & F_HASNAME:
-    namedata, offset = get_bsdata(data, offset)
-    name = namedata.decode()
-  else:
-    name = ""
-  meta = None
-  if flags & F_HASMETA:
-    metadata, offset = get_bsdata(data, offset)
-    metatext = metadata.decode()
-  else:
-    metatext = None
-  block, offset = decodeBlock(data, offset)
-  if type_ == D_DIR_T:
-    E = Dir(name, metatext=metatext, parent=None, block=block)
-  elif type_ == D_FILE_T:
-    E = FileDirent(name, metatext=metatext, block=block)
-  else:
-    E = _Dirent(type_, name, metatext=metatext, block=block)
+  offset0 = offset
+  components, offset = DirentComponents.from_data(data, offset)
+  type_, name, metatext, block = components
+  try:
+    if type_ == D_DIR_T:
+      E = Dir(name, metatext=metatext, parent=None, block=block)
+    elif type_ == D_FILE_T:
+      E = FileDirent(name, metatext=metatext, block=block)
+    elif type_ == D_SYM_T:
+      E = SymlinkDirent(name, metatext=metatext)
+    elif type_ == D_HARD_T:
+      E = HardlinkDirent(name, metatext=metatext)
+    else:
+      E = _Dirent(type_, name, metatext=metatext, block=block)
+  except ValueError as e:
+    warning("%r: invalid DirentComponents, marking Dirent as invalid: %s: %s",
+            name, e, components)
+    E = InvalidDirent(components, data[offset0:offset])
   return E, offset
 
-def decodeDirents(dirdata, offset=0):
-  ''' Yield Dirents from the supplied bytes `dirdata`.
+def decode_Dirents(dirdata, offset=0):
+  ''' Decode and yield all the Dirents from the supplied bytes `dirdata`.
+      Return invalid Dirent data chunks and valid Dirents.
   '''
   while offset < len(dirdata):
-    E, offset = decodeDirent(dirdata, offset)
-    if E.name is None or len(E.name) == 0:
-      # FIXME: skip unnamed dirent
-      warning("skip unnamed _Dirent")
-      continue
-    if E.name == '.' or E.name == '..':
-      continue
+    E, offset = decode_Dirent(dirdata, offset)
     yield E
 
 class _Dirent(object):
@@ -96,20 +155,26 @@ class _Dirent(object):
     self.name = name
     self.meta = Meta(self)
     if metatext is not None:
-      self.meta.update(metatext)
-    self.d_ino = None
+      if isinstance(metatext, str):
+        self.meta.update_from_text(metatext)
+      else:
+        self.meta.update_from_items(metatext.items())
 
   def __str__(self):
     return self.textencode()
 
   def __repr__(self):
-    return "_Dirent(%s, %s, %s)" % (D_type2str, self.name, self.meta)
+    return "%s(%s, %s, %s)" % (self.__class__.__name__,
+                               D_type2str(self.type),
+                               self.name,
+                               self.meta)
 
+  # TODO: support .block=None
   def __eq__(self, other):
     return ( self.name == other.name
          and self.type == other.type
          and self.meta == other.meta
-         and self.block.hashcode == other.block.hashcode
+         and self.block == other.block
            )
 
   @property
@@ -124,84 +189,55 @@ class _Dirent(object):
     '''
     return self.type == D_DIR_T
 
-  def encode(self, no_name=False):
-    ''' Serialise the dirent.
-        Output format: bs(type)bs(flags)[bsdata(name)][bsdata(metadata)]block
+  @property
+  def issym(self):
+    ''' Is this a symbolic link _Dirent?
     '''
-    flags = 0
+    return self.type == D_SYM_T
 
-    if no_name:
-      name = ""
+  @property
+  def ishardlink(self):
+    ''' Is this a hard link _Dirent?
+    '''
+    return self.type == D_HARD_T
+
+  def encode(self):
+    ''' Serialise this dirent.
+    '''
+    type_ = self.type
     name = self.name
-    if name is None:
-      name = ""
-    if name:
-      namedata = put_bsdata(name.encode())
-      flags |= F_HASNAME
-    else:
-      namedata = b''
-
     meta = self.meta
-    if meta:
-      if not isinstance(meta, Meta):
-        raise TypeError("self.meta is not a Meta: <%s>%r" % (type(meta), meta))
-      metadata = put_bsdata(meta.encode())
-      if len(metadata) > 0:
-        flags |= F_HASMETA
+    if self.issym or self.ishardlink:
+      block = None
     else:
-      metadata = b''
-
-    block = self.block
-    return put_bs(self.type) \
-         + put_bs(flags) \
-         + namedata \
-         + metadata \
-         + block.encode()
+      block = self.block
+    return DirentComponents(type_, name, meta, block).encode()
 
   def textencode(self):
     ''' Serialise the dirent as text.
         Output format: bs(type)bs(flags)[bs(namelen)name][bs(metalen)meta]block
     '''
-    flags = 0
-
-    name = self.name
-    if name is None or len(name) == 0:
-      nametxt = ""
-    else:
-      nametxt = totext(put_bsdata(name.encode()))
-      flags |= F_HASNAME
-
-    meta = self.meta
-    if meta:
-      if not isinstance(meta, Meta):
-        raise TypeError("self.meta is not a Meta: <%s>%r" % (type(meta), meta))
-      metatxt = meta.textencode()
-      if metatxt == meta.dflt_acl_text:
-        metatxt = ''
-      if len(metatxt) > 0:
-        metatxt = totext(put_bsdata(metatxt.encode()))
-        flags |= F_HASMETA
-    else:
-      metatxt = ""
-
-    block = self.block
-    return ( hexify(put_bs(self.type))
-           + hexify(put_bs(flags))
-           + nametxt
-           + metatxt
-           + block.textencode()
-           )
+    return totext(self.encode())
 
   @property
   def size(self):
-    return len(self.block)
+    block = self.block
+    return None if block is None else len(block)
 
   @property
   def mtime(self):
     return self.meta.mtime
+
   @mtime.setter
   def mtime(self, newtime):
     self.meta.mtime = newtime
+
+  def touch(self, when=None):
+    ''' Set the mtime for this file to `when` (default now: time.time()).
+    '''
+    if when is None:
+      when = time.time()
+    self.mtime = when
 
   def stat(self):
     from pwd import getpwnam
@@ -228,18 +264,99 @@ class _Dirent(object):
     else:
       unixmode |= stat.S_IFREG
 
-    if self.d_ino is None:
-      self.d_ino = seq()
-    ino = self.d_ino
-
-    dev = 0       # FIXME: we're not hooked to a FS?
+    dev = None          # make it clear that we have no associated filesystem
     nlink = 1
+    ino = None          # also needs a filesystem
     size = self.size
     atime = 0
     mtime = self.mtime
     ctime = 0
 
     return (unixmode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime)
+
+  def complete(self, S2, recurse=False):
+    ''' Complete this Dirent from alternative Store `S2`.
+        TODO: paralellise like _Block.complete.
+    '''
+    self.block.complete(S2)
+    if self.isdir:
+      for name, entry in self.entries.items():
+        if name != '.' and name != '..':
+          entry.complete(S2, True)
+
+class InvalidDirent(_Dirent):
+
+  def __init__(self, components, chunk):
+    ''' An invalid Dirent. Record the original data chunk for regurgitation later.
+    '''
+    self.components = components
+    self.chunk = chunk
+    self.type = components.type
+    self.name = components.name
+    self.metatext = components.metatext
+    self.block = components.block
+    self._meta = None
+
+  def __str__(self):
+    return '<InvalidDirent:%s:%s>' % (self.components, texthexify(self.chunk))
+
+  def encode(self):
+    ''' Return the original data chunk.
+    '''
+    return self.chunk
+
+  @property
+  def meta(self):
+    M = self._meta
+    if M is None:
+      M = self.metatext
+      if M is None:
+        M = Meta(self)
+      elif isinstance(M, str):
+        M = Meta.from_text(meta, self)
+      self._meta = M
+    return M
+
+class SymlinkDirent(_Dirent):
+
+  def __init__(self, name, metatext, block=None):
+    if block is not None:
+      raise ValueError("SymlinkDirent: block must be None, received: %s", block)
+    _Dirent.__init__(self, D_SYM_T, name, metatext=metatext)
+    if self.meta.pathref is None:
+      raise ValueError("SymlinkDirent: meta.pathref required")
+
+  @property
+  def pathref(self):
+    return self.meta.pathref
+
+class HardlinkDirent(_Dirent):
+  ''' A hard link.
+      Unlike the regular UNIX filesystem, in a venti filesystem a
+      hard link is a wrapper for an ordinary Dirent; this wrapper references
+      a persistent inode number and the source Dirent. Most attributes
+      are proxied from the wrapped Dirent.
+      In a normal Dirent .inum is a local attribute and not preserved;
+      in a HardlinkDirent it is a proxy for the local .meta.inum.
+  '''
+
+  def __init__(self, name, metatext, block=None):
+    if block is not None:
+      raise ValueError("HardlinkDirent: block must be None, received: %s", block)
+    _Dirent.__init__(self, D_HARD_T, name, metatext=metatext)
+    if not hasattr(self.meta, 'inum'):
+      raise ValueError("HardlinkDirent: meta.inum required (no iref in metatext=%r)" % (metatext,))
+
+  @property
+  def inum(self):
+    ''' On a HardlinkDirent the .inum accesses the meta['iref'] field.
+        It is set at initialisation, so there is no .setter.
+    '''
+    return self.meta.inum
+
+  @classmethod
+  def to_inum(cls, inum, name):
+    return cls(name, {'iref': str(inum)})
 
 class FileDirent(_Dirent, MultiOpenMixin):
   ''' A _Dirent subclass referring to a file.
@@ -278,6 +395,7 @@ class FileDirent(_Dirent, MultiOpenMixin):
     if self._open_file is not None:
       self._block = self._open_file.flush()
       warning("FileDirent.block: updated to %s", self._block)
+      ##stack_dump(indent=2)
     return self._block
 
   @block.setter
@@ -371,6 +489,11 @@ class FileDirent(_Dirent, MultiOpenMixin):
 
 class Dir(_Dirent):
   ''' A directory.
+
+      .changed  Starts False, becomes true if this or any subdirectory
+                gets changed or has a file opened; stays True from then on.
+                This accepts an ongoing compute cost for .block to avoid
+                setting the flag on every file.write etc.
   '''
 
   def __init__(self, name, metatext=None, parent=None, block=None):
@@ -386,21 +509,35 @@ class Dir(_Dirent):
       self._block = block
       self._entries = None
     _Dirent.__init__(self, D_DIR_T, name, metatext=metatext)
+    self._unhandled_dirent_chunks = None
     self.parent = parent
+    self.changed = False
     self._lock = RLock()
 
+  @locked
+  def change(self):
+    ''' Mark this Dir as changed; propagate to parent Dir if present.
+    '''
+    ##XP("Dir %r: changed=True", self.name)
+    ##stack_dump(indent=2)
+    self.changed = True
+    if self.parent:
+      self.parent.change()
+
   @property
+  @locked
   def entries(self):
-    with self._lock:
-      es = self._entries
-      if self._entries is None:
-        # unpack ._block into ._entries, discard ._block
-        es = self._entries = {}
-        for E in decodeDirents(self._block.data):
-          E.parent = self
-          es[E.name] = E
-        self._block = None
-    return es
+    ''' Property containing the live dictionary holding the Dir entries.
+    '''
+    emap = self._entries
+    if emap is None:
+      # compute the dictionary holding the live Dir entries
+      emap = {}
+      for E in decode_Dirents(self._block.all_data()):
+        E.parent = self
+        emap[E.name] = E
+      self._entries = emap
+    return emap
 
   @property
   @locked
@@ -408,18 +545,27 @@ class Dir(_Dirent):
     ''' Return the top Block referring to an encoding of this Dir.
         TODO: blockify the encoding? Probably desirable for big Dirs.
     '''
-    if self._entries is None:
-      # dir never unpacked: just return the Block
-      return self._block
-    # unpacked; always recompute in case of change
-    names = sorted(self.keys())
-    data = b''.join( self[name].encode()
-                     for name in names
-                     if name != '.' and name != '..'
-                   )
-    # TODO: if len(data) >= 16384
-    B = Block(data=data)
-    warning("Dir.block: computed Block %s", B)
+    if self._block is None or self.changed:
+      # recompute in case of change
+      # restore the unparsed Dirents from initial load
+      if self._unhandled_dirent_chunks is None:
+        data = b''
+      else:
+        data = b''.join(self._unhandled_dirent_chunks)
+      # append the valid or new Dirents
+      names = sorted(self.keys())
+      data += b''.join( self[name].encode()
+                        for name in names
+                        if name != '.' and name != '..'
+                      )
+      # TODO: if len(data) >= 16384
+      B = self._block = Block(data=data)
+      self.changed = False
+      ##warning("Dir.block: computed Block %s", B)
+      ##XP("Dir %r: RECOMPUTED BLOCK: %s", self.name, B)
+    else:
+      B = self._block
+      ##XP("Dir %r: REUSE ._block: %s", self.name, B)
     return B
 
   def dirs(self):
@@ -467,15 +613,23 @@ class Dir(_Dirent):
       raise KeyError("invalid name: %s" % (name,))
     if not isinstance(E, _Dirent):
       raise ValueError("E is not a _Dirent: <%s>%r" % (type(E), E))
+    self.change()
     self.entries[name] = E
-    if E.isdir and E.parent is None:
-      E.parent = D
+    E.name = name
+    if E.isdir:
+      Eparent = E.parent
+      if Eparent is None:
+        E.parent = D
+      elif Eparent is not self:
+        warning("%s: changing %r.parent to self, was %s", self, name, Eparent)
+        E.parent = self
 
   def __delitem__(self, name):
     if not self._validname(name):
       raise KeyError("invalid name: %s" % (name,))
     if name == '.' or name == '..':
       raise KeyError("refusing to delete . or ..: name=%s" % (name,))
+    self.change()
     del self.entries[name]
 
   def add(self, E):
@@ -487,6 +641,7 @@ class Dir(_Dirent):
       raise KeyError("name already exists: %r", name)
     self[name] = E
 
+  @locked
   def rename(self, oldname, newname):
     ''' Rename entry `oldname` to entry `newname`.
     '''
@@ -522,9 +677,8 @@ class Dir(_Dirent):
     return D
 
   def makedirs(self, path, force=False):
-    ''' Like os.makedirs(), create a directory path at need.
-        If `force`, replace an non-DIr encountered with an empty Dir.
-        Returns the bottom directory.
+    ''' Like os.makedirs(), create a directory path at need; return the bottom Dir.
+        If `force`, replace any non-Dir encountered with an empty Dir.
     '''
     E = self
     if isinstance(path, str):

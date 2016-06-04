@@ -1,4 +1,4 @@
-#!/bin/sed -nf
+#!/usr/bin/env sed -nf
 #
 # Return all ancestors of the pathnnames on stdin.
 #	- Cameron Simpson <cs@zip.com.au> 02jul2004

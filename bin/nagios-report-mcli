@@ -1,0 +1,31 @@
+#!/bin/sh -ue
+#
+# Emit a Nagios report for the MegaRAID hardware RAID state.
+#       - Cameron Simpson <cs@zip.com.au> 24oct2008
+#
+
+usage="Usage: $0"
+
+[ $# = 0 ] || { echo "$usage" >&2; exit 2; }
+
+PATH=/usr/local/bin:$PATH
+. /opt/css/env.sh
+
+mcli status \
+| \
+{ good=1
+  summary=
+  while read ok adapter errors
+  do
+    case "$ok" in
+      OK)   summary="$summary $adapter[OK]" ;;
+      *)    good= summary="$summary $adapter[$errors]" ;;
+    esac
+  done
+  if [ $good ]
+  then
+    echo "OK: $summary"
+  else
+    echo "CRITICAL: $summary"
+  fi
+}

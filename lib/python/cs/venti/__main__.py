@@ -21,32 +21,20 @@ from .archive import CopyModes, update_archive, toc_archive, last_Dirent, copy_o
 from .block import Block, IndirectBlock, dump_block
 from .cache import CacheStore, MemoryCacheStore
 from .debug import dump_Dirent
-from .datafile import DataDirMapping_from_spec
+from .datafile import DataFile, DataDir, \
+                      F_COMPRESSED, decompress, DataDirMapping_from_spec
 from .dir import Dir
 from .hash import DEFAULT_HASHCLASS, HASHCLASS_BY_NAME
 from .paths import dirent_dir, dirent_file, dirent_resolve, resolve
-from .store import Store
+from .pushpull import pull_hashcodes, missing_hashcodes_by_checksum
+from .store import Store, ProgressStore
 
 def main(argv):
   cmd = os.path.basename(argv[0])
   if cmd.endswith('.py'):
     cmd = 'vt'
-  setup_logging(cmd_name=cmd, upd_mode=False)
-  usage = '''Usage:
-    %s [options...] ar tar-options paths..
-    %s [options...] cat filerefs...
-    %s [options...] catblock [-i] hashcodes...
-    %s [options...] datadir [indextype:[hashname:]]/dirpath index
-    %s [options...] datadir [indextype:[hashname:]]/dirpath pull other-datadirs...
-    %s [options...] datadir [indextype:[hashname:]]/dirpath push other-datadir
-    %s [options...] dump filerefs
-    %s [options...] listen {-|host:port}
-    %s [options...] ls [-R] dirrefs...
-    %s [options...] mount dirref mountpoint
-    %s [options...] pack paths...
-    %s [options...] scan datafile
-    %s [options...] pull stores...
-    %s [options...] unpack dirrefs...
+  setup_logging(cmd_name=cmd)
+  usage = '''Usage: %s [options...] operation [args...]
     Options:
       -C store    Use this as a front end cache store.
                   "-" means no front end cache.
@@ -57,7 +45,22 @@ def main(argv):
                     |sh-command   StreamStore via sh-command
       -q          Quiet; not verbose. Default if stdout is not a tty.
       -v          Verbose; not quiet. Default it stdout is a tty.
-''' % (cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd, cmd)
+    Operations:
+      ar tar-options paths..
+      cat filerefs...
+      catblock [-i] hashcodes...
+      datadir [indextype:[hashname:]]/dirpath index
+      datadir [indextype:[hashname:]]/dirpath pull other-datadirs...
+      datadir [indextype:[hashname:]]/dirpath push other-datadir
+      dump filerefs
+      listen {-|host:port}
+      ls [-R] dirrefs...
+      mount mountlog.vt mountpoint [subpath]
+      pack paths...
+      scan datafile
+      pull other-store objects...
+      unpack dirrefs...
+''' % (cmd,)
 
   badopts = False
 
@@ -72,8 +75,9 @@ def main(argv):
   dflt_log = os.environ.get('VT_LOGFILE')
   useMemoryCacheStore = True
 
+  args = argv[1:]
   try:
-    opts, args = getopt(argv[1:], 'C:MS:qv')
+    opts, args = getopt(args, 'C:MS:qv')
   except GetoptError as e:
     error("unrecognised option: %s: %s"% (e.opt, e.msg))
     badopts = True
@@ -341,7 +345,7 @@ def cmd_datadir(args, verbose=None, log=None):
           for other_spec in args:
             with Pfx(other_spec):
               Dother = DataDirMapping_from_spec(other_spec)
-              D.merge_other(Dother)
+              pull_hashcodes(D, Dother, missing_hashcodes_by_checksum(D, Dother))
       elif subop == 'push':
         if not args:
           raise GetoptError("missing other-datadir")
@@ -351,7 +355,7 @@ def cmd_datadir(args, verbose=None, log=None):
             raise GetoptError("extra arguments after other_spec: %s" % (' '.join(args),))
           with Pfx(other_spec):
             Dother = DataDirMapping_from_spec(other_spec)
-            Dother.merge_other(D)
+            pull_hashcodes(Dother, D, missing_hashcodes_by_checksum(Dother, D))
       else:
         raise GetoptError('unrecognised subop')
   return xit
@@ -443,6 +447,10 @@ def cmd_mount(args, verbose=None, log=None):
     error("missing mountpoint")
     badopts = True
   if args:
+    subpath = args.pop(0)
+  else:
+    subpath = None
+  if args:
     error("extra arguments: %s", ' '.join(args))
     badopts = True
   if badopts:
@@ -461,14 +469,14 @@ def cmd_mount(args, verbose=None, log=None):
     if E is None:
       E = Dir('/')
     else:
-      dump_Dirent(E, recurse=True)
+      ##dump_Dirent(E, recurse=True)
       if not E.isdir:
         error("expected directory, not file: %s", E)
         return 1
     with Pfx("open('a')"):
       syncfp = open(special, 'a')
-  S = defaults.S
-  mount(mountpoint, E, S, syncfp=syncfp)
+  with ProgressStore(defaults.S) as PS:
+    mount(mountpoint, E, PS, syncfp=syncfp, subpath=subpath)
   return 0
 
 def cmd_pack(args, verbose=None, log=None):
@@ -510,19 +518,24 @@ def cmd_pull(args, verbose=None, log=None):
 def cmd_scan(args, verbose=None, log=None):
   ''' Read a datafile and report.
   '''
-  if len(args) != 1:
-    raise GetoptError("missing datafile")
-  datafile = args[0]
-  from cs.venti.datafile import DataFile, F_COMPRESSED, decompress
-  from cs.venti.hash import Hash_SHA1
-  with Pfx(datafile):
-    with DataFile(datafile) as dfp:
-      for offset, flags, data in dfp.scan():
-        if flags & F_COMPRESSED:
-          data2 = decompress(data)
-        else:
-          data2 = data
-        print(Hash_SHA1.from_data(data2), offset, flags, len(data))
+  if len(args) < 1:
+    raise GetoptError("missing datafile/datadir")
+  hashclass = DEFAULT_HASHCLASS
+  for arg in args:
+    if os.path.isdir(arg):
+      dirpath = arg
+      D = DataDir(dirpath)
+      with D:
+        for n, offset, data in D.scan():
+          print(dirpath, n, offset, "%d:%s" % (len(data), hashclass.from_data(data)))
+    else:
+      filepath = arg
+      F = DataFile(filepath)
+      with F:
+        for offset, flags, data in F.scan():
+          if flags & F_COMPRESSED:
+            data = decompress(data)
+          print(filepath, offset, "%d:%s" % (len(data), hashclass.from_data(data)))
   return 0
 
 def cmd_unpack(args, verbose=None, log=None):

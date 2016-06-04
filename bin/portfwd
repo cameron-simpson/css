@@ -238,6 +238,36 @@ do
   pfflags="$pfflags ROUTE_GW_$rc_ugwname"
 done
 
+# extract "# F: pfname needs gw !ip-addr"
+# add PORTFWD_GW_IP_ADDR to flags
+for rc_gw in $( sed -n "s/^#  *F:  *${target}  *needs  *gw  *!\\([0-9][0-9]*\\.[0-9][0-9]*\\.[0-9][0-9]*\\.[0-9][0-9]*\\) *$/\\1/p" "$sshcfg" )
+do
+  rc_gwname=$( printf '%s\n' "$rc_gw" | tr . _ )
+  rc_ugwname=$(uppername "$rc_gwname")
+  pfflags="$pfflags !ROUTE_GW_$rc_ugwname"
+done
+
+# extract probe "# F: probe probe-shell-cmannd"
+pfprobes=$( sed -n "s/^#  *F:  *${target}  *probe  *\\([^ ].*\\)/\1/p" "$sshcfg" )
+
+# extract ping probes "# F: ping [!]host..."
+for rc_ping in $( sed -n "s/^#  *F:  *${target}  *ping  *\\([^ ].*\\)/\1/p" "$sshcfg" )
+do
+  case "$rc_ping" in
+    !?*)rc_ping=$( expr "x$rc_ping" : 'x.\(.*\)' )
+        rc_ping="not ping -c 1 -t 3 $rc_ping >/dev/null 2>&1"
+        ;;
+    ?*) rc_ping="ping -c 1 -t 3 $rc_ping >/dev/null 2>&1"
+        ;;
+    *)  echo "$cmd: $target: $sshcfg: invalid \"# F: ping\" target: $rc_ping" >&2
+        badopts=1
+        continue
+        ;;
+  esac
+  pfprobes="$pfprobes
+            $rc_ping"
+done
+        
 # construct svcd "ok to ssh" test command
 test_shcmd=' flag -w PORTFWD_OVERRIDE && exit 0
              flag -w PORTFWD_DISABLE && exit 1'
@@ -251,16 +281,23 @@ done
 
 for pfflag in $pfflags
 do
-  test_shcmd="$test_shcmd
-              flag -w '$pfflag' || exit 1"
+  case "$pfflag" in
+    !*) pfflag=$( expr "x$pfflag" : 'x!\(.*\)' )
+        test_shcmd="$test_shcmd
+                    flag -w '$pfflag' && exit 1"
+        ;;
+    *)  test_shcmd="$test_shcmd
+                    flag -w '$pfflag' || exit 1"
+        ;;
+  esac
 done
 test_shcmd=" $test_shcmd
            "'flag -w ! PORTFWD_NEED_SSH_AGENT || ssh-add -l >/dev/null || exit 1
              flag -w ROUTE_DEFAULT || exit 1
+            '$( printf '%s\n' "$pfprobes" | sed -n 's/ *\([^ ].*\)/{ \1; } || exit 1/p' )'
              [ -x "$HOME/bin-local/do-portfwd" ] || exit 0
              "$HOME/bin-local/do-portfwd"
             '
-
 if [ $doit ]
 then set_x=set-x
 else set_x=echo
@@ -269,9 +306,9 @@ fi
 # run main restart outer control via svcd
 [ $once ] \
 || exec $set_x \
-          svcd -n "portfwd-$target" \
+          svcd -q -n "portfwd-$target" \
                -t "$test_shcmd" \
-               -- "$0" -1 $opts -- "$target"
+               -- pfx "svcd $target" "$0" -1 $opts -- "$target"
 
 # getconfig target
 #
@@ -318,27 +355,16 @@ then
   exit 1
 fi
 
-# fetch some values to compute ControlPath
-ssh_user=$( get-ssh-option -F "$sshcfg" -- "$target" User "$USER" )
-ssh_port=$( get-ssh-option -F "$sshcfg" -- "$target" Port 22 )
-
-ssh_ctrlpath='~/.sshctrl-%r@%n-pf:%p'
-sh_ctrlpath=$HOME/.sshctrl-$ssh_user@$target-pf:$ssh_port
-
 set --  \
     ssh $sshopts -F "$sshcfg" \
       -o 'PermitLocalCommand=yes' \
       -o "LocalCommand=flag -w '$flag_connected' 1; </dev/null alert -t 'PORTFWD ${utarget}' CONNECTED: $target &" \
-      -o "User=$ssh_user" \
-      -o "Port=$ssh_port" \
-      -o "ControlPath=$ssh_ctrlpath" \
       "$target" "$cfg_command" \
 
 [ $doit ] || exec echo "$*"
 
 flag -w "$flag_connected" 0
 alert "STARTING: $target"
-rm -f -- "$sh_ctrlpath"
 tag_fd 2 "$target" \
   $trace_dated \
     "$@" \
@@ -349,5 +375,4 @@ echo "$sshpid" >"$pidfile"
 wait
 flag -w "$flag_connected" 0
 >"$pidfile"; rm -f "$pidfile"
-rm -f -- "$sh_ctrlpath"
 alert "EXITED: $target"

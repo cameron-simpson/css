@@ -125,7 +125,7 @@ def save_Dirent(fp, E, when=None):
     with lockfile(path):
       with open(path, "a") as fp:
         return save_Dirent(fp, E, when=when)
-  write_Dirent(fp, E, when=when)
+  return write_Dirent(fp, E, when=when)
 
 def read_Dirents(fp):
   ''' Generator to yield (unixtime, Dirent) from an open archive file.
@@ -158,19 +158,31 @@ def last_Dirent(arpath, missing_ok=False):
     raise
   raise RuntimeError("NOTREACHED")
 
+def strfor_Dirent(E):
+  ''' Exposed function for 
+  '''
+  return E.textencode()
+
 def write_Dirent(fp, E, when=None):
-  ''' Write a Dirent to an open archive file:
+  ''' Write a Dirent to an open archive file; return the E.textencode() value used.
+      Archive lines have the form:
         isodatetime unixtime totext(dirent) dirent.name
   '''
+  encoded = strfor_Dirent(E)
+  write_Dirent_str(fp, when, encoded, E.name)
+  return encoded
+
+def write_Dirent_str(fp, text, when=None, etc=None):
   if when is None:
     when = time.time()
   fp.write(datetime.fromtimestamp(when).isoformat())
   fp.write(' ')
   fp.write(str(when))
   fp.write(' ')
-  fp.write(E.textencode())
-  fp.write(' ')
-  fp.write(unctrl(E.name))
+  fp.write(text)
+  if etc is not None:
+    fp.write(' ')
+    fp.write(unctrl(etc))
   fp.write('\n')
 
 def copy_in_dir(rootD, rootpath, modes, log=None):

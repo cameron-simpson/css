@@ -19,23 +19,81 @@ from cs.py3 import Queue, Queue_Full as Full, Queue_Empty as Empty
 # a db update
 _Update = namedtuple('_Update', 'do_append type name attr values')
 
+class Update(_Update):
+
+  @classmethod
+  def from_csv_row(cls, row):
+    ''' Decode a CSV row into a Update instances (one row may be represented by multiple Updates); yields Updates.
+        Honour the incremental notation for data:
+        - a NAME commencing with '=' discards any existing (TYPE, NAME)
+          and begins anew.
+        - an ATTR commencing with '=' discards any existing ATTR and
+          commences the ATTR anew
+        - an ATTR commencing with '-' discards any existing ATTR;
+          VALUE must be empty
+        Otherwise each VALUE is appended to any existing ATTR VALUEs.
+    '''
+    t, name, attr, value = row
+    if name.startswith('='):
+      # reset Node, optionally commence attribute
+      yield ResetUpdate(t, name[1:])
+      if attr != "":
+        yield ExtendUpdate(t, name[1:], attr, (value,))
+    elif attr.startswith('='):
+      yield ExtendUpdate(t, name, attr[1:], (value,))
+    elif attr.startswith('-'):
+      if value != "":
+        raise ValueError("reset CVS row: value != '': %r" % (row,))
+      yield ResetUpdate(t, name, attr[1:])
+    else:
+      yield ExtendUpdate(t, name, attr, (value,))
+
+  def to_csv(self):
+    ''' Transform an Update into row data suitable for CSV.
+    '''
+    do_append, t, name, attr, values = self
+    if do_append:
+      # straight value appends
+      for value in values:
+        yield t, name, attr, value
+    else:
+      if attr is None:
+        # reset whole Node
+        if values:
+          raise ValueError("values supplied when attr is None: %r" % (values,))
+        yield t, '=' + name, "", ""
+      else:
+        # reset attr values
+        if values:
+          # reset values
+          first = True
+          for value in values:
+            if first:
+              yield t, name, '=' + attr, value
+              first = False
+            else:
+              yield t, name, attr, value
+        else:
+          # no values - discard whole attr
+          yield t, name, '-' + attr, ""
+
 def ResetUpdate(t, name, attr=None, values=None):
   ''' Return an update to reset a whole Node (t, name) or attribute (t, name).attr if `attr` is not None.
   '''
   if attr is None:
     if values is not None:
       raise ValueError("ResetUpdate: attr is None, but values is %r" % (values,))
-    return _Update(False, t, name, None, None)
+    return Update(False, t, name, None, None)
   if values is None:
     values = ()
   else:
     values = tuple(values)
-  return _Update(False, t, name, attr, values)
+  return Update(False, t, name, attr, values)
 
 def ExtendUpdate(t, name, attr, values):
   ''' Return an update to extend (t, name).attr with the iterable `values`.
   '''
-  return _Update(True, t, name, attr, tuple(values))
+  return Update(True, t, name, attr, tuple(values))
 
 class Backend(O):
   ''' Base class for NodeDB backends.

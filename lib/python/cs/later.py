@@ -30,7 +30,7 @@ from cs.queues import IterableQueue, IterablePriorityQueue, PushQueue, \
                         MultiOpenMixin, TimerQueue
 from cs.threads import AdjustableSemaphore, \
                        WorkerThreadPool, locked, bg
-from cs.asynchron import Result, Asynchron, ASYNCH_RUNNING, report
+from cs.asynchron import Result, _PendingFunction, ASYNCH_RUNNING, report
 from cs.seq import seq, TrackingCounter
 from cs.logutils import Pfx, PrePfx, PfxCallInfo, error, info, warning, debug, exception, D, X, XP, OBSOLETE
 
@@ -145,42 +145,7 @@ class _Late_context_manager(object):
       raise lf_exc_type(lf_exc_info)
     return True
 
-class PendingFunction(Asynchron):
-
-  def __init__(self, func, *a, **kw):
-    final = kw.pop('final', None)
-    Asynchron.__init__(self, final=final)
-    if a or kw:
-      func = partial(func, *a, **kw)
-    self.func = func
-
-class OnDemandFunction(PendingFunction):
-  ''' Wrap a callable, call it later.
-      Like a LateFunction, you can call the wrapper many times; the
-      inner function will only run once.
-  '''
-
-  def __call__(self):
-    with self._lock:
-      state = self.state
-      if state == ASYNC_CANCELLED:
-        raise CancellationError()
-      if state == ASYNCH_PENDING:
-        self.state = ASYNCH_RUNNING
-      else:
-        raise RuntimeError("state should be ASYNCH_PENDING but is %s" % (self.state))
-    result, exc_info = None, None
-    try:
-      result = self.func()
-    except Exception:
-      exc_info = sys.exc_info()
-      self.exc_info = exc_info
-      raise
-    else:
-      self.result = result
-    return result
-
-class LateFunction(PendingFunction):
+class LateFunction(_PendingFunction):
   ''' State information about a pending function.
       A LateFunction is callable, so a synchronous call can be done like this:
 
@@ -223,7 +188,7 @@ class LateFunction(PendingFunction):
         `retry_local`: time delay before retry of this function on RetryError.
             Default from `later.retry_delay`.
     '''
-    PendingFunction.__init__(self, func, final=final)
+    _PendingFunction.__init__(self, func, final=final)
     if name is None:
       name = "LF-%d[func=%s]" % ( seq(), funcname(func) )
     if retry_delay is None:
@@ -242,7 +207,7 @@ class LateFunction(PendingFunction):
   def _complete(self, result, exc_info):
     ''' Record the completion result of this LateFunction and update the parent Later.
     '''
-    PendingFunction._complete(self, result, exc_info)
+    _PendingFunction._complete(self, result, exc_info)
     self.later._completed(self, result, exc_info)
     self.later._busy.dec(self.name)
     self.later.close()
@@ -883,6 +848,14 @@ class Later(MultiOpenMixin):
     LF = self._submit(func, **params)
     return LF
 
+  def with_result_of(self, callable1, func, *a, **kw):
+    ''' Defer `callable1`, then add its result to the arguments for `func` and defer that. Return the LateFunction for `func`.
+    '''
+    def then():
+      LF1 = self.defer(callable1)
+      return self.defer(func, *[a + [LF1.result]])
+    return then()
+
   @MultiOpenMixin.is_opened
   def after(self, LFs, R, func, *a, **kw):
     ''' Queue the function `func` for later dispatch after completion of `LFs`.
@@ -926,8 +899,8 @@ class Later(MultiOpenMixin):
   def _after(self, LFs, R, func, *a, **kw):
     if R is None:
       R = Result()
-    elif not isinstance(R, Asynchron):
-      raise TypeError("Later.after(LFs, R, func, ...): expected Asynchron for R, got %r" % (R,))
+    elif not isinstance(R, Result):
+      raise TypeError("Later.after(LFs, R, func, ...): expected Result for R, got %r" % (R,))
     LFs = list(LFs)
     count = len(LFs)
 
@@ -1078,6 +1051,11 @@ class Later(MultiOpenMixin):
     yield
     self._priority = oldpri
 
+  def pool(self, *a, **kw):
+    ''' Return a LatePool to manage some tasks run with this Later.
+    '''
+    return LatePool(L=self, *a, **kw)
+
 class LatePool(object):
   ''' A context manager after the style of subprocess.Pool but with deferred completion.
       Example usage:
@@ -1127,12 +1105,19 @@ class LatePool(object):
       self.join()
     return False
 
+  def add(self, LF):
+    ''' Add a LateFunction to those to be tracked by this LatePool.
+    '''
+    self.LFs.append(LF)
+
   def submit(self, func, **params):
     ''' Submit a function using the LatePool's default paramaters, overridden by `params`.
     '''
     submit_params = dict(self.parameters)
     submit_params.update(kw)
-    return self.L.submit(func, **submit_params)
+    LF = self.L.submit(func, **submit_params)
+    self.add(LF)
+    return LF
 
   def defer(self, func, *a, **kw):
     ''' Defer a function using the LatePool's default paramaters.

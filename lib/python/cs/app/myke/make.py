@@ -18,7 +18,7 @@ from cs.threads import Lock, RLock, Channel, locked_property
 from cs.later import Later
 from cs.queues import MultiOpenMixin
 from cs.asynchron import Result, report as report_LFs, \
-        Asynchron, ASYNCH_PENDING, ASYNCH_RUNNING, ASYNCH_CANCELLED, ASYNCH_READY
+        ASYNCH_PENDING, ASYNCH_RUNNING, ASYNCH_CANCELLED, ASYNCH_READY
 import cs.logutils
 from cs.logutils import Pfx, info, error, debug, D, X, XP
 from cs.obj import O
@@ -233,7 +233,7 @@ class Maker(MultiOpenMixin):
         and the error state (unparsed or invalid options encountered).
     '''
     badopts = False
-    opts, args = getopt.getopt(args, 'deikmnpqrstuvxENRj:D:S:f:')
+    opts, args = getopt.getopt(args, 'dD:eEf:ij:kmNnpqrRsS:tuvx')
     for opt, value in opts:
       with Pfx(opt):
         if opt == '-d':
@@ -508,7 +508,7 @@ class Target(Result):
         Actions will cease as soon as decorum allows.
     '''
     self.maker.debug_make("%s: CANCEL", self)
-    Asynchron.cancel(self)
+    Result.cancel(self)
 
   def require(self):
     ''' Require this Target to be made.
@@ -622,7 +622,7 @@ class Action(O):
 
   def act_later(self, target):
     ''' Request that this Action occur on behalf of the Target `target`.
-        Return an Asynchron which returns the success or failure
+        Return a Result which returns the success or failure
         of the action.
     '''
     R = Result()

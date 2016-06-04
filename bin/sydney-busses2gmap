@@ -1,4 +1,4 @@
-#!/bin/sed -f
+#!/usr/bin/env sed -f
 #
 # An assortment of hacks to translate Sydney Busses locations into Google
 # Maps locations.

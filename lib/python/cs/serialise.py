@@ -39,7 +39,7 @@ def is_bytes(value):
                        % (type(value), value))
 
 def get_bs(data, offset=0):
-  ''' Read an extensible value from `data` at `offset`.
+  ''' Read an extensible byte serialised value from `data` at `offset`.
       Continuation octets have their high bit set.
       The value is big-endian.
       Return value and new offset.
@@ -54,7 +54,7 @@ def get_bs(data, offset=0):
   return n, offset
 
 def read_bs(fp):
-  ''' Read an extensible value from the binary stream `fp`.
+  ''' Read an extensible byte serialised value from the binary stream `fp`.
       Continuation octets have their high bit set.
       The value is big-endian.
       Return value.
@@ -71,7 +71,7 @@ def read_bs(fp):
 
 @returns_bytes
 def put_bs(n):
-  ''' Encode a value as an entensible octet sequence for decode by get_bs().
+  ''' Encode a value as an entensible byte serialised octet sequence for decode by get_bs().
       Return the bytes object.
   '''
   bs = [ n&0x7f ]
@@ -192,6 +192,8 @@ if sys.hexversion >= 0x03000000:
     ''' Write a Packet to a binary stream.
         Note: does not flush the stream.
     '''
+    ##from cs.logutils import X
+    ##X("write_Packet(%s)", P)
     fp.write(put_bsdata(P.serialise()))
 else:
   def write_Packet(fp, P):

@@ -1,4 +1,4 @@
-#!/bin/sed -f
+#!/usr/bin/env sed -f
 #
 # Translate a lot of shorthand for common idioms.
 #	- Cameron Simpson <cs@zip.com.au> 06jul2004

@@ -12,7 +12,7 @@ else:
   from sha import new as sha1
 import unittest
 from cs.logutils import X
-from cs.randutils import rand0, randblock
+from cs.randutils import rand0, randbool, randblock
 from . import _TestAdditionsMixin
 from .hash import Hash_SHA1, decode, HashCodeUtilsMixin, HashUtilDict
 
@@ -68,14 +68,14 @@ class _TestHashCodeUtils(_TestAdditionsMixin):
     self.assertIs(h, None)
     self.assertLen(M1, 0)
     # add one block
-    data = randblock(rand0(8192))
+    data = randblock(rand0(8193))
     h = M1.add(data)
     KS1.add(h)
     self.assertLen(M1, 1)
     self.assertEqual(set(M1.hashcodes()), KS1)
     self.assertEqual(M1.first(), h)
     # add another block
-    data2 = randblock(rand0(8192))
+    data2 = randblock(rand0(8193))
     h2 = M1.add(data2)
     KS1.add(h2)
     self.assertLen(M1, 2)
@@ -85,40 +85,105 @@ class _TestHashCodeUtils(_TestAdditionsMixin):
   def test01hashcodes(self):
     M1 = self.map1
     KS1 = self.keys1
+    # add 16 random blocks to the map with some sanity checks along the way
     for n in range(16):
-      data = randblock(rand0(8192))
+      data = randblock(rand0(8193))
       h = M1.add(data)
+      self.assertIn(h, M1)
+      self.assertNotIn(h, KS1)
       KS1.add(h)
+      self.assertIn(h, KS1)
       self.assertLen(M1, n+1)
       self.assertEqual(len(KS1), n+1)
       self.assertEqual(set(M1.hashcodes()), KS1)
       if self.has_keys:
         self.assertEqual(M1.first(), min(M1.keys()))
       self.assertEqual(M1.first(), min(M1.hashcodes()))
+    # asking for 0 hashcodes is forbidden
     with self.assertRaises(ValueError):
       hs = list(M1.hashcodes(length=0))
-    for n in range(1,16):
-      hs = list(M1.hashcodes(length=n))
-      self.assertEqual(len(hs), n)
+    # fetch the leading n hashcodes from the map, with and without `after`
+    for after in False, True:
+      with self.subTest(after=after):
+        for n in range(1,16):
+          hs = list(M1.hashcodes(length=n, after=after))
+          hn = min(n, 15 if after else 16)
+          self.assertEqual(len(hs), hn)
+    # traverse the map in various sized steps, including random
+    ks = sorted(KS1)
+    for step_size in 1, 2, 3, 7, 8, 15, 16, None:
+      with self.subTest(step_size=step_size):
+        start_hashcode = None
+        ksndx = 0
+        seen = set()
+        while ksndx < len(ks):
+          if step_size is None:
+            n = random.randint(1,7)
+          else:
+            n = step_size
+          with self.subTest(start_hashcode=start_hashcode, ksndx=ksndx, n=n):
+            hs = list(M1.hashcodes(start_hashcode=start_hashcode, length=n, after=True))
+            # check ordering between adjacent hashcodes returns and against start_hashcode if not None
+            h0 = None
+            for h in hs:
+              self.assertNotIn(h, seen)
+              seen.add(h)
+              if start_hashcode is not None:
+                self.assertGreater(h, start_hashcode)
+              if h0 is not None:
+                self.assertGreater(h, h0)
+              h0 = h
+            hn = min(len(ks) - ksndx, n)
+            self.assertEqual(len(hs), hn)
+            for i in range(hn):
+              self.assertEqual(ks[ksndx + i], hs[i])
+            ksndx += hn
+            start_hashcode = hs[-1]
+        self.assertEqual(ks, sorted(seen))
 
-  def test02hashcodes_missing(self):
+  def test02test_hashcodes_from(self):
+    # fill map1 with 16 random data blocks
     M1 = self.map1
     KS1 = self.keys1
     for n in range(16):
-      data = randblock(rand0(8192))
+      data = randblock(rand0(8193))
+      h = M1.add(data)
+      KS1.add(h)
+    # make a block not in the map
+    data2 = randblock(rand0(8193))
+    h2 = Hash_SHA1.from_data(data2)
+    # extract hashes, check results
+    ks = sorted(KS1)
+    for reverse in False, True:
+      for start_hashcode in [None] + ks + [h2]:
+        with self.subTest(M1type=type(M1), reverse=reverse, start_hashcode=start_hashcode):
+          hs = list(M1.hashcodes_from(start_hashcode=start_hashcode,
+                                      reverse=reverse))
+          if reverse:
+            ksrev = reversed(ks)
+            hs2 = [ h for h in ksrev if start_hashcode is None or h <= start_hashcode ]
+          else:
+            hs2 = [ h for h in ks if start_hashcode is None or h >= start_hashcode ]
+          self.assertEqual(hs, hs2)
+
+  def test03hashcodes_missing(self):
+    M1 = self.map1
+    KS1 = self.keys1
+    for n in range(16):
+      data = randblock(rand0(8193))
       h = M1.add(data)
       KS1.add(h)
     M2 = self.MAP_FACTORY()
     KS2 = set()
     # construct M2 as a mix of M1 and random new blocks
     for n in range(16):
-      if rand0(1) == 0:
-        data = randblock(rand0(8192))
+      if randbool():
+        data = randblock(rand0(8193))
         h = M2.add(data)
         KS2.add(h)
       else:
         M1ks = list(M1.hashcodes())
-        M1hash = M1ks[rand0(len(M1ks)-1)]
+        M1hash = M1ks[rand0(len(M1ks))]
         data = M1[M1hash]
         h = M2.add(data)
         self.assertEqual(h, M1hash)

@@ -13,10 +13,10 @@ import tempfile
 import unittest
 from cs.excutils import logexc
 from cs.logutils import setup_logging, warning, X
-from cs.randutils import rand0, randblock
+from cs.randutils import randblock
 from . import _TestAdditionsMixin
 from .datafile import GDBMIndex, KyotoIndex
-from .store import MappingStore, DataDirStore
+from .store import MappingStore, DataDirStore, ProgressStore
 from .hash import HashUtilDict
 from .hash_tests import _TestHashCodeUtils
 
@@ -102,6 +102,11 @@ class TestMappingStore(_TestStore, unittest.TestCase):
 
   def _init_Store(self):
     self.S = MappingStore({}).open()
+
+class TestProgressStore(_TestStore, unittest.TestCase):
+
+  def _init_Store(self):
+    self.S = ProgressStore(MappingStore({}).open()).open()
 
 class TestHashCodeUtilsMappingStoreDict(_TestHashCodeUtils, unittest.TestCase):
   ''' Test HashUtils on a MappingStore on a plain dict.
