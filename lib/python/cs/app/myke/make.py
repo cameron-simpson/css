@@ -233,7 +233,7 @@ class Maker(MultiOpenMixin):
         and the error state (unparsed or invalid options encountered).
     '''
     badopts = False
-    opts, args = getopt.getopt(args, 'deikmnpqrstuvxENRj:D:S:f:')
+    opts, args = getopt.getopt(args, 'dD:eEf:ij:kmNnpqrRsS:tuvx')
     for opt, value in opts:
       with Pfx(opt):
         if opt == '-d':
