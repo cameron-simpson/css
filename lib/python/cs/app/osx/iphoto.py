@@ -15,6 +15,7 @@ import sqlite3
 from threading import RLock
 from PIL import Image
 Image.warnings.simplefilter('error', Image.DecompressionBombWarning)
+from cs.edit import edit_strings
 from cs.env import envsub
 from cs.lex import get_identifier
 from cs.logutils import Pfx, info, warning, error, setup_logging, X, XP
@@ -33,6 +34,7 @@ USAGE = '''Usage: %s [/path/to/iphoto-library-path] op [op-args...]
   ls keywords       List keywords.
   ls masters        List master pathnames.
   ls people         List person names.
+  rename events     Rename events.
   select criteria... List masters with all specified criteria.
 
 Criteria:
@@ -131,6 +133,34 @@ def main(argv=None):
               if not badopts:
                 for name in sorted(names):
                   print(name)
+        elif op == 'rename':
+          if not argv:
+            warning("missing 'events'")
+            badopts = True
+          else:
+            obclass = argv.pop(0)
+            if obclass == 'events':
+              I.load_folders()
+              all_names = I.event_names()
+              if argv:
+                names = []
+                for arg in argv:
+                  # TODO: select by regexp if /blah
+                  if arg in all_names:
+                    names.append(arg)
+                  else:
+                    warning("unknown event name: %s", arg)
+                    badopts = True
+              else:
+                names = all_names
+              if not badopts:
+                changes = edit_strings(names)
+                for old_name, new_name in changes:
+                  for erow in I.events_by_name(old_name):
+                    I.folder_table.update_row('modelId', erow.modelId, 'name', new_name)
+            else:
+              warning("known class %r", obclass)
+              badopts = True
         elif op == 'select':
           if not argv:
             warning("missing selectors")
@@ -362,6 +392,9 @@ class iPhoto(O):
 
   def event_names(self):
     return [ event.name for event in self.events() ]
+
+  def events_by_name(self, name):
+    return [ event for event in self.events() if event.name == name ]
 
   def _load_table_persons(self):
     ''' Load Faces.RKFaceName into memory and set up mappings.
@@ -700,6 +733,25 @@ class iPhotoTable(object):
     row_class = self.row_class
     for row in self.conn.cursor().execute('select * from %s' % (self.table_name,)):
       yield row_class(*([I] + list(row)))
+
+  def update_row(self, cond_column, cond_value, column, new_value):
+    sql = 'update %s set %s=? where %s=?' \
+          % (self.table_name, column, cond_column)
+    XP("SQL = %s", sql)
+    XP("new_value=%r, cond_value=%r", new_value, cond_value)
+    C = self.conn.cursor()
+    C.execute(sql, (new_value, cond_value))
+    self.conn.commit()
+    C.close()
+
+  def rename_row(self, old_name, new_name, name_column='name'):
+    sql = 'update %s set %s=? where %s=?' \
+          % (self.table_name, name_column, name_column)
+    XP("SQL = %s", sql)
+    C = self.conn.cursor()
+    C.execute(sql, (old_name, new_name))
+    self.conn.commit()
+    C.close()
 
 class Master_Mixin(object):
 
