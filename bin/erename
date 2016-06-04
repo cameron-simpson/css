@@ -7,14 +7,16 @@
 from __future__ import print_function
 import sys
 import os
+import os.path
 from subprocess import Popen
 from tempfile import NamedTemporaryFile
+from cs.edit import edit_strings
 
 USAGE = 'Usage: %s [pathnames...]'
 EDITOR = 'vi'
 
 def main(argv):
-  cmd = argv.pop(0)
+  cmd = os.path.basename(argv.pop(0))
   usage = USAGE % (cmd,)
   badopts = False
   editor = os.environ.get('EDITOR', EDITOR)
@@ -27,52 +29,23 @@ def main(argv):
     if not names:
       error("%s: no suitable names in the current directory", cmd)
       badopts = True
-  for name in names:
-    if not name or not name.isprintable():
-      error("%s: unprintable: %r", cmd, name)
-      badopts = True
-  if badopts:
-    error(usage)
-    return 2
-  with NamedTemporaryFile(mode='w') as T:
-    for name in names:
-      print(name, file=T)
-    T.flush()
-    P = Popen([editor, T.name])
-    P.wait()
-    if P.returncode != 0:
-      error("%s: editor fails, aborting", cmd)
-    else:
-      ok = True
-      newnames = []
-      with open(T.name, 'r') as fp:
-        for lineno, newname in enumerate(fp, 1):
-          if not newname.endswith('\n'):
-            error("%s: %s:%d: missing newline", cmd, T.name, lineno)
-            ok = False
-          else:
-            newnames.append(newname[:-1])
-      if len(newnames) != len(names):
-        error("%s: %d old names, %d new names",
-              cmd, len(names), len(newnames))
-        ok = False
-  if not ok:
-    error("%s: aborting", cmd)
-    return 1
   xit = 0
-  for ndx, name in enumerate(names):
-    newname = newnames[ndx]
-    if newname != name:
-      if os.path.exists(newname):
-        error("%s: %s => %s: target exists", cmd, name, newname)
-        xit = 1
-      else:
-        print(name, '=>', newname)
-        try:
-          os.rename(name, newname)
-        except OSError as e:
-          error("%s: %s => %s: %s", cmd, name, newname, e)
+  try:
+    for name, newname in edit_strings(names):
+      if newname != name:
+        if os.path.exists(newname):
+          error("%s: %s => %s: target exists", cmd, name, newname)
           xit = 1
+        else:
+          print(name, '=>', newname)
+          try:
+            os.rename(name, newname)
+          except OSError as e:
+            error("%s: %s => %s: %s", cmd, name, newname, e)
+            xit = 1
+  except ValueError as e:
+    error("%s: %s", cmd, e)
+    xit = 1
   return xit
 
 def error(msg, *a):
