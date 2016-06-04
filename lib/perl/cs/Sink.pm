@@ -66,7 +66,8 @@ use strict qw(vars);
 use cs::Misc;
 use cs::IO;
 
-require 'flush.pl';
+##require 'flush.pl';
+use IO::Handle qw();
 
 package cs::Sink;
 
@@ -150,7 +151,8 @@ Flushes any pending output in I<handle> as a side-effect.
 
   if ($type eq FILE)
   { my($FILE)=shift;
-    ::flush($FILE);
+    $FILE->flush();
+    $FILE->flush();
     $this->{IO}=($cs::Sink::_UseIO
 		  ? new_from_fd IO::Handle (fileno($FILE),"w")
 		  : $FILE);
@@ -448,7 +450,7 @@ sub Flush
 
   if ($type eq FILE)
   {
-    ::flush($this->{IO});
+    $this->{IO}->flush();
   }
   elsif ($type eq ARRAY || $type eq SCALAR)
   {}

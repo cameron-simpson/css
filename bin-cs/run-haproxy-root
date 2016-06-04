@@ -1,0 +1,49 @@
+#!/bin/sh
+#
+# Dispatch haproxy as root via svcd for specific priviledged ports.
+#   - Cameron Simpson <cs@zip.com.au> 23apr2016
+#
+
+set -ue
+
+cmd=$0
+
+: ${FLAGDIR:=$HOME/var/flags}
+cfg=$HOME/rc-local/haproxy-root.cfg
+ifname=$( ifconfig -a | sed -n '1s/[: ].*//p' )
+svcdname=haproxy-root
+trace=
+[ -t 2 ] && trace=set-x
+
+usage="Usage: $0 [-f haproxy-cfg] [-i ifname] [--] [ipaddrs...]
+  -f haproxy-cfg    Specify haproxy configuration file.
+                    Default: $cfg
+  -i ifname         Interface name, default: $ifname
+  -n svcd-name      Specify svcd name, default: $svcdname
+  ipaddrs           Addresses to attach to interface."
+
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    -f) cfg=$2; shift ;;
+    -i) ifname=$2; shift ;;
+    -n) svcdname=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+first=1
+for ipaddr
+do
+  [ $first ] && { set --; first=; }
+  set -- ${1+"$@"} with-addif "$ifname" "$ipaddr"
+done
+
+set -- ${1+"$@"} haproxy -f "$cfg"
+
+$trace sudo env "PATH=$PATH" "FLAGDIR=$FLAGDIR" /opt/css/bin/with-opt-css svcd -n "$svcdname" "$@"

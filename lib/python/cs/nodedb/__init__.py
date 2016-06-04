@@ -16,7 +16,7 @@ DISTINFO = {
 from getopt import GetoptError
 import os.path
 import sys
-from cs.nodedb.backend import Backend
+from cs.nodedb.backend import Backend, Update, ExtendUpdate, ResetUpdate
 from cs.nodedb.node import Node, NodeDB, NodeDBFromURL
 from cs.logutils import setup_logging, Pfx, error
 

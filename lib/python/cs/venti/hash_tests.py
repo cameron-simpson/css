@@ -12,7 +12,7 @@ else:
   from sha import new as sha1
 import unittest
 from cs.logutils import X
-from cs.randutils import rand0, randblock
+from cs.randutils import rand0, randbool, randblock
 from . import _TestAdditionsMixin
 from .hash import Hash_SHA1, decode, HashCodeUtilsMixin, HashUtilDict
 
@@ -68,14 +68,14 @@ class _TestHashCodeUtils(_TestAdditionsMixin):
     self.assertIs(h, None)
     self.assertLen(M1, 0)
     # add one block
-    data = randblock(rand0(8192))
+    data = randblock(rand0(8193))
     h = M1.add(data)
     KS1.add(h)
     self.assertLen(M1, 1)
     self.assertEqual(set(M1.hashcodes()), KS1)
     self.assertEqual(M1.first(), h)
     # add another block
-    data2 = randblock(rand0(8192))
+    data2 = randblock(rand0(8193))
     h2 = M1.add(data2)
     KS1.add(h2)
     self.assertLen(M1, 2)
@@ -87,7 +87,7 @@ class _TestHashCodeUtils(_TestAdditionsMixin):
     KS1 = self.keys1
     # add 16 random blocks to the map with some sanity checks along the way
     for n in range(16):
-      data = randblock(rand0(8192))
+      data = randblock(rand0(8193))
       h = M1.add(data)
       self.assertIn(h, M1)
       self.assertNotIn(h, KS1)
@@ -146,11 +146,11 @@ class _TestHashCodeUtils(_TestAdditionsMixin):
     M1 = self.map1
     KS1 = self.keys1
     for n in range(16):
-      data = randblock(rand0(8192))
+      data = randblock(rand0(8193))
       h = M1.add(data)
       KS1.add(h)
     # make a block not in the map
-    data2 = randblock(rand0(8192))
+    data2 = randblock(rand0(8193))
     h2 = Hash_SHA1.from_data(data2)
     # extract hashes, check results
     ks = sorted(KS1)
@@ -170,20 +170,20 @@ class _TestHashCodeUtils(_TestAdditionsMixin):
     M1 = self.map1
     KS1 = self.keys1
     for n in range(16):
-      data = randblock(rand0(8192))
+      data = randblock(rand0(8193))
       h = M1.add(data)
       KS1.add(h)
     M2 = self.MAP_FACTORY()
     KS2 = set()
     # construct M2 as a mix of M1 and random new blocks
     for n in range(16):
-      if rand0(1) == 0:
-        data = randblock(rand0(8192))
+      if randbool():
+        data = randblock(rand0(8193))
         h = M2.add(data)
         KS2.add(h)
       else:
         M1ks = list(M1.hashcodes())
-        M1hash = M1ks[rand0(len(M1ks)-1)]
+        M1hash = M1ks[rand0(len(M1ks))]
         data = M1[M1hash]
         h = M2.add(data)
         self.assertEqual(h, M1hash)

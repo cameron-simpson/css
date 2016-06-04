@@ -173,18 +173,29 @@ class Progress(object):
       return None
     return time.time() + runtime
 
-class ProgressWriter(Proxy):
-  ''' An object with a .write method which updates a Progress and then passes the write through to a file.
+class ProgressWriter(object):
+  ''' An object with a .write method which passes the write through to a file and then updates a Progress.
   '''
 
   def __init__(self, progress, fp):
+    ''' Initialise the ProgressWriter with a Progress `progress` and a file `fp`.
+    '''
     Proxy.__init__(self, fp)
     self.progress = progress
     self.fp = fp
 
   def write(self, data):
+    ''' Write `data` to the file and update the Progress. Return as from `fp.write`.
+        The Progress is updated by the amount written; if fp.write
+        returns None then this presumed to be len(data), otherwise
+        the return value from fp.write is used.
+    '''
     retval = self.fp.write(data)
-    self.progress.advance(len(data))
+    if retval is None:
+      written = len(data)
+    else:
+      written = retval
+    self.progress.advance(written)
     return retval
 
 if __name__ == '__main__':

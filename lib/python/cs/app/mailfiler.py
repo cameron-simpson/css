@@ -359,9 +359,9 @@ class MailFiler(O):
 
   def folder_logfile(self, folder_path):
     ''' Return path to log file associated with the named folder.
-        TODO: ase on relative path from folder root, not just basename.
+        TODO: base on relative path from folder root, not just basename.
     '''
-    return os.path.join(self.logdir, 'filer-%s.log' % (os.path.basename(folder_path)))
+    return os.path.join(self.logdir, '%s.log' % (os.path.basename(folder_path)))
 
   def sweep(self, wmdir, justone=False, no_remove=False, logfile=None):
     ''' Scan a WatchedMaildir for messages to filter.
@@ -1138,10 +1138,20 @@ def get_targets(s, offset):
   while offset < len(s) and not s[offset].isspace():
     offset0 = offset
     T, offset = get_target(s, offset)
-    if T is not None:
-      targets.append(T)
-    if offset < len(s) and s[offset] == ',':
-      offset += 1
+    targets.append(T)
+    if offset < len(s):
+      # check for end of targets (whitespace) or comma (another target)
+      ch = s[offset]
+      if ch.isspace():
+        continue
+      elif ch == ',':
+        while True:
+          offset += 1
+          if offset >= len(s) or s[offset] != ',':
+            break
+      else:
+        raise ValueError('offset %d: expected comma after target, found: %r'
+                         % (offset, s[offset:]))
   return targets, offset
 
 def get_target(s, offset, quoted=False):
