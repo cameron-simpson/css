@@ -20,6 +20,7 @@ from cs.env import envsub
 from cs.lex import get_identifier
 from cs.logutils import Pfx, info, warning, error, setup_logging, X, XP
 from cs.obj import O
+from cs.seq import the
 from cs.threads import locked, locked_property
 
 DEFAULT_LIBRARY = '$HOME/Pictures/iPhoto Library.photolibrary'
@@ -143,21 +144,36 @@ def main(argv=None):
               I.load_folders()
               all_names = I.event_names()
               if argv:
-                names = []
+                edit_lines = []
                 for arg in argv:
                   # TODO: select by regexp if /blah
                   if arg in all_names:
-                    names.append(arg)
+                    for event in I.events():
+                      if event.name == arg:
+                        edit_lines.append("%d:%s" % (event.modelId, event.name))
                   else:
                     warning("unknown event name: %s", arg)
                     badopts = True
               else:
-                names = all_names
+                edit_lines = [ "%d:%s" % (event.modelId, event.name) for event in I.events() ]
               if not badopts:
-                changes = edit_strings(names)
-                for old_name, new_name in changes:
-                  for erow in I.events_by_name(old_name):
-                    I.folder_table.update_row('modelId', erow.modelId, 'name', new_name)
+                changes = edit_strings(edit_lines)
+                for old_string, new_string in changes:
+                  with Pfx("%s => %s", old_string, new_string):
+                    old_modelId, old_name = old_string.split(':', 1)
+                    old_modelId = int(old_modelId)
+                    try:
+                      new_modelId, new_name = new_string.split(':', 1)
+                      new_modelId = int(new_modelId)
+                    except ValueError as e:
+                      error("invalid edited string: %s", e)
+                      xit = 1
+                    else:
+                      if old_modelId != new_modelId:
+                        error("modelId changed")
+                        xit = 1
+                      else:
+                        I.folder_table[old_modelId].name = new_name
             else:
               warning("known class %r", obclass)
               badopts = True
@@ -385,6 +401,9 @@ class iPhoto(O):
              if folder.sortKeyPath == 'custom.default'
            ]
 
+  def event(self, event_id):
+    self.load_folders()
+    l
   def events(self):
     return [ folder for folder in self.folders()
              if folder.sortKeyPath == 'custom.kind'
@@ -704,17 +723,25 @@ class iPhotoTable(object):
     table_name = schema['table_name']
     self.name = table_name
     self.qualname = '.'.join( (self.db.name, table_name) )
-    klass = namedtuple('%s_Row' % (table_name,), ['I'] + list(schema['columns']))
+    # TODO: additional mixin to support assignment to columns
+    _klass = namedtuple('%s_Row' % (table_name,), ['I'] + list(schema['columns']))
+    class klass(_klass):
+      iph_table=self
+      def __setattr__(self, attr, value):
+        return self.iph_table.update_by_column(attr, value, 'modelId', self.modelId)
     mixin = schema.get('mixin')
     lock = self.iphoto._lock
     if mixin is not None:
       class Mixed(klass, mixin):
         pass
       def klass(*a, **kw):
-        o = Mixed(*a, **kw)
-        o._lock = lock
-        return o
+        return Mixed(*a, **kw)
     self.row_class = klass
+
+  def _Row(self, row_values):
+    ''' Instantiate a row.
+    '''
+    return self.row_class(*([self.iphoto] + list(row_values)))
 
   @property
   def iphoto(self):
@@ -728,11 +755,32 @@ class iPhotoTable(object):
   def table_name(self):
     return self.schema['table_name']
 
+  def select_by_column(self, column=None, value=None):
+    sql = 'select * from %s' % (self.table_name,)
+    sqlargs = []
+    if column is not None:
+      sql += ' where %s=?' % (column,)
+      sqlargs.append(value)
+    XP("SQL: %s %r", sql, sqlargs)
+    return self.conn.cursor().execute(sql, sqlargs)
+
+  def update_by_column(self, upd_column, upd_value, sel_column, sel_value, sel_op='='):
+    sql = 'update %s set %s=? where %s %s ?' % (self.table_name, upd_column, sel_column, sel_op)
+    sqlargs = (upd_value, sel_value)
+    C = self.conn.cursor()
+    XP("SQL: %s %r", sql, sqlargs)
+    C.execute(sql, sqlargs)
+    self.conn.commit()
+    C.close()
+
+  def __getitem__(self, modelId):
+    return self._Row(the(self.select_by_column('modelId', modelId)))
+
   def read_rows(self):
     I = self.iphoto
     row_class = self.row_class
-    for row in self.conn.cursor().execute('select * from %s' % (self.table_name,)):
-      yield row_class(*([I] + list(row)))
+    for row in self.select_by_column():
+      yield self._Row(row)
 
   def update_row(self, cond_column, cond_value, column, new_value):
     sql = 'update %s set %s=? where %s=?' \
@@ -741,15 +789,6 @@ class iPhotoTable(object):
     XP("new_value=%r, cond_value=%r", new_value, cond_value)
     C = self.conn.cursor()
     C.execute(sql, (new_value, cond_value))
-    self.conn.commit()
-    C.close()
-
-  def rename_row(self, old_name, new_name, name_column='name'):
-    sql = 'update %s set %s=? where %s=?' \
-          % (self.table_name, name_column, name_column)
-    XP("SQL = %s", sql)
-    C = self.conn.cursor()
-    C.execute(sql, (old_name, new_name))
     self.conn.commit()
     C.close()
 
@@ -863,6 +902,17 @@ class Version_Mixin(object):
   @property
   def keyword_names(self):
     return [ kw.name for kw in self.keywords ]
+
+class Folder_Mixin(object):
+
+  def edit_string(self):
+    return "%d:%s" % (self.modelId, self.name)
+
+  @staticmethod
+  def event_from_edit_string(s):
+    modelId, name = s.split(':', 1)
+    modelId = int(modelId)
+    l
 
 class Keyword_Mixin(object):
 
@@ -1131,6 +1181,7 @@ SCHEMAE = {'Faces':
                 },
               'folder':
                 { 'table_name': 'RKFolder',
+                  'mixin': Folder_Mixin,
                   'columns':
                     ( 'modelId', 'uuid', 'folderType', 'name', 'parentFolderUuid',
                       'implicitAlbumUuid', 'posterVersionUuid',
