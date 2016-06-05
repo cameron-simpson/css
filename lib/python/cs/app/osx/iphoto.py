@@ -142,55 +142,65 @@ def main(argv=None):
           else:
             obclass = argv.pop(0)
             if obclass == 'events':
+              table = I.folder_table
               I.load_folders()
-              all_names = I.event_names()
-              if argv:
-                edit_lines = set()
-                for arg in argv:
-                  # TODO: select by regexp if /blah
-                  if arg.startswith('/'):
-                    regexp = re.compile(arg[1:-1] if arg.endswith('/') else arg[1:])
-                    edit_lines.update(event.edit_string
-                                      for event in I.events()
-                                      if regexp.search(event.name))
-                  elif '*' in arg or '?' in arg:
-                    edit_lines.update(event.edit_string
-                                      for event in I.events()
-                                      if fnmatch(event.name, arg))
-                  elif arg in all_names:
-                    for event in I.events():
-                      if event.name == arg:
-                        edit_lines.add(event.edit_string)
-                  else:
-                    warning("unknown event name: %s", arg)
-                    badopts = True
-              else:
-                edit_lines = set(event.edit_string for event in I.events())
-              if not badopts:
-                changes = edit_strings(sorted(edit_lines,
-                                              key=lambda _: _.split(':', 1)[1]),
-                                       errors=lambda msg: warning(msg + ', discarded')
-                                      )
-                for old_string, new_string in changes:
-                  with Pfx("%s => %s", old_string, new_string):
-                    old_modelId, old_name = old_string.split(':', 1)
-                    old_modelId = int(old_modelId)
-                    try:
-                      new_modelId, new_name = new_string.split(':', 1)
-                      new_modelId = int(new_modelId)
-                    except ValueError as e:
-                      error("invalid edited string: %s", e)
-                      xit = 1
-                    else:
-                      if old_modelId != new_modelId:
-                        error("modelId changed")
-                        xit = 1
-                      else:
-                        print("%d: %s => %s" % (old_modelId, old_name, new_name))
-                        I.folder_table[old_modelId].name = new_name
+              get_items = I.events
+            elif obclass == 'keywords':
+              table = I.keyword_table
+              I.load_keywords()
+              get_items = I.read_keywords
+            elif obclass == 'people':
+              table = I.person_table
+              I.load_persons()
+              get_items = I.persons
             else:
               warning("known class %r", obclass)
               badopts = True
+            if argv:
+              all_names = set(item.name for item in get_items())
+              edit_lines = set()
+              for arg in argv:
+                # TODO: select by regexp if /blah
+                if arg.startswith('/'):
+                  regexp = re.compile(arg[1:-1] if arg.endswith('/') else arg[1:])
+                  edit_lines.update(item.edit_string
+                                    for item in get_items()
+                                    if regexp.search(item.name))
+                elif '*' in arg or '?' in arg:
+                  edit_lines.update(item.edit_string
+                                    for item in get_items()
+                                    if fnmatch(item.name, arg))
+                elif arg in all_names:
+                  for item in get_items():
+                    if item.name == arg:
+                      edit_lines.add(item.edit_string)
+                else:
+                  warning("unknown item name: %s", arg)
+                  badopts = True
+            else:
+              edit_lines = set(item.edit_string for item in get_items())
+            if not badopts:
+              changes = edit_strings(sorted(edit_lines,
+                                            key=lambda _: _.split(':', 1)[1]),
+                                     errors=lambda msg: warning(msg + ', discarded')
+                                    )
+              for old_string, new_string in changes:
+                with Pfx("%s => %s", old_string, new_string):
+                  old_modelId, old_name = old_string.split(':', 1)
+                  old_modelId = int(old_modelId)
+                  try:
+                    new_modelId, new_name = new_string.split(':', 1)
+                    new_modelId = int(new_modelId)
+                  except ValueError as e:
+                    error("invalid edited string: %s", e)
+                    xit = 1
+                  else:
+                    if old_modelId != new_modelId:
+                      error("modelId changed")
+                      xit = 1
+                    else:
+                      print("%d: %s => %s" % (old_modelId, old_name, new_name))
+                      table[old_modelId].name = new_name
         elif op == 'select':
           if not argv:
             warning("missing selectors")
@@ -796,7 +806,13 @@ class iPhotoTable(object):
     for row in self.select_by_column():
       yield self._Row(row)
 
-class Master_Mixin(object):
+class _Named_Mixin(object):
+
+  @property
+  def edit_string(self):
+    return "%d:%s" % (self.modelId, self.name)
+
+class Master_Mixin(_Named_Mixin):
 
   @property
   def pathname(self):
@@ -887,7 +903,7 @@ class Master_Mixin(object):
   def format(self):
     return self.image_info.format
 
-class Version_Mixin(object):
+class Version_Mixin(_Named_Mixin):
 
   @property
   def master(self):
@@ -907,13 +923,10 @@ class Version_Mixin(object):
   def keyword_names(self):
     return [ kw.name for kw in self.keywords ]
 
-class Folder_Mixin(object):
+class Folder_Mixin(_Named_Mixin):
+  pass
 
-  @property
-  def edit_string(self):
-    return "%d:%s" % (self.modelId, self.name)
-
-class Keyword_Mixin(object):
+class Keyword_Mixin(_Named_Mixin):
 
   def versions(self):
     ''' Return the versions with this keyword.
@@ -936,13 +949,13 @@ class Keyword_Mixin(object):
     '''
     return set(master.latest_version for master in self.masters())
 
-class Person_Mixin(object):
+class Person_Mixin(_Named_Mixin):
 
   @locked_property
   def vfaces(self):
     return set()
 
-class VFace_Mixin(object):
+class VFace_Mixin(_Named_Mixin):
 
   @property
   def master(self):
