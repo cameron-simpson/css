@@ -33,8 +33,12 @@ USAGE = '''Usage: %s [/path/to/iphoto-library-path] op [op-args...]
   select criteria... List books with all specified criteria.
 
 Criteria:
-  [!]/regexp            Regexp found in text fields.
-  [!]tag:keyword      Book has keyword.
+  [!]/regexp            Filename matches regexp.
+  [!]kw:[keyword]       Latest version has keyword.
+                        Empty keyword means "has a keyword".
+  [!]face:[person_name] Latest version has named person.
+                        Empty person_name means "has a face".
+                        May also be writtens "who:...".
   Because "!" is often used for shell history expansion, a dash "-"
   is also accepted to invert the selector.
 '''
@@ -141,19 +145,48 @@ class Calibre_Library(O):
     T = self._tables.get(table_name)
     if T is None:
       try:
-        meta = self._table_meta[table_name]
+        faces = by_master_uuid[muuid]
+      except KeyError as e:
+        faces = by_master_uuid[muuid] = set()
+      faces.add(face)
+
+  def face(self, face_id):
+    return self.face_by_id.get(face_id)
+
+  def _load_table_vfaces(self):
+    ''' Load Faces.RKVersionFaceContent into memory and set up mappings.
+    '''
+    by_id = self.vface_by_id = {}
+    by_master_id = self.vfaces_by_master_id
+    for vface in self.read_vfaces():
+      by_id[vface.modelId] = vface
+      master_id = vface.masterId
+      try:
+        vfaces = by_master_id[master_id]
       except KeyError:
         raise AttributeError('%s: no entry in ._table_meta' % (table_name,))
       T = CalibreTable(meta.klass, self, self.metadb, table_name, meta.columns, meta.name)
       self._tables[table_name] = T
     return T
 
-  def __getattr__(self, attr):
-    if attr.startswith('table_'):
-      return self.table(attr[6:])
-    if attr in ('books', 'authors', 'tags'):
-      return self.table(attr).instances()
-    raise AttributeError(attr)
+  @locked_property
+  def vfaces_by_master_id(self):
+    self.load_vfaces()
+    return I.vfaces_by_master_id.get(self.modelId, ())
+
+  def _load_table_folders(self):
+    ''' Load Library.RKFolder into memory and set up mappings.
+    '''
+    by_id = self.folder_by_id = {}
+    by_name = self.folders_by_name = {}
+    for folder in self.read_folders():
+      by_id[folder.modelId] = folder
+      name = folder.name
+      try:
+        folders = by_name[name]
+      except KeyError:
+        folders = by_name[name] = set()
+      folders.add(folder)
 
 class CalibreTable(object):
 
@@ -192,6 +225,206 @@ class CalibreTableRowNS(NS):
 
   def __hash__(self):
     return self.id
+
+  def match_one_person(self, person_name):
+    matches = self.match_people(person_name)
+    if not matches:
+      raise ValueError("unknown person")
+    if len(matches) > 1:
+      raise ValueError("matches multiple people, rejected: %r" % (matches,))
+    return matches.pop()
+
+  def _load_table_masters(self):
+    ''' Load Library.RKMaster into memory and set up mappings.
+    '''
+    by_id = self.master_by_id = {}
+    for master in self.read_masters():
+      by_id[master.modelId] = master
+
+  def master(self, master_id):
+    self.load_masters()
+    return self.master_by_id.get(master_id)
+
+  def master_pathnames(self):
+    self.load_masters()
+    for master in self.master_by_id.values():
+      yield master.pathname
+
+  def _load_table_versions(self):
+    ''' Load Library.RKVersion into memory and set up mappings.
+    '''
+    by_id = self.version_by_id = {}
+    by_master_id = self.versions_by_master_id = {}
+    for version in self.read_versions():
+      by_id[version.modelId] = version
+      master_id = version.masterId
+      try:
+        versions = by_master_id[master_id]
+      except KeyError:
+        versions = by_master_id[master_id] = set()
+      versions.add(version)
+
+  def version(self, version_id):
+    self.load_versions()
+    return self.version_by_id.get(version_id)
+
+  def _load_table_keywords(self):
+    ''' Load Library.RKKeyword into memory and set up mappings.
+    '''
+    by_id = self.keyword_by_id = {}
+    by_name = self.keyword_by_name = {}
+    for kw in self.read_keywords():
+      by_id[kw.modelId] = kw
+      by_name[kw.name] = kw
+
+  def keyword(self, keyword_id):
+    self.load_keywords()
+    return self.keyword_by_id.get(keyword_id)
+
+  @locked_property
+  def keywords(self):
+    self.load_keywords()
+    return self.keyword_by_name.values()
+
+  def keyword_names(self):
+    return frozenset(kw.name for kw in self.keywords)
+
+  def match_keyword(self, kwname):
+    ''' User convenience: match string against all keywords, return matches.
+    '''
+    self.load_keywords()
+    if kwname in self.keyword_by_name:
+      return (kwname,)
+    lc_kwname = kwname.lower()
+    matches = []
+    for name in self.keyword_names():
+      if lc_kwname in name.lower():
+        matches.append(name)
+    return matches
+
+  def match_one_keyword(self, kwname):
+    matches = self.match_keyword(kwname)
+    if not matches:
+      raise ValueError("unknown keyword")
+    if len(matches) > 1:
+      raise ValueError("matches multiple keywords, rejected: %r" % (matches,))
+    return matches[0]
+
+  def versions_by_keyword(self, kwname):
+    self.load_keywords()
+    return self.keywords_by_name[kwname].versions()
+
+  def masters_by_keyword(self, kwname):
+    self.load_keywords()
+    return self.keyword_by_name[kwname].masters()
+
+  def _load_table_keywordForVersions(self):
+    ''' Load Library.RKKeywordForVersion into memory and set up mappings.
+    '''
+    by_kwid = self.kw4v_version_ids_by_keyword_id = {}
+    by_vid = self.kw4v_keyword_ids_by_version_id = {}
+    for kw4v in self.read_keywordForVersions():
+      kwid = kw4v.keywordId
+      vid = kw4v.versionId
+      try:
+        version_ids = by_kwid[kwid]
+      except KeyError:
+        version_ids = by_kwid[kwid] = set()
+      version_ids.add(vid)
+      try:
+        keyword_ids = by_vid[vid]
+      except KeyError:
+        keyword_ids = by_vid[vid] = set()
+      keyword_ids.add(kwid)
+
+  def keywords_by_version(self, version_id):
+    ''' Return version
+    '''
+    self.load_keywordForVersions()
+    kwids = self.kw4v_keyword_ids_by_version_id.get(version_id, ())
+    return [ self.keyword(kwid) for kwid in kwids ]
+
+  def parse_selector(self, selection):
+    with Pfx(selection):
+      selection0 = selection
+      selector = None
+      invert = False
+      if selection.startswith('!') or selection.startswith('-'):
+        invert = True
+        selection = selection[1:]
+      if selection.startswith('/'):
+        re_text = selection[1:]
+        selector = SelectByFilenameRE(self, re_text, invert)
+      else:
+        sel_type, offset = get_identifier(selection)
+        if not sel_type:
+          raise ValueError("expected identifier at %r" % (selection,))
+        if offset == len(selection):
+          raise ValueError("expected delimiter after %r" % (sel_type,))
+        selection = selection[offset:]
+        if selection.startswith(':'):
+          selection = selection[1:]
+          if sel_type == 'kw':
+            kwname = selection
+            if not kwname:
+              selector = SelectByFunction(self,
+                                          lambda master: len(master.keywords) > 0,
+                                          invert)
+            else:
+              okwname = kwname
+              try:
+                kwname = self.match_one_keyword(kwname)
+              except ValueError as e:
+                raise ValueError("invalid keyword: %s" % (e,))
+              else:
+                if kwname != okwname:
+                  info("%r ==> %r", okwname, kwname)
+                selector = SelectByKeyword_Name(self, kwname, invert)
+          elif sel_type == 'face' or sel_type == 'who':
+            person_name = selection
+            if not person_name:
+              selector = SelectByFunction(self,
+                                          lambda master: len(master.vfaces) > 0,
+                                          invert)
+            else:
+              operson_name = person_name
+              try:
+                person_name = self.match_one_person(person_name)
+              except ValueError as e:
+                warning("rejected face name: %s", e)
+                badopts = True
+              else:
+                if person_name != operson_name:
+                  info("%r ==> %r", operson_name, person_name)
+                selector = SelectByPerson_Name(self, person_name, invert)
+          else:
+            raise ValueError("unknown selector type %r" % (sel_type,))
+        elif selection[0] in '<=>':
+          cmpop = selection[0]
+          selection = selection[1:]
+          if selection.startswith('='):
+            cmpop += '='
+            selection = selection[1:]
+          left = sel_type
+          right = selection
+          selector = SelectByComparison(self, left, cmpop, right, invert)
+        else:
+          raise ValueError("unrecognised delimiter after %r" % (sel_type,))
+      if selector is None:
+        raise RuntimeError("parse_selector(%r) did not set selector" % (selection0,))
+      return selector
+
+class iPhotoDBs(object):
+
+  def __init__(self, iphoto):
+    self.iphoto = iphoto
+    self.dbmap = {}
+    self.named_tables = {}
+    self._lock = iphoto._lock
+
+  def load_all(self):
+    for dbname in 'Library', 'Faces':
+      self._load_db(dbname)
 
   @property
   def library(self):
