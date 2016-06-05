@@ -14,10 +14,22 @@ from tempfile import NamedTemporaryFile
 # default editor
 EDITOR = 'vi'
 
-def edit_strings(strs, editor=None, environ=None):
+def edit_strings(strs, editor=None, environ=None, errors=None):
   ''' Edit a list of string, return tuples of changed string pairs.
       Honours $EDITOR envvar, defaults to "vi".
   '''
+  if errors is None:
+    def errors(s, message):
+      raise ValueError(message)
+  elif isinstance(errors, str):
+    if errors == 'ignore':
+      def errors(s, message):
+        pass
+    elif errors == 'raise':
+      def errors(s, message):
+        raise ValueError(message)
+    else:
+      raise ValueError("invalid errors: %r" % (errors,))
   if editor is None:
     if environ is None:
       environ = os.environ
@@ -25,10 +37,13 @@ def edit_strings(strs, editor=None, environ=None):
   strs = list(strs)
   changes = []
   with NamedTemporaryFile(mode='w') as T:
+    oldstrs = []
     for oldstr in strs:
       if not oldstr or not oldstr.isprintable():
-        raise ValueError("unprintable: %r" % (oldstr,))
-      print(oldstr, file=T)
+        errors("unprintable: %r" % (oldstr,))
+      else:
+        print(oldstr, file=T)
+        oldstrs.append(oldstr)
     T.flush()
     P = Popen([editor, T.name])
     P.wait()
@@ -41,10 +56,10 @@ def edit_strings(strs, editor=None, environ=None):
         if not newstr.endswith('\n'):
           raise ValueError("%s:%d: missing newline" % (T.name, lineno))
         newstrs.append(newstr[:-1])
-  if len(newstrs) != len(strs):
-    raise ValueError("%d old strs, %d new strs" % (len(strs), len(newstrs)))
+  if len(newstrs) != len(oldstrs):
+    raise ValueError("%d old strs, %d new strs" % (len(oldstrs), len(newstrs)))
   changes = [ old_new
-              for old_new in zip(strs, newstrs)
+              for old_new in zip(oldstrs, newstrs)
               if old_new[0] != old_new[1]
             ]
   return changes

@@ -167,7 +167,10 @@ def main(argv=None):
               else:
                 edit_lines = set(event.edit_string for event in I.events())
               if not badopts:
-                changes = edit_strings(sorted(edit_lines, key=lambda _: _.split(':', 1)[1]))
+                changes = edit_strings(sorted(edit_lines,
+                                              key=lambda _: _.split(':', 1)[1]),
+                                       errors=lambda msg: warning(msg + ', discarded')
+                                      )
                 for old_string, new_string in changes:
                   with Pfx("%s => %s", old_string, new_string):
                     old_modelId, old_name = old_string.split(':', 1)
