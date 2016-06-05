@@ -152,7 +152,7 @@ def main(argv=None):
                     regexp = re.compile(arg[1:-1] if arg.endswith('/') else arg[1:])
                     edit_lines.update(event.edit_string
                                       for event in I.events()
-                                      if regexp.match(event.name))
+                                      if regexp.search(event.name))
                   elif '*' in arg or '?' in arg:
                     edit_lines.update(event.edit_string
                                       for event in I.events()
@@ -183,6 +183,7 @@ def main(argv=None):
                         error("modelId changed")
                         xit = 1
                       else:
+                        print("%d: %s => %s" % (old_modelId, old_name, new_name))
                         I.folder_table[old_modelId].name = new_name
             else:
               warning("known class %r", obclass)
