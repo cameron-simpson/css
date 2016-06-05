@@ -9,6 +9,7 @@ import sys
 import os
 import os.path
 from collections import namedtuple
+from fnmatch import fnmatch
 from functools import partial
 import re
 import sqlite3
@@ -18,7 +19,7 @@ Image.warnings.simplefilter('error', Image.DecompressionBombWarning)
 from cs.edit import edit_strings
 from cs.env import envsub
 from cs.lex import get_identifier
-from cs.logutils import Pfx, info, warning, error, setup_logging, X, XP
+from cs.logutils import Pfx, debug, info, warning, error, setup_logging, X, XP
 from cs.obj import O
 from cs.seq import the
 from cs.threads import locked, locked_property
@@ -144,20 +145,29 @@ def main(argv=None):
               I.load_folders()
               all_names = I.event_names()
               if argv:
-                edit_lines = []
+                edit_lines = set()
                 for arg in argv:
                   # TODO: select by regexp if /blah
-                  if arg in all_names:
+                  if arg.startswith('/'):
+                    regexp = re.compile(arg[1:-1] if arg.endswith('/') else arg[1:])
+                    edit_lines.update(event.edit_string
+                                      for event in I.events()
+                                      if regexp.match(event.name))
+                  elif '*' in arg or '?' in arg:
+                    edit_lines.update(event.edit_string
+                                      for event in I.events()
+                                      if fnmatch(event.name, arg))
+                  elif arg in all_names:
                     for event in I.events():
                       if event.name == arg:
-                        edit_lines.append("%d:%s" % (event.modelId, event.name))
+                        edit_lines.add(event.edit_string)
                   else:
                     warning("unknown event name: %s", arg)
                     badopts = True
               else:
-                edit_lines = [ "%d:%s" % (event.modelId, event.name) for event in I.events() ]
+                edit_lines = set(event.edit_string for event in I.events())
               if not badopts:
-                changes = edit_strings(edit_lines)
+                changes = edit_strings(sorted(edit_lines, key=lambda _: _.split(':', 1)[1]))
                 for old_string, new_string in changes:
                   with Pfx("%s => %s", old_string, new_string):
                     old_modelId, old_name = old_string.split(':', 1)
@@ -761,14 +771,14 @@ class iPhotoTable(object):
     if column is not None:
       sql += ' where %s=?' % (column,)
       sqlargs.append(value)
-    XP("SQL: %s %r", sql, sqlargs)
+    debug("SQL: %s %r", sql, sqlargs)
     return self.conn.cursor().execute(sql, sqlargs)
 
   def update_by_column(self, upd_column, upd_value, sel_column, sel_value, sel_op='='):
     sql = 'update %s set %s=? where %s %s ?' % (self.table_name, upd_column, sel_column, sel_op)
     sqlargs = (upd_value, sel_value)
     C = self.conn.cursor()
-    XP("SQL: %s %r", sql, sqlargs)
+    debug("SQL: %s %r", sql, sqlargs)
     C.execute(sql, sqlargs)
     self.conn.commit()
     C.close()
@@ -781,16 +791,6 @@ class iPhotoTable(object):
     row_class = self.row_class
     for row in self.select_by_column():
       yield self._Row(row)
-
-  def update_row(self, cond_column, cond_value, column, new_value):
-    sql = 'update %s set %s=? where %s=?' \
-          % (self.table_name, column, cond_column)
-    XP("SQL = %s", sql)
-    XP("new_value=%r, cond_value=%r", new_value, cond_value)
-    C = self.conn.cursor()
-    C.execute(sql, (new_value, cond_value))
-    self.conn.commit()
-    C.close()
 
 class Master_Mixin(object):
 
@@ -905,14 +905,9 @@ class Version_Mixin(object):
 
 class Folder_Mixin(object):
 
+  @property
   def edit_string(self):
     return "%d:%s" % (self.modelId, self.name)
-
-  @staticmethod
-  def event_from_edit_string(s):
-    modelId, name = s.split(':', 1)
-    modelId = int(modelId)
-    l
 
 class Keyword_Mixin(object):
 
