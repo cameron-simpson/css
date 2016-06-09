@@ -36,7 +36,8 @@ USAGE = '''Usage: %s [/path/to/iphoto-library-path] op [op-args...]
   ls keywords       List keywords.
   ls masters        List master pathnames.
   ls people         List person names.
-  rename events     Rename events.
+  rename {events|keywords|people} {/regexp|name}...
+                    Rename entities.
   select criteria... List masters with all specified criteria.
 
 Criteria:
