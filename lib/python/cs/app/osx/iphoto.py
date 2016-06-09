@@ -157,8 +157,8 @@ def main(argv=None):
             else:
               warning("known class %r", obclass)
               badopts = True
+            all_names = set(item.name for item in get_items())
             if argv:
-              all_names = set(item.name for item in get_items())
               edit_lines = set()
               for arg in argv:
                 # TODO: select by regexp if /blah
@@ -199,6 +199,18 @@ def main(argv=None):
                     if old_modelId != new_modelId:
                       error("modelId changed")
                       xit = 1
+                    elif new_name in all_names:
+                      if obclass == 'keywords':
+                        # TODO: merge keywords
+                        print("%d: merge %s => %s" % (old_modelId, old_name, new_name))
+                        otherModelId = the(item.modelId
+                                           for item in get_items()
+                                           if item.name == new_name)
+                        I.replace_keywords(old_modelId, otherModelId)
+                        I.expunge_keyword(old_modelId)
+                      else:
+                        error("new name already in use: %r", new_name)
+                        xit = 1
                     else:
                       print("%d: %s => %s" % (old_modelId, old_name, new_name))
                       table[old_modelId].name = new_name
@@ -606,6 +618,24 @@ class iPhoto(O):
     kwids = self.kw4v_keyword_ids_by_version_id.get(version_id, ())
     return [ self.keyword(kwid) for kwid in kwids ]
 
+  def replace_keywords(self, old_keyword_id, new_keyword_id):
+    ''' Update image tags to replace one keyword with another.
+    '''
+    self \
+      .table_by_nickname['keywordForVersion'] \
+      . update_by_column('keywordId', new_keyword_id,
+                         'keywordId', old_keyword_id)
+
+  def expunge_keyword(self, keyword_id):
+    ''' Remove the specified keyword.
+    '''
+    self \
+      .table_by_nickname['keywordForVersion'] \
+      .delete_by_column('keywordId', keyword_id)
+    self \
+      .table_by_nickname['keyword'] \
+      .delete_by_column('modelId', keyword_id)
+
   def parse_selector(self, selection):
     with Pfx(selection):
       selection0 = selection
@@ -793,7 +823,16 @@ class iPhotoTable(object):
     sql = 'update %s set %s=? where %s %s ?' % (self.table_name, upd_column, sel_column, sel_op)
     sqlargs = (upd_value, sel_value)
     C = self.conn.cursor()
-    debug("SQL: %s %r", sql, sqlargs)
+    info("SQL: %s %r", sql, sqlargs)
+    C.execute(sql, sqlargs)
+    self.conn.commit()
+    C.close()
+
+  def delete_by_column(self, sel_column, sel_value, sel_op='='):
+    sql = 'delete from %s where %s %s ?' % (self.table_name, sel_column, sel_op)
+    sqlargs = (sel_value,)
+    C = self.conn.cursor()
+    info("SQL: %s %r", sql, sqlargs)
     C.execute(sql, sqlargs)
     self.conn.commit()
     C.close()
