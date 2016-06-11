@@ -36,7 +36,8 @@ USAGE = '''Usage: %s [/path/to/iphoto-library-path] op [op-args...]
   ls keywords       List keywords.
   ls masters        List master pathnames.
   ls people         List person names.
-  rename events     Rename events.
+  rename {events|keywords|people} {/regexp|name}...
+                    Rename entities.
   select criteria... List masters with all specified criteria.
 
 Criteria:
@@ -142,55 +143,77 @@ def main(argv=None):
           else:
             obclass = argv.pop(0)
             if obclass == 'events':
+              table = I.folder_table
               I.load_folders()
-              all_names = I.event_names()
-              if argv:
-                edit_lines = set()
-                for arg in argv:
-                  # TODO: select by regexp if /blah
-                  if arg.startswith('/'):
-                    regexp = re.compile(arg[1:-1] if arg.endswith('/') else arg[1:])
-                    edit_lines.update(event.edit_string
-                                      for event in I.events()
-                                      if regexp.search(event.name))
-                  elif '*' in arg or '?' in arg:
-                    edit_lines.update(event.edit_string
-                                      for event in I.events()
-                                      if fnmatch(event.name, arg))
-                  elif arg in all_names:
-                    for event in I.events():
-                      if event.name == arg:
-                        edit_lines.add(event.edit_string)
-                  else:
-                    warning("unknown event name: %s", arg)
-                    badopts = True
-              else:
-                edit_lines = set(event.edit_string for event in I.events())
-              if not badopts:
-                changes = edit_strings(sorted(edit_lines,
-                                              key=lambda _: _.split(':', 1)[1]),
-                                       errors=lambda msg: warning(msg + ', discarded')
-                                      )
-                for old_string, new_string in changes:
-                  with Pfx("%s => %s", old_string, new_string):
-                    old_modelId, old_name = old_string.split(':', 1)
-                    old_modelId = int(old_modelId)
-                    try:
-                      new_modelId, new_name = new_string.split(':', 1)
-                      new_modelId = int(new_modelId)
-                    except ValueError as e:
-                      error("invalid edited string: %s", e)
-                      xit = 1
-                    else:
-                      if old_modelId != new_modelId:
-                        error("modelId changed")
-                        xit = 1
-                      else:
-                        print("%d: %s => %s" % (old_modelId, old_name, new_name))
-                        I.folder_table[old_modelId].name = new_name
+              get_items = I.events
+            elif obclass == 'keywords':
+              table = I.keyword_table
+              I.load_keywords()
+              get_items = I.read_keywords
+            elif obclass == 'people':
+              table = I.person_table
+              I.load_persons()
+              get_items = I.persons
             else:
               warning("known class %r", obclass)
               badopts = True
+            all_names = set(item.name for item in get_items())
+            if argv:
+              edit_lines = set()
+              for arg in argv:
+                # TODO: select by regexp if /blah
+                if arg.startswith('/'):
+                  regexp = re.compile(arg[1:-1] if arg.endswith('/') else arg[1:])
+                  edit_lines.update(item.edit_string
+                                    for item in get_items()
+                                    if regexp.search(item.name))
+                elif '*' in arg or '?' in arg:
+                  edit_lines.update(item.edit_string
+                                    for item in get_items()
+                                    if fnmatch(item.name, arg))
+                elif arg in all_names:
+                  for item in get_items():
+                    if item.name == arg:
+                      edit_lines.add(item.edit_string)
+                else:
+                  warning("unknown item name: %s", arg)
+                  badopts = True
+            else:
+              edit_lines = set(item.edit_string for item in get_items())
+            if not badopts:
+              changes = edit_strings(sorted(edit_lines,
+                                            key=lambda _: _.split(':', 1)[1]),
+                                     errors=lambda msg: warning(msg + ', discarded')
+                                    )
+              for old_string, new_string in changes:
+                with Pfx("%s => %s", old_string, new_string):
+                  old_modelId, old_name = old_string.split(':', 1)
+                  old_modelId = int(old_modelId)
+                  try:
+                    new_modelId, new_name = new_string.split(':', 1)
+                    new_modelId = int(new_modelId)
+                  except ValueError as e:
+                    error("invalid edited string: %s", e)
+                    xit = 1
+                  else:
+                    if old_modelId != new_modelId:
+                      error("modelId changed")
+                      xit = 1
+                    elif new_name in all_names:
+                      if obclass == 'keywords':
+                        # TODO: merge keywords
+                        print("%d: merge %s => %s" % (old_modelId, old_name, new_name))
+                        otherModelId = the(item.modelId
+                                           for item in get_items()
+                                           if item.name == new_name)
+                        I.replace_keywords(old_modelId, otherModelId)
+                        I.expunge_keyword(old_modelId)
+                      else:
+                        error("new name already in use: %r", new_name)
+                        xit = 1
+                    else:
+                      print("%d: %s => %s" % (old_modelId, old_name, new_name))
+                      table[old_modelId].name = new_name
         elif op == 'select':
           if not argv:
             warning("missing selectors")
@@ -595,6 +618,24 @@ class iPhoto(O):
     kwids = self.kw4v_keyword_ids_by_version_id.get(version_id, ())
     return [ self.keyword(kwid) for kwid in kwids ]
 
+  def replace_keywords(self, old_keyword_id, new_keyword_id):
+    ''' Update image tags to replace one keyword with another.
+    '''
+    self \
+      .table_by_nickname['keywordForVersion'] \
+      . update_by_column('keywordId', new_keyword_id,
+                         'keywordId', old_keyword_id)
+
+  def expunge_keyword(self, keyword_id):
+    ''' Remove the specified keyword.
+    '''
+    self \
+      .table_by_nickname['keywordForVersion'] \
+      .delete_by_column('keywordId', keyword_id)
+    self \
+      .table_by_nickname['keyword'] \
+      .delete_by_column('modelId', keyword_id)
+
   def parse_selector(self, selection):
     with Pfx(selection):
       selection0 = selection
@@ -782,7 +823,16 @@ class iPhotoTable(object):
     sql = 'update %s set %s=? where %s %s ?' % (self.table_name, upd_column, sel_column, sel_op)
     sqlargs = (upd_value, sel_value)
     C = self.conn.cursor()
-    debug("SQL: %s %r", sql, sqlargs)
+    info("SQL: %s %r", sql, sqlargs)
+    C.execute(sql, sqlargs)
+    self.conn.commit()
+    C.close()
+
+  def delete_by_column(self, sel_column, sel_value, sel_op='='):
+    sql = 'delete from %s where %s %s ?' % (self.table_name, sel_column, sel_op)
+    sqlargs = (sel_value,)
+    C = self.conn.cursor()
+    info("SQL: %s %r", sql, sqlargs)
     C.execute(sql, sqlargs)
     self.conn.commit()
     C.close()
@@ -796,7 +846,13 @@ class iPhotoTable(object):
     for row in self.select_by_column():
       yield self._Row(row)
 
-class Master_Mixin(object):
+class _Named_Mixin(object):
+
+  @property
+  def edit_string(self):
+    return "%d:%s" % (self.modelId, self.name)
+
+class Master_Mixin(_Named_Mixin):
 
   @property
   def pathname(self):
@@ -887,7 +943,7 @@ class Master_Mixin(object):
   def format(self):
     return self.image_info.format
 
-class Version_Mixin(object):
+class Version_Mixin(_Named_Mixin):
 
   @property
   def master(self):
@@ -907,13 +963,10 @@ class Version_Mixin(object):
   def keyword_names(self):
     return [ kw.name for kw in self.keywords ]
 
-class Folder_Mixin(object):
+class Folder_Mixin(_Named_Mixin):
+  pass
 
-  @property
-  def edit_string(self):
-    return "%d:%s" % (self.modelId, self.name)
-
-class Keyword_Mixin(object):
+class Keyword_Mixin(_Named_Mixin):
 
   def versions(self):
     ''' Return the versions with this keyword.
@@ -936,13 +989,13 @@ class Keyword_Mixin(object):
     '''
     return set(master.latest_version for master in self.masters())
 
-class Person_Mixin(object):
+class Person_Mixin(_Named_Mixin):
 
   @locked_property
   def vfaces(self):
     return set()
 
-class VFace_Mixin(object):
+class VFace_Mixin(_Named_Mixin):
 
   @property
   def master(self):
