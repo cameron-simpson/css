@@ -18,7 +18,7 @@
 
 set -ue
 
-: ${MP3_RETAG_OPTS:='-/ --artist'}
+: ${MP3_RETAG_OPTS:='-/ artist--'}
 
 cmd=$( basename "$0" )
 usage="Usage: $cmd [-/ {artist{sep}|{sep}artist}] [-T re_artist re_songname] mp3files...
