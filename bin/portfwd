@@ -9,7 +9,7 @@ set -ue
 : ${VARRUN:=$HOME/var/run}
 : ${LOGDIR:=$HOME/var/log}
 : ${PORTFWD_CONFIG:=$HOME/rc/ssh/portfwd}
-: ${PORTFWD_SSH_CONFIG:=$HOME/.ssh/config-pf}
+: ${PORTFWD_SSH_CONFIG:=''}
 : ${USER:=`id -un`}
 
 trace=set-x
@@ -39,7 +39,8 @@ usage="Usage:
   $cmd [-1] [-F ssh_config] targets...
   -1    Once. Do not restart the tunnel if it dies.
   -F    Ssh configuration file with clause for target.
-        Default from \$PORTFWD_SSH_CONFIG: $sshcfg
+        Default from \$PORTFWD_SSH_CONFIG,
+        otherwise ~/.ssh/config-pf, otherwise ~/.ssh/config.
   -n    No action. Recite final command.
   -P pfname
         Require the named portfwd instance to have its CONNECTED
@@ -76,6 +77,25 @@ do
   esac
   shift
 done
+
+if [ -z "$sshcfg" ]
+then
+  for f in "$PORTFWD_SSH_CONFIG" \
+           "$HOME/rc/ssh/config-pf" \
+           "$HOME/rc/ssh/config"
+  do
+    [ -s "$f" ] && { sshcfg=$f; break; }
+  done
+  [ -n "$sshcfg" ] || { echo "$cmd: no ssh config found" >&2; badopts=1; }
+else
+  if [ ! -f "$sshcfg" ]
+  then
+    echo "$cmd: ssh config is not a file: $sshcfg" >&2
+    badopts=1
+  fi
+fi
+# prevent subsequent errors from missing ssh config
+[ -f "$sshcfg" ] || sshcfg=/dev/null
 
 if [ -z "$setflag" ]
 then
