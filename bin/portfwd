@@ -56,6 +56,7 @@ the group name appended. Example: \"Host home ALL\""
 setflag=
 opts=
 badopts=
+badtargets=
 
 while [ $# -gt 0 ]
 do
@@ -80,11 +81,12 @@ done
 
 if [ -z "$sshcfg" ]
 then
+  # look for an ssh config
   for f in "$PORTFWD_SSH_CONFIG" \
            "$HOME/rc/ssh/config-pf" \
            "$HOME/rc/ssh/config"
   do
-    [ -s "$f" ] && { sshcfg=$f; break; }
+    [ -n "$f" ] && [ -s "$f" ] && { sshcfg=$f; break; }
   done
   [ -n "$sshcfg" ] || { echo "$cmd: no ssh config found" >&2; badopts=1; }
 else
@@ -94,17 +96,14 @@ else
     badopts=1
   fi
 fi
-# prevent subsequent errors from missing ssh config
-[ -f "$sshcfg" ] || sshcfg=/dev/null
+[ -f "$sshcfg" ] || sshcfg=
 
 if [ -z "$setflag" ]
 then
   if [ $# = 0 ]
   then
     echo "$cmd: no targets supplied" >&2
-    sed -n 's/^ *[Hh][Oo][Ss][Tt][ 	][ 	]*/  /p' "$sshcfg" >&2
-    echo >&2
-    badopts=1
+    badtargets=1
   fi
 fi
 
@@ -128,28 +127,52 @@ group_members()
 }
 
 # transmute group names into hosts
-first=1
-for target
-do
-  [ $first ] && { set --; first=; }
-  case "$target" in
-    [A-Z]*)
-      # match all targets with the uppercase label
-      gtargets=$(group_members "$target")
-      if [ -z "$gtargets" ]
-      then
-        echo "$cmd: group \"$target\" does not match any Hosts in $sshcfg" >&2
-        sed -n 's/^ *[Hh][Oo][Ss][Tt][ 	][ 	]*/  /p' "$sshcfg" >&2
-        echo >&2
-        badopts=1
-      else
-        set -- ${1+"$@"} $gtargets
-      fi
-      ;;
-    *)set -- ${1+"$@"} "$target"
-      ;;
-  esac
-done
+if [ -n "$sshcfg" ]
+then
+  first=1
+  for target
+  do
+    [ $first ] && { set --; first=; }
+    case "$target" in
+      [A-Z]*)
+        # match all targets with the uppercase label
+        gtargets=$(group_members "$target")
+        if [ -z "$gtargets" ]
+        then
+          echo "$cmd: group \"$target\" does not match any Hosts in $sshcfg" >&2
+          badtargets=1
+        else
+          set -- ${1+"$@"} $gtargets
+        fi
+        ;;
+      *)if sed 'y/	/ /; s/.*/ & /' -- "$sshcfg" \
+           | grep "^ *[Hh][Oo][Ss][Tt]  *$target " >/dev/null
+        then
+          set -- ${1+"$@"} "$target"
+        else
+          echo "$cmd: no Host clause for \"$target\" in $sshcfg" >&2
+          badtargets=1
+        fi
+        ;;
+    esac
+  done
+fi
+
+if [ $badtargets ]
+then
+  if [ -n "$sshcfg" ]
+  then
+    echo "$cmd: host lines from $sshcfg:"  >&2
+    sed -n 's/^ *[Hh][Oo][Ss][Tt][ 	][ 	]*/  /p' "$sshcfg" \
+    | tr '\011 ' '\012\012' \
+    | grep '^[^*][^*]*$' \
+    | sort -uf \
+    | fmt \
+    | sed 's/^/  /' \
+    >&2
+  fi
+  badopts=1
+fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
