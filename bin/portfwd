@@ -145,7 +145,7 @@ then
           set -- ${1+"$@"} $gtargets
         fi
         ;;
-      *)if sed 'y/	/ /; s/.*/ & /' -- "$sshcfg" \
+      *)if sed 'y/	/ /; s/.*/ & /' "$sshcfg" \
            | grep "^ *[Hh][Oo][Ss][Tt]  *$target " >/dev/null
         then
           set -- ${1+"$@"} "$target"
