@@ -546,10 +546,13 @@ def make_files_property(attr_name=None, unset_object=None, poll_rate=DEFAULT_POL
     return property(getprop)
   return made_files_property
 
-@contextmanager
-def lockfile(path, ext=None, poll_interval=None, timeout=None):
-  ''' A context manager which takes and holds a lock file.
-      `path`: the base associated with the lock file.
+def makelockfile(path, ext=None, poll_interval=None, timeout=None):
+  ''' Create a lockfile and return its path.
+      The file can be removed with os.remove.
+      This is the core functionality supporting the lockfile()
+      context manager.
+      `path`: the base associated with the lock file, often the
+              filesystem object whose access is being managed.
       `ext`: the extension to the base used to construct the lock file name.
              Default: ".lock"
       `timeout`: maximum time to wait before failing,
@@ -604,6 +607,19 @@ def lockfile(path, ext=None, poll_interval=None, timeout=None):
     else:
       break
   os.close(lockfd)
+  return lockpath
+
+@contextmanager
+def lockfile(path, ext=None, poll_interval=None, timeout=None):
+  ''' A context manager which takes and holds a lock file.
+      `path`: the base associated with the lock file.
+      `ext`: the extension to the base used to construct the lock file name.
+             Default: ".lock"
+      `timeout`: maximum time to wait before failing,
+                 default None (wait forever).
+      `poll_interval`: polling frequency when timeout is not 0.
+  '''
+  lockpath = makelockfile(path, ext=ext, poll_interval=poll_interval, timeout=timeout)
   yield lockpath
   os.remove(lockpath)
 
