@@ -63,13 +63,12 @@ def encode_index_entry(n, offset):
   '''
   return put_bs(n) + put_bs(offset)
 
-def read_chunk(fp, offset, do_decompress=False):
+def read_chunk(fp, do_decompress=False):
   ''' Read a data chunk from a file at its current offset. Return (flags, chunk, post_offset).
       If do_decompress is true and flags&F_COMPRESSED, strip that
       flag and decompress the data before return.
       Raises EOFError on premature end of file.
   '''
-  fp = self.fp
   flags = read_bs(fp)
   if (flags & ~F_COMPRESSED) != 0:
     raise ValueError("flags other than F_COMPRESSED: 0x%02x" % ((flags & ~F_COMPRESSED),))
