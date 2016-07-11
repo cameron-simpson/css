@@ -187,108 +187,255 @@ class _DataDirFile(SimpleNamespace):
     return id(self)
 
 class DataDir(MultiOpenMixin):
-  ''' A class for managing a directory of DataFiles. An instance
-      of this may be shared between different DataDirMaps.
+  ''' Maintenance of a collection of DataFiles in a directory.
+      NB: _not_ thread safe; callers must arrange that.
+      The directory may be maintained by multiple instances of this
+      class as they will not try to add data to the same DataFile.
+      This is intended to address shared Stores such as a Store on
+      a NAS or a Store replicated by an external file-level service
+      such as Dropbox or plain old rsync.
 
-      A DataDir directory contains DataFiles named n.vtd where n
-      is an nonnegative integer.
+      Note that this is _not_ a mapping that can be used as the
+      basis of a Store.
   '''
 
-  def __init__(self, dirpath, rollover=None):
-    ''' Initialise this DataDir with the directory path `dirpath` and the optional DataFile rollover size `rollover`.
+  STATE_FILENAME = 'index-state.csv'
+  INDEX_FILENAME_FORMAT = 'index-%s.%s'
+
+  def __init__(self, statedirpath, datadirpath, hashclass, indexclass, rollover=None):
+    ''' Initialise the DataDir with `statedirpath` and `datadirpath`.
+        `statedirpath`: a directory containing state information
+          about the DataFiles; this is the index-state.csv file and
+          the associated index dbm-ish files.
+        `datadirpath`: the directory containing the DataFiles.
+          If this is shared by other clients then it should be
+          different from the `statedirpath`.
+        `hashclass`: the hash class used to index chunk contents.
+        `indexclass`: the IndexClass providing the index to chunks
+          in the DataFiles.
+        `rollover`: data file roll over size; if a data file grows
+            beyond this a new datafile is commenced for new blocks.
     '''
     if rollover is None:
       rollover = DEFAULT_ROLLOVER
     elif rollover < 1024:
       raise ValueError("rollover < 1024 (a more normal size would be in megabytes or gigabytes): %r" % (rollover,))
+    self.statedirpath = statedirpath
+    self.datadirpath = datadirpath
+    self.hashclass = hashclass
+    self.indexclass = indexclass
+    self.rollover = rollover
+    self._filemap = {}
+    self._extra_state = {}
+    self._load_state()
     MultiOpenMixin.__init__(self)
-    self.dirpath = dirpath
-    self._rollover = rollover
-    # cache of open DataFiles
-    self._datafile_cache = LRU_Cache(maxsize=4,
-                                     on_remove=lambda k, datafile: datafile.close())
-    # current append DataFile for new data
-    current = self._datafile_indices()
-    self.n = current[0] if current else 0
 
-  def __str__(self):
-    return "%s(rollover=%s)" % (self.__class__.__name__, self._rollover)
+  def __repr__(self):
+    return ( '%s(statedirpath=%r,datadirpath=%r,hashclass=%s,indexclass=%s,rollover=%d)'
+             % (self.__class__.__name__,
+                self.statedirpath,
+                self.datadirpath,
+                self.hashclass.HASHNAME,
+                self.indexclass.
+                self.rollover)
+           )
+
+  def spec(self):
+    ''' Return a datadir_spec for this DataDirMapping.
+    '''
+    return ':'.join( (self.indexclass.INDEXNAME,
+                      self.hashclass.HASHNAME,
+                      str(self.statedirpath),
+                      str(self.datadirpath)) )
+
+  __str__ = spec
 
   def startup(self):
-    pass
+    # mapping of file numerals to DataFile pathnames
+    self._n = None
+    # cache of open DataFiles
+    self._cache = LRU_Cache(maxsize=4,
+                            on_remove=lambda k, datafile: datafile.close())
+    self.lockpath = makelockfile(self.statefilepath)
+    self.index = self.indexclass(self.indexpath, self.hashclass)
+    self.index.open()
+    # set up indexing thread
+    # map individual hashcodes to locations before being persistently stored
+    self._unindexed = {}
+    self._indexQ = IterableQueue()
+    T = self._index_Thread = Thread(name="%s-index-thread" % (self,),
+                                    target=self._index_updater)
+    T.start()
+    for filenum, F in self._filemap.items():
+      self._update_datafile(F)
 
   def shutdown(self):
-    ''' Called on final close of the DataDir.
-        Close and release any open indices.
-        Close any open datafiles.
-    '''
-    self.flush()
+    self._save_state()
+    self._cache.flush()
+    del self._cache
+    del self._filemap
+    # drain index update queue
+    self._indexQ.close()
+    self._index_Thread.join()
+    if self._unindexed:
+      error("UNINDEXED BLOCKS: %r", self._unindexed)
+    self.index.close()
+    # release lockfile
+    os.remove(self.lockpath)
+    del self.lockpath
 
-  def flush(self):
-    ''' Flush all the open datafiles.
-    '''
-    with self._lock:
-      self._datafile_cache.flush()
+  def localpathto(self, rpath):
+    return joinpath(self.statedirpath, rpath)
 
-  def pathto(self, rpath):
-    ''' Return a pathname within the DataDir given `rpath`, a path
-        relative to the DataDir.
-    '''
-    return os.path.join(self.dirpath, rpath)
-
-  def datafile(self, n):
-    ''' Obtain the Datafile with index `n`.
-    '''
-    datafiles = self._datafile_cache
-    with self._lock:
-      D = datafiles.get(n)
-      if D is None:
-        D = datafiles[n] = DataFile(self.pathto(self.datafilename(n)))
-        D.open()
-    return D
-
-  def datafilename(self, n):
-    ''' Return the file basename for file index `n`.
-    '''
-    return str(n) + '.vtd'
-
-  def _datafile_indices(self):
-    ''' Return the indices of datafiles present.
-    '''
-    indices = []
-    for name in os.listdir(self.dirpath):
-      if name.endswith('.vtd'):
-        prefix = name[:-4]
-        if prefix.isdigit():
-          n = int(prefix)
-          if str(n) == prefix:
-            if os.path.isfile(self.pathto(name)):
-              indices.append(n)
-    return indices
-
-  def next_n(self):
-    ''' Compute an available index for the next data file.
-    '''
-    ns = self._datafile_indices()
-    return max(ns)+1 if ns else 0
+  def datapathto(self, rpath):
+    return joinpath(self.datadirpath, rpath)
 
   @property
-  def datafile_paths(self):
-    ''' A list of the current datafile pathnames.
-    '''
-    return [ self.pathto(self.datafilename(n)) for n in self._datafile_indices() ]
+  def statefilepath(self):
+    return self.localpathto(self.STATE_FILENAME)
 
-  def scan(self, indices=None):
-    ''' Generator which scans the specified datafiles (or all if `indices` is missing or None).
-        Yields (n, offset, data) for each data chunk.
+  @property
+  def indexpath(self):
+    return self.localpathto(self.INDEX_FILENAME_FORMAT
+                            % (self.hashclass.HASHNAME,
+                               self.indexclass.SUFFIX))
+
+  def _queue_index(self, hashcode, n, offset):
+    self._unindexed[hashcode] = n, offset
+    self._indexQ.put( (hashcode, n, offset) )
+
+  def _index_updater(self):
+    ''' Thread body to collect hashcode index data and store it.
     '''
-    if indices is None:
-      indices = self._datafile_indices()
-    for dfn in indices:
-      with Pfx("scan %d", dfn):
-        D = self.datafile(dfn)
-        for offset, flags, data in D.scan(do_decompress=True):
-          yield dfn, offset, data
+    with Pfx("_index_updater"):
+      index = self.index
+      unindexed = self._unindexed
+      for hashcode, n, offset in self._indexQ:
+        index[hashcode] = n, offset
+        del unindexed[hashcode]
+
+  def _load_state(self):
+    ''' Read STATE_FILENAME.
+    '''
+    statefilepath = self.statefilepath
+    os.system('sed "s/^/IN  /" %r' % (statefilepath,))
+    filemap = self._filemap
+    with Pfx('_load_state(%r)', statefilepath):
+      if existspath(statefilepath):
+        with open(statefilepath, 'r') as fp:
+          extras = self._extra_state
+          for lineno, row in enumerate(csv_reader(fp), 1):
+            with Pfx("%d", lineno):
+              col1 = row[0]
+              with Pfx(col1):
+                try:
+                  filenum = int(col1)
+                except ValueError:
+                  _, col2 = row
+                  with Pfx("%s=%r", col1, col2):
+                    if col1 == 'datadir':
+                      datadirpath = longpath(col2)
+                      if self.datadirpath is None:
+                        self.datadirpath = datadirpath
+                      elif not samefile(datadirpath, self.datadirpath):
+                        warning("not the same directory as supplied self.datadirpath=%r, will be updated",
+                                self.datadirpath)
+                    elif col1 == 'current':
+                      self._n = int(col2)
+                    else:
+                      warning("unrecognised parameter")
+                      extras[col1] = col2
+                else:
+                  _, filename, size = row
+                  size = int(size)
+                  F = _DataDirFile(filenum=filenum, filename=filename, size=size)
+                  if filenum in filemap:
+                    raise KeyError('already in filemap: %r' % (filenum,))
+                  if filename in filemap:
+                    raise KeyError('already in filemap: %r' % (filename,))
+                  filemap[filenum] = F
+                  filemap[filename] = F
+                  X("IN   filemap[%r] = filemap[%r] = F", filenum, filename)
+    X("IN  id(filemap) = %s", id(filemap))
+
+  def _save_state(self):
+    ''' Rewrite STATE_FILENAME.
+    '''
+    statefilepath = self.statefilepath
+    with Pfx("_save_state(%r)", statefilepath):
+      with open(statefilepath, 'w') as fp:
+        csvw = csv.writer(fp)
+        csvw.writerow( ('datadir', shortpath(self.datadirpath)) )
+        if self._n is not None:
+          csvw.writerow( ('current', self._n) )
+        extras = self._extra_state
+        for k in sorted(extras.keys()):
+          csvw.writerow( (k, extras[k]) )
+        filemap = self._filemap
+        for F in set(filemap.values()):
+          csvw.writerow( (F.filenum, F.filename, F.size) )
+    os.system('sed "s/^/OUT /" %r' % (statefilepath,))
+
+  def _add_datafile(self, filename):
+    ''' Add the datafile with basename `filename` to the filemap.
+    '''
+    filemap = self._filemap
+    if filename in filemap:
+      raise KeyError('already in filemap: %r' % (filename,))
+    filenum = max([0] + list(filemap.keys())) + 1
+    F = _DataDirFile(filenum=filenum, filename=filename, size=0)
+    filemap[filenum] = F
+    return F
+
+  def _new_datafile(self):
+    ''' Create a new datafile and return its record.
+    '''
+    filename = str(uuid4()) + '.vtd'
+    DataFile(self.datapathto(filename), readwrite=True, do_create=True)
+    F = self._add_datafile(filename)
+    return F
+
+  def _update_datafile(self, F):
+    ''' Update the datafile record `F`.
+    '''
+    datafilepath = self.datapathto(F.filename)
+    S = os.stat(datafilepath)
+    if S.st_size < F.size:
+      warning("%s: shorter than expected (%d < %d)",
+              datafilepath, S.st_size, F.size)
+    elif S.st_size > F.size:
+      F.size = self._scan_datafile_from(self[F.filenum], F.size)
+
+  def _current_output_datafile(self):
+    ''' Return the number and DataFile of the current datafile,
+        opening one if necessary.
+    '''
+    n = self._n
+    if n is None:
+      F = self._new_datafile()
+      n = self._n = F.filenum
+    D = self._open_datafile(n)
+    return n, D
+
+  def _open_datafile(self, n):
+    ''' Return the DataFile with index `n`.
+    '''
+    cache = self._cache
+    D = cache.get(n)
+    if D is None:
+      # not in the cache, open it
+      X("open new DataFile[%d], id(self._filemap) = %s", n, id(self._filemap))
+      F = self._filemap[n]
+      readwrite = (n == self._n)
+      X("open Datafile[%d]: filename=%r, readwrite=%s", n, F.filename, readwrite)
+      D = cache[n] = DataFile(self.datapathto(F.filename), readwrite=readwrite)
+      D.open()
+    return D
+
+  @locked
+  def flush(self):
+    self.datadir.flush()
+    self.index.flush()
 
   def add(self, data):
     ''' Add the supplied data chunk to the current DataFile, return (n, offset).
@@ -296,110 +443,76 @@ class DataDir(MultiOpenMixin):
         datafile has reached the rollover threshold.
     '''
     # save the data in the current datafile, record the file number and offset
-    n = self.n
-    D = self.datafile(n)
+    n, D = self._current_output_datafile()
     with D:
-      offset = D.put(data)
-    rollover = self._rollover
-    if rollover is not None and offset >= rollover:
+      offset, offset2 = D.add(data)
+    hashcode = self.hashclass.from_data(data)
+    self._queue_index(hashcode, n, offset)
+    rollover = self.rollover
+    if rollover is not None and offset2 >= rollover:
       with self._lock:
         # we're still the current file? then advance to a new file
         if self.n == n:
           self.n = self.next_n()
+    F = self._filemap[n]
+    if offset2 <= F.size:
+      raise RuntimeError("%s: offset2(%d) after adding chunk <= F.size(%d)"
+                         % (F.filename, offset2, F.size))
+    F.size = offset2
     return n, offset
 
-  def get(self, n, offset):
-    return self.datafile(n).get(offset)
-
-class DataDirMapping(MultiOpenMixin, HashCodeUtilsMixin):
-  ''' Access to a DataDir as a mapping by using a hashtype specific dbm index.
-  '''
-
-  def __init__(self, dirpath, hashclass, indexclass=None, rollover=None):
-    ''' Initialise this DataDirMapping.
-        `dirpath`: if a str the path to the DataDir, otherwise an existing DataDir
-        `hashclass`: the hashclass for operations
-        `indexclass`: class implementing the dbm, initialised with the path
-                      to the dbm file; if this is a str it will be looked up
-                      in INDEXCLASS_BY_NAME
-        `rollover`: if `dirpath` is a str, this is passed in to the DataDir constructor
-        The indexclass is normally a mapping wrapper for some kind of DBM
-        file stored in the DataDir.
+  def fetch(self, n, offset):
+    ''' Return the data chunk stored in DataFile `n` at `offset`.
     '''
-    global INDEXCLASS_BY_NAME
-    if isinstance(dirpath, str):
-      datadir = DataDir(dirpath, rollover=rollover)
-    else:
-      if rollover is not None:
-        raise ValueError("rollover may not be supplied unless dirpath is a str: %r, rollover=%r" % (dirpath, rollover))
-      datadir = dirpath
-    if indexclass is None:
-      indexclass = GDBMIndex
-    elif isinstance(indexclass, str):
-      indexclass = INDEXCLASS_BY_NAME[indexclass]
-    self.hashclass = hashclass
-    # we will use the same lock as the underlying DataDir
-    MultiOpenMixin.__init__(self, lock=datadir._lock)
-    self.datadir = datadir
-    self.indexclass = indexclass
-    # map individual hashcodes to locations before being persistently stored
-    self._unindexed = {}
-    self._indexQ = IterableQueue()
-    T = self._index_Thread = Thread(name="%s-index-thread" % (self,),
-                                    target=self._update_index)
-    T.start()
+    return self._open_datafile(n).fetch(offset)
 
-  def spec(self):
-    ''' Return a datadir_spec for this DataDirMapping.
+  def _scan_datafile_from(self, F, start):
+    pathname = self.datapathto(F.filename)
+    with Pfx("_scan_datafile_from(%r)", pathname):
+      S = os.stat(pathname)
+      if S.st_size > start:
+        hashclass = self.hashclass
+        with DataDir(self.datapathto(F.filename)) as D:
+          offset2 = start
+          for offset, flags, data, offset2 in D.scan(offset=start, do_decompress=True):
+            hashcode = self.hashclass.from_bytes(data)
+            self._queue_index(hashcode, n, offset)
+          if offset2 > F.size:
+            F.size = offset2
+
+  def updates(self, from_start=False, save_update=False):
+    ''' Scan all the datafiles and yield new data as:
+          filenum, filename, flags, data, offset, offset2
+        being the file index, the filename, flags and data of the
+        chunk, offset of the start of the chunk, offset2 the offset
+        after the chunk.
     '''
-    return ':'.join( (self.indexclass.indexname,
-                      self.hashclass.HASHNAME,
-                      self.dirpath) )
-
-  __str__ = spec
+    raise RuntimeError("REALLY? UPDATES?")
+    for filenum, filename, size in self.datafiles:
+      with Pfx("updates[%d:%r]", filenum, filename):
+        S = os.stat(filename)
+        endsize = S.st_size
+        if from_start:
+          size = 0
+        if endsize < size:
+          warning("st_size(%d) < size", endsize, size)
+        else:
+          offset = size
+          with open(filename, "rb") as fp:
+            while size < endsize:
+              flags, data, offset2 = read_chunk(fp, offset, do_decompress=True)
+              yield filenum, filename, flags, data, offset, offset2
+              offset = offset2
+          if save_update:
+            self.datafiles.update_size(filenum, offset)
 
   def __len__(self):
     return len(self._default_index)
-
-  def startup(self):
-    self.datadir.open()
-    hashclass = self.hashclass
-    hashname = hashclass.HASHNAME
-    indexpath = self.datadir.localpathto('index-' + hashname + '.' + suffix)
-    index = indexclass(indexpath, hashclass, lock=self._lock)
-    index.open()
-    self.index = index
-
-  def shutdown(self):
-    with self._lock:
-      # shut down new pending index updates and wait for them to be applied
-      self._indexQ.close()
-      self._index_Thread.join()
-      if self._unindexed:
-        error("UNINDEXED BLOCKS: %r", self._unindexed)
-    self.index.close()
-    self.datadir.close()
 
   def hashcodes_from(self, start_hashcode=None, reverse=False):
     return self.index.hashcodes_from(hashclass=self.hashclass,
                                      start_hashcode=start_hashcode,
                                      reverse=reverse)
-
-  @property
-  def dirpath(self):
-    return self.datadir.dirpath
-
-  # TODO: turn into "ingest" function wrapper?
-  def update(self, from_start=False):
-    ''' Rescan all the data files, update the index with new content.
-    '''
-    hashclass = self.hashclass
-    I = self.index
-    for n, filename, flags, data, offset, offset2 \
-        in self.datadir.updates(from_start=from_start, save_update=True):
-      hashcode = hashclass.from_data(data)
-      if hashcode not in I:
-        I[hashcode] = n, offset
 
   # without this "in" tries to iterate over the mapping with int indices
   def __contains__(self, hashcode):
@@ -419,7 +532,7 @@ class DataDirMapping(MultiOpenMixin, HashCodeUtilsMixin):
         error("%s[%s]: hash not in index", self, hashcode)
         raise
     try:
-      return self.datadir.get(n, offset)
+      return self.fetch(n, offset)
     except Exception as e:
       exception("%s[%s]:%d:%d not available: %s", self, hashcode, n, offset, e)
       raise KeyError(str(hashcode))
@@ -441,33 +554,7 @@ class DataDirMapping(MultiOpenMixin, HashCodeUtilsMixin):
         elif hashcode in index:
           pass
         else:
-          n, offset = self.datadir.add(data)
-          # cache the location
-          unindexed[hashcode] = n, offset
-          # queue the location for persistent storage
-          self._indexQ.put( (index, hashcode, n, offset) )
-
-  def _update_index(self):
-    ''' Thread body to collect hashcode index data and store it.
-    '''
-    with Pfx("_update_index"):
-      unindexed = self._unindexed
-      for index, hashcode, n, offset in self._indexQ:
-        index[hashcode] = n, offset
-        del unindexed[hashcode]
-
-  def add(self, data):
-    ''' Add a data chunk. Return the hashcode.
-    '''
-    hashclass = self.hashclass
-    h = hashclass.from_data(data)
-    self[h] = data
-    return h
-
-  @locked
-  def flush(self):
-    self.datadir.flush()
-    self.index.flush()
+          n, offset = self.add(data)
 
   def first(self, hashclass=None):
     ''' Return the first hashcode in the database or None if empty.
