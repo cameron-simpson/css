@@ -6,13 +6,21 @@
 
 import sys
 from collections import namedtuple
+from collections.abc import Mapping
 import os
 from os import SEEK_SET, SEEK_END
-import os.path
+from os.path import join as joinpath, samefile, exists as existspath
+import errno
+import csv
+from subprocess import Popen, PIPE
 from threading import Lock, RLock, Thread
+from types import SimpleNamespace
+from uuid import uuid4
 from zlib import compress, decompress
 from cs.cache import LRU_Cache
+from cs.csvutils import csv_reader, csv_writerow
 from cs.excutils import LogExceptions
+from cs.fileutils import makelockfile, shortpath, longpath
 from cs.logutils import D, X, XP, debug, warning, error, exception, Pfx
 from cs.obj import O
 from cs.queues import IterableQueue
