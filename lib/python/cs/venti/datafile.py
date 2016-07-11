@@ -101,31 +101,47 @@ class DataFile(MultiOpenMixin):
       This is the usual file based persistence layer of a local venti Store.
   '''
 
-  def __init__(self, pathname):
-    MultiOpenMixin.__init__(self)
+  def __init__(self, pathname, do_create=False, readwrite=False, lock=None):
+    MultiOpenMixin.__init__(self, lock=lock)
     self.pathname = pathname
+    self.readwrite = readwrite
+    if do_create and not readwrite:
+      raise ValueError("do_create=true requires readwrite=true")
     self.appending = False
+    if do_create:
+      fd = os.open(pathname, os.O_CREAT|os.O_EXCL|os.O_RDWR)
+      os.close(fd)
+    X("%s initialised", self)
 
   def __str__(self):
     return "DataFile(%s)" % (self.pathname,)
 
   def startup(self):
-    self.fp = open(self.pathname, "a+b")
+    self.fp = open(self.pathname, ( "a+b" if self.readwrite else "r+b" ))
 
   def shutdown(self):
-    if self.appending:
-      self.fp.flush()
+    self.flush()
     self.fp.close()
     self.fp = None
 
-  def scan(self, do_decompress=False):
-    ''' Scan the data file and yield (offset, flags, zdata) tuples.
-        If `do_decompress` is true, decompress the data and strip that flag value.
-        This can be used in parallel with other activity.
+  def flush(self):
+    with self._lock:
+      if self.appending:
+        self.fp.flush()
+
+  def scan(self, do_decompress=False, offset=None):
+    ''' Scan the data file and yield (offset, flags, zdata, offset2) tuples.
+        `offset` is the start of the chunk and `offset2` is the
+        offset at the end of the chunk.
+        If `do_decompress` is true, decompress the data and strip
+        that flag value.
+        This can be used in parallel with other activity, though
+        it may impact performance.
     '''
+    if offset is None:
+      offset = fp.tell()
     with self:
       fp = self.fp
-      offset = 0
       while True:
         with self._lock:
           if self.appending:
@@ -136,9 +152,10 @@ class DataFile(MultiOpenMixin):
             flags, data, offset = read_chunk(fp, do_decompress=do_decompress)
           except EOFError:
             break
-        yield offset, flags, data
+          offset2 = fp.tell()
+        yield offset, flags, data, offset2
 
-  def get(self, offset):
+  def fetch(self, offset):
     ''' Fetch data bytes from the supplied offset.
     '''
     fp = self.fp
@@ -147,14 +164,16 @@ class DataFile(MultiOpenMixin):
         fp.flush()
         self.appending = False
       fp.seek(offset, SEEK_SET)
-      flags, data, offset = read_chunk(fp, do_decompress=True)
+      flags, data, offset2 = read_chunk(fp, do_decompress=True)
     if flags:
       raise ValueError("unhandled flags: 0x%02x" % (flags,))
     return data
 
-  def put(self, data, no_compress=False):
-    ''' Append a chunk of data to the file, return the store offset.
+  def add(self, data, no_compress=False):
+    ''' Append a chunk of data to the file, return the store start and end offsets.
     '''
+    if not self.readwrite:
+      raise RuntimeError("%s: not readwrite" % (self,))
     fp = self.fp
     with self._lock:
       if not self.appending:
