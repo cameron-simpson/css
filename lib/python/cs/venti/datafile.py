@@ -81,8 +81,9 @@ def read_chunk(fp, do_decompress=False):
   return flags, data, offset
 
 def write_chunk(fp, data, no_compress=False):
-  ''' Write a data chunk to a file at the current position, return the starting offset.
+  ''' Write a data chunk to a file at the current position, return the starting and ending offsets.
       If not no_compress, try to compress the chunk.
+      Note: does _not_ call .flush().
   '''
   flags = 0
   if not no_compress:
@@ -93,7 +94,7 @@ def write_chunk(fp, data, no_compress=False):
     offset = fp.tell()
     fp.write(put_bs(flags))
     fp.write(put_bsdata(data))
-  return offset
+  return offset, fp.tell()
 
 class DataFile(MultiOpenMixin):
   ''' A cs.venti data file, storing data chunks in compressed form.
