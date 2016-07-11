@@ -98,7 +98,7 @@ def write_chunk(fp, data, no_compress=False):
 
 class DataFile(MultiOpenMixin):
   ''' A cs.venti data file, storing data chunks in compressed form.
-      This is the usual persistence layer of a local venti Store.
+      This is the usual file based persistence layer of a local venti Store.
   '''
 
   def __init__(self, pathname):
