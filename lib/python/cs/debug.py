@@ -384,6 +384,25 @@ class DummyMap(object):
     X("%s[%r] => %r", self, key, v)
     return v
 
+def openfiles(substr=None, pid=None):
+  ''' Run lsof(8) against process `pid` returning paths of open files whose paths contain `substr`.
+      `substr`: default substring to select by; default returns all paths.
+      `pid`: process to examine; default from os.getpid().
+  '''
+  if pid is None:
+    pid = os.getpid()
+  paths = []
+  P = Popen(['lsof', '-p', str(pid)], stdout=PIPE)
+  for lsof in P.stdout:
+    lsof = lsof.decode()
+    fields = lsof.split()
+    if len(fields) >= 9:
+      if fields[4] == 'REG':
+        if substr is None or substr in fields[8]:
+          paths.append(fields[8])
+  P.wait()
+  return paths
+
 class DebugShell(Cmd):
   ''' An interactive prompt for python statements, attached to /dev/tty by default.
   '''
