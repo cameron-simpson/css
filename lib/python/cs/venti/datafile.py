@@ -582,8 +582,8 @@ class GDBMIndex(HashCodeUtilsMixin, MultiOpenMixin):
   ''' GDBM index for a DataDir.
   '''
 
-  indexname = 'gdbm'
-  suffix = 'gdbm'
+  INDEXNAME = 'gdbm'
+  SUFFIX = 'gdbm'
 
   def __init__(self, gdbmpath, hashclass, lock=None):
     import dbm.gnu
@@ -612,9 +612,6 @@ class GDBMIndex(HashCodeUtilsMixin, MultiOpenMixin):
     ##X("GDBMIndex ADD %s (%r)", hashcode, value)
     self._gdbm[hashcode] = encode_index_entry(*value)
 
-def GDBMDataDirMapping(dirpath, rollover=None):
-  return DataDirMapping(dirpath, indexclass=GDBMIndex, rollover=rollover)
-
 class KyotoIndex(HashCodeUtilsMixin, MultiOpenMixin):
   ''' Kyoto Cabinet index for a DataDir.
       Notably this uses a B+ tree for the index and thus one can
@@ -622,8 +619,8 @@ class KyotoIndex(HashCodeUtilsMixin, MultiOpenMixin):
       the coming Store synchronisation processes.
   '''
 
-  indexname = 'kyoto'
-  suffix = 'kct'
+  INDEXNAME = 'kyoto'
+  SUFFIX = 'kct'
 
   def __init__(self, kyotopath, hashclass, lock=None):
     MultiOpenMixin.__init__(self, lock=lock)
@@ -701,9 +698,6 @@ class KyotoIndex(HashCodeUtilsMixin, MultiOpenMixin):
           yield self._hashclass.from_hashbytes(cursor.get_key())
     cursor.disable()
 
-def KyotoDataDirMapping(dirpath, rollover=None):
-  return DataDirMapping(dirpath, indexclass=KyotoIndex, rollover=rollover)
-
 INDEXCLASS_BY_NAME = {}
 
 def register_index(indexname, indexclass):
@@ -715,7 +709,12 @@ def register_index(indexname, indexclass):
   INDEXCLASS_BY_NAME[indexname] = indexclass
 
 register_index('gdbm', GDBMIndex)
-register_index('kyoto', KyotoIndex)
+try:
+    import kyotocabinet
+except ImportError:
+    pass
+else:
+    register_index('kyoto', KyotoIndex)
 
 DEFAULT_INDEXCLASS = GDBMIndex
 
