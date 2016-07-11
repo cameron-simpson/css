@@ -181,6 +181,11 @@ class DataFile(MultiOpenMixin):
         fp.seek(0, SEEK_END)
       return write_chunk(fp, data, no_compress=no_compress)
 
+class _DataDirFile(SimpleNamespace):
+
+  def __hash__(self):
+    return id(self)
+
 class DataDir(MultiOpenMixin):
   ''' A class for managing a directory of DataFiles. An instance
       of this may be shared between different DataDirMaps.
