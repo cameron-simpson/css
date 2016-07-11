@@ -718,48 +718,40 @@ else:
 
 DEFAULT_INDEXCLASS = GDBMIndex
 
-def DataDirMapping_from_spec(datadir_spec, **kw):
-  ''' Accept `datadir_spec` of the form [indextype:[hashname:]]/dirpath and return a DataDirMapping.
+def DataDir_from_spec(spec, indexclass=None, hashclass=None, rollover=None):
+  ''' Accept `spec` of the form:
+        [indextype:[hashname:]]/indexdir[:/dirpath][:rollover=n]
+      and return a DataDir.
   '''
-  global INDEXCLASS_BY_NAME, DEFAULT_HASHCLASS, HASHCLASS_BY_NAME
-  with Pfx(datadir_spec):
-    indexclass = None
-    hashname = None
-    # leading indextype
-    if not datadir_spec.startswith('/'):
-      indexname, datadir_spec = datadir_spec.split(':', 1)
-      try:
-        indexclass = INDEXCLASS_BY_NAME[indexname]
-      except KeyError:
-        raise ValueError("invalid indextype: %r (I know %r)"
-                         % (indexname,), sorted(INDEXCLASS_BY_NAME.keys()))
-    if not datadir_spec.startswith('/'):
-      hashname, datadir_spec = datadir_spec.split(':', 1)
-      try:
-        hashclass = HASHCLASS_BY_NAME[hashname]
-      except KeyError:
-        raise ValueError("invalid hashname: %r (I know %r)"
-                         % (hashname, sorted(HASHCLASS_BY_NAME.keys())))
-    else:
-      hashclass = DEFAULT_HASHCLASS
-      hashname = hashclass.HASHNAME
-    dirpath = datadir_spec
-    if not os.path.isdir(dirpath):
-      raise ValueError("not a directory: %r" % (dirpath,))
-    # no indextype yet? look for an index file
-    if indexclass is None:
-      found = False
-      for indexname, indexclass in INDEXCLASS_BY_NAME.items():
-        suffix = indexclass.suffix
-        indexfilename = DataDirMapping._indexfilename(hashname, suffix)
-        entries = list(os.listdir(dirpath))
-        if indexfilename in entries:
-          found = True
-          break
-        if not found:
+  global INDEXCLASS_BY_NAME, DEFAULT_INDEXCLASS
+  global HASHCLASS_BY_NAME, DEFAULT_HASHCLASS
+  indexdirpath = None
+  datadirpath = None
+  with Pfx(spec):
+    specpath = spec.split(os.pathsep)
+    for partnum, specpart in enumerate(specpath, 1):
+      with Pfx("%d:%r", partnum, specpart):
+        if indexclass is None:
+          if specpart in INDEXCLASS_BY_NAME:
+            indexclass = INDEXCLASS_BY_NAME[specpart]
+            continue
           indexclass = DEFAULT_INDEXCLASS
-          warning("no index file found, using %s (EMPTY)", indexclass)
-    return DataDirMapping(dirpath, indexclass=indexclass, **kw)
+        if hashclass is None:
+          if specpart in HASHCLASS_BY_NAME:
+            hashclass = HASHCLASS_BY_NAME[specpart]
+            continue
+        if indexdirpath is None:
+          indexdirpath = specpart
+          continue
+        if datadirpath is None:
+          datadirpath = specpart
+          continue
+        raise ValueError("unexpected part")
+  if indexclass is None:
+    indexclass = DEFAULT_INDEXCLASS
+  if hashclass is None:
+    hashclass = DEFAULT_HASHCLASS
+  return DataDir(indexdirpath, datadirpath, hashclass, indexclass, rollover=rollover)
 
 if __name__ == '__main__':
   import cs.venti.datafile_tests
