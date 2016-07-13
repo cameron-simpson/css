@@ -148,7 +148,8 @@ class TestDataDir(unittest.TestCase):
   def test002randomblocks(self):
     ''' Save random blocks, retrieve in random order.
     '''
-    with self.datadir as D:
+    D = self.datadir
+    with D:
       hashfunc = D.hashclass.from_data
       by_hash = {}
       by_data = {}
@@ -187,7 +188,7 @@ class TestDataDir(unittest.TestCase):
     # this is because the test framework normally does the outermost open/close
     # and therefore the datadir index lock is still sitting aroung
     D.close()
-    D = DataDir_from_spec(datadir_spec)
+    D = self.datadir = DataDir_from_spec(datadir_spec)
     self.assertEqual(datadir_spec, D.spec())
     D.open()
     # reopen the DataDir
