@@ -17,6 +17,8 @@ try:
 except ImportError:
   kyotocabinet = None
 from cs.debug import thread_dump
+import cs.logutils
+cs.logutils.X_via_tty = True
 from cs.logutils import X
 from cs.randutils import rand0, randblock
 from .datafile import DataFile, DataDir, DataDir_from_spec, \
