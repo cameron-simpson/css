@@ -198,11 +198,10 @@ class DataFile(MultiOpenMixin):
       return write_chunk(fp, data, no_compress=no_compress)
 
 class _DataDirFile(SimpleNamespace):
-
   def __hash__(self):
     return id(self)
 
-class DataDir(MultiOpenMixin):
+class DataDir(MultiOpenMixin, Mapping):
   ''' Maintenance of a collection of DataFiles in a directory.
       NB: _not_ thread safe; callers must arrange that.
       The directory may be maintained by multiple instances of this
@@ -211,8 +210,7 @@ class DataDir(MultiOpenMixin):
       a NAS or a Store replicated by an external file-level service
       such as Dropbox or plain old rsync.
 
-      Note that this is _not_ a mapping that can be used as the
-      basis of a Store.
+      A DataDir may be used as the Mapping for a MappingStore.
   '''
 
   STATE_FILENAME = 'index-state.csv'
@@ -527,9 +525,16 @@ class DataDir(MultiOpenMixin):
     return len(self._default_index)
 
   def hashcodes_from(self, start_hashcode=None, reverse=False):
-    return self.index.hashcodes_from(hashclass=self.hashclass,
-                                     start_hashcode=start_hashcode,
+    ''' Generator yielding the hashcodes from the database in order starting with optional `start_hashcode`.
+        `start_hashcode`: the first hashcode; if missing or None, iteration
+                          starts with the first key in the index
+        `reverse`: iterate backwards if true, otherwise forwards
+    '''
+    return self.index.hashcodes_from(start_hashcode=start_hashcode,
                                      reverse=reverse)
+
+  def __iter__(self):
+    return self.hashcodes_from()
 
   # without this "in" tries to iterate over the mapping with int indices
   def __contains__(self, hashcode):
@@ -554,25 +559,6 @@ class DataDir(MultiOpenMixin):
       exception("%s[%s]:%d:%d not available: %s", self, hashcode, n, offset, e)
       raise KeyError(str(hashcode))
 
-  def __setitem__(self, hashcode, data):
-    ''' Store the supplied `data` indexed by `hashcode`.
-        If the hashcode is already known, do not both storing the `data`.
-    '''
-    unindexed = self._unindexed
-    if hashcode in unindexed:
-      # already received
-      pass
-    else:
-      index = self.index
-      with self._lock:
-        # might have arrived outside the lock
-        if hashcode in unindexed:
-          pass
-        elif hashcode in index:
-          pass
-        else:
-          n, offset = self.add(data)
-
   def first(self, hashclass=None):
     ''' Return the first hashcode in the database or None if empty.
         `hashclass`: specify the hashcode type, default from defaults.S
@@ -584,16 +570,6 @@ class DataDir(MultiOpenMixin):
     except AttributeError:
       raise NotImplementedError("._index(%s) has no .first" % (hashclass,))
     return first_method()
-
-  def hashcodes_from(self, start_hashcode=None, reverse=False):
-    ''' Generator yielding the hashcodes from the database in order starting with optional `start_hashcode`.
-        `start_hashcode`: the first hashcode; if missing or None, iteration
-                          starts with the first key in the index
-        `reverse`: iterate backwards if true, otherwise forwards
-    '''
-    hashclass = self.hashclass
-    return self.index.hashcodes_from(start_hashcode=start_hashcode,
-                                     reverse=reverse)
 
 class GDBMIndex(HashCodeUtilsMixin, MultiOpenMixin):
   ''' GDBM index for a DataDir.
