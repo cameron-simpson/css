@@ -326,7 +326,8 @@ class DataDir(MultiOpenMixin):
     ''' Read STATE_FILENAME.
     '''
     statefilepath = self.statefilepath
-    os.system('sed "s/^/IN  /" %r' % (statefilepath,))
+    if existspath(statefilepath):
+      os.system('sed "s/^/IN  /" %r' % (statefilepath,))
     filemap = self._filemap
     with Pfx('_load_state(%r)', statefilepath):
       if existspath(statefilepath):
