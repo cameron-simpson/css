@@ -107,6 +107,14 @@ def write_chunk(fp, data, no_compress=False):
 class DataFile(MultiOpenMixin):
   ''' A cs.venti data file, storing data chunks in compressed form.
       This is the usual file based persistence layer of a local venti Store.
+
+      A DataFile is a MultiOpenMixin and supports:
+        .flush()        Flush any pending output to the file.
+        .fetch(offset)  Fetch the data chunk from `offset`.
+        .add(data)      Store data chunk, return (offset, offset2) indicating its location.
+        .scan([do_decompress=],[offset=0])
+                        Scan the data file and yield (offset, flags, zdata, offset2) tuples.
+                        This can take place during other activity.
   '''
 
   def __init__(self, pathname, do_create=False, readwrite=False, lock=None):
