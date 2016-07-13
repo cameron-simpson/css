@@ -26,6 +26,7 @@ from .datafile import DataFile, DataDir, DataDir_from_spec, \
                       INDEXCLASS_BY_NAME
 from .hash import HASHCLASS_BY_NAME
 from .hash_tests import _TestHashCodeUtils
+# TODO: run _TestHashCodeUtils on DataDirs as separate test suite?
 
 # arbitrary limit
 MAX_BLOCK_SIZE = 16383
@@ -89,9 +90,9 @@ class TestDataFile(unittest.TestCase):
         data = self.datafile.fetch(offset)
         self.assertTrue(data == blocks[offset])
 
-class TestDataDir(_TestHashCodeUtils, unittest.TestCase):
+class TestDataDir(unittest.TestCase):
 
-  MAP_FACTORY = lambda self: DataDir(mktmpdir(), mktmpdir(), self.hashclass, self.indexclass)
+  ##MAP_FACTORY = lambda self: DataDir(mktmpdir(), mktmpdir(), self.hashclass, self.indexclass)
 
   def __init__(self, *a, **kw):
     a = list(a)
@@ -107,7 +108,6 @@ class TestDataDir(_TestHashCodeUtils, unittest.TestCase):
     unittest.TestCase.__init__(self, method_name)
 
   def setUp(self):
-    _TestHashCodeUtils.setUp(self)
     if self.indexdirpath is None:
       self.indexdirpath = mktmpdir('indexstate')
       self.do_remove_indexdirpath = True
@@ -134,7 +134,6 @@ class TestDataDir(_TestHashCodeUtils, unittest.TestCase):
     os.system("ls -l -- " + self.indexdirpath)
     if self.do_remove_indexdirpath:
       shutil.rmtree(self.indexdirpath)
-    _TestHashCodeUtils.tearDown(self)
 
   def test000IndexEntry(self):
     ''' Test roundtrip of index entry encode/decode.
