@@ -38,6 +38,9 @@ class _TestHashCodeUtils(_TestAdditionsMixin):
   MAP_FACTORY = None
 
   def setUp(self):
+    MF = self.MAP_FACTORY
+    if MF is None:
+      raise unittest.SkipTest("no MAP_FACTORY, skipping test")
     self.map1 = self.MAP_FACTORY()
     self.map1.open()
     self.keys1 = set()
