@@ -220,7 +220,7 @@ def selftest(argv):
     for indexname in sorted(INDEXCLASS_BY_NAME.keys()):
       indexclass = INDEXCLASS_BY_NAME[indexname]
       suite.addTest(multitest_suite(TestDataDir, hashclass=hashclass, indexclass=indexclass))
-  runner = unittest.TextTestRunner(failfast=True)
+  runner = unittest.TextTestRunner(failfast=True, verbosity=2)
   runner.run(suite)
   ##if False:
   ##  import cProfile
