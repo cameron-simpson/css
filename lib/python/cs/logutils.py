@@ -352,14 +352,27 @@ def DP(msg, *args):
   if D_mode:
     XP(msg, *args)
 
+# set to true to write direct to /dev/tty
+X_via_tty = False
+
 def X(msg, *args, **kwargs):
   ''' Unconditionally write the message `msg` to sys.stderr.
       If `args` is not empty, format `msg` using %-expansion with `args`.
   '''
-  file = kwargs.pop('file', None)
-  if file is None:
-    file = sys.stderr
-  return nl(msg, *args, file=file)
+  if X_via_tty:
+    # NB: ignores any kwargs
+    msg = str(msg)
+    if args:
+      msg = msg % args
+    with open('/dev/tty', 'w') as fp:
+      fp.write(msg)
+      fp.write('\n')
+      fp.flush()
+  else:
+    file = kwargs.pop('file', None)
+    if file is None:
+      file = sys.stderr
+    return nl(msg, *args, file=file)
 
 def XP(msg, *args, **kwargs):
   ''' Variation on X() which prefixes the message with the currrent Pfx prefix.
