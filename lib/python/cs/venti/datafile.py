@@ -127,7 +127,6 @@ class DataFile(MultiOpenMixin):
     if do_create:
       fd = os.open(pathname, os.O_CREAT|os.O_EXCL|os.O_RDWR)
       os.close(fd)
-    X("%s initialised", self)
 
   def __str__(self):
     return "DataFile(%s)" % (self.pathname,)
@@ -370,8 +369,6 @@ class DataDir(MultiOpenMixin, Mapping):
                     raise KeyError('already in filemap: %r' % (filename,))
                   filemap[filenum] = F
                   filemap[filename] = F
-                  X("IN   filemap[%r] = filemap[%r] = F", filenum, filename)
-    X("IN  id(filemap) = %s", id(filemap))
 
   def _save_state(self):
     ''' Rewrite STATE_FILENAME.
@@ -439,10 +436,8 @@ class DataDir(MultiOpenMixin, Mapping):
     D = cache.get(n)
     if D is None:
       # not in the cache, open it
-      X("open new DataFile[%d], id(self._filemap) = %s", n, id(self._filemap))
       F = self._filemap[n]
       readwrite = (n == self._n)
-      X("open Datafile[%d]: filename=%r, readwrite=%s", n, F.filename, readwrite)
       D = cache[n] = DataFile(self.datapathto(F.filename), readwrite=readwrite)
       D.open()
     return D
@@ -602,7 +597,6 @@ class GDBMIndex(HashCodeUtilsMixin, MultiOpenMixin):
                     decode_index_entry(self._gdbm.get(hashcode, default))
 
   def __setitem__(self, hashcode, value):
-    ##X("GDBMIndex ADD %s (%r)", hashcode, value)
     self._gdbm[hashcode] = encode_index_entry(*value)
 
 class KyotoIndex(HashCodeUtilsMixin, MultiOpenMixin):
