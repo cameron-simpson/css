@@ -167,7 +167,7 @@ class TestDataDir(unittest.TestCase):
           # store block/hashcode
           by_hash[hashcode] = data
           by_data[data] = hashcode
-          D[hashcode] = data
+          D.add(data)
           # test integrity afterwards
           self.assertTrue(hashcode in by_hash)
           self.assertTrue(data in by_data)
