@@ -16,6 +16,7 @@ try:
   import kyotocabinet
 except ImportError:
   kyotocabinet = None
+from cs.debug import thread_dump
 from cs.logutils import X
 from cs.randutils import rand0, randblock
 from .datafile import DataFile, DataDir, DataDir_from_spec, \
@@ -224,6 +225,7 @@ def selftest(argv):
   ##  cProfile.runctx('unittest.main(__name__, None, argv)', globals(), locals())
   ##else:
   ##  unittest.main(__name__, None, argv)
+  thread_dump()
 
 if __name__ == '__main__':
   selftest(sys.argv)
