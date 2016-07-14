@@ -30,7 +30,7 @@ from cs.resources import MultiOpenMixin
 from cs.seq import Seq
 from cs.threads import Q1, Get1
 from . import defaults, totext
-from .datafile import DataDirMapping
+from .datafile import DataDir, DEFAULT_INDEXCLASS
 from .hash import DEFAULT_HASHCLASS, HashCodeUtilsMixin
 
 class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin):
@@ -381,10 +381,29 @@ class MappingStore(BasicStoreSync):
   def hashcodes_from(self, hashclass=None, start_hashcode=None, reverse=False):
     return self.mapping.hashcodes_from(hashclass=hashclass, start_hashcode=start_hashcode, reverse=reverse)
 
-def DataDirStore(dirpath, indexclass=None, rollover=None, **kw):
-  return MappingStore(
-           DataDirMapping(dirpath, indexclass=indexclass, rollover=rollover),
-           **kw)
+class DataDirStore(MappingStore):
+  ''' A MappingStore using a DataDir as its backend.
+  '''
+
+  def __init__(self, statedirpath, datadirpath=None, hashclass=None, indexclass=None, rollover=None, **kw):
+    if hashclass is None:
+      S = defaults.S
+      if S is None:
+        hashclass = DEFAULT_HASHCLASS
+      else:
+        hashclass = S.hashclass
+    if indexclass is None:
+      indexclass = DEFAULT_INDEXCLASS
+    self._datadir = DataDir(statedirpath, datadirpath, hashclass, indexclass, rollover=rollover)
+    MappingStore.__init__(self, self._datadir, **kw)
+
+  def open(self):
+    self._datadir.open()
+    return MappingStore.open(self)
+
+  def close(self):
+    self._datadir.close()
+    return MappingStore.close(self)
 
 class _ProgressStoreTemplateMapping(object):
 
