@@ -135,15 +135,18 @@ class _TestDataDirStore(_TestStore):
 
 class TestDataDirStoreGDBM(_TestDataDirStore, unittest.TestCase):
   INDEX_CLASS = GDBMIndex
-
 class TestHashCodeUtilsDataDirStoreGDBMStore(_TestHashCodeUtils, unittest.TestCase):
   MAP_FACTORY = lambda self: DataDirStore(self.mktmpdir(), indexclass=GDBMIndex, rollover=200000)
 
-class TestDataDirStoreKyoto(_TestDataDirStore, unittest.TestCase):
-  INDEX_CLASS = KyotoIndex
-
-class TestHashCodeUtilsDataDirStoreKyotoStore(_TestHashCodeUtils, unittest.TestCase):
-  MAP_FACTORY = lambda self: DataDirStore(self.mktmpdir(), indexclass=KyotoIndex, rollover=200000)
+try:
+  import kyotocabinet
+except ImportError:
+  pass
+else:
+  class TestDataDirStoreKyoto(_TestDataDirStore, unittest.TestCase):
+    INDEX_CLASS = KyotoIndex
+  class TestHashCodeUtilsDataDirStoreKyotoStore(_TestHashCodeUtils, unittest.TestCase):
+    MAP_FACTORY = lambda self: DataDirStore(self.mktmpdir(), indexclass=KyotoIndex, rollover=200000)
 
 def selftest(argv):
   unittest.main(__name__, None, argv)
