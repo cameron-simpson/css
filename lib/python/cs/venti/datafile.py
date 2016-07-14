@@ -368,6 +368,9 @@ class DataDir(MultiOpenMixin, Mapping):
                     raise KeyError('already in filemap: %r' % (filename,))
                   filemap[filenum] = F
                   filemap[filename] = F
+    # presume data in state dir if not specified
+    if self.datadirpath is None:
+      self.datadirpath = self.statedirpath
 
   def _save_state(self):
     ''' Rewrite STATE_FILENAME.
