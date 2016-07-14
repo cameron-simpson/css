@@ -130,8 +130,8 @@ class _TestDataDirStore(_TestStore):
 
   def tearDown(self):
     ##os.system("ls -l "+self.pathname)
-    shutil.rmtree(self.pathname)
     _TestStore.tearDown(self)
+    shutil.rmtree(self.pathname)
 
 class TestDataDirStoreGDBM(_TestDataDirStore, unittest.TestCase):
   INDEX_CLASS = GDBMIndex
