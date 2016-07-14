@@ -517,7 +517,7 @@ class DataDir(MultiOpenMixin, Mapping):
             self.datafiles.update_size(filenum, offset)
 
   def __len__(self):
-    return len(self._default_index)
+    return len(self.index)
 
   def hashcodes_from(self, start_hashcode=None, reverse=False):
     ''' Generator yielding the hashcodes from the database in order starting with optional `start_hashcode`.
