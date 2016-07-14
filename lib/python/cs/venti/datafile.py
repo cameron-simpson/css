@@ -283,8 +283,7 @@ class DataDir(MultiOpenMixin, Mapping):
       self._update_datafile(F)
 
   def shutdown(self):
-    self._save_state()
-    self._cache.flush()
+    self.flush()
     del self._cache
     del self._filemap
     # drain index update queue
@@ -444,7 +443,8 @@ class DataDir(MultiOpenMixin, Mapping):
 
   @locked
   def flush(self):
-    self.datadir.flush()
+    self._save_state()
+    self._cache.flush()
     self.index.flush()
 
   def add(self, data):
