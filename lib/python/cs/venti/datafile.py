@@ -451,7 +451,7 @@ class DataDir(MultiOpenMixin, Mapping):
     self.index.flush()
 
   def add(self, data):
-    ''' Add the supplied data chunk to the current DataFile, return (n, offset).
+    ''' Add the supplied data chunk to the current DataFile, return the hashcode.
         Roll the internal state over to a new file if the current
         datafile has reached the rollover threshold.
     '''
@@ -472,7 +472,13 @@ class DataDir(MultiOpenMixin, Mapping):
       raise RuntimeError("%s: offset2(%d) after adding chunk <= F.size(%d)"
                          % (F.filename, offset2, F.size))
     F.size = offset2
-    return n, offset
+    return hashcode
+
+  def __setitem__(self, hashcode, data):
+    h = self.add(data)
+    if hashcode != h:
+      raise ValueError('hashcode %s does not match data, data added under %s instead'
+                       % (hashcode, h))
 
   def fetch(self, n, offset):
     ''' Return the data chunk stored in DataFile `n` at `offset`.
