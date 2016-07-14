@@ -44,7 +44,7 @@ class _TestStore(_TestAdditionsMixin):
     self.assertLen(S, 0)
     size = random.randint(127, 16384)
     data = randblock(size)
-    # compute blakc hash but do not store
+    # compute block hash but do not store
     h = S.hash(data)
     self.assertLen(S, 0)
     ok = S.contains(h)
