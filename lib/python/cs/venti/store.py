@@ -473,7 +473,7 @@ class ProgressStore(BasicStoreSync):
   def do_request(self, category):
     Ps = self._progress
     self.requests += 1
-    Ps['requests_all'].inc()
+    Ps['requests_all'] += 1
     if category is not None:
       Pactive = self._progress[category]
       Pactive.update(Pactive.position + 1)
