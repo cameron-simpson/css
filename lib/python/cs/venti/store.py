@@ -27,7 +27,7 @@ from cs.later import Later
 from cs.logutils import status, info, debug, warning, Pfx, D, X, XP
 from cs.progress import Progress
 from cs.resources import MultiOpenMixin
-from cs.seq import Seq
+from cs.seq import Seq, first
 from cs.threads import Q1, Get1
 from . import defaults, totext
 from .datafile import DataDir, DEFAULT_INDEXCLASS
@@ -361,7 +361,12 @@ class MappingStore(BasicStoreSync):
     try:
       first_method = mapping.first
     except AttributeError:
-      raise NotImplementedError("underlying .mapping has no .first")
+      for hashcode in sorted(mapping.keys()):
+        if hashclass is not None and not isinstance(hashcode, hashclass):
+          raise ValueError("first(iter(mapping)) returns %s, not of type %s"
+                           % (hashcode, hashclass))
+        return hashcode
+      return None
     else:
       return first_method(hashclass=hashclass)
 
