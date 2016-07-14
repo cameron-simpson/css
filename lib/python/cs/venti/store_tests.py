@@ -12,6 +12,8 @@ import sys
 import tempfile
 import unittest
 from cs.excutils import logexc
+import cs.logutils
+cs.logutils.X_via_tty = True
 from cs.logutils import setup_logging, warning, X
 from cs.randutils import randblock
 from . import _TestAdditionsMixin
