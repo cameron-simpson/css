@@ -564,18 +564,6 @@ class DataDir(MultiOpenMixin, Mapping):
       exception("%s[%s]:%d:%d not available: %s", self, hashcode, n, offset, e)
       raise KeyError(str(hashcode))
 
-  def first(self, hashclass=None):
-    ''' Return the first hashcode in the database or None if empty.
-        `hashclass`: specify the hashcode type, default from defaults.S
-    '''
-    hashclass = self.hashclass
-    index = self.index
-    try:
-      first_method = index.first
-    except AttributeError:
-      raise NotImplementedError("._index(%s) has no .first" % (hashclass,))
-    return first_method()
-
 class GDBMIndex(HashCodeUtilsMixin, MultiOpenMixin):
   ''' GDBM index for a DataDir.
   '''
@@ -660,18 +648,6 @@ class KyotoIndex(HashCodeUtilsMixin, MultiOpenMixin):
 
   def __setitem__(self, hashcode, value):
     self._kyoto[hashcode] = encode_index_entry(*value)
-
-  def first(self):
-    ''' Return the first hashcode in the database or None if empty.
-    '''
-    cursor = self._kyoto.cursor()
-    if not cursor.jump():
-      return None
-    hashcode = self._hashclass.from_hashbytes(cursor.get_key())
-    cursor.disable()
-    return hashcode
-
-    cursor.disable()
 
   def hashcodes_from(self, hashclass=None, start_hashcode=None, reverse=None):
     ''' Generator yielding the keys from the index in order starting with optional `start_hashcode`.
