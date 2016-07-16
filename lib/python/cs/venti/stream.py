@@ -21,9 +21,8 @@ T_ADD = RqType(0)           # data->hashcode
 T_GET = RqType(1)           # hashcode->data
 T_CONTAINS = RqType(2)      # hash->boolean
 T_FLUSH = RqType(3)         # flush local and remote store
-T_FIRST = RqType(4)         # ->first hashcode
-T_HASHCODES = RqType(5)     # (hashcode,length)=>hashcodes
-T_HASHCODES_HASH = RqType(6)# (hashcode,length)=>hashcode_of_hashes
+T_HASHCODES = RqType(4)     # (hashcode,length)=>hashcodes
+T_HASHCODES_HASH = RqType(5)# (hashcode,length)=>hashcode_of_hashes
 
 class StreamStore(BasicStoreAsync):
   ''' A Store connected to a remote Store via a PacketConnection.
@@ -96,17 +95,6 @@ class StreamStore(BasicStoreAsync):
         raise ValueError("unexpected payload for flush")
       self.local_store.flush()
       return 0
-    if rq_type == T_FIRST:
-      hashname, offset = get_bss(payload)
-      if offset < len(payload):
-        raise ValueError("extra payload bytes after hashname %r: %r" % (hashname, payload[offset:]))
-      hashclass = HASHCLASS_BY_NAME[hashname]
-      try:
-        hashcode = self.local_store.first(hashclass)
-      except NotImplementedError as e:
-        hashcode = None
-      payload = hashcode.encode() if hashcode else b''
-      return 1, payload
     if rq_type == T_HASHCODES:
       hashclass, start_hashcode, reverse, after, length = self._decode_request_hashcodes(flags, payload)
       hcodes = self.local_store.hashcodes(hashclass=hashclass,
@@ -224,34 +212,6 @@ class StreamStore(BasicStoreAsync):
     if payload:
       raise ValueError("non-empty payload: %r" % (payload,))
     return ok
-
-  def first_bg(self, hashclass=None):
-    ''' Dispatch a first-hashcode request, return a Result for collection.
-    '''
-    if hashclass is None:
-      hashclass = self.hashclass
-    return self._conn.request(T_FIRST, 0, put_bss(hashclass.HASHNAME), self._decode_response_first)
-
-  @staticmethod
-  def _decode_response_first(flags, payload):
-    ''' Decode the reply to a first, should be ok and hashcode payload.
-    '''
-    ok = flags & 0x01
-    if ok:
-      flags &= ~0x01
-    if flags:
-      raise ValueError("unexpected flags: 0x%02x" % (flags,))
-    if ok:
-      if not payload:
-        # no hashcodes in remote Store
-        return None
-      hashcode, offset = hash_decode(payload)
-      if offset < len(payload):
-        raise ValueError("unparsed data after hashcode: %d, %r" % (len(payload)-offset, payload[offset:]))
-      return hashcode
-    if payload:
-      raise ValueError("not ok, but payload=%r", payload)
-    return None
 
   def hashcodes_missing(self, other, window_size=None):
     ''' Generator yielding hashcodes in `other` which are missing in `self`.
