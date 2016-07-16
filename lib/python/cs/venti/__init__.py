@@ -76,8 +76,9 @@ class _TestAdditionsMixin:
     '''
     try:
       olen = len(o)
-    except NotImplementedError as e:
-      ##warning("skip test of len(%s) == %r: %s", o, length, e)
+    except TypeError:
+      import cs.logutils
+      cs.logutils.warning("skip assertLen(o, %d): no len(%s)", length, type(o))
       pass
     else:
       self.assertEqual(olen, length, *a, **kw)
