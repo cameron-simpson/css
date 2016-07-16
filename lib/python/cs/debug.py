@@ -440,7 +440,7 @@ def debug_object_shell(o, prompt=None):
   C.prompt = prompt
   C.cmdloop(intro)
 
-def selftest(module_name, argv=None, defaultTest=None):
+def selftest(module_name, defaultTest=None, argv=None):
   ''' Called by my unit tests.
   '''
   if argv is None:
