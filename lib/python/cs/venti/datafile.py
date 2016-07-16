@@ -577,7 +577,7 @@ class GDBMIndex(HashCodeUtilsMixin, MultiOpenMixin):
   def __init__(self, gdbmpath, hashclass, lock=None):
     import dbm.gnu
     MultiOpenMixin.__init__(self, lock=lock)
-    self._hashclass = hashclass
+    self.hashclass = hashclass
     self._gdbm_path = gdbmpath
     self._gdbm = None
 
@@ -595,7 +595,7 @@ class GDBMIndex(HashCodeUtilsMixin, MultiOpenMixin):
   def __iter__(self):
     hashcode = self._gdbm.firstkey()
     while hashcode is not None:
-      hashcode = self._hashclass.from_hashbytes(hashcode)
+      hashcode = self.hashclass.from_hashbytes(hashcode)
       yield hashcode
       hashcode = self._gdbm.nextkey()
 
@@ -619,7 +619,7 @@ class KyotoIndex(HashCodeUtilsMixin, MultiOpenMixin):
 
   def __init__(self, kyotopath, hashclass, lock=None):
     MultiOpenMixin.__init__(self, lock=lock)
-    self._hashclass = hashclass
+    self.hashclass = hashclass
     self._kyoto_path = kyotopath
     self._kyoto = None
 
@@ -665,20 +665,20 @@ class KyotoIndex(HashCodeUtilsMixin, MultiOpenMixin):
                     starts with the first key in the index
         `reverse`: iterate backwards if true, otherwise forwards
     '''
-    if hashclass is not None and hashclass is not self._hashclass:
-      raise ValueError("tried to get hashcodes of class %s from %s<_hashclass=%s>"
-                       % (hashclass, self, self._hashclass))
+    if hashclass is not None and hashclass is not self.hashclass:
+      raise ValueError("tried to get hashcodes of class %s from %s<hashclass=%s>"
+                       % (hashclass, self, self.hashclass))
     cursor = self._kyoto.cursor()
     if reverse:
       if cursor.jump_back(start_hashcode):
-        yield self._hashclass.from_hashbytes(cursor.get_key())
+        yield self.hashclass.from_hashbytes(cursor.get_key())
         while cursor.step_back():
-          yield self._hashclass.from_hashbytes(cursor.get_key())
+          yield self.hashclass.from_hashbytes(cursor.get_key())
     else:
       if cursor.jump(start_hashcode):
-        yield self._hashclass.from_hashbytes(cursor.get_key())
+        yield self.hashclass.from_hashbytes(cursor.get_key())
         while cursor.step():
-          yield self._hashclass.from_hashbytes(cursor.get_key())
+          yield self.hashclass.from_hashbytes(cursor.get_key())
     cursor.disable()
 
 INDEXCLASS_BY_NAME = {}
