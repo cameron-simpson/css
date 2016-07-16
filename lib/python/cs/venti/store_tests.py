@@ -77,29 +77,6 @@ class _TestStore(_TestAdditionsMixin):
       self.assertEqual(chunk, random_chunk_map[h])
     S.flush()
 
-  def test03first(self):
-    S = self.S
-    self.assertLen(S, 0)
-    try:
-      first_hashcode = S.first()
-    except NotImplementedError as e:
-      raise unittest.SkipTest("no .first in %s: %s" % (S, e))
-    else:
-      self.assertIs(first_hashcode, None, ".first of empty Store should be None")
-    random_chunk_map = {}
-    for _ in range(16):
-      size = random.randint(127, 16384)
-      data = randblock(size)
-      h = S.hash(data)
-      h2 = S.add(data)
-      self.assertEqual(h, h2)
-      random_chunk_map[h] = data
-    self.assertLen(S, 16)
-    ordered_hashcodes = sorted(random_chunk_map.keys())
-    first_hashcode = S.first()
-    self.assertIsNot(first_hashcode, None, ".first of nonempty Store should not be None")
-    self.assertEqual(first_hashcode, ordered_hashcodes[0])
-
 class TestMappingStore(_TestStore, unittest.TestCase):
 
   def _init_Store(self):
