@@ -200,7 +200,7 @@ class _DataDirFile(SimpleNamespace):
   def __hash__(self):
     return id(self)
 
-class DataDir(MultiOpenMixin, Mapping):
+class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
   ''' Maintenance of a collection of DataFiles in a directory.
       NB: _not_ thread safe; callers must arrange that.
       The directory may be maintained by multiple instances of this
