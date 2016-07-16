@@ -80,7 +80,7 @@ class _TestStore(_TestAdditionsMixin):
 class TestMappingStore(_TestStore, unittest.TestCase):
 
   def _init_Store(self):
-    self.S = MappingStore({}).open()
+    self.S = MappingStore({})
 
 class TestProgressStore(_TestStore, unittest.TestCase):
 
