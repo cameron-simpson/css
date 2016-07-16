@@ -183,6 +183,19 @@ def onetomany(func):
     return itertools.chain(*[ func(item) for item in self ])
   return gather
 
+def isordered(s, reverse=False, strict=False):
+  first = True
+  for i, item in enumerate(s):
+    if not first:
+      if reverse:
+        ordered = item < prev if strict else item <= prev
+      else:
+        ordered = item > prev if strict else item >= prev
+      if not ordered:
+        raise AssertionError("s[%d],s[%d] out of order: %s <=> %s" % (i-1, i, prev, item))
+    prev = item
+    first = False
+
 class TrackingCounter(object):
   ''' A wrapper for a counter which can be incremented and decremented.
       A facility is provided to wait for the counter to reach a specific value.
