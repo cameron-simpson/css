@@ -27,7 +27,7 @@ from cs.later import Later
 from cs.logutils import status, info, debug, warning, Pfx, D, X, XP
 from cs.progress import Progress
 from cs.resources import MultiOpenMixin
-from cs.seq import Seq, first
+from cs.seq import Seq
 from cs.threads import Q1, Get1
 from . import defaults, totext
 from .datafile import DataDir, DEFAULT_INDEXCLASS
@@ -54,7 +54,6 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin):
       A subclass _may_ provide thread-safe implementations of the following
       methods:
 
-        .first() -> hashcode
         .hashcodes(starting_hashcode, length) -> iterable-of-hashcodes
 
       The background (*_bg) functions return cs.later.LateFunction instances
@@ -99,9 +98,6 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin):
   ###################
   ## Special methods.
   ##
-
-  def __len__(self):
-    raise NotImplementedError("no .__len__")
 
   def __contains__(self, h):
     ''' Test if the supplied hashcode is present in the store.
@@ -182,15 +178,6 @@ class BasicStoreSync(_BasicStoreCommon):
   def flush_bg(self):
     return self._defer(self.flush)
 
-  def first(self):
-    raise NotImplementedError("no .first")
-
-  def hashcodes(self, hashclass=None, start_hashcode=None, reverse=None, after=False, length=None):
-    raise NotImplementedError("no .first")
-
-  def first_bg(self, hashclass=None):
-    return self._defer(self.first, hashclass)
-
   def hashcodes_bg(self, hashclass=None, start_hashcode=None, reverse=None, after=False, length=None):
     return self._defer(self.hashcodes_bg, hashclass=hashclass, start_hashcode=start_hashcode, reverse=reverse, after=after, length=length)
 
@@ -213,9 +200,6 @@ class BasicStoreAsync(_BasicStoreCommon):
 
   def flush(self):
     return self.flush_bg()()
-
-  def first(self, hashclass=None):
-    return self.first_bg(hashclass=hashclass)()
 
   def hashcodes(self, hashclass=None, start_hashcode=None, reverse=None, after=False, length=None):
     return self.hashcodes_bg(hashclass=hashclass, start_hashcode=start_hashcode, reverse=reverse, after=after, length=length)()
@@ -346,42 +330,7 @@ class MappingStore(BasicStoreSync):
       map_flush()
 
   def __len__(self):
-    try:
-      return len(self.mapping)
-    except TypeError as e:
-      raise NotImplementedError("%s: no self.mapping.len(): %s" % (self, e))
-
-  def first(self, hashclass=None):
-    ''' Return the first hashcode in the Store or None if empty.
-        `hashclass`: specify the hashcode type, default from self.hashclass
-    '''
-    if hashclass is None:
-      hashclass = self.hashclass
-    mapping = self.mapping
-    try:
-      first_method = mapping.first
-    except AttributeError:
-      for hashcode in sorted(mapping.keys()):
-        if hashclass is not None and not isinstance(hashcode, hashclass):
-          raise ValueError("first(iter(mapping)) returns %s, not of type %s"
-                           % (hashcode, hashclass))
-        return hashcode
-      return None
-    else:
-      return first_method(hashclass=hashclass)
-
-  def hashcodes(self, hashclass=None, start_hashcode=None, reverse=None, after=False, length=None):
-    ''' Generator yielding the Store's in order hashcodes starting with optional `hashcode`.
-        `hashclass`: specify the hashcode type, default from defaults.S
-        `start_hashcode`: the first hashcode; if missing or None, iteration
-                    starts with the first key in the index
-        `reverse`: iterate backwards if true, forwards if false and in no
-                   specified order if missing or None
-        `after`: commence iteration after the first hashcode
-        `length`: if not None, the maximum number of hashcodes to yield
-    '''
-    return self.mapping.hashcodes(hashclass=hashclass, start_hashcode=start_hashcode,
-                                  reverse=reverse, after=after, length=length)
+    return len(self.mapping)
 
   def hashcodes_from(self, hashclass=None, start_hashcode=None, reverse=False):
     return self.mapping.hashcodes_from(hashclass=hashclass, start_hashcode=start_hashcode, reverse=reverse)
