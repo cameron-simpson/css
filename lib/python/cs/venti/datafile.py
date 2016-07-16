@@ -589,6 +589,13 @@ class GDBMIndex(HashCodeUtilsMixin, MultiOpenMixin):
   def flush(self):
     self._gdbm.sync()
 
+  def __iter__(self):
+    hashcode = self._gdbm.firstkey()
+    while hashcode is not None:
+      hashcode = self._hashclass.from_hashbytes(hashcode)
+      yield hashcode
+      hashcode = self._gdbm.nextkey()
+
   __contains__ = lambda self, hashcode: hashcode in self._gdbm
   __getitem__  = lambda self, hashcode: decode_index_entry(self._gdbm[hashcode])
   get          = lambda self, hashcode, default=None: \
