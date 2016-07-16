@@ -114,7 +114,7 @@ class _TestHashCodeUtils(_TestAdditionsMixin):
           else:
             n = step_size
           with self.subTest(start_hashcode=start_hashcode, ksndx=ksndx, n=n):
-            hs = list(M1.hashcodes(start_hashcode=start_hashcode, length=n, after=True))
+            hs = list(M1.hashcodes(start_hashcode=start_hashcode, length=n, reverse=False, after=True))
             # check ordering between adjacent hashcodes returns and against start_hashcode if not None
             h0 = None
             for h in hs:
