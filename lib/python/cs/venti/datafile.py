@@ -529,13 +529,16 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
   def __len__(self):
     return len(self.index)
 
-  def hashcodes_from(self, start_hashcode=None, reverse=False):
+  def hashcodes_from(self, hashclass, start_hashcode=None, reverse=False):
     ''' Generator yielding the hashcodes from the database in order starting with optional `start_hashcode`.
         `start_hashcode`: the first hashcode; if missing or None, iteration
                           starts with the first key in the index
         `reverse`: iterate backwards if true, otherwise forwards
     '''
-    return self.index.hashcodes_from(start_hashcode=start_hashcode,
+    if hashclass is not None and hashclass is not self.hashclass:
+      raise ValueError("require hashclass=%s, given %s" % (self.hashclass, hashclass))
+    return self.index.hashcodes_from(self.hashclass,
+                                     start_hashcode=start_hashcode,
                                      reverse=reverse)
 
   def __iter__(self):
