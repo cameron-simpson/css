@@ -212,7 +212,7 @@ class DataDir(MultiOpenMixin, Mapping):
       A DataDir may be used as the Mapping for a MappingStore.
   '''
 
-  STATE_FILENAME = 'index-state.csv'
+  STATE_FILENAME_FORMAT = 'index-%s-state.csv'
   INDEX_FILENAME_FORMAT = 'index-%s.%s'
 
   def __init__(self, statedirpath, datadirpath, hashclass, indexclass, rollover=None):
@@ -304,7 +304,8 @@ class DataDir(MultiOpenMixin, Mapping):
 
   @property
   def statefilepath(self):
-    return self.localpathto(self.STATE_FILENAME)
+    return self.localpathto(self.STATE_FILENAME_FORMAT
+                            % (self.hashclass.HASHNAME,))
 
   @property
   def indexpath(self):
