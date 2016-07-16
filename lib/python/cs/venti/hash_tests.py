@@ -45,10 +45,6 @@ class _TestHashCodeUtils(_TestAdditionsMixin):
     self.map1.open()
     self.keys1 = set()
     try:
-      h = self.map1.first()
-    except NotImplementedError as e:
-      raise unittest.SkipTest("no .first: %s" % (e,))
-    try:
       keys_method = self.map1.keys
     except AttributeError:
       self.has_keys = False
@@ -67,8 +63,6 @@ class _TestHashCodeUtils(_TestAdditionsMixin):
     M1 = self.map1
     KS1 = self.keys1
     # test emptiness
-    h = M1.first()
-    self.assertIs(h, None)
     self.assertLen(M1, 0)
     # add one block
     data = randblock(rand0(8193))
@@ -76,14 +70,12 @@ class _TestHashCodeUtils(_TestAdditionsMixin):
     KS1.add(h)
     self.assertLen(M1, 1)
     self.assertEqual(set(M1.hashcodes()), KS1)
-    self.assertEqual(M1.first(), h)
     # add another block
     data2 = randblock(rand0(8193))
     h2 = M1.add(data2)
     KS1.add(h2)
     self.assertLen(M1, 2)
     self.assertEqual(set(M1.hashcodes()), KS1)
-    self.assertEqual(M1.first(), min( (h, h2) ))
 
   def test01hashcodes(self):
     M1 = self.map1
@@ -99,9 +91,6 @@ class _TestHashCodeUtils(_TestAdditionsMixin):
       self.assertLen(M1, n+1)
       self.assertEqual(len(KS1), n+1)
       self.assertEqual(set(M1.hashcodes()), KS1)
-      if self.has_keys:
-        self.assertEqual(M1.first(), min(M1.keys()))
-      self.assertEqual(M1.first(), min(M1.hashcodes()))
     # asking for 0 hashcodes is forbidden
     with self.assertRaises(ValueError):
       hs = list(M1.hashcodes(length=0))
