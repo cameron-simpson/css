@@ -243,21 +243,26 @@ class HashCodeUtilsMixin(object):
         if length < 1:
           break
 
-class HashUtilDict(dict, HashCodeUtilsMixin):
+class HashUtilDict(dict, MultiOpenMixin, HashCodeUtilsMixin):
   ''' Simple dict subclass supporting HashCodeUtilsMixin.
   '''
+
+  def __init__(self):
+    dict.__init__(self)
+    MultiOpenMixin.__init__(self)
+    self.hashclass = DEFAULT_HASHCLASS
 
   def add(self, data):
     hashcode = Hash_SHA1.from_data(data)
     self[hashcode] = data
     return hashcode
 
-  def open(self):
+  def startup(self):
     ''' Dummy method to support unit tests with open/close.
     '''
     pass
 
-  def close(self):
+  def shutdown(self):
     ''' Dummy method to support unit tests with open/close.
     '''
     pass
