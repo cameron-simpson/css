@@ -19,10 +19,12 @@ from cs.randutils import randblock
 from . import _TestAdditionsMixin
 from .datafile import GDBMIndex, KyotoIndex
 from .store import MappingStore, DataDirStore, ProgressStore
-from .hash import HashUtilDict
+from .hash import HashUtilDict, DEFAULT_HASHCLASS
 from .hash_tests import _TestHashCodeUtils
 
 class _TestStore(_TestAdditionsMixin):
+
+  hashclass = DEFAULT_HASHCLASS
 
   def setUp(self):
     self._init_Store()
@@ -80,7 +82,7 @@ class _TestStore(_TestAdditionsMixin):
 class TestMappingStore(_TestStore, unittest.TestCase):
 
   def _init_Store(self):
-    self.S = MappingStore({})
+    self.S = MappingStore({}, hashclass=self.hashclass)
 
 class TestProgressStore(_TestStore, unittest.TestCase):
 
@@ -90,12 +92,12 @@ class TestProgressStore(_TestStore, unittest.TestCase):
 class TestHashCodeUtilsMappingStoreDict(_TestHashCodeUtils, unittest.TestCase):
   ''' Test HashUtils on a MappingStore on a plain dict.
   '''
-  MAP_FACTORY = lambda self: MappingStore({})
+  MAP_FACTORY = lambda self: MappingStore({}, hashclass=DEFAULT_HASHCLASS)
 
 class TestHashCodeUtilsMappingStoreHashUtilDict(_TestHashCodeUtils, unittest.TestCase):
   ''' Test HashUtils on a MappingStore on a HashUtilDict.
   '''
-  MAP_FACTORY = lambda self: MappingStore(HashUtilDict())
+  MAP_FACTORY = lambda self: MappingStore(HashUtilDict(), hashclass=DEFAULT_HASHCLASS)
 
 class _TestDataDirStore(_TestStore):
 
@@ -105,7 +107,7 @@ class _TestDataDirStore(_TestStore):
     indexclass = self.__class__.INDEX_CLASS
     random.seed()
     self.pathname = self.mktmpdir()
-    self.S = DataDirStore(self.pathname, indexclass=indexclass, rollover=200000)
+    self.S = DataDirStore(self.pathname, indexclass=indexclass, hashclass=self.hashclass, rollover=200000)
 
   def tearDown(self):
     ##os.system("ls -l "+self.pathname)
@@ -115,7 +117,7 @@ class _TestDataDirStore(_TestStore):
 class TestDataDirStoreGDBM(_TestDataDirStore, unittest.TestCase):
   INDEX_CLASS = GDBMIndex
 class TestHashCodeUtilsDataDirStoreGDBMStore(_TestHashCodeUtils, unittest.TestCase):
-  MAP_FACTORY = lambda self: DataDirStore(self.mktmpdir(), indexclass=GDBMIndex, rollover=200000)
+  MAP_FACTORY = lambda self: DataDirStore(self.mktmpdir(), hashclass=DEFAULT_HASHCLASS, indexclass=GDBMIndex, rollover=200000)
 
 try:
   import kyotocabinet
@@ -125,7 +127,7 @@ else:
   class TestDataDirStoreKyoto(_TestDataDirStore, unittest.TestCase):
     INDEX_CLASS = KyotoIndex
   class TestHashCodeUtilsDataDirStoreKyotoStore(_TestHashCodeUtils, unittest.TestCase):
-    MAP_FACTORY = lambda self: DataDirStore(self.mktmpdir(), indexclass=KyotoIndex, rollover=200000)
+    MAP_FACTORY = lambda self: DataDirStore(self.mktmpdir(), hashclass=DEFAULT_HASHCLASS, indexclass=KyotoIndex, rollover=200000)
 
 def selftest(argv):
   unittest.main(__name__, None, argv)
