@@ -351,9 +351,9 @@ class DataDirStore(MappingStore):
     self._datadir = DataDir(statedirpath, datadirpath, hashclass, indexclass, rollover=rollover)
     MappingStore.__init__(self, self._datadir, **kw)
 
-  def open(self):
+  def open(self, **kw):
     self._datadir.open()
-    return MappingStore.open(self)
+    return MappingStore.open(self, **kw)
 
   def close(self):
     self._datadir.close()
