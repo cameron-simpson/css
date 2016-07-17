@@ -104,6 +104,12 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin):
     '''
     return self.contains(h)
 
+  def __iter__(self):
+    return self.hashcodes_from()
+
+  def keys(self):
+    return iter(self)
+
   def __getitem__(self, h):
     ''' Return the data bytes associated with the supplied hashcode.
         Raise KeyError if the hashcode is not present.
@@ -132,11 +138,6 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin):
         NB: does _not_ store the data.
     '''
     return self.hashclass.from_data(data)
-
-  def keys(self):
-    ''' For a big store this is almost certainly unreasonable.
-    '''
-    raise NotImplementedError
 
   def startup(self):
     # Later already open
