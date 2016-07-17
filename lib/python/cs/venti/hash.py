@@ -200,6 +200,8 @@ class HashCodeUtilsMixin(object):
         break
       yield hashcode
       if reverse:
+        if ndx == 0:
+          break
         ndx -= 1
       else:
         ndx += 1
