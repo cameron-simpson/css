@@ -332,8 +332,19 @@ class MappingStore(BasicStoreSync):
   def __len__(self):
     return len(self.mapping)
 
-  def hashcodes_from(self, hashclass=None, start_hashcode=None, reverse=False):
-    return self.mapping.hashcodes_from(hashclass=hashclass, start_hashcode=start_hashcode, reverse=reverse)
+  def __iter__(self):
+    ''' Return iterator over the mapping; required for use of HashCodeUtilsMixin.hashcodes_from.
+    '''
+    return iter(self.mapping)
+
+  def hashcodes_from(self, start_hashcode=None, reverse=False):
+    ''' Use the mapping's .hashcodes_from if present, otherwise use HashCodeUtilsMixin.hashcodes_from.
+    '''
+    try:
+      hashcodes_method = self.mapping.hashcodes_from
+    except AttributeError:
+      return HashCodeUtilsMixin.hashcodes_from(self, start_hashcode=start_hashcode, reverse=reverse)
+    return hashcodes_method(start_hashcode=start_hashcode, reverse=reverse)
 
 class DataDirStore(MappingStore):
   ''' A MappingStore using a DataDir as its backend.
