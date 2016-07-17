@@ -530,7 +530,7 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
   def __len__(self):
     return len(self.index)
 
-  def hashcodes_from(self, hashclass, start_hashcode=None, reverse=False):
+  def hashcodes_from(self, start_hashcode=None, reverse=False):
     ''' Generator yielding the hashcodes from the database in order starting with optional `start_hashcode`.
         `start_hashcode`: the first hashcode; if missing or None, iteration
                           starts with the first key in the index
@@ -552,6 +552,8 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
   def __getitem__(self, hashcode):
     ''' Return the decompressed data associated with the supplied `hashcode`.
     '''
+    if not isinstance(hashcode, self.hashclass):
+      raise ValueError("hashcode %r is not a %s", hashcode, self.hashclass)
     unindexed = self._unindexed
     try:
       n, offset = unindexed[hashcode]
@@ -660,26 +662,24 @@ class KyotoIndex(HashCodeUtilsMixin, MultiOpenMixin):
   def __setitem__(self, hashcode, value):
     self._kyoto[hashcode] = encode_index_entry(*value)
 
-  def hashcodes_from(self, hashclass=None, start_hashcode=None, reverse=None):
+  def hashcodes_from(self, start_hashcode=None, reverse=False):
     ''' Generator yielding the keys from the index in order starting with optional `start_hashcode`.
         `start_hashcode`: the first hashcode; if missing or None, iteration
                     starts with the first key in the index
         `reverse`: iterate backwards if true, otherwise forwards
     '''
-    if hashclass is not None and hashclass is not self.hashclass:
-      raise ValueError("tried to get hashcodes of class %s from %s<hashclass=%s>"
-                       % (hashclass, self, self.hashclass))
+    hashclass = self.hashclass
     cursor = self._kyoto.cursor()
     if reverse:
       if cursor.jump_back(start_hashcode):
-        yield self.hashclass.from_hashbytes(cursor.get_key())
+        yield hashclass.from_hashbytes(cursor.get_key())
         while cursor.step_back():
-          yield self.hashclass.from_hashbytes(cursor.get_key())
+          yield hashclass.from_hashbytes(cursor.get_key())
     else:
       if cursor.jump(start_hashcode):
-        yield self.hashclass.from_hashbytes(cursor.get_key())
+        yield hashclass.from_hashbytes(cursor.get_key())
         while cursor.step():
-          yield self.hashclass.from_hashbytes(cursor.get_key())
+          yield hashclass.from_hashbytes(cursor.get_key())
     cursor.disable()
 
 INDEXCLASS_BY_NAME = {}
