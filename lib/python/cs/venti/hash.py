@@ -8,6 +8,7 @@ if sys.hexversion < 0x02060000:
 from bisect import bisect_left, bisect_right
 from cs.lex import hexify
 from cs.logutils import D, X
+from cs.resources import MultiOpenMixin
 from cs.serialise import get_bs, put_bs
 from .pushpull import missing_hashcodes
 
