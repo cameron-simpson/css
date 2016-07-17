@@ -666,7 +666,7 @@ class KyotoIndex(HashCodeUtilsMixin, MultiOpenMixin):
     ''' Generator yielding the keys from the index in order starting with optional `start_hashcode`.
         `start_hashcode`: the first hashcode; if missing or None, iteration
                     starts with the first key in the index
-        `reverse`: iterate backwards if true, otherwise forwards
+        `reverse`: iterate backward if true, otherwise forward
     '''
     hashclass = self.hashclass
     cursor = self._kyoto.cursor()
