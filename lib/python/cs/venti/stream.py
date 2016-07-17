@@ -30,9 +30,8 @@ class StreamStore(BasicStoreAsync):
       or simply to implement the server side.
   '''
 
-  def __init__(self, name, send_fp, recv_fp, local_store=None, addif=False):
+  def __init__(self, send_fp, recv_fp, local_store=None, addif=False, name=None, **kw):
     ''' Initialise the Stream Store.
-        `name`: the Store name.
         `send_fp`: binary stream file for sending data to the peer.
         `recv_fp`: binary stream file for receiving data from the peer.
         `local_store`: optional local Store for serving requests from the peer.
@@ -40,10 +39,11 @@ class StreamStore(BasicStoreAsync):
             the data chunk's hash and to only submit a T_ADD request
             if the block is missing; this is a bandwith optimisation
             at the expense of latency.
+        `name`: the Store name.
     '''
-    BasicStoreAsync.__init__(self, ':'.join( ('StreamStore', name) ))
+    BasicStoreAsync.__init__(self, 'StreamStore:'+name, **kw)
     self._conn = PacketConnection(send_fp, recv_fp, self._handle_request,
-                                  name=':'.join( (self.name, 'PacketConnection') ))
+                                  name='PacketConnection:'+self.name)
     self.local_store = local_store
     self.mode_addif = addif
 
@@ -97,8 +97,7 @@ class StreamStore(BasicStoreAsync):
       return 0
     if rq_type == T_HASHCODES:
       hashclass, start_hashcode, reverse, after, length = self._decode_request_hashcodes(flags, payload)
-      hcodes = self.local_store.hashcodes(hashclass=hashclass,
-                                          start_hashcode=start_hashcode,
+      hcodes = self.local_store.hashcodes(start_hashcode=start_hashcode,
                                           reverse=reverse,
                                           after=after,
                                           length=length)
@@ -218,11 +217,10 @@ class StreamStore(BasicStoreAsync):
     '''
     return missing_hashcodes_by_checksum(self, other, window_size=window_size)
 
-  def hashcodes_bg(self, hashclass=None, start_hashcode=None, reverse=None, after=False, length=None):
+  def hashcodes_bg(self, start_hashcode=None, reverse=None, after=False, length=None):
     ''' Dispatch a hashcodes request, return a Result for collection.
     '''
-    if hashclass is None:
-      hashclass = self.hashclass
+    hashclass = self.hashclass
     if length is not None and length < 1:
       raise ValueError("length should be None or >1, got: %r", length)
     flags = ( 0x01 if reverse else 0x00 ) \
@@ -360,14 +358,13 @@ class StreamStore(BasicStoreAsync):
       raise ValueError("not ok, but payload=%r", payload)
     return None
 
-  def hashcodes_from(self, hashclass=None, start_hashcode=None, reverse=False):
+  def hashcodes_from(self, start_hashcode=None, reverse=False):
     ''' Unbounded sequence of hashcodes obtained by successive calls to self.hashcodes.
     '''
     length = 64
     after = False
     while True:
-      hashcodes = self.hashcodes(hashclass=hashclass,
-                                 start_hashcode=start_hashcode,
+      hashcodes = self.hashcodes(start_hashcode=start_hashcode,
                                  reverse=reverse,
                                  after=after,
                                  length=length)
