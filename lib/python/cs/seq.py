@@ -118,18 +118,27 @@ def NamedTuple(fields,iter=()):
   '''
   return NamedTupleClassFactory(*fields)(iter)
 
-class _MergeHeapItem(tuple):
-  def __lt__(self, other):
-    return self[0] < other[0]
-
-def imerge(*iters):
+def imerge(*iters, reverse=False):
   ''' Merge an iterable of ordered iterables in order.
+      `reverse`: if true, yield items in reverse order
+                 this requires the iterables themselves to also be in
+                 reversed order
       It relies on the source iterables being ordered and their elements
       being comparable, through slightly misordered iterables (for example,
       as extracted from web server logs) will produce only slightly
       misordered results, as the merging is done on the basis of the front
       elements of each iterable.
   '''
+  if reverse:
+    # tuples that compare in reverse order
+    class _MergeHeapItem(tuple):
+      def __lt__(self, other):
+        return self[0] > other[0]
+  else:
+    # tuples that compare in forward order
+    class _MergeHeapItem(tuple):
+      def __lt__(self, other):
+        return self[0] < other[0]
   # prime the list of head elements with (value, iter)
   heap = []
   for I in iters:
