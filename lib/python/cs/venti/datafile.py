@@ -25,6 +25,7 @@ from cs.logutils import D, X, XP, debug, warning, error, exception, Pfx
 from cs.obj import O
 from cs.queues import IterableQueue
 from cs.resources import MultiOpenMixin
+from cs.seq import imerge
 from cs.serialise import get_bs, put_bs, read_bs, put_bsdata, read_bsdata
 from cs.threads import locked, locked_property
 from . import defaults
@@ -535,11 +536,11 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
                           starts with the first key in the index
         `reverse`: iterate backwards if true, otherwise forwards
     '''
-    if hashclass is not None and hashclass is not self.hashclass:
-      raise ValueError("require hashclass=%s, given %s" % (self.hashclass, hashclass))
-    return self.index.hashcodes_from(self.hashclass,
-                                     start_hashcode=start_hashcode,
-                                     reverse=reverse)
+    unindexed = set(self._unindexed)
+    indexed = self.index.hashcodes_from(start_hashcode=start_hashcode,
+                                        reverse=reverse)
+    unseen_indexed = ( h for h in indexed if h not in unindexed )
+    return imerge(sorted(unindexed, reverse=reverse), unseen_indexed)
 
   def __iter__(self):
     return self.hashcodes_from()
