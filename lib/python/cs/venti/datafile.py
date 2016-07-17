@@ -596,11 +596,11 @@ class GDBMIndex(HashCodeUtilsMixin, MultiOpenMixin):
     self._gdbm.sync()
 
   def __iter__(self):
+    mkhash = self.hashclass.from_hashbytes
     hashcode = self._gdbm.firstkey()
     while hashcode is not None:
-      hashcode = self.hashclass.from_hashbytes(hashcode)
-      yield hashcode
-      hashcode = self._gdbm.nextkey()
+      yield mkhash(hashcode)
+      hashcode = self._gdbm.nextkey(hashcode)
 
   __contains__ = lambda self, hashcode: hashcode in self._gdbm
   __getitem__  = lambda self, hashcode: decode_index_entry(self._gdbm[hashcode])
