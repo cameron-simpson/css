@@ -27,6 +27,7 @@ from string import ascii_letters, digits
 import tempfile
 import threading
 from cs.lex import texthexify, untexthexify
+from cs.seq import isordered
 
 class _ventiDefaults(threading.local):
   ''' Per-thread default store stack.
@@ -82,3 +83,6 @@ class _TestAdditionsMixin:
       pass
     else:
       self.assertEqual(olen, length, *a, **kw)
+
+  def assertIsOrdered(self, s, reverse, strict=False):
+    return isordered(s, reverse, strict)
