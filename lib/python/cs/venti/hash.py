@@ -133,10 +133,10 @@ class HashCodeUtilsMixin(object):
         .hashcodes_missing, likewise
   '''
 
-  def hash_of_hashcodes(self, hashclass=None, start_hashcode=None, reverse=None, after=False, length=None):
+  def hash_of_hashcodes(self, start_hashcode=None, reverse=None, after=False, length=None):
     ''' Return a hash of the hashcodes requested and the last hashcode (or None if no hashcodes matched); used for comparing remote Stores.
     '''
-    hs = list(self.hashcodes(hashclass=hashclass, start_hashcode=start_hashcode, reverse=reverse, after=after, length=length))
+    hs = list(self.hashcodes(start_hashcode=start_hashcode, reverse=reverse, after=after, length=length))
     if hs:
       h_final = hs[-1]
     else:
@@ -150,18 +150,18 @@ class HashCodeUtilsMixin(object):
     '''
     return missing_hashcodes(self, other, window_size=window_size)
 
-  def hashcodes_from(self, hashclass, start_hashcode=None, reverse=False):
+  def hashcodes_from(self, start_hashcode=None, reverse=False):
     ''' Default generator yielding hashcodes from this object until none remains.
         This implementation starts by fetching and sorting all the
         keys, so for large mappings this implementation is memory
         expensive and also runtime expensive if only a few hashcodes
         are desired.
-        `hashclass`: hashclass for yielded hashcodes
         `start_hashcode`: starting hashcode - hashcodes are >=`start_hashcode`;
                           if None start the sequences from the smallest
                           hashcode or from the largest if `reverse` is true
         `reverse`: yield hashcodes in reverse order (counting down instead of up).
     '''
+    hashclass = self.hashclass
     if start_hashcode is not None:
       if not isinstance(start_hashcode, hashclass):
         raise TypeError("hashclass %s does not match start_hashcode %r"
@@ -206,10 +206,9 @@ class HashCodeUtilsMixin(object):
       else:
         ndx += 1
 
-  def hashcodes(self, hashclass=None, start_hashcode=None, reverse=False, after=False, length=None):
+  def hashcodes(self, start_hashcode=None, reverse=False, after=False, length=None):
     ''' Generator yielding up to `length` hashcodes >=`start_hashcode`.
         This relies on .hashcodes_from as the source of hashcodes.
-        `hashclass`: hashclass for yielded hashcodes
         `start_hashcode`: starting hashcode - hashcodes are >=`start_hashcode`;
                           if None start the sequences from the smallest
                           hashcode or from the largest if `reverse` is true
@@ -228,8 +227,7 @@ class HashCodeUtilsMixin(object):
       if nhashcodes == 0:
         return
     first = True
-    for hashcode in self.hashcodes_from(hashclass=hashclass,
-                                        start_hashcode=start_hashcode,
+    for hashcode in self.hashcodes_from(start_hashcode=start_hashcode,
                                         reverse=reverse):
       if first:
         first = False
