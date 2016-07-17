@@ -201,7 +201,9 @@ def isordered(s, reverse=False, strict=False):
       else:
         ordered = item > prev if strict else item >= prev
       if not ordered:
-        raise AssertionError("s[%d],s[%d] out of order: %s <=> %s" % (i-1, i, prev, item))
+        raise AssertionError(
+                "isordered(reverse=%s,strict=%s): s[%d],s[%d] out of order: %s <=> %s"
+                % (reverse, strict, i-1, i, prev, item))
     prev = item
     first = False
 
