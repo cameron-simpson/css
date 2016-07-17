@@ -30,11 +30,11 @@ class _TestStore(_TestAdditionsMixin):
     self._init_Store()
     self.S.open()
 
-  def _init_Store(self):
-    raise unittest.SkipTest("no Store in base class")
-
   def tearDown(self):
     self.S.close()
+
+  def _init_Store(self):
+    raise unittest.SkipTest("no Store in base class")
 
   def test00empty(self):
     S = self.S
