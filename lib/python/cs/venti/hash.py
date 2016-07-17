@@ -218,6 +218,8 @@ class HashCodeUtilsMixin(object):
     '''
     if length is not None and length < 1:
       raise ValueError("length < 1: %r" % (length,))
+    if after and start_hashcode is None:
+      raise ValueError("after=%s but start_hashcode=%s" % (after, start_hashcode))
     # try to short circuit if there are no hashcodes
     try:
       nhashcodes = len(self)
@@ -231,7 +233,8 @@ class HashCodeUtilsMixin(object):
                                         reverse=reverse):
       if first:
         first = False
-        if after and start_hashcode is not None and hashcode == start_hashcode:
+        if after and hashcode == start_hashcode:
+          # skip start_hashcode if present
           continue
       yield hashcode
       if length is not None:
