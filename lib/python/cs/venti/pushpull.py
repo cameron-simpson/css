@@ -97,13 +97,14 @@ def missing_hashcodes_by_checksum(S1, S2, window_size=None):
     window_size = 1024
   # latest hashcode already compared
   start_hashcode = None
+  after = False
   while True:
     # collect checksum of hashcodes after start_hashcode from S1 and S2
-    hash1, h_final1 = S1.hash_of_hashcodes(length=window_size, start_hashcode=start_hashcode, after=True)
+    hash1, h_final1 = S1.hash_of_hashcodes(length=window_size, start_hashcode=start_hashcode, after=after)
     if h_final1 is None:
       # end of S1 hashcodes - return all following S2 hashcodes
       break
-    hash2, h_final2 = S2.hash_of_hashcodes(length=window_size, start_hashcode=start_hashcode, after=True)
+    hash2, h_final2 = S2.hash_of_hashcodes(length=window_size, start_hashcode=start_hashcode, after=after)
     if h_final2 is None:
       # end of S2 hashcodes - done - return from function
       return
@@ -121,11 +122,11 @@ def missing_hashcodes_by_checksum(S1, S2, window_size=None):
       window_size //= 2
       continue
     # fetch the actual hashcodes
-    hashcodes2 = list(S2.hashcodes(start_hashcode=start_hashcode, length=window_size, after=True))
+    hashcodes2 = list(S2.hashcodes(start_hashcode=start_hashcode, length=window_size, after=after))
     if not hashcodes2:
       # maybe some entires removed? - anyway, no more S2 so return
       return
-    hashcodes1 = set(S1.hashcodes(start_hashcode=start_hashcode, length=window_size, after=True))
+    hashcodes1 = set(S1.hashcodes(start_hashcode=start_hashcode, length=window_size, after=after))
     if not hashcodes1:
       # maybe some entries removed? - anyway, no more S1 so return all following S2 hashcodes
       break
@@ -145,9 +146,10 @@ def missing_hashcodes_by_checksum(S1, S2, window_size=None):
         yield hashcode
     # resume scan from here
     start_hashcode = hashcodes2[-1]
+    after = True
   # collect all following S2 hashcodes
   while True:
-    hashcodes2 = list(S2.hashcodes(start_hashcode=start_hashcode, length=window_size, after=True))
+    hashcodes2 = list(S2.hashcodes(start_hashcode=start_hashcode, length=window_size, after=after))
     if not hashcodes2:
       break
     for hashcode in hashcodes2:
