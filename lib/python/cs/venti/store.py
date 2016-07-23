@@ -74,8 +74,10 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, ABC):
 
   _seq = Seq()
 
-  def __init__(self, name=None, capacity=None, hashclass=None, lock=None):
+  def __init__(self, name, capacity=None, hashclass=None, lock=None):
     with Pfx("_BasicStoreCommon.__init__(%s,..)", name):
+      if not isinstance(name, str):
+        raise TypeError("initial `name` argument must be a str, got %s", type(name))
       if name is None:
         name = "%s%d" % (self.__class__.__name__, next(_BasicStoreCommon._seq()))
       if capacity is None:
@@ -297,11 +299,8 @@ class MappingStore(BasicStoreSync):
   ''' A Store built on an arbitrary mapping object.
   '''
 
-  def __init__(self, mapping, **kw):
-    name = kw.pop('name', None)
-    if name is None:
-      name = "MappingStore(%s)" % (type(mapping).__name__,)
-    BasicStoreSync.__init__(self, name=name, **kw)
+  def __init__(self, name, mapping, **kw):
+    BasicStoreSync.__init__(self, "MappingStore(%s)" % (name,), **kw)
     self.mapping = mapping
 
   def startup(self):
@@ -378,7 +377,7 @@ class DataDirStore(MappingStore):
   ''' A MappingStore using a DataDir as its backend.
   '''
 
-  def __init__(self, statedirpath, datadirpath=None, hashclass=None, indexclass=None, rollover=None, **kw):
+  def __init__(self, name, statedirpath, datadirpath=None, hashclass=None, indexclass=None, rollover=None, **kw):
     if hashclass is None:
       S = defaults.S
       if S is None:
@@ -388,7 +387,7 @@ class DataDirStore(MappingStore):
     if indexclass is None:
       indexclass = DEFAULT_INDEXCLASS
     self._datadir = DataDir(statedirpath, datadirpath, hashclass, indexclass, rollover=rollover)
-    MappingStore.__init__(self, self._datadir, **kw)
+    MappingStore.__init__(self, name, self._datadir, **kw)
 
   def open(self, **kw):
     self._datadir.open()
@@ -418,14 +417,11 @@ class _ProgressStoreTemplateMapping(object):
 
 class ProgressStore(BasicStoreSync):
 
-  def __init__(self, S, template='rq  {requests_all_position}  {requests_all_throughput}/s', **kw):
-    name = kw.pop('name', None)
-    if name is None:
-      name = "ProgressStore(%s)" % (S,)
+  def __init__(self, name, S, template='rq  {requests_all_position}  {requests_all_throughput}/s', **kw):
     lock = kw.pop('lock', None)
     if lock is None:
       lock = S._lock
-    BasicStoreSync.__init__(self, name=name, lock=lock, **kw)
+    BasicStoreSync.__init__(self, "ProgressStore(%s)" % (name,), lock=lock, **kw)
     self.S = S
     self.template = template
     self.template_mapping = _ProgressStoreTemplateMapping(self)

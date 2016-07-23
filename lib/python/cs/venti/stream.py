@@ -30,7 +30,7 @@ class StreamStore(BasicStoreAsync):
       or simply to implement the server side.
   '''
 
-  def __init__(self, send_fp, recv_fp, local_store=None, addif=False, name=None, **kw):
+  def __init__(self, name, send_fp, recv_fp, local_store=None, addif=False, **kw):
     ''' Initialise the Stream Store.
         `send_fp`: binary stream file for sending data to the peer.
         `recv_fp`: binary stream file for receiving data from the peer.

@@ -17,16 +17,16 @@ from .stream import StreamStore
 def make_stream_store(hashclass, addif):
   upstream_rd, upstream_wr = os.pipe()
   downstream_rd, downstream_wr = os.pipe()
-  remote_S = StreamStore( os.fdopen(upstream_rd, 'rb'),
+  remote_S = StreamStore( "stream_tests.make_stream_store.remote_S",
+                          os.fdopen(upstream_rd, 'rb'),
                           os.fdopen(downstream_wr, 'wb'),
-                          name="test_remote_Store",
-                          local_store=MappingStore(HashUtilDict()).open(),
+                          local_store=MappingStore("stream_tests.make_stream_store.remote_S.local_store", HashUtilDict()).open(),
                           addif=addif,
                           hashclass=hashclass
                         )
-  S = StreamStore( os.fdopen(downstream_rd, 'rb'),
+  S = StreamStore( "stream_tests.make_stream_store.S",
+                   os.fdopen(downstream_rd, 'rb'),
                    os.fdopen(upstream_wr, 'wb'),
-                   name="test_local_Store",
                    addif=addif,
                    hashclass=hashclass
                  )

@@ -16,9 +16,9 @@ from .hash import DEFAULT_HASHCLASS
 
 class TestCacheStore(_TestStore, unittest.TestCase):
   def _init_Store(self):
-    self.fastS = MappingStore({}, hashclass=self.hashclass)
-    self.slowS = MappingStore({}, hashclass=self.hashclass)
-    self.S = CacheStore(self.fastS, self.slowS, hashclass=self.hashclass)
+    self.fastS = MappingStore("TestCacheStore.fastS", {}, hashclass=self.hashclass)
+    self.slowS = MappingStore("TestCacheStore.slowS", {}, hashclass=self.hashclass)
+    self.S = CacheStore("TestCacheStore.S", self.fastS, self.slowS, hashclass=self.hashclass)
 
 class TestMemoryCacheStore(_TestStore, unittest.TestCase):
   def _init_Store(self):

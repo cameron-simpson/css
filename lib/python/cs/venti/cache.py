@@ -20,7 +20,7 @@ class CacheStore(BasicStoreSync):
       the backend. A block store is stored to the cache and then
       asynchronously to the backend.
   '''
-  def __init__(self, backend, cache, **kw):
+  def __init__(self, name, backend, cache, **kw):
     hashclass = kw.pop('hashclass', None)
     if hashclass is None:
       hashclass = backend.hashclass
@@ -31,8 +31,10 @@ class CacheStore(BasicStoreSync):
       raise ValueError("backend and cache hashclasses are not the same (%s vs %s)"
                        % (backend.hashclass, cache.hashclass))
     kw['hashclass'] = hashclass
-    kw['name'] = "Cache(cache=%s, backend=%s)" % (cache, backend)
-    BasicStoreSync.__init__(self, **kw)
+    BasicStoreSync.__init__(self,
+                            "CacheStore(backend=%s,cache=%s)"
+                            % (backend.name, cache.name),
+                            **kw)
     self.backend = backend
     self.cache = cache
     # secondary queue to process background self.backend operations
@@ -96,9 +98,8 @@ class MemoryCacheStore(BasicStoreSync):
       all chunks in memory.
   '''
 
-  def __init__(self, maxchunks=1024, **kw):
-    kw['name'] = 'MemoryCacheStore'
-    BasicStoreSync.__init__(self, **kw)
+  def __init__(self, name, maxchunks=1024, **kw):
+    BasicStoreSync.__init__(self, "MemoryCacheStore(%s)" % (name,), **kw)
     # TODO: fails if maxchunks == 0
     assert maxchunks > 0
     self.hashlist = [None for _ in range(maxchunks)]
