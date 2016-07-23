@@ -13,6 +13,7 @@
 '''
 
 from __future__ import with_statement
+from abc import ABC, abstractmethod
 from binascii import hexlify
 from contextlib import contextmanager
 import os
@@ -159,7 +160,7 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin):
       if h not in self:
         yield h
 
-class BasicStoreSync(_BasicStoreCommon):
+class BasicStoreSync(_BasicStoreCommon, ABC):
   ''' Subclass of _BasicStoreCommon expecting synchronous operations and providing asynchronous hooks, dual of BasicStoreAsync.
   '''
 
@@ -167,22 +168,35 @@ class BasicStoreSync(_BasicStoreCommon):
   ## Background versions of operations.
   ##
 
+  @abstractmethod
+  def add(self, data):
+    pass
+
   def add_bg(self, data):
     return self._defer(self.add, data)
+
+  @abstractmethod
+  def get(self, h):
+    pass
 
   def get_bg(self, h):
     return self._defer(self.get, h)
 
+  @abstractmethod
+  def contains(self, h):
+    pass
+
   def contains_bg(self, h):
     return self._defer(self.contains, h)
+
+  @abstractmethod
+  def flush(self):
+    pass
 
   def flush_bg(self):
     return self._defer(self.flush)
 
-  def hashcodes_bg(self, start_hashcode=None, reverse=None, after=False, length=None):
-    return self._defer(self.hashcodes, start_hashcode=start_hashcode, reverse=reverse, after=after, length=length)
-
-class BasicStoreAsync(_BasicStoreCommon):
+class BasicStoreAsync(_BasicStoreCommon, ABC):
   ''' Subclass of _BasicStoreCommon expecting asynchronous operations and providing synchronous hooks, dual of BasicStoreSync.
   '''
 
@@ -193,18 +207,30 @@ class BasicStoreAsync(_BasicStoreCommon):
   def add(self, data):
     return self.add_bg(data)()
 
+  @abstractmethod
+  def add_bg(self, data):
+    pass
+
   def get(self, h):
     return self.get_bg(h)()
+
+  @abstractmethod
+  def get_bg(self, h):
+    pass
 
   def contains(self, h):
     return self.contains_bg(h)()
 
+  @abstractmethod
+  def contains_bg(self, h):
+    pass
+
   def flush(self):
     return self.flush_bg()()
 
-  def hashcodes(self, start_hashcode=None, reverse=None, after=False, length=None):
-    X("BasicStoreSync.hashcodes WRAPPER")
-    return self.hashcodes_bg(start_hashcode=start_hashcode, reverse=reverse, after=after, length=length)()
+  @abstractmethod
+  def flush_bg(self):
+    pass
 
 def Store(store_spec):
   ''' Factory function to return an appropriate BasicStore* subclass
