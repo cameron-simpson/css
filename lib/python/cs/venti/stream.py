@@ -113,6 +113,10 @@ class StreamStore(BasicStoreAsync):
       if hashclass is not self.local_store.hashclass:
         raise ValueError("request hashclass %s does not match local_store hashclass %s"
                          % (hashclass, self.local_store.hashclass))
+      if length is not None and length < 1:
+        raise ValueError("length < 1: %r" % (length,))
+      if after and start_hashcode is None:
+        raise ValueError("after=%s but start_hashcode=%s" % (after, start_hashcode))
       etc = self.local_store.hash_of_hashcodes(start_hashcode=start_hashcode,
                                                reverse=reverse,
                                                after=after,
@@ -223,8 +227,15 @@ class StreamStore(BasicStoreAsync):
     '''
     return missing_hashcodes_by_checksum(self, other, window_size=window_size)
 
-  def hashcodes(self, *a, **kw):
-    return self.hashcodes_bg(*a, **kw)()
+  def hashcodes(self, start_hashcode=None, reverse=None, after=False, length=None):
+    if length is not None and length < 1:
+      raise ValueError("length should be None or >1, got: %r", length)
+    if after and start_hashcode is None:
+      raise ValueError("after=%s but start_hashcode=%s" % (after, start_hashcode))
+    return self.hashcodes_bg(start_hashcode=start_hashcode,
+                             reverse=reverse,
+                             after=after,
+                             length=length)()
 
   def hashcodes_bg(self, start_hashcode=None, reverse=None, after=False, length=None):
     ''' Dispatch a hashcodes request, return a Result for collection.
@@ -232,6 +243,8 @@ class StreamStore(BasicStoreAsync):
     hashclass = self.hashclass
     if length is not None and length < 1:
       raise ValueError("length should be None or >1, got: %r", length)
+    if after and start_hashcode is None:
+      raise ValueError("after=%s but start_hashcode=%s" % (after, start_hashcode))
     flags = ( 0x01 if reverse else 0x00 ) \
           | ( 0x02 if after else 0x00 )
     payload = put_bss(hashclass.HASHNAME) \
@@ -298,6 +311,8 @@ class StreamStore(BasicStoreAsync):
       hashclass = self.hashclass
     if length is not None and length < 1:
       raise ValueError("length should be None or >1, got: %r", length)
+    if after and start_hashcode is None:
+      raise ValueError("after=%s but start_hashcode=%s" % (after, start_hashcode))
     flags = ( 0x01 if reverse else 0x00 ) \
           | ( 0x02 if after else 0x00 )
     payload = put_bss(hashclass.HASHNAME) \
@@ -306,6 +321,10 @@ class StreamStore(BasicStoreAsync):
     return self._conn.request(T_HASHCODES_HASH, flags, payload, self._decode_response_hash_of_hashcodes)
 
   def hash_of_hashcodes(self, hashclass=None, start_hashcode=None, reverse=None, after=False, length=None):
+    if length is not None and length < 1:
+      raise ValueError("length should be None or >1, got: %r", length)
+    if after and start_hashcode is None:
+      raise ValueError("after=%s but start_hashcode=%s" % (after, start_hashcode))
     return self.hash_of_hashcodes_bg(hashclass=hashclass,
                                      start_hashcode=start_hashcode,
                                      reverse=reverse,
