@@ -217,6 +217,9 @@ class StreamStore(BasicStoreAsync):
     '''
     return missing_hashcodes_by_checksum(self, other, window_size=window_size)
 
+  def hashcodes(self, *a, **kw):
+    return self.hashcodes_bg(*a, **kw)()
+
   def hashcodes_bg(self, start_hashcode=None, reverse=None, after=False, length=None):
     ''' Dispatch a hashcodes request, return a Result for collection.
     '''
