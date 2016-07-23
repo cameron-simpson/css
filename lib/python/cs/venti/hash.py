@@ -243,6 +243,9 @@ class HashCodeUtilsMixin(object):
         if length < 1:
           break
 
+  def hashcodes_bg(self, start_hashcode=None, reverse=None, after=False, length=None):
+    return self._defer(self.hashcodes, start_hashcode=start_hashcode, reverse=reverse, after=after, length=length)
+
 class HashUtilDict(dict, MultiOpenMixin, HashCodeUtilsMixin):
   ''' Simple dict subclass supporting HashCodeUtilsMixin.
   '''
