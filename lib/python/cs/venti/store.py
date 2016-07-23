@@ -34,7 +34,7 @@ from . import defaults, totext
 from .datafile import DataDir, DEFAULT_INDEXCLASS
 from .hash import DEFAULT_HASHCLASS, HashCodeUtilsMixin
 
-class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin):
+class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, ABC):
   ''' Core functions provided by all Stores.
 
       Subclasses should not subclass this class but BasicStoreSync
@@ -160,7 +160,39 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin):
       if h not in self:
         yield h
 
-class BasicStoreSync(_BasicStoreCommon, ABC):
+  @abstractmethod
+  def add(self, data):
+    pass
+
+  @abstractmethod
+  def add_bg(self, data):
+    pass
+
+  @abstractmethod
+  def get(self, h):
+    pass
+
+  @abstractmethod
+  def get_bg(self, h):
+    pass
+
+  @abstractmethod
+  def contains(self, h):
+    pass
+
+  @abstractmethod
+  def contains_bg(self, h):
+    pass
+
+  @abstractmethod
+  def flush(self):
+    pass
+
+  @abstractmethod
+  def flush_bg(self):
+    pass
+
+class BasicStoreSync(_BasicStoreCommon):
   ''' Subclass of _BasicStoreCommon expecting synchronous operations and providing asynchronous hooks, dual of BasicStoreAsync.
   '''
 
@@ -168,35 +200,19 @@ class BasicStoreSync(_BasicStoreCommon, ABC):
   ## Background versions of operations.
   ##
 
-  @abstractmethod
-  def add(self, data):
-    pass
-
   def add_bg(self, data):
     return self._defer(self.add, data)
-
-  @abstractmethod
-  def get(self, h):
-    pass
 
   def get_bg(self, h):
     return self._defer(self.get, h)
 
-  @abstractmethod
-  def contains(self, h):
-    pass
-
   def contains_bg(self, h):
     return self._defer(self.contains, h)
-
-  @abstractmethod
-  def flush(self):
-    pass
 
   def flush_bg(self):
     return self._defer(self.flush)
 
-class BasicStoreAsync(_BasicStoreCommon, ABC):
+class BasicStoreAsync(_BasicStoreCommon):
   ''' Subclass of _BasicStoreCommon expecting asynchronous operations and providing synchronous hooks, dual of BasicStoreSync.
   '''
 
@@ -207,30 +223,14 @@ class BasicStoreAsync(_BasicStoreCommon, ABC):
   def add(self, data):
     return self.add_bg(data)()
 
-  @abstractmethod
-  def add_bg(self, data):
-    pass
-
   def get(self, h):
     return self.get_bg(h)()
-
-  @abstractmethod
-  def get_bg(self, h):
-    pass
 
   def contains(self, h):
     return self.contains_bg(h)()
 
-  @abstractmethod
-  def contains_bg(self, h):
-    pass
-
   def flush(self):
     return self.flush_bg()()
-
-  @abstractmethod
-  def flush_bg(self):
-    pass
 
 def Store(store_spec):
   ''' Factory function to return an appropriate BasicStore* subclass
