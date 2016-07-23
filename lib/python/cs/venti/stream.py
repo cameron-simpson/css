@@ -42,6 +42,10 @@ class StreamStore(BasicStoreAsync):
         `name`: the Store name.
     '''
     BasicStoreAsync.__init__(self, 'StreamStore:'+name, **kw)
+    if local_store is not None:
+      if local_store.hashclass is not self.hashclass:
+        raise ValueError("local_store.hashclass %s is not self.hashclass %s"
+                         % (local_store.hashclass, self.hashclass))
     self._conn = PacketConnection(send_fp, recv_fp, self._handle_request,
                                   name='PacketConnection:'+self.name)
     self.local_store = local_store
