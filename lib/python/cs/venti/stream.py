@@ -110,8 +110,10 @@ class StreamStore(BasicStoreAsync):
     if rq_type == T_HASHCODES_HASH:
       hashclass, start_hashcode, reverse, after, length \
         = self._decode_request_hash_of_hashcodes(flags, payload)
-      etc = self.local_store.hash_of_hashcodes(hashclass=hashclass,
-                                               start_hashcode=start_hashcode,
+      if hashclass is not self.local_store.hashclass:
+        raise ValueError("request hashclass %s does not match local_store hashclass %s"
+                         % (hashclass, self.local_store.hashclass))
+      etc = self.local_store.hash_of_hashcodes(start_hashcode=start_hashcode,
                                                reverse=reverse,
                                                after=after,
                                                length=length)
