@@ -379,11 +379,7 @@ class DataDirStore(MappingStore):
 
   def __init__(self, name, statedirpath, datadirpath=None, hashclass=None, indexclass=None, rollover=None, **kw):
     if hashclass is None:
-      S = defaults.S
-      if S is None:
-        hashclass = DEFAULT_HASHCLASS
-      else:
-        hashclass = S.hashclass
+      raise ValueError("hashclass is mandatory")
     if indexclass is None:
       indexclass = DEFAULT_INDEXCLASS
     self._datadir = DataDir(statedirpath, datadirpath, hashclass, indexclass, rollover=rollover)
