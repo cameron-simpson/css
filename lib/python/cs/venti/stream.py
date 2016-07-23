@@ -41,7 +41,7 @@ class StreamStore(BasicStoreAsync):
             at the expense of latency.
         `name`: the Store name.
     '''
-    BasicStoreAsync.__init__(self, 'StreamStore:'+name, **kw)
+    BasicStoreAsync.__init__(self, 'StreamStore:%s' % (name,), **kw)
     if local_store is not None:
       if local_store.hashclass is not self.hashclass:
         raise ValueError("local_store.hashclass %s is not self.hashclass %s"
