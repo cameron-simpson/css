@@ -859,7 +859,7 @@ class Later(MultiOpenMixin):
   @MultiOpenMixin.is_opened
   def after(self, LFs, R, func, *a, **kw):
     ''' Queue the function `func` for later dispatch after completion of `LFs`.
-        Return a Result for later collection of the function result.
+        Return a Result for collection of the result of `func`.
 
         This function will not be submitted until completion of
         the supplied LateFunctions `LFs`.
