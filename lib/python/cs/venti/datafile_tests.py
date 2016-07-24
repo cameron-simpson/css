@@ -227,7 +227,7 @@ def selftest(argv):
   ##  cProfile.runctx('unittest.main(__name__, None, argv)', globals(), locals())
   ##else:
   ##  unittest.main(__name__, None, argv)
-  thread_dump()
+  ##thread_dump()
 
 if __name__ == '__main__':
   selftest(sys.argv)
