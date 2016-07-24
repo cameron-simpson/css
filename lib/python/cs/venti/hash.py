@@ -137,6 +137,10 @@ class HashCodeUtilsMixin(object):
   def hash_of_hashcodes(self, start_hashcode=None, reverse=None, after=False, length=None):
     ''' Return a hash of the hashcodes requested and the last hashcode (or None if no hashcodes matched); used for comparing remote Stores.
     '''
+    if length is not None and length < 1:
+      raise ValueError("length < 1: %r" % (length,))
+    if after and start_hashcode is None:
+      raise ValueError("after=%s but start_hashcode=%s" % (after, start_hashcode))
     hs = list(self.hashcodes(start_hashcode=start_hashcode, reverse=reverse, after=after, length=length))
     if hs:
       h_final = hs[-1]
