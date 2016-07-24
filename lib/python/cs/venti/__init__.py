@@ -79,7 +79,7 @@ class _TestAdditionsMixin:
       olen = len(o)
     except TypeError:
       import cs.logutils
-      cs.logutils.warning("skip assertLen(o, %d): no len(%s)", length, type(o))
+      cs.logutils.debug("skip assertLen(o, %d): no len(%s)", length, type(o))
       pass
     else:
       self.assertEqual(olen, length, *a, **kw)
