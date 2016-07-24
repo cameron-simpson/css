@@ -11,6 +11,7 @@ if sys.hexversion >= 0x02050000:
 else:
   from sha import new as sha1
 import unittest
+from itertools import accumulate
 import cs.logutils
 cs.logutils.X_via_tty = True
 from cs.logutils import X
@@ -149,9 +150,11 @@ class _TestHashCodeUtils(_TestAdditionsMixin):
         with self.subTest(after=after):
           for n in range(1,16):
             if after:
-              start_hashcode = min(*iter(M1))
-              if start_hashcode is 0:
-                X("start_hashcode is 0, skipping this test")
+              start_hashcode = None
+              for mincode in accumulate(iter(M1), min):
+                start_hashcode = mincode
+              if start_hashcode is None:
+                # no start_hashcode, skip when after is true
                 continue
             else:
               start_hashcode = None
