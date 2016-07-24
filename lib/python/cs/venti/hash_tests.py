@@ -76,8 +76,6 @@ class _TestHashCodeUtils(_TestAdditionsMixin):
       self.assertLen(M1, 1)
       MS = sorted(M1.hashcodes())
       KS = sorted(KS1)
-      X("MS = %r", MS)
-      X("KS = %r", KS)
       self.assertEqual(set(M1.hashcodes()), KS1)
       # add another block
       data2 = randblock(rand0(8193))
@@ -86,8 +84,6 @@ class _TestHashCodeUtils(_TestAdditionsMixin):
       self.assertLen(M1, 2)
       MS = sorted(M1.hashcodes())
       KS = sorted(KS1)
-      X("MS = %r", MS)
-      X("KS = %r", KS)
       self.assertEqual(set(M1.hashcodes()), KS1)
 
   def test01test_hashcodes_from(self):
@@ -112,10 +108,7 @@ class _TestHashCodeUtils(_TestAdditionsMixin):
           with self.subTest(M1type=type(M1), reverse=reverse, start_hashcode=start_hashcode):
             hs = list(M1.hashcodes_from(start_hashcode=start_hashcode,
                                         reverse=reverse))
-            X("LEN(hs) = %d", len(hs))
-            X("HS = %r", hs)
             self.assertIsOrdered(hs, reverse=reverse, strict=True)
-            X("hs = %r", hs)
             if reverse:
               ksrev = reversed(ks)
               hs2 = [ h for h in ksrev if start_hashcode is None or h <= start_hashcode ]
