@@ -148,16 +148,13 @@ class File(BackedFile):
   def read(self, size = -1):
     ''' Read up to `size` bytes, honouring the "single system call" spirit.
     '''
-    ##X("vt.File.read(size=%r)", size)
     if size == -1:
       return self.readall()
     if size < 1:
       raise ValueError("%s.read: size(%r) < 0 but not -1", self, size)
     start = self._offset
     end = start + size
-    ##X("vt.File.read: start=%d, end=%d", start, end)
     for inside, span in self.front_range.slices(start, end):
-      ##X("vt.File.read: inside=%s span=%s", inside, span)
       if inside:
         # data from the front file; return the first chunk
         for chunk in filedata(self.front_file, start=span.start, end=span.end):
@@ -165,14 +162,10 @@ class File(BackedFile):
           return chunk
       else:
         # data from the backing block: return the first chunk
-        ##X("vt.File.read: backing data, get slices...")
         for B, Bstart, Bend in self.backing_block.slices(span.start, span.end):
-          ##X("vt.File.read: B=%s[len=%s], Bstart=%r, Bend=%r", B, len(B), Bstart, Bend)
           data = B[Bstart:Bend]
-          ##X("vt.File.read: data=%r", data)
           self._offset += len(data)
           return data
-    ##X("vt.File.read: no chunks: return empty bytes")
     return b''
 
   @locked
