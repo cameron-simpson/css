@@ -18,7 +18,6 @@ from .fileutils import compare, rewrite, rewrite_cmgr, lockfile, Pathname, \
                         file_property, make_file_property, \
                         make_files_property, \
                         BackedFile, BackedFile_TestMethods
-from .py3 import StringIO
 from .timeutils import TimeoutError, sleep
 from .logutils import D, X
 

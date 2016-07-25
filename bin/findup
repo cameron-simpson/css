@@ -7,7 +7,7 @@
 set -ue
 
 cmd=$( basename "$0" )
-usage="Usage: [-a] relpath [testcmd]"
+usage="Usage: $cmd [-a] relpath [testcmd]"
 
 all=
 
@@ -34,6 +34,8 @@ else
   relpath=$1
   shift
 fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 # default test: path exists
 [ $# -gt 0 ] || set -- test -e
