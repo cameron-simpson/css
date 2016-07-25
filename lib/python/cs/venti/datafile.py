@@ -21,6 +21,7 @@ from cs.cache import LRU_Cache
 from cs.csvutils import csv_reader, csv_writerow
 from cs.excutils import LogExceptions
 from cs.fileutils import makelockfile, shortpath, longpath
+import cs.logutils; cs.logutils.X_via_tty = True
 from cs.logutils import D, X, XP, debug, warning, error, exception, Pfx
 from cs.obj import O
 from cs.queues import IterableQueue
@@ -332,8 +333,8 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     ''' Read STATE_FILENAME.
     '''
     statefilepath = self.statefilepath
-    if existspath(statefilepath):
-      os.system('sed "s/^/IN  /" %r' % (statefilepath,))
+    ##if existspath(statefilepath):
+    ##  os.system('sed "s/^/IN  /" %r' % (statefilepath,))
     filemap = self._filemap
     with Pfx('_load_state(%r)', statefilepath):
       if existspath(statefilepath):
@@ -390,7 +391,7 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
         filemap = self._filemap
         for F in set(filemap.values()):
           csvw.writerow( (F.filenum, F.filename, F.size) )
-    os.system('sed "s/^/OUT /" %r' % (statefilepath,))
+    ##os.system('sed "s/^/OUT /" %r' % (statefilepath,))
 
   def _add_datafile(self, filename):
     ''' Add the datafile with basename `filename` to the filemap.
