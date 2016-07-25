@@ -171,7 +171,6 @@ class TestDataDir(unittest.TestCase):
           # test integrity afterwards
           self.assertTrue(hashcode in by_hash)
           self.assertTrue(data in by_data)
-          ##X("D[]=%r", list(D.keys()))
           self.assertTrue(hashcode in D)
       # now retrieve in random order
       hashcodes = list(by_hash.keys())
