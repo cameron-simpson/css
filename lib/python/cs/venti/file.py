@@ -98,11 +98,6 @@ class File(BackedFile):
     self._backing_block = new_block
     self._reset(BlockFile(new_block))
 
-  def __len__(self):
-    ''' Return the current length of the file.
-    '''
-    return max(len(self.backing_block), self.front_range.end)
-
   @locked
   def flush(self):
     ''' Push the current state to the Store and update the current top block.
