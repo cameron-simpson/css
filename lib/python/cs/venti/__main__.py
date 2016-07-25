@@ -385,7 +385,7 @@ def cmd_init(args, verbose=None, log=None):
   return 0
 
 def cmd_listen(args, verbose=None, log=None):
-  ''' Start a daemon listening on a TCP port or in stdin/stdout.
+  ''' Start a daemon listening on a TCP port or on stdin/stdout.
   '''
   if len(args) != 1:
     raise GetoptError("expected a port")
