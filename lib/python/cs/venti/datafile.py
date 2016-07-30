@@ -29,7 +29,6 @@ from cs.resources import MultiOpenMixin
 from cs.seq import imerge
 from cs.serialise import get_bs, put_bs, read_bs, put_bsdata, read_bsdata
 from cs.threads import locked, locked_property
-from . import defaults
 from .hash import HASHCLASS_BY_NAME, DEFAULT_HASHCLASS, HashCodeUtilsMixin
 
 F_COMPRESSED = 0x01
