@@ -467,7 +467,7 @@ def IndirectBlock(subblocks=None, hashcode=None, span=None):
       Indirect blocks may be initialised in two ways:
 
       The first way is specified by supplying the `subblocks`
-      paramater, an iterable of Blocks to be referenced by this
+      parameter, an iterable of Blocks to be referenced by this
       IndirectBlock. The referenced Blocks are encoded and assembled
       into the data for this Block.
 
@@ -488,7 +488,7 @@ def IndirectBlock(subblocks=None, hashcode=None, span=None):
       raise ValueError("no span supplied with hashcode %s" % (hashcode,))
     B = HashCodeBlock(hashcode=hashcode)
   else:
-    # subblcoks specified
+    # subblocks specified
     if hashcode is not None:
       raise ValueError("only one of hashocde and subblocks may be supplied")
     subspan = sum(subB.span for subB in subblocks)
