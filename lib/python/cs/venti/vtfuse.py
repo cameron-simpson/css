@@ -263,7 +263,7 @@ class Inodes(object):
     '''
     if delta < 1:
       raise ValueError("inc_kref(%d, delta=%s): expected delta >= 1" % (inum, delta))
-    count = self.krefcount.get(inum)
+    count = self.krefcount.get(inum, 0)
     count += delta
     self.krefcount[inum] = count
     return count
@@ -324,6 +324,7 @@ class Inodes(object):
       except AttributeError:
         E._inum = inum
         self._dirents_by_inum[inum] = E, None
+        self._mortal.add(inum)
       else:
         raise RuntimeError("already has ._inum: %s" % (inum0,))
     else:
@@ -677,7 +678,8 @@ if FUSE_CLASS == 'llfuse':
       if name in P:
         warning("create(parent_inode=%d:%s,name=%r): already exists - surprised!",
                 parent_inode, P, name)
-      fnhdx = self._vt_core.open2(P, name, flags|O_CREAT, ctx)
+      fhndx = self._vt_core.open2(P, name, flags|O_CREAT, ctx)
+      E = self._vt_core._fh(fhndx).E
       E.meta.chmod(mode)
       P.change()
       return fhndx, self._vt_EntryAttributes(E)
