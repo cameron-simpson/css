@@ -312,6 +312,24 @@ class Inodes(object):
     return inum
 
   @locked
+  def assign_inum(self, E, inum):
+    X("ASSIGN INUM %d ==> %s", inum, E)
+    try:
+      E2 = self.dirent(inum)
+    except ValueError:
+      if E.ishardlink:
+        raise RuntimeError("hardlink: %s" % (E,))
+      try:
+        inum0 = E._inum
+      except AttributeError:
+        E._inum = inum
+        self._dirents_by_inum[inum] = E
+      else:
+        raise RuntimeError("already has ._inum: %s" % (inum0,))
+    else:
+      raise ValueError("inode %s already allocated to: %s", inum, E2)
+
+  @locked
   def make_hardlink(self, E):
     ''' Create a new HardlinkDirent wrapping `E` and return the new Dirent.
     '''
@@ -392,6 +410,8 @@ class _StoreFS_core(object):
     self._path_files = {}
     self._file_handles = []
     self._inodes = Inodes(self, E.meta.get('fs_inode_data'))
+    # preassign inode 1, llfuse seems to presume it :-(
+    self._inodes.assign_inum(self.mntE, 1)
     X("StoreFS.__init__ COMPLETE")
 
   def __str__(self):
