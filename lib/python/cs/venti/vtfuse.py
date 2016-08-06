@@ -120,8 +120,8 @@ class FileHandle(O):
   ''' Filesystem state for open files.
   '''
 
-  def __init__(self, fs, path, E, for_read, for_write, for_append, lock=None):
-    ''' Initialise the FileHandle with filesystem, path, dirent and modes.
+  def __init__(self, fs, E, for_read, for_write, for_append, lock=None):
+    ''' Initialise the FileHandle with filesystem, dirent and modes.
     '''
     O.__init__(self)
     if lock is None:
@@ -517,8 +517,7 @@ class _StoreFS_core(object):
       X("create %r", name)
       name_s = name.decode('utf8')
       E = FileDirent(name_s)
-      E.meta.apply_open_mode(mode)
-      P[name] = E
+      P[name_s] = E
     return self.open(E, flags, ctx)
 
   def open(self, E, flags, ctx):
@@ -528,10 +527,10 @@ class _StoreFS_core(object):
     for_read = (flags & O_RDONLY) == O_RDONLY or (flags & O_RDWR) == O_RDWR
     for_write = (flags & O_WRONLY) == O_WRONLY or (flags & O_RDWR) == O_RDWR
     for_append = (flags & O_APPEND) == O_APPEND
-    debug("do_create=%s for_read=%s, for_write=%s, for_append=%s",
-          do_create, for_read, for_write, for_append)
+    debug("for_read=%s, for_write=%s, for_append=%s",
+          for_read, for_write, for_append)
     FH = FileHandle(self, E, for_read, for_write, for_append, lock=self._lock)
-    self.inc_kref(self.E2i(E))
+    self._inodes.inc_kref(self.E2i(E))
     if flags & O_TRUNC:
       FH.truncate(0)
     fhndx = self._new_file_handle_index(FH)
@@ -679,6 +678,7 @@ if FUSE_CLASS == 'llfuse':
         warning("create(parent_inode=%d:%s,name=%r): already exists - surprised!",
                 parent_inode, P, name)
       fnhdx = self._vt_core.open2(P, name, flags|O_CREAT, ctx)
+      E.meta.chmod(mode)
       P.change()
       return fhndx, self._vt_EntryAttributes(E)
 
