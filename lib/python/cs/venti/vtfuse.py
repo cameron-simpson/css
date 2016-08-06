@@ -323,7 +323,7 @@ class Inodes(object):
         inum0 = E._inum
       except AttributeError:
         E._inum = inum
-        self._dirents_by_inum[inum] = E
+        self._dirents_by_inum[inum] = E, None
       else:
         raise RuntimeError("already has ._inum: %s" % (inum0,))
     else:
@@ -515,7 +515,8 @@ class _StoreFS_core(object):
       raise FuseOSError(errno.ENOENT)
     else:
       X("create %r", name)
-      E = FileDirent(name)
+      name_s = name.decode('utf8')
+      E = FileDirent(name_s)
       E.meta.apply_open_mode(mode)
       P[name] = E
     return self.open(E, flags, ctx)
@@ -548,6 +549,9 @@ class _StoreFS_core(object):
     if fh is None:
       error("cannot look up FileHandle index %r", fhndx)
     return fh
+
+  def _fh_remove(self, fhndx):
+    del self._file_handles[fhndx]
 
   @locked
   def _new_file_handle_index(self, file_handle):
@@ -641,14 +645,14 @@ if FUSE_CLASS == 'llfuse':
       '''
       st = self._vt_core._Estat(E)
       EA = llfuse.EntryAttributes()
-      EA.st_ino = st.st_ino
+      EA.st_ino = self._vt_core.E2i(E)
       ## EA.generation
       ## EA.entry_timeout
       ## EA.attr_timeout
       EA.st_mode = st.st_mode
       EA.st_nlink = st.st_nlink
-      EA.st_uid = st.st_uid
-      EA.st_gid = st.st_gid
+      EA.st_uid = st.st_uid if st.st_uid >= 0 else self._vt_core._fs_uid
+      EA.st_gid = st.st_gid if st.st_gid >= 0 else self._vt_core._fs_gid
       ## EA.st_rdev
       EA.st_size = st.st_size
       ## EA.st_blksize
@@ -709,7 +713,7 @@ if FUSE_CLASS == 'llfuse':
       return self._vt_EntryAttributes(E)
 
     @trace_method
-    def getxattr(self, inode, name):
+    def getxattr(self, inode, name, ctx):
       # TODO: test for permission to access inode?
       E = self._vt_core.i2E(inode)
       meta = E.meta
@@ -856,6 +860,7 @@ if FUSE_CLASS == 'llfuse':
           except KeyError:
             continue
           yield name, self._vt_EntryAttributes(E), o + 1
+      return entries()
 
     @trace_method
     def readlink(self, inode, ctx):
