@@ -258,25 +258,25 @@ class Inodes(object):
       return E
 
   @locked
-  def inc_kref(self, inum, delta=1):
+  def kref_inc(self, inum, delta=1):
     ''' Adjust the kernel reference count for this inode up. Return the new count.
     '''
     if delta < 1:
-      raise ValueError("inc_kref(%d, delta=%s): expected delta >= 1" % (inum, delta))
+      raise ValueError("kref_inc(%d, delta=%s): expected delta >= 1" % (inum, delta))
     count = self.krefcount.get(inum, 0)
     count += delta
     self.krefcount[inum] = count
     return count
 
   @locked
-  def dec_kref(self, inum, delta=1):
+  def kref_dec(self, inum, delta=1):
     ''' Adjust the kernel reference count for this inode down. Return the new count.
     '''
     if delta < 1:
-      raise ValueError("dec_kref(%d, delta=%s): expected delta >= 1" % (inum, delta))
+      raise ValueError("kref_dec(%d, delta=%s): expected delta >= 1" % (inum, delta))
     count = self.krefcount[inum]
     if count < delta:
-      raise ValueError("dec_kref(%d, delta=%s): count(%d) < delta" % (inum, delta, count))
+      raise ValueError("kref_dec(%d, delta=%s): count(%d) < delta" % (inum, delta, count))
     count -= delta
     self.krefcount[inum] = count
     # TODO: free the inode if ==> 0 ?
@@ -531,7 +531,7 @@ class _StoreFS_core(object):
     debug("for_read=%s, for_write=%s, for_append=%s",
           for_read, for_write, for_append)
     FH = FileHandle(self, E, for_read, for_write, for_append, lock=self._lock)
-    self._inodes.inc_kref(self.E2i(E))
+    self._inodes.kref_inc(self.E2i(E))
     if flags & O_TRUNC:
       FH.truncate(0)
     fhndx = self._new_file_handle_index(FH)
@@ -539,6 +539,12 @@ class _StoreFS_core(object):
 
   def make_hardlink(self, E):
     return self._inodes.make_hardlink(E)
+
+  def kref_inc(self, inum, delta=1):
+    return self._inodes.kref_inc(inum, delta)
+
+  def kref_dec(self, inum, delta=1):
+    return self._inodes.kref_dec(inum, delta)
 
   @locked
   def _fh(self, fhndx):
@@ -552,6 +558,11 @@ class _StoreFS_core(object):
 
   def _fh_remove(self, fhndx):
     del self._file_handles[fhndx]
+
+  def _fh_close(self, fhndx):
+    fh = self._fh(fhndx)
+    fh.close()
+    self._fh_remove(fhndx)
 
   @locked
   def _new_file_handle_index(self, file_handle):
@@ -693,7 +704,8 @@ if FUSE_CLASS == 'llfuse':
     def flush(self, fh):
       FH = self._vt_core._fh(fh)
       FH.flush()
-      self._vt_core.kref_dec(FH.inum)
+      inum = self._vt_core.E2i(FH.E)
+      self._vt_core.kref_dec(inum)
 
     def forget(self, inode_list):
       for inode, nlookup in inode_list:
