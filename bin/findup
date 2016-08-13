@@ -7,9 +7,14 @@
 set -ue
 
 cmd=$( basename "$0" )
-usage="Usage: $cmd [-a] relpath [testcmd]"
+usage="Usage: $cmd [-a] relpath [{-c shcmd | testcmd [args...]}]
+  -a    Find all matches. Default is to stop after the first match.
+  -c shcmd
+        Run shell command \"shcmd\" with the environment variable
+        \$FINDUP_PATH set to the test directory."
 
 all=
+shmode=
 
 badopts=
 
@@ -38,7 +43,27 @@ fi
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 # default test: path exists
-[ $# -gt 0 ] || set -- test -e
+if [ $# = 0 ]
+then
+  set -- test -e
+else
+  if [ "x$1" = x-c ]
+  then
+    shmode=1
+    shift
+    if [ $# = 0 ]
+    then
+      echo "$cmd: -c: missing shcmd" >&2
+      badopts=1
+    else
+      shcmd=$1
+      shift
+      [ $# = 0 ] || { echo "$cmd: -c: extra arguments after shcmd: $*" >&2
+                      badopts=1
+                    }
+    fi
+  fi
+fi
 
 xit=1
 
@@ -47,7 +72,10 @@ dir=$( pwd )
 while [ -z "$odir" ] || [ "x$odir" != "x$dir" ]
 do
   path=$dir/$relpath
-  if "$@" "$path"
+  if if [ $shmode ]
+     then  FINDUP_PATH=$path sh -c "$shcmd"
+     else  "$@" "$path"
+     fi
   then
     xit=0
     printf '%s\n' "$path"
