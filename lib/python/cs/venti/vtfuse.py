@@ -186,17 +186,17 @@ class Inode(NS):
 
   def __iadd__(self, delta):
     if delta < 1:
-      raise ValueError("Inode.inc(%d, delta=%s): expected delta >= 1"
+      raise ValueError("Inode.__iadd__(%d, delta=%s): expected delta >= 1"
                        % (self.inum, delta))
     self.krefcount += delta
 
   def __isub__(self, delta):
     if delta < 1:
-      raise ValueError("Inode.inc(%d, delta=%s): expected delta >= 1"
+      raise ValueError("Inode.__isub__(%d, delta=%s): expected delta >= 1"
                        % (self.inum, delta))
     if self.krefcount < delta:
-      raise ValueError("Inode.inc(%d, delta=%s): krefcount(%d) < delta"
-                       % (self.inum, delta, self.count))
+      raise ValueError("Inode.__isub__(%d, delta=%s): krefcount(%d) < delta"
+                       % (self.inum, delta, self.krefcount))
     self.krefcount -= delta
 
 class Inodes(object):
