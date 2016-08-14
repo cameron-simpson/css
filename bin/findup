@@ -7,7 +7,7 @@
 set -ue
 
 cmd=$( basename "$0" )
-usage="Usage: $cmd [-a] {relpath|.} [{-c shcmd | testcmd [args...]}]
+usage="Usage: $cmd [-a] [-d] {relpath|.} [{-c shcmd | testcmd [args...]}]
   -a    Find all matches. Default is to stop after the first match.
   -c shcmd
         Run shell command \"shcmd\" with the environment variable
