@@ -706,7 +706,7 @@ if FUSE_CLASS == 'llfuse':
       return fhndx, self._vt_EntryAttributes(E)
 
     @trace_method
-    def destroy(self, path):
+    def destroy(self):
       # TODO: call self.forget with all kreffed inums?
       self._vt_core._sync()
 
