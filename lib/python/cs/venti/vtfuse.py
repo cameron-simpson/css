@@ -520,9 +520,8 @@ class _StoreFS_core(object):
       raise FuseOSError(errno.ENOENT)
     else:
       X("create %r", name)
-      name_s = name.decode('utf8')
-      E = FileDirent(name_s)
-      P[name_s] = E
+      E = FileDirent(name)
+      P[name] = E
     return self.open(E, flags, ctx)
 
   def open(self, E, flags, ctx):
@@ -683,6 +682,28 @@ if FUSE_CLASS == 'llfuse':
       EA.st_mtime_ns = int(st.st_mtime * 1000000000)
       return EA
 
+    @staticmethod
+    def _vt_str(bs):
+      if isinstance(bs, bytes):
+        try:
+          s = bs.decode('utf-8')
+        except UnicodeDecodeError as e:
+          warning("decode %r: %e, falling back to surrogateescape", bs, e)
+          s = bs.decode('utf-8', errors='surrogateescape')
+      else:
+        warning("_vt_str: expected bytes, got %s %r, passing unchanged", type(bs), bs)
+        s = bs
+      return s
+
+    @staticmethod
+    def _vt_bytes(s):
+      if isinstance(s, str):
+        bs = s.encode('utf-8')
+      else:
+        warning("_vt_bytes: expected str, got %s %r, passing unchanged", type(s), s)
+        bs = s
+      return bs
+
     ##############
     # FUSE support methods.
 
@@ -692,9 +713,11 @@ if FUSE_CLASS == 'llfuse':
       return self._vt_core._Eaccess(E, mode, ctx)
 
     @trace_method
-    def create(self, parent_inode, name, mode, flags, ctx):
+    def create(self, parent_inode, name_b, mode, flags, ctx):
       ''' Create a new file and open it. Return file handle index and EntryAttributes.
       '''
+      X("create: name_b=%r ...", name_b)
+      name = self._vt_str(name_b)
       P = self._vt_i2E(parent_inode)
       if name in P:
         warning("create(parent_inode=%d:%s,name=%r): already exists - surprised!",
@@ -737,19 +760,20 @@ if FUSE_CLASS == 'llfuse':
       return self._vt_EntryAttributes(E)
 
     @trace_method
-    def getxattr(self, inode, name, ctx):
+    def getxattr(self, inode, xattr_name, ctx):
       # TODO: test for permission to access inode?
       E = self._vt_core.i2E(inode)
       meta = E.meta
       try:
-        xattr = meta.xattrs[name]
+        xattr = meta.xattrs[xattr_name]
       except KeyError:
         raise FuseOSError(errno.ENOATTR)
       return xattr
 
     @locked
     @trace_method
-    def link(self, inode, new_parent_inode, new_name, ctx):
+    def link(self, inode, new_parent_inode, new_name_b, ctx):
+      new_name = self._vt_str(new_name_b)
       # TODO: test for write access to new_parent_inode
       Esrc, Psrc = self._vt_core.i2EP(inode)
       if not Esrc.isfile and not Esrc.ishardlink:
@@ -792,7 +816,8 @@ if FUSE_CLASS == 'llfuse':
       return list(E.meta.xattrs.keys())
 
     @trace_method
-    def lookup(self, parent_inode, name, ctx):
+    def lookup(self, parent_inode, name_b, ctx):
+      name = self._vt_str(name_b)
       # TODO: test for permission to search parent_inode
       P, PP = self._vt_core.i2EP(parent_inode)
       if name == '.':
@@ -807,7 +832,8 @@ if FUSE_CLASS == 'llfuse':
       return self._vt_EntryAttributes(E)
 
     @trace_method
-    def mkdir(self, parent_inode, name, mode, ctx):
+    def mkdir(self, parent_inode, name_b, mode, ctx):
+      name = self._vt_str(name_b)
       # TODO: test for permission to search and write parent_inode
       P = self._vt_core.i2E(parent_inode)
       if not P.isdir:
@@ -820,7 +846,8 @@ if FUSE_CLASS == 'llfuse':
       E.meta.chmod(mode & 0o7777)
 
     @trace_method
-    def mknod(self, parent_inode, name, mode, rdev, ctx):
+    def mknod(self, parent_inode, name_b, mode, rdev, ctx):
+      name = self._vt_str(name_b)
       P = self._vt_core.i2E(parent_inode)
       if not P.isdir:
         error("parent (%r) not a directory, raising ENOTDIR", P.name)
@@ -843,8 +870,8 @@ if FUSE_CLASS == 'llfuse':
         warning("open(ionde=%d:%s,flags=0o%o): unexpected O_CREAT(0o%o) or O_EXCL(0o%o)",
                 inode, E, flags, O_CREAT, O_EXCL)
         flags &= ~(O_CREAT|O_EXCL)
-      fnhdx = self._vt_core.open(E, flags, ctx)
-      return rhndx
+      fhndx = self._vt_core.open(E, flags, ctx)
+      return fhndx
 
     @trace_method
     def opendir(self, inode, ctx):
@@ -870,11 +897,11 @@ if FUSE_CLASS == 'llfuse':
       FH = self._vt_core._fh(fhndx)
       chunks = []
       while size > 0:
-        data = FH.read(offset, size)
+        data = FH.read(off, size)
         if len(data) == 0:
           break
         chunks.append(data)
-        offset += len(data)
+        off += len(data)
         size -= len(data)
       return b''.join(chunks)
 
@@ -905,7 +932,7 @@ if FUSE_CLASS == 'llfuse':
               E = D.get(name)
           if E is not None:
             # yield name, attributes and next offset
-            yield name.encode(), self._vt_EntryAttributes(E), o + 1
+            yield self._vt_bytes(name), self._vt_EntryAttributes(E), o + 1
           o += 1
       return entries()
 
@@ -926,18 +953,20 @@ if FUSE_CLASS == 'llfuse':
       self._vt_core._fh_remove(fhndx)
 
     @trace_method
-    def removexattr(self, inode, name, ctx):
+    def removexattr(self, inode, xattr_name, ctx):
       raise FuseOSError(errno.ENOATTR)
       # TODO: test for inode ownership?
       E = self._vt_core.i2E(inode)
       meta = E.meta
       try:
-        del meta.xattrs[name]
+        del meta.xattrs[xattr_name]
       except KeyError:
         raise FuseOSError(errno.ENOATTR)
 
     @trace_method
-    def rename(self, parent_inode_old, name_old, parent_inode_new, name_new, ctx):
+    def rename(self, parent_inode_old, name_old_b, parent_inode_new, name_new_b, ctx):
+      name_old = self._vt_str(name_old_b)
+      name_new = self._vt_str(name_new_b)
       Psrc = self._vt_core.i2E(parent_inode_old)
       if name_old not in Psrc:
         raise FuseOSError(errno.ENOENT)
@@ -952,7 +981,8 @@ if FUSE_CLASS == 'llfuse':
       Pdst[name_new] = E
 
     @trace_method
-    def rmdir(self, parent_inode, name, ctx):
+    def rmdir(self, parent_inode, name_b, ctx):
+      name = self._vt_str(name_b)
       P = self._vt_core.i2E(parent_inode)
       if not self._vt_core._Eaccess(Psrc, os.X_OK|os.W_OK):
         raise FuseOSError(errno.EPERM)
@@ -973,10 +1003,10 @@ if FUSE_CLASS == 'llfuse':
       raise FuseOSError(errno.ENOSYS)
 
     @trace_method
-    def setxattr(self, inode, name, value, ctx):
+    def setxattr(self, inode, xattr_name, value, ctx):
       # TODO: check perms (ownership?)
       E = self._vt_core.i2E(inode)
-      E.meta.xattrs[name] = value
+      E.meta.xattrs[xattr_name] = value
 
     @trace_method
     def statfs(self, ctx):
@@ -988,7 +1018,8 @@ if FUSE_CLASS == 'llfuse':
       return fst
 
     @trace_method
-    def symlink(self, parent_inode, name, target, ctx):
+    def symlink(self, parent_inode, name_b, target, ctx):
+      name = self._vt_str(name_b)
       # TODO: check search/write on P
       P = self._vt_core.i2E(parent_inode)
       if not P.isdir:
@@ -998,7 +1029,8 @@ if FUSE_CLASS == 'llfuse':
       P[name] = SymlinkDirent(name, {'pathref': target})
 
     @trace_method
-    def unlink(self, parent_inode, name, ctx):
+    def unlink(self, parent_inode, name_b, ctx):
+      name = self._vt_str(name_b)
       # TODO: check search/write on P
       P = self._vt_core.i2E(parent_inode)
       if not P.isdir:
