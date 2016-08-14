@@ -7,13 +7,21 @@
 set -ue
 
 cmd=$( basename "$0" )
-usage="Usage: $cmd [-a] relpath [{-c shcmd | testcmd [args...]}]
+usage="Usage: $cmd [-a] {relpath|.} [{-c shcmd | testcmd [args...]}]
   -a    Find all matches. Default is to stop after the first match.
   -c shcmd
         Run shell command \"shcmd\" with the environment variable
-        \$FINDUP_PATH set to the test directory."
+  -d    Print the test directory instead of the test directory plus
+        \"relpath\".
+  Environment:
+        \$FINDUP_DIR is set to the test directory.
+        \$FINDUP_PATH is set to the test path (the test directory
+        with \"relpath\" appended, unless \"relpath\" is \".\" or
+        the empty string, in which case it will just be the test
+        directory."
 
 all=
+dirmode=
 shmode=
 
 badopts=
@@ -22,6 +30,7 @@ while [ $# -gt 0 ]
 do
   case $1 in
     -a) all=1 ;;
+    -d) dirmode=1 ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2
         badopts=1
@@ -71,14 +80,20 @@ odir=
 dir=$( pwd )
 while [ -z "$odir" ] || [ "x$odir" != "x$dir" ]
 do
-  path=$dir/$relpath
+  case "$relpath" in
+    '' | . )    path=$dir ;;
+    *)          path=$dir/$relpath ;;
+  esac
   if if [ $shmode ]
-     then  FINDUP_PATH=$path sh -c "$shcmd"
-     else  "$@" "$path"
+     then  FINDUP_DIR=$dir FINDUP_PATH=$path sh -c "$shcmd"
+     else  FINDUP_DIR=$dir FINDUP_PATH=$path "$@" "$path"
      fi
   then
     xit=0
-    printf '%s\n' "$path"
+    if [ $dirmode ]
+    then  printf '%s\n' "$dir"
+    else  printf '%s\n' "$path"
+    fi
     [ $all ] || break
   fi
   odir=$dir
