@@ -17,6 +17,7 @@ import stat
 import sys
 from threading import Thread, RLock
 import time
+from types import SimpleNamespace as NS
 from cs.debug import DummyMap, TracingObject
 from cs.lex import texthexify, untexthexify
 from cs.logutils import X, XP, debug, info, warning, error, Pfx, DEFAULT_BASE_FORMAT
@@ -173,6 +174,30 @@ class FileHandle(O):
   def close(self):
     self.E.touch()
     self.Eopen.close()
+
+class Inode(NS):
+
+  def __init__(self, **kw):
+    self.inum = None
+    self.krefcount = 0
+    self.E = None
+    self.parentE = None
+    NS.__init__(self, **kw)
+
+  def __iadd__(self, delta):
+    if delta < 1:
+      raise ValueError("Inode.inc(%d, delta=%s): expected delta >= 1"
+                       % (self.inum, delta))
+    self.krefcount += delta
+
+  def __isub__(self, delta):
+    if delta < 1:
+      raise ValueError("Inode.inc(%d, delta=%s): expected delta >= 1"
+                       % (self.inum, delta))
+    if self.krefcount < delta:
+      raise ValueError("Inode.inc(%d, delta=%s): krefcount(%d) < delta"
+                       % (self.inum, delta, self.count))
+    self.krefcount -= delta
 
 class Inodes(object):
   ''' Inode information for a filesystem.
