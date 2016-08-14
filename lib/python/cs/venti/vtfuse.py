@@ -10,7 +10,7 @@ from collections import namedtuple
 from logging import getLogger, FileHandler, Formatter
 import errno
 import os
-from os import O_CREAT, O_RDONLY, O_WRONLY, O_RDWR, O_APPEND, O_TRUNC
+from os import O_CREAT, O_RDONLY, O_WRONLY, O_RDWR, O_APPEND, O_TRUNC, O_EXCL
 from os.path import basename
 from pprint import pformat
 import stat
