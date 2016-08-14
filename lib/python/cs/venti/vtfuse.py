@@ -75,6 +75,7 @@ def mount(mnt, E, S, syncfp=None, subpath=None):
   FS._vt_runfuse(mnt)
 
 def trace_method(method):
+  return method
   ##fname = '.'.join( (method.__module__, funccite(method)) )
   fname = '.'.join( (method.__module__, funcname(method)) )
   def traced_method(self, *a, **kw):
