@@ -206,9 +206,9 @@ class Inodes(object):
   def __init__(self, fs, inodes_datatext=None):
     self.fs = fs                # main filesystem
     self.krefcount = {}         # kernel inode reference counts
-    self._dirents_by_inum = {}  # mapping from inum->Dirent
+    self._info = {}              # mapping from inum->Inode record
     self._freed = Range()       # freed inode numbers for reuse
-    self._mortal = Range()      # inodes which are not hardlinks
+    self._mortal = Range()      # inode numbers which are not hardlinks
     if inodes_datatext is None:
       self._init_empty()
     else:
@@ -237,6 +237,10 @@ class Inodes(object):
       self._init_empty()
     if offset1 < len(idata):
       warning("unparsed idatatext at offset %d: %r", offset1, idata[offset1:])
+    # record the hardlinked inodes in the inode map
+    for inum_name, inum_E in _hardlinked_dir:
+      inum = int(inum_name)
+      self[inum] = inum_E, None
     return _hardlinked, _hardlinked_dir
 
   @locked
@@ -255,24 +259,39 @@ class Inodes(object):
   def ipath(self, inum):
     return '/'.join(self.ipathelems(inum))
 
+  def __contains__(self, inum):
+    return inum in self._info
+
+  def __getitem__(self, inum):
+    return self._info[inum]
+
+  def __setitem__(self, inum, EP):
+    E, P = EP
+    info = self._info
+    if inum in self._mortal:
+      raise KeyError("inum %d already in _mortal list", inum)
+    if inum in self._hardlinked:
+      raise KeyError("inum %d already in _hardlinked list", inum)
+    I = info.get(inum)
+    if I is not None:
+      raise KeyError("inum %d already taken by %s, rejected %s", inum, I.E, E)
+    info[inum] = Inode(inum=inum, E=E, parentE=P, krefcount=0)
+    if E.ishardlink:
+      self._hardlinked.add(inum)
+    else:
+      self._mortal.add(inum)
+
+  def get(self, inum):
+    return self._info.get(inum)
+
   @locked
   def dirent2(self, inum):
     ''' Locate the Dirent for inode `inum`, return it and its parent.
         Raises ValueError if the `inum` is unknown.
     '''
     with Pfx("dirent2(%d)", inum):
-      XP("inum=%r, _dirents_by_inum=%r", inum, self._dirents_by_inum)
-      Einfo = self._dirents_by_inum.get(inum)
-      if Einfo is None:
-        ipath = self.ipath(inum)
-        E, P, tail_path = resolve(self._hardlinks_dir, ipath)
-        if tail_path:
-          raise ValueError("not in self._dirents_by_inum and %r not in self._hardlinks_dir"
-                           % (ipath,))
-        self._dirents_by_inum[inum] = E, P
-      else:
-        E, P = Einfo
-      return E, P
+      I = self[inum]
+      return I.E, I.parentE
 
   @locked
   def dirent(self, inum):
@@ -280,33 +299,7 @@ class Inodes(object):
         Raises ValueError if the `inum` is unknown.
     '''
     with Pfx("dirent(%d)", inum):
-      E, P = self.dirent2(inum)
-      return E
-
-  @locked
-  def kref_inc(self, inum, delta=1):
-    ''' Adjust the kernel reference count for this inode up. Return the new count.
-    '''
-    if delta < 1:
-      raise ValueError("kref_inc(%d, delta=%s): expected delta >= 1" % (inum, delta))
-    count = self.krefcount.get(inum, 0)
-    count += delta
-    self.krefcount[inum] = count
-    return count
-
-  @locked
-  def kref_dec(self, inum, delta=1):
-    ''' Adjust the kernel reference count for this inode down. Return the new count.
-    '''
-    if delta < 1:
-      raise ValueError("kref_dec(%d, delta=%s): expected delta >= 1" % (inum, delta))
-    count = self.krefcount[inum]
-    if count < delta:
-      raise ValueError("kref_dec(%d, delta=%s): count(%d) < delta" % (inum, delta, count))
-    count -= delta
-    self.krefcount[inum] = count
-    # TODO: free the inode if ==> 0 ?
-    return count
+      return self[inum].E
 
   @locked
   def _allocate_free_inum(self):
@@ -320,41 +313,22 @@ class Inodes(object):
       freed -= inum
     else:
       inum = max( (1, self._mortal.end, self._hardlinked.end) )
-    if inum in self._dirents_by_inum:
-      raise RuntimeError("allocated inode number %d, but already in inode cache"
-                         % (inum,))
+    I = self.get(inum)
+    if I is not None:
+      raise RuntimeError("allocated inode number %d, but already in inode cache: %s"
+                         % (inum, I))
     if inum in self._mortal:
       raise RuntimeError("allocated inode number %d, but already in mortal inode list (%s)"
                          % (inum, self._mortal))
     return inum
 
   @locked
-  def allocate_mortal_inum(self):
-    ''' Allocate an ephemeral inode number to survive only until umount.
-        Record the inum in ._mortal.
+  def allocate_mortal_inode(self, E):
+    ''' Allocate an ephemeral inode number to survive only until umount; return the inum.
     '''
     inum = self._allocate_free_inum()
-    self._mortal.add(inum)
+    self[inum] = E, None
     return inum
-
-  @locked
-  def assign_inum(self, E, inum):
-    X("ASSIGN INUM %d ==> %s", inum, E)
-    try:
-      E2 = self.dirent(inum)
-    except ValueError:
-      if E.ishardlink:
-        raise RuntimeError("hardlink: %s" % (E,))
-      try:
-        inum0 = E._inum
-      except AttributeError:
-        E._inum = inum
-        self._dirents_by_inum[inum] = E, None
-        self._mortal.add(inum)
-      else:
-        raise RuntimeError("already has ._inum: %s" % (inum0,))
-    else:
-      raise ValueError("inode %s already allocated to: %s", inum, E2)
 
   @locked
   def make_hardlink(self, E):
@@ -364,10 +338,15 @@ class Inodes(object):
       raise ValueError("may not hardlink Dirents of type %s", E.type)
     # use the inode number of the source Dirent
     inum = self.fs.E2i(E)
+    if inum not in self._mortal:
+      error("make_hardlink: inum %d not in _mortal: E=%s", inum, E)
     E.meta.nlink = 1
     Edst = HardlinkDirent.to_inum(inum, E.name)
-    # note the inum in the _hardlinked Range
+    # note the inum in the _hardlinked Range, remove from the _mortal Range
+    # TODO: on umount, if nlinks <= 1, discard
+    # TODO: on umount, build hardlink Dir from scratch? maybe not
     self._hardlinked.add(inum)
+    self._mortal.remove(inum)
     # file the Dirent away in the _hardlinks_dir
     D = self._hardlinks_dir
     pathelems = self.ipathelems(inum)
@@ -381,7 +360,7 @@ class Inodes(object):
     if name in D:
       raise RuntimeError("inum %d already allocated: %s", inum, D[name])
     D[name] = E
-    self._dirents_by_inum[inum] = E, D
+    self[inum] = E, D
     # return the new HardlinkDirent
     return Edst
 
@@ -411,7 +390,7 @@ class _StoreFS_core(object):
     self.subpath = subpath
     if subpath:
       # locate subdirectory to display at mountpoint
-      mntE, P, tail_path = resolve(E, subpath)
+      mntE, mntP, tail_path = resolve(E, subpath)
       if tail_path:
         raise ValueError("subpath %r does not resolve", subpath)
       if not mntE.isdir:
@@ -419,6 +398,7 @@ class _StoreFS_core(object):
       self.mntE = mntE
     else:
       self.mntE = E
+      mntP = None
     # set up a queue to collect logging requests
     # and a thread to process then asynchronously
     self.log = getLogger(LOGGER_NAME)
@@ -438,7 +418,7 @@ class _StoreFS_core(object):
     self._file_handles = []
     self._inodes = Inodes(self, E.meta.get('fs_inode_data'))
     # preassign inode 1, llfuse seems to presume it :-(
-    self._inodes.assign_inum(self.mntE, 1)
+    self._inodes[1] = (self.mntE, mntP)
     X("StoreFS.__init__ COMPLETE")
 
   def __str__(self):
@@ -477,9 +457,6 @@ class _StoreFS_core(object):
     '''
     return self.i2EP(inum)[0]
 
-  def allocate_mortal_inum(self):
-    return self._inodes.allocate_mortal_inum()
-
   def _resolve(self, path):
     ''' Call cs.venti.paths.resolve and return its result.
     '''
@@ -511,7 +488,8 @@ class _StoreFS_core(object):
       try:
         inum = E._inum
       except AttributeError:
-        inum = E._inum = self.allocate_mortal_inum()
+        inum = self._inodes.allocate_mortal_inode(E)
+        E._inum = inum
     return inum
 
   def i2E(self, inum):
@@ -557,7 +535,11 @@ class _StoreFS_core(object):
     debug("for_read=%s, for_write=%s, for_append=%s",
           for_read, for_write, for_append)
     FH = FileHandle(self, E, for_read, for_write, for_append, lock=self._lock)
-    self._inodes.kref_inc(self.E2i(E))
+    inum = self.E2i(E)
+    X("open: inum=%s", inum)
+    I = self._inodes[inum]
+    X("open: inode=%s", I)
+    I += 1
     if flags & O_TRUNC:
       FH.truncate(0)
     fhndx = self._new_file_handle_index(FH)
@@ -567,10 +549,12 @@ class _StoreFS_core(object):
     return self._inodes.make_hardlink(E)
 
   def kref_inc(self, inum, delta=1):
-    return self._inodes.kref_inc(inum, delta)
+    I = self._inodes[inum]
+    I += delta
 
   def kref_dec(self, inum, delta=1):
-    return self._inodes.kref_dec(inum, delta)
+    I = self._inodes[inum]
+    I -= delta
 
   @locked
   def _fh(self, fhndx):
