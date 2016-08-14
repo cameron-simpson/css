@@ -883,16 +883,30 @@ if FUSE_CLASS == 'llfuse':
       X("readdir(fhndx=%d, off=%d)", fhndx, off)
       OD = self._vt_core._fh(fhndx)
       def entries():
+        o = off
         D = OD.D
-        for o, name in enumerate(OD.names[off:], off):
-          try:
+        names = OD.names
+        while True:
+          if o == 0:
+            name = '.'
             E = D[name]
-          except KeyError:
-            # skip names no longer valid
-            continue
-          # yield name, attributes and next offset
-          X("readdir: yield %r, attrs, %d", name, o + 1)
-          yield name.encode(), self._vt_EntryAttributes(E), o + 1
+          elif o == 1:
+            name = '..'
+            E = D[name]
+          else:
+            o2 = o - 2
+            if o2 >= len(names):
+              break
+            name = names[o2]
+            if name == '.' or name == '..':
+              # already special cased
+              E = None
+            else:
+              E = D.get(name)
+          if E is not None:
+            # yield name, attributes and next offset
+            yield name.encode(), self._vt_EntryAttributes(E), o + 1
+          o += 1
       return entries()
 
     @trace_method
