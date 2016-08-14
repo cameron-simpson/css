@@ -849,7 +849,12 @@ if FUSE_CLASS == 'llfuse':
     @trace_method
     def opendir(self, inode, ctx):
       # TODO: check for permission to read
+      X("opendir(inode=%s, ctx=%s)", inode, ctx)
       class _OpenDir:
+        ''' An "open" Dir: keeps a list of the names from open time
+            and a reference to the Dir so that it can validate the names
+            at readdir time.
+        '''
         def __init__(self, D):
           self.D = D
           self.names = list(D.keys())
@@ -875,6 +880,7 @@ if FUSE_CLASS == 'llfuse':
 
     @trace_method
     def readdir(self, fhndx, off):
+      X("readdir(fhndx=%d, off=%d)", fhndx, off)
       OD = self._vt_core._fh(fhndx)
       def entries():
         D = OD.D
@@ -882,8 +888,11 @@ if FUSE_CLASS == 'llfuse':
           try:
             E = D[name]
           except KeyError:
+            # skip names no longer valid
             continue
-          yield name, self._vt_EntryAttributes(E), o + 1
+          # yield name, attributes and next offset
+          X("readdir: yield %r, attrs, %d", name, o + 1)
+          yield name.encode(), self._vt_EntryAttributes(E), o + 1
       return entries()
 
     @trace_method
