@@ -13,6 +13,7 @@ from collections import namedtuple
 import datetime
 import json
 import struct
+from subprocess import Popen, PIPE
 from threading import Lock, RLock
 from xml.etree.ElementTree import XML
 from cs.logutils import Pfx, error, warning, info, setup_logging
@@ -22,6 +23,7 @@ from cs.urlutils import URL
 
 USAGE = '''Usage:
     %s cat tvwizdirs...
+    %s convert tvwizdir output.mp4
     %s header tvwizdirs...
     %s scan tvwizdirs...
     %s test'''
@@ -49,7 +51,7 @@ def main(argv):
   args = list(argv)
   cmd = os.path.basename(args.pop(0))
   setup_logging(cmd)
-  usage = USAGE % (cmd, cmd, cmd, cmd)
+  usage = USAGE % (cmd, cmd, cmd, cmd, cmd)
 
   badopts = False
 
@@ -62,6 +64,16 @@ def main(argv):
       if op == "cat":
         if len(args) < 1:
           error("missing tvwizdirs")
+          badopts = True
+      elif op == "convert":
+        if len(args) < 1:
+          error("missing tvwizdir")
+          badopts = True
+        if len(args) < 2:
+          error("missing output.mp4")
+          badopts = True
+        if len(args) > 2:
+          warning("extra arguments after output: %s", " ".join(args))
           badopts = True
       elif op == "header":
         if len(args) < 1:
@@ -95,6 +107,25 @@ def main(argv):
         stdout_bfp = os.fdopen(stdout_bfd, "wb")
         TVWiz(arg).copyto(stdout_bfp)
         stdoutp.bfp.close()
+    elif op == "convert":
+      tvwizdir, outpath = args
+      if outpath.startswith('-'):
+        warning("invalid outpath, may not commence with dash: %r", outpath)
+        return 2
+      outprefix, outext = os.path.splitext(outpath)
+      if not outext:
+        warning("no extension on outpath, cannot infer output format for mmfpeg: %r", outpath)
+        return 2
+      ffmpeg_argv = ['ffmpeg', '-f', 'mpegts', '-i', '-', '-f', outext[1:], outpath]
+      TV = TVWiz(tvwizdir)
+      info("running: %r", ffmpeg_argv)
+      P = Popen(ffmpeg_argv, stdin=PIPE)
+      TV.copyto(P.stdin)
+      P.stdin.close()
+      xit = P.wait()
+      if xit != 0:
+        warning("ffmpeg failed, exit status %d", xit)
+      return xit
     elif op == "header":
       for arg in args:
         print(arg)
