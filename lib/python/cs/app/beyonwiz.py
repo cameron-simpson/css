@@ -264,11 +264,11 @@ def parse_header(data):
 
 class TVWiz(O):
   def __init__(self, wizdir):
-    self.dir = wizdir
+    self.dirpath = wizdir
 
   @property
   def header_path(self):
-    return os.path.join(self.dir, TVHDR)
+    return os.path.join(self.dirpath, TVHDR)
 
   def header(self):
     with open(self.header_path, "rb") as hfp:
@@ -278,21 +278,21 @@ class TVWiz(O):
   def trunc_records(self):
     ''' Generator to yield TruncRecords for this TVWiz directory.
     '''
-    with open(os.path.join(self.dir, "trunc"), "rb") as tfp:
+    with open(os.path.join(self.dirpath, "trunc"), "rb") as tfp:
       for trec in parse_trunc(tfp):
         yield trec
 
   def data(self):
     ''' A generator that yields MPEG2 data from the stream.
     '''
-    with Pfx("data(%s)", self.dir):
+    with Pfx("data(%s)", self.dirpath):
       lastFileNum = None
       for rec in self.trunc_records():
         wizOffset, fileNum, flags, offset, size  = rec
         if lastFileNum is None or lastFileNum != fileNum:
           if lastFileNum is not None:
             fp.close()
-          fp = open(os.path.join(self.dir, "%04d" % (fileNum,)), "rb")
+          fp = open(os.path.join(self.dirpath, "%04d" % (fileNum,)), "rb")
           filePos = 0
           lastFileNum = fileNum
         if filePos != offset:
