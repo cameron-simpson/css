@@ -90,7 +90,9 @@ def main(argv):
   with Pfx(op):
     if op == "cat":
       for arg in args:
-        stdout_bfp = os.fdopen(sys.stdout.fileno(), "wb")
+        # NB: dup stdout so that close doesn't close real stdout
+        stdout_bfd = os.dup(sys.stdout.fileno())
+        stdout_bfp = os.fdopen(stdout_bfd, "wb")
         TVWiz(arg).copyto(stdout_bfp)
         stdoutp.bfp.close()
     elif op == "header":
