@@ -7,11 +7,13 @@
 
 from __future__ import print_function
 import sys
+import os
 import os.path
 from collections import namedtuple
 import datetime
 import json
 import struct
+from subprocess import Popen, PIPE
 from threading import Lock, RLock
 from xml.etree.ElementTree import XML
 from cs.logutils import Pfx, error, warning, info, setup_logging
@@ -21,6 +23,7 @@ from cs.urlutils import URL
 
 USAGE = '''Usage:
     %s cat tvwizdirs...
+    %s convert tvwizdir output.mp4
     %s header tvwizdirs...
     %s scan tvwizdirs...
     %s test'''
@@ -48,7 +51,7 @@ def main(argv):
   args = list(argv)
   cmd = os.path.basename(args.pop(0))
   setup_logging(cmd)
-  usage = USAGE % (cmd, cmd, cmd, cmd)
+  usage = USAGE % (cmd, cmd, cmd, cmd, cmd)
 
   badopts = False
 
@@ -61,6 +64,16 @@ def main(argv):
       if op == "cat":
         if len(args) < 1:
           error("missing tvwizdirs")
+          badopts = True
+      elif op == "convert":
+        if len(args) < 1:
+          error("missing tvwizdir")
+          badopts = True
+        if len(args) < 2:
+          error("missing output.mp4")
+          badopts = True
+        if len(args) > 2:
+          warning("extra arguments after output: %s", " ".join(args))
           badopts = True
       elif op == "header":
         if len(args) < 1:
@@ -89,7 +102,30 @@ def main(argv):
   with Pfx(op):
     if op == "cat":
       for arg in args:
-        TVWiz(arg).copyto(sys.stdout)
+        # NB: dup stdout so that close doesn't close real stdout
+        stdout_bfd = os.dup(sys.stdout.fileno())
+        stdout_bfp = os.fdopen(stdout_bfd, "wb")
+        TVWiz(arg).copyto(stdout_bfp)
+        stdoutp.bfp.close()
+    elif op == "convert":
+      tvwizdir, outpath = args
+      if outpath.startswith('-'):
+        warning("invalid outpath, may not commence with dash: %r", outpath)
+        return 2
+      outprefix, outext = os.path.splitext(outpath)
+      if not outext:
+        warning("no extension on outpath, cannot infer output format for mmfpeg: %r", outpath)
+        return 2
+      ffmpeg_argv = ['ffmpeg', '-f', 'mpegts', '-i', '-', '-f', outext[1:], outpath]
+      TV = TVWiz(tvwizdir)
+      info("running: %r", ffmpeg_argv)
+      P = Popen(ffmpeg_argv, stdin=PIPE)
+      TV.copyto(P.stdin)
+      P.stdin.close()
+      xit = P.wait()
+      if xit != 0:
+        warning("ffmpeg failed, exit status %d", xit)
+      return xit
     elif op == "header":
       for arg in args:
         print(arg)
@@ -242,7 +278,7 @@ class TVWiz(O):
   def trunc_records(self):
     ''' Generator to yield TruncRecords for this TVWiz directory.
     '''
-    with open(os.path.join(self.dir, "trunc")) as tfp:
+    with open(os.path.join(self.dir, "trunc"), "rb") as tfp:
       for trec in parse_trunc(tfp):
         yield trec
 
@@ -256,7 +292,7 @@ class TVWiz(O):
         if lastFileNum is None or lastFileNum != fileNum:
           if lastFileNum is not None:
             fp.close()
-          fp = open(os.path.join(self.dir, "%04d" % (fileNum,)))
+          fp = open(os.path.join(self.dir, "%04d" % (fileNum,)), "rb")
           filePos = 0
           lastFileNum = fileNum
         if filePos != offset:
@@ -277,7 +313,7 @@ class TVWiz(O):
     ''' Transcribe the uncropped content to a file named by output.
     '''
     if type(output) is str:
-      with open(output, "w") as out:
+      with open(output, "wb") as out:
         self.copyto(out)
     else:
       for buf in self.data():
