@@ -4,6 +4,16 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
+DISTINFO = {
+    'description': "Convenience facilities for managing exceptions.",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+    ],
+}
+
 import sys
 import logging
 import traceback
@@ -21,7 +31,7 @@ def return_exc_info(func, *args, **kwargs):
   '''
   try:
     result = func(*args, **kwargs)
-  except:
+  except Exception:
     return None, tuple(sys.exc_info())
   return result, None
 
@@ -53,10 +63,12 @@ def noexc(func):
       return func(*args, **kwargs)
     except Exception as e:
       try:
-        exception("exception calling %s(%s, **(%s))", func.__name__, args, kwargs)
+        exception(
+            "exception calling %s(%s, **(%s))", func.__name__, args, kwargs)
       except Exception as e:
         try:
-          X("exception calling %s(%s, **(%s)): %s", func.__name__, args, kwargs, e)
+          X("exception calling %s(%s, **(%s)): %s",
+            func.__name__, args, kwargs, e)
         except Exception:
           pass
   noexc_wrapper.__name__ = 'noexc(%s)' % (func.__name__,)
@@ -69,15 +81,18 @@ def noexc_gen(func):
       as in cs.later.Later.pipeline.
   '''
   from cs.logutils import exception, X
+
   def noexc_gen_wrapper(*args, **kwargs):
     try:
       it = iter(func(*args, **kwargs))
     except Exception as e0:
       try:
-        exception("exception calling %s(*%s, **(%s)): %s", func.__name__, args, kwargs, e)
+        exception(
+            "exception calling %s(*%s, **(%s)): %s", func.__name__, args, kwargs, e)
       except Exception as e2:
         try:
-          X("exception calling %s(*%s, **(%s)): %s", func.__name__, args, kwargs, e)
+          X("exception calling %s(*%s, **(%s)): %s",
+            func.__name__, args, kwargs, e)
         except Exception:
           pass
       return
@@ -88,10 +103,12 @@ def noexc_gen(func):
         raise
       except Exception as e:
         try:
-          exception("exception calling next(%s(*%s, **(%s))): %s", func.__name__, args, kwargs, e)
+          exception("exception calling next(%s(*%s, **(%s))): %s",
+                    func.__name__, args, kwargs, e)
         except Exception as e2:
           try:
-            X("exception calling next(%s(*%s, **(%s))): %s", func.__name__, args, kwargs, e)
+            X("exception calling next(%s(*%s, **(%s))): %s",
+              func.__name__, args, kwargs, e)
           except Exception:
             pass
         return
@@ -112,66 +129,73 @@ def transmute(exc_from, exc_to=None):
   '''
   if exc_to is None:
     exc_to = RuntimeError
+
   def transmutor(func):
     def transmute_transmutor_wrapper(*a, **kw):
       try:
         return func(*a, **kw)
       except exc_from as e:
-        raise exc_to("inner %s transmuted to %s: %s" % (type(e), exc_to, str(e)))
+        raise exc_to("inner %s:%s transmuted to %s" % (type(e), e, exc_to))
     return transmute_transmutor_wrapper
   return transmutor
+
+def unattributable(func):
+  return transmute(AttributeError, RuntimeError)(func)
+
+def safe_property(func):
+  return property(unattributable(func))
 
 def unimplemented(func):
   ''' Decorator for stub methods that must be implemented by a stub class.
   '''
+
   def unimplemented_wrapper(self, *a, **kw):
-    raise NotImplementedError("%s.%s(*%s, **%s)" % (type(self), func.__name__, a, kw))
+    raise NotImplementedError(
+        "%s.%s(*%s, **%s)" % (type(self), func.__name__, a, kw))
   return unimplemented_wrapper
 
 class NoExceptions(object):
+
   ''' A context manager to catch _all_ exceptions and log them.
       Arguably this should be a bare try...except but that's syntacticly
       noisy and separates the catch from the top.
       For simple function calls return_exc_info() is probably better.
   '''
 
-  def __init__(self, handleException):
+  def __init__(self, handler):
     ''' Initialise the NoExceptions context manager.
-        The handleException is a callable which
+        The handler is a callable which
         expects (exc_type, exc_value, traceback)
         and returns True or False for the __exit__
         method of the manager.
-        If handleException is None, the __exit__ method
+        If handler is None, the __exit__ method
         always returns True, suppressing any exception.
     '''
-    self.__handler = handleException
+    self.handler = handler
 
   def __enter__(self):
     pass
 
   def __exit__(self, exc_type, exc_value, tb):
-    from cs.logutils import X, warning, D
-    from cs.py.func import funccite
     if exc_type is not None:
-      if self.__handler is not None:
-        # user supplied handler
-        D("NoExceptions: call %s", funccite(self.__handler))
-        return self.__handler(exc_type, exc_value, tb)
-      else:
-        D("__handler is None")
+      if self.handler is not None:
+        return self.handler(exc_type, exc_value, tb)
       # report handled exception
-      warning("IGNORE  "+str(exc_type)+": "+str(exc_value))
+      from cs.logutils import warning
+      warning("IGNORE  " + str(exc_type) + ": " + str(exc_value))
       for line in traceback.format_tb(tb):
-        warning("IGNORE> "+line[:-1])
+        warning("IGNORE> " + line[:-1])
     return True
 
 def LogExceptions(conceal=False):
   ''' Wrapper of NoExceptions which reports exceptions and optionally
       suppresses them.
   '''
-  from cs.logutils import exception, X
-  def handler(exc_type, exc_value, tb):
-    exception("EXCEPTION: %s", exc_value)
+  from cs.logutils import exception
+  def handler(exc_type, exc_value, exc_tb):
+    exception("EXCEPTION: <%s> %s", exc_type, exc_value)
+    for line in traceback.format_exception(exc_type, exc_value, exc_tb):
+      exception("EXCEPTION> "+line)
     return conceal
   return NoExceptions(handler)
 

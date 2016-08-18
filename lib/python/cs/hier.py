@@ -1,13 +1,15 @@
 #!/usr/bin/python
 
-import re
+from __future__ import absolute_import
+from io import StringIO
 import os
 import os.path
+import re
 import sys
 from cs.lex import lastlinelen
 import cs.io
-from cs.obj import DictUC_Attrs, T_SEQ, T_MAP, T_SCALAR, objFlavour as flavour
-from cs.py3 import StringIO
+from cs.obj import T_SEQ, T_MAP, T_SCALAR, flavour
+from cs.mixin.ucattrs import UCdict
 
 DEFAULT_OPTS={'dictSep': ' =>',
               'bareWords': True,
@@ -228,7 +230,7 @@ class HierInput(_Hier):
     """ Read Hier data from the named directory.
     """
     out("loaddir "+dirname)
-    D=DictUC_Attrs()
+    D=UCdict()
 
     dents=[ dirent for dirent in os.listdir(dirname) if dirent[0] != '.']
     for dent in dents:
@@ -246,7 +248,7 @@ class HierInput(_Hier):
   def loadfp(self, fp, charset=None):
     """ Read Hier data from the supplied file object.
     """
-    D=DictUC_Attrs()
+    D=UCdict()
     for line in cs.io.contlines(fp):
       if line.startswith('#'):
         continue

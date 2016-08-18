@@ -1,0 +1,18 @@
+release/cs.py3-20150111/CHANGES.txt release/cs.py3-20150111/SUMMARY.txt release/cs.py3-20150111/release-tag.txt: Release information for cs.py3-20150111.
+bin-cs/cs-release: cs-release: mention update-tag in usage message
+lib/python/cs/distinfo.py: cs.distinfo: fix up inclusion of README.rst in MANIFEST.in
+bin-cs/cs-release: cs-release: move release prefix string to after op
+bin-cs/cs-release: cs-release: add "ls" op; accept relpfx=ALL to "last"
+bin-cs/cs-release: cs-release: pypi: add "ALL" support, initially just reporting commit versus release
+lib/python/cs/README-seq.rst lib/python/cs/seq.py: cs.seq: move long_description into cs/README-seq.rst
+lib/python/cs/py/READEME-stack.rst lib/python/cs/py/stack.py: cs.py.stack: move long_description into cs/py/README-stack.rst
+lib/python/cs/README-logutils.rst lib/python/cs/logutils.py: cs.logutils: move long_description into cs/README-logutils.rst
+lib/python/cs/README-queues.rst lib/python/cs/queues.py: cs.queues: move long_description into cs/README-queues.rst
+lib/python/cs/README-ansi_colour.rst lib/python/cs/ansi_colour.py: cs.ansi_colour: move long_description into cs/README-ansi_colour.rst
+lib/python/cs/README-asynchron.rst lib/python/cs/asynchron.py: cs.asynchron: move long_description into cs/README-asynchron.rst
+lib/python/cs/README-excutils.rst lib/python/cs/excutils.py: excutils: move long_description into cs/README-excutils.rst
+lib/python/cs/mixin/README-ucattrs.rst lib/python/cs/mixin/ucattrs.py: cs.mixin.excutils: move long_description into cs/mixin/README-ucattrs.rst
+lib/python/cs/README-obj.rst lib/python/cs/obj.py: cs.obj: move long_description into cs/README-obj.rst
+lib/python/cs/README-sh.rst lib/python/cs/sh.py: cs.sh: move long_description into cs/README-sh.rst
+lib/python/cs/ansi_colour.py: cs.ansi_colour: rename colours to COLOURS, effectively a table of constants
+lib/python/cs/distinfo.py: cs.distinfo: honour $PYPI_URL if specified

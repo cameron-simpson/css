@@ -69,7 +69,7 @@ def tail(fp,
 
 if __name__ == '__main__':
   import unittest
-  from cs.py3 import StringIO
+  from io import StringIO
 
   class TestTail(unittest.TestCase):
 

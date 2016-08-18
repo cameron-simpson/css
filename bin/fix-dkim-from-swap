@@ -1,0 +1,59 @@
+#!/bin/sh
+#
+# A different DKIM fixup from fix-dkim-from.
+#
+# fix-dkim-from works for lists where the original From: information
+# is preserved in a quotes string in the mangled From: header.
+#
+# fix-dkim-from-swap is for lists where (arguably more sensibly)
+# the original from header has been renamed to (by default)
+# X-Original-From:. We just swap them around.
+#   - Cameron Simpson <cs@zip.com.au> 02jan2015
+#
+
+set -ue
+
+# a basic regular expression matching the former From: header name
+otherfrom_re=X-Original-From
+
+cmd=$(basename "$0")
+usage="Usage: $cmd [orig-hdr-name-re] <dkim-headers >fixed-headers
+  Default orig-hdr-name-re: $otherfrom_re"
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case "$1" in
+    -*) echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# -gt 0 ]
+then
+  otherfrom_re=$1
+  shift
+  case "$otherfrom_re" in
+    */*)
+      echo "$cmd: slash (/) characters forbidden in orig-hdr-name-re: $otherfrom_re" >&2
+      badopts=1
+      ;;
+  esac
+  if [ $# -gt 0 ]
+  then
+    echo "$cmd: extra arguments after orig-hdr-name-re: $*" >&2
+    badopts=1
+  fi
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+sed -e "s/^[Ff][Rr][Oo][Mm]:/X-Old-&/
+        t done
+        s/^$otherfrom_re:/From:/
+        :done"
+

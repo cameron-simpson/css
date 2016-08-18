@@ -1,0 +1,1 @@
+lib/python/cs/sh.py: cs.sh: discard vpopen(), long subsumed by subprocess.Popen; clean out some unused imports; tweak distinfo long_description

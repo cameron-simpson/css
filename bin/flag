@@ -6,7 +6,7 @@
 
 trace=
 [ -t 2 ] && trace=set-x
-flagdir=$HOME/var/flags
+flagdir=${FLAGDIR:-$HOME/var/flags}
 quiet=
 qopt=
 invert=
@@ -61,6 +61,7 @@ then
   cd "$flagdir" || exit 1
   for flag in *
   do
+    [ "x$flag" = 'x*' ] && continue
     if flag "$flag"
     then
       if [ $quiet ]

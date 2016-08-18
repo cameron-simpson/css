@@ -103,6 +103,7 @@ symlink_unchanged=1
 rsopts=
 rsdelete=--delete
 thisbackup=
+reverse=
 verbose=
 imode=
 ##[ -t 1 ] && verbose=1
@@ -113,8 +114,13 @@ usage="Usage:
   $cmd [options...] --no-rsync backupdir
   $cmd [options...] [-- [rsyncopts...]]
 
+  -A, --acls    Preserve ACLs. Passed to rsync.
   -i, --itemize-changes
                 Passed to rsync, result slightly filtered by histbackup.
+  -r, --reverse Reverse. Consider the youngest older date instead
+                of the oldest younger date as the reference tree.
+                Clears any --symlink setting; --symlink must come
+                later than this option is required.
   -v, --verbose Verbose. Note: _not_ passed to rsync.
   -x            Trace execution. Recite linktree and rsync invocations.
   --no-delete   Don't pass --delete to rsync.
@@ -285,6 +291,14 @@ do
     --symlink)
       symlink=$2; shift ;;
 
+    # =item -A, --acls
+    #
+    # Preserve ACLs. Passed to rsync.
+    #
+    -A|--acls)
+      rsopts="$rsopts $1"
+      ;;
+
     # =item -i, --itemize-changes
     #
     # Itemise changes. Passed to rsync, but histbackup strips a few noisy outputs.
@@ -294,8 +308,17 @@ do
       rsopts="$rsopts -i"
       ;;
 
+    # -item -r, --reverse
+    #
+    # Reverse dates.
+    #
     # =item -v, --verbose
     #
+    -r|--reverse)
+      reverse=1
+      symlink=
+      ;;
+
     # Turn on verbose mode.
     #
     -v|--verbose)
@@ -492,7 +515,8 @@ else
   fi
 fi
 
-# locate to most recent backup, if any
+# locate to most recent backup younger than this one, if any
+# if $reverse, locate oldest backup later than this one
 lastbackup=$(
         cd "$dest" || exit 1
         (
@@ -507,7 +531,7 @@ lastbackup=$(
           fi
           echo "$thisbackup"
         ) \
-        | sort -u \
+        | if [ $reverse ]; then sort -ur; else sort -u; fi \
         | sed "/^$thisbackup/,\$d" \
         | sed -n '$p'
 )
@@ -521,9 +545,9 @@ dorsync()
     /* | ./* | ../* ) ;; 
     *) _drs_dst=./$_drs_dst ;;
   esac
-  set -- rsync $rsopts -aH $rsdelete --rsync-path "$rrsync" ${1+"$@"} "$_drs_src/" "$_drs_dst/"
+  set -- $trace rsync $rsopts -aH $rsdelete --rsync-path "$rrsync" ${1+"$@"} "$_drs_src/" "$_drs_dst/"
   [ $imode ] && set -- filter_fd 1 "$filteroutput" "$@"
-  $trace "$@"
+  "$@"
 }
 
 ok=
@@ -540,8 +564,11 @@ then
       if [ -z "$changes" ]
       then
         $vecho "no changes, symlinking last tree"
-        ( cd "$dest" || exit 1
-          exec $trace ln -s "$lastbackup" "$thisbackup"
+        ( set -ue
+          cd "$dest" || exit 1
+          $trace ln -s "$lastbackup" "$thisbackup"
+          [ -z "$symlink" ] \
+          || { rm -f "$symlink"; $trace ln -s "$thisbackup" "$symlink"; }
         )
         exit
       else

@@ -5,16 +5,30 @@
 #
 
 from __future__ import print_function
+
+DISTINFO = {
+    'description': "assorted debugging facilities",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'requires': ['cs.py3', 'cs.py.stack', 'cs.logutils', 'cs.obj', 'cs.seq', 'cs.timeutils'],
+}
+
+from contextlib import contextmanager
+from cmd import Cmd
 import inspect
 import logging
 import sys
 import threading
 import time
 import traceback
-from cs.py3 import Queue, Queue_Empty
+from cs.py3 import Queue, Queue_Empty, exec_code
 from cs.py.stack import caller
 import cs.logutils
-from cs.logutils import infer_logging_level, debug, error, setup_logging, D, Pfx, ifdebug, X
+from cs.logutils import infer_logging_level, debug, error, setup_logging, D, Pfx, PrePfx, ifdebug, X
 from cs.obj import O, Proxy
 from cs.seq import seq
 from cs.timeutils import sleep
@@ -370,13 +384,64 @@ class DummyMap(object):
     X("%s[%r] => %r", self, key, v)
     return v
 
+class DebugShell(Cmd):
+  ''' An interactive prompt for python statements, attached to /dev/tty by default.
+  '''
+
+  def __init__(self, var_dict, stdin=None, stdout=None):
+    if stdin is None:
+      stdin = open('/dev/tty', 'r')
+    if stdout is None:
+      stdout = open('/dev/tty', 'a')
+    self.stdin = stdin
+    self.stdout = stdout
+    Cmd.__init__(self, stdin=stdin, stdout=stdout)
+    self.vars = var_dict
+
+  def default(self, line):
+    if line == 'EOF':
+      return True
+    try:
+      exec_code(line, globals(), self.vars)
+    except Exception as e:
+      X("Exception: %s", e)
+    self.stdout.flush()
+    self.stderr.flush()
+    return False
+
+def debug_object_shell(o, prompt=None):
+  if prompt is None:
+    prompt = str(o) + '> '
+  v = o.__dict__
+  C = DebugShell(v)
+  intro = '\n\n'
+  for k in sorted(v.keys()):
+    intro += '\n  %s = %r' % (k, v[k])
+  intro += '\n'
+  C.prompt = prompt
+  C.cmdloop(intro)
+
+def selftest(module_name, argv=None, defaultTest=None):
+  ''' Called by my unit tests.
+  '''
+  if argv is None:
+    argv = sys.argv
+  import importlib
+  importlib.import_module(module_name)
+  import signal
+  signal.signal(signal.SIGHUP, lambda sig, frame: thread_dump())
+  signal.signal(signal.SIGINT, lambda sig, frame: sys.exit(thread_dump()))
+  import unittest
+  return unittest.main(module=module_name, defaultTest=defaultTest, argv=argv)
+
 if __name__ == '__main__':
   setup_logging()
   @DEBUG
   def testfunc(x):
     debug("into testfunc: x=%r", x)
-    sleep(7)
+    sleep(2)
     debug("leaving testfunc: returning x=%r", x)
     return x
   print("TESTFUNC", testfunc(9))
   thread_dump()
+  ##DebugShell({'x': 1, 'y':2}).cmdloop('Debug> ')

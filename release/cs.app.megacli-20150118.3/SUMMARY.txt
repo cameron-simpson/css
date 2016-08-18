@@ -1,0 +1,1 @@
+mention MegaCLI class in README

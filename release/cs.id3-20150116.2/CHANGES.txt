@@ -1,0 +1,1 @@
+lib/python/cs/README-id3.rst lib/python/cs/id3.py: cs.id3: pyid3lib not on PyPI, remove from requirements and mention in README

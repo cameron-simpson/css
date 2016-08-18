@@ -1,0 +1,1 @@
+lib/python/cs/app/maildb.py: cs.app.maildb: DISTINFO: fix up entry_points

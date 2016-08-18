@@ -9,19 +9,21 @@ from __future__ import print_function
 import sys
 import os.path
 from collections import namedtuple
+import datetime
+import json
 import struct
 from threading import Lock, RLock
 from xml.etree.ElementTree import XML
-from cs.logutils import Pfx, error, setup_logging
+from cs.logutils import Pfx, error, warning, info, setup_logging
 from cs.obj import O
 from cs.threads import locked_property
 from cs.urlutils import URL
 
 USAGE = '''Usage:
-    %s  cat tvwizdirs...
-    %s  header tvwizdirs...
-    %s  scan tvwizdirs...
-    %s  test'''
+    %s cat tvwizdirs...
+    %s header tvwizdirs...
+    %s scan tvwizdirs...
+    %s test'''
 
 # constants related to headers
 
@@ -64,6 +66,10 @@ def main(argv):
         if len(args) < 1:
           error("missing tvwizdirs")
           badopts = True
+      elif op == "meta":
+        if len(args) < 1:
+          error("missing .ts files or tvwizdirs")
+          badopts = True
       elif op == "scan":
         if len(args) < 1:
           error("missing tvwizdirs")
@@ -80,47 +86,125 @@ def main(argv):
 
   xit = 0
 
-  if op == "cat":
-    for arg in args:
-      TVWiz(arg).copyto(sys.stdout)
-  elif op == "header":
-    for arg in args:
-      print(arg)
-      TV = TVWiz(arg)
-      print(repr(TV.header()))
-  elif op == "scan":
-    for arg in args:
-      print(arg)
-      total = 0
-      chunkSize = 0
-      chunkOff = 0
-      for wizOffset, fileNum, flags, offset, size in TVWiz(arg).trunc_records():
-        print("  wizOffset=%d, fileNum=%d, flags=%02x, offset=%d, size=%d" \
-              % ( wizOffset, fileNum, flags, offset, size )
-             )
-        total += size
-        if chunkOff != wizOffset:
-          skip = wizOffset - chunkOff
-          if chunkSize == 0:
-            print("    %d skipped" % skip)
+  with Pfx(op):
+    if op == "cat":
+      for arg in args:
+        TVWiz(arg).copyto(sys.stdout)
+    elif op == "header":
+      for arg in args:
+        print(arg)
+        TV = TVWiz(arg)
+        print(repr(TV.header()))
+    elif op == "meta":
+      for filename in args:
+        with Pfx(filename):
+          try:
+            meta = get_metadata(filename)
+          except ValueError as e:
+            error(e)
+            xit = 1
           else:
-            print("    %d skipped, after a chunk of %d" % (skip, chunkSize))
-          chunkOff = wizOffset
-          chunkSize = 0
-        chunkOff += size
-        chunkSize += size
-      if chunkOff > 0:
-        print("    final chunk of %d" % chunkSize)
-      print("  total %d" % total)
-  elif op == "test":
-    host = args.pop(0)
-    print("host =", host, "args =", args)
-    WizPnP(host).test()
-  else:
-    error("unsupported operation: %s" % op)
-    xit = 2
+            print(filename, json.dumps(meta, sort_keys=True), sep='\t')
+    elif op == "scan":
+      for arg in args:
+        print(arg)
+        total = 0
+        chunkSize = 0
+        chunkOff = 0
+        for wizOffset, fileNum, flags, offset, size in TVWiz(arg).trunc_records():
+          print("  wizOffset=%d, fileNum=%d, flags=%02x, offset=%d, size=%d" \
+                % ( wizOffset, fileNum, flags, offset, size )
+               )
+          total += size
+          if chunkOff != wizOffset:
+            skip = wizOffset - chunkOff
+            if chunkSize == 0:
+              print("    %d skipped" % skip)
+            else:
+              print("    %d skipped, after a chunk of %d" % (skip, chunkSize))
+            chunkOff = wizOffset
+            chunkSize = 0
+          chunkOff += size
+          chunkSize += size
+        if chunkOff > 0:
+          print("    final chunk of %d" % chunkSize)
+        print("  total %d" % total)
+    elif op == "test":
+      host = args.pop(0)
+      print("host =", host, "args =", args)
+      WizPnP(host).test()
+    else:
+      error("unsupported operation: %s" % op)
+      xit = 2
 
   return xit
+
+def get_metadata(target):
+  if target.endswith('.ts') and os.path.isfile(target):
+    metadata = TnMovie(target).metadata()
+  elif target.endswith('.tvwiz') and os.path.isdir(target):
+    metadata = meta_tvwizdir(target)
+  else:
+    raise ValueError('not a .ts file or a .tvwiz dir: %r' % (target,))
+  return metadata
+
+class TnMovie(O):
+  ''' A class that knows about a modern Beyonwiz T2, T3 etc recording.
+  '''
+
+  def __init__(self, filename):
+    ''' Initialise with `filename`, the recording's .ts file.
+    '''
+    if not filename.endswith('.ts'):
+      raise ValueError('not a .ts file')
+    self.filename = filename
+
+  @property
+  def meta_filename(self):
+    return self.filename + '.meta'
+
+  @property
+  def cuts_filename(self):
+    return self.filename + '.cuts'
+
+  def metadata(self):
+    ''' Information about the recording.
+    '''
+    meta = {}
+    base, ext = os.path.splitext(os.path.basename(self.filename))
+    fields = base.split(' - ', 2)
+    if len(fields) != 3:
+      warning('cannot parse into "time - channel - program": %r', base)
+    else:
+      time_field, channel, title = fields
+      meta['channel'] = channel
+      meta['title'] = title
+      time_fields = time_field.split()
+      if ( len(time_fields) != 2
+        or not all(_.isdigit() for _ in time_fields)
+        or len(time_fields[0]) != 8 or len(time_fields[1]) != 4
+         ):
+        warning('mailformed time field: %r', time_field)
+      else:
+        ymd, hhmm = time_fields
+        meta['date'] = '-'.join( (ymd[:4], ymd[4:6], ymd[6:8]) )
+        meta['start_time'] = ':'.join( (hhmm[:2], hhmm[2:4]) )
+    mfname = self.meta_filename
+    with Pfx(mfname):
+      with open(mfname) as mfp:
+        hdr = mfp.readline()
+        title2 = mfp.readline().strip()
+        if title2 and title2 != title:
+          warning('override file title')
+          meta['title_from_filename'] = title
+          meta['title'] = title2
+        synopsis = mfp.readline().strip()
+        if synopsis:
+          meta['synopsis'] = synopsis
+        start_time_unix = mfp.readline().strip()
+        if start_time_unix.isdigit():
+          meta['start_time_unix'] = int(start_time_unix)
+    return meta
 
 TruncRecord = namedtuple('TruncRecord', 'wizOffset fileNum flags offset size')
 

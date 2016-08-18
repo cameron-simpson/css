@@ -20,7 +20,7 @@ from cs.logutils import Pfx, error, warning, info, debug, D, X
 from cs.threads import locked
 from cs.py3 import StringTypes, Queue_Full as Full, Queue_Empty as Empty
 from . import NodeDB
-from .backend import Backend, CSVRow
+from .backend import Backend, Update, ResetUpdate, ExtendUpdate
 
 def resolve_csv_row(row, lastrow):
   ''' Transmute a CSV row, resolving omitted TYPE, NAME or ATTR fields.
@@ -66,31 +66,51 @@ def write_csv_file(fp, nodedata):
         name = ''
 
 class Backend_CSVFile(Backend):
+  ''' An interface to a cs.csvutils.SharedCSVFile to store nodedb state.
+  '''
 
   def __init__(self, csvpath, readonly=False, rewrite_inplace=False):
     Backend.__init__(self, readonly=readonly)
     self.pathname = csvpath
     self.rewrite_inplace = rewrite_inplace
     self.keep_backups = False
-    self._loaded = Lock()
-    self._loaded.acquire()
+    self._lastrow = (None, None, None, None)
 
   def init_nodedb(self):
-    ''' Wait for the first update pass to complete.
+    ''' Open the CSV file and wait for the first update pass to complete.
     '''
     self._open_csv()
-    self._monitor_thread = Thread(target=self._monitor, name="%s._monitor" % (self,))
-    self._monitor_thread.daemon = True
-    self._monitor_thread.start()
-    self._loaded.acquire()
-    self._loaded.release()
-    self._loaded = None
+    self.csv.ready()
+
+  def import_foreign_row(self, row0):
+    ''' Apply the values from an individual CSV update row to the NodeDB without propagating to the backend.
+        Each row is expected to be post-resolve_csv_row().
+        Honour the incremental notation for data:
+        - a NAME commencing with '=' discards any existing (TYPE, NAME)
+          and begins anew.
+        - an ATTR commencing with '=' discards any existing ATTR and
+          commences the ATTR anew
+        - an ATTR commencing with '-' discards any existing ATTR;
+          VALUE must be empty
+        Otherwise each VALUE is appended to any existing ATTR VALUEs.
+    '''
+    if row0 is None:
+      return
+    row = resolve_csv_row(row0, self._lastrow)
+    self._lastrow = row
+    t, name, attr, value = row
+    nodedb = self.nodedb
+    value = nodedb.fromtext(value)
+    for update in Update.from_csv_row( (t, name, attr, value) ):
+      nodedb._update_local(update)
 
   @locked
   def _open_csv(self):
     ''' Attach to the shared CSV file.
     '''
-    self.csv = SharedCSVFile(self.pathname, eof_markers=True, readonly=self.readonly)
+    self.csv = SharedCSVFile(self.pathname,
+                             importer=self.import_foreign_row,
+                             readonly=self.readonly)
 
   @locked
   def _close_csv(self):
@@ -101,52 +121,15 @@ class Backend_CSVFile(Backend):
     ''' Final shutdown: stop monitor thread, detach from CSV file.
     '''
     self._close_csv()
-    self._monitor_thread.join()
 
-  def _update(self, csvrow):
+  def _update(self, update):
     ''' Update the backing store from an update csvrow.
     '''
-    if not isinstance(csvrow, CSVRow):
-      raise TypeError("csvrow=%r" % (csvrow,))
     if self.readonly:
-      warning("%s: readonly, discarding: %s", self.pathname, csvrow)
-    else:
-      self.csv.put(csvrow)
-
-  def _monitor(self):
-    ''' Monitor loop: collect updates from the backend and apply to the NodeDB.
-    '''
-    first = True
-    fromtext = self.nodedb.fromtext
-    lastrow = None
-    while self.csv is not None:
-      csv = self.csv
-      if csv is None:
-        pass
-      else:
-        old_state = csv.filestate
-        if old_state is not None:
-          new_state = FileState(self.pathname)
-          if not new_state.samefile(old_state):
-            # a new CSV file is there; assume rewritten entirely
-            # reconnect and reload
-            with self._lock:
-              self._close_csv()
-              self._open_csv()
-            self.nodedb._scrub()
-      csv = self.csv
-      if csv is None:
-        pass
-      else:
-        for row in csv.foreign_rows(to_eof=True):
-          row = resolve_csv_row(row, lastrow)
-          t, name, attr, value = row
-          value = fromtext(value)
-          self.import_csv_row(CSVRow(t, name, attr, value))
-          lastrow = row
-      if first:
-        first = False
-        self._loaded.release()
+      warning("%s: readonly, discarding: %s", self.pathname, update)
+      return
+    for row in update.to_csv():
+      self.csv.put(row)
 
   def rewrite(self):
     ''' Force a complete rewrite of the CSV file.

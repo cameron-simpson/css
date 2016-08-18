@@ -1,0 +1,1 @@
+lib/python/cs/mixin/README-ucattrs.rst lib/python/cs/mixin/ucattrs.py: cs.mixin.excutils: move long_description into cs/mixin/README-ucattrs.rst

@@ -1,0 +1,223 @@
+#!/usr/bin/python
+#
+# File media files according to metadata, used to maintain the home
+# media library incrementally.
+#   - Cameron Simpson <cs@zip.com.au> 04sep2015
+#
+
+from __future__ import print_function
+import sys
+import os
+import os.path
+from errno import EXDEV
+import json
+import shutil
+from string import Formatter
+from cs.logutils import setup_logging, error, warning, info, Pfx, X
+
+DEFAULT_FORMATS = (
+    '{title_lc_dash}/series-{series_number:02d}/s{series_number:02d}-e{episode_number:02d}-{episode_trim_lc_dash}--{source_tag}',
+    '{title_lc_dash}/{date.year}/{date.year}-{date.month:02d}-{date.day:02d}-{episode_trim_lc_dash}--{source_tag}',
+)
+            
+
+USAGE = '''Usage: %s -d media-dir [-F format]... -s source-tag filenames... < metadata
+  -d media-dir      Target media directory tree.
+  -F formats:...    Format strings, preceeding the default list:
+                      ''' + '''
+                      '''.join(DEFAULT_FORMATS) + '''
+  -s source-tag     Source tag for attribution purposes.
+                    
+  Metadata format:
+    filename\\t{JSON-data}'''
+
+def main(argv):
+  cmd = argv.pop(0)
+  usage = USAGE % (cmd,)
+  setup_logging(cmd)
+
+  badopts = False
+  media_dir = None
+  formats = []
+  source_tag = None
+
+  # Not using Getopt because I need to collect multiple -F options.
+  # I should probably learn argparse at this point...
+  while argv and argv[0].startswith('-'):
+    opt = argv.pop(0)
+    if opt == '-':
+      argv.insert(0, opt)
+    elif opt == '--':
+      break
+    else:
+      with Pfx(opt):
+        try:
+          if opt == '-d':
+            media_dir = argv.pop(0)
+          elif opt == '-F':
+            formats.append(argv.pop(0))
+          elif opt == '-s':
+            source_tag = argv.pop(0)
+          else:
+            warning('unrecognised option')
+            badopts = True
+        except IndexError:
+          warning('missing option value')
+          badopts = True
+
+  formats.extend(DEFAULT_FORMATS)
+
+  if not argv:
+    warning("missing filenames")
+    badopts = True
+  else:
+    filenames = set(argv)
+
+  if media_dir is None:
+    warning('missing media-dir')
+    badopts = True
+  elif not os.path.isdir(media_dir):
+    warning('media-dir: not a directory: %s', media_dir)
+    badopts = True
+
+  if source_tag is not None and os.path.sep in source_tag:
+    warning('source_tag contains pathsep %r: %s', os.path.sep, source_tag)
+    badopts = True
+
+  if badopts:
+    print(usage, file=sys.stderr)
+    return 2
+
+  xit = 0
+
+  # filing locations
+  filed = {}
+  for lineno, metadata_line in enumerate(sys.stdin, 1):
+    with Pfx('stdin:%d', lineno):
+      if not metadata_line.endswith('\n'):
+        raise ValueError('missing trailing newline')
+      filename, json_s = metadata_line.rstrip().split(None, 1)
+      with Pfx(filename):
+        if filename not in filenames:
+          continue
+        metadata = json.loads(json_s)
+        newpath = media_path(filename, metadata, formats, source_tag=source_tag)
+        if newpath is None:
+          error('no working format strings')
+          xit = 1
+        else:
+          newpath = os.path.join(media_dir, newpath)
+          if os.path.exists(newpath):
+            warning('already exists, skipping: %s', newpath)
+            continue
+          target_dir = os.path.dirname(newpath)
+          if not os.path.isdir(target_dir):
+            info('makedirs(%r)', target_dir)
+            with Pfx('makedirs(%r)', target_dir):
+              try:
+                os.makedirs(target_dir)
+              except OSError as e:
+                error(e)
+                xit = 1
+                continue
+          filed = False
+          for srcpath in [filename] + filed.get(filename, []):
+            with Pfx('link(%r, %r)', srcpath, newpath):
+              try:
+                os.link(srcpath, newpath)
+              except OSError as e:
+                if e.errno != EXDEV:
+                  warning(e)
+              else:
+                info('success')
+                filed = True
+                filed.setdefault(filename, []).append(newpath)
+          if not filed:
+            with Pfx('copy(%r, %r)', filename, newpath):
+              try:
+                shutil.copy2(filename, newpath)
+              except OSError as e:
+                error(e)
+                xit = 1
+              else:
+                info('success')
+                filed = True
+                filed.setdefault(filename, []).append(newpath)
+  
+  # check for unfiled items
+  for filename in filenames:
+    if filename not in filed:
+      error('not filed: %s', filename)
+      xit = 1
+
+  return xit
+
+def media_path(filename, metadata, formats, **kw):
+  ''' Compute filing name.
+      `filename`: source filename
+  '''
+  filebase, ext = os.path.splitext(filename)
+  F = MetaFormatter(metadata)
+  media_path = None
+  for fmt in formats:
+    with Pfx(fmt):
+      try:
+        formatted = F.format(fmt, **kw)
+      except KeyError as e:
+        info('skip format: %s', e)
+        continue
+    media_path = formatted
+    break
+  return media_path + ext
+
+def trim_episode(name):
+  ''' Strip leading series/episode info from episode name.
+  '''
+  for prefix in 'series', 'episode':
+    words = name.split(None, 2)
+    if len(words) >= 3 and words[0].lower() == prefix and words[1].isdigit():
+      name = words[2]
+  return name
+
+class MetaFormatter(Formatter):
+
+  def __init__(self, metadata):
+    self.meta = metadata
+
+  _attr_exts = {
+    'lc':   lambda value: value.lower(),
+    'dash': lambda value: value.replace(' ', '-').replace('\t', '_'),
+    'trim': trim_episode,
+  }
+
+  def convert_field(self, value, conversion):
+    if conversion is None:
+      return value
+    return MetaFormatter._attr_exts[conversion](value)
+
+  def get_field(self, field_name, a, kw):
+    ''' Pull a field from the MetaFormatter.
+        Allow `kw` to override the presupplied .meta values.
+        Allow field_foo to return _attr_exts[foo](field) if field_foo
+        is not a presupplied .meta value.
+    '''
+    meta = self.meta
+    ext_map = MetaFormatter._attr_exts
+    with Pfx('get_field(%r)', field_name):
+      if a:
+        warning('unexpected a: %r', a)
+      value = kw.get(field_name)
+      if value is not None:
+        return value, field_name
+      value = meta.get(field_name)
+      if value is not None:
+        return value, field_name
+      for ext in ext_map.keys():
+        _ext = '_' + ext
+        if field_name.endswith(_ext):
+          inner_value, used_field = self.get_field(field_name[:-len(_ext)], a, kw)
+          return ext_map[ext](inner_value), field_name
+    raise KeyError('unknown field name %r' % (field_name,))
+
+if __name__ == '__main__':
+  sys.exit(main(sys.argv))

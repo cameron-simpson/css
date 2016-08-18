@@ -1,0 +1,25 @@
+#!/bin/sh
+#
+# File ABC IView downloads for easy viewing.
+#   - Cameron Simpson <cs@zip.com.au> 05sep2015
+#
+
+dl_dir=$HOME/dl/iview
+media_dir=/Volumes/Public/Video
+
+if [ ! -d "$media_dir/." ]
+then
+  echo "$0: no media directory, quitting: $media_dir"
+  exit 0
+fi
+
+cd "$dl_dir"
+set -- *.mp4
+if [ "x$1" = 'x*.mp4' ]
+then
+  echo "$cmd: $dl_dir: no .mp4 files, quitting"
+  exit 0
+fi
+
+set -x
+iview meta | file-media -s iview -d "$media_dir" -- *.mp4

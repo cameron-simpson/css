@@ -1,0 +1,1 @@
+lib/python/cs/README-seq.rst lib/python/cs/seq.py: cs.seq: move long_description into cs/README-seq.rst

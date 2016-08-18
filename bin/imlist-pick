@@ -1,0 +1,64 @@
+#!/bin/sh
+#
+# Select images from .imlists.
+#   - Cameron Simpson <cs@zip.com.au> 13oct2015
+#
+
+set -ue
+
+cmd=$(basename "$0")
+usage="Usage: $cmd [-/ regexp] [-atw] [-n maxn] [-x minx] [-y miny] dirs...
+    -/ regexp   Choose images whose paths macth regexp.
+    -a          Absolute paths; passed to imlist.
+    -t          Tall. Choose images taller than wide.
+    -w          Wide. Choose images wider than tall.
+    -x minx     Choose images with width >= minx.
+    -y miny     Choose images with height >= miny."
+
+awkcond=1
+maxn=
+regexp=
+imlist_opts=
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -/) regexp=$2; shift ;;
+    -/*)regexp=$( expr "x$1" : 'x..\(.*\)' ) ;;
+    -a) imlist_opts="$imlist_opts $1" ;;
+    -n) maxn=$2; shift ;;
+    -t) awkcond="$awkcond && width < height" ;;
+    -w) awkcond="$awkcond && width > height" ;;
+    -x) awkcond="$awkcond && width >= $2"; shift ;;
+    -y) awkcond="$awkcond && height >= $2"; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing dirs" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+imlist $imlist_opts "$@" \
+| awk '{ width=$1; height=$2; pathname=$3 }
+      '"$awkcond { print }" \
+| sed -n 's/^[1-9][0-9]*  *[1-9][0-9]*  *//p' \
+| if [ -n "$regexp" ]
+  then  egrep -i -- "$regexp"
+  else  cat
+  fi \
+| if [ -n "$maxn" ]
+  then  shuffle | sed "${maxn}q"
+  else  cat
+  fi

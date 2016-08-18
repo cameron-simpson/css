@@ -1,0 +1,93 @@
+#!/bin/sh
+#
+# Construct an unbound.conf(5) file then dispatch unbound(8) via svcd.
+#       - Cameron Simpson <cs@zip.com.au> 26jul2012
+#
+
+set -ue
+
+: ${VARRUN:=$HOME/var/run}
+: ${LOGDIR:=$HOME/var/log}
+: ${UNBOUND_DNS_UPSTREAM:=}     # server set, eg: opennic
+: ${TMPDIR:=/tmp}
+
+# note current username at startup
+ousername=`id -un`
+username=$ousername
+dosudo=
+once=
+trace=set-x
+logdir=$LOGDIR/unbound
+svcdpidfile=$VARRUN/svcd-unbound.pid
+wkdir=$HOME/var/unbound
+cf=$wkdir/unbound.conf
+log=$logdir/unbound.log
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [-1] [-u username] [-S] [--] [upstream-forwards...]
+  -1            Run just once; otherwise run via svcd.
+  -u username   Specify username; passed to gen-unbound.conf.
+  -S            Dispatch with sudo."
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -1) once=1 ;;
+    -u) username=$2; shift ;;
+    -S) dosudo=1 ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+# if target user is not current user, prefix to commands to run as target
+if [ "x$username" = "x$ousername" ]
+then  as=
+else  as="sux -u $username --"
+fi
+
+# if not once, wrap in svcd
+[ $once ] || \
+{ set $trace \
+        svcd -q -x -n unbound -p "$svcdpidfile" -s get-default-route -U "$username" -- \
+          "$0" -1 -u "$username" -- ${1+"$@"}
+  if [ $dosudo ]
+  then  set -- $trace sudo env "HOST=$HOST" "TMPDIR=$TMPDIR" "PATH=$PATH" "PYTHONPATH=$PYTHONPATH" "$@"
+  fi
+  exec "$@"
+}
+
+# run once - generate config and go, possibly via sudo
+
+# default upstream DNS servers
+if [ $# -gt 0 ]
+then
+  $trace $as lastvalue unbound "$*"
+else
+  set -- `$as lastvalue unbound`
+  echo "$cmd: using lastvalue unbound: $*" >&2
+fi
+
+for d in "$VARRUN" "$wkdir" "$LOGDIR"
+do  [ -d "$d/." ] || $trace $as mkdir "$d"
+done
+
+$trace $as rewriteif -d "$cf" gen-unbound.conf -u "$username" -- ${1+"$@"}
+$trace $as unbound-checkconf "$cf"
+
+set -- $trace unbound -d -c "$cf"
+if [ $dosudo ]
+then  set -- $trace sudo env "HOST=$HOST" "TMPDIR=$TMPDIR" "$@"
+fi
+
+set -x
+cd "$wkdir"
+exec "$@"

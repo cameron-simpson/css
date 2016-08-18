@@ -10,7 +10,7 @@ import time
 import unittest
 from cs.logutils import D, setup_logging
 from cs.timeutils import sleep
-from cs.threads import report
+from cs.asynchron import report
 from cs.later import Later, FUNC_MANY_TO_MANY, FUNC_SELECTOR
 
 class TestLater(unittest.TestCase):
@@ -31,9 +31,10 @@ class TestLater(unittest.TestCase):
   def setUp(self):
     self.L = Later(2)
     self.L.logTo("/dev/tty")
+    self.L.open()
 
   def tearDown(self):
-    pass
+    self.L.close()
 
   def test00one(self):
     # compute 3*2

@@ -1,0 +1,1 @@
+PyPI metadata and slight code cleanup.

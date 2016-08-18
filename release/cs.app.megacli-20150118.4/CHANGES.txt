@@ -1,0 +1,1 @@
+lib/python/cs/app/README-megacli.rst: cs.app.megacli: include sample output in README

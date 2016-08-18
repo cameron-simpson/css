@@ -1,0 +1,389 @@
+#!/usr/bin/python
+#
+# Emit configuration lines computed from my proxy peerage file.
+#   - Cameron Simpson <cs@zip.com.au> 09sep2015
+#
+
+from __future__ import print_function
+import sys
+from collections import namedtuple
+from re import escape
+from cs.app.haproxy import quote as haquote
+from cs.lex import get_uc_identifier
+from cs.logutils import setup_logging, Pfx, X, error, warning, info
+
+USAGE = '''Usage:
+    %s haproxy backends frontend_name frontend_listen <peerage-file
+    %s squid acls proxy_name <peerage-file'''
+
+def main(argv):
+  cmd = argv.pop(0)
+  setup_logging(cmd)
+  usage = USAGE % (cmd, cmd)
+  with Pfx(cmd):
+    badopts = False
+    if not argv:
+      error('missing op')
+      badopts = True
+    else:
+      op = argv.pop(0)
+      with Pfx(op):
+        if op == 'haproxy':
+          if not argv:
+            error('missing subop')
+            badopts = True
+          else:
+            subop = argv.pop(0)
+            with Pfx(subop):
+              if subop == 'backends':
+                if not argv:
+                  error('missing frontend_name')
+                  badopts = True
+                else:
+                  frontend_name = argv.pop(0)
+                  if not argv:
+                    error('missing frontend_listen')
+                    badopts = True
+                  else:
+                    frontend_listen = argv.pop(0)
+                    if argv:
+                      error('extra arguments: %s', ' '.join(argv))
+                      badopts = True
+              else:
+                error('unrecognised subop')
+                badopts = True
+        elif op == 'squid':
+          if not argv:
+            error('missing subop')
+            badopts = True
+          else:
+            subop = argv.pop(0)
+            with Pfx(subop):
+              if subop == 'acls':
+                if not argv:
+                  error('missing proxy_name')
+                  badopts = True
+                else:
+                  proxy_name = argv.pop(0)
+                  if argv:
+                    error('extra arguments: %s', ' '.join(argv))
+                    badopts = True
+              else:
+                error('unrecognised subop')
+                badopts = True
+        else:
+          error('unrecognised op')
+          badopts = True
+    if badopts:
+      print(usage, file=sys.stderr)
+      return 2
+    xit = 0
+    proxies = Proxies()
+    proxies.add_proxy(Proxy('DIRECT', None, None, None, []))
+    with Pfx('stdin'):
+      if not proxies.load_proxies(sys.stdin):
+        xit=1
+    if op == 'haproxy':
+      # haproxy does not handle DIRECT
+      if subop == 'backends':
+        return cmd_haproxy_backends(proxies, frontend_name, frontend_listen)
+    if op == 'squid':
+      if subop == 'acls':
+        return cmd_squid_acls(proxies, proxy_name)
+    error('unimplemented op/subop: %s/%s', op, subop)
+    return 2
+
+def cmd_haproxy_backends(proxies, frontend_name, frontend_listen):
+  # define the frontend
+  for ha_line_words in proxies.haproxy_define_frontend(frontend_name, frontend_listen):
+    print(*ha_line_words)
+  # define the backends
+  for proxy_combo in sorted(proxies.proxy_combinations()):
+    if proxy_combo == ('DIRECT',):
+      continue
+    print()
+    for ha_line_words in proxies.haproxy_define_backend(proxy_combo):
+      print(*ha_line_words)
+
+def haproxy_backend_name(proxy_names):
+  return '__'.join(sorted(proxy_names))
+
+def cmd_squid_acls(proxies, proxy_name):
+  proxy = proxies[proxy_name]
+  patterns = proxy.patterns
+  allow_as_fallback = False
+  for n, pattern in enumerate(patterns):
+    defn = pattern.definition
+    if defn == '*':
+      allow_as_fallback = True
+    else:
+      print('acl', '_'.join( (proxy_name, str(n)) ), pattern.squid_acl())
+  if proxy_name == 'DIRECT':
+    # force these ACLs to be direct
+    for n, pattern in enumerate(patterns):
+      acl_name = '_'.join( (proxy_name, str(n)) )
+      print('always_direct allow', acl_name)
+    print('always_direct deny all')
+    # prevent these ACLs from being never_direct
+    for n, pattern in enumerate(patterns):
+      acl_name = '_'.join( (proxy_name, str(n)) )
+      print('never_direct deny', acl_name)
+    if not allow_as_fallback:
+      # prevent other ACLs from going direct
+      print('never_direct allow all')
+  else:
+    raise ValueError(proxy_name)
+
+Proxy = namedtuple('Proxy', 'name defn_lineno hostname port patterns')
+
+_Pattern = namedtuple('Pattern', 'definition defn_lineno proxy_names')
+
+class Pattern(_Pattern):
+  ''' Subclass of _Pattern with various computed properties.
+  '''
+
+  def __str__(self):
+    return "Pattern(%s:%s)" % (self.definition, ','.join(sorted(self.proxy_names)))
+
+  def proxy_names_tuple(self):
+    ''' Canonical proxy name tuple - sorted.
+    '''
+    return tuple(sorted(set(self.proxy_names)))
+
+  def haproxy_acl(self):
+    ''' Return the inline ACL condition for use in an haproxy backend selector.
+    '''
+    pattern = self.definition
+    with Pfx('haproxy_acl(%r)', self):
+      if not pattern:
+        raise ValueError('empty pattern')
+      # * - wildcard pattern
+      if pattern == '*':
+        return None
+      # *.dom.ain
+      if pattern.startswith('*.') and len(pattern) > 2:
+        return r'hdr_end(host) %s || hdr_reg(host) %s:[1-9][0-9]*$' \
+               % (haquote(pattern[1:]), haquote(escape(pattern[1:])))
+      # hostname or fqdn
+      if pattern[0].isalpha():
+        return r'hdr(host) %s || hdr_reg(host) ^%s:[1-9][0-9]*$' \
+               % (haquote(pattern), haquote(escape(pattern)))
+      # n.n.* - ip-prefix
+      if pattern[0].isdigit() and '.' in pattern:
+        words = pattern.split('.')
+        if words[-1] == '*':
+          words.pop(-1)
+          if ( len(words) > 3
+            or not(all(word.isdigit() and int(word) < 256 for word in words))
+             ):
+            raise ValueError('invalid ip-prefix')
+          return 'hdr_beg(host) %s' % haquote('.'.join(words) + '.')
+        X("words = %r", words)
+        if ( len(words) > 4
+          or not(all(word.isdigit() and int(word) < 256 for word in words))
+           ):
+          raise ValueError('invalid IPv4')
+        return r'hdr(host) %s || hdr_reg(host) ^%s:[1-9][0-9]*$' \
+               (haquote(pattern), haquote(escape(pattern)))
+      # .ext - file extension
+      if pattern.startswith('.'):
+        return r'path_end %s || path_reg %s' \
+               % ( haquote(pattern), haquote(escape(pattern + '?')))
+      raise ValueError('unrecognised pattern')
+
+  def squid_acl(self):
+    ''' Return the condition part of a squid ACL.
+    '''
+    pattern = self.definition
+    with Pfx('squid_acl(%r)', pattern):
+      if not pattern:
+        raise ValueError('empty pattern')
+      # * - wildcard pattern
+      if pattern == '*':
+        return 'true'
+      # *.dom.ain
+      if pattern.startswith('*.') and len(pattern) > 2:
+        return 'dstdomain %s' % (pattern[1:],)
+      # hostname or fqdn
+      if pattern[0].isalpha():
+        return 'dstdomain %s' % (pattern,)
+      # n.n.* - ip-prefix
+      if pattern[0].isdigit() and '.' in pattern:
+        words = pattern.split('.')
+        if words[-1] == '*':
+          words.pop(-1)
+          if ( len(words) > 3
+            or not(all(word.isdigit() and int(word) < 256 for word in words))
+             ):
+            raise ValueError('invalid ip-prefix')
+          padwords = ( words + ['0', '0', '0'] ) [:4]
+          return 'dst -n %s/%d' % ('.'.join(padwords), 8*len(words))
+        if ( len(words) > 4
+          or not(all(word.isdigit() and int(word) < 256 for word in words))
+           ):
+          raise ValueError('invalid IPv4')
+        return 'dstdomain %s' % (pattern,)
+      # .ext - file extension
+      if pattern.startswith('.'):
+        return r'url_regex [.]%s(\?[^?]*)?$' % (escape(pattern),)
+      raise ValueError('unrecognised pattern')
+
+class Proxies(object):
+
+  def __init__(self):
+    self.by_name = {}   # map from proxy name to Proxy
+    self._patterns = []  # Patterns in order received
+
+  def get(self, proxy_name):
+    ''' Fetch the named Proxy or None.
+    '''
+    return self.by_name.get(proxy_name)
+
+  def __getitem__(self, proxy_name):
+    ''' Fetch the named Proxy.
+    '''
+    return self.by_name[proxy_name]
+
+  @property
+  def patterns(self):
+    return self._patterns
+
+  def add_pattern(self, pattern):
+    ''' Add a pattern, vet the proxy name.
+    '''
+    self._patterns.append(pattern)
+    for proxy_name in pattern.proxy_names:
+      proxy = self.by_name.get(proxy_name)
+      if proxy is None:
+        warning("unknown proxy name: %r", proxy_name)
+      else:
+        proxy.patterns.append(pattern)
+
+  def add_proxy(self, proxy):
+    ''' Record a Proxy object in this Proxies collection.
+    '''
+    proxies = self.by_name
+    if proxy.name in proxies:
+      raise ValueError('proxy %r already exists', proxy.name)
+    proxies[proxy.name] = proxy
+
+  def proxy_combinations(self):
+    ''' Compute the set of unique proxy combinations.
+    '''
+    combos = set()
+    for pattern in self.patterns:
+      combos.add(pattern.proxy_names_tuple())
+    return combos
+
+  def load_proxies(self, fp):
+    ''' Load proxy definitions from `fp`. Return success.
+        If `fp` is a str subclass, open the named file.
+    '''
+    if isinstance(fp, str):
+      with Pfx(fp):
+        return self.load_proxies(open(fp))
+    all_ok = True
+    for lineno, line in enumerate(fp, 1):
+      with Pfx(lineno):
+        ok = True
+        if not line.endswith('\n'):
+          error('missing newline')
+          all_ok = False
+          continue
+        line = line.strip()
+        if not line or line.startswith('#'):
+          # skip blank lines and comments
+          continue
+        label, offset = get_uc_identifier(line)
+        if not label:
+          error('expected leading uppercase identifier')
+          all_ok = False
+          continue
+        if line[offset:].startswith('='):
+          with Pfx(label):
+            defn = line[offset+1:]
+            if not defn:
+              error('missing definition')
+              all_ok = False
+              continue
+            words = defn.split()
+            defn = words[0]
+            if ':' in defn:
+              proxy_host, proxy_port = defn.rsplit(':', 1)
+              with Pfx('proxy_port: %r', proxy_port):
+                try:
+                  proxy_port = int(proxy_port)
+                except ValueError as e:
+                  error(e)
+                  ok = False
+                else:
+                  if proxy_port < 1 or proxy_port >= 65536:
+                    error('out of range')
+                    ok = False
+            else:
+              proxy_host, proxy_port = defn, 3128
+            if len(words) > 1:
+              error('extra text after definition: %s', ' '.join(words[1:]))
+              ok = False
+            proxy = self.get(label)
+            if proxy:
+              error('repeated definition, first on line %d', proxy.defn_lineno)
+              ok = False
+            if ok:
+              self.add_proxy(Proxy(label, lineno, proxy_host, proxy_port, []))
+            else:
+              all_ok = False
+        else:
+          # gather comma separated labels
+          labels = [label]
+          while offset < len(line) and line[offset] == ',':
+            label, offset = get_uc_identifier(line, offset + 1)
+            if not label:
+              error('expected uppercase identifier after comma, found: %r', line[offset:])
+              all_ok = False
+              continue
+            labels.append(label)
+          if offset == len(line) or not line[offset].isspace():
+            error('expected patterns after labels, found: %r', line[offset:])
+            all_ok = False
+            continue
+          words = line[offset:].split()
+          patterns = []
+          for word in words:
+            patterns.extend(_ for _ in word.split(',') if _)
+          for pattern in patterns:
+            self.add_pattern(Pattern(pattern, lineno, labels))
+    return all_ok
+
+  def haproxy_define_frontend(self, frontend_name, frontend_listen):
+    ''' Generator yielding words to define a frontend to choose amongst the proxies.
+    '''
+    yield 'frontend', frontend_name, frontend_listen
+    default_proxies = set()
+    for pattern in self.patterns:
+      defn = pattern.definition
+      proxy_names = [ _ for _ in pattern.proxy_names if _ != 'DIRECT' ]
+      if not proxy_names:
+        continue
+      # catch the wildcard last
+      if defn == '*':
+        default_proxies.update(proxy_names)
+        continue
+      yield ( '  use_backend %s if { %s }' \
+              % (haproxy_backend_name(pattern.proxy_names), pattern.haproxy_acl()),
+            )
+    yield '  default_backend', haproxy_backend_name(default_proxies)
+
+  def haproxy_define_backend(self, proxy_names):
+    ''' Generator yielding words to define an haproxy backend.
+    '''
+    yield 'backend', haproxy_backend_name(proxy_names)
+    yield '  option httpchk HEAD http://www.smh.com.au/ HTTP/1.0\\r\\n',
+    for proxy_name in sorted(proxy_names):
+      proxy = self.by_name[proxy_name]
+      yield ( '  server %s_%d %s:%d check' \
+              % (proxy.hostname, proxy.port, proxy.hostname, proxy.port),
+            )
+
+if __name__ == '__main__':
+  sys.exit(main(sys.argv))

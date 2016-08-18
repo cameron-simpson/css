@@ -1,13 +1,28 @@
+#!/usr/bin/python
+#
+# Single line status updates.
+#   - Cameron Simpson <cs@zip.com.au>
+#
+
 from __future__ import with_statement
+
+DISTINFO = {
+    'description': "single line status updates with minimal update sequences",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'requires': ['cs.lex', 'cs.tty'],
+}
+
 from threading import Lock
 import threading
 from contextlib import contextmanager
 import atexit
 import logging
 from logging import StreamHandler
-from subprocess import Popen, PIPE
-from cs.ansi_colour import colourise
-from cs.logutils import Pfx
 from cs.lex import unctrl
 from cs.tty import ttysize
 
@@ -21,47 +36,6 @@ def cleanupAtExit():
 
 atexit.register(cleanupAtExit)
 
-class UpdHandler(StreamHandler):
-
-  def __init__(self, strm=None, nlLevel=None, ansi_mode=None):
-    ''' Initialise the UpdHandler.
-        `strm` is the output stream, default sys.stderr.
-        `nlLevel` is the logging level at which conventional line-of-text
-        output is written; log messages of a lower level go via the
-        update-the-current-line method. Default is logging.WARNING.
-        If `ansi_mode` is None, set if from strm.isatty().
-        A true value causes the handler to colour certain logging levels
-        using ANSI terminal sequences.
-    '''
-    if strm is None:
-      strm = sys.stderr
-    if nlLevel is None:
-      nlLevel = logging.WARNING
-    if ansi_mode is None:
-      ansi_mode = strm.isatty()
-    StreamHandler.__init__(self, strm)
-    self.__upd = Upd(strm)
-    self.__nlLevel = nlLevel
-    self.__ansi_mode = ansi_mode
-    self.__lock = Lock()
-
-  def emit(self, logrec):
-    with self.__lock:
-      if logrec.levelno >= self.__nlLevel:
-        with self.__upd._withoutContext():
-          if self.__ansi_mode:
-            if logrec.levelno >= logging.ERROR:
-              logrec.msg = colourise(logrec.msg, 'red')
-            elif logrec.levelno >= logging.WARN:
-              logrec.msg = colourise(logrec.msg, 'yellow')
-          StreamHandler.emit(self, logrec)
-      else:
-        self.__upd.out(logrec.getMessage())
-
-  def flush(self):
-    if self.__upd._backend:
-      self.__upd._backend.flush()
-
 class Upd(object):
 
   def __init__(self, backend, columns=None):
@@ -72,7 +46,7 @@ class Upd(object):
         rc = ttysize(backend)
         if rc.columns is not None:
           columns = rc.columns
-    self._backend=backend
+    self._backend = backend
     self.columns = columns
     self._state = ''
     self._lock = threading.RLock()
@@ -83,10 +57,17 @@ class Upd(object):
   def state(self):
     return self._state
 
-  def out(self, txt, noStrip=False):
+  def out(self, txt, *a, **kw):
+    noStrip = kw.pop('noStrip', False)
+    if kw:
+      raise ValueError("unexpected keyword arguments: %r" % (kw,))
+    if a:
+      txt = txt % a
+    # normalise text
     if not noStrip:
       txt = txt.rstrip()
     txt = unctrl(txt)
+    # crop for terminal width
     if self.columns is not None:
       txt = txt[:self.columns-1]
     txtlen = len(txt)
@@ -94,6 +75,7 @@ class Upd(object):
       old = self._state
       buflen = len(old)
       pfxlen = min(txtlen, buflen)
+      # compute length of common prefix
       for i in range(pfxlen):
         if txt[i] != old[i]:
           pfxlen = i
@@ -114,19 +96,31 @@ class Upd(object):
         # carriage return and complete overwrite
         self._backend.write('\r')
         self._backend.write(txt)
-        extlen = buflen-txtlen
-        if extlen > 0:
-          # old line was longer - write spaces over the old tail
-          self._backend.write( ' ' * extlen )
-          self._backend.write( '\b' * extlen )
+      # trailing text to overwrite with spaces?
+      extlen = buflen-txtlen
+      if extlen > 0:
+        # old line was longer - write spaces over the old tail
+        self._backend.write( ' ' * extlen )
+        self._backend.write( '\b' * extlen )
 
       self._backend.flush()
       self._state = txt
 
     return old
 
-  def nl(self, txt, noStrip=False):
+  def nl(self, txt, *a, **kw):
+    noStrip = kw.pop('noStrip', False)
+    if kw:
+      raise ValueError("unexpected keyword arguments: %r" % (kw,))
+    if a:
+      txt = txt % a
     self.without(self._backend.write, txt+'\n', noStrip=noStrip)
+
+  def flush(self):
+    ''' Flush the output stream.
+    '''
+    if self._backend:
+      return self._backend.flush()
 
   def close(self):
     if self._backend is not None:
@@ -147,7 +141,7 @@ class Upd(object):
     return ret
 
   @contextmanager
-  def _withoutContext(self,noStrip=False):
+  def _withoutContext(self, noStrip=False):
     with self._lock:
       old = self.out('', noStrip=noStrip)
       yield

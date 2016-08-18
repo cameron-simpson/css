@@ -1,0 +1,1 @@
+lib/python/cs/py/READEME-stack.rst lib/python/cs/py/stack.py: cs.py.stack: move long_description into cs/py/README-stack.rst

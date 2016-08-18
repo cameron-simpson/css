@@ -1,16 +1,26 @@
 #!/usr/bin/python -tt
 #
-# Stuff to do with sequences and iterables.
+# Stuff to do with counters, sequences and iterables.
 #       - Cameron Simpson <cs@zip.com.au> 20jul2008
 #
 
-import bisect
-import unittest
+DISTINFO = {
+    'description': "Stuff to do with counters, sequences and iterables.",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'requires': ['cs.logutils', 'cs.py.stack'],
+}
+
 import heapq
 import itertools
 from threading import Lock, Condition
 from cs.logutils import warning, debug, D
 from cs.py.stack import caller
+from cs.py3 import exec_code
 
 class Seq(object):
   ''' A thread safe wrapper for itertools.count().
@@ -60,6 +70,13 @@ def the(iterable, context=None):
 
   return it
 
+def first(iterable):
+  ''' Return the first item from an iterable; raise IndexError on empty iterables.
+  '''
+  for i in iterable:
+    return i
+  raise IndexError("empty iterable %r" % (iterable,))
+
 def last(iterable):
   ''' Return the last item from an iterable; raise IndexError on empty iterables.
   '''
@@ -70,12 +87,15 @@ def last(iterable):
     raise IndexError("no items in iterable: %r" % (iterable,))
   return item
 
-def get0(seq, default=None):
-  ''' Return first element of a sequence, or the default.
+def get0(iterable, default=None):
+  ''' Return first element of an iterable, or the default.
   '''
-  for i in seq:
+  try:
+    i = first(iterable)
+  except IndexError:
+    return default
+  else:
     return i
-  return default
 
 def NamedTupleClassFactory(*fields):
   ''' Construct classes for named tuples a bit like the named tuples
@@ -87,9 +107,9 @@ def NamedTupleClassFactory(*fields):
   class NamedTuple(list):
     for i in range(len(fields)):
       f=fields[i]
-      exec('def getx(self): return self[%d]' % i)
-      exec('def setx(self,value): self[%d]=value' % i)
-      exec('%s=property(getx,setx)' % f)
+      exec_code('def getx(self): return self[%d]' % i)
+      exec_code('def setx(self,value): self[%d]=value' % i)
+      exec_code('%s=property(getx,setx)' % f)
   return NamedTuple
 
 def NamedTuple(fields,iter=()):
@@ -172,14 +192,16 @@ class TrackingCounter(object):
       to go below zero.
   '''
 
-  def __init__(self, value=0, name=None):
+  def __init__(self, value=0, name=None, lock=None):
     ''' Initialise the counter to `value` (default 0) with the optional `name`.
     '''
     if name is None:
       name = "TrackingCounter-%d" % (seq(),)
+    if lock is None:
+      lock = Lock()
     self.value = value
     self.name = name
-    self._lock = Lock()
+    self._lock = lock
     self._watched = {}
     self._tag_up = {}
     self._tag_down = {}

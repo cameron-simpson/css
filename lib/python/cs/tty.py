@@ -5,7 +5,20 @@
 #
 
 from __future__ import print_function
-import os
+
+DISTINFO = {
+    'description': "functions related to terminals",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Environment :: Console",
+        "Operating System :: POSIX",
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        "Topic :: Terminals",
+        ],
+}
+
 import re
 from subprocess import Popen, PIPE
 from collections import namedtuple

@@ -1,4 +1,5 @@
-require 'flush.pl';
+##require 'flush.pl';
+use IO::Handle qw();
 require 'cs/tcp.pl';
 require 'cs/open.pl';
 
@@ -51,7 +52,7 @@ sub disconnect
 sub reply	# void -> (code,text) or undef on EOF
 	{ local($_);
 
-	  &'flush($TO);
+	  $TO->flush();
 	  # print main'STDERR "getting reply\n";
 	  do {	$_=<$FROM>;
 		return undef if !defined;
@@ -72,7 +73,7 @@ sub reply	# void -> (code,text) or undef on EOF
 sub text	# (void) -> @lines
 	{ local(@lines);
 
-	  &'flush($TO);
+	  $TO->flush();
 
 	  @lines=();
 	  while (<$FROM>)

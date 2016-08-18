@@ -1,0 +1,19 @@
+#!/bin/sh
+#
+# Convenient invocation of autopep8.
+#   - Cameron Simpson <cs@zip.com.au> 20mar2015
+#
+
+set -ue
+
+opts='--indent-size 2 --ignore E302'
+mode=--diff
+hgdiff=
+trace=
+[ -t 2 ] && trace=set-x
+
+[ $# -gt 0 ] && [ "x$1" = x-y ] && { shift; mode=--in-place; hgdiff=1; }
+
+$trace venv exec autopep8 "$mode" $opts ${1+"$@"} || exit $?
+[ -d .hg/ -o -d ../.hg/ ] || exit 0
+$trace hg diff

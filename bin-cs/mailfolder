@@ -8,33 +8,34 @@
 
 set -ue
 
+: ${MAILHOMEHOST:=}
 : ${MAILDIR:=$HOME/mail}
 : ${MAIL_EXPIRE_FORMAT:='%Y'}           # versus, say, %Y-%m
 : ${MAIL_IMAPSYNC:=}
-: ${MAILBOX:=$MAILDIR/INBOX}
+: ${MAILBOX:=INBOX}
 : ${SENDMESG_FCC:=spool-out}
 export SENDMESG_FCC
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [-f] [-I imapsync] [-q] [foldername]
-  -C dir Change directory to dir. Default from \$HOME: $HOME
-        Implies -l.
+  -C dir    Change directory to dir. Default from \$HOME: $HOME
+            Implies -l.
   -I imapsync
-        Specify remote IMAP for use with imap-sync(1cs).
-        Default from \$MAIL_IMAPSYNC: $MAIL_IMAPSYNC
-        Supply empty string to prevent sync.
-  -l    Run locally. Default is to run remote if not on home machine
-        and no local folder.
-  -q    Quick imap-sync.
-  -r rhost Run remotely, on rhost.
+            Specify remote IMAP for use with imap-sync(1cs).
+            Default from \$MAIL_IMAPSYNC: $MAIL_IMAPSYNC
+            Supply empty string to prevent sync.
+  -l        Run locally. Default is to run remote if \$MAILHOMEHOST is not
+            empty. Curently MAILHOMEHOST=$MAILHOMEHOST
+  -q        Quick imap-sync.
+  -r rhost  Run remotely on rhost, overriding \$MAILHOMEHOST.
   foldername Default from \$MAILBOX: $MAILBOX"
 
 badopts=
 
-cdto=$HOME
+cdto=
 trace=set-x
-runlocal=
-rhost=$SYSTEMID
+runlocal=1
+[ -z "$MAILHOMEHOST" ] || runlocal=
 imapsyncopts=
 foldername=$MAILBOX
 
@@ -44,7 +45,7 @@ do
     -C) cdto=$2; shift; runlocal=1 ;;
     -I) MAIL_IMAPSYNC=$2; export MAIL_IMAPSYNC; shift ;;
     -l) runlocal=1 ;;
-    -r) runlocal= rhost=$2 ;;
+    -r) runlocal= MAILHOMEHOST=$2 ;;
     -q) imapsyncopts="$imapsyncopts $1" ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
@@ -62,10 +63,21 @@ then
                 }
 fi
 
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+if [ -z "$runlocal" ]
+then
+  exec $trace sshx -E -t "$MAILHOMEHOST" \
+        mailfolder \
+          -l -C "$cdto" \
+          -- "$foldername"
+fi
+
 case "$foldername" in
   /*) maildir=$foldername ;;
   *)  maildir=$MAILDIR/$foldername ;;
 esac
+_foldername=`printf '%s\n' "$foldername" | tr / _`
 bfoldername=`basename "$foldername"`
 old=OLD/`date "+$MAIL_EXPIRE_FORMAT"`
 omaildir=$MAILDIR/$old/$bfoldername
@@ -73,27 +85,13 @@ omaildir=$MAILDIR/$old/$bfoldername
 # update where to take copies - presumes sendmail=sendmesg-fcc in muttrc
 SENDMESG_FCC="$maildir $SENDMESG_FCC"
 
-case "$runlocal" in
-  '') # not set - infer from environment
-      # not at home? run remote, unless local folder present
-      if needhost "$MAILHOMEHOST@$SYSTEMID"
-      then  runlocal=1
-      else  runlocal=
-            { ismbox "$maildir" || ismaildir "$maildir"; } && runlocal=1
-      fi
-      ;;
-esac
-
 if [ $runlocal ] && not ismbox "$maildir" && not ismaildir "$maildir"
 then
   echo "$cmd: not a maildir: $maildir" >&2
-  badopts=1
+  exit 1
 fi
 
-[ $badopts ] && { echo "$usage" >&2; exit 2; }
-
-[ $runlocal ] || exec $trace sshx -E -t "$rhost" mailfolder -l -- "$foldername"
-
+[ -n "$cdto" ] || cdto=$HOME
 cd "$cdto"
 
 if ismbox "$omaildir"
@@ -106,4 +104,4 @@ fi
 [ -n "$MAIL_IMAPSYNC" ] \
 && $trace imap-sync $imapsyncopts "$MAILDIR" "$MAIL_IMAPSYNC" "$foldername" "$old/$foldername" out spool spool-in spool-out
 
-$trace mutt -f "$maildir" -e "fcc-hook . $maildir; save-hook . $omaildir"
+$trace mutt -f "$maildir" -e "set header_cache='$HOME/var/mutt/header-cache+$_foldername'; fcc-hook . $maildir; save-hook . $omaildir"

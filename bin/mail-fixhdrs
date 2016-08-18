@@ -1,4 +1,4 @@
-#!/bin/sed -f
+#!/usr/bin/env sed -f
 #
 # Fix some fuckups by egroups.com's digest maker.
 #	- Cameron Simpson <cs@zip.com.au> 10jan2002

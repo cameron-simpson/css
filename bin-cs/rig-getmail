@@ -1,0 +1,40 @@
+#!/bin/sh
+#
+# Run getmail.
+#       - Cameron Simpson <cs@zip.com.au> 26dec2014
+#
+
+set -ue
+
+cmd=`basename "$0"`
+usage="Usage: $cmd [upstream-mailboxes...]"
+
+: ${VARRUN:=$HOME/var/run}
+: ${LOGDIR:=$HOME/var/log}
+
+badopts=
+
+# default upstream mailboxes
+if [ $# -gt 0 ]
+then  lastvalue getmail "$*"
+else  set -- `lastvalue getmail`
+      echo "$cmd: using lastvalue getmail: $*" >&2
+      [ $# -gt 0 ] || { echo "$cmd: no default mailboxes" >&2; badopts=1; }
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+cd "$LOGDIR" || exit 1
+
+first=1
+for mailbox
+do
+  [ $first ] && set --
+  set -- ${1+"$@"} -r "$mailbox"
+  first=
+done
+
+set -- svcd -n getmail -q -T 11 \{ date \; lock -1 GETMAIL time timeout 900 getmail -v "$@" \}
+
+set -x
+exec "$@"

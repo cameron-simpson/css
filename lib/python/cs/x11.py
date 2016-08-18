@@ -1,9 +1,10 @@
 #!/usr/bin/python
 
 from __future__ import print_function
-from cs.obj import DictUCAttrs
+from subprocess import Popen, PIPE
+from cs.mixin.ucattrs import UCdict
 
-class Display(DictUCAttrs):
+class Display(UCdict):
   def __init__(self,display=None):
     dict.__init__(self)
     self.windows={}
@@ -12,8 +13,8 @@ class Display(DictUCAttrs):
       display=os.environ['DISPLAY']
     self['DISPLAY']=display
 
-    import cs.sh
-    fp=cs.sh.vpopen(("xdpyinfo","-display",display))
+    P = Popen(['xdpyinfo', '-display', display], stdout=PIPE)
+    fp = P.stdout
 
     extensions=[]
     screens=[]
@@ -55,9 +56,9 @@ class Display(DictUCAttrs):
       if line.startswith("screen #"):
         screennum=int(line[8:-2])
         assert screennum == len(screens)
-        screen=DictUCAttrs()
+        screen=UCdict()
         screens.append(screen)
-        visuals=DictUCAttrs()
+        visuals=UCdict()
         screen.VISUALS=visuals
         while True:
           if redo:
@@ -83,7 +84,7 @@ class Display(DictUCAttrs):
           elif line.startswith('default visual id:'):
             screen.DEFAULT_VISUAL_ID=eval(line.split()[3])
           elif line.startswith("visual"):
-            visual=DictUCAttrs()
+            visual=UCdict()
             while True:
               line=fp.readline()
               if len(line) == 0:
@@ -107,6 +108,8 @@ class Display(DictUCAttrs):
 
         redo=True
         continue
+
+    P.wait()
 
   def __getattr__(self,attr):
     if attr.isalpha() and attr.isupper():

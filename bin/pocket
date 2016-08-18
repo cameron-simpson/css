@@ -1,0 +1,79 @@
+#!/bin/sh
+#
+# Convenience script for Pocket (getpocket.com).
+#   - Cameron Simpson <cs@zip.com.au> 16jul2015
+#
+
+set -ue
+
+trace=
+[ -t 2 ] && trace=set-x
+from_addr=
+add_addr=add@getpocket.com
+
+cmd=$( basename "$0" )
+usage="Usage: $cmd add [-f from-addr] links..."
+
+badopts=
+
+add_link() {
+  [ $# = 1 ] || { echo "$cmd: usage: add_link link" >&2; return 2; }
+  ( echo "From: $from_addr"
+    echo "To: $add_addr"
+    echo "Subject: add link $1"
+    echo
+    $trace echo "$1"
+  ) | $trace sendmail -f "$add_addr" -oi "$add_addr"
+}
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing op" >&2
+  badopts=1
+else
+  op=$1
+  shift
+  case "$op" in
+    add)
+        while [ $# -gt 0 ]
+        do
+          case $1 in
+            -f) from_addr=$2; shift ;;
+            --) shift; break ;;
+            -?*)echo "$cmd: $op: unrecognised option: $1" >&2
+                badopts=1
+                ;;
+            *)  break ;;
+          esac
+          shift
+        done
+        [ $# -gt 0 ] || set -- -
+        ;;
+    *)  echo "$cmd: unrecognised op: $op" >&2
+        badopts=1
+        ;;
+  esac
+fi
+
+[ -n "$from_addr" ] || from_addr=$EMAIL
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+case "$op" in
+  add)
+    for link
+    do
+      if [ "x$link" = x- ]
+      then
+        while read -r link
+        do  add_link "$link"
+        done
+      else
+        add_link "$link"
+      fi
+    done
+    ;;
+  *)echo "$cmd: $op: unimplemented" >&2
+    exit 1
+    ;;
+esac

@@ -1,0 +1,106 @@
+release/cs.ansi_colour-20150107/SUMMARY.txt release/cs.ansi_colour-20150107/release-tag.txt: Release information for cs.ansi_colour-20150107.
+lib/python/cs/ansi_colour.py: cs.ansi_colour: DISTINFO update
+lib/python/cs/app/mailfiler.py lib/python/cs/app/mailfiler_tests.py: cs.app.mailfiler: remove use of cs.obj.slist
+lib/python/cs/obj.py: cs.obj: remove slist
+lib/python/cs/obj.py: cs.obj: objFlavour: add a little explaination to the docstring
+lib/python/cs/obj.py: cs.obj: remove DictAttrs, not used
+lib/python/cs/hier.py lib/python/cs/obj.py: cs.obj: rename objFlavour to flavour, tidy up slightly
+lib/python/cs/webservice.py: cs.webservice: rename objFlavour to flavour
+lib/python/cs/mixin/__init__.py: cs.mixin.__init__: namespace for mixins
+lib/python/cs/mixin/ucattrs.py: cs.mixin.ucattrs: WithUC_Attrs mixin class to support o.X ==> o["X"]
+lib/python/cs/mixin/ucattrs.py: cs.mixin.ucattrs: short docstring for UCdict class
+lib/python/cs/hier.py: cs.hier: port to cs.mixin.ucattrs
+lib/python/cs/idset.py: cs.idset: port to cs.mixin.ucattrs.WithUC_Attrs
+lib/python/cs/x11.py: cs.x11: port to cs.mixin.ucattrs.UCdict
+lib/python/cs/obj.py: cs.obj: remove WithUCAttrs, DictUCAttrs, WithUC_Attrs, DictUC_Attrs - superceded by classes from cs.mixin.ucattrs
+lib/python/cs/secret.py: cs.secret: Secret: now a subclass of cs.mixin.ucattrs.UCdict
+lib/python/cs/dbdigraph.py: cs.dbdigraph: use cs.mixin.ucattrs.UCdict
+lib/python/cs/db.py: cs.db: get WithUC_Attrs from cs.mixin.ucattrs
+lib/python/cs/obj.py: cs.obj: DISTINFO for PyPI
+release/cs.obj-20150110/SUMMARY.txt release/cs.obj-20150110/release-tag.txt: Release information for cs.obj-20150110.
+lib/python/cs/obj.py: cs.obj: syntax fix for DISTINFO long description
+lib/python/cs/excutils.py: cs.excutils: initial DISTINFO
+release/cs.excutils-20150110/SUMMARY.txt release/cs.excutils-20150110/release-tag.txt: Release information for cs.excutils-20150110.
+bin-cs/cs-release: cs-release: add "pypi" for releasing to PyPI
+lib/python/cs/excutils.py: cs.excutils: fix up the distinfo a bit
+lib/python/cs/logutils.py: cs.logutils: distinfo for PyPI, initial release
+release/cs.logutils-20150110/SUMMARY.txt release/cs.logutils-20150110/release-tag.txt: Release information for cs.logutils-20150110.
+lib/python/cs/logutils.py: cs.logutils: distinfo: add "requires"
+bin/portfwd: portfwd: parse "# F: pfname needs other-pfname" lines from ssh config to infer prerequisite names
+bin/tm: tm: accept optional command with use-session
+bin/tm: tm: document use-session -c option in usage message
+bin/tm: tm: use-session: add -K keyline option to send keyboard command lines to session after instantiation
+bin-cs/rig-tm: rig-tm: read "tm" command arguments from ~/.tmrc and dispatch sessions
+bin-cs/rig-tm bin/tm: tm: use-session: add -d option to not join the session; rig-tm: use -d option in tm incantations
+bin-cs/hg-merge: merge default ==> pilfer
+lib/python/cs/urlutils.py: cs.urlutils: python 3 import update
+lib/python/cs/py3.py: cs.py3: ustr: accept errors= parameter, default "strict"
+lib/python/cs/logutils.py: cs.logutils: use cs.py3.ustr() instead of unicode()
+lib/python/cs/app/pilfer.py: cs.app.pilfer: python 3 fix: use .items() instead of .iteritems()
+lib/python/cs/urlutils.py: cs.urlutils: more python 3 import fixes
+bin/pilfer: pilfer: use python3
+lib/python/cs/urlutils.py: cs.urlutils: _URL.content_transfer_encoding: make into locked_property to get internal AttributeErrors transmuted into RuntimeErrors
+lib/python/cs/urlutils.py: cs.urlutils: _URL.content_type: python 3 fix - update to method available in both 2 and 3
+lib/python/cs/urlutils.py: cs.urlutils: minor changes from debugging, left in
+lib/python/cs/queues.py: cs.queues: NullQueue: rename .next to .__next__, keep .next synonym
+lib/python/cs/excutils.py: cs.excutis: transmute: reword transmuted exception message
+lib/python/cs/app/pilfer.py: cs.app.pilfer: url_io_iter: correct use of iterator protocol - call next(I) instead if I.next()
+lib/python/cs/resources.py: cs.resources: remove call to error, not imported
+lib/python/cs/app/pilfer.py: cs.app.pilfer: bugfix quiesing the Pilfer diversions: close chosen busy_div, not last loop div
+lib/python/cs/app/pilfer.py: cs.app.pilfer: Pilfer: new diversion: split up the pipeline construction for readability/debugging
+lib/python/cs/app/pilfer.py: cs.app.pilfer: expand environment variables in pilferrc pythonpath setting
+lib/python/cs/app/pilfer.py: cs.app.pilfer: rename Pilfer.with_user_vars to Pilfer.copy_with_vars
+lib/python/cs/app/pilfer.py: cs.app.pilfer: fix typo in docstring
+lib/python/cs/app/pilfer.py: cs.app.pilfer: action_per: use "P", not "item"
+lib/python/cs/app/pilfer.py: cs.app.pilfer: redo the diversion quiesing code
+lib/python/cs/app/pilfer.py: cs.app.pilfer: sort: bugfix - fix spelling of sorted "reverse" parameter
+lib/python/cs/app/pilfer.py: cs.app.pilfer: grokall: fix spelling of "Ps"
+lib/python/cs/app/pilfer.py: cs.app.pilfer: Pilfer.save_url: upgrade U to type URL
+lib/python/cs/app/pilfer.py: cs.app.pilfer: assignment: pass context string `U` through to formatter object
+lib/python/cs/app/pilfer.py: cs.app.pilfer: assignment: unfold computation of new value and assignment for debug purposes, leave unfolded for readability
+lib/python/cs/app/pilfer.py lib/python/cs/later.py lib/python/cs/resources.py: cs.resources: NestingOpenCloseMixin.close: remove @not_closed decorator, rename `check_final_close` paramater to `enforce_final_close`
+lib/python/cs/excutils.py lib/python/cs/logutils.py lib/python/cs/py3.py: merge default ==> pypi
+lib/python/cs/mixin/ucattrs.py: cs.mixin.ucattrs: distinfo for PyPI release
+release/cs.mixin.ucattrs-20150110/SUMMARY.txt release/cs.mixin.ucattrs-20150110/release-tag.txt: Release information for cs.mixin.ucattrs-20150110.
+lib/python/cs/distinfo.py: cs.distinfo: python 3 fix: decode external command output as utf-8
+lib/python/cs/distinfo.py: cs.distinfo: remove some debug
+lib/python/cs/py/stack.py: cs.py.stack: PyPI distinfo
+lib/python/cs/py/modules.py: cs.py.modules: raise ImportError, not NameError
+release/cs.py.stack-20150111/SUMMARY.txt release/cs.py.stack-20150111/release-tag.txt: Release information for cs.py.stack-20150111.
+lib/python/cs/distinfo.py: cs.distinfo: redo .copyin to build single large "hg archive" with lots of paths; autoinclude _tests.py file if present
+lib/python/cs/seq.py: cs.seq: add distinfo for PyPI
+release/cs.seq-20150111/SUMMARY.txt release/cs.seq-20150111/release-tag.txt: Release information for cs.seq-20150111.
+lib/python/cs/sh.py: cs.sh: discard vpopen(), long subsumed by subprocess.Popen; clean out some unused imports; tweak distinfo long_description
+release/cs.sh-20150111/CHANGES.txt release/cs.sh-20150111/SUMMARY.txt release/cs.sh-20150111/release-tag.txt: Release information for cs.sh-20150111.
+bin-cs/cs-release: cs-release: add update-tag operation; pypi: use $relpfx as package name, call update-tag; freshmeat-submit: call update-tag
+lib/python/cs/x11.py: cs.x11: replace use of cs.sh.vpopen with subprocess.popen
+lib/python/cs/asynchron.py: cs.asynchron: distinfo for PyPI
+release/cs.asynchron-20150111/SUMMARY.txt release/cs.asynchron-20150111/release-tag.txt: Release information for cs.asynchron-20150111.
+lib/python/cs/queues.py: cs.queues: tweak docstring
+lib/python/cs/queues.py: cs.queues: distinfo for PyPI
+release/cs.queues-20150111/SUMMARY.txt release/cs.queues-20150111/release-tag.txt: Release information for cs.queues-20150111.
+lib/python/cs/distinfo.py: cs.distinfo: look for package README.rst file, use as long_description and copy file in as README.rst if found
+lib/python/cs/README-py3.rst lib/python/cs/py3.py: cs.py3: move long_description into cs/README-py3.rst
+lib/python/cs/distinfo.py: cs.distinfo: probe for README.rst file for inclusion
+release/cs.py3-20150111/CHANGES.txt release/cs.py3-20150111/SUMMARY.txt release/cs.py3-20150111/release-tag.txt: Release information for cs.py3-20150111.
+bin-cs/cs-release: cs-release: mention update-tag in usage message
+lib/python/cs/distinfo.py: cs.distinfo: fix up inclusion of README.rst in MANIFEST.in
+bin-cs/cs-release: cs-release: move release prefix string to after op
+bin-cs/cs-release: cs-release: add "ls" op; accept relpfx=ALL to "last"
+bin-cs/cs-release: cs-release: pypi: add "ALL" support, initially just reporting commit versus release
+lib/python/cs/README-seq.rst lib/python/cs/seq.py: cs.seq: move long_description into cs/README-seq.rst
+lib/python/cs/py/READEME-stack.rst lib/python/cs/py/stack.py: cs.py.stack: move long_description into cs/py/README-stack.rst
+lib/python/cs/README-logutils.rst lib/python/cs/logutils.py: cs.logutils: move long_description into cs/README-logutils.rst
+lib/python/cs/README-queues.rst lib/python/cs/queues.py: cs.queues: move long_description into cs/README-queues.rst
+lib/python/cs/README-ansi_colour.rst lib/python/cs/ansi_colour.py: cs.ansi_colour: move long_description into cs/README-ansi_colour.rst
+lib/python/cs/README-asynchron.rst lib/python/cs/asynchron.py: cs.asynchron: move long_description into cs/README-asynchron.rst
+lib/python/cs/README-excutils.rst lib/python/cs/excutils.py: excutils: move long_description into cs/README-excutils.rst
+lib/python/cs/mixin/README-ucattrs.rst lib/python/cs/mixin/ucattrs.py: cs.mixin.excutils: move long_description into cs/mixin/README-ucattrs.rst
+lib/python/cs/README-obj.rst lib/python/cs/obj.py: cs.obj: move long_description into cs/README-obj.rst
+lib/python/cs/README-sh.rst lib/python/cs/sh.py: cs.sh: move long_description into cs/README-sh.rst
+lib/python/cs/ansi_colour.py: cs.ansi_colour: rename colours to COLOURS, effectively a table of constants
+lib/python/cs/distinfo.py: cs.distinfo: honour $PYPI_URL if specified
+release/cs.py3-20150112/CHANGES.txt release/cs.py3-20150112/SUMMARY.txt release/cs.py3-20150112/release-tag.txt: Release information for cs.py3-20150112.
+lib/python/cs/sh.py: cs.sh: add colon to SAFECHARS
+bin-cs/cs-release: cs-release: pypi: add "prod" mode
+bin-cs/cs-release: cs-release: add -x option: trace command execution

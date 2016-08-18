@@ -1,7 +1,16 @@
 #!/bin/sh
 #
-# Run vim with options suiting format-flowed text.
+# Run vim with options suiting format=flowed text.
 #       - Cameron Simpson <cs@zip.com.au> 19apr2014
 #
+# Strip trailing whitespace from header lines to avoid accidents.
+#
+# Choose formatting options. See ":help fo-table" in vim.
+#
+# TODO: apply format=flowed for incoming quoted paragraphs
+#
 
-exec vim -c 'silent 1,/^$/s/  *$//' -c 'set formatoptions=wa' ${1+"$@"}
+exec vim \
+    -c 'silent 1,/^$/s/  *$//' \
+    -c 'set formatoptions=waqj' \
+    ${1+"$@"}

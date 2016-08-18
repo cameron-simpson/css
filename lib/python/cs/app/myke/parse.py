@@ -4,6 +4,7 @@
 import sys
 import glob
 from collections import namedtuple
+from io import StringIO
 from itertools import chain, product
 import os
 import os.path
@@ -11,7 +12,7 @@ from os.path import dirname, realpath, isabs
 import re
 from string import whitespace, digits
 import unittest
-from cs.lex import get_chars, get_other_chars, get_white, get_identifier
+from cs.lex import get_other_chars, get_white, get_identifier
 from cs.logutils import Pfx, error, warning, info, debug, exception, D
 
 # mapping of special macro names to evaluation functions
@@ -344,7 +345,7 @@ class Macro(object):
       namespaces = [ dict(zip(self.params, param_values)) ] + namespaces
     return self.mexpr(context, namespaces)
 
-def readMakefileLines(M, fp, parent_context=None):
+def readMakefileLines(M, fp, parent_context=None, start_lineno=1):
   ''' Read a Mykefile and yield text lines.
       This generator parses slosh extensions and
       :if/ifdef/ifndef/else/endif directives.
@@ -366,32 +367,27 @@ def readMakefileLines(M, fp, parent_context=None):
   ifStack = []        # active ifStates (state, in-first-branch)
   context = None      # FileContext(filename, lineno, line)
 
-  lineno = 0
   prevline = None
-  for line in fp:
-    lineno += 1
+  for lineno, line in enumerate(fp, start_lineno):
     if not line.endswith('\n'):
       raise ParseError(context, len(line), '%s:%d: unexpected EOF (missing final newline)', filename, lineno)
-
     if prevline is not None:
       # prepend previous continuation line if any
+      # keep the same FileContext
       line = prevline + '\n' + line
       prevline = None
     else:
-      # start of line - new context
+      # start of line - new FileContext
       context = FileContext(filename, lineno, line.rstrip(), parent_context)
-
     with Pfx(str(context)):
       if line.endswith('\\\n'):
         # continuation line - gather next line before parse
         prevline = line[:-2]
         continue
-
       # skip blank lines and comments
       w1 = line.lstrip()
       if not w1 or w1.startswith('#'):
         continue
-
       try:
         # look for :if etc
         if line.startswith(':'):
@@ -437,6 +433,7 @@ def readMakefileLines(M, fp, parent_context=None):
                 raise ParseError(context, 0, ":else inside :else")
               else:
                 ifStack[-1][1] = False
+              continue
             if word == "endif":
               # extra text permitted
               if not ifStack:
@@ -456,20 +453,19 @@ def readMakefileLines(M, fp, parent_context=None):
                   for context, line in readMakefileLines(M, include_file, parent_context=context):
                     yield context, line
               continue
-
         if not all( ifState[0] for ifState in ifStack ):
           # in false branch of "if"; skip line
           continue
-
       except SyntaxError as e:
         error(e)
         continue
-
-      yield context, line
+    # NB: yield is outside the Pfx context manager because Pfx does
+    # not play nicely with generators
+    yield context, line
 
   if prevline is not None:
     # incomplete continuation line
-    error("unexpected EOF: unterminated slosh continued line")
+    error("%s: unexpected EOF: unterminated slosh continued line")
 
   if ifStack:
     raise SyntaxError("%s: EOF with open :if directives" % (filename,))
@@ -624,7 +620,7 @@ def parseMacroExpression(context, text=None, offset=0, stopchars=''):
         permutations.append(wh)
     else:
       # non-white, non-macro
-      plain, offset = get_other_chars(text, stopchars+'$'+whitespace, offset)
+      plain, offset = get_other_chars(text, offset, stopchars+'$'+whitespace)
       if plain:
         permutations.append(plain)
       else:
@@ -895,7 +891,7 @@ def parseMacro(context, text=None, offset=0):
             else:
               submname, offset = get_identifier(text, offset)
               if not submname:
-                raise ParseError(context, moffset, 'missing macro name or string after "%s" modifier', mod0)
+                raise ParseError(context, offset, 'missing macro name or string after "%s" modifier', mod0)
               modargs = (mod0, submname, False)
           elif mod0 == ':':
             _, offset = get_white(text, offset)
@@ -1042,7 +1038,6 @@ class TestAll(unittest.TestCase):
     self.assertEqual(parseMacroExpression('abc  xyz'), (['abc', '  ', 'xyz'], 8))
 
   def test20parseMakeLines(self):
-    from cs.py3 import StringIO
     from .make import Maker
     with Maker("myke") as M:
       parsed = list(parseMakefile(M, StringIO("abc = def\n")))

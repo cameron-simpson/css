@@ -1,0 +1,2 @@
+lib/python/cs/py3.py: cs.py3: docstring for py3 version of ustr
+lib/python/cs/py3.py: cs.py3: py2 bytes: add __contains__ method

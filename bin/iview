@@ -1,0 +1,273 @@
+#!/usr/bin/env python3
+#
+# Trivial convenience wrapper for the essential iview-python tool:
+#  https://github.com/vadmium/python-iview
+# Cameron Simpson <cs@zip.com.au>
+#
+
+from __future__ import print_function, absolute_import
+import os
+import os.path
+import sys
+import datetime
+import json
+import re
+import subprocess
+from io import TextIOWrapper
+from collections import namedtuple
+from cs.cmdutils import run, pipefrom
+from cs.logutils import setup_logging, error, warning, info, Pfx, X
+
+USAGE = '''Usage:
+  %s {download|dl} {file|/regexp/}...
+                Download specified files.
+  %s [ls] [/regexp/]
+                Listing selected by regexp.
+  %s meta [/regexp/]
+                Print metadata about selected programmes.
+  %s programme  Return the full output of iview-cli --programme.'''
+
+_IViewInfo = namedtuple('IViewInfo', 'title episode url')
+
+class IViewInfo(_IViewInfo):
+
+  def print(self):
+    ''' Print out this object, TAB separated.
+    '''
+    print(self.title, self.episode, self.url, sep='\t')
+
+  def match_re(self, R):
+    ''' Test whether this object's title or episode is matched by `R`.
+    '''
+    if isinstance(R, str):
+      R = re.compile(R, re.I)
+    return R.search(self.title) or R.search(self.episode)
+
+  @property
+  def series_number(self):
+    ''' Return the series number if it can be inferred.
+    '''
+    parts = os.path.basename(self.url).split('_')
+    if len(parts) >= 4:
+      ss, ep, other = parts[-3:]
+      if len(ss) == 2 and ss.isdigit() and len(ep) == 2 and ep.isdigit():
+        return int(ss)
+    ep_words = self.episode.lower().split()
+    if ( len(ep_words) >= 4
+     and ep_words[0] == 'series'
+     and ep_words[1].isdigit()
+       ):
+      return int(ep_words[1])
+
+  @property
+  def episode_number(self):
+    ''' Return the series number if it can be inferred.
+    '''
+    parts = os.path.basename(self.url).split('_')
+    if len(parts) >= 4:
+      ss, ep, other = parts[-3:]
+      if len(ss) == 2 and ss.isdigit() and len(ep) == 2 and ep.isdigit():
+        return int(ep)
+    ep_words = self.episode.lower().split()
+    if ( len(ep_words) >= 4
+     and ep_words[0] == 'series'
+     and ep_words[1].isdigit()
+     and ep_words[2] == 'episode'
+     and ep_words[3].isdigit()
+       ):
+      return int(ep_words[3])
+
+  @property
+  def date(self):
+    ''' If there are no series or episode numbers the date is often encoded.
+    '''
+    parts = os.path.basename(self.url).split('_')
+    if len(parts) >= 3:
+      ddmm, other = parts[-2:]
+      if len(ddmm) == 4 and ddmm.isdigit():
+        dd, mm = int(ddmm[:2]), int(ddmm[2:])
+        if dd >= 1 and dd <= 31 and mm >= 1 and mm <= 12:
+          yyyy = datetime.date.today().year
+          return datetime.date(yyyy, mm, dd)
+
+  def fetch(self, overwrite=False, make_mp4=False):
+    ''' Fetch video, optionally convert to MP4.
+    '''
+    url = self.url
+    with Pfx('fetch: %s', url):
+      base, ext = os.path.splitext(os.path.basename(url))
+      if ext != '.mp4':
+        warning('expected .mp4 but ext=%r', ext)
+      output_flv = base + '.flv'
+      output_mp4 = base + '.mp4'
+      if make_mp4 and os.path.exists(output_mp4):
+        warning('MP4 output exists, skipping fetch of FLV')
+        return 0
+      with Pfx(output_flv):
+        if not overwrite and os.path.exists(output_flv):
+          warning('FLV output exists, skipping fetch')
+          xit = 0
+        else:
+          argv = ['iview-cli', '-d', url]
+          xit = run(argv, trace=True)
+          if xit != 0:
+            error("nonzero exit from %r: %d", argv, xit)
+            with Pfx('remove %r', output_flv):
+              try:
+                os.remove(output_flv)
+              except OSError as e:
+                if e.errno != ENOENT:
+                  error('%s', e)
+              else:
+                info('removed')
+      if xit == 0:
+        if make_mp4:
+          with Pfx(output_mp4):
+            if not overwrite and os.path.exists(output_mp4):
+              warning('MP4 output exists, skipping conversion')
+            else:
+              argv = ['ffmpeg', '-i', output_flv, '-strict', '-2', '--', output_mp4]
+              xit = run(argv, trace=True)
+              if xit != 0:
+                error("nonzero exit from %r: %d", argv, xit)
+                with Pfx('remove %r', output_mp4):
+                  try:
+                    os.remove(output_mp4)
+                  except OSError as e:
+                    if e.errno != ENOENT:
+                      error('%s', e)
+                      xit = 1
+                  else:
+                    info('removed')
+      return xit
+
+def iview_info():
+  ''' Generator yieldinfo IViewInfo objects.
+  '''
+  argv = ['iview-cli', '--programme']
+  P = pipefrom(argv, trace=True)
+  title = None
+  for lineno, line in enumerate(P.stdout, 1):
+    with Pfx(lineno):
+      if not line.endswith('\n'):
+        raise ValueError("mssing newline")
+      if line.startswith('\t'):
+        episode, url = line.strip().split('\t', 1)
+        with Pfx('url: %r', url):
+          if url.startswith('('):
+            url = url[1:]
+          else:
+            warning('expected URL to start with open bracket')
+          if url.endswith(')'):
+            url = url[:-1]
+          else:
+            warning('expected URL to end with closing bracket')
+        if title is None:
+          warning('episode before any title, discarded')
+        else:
+          yield IViewInfo(title, episode, url)
+      else:
+        title = line.strip()
+        if title.endswith(':'):
+          title = title[:-1]
+        else:
+          warning('title line not terminated by colon')
+  xit = P.wait()
+  if xit != 0:
+    warning('nonzero exit %d from: %r', xit, argv)
+  return
+
+def iview_matches(matches):
+  ''' Generator returning matching IViewInfo objects.
+      `matches` is an iterable or regexp objects or regexp strings.
+  '''
+  Rs = []
+  for regexp_s in matches:
+    if isinstance(regexp_s, str):
+      if regexp_s.startswith('/'):
+        regexp_s = regexp_s[1:]
+      if regexp_s.endswith('/'):
+        regexp_s = regexp_s[:-1]
+      try:
+        R = re.compile(regexp_s, re.I)
+      except Exception as e:
+        warning('bad regexp, ignored: %s', e)
+      else:
+        Rs.append(R)
+    else:
+      Rs.append(regexp_s)
+  if Rs:
+    all_info = list(iview_info())
+    for info in all_info:
+      for R in Rs:
+        if info.match_re(R):
+          yield info
+          break
+
+def main(argv):
+  cmd = os.path.basename(argv.pop(0))
+  usage = USAGE % (cmd, cmd, cmd, cmd)
+  setup_logging(cmd)
+  badopts = False
+  if not argv:
+    op = 'programme'
+  elif argv[0].startswith('/'):
+    op = 'ls'
+  else:
+    op = argv.pop(0)
+
+  xit = 0
+  if not badopts:
+    with Pfx(op):
+      if op == 'ls':
+        if argv:
+          matches = iview_matches(argv)
+        else:
+          matches = iview_info()
+        for info in matches:
+          info.print()
+      elif op == 'meta':
+        if argv:
+          matches = iview_matches(argv)
+        else:
+          matches = iview_info()
+        for info in matches:
+          meta = {}
+          for attr in info._fields:
+            meta[attr] = getattr(info, attr)
+          for attr in 'series_number', 'episode_number', 'date':
+            value = getattr(info, attr)
+            if value is None:
+              continue
+            if isinstance(value, datetime.date):
+              value = value.strftime('%Y-%m-%d')
+            meta[attr] = value
+          filename = os.path.basename(info.url)
+          print(filename, json.dumps(meta, sort_keys=True), sep='\t')
+      elif op == 'programme':
+        if argv:
+          warning('extra arguments: %r', argv)
+          badopts = True
+        else:
+          xit = run(['iview-cli', '--programme'], trace=True)
+      elif op == 'download' or op == 'dl':
+        if argv:
+          matches = iview_matches(argv)
+        else:
+          matches = iview_info()
+        xit = 0
+        for info in matches:
+          with Pfx(info):
+            if info.fetch(overwrite=False, make_mp4=True) != 0:
+              error('fetch fails')
+              xit = 1
+      else:
+        warning('unrecognised operator')
+        badopts = True
+  if badopts:
+    print(usage, file=sys.stderr)
+    xit = 2
+  return xit
+
+if __name__ == '__main__':
+  sys.exit(main(sys.argv))

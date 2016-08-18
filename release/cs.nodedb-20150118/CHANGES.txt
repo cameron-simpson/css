@@ -1,0 +1,2 @@
+lib/python/cs/nodedb/README.rst: cs.nodedb: README tweak
+lib/python/cs/nodedb/__init__.py: cs.nodedb: fix up pypi metadata

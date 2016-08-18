@@ -22,7 +22,8 @@ import sys
 if sys.hexversion < 0x02060000: from sets import Set as set
 from cs.env import envsub
 from cs.lex import get_identifier
-from cs.logutils import error, warning, info, debug, Pfx, setup_logging
+from cs.logutils import error, warning, info, debug, Pfx, setup_logging, X
+import cs.sh
 
 def main(argv):
   cmd = os.path.basename(argv[0])
@@ -30,29 +31,29 @@ def main(argv):
   setup_logging(cmd)
 
   # load up the environ mapping
-  environ = EnvMapping(os.environ)
-  vars = set()
+  environ = EnvMapping()
+  for var in 'HOME', 'PATH':
+    environ[var] = os.environ[var]
 
   home = environ['HOME']
-  envpath = setvar('ENVPATH',
-                   '%s/.setvar-local:%s/.setvar:/etc/setvar'
-                   % (home, home),
-                   environ,
-                   vars)
+  envpath = environ['ENVPATH'] = \
+                   '%s/.setvar-local:%s/.setvar:/etc/setvar' % (home, home)
+  # load the "var" file from each directory in $ENVPATH
   for envdir in reversed(envpath.split(':')):
     varfile = os.path.join(envdir, 'var')
     if os.path.isfile(varfile):
       for var, value in filevars(varfile):
-        environ[var] = value
+        environ._definitions[var] = value
 
   if len(args) == 0:
     args=('var *',)
 
+  named_vars = set()
   for arg in args:
     if ' ' in arg:
-      doCommand(arg.split(), environ, vars)
+      doCommand(arg.split(), environ, named_vars)
     else:
-      setvar(arg, None, environ, vars)
+      setvar(arg, None, environ, named_vars)
 
   for var in 'PATH', 'MANPATH', 'PYTHONPATH', 'PERL5LIB':
     try:
@@ -62,9 +63,14 @@ def main(argv):
     else:
       environ[var] = new_value
 
-  import cs.sh
-  for var in sorted(vars):
-    print "%s=%s; export %s;" % (var, cs.sh.quotestr(environ[var]), var)
+  for var in sorted(named_vars):
+    try:
+      value = environ[var]
+    except ValueError, e:
+      error("cannot define $%s: %s", var, e)
+      raise
+    else:
+      print "%s=%s; export %s;" % (var, cs.sh.quotestr(value), var)
 
 def filevars(path):
   ''' Return a list of (var, value) tuples from the specific file.
@@ -88,105 +94,113 @@ def filevars(path):
           items.append( (var, value) )
   return items
 
-def setvar(var, value, environ, vars):
+def setvar(var, value, environ, named_vars):
   if value is None:
     try:
       value = environ[var]
     except KeyError:
-      ##error("no definition for $%s, using empty value" % (var,))
+      warning("no definition for $%s, using empty value" % (var,))
       value = ''
+    else:
+      ##warning("choosing existing value for $%s: %r" % (var, value))
+      pass
   environ[var] = value
-  vars.add(var)
+  named_vars.add(var)
   return value
 
-def doCommand(argv, environ, vars):
+def doCommand(argv, environ, named_vars):
   op = argv[0]
   argv = argv[1:]
   if op == 'addprefix':
     for arg in argv:
-      arg = envsub(arg, environ=environ, bare='$', default='')
+      arg = envsub(arg, environ=environ, default='')
       if not os.path.isabs(arg):
         arg=os.path.join('/opt',arg)
       setvar('PATH',
              '%s:%s/bin:%s/sbin' % (environ['PATH'], arg, arg),
              environ,
-             vars)
+             named_vars)
       setvar('MANPATH',
              '%s:%s/man:%s/share/man' % (environ['MANPATH'], arg, arg),
              environ,
-             vars)
+             named_vars)
       setvar('PERL5LIB',
              '%s:%s/lib/perl5:%s/lib/perl5/vendor_perl'
              % (environ['PERL5LIB'], arg, arg),
              environ,
-             vars)
+             named_vars)
   elif op == 'insprefix':
     for arg in reversed(argv):
-      arg = envsub(arg, environ=environ, bare='$', default='')
+      arg = envsub(arg, environ=environ, default='')
       if not os.path.isabs(arg):
         arg=os.path.join('/opt',arg)
       setvar('PATH',
              '%s/bin:%s/sbin:%s' % (arg, arg, environ['PATH']),
              environ,
-             vars)
+             named_vars)
       setvar('MANPATH',
              '%s/man:%s/share/man:%s' % (arg, arg, environ['MANPATH']),
              environ,
-             vars)
+             named_vars)
       setvar('PERL5LIB',
              '%s/lib/perl5:%s/lib/perl5/vendor_perl:%s'
              % (arg, arg, environ['PERL5LIB']),
              environ,
-             vars)
+             named_vars)
   elif op == 'python':
-    eval(' '.join(argv))
+    pycmd = ' '.join(argv)
+    eval(pycmd)
   elif op == 'use':
     for arg in argv:
       if os.path.isabs(arg):
-        doFile(arg, environ, vars)
+        doFile(arg, environ, named_vars)
       else:
-        for path in environ['ENVPATH'].split(':'):
+        envpath = environ['ENVPATH']
+        if envpath is None:
+          raise ValueError("BAD ENVPATH: environ= %s %r", type(environ), environ)
+        for path in envpath.split(':'):
           fpath = os.path.join(path, arg)
           if os.path.isfile(fpath):
-            doFile(fpath, environ, vars)
+            doFile(fpath, environ, named_vars)
             break
   elif op == 'var':
     for arg in argv:
       if arg == '*':
         varlist = sorted(set( get_identifier(v)[0] for v in environ.keys() ))
       else:
-        varlist = envsub(arg, environ=environ, bare='$', default='').split(' ')
+        varlist = envsub(arg, environ=environ, default='').split(' ')
       for var in varlist:
         try:
-          setvar(var, None, environ, vars)
+          setvar(var, None, environ, named_vars)
         except ValueError, e:
           error(str(e))
   else:
     error("unsupported operation: %s", op)
 
-def doFile(path, environ, vars):
+def doFile(path, environ, named_vars):
   with Pfx(path):
     oline=""
     lineno = 0
     for line in open(path):
       lineno += 1
-      if not line.endswith('\n'):
-        error("unexpected EOF - missing newline")
-        break
-      line = line.strip()
-      if not line or line.startswith('#'):
-        continue
-      word1, offset = get_identifier(line)
-      if not word1:
-        error("no var= or command")
-        continue
-      if offset < len(line) and line[offset] == '=':
-        setvar(word1,
-               envsub(line[offset+1:], environ, bare='$', default=''),
-               environ,
-               vars)
-      else:
-        doCommand(line.split(), environ, vars)
+      with Pfx("%d", lineno):
+        if not line.endswith('\n'):
+          error("unexpected EOF - missing newline")
+          break
+        line = line.strip()
+        if not line or line.startswith('#'):
+          continue
+        word1, offset = get_identifier(line)
+        if not word1:
+          error("no var= or command")
+          continue
+        if offset < len(line) and line[offset] == '=':
+          setvar(word1,
+                 envsub(line[offset+1:], environ, default=''),
+                 environ,
+                 named_vars)
+        else:
+          doCommand(line.split(), environ, named_vars)
 
 def cleanpath(path, sep=':'):
   keep = []
@@ -195,29 +209,60 @@ def cleanpath(path, sep=':'):
       keep.append(subpath)
   return sep.join(keep)
 
-class EnvMapping(dict):
+class EnvMapping(object):
+
+  def __init__(self, baseenv=None):
+    self._defined = {}
+    if baseenv:
+      self._defined.update(baseenv)
+    self._definitions = {}
+
+  def keys(self):
+    ks = set()
+    ks.update(self._defined.keys())
+    ks.update(self._definitions.keys())
+    return ks
+
+  def get(self, var, default=None):
+    value = self[var]
+    if value is None:
+      warning("no value computed for $%s, returning default (%r)", var, default)
+      value = default
+    return value
+
+  def __setitem__(self, var, value):
+    ##if var in self._definitions:
+    ##  warning("overwrite $%s: %r ==> %r", var, self._definitions[var], value)
+    self._defined[var] = value
 
   def __getitem__(self, var):
+    value = self._defined.get(var)
+    if value is not None:
+      return value
+    value = self._compute(var)
+    if value is None:
+      raise ValueError("$%s ==> None!" % (var,))
+    self._defined[var] = value
+    return value
+
+  def _compute(self, var):
+    # prevent recursion
+    placeholder = '$' + var
+    self._defined[var] = placeholder
+    # try var.ext for the various extensions
     for ext in self._exts():
       var_ext = var + ext
-      try:
-        value = dict.__getitem__(self, var_ext)
-      except KeyError:
+      value = self._definitions.get(var_ext)
+      if value is None:
         continue
-      return envsub(value, environ=self, bare='$', default='')
-    try:
-      value = dict.__getitem__(self, var)
-    except KeyError:
-      try:
-        value = self._boot(var)
-      except KeyError:
-        raise
-      else:
-        # save boot value for reuse
-        self[var] = value
-        return value
-    else:
-      return envsub(value, environ=self, bare='$', default='')
+      return envsub(value, environ=self)
+    value = self._definitions.get(var)
+    if value is not None:
+      return envsub(value, environ=self)
+    value = self._boot(var)
+    if value is not None:
+      return value
+    return placeholder
 
   def _boot(self, var):
     ''' Compute the value of a variety of variables from scratch.
@@ -241,12 +286,12 @@ class EnvMapping(dict):
       if '.' in hostname:
         host, hostdomain = hostname.split('.',1)
         return hostdomain
-      raise KeyError("%s: no '.' in $HOSTNAME: %s" % (var, hostname))
+      raise ValueError("%s: no '.' in $HOSTNAME: %s" % (var, hostname))
     if var == "HOSTNAME":
       val=os.popen('exec hostname').read()
       if val.endswith('\n'):
         return val[:-1]
-      raise KeyError("%s: no result from 'hostname' command" % (var,))
+      raise ValueError("%s: no result from 'hostname' command" % (var,))
     if var == "OS":
       opsys = os.uname()[0].lower()
       if opsys == "sunos":
@@ -274,8 +319,9 @@ class EnvMapping(dict):
         return "openbsd"
       if opsys == "freebsd":
         return "freebsd"
-      raise KeyError('%s: unknown vendor for OS=%s' % (var, opsys))
-    raise KeyError(var)
+      if opsys == "linux":
+        return "linux"
+      raise ValueError('%s: unknown vendor for OS=%s' % (var, opsys))
 
   def _exts(self):
     ''' Generator yielding
@@ -286,11 +332,12 @@ class EnvMapping(dict):
           .$OS
         if available for use in choosing variable values.
     '''
-    v_arch = dict.get(self, 'ARCH')
-    v_hostname = dict.get(self, 'HOSTNAME')
-    v_host = dict.get(self, 'HOST')
-    v_os = dict.get(self, 'OS')
-    v_systemid = dict.get(self, 'SYSTEMID')
+    _defns = self._defined
+    v_arch = _defns.get('ARCH')
+    v_hostname = _defns.get('HOSTNAME')
+    v_host = _defns.get('HOST')
+    v_os = _defns.get('OS')
+    v_systemid = _defns.get('SYSTEMID')
     if v_hostname:
       yield '.' + v_hostname
     if v_host:

@@ -1,0 +1,2 @@
+lib/python/cs/README-queues.rst lib/python/cs/queues.py: cs.queues: move long_description into cs/README-queues.rst
+lib/python/cs/README-queues.rst lib/python/cs/queues.py: cs.queues: more PyPI prep

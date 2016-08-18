@@ -4,10 +4,10 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
+from io import StringIO
 import sys
 import unittest
 from cs.hier import loadfp
-from cs.py3 import StringIO
 
 class TestHier(unittest.TestCase):
 

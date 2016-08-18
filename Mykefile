@@ -2,6 +2,7 @@ PREFIX          = /opt/css
 weblocal        = $(HOME)/@/ezos/html/cs/css
 ##hg_bitbucket    = https://bitbucket.org/cameron_simpson/css
 hg_bitbucket    = ssh://hg@bitbucket.org/cameron_simpson/css
+www_bitbucket   = https://bitbucket.org/cameron_simpson/css/commits/all
 title           = Cameron Simpson's Scripts
 
 target  = bin
@@ -42,7 +43,7 @@ scriptfromman(manf) = $(manf FP)
 py2files        = $("lib/python/cs/*.py lib/python/cs/*/*.py lib/python/cs/*/*/*.py" G)
 py3files        = $(py2files :|/python/|/python3/|)
 
-rsync = rsync -iO --exclude='.*.swp' --exclude='*.pyc'
+rsync = rsync -iOt --exclude='.*.swp' --exclude='*.pyc'
 
 _help:
         @echo '_test              - do syntax checks and self tests (may set \$$MYKE_TEST_PYTHON_MODULES if desired)'
@@ -60,6 +61,23 @@ _help:
 
 _updcss:
         ./bin-cs/updcss
+
+_testhost:
+        set -ue \
+        hosts=$$(hostlist "$$TESTHOST") \
+        for testhost in $$hosts \
+        do \
+          for basedir in . $(PREFIX) \
+          do \
+            target=$$testhost:$$basedir \
+            pfx "$$target/bin" set-x \\
+              rsync -iOtrl "bin/" "$$target/bin/" & \
+            pfx "$$target/lib/python/cs" set-x \\
+              rsync -iOtrl '--include=*/' '--include=*.py' '--exclude=*' \\
+                lib/python/cs/ "$$target/lib/python/cs/" & \
+          done \
+        done \
+        wait
 
 _tarball:
         set -uex \
@@ -89,7 +107,8 @@ $(py3files): lib/python/$(@ :|lib/python3/||)
         echo "$@ <- $?"
 
 _home:
-        @skip=`hg status | sed -n 's:^? \(.*\):--exclude=/\1:p'` \
+        set -x \
+        skip=`hg status | sed -n 's:^? \(.*\):--exclude=/\1:p'` \
         binskip=`hg status | sed -n 's:^? bin/\(.*\):--exclude=/\1:p'` \
         pfx bin $(rsync) -a --delete \\
                 --include=/CHANGELOG.txt \\
@@ -97,21 +116,36 @@ _home:
                 --include=synonyms/ \\
                 --exclude=squid_redirect \\
                 --exclude=/\*/ \\
-                bin/. $(HOME)/bin/. \
-        bosskip=`hg status | sed -n 's:^? bin-bos/\(.*\):--exclude=/\1:p'` \
-        pfx bin-bos $(rsync) -a --delete $$bosskip bin-bos/. $(HOME)/bin-bos/. \
-        csskip=`hg status | sed -n 's:^? bin-cs/\(.*\):--exclude=/\1:p'` \
-        pfx bin-cs $(rsync) -a --delete $$csskip \\
-                --exclude=/testzap \\
-                --exclude=/testpageurls \\
-                bin-cs/. $(HOME)/bin-cs/. \
+                bin/. $(HOME)/bin/.
+        set -x; $(MAKE) _bin_$((bin_suffixes))
+        set -x \
         libskip=`hg status | sed -n 's:^? lib/\(.*\):--exclude=/\1:p'` \
         pfx lib $(rsync) -a --delete \\
-                --include=/CHANGELOG.txt \\
+                --include=/js \\
+                --include=/js/cs \\
+                --exclude=/js/* \\
+                --include=/perl \\
+                --include=/perl/cs \\
+                --exclude=/perl/* \\
+                --include=/python \\
+                --include=/python/cs \\
+                --exclude=/python/* \\
                 $$libskip \\
-                --exclude=/venv* \\
-                --exclude=testdata/ \\
+                --exclude=/* \\
+                --exclude=testdata* \\
                 lib/. $(HOME)/lib/.
+        @echo "home updated"
+
+bin_suffixes = cs darwin lrn
+
+_bin_$((bin_suffixes)):
+    set -x \
+    sfx=$(@S[_]) \
+    base=bin-$$sfx \
+    target=$(HOME)/$$base \
+    skip=$$( hg status | sed -n 's:^? '"$$base"'/\(.*\):--exclude=/\1:p' ) \
+    pfx "$$base" $(rsync) -a --delete $$skip "$$base/" "$$target/"
+    echo "DONE $@"
 
 # squid_redirect
 _all: 1INDEX.txt _submakes _man
@@ -120,7 +154,7 @@ _deploy:
         :make _home
         OPTCSS=$(PREFIX) updcss
 
-_publish:
+_publish _pub:
         :make _publish_bitbucket
         :make _publish_ezos
 
@@ -130,6 +164,7 @@ _publish_ezos:
 
 _publish_bitbucket:
         hg push --new-branch $(hg_bitbucket)
+        @echo 'changes visible at $(www_bitbucket)'
 
 # mark the tip as a new release
 _release:

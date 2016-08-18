@@ -20,7 +20,7 @@ from getopt import getopt, GetoptError
 from string import Formatter
 from subprocess import Popen, PIPE
 from time import sleep
-from threading import Lock, Thread
+from threading import Lock, RLock, Thread
 try:
   from urllib.parse import quote, unquote
 except ImportError:
@@ -41,8 +41,9 @@ from cs.debug import thread_dump, ifdebug
 from cs.env import envsub
 from cs.excutils import noexc, noexc_gen, logexc, logexc_gen, LogExceptions
 from cs.fileutils import file_property, mkdirn
-from cs.later import Later, FUNC_ONE_TO_ONE, FUNC_ONE_TO_MANY, FUNC_SELECTOR, FUNC_MANY_TO_MANY
-from cs.lex import get_identifier, get_other_chars
+from cs.later import Later, RetryError, \
+                    FUNC_ONE_TO_ONE, FUNC_ONE_TO_MANY, FUNC_SELECTOR, FUNC_MANY_TO_MANY
+from cs.lex import get_identifier, is_identifier, get_other_chars
 import cs.logutils
 from cs.logutils import setup_logging, logTo, Pfx, info, debug, error, warning, exception, trace, pfx_iter, D, X
 from cs.mappings import MappingChain, SeenSet
@@ -50,12 +51,18 @@ from cs.queues import NullQueue, NullQ, IterableQueue
 from cs.seq import seq
 from cs.threads import locked, locked_property
 from cs.urlutils import URL, isURL, NetrcHTTPPasswordMgr
+from cs.app.flag import PolledFlags
 import cs.obj
 from cs.obj import O
 from cs.py.func import funcname, funccite, yields_type, returns_type
-from cs.py3 import input, ConfigParser, sorted, ustr
+from cs.py.modules import import_module_name
+from cs.py3 import input, ConfigParser, sorted, ustr, unicode
 
+# parallelism of jobs
 DEFAULT_JOBS = 4
+
+# default flag status probe
+DEFAULT_FLAGS_CONJUNCTION = '!PILFER_DISABLE'
 
 usage = '''Usage: %s [options...] op [args...]
   %s url URL actions...
@@ -63,6 +70,8 @@ usage = '''Usage: %s [options...] op [args...]
   Options:
     -c config
         Load rc file.
+    -F flag-conjunction
+        Space separated list of flag or !flag to satisfy as a conjunction.
     -j jobs
 	How many jobs (actions: URL fetches, minor computations)
 	to run at a time.
@@ -84,11 +93,12 @@ def main(argv, stdin=None):
   P = Pilfer()
   quiet = False
   jobs = DEFAULT_JOBS
+  flagnames = DEFAULT_FLAGS_CONJUNCTION
 
   badopts = False
 
   try:
-    opts, argv = getopt(argv, 'c:j:qux')
+    opts, argv = getopt(argv, 'c:F:j:qux')
   except GetoptError as e:
     warning("%s", e)
     badopts = True
@@ -98,6 +108,8 @@ def main(argv, stdin=None):
     with Pfx("%s", opt):
       if opt == '-c':
         P.rcs[0:0] = load_pilferrcs(val)
+      elif opt == '-F':
+        flagnames = val
       elif opt == '-j':
         jobs = int(val)
       elif opt == '-q':
@@ -108,6 +120,17 @@ def main(argv, stdin=None):
         P.do_trace = True
       else:
         raise NotImplementedError("unimplemented option")
+
+  # break the flags into separate words and syntax check
+  flagnames = flagnames.split()
+  for flagname in flagnames:
+    if flagname.startswith('!'):
+      flag_ok = is_identifier(flagname, 1)
+    else:
+      flag_ok = is_identifier(flagname)
+    if not flag_ok:
+      error('invalid flag specifier: %r', flagname)
+      badopts = True
 
   dflt_rc = os.environ.get('PILFERRC')
   if dflt_rc is None:
@@ -165,6 +188,7 @@ def main(argv, stdin=None):
             badopts = True
           if not badopts:
             LTR = Later(jobs)
+            P.flagnames = flagnames
             if cs.logutils.D_mode or ifdebug():
               # poll the status of the Later regularly
               def pinger(L):
@@ -204,42 +228,31 @@ def main(argv, stdin=None):
               #  - close the div
               #  - wait for that div to drain
               #  - repeat
-              while True:
-                D("quiesce LTR")
-                LTR.state("quiescing")
-                L.quiesce()
-                busy_div = None
-                for div in P.diversions:
+              # drain all the divserions, choosing the busy ones first
+              divnames = P.open_diversion_names
+              while divnames:
+                busy_name = None
+                for divname in divnames:
+                  div = P.diversion(divname)
                   if div._busy:
-                    busy_div = div
+                    busy_name = divname
                     break
-                if busy_div is None:
-                  break
-                D("CLOSE DIV %s", div)
-                LTR.state("CLOSE DIV %s", div)
-                div.close(check_final_close=True)
-                outQ = div.outQ
-                D("DRAIN DIV %s", div)
-                LTR.state("DRAIN DIV %s: outQ=%s", div, outQ)
+                # nothing busy? pick the first one arbitrarily
+                if not busy_name:
+                  busy_name = divnames[0]
+                busy_div = P.diversion(busy_name)
+                LTR.state("CLOSE DIV %s", busy_div)
+                busy_div.close(enforce_final_close=True)
+                outQ = busy_div.outQ
+                D("DRAIN DIV %s", busy_div)
+                LTR.state("DRAIN DIV %s: outQ=%s", busy_div, outQ)
                 for item in outQ:
                   # diversions are supposed to discard their outputs
-                  error("%s: RECEIVED %r", div, item)
-                LTR.state("DRAINED DIV %s using outQ=%s", div, outQ)
-              D("CLOSE REMAINING DIVS")
-              for div in P.diversions:
-                if not div.closed:
-                  D("CLOSE DIV %s", div)
-                  LTR.state("CLOSE DIV %s", div)
-                  div.close(check_final_close=True)
-                  outQ = div.outQ
-                  D("DRAIN DIV %s", div)
-                  LTR.state("DRAIN DIV %s: outQ=%s", div, outQ)
-                  for item in outQ:
-                    # diversions are supposed to discard their outputs
-                    error("%s: RECEIVED %r", div, item)
-                  LTR.state("DRAINED DIV %s using outQ=%s", div, outQ)
+                  error("%s: RECEIVED %r", busy_div, item)
+                LTR.state("DRAINED DIV %s using outQ=%s", busy_div, outQ)
+                divnames = P.open_diversion_names
               LTR.state("quiescing")
-              L.quiesce()
+              L.wait_outstanding(until_idle=True)
               # Now the diversions should have completed and closed.
             # out of the context manager, the Later should be shut down
             LTR.state("WAIT...")
@@ -345,6 +358,9 @@ def argv_pipefuncs(argv, action_map, do_trace):
       except ValueError as e:
         errors.append("bad action %r: %s" % (action, e))
       else:
+        if func_sig != FUNC_MANY_TO_MANY:
+          # other functions are called with each item
+          function = retriable(function)
         pipe_funcs.append( (func_sig, function) )
   return pipe_funcs, errors
 
@@ -402,7 +418,7 @@ def notNone(v, name="value"):
   return True
 
 def url_xml_find(U, match):
-  for found in url_io(URL(U, None).xmlFindall, (), match):
+  for found in url_io(URL(U, None).xml_find_all, (), match):
     yield ElementTree.tostring(found, encoding='utf-8')
 
 class Pilfer(O):
@@ -420,10 +436,11 @@ class Pilfer(O):
     self._ = None
     self.flush_print = False
     self.do_trace = False
+    self.flags = PolledFlags()
     self._print_to = None
     self._print_lock = Lock()
     self.user_agent = None
-    self._lock = Lock()
+    self._lock = RLock()
     self.rcs = []               # chain of PilferRC libraries
     self.seensets = {}
     self.diversions_map = {}        # global mapping of names to divert: pipelines
@@ -443,10 +460,14 @@ class Pilfer(O):
 
   @property
   def defaults(self):
+    ''' Mapping for default values formed by cascading PilferRCs.
+    '''
     return MappingChain(mappings=[ rc.defaults for rc in self.rcs ])
 
   @property
   def _(self):
+    ''' Shortcut to this Pilfer's user_vars['_'] entry - the current item value.
+    '''
     return self.user_vars['_']
 
   @_.setter
@@ -460,6 +481,23 @@ class Pilfer(O):
     ''' self._ as a URL object.
     '''
     return URL(self._, None)
+
+  def test_flags(self):
+    ''' Evaluate the flags conjunction.
+        Installs the tested names into the status dictionary as side effect.
+        Note that it deliberately probes all flags instead of stopping
+        at the first false condition.
+    '''
+    all_status = True
+    flags = self.flags
+    for flagname in self.flagnames:
+      if flagname.startswith('!'):
+        status = not flags.setdefault(flagname[1:], False)
+      else:
+        status = flags.setdefault(flagname[1:], False)
+      if not status:
+        all_status = False
+    return all_status
 
   @locked
   def seenset(self, name):
@@ -482,14 +520,41 @@ class Pilfer(O):
     return seen[name]
 
   def seen(self, url, seenset='_'):
+    ''' Test if the named `url` has been seen. Default seetset is '_'.
+    '''
     return url in self.seenset(seenset)
 
   def see(self, url, seenset='_'):
+    ''' Mark a `url` as seen. Default seetset is '_'.
+    '''
     self.seenset(seenset).add(url)
 
   @property
+  @locked
   def diversions(self):
+    ''' The current list of named diversions.
+    '''
     return list(self.diversions_map.values())
+
+  @property
+  @locked
+  def diversion_names(self):
+    ''' The current list of diversion names.
+    '''
+    return list(self.diversions_map.keys())
+
+  @property
+  @locked
+  @logexc
+  def open_diversion_names(self):
+    ''' The current list of open named diversions.
+    '''
+    names = []
+    for divname in self.diversion_names:
+      div = self.diversion(divname)
+      if not div.closed:
+        names.append(divname)
+    return names
 
   @logexc
   def quiesce_diversions(self):
@@ -530,10 +595,11 @@ class Pilfer(O):
           error(err)
         raise KeyError("invalid pipe specification for diversion named %r" % (pipe_name,))
       name = "DIVERSION:%s" % (pipe_name,)
-      diversions[pipe_name] = self.later.pipeline(pipe_funcs,
-                                                  name=name,
-                                                  outQ=NullQueue(name=name,
-                                                                 blocking=True).open()).open()
+      outQ=NullQueue(name=name, blocking=True)
+      outQ.open()   # open outQ so it can be closed at the end of the pipeline
+      div = self.later.pipeline(pipe_funcs, name=name, outQ=outQ)
+      div.open()    # will be closed in main program shutdown
+      diversions[pipe_name] = div
     return diversions[pipe_name]
 
   @logexc
@@ -626,6 +692,7 @@ class Pilfer(O):
     '''
     debug("save_url(U=%r, saveas=%r, dir=%s, overwrite=%r, kw=%r)...", U, saveas, dir, overwrite, kw)
     with Pfx("save_url(%s)", U):
+      U = URL(U, None)
       save_dir = self.save_dir
       if saveas is None:
         saveas = os.path.join(save_dir, U.basename)
@@ -646,38 +713,21 @@ class Pilfer(O):
               try:
                 with open(saveas, "wb") as savefp:
                   savefp.write(content)
-              except:
+              except Exception:
                 exception("save fails")
             # discard contents, releasing memory
             U.flush()
 
   def import_module_func(self, module_name, func_name):
     with LogExceptions():
-      import importlib
-      pylib = [ path for path in self.defaults.get('pythonpath', '').split(':') if path ]
-      with self._lock:
-        osyspath = sys.path
-        if pylib:
-          sys.path = [ envsub(path) for path in pylib ] + sys.path
-        try:
-          M = importlib.import_module(module_name)
-        except ImportError as e:
-          exception("%s", e)
-          M = None
-        if pylib:
-          sys.path = osyspath
-      if M is not None:
-        try:
-          return getattr(M, func_name)
-        except AttributeError as e:
-          error("%s: no entry named %r: %s", module_name, func_name, e)
-      return None
+      pylib = [ path for path in envsub(self.defaults.get('pythonpath', '')).split(':') if path ]
+      return import_module_name(module_name, func_name, pylib, self._lock)
 
   def format_string(self, s, U):
     ''' Format a string using the URL `U` as context.
         `U` will be promoted to an URL if necessary.
     '''
-    return FormatMapping(self).format(s)
+    return FormatMapping(self, U=U).format(s)
 
   def set_user_var(self, k, value, U, raw=False):
     if not raw:
@@ -885,7 +935,7 @@ def url_io_iter(I):
   '''
   while True:
     try:
-      item = I.next()
+      item = next(I)
     except StopIteration:
       break
     except (URLError, HTTPError) as e:
@@ -941,7 +991,7 @@ def grokall(module_name, func_name, Ps, *a, **kw):
   if not isinstance(Ps, list):
     Ps = list(Ps)
   if Ps:
-    mfunc = P[0].import_module_func(module_name, func_name)
+    mfunc = Ps[0].import_module_func(module_name, func_name)
     if mfunc is None:
       error("import fails")
     else:
@@ -964,7 +1014,8 @@ def _test_grokfunc( P, *a, **kw ):
 
 # actions that work on the whole list of in-play URLs
 many_to_many = {
-      'sort':         lambda Ps, key=lambda P: P._, reversed=False: sorted(Ps, key=key, reversed=reversed),
+      'sort':         lambda Ps, key=lambda P: P._, reverse=False: \
+                        sorted(Ps, key=key, reverse=reverse),
       'last':         lambda Ps: Ps[-1:],
     }
 
@@ -1190,7 +1241,7 @@ def action_func_raw(action, do_trace):
         if m:
           varmap = m.groupdict()
           if varmap:
-            P = P.with_user_vars(**varmap)
+            P = P.copy_with_vars(**varmap)
           yield P
       func_sig = FUNC_ONE_TO_MANY
     else:
@@ -1242,6 +1293,18 @@ def action_func_raw(action, do_trace):
 
   function.__name__ = "action(%r)" % (action0,)
   return function, args, kwargs, func_sig, result_is_Pilfer
+
+def retriable(func):
+  ''' A decorator for a function to probe the Pilfer flags and raise RetryError if unsatisfied.
+  '''
+  def retry_func(P, *a, **kw):
+    ''' Call func after testing flags.
+    '''
+    if not P.test_flags():
+      raise RetryError('flag conjunction fails: %s' % (' '.join(P.flagnames)))
+    return func(P, *a, **kw)
+  retry_func.__name__ = 'retriable(%s)' % (funcname(func),)
+  return retry_func
 
 def action_func(action, do_trace, raw=False):
   ''' Accept a string `action` and return a tuple of:
@@ -1480,16 +1543,16 @@ def action_divert_pipe(func_name, action, offset, do_trace):
   return func_sig, function, result_is_Pilfer
 
 def action_per(action, argv):
-  ''' Function to perform a "per": send each item does its own instance of a pipeline.
+  ''' Function to perform a "per": send each item down its own instance of a pipeline.
   '''
   debug("action_per: argv=%r", argv)
   argv = list(argv)
   pipespec = PipeSpec("per:[%s]" % (','.join(argv)), argv)
   @yields_Pilfer
   def function(P):
-    debug("action_per func %r per(%r)", function.__name__, item)
+    debug("action_per func %r per(%r)", function.__name__, P)
     with P.later.more_capacity(1):
-      pipeline = P.pipe_through(pipespec, (item,))
+      pipeline = P.pipe_through(pipespec, (P,))
       debug("pipe: pipe_though(%s) => %r", pipespec, pipeline)
       for item in pipeline.outQ:
         debug("pipe: postpipe: yield %r", item)
@@ -1506,7 +1569,7 @@ def action_sight(func_name, action, offset):
   if offset < len(action):
     if action[offset] != ':':
       raise ValueError("bad marker after %r, expected ':', found %r", func_name, action[offset])
-    seensets, offset = get_other_chars(action, ':', offset+1)
+    seensets, offset = get_other_chars(action, offset+1, ':')
     seensets = seensets.split(',')
     if not seensets:
       seensets = ('_',)
@@ -1578,7 +1641,7 @@ def action_for(func_name, action, offset):
       # expand "values", split on whitespace, iterate with new Pilfer
       value_list = P.format_string(values, U).split()
       for value in value_list:
-        yield P.with_user_vars(**{varname: value})
+        yield P.copy_with_vars(**{varname: value})
   elif marker == ':':
     # for:varname:{start}..{stop}
     start, stop = action[offset+1:].split('..', 1)
@@ -1589,7 +1652,7 @@ def action_for(func_name, action, offset):
       istart = int(P.format_string(start, U))
       istop = int(P.format_string(stop, U))
       for value in range(istart, istop+1):
-        yield P.with_user_vars(**{varname: str(value)})
+        yield P.copy_with_vars(**{varname: str(value)})
   else:
     raise ValueError("unrecognised marker after varname: %r", marker)
   return func_sig, function, result_is_Pilfer
@@ -1791,10 +1854,14 @@ def action_assign(var, value):
   '''
   def function(P):
     U = P._
-    return P.copy_with_vars(**{var: P.format_string(value, U)})
+    varvalue = P.format_string(value, U)
+    P2 = P.copy_with_vars(**{var: varvalue})
+    return P2
   return function, FUNC_ONE_TO_ONE
 
 class PipeSpec(O):
+  ''' A pipeline specification: a name and list of actions.
+  '''
 
   def __init__(self, name, argv):
     O.__init__(self)
@@ -1804,15 +1871,18 @@ class PipeSpec(O):
   @logexc
   def pipe_funcs(self, action_map, do_trace):
     ''' Compute a list of functions to implement a pipeline.
-	It is important that this list is constructed anew for each
-	new pipeline instance because many of the functions rely
-	on closures to track state.
+        It is important that this list is constructed anew for each
+        new pipeline instance because many of the functions rely
+        on closures to track state.
     '''
     with Pfx(self.name):
       pipe_funcs, errors = argv_pipefuncs(self.argv, action_map, do_trace)
     return pipe_funcs, errors
 
 def load_pilferrcs(pathname):
+  ''' Load PilferRC instances rom the supplied `pathname`, recursing if this is a directory.
+      Return a list of the PilferRC instances obtained.
+  '''
   rcs = []
   with Pfx(pathname):
     if os.path.isfile(pathname):
@@ -1837,6 +1907,8 @@ def load_pilferrcs(pathname):
 class PilferRC(O):
 
   def __init__(self, filename):
+    ''' Initialise the PilferRC instance. Load values from `filename` if not None.
+    '''
     O.__init__(self)
     self.filename = filename
     self._lock = Lock()
@@ -1866,7 +1938,7 @@ class PilferRC(O):
       cfg = ConfigParser()
       with open(filename) as fp:
         cfg.readfp(fp)
-      self.defaults.update(cfg.defaults().iteritems())
+      self.defaults.update(cfg.defaults().items())
       if cfg.has_section('actions'):
         for action_name in cfg.options('actions'):
           with Pfx('[actions].%s', action_name):

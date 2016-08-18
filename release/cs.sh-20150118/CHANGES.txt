@@ -1,0 +1,2 @@
+lib/python/cs/README-sh.rst lib/python/cs/sh.py: cs.sh: move long_description into cs/README-sh.rst
+lib/python/cs/sh.py: cs.sh: add colon to SAFECHARS

@@ -15,15 +15,17 @@ do
   shift
 done
 
+[ $# -gt 0 ] || set -- *
+
 set -x
 exec frename $rnopts -- \
 	'if (m:[^/]+$:)
 	 { $lhs=$`;
-           $_=$&;
+       $_=$&;
 	   s/\%([0-9a-f][0-9a-f])/chr(hex($1))/ieg;
 	   tr/_&A-Z/-+a-z/;
 	   s/[-\s]+/-/g;
 	   s/^-/_/;
-	   $_=$lhs.$rhs;
+	   $_=$lhs.$_;
 	 }
 	' ${1+"$@"}

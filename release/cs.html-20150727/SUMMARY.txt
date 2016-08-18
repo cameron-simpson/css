@@ -1,0 +1,3 @@
+More readable attribute value quoted strings.
+More doco in cs/README-html.rst.
+Conveniences related to &nbsp; entities.

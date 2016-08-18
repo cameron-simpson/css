@@ -6,29 +6,38 @@
 #
 # =head1 SYNOPSIS
 #
-# buglog [-B bugsystem] [-n] headline < description
+# buglog [-B bugsystem] [-d datetime] [-n] headline < description
 #
-# buglog [-B bugsystem] [-n] headline command [args...]
+# buglog [-B bugsystem] [-d datetime] [-n] headline command [args...]
 #
 # =head1 DESCRIPTION
 #
-# I<buglog> takes a change I<headline> on the command line and a I<description> on its input
-# and logs it to the bug subsystems enumerated by the environment variable B<$BUGSYSTEMS>.
+# I<buglog> takes a change I<headline> on the command line and a
+# I<description> on its input and logs it to the bug subsystems
+# enumerated by the environment variable B<$BUGSYSTEMS>.
 # B<$BUGSYSTEMS> is a space separated list of subsystems that accept log information.
 #
+
+set -ue
 
 : ${TMPDIR:=/tmp}
 : ${USER:=`whoami`}
 : ${BUGSYSTEMS:=`bugsystems`}
 
+trace=
+[ -t 2 ] && trace=set-x
+
 readstdin=1
+when=
 
 cmd=`basename "$0"`
 usage="Usage: $cmd [-B bugsystems] [-n] headline < description
   -B bugsystems Space separated list of bugsystems to consider.
                 Default from \$BUGSYSTEMS or \`bugsystems\`:
                 $BUGSYSTEMS
-  -n            No description on input."
+  -d datetime   Timestamp suitable for passing to \"date -d\".
+  -n            No description on input.
+  -x            Trace command execution."
 
 badopts=
 
@@ -43,15 +52,29 @@ do
     #
     # Deliver reports to the specified I<bugsystems> instead of the default.
     #
-    -B)	BUGSYSTEMS=$2; export BUGSYSTEMS; shift ;;
+    -B) BUGSYSTEMS=$2; export BUGSYSTEMS; shift ;;
+
+    # =item B<-d>
+    #
+    # Timestamp suitable for passing to \"date -d\".
+    #
+    -d) when=$2; shift ;;
+
     # =item B<-n>
     #
     # No description.
     #
-    -n)	readstdin= ;;
-    --)	shift; break ;;
+    -n) readstdin= ;;
+
+    # =item B<-x>
+    #
+    # Trace command execution.
+    #
+    -x) trace=set-x ;;
+
+    --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
-    *)	break ;;
+    *)  break ;;
   esac
   shift
 done
@@ -66,11 +89,17 @@ else
   headline=$1
   shift
   [ $# = 0 ] || { echo "$cmd: extra arguments after headline: $*" >&2
-		  badopts=1
-		}
+                  badopts=1
+                }
 fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+# compute ISO8601 timestamp string in local time
+if [ -n "$when" ]
+then  when=`date -d "$when" '+%Y-%m-%d %H:%M:%S'`
+else  when=`date '+%Y-%m-%d %H:%M:%S'`
+fi
 
 attachment=$TMPDIR/bugids$$
 trap 'rm -f "$attachment"' 0
@@ -124,13 +153,13 @@ do
       sfxbugsys=`expr "$bugsystem" : '/[^/][^/]*/\(.*\)'` || { xit=1; continue; }
       if expr "x$headline" : "x$pfxre" >/dev/null
       then
-	bugsystem=$sfxbugsys
+        bugsystem=$sfxbugsys
       else
-	continue
+        continue
       fi
       ;;
   esac
-	  
+          
   case "$bugsystem" in
 
     # =item B<dlog>
@@ -141,14 +170,14 @@ do
     #
     dlog)
       ##dlog "$headline" || xit=1
-      buglog-daily "$headline"
+      $trace buglog-daily "$headline"
       # handle FOO: headlines
       if pfx=`expr "x$headline" : 'x\([A-Z][A-Z_0-9,]*\):.*'`
       then
         sfx=` expr "x$headline" : 'x[A-Z][A-Z_0-9,]*: *\(.*\)'`
         for category in `printf "%s\n" "$pfx" | tr , ' '`
         do
-          log-tsline -\? -- "$category" "$sfx"
+          $trace log-tsline -\? -d "$when" -- "$category" "$sfx"
         done
       fi
       ;;
@@ -164,27 +193,28 @@ do
     mailto:*)
       echo "$bugsystem" \
       | sed 's/^mailto://
-	     s/?/ /' \
+             s/?/ /' \
       | \
       (
-	# ensure no spurious envvars
-	params=`env | sed -n 's/^\(PARAM_[A-Za-z0-9_]*\)=.*/\1/p'`
-	eval unset $params	# no quotes to turn newlines into spaces
+        # ensure no spurious envvars
+        params=`env | sed -n 's/^\(PARAM_[A-Za-z0-9_]*\)=.*/\1/p'`
+        eval unset $params      # no quotes to turn newlines into spaces
 
-	read addr args || exit 1
-	hdrs="To: $addr"
-	subj=$headline
+        read addr args || exit 1
+        hdrs="To: $addr"
+        subj=$headline
 
-	( qsvals=`query_string2sh "$args"`
-	  eval "$qsvals"
-	  [ -n "${PARAM_subject:-}" ] && subj="$PARAM_subject: $subj"
+        ( qsvals=`query_string2sh "$args"`
+          eval "$qsvals"
+          [ -n "${PARAM_subject:-}" ] && subj="$PARAM_subject: $subj"
 
-	  echo "To: $addr"
-	  echo "Subject: $subj"
-	  echo "X-Buglog-Date: `date`"
-	  echo
-	  cat "$attachment"
-	) | sendmail -oi "$addr"
+          echo "To: $addr"
+          echo "Subject: $subj"
+          echo "Date: `date -d "$when" '+%d %b %Y %H:%M:S %z'`"
+          echo "X-Buglog-Date: $when"
+          echo
+          cat "$attachment"
+        ) | $trace sendmail -oi "$addr"
       ) || xit=1
       ;;
 
@@ -197,7 +227,7 @@ do
     #
     \|*)
       { command=`expr "x$bugsystem" : 'x.\(.*\)'` \
-        && "$command" "$headline" <"$attachment"
+        && $trace "$command" "$headline" <"$attachment"
       } || xit=1
       ;;
 
@@ -210,17 +240,17 @@ do
     # For example,
     # we routinely commit trivial CVS changes with headlines like:
     #
-    #	moved user home dir from here to there [CISaa12345]
+    #   moved user home dir from here to there [CISaa12345]
     #
     # which would add an enclosure to bug B<CISaa12345>.
     #
     ddts)
       { ddtsids=`echo "$headline" | ddtsids` \
-	&& { [ -z "$ddtsids" ] \
-	     || ( printf "%s\n\n" "$headline"
-		  exec cat "$attachment"
-		) | mailif -s "$headline" $ddtsids
-	   }
+        && { [ -z "$ddtsids" ] \
+             || ( printf "%s\n\n" "$headline"
+                  exec cat "$attachment"
+                ) | $trace mailif -s "$headline" $ddtsids
+           }
       } || xit=1
       ;;
 
@@ -233,13 +263,13 @@ do
     # For example,
     # we routinely commit trivial CVS changes with headlines like:
     #
-    #	moved user home dir from here to there [infra12345]
+    #   moved user home dir from here to there [infra12345]
     #
     # which would add an attachment to Infra bug B<12345>.
     #
     infra)
       infraids=`echo "$headline" | infraids`
-      [ -z "$infraids" ] || buglog-infra "$headline" <"$attachement" || xit=1
+      [ -z "$infraids" ] || $trace buglog-infra "$headline" <"$attachement" || xit=1
       ;;
 
     # =item B<logger>
@@ -248,10 +278,10 @@ do
     # to syslog
     # using the I<logger> command, thus:
     #
-    #	logger -t buglog -- "$USER: $headline"
+    #   logger -t buglog -- "$USER: $headline"
     #
     logger)
-      logger -t buglog -- "$USER: $headline" || xit=1
+      $trace logger -t buglog -- "$USER: $headline" || xit=1
       ;;
 
     *)

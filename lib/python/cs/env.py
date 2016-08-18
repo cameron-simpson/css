@@ -1,7 +1,24 @@
+#!/usr/bin/python
+#
+# Environment access and substitution.
+#   - Cameron Simpson <cs@zip.com.au>
+#
+
+DISTINFO = {
+    'description': "a few environment related functions",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+    ],
+    'requires': ['cs.lex'],
+}
+
 import os
 import string
 import types
-from cs.lex import get_identifier
+from cs.lex import get_qstr
 
 def getLogin(uid=None):
   import pwd
@@ -35,39 +52,15 @@ def getenv(var, default=None, environ=None, dosub=False):
       value = envsub(value, environ=environ)
   return value
 
-def envsub(s, environ=None, bare=None, default=None):
-  ''' Replace substring of the form '$var' with the value of 'var' from environ.
+def envsub(s, environ=None, default=None):
+  ''' Replace substrings of the form '$var' with the value of 'var' from environ.
       `environ`: environment mapping, default os.environ.
-      `bare`: string to replace a '$' with no following identifier;
-              a bare '$' raises ValueError if this is not specified.
       `default`: value to substitute for unknown vars;
               if `default` is None a ValueError is raised.
   '''
   if environ is None:
     environ = os.environ
-  strs = []
-  opos = 0
-  while True:
-    pos = s.find('$', opos)
-    if pos < 0:
-      strs.append(s[opos:])
-      break
-    if pos > opos:
-      strs.append(s[opos:pos])
-    id, offset = get_identifier(s, pos+1)
-    if id:
-      value = environ.get(id, default)
-      if value is None:
-        raise ValueError("unknown envvar name $%s, offset %d: %s"
-                         % (id, pos, s))
-      strs.append(value)
-    else:
-      if bare is not None:
-        strs.append(bare)
-      else:
-        raise ValueError("missing envvar name, offset %d: %s" % (pos, s))
-    opos = offset
-  return ''.join(strs)
+  return get_qstr(s, 0, q=None, environ=environ, default=default)[0]
 
 def varlog(environ=None):
   ''' Return the default base for logs for most cs.* modules.

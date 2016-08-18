@@ -4,9 +4,23 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
+from __future__ import absolute_import
+
+DISTINFO = {
+    'description': "functions and classes to work with email",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'requires': ['cs.fileutils', 'cs.logutils', 'cs.threads', 'cs.seq', 'cs.py3'],
+}
+
 import email.message
 import email.parser
 from email.utils import getaddresses
+from io import StringIO
 from itertools import chain
 import mailbox
 import os
@@ -18,29 +32,29 @@ from tempfile import NamedTemporaryFile
 from threading import Lock
 import time
 from cs.fileutils import Pathname, shortpath as _shortpath
-from cs.logutils import Pfx, info, warning, debug, D
+from cs.logutils import Pfx, info, warning, exception, debug, D, X
 from cs.threads import locked_property
 from cs.seq import seq
-from cs.py3 import StringIO
+from cs.py3 import StringTypes
 
 SHORTPATH_PREFIXES = ( ('$MAILDIR/', '+'), ('$HOME/', '~/') )
 
 def shortpath(path, environ=None):
   return _shortpath(path, environ=environ, prefixes=SHORTPATH_PREFIXES)
 
-def Message(M, headersonly=False):
-  ''' Factory function to accept a file or filename and return an
-      email.message.Message.
+def Message(msgfile, headersonly=False):
+  ''' Factory function to accept a file or filename and return an email.message.Message.
   '''
-  if isinstance(M, str):
-    pathname = M
+  if isinstance(msgfile, StringTypes):
+    # msgfile presumed to be filename
+    pathname = msgfile
     with Pfx(pathname):
-      with open(pathname) as mfp:
+      with open(pathname, errors='replace') as mfp:
         M = Message(mfp, headersonly=headersonly)
         M.pathname = pathname
         return M
-  mfp = M
-  return email.parser.Parser().parse(mfp, headersonly=headersonly)
+  # msgfile presumed to be file-like object
+  return email.parser.Parser().parse(msgfile, headersonly=headersonly)
 
 def message_addresses(M, header_names):
   ''' Yield (realname, address) pairs from all the named headers.
@@ -54,6 +68,29 @@ def message_addresses(M, header_names):
                   header_names, header_name, hdr, realname, address)
         else:
           yield realname, address
+
+def modify_header(M, hdr, new_values, always=False):
+  ''' Modify a Message `M` to change the value of the named header `hdr` to the new value `new_values` (a string or an interable of strings).
+      If `new_values` is a string subclass, convert to a single element list.
+      If `new_values` differs from the existing value or if `always`
+      is true, save the old value as X-Old-`hdr`.
+      Return a Boolean indicating whether the headers were modified.
+  '''
+  if isinstance(new_values, StringTypes):
+    new_values = [new_values]
+  else:
+    new_values = list(new_values)
+  modified = False
+  old_values = M.get_all(hdr, ())
+  if always or old_values != new_values:
+    modified = True
+    old_hdr = 'X-Old-' + hdr
+    for old_value in old_values:
+      M.add_header("X-Old-" + hdr, old_value)
+    del M[hdr]
+    for new_value in new_values:
+      M.add_header(hdr, new_value)
+  return modified
 
 def ismhdir(path):
   ''' Test if `path` points at an MH directory.
@@ -71,16 +108,17 @@ def ismaildir(path):
 def ismbox(path):
   ''' Open path and check that its first line begins with "From ".
   '''
-  fp=None
+  fp = None
   try:
-    fp=open(path)
+    fp = open(path)
     from_ = fp.read(5)
   except IOError:
     if fp is not None:
       fp.close()
     return False
-  fp.close()
-  return from_ == 'From '
+  else:
+    fp.close()
+    return from_ == 'From '
 
 def make_maildir(path):
   ''' Create a new maildir at `path`.
@@ -233,8 +271,8 @@ class Maildir(mailbox.Maildir):
       try:
         debug("rename %s => %s", tmppath, newpath)
         os.rename(tmppath, newpath)
-      except:
-        debug("unlink %s", tmppath)
+      except Exception as e:
+        exception("%s: unlink %s", e, tmppath)
         os.unlink(tmppath)
         raise
       self.msgmap[key] = ('new', newbase)
@@ -400,7 +438,7 @@ class Maildir(mailbox.Maildir):
         The default is to transcribe all messages.
     '''
     if keys is None:
-      keys = self.iterkeys()
+      keys = self.keys()
     for key in keys:
       with Pfx(key):
         message = self[key]

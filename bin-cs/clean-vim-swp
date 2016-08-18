@@ -1,0 +1,23 @@
+#!/bin/sh
+#
+# Remove all Vim .*.swp files from the usual places.
+#   - Cameron Simpson <cs@zip.com.au> 12jan2015
+#
+
+set -ue
+
+[ $# -gt 0 ] || set -- "$HOME/hg" "$HOME/rc" "$HOME/bin"*
+
+xit=0
+
+for d
+do
+  case "$d" in
+    -*) d=./$d ;;
+  esac
+  ( ##set -x
+    find "$d" \( -type d -name .hg -prune \) -o \( -type f -name '.*.swp' -ls -exec rm {} ';' \)
+  ) || xit=1
+done
+
+exit $xit

@@ -2,40 +2,129 @@
 #
 # =head1 NAME
 #
-# pipeargs - feed arguments, one per line, to stdin of a command
+# pipeargs - feed arguments, one per line, to standard input of a command
 #
 # =head1 SYNOPSIS
 #
-# pipeargs shcmd [args...]
+# pipeargs [-p prompt] shcmd [args...]
+# pipeargs [-p prompt] -e cmd [cmd-args...]
 #
 # =head1 DESCRIPTION
 #
-# I<pipeargs> runs the shell command I<shcmd>
-# with input from a file containing the I<args>, one per line.
+# I<pipeargs> supplies its arguments, one per line, as input the the supplied command.
+# The argment B<-> causes I<pipeargs> to copy its standard input to the command at that point.
+# If standard input is a tty and standard error is a tty,
+# a prompt will be issued to standard error for each input line.
 #
+
+set -ue
 
 : ${TMPDIR:=/tmp}
 
-usage="Usage: $0 shcmd [args...]"
+cmd=$( basename "$0" )
+usage="Usage:
+  $cmd [-p prompt] shcmd [args...]
+      \"-\" Insert stdin at this point.
+  $cmd [-p prompt] -e cmd [cmd-args...]"
+
+prompt=
+noargs=
 
 badopts=
+
+# =over 4
+#
+while [ $# -gt 0 ]
+do
+  case $1 in
+    # =item B<-p> I<prompt>
+    #
+    # Specify the prompt for interactive use.
+    # The default prompt is the command.
+    #
+    -p) prompt=$2; shift ;;
+    # =item B<-e> I<cmd> [I<cmd-args...>]
+    #
+    # Instead of issuing a shell command, execute the supplied command and arguments.
+    # This avoids quoting difficulties.
+    #
+    -e) noargs=1; shift; break ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+# =back
+#
+
 if [ $# = 0 ]
-then  echo "$0: missing shcmd" >&2; badopts=1
-else  shcmd=$1; shift
+then
+  if [ $noargs ]
+  then  echo "$0: missing cmd" >&2
+  else  echo "$0: missing shcmd" >&2
+  fi
+  badopts=1
+else
+  [ $noargs ] || { shcmd=$1; shift; }
 fi
+
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-tmp=$TMPDIR/.pa$$
+if [ -z "$prompt" ]
+then
+  if [ $noargs ]
+  then  prompt=$*
+  else  prompt=$shcmd
+  fi
+fi
 
-for arg
-do  echo "$arg"
-done >"$tmp"
+if [ -t 0 -a -t 2 ]
+then
+  copystdin() {
+    while necho "$prompt> " >&2
+          read -r line
+    do  printf '%s\n' "$line"
+    done
+  }
+else
+  copystdin() {
+    cat
+  }
+fi
 
-exec <"$tmp"
-rm -f "$tmp"
+pipe=$TMPDIR/$cmd.$$
+mkfifo -m 0600 "$pipe"
 
-exec sh -c "$shcmd"
+if [ $noargs ]
+then
+  copystdin >"$pipe" &
+  exec <"$pipe"
+  rm "$pipe"
+  exec "$@"
+else
+  [ $# -gt 0 ] || set -- -
+  for arg
+  do
+    if [ "x$arg" = x- ]
+    then
+      copystdin
+    else
+      printf '%s\n' "$arg"
+    fi
+  done >"$pipe" &
+  exec <"$pipe"
+  rm "$pipe"
+  exec sh -c "$shcmd"
+fi
 
+# =head1 BUGS
+#
+# Interactive use uses the shell's "read -r" command to read standard input,
+# which strips whitespace.
+#
 # =head1 AUTHOR
 #
 # Cameron Simpson E<lt>cs@zip.com.auE<gt> 20mar2000

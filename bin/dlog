@@ -1,11 +1,14 @@
-#!/bin/sh -u
+#!/bin/sh
 #
 # Log an action to $LOGDIR/dlog-quick and also via buglog's dlog facility,
 # which uses buglog-daily.      - Cameron Simpson <cs@zip.com.au>
 # 
 
+set -ue
+
 cmd=$0
-usage="Usage: $cmd [-l {log|logfile}] [remark...]"
+usage="Usage: $cmd [-d datetime] [-l {log|logfile}] [--] [remark...]"
+
 trace=  ##set-x
 echo=:
 [ -t 2 ] && echo=eecho
@@ -16,24 +19,49 @@ when=${DLOG_WHEN:-}
 
 [ -t 0 ] && exec </dev/null
 
-if not flag DLOG_LOCAL && [ "x$HOST" != "x$HOMEHOST" ]
+if [ -n "${HOMEHOST:-}" ]
 then
-  if flag DLOG_REMOTE_DISABLE
+  if not flag DLOG_LOCAL && [ "x$HOST" != "x$HOMEHOST" ]
   then
-    $echo "$cmd: flag DLOG_REMOTE_DISABLE: logging locally"
-  else
-    exec $trace sshx "$HOMEHOST" ./bin/with-login-env dlog ${1+"$@"}
+    if flag DLOG_REMOTE_DISABLE
+    then
+      $echo "$cmd: flag DLOG_REMOTE_DISABLE: logging locally"
+    else
+      exec $trace sshx "$HOMEHOST" ./bin/with-login-env dlog ${1+"$@"}
+    fi
   fi
 fi
 
 logname=dlog-quick
-[ $# -gt 0 ] && [ "x$1" = x-l ] && { logname=$2; shift; shift; }
-case "$logname" in /*) ;; *) logname=$LOGDIR/$logname ;; esac
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -d) when=$2; shift ;;
+    -l) logname=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+case "$logname" in
+  /*) ;;
+  *) logname=$LOGDIR/$logname ;;
+esac
+
 [ $# = 0 ] && exec pageif cat "$logname"
 
+# compute ISO8601 timestamp string
 if [ -n "$when" ]
-then  ts=`date -d "$DLOG_WHEN" '+%Y-%m-%d-%H:%M:%S'`
-else  ts=`date '+%Y-%m-%d-%H:%M:%S'`
+then  ts=`date -d "$when" '+%Y-%m-%d %H:%M:%S'`
+else  ts=`date '+%Y-%m-%d %H:%M:%S'`
 fi
+
 echo "$ts $*" >>"$logname"
-exec buglog -B dlog "$*"
+exec buglog -d "$ts" -B dlog "$*"

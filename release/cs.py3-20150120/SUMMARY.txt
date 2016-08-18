@@ -1,0 +1,1 @@
+cs.py3: add __contains__ to python 2 bytes type

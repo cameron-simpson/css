@@ -1,0 +1,1 @@
+lib/python/cs/app/README-megacli.rst: cs.app.megacli: README: scrub adapter serial number from example, fix typo

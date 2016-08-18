@@ -1,0 +1,1 @@
+Added RST doco for cs.numeric.
