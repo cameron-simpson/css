@@ -92,6 +92,7 @@ def main(argv):
       for arg in args:
         stdout_bfp = os.fdopen(sys.stdout.fileno(), "wb")
         TVWiz(arg).copyto(stdout_bfp)
+        stdoutp.bfp.close()
     elif op == "header":
       for arg in args:
         print(arg)
