@@ -7,6 +7,7 @@
 
 from __future__ import print_function
 import sys
+import os
 import os.path
 from collections import namedtuple
 import datetime
@@ -89,7 +90,8 @@ def main(argv):
   with Pfx(op):
     if op == "cat":
       for arg in args:
-        TVWiz(arg).copyto(sys.stdout)
+        stdout_bfp = os.fdopen(sys.stdout.fileno(), "wb")
+        TVWiz(arg).copyto(stdout_bfp)
     elif op == "header":
       for arg in args:
         print(arg)
@@ -242,7 +244,7 @@ class TVWiz(O):
   def trunc_records(self):
     ''' Generator to yield TruncRecords for this TVWiz directory.
     '''
-    with open(os.path.join(self.dir, "trunc")) as tfp:
+    with open(os.path.join(self.dir, "trunc"), "rb") as tfp:
       for trec in parse_trunc(tfp):
         yield trec
 
@@ -256,7 +258,7 @@ class TVWiz(O):
         if lastFileNum is None or lastFileNum != fileNum:
           if lastFileNum is not None:
             fp.close()
-          fp = open(os.path.join(self.dir, "%04d" % (fileNum,)))
+          fp = open(os.path.join(self.dir, "%04d" % (fileNum,)), "rb")
           filePos = 0
           lastFileNum = fileNum
         if filePos != offset:
@@ -277,7 +279,7 @@ class TVWiz(O):
     ''' Transcribe the uncropped content to a file named by output.
     '''
     if type(output) is str:
-      with open(output, "w") as out:
+      with open(output, "wb") as out:
         self.copyto(out)
     else:
       for buf in self.data():
