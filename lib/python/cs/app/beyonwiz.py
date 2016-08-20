@@ -15,8 +15,9 @@ import json
 import struct
 from subprocess import Popen, PIPE
 from threading import Lock, RLock
+from types import SimpleNamespace as NS
 from xml.etree.ElementTree import XML
-from cs.logutils import Pfx, error, warning, info, setup_logging
+from cs.logutils import Pfx, error, warning, info, setup_logging, X
 from cs.obj import O
 from cs.threads import locked_property
 from cs.urlutils import URL
@@ -26,32 +27,39 @@ USAGE = '''Usage:
     %s convert tvwizdir output.mp4
     %s header tvwizdirs...
     %s scan tvwizdirs...
+    %s stat tvwizdirs...
     %s test'''
 
 # constants related to headers
+#
+# See:
+#  https://github.com/prl001/getWizPnP/blob/master/wizhdrs.h
 
 # header filenames
 TVHDR = 'header.tvwiz';
 RADHDR = 'header.radwiz';
 
-# header data offsets and sizes
-HDR_MAIN_OFF = 0
-HDR_MAIN_SIZE = 1564
-HDR_MAX_OFFSETS = 8640
-HDR_OFFSETS_OFF = HDR_MAIN_SIZE
-HDR_OFFSETS_SIZE = 8 * (HDR_MAX_OFFSETS - 1)
-HDR_BOOKMARKS_OFF = 79316
-HDR_BOOKMARKS_SZ = 20 + 64 * 8
-HDR_EPISODE_OFF = 79856
-HDR_EPISODE_SZ = 1 + 255
-HDR_EXTINFO_OFF = 80114
-HDR_EXTINFO_SZ = 2 + 1024
+# TVWizFileHeader: 5 unsigned shorts, then 4 bytes: lock, mediaType, inRec, unused
+TVWizFileHeader = struct.Struct('<HHHHHBBBB')
+# TOffset: unsigned long long lastOff, then 8640 unsigned long long fileOff
+# TVWizTSPoint, offset 1024:
+#    svcName    eg TV channel name
+#    evtName    eg program title
+#    mjd        Modified Julian Date
+#                 http://tycho.usno.navy.mil/mjd.html
+#    pad
+#    start
+#    last       play time = last*10 + sec
+#    sec
+#    lastOff
+# followed by 8640 fileOff
+TVWizTSPoint = struct.Struct('<256s256sHHLHHQ')
 
 def main(argv):
   args = list(argv)
   cmd = os.path.basename(args.pop(0))
   setup_logging(cmd)
-  usage = USAGE % (cmd, cmd, cmd, cmd, cmd)
+  usage = USAGE % (cmd, cmd, cmd, cmd, cmd, cmd)
 
   badopts = False
 
@@ -84,6 +92,10 @@ def main(argv):
           error("missing .ts files or tvwizdirs")
           badopts = True
       elif op == "scan":
+        if len(args) < 1:
+          error("missing tvwizdirs")
+          badopts = True
+      elif op == "stat":
         if len(args) < 1:
           error("missing tvwizdirs")
           badopts = True
@@ -165,6 +177,12 @@ def main(argv):
         if chunkOff > 0:
           print("    final chunk of %d" % chunkSize)
         print("  total %d" % total)
+    elif op == "stat":
+      for arg in args:
+        TV = TVWiz(arg)
+        H = TV.header()
+        print(arg)
+        print("  %s %s: %s, %s" % (H.svcName, H.dt_start.isoformat(' '), H.evtName, H.episode))
     elif op == "test":
       host = args.pop(0)
       print("host =", host, "args =", args)
@@ -255,44 +273,121 @@ def parse_trunc(fp):
       raise ValueError("short buffer: %d bytes: %r" % (len(buf), buf))
     yield TruncRecord(*struct.unpack("<QHHQL", buf))
 
-def parse_header(data):
+def parse_header_data(data, offset=0):
   ''' Decode the data chunk from a TV or radio header chunk.
   '''
-  main = data[HDR_MAIN_OFF:HDR_MAIN_OFF+HDR_MAIN_SIZE]
-  main_unpacked = struct.unpack('6x 3s 1024s 256s 256s <H 2x <L <H <H 1548s <H <H <H <H', data)
-  print(main_unpacked)
+  h1, h2, h3, h4, h5, \
+  lock, mediaType, inRec, unused = TVWizFileHeader.unpack(data[offset:offset+TVWizFileHeader.size])
+  # skip ahead to TSPoint information
+  offset += 1024
+  svcName, evtName, \
+  mjd, pad, start, last, sec, lastOff = TVWizTSPoint.unpack(data[offset:offset+TVWizTSPoint.size])
+  unix_start = (mjd - 40587) * 24 * 3600 + start
+  dt_start = datetime.datetime.fromtimestamp(unix_start)
+  svcName = bytes0_to_str(svcName)
+  evtName = bytes0_to_str(evtName)
+  # advance to file offsets
+  offset += TVWizTSPoint.size
+  fileOffs = []
+  for i in range(0, 8640):
+    fileOff, = struct.unpack('<Q', data[offset:offset+8])
+    fileOffs.append(fileOff)
+    offset += 8
+  # hack: presume episode and synopsis are the first data after any following NULs
+  tail = data[offset:].lstrip(b'\x00')
+  epi_b = b''
+  syn_b = b''
+  if len(tail) > 0:
+    epi_b, offset = unrle(tail, '<B')
+    epi_b = epi_b.rstrip(b'\xff')
+    tail = tail[offset:].lstrip(b'\x00')
+    if len(tail) > 0:
+      syn_b, offset = unrle(tail, '<H')
+      syn_b = syn_b.rstrip(b'\xff')
+      tail = tail[offset:].lstrip(b'\x00')
+  if len(tail) > 0:
+    warning("unparsed data (%d bytes) after synopsis: %r...", len(tail), tail[:64])
+  episode = epi_b.decode('utf8', errors='replace')
+  synopsis = syn_b.decode('utf8', errors='replace')
+  return NS(lock=lock, mediaType=mediaType, inRec=inRec,
+            svcName=svcName, evtName=evtName, episode=episode, synopsis=synopsis,
+            mjd=mjd, start=start, unix_start=unix_start, dt_start=dt_start,
+            playtime=last*10+sec, lastOff=lastOff)
+
+def bytes0_to_str(bs0, encoding='utf8'):
+  nulpos = bs0.find(0)
+  if nulpos >= 0:
+    bs0 = bs0[:nulpos]
+  s = bs0.decode(encoding)
+  return s
+
+def unrle(data, fmt, offset=0):
+  offset0 = offset
+  S = struct.Struct(fmt)
+  offset2 = offset + S.size
+  length, = S.unpack(data[offset:offset2])
+  offset = offset2
+  offset2 += length
+  subdata = data[offset:offset2]
+  if length != len(subdata):
+    warning("unrle(%r...): rle=%d but len(subdata)=%d", data[offset0:offset0+16], length, len(subdata))
+  offset += len(subdata)
+  return subdata, offset
+
+def trailing_nul(bs):
+  # strip trailing NULs
+  bs = bs.rstrip(b'\x00')
+  # locate preceeding NUL padded area
+  start = bs.rfind(b'\x00')
+  if start < 0:
+    start = 0
+  else:
+    start += 1
+  return start, bs[start:]
 
 class TVWiz(O):
   def __init__(self, wizdir):
-    self.dir = wizdir
+    self.dirpath = wizdir
+    self.path_title, self.path_datetime = self._parse_path()
+
+  def _parse_path(self):
+    basis, ext = os.path.splitext(self.dirpath)
+    if ext != '.tvwiz':
+      warning("does not end with .tvwiz: %r", self.dirpath)
+    title, daytext, timetext = basis.rsplit('_', 2)
+    title = title \
+            .replace('_ ', ': ') \
+            .replace('_s ', "'s ")
+    dt = datetime.datetime.strptime(daytext+timetext, '%b.%d.%Y%H.%M')
+    return title, dt
 
   @property
   def header_path(self):
-    return os.path.join(self.dir, TVHDR)
+    return os.path.join(self.dirpath, TVHDR)
 
   def header(self):
     with open(self.header_path, "rb") as hfp:
       data = hfp.read()
-    return parse_header(data)
+    return parse_header_data(data)
 
   def trunc_records(self):
     ''' Generator to yield TruncRecords for this TVWiz directory.
     '''
-    with open(os.path.join(self.dir, "trunc"), "rb") as tfp:
+    with open(os.path.join(self.dirpath, "trunc"), "rb") as tfp:
       for trec in parse_trunc(tfp):
         yield trec
 
   def data(self):
     ''' A generator that yields MPEG2 data from the stream.
     '''
-    with Pfx("data(%s)", self.dir):
+    with Pfx("data(%s)", self.dirpath):
       lastFileNum = None
       for rec in self.trunc_records():
         wizOffset, fileNum, flags, offset, size  = rec
         if lastFileNum is None or lastFileNum != fileNum:
           if lastFileNum is not None:
             fp.close()
-          fp = open(os.path.join(self.dir, "%04d" % (fileNum,)), "rb")
+          fp = open(os.path.join(self.dirpath, "%04d" % (fileNum,)), "rb")
           filePos = 0
           lastFileNum = fileNum
         if filePos != offset:
