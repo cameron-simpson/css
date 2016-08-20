@@ -26,6 +26,7 @@ USAGE = '''Usage:
     %s cat tvwizdirs...
     %s convert tvwizdir output.mp4
     %s header tvwizdirs...
+    %s mconvert tvwizdirs...
     %s scan tvwizdirs...
     %s stat tvwizdirs...
     %s test'''
@@ -59,7 +60,7 @@ def main(argv):
   args = list(argv)
   cmd = os.path.basename(args.pop(0))
   setup_logging(cmd)
-  usage = USAGE % (cmd, cmd, cmd, cmd, cmd, cmd)
+  usage = USAGE % (cmd, cmd, cmd, cmd, cmd, cmd, cmd)
 
   badopts = False
 
@@ -84,6 +85,10 @@ def main(argv):
           warning("extra arguments after output: %s", " ".join(args))
           badopts = True
       elif op == "header":
+        if len(args) < 1:
+          error("missing tvwizdirs")
+          badopts = True
+      elif op == "mconvert":
         if len(args) < 1:
           error("missing tvwizdirs")
           badopts = True
@@ -121,28 +126,44 @@ def main(argv):
         stdoutp.bfp.close()
     elif op == "convert":
       tvwizdir, outpath = args
-      if outpath.startswith('-'):
-        warning("invalid outpath, may not commence with dash: %r", outpath)
-        return 2
-      outprefix, outext = os.path.splitext(outpath)
-      if not outext:
-        warning("no extension on outpath, cannot infer output format for mmfpeg: %r", outpath)
-        return 2
-      ffmpeg_argv = ['ffmpeg', '-f', 'mpegts', '-i', '-', '-f', outext[1:], outpath]
       TV = TVWiz(tvwizdir)
-      info("running: %r", ffmpeg_argv)
-      P = Popen(ffmpeg_argv, stdin=PIPE)
-      TV.copyto(P.stdin)
-      P.stdin.close()
-      xit = P.wait()
-      if xit != 0:
-        warning("ffmpeg failed, exit status %d", xit)
-      return xit
+      xit = TV.convert(outpath)
     elif op == "header":
-      for arg in args:
-        print(arg)
-        TV = TVWiz(arg)
-        print(repr(TV.header()))
+      for tvwizdir in args:
+        with Pfx(tvwizdir):
+          print(tvwizdir)
+          TV = TVWiz(tvwizdir)
+          print(repr(TV.header()))
+    elif op == "mconvert":
+      for tvwizdir in args:
+        with Pfx(tvwizdir):
+          ok = True
+          TV = TVWiz(tvwizdir)
+          H = TV.header()
+          X("H=%r", H.__dict__)
+          outpath = "{iso}--{evtName}--{episode}--{svcName}.mp4" \
+                    .format_map(H.__dict__) \
+                    .replace('/', '|') \
+                    .replace(' ', '-') \
+                    .replace('----', '--')
+          if os.path.exists(outpath):
+            outpfx, outext = os.path.splitext(outpath)
+            ok = False
+            for i in range(32):
+              outpath2 = "%s--%d%s" % (outpfx, i+1, outext)
+              if not os.path.exists(outpath2):
+                outpath = outpath2
+                ok = True
+                break
+            if not ok:
+              error("file exists, and so do most -n flavours of it: %r", outpath)
+              xit = 1
+          if ok:
+            try:
+              ffxit = TV.convert(outpath)
+            except ValueError as e:
+              error("%s: %s", outpath, e)
+              xit = 1
     elif op == "meta":
       for filename in args:
         with Pfx(filename):
@@ -300,7 +321,9 @@ def parse_header_data(data, offset=0):
   if len(tail) > 0:
     epi_b, offset = unrle(tail, '<B')
     epi_b = epi_b.rstrip(b'\xff')
-    tail = tail[offset:].lstrip(b'\x00')
+    # hack: strip NULs or \xff
+    while tail.startswith(b'\x00\x00') or tail.startswith(b'\xff\xff'):
+      tail = tail[offset:].lstrip(tail[:1])
     if len(tail) > 0:
       syn_b, offset = unrle(tail, '<H')
       syn_b = syn_b.rstrip(b'\xff')
@@ -312,6 +335,7 @@ def parse_header_data(data, offset=0):
   return NS(lock=lock, mediaType=mediaType, inRec=inRec,
             svcName=svcName, evtName=evtName, episode=episode, synopsis=synopsis,
             mjd=mjd, start=start, unix_start=unix_start, dt_start=dt_start,
+            iso=dt_start.isoformat(' '),
             playtime=last*10+sec, lastOff=lastOff)
 
 def bytes0_to_str(bs0, encoding='utf8'):
@@ -408,11 +432,49 @@ class TVWiz(O):
     ''' Transcribe the uncropped content to a file named by output.
     '''
     if type(output) is str:
-      with open(output, "wb") as out:
-        self.copyto(out)
+      outpath = output
+      with open(outpath, "wb") as output:
+        self.copyto(output)
     else:
       for buf in self.data():
         output.write(buf)
+
+  def convert(self, outpath, format=None):
+    ''' Transcode video to `outpath` in FFMPEG `format`.
+    '''
+    if os.path.exists(outpath):
+      raise ValueError("outpath exists")
+    if format is None:
+      _, ext = os.path.splitext(outpath)
+      if not ext:
+        raise ValueError("can't infer format from outpath, no extension")
+      format = ext[1:]
+    # prevent output path looking like option or URL
+    if not os.path.isabs(outpath):
+      outpath = os.path.join('.', outpath)
+    H = self.header()
+    ffmpeg_argv = [ 'ffmpeg', '-f', 'mpegts', '-i', '-',
+                              '-f', format,
+                              '-metadata', 'title='
+                                           + ( H.evtName
+                                               if len(H.episode) == 0
+                                               else '%s: %s' % (H.evtName, H.episode)
+                                             ),
+                              '-metadata', 'show='+H.evtName,
+                              '-metadata', 'episode_id='+H.episode,
+                              '-metadata', 'synopsis='+H.synopsis,
+                              '-metadata', 'network='+H.svcName,
+                              '-metadata', 'comment=Transcoded from %r using ffmpeg. Recording date %s.' % (self.dirpath, H.iso),
+                              outpath]
+    info("running: %r", ffmpeg_argv)
+    P = Popen(ffmpeg_argv, stdin=PIPE)
+    self.copyto(P.stdin)
+    P.stdin.close()
+    xit = P.wait()
+    if xit != 0:
+      warning("ffmpeg failed, exit status %d", xit)
+    return xit
+
 
 class WizPnP(O):
   ''' Class to access a pre-T3 beyonwiz over HTTP.
