@@ -36,9 +36,30 @@ USAGE = '''Usage:
 # See:
 #  https://github.com/prl001/getWizPnP/blob/master/wizhdrs.h
 
-# header filenames
-TVHDR = 'header.tvwiz';
-RADHDR = 'header.radwiz';
+# various constants sucked directly from getWizPnP/Beyonwiz/Recording/Header.pm
+DAY = 24*60*60      # Seconds in a day
+TVEXT = '.tvwiz'
+TVHDR = 'header' + TVEXT
+RADEXT = '.radwiz'
+RADHDR = 'header' + RADEXT
+
+MAX_TS_POINT = 8640
+HDR_SIZE = 256 * 1024
+MAX_BOOKMARKS = 64
+
+HDR_MAIN_OFF = 0
+HDR_MAIN_SZ = 1564
+HDR_OFFSETS_OFF = 1564
+HDR_OFFSETS_SIZE = (MAX_TS_POINT-1) * 8
+HDR_BOOKMARKS_OFF = 79316
+HDR_BOOKMARKS_SZ = 20 + MAX_BOOKMARKS * 8
+HDR_EPISODE_OFF = 79856
+HDR_EPISODE_SZ = 1 + 255
+HDR_EXTINFO_OFF = 80114
+HDR_EXTINFO_SZ = 2 + 1024
+
+HEADER_DATA_OFF = HDR_MAIN_OFF
+HEADER_DATA_SZ = HDR_EXTINFO_OFF + HDR_EXTINFO_SZ
 
 # TVWizFileHeader: 5 unsigned shorts, then 4 bytes: lock, mediaType, inRec, unused
 TVWizFileHeader = struct.Struct('<HHHHHBBBB')
@@ -303,7 +324,7 @@ def parse_header_data(data, offset=0):
   offset += 1024
   svcName, evtName, \
   mjd, pad, start, last, sec, lastOff = TVWizTSPoint.unpack(data[offset:offset+TVWizTSPoint.size])
-  unix_start = (mjd - 40587) * 24 * 3600 + start
+  unix_start = (mjd - 40587) * DAY + start
   dt_start = datetime.datetime.fromtimestamp(unix_start)
   svcName = bytes0_to_str(svcName)
   evtName = bytes0_to_str(evtName)
@@ -314,22 +335,10 @@ def parse_header_data(data, offset=0):
     fileOff, = struct.unpack('<Q', data[offset:offset+8])
     fileOffs.append(fileOff)
     offset += 8
-  # hack: presume episode and synopsis are the first data after any following NULs
-  tail = data[offset:].lstrip(b'\x00')
-  epi_b = b''
-  syn_b = b''
-  if len(tail) > 0:
-    epi_b, offset = unrle(tail, '<B')
-    epi_b = epi_b.rstrip(b'\xff')
-    # hack: strip NULs or \xff
-    while tail.startswith(b'\x00\x00') or tail.startswith(b'\xff\xff'):
-      tail = tail[offset:].lstrip(tail[:1])
-    if len(tail) > 0:
-      syn_b, offset = unrle(tail, '<H')
-      syn_b = syn_b.rstrip(b'\xff')
-      tail = tail[offset:].lstrip(b'\x00')
-  if len(tail) > 0:
-    warning("unparsed data (%d bytes) after synopsis: %r...", len(tail), tail[:64])
+  epi_b, offset = unrle(data[HDR_EPISODE_OFF:HDR_EPISODE_OFF+HDR_EPISODE_SZ], '<B')
+  epi_b = epi_b.rstrip(b'\xff')
+  syn_b, offset = unrle(data[HDR_EXTINFO_OFF:HDR_EXTINFO_OFF+HDR_EXTINFO_SZ], '<H')
+  syn_b = syn_b.rstrip(b'\xff')
   episode = epi_b.decode('utf8', errors='replace')
   synopsis = syn_b.decode('utf8', errors='replace')
   return NS(lock=lock, mediaType=mediaType, inRec=inRec,
