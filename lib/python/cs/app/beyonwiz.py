@@ -1,8 +1,8 @@
 #!/usr/bin/python
 #
 
-''' Classes to support access to Beyonwiz TVWiz data structures
-    and Beyonwiz devices via the net.
+''' Classes to support access to Beyonwiz TVWiz on disc data structures
+    and to Beyonwiz devices via the net.
 '''
 
 from __future__ import print_function
@@ -24,12 +24,26 @@ from cs.urlutils import URL
 
 USAGE = '''Usage:
     %s cat tvwizdirs...
+        Write the video content of the named tvwiz directories to
+        standard output as MPEG2 transport Stream, acceptable to
+        ffmpeg's "mpegts" format.
     %s convert tvwizdir output.mp4
+        Convert the video content of the named tvwiz directory to
+        the named output file (typically MP4, though he ffmpeg
+        output format chosen is based on the extension). Most
+        metadata are preserved.
     %s header tvwizdirs...
+        Print header information from the named tvwiz directories.
     %s mconvert tvwizdirs...
+        Convert the video content of the named tvwiz directories to
+        autmoatically named .mp4 files in the current directory.
+        Most metadata are preserved.
     %s scan tvwizdirs...
+        Scan the data structures of the named tvwiz directories.
     %s stat tvwizdirs...
-    %s test'''
+        Print some summary infomation for the named tvwiz directories.
+    %s test
+        Run unit tests.'''
 
 # constants related to headers
 #
