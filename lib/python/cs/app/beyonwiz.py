@@ -36,7 +36,7 @@ USAGE = '''Usage:
         Print header information from the named tvwiz directories.
     %s mconvert tvwizdirs...
         Convert the video content of the named tvwiz directories to
-        autmoatically named .mp4 files in the current directory.
+        automatically named .mp4 files in the current directory.
         Most metadata are preserved.
     %s scan tvwizdirs...
         Scan the data structures of the named tvwiz directories.
