@@ -404,7 +404,12 @@ class TVWiz(O):
     title = title \
             .replace('_ ', ': ') \
             .replace('_s ', "'s ")
-    dt = datetime.datetime.strptime(daytext+timetext, '%b.%d.%Y%H.%M')
+    to_parse = daytext + timetext
+    extra = to_parse[16:]
+    if extra:
+      warning("discarding extra text from title timestamp: %r", extra)
+      to_parse = to_parse[:16]
+    dt = datetime.datetime.strptime(to_parse, '%b.%d.%Y%H.%M')
     return title, dt
 
   @property
