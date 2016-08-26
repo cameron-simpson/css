@@ -175,7 +175,7 @@ def main(argv):
           ok = True
           TV = TVWiz(tvwizdir)
           H = TV.header()
-          outpath = "{iso}--{evtName}--{episode}--{svcName}.mp4" \
+          outpath = "{iso}--{evtName}--{episode:.200}--{svcName}.mp4" \
                     .format_map(H.__dict__) \
                     .replace('/', '|') \
                     .replace(' ', '-') \
