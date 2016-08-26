@@ -1,8 +1,8 @@
 #!/usr/bin/python
 #
 
-''' Classes to support access to Beyonwiz TVWiz data structures
-    and Beyonwiz devices via the net.
+''' Classes to support access to Beyonwiz TVWiz on disc data structures
+    and to Beyonwiz devices via the net.
 '''
 
 from __future__ import print_function
@@ -24,12 +24,26 @@ from cs.urlutils import URL
 
 USAGE = '''Usage:
     %s cat tvwizdirs...
+        Write the video content of the named tvwiz directories to
+        standard output as MPEG2 transport Stream, acceptable to
+        ffmpeg's "mpegts" format.
     %s convert tvwizdir output.mp4
+        Convert the video content of the named tvwiz directory to
+        the named output file (typically MP4, though he ffmpeg
+        output format chosen is based on the extension). Most
+        metadata are preserved.
     %s header tvwizdirs...
+        Print header information from the named tvwiz directories.
     %s mconvert tvwizdirs...
+        Convert the video content of the named tvwiz directories to
+        automatically named .mp4 files in the current directory.
+        Most metadata are preserved.
     %s scan tvwizdirs...
+        Scan the data structures of the named tvwiz directories.
     %s stat tvwizdirs...
-    %s test'''
+        Print some summary infomation for the named tvwiz directories.
+    %s test
+        Run unit tests.'''
 
 # constants related to headers
 #
@@ -161,8 +175,7 @@ def main(argv):
           ok = True
           TV = TVWiz(tvwizdir)
           H = TV.header()
-          X("H=%r", H.__dict__)
-          outpath = "{iso}--{evtName}--{episode}--{svcName}.mp4" \
+          outpath = "{iso}--{evtName}--{episode:.200}--{svcName}.mp4" \
                     .format_map(H.__dict__) \
                     .replace('/', '|') \
                     .replace(' ', '-') \
@@ -391,7 +404,12 @@ class TVWiz(O):
     title = title \
             .replace('_ ', ': ') \
             .replace('_s ', "'s ")
-    dt = datetime.datetime.strptime(daytext+timetext, '%b.%d.%Y%H.%M')
+    to_parse = daytext + timetext
+    extra = to_parse[16:]
+    if extra:
+      warning("discarding extra text from title timestamp: %r", extra)
+      to_parse = to_parse[:16]
+    dt = datetime.datetime.strptime(to_parse, '%b.%d.%Y%H.%M')
     return title, dt
 
   @property
