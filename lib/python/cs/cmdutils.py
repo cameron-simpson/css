@@ -23,9 +23,10 @@ def run(argv, trace=False):
     print(*pargv, file=tracefp)
   return subprocess.call(argv)
 
-def pipefrom(argv, trace=False, **kw):
+def pipefrom(argv, trace=False, binary=False, keep_stdin=False, **kw):
   ''' Pipe text from a command. Optionally trace invocation. Return the Popen object with .stdout decoded as text.
       `argv`: the command argument list
+      `binary`: if true (default false) return the binary stdout instead of a text wrapper
       `trace`: Default False. If True, recite invocation to stderr.
         Otherwise presume a stream to which to recite the invocation.
       The command's stdin is attached to the null device.
@@ -33,16 +34,23 @@ def pipefrom(argv, trace=False, **kw):
   '''
   if trace:
     tracefp = sys.stderr if trace is True else trace
-    pargv = ['+'] + argv + ['|']
+    pargv = ['+'] + list(argv) + ['|']
     print(*pargv, file=tracefp)
-  sp_devnull = getattr(subprocess, 'DEVNULL', None)
-  if sp_devnull is None:
-    devnull = open(os.devnull, 'wb')
+  popen_kw = {}
+  if not keep_stdin:
+    sp_devnull = getattr(subprocess, 'DEVNULL', None)
+    if sp_devnull is None:
+      devnull = open(os.devnull, 'wb')
+    else:
+      devnull = sp_devnull
+    popen_kw['stdin'] = devnull
+  P = subprocess.Popen(argv, stdout=subprocess.PIPE, **popen_kw)
+  if binary:
+    if kw:
+      raise ValueError("binary mode: extra keyword arguments not supported: %r", kw)
   else:
-    devnull = sp_devnull
-  P = subprocess.Popen(argv, stdin=devnull, stdout=subprocess.PIPE)
-  P.stdout = io.TextIOWrapper(P.stdout, **kw)
-  if sp_devnull is None:
+    P.stdout = io.TextIOWrapper(P.stdout, **kw)
+  if not keep_stdin and sp_devnull is None:
     devnull.close()
   return P
 

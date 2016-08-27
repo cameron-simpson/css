@@ -1,11 +1,27 @@
 #!/usr/bin/python
 #
 
+from __future__ import print_function
+
 ''' Classes to support access to Beyonwiz TVWiz on disc data structures
     and to Beyonwiz devices via the net.
 '''
 
-from __future__ import print_function
+DISTINFO = {
+    'description': "Beyonwiz PVR and TVWiz recording utilities",
+    'keywords': ["python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 3",
+        ],
+    'requires': ['cs.logutils', 'cs.obj', 'cs.threads', 'cs.urlutils'],
+    'entry_points': {
+      'console_scripts': [
+          'beyonwiz = cs.app.beyonwiz:main',
+          ],
+    },
+}
+
 import sys
 import os
 import os.path

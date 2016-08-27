@@ -14,6 +14,16 @@ from cs.lex import get_hexadecimal, get_chars, get_other_chars
 from cs.logutils import X, warning
 from cs.timeutils import time_func
 
+DISTINFO = {
+    'description': "RFC2616 (HTTP 1.1) facilities",
+    'keywords': ["python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 3",
+        ],
+    'requires': ['cs.fileutils', 'cs.lex', 'cs.logutils', 'cs.timeutils'],
+}
+
 # character classes: see RFC2616 part 2.2
 CR = '\r'
 CHAR = ''.join( chr(o) for o in range(128) )
