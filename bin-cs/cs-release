@@ -502,7 +502,7 @@ class ReleaseName(object):
 
   def uncommitted(self):
     pathset = set(self.paths())
-    changed = ()
+    changed = []
     for path in self.vcs.uncommitted():
       if path in pathset:
         changed.append(path)
