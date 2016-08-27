@@ -7,18 +7,52 @@
 set -ue
 
 cmd=$(basename "$0")
-usage="Usage: $cmd media-files..."
+usage="Usage: $cmd [-d workdir] media-files..."
 
 trace=set-x
 ripped=RIPPED
 unripped=UNRIPPED
+workdir=.
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -d) workdir=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing media-files" >&2
+  badopts=1
+fi
+
+if [ ! -d "$workdir/." ]
+then
+  echo "$cmd: missing workdir: $workdir" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+wd=$( pwd )
 
 xit=0
 
 for f
 do
+  f0=$f
   case "$f" in
-      -)        f=./$f ;;
+    /*) ;;
+    *)  f=$wd/$f ;;
   esac
   case "$f" in
       *.tvwiz)  set -- beyonwiz mconvert "$f" ;;
@@ -27,11 +61,11 @@ do
                 continue
                 ;;
   esac
-  if time $trace "$@"
+  if time $trace incd "$workdir" "$@"
   then
-    mvto=$RIPPED/$f
+    mvto=$ripped/$f0
   else
-    mvto=$UNRIPPED/$f
+    mvto=$unripped/$f0
     xit=1
   fi
   mvtodir=$( dirname "$mvto" )
