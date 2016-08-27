@@ -1,0 +1,6 @@
+Pfx: import __exit__ handler
+Preliminary per-module and per-function syntax accepted in $DEBUG envvar.
+Improvements to X(), add DP() and XP() prefixed flavours.
+status() function to update terminal status line.
+New X_via_tty global flag: directs X() to tty instead of sys.stderr.
+Assorted other minor improvements.
