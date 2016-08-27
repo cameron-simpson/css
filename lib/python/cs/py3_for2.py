@@ -5,6 +5,15 @@
 #   - Cameron Simpson <cs@zip.com.au> 12nov2015
 # 
 
+DISTINFO = {
+    'description': "python 2 specific support for cs.py3 module",
+    'keywords': ["python2"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        ],
+}
+
 def raise3(exc_type, exc_value, exc_traceback):
   raise exc_type, exc_value, exc_traceback
 
