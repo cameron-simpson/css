@@ -1,6 +1,8 @@
 #!/usr/bin/python
 #
 
+from __future__ import print_function
+
 ''' Classes to support access to Beyonwiz TVWiz on disc data structures
     and to Beyonwiz devices via the net.
 '''
@@ -17,9 +19,9 @@ DISTINFO = {
       'console_scripts': [
           'beyonwiz = cs.app.beyonwiz:main',
           ],
+    },
 }
 
-from __future__ import print_function
 import sys
 import os
 import os.path
