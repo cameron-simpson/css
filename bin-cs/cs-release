@@ -89,7 +89,7 @@ def main(argv):
             for files, firstline in changes:
               print(" ", ' '.join(files) + ': ' + firstline)
             print()
-            with pipefrom('readdottext') as dotfp:
+            with pipefrom('readdottext', keep_stdin=True) as dotfp:
               release_message = dotfp.read().rstrip()
             if not release_message:
               error("empty release message, aborting")
@@ -333,10 +333,10 @@ def ask(message):
   return response in ('y', 'yes')
 
 @contextmanager
-def pipefrom(*argv):
+def pipefrom(*argv, **kw):
   ''' Context manager returning the standard output of a command.
   '''
-  P = cs.cmdutils.pipefrom(argv, trace=True)
+  P = cs.cmdutils.pipefrom(argv, trace=True, **kw)
   yield P.stdout
   if P.wait() != 0:
     pipecmd = ' '.join(argv)
