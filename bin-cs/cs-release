@@ -497,8 +497,10 @@ class ReleaseName(object):
     '''
     suffix = self.last_suffix()
     if suffix is None:
-      return
-    for logitem in self.vcs.log_since(self.tagname(suffix), self.paths()):
+      start_tag = ""
+    else:
+      start_tag = self.tagname(suffix)
+    for logitem in self.vcs.log_since(start_tag, self.paths()):
       yield logitem
 
   def uncommitted(self):
