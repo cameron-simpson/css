@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # General release stuff for packages.
 #   - Cameron Simpson <cs@zip.com.au> 28feb2009
@@ -13,6 +13,7 @@ import os.path
 import re
 from subprocess import Popen, PIPE, check_call
 from contextlib import contextmanager
+import cs.cmdutils
 from cs.dateutils import isodate
 from cs.distinfo import URL_PYPI_PROD, URL_PYPI_TEST, PyPI_Package
 from cs.logutils import setup_logging, Pfx, error, warning, info, X
@@ -333,9 +334,9 @@ def ask(message):
 
 @contextmanager
 def pipefrom(*argv):
-  ''' Context manager returning standard output of command.
+  ''' Context manager returning the standard output of a command.
   '''
-  P = Popen(argv, stdout=PIPE)
+  P = cs.cmdutils.pipefrom(argv, trace=True)
   yield P.stdout
   if P.wait() != 0:
     pipecmd = ' '.join(argv)
@@ -367,7 +368,6 @@ class VCS_Hg(VCS):
 
   def _pipefrom(self, *hgargs):
     hgargv = ['hg'] + list(hgargs) + ['|']
-    print(hgargv, file=sys.stderr)
     return pipefrom('hg', *hgargs)
 
   def _hgcmd(self, *hgargs):
