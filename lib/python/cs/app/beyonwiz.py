@@ -5,6 +5,17 @@
     and to Beyonwiz devices via the net.
 '''
 
+DISTINFO = {
+    'description': "Beyonwiz PVR and TVWiz recording utilities",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'requires': ['cs.logutils', 'cs.obj', 'cs.threads', 'cs.urlutils'],
+}
+
 from __future__ import print_function
 import sys
 import os
