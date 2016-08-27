@@ -7,13 +7,16 @@
 
 DISTINFO = {
     'description': "Beyonwiz PVR and TVWiz recording utilities",
-    'keywords': ["python2", "python3"],
+    'keywords': ["python3"],
     'classifiers': [
         "Programming Language :: Python",
-        "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         ],
     'requires': ['cs.logutils', 'cs.obj', 'cs.threads', 'cs.urlutils'],
+    'entry_points': {
+      'console_scripts': [
+          'beyonwiz = cs.app.beyonwiz:main',
+          ],
 }
 
 from __future__ import print_function
