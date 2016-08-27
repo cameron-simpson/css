@@ -6,7 +6,7 @@
 #
 
 DISTINFO = {
-    'description': "command line tool to inspect and manipulate LSI MegaRAID adapters (such as used in IBM ServerRAID systems)",
+    'description': "command line tool to inspect and manipulate LSI MegaRAID adapters, such as used in IBM ServerRAID systems and Dell PowerEdge RAID Controller (PERC)",
     'keywords': ["python2", "python3"],
     'classifiers': [
         "Programming Language :: Python",
@@ -175,7 +175,7 @@ class MegaRAID(O):
 
   def __init__(self, megacli=None):
     if megacli is None:
-      megacli = MEGACLI
+      megacli = os.environ.get('MEGACLI', MEGACLI)
     self.megacli = megacli
 
   @property
@@ -420,7 +420,7 @@ class MegaRAID(O):
             error("rejecting drive, firmware state not unconfigured good: %s", DRV.firmware_state)
             ok = False
           else:
-            info("acceptable drive: %s", DRV.firmware_state)
+            D("acceptable drive: %s", DRV.firmware_state)
         cmd_pop()
     cmd_pop()
     if not ok:
@@ -431,8 +431,7 @@ class MegaRAID(O):
     ''' Open a pipe from the megacli command and yield lines from its output.
     '''
     cmdargs = [self.megacli] + list(args)
-    if sys.stderr.isatty():
-      cmdargs.insert(0, 'set-x')
+    D("+ %r", cmdargs)
     P = Popen(cmdargs, stdout=PIPE, close_fds=True)
     for line in P.stdout:
       yield line
@@ -444,8 +443,10 @@ class MegaRAID(O):
         the "new raid" stuff etc automatically.
         Return True if the exit code is 0, False otherwise.
     '''
-    ## if really: trace=set-x else trace=eecho
-    return call(['eecho', self.megacli] + list(args)) == 0
+    cmdargs = [self.megacli] + list(args)
+    D("%r", cmdargs)
+    ## return call(cmdargs) == 0
+    return True
 
   def adapter_save(self, adapter, save_file):
     savepath = "%s-a%d" % (save_file, adapter)
@@ -538,9 +539,6 @@ def merge_attrs(o, **kw):
 
 def D(msg, *a):
   message(msg, sys.stderr, "debug", *a)
-
-def info(msg, *a):
-  message(msg, sys.stdout, "info", *a)
 
 def warning(msg, *a):
   message(msg, sys.stderr, "warning", *a)

@@ -12,7 +12,6 @@ import sys
 import unittest
 from cs.debug import thread_dump, debug_object_shell
 from cs.logutils import X
-from cs.randutils import rand0, randblock
 from .hash import HashUtilDict
 from .hash_tests import _TestHashCodeUtils
 from .store import MappingStore

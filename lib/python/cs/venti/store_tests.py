@@ -13,7 +13,7 @@ import tempfile
 import unittest
 from cs.excutils import logexc
 from cs.logutils import setup_logging, warning, X
-from cs.randutils import rand0, randblock
+from cs.randutils import randblock
 from . import _TestAdditionsMixin
 from .datafile import GDBMIndex, KyotoIndex
 from .store import MappingStore, DataDirStore, ProgressStore

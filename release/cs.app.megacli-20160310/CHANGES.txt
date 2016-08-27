@@ -1,0 +1,2 @@
+  lib/python/cs/app/README-megacli.rst: README-megacli.rst: mention Dell PowerEdge RAID Controller (PERC)
+  lib/python/cs/app/megacli.py: cs.app.megacli: remove calls to cs.logutils.info, use internal D() function

@@ -1,0 +1,104 @@
+#!/bin/sh
+#
+# Recite or fetch a sequence of URLs with wget.
+#   - Cameron Simpson <cs@zip.com.au> 27feb2016
+#
+
+set -ue
+
+cmd=$( basename "$0" )
+usage="Usage: $cmd [-q] [-v] [-x] [-y] [m..]n URL-with-#
+  -q, -v    Quiet, verbose. Passed to wget.
+  -n        No action (default): recite generated URLs.
+  -x        Trace invocation of wget.
+  -y        Untraced invocation of wget."
+
+badopts=
+
+doit=
+trace=
+wgopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -[qv])
+        wgopts="$wgopts $1" ;;
+    -n) doit= ;;
+    -x) doit=1 trace=set-x ;;
+    -y) doit=1 trace= ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing m..n" >&2
+  badopts=1
+else
+  mn=$1
+  shift
+  case $mn in
+    [0-9]*..[1-9]*)
+      m=$( expr "x$mn" : 'x\([0-9][0-9]*\).*' || : )
+      n=$( expr "x$mn" : 'x[0-9][0-9]*\.\.\([1-9][0-9]*\)' )
+      ;;
+    [1-9]*)
+      m=1
+      n=$mn
+      # support "m n" as alternative to "m..n"
+      if [ $# -gt 1 ]
+      then
+        case $1 in
+          [1-9]*)
+            m=$n
+            n=$1; shift
+            ;;
+        esac
+      fi
+      ;;
+    *)echo "$cmd: invalid m..n: $mn" >&2
+      badopts=1
+      ;;
+  esac
+fi
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing URL-with-#" >&2
+  badopts=1
+else
+  urltplt=$1
+  shift
+  case "$urltplt" in
+    *\#*)
+        urlleft=$(  expr "x$urltplt" : 'x\([^#]*\)#.*' )
+        urlright=$( expr "x$urltplt" : 'x[^#]*#\(.*\)' )
+        ;;
+    *)  echo "$cmd: invalid URL-with-#, no #: $urltplt" >&2
+        badopts=1
+        ;;
+  esac
+fi
+
+if [ $# -gt 0 ]
+then
+  echo "$cmd: extra arguments: $*" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+for i in $( seq -w "$m" "$n" )
+do  printf '%s\n' "$urlleft$i$urlright"
+done \
+| \
+if [ $doit ]
+then  $trace wget -i - -nc $wgopts
+else  cat
+fi

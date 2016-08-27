@@ -8,7 +8,7 @@ from random import shuffle
 import sys
 import unittest
 from cs.logutils import D, X
-from cs.randutils import rand0, randblock
+from cs.randutils import randbool, randblock
 from cs.py3 import bytes
 from . import totext
 from .store import MappingStore
@@ -53,7 +53,7 @@ class TestAll(unittest.TestCase):
         ordinals = list(range(16))
         shuffle(ordinals)
         for n in ordinals:
-          dofile = True if rand0(1) == 0 else False
+          dofile = randbool()
           if dofile:
             name = 'file' + str(n)
             E = FileDirent(name)

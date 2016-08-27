@@ -9,16 +9,19 @@ import sys
 import os
 import os.path
 from collections import namedtuple
+from fnmatch import fnmatch
 from functools import partial
 import re
 import sqlite3
 from threading import RLock
 from PIL import Image
 Image.warnings.simplefilter('error', Image.DecompressionBombWarning)
+from cs.edit import edit_strings
 from cs.env import envsub
 from cs.lex import get_identifier
-from cs.logutils import Pfx, info, warning, error, setup_logging, X, XP
+from cs.logutils import Pfx, debug, info, warning, error, setup_logging, X, XP
 from cs.obj import O
+from cs.seq import the
 from cs.threads import locked, locked_property
 
 DEFAULT_LIBRARY = '$HOME/Pictures/iPhoto Library.photolibrary'
@@ -33,6 +36,8 @@ USAGE = '''Usage: %s [/path/to/iphoto-library-path] op [op-args...]
   ls keywords       List keywords.
   ls masters        List master pathnames.
   ls people         List person names.
+  rename {events|keywords|people} {/regexp|name}...
+                    Rename entities.
   select criteria... List masters with all specified criteria.
 
 Criteria:
@@ -41,6 +46,7 @@ Criteria:
                         Empty keyword means "has a keyword".
   [!]face:[person_name] Latest version has named person.
                         Empty person_name means "has a face".
+                        May also be writtens "who:...".
   Because "!" is often used for shell history expansion, a dash "-"
   is also accepted to invert the selector.
 '''
@@ -130,6 +136,84 @@ def main(argv=None):
               if not badopts:
                 for name in sorted(names):
                   print(name)
+        elif op == 'rename':
+          if not argv:
+            warning("missing 'events'")
+            badopts = True
+          else:
+            obclass = argv.pop(0)
+            if obclass == 'events':
+              table = I.folder_table
+              I.load_folders()
+              get_items = I.events
+            elif obclass == 'keywords':
+              table = I.keyword_table
+              I.load_keywords()
+              get_items = I.read_keywords
+            elif obclass == 'people':
+              table = I.person_table
+              I.load_persons()
+              get_items = I.persons
+            else:
+              warning("known class %r", obclass)
+              badopts = True
+            all_names = set(item.name for item in get_items())
+            if argv:
+              edit_lines = set()
+              for arg in argv:
+                # TODO: select by regexp if /blah
+                if arg.startswith('/'):
+                  regexp = re.compile(arg[1:-1] if arg.endswith('/') else arg[1:])
+                  edit_lines.update(item.edit_string
+                                    for item in get_items()
+                                    if regexp.search(item.name))
+                elif '*' in arg or '?' in arg:
+                  edit_lines.update(item.edit_string
+                                    for item in get_items()
+                                    if fnmatch(item.name, arg))
+                elif arg in all_names:
+                  for item in get_items():
+                    if item.name == arg:
+                      edit_lines.add(item.edit_string)
+                else:
+                  warning("unknown item name: %s", arg)
+                  badopts = True
+            else:
+              edit_lines = set(item.edit_string for item in get_items())
+            if not badopts:
+              changes = edit_strings(sorted(edit_lines,
+                                            key=lambda _: _.split(':', 1)[1]),
+                                     errors=lambda msg: warning(msg + ', discarded')
+                                    )
+              for old_string, new_string in changes:
+                with Pfx("%s => %s", old_string, new_string):
+                  old_modelId, old_name = old_string.split(':', 1)
+                  old_modelId = int(old_modelId)
+                  try:
+                    new_modelId, new_name = new_string.split(':', 1)
+                    new_modelId = int(new_modelId)
+                  except ValueError as e:
+                    error("invalid edited string: %s", e)
+                    xit = 1
+                  else:
+                    if old_modelId != new_modelId:
+                      error("modelId changed")
+                      xit = 1
+                    elif new_name in all_names:
+                      if obclass == 'keywords':
+                        # TODO: merge keywords
+                        print("%d: merge %s => %s" % (old_modelId, old_name, new_name))
+                        otherModelId = the(item.modelId
+                                           for item in get_items()
+                                           if item.name == new_name)
+                        I.replace_keywords(old_modelId, otherModelId)
+                        I.expunge_keyword(old_modelId)
+                      else:
+                        error("new name already in use: %r", new_name)
+                        xit = 1
+                    else:
+                      print("%d: %s => %s" % (old_modelId, old_name, new_name))
+                      table[old_modelId].name = new_name
         elif op == 'select':
           if not argv:
             warning("missing selectors")
@@ -312,7 +396,7 @@ class iPhoto(O):
     ''' Load Faces.RKVersionFaceContent into memory and set up mappings.
     '''
     by_id = self.vface_by_id = {}
-    by_master_id = self.vfaces_by_master_id = {}
+    by_master_id = self.vfaces_by_master_id
     for vface in self.read_vfaces():
       by_id[vface.modelId] = vface
       master_id = vface.masterId
@@ -321,6 +405,11 @@ class iPhoto(O):
       except KeyError:
         vfaces = by_master_id[master_id] = set()
       vfaces.add(vface)
+
+  @locked_property
+  def vfaces_by_master_id(self):
+    self.load_vfaces()
+    return I.vfaces_by_master_id.get(self.modelId, ())
 
   def _load_table_folders(self):
     ''' Load Library.RKFolder into memory and set up mappings.
@@ -349,6 +438,9 @@ class iPhoto(O):
              if folder.sortKeyPath == 'custom.default'
            ]
 
+  def event(self, event_id):
+    self.load_folders()
+    l
   def events(self):
     return [ folder for folder in self.folders()
              if folder.sortKeyPath == 'custom.kind'
@@ -356,6 +448,9 @@ class iPhoto(O):
 
   def event_names(self):
     return [ event.name for event in self.events() ]
+
+  def events_by_name(self, name):
+    return [ event for event in self.events() if event.name == name ]
 
   def _load_table_persons(self):
     ''' Load Faces.RKFaceName into memory and set up mappings.
@@ -523,6 +618,24 @@ class iPhoto(O):
     kwids = self.kw4v_keyword_ids_by_version_id.get(version_id, ())
     return [ self.keyword(kwid) for kwid in kwids ]
 
+  def replace_keywords(self, old_keyword_id, new_keyword_id):
+    ''' Update image tags to replace one keyword with another.
+    '''
+    self \
+      .table_by_nickname['keywordForVersion'] \
+      . update_by_column('keywordId', new_keyword_id,
+                         'keywordId', old_keyword_id)
+
+  def expunge_keyword(self, keyword_id):
+    ''' Remove the specified keyword.
+    '''
+    self \
+      .table_by_nickname['keywordForVersion'] \
+      .delete_by_column('keywordId', keyword_id)
+    self \
+      .table_by_nickname['keyword'] \
+      .delete_by_column('modelId', keyword_id)
+
   def parse_selector(self, selection):
     with Pfx(selection):
       selection0 = selection
@@ -554,12 +667,12 @@ class iPhoto(O):
               try:
                 kwname = self.match_one_keyword(kwname)
               except ValueError as e:
-                raise ValueError("invalid keyword: %s", e)
+                raise ValueError("invalid keyword: %s" % (e,))
               else:
                 if kwname != okwname:
                   info("%r ==> %r", okwname, kwname)
                 selector = SelectByKeyword_Name(self, kwname, invert)
-          elif sel_type == 'face':
+          elif sel_type == 'face' or sel_type == 'who':
             person_name = selection
             if not person_name:
               selector = SelectByFunction(self,
@@ -665,17 +778,25 @@ class iPhotoTable(object):
     table_name = schema['table_name']
     self.name = table_name
     self.qualname = '.'.join( (self.db.name, table_name) )
-    klass = namedtuple('%s_Row' % (table_name,), ['I'] + list(schema['columns']))
+    # TODO: additional mixin to support assignment to columns
+    _klass = namedtuple('%s_Row' % (table_name,), ['I'] + list(schema['columns']))
+    class klass(_klass):
+      iph_table=self
+      def __setattr__(self, attr, value):
+        return self.iph_table.update_by_column(attr, value, 'modelId', self.modelId)
     mixin = schema.get('mixin')
     lock = self.iphoto._lock
     if mixin is not None:
       class Mixed(klass, mixin):
         pass
       def klass(*a, **kw):
-        o = Mixed(*a, **kw)
-        o._lock = lock
-        return o
+        return Mixed(*a, **kw)
     self.row_class = klass
+
+  def _Row(self, row_values):
+    ''' Instantiate a row.
+    '''
+    return self.row_class(*([self.iphoto] + list(row_values)))
 
   @property
   def iphoto(self):
@@ -689,13 +810,49 @@ class iPhotoTable(object):
   def table_name(self):
     return self.schema['table_name']
 
+  def select_by_column(self, column=None, value=None):
+    sql = 'select * from %s' % (self.table_name,)
+    sqlargs = []
+    if column is not None:
+      sql += ' where %s=?' % (column,)
+      sqlargs.append(value)
+    debug("SQL: %s %r", sql, sqlargs)
+    return self.conn.cursor().execute(sql, sqlargs)
+
+  def update_by_column(self, upd_column, upd_value, sel_column, sel_value, sel_op='='):
+    sql = 'update %s set %s=? where %s %s ?' % (self.table_name, upd_column, sel_column, sel_op)
+    sqlargs = (upd_value, sel_value)
+    C = self.conn.cursor()
+    info("SQL: %s %r", sql, sqlargs)
+    C.execute(sql, sqlargs)
+    self.conn.commit()
+    C.close()
+
+  def delete_by_column(self, sel_column, sel_value, sel_op='='):
+    sql = 'delete from %s where %s %s ?' % (self.table_name, sel_column, sel_op)
+    sqlargs = (sel_value,)
+    C = self.conn.cursor()
+    info("SQL: %s %r", sql, sqlargs)
+    C.execute(sql, sqlargs)
+    self.conn.commit()
+    C.close()
+
+  def __getitem__(self, modelId):
+    return self._Row(the(self.select_by_column('modelId', modelId)))
+
   def read_rows(self):
     I = self.iphoto
     row_class = self.row_class
-    for row in self.conn.cursor().execute('select * from %s' % (self.table_name,)):
-      yield row_class(*([I] + list(row)))
+    for row in self.select_by_column():
+      yield self._Row(row)
 
-class Master_Mixin(object):
+class _Named_Mixin(object):
+
+  @property
+  def edit_string(self):
+    return "%d:%s" % (self.modelId, self.name)
+
+class Master_Mixin(_Named_Mixin):
 
   @property
   def pathname(self):
@@ -786,7 +943,7 @@ class Master_Mixin(object):
   def format(self):
     return self.image_info.format
 
-class Version_Mixin(object):
+class Version_Mixin(_Named_Mixin):
 
   @property
   def master(self):
@@ -806,7 +963,10 @@ class Version_Mixin(object):
   def keyword_names(self):
     return [ kw.name for kw in self.keywords ]
 
-class Keyword_Mixin(object):
+class Folder_Mixin(_Named_Mixin):
+  pass
+
+class Keyword_Mixin(_Named_Mixin):
 
   def versions(self):
     ''' Return the versions with this keyword.
@@ -829,13 +989,13 @@ class Keyword_Mixin(object):
     '''
     return set(master.latest_version for master in self.masters())
 
-class Person_Mixin(object):
+class Person_Mixin(_Named_Mixin):
 
   @locked_property
   def vfaces(self):
     return set()
 
-class VFace_Mixin(object):
+class VFace_Mixin(_Named_Mixin):
 
   @property
   def master(self):
@@ -1073,6 +1233,7 @@ SCHEMAE = {'Faces':
                 },
               'folder':
                 { 'table_name': 'RKFolder',
+                  'mixin': Folder_Mixin,
                   'columns':
                     ( 'modelId', 'uuid', 'folderType', 'name', 'parentFolderUuid',
                       'implicitAlbumUuid', 'posterVersionUuid',
