@@ -15,19 +15,19 @@ DISTINFO = {
 }
 
 def raise3(exc_type, exc_value, exc_traceback):
-  raise exc_type, exc_value, exc_traceback
+  exec("raise exc_type, exc_value, exc_traceback")
 
 def exec_code(code, *a):
   if not a:
-    exec code
+    exec(code)
   else:
     gs = a.pop(0)
     if not a:
-      exec code in gs
+      exec("exec code in gs")
     else:
       ls = a.pop(0)
       if not a:
-        exec code in gs, ls
+        exec("exec code in gs, ls")
       else:
         raise ValueError("exec_code: extra arguments after locals: %r" % (a,))
 
