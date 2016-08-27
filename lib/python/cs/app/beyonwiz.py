@@ -403,17 +403,16 @@ class TVWiz(O):
     if ext != '.tvwiz':
       warning("does not end with .tvwiz: %r", self.dirpath)
     title, daytext, timetext = basis.rsplit('_', 2)
+    try:
+      timetext, plustext = timetext.rsplit('+', 1)
+    except ValueError:
+      pass
+    else:
+      warning("discarding %r from timetext", "+" + plustext)
     title = title \
             .replace('_ ', ': ') \
             .replace('_s ', "'s ")
     to_parse = daytext + timetext
-    extra = to_parse[16:]
-    if extra:
-      warning("discarding extra text from title timestamp: %r", extra)
-      to_parse = to_parse[:16]
-    while not to_parse[-1].isdigit():
-      warning("discarding extra text from title timestamp: %r", to_parse[-1])
-      to_parse = to_parse[:-1]
     dt = datetime.datetime.strptime(to_parse, '%b.%d.%Y%H.%M')
     return title, dt
 
