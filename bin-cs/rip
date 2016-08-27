@@ -62,11 +62,8 @@ do
                 ;;
   esac
   if time $trace incd "$workdir" "$@"
-  then
-    mvto=$ripped/$f0
-  else
-    mvto=$unripped/$f0
-    xit=1
+  then  mvto=$ripped/$f0
+  else  mvto=$unripped/$f0; xit=1
   fi
   mvtodir=$( dirname "$mvto" )
   [ -d "$mvtodir" ] || $trace mkdir "$mvtodir"
