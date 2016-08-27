@@ -320,7 +320,7 @@ class PyPI_Package(O):
             'long_description: already provided, ignoring %s', readme_subpath)
       else:
         with open(readme_path) as readmefp:
-          distinfo['long_description'] = readmefp.read().decode('utf-8')
+          distinfo['long_description'] = readmefp.read()
       shutil.copy2(readme_path, os.path.join(pkg_dir, 'README.rst'))
       with open(manifest_path, "a") as mfp:
         mfp.write('include README.rst\n')
