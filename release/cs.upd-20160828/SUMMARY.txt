@@ -1,0 +1,4 @@
+Use "install_requires" instead of "requires" in DISTINFO.
+Add Upd.flush method.
+Upd.out: fix longstanding trailing text erasure bug.
+Upd.nl,out: accept optional positional parameters, use with %-formatting if supplied, just like logging.
