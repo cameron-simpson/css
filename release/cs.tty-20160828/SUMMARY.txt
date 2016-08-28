@@ -1,0 +1,1 @@
+Use "install_requires" instead of "requires" in DISTINFO, add PyPI category.

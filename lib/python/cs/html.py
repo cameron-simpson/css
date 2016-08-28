@@ -14,7 +14,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'requires': ['cs.logutils', 'cs.py3'],
+    'install_requires': ['cs.logutils', 'cs.py3'],
 }
 
 from io import StringIO

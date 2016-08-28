@@ -12,7 +12,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         ],
-    'requires': ['cs.excutils', 'cs.logutils', 'cs.obj', 'cs.py.stack'],
+    'install_requires': ['cs.excutils', 'cs.logutils', 'cs.obj', 'cs.py.stack'],
 }
 
 from contextlib import contextmanager

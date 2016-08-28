@@ -21,7 +21,7 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
         ],
-    'requires': ['cs.fileutils', 'cs.lex', 'cs.logutils', 'cs.timeutils'],
+    'install_requires': ['cs.fileutils', 'cs.lex', 'cs.logutils', 'cs.timeutils'],
 }
 
 # character classes: see RFC2616 part 2.2
