@@ -44,6 +44,7 @@ def main(argv):
   xit = 0
 
   LV = LastValues()
+  V = VCS_Hg()
 
   if not argv:
     for k in sorted(LV.keys()):
@@ -52,9 +53,14 @@ def main(argv):
   else:
     op = argv.pop(0)
     with Pfx(op):
-      N = ReleaseName(name, VCS_Hg())
       if op == 'last':
-        print(N.last_suffix())
+        if argv:
+          names = argv
+        else:
+          names = sorted(V.release_prefixes())
+        for name in names:
+          N = ReleaseName(name, V)
+          print(name, N.last_suffix())
       elif op == 'log':
         for files, firstline in N.log_since():
           print(' '.join(files)+':', firstline)
@@ -145,7 +151,7 @@ def pipefrom(*argv, **kw):
     pipecmd = ' '.join(argv)
     raise ValueError("%s: exit status %d" % (pipecmd, P.returncode,))
 
-#                               name        -  YYYYMMDD[.n]
+#                              name       - YYYYMMDD                            [.n]
 re_RELEASE_TAG = re.compile(r'([a-z][^-]*)-(2[0-9][0-9][0-9][01][0-9][0-3][0-9](\.[1-9]\d*)?)$')
 
 class VCS(object):
@@ -164,7 +170,7 @@ class VCS(object):
     tagpfxs = set()
     for tag in self.release_tags():
       tagpfx, _ = tag.split('-', 1)
-      tags.add(tagpfx)
+      tagpfxs.add(tagpfx)
     return tagpfxs
 
 class VCS_Hg(VCS):
