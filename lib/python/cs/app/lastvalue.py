@@ -81,7 +81,7 @@ class LastValues(MutableMapping):
       raise
     for k in listing:
       if len(k) > 0 and not k.startswith('.'):
-        yield name
+        yield k
 
   def __len__(self):
     ''' Return the number of lastvalue files.
@@ -98,7 +98,7 @@ class LastValues(MutableMapping):
     line = ""
     try:
       with open(lastvaluepath) as lvfp:
-        for line in fp:
+        for line in lvfp:
           pass
     except OSError:
       raise KeyError(k)
