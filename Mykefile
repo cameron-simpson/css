@@ -175,7 +175,8 @@ _release_force:
         cs-release add
 
 _pending:
-        cs-release log | grep '^[^:]'; :
+        cs-release log
+        cs-release status
         hg status | grep '^[^?]'; :
 
 _freshmeat:
