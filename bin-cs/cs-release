@@ -29,7 +29,7 @@ USAGE = '''Usage: %s [op [names...]]
     ls          List all release prefixes in use.
     next        Generate a new release number.
     pypi        Upload latest release to PyPI.
-    release     Issue a new release.
+    release     Issue a new release tag with change summary.
     testpypi    Upload latest release to test PyPI.'''
 
 ##  export      Export release to temporary directory, report directory.
@@ -80,6 +80,7 @@ def main(argv):
             N.submit_pypi()
           elif op == 'release':
             # issue new release tag
+            print("new release for %s ..." % (name,))
             outstanding = N.uncommitted()
             if outstanding:
               print("Uncommited changes exist for these files:")
@@ -92,38 +93,41 @@ def main(argv):
             changes = list(N.log_since())
             if not changes:
               error("no changes since last release, aborting")
-              return 1
-            print("Changes since the last release:")
-            for files, firstline in changes:
-              print(" ", ' '.join(files) + ': ' + firstline)
-            print()
-            with pipefrom('readdottext', keep_stdin=True) as dotfp:
-              release_message = dotfp.read().rstrip()
-            if not release_message:
-              error("empty release message, aborting")
-              return 1
-            next_tag = N.next_release_tag()
-            if not ask("Confirm new release for %r as %r" % (name, next_tag)):
-              error("aborting release at user request")
-              return 1
-            rel_dir = os.path.join('release', next_tag)
-            with Pfx("mkdir(%s)", rel_dir):
-              os.mkdir(rel_dir)
-            summary_filename = os.path.join(rel_dir, 'SUMMARY.txt')
-            with Pfx(summary_filename):
-              with open(summary_filename, 'w') as sfp:
-                print(release_message, file=sfp)
-            changes_filename = os.path.join(rel_dir, 'CHANGES.txt')
-            with Pfx(changes_filename):
-              with open(changes_filename, 'w') as cfp:
-                for files, firstline in changes:
-                  print(" ", ' '.join(files) + ': ' + firstline, file=cfp)
-            VCS = N.vcs
-            VCS.add_files(summary_filename, changes_filename)
-            VCS.commit('Release information for %s.\nSummary:\n%s'
-                       % (next_tag, release_message),
-                       summary_filename, changes_filename)
-            VCS.tag(next_tag)
+              xit = 1
+            else:
+              print("Changes since the last release:")
+              for files, firstline in changes:
+                print(" ", ' '.join(files) + ': ' + firstline)
+              print()
+              with pipefrom('readdottext', keep_stdin=True) as dotfp:
+                release_message = dotfp.read().rstrip()
+              if not release_message:
+                error("empty release message, aborting")
+                xit = 1
+              else:
+                next_tag = N.next_release_tag()
+                if not ask("Confirm new release for %r as %r" % (name, next_tag)):
+                  error("aborting release at user request")
+                  xit = 1
+                else:
+                  rel_dir = os.path.join('release', next_tag)
+                  with Pfx("mkdir(%s)", rel_dir):
+                    os.mkdir(rel_dir)
+                  summary_filename = os.path.join(rel_dir, 'SUMMARY.txt')
+                  with Pfx(summary_filename):
+                    with open(summary_filename, 'w') as sfp:
+                      print(release_message, file=sfp)
+                  changes_filename = os.path.join(rel_dir, 'CHANGES.txt')
+                  with Pfx(changes_filename):
+                    with open(changes_filename, 'w') as cfp:
+                      for files, firstline in changes:
+                        print(" ", ' '.join(files) + ': ' + firstline, file=cfp)
+                  VCS = N.vcs
+                  VCS.add_files(summary_filename, changes_filename)
+                  VCS.commit('Release information for %s.\nSummary:\n%s'
+                             % (next_tag, release_message),
+                             summary_filename, changes_filename)
+                  VCS.tag(next_tag)
           elif op in 'testpypi':
             N.submit_testpypi()
           else:
