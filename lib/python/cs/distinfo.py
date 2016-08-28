@@ -355,7 +355,7 @@ class PyPI_Package(O):
       with open(setup_path, "w") as setup:
         distinfo = self.distinfo
         out = partial(print, file=setup)
-        out("#!/usr/bin/python")
+        out("#!/usr/bin/env python")
         out("from distutils.core import setup")
         out("setup(")
         # mandatory fields, in preferred order
@@ -433,7 +433,7 @@ class PyPI_Package(O):
         for subpath in self.package_paths(superpackage_name, self.libdir):
           hgargv.extend(['-I', os.path.join(self.libdir, subpath)])
       else:
-        # just collecting requires __init__.py files
+        # just collecting required __init__.py files
         hgargv.extend(['-I', os.path.join(base, '__init__.py')])
       package_parts.pop()
       first = False
