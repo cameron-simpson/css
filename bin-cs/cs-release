@@ -59,7 +59,7 @@ def main(argv):
     for name in names:
       with Pfx(op):
         with Pfx(name):
-          N = ReleaseName(name, VCS)
+          N = ReleaseName(name, VCS, LV)
           if op == 'last':
             print(name, N.last_suffix())
           elif op == 'log':
@@ -74,12 +74,10 @@ def main(argv):
             for suffix in sorted(N.release_suffixes()):
               print(name, suffix)
           elif op == 'next':
-            print(N.next_suffix())
+            print(name, N.next_suffix())
           elif op in 'pypi':
             # upload latest release to testpypi
-            lastvalue_prefix = 'pypi'
-            pypi_url = URL_PYPI_PROD
-            N.submit_pypi(pypi_url, lastvalue_prefix)
+            N.submit_pypi()
           elif op == 'release':
             # issue new release tag
             outstanding = N.uncommitted()
@@ -127,10 +125,7 @@ def main(argv):
                        summary_filename, changes_filename)
             VCS.tag(next_tag)
           elif op in 'testpypi':
-            # upload latest release to testpypi
-            lastvalue_prefix = 'testpypi'
-            pypi_url = URL_PYPI_TEST
-            N.submit_pypi(pypi_url, lastvalue_prefix)
+            N.submit_testpypi()
           else:
             warning("unrecognised op")
             badopts = True
@@ -241,9 +236,10 @@ class ReleaseName(object):
   ''' State surrounding a particular release tag prefix.
   '''
 
-  def __init__(self, prefix, vcs):
+  def __init__(self, prefix, VCS, LV):
     self.prefix = prefix
-    self.vcs = vcs
+    self.vcs = VCS
+    self.lv = LV
 
   def tagname(self, suffix):
     tag = self.prefix + '-' + suffix
@@ -329,15 +325,26 @@ class ReleaseName(object):
         changed.append(path)
     return changed
 
-  def submit_pypi(self, pypi_url, lastvalue_prefix, suffix=None):
-    if suffix is None:
-      suffix = self.last_suffix()
-    PKG = PyPI_Package(pypi_url, self.prefix, suffix)
-    PKG.check()
-    PKG.register()
-    PKG.upload()
-    lastvalue_label = '-'.join( [lastvalue_prefix, 'css', self.prefix] )
-    lastvalue(lastvalue_label, suffix)
+  def submit_pypi(self):
+    return self._submit_pypi('pypi', URL_PYPI_PROD)
+
+  def submit_testpypi(self):
+    return self._submit_pypi('testpypi', URL_PYPI_TEST)
+
+  def _submit_pypi(self, pypi_flavour, pypi_url):
+    with Pfx(pypi_flavour):
+      last_suffix = self.last_suffix()
+      lastvalue_key = "%s-css-%s" % (pypi_flavour, self.prefix)
+      last_pypi_release = self.lv[lastvalue_key]
+      if last_suffix == last_pypi_release:
+        info("already released %r", last_suffix)
+      else:
+        with Pfx("%r->%r", last_pypi_release, last_suffix):
+          PKG = PyPI_Package(pypi_url, self.prefix, last_suffix)
+          PKG.check()
+          PKG.register()
+          PKG.upload()
+          self.lv[lastvalue_key] = last_suffix
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
