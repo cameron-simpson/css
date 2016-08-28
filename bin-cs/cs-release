@@ -30,6 +30,7 @@ USAGE = '''Usage: %s [op [names...]]
     next        Generate a new release number.
     pypi        Upload latest release to PyPI.
     release     Issue a new release tag with change summary.
+    status      Report latest release tag and differing releases at pypi and testpypi.
     testpypi    Upload latest release to test PyPI.'''
 
 ##  export      Export release to temporary directory, report directory.
@@ -75,7 +76,7 @@ def main(argv):
               print(name, suffix)
           elif op == 'next':
             print(name, N.next_suffix())
-          elif op in 'pypi':
+          elif op == 'pypi':
             # upload latest release to testpypi
             N.submit_pypi()
           elif op == 'release':
@@ -128,7 +129,15 @@ def main(argv):
                              % (next_tag, release_message),
                              summary_filename, changes_filename)
                   VCS.tag(next_tag)
-          elif op in 'testpypi':
+          elif op == 'status':
+            tagged = N.last_suffix()
+            result = [name, tagged]
+            for pypi_flavour in 'testpypi', 'pypi':
+              lvkey, last_upload = N.last_upload(pypi_flavour)
+              if last_upload != tagged:
+                result.append("%s:%s" % (pypi_flavour, last_upload))
+            print(*result)
+          elif op == 'testpypi':
             N.submit_testpypi()
           else:
             warning("unrecognised op")
@@ -335,11 +344,15 @@ class ReleaseName(object):
   def submit_testpypi(self):
     return self._submit_pypi('testpypi', URL_PYPI_TEST)
 
+  def last_upload(self, pypi_flavour):
+    lastvalue_key = "%s-css-%s" % (pypi_flavour, self.prefix)
+    last_pypi_release = self.lv.get(lastvalue_key, "")
+    return lastvalue_key, last_pypi_release
+
   def _submit_pypi(self, pypi_flavour, pypi_url):
     with Pfx(pypi_flavour):
       last_suffix = self.last_suffix()
-      lastvalue_key = "%s-css-%s" % (pypi_flavour, self.prefix)
-      last_pypi_release = self.lv[lastvalue_key]
+      lastvalue_key, last_pypi_release = self.last_upload(pypi_flavour)
       if last_suffix == last_pypi_release:
         info("already released %r", last_suffix)
       else:
