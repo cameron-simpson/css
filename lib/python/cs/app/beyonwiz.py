@@ -14,7 +14,7 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
         ],
-    'requires': ['cs.logutils', 'cs.obj', 'cs.threads', 'cs.urlutils'],
+    'install_requires': ['cs.logutils', 'cs.obj', 'cs.threads', 'cs.urlutils'],
     'entry_points': {
       'console_scripts': [
           'beyonwiz = cs.app.beyonwiz:main',
