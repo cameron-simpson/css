@@ -56,16 +56,13 @@ def main(argv):
       names = argv
     else:
       names = sorted(VCS.release_prefixes())
-    with Pfx(op):
-      if op == 'last':
-        for name in names:
-          with Pfx(name):
-            N = ReleaseName(name, VCS)
+    for name in names:
+      with Pfx(op):
+        with Pfx(name):
+          N = ReleaseName(name, VCS)
+          if op == 'last':
             print(name, N.last_suffix())
-      elif op == 'log':
-        for name in names:
-          with Pfx(name):
-            N = ReleaseName(name, VCS)
+          elif op == 'log':
             first = True
             for files, firstline in N.log_since():
               if first:
@@ -73,70 +70,71 @@ def main(argv):
                 first = False
               files = [ filename[11:] if filename.startswith('lib/python/') else filename for filename in files ]
               print(' ', ' '.join(files)+':', firstline)
-      elif op == 'ls':
-        for suffix in sorted(N.release_suffixes()):
-          print(suffix)
-      elif op == 'next':
-        print(N.next_suffix())
-      elif op in 'pypi':
-        # upload latest release to testpypi
-        lastvalue_prefix = 'pypi'
-        pypi_url = URL_PYPI_PROD
-        N.submit_pypi(pypi_url, lastvalue_prefix)
-      elif op == 'release':
-        # issue new release tag
-        outstanding = N.uncommitted()
-        if outstanding:
-          print("Uncommited changes exist for these files:")
-          for path in sorted(outstanding):
-            print(' ', path)
-          print("These changes will not be included in the release.")
-          if not ask("Proceed with release anyway"):
-            error("aborting release at user request")
-            return 1
-        changes = list(N.log_since())
-        if not changes:
-          error("no changes since last release, aborting")
-          return 1
-        print("Changes since the last release:")
-        for files, firstline in changes:
-          print(" ", ' '.join(files) + ': ' + firstline)
-        print()
-        with pipefrom('readdottext', keep_stdin=True) as dotfp:
-          release_message = dotfp.read().rstrip()
-        if not release_message:
-          error("empty release message, aborting")
-          return 1
-        next_tag = N.next_release_tag()
-        if not ask("Confirm new release for %r as %r" % (name, next_tag)):
-          error("aborting release at user request")
-          return 1
-        rel_dir = os.path.join('release', next_tag)
-        with Pfx("mkdir(%s)", rel_dir):
-          os.mkdir(rel_dir)
-        summary_filename = os.path.join(rel_dir, 'SUMMARY.txt')
-        with Pfx(summary_filename):
-          with open(summary_filename, 'w') as sfp:
-            print(release_message, file=sfp)
-        changes_filename = os.path.join(rel_dir, 'CHANGES.txt')
-        with Pfx(changes_filename):
-          with open(changes_filename, 'w') as cfp:
+          elif op == 'ls':
+            for suffix in sorted(N.release_suffixes()):
+              print(name, suffix)
+          elif op == 'next':
+            print(N.next_suffix())
+          elif op in 'pypi':
+            # upload latest release to testpypi
+            lastvalue_prefix = 'pypi'
+            pypi_url = URL_PYPI_PROD
+            N.submit_pypi(pypi_url, lastvalue_prefix)
+          elif op == 'release':
+            # issue new release tag
+            outstanding = N.uncommitted()
+            if outstanding:
+              print("Uncommited changes exist for these files:")
+              for path in sorted(outstanding):
+                print(' ', path)
+              print("These changes will not be included in the release.")
+              if not ask("Proceed with release anyway"):
+                error("aborting release at user request")
+                return 1
+            changes = list(N.log_since())
+            if not changes:
+              error("no changes since last release, aborting")
+              return 1
+            print("Changes since the last release:")
             for files, firstline in changes:
-              print(" ", ' '.join(files) + ': ' + firstline, file=cfp)
-        VCS = N.vcs
-        VCS.add_files(summary_filename, changes_filename)
-        VCS.commit('Release information for %s.\nSummary:\n%s'
-                   % (next_tag, release_message),
-                   summary_filename, changes_filename)
-        VCS.tag(next_tag)
-      elif op in 'testpypi':
-        # upload latest release to testpypi
-        lastvalue_prefix = 'testpypi'
-        pypi_url = URL_PYPI_TEST
-        N.submit_pypi(pypi_url, lastvalue_prefix)
-      else:
-        warning("unrecognised op")
-        badopts = True
+              print(" ", ' '.join(files) + ': ' + firstline)
+            print()
+            with pipefrom('readdottext', keep_stdin=True) as dotfp:
+              release_message = dotfp.read().rstrip()
+            if not release_message:
+              error("empty release message, aborting")
+              return 1
+            next_tag = N.next_release_tag()
+            if not ask("Confirm new release for %r as %r" % (name, next_tag)):
+              error("aborting release at user request")
+              return 1
+            rel_dir = os.path.join('release', next_tag)
+            with Pfx("mkdir(%s)", rel_dir):
+              os.mkdir(rel_dir)
+            summary_filename = os.path.join(rel_dir, 'SUMMARY.txt')
+            with Pfx(summary_filename):
+              with open(summary_filename, 'w') as sfp:
+                print(release_message, file=sfp)
+            changes_filename = os.path.join(rel_dir, 'CHANGES.txt')
+            with Pfx(changes_filename):
+              with open(changes_filename, 'w') as cfp:
+                for files, firstline in changes:
+                  print(" ", ' '.join(files) + ': ' + firstline, file=cfp)
+            VCS = N.vcs
+            VCS.add_files(summary_filename, changes_filename)
+            VCS.commit('Release information for %s.\nSummary:\n%s'
+                       % (next_tag, release_message),
+                       summary_filename, changes_filename)
+            VCS.tag(next_tag)
+          elif op in 'testpypi':
+            # upload latest release to testpypi
+            lastvalue_prefix = 'testpypi'
+            pypi_url = URL_PYPI_TEST
+            N.submit_pypi(pypi_url, lastvalue_prefix)
+          else:
+            warning("unrecognised op")
+            badopts = True
+
   if badopts:
     print(usage, file=sys.stderr)
     xit = 2
