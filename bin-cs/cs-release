@@ -49,7 +49,7 @@ def main(argv):
   if not argv:
     for k in sorted(LV.keys()):
       if k.startswith("pypi-css-cs."):
-        print(k[12:], LV[k])
+        print(k[9:], LV[k])
   else:
     op = argv.pop(0)
     if argv:
