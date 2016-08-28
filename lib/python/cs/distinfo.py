@@ -356,7 +356,8 @@ class PyPI_Package(O):
         distinfo = self.distinfo
         out = partial(print, file=setup)
         out("#!/usr/bin/env python")
-        out("from distutils.core import setup")
+        ##out("from distutils.core import setup")
+        out("from setuptools import setup")
         out("setup(")
         # mandatory fields, in preferred order
         written = set()
