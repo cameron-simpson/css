@@ -65,9 +65,12 @@ def main(argv):
       elif op == 'log':
         for name in names:
           with Pfx(name):
-            print(name)
             N = ReleaseName(name, VCS)
+            first = True
             for files, firstline in N.log_since():
+              if first:
+                print(name)
+                first = False
               files = [ filename[11:] if filename.startswith('lib/python/') else filename for filename in files ]
               print(' ', ' '.join(files)+':', firstline)
       elif op == 'ls':
