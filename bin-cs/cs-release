@@ -44,7 +44,7 @@ def main(argv):
   xit = 0
 
   LV = LastValues()
-  V = VCS_Hg()
+  VCS = VCS_Hg()
 
   if not argv:
     for k in sorted(LV.keys()):
@@ -52,18 +52,24 @@ def main(argv):
         print(k[12:], LV[k])
   else:
     op = argv.pop(0)
+    if argv:
+      names = argv
+    else:
+      names = sorted(VCS.release_prefixes())
     with Pfx(op):
       if op == 'last':
-        if argv:
-          names = argv
-        else:
-          names = sorted(V.release_prefixes())
         for name in names:
-          N = ReleaseName(name, V)
-          print(name, N.last_suffix())
+          with Pfx(name):
+            N = ReleaseName(name, VCS)
+            print(name, N.last_suffix())
       elif op == 'log':
-        for files, firstline in N.log_since():
-          print(' '.join(files)+':', firstline)
+        for name in names:
+          with Pfx(name):
+            print(name)
+            N = ReleaseName(name, VCS)
+            for files, firstline in N.log_since():
+              files = [ filename[11:] if filename.startswith('lib/python/') else filename for filename in files ]
+              print(' ', ' '.join(files)+':', firstline)
       elif op == 'ls':
         for suffix in sorted(N.release_suffixes()):
           print(suffix)
@@ -145,7 +151,7 @@ def ask(message):
 def pipefrom(*argv, **kw):
   ''' Context manager returning the standard output of a command.
   '''
-  P = cs.cmdutils.pipefrom(argv, trace=True, **kw)
+  P = cs.cmdutils.pipefrom(argv, trace=False, **kw)
   yield P.stdout
   if P.wait() != 0:
     pipecmd = ' '.join(argv)
@@ -309,8 +315,10 @@ class ReleaseName(object):
       start_tag = ""
     else:
       start_tag = self.tagname(suffix)
-    for logitem in self.vcs.log_since(start_tag, self.paths()):
-      yield logitem
+    paths = self.paths()
+    for files, firstline in self.vcs.log_since(start_tag, paths):
+      files = [ filename for filename in files if filename in paths ]
+      yield files, firstline
 
   def uncommitted(self):
     pathset = set(self.paths())
