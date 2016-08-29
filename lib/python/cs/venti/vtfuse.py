@@ -647,12 +647,13 @@ if FUSE_CLASS == 'llfuse':
     def _vt_runfuse(self, mnt):
       ''' Run the filesystem once.
       '''
-      X("llfuse.init(mnt=%r, %r)", mnt, self._vt_llf_opts)
-      llfuse.init(self, mnt, self._vt_llf_opts)
-      X("llfuse.main...")
-      llfuse.main()
-      X("llfuse.close...")
-      llfuse.close()
+      with self._vt_core.S:
+        X("llfuse.init(mnt=%r, %r)", mnt, self._vt_llf_opts)
+        llfuse.init(self, mnt, self._vt_llf_opts)
+        X("llfuse.main...")
+        llfuse.main()
+        X("llfuse.close...")
+        llfuse.close()
 
     def _vt_i2E(self, inode):
       try:
