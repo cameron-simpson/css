@@ -616,8 +616,9 @@ class Dir(_Dirent):
       raise KeyError("invalid name: %s" % (name,))
     if not isinstance(E, _Dirent):
       raise ValueError("E is not a _Dirent: <%s>%r" % (type(E), E))
-    self.change()
     self.entries[name] = E
+    self.touch()
+    self.change()
     E.name = name
     if E.isdir:
       Eparent = E.parent
@@ -632,8 +633,9 @@ class Dir(_Dirent):
       raise KeyError("invalid name: %s" % (name,))
     if name == '.' or name == '..':
       raise KeyError("refusing to delete . or ..: name=%s" % (name,))
-    self.change()
     del self.entries[name]
+    self.touch()
+    self.change()
 
   def add(self, E):
     ''' Add a Dirent to this Dir.
