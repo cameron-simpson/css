@@ -12,7 +12,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         ],
-    'requires': ['cs.logutils', 'cs.py.stack'],
+    'install_requires': ['cs.logutils', 'cs.py.stack'],
 }
 
 import heapq

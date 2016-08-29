@@ -1,0 +1,1 @@
+  lib/python/cs/app/beyonwiz.py: cs.app.beyonwiz: syntax fix after insertion of DISTINFO

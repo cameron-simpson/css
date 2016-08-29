@@ -320,7 +320,7 @@ class PyPI_Package(O):
             'long_description: already provided, ignoring %s', readme_subpath)
       else:
         with open(readme_path) as readmefp:
-          distinfo['long_description'] = readmefp.read().decode('utf-8')
+          distinfo['long_description'] = readmefp.read()
       shutil.copy2(readme_path, os.path.join(pkg_dir, 'README.rst'))
       with open(manifest_path, "a") as mfp:
         mfp.write('include README.rst\n')
@@ -355,8 +355,9 @@ class PyPI_Package(O):
       with open(setup_path, "w") as setup:
         distinfo = self.distinfo
         out = partial(print, file=setup)
-        out("#!/usr/bin/python")
-        out("from distutils.core import setup")
+        out("#!/usr/bin/env python")
+        ##out("from distutils.core import setup")
+        out("from setuptools import setup")
         out("setup(")
         # mandatory fields, in preferred order
         written = set()
@@ -433,7 +434,7 @@ class PyPI_Package(O):
         for subpath in self.package_paths(superpackage_name, self.libdir):
           hgargv.extend(['-I', os.path.join(self.libdir, subpath)])
       else:
-        # just collecting requires __init__.py files
+        # just collecting required __init__.py files
         hgargv.extend(['-I', os.path.join(base, '__init__.py')])
       package_parts.pop()
       first = False

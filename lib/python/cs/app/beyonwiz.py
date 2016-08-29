@@ -1,54 +1,117 @@
 #!/usr/bin/python
 #
 
-''' Classes to support access to Beyonwiz TVWiz data structures
-    and Beyonwiz devices via the net.
+from __future__ import print_function
+
+''' Classes to support access to Beyonwiz TVWiz on disc data structures
+    and to Beyonwiz devices via the net.
 '''
 
-from __future__ import print_function
+DISTINFO = {
+    'description': "Beyonwiz PVR and TVWiz recording utilities",
+    'keywords': ["python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 3",
+        ],
+    'install_requires': ['cs.logutils', 'cs.obj', 'cs.threads', 'cs.urlutils'],
+    'entry_points': {
+      'console_scripts': [
+          'beyonwiz = cs.app.beyonwiz:main',
+          ],
+    },
+}
+
 import sys
+import os
 import os.path
 from collections import namedtuple
 import datetime
 import json
 import struct
+from subprocess import Popen, PIPE
 from threading import Lock, RLock
+from types import SimpleNamespace as NS
 from xml.etree.ElementTree import XML
-from cs.logutils import Pfx, error, warning, info, setup_logging
+from cs.logutils import Pfx, error, warning, info, setup_logging, X
 from cs.obj import O
 from cs.threads import locked_property
 from cs.urlutils import URL
 
 USAGE = '''Usage:
     %s cat tvwizdirs...
+        Write the video content of the named tvwiz directories to
+        standard output as MPEG2 transport Stream, acceptable to
+        ffmpeg's "mpegts" format.
+    %s convert tvwizdir output.mp4
+        Convert the video content of the named tvwiz directory to
+        the named output file (typically MP4, though he ffmpeg
+        output format chosen is based on the extension). Most
+        metadata are preserved.
     %s header tvwizdirs...
+        Print header information from the named tvwiz directories.
+    %s mconvert tvwizdirs...
+        Convert the video content of the named tvwiz directories to
+        automatically named .mp4 files in the current directory.
+        Most metadata are preserved.
     %s scan tvwizdirs...
-    %s test'''
+        Scan the data structures of the named tvwiz directories.
+    %s stat tvwizdirs...
+        Print some summary infomation for the named tvwiz directories.
+    %s test
+        Run unit tests.'''
 
 # constants related to headers
+#
+# See:
+#  https://github.com/prl001/getWizPnP/blob/master/wizhdrs.h
 
-# header filenames
-TVHDR = 'header.tvwiz';
-RADHDR = 'header.radwiz';
+# various constants sucked directly from getWizPnP/Beyonwiz/Recording/Header.pm
+DAY = 24*60*60      # Seconds in a day
+TVEXT = '.tvwiz'
+TVHDR = 'header' + TVEXT
+RADEXT = '.radwiz'
+RADHDR = 'header' + RADEXT
 
-# header data offsets and sizes
+MAX_TS_POINT = 8640
+HDR_SIZE = 256 * 1024
+MAX_BOOKMARKS = 64
+
 HDR_MAIN_OFF = 0
-HDR_MAIN_SIZE = 1564
-HDR_MAX_OFFSETS = 8640
-HDR_OFFSETS_OFF = HDR_MAIN_SIZE
-HDR_OFFSETS_SIZE = 8 * (HDR_MAX_OFFSETS - 1)
+HDR_MAIN_SZ = 1564
+HDR_OFFSETS_OFF = 1564
+HDR_OFFSETS_SIZE = (MAX_TS_POINT-1) * 8
 HDR_BOOKMARKS_OFF = 79316
-HDR_BOOKMARKS_SZ = 20 + 64 * 8
+HDR_BOOKMARKS_SZ = 20 + MAX_BOOKMARKS * 8
 HDR_EPISODE_OFF = 79856
 HDR_EPISODE_SZ = 1 + 255
 HDR_EXTINFO_OFF = 80114
 HDR_EXTINFO_SZ = 2 + 1024
 
+HEADER_DATA_OFF = HDR_MAIN_OFF
+HEADER_DATA_SZ = HDR_EXTINFO_OFF + HDR_EXTINFO_SZ
+
+# TVWizFileHeader: 5 unsigned shorts, then 4 bytes: lock, mediaType, inRec, unused
+TVWizFileHeader = struct.Struct('<HHHHHBBBB')
+# TOffset: unsigned long long lastOff, then 8640 unsigned long long fileOff
+# TVWizTSPoint, offset 1024:
+#    svcName    eg TV channel name
+#    evtName    eg program title
+#    mjd        Modified Julian Date
+#                 http://tycho.usno.navy.mil/mjd.html
+#    pad
+#    start
+#    last       play time = last*10 + sec
+#    sec
+#    lastOff
+# followed by 8640 fileOff
+TVWizTSPoint = struct.Struct('<256s256sHHLHHQ')
+
 def main(argv):
   args = list(argv)
   cmd = os.path.basename(args.pop(0))
   setup_logging(cmd)
-  usage = USAGE % (cmd, cmd, cmd, cmd)
+  usage = USAGE % (cmd, cmd, cmd, cmd, cmd, cmd, cmd)
 
   badopts = False
 
@@ -62,7 +125,21 @@ def main(argv):
         if len(args) < 1:
           error("missing tvwizdirs")
           badopts = True
+      elif op == "convert":
+        if len(args) < 1:
+          error("missing tvwizdir")
+          badopts = True
+        if len(args) < 2:
+          error("missing output.mp4")
+          badopts = True
+        if len(args) > 2:
+          warning("extra arguments after output: %s", " ".join(args))
+          badopts = True
       elif op == "header":
+        if len(args) < 1:
+          error("missing tvwizdirs")
+          badopts = True
+      elif op == "mconvert":
         if len(args) < 1:
           error("missing tvwizdirs")
           badopts = True
@@ -71,6 +148,10 @@ def main(argv):
           error("missing .ts files or tvwizdirs")
           badopts = True
       elif op == "scan":
+        if len(args) < 1:
+          error("missing tvwizdirs")
+          badopts = True
+      elif op == "stat":
         if len(args) < 1:
           error("missing tvwizdirs")
           badopts = True
@@ -89,12 +170,52 @@ def main(argv):
   with Pfx(op):
     if op == "cat":
       for arg in args:
-        TVWiz(arg).copyto(sys.stdout)
+        # NB: dup stdout so that close doesn't close real stdout
+        stdout_bfd = os.dup(sys.stdout.fileno())
+        stdout_bfp = os.fdopen(stdout_bfd, "wb")
+        TVWiz(arg).copyto(stdout_bfp)
+        stdoutp.bfp.close()
+    elif op == "convert":
+      tvwizdir, outpath = args
+      TV = TVWiz(tvwizdir)
+      xit = TV.convert(outpath)
     elif op == "header":
-      for arg in args:
-        print(arg)
-        TV = TVWiz(arg)
-        print(repr(TV.header()))
+      for tvwizdir in args:
+        with Pfx(tvwizdir):
+          print(tvwizdir)
+          TV = TVWiz(tvwizdir)
+          print(repr(TV.header()))
+    elif op == "mconvert":
+      for tvwizdir in args:
+        with Pfx(tvwizdir):
+          ok = True
+          TV = TVWiz(tvwizdir)
+          H = TV.header()
+          outleft = "{iso}--{evtName}--".format_map(H.__dict__)
+          outright = "--{svcName}.mp4".format_map(H.__dict__)
+          outmiddle = H.episode[:255-len(outleft)-len(outright)]
+          outpath = ( outleft + outmiddle + outright ) \
+                    .replace('/', '|') \
+                    .replace(' ', '-') \
+                    .replace('----', '--')
+          if os.path.exists(outpath):
+            outpfx, outext = os.path.splitext(outpath)
+            ok = False
+            for i in range(32):
+              outpath2 = "%s--%d%s" % (outpfx, i+1, outext)
+              if not os.path.exists(outpath2):
+                outpath = outpath2
+                ok = True
+                break
+            if not ok:
+              error("file exists, and so do most -n flavours of it: %r", outpath)
+              xit = 1
+          if ok:
+            try:
+              ffxit = TV.convert(outpath)
+            except ValueError as e:
+              error("%s: %s", outpath, e)
+              xit = 1
     elif op == "meta":
       for filename in args:
         with Pfx(filename):
@@ -129,6 +250,12 @@ def main(argv):
         if chunkOff > 0:
           print("    final chunk of %d" % chunkSize)
         print("  total %d" % total)
+    elif op == "stat":
+      for arg in args:
+        TV = TVWiz(arg)
+        H = TV.header()
+        print(arg)
+        print("  %s %s: %s, %s" % (H.svcName, H.dt_start.isoformat(' '), H.evtName, H.episode))
     elif op == "test":
       host = args.pop(0)
       print("host =", host, "args =", args)
@@ -219,44 +346,119 @@ def parse_trunc(fp):
       raise ValueError("short buffer: %d bytes: %r" % (len(buf), buf))
     yield TruncRecord(*struct.unpack("<QHHQL", buf))
 
-def parse_header(data):
+def parse_header_data(data, offset=0):
   ''' Decode the data chunk from a TV or radio header chunk.
   '''
-  main = data[HDR_MAIN_OFF:HDR_MAIN_OFF+HDR_MAIN_SIZE]
-  main_unpacked = struct.unpack('6x 3s 1024s 256s 256s <H 2x <L <H <H 1548s <H <H <H <H', data)
-  print(main_unpacked)
+  h1, h2, h3, h4, h5, \
+  lock, mediaType, inRec, unused = TVWizFileHeader.unpack(data[offset:offset+TVWizFileHeader.size])
+  # skip ahead to TSPoint information
+  offset += 1024
+  svcName, evtName, \
+  mjd, pad, start, last, sec, lastOff = TVWizTSPoint.unpack(data[offset:offset+TVWizTSPoint.size])
+  unix_start = (mjd - 40587) * DAY + start
+  dt_start = datetime.datetime.fromtimestamp(unix_start)
+  svcName = bytes0_to_str(svcName)
+  evtName = bytes0_to_str(evtName)
+  # advance to file offsets
+  offset += TVWizTSPoint.size
+  fileOffs = []
+  for i in range(0, 8640):
+    fileOff, = struct.unpack('<Q', data[offset:offset+8])
+    fileOffs.append(fileOff)
+    offset += 8
+  epi_b, offset = unrle(data[HDR_EPISODE_OFF:HDR_EPISODE_OFF+HDR_EPISODE_SZ], '<B')
+  epi_b = epi_b.rstrip(b'\xff')
+  syn_b, offset = unrle(data[HDR_EXTINFO_OFF:HDR_EXTINFO_OFF+HDR_EXTINFO_SZ], '<H')
+  syn_b = syn_b.rstrip(b'\xff')
+  episode = epi_b.decode('utf8', errors='replace')
+  synopsis = syn_b.decode('utf8', errors='replace')
+  return NS(lock=lock, mediaType=mediaType, inRec=inRec,
+            svcName=svcName, evtName=evtName, episode=episode, synopsis=synopsis,
+            mjd=mjd, start=start, unix_start=unix_start, dt_start=dt_start,
+            iso=dt_start.isoformat(' '),
+            playtime=last*10+sec, lastOff=lastOff)
+
+def bytes0_to_str(bs0, encoding='utf8'):
+  nulpos = bs0.find(0)
+  if nulpos >= 0:
+    bs0 = bs0[:nulpos]
+  s = bs0.decode(encoding)
+  return s
+
+def unrle(data, fmt, offset=0):
+  offset0 = offset
+  S = struct.Struct(fmt)
+  offset2 = offset + S.size
+  length, = S.unpack(data[offset:offset2])
+  offset = offset2
+  offset2 += length
+  subdata = data[offset:offset2]
+  if length != len(subdata):
+    warning("unrle(%r...): rle=%d but len(subdata)=%d", data[offset0:offset0+16], length, len(subdata))
+  offset += len(subdata)
+  return subdata, offset
+
+def trailing_nul(bs):
+  # strip trailing NULs
+  bs = bs.rstrip(b'\x00')
+  # locate preceeding NUL padded area
+  start = bs.rfind(b'\x00')
+  if start < 0:
+    start = 0
+  else:
+    start += 1
+  return start, bs[start:]
 
 class TVWiz(O):
   def __init__(self, wizdir):
-    self.dir = wizdir
+    self.dirpath = wizdir
+    self.path_title, self.path_datetime = self._parse_path()
+
+  def _parse_path(self):
+    basis, ext = os.path.splitext(self.dirpath)
+    if ext != '.tvwiz':
+      warning("does not end with .tvwiz: %r", self.dirpath)
+    title, daytext, timetext = basis.rsplit('_', 2)
+    try:
+      timetext, plustext = timetext.rsplit('+', 1)
+    except ValueError:
+      pass
+    else:
+      warning("discarding %r from timetext", "+" + plustext)
+    title = title \
+            .replace('_ ', ': ') \
+            .replace('_s ', "'s ")
+    to_parse = daytext + timetext
+    dt = datetime.datetime.strptime(to_parse, '%b.%d.%Y%H.%M')
+    return title, dt
 
   @property
   def header_path(self):
-    return os.path.join(self.dir, TVHDR)
+    return os.path.join(self.dirpath, TVHDR)
 
   def header(self):
     with open(self.header_path, "rb") as hfp:
       data = hfp.read()
-    return parse_header(data)
+    return parse_header_data(data)
 
   def trunc_records(self):
     ''' Generator to yield TruncRecords for this TVWiz directory.
     '''
-    with open(os.path.join(self.dir, "trunc")) as tfp:
+    with open(os.path.join(self.dirpath, "trunc"), "rb") as tfp:
       for trec in parse_trunc(tfp):
         yield trec
 
   def data(self):
     ''' A generator that yields MPEG2 data from the stream.
     '''
-    with Pfx("data(%s)", self.dir):
+    with Pfx("data(%s)", self.dirpath):
       lastFileNum = None
       for rec in self.trunc_records():
         wizOffset, fileNum, flags, offset, size  = rec
         if lastFileNum is None or lastFileNum != fileNum:
           if lastFileNum is not None:
             fp.close()
-          fp = open(os.path.join(self.dir, "%04d" % (fileNum,)))
+          fp = open(os.path.join(self.dirpath, "%04d" % (fileNum,)), "rb")
           filePos = 0
           lastFileNum = fileNum
         if filePos != offset:
@@ -277,11 +479,49 @@ class TVWiz(O):
     ''' Transcribe the uncropped content to a file named by output.
     '''
     if type(output) is str:
-      with open(output, "w") as out:
-        self.copyto(out)
+      outpath = output
+      with open(outpath, "wb") as output:
+        self.copyto(output)
     else:
       for buf in self.data():
         output.write(buf)
+
+  def convert(self, outpath, format=None):
+    ''' Transcode video to `outpath` in FFMPEG `format`.
+    '''
+    if os.path.exists(outpath):
+      raise ValueError("outpath exists")
+    if format is None:
+      _, ext = os.path.splitext(outpath)
+      if not ext:
+        raise ValueError("can't infer format from outpath, no extension")
+      format = ext[1:]
+    # prevent output path looking like option or URL
+    if not os.path.isabs(outpath):
+      outpath = os.path.join('.', outpath)
+    H = self.header()
+    ffmpeg_argv = [ 'ffmpeg', '-f', 'mpegts', '-i', '-',
+                              '-f', format,
+                              '-metadata', 'title='
+                                           + ( H.evtName
+                                               if len(H.episode) == 0
+                                               else '%s: %s' % (H.evtName, H.episode)
+                                             ),
+                              '-metadata', 'show='+H.evtName,
+                              '-metadata', 'episode_id='+H.episode,
+                              '-metadata', 'synopsis='+H.synopsis,
+                              '-metadata', 'network='+H.svcName,
+                              '-metadata', 'comment=Transcoded from %r using ffmpeg. Recording date %s.' % (self.dirpath, H.iso),
+                              outpath]
+    info("running: %r", ffmpeg_argv)
+    P = Popen(ffmpeg_argv, stdin=PIPE)
+    self.copyto(P.stdin)
+    P.stdin.close()
+    xit = P.wait()
+    if xit != 0:
+      warning("ffmpeg failed, exit status %d", xit)
+    return xit
+
 
 class WizPnP(O):
   ''' Class to access a pre-T3 beyonwiz over HTTP.

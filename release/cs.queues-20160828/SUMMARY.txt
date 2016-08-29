@@ -1,0 +1,3 @@
+Use "install_requires" instead of "requires" in DISTINFO.
+TimerQueue.add: support optional *a and **kw arguments for func.
+Many bugfixes and internal changes.

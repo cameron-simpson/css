@@ -14,7 +14,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         ],
-    'requires': ['cs.logutils', 'cs.threads', 'cs.obj'],
+    'install_requires': ['cs.logutils', 'cs.threads', 'cs.obj'],
 }
 
 from threading import RLock
