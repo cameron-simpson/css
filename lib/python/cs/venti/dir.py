@@ -592,6 +592,9 @@ class Dir(_Dirent):
   def keys(self):
     return self.entries.keys()
 
+  def items(self):
+    return self.entries.items()
+
   def __contains__(self, name):
     if name == '.':
       return True
