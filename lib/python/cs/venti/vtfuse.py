@@ -162,18 +162,20 @@ class FileHandle(O):
 
   @trace_method
   def truncate(self, length):
-    self.E.touch()
     self.Eopen._open_file.truncate(length)
+    self.E.touch()
 
   @trace_method
   def flush(self):
-    self.E.touch()
     self.Eopen.flush()
+    ## no touch, already done by any writes
+    ## self.E.touch()
 
   @trace_method
   def close(self):
-    self.E.touch()
     self.Eopen.close()
+    ## no touch, already done by any writes
+    ## self.E.touch()
 
 class Inode(NS):
 
