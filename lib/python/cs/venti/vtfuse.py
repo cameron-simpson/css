@@ -252,7 +252,7 @@ class Inodes(object):
     if offset1 < len(idata):
       warning("unparsed idatatext at offset %d: %r", offset1, idata[offset1:])
     # record the hardlinked inodes in the inode map
-    for inum_name, inum_E in _hardlinked_dir:
+    for inum_name, inum_E in _hardlinked_dir.items():
       inum = int(inum_name)
       self[inum] = inum_E, None
     return _hardlinked, _hardlinked_dir
