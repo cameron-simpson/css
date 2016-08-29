@@ -108,6 +108,7 @@ class File(BackedFile):
       # As a side-effect of setting .backing_block we discard the
       # front file data, which are now saved to the Store.
       self.backing_block = top_block_for(self.high_level_blocks())
+      # TODO: truncate the front file?
     return self.backing_block
 
   @locked

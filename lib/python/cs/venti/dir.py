@@ -443,6 +443,9 @@ class FileDirent(_Dirent, MultiOpenMixin):
     self._open_file = None
     self._check()
 
+  def flush(self):
+    return self._open_file.flush()
+
   def truncate(self, length):
     ''' Truncate this FileDirent to the specified size.
     '''
