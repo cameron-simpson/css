@@ -40,6 +40,7 @@ class BlockFile(RawIOBase):
     elif whence == 2:
       offset += len(self)
     self._offset = offset
+    return offset
 
   def tell(self):
     ''' Return the current file offset.
