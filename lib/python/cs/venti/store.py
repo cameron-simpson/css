@@ -266,7 +266,7 @@ def Store(store_spec):
     # TODO: after tokyocabinet available, probe for index file name
     storepath = os.path.abspath(spec)
     if os.path.isdir(storepath):
-      return DataDirStore(os.path.abspath(spec))
+      return DataDirStore(spec, os.path.abspath(spec), hashclass=DEFAULT_HASHCLASS)
     raise ValueError("unsupported file store: %s" % (storepath,))
   if scheme == "exec":
     from .stream import StreamStore

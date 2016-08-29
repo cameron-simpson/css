@@ -158,11 +158,12 @@ def main(argv):
                   exception("can't open cache store \"%s\"", dflt_cache)
                   badopts = True
                 else:
-                  S = CacheStore(S, C)
+                  S = CacheStore("CacheStore(%s,%s)" % (S, C), S, C)
               if not badopts:
                 # put an in-memory cache in front of the main cache
                 if useMemoryCacheStore:
-                  S = CacheStore(S, MemoryCacheStore())
+                  S = CacheStore("CacheStore(%s,MemoryCacheStore)" % (S,),
+                                 S, MemoryCacheStore("MemoryCacheStore"))
                 with S:
                   try:
                     xit = op_func(args, verbose=verbose, log=log)
@@ -461,7 +462,7 @@ def cmd_mount(args, verbose=None, log=None):
     badopts = True
   if badopts:
     raise GetoptError("bad arguments")
-  from cs.venti.vtfuse import mount
+  from .vtfuse import mount
   if not os.path.isdir(mountpoint):
     error("%s: mountpoint is not a directory", mountpoint)
     return 1
@@ -481,7 +482,7 @@ def cmd_mount(args, verbose=None, log=None):
         return 1
     with Pfx("open('a')"):
       syncfp = open(special, 'a')
-  with ProgressStore(defaults.S) as PS:
+  with ProgressStore("ProgressStore(%s)" % (defaults.S,), defaults.S) as PS:
     mount(mountpoint, E, PS, syncfp=syncfp, subpath=subpath)
   return 0
 
