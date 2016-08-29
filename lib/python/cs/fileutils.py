@@ -839,6 +839,7 @@ class BackedFile(RawIOBase):
       self._offset = len(self) + pos
     else:
       raise ValueError("unsupported whence value %r" % (whence,))
+    return self._offset
 
   def spans(self):
     ''' Yield (in_front, span) for all spans from 0 to len(self).
