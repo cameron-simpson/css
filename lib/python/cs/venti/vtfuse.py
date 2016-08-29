@@ -727,7 +727,7 @@ if FUSE_CLASS == 'llfuse':
       fhndx = self._vt_core.open2(P, name, flags|O_CREAT, ctx)
       E = self._vt_core._fh(fhndx).E
       E.meta.chmod(mode)
-      P.change()
+      P[name] = E
       return fhndx, self._vt_EntryAttributes(E)
 
     @trace_method
