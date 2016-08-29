@@ -22,12 +22,12 @@ from .block import Block, IndirectBlock, dump_block
 from .cache import CacheStore, MemoryCacheStore
 from .debug import dump_Dirent
 from .datafile import DataFile, DataDir, \
-                      F_COMPRESSED, decompress, DataDirMapping_from_spec
+                      F_COMPRESSED, decompress, DataDir_from_spec
 from .dir import Dir
 from .hash import DEFAULT_HASHCLASS, HASHCLASS_BY_NAME
 from .paths import dirent_dir, dirent_file, dirent_resolve, resolve
 from .pushpull import pull_hashcodes, missing_hashcodes_by_checksum
-from .store import Store, ProgressStore
+from .store import Store, ProgressStore, DataDirStore
 
 def main(argv):
   cmd = os.path.basename(argv[0])
@@ -133,7 +133,7 @@ def main(argv):
         error("unknown operation \"%s\"", op)
         badopts = True
       else:
-        if op in ("scan", "datadir"):
+        if op in ("scan", "datadir", "init"):
           # run without a context store
           try:
             xit = op_func(args)
@@ -329,7 +329,7 @@ def cmd_datadir(args, verbose=None, log=None):
     raise GetoptError("missing datadir spec")
   datadir_spec = args.pop(0)
   with Pfx(datadir_spec):
-    D = DataDirMapping_from_spec(datadir_spec)
+    D = DataDir_from_spec(datadir_spec)
     if not args:
       raise GetoptError("missing subop")
     subop = args.pop(0)
@@ -344,7 +344,7 @@ def cmd_datadir(args, verbose=None, log=None):
         else:
           for other_spec in args:
             with Pfx(other_spec):
-              Dother = DataDirMapping_from_spec(other_spec)
+              Dother = DataDir_from_spec(other_spec)
               pull_hashcodes(D, Dother, missing_hashcodes_by_checksum(D, Dother))
       elif subop == 'push':
         if not args:
@@ -354,7 +354,7 @@ def cmd_datadir(args, verbose=None, log=None):
           if args:
             raise GetoptError("extra arguments after other_spec: %s" % (' '.join(args),))
           with Pfx(other_spec):
-            Dother = DataDirMapping_from_spec(other_spec)
+            Dother = DataDir_from_spec(other_spec)
             pull_hashcodes(Dother, D, missing_hashcodes_by_checksum(Dother, D))
       else:
         raise GetoptError('unrecognised subop')
@@ -370,18 +370,24 @@ def cmd_dump(args, verbose=None, log=None):
   return 0
 
 def cmd_init(args, verbose=None, log=None):
-  ''' Initialise a directory for use as a store, using the GDBM backend.
+  ''' Initialise a directory for use as a store.
+      Usage: init dirpath [datadir]
   '''
   if not args:
     raise GetoptError("missing dirpath")
-  dirpath = args.pop(0)
+  statedirpath = args.pop(0)
   if args:
-    raise GetoptError("extra arguments after dirpath: %s" % (' '.join(args),))
-  with Pfx(dirpath):
-    if not os.path.isdir(dirpath):
-      raise GetoptError("not a directory")
-    with Store("file:"+dirpath):
-      pass
+    datadirpath = args.pop(0)
+  else:
+    datadirpath = statedirpath
+  if args:
+    raise GetoptError("extra arguments after datadir: %s" % (' '.join(args),))
+  for dirpath in statedirpath, datadirpath:
+    with Pfx(dirpath):
+      if not os.path.isdir(dirpath):
+        raise GetoptError("not a directory")
+    with DataDirStore(statedirpath, statedirpath, datadirpath, DEFAULT_HASHCLASS) as S:
+      os.system("ls -la %s" % (statedirpath,))
   return 0
 
 def cmd_listen(args, verbose=None, log=None):
