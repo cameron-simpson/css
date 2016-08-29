@@ -197,9 +197,12 @@ class Inode(NS):
       raise ValueError("Inode.__isub__(%d, delta=%s): expected delta >= 1"
                        % (self.inum, delta))
     if self.krefcount < delta:
-      raise ValueError("Inode.__isub__(%d, delta=%s): krefcount(%d) < delta"
+      error("Inode%d.__isub__(delta=%s): krefcount(%d) < delta"
                        % (self.inum, delta, self.krefcount))
-    self.krefcount -= delta
+      self.krefcount = 0
+      ##raise ValueError("Inode.__isub__(%d, delta=%s): krefcount(%d) < delta" % (self.inum, delta, self.krefcount))
+    else:
+      self.krefcount -= delta
 
 class Inodes(object):
   ''' Inode information for a filesystem.
