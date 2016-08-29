@@ -21,7 +21,7 @@ class Test_VTFuse(unittest.TestCase):
 
   def setUp(self):
     self.store_dict = {}
-    self.S = MappingStore(self.store_dict, name='tesing MappingStore')
+    self.S = MappingStore('Test_VTFuse', self.store_dict)
     defaults.pushStore(self.S)
     if os.path.exists(TESTDIR):
       X("rmdir %s", TESTDIR)
