@@ -909,6 +909,7 @@ if FUSE_CLASS == 'llfuse':
 
     @trace_method
     def readdir(self, fhndx, off):
+      # TODO: if rootdir, generate '..' for parent of mount
       X("readdir(fhndx=%d, off=%d)", fhndx, off)
       OD = self._vt_core._fh(fhndx)
       def entries():
@@ -1001,8 +1002,25 @@ if FUSE_CLASS == 'llfuse':
 
     @trace_method
     def setattr(self, inode, attr, fields, fhndx, ctx):
-      # TODO !!
-      raise FuseOSError(errno.ENOSYS)
+      # TODO: test CTX for permission to chmod/chown/whatever
+      # TODO: sanity check fields for other update_* flags?
+      M = self._vt_core._fh(fhndx).E.meta
+      with Pfx(E):
+        if fields.update_atime:
+          info("ignoring update_atime st_atime_ns=%s", attr.st_atime_ns)
+        if fields.update_mtime:
+          M.mtime = attr.st_mtime_ns / 1000000000.0
+        if fields.update_mode:
+          M.chmod(attr.st_mode&0o7777)
+          extra_mode = attr.st_mode & ~0o7777
+          warning("update_mode: ignoring extra mode bits: 0o%o", extra_mode)
+        if fields.attr_uid:
+          M.uid = attr.st_uid
+        if fields.attr_gid:
+          M.gid = attr.st_gid
+        if fields.update_size:
+          # TODO: what calls this? do we sanity check file sizes etc?
+          warning("UNIMPLEMENTED: update_size st_size=%s", attr.st_size)
 
     @trace_method
     def setxattr(self, inode, xattr_name, value, ctx):
