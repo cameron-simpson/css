@@ -575,9 +575,8 @@ class _StoreFS_core(object):
     try:
       fh = self._file_handles[fhndx]
     except IndexError:
-      fh = None
-    if fh is None:
       error("cannot look up FileHandle index %r", fhndx)
+      raise
     return fh
 
   def _fh_remove(self, fhndx):
