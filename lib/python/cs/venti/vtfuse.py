@@ -115,8 +115,9 @@ def with_S(method):
   ''' FUSE request methods may run in any worker thread; push _vt_core.S around each call.
   '''
   def inner(self, *a, **kw):
-    with self._vt_core.S:
-      return method(self, *a, **kw)
+    with Pfx(method.__name__):
+      with self._vt_core.S:
+        return method(self, *a, **kw)
   return inner
 
 def log_traces_queued(Q):
