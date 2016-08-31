@@ -117,7 +117,7 @@ class File(BackedFile):
     ''' Truncate the File to the specified `length`.
     '''
     if length < 0:
-      raise FuseOSError(errno.EINVAL)
+      raise ValueError("length must be >= 0, received %s" % (length,))
     cur_len = len(self)
     front_range = self.front_range
     backing_block0 = self.backing_block
