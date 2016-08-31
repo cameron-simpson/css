@@ -782,8 +782,8 @@ class Pathname(str):
   def shorten(self, environ=None, prefixes=None):
     return shortpath(self, environ=environ, prefixes=prefixes)
 
-class BackedFile(RawIOBase):
-  ''' A RawIOBase implementation that uses a backing file for initial data and writes new data to a front file.
+class BackedFile(object):
+  ''' A RawIOBase duck type that uses a backing file for initial data and writes new data to a front file.
   '''
 
   def __init__(self, back_file):
@@ -813,7 +813,6 @@ class BackedFile(RawIOBase):
     self.flush()
     self.front_file.close()
     self.front_file = None
-    RawIOBase.close(self)
 
   def tell(self):
     return self._offset
@@ -821,7 +820,6 @@ class BackedFile(RawIOBase):
   @locked
   def flush(self):
     self.front_file.flush()
-    RawIOBase.flush(self)
 
   @locked
   def __len__(self):
