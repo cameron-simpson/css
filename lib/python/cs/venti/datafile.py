@@ -14,6 +14,7 @@ import errno
 import csv
 from subprocess import Popen, PIPE
 from threading import Lock, RLock, Thread
+from time import sleep
 from types import SimpleNamespace
 from uuid import uuid4
 from zlib import compress, decompress
@@ -35,6 +36,9 @@ F_COMPRESSED = 0x01
 
 # 100MiB rollover
 DEFAULT_ROLLOVER = 100 * 1024 * 1024
+
+DATAFILE_EXT = 'vtd'
+DATAFILE_DOT_EXT = '.' + DATAFILE_EXT
 
 class DataFlags(int):
   ''' Subclass of int to label stuff nicely.
@@ -198,8 +202,24 @@ class DataFile(MultiOpenMixin):
       return write_chunk(fp, data, no_compress=no_compress)
 
 class _DataDirFile(SimpleNamespace):
+
   def __hash__(self):
     return id(self)
+
+  @property
+  def pathname(self):
+    return self.datadir.datapathto(self.filename)
+
+  def scan_from(self, offset):
+    ''' Scan this datafile from the supplied `offset` yielding (data, offset, post_offset).
+        This is used by the monitor thread to add new third party data to the index.
+    '''
+    with open(self.pathname, "rb") as fp:
+      fp.seek(offset)
+      while True:
+        flags, data, post_offset = read_chunk(fp, do_decompress=True)
+        yield data, offset, post_offset
+        offset = post_offset
 
 class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
   ''' Maintenance of a collection of DataFiles in a directory.
@@ -241,6 +261,7 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     self.rollover = rollover
     self._filemap = {}
     self._extra_state = {}
+    self._n = None
     self._load_state()
     MultiOpenMixin.__init__(self)
 
@@ -265,37 +286,94 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
   __str__ = spec
 
   def startup(self):
-    # mapping of file numerals to DataFile pathnames
-    self._n = None
     # cache of open DataFiles
     self._cache = LRU_Cache(maxsize=4,
                             on_remove=lambda k, datafile: datafile.close())
+    # obtain lock
     self.lockpath = makelockfile(self.statefilepath)
+    # open dbm index
     self.index = self.indexclass(self.indexpath, self.hashclass)
     self.index.open()
     # set up indexing thread
     # map individual hashcodes to locations before being persistently stored
+    # This lets us add data, stash the location in _unindexed and
+    # drop the location onto the _indexQ for persistent storage in
+    # the index asynchronously.
     self._unindexed = {}
     self._indexQ = IterableQueue()
     T = self._index_Thread = Thread(name="%s-index-thread" % (self,),
                                     target=self._index_updater)
     T.start()
-    for filenum, F in self._filemap.items():
-      self._update_datafile(F)
+    self._monitor_halt = False
+    T = self._monitor_Thread = Thread(name="%s-datafile-monitor" % (self,),
+                                      target=self._monitor_datafiles)
+    T.start()
 
   def shutdown(self):
-    self.flush()
-    del self._cache
-    del self._filemap
+    # shut down the monitor Thread
+    self._monitor_halt = True
+    self._monitor_Thread.join()
     # drain index update queue
     self._indexQ.close()
     self._index_Thread.join()
     if self._unindexed:
       error("UNINDEXED BLOCKS: %r", self._unindexed)
+    # update state to substrate
+    self.flush()
+    del self._cache
+    del self._filemap
     self.index.close()
     # release lockfile
     os.remove(self.lockpath)
     del self.lockpath
+
+  def _monitor_datafiles(self):
+    ''' Thread body to poll all the datafiles regularly for new data arrival.
+    '''
+    X("ENTER MONITOR")
+    filemap = self.filemap
+    indexQ = self._indexQ
+    while not self._monitor_halt:
+      # scan for new datafiles
+      for filename in os.listdir(self.datadirpath):
+        if ( not filename.startswith('.')
+         and filename.endswith(DATAFILE_DOT_EXT)
+         and filename not in filemap):
+          self._add_datafile(filename)
+      # now scan datafiles for new data
+      for filenum in filemap.keys():
+        if self._monitor_halt:
+          break
+        if not isinstance(filenum, int):
+          continue
+        # don't monitor the current datafile: our own actions will update it
+        n = self._n
+        if n is not None and filenum == n:
+          continue
+        try:
+          F = filemap[filenum]
+        except KeyError:
+          warning("missing entry %d in filemap", filenum)
+          continue
+        try:
+          new_size = F.stat_size()
+        except OSError as e:
+          warning("%s: could not get file size: %s", F.pathname, e)
+          continue
+        if new_size > F.size:
+          try:
+            scan_data = F.scan_from(F.size)
+          except OSError as e:
+            warning("%s: could not scan: %s", F.pathname, e)
+            continue
+          for data, offset, post_offset in scan_data:
+            hashcode = self.hashclass.from_data(data)
+            indexQ.put( (hashcode, filenum, offset) )
+            F.size = upto
+            if self._monitor_halt:
+              break
+      sleep(1)
+    X("EXIT MONITOR")
 
   def localpathto(self, rpath):
     return joinpath(self.statedirpath, rpath)
@@ -319,7 +397,7 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     self._indexQ.put( (hashcode, n, offset) )
 
   def _index_updater(self):
-    ''' Thread body to collect hashcode index data and store it.
+    ''' Thread body to collect hashcode index data from .indexQ and store it.
     '''
     with Pfx("_index_updater"):
       index = self.index
@@ -363,13 +441,7 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
                 else:
                   _, filename, size = row
                   size = int(size)
-                  F = _DataDirFile(filenum=filenum, filename=filename, size=size)
-                  if filenum in filemap:
-                    raise KeyError('already in filemap: %r' % (filenum,))
-                  if filename in filemap:
-                    raise KeyError('already in filemap: %r' % (filename,))
-                  filemap[filenum] = F
-                  filemap[filename] = F
+                  self._add_datafile(filename, filenum=filenum, size=size)
     # presume data in state dir if not specified
     if self.datadirpath is None:
       self.datadirpath = self.statedirpath
@@ -392,35 +464,30 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
           csvw.writerow( (F.filenum, F.filename, F.size) )
     ##os.system('sed "s/^/OUT /" %r' % (statefilepath,))
 
-  def _add_datafile(self, filename):
-    ''' Add the datafile with basename `filename` to the filemap.
+  def _add_datafile(self, filename, filenum=None, size=0):
+    ''' Add the datafile with basename `filename` to the filemap, return the _DataDirFile.
+        `filenum`: optional index number.
+        `size`: optional size, default 0.
     '''
     filemap = self._filemap
     if filename in filemap:
       raise KeyError('already in filemap: %r' % (filename,))
-    filenum = max([0] + list(filemap.keys())) + 1
-    F = _DataDirFile(filenum=filenum, filename=filename, size=0)
+    if filenum is None:
+      filenum = max([0] + list(k for k in filemap.keys() if isinstance(k, int))) + 1
+    elif filenum in filemap:
+      raise KeyError('already in filemap: %r' % (filennum,))
+    F = _DataDirFile(datadir=self, filenum=filenum, filename=filename, size=size)
     filemap[filenum] = F
+    filemap[filename] = F
     return F
 
   def _new_datafile(self):
     ''' Create a new datafile and return its record.
     '''
-    filename = str(uuid4()) + '.vtd'
+    filename = str(uuid4()) + DATAFILE_DOT_EXT
     DataFile(self.datapathto(filename), readwrite=True, do_create=True)
     F = self._add_datafile(filename)
     return F
-
-  def _update_datafile(self, F):
-    ''' Update the datafile record `F`.
-    '''
-    datafilepath = self.datapathto(F.filename)
-    S = os.stat(datafilepath)
-    if S.st_size < F.size:
-      warning("%s: shorter than expected (%d < %d)",
-              datafilepath, S.st_size, F.size)
-    elif S.st_size > F.size:
-      F.size = self._scan_datafile_from(self[F.filenum], F.size)
 
   def _current_output_datafile(self):
     ''' Return the number and DataFile of the current datafile,
@@ -448,9 +515,9 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
 
   @locked
   def flush(self):
-    self._save_state()
     self._cache.flush()
     self.index.flush()
+    self._save_state()
 
   def add(self, data):
     ''' Add the supplied data chunk to the current DataFile, return the hashcode.
@@ -486,46 +553,6 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     ''' Return the data chunk stored in DataFile `n` at `offset`.
     '''
     return self._open_datafile(n).fetch(offset)
-
-  def _scan_datafile_from(self, F, start):
-    pathname = self.datapathto(F.filename)
-    with Pfx("_scan_datafile_from(%r)", pathname):
-      S = os.stat(pathname)
-      if S.st_size > start:
-        hashclass = self.hashclass
-        with DataDir(self.datapathto(F.filename)) as D:
-          offset2 = start
-          for offset, flags, data, offset2 in D.scan(offset=start, do_decompress=True):
-            hashcode = self.hashclass.from_bytes(data)
-            self._queue_index(hashcode, n, offset)
-          if offset2 > F.size:
-            F.size = offset2
-
-  def updates(self, from_start=False, save_update=False):
-    ''' Scan all the datafiles and yield new data as:
-          filenum, filename, flags, data, offset, offset2
-        being the file index, the filename, flags and data of the
-        chunk, offset of the start of the chunk, offset2 the offset
-        after the chunk.
-    '''
-    raise RuntimeError("REALLY? UPDATES?")
-    for filenum, filename, size in self.datafiles:
-      with Pfx("updates[%d:%r]", filenum, filename):
-        S = os.stat(filename)
-        endsize = S.st_size
-        if from_start:
-          size = 0
-        if endsize < size:
-          warning("st_size(%d) < size", endsize, size)
-        else:
-          offset = size
-          with open(filename, "rb") as fp:
-            while size < endsize:
-              flags, data, offset2 = read_chunk(fp, offset, do_decompress=True)
-              yield filenum, filename, flags, data, offset, offset2
-              offset = offset2
-          if save_update:
-            self.datafiles.update_size(filenum, offset)
 
   def __len__(self):
     return len(self.index)
