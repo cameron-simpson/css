@@ -409,7 +409,8 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
                                self.indexclass.SUFFIX))
 
   def _queue_index(self, hashcode, n, offset):
-    self._unindexed[hashcode] = n, offset
+    with self._lock:
+      self._unindexed[hashcode] = n, offset
     self._indexQ.put( (hashcode, n, offset) )
 
   def _index_updater(self):
@@ -420,7 +421,13 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
       unindexed = self._unindexed
       for hashcode, n, offset in self._indexQ:
         index[hashcode] = n, offset
-        del unindexed[hashcode]
+        with self._lock:
+          try:
+            del unindexed[hashcode]
+          except KeyError:
+            # this can happens when the same key is indexed twice
+            # entirely plausible if a new datafile is added to the datadir
+            pass
 
   def _load_state(self):
     ''' Read STATE_FILENAME.
