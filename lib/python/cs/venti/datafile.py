@@ -506,6 +506,7 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     F = self._add_datafile(filename)
     return F
 
+  @locked
   def _current_output_datafile(self):
     ''' Return the number and DataFile of the current datafile,
         opening one if necessary.
