@@ -469,7 +469,8 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
         for k in sorted(extras.keys()):
           csvw.writerow( (k, extras[k]) )
         filemap = self._filemap
-        for F in set(filemap.values()):
+        for n in sorted(n for n in filemap.keys() if isinstance(n, int)):
+          F = filemap[n]
           csvw.writerow( (F.filenum, F.filename, F.size) )
     ##os.system('sed "s/^/OUT /" %r' % (statefilepath,))
 
