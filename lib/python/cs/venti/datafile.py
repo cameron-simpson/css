@@ -331,7 +331,7 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     ''' Thread body to poll all the datafiles regularly for new data arrival.
     '''
     X("ENTER MONITOR")
-    filemap = self.filemap
+    filemap = self._filemap
     indexQ = self._indexQ
     while not self._monitor_halt:
       # scan for new datafiles
