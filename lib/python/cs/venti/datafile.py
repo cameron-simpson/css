@@ -209,6 +209,11 @@ class _DataDirFile(SimpleNamespace):
   def pathname(self):
     return self.datadir.datapathto(self.filename)
 
+  def stat_size(self):
+    ''' Stat the datafile, return its size.
+    '''
+    return os.stat(self.pathname).st_size
+
   def scan_from(self, offset):
     ''' Scan this datafile from the supplied `offset` yielding (data, offset, post_offset).
         This is used by the monitor thread to add new third party data to the index.
