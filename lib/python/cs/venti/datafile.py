@@ -202,9 +202,8 @@ class DataFile(MultiOpenMixin):
       return write_chunk(fp, data, no_compress=no_compress)
 
 class _DataDirFile(SimpleNamespace):
-
-  def __hash__(self):
-    return id(self)
+  ''' General state information about a DataFile in use by a DataDir.
+  '''
 
   @property
   def pathname(self):
