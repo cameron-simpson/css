@@ -375,13 +375,16 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
             warning("%s: could not scan: %s", F.pathname, e)
             continue
           advanced = False
-          for data, offset, post_offset in scan_data:
-            hashcode = self.hashclass.from_data(data)
-            indexQ.put( (hashcode, filenum, offset) )
-            F.size = upto
-            advanced = True
-            if self._monitor_halt:
-              break
+          try:
+            for data, offset, post_offset in scan_data:
+              hashcode = self.hashclass.from_data(data)
+              indexQ.put( (hashcode, filenum, offset) )
+              F.size = post_offset
+              advanced = True
+              if self._monitor_halt:
+                break
+          except EOFError as e:
+            warning("%s: EOF interrupts scan: %s", F.pathname, e)
           # update state after completion of a scan
           if advanced:
             self._save_state()
