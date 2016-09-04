@@ -334,11 +334,15 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     indexQ = self._indexQ
     while not self._monitor_halt:
       # scan for new datafiles
+      added = False
       for filename in os.listdir(self.datadirpath):
         if ( not filename.startswith('.')
          and filename.endswith(DATAFILE_DOT_EXT)
          and filename not in filemap):
-          self._add_datafile(filename)
+          self._add_datafile(filename, no_save=True)
+          added = True
+      if added:
+        self._save_state()
       # now scan datafiles for new data
       for filenum in filemap.keys():
         if self._monitor_halt:
@@ -365,12 +369,17 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
           except OSError as e:
             warning("%s: could not scan: %s", F.pathname, e)
             continue
+          advanced = False
           for data, offset, post_offset in scan_data:
             hashcode = self.hashclass.from_data(data)
             indexQ.put( (hashcode, filenum, offset) )
             F.size = upto
+            advanced = True
             if self._monitor_halt:
               break
+          # update state after completion of a scan
+          if advanced:
+            self._save_state()
       sleep(1)
     X("EXIT MONITOR")
 
