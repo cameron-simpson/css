@@ -485,7 +485,12 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     ''' Create a new datafile and return its record.
     '''
     filename = str(uuid4()) + DATAFILE_DOT_EXT
-    DataFile(self.datapathto(filename), readwrite=True, do_create=True)
+    pathname = self.datapathto(filename)
+    if os.path.exists(pathname):
+      raise RuntimeError("path already exists: %r", pathname)
+    # create the file
+    with open(pathname, "ab"):
+      pass
     F = self._add_datafile(filename)
     return F
 
