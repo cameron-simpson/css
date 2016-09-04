@@ -440,7 +440,7 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
                 else:
                   _, filename, size = row
                   size = int(size)
-                  self._add_datafile(filename, filenum=filenum, size=size)
+                  self._add_datafile(filename, filenum=filenum, size=size, no_save=True)
     # presume data in state dir if not specified
     if self.datadirpath is None:
       self.datadirpath = self.statedirpath
@@ -463,7 +463,7 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
           csvw.writerow( (F.filenum, F.filename, F.size) )
     ##os.system('sed "s/^/OUT /" %r' % (statefilepath,))
 
-  def _add_datafile(self, filename, filenum=None, size=0):
+  def _add_datafile(self, filename, filenum=None, size=0, no_save=False):
     ''' Add the datafile with basename `filename` to the filemap, return the _DataDirFile.
         `filenum`: optional index number.
         `size`: optional size, default 0.
@@ -478,6 +478,8 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     F = _DataDirFile(datadir=self, filenum=filenum, filename=filename, size=size)
     filemap[filenum] = F
     filemap[filename] = F
+    if not no_save:
+      self._save_state()
     return F
 
   def _new_datafile(self):
