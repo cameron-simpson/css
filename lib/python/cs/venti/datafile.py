@@ -454,6 +454,7 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
     if self.datadirpath is None:
       self.datadirpath = self.statedirpath
 
+  @locked
   def _save_state(self):
     ''' Rewrite STATE_FILENAME.
     '''
