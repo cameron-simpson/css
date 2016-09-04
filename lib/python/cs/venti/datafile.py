@@ -209,6 +209,14 @@ class _DataDirFile(SimpleNamespace):
   def pathname(self):
     return self.datadir.datapathto(self.filename)
 
+  @property
+  def last_stat_size(self):
+    return getattr(self, '_last_stat_size', None)
+
+  @last_stat_size.setter
+  def last_stat_size(self, new_size):
+    self._last_stat_size = new_size
+
   def stat_size(self):
     ''' Stat the datafile, return its size.
     '''
@@ -368,7 +376,11 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
         except OSError as e:
           warning("%s: could not get file size: %s", F.pathname, e)
           continue
-        if new_size > F.size:
+        old_size = F.last_stat_size
+        if ( new_size > F.size
+         and ( old_size is None or old_size < new_size )
+           ):
+          # scan data file for more blocks
           try:
             scan_data = F.scan_from(F.size)
           except OSError as e:
@@ -385,6 +397,7 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
                 break
           except EOFError as e:
             warning("%s: EOF interrupts scan: %s", F.pathname, e)
+          F.last_stat_size = new_size
           # update state after completion of a scan
           if advanced:
             self._save_state()
