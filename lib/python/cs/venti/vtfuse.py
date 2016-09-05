@@ -1021,7 +1021,7 @@ if FUSE_CLASS == 'llfuse':
       Pdst = self._vt_core.i2E(parent_inode_new)
       if not self._vt_core._Eaccess(Pdst, os.X_OK|os.W_OK, ctx):
         raise FuseOSError(errno.EPERM)
-      E = P[name_old]
+      E = Psrc[name_old]
       del Psrc[name_old]
       E.name = name_new
       Pdst[name_new] = E
