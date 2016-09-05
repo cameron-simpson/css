@@ -834,6 +834,7 @@ if FUSE_CLASS == 'llfuse':
       Pdst[new_name] = EdstLink
       # increment link count on underlying Dirent
       Esrc.meta.nlink += 1
+      return self._vt_EntryAttributes(E)
 
     @trace_method
     @with_S
@@ -870,9 +871,11 @@ if FUSE_CLASS == 'llfuse':
         raise FuseOSError(errno.ENOTDIR)
       if name in P:
         raise FuseOSError(errno.EEXIST)
-      E = Dir(base, parent=P)
-      P[base] = E
+      E = Dir(name, parent=P)
       E.meta.chmod(mode & 0o7777)
+      E.touch()
+      P[name] = E
+      return self._vt_EntryAttributes(E)
 
     @trace_method
     @with_S
@@ -889,7 +892,10 @@ if FUSE_CLASS == 'llfuse':
       else:
         # TODO: support pipes'n'stuff one day...
         raise FuseOSError(errno.ENOTSUP)
+      E.meta.chmod(mode & 0o7777)
+      E.touch()
       P[name] = E
+      return self._vt_EntryAttributes(E)
 
     @trace_method
     @with_S
