@@ -1043,8 +1043,9 @@ if FUSE_CLASS == 'llfuse':
     def setattr(self, inode, attr, fields, fhndx, ctx):
       # TODO: test CTX for permission to chmod/chown/whatever
       # TODO: sanity check fields for other update_* flags?
-      M = self._vt_core._fh(fhndx).E.meta
+      E = self._vt_core._fh(fhndx).E
       with Pfx(E):
+        M = E.meta
         if fields.update_atime:
           info("ignoring update_atime st_atime_ns=%s", attr.st_atime_ns)
         if fields.update_mtime:
@@ -1053,13 +1054,14 @@ if FUSE_CLASS == 'llfuse':
           M.chmod(attr.st_mode&0o7777)
           extra_mode = attr.st_mode & ~0o7777
           warning("update_mode: ignoring extra mode bits: 0o%o", extra_mode)
-        if fields.attr_uid:
+        if fields.update_uid:
           M.uid = attr.st_uid
-        if fields.attr_gid:
+        if fields.update_gid:
           M.gid = attr.st_gid
         if fields.update_size:
           # TODO: what calls this? do we sanity check file sizes etc?
           warning("UNIMPLEMENTED: update_size st_size=%s", attr.st_size)
+        return self._vt_EntryAttributes(E)
 
     @trace_method
     @with_S
