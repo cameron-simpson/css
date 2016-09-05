@@ -283,7 +283,7 @@ class DataDir(HashCodeUtilsMixin, MultiOpenMixin, Mapping):
                 self.statedirpath,
                 self.datadirpath,
                 self.hashclass.HASHNAME,
-                self.indexclass.
+                self.indexclass,
                 self.rollover)
            )
 
