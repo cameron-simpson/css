@@ -482,8 +482,8 @@ def cmd_mount(args, verbose=None, log=None):
         return 1
     with Pfx("open('a')"):
       syncfp = open(special, 'a')
-  with ProgressStore("ProgressStore(%s)" % (defaults.S,), defaults.S) as PS:
-    mount(mountpoint, E, PS, syncfp=syncfp, subpath=subpath)
+  ##with ProgressStore("ProgressStore(%s)" % (defaults.S,), defaults.S) as PS:
+  mount(mountpoint, E, defaults.S, syncfp=syncfp, subpath=subpath)
   return 0
 
 def cmd_pack(args, verbose=None, log=None):
