@@ -1049,7 +1049,7 @@ if FUSE_CLASS == 'llfuse':
     def setattr(self, inode, attr, fields, fhndx, ctx):
       # TODO: test CTX for permission to chmod/chown/whatever
       # TODO: sanity check fields for other update_* flags?
-      E = self._vt_core._fh(fhndx).E
+      E = self._vt_core.i2E(inode)
       with Pfx(E):
         M = E.meta
         if fields.update_atime:
