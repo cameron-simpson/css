@@ -27,6 +27,7 @@ from string import ascii_letters, digits
 import tempfile
 import threading
 from cs.lex import texthexify, untexthexify
+from cs.logutils import X
 from cs.seq import isordered
 
 class _ventiDefaults(threading.local):
@@ -42,10 +43,13 @@ class _ventiDefaults(threading.local):
       return oldS
     raise AttributeError("no .%s attribute" % attr)
   def pushStore(self, newS):
+    ##X("PUSH STORE %s => %s", defaults.S, newS)
     defaults.oldS.append(defaults.S)
     defaults.S = newS
   def popStore(self):
-    defaults.S = defaults.oldS.pop()
+    oldS = defaults.oldS.pop()
+    ##X("POP STORE %s => %s", defaults.S, oldS)
+    defaults.S = oldS
 
 defaults = _ventiDefaults()
 
