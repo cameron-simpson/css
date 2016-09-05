@@ -604,7 +604,7 @@ class _StoreFS_core(object):
 
   def _Eaccess(self, E, amode, ctx):
     with Pfx("_Eaccess(E=%r,amode=%s,ctx=%r)", E, amode, ctx):
-      uid, gid, pid = ctx
+      uid, gid, pid, umask = ctx.uid, ctx.gid, ctx.pid, ctx.umask
       if E.ishardlink:
         E2 = self._inodes.dirent(E.inum)
         warning("map hardlink %s => %s", E, E2)
@@ -1016,10 +1016,10 @@ if FUSE_CLASS == 'llfuse':
       Psrc = self._vt_core.i2E(parent_inode_old)
       if name_old not in Psrc:
         raise FuseOSError(errno.ENOENT)
-      if not self._vt_core._Eaccess(Psrc, os.X_OK|os.W_OK):
+      if not self._vt_core._Eaccess(Psrc, os.X_OK|os.W_OK, ctx):
         raise FuseOSError(errno.EPERM)
       Pdst = self._vt_core.i2E(parent_inode_new)
-      if not self._vt_core._Eaccess(Pdst, os.X_OK|os.W_OK):
+      if not self._vt_core._Eaccess(Pdst, os.X_OK|os.W_OK, ctx):
         raise FuseOSError(errno.EPERM)
       E = P[name_old]
       del Psrc[name_old]
@@ -1031,7 +1031,7 @@ if FUSE_CLASS == 'llfuse':
     def rmdir(self, parent_inode, name_b, ctx):
       name = self._vt_str(name_b)
       P = self._vt_core.i2E(parent_inode)
-      if not self._vt_core._Eaccess(Psrc, os.X_OK|os.W_OK):
+      if not self._vt_core._Eaccess(Psrc, os.X_OK|os.W_OK, ctx):
         raise FuseOSError(errno.EPERM)
       try:
         E = P[name]
