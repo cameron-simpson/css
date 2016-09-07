@@ -1059,7 +1059,13 @@ if FUSE_CLASS == 'llfuse':
         if fields.update_mode:
           M.chmod(attr.st_mode&0o7777)
           extra_mode = attr.st_mode & ~0o7777
-          warning("update_mode: ignoring extra mode bits: 0o%o", extra_mode)
+          typemode = stat.S_IFMT(extra_mode)
+          extra_mode &= ~typemode
+          if typemode != M.unix_typemode:
+            warning("update_mode: E.meta.typemode 0o%o != attr.st_mode&S_IFMT 0o%o",
+                    M.unix_typemode, typemode)
+          if extra_mode != 0:
+            warning("update_mode: ignoring extra mode bits: 0o%o", extra_mode)
         if fields.update_uid:
           M.uid = attr.st_uid
         if fields.update_gid:
