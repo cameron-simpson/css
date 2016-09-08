@@ -168,6 +168,7 @@ class FileHandle(O):
     fp = self.Eopen._open_file
     with fp:
       with self._lock:
+        fp.flush()
         fp.seek(offset)
         data = fp.read(size)
     return data
