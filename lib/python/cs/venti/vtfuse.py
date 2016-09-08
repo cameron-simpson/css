@@ -464,6 +464,7 @@ class _StoreFS_core(object):
           text = None
       if text is not None:
         write_Dirent_str(self.syncfp, text, etc=self.E.name)
+        self.syncfp.flush()
         self._syncfp_last_dirent_text = text
         # debugging
         dump_Dirent(self.E, recurse=False)
