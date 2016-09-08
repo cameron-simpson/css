@@ -435,10 +435,10 @@ class FileDirent(_Dirent, MultiOpenMixin):
   def shutdown(self):
     ''' On final close, close ._open_file and save result as ._block.
     '''
-    X("CLOSE %s ...", self)
+    X("FileDirent.CLOSE %s ...", self)
     self._check()
     if self._block is not None:
-      error("final close, but ._block is not None; replacing with self._open_file.close(), was: %r", self._block)
+      error("final close, but ._block is not None; replacing with self._open_file.close(), was: %s", self._block)
     self._block = self._open_file.close()
     X("CLOSE %s: _block=%s", self, self._block)
     self._open_file = None
@@ -455,6 +455,7 @@ class FileDirent(_Dirent, MultiOpenMixin):
       with self:
         return self._open_file.truncate(length)
 
+  # TODO: move into distinctfile utilities class with rsync-like stuff etc
   def restore(self, path, makedirs=False, verbosefp=None):
     ''' Restore this _Dirent's file content to the name `path`.
     '''
