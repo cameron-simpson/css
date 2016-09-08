@@ -392,11 +392,12 @@ class FileDirent(_Dirent, MultiOpenMixin):
         If open, sync the file to update ._block.
     '''
     self._check()
-    if self._open_file is not None:
-      self._block = self._open_file.flush()
-      warning("FileDirent.block: updated to %s", self._block)
-      ##stack_dump(indent=2)
-    return self._block
+    ##X("access FileDirent.block from:")
+    ##stack_dump(indent=2)
+    if self._open_file is None:
+      return self._block
+    else:
+      return self._open_file.flush()
 
   @block.setter
   @locked
