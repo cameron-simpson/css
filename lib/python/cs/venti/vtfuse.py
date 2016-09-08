@@ -812,7 +812,7 @@ if FUSE_CLASS == 'llfuse':
       if not Esrc.isfile and not Esrc.ishardlink:
         raise FuseOSError(errno.EPERM)
       Pdst = self._vt_core.i2E(new_parent_inode)
-      if new_name in P:
+      if new_name in Pdst:
         raise FuseOSError(errno.EEXIST)
       # the final component must be a directory in order to create the new link
       if not Pdst.isdir:
