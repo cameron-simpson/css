@@ -1098,6 +1098,8 @@ if FUSE_CLASS == 'llfuse':
     @trace_method
     @with_S
     def statfs(self, ctx):
+      # TODO: get free space from the current Store
+      #       implies adding some kind of method to stores?
       st = os.statvfs(".")
       fst = llfuse.StatvfsData()
       for attr in 'f_bsize', 'f_frsize', 'f_blocks', 'f_bfree', 'f_bavail', 'f_files', 'f_ffree', 'f_favail':
