@@ -77,6 +77,7 @@ def mount(mnt, E, S, syncfp=None, subpath=None):
   FS._vt_runfuse(mnt)
 
 def trace_method(method):
+  ## do nothing
   return method
   ##fname = '.'.join( (method.__module__, funccite(method)) )
   fname = '.'.join( (method.__module__, funcname(method)) )
@@ -152,6 +153,7 @@ class FileHandle(O):
     return "<FileHandle %s>" % (self.E,)
 
   def write(self, data, offset):
+    X("FH.write(data=%r, offset=%d)", data, offset)
     fp = self.Eopen._open_file
     with fp:
       with self._lock:
@@ -247,6 +249,7 @@ class Inodes(object):
       end, offset = get_bs(taken_data, offset)
       _hardlinked.add(start, end)
     _hardlinked_dir, offset1 = decode_Dirent(idata, offset1)
+    X("_hardlinked_dir = %s %s", type(_hardlinked_dir), _hardlinked_dir)
     if _hardlinked_dir is None:
       error("invalid Dirent for _hardlinked_dir, inodes LOST")
       self._init_empty()
@@ -447,6 +450,9 @@ class _StoreFS_core(object):
 
   @trace_method
   def _sync(self):
+    X("pid %d: _sync ...", os.getpid())
+    if defaults.S is None:
+      raise RuntimeError("RUNTIME: defaults.S is None!")
     if self.syncfp is not None:
       with self._lock:
         # update the inode table state
@@ -557,6 +563,7 @@ class _StoreFS_core(object):
     if flags & O_TRUNC:
       FH.truncate(0)
     fhndx = self._new_file_handle_index(FH)
+    XP("OPEN: allocated new _file_handles[%s] => %s", fhndx, FH)
     return fhndx
 
   def make_hardlink(self, E):
@@ -584,6 +591,7 @@ class _StoreFS_core(object):
     self._file_handles[fhndx] = None
 
   def _fh_close(self, fhndx):
+    X("CLOSE _file_handles[%s] (pre: %r)", fhndx, self._file_handles)
     fh = self._fh(fhndx)
     fh.close()
     self._fh_remove(fhndx)
@@ -667,6 +675,7 @@ if FUSE_CLASS == 'llfuse':
         llfuse.main()
         X("llfuse.close...")
         llfuse.close()
+        X("llfuse.close DONE, leaving _VT_RUNFUSE")
 
     def _vt_i2E(self, inode):
       try:
@@ -779,7 +788,6 @@ if FUSE_CLASS == 'llfuse':
     @trace_method
     @with_S
     def getattr(self, inode, ctx):
-      X("getattr: inode=%s", inode)
       E = self._vt_core.i2E(inode)
       return self._vt_EntryAttributes(E)
 
@@ -846,6 +854,7 @@ if FUSE_CLASS == 'llfuse':
     @trace_method
     @with_S
     def lookup(self, parent_inode, name_b, ctx):
+      X("lookup %r...", name_b)
       name = self._vt_str(name_b)
       # TODO: test for permission to search parent_inode
       P, PP = self._vt_core.i2EP(parent_inode)
@@ -1089,7 +1098,6 @@ if FUSE_CLASS == 'llfuse':
       fst = llfuse.StatvfsData()
       for attr in 'f_bsize', 'f_frsize', 'f_blocks', 'f_bfree', 'f_bavail', 'f_files', 'f_ffree', 'f_favail':
         setattr(fst, attr, getattr(st, attr))
-      X("statfs ==> %r:%s", fst, fst)
       return fst
 
     @trace_method
