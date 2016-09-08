@@ -913,6 +913,9 @@ if FUSE_CLASS == 'llfuse':
       ''' Open an existing file, return file handle index.
       '''
       E = self._vt_i2E(inode)
+      # TODO: mark parent, not root?
+      X("MARK ROOT AS CHANGED - NEED TO FIND PARENT INSTEAD")
+      self._vt_core.E.change()
       if flags & (O_CREAT|O_EXCL):
         warning("open(ionde=%d:%s,flags=0o%o): unexpected O_CREAT(0o%o) or O_EXCL(0o%o)",
                 inode, E, flags, O_CREAT, O_EXCL)
