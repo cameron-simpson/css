@@ -805,7 +805,6 @@ if FUSE_CLASS == 'llfuse':
 
     @trace_method
     @with_S
-    @locked
     def link(self, inode, new_parent_inode, new_name_b, ctx):
       new_name = self._vt_str(new_name_b)
       # TODO: test for write access to new_parent_inode
