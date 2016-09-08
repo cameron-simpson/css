@@ -96,6 +96,7 @@ class File(BackedFile):
   @backing_block.setter
   @locked
   def backing_block(self, new_block):
+    X("File: update _backing_block to %s from %s", new_block, self._backing_block)
     self._backing_block = new_block
     self._reset(BlockFile(new_block))
 
