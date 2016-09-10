@@ -207,9 +207,7 @@ class Range(object):
       start, end = list(x)
     _spans = self._spans
     ndx = bisect_left(_spans, Span(start, start))
-    if ndx >= len(_spans):
-      return False
-    if ndx > 0 and start < _spans[ndx].start:
+    if ndx > 0 and _spans[ndx-1].end > start:
       ndx -= 1
     elif ndx >= len(_spans):
       return False
