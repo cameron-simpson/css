@@ -10,7 +10,8 @@ import unittest
 from cs.lex import texthexify, untexthexify, \
                    get_envvar, \
                    get_sloshed_text, SLOSH_CHARMAP, \
-                   get_qstr
+                   get_qstr, \
+                   get_identifier, get_dotted_identifier
 from cs.py3 import bytes
 ##from cs.logutils import X
 
@@ -108,6 +109,31 @@ class TestLex(unittest.TestCase):
     self.assertEqual(get_qstr('"\\t"'), ('\t', 4))
     self.assertEqual(get_qstr('"$B1"', environ=self.env), ('BB1', 5))
     self.assertEqual(get_qstr('"\\$B1"', environ=self.env), ('$B1', 6))
+
+  def test05get_identifier(self):
+    self.assertEqual(get_identifier(''), ('', 0))
+    self.assertEqual(get_identifier('a'), ('a', 1))
+    self.assertEqual(get_identifier('a1'), ('a1', 2))
+    self.assertEqual(get_identifier('1a'), ('', 0))
+    self.assertEqual(get_identifier('1a', 1), ('a', 2))
+
+  def test05get_dotted_identifier(self):
+    self.assertEqual(get_dotted_identifier(''), ('', 0))
+    self.assertEqual(get_dotted_identifier('a'), ('a', 1))
+    self.assertEqual(get_dotted_identifier('a1'), ('a1', 2))
+    self.assertEqual(get_dotted_identifier('1a'), ('', 0))
+    self.assertEqual(get_dotted_identifier('1a', 1), ('a', 2))
+    self.assertEqual(get_dotted_identifier('a.b'), ('a.b', 3))
+    self.assertEqual(get_dotted_identifier('a1.b'), ('a1.b', 4))
+    self.assertEqual(get_dotted_identifier('a1..b'), ('a1', 2))
+    self.assertEqual(get_dotted_identifier('a1.b.c'), ('a1.b.c', 6))
+    self.assertEqual(get_dotted_identifier('a1.b.c+'), ('a1.b.c', 6))
+
+def selftest(argv):
+  unittest.main(__name__, None, argv)
+
+if __name__ == '__main__':
+  selftest(sys.argv)
 
 def selftest(argv):
   unittest.main(__name__, None, argv)

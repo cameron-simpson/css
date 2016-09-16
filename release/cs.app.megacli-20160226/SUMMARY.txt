@@ -1,0 +1,1 @@
+cs.app.megacli: honour $MEGACLI for MegaCLI executable path, remove some external script dependencies, note Dell PowerEdge RAID Controller (PERC) is also a MegaRAID or compatible

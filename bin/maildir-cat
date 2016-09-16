@@ -1,4 +1,4 @@
-#!/usr/bin/python -tt
+#!/usr/bin/env python3
 #
 # List the contents of maildir folders in mbox format.
 #       - Cameron Simpson <cs@zip.com.au> 09nov2006

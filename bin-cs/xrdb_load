@@ -11,7 +11,7 @@ esac
 
 cd $HOME/rc/x11 || exit $?
 
-uncurly `ls -d dflt/* | grep -v '^dflt/CVS$'` \
+uncurly `ls -d dflt/* | grep -v '^dflt/defunct$'` \
 | xrdb -nocpp -load -
 
 ##dpp ${1+"$@"} $X11/xinfo.dpp $X11/defaults | xrdb -load -nocpp

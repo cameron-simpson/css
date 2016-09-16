@@ -1,0 +1,17 @@
+#!/bin/sh
+#
+# Unpack the MIME message named (or on stdin) in a temp direct and open.
+#   - Cameron Simpson <cs@zip.com.au> 16nov2015
+#
+
+set -uex
+
+outdir=$HOME/var/mail-attachments
+
+cmd=$(basename "$0")
+unpackdir=$outdir/$(datecode)-$$
+
+mkdir "$unpackdir"
+cat ${1+"$@"} | munpack -C "$unpackdir" -t
+( cd "$unpackdir"; fixexts * ) || :
+open "$unpackdir"

@@ -10,15 +10,15 @@ DISTINFO = {
     'description': "functions related to terminals",
     'keywords': ["python2", "python3"],
     'classifiers': [
+        "Environment :: Console",
+        "Operating System :: POSIX",
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         "Topic :: Terminals",
-        "Operating System :: POSIX",
         ],
 }
 
-import os
 import re
 from subprocess import Popen, PIPE
 from collections import namedtuple

@@ -1,2 +1,2 @@
 #!/bin/sh
-exec py3 -m cs.app.pilfer ${1+"$@"}
+exec python3 -m cs.app.pilfer ${1+"$@"}

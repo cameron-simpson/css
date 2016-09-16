@@ -17,12 +17,13 @@ DISTINFO = {
     'requires': [ 'cs.configutils', 'cs.env', 'cs.fileutils', 'cs.lex', 'cs.logutils', 'cs.mailutils', 'cs.obj', 'cs.seq', 'cs.threads', 'cs.app.maildb', 'cs.py.modules', 'cs.py3' ],
     'entry_points': {
       'console_scripts': [
-          'maildb = cs.app.mailfiler:main',
+          'mailfiler = cs.app.mailfiler:main',
           ],
         },
 }
 
 from collections import namedtuple
+from copy import deepcopy
 from email import message_from_string, message_from_file
 from email.header import decode_header, make_header
 import email.parser
@@ -49,8 +50,8 @@ from cs.excutils import LogExceptions
 from cs.fileutils import abspath_from_file, file_property, files_property, \
                          longpath, Pathname
 import cs.lex
-from cs.lex import get_white, get_nonwhite, get_other_chars, get_qstr, \
-                   unrfc2047, match_tokens, get_delimited
+from cs.lex import get_white, get_nonwhite, skipwhite, get_other_chars, \
+                   get_qstr, unrfc2047, match_tokens, get_delimited
 from cs.logutils import Pfx, setup_logging, with_log, \
                         debug, info, warning, error, exception, \
                         D, X, LogTime
@@ -358,9 +359,9 @@ class MailFiler(O):
 
   def folder_logfile(self, folder_path):
     ''' Return path to log file associated with the named folder.
-        TODO: ase on relative path from folder root, not just basename.
+        TODO: base on relative path from folder root, not just basename.
     '''
-    return os.path.join(self.logdir, 'filer-%s.log' % (os.path.basename(folder_path)))
+    return os.path.join(self.logdir, '%s.log' % (os.path.basename(folder_path)))
 
   def sweep(self, wmdir, justone=False, no_remove=False, logfile=None):
     ''' Scan a WatchedMaildir for messages to filter.
@@ -531,6 +532,7 @@ class MessageFiler(O):
     self.flags = O(alert=0,
                    flagged=False, passed=False, replied=False,
                    seen=False, trashed=False, draft=False)
+    self.alert_rule = None
     self.save_to_folders = set()
     self.save_to_addresses = set()
     self.save_to_cmds = []
@@ -558,6 +560,22 @@ class MessageFiler(O):
       except Exception as e:
         exception("matching rules: %s", e)
         return False
+
+      # apply additional targets from $ALERT_TARGETS, if any
+      if self.flags.alert:
+        alert_targets = self.environ.get('ALERT_TARGETS', '')
+        if alert_targets:
+          try:
+            Ts, offset = get_targets(alert_targets, 0)
+            offset = skipwhite(alert_targets, offset)
+            if offset < len(alert_targets):
+              raise ValueError('unparsed $ALERT_TARGETS text: %r'
+                               % alert_targets[offset:])
+          except Exception as e:
+            error('parsing $ALERT_TARGETS: %s', e)
+          else:
+            for T in Ts:
+              T.apply(self)
 
       # use default destination if no save destinations chosen
       if not self.save_to_folders \
@@ -593,6 +611,9 @@ class MessageFiler(O):
         This is separated out to support the command line "save target" operation.
     '''
     ok = True
+    # issue arrival alert
+    if self.flags.alert > 0:
+      self.alert(self.flags.alert)
     # save message to folders
     for folder in sorted(self.save_to_folders):
       try:
@@ -602,12 +623,31 @@ class MessageFiler(O):
         exception("saving to folder %r: %s", folder, e)
         ok = False
     # forward message
-    for address in sorted(self.save_to_addresses):
-      try:
-        self.sendmail(address)
-      except Exception as e:
-        exception("forwarding to address %r: %s", address, e)
+    if self.save_to_addresses:
+      sender = self.env('EMAIL', None)
+      if sender is None:
+        error("no $EMAIL, required to set Sender-related fields in forwarded messages")
         ok = False
+      else:
+        # change who@where to <who@where> for Return-Path etc
+        if not sender.startswith('<') or not sender.endswith('>'):
+          sender = '<' + sender + '>'
+        # create special message copy with adjusted sender fields
+        fwd_message = deepcopy(self.message)
+        for hdr_name in 'Sender', 'Errors-To', 'Return-Path':
+          modify_header(fwd_message, hdr_name, sender)
+        # remove delivery loop detection headers
+        modify_header(fwd_message, 'Delivered-To', ())
+        with TemporaryFile('w+') as fwd_mfp:
+          fwd_mfp.write(str(fwd_message))
+          fwd_mfp.flush()
+          for address in sorted(self.save_to_addresses):
+            fwd_mfp.seek(0)
+            try:
+              self.sendmail(address, mfp=fwd_mfp, sender=sender)
+            except Exception as e:
+              exception("forwarding to address %r: %s", address, e)
+              ok = False
     # pipeline message
     for shcmd, shenv in self.save_to_cmds:
       try:
@@ -615,9 +655,6 @@ class MessageFiler(O):
       except Exception as e:
         exception("piping to %r: %s", shcmd, e)
         ok = False
-    # issue arrival alert
-    if self.flags.alert > 0:
-      self.alert(self.flags.alert)
     return ok
 
   def modify(self, hdr, new_value, always=False):
@@ -768,12 +805,17 @@ class MessageFiler(O):
     info("    %s => | %s" % (("OK" if retcode == 0 else "FAIL"), argv))
     return retcode == 0
 
-  def sendmail(self, address, mfp=None):
+  def sendmail(self, address, mfp=None, sender=None):
     ''' Dispatch a message to `address`.
         `mfp` is a file containing the message text.
         If `mfp` is None, use the text of the current message.
+        If `sender` is supplied, pass to sendmail with -f option.
     '''
-    return self.save_to_pipe([self.env('SENDMAIL', 'sendmail'), '-oi', address], mfp=mfp)
+    sendmail_argv = [ self.env('SENDMAIL', 'sendmail'), '-oi' ]
+    if sender is not None:
+      sendmail_argv.extend( ('-f', sender) )
+    sendmail_argv.append(address)
+    return self.save_to_pipe(sendmail_argv, mfp=mfp)
 
   @property
   def alert_format(self):
@@ -811,8 +853,8 @@ class MessageFiler(O):
   def alert(self, alert_level, alert_message=None):
     ''' Issue an alert with the specified `alert_message`.
         If missing or None, use self.alert_message(self.message).
-	If `alert_level` is more than 1, prepend "-l alert_level"
-	to the alert command line arguments.
+        If `alert_level` is more than 1, prepend "-l alert_level"
+        to the alert command line arguments.
     '''
     if alert_message is None:
       alert_message = self.alert_message(self.message)
@@ -880,24 +922,22 @@ re_GROUPNAME_s = '[A-Z][A-Z0-9_]+'
 # @domain
 re_atDOM_s = '@[-\w]+(\.[-\w]+)+'
 
-# GROUPNAME or @domain
-re_GROUPNAMEorDOM_s = '(%s|%s)' % (re_GROUPNAME_s, re_atDOM_s)
+# local-part@domain
+re_simpleADDRatDOM_s = '[a-z0-9][\-\.a-z0-9]*' + re_atDOM_s
 
-# comma separated list of GROUPNAME or @domain
-re_GROUPorDOM_LIST_s = r'%s(,%s)*' % (re_GROUPNAMEorDOM_s, re_GROUPNAMEorDOM_s)
+# GROUPNAME or @domain
+re_GROUPNAMEorDOMorADDR_s = \
+    '(%s|%s|%s)' % (re_GROUPNAME_s, re_atDOM_s, re_simpleADDRatDOM_s)
 
 # (GROUP[|GROUP...])
 re_INGROUP_s = ( r'\(\s*%s(\s*\|\s*%s)*\s*\)'
                  % (re_GROUPNAME_s, re_GROUPNAME_s)
                )
 
-# (GROUPorDOM[|GROUPorDOM...])
-re_INGROUPorDOM_s = ( r'\(\s*%s(\s*\|\s*%s)*\s*\)'
-                      % (re_GROUPNAMEorDOM_s, re_GROUPNAMEorDOM_s)
-                    )
-
-re_INGROUPorDOM = re.compile( re_INGROUPorDOM_s, re.I)
-re_INGROUP = re.compile( re_INGROUP_s, re.I)
+# (GROUPorDOMorADDR[|GROUPorDOMorADDR...])
+re_INGROUPorDOMorADDR_s = \
+    r'\(\s*%s(\s*\|\s*%s)*\s*\)' \
+    % (re_GROUPNAMEorDOMorADDR_s, re_GROUPNAMEorDOMorADDR_s)
 
 # simple argument shorthand (GROUPNAME|@domain|number|"qstr")
 re_ARG_s = r'(%s|%s|%s|%s)' % (re_GROUPNAME_s, re_atDOM_s, re_NUMBER_s, re_QSTR_s)
@@ -914,13 +954,13 @@ re_NONALNUMWSP = re.compile(re_NONALNUMWSP_s, re.I)
 re_ASSIGN = re.compile(re_ASSIGN_s, re.I)
 re_HEADERNAME_LIST = re.compile(re_HEADERNAME_LIST_s, re.I)
 re_HEADERNAME_LIST_PREFIX = re.compile(re_HEADERNAME_LIST_PREFIX_s, re.I)
-re_GROUPorDOM_LIST = re.compile(re_GROUPorDOM_LIST_s)
 re_HEADER_SUBST = re.compile(re_HEADER_SUBST_s, re.I)
 re_UNQWORD = re.compile(re_UNQWORD_s)
 re_HEADERNAME = re.compile(re_HEADERNAME_s, re.I)
 re_DOTTED_IDENTIFIER = re.compile(re_DOTTED_IDENTIFIER_s, re.I)
 re_ARG = re.compile(re_ARG_s)
 re_ARGLIST = re.compile(re_ARGLIST_s)
+re_INGROUPorDOMorADDR = re.compile( re_INGROUPorDOMorADDR_s, re.I)
 
 def parserules(fp):
   ''' Read rules from `fp`, yield Rules.
@@ -1070,7 +1110,7 @@ def parserules(fp):
           C = Condition_Regexp(condition_flags, header_names, atstart, regexp)
         else:
           # headers:(group[|group...])
-          m = re_INGROUPorDOM.match(line, offset)
+          m = re_INGROUPorDOMorADDR.match(line, offset)
           if m:
             group_names = set( w.strip().lower() for w in m.group()[1:-1].split('|') )
             offset = m.end()
@@ -1098,10 +1138,20 @@ def get_targets(s, offset):
   while offset < len(s) and not s[offset].isspace():
     offset0 = offset
     T, offset = get_target(s, offset)
-    if T is not None:
-      targets.append(T)
-    if offset < len(s) and s[offset] == ',':
-      offset += 1
+    targets.append(T)
+    if offset < len(s):
+      # check for end of targets (whitespace) or comma (another target)
+      ch = s[offset]
+      if ch.isspace():
+        continue
+      elif ch == ',':
+        while True:
+          offset += 1
+          if offset >= len(s) or s[offset] != ',':
+            break
+      else:
+        raise ValueError('offset %d: expected comma after target, found: %r'
+                         % (offset, s[offset:]))
   return targets, offset
 
 def get_target(s, offset, quoted=False):
@@ -1178,9 +1228,6 @@ def get_target(s, offset, quoted=False):
     delim = m_delim.group()
     regexp, offset = get_delimited(s, offset, delim)
     replacement, offset = get_delimited(s, offset, delim)
-    if offset < len(s):
-      warning("UNPARSED TEXT AFTER s/this/that: %r", s[offset:])
-      offset = len(s)
     try:
       subst_re = re.compile(regexp)
     except Exception as e:
@@ -1475,26 +1522,56 @@ class Condition_InGroups(_Condition):
     self.group_names = group_names
 
   def test_value(self, filer, header_name, header_value):
+    # choose to test message-ids or addresses
     if header_name.lower() in ('message-id', 'references', 'in-reply-to'):
+      # test is against message-ids
       msgiddb = self.filer.msgiddb
       msgids = [ v for v in header_value.split() if v ]
       for msgid in msgids:
+        # get the foo@bar part of <foo@bar>
+        # be very lenient
+        if msgid.startswith('<'):
+          if msgid.endswith('>'):
+            # <...>
+            msgid_inner = msgid[1:-1]
+          else:
+            # <...
+            msgid_inner = msgid[1:]
+        elif msgid.endswith('>'):
+          # ...>
+          msgid_inner = msgid[:-1]
+        else:
+          # ...
+          msgid_inner = msgid
         msgid_node = msgiddb.get( ('MESSAGE_ID', msgid) )
         for group_name in self.group_names:
+          # look for <...@domain>
           if group_name.startswith('@'):
-            if msgid.endswith(groupname+'>'):
+            if msgid_inner.lower().endswith(groupname):
               debug("match %s to %s", msgid, group_name)
               return True
+          # look for specific <local@domain>
+          elif '@' in group_name:
+            if msgid_inner.lower() == group_name:
+              debug("match %s to %s", msgid, group_name)
+              return True
+          # look for named group in MESSAGE_ID.GROUPs
           elif msgid_node:
               if group_name in msgid_node.GROUPs:
                 debug("match %s to (%s)", msgid, group_name)
                 return True
     else:
+      # test is against addresses
       for address in filer.addresses(header_name):
         for group_name in self.group_names:
           if group_name.startswith('@'):
             # address ending in @foo
             if address.endswith(group_name):
+              debug("match %s to %s", address, group_name)
+              return True
+          elif '@' in group_name:
+            # full address local part
+            if address.lower() == group_name:
               debug("match %s to %s", address, group_name)
               return True
           elif address.lower() in filer.group(group_name):
@@ -1539,6 +1616,14 @@ class Rule(O):
     self.flags = O(alert=0, halt=False)
     self.label = ''
 
+  def __str__(self):
+    return "%s:%d: %r %r" % (self.filename, self.lineno, self.targets, self.conditions)
+
+  def __repr__(self):
+    return "Rule(%r:%d,targets=%r,conditions=%r,flags=%s,label=%r)" \
+           % (self.filename, self.lineno, self.targets, self.conditions,
+             self.flags, self.label)
+
   @property
   def context(self):
     return "%s:%d" % (shortpath(self.filename), self.lineno)
@@ -1581,7 +1666,6 @@ class Rules(list):
         if R.match(filer):
           filer.apply_rule(R)
           if R.flags.halt:
-            done = True
             break
 
 class WatchedMaildir(O):

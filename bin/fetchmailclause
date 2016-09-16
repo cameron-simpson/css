@@ -9,36 +9,34 @@ rc=$HOME/.fetchmailrc
 start=skip	# vs poll
 
 cmd=$0
-usage="Usage: $cmd [-f fetchmailrc] clause"
+usage="Usage: $cmd [-f fetchmailrc] [clause]"
 
 badopts=
 
 [ "x$1" = x-f ] && { rc=$2; shift; shift; }
 
-if [ $# = 0 ]
-then  echo "$cmd: missing clause" >&2; badopts=1
-else  clause=$1; shift
-      [ $# = 0 ] || { echo "$cmd: extra arguments after clause: $*" >&2
-		      badopts=1
-		    }
-fi
+[ $# = 0 ] && exec awk '$1 == "spoll" || $1 == "skip" { print $2 }' "$rc"
+
+clause=$1; shift
+[ $# = 0 ] || { echo "$cmd: extra arguments after clause: $*" >&2; badopts=1; }
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 exec sed -ne '
-		y/	/ /
-	    '"	/^ *skip  *$clause/b start
-		/^ *poll  *$clause/b start
-		d
-		:start
-		n
-		y/	/ /
-		s/   */ /g
-		s/^ //
-		s/ $//
-		/^#/b start
-		/^$/b start
-		/^skip /d
-		/^poll /d
-		p
-		b start" "$rc"
+        y/	/ /
+        s/$/ /
+        '"	/^ *skip  *$clause /b start
+        /^ *poll  *$clause /b start
+        d
+        :start
+        n
+        y/	/ /
+        s/   */ /g
+        s/^ //
+        s/ $//
+        /^#/b start
+        /^$/b start
+        /^skip /d
+        /^poll /d
+        p
+        b start" "$rc"

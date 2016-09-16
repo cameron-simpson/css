@@ -20,9 +20,8 @@ from cs.threads import locked_property
 from cs.py.modules import import_module_name
 from cs.obj import O
 
-PYPI_PROD_URL = 'https://pypi.python.org/pypi'
-PYPI_TEST_URL = 'https://testpypi.python.org/pypi'
-PYPI_DFLT_URL = PYPI_TEST_URL
+URL_PYPI_PROD = 'https://pypi.python.org/pypi'
+URL_PYPI_TEST = 'https://testpypi.python.org/pypi'
 
 # published URL
 URL_BASE = 'https://bitbucket.org/cameron_simpson/css/src/tip/'
@@ -63,14 +62,14 @@ USAGE = '''Usage: %s [-n pypi-pkg-name] [-v pypi_version] pkg-name op [op-args..
 
 def main(argv):
   cmd = os.path.basename(argv.pop(0))
-  usage = USAGE % (cmd, PYPI_DFLT_URL, PYPI_PROD_URL)
+  usage = USAGE % (cmd, URL_PYPI_TEST, URL_PYPI_PROD)
   setup_logging(cmd)
 
   badopts = False
 
   pypi_package_name = None
   pypi_version = None
-  pypi_url = os.environ.get('PYPI_URL', PYPI_DFLT_URL)
+  pypi_url = None
 
   try:
     opts, argv = getopt(argv, 'n:r:v:')
@@ -113,13 +112,14 @@ def main(argv):
     print(usage, file=sys.stderr)
     return 2
 
+  if pypi_url is None:
+    pypi_url = os.environ.get('PYPI_URL', URL_PYPI_TEST)
+
   if pypi_package_name is None:
     pypi_package_name = package_name
 
-  PKG = PyPI_Package(package_name,
-                     pypi_package_name=pypi_package_name,
-                     pypi_url=pypi_url,
-                     pypi_version=pypi_version)
+  PKG = PyPI_Package(pypi_url, package_name, pypi_version,
+                     pypi_package_name=pypi_package_name)
 
   xit = 0
 
@@ -190,32 +190,20 @@ def test_is_package(libdir, package_name):
 
 class PyPI_Package(O):
 
-  ''' Class for creating and administering cs.* packages for PyPI.
-  '''
-
-  def __init__(self, package_name, pypi_package_name=None, pypi_url=None, pypi_version=None):
-    ''' Iinitialise: save package_name and its name in PyPI.
+  def __init__(self, pypi_url, package_name, package_version, pypi_package_name=None, pypi_version=None):
+    ''' Initialise: save package_name and its name in PyPI.
     '''
+    self.pypi_url = pypi_url
     if pypi_package_name is None:
       pypi_package_name = package_name
-    if pypi_url is None:
-      pypi_url = PYPI_DFLT_URL
+    if pypi_version is None:
+      pypi_version = package_version
     self.package_name = package_name
     self.pypi_package_name = pypi_package_name
-    self.pypi_url = pypi_url
+    self.version = package_version
+    self.pypi_version = pypi_version
     self.libdir = LIBDIR
-    self._lock = RLock()
     self._prep_distinfo()
-    if pypi_version is not None:
-      self._version = pypi_version
-
-  @locked_property
-  def version(self):
-    return cmdstdout(['cs-release', 'last', self.package_name]).rstrip()
-
-  @property
-  def pypi_version(self):
-    return self.version
 
   @property
   def hg_tag(self):
@@ -227,49 +215,52 @@ class PyPI_Package(O):
     global DISTINFO_DEFAULTS
     global DISTINFO_CLASSIFICATION
 
-    info = dict(import_module_name(self.package_name, 'DISTINFO'))
+    dinfo = dict(import_module_name(self.package_name, 'DISTINFO'))
 
-    info['package_dir'] = {'': self.libdir}
+    dinfo['package_dir'] = {'': self.libdir}
 
     for kw, value in DISTINFO_DEFAULTS.items():
       with Pfx(kw):
-        if kw not in info:
-          X("%s = %r", kw, value)
-          info[kw] = value
+        if kw not in dinfo:
+          dinfo[kw] = value
 
-    classifiers = info['classifiers']
+    classifiers = dinfo['classifiers']
     for classifier_topic, classifier_subsection in DISTINFO_CLASSIFICATION.items():
       classifier_prefix = classifier_topic + " ::"
       classifier_value = classifier_topic + " :: " + classifier_subsection
-      X("look for %r ...", classifier_prefix)
       if not any(classifier.startswith(classifier_prefix)
                  for classifier in classifiers
                  ):
-        X("classifiers + %s", classifier_value)
-        info['classifiers'].append(classifier_value)
-      else:
-        X("already has %r*", classifier_prefix)
+        dinfo['classifiers'].append(classifier_value)
 
     ispkg = self.is_package(self.package_name)
     if ispkg:
       # stash the package in a top level directory of that name
-      ## info['package_dir'] = {package_name: package_name}
-      info['packages'] = [self.package_name]
+      ## dinfo['package_dir'] = {package_name: package_name}
+      dinfo['packages'] = [self.package_name]
     else:
-      info['py_modules'] = [self.package_name]
+      dinfo['py_modules'] = [self.package_name]
 
     for kw, value in (('name', self.pypi_package_name),
                       ('version', self.pypi_version),
                       ):
-      if value is not None:
+      if value is None:
+        warning("_prep: no value for %r", name)
+      else:
         with Pfx(kw):
-          if kw in info:
-            if info[kw] != value:
-              info("publishing %s instead of %s", value, info[kw])
+          if kw in dinfo:
+            if dinfo[kw] != value:
+              info("publishing %s instead of %s", value, dinfo[kw])
           else:
-            info[kw] = value
+            dinfo[kw] = value
 
-    self.distinfo = info
+    self.distinfo = dinfo
+    for kw in ('name',
+               'description', 'author', 'author_email', 'version',
+               'url',
+              ):
+      if kw not in dinfo:
+        error('no %r in distinfo', kw)
 
   def pkg_rpath(self, package_name=None, prefix_dir=None, up=False):
     ''' Return a path based on a `package_name` (default self.package_name).
@@ -323,10 +314,9 @@ class PyPI_Package(O):
 
     readme_subpath = self.pkg_readme_rpath(prefix_dir=self.libdir)
     readme_path = os.path.join(pkg_dir, readme_subpath)
-    X("make_package: readme_path = %r", readme_path)
     if os.path.exists(readme_path):
       if 'long_description' in distinfo:
-        warning(
+        info(
             'long_description: already provided, ignoring %s', readme_subpath)
       else:
         with open(readme_path) as readmefp:
@@ -369,19 +359,20 @@ class PyPI_Package(O):
         out("from distutils.core import setup")
         out("setup(")
         # mandatory fields, in preferred order
+        written = set()
         for kw in ('name',
                    'description', 'author', 'author_email', 'version',
                    'url',
                    ):
-          try:
-            value = distinfo.pop(kw)
-          except KeyError:
+          if kw in distinfo:
+            out("  %s = %r," % (kw, distinfo[kw]))
+            written.add(kw)
+          else:
             warning("missing distinfo[%r]", kw)
             ok = False
-          else:
-            out("  %s = %r," % (kw, value))
         for kw in sorted(distinfo.keys()):
-          out("  %s = %r," % (kw, distinfo[kw]))
+          if kw not in written:
+            out("  %s = %r," % (kw, distinfo[kw]))
         out(")")
       if not ok:
         raise ValueError("could not construct valid setup.py file")
@@ -403,13 +394,11 @@ class PyPI_Package(O):
   def package_paths(self, package_name, libdir):
     ''' Generator to yield the file paths from a package relative to the `libdir` subdirectory.
     '''
-    X("PACKAGE_PATHS...")
     package_subpath = pathify(package_name)
     if not self.is_package(package_name):
       yield package_subpath + '.py'
       test_subpath = package_subpath + '_tests.py'
       test_path = os.path.join(libdir, test_subpath)
-      X("check for tests at: %r", test_path)
       if os.path.exists(test_path):
         yield test_subpath
     else:
@@ -452,7 +441,6 @@ class PyPI_Package(O):
     runcmd(hgargv)
 
 class PyPI_PackageCheckout(O):
-
   ''' Facilities available with a checkout of a package.
   '''
 
@@ -465,7 +453,7 @@ class PyPI_PackageCheckout(O):
     if hasattr(self, 'pkg_dir'):
       raise RuntimeError("already using .pkg_dir = %r" % (self.pkg_dir,))
     self.pkg_dir = self.package.make_package()
-    self.inpkg("find . -type f | sort | xxargs ls -ld -- ")
+    ##self.inpkg("find . -type f | sort | xxargs ls -ld -- ")
     return self
 
   def __exit__(self, exc_type, exc_value, traceback):

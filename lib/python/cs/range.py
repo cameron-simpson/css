@@ -23,7 +23,7 @@ DISTINFO = {
 import sys
 from bisect import bisect_left
 from collections import namedtuple
-from cs.logutils import ifdebug
+from cs.logutils import ifdebug, X, XP
 
 def overlap(span1, span2):
   ''' Return a list [start, end] denoting the overlap of two spans.
@@ -88,6 +88,13 @@ class Range(object):
   '''
 
   def __init__(self, start=None, end=None, debug=None):
+    ''' Initialise the Range.
+        Called with `start` and `end`, these specify the initial
+        span of the Range.
+        If called with just `start`, `start` should instead be an
+        iterable if integer values comprising the values in the
+        Range.
+    '''
     if debug is None:
       debug = ifdebug()
     self._debug = debug
@@ -163,6 +170,16 @@ class Range(object):
     return sum( [ end-start for start, end in self._spans ] )
 
   @property
+  def start(self):
+    ''' Return the start offset of the Range - the minimum Span .start or 0 if the Range is empty.
+    '''
+    spans = self._spans
+    if len(spans) > 0:
+      return spans[0].start
+    else:
+      return 0
+
+  @property
   def end(self):
     ''' Return the end offset of the Range - the maximum Span .end or 0 if the Range is empty.
     '''
@@ -189,7 +206,9 @@ class Range(object):
     else:
       start, end = list(x)
     _spans = self._spans
-    ndx = bisect_left(self._spans, Span(start, start))
+    ndx = bisect_left(_spans, Span(start, start))
+    if ndx >= len(_spans):
+      return False
     if ndx > 0 and start < _spans[ndx].start:
       ndx -= 1
     elif ndx >= len(_spans):
@@ -222,9 +241,9 @@ class Range(object):
     '''
     spans = self._spans
     if start is None:
-      start = min(0, spans[0].start) if spans else 0
+      start = min(0, self.start) if spans else 0
     if end is None:
-      end = max(start, spans[-1].end) if spans else start
+      end = max(start, self.end) if spans else start
     for span in spans:
       if start < span.start:
         yield False, Span(start, span.start)

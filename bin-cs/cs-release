@@ -1,376 +1,522 @@
-#!/bin/sh -ue
+#!/usr/bin/python
 #
 # General release stuff for packages.
-#       - Cameron Simpson <cs@zip.com.au> 28feb2009
+#   - Cameron Simpson <cs@zip.com.au> 28feb2009
+#
+# Redo in python; it is getting unmanagable in shell.
+#   - Cameron Simpson <cs@zip.com.au> 23jul2015
 #
 
-set -ue
+from __future__ import print_function
+import sys
+import os.path
+import re
+from subprocess import Popen, PIPE, check_call
+from contextlib import contextmanager
+from cs.dateutils import isodate
+from cs.distinfo import URL_PYPI_PROD, URL_PYPI_TEST, PyPI_Package
+from cs.logutils import setup_logging, Pfx, error, warning, info, X
 
-: ${TMPDIR:=/tmp}
+PYLIBTOP = 'lib/python'
 
-trace=  ##set-x
-relpfx=release
-
-prodpypi_url='https://pypi.python.org/pypi'
-testpypi_url='https://testpypi.python.org/pypi'
-pypi_test_mode=1
-
-cmd=$( basename "$0" )
-usage="Usage: $cmd [-x] op [relpfx [args...]]
-  -x            Trace command execution.
-  relpfx        Prefix for new release tag names. Default: $relpfx
+USAGE = '''Usage: %s name [op [args...]]
+  name          Prefix for new release tag names.
   op:
-    ls          List all release prefixes in use.
-    add         Issue a new release.
     last        Report last release issued.
-    next        Generate a new release number.
-    update-tag  Update a release tag.
     log         Changelog from last release to now.
-    export      Export release to temporary directory, report directory.
-    freshmeat-submit
-                Announce last release to freshmeat.
-    pypi [prod] Release python package to PyPI."
+    ls          List all release prefixes in use.
+    next        Generate a new release number.
+    pypi        Upload latest release to PyPI.
+    release     Issue a new release.
+    testpypi    Upload latest release to test PyPI.'''
 
-badopts=
+##  export      Export release to temporary directory, report directory.
+##  freshmeat-submit Announce last release to freshmeat.
 
-while [ $# -gt 0 ]
-do
-  case $1 in
-    -x) trace=set-x ;;
-    --) shift; break ;;
-    -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
-    *)  break ;;
-  esac
-  shift
-done
+def main(argv):
+  cmd = os.path.basename(argv.pop(0))
+  usage = USAGE % (cmd,)
+  setup_logging(cmd)
 
-if [ $# = 0 ]
-then
-  echo "$cmd: missing op" >&2
-  badopts=1
-else
-  op=$1
-  shift
-  [ $# = 0 ] || { relpfx=$1; shift; }
-fi
+  badopts = False
+  xit = 0
 
-case "$relpfx" in
-  ALL)
-    ;;
-  release)
-    logpaths=.
-    ;;
-  [a-z]*)
-    pfxdir=lib/python/$( echo "$relpfx" | tr . / )
-    logpaths=
-    [ -d "$pfxdir" ] && logpaths="$logpaths $pfxdir"
-    pfxfile=$pfxdir.py
-    [ -f "$pfxfile" ] && logpaths="$logpaths $pfxfile"
-    readmepath=$( dirname "$pfxdir" )/README-$( basename "$pfxdir" ).rst
-    [ -f "$readmepath" ] && logpaths="$logpaths $readmepath"
-    ;;
-  *)echo "$cmd: invalid relpfx, must start with a lowercase letter, got: $relpfx" >&2
-    badopts=1
-    ;;
-esac
+  if not argv:
+    warning('missing name')
+    badopts = True
+  else:
+    name = argv.pop(0)
+    with Pfx(name):
+      if not argv:
+        warning('missing op')
+        badopts = True
+      else:
+        op = argv.pop(0)
+        with Pfx(op):
+          N = ReleaseName(name, VCS_Hg())
+          if op == 'last':
+            print(N.last_suffix())
+          elif op == 'log':
+            for files, firstline in N.log_since():
+              print(' '.join(files)+':', firstline)
+          elif op == 'ls':
+            for suffix in sorted(N.release_suffixes()):
+              print(suffix)
+          elif op == 'next':
+            print(N.next_suffix())
+          elif op in 'pypi':
+            # upload latest release to testpypi
+            lastvalue_prefix = 'pypi'
+            pypi_url = URL_PYPI_PROD
+            N.submit_pypi(pypi_url, lastvalue_prefix)
+          elif op == 'release':
+            # issue new release tag
+            outstanding = N.uncommitted()
+            if outstanding:
+              print("Uncommited changes exist for these files:")
+              for path in sorted(outstanding):
+                print(' ', path)
+              print("These changes will not be included in the release.")
+              if not ask("Proceed with release anyway"):
+                error("aborting release at user request")
+                return 1
+            changes = list(N.log_since())
+            if not changes:
+              error("no changes since last release, aborting")
+              return 1
+            print("Changes since the last release:")
+            for files, firstline in changes:
+              print(" ", ' '.join(files) + ': ' + firstline)
+            print()
+            with pipefrom('readdottext') as dotfp:
+              release_message = dotfp.read().rstrip()
+            if not release_message:
+              error("empty release message, aborting")
+              return 1
+            next_tag = N.next_release_tag()
+            if not ask("Confirm new release for %r as %r" % (name, next_tag)):
+              error("aborting release at user request")
+              return 1
+            rel_dir = os.path.join('release', next_tag)
+            with Pfx("mkdir(%s)", rel_dir):
+              os.mkdir(rel_dir)
+            summary_filename = os.path.join(rel_dir, 'SUMMARY.txt')
+            with Pfx(summary_filename):
+              with open(summary_filename, 'w') as sfp:
+                print(release_message, file=sfp)
+            changes_filename = os.path.join(rel_dir, 'CHANGES.txt')
+            with Pfx(changes_filename):
+              with open(changes_filename, 'w') as cfp:
+                for files, firstline in changes:
+                  print(" ", ' '.join(files) + ': ' + firstline, file=cfp)
+            VCS = N.vcs
+            VCS.add_files(summary_filename, changes_filename)
+            VCS.commit('Release information for %s.\nSummary:\n%s'
+                       % (next_tag, release_message),
+                       summary_filename, changes_filename)
+            VCS.tag(next_tag)
+          elif op in 'testpypi':
+            # upload latest release to testpypi
+            lastvalue_prefix = 'testpypi'
+            pypi_url = URL_PYPI_TEST
+            N.submit_pypi(pypi_url, lastvalue_prefix)
+          else:
+            warning("unrecognised op")
+            badopts = True
+  if badopts:
+    print(usage, file=sys.stderr)
+    xit = 2
+  return xit
 
-[ $badopts ] && { echo "$usage" >&2; exit 2; }
+##        export)
+##          exec 3>&1 1>&2
+##          rev=
+##          usage="Usage: $cmd $op [-r rev]"
+##          badopts=
+##          while [ $# -gt 0 ]
+##          do
+##            case $1 in
+##              -r) rev=$2; shift ;;
+##              --) shift; break ;;
+##              -?*)echo "$cmd: $op: unrecognised option: $1" >&2
+##                  badopts=1
+##                  ;;
+##              *)  break ;;
+##            esac
+##            shift
+##          done
+##
+##          [ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2
+##                          badopts=1
+##                        }
+##
+##          [ $badopts ] && { echo "$usage" >&2; exit 2; }
+##
+##          if [ -z "$rev" ]
+##          then
+##            rev=$( self last )
+##            rev=$relpfx-$rev
+##          fi
+##
+##          xit=0
+##
+##          set -ue
+##
+##          unset tmpdir
+##          trap '[ ! -d "$tmpdir" ] || rm -rf $tmpdir; exit 1' 1 2 13 15
+##          tmpdir=$( mkdirn "$TMPDIR/$cmd" )
+##
+##          dstdir=$tmpdir
+##          echo archive revision $rev ...
+##          hg archive -t files -r "'$rev'" "$dstdir"
+##          echo update file timestamps ...
+##          hg-apply-manifest-dates -r "'$rev'" "$dstdir"
+##
+##          echo "$dstdir" >&3
+##          exit $xit
+##          ;;
+##
+##        freshmeat-submit)
+##          unset fm_project \
+##                fm_url_home \
+##                fm_url_tarball \
+##                fm_url_changelog
+##          cf=.freshmeatrc
+##          [ -s "$cf" ] || { echo "$cmd: missing $cf" >&2; exit 1; }
+##          eval $( winclausevars "$cf" freshmeat fm )
+##          self update-tag
+##          lastrelease=$( self last )
+##          [ -n "$lastrelease" ] || exit 1
+##          summary=$( $trace cat release/$lastrelease/SUMMARY.txt )
+##          [ -n "$summary" ] || exit 1
+##          printf "%s\n" "$summary"
+##          ask "Confirm freshmeat-submit of release $lastrelease to project $fm_project"
+##          ( echo "Project: $fm_project"
+##            echo "Version: $lastrelease"
+##            echo "Release-Focus: Minor feature enhancements"
+##            echo "Hide: N"
+##            echo "Website-URL: $fm_url_home"
+##            echo "Tar/GZ-URL: $fm_url_tarball"
+##            echo "Changelog-URL: $fm_url_changelog"
+##            echo
+##            printf "%s\n" "$summary"
+##          ) \
+##          | $trace freshmeat-submit
+##          ;;
+##
 
-# self invoke, passing tunable settings
-self(){
-  _self_op=$1; shift
-  $trace "$0" "$_self_op" "$relpfx" ${1+"$@"}
-}
+##        pypi)
+##          if [ $# -gt 0 ] && [ "x$1" = xprod ]
+##          then  shift; pypi_test_mode=
+##          else  pypi_test_mode=1
+##          fi
+##          pypi_setup
+##          if [ "$relpfx" = ALL ]
+##          then
+##            for relpfx in $( self ls | grep '^cs\.' )
+##            do
+##              pkg=$relpfx
+##              lastlabel=$pypi_pfx-css-$pkg
+##              lastrelease=$( self last ) || exit 1
+##              lastpypirelease=$( $trace lastvalue "$lastlabel" 2>/dev/null || : )
+##              if [ "x$lastrelease" = "x$lastpypirelease" ]
+##              then
+##                echo "OK $relpfx: $pypi_pfx up to date at $lastpypirelease"
+##              else
+##                if [ -n "$lastpypirelease" ]
+##                then
+##                  echo "NEWER $relpfx: $lastrelease, but $pypi_pfx has $lastpypirelease"
+##                else
+##                  echo "NEWER $relpfx: $lastrelease, but $pypi_pfx has nothing"
+##                fi
+##              fi
+##              log=$( self log )
+##              if [ -n "$log" ]
+##              then
+##                echo "  has untagged changes"
+##              fi
+##            done
+##          else
+##            pkg=$relpfx
+##            lastlabel=$pypi_pfx-css-$pkg
+##            case "$pkg" in
+##              cs.*) ;;
+##              *)  echo "$cmd: $op: invalid package name, expected cs.*: $pkg" >&2
+##                  exit 2
+##                  ;;
+##            esac
+##            self update-tag
+##            lastrelease=$( self last )
+##            [ -n "$lastrelease" ] || exit 1
+##            $trace python -m cs.distinfo "$pkg" check
+##            $trace python -m cs.distinfo "$pkg" register
+##            $trace python -m cs.distinfo "$pkg" upload
+##            $trace lastvalue "$lastlabel" "$lastrelease"
+##          fi
+##          ;;
 
-pypi_setup(){
-  if [ $pypi_test_mode ]
-  then
-    pypi_url=$testpypi_url
-    pypi_pfx=testpypi
-  else
-    pypi_url=$prodpypi_url
-    pypi_pfx=pypi
-  fi
-  PYPI_URL=$pypi_url
-  export PYPI_URL
-}
+def lastvalue(key, value=None):
+  ''' Retrieve or store a lastvalue.
+  '''
+  with Pfx('lastvalue(%r)', key):
+    if not key or '/' in key or key.startswith('.'):
+      raise ValueError('invalid key')
+    last_filename = os.path.join(os.environ['HOME'], 'var', 'log', 'lastvalue', key)
+    if value is None:
+      with Pfx(last_filename):
+        with open(last_filename):
+          last = None
+          for lineno, line in enumerate(fp, 1):
+            with Pfx(lineno):
+              if not line.endswith('\n'):
+                raise ValueError('incomplete line')
+              last = line[:-1]
+        return last
+    else:
+      with open(last_filename, 'a') as fp:
+        print(value, file=fp)
 
-case $op in
-  ls)
-    hg tags \
-    | sed -n 's/^\([a-z][^-]*\)-\(2[0-9][0-9][0-9][0-9][0-9][0-9][0-9][^ ]*\) .*/\1/p' \
-    | sort -u
-    ;;
+##          if [ $# -gt 0 ] && [ "x$1" = xprod ]
+##          then  shift; pypi_test_mode=
+##          else  pypi_test_mode=1
+##          fi
+##          pypi_setup
+##          if [ "$relpfx" = ALL ]
+##          then
+##            for relpfx in $( self ls | grep '^cs\.' )
+##            do
+##              pkg=$relpfx
+##              lastlabel=$pypi_pfx-css-$pkg
+##              lastrelease=$( self last ) || exit 1
+##              lastpypirelease=$( $trace lastvalue "$lastlabel" 2>/dev/null || : )
+##              if [ "x$lastrelease" = "x$lastpypirelease" ]
+##              then
+##                echo "OK $relpfx: $pypi_pfx up to date at $lastpypirelease"
+##              else
+##                if [ -n "$lastpypirelease" ]
+##                then
+##                  echo "NEWER $relpfx: $lastrelease, but $pypi_pfx has $lastpypirelease"
+##                else
+##                  echo "NEWER $relpfx: $lastrelease, but $pypi_pfx has nothing"
+##                fi
+##              fi
+##              log=$( self log )
+##              if [ -n "$log" ]
+##              then
+##                echo "  has untagged changes"
+##              fi
+##            done
+##          else
+##            pkg=$relpfx
+##            lastlabel=$pypi_pfx-css-$pkg
+##            case "$pkg" in
+##              cs.*) ;;
+##              *)  echo "$cmd: $op: invalid package name, expected cs.*: $pkg" >&2
+##                  exit 2
+##                  ;;
+##            esac
+##            self update-tag
+##            lastrelease=$( self last )
+##            [ -n "$lastrelease" ] || exit 1
+##            $trace python -m cs.distinfo "$pkg" check
+##            $trace python -m cs.distinfo "$pkg" register
+##            $trace python -m cs.distinfo "$pkg" upload
+##          fi
 
-  last)
-    if [ "$relpfx" = ALL ]
-    then
-      for relpfx in $( self ls )
-      do
-        lastrelease=$( self last )
-        echo "$relpfx $lastrelease"
-      done
-    else
-      lastrelease=$( $trace hg tags | sed -n "/^$relpfx-[1-9][01][0-9][0-9][01][0-9][0-3][0-9]/{s/^$relpfx-//; s/ .*//; p; q;}" )
-      if [ -z "$lastrelease" ]
-      then
-        echo "$cmd: no last release for prefix \"$relpfx\"" >&2
-        exit 1
-      fi
-      printf "%s\n" "$lastrelease"
-      exit 0
-    fi
-    ;;
+def ask(message):
+  ''' Prompt with yes/no question, return true if response is "y" or "yes".
+  '''
+  print(message, end='? ')
+  sys.stdout.flush()
+  response = sys.stdin.readline().rstrip().lower()
+  return response in ('y', 'yes')
 
-  next)
-    lastrelease=$( self last ) || lastrelease=
-    today=$( date +%Y%m%d )
-    if [ -z "$lastrelease" ]
-    then
-      release=$today
-    else
-      if [ "x$lastrelease" '<' "x$today" ]
-      then
-        release=$today
-      else 
-        if [ "x$lastrelease" = "x$today" ]
-        then
-          release=${today}.2
-        else
-          case "$lastrelease" in
-            "$today".[1-9] )
-              sfx=$( expr "x$lastrelease" : "x$today".'\([1-9][0-9]*\).*' )
-              release=$today.$( expr "$sfx" + 1 )
-              ;;
-            *)
-              echo "$cmd: can't compute next release from \"$lastrelease\"" >&2
-              exit 1
-              ;;
-          esac
-        fi
-      fi
-    fi
-    printf "%s\n" "$release"
-    exit 0
-    ;;
+@contextmanager
+def pipefrom(*argv):
+  ''' Context manager returning standard output of command.
+  '''
+  P = Popen(argv, stdout=PIPE)
+  yield P.stdout
+  if P.wait() != 0:
+    pipecmd = ' '.join(argv)
+    raise ValueError("%s: exit status %d" % (pipecmd, P.returncode,))
 
-  log)
-    lastrelease=$relpfx-$( self last ) || lastrelease=0
-    if [ "x$lastrelease" = x0 ]
-    then
-      echo "$cmd: no log because no previous release tag" >&2
-      exit 1
-    else
-      $trace hg log -r "'$lastrelease':" \
-                    --template '{files}: {desc|firstline}\n' \
-                    $logpaths \
-      | $trace sed "/^\\.hg/d; /^CHANGELOG/d; /^$relpfx-/d"
-    fi
-    ;;
+#                               name        -  YYYYMMDD[.n]
+re_RELEASE_TAG = re.compile(r'([a-z][^-]*)-(2[0-9][0-9][0-9][01][0-9][0-3][0-9](\.[1-9]\d*)?)$')
 
-  add)
-    uncommited=$( $trace hg status | grep -v '^?' || : )
-    if [ -n "$uncommited" ]
-    then
-      echo "Uncommited changes exist:"
-      printf "%s\n" "$uncommited"
-      echo "These changes will not be included in the release."
-      ask "Proceed anyway" || exit 1
-    fi
-    lastrelease=$relpfx-$( self last ) || lastrelease=0
-    if [ "x$lastrelease" != x0 ]
-    then
-      log=$( self log )
-      if [ -z "$log" ]
-      then
-        echo "$cmd: no changes since last release tag, aborting" >&2
-        exit 1
-      fi
-      echo "Changes since $lastrelease:"
-      printf "%s\n" "$log"
-    fi
-    echo
-    echo "Enter short change summary since $lastrelease."
-    changefile=$TMPDIR/$cmd.$$.changes
-    readdottext >"$changefile"
-    [ -s "$changefile" ] || exit 1
-    while echo
-          cat "$changefile"
-          echo
-          ask "Edit the changes"
-    do
-      "$EDITOR" "$changefile"
-    done
-    if [ ! -s "$changefile" ]
-    then
-      echo "$cmd: empty changefile, aborting" >&2
-      exit 1
-    fi
-    newrelease=$( self next ) \
-    || { echo "$cmd: cannot generate next tag" >&2; exit 1; }
-    echo
-    newtag=$relpfx-$newrelease
-    ask "Ok to mark release as $newtag" || exit 1
-    if [ "x$relpfx" = xrelease ]
-    then reldir=release/$newrelease
-    else reldir=release/$relpfx-$newrelease
-    fi
-    $trace mkdir "$reldir"
-    printf "%s\n" "$newtag" >"$reldir/release-tag.txt"
-    $trace mv "$changefile" "$reldir/SUMMARY.txt"
-    [ "x$lastrelease" == x0 ] \
-    || printf '%s\n' "$log" >"$reldir/CHANGES.txt"
-    $trace hg add "$reldir"
-    summary_text=$( cat "$reldir/SUMMARY.txt" )
-    $trace hg commit -m "Release information for $newtag.
-Summary:
-$summary_text" "$reldir"
-    $trace hg tag "$newtag"
-    ;;
+class VCS(object):
 
-  export)
-    exec 3>&1 1>&2
-    rev=
-    usage="Usage: $cmd $op [-r rev]"
-    badopts=
-    while [ $# -gt 0 ]
-    do
-      case $1 in
-        -r) rev=$2; shift ;;
-        --) shift; break ;;
-        -?*)echo "$cmd: $op: unrecognised option: $1" >&2
-            badopts=1
-            ;;
-        *)  break ;;
-      esac
-      shift
-    done
+  def release_tags(self):
+    ''' Generator yielding the current release tags.
+    '''
+    for tag in self.tags():
+      m = re_RELEASE_TAG.match(tag)
+      if m:
+        yield tag
 
-    [ $# = 0 ] || { echo "$cmd: extra arguments: $*" >&2
-                    badopts=1
-                  }
+  def release_prefixes(self):
+    ''' Return a set of the existing release prefixes.
+    '''
+    tagpfxs = set()
+    for tag in self.release_tags():
+      tagpfx, _ = tag.split('-', 1)
+      tags.add(tagpfx)
+    return tagpfxs
 
-    [ $badopts ] && { echo "$usage" >&2; exit 2; }
+class VCS_Hg(VCS):
 
-    if [ -z "$rev" ]
-    then
-      rev=$( self last )
-      rev=$relpfx-$rev
-    fi
+  def _pipefrom(self, *hgargs):
+    hgargv = ['hg'] + list(hgargs) + ['|']
+    print(hgargv, file=sys.stderr)
+    return pipefrom('hg', *hgargs)
 
-    xit=0
+  def _hgcmd(self, *hgargs):
+    print('hg', *hgargs, file=sys.stderr)
+    check_call(['hg'] + list(hgargs))
 
-    set -ue
+  def tags(self):
+    ''' Generator yielding the current tags.
+    '''
+    with self._pipefrom('tags') as hgfp:
+      tags = set()
+      for tagline in hgfp:
+        tag, _ = tagline.split(None, 1)
+        yield tag
 
-    unset tmpdir
-    trap '[ ! -d "$tmpdir" ] || rm -rf $tmpdir; exit 1' 1 2 13 15
-    tmpdir=$( mkdirn "$TMPDIR/$cmd" )
+  def tag(self, tag_name, revision=None):
+    ''' Tag a revision with the supplied `tag`, by default revision "tip".
+    '''
+    if revision is None:
+      revision = 'tip'
+    self._hgcmd('tag',  '-r', revision, '--', tag_name)
 
-    dstdir=$tmpdir
-    echo archive revision $rev ...
-    hg archive -t files -r "'$rev'" "$dstdir"
-    echo update file timestamps ...
-    hg-apply-manifest-dates -r "'$rev'" "$dstdir"
+  def log_since(self, tag, paths):
+    with self._pipefrom('log',
+                     '-r', tag+':',
+                     '--template', '{files}\t{desc|firstline}\n',
+                     '--',
+                     *paths) as hgfp:
+      for hgline in hgfp:
+        files, firstline = hgline.split('\t', 1)
+        files = files.split()
+        firstline = firstline.strip()
+        yield files, firstline
 
-    echo "$dstdir" >&3
-    exit $xit
-    ;;
+  def add_files(self, *paths):
+    ''' Add the specified paths to the repository.
+    '''
+    self._hgcmd('add', *paths)
 
-  freshmeat-submit)
-    unset fm_project \
-          fm_url_home \
-          fm_url_tarball \
-          fm_url_changelog
-    cf=.freshmeatrc
-    [ -s "$cf" ] || { echo "$cmd: missing $cf" >&2; exit 1; }
-    eval $( winclausevars "$cf" freshmeat fm )
-    self update-tag
-    lastrelease=$( self last )
-    [ -n "$lastrelease" ] || exit 1
-    summary=$( $trace cat release/$lastrelease/SUMMARY.txt )
-    [ -n "$summary" ] || exit 1
-    printf "%s\n" "$summary"
-    ask "Confirm freshmeat-submit of release $lastrelease to project $fm_project"
-    ( echo "Project: $fm_project"
-      echo "Version: $lastrelease"
-      echo "Release-Focus: Minor feature enhancements"
-      echo "Hide: N"
-      echo "Website-URL: $fm_url_home"
-      echo "Tar/GZ-URL: $fm_url_tarball"
-      echo "Changelog-URL: $fm_url_changelog"
-      echo
-      printf "%s\n" "$summary"
-    ) \
-    | $trace freshmeat-submit
-    ;;
+  def commit(self, message, *paths):
+    ''' Commit the specified `paths` with the specified `message`.
+    '''
+    self._hgcmd('commit', '-m', message, '--', *paths)
 
-  update-tag)
-    if lastrelease=$( self last )
-    then
-      log=$( self log )
-      printf "%s\n" "$log"
-      if [ -n "$log" ] && ask "Issue new tag for $relpfx"
-      then
-        self add || exit 1
-      fi
-    else
-      ask "Issue first tag for $relpfx" || exit 1
-      self add || exit 1
-    fi
-    ;;
+  def uncommitted(self):
+    ''' Generator yielding uncommited but tracked paths.
+    '''
+    with self._pipefrom('status') as hgfp:
+      for hgline in hgfp:
+        s, path = hgline.rstrip().split(' ', 1)
+        if s != '?':
+          yield path
 
-  pypi)
-    if [ $# -gt 0 ] && [ "x$1" = xprod ]
-    then  shift; pypi_test_mode=
-    else  pypi_test_mode=1
-    fi
-    pypi_setup
-    if [ "$relpfx" = ALL ]
-    then
-      for relpfx in $( self ls | grep '^cs\.' )
-      do
-        pkg=$relpfx
-        lastlabel=$pypi_pfx-css-$pkg
-        lastrelease=$( self last ) || exit 1
-        lastpypirelease=$( $trace lastvalue "$lastlabel" 2>/dev/null || : )
-        if [ "x$lastrelease" = "x$lastpypirelease" ]
-        then
-          echo "OK $relpfx: $pypi_pfx up to date at $lastpypirelease"
-        else
-          if [ -n "$lastpypirelease" ]
-          then
-            echo "NEWER $relpfx: $lastrelease, but $pypi_pfx has $lastpypirelease"
-          else
-            echo "NEWER $relpfx: $lastrelease, but $pypi_pfx has nothing"
-          fi
-        fi
-        log=$( self log )
-        if [ -n "$log" ]
-        then
-          echo "  has untagged changes"
-        fi
-      done
-    else
-      pkg=$relpfx
-      lastlabel=$pypi_pfx-css-$pkg
-      case "$pkg" in
-        cs.*) ;;
-        *)  echo "$cmd: $op: invalid package name, expected cs.*: $pkg" >&2
-            exit 2
-            ;;
-      esac
-      self update-tag
-      lastrelease=$( self last )
-      [ -n "$lastrelease" ] || exit 1
-      $trace python -m cs.distinfo "$pkg" check
-      $trace python -m cs.distinfo "$pkg" register
-      $trace python -m cs.distinfo "$pkg" upload
-      $trace lastvalue "$lastlabel" "$lastrelease"
-    fi
-    ;;
+class ReleaseName(object):
+  ''' State surrounding a particular release tag prefix.
+  '''
 
-  *)echo "$cmd: unimplemented op \"$op\"" >&2
-    exit 2
-    ;;
+  def __init__(self, prefix, vcs):
+    self.prefix = prefix
+    self.vcs = vcs
 
-esac
+  def tagname(self, suffix):
+    tag = self.prefix + '-' + suffix
+    m = re_RELEASE_TAG.match(tag)
+    if not m:
+      raise ValueError("invalid tag made from prefix %r and suffix %r" % (self.prefix, suffix))
+    return tag
+
+  def release_tags(self):
+    ''' Generator yielding existing release tags.
+    '''
+    prefix = self.prefix
+    prefix_ = prefix + '-'
+    for tag in self.vcs.release_tags():
+      if tag.startswith(prefix_):
+        yield tag
+
+  def release_suffixes(self):
+    ''' Generator yielding existing suffixes.
+    '''
+    poffset = len(self.prefix) + 1
+    for tag in self.release_tags():
+      yield tag[poffset:]
+
+  def last_suffix(self):
+    ''' Return the last release suffix for the specified release prefix, or None.
+    '''
+    last = None
+    for suffix in self.release_suffixes():
+      if last is None or suffix > last:
+        last = suffix
+    return last
+
+  def next_suffix(self):
+    ''' Compute the next release suffix.
+    '''
+    prefix = self.prefix
+    last_suffix = self.last_suffix()
+    today = isodate(dashed=False)
+    if last_suffix is None or last_suffix < today:
+      next_suffix = today
+    elif last_suffix == today:
+      next_suffix = today + '.1'
+    else:
+      # last_suffix > today, therefore YYYYMMDD.n
+      ordinal = last_suffix.split('.', 1)[1]
+      if ordinal.startswith('0'):
+        raise ValueError("expected last_suffix of the form YYYYMMDD.n, received %r" % (last_suffix,))
+      ordinal = int(ordinal)
+      next_suffix = today + '.' + str(ordinal + 1)
+    return next_suffix
+
+  def next_release_tag(self):
+    return self.prefix + '-' + self.next_suffix()
+
+  def paths(self):
+    ''' List of paths relevant this name, for use with hg log.
+    '''
+    prefix = self.prefix
+    base = os.path.join(PYLIBTOP, prefix.replace('.', '/'))
+    basepy = base + '.py'
+    readme = os.path.join(os.path.dirname(base), 'README-' + os.path.basename(base) + '.rst')
+    return (base, basepy, readme)
+
+  def log_since(self):
+    ''' Generator yielding (files, line) tuples for log lines since the last release for the supplied `prefix`.
+    '''
+    suffix = self.last_suffix()
+    if suffix is None:
+      return
+    return self.vcs.log_since(self.tagname(suffix), self.paths())
+
+  def uncommitted(self):
+    pathset = set(self.paths())
+    changed = ()
+    for path in self.vcs.uncommitted():
+      if path in pathset:
+        changed.append(path)
+    return changed
+
+  def submit_pypi(self, pypi_url, lastvalue_prefix, suffix=None):
+    if suffix is None:
+      suffix = self.last_suffix()
+    PKG = PyPI_Package(pypi_url, self.prefix, suffix)
+    PKG.check()
+    PKG.register()
+    PKG.upload()
+    lastvalue_label = '-'.join( [lastvalue_prefix, 'css', self.prefix] )
+    lastvalue(lastvalue_label, suffix)
+
+if __name__ == '__main__':
+  sys.exit(main(sys.argv))

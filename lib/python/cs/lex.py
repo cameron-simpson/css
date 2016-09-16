@@ -21,7 +21,6 @@ import re
 import sys
 import os
 from cs.py3 import bytes, unicode, ustr, sorted, StringTypes
-from cs.logutils import X, warning
 
 unhexify = binascii.unhexlify
 if sys.hexversion >= 0x030000:
@@ -103,8 +102,15 @@ def htmlquote(s):
   return "\"" + s + "\""
 
 def jsquote(s):
+  ''' Quote a string for use in JavaScript.
+  '''
   s = s.replace("\"", "&dquot;")
   return "\"" + s + "\""
+
+def phpquote(s):
+  ''' Quote a string for use in PHP code.
+  '''
+  return "'" + s.replace('\\', '\\\\').replace("'", "\\'") + "'"
 
 def dict2js(d):
   import cs.json
@@ -201,11 +207,14 @@ def untexthexify(s, shiftin='[', shiftout=']'):
 # regexp to match RFC2047 text chunks
 re_RFC2047 = re.compile(r'=\?([^?]+)\?([QB])\?([^?]*)\?=', re.I)
 
-def unrfc2047(s):
-  ''' Accept a string containing RFC2047 text encodings (or the whitespace
+def unrfc2047(s, warning=None):
+  ''' Accept a string `s` containing RFC2047 text encodings (or the whitespace
       littered varieties that come from some low quality mail clients) and
       decode them into flat Unicode.
+      `warning`: optional parameter specifying function to report warning messages, default cs.logutils.warning
   '''
+  if warning is None:
+    from cs.logutils import warning
   if not isinstance(s, unicode):
     s = unicode(s, 'iso8859-1')
   chunks = []
@@ -217,6 +226,7 @@ def unrfc2047(s):
       chunks.append(s[sofar:start])
     enccset = m.group(1)
     enctype = m.group(2).upper()
+    # default to undecoded text
     enctext = m.group(3)
     if enctype == 'B':
       try:
@@ -265,12 +275,24 @@ def get_white(s, offset=0):
   '''
   return get_chars(s, offset, whitespace)
 
+def skipwhite(s, offset):
+  ''' Convenience routine for skipping past whitespace; returns offset of next nonwhitespace character.
+  '''
+  _, offset = get_white(s, offset=offset)
+  return offset
+
 def get_nonwhite(s, offset=0):
   ''' Scan the string `s` for characters not in string.whitespace starting at
       `offset` (default 0).
       Return (match, new_offset).
   '''
   return get_other_chars(s, offset=offset, stopchars=whitespace)
+
+def get_hexadecimal(s, offset=0):
+  ''' Scan the string `s` for hexadecimal characters starting at `offset`.
+      Return hex_string, new_offset.
+  '''
+  return get_chars(s, offset, '0123456789abcdefABCDEF')
 
 def get_identifier(s, offset=0, alpha=ascii_letters, number=digits, extras='_'):
   ''' Scan the string `s` for an identifier (by default an ASCII
@@ -280,16 +302,49 @@ def get_identifier(s, offset=0, alpha=ascii_letters, number=digits, extras='_'):
       The empty string and an unchanged offset will be returned if
       there is no leading letter/underscore.
   '''
+  if offset >= len(s):
+    return '', offset
   ch = s[offset]
   if ch not in alpha and ch not in extras:
     return '', offset
   idtail, offset = get_chars(s, offset + 1, alpha + number + extras)
   return ch + idtail, offset
 
+def is_identifier(s, offset=0, **kw):
+  ''' Test if the string `s` is an identifier from position `offset` onward.
+  '''
+  s2, offset2 = get_identifier(s, offset=offset, **kw)
+  return s2 and offset2 == len(s)
+
 def get_uc_identifier(s, offset=0, number=digits, extras='_'):
   ''' Scan the string `s` for an identifier as for get_identifier(), but require the letters to be uppercase.
   '''
   return get_identifier(s, offset=offset, alpha=ascii_uppercase, number=number, extras=extras)
+
+def get_dotted_identifier(s, offset=0, **kw):
+  ''' Scan the string `s` for a dotted identifier (by default an ASCII
+      letter or underscore followed by letters, digits or underscores)
+      with optional trailing dot and another dotted identifier,
+      starting at `offset` (default 0).
+      Return (match, new_offset).
+      The empty string and an unchanged offset will be returned if
+      there is no leading letter/underscore.
+  '''
+  offset0 = offset
+  _, offset = get_identifier(s, offset=offset, **kw)
+  if _:
+    while offset < len(s)-1 and s[offset] == '.':
+      _, offset2 = get_identifier(s, offset=offset+1, **kw)
+      if not _:
+        break
+      offset = offset2
+  return s[offset0:offset], offset
+
+def is_dotted_identifier(s, offset=0, **kw):
+  ''' Test if the string `s` is an identifier from position `offset` onward.
+  '''
+  s2, offset2 = get_dotted_identifier(s, offset=offset, **kw)
+  return s2 and offset2 == len(s)
 
 def get_other_chars(s, offset=0, stopchars=None):
   ''' Scan the string `s` for characters not in `stopchars` starting

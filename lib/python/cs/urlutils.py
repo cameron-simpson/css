@@ -20,7 +20,9 @@ DISTINFO = {
 import os
 import os.path
 import sys
+from collections import namedtuple
 import errno
+from heapq import heappush, heappop
 import time
 from itertools import chain
 from bs4 import BeautifulSoup, Tag, BeautifulStoneSoup
@@ -38,25 +40,35 @@ try:
   from urllib.request import Request, HTTPError, URLError, \
             HTTPPasswordMgrWithDefaultRealm, HTTPBasicAuthHandler, \
             build_opener
-  from urllib.parse import urlparse, urljoin
-  from html.parser import HTMLParseError
-except ImportError:
+  from urllib.parse import urlparse, urljoin, quote as urlquote
+except ImportError as e:
   from urllib2 import Request, HTTPError, URLError, \
 		    HTTPPasswordMgrWithDefaultRealm, HTTPBasicAuthHandler, \
 		    build_opener
   from urlparse import urlparse, urljoin
-  from HTMLParser import HTMLParseError
 try:
   import xml.etree.cElementTree as ElementTree
 except ImportError:
   import xml.etree.ElementTree as ElementTree
+from string import whitespace
 from threading import RLock
 from cs.excutils import logexc
+##safe_property
+safe_property = property
 from cs.lex import parseUC_sAttr
 from cs.logutils import Pfx, pfx_iter, debug, error, warning, exception, D, X
+from cs.rfc2616 import datetime_from_http_date
 from cs.threads import locked_property
 from cs.py3 import ustr, unicode
 from cs.obj import O
+
+##from http.client import HTTPConnection
+##putheader0 = HTTPConnection.putheader
+##def my_putheader(self, header, *values):
+##  for v in values:
+##    X("HTTPConnection.putheader(%r): value=%r", header, v)
+##  return putheader0(self, header, *values)
+##HTTPConnection.putheader = my_putheader
 
 def isURL(U):
   ''' Test if an object `U` is an URL instance.
@@ -69,8 +81,8 @@ def URL(U, referer, **kw):
   '''
   if not isURL(U):
     ##D("new U %r (ref=%r)", U, referer)
-    U = _URL(ustr(U))
-    U._init(referer=referer, **kw)
+    U = _URL(U)
+    U._init(referer, **kw)
   else:
     if U.referer is None and referer is not None:
       ##D("old U %r, updating referer to %r", U, referer)
@@ -94,10 +106,13 @@ class _URL(unicode):
         `opener`: urllib2 opener object, inherited from `referer` if unspecified,
                   made at need if no referer.
     '''
-    self.referer = URL(referer, None) if referer else referer
+    if referer is not None:
+      referer = URL(referer, None)
+    self.referer = referer
     self.user_agent = user_agent if user_agent else self.referer.user_agent if self.referer else None
     self._opener = opener
     self._parts = None
+    self._info = None
     self.flush()
     self._lock = RLock()
     self.flush()
@@ -115,7 +130,8 @@ class _URL(unicode):
       if plural:
         return nodes
       return the(nodes)
-    raise AttributeError(attr)
+    # look up method on equivalent Unicode string
+    return getattr(unicode(self), attr)
 
   def flush(self):
     ''' Forget all cached content.
@@ -124,12 +140,12 @@ class _URL(unicode):
     #       _parsed is a BeautifulSoup parse of the _content decoded as utf-8.
     #       _xml is an Elementtree parse of the _content decoded as utf-8.
     self._content = None
-    self._content_type = None
+    self._info = None
     self._parsed = None
     self._xml = None
     self._fetch_exception = None
 
-  @property
+  @safe_property
   def opener(self):
     if self._opener is None:
       if self.referer is not None and self.referer._opener is not None:
@@ -146,10 +162,10 @@ class _URL(unicode):
         return method
     hdrs = {}
     if self.referer:
-      hdrs['Referer'] = self.referer
+      hdrs['Referer'] = urlquote(self.referer, encoding='utf-8', safe=':/;#')
     hdrs['User-Agent'] = self.user_agent if self.user_agent else os.environ.get('USER_AGENT', 'css')
-    url = 'file://'+self if self.startswith('/') else self
-    rq = MyRequest(url, None, hdrs)
+    rqurl = urlquote(self, encoding='utf-8', safe=':/;#')
+    rq = MyRequest(rqurl, None, hdrs)
     return rq
 
   def _response(self, method):
@@ -159,23 +175,25 @@ class _URL(unicode):
     with Pfx("open(%s)", rq):
       while retries > 0:
         now = time.time()
+        open = opener.open
         try:
-          rsp = opener.open(rq)
+          opened_url = open(rq)
         except OSError as e:
           if e.errno == errno.ETIMEDOUT:
             elapsed = time.time() - now
             warning("open %s: %s; elapsed=%gs", self, e, elapsed)
             if retries > 0:
               retries -= 1
-            else:
-              raise
+              continue
+          raise
         except HTTPError as e:
           warning("open %s: %s", self, e)
           raise
         else:
           # success, exit retry loop
           break
-    return rsp
+    self._info = opened_url.info()
+    return opened_url
 
   def _fetch(self):
     ''' Fetch the URL content.
@@ -186,22 +204,45 @@ class _URL(unicode):
     '''
     with Pfx("_fetch(%s)", self):
       try:
-        rsp = self._response('GET')
-        H = rsp.info()
-        self._info = rsp.info()
-        self._content = rsp.read()
-        self._parsed = None
+        with self._response('GET') as opened_url:
+          opened_url = self._response('GET')
+          self.opened_url = opened_url
+          # URL post redirection
+          final_url = opened_url.geturl()
+          if final_url == self:
+            final_url = self
+          else:
+            final_url = URL(final_url, self)
+          self.final_url = final_url
+          self._content = opened_url.read()
+          self._parsed = None
       except HTTPError as e:
         error("error with GET: %s", e)
         self.flush()
         self._fetch_exception = e
 
-  def HEAD(self):
-    rsp = self._response('HEAD')
-    rsp.read()
-    return rsp
+  # present GET action publicly
+  GET = _fetch
 
-  @logexc
+  def exists(self):
+    ''' Test if this URL exists, return Boolean.
+    '''
+    if self._info is not None:
+      return True
+    try:
+      self.HEAD()
+    except HTTPError as e:
+      if e.code == 404:
+        return False
+      raise
+    else:
+      return True
+
+  def HEAD(self):
+    opened_url = self._response('HEAD')
+    opened_url.read()
+    return opened_url
+
   def get_content(self, onerror=None):
     ''' Probe URL for content to avoid exceptions later.
         Use, and save as .content, `onerror` in the case of HTTPError.
@@ -221,12 +262,12 @@ class _URL(unicode):
     self._fetch()
     return self._content
 
-  @property
+  @safe_property
   def content_type(self):
     ''' The URL content MIME type.
     '''
-    if self._content is None:
-      self._fetch()
+    if self._info is None:
+      self.HEAD()
     try:
       ctype = self._info.get_content_type()
     except AttributeError as e:
@@ -234,15 +275,42 @@ class _URL(unicode):
       ctype = None
     return ctype
 
+  @safe_property
+  def content_length(self):
+    ''' The value of the Content-Length: header or None.
+    '''
+    try:
+      if self._info is None:
+        self.HEAD()
+      value = self._info['Content-Length']
+      if value is not None:
+        value = int(value.strip())
+      return value
+    except AttributeError as e:
+      raise RuntimeError("%s" % (e,)) from e
+
+  @safe_property
+  def last_modified(self):
+    ''' The value of the Last-Modified: header as a UNIX timestamp, or None.
+    '''
+    if self._info is None:
+      self.HEAD()
+    value = self._info['Last-Modified']
+    if value is not None:
+      # parse HTTP-date into datetime object
+      dt_last_modified = datetime_from_http_date(value.strip())
+      value = dt_last_modified.timestamp()
+    return value
+
   @locked_property
   def content_transfer_encoding(self):
     ''' The URL content tranfer encoding.
     '''
     if self._content is None:
-      self._fetch()
+      self.HEAD()
     return self._info.getencoding()
 
-  @property
+  @safe_property
   def domain(self):
     ''' The URL domain - the hostname with the first dotted component removed.
     '''
@@ -262,7 +330,7 @@ class _URL(unicode):
     else:
       parser_names = ('lxml', 'xml')
     try:
-      P = BeautifulSoup(content.decode('utf-8', 'replace'), 'lxml')
+      P = BeautifulSoup(content.decode('utf-8', 'replace'), 'html5lib')
       ##P = BeautifulSoup(content.decode('utf-8', 'replace'), list(parser_names))
     except Exception as e:
       exception("%s: .parsed: BeautifulSoup(unicode(content)) fails: %s", self, e)
@@ -281,7 +349,7 @@ class _URL(unicode):
   def xml(self):
     return ElementTree.XML(self.content.decode('utf-8', 'replace'))
 
-  @property
+  @safe_property
   def parts(self):
     ''' The URL parsed into parts by urlparse.urlparse.
     '''
@@ -289,81 +357,81 @@ class _URL(unicode):
       self._parts = urlparse(self)
     return self._parts
 
-  @property
+  @safe_property
   def scheme(self):
     ''' The URL scheme as returned by urlparse.urlparse.
     '''
     return self.parts.scheme
 
-  @property
+  @safe_property
   def netloc(self):
     ''' The URL netloc as returned by urlparse.urlparse.
     '''
     return self.parts.netloc
 
-  @property
+  @safe_property
   def path(self):
     ''' The URL path as returned by urlparse.urlparse.
     '''
     return self.parts.path
 
-  @property
+  @safe_property
   def path_elements(self):
-    ''' Return the non-empty path components.
+    ''' Return the non-empty path components; NB: a new list every time.
     '''
     return [ w for w in self.path.strip('/').split('/') if w ]
 
-  @property
+  @safe_property
   def params(self):
     ''' The URL params as returned by urlparse.urlparse.
     '''
     return self.parts.params
 
-  @property
+  @safe_property
   def query(self):
     ''' The URL query as returned by urlparse.urlparse.
     '''
     return self.parts.query
 
-  @property
+  @safe_property
   def fragment(self):
     ''' The URL fragment as returned by urlparse.urlparse.
     '''
     return self.parts.fragment
 
-  @property
+  @safe_property
   def username(self):
     ''' The URL username as returned by urlparse.urlparse.
     '''
     return self.parts.username
 
-  @property
+  @safe_property
   def password(self):
     ''' The URL password as returned by urlparse.urlparse.
     '''
     return self.parts.password
 
-  @property
+  @safe_property
   def hostname(self):
     ''' The URL hostname as returned by urlparse.urlparse.
     '''
     return self.parts.hostname
 
-  @property
+  @safe_property
   def port(self):
     ''' The URL port as returned by urlparse.urlparse.
     '''
     return self.parts.port
 
-  @property
+  @safe_property
   def dirname(self, absolute=False):
     return os.path.dirname(self.path)
 
-  @property
+  @safe_property
   def parent(self):
     return URL(urljoin(self, self.dirname), self)
 
-  @property
+  @safe_property
   def basename(self):
     return os.path.basename(self.path)
 
@@ -381,11 +449,11 @@ class _URL(unicode):
     '''
     return self.xml.findall(match)
 
-  @property
+  @safe_property
   def baseurl(self):
     for B in self.BASEs:
       try:
-        base = B['href']
+        base = strip_whitespace(B['href'])
       except KeyError:
         pass
       else:
@@ -393,12 +461,48 @@ class _URL(unicode):
           return URL(base, self)
     return self
 
-  @property
+  @safe_property
   def page_title(self):
     t = self.parsed.title
     if t is None:
       return ''
     return t.string
+
+  def resolve(self, base):
+    ''' Resolve this URL with respect to a base URL.
+    '''
+    return URL(urljoin(base, self), base)
+
+  def normalised(self):
+    ''' Return a normalised URL where "." and ".." components have been processed.
+    '''
+    slashed = self.path.endswith('/')
+    elems = self.path_elements
+    i = 0
+    while i < len(elems):
+      elem = elems[i]
+      if elem == '' or elem == '.':
+        elems.pop(i)
+      elif elem == '..':
+        elems.pop(i)
+        if i > 0:
+          i -= 1
+          elems.pop(i)
+      else:
+        i += 1
+    normpath = '/' + '/'.join(elems)
+    if slashed and not normpath.endswith('/'):
+      normpath += '/'
+    if normpath == self.path:
+      U = self
+    else:
+      normURL = self.scheme + '://' + self.netloc + normpath
+      if self.params:
+        normURL += ';' + self.paras
+      if self.fragment:
+        normURL += '#' + self.fragment
+      U = URL(normURL, self.referer)
+    return U
 
   def hrefs(self, absolute=False):
     ''' All 'href=' values from the content HTML 'A' tags.
@@ -406,7 +510,7 @@ class _URL(unicode):
     '''
     for A in self.As:
       try:
-        href = A['href']
+        href = strip_whitespace(A['href'])
       except KeyError:
         debug("no href, skip %r", A)
         continue
@@ -422,11 +526,138 @@ class _URL(unicode):
       del kw['absolute']
     for A in self.find_all(*a, **kw):
       try:
-        src = A['src']
+        src = strip_whitespace(A['src'])
       except KeyError:
         debug("no src, skip %r", A)
         continue
       yield URL( (urljoin(self.baseurl, src) if absolute else src), self )
+
+  def savepath(self, rootdir):
+    ''' Compute a local filesystem save pathname for this URL.
+        This scheme is designed to accomodate the fact that 'a',
+        'a/' and 'a/b' can all coexist.
+        Extend any component ending in '.' with another '.'.
+        Extend directory components with '.d.'.
+    '''
+    elems = []
+    Uelems = self.path_elements
+    if self.endswith('/'):
+      base = None
+    else:
+      base = Uelems.pop()
+      if base.endswith('.'):
+        base += '.'
+    for elem in Uelems:
+      if elem.endswith('.'):
+        elem += '.'
+      elem += '.d.'
+      elems.append(elem)
+    if base is not None:
+      elems.append(base)
+    path = '/'.join(elems)
+    if not path:
+      path = '.d.'
+    revpath = '/' + self.unsavepath(path)
+    if revpath != self.path:
+      raise RuntimeError("savepath: MISMATCH %r => %r => %r (expected %r)" % (self, path, revpath, self.path))
+      raise RuntimeError("BANG")
+    return path
+
+  @classmethod
+  def unsavepath(cls, savepath):
+    ''' Compute URL path component from a savepath as returned by URL.savepath.
+        This should always round trip with URL.savepath.
+    '''
+    with Pfx("unsavepath(%r)", savepath):
+      elems = [ elem for elem in savepath.split('/') if elem ]
+      base = elems.pop()
+      with Pfx(base):
+        if base == '.d.':
+          base = ''
+        elif base.endswith('.d.'):
+          raise ValueError('basename may not end with ".d."')
+      for i, elem in enumerate(elems):
+        with Pfx(elem):
+          if elem.endswith('.d.'):
+            elem = elem[:-3]
+          else:
+            raise ValueError('dir elements must end in ".d."')
+          elems[i] = elem
+      elems.append(base)
+      for elem in elems:
+        with Pfx(elem):
+          if elem.endswith('.'):
+            elem = elem[:-1]
+            if not elem.endswith('.'):
+              raise ValueError('post "." trimming elem should end in ".", but does not')
+      return '/'.join(elems)
+
+  def walk(self, limit=None, seen=None, follow_redirects=False):
+    ''' Walk a website from this URL yielding this and all descendent URLs.
+        `limit`: an object with a contraint test method "ok".
+                 If not supplied, limit URLs to the same host and port.
+        `seen`: a setlike object with a "__contains__" method and an "add" method.
+                 URLs already in the set will not be yielded or visited.
+        `follow_redirects`: whether to follow URL redirects
+    '''
+    with Pfx("walk(%r)", self):
+      if limit is None:
+        limit = self.default_limit()
+      if seen is None:
+        seen = set()
+      todo = [self]
+      while todo:
+        U = heappop(todo)
+        with Pfx(U):
+          if U in seen:
+            continue
+          seen.add(U)
+          if not limit.ok(U):
+            X("walk: reject %r, does not match limit %s", U, limit)
+            continue
+          yield U
+          subURLs = []
+          try:
+            # TODO: also parse CSS, XML?
+            if U.content_type == 'text/html':
+              subURLs.extend(U.srcs())
+              subURLs.extend(U.hrefs())
+          except HTTPError as e:
+            if e.code != 404:
+              warning("%s", e)
+          for subU in sorted(subURLs):
+            subU0 = subU
+            subU = subU.resolve(U)
+            subU = subU.normalised()
+            if limit.ok(subU):
+              # strip fragment if present - not relevant
+              try:
+                subU, frag = subU.rsplit('#', 1)
+              except ValueError:
+                pass
+              else:
+                subU = URL(subU, U)
+              heappush(todo, subU)
+
+  def default_limit(self):
+    ''' Default URLLimit for this URL: same host:port, any subpath.
+    '''
+    return URLLimit(self.scheme, self.hostname, self.port, '/')
+
+class URLLimit(namedtuple('URLLimit', 'scheme hostname port subpath')):
+
+  def ok(self, U):
+    U = URL(U, None)
+    return ( U.scheme == self.scheme
+         and U.hostname == self.hostname
+         and U.port == self.port
+         and U.path.startswith(self.subpath)
+           )
+
+def strip_whitespace(s):
+  ''' Strip whitespace characters from a string, per HTML 4.01 section 1.6 and appendix E.
+  '''
+  return ''.join([ ch for ch in s if ch not in whitespace ])
 
 def skip_errs(iterable):
   ''' Iterate over `iterable` and yield its values.
@@ -485,7 +716,7 @@ class URLs(object):
   def __setitem__(self, key, value):
     self.context[key] = value
 
-  @property
+  @safe_property
   def multi(self):
     ''' Prepare this URLs object for reuse by converting its urls
         iterable to a list if not already a list or tuple.
@@ -534,7 +765,7 @@ class NetrcHTTPPasswordMgr(HTTPPasswordMgrWithDefaultRealm):
   def find_user_password(self, realm, authuri):
     user, password = HTTPPasswordMgrWithDefaultRealm.find_user_password(self, realm, authuri)
     if user is None:
-      U = _URL(authuri)
+      U = URL(authuri, None)
       netauth = self._netrc.authenticators(U.hostname)
       if netauth is not None:
         user, account, password = netauth

@@ -139,6 +139,12 @@ def transmute(exc_from, exc_to=None):
     return transmute_transmutor_wrapper
   return transmutor
 
+def unattributable(func):
+  return transmute(AttributeError, RuntimeError)(func)
+
+def safe_property(func):
+  return property(unattributable(func))
+
 def unimplemented(func):
   ''' Decorator for stub methods that must be implemented by a stub class.
   '''
@@ -156,31 +162,26 @@ class NoExceptions(object):
       For simple function calls return_exc_info() is probably better.
   '''
 
-  def __init__(self, handleException):
+  def __init__(self, handler):
     ''' Initialise the NoExceptions context manager.
-        The handleException is a callable which
+        The handler is a callable which
         expects (exc_type, exc_value, traceback)
         and returns True or False for the __exit__
         method of the manager.
-        If handleException is None, the __exit__ method
+        If handler is None, the __exit__ method
         always returns True, suppressing any exception.
     '''
-    self.__handler = handleException
+    self.handler = handler
 
   def __enter__(self):
     pass
 
   def __exit__(self, exc_type, exc_value, tb):
-    from cs.logutils import X, warning, D
-    from cs.py.func import funccite
     if exc_type is not None:
-      if self.__handler is not None:
-        # user supplied handler
-        D("NoExceptions: call %s", funccite(self.__handler))
-        return self.__handler(exc_type, exc_value, tb)
-      else:
-        D("__handler is None")
+      if self.handler is not None:
+        return self.handler(exc_type, exc_value, tb)
       # report handled exception
+      from cs.logutils import warning
       warning("IGNORE  " + str(exc_type) + ": " + str(exc_value))
       for line in traceback.format_tb(tb):
         warning("IGNORE> " + line[:-1])
@@ -190,10 +191,11 @@ def LogExceptions(conceal=False):
   ''' Wrapper of NoExceptions which reports exceptions and optionally
       suppresses them.
   '''
-  from cs.logutils import exception, X
-
-  def handler(exc_type, exc_value, tb):
-    exception("EXCEPTION: %s", exc_value)
+  from cs.logutils import exception
+  def handler(exc_type, exc_value, exc_tb):
+    exception("EXCEPTION: <%s> %s", exc_type, exc_value)
+    for line in traceback.format_exception(exc_type, exc_value, exc_tb):
+      exception("EXCEPTION> "+line)
     return conceal
   return NoExceptions(handler)
 

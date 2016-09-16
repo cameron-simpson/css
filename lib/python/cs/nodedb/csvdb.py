@@ -20,7 +20,7 @@ from cs.logutils import Pfx, error, warning, info, debug, D, X
 from cs.threads import locked
 from cs.py3 import StringTypes, Queue_Full as Full, Queue_Empty as Empty
 from . import NodeDB
-from .backend import Backend, CSVRow
+from .backend import Backend, Update, ResetUpdate, ExtendUpdate
 
 def resolve_csv_row(row, lastrow):
   ''' Transmute a CSV row, resolving omitted TYPE, NAME or ATTR fields.
@@ -66,6 +66,8 @@ def write_csv_file(fp, nodedata):
         name = ''
 
 class Backend_CSVFile(Backend):
+  ''' An interface to a cs.csvutils.SharedCSVFile to store nodedb state.
+  '''
 
   def __init__(self, csvpath, readonly=False, rewrite_inplace=False):
     Backend.__init__(self, readonly=readonly)
@@ -81,13 +83,26 @@ class Backend_CSVFile(Backend):
     self.csv.ready()
 
   def import_foreign_row(self, row0):
+    ''' Apply the values from an individual CSV update row to the NodeDB without propagating to the backend.
+        Each row is expected to be post-resolve_csv_row().
+        Honour the incremental notation for data:
+        - a NAME commencing with '=' discards any existing (TYPE, NAME)
+          and begins anew.
+        - an ATTR commencing with '=' discards any existing ATTR and
+          commences the ATTR anew
+        - an ATTR commencing with '-' discards any existing ATTR;
+          VALUE must be empty
+        Otherwise each VALUE is appended to any existing ATTR VALUEs.
+    '''
     if row0 is None:
       return
     row = resolve_csv_row(row0, self._lastrow)
     self._lastrow = row
     t, name, attr, value = row
-    value = self.nodedb.fromtext(value)
-    self.import_csv_row(CSVRow(t, name, attr, value))
+    nodedb = self.nodedb
+    value = nodedb.fromtext(value)
+    for update in Update.from_csv_row( (t, name, attr, value) ):
+      nodedb._update_local(update)
 
   @locked
   def _open_csv(self):
@@ -107,15 +122,14 @@ class Backend_CSVFile(Backend):
     '''
     self._close_csv()
 
-  def _update(self, csvrow):
+  def _update(self, update):
     ''' Update the backing store from an update csvrow.
     '''
-    if not isinstance(csvrow, CSVRow):
-      raise TypeError("csvrow=%r" % (csvrow,))
     if self.readonly:
-      warning("%s: readonly, discarding: %s", self.pathname, csvrow)
-    else:
-      self.csv.put(csvrow)
+      warning("%s: readonly, discarding: %s", self.pathname, update)
+      return
+    for row in update.to_csv():
+      self.csv.put(row)
 
   def rewrite(self):
     ''' Force a complete rewrite of the CSV file.

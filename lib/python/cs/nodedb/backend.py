@@ -16,9 +16,84 @@ from cs.debug import RLock, Thread
 from cs.obj import O
 from cs.py3 import Queue, Queue_Full as Full, Queue_Empty as Empty
 
-# convenience tuple of raw values, actually used to encode updates
-# via Backend.import_csv_row
-CSVRow = namedtuple('CSVRow', 'type name attr value')
+# a db update
+_Update = namedtuple('_Update', 'do_append type name attr values')
+
+class Update(_Update):
+
+  @classmethod
+  def from_csv_row(cls, row):
+    ''' Decode a CSV row into a Update instances (one row may be represented by multiple Updates); yields Updates.
+        Honour the incremental notation for data:
+        - a NAME commencing with '=' discards any existing (TYPE, NAME)
+          and begins anew.
+        - an ATTR commencing with '=' discards any existing ATTR and
+          commences the ATTR anew
+        - an ATTR commencing with '-' discards any existing ATTR;
+          VALUE must be empty
+        Otherwise each VALUE is appended to any existing ATTR VALUEs.
+    '''
+    t, name, attr, value = row
+    if name.startswith('='):
+      # reset Node, optionally commence attribute
+      yield ResetUpdate(t, name[1:])
+      if attr != "":
+        yield ExtendUpdate(t, name[1:], attr, (value,))
+    elif attr.startswith('='):
+      yield ExtendUpdate(t, name, attr[1:], (value,))
+    elif attr.startswith('-'):
+      if value != "":
+        raise ValueError("reset CVS row: value != '': %r" % (row,))
+      yield ResetUpdate(t, name, attr[1:])
+    else:
+      yield ExtendUpdate(t, name, attr, (value,))
+
+  def to_csv(self):
+    ''' Transform an Update into row data suitable for CSV.
+    '''
+    do_append, t, name, attr, values = self
+    if do_append:
+      # straight value appends
+      for value in values:
+        yield t, name, attr, value
+    else:
+      if attr is None:
+        # reset whole Node
+        if values:
+          raise ValueError("values supplied when attr is None: %r" % (values,))
+        yield t, '=' + name, "", ""
+      else:
+        # reset attr values
+        if values:
+          # reset values
+          first = True
+          for value in values:
+            if first:
+              yield t, name, '=' + attr, value
+              first = False
+            else:
+              yield t, name, attr, value
+        else:
+          # no values - discard whole attr
+          yield t, name, '-' + attr, ""
+
+def ResetUpdate(t, name, attr=None, values=None):
+  ''' Return an update to reset a whole Node (t, name) or attribute (t, name).attr if `attr` is not None.
+  '''
+  if attr is None:
+    if values is not None:
+      raise ValueError("ResetUpdate: attr is None, but values is %r" % (values,))
+    return Update(False, t, name, None, None)
+  if values is None:
+    values = ()
+  else:
+    values = tuple(values)
+  return Update(False, t, name, attr, values)
+
+def ExtendUpdate(t, name, attr, values):
+  ''' Return an update to extend (t, name).attr with the iterable `values`.
+  '''
+  return Update(True, t, name, attr, tuple(values))
 
 class Backend(O):
   ''' Base class for NodeDB backends.
@@ -58,8 +133,8 @@ class Backend(O):
     '''
     raise NotImplementedError("method to shutdown backend, set .nodedb=None, etc")
 
-  def _update(self, csvrow):
-    ''' Update the actual backend with a difference expressed as a CSVRow.
+  def _update(self, update):
+    ''' Update the actual backend with an _Update object expressing a difference.
         The values are as follows:
           .type, .name  The Node key.
           .attr         If this commences with a dash ('-') the attribute
@@ -67,7 +142,7 @@ class Backend(O):
                         to be appended to the attribute.
           .value        The value to store, already textencoded.
     '''
-    raise NotImplementedError("method to update the backend from a CSVRow with difference information")
+    raise NotImplementedError("method to update the backend from an _Update with difference information")
 
   @property
   def update_count(self):
@@ -87,51 +162,13 @@ class Backend(O):
   def delAttr(self, t, name, attr):
     ''' Delete an attribute.
     '''
-    self._update(CSVRow(t, name, '-'+attr, ''))
+    self._update(ResetUpdate(t, name, attr))
 
   @locked
   def extendAttr(self, t, name, attr, values):
     ''' Append values to an attribute.
     '''
-    for value in values:
-      self._update(CSVRow(t, name, attr, value))
-
-  def import_csv_row(self, row):
-    ''' Apply the values from an individual CSV update row to the NodeDB without propagating to the backend.
-        Each row is expected to be post-resolve_csv_row().
-        Honour the incremental notation for data:
-        - a NAME commencing with '=' discards any existing (TYPE, NAME)
-          and begins anew.
-        - an ATTR commencing with '=' discards any existing ATTR and
-          commences the ATTR anew
-        - an ATTR commencing with '-' discards any existing ATTR;
-          VALUE must be empty
-        Otherwise each VALUE is appended to any existing ATTR VALUEs.
-    '''
-    nodedb = self.nodedb
-    t, name, attr, value = row
-    if attr.startswith('-'):
-      # remove attribute
-      attr = attr[1:]
-      if value != "":
-        raise ValueError("ATTR = \"%s\" but non-empty VALUE: %r" % (attr, value))
-      N = nodedb.make( (t, name) )
-      N[attr]._set_values_local( () )
-    else:
-      # add attribute
-      if name.startswith('='):
-        # discard node and start anew
-        name = name[1:]
-        key = t, name
-        if key in nodedb:
-          nodedb[t, name]._scrub_local()
-      N = nodedb.make( (t, name) )
-      if attr.startswith('='):
-        # reset attribute completely before appending value
-        attr = attr[1:]
-        N[attr]._set_values_local( (value,) )
-      else:
-        N.get(attr)._extend_local( (value,) )
+    self._update(ExtendUpdate(t, name, attr, values))
 
 class TestAll(unittest.TestCase):
 

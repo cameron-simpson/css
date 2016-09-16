@@ -60,7 +60,7 @@ fi
         svcd -q -x -n unbound -p "$svcdpidfile" -s get-default-route -U "$username" -- \
           "$0" -1 -u "$username" -- ${1+"$@"}
   if [ $dosudo ]
-  then  set -- $trace sudo env "HOST=$HOST" "TMPDIR=$TMPDIR" "$@"
+  then  set -- $trace sudo env "HOST=$HOST" "TMPDIR=$TMPDIR" "PATH=$PATH" "PYTHONPATH=$PYTHONPATH" "$@"
   fi
   exec "$@"
 }

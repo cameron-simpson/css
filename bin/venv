@@ -6,103 +6,79 @@
 
 set -ue
 
+: ${VENV_DIR:=$HOME/var/venv}
+
 # this was inline, but vim's syntax highlighting broke
 pyver() {
   # NB: before python 3.4 "python --version" wrote to stderr
   # http://bugs.python.org/issue18338
-  "$VENV_PYTHON" --version 2>&1 | awk '{print$2}'
+  "$1" --version 2>&1 | awk '{print$2}'
 }
 
-pyexe=python
+: ${VENV_DIR:=$HOME/var/venv}
 
 cmd=`basename "$0"`
 usage="Usage:
-    $cmd [options...] init
-    $cmd [options...] exec command [args...]
-    $cmd [options...] pip pip-arguments...
-  Options:
-      -p python-exe
-        Specify python executable.
-        This may also be a python version such as 3.3 or 2."
+    $cmd [version]
+    $cmd [version] init [python [venv-dir]]
+    $cmd [version] [exec] command [args...]"
 
 badopts=
 
-while [ $# -gt 0 ]
-do
-  case $1 in
-    -p) pyexe=$2; shift ;;
-    --) shift; break ;;
-    -?*)echo "$cmd: unrecognised option: $1" >&2
-        badopts=1
-        ;;
-    *)  break ;;
-  esac
-  shift
-done
-
-_pyexe=
-case "$pyexe" in
-  [123])
-    majver=$pyexe
-    for minver in `seq 9 -1 0`
-    do
-      _pyexe=`which "python$majver.$minver" 2>/dev/null` || continue
-      break
-    done
-    ;;
-  [123].[0-9])
-    pyver=$pyexe
-    _pyexe=`which "python$pyver" 2>/dev/null` || :
-    ;;
-  *)_pyexe=`which "$pyexe" 2>/dev/null` || :
-    ;;
+case "${1:-''}" in
+  [123]*)   pyver=$1; shift ;;
+  *)        pyver=3 ;;
 esac
-
-if [ -n "$_pyexe" ]
-then
-  VENV_PYTHON=$_pyexe
-else
-  echo "$cmd: no executable found for -p $pyexe" >&2
-  badopts=1
-fi
-
-[ $badopts ] && { echo "$usage" >&2; exit 2; }
-
-: ${VENV_PYVER:=`pyver`}
-: ${VENV_BASE:=$HOME/var/venv}
-: ${VENV_DIR:=$VENV_BASE/$VENV_PYVER}
 
 if [ $# = 0 ]
 then
-  set | grep '^VENV_'
-  exit 0
+  pyver "$VENV_DIR/$pyver/bin/python"
+  exit $?
 fi
 
 op=$1
 shift
 
-case $op in
+case "$op" in
   init)
+    if [ $# -gt 0 ]
+    then  pyexe=$1; shift
+    else  pyexe=python$pyver
+    fi
+    pyver=$( pyver "$pyexe" ) || exit 1
+    if [ $# -gt 0 ]
+    then  venvdir=$1; shift; set_major=
+    else  venvdir=$VENV_DIR/$pyver set_major=1
+    fi
     [ -t 2 ] && set -x
-    mkdir -- "$VENV_DIR"
-    virtualenv -p "$VENV_PYTHON" ${1+"$@"} -- "$VENV_DIR"
+    mkdir -- "$venvdir"
+    virtualenv -p "$pyexe" --system-site-packages ${1+"$@"} -- "$venvdir"
+    if [ $set_major ]
+    then
+      venvdir_up=$( dirname "$venvdir" )
+      pyver_major=$( expr "x$pyver" : 'x\([1-9]\)\..*' )
+      symlink=$venvdir_up/$pyver_major
+      [ -e "$symlink" ] || ln -s "$pyver" "$symlink"
+    fi
+    exit $?
     ;;
   exec)
-    if [ $# = 0 ]
-    then
-      echo "$cmd: $op: missing command" >&2
-      exit 2
-    fi
-    set +u
-    . "$VENV_DIR/bin/activate"
-    [ -t 2 ] && set -x
-    exec "$@"
     ;;
-  pip | python )
-    [ -t 2 ] && set -x
-    exec "$VENV_DIR/bin/$op" ${1+"$@"}
-    ;;
-  *)echo "$cmd: unrecognised operator: $op" >&2
-    exit 2
+  # put the command back
+  *)set -- "$op" ${1+"$@"}
     ;;
 esac
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing command" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+venvdir=$VENV_DIR/$pyver
+
+set +u
+. "$venvdir/bin/activate"
+exec "$@"

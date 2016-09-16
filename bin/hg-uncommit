@@ -1,0 +1,52 @@
+#!/bin/sh
+#
+# Revert a mistaken commit:
+#  - get the diff from the target commit (default: previous commit)
+#  - close this branch
+#  - update to target revision
+#  - reapply diff
+#
+
+set -ue
+
+: ${TMPDIR:=/tmp}
+
+rev=-2
+
+cmd=$( basename "$0" )
+usage="Usage: $cmd [-r rev]
+  -r rev    Revert to specified revision. Default: $rev"
+
+badopts=
+
+while [ $# -gt 0 ]
+do
+  case $1 in
+    -r) rev=$2; shift ;;
+    --) shift; break ;;
+    -?*)echo "$cmd: unrecognised option: $1" >&2
+        badopts=1
+        ;;
+    *)  break ;;
+  esac
+  shift
+done
+
+rev=$( hg identify -n -r "$rev" )
+
+if [ $# -gt 0 ]
+then
+  echo "$0: unexpected arguments: $*" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
+
+tmpf=$TMPDIR/uncommit$$
+trap 'rm -f -- "$tmpf"' 0 1 2 3 15
+
+set -x
+hg diff -r "$rev" | tee /dev/tty >"$tmpf"
+hg commit --close-branch -m 'close branch with mistaken commit'
+hg update -r "$rev"
+patch -p 1 <"$tmpf"

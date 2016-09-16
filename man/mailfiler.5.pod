@@ -55,10 +55,13 @@ Note that a shell command in quotes will need any backslashes doubled,
 as the quoted string parse strips one level of backslash escaping.
 
 Targets come in two flavours, deliverable targets and action targets.
-Deliverable targets are those which deliver a message to some location such as a mail folder, email address or a shell pipeline.
-Action targets affect the filer status or the message itself, such as a variable assignment or a message header modification.
+Deliverable targets are those which deliver a message to some location
+such as a mail folder, email address or a shell pipeline.
+Action targets affect the filer status or the message itself,
+such as a variable assignment or a message header modification.
 
-The action targets are applied as they are encountered in matching rules. The deliverable targets are accrued for delivery at the end of the rules.
+The action targets are applied as they are encountered in matching rules.
+The deliverable targets are accrued for delivery at the end of the rules.
 
 If no deliverable targets have been accrued then the default target,
 specified by the B<$DEFAULT> environment variable, is used.
@@ -88,9 +91,12 @@ or
 assigns the value to the named environment variable.
 If unquoted, I<value> consists of nonwhitespace characters excluding the comma.
 If quoted, I<quoted-value> is a slosh escaped string.
-Note that the value is subject to paramater substitution and the
+Note that the value is subject to parameter substitution and the
 associated slosh escaping and therefore sloshes needed for that
 latter phase will need doubling in the B<">I<quoted-value>B<"> form.
+
+Some environment variables have special meaning
+as described in the ENVIRONMENT section below.
 
 =head4 Header Substitution
 
@@ -107,7 +113,7 @@ The available parameter names consist of:
 
 =item the existing header values
 
-The parameter name is the header name in lowercase with dash ('-') replaced by underscore ('_').
+The parameter name is the header name in lowercase with dash ('-') replaced by underscore ('_'); example: "message_id".
 The parameter value is the last header value with CR and LF stripped per RFC2822 part 2.2.3.
 
 =item name subexpressions from the regular expression
@@ -190,6 +196,13 @@ Otherwise, a target containing an "at" symbol ('@') is considered
 an email address to which to send a copy of the message.
 If the mail system accepts the message it is considered to have been dispatched successfully.
 
+To avoid avoid blowback to the original author or source of the message
+the B<Sender:>, B<Return-Path:> and B<Errors-To:> headers are set to the value of the environment variable B<$EMAIL>,
+which is expected to be a bare I<localpart>B<@>I<domain> address.
+If B<$EMAIL> is not set then the message is not sent and delivery is not considered successful.
+
+To avoid spurious delivery loop detection, the B<Delivered-To:> header is cleared.
+
 =head4 Deliver to Mail Folder
 
 Otherwise, a target is considered to indicate a Maildir or a UNIX mbox
@@ -219,8 +232,17 @@ Example:
 
 matches a message from "cs@zip.com.au" or addressed to "cs@zip.com.au" in the 'To:' header.
 
-A header may be tested against a regular expression instead of by email address:
-Example:
+A header may be matched against any of multiple addresses by grouping the alternatives in brackets, example:
+
+  to,cc:(python-list@python.org|@example.com|ME|THEM)
+
+which tests all the addresses in the headers 'To:' or 'CC:' against:
+the address B<python-list@python.org>,
+the mail domain B<@example.com>,
+either of the mail address groups B<me> or B<them>.
+The mail address groups come from the maildb(1cs), if any.
+
+A header may be tested against a regular expression instead of by email address by preceding it with a slash ('B</>'), example:
 
   subject:/icewm-Bugs
 
@@ -235,6 +257,55 @@ Example:
 matches a message with the string "<squid-users.squid-cache.org>" in the 'List-ID:' header.
 
 The list of available functions is as follows: B<contains>. (More to come.)
+
+=head1 ENVIRONMENT
+
+B<ALERT>, the executable path of the command to issue alerts, by default "B<alert>".
+
+B<ALERT_FORMAT>, the format of alert strings.
+This is a Python format string, by default: "B<MAILFILER: {short_from}->{short_recipients}: {subject}>".
+
+B<ALERT_TARGETS>, additional implied targets to be used if an alert was issued.
+
+B<DEFAULT>, default delivery target if no rule with a delivery target has been matched.
+See the Targets section above.
+Note that this is considered I<after> any B<$ALERT_TARGETS> have been added.
+
+=head1 CAVEATS
+
+=head2 No Loop Detection
+
+There is no loop detection for folders.
+It is possible to file from folder A to folder B and have a rule for folder B which in turn files to A; this will process the message indefinitely (once per pass).
+
+However, a message which fails to file is noted and never reprocessed.
+This allows the user to fix the rules and then refile the message by hand,
+for example by using mutt to save the offending message to the same folder.
+The refiled message will be seen as new and processed anew.
+
+=head2 Assignments Are Rule Targets
+
+Do not forget that assignments are I<targets>.
+Even the author has been bitten by writing:
+
+  ALERT_TARGETS=F,spool-to-phone
+
+in his environment rules.
+This is I<two> targets: "ALTER_TARGETS=F" and "spool-to-phone".
+As a consequence, all the rule files had an unconditional filing to the "spool-to-phone" folder, including that folder filing to itself.
+The correct incantation is:
+
+  ALERT_TARGETS="F,spool-to-phone"
+
+For completeness the author also added:
+
+  ALERT_TARGETS=""
+
+after the environment load in his "spool-to-phone" folder rules, which now read:
+
+  < env
+  ALERT_TARGETS=""
+  $PHONE . .
 
 =head1 SEE ALSO
 
