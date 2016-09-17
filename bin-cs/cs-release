@@ -59,13 +59,14 @@ def main(argv):
       names = argv
     else:
       names = sorted(VCS.release_prefixes())
+    check_map = {}
     for name in names:
       with Pfx(op):
         with Pfx(name):
           N = ReleaseName(name, VCS, LV)
           if op == 'check':
             if name.startswith('cs.'):
-              if N.check():
+              if N.check(check_map=check_map):
                 print(name, 'OK')
               else:
                 print(name, 'NOT OK')
