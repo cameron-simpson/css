@@ -236,6 +236,7 @@ def _check_module(name, silent, check_map):
   filename = M.__file__
   with Pfx(filename):
     with open(filename) as codefp:
+      subimports = set()
       for lineno, line in enumerate(codefp, 1):
         with Pfx(lineno):
           if line.startswith('import ') or line.startswith('from '):
@@ -247,10 +248,28 @@ def _check_module(name, silent, check_map):
                 silent or warning("missing module name")
                 continue
               subimport = words[1]
-              if subimport.startswith('cs.'):
-                if not check_module(subimport, True, check_map):
-                  silent or error("depends on NOT OK module %r", subimport)
-                  ok = False
+              if subimport.startswith('.'):
+                # resolve relative import name
+                preparts = name.split('.')
+                while subimport.startswith('.'):
+                  preparts.pop(-1)
+                  subimport = subimport[1:]
+                if preparts:
+                  subimport = '.'.join(preparts + [subimport])
+              with Pfx("import %s", subimport):
+                if subimport in subimports:
+                  silent or warning("repeated")
+                  continue
+                subimports.add(subimport)
+                if subimport.startswith('cs.'):
+                  if subimport not in install_requires:
+                    silent or error("not mentioned in install_requires")
+                  if not check_module(subimport, True, check_map):
+                    silent or error("module NOT OK")
+                    ok = False
+      for required in sorted(install_requires - subimports):
+        with Pfx("install_required[%s]", required):
+          silent or warning("not imported")
   return ok
 
 #                              name       - YYYYMMDD                            [.n]
