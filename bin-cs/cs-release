@@ -13,17 +13,19 @@ import os.path
 import re
 from subprocess import Popen, PIPE, check_call
 from contextlib import contextmanager
+import importlib
 from cs.app.lastvalue import LastValues
 import cs.cmdutils
 from cs.dateutils import isodate
 from cs.distinfo import URL_PYPI_PROD, URL_PYPI_TEST, PyPI_Package
-from cs.logutils import setup_logging, Pfx, error, warning, info, X
+from cs.logutils import setup_logging, Pfx, exception, error, warning, info, X, XP
 
 PYLIBTOP = 'lib/python'
 
 USAGE = '''Usage: %s [op [names...]]
   With no op, report all pypi and testpypi lastvalues.
   op:
+    check       Check simple things about a module's DISTINFO map.
     last        Report last release issued.
     log         Changelog from last release to now.
     ls          List all release prefixes in use.
@@ -61,7 +63,16 @@ def main(argv):
       with Pfx(op):
         with Pfx(name):
           N = ReleaseName(name, VCS, LV)
-          if op == 'last':
+          if op == 'check':
+            if name.startswith('cs.'):
+              if N.check():
+                print(name, 'OK')
+              else:
+                print(name, 'NOT OK')
+                xit = 1
+            else:
+              warning('skipped, not a "cs." module name')
+          elif op == 'last':
             print(name, N.last_suffix())
           elif op == 'log':
             first = True
@@ -166,6 +177,81 @@ def pipefrom(*argv, **kw):
     pipecmd = ' '.join(argv)
     raise ValueError("%s: exit status %d" % (pipecmd, P.returncode,))
 
+def check_module(name, silent, check_map):
+  ''' Perform various sanity checks on a module.
+      Actually a caching wrapper for the _check_module function.
+  '''
+  if check_map is None:
+    check_map = {}
+  try:
+    checked = check_map[name]
+  except KeyError:
+    # never checked: run check now with slot markered None ==> in progress
+    check_map[name] = None
+    checked = _check_module(name, silent, check_map)
+    check_map[name] = checked
+  else:
+    # already in progress?
+    if checked is None:
+      error("recursion: already checking %r", name)
+      return False
+    # return cached result if silent
+    if silent:
+      return checked
+    # not silent: preform check regardless
+    check_map[name] = None
+    checked = _check_module(name, silent, check_map)
+    check_map[name] = checked
+  return checked
+
+def _check_module(name, silent, check_map):
+  ''' Real module check.
+  '''
+  ok = True
+  try:
+    M = importlib.import_module(name)
+  except ImportError as e:
+    silent or error("import_module: %s", e)
+    return False
+  except SyntaxError as e:
+    silent or exception("import_module: %s", e)
+    return False
+  try:
+    D = getattr(M, 'DISTINFO')
+  except AttributeError:
+    silent or error("no DISTINFO")
+    D = {}
+  with Pfx('DISTINFO'):
+    install_requires = D.get('install_requires')
+    if install_requires is None:
+      silent or error("missing DISTINFO[install_requires]")
+      ok = False
+      install_requires = D.get('requires')
+      if install_requires is None:
+        install_requires = ()
+      else:
+        silent or warning("working off DISTINFO[requires]=%r", install_requires)
+    install_requires = set(install_requires)
+  filename = M.__file__
+  with Pfx(filename):
+    with open(filename) as codefp:
+      for lineno, line in enumerate(codefp, 1):
+        with Pfx(lineno):
+          if line.startswith('import ') or line.startswith('from '):
+            words = line.strip().split()
+            if not words:
+              continue
+            if words[0] == 'import' or words[0] == 'from':
+              if len(words) < 2:
+                silent or warning("missing module name")
+                continue
+              subimport = words[1]
+              if subimport.startswith('cs.'):
+                if not check_module(subimport, True, check_map):
+                  silent or error("depends on NOT OK module %r", subimport)
+                  ok = False
+  return ok
+
 #                              name       - YYYYMMDD                            [.n]
 re_RELEASE_TAG = re.compile(r'([a-z][^-]*)-(2[0-9][0-9][0-9][01][0-9][0-3][0-9](\.[1-9]\d*)?)$')
 
@@ -253,6 +339,11 @@ class ReleaseName(object):
     self.prefix = prefix
     self.vcs = VCS
     self.lv = LV
+
+  def check(self, silent=False, check_map=None):
+    ''' Perform various sanity checks on the named module, return true if all pass.
+    '''
+    return check_module(self.prefix, silent, check_map)
 
   def tagname(self, suffix):
     tag = self.prefix + '-' + suffix
