@@ -1,0 +1,21 @@
+  lib/python/cs/lex.py: cs.lex: discard str1(), pointless optimisation
+  lib/python/cs/lex.py: cs.lex: tidy up import of cs.logutils.warning
+  lib/python/cs/lex.py: merge default ==> mailfiler
+  lib/python/cs/lex.py: cs.lex: unrfc2047: map _ to SPACE, improve exception handling
+  lib/python/cs/lex.py: cs.lex: autopep8
+  lib/python/cs/lex.py: cs.lex: add phpquote: quote a string for use in PHP code; add docstring to jsquote
+  lib/python/cs/lex.py: cs.lex: add is_identifier test
+  lib/python/cs/lex.py: cs.lex: unrfc2047: move import of cs.logutils.waring inside function, add optional parameter for this purpose
+  lib/python/cs/lex.py: merge default ==> logutils
+  lib/python/cs/lex.py: cs.lex: get_identifier: handle offset at or past end of string
+  lib/python/cs/lex.py: cs.lex: add get_dotted_identifier and unit test
+  lib/python/cs/lex.py: cs.lex: add is_dotted_identifier, twaek is_identifier
+  lib/python/cs/lex.py: cs.lex: new function get_hexadecimal to gather hexadecimal characters, case insensitive, may be empty
+  lib/python/cs/lex.py: merge default ==> metaproxy
+  lib/python/cs/lex.py: merge default ==> metaproxy
+  lib/python/cs/lex.py: cs.lex: discard _texthexify_white_octets, unused and misguided
+  lib/python/cs/lex.py: cs.lex: get_hexadecimal: fix parameter order in call to get_chars
+  lib/python/cs/lex.py: merge default ==> metaproxy
+  lib/python/cs/lex.py: merge default ==> metaproxy
+  lib/python/cs/lex.py: cs.lex: add skipwhite, convenince wrapper for get_white returning just the next offset
+  lib/python/cs/lex.py: cs.*: use "install_requires" instead of "requires" in DISTINFO

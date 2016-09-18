@@ -7,6 +7,7 @@
 import os
 from os.path import abspath
 import sys
+from functools import partial
 import random
 import shutil
 import tempfile
@@ -15,19 +16,33 @@ try:
   import kyotocabinet
 except ImportError:
   kyotocabinet = None
+from cs.debug import thread_dump
+import cs.logutils
+cs.logutils.X_via_tty = True
 from cs.logutils import X
 from cs.randutils import rand0, randblock
-from .datafile import DataFile, GDBMDataDirMapping, KyotoDataDirMapping, \
-                DataDirMapping_from_spec, encode_index_entry, decode_index_entry
-from .hash import DEFAULT_HASHCLASS
+from .datafile import DataFile, DataDir, DataDir_from_spec, \
+                      encode_index_entry, decode_index_entry, \
+                      INDEXCLASS_BY_NAME
+from .hash import HASHCLASS_BY_NAME
 from .hash_tests import _TestHashCodeUtils
+# TODO: run _TestHashCodeUtils on DataDirs as separate test suite?
 
 # arbitrary limit
 MAX_BLOCK_SIZE = 16383
 RUN_SIZE = 100
 
-def mktmpdir():
-  return abspath(tempfile.mkdtemp(prefix="cs.venti.datafile.testdir", suffix=".dir", dir='.'))
+def mktmpdir(flavour=None):
+  ''' Create a temporary scratch directory.
+  '''
+  prefix="cs.venti.datafile.testdir"
+  if flavour is not None:
+    prefix += '-' + flavour
+  return abspath(
+           tempfile.mkdtemp(
+             prefix="cs.venti.datafile.testdir",
+             suffix=".dir",
+             dir='.'))
 
 class TestDataFile(unittest.TestCase):
 
@@ -36,7 +51,7 @@ class TestDataFile(unittest.TestCase):
     tfd, pathname = tempfile.mkstemp(prefix="cs.venti.datafile.test", suffix=".vtd", dir='.')
     os.close(tfd)
     self.pathname = pathname
-    self.datafile = DataFile(pathname)
+    self.datafile = DataFile(pathname, readwrite=True)
     self.datafile.open()
 
   def tearDown(self):
@@ -49,14 +64,14 @@ class TestDataFile(unittest.TestCase):
   def test00store1(self):
     ''' Save a single block.
     '''
-    self.datafile.put(randblock(rand0(MAX_BLOCK_SIZE+1)))
+    self.datafile.add(randblock(rand0(MAX_BLOCK_SIZE+1)))
 
   def test01fetch1(self):
     ''' Save and the retrieve a single block.
     '''
     data = randblock(rand0(MAX_BLOCK_SIZE+1))
-    self.datafile.put(data)
-    data2 = self.datafile.get(0)
+    self.datafile.add(data)
+    data2 = self.datafile.fetch(0)
     self.assertEqual(data, data2)
 
   def test02randomblocks(self):
@@ -66,30 +81,59 @@ class TestDataFile(unittest.TestCase):
     for n in range(RUN_SIZE):
       with self.subTest(put_block_n=n):
         data = randblock(rand0(MAX_BLOCK_SIZE+1))
-        offset = self.datafile.put(data)
+        offset, offset2 = self.datafile.add(data)
         blocks[offset] = data
     offsets = list(blocks.keys())
     random.shuffle(offsets)
     for n, offset in enumerate(offsets):
       with self.subTest(shuffled_offsets_n=n, offset=offset):
-        data = self.datafile.get(offset)
+        data = self.datafile.fetch(offset)
         self.assertTrue(data == blocks[offset])
 
-class _TestDataDirMapping:
+class TestDataDir(unittest.TestCase):
 
-  MAPPING_CLASS = None
+  ##MAP_FACTORY = lambda self: DataDir(mktmpdir(), mktmpdir(), self.hashclass, self.indexclass)
+
+  def __init__(self, *a, **kw):
+    a = list(a)
+    method_name = a.pop()
+    if a:
+      raise ValueError("unexpected arguments: %r" % (a,))
+    self.indexdirpath = None
+    self.datadirpath = None
+    self.indexclass = None
+    self.hashclass = None
+    self.rollover = None
+    self.__dict__.update(kw)
+    unittest.TestCase.__init__(self, method_name)
 
   def setUp(self):
-    mapping_class = self.__class__.MAPPING_CLASS
-    if mapping_class is None:
-      raise unittest.SkipTest("MAPPING_CLASS is None, skipping TestCase")
+    if self.indexdirpath is None:
+      self.indexdirpath = mktmpdir('indexstate')
+      self.do_remove_indexdirpath = True
+    else:
+      self.do_remove_indexdirpath = False
+    if self.datadirpath is None:
+      self.datadirpath = mktmpdir('data')
+      self.do_remove_datadirpath = True
+    else:
+      self.do_remove_datadirpath = False
+    self.datadir = DataDir(self.indexdirpath,
+                           self.datadirpath,
+                           self.hashclass,
+                           self.indexclass,
+                           rollover=self.rollover)
     random.seed()
-    self.pathname = mktmpdir()
-    self.datadir = mapping_class(self.pathname, rollover=200000)
+    self.datadir.open()
 
   def tearDown(self):
-    ##os.system("ls -l "+self.pathname)
-    shutil.rmtree(self.pathname)
+    self.datadir.close()
+    os.system("ls -l -- " + self.datadirpath)
+    if self.do_remove_datadirpath:
+      shutil.rmtree(self.datadirpath)
+    os.system("ls -l -- " + self.indexdirpath)
+    if self.do_remove_indexdirpath:
+      shutil.rmtree(self.indexdirpath)
 
   def test000IndexEntry(self):
     ''' Test roundtrip of index entry encode/decode.
@@ -101,30 +145,12 @@ class _TestDataDirMapping:
       self.assertEqual(rand_n, n)
       self.assertEqual(rand_offset, offset)
 
-  def test001datadir_spec(self):
-    # force creation of index file
-    with self.datadir:
-      self.datadir.add(b'')
-    datadir_spec = self.datadir.spec()
-    D2 = DataDirMapping_from_spec(datadir_spec)
-    self.assertEqual(datadir_spec, D2.spec())
-    D2 = DataDirMapping_from_spec(self.datadir.dirpath)
-    self.assertEqual(datadir_spec, D2.spec())
-    for indexname in 'gdbm', 'kyoto':
-      with self.subTest(indexname=indexname):
-        if indexname == 'kyoto' and kyotocabinet is None:
-            raise unittest.SkipTest('could not import kyotocabinet')
-        for hashname in 'sha1',:
-          with self.subTest(hashname=hashname):
-            spec = '%s:%s:%s' % (indexname, hashname, self.datadir.dirpath)
-            D3 = DataDirMapping_from_spec(spec)
-
   def test002randomblocks(self):
     ''' Save random blocks, retrieve in random order.
     '''
-    hashclass = DEFAULT_HASHCLASS
-    hashfunc = hashclass.from_data
-    with self.datadir as D:
+    D = self.datadir
+    with D:
+      hashfunc = D.hashclass.from_data
       by_hash = {}
       by_data = {}
       # store RUN_SIZE random blocks
@@ -145,7 +171,6 @@ class _TestDataDirMapping:
           # test integrity afterwards
           self.assertTrue(hashcode in by_hash)
           self.assertTrue(data in by_data)
-          ##X("D[]=%r", list(D.keys()))
           self.assertTrue(hashcode in D)
       # now retrieve in random order
       hashcodes = list(by_hash.keys())
@@ -158,10 +183,15 @@ class _TestDataDirMapping:
           data = D[hashcode]
           self.assertEqual(data, odata)
       datadir_spec = D.spec()
-    D2 = DataDirMapping_from_spec(datadir_spec)
-    self.assertEqual(datadir_spec, D2.spec())
+    # explicitly close the DataDir and reopen
+    # this is because the test framework normally does the outermost open/close
+    # and therefore the datadir index lock is still sitting aroung
+    D.close()
+    D = self.datadir = DataDir_from_spec(datadir_spec)
+    self.assertEqual(datadir_spec, D.spec())
+    D.open()
     # reopen the DataDir
-    with self.__class__.MAPPING_CLASS(self.pathname, rollover=200000) as D:
+    with D:
       self.assertEqual(datadir_spec, D.spec())
       hashcodes = list(by_hash.keys())
       random.shuffle(hashcodes)
@@ -173,26 +203,30 @@ class _TestDataDirMapping:
           data = D[hashcode]
           self.assertEqual(data, odata)
 
-class TestDataDirMappingGDBM(_TestDataDirMapping, unittest.TestCase):
-  MAPPING_CLASS = GDBMDataDirMapping
-
-class TestHashCodeUtilsGDBM(_TestHashCodeUtils, unittest.TestCase):
-  MAP_FACTORY = lambda self: GDBMDataDirMapping(mktmpdir())
-
-@unittest.skipIf(kyotocabinet is None, "could not import kyotocabinet")
-class TestDataDirMappingKyoto(_TestDataDirMapping, unittest.TestCase):
-  MAPPING_CLASS = KyotoDataDirMapping
-
-@unittest.skipIf(kyotocabinet is None, "could not import kyotocabinet")
-class TestHashCodeUtilsKyoto(_TestHashCodeUtils, unittest.TestCase):
-  MAP_FACTORY = lambda self: KyotoDataDirMapping(mktmpdir())
+def multitest_suite(testcase_class, *a, **kw):
+  suite = unittest.TestSuite()
+  for method_name in dir(testcase_class):
+    if method_name.startswith('test'):
+      ta = list(a) + [method_name]
+      suite.addTest(testcase_class(*ta, **kw))
+  return suite
 
 def selftest(argv):
-  if False:
-    import cProfile
-    cProfile.runctx('unittest.main(__name__, None, argv)', globals(), locals())
-  else:
-    unittest.main(__name__, None, argv)
+  suite = unittest.TestSuite()
+  suite.addTest(multitest_suite(TestDataFile))
+  for hashname in sorted(HASHCLASS_BY_NAME.keys()):
+    hashclass = HASHCLASS_BY_NAME[hashname]
+    for indexname in sorted(INDEXCLASS_BY_NAME.keys()):
+      indexclass = INDEXCLASS_BY_NAME[indexname]
+      suite.addTest(multitest_suite(TestDataDir, hashclass=hashclass, indexclass=indexclass))
+  runner = unittest.TextTestRunner(failfast=True, verbosity=2)
+  runner.run(suite)
+  ##if False:
+  ##  import cProfile
+  ##  cProfile.runctx('unittest.main(__name__, None, argv)', globals(), locals())
+  ##else:
+  ##  unittest.main(__name__, None, argv)
+  ##thread_dump()
 
 if __name__ == '__main__':
   selftest(sys.argv)

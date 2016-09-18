@@ -1,0 +1,16 @@
+  lib/python/cs/mailutils.py: cs.mailutils: import cs.logutils.X, used in transient debugging
+  lib/python/cs/mailutils.py: cs.mailutils: get StringIO from io instead of cs.py3
+  lib/python/cs/mailutils.py: cs.mailutils: modify_header: accept multiple header values
+  lib/python/cs/mailutils.py: merge mailfiler ==> default: improvement to hdr:function target behaviour
+  lib/python/cs/mailutils.py: use __future__.absolute_import in modules importing "io", avoids soon to be defunct cs.io module
+  lib/python/cs/mailutils.py: cs.mailutils: Message factory function: open message files with errors="replace" because messages might have any arbitrary guff in them; accept the mangling that may occur
+  lib/python/cs/mailutils.py: merge mailfiler ==> default: handle messages that are not UTF-8; possibly one should just assume ISO8859-1, but I do not want to
+  lib/python/cs/mailutils.py: remove bare "except:"s from code, use "except Exception:"
+  lib/python/cs/mailutils.py: cs.mailutils: add new_message_id() and need_message_id()
+  lib/python/cs/mailutils.py: cs.mailutils: add message_references() to return related Message-IDs from Reply-To: and References: headers
+  lib/python/cs/mailutils.py: cs.mailutils: message_references: use In-Reply-To:, not Reply-To:
+  lib/python/cs/mailutils.py: merge default ==> csbug
+  lib/python/cs/mailutils.py: merge default==>csbug
+  lib/python/cs/mailutils.py: merge default ==> csbug
+  lib/python/cs/mailutils.py: cs.mailutils: port to python3, will run a little less parsimoniously in python 2 now
+  lib/python/cs/mailutils.py: cs.*: use "install_requires" instead of "requires" in DISTINFO

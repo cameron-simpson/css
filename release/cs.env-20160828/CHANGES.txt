@@ -1,0 +1,2 @@
+  lib/python/cs/env.py: cs.env: autopep8
+  lib/python/cs/env.py: cs.*: use "install_requires" instead of "requires" in DISTINFO

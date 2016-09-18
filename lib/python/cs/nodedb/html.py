@@ -5,7 +5,6 @@
 #
 
 import sys
-import cherrypy
 from io import StringIO
 import cs.html
 from cs.py3 import StringTypes

@@ -1,0 +1,5 @@
+  lib/python/cs/range.py: cs.range: docstring for Range.__init__
+  lib/python/cs/range.py: cs.range: add Range.start like existing Range.end
+  lib/python/cs/range.py: cs.range: use Range.start and Range.end to avoid some magic numbers and to make meaning more clear
+  lib/python/cs/range.py: cs.range: Range.__contains__: bugfix for `x` being outside the Range
+  lib/python/cs/range.py: cs.*: use "install_requires" instead of "requires" in DISTINFO

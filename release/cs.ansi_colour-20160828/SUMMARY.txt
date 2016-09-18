@@ -1,0 +1,1 @@
+Add PyPI category, other minor tweaks.

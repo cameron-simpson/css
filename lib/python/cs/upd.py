@@ -14,7 +14,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         ],
-    'requires': ['cs.lex', 'cs.tty'],
+    'install_requires': ['cs.lex', 'cs.tty'],
 }
 
 from threading import Lock
