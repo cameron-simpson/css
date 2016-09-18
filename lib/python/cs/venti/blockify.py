@@ -43,7 +43,6 @@ def top_block_for(blocks):
       return topblock
 
     # add a layer of indirection and repeat
-    debug("push new indirect_blocks()")
     blocks = indirect_blocks(chain( ( topblock, nexttopblock ), blocks ))
 
   raise RuntimeError("SHOULD NEVER BE REACHED")

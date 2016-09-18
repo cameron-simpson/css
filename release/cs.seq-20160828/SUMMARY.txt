@@ -1,0 +1,1 @@
+Modify DISTINFO to say "install_requires", fixes pypi requirements.

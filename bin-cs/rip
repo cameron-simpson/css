@@ -1,0 +1,42 @@
+#!/bin/sh
+#
+# Transcode media files.
+#   - Cameron Simpson <cs@zip.com.au> 27aug2016
+#
+
+set -ue
+
+cmd=$(basename "$0")
+usage="Usage: $cmd media-files..."
+
+trace=set-x
+ripped=RIPPED
+unripped=UNRIPPED
+
+xit=0
+
+for f
+do
+  case "$f" in
+      -)        f=./$f ;;
+  esac
+  case "$f" in
+      *.tvwiz)  set -- beyonwiz mconvert "$f" ;;
+      *)        echo "$cmd: unsupported format: $f" >&2
+                xit=1
+                continue
+                ;;
+  esac
+  if time $trace "$@"
+  then
+    mvto=$RIPPED/$f
+  else
+    mvto=$UNRIPPED/$f
+    xit=1
+  fi
+  mvtodir=$( dirname "$mvto" )
+  [ -d "$mvtodir" ] || $trace mkdir "$mvtodir"
+  $trace mv -i "$f" "$mvto"
+done
+
+exit $xit

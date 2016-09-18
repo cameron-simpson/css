@@ -22,12 +22,12 @@ from .block import Block, IndirectBlock, dump_block
 from .cache import CacheStore, MemoryCacheStore
 from .debug import dump_Dirent
 from .datafile import DataFile, DataDir, \
-                      F_COMPRESSED, decompress, DataDirMapping_from_spec
+                      F_COMPRESSED, decompress, DataDir_from_spec
 from .dir import Dir
 from .hash import DEFAULT_HASHCLASS, HASHCLASS_BY_NAME
 from .paths import dirent_dir, dirent_file, dirent_resolve, resolve
 from .pushpull import pull_hashcodes, missing_hashcodes_by_checksum
-from .store import Store, ProgressStore
+from .store import Store, ProgressStore, DataDirStore
 
 def main(argv):
   cmd = os.path.basename(argv[0])
@@ -133,7 +133,7 @@ def main(argv):
         error("unknown operation \"%s\"", op)
         badopts = True
       else:
-        if op in ("scan", "datadir"):
+        if op in ("scan", "datadir", "init"):
           # run without a context store
           try:
             xit = op_func(args)
@@ -158,11 +158,12 @@ def main(argv):
                   exception("can't open cache store \"%s\"", dflt_cache)
                   badopts = True
                 else:
-                  S = CacheStore(S, C)
+                  S = CacheStore("CacheStore(%s,%s)" % (S, C), S, C)
               if not badopts:
                 # put an in-memory cache in front of the main cache
                 if useMemoryCacheStore:
-                  S = CacheStore(S, MemoryCacheStore())
+                  S = CacheStore("CacheStore(%s,MemoryCacheStore)" % (S,),
+                                 S, MemoryCacheStore("MemoryCacheStore"))
                 with S:
                   try:
                     xit = op_func(args, verbose=verbose, log=log)
@@ -329,7 +330,7 @@ def cmd_datadir(args, verbose=None, log=None):
     raise GetoptError("missing datadir spec")
   datadir_spec = args.pop(0)
   with Pfx(datadir_spec):
-    D = DataDirMapping_from_spec(datadir_spec)
+    D = DataDir_from_spec(datadir_spec)
     if not args:
       raise GetoptError("missing subop")
     subop = args.pop(0)
@@ -344,7 +345,7 @@ def cmd_datadir(args, verbose=None, log=None):
         else:
           for other_spec in args:
             with Pfx(other_spec):
-              Dother = DataDirMapping_from_spec(other_spec)
+              Dother = DataDir_from_spec(other_spec)
               pull_hashcodes(D, Dother, missing_hashcodes_by_checksum(D, Dother))
       elif subop == 'push':
         if not args:
@@ -354,7 +355,7 @@ def cmd_datadir(args, verbose=None, log=None):
           if args:
             raise GetoptError("extra arguments after other_spec: %s" % (' '.join(args),))
           with Pfx(other_spec):
-            Dother = DataDirMapping_from_spec(other_spec)
+            Dother = DataDir_from_spec(other_spec)
             pull_hashcodes(Dother, D, missing_hashcodes_by_checksum(Dother, D))
       else:
         raise GetoptError('unrecognised subop')
@@ -370,22 +371,28 @@ def cmd_dump(args, verbose=None, log=None):
   return 0
 
 def cmd_init(args, verbose=None, log=None):
-  ''' Initialise a directory for use as a store, using the GDBM backend.
+  ''' Initialise a directory for use as a store.
+      Usage: init dirpath [datadir]
   '''
   if not args:
     raise GetoptError("missing dirpath")
-  dirpath = args.pop(0)
+  statedirpath = args.pop(0)
   if args:
-    raise GetoptError("extra arguments after dirpath: %s" % (' '.join(args),))
-  with Pfx(dirpath):
-    if not os.path.isdir(dirpath):
-      raise GetoptError("not a directory")
-    with Store("file:"+dirpath):
-      pass
+    datadirpath = args.pop(0)
+  else:
+    datadirpath = statedirpath
+  if args:
+    raise GetoptError("extra arguments after datadir: %s" % (' '.join(args),))
+  for dirpath in statedirpath, datadirpath:
+    with Pfx(dirpath):
+      if not os.path.isdir(dirpath):
+        raise GetoptError("not a directory")
+    with DataDirStore(statedirpath, statedirpath, datadirpath, DEFAULT_HASHCLASS) as S:
+      os.system("ls -la %s" % (statedirpath,))
   return 0
 
 def cmd_listen(args, verbose=None, log=None):
-  ''' Start a daemon listening on a TCP port or in stdin/stdout.
+  ''' Start a daemon listening on a TCP port or on stdin/stdout.
   '''
   if len(args) != 1:
     raise GetoptError("expected a port")
@@ -455,7 +462,7 @@ def cmd_mount(args, verbose=None, log=None):
     badopts = True
   if badopts:
     raise GetoptError("bad arguments")
-  from cs.venti.vtfuse import mount
+  from .vtfuse import mount
   if not os.path.isdir(mountpoint):
     error("%s: mountpoint is not a directory", mountpoint)
     return 1
@@ -475,8 +482,8 @@ def cmd_mount(args, verbose=None, log=None):
         return 1
     with Pfx("open('a')"):
       syncfp = open(special, 'a')
-  with ProgressStore(defaults.S) as PS:
-    mount(mountpoint, E, PS, syncfp=syncfp, subpath=subpath)
+  ##with ProgressStore("ProgressStore(%s)" % (defaults.S,), defaults.S) as PS:
+  mount(mountpoint, E, defaults.S, syncfp=syncfp, subpath=subpath)
   return 0
 
 def cmd_pack(args, verbose=None, log=None):

@@ -540,17 +540,7 @@ class Meta(dict):
         For ACLs with more than one user or group this is only an approximation,
         keeping the permissions for the frontmost user and group.
     '''
-    if self.E.isdir:
-      perms = stat.S_IFDIR
-    elif self.E.isfile:
-      perms = stat.S_IFREG
-    elif self.E.issym:
-      perms = stat.S_IFLNK
-    elif self.E.ishardlink:
-      perms = stat.S_IFREG
-    else:
-      warning("Meta.unix_perms: neither a dir nor a file, pretending S_IFREG")
-      perms = stat.S_IFREG
+    perms = self.unix_typemode
     for ac in self.acl:
       if ac.prefix == 'o':
         perms |= ac.unixmode << 6
@@ -572,6 +562,23 @@ class Meta(dict):
     if gid is None:
       gid = NOGROUPID
     return uid, gid, perms
+
+  @property
+  def unix_typemode(self):
+    ''' The portion of the mode bits defining the inode type.
+    '''
+    if self.E.isdir:
+      typemode = stat.S_IFDIR
+    elif self.E.isfile:
+      typemode = stat.S_IFREG
+    elif self.E.issym:
+      typemode = stat.S_IFLNK
+    elif self.E.ishardlink:
+      typemode = stat.S_IFREG
+    else:
+      warning("Meta.unix_typemode: neither a dir nor a file, pretending S_IFREG")
+      typemode = stat.S_IFREG
+    return typemode
 
   @property
   def inum(self):
