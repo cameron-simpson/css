@@ -18,7 +18,6 @@ DISTINFO = {
 }
 
 from threading import RLock
-import pyid3lib
 from cs.logutils import X, info, debug
 from cs.threads import locked, locked_property
 from cs.obj import O
@@ -136,12 +135,14 @@ class ID3(O):
   def __init__(self, pathname):
     ''' 
     '''
+    import pyid3lib
     self.__dict__['pathname'] = pathname
     self.__dict__['modified'] = False
     self._lock = RLock()
 
   @locked_property
   def tag(self):
+    import pyid3lib
     return pyid3lib.tag(self.pathname)
 
   @staticmethod
