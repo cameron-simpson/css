@@ -264,7 +264,7 @@ class PyPI_Package(O):
 
   def pkg_rpath(self, package_name=None, prefix_dir=None, up=False):
     ''' Return a path based on a `package_name` (default self.package_name).
-        `prefix_dir`: is supplied, prefixed to the returned relative path.
+        `prefix_dir`: if supplied, prefixed to the returned relative path.
         `up`: if true, discard the last component of the package name before
         computing the path.
     '''
@@ -397,12 +397,15 @@ class PyPI_Package(O):
     '''
     package_subpath = pathify(package_name)
     if not self.is_package(package_name):
+      # simple case - module file and its tests
       yield package_subpath + '.py'
       test_subpath = package_subpath + '_tests.py'
       test_path = os.path.join(libdir, test_subpath)
       if os.path.exists(test_path):
         yield test_subpath
     else:
+      # packages - all .py files in directory
+      # warning about unexpected other files
       libprefix = libdir + os.path.sep
       for dirpath, dirnames, filenames in os.walk(os.path.join(libdir, package_subpath)):
         for filename in filenames:
