@@ -11,8 +11,8 @@ from cs.logutils import X
 from cs.mailutils import message_addresses, Message
 from cs.nodedb.csvdb import write_csv_file
 
-if sys.argv:
-  groups = sys.argv
+if len(sys.argv) > 1:
+  groups = sys.argv[1:]
 else:
   groups = ('known',)
 
