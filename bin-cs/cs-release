@@ -347,7 +347,6 @@ class Module(object):
           fok, fimports = self._check_imports(module_name, pathname, install_requires, silent, self.modules)
           subimports.update(fimports)
           if not fok:
-            X("OK = FALSE from _check_imports")
             ok = False
         for required in sorted(install_requires - subimports):
           with Pfx("install_required[%s]", required):
@@ -502,7 +501,18 @@ class ReleaseName(object):
   def check(self, silent=False):
     ''' Perform various sanity checks on the named module, return true if all pass.
     '''
-    return self.modules[self.prefix].check(silent)
+    ok = True
+    if not self.modules[self.prefix].check(silent):
+      ok = False
+    unreleased_changes = list(self.log_since())
+    if unreleased_changes:
+      ok = False
+      if not silent:
+        error("unreleased changes")
+        for files, firstline in unreleased_changes:
+          files = [ filename[11:] if filename.startswith('lib/python/') else filename for filename in files ]
+          info("  %s: %s", ' '.join(files)+':', firstline)
+    return ok
 
   def tagname(self, suffix):
     tag = self.prefix + '-' + suffix
