@@ -399,7 +399,7 @@ class Module(object):
                       if subpkg_name is None:
                         warning("no package name?")
                       elif subpkg_name != self.package_name:
-                        silent or error("not mentioned in install_requires %r", install_requires)
+                        silent or error("not mentioned in install_requires")
                         ok = False
                     subcheck = subM.check(True)
                     if subcheck is None:
