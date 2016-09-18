@@ -16,6 +16,7 @@ DISTINFO = {
 }
 
 import sys
+import os.path
 
 def import_module_name(module_name, name, path=None, lock=None):
   ''' Import `module_name` and return the value of `name` within it.
@@ -47,3 +48,15 @@ def import_module_name(module_name, name, path=None, lock=None):
     except AttributeError as e:
       raise ImportError("%s: no entry named %r: %s: %s" % (module_name, name, type(e), e))
   return None
+
+def module_files(M):
+  ''' Generator yielding .py pathnames involved in a module.
+  '''
+  from cs.logutils import X
+  X("M = %r", dir(M))
+  initpath = M.__file__
+  moddir = os.path.dirname(initpath)
+  for dirpath, dirnames, filenames in os.walk(moddir):
+    for filename in filenames:
+      if filename.endswith('.py'):
+        yield os.path.join(dirpath, filename)
