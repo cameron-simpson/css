@@ -23,7 +23,6 @@ import time
 import traceback
 from cs.py3 import Queue, raise3
 from cs.py.func import funcname
-from cs.py.stack import caller
 from cs.debug import ifdebug, Lock, RLock, Thread, trace_caller, thread_dump, stack_dump
 from cs.excutils import noexc, noexc_gen, logexc, logexc_gen, LogExceptions
 from cs.queues import IterableQueue, IterablePriorityQueue, PushQueue, \

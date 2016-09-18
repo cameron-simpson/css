@@ -12,6 +12,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         ],
+    'install_requires': ['cs.py3'],
 }
 
 import sys

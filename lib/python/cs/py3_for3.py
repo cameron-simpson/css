@@ -14,6 +14,7 @@ DISTINFO = {
         "Programming Language :: Python",
         "Programming Language :: Python :: 3",
         ],
+    'install_requires': [],
 }
 
 def raise3(exc_type, exc_value, exc_traceback):

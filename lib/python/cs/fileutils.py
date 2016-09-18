@@ -14,7 +14,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         ],
-    'install_requires': ['cs.asynchron', 'cs.debug', 'cs.env', 'cs.logutils', 'cs.queues', 'cs.range', 'cs.threads', 'cs.timeutils', 'cs.obj', 'cs.py3'],
+    'install_requires': ['cs.asynchron', 'cs.debug', 'cs.env', 'cs.lex', 'cs.logutils', 'cs.queues', 'cs.range', 'cs.threads', 'cs.timeutils', 'cs.obj', 'cs.py3'],
 }
 
 from io import RawIOBase
@@ -24,7 +24,6 @@ from os import SEEK_CUR, SEEK_END, SEEK_SET
 from os.path import basename, dirname, isabs, isdir, \
                     abspath, join as joinpath, exists as existspath
 import errno
-import os
 import sys
 from collections import namedtuple
 from contextlib import contextmanager
