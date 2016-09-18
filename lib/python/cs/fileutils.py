@@ -1164,6 +1164,8 @@ class SharedAppendFile(object):
           if first:
             # indicate first to-EOF read complete, output queue primed
             self.ready.put(True)
+        else:
+          count = 0
         if not self.no_update:
           # check for outgoing updates
           if self._inQ.empty():
