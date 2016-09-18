@@ -61,14 +61,13 @@ def main(argv):
       names = argv
     else:
       names = sorted(VCS.release_prefixes())
-    check_map = {}
     for name in names:
       with Pfx(op):
         with Pfx(name):
           N = ReleaseName(name, Ms, VCS, LV)
           if op == 'check':
             if name.startswith('cs.'):
-              if N.check(check_map=check_map):
+              if N.check():
                 print(name, 'OK')
               else:
                 print(name, 'NOT OK')
@@ -500,7 +499,7 @@ class ReleaseName(object):
     self.vcs = VCS
     self.lv = LV
 
-  def check(self, silent=False, check_map=None):
+  def check(self, silent=False):
     ''' Perform various sanity checks on the named module, return true if all pass.
     '''
     return self.modules[self.prefix].check(silent)
