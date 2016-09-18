@@ -1,0 +1,5 @@
+  lib/python/cs/seq.py: cs.seq: new function isordered() to test ordering of a sequence
+  lib/python/cs/seq.py: cs.seq: imerge: accept new `reverse` parameter for merging reversed iterables
+  lib/python/cs/seq.py: cs.seq: isordered: improve assertion failure message
+  lib/python/cs/seq.py: merge default ==> venti
+  lib/python/cs/seq.py: cs.seq: add cs.p3 to install_requires
