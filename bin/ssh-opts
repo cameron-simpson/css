@@ -7,8 +7,8 @@
 from __future__ import print_function
 import sys
 from fnmatch import fnmatch
+from cs.app.ssh import parse_option, update_from_file
 from cs.env import envsub
-from cs.lex import get_identifier
 from cs.logutils import setup_logging, Pfx, info, warning, error, XP
 
 DEFAULT_CONFIGS = ('$HOME/.ssh/config', '/etc/ssh/ssh_config')
@@ -75,7 +75,7 @@ def main(argv):
     return 2
   xit = 0
   for config in configs:
-    if not update_options_from_file(options, config, host):
+    if not update_from_file(options, config, host):
       xit = 1
   if argv:
     for option in argv:
@@ -84,56 +84,6 @@ def main(argv):
     for option in sorted(options.keys()):
       print(option, options[option])
   return xit
-
-def parse_option(opttext):
-  option, offset = get_identifier(opttext)
-  if len(option) == 0:
-    raise ValueError('missing option name')
-  option = option.lower()
-  opttext = opttext[offset:]
-  if not opttext:
-    raise ValueError("missing option value")
-  if opttext.startswith('='):
-    opttext = aptarg[1:]
-  elif opttext[0].isspace():
-    opttext = opttext.strip()
-  else:
-    raise ValueError("invalid text after option: %r", opttext)
-  return option, opttext
-
-def update_options_from_file(options, config, host):
-  host_lc = host.lower()
-  ok = True
-  with Pfx(config):
-    with open(config) as fp:
-      use_host = False
-      for lineno, line in enumerate(fp, 1):
-        with Pfx(lineno):
-          if not line.endswith('\n'):
-            warning("missing newline")
-          line = line.strip()
-          if not line or line.startswith('#'):
-            continue
-          words = line.split(None, 1)
-          if words[0].lower() == 'host':
-            use_host = False
-            if len(words) == 1:
-              warning("no host patterns")
-            else:
-              for hostptn in words[1].split():
-                if fnmatch(host_lc, hostptn.lower()):
-                  use_host = True
-                  break
-          elif use_host:
-            try:
-              option, optvalue = parse_option(line)
-            except ValueError as e:
-              error("invalid option: %s", e)
-              ok = False
-            else:
-              if option not in options:
-                options[option] = optvalue
-  return ok
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
