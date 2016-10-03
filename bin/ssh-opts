@@ -7,11 +7,9 @@
 from __future__ import print_function
 import sys
 from fnmatch import fnmatch
-from cs.app.ssh import parse_option, update_from_file
+from cs.app.ssh import parse_option, update_from_file, DEFAULT_CONFIGS
 from cs.env import envsub
 from cs.logutils import setup_logging, Pfx, info, warning, error, XP
-
-DEFAULT_CONFIGS = ('$HOME/.ssh/config', '/etc/ssh/ssh_config')
 
 USAGE = r'''Usage: %s [-F config-file]... [-o opt=value]... host [options...]
   -F config-file    Specific configuration file to read. These accumulate.
