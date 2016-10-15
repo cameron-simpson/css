@@ -75,6 +75,7 @@ revhash=$( git "--git-dir=$git_top_repo" rev-parse "$rev" )
 git_top_remote=git://127.0.0.1:1234$git_top
 
 qremote_dir=$( shqstr "$remote_dir" )
+qrev=$( shqstr "$rev" )
 qrevhash=$( shqstr "$revhash" )
 qgit_top_remote=$( shqstr "$git_top_remote" )
 
@@ -94,10 +95,11 @@ $trace git -C "$git_top" daemon --inetd --verbose --informative-errors "$git_top
 gitd=$!
 
 # present the git daemon to the remote host
-$trace ssh "$remote" '
+ssh "$remote" '
     set -ue'"
     remote_dir=$qremote_dir"'
     [ -z "$remote_dir" ] || cd "$remote_dir"
+    set -x
     nc -l 127.0.0.1 1234
     ' <&4 >&3 &
 ssh_gitd=$!
@@ -105,18 +107,20 @@ ssh_gitd=$!
 # detach from pipes
 exec 3<&- 4<&-
 
+sleep 1
+
 xit=0
 
 # go to the remote host and access the local git via the daemon
-$trace ssh "$remote" '
+ssh "$remote" '
     set -ue'"
     remote_dir=$qremote_dir
+    rev=$qrev
     revhash=$qrevhash
     git_top_remote=$qgit_top_remote"'
     cd "$remote_dir"; pwd
-    git fetch --verbose --progress "$git_top_remote" "$revhash"' \
+    set -x
+    git fetch "$git_top_remote" "$rev"' \
 || xit=1
-
-kill "$gitd" || xit=1
 
 exit $xit
