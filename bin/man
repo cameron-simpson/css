@@ -16,7 +16,8 @@ $usage="Usage: $cmd [-1ap] [-M manpath] [[-s] section] manual\n";
 $ManMacros=($ENV{OS} eq 'linux' ? '-mandoc' : '-man');
 $MyMacros="";	## "$ENV{HOME}/rc/header/man";
 $Roff=($ENV{OS} eq 'linux' ? 'groff -Tlatin1' : 'nroff');
-$ManProcess="soelim | neqn | tbl | $Roff $ManMacros $MyMacros -";
+$Roff='nroff';
+$ManProcess="soelim | eqn | tbl | $Roff $ManMacros $MyMacros - | tr − -";
 $SolarisManProcess="/usr/lib/sgml/sgml2roff \"\$MANFILE\" | $ManProcess";
 
 # GNU col is a busted piece of crap
