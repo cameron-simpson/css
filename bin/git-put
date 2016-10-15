@@ -94,7 +94,7 @@ $trace git -C "$git_top" daemon --inetd --verbose --informative-errors "$git_top
 gitd=$!
 
 # present the git daemon to the remote host
-ssh "$remote" '
+$trace ssh "$remote" '
     set -ue'"
     remote_dir=$qremote_dir"'
     [ -z "$remote_dir" ] || cd "$remote_dir"
@@ -108,13 +108,12 @@ exec 3<&- 4<&-
 xit=0
 
 # go to the remote host and access the local git via the daemon
-ssh "$remote" '
+$trace ssh "$remote" '
     set -ue'"
     remote_dir=$qremote_dir
     revhash=$qrevhash
     git_top_remote=$qgit_top_remote"'
     cd "$remote_dir"; pwd
-    set -x
     git fetch --verbose --progress "$git_top_remote" "$revhash"' \
 || xit=1
 
