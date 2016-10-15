@@ -13,10 +13,12 @@ trace=
 [ -t 2 ] && trace=set-x
 
 cmd=$( basename "$0" )
-usage="Usage: $cmd [-d git-work-dir] {/path|./path|../path|remote[:path]} [local-ref]
-  -d git-work-dir   Git working directory (should contain a .git).
-                    Default the git work directory containing the
-                    current directory.
+usage="Usage: $cmd [-d git-work-dir] [-u] {/path|./path|../path|remote[:path]} [local-ref]
+  -d git-work-dir   Git source working directory (should contain a .git).
+                    Default the git work directory containing the current
+                    directory.
+  -u                Update the destination repository by also checking out
+                    the revision.
   local-ref         Changeset reference in the source git working directory.
                     Defaul;t: HEAD"
 
@@ -24,11 +26,13 @@ rev=HEAD
 
 badopts=
 git_work_dir=.
+no_checkout=1
 
 while [ $# -gt 0 ]
 do
   case $1 in
     -d) git_work_dir=$2; shift ;;
+    -u) no_checkout= ;;
     --) shift; break ;;
     -?*)echo "$cmd: unrecognised option: $1" >&2; badopts=1 ;;
     *)  break ;;
@@ -64,6 +68,8 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
+exec 5>&1 1>&2
+
 git_top=$( git-top "$git_work_dir" )
 git_top_repo=$git_top/.git
 revhash=$( git "--git-dir=$git_top_repo" rev-parse "$rev" )
@@ -94,10 +100,11 @@ $trace git -C "$git_top" daemon --inetd --verbose --informative-errors "$git_top
 gitd=$!
 
 # present the git daemon to the remote host
-$trace ssh "$remote" '
+ssh "$remote" '
     set -ue'"
     remote_dir=$qremote_dir"'
     [ -z "$remote_dir" ] || cd "$remote_dir"
+    set -x
     nc -l 127.0.0.1 1234
     ' <&4 >&3 &
 ssh_gitd=$!
@@ -105,18 +112,24 @@ ssh_gitd=$!
 # detach from pipes
 exec 3<&- 4<&-
 
+sleep 1
+
 xit=0
 
 # go to the remote host and access the local git via the daemon
-$trace ssh "$remote" '
+ssh "$remote" '
     set -ue'"
+    no_checkout=$no_checkout
     remote_dir=$qremote_dir
     revhash=$qrevhash
     git_top_remote=$qgit_top_remote"'
     cd "$remote_dir"; pwd
-    git fetch --verbose --progress "$git_top_remote" "$revhash"' \
+    set -x
+    git fetch "$git_top_remote" "$revhash"
+    [ $no_checkout ] || git checkout "$revhash"' \
 || xit=1
 
-kill "$gitd" || xit=1
+exec 1>&5 5>&-
+echo "$revhash"
 
 exit $xit
