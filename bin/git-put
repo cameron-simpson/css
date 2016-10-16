@@ -75,7 +75,12 @@ git_top_repo=$git_top/.git
 revhash=$( git "--git-dir=$git_top_repo" rev-parse "$rev" )
 
 # local directory? run git directly
-[ -n "$remote" ] || exec git -C "$remote_dir" fetch --verbose --progress "$git_top_repo" "$revhash"
+if [ -z "$remote" ]
+then
+  git -C "$remote_dir" fetch --verbose --progress "$git_top_repo" "$revhash"
+  [ $no_checkout ] || git -C "$remote_dir" checkout "$revhash"
+  exit $?
+fi
 
 # otherwise remote: work a lot harder
 git_top_remote=git://127.0.0.1:1234$git_top
