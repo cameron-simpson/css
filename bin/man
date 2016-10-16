@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 #
 # My manual command, having given up on the bogosities of the others.
-#	- Cameron Simpson <cs@zip.com.au> 11may1997
+#       - Cameron Simpson <cs@zip.com.au> 11may1997
 #
 
 ##require 'flush.pl';
@@ -14,7 +14,7 @@ use cs::Shell;
 $usage="Usage: $cmd [-1ap] [-M manpath] [[-s] section] manual\n";
 
 $ManMacros=($ENV{OS} eq 'linux' ? '-mandoc' : '-man');
-$MyMacros="";	## "$ENV{HOME}/rc/header/man";
+$MyMacros="";   ## "$ENV{HOME}/rc/header/man";
 $Roff=($ENV{OS} eq 'linux' ? 'groff -Tlatin1' : 'nroff');
 $Roff='nroff';
 $ManProcess="soelim | eqn | tbl | $Roff $ManMacros $MyMacros - | tr − -";
@@ -22,7 +22,7 @@ $SolarisManProcess="/usr/lib/sgml/sgml2roff \"\$MANFILE\" | $ManProcess";
 
 # GNU col is a busted piece of crap
 if ($ENV{OS} ne 'linux') { $ManProcess.=" | col -x"; }
-$InfoProcess="info2pod | pod2text";	## "info2man | $ManProcess";
+$InfoProcess="info2pod | pod2text";     ## "info2man | $ManProcess";
 $Section="";
 $UseFirst=0;
 $UsePager= -t STDOUT;
@@ -61,8 +61,8 @@ else
 die $usage if $badopts;
 
 $MANPATH=(defined $ENV{MANPATH}
-		? $ENV{MANPATH}
-		: "$ENV{HOME}/man:/usr/local/man:/usr/local/info:/usr/man");
+                ? $ENV{MANPATH}
+                : "$ENV{HOME}/man:/usr/local/man:/usr/local/info:/usr/man");
 
 @MANPATH=split(/:/,$MANPATH);
 for (@MANPATH)
@@ -72,8 +72,8 @@ for (@MANPATH)
 # step 1 - locate manual entries
 ($reManual=$Manual) =~ s/(\W)/\\$1/g;
 $ptn=($Prefix
-	? "$reManual.*\\.$Section"
-	: "^$reManual\\.$Section"
+      ? "$reManual.*\\.$Section"
+      : "^$reManual\\.$Section"
      );
 undef %found;
 MANDIR:
@@ -100,19 +100,19 @@ MANDIR:
 
     SUBDIR:
     for (sort
-	   { $a =~ /^s?man/
-	       ? $b =~ /^s?man/
-		 ? $a cmp $b
-		 : -1
-	       : $b =~ /^s?man/
-		 ? 1
-		 : $a cmp $b
-		 ;
-	   }
-	   @subdirs)
-    { if (/^sman/)	{ $type=SMAN; }	# Solaris SGML manuals
-      elsif (/^man/)	{ $type=MAN; }	# roff manuals
-      else		{ $type=CAT; }	# preformatted manuals
+           { $a =~ /^s?man/
+               ? $b =~ /^s?man/
+                 ? $a cmp $b
+                 : -1
+               : $b =~ /^s?man/
+                 ? 1
+                 : $a cmp $b
+                 ;
+           }
+           @subdirs)
+    { if (/^sman/)      { $type=SMAN; } # Solaris SGML manuals
+      elsif (/^man/)    { $type=MAN; }  # roff manuals
+      else              { $type=CAT; }  # preformatted manuals
 
       $subdir="$dir/$_";
       next SUBDIR if ! -d "$subdir/.";
@@ -120,17 +120,17 @@ MANDIR:
       @entries=cs::Pathname::dirents($subdir);
       for $man (grep(/$ptn/oi,@entries))
       { $file="$subdir/$man";
-	($key=$file) =~ s/(\.(gz|Z|z))+$//;
-	$found{$key}=[$type,$file];
-	push(@found,$key);
-	##warn "found $key ($type)\n";
+        ($key=$file) =~ s/(\.(gz|Z|z))+$//;
+        $found{$key}=[$type,$file];
+        push(@found,$key);
+        ##warn "found $key ($type)\n";
       }
     }
   }
 
 die "$cmd: no manual entry for $Manual"
    .(length $Section ? " in section $Section\n" : "\n")
-	if ! keys %found;
+        if ! keys %found;
 
 # toss cats for which there are mans
 CAT:
@@ -167,7 +167,7 @@ if (@found > 1)
 }
 
 @found=sort { lc(basename($a)) cmp lc(basename($b)) } @found
-	if @found > 1;
+        if @found > 1;
 
 @found=$found[0] if $UseFirst;
 $Repeat=(@found > 1);
@@ -181,8 +181,8 @@ PROMPT:
     {
       for ($i=0; $i <= $#found; $i++)
       { printf("%-3s %s\n",
-	      ($i+1).":",
-	      $found{$found[$i]}[1]);
+              ($i+1).":",
+              $found{$found[$i]}[1]);
       }
       necho("which entry? ");
       exit 0 if ! defined ($_=<STDIN>);
@@ -193,21 +193,21 @@ PROMPT:
       }
       elsif ($_ eq 'q')
       {
-	exit 0;
+        exit 0;
       }
       else
       { if (! /^\d+$/)
-	{ die "$cmd: don't understand \"$_\"\n";
-	}
+        { die "$cmd: don't understand \"$_\"\n";
+        }
 
-	$i=$_-1;
-	if ($i < 0 || $i > $#found)
-	{ warn "$cmd: out of range\n";
-	  redo PROMPT;
-	}
+        $i=$_-1;
+        if ($i < 0 || $i > $#found)
+        { warn "$cmd: out of range\n";
+          redo PROMPT;
+        }
 
-	# pick desired element
-	$found=$found[$i];
+        # pick desired element
+        $found=$found[$i];
       }
     }
     else
@@ -245,15 +245,15 @@ PROMPT:
       }
 
       for (@exts)
-      { if ($_ eq 'gz')		{ $preprocess="gunzip"; }
-	elsif ($_ eq 'bz2')	{ $preprocess="bunzip2"; }
-	elsif ($_ eq 'Z')	{ $preprocess="zcat"; }
-	elsif ($_ eq 'z')	{ $preprocess="pcat"; }
-	else
-	{ die "$cmd: unsupported extension \"$_\"";
-	}
+      { if ($_ eq 'gz')         { $preprocess="gunzip"; }
+        elsif ($_ eq 'bz2')     { $preprocess="bunzip2"; }
+        elsif ($_ eq 'Z')       { $preprocess="zcat"; }
+        elsif ($_ eq 'z')       { $preprocess="pcat"; }
+        else
+        { die "$cmd: unsupported extension \"$_\"";
+        }
 
-	$command="$preprocess | $command";
+        $command="$preprocess | $command";
       }
     }
 
