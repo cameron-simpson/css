@@ -58,6 +58,10 @@ else
     *)      remote_dir=
             ;;
   esac
+  case "$remote" in
+    *!*)    ssh=sshto ;;
+    *)      ssh=ssh ;;
+  esac
 fi
 
 if [ $# -gt 0 ]
@@ -105,7 +109,7 @@ $trace git -C "$git_top" daemon --inetd --verbose --informative-errors "$git_top
 gitd=$!
 
 # present the git daemon to the remote host
-ssh "$remote" '
+$ssh "$remote" '
     set -ue'"
     remote_dir=$qremote_dir"'
     [ -z "$remote_dir" ] || cd "$remote_dir"
@@ -122,7 +126,7 @@ sleep 1
 xit=0
 
 # go to the remote host and access the local git via the daemon
-ssh "$remote" '
+$ssh "$remote" '
     set -ue'"
     no_checkout=$no_checkout
     remote_dir=$qremote_dir
