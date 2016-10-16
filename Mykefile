@@ -107,7 +107,6 @@ $(py3files): lib/python/$(@ :|lib/python3/||)
         echo "$@ <- $?"
 
 _home:
-        set -x \
         skip=`hg status | sed -n 's:^? \(.*\):--exclude=/\1:p'` \
         binskip=`hg status | sed -n 's:^? bin/\(.*\):--exclude=/\1:p'` \
         pfx bin $(rsync) -a --delete \\
@@ -117,8 +116,7 @@ _home:
                 --exclude=squid_redirect \\
                 --exclude=/\*/ \\
                 bin/. $(HOME)/bin/.
-        set -x; $(MAKE) _bin_$((bin_suffixes))
-        set -x \
+        $(MAKE) _bin_$((bin_suffixes))
         libskip=`hg status | sed -n 's:^? lib/\(.*\):--exclude=/\1:p'` \
         pfx lib $(rsync) -a --delete \\
                 --include=/js \\
@@ -139,13 +137,11 @@ _home:
 bin_suffixes = cs darwin lrn
 
 _bin_$((bin_suffixes)):
-    set -x \
     sfx=$(@S[_]) \
     base=bin-$$sfx \
     target=$(HOME)/$$base \
     skip=$$( hg status | sed -n 's:^? '"$$base"'/\(.*\):--exclude=/\1:p' ) \
     pfx "$$base" $(rsync) -a --delete $$skip "$$base/" "$$target/"
-    echo "DONE $@"
 
 # squid_redirect
 _all: 1INDEX.txt _submakes _man
@@ -251,7 +247,7 @@ noads	= $(HOME)/@/adzapper.sf/html/rc/patterns
 
 squid_redirect: $(noads)
 	@cd $(?DD) || exit 1 \
-	pwd; set -x \
+	pwd; \
 	exec $(MAKE) _scripts
 
 %.class: %.java %.class-prereqs : $(("%.class-prereqs" G?<P)).class
