@@ -88,14 +88,17 @@ fi
 
 # otherwise remote: work a lot harder
 git_top_remote=git://127.0.0.1:1234$git_top
+git_tag=$cmd-$revhash-$$
 
 qremote_dir=$( shqstr "$remote_dir" )
 qrevhash=$( shqstr "$revhash" )
+qgit_tag=$( shqstr "$git_tag" )
 qgit_top_remote=$( shqstr "$git_top_remote" )
 
 gitd_out=$TMPDIR/$cmd.gitd-out.$$
 gitd_in=$TMPDIR/$cmd.gitd-in.$$
 
+git "--git-dir=$git_top_repo" tag "$git_tag" "$revhash"
 git "--git-dir=$git_top_repo" init --shared=true
 >>"$git_top_repo/git-daemon-export-ok"
 
@@ -131,12 +134,14 @@ $ssh "$remote" '
     no_checkout=$no_checkout
     remote_dir=$qremote_dir
     revhash=$qrevhash
+    git_tag=$qgit_tag
     git_top_remote=$qgit_top_remote"'
     cd "$remote_dir"; pwd
-    set -x
-    git fetch "$git_top_remote" "$revhash"
+    git fetch --verbose --progress "$git_top_remote" "$git_tag"
     [ $no_checkout ] || git checkout "$revhash"' \
 || xit=1
+
+git "--git-dir=$git_top_repo" tag -d "$git_tag"
 
 exec 1>&5 5>&-
 echo "$revhash"
