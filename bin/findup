@@ -102,8 +102,8 @@ do
     then  printf '%s\n' "$dir"
     else  printf '%s\n' "$path"
     fi
+    [ $all ] || break
   fi
-  [ $all ] || break
   [ -z "$top" ] || [ "x$dir" != "x$top" ] || break
   odir=$dir
   dir=$( dirname "$dir" )
