@@ -16,8 +16,7 @@ usage="Usage: $cmd pathname"
 cd "$1"
 wd=$( command pwd )
 
-: ${rawHOME:=$( sh -c 'cd && pwd' )}
-: ${rawHOME:=$HOME}
+rawHOME=$( sh -c 'cd && /bin/pwd' )
 
 case "$wd" in
   "$HOME" | "$rawHOME" )
