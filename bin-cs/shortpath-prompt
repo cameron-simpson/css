@@ -1,0 +1,76 @@
+#!/bin/sh
+#
+# Shorten a pathname for use in my prompt string.
+#   - Cameron Simpson <cs@zip.com.au> 18oct2016
+#
+# NB: uses findup and therefore requires the ability to cd into the
+# named directory.
+#
+
+set -ue
+
+cmd=$0
+usage="Usage: $cmd pathname"
+
+[ $# = 1 ] || { echo "$usage" >&2; exit 2; }
+cd "$1"
+wd=$( command pwd )
+
+: ${rawHOME:=$( sh -c 'cd && pwd' )}
+: ${rawHOME:=$HOME}
+
+case "$wd" in
+  "$HOME" | "$rawHOME" )
+    echo '~'
+    exit 0
+    ;;
+esac
+
+case "$wd" in
+  $rawHOME/*)
+      dirtop=$rawHOME
+      dirname='~/'
+      ;;
+  $HOME/*)
+      dirtop=$HOME
+      dirname='~/'
+      ;;
+  /*) dirtop=/
+      dirname=/ ;;
+esac
+
+findup -a -T "$dirtop" . \
+| \
+{ 
+  read -r dir || exit 1
+  base0=$( basename "$dir" )
+  reverse \
+  | \
+  { 
+    while read -r dir
+    do
+      base=$(basename "$dir")
+      case "$base" in
+        ???*)
+          if [ -e "$dir/.hg" -o -e "$dir/.git" ]
+          then
+            printf '%s\n' "$base"
+          else
+            printf '%s\n' "$base" | sed 's/\(.\).*/\1/'
+          fi
+          ;;
+        *)printf '%s\n' "$base"
+          ;;
+      esac
+    done
+  }
+  printf "%s\n" "$base0"
+} \
+| \
+{ while read -r dirpart
+  do
+    case "$dirname" in */) ;; *) dirname="$dirname"/ ;; esac
+    dirname="$dirname$dirpart"
+  done
+  echo "$dirname"
+}
