@@ -13,10 +13,10 @@ exec 3>&1 1>&2
 
 statefile=$HOME/var/run/gpg-agent-$HOST
 
-{ [ -n "$GPG_AGENT_INFO" ] && gpg-agent; } \
+{ [ -n "$GPG_AGENT_INFO" ] && gpg-agent >/dev/null 2>&1; } \
 || \
 { unset GPG_AGENT_INFO
-  [ -s "$statefile" ] && . "$statefile" && gpg-agent >/dev/null \
+  [ -s "$statefile" ] && . "$statefile" && gpg-agent >/dev/null 2>&1 \
   || eval `gpg-agent --daemon --sh "--homedir=$GNUPGHOME" | tee "$statefile"`
 }
 
