@@ -79,6 +79,14 @@ fi
 
 exec 5>&1 1>&2
 
+tmppfx=$TMPDIR/$cmd.$$.
+trap 'rm -f "$tmppfx"*' 0 1 3 15
+
+tmpdiff=${tmppfx}diff
+[ $no_diff ] \
+|| { git diff >"$tmpdiff"; [ -s "$tmpdiff" ] || no_diff=1; }
+
+
 git_top=$( git-top "$git_work_dir" )
 git_top_repo=$git_top/.git
 revhash=$( git "--git-dir=$git_top_repo" rev-parse "$rev" )
@@ -88,7 +96,7 @@ if [ -z "$remote" ]
 then
   $trace git -C "$remote_dir" fetch --verbose --progress "$git_top_repo" "$revhash"
   [ $no_checkout ] || $trace git -C "$remote_dir" checkout -f "$revhash"
-  [ $no_diff ] || $trace git diff | $trace git -C "$remote_dir" apply
+  [ $no_diff ] || git -C "$remote_dir" apply <"$tmpdiff"
   exit $?
 fi
 
@@ -135,7 +143,7 @@ sleep 1
 xit=0
 
 # go to the remote host and access the local git via the daemon
-{ [ $no_diff ] || $trace git diff; } \
+{ [ $no_diff ] || cat "$tmpdiff"; } \
 | $ssh "$remote" '
     set -ue'"
     no_checkout=$no_checkout
