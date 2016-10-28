@@ -7,36 +7,47 @@
 set -ue
 
 cmd=$(basename "$0")
-usage="Usage: $cmd media-files..."
+usage="Usage: $cmd UNRIPPED/media-files..."
 
-trace=set-x
-ripped=RIPPED
-unripped=UNRIPPED
+trace=
+[ -t 2 ] && trace=set-x
+
+badopts=
+
+if [ $# = 0 ]
+then
+  echo "$cmd: missing media-files" >&2
+  badopts=1
+fi
+
+[ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 xit=0
 
 for f
 do
   case "$f" in
-      -)        f=./$f ;;
+    UNRIPPED/*) ;;
+    *)  echo "$cmd: not in UNRIPPED/, skipping: $f" >&2
+        continue
+        ;;
   esac
-  case "$f" in
-      *.tvwiz)  set -- beyonwiz mconvert "$f" ;;
-      *)        echo "$cmd: unsupported format: $f" >&2
-                xit=1
-                continue
-                ;;
-  esac
-  if time $trace "$@"
-  then
-    mvto=$RIPPED/$f
-  else
-    mvto=$UNRIPPED/$f
-    xit=1
+  subpath=${f:9}
+  subdir=$(dirname "$subpath")
+  if  case "$f" in
+        *.tvwiz)
+            $trace beyonwiz mconvert "$f"
+            ;;
+        *)  echo "$cmd: unsupported format, skipping: $f" >&2
+            continue
+            ;;
+      esac
+  then  todir=RIPPED/$subdir
+  else  todir=FAILED/$subdir
+        xit=1
   fi
-  mvtodir=$( dirname "$mvto" )
-  [ -d "$mvtodir" ] || $trace mkdir "$mvtodir"
-  $trace mv -i "$f" "$mvto"
+  [ -d "$todir/." ] || $trace mkdir "$todir"
+  $trace mv -i "$f" "$todir/."
 done
 
 exit $xit
