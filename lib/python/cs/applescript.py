@@ -4,4 +4,4 @@
 #
 
 def quotestr(s):
-  return s.replace('\\', '\\\\').replace('"', '\\"')
+  return '"' + s.replace('\\', '\\\\').replace('"', '\\"') + '"'
