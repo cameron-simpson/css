@@ -27,6 +27,7 @@ import os
 import os.path
 from collections import namedtuple
 import datetime
+from cs.app.ffmpeg import MetaData as FFmpegMetaData, convert as ffconvert
 import json
 import struct
 from subprocess import Popen, PIPE
@@ -410,6 +411,7 @@ def trailing_nul(bs):
   return start, bs[start:]
 
 class TVWiz(O):
+
   def __init__(self, wizdir):
     self.dirpath = wizdir
     self.path_title, self.path_datetime = self._parse_path()
@@ -486,6 +488,21 @@ class TVWiz(O):
       for buf in self.data():
         output.write(buf)
 
+  def ffmpeg_metadata(self):
+    H = self.header()
+    return FFmpegMetaData('mp4',
+                          title=( H.evtName
+                                  if len(H.episode) == 0
+                                  else '%s: %s' % (H.evtName, H.episode)
+                                ),
+                          show=H.evtName,
+                          episode_id=H.episode,
+                          synopsis=H.synopsis,
+                          network=H.svcName,
+                          comment='Transcoded from %r using ffmpeg. Recording date %s.'
+                                  % (self.dirpath, H.iso),
+                         )
+
   def convert(self, outpath, format=None):
     ''' Transcode video to `outpath` in FFMPEG `format`.
     '''
@@ -499,22 +516,8 @@ class TVWiz(O):
     # prevent output path looking like option or URL
     if not os.path.isabs(outpath):
       outpath = os.path.join('.', outpath)
-    H = self.header()
-    ffmpeg_argv = [ 'ffmpeg', '-f', 'mpegts', '-i', '-',
-                              '-f', format,
-                              '-metadata', 'title='
-                                           + ( H.evtName
-                                               if len(H.episode) == 0
-                                               else '%s: %s' % (H.evtName, H.episode)
-                                             ),
-                              '-metadata', 'show='+H.evtName,
-                              '-metadata', 'episode_id='+H.episode,
-                              '-metadata', 'synopsis='+H.synopsis,
-                              '-metadata', 'network='+H.svcName,
-                              '-metadata', 'comment=Transcoded from %r using ffmpeg. Recording date %s.' % (self.dirpath, H.iso),
-                              outpath]
-    info("running: %r", ffmpeg_argv)
-    P = Popen(ffmpeg_argv, stdin=PIPE)
+    ffmeta = self.ffmpeg_metadata('mp4')
+    P = ffconvert(None, 'mpegts', outpath, 'mp4', ffmeta)
     self.copyto(P.stdin)
     P.stdin.close()
     xit = P.wait()
