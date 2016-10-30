@@ -63,7 +63,7 @@ class MetaData(O):
     return opts
 
 def convert(src, srcfmt, dst, dstfmt, meta=None):
-    ''' Convert video `src` to `dst`, return a subprocess.Popen object.
+    ''' Convert video `src` to `dst`, return a subprocess.Popen object and the ffmpeg argv.
         If `src` is None, pass '-' as the input path and attach a
           pipe to its standard input.
         If `src` is a string it is considered to be a filename and
@@ -135,4 +135,4 @@ def convert(src, srcfmt, dst, dstfmt, meta=None):
     argv.extend( ('-f', dstfmt) )
     argv.extend(ffmeta.options())
     argv.append(dstpath)
-    return Popen(ffmpeg_argv, stdin=stdin, stdout=stdout)
+    return Popen(ffmpeg_argv, stdin=stdin, stdout=stdout), ffmpeg_argv
