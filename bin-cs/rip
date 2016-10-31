@@ -46,7 +46,7 @@ do
   else  todir=FAILED/$subdir
         xit=1
   fi
-  [ -d "$todir/." ] || $trace mkdir "$todir"
+  [ -d "$todir/." ] || $trace mkdir -p "$todir"
   $trace mv -i "$f" "$todir/."
 done
 
