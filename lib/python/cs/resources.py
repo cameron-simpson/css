@@ -12,12 +12,11 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         ],
-    'requires': ['cs.excutils', 'cs.logutils', 'cs.obj', 'cs.py.stack'],
+    'install_requires': ['cs.excutils', 'cs.logutils', 'cs.obj', 'cs.py.stack'],
 }
 
 from contextlib import contextmanager
-import threading
-from threading import Condition, RLock, Lock
+from threading import Condition, RLock, Lock, current_thread
 import time
 import traceback
 from cs.excutils import logexc
@@ -101,7 +100,7 @@ class MultiOpenMixin(O):
         for Fkey in sorted(self._opened_from.keys()):
           error("  opened from %s %d times", Fkey, self._opened_from[Fkey])
         ##from cs.debug import thread_dump
-        ##thread_dump([threading.current_thread()])
+        ##thread_dump([current_thread()])
         ##raise RuntimeError("UNDERFLOW CLOSE of %s" % (self,))
         return
       self._opens -= 1

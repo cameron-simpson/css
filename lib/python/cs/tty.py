@@ -17,6 +17,7 @@ DISTINFO = {
         "Programming Language :: Python :: 3",
         "Topic :: Terminals",
         ],
+    'install_requires': [],
 }
 
 import re

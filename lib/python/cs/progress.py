@@ -12,7 +12,7 @@ from cs.seq import seq
 CheckPoint = namedtuple('CheckPoint', 'time position')
 
 class Progress(object):
-  ''' A progress counter to track task completion with various utility functions.
+  ''' A progress counter to track task completion with various utility methods.
   '''
 
   def __init__(self, total=None, start=0, position=None, start_time=None, throughput_window=None, name=None):
@@ -54,6 +54,10 @@ class Progress(object):
     '''
     return self._positions[-1][1]
 
+  @position.setter
+  def position(self, new_position):
+    self.update(new_position)
+
   def update(self, new_position, update_time=None):
     ''' Record more progress.
     '''
@@ -66,9 +70,13 @@ class Progress(object):
     self._flushed = False
 
   def advance(self, delta, update_time=None):
-    ''' Record more progress.
+    ''' Record more progress, return the advanced position.
     '''
-    return self.update(self.position + delta, update_time=update_time)
+    self.update(self.position + delta, update_time=update_time)
+
+  def __iadd__(self, delta):
+    self.advance(delta)
+    return self
 
   def _flush(self, oldest=None):
     if oldest is None:

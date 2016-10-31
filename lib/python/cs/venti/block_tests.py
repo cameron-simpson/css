@@ -20,7 +20,7 @@ from .cache import MemoryCacheStore
 class TestAll(unittest.TestCase):
 
   def setUp(self):
-    self.S = MemoryCacheStore()
+    self.S = MemoryCacheStore("TestAll")
 
   def _verify_block(self, B, **kw):
     errs = list(verify_block(B, **kw))
