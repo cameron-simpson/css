@@ -39,7 +39,7 @@ class MetaData(O):
     ''' Initialise .format, .fields and .values.
     '''
     try:
-      fields = FFmpegMetaData.FIELDNAMES[format]
+      fields = MetaData.FIELDNAMES[format]
     except KeyError:
       raise ValueError("unsupported target format %r" % (format,))
     self.format = format
@@ -52,14 +52,14 @@ class MetaData(O):
         raise ValueError("format %r does not support field %r" % (format, field))
       self.values[k] = v
 
-  def options():
+  def options(self):
     ''' Compute the FFmpeg -metadata option strings and return as a list.
     '''
     opts = []
     for field in self.fields:
       value = self.values.get(field)
       if value is not None:
-        opts.extend('-metadata', value)
+        opts.extend( ('-metadata', '='.join( (field, value) ) ) )
     return opts
 
 def convert(src, srcfmt, dst, dstfmt, meta=None):
@@ -133,6 +133,7 @@ def convert(src, srcfmt, dst, dstfmt, meta=None):
       argv.extend( ('-f', srcfmt) )
     argv.extend( ('-i', srcpath) )
     argv.extend( ('-f', dstfmt) )
-    argv.extend(ffmeta.options())
+    if meta is not None:
+      argv.extend(meta.options())
     argv.append(dstpath)
-    return Popen(ffmpeg_argv, stdin=stdin, stdout=stdout), ffmpeg_argv
+    return Popen(argv, stdin=stdin, stdout=stdout), argv
