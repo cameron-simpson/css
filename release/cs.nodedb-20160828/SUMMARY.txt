@@ -1,0 +1,3 @@
+New method Node.nextNode: allocate a new Node with the next numeric name above the existing names.
+NodeDB.__init__: accept optional type_factories mapping parameter, used by ._createNode.
+Many other fixes and improvements.

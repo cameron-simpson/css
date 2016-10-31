@@ -1,0 +1,11 @@
+Use "install_requires" instead of "requires" in DISTINFO.
+Add LatePool, a context manager after the flavour of subprocess.Pool.
+Python 2 fix.
+Rename NestingOpenCloseMixin to MultiOpenMixin - easier to type, say and remember, not to mention being more accurate.
+Add RetryError exception for use by Later.retriable.
+LateFunction: support RetryError exception from function, causing requeue.
+LateFunction: accept retry_delay parameter, used to delay function retry.
+Later.defer_iterable: accept `test_ready` callable to support deferring iteration until the callable returns truthiness.
+New function retry(retry_interval, func, *a, **kw) to call func until it does not raise RetryError.
+Later: wrap several methods in @MultiOpenMixin.is_opened.
+Assorted bugfixes and improvements.
