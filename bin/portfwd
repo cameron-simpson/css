@@ -83,8 +83,8 @@ if [ -z "$sshcfg" ]
 then
   # look for an ssh config
   for f in "$PORTFWD_SSH_CONFIG" \
-           "$HOME/rc/ssh/config-pf" \
-           "$HOME/rc/ssh/config"
+           "$HOME/.ssh/config-pf" \
+           "$HOME/.ssh/config"
   do
     [ -n "$f" ] && [ -s "$f" ] && { sshcfg=$f; break; }
   done
