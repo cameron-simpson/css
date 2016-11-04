@@ -11,8 +11,11 @@ exec 3>&1 1>&2
 statefile=$HOME/var/run/ssh-agent-$HOST
 
 # test for existing ssh-agent
-ssh-add -l >/dev/null || [ $? = 1 ] \
-|| [ -s "$statefile" ] && . "$statefile" && { ssh-add -l >/dev/null || [ $? = 1 ]; } \
+{ ssh-add -l >/dev/null || [ $? = 1 ]; } \
+|| { [ -s "$statefile" ] \
+     && . "$statefile" \
+     && { ssh-add -l >/dev/null || [ $? = 1 ]; }
+   } \
 || eval `ssh-agent -s | tee "$statefile"`
 
 echo "$SSH_AUTH_SOCK" >&3
