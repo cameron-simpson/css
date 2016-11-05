@@ -210,7 +210,7 @@ class CalibreTable(object):
     self._load()
 
   def instances(self):
-    return self.by_id.values()
+    return sorted(self.by_id.values(), key=lambda obj: obj.name)
 
   def _load(self):
     for row in self.dosql_ro(self._select_all):
