@@ -8,7 +8,7 @@
 set -ue
 exec 3>&1 1>&2
 
-: ${GPG_AGENT_INFO:=}
+: ${GPG_AGENT_INFO:=''}
 : ${GNUPGHOME:=$HOME/rc/gnupg}
 
 statefile=$HOME/var/run/gpg-agent-$HOST
@@ -17,7 +17,7 @@ statefile=$HOME/var/run/gpg-agent-$HOST
 || \
 { unset GPG_AGENT_INFO
   [ -s "$statefile" ] && . "$statefile" && gpg-agent >/dev/null 2>&1 \
-  || eval `gpg-agent --daemon --sh "--homedir=$GNUPGHOME" | tee "$statefile"`
+  || { gpg-agent --daemon --sh "--homedir=$GNUPGHOME" "--write-env-file=$statefile" && . "$statefile"; }
 }
 
 echo "$GPG_AGENT_INFO" >&3
