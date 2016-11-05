@@ -1,0 +1,1 @@
+changes to remove dependencies on pythons newer than 2.4 and also other modules; issue reported by desius@gmail.com

@@ -11,6 +11,7 @@ set -ue
 : ${ADDIF_LOW:=1}	# default base subinterface number
 
 trace=
+[ -t 2 ] && trace=set-x
 baseif=$ADDIF
 basen=$ADDIF_LOW
 netmask=
@@ -135,11 +136,11 @@ do
           esac
       done
       # apply and then bump $basen
-      ( set -x; $trace ifconfig "$baseif:$n" "$ipaddr" netmask "$netmask" ) || xit=1
+      ( $trace ifconfig "$baseif:$n" "$ipaddr" netmask "$netmask" ) || xit=1
       inuse="$inuse $n"
     else
       # no silly :n logical interfaces for BSD!
-      ( set -x; $trace ifconfig "$baseif" alias "$ipaddr" netmask "$netmask" ) || xit=1
+      ( $trace ifconfig "$baseif" alias "$ipaddr" netmask "$netmask" ) || xit=1
     fi
   done
 done

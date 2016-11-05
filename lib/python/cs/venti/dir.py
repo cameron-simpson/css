@@ -15,7 +15,7 @@ from cs.seq import seq
 from cs.serialise import get_bs, get_bsdata, get_bss, put_bs, put_bsdata, put_bss
 from cs.threads import locked, locked_property
 from . import totext, fromtext
-from .block import Block, decodeBlock
+from .block import Block, decodeBlock, encodeBlock
 from .file import File
 from .meta import Meta
 
@@ -44,7 +44,7 @@ F_HASNAME = 0x02
 F_NOBLOCK = 0x04
 
 def decode_Dirent_text(text):
-  ''' Accept `text`, a text transcription of a Direct, such as from
+  ''' Accept `text`, a text transcription of a Dirent, such as from
       Dirent.textencode(), and return the corresponding Dirent.
   '''
   data = fromtext(text)
@@ -59,7 +59,7 @@ class DirentComponents(namedtuple('DirentComponents', 'type name metatext block'
   @classmethod
   def from_data(cls, data, offset=0):
     ''' Unserialise a serialised Dirent, return (DirentComponents, offset).
-        Input format: bs(type)bs(flags)[bs(namelen)name][bs(metalen)meta]block
+        Input format: bs(type)bs(flags)[bs(namelen)name][bs(metalen)meta]blockref
     '''
     type_, offset = get_bs(data, offset)
     flags, offset = get_bs(data, offset)
@@ -104,7 +104,7 @@ class DirentComponents(namedtuple('DirentComponents', 'type name metatext block'
       flags |= F_NOBLOCK
       blockref = b''
     else:
-      blockref = block.encode()
+      blockref = encodeBlock(block)
     return put_bs(self.type) \
          + put_bs(flags) \
          + namedata \
@@ -174,7 +174,7 @@ class _Dirent(object):
     return ( self.name == other.name
          and self.type == other.type
          and self.meta == other.meta
-         and self.block.hashcode == other.block.hashcode
+         and self.block == other.block
            )
 
   @property
@@ -217,38 +217,7 @@ class _Dirent(object):
     ''' Serialise the dirent as text.
         Output format: bs(type)bs(flags)[bs(namelen)name][bs(metalen)meta]block
     '''
-    flags = 0
-
-    name = self.name
-    if name is None or len(name) == 0:
-      nametxt = ""
-    else:
-      nametxt = totext(put_bsdata(name.encode()))
-      flags |= F_HASNAME
-
-    meta = self.meta
-    if meta:
-      if not isinstance(meta, Meta):
-        raise TypeError("self.meta is not a Meta: <%s>%r" % (type(meta), meta))
-      metatxt = meta.textencode()
-      if metatxt == meta.dflt_acl_text:
-        metatxt = ''
-      if len(metatxt) > 0:
-        metatxt = totext(put_bsdata(metatxt.encode()))
-        flags |= F_HASMETA
-    else:
-      metatxt = ""
-
-    if self.issym or self.ishardlink:
-      blocktxt = ''
-    else:
-      blocktxt = self.block.textencode()
-    return ( hexify(put_bs(self.type))
-           + hexify(put_bs(flags))
-           + nametxt
-           + metatxt
-           + blocktxt
-           )
+    return totext(self.encode())
 
   @property
   def size(self):
@@ -304,6 +273,16 @@ class _Dirent(object):
     ctime = 0
 
     return (unixmode, ino, dev, nlink, uid, gid, size, atime, mtime, ctime)
+
+  def complete(self, S2, recurse=False):
+    ''' Complete this Dirent from alternative Store `S2`.
+        TODO: paralellise like _Block.complete.
+    '''
+    self.block.complete(S2)
+    if self.isdir:
+      for name, entry in self.entries.items():
+        if name != '.' and name != '..':
+          entry.complete(S2, True)
 
 class InvalidDirent(_Dirent):
 
@@ -413,11 +392,12 @@ class FileDirent(_Dirent, MultiOpenMixin):
         If open, sync the file to update ._block.
     '''
     self._check()
-    if self._open_file is not None:
-      self._block = self._open_file.flush()
-      warning("FileDirent.block: updated to %s", self._block)
-      ##stack_dump(indent=2)
-    return self._block
+    ##X("access FileDirent.block from:")
+    ##stack_dump(indent=2)
+    if self._open_file is None:
+      return self._block
+    else:
+      return self._open_file.flush()
 
   @block.setter
   @locked
@@ -455,14 +435,17 @@ class FileDirent(_Dirent, MultiOpenMixin):
   def shutdown(self):
     ''' On final close, close ._open_file and save result as ._block.
     '''
-    X("CLOSE %s ...", self)
+    X("FileDirent.CLOSE %s ...", self)
     self._check()
     if self._block is not None:
-      error("final close, but ._block is not None; replacing with self._open_file.close(), was: %r", self._block)
+      error("final close, but ._block is not None; replacing with self._open_file.close(), was: %s", self._block)
     self._block = self._open_file.close()
     X("CLOSE %s: _block=%s", self, self._block)
     self._open_file = None
     self._check()
+
+  def flush(self):
+    return self._open_file.flush()
 
   def truncate(self, length):
     ''' Truncate this FileDirent to the specified size.
@@ -472,6 +455,7 @@ class FileDirent(_Dirent, MultiOpenMixin):
       with self:
         return self._open_file.truncate(length)
 
+  # TODO: move into distinctfile utilities class with rsync-like stuff etc
   def restore(self, path, makedirs=False, verbosefp=None):
     ''' Restore this _Dirent's file content to the name `path`.
     '''
@@ -539,7 +523,7 @@ class Dir(_Dirent):
   def change(self):
     ''' Mark this Dir as changed; propagate to parent Dir if present.
     '''
-    XP("Dir %r: changed=True", self.name)
+    ##XP("Dir %r: changed=True", self.name)
     ##stack_dump(indent=2)
     self.changed = True
     if self.parent:
@@ -610,6 +594,9 @@ class Dir(_Dirent):
   def keys(self):
     return self.entries.keys()
 
+  def items(self):
+    return self.entries.items()
+
   def __contains__(self, name):
     if name == '.':
       return True
@@ -634,8 +621,9 @@ class Dir(_Dirent):
       raise KeyError("invalid name: %s" % (name,))
     if not isinstance(E, _Dirent):
       raise ValueError("E is not a _Dirent: <%s>%r" % (type(E), E))
-    self.change()
     self.entries[name] = E
+    self.touch()
+    self.change()
     E.name = name
     if E.isdir:
       Eparent = E.parent
@@ -650,8 +638,9 @@ class Dir(_Dirent):
       raise KeyError("invalid name: %s" % (name,))
     if name == '.' or name == '..':
       raise KeyError("refusing to delete . or ..: name=%s" % (name,))
-    self.change()
     del self.entries[name]
+    self.touch()
+    self.change()
 
   def add(self, E):
     ''' Add a Dirent to this Dir.

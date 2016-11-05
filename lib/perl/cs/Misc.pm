@@ -10,7 +10,6 @@ use strict qw(vars);
 
 $::DEBUG=0 if ! defined $::DEBUG;
 
-##require 'flush.pl';	# for ::flush()
 use cs::Math;
 
 package cs::Misc;

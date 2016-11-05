@@ -1,0 +1,9 @@
+#!/bin/sh
+#
+# Turn whitespace in filenames into a dash.
+# - Cameron Simpson <cs@zip.com.au> 28may2016
+#
+
+[ $# -gt 0 ] || set -- *' '*
+set -x
+exec frename 's/\s+/-/g' ${1+"$@"}

@@ -6,4 +6,4 @@
 
 set -ue
 [ -t 2 ] && set -x
-exec py26+ -m cs.app.megacli ${1+"$@"}
+exec python -c 'import sys; import cs.app.megacli; sys.argv[0]="mcli"; sys.exit(cs.app.megacli.main(sys.argv))' ${1+"$@"}

@@ -6,7 +6,8 @@ use strict qw(vars);
 ##BEGIN { use cs::DEBUG; cs::DEBUG::using(__FILE__); }
 
 require 'open3.pl';
-require 'flush.pl';
+##require 'flush.pl';
+use IO::Handle qw();
 
 package cs::RStat;
 
@@ -36,7 +37,7 @@ sub _RStat
 	{ my($this,$host)=@_;
 
 	  print TO "$host\n";
-	  &'flush(TO);
+	  $TO->flush();
 
 	  local($_);
 

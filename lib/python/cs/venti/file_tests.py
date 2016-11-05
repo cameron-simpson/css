@@ -19,7 +19,7 @@ class Test_RWFile(unittest.TestCase, BackedFile_TestMethods):
 
   def setUp(self):
     self.store_dict = {}
-    self.S = MappingStore(self.store_dict, name='tesing MappingStore')
+    self.S = MappingStore("Test_RWFile", self.store_dict)
     defaults.pushStore(self.S)
     # construct test backing block
     with open(__file__, "rb") as fp:
@@ -36,7 +36,7 @@ class Test_RWFile(unittest.TestCase, BackedFile_TestMethods):
     bfp = self.backed_fp
     B2 = bfp.flush()
     self.assertEqual(B2, bfp.backing_block)
-    self.assertIsNone(bfp._front_file)
+    self.assertEqual(bfp.front_range.end, 0)
 
 def selftest(argv):
   unittest.main(__name__, None, argv, failfast=True)

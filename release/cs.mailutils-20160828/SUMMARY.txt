@@ -1,0 +1,7 @@
+Use "install_requires" instead of "requires" in DISTINFO.
+modify_header: accept multiple header values.
+Message factory function: open message files with errors="replace" because messages might have any arbitrary guff in them; accept the mangling that may occur.
+Add new_message_id() and need_message_id().
+Add message_references() to return related Message-IDs from Reply-To: and References: headers.
+Python 2/3 portability fixes.
+Assorted bugfixes and improvements.

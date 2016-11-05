@@ -1,0 +1,44 @@
+  bin/beyonwiz lib/python/cs/app/beyonwiz.py: beyonwiz: move data file parse into cs.app.beyonwiz, assorted modernisations and trivial bugfixes
+  lib/python/cs/app/beyonwiz.py: cs.app.beyonwiz: fix var name typo
+  lib/python/cs/app/beyonwiz.py: cs.app.beyonwiz: add imports, fix typo
+  lib/python/cs/app/beyonwiz.py lib/python/cs/app/mailfiler.py lib/python/cs/app/mklinks.py lib/python/cs/app/myke/make.py lib/python/cs/app/myke/parse.py lib/python/cs/app/osx/addressbook.py lib/python/cs/app/pilfer.py lib/python/cs/configutils.py lib/python/cs/later.py lib/python/cs/mailutils.py lib/python/cs/nodedb/csvdb.py lib/python/cs/nodedb/node.py lib/python/cs/nodedb/sqla.py lib/python/cs/nodedb/text.py lib/python/cs/nodedb/tokcab.py lib/python/cs/urlutils.py lib/python/cs/venti/archive.py lib/python/cs/venti/datafile.py lib/python/cs/venti/dir.py lib/python/cs/venti/store.py lib/python/cs/venti/stream.py: cs.*: make use of new Pfx deferred argument formatting
+  lib/python/cs/app/beyonwiz.py: cs.app.beyonwiz: minor modernisations, no semantic changes
+  bin/beyonwiz lib/python/cs/app/beyonwiz.py: beyonwiz, cs.app.beywonwiz: move utility main logic into cs.app.beyonwiz
+  lib/python/cs/app/beyonwiz.py: cs.app.beyonwiz: remove spurious __name__ if-statement
+  lib/python/cs/app/beyonwiz.py: cs.app.beyonwiz: split Trunc records off into a namedtuple
+  lib/python/cs/app/beyonwiz.py: cs.app.beyonwiz: subclass cs.obj.O for debugging
+  lib/python/cs/app/beyonwiz.py: cs.app.beyonwiz: add "test" command mode, start on WizPnP class to access beyonwiz via HTTP
+  lib/python/cs/app/beyonwiz.py: cs.app.beyonwiz: WizPnP: add tvdevicedesc_XML property returning an Element
+  lib/python/cs/app/beyonwiz.py: cs.app.beyonwiz: add WinPnP.specVersion property
+  lib/python/cs/app/beyonwiz.py: cs.app.beyonwiz: use an RLock for locked_properties
+  lib/python/cs/app/beyonwiz.py: cs.app.beyonwiz: read recording index
+  lib/python/cs/app/beyonwiz.py: cs.app.beyonwiz: pull trunc parsing out into a function, discard Trunc class
+  lib/python/cs/app/beyonwiz.py: cs.app.beyonwiz: print function
+  lib/python/cs/app/beyonwiz.py: cs.app.beyonwiz: assorted constants related to TVWiz headers
+  lib/python/cs/app/beyonwiz.py: cs.app.beyonwiz: initial parse_header() function, indent tweak
+  lib/python/cs/app/beyonwiz.py: cs.app.beyonwiz: adjust misnamed call to TVWiz.trunc_records, turn an assert into a check/raise
+  lib/python/cs/app/beyonwiz.py: cs.app.beyonwiz: trite WizPnP docstring
+  lib/python/cs/app/beyonwiz.py: cs.app.beyonwiz: move usage string to top of file
+  lib/python/cs/app/beyonwiz.py: cs.app.beyonwiz: add "header" op, to print header information
+  lib/python/cs/app/beyonwiz.py: cs.app.beyonwiz: header implementation code
+  lib/python/cs/app/beyonwiz.py: cs.app.pilfer: parse_header: add missing "data" parameter to struct.unpack
+  lib/python/cs/app/beyonwiz.py: cs.app.beyonwiz: whitespace
+  lib/python/cs/app/beyonwiz.py: cs.app.beyonwiz: add "meta" command, implement meta infor for modern Beyonwiz Tn recordingslib/python/cs/app/beyonwiz.py
+  lib/python/cs/app/beyonwiz.py: cs.app.beyonwiz: binary fixes for python 3
+  lib/python/cs/app/beyonwiz.py: cs.app.beyonwiz: cat: close binary stream when finished
+  lib/python/cs/app/beyonwiz.py: cs.app.beyonwiz: cat: open a os.dup(stdout) to avoid spurious close
+  lib/python/cs/app/beyonwiz.py: cs.app.beyonwiz: add "convert tvwizdir output.mp4" operation
+  lib/python/cs/app/beyonwiz.py: cs.app.beyonwiz: TVWiz: rename .dir to .dirpath
+  lib/python/cs/app/beyonwiz.py: cs.app.beyonwiz: superior parse of header file, extracting most metadata; add "stat" operation for reciting summary data about tvwiz dirs
+  lib/python/cs/app/beyonwiz.py: cs.app.beyonwiz: add "mconvert" option for batch conversion of tvwiz dirs; embed tvwiz metadata into resulting output using ffmepg -metadata options
+  lib/python/cs/app/beyonwiz.py: cs.app.beyonwiz: remove guesswork episode and synopsis extraction, insert direct extraction based on getWizPnP/Beyonwiz/Recording/Header.pm constants
+  lib/python/cs/app/beyonwiz.py: cs.app.beyonwiz: remove debug
+  lib/python/cs/app/beyonwiz.py: cs.app.beyonwiz: expand docstring and usage message
+  lib/python/cs/app/beyonwiz.py: cs.app.beyonwiz: spelling fix
+  lib/python/cs/app/beyonwiz.py: cs.app.beyonwiz: strip extra characters from timestampt part of tvwiz dir name
+  lib/python/cs/app/beyonwiz.py: cs.app.beyonwiz: hack: crop episode name at 200 chars to handle idiocy by TV station programmes causing excessively long filenames
+  lib/python/cs/app/beyonwiz.py: cs.app.beyonwiz: further cleansing of the filename timestamp
+  lib/python/cs/app/beyonwiz.py: cs.app.beyonwiz: mconvert: get more serious about figuring how much room we can use for an output filename
+  lib/python/cs/app/beyonwiz.py: cs.app.beyonwiz: better discrad of optional +blah from filename time component
+  lib/python/cs/app/beyonwiz.py: cs.app.beyonwiz: add DISTINFO for PyPI
+  lib/python/cs/app/beyonwiz.py: cs.app.beyonwiz: update DISTINFO, add main script

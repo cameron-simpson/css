@@ -8,5 +8,5 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         ],
-    'requires': [ 'cs.debug', 'cs.logutils', 'cs.inttypes', 'cs.threads', 'cs.later', 'cs.queues', 'cs.asynchron', 'cs.obj', 'cs.lex' ],
+    'install_requires': [ 'cs.debug', 'cs.logutils', 'cs.inttypes', 'cs.threads', 'cs.later', 'cs.queues', 'cs.asynchron', 'cs.obj', 'cs.lex' ],
 }

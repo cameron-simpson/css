@@ -1,7 +1,7 @@
 MegaCLI access kit.
 ===================
 
-Many IBM xSeries servers come with LSI Logic MegaRAID RAID controllers, under the name IBM ServerRAID.
+Many IBM xSeries servers come with LSI Logic MegaRAID RAID controllers, under the name IBM ServerRAID. These controllers are also used by Dell as Dell PowerEdge RAID Controller (PERC).
 
 These can be accessed during the machine boot process via the BIOS screens using a conventional BIOS-like text interface or a ghastly and painful to use GUI interface. However, either of these requires the machine OS to be down.
 

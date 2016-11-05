@@ -1,332 +1,868 @@
 #!/usr/bin/python
 #
 # Access Amazon AWS services.
-# Uses boto underneath, but boto does not feel awfully pythonic.
-# In any case, this exercise will give me convenient AWS access and
-# an avenue to learn the boto interfaces.
-#       - Cameron Simpson <cs@zip.com.au> 17nov2012
+# - Cameron Simpson <cs@zip.com.au> 2016
 #
 
 from __future__ import print_function
-from contextlib import contextmanager
-from threading import RLock
-import os.path
-from getopt import getopt, GetoptError
-from boto.ec2.connection import EC2Connection
-from boto.s3.connection import S3Connection, Location
-from cs.logutils import setup_logging, D, error, Pfx
-from cs.mappings import LRUCache
-from cs.threads import locked_property
-from cs.obj import O, O_str
 
-def main(argv, stderr=None):
+DISTINFO = {
+    'description': "Amazon AWS S3 upload client",
+    'keywords': ["python2", "python3"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 3",
+        ],
+    'install_requires': ['boto3', 'python-magic',
+                ],
+}
+
+import sys
+from collections import namedtuple
+from contextlib import contextmanager
+import hashlib
+import logging
+import magic
+from threading import RLock, Thread
+from time import sleep
+import os
+import os.path
+from os.path import basename, abspath, normpath, join as joinpath
+import stat
+import mimetypes
+from getopt import getopt, GetoptError
+from tempfile import NamedTemporaryFile
+import boto3
+from botocore.exceptions import ClientError
+from urllib.parse import quote, unquote
+from urllib.error import HTTPError
+from cs.env import envsub
+from cs.excutils import logexc
+from cs.fileutils import chunks_of
+from cs.later import Later
+from cs.logutils import setup_logging, D, X, XP, error, warning, info, Pfx
+from cs.obj import O, O_str
+from cs.queues import IterableQueue
+from cs.resources import Pool
+from cs.threads import locked_property
+from cs.upd import Upd
+from cs.urlutils import URL
+
+USAGE = r'''Usage: %s [-L location (ignored, fixme)] command [args...]
+  s3
+    List buckets.
+  s3 bucket_name sync-up [-DnU%%] localdir [bucket_subdir]
+    Synchronise bucket contents from localdir.
+    -D  Delete items in bucket not in localdir.
+    -n  No action. Recite required changes.
+    -U  No upload phase; delete only.
+    -%%  Decode %%hh sequences in local filenames.
+  s3 bucket_name scrape [-DnU] url
+    Synchronise bucket contents with website.
+    -D  Delete items in bucket not in localdir.
+    -n  No action. Recite required changes.
+    -U  No upload phase; delete only.'''
+
+S3_MAX_DELETE_OBJECTS = 1000
+LSEP = os.path.sep
+RSEP = '/'
+
+# will be magic.Magic(mime=True)
+MAGIC = None
+
+# will be cs.upd.Upd
+UPD = None
+
+def main(argv, stdout=None, stderr=None):
+  global MAGIC, UPD
+  if stdout is None:
+    stdout = sys.stdout
   if stderr is None:
     stderr = sys.stderr
 
-  argv=list(sys.argv)
   cmd=os.path.basename(argv.pop(0))
-  usage="Usage: %s {s3|ec2} [-L location] command [args...]"
-  setup_logging(cmd)
+  loginfo = setup_logging(cmd, level=logging.WARNING, upd_mode=True)
+  UPD = loginfo.upd
 
   location = None
 
   badopts = False
 
-  if not argv:
-    error("missing s3 or ec2")
+  try:
+    opts, argv = getopt(argv, 'L:')
+  except GetoptError as e:
+    error("bad option: %s", e)
     badopts = True
-  else:
-    mode = argv.pop(0)
-    if mode == 's3':
-      klass = S3
-    elif mode == 'ec2':
-      klass = EC2
+    opts = ()
+
+  for opt, val in opts:
+    if opt == '-L':
+      location = val
     else:
-      error("unknown mode, I expect \"s3\" or \"ec2\", got \"%s\"", mode)
+      error("unimplemented option: %s", opt)
       badopts = True
 
-    with Pfx(mode):
+  if not badopts:
+    for mtpath in ( '/etc/mime.types',
+                    '/usr/local/etc/mime.types',
+                    '/opt/local/etc/mime.types',
+                    '$HOME/.mime.types',
+                  ):
+      filepath = envsub(mtpath)
+      if os.path.exists(filepath):
+        mimetypes.init((filepath,))
+    mtpath = os.environ.get('MIME_TYPES')
+    if mtpath and os.path.exists(mtpath):
+      mimetypes.init((mtpath,))
+    MAGIC = magic.Magic(mime=True)
+
+  if not argv:
+    error("missing command")
+    badopts = True
+  else:
+    command = argv.pop(0)
+    with Pfx(command):
       try:
-        opts, argv = getopt(argv, 'L:')
+        if command == 's3':
+          xit = cmd_s3(argv)
+        else:
+          warning("unrecognised command")
+          xit = 2
       except GetoptError as e:
-        error("bad option: %s", e)
+        warning(str(e))
         badopts = True
-        opts = ()
-
-      for opt, val in opts:
-        if opt == '-L':
-          location = val
-        else:
-          error("unimplemented option: %s", opt)
-          badopts = True
-
-      if not argv:
-        error("missing command")
-        badopts = True
-      else:
-        command = argv.pop(0)
-        command_method = "cmd_" + command
-        if not hasattr(klass, command_method):
-          error("unimplemented command: %s", command)
-          badopts = True
-        else:
-          with Pfx(command):
-            if mode == 'ec2':
-              aws = klass(region=location)
-            elif mode == 's3':
-              aws = klass(location=location)
-            else:
-              raise RuntimeError("unimplemented mode: %s" % (mode,))
-            with aws:
-              try:
-                xit = getattr(aws, command_method)(argv)
-              except GetoptError as e:
-                error("%s", e)
-                badopts = True
+        xit = 2
 
   if badopts:
-    print(usage % (cmd,), file=stderr)
+    print(USAGE % (cmd,), file=stderr)
     xit = 2
 
   return xit
 
-class _AWS(O):
-  ''' Convenience wrapper for EC2 connections.
+def cmd_s3(argv):
+  ''' Work with S3 resources.
   '''
+  xit = 0
+  s3 = boto3.resource('s3')
+  if not argv:
+    for bucket in s3.buckets.all():
+      print(bucket.name)
+    return 0
+  bucket_name = argv.pop(0)
+  bucket_pool = BucketPool(bucket_name)
+  if not argv:
+    with BucketPool.instance() as B:
+      print("s3.%s.meta = %s", bucket_name, B.meta)
+  else:
+    s3op = argv.pop(0)
+    with Pfx(s3op):
+      if s3op == 'sync-up':
+        doit = True
+        do_delete = False
+        do_upload = True
+        unpercent = False
+        badopts = False
+        try:
+          opts, argv = getopt(argv, 'DnU%')
+        except GetoptError as e:
+          error("bad option: %s", e)
+          badopts = True
+          opts = ()
+        else:
+          for opt, val in opts:
+            with Pfx(opt):
+              if opt == '-D':
+                do_delete = True
+              elif opt == '-n':
+                doit = False
+              elif opt == '-U':
+                do_upload = False
+              elif opt == '-%':
+                unpercent = True
+              else:
+                error("unimplemented option")
+                badopts = True
+          if not argv:
+            error("missing source directory")
+            badopts = True
+          else:
+            srcdir = argv.pop(0)
+            if argv:
+              dstdir = argv.pop(0)
+            else:
+              dstdir = ''
+            if argv:
+              error("extra arguments after srcdir: %r" % (argv,))
+              badopts = True
+        if not badopts:
+          if os.path.isfile(srcdir):
+            diff, ctype, srcpath, dstpath, e, error_msg = \
+                s3syncup_file(bucket_pool, srcdir, dstdir,
+                              doit=doit, default_ctype='text/html')
+            if e:
+              error(error_msg)
+              xit = 1
+            else:
+              line = "%s %-25s %s" % (diff.summary(), ctype, dstpath)
+              UPD.nl(line)
+          else:
+            if not s3syncup_dir(bucket_pool, srcdir, dstdir,
+                                doit=doit, do_delete=do_delete,
+                                do_upload=do_upload, unpercent=unpercent,
+                                default_ctype='text/html'):
+              xit = 1
+      elif s3op == 'scrape':
+        doit = True
+        do_delete = False
+        do_upload = True
+        badopts = False
+        try:
+          opts, argv = getopt(argv, 'DnU')
+        except GetoptError as e:
+          error("bad option: %s", e)
+          badopts = True
+          opts = ()
+        else:
+          for opt, val in opts:
+            with Pfx(opt):
+              if opt == '-D':
+                do_delete = True
+              elif opt == '-n':
+                doit = False
+              elif opt == '-U':
+                do_upload = False
+              else:
+                error("unimplemented option")
+                badopts = True
+          if not argv:
+            error("missing source URL")
+            badopts = True
+          else:
+            srcurl = URL(argv.pop(0), None)
+            if argv:
+              error("extra arguments after srcdir: %r" % (argv,))
+              badopts = True
+        if not badopts:
+          if not s3scrape(bucket_pool, srcurl,
+                          doit=doit, do_delete=do_delete, do_upload=do_upload):
+              xit = 1
+      else:
+        error("unrecognised s3 op")
+        badopts = True
+      if badopts:
+        raise GetoptError("bad arguments")
+  return xit
 
-  def __init__(self, aws_access_key_id=None, aws_secret_access_key=None):
-    ''' Initialise the EC2 with access id and secret.
+class Differences(O):
+
+  def __init__(self, *a, **kw):
+    self.hashcodes = {}
+    O.__init__(self, *a, **kw)
+
+  def summary(self):
+    return ( ( '-' if self.same_content else 'C' )
+           + ( '-' if self.same_mimetype else 'M' )
+           + ( '-' if self.same_size else 's' )
+           + ( '-' if self.same_time else 't' )
+           )
+
+  def changes(self):
+    ''' Return a dict containing updated field values.
     '''
-    O.__init__(self)
-    self.aws = O()
-    self.aws.access_key_id = aws_access_key_id
-    self.aws.secret_access_key = aws_secret_access_key
-    self._lock = RLock()
-    self._O_omit.append('conn')
+    ch = {}
+    if not self.same_content:
+      ch['content'] = self.hashcodes
+    if not self.same_mimetype:
+      ch['mimetype'] = self.mimetype_new
+    if not self.same_size:
+      ch['size'] = self.size_new
+    if not self.same_time:
+      ch['time'] = self.time_new
+    return ch
 
-  def __enter__(self):
-    return self
+  def changed_fields(self):
+    ''' Return a lexically sorted list of the changed fields.
+    '''
+    return sorted(self.changes().keys())
 
-  def __exit__(self, exc_type, exc_value, traceback):
-    self.conn.close()
+  @property
+  def unchanged(self):
+    return self.same_time and self.same_size and self.same_mimetype and self.same_content
+
+  @property
+  def same_content(self):
+    old = getattr(self, 'sha256_old', None)
+    if old is not None:
+      new = self.hashcodes['sha256']
+      return old is not None and old == new
+    old = getattr(self, 'md5_old', None)
+    if old is not None:
+      new = self.hashcodes['md5']
+      return old is not None and old == new
     return False
 
-  @contextmanager
-  def connection(self, **kwargs):
-    ''' Return a context manager for a Connection.
-    '''
-    conn = self.connect(**kwargs)
-    yield conn
-    conn.close()
-
-  @locked_property
-  def conn(self):
-    ''' The default connection, on demand.
-    '''
-    return self.connect()
-
-  def cmd_report(self, argv):
-    for line in self.report():
-      print(line)
-    return 0
-
-class EC2(_AWS):
-
-  def __init__(self, aws_access_key_id=None, aws_secret_access_key=None, region=None):
-    ''' Initialise the EC2 with access id and secret.
-    '''
-    _AWS.__init__(self, aws_access_key_id=aws_access_key_id, aws_secret_access_key=aws_secret_access_key)
-    self.aws.region = region
-    self._O_omit.extend( ('regions', 'instances') )
-
-  def __getattr__(self, attr):
-    ''' Intercept public attributes.
-        Support:
-          Region name with '-' replaced by '_' -> RegionInfo
-    '''
-    if not attr.startswith('_'):
-      dashed = attr.replace('_', '-')
-      if dashed in self.regions:
-        return self.region(dashed)
-    raise AttributeError(attr)
-
-  def connect(self, **kwargs):
-    ''' Obtain a boto.ec2.connection.EC2Connection.
-        Missing `aws_access_key_id`, `aws_secret_access_key`, `region`
-        arguments come from the corresponding EC2 attributes.
-    '''
-    for kw in ('aws_access_key_id', 'aws_secret_access_key'):
-      if kw not in kwargs:
-        kwargs[kw] = getattr(self.aws, kw[4:], None)
-    for kw in ('region',):
-      if kw not in kwargs:
-        kwargs[kw] = getattr(self.aws, kw, None)
-    if isinstance(kwargs.get('region', None), (str, unicode)):
-      kwargs['region'] = self.region(kwargs['region'])
-    return EC2Connection(**kwargs)
-
-  @locked_property
-  def regions(self):
-    ''' Return a mapping from Region name to Region.
-    '''
-    with self.connection(region=None) as ec2conn:
-      RS = dict( [ (R.name, R) for R in ec2conn.get_all_regions() ] )
-    return RS
-
-  def region(self, name):
-    ''' Return the Region with the specified `name`.
-    '''
-    return self.regions[name]
+  @property
+  def same_mimetype(self):
+    old = getattr(self, 'mimetype_old', None)
+    new = getattr(self, 'mimetype_new', None)
+    if new is not None:
+      return old is not None and old == new
+    return False
 
   @property
-  def reservations(self):
-    ''' Return Reservations in the default Connection.
-    '''
-    return self.conn.get_all_instances()
+  def same_size(self):
+    old = getattr(self, 'size_old', None)
+    new = getattr(self, 'size_new', None)
+    if new is not None:
+      return old is not None and old == new
+    return False
 
-  def report(self):
-    ''' Report AWS info. Debugging/testing method.
-    '''
-    yield str(self)
-    yield "  regions: " + str(self.regions)
-    yield "  reservations: " + str(self.reservations)
-    for R in self.reservations:
-      region = R.region
-      yield "    %s @ %s %s" % (R.id, R.region.name, O_str(R))
-      for I in R.instances:
-        yield "      %s %s %s" % (I, I.public_dns_name, O_str(I))
+  @property
+  def same_time(self):
+    old = getattr(self, 'time_old', None)
+    new = getattr(self, 'time_new', None)
+    if new is not None:
+      return old is not None and old == new
+    return False
 
-class S3(_AWS):
+def path2s3(path, unpercent):
+  ''' Accept a local path and return an S3 path.
+      If `unpercent`, call urllib.parse.unquote on each component.
+  '''
+  components = path.split(LSEP)
+  if unpercent:
+    components = [ unquote(c) for c in components ]
+  return RSEP.join(components)
 
-  def __init__(self, aws_access_key_id=None, aws_secret_access_key=None, location=None, **kwargs):
-    ''' Initialise the S3 with access id and secret.
-    '''
-    _AWS.__init__(self, aws_access_key_id=aws_access_key_id, aws_secret_access_key=aws_secret_access_key)
-    if 'location' is None:
-      self.default_location = Location.DEFAULT
-    else:
-      self.default_location = location
-    self._buckets = {}
-    D("S3 = %s", self)
+def s32path(s3path, unpercent):
+  ''' Accept an S3 path and return a local path.
+      If `unpercent`, call urllib.parse.quote on each component.
+  '''
+  components = s3path.split(RSEP)
+  if unpercent:
+    components = [ quote(c, safe="'/ :(),?&=+") for c in components ]
+  return LSEP.join(components)
 
-  def connect(self, **kwargs):
-    ''' Obtain a boto.s3.connection.S3Connection.
-        Missing `aws_access_key_id`, `aws_secret_access_key`, `region`
-        arguments come from the corresponding S3 attributes.
-    '''
-    for kw in ('aws_access_key_id', 'aws_secret_access_key'):
-      if kw not in kwargs:
-        kwargs[kw] = getattr(self.aws, kw[4:], None)
-    return S3Connection(**kwargs)
+def s3syncup_dir(bucket_pool, srcdir, dstdir, doit=False, do_delete=False, do_upload=False, unpercent=False, default_ctype=None):
+  ''' Sync local directory tree to S3 directory tree.
+  '''
+  global UPD
+  ok = True
+  L = Later(4, name="s3syncup(%r, %r, %r)" % (bucket_pool.bucket_name, srcdir, dstdir))
+  with L:
+    if do_upload:
+      Q = IterableQueue()
+      def dispatch():
+        for LF in s3syncup_dir_async(L, bucket_pool, srcdir, dstdir, doit=doit, do_delete=do_delete, unpercent=unpercent, default_ctype=default_ctype):
+          Q.put(LF)
+        Q.close()
+      Thread(target=dispatch).start()
+      for LF in Q:
+        diff, ctype, srcpath, dstpath, e, error_msg = LF()
+        if e:
+          error(error_msg)
+          ok = False
+        else:
+          line = "%s %-25s %s" % (diff.summary(), ctype, dstpath)
+          if diff.unchanged:
+            UPD.out(line)
+          else:
+            if diff.changed_fields() == ['time']:
+              # be quiet about time changes
+              UPD.out(line)
+            else:
+              UPD.nl(line)
+              ##UPD.nl("  %r", diff.metadata)
+    if do_delete:
+      # now process deletions
+      with bucket_pool.instance() as B:
+        ##if dstdir:
+        ##  dstdir_prefix = dstdir + RSEP
+        ##else:
+        ##  dstdir_prefix = ''
+        dstdir_prefix = dstdir + RSEP
+        with Pfx("S3.filter(Prefix=%r)", dstdir_prefix):
+          dstdelpaths = []
+          for s3obj in B.objects.filter(Prefix=dstdir_prefix):
+            dstpath = s3obj.key
+            with Pfx(dstpath):
+              if not dstpath.startswith(dstdir_prefix):
+                error("unexpected dstpath, not in subdir")
+                continue
+              dstrpath = dstpath[len(dstdir_prefix):]
+              if dstrpath.startswith(RSEP):
+                error("unexpected dstpath, extra %r", RSEP)
+                continue
+              srcpath = joinpath(srcdir, s32path(dstrpath, unpercent))
+              if os.path.exists(srcpath):
+                ##info("src exists, not deleting (src=%r)", srcpath)
+                continue
+              ## uncomment if new %hh omissions surface
+              ##UPD.nl("MISSING local %r", srcpath)
+              if dstrpath.endswith(RSEP):
+                # a folder
+                UPD.nl("d DEL %s", dstpath)
+              else:
+                UPD.nl("* DEL %s", dstpath)
+              dstdelpaths.append(dstpath)
+          if dstdelpaths:
+            dstdelpaths = sorted(dstdelpaths, reverse=True)
+            while dstdelpaths:
+              delpaths = dstdelpaths[:S3_MAX_DELETE_OBJECTS]
+              if doit:
+                result = B.delete_objects(
+                          Delete={
+                            'Objects':
+                              [ {'Key': dstpath} for dstpath in delpaths ]})
+                errs = result.get('Errors')
+                if errs:
+                  ok = False
+                  for err in errors:
+                    error("delete: %s: %r", err['Message'], err['Key'])
+              dstdelpaths[:len(delpaths)] = []
+  L.wait()
+  return ok
 
-  def bucket(self, name, do_create=False, new=False):
-    ''' Return an S3 Bucket.
-	TODO: contrive that self.conn.lookup() does not block other
-	stuff unnecessarily.
-    '''
-    with self._lock:
-      if name in self._buckets:
-        B = self._buckets[name]
+def s3syncup_dir_async(L, bucket_pool, srcdir, dstdir, doit=False, do_delete=False, unpercent=False, default_ctype=None):
+  ''' Sync local directory tree to S3 directory tree.
+  '''
+  srcdir0 = srcdir
+  srcdir = abspath(srcdir)
+  if not os.path.isdir(srcdir):
+    raise ValueError("srcdir not a directory: %r", srcdir)
+  srcdir_slash = srcdir + LSEP
+  # compare existing local files with remote
+  for dirpath, dirnames, filenames in os.walk(srcdir, topdown=True):
+    # arrange lexical order of descent
+    dirnames[:] = sorted(dirnames)
+    with Pfx(dirpath):
+      # compute the path relative to srcdir
+      if dirpath == srcdir:
+        subdirpath = ''
+      elif dirpath.startswith(srcdir_slash):
+        subdirpath = dirpath[len(srcdir_slash):]
       else:
+        raise RuntimeError("os.walk(%r) gave surprising dirpath %r" % (srcdir, dirpath))
+      if subdirpath:
+        s3subdirpath = path2s3(subdirpath, unpercent)
+        if dstdir:
+          dstdirpath = dstdir + RSEP + s3subdirpath
+        else:
+          dstdirpath = s3subdirpath
+      else:
+        dstdirpath = dstdir
+      for filename in sorted(filenames):
+        with Pfx(filename):
+          # TODO: dispatch these in parallel
+          srcpath = joinpath(dirpath, filename)
+          s3filename = path2s3(filename, unpercent)
+          if dstdirpath:
+            dstpath = dstdirpath + RSEP + s3filename
+          else:
+            dstpath = s3filename
+          yield L.defer(s3syncup_file, bucket_pool, srcpath, dstpath, doit=True, default_ctype=default_ctype)
+
+@logexc
+def s3syncup_file(bucket_pool, srcpath, dstpath, trust_size_mtime=False, doit=False, default_ctype=None):
+  with Pfx('s3syncup_file'):
+    diff = Differences()
+
+    # fetch size and mtime of local file
+    S = os.stat(srcpath)
+    if not stat.S_ISREG(S.st_mode):
+      raise ValueError("not a regular file")
+    diff.size_new = S.st_size
+    diff.time_new = S.st_mtime
+
+    # compute MIME type for local file
+    ctype = mimetype(srcpath)
+    if ctype is None:
+      if default_ctype is None:
+        raise ValueError("cannot deduce content_type")
+      ctype = default_ctype
+    diff.mimetype_new = ctype
+
+    with bucket_pool.instance() as B:
+      # fetch S3 object attribute
+      s3obj = B.Object(dstpath)
+      try:
+        s3obj.load()
+      except UnicodeError as e:
+        error("SKIP: cannot handle s3 path %r: %s", dstpath, e)
+        return None, None, srcpath, dstpath, \
+               e, ("SKIP: cannot handle s3 path %r: %s" % (dstpath, e))
+      except ClientError as e:
+        if e.response['Error']['Code'] == '404':
+          diff.missing = True
+          diff.s3metadata = None
+        else:
+          raise
+      else:
+        diff.missing = False
+        s3m = diff.s3metadata = s3obj.metadata
+        # import some s3cmd-attrs into our own scheme if present
+        if 's3cmd-attrs' in s3m:
+          for s3cmdattr in s3m['s3cmd-attrs'].split('/'):
+            a, v = s3cmdattr.split(':', 1)
+            if a == 'mtime' and 'st_mtime' not in s3m:
+              s3m['st_mtime'] = v
+            elif a == 'md5' and 'md5' not in s3m:
+              s3m['md5'] = v
+        diff.size_old = s3obj.content_length
+        time_old_s = s3obj.metadata.get('st_mtime')
+        if time_old_s is None:
+          time_old = None
+        else:
+          try:
+            time_old = float(time_old_s)
+          except ValueError:
+            time_old = None
+        diff.time_old = time_old
+
+      # look for content hash metadata
+      sha256_local_a = None
+      if diff.missing:
+        hashname = 'sha256'
+        hashcode_a = None
+      else:
+        s3meta = s3obj.metadata
+        hashcode_a = s3meta.get('sha256')
+        if hashcode_a:
+          hashname = 'sha256'
+          diff.sha256_old = hashcode_a
+        else:
+          hashcode_a = s3meta.get('md5')
+          if hashcode_a:
+            hashname = 'md5'
+            diff.md5_old = hashcode_a
+          else:
+            hashname = 'sha256'
+        # compute the local hashcode anyway
+        # it will be the preferred SHA256 code if there was no S3-side hashcode
+        diff.hashcodes[hashname] = hash_fp(srcpath, hashname).hexdigest()
+        # fetch content-type
         try:
-          buck = self.conn.lookup(name)
-        except KeyError:
-          if not do_create:
-            raise
-          buck = self.conn.create_bucket(name, self.default_location)
-        B = self._buckets[name] = Bucket(self, buck)
-    return B
+          s3ctype = s3obj.content_type
+        except AttributeError:
+          s3ctype = None
+        else:
+          diff.mimetype_old = s3ctype
 
-  def keys(self):
-    ''' Return a list of the bucket names.
-    '''
-    return [ B.name for B in self.conn.get_all_buckets() ]
+      metadata = { 'st_mtime': str(S.st_mtime),
+                 }
+      if diff.same_content:
+        for hn in 'sha256', 'md5':
+          if hn in s3obj.metadata:
+            metadata[hn] = s3obj.metadata[hn]
+        if diff.same_mimetype and diff.same_time:
+          pass
+        else:
+          # update content_type
+          kw={ 'ACL': 'public-read',
+               'ContentType': ctype,
+               # NB: bucket name plus path
+               'CopySource': B.name + RSEP + dstpath,
+               'Key': dstpath,
+               ##'MetadataDirective': 'COPY',
+               'MetadataDirective': 'REPLACE',
+               'Metadata': metadata,
+             }
+          if doit:
+            with Pfx("copy_from(**%r)", kw):
+              s3obj.copy_from(**kw)
+      else:
+        # upload new content
+        # ensure we have our preferred hashcode
+        if 'sha256' not in diff.hashcodes:
+          diff.hashcodes['sha256'] = hash_fp(srcpath, 'sha256').hexdigest()
+        for hashname, hashcode_a in diff.hashcodes.items():
+          metadata[hashname] = hashcode_a
+        kw={ 'ACL': 'public-read',
+             'ContentType': ctype,
+             'Body': open(srcpath, 'rb'),
+             'Key': dstpath,
+             'Metadata': metadata,
+           }
+        if doit:
+          with Pfx("put(**%r)", kw):
+            s3obj.put(**kw)
+      diff.metadata = metadata
+    return diff, ctype, srcpath, dstpath, None, None
 
-  def __getitem__(self, key):
-    ''' Return the Bucket object with the specified name.
-    '''
-    return self.bucket(key)
+def s3scrape(bucket_pool, srcurl, doit=False, do_delete=False, do_upload=False):
+  ''' Sync website to S3 directory tree.
+  '''
+  global UPD
+  ok = True
+  L = Later(4, name="s3scrape(%r, %r)" % (bucket_pool.bucket_name, srcurl))
+  with L:
+    if do_upload:
+      Q = IterableQueue()
+      def dispatch():
+        for LF in s3scrape_async(L, bucket_pool, srcurl, doit=doit, do_delete=do_delete):
+          Q.put(LF)
+        Q.close()
+      Thread(target=dispatch).start()
+      for LF in Q:
+        diff, ctype, srcU, dstpath, e, error_msg = LF()
+        with Pfx(srcU):
+          if e:
+            error(error_msg)
+            ok = False
+          else:
+            line = "%s %-25s %s" % (diff.summary(), ctype, dstpath)
+            if diff.unchanged:
+              UPD.out(line)
+              ##UPD.nl(line)
+            else:
+              if diff.changed_fields() == ['time']:
+                # be quiet about time changes
+                UPD.out(line)
+              else:
+                UPD.nl(line)
+                ##UPD.nl("  %r", diff.metadata)
+    if do_delete:
+      # now process deletions
+      with bucket_pool.instance() as B:
+        ##if dstdir:
+        ##  dstdir_prefix = dstdir + RSEP
+        ##else:
+        ##  dstdir_prefix = ''
+        dstdir_prefix = RSEP
+        with Pfx("S3.filter(Prefix=%r)", dstdir_prefix):
+          dstdelpaths = []
+          for s3obj in B.objects.filter(Prefix=dstdir_prefix):
+            dstpath = s3obj.key
+            with Pfx(dstpath):
+              if not dstpath.startswith(dstdir_prefix):
+                error("unexpected dstpath, not in subdir")
+                continue
+              dstrpath = dstpath[len(dstdir_prefix):]
+              if dstrpath.startswith(RSEP):
+                error("unexpected dstpath, extra %r", RSEP)
+                continue
+              raise RuntimeError("DELETION UNIMPLEMENTED")
+              srcpath = joinpath(srcdir, s32path(dstrpath, unpercent))
+              if os.path.exists(srcpath):
+                ##info("src exists, not deleting (src=%r)", srcpath)
+                continue
+              ## uncomment if new %hh omissions surface
+              ##UPD.nl("MISSING local %r", srcpath)
+              if dstrpath.endswith(RSEP):
+                # a folder
+                UPD.nl("d DEL %s", dstpath)
+              else:
+                UPD.nl("* DEL %s", dstpath)
+              dstdelpaths.append(dstpath)
+          if dstdelpaths:
+            dstdelpaths = sorted(dstdelpaths, reverse=True)
+            while dstdelpaths:
+              delpaths = dstdelpaths[:S3_MAX_DELETE_OBJECTS]
+              if doit:
+                result = B.delete_objects(
+                          Delete={
+                            'Objects':
+                              [ {'Key': dstpath} for dstpath in delpaths ]})
+                errs = result.get('Errors')
+                if errs:
+                  ok = False
+                  for err in errors:
+                    error("delete: %s: %r", err['Message'], err['Key'])
+              dstdelpaths[:len(delpaths)] = []
+  L.wait()
+  return ok
 
-  def report(self):
-    ''' Report AWS info. Debugging/testing method.
-    '''
-    yield str(self)
-    yield "Cached buckets:"
-    for name in sorted(self._buckets.keys()):
-      yield "  %s => %s" % (name, self._buckets[name])
+def s3scrape_async(L, bucket_pool, srcurl, doit=False, do_delete=False, limit=None):
+  ''' Sync website to S3 directory tree.
+  '''
+  if limit is None:
+    limit = srcurl.default_limit()
+  for U in srcurl.walk(limit=limit):
+    ##s3scrape_single_url(bucket_pool, U, limit, doit=True)
+    yield L.defer(s3scrape_single_url, bucket_pool, U, limit, doit=doit)
+  if False: yield None
 
-  def cmd_list(self, argv):
-    badopts = False
-    if argv:
-      error("extra arguments: %s", " ".join(argv))
-      badopts = True
-    if badopts:
-      raise GetoptError("invalid invocation")
-    for name in self.keys():
-      print(name)
-      B = self[name]
-      for key in B:
-        D("key: %s %r" % (key, key))
-        print(B[key])
+def s3scrape_single_url(bucket_pool, U, limit, doit, trust_size_mtime=True):
+  with Pfx('s3scrape_single_url'):
+    dstpath = U.path
+    if U.params:
+      dstpath += '&' + U.params
+    if U.query:
+      dstpath += '&' + U.query
+    diff = Differences()
+    if not U.exists():
+      return diff, None, U, dstpath, HTTPError(U, 404, "does not exist", None, None), "missing URL"
 
-  def cmd_new(self, argv):
-    badopts = False
-    if not argv:
-      error("missing bucket name")
-      badopts = True
-    else:
-      bucket_name = argv.pop(0)
-    if argv:
-      error("extra arguments after bucket_name: %s", " ".join(argv))
-      badopts = True
-    if badopts:
-      raise GetoptError("invalid invocation")
-    B = self.create_bucket(bucket_name)
-    print("new bucket \"%s\": %s" % (bucket_name, B))
+    # fetch size and mtime of source URL
+    diff.size_new = U.content_length
+    diff.time_new = U.last_modified
 
-class BucketMapping(O):
+    ctype = U.content_type
+    diff.mimetype_new = ctype
 
-  def __init__(self, B):
-    self.bucket = B
+    # now examine S3 object
+    with bucket_pool.instance() as B:
+      # fetch S3 object attribute
+      s3obj = B.Object(dstpath)
+      try:
+        s3obj.load()
+      except UnicodeError as e:
+        error("SKIP: cannot handle s3 path %r: %s", dstpath, e)
+        return None, None, srcpath, dstpath, \
+               e, ("SKIP: cannot handle s3 path %r: %s" % (dstpath, e))
+      except ClientError as e:
+        if e.response['Error']['Code'] == '404':
+          diff.missing = True
+          diff.s3metadata = None
+        else:
+          raise
+      else:
+        diff.missing = False
+        s3m = diff.s3metadata = s3obj.metadata
+        # import some s3cmd-attrs into our own scheme if present
+        if 's3cmd-attrs' in s3m:
+          for s3cmdattr in s3m['s3cmd-attrs'].split('/'):
+            a, v = s3cmdattr.split(':', 1)
+            if a == 'mtime' and 'st_mtime' not in s3m:
+              s3m['st_mtime'] = v
+            elif a == 'md5' and 'md5' not in s3m:
+              s3m['md5'] = v
+        diff.size_old = s3obj.content_length
+        time_old_s = s3obj.metadata.get('st_mtime')
+        if time_old_s is None:
+          time_old = None
+        else:
+          try:
+            time_old = float(time_old_s)
+          except ValueError:
+            time_old = None
+        diff.time_old = time_old
 
-  def __iter__(self):
-    for k in self.bucket._bucket:
-      yield k.name
+      if ( trust_size_mtime
+       and diff.same_size
+       and diff.same_time
+       and diff.same_mimetype
+         ):
+        # leave it alone
+        X("SAME SIZE/TIME/TYPE: %s", U)
+        pass
+      else:
+        with NamedTemporaryFile(mode="wb") as T:
+          T.write(U.content)
+          T.flush()
+          srcpath = T.name
+          # look for content hash metadata
+          sha256_local_a = None
+          if diff.missing:
+            hashname = 'sha256'
+            hashcode_a = None
+          else:
+            s3meta = s3obj.metadata
+            hashcode_a = s3meta.get('sha256')
+            if hashcode_a:
+              hashname = 'sha256'
+              diff.sha256_old = hashcode_a
+            else:
+              hashcode_a = s3meta.get('md5')
+              if hashcode_a:
+                hashname = 'md5'
+                diff.md5_old = hashcode_a
+              else:
+                hashname = 'sha256'
+            # compute the local hashcode anyway
+            # it will be the preferred SHA256 code if there was no S3-side hashcode
+            diff.hashcodes[hashname] = hash_fp(srcpath, hashname).hexdigest()
+            # fetch content-type
+            try:
+              s3ctype = s3obj.content_type
+            except AttributeError:
+              s3ctype = None
+            else:
+              diff.mimetype_old = s3ctype
+          metadata = { 'st_mtime': str(diff.time_new),
+                     }
+          if diff.same_content:
+            for hn in 'sha256', 'md5':
+              if hn in s3obj.metadata:
+                metadata[hn] = s3obj.metadata[hn]
+            if diff.same_mimetype and diff.same_time:
+              pass
+            else:
+              # update content_type
+              kw={ 'ACL': 'public-read',
+                   'ContentType': ctype,
+                   # NB: bucket name plus path
+                   'CopySource': B.name + RSEP + dstpath,
+                   'Key': dstpath,
+                   ##'MetadataDirective': 'COPY',
+                   'MetadataDirective': 'REPLACE',
+                   'Metadata': metadata,
+                 }
+              if doit:
+                with Pfx("copy_from(**%r)", kw):
+                  s3obj.copy_from(**kw)
+          else:
+            # upload new content
+            # ensure we have our preferred hashcode
+            if 'sha256' not in diff.hashcodes:
+              diff.hashcodes['sha256'] = hash_fp(srcpath, 'sha256').hexdigest()
+            for hashname, hashcode_a in diff.hashcodes.items():
+              metadata[hashname] = hashcode_a
+            kw={ 'ACL': 'public-read',
+                 'ContentType': ctype,
+                 'Body': open(srcpath, 'rb'),
+                 'Key': dstpath,
+                 'Metadata': metadata,
+               }
+            if doit:
+              with Pfx("put(**%r)", kw):
+                s3obj.put(**kw)
+          diff.metadata = metadata
+    return diff, ctype, U, dstpath, None, None
 
-  keys = __iter__
+def hash_byteses(bss, hashname, h=None):
+  ''' Compute or update the sha256 hashcode for an iterable of bytes objects.
+  '''
+  if h is None:
+    h = hashlib.new(hashname)
+  for bs in bss:
+    h.update(bs)
+  return h
 
-  def __getitem__(self, key):
-    if isinstance(key, (str, unicode)):
-      okey = key
-      key = self.bucket._bucket.get_key(key)
-    else:
-      raise TypeError("invalid key type, expected str/unicode, got %s" % (type(key),))
-    return key.get_contents_as_string()
+def hash_fp(fp, hashname, h=None, rsize=16384):
+  ''' Compute or update the sha256 hashcode for data read from a file.
+  '''
+  if isinstance(fp, str):
+    filename = fp
+    with open(filename, 'rb') as fp:
+      return hash_fp(fp, hashname, h=h, rsize=rsize)
+  return hash_byteses(chunks_of(fp, rsize=rsize), hashname, h=h)
 
-class Bucket(O):
+def mimetype(filename):
+  global MAGIC
+  base = basename(filename)
+  try:
+    baseleft, basequery = base.split('?', 1)
+  except ValueError:
+    guesspart = base
+  else:
+    guesspart = baseleft
+  try:
+    ctype, cencoding  = mimetypes.guess_type(guesspart)
+  except ValueError as e:
+    warning("cannot guess MIME type from basename, trying MAGIC: %r: %s", guesspart, e)
+    ctype = MAGIC.from_file(filename).decode()
+  return ctype
 
-  def __init__(self, s3, buck):
-    O.__init__(self)
-    self.s3 = s3
-    self._bucket = buck
-    self._cache = LRUCache(1024, BucketMapping(self))
+class BucketPool(Pool):
 
-  @property
-  def name(self):
-    return self._bucket.name
-
-  def keys(self):
-    return self._cache.keys()
-
-  __iter__ = keys
-
-  def __getitem__(self, key):
-    D("key = %r", key)
-    return self._cache[key]
-
-  def __setitem__(self, key, value):
-    self._cache[key] = value
+  def __init__(self, bucket_name):
+    Pool.__init__(self, lambda: boto3.session.Session().resource('s3').Bucket(bucket_name))
+    self.bucket_name = bucket_name
 
 if __name__ == '__main__':
-  import sys
+  import signal
+  from cs.debug import thread_dump
+  signal.signal(signal.SIGHUP, lambda sig, frame: thread_dump())
   sys.exit(main(sys.argv))

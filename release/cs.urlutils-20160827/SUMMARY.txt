@@ -1,0 +1,11 @@
+Handle TimeoutError, reporting elapsed time.
+URL: present ._fetch as .GET.
+URL: add .resolve to resolve this URL against a base URL.
+URL: add .savepath and .unsavepath methods to generate nonconflicting save pathnames for URLs and the reverse.
+URL._fetch: record the post-redirection URL as final_url.
+New URLLimit class for specifying simple tests for URL acceptance.
+New walk(): method to walk website from starting URL, yielding URLs.
+URL.content_length property, returns int or None if header missing.
+New URL.normalised method to return URL with . and .. processed in the path.
+new URL.exists test function.
+Assorted bugfixes and improvements.

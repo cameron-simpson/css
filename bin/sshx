@@ -1,13 +1,17 @@
-#!/bin/sh -ue
+#!/bin/sh
 #
 # Run a command over ssh, quoted to preserve the argument list.
 #       - Cameron Simpson <cs@zip.com.au> 26sep2009
 #
 
+set -ue
+
+# default "ssh" command; I use my "sshto" ssh wrapper
+: ${SSH:=ssh}
+
 cmd=`basename "$0"`
 usage="Usage: $cmd distinct-ssh-options... [--] [login@]host command [args...]"
 
-ssh=sshto
 sshopts=
 
 badopts=
@@ -53,4 +57,4 @@ fi
 
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
-eval "exec $ssh $sshopts \"\$host\" \"exec \$qcmd\""
+eval "exec $SSH $sshopts \"\$host\" \"exec \$qcmd\""
