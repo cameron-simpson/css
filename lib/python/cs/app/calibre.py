@@ -16,6 +16,7 @@ from threading import RLock
 from types import SimpleNamespace as NS
 from PIL import Image
 Image.warnings.simplefilter('error', Image.DecompressionBombWarning)
+from cs.edit import edit_strings
 from cs.env import envsub
 from cs.lex import get_identifier
 from cs.logutils import Pfx, info, warning, error, setup_logging, X, XP
@@ -27,6 +28,7 @@ DEFAULT_LIBRARY = '$HOME/Calibre_Library'
 METADB_NAME = 'metadata.db'
 
 USAGE = '''Usage: %s [/path/to/iphoto-library-path] op [op-args...]
+  edit tags         Edit tag names.
   ls [books]        List books.
   ls authors        List authors.
   ls tags           List tags.
@@ -64,6 +66,8 @@ def main(argv=None):
       with Pfx(op):
         if op == 'ls':
           xit, badopts = CL.cmd_ls(argv)
+        elif op == 'rename':
+          xit, badopts = CL.cmd_rename(argv)
         elif op == 'tag':
           xit, badopts = CL.cmd_tag(argv)
         else:
@@ -148,6 +152,31 @@ class Calibre_Library(O):
       return self.table(attr).instances()
     raise AttributeError(attr)
 
+  def cmd_rename(self, argv):
+    xit = 0
+    badopts = False
+    if not argv:
+      warning("missing 'tags'")
+      badopts = True
+    else:
+      entity = argv.pop(0)
+      if entity == "tags":
+        table = self.table_tags
+      else:
+        warning("unsupported entity type: %r", entity)
+        badopts = True
+      if argv:
+        warning("extra arguments after %s: %s", entity, ' '.join(argv))
+        badopts = True
+    if not badopts:
+      names = [ obj.name for obj in table.instances() ]
+      if not names:
+        warning
+      for name, newname in edit_strings(names):
+        if newname != name:
+          table[name].rename(newname)
+    return xit, badopts
+
   def cmd_ls(self, argv):
     xit = 0
     badopts = False
@@ -210,29 +239,98 @@ class CalibreTable(object):
   def __init__(self, row_class, CL, db, name, columns, name_column):
     self.row_class = row_class
     self.library = CL
+    self.db = db
     self.dosql_ro = CL.dosql_ro
     self.dosql_rw = CL.dosql_rw
     self.name = name
     self.columns = columns.split()
     self.name_column = name_column
-    X("columns = %r", self.columns)
     self._select_all = 'SELECT %s from %s' % (','.join(self.columns), name)
-    X("select = %r", self._select_all)
-    self.by_id = {}
-    self._load()
+
+  def _select_rows(self, where=None):
+    sql = self._select_all
+    if where:
+      sql += ' WHERE ' + where
+    for row in self.dosql_ro(sql):
+      yield self.row_class(self, dict(zip(self.columns, row)))
 
   def instances(self):
-    return sorted(self.by_id.values(), key=lambda obj: obj.name)
-
-  def _load(self):
-    for row in self.dosql_ro(self._select_all):
-      o = self.row_class(self, dict(zip(self.columns, row)))
-      self.by_id[o.id] = o
+    ''' Return rows sorted by name.
+    '''
+    return sorted(self._select_rows(), key=lambda obj: obj.name)
 
   def __getitem__(self, row_id):
-    return self.by_id[row_id]
+    ''' Retrieve row by id or name.
+    '''
+    if isinstance(row_id, int):
+      rows = self._select_rows('id = %d' % (row_id,))
+    elif isinstance(row_id, str):
+      rows = filter(lambda r: r.name == row_id, self._select_rows())
+    else:
+      raise TypeError("invalid type, expected int or str, got: %s" % (type(row_id),))
+    try:
+      row = the(rows)
+    except IndexError as e:
+      raise KeyError(row_id)
+    return row
 
-class CalibreTableRowNS(NS):
+  def make(self, name):
+    try:
+      R = self[name]
+    except KeyError:
+      R = new(name)
+    return R
+
+  def new(self, name, **row_map):
+    ''' Create a new row with the supplied name and optional column value map.
+        Return a CalibreTableRow for the new row.
+    '''
+    if self.name_column in row_map:
+      raise ValueError('row_map contains column %r' % (self.name_column,))
+    new_id = row_map.pop('id', None)
+    if new_id is None:
+      all_ids = list(obj.id for obj in self.instances())
+      if all_ids:
+        new_id = max(all_ids) + 1
+      else:
+        new_id = 1
+    row_map['id'] = new_id
+    row_map[self.name_column] = name
+    self.insert_row(row_map)
+    return self[new_id]
+
+  def insert_row(self, row_map):
+    columns = []
+    values = []
+    for k, v in row_map.items():
+      columns.append(k)
+      values.append(v)
+    return self.dosql_rw('insert into %s(%s) values (%s)'
+                         % (self.name,
+                            ','.join(columns),
+                            ','.join('?' for v in values)),
+                         *values)
+
+  def delete(self, where, *where_params):
+    return self.dosql_rw('delete from %s where %s' % (self.name, where), *where_params)
+
+  def update(self, attr, value, where=None, *where_params):
+    ''' Update an attribute in selected table rows.
+    '''
+    sql = "update %s set %s=?" % (self.name, attr)
+    params = [value]
+    if where:
+      sql += ' WHERE ' + where
+      if where_params:
+        params.extend(where_params)
+    return self.dosql_rw(sql, *params)
+
+class CalibreTableRow(O):
+  ''' A snapshot of a row from a table, with column values as attributes.
+      Not intended to represent significant state, actions take
+      place against the database and generally also update the row's
+      attribute values to match.
+  '''
 
   def __init__(self, table, rowmap):
     self.table = table
@@ -293,13 +391,13 @@ class CalibreTableRowNS(NS):
                                   link_table_name,
                                   our_column_name, self.id)) )
 
-class Author(CalibreTableRowNS):
+class Author(CalibreTableRow):
 
   @property
   def books(self):
     return self.related_entities('books_authors_link', 'author', 'book')
 
-class Book(CalibreTableRowNS):
+class Book(CalibreTableRow):
 
   @property
   def authors(self):
@@ -325,10 +423,9 @@ class Book(CalibreTableRowNS):
 
   def add_tag(self, tag_name):
     if tag_name not in [ str(T) for T in self.tags ]:
-      T = self.library.make_tag(tag_name)
+      T = self.library.table_tags.make(tag_name)
       sql = 'INSERT INTO books_tags_link(book, tag) VALUES (%d, %d)' \
             % (self.id, T.id)
-      X("SQL %r", sql)
       self.dosql_rw(sql)
 
   def remove_tag(self, tag_name):
@@ -337,26 +434,44 @@ class Book(CalibreTableRowNS):
       T = CL.tag_by_name(tag_name)
       sql = 'DELETE FROM books_tags_link WHERE book = %d and tag = %d' \
             % (self.id, T.id)
-      X("SQL %r", sql)
-      results = CL.dosql_rw(sql)
-      X("results = %r", results)
+      CL.dosql_rw(sql)
 
-class Rating(CalibreTableRowNS):
+class Rating(CalibreTableRow):
 
   def __str__(self):
     return ('*' * self.rating) if self.rating else '-'
 
-class Series(CalibreTableRowNS):
+class Series(CalibreTableRow):
 
   @property
   def books(self):
     return self.related_entities('books_series_link', 'series', 'book')
 
-class Tag(CalibreTableRowNS):
+class Tag(CalibreTableRow):
 
   @property
   def books(self):
     return self.related_entities('books_tags_link', 'tag', 'book')
+
+  def rename(self, new_name):
+    if self.name == new_name:
+      warning("rename tag %r: no change", self.name)
+      return
+    T = self.table
+    try:
+      otag = T[new_name]
+    except KeyError:
+      T.update('name', new_name, 'id = %d' % (self.id,))
+    else:
+      # update related objects (books?)
+      # to point at the other tag
+      for B in self.books:
+        B.add_tag(new_name)
+        B.remove_tag(self.name)
+      # delete our tag, become the other tag
+      T.delete('id = ?', self.id)
+      self.ns.id = otag.id
+    self.name = new_name
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
