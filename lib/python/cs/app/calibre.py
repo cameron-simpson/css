@@ -236,7 +236,7 @@ class CalibreTableRowNS(NS):
 
   def __init__(self, table, rowmap):
     self.table = table
-    NS.__init__(self, **rowmap)
+    self.ns = NS(**rowmap)
 
   @property
   def dosql_ro(self):
@@ -246,11 +246,34 @@ class CalibreTableRowNS(NS):
   def dosql_rw(self):
     return self.table.dosql_rw
 
+  @property
+  def name(self):
+    name_column = self.table.name_column
+    return getattr(self.ns, name_column)
+
   def __str__(self):
-    return getattr(self, self.table.name_column)
+    return self.name
 
   def __hash__(self):
     return self.id
+
+  def __lt__(self, other):
+    return self.name < other.name
+
+  def __getattr__(self, attr):
+    return getattr(self.ns, attr)
+
+  def __setattr__(self, attr, value):
+    ''' Set attribute of this row, excluding `id`.
+    '''
+    if 'ns' in self.__dict__:
+      ns = self.ns
+      if hasattr(ns, attr):
+        if attr == 'id':
+          raise AttributeError('may not set %r' % (attr,))
+        self.table.update(attr, value, "id=?", self.id)
+        return setattr(ns, attr, value)
+    return super().__setattr__(attr, value)
 
   @property
   def library(self):
