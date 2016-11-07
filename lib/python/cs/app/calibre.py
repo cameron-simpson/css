@@ -63,54 +63,9 @@ def main(argv=None):
       op = argv.pop(0)
       with Pfx(op):
         if op == 'ls':
-          if not argv:
-            obclass = 'books'
-          else:
-            obclass = argv.pop(0)
-          with Pfx(obclass):
-            if obclass == 'books':
-              for B in CL.table_books.instances():
-                print(B,
-                      ' '.join(str(T) for T in B.tags),
-                      str(B.rating),
-                      str(B.series),
-                     )
-                print(' ', '+'.join(str(A) for A in B.authors))
-                S = B.series
-                if S:
-                  for B2 in S.books:
-                    if B2 is not B:
-                      print('  also', B2)
-            elif obclass in ('authors', 'tags'):
-              for obj in CL.table(obclass).instances():
-                print(obj)
-                for B in obj.books:
-                  print(' ', B)
-            else:
-              warning("unknown class %r", obclass)
-              badopts = True
-            if argv:
-              warning("extra arguments: %r", argv)
-              badopts = True
+          xit, badopts = CL.cmd_ls(argv)
         elif op == 'tag':
-          if not argv:
-            warning('missing book-title')
-            badopts = True
-          else:
-            book_title = argv.pop(0)
-          if not badopts:
-            with Pfx(book_title):
-              for B in CL.books_by_title(book_title):
-                for tag_op in argv:
-                  if tag_op.startswith('+'):
-                    tag_name = tag_op[1:]
-                    B.add_tag(tag_name)
-                  elif tag_op.startswith('-'):
-                    tag_name = tag_op[1:]
-                    B.remove_tag(tag_name)
-                  else:
-                    warning('unsupported tag op %r', tag_op)
-                    badopts = True
+          xit, badopts = CL.cmd_tag(argv)
         else:
           warning("unrecognised op")
           badopts = True
@@ -192,6 +147,63 @@ class Calibre_Library(O):
     if attr in ('books', 'authors', 'tags'):
       return self.table(attr).instances()
     raise AttributeError(attr)
+
+  def cmd_ls(self, argv):
+    xit = 0
+    badopts = False
+    if not argv:
+      obclass = 'books'
+    else:
+      obclass = argv.pop(0)
+    with Pfx(obclass):
+      if obclass == 'books':
+        for B in self.table_books.instances():
+          print(B,
+                ' '.join(str(T) for T in B.tags),
+                'rating:'+str(B.rating),
+                'series:'+str(B.series),
+               )
+          print(' ', '+'.join(str(A) for A in B.authors))
+          S = B.series
+          if S:
+            for B2 in sorted(S.books):
+              if B2.id != B.id:
+                print('  also', B2)
+      elif obclass in ('authors', 'tags'):
+        for obj in self.table(obclass).instances():
+          print(obj)
+          for B in obj.books:
+            print(' ', B)
+      else:
+        warning("unknown class %r", obclass)
+        badopts = True
+      if argv:
+        warning("extra arguments: %r", argv)
+        badopts = True
+    return xit, badopts
+
+  def cmd_tag(self, argv):
+    xit = 0
+    badopts = False
+    if not argv:
+      warning('missing book-title')
+      badopts = True
+    else:
+      book_title = argv.pop(0)
+    if not badopts:
+      with Pfx(book_title):
+        for B in self.books_by_title(book_title):
+          for tag_op in argv:
+            if tag_op.startswith('+'):
+              tag_name = tag_op[1:]
+              B.add_tag(tag_name)
+            elif tag_op.startswith('-'):
+              tag_name = tag_op[1:]
+              B.remove_tag(tag_name)
+            else:
+              warning('unsupported tag op %r', tag_op)
+              badopts = True
+    return xit, badopts
 
 class CalibreTable(object):
 
