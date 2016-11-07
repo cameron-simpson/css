@@ -34,7 +34,7 @@ USAGE = '''Usage: %s [/path/to/iphoto-library-path] op [op-args...]
   tag book-title +tag...
 
 Criteria:
-  [!]/regexp            Regexp found in text fields.
+  [!]/regexp          Regexp found in text fields.
   [!]tag:keyword      Book has keyword.
   Because "!" is often used for shell history expansion, a dash "-"
   is also accepted to invert the selector.
