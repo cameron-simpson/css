@@ -781,9 +781,13 @@ class iPhotoTable(object):
     # TODO: additional mixin to support assignment to columns
     _klass = namedtuple('%s_Row' % (table_name,), ['I'] + list(schema['columns']))
     class klass(_klass):
-      iph_table=self
+      _lock = RLock()
+      iph_table = self
       def __setattr__(self, attr, value):
-        return self.iph_table.update_by_column(attr, value, 'modelId', self.modelId)
+        if attr in self.iph_table.schema['columns']:
+          return self.iph_table.update_by_column(attr, value, 'modelId', self.modelId)
+        else:
+          self.__dict__[attr] = value
     mixin = schema.get('mixin')
     lock = self.iphoto._lock
     if mixin is not None:
