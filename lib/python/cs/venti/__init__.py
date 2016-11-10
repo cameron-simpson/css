@@ -27,6 +27,8 @@ from string import ascii_letters, digits
 import tempfile
 import threading
 from cs.lex import texthexify, untexthexify
+from cs.logutils import X
+from cs.seq import isordered
 
 class _ventiDefaults(threading.local):
   ''' Per-thread default store stack.
@@ -41,10 +43,13 @@ class _ventiDefaults(threading.local):
       return oldS
     raise AttributeError("no .%s attribute" % attr)
   def pushStore(self, newS):
+    ##X("PUSH STORE %s => %s", defaults.S, newS)
     defaults.oldS.append(defaults.S)
     defaults.S = newS
   def popStore(self):
-    defaults.S = defaults.oldS.pop()
+    oldS = defaults.oldS.pop()
+    ##X("POP STORE %s => %s", defaults.S, oldS)
+    defaults.S = oldS
 
 defaults = _ventiDefaults()
 
@@ -76,8 +81,12 @@ class _TestAdditionsMixin:
     '''
     try:
       olen = len(o)
-    except NotImplementedError as e:
-      ##warning("skip test of len(%s) == %r: %s", o, length, e)
+    except TypeError:
+      import cs.logutils
+      cs.logutils.debug("skip assertLen(o, %d): no len(%s)", length, type(o))
       pass
     else:
       self.assertEqual(olen, length, *a, **kw)
+
+  def assertIsOrdered(self, s, reverse, strict=False):
+    return isordered(s, reverse, strict)

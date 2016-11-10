@@ -21,7 +21,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
-    'requires': ['cs.fileutils', 'cs.debug', 'cs.logutils', 'cs.queues'],
+    'install_requires': ['cs.fileutils', 'cs.debug', 'cs.logutils', 'cs.queues'],
 }
 
 import csv

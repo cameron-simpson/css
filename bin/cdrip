@@ -271,8 +271,8 @@ sed -e 's;//*; -- ;g' -e 's/   */ /g' \
       # recognise track with their own artist information
       # "title -- artist"
       case "$title" in
-        *--*)   meta_artist=$( expr "x$title" : 'x.*-- *\(.*[^ ]\) *' )
-                meta_title=$( expr "x$title" : 'x *\(.*[^ ]\) *--.*' )
+        *--*)   meta_artist=$( expr "x$title" : 'x *\(.*[^ ]\) *--.*' )
+                meta_title=$( expr "x$title" : 'x.*-- *\(.*[^ ]\) *' )
                 ;;
         *)      meta_artist=$artist
                 meta_title=$title

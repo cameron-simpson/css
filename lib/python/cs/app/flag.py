@@ -1,4 +1,4 @@
-#!/usr/bin/sh
+#!/usr/bin/python
 #
 # Python API for the flag(1cs) command.
 #       - Cameron Simpson <cs@zip.com.au> 24apr2014

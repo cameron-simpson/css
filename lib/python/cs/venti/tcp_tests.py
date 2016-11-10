@@ -23,7 +23,7 @@ _base_port = 9999
 
 def make_tcp_store():
   global _base_port
-  mapping_S = MappingStore(HashUtilDict())
+  mapping_S = MappingStore("tcp_tests.make_tcp_store.mapping_S", HashUtilDict())
   while True:
     bind_addr = (BIND_HOST, _base_port)
     try:

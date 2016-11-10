@@ -14,7 +14,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         ],
-    'requires': ['boto3', 'python-magic',
+    'install_requires': ['boto3', 'python-magic',
                 ],
 }
 

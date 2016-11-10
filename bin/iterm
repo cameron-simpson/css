@@ -11,8 +11,10 @@ trace=
 cmd=$0
 usage="Usage: $cmd [-x] op [op-args...]
   Ops:
+    badge-forma format...
     open command [args...]
         Open new terminal window runnong command.
+    setvar varname value...
     switch-profile profile name...
         Change the current tty's profile to 'profile name...'"
 
@@ -39,10 +41,29 @@ else
   op=$1
   shift
   case $op in
+    badge-format)
+      if [ $# = 0 ]
+      then
+        echo "$cmd: $op: missing format" >&2
+        badopts=1
+      fi
+      ;;
     open)
       if [ $# = 0 ]
       then
         echo "$cmd: $op: missing command" >&2
+        badopts=1
+      fi
+      ;;
+    setvar)
+      if [ $# -lt 1 ]
+      then
+        echo "$cmd: $op: missing varname" >&2
+        badopts=1
+      fi
+      if [ $# -lt 2 ]
+      then
+        echo "$cmd: $op: missing value" >&2
         badopts=1
       fi
       ;;
@@ -62,6 +83,10 @@ fi
 [ $badopts ] && { echo "$usage" >&2; exit 2; }
 
 case "$op" in
+  badge-format)
+    format64=$( printf '%s' "$*" | base64 )
+    printf '\e]1337;SetBadgeFormat=%s\a' "$format64"
+    ;;
   open)
     shcmd=$( shqstr "$@" )
     as_shcmd=\"$( printf '%s\n' "$shcmd" | sed 's/["\\]/\\&/g' )\"
@@ -84,9 +109,16 @@ case "$op" in
     exec $trace osascript -e "$iterm_script"
     ;;
 
+  setvar)
+    varname=$1
+    shift
+    value64=$( printf '%s' "$*" | base64 )
+    printf '\e]1337;SetUserVar=%s\a' "$value64"
+    ;;
+
   switch-profile)
     profilename=$*
-    printf ']50;SetProfile=%s' "$profilename" >/dev/tty
+    printf '\e]50;SetProfile=%s\a' "$profilename" >/dev/tty
     ;;
 
   *)echo "$cmd: $op: unimplemented op" >&2

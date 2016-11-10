@@ -12,25 +12,29 @@ import sys
 import tempfile
 import unittest
 from cs.excutils import logexc
+import cs.logutils
+cs.logutils.X_via_tty = True
 from cs.logutils import setup_logging, warning, X
 from cs.randutils import randblock
 from . import _TestAdditionsMixin
 from .datafile import GDBMIndex, KyotoIndex
 from .store import MappingStore, DataDirStore, ProgressStore
-from .hash import HashUtilDict
+from .hash import HashUtilDict, DEFAULT_HASHCLASS
 from .hash_tests import _TestHashCodeUtils
 
 class _TestStore(_TestAdditionsMixin):
+
+  hashclass = DEFAULT_HASHCLASS
 
   def setUp(self):
     self._init_Store()
     self.S.open()
 
-  def _init_Store(self):
-    raise unittest.SkipTest("no Store in base class")
-
   def tearDown(self):
     self.S.close()
+
+  def _init_Store(self):
+    raise unittest.SkipTest("no Store in base class")
 
   def test00empty(self):
     S = self.S
@@ -42,7 +46,7 @@ class _TestStore(_TestAdditionsMixin):
     self.assertLen(S, 0)
     size = random.randint(127, 16384)
     data = randblock(size)
-    # compute blakc hash but do not store
+    # compute block hash but do not store
     h = S.hash(data)
     self.assertLen(S, 0)
     ok = S.contains(h)
@@ -75,48 +79,25 @@ class _TestStore(_TestAdditionsMixin):
       self.assertEqual(chunk, random_chunk_map[h])
     S.flush()
 
-  def test03first(self):
-    S = self.S
-    self.assertLen(S, 0)
-    try:
-      first_hashcode = S.first()
-    except NotImplementedError as e:
-      raise unittest.SkipTest("no .first in %s: %s" % (S, e))
-    else:
-      self.assertIs(first_hashcode, None, ".first of empty Store should be None")
-    random_chunk_map = {}
-    for _ in range(16):
-      size = random.randint(127, 16384)
-      data = randblock(size)
-      h = S.hash(data)
-      h2 = S.add(data)
-      self.assertEqual(h, h2)
-      random_chunk_map[h] = data
-    self.assertLen(S, 16)
-    ordered_hashcodes = sorted(random_chunk_map.keys())
-    first_hashcode = S.first()
-    self.assertIsNot(first_hashcode, None, ".first of nonempty Store should not be None")
-    self.assertEqual(first_hashcode, ordered_hashcodes[0])
-
 class TestMappingStore(_TestStore, unittest.TestCase):
 
   def _init_Store(self):
-    self.S = MappingStore({}).open()
+    self.S = MappingStore("TestMappingStore", {}, hashclass=self.hashclass)
 
 class TestProgressStore(_TestStore, unittest.TestCase):
 
   def _init_Store(self):
-    self.S = ProgressStore(MappingStore({}).open()).open()
+    self.S = ProgressStore("ProgressMappingStore", MappingStore("TestProgressStore", self.hashclass, {}).open()).open()
 
 class TestHashCodeUtilsMappingStoreDict(_TestHashCodeUtils, unittest.TestCase):
   ''' Test HashUtils on a MappingStore on a plain dict.
   '''
-  MAP_FACTORY = lambda self: MappingStore({})
+  MAP_FACTORY = lambda self: MappingStore("TestHashCodeUtilsMappingStoreDict", {}, hashclass=DEFAULT_HASHCLASS)
 
 class TestHashCodeUtilsMappingStoreHashUtilDict(_TestHashCodeUtils, unittest.TestCase):
   ''' Test HashUtils on a MappingStore on a HashUtilDict.
   '''
-  MAP_FACTORY = lambda self: MappingStore(HashUtilDict())
+  MAP_FACTORY = lambda self: MappingStore("TestHashCodeUtilsMappingStoreHashUtilDict", HashUtilDict(), hashclass=DEFAULT_HASHCLASS)
 
 class _TestDataDirStore(_TestStore):
 
@@ -126,24 +107,27 @@ class _TestDataDirStore(_TestStore):
     indexclass = self.__class__.INDEX_CLASS
     random.seed()
     self.pathname = self.mktmpdir()
-    self.S = DataDirStore(self.pathname, indexclass=indexclass, rollover=200000)
+    self.S = DataDirStore("_TestDataDirStore", self.pathname, indexclass=indexclass, hashclass=self.hashclass, rollover=200000)
 
   def tearDown(self):
     ##os.system("ls -l "+self.pathname)
-    shutil.rmtree(self.pathname)
     _TestStore.tearDown(self)
+    shutil.rmtree(self.pathname)
 
 class TestDataDirStoreGDBM(_TestDataDirStore, unittest.TestCase):
   INDEX_CLASS = GDBMIndex
-
 class TestHashCodeUtilsDataDirStoreGDBMStore(_TestHashCodeUtils, unittest.TestCase):
-  MAP_FACTORY = lambda self: DataDirStore(self.mktmpdir(), indexclass=GDBMIndex, rollover=200000)
+  MAP_FACTORY = lambda self: DataDirStore("TestHashCodeUtilsDataDirStoreGDBMStore", self.mktmpdir(), hashclass=DEFAULT_HASHCLASS, indexclass=GDBMIndex, rollover=200000)
 
-class TestDataDirStoreKyoto(_TestDataDirStore, unittest.TestCase):
-  INDEX_CLASS = KyotoIndex
-
-class TestHashCodeUtilsDataDirStoreKyotoStore(_TestHashCodeUtils, unittest.TestCase):
-  MAP_FACTORY = lambda self: DataDirStore(self.mktmpdir(), indexclass=KyotoIndex, rollover=200000)
+try:
+  import kyotocabinet
+except ImportError:
+  pass
+else:
+  class TestDataDirStoreKyoto(_TestDataDirStore, unittest.TestCase):
+    INDEX_CLASS = KyotoIndex
+  class TestHashCodeUtilsDataDirStoreKyotoStore(_TestHashCodeUtils, unittest.TestCase):
+    MAP_FACTORY = lambda self: DataDirStore("TestHashCodeUtilsDataDirStoreKyotoStore", self.mktmpdir(), hashclass=DEFAULT_HASHCLASS, indexclass=KyotoIndex, rollover=200000)
 
 def selftest(argv):
   unittest.main(__name__, None, argv)

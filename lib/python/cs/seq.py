@@ -12,7 +12,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         ],
-    'requires': ['cs.logutils', 'cs.py.stack'],
+    'install_requires': ['cs.logutils', 'cs.py.stack', 'cs.py3'],
 }
 
 import heapq
@@ -118,18 +118,30 @@ def NamedTuple(fields,iter=()):
   '''
   return NamedTupleClassFactory(*fields)(iter)
 
-class _MergeHeapItem(tuple):
-  def __lt__(self, other):
-    return self[0] < other[0]
-
-def imerge(*iters):
+def imerge(*iters, **kw):
   ''' Merge an iterable of ordered iterables in order.
+      `reverse`: if true, yield items in reverse order
+                 this requires the iterables themselves to also be in
+                 reversed order
       It relies on the source iterables being ordered and their elements
       being comparable, through slightly misordered iterables (for example,
       as extracted from web server logs) will produce only slightly
       misordered results, as the merging is done on the basis of the front
       elements of each iterable.
   '''
+  reverse = kw.get('reverse', False)
+  if kw:
+    raise ValueError("unexpected keyword arguments: %r", kw)
+  if reverse:
+    # tuples that compare in reverse order
+    class _MergeHeapItem(tuple):
+      def __lt__(self, other):
+        return self[0] > other[0]
+  else:
+    # tuples that compare in forward order
+    class _MergeHeapItem(tuple):
+      def __lt__(self, other):
+        return self[0] < other[0]
   # prime the list of head elements with (value, iter)
   heap = []
   for I in iters:
@@ -182,6 +194,21 @@ def onetomany(func):
   def gather(self, *a, **kw):
     return itertools.chain(*[ func(item) for item in self ])
   return gather
+
+def isordered(s, reverse=False, strict=False):
+  first = True
+  for i, item in enumerate(s):
+    if not first:
+      if reverse:
+        ordered = item < prev if strict else item <= prev
+      else:
+        ordered = item > prev if strict else item >= prev
+      if not ordered:
+        raise AssertionError(
+                "isordered(reverse=%s,strict=%s): s[%d],s[%d] out of order: %s <=> %s"
+                % (reverse, strict, i-1, i, prev, item))
+    prev = item
+    first = False
 
 class TrackingCounter(object):
   ''' A wrapper for a counter which can be incremented and decremented.

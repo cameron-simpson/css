@@ -107,7 +107,7 @@ $(py3files): lib/python/$(@ :|lib/python3/||)
         echo "$@ <- $?"
 
 _home:
-        @skip=`hg status | sed -n 's:^? \(.*\):--exclude=/\1:p'` \
+        skip=`hg status | sed -n 's:^? \(.*\):--exclude=/\1:p'` \
         binskip=`hg status | sed -n 's:^? bin/\(.*\):--exclude=/\1:p'` \
         pfx bin $(rsync) -a --delete \\
                 --include=/CHANGELOG.txt \\
@@ -116,8 +116,8 @@ _home:
                 --exclude=squid_redirect \\
                 --exclude=/\*/ \\
                 bin/. $(HOME)/bin/.
-        :make _bin_$((bin_suffixes))
-        @libskip=`hg status | sed -n 's:^? lib/\(.*\):--exclude=/\1:p'` \
+        $(MAKE) _bin_$((bin_suffixes))
+        libskip=`hg status | sed -n 's:^? lib/\(.*\):--exclude=/\1:p'` \
         pfx lib $(rsync) -a --delete \\
                 --include=/js \\
                 --include=/js/cs \\
@@ -137,7 +137,7 @@ _home:
 bin_suffixes = cs darwin lrn
 
 _bin_$((bin_suffixes)):
-    @sfx=$(@S[_]) \
+    sfx=$(@S[_]) \
     base=bin-$$sfx \
     target=$(HOME)/$$base \
     skip=$$( hg status | sed -n 's:^? '"$$base"'/\(.*\):--exclude=/\1:p' ) \
@@ -171,7 +171,8 @@ _release_force:
         cs-release add
 
 _pending:
-        cs-release log | grep '^[^:]'; :
+        cs-release log
+        cs-release status
         hg status | grep '^[^?]'; :
 
 _freshmeat:
@@ -246,7 +247,7 @@ noads	= $(HOME)/@/adzapper.sf/html/rc/patterns
 
 squid_redirect: $(noads)
 	@cd $(?DD) || exit 1 \
-	pwd; set -x \
+	pwd; \
 	exec $(MAKE) _scripts
 
 %.class: %.java %.class-prereqs : $(("%.class-prereqs" G?<P)).class

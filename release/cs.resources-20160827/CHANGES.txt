@@ -1,0 +1,22 @@
+  lib/python/cs/resources.py: cs.resources: add missing import
+  lib/python/cs/resources.py: cs.resources: NestingOpenCloseMixin.ping: don't assume .name attribute, import fixes
+  lib/python/cs/resources.py: cs.resources: NestingOpenCloseMixin: remove the whole .ping/_keep_open hack
+  lib/python/cs/resources.py: cs.resources: new class MultiOpen to wrap simple open/close objects in a NestingOpenCloseMixin, untested
+  lib/python/cs/app/myke/make.py lib/python/cs/later.py lib/python/cs/queues.py lib/python/cs/resources.py lib/python/cs/threads.py lib/python/cs/venti/datafile.py lib/python/cs/venti/dir.py lib/python/cs/venti/store.py lib/python/cs/venti/tcp.py: cs.resources: rename NestingOpenCloseMixin to MultiOpenMixin - easier to type, say and remember, not to mention being more accurate
+  lib/python/cs/resources.py: cs.resources: MultiOpenMixin: remove use of .on_open and .on_close, just expect .startup and .shutdown in subclasses; docstring updates
+  lib/python/cs/resources.py: cs.resources: import cs.logutils.X, used in debugging
+  lib/python/cs/resources.py: cs.resources: update docstring, adjust some whitespace
+  lib/python/cs/resources.py: cs.resources: MultiOpenMixin.__init__: define ._lock = RLock()
+  lib/python/cs/resources.py: cs.resource: MultiOpenMixin: accept optional `lock` parameter to share an existing lock
+  lib/python/cs/resources.py: cs.resources: MultiOpenMixin.closed: back off open count warning message to XP
+  lib/python/cs/resources.py: cs.resources: add @MultiOpenMixin.is_opened decorator to wrap methods which should not be called before first open or after final close
+  lib/python/cs/resources.py: cs.resources: new exception ClosedError, raised by @not_closed decorator
+  lib/python/cs/resources.py: cs.resources: assorted changes to debug levels; MultiOpenMixin.close: make extra closes raise a RuntimeError
+  lib/python/cs/resources.py: cs.resources: MultiOpenMixin: track callers of .open, recite counts on extra closes
+  lib/python/cs/resources.py: cs.resources: MultiOpenMixin.finalise: reorder ._finalise cleanup in case of races (turns out not to be the issue) and add a stack dump to the extra-finalise case
+  lib/python/cs/resources.py: cs.resources: MultiOpenMixin: multiple finalise - just raise exception
+  lib/python/cs/resources.py: cs.resources: MultiOpenMixin.finalise: make repeated finalise issue error instead of raising RuntimeError
+  lib/python/cs/resources.py: cs.resources: remove unused variable
+  lib/python/cs/resources.py: cs.resources: new class Pool for object reuse
+  lib/python/cs/resources.py: cs.resources: Pool: use a lock around instance management operations
+  lib/python/cs/resources.py: cs.resources: DISTINFO: update depnedency list
