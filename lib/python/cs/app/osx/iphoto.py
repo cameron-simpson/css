@@ -780,8 +780,10 @@ class iPhotoTable(object):
     self.qualname = '.'.join( (self.db.name, table_name) )
     # TODO: additional mixin to support assignment to columns
     _klass = namedtuple('%s_Row' % (table_name,), ['I'] + list(schema['columns']))
+    _lock = RLock()
     class klass(_klass):
-      _lock = RLock()
+      def __init__(self):
+        self._lock = _lock
       iph_table = self
       def __setattr__(self, attr, value):
         if attr in self.iph_table.schema['columns']:
@@ -792,7 +794,8 @@ class iPhotoTable(object):
     lock = self.iphoto._lock
     if mixin is not None:
       class Mixed(klass, mixin):
-        pass
+        def __init__(self, *a, **kw):
+          klass.__init__(self, *a, **kw)
       def klass(*a, **kw):
         return Mixed(*a, **kw)
     self.row_class = klass
