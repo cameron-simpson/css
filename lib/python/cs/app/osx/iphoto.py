@@ -775,28 +775,34 @@ class iPhotoTable(object):
     self.nickname = nickname
     self.db = db
     self.schema = schema
+    self.columns = schema['columns']
+    lock = self._lock = self.iphoto._lock
     table_name = schema['table_name']
     self.name = table_name
     self.qualname = '.'.join( (self.db.name, table_name) )
     # TODO: additional mixin to support assignment to columns
-    _klass = namedtuple('%s_Row' % (table_name,), ['I'] + list(schema['columns']))
-    class klass(_klass):
-      iph_table=self
-      def __setattr__(self, attr, value):
-        return self.iph_table.update_by_column(attr, value, 'modelId', self.modelId)
+    core_row_klass = namedtuple('%s_Row' % (table_name,), self. schema['columns'])
     mixin = schema.get('mixin')
-    lock = self.iphoto._lock
-    if mixin is not None:
-      class Mixed(klass, mixin):
+    if mixin is None:
+      class mixin(object):
         pass
-      def klass(*a, **kw):
-        return Mixed(*a, **kw)
+    class klass(mixin):
+      I = self.iphoto
+      table = self
+      columns = table.columns
+      def __init__(self, values):
+        self._lock = lock
+        self._row = core_row_klass(*values)
+      def __getattr__(self, attr):
+        if attr.startswith('_'):
+          raise RuntimeError("bang: self.__dict__=%r" % (self.__dict__,))
+        return getattr(self._row, attr)
     self.row_class = klass
 
   def _Row(self, row_values):
     ''' Instantiate a row.
     '''
-    return self.row_class(*([self.iphoto] + list(row_values)))
+    return self.row_class(row_values)
 
   @property
   def iphoto(self):
