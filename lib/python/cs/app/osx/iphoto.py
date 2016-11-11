@@ -794,8 +794,6 @@ class iPhotoTable(object):
         self._lock = lock
         self._row = core_row_klass(*values)
       def __getattr__(self, attr):
-        if attr.startswith('_'):
-          raise RuntimeError("bang: self.__dict__=%r" % (self.__dict__,))
         return getattr(self._row, attr)
     self.row_class = klass
 
