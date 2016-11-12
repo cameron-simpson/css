@@ -9,7 +9,7 @@ from cs.threads import locked
 from cs.logutils import X
 
 class TableSpace(object):
-  
+
   def __init__(self, table_class=None, lock=None, db_name=None):
     if table_class is None:
       table_class = Table
@@ -64,7 +64,7 @@ class TableSpace(object):
 
   @locked
   def table(self, name):
-    ''' Return the Table 
+    ''' Return the Table named `name`.
     '''
     T = self._tables.get(name)
     if T is None:

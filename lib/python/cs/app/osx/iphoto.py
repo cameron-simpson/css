@@ -991,7 +991,7 @@ class VFace_Mixin(iPhotoRow):
     '''
     MI = self.master.Image()
     mdx, mdy = MI.size
-    # convert face box into centre and radii 
+    # convert face box into centre and radii
     rx = self.faceRectWidth / 2 * padfactor
     ry = self.faceRectHeight / 2 * padfactor
     cx = self.faceRectLeft + rx
