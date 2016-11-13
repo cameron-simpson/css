@@ -47,6 +47,20 @@ def callmethod_if(o, method, default=None, a=None, kw=None):
     kw = {}
   return m(*a, **kw)
 
+def prop(func):
+  ''' The builtin @property decorator lets internal AttributeErrors escape.
+      While that can support properties that appear to exist conditionally,
+      in practice this is almost never what I want, and it masks deeper errors.
+      Hence this wrapper for @property that transmutes internal AttributeErrors
+      into RuntimeErrors.
+  '''
+  def wrapper(*a, **kw):
+    try:
+      return func(*a, **kw)
+    except AttributeError as e:
+      raise RuntimeError("inner function %s raised %s" % (func, e))
+  return property(wrapper)
+
 def derived_property(func, original_revision_name='_revision', lock_name='_lock', property_name=None, unset_object=None):
   ''' A property which must be recomputed if the reference revision exceeds the snapshot revision.
   '''
