@@ -6,7 +6,7 @@
 from collections import namedtuple
 from threading import RLock
 from cs.threads import locked
-from cs.logutils import X
+from cs.logutils import X, debug, info, warning, error
 
 class TableSpace(object):
 
@@ -89,6 +89,44 @@ class Table(object):
   @property
   def qual_name(self):
     return '.'.join( (self.db.db_name, self.table_name) )
+
+  def select(self, where=None, *where_argv):
+    ''' Select raw SQL data from the table.
+    '''
+    sql = 'select %s from %s' % (','.join(self.column_names), self.table_name)
+    sqlargs = []
+    if where:
+      sql += ' where ' + where
+      sqlargs.append(where_argv)
+    elif where_argv:
+      raise ValueError("empty where (%r) but where_argv=%r" % (where, where_argv))
+    X("SQL: %s %r", sql, sqlargs)
+    return self.conn.cursor().execute(sql, sqlargs)
+
+  def read_rows(self, where=None, *where_argv):
+    ''' Return row objects.
+    '''
+    row_class = self.row_class
+    for row in self.select(where=where, *where_argv):
+      yield row_class(self, row)
+
+  def update(self, update_set, update_set_argv, where, *where_argv):
+    sql = 'update %s set %s where %s' % (self.table_name, update_set, where)
+    sqlargs = list(update_set_argv) + where_argv
+    C = self.conn.cursor()
+    info("SQL: %s %r", sql, sqlargs)
+    C.execute(sql, sqlargs)
+    self.conn.commit()
+    C.close()
+
+  def delete(self, where, *where_argv):
+    sql = 'delete from %s where %s' % (self.table_name, where)
+    sqlargs = where_argv
+    C = self.conn.cursor()
+    info("SQL: %s %r", sql, sqlargs)
+    C.execute(sql, sqlargs)
+    self.conn.commit()
+    C.close()
 
   def __getitem__(self, id_value):
     return self.row_class(the(self.select_by_column(self.id_column, id_value)))

@@ -790,37 +790,11 @@ class iPhotoTable(Table):
   def conn(self):
     return self.db.conn
 
-  def select_by_column(self, column=None, value=None):
-    sql = 'select * from %s' % (self.table_name,)
-    sqlargs = []
-    if column is not None:
-      sql += ' where %s=?' % (column,)
-      sqlargs.append(value)
-    debug("SQL: %s %r", sql, sqlargs)
-    return self.conn.cursor().execute(sql, sqlargs)
-
   def update_by_column(self, upd_column, upd_value, sel_column, sel_value, sel_op='='):
-    sql = 'update %s set %s=? where %s %s ?' % (self.table_name, upd_column, sel_column, sel_op)
-    sqlargs = (upd_value, sel_value)
-    C = self.conn.cursor()
-    info("SQL: %s %r", sql, sqlargs)
-    C.execute(sql, sqlargs)
-    self.conn.commit()
-    C.close()
+    return self.update('%s=?' % (upd_column,), [upd_value], '%s %s ?' % (sel_column, sel_op), sel_value)
 
   def delete_by_column(self, sel_column, sel_value, sel_op='='):
-    sql = 'delete from %s where %s %s ?' % (self.table_name, sel_column, sel_op)
-    sqlargs = (sel_value,)
-    C = self.conn.cursor()
-    info("SQL: %s %r", sql, sqlargs)
-    C.execute(sql, sqlargs)
-    self.conn.commit()
-    C.close()
-
-  def read_rows(self):
-    row_class = self.row_class
-    for row in self.select_by_column():
-      yield row_class(self, row)
+    return self.delete('%s %s ?' % (sel_column, sel_op), sel_value)
 
 class iPhotoRow(Row):
 
