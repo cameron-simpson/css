@@ -16,8 +16,10 @@ from threading import RLock
 from types import SimpleNamespace as NS
 from PIL import Image
 Image.warnings.simplefilter('error', Image.DecompressionBombWarning)
+from cs.dbutils import TableSpace, Table, Row
 from cs.edit import edit_strings
 from cs.env import envsub
+from cs.py.func import prop
 from cs.lex import get_identifier
 from cs.logutils import Pfx, info, warning, error, setup_logging, X, XP
 from cs.obj import O
@@ -89,36 +91,10 @@ class Calibre_Library(O):
     if not os.path.isdir(libpath):
       raise ValueError("not a directory: %r" % (libpath,))
     self.path = libpath
+    self._lock = RLock()
     self.metadbpath = self.pathto(METADB_NAME)
-    self.metadb = sqlite3.connect(self.metadbpath)
-    self._tables = {}
-    self._table_meta = \
-      {
-        'authors': NS(klass=Author,
-                      columns='id name sort link',
-                      name='name'),
-        'books': NS(klass=Book,
-                    columns='id title sort timestamp pubdate series_index author_sort isbn lccn path flags uuid has_cover last_modified',
-                    name='title'),
-        'ratings': NS(klass=Rating,
-                      columns='id rating',
-                      name='rating'),
-        'series': NS(klass=Series,
-                     columns='id name sort',
-                     name='name'),
-        'tags': NS(klass=Tag,
-                   columns='id name',
-                   name='name'),
-      }
-
-  def dosql_ro(self, sql, *params):
-    return self.metadb.execute(sql, params)
-
-  def dosql_rw(self, sql, *params):
-    c = self.metadb.cursor()
-    results = c.execute(sql, params)
-    self.metadb.commit()
-    return results
+    self.metadb = CalibreMetaDB(self, self.metadbpath)
+    self.table = self.metadb.table
 
   def pathto(self, rpath):
     if rpath.startswith('/'):
@@ -126,31 +102,8 @@ class Calibre_Library(O):
     return os.path.join(self.path, rpath)
 
   def table(self, table_name):
-    T = self._tables.get(table_name)
-    if T is None:
-      try:
-        meta = self._table_meta[table_name]
-      except KeyError:
-        raise AttributeError('%s: no entry in ._table_meta' % (table_name,))
-      T = CalibreTable(meta.klass, self, self.metadb, table_name, meta.columns, meta.name)
-      self._tables[table_name] = T
-    return T
-
-  def books_by_title(self, book_title):
-    return [ B for B in self.books if B.title == book_title ]
-
-  def book_by_title(self, book_title):
-    return the(self.books_by_title(book_title))
-
-  def tag_by_name(self, tag_name):
-    return the( T for T in self.tags if T.name == tag_name )
-
-  def __getattr__(self, attr):
-    if attr.startswith('table_'):
-      return self.table(attr[6:])
-    if attr in ('books', 'authors', 'tags'):
-      return self.table(attr).instances()
-    raise AttributeError(attr)
+    # will get beefed up if we open more DBs
+    return self.metadb.table(table_name)
 
   def cmd_rename(self, argv):
     xit = 0
@@ -161,7 +114,7 @@ class Calibre_Library(O):
     else:
       entity = argv.pop(0)
       if entity == "tags":
-        table = self.table_tags
+        table = self.table('tags')
       else:
         warning("unsupported entity type: %r", entity)
         badopts = True
@@ -234,40 +187,67 @@ class Calibre_Library(O):
               badopts = True
     return xit, badopts
 
-class CalibreTable(object):
+class CalibreMetaDB(TableSpace):
 
-  def __init__(self, row_class, CL, db, name, columns, name_column):
-    self.row_class = row_class
+  def __init__(self, CL, dbpath):
+    TableSpace.__init__(self, CalibreTable, db_name=dbpath, lock=CL._lock)
     self.library = CL
-    self.db = db
-    self.dosql_ro = CL.dosql_ro
-    self.dosql_rw = CL.dosql_rw
-    self.name = name
-    self.columns = columns.split()
-    self.name_column = name_column
-    self._select_all = 'SELECT %s from %s' % (','.join(self.columns), name)
+    self.conn = sqlite3.connect(CL.metadbpath)
 
-  def _select_rows(self, where=None):
-    sql = self._select_all
-    if where:
-      sql += ' WHERE ' + where
-    for row in self.dosql_ro(sql):
-      yield self.row_class(self, dict(zip(self.columns, row)))
+  def dosql_ro(self, sql, *params):
+    return self.conn.execute(sql, params)
+
+  def dosql_rw(self, sql, *params):
+    c = self.conn.cursor()
+    results = c.execute(sql, params)
+    self.conn.commit()
+    return results
+
+  def books_by_title(self, book_title):
+    return [ B for B in self.books if B.title == book_title ]
+
+  def book_by_title(self, book_title):
+    return the(self.books_by_title(book_title))
+
+  def tag_by_name(self, tag_name):
+    return the( T for T in self.tags if T.name == tag_name )
+
+  def __getattr__(self, attr):
+    if attr.startswith('table_'):
+      return self.table(attr[6:])
+    if attr in ('books', 'authors', 'tags'):
+      return self.table(attr).instances()
+    return TableSpace.__getattr__(self, attr)
+
+class CalibreTable(Table):
+
+  def __init__(self, db, table_name):
+    meta = self.META_DATA[table_name]
+    Table.__init__(self, db, table_name,
+                   column_names=meta.columns.split(),
+                   row_class=meta.klass,
+                   id_column='id')
+    CL = db.library
+    self.library = CL
+    self.name_column = getattr(meta, 'name_column', None)
 
   def instances(self):
     ''' Return rows sorted by name.
     '''
-    return sorted(self._select_rows(), key=lambda obj: obj.name)
+    return sorted(self.read_rows(), key=lambda row: row.name)
 
   def __getitem__(self, row_id):
     ''' Retrieve row by id or name.
     '''
     if isinstance(row_id, int):
-      rows = self._select_rows('id = %d' % (row_id,))
+      where = 'id = %d' % (row_id,)
+      where_argv = ()
     elif isinstance(row_id, str):
-      rows = filter(lambda r: r.name == row_id, self._select_rows())
+      where = '%s = ?' % (self.name_column,)
+      where_argv = (row_id,)
     else:
       raise TypeError("invalid type, expected int or str, got: %s" % (type(row_id),))
+    rows = self.rows(where, *where_argv)
     try:
       row = the(rows)
     except IndexError as e:
@@ -325,29 +305,20 @@ class CalibreTable(object):
         params.extend(where_params)
     return self.dosql_rw(sql, *params)
 
-class CalibreTableRow(O):
+class CalibreTableRow(Row):
   ''' A snapshot of a row from a table, with column values as attributes.
       Not intended to represent significant state, actions take
       place against the database and generally also update the row's
       attribute values to match.
   '''
 
-  def __init__(self, table, rowmap):
-    self.table = table
-    self.ns = NS(**rowmap)
+  def __init__(self, table, values, lock=None):
+    Row.__init__(self, table, values)
 
-  @property
-  def dosql_ro(self):
-    return self.table.dosql_ro
-
-  @property
-  def dosql_rw(self):
-    return self.table.dosql_rw
-
-  @property
+  @prop
   def name(self):
-    name_column = self.table.name_column
-    return getattr(self.ns, name_column)
+    name_column = self._table.name_column
+    return getattr(self._row, name_column)
 
   def __str__(self):
     return self.name
@@ -358,66 +329,55 @@ class CalibreTableRow(O):
   def __lt__(self, other):
     return self.name < other.name
 
-  def __getattr__(self, attr):
-    return getattr(self.ns, attr)
-
-  def __setattr__(self, attr, value):
-    ''' Set attribute of this row, excluding `id`.
-    '''
-    if 'ns' in self.__dict__:
-      ns = self.ns
-      if hasattr(ns, attr):
-        if attr == 'id':
-          raise AttributeError('may not set %r' % (attr,))
-        self.table.update(attr, value, "id=?", self.id)
-        return setattr(ns, attr, value)
-    return super().__setattr__(attr, value)
-
-  @property
+  @prop
   def library(self):
-    return self.table.library
+    return self.db.library
 
-  @property
-  def db(self):
-    return self.library.metadb
-
-  def related_entities(self, link_table_name, our_column_name, other_column_name, other_table_name=None):
-    if other_table_name is None:
-     other_table_name = other_column_name + 's'
-    T = self.library.table(other_table_name)
-    return set( T[row[0]] for row
-                in T.dosql_ro( 'SELECT %s as %s_id from %s where %s = %d'
-                               % (other_column_name, other_column_name,
-                                  link_table_name,
-                                  our_column_name, self.id)) )
+  def related_entities(self, link_table_name, our_column_name, related_column_name, related_table_name=None):
+    ''' Look up related entities via a link table.
+        Return l
+    '''
+    if related_table_name is None:
+     related_table_name = related_column_name + 's'
+    LT = self.db.table(link_table_name)
+    entity_ids = set( row[related_column_name]
+                      for row in LT.read_rows('%s = %d'
+                                              % (our_column_name, self.id))
+                    )
+    RT = self.db.table(related_table_name)
+    return RT.read_rows('%s in (%s)' \
+             % (RT.id_column,
+                ','.join( str(eid) for eid in sorted(entity_ids) )
+               )
+          )
 
 class Author(CalibreTableRow):
 
-  @property
+  @prop
   def books(self):
     return self.related_entities('books_authors_link', 'author', 'book')
 
 class Book(CalibreTableRow):
 
-  @property
+  @prop
   def authors(self):
     return self.related_entities('books_authors_link', 'book', 'author')
 
-  @property
+  @prop
   def rating(self):
     Rs = self.related_entities('books_ratings_link', 'book', 'rating')
     if Rs:
       return the(Rs).rating
     return None
 
-  @property
+  @prop
   def series(self):
     Ss = self.related_entities('books_series_link', 'book', 'series', 'series')
     if Ss:
       return the(Ss)
     return None
 
-  @property
+  @prop
   def tags(self):
     return self.related_entities('books_tags_link', 'book', 'tag')
 
@@ -443,13 +403,13 @@ class Rating(CalibreTableRow):
 
 class Series(CalibreTableRow):
 
-  @property
+  @prop
   def books(self):
     return self.related_entities('books_series_link', 'series', 'book')
 
 class Tag(CalibreTableRow):
 
-  @property
+  @prop
   def books(self):
     return self.related_entities('books_tags_link', 'tag', 'book')
 
@@ -472,6 +432,26 @@ class Tag(CalibreTableRow):
       T.delete('id = ?', self.id)
       self.ns.id = otag.id
     self.name = new_name
+
+CalibreTable.META_DATA = {
+  'authors': NS(klass=Author,
+                columns='id name sort link',
+                name_column='name'),
+  'books': NS(klass=Book,
+              columns='id title sort timestamp pubdate series_index author_sort isbn lccn path flags uuid has_cover last_modified',
+              name_column='title'),
+  'books_tags_link': NS(klass=CalibreTableRow,
+                        columns='id book tag'),
+  'ratings': NS(klass=Rating,
+                columns='id rating',
+                name_column='rating'),
+  'series': NS(klass=Series,
+               columns='id name sort',
+               name_column='name'),
+  'tags': NS(klass=Tag,
+             columns='id name',
+             name_column='name'),
+}
 
 if __name__ == '__main__':
   sys.exit(main(sys.argv))
