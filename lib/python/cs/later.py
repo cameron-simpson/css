@@ -11,7 +11,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         ],
-    'requires': ['cs.py3', 'cs.py.func', 'cs.debug', 'cs.excutils', 'cs.queues', 'cs.threads', 'cs.asynchron', 'cs.seq', 'cs.logutils'],
+    'install_requires': ['cs.py3', 'cs.py.func', 'cs.debug', 'cs.excutils', 'cs.queues', 'cs.threads', 'cs.asynchron', 'cs.seq', 'cs.logutils'],
 }
 
 from contextlib import contextmanager
@@ -23,7 +23,6 @@ import time
 import traceback
 from cs.py3 import Queue, raise3
 from cs.py.func import funcname
-from cs.py.stack import caller
 from cs.debug import ifdebug, Lock, RLock, Thread, trace_caller, thread_dump, stack_dump
 from cs.excutils import noexc, noexc_gen, logexc, logexc_gen, LogExceptions
 from cs.queues import IterableQueue, IterablePriorityQueue, PushQueue, \
@@ -859,7 +858,7 @@ class Later(MultiOpenMixin):
   @MultiOpenMixin.is_opened
   def after(self, LFs, R, func, *a, **kw):
     ''' Queue the function `func` for later dispatch after completion of `LFs`.
-        Return a Result for later collection of the function result.
+        Return a Result for collection of the result of `func`.
 
         This function will not be submitted until completion of
         the supplied LateFunctions `LFs`.

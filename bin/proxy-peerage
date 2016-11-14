@@ -358,7 +358,8 @@ class Proxies(object):
   def haproxy_define_frontend(self, frontend_name, frontend_listen):
     ''' Generator yielding words to define a frontend to choose amongst the proxies.
     '''
-    yield 'frontend', frontend_name, frontend_listen
+    yield 'frontend', frontend_name
+    yield '  bind', frontend_listen
     default_proxies = set()
     for pattern in self.patterns:
       defn = pattern.definition

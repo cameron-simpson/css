@@ -1,0 +1,8 @@
+  lib/python/cs/app/mailfiler.py: cs.app.mailfiler: accept "." in simple addresses local part
+  lib/python/cs/app/mailfiler.py: cs.app.mailfiler: BUGFIX: remove incorrect sanity check at end of hdr:s/this/that/ parse
+  lib/python/cs/app/mailfiler.py: cs.app.mailfiler: add a few clarifying comments
+  lib/python/cs/app/mailfiler.py: cs.appmailfiler: Rule: add __str__ and __repr__
+  lib/python/cs/app/mailfiler.py: cs.app.mailfiler: remove unused variable
+  lib/python/cs/app/mailfiler.py: cs.app.mailfiler: remove annoying "filer-" prefix from log filenames; fix docstring typo
+  lib/python/cs/app/mailfiler.py: cs.app.mailfiler: bugfix target parse: require comma before more targets
+  lib/python/cs/app/mailfiler.py: cs.*: use "install_requires" instead of "requires" in DISTINFO

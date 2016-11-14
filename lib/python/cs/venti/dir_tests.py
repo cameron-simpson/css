@@ -17,7 +17,7 @@ from .dir import FileDirent, Dir, decode_Dirent, decode_Dirent_text, decode_Dire
 class TestAll(unittest.TestCase):
 
   def setUp(self):
-    self.S = MappingStore({})
+    self.S = MappingStore("TestAll", {})
     self.S.open()
 
   def tearDown(self):

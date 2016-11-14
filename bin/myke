@@ -4,4 +4,4 @@
 #       - Cameron Simpson <cs@zip.com.au>
 #
 
-exec py27+ -m cs.app.myke ${1+"$@"}
+exec python3 -m cs.app.myke ${1+"$@"}

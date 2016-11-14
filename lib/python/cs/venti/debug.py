@@ -3,6 +3,7 @@
 import sys
 from cs.lex import hexify, texthexify
 from cs.logutils import X
+from .block import BlockType
 from .dir import InvalidDirent
 
 def dump_Block(block, indent=''):
@@ -26,6 +27,8 @@ def dump_Dirent(E, indent='', recurse=False, not_dir=False):
     details = '-> ' + repr(E.pathref)
   elif E.ishardlink:
     details = 'inode ' + str(E.inum)
+  elif E.block.type == BlockType.BT_LITERAL:
+    details = "literal(%r)" % (E.block.data,)
   else:
     details = hexify(E.block.hashcode)
   details 

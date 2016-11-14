@@ -392,11 +392,12 @@ class FileDirent(_Dirent, MultiOpenMixin):
         If open, sync the file to update ._block.
     '''
     self._check()
-    if self._open_file is not None:
-      self._block = self._open_file.flush()
-      warning("FileDirent.block: updated to %s", self._block)
-      ##stack_dump(indent=2)
-    return self._block
+    ##X("access FileDirent.block from:")
+    ##stack_dump(indent=2)
+    if self._open_file is None:
+      return self._block
+    else:
+      return self._open_file.flush()
 
   @block.setter
   @locked
@@ -434,14 +435,17 @@ class FileDirent(_Dirent, MultiOpenMixin):
   def shutdown(self):
     ''' On final close, close ._open_file and save result as ._block.
     '''
-    X("CLOSE %s ...", self)
+    X("FileDirent.CLOSE %s ...", self)
     self._check()
     if self._block is not None:
-      error("final close, but ._block is not None; replacing with self._open_file.close(), was: %r", self._block)
+      error("final close, but ._block is not None; replacing with self._open_file.close(), was: %s", self._block)
     self._block = self._open_file.close()
     X("CLOSE %s: _block=%s", self, self._block)
     self._open_file = None
     self._check()
+
+  def flush(self):
+    return self._open_file.flush()
 
   def truncate(self, length):
     ''' Truncate this FileDirent to the specified size.
@@ -451,6 +455,7 @@ class FileDirent(_Dirent, MultiOpenMixin):
       with self:
         return self._open_file.truncate(length)
 
+  # TODO: move into distinctfile utilities class with rsync-like stuff etc
   def restore(self, path, makedirs=False, verbosefp=None):
     ''' Restore this _Dirent's file content to the name `path`.
     '''
@@ -589,6 +594,9 @@ class Dir(_Dirent):
   def keys(self):
     return self.entries.keys()
 
+  def items(self):
+    return self.entries.items()
+
   def __contains__(self, name):
     if name == '.':
       return True
@@ -613,8 +621,9 @@ class Dir(_Dirent):
       raise KeyError("invalid name: %s" % (name,))
     if not isinstance(E, _Dirent):
       raise ValueError("E is not a _Dirent: <%s>%r" % (type(E), E))
-    self.change()
     self.entries[name] = E
+    self.touch()
+    self.change()
     E.name = name
     if E.isdir:
       Eparent = E.parent
@@ -629,8 +638,9 @@ class Dir(_Dirent):
       raise KeyError("invalid name: %s" % (name,))
     if name == '.' or name == '..':
       raise KeyError("refusing to delete . or ..: name=%s" % (name,))
-    self.change()
     del self.entries[name]
+    self.touch()
+    self.change()
 
   def add(self, E):
     ''' Add a Dirent to this Dir.

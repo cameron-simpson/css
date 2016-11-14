@@ -43,7 +43,7 @@ scriptfromman(manf) = $(manf FP)
 py2files        = $("lib/python/cs/*.py lib/python/cs/*/*.py lib/python/cs/*/*/*.py" G)
 py3files        = $(py2files :|/python/|/python3/|)
 
-rsync = rsync -iO --exclude='.*.swp' --exclude='*.pyc'
+rsync = rsync -iOt --exclude='.*.swp' --exclude='*.pyc'
 
 _help:
         @echo '_test              - do syntax checks and self tests (may set \$$MYKE_TEST_PYTHON_MODULES if desired)'
@@ -107,7 +107,7 @@ $(py3files): lib/python/$(@ :|lib/python3/||)
         echo "$@ <- $?"
 
 _home:
-        @skip=`hg status | sed -n 's:^? \(.*\):--exclude=/\1:p'` \
+        skip=`hg status | sed -n 's:^? \(.*\):--exclude=/\1:p'` \
         binskip=`hg status | sed -n 's:^? bin/\(.*\):--exclude=/\1:p'` \
         pfx bin $(rsync) -a --delete \\
                 --include=/CHANGELOG.txt \\
@@ -115,14 +115,8 @@ _home:
                 --include=synonyms/ \\
                 --exclude=squid_redirect \\
                 --exclude=/\*/ \\
-                bin/. $(HOME)/bin/. \
-        bosskip=`hg status | sed -n 's:^? bin-bos/\(.*\):--exclude=/\1:p'` \
-        pfx bin-bos $(rsync) -a --delete $$bosskip bin-bos/. $(HOME)/bos/bin/. \
-        csskip=`hg status | sed -n 's:^? bin-cs/\(.*\):--exclude=/\1:p'` \
-        pfx bin-cs $(rsync) -a --delete $$csskip \\
-                --exclude=/testzap \\
-                --exclude=/testpageurls \\
-                bin-cs/. $(HOME)/bin-cs/. \
+                bin/. $(HOME)/bin/.
+        $(MAKE) _bin_$((bin_suffixes))
         libskip=`hg status | sed -n 's:^? lib/\(.*\):--exclude=/\1:p'` \
         pfx lib $(rsync) -a --delete \\
                 --include=/js \\
@@ -138,6 +132,16 @@ _home:
                 --exclude=/* \\
                 --exclude=testdata* \\
                 lib/. $(HOME)/lib/.
+        @echo "home updated"
+
+bin_suffixes = cs darwin lrn
+
+_bin_$((bin_suffixes)):
+    sfx=$(@S[_]) \
+    base=bin-$$sfx \
+    target=$(HOME)/$$base \
+    skip=$$( hg status | sed -n 's:^? '"$$base"'/\(.*\):--exclude=/\1:p' ) \
+    pfx "$$base" $(rsync) -a --delete $$skip "$$base/" "$$target/"
 
 # squid_redirect
 _all: 1INDEX.txt _submakes _man
@@ -167,7 +171,8 @@ _release_force:
         cs-release add
 
 _pending:
-        cs-release log | grep '^[^:]'; :
+        cs-release log
+        cs-release status
         hg status | grep '^[^?]'; :
 
 _freshmeat:
@@ -242,7 +247,7 @@ noads	= $(HOME)/@/adzapper.sf/html/rc/patterns
 
 squid_redirect: $(noads)
 	@cd $(?DD) || exit 1 \
-	pwd; set -x \
+	pwd; \
 	exec $(MAKE) _scripts
 
 %.class: %.java %.class-prereqs : $(("%.class-prereqs" G?<P)).class
