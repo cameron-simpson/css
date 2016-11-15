@@ -61,7 +61,7 @@ def prop(func):
     except AttributeError as e:
       e2 = RuntimeError("inner function %s raised %s" % (func, e))
       if sys.version_info[0] >= 3:
-        exec('raise e2 from e')
+        exec('raise e2 from e', globals(), locals())
       else:
         raise e2
   return property(wrapper)
