@@ -41,14 +41,13 @@ else
   op=$1
   shift
   case $op in
-<<<<<<< local
     badge-format)
       if [ $# = 0 ]
       then
         echo "$cmd: $op: missing format" >&2
         badopts=1
       fi
-=======
+      ;;
     colour)
       if [ $# = 0 ]
       then
@@ -76,7 +75,6 @@ else
           end tell
 X
       }
->>>>>>> other
       ;;
     open)
       if [ $# = 0 ]
