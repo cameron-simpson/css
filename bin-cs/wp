@@ -20,6 +20,10 @@ do
         count=$1 ;;
     /*) WPDIR=$1 ;;
     --) shift; break ;;
+    -h|--help|-?)
+        echo "$usage"
+        exit 0
+        ;;
     *)  break ;;
   esac
   shift

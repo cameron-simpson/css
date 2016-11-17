@@ -8,8 +8,6 @@ from __future__ import print_function
 import sys
 import os
 import os.path
-from subprocess import Popen
-from tempfile import NamedTemporaryFile
 from cs.edit import edit_strings
 
 USAGE = 'Usage: %s [pathnames...]'
