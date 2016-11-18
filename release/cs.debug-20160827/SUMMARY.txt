@@ -1,0 +1,4 @@
+New openfiles() to return selected pathnames of open files via lsof(8).
+New selftest() to invoke unittests with benefits.
+DebugShell, a cmd.Cmd subclass for debugging - current use case calls this with self.__dict__ in a test case tearDwon.
+debug_object_shell: convenience wrapper for DebugShell to call it on an object's attributes.

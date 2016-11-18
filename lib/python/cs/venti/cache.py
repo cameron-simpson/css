@@ -20,14 +20,29 @@ class CacheStore(BasicStoreSync):
       the backend. A block store is stored to the cache and then
       asynchronously to the backend.
   '''
-  def __init__(self, backend, cache):
-    BasicStoreSync.__init__(self, "Cache(cache=%s, backend=%s)" % (cache, backend))
-    backend.open()
+  def __init__(self, name, backend, cache, **kw):
+    hashclass = kw.pop('hashclass', None)
+    if hashclass is None:
+      hashclass = backend.hashclass
+    elif hashclass is not backend.hashclass:
+      raise ValueError("hashclass and backend.hashclass are not the same (%s vs %s)"
+                       % (hashclass, backend.hashclass))
+    if hashclass is not cache.hashclass:
+      raise ValueError("backend and cache hashclasses are not the same (%s vs %s)"
+                       % (backend.hashclass, cache.hashclass))
+    kw['hashclass'] = hashclass
+    BasicStoreSync.__init__(self,
+                            "CacheStore(backend=%s,cache=%s)"
+                            % (backend.name, cache.name),
+                            **kw)
     self.backend = backend
-    cache.open()
     self.cache = cache
     # secondary queue to process background self.backend operations
     self.__closing = False
+
+  def startup(self):
+    self.backend.open()
+    self.cache.open()
 
   def shutdown(self):
     self.cache.shutdown()
@@ -35,8 +50,13 @@ class CacheStore(BasicStoreSync):
     BasicStoreSync.shutdown(self)
 
   def flush(self):
-    self.cache.flush()
-    self.backend.flush()
+    # dispatch flushes in parallel
+    LFs = [ self.cache.flush_bg(),
+            self.backend.flush_bg()
+          ]
+    # wait for the cache flush and then the backend flush
+    for LF in LFs:
+      LF()
 
   def keys(self):
     cache = self.cache
@@ -69,16 +89,6 @@ class CacheStore(BasicStoreSync):
     self._defer(add_backend)
     return h
 
-  def prefetch(self, hs):
-    ''' Request from the backend those hashes from 'hs'
-        which do not occur in the cache.
-    '''
-    self.backend.prefetch(self.missing(hs))
-
-  def sync(self):
-    for _ in cs.later.report([ self.cache.flush_bg(), self.backend.flush_bg() ]):
-      pass
-
 class MemoryCacheStore(BasicStoreSync):
   ''' A lossy store that keeps an in-memory cache of recent chunks.  It may
       discard older chunks if new ones come in when full and would normally
@@ -87,8 +97,9 @@ class MemoryCacheStore(BasicStoreSync):
       chunks to keep in memory; it defaults to 1024. Specifying 0 keeps
       all chunks in memory.
   '''
-  def __init__(self, maxchunks=1024):
-    BasicStoreSync.__init__(self, "MemoryCacheStore")
+
+  def __init__(self, name, maxchunks=1024, **kw):
+    BasicStoreSync.__init__(self, "MemoryCacheStore(%s)" % (name,), **kw)
     # TODO: fails if maxchunks == 0
     assert maxchunks > 0
     self.hashlist = [None for _ in range(maxchunks)]

@@ -304,7 +304,6 @@ class _Block(object):
     ''' Return an iterator yielding (Block, start, len) tuples representing the leaf data covering the supplied span `start`:`end`.
         The iterator may end early if the span exceeds the Block data.
     '''
-    ##X("Block<%s>[len=%d].slices(start=%r, end=%r)...", self, len(self), start, end)
     if start is None:
       start = 0
     elif start < 0:
@@ -314,7 +313,6 @@ class _Block(object):
     elif end < start:
       raise ValueError("end must be >= start(%r), received: %r" % (start,end))
     if self.indirect:
-      ##X("Block.slices: indirect...")
       offset = 0
       for B in self.subblocks:
         sublen = len(B)
@@ -327,12 +325,9 @@ class _Block(object):
         if offset >= end:
           break
     else:
-      ##X("Block.slices: direct")
       # a leaf Block
       if start < len(self):
-        ##X("Block.slices: yield self, %d, %d", start, min(end, len(self)))
         yield self, start, min(end, len(self))
-    ##X("Block.slices: COMPLETE")
 
   def top_slices(self, start=None, end=None):
     ''' Return an iterator yielding (Block, start, len) tuples representing the uppermost Blocks spanning `start`:`end`.
@@ -404,42 +399,6 @@ class _Block(object):
       return File(backing_block=self)
     raise ValueError("unsupported open mode, expected 'rb' or 'w+b', got: %s", mode)
 
-  def complete(self, S2, capacity=None):
-    ''' Complete this Block from alternative Store `S2`.
-        If the current Store does not contain us, fetch data from `S2`.
-        If indirect, repeat for all children.
-        `capacity` controls the parallelism of the completion.
-        If None, use the self.capacity.
-        If an int, construct a Later instance with that capacity.
-        Otherwise presume `capacity` is already a Later instance and use that.
-    '''
-    if capacity is None:
-      capacity = self.capacity
-    if isinstance(capacity, int):
-      with Later(capacity) as L:
-        return self.complete(S2, L)
-    # capacity should be a Later instance
-    L = capacity
-    with L.pool() as LP:
-      LFs = []
-      try:
-        h = self.hashcode
-      except AttributeError:
-        pass
-      else:
-        S = defaults.S
-        if h not in S:
-          # dispatch fetch for missing data
-          X("complete: fetch S2[%s]...", h)
-          LP.add(L.with_result_of(partial(S2.get, h), S.add))
-      if self.indirect:
-        for subB in self.subbblocks():
-          X("complete: complete subblock %s...", subB)
-          LP.defer(subB.complete, S2, L)
-    X("complete: join...")
-    LP.join()
-    X("complete: completed")
-
 class HashCodeBlock(_Block):
 
   def __init__(self, hashcode=None, data=None):
@@ -508,7 +467,7 @@ def IndirectBlock(subblocks=None, hashcode=None, span=None):
       Indirect blocks may be initialised in two ways:
 
       The first way is specified by supplying the `subblocks`
-      paramater, an iterable of Blocks to be referenced by this
+      parameter, an iterable of Blocks to be referenced by this
       IndirectBlock. The referenced Blocks are encoded and assembled
       into the data for this Block.
 
@@ -529,7 +488,7 @@ def IndirectBlock(subblocks=None, hashcode=None, span=None):
       raise ValueError("no span supplied with hashcode %s" % (hashcode,))
     B = HashCodeBlock(hashcode=hashcode)
   else:
-    # subblcoks specified
+    # subblocks specified
     if hashcode is not None:
       raise ValueError("only one of hashocde and subblocks may be supplied")
     subspan = sum(subB.span for subB in subblocks)

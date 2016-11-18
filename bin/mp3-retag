@@ -16,6 +16,10 @@
 # where nn is the track number.
 #
 
+set -ue
+
+: ${MP3_RETAG_OPTS:='-/ artist--'}
+
 cmd=$( basename "$0" )
 usage="Usage: $cmd [-/ {artist{sep}|{sep}artist}] [-T re_artist re_songname] mp3files...
   -/ artist{sep}
@@ -36,6 +40,8 @@ badopts=
 trace=set-x
 track_re_artist=
 track_re_songname=
+
+set -- $MP3_RETAG_OPTS ${1+"$@"}
 
 while [ $# -gt 0 ]
 do
@@ -105,8 +111,9 @@ do
           ;;
       esac
       songname=$trackname
-      [ -z "$track_re_artist" ] || artist=$( expr "x$trackname" : "x$track_re_artist" )
-      [ -z "$track_re_songname" ] || songname=$( expr "x$trackname" : "x$track_re_songname" )
+      oartist=$artist
+      [ -z "$track_re_artist" ] || artist=$( expr "x$trackname" : "x$track_re_artist" ) || artist=$oartist
+      [ -z "$track_re_songname" ] || songname=$( expr "x$trackname" : "x$track_re_songname" ) || songname=$trackname
       ;;
     *)echo "$cmd: not an MP3 file: $mp3file" >&2
       ok=
