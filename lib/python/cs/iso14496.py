@@ -14,6 +14,7 @@ from collections import namedtuple
 from os import SEEK_CUR
 import sys
 from cs.fileutils import read_data, pread, seekable
+from cs.py.func import prop
 from cs.py3 import bytes, pack, unpack, iter_unpack
 # DEBUG
 from cs.logutils import warning, X, Pfx
@@ -363,7 +364,7 @@ class Box(object):
     '''
     yield self._load_box_data()
 
-  @property
+  @prop
   def box_data(self):
     ''' A bytes object containing the data section for this Box.
     '''
@@ -430,7 +431,7 @@ class FullBox(Box):
     attr_summary = self.attribute_summary()
     return prefix + ',' + attr_summary + ')'
 
-  @property
+  @prop
   def box_vf_data_chunk(self):
     ''' Return the leading version and flags.
         Subclasses need to yield this first from .box_data_chunks().
@@ -562,7 +563,7 @@ class ContainerBox(Box):
     Box.__init__(self, box_type, box_data)
     self._boxes = None
 
-  @property
+  @prop
   def boxes(self):
     if self._boxes is None:
       box_data = self._load_box_data()
@@ -635,14 +636,14 @@ class MVHDBox(FullBox):
       raise ValueError("MVHD: after decode offset=%d but len(box_data)=%d"
                        % (offset, len(box_data)))
 
-  @property
+  @prop
   def rate(self):
     ''' Rate field converted to float: 1.0 represents normal rate.
     '''
     _rate = self._rate
     return (_rate>>16) + (_rate&0xffff)/65536.0
 
-  @property
+  @prop
   def volume(self):
     ''' Volume field converted to float: 1.0 represents full volume.
     '''
@@ -734,19 +735,19 @@ class TKHDBox(FullBox):
     self.width, self.height = unpack('>LL', box_data[offset:offset+8])
     offset += 8
 
-  @property
+  @prop
   def track_enabled(self):
     return (self.flags&0x1) != 0
 
-  @property
+  @prop
   def track_in_movie(self):
     return (self.flags&0x2) != 0
 
-  @property
+  @prop
   def track_in_preview(self):
     return (self.flags&0x4) != 0
 
-  @property
+  @prop
   def track_size_is_aspect_ratio(self):
     return (self.flags&0x8) != 0
 
@@ -904,7 +905,7 @@ class MDHDBox(FullBox):
       raise RuntimeError('unsupported version: %d', self.version)
     yield self.pack('>HH', self._language, self.pre_defined)
 
-  @property
+  @prop
   def language(self):
     ''' The ISO 639‐2/T language code as decoded from the packed form.
     '''
@@ -1073,7 +1074,7 @@ class _SampleEntry(Box):
     attr_summary = self.attribute_summary()
     return prefix + ',' + attr_summary + ')'
 
-  @property
+  @prop
   def box_se_data_chunk(self):
     ''' Return the leading reserved bytes and data_reference_index.
         Subclasses need to yield this first from .box_data_chunks().
