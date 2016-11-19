@@ -14,9 +14,10 @@ from collections import namedtuple
 from os import SEEK_CUR
 import sys
 from cs.fileutils import read_data, pread, seekable
-from cs.py3 import bytes, pack, unpack
+from cs.py.func import prop
+from cs.py3 import bytes, pack, unpack, iter_unpack
 # DEBUG
-from cs.logutils import X
+from cs.logutils import warning, X, Pfx
 
 # a convenience chunk of 256 zero bytes, mostly for use by 'free' blocks
 B0_256 = bytes(256)
@@ -195,6 +196,14 @@ def write_box(fp, box_type, box_tail):
     fp.write(bs)
   return written
 
+def get_utf8_nul(bs, offset=0):
+  ''' Collect a NUL terminated UTF8 encoded string. Return string and new offset.
+  '''
+  endpos = bs.find(b'\0', offset)
+  if endpos < 0:
+    raise ValueError('no NUL in data: %r' % (bs[offset:],))
+  return bs[offset:endpos].decode('utf-8'), endpos + 1
+
 class Box(object):
   ''' Base class for all boxes - ISO14496 section 4.2.
   '''
@@ -210,7 +219,9 @@ class Box(object):
       try:
         BOX_TYPES = self.BOX_TYPES
       except AttributeError:
-        X("no box_type check in %s, box_type=%r", self.__class__, box_type)
+        if type(self) is not Box:
+          raise RuntimeError("no box_type check in %s, box_type=%r"
+                             % (self.__class__, box_type))
         pass
       else:
         if box_type not in BOX_TYPES:
@@ -231,15 +242,47 @@ class Box(object):
       self._fetch_box_data = box_data
       self._box_data = None
 
+  @classmethod
+  def box_type_from_klass(klass):
+    klass_name = klass.__name__
+    if len(klass_name) == 7 and klass_name.endswith('Box'):
+      klass_prefix = klass_name[:4]
+      if klass_prefix.isupper():
+        return klass_prefix.lower().encode('ascii')
+    raise AttributeError("no automatic .BOX_TYPE for %s" % (klass,))
+
+  # NB: a @property instead of @prop to preserve AttributeError
+  @property
+  def BOX_TYPE(self):
+    return type(self).box_type_from_klass()
+
+  def attribute_summary(self):
+    strs = []
+    for attr in self.ATTRIBUTES:
+      if isinstance(attr, str):
+        fmt = '%s'
+      else:
+        # an (attr, fmt) tuple
+        attr, fmt = attr
+      strs.append(attr + '=' + fmt % (getattr(self, attr),))
+    return ','.join(strs)
+
   def __str__(self):
     if self._box_data is None:
       # do not load the data just for __str__
-      return 'Box(box_type=%r,box_data=%s())' \
+      return 'Box(%r,box_data=%s())' \
              % (self.box_type, self._fetch_box_data)
-    return 'Box(box_type=%r,box_data=%d:%r%s)' \
+    return 'Box(%r,box_data=%d:%r%s)' \
            % (self.box_type, len(self._box_data),
               self._box_data[:32],
               '...' if len(self._box_data) > 32 else '')
+
+  def dump(self, indent='', fp=None):
+    if fp is None:
+      fp = sys.stdout
+    fp.write(indent)
+    fp.write(str(self))
+    fp.write('\n')
 
   @staticmethod
   def from_file(fp, cls=None):
@@ -284,7 +327,7 @@ class Box(object):
                          % (box_data_length, len(fetch_data)))
     if cls is None:
       cls = pick_box_class(box_type)
-      X("from_file: KNOWN_BOX_CLASSES.get(%r) => %s", box_type, Box)
+      ##X("from_file: KNOWN_BOX_CLASSES.get(%r) => %s", box_type, Box)
     return cls(box_type, fetch_data)
 
   @staticmethod
@@ -311,7 +354,7 @@ class Box(object):
     fetch_box_data = lambda: bs[tail_offset:tail_offset+tail_length]
     if cls is None:
       cls = pick_box_class(box_type)
-      X("from_bytes: KNOWN_BOX_CLASSES.get(%r) => %s", box_type, Box)
+      ##X("from_bytes: KNOWN_BOX_CLASSES.get(%r) => %s", box_type, Box)
     B = cls(box_type, fetch_box_data)
     return B, offset
 
@@ -335,7 +378,7 @@ class Box(object):
     '''
     yield self._load_box_data()
 
-  @property
+  @prop
   def box_data(self):
     ''' A bytes object containing the data section for this Box.
     '''
@@ -359,6 +402,23 @@ class Box(object):
 # mapping of known box subclasses for use by factories
 KNOWN_BOX_CLASSES = {}
 
+def add_box_class(klass):
+  global KNOWN_BOX_CLASSES
+  with Pfx("add_box_class(%s)", klass):
+    try:
+      box_types = klass.BOX_TYPES
+    except AttributeError:
+      box_type = klass.box_type_from_klass()
+      box_types = (box_type,)
+      X("got klass.BOX_TYPE = %r", box_type)
+    else:
+      X("got klass.BOX_TYPES = %r", box_types)
+    for box_type in box_types:
+      if box_type in KNOWN_BOX_CLASSES:
+        raise TypeError("box_type %r already in KNOWN_BOX_CLASSES as %s"
+                        % (box_type, KNOWN_BOX_CLASSES[box_type]))
+      KNOWN_BOX_CLASSES[box_type] = klass
+
 if sys.hexversion >= 0x03000000:
   def pick_box_class(box_type):
     return KNOWN_BOX_CLASSES.get(box_type, Box)
@@ -380,9 +440,17 @@ class FullBox(Box):
     self.flags = (box_data[1]<<16) | (box_data[2]<<8) | box_data[3]
     self._set_box_data(box_data[4:])
 
-  @property
+  def __str__(self):
+    prefix = '%s(%r-v%d-0x%02x' % (self.__class__.__name__,
+                                   self.box_type,
+                                   self.version,
+                                   self.flags)
+    attr_summary = self.attribute_summary()
+    return prefix + ',' + attr_summary + ')'
+
+  @prop
   def box_vf_data_chunk(self):
-    ''' Return the leading version and 
+    ''' Return the leading version and flags.
         Subclasses need to yield this first from .box_data_chunks().
     '''
     return bytes([ self.version,
@@ -419,16 +487,12 @@ class FREEBox(Box):
     if free_bytes > 0:
       yield bytes(free_bytes)
 
-for box_type in FREEBox.BOX_TYPES:
-  KNOWN_BOX_CLASSES[box_type] = FREEBox
-del box_type
+add_box_class(FREEBox)
 
 class FTYPBox(Box):
   ''' An 'ftyp' File Type box - ISO14496 section 4.3.
       Decode the major_brand, minor_version and compatible_brands.
   '''
-
-  BOX_TYPE = b'ftyp'
 
   def __init__(self, box_type, box_data):
     Box.__init__(self, box_type, box_data)
@@ -456,7 +520,7 @@ class FTYPBox(Box):
     for brand in self.compatible_brands:
       yield brand
 
-KNOWN_BOX_CLASSES[FTYPBox.BOX_TYPE] = FTYPBox
+add_box_class(FTYPBox)
 
 # field names for the tuples in a PDINBox
 PDInfo = namedtuple('PDInfo', 'rate initial_delay')
@@ -466,7 +530,7 @@ class PDINBox(FullBox):
       Decode the (rate, initial_delay) pairs of the data section.
   '''
 
-  BOX_TYPE = b'pdin'
+  ATTRIBUTES = (('pdinfo', '%r'))
 
   def __init__(self, box_type, box_data):
     FullBox.__init__(self, box_type, box_data)
@@ -481,17 +545,29 @@ class PDINBox(FullBox):
     # forget data bytes
     self._set_box_data(b'')
 
-  def __str__(self):
-    return 'PDINBox(version=%d,flags=0x%02x,pdinfo=%s)' \
-           % (self.version, self.flags,
-              ','.join(str(pdinfo) for pdinfo in self.pdinfo))
-
   def box_data_chunks(self):
     yield self.box_vf_data_chunk
     for pdinfo in self.pdinfo:
       yield pack('>LL', pdinfo.rate, pdinfo.initial_delay)
 
-KNOWN_BOX_CLASSES[PDINBox.BOX_TYPE] = PDINBox
+add_box_class(PDINBox)
+
+def get_boxes(bs, offset=0, max_offset=None):
+  ''' Generator collecting Boxes from the supplied data `bs`, starting at `offset` (default: 0) and ending at `max_offset` (default: end of `bs`).
+      Postcondition: all data up to `max_offset` has been collectewd into Boxes.
+  '''
+  if max_offset is None:
+    max_offset = len(bs)
+  while offset < max_offset:
+    B, offset = Box.from_bytes(bs, offset)
+    if B is None:
+      if offset is not None:
+        raise RuntimeError("unexpected offset=%r with B=None" % (offset,))
+      break
+    if offset > max_offset:
+      raise ValueError('final box exceeds limit: finished at %d but limit was %d'
+                       % (offset, max_offset))
+    yield B
 
 class ContainerBox(Box):
   ''' A base class for pure container boxes.
@@ -499,20 +575,28 @@ class ContainerBox(Box):
 
   def __init__(self, box_type, box_data):
     Box.__init__(self, box_type, box_data)
-    box_data = self._load_box_data()
-    self.boxes = []
-    offset = 0
-    while True:
-      B, offset = Box.from_bytes(box_data, offset)
-      if B is None:
-        if offset is not None:
-          raise RuntimeError("unexpected offset=%r with B=None" % (offset,))
-        break
-      self.boxes.append(B)
+    self._boxes = None
+
+  @prop
+  def boxes(self):
+    if self._boxes is None:
+      box_data = self._load_box_data()
+      self._boxes = list(get_boxes(box_data))
+    return self._boxes
 
   def __str__(self):
     return '%s(%s)' \
            % (self.__class__.__name__, ','.join(str(B) for B in self.boxes))
+
+  def dump(self, indent='', fp=None):
+    if fp is None:
+      fp = sys.stdout
+    fp.write(indent)
+    fp.write(self.__class__.__name__)
+    fp.write('\n')
+    indent += '  '
+    for B in self.boxes:
+      B.dump(indent, fp)
 
   def box_data_chunks(self):
     for B in self.boxes:
@@ -523,17 +607,20 @@ class MOOVBox(ContainerBox):
   ''' An 'moov' Movie box - ISO14496 section 8.2.1.
       Decode the contained boxes.
   '''
-  BOX_TYPE = b'moov'
-KNOWN_BOX_CLASSES[MOOVBox.BOX_TYPE] = MOOVBox
+  pass
+
+add_box_class(MOOVBox)
 
 class MVHDBox(FullBox):
   ''' An 'mvhd' Movie Header box - ISO14496 section 8.2.2.
   '''
 
-  BOX_TYPE = b'mvhd'
+  ATTRIBUTES = ( ('rate', '%g'),
+                 ('volume', '%g'),
+                 ('matrix', '%r'),
+                 ('next_track_id', '%d') )
 
   def __init__(self, box_type, box_data):
-    X("INIT MVHDBox ...")
     FullBox.__init__(self, box_type, box_data)
     # obtain box data after version and flags decode
     box_data = self._box_data
@@ -562,19 +649,14 @@ class MVHDBox(FullBox):
       raise ValueError("MVHD: after decode offset=%d but len(box_data)=%d"
                        % (offset, len(box_data)))
 
-  def __str__(self):
-    return 'MVHDBox(version=%d,flags=0x%02x,rate=%g,volume=%g,matrix=%r,next_track_id=%d)' \
-           % (self.version, self.flags, self.rate, self.volume,
-              self.matrix, self.next_track_id)
-
-  @property
+  @prop
   def rate(self):
     ''' Rate field converted to float: 1.0 represents normal rate.
     '''
     _rate = self._rate
     return (_rate>>16) + (_rate&0xffff)/65536.0
 
-  @property
+  @prop
   def volume(self):
     ''' Volume field converted to float: 1.0 represents full volume.
     '''
@@ -604,20 +686,35 @@ class MVHDBox(FullBox):
     yield bytes(24)
     yield pack('>L', self.next_track_id)
 
-KNOWN_BOX_CLASSES[MVHDBox.BOX_TYPE] = MVHDBox
+add_box_class(MVHDBox)
 
 class TRAKBox(ContainerBox):
   ''' A 'trak' Track box - ISO14496 section 8.3.1.
       Decode the contained boxes.
   '''
-  BOX_TYPE = b'trak'
-KNOWN_BOX_CLASSES[TRAKBox.BOX_TYPE] = TRAKBox
+  pass
+
+add_box_class(TRAKBox)
 
 class TKHDBox(FullBox):
   ''' An 'tkhd' Track Header box - ISO14496 section 8.2.2.
   '''
 
-  BOX_TYPE = b'tkhd'
+  ATTRIBUTES = ( 'track_enabled',
+                 'track_in_movie',
+                 'track_in_preview',
+                 'track_size_is_aspect_ratio',
+                 'creation_time',
+                 'modification_time',
+                 'track_id',
+                 'duration',
+                 'layer',
+                 'alternate_group',
+                 'volume',
+                 ('matrix', '%r'),
+                 'width',
+                 'height',
+               )
 
   def __init__(self, box_type, box_data):
     FullBox.__init__(self, box_type, box_data)
@@ -627,58 +724,42 @@ class TKHDBox(FullBox):
       self.creation_time, \
       self.modification_time, \
       self.track_id, \
-      _, \
+      self.reserved1, \
       self.duration = unpack('>LLLLL', box_data[:20])
       offset = 20
     elif self.version == 1:
       self.creation_time, \
       self.modification_time, \
       self.track_id, \
-      _, \
+      self.reserved1, \
       self.duration = unpack('>QQLLQ', box_data[:32])
       offset = 32
     else:
       raise ValueError("TRHD: unsupported version %d" % (self.version,))
-    _, _, \
+    self.reserved2, self.reserved3, \
     self.layer, \
     self.alternate_group, \
     self.volume, \
-    _ = unpack('>LLhhhH', box_data[offset:offset+16])
+    self.reserved4 = unpack('>LLhhhH', box_data[offset:offset+16])
     offset += 16
     self.matrix = unpack('>lllllllll', box_data[offset:offset+36])
     offset += 36
     self.width, self.height = unpack('>LL', box_data[offset:offset+8])
     offset += 8
 
-  def __str__(self):
-    return 'TRHDBox(version=%d,flags=0x%02x,enabled=%s,in_movie=%s,in_preview=%s,size_is_aspect=%s,creation_time=%d,modification_time=%s,track_id=%d,duration=%d,laer=%d,alternate_group=%d,volume=0x%04x,matrix=%r,width=%d,height=%d)' \
-           % (self.version, self.flags,
-              self.track_enabled, self.track_in_movie, self.track_in_preview,
-              self.track_size_is_aspect_ratio,
-              self.creation_time,
-              self.modification_time,
-              self.track_id,
-              self.duration,
-              self.layer,
-              self.alternate_group,
-              self.volume,
-              self.matrix,
-              self.width,
-              self.height)
-
-  @property
+  @prop
   def track_enabled(self):
     return (self.flags&0x1) != 0
 
-  @property
+  @prop
   def track_in_movie(self):
     return (self.flags&0x2) != 0
 
-  @property
+  @prop
   def track_in_preview(self):
     return (self.flags&0x4) != 0
 
-  @property
+  @prop
   def track_size_is_aspect_ratio(self):
     return (self.flags&0x8) != 0
 
@@ -689,27 +770,390 @@ class TKHDBox(FullBox):
                  self.creation_time,
                  self.modification_time,
                  self.track_id,
-                 0,
+                 self.reserved1,
                  self.duration)
     elif self.version == 1:
       yield pack('>QQLLQ',
                  self.creation_time,
                  self.modification_time,
                  self.track_id,
-                 0,
+                 self.reserved1,
                  self.duration)
     else:
       raise RuntimeError("unsupported version %d" % (self.version,))
     yield pack('>LLhhhH',
-               0, 0,
+               self.reserved2, self.reserved3,
                self.layer,
                self.alternate_group,
                self.volume,
-               0)
+               self.reserved4)
     yield pack('>lllllllll', *self.matrix)
     yield pack('>LL', self.width, self.height)
 
-KNOWN_BOX_CLASSES[TKHDBox.BOX_TYPE] = TKHDBox
+add_box_class(TKHDBox)
+
+class TREFBox(ContainerBox):
+  ''' An 'tref' Track Reference box - ISO14496 section 8.3.3.
+      Decode the contained boxes.
+  '''
+  pass
+
+add_box_class(TREFBox)
+
+class TrackReferenceTypeBox(Box):
+  ''' A TrackReferenceTypeBox continas references to other tracks - ISO14496 section 8.3.3.2.
+  '''
+
+  BOX_TYPES = (b'hint', b'cdsc', b'font', b'hind', b'vdep', b'vplx', b'subt')
+
+  def __init__(self, box_type, box_data):
+    Box.__init__(self, box_type, box_data)
+    box_data = self._load_box_data()
+    track_ids = []
+    for track_id, in iter_unpack('>L', box_data):
+      track_ids.append(track_id)
+    self.track_ids = track_id
+
+  def __str__(self):
+    return '%s(type=%r,track_ids=%r)' % (self.__class__.__name__, self.box_type, self.track_ids)
+
+  def box_data_chunks(self):
+    for track_id in self.track_ids:
+      yield pack('>L', track_id)
+
+for box_type in TrackReferenceTypeBox.BOX_TYPES:
+  KNOWN_BOX_CLASSES[box_type] = TrackReferenceTypeBox
+del box_type
+
+class TRGRBox(ContainerBox):
+  ''' An 'trgr' Track Group box - ISO14496 section 8.3.4.
+      Decode the contained boxes.
+  '''
+  pass
+
+add_box_class(TRGRBox)
+
+class TrackGroupTypeBox(FullBox):
+  ''' A TrackGroupTypeBox contains track group id types - ISO14496 section 8.3.3.2.
+  '''
+
+  BOX_TYPE = b'msrc'
+  ATTRIBUTES = ( 'track_group_id', )
+
+  def __init__(self, box_type, box_data):
+    FullBox.__init__(self, box_type, box_data)
+    # obtain box data after version and flags decode
+    box_data = self._box_data
+    self.track_group_id, = unpack('>L', box_data[:4])
+    if len(box_data) > 4:
+      warning('%s: %d bytes of unparsed data after track_group_id: %r',
+              self.__class__.__name__, len(box_data)-4, box_data[4:])
+
+  def box_data_chunks(self):
+    yield self.box_vf_data_chunk
+    yield pack('>L', self.track_group_id)
+
+class MSRCBox(TrackGroupTypeBox):
+  ''' Multi-source presentation TrackGroupTypeBox - ISO14496 section 8.3.4.3.
+  '''
+  pass
+
+add_box_class(MSRCBox)
+
+class MDIABox(ContainerBox):
+  ''' An 'mdia' Media box - ISO14496 section 8.4.1.
+      Decode the contained boxes.
+  '''
+  pass
+
+add_box_class(MDIABox)
+
+class MDHDBox(FullBox):
+  ''' A MDHDBox is a Media Header box - ISO14496 section 8.4.2.
+  '''
+
+  ATTRIBUTES = ( 'creation_time',
+                 'modification_time',
+                 'timescale',
+                 'duration',
+                 'language' )
+
+  def __init__(self, box_type, box_data):
+    FullBox.__init__(self, box_type, box_data)
+    # obtain box data after version and flags decode
+    box_data = self._box_data
+    if self.version == 0:
+      self.creation_time, \
+      self.modification_time, \
+      self.timescale, \
+      self.duration = unpack('>LLLL', box_data[:16])
+      offset = 16
+    elif self.version == 1:
+      self.creation_time, \
+      self.modification_time, \
+      self.timescale, \
+      self.duration = unpack('>QQLQ', box_data[:28])
+      offset = 28
+    else:
+      raise RuntimeError("unsupported version %d" % (self.version,))
+    self._language, \
+    self.pre_defined = unpack('>HH', box_data[offset:offset+4])
+    offset += 4
+    if offset != len(box_data):
+      warning("MDHD: %d unparsed bytes after pre_defined: %r",
+              len(box_data)-offset, box_data[offset:])
+
+  def box_data_chunks(self):
+    yield self.box_vf_data_chunk
+    if self.version == 0:
+      yield pack('>LLLL',
+                 self.creation_time,
+                 self.modification_time,
+                 self.timescale,
+                 self.duration)
+    elif self.version == 1:
+      yield pack('>QQLQ',
+                 self.creation_time,
+                 self.modification_time,
+                 self.timescale,
+                 self.duration)
+    else:
+      raise RuntimeError('unsupported version: %d', self.version)
+    yield self.pack('>HH', self._language, self.pre_defined)
+
+  @prop
+  def language(self):
+    ''' The ISO 639‐2/T language code as decoded from the packed form.
+    '''
+    _language = self._language
+    return bytes([ x+0x60
+                   for x in ( (_language>>10)&0x1f,
+                              (_language>>5)&0x1f,
+                              _language&0x1f
+                            )
+                 ]).decode('ascii')
+
+add_box_class(MDHDBox)
+
+class HDLRBox(FullBox):
+  ''' A HDLRBox is a Handler Reference box - ISO14496 section 8.4.3.
+  '''
+
+  ATTRIBUTES = ( ('handler_type', '%r'), 'name' )
+
+  def __init__(self, box_type, box_data):
+    FullBox.__init__(self, box_type, box_data)
+    # obtain box data after version and flags decode
+    box_data = self._box_data
+    # NB: handler_type is supported to be an unsigned long, but in practice seems to be 4 ASCII bytes, so we load it as a string for readability
+    self.pre_defined, \
+    self.handler_type, \
+    self.reserved1, \
+    self.reserved2, \
+    self.reserved3 = unpack('>L4sLLL', box_data[:20])
+    offset1 = 20
+    self.name, offset = get_utf8_nul(box_data, offset1)
+    if offset < len(box_data):
+      raise ValueError('HDLR: found NUL not at end of data: %r' % (box_data[offset1:],))
+
+  def box_data_chunks(self):
+    yield self.box_vf_data_chunk
+    yield pack('>L4sLLL',
+               self.pre_defined,
+               self.handler_type,
+               self.reserved1,
+               self.reserved2,
+               self.reserved3)
+    yield self.name.encode('utf-8')
+    yield b'\0'
+
+add_box_class(HDLRBox)
+
+class MINFBox(ContainerBox):
+  ''' An 'minf' Media Information box - ISO14496 section 8.4.4.
+      Decode the contained boxes.
+  '''
+  pass
+
+add_box_class(MINFBox)
+
+class NMHDBox(FullBox):
+  ''' A NMHDBox is a Null Media Header box - ISO14496 section 8.4.5.2.
+  '''
+
+  ATTRIBUTES = ()
+
+  def __init__(self, box_type, box_data):
+    FullBox.__init__(self, box_type, box_data)
+    # obtain box data after version and flags decode
+    box_data = self._box_data
+    if len(box_data) > 0:
+      raise ValueError("NMHD: unexpected data: %r" % (box_data,))
+
+  def box_data_chunks(self):
+    yield self.box_vf_data_chunk
+
+add_box_class(NMHDBox)
+
+class ELNGBox(FullBox):
+  ''' A ELNGBox is a Extended Language Tag box - ISO14496 section 8.4.6.
+  '''
+
+  BOX_TYPE = b'elng'
+  ATTRIBUTES = ( 'extended_language', )
+
+  def __init__(self, box_type, box_data):
+    FullBox.__init__(self, box_type, box_data)
+    # obtain box data after version and flags decode
+    box_data = self._box_data
+    # extended language based on RFC4646
+    self.extended_language, offset = get_utf8_nul(box_data)
+    if offset < len(box_data):
+      raise ValueError("ELNG: unexpected data: %r" % (box_data[offset:],))
+
+  def box_data_chunks(self):
+    yield self.box_vf_data_chunk
+    yield self.extended_language.encode('utf-8')
+    yield b'\0'
+
+add_box_class(ELNGBox)
+
+class STBLBox(ContainerBox):
+  ''' An 'stbl' Sample Table box - ISO14496 section 8.5.1.
+      Decode the contained boxes.
+  '''
+  pass
+
+add_box_class(STBLBox)
+
+class _SampleTableContainerBox(FullBox):
+  ''' An intermediate FullBox subclass which contains more boxes.
+  '''
+
+  ATTRIBUTES = ()
+
+  def __init__(self, box_type, box_data):
+    FullBox.__init__(self, box_type, box_data)
+    # obtain box data after version and flags decode
+    box_data = self._box_data
+    entry_count, = unpack('>L', box_data[:4])
+    self.boxes = list(get_boxes(box_data, 4))
+    if len(self.boxes) != entry_count:
+      raise ValueError('expected %d contained Boxes but parsed %d'
+                       % (entry_count, len(self.boxes)))
+
+  def __str__(self):
+    return '%s(%s)' \
+           % (self.__class__.__name__, ','.join(str(B) for B in self.boxes))
+
+  def dump(self, indent='', fp=None):
+    if fp is None:
+      fp = sys.stdout
+    fp.write(indent)
+    fp.write(self.__class__.__name__)
+    fp.write('\n')
+    indent += '  '
+    for B in self.boxes:
+      B.dump(indent, fp)
+
+  def box_data_chunks(self):
+    yield self.box_vf_data_chunk
+    yield pack('>L', len(self.boxes))
+    for B in self.boxes:
+      for chunk in B.box_data_chunks():
+        yield chunk
+
+class STSDBox(_SampleTableContainerBox):
+  ''' A 'stsd' Sample Description box -= section 8.5.2.
+  '''
+  pass
+
+add_box_class(STSDBox)
+
+class _SampleEntry(Box):
+  ''' Superclass of Sample Entry boxes.
+  '''
+
+  def __init__(self, box_type, box_data):
+    Box.__init__(self, box_type, box_data)
+    box_data = self._load_box_data()
+    self.reserved, self.data_reference_index = unpack('>6sH', box_data[:8])
+    self._set_box_data(box_data[8:])
+
+  def __str__(self):
+    prefix = '%s(%r-%r,data_reference_index=%d' \
+           % (self.__class__.__name__,
+              self.box_type,
+              self.reserved,
+              self.data_reference_index)
+    attr_summary = self.attribute_summary()
+    return prefix + ',' + attr_summary + ')'
+
+  @prop
+  def box_se_data_chunk(self):
+    ''' Return the leading reserved bytes and data_reference_index.
+        Subclasses need to yield this first from .box_data_chunks().
+    '''
+    return pack('>6sH', self.reserved, self.data_reference_index)
+
+class BTRTBox(Box):
+  ''' BitRateBox - section 8.5.2.2.
+  '''
+
+  ATTRIBUTES = ( 'bufferSizeDB', 'maxBitrate', 'avgBitrate' )
+
+  def __init__(self, box_type, box_data):
+    box_data = self._load_box_data()
+    self.bufferSizeDB, \
+    self.maxBitrate, \
+    self.avgBitrate = unpack('>LLL', box_data)
+
+  def __str__(self):
+    attr_summary = self.attribute_summary()
+    return self.__class__.__name__ + '(' + attr_summary + ')'
+
+  def box_data_chunks(self):
+    yield pack('>LLL',
+               self.bufferSizeDB,
+               self.maxBitrate,
+               self.avgBitrate)
+
+add_box_class(BTRTBox)
+
+class STDPBox(_SampleTableContainerBox):
+  ''' A 'stdp' Degradation Priority box - section 8.5.3.
+  '''
+  pass
+
+add_box_class(STDPBox)
+
+TTSB_Sample = namedtuple('TTSB_Sample', 'sample_count sample_delta')
+
+class _TimeToSampleBox(Box):
+  ''' Time to Sample box - section 8.6.1.
+  '''
+
+  def __init__(self, box_type, box_data):
+    FullBox.__init__(self, box_type, box_data)
+    # obtain box data after version and flags decode
+    box_data = self._box_data
+    entry_count, = unpack('>L', box_data[:4])
+    bd_offset = 4
+    samples = []
+    for i in range(entry_count):
+      sample_count, sample_delta = unpack('>LL', box_data[bd_offset:bd_offset+8])
+      samples.append(TTSB_Sample(sample_count, sample_delta))
+      bd_offset += 8
+    self.samples = samples
+
+class STTSBox(_TimeToSampleBox):
+  ''' A 'stts' Sample Table box - section 8.6.1.2.1.
+  '''
+  pass
+
+add_box_class(STTSBox)
+
+X("KNOWN_BOX_CLASSES = %r", KNOWN_BOX_CLASSES)
 
 if __name__ == '__main__':
   # parse media stream from stdin as test
@@ -721,4 +1165,5 @@ if __name__ == '__main__':
     B = Box.from_file(stdin)
     if B is None:
       break
-    print(B)
+    B.dump()
+    ##print(B)
