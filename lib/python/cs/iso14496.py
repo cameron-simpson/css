@@ -1127,6 +1127,32 @@ class STDPBox(_SampleTableContainerBox):
 
 add_box_class(STDPBox)
 
+TTSB_Sample = namedtuple('TTSB_Sample', 'sample_count sample_delta')
+
+class _TimeToSampleBox(Box):
+  ''' Time to Sample box - section 8.6.1.
+  '''
+
+  def __init__(self, box_type, box_data):
+    FullBox.__init__(self, box_type, box_data)
+    # obtain box data after version and flags decode
+    box_data = self._box_data
+    entry_count, = unpack('>L', box_data[:4])
+    bd_offset = 4
+    samples = []
+    for i in range(entry_count):
+      sample_count, sample_delta = unpack('>LL', box_data[bd_offset:bd_offset+8])
+      samples.append(TTSB_Sample(sample_count, sample_delta))
+      bd_offset += 8
+    self.samples = samples
+
+class STTSBox(_TimeToSampleBox):
+  ''' A 'stts' Sample Table box - section 8.6.1.2.1.
+  '''
+  pass
+
+add_box_class(STTSBox)
+
 X("KNOWN_BOX_CLASSES = %r", KNOWN_BOX_CLASSES)
 
 if __name__ == '__main__':
