@@ -550,7 +550,7 @@ class PDINBox(FullBox):
       Decode the (rate, initial_delay) pairs of the data section.
   '''
 
-  ATTRIBUTES = (('pdinfo', '%r'))
+  ATTRIBUTES = (('pdinfo', '%r'),)
 
   def __init__(self, box_type, box_data):
     FullBox.__init__(self, box_type, box_data)
@@ -1033,7 +1033,7 @@ class _SampleTableContainerBox(FullBox):
   ''' An intermediate FullBox subclass which contains more boxes.
   '''
 
-  ATTRIBUTES = []
+  ATTRIBUTES = ()
 
   def __init__(self, box_type, box_data):
     FullBox.__init__(self, box_type, box_data)
@@ -1126,7 +1126,7 @@ class _GenericSampleBox(FullBox):
   ''' Time to Sample box - section 8.6.1.
   '''
 
-  ATTRIBUTES = [ ('samples', '%r') ]
+  ATTRIBUTES = ( ('samples', '%r'), )
 
   def __init__(self, box_type, box_data, sample_struct_format_v0, sample_fields, sample_struct_format_v1=None):
     if sample_struct_format_v1 is None:
@@ -1160,14 +1160,14 @@ class _TimeToSampleBox(_GenericSampleBox):
 add_box_subclass(_TimeToSampleBox, b'stts', '8.6.1.2.1', 'Time to Sample')
 
 class CTTSBox(FullBox):
-  ''' A 'ctts' Composition Time to Sample box - sections 8.6.1.3.
+  ''' A 'ctts' Composition Time to Sample box - section 8.6.1.3.
   '''
   def __init__(self, box_type, box_data):
     _GenericSampleBox.__init__(self, box_type, box_data, '>LL', 'count delta', '>Ll')
 add_box_class(CTTSBox)
 
 class CSLGBox(FullBox):
-  ''' A 'cslg' Composition to Decode box - sections 8.6.1.4.
+  ''' A 'cslg' Composition to Decode box - section 8.6.1.4.
   '''
 
   ATTRIBUTES = ( 'compositionToDTSShift',
@@ -1197,6 +1197,13 @@ class CSLGBox(FullBox):
       = S.unpack(struct_format, box_data[:S.size])
 
 add_box_class(CSLGBox)
+
+class STSSBox(_GenericSampleBox):
+  ''' A 'stss' Sync Sample box - section 8.6.2.
+  '''
+  def __init__(self, box_type, box_data):
+    _GenericSampleBox.__init__(self, box_type, box_data, '>L', 'number')
+add_box_class(STSSBox)
 
 if __name__ == '__main__':
   # parse media stream from stdin as test
