@@ -1232,6 +1232,17 @@ class SDTPBox(_GenericSampleBox):
                                inferred_entry_count=True)
 add_box_class(SDTPBox)
 
+add_box_subclass(Box, b'edts', '8.6.5.1', 'Edit')
+
+class ELSTBox(_GenericSampleBox):
+  ''' A 'elst' Edit List box - section 8.6.6.
+  '''
+  def __init__(self, box_type, box_data):
+    _GenericSampleBox.__init__(self, box_type, box_data, '>Ll',
+                               'segment_duration media_time',
+                               sample_struct_format_v1='>Qq')
+add_box_class(ELSTBox)
+
 if __name__ == '__main__':
   # parse media stream from stdin as test
   from os import fdopen
