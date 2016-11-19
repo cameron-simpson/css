@@ -242,6 +242,20 @@ class Box(object):
       self._fetch_box_data = box_data
       self._box_data = None
 
+  @classmethod
+  def box_type_from_klass(klass):
+    klass_name = klass.__name__
+    if len(klass_name) == 7 and klass_name.endswith('Box'):
+      klass_prefix = klass_name[:4]
+      if klass_prefix.isupper():
+        return klass_prefix.lower()
+    raise AttributeError("no automatic .BOX_TYPE for %s" % (klass,))
+
+  # NB: a @property instead of @prop to preserve AttributeError
+  @property
+  def BOX_TYPE(self):
+    return type(self).box_type_from_klass()
+
   def attribute_summary(self):
     strs = []
     for attr in self.ATTRIBUTES:
@@ -394,8 +408,11 @@ def add_box_class(klass):
     try:
       box_types = klass.BOX_TYPES
     except AttributeError:
-      box_type = klass.BOX_TYPE
+      box_type = klass.box_type_from_klass()
       box_types = (box_type,)
+      X("got klass.BOX_TYPE = %r", box_type)
+    else:
+      X("got klass.BOX_TYPES = %r", box_types)
     for box_type in box_types:
       if box_type in KNOWN_BOX_CLASSES:
         raise TypeError("box_type %r already in KNOWN_BOX_CLASSES as %s"
@@ -477,8 +494,6 @@ class FTYPBox(Box):
       Decode the major_brand, minor_version and compatible_brands.
   '''
 
-  BOX_TYPE = b'ftyp'
-
   def __init__(self, box_type, box_data):
     Box.__init__(self, box_type, box_data)
     box_data = self._load_box_data()
@@ -515,7 +530,6 @@ class PDINBox(FullBox):
       Decode the (rate, initial_delay) pairs of the data section.
   '''
 
-  BOX_TYPE = b'pdin'
   ATTRIBUTES = (('pdinfo', '%r'))
 
   def __init__(self, box_type, box_data):
@@ -593,7 +607,7 @@ class MOOVBox(ContainerBox):
   ''' An 'moov' Movie box - ISO14496 section 8.2.1.
       Decode the contained boxes.
   '''
-  BOX_TYPE = b'moov'
+  pass
 
 add_box_class(MOOVBox)
 
@@ -601,7 +615,6 @@ class MVHDBox(FullBox):
   ''' An 'mvhd' Movie Header box - ISO14496 section 8.2.2.
   '''
 
-  BOX_TYPE = b'mvhd'
   ATTRIBUTES = ( ('rate', '%g'),
                  ('volume', '%g'),
                  ('matrix', '%r'),
@@ -679,7 +692,7 @@ class TRAKBox(ContainerBox):
   ''' A 'trak' Track box - ISO14496 section 8.3.1.
       Decode the contained boxes.
   '''
-  BOX_TYPE = b'trak'
+  pass
 
 add_box_class(TRAKBox)
 
@@ -687,7 +700,6 @@ class TKHDBox(FullBox):
   ''' An 'tkhd' Track Header box - ISO14496 section 8.2.2.
   '''
 
-  BOX_TYPE = b'tkhd'
   ATTRIBUTES = ( 'track_enabled',
                  'track_in_movie',
                  'track_in_preview',
@@ -784,7 +796,7 @@ class TREFBox(ContainerBox):
   ''' An 'tref' Track Reference box - ISO14496 section 8.3.3.
       Decode the contained boxes.
   '''
-  BOX_TYPE = b'tref'
+  pass
 
 add_box_class(TREFBox)
 
@@ -817,7 +829,7 @@ class TRGRBox(ContainerBox):
   ''' An 'trgr' Track Group box - ISO14496 section 8.3.4.
       Decode the contained boxes.
   '''
-  BOX_TYPE = b'trgr'
+  pass
 
 add_box_class(TRGRBox)
 
@@ -841,13 +853,18 @@ class TrackGroupTypeBox(FullBox):
     yield self.box_vf_data_chunk
     yield pack('>L', self.track_group_id)
 
-add_box_class(TrackGroupTypeBox)
+class MSRCBox(TrackGroupTypeBox):
+  ''' Multi-source presentation TrackGroupTypeBox - ISO14496 section 8.3.4.3.
+  '''
+  pass
+
+add_box_class(MSRCBox)
 
 class MDIABox(ContainerBox):
   ''' An 'mdia' Media box - ISO14496 section 8.4.1.
       Decode the contained boxes.
   '''
-  BOX_TYPE = b'mdia'
+  pass
 
 add_box_class(MDIABox)
 
@@ -855,7 +872,6 @@ class MDHDBox(FullBox):
   ''' A MDHDBox is a Media Header box - ISO14496 section 8.4.2.
   '''
 
-  BOX_TYPE = b'mdhd'
   ATTRIBUTES = ( 'creation_time',
                  'modification_time',
                  'timescale',
@@ -923,7 +939,6 @@ class HDLRBox(FullBox):
   ''' A HDLRBox is a Handler Reference box - ISO14496 section 8.4.3.
   '''
 
-  BOX_TYPE = b'hdlr'
   ATTRIBUTES = ( ('handler_type', '%r'), 'name' )
 
   def __init__(self, box_type, box_data):
@@ -958,7 +973,7 @@ class MINFBox(ContainerBox):
   ''' An 'minf' Media Information box - ISO14496 section 8.4.4.
       Decode the contained boxes.
   '''
-  BOX_TYPE = b'minf'
+  pass
 
 add_box_class(MINFBox)
 
@@ -966,7 +981,6 @@ class NMHDBox(FullBox):
   ''' A NMHDBox is a Null Media Header box - ISO14496 section 8.4.5.2.
   '''
 
-  BOX_TYPE = b'nmhd'
   ATTRIBUTES = ()
 
   def __init__(self, box_type, box_data):
@@ -1008,7 +1022,7 @@ class STBLBox(ContainerBox):
   ''' An 'stbl' Sample Table box - ISO14496 section 8.5.1.
       Decode the contained boxes.
   '''
-  BOX_TYPE = b'stbl'
+  pass
 
 add_box_class(STBLBox)
 
@@ -1052,7 +1066,7 @@ class _SampleTableContainerBox(FullBox):
 class STSDBox(_SampleTableContainerBox):
   ''' A 'stsd' Sample Description box -= section 8.5.2.
   '''
-  BOX_TYPE = b'stsd'
+  pass
 
 add_box_class(STSDBox)
 
@@ -1086,7 +1100,6 @@ class BTRTBox(Box):
   ''' BitRateBox - section 8.5.2.2.
   '''
 
-  BOX_TYPE = b'btrt'
   ATTRIBUTES = ( 'bufferSizeDB', 'maxBitrate', 'avgBitrate' )
 
   def __init__(self, box_type, box_data):
@@ -1110,9 +1123,11 @@ add_box_class(BTRTBox)
 class STDPBox(_SampleTableContainerBox):
   ''' A 'stdp' Degradation Priority box - section 8.5.3.
   '''
-  BOX_TYPE = b'stdp'
+  pass
 
 add_box_class(STDPBox)
+
+X("KNOWN_BOX_CLASSES = %r", KNOWN_BOX_CLASSES)
 
 if __name__ == '__main__':
   # parse media stream from stdin as test
