@@ -264,6 +264,8 @@ class Box(object):
     return type(self).box_type_from_klass()
 
   def attribute_summary(self):
+    ''' Comma separator list of attribute values honouring format strings.
+    '''
     strs = []
     for attr in self.ATTRIBUTES:
       if isinstance(attr, str):
@@ -1204,6 +1206,14 @@ class STSSBox(_GenericSampleBox):
   def __init__(self, box_type, box_data):
     _GenericSampleBox.__init__(self, box_type, box_data, '>L', 'number')
 add_box_class(STSSBox)
+
+class STSHBox(_GenericSampleBox):
+  ''' A 'stsh' Shadow Sync Table box - section 8.6.3.
+  '''
+  def __init__(self, box_type, box_data):
+    _GenericSampleBox.__init__(self, box_type, box_data, '>LL',
+                               'shadowed_sample_number sync_sample_number')
+add_box_class(STSHBox)
 
 if __name__ == '__main__':
   # parse media stream from stdin as test
