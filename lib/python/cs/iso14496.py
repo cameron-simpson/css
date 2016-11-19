@@ -1153,7 +1153,30 @@ class STTSBox(_TimeToSampleBox):
   pass
 add_box_class(STTSBox)
 
-X("KNOWN_BOX_CLASSES = %r", KNOWN_BOX_CLASSES)
+class CTTSBox(FullBox):
+  ''' A 'ctts' Composition Time to Sample box - sections 8.6.1.3.
+  '''
+
+  def __init__(self, box_type, box_data):
+    FullBox.__init__(self, box_type, box_data)
+    # obtain box data after version and flags decode
+    box_data = self._box_data
+    if self.version == 0:
+      count_delta_struct_format = '>LL'
+    elif self.version == 1:
+      count_delta_struct_format = '>Ll'
+    else:
+      warning("unsupported version %d, treating like version 1")
+      count_delta_struct_format = '>Ll'
+    entry_count, = unpack('>L', box_data[:4])
+    bd_offset = 4
+    samples = []
+    for i in range(entry_count):
+      sample_count, sample_delta = unpack(count_delta_struct_format,
+                                          box_data[bd_offset:bd_offset+8])
+      samples.append(TTSB_Sample(sample_count, sample_delta))
+      bd_offset += 8
+    self.samples = samples
 
 if __name__ == '__main__':
   # parse media stream from stdin as test
