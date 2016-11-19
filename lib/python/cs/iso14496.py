@@ -12,6 +12,7 @@
 from __future__ import print_function
 from collections import namedtuple
 from os import SEEK_CUR
+from struct import Struct
 import sys
 from cs.fileutils import read_data, pread, seekable
 from cs.py.func import prop
@@ -209,7 +210,8 @@ class Box(object):
   '''
 
   def __init__(self, box_type, box_data):
-    # sanity check the box_type
+    # sanity check the supplied box_type
+    # against the box types this class supports
     if sys.hexversion < 0x03000000:
       if isinstance(box_type, bytes):
         box_type = box_type._bytes__s
@@ -232,6 +234,7 @@ class Box(object):
         raise ValueError("box_type should be %r but got %r"
                          % (BOX_TYPE, box_type))
     self.box_type = box_type
+    # store the box_data, which may be in various forms
     if isinstance(box_data, bytes):
       # bytes? store directly for use
       self._box_data = box_data
@@ -244,16 +247,20 @@ class Box(object):
 
   @classmethod
   def box_type_from_klass(klass):
+    ''' Compute the Box's 4 byte type field from the class name.
+    '''
     klass_name = klass.__name__
     if len(klass_name) == 7 and klass_name.endswith('Box'):
       klass_prefix = klass_name[:4]
       if klass_prefix.isupper():
         return klass_prefix.lower().encode('ascii')
-    raise AttributeError("no automatic .BOX_TYPE for %s" % (klass,))
+    raise AttributeError("no automatic box type for %s" % (klass,))
 
   # NB: a @property instead of @prop to preserve AttributeError
   @property
   def BOX_TYPE(self):
+    ''' The default .BOX_TYPE is inferred from the class name.
+    '''
     return type(self).box_type_from_klass()
 
   def attribute_summary(self):
@@ -403,6 +410,8 @@ class Box(object):
 KNOWN_BOX_CLASSES = {}
 
 def add_box_class(klass):
+  ''' Register a box class in KNOWN_BOX_CLASSES.
+  '''
   global KNOWN_BOX_CLASSES
   with Pfx("add_box_class(%s)", klass):
     try:
@@ -410,20 +419,31 @@ def add_box_class(klass):
     except AttributeError:
       box_type = klass.box_type_from_klass()
       box_types = (box_type,)
-      X("got klass.BOX_TYPE = %r", box_type)
-    else:
-      X("got klass.BOX_TYPES = %r", box_types)
     for box_type in box_types:
       if box_type in KNOWN_BOX_CLASSES:
         raise TypeError("box_type %r already in KNOWN_BOX_CLASSES as %s"
                         % (box_type, KNOWN_BOX_CLASSES[box_type]))
       KNOWN_BOX_CLASSES[box_type] = klass
 
+def add_box_subclass(superclass, box_type, section, desc):
+  ''' Create and register a new Box class that is simply a subclass of another.
+  '''
+  if isinstance(box_type, bytes):
+    classname = box_type.decode('ascii').upper() + 'Box'
+  else:
+    classname = box_type.upper() + 'Box'
+    box_type = box_type.decode('ascii')
+  K = type(classname, (superclass,), {})
+  K.__doc__ = "Box type %r %s box - ISO14496 section %s." % (box_type, desc, section)
+  add_box_class(K)
+
 if sys.hexversion >= 0x03000000:
   def pick_box_class(box_type):
+    global KNOWN_BOX_CLASSES
     return KNOWN_BOX_CLASSES.get(box_type, Box)
 else:
   def pick_box_class(box_type):
+    global KNOWN_BOX_CLASSES
     if isinstance(box_type, bytes):
       box_type = box_type._bytes__s
     return KNOWN_BOX_CLASSES.get(box_type, Box)
@@ -530,7 +550,7 @@ class PDINBox(FullBox):
       Decode the (rate, initial_delay) pairs of the data section.
   '''
 
-  ATTRIBUTES = (('pdinfo', '%r'))
+  ATTRIBUTES = (('pdinfo', '%r'),)
 
   def __init__(self, box_type, box_data):
     FullBox.__init__(self, box_type, box_data)
@@ -608,7 +628,6 @@ class MOOVBox(ContainerBox):
       Decode the contained boxes.
   '''
   pass
-
 add_box_class(MOOVBox)
 
 class MVHDBox(FullBox):
@@ -797,7 +816,6 @@ class TREFBox(ContainerBox):
       Decode the contained boxes.
   '''
   pass
-
 add_box_class(TREFBox)
 
 class TrackReferenceTypeBox(Box):
@@ -836,8 +854,6 @@ add_box_class(TRGRBox)
 class TrackGroupTypeBox(FullBox):
   ''' A TrackGroupTypeBox contains track group id types - ISO14496 section 8.3.3.2.
   '''
-
-  BOX_TYPE = b'msrc'
   ATTRIBUTES = ( 'track_group_id', )
 
   def __init__(self, box_type, box_data):
@@ -969,13 +985,7 @@ class HDLRBox(FullBox):
 
 add_box_class(HDLRBox)
 
-class MINFBox(ContainerBox):
-  ''' An 'minf' Media Information box - ISO14496 section 8.4.4.
-      Decode the contained boxes.
-  '''
-  pass
-
-add_box_class(MINFBox)
+add_box_subclass(ContainerBox, b'minf', '8.4.4', 'Media Information')
 
 class NMHDBox(FullBox):
   ''' A NMHDBox is a Null Media Header box - ISO14496 section 8.4.5.2.
@@ -999,7 +1009,6 @@ class ELNGBox(FullBox):
   ''' A ELNGBox is a Extended Language Tag box - ISO14496 section 8.4.6.
   '''
 
-  BOX_TYPE = b'elng'
   ATTRIBUTES = ( 'extended_language', )
 
   def __init__(self, box_type, box_data):
@@ -1018,13 +1027,7 @@ class ELNGBox(FullBox):
 
 add_box_class(ELNGBox)
 
-class STBLBox(ContainerBox):
-  ''' An 'stbl' Sample Table box - ISO14496 section 8.5.1.
-      Decode the contained boxes.
-  '''
-  pass
-
-add_box_class(STBLBox)
+add_box_subclass(ContainerBox, b'stbl', '8.5.1', 'Sample Table')
 
 class _SampleTableContainerBox(FullBox):
   ''' An intermediate FullBox subclass which contains more boxes.
@@ -1063,12 +1066,7 @@ class _SampleTableContainerBox(FullBox):
       for chunk in B.box_data_chunks():
         yield chunk
 
-class STSDBox(_SampleTableContainerBox):
-  ''' A 'stsd' Sample Description box -= section 8.5.2.
-  '''
-  pass
-
-add_box_class(STSDBox)
+add_box_subclass(_SampleTableContainerBox, b'stsd', '8.5.2', 'Sample Description')
 
 class _SampleEntry(Box):
   ''' Superclass of Sample Entry boxes.
@@ -1120,40 +1118,92 @@ class BTRTBox(Box):
 
 add_box_class(BTRTBox)
 
-class STDPBox(_SampleTableContainerBox):
-  ''' A 'stdp' Degradation Priority box - section 8.5.3.
-  '''
-  pass
+add_box_subclass(_SampleTableContainerBox, b'stdp', '8.5.3', 'Degradation Priority')
 
-add_box_class(STDPBox)
+TTSB_Sample = namedtuple('TTSB_Sample', 'count delta')
 
-TTSB_Sample = namedtuple('TTSB_Sample', 'sample_count sample_delta')
-
-class _TimeToSampleBox(Box):
+class _GenericSampleBox(FullBox):
   ''' Time to Sample box - section 8.6.1.
   '''
 
-  def __init__(self, box_type, box_data):
+  ATTRIBUTES = ( ('samples', '%r'), )
+
+  def __init__(self, box_type, box_data, sample_struct_format_v0, sample_fields, sample_struct_format_v1=None):
+    if sample_struct_format_v1 is None:
+      sample_struct_format_v1 = sample_struct_format_v0
     FullBox.__init__(self, box_type, box_data)
+    if self.version == 0:
+      S = Struct(sample_struct_format_v0)
+    elif self.version == 1:
+      S = Struct(sample_struct_format_v1)
+    else:
+      warning("unsupported version %d, treating like version 1", self.version)
+      S = Struct(sample_struct_format_v1)
+    sample_type = namedtuple(type(self).__name__ + '_Sample',
+                             sample_fields)
     # obtain box data after version and flags decode
     box_data = self._box_data
     entry_count, = unpack('>L', box_data[:4])
     bd_offset = 4
     samples = []
     for i in range(entry_count):
-      sample_count, sample_delta = unpack('>LL', box_data[bd_offset:bd_offset+8])
-      samples.append(TTSB_Sample(sample_count, sample_delta))
-      bd_offset += 8
+      sample = sample_type(*S.unpack(box_data[bd_offset:bd_offset+S.size]))
+      samples.append(sample)
+      bd_offset += S.size
     self.samples = samples
 
-class STTSBox(_TimeToSampleBox):
-  ''' A 'stts' Sample Table box - section 8.6.1.2.1.
+class _TimeToSampleBox(_GenericSampleBox):
+  ''' Time to Sample box - section 8.6.1.
   '''
-  pass
+  def __init__(self, box_type, box_data):
+    _GenericSampleBox.__init__(self, box_type, box_data, '>LL', 'count delta')
+add_box_subclass(_TimeToSampleBox, b'stts', '8.6.1.2.1', 'Time to Sample')
 
-add_box_class(STTSBox)
+class CTTSBox(FullBox):
+  ''' A 'ctts' Composition Time to Sample box - section 8.6.1.3.
+  '''
+  def __init__(self, box_type, box_data):
+    _GenericSampleBox.__init__(self, box_type, box_data, '>LL', 'count delta', '>Ll')
+add_box_class(CTTSBox)
 
-X("KNOWN_BOX_CLASSES = %r", KNOWN_BOX_CLASSES)
+class CSLGBox(FullBox):
+  ''' A 'cslg' Composition to Decode box - section 8.6.1.4.
+  '''
+
+  ATTRIBUTES = ( 'compositionToDTSShift',
+                 'leastDecodeToDisplayDelta',
+                 'greatestDecodeToDisplayDelta',
+                 'compositionStartTime',
+                 'compositionEndTime',
+               )
+
+  def __init__(self, box_type, box_data):
+    FullBox.__init__(self, box_type, box_data)
+    # obtain box data after version and flags decode
+    box_data = self._box_data
+    if self.version == 0:
+      struct_format = '>lllll'
+    elif self.version == 1:
+      struct_format = '>qqqqq'
+    else:
+      warning("unsupported version %d, treating like version 1")
+      struct_format = '>qqqqq'
+    S = Struct(struct_format)
+    self.compositionToDTSShift, \
+    self.leastDecodeToDisplayDelta, \
+    self.greatestDecodeToDisplayDelta, \
+    self.compositionStartTime, \
+    self.compositionEndTime \
+      = S.unpack(struct_format, box_data[:S.size])
+
+add_box_class(CSLGBox)
+
+class STSSBox(_GenericSampleBox):
+  ''' A 'stss' Sync Sample box - section 8.6.2.
+  '''
+  def __init__(self, box_type, box_data):
+    _GenericSampleBox.__init__(self, box_type, box_data, '>L', 'number')
+add_box_class(STSSBox)
 
 if __name__ == '__main__':
   # parse media stream from stdin as test
