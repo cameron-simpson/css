@@ -1130,7 +1130,7 @@ class _GenericSampleBox(FullBox):
 
   ATTRIBUTES = ( ('samples', '%r'), )
 
-  def __init__(self, box_type, box_data, sample_struct_format_v0, sample_fields, sample_struct_format_v1=None):
+  def __init__(self, box_type, box_data, sample_struct_format_v0, sample_fields, sample_struct_format_v1=None, inferred_entry_count=False):
     if sample_struct_format_v1 is None:
       sample_struct_format_v1 = sample_struct_format_v0
     FullBox.__init__(self, box_type, box_data)
@@ -1145,8 +1145,16 @@ class _GenericSampleBox(FullBox):
                              sample_fields)
     # obtain box data after version and flags decode
     box_data = self._box_data
-    entry_count, = unpack('>L', box_data[:4])
-    bd_offset = 4
+    if inferred_entry_count:
+      entry_count = len(box_data) // S.size
+      remainder = len(box_data) % S.size
+      if remainder != 0:
+        warning("box_data length %d is not a multiple of len(%s), %d bytes left over: %r",
+                len(box_data), S.size, remainder, box_data[-remainder:])
+      bd_offset = 0
+    else:
+      entry_count, = unpack('>L', box_data[:4])
+      bd_offset = 4
     samples = []
     for i in range(entry_count):
       sample = sample_type(*S.unpack(box_data[bd_offset:bd_offset+S.size]))
@@ -1214,6 +1222,15 @@ class STSHBox(_GenericSampleBox):
     _GenericSampleBox.__init__(self, box_type, box_data, '>LL',
                                'shadowed_sample_number sync_sample_number')
 add_box_class(STSHBox)
+
+class SDTPBox(_GenericSampleBox):
+  ''' A 'sdtp' Independent and Disposable Samples box - section 8.6.4.
+  '''
+  def __init__(self, box_type, box_data):
+    _GenericSampleBox.__init__(self, box_type, box_data, '>HHHH',
+                               'is_leading sample_depends_on sample_is_depended_on sample_has_redundancy',
+                               inferred_entry_count=True)
+add_box_class(SDTPBox)
 
 if __name__ == '__main__':
   # parse media stream from stdin as test
