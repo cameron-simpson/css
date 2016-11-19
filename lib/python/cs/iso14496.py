@@ -209,7 +209,8 @@ class Box(object):
   '''
 
   def __init__(self, box_type, box_data):
-    # sanity check the box_type
+    # sanity check the supplied box_type
+    # against the box types this class supports
     if sys.hexversion < 0x03000000:
       if isinstance(box_type, bytes):
         box_type = box_type._bytes__s
@@ -232,6 +233,7 @@ class Box(object):
         raise ValueError("box_type should be %r but got %r"
                          % (BOX_TYPE, box_type))
     self.box_type = box_type
+    # store the box_data, which may be in various forms
     if isinstance(box_data, bytes):
       # bytes? store directly for use
       self._box_data = box_data
@@ -244,16 +246,20 @@ class Box(object):
 
   @classmethod
   def box_type_from_klass(klass):
+    ''' Compute the Box's 4 byte type field from the class name.
+    '''
     klass_name = klass.__name__
     if len(klass_name) == 7 and klass_name.endswith('Box'):
       klass_prefix = klass_name[:4]
       if klass_prefix.isupper():
         return klass_prefix.lower().encode('ascii')
-    raise AttributeError("no automatic .BOX_TYPE for %s" % (klass,))
+    raise AttributeError("no automatic box type for %s" % (klass,))
 
   # NB: a @property instead of @prop to preserve AttributeError
   @property
   def BOX_TYPE(self):
+    ''' The default .BOX_TYPE is inferred from the class name.
+    '''
     return type(self).box_type_from_klass()
 
   def attribute_summary(self):
@@ -421,9 +427,11 @@ def add_box_class(klass):
 
 if sys.hexversion >= 0x03000000:
   def pick_box_class(box_type):
+    global KNOWN_BOX_CLASSES
     return KNOWN_BOX_CLASSES.get(box_type, Box)
 else:
   def pick_box_class(box_type):
+    global KNOWN_BOX_CLASSES
     if isinstance(box_type, bytes):
       box_type = box_type._bytes__s
     return KNOWN_BOX_CLASSES.get(box_type, Box)
@@ -836,8 +844,6 @@ add_box_class(TRGRBox)
 class TrackGroupTypeBox(FullBox):
   ''' A TrackGroupTypeBox contains track group id types - ISO14496 section 8.3.3.2.
   '''
-
-  BOX_TYPE = b'msrc'
   ATTRIBUTES = ( 'track_group_id', )
 
   def __init__(self, box_type, box_data):
@@ -999,7 +1005,6 @@ class ELNGBox(FullBox):
   ''' A ELNGBox is a Extended Language Tag box - ISO14496 section 8.4.6.
   '''
 
-  BOX_TYPE = b'elng'
   ATTRIBUTES = ( 'extended_language', )
 
   def __init__(self, box_type, box_data):
@@ -1030,7 +1035,7 @@ class _SampleTableContainerBox(FullBox):
   ''' An intermediate FullBox subclass which contains more boxes.
   '''
 
-  ATTRIBUTES = ()
+  ATTRIBUTES = []
 
   def __init__(self, box_type, box_data):
     FullBox.__init__(self, box_type, box_data)
@@ -1127,11 +1132,13 @@ class STDPBox(_SampleTableContainerBox):
 
 add_box_class(STDPBox)
 
-TTSB_Sample = namedtuple('TTSB_Sample', 'sample_count sample_delta')
+TTSB_Sample = namedtuple('TTSB_Sample', 'count delta')
 
-class _TimeToSampleBox(Box):
+class _TimeToSampleBox(FullBox):
   ''' Time to Sample box - section 8.6.1.
   '''
+
+  ATTRIBUTES = [ ('samples', '%r') ]
 
   def __init__(self, box_type, box_data):
     FullBox.__init__(self, box_type, box_data)
