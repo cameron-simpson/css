@@ -409,6 +409,8 @@ class Box(object):
 KNOWN_BOX_CLASSES = {}
 
 def add_box_class(klass):
+  ''' Register a box class in KNOWN_BOX_CLASSES.
+  '''
   global KNOWN_BOX_CLASSES
   with Pfx("add_box_class(%s)", klass):
     try:
@@ -424,6 +426,18 @@ def add_box_class(klass):
         raise TypeError("box_type %r already in KNOWN_BOX_CLASSES as %s"
                         % (box_type, KNOWN_BOX_CLASSES[box_type]))
       KNOWN_BOX_CLASSES[box_type] = klass
+
+def add_box_subclass(superclass, box_type, section, desc):
+  ''' Create and register a new Box class that is simply a subclass of another.
+  '''
+  if isinstance(box_type, bytes):
+    classname = box_type.decode('ascii').upper() + 'Box'
+  else:
+    classname = box_type.upper() + 'Box'
+    box_type = box_type.decode('ascii')
+  K = type(classname, (superclass,), {})
+  K.__doc__ = "Box type %r %s box - ISO14496 section %s." % (box_type, desc, section)
+  add_box_class(K)
 
 if sys.hexversion >= 0x03000000:
   def pick_box_class(box_type):
@@ -973,12 +987,7 @@ class HDLRBox(FullBox):
 
 add_box_class(HDLRBox)
 
-class MINFBox(ContainerBox):
-  ''' An 'minf' Media Information box - ISO14496 section 8.4.4.
-      Decode the contained boxes.
-  '''
-  pass
-add_box_class(MINFBox)
+add_box_subclass(ContainerBox, b'minf', '8.4.4', 'Media Information')
 
 class NMHDBox(FullBox):
   ''' A NMHDBox is a Null Media Header box - ISO14496 section 8.4.5.2.
@@ -1020,12 +1029,7 @@ class ELNGBox(FullBox):
 
 add_box_class(ELNGBox)
 
-class STBLBox(ContainerBox):
-  ''' An 'stbl' Sample Table box - ISO14496 section 8.5.1.
-      Decode the contained boxes.
-  '''
-  pass
-add_box_class(STBLBox)
+add_box_subclass(ContainerBox, b'stbl', '8.5.1', 'Sample Table')
 
 class _SampleTableContainerBox(FullBox):
   ''' An intermediate FullBox subclass which contains more boxes.
@@ -1064,11 +1068,7 @@ class _SampleTableContainerBox(FullBox):
       for chunk in B.box_data_chunks():
         yield chunk
 
-class STSDBox(_SampleTableContainerBox):
-  ''' A 'stsd' Sample Description box -= section 8.5.2.
-  '''
-  pass
-add_box_class(STSDBox)
+add_box_subclass(_SampleTableContainerBox, b'stsd', '8.5.2', 'Sample Description')
 
 class _SampleEntry(Box):
   ''' Superclass of Sample Entry boxes.
@@ -1120,11 +1120,7 @@ class BTRTBox(Box):
 
 add_box_class(BTRTBox)
 
-class STDPBox(_SampleTableContainerBox):
-  ''' A 'stdp' Degradation Priority box - section 8.5.3.
-  '''
-  pass
-add_box_class(STDPBox)
+add_box_subclass(_SampleTableContainerBox, b'stdp', '8.5.3', 'Degradation Priority')
 
 TTSB_Sample = namedtuple('TTSB_Sample', 'count delta')
 
@@ -1147,11 +1143,7 @@ class _TimeToSampleBox(FullBox):
       bd_offset += 8
     self.samples = samples
 
-class STTSBox(_TimeToSampleBox):
-  ''' A 'stts' Sample Table box - section 8.6.1.2.1.
-  '''
-  pass
-add_box_class(STTSBox)
+add_box_subclass(_TimeToSampleBox, b'stts', '8.6.1.2.1', 'Time to Sample')
 
 class CTTSBox(FullBox):
   ''' A 'ctts' Composition Time to Sample box - sections 8.6.1.3.
