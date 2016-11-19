@@ -248,7 +248,7 @@ class Box(object):
     if len(klass_name) == 7 and klass_name.endswith('Box'):
       klass_prefix = klass_name[:4]
       if klass_prefix.isupper():
-        return klass_prefix.lower()
+        return klass_prefix.lower().encode('ascii')
     raise AttributeError("no automatic .BOX_TYPE for %s" % (klass,))
 
   # NB: a @property instead of @prop to preserve AttributeError
