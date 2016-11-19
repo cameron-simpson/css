@@ -16,7 +16,7 @@ import sys
 from cs.fileutils import read_data, pread, seekable
 from cs.py3 import bytes, pack, unpack, iter_unpack
 # DEBUG
-from cs.logutils import warning, X
+from cs.logutils import warning, X, Pfx
 
 # a convenience chunk of 256 zero bytes, mostly for use by 'free' blocks
 B0_256 = bytes(256)
@@ -387,6 +387,20 @@ class Box(object):
 # mapping of known box subclasses for use by factories
 KNOWN_BOX_CLASSES = {}
 
+def add_box_class(klass):
+  global KNOWN_BOX_CLASSES
+  with Pfx("add_box_class(%s)", klass):
+    try:
+      box_types = klass.BOX_TYPES
+    except AttributeError:
+      box_type = klass.BOX_TYPE
+      box_types = (box_type,)
+    for box_type in box_types:
+      if box_type in KNOWN_BOX_CLASSES:
+        raise TypeError("box_type %r already in KNOWN_BOX_CLASSES as %s"
+                        % (box_type, KNOWN_BOX_CLASSES[box_type]))
+      KNOWN_BOX_CLASSES[box_type] = klass
+
 if sys.hexversion >= 0x03000000:
   def pick_box_class(box_type):
     return KNOWN_BOX_CLASSES.get(box_type, Box)
@@ -455,9 +469,7 @@ class FREEBox(Box):
     if free_bytes > 0:
       yield bytes(free_bytes)
 
-for box_type in FREEBox.BOX_TYPES:
-  KNOWN_BOX_CLASSES[box_type] = FREEBox
-del box_type
+add_box_class(FREEBox)
 
 class FTYPBox(Box):
   ''' An 'ftyp' File Type box - ISO14496 section 4.3.
@@ -492,7 +504,7 @@ class FTYPBox(Box):
     for brand in self.compatible_brands:
       yield brand
 
-KNOWN_BOX_CLASSES[FTYPBox.BOX_TYPE] = FTYPBox
+add_box_class(FTYPBox)
 
 # field names for the tuples in a PDINBox
 PDInfo = namedtuple('PDInfo', 'rate initial_delay')
@@ -523,7 +535,7 @@ class PDINBox(FullBox):
     for pdinfo in self.pdinfo:
       yield pack('>LL', pdinfo.rate, pdinfo.initial_delay)
 
-KNOWN_BOX_CLASSES[PDINBox.BOX_TYPE] = PDINBox
+add_box_class(PDINBox)
 
 def get_boxes(bs, offset=0, max_offset=None):
   ''' Generator collecting Boxes from the supplied data `bs`, starting at `offset` (default: 0) and ending at `max_offset` (default: end of `bs`).
@@ -581,7 +593,8 @@ class MOOVBox(ContainerBox):
       Decode the contained boxes.
   '''
   BOX_TYPE = b'moov'
-KNOWN_BOX_CLASSES[MOOVBox.BOX_TYPE] = MOOVBox
+
+add_box_class(MOOVBox)
 
 class MVHDBox(FullBox):
   ''' An 'mvhd' Movie Header box - ISO14496 section 8.2.2.
@@ -659,14 +672,15 @@ class MVHDBox(FullBox):
     yield bytes(24)
     yield pack('>L', self.next_track_id)
 
-KNOWN_BOX_CLASSES[MVHDBox.BOX_TYPE] = MVHDBox
+add_box_class(MVHDBox)
 
 class TRAKBox(ContainerBox):
   ''' A 'trak' Track box - ISO14496 section 8.3.1.
       Decode the contained boxes.
   '''
   BOX_TYPE = b'trak'
-KNOWN_BOX_CLASSES[TRAKBox.BOX_TYPE] = TRAKBox
+
+add_box_class(TRAKBox)
 
 class TKHDBox(FullBox):
   ''' An 'tkhd' Track Header box - ISO14496 section 8.2.2.
@@ -763,14 +777,15 @@ class TKHDBox(FullBox):
     yield pack('>lllllllll', *self.matrix)
     yield pack('>LL', self.width, self.height)
 
-KNOWN_BOX_CLASSES[TKHDBox.BOX_TYPE] = TKHDBox
+add_box_class(TKHDBox)
 
 class TREFBox(ContainerBox):
   ''' An 'tref' Track Reference box - ISO14496 section 8.3.3.
       Decode the contained boxes.
   '''
   BOX_TYPE = b'tref'
-KNOWN_BOX_CLASSES[TREFBox.BOX_TYPE] = TREFBox
+
+add_box_class(TREFBox)
 
 class TrackReferenceTypeBox(Box):
   ''' A TrackReferenceTypeBox continas references to other tracks - ISO14496 section 8.3.3.2.
@@ -802,7 +817,8 @@ class TRGRBox(ContainerBox):
       Decode the contained boxes.
   '''
   BOX_TYPE = b'trgr'
-KNOWN_BOX_CLASSES[TRGRBox.BOX_TYPE] = TRGRBox
+
+add_box_class(TRGRBox)
 
 class TrackGroupTypeBox(FullBox):
   ''' A TrackGroupTypeBox contains track group id types - ISO14496 section 8.3.3.2.
@@ -824,14 +840,15 @@ class TrackGroupTypeBox(FullBox):
     yield self.box_vf_data_chunk
     yield pack('>L', self.track_group_id)
 
-KNOWN_BOX_CLASSES[TrackGroupTypeBox.BOX_TYPE] = TrackGroupTypeBox
+add_box_class(TrackGroupTypeBox)
 
 class MDIABox(ContainerBox):
   ''' An 'mdia' Media box - ISO14496 section 8.4.1.
       Decode the contained boxes.
   '''
   BOX_TYPE = b'mdia'
-KNOWN_BOX_CLASSES[MDIABox.BOX_TYPE] = MDIABox
+
+add_box_class(MDIABox)
 
 class MDHDBox(FullBox):
   ''' A MDHDBox is a Media Header box - ISO14496 section 8.4.2.
@@ -898,7 +915,7 @@ class MDHDBox(FullBox):
                             _language&0x1f
                  ]).decode('ascii')
 
-KNOWN_BOX_CLASSES[MDHDBox.BOX_TYPE] = MDHDBox
+add_box_class(MDHDBox)
 
 class HDLRBox(FullBox):
   ''' A HDLRBox is a Handler Reference box - ISO14496 section 8.4.3.
@@ -933,14 +950,15 @@ class HDLRBox(FullBox):
     yield self.name.encode('utf-8')
     yield b'\0'
 
-KNOWN_BOX_CLASSES[HDLRBox.BOX_TYPE] = HDLRBox
+add_box_class(HDLRBox)
 
 class MINFBox(ContainerBox):
   ''' An 'minf' Media Information box - ISO14496 section 8.4.4.
       Decode the contained boxes.
   '''
   BOX_TYPE = b'minf'
-KNOWN_BOX_CLASSES[MINFBox.BOX_TYPE] = MINFBox
+
+add_box_class(MINFBox)
 
 class NMHDBox(FullBox):
   ''' A NMHDBox is a Null Media Header box - ISO14496 section 8.4.5.2.
@@ -959,7 +977,7 @@ class NMHDBox(FullBox):
   def box_data_chunks(self):
     yield self.box_vf_data_chunk
 
-KNOWN_BOX_CLASSES[NMHDBox.BOX_TYPE] = NMHDBox
+add_box_class(NMHDBox)
 
 class ELNGBox(FullBox):
   ''' A ELNGBox is a Extended Language Tag box - ISO14496 section 8.4.6.
@@ -982,14 +1000,15 @@ class ELNGBox(FullBox):
     yield self.extended_language.encode('utf-8')
     yield b'\0'
 
-KNOWN_BOX_CLASSES[ELNGBox.BOX_TYPE] = ELNGBox
+add_box_class(ELNGBox)
 
 class STBLBox(ContainerBox):
   ''' An 'stbl' Sample Table box - ISO14496 section 8.5.1.
       Decode the contained boxes.
   '''
   BOX_TYPE = b'stbl'
-KNOWN_BOX_CLASSES[STBLBox.BOX_TYPE] = STBLBox
+
+add_box_class(STBLBox)
 
 class _SampleTableContainerBox(FullBox):
   ''' An intermediate FullBox subclass which contains more boxes.
@@ -1032,7 +1051,8 @@ class STSDBox(_SampleTableContainerBox):
   ''' A 'stsd' Sample Description box -= section 8.5.2.
   '''
   BOX_TYPE = b'stsd'
-KNOWN_BOX_CLASSES[STSDBox.BOX_TYPE] = STSDBox
+
+add_box_class(STSDBox)
 
 class _SampleEntry(Box):
   ''' Superclass of Sample Entry boxes.
@@ -1083,11 +1103,14 @@ class BTRTBox(Box):
                self.maxBitrate,
                self.avgBitrate)
 
+add_box_class(BTRTBox)
+
 class STDPBox(_SampleTableContainerBox):
   ''' A 'stdp' Degradation Priority box - section 8.5.3.
   '''
-  BOX_TYPE = b'stsd'
-KNOWN_BOX_CLASSES[STDPBox.BOX_TYPE] = STDPBox
+  BOX_TYPE = b'stdp'
+
+add_box_class(STDPBox)
 
 if __name__ == '__main__':
   # parse media stream from stdin as test
