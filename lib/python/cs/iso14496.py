@@ -1122,51 +1122,49 @@ add_box_subclass(_SampleTableContainerBox, b'stdp', '8.5.3', 'Degradation Priori
 
 TTSB_Sample = namedtuple('TTSB_Sample', 'count delta')
 
-class _TimeToSampleBox(FullBox):
+class _GenericSampleBox(FullBox):
   ''' Time to Sample box - section 8.6.1.
   '''
 
   ATTRIBUTES = [ ('samples', '%r') ]
 
-  def __init__(self, box_type, box_data):
+  def __init__(self, box_type, box_data, sample_struct_format_v0, sample_fields, sample_struct_format_v1=None):
+    if sample_struct_format_v1 is None:
+      sample_struct_format_v1 = sample_struct_format_v0
     FullBox.__init__(self, box_type, box_data)
+    if self.version == 0:
+      S = Struct(sample_struct_format_v0)
+    elif self.version == 1:
+      S = Struct(sample_struct_format_v1)
+    else:
+      warning("unsupported version %d, treating like version 1", self.version)
+      S = Struct(sample_struct_format_v1)
+    sample_type = namedtuple(type(self).__name__ + '_Sample',
+                             sample_fields)
     # obtain box data after version and flags decode
     box_data = self._box_data
     entry_count, = unpack('>L', box_data[:4])
     bd_offset = 4
     samples = []
     for i in range(entry_count):
-      sample_count, sample_delta = unpack('>LL', box_data[bd_offset:bd_offset+8])
-      samples.append(TTSB_Sample(sample_count, sample_delta))
-      bd_offset += 8
+      sample = sample_type(*S.unpack(box_data[bd_offset:bd_offset+S.size]))
+      samples.append(sample)
+      bd_offset += S.size
     self.samples = samples
 
+class _TimeToSampleBox(_GenericSampleBox):
+  ''' Time to Sample box - section 8.6.1.
+  '''
+  def __init__(self, box_type, box_data):
+    _GenericSampleBox.__init__(self, box_type, box_data, '>LL', 'count delta')
 add_box_subclass(_TimeToSampleBox, b'stts', '8.6.1.2.1', 'Time to Sample')
 
 class CTTSBox(FullBox):
   ''' A 'ctts' Composition Time to Sample box - sections 8.6.1.3.
   '''
-
   def __init__(self, box_type, box_data):
-    FullBox.__init__(self, box_type, box_data)
-    # obtain box data after version and flags decode
-    box_data = self._box_data
-    if self.version == 0:
-      count_delta_struct_format = '>LL'
-    elif self.version == 1:
-      count_delta_struct_format = '>Ll'
-    else:
-      warning("unsupported version %d, treating like version 1")
-      count_delta_struct_format = '>Ll'
-    entry_count, = unpack('>L', box_data[:4])
-    bd_offset = 4
-    samples = []
-    for i in range(entry_count):
-      sample_count, sample_delta = unpack(count_delta_struct_format,
-                                          box_data[bd_offset:bd_offset+8])
-      samples.append(TTSB_Sample(sample_count, sample_delta))
-      bd_offset += 8
-    self.samples = samples
+    _GenericSampleBox.__init__(self, box_type, box_data, '>LL', 'count delta', '>Ll')
+add_box_class(CTTSBox)
 
 class CSLGBox(FullBox):
   ''' A 'cslg' Composition to Decode box - sections 8.6.1.4.
