@@ -911,9 +911,10 @@ class MDHDBox(FullBox):
     '''
     _language = self._language
     return bytes([ x+0x60
-                   for x in (_language>>10)&0x1f,
-                            (_language>>5)&0x1f,
-                            _language&0x1f
+                   for x in ( (_language>>10)&0x1f,
+                              (_language>>5)&0x1f,
+                              _language&0x1f
+                            )
                  ]).decode('ascii')
 
 add_box_class(MDHDBox)
