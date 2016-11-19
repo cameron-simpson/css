@@ -12,6 +12,7 @@
 from __future__ import print_function
 from collections import namedtuple
 from os import SEEK_CUR
+from struct import Struct
 import sys
 from cs.fileutils import read_data, pread, seekable
 from cs.py.func import prop
@@ -418,9 +419,6 @@ def add_box_class(klass):
     except AttributeError:
       box_type = klass.box_type_from_klass()
       box_types = (box_type,)
-      X("got klass.BOX_TYPE = %r", box_type)
-    else:
-      X("got klass.BOX_TYPES = %r", box_types)
     for box_type in box_types:
       if box_type in KNOWN_BOX_CLASSES:
         raise TypeError("box_type %r already in KNOWN_BOX_CLASSES as %s"
@@ -1169,6 +1167,38 @@ class CTTSBox(FullBox):
       samples.append(TTSB_Sample(sample_count, sample_delta))
       bd_offset += 8
     self.samples = samples
+
+class CSLGBox(FullBox):
+  ''' A 'cslg' Composition to Decode box - sections 8.6.1.4.
+  '''
+
+  ATTRIBUTES = ( 'compositionToDTSShift',
+                 'leastDecodeToDisplayDelta',
+                 'greatestDecodeToDisplayDelta',
+                 'compositionStartTime',
+                 'compositionEndTime',
+               )
+
+  def __init__(self, box_type, box_data):
+    FullBox.__init__(self, box_type, box_data)
+    # obtain box data after version and flags decode
+    box_data = self._box_data
+    if self.version == 0:
+      struct_format = '>lllll'
+    elif self.version == 1:
+      struct_format = '>qqqqq'
+    else:
+      warning("unsupported version %d, treating like version 1")
+      struct_format = '>qqqqq'
+    S = Struct(struct_format)
+    self.compositionToDTSShift, \
+    self.leastDecodeToDisplayDelta, \
+    self.greatestDecodeToDisplayDelta, \
+    self.compositionStartTime, \
+    self.compositionEndTime \
+      = S.unpack(struct_format, box_data[:S.size])
+
+add_box_class(CSLGBox)
 
 if __name__ == '__main__':
   # parse media stream from stdin as test
