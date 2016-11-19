@@ -6,7 +6,8 @@
 
 use strict qw(vars);
 
-require 'flush.pl';
+##require 'flush.pl';
+use IO::Handle qw();
 
 package cs::VDis;
 
@@ -64,7 +65,7 @@ sub out	 { local($_)=join('',@_);
 	 }
 
 sub Flush{ _with(\&flush,@_); }
-sub flush{ main::flush($cs::VDis::VDIS); }
+sub flush{ $cs::VDis::VDIS->flush(); }
 
 sub Size{ _with(\&size,@_); }
 sub size{ { package main; require 'cs/stty.pl'; }
@@ -79,7 +80,7 @@ sub move{ print $cs::VDis::VDIS "\033p$_[0],$_[1].";
 	}
 
 sub Sync{ _with(\&sync,@_); }
-sub sync{ print $cs::VDis::VDIS ''; flush(); }
+sub sync{ print $cs::VDis::VDIS ''; $cs::VDis::VDIS->flush(); }
 
 sub NewPage{ _with(\&newpage,@_); }
 sub newpage

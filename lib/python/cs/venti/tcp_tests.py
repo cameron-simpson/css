@@ -12,7 +12,6 @@ import sys
 import unittest
 from cs.debug import thread_dump, debug_object_shell
 from cs.logutils import X
-from cs.randutils import rand0, randblock
 from .hash import HashUtilDict
 from .hash_tests import _TestHashCodeUtils
 from .store import MappingStore
@@ -24,7 +23,7 @@ _base_port = 9999
 
 def make_tcp_store():
   global _base_port
-  mapping_S = MappingStore(HashUtilDict())
+  mapping_S = MappingStore("tcp_tests.make_tcp_store.mapping_S", HashUtilDict())
   while True:
     bind_addr = (BIND_HOST, _base_port)
     try:

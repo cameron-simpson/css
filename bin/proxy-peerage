@@ -13,8 +13,8 @@ from cs.lex import get_uc_identifier
 from cs.logutils import setup_logging, Pfx, X, error, warning, info
 
 USAGE = '''Usage:
-    %s haproxy backends frontend_name frontend_listen
-    %s squid acls proxy_name'''
+    %s haproxy backends frontend_name frontend_listen <peerage-file
+    %s squid acls proxy_name <peerage-file'''
 
 def main(argv):
   cmd = argv.pop(0)
@@ -358,7 +358,8 @@ class Proxies(object):
   def haproxy_define_frontend(self, frontend_name, frontend_listen):
     ''' Generator yielding words to define a frontend to choose amongst the proxies.
     '''
-    yield 'frontend', frontend_name, frontend_listen
+    yield 'frontend', frontend_name
+    yield '  bind', frontend_listen
     default_proxies = set()
     for pattern in self.patterns:
       defn = pattern.definition

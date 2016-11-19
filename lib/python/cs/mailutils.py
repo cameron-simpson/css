@@ -14,7 +14,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         ],
-    'requires': ['cs.fileutils', 'cs.logutils', 'cs.threads', 'cs.seq', 'cs.py3'],
+    'install_requires': ['cs.fileutils', 'cs.logutils', 'cs.threads', 'cs.seq', 'cs.py3'],
 }
 
 import email.message
@@ -438,7 +438,7 @@ class Maildir(mailbox.Maildir):
         The default is to transcribe all messages.
     '''
     if keys is None:
-      keys = self.iterkeys()
+      keys = self.keys()
     for key in keys:
       with Pfx(key):
         message = self[key]

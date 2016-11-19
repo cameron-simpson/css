@@ -5,7 +5,7 @@
 # discid function outsourced to a CDDB daemon (because both
 # FreeDB.pm and CDDB_get.pm appear to have subtly broken
 # algorithms).
-#	- Cameron Simpson <cs@zip.com.au> 10sep2001
+#       - Cameron Simpson <cs@zip.com.au> 10sep2001
 #
 
 =head1 NAME
@@ -185,9 +185,9 @@ sub new
 { my($class,$host,$port)=@_;
   if (! defined $host)
   { my $dflt = ( defined $ENV{CDDBSERVER} && length $ENV{CDDBSERVER}
-	       ? $ENV{CDDBSERVER}
-	       : "cddb:888"
-	       );
+               ? $ENV{CDDBSERVER}
+               : "cddb:888"
+               );
 
     if ($dflt =~ /:/)
     { $port=$';
@@ -204,9 +204,9 @@ sub new
 
   my $this
   = bless { DEV => $cs::CDDB::DfltDev,
-	    HOST => $host,
-	    PORT => $port,
-	  }, $class;
+            HOST => $host,
+            PORT => $port,
+          }, $class;
 
   $this->Reset();
 
@@ -230,7 +230,7 @@ sub Reset()
 
   for my $k (keys %$this)
   { delete $this->{$k}
-	if $k ne DEV && $k ne HOST && $k ne PORT;
+        if $k ne DEV && $k ne HOST && $k ne PORT;
   }
 }
 
@@ -292,59 +292,59 @@ sub Stat($)
 
       for my $tno ($start..$end)
       { $tocentry = pack('C8', $tno, 0, 2, 0, 0, 0, 0, 0);
-	if (! ioctl(CDROM, 0x5306, $tocentry))
-	{ warn "$::cmd: Stat($dev): ioctl(..,$0x5306,track=$tno): $!\n";
-	  $ok=0;
-	}
-	else
-	{ @toc=unpack("C*", $tocentry);
-	  push(@tracks, { TRACK		=> $toc[0],
-			  ADR_CTL	=> $toc[1],
-			  FORMAT	=> $toc[2],
-			  FRAME		=> $toc[3],
-			  MINUTE	=> $toc[4],
-			  SECONDS	=> $toc[5],
-			  LENGTH	=> $toc[4]*60+$toc[5],
-			});
-	}
+        if (! ioctl(CDROM, 0x5306, $tocentry))
+        { warn "$::cmd: Stat($dev): ioctl(..,$0x5306,track=$tno): $!\n";
+          $ok=0;
+        }
+        else
+        { @toc=unpack("C*", $tocentry);
+          push(@tracks, { TRACK         => $toc[0],
+                          ADR_CTL       => $toc[1],
+                          FORMAT        => $toc[2],
+                          FRAME         => $toc[3],
+                          MINUTE        => $toc[4],
+                          SECONDS       => $toc[5],
+                          LENGTH        => $toc[4]*60+$toc[5],
+                        });
+        }
       }
 
       $tocentry = pack("C8", 0xAA, 0, 2, 0, 0, 0, 0, 0);
       if (! ioctl(CDROM,0x5306,$tocentry))
       { warn "$::cmd: Stat($dev): ioctl(..,0x5306, 0xAA...): $!\n";
-	$ok=0;
+        $ok=0;
       }
       else
       { 
-	@toc=unpack("C*", $tocentry);
-	push(@tracks, { TRACK		=> $toc[0],
-			ADR_CTL		=> $toc[1],
-			FORMAT		=> $toc[2],
-			FRAME		=> $toc[3],
-			MINUTE		=> $toc[4],
-			SECONDS		=> $toc[5],
-			LENGTH		=> $toc[4]*60+$toc[5],
-		      });
+        @toc=unpack("C*", $tocentry);
+        push(@tracks, { TRACK           => $toc[0],
+                        ADR_CTL         => $toc[1],
+                        FORMAT          => $toc[2],
+                        FRAME           => $toc[3],
+                        MINUTE          => $toc[4],
+                        SECONDS         => $toc[5],
+                        LENGTH          => $toc[4]*60+$toc[5],
+                      });
       }
 
       if ($ok)
       {
-	# tidy up records
-	# make OFFSET = cumulative prelength * 75
-	# make length = length - cumulative prelength
-	for my $i (0..$#tracks-1)
-	{ my $T = $tracks[$i];
-	  my $nT= $tracks[$i+1];
-	  $T->{OFFSET}=$T->{LENGTH}*75;
-	  $T->{LENGTH}=$nT->{LENGTH}-$T->{LENGTH};
-	}
+        # tidy up records
+        # make OFFSET = cumulative prelength * 75
+        # make length = length - cumulative prelength
+        for my $i (0..$#tracks-1)
+        { my $T = $tracks[$i];
+          my $nT= $tracks[$i+1];
+          $T->{OFFSET}=$T->{LENGTH}*75;
+          $T->{LENGTH}=$nT->{LENGTH}-$T->{LENGTH};
+        }
 
-	$tracks[$#tracks]->{OFFSET}=$tracks[$#tracks]->{LENGTH}*75;
-	$tracks[$#tracks]->{LENGTH}=0;
+        $tracks[$#tracks]->{OFFSET}=$tracks[$#tracks]->{LENGTH}*75;
+        $tracks[$#tracks]->{LENGTH}=0;
 
-	$this->{START}=$start;
-	$this->{END}=$end;
-	$this->{TRACKS}=[ @tracks ];
+        $this->{START}=$start;
+        $this->{END}=$end;
+        $this->{TRACKS}=[ @tracks ];
       }
     }
 
@@ -411,7 +411,7 @@ sub Length($;$)
 
   for my $i (0..$#{$this->{TRACKS}}-1)
   { return $this->{TRACKS}->[$i]->{LENGTH}
-	if $this->{TRACKS}->[$i]->{TRACK} == $tno;
+        if $this->{TRACKS}->[$i]->{TRACK} == $tno;
   }
 
   # no match!
@@ -472,7 +472,7 @@ sub DiscId()
     return undef;
   }
 
-  return $this->{DISCID}="$1";	## was hex($1)
+  return $this->{DISCID}="$1";  ## was hex($1)
 }
 
 =item Query()

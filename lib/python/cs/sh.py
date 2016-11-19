@@ -12,6 +12,12 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
     ],
+    'install_requires': [],
+    'entry_points': {
+      'console_scripts': [
+        'shqstr = cs.sh:main_shqstr'
+      ],
+    },
 }
 
 import string
@@ -64,3 +70,8 @@ def quotestr(s):
     offset += 1
   flush()
   return ''.join(qparts)
+
+def main_shqstr(argv):
+  cmd = argv.pop(0)
+  qstr = ' '.join(quote(argv))
+  print(qstr)

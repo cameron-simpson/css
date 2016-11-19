@@ -233,7 +233,7 @@ class Maker(MultiOpenMixin):
         and the error state (unparsed or invalid options encountered).
     '''
     badopts = False
-    opts, args = getopt.getopt(args, 'deikmnpqrstuvxENRj:D:S:f:')
+    opts, args = getopt.getopt(args, 'dD:eEf:ij:kmNnpqrRsS:tuvx')
     for opt, value in opts:
       with Pfx(opt):
         if opt == '-d':
@@ -272,7 +272,7 @@ class Maker(MultiOpenMixin):
     return args, badopts
 
   def loadMakefiles(self, makefiles, parent_context=None):
-    ''' Load the specified Makefiles.
+    ''' Load the specified Makefiles; return success.
         Each top level Makefile named gets its own namespace prepended
         to the namespaces list. In this way later top level Makefiles'
         definitions override ealier ones while still detecting conflicts
@@ -280,6 +280,7 @@ class Maker(MultiOpenMixin):
         Also, the default_target property is set to the first
         encountered target if not yet set.
     '''
+    ok = True
     for makefile in makefiles:
       self.debug_parse("load makefile: %s", makefile)
       first_target = None
@@ -287,7 +288,10 @@ class Maker(MultiOpenMixin):
       self._namespaces.insert(0, ns)
       for O in parseMakefile(self, makefile, parent_context):
         with Pfx(O.context):
-          if isinstance(O, Target):
+          if isinstance(O, Exception):
+            error("exception: %s", O)
+            ok = False
+          elif isinstance(O, Target):
             # record this Target in the Maker
             T = O
             self.debug_parse("add target %s", T)
@@ -308,6 +312,7 @@ class Maker(MultiOpenMixin):
                   )
       if first_target is not None:
         self.default_target = first_target
+    return ok
 
 class TargetMap(O):
   ''' A mapping interface to the known targets.

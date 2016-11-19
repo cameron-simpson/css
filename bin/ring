@@ -250,7 +250,7 @@ sub checkit
     else
     { if ($first)
       { ($verbose || $shownames) && print $context, ":\n";
-	$first=0;
+	      $first=0;
       }
 
       print;

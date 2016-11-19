@@ -13,6 +13,7 @@
 '''
 
 from __future__ import with_statement
+from abc import ABC, abstractmethod
 from binascii import hexlify
 from contextlib import contextmanager
 import os
@@ -30,10 +31,10 @@ from cs.resources import MultiOpenMixin
 from cs.seq import Seq
 from cs.threads import Q1, Get1
 from . import defaults, totext
-from .datafile import DataDirMapping
+from .datafile import DataDir, DEFAULT_INDEXCLASS
 from .hash import DEFAULT_HASHCLASS, HashCodeUtilsMixin
 
-class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin):
+class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin, ABC):
   ''' Core functions provided by all Stores.
 
       Subclasses should not subclass this class but BasicStoreSync
@@ -54,7 +55,6 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin):
       A subclass _may_ provide thread-safe implementations of the following
       methods:
 
-        .first() -> hashcode
         .hashcodes(starting_hashcode, length) -> iterable-of-hashcodes
 
       The background (*_bg) functions return cs.later.LateFunction instances
@@ -74,8 +74,10 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin):
 
   _seq = Seq()
 
-  def __init__(self, name=None, capacity=None, hashclass=None, lock=None):
+  def __init__(self, name, capacity=None, hashclass=None, lock=None):
     with Pfx("_BasicStoreCommon.__init__(%s,..)", name):
+      if not isinstance(name, str):
+        raise TypeError("initial `name` argument must be a str, got %s", type(name))
       if name is None:
         name = "%s%d" % (self.__class__.__name__, next(_BasicStoreCommon._seq()))
       if capacity is None:
@@ -100,13 +102,16 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin):
   ## Special methods.
   ##
 
-  def __len__(self):
-    raise NotImplementedError("no .__len__")
-
   def __contains__(self, h):
     ''' Test if the supplied hashcode is present in the store.
     '''
     return self.contains(h)
+
+  def __iter__(self):
+    return self.hashcodes_from()
+
+  def keys(self):
+    return iter(self)
 
   def __getitem__(self, h):
     ''' Return the data bytes associated with the supplied hashcode.
@@ -137,11 +142,6 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin):
     '''
     return self.hashclass.from_data(data)
 
-  def keys(self):
-    ''' For a big store this is almost certainly unreasonable.
-    '''
-    raise NotImplementedError
-
   def startup(self):
     # Later already open
     pass
@@ -151,7 +151,7 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin):
     '''
     self.__funcQ.close()
     if not self.__funcQ.closed:
-      warning("%s.shutdown: __funcQ not closed yet", self)
+      debug("%s.shutdown: __funcQ not closed yet", self)
     self.__funcQ.wait()
 
   def missing(self, hashes):
@@ -162,34 +162,37 @@ class _BasicStoreCommon(MultiOpenMixin, HashCodeUtilsMixin):
       if h not in self:
         yield h
 
-  def prefetch(self, hashes):
-    ''' Prefetch the blocks associated with hs, an iterable returning hashes.
-        This is intended to hint that these blocks will be wanted soon,
-        and so implementors might queue the fetches on an "idle" queue so as
-        not to penalise other store users.
-        This default implementation does nothing, which may be perfectly
-        legitimate for some stores.
-    '''
+  @abstractmethod
+  def add(self, data):
     pass
 
-  def multifetch(self, hs, ordered=False):
-    ''' Generator yielding:
-          hash, data
-        for each hash in `hs`.
-        If `ordered` is true, yield data in the order of `hs`
-        otherwise yield data as it arrives from the Store.
-    '''
-    LFs = []
-    for h in hs:
-      LF = self.fetch_bg(h)
-      h2LF[h] = self.fetch_bg(h)
-      LF2h[LF] = h
-    if ordered:
-      for h in hs:
-        yield h, h2LF[h]()
-    else:
-      for LF in reportLFs(LF2h.keys()):
-        yield LF2h[LF], LF()
+  @abstractmethod
+  def add_bg(self, data):
+    pass
+
+  @abstractmethod
+  def get(self, h):
+    pass
+
+  @abstractmethod
+  def get_bg(self, h):
+    pass
+
+  @abstractmethod
+  def contains(self, h):
+    pass
+
+  @abstractmethod
+  def contains_bg(self, h):
+    pass
+
+  @abstractmethod
+  def flush(self):
+    pass
+
+  @abstractmethod
+  def flush_bg(self):
+    pass
 
 class BasicStoreSync(_BasicStoreCommon):
   ''' Subclass of _BasicStoreCommon expecting synchronous operations and providing asynchronous hooks, dual of BasicStoreAsync.
@@ -211,18 +214,6 @@ class BasicStoreSync(_BasicStoreCommon):
   def flush_bg(self):
     return self._defer(self.flush)
 
-  def first(self):
-    raise NotImplementedError("no .first")
-
-  def hashcodes(self, hashclass=None, start_hashcode=None, reverse=None, after=False, length=None):
-    raise NotImplementedError("no .first")
-
-  def first_bg(self, hashclass=None):
-    return self._defer(self.first, hashclass)
-
-  def hashcodes_bg(self, hashclass=None, start_hashcode=None, reverse=None, after=False, length=None):
-    return self._defer(self.hashcodes_bg, hashclass=hashclass, start_hashcode=start_hashcode, reverse=reverse, after=after, length=length)
-
 class BasicStoreAsync(_BasicStoreCommon):
   ''' Subclass of _BasicStoreCommon expecting asynchronous operations and providing synchronous hooks, dual of BasicStoreSync.
   '''
@@ -242,12 +233,6 @@ class BasicStoreAsync(_BasicStoreCommon):
 
   def flush(self):
     return self.flush_bg()()
-
-  def first(self, hashclass=None):
-    return self.first_bg(hashclass=hashclass)()
-
-  def hashcodes(self, hashclass=None, start_hashcode=None, reverse=None, after=False, length=None):
-    return self.hashcodes_bg(hashclass=hashclass, start_hashcode=start_hashcode, reverse=reverse, after=after, length=length)()
 
 def Store(store_spec):
   ''' Factory function to return an appropriate BasicStore* subclass
@@ -281,7 +266,7 @@ def Store(store_spec):
     # TODO: after tokyocabinet available, probe for index file name
     storepath = os.path.abspath(spec)
     if os.path.isdir(storepath):
-      return DataDirStore(os.path.abspath(spec))
+      return DataDirStore(spec, os.path.abspath(spec), hashclass=DEFAULT_HASHCLASS)
     raise ValueError("unsupported file store: %s" % (storepath,))
   if scheme == "exec":
     from .stream import StreamStore
@@ -314,11 +299,8 @@ class MappingStore(BasicStoreSync):
   ''' A Store built on an arbitrary mapping object.
   '''
 
-  def __init__(self, mapping, **kw):
-    name = kw.pop('name', None)
-    if name is None:
-      name = "MappingStore(%s)" % (type(mapping).__name__,)
-    BasicStoreSync.__init__(self, name=name, **kw)
+  def __init__(self, name, mapping, **kw):
+    BasicStoreSync.__init__(self, "MappingStore(%s)" % (name,), **kw)
     self.mapping = mapping
 
   def startup(self):
@@ -375,45 +357,41 @@ class MappingStore(BasicStoreSync):
       map_flush()
 
   def __len__(self):
-    try:
-      return len(self.mapping)
-    except TypeError as e:
-      raise NotImplementedError("%s: no self.mapping.len(): %s" % (self, e))
+    return len(self.mapping)
 
-  def first(self, hashclass=None):
-    ''' Return the first hashcode in the Store or None if empty.
-        `hashclass`: specify the hashcode type, default from self.hashclass
+  def __iter__(self):
+    ''' Return iterator over the mapping; required for use of HashCodeUtilsMixin.hashcodes_from.
     '''
-    if hashclass is None:
-      hashclass = self.hashclass
-    mapping = self.mapping
+    return iter(self.mapping)
+
+  def hashcodes_from(self, start_hashcode=None, reverse=False):
+    ''' Use the mapping's .hashcodes_from if present, otherwise use HashCodeUtilsMixin.hashcodes_from.
+    '''
     try:
-      first_method = mapping.first
+      hashcodes_method = self.mapping.hashcodes_from
     except AttributeError:
-      raise NotImplementedError("underlying .mapping has no .first")
-    else:
-      return first_method(hashclass=hashclass)
+      return HashCodeUtilsMixin.hashcodes_from(self, start_hashcode=start_hashcode, reverse=reverse)
+    return hashcodes_method(start_hashcode=start_hashcode, reverse=reverse)
 
-  def hashcodes(self, hashclass=None, start_hashcode=None, reverse=None, after=False, length=None):
-    ''' Generator yielding the Store's in order hashcodes starting with optional `hashcode`.
-        `hashclass`: specify the hashcode type, default from defaults.S
-        `start_hashcode`: the first hashcode; if missing or None, iteration
-                    starts with the first key in the index
-        `reverse`: iterate backwards if true, forwards if false and in no
-                   specified order if missing or None
-        `after`: commence iteration after the first hashcode
-        `length`: if not None, the maximum number of hashcodes to yield
-    '''
-    return self.mapping.hashcodes(hashclass=hashclass, start_hashcode=start_hashcode,
-                                  reverse=reverse, after=after, length=length)
+class DataDirStore(MappingStore):
+  ''' A MappingStore using a DataDir as its backend.
+  '''
 
-  def hashcodes_from(self, hashclass=None, start_hashcode=None, reverse=False):
-    return self.mapping.hashcodes_from(hashclass=hashclass, start_hashcode=start_hashcode, reverse=reverse)
+  def __init__(self, name, statedirpath, datadirpath=None, hashclass=None, indexclass=None, rollover=None, **kw):
+    if hashclass is None:
+      raise ValueError("hashclass is mandatory")
+    if indexclass is None:
+      indexclass = DEFAULT_INDEXCLASS
+    self._datadir = DataDir(statedirpath, datadirpath, hashclass, indexclass, rollover=rollover)
+    MappingStore.__init__(self, name, self._datadir, **kw)
 
-def DataDirStore(dirpath, indexclass=None, rollover=None, **kw):
-  return MappingStore(
-           DataDirMapping(dirpath, indexclass=indexclass, rollover=rollover),
-           **kw)
+  def open(self, **kw):
+    self._datadir.open()
+    return MappingStore.open(self, **kw)
+
+  def close(self):
+    self._datadir.close()
+    return MappingStore.close(self)
 
 class _ProgressStoreTemplateMapping(object):
 
@@ -435,14 +413,11 @@ class _ProgressStoreTemplateMapping(object):
 
 class ProgressStore(BasicStoreSync):
 
-  def __init__(self, S, template='rq  {requests_all_position}  {requests_all_throughput}/s', **kw):
-    name = kw.pop('name', None)
-    if name is None:
-      name = "ProgressStore(%s)" % (S,)
+  def __init__(self, name, S, template='rq  {requests_all_position}  {requests_all_throughput}/s', **kw):
     lock = kw.pop('lock', None)
     if lock is None:
       lock = S._lock
-    BasicStoreSync.__init__(self, name=name, lock=lock, **kw)
+    BasicStoreSync.__init__(self, "ProgressStore(%s)" % (name,), lock=lock, **kw)
     self.S = S
     self.template = template
     self.template_mapping = _ProgressStoreTemplateMapping(self)
@@ -483,7 +458,7 @@ class ProgressStore(BasicStoreSync):
   def do_request(self, category):
     Ps = self._progress
     self.requests += 1
-    Ps['requests_all'].inc()
+    Ps['requests_all'] += 1
     if category is not None:
       Pactive = self._progress[category]
       Pactive.update(Pactive.position + 1)

@@ -1,0 +1,10 @@
+#!/usr/bin/python
+#
+# Parse command line options and ssh config files.
+#   - Cameron Simpson <cs@zip.com.au> 01oct2016
+#
+
+import sys
+from cs.app.ssh import main_ssh_opts
+
+sys.exit(main_ssh_opts(sys.argv))

@@ -40,6 +40,7 @@ class BlockFile(RawIOBase):
     elif whence == 2:
       offset += len(self)
     self._offset = offset
+    return offset
 
   def tell(self):
     ''' Return the current file offset.
@@ -95,13 +96,9 @@ class File(BackedFile):
   @backing_block.setter
   @locked
   def backing_block(self, new_block):
+    X("File: update _backing_block to %s from %s", new_block, self._backing_block)
     self._backing_block = new_block
     self._reset(BlockFile(new_block))
-
-  def __len__(self):
-    ''' Return the current length of the file.
-    '''
-    return max(len(self.backing_block), self.front_range.end)
 
   @locked
   def flush(self):
@@ -113,6 +110,7 @@ class File(BackedFile):
       # As a side-effect of setting .backing_block we discard the
       # front file data, which are now saved to the Store.
       self.backing_block = top_block_for(self.high_level_blocks())
+      # TODO: truncate the front file?
     return self.backing_block
 
   @locked
@@ -120,7 +118,7 @@ class File(BackedFile):
     ''' Truncate the File to the specified `length`.
     '''
     if length < 0:
-      raise FuseOSError(errno.EINVAL)
+      raise ValueError("length must be >= 0, received %s" % (length,))
     cur_len = len(self)
     front_range = self.front_range
     backing_block0 = self.backing_block
@@ -153,16 +151,13 @@ class File(BackedFile):
   def read(self, size = -1):
     ''' Read up to `size` bytes, honouring the "single system call" spirit.
     '''
-    ##X("vt.File.read(size=%r)", size)
     if size == -1:
       return self.readall()
     if size < 1:
       raise ValueError("%s.read: size(%r) < 0 but not -1", self, size)
     start = self._offset
     end = start + size
-    ##X("vt.File.read: start=%d, end=%d", start, end)
     for inside, span in self.front_range.slices(start, end):
-      ##X("vt.File.read: inside=%s span=%s", inside, span)
       if inside:
         # data from the front file; return the first chunk
         for chunk in filedata(self.front_file, start=span.start, end=span.end):
@@ -170,14 +165,10 @@ class File(BackedFile):
           return chunk
       else:
         # data from the backing block: return the first chunk
-        ##X("vt.File.read: backing data, get slices...")
         for B, Bstart, Bend in self.backing_block.slices(span.start, span.end):
-          ##X("vt.File.read: B=%s[len=%s], Bstart=%r, Bend=%r", B, len(B), Bstart, Bend)
           data = B[Bstart:Bend]
-          ##X("vt.File.read: data=%r", data)
           self._offset += len(data)
           return data
-    ##X("vt.File.read: no chunks: return empty bytes")
     return b''
 
   @locked
