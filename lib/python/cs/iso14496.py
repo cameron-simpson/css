@@ -616,7 +616,6 @@ class MOOVBox(ContainerBox):
       Decode the contained boxes.
   '''
   pass
-
 add_box_class(MOOVBox)
 
 class MVHDBox(FullBox):
@@ -805,7 +804,6 @@ class TREFBox(ContainerBox):
       Decode the contained boxes.
   '''
   pass
-
 add_box_class(TREFBox)
 
 class TrackReferenceTypeBox(Box):
@@ -980,7 +978,6 @@ class MINFBox(ContainerBox):
       Decode the contained boxes.
   '''
   pass
-
 add_box_class(MINFBox)
 
 class NMHDBox(FullBox):
@@ -1028,7 +1025,6 @@ class STBLBox(ContainerBox):
       Decode the contained boxes.
   '''
   pass
-
 add_box_class(STBLBox)
 
 class _SampleTableContainerBox(FullBox):
@@ -1072,7 +1068,6 @@ class STSDBox(_SampleTableContainerBox):
   ''' A 'stsd' Sample Description box -= section 8.5.2.
   '''
   pass
-
 add_box_class(STSDBox)
 
 class _SampleEntry(Box):
@@ -1129,7 +1124,6 @@ class STDPBox(_SampleTableContainerBox):
   ''' A 'stdp' Degradation Priority box - section 8.5.3.
   '''
   pass
-
 add_box_class(STDPBox)
 
 TTSB_Sample = namedtuple('TTSB_Sample', 'count delta')
@@ -1157,7 +1151,6 @@ class STTSBox(_TimeToSampleBox):
   ''' A 'stts' Sample Table box - section 8.6.1.2.1.
   '''
   pass
-
 add_box_class(STTSBox)
 
 X("KNOWN_BOX_CLASSES = %r", KNOWN_BOX_CLASSES)
