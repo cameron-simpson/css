@@ -360,11 +360,10 @@ class Box(object):
     if offset > len(bs):
       raise RuntimeError("box length=%d, but that exceeds the size of bs (%d bytes, offset=%d)"
                          % (length, len(bs), offset0))
-    fetch_box_data = lambda: bs[tail_offset:tail_offset+tail_length]
     if cls is None:
       cls = pick_box_class(box_type)
       ##X("from_bytes: KNOWN_BOX_CLASSES.get(%r) => %s", box_type, Box)
-    B = cls(box_type, fetch_box_data)
+    B = cls(box_type, bs[tail_offset:tail_offset+tail_length])
     return B, offset
 
   def _load_box_data(self):
