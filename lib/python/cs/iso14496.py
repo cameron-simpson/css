@@ -381,9 +381,22 @@ class Box(object):
     '''
     self._box_data = data
 
+  def _advance_box_data(self, advance):
+    ''' Advance/crop _box_data to allow for ingested parsed fields.
+        This requires matching subclass .box_data_chunks to extrude the parsed fields.
+    '''
+    if advance <= 0:
+      raise ValueError("_parsed_box_data: advance should be > 0: %d" % (advance,))
+    if advance > len(self._box_data):
+      raise ValueError("_parsed_box_data: advance beyond len(_box_data:%d): %d" % (len(self._box_data), advance))
+    self._set_box_data(self._box_data[advance:])
+
   def box_data_chunks(self):
     ''' Return an iterable of bytes objects comprising the data section of this Box.
         This method should be overridden by subclasses which decompose data sections.
+        If they also call ._parsed_box_data to advance past the
+        ingested fields they can then call this method to emit the
+        trailing unparsed data if any.
     '''
     yield self._load_box_data()
 
@@ -460,7 +473,7 @@ class FullBox(Box):
     box_data = self._load_box_data()
     self.version = box_data[0]
     self.flags = (box_data[1]<<16) | (box_data[2]<<8) | box_data[3]
-    self._set_box_data(box_data[4:])
+    self._advance_box_data(4)
 
   def __str__(self):
     prefix = '%s(%r-v%d-0x%02x' % (self.__class__.__name__,
