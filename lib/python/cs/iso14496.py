@@ -252,8 +252,8 @@ class Box(object):
     klass_name = klass.__name__
     if len(klass_name) == 7 and klass_name.endswith('Box'):
       klass_prefix = klass_name[:4]
-      if klass_prefix.isupper():
-        return klass_prefix.lower().encode('ascii')
+      if klass_prefix.rstrip('_').isupper():
+        return klass_prefix.replace('_', ' ').lower().encode('ascii')
     raise AttributeError("no automatic box type for %s" % (klass,))
 
   # NB: a @property instead of @prop to preserve AttributeError
@@ -604,7 +604,6 @@ class PDINBox(FullBox):
     self.pdinfo = [ PDInfo(unpack('>LL', box_data[offset:offset+8]))
                     for offset in range(0, len(box_data), 8)
                   ]
-    # forget data bytes
     self._set_box_data(b'')
 
   def parsed_data_chunks(self):
@@ -710,6 +709,7 @@ class MVHDBox(FullBox):
     if offset != len(box_data):
       raise ValueError("MVHD: after decode offset=%d but len(box_data)=%d"
                        % (offset, len(box_data)))
+    self._advance_box_data(offset)
 
   @prop
   def rate(self):
@@ -802,6 +802,7 @@ class TKHDBox(FullBox):
     offset += 36
     self.width, self.height = unpack('>LL', box_data[offset:offset+8])
     offset += 8
+    self._advance_box_data(offset)
 
   @prop
   def track_enabled(self):
@@ -820,7 +821,7 @@ class TKHDBox(FullBox):
     return (self.flags&0x8) != 0
 
   def parsed_data_chunks(self):
-    return FullBox.parsed_data_chunks(self)
+    yield FullBox.parsed_data_chunks(self)
     if self.version == 0:
       yield pack('>LLLLL',
                  self.creation_time,
@@ -862,6 +863,7 @@ class TrackReferenceTypeBox(Box):
     for track_id, in iter_unpack('>L', box_data):
       track_ids.append(track_id)
     self.track_ids = track_id
+    self._set_box_data(b'')
 
   def __str__(self):
     return '%s(type=%r,track_ids=%r)' % (self.__class__.__name__, self.box_type, self.track_ids)
@@ -884,9 +886,7 @@ class TrackGroupTypeBox(FullBox):
     # obtain box data after version and flags decode
     box_data = self._box_data
     self.track_group_id, = unpack('>L', box_data[:4])
-    if len(box_data) > 4:
-      warning('%s: %d bytes of unparsed data after track_group_id: %r',
-              self.__class__.__name__, len(box_data)-4, box_data[4:])
+    self._advance_box_data(4)
 
   def parsed_data_chunks(self):
     yield FullBox.parsed_data_chunks(self)
@@ -929,6 +929,7 @@ class MDHDBox(FullBox):
     if offset != len(box_data):
       warning("MDHD: %d unparsed bytes after pre_defined: %r",
               len(box_data)-offset, box_data[offset:])
+    self._advance_box_data(offset)
 
   def parsed_data_chunks(self):
     yield FullBox.parsed_data_chunks(self)
@@ -982,6 +983,7 @@ class HDLRBox(FullBox):
     self.name, offset = get_utf8_nul(box_data, offset1)
     if offset < len(box_data):
       raise ValueError('HDLR: found NUL not at end of data: %r' % (box_data[offset1:],))
+    self._advance_box_data(offset)
 
   def parsed_data_chunks(self):
     yield FullBox.parsed_data_chunks(self)
@@ -1012,6 +1014,7 @@ class ELNGBox(FullBox):
     self.extended_language, offset = get_utf8_nul(box_data)
     if offset < len(box_data):
       raise ValueError("ELNG: unexpected data: %r" % (box_data[offset:],))
+    self._advance_box_data(offset)
 
   def parsed_data_chunks(self):
     yield FullBox.parsed_data_chunks(self)
@@ -1036,6 +1039,7 @@ class _SampleTableContainerBox(FullBox):
     if len(self.boxes) != entry_count:
       raise ValueError('expected %d contained Boxes but parsed %d'
                        % (entry_count, len(self.boxes)))
+    self._set_box_data(b'')
 
   def __str__(self):
     return '%s(%s)' \
@@ -1068,7 +1072,7 @@ class _SampleEntry(Box):
     Box.__init__(self, box_type, box_data)
     box_data = self._load_box_data()
     self.reserved, self.data_reference_index = unpack('>6sH', box_data[:8])
-    self._set_box_data(box_data[8:])
+    self._advance_box_data(8)
 
   def __str__(self):
     prefix = '%s(%r-%r,data_reference_index=%d' \
@@ -1097,6 +1101,7 @@ class BTRTBox(Box):
     self.bufferSizeDB, \
     self.maxBitrate, \
     self.avgBitrate = unpack('>LLL', box_data)
+    self._advance_box_data(12)
 
   def __str__(self):
     attr_summary = self.attribute_summary()
@@ -1154,6 +1159,7 @@ class _GenericSampleBox(FullBox):
       samples.append(sample)
       bd_offset += S.size
     self.samples = samples
+    self._advance_box_data(bd_offset)
 
   def parsed_data_chunks(self):
     yield FullBox.parsed_data_chunk(self)
@@ -1205,6 +1211,7 @@ class CSLGBox(FullBox):
     self.compositionStartTime, \
     self.compositionEndTime \
       = S.unpack(struct_format, box_data[:S.size])
+    self._advance_box_data(S.size)
 
   def parsed_data_chunks(self):
     yield FullBox.parsed_data_chunks(self)
@@ -1240,7 +1247,6 @@ class SDTPBox(_GenericSampleBox):
                                'is_leading sample_depends_on sample_is_depended_on sample_has_redundancy',
                                inferred_entry_count=True)
 add_box_class(SDTPBox)
-
 add_box_subclass(Box, b'edts', '8.6.5.1', 'Edit')
 
 class ELSTBox(_GenericSampleBox):
