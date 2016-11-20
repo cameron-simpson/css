@@ -205,6 +205,11 @@ def get_utf8_nul(bs, offset=0):
     raise ValueError('no NUL in data: %r' % (bs[offset:],))
   return bs[offset:endpos].decode('utf-8'), endpos + 1
 
+def put_utf8_nul(s):
+  ''' Return bytes encoding a string in UTF-8 with a trailing NUL.
+  '''
+  return s.encode('utf-8') + b'\0'
+
 class Box(object):
   ''' Base class for all boxes - ISO14496 section 4.2.
   '''
@@ -661,8 +666,7 @@ class ContainerBox(Box):
   def parsed_data_chunks(self):
     yield Box.parsed_data_chunks()
     for B in self.boxes:
-      for chunk in B.data_chunks():
-        yield chunk
+      yield B.data_chunks()
 
 class MOOVBox(ContainerBox):
   ''' An 'moov' Movie box - ISO14496 section 8.2.1.
@@ -992,8 +996,7 @@ class HDLRBox(FullBox):
                self.reserved1,
                self.reserved2,
                self.reserved3)
-    yield self.name.encode('utf-8')
-    yield b'\0'
+    yield put_utf8_nul(self.name)
 
 add_box_class(HDLRBox)
 add_box_subclass(ContainerBox, b'minf', '8.4.4', 'Media Information')
@@ -1017,8 +1020,7 @@ class ELNGBox(FullBox):
 
   def parsed_data_chunks(self):
     yield FullBox.parsed_data_chunks(self)
-    yield self.extended_language.encode('utf-8')
-    yield b'\0'
+    yield put_utf8_nul(self.extended_language)
 
 add_box_class(ELNGBox)
 add_box_subclass(ContainerBox, b'stbl', '8.5.1', 'Sample Table')
@@ -1256,6 +1258,77 @@ class ELSTBox(_GenericSampleBox):
                                'segment_duration media_time',
                                sample_struct_format_v1='>Qq')
 add_box_class(ELSTBox)
+add_box_subclass(Box, b'dinf', '8.7.1', 'Data Information')
+
+class URL_Box(FullBox):
+  ''' An 'url ' Data Entry URL Box - section 8.7.2.1.
+  '''
+
+  ATTRIBUTES = ('location',)
+
+  def __init__(self, box_type, box_data):
+    self.location, offset = get_utf8_nul(self._box_data, offset=0)
+    self._advance_box_data(offset)
+
+  def parsed_data_chunks(self):
+    yield FullBox.parsed_data_chunks(self)
+    yield put_utf8_nul(self.location)
+
+add_box_class(URL_Box)
+
+class URN_Box(FullBox):
+  ''' An 'urn ' Data Entry URL Box - section 8.7.2.1.
+  '''
+
+  ATTRIBUTES = ('name', 'location',)
+
+  def __init__(self, box_type, box_data):
+    self.name, offset = get_utf8_nul(self._box_data, offset=0)
+    self.location, offset = get_utf8_nul(self._box_data, offset=offset)
+    self._advance_box_data(offset)
+
+  def parsed_data_chunks(self):
+    yield FullBox.parsed_data_chunks(self)
+    yield put_utf8_nul(self.name)
+    yield put_utf8_nul(self.location)
+
+add_box_class(URN_Box)
+
+class DREFBox(FullBox):
+  ''' A 'dref' Data Reference box containing Data Entry boxes - section 8.7.2.1.
+  '''
+
+  def __init__(self, box_type, box_data):
+    Box.__init__(self, box_type, box_data)
+    entry_count = unpack('>L', self._box_data[:4])
+    offset = 4
+    boxes = []
+    for i in enumerate(entry_count):
+      B, offset = Box.from_bytes(bs, offset)
+      boxes.append(B)
+    self.boxes = boxes
+    self._advance_box_data(offset)
+
+  def __str__(self):
+    return '%s(%s)' \
+           % (self.__class__.__name__, ','.join(str(B) for B in self.boxes))
+
+  def dump(self, indent='', fp=None):
+    if fp is None:
+      fp = sys.stdout
+    fp.write(indent)
+    fp.write(self.__class__.__name__)
+    fp.write('\n')
+    indent += '  '
+    for B in self.boxes:
+      B.dump(indent, fp)
+
+  def parsed_data_chunks(self):
+    yield Box.parsed_data_chunks()
+    for B in self.boxes:
+      yield B.data_chunks()
+
+add_box_class(DREFBox)
 
 if __name__ == '__main__':
   # parse media stream from stdin as test
