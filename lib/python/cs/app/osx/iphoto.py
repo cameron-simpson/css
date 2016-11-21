@@ -778,7 +778,7 @@ class iPhotoTable(Table):
     table_name = schema['table_name']
     column_names = schema['columns']
     row_class = schema.get('mixin', iPhotoRow)
-    Table.__init__(self, db, table_name, column_names=column_names, row_class=row_class)
+    Table.__init__(self, db, table_name, column_names=column_names, id_column='modelId', row_class=row_class)
     self.nickname = nickname
     self.schema = schema
 
