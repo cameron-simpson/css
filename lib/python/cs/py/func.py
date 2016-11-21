@@ -15,6 +15,7 @@ DISTINFO = {
     'install_requires': ['cs.excutils'],
 }
 
+import sys
 from cs.excutils import transmute
 
 def funcname(func):
@@ -58,7 +59,11 @@ def prop(func):
     try:
       return func(*a, **kw)
     except AttributeError as e:
-      raise RuntimeError("inner function %s raised %s" % (func, e))
+      e2 = RuntimeError("inner function %s raised %s" % (func, e))
+      if sys.version_info[0] >= 3:
+        exec('raise e2 from e', globals(), locals())
+      else:
+        raise e2
   return property(wrapper)
 
 def derived_property(func, original_revision_name='_revision', lock_name='_lock', property_name=None, unset_object=None):

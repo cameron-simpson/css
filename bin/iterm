@@ -25,7 +25,7 @@ do
   case $1 in
     -x) trace=set-x ;;
     --) shift; break ;;
-    -?)echo "$cmd: unrecognised option: $1" >&2
+    -?) echo "$cmd: unrecognised option: $1" >&2
         badopts=1
         ;;
     *)  break ;;
@@ -47,6 +47,34 @@ else
         echo "$cmd: $op: missing format" >&2
         badopts=1
       fi
+      ;;
+    colour)
+      if [ $# = 0 ]
+      then
+        echo "$cmd: $op: missing scheme" >&2
+        badopts=1
+      else
+        scheme=$1
+        shift
+        case "$scheme" in
+          green)    fg=0,65535,0 bg=0,0,0 ;;
+          white)    fg=65535,65535,65535 bg=0,0,0 ;;
+          black)    fg=0,0,0 bg=65535,65535,65535 ;;
+          *)        echo "$cmd: $op: unsupported colour scheme: $scheme" >&2
+                    badopts=1
+                    ;;
+        esac
+      fi
+      [ $badopts ] || {
+        tee /dev/tty <<X | osascript -
+          tell application iTerm2
+            -- tell current session
+              -- set foreground color to {$fg, 0}
+              -- set background color to {$bg, 0}
+            -- end tell
+          end tell
+X
+      }
       ;;
     open)
       if [ $# = 0 ]
@@ -74,9 +102,9 @@ else
         badopts=1
       fi
       ;;
-    *)  echo "$cmd: unrecognised op: $op" >&2
-        badopts=1
-        ;;
+    *)echo "$cmd: unrecognised op: $op" >&2
+      badopts=1
+      ;;
   esac
 fi
 

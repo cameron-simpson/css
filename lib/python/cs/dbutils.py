@@ -17,7 +17,7 @@ class TableSpace(object):
       lock = RLock()
     self.db_name = db_name
     self._tables = {}
-    self._table_class = table_class
+    self.table_class = table_class
     self._lock = lock
 
   def __getattr__(self, attr):
@@ -68,7 +68,7 @@ class TableSpace(object):
     '''
     T = self._tables.get(name)
     if T is None:
-      T = self._tables[name] = self._table_class(self, name)
+      T = self._tables[name] = self.table_class(self, name)
     return T
 
 class Table(object):
@@ -88,7 +88,12 @@ class Table(object):
 
   @property
   def qual_name(self):
-    return '.'.join( (self.db.db_name, self.table_name) )
+    db_name = self.db.db_name
+    return '.'.join( (db_name, self.table_name) )
+
+  @property
+  def conn(self):
+    return self.db.conn
 
   def select(self, where=None, *where_argv):
     ''' Select raw SQL data from the table.
@@ -100,8 +105,8 @@ class Table(object):
       sqlargs.append(where_argv)
     elif where_argv:
       raise ValueError("empty where (%r) but where_argv=%r" % (where, where_argv))
-    X("SQL: %s %r", sql, sqlargs)
-    return self.conn.cursor().execute(sql, sqlargs)
+    ##X("SQL: %s %r", sql, sqlargs)
+    return self.conn.cursor().execute(sql, *sqlargs)
 
   def read_rows(self, where=None, *where_argv):
     ''' Return row objects.
@@ -115,7 +120,7 @@ class Table(object):
     sqlargs = list(update_set_argv) + where_argv
     C = self.conn.cursor()
     info("SQL: %s %r", sql, sqlargs)
-    C.execute(sql, sqlargs)
+    C.execute(sql, *sqlargs)
     self.conn.commit()
     C.close()
 
@@ -124,7 +129,7 @@ class Table(object):
     sqlargs = where_argv
     C = self.conn.cursor()
     info("SQL: %s %r", sql, sqlargs)
-    C.execute(sql, sqlargs)
+    C.execute(sql, *sqlargs)
     self.conn.commit()
     C.close()
 
