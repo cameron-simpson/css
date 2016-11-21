@@ -791,7 +791,7 @@ class iPhotoTable(Table):
     return self.db.conn
 
   def update_by_column(self, upd_column, upd_value, sel_column, sel_value, sel_op='='):
-    return self.update('%s=?' % (upd_column,), [upd_value], '%s %s ?' % (sel_column, sel_op), sel_value)
+    return self.update_columns((upd_column,), (upd_value,), '%s %s ?' % (sel_column, sel_op), sel_value)
 
   def delete_by_column(self, sel_column, sel_value, sel_op='='):
     return self.delete('%s %s ?' % (sel_column, sel_op), sel_value)
