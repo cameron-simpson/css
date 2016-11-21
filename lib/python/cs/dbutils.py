@@ -5,8 +5,10 @@
 
 from collections import namedtuple
 from threading import RLock
+from cs.py.func import prop
+from cs.seq import the
 from cs.threads import locked
-from cs.logutils import X, debug, info, warning, error
+from cs.logutils import X, debug, info, warning, error, Pfx
 
 class TableSpace(object):
 
@@ -86,12 +88,12 @@ class Table(object):
     self.row_class = row_class
     self._lock = lock
 
-  @property
+  @prop
   def qual_name(self):
     db_name = self.db.db_name
     return '.'.join( (db_name, self.table_name) )
 
-  @property
+  @prop
   def conn(self):
     return self.db.conn
 
@@ -106,21 +108,26 @@ class Table(object):
     elif where_argv:
       raise ValueError("empty where (%r) but where_argv=%r" % (where, where_argv))
     ##X("SQL: %s %r", sql, sqlargs)
-    return self.conn.cursor().execute(sql, *sqlargs)
+    with Pfx("SQL %r: %r", sql, sqlargs):
+      return self.conn.cursor().execute(sql, *sqlargs)
 
   def read_rows(self, where=None, *where_argv):
     ''' Return row objects.
     '''
     row_class = self.row_class
-    for row in self.select(where=where, *where_argv):
+    for row in self.select(where, *where_argv):
       yield row_class(self, row)
 
-  def update(self, update_set, update_set_argv, where, *where_argv):
-    sql = 'update %s set %s where %s' % (self.table_name, update_set, where)
-    sqlargs = list(update_set_argv) + where_argv
+  def update_columns(self, update_columns, update_argv, where, *where_argv):
+    sql = 'update %s set %s where %s' \
+          % (self.table_name,
+             ','.join("%s=?" % (column_name,) for column_name in update_columns),
+             where)
+    sqlargs = list(update_argv) + list(where_argv)
     C = self.conn.cursor()
     info("SQL: %s %r", sql, sqlargs)
-    C.execute(sql, *sqlargs)
+    with Pfx("SQL %r: %r", sql, sqlargs):
+      C.execute(sql, sqlargs)
     self.conn.commit()
     C.close()
 
@@ -129,12 +136,13 @@ class Table(object):
     sqlargs = where_argv
     C = self.conn.cursor()
     info("SQL: %s %r", sql, sqlargs)
-    C.execute(sql, *sqlargs)
+    with Pfx("SQL %r: %r", sql, sqlargs):
+      C.execute(sql, sqlargs)
     self.conn.commit()
     C.close()
 
   def __getitem__(self, id_value):
-    return self.row_class(the(self.select_by_column(self.id_column, id_value)))
+    return the(self.read_rows("%s = ?" % (self.id_column,), id_value))
 
 class Row(object):
 
@@ -145,17 +153,17 @@ class Row(object):
     self._row = table.row_tuple(*values)
     self._lock = lock
 
-  @property
+  @prop
   def db(self):
     return self._table.db
 
-  @property
+  @prop
   def column_names(self):
     return self._table.column_names
 
-  @property
+  @prop
   def id_value(self):
-    return getattr(self._row, self.id_column)
+    return getattr(self._row, self._table.id_column)
 
   def __getitem__(self, key):
     if isinstance(key, int):
@@ -173,7 +181,7 @@ class Row(object):
 
   def __setattr__(self, attr, value):
     if not attr.startswith('_') and attr in self.column_names:
-      self.update_by_column(self, attr, value, self.id_column, self.id_value, sel_op='=')
+      self._table.update_columns((attr,), (value,), '%s = ?' % (self._table.id_column,), self.id_value)
       self._row = self._row._replace(**{attr: value})
     else:
       self.__dict__[attr] = value
