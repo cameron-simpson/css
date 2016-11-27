@@ -1,4 +1,4 @@
-#!/bin/sh -u
+#!/bin/sh
 #
 # Yet another audio CD ripper. Easiest way to learn the tools :-)
 # Like mkcd and mkiso, this is meant to be a no brainer command line.
@@ -31,7 +31,10 @@
 # Note: B<cdrip> is a wrapper. See the PREREQUISITES section below for needed software.
 #
 
+set -ue
+
 : ${TMPDIR:=$HOME/tmp}
+: ${OS:=`uname -s | tr '[A-Z]' '[a-z]'`}
 : ${EDITOR:=vi}
 : ${NAME:=''}
 : ${CDRIP_TRACKFMT:='%02d - %s'}        # track number then title
@@ -42,6 +45,7 @@
 : ${CDRIP_QUAL=6}
 : ${CDRIP_LOCK:=''}
 : ${CDRIP_OPTS:=''}
+: ${CDRIP_TOCDIR:=$HOME/var/cdrip/toc}
 : ${CDDBSERVER:=au.freedb.org:8880}
 export CDDBSERVER
 
@@ -237,16 +241,18 @@ fi
 byNAME=
 ##[ -n "$NAME" ] && byNAME=" by $NAME"
 
-toc=$TMPDIR/cdtoc.$$
-$trace cdtoc2 "$CDRIP_DEV" >"$toc" || { rm -f "$toc"; exit 1; }
+toc=$( $trace cdtoc2 -d "$CDRIP_TOCDIR" "$CDRIP_DEV" ) || exit 1
 
-echo "TOC:"
-cat "$toc"
-echo
-ask "Edit TOC before use" && $EDITOR "$toc"
+while :
+do
+  $EDITOR "$toc"
+  echo
+  cat "$toc"
+  echo
+  ask "Proceed with rip" && break
+done
 
 exec <"$toc"
-rm "$toc"
 
 sed -e 's;//*; -- ;g' -e 's/   */ /g' \
 | ( read artist || exit 1
@@ -255,14 +261,22 @@ sed -e 's;//*; -- ;g' -e 's/   */ /g' \
     encpid=
     xit=0
     nextjob=1
-    while read track secs offset \
-       && read title \
-       && read xtra
+    while read track title
     do
       dir=$artist/$album
       case $track in
           [0-9])        wtrack=0$track ;;
           *)            wtrack=$track ;;
+      esac
+      # recognise track with their own artist information
+      # "title -- artist"
+      case "$title" in
+        *--*)   meta_artist=$( expr "x$title" : 'x *\(.*[^ ]\) *--.*' )
+                meta_title=$( expr "x$title" : 'x.*-- *\(.*[^ ]\) *' )
+                ;;
+        *)      meta_artist=$artist
+                meta_title=$title
+                ;;
       esac
       ftitle=`printf "$trackfmt" "$track" "$title"`
 
@@ -323,7 +337,7 @@ sed -e 's;//*; -- ;g' -e 's/   */ /g' \
             set -- flac $flacenc -o "$out" "$in"
             ;;
           ogg)
-            set -- oggenc $oggencqual -a "$artist" -N "$track" -t "$title" -l "$album"
+            set -- oggenc $oggencqual -a "$meta_artist" -N "$track" -t "$meta_title" -l "$album"
 
             # This fiddling is because oggenc blows up with long comments.
             commentf=.tmp$$c
@@ -351,7 +365,7 @@ sed -e 's;//*; -- ;g' -e 's/   */ /g' \
               then
                 : ${lamev:=`lame -v 2>&1 | sed 1q`}
                 $trace id3ed -q -q \
-                             -s "$title" -n "$artist" -a "$album" \
+                             -s "$meta_title" -n "$meta_artist" -a "$album" \
                              -c "Encoded$byNAME with $lamev [$lamequal] on `date`" \
                              -k "$track" "$out" </dev/null >/dev/null
               fi
@@ -397,7 +411,18 @@ sed -e 's;//*; -- ;g' -e 's/   */ /g' \
 
 xit=$?
 
-eject "$CDRIP_DEV"
+case "$OS" in
+  darwin)
+    case "$CDRIP_DEV" in
+      default)  dev=$(osx-cd-device) ;;
+      *)        dev=$CDRIP_DEV ;;
+    esac
+    diskutil eject "$dev"
+    ;;
+  *)eject "$CDRIP_DEV"
+    ;;
+esac
+
 necho ''
 
 exit $xit

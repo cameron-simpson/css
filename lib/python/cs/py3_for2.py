@@ -5,20 +5,30 @@
 #   - Cameron Simpson <cs@zip.com.au> 12nov2015
 # 
 
+DISTINFO = {
+    'description': "python 2 specific support for cs.py3 module",
+    'keywords': ["python2"],
+    'classifiers': [
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 2",
+        ],
+    'install_requires': [],
+}
+
 def raise3(exc_type, exc_value, exc_traceback):
-  raise exc_type, exc_value, exc_traceback
+  exec("raise exc_type, exc_value, exc_traceback")
 
 def exec_code(code, *a):
   if not a:
-    exec code
+    exec(code)
   else:
     gs = a.pop(0)
     if not a:
-      exec code in gs
+      exec("exec code in gs")
     else:
       ls = a.pop(0)
       if not a:
-        exec code in gs, ls
+        exec("exec code in gs, ls")
       else:
         raise ValueError("exec_code: extra arguments after locals: %r" % (a,))
 
@@ -77,6 +87,22 @@ class bytes(object):
   @staticmethod
   def join(bss):
     return bytes(str.join(bss))
+  def decode(self, encoding='ascii', errors='strict'):
+    return self.__s.decode(encoding, errors)
+  def find(self, sub, *start_end):
+    start_end = list(start_end)
+    if start_end:
+      start = start_end.pop(0)
+    else:
+      start = 0
+    if start_end:
+      end = start_end.pop(0)
+    else:
+      end = len(self)
+    if start_end:
+      raise TypeError('find() takes 2 to 4 arguments: extra arguments: %r'
+                      % (start_end,))
+    return self.__s.find(sub, start, end)
 
 class BytesFile(object):
   ''' Wrapper class for a file opened in binary mode which uses bytes in its methods instead of str.
@@ -114,9 +140,9 @@ def pack(fmt, *values):
   return bytes(_pack(fmt, *values))
 
 def unpack(fmt, bs):
-  from cs.logutils import X
-  X("py3_for2.unpack: fmt=%r, bs=%r", fmt, bs)
+  ##from cs.logutils import X
+  ##X("py3_for2.unpack: fmt=%r, bs=%r", fmt, bs)
   if isinstance(bs, bytes):
     bs = bs._bytes__s
-    X("py3_for2.unpack: bs => %r", bs)
+    ##X("py3_for2.unpack: bs => %r", bs)
   return _unpack(fmt, bs)

@@ -19,7 +19,7 @@ class TestAll(unittest.TestCase):
     self.fp.close()
 
   def test00blockifyAndRetrieve(self):
-    with MemoryCacheStore():
+    with MemoryCacheStore("TestAll.test00blockifyAndRetrieve"):
       data = self.fp.read()
       blocks = list(blockify([data]))
       data2 = b''.join( b.data for b in blocks )

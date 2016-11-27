@@ -1,0 +1,2 @@
+  lib/python/cs/app/ssh.py: cs.app.ssh: new module containing ssh_config(5) parsing functions from ssh-opts command
+  lib/python/cs/app/ssh.py: cs.app.ssh: initial pypi prep (DISTINFO, move ssh-opts main function in as main_ssh_opts

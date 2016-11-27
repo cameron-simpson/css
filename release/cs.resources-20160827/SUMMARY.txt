@@ -1,0 +1,3 @@
+BREAKING CHANGE: rename NestingOpenCloseMixin to MultiOpenMixin.
+New Pool class for generic object reuse.
+Assorted minor improvements.

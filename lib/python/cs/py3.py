@@ -12,6 +12,7 @@ DISTINFO = {
         "Programming Language :: Python :: 2",
         "Programming Language :: Python :: 3",
         ],
+    'install_requires': ['cs.py3_for2', 'cs.py3_for3'],
 }
 
 import sys
@@ -67,6 +68,19 @@ else:
   input = raw_input
   from itertools import ifilter as filter, ifilterfalse as filterfalse
   from .py3_for2 import raise3, exec_code, bytes, BytesFile, pack, unpack
+
+try:
+  from struct import iter_unpack
+except ImportError:
+  from struct import calcsize
+  def iter_unpack(fmt, buffer):
+    chunk_size = calcsize(fmt)
+    if chunk_size < 1:
+      raise ValueError("struct.calcsize(%r) gave %d, expected >= 1" % (fmt, chunk_size))
+    offset = 0
+    while offset < len(buffer):
+      yield unpack(fmt, buffer[offset:offset+chunk_size])
+      offset += chunk_size
 
 if __name__ == '__main__':
   import cs.py3_tests
