@@ -12,18 +12,22 @@ set -ue
 cmd=$0
 usage="Usage: $cmd [command [args...]]"
 
-[ $# = 0 ] || set -- $(basename "$SHELL")
+[ $# -gt 0 ] || set -- $(basename "$SHELL")
 
 if [ -z "$HOMEHOST" ] || [ "x$HOST" = "x$HOMEHOST" ]
 then
   exec "$@"
 fi
 
-sshto-proxy-command "$HOMEHOST" \
+exec 3<&0
+sshto-proxy-command "$HOMEHOST" </dev/null \
 | \
 { read target proxy_command
-  set -- "$target" "$@"
+  exec 0<&3 3<&-
+  rcmd=$( shqstr "$@" )
+  set -- "$target" ". $HOME/.profile; $rcmd"
   [ -n "$proxy_command" ] && set -- -o "proxycommand=$proxy_command" "$@"
-  set -x
-  exec sshx "$@"
+  [ -t 0 -a -t 1 ] && set -- -t "$@"
+  [ -t 2 ] && set -x
+  exec ssh "$@"
 }
