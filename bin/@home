@@ -25,7 +25,7 @@ sshto-proxy-command "$HOMEHOST" </dev/null \
 { read target proxy_command
   exec 0<&3 3<&-
   rcmd=$( shqstr "$@" )
-  set -- "$target" ". $HOME/.profile; $rcmd"
+  set -- "$target" ". \"\$HOME/.profile\"; $rcmd"
   [ -n "$proxy_command" ] && set -- -o "proxycommand=$proxy_command" "$@"
   [ -t 0 -a -t 1 ] && set -- -t "$@"
   [ -t 2 ] && set -x
