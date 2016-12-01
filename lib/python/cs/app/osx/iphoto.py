@@ -778,7 +778,7 @@ class iPhotoTable(Table):
     table_name = schema['table_name']
     column_names = schema['columns']
     row_class = schema.get('mixin', iPhotoRow)
-    Table.__init__(self, db, table_name, column_names=column_names, row_class=row_class)
+    Table.__init__(self, db, table_name, column_names=column_names, id_column='modelId', row_class=row_class)
     self.nickname = nickname
     self.schema = schema
 
@@ -791,7 +791,7 @@ class iPhotoTable(Table):
     return self.db.conn
 
   def update_by_column(self, upd_column, upd_value, sel_column, sel_value, sel_op='='):
-    return self.update('%s=?' % (upd_column,), [upd_value], '%s %s ?' % (sel_column, sel_op), sel_value)
+    return self.update_columns((upd_column,), (upd_value,), '%s %s ?' % (sel_column, sel_op), sel_value)
 
   def delete_by_column(self, sel_column, sel_value, sel_op='='):
     return self.delete('%s %s ?' % (sel_column, sel_op), sel_value)
