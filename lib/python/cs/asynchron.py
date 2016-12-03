@@ -278,6 +278,42 @@ def report(LFs):
   for i in range(n):
     yield Q.get()
 
+def after(Rs, R, func, *a, **kw):
+  ''' After the completion of `Rs` call `func(*a, **kw)` and return its result via `R`; return the Result object.
+      `Rs`: an iterable of Results.
+      `R`: a Result to collect to result of calling `func`. If None,
+           one will be created.
+      `func`, `a`, `kw`: a callable and its arguments.
+  '''
+  if R is None:
+    R = Result()
+  elif not isinstance(R, Result):
+    raise TypeError("after(Rs, R, func, ...): expected Result for R, got %r" % (R,))
+  lock = Lock()
+  Rs = list(Rs)
+  count = len(Rs)
+  if count == 0:
+    R.call(func, *a, **kw)
+  else:
+    countery = [count]  # to stop "count" looking like a local var inside the closure
+    def count_down(R):
+      ''' Notification function to submit `func` after sufficient invocations.
+      '''
+      with lock:
+        countery[0] -= 1
+        count = countery[0]
+      if count > 0:
+        # not ready yet
+        return
+      if count == 0:
+        R.call(func, *a, **kw)
+      else:
+        raise RuntimeError("count < 0: %d", count)
+    # submit the notifications
+    for subR in Rs:
+      subR.notify(count_down)
+  return R
+
 class _PendingFunction(Result):
   ''' An Result with a callable used to obtain its result.
       Since nothing triggers the function call this is an abstract class.
