@@ -29,7 +29,7 @@ from cs.queues import IterableQueue, IterablePriorityQueue, PushQueue, \
                         MultiOpenMixin, TimerQueue
 from cs.threads import AdjustableSemaphore, \
                        WorkerThreadPool, locked, bg
-from cs.asynchron import Result, _PendingFunction, ASYNCH_RUNNING, report
+from cs.asynchron import Result, _PendingFunction, ASYNCH_RUNNING, report, after
 from cs.seq import seq, TrackingCounter
 from cs.logutils import Pfx, PrePfx, PfxCallInfo, error, info, warning, debug, exception, D, X, XP, OBSOLETE
 
@@ -900,38 +900,18 @@ class Later(MultiOpenMixin):
       R = Result()
     elif not isinstance(R, Result):
       raise TypeError("Later.after(LFs, R, func, ...): expected Result for R, got %r" % (R,))
-    LFs = list(LFs)
-    count = len(LFs)
-
     def put_func():
       ''' Function to defer: run `func` and pass its return value to R.put().
       '''
       R.call(func, *a, **kw)
     put_func.__name__ = "%s._after(%r)[func=%s]" % (self, LFs, funcname(func))
-
-    if count == 0:
-      # nothing to wait for - queue the function immediately
-      debug("Later.after: len(LFs) == 0, func=%s", funcname(func))
+    def submit_func():
       self._defer(put_func)
-    else:
-      # create a notification function which submits put_func
-      # after sufficient notifications have been received
-      self._busy.inc("Later._after")
-      L = self.open()
-      countery = [count]  # to stop "count" looking like a local var inside the closure
-      def submit_func(LF):
-        ''' Notification function to submit `func` after sufficient invocations.
-        '''
-        countery[0] -= 1
-        if countery[0] != 0:
-          return
-        self._defer(put_func)
-        L.close()
-        self._busy.dec("Later._after")
-      # submit the notifications
-      for LF in LFs:
-        LF.notify(submit_func)
-    return R
+      L.close()
+      self._busy.dec("Later._after")
+    self._busy.inc("Later._after")
+    L = self.open()
+    return after(LFs, R, submit_func)
 
   @MultiOpenMixin.is_opened
   def defer_iterable(self, I, outQ, test_ready=None):
