@@ -242,7 +242,7 @@ class Maker(MultiOpenMixin):
           self.setDebug('make', True)
         elif opt == '-D':
           for flag in [ w.strip().lower() for w in value.split(',') ]:
-            if len(w) == 0:
+            if len(flag) == 0:
               # silently skip empty flag items
               continue
             if flag.startswith('-'):
