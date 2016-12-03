@@ -22,6 +22,7 @@ from cs.asynchron import Result, report as report_LFs, \
 import cs.logutils
 from cs.logutils import Pfx, info, error, debug, D, X, XP
 from cs.obj import O
+from cs.py.func import prop
 from .parse import SPECIAL_MACROS, Macro, MacroExpression, \
                    parseMakefile, parseMacroExpression
 
@@ -99,13 +100,13 @@ class Maker(MultiOpenMixin):
       time.sleep(5)
       self.report()
 
-  @property
+  @prop
   def namespaces(self):
     ''' The namespaces for this Maker: the built namespaces plus the special macros.
     '''
     return self._namespaces + [ SPECIAL_MACROS ]
 
-  @property
+  @prop
   def makefiles(self):
     ''' The list of makefiles to consult, a tuple.
         It is not possible to add more makefiles after accessing this property.
@@ -441,7 +442,7 @@ class Target(Result):
       raise RuntimeError("%s.madeness: unexpected state %s" % (self, state))
     return "made" if self.result else "FAILED"
 
-  @property
+  @prop
   def namespaces(self):
     ''' The namespaces for this Target: the special per-Target macros,
         the Maker's namespaces, the Maker's macros and the special macros.
@@ -459,7 +460,7 @@ class Target(Result):
              ]
            )
 
-  @property
+  @prop
   def prereqs(self):
     ''' Return the prerequisite target names.
     '''
@@ -469,7 +470,7 @@ class Target(Result):
       self._prereqs = prereqs_mexpr(self.context, self.namespaces).split()
     return self._prereqs
 
-  @property
+  @prop
   def new_prereqs(self):
     ''' Return the new prerequisite target names.
     '''
@@ -621,7 +622,7 @@ class Action(O):
 
   __repr__ = __str__
 
-  @property
+  @prop
   def prline(self):
     return self.line.rstrip().replace('\n', '\\n')
 
