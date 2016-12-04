@@ -292,7 +292,7 @@ def after(Rs, R, func, *a, **kw):
       `func`, `a`, `kw`: a callable and its arguments.
   '''
   if R is None:
-    R = Result()
+    R = Result("after-%d" % (seq(),))
   elif not isinstance(R, Result):
     raise TypeError("after(Rs, R, func, ...): expected Result for R, got %r" % (R,))
   lock = Lock()
